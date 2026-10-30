@@ -4,8 +4,8 @@
 _NeutralConfigManifestProjections() {
 	AssertEqual(ManifestDefaultFor("category_enabled.shortcuts"), false)
 	AssertEqual(ManifestRecommendedFor("category_enabled.shortcuts"), true)
-	AssertEqual(ManifestDefaultFor("shortcuts.keyboard.win_a"), "none")
-	AssertEqual(ManifestRecommendedFor("shortcuts.keyboard.win_a"), "select_line")
+	AssertEqual(ManifestDefaultFor("shortcuts.keyboard.meta_a"), "none")
+	AssertEqual(ManifestRecommendedFor("shortcuts.keyboard.meta_a"), "select_line")
 	; The declared exception: the script-management chords start with their
 	; preset (maintainer decision of 2026-09-30).
 	for Slot, Action in Map("script_altgr_enter", "script_pause_toggle", "script_altgr_backspace", "script_reload",

@@ -754,9 +754,9 @@ _KCT_GroupScope(Mode) {
 	global _MenuDispatchCallbacks
 	Source := '[shortcuts.key_combination_taps]`nleft_alt_then_caps_lock = "open_url"`nspace_then_enter = "caps_word"`nfuture_pair = "keep"`n'
 		. '[shortcuts.key_combination_holds]`nspace_then_enter = "ctrl"`nfuture_pair = "keep"`n'
-		. '[shortcuts.keyboard]`nwin_b = "copy"`n[category_enabled]`nkey_combinations = false`nshortcuts = false`n'
+		. '[shortcuts.keyboard]`nmeta_b = "copy"`n[category_enabled]`nkey_combinations = false`nshortcuts = false`n'
 		. '[action_parameters]`ncombination__left_alt_then_caps_lock__open_url = "https://pair.test"`n'
-		. 'combination__future_pair__open_url = "keep"`nkeyboard__win_b__open_url = "keep"`n'
+		. 'combination__future_pair__open_url = "keep"`nkeyboard__meta_b__open_url = "keep"`n'
 	Fixture := _ScopeOwnerFixture(Source)
 	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
@@ -790,8 +790,8 @@ _KCT_GroupScope(Mode) {
 		AssertEqual("keep", Holds["future_pair"])
 		Assert(!Parsed["action_parameters"].Has("combination__left_alt_then_caps_lock__open_url"))
 		AssertEqual("keep", Parsed["action_parameters"]["combination__future_pair__open_url"])
-		AssertEqual("keep", Parsed["action_parameters"]["keyboard__win_b__open_url"])
-		AssertEqual("copy", Parsed["shortcuts.keyboard"]["win_b"])
+		AssertEqual("keep", Parsed["action_parameters"]["keyboard__meta_b__open_url"])
+		AssertEqual("copy", Parsed["shortcuts.keyboard"]["meta_b"])
 		AssertEqual(false, Parsed["category_enabled"]["shortcuts"])
 		AssertEqual(Mode == "recommended", Parsed["category_enabled"].Get("key_combinations",
 			ManifestDefaultFor("category_enabled.key_combinations")), "clear preserves the disabled switch")

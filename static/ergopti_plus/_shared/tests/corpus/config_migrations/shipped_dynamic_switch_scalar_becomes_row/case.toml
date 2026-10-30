@@ -5,4 +5,4 @@ description = "A dynamic-hotstring family switch stored as a bare boolean (the m
 drivers = ["ahk", "hs", "linux"]
 outcome = "migrated"
 from_version = 15
-to_version = 17
+to_version = 18

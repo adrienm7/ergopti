@@ -60,7 +60,7 @@ _CUK_RetiredGestureBindingsPreserveWholeSource() {
 		. Retired . ' = "https://obsolete.example" # explicit cleanup owns this row' . "`n"
 		. Known . ' = "https://known.example"' . "`n"
 		. Twin . ' = "https://unjudged.example"' . "`n"
-		. 'keyboard__ctrl_k__open_url = "https://keyboard.example"' . "`n"
+		. 'keyboard__primary_k__open_url = "https://keyboard.example"' . "`n"
 	Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n# independent user comment`n" . ParameterSource
 		. "`n[future]`nkeep = " . Chr(34) . "independent" . Chr(34) . "`n"
 		. "`n[layout]`nergopti_base = true`n"
@@ -122,7 +122,7 @@ _CUK_RetiredGestureBindingsPreserveWholeSource() {
 		AssertEqual("https://obsolete.example", Parsed["action_parameters"][Retired])
 		AssertEqual("https://changed.example", Parsed["action_parameters"][Known])
 		AssertEqual("https://unjudged.example", Parsed["action_parameters"][Twin])
-		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__ctrl_k__open_url"])
+		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__primary_k__open_url"])
 		AssertEqual("independent", Parsed["future"]["keep"])
 
 		FreshRows := []
@@ -194,7 +194,7 @@ _CUK_RetiredScriptBindingsPreserveWholeSourceBody() {
 		. Retired . ' = "https://obsolete.example" # explicit cleanup owns this row' . "`n"
 		. Known . ' = "https://known.example"' . "`n"
 		. Twin . ' = "https://unjudged.example"' . "`n"
-		. 'keyboard__ctrl_k__open_url = "https://keyboard.example"' . "`n"
+		. 'keyboard__primary_k__open_url = "https://keyboard.example"' . "`n"
 	Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n# independent user comment`n" . ParameterSource
 		. "`n[future]`nkeep = " . Chr(34) . "independent" . Chr(34) . "`n"
 		. "`n[layout]`nergopti_base = true`n"
@@ -257,7 +257,7 @@ _CUK_RetiredScriptBindingsPreserveWholeSourceBody() {
 		AssertEqual("https://obsolete.example", Parsed["action_parameters"][Retired])
 		AssertEqual("https://changed.example", Parsed["action_parameters"][Known])
 		AssertEqual("https://unjudged.example", Parsed["action_parameters"][Twin])
-		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__ctrl_k__open_url"])
+		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__primary_k__open_url"])
 		AssertEqual("independent", Parsed["future"]["keep"])
 
 		FreshRows := []
@@ -324,7 +324,7 @@ _CUK_RetiredTapBindingsPreserveWholeSourceBody() {
 		. Retired . ' = "https://obsolete.example" # explicit cleanup owns this row' . "`n"
 		. Known . ' = "https://known.example"' . "`n"
 		. Twin . ' = "https://unjudged.example"' . "`n"
-		. 'keyboard__ctrl_k__open_url = "https://keyboard.example"' . "`n"
+		. 'keyboard__primary_k__open_url = "https://keyboard.example"' . "`n"
 	Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n# independent user comment`n" . ParameterSource
 		. "`n[future]`nkeep = " . Chr(34) . "independent" . Chr(34) . "`n"
 		. "`n[layout]`nergopti_base = true`n"
@@ -387,7 +387,7 @@ _CUK_RetiredTapBindingsPreserveWholeSourceBody() {
 		AssertEqual("https://obsolete.example", Parsed["action_parameters"][Retired])
 		AssertEqual("https://changed.example", Parsed["action_parameters"][Known])
 		AssertEqual("https://unjudged.example", Parsed["action_parameters"][Twin])
-		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__ctrl_k__open_url"])
+		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__primary_k__open_url"])
 		AssertEqual("independent", Parsed["future"]["keep"])
 
 		FreshRows := []

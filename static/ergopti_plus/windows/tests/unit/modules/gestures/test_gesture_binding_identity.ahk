@@ -50,7 +50,7 @@ TestGestures_PublishedNativeSlotDomain() {
 	AssertEqual("retired", ConfigBindingIdentityGestureStatus("gesture__removed_gesture_slot", Catalogue))
 	AssertEqual("retired", ConfigBindingIdentityGestureStatus("gesture__TAP_3", Catalogue))
 	AssertEqual("unjudged", ConfigBindingIdentityGestureStatus("Gesture__tap_3", Catalogue))
-	for Binding in ["keyboard__ctrl_k", "tap_key__a", "script__pause", "tap_hold__caps_lock", "combination__caps_lock_then_space"]
+	for Binding in ["keyboard__primary_k", "tap_key__a", "script__pause", "tap_hold__caps_lock", "combination__caps_lock_then_space"]
 		AssertEqual("unjudged", ConfigBindingIdentityGestureStatus(Binding, Catalogue), Binding)
 }
 Test("Gestures: native owner publishes its exact ten-slot domain (gesture-binding-identity-native-catalogue)",

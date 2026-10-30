@@ -17,7 +17,7 @@
 _RPA_UnsetKeyboardBody(Context) {
 	global KeyboardShortcutAssignments
 	Assert(KeyboardShortcutAssignments is Map, "fixture initializes the actual keyboard assignment owner")
-	AssertEqual("run_program", KeyboardShortcutAssignments.Get("ctrl_p", ""), "fixture initializes the keyboard binding")
+	AssertEqual("run_program", KeyboardShortcutAssignments.Get("primary_p", ""), "fixture initializes the keyboard binding")
 	AssertEqual(Context["scalar"], GestureGetActionParameter("gesture__tap_3", "run_program"),
 		"fixture uses the actual acknowledged action parameter owner")
 }
@@ -285,7 +285,7 @@ _RPA_ConstructorFailure(Mode, Context) {
 		Assert(_UserProgramEntries.Get(Binding, 0) == Entry, "retirement preserves debt rather than dropping its entry")
 		_UserProgramAcquiring := 0
 		AssertFalse(_UserProgramPaused, "replacement refusal is not caused by the pause gate")
-		AssertFalse(ProgramActions_Run("keyboard__ctrl_p"), "clearing acquisition cannot admit replacement while the retained physical entry owes native cleanup")
+		AssertFalse(ProgramActions_Run("keyboard__primary_p"), "clearing acquisition cannot admit replacement while the retained physical entry owes native cleanup")
 		AssertFalse(FileExist(Context["output"]), "failed constructor never resumes payload script")
 		Assert(_SRTOW_WaitForExactProcessExit(Scope["observer"]), "rollback stops the exact native root")
 		AssertEqual(0, _SRTOW_ExactJobActiveProcessCount(Scope["job_observer"]), "the exact pre-assignment Job is physically empty")

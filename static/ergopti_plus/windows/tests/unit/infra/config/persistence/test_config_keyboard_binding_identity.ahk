@@ -16,7 +16,7 @@ TestConfigKeyboardBindingIdentity_Corpus() {
 	Ids := Corpus["ids"]
 	Catalogue := ConfigBindingIdentityKeyboardCatalogue(Ids)
 	Ids[1] := "changed_after_capture"
-	Assert(Catalogue["slots"].Has("ctrl_k"), "detached publication retains the admitted source value")
+	Assert(Catalogue["slots"].Has("primary_k"), "detached publication retains the admitted source value")
 	Assert(!Catalogue["slots"].Has("changed_after_capture"), "source mutation does not rewrite the detached catalogue")
 	for Row in Corpus["vectors"] {
 		AssertEqual(Row["expected"], ConfigBindingIdentityKeyboardStatus(Row["binding"], Catalogue), Row["name"])
@@ -26,19 +26,19 @@ TestConfigKeyboardBindingIdentity_Corpus() {
 }
 
 TestConfigKeyboardBindingIdentity_InvalidSources() {
-	for Ids in [[], ["ctrl_k", "ctrl_k"], [""], ["nested__id"], [true], Map(1, "ctrl_k")]
+	for Ids in [[], ["primary_k", "primary_k"], [""], ["nested__id"], [true], Map(1, "primary_k")]
 		AssertThrows(ConfigBindingIdentityKeyboardCatalogue.Bind(Ids), "invalid native source refuses before publication")
 	Sparse := Array()
 	Sparse.Length := 2
-	Sparse[2] := "ctrl_k"
+	Sparse[2] := "primary_k"
 	AssertThrows(ConfigBindingIdentityKeyboardCatalogue.Bind(Sparse), "sparse native source refuses before publication")
-	Catalogue := ConfigBindingIdentityKeyboardCatalogue(["ctrl_k", "Ctrl_k"])
+	Catalogue := ConfigBindingIdentityKeyboardCatalogue(["primary_k", "Ctrl_k"])
 	AssertEqual(2, Catalogue["slots"].Count, "case-distinct admitted source identities remain independent")
 }
 
 TestConfigKeyboardBindingIdentity_InvalidCatalogues() {
-	for Catalogue in [false, Map(), Map("prefix", "script__", "slots", Map("ctrl_k", true)),
-		Map("prefix", "keyboard__", "slots", Map()), Map("prefix", "keyboard__", "slots", Map("ctrl_k", false)),
+	for Catalogue in [false, Map(), Map("prefix", "script__", "slots", Map("primary_k", true)),
+		Map("prefix", "keyboard__", "slots", Map()), Map("prefix", "keyboard__", "slots", Map("primary_k", false)),
 		Map("prefix", "keyboard__", "slots", Map("", true)), Map("prefix", "keyboard__", "slots", Map("nested__id", true))]
 		AssertThrows(ConfigBindingIdentityKeyboardStatus.Bind("keyboard__removed", Catalogue), "malformed explicit authority refuses")
 }
@@ -60,30 +60,30 @@ _CKBI_RejectCallback(Counter, *) {
 }
 
 TestConfigKeyboardBindingIdentity_NamedProperties() {
-	Named := ["ctrl_k"]
-	Named.named := "ctrl_j"
+	Named := ["primary_k"]
+	Named.named := "primary_j"
 	AssertThrows(ConfigBindingIdentityKeyboardCatalogue.Bind(Named), "named native Array members refuse")
 	for PropertyName in ["OwnProps", "Has", "Length", "__Item", "__Enum", "Get"] {
 		Counter := [0]
-		Ids := ["ctrl_k"]
+		Ids := ["primary_k"]
 		Ids.DefineProp(PropertyName, { Get: _CKBI_RejectCallback.Bind(Counter), Call: _CKBI_RejectCallback.Bind(Counter) })
 		AssertThrows(ConfigBindingIdentityKeyboardCatalogue.Bind(Ids), PropertyName . ": named callback source refuses")
 		AssertEqual(0, Counter[1], PropertyName . ": source rejection must not execute any callback")
-		AssertEqual("ctrl_k", Array.Prototype.Get.Call(Ids, 1), PropertyName . ": native indexed source stays intact")
+		AssertEqual("primary_k", Array.Prototype.Get.Call(Ids, 1), PropertyName . ": native indexed source stays intact")
 	}
 }
 
 TestConfigKeyboardBindingIdentity_DerivedSources() {
-	Derived := _CKBI_DerivedArray("ctrl_k")
+	Derived := _CKBI_DerivedArray("primary_k")
 	AssertThrows(ConfigBindingIdentityKeyboardCatalogue.Bind(Derived), "derived native Array source refuses")
 	Counter := [0]
 	Prototype := Array()
 	Prototype.DefineProp("Has", { Call: _CKBI_RejectCallback.Bind(Counter) })
-	Ids := ["ctrl_k"]
+	Ids := ["primary_k"]
 	ObjSetBase(Ids, Prototype)
 	AssertThrows(ConfigBindingIdentityKeyboardCatalogue.Bind(Ids), "a distinct inherited native Array source refuses")
 	AssertEqual(0, Counter[1], "inherited source rejection must not execute its overridden Has")
-	AssertEqual("ctrl_k", Array.Prototype.Get.Call(Ids, 1), "rejected inherited source retains its native indexed cell")
+	AssertEqual("primary_k", Array.Prototype.Get.Call(Ids, 1), "rejected inherited source retains its native indexed cell")
 }
 
 Test("Config binding identity: keyboard rejects named Array metadata without invoking source callbacks",
@@ -104,16 +104,16 @@ Test("Config binding identity: keyboard rejects derived and inherited callback A
 ; The boot loader, the cleanup and the input owner judged keyboard slots by
 ; three different rules: the loader by a lowercase grammar, the input owner by
 ; no rule at all (any persisted slot whose prefix resolved became a live
-; hotkey, a case-insensitive « CTRL_K » or a hand-written « ctrl_f1 »
+; hotkey, a case-insensitive « CTRL_K » or a hand-written « primary_f1 »
 ; included, while the cleanup offered to delete it), and the parameter owner
 ; never judged a keyboard binding, so a parameter of a slot this build lacks
 ; stayed unread and unoffered forever. One published slot domain now serves
 ; all three (keyboard-slot-publication).
 _CKBI_CurrentSlots() {
-	return ["ctrl_k", "ctrl_shift_space", "alt_9", "win_period", "win_sc029", "win_SC03A", "magic_editor"]
+	return ["primary_k", "primary_shift_space", "alt_9", "meta_period", "meta_sc029", "meta_SC03A", "magic_editor"]
 }
 _CKBI_ForeignSlots() {
-	return ["ctrl_f1", "CTRL_K", "ctrl_alt_k", "win_SC0FF", "super_space"]
+	return ["primary_f1", "CTRL_K", "ctrl_alt_k", "meta_SC0FF", "super_space"]
 }
 
 TestConfigKeyboardBindingIdentity_OwnerAndLoaderAgree() {
@@ -164,7 +164,7 @@ TestConfigKeyboardBindingIdentity_ParametersFollowThePublication() {
 	try {
 		Tree := ManifestBuildFeaturesMap()
 		for Slot in _CKBI_CurrentSlots() {
-			if Slot == "win_SC03A"
+			if Slot == "meta_SC03A"
 				continue
 			Key := GestureBindingId("keyboard", Slot) . "__open_url"
 			AssertEqual("current", TomlConfigActionParameterBindingStatus(Key), Slot)
@@ -172,7 +172,7 @@ TestConfigKeyboardBindingIdentity_ParametersFollowThePublication() {
 			AssertEqual("", TomlConfigUnknownKind(Tree, "action_parameters", Key, &Owner), Slot)
 			AssertEqual("Gestures", Owner, Slot)
 		}
-		Retired := "keyboard__ctrl_f1__open_url"
+		Retired := "keyboard__primary_f1__open_url"
 		AssertEqual("retired", TomlConfigActionParameterBindingStatus(Retired))
 		AssertEqual("section", TomlConfigUnknownKind(Tree, "action_parameters", Retired),
 			"a retired keyboard parameter is offered for explicit cleanup")
@@ -181,10 +181,10 @@ TestConfigKeyboardBindingIdentity_ParametersFollowThePublication() {
 		GestureActionParameters := Map()
 		GestureActionParameters.CaseSense := "On"
 		GestureActionParameters[Retired] := "https://example.invalid/"
-		AssertEqual("", GestureGetActionParameter("keyboard__ctrl_f1", "open_url"), "a retired binding reads neutral")
+		AssertEqual("", GestureGetActionParameter("keyboard__primary_f1", "open_url"), "a retired binding reads neutral")
 		Writes := 0
 		Writer := (*) => (Writes += 1, true)
-		AssertFalse(GestureSetActionParameter("keyboard__ctrl_f1", "open_url", "https://other.invalid/", Writer, (*) => 0))
+		AssertFalse(GestureSetActionParameter("keyboard__primary_f1", "open_url", "https://other.invalid/", Writer, (*) => 0))
 		AssertEqual(0, Writes, "a retired binding is refused before any write")
 		AssertEqual("https://example.invalid/", GestureActionParameters[Retired], "its source value is kept for the cleanup")
 	} finally GestureActionParameters := Saved

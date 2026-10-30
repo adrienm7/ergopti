@@ -146,7 +146,10 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-slot-roles.cjs',
-		outputs: ['static/ergopti_plus/_shared/lua/shortcuts/slot_roles_data.lua']
+		outputs: [
+			'static/ergopti_plus/_shared/lua/shortcuts/slot_roles_data.lua',
+			'static/ergopti_plus/windows/_generated/slot_roles.ahk'
+		]
 	},
 	{
 		script: 'codegen/codegen-terminators.cjs',

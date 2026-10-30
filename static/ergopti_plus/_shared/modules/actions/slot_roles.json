@@ -49,7 +49,23 @@
 		]
 	},
 	"extra_keys": {
-		"windows": [],
+		"windows": [
+			{
+				"id": "quote",
+				"label": "'",
+				"chord_key": "'"
+			},
+			{
+				"id": "capslock",
+				"label": "Caps Lock",
+				"chord_key": "capslock"
+			},
+			{
+				"id": "sc029",
+				"label": "²",
+				"chord_key": "sc029"
+			}
+		],
 		"macos": [
 			{
 				"id": "quote",

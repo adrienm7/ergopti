@@ -608,52 +608,46 @@ M.features = {
 		path = "shortcuts.keyboard.magic_editor", id = "magic_editor", section = "shortcuts.keyboard", default = "open_hotstrings_editor", type = "action", description_key = "menu.shortcuts.keyboard.magic_editor", platforms = { "ahk", "hs", "linux" }, recommended = "open_hotstrings_editor", input_altering = true, cleared = "none",
 	},
 	{
-		path = "shortcuts.keyboard.ctrl_b", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.primary_b", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.ctrl_shift_v", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.meta_a", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.win_a", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.meta_d", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.win_d", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.meta_g", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.win_g", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.meta_h", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.win_h", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.meta_m", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.win_m", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.meta_n", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.win_n", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.meta_o", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.win_o", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.meta_s", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.win_s", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.meta_sc029", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.win_sc029", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.meta_t", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.win_t", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.meta_u", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.win_u", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.meta_w", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.win_w", section = "shortcuts.keyboard", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.keyboard.win_x", section = "shortcuts.keyboard", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.keyboard.win_space", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.meta_x", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
 		path = "shortcuts.keyboard.secondary_space", id = "secondary_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.hs_ctrl_space", platforms = { "hs" }, recommended = "llm_generate_prediction", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
@@ -710,13 +704,13 @@ M.features = {
 		path = "shortcuts.keyboard.secondary_quote", id = "secondary_quote", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_quote", platforms = { "hs" }, recommended = "spotlight_mouse", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
-		path = "shortcuts.keyboard.primary_shift_v", id = "primary_shift_v", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_cmd_shift_v", platforms = { "hs" }, recommended = "paste_plain", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+		path = "shortcuts.keyboard.primary_shift_v", id = "primary_shift_v", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_cmd_shift_v", platforms = { "ahk", "hs" }, recommended = "paste_plain", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.keyboard.primary_g", id = "primary_g", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_g", platforms = { "linux" }, recommended = "open_chatgpt", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
-		path = "shortcuts.keyboard.meta_space", id = "meta_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.super_space", platforms = { "linux" }, recommended = "llm_generate_prediction", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+		path = "shortcuts.keyboard.meta_space", id = "meta_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.super_space", platforms = { "ahk", "linux" }, recommended = "llm_generate_prediction", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.tap_keys.number_row_left", id = "number_row_left", section = "shortcuts.tap_keys", default = "none", type = "action", description_key = "menu.shortcuts.tap_keys.number_row_left", platforms = { "ahk", "hs", "linux" }, recommended = "screenshot_fullscreen_save", input_altering = true,

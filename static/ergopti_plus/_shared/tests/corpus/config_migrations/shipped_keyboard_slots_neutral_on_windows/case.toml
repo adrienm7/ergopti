@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_keyboard_slots_neutral_on_windows/case.toml
+
+[case]
+description = "Every Windows slot family takes its role name, a physical slot keeps its spelling, an action parameter follows its slot (Ctrl+Shift through the Ctrl prefix), Alt slots and a key no slot owns stay, and an action already under the neutral id wins."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 17
+to_version = 18

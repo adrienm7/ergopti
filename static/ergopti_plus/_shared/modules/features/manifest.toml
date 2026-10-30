@@ -1603,7 +1603,7 @@ description_key = "menu.llm.trigger.url_bar_filter_enabled"
 
 # No dedicated trigger shortcut: a prediction on demand is the
 # llm_generate_prediction action, recommended on each OS's keyboard slot
-# (shortcuts.keyboard.secondary_space, win_space, meta_space).
+# (shortcuts.keyboard.secondary_space, meta_space).
 
 
 
@@ -2265,7 +2265,7 @@ description_key = "menu.shortcuts.keyboard.magic_editor"
 
 # ===== 4.8b ahk.shortcuts.keyboard ========
 [[features.shortcuts.keyboard]]
-id = "ctrl_b"
+id = "primary_b"
 platforms = ["ahk"]
 default = "none"
 recommended = "microsoft_bold"
@@ -2274,16 +2274,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.ctrl_b"
 
 [[features.shortcuts.keyboard]]
-id = "ctrl_shift_v"
-platforms = ["ahk"]
-default = "none"
-recommended = "paste_plain"
-input_altering = true
-type = "action"
-description_key = "menu.shortcuts.keyboard.ctrl_shift_v"
-
-[[features.shortcuts.keyboard]]
-id = "win_a"
+id = "meta_a"
 platforms = ["ahk"]
 default = "none"
 recommended = "select_line"
@@ -2292,7 +2283,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.win_a"
 
 [[features.shortcuts.keyboard]]
-id = "win_d"
+id = "meta_d"
 platforms = ["ahk"]
 default = "none"
 recommended = "none"
@@ -2301,7 +2292,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.win_d"
 
 [[features.shortcuts.keyboard]]
-id = "win_g"
+id = "meta_g"
 platforms = ["ahk"]
 default = "none"
 recommended = "open_url"
@@ -2310,7 +2301,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.win_g"
 
 [[features.shortcuts.keyboard]]
-id = "win_h"
+id = "meta_h"
 platforms = ["ahk"]
 default = "none"
 recommended = "screen_capture"
@@ -2319,7 +2310,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.win_h"
 
 [[features.shortcuts.keyboard]]
-id = "win_m"
+id = "meta_m"
 platforms = ["ahk"]
 default = "none"
 recommended = "activity_simulation"
@@ -2328,7 +2319,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.win_m"
 
 [[features.shortcuts.keyboard]]
-id = "win_n"
+id = "meta_n"
 platforms = ["ahk"]
 default = "none"
 recommended = "take_note"
@@ -2337,7 +2328,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.win_n"
 
 [[features.shortcuts.keyboard]]
-id = "win_o"
+id = "meta_o"
 platforms = ["ahk"]
 default = "none"
 recommended = "surround_parens"
@@ -2346,7 +2337,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.win_o"
 
 [[features.shortcuts.keyboard]]
-id = "win_s"
+id = "meta_s"
 platforms = ["ahk"]
 default = "none"
 recommended = "search_web"
@@ -2355,7 +2346,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.win_s"
 
 [[features.shortcuts.keyboard]]
-id = "win_sc029"
+id = "meta_sc029"
 platforms = ["ahk"]
 default = "none"
 recommended = "screen_capture_instant"
@@ -2364,7 +2355,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.win_sc029"
 
 [[features.shortcuts.keyboard]]
-id = "win_t"
+id = "meta_t"
 platforms = ["ahk"]
 default = "none"
 recommended = "teleport_mouse"
@@ -2373,7 +2364,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.win_t"
 
 [[features.shortcuts.keyboard]]
-id = "win_u"
+id = "meta_u"
 platforms = ["ahk"]
 default = "none"
 recommended = "uppercase_selection"
@@ -2382,7 +2373,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.win_u"
 
 [[features.shortcuts.keyboard]]
-id = "win_w"
+id = "meta_w"
 platforms = ["ahk"]
 default = "none"
 recommended = "titlecase_selection"
@@ -2391,7 +2382,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.win_w"
 
 [[features.shortcuts.keyboard]]
-id = "win_x"
+id = "meta_x"
 platforms = ["ahk"]
 default = "none"
 recommended = "pick_color"
@@ -2404,15 +2395,6 @@ description_key = "menu.shortcuts.keyboard.win_x"
 # language on Windows; macOS warns when its own input-source shortcut still
 # owns Ctrl+Space). They replace the AI menu's dedicated trigger shortcut. The
 # binding is Ergopti's recommendation only: the default stays neutral ("none").
-[[features.shortcuts.keyboard]]
-id = "win_space"
-platforms = ["ahk"]
-default = "none"
-recommended = "llm_generate_prediction"
-input_altering = true
-type = "action"
-description_key = "menu.shortcuts.keyboard.win_space"
-
 [[features.shortcuts.keyboard]]
 id = "secondary_space"
 platforms = ["hs"]
@@ -2595,7 +2577,7 @@ description_key = "shortcuts.label_ctrl_quote"
 
 [[features.shortcuts.keyboard]]
 id = "primary_shift_v"
-platforms = ["hs"]
+platforms = ["ahk", "hs"]
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "paste_plain"
@@ -2615,7 +2597,7 @@ description_key = "shortcuts.label_ctrl_g"
 
 [[features.shortcuts.keyboard]]
 id = "meta_space"
-platforms = ["linux"]
+platforms = ["ahk", "linux"]
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "llm_generate_prediction"

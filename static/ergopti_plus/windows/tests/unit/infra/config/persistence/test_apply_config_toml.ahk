@@ -63,7 +63,7 @@ TestFMv2_RejectsScalarTypeConfusion() {
 			"[layout]`r`nergopti_base = " . '"false"' . "`r`n"
 			. "[script]`r`nlocale = true`r`nlog_level = " . '"LOUD"' . "`r`n"
 			. "[llm.generation]`r`ncontext_length = " . '"500"' . "`r`n"
-			. "[shortcuts.keyboard]`r`nctrl_b = 7`r`n"
+			. "[shortcuts.keyboard]`r`nprimary_b = 7`r`n"
 			. "[llm.navigation]`r`nval_modifiers = " . '"alt"' . "`r`n"
 			. "[hotstrings.french_autocorrection.accents]`r`nenabled = "
 			. '"false"' . "`r`ntime_activation_seconds = " . '"0.5"' . "`r`n")
@@ -75,7 +75,7 @@ TestFMv2_RejectsScalarTypeConfusion() {
 		AssertEqual("fr", Features["script"]["locale"])
 		AssertEqual("INFO", Features["script"]["log_level"])
 		Assert(Features["llm"]["generation"]["context_length"] is Integer)
-		Assert(Features["shortcuts"]["keyboard"]["ctrl_b"] is String)
+		Assert(Features["shortcuts"]["keyboard"]["primary_b"] is String)
 		Assert(Features["llm"]["navigation"]["val_modifiers"] is Array)
 		Accents := Features["hotstrings"]["french_autocorrection"]["accents"]
 		AssertEqual(false, Accents["enabled"],
@@ -432,9 +432,9 @@ TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 			. "[gestures]`r`n"
 			. "auto_configure_on_next_start = true`r`n"
 			. "[shortcuts.keyboard]`r`n"
-			. 'win_c = "ocr_screenshot"' . "`r`n"
-			. 'win_b = "microsoft_bold"' . "`r`n"
-			. 'win_cc = "ocr_screenshot"' . "`r`n")
+			. 'meta_c = "ocr_screenshot"' . "`r`n"
+			. 'meta_b = "microsoft_bold"' . "`r`n"
+			. 'meta_cc = "ocr_screenshot"' . "`r`n")
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied,
 			"foreign owners, not the Features loader, must apply these keys")
@@ -443,9 +443,9 @@ TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 		for Line in Captured
 			Joined .= Line . "`n"
 		_FM_AssertUnusedWarning(Captured, Path,
-			["category_enabled.autocorrectoin", "llm.ollama_port_typo", "shortcuts.keyboard.win_cc"])
+			["category_enabled.autocorrectoin", "llm.ollama_port_typo", "shortcuts.keyboard.meta_cc"])
 		AssertEqual("ConfigIO",
-			TomlConfigForeignOwner("shortcuts.keyboard", "win_b"),
+			TomlConfigForeignOwner("shortcuts.keyboard", "meta_b"),
 			"a picker-created keyboard slot must name its real config owner")
 		AssertFalse(InStr(Joined, "log format failed", true) > 0,
 			"array-valued foreign settings must remain formatter-safe")
@@ -606,7 +606,7 @@ TestFMv2_ApplyInlineCommentsBeforeCoercion() {
 			"[layout]`r`nergopti_base = false # disable base`r`n"
 			. "[llm.generation]`r`ncontext_length = 1024 # tokens`r`n"
 			. "[shortcuts.keyboard]`r`n"
-			. 'ctrl_b = "open#docs" # hash inside string' . "`r`n"
+			. 'primary_b = "open#docs" # hash inside string' . "`r`n"
 			. "[llm.navigation]`r`n"
 			. 'val_modifiers = ["alt", "ctrl#keep"] # navigation' . "`r`n")
 		Applied := ApplyConfigToml(Features, Path)
@@ -614,7 +614,7 @@ TestFMv2_ApplyInlineCommentsBeforeCoercion() {
 			"TOML comments must be removed before value coercion")
 		AssertEqual(false, Features["layout"]["ergopti_base"])
 		AssertEqual(1024, Features["llm"]["generation"]["context_length"])
-		AssertEqual("open#docs", Features["shortcuts"]["keyboard"]["ctrl_b"])
+		AssertEqual("open#docs", Features["shortcuts"]["keyboard"]["primary_b"])
 		Modifiers := Features["llm"]["navigation"]["val_modifiers"]
 		AssertEqual(2, Modifiers.Length)
 		AssertEqual("ctrl#keep", Modifiers[2],
@@ -633,12 +633,12 @@ TestFMv2_LiteralStringsKeepManifestTypes() {
 	try {
 		Path := _FM_WriteFixture("literal_string_types",
 			"[script]`nlocale = 'en'`nlog_level = 'ERROR' # explicit threshold`n"
-			. "[shortcuts.keyboard]`nctrl_b = 'microsoft_bold'`n")
+			. "[shortcuts.keyboard]`nprimary_b = 'microsoft_bold'`n")
 		AssertEqual(3, ApplyConfigToml(Features, Path, &Rejected, , &Outdated),
 			"literal strings must apply to string, enum and action manifest leaves")
 		AssertEqual("en", Features["script"]["locale"])
 		AssertEqual("ERROR", Features["script"]["log_level"])
-		AssertEqual("microsoft_bold", Features["shortcuts"]["keyboard"]["ctrl_b"])
+		AssertEqual("microsoft_bold", Features["shortcuts"]["keyboard"]["primary_b"])
 		AssertEqual(0, Rejected)
 		AssertEqual(0, Outdated.Count,
 			"valid literal strings must never be proposed for configuration cleanup")
@@ -659,7 +659,7 @@ _FM_QuotedStringBootAdmission(Style, Locale := "en", Comment := "") {
 	OldRejected := _ConfigBootRejectedOverrides
 	OldOutdated := _ConfigBootOutdatedEntries
 	Quote := Style == "single" ? Chr(39) : Style == "basic" ? Chr(34) : Style == "triple-basic" ? Chr(34) . Chr(34) . Chr(34) : Chr(39) . Chr(39) . Chr(39)
-	Source := "[script]`nlocale = " . Quote . Locale . Quote . Comment . "`nlog_level = " . Quote . "ERROR" . Quote . "`n[shortcuts.keyboard]`nctrl_b = " . Quote . "microsoft_bold" . Quote . "`n"
+	Source := "[script]`nlocale = " . Quote . Locale . Quote . Comment . "`nlog_level = " . Quote . "ERROR" . Quote . "`n[shortcuts.keyboard]`nprimary_b = " . Quote . "microsoft_bold" . Quote . "`n"
 	try {
 		_ConfigBootRejectedOverrides := 0
 		_ConfigBootOutdatedEntries := Map()
@@ -670,7 +670,7 @@ _FM_QuotedStringBootAdmission(Style, Locale := "en", Comment := "") {
 		AssertEqual(3, Applied, "three valid quoted overrides must apply at the real boot owner")
 		AssertEqual(Locale, Features["script"]["locale"])
 		AssertEqual("ERROR", Features["script"]["log_level"])
-		AssertEqual("microsoft_bold", Features["shortcuts"]["keyboard"]["ctrl_b"])
+		AssertEqual("microsoft_bold", Features["shortcuts"]["keyboard"]["primary_b"])
 		AssertEqual(0, _ConfigBootOutdatedEntries.Count, "valid quoted values must not become cleanup candidates")
 	} finally {
 		if IsSet(Path) && FileExist(Path)

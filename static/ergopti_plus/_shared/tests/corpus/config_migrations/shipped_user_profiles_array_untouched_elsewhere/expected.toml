@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_user_profiles_array_untouched_elsewhere/expected.toml
 
 [_meta]
-schema_version = 17
+schema_version = 18
 
 [llm.profiles]
 user_profiles = [{ id = "user_first", label = "First Profile", system_single = "first" }, { id = "user_second", label = "Second Profile", system_single = "second" }]

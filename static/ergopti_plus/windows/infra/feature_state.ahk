@@ -131,7 +131,7 @@ for _FeatureStateIndex, _FeatureStateSlot in SCRIPT_SHORTCUT_SLOTS {
 }
 
 ; Configurable keyboard shortcuts — Ctrl/Win/Alt × a-z, 0-9 and special keys.
-; Each slot id matches a GESTURE_ACTIONS key (e.g. "win_a", "ctrl_b").
+; Each slot id is a neutral chord id (e.g. "meta_a", "primary_b").
 ; Defaults below mirror the legacy hard-coded shortcuts so a fresh install
 ; behaves identically to before while giving the user full control via the menu.
 global KEYBOARD_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection("shortcuts.keyboard")

@@ -58,17 +58,17 @@ _KGS_ScopeTouchesOneGroup() {
 	HadAssignments := IsSet(KeyboardShortcutAssignments)
 	SavedAssignments := HadAssignments ? KeyboardShortcutAssignments : 0
 	SavedParameters := GestureActionParameters
-	Source := '[shortcuts.keyboard]`nwin_b = "open_url"`nctrl_q = "open_url"`nctrl_shift_q = "select_line"`n'
-		. '[action_parameters]`nkeyboard__win_b__open_url = "https://example.com/b"`n'
-		. 'keyboard__ctrl_q__open_url = "https://example.com/q"`n[llm]`nenabled = true`n'
+	Source := '[shortcuts.keyboard]`nmeta_b = "open_url"`nprimary_q = "open_url"`nprimary_shift_q = "select_line"`n'
+		. '[action_parameters]`nkeyboard__meta_b__open_url = "https://example.com/b"`n'
+		. 'keyboard__primary_q__open_url = "https://example.com/q"`n[llm]`nenabled = true`n'
 	Fixture := _ScopeOwnerFixture(Source)
 	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
 	Assignments := ManifestBuildFeaturesMap()["shortcuts"]["keyboard"].Clone()
-	Assignments["win_b"] := "open_url", Assignments["ctrl_q"] := "open_url", Assignments["ctrl_shift_q"] := "select_line"
+	Assignments["meta_b"] := "open_url", Assignments["primary_q"] := "open_url", Assignments["primary_shift_q"] := "select_line"
 	KeyboardShortcutAssignments := Assignments
-	GestureActionParameters := Map("keyboard__win_b__open_url", "https://example.com/b",
-		"keyboard__ctrl_q__open_url", "https://example.com/q")
+	GestureActionParameters := Map("keyboard__meta_b__open_url", "https://example.com/b",
+		"keyboard__primary_q__open_url", "https://example.com/q")
 	Refusal := 0, Bundle := 0
 	Launch(_Success, Borrowed, Refused) {
 		Bundle := Borrowed
@@ -79,22 +79,22 @@ _KGS_ScopeTouchesOneGroup() {
 	try {
 		for Mode in ["clear", "recommended"] {
 			Fixture.options["stamp"] := "group-" . Mode
-			Receipt := KeyboardSlotGroupApplyScope("win_", Mode, Fixture.options)
+			Receipt := KeyboardSlotGroupApplyScope("meta_", Mode, Fixture.options)
 			AssertEqual("pending", Receipt["status"], "the Win group " . Mode . " is published")
 			Parsed := TOML_ParseFreshFile(Fixture.path)
 			Keyboard := Parsed["shortcuts.keyboard"]
-			Assert(!Keyboard.Has("win_b"), "the user's Win slot leaves with the " . Mode)
-			Assert(!Parsed["action_parameters"].Has("keyboard__win_b__open_url"), "its parameter goes with it")
-			AssertEqual("open_url", Keyboard["ctrl_q"], "the Ctrl group is untouched")
-			AssertEqual("select_line", Keyboard["ctrl_shift_q"], "the Ctrl+Shift group is untouched")
-			AssertEqual("https://example.com/q", Parsed["action_parameters"]["keyboard__ctrl_q__open_url"])
+			Assert(!Keyboard.Has("meta_b"), "the user's Win slot leaves with the " . Mode)
+			Assert(!Parsed["action_parameters"].Has("keyboard__meta_b__open_url"), "its parameter goes with it")
+			AssertEqual("open_url", Keyboard["primary_q"], "the Ctrl group is untouched")
+			AssertEqual("select_line", Keyboard["primary_shift_q"], "the Ctrl+Shift group is untouched")
+			AssertEqual("https://example.com/q", Parsed["action_parameters"]["keyboard__primary_q__open_url"])
 			AssertEqual(true, Parsed["llm"]["enabled"], "another scope is untouched")
-			Assert(!Keyboard.Has("ctrl_b"), "another group's preset is not applied")
+			Assert(!Keyboard.Has("primary_b"), "another group's preset is not applied")
 			if Mode == "recommended"
-				AssertEqual(ManifestRecommendedFor("shortcuts.keyboard.win_a"), Keyboard["win_a"],
+				AssertEqual(ManifestRecommendedFor("shortcuts.keyboard.meta_a"), Keyboard["meta_a"],
 					"a shipped Win slot takes its recommended action")
 			else
-				Assert(!Keyboard.Has("win_a"), "the clear empties the shipped Win slots")
+				Assert(!Keyboard.Has("meta_a"), "the clear empties the shipped Win slots")
 			Refusal.Call("refused")
 			AssertEqual("refused", Receipt["status"])
 			AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "the refusal restores the exact source")
