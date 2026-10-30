@@ -149,7 +149,7 @@ end
 --- Where a vision request for a backend goes.
 --- @param backend string The binding's backend id.
 --- @param model string The resolved vision model.
---- @return table|nil target { url, headers, format }, string|nil reason
+--- @return table|nil target { url, headers, format, provider?, model? }, string|nil reason
 function M.resolve_target(backend, model)
 	if backend == Vision.LOCAL_BACKEND then
 		local profiles = require("modules.llm.profiles")
@@ -164,11 +164,9 @@ function M.resolve_target(backend, model)
 	if not Remote.serves(backend, "vision") then return nil, "the provider " .. backend .. " reads no image" end
 	local entry = M.entry_for(backend)
 	if not entry then return nil, "no API key is stored for " .. backend end
-	local target, reason = Remote.endpoint(entry, model)
-	if not target then return nil, reason end
-	-- send() completes the body for this provider and model (thinking off)
-	target.provider, target.model = backend, model
-	return target, nil
+	-- The endpoint names its provider and model, which send() completes the
+	-- body for (thinking off).
+	return Remote.endpoint(entry, model)
 end
 
 
