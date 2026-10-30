@@ -422,6 +422,19 @@
 				]
 			},
 			"expect": ["fireworks/ultramarine-1-flash", "openai/gpt-4o-mini", "particle/particle-1"]
+		},
+		{
+			"name": "reka listing (docs example)",
+			"provider": "reka",
+			"source": "https://docs.reka.ai/chat/models (example response, 2026-10-30, trimmed)",
+			"format": "openai",
+			"body": {
+				"object": "list",
+				"data": [
+					{ "id": "reka-edge-2603", "object": "model", "created": 1773154800, "owned_by": "reka" }
+				]
+			},
+			"expect": ["reka-edge-2603"]
 		}
 	],
 	"names": [
@@ -571,6 +584,11 @@
 		"scaleway": "Documented as OpenAI-compatible (using-models-api) with no example response; the route answers 401 without a key: none recorded.",
 		"upstage": "No model listing is documented (console.upstage.ai llms.txt) and the route answers 401 without a key: none recorded.",
 		"ai21": "No model listing is documented; the route answers {\"data\": []} without a key, so no listing holding a model was recorded.",
-		"baseten": "GET <base_url>/models needs a key and the docs show no response: none recorded."
+		"baseten": "GET <base_url>/models needs a key and the docs show no response: none recorded.",
+		"stepfun": "Documented (platform.stepfun.ai api-reference/models/list), but only fragments of a response are published and the route needs a key: none recorded.",
+		"volcengine": "Ark documents no OpenAI-style GET /api/v3/models (models are found in the console or the AK/SK-signed control API): the page offers the catalogue models and a typed id.",
+		"qianfan": "The documented example lists only deepseek-v3.2 and the route needs a key: none recorded that holds the default model.",
+		"spark": "No model listing is documented for spark-api-open.xf-yun.com/v1: the page offers the catalogue models and a typed id.",
+		"baichuan": "No model listing is documented (platform.baichuan-ai.com docs-v2 api): the page offers the catalogue models and a typed id."
 	}
 }
