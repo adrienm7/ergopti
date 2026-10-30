@@ -216,9 +216,34 @@ def managed_lookup_stage_projection(source):
     return source
 
 
+# The route-kind observation (ledger L42): one closed stderr marker per dispatch
+# attempt and its pure kind helper. Both spans are literal and unique; peeled
+# first, every older reviewed layer and the historical whole pin still apply.
+ROUTE_KIND_OBSERVATION_INVERSE = (
+    '\t\t\t// The kind of the route this attempt dispatches on, a closed token and\n\t\t\t// never the relay: a lookup that answered DIRECT by itself carried no\n\t\t\t// fallback marker, so the field report could not tell it from a proxy (L42).\n\t\t\t_ = fputs("# native_http_route kind=\\(managedHTTPRouteKind(route)) attempt=\\(index + 1)/\\(routes.count)\\n", stderr)\n',
+    '\n/// The closed kind of a selected route: direct, http, https, socks or other.\nfunc managedHTTPRouteKind(_ route: [String: Any]) -> String {\n\tguard let kind = route[kCFProxyTypeKey as String] as? String else { return "other" }\n\tlet kinds: [(String, String)] = [\n\t\t(kCFProxyTypeNone as String, "direct"), (kCFProxyTypeHTTP as String, "http"),\n\t\t(kCFProxyTypeHTTPS as String, "https"), (kCFProxyTypeSOCKS as String, "socks"),\n\t]\n\treturn kinds.first(where: { $0.0 == kind })?.1 ?? "other"\n}\n',
+)
+ROUTE_KIND_OBSERVATION_MARKERS = ("managedHTTPRouteKind", "native_http_route kind=")
+
+
+def route_kind_observation_projection(source):
+    """Remove both exact route-kind spans together, or keep a source without them."""
+    if not any(marker in source for marker in ROUTE_KIND_OBSERVATION_MARKERS):
+        return source
+    if any(source.count(span) != 1 for span in ROUTE_KIND_OBSERVATION_INVERSE):
+        raise ValueError("Route kind observation enrollment refused")
+    for span in ROUTE_KIND_OBSERVATION_INVERSE:
+        source = source.replace(span, "", 1)
+    if any(marker in source for marker in ROUTE_KIND_OBSERVATION_MARKERS):
+        raise ValueError("Route kind observation projection refused")
+    return source
+
+
 def worker_source():
     """Read the worker with the newest reviewed layer peeled, as every historical pin expects."""
-    return managed_lookup_stage_projection(WORKER.read_text(encoding="utf-8"))
+    return managed_lookup_stage_projection(
+        route_kind_observation_projection(WORKER.read_text(encoding="utf-8"))
+    )
 
 
 def native_failure_stage_projection(source):
@@ -2349,6 +2374,27 @@ NATIVE_FIXTURE_CLOCK_CONTROLS = load(
     NativeFixtureClockFrameContractControls,
     NativeFixtureClockContextContractControls,
 ) = NATIVE_FIXTURE_CLOCK_CONTROLS.enrolled_cases()
+
+
+class RouteKindObservationTests(unittest.TestCase):
+    """Ledger L42: the worker names each attempt's route kind, enrolled exactly."""
+
+    def test_both_spans_are_present_once_and_peel_to_the_reviewed_worker(self):
+        current = WORKER.read_text(encoding="utf-8")
+        for span in ROUTE_KIND_OBSERVATION_INVERSE:
+            self.assertEqual(current.count(span), 1)
+        peeled = route_kind_observation_projection(current)
+        self.assertNotIn("native_http_route kind=", peeled)
+        self.assertEqual(route_kind_observation_projection(peeled), peeled)
+
+    def test_a_partial_or_altered_observation_refuses(self):
+        current = WORKER.read_text(encoding="utf-8")
+        for span in ROUTE_KIND_OBSERVATION_INVERSE:
+            with self.subTest(span=span[:40]):
+                with self.assertRaises(ValueError):
+                    route_kind_observation_projection(current.replace(span, "", 1))
+                with self.assertRaises(ValueError):
+                    route_kind_observation_projection(current.replace(span, span + span, 1))
 
 
 if __name__ == "__main__":
