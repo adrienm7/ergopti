@@ -556,6 +556,23 @@ Test("LLM API entries: a retired provider row is kept and written back "
 	. "(api-entry-retired-provider-row)",
 	_LMT_RetiredProviderRowIsKeptNotFatal)
 
+_LMT_RetiredProviderRowsWarnOneByOne() {
+	Lines := []
+	Sink := (Message, Args*) => Lines.Push(Format(Message, Args*))
+	Path := A_Temp . "\ergopti-api-entries-retired-" . A_TickCount . ".json"
+	Rows := [Map("Id", "old_one", "Provider", "gone"), Map("Id", "old_two", "Provider", "gone_too")]
+	_LLM_Menu_ReportRetiredApiEntries(Path, Rows, Sink)
+	AssertEqual(2, Lines.Length, "one warning per outdated row, not one count")
+	AssertContains(Lines[1], "entries[id=old_one]")
+	AssertContains(Lines[1], "gone")
+	AssertContains(Lines[2], "entries[id=old_two]")
+	_LLM_Menu_ReportRetiredApiEntries(Path, Rows, Sink)
+	AssertEqual(2, Lines.Length, "a reload does not repeat them")
+}
+Test("LLM API entries: each retired provider row gets its own warning "
+	. "(api-entry-retired-provider-row)",
+	_LMT_RetiredProviderRowsWarnOneByOne)
+
 
 Test("LLM API entries: strict parser preserves escaped strings and braces "
 	. "(api-entry-identity-cardinality)",
