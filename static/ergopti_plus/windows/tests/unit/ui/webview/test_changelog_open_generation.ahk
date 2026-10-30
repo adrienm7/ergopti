@@ -22,7 +22,8 @@ _CWOC_Source(Root) {
 		AssertTrue(Owner != "", "The changelog child requires its genuine whole owner: " . Symbol)
 		Source .= "#Include " . Owner . "`n"
 	}
-	return Source . "#Include " . _DriverDir . "\ui\changelog\init.ahk`n"
+	return Source . _WebViewChildTimingBinding("webview_page_safety_flush_ms")
+		. "#Include " . _DriverDir . "\ui\changelog\init.ahk`n"
 		. "#Include " . _DriverDir . "\tests\fixtures\changelog_open_generation_body.ahk`n"
 }
 
