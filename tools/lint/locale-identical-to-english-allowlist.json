@@ -445,6 +445,10 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["it"]
 		},
+		"hs_config.unit_ms": {
+			"reason": "unit-or-abbreviation",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "ko", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
 		"input_probe.hook_line": {
 			"reason": "symbol-or-placeholder-only",
 			"locales": [
