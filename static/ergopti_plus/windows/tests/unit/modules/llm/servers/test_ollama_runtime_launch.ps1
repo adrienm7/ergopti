@@ -89,6 +89,31 @@ $script:Spawns = 0
 $script:HttpCalls = 0
 $script:LastStart = $null
 
+# The proxy captures are opaque to this model: the lookup itself is replayed
+# by tools/test/test-windows-route-plan.cjs. These stubs record the hand-off.
+$script:VendorDirectory = 'C:\bundled\vendor'
+$script:VendorSha256 = 'd' * 64
+$script:ProxyPolicyPath = 'C:\bundled\proxy_policy.json'
+$script:ProxyPolicySha256 = 'e' * 64
+$script:UpdaterDefaultsPath = 'C:\bundled\defaults.json'
+$script:UpdaterDefaultsSha256 = 'f' * 64
+$script:RouteOriginsPath = 'C:\bundled\route_origins.json'
+$script:RouteOriginsSha256 = '0' * 64
+$script:FixtureProxy = $null
+function Read-OllamaRuntimeJson([string]$Path, [string]$ExpectedHash) {
+	[Ergopti.Ollama.ManagedNative]::Events.Add('declaration:' + [IO.Path]::GetFileName($Path))
+	return [pscustomobject]@{}
+}
+function Open-OllamaRuntimeVendor([string]$Directory, [string]$ExpectedHash) {
+	if ($Directory -cne $script:VendorDirectory -or $ExpectedHash -cne $script:VendorSha256) { throw 'The captured vendor inventory changed.' }
+	[Ergopti.Ollama.ManagedNative]::Events.Add('vendor-open')
+	return [ordered]@{}
+}
+function Get-OllamaRuntimeProxy($Vendor, $Request) {
+	if ($Request.route_origins -cne $script:RouteOriginsPath -or $Request.policy -cne $script:ProxyPolicyPath) { throw 'The proxy captures did not reach the lookup.' }
+	[Ergopti.Ollama.ManagedNative]::Events.Add('proxy-lookup')
+	return $script:FixtureProxy
+}
 function Get-OllamaRuntimeListeners([int]$Port) {
 	if ($script:Collision) { return [pscustomobject]@{ LocalPort = $Port; LocalAddress = '127.0.0.1'; OwningProcess = 9999 } }
 	if ($script:Spawns -eq 0) { return @() }
@@ -127,11 +152,31 @@ function Reset-Case([string]$Name) {
 	$global:FixtureRuntimeFiles = @(@{ path = 'runner.dll' })
 	$global:FixtureHttpRefusal = $false
 	$script:Spawns = 0; $script:HttpCalls = 0; $script:Collision = $false; $script:Foreign = $false
+	$script:FixtureProxy = @{ Mode = 'direct'; Tunnel = 'none'; Environment = [ordered]@{} }
 	[Ergopti.Ollama.RuntimeObservation]::Active = 1
 	[Ergopti.Ollama.RuntimeObservation]::Sequence.Clear()
 	[Ergopti.Ollama.ManagedNative]::Events.Clear()
 }
 $cases = @(
+	@('a looked-up relay reaches the daemon and the receipt names it', {
+		Reset-Case 'relay'
+		$script:FixtureProxy = @{ Mode = 'relay'; Tunnel = 'open'; Environment = [ordered]@{ HTTPS_PROXY = 'http://relay.corp:3128'; NO_PROXY = 'blobs.example' } }
+		Must ((Invoke-OllamaRuntimeEntry) -eq 0) 'Actual recording child exit must be retained.'
+		Must ($script:LastStart.EnvironmentVariables['HTTPS_PROXY'] -ceq 'http://relay.corp:3128') 'The looked-up relay must reach the daemon.'
+		Must ($script:LastStart.EnvironmentVariables['NO_PROXY'] -ceq 'blobs.example') 'The origins sent direct must bypass the relay.'
+		$receipt = $global:CapturedReadyText | ConvertFrom-Json
+		Must ($receipt.proxy_mode -ceq 'relay' -and $receipt.proxy_tunnel -ceq 'open') 'The receipt must name the proxy decision.'
+		$events = [Ergopti.Ollama.ManagedNative]::Events
+		Must ($events.IndexOf('vendor-open') -ge 0 -and $events.IndexOf('proxy-lookup') -gt $events.IndexOf('vendor-open')) 'The lookup must run over the captured vendor inventory.'
+	}),
+	@('a relay demanding a Windows login is never exported', {
+		Reset-Case 'login'
+		$script:FixtureProxy = @{ Mode = 'relay'; Tunnel = 'windows_login'; Environment = [ordered]@{} }
+		Must ((Invoke-OllamaRuntimeEntry) -eq 0) 'Local models keep their daemon.'
+		Must (-not $script:LastStart.EnvironmentVariables.ContainsKey('HTTPS_PROXY')) 'A login-only relay must not reach the daemon.'
+		$receipt = $global:CapturedReadyText | ConvertFrom-Json
+		Must ($receipt.proxy_tunnel -ceq 'windows_login') 'The receipt must tell the pull why it is refused.'
+	}),
 	@('actual entry binds prepared borrowed handle, private models, exact receipt', {
 		Reset-Case 'positive'
 		Must ((Invoke-OllamaRuntimeEntry) -eq 0) 'Actual recording child exit must be retained.'

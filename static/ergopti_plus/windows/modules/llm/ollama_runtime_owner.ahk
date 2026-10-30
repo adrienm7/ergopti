@@ -28,6 +28,17 @@ class OllamaRuntimeOwner {
 		if !this._LocalPath(Options.Get("environment", ""))
 				|| !RegExMatch(Options.Get("environment_sha256", ""), "^[0-9a-f]{64}$")
 			throw TypeError("Runtime ownership requires the captured shared serve environment.")
+		; The proxy the owned daemon reads is looked up by the launcher itself
+		; (ollama-runtime-launch.ps1 Get-OllamaRuntimeProxy) from these captures
+		Proxy := Options.Get("proxy", 0)
+		if !(Proxy is Map)
+			throw TypeError("Runtime ownership requires the captured proxy dependencies.")
+		for Name in ["VendorDirectory", "ProxyPolicyPath", "UpdaterDefaultsPath", "RouteOriginsPath"]
+			if !this._LocalPath(Proxy.Get(Name, ""))
+				throw TypeError("Runtime proxy capture requires a local path.", -1, Name)
+		for Name in ["VendorSha256", "ProxyPolicySha256", "UpdaterDefaultsSha256", "RouteOriginsSha256"]
+			if !RegExMatch(Proxy.Get(Name, ""), "^[0-9a-f]{64}$")
+				throw TypeError("Runtime proxy capture requires its digest.", -1, Name)
 		if !HasMethod(Options.Get("on_retired", 0), "Call")
 			throw TypeError("Runtime ownership requires an independent physical retirement observer.")
 		for Name in ["spawn", "factory", "read_ready", "live_identity", "clock", "on_error", "on_retired"]
@@ -101,6 +112,9 @@ class OllamaRuntimeOwner {
 			}
 			Arguments.Push("-ServeEnvironmentPath", this.Options["environment"],
 				"-ServeEnvironmentSha256", this.Options["environment_sha256"])
+			for Name in ["VendorDirectory", "VendorSha256", "ProxyPolicyPath", "ProxyPolicySha256",
+					"UpdaterDefaultsPath", "UpdaterDefaultsSha256", "RouteOriginsPath", "RouteOriginsSha256"]
+				Arguments.Push("-" . Name, this.Options["proxy"][Name])
 			Spawn := this.Options.Get("spawn", ObjBindMethod(this, "_NativeSpawn"))
 			Task := Spawn.Call(PowerShell, Arguments, ObjBindMethod(this, "_OnTerminal", Record),
 				ObjBindMethod(this, "_AdoptConstruction", Record))

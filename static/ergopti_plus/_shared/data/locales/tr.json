@@ -2191,6 +2191,7 @@
 	"mlx.cause_venv_not_native": "MLX ortamı başka bir işlemci için bir Python ile oluşturuldu ({1}): macOS onu Rosetta ile çalıştırırdı, bu yüzden başlatılmıyor.",
 	"network.failure.certificate": "Güvenli bağlantının sertifika doğrulaması başarısız oldu. Sistem sertifikalarını, saati ve sunucu adresini kontrol edin; yönetilen bir ağdaysanız BT departmanınızdan yardım isteyin.",
 	"network.failure.proxy": "Sistemin vekil sunucu yapılandırması kullanılamadı veya vekil sunucu bağlantıyı reddetti ya da kimlik doğrulaması istedi. Sistemin vekil sunucu ayarlarını kontrol edin.",
+	"network.failure.proxy_windows_login": "Proxy, Ergopti'nin Ollama'sının sağlayamadığı Windows oturum açmanızı (NTLM veya Negotiate) istiyor, bu yüzden onun üzerinden hiçbir model indirilemez. Modeli başka bir ağda indirin veya BT ekibinizden bu oturum açmayı gerektirmeyen bir proxy isteyin.",
 	"network.failure.host_blocked": "Ağ bu sunucuya erişimi engelliyor (şirket filtrelemesi veya güvenlik duvarı).",
 	"network.failure.offline": "Ağ veya ağ yolu kullanılamıyor. Bağlantınızı ve sistemin ağ ayarlarını kontrol edin.",
 	"network.failure.pac_unreachable_direct_failed": "Otomatik proxy yapılandırmasına (PAC) ulaşılamadı veya okunamadı; bunun yerine denenen doğrudan bağlantı da başarısız oldu. Ağ bağlantısını ve sistemin proxy ayarlarını denetleyin ya da BT biriminize danışın.",
