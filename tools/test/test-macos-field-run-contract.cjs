@@ -518,6 +518,10 @@ function reportFolder(paths) {
 			);
 			assert.match(collector, /^run_started_epoch="\$\(date \+%s\)"$/m);
 			const dir = fs.mkdtempSync(path.join(scratch, 'ips-'));
+			// The home a real crash report records: the summary must print none of it.
+			// One constant, not a literal checkout path (test-dev-tool-paths.cjs).
+			const reportHome = '/Users/someone';
+			const reportExecutable = `${reportHome}/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus`;
 			const header = JSON.stringify({
 				app_name: 'ErgoptiPlus',
 				bug_type: '309',
@@ -530,7 +534,7 @@ function reportFolder(paths) {
 				codeSigningID: 'com.ergoptiplus.app',
 				codeSigningTeamID: '',
 				codeSigningFlags: 570556929,
-				procPath: '/Users/someone/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus',
+				procPath: reportExecutable,
 				exception: {
 					type: 'EXC_CRASH',
 					signal: 'SIGKILL',
@@ -542,7 +546,7 @@ function reportFolder(paths) {
 				usedImages: [
 					{
 						name: 'ErgoptiPlus',
-						path: '/Users/someone/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus'
+						path: reportExecutable
 					},
 					{ name: 'libsystem_kernel.dylib', path: '/usr/lib/system/libsystem_kernel.dylib' }
 				],
@@ -560,7 +564,7 @@ function reportFolder(paths) {
 						]
 					}
 				],
-				environment: { HOME: '/Users/someone' }
+				environment: { HOME: reportHome }
 			});
 			fs.writeFileSync(path.join(dir, 'ErgoptiPlus-2026-10-30-210130.ips'), `${header}\n${body}`);
 			fs.writeFileSync(path.join(dir, 'Safari-2026-10-30.ips'), `${header}\n${body}`);
