@@ -447,7 +447,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_ollama_serve_command_receiving_test.py', 2]);
 	cases.push(['tools/diagnostics/macos_native_python_probe_io_test.py', 3]);
 	cases.push(['tools/test/macos_managed_ollama_pull_caller_test.py', 12]);
-	cases.push(['tools/test/macos_managed_ollama_cleanup_test.py', 36]);
+	cases.push(['tools/test/macos_managed_ollama_cleanup_test.py', 37]);
 	cases.push(['tools/test/managed_source_alias_test.py', 23]);
 	cases.push(['tools/diagnostics/macos_owned_image_alias_test.py', 28]);
 	cases.push(['tools/test/macos_native_ollama_alias_api_test.py', 5]);
