@@ -217,7 +217,7 @@ end
 -- =========================================
 
 --- Sends a chat completion request to the Ollama /api/chat endpoint.
---- @param base_url string   Ollama base URL (e.g. "http://localhost:11434").
+--- @param base_url string   Ollama base URL (e.g. "http://127.0.0.1:11435").
 --- @param model    string   Model name.
 --- @param messages table    Array of { role, content } message objects.
 --- @param opts     table|nil  { stream?, temperature?, max_tokens?, verify_local_model? }
