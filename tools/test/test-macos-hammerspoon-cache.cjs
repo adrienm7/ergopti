@@ -34,12 +34,18 @@ function check(name, body) {
 	console.log(`PASS ${name}`);
 }
 
-/** Returns one top-level shell function of the build script. */
-function shellFunction(name) {
-	const start = BUILD.indexOf(`\n${name}() {\n`);
-	assert(start >= 0, `build_macos_app.sh defines ${name}()`);
-	return BUILD.slice(start + 1, BUILD.indexOf('\n}\n', start + 1) + 2);
+/** Returns one top-level shell function of the build script, or of `source`. */
+function shellFunction(name, source = BUILD) {
+	const start = source.indexOf(`\n${name}() {\n`);
+	assert(start >= 0, `the shell source defines ${name}()`);
+	return source.slice(start + 1, source.indexOf('\n}\n', start + 1) + 2);
 }
+
+// The build sources the shared digest owner; the replay runs the real one.
+const NETWORK_RETRY = fs.readFileSync(
+	path.join(ROOT, 'static/ergopti_plus/macos/modules/llm/network-retry.sh'),
+	'utf8'
+);
 
 const pin = BUILD.match(/^HAMMERSPOON_SHA256="\$\{HAMMERSPOON_SHA256:-([0-9a-f]{64})\}"$/m)?.[1];
 const OFFICIAL = Buffer.from('official Hammerspoon release bytes');
@@ -103,6 +109,7 @@ ERGOPTI_HOST_GITHUB=github.com HAMMERSPOON_VERSION=1.1.1 HAMMERSPOON_SHA256=${di
 BUILD_DIR="$REPO_ROOT/build/macos"
 HAMMERSPOON_CACHE_DIR="$REPO_ROOT/build/cache/hammerspoon"
 ${shellFunction('clean_build_dir')}
+${shellFunction('sha256_file_digest', NETWORK_RETRY)}
 ${shellFunction('hammerspoon_zip_matches')}
 ${shellFunction('download_hammerspoon')}
 clean_build_dir
