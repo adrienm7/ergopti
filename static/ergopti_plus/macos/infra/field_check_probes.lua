@@ -135,10 +135,27 @@ end
 --- keeps the grants (an ad hoc signature changes with every build).
 function M.permissions(ports, report, finish)
 	local facts = ports.permission_facts()
+	if facts.input_monitoring ~= nil then
+		return M.permissions_with(ports, report, finish, facts, grant_value(facts.input_monitoring))
+	end
+	-- Hammerspoon cannot ask without prompting: the launcher's IOHIDCheckAccess
+	-- role reads it (ledger L32), and an unreadable answer stays named.
+	ports.input_monitoring_access(function(state)
+		local value = (state == "granted" or state == "denied" or state == "unknown") and state or "not_queryable"
+		M.permissions_with(ports, report, finish, facts, value == "denied" and "missing" or value)
+	end)
+end
+
+--- The permissions steps once the Input Monitoring answer is known.
+--- @param ports table Probe ports.
+--- @param report table Step reporter.
+--- @param finish function Settles the check.
+--- @param facts table permission_facts() answer.
+--- @param input_monitoring string Closed Input Monitoring value.
+function M.permissions_with(ports, report, finish, facts, input_monitoring)
 	report.step("accessibility", facts.accessibility == true and STATE.pass or STATE.fail,
 		grant_value(facts.accessibility))
-	report.step("input_monitoring", STATE.info,
-		facts.input_monitoring == nil and "not_queryable" or grant_value(facts.input_monitoring))
+	report.step("input_monitoring", STATE.info, input_monitoring)
 	report.step("screen_recording", STATE.info, grant_value(facts.screen_recording))
 	report.step("automation", STATE.skip, "not_queryable")
 	local secure = facts.secure_input

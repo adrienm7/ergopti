@@ -44,6 +44,10 @@ local function make_ports()
 		end,
 		permission_facts = function() return world.facts end,
 		running_bundle_path = function() return world.bundle end,
+		input_monitoring_access = function(callback)
+			world.access_reads = (world.access_reads or 0) + 1
+			callback(world.access)
+		end,
 	}
 	return ports, world
 end
@@ -68,6 +72,20 @@ local function run(ports)
 end
 
 helpers.describe("permissions probe", function()
+	helpers.it("(input-monitoring-reader) reads Input Monitoring through the launcher role when Hammerspoon cannot", function()
+		local ports, world = make_ports()
+		for answer, value in pairs({ granted = "granted", denied = "missing", unknown = "unknown" }) do
+			world.access = answer
+			helpers.assert_eq(run(ports).input_monitoring.value, value)
+		end
+		world.access = nil
+		helpers.assert_eq(run(ports).input_monitoring.value, "not_queryable", "an unreadable role stays named")
+		local reads = world.access_reads
+		world.facts.input_monitoring = true
+		helpers.assert_eq(run(ports).input_monitoring.value, "granted")
+		helpers.assert_eq(world.access_reads, reads, "a Hammerspoon answer needs no launcher read")
+	end)
+
 	helpers.it("passes with Accessibility, the declared bundle and a valid team signature", function()
 		local ports = make_ports()
 		local steps, result = run(ports)

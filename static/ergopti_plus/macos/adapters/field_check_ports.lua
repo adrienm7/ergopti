@@ -226,6 +226,19 @@ local function login_startup_status(callback)
 	end, environment)
 end
 
+--- Reads the Input Monitoring grant through the launcher's IOHIDCheckAccess
+--- role, which never prompts (ledger L32).
+--- @param callback function fn("granted"|"denied"|"unknown"|nil); nil when unreadable.
+local function input_monitoring_access(callback)
+	local launcher, _, environment = require("platform.remap.lease_helper").resolve()
+	if not launcher then return callback(nil) end
+	exec(launcher, { "--input-monitoring", "status" }, 5, function(code, output)
+		local state = code == 0 and tostring(output):match("^(%a+)%s*$") or nil
+		if state ~= "granted" and state ~= "denied" and state ~= "unknown" then state = nil end
+		callback(state)
+	end, environment)
+end
+
 --- Facts about the pieces of the owned runtime that are not installed yet:
 --- whether the artifact manifest is pinned, whether the installed-source module
 --- can be reached (it is loaded, never acquired), and what a close of the official
@@ -288,6 +301,7 @@ function M.new()
 		owned_readiness = owned_readiness,
 		app_path = app_path,
 		login_startup_status = login_startup_status,
+		input_monitoring_access = input_monitoring_access,
 		composer_env = function() return (require("modules.keymap.composer_check").env()) end,
 	}
 	-- The field run's own checks (infra/field_check_probes.lua) read more facts
