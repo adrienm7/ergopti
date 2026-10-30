@@ -1482,10 +1482,11 @@ function M.new(deps, presets, ram_getter)
 			end
 			local join = owner.start_attempted == true
 				and ManagedPullReceipt.retire or ManagedPullReceipt.rollback
-			local joined, retired = pcall(join, task, callback_status)
+			local joined, retired, refusal = pcall(join, task, callback_status)
 			owner.receipt_joining = false
 			if joined ~= true or retired ~= true then
-				Logger.error(LOG, "Managed model pull retirement is pending; exact task slot retained.")
+				Logger.error(LOG, "Managed model pull retirement is pending (%s); exact task slot retained.",
+					joined and tostring(refusal or "no reason given") or "the receipt check raised")
 				return false
 			end
 			owner.task_settled = true
