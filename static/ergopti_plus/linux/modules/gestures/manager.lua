@@ -1926,6 +1926,32 @@ function M.dispatch_gesture(gesture)
 	return true
 end
 
+--- Names, once per reading start, the slots this touchpad can never fire and
+--- the bound slots the desktop also acts on. The menu greys the first kind, but
+--- a binding written by hand or carried over from another machine is only seen
+--- here: without this line a bound swipe_4_up on a three-finger pad is silent.
+--- @param touchpad table The selected touchpad.
+local function report_slots(touchpad)
+	local slots, bound = {}, {}
+	for slot in pairs(M.DEFAULT_GESTURES) do
+		slots[#slots + 1] = slot
+		local action = M.get_action(slot)
+		if action ~= nil and action ~= "none" then bound[slot] = true end
+	end
+	local report = require("modules.gestures.slot_report").report(slots, bound, touchpad.max_fingers)
+	if #report.unreachable > 0 then
+		Logger.info(LOG, "This touchpad counts up to %d finger(s): %d of %d gesture slot(s) can never fire: %s.",
+			touchpad.max_fingers, #report.unreachable, #slots, table.concat(report.unreachable, ", "))
+	end
+	for _, slot in ipairs(report.bound_unreachable) do
+		Logger.warn(LOG, "Gesture %s is bound, but this touchpad cannot count that many fingers: it will never fire.", slot)
+	end
+	if #report.bound_two_finger > 0 then
+		Logger.warn(LOG, "Two-finger gesture(s) bound: %s. The desktop reads the same touches as scrolling or a "
+			.. "secondary click, so it acts on them too.", table.concat(report.bound_two_finger, ", "))
+	end
+end
+
 --- Starts reading the touchpad.
 ---
 --- Reads the device's evdev node directly, WITHOUT a grab, and decodes the
@@ -1972,6 +1998,7 @@ function M.start_reading()
 	Logger.success(LOG, "Reading %s (%s), up to %d finger(s)%s.",
 		touchpad.path, touchpad.name, touchpad.max_fingers,
 		touchpad.semi_mt and ", semi-MT" or "")
+	report_slots(touchpad)
 	return true
 end
 
