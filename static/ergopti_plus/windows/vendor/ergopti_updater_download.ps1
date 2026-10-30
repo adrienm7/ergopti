@@ -185,6 +185,7 @@ function Invoke-ErgoptiUpdaterDownload {
                 # HTTP receipt resource. The parent's owned Job remains the fence.
                 $State.NativeCleanupDebt = $true
             }
+            if ($Selection -is [hashtable] -and $Selection.ContainsKey('PacFallbackStage')) { $State.PacFallbackStage = $Selection.PacFallbackStage }
             if ($null -eq $Selection -or $Selection.Ok -isnot [bool] -or
                 -not $Selection.Ok -or $Selection.Routes -isnot [array] -or
                 $Selection.Routes.Count -eq 0 -or
@@ -430,6 +431,7 @@ function Invoke-ErgoptiUpdaterArtifactDownload {
                 $State.NativeCleanupDebt = $true
                 throw [InvalidOperationException]::new('Native routing has retained retirement debt.')
             }
+            if ($Selection -is [hashtable] -and $Selection.ContainsKey('PacFallbackStage')) { $State.PacFallbackStage = $Selection.PacFallbackStage }
             if ($null -eq $Selection -or $Selection.Ok -isnot [bool] -or -not $Selection.Ok -or
                 $Selection.Routes -isnot [array] -or $Selection.Routes.Count -lt 1 -or
                 -not (Test-ErgoptiNetworkInt32 $Selection.MaxRoutes) -or $Selection.MaxRoutes -lt 1 -or

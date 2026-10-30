@@ -496,6 +496,9 @@ class OllamaManagedBootstrap {
 		Receipt := this.LastReceipt
 		if !this._Success(Terminal, Receipt) || Receipt["phase"] != "downloaded"
 			return this._Fail("download")
+		if Receipt.Get("pac_fallback_stage", "") != ""
+			LoggerWarn("LLM.managed", "Automatic proxy configuration unusable at {1}; the download went direct.",
+				Receipt["pac_fallback_stage"])
 		Request := this._BaseRequest()
 		Request["TicketId"] := this._Ticket()
 		Request["ArchivePath"] := Receipt["archive"]
