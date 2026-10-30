@@ -12,6 +12,9 @@
 ---    answers a timer on time, and how many holds and late keys the session saw.
 --- 3. input_sources: the selected and enabled input sources, and whether every
 ---    installed Ergopti layout file and bundle property list parses.
+--- 4. storage: the keystats database passes SQLite's quick check (read-only),
+---    every configuration file parses, the logs folder takes a write and the
+---    auto-reload file watchers are owned.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only, like the Debug checks: nothing is granted, prompted, written
@@ -287,6 +290,78 @@ function M.input_sources(ports, report, finish)
 			finish()
 		end)
 	end)
+end
+
+
+
+
+
+-- ==========================
+-- ==========================
+-- ======= 4/ Storage =======
+-- ==========================
+-- ==========================
+
+local SQLITE = "/usr/bin/sqlite3"
+
+-- A large database takes a while to scan; the step deadline covers it.
+local SQLITE_TIMEOUT = 45
+
+--- Counts the non-empty lines of a command output.
+--- @param text any Output.
+--- @return integer
+local function line_count(text)
+	local count = 0
+	for line in tostring(text or ""):gmatch("[^\r\n]+") do
+		if line:match("%S") then count = count + 1 end
+	end
+	return count
+end
+
+--- The keystats database, the configuration files, the logs and the watchers.
+--- The database is opened read-only (sqlite3 -readonly) and checked with PRAGMA
+--- quick_check, whose only healthy answer is "ok"; each configuration file goes
+--- through the driver's own TOML reader without being written; the logs folder
+--- takes one probe file that is removed at once; the file watcher owner must be
+--- published, since FSEvents refusing a stream leaves every edit unseen.
+function M.storage(ports, report, finish)
+	for _, file in ipairs(ports.config_files()) do
+		local id = "config_" .. file.name
+		if not file.present then
+			report.step(id, STATE.skip, "absent")
+		else
+			local parsed = ports.parse_toml(file.path)
+			report.step(id, parsed and STATE.pass or STATE.fail, parsed and "parsed" or "parse_error")
+		end
+	end
+	local logs = ports.log_facts()
+	report.step("log_today", logs.today_present and STATE.pass or STATE.fail, logs.today_present and "present" or "absent")
+	report.step("log_writable", logs.writable and STATE.pass or STATE.fail, logs.writable and "yes" or "no")
+	report.step("log_files", STATE.info, logs.files or 0)
+	report.step("log_total_mb", STATE.info, math.floor((logs.bytes or 0) / 1048576))
+	local owners = ports.watcher_owners()
+	report.step("file_watchers", owners > 0 and STATE.pass or STATE.fail, owners > 0 and ("owners_" .. owners) or "none")
+	local database = ports.keystats_database()
+	if database.path == nil then
+		report.step("keystats_db", STATE.skip, "not_initialized")
+		return finish()
+	end
+	if not database.present then
+		report.step("keystats_db", STATE.skip, "absent")
+		return finish()
+	end
+	ports.exec(SQLITE, { "-readonly", database.path, "PRAGMA quick_check;" }, SQLITE_TIMEOUT,
+		function(code, output)
+			local answer = tostring(output or ""):gsub("%s+$", "")
+			if code == 0 and answer == "ok" then
+				report.step("keystats_db", STATE.pass, "quick_check_ok")
+			elseif code == 0 then
+				report.step("keystats_db", STATE.fail, "issues_" .. line_count(answer))
+			else
+				report.step("keystats_db", STATE.fail, failure_token(code))
+			end
+			finish()
+		end)
 end
 
 return M
