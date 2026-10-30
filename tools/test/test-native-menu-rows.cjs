@@ -149,6 +149,7 @@ function sitesOf(rel, text, ext) {
  * are read, before either normal or update mode may touch the debt ledger.
  */
 function admittedSourceRetirements(driver, traversed) {
+	if (driver === 'windows') return admittedWindowsRetirements();
 	const retired = 'macos/ui/menu/menu_llm/live_mode_panel.lua';
 	// 69d9506d24ff8d287eb10831033d9f46a36a89f4 removed original blob
 	// 78f8a92e37639bcd2eecc8abc3900bc7ff3aab18 and its orphan declarations.
@@ -245,6 +246,20 @@ function admittedSourceRetirements(driver, traversed) {
  * while no macOS menu source names the module again.
  * @returns {Set<string>}
  */
+/**
+ * Admits the Windows chord switches' retired file only while nothing includes it.
+ * @returns {Set<string>} The admitted retired sources.
+ */
+function admittedWindowsRetirements() {
+	const retired = 'windows/modules/shortcuts/ctrl.ahk';
+	for (const file of sourceFiles(path.join(SP, 'windows'), '.ahk'))
+		assert.ok(
+			!/^\s*#Include\b.*shortcuts[\\/]ctrl\.ahk/im.test(fs.readFileSync(file, 'utf8')),
+			`retired chord switch file is included again: ${path.relative(SP, file)}`
+		);
+	return new Set([retired]);
+}
+
 function admittedSelectorRetirement() {
 	const retired = 'macos/ui/menu/menu_llm/models_selector.lua';
 	const { scriptTokens } = require('../lib/script-source.cjs');
@@ -381,7 +396,9 @@ const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
 	macos: Object.freeze([
 		'macos/ui/menu/menu_llm/live_mode_panel.lua',
 		'macos/ui/menu/menu_llm/models_selector.lua'
-	])
+	]),
+	// ctrl.ahk retired when schema v19 turned the chord switches into keyboard slots.
+	windows: Object.freeze(['windows/modules/shortcuts/ctrl.ahk'])
 });
 
 // The frozen oracle keeps the pre-rename spelling; the current tree uses the new one.
