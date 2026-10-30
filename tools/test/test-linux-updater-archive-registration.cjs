@@ -137,7 +137,10 @@ function validateWorkflow(text) {
 		'npm run --silent test:linux:archive-source-controls | tee "$RUNNER_TEMP/linux-archive-source-controls.log"'
 	]);
 	const setup = Pipeline.runOf(
-		Pipeline.step(body, 'Prepare authenticated managed HTTP validation tools')
+		Pipeline.step(
+			body,
+			'Install prerequisites for Prepare authenticated managed HTTP validation tools'
+		)
 	).join('\n');
 	for (const dependency of [
 		'build-essential',

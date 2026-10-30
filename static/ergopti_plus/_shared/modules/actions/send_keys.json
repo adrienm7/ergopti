@@ -1,6 +1,7 @@
 {
-	"description": "The vocabulary of the send_key and send_shortcut action parameters, and the limit of send_text. The value grammar is pinned by _shared/tests/corpus/action_parameters/send_input_vectors.json, which the three driver suites replay. `ahk` is the AutoHotkey key or modifier name, `hs` the Hammerspoon one, `linux` the evdev keycode the Linux driver presses on its uinput device. `primary` is the portable modifier: Command on macOS, Control elsewhere.",
+	"description": "The vocabulary of the send_key and send_shortcut action parameters, and the limit of send_text. The value grammar is pinned by _shared/tests/corpus/action_parameters/send_input_vectors.json, which the three driver suites replay. `ahk` is the AutoHotkey key or modifier name, `hs` the Hammerspoon one, `linux` the evdev keycode the Linux driver presses on its uinput device. `primary` is the portable modifier: Command on macOS, Control elsewhere. The keys are also the {name} tokens of a hotstring output, whose grammar is pinned by _shared/tests/corpus/hotstrings/output_token_vectors.json; `output_key_max_repeat` is the largest N of {name N}.",
 	"text_max_code_points": 500,
+	"output_key_max_repeat": 100,
 	"modifiers": [
 		{ "id": "primary", "aliases": [], "ahk": "Ctrl", "hs": "cmd", "linux": 29 },
 		{ "id": "ctrl", "aliases": ["control"], "ahk": "Ctrl", "hs": "ctrl", "linux": 29 },
@@ -18,7 +19,7 @@
 		{ "id": "enter", "aliases": ["return"], "ahk": "Enter", "hs": "return", "linux": 28 },
 		{ "id": "tab", "aliases": [], "ahk": "Tab", "hs": "tab", "linux": 15 },
 		{ "id": "escape", "aliases": ["esc"], "ahk": "Escape", "hs": "escape", "linux": 1 },
-		{ "id": "backspace", "aliases": [], "ahk": "Backspace", "hs": "delete", "linux": 14 },
+		{ "id": "backspace", "aliases": ["bs"], "ahk": "Backspace", "hs": "delete", "linux": 14 },
 		{ "id": "delete", "aliases": ["del"], "ahk": "Delete", "hs": "forwarddelete", "linux": 111 },
 		{ "id": "insert", "aliases": ["ins"], "ahk": "Insert", "hs": "help", "linux": 110 },
 		{ "id": "space", "aliases": [], "ahk": "Space", "hs": "space", "linux": 57 },

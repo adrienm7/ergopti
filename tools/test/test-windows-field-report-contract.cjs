@@ -10,7 +10,9 @@
  *    names from app_dirs.toml, the branch is derived from the current one, the
  *    base is recorded and written to base.txt, the deepen loop, the commit of
  *    the report folder alone, the Ctrl-C closing block, ASCII for Windows
- *    PowerShell 5.1, and a header that names what is not covered;
+ *    PowerShell 5.1, a header that names what is not covered, the shared
+ *    analyser run on the scrubbed copies, the collector's own checks in the
+ *    verdict grammar, and proxy facts that never print an address;
  * 2. runtime: the real script runs in fixture clones with a file:// origin
  *    and a fixture LOCALAPPDATA, under Windows PowerShell 5.1 on Windows and
  *    pwsh elsewhere (a private copy without the unique platform guard; the
@@ -37,6 +39,8 @@ const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.json';
 const APP_DIRS = 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml';
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
+// The analyser and the declarations it reads its budgets from.
+const ANALYSER = 'tools/dev/field-log-analyse.py';
 const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml';
 const GUARD =
 	"if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { Fail 'This collector runs on Windows only.' }\n";
@@ -141,6 +145,52 @@ check('Ctrl-C still commits what was collected, marked interrupted', () => {
 	assert.match(code, /-not \$script:Failing -and -not \$script:Finalized/);
 });
 
+check('the shared analyser reads the scrubbed copies, after every other step', () => {
+	assert.match(
+		code,
+		/\(Join-Path \$DevTools 'field-log-analyse\.py'\), '--repo', \$RepoRoot, '--out', \$script:Out/
+	);
+	assert.match(code, /& \$script:Python @Analyser @DayLogs/);
+	assert.match(code, /\$DayLog = Join-Path \$script:Out "\$MainPrefix\$Day\$Extension"/);
+	assert(
+		code.indexOf('@Analyser @DayLogs') > code.indexOf("Invoke-Step 'hotstring_collisions'"),
+		'the analysis reads the verdicts of every step before it'
+	);
+	assert(code.indexOf('@Analyser @DayLogs') < code.indexOf("Invoke-Git add '-f' $OutRelative"));
+});
+
+check("the collector's own checks print one verdict line each", () => {
+	const block = code.match(/Invoke-Step 'collector_checks' \{\n([\s\S]*?)\n\t\}\n/);
+	assert(block, 'no collector_checks step');
+	for (const id of ['autohotkey', 'driver_running', 'python', 'webview2']) {
+		assert.match(block[1], new RegExp(`'check=${id} verdict=pass codes=[a-z0-9_]+'`));
+		assert.match(block[1], new RegExp(`'check=${id} verdict=fail codes=[a-z0-9_]+'`));
+	}
+	for (const name of [
+		'runtimes',
+		'memory',
+		'input_devices',
+		'autostart',
+		'privileges',
+		'crash_dumps',
+		'proxy_winhttp'
+	])
+		assert.match(code, new RegExp(`Invoke-Step '${name}' \\{`));
+});
+
+check('the proxy facts say set or unset, never an address', () => {
+	const winhttp = code.match(/Invoke-Step 'proxy_winhttp' \{\n([\s\S]*?)\n\t\}\n/)[1];
+	assert.match(winhttp, /'WinHTTP: direct' \} else \{ 'WinHTTP: set' \}/);
+	assert.doesNotMatch(winhttp, /\$Text\s*$/m, 'the netsh output itself is never printed');
+	const proxy = code.match(/Invoke-Step 'proxy' \{\n([\s\S]*?)\n\t\}\n/)[1];
+	// Only the two switches print their value; the server and the PAC say "set".
+	assert.equal(proxy.split('$Value.Value').length, 2);
+	assert.match(
+		proxy,
+		/elseif \(\$Name -in 'ProxyEnable', 'AutoDetect'\) \{ "\$\{Name\}: \$\(\$Value\.Value\)" \}\n\t+else \{ "\$\{Name\}: set" \}/
+	);
+});
+
 check('the header names what the collector does not cover', () => {
 	assert.match(source, /^# NOT COVERED, AND WHY:$/m);
 	for (const topic of [
@@ -223,6 +273,12 @@ assert.ifError(probe.error);
 assert.equal(probe.status, 0, probe.stdout + probe.stderr);
 console.log(`[runtime] PowerShell ${probe.stdout.trim()}`);
 
+// The interpreter the collector finds: it names the analyser's budget sources.
+const python = ['python3', 'python', 'py'].find(
+	(name) => spawnSync(name, ['--version'], { encoding: 'utf8' }).status === 0
+);
+assert(python, 'the collector runtime needs a Python interpreter');
+
 const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-windows-field-')));
 
 /**
@@ -235,7 +291,20 @@ function fixture(name, start = 'dev') {
 	const clone = path.join(base, 'clone');
 	const origin = path.join(base, 'origin.git');
 	const local = path.join(base, 'localappdata');
-	for (const relative of [IDENTIFIERS, APP_DIRS, LOG_SCRUB, COLLISIONS, BUNDLED_SAMPLE]) {
+	const sources = JSON.parse(
+		spawnSync(python, [path.join(ROOT, ANALYSER), '--repo', ROOT, '--describe'], {
+			encoding: 'utf8'
+		}).stdout
+	).sources;
+	for (const relative of [
+		IDENTIFIERS,
+		APP_DIRS,
+		LOG_SCRUB,
+		COLLISIONS,
+		BUNDLED_SAMPLE,
+		ANALYSER,
+		...sources
+	]) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), path.join(clone, relative));
 	}
@@ -343,6 +412,16 @@ try {
 				fs.readFileSync(path.join(folders[0], 'digest_field_checks.txt'), 'utf8'),
 				/check=composer verdict=fail/
 			);
+			// The analysis marks the tray check of the day and the collector's own.
+			assert.match(steps, /^collector_checks\s+exit=\d+$/m);
+			assert.match(steps, /^analysis\s+exit=0$/m);
+			const analysis = JSON.parse(fs.readFileSync(path.join(folders[0], 'analysis.json'), 'utf8'));
+			assert.equal(
+				analysis.field_checks.items.find((item) => item.id === 'composer').verdict,
+				'fail'
+			);
+			assert.equal(analysis.performance.find((row) => row.metric === 'boot.total').max, 900);
+			assert.match(result.stdout, /Check verdicts summary: /);
 			assert.doesNotMatch(fs.readFileSync(path.join(folders[0], 'steps.txt'), 'utf8'), /\r/);
 			const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD').split('\n');
 			assert(
@@ -354,6 +433,11 @@ try {
 				'the ignored log is committed'
 			);
 			assert(committed.some((file) => file.endsWith(`/${LOG.bootstrap}`)));
+			for (const name of ['analysis.md', 'analysis.json'])
+				assert(
+					committed.some((file) => file.endsWith(`/${name}`)),
+					`${name} is committed`
+				);
 			assert.equal(git(paths.origin, 'rev-parse', expected), git(paths.clone, 'rev-parse', 'HEAD'));
 			assert.equal(git(paths.clone, 'status', '--porcelain', '--untracked-files=no'), '');
 		}

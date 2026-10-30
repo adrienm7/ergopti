@@ -11,7 +11,7 @@ real download, then prints one line per step on stdout:
 Every value comes from a closed vocabulary (a native failure stage or reason,
 an HTTP status class); no URL, host, user name or PAC content is ever printed.
 
-With --hosts it instead sends one HEAD to the root of every external host the
+With --hosts it instead sends one HEAD to the root (or the probe path) of every external host the
 drivers declare (_shared/data/identifiers.json), one after the other, and
 prints one "step host_<name> <state> <value>" line each: the field run's
 reachability check. A host is named by its declared key, never by its name.
@@ -117,10 +117,19 @@ def main():
     emit("digest", "skip", "head_only")
 
 
+# The path a host is probed at when its root does not prove reachability: the
+# Ollama registry answers 503 at its root (field run of 2026-10-30 20:51) and
+# 200 or 401 at the registry API base, /v2/, whenever it is reachable.
+PROBE_PATHS = {"ollama_registry": "v2/"}
+
+
 def declared_hosts():
-    """The declared external hosts as (key, root URL), in key order."""
+    """The declared external hosts as (key, probe URL), in key order."""
     hosts = json.loads(IDENTIFIERS.read_text(encoding="utf-8"))["hosts"]
-    return [(key, "https://" + host + "/") for key, host in sorted(hosts.items())]
+    return [
+        (key, "https://" + host + "/" + PROBE_PATHS.get(key, ""))
+        for key, host in sorted(hosts.items())
+    ]
 
 
 def host_step(bootstrap, key, url):

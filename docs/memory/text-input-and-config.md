@@ -169,6 +169,23 @@ trigger, but 141 of those triggers need an end character AND a word boundary
 before them (`Docker` ends with the word-bound trigger `r`), and the other 6 are
 identity masks (`prochaine` > `prochaine`) that never fire.
 
+### project-hotstring-output-tokens
+
+A TOML output is a small grammar (`{Left}`, `{Left 2}`, `{U+27C3}`, `{{}`), one
+shared rule read by `_shared/lua/send_input` `parse_output` and Windows
+`SendInputParseOutput`, pinned by `output_token_vectors.json`, over the keys of
+`send_keys.json`. It is not AutoHotkey Send syntax: `+ ^ ! #` and `{Ctrl down}` stay
+text on purpose, or one OS would run what another prints. Registration resolves
+it: an output with no key becomes its characters (so the matcher, casing and
+cascade see them), one with a key stays a key output. Windows' one owner is
+`HSE_RegisterFromTomlFlags`; `{Text}` covers the rest of a Send, so text beside a
+key goes out through `SendEscapeLiteral`, and so does a replayed end character,
+where `!` would otherwise press Alt. Linux keeps `injector.inject` text-only and
+plays key outputs through `inject_tokens`, because a prediction holding the
+characters `{Left}` must type them. After a key output each driver forgets its
+buffer and the AI context, and Linux drops its Undo. Windows withholds the preview
+row of a key output; macOS and Linux show its typed text.
+
 ### project-hotstring-delay-architecture
 
 Typing delays live in shared timing constants with explicit per-driver

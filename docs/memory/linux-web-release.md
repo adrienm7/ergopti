@@ -22,6 +22,19 @@ virtual keyboard nobody destroys. Action: open every device descriptor
 `O_CLOEXEC`; `tests/hardware/run_grab_race.lua` section 7 kills a daemon that
 left a child running and checks the keyboard comes back.
 
+### project-linux-the-mouse-is-grabbed-only-for-a-wheel-binding
+
+The hook observes the pointer and never grabs it, except while the navigation
+layer is held and binds a wheel direction: then it grabs the mice (EV_REL and
+no EV_ABS; a touchpad is never taken), forwards every report through the
+virtual device (created with the relative axes for that reason) and turns a
+bound notch into its key press and release, dropping the high-resolution twin.
+The grab ends with the layer, after the last forwarded button is released, or
+the desktop keeps a button down. `adapters/keyboard_hook.lua`'s main chunk is
+at LuaJIT's 200-local ceiling ("main function has more than 200 local
+variables" at load): new hook state goes into an existing table such as
+`LayerPointer`, never into new top-level locals.
+
 ### project-linux-a-field-must-be-named-at-every-boundary
 
 Linux input records cross evdev, resolver, injector, and Lua boundaries. Preserve

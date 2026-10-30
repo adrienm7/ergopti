@@ -43,6 +43,12 @@ local function with_activation(options, callback)
 						helpers.assert_true(attempted, "the original owner must mark dispatch")
 						return start(self)
 					end
+					function task:closeInput()
+						calls.close_input = (calls.close_input or 0) + 1
+						calls.closed_while_running = self.running == true
+						if options.close_refused then return false end
+						return self
+					end
 				end
 				return task
 			end
@@ -157,6 +163,16 @@ helpers.describe("Managed Ollama original pull activation", function()
 			helpers.assert_eq(f.calls.opaque, 0)
 			helpers.assert_eq(f.pulls[1].executable, PYTHON)
 			helpers.assert_eq(f.pulls[1].args, ARGUMENTS)
+			-- The 20:47 Mac run: stdin stayed open and the owner refused after 30 s.
+			helpers.assert_eq(f.calls.close_input, 1, "the owner reads its request to EOF")
+			helpers.assert_true(f.calls.closed_while_running, "EOF follows the start")
+		end)
+	end)
+
+	helpers.it("cancels a pull whose request input cannot be closed", function()
+		with_activation({ close_refused = true }, function(f)
+			helpers.assert_eq(f.start(), false)
+			helpers.assert_eq(f.calls.close_input, 1)
 		end)
 	end)
 

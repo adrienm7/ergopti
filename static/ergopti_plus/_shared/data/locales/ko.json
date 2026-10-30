@@ -3689,7 +3689,6 @@
 	"platform_reason.layer_fn_modifier_is_macos": "macOS 전용: Fn은 Mac에서만 수정자 키입니다. PC 키보드는 Fn을 키보드 내부에서 처리하므로 Windows와 Linux는 이를 받지 못하고 보낼 수도 없습니다.",
 	"platform_reason.layer_spotlight_is_macos": "macOS 전용: 이 동작은 macOS의 검색 기능인 Spotlight를 엽니다. Windows 또는 Linux에서는 대신 사용 중인 데스크톱의 검색 단축키를 키 조합으로 지정하세요.",
 	"platform_reason.layer_pointer_source_is_not_linux": "Linux에서는 사용할 수 없음: Linux 후크는 마우스를 독점하지 않고 관찰만 하므로, 레이어 바인딩이 대체할 버튼 입력을 취소할 수 없습니다. 마우스를 독점하면 데스크톱에서 포인터를 빼앗게 됩니다.",
-	"platform_reason.layer_wheel_source_is_not_linux": "Linux에서는 사용할 수 없음: Linux 후크는 마우스를 독점하지 않고 관찰만 하므로, 레이어 바인딩이 대체할 휠 회전을 취소할 수 없습니다.",
 	"platform_reason.debug_surface_is_each_drivers_own": "각 드라이버는 자신의 런타임으로 디버깅합니다. AutoHotkey는 Window Spy와 변수 목록, 키 기록을 제공하고 Hammerspoon은 Lua 콘솔을 제공합니다. 다른 런타임에는 열 만한 대응물이 없습니다.",
 	"platform_reason.chord_families_are_each_platforms": "드라이버가 묶는 조합 계열은 그 플랫폼의 것입니다. Windows는 AltGr과 CapsLock 조합을 묶고 개인 단축키 파일을 두며, macOS는 Ctrl과 Cmd 단축키를 묶습니다. 각 드라이버는 자신이 묶는 계열만 나열합니다.",
 	"platform_reason.metrics_extras_are_not_on_linux": "Linux에서는 사용할 수 없습니다: 이 드라이버에는 애플리케이션별 제외 목록이 없습니다.",

@@ -259,22 +259,98 @@ local function count_refusals(ports, executable, prefix, files, callback)
 	check(1)
 end
 
+--- Rewrites a .keylayout into the XML 1.0 xmllint reads. Apple keyboard
+--- layouts are XML 1.1 and carry character references to C0 controls
+--- (`&#x0008;` for backspace), which XML 1.0 forbids: libxml2 refused all
+--- eight genuine Ergopti files on the 2026-10-30 20:51 run. The declaration is
+--- read as 1.0 and each such reference as a space, so the parser judges
+--- everything else; a UTF-16 file (byte order mark) is left as it is.
+--- @param text string File bytes.
+--- @return string text
+function M.keylayout_as_xml10(text)
+	local head = text:sub(1, 2)
+	if head == "\254\255" or head == "\255\254" then return text end
+	text = text:gsub('^(%s*<%?xml[^>]-version%s*=%s*["\'])1%.1(["\'])', "%11.0%2", 1)
+	local function control(code)
+		return code ~= nil and code >= 1 and code <= 31 and code ~= 9 and code ~= 10 and code ~= 13
+	end
+	text = text:gsub("&#[xX](%x+);", function(hex)
+		if control(tonumber(hex, 16)) then return "&#x20;" end
+	end)
+	text = text:gsub("&#(%d+);", function(decimal)
+		if control(tonumber(decimal)) then return "&#x20;" end
+	end)
+	return text
+end
+
+-- xmllint diagnostics, in the order a cause is looked for, with the closed
+-- token a refused layout names.
+local XML_CAUSES = {
+	{ "xmlParseCharRef", "char_ref" },
+	{ "Unsupported version", "xml_version" },
+	{ "Opening and ending tag mismatch", "tag_mismatch" },
+	{ "Premature end of data", "truncated" },
+	{ "Entity", "entity" },
+	{ "encoding", "encoding" },
+	{ "AttValue", "attribute" },
+}
+
+--- Names the construct xmllint refused.
+--- @param text any The tool's stderr.
+--- @return string token
+function M.xml_refusal(text)
+	text = tostring(text or "")
+	for _, cause in ipairs(XML_CAUSES) do
+		if text:find(cause[1], 1, true) then return cause[2] end
+	end
+	return "not_well_formed"
+end
+
+--- Parses each .keylayout with xmllint over stdin, after M.keylayout_as_xml10.
+--- @param ports table Check ports (read_text, exec_input).
+--- @param files table Absolute paths (never reported).
+--- @param callback function fn(bad, timed_out, first_cause).
+local function check_keylayouts(ports, files, callback)
+	local bad, timed_out, cause = 0, 0, nil
+	local function check(index)
+		if index > #files then return callback(bad, timed_out, cause) end
+		local text = ports.read_text(files[index])
+		if type(text) ~= "string" then
+			bad, cause = bad + 1, cause or "unreadable"
+			return check(index + 1)
+		end
+		ports.exec_input(XMLLINT, { "--noout", "--nonet", "-" }, M.keylayout_as_xml10(text), COMMAND_TIMEOUT,
+			function(code, _, errors)
+				if code == nil then
+					timed_out = timed_out + 1
+				elseif code ~= 0 then
+					bad, cause = bad + 1, cause or M.xml_refusal(errors)
+				end
+				check(index + 1)
+			end)
+	end
+	check(1)
+end
+
 --- Reports one family of files checked by a parser.
 --- @param report table Report.
 --- @param id string Step id.
 --- @param files table Paths checked.
 --- @param bad integer Files the parser refused.
 --- @param timed_out integer Files whose check timed out.
-local function report_parsed(report, id, files, bad, timed_out)
+--- @param cause string|nil The construct the first refused file failed on.
+local function report_parsed(report, id, files, bad, timed_out, cause)
 	if #files == 0 then return report.step(id, STATE.skip, "none_installed") end
 	if bad == 0 and timed_out == 0 then return report.step(id, STATE.pass, #files .. "_parsed") end
-	report.step(id, STATE.fail, bad > 0 and ("refused_" .. bad .. "_of_" .. #files) or ("timeout_" .. timed_out))
+	report.step(id, STATE.fail, bad > 0 and ("refused_" .. bad .. "_of_" .. #files .. (cause and (":" .. cause) or ""))
+		or ("timeout_" .. timed_out))
 end
 
 --- The input sources macOS has turned on and the Ergopti layouts on disk. The
 --- selected source and the enabled list are what the text-input system holds
 --- now (not the preference, which it reads at login); every Ergopti .keylayout
---- must parse as XML and every Ergopti bundle's Info.plist as a property list,
+--- must parse as XML (its 1.1 control references aside) and every Ergopti
+--- bundle's Info.plist as a property list,
 --- since macOS drops a layout it cannot read without a word.
 function M.input_sources(ports, report, finish)
 	local facts = ports.input_source_facts()
@@ -297,8 +373,8 @@ function M.input_sources(ports, report, finish)
 	end
 	local files = ports.layout_files()
 	report.step("layout_bundles", STATE.info, #files.plists)
-	count_refusals(ports, XMLLINT, { "--noout", "--nonet" }, files.keylayouts, function(bad, timed_out)
-		report_parsed(report, "keylayout_xml", files.keylayouts, bad, timed_out)
+	check_keylayouts(ports, files.keylayouts, function(bad, timed_out, cause)
+		report_parsed(report, "keylayout_xml", files.keylayouts, bad, timed_out, cause)
 		count_refusals(ports, PLUTIL, { "-lint", "-s" }, files.plists, function(plist_bad, plist_timed_out)
 			report_parsed(report, "bundle_plist", files.plists, plist_bad, plist_timed_out)
 			finish()
@@ -318,8 +394,11 @@ end
 
 local SQLITE = "/usr/bin/sqlite3"
 
--- A large database takes a while to scan; the step deadline covers it.
-local SQLITE_TIMEOUT = 45
+-- A large database takes a while to scan; the step deadline covers both scans.
+local SQLITE_TIMEOUT = 40
+
+-- Seconds before the second scan that confirms a reported issue.
+M.SQLITE_RECHECK_SECONDS = 2
 
 --- Counts the non-empty lines of a command output.
 --- @param text any Output.
@@ -333,8 +412,8 @@ local function line_count(text)
 end
 
 --- The keystats database, the configuration files, the logs and the watchers.
---- The database is opened read-only (sqlite3 -readonly) and checked with PRAGMA
---- quick_check, whose only healthy answer is "ok"; each configuration file goes
+--- The database is opened read-only and without a lock (immutable URI) and
+--- checked with PRAGMA quick_check, whose only healthy answer is "ok"; each configuration file goes
 --- through the driver's own TOML reader without being written; the logs folder
 --- takes one probe file that is removed at once; the file watcher owner must be
 --- published, since FSEvents refusing a stream leaves every edit unseen.
@@ -364,18 +443,46 @@ function M.storage(ports, report, finish)
 		report.step("keystats_db", STATE.skip, "absent")
 		return finish()
 	end
-	ports.exec(SQLITE, { "-readonly", database.path, "PRAGMA quick_check;" }, SQLITE_TIMEOUT,
-		function(code, output)
-			local answer = tostring(output or ""):gsub("%s+$", "")
-			if code == 0 and answer == "ok" then
-				report.step("keystats_db", STATE.pass, "quick_check_ok")
-			elseif code == 0 then
-				report.step("keystats_db", STATE.fail, "issues_" .. line_count(answer))
-			else
-				report.step("keystats_db", STATE.fail, failure_token(code))
-			end
-			finish()
+	-- immutable=1 takes no lock: the ingest writes in rollback-journal mode, and
+	-- a reader's shared lock made its COMMIT fail with "database is locked"
+	-- (2026-10-30 20:52:44, during this step). Without a lock a write can land
+	-- mid-scan, so a reported issue counts only when a second scan sees it too.
+	local uri = M.immutable_uri(database.path)
+	local function quick_check(callback)
+		ports.exec(SQLITE, { "-readonly", uri, "PRAGMA quick_check;" }, SQLITE_TIMEOUT, function(code, output)
+			callback(code, (tostring(output or ""):gsub("%s+$", "")))
 		end)
+	end
+	quick_check(function(code, answer)
+		if code == 0 and answer == "ok" then
+			report.step("keystats_db", STATE.pass, "quick_check_ok")
+			return finish()
+		end
+		if code ~= 0 then
+			report.step("keystats_db", STATE.fail, failure_token(code))
+			return finish()
+		end
+		ports.after(M.SQLITE_RECHECK_SECONDS, function()
+			quick_check(function(again_code, again)
+				if again_code == 0 and again == "ok" then
+					report.step("keystats_db", STATE.info, "concurrent_write")
+				elseif again_code == 0 then
+					report.step("keystats_db", STATE.fail, "issues_" .. line_count(again))
+				else
+					report.step("keystats_db", STATE.fail, failure_token(again_code))
+				end
+				finish()
+			end)
+		end)
+	end)
+end
+
+--- The URI SQLite opens without any lock, for a file another connection writes.
+--- @param path string Absolute database path.
+--- @return string uri
+function M.immutable_uri(path)
+	local escaped = path:gsub("[%%%?#%s]", function(char) return string.format("%%%02X", char:byte()) end)
+	return "file:" .. escaped .. "?immutable=1"
 end
 
 
@@ -530,6 +637,9 @@ end
 
 local PS = "/bin/ps"
 
+-- Newest app crash reports listed one by one with their kind.
+M.CRASHES_LISTED = 3
+
 --- Reads `ps -o rss=,%cpu=` output.
 --- @param output any Command output.
 --- @return number|nil rss_kb, number|nil cpu_percent
@@ -541,13 +651,29 @@ end
 
 --- The app's resident memory and CPU share while the field run waits between
 --- steps, and the crash reports of the last day: the driver's own (a Lua
---- fatal it caught) and the ones macOS wrote for this app or its helpers. A
---- crash report fails its step with the count; the reports themselves stay on
---- the Mac, and the day log names what each one was.
+--- fatal it caught) and the ones macOS wrote for this app's processes (the app
+--- and its launcher roles, Hammerspoon, Ollama, Python, Karabiner), which fail
+--- by process and are listed with their closed kind (hang or crash, exception,
+--- signal, termination namespace); other apps' reports are counted only.
 function M.app_health(ports, report, finish)
 	local crashes = ports.crash_counts()
 	report.step("driver_crash_reports_24h", (crashes.driver or 0) == 0 and STATE.pass or STATE.fail, crashes.driver or 0)
-	report.step("system_crash_reports_24h", (crashes.system or 0) == 0 and STATE.pass or STATE.fail, crashes.system or 0)
+	-- One of this app's processes fails the step; every other app's report is information
+	local owned = crashes.owned or {}
+	local per_process, names = {}, {}
+	for _, entry in ipairs(owned) do
+		if not per_process[entry.process] then names[#names + 1] = entry.process end
+		per_process[entry.process] = (per_process[entry.process] or 0) + 1
+	end
+	table.sort(names)
+	local parts = {}
+	for _, name in ipairs(names) do parts[#parts + 1] = name .. ":" .. per_process[name] end
+	report.step("app_crash_reports_24h", #owned == 0 and STATE.pass or STATE.fail,
+		#owned == 0 and 0 or table.concat(parts, "+"))
+	for index = 1, math.min(#owned, M.CRASHES_LISTED) do
+		report.step("app_crash_" .. index, STATE.info, owned[index].process .. ":" .. owned[index].kind)
+	end
+	report.step("other_crash_reports_24h", STATE.info, crashes.other or 0)
 	ports.exec(PS, { "-o", "rss=,%cpu=", "-p", tostring(ports.pid()) }, COMMAND_TIMEOUT, function(code, output)
 		local rss, cpu = M.parse_usage(code == 0 and output or "")
 		if not rss then

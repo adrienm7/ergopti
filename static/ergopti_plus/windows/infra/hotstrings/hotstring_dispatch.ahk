@@ -1410,6 +1410,10 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					; Consume the end-char when it is explicitly listed as consumed —
 					; otherwise always re-inject it so the user sees what they typed.
 					EndCharPart := Plan["tail"]
+					; Outside {Text} a replayed "!" would press Alt instead of typing itself.
+					; A Send payload's plain text is never read: its buffer effect clears.
+					if !OnlyText
+							EndCharPart := SendEscapeLiteral(EndCharPart)
 					Burst := BackSpaceSeq . ReplacementPart . EndCharPart
 
 				if IsNotepadApp {

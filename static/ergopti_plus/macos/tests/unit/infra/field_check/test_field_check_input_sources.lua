@@ -6,9 +6,11 @@
 --- The field run's input sources check over scripted ports:
 --- 1. the selected source and the enabled list are reported as the
 ---    text-input system holds them, and an unreadable one fails its step;
---- 2. every installed Ergopti .keylayout goes through xmllint and every
+--- 2. every installed Ergopti .keylayout goes through xmllint on stdin, read as
+---    XML 1.0 with its control references blanked (genuine Apple layouts are
+---    XML 1.1: libxml2 refused all eight on the 2026-10-30 20:51 run), and every
 ---    Ergopti bundle's Info.plist through plutil -lint, one bounded command
----    each, so one broken file fails its family and names the count;
+---    each, so one broken file fails its family with the count and the cause;
 --- 3. with nothing installed the parse steps are skipped, and no step value
 ---    carries a file path.
 --- ==============================================================================
@@ -28,11 +30,25 @@ local function make_ports()
 	local world = {
 		commands = {},
 		exits = {},
+		inputs = {},
+		texts = {},
 		facts = { current = "org.unknown.keylayout.Ergopti", enabled_ids = {
 			"com.apple.keylayout.ABC", "org.unknown.keylayout.Ergopti", "org.unknown.keylayout.ErgoptiPlus" } },
 		files = { keylayouts = { BUNDLE_LAYOUT, LOOSE_LAYOUT }, plists = { PLIST } },
 	}
 	local ports = {
+		read_text = function(path)
+			world.reading = path
+			return world.texts[path] or '<?xml version="1.1"?><keyboard/>'
+		end,
+		exec_input = function(executable, args, input, timeout_s, callback)
+			world.commands[#world.commands + 1] = executable .. " " .. table.concat(args, " ")
+			world.inputs[#world.inputs + 1] = input
+			local exit = world.exits[world.reading]
+			world.reading = nil
+			if exit == "timeout" then return callback(nil, "", "") end
+			callback(exit or 0, "", world.stderr or "")
+		end,
 		exec = function(executable, args, timeout_s, callback)
 			local key = executable .. " " .. table.concat(args, " ")
 			world.commands[#world.commands + 1] = key
@@ -77,7 +93,8 @@ helpers.describe("input sources probe", function()
 		helpers.assert_eq(steps.layout_bundles.value, "1")
 		helpers.assert_eq(steps.keylayout_xml.value, "2_parsed")
 		helpers.assert_eq(steps.bundle_plist.value, "1_parsed")
-		helpers.assert_eq(world.commands[1], "/usr/bin/xmllint --noout --nonet " .. BUNDLE_LAYOUT)
+		helpers.assert_eq(world.commands[1], "/usr/bin/xmllint --noout --nonet -")
+		helpers.assert_eq(world.inputs[1], '<?xml version="1.0"?><keyboard/>', "read as XML 1.0")
 		helpers.assert_eq(world.commands[3], "/usr/bin/plutil -lint -s " .. PLIST)
 		for _, step in pairs(steps) do
 			helpers.assert_true(tostring(step.value):find("/", 1, true) == nil, "a step carries a path")
@@ -87,11 +104,13 @@ helpers.describe("input sources probe", function()
 	helpers.it("fails the layout family whose file does not parse, and names the count", function()
 		local ports, world = make_ports()
 		world.exits[LOOSE_LAYOUT] = 1
+		world.stderr = "-:4: parser error : Opening and ending tag mismatch: keyMap line 3 and keyboard\n"
 		local steps, result = run(ports)
 		helpers.assert_true(not result.passed)
-		helpers.assert_eq(steps.keylayout_xml.value, "refused_1_of_2")
+		helpers.assert_eq(steps.keylayout_xml.value, "refused_1_of_2:tag_mismatch")
 		helpers.assert_eq(steps.bundle_plist.state, "pass")
 		world.exits[LOOSE_LAYOUT] = nil
+		world.stderr = nil
 		world.exits[PLIST] = "timeout"
 		steps = run(ports)
 		helpers.assert_eq(steps.bundle_plist.value, "timeout_1")
@@ -110,5 +129,23 @@ helpers.describe("input sources probe", function()
 		helpers.assert_eq(steps.keylayout_xml.value, "none_installed")
 		helpers.assert_eq(steps.bundle_plist.state, "skip")
 		helpers.assert_eq(#world.commands, 0)
+	end)
+
+	helpers.it("reads a genuine XML 1.1 keylayout as one xmllint accepts", function()
+		local Probes
+		helpers.with_stub_scope(MODULES, function()
+			package.loaded["infra.field_check_probes"] = nil
+			Probes = require("infra.field_check_probes")
+		end)
+		local text = '<?xml version="1.1" encoding="utf-8"?>\n<keyboard group="126" id="-1" name="E">'
+			.. '<key code="51" action="&#x0008;"/><key code="48" output="&#9;"/><key code="1" output="&#16;"/></keyboard>'
+		local converted = Probes.keylayout_as_xml10(text)
+		helpers.assert_true(converted:find('version="1.0"', 1, true) ~= nil)
+		helpers.assert_true(converted:find("&#x0008;", 1, true) == nil, "a C0 reference XML 1.0 forbids is blanked")
+		helpers.assert_true(converted:find("&#16;", 1, true) == nil)
+		helpers.assert_true(converted:find("&#9;", 1, true) ~= nil, "a tab stays")
+		helpers.assert_eq(Probes.keylayout_as_xml10("\255\254<\0"), "\255\254<\0", "UTF-16 is left as it is")
+		helpers.assert_eq(Probes.xml_refusal("x: parser error : xmlParseCharRef: invalid xmlChar value 8"), "char_ref")
+		helpers.assert_eq(Probes.xml_refusal("odd"), "not_well_formed")
 	end)
 end)

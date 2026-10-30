@@ -174,6 +174,48 @@ helpers.describe("uinput_writer: device creation", function()
 		U._reset_backend()
 	end)
 
+	helpers.it("registers the mouse's relative axes for the navigation layer's forwarding (layer-wheel-linux)", function()
+		-- A mouse the navigation layer holds for its wheel moves on through this
+		-- device: an axis missing here is frozen by UI_DEV_CREATE and a forwarded
+		-- movement on it vanishes. Literal kernel codes: REL_X, REL_Y, REL_HWHEEL,
+		-- REL_WHEEL, REL_WHEEL_HI_RES, REL_HWHEEL_HI_RES.
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		U.open()
+		local saw_ev_rel, relbits, created_at = false, {}, nil
+		for index, call in ipairs(rec.ioctls) do
+			if call.request == 0x40045564 and call.arg == 0x02 then saw_ev_rel = true end
+			if call.request == 0x40045566 then relbits[call.arg] = index end
+			if call.request == U.UI_DEV_CREATE then created_at = index end
+		end
+		helpers.assert_true(saw_ev_rel, "EV_REL must be enabled")
+		for _, axis in ipairs({ 0x00, 0x01, 0x06, 0x08, 0x0b, 0x0c }) do
+			helpers.assert_true(relbits[axis] ~= nil and relbits[axis] < created_at,
+				"relative axis " .. axis .. " is registered before UI_DEV_CREATE")
+		end
+		U._reset_backend()
+	end)
+
+	helpers.it("writes a relative report then a SYN_REPORT, and refuses what the device cannot send (layer-wheel-linux)", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		U.open()
+		local before = #rec.writes
+		helpers.assert_eq(U.emit_relative(0x08, -1), true)
+		helpers.assert_eq(#rec.writes, before + 2, "one REL then one SYN")
+		local rel, syn = rec.writes[before + 1], rec.writes[before + 2]
+		helpers.assert_eq(le(rel, 17, 2), 0x02, "EV_REL")
+		helpers.assert_eq(le(rel, 19, 2), 0x08, "REL_WHEEL")
+		helpers.assert_eq(le(rel, 21, 4), 0xFFFFFFFF, "-1 as two's complement")
+		helpers.assert_eq(le(syn, 17, 2), 0x00, "then EV_SYN")
+		helpers.assert_eq(U.emit_relative(0x09, 1), false, "REL_MISC is not an axis the device has")
+		helpers.assert_eq(U.emit_relative(0x00, 1.5), false, "a fractional delta is refused")
+		helpers.assert_eq(#rec.writes, before + 2, "a refused report writes nothing")
+		U._reset_backend()
+	end)
+
 	helpers.it("passes the 92-byte setup struct to UI_DEV_SETUP, not an integer", function()
 		local U = helpers.load_module("adapters.uinput_writer")
 		local rec = recorder()

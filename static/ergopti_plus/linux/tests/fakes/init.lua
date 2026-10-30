@@ -67,9 +67,15 @@ function M.uinput_writer(opts)
 			if #bytes ~= 24 then return false end
 			local kind, code, value = uint(bytes, 17, 2), uint(bytes, 19, 2), uint(bytes, 21, 4)
 			if kind == 1 then pending = { code = code, value = value }; return true end
+			-- A relative report: the value is a signed 32-bit delta.
+			if kind == 2 then
+				if value >= 0x80000000 then value = value - 0x100000000 end
+				pending = { code = code, value = value, relative = true }
+				return true
+			end
 			if kind ~= 0 or code ~= 0 or not pending then return false end
 			local row = pending; pending = nil
-			if opts.on_emit and opts.on_emit(row.code, row.value) ~= true then return false end
+			if not row.relative and opts.on_emit and opts.on_emit(row.code, row.value) ~= true then return false end
 			fake.events[#fake.events + 1] = row
 			return true
 		end,
@@ -95,7 +101,7 @@ function M.uinput_writer(opts)
 	function fake.test.pressed()
 		local out = {}
 		for _, e in ipairs(fake.events) do
-			if e.value == 1 then out[#out + 1] = e.code end
+			if e.value == 1 and not e.relative then out[#out + 1] = e.code end
 		end
 		return out
 	end

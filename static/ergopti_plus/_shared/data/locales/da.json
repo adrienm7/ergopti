@@ -3689,7 +3689,6 @@
 	"platform_reason.layer_fn_modifier_is_macos": "Kun macOS: Fn er kun en modifikator på en Mac. Et pc-tastatur håndterer Fn inde i selve tastaturet, så Windows og Linux modtager den aldrig og kan ikke sende den.",
 	"platform_reason.layer_spotlight_is_macos": "Kun macOS: denne handling åbner Spotlight, søgningen i macOS. På Windows eller Linux skal du i stedet tildele dit skrivebords egen søgegenvej som en tastekombination.",
 	"platform_reason.layer_pointer_source_is_not_linux": "Ikke på Linux: Linux-krogen overvåger musen uden at gribe den, så den kan ikke annullere det knaptryk, en lagbinding ville erstatte. At gribe musen ville tage markøren fra skrivebordet.",
-	"platform_reason.layer_wheel_source_is_not_linux": "Ikke på Linux: Linux-krogen overvåger musen uden at gribe den, så den kan ikke annullere det drej på hjulet, en lagbinding ville erstatte.",
 	"platform_reason.debug_surface_is_each_drivers_own": "Hver driver fejlsøger gennem sin egen runtime: AutoHotkey giver Window Spy, en variabelliste og en tastehistorik, og Hammerspoon giver en Lua-konsol. De andre runtimes har intet tilsvarende at åbne.",
 	"platform_reason.chord_families_are_each_platforms": "De akkordfamilier en driver binder, tilhører dens platform: Windows samler sine AltGr- og CapsLock-kombinationer og holder en fil med personlige genveje, macOS samler sine Ctrl- og Cmd-genveje. Hver driver viser kun den familie, den binder.",
 	"platform_reason.metrics_extras_are_not_on_linux": "Ikke tilgængelig på Linux: denne driver har ingen udelukkelsesliste per program.",
