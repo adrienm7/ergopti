@@ -16,6 +16,12 @@ _KBSP_Require(Condition, Message) {
 		throw Error(Message)
 }
 
+; KL_LogHotstring names the category through this diagnostic-only policy, whose
+; owner reads the driver's TOML tree; the child owns no such tree or log file.
+HotstringCategoryLogName(Category) {
+	return Category
+}
+
 LoggerDebug(Source, Message, Values*) {
 	global _KBSP
 	Text := Message
