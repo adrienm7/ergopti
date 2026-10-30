@@ -215,8 +215,12 @@ _TLTSH_RequestSourceIsBoundAndPublished() {
 		"legacy mutable engine focus fields must not coexist with request/presentation-owned source snapshots")
 	BoundTimers := _TLTSH_Count(DriverSrc,
 		"LLM_Engine_FirePrediction.Bind(buffer, AcceptSource")
-	AssertEqual(4, BoundTimers,
-		"all four FirePrediction timer/retry bindings must carry AcceptSource; a newly added raw Bind is an unowned-control regression")
+	AssertEqual(2, BoundTimers,
+		"both FirePrediction retry bindings must carry AcceptSource; a newly added raw Bind is an unowned-control regression")
+	; The two debounce timers reach FirePrediction through the request plan's token.
+	AssertEqual(2, _TLTSH_Count(DriverSrc,
+		'_LLM_Engine_FireArmed.Bind(Decision["token"], buffer, AcceptSource,'),
+		"both armed debounce timers must carry AcceptSource; a newly added raw Bind is an unowned-control regression")
 	; The warmup and rate-limit re-arms replay a prompt action's own request.
 	AssertEqual(2, _TLTSH_Count(DriverSrc,
 		"LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)"),
