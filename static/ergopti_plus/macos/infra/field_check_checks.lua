@@ -803,6 +803,7 @@ M.checks = {
 	input_sources = Probes.input_sources,
 	storage = Probes.storage,
 	launcher_roles = Probes.launcher_roles,
+	network_hosts = Probes.network_hosts,
 }
 
 return M
