@@ -18,10 +18,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TTCWS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TTCWS_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TTCWS_StripLineComments(Src) {
@@ -65,7 +63,7 @@ Test("prediction_engine: TickCount delta uses wrap-safe (now - last + 0x10000000
 ; ==========================================================================
 
 _TTCWS_LlmBridgeWrapSafe() {
-	Src := _TTCWS_StripLineComments(_TTCWS_ReadSource("modules/keymap/llm_bridge.ahk"))
+	Src := _TTCWS_StripLineComments(_TTCWS_ReadSource("llm_bridge.ahk"))
 	Assert(Src != "", "modules/keymap/llm_bridge.ahk must be readable")
 
 	Assert(InStr(Src, "0x100000000") > 0,

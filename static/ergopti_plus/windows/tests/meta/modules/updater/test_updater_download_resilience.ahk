@@ -15,14 +15,12 @@
 
 #Requires AutoHotkey v2.0
 
-_G5UD_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_G5UD_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _G5UD_CheckDownloadPollGuards() {
-	Src := _G5UD_ReadSource("modules/updater.ahk")
+	Src := _G5UD_ReadSource("updater.ahk")
 	Seg := _DriverFuncBody("_Updater_MonitorStagingWorker")
 	
 	Assert(Seg != "", "_Updater_MonitorStagingWorker must exist in updater.ahk")

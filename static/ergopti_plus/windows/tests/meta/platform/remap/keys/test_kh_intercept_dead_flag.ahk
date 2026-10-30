@@ -33,10 +33,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_KHIDF_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_KHIDF_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -49,7 +47,7 @@ _KHIDF_ReadSource(RelPath) {
 ; ==================================================
 
 _KHIDF_KHStartWarnsOnIntercept() {
-	Src := _KHIDF_ReadSource("adapters/keyboard_hook.ahk")
+	Src := _KHIDF_ReadSource("keyboard_hook.ahk")
 	Seg := _DriverFuncBody("KHStart")
 	Assert(Seg != "", "KHStart(Opts) declaration must exist in keyboard_hook.ahk")
 	Assert(InStr(Seg, "intercept") > 0,
