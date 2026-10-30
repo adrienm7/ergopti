@@ -194,7 +194,7 @@ check(
 // ------------------------------------------------------------------
 const luaSearch = (lua.match(/^M\.DEFAULT_SEARCH_URL = "([^"]+)"/m) || [])[1];
 const manifestSearch = (read(MANIFEST).match(
-	/^default = \{ enabled = \w+, search_engine = "[^"]+", search_engine_url_query = "([^"]+)" \}/m
+	/^id = "search_engine_url_query"\ndefault = "([^"]+)"/m
 ) || [])[1];
 check(Boolean(luaSearch), 'the Lua port must declare M.DEFAULT_SEARCH_URL');
 check(Boolean(manifestSearch), 'the shortcuts.search feature must declare search_engine_url_query');
