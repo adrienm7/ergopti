@@ -371,6 +371,26 @@ helpers.describe("field run: declaration and requests", function()
 	end)
 end)
 
+helpers.describe("field run: a disabled step", function()
+	helpers.it("skips the shipped driver_reload by name and never asks for a reload", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			local spec = FieldRun.validate(Json.decode(SPEC_TEXT))
+			-- The Mac run of 2026-10-30 21:06 lost the app when this step reloaded.
+			helpers.assert_eq(spec.step_by_id.driver_reload.disabled, "reload_lost_the_app")
+			local session = FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports })
+			session:start()
+			state.request({ schema = 1, request_id = "r39", steps = Json.array({ "driver_reload" }) })
+			state.advance(0)
+			local result = state.json(result_path("r39", 1, "driver_reload"))
+			helpers.assert_eq(result.verdict, "skip")
+			helpers.assert_eq(result.codes[1], "reload_lost_the_app")
+			helpers.assert_nil(state.files[FOLDER .. "/resume.json"], "no reload was prepared")
+		end)
+	end)
+end)
+
 helpers.describe("field run: the timed reload", function()
 	--- Declares a two-step run: one check, then the reload, then a check.
 	local function reload_spec(FieldRun)
@@ -381,6 +401,8 @@ helpers.describe("field run: the timed reload", function()
 			if step.id == "field_lease" then check = step end
 			if step.id == "field_network" then last = step end
 		end
+		-- The mechanism stays proven while the shipped step is disabled.
+		reload.disabled = nil
 		declaration.steps = { check, reload, last }
 		declaration.deadline_seconds.default = 600
 		return FieldRun.validate(declaration), reload
