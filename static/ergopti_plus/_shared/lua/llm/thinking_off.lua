@@ -39,6 +39,8 @@
 --- _shared/tests/corpus/llm/thinking_off_vectors.json.
 --- ==============================================================================
 
+local TableUtil = require("table_util")
+
 local M = {}
 
 local ModelCapabilities = require("llm.model_capabilities")
@@ -481,9 +483,7 @@ end
 function M.record_refusal(refused, provider, model, field, now)
 	local key = provider .. "|" .. model
 	if not refused[key] then
-		local count = 0
-		for _ in pairs(refused) do count = count + 1 end
-		if count >= M.MAX_REFUSALS then return false end
+		if TableUtil.count(refused) >= M.MAX_REFUSALS then return false end
 		refused[key] = {}
 	end
 	refused[key][field] = now
