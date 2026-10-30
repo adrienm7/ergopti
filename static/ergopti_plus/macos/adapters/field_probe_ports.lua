@@ -225,7 +225,15 @@ local function keystats_database()
 	local path = type(manager) == "table" and type(manager.get_sqlite_path) == "function"
 		and manager.get_sqlite_path() or nil
 	if type(path) ~= "string" or path == "" then return { path = nil, present = false } end
-	return { path = path, present = require("adapters.file_system").exists(path) == true }
+	local FileSystem = require("adapters.file_system")
+	-- The cache of earlier versions, <TMPDIR>/ergopti_metrics/<device>/db.sqlite,
+	-- which the log manager adopts once (log_manager._adopt_legacy_cache).
+	local device, tmp = path:match("([^/]+)/db%.sqlite$"), os.getenv("TMPDIR")
+	local legacy = device and type(tmp) == "string" and tmp:sub(1, 1) == "/"
+		and (tmp:gsub("/+$", "") .. "/ergopti_metrics/" .. device .. "/db.sqlite") or nil
+	return { path = path, present = FileSystem.exists(path) == true,
+		expected_root = require("infra.config_paths").metrics_cache_dir(),
+		legacy_present = legacy ~= nil and FileSystem.exists(legacy) == true }
 end
 
 

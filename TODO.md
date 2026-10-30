@@ -77,7 +77,8 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    - **oMLX:** oMLX on port 8181 is found in API mode, with no `ps` deadlock.
    - **Composer (L52):** the composer is enabled after a single re-read, and `06_field_composer` passes.
    - **Keystats cache:** it now lives in `~/Library/Caches/ergopti_plus/metrics`. Check the one-time move
-     line from TMPDIR.
+     line from TMPDIR. Automated: `field_storage`'s `keystats_cache_place` passes only when the live cache
+     sits there and no `<TMPDIR>/ergopti_metrics/<device>/db.sqlite` is left.
    - **Gestures:** the menu shows one « Infos… » row that opens the dialog, and `tap_3` recommends left
      click.
    - **Three-finger swipe (L46):** each step of 25 units (4, 29, 54, 79…) gives one more action, and two-finger
@@ -115,7 +116,9 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      (`immutable=1`, so the ingest never meets a lock; an issue counts when a second scan sees it) (a damage names the
      number of issue lines only); `config.toml`, `config_karabiner.toml`, the personal hotstrings and personal
      info files each parse with the driver's TOML reader, read-only; today's log exists; the logs folder takes a
-     probe file (removed at once); the auto-reload file watcher owner is published (FSEvents accepted it).
+     probe file (removed at once); the auto-reload file watcher owner is published (FSEvents accepted it);
+     the keystats cache is under `~/Library/Caches/ergopti_plus/` with no TMPDIR copy left
+     (`keystats_cache_place`: `caches`, `legacy_left`, `outside_caches`).
    - `field_launcher_roles`: the launcher resolves; `--managed-http-worker` with malformed arguments exits 64
      at once (any other exit or a timeout: the role did not dispatch); the same worker carries one direct GET,
      with the request `native_http.py` sends, to a loopback server the check opens and closes. An exit 64 there
