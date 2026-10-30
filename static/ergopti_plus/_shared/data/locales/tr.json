@@ -1802,6 +1802,7 @@
 	"menu.llm.debounce_label": "Öneriden önce boşta kalma süresi: %s",
 	"menu.llm.debounce_prompt": "Oluşturmadan önce boşta kalma gecikmesi (ms cinsinden, ör. 600):",
 	"menu.llm.min_interval_label": "İki otomatik YZ isteği arasındaki en kısa süre: %s",
+	"menu.llm.trigger.min_request_interval_ms": "İstek aralığı",
 	"menu.llm.delete_model_body": "\"%s\" modelini yerel önbellekten gerçekten silmek istiyor musunuz?",
 	"menu.llm.delete_model_cache": "🗑️ Bu modeli önbellekten sil",
 	"menu.llm.delete_model_title": "Model silinsin mi?",

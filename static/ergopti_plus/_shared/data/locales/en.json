@@ -1797,6 +1797,7 @@
 	"menu.llm.debounce_label": "Idle time before suggestion: %s",
 	"menu.llm.debounce_prompt": "Idle delay before generation (in ms, e.g. 600):",
 	"menu.llm.min_interval_label": "Minimum time between two automatic AI requests: %s",
+	"menu.llm.trigger.min_request_interval_ms": "Request Interval",
 	"menu.llm.delete_model_body": "Do you really want to delete the model \"%s\" from the local cache?",
 	"menu.llm.delete_model_cache": "🗑️ Delete this model from cache",
 	"menu.llm.delete_model_title": "Delete the model?",

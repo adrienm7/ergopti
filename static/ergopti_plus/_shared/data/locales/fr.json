@@ -1797,6 +1797,7 @@
 	"menu.llm.debounce_label": "Temps d’inactivité avant suggestion : %s",
 	"menu.llm.debounce_prompt": "Délai d’inactivité avant génération (en ms, ex. 600) :",
 	"menu.llm.min_interval_label": "Délai minimum entre deux requêtes IA automatiques : %s",
+	"menu.llm.trigger.min_request_interval_ms": "Intervalle des requêtes",
 	"menu.llm.delete_model_body": "Voulez-vous vraiment supprimer le modèle « %s » du cache local ?",
 	"menu.llm.delete_model_cache": "🗑️ Supprimer ce modèle du cache",
 	"menu.llm.delete_model_title": "Supprimer le modèle ?",

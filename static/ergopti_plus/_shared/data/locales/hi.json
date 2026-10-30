@@ -1802,6 +1802,7 @@
 	"menu.llm.debounce_label": "सुझाव से पहले निष्क्रिय समय: %s",
 	"menu.llm.debounce_prompt": "जनरेशन से पहले निष्क्रियता विलंब (ms में, जैसे 600):",
 	"menu.llm.min_interval_label": "दो स्वचालित AI अनुरोधों के बीच न्यूनतम समय: %s",
+	"menu.llm.trigger.min_request_interval_ms": "अनुरोध अंतराल",
 	"menu.llm.delete_model_body": "क्या आप वास्तव में मॉडल \"%s\" को स्थानीय कैश से हटाना चाहते हैं?",
 	"menu.llm.delete_model_cache": "🗑️ इस मॉडल को कैश से हटाएं",
 	"menu.llm.delete_model_title": "मॉडल हटाएं?",

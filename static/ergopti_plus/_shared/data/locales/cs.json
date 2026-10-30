@@ -1802,6 +1802,7 @@
 	"menu.llm.debounce_label": "Čas nečinnosti před návrhem: %s",
 	"menu.llm.debounce_prompt": "Prodleva nečinnosti před generováním (v ms, např. 600):",
 	"menu.llm.min_interval_label": "Minimální doba mezi dvěma automatickými požadavky na AI: %s",
+	"menu.llm.trigger.min_request_interval_ms": "Odstup požadavků",
 	"menu.llm.delete_model_body": "Opravdu chcete smazat model \"%s\" z lokální mezipaměti?",
 	"menu.llm.delete_model_cache": "🗑️ Smazat tento model z mezipaměti",
 	"menu.llm.delete_model_title": "Smazat model?",
