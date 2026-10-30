@@ -89,7 +89,7 @@ _GPO_Source(Owners) {
 	Dispatcher := _GKO_DispatcherOwner()
 	AssertTrue(_DriverIsProductionSource(Dispatcher) && InStr(FSReadStrict(Dispatcher), "class HookDispatcher {", true), "the complete real dispatcher must exist")
 	Imports.Push(Dispatcher, _GPO_MetadataOwner())
-	for Symbol in ["WallClockTimestamp", "CryptoSha256Bytes", "KL_JsonEncode", "JsonStringLiteral", "HotPath_Now", "GestureInvokeAction"] {
+	for Symbol in ["WallClockTimestamp", "CryptoSha256Bytes", "KL_JsonEncode", "JsonStringLiteral", "HotPath_Now", "GestureInvokeAction", "AiActionBlocked", "QuitRequest_Run"] {
 		Path := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Path != "" && _DriverFuncBody(Symbol) != "", "the genuine child dependency must be nonempty: " . Symbol)
 		Imports.Push(Path)
@@ -104,7 +104,18 @@ _GPO_Source(Owners) {
 	}
 	Owners["imports"] := ImportReceipts
 	RouteReceipts := []
-	for Symbol in ["GestureDispatch", "GestureReleaseOwnedCarrierModifiers"] {
+	; script_quit reaches the native exit through the tray's genuine Quit admission;
+	; only the owners of its facts are the fixture's idle answers.
+	QuitOwner := _DriverProductionFileForSymbol("ActivateExitApp")
+	AssertTrue(QuitOwner != "", "the Quit route owner must resolve")
+	QuitLifecycle := FSReadStrict(QuitOwner)
+	for Name in ["_LifecycleFlushExitRetryArmed", "LIFECYCLE_USER_QUIT_DEADLINE_MS", "LIFECYCLE_USER_QUIT_POLL_MS"] {
+		Found := RegExMatch(QuitLifecycle, "m)^global " . Name . "[ \t]*:=[^`r`n]+", &Declaration)
+		AssertTrue(Found != 0, "the Quit route must use its genuine global initializer: " . Name)
+		Source .= Declaration[0] . "`n"
+	}
+	for Symbol in ["GestureDispatch", "GestureReleaseOwnedCarrierModifiers", "ActivateExitApp", "_LifecycleQuitFacts",
+			"_LifecycleQuitSchedule", "_LifecycleQuitRetryOwned", "NotifyQuitRefused"] {
 		Body := _DriverFuncBody(Symbol)
 		Path := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Body != "" && Path != "", "the actual route body must resolve: " . Symbol)
