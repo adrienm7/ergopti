@@ -425,6 +425,8 @@ LLM_Menu_ActivateRuntime(ActivateHotkeysFn := 0, ScheduleBackendFn := 0, HealthT
 	; no health timer or probe starts. A boot with the AI off used to bind them
 	; anyway, and a refused native navigation plan aborted the boot (issue #97).
 	Enabled := LLM_Menu_AiEnabled()
+	; The slots bound to an AI action were bound before this state was restored.
+	KeyboardShortcutsFollowAiSwitch()
 	if Enabled {
 		Activate := HasMethod(ActivateHotkeysFn, "Call") ? ActivateHotkeysFn : _LLM_Menu_RequireFirstRestoreHotkeys
 		try Activate.Call(true)

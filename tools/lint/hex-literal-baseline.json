@@ -37,7 +37,6 @@
 	"static/ergopti_plus/extensions/ergopti-demo/hotstrings/demo-symbols.toml": 1,
 	"static/ergopti_plus/macos/apps/App Cloner.app/Contents/Resources/clone_app.sh": 2,
 	"static/ergopti_plus/macos/apps/App Cloner.app/Contents/Resources/make_shortcut.sh": 1,
-	"static/ergopti_plus/windows/ui/hotstrings_config_window/hcw_helpers.ahk": 14,
 	"static/ergopti_plus/windows/ui/hotstrings_config_window/hcw_mutations.ahk": 1,
 	"static/ergopti_plus/windows/ui/hotstrings_config_window/webview.ahk": 1
 }

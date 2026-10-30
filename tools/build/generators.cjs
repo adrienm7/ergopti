@@ -185,7 +185,10 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-native-theme.cjs',
-		outputs: ['static/ergopti_plus/_shared/lua/native_theme_data.lua']
+		outputs: [
+			'static/ergopti_plus/_shared/lua/native_theme_data.lua',
+			'static/ergopti_plus/windows/_generated/native_theme.ahk'
+		]
 	},
 	{
 		script: 'codegen/codegen-brightness-actions.cjs',

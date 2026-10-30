@@ -267,7 +267,7 @@ _PCA_StaleAgentCannotCancel() {
 		AssertEqual(Generation, _LLM_Agent_Generation)
 		AssertEqual(ObjPtr(Timer), ObjPtr(_LLM_Agent_Auto["timer"]))
 	}
-	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
 }
 Test("prefix: agent observer revalidates before replacing the pause owner (prefix-char-admission)",
 	_PCA_StaleAgentCannotCancel)

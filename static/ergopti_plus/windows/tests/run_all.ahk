@@ -348,6 +348,7 @@ InstallHotstringHooks()
 
 ; ── Adapter contract: include all port adapters so contract vector tests can call them ──
 #Include ../adapters/notifier.ahk
+#Include ../infra/quit_admission.ahk
 #Include ../adapters/timer_scheduler.ahk
 #Include ../adapters/file_system.ahk
 #Include ../adapters/window_info.ahk
@@ -438,6 +439,7 @@ InstallSendNoOps()
 #Include unit/infra/lifecycle/test_build_commit.ahk
 #Include unit/modules/updater/test_version_display_strips_build_metadata.ahk
 #Include unit/infra/logger/test_logger_daily_rotation.ahk
+#Include unit/infra/logger/test_logger_volume.ahk
 ; The logs-folder resolver and the Debug menu log openers built on it
 ; (logs-dir-resolver). log_openers.ahk is definitions only.
 #Include ../ui/log_openers.ahk
@@ -580,6 +582,7 @@ InstallSendNoOps()
 #Include unit/modules/hotstrings/catalogue/test_hotstring_handler.ahk
 #Include unit/modules/hotstrings/catalogue/test_hotstrings_end_to_end.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_loader.ahk
+#Include unit/platform/remap/tap_hold/test_tap_hold_migration.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_overlay_and_modifiers.ahk
 #Include unit/infra/i18n/test_i18n.ahk
 #Include unit/infra/i18n/test_locale_probe_is_silent.ahk
@@ -623,6 +626,9 @@ InstallSendNoOps()
 #Include unit/modules/updater/test_updater_balloon_click_ownership.ahk
 #Include unit/modules/updater/test_updater_channel_selection.ahk
 #Include unit/modules/updater/test_updater_release_list_budget.ahk
+#Include unit/modules/updater/test_updater_check_only_fallback.ahk
+#Include unit/modules/updater/test_updater_check_session_vectors.ahk
+#Include unit/infra/lifecycle/test_quit_admission.ahk
 ; The About row actions; menu_init.ahk is included with the tray root below.
 #Include ../ui/menu/menu_actions.ahk
 #Include unit/modules/updater/test_about_menu_channel_rows.ahk
@@ -959,12 +965,14 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/llm/actions/test_llm_agent.ahk
 #Include unit/modules/llm/actions/test_llm_agent_connectors.ahk
 #Include unit/modules/llm/actions/test_llm_agent_ai_off.ahk
+#Include unit/modules/llm/menu/test_llm_menu_test_prediction.ahk
 #Include unit/modules/llm/actions/test_llm_agent_system_menu.ahk
 #Include unit/modules/llm/actions/test_llm_agent_requester.ahk
 #Include unit/modules/llm/api/test_llm_remote_formats.ahk
 #Include unit/modules/llm/prediction/test_llm_live_mode.ahk
 #Include unit/modules/shortcuts/test_send_input_actions.ahk
 #Include unit/platform/remap/keys/test_tap_keys.ahk
+#Include unit/platform/remap/keys/test_ai_action_gate.ahk
 #Include unit/platform/remap/key_combinations/test_key_combinations.ahk
 #Include unit/modules/gestures/test_gesture_cycle_candidates.ahk
 #Include unit/modules/gestures/test_gesture_recommended_actions.ahk
@@ -1165,6 +1173,7 @@ global _AhkSubDir := ""
 #Include unit/infra/config/migration/test_keystats_migration_read_refusal.ahk
 #Include unit/modules/hotstrings/engine/test_build_inserts_covers_emitted_types.ahk
 #Include unit/modules/keystats/metrics/test_metrics_and_locale_honesty.ahk
+#Include unit/modules/keystats/test_corpus_app_category_store.ahk
 #Include unit/modules/keystats/test_keystats_app_categories.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader_manifest_contract.ahk
@@ -1546,7 +1555,10 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/hotstrings/preview/test_preview_engine_single_owner.ahk
 #Include meta/corpus/test_corpus_dynamic_hotstrings_prefix.ahk
 #Include meta/corpus/test_corpus_hotstrings_config_resolve.ahk
+#Include meta/corpus/test_corpus_hotstring_family_samples.ahk
+#Include meta/corpus/test_corpus_hotstring_override_parse.ahk
 #Include meta/corpus/test_corpus_tap_hold.ahk
+#Include meta/corpus/test_corpus_tap_hold_decisions.ahk
 #Include meta/corpus/test_corpus_keymap_layers.ahk
 #Include meta/corpus/test_corpus_hotstring_matcher.ahk
 ; LLM parser corpus -- tests LLM_ParseOllamaResponse and _LLMRemoteParseResponse
@@ -1602,6 +1614,7 @@ _LogBootProgress("keystats modules + tests included")
 ; Keystats aggregation corpus -- tests KLW_WalkTypingEntry / KLW_WalkAppSwitch /
 ; KLW_WalkWindowSwitch / KLW_WalkSystemEvent against shared cross-driver vectors.
 #Include meta/corpus/test_corpus_keystats_aggregation.ahk
+#Include meta/corpus/test_corpus_keystats_correction_erased.ahk
 ; Healthcheck snapshot corpus -- tests _HealthCheck_FormatUptime and validates
 ; the golden vectors for the shared snapshot logic (format_uptime, issues, schema).
 #Include meta/corpus/test_corpus_healthcheck_snapshot.ahk
@@ -1615,6 +1628,7 @@ _LogBootProgress("keystats modules + tests included")
 ; cross-driver vectors.
 #Include meta/corpus/test_corpus_tooltip_layout.ahk
 ; TOML coercion corpus
+#Include meta/corpus/test_corpus_toml_batch_write.ahk
 #Include meta/corpus/test_corpus_toml_coercion.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
@@ -2082,6 +2096,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/platform/remap/altgr/test_kana_altgr_ctrl_chords.ahk
 #Include ../ui/error_dialog/init.ahk
 #Include unit/ui/windows/test_error_dialog.ahk
+#Include unit/ui/windows/test_hcw_palette_generated.ahk
 #Include unit/ui/webview/test_onboarding_open_generation.ahk
 #Include unit/ui/webview/test_changelog_open_generation.ahk
 #Include unit/ui/webview/test_changelog_restore_authority.ahk
@@ -2224,6 +2239,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/infra/config/persistence/test_group_config_cache_alias_invalidation.ahk
 #Include unit/infra/dispatch/test_hotpath_profiler_exclusive.ahk
 #Include unit/infra/dispatch/test_hotpath_latency_statistics.ahk
+#Include unit/infra/dispatch/test_phase_stats.ahk
 #Include unit/infra/dispatch/test_hotpath_breakdown_reentry.ahk
 #Include unit/infra/dispatch/test_hook_timing_input_privacy.ahk
 #Include unit/infra/dispatch/test_hotpath_per_segment_threshold.ahk
@@ -2275,6 +2291,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/adapters/shell_runner/test_shell_runner_deferred_completion.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_tree_deferred_completion.ahk
 #Include unit/adapters/crash_report/test_crash_report_worker_transport.ahk
+#Include unit/adapters/crash_report/test_crash_report_shared_document.ahk
 #Include unit/adapters/crash_report/test_crash_mapping_drain_reentry.ahk
 #Include unit/adapters/crash_report/test_crash_mapping_payload_bounds.ahk
 #Include unit/adapters/crash_report/test_crash_worker_git_exit.ahk

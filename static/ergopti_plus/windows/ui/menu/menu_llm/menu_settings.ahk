@@ -967,6 +967,96 @@ LLM_Menu_TriggerPrediction(FireFn := 0) {
 	return true
 }
 
+; The most characters of an answer the test prediction's notice shows.
+global LLM_TEST_PREDICTION_EXCERPT_CHARS := 200
+
+; Generation of the newest test prediction: an older answer is dropped.
+global _LLM_Menu_TestPredictionGeneration := 0
+
+/**
+ * The AI menu's "Test a prediction": one prediction on a sample context with the
+ * active backend, showing its result or why it could not run. It goes straight
+ * to the backend rather than through the engine, whose answer is a tooltip the
+ * user could accept into the focused document, and never touches the typed
+ * context. The refusals are those of a manual request.
+ * @param {Func} SendFn Test seam taking the sample, the two callbacks and the
+ *     requester's admission; the active backend when omitted.
+ * @returns {Boolean} True when the request was sent.
+ */
+LLM_Menu_TestPrediction(SendFn := 0) {
+	global _LLM_Menu_TestPredictionGeneration
+	Sample := t("llm.test_prediction.sample")
+	Enabled := LLM_Menu_AiEnabled()
+	Reason := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, Enabled,
+		Enabled && _LLM_Menu_BackendIsReadyForUse(), Sample)
+	if (Reason != "") {
+		_LLM_Menu_ShowManualPredictionRefusal(Reason, StrLen(Sample))
+		return false
+	}
+	_LLM_Menu_TestPredictionGeneration += 1
+	Generation := _LLM_Menu_TestPredictionGeneration
+	LoggerStart("LLM", "Test prediction #{1} sent to the active backend.", Generation)
+	_LLM_Menu_ShowManualPredictionNotice("llm.test_prediction.running")
+	Send := HasMethod(SendFn, "Call") ? SendFn : _LLM_Menu_TestPredictionSend
+	try Send.Call(Sample, _LLM_Menu_OnTestPredictionAnswer.Bind(Generation),
+		_LLM_Menu_OnTestPredictionFailure.Bind(Generation), _LLM_Menu_TestPredictionIsCurrent.Bind(Generation))
+	catch as Err {
+		_LLM_Menu_OnTestPredictionFailure(Generation, Map("reason", Err.Message))
+		return false
+	}
+	return true
+}
+
+; Sends the sample to the active backend, with the active prompt and settings.
+_LLM_Menu_TestPredictionSend(Sample, OnSuccess, OnFail, Current) {
+	global _LLM_Menu, _LLM_Engine
+	Profile := LLM_FindProfile(_LLM_Menu["profile_id"], _LLM_Menu["user_profiles"])
+	System := LLM_ResolveSystemPrompt(Profile, 1, _LLM_Engine["min_words"], _LLM_Engine["max_words"],
+		_LLM_Engine["language"])
+	Temperature := _LLM_Engine["temperature"] + 0.0
+	if (_LLM_Menu["backend"] == "api") {
+		Entry := _LLM_Engine_GetActiveApiEntry()
+		if (Entry == "")
+			throw Error("no API entry is selected")
+		_LLM_Engine_ResolveRemoteTransport().Call(Entry, System, Sample, Temperature, OnSuccess, OnFail, "", "", "", 0, Current)
+		return
+	}
+	LLM_OllamaGenerate_Async(LLM_ResolveOllamaTag(_LLM_Menu["model"]), System, Sample, Temperature, OnSuccess, OnFail,
+		"", "", false, "", "", Current)
+}
+
+; @returns {Boolean} True while this test's answer may still be shown.
+_LLM_Menu_TestPredictionIsCurrent(Generation) {
+	global _LLM_Menu_TestPredictionGeneration
+	return (Generation == _LLM_Menu_TestPredictionGeneration && !A_IsSuspended && LLM_Menu_AiEnabled()) ? true : false
+}
+
+; The backend answered: show the answer, a blank one being a failure.
+_LLM_Menu_OnTestPredictionAnswer(Generation, Text, *) {
+	global LLM_TEST_PREDICTION_EXCERPT_CHARS
+	if !_LLM_Menu_TestPredictionIsCurrent(Generation)
+		return
+	Answer := (Text is String) ? Trim(Text, " `t`r`n") : ""
+	if (Answer == "") {
+		_LLM_Menu_OnTestPredictionFailure(Generation, Map("reason", "the backend returned an empty answer"))
+		return
+	}
+	; Sizes only: the answer stays out of the log, like every prediction.
+	LoggerSuccess("LLM", "Test prediction #{1} answered ({2} character(s)).", Generation, StrLen(Answer))
+	Shown := StrLen(Answer) > LLM_TEST_PREDICTION_EXCERPT_CHARS
+		? SubStr(Answer, 1, LLM_TEST_PREDICTION_EXCERPT_CHARS) . "…" : Answer
+	_LLM_Menu_ShowNotice(StrReplace(t("llm.test_prediction.result"), "{1}", Shown))
+}
+
+; The backend refused or failed: show why.
+_LLM_Menu_OnTestPredictionFailure(Generation, Failure := "") {
+	if !_LLM_Menu_TestPredictionIsCurrent(Generation)
+		return
+	Reason := _LLM_Vision_FailureReason(Failure)
+	LoggerWarn("LLM", "Test prediction #{1} failed: {2}.", Generation, Reason)
+	_LLM_Menu_ShowNotice(StrReplace(t("llm.test_prediction.failed"), "{1}", Reason))
+}
+
 ; Marks the prediction request just fired as one the user asked for: the AI
 ; agent's automatic mode lets an automatic prediction tooltip be, never this one.
 _LLM_Menu_MarkExplicitPrediction() {

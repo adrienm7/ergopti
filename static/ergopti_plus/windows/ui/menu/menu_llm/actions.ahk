@@ -138,7 +138,9 @@ _LLM_Menu_ApplyToggleCommitted(Candidate, ShowUi := true) {
 		SetTimer(_LLM_Menu_FireHealthProbe, 0)
 		LLM_Menu_BackendLifecycleInvalidate(true)
 		LLM_Bridge_Stop()
+		LLM_Agent_OnAiSwitchedOff()
 	}
+	KeyboardShortcutsFollowAiSwitch()
 	; Runtime admission/retirement precedes a potentially slow or refused repaint.
 	LLM_Menu_RequestBuild("toggle_committed")
 	return true

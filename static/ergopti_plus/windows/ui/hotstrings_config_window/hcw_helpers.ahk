@@ -52,6 +52,8 @@ global _HCW_COMMON_CATS := [
 ; hotstrings_config.toml under the category key (e.g. llm_prediction).
 global _HCW_VIRTUAL_CATS := ["llm_prediction"]
 
+#Include ../../_generated/native_theme.ahk
+
 ; Locale-dependent labels — populated lazily at window-open time.
 global _HCW_CATEGORY_LABELS := Map()
 global _HCW_COLOR_PRESETS   := []
@@ -74,24 +76,11 @@ _HCW_InitLocaleStrings() {
 	; not the picker's, and a hint that was valid before
 	; ``rolls/sfbs/distancesreduction`` lost their hardcoded orange would
 	; now actively mislead. Colours are ordered along the standard hue wheel
-	; (warm → cool → neutral) so the picker reads naturally.
-	_HCW_COLOR_PRESETS := [
-		Map("Label", t("hs_config.color_inherit"),   "Hex", ""),
-		Map("Label", t("hs_config.color_red"),       "Hex", "#e53935"),
-		Map("Label", t("hs_config.color_pink"),      "Hex", "#e91e63"),
-		Map("Label", t("hs_config.color_purple"),    "Hex", "#8e44ad"),
-		Map("Label", t("menu.hotstrings.tooltip_ai"), "Hex", "#AD61FF"),
-		Map("Label", t("hs_config.color_indigo"),    "Hex", "#3f51b5"),
-		Map("Label", t("hs_config.color_blue"),      "Hex", "#1e88e5"),
-		Map("Label", t("hs_config.color_cyan"),      "Hex", "#00838f"),
-		Map("Label", t("hs_config.color_turquoise"), "Hex", "#009688"),
-		Map("Label", t("hs_config.color_green"),     "Hex", "#43a047"),
-		Map("Label", t("hs_config.color_lime"),      "Hex", "#9e9d24"),
-		Map("Label", t("hs_config.color_yellow"),    "Hex", "#fdd835"),
-		Map("Label", t("hs_config.color_orange"),    "Hex", "#fb8c00"),
-		Map("Label", t("hs_config.color_brown"),     "Hex", "#8d6e63"),
-		Map("Label", t("hs_config.color_gray"),      "Hex", "#6e6e73"),
-	]
+	; (warm → cool → neutral) so the picker reads naturally. The colours come from
+	; _shared/data/native_theme.toml, the palette macOS and Linux read too.
+	_HCW_COLOR_PRESETS := [Map("Label", t("hs_config.color_inherit"), "Hex", "")]
+	for Row in NativeThemeHotstringPalette()
+		_HCW_COLOR_PRESETS.Push(Map("Label", t(Row["I18n"]), "Hex", Row["Hex"]))
 	_HCW_FILE_LEVEL_LABEL := t("hs_config.file_level")
 }
 

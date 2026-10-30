@@ -29,6 +29,10 @@
 
 #Requires AutoHotkey v2.0
 
+; Boot assigns the floor; this suite does not run boot.
+TimingsLoadShared()
+HotPath_LoadTimings()
+
 
 
 
@@ -174,6 +178,32 @@ _HPT_TooltipSegmentsUseTheirMeasuredThreshold() {
 }
 
 
+; The floor used to be the literal 5.0 while macOS and Linux read the registry:
+; changing the shared number moved two drivers and left Windows behind.
+_HPT_FloorComesFromTheRegistry() {
+	global _HOTPATH_SLOW_MS, _TimingsCache
+	Saved := _TimingsCache
+	SavedSlow := _HOTPATH_SLOW_MS
+	try {
+		_TimingsCache := Map("logger", Map("hotpath_slow_ms", 37))
+		HotPath_LoadTimings()
+		AssertEqual(37, _HOTPATH_SLOW_MS, "the floor must be the registry's [logger] hotpath_slow_ms")
+		_TimingsCache := Map("logger", Map("hotpath_slow_ms", 0))
+		AssertThrows(HotPath_LoadTimings, "a zero floor would report every keystroke as slow")
+	} finally {
+		_TimingsCache := Saved
+		_HOTPATH_SLOW_MS := SavedSlow
+	}
+	Boot := _DriverFuncBody("HotPath_LoadTimings")
+	Assert(Boot != "", "HotPath_LoadTimings must exist")
+	Src := _DriverSourceNoComments()
+	LoadAt := InStr(Src, "`nTimingsLoadShared()`n")
+	Assert(LoadAt > 0, "boot must load the registry")
+	Assert(InStr(Src, "`nHotPath_LoadTimings()`n", , LoadAt) > 0,
+		"boot must assign the floor after loading the registry")
+}
+
+Test("hotpath: the slow-segment floor is read from [logger] hotpath_slow_ms", _HPT_FloorComesFromTheRegistry)
 Test("hotpath: an overridden segment is judged against its own threshold, not the keystroke floor (hotpath-threshold-floods-the-errors-sink)",
 	_HPT_OverriddenSegmentUsesItsOwnThreshold)
 Test("hotpath: a segment with no override still uses the global floor (hotpath-threshold-floods-the-errors-sink)",

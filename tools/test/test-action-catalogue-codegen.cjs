@@ -229,6 +229,16 @@ check(
 	'Linux left_click_toggle carries its requirements'
 );
 check(!models.ahk.actions.left_click_toggle.requires, 'requirements stay per-OS');
+for (const id of ['llm_agent_selection', 'llm_agent_command']) {
+	check(
+		JSON.stringify(models.ahk.actions[id].requires) === JSON.stringify(['ai:on']),
+		`Windows ${id} needs the AI switch`
+	);
+	check(
+		new RegExp(`Actions\\["${id}"\\].*Requires: \\["ai:on"\\]`).test(generated.ahk.text),
+		`the Windows catalogue carries the requirement of ${id}`
+	);
+}
 check(
 	models.hs.karabinerAliases && models.hs.karabinerAliases.return === 'enter',
 	'macOS keeps the Karabiner aliases'

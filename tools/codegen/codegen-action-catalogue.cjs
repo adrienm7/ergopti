@@ -111,7 +111,7 @@ const AX_FIELDS = new Set(['platform', 'scalable']);
  * @type {Record<string, RegExp[]>}
  */
 const REQUIREMENT_TOKENS = {
-	ahk: [],
+	ahk: [/^ai:on$/],
 	hs: [/^ai:on$/],
 	linux: [/^tool:[A-Za-z0-9._+-]+$/, /^session:x11$/, /^session:workspaces$/, /^ai:on$/]
 };
@@ -502,7 +502,9 @@ function renderAhk(model, refresh) {
 	out.push('; Every action the Windows driver offers, already filtered to its platform:');
 	out.push('; the picker order with heading levels and locale keys, the modifier-chord');
 	out.push('; block the driver expands from its own chord registry, and per-action');
-	out.push('; metadata (label key, parameter kind, confirmation). A data function rather');
+	out.push(
+		'; metadata (label key, parameter kind, confirmation, requirements). A data function rather'
+	);
 	out.push('; than a global, so include order cannot matter, and no TOML is parsed to');
 	out.push('; build the picker.');
 	out.push('; ==============================================================================');
@@ -532,6 +534,7 @@ function renderAhk(model, refresh) {
 			`Parameter: ${ahkQ(a.parameter || '')}`,
 			`Confirm: ${a.confirm ? 'true' : 'false'}`
 		];
+		if (a.requires) parts.push(`Requires: [${a.requires.map(ahkQ).join(', ')}]`);
 		out.push(`\tActions[${ahkQ(id)}] := { ${parts.join(', ')} }`);
 	}
 	out.push('\treturn Catalogue');

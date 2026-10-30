@@ -25,6 +25,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\ai_action_gate.ahk
 
 
 
@@ -124,8 +125,9 @@ _TapKeysCategoryEnabled() {
 	return !IsSet(CategoryEnabled) || !(CategoryEnabled is Map) || CategoryEnabled.Get("Shortcuts", true)
 }
 
-; The #HotIf predicate of one tap key: assigned to a known action, and the
-; Shortcuts category on. Evaluated by the keyboard hook on every press, so it
+; The #HotIf predicate of one tap key: assigned to a known action that is armed
+; (an AI action is not while the AI is off), and the Shortcuts category on.
+; Evaluated by the keyboard hook on every press, so it
 ; only reads memory.
 ; @param {String} Id A tap key id.
 ; @returns {Boolean}
@@ -134,7 +136,7 @@ TapKeyShouldFire(Id) {
 	if !IsSet(TapKeyAssignments) || !IsSet(GESTURE_ACTIONS)
 		return false
 	Action := TapKeyAssignments.Get(Id, "none")
-	return Action != "none" && GESTURE_ACTIONS.Has(Action) && _TapKeysCategoryEnabled()
+	return Action != "none" && GESTURE_ACTIONS.Has(Action) && !AiActionBlocked(Action) && _TapKeysCategoryEnabled()
 }
 
 ; Runs a tap key's action, then holds the hotkey thread until the key is up so

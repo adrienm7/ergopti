@@ -2147,6 +2147,9 @@ ScriptShortcutSlotRunsAction(Slot, Suspended := A_IsSuspended) {
 		Action := ScriptShortcutAssignments[Slot]
 		if (Action == "none" or !GESTURE_ACTIONS.Has(Action))
 				return false
+		; An AI action is unarmed while the AI is off: the chord stays the system's.
+		if AiActionBlocked(Action)
+				return false
 		; While suspended these chords stay armed ONLY for script management. Without this
 		; scope check the exemption silently widened to whatever the user assigned, so a
 		; paused driver still fired arbitrary gesture actions.
@@ -2157,9 +2160,9 @@ RunScriptShortcutAction(Slot) {
 		global ScriptShortcutAssignments, SCRIPT_SHORTCUT_FALLBACKS
 		if !ScriptShortcutSlotRunsAction(Slot) {
 				; The chord's #HotIf admitted this slot at the press, so only a pause
-				; that began before this thread ran gets here: the chord was already
-				; taken, and its key is the one thing left to give back.
-				LoggerWarn("Shortcuts", "Script slot '{1}' no longer runs '{2}' (paused since the press); sending its key instead.",
+				; or an AI switch-off that began before this thread ran gets here: the chord
+				; was already taken, and its key is the one thing left to give back.
+				LoggerWarn("Shortcuts", "Script slot '{1}' no longer runs '{2}' (paused or AI off since the press); sending its key instead.",
 						Slot, ScriptShortcutAssignments[Slot])
 				SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
 				return
@@ -2193,6 +2196,7 @@ SetScriptShortcutChordsOn(On, Path := "", ReloadFn := 0) {
 		Row := ManifestSparseOperation("shortcuts.script_control.chords_enabled", On ? true : false)
 		if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, [Row], "the script chords switch")
 				return false
+		NotifyFeature(t("notify.script_control"), On ? true : false)
 		return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
 }
 
@@ -2442,7 +2446,56 @@ RunKeyboardShortcutAction(SlotId) {
 		Action := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
 		if (Action == "none" or !GESTURE_ACTIONS.Has(Action))
 				return
+		; Re-read at delivery: the switch may have turned off since the press.
+		if AiActionBlocked(Action) {
+				LoggerDebug("KeyboardShortcuts", "Slot '{1}' -> '{2}' held back: the AI is off.", SlotId, Action)
+				return
+		}
 		GestureInvokeAction(Action, GestureBindingId("keyboard", SlotId))
+}
+
+; The registrar handles of the keyboard slots bound to an AI action, by slot. A
+; function, not a global: the boot binds the slots before this file's include.
+; @returns {Map}
+_KeyboardShortcutAiHandles() {
+		static Handles := Map()
+		return Handles
+}
+
+; Retains the handle of a slot bound to an AI action, which follows the AI switch.
+; @param SlotId {String} The keyboard slot.
+; @param Action {String} Its action.
+; @param Handle {String} Its registrar handle.
+KeyboardShortcutRecordHandle(SlotId, Action, Handle) {
+		if AiActionIsAi(Action)
+				_KeyboardShortcutAiHandles()[SlotId] := Handle
+}
+
+; Follows the AI switch: the hotkeys bound to an AI action are released while the
+; AI is off, so the chord reaches the application, and armed again by the
+; switch-on with no reload. A native hotkey cannot ask at each press, unlike every
+; other key layer. A slot the physical Win broker took stays with it: the broker's
+; criterion asks at each press. A refusal is logged and the others still follow.
+; @param SetEnabledFn {Func} Test seam; HotkeyRegistrarSetEnabled by default.
+; @returns {Boolean} True when every handle holds the wanted state.
+KeyboardShortcutsFollowAiSwitch(SetEnabledFn := 0) {
+		global KeyboardShortcutAssignments
+		SetEnabled := HasMethod(SetEnabledFn, "Call") ? SetEnabledFn : HotkeyRegistrarSetEnabled
+		Settled := true
+		for SlotId, Handle in _KeyboardShortcutAiHandles() {
+				if MagicEditorOwnsOrdinarySlot(SlotId)
+						continue
+				Wanted := !AiActionBlocked(KeyboardShortcutAssignments.Get(SlotId, "none"))
+				Accepted := false
+				try Accepted := SetEnabled.Call(Handle, Wanted)
+				catch as Err
+						LoggerError("KeyboardShortcuts", "Slot '{1}' raised while following the AI switch: {2}.", SlotId, Err.Message)
+				if (Accepted == true)
+						continue
+				Settled := false
+				LoggerError("KeyboardShortcuts", "Slot '{1}' could not follow the AI switch (enabled={2}).", SlotId, Wanted ? "true" : "false")
+		}
+		return Settled
 }
 
 SetKeyboardShortcutAction(SlotId, ActionName) {
