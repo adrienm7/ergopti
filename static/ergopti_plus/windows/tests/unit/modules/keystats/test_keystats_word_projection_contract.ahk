@@ -57,7 +57,7 @@ _KLRWord_CompletionContract(Fixture, Spec) {
 		AssertEqual(Boundaries, Completed, "multiple corrections count once per completed word")
 		AssertEqual(Spec["snapshot"]["expected_words"], Completed)
 		Db := _KLRShortcut_OpenFixture()
-		AssertTrue(SQLite_Exec(Db, KLW_BuildBatchSql(SQLite_Q("word-contract"), false)),
+		AssertTrue(SQLite_Exec(Db, KLW_BuildBatchSql("word-contract", false)),
 			"the real SQL writer must persist the completed history")
 		Expected := Spec["snapshot"]["range"]["historical"]
 		Historical := JsonParse(KLR_BuildNgramsJson(Db, Day, Day, [Fixture["app"]]))
