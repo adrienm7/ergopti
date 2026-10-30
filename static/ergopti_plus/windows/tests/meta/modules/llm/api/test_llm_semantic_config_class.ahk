@@ -100,8 +100,8 @@ _AHK16_ConfigClassPartitionIsExhaustive() {
 	Emitted := Map()
 	MatchCount := 0
 	Position := 1
-	while RegExMatch(BuildOptsBody, 'm)^\s*"([a-z_]+)",\s+', &Match, Position) {
-		Key := Match[1]
+	while RegExMatch(BuildOptsBody, 'm)^\s*(?:"([a-z_]+)"|ConfigLeaf\.([A-Z0-9_]+)),\s+', &Match, Position) {
+		Key := Match[1] != "" ? Match[1] : StrLower(Match[2])
 		AssertFalse(Emitted.Has(Key),
 			"AHK-16 LLM_Menu_BuildOpts emits duplicate option '" . Key . "'")
 		Emitted[Key] := true
