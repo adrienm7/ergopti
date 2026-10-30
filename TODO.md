@@ -160,6 +160,16 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      configuration snapshot for the guard. A reload refused, or accepted and never started, fails by name.
    - `field_menu_build`: one rebuild of the menu tree, as a state change triggers it, must be accepted by
      AppKit; its duration in ms, the number of top-level rows and the three slowest rows (`id:ms`) are named.
+   - `field_layout_rows` (after `field_composer`): from the Ergo-L file the app ships, a loose layout typing
+     the symbols first is written as `~/Library/Keyboard Layouts/ErgoptiFieldRows-<n>.keylayout` under a new
+     name and id, enabled through the enabled-sources preference, selected, and read back from a fresh
+     process (`rows_build:keys_13` when the launcher's keyboard probe types its thirteen base cells); a second
+     build that also moves the edge keys replaces it live and retires it (`rows_replace`, the design note's
+     M4); then the user's selected source is selected again, every check build is disabled and deleted
+     (`rows_retire`), and the selected id and the `AppleEnabledInputSources` list must be identical to the
+     ones read before (`rows_restore`). `rows_ghosts` counts builds the system keeps listing until logout
+     (M5a). A failure names its code: `requires_logout`, `select_refused`, `readback_mismatch`; the step's log
+     window names each build and the source id the probe read.
 
 ## Maintainer requests of 2026-10-30 (coordinator session; everything here is to be done)
 

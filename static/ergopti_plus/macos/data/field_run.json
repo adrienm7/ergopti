@@ -62,6 +62,13 @@
 			"proves": "The layout composer installs, enables and removes its check layout through the real path."
 		},
 		{
+			"id": "field_layout_rows",
+			"kind": "field_check",
+			"check": "layout_rows",
+			"deadline_seconds": 90,
+			"proves": "With no logout, a new layout build typing the symbols first is selected and read back, a second build replaces it live and retires it, and the user's selected and enabled input sources are put back exactly."
+		},
+		{
 			"id": "field_permissions",
 			"kind": "field_check",
 			"check": "permissions",
