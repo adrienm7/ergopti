@@ -121,7 +121,8 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      (the 2026-10-30 `native_child_status=64`), a refusal stage or `not_reached` names where it broke.
    - `field_network_hosts`: one HEAD, one after the other, to the root of every host of
      `_shared/data/identifiers.json` (`github`, `github_api` for the update feed, `huggingface`, `ollama`,
-     `ollama_registry`) through the managed transport a download uses (route lookup, PAC or proxy, TLS); any
+     `ollama_registry`) (the registry at `/v2/`, whose root answers 503) through the managed transport (route lookup, PAC or proxy,
+     TLS); any
      answer below 500 passes, a failure names the native reason by the host's key. Nothing is downloaded.
    - `field_app_health` (after the AI steps): no crash report of the last day in the driver's `crash_reports`
      folder nor in `~/Library/Logs/DiagnosticReports` for ErgoptiPlus, Hammerspoon or Ollama (each fails with
