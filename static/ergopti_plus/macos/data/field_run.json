@@ -163,7 +163,7 @@
 			"kind": "field_check",
 			"check": "app_health",
 			"deadline_seconds": 30,
-			"proves": "No crash report from the driver or from macOS for the app in the last day; the app's memory and CPU share after the AI steps are named."
+			"proves": "No crash report of the last day from the driver or from macOS for the app's processes, each named with its kind; other apps' reports, memory and CPU are named."
 		},
 		{
 			"id": "driver_reload",
