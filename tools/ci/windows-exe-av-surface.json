@@ -26,7 +26,7 @@
 			"keyboard_hook_api": { "pattern": "SetWindowsHookEx", "max": 2 },
 			"key_state_polling": {
 				"pattern": "GetAsyncKeyState|GetKeyState|GetKeyboardState",
-				"max": 62
+				"max": 59
 			},
 			"clipboard_listener": {
 				"pattern": "AddClipboardFormatListener|SetClipboardViewer|OnClipboardChange",
