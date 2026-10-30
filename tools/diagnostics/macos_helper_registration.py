@@ -8,6 +8,9 @@ import subprocess
 import sys
 
 ABSENT_JOB_STATUS = 113
+# An ad hoc signed helper (no TeamIdentifier) names its registration reset on
+# a second line; a Developer ID helper prints the status alone.
+READY_REGISTRATIONS = ("ready\n", "ready\ndeveloper_adhoc_reregistered\n")
 
 
 def observe(application, output):
@@ -52,7 +55,10 @@ def observe(application, output):
             raise RuntimeError("Invalid helper identity caused registration")
         owns_possible_job = True
         receipt["registered"] = invoke("--register-remap-guardian")
-        if receipt["registered"]["exit"] != 0 or receipt["registered"]["stdout"] != "ready\n":
+        if (
+            receipt["registered"]["exit"] != 0
+            or receipt["registered"]["stdout"] not in READY_REGISTRATIONS
+        ):
             raise RuntimeError(
                 "Native helper did not register a ready guardian: " + repr(receipt["registered"])
             )
@@ -60,7 +66,10 @@ def observe(application, output):
         if receipt["observed"]["exit"] != 0 or receipt["observed"]["stdout"] != "ready\n":
             raise RuntimeError("Independent guardian readiness readback failed")
         receipt["repeated"] = invoke("--register-remap-guardian")
-        if receipt["repeated"]["exit"] != 0 or receipt["repeated"]["stdout"] != "ready\n":
+        if (
+            receipt["repeated"]["exit"] != 0
+            or receipt["repeated"]["stdout"] not in READY_REGISTRATIONS
+        ):
             raise RuntimeError("Repeated registration did not preserve readiness")
         receipt["rejected_unregister"] = invoke("--unregister-remap-guardian", wrong)
         retained = inspect_job()
