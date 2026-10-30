@@ -35,7 +35,10 @@
  * WHY A MODULE-PATH SCAN AND NOT A NAME SCAN:
  * see above. This looks for `adapters.<stem>` / `adapters/<stem>` /
  * `adapters\<stem>`, which is how a Lua require and an AutoHotkey include both
- * spell it, and never for the bare stem.
+ * spell it, and never for the bare stem. One adapter including a sibling spells
+ * the path from its own directory, `#Include %A_LineFile%\..\<stem>.ahk`, which
+ * names no `adapters` segment: that form counts only inside the adapter
+ * directory, where it resolves to the sibling.
  * ==============================================================================
  */
 
@@ -79,6 +82,29 @@ const BASELINE_UNREFERENCED = {
 const errors = [];
 const report = [];
 
+/**
+ * Whether a production file other than the adapter itself requires it.
+ * @param {string} adapterDir Absolute path of the driver's adapters/ directory.
+ * @param {string} adapter File name of the adapter.
+ * @param {{p: string, src: string}[]} sources Production files and their text.
+ * @returns {boolean}
+ */
+function hasProductionCaller(adapterDir, adapter, sources) {
+	const stem = adapter.replace(/\.(lua|ahk)$/, '');
+	const self = path.join(adapterDir, adapter);
+	const needles = [`adapters.${stem}`, `adapters/${stem}`, `adapters\\${stem}`];
+	const siblingInclude = new RegExp(
+		`^\\s*#Include\\s+%A_LineFile%[\\\\/]\\.\\.[\\\\/]${stem}\\.ahk\\s*$`,
+		'im'
+	);
+	return sources.some(
+		({ p, src }) =>
+			p !== self &&
+			(needles.some((n) => src.includes(n)) ||
+				(path.dirname(p) === adapterDir && siblingInclude.test(src)))
+	);
+}
+
 for (const driver of DRIVERS) {
 	const adapterDir = path.join(SP, driver, 'adapters');
 	if (!fs.existsSync(adapterDir)) {
@@ -104,14 +130,8 @@ for (const driver of DRIVERS) {
 
 	const unreferenced = [];
 	for (const a of adapters) {
-		const stem = a.replace(/\.(lua|ahk)$/, '');
-		const self = path.join(adapterDir, a);
-		const needles = [`adapters.${stem}`, `adapters/${stem}`, `adapters\\${stem}`];
-		const hasCaller = sources.some(
-			({ p, src }) => p !== self && needles.some((n) => src.includes(n))
-		);
-		if (!hasCaller) {
-			const lines = fs.readFileSync(self, 'utf8').split('\n').length;
+		if (!hasProductionCaller(adapterDir, a, sources)) {
+			const lines = fs.readFileSync(path.join(adapterDir, a), 'utf8').split('\n').length;
 			unreferenced.push({ file: a, lines });
 		}
 	}
@@ -148,12 +168,7 @@ if (process.argv.includes('--measure')) {
 		const dead = fs
 			.readdirSync(adapterDir)
 			.filter((f) => /\.(lua|ahk)$/.test(f))
-			.filter((a) => {
-				const stem = a.replace(/\.(lua|ahk)$/, '');
-				const self = path.join(adapterDir, a);
-				const needles = [`adapters.${stem}`, `adapters/${stem}`, `adapters\\${stem}`];
-				return !sources.some(({ p, src }) => p !== self && needles.some((n) => src.includes(n)));
-			});
+			.filter((a) => !hasProductionCaller(adapterDir, a, sources));
 		if (dead.length) console.log(`\n${driver} unreferenced:\n  ` + dead.join('\n  '));
 	}
 	process.exit(0);
