@@ -66,6 +66,7 @@ _LLM_Persist_MakeDefaultTray() {
 		"max_words",                  15,
 		"language",                   "fr",
 		"debounce_ms",                500,
+		"min_request_interval_ms",    300,
 		"ctx_chars",                  500,
 		"temperature",                "0.10",
 		"instant_on_word_end",        true,
@@ -82,7 +83,7 @@ _LLM_Persist_MakeDefaultTray() {
 		"nav_modifiers",              "",
 		"val_modifiers",              "alt",
 		"api_entry_id",               "api_primary",
-		"ollama_port",                11434,
+		"ollama_port",                11435,
 		"inline_autotype",            false,
 		"user_profiles",              []
 	)

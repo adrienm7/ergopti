@@ -832,7 +832,7 @@ _LogBootProgress("LLM modules + tests included")
 global _LLM_Menu := Map(
 	"enabled", true, "backend", "ollama", "model", "Qwen3.5-0.8B",
 	"profile_id", "basic", "n_predictions", 3, "auto_profile_for_model", true,
-	"min_words", 3, "max_words", 15, "language", "fr", "debounce_ms", 500,
+	"min_words", 3, "max_words", 15, "language", "fr", "debounce_ms", 500, "min_request_interval_ms", 300,
 	"ctx_chars", 500, "temperature", "0.10", "instant_on_word_end", true,
 	"after_hotstring", true, "reset_on_nav", true, "disable_url_bars", true,
 	"disable_password_fields", true, "disabled_apps", [], "show_info_bar", true,
@@ -2272,6 +2272,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/llm/servers/test_ollama_managed_bootstrap.ahk
 #Include unit/modules/llm/servers/test_ollama_managed_origin.ahk
 #Include unit/modules/llm/servers/test_ollama_owned_only.ahk
+#Include unit/modules/llm/prediction/test_llm_request_plan.ahk
 #Include unit/modules/llm/servers/test_ollama_managed_model_offer.ahk
 #Include unit/modules/shortcuts/test_run_program_actions.ahk
 #Include unit/modules/shortcuts/test_run_program_actions_custody.ahk
