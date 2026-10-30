@@ -2514,6 +2514,24 @@ local function taps_are_enabled()
 		and eventtap_is_enabled("mouse", mouse_tap)
 end
 
+--- The native state of each keymap event tap, read without changing any, for
+--- the field run's event tap check (infra/field_check_probes.lua).
+--- @return table states { started, watchdog, taps = { { name, state } } } where
+---   state is "enabled", "disabled", "absent" or "unreadable", in a fixed order.
+function M.tap_states()
+	local taps = {}
+	for _, entry in ipairs({ { "keyDown", tap }, { "loopbackKeyUp", loopback_keyup_tap },
+		{ "flagsChanged", shift_tap }, { "mouse", mouse_tap } }) do
+		local state = "absent"
+		if entry[2] then
+			local enabled, state_ok = eventtap_is_enabled(entry[1], entry[2])
+			state = not state_ok and "unreadable" or (enabled and "enabled" or "disabled")
+		end
+		taps[#taps + 1] = { name = entry[1], state = state }
+	end
+	return { started = _started == true, watchdog = _watchdog_committed == true, taps = taps }
+end
+
 tap_watchdog = function(timer, generation)
 	if _started ~= true
 		or _watchdog_committed ~= true
