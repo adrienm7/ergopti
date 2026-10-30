@@ -13,6 +13,8 @@
 ; Included by modules/gestures/init.ahk after the constants block.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 ; Action registry — each action has a label and an execution function
 global GESTURE_ACTIONS := Map(
 		"run_program", { Fn: (BindingId := "") => ProgramActions_Run(BindingId) },
@@ -482,7 +484,7 @@ GesturePromptPrediction(BindingId := "", FireFn := 0) {
 				return false
 		}
 		return LLM_Menu_TriggerPredictionWith(Parsed["profile_id"],
-				Parsed.Get("num_predictions", 0), FireFn, Parsed.Get("translation_target", ""))
+				Parsed.Get(ConfigLeaf.NUM_PREDICTIONS, 0), FireFn, Parsed.Get("translation_target", ""))
 }
 
 ; Runs the llm_live_prompt_toggle action of one binding. While live mode is on,
@@ -500,7 +502,7 @@ GestureLivePromptToggle(BindingId := "") {
 				LoggerWarn("gestures", "llm_live_prompt_toggle ignored for binding '{1}': {2}.", BindingId, Reason)
 				return false
 		}
-		return LLM_Menu_ToggleLiveMode(Parsed["profile_id"], Parsed.Get("num_predictions", 0),
+		return LLM_Menu_ToggleLiveMode(Parsed["profile_id"], Parsed.Get(ConfigLeaf.NUM_PREDICTIONS, 0),
 				Parsed.Get("translation_target", ""))
 }
 

@@ -22,6 +22,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -114,7 +115,7 @@ LLM_PromptAction_Parse(Value, &Reason := "") {
 		Reason := "prediction count out of range"
 		return false
 	}
-	Parsed := Map("profile_id", ProfileId, "num_predictions", Predictions)
+	Parsed := Map("profile_id", ProfileId, ConfigLeaf.NUM_PREDICTIONS, Predictions)
 	if TargetAt
 		Parsed["translation_target"] := TranslationTarget
 	return Parsed

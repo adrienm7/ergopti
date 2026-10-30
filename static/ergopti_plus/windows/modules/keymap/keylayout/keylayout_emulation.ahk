@@ -31,6 +31,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -299,7 +300,7 @@ _KLE_MagicKeyOwnsKey(Sc) {
 	global Features, ScriptInformation
 	return ScriptInformation["MagicKeySourceOverridesEmulation"]
 		&& Sc == ScriptInformation["MagicKeySourceScan"]
-		&& Features["hotstrings"]["magic_key"]["replace"]["enabled"]
+		&& Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"]
 }
 
 _KLE_DigitsOwnKey(Sc, Shift, ForegroundFn := 0) {

@@ -18,6 +18,8 @@
 ; Included by modules/llm/prediction_engine.ahk after the execution section.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -29,7 +31,7 @@
 ; ==================================
 
 ; The prompt and count live mode runs while it is on. Never persisted.
-global _LLM_Live := Map("active", false, "profile_id", "", "num_predictions", 0)
+global _LLM_Live := Map("active", false, "profile_id", "", ConfigLeaf.NUM_PREDICTIONS, 0)
 
 /**
  * Returns the decoded, validated live.json, read on first use.
@@ -43,7 +45,7 @@ LLM_Live_Config() {
 	Path := _SharedDir . "\modules\llm\live.json"
 	Candidate := JsonParse(FSReadStrict(Path))
 	_LLM_Live_ValidateConfig(Candidate, Path)
-	Config := Map("debounce_ms", Candidate["debounce_ms"],
+	Config := Map(ConfigLeaf.DEBOUNCE_MS, Candidate[ConfigLeaf.DEBOUNCE_MS],
 		"min_words", Candidate["min_words"])
 	return Config
 }
@@ -55,8 +57,8 @@ _LLM_Live_ValidateConfig(Candidate, Path) {
 	if !(Candidate is Map)
 		throw ValueError(Path . ": the root must be an object.")
 	; The same bounds as the menu's debounce: the timer period rule is shared
-	if !(Candidate.Get("debounce_ms", "") is Integer) || Candidate["debounce_ms"] < 0
-			|| !LLM_Option_TryNormalize("debounce_ms", Candidate["debounce_ms"], &Normalized)
+	if !(Candidate.Get(ConfigLeaf.DEBOUNCE_MS, "") is Integer) || Candidate[ConfigLeaf.DEBOUNCE_MS] < 0
+			|| !LLM_Option_TryNormalize(ConfigLeaf.DEBOUNCE_MS, Candidate[ConfigLeaf.DEBOUNCE_MS], &Normalized)
 		throw ValueError(Path . ": debounce_ms must be an integer the debounce setting accepts.")
 	if !(Candidate.Get("min_words", "") is Integer) || Candidate["min_words"] < 0
 		throw ValueError(Path . ": min_words must be a non-negative integer.")
@@ -91,7 +93,7 @@ LLM_Engine_LiveOverride() {
 	if !_LLM_Live["active"]
 		return 0
 	Override := Map("profile_id", _LLM_Live["profile_id"],
-		"num_predictions", _LLM_Live["num_predictions"], "live", true)
+		ConfigLeaf.NUM_PREDICTIONS, _LLM_Live[ConfigLeaf.NUM_PREDICTIONS], "live", true)
 	if _LLM_Live.Has("translation_target")
 		Override["translation_target"] := _LLM_Live["translation_target"]
 	return Override
@@ -104,8 +106,8 @@ LLM_Engine_LiveOverride() {
  */
 LLM_Engine_LiveDebounceMs() {
 	global _LLM_Engine
-	return LLM_Engine_LiveIsActive() ? LLM_Live_Config()["debounce_ms"]
-		: _LLM_Engine["debounce_ms"]
+	return LLM_Engine_LiveIsActive() ? LLM_Live_Config()[ConfigLeaf.DEBOUNCE_MS]
+		: _LLM_Engine[ConfigLeaf.DEBOUNCE_MS]
 }
 
 /**
@@ -117,7 +119,7 @@ LLM_Engine_LiveDebounceMs() {
 LLM_Engine_LiveStart(ProfileId, NumPredictions := 0, TranslationTarget := "") {
 	global _LLM_Live
 	; Throws on a caller bug before anything changes
-	Override := Map("profile_id", ProfileId, "num_predictions", NumPredictions)
+	Override := Map("profile_id", ProfileId, ConfigLeaf.NUM_PREDICTIONS, NumPredictions)
 	if (TranslationTarget != "")
 		Override["translation_target"] := TranslationTarget
 	Checked := _LLM_Engine_NormalizePromptOverride(Override)
@@ -126,7 +128,7 @@ LLM_Engine_LiveStart(ProfileId, NumPredictions := 0, TranslationTarget := "") {
 	; A debounce armed by the last keystroke holds the previous prompt
 	LLM_Engine_CancelTimer()
 	_LLM_Live["profile_id"] := Checked["profile_id"]
-	_LLM_Live["num_predictions"] := Checked["num_predictions"]
+	_LLM_Live[ConfigLeaf.NUM_PREDICTIONS] := Checked[ConfigLeaf.NUM_PREDICTIONS]
 	if _LLM_Live.Has("translation_target")
 		_LLM_Live.Delete("translation_target")
 	if Checked.Has("translation_target")
@@ -134,8 +136,8 @@ LLM_Engine_LiveStart(ProfileId, NumPredictions := 0, TranslationTarget := "") {
 	_LLM_Live["active"] := true
 	LoggerInfo("LLM", "Live mode {1} with '{2}' ({3} prediction(s), {4} ms debounce, {5} minimum word(s)).",
 		WasActive ? "moved" : "on", Checked["profile_id"],
-		Checked["num_predictions"] > 0 ? Checked["num_predictions"] : "the menu's",
-		Config["debounce_ms"], Config["min_words"])
+		Checked[ConfigLeaf.NUM_PREDICTIONS] > 0 ? Checked[ConfigLeaf.NUM_PREDICTIONS] : "the menu's",
+		Config[ConfigLeaf.DEBOUNCE_MS], Config["min_words"])
 }
 
 /**
@@ -151,7 +153,7 @@ LLM_Engine_LiveStop(Reason) {
 		_LLM_Live.Delete("translation_target")
 	_LLM_Live["active"] := false
 	_LLM_Live["profile_id"] := ""
-	_LLM_Live["num_predictions"] := 0
+	_LLM_Live[ConfigLeaf.NUM_PREDICTIONS] := 0
 	LLM_Engine_CancelTimer()
 	LLM_Engine_CancelInflight()
 	LoggerInfo("LLM", "Live mode off ({1}).", Reason)
