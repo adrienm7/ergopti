@@ -213,6 +213,18 @@ _LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
 }
 
 /**
+ * The plan's floor decision for a request of this Override: a prompt action the
+ * user triggered is explicit, live mode's automatic trigger is not.
+ * @param {Map|Integer} Override FirePrediction's Override.
+ * @param {Number} NowMs The monotonic clock in milliseconds.
+ * @returns {Map} One send, or one defer.
+ */
+_LLM_Engine_DispatchDecision(Override, NowMs) {
+	Explicit := Override is Map && !Override.Get("live", false)
+	return _LLM_Engine_Plan().OnDispatch(Map("explicit", Explicit), NowMs)[1]
+}
+
+/**
  * Fires the actual LLM call after the debounce period expires.
  * Skips the call if context is identical to the last result's context.
  * @param {string} buffer - Full typed buffer captured at debounce arm time.
@@ -506,23 +518,18 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		}
 	}
 
-	; ── Backend-aware request floor ──
-	; Even when the user has set a 50 ms debounce, fire no more than one
-	; request per ``min_interval`` ms for the active backend (paid APIs need
-	; this hard cap; local backends benefit from it for energy). When the
-	; floor blocks, re-arm the debounce timer for the remaining gap so the
-	; next attempt fires at exactly the right moment instead of being lost.
+	; ── The user's request floor ──
+	; Even with a 50 ms debounce, automatic requests go no faster than
+	; llm.trigger.min_request_interval_ms (paid APIs need this cap; local backends
+	; save energy). When it blocks, re-arm for the remaining gap so the next attempt
+	; fires at exactly the right moment instead of being lost. An explicit request
+	; is never held.
 	backend := _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama"
-	min_interval := LLM_ApiCommon_GetRateLimitMs(backend)
-	now := A_TickCount
-	last := _LLM_Engine.Has("last_request_tick") ? _LLM_Engine["last_request_tick"] : 0
-	; Wrap-safe delta: A_TickCount overflows at ~49.7 days; the mask keeps the
-	; result in [0, 0xFFFFFFFF] regardless of counter direction
-	elapsed_since_last := (now - last + 0x100000000) & 0xFFFFFFFF
-	if (last > 0 and elapsed_since_last < min_interval) {
-		remaining := min_interval - elapsed_since_last
-		try LoggerInfo("LLM", Format("Prediction request #{1} rate-floor deferred: backend={2}, remaining={3} ms.",
-			this_request_id, backend, remaining))
+	FloorDecision := _LLM_Engine_DispatchDecision(Override, A_TickCount)
+	if (FloorDecision["action"] == "defer") {
+		remaining := Max(1, FloorDecision["delay_ms"])
+		try LoggerInfo("LLM", Format("Prediction request #{1} rate-floor deferred: remaining={2} ms.",
+			this_request_id, remaining))
 		; Same reasoning as LLM_Engine_OnKeystroke: keep a reference to the
 		; closure so the next CancelTimer call can actually cancel it.
 		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)
@@ -565,10 +572,10 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 
 	; A batch call returns all N predictions in one response; a sequential-variant
 	; call returns one. Size the per-call token budget accordingly (macOS parity).
-	preds_per_call := (n_predictions > 1 and is_batch_profile) ? n_predictions : 1
+	preds_per_call := LLM_RequestPlanBatching(is_batch_profile ? true : false, n_predictions)["per_call"]
 	call_tokens := _LLM_Engine_CallTokenBudget(max_tokens, preds_per_call)
 
-	_LLM_Engine["last_request_tick"] := A_TickCount
+	_LLM_Engine_Plan().OnSent(A_TickCount)
 
 	; Resolve the model + the per-backend async dispatch closure exactly
 	; once so the variant loop doesn't repeat the backend branch on every

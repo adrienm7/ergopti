@@ -1,5 +1,5 @@
 {
-	"_comment": "Single source of truth for LLM INFERENCE constants — diversity temperature, dedup, retry, rate-limit floor. Both drivers (HS api_common.lua and AHK api_common.ahk) load this file at boot. Change a value here and it propagates to both backends in lockstep.",
+	"_comment": "Single source of truth for LLM INFERENCE constants — diversity temperature, dedup, retry. Both drivers (HS api_common.lua and AHK api_common.ahk) load this file at boot. Change a value here and it propagates to both backends in lockstep.",
 
 	"diversity_temperature": {
 		"_comment": "Per-variant temperature increment when generating N predictions sequentially. The step depends on the user's base temperature: low base → bigger step to compensate, high base → smaller step so variants stay coherent. effective_base raises a low base to 0.20 starting at variant 2 so the first variant stays faithful to the user's setting but the following ones have headroom.",
@@ -20,13 +20,6 @@
 		"max_multiplier": 2,
 		"retry_temperature_step": 0.18,
 		"retry_extra_tokens": 5
-	},
-
-	"rate_limit_min_interval_ms": {
-		"_comment": "Minimum interval between two consecutive prediction requests per backend. Floors the user's debounce so paid API providers are protected from per-keystroke token burn, and local backends save GPU energy on back-to-back calls. Read by the Windows driver only: macOS and Linux use the one value the user sets (llm.trigger.min_request_interval_ms, default llm_min_request_interval_ms in defaults.json) and an explicit request is never held. Remove this section when Windows adopts that setting.",
-		"ollama": 300,
-		"mlx": 300,
-		"api": 500
 	},
 
 	"profile_recommendation": {

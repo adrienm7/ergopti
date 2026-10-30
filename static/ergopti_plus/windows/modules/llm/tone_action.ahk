@@ -207,7 +207,7 @@ _LLM_Tone_Dispatch(Generation, Plan, Focus) {
 	; single slot and delay the rewrite behind it; so would an older step.
 	LLM_Engine_CancelTimer()
 	LLM_Engine_CancelInflight()
-	_LLM_Engine["last_request_tick"] := A_TickCount
+	_LLM_Engine_Plan().OnSent(A_TickCount)
 	; The size of the selection, never its content: it is the user's own text
 	LoggerInfo("LLM", "Tone step requested with '{1}' ({2} character(s)).", ProfileId, StrLen(Source))
 	; Profile/entry readers, cancellation and logging can withdraw this request.
