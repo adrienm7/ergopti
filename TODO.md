@@ -53,10 +53,10 @@ on the PC; push the branch and say so, dev integration stays with the coordinato
    - Hotstrings: Windows sends text with `{Text}` (VK_PACKET), so the macOS bug where `axa` turned into `XA`
      cannot happen here. Type `axa` and Space fast twenty times; every one must give `AXA`.
 3. **Every remaining item of "Windows side to do on the PC (from October 25)"** below, in its order.
-4. **"Windows counterparts of the 26 October work"** in the handover below (hotpath_slow_ms, crash kind,
+4. **"Windows counterparts of the 26 October work"** in "Windows side to do on the PC" below (hotpath_slow_ms, crash kind,
    palette, requires_ai, request_plan port, tap_hold v1 migration, Quit refusals, config_migrate op).
-5. **Antivirus surface ceilings:** the "Review the Windows antivirus surface ceilings" item in the handover
-   below. Lower them once a Windows build confirms the counts.
+5. **Antivirus surface ceilings:** the "Review the Windows antivirus surface ceilings" item of "Windows side to
+   do on the PC" below. Lower them once a Windows build confirms the counts.
 6. **Physical checks:** "Maintainer checks > Windows PC" below; report each line as pass, fail or not run.
 
 Every commit keeps the AHK UTF-8 BOM (repository encoding gate), reseals a touched updater source and
@@ -206,6 +206,15 @@ runs the branch cleanup below. Each pass left a full handover; read it first:
    - Run as a normal user with `USER` and `LOGNAME` set; the JS suite refuses root.
    - Use Node 22.22.2 and Ruff 0.15.8, and PowerShell 7 for the Windows host checks.
    - AutoHotkey under Wine is narrower evidence only; it does not replace Windows CI.
+   - **Host-only reds on the Linux container** (not bugs): JS `test-ahk-tap-follower`, `test-linux-install-sandbox`,
+     `test-linux-runtime-native-registration`, `test-macos-managed-bootstrap-http`, `test-managed-ollama-protocol`,
+     `test-managed-remote-retirement` (no pwsh), `test-linux-deb-package-owner` (refuses root),
+     `test-drift-guard-covers-every-output` (worktrees only, node_modules symlink). Lua as root: every
+     EACCES/unreadable/denied case, Linux test 102, four `test_sqlite_first_open` native cases; macOS screenshot
+     EACCES, two mlx-repair unreadable neighbour, errors-log refuses denied, the eight `release-arming-physical`
+     cases (refuse root). Confirm with
+     `setpriv --reuid=65534 --regid=65534 --clear-groups` and set `XDG_RUNTIME_DIR`. Run the macOS suite per
+     group: one process slows down progressively here.
 
 **Left open by the 28 October passes:**
 
@@ -256,7 +265,8 @@ The automatic report `mac-2026-10-27_194738` (developer app from about dev 57fd7
 19:47:05 and 19:48:21) is "the 19:47 run" below; L40 onwards come from it. The report
 `mac-2026-10-27_210657` is "the 21:06 run": its Lua and shell were current (dev 35725ebc22 era),
 but the collector reused a running developer app whose launcher predates L40 and L41 (fixed by
-e4ca76b1c9), so no Swift fix was active. Labels are local to this ledger. Shas on `tmp/wip-audit-field` change when rebased onto
+e4ca76b1c9), so no Swift fix was active. Labels are local to this ledger. A label cited here without its own entry below was fixed; its entry is in
+`git show 7f80d3d141:TODO.md`. Shas on `tmp/wip-audit-field` change when rebased onto
 dev.
 
 ### Open TODO
@@ -520,6 +530,18 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       `available` phase through the allowlist behind `_Updater_OpenManualUrl`, add `"open_url", "available"` to
       `UC_PAGE_ACTIONS`, then drop `open_url:available` from `luaHostsOnly` in
       `tools/test/test-update-check-dialog.cjs`.
+
+- [ ] **Review the Windows antivirus surface ceilings (27 Oct).** d7d98e133b raised the exe bundle's DllImport
+      ceiling in `tools/ci/windows-exe-av-surface.json` from 52 to 54 for the two staged-file custody P/Invokes of
+      `vendor/ergopti_updater_download.ps1` (`CreateFileW`, `GetFileInformationByHandle`, from bdfa026d16). Check
+      whether a bundled type already declaring them could be reused, then lower it back. The same build log notes
+      `key_state_polling` dropped to 59: lower its script ceiling from 62 once a Windows build confirms 59.
+- [ ] **Windows counterparts of the 26 October work.** [CODE] The Lua side is on dev: - read `[logger] hotpath_slow_ms` in `hotpath_profiler.ahk`; - drop the dead crash kind (`error_dialog/init.ahk`, `ERROR_REPORT_KINDS`, then the shared `KINDS` and the
+      `crash_multi_line_without_recent_issues` vector together); - read the 14-colour palette from `native_theme.toml`; - use `dialog.action_picker.requires_ai` for the greyed AI actions; - port `llm/request_plan` (debounce, batching) with its vectors, accept -1 "never", never hold explicit
+      requests, read `llm.trigger.min_request_interval_ms` with a menu row, then delete
+      `rate_limit_min_interval_ms` from `inference.json`; - `tap_hold.toml` v0→v1 migration (`_shared/tap_hold/migrations.toml`) in the loader and writer, stop
+      reading and writing `explicit_delays`; - Quit refusals before `ExitApp` with `notify.quit_refused` (PAR-45); - the registry op that re-encodes a value in `config_migrate.ahk`, then delete the macOS
+      `[llm.profiles] user_profiles` reader import.
 
 ## Decisions of 2026-10-26 to implement (the maintainer's answers of that day)
 
@@ -867,6 +889,11 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       shrink-only baseline. Left: an AHK emitter and the AHK, Swift, shell, Python and JS-page copies.
 
 ## Backlog (one line each)
+
+- [ ] **macOS cold official-Ollama lane.** [CI] since bc09e4584c no product path calls the stock
+      `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,
+      `runtime_install_offer.lua`), so the macOS "official cold Ollama without stock Python" lane only proves
+      the official installer still works cold. Repoint it at the native install or retire it.
 
 Maintainer requests of 2026-10-30 (Windows, macOS and Linux each):
 
