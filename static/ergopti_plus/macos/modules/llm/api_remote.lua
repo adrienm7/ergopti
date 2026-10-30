@@ -1752,7 +1752,12 @@ function M.warmup(_model_name, _profile, on_acquired)
 				-- known only once the scan read them: resolved before it, the ping
 				-- went without one and a server requiring a key answered 401
 				if entry.token == nil or entry.token == "" then
-					entry.token = LocalServers.discovered_key(entry.provider, entry.base_url)
+					-- A fresh copy carries the borrowed key: no entry table, even
+					-- this resolved one, has its token replaced.
+					local borrowed = {}
+					for key, value in pairs(entry) do borrowed[key] = value end
+					borrowed.token = LocalServers.discovered_key(entry.provider, entry.base_url)
+					entry = borrowed
 				end
 				dispatch_ping()
 			end)
