@@ -259,6 +259,18 @@
 			"_source": "https://inference-docs.cerebras.ai/capabilities/reasoning"
 		},
 		{
+			"_family": "GLM 5.3: forced thinking that cannot be disabled, low is the lowest effort",
+			"models": ["glm-5.3*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://docs.z.ai/guides/capabilities/thinking-mode"
+		},
+		{
 			"_family": "GLM 4.5 and later: hybrid, thinking can be turned off",
 			"models": ["glm-4.5*", "glm-4.6*", "glm-4.7*", "glm-5*"],
 			"controls": [
@@ -309,7 +321,19 @@
 			"_source": "https://docs.fireworks.ai/api-reference/post-chatcompletions"
 		},
 		{
-			"_family": "MiniMax M3: hybrid on Together",
+			"_family": "MiniMax M3.1 Flash: thinking cannot be disabled (400), low is the lowest effort",
+			"models": ["minimax-m3.1-flash*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://platform.minimax.io/docs/api-reference/text-openai-api"
+		},
+		{
+			"_family": "MiniMax M3: hybrid on Together and MiniMax",
 			"models": ["minimax-m3*"],
 			"controls": [
 				{
