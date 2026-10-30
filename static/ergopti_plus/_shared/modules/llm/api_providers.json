@@ -28,6 +28,11 @@
 		"hyperbolic",
 		"scaleway",
 		"ovhcloud",
+		"upstage",
+		"ai21",
+		"venice",
+		"vercel",
+		"poe",
 		"backboard",
 		"typesafe",
 		"openrouter_jev",
@@ -266,6 +271,50 @@
 			"default_model": "Mistral-Small-3.2-24B-Instruct-2506",
 			"format": "openai",
 			"_source": "https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-capabilities (no top-level thinking control documented)"
+		},
+		"upstage": {
+			"label": "Upstage (Solar)",
+			"base_url": "https://api.upstage.ai/v1",
+			"default_model": "solar-mini4",
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } },
+			"_source": "https://console.upstage.ai/docs/capabilities/generate/reasoning (reasoning_effort none or minimal is off, the default), https://console.upstage.ai/docs/models/solar-mini-4"
+		},
+		"ai21": {
+			"label": "AI21 (Jamba)",
+			"base_url": "https://api.ai21.com/studio/v1",
+			"default_model": "jamba-mini",
+			"format": "openai",
+			"_source": "https://docs.ai21.com/reference/jamba-1-6-api-ref, https://docs.ai21.com/docs/jamba-foundation-models (Jamba does not reason; no thinking control)"
+		},
+		"venice": {
+			"label": "Venice.ai",
+			"base_url": "https://api.venice.ai/api/v1",
+			"default_model": "llama-3.2-3b",
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "reasoning": { "enabled": false } },
+				"effort": { "reasoning_effort": "$level" }
+			},
+			"_source": "https://docs.venice.ai/overview/guides/reasoning-models, https://docs.venice.ai/api-reference/endpoint/models/list"
+		},
+		"vercel": {
+			"label": "Vercel AI Gateway",
+			"base_url": "https://ai-gateway.vercel.sh/v1",
+			"default_model": "openai/gpt-4.1-nano",
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "reasoning": { "enabled": false } },
+				"effort": { "reasoning": { "effort": "$level" } }
+			},
+			"_source": "https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions, https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions/reasoning"
+		},
+		"poe": {
+			"label": "Poe",
+			"base_url": "https://api.poe.com/v1",
+			"default_model": "gpt-4.1-mini",
+			"format": "openai",
+			"_source": "https://creator.poe.com/docs/external-applications/openai-compatible-api (the reasoning field differs per bot and top-level reasoning_effort is documented as ignored, so no dialect), https://creator.poe.com/api-reference/listModels"
 		},
 		"backboard": {
 			"label": "Backboard",

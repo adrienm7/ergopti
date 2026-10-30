@@ -2146,6 +2146,151 @@
 			"expected": { "model": "gpt-oss-20b", "max_tokens": 16, "stream": false, "temperature": 0.7 },
 			"added": [],
 			"family": 11
+		},
+		{
+			"id": "upstage_solar-mini4",
+			"provider": "upstage",
+			"model": "solar-mini4",
+			"body": { "model": "solar-mini4", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "solar-mini4", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "upstage_solar-pro4",
+			"provider": "upstage",
+			"model": "solar-pro4",
+			"body": { "model": "solar-pro4", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "solar-pro4", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "ai21_jamba-mini",
+			"provider": "ai21",
+			"model": "jamba-mini",
+			"body": { "model": "jamba-mini", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "jamba-mini", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "venice_llama-3.2-3b",
+			"provider": "venice",
+			"model": "llama-3.2-3b",
+			"body": { "model": "llama-3.2-3b", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "llama-3.2-3b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "venice_qwen3-235b-a22b-thinking-2507",
+			"provider": "venice",
+			"model": "qwen3-235b-a22b-thinking-2507",
+			"body": {
+				"model": "qwen3-235b-a22b-thinking-2507",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen3-235b-a22b-thinking-2507",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 29
+		},
+		{
+			"id": "venice_kimi-k3",
+			"provider": "venice",
+			"model": "kimi-k3",
+			"body": { "model": "kimi-k3", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "kimi-k3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": { "enabled": false }
+			},
+			"added": [["reasoning"]],
+			"family": 25,
+			"kind": "toggle"
+		},
+		{
+			"id": "vercel_openai_gpt-4.1-nano",
+			"provider": "vercel",
+			"model": "openai/gpt-4.1-nano",
+			"body": {
+				"model": "openai/gpt-4.1-nano",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-4.1-nano",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "vercel_openai_gpt-oss-120b",
+			"provider": "vercel",
+			"model": "openai/gpt-oss-120b",
+			"body": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": { "effort": "low" }
+			},
+			"added": [["reasoning"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "vercel_alibaba_qwen3-max",
+			"provider": "vercel",
+			"model": "alibaba/qwen3-max",
+			"body": {
+				"model": "alibaba/qwen3-max",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "alibaba/qwen3-max",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": { "enabled": false }
+			},
+			"added": [["reasoning"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "poe_gpt-4.1-mini",
+			"provider": "poe",
+			"model": "gpt-4.1-mini",
+			"body": { "model": "gpt-4.1-mini", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "gpt-4.1-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
 		}
 	],
 	"refusal_vectors": [
