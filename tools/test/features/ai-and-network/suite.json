@@ -460,7 +460,7 @@
 		},
 		{
 			"id": "js-windows-route-plan",
-			"ordinal": 540,
+			"ordinal": 541,
 			"name": "Windows route plan replays the shared route-plan vectors in PowerShell",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-route-plan.cjs"],
