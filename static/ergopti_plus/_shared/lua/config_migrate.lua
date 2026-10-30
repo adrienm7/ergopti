@@ -1485,7 +1485,12 @@ function M.run(opts)
 		return refuse(status, detail)
 	end
 	if version ~= nil and not is_version(version) then return refuse_version("invalid", "canonical schema version is invalid") end
-	if version ~= nil and version > registry.current then return refuse_version("newer", "canonical schema version is newer than this build") end
+	-- Both versions are named: a developer who switches branches reads which
+	-- build wrote the file (field log 2026-10-30: five refusals, no versions).
+	if version ~= nil and version > registry.current then
+		return refuse_version("newer", "canonical schema v" .. version_text(version)
+			.. " is newer than this build's v" .. version_text(registry.current))
+	end
 	local plan = M.plan(source, registry, opts.driver, opts.context)
 	if version ~= nil and version ~= registry.current and plan.version ~= version then
 		return refuse("unsupported", "legacy metadata is not addressable by this migration owner")
