@@ -958,7 +958,7 @@ const CHECKS = [
 				const drift = live
 					.diffSnapshots(r1.config, r2.config)
 					.map((change) => change.key)
-					.filter((key) => key !== 'hotstrings.preview_ai_enabled');
+					.filter((key) => key !== KEY.HOTSTRINGS_PREVIEW_AI_ENABLED);
 				if (drift.length > 0)
 					problems.push(`${name}: Restore after Clear differs from Restore: ${drift.join(', ')}`);
 				if (c.changed === 0 && r2.changed === 0)
@@ -1379,14 +1379,14 @@ const CHECKS = [
 			else if (!configBytes(session, `autohotkey/${backups[0]}`).equals(Buffer.from(old)))
 				problems.push(`the backup ${backups[0]} is not the exact old file`);
 			const want = {
-				'_meta.schema_version': String(version),
+				[KEY._META_SCHEMA_VERSION]: String(version),
 				'shortcuts.keyboard.primary_g': '"open_hotstrings_editor"',
 				'shortcuts.keyboard.meta_e': '"search_web"',
-				'hotstrings.dynamic.enabled': 'false',
-				'hotstrings.cascade_max_arrows': '3',
-				'layout.direct_access_digits': '"digits"',
+				[KEY.HOTSTRINGS_DYNAMIC_ENABLED]: 'false',
+				[KEY.HOTSTRINGS_CASCADE_MAX_ARROWS]: '3',
+				[KEY.LAYOUT_DIRECT_ACCESS_DIGITS]: '"digits"',
 				'hotstrings.autocorrection.names.enabled': 'true',
-				'hotstrings.magic_key_source': '"Backquote"',
+				[KEY.HOTSTRINGS_MAGIC_KEY_SOURCE]: '"Backquote"',
 				'llm.trigger_shortcut': '"^!a"'
 			};
 			for (const [key, value] of Object.entries(want))
