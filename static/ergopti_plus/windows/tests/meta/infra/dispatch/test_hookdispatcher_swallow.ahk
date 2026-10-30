@@ -16,7 +16,8 @@ _THS_Throw(Message, *) {
 _THS_CaptureWarnings(Body) {
 	global _LOGGER_WARN_ENABLED, _LOGGER_REPEAT_ENABLED
 	Saved := _LOGGER_WARN_ENABLED
-	; The logger collapses equal lines itself; only the dispatcher's throttle is measured.
+	; The logger folds equal lines itself, consecutive or repeated; only the dispatcher's
+	; throttle is measured, so the repeat layer is off and _THS_Separate ends a streak.
 	SavedRepeat := _LOGGER_REPEAT_ENABLED
 	_LOGGER_REPEAT_ENABLED := false
 	Lines := []
@@ -31,6 +32,18 @@ _THS_CaptureWarnings(Body) {
 	return Lines
 }
 
+_THS_Separate() {
+	LoggerWarn("THS", "A different line ends the logger's consecutive dedup.")
+}
+
+_THS_Matching(Lines, Needle) {
+	Found := []
+	for Line in Lines
+		if InStr(Line, Needle)
+			Found.Push(Line)
+	return Found
+}
+
 ; A throwing subscriber must neither reach the keystroke's caller nor cost the
 ; subscribers after it, and it logs once per signature, not once per keystroke.
 _THS_Check() {
@@ -41,7 +54,8 @@ _THS_Check() {
 	HookDispatcher.Register(Evt, Thrower)
 	HookDispatcher.Register(Evt, Peer)
 	try {
-		Lines := _THS_CaptureWarnings(() => (HookDispatcher.Dispatch(Evt), HookDispatcher.Dispatch(Evt)))
+		Lines := _THS_CaptureWarnings(() => (HookDispatcher.Dispatch(Evt), _THS_Separate(), HookDispatcher.Dispatch(Evt)))
+		Lines := _THS_Matching(Lines, "swallowed-" . Evt)
 		AssertEqual(2, Later, "the subscriber after the throwing one runs on every dispatch")
 		AssertEqual(1, Lines.Length, "two equal faults within the throttle window log one warning")
 		AssertContains(Lines[1], "swallowed-" . Evt, "the warning names the fault")
@@ -134,8 +148,8 @@ _THS_TrackerFaultsAreReported() {
 	Assert(InStr(Src, '_TrackFault("TapHoldTrackKeyDownByScancode"') > 0,
 		"the key-down tracker fault must route through the throttled reporter")
 	Label := "test_tracker_" . A_TickCount
-	Lines := _THS_CaptureWarnings(() => (HookDispatcher._TrackFault(Label, Error("broken")),
-		HookDispatcher._TrackFault(Label, Error("broken")), HookDispatcher._TrackFault(Label, Error("other"))))
+	Lines := _THS_Matching(_THS_CaptureWarnings(() => (HookDispatcher._TrackFault(Label, Error("broken")), _THS_Separate(),
+		HookDispatcher._TrackFault(Label, Error("broken")), _THS_Separate(), HookDispatcher._TrackFault(Label, Error("other")))), Label)
 	AssertEqual(2, Lines.Length, "one warning per fault signature, whatever the keystroke rate")
 	AssertContains(Lines[1], Label, "the warning names the tracker")
 }
