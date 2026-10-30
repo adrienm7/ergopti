@@ -33,6 +33,7 @@
 local Decoder = require("modules.gestures.mt_decoder")
 local Finder = require("modules.gestures.touchpad_finder")
 local Reader = require("adapters.evdev_reader")
+local Record = require("tests.support.touchpad_record")
 
 local UINPUT_PATH = "/dev/uinput"
 local DEVICE_NAME = "Ergopti Roundtrip Touchpad"
@@ -46,6 +47,10 @@ local SETTLE_SECONDS  = 0.1
 local _origin_nudge = 0
 
 local _failures, _checks = 0, 0
+
+-- Every event the reader delivered to a decoder, and the gestures it gave, kept
+-- as a libinput record capture of this run.
+local _captured, _decoded = {}, {}
 
 --- @param condition boolean
 --- @param what string
@@ -305,8 +310,10 @@ local function play(fingers, dx, dy)
 	local out = nil
 	for _ = 1, SETTLE_ATTEMPTS do
 		local drained = Reader.drain(function(event)
+			_captured[#_captured + 1] = { type = event.type, code = event.code, value = event.value,
+				timestamp_us = event.timestamp_us }
 			local gesture = decoder:feed(event)
-			if gesture then out = gesture end
+			if gesture then out = gesture; _decoded[#_decoded + 1] = gesture end
 		end, Reader.TOUCHPAD)
 		if out then break end
 		if drained == 0 then os.execute("sleep " .. tostring(SETTLE_SECONDS)) end
@@ -340,6 +347,31 @@ check(left ~= nil and left.direction == "left", string.format(
 	left and tostring(left.direction) or "nothing"))
 
 Reader.close(Reader.TOUCHPAD)
+
+-- The capture, written in libinput record format and read back, must decode
+-- into the same gestures: the reader of that format is then checked against
+-- what a kernel delivered rather than against a hand-written table.
+local record_text = Record.encode(DEVICE_NAME, _captured)
+local trace, record_error = Record.decode(record_text)
+check(trace ~= nil, "the capture reads back as a libinput record" .. (record_error and ": " .. record_error or ""))
+if trace then
+	local replayed = Record.replay(Decoder.new(), trace)
+	local same = #replayed == #_decoded
+	for index, gesture in ipairs(_decoded) do
+		local other = replayed[index]
+		same = same and other ~= nil and other.fingers == gesture.fingers
+			and other.direction == gesture.direction and (other.tap == true) == (gesture.tap == true)
+	end
+	check(same, string.format("the recorded capture replays into the same %d gesture(s); got %d",
+		#_decoded, #replayed))
+end
+local record_path = os.getenv("ERGOPTI_TOUCHPAD_RECORD")
+if record_path and record_path ~= "" then
+	local file = assert(io.open(record_path, "wb"))
+	assert(file:write(record_text))
+	assert(file:close())
+	print("  capture written to " .. record_path)
+end
 destroy()
 
 print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))
