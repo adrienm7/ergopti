@@ -3734,7 +3734,7 @@
 	"menu.layout.number_row_digits": "数字优先",
 	"menu.layout.number_row_symbols": "符号优先",
 	"platform_reason.number_row_override_unsupported": "仅限 Windows：在此系统上，数字行由系统中安装的布局输入；只有模拟布局的 Windows 才能让数字或符号优先。",
-	"platform_reason.number_row_live_session": "不可用: 只有 X11 会话会即时应用此设置。当前会话保持现有布局，您的选择已保存。",
+	"platform_reason.number_row_live_session": "不可用: 只有 X11 会话，或 Wayland 上的 GNOME 或 KDE，会即时应用此设置。当前桌面保持现有布局，您的选择已保存。",
 	"platform_reason.number_row_live_no_layout": "不可用: 请先安装 ErgoptiPlus 键盘布局；此选项会更改您正在使用的布局。",
 	"layouts.linux_rows_not_applied": "数字行的选择已保存，但无法更新当前使用的键盘布局。",
 	"platform_reason.number_row_source_unavailable": "不可用: 符号优先需要启用模拟布局，且数字行的每个位置都必须具有有效的数字和符号层级。",

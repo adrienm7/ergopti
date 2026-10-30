@@ -3734,7 +3734,7 @@
 	"menu.layout.number_row_digits": "Nejprve číslice",
 	"menu.layout.number_row_symbols": "Nejprve symboly",
 	"platform_reason.number_row_override_unsupported": "Pouze Windows: v tomto systému píše řadu číslic rozložení nainstalované v systému; číslice nebo symboly dává na první místo jen Windows, který rozložení emuluje.",
-	"platform_reason.number_row_live_session": "Nedostupné: Okamžitě to použije jen relace X11. Tato relace si ponechá současné rozložení; vaše volba je uložena.",
+	"platform_reason.number_row_live_session": "Nedostupné: Okamžitě to použije jen relace X11 nebo GNOME či KDE na Waylandu. Toto prostředí si ponechá současné rozložení; vaše volba je uložena.",
 	"platform_reason.number_row_live_no_layout": "Nedostupné: Nejprve nainstalujte rozložení ErgoptiPlus; tato volba mění rozložení, které používáte.",
 	"layouts.linux_rows_not_applied": "Volba číselné řady je uložena, ale aktivní rozložení klávesnice se nepodařilo aktualizovat.",
 	"platform_reason.number_row_source_unavailable": "Nedostupné: Symboly nejprve vyžadují aktivní emulované rozložení s platnými úrovněmi číslic a symbolů na každé pozici číselné řady.",
