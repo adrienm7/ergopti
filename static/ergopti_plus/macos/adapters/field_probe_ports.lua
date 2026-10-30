@@ -597,9 +597,13 @@ local function scratch_typing(keys, callback, options)
 		local screen = hs.screen.mainScreen():frame()
 		view = hs.webview.new({ x = screen.x + screen.w / 2 - 180, y = screen.y + 80, w = 360, h = 90 },
 			{ developerExtrasEnabled = false })
-		view:windowStyle({ "titled" }):windowTitle("Ergopti field run"):allowTextEntry(true)
-		view:level(hs.drawing.windowLevels.floating):html(SCRATCH_HTML):show()
-		require("ui.ui_builder").force_focus(view, true)
+		-- The shared chrome keeps the normal level: the field is focused before
+		-- each key and the run aborts when it loses the focus, so floating it
+		-- would only leave it above the windows the user opens meanwhile
+		local UiBuilder = require("ui.ui_builder")
+		for _, step in ipairs(UiBuilder.window_chrome_steps(view)) do step.apply() end
+		view:windowTitle("Ergopti field run"):allowTextEntry(true):html(SCRATCH_HTML):show()
+		UiBuilder.force_focus(view, true)
 	end)
 	if not ok then
 		require("infra.logger").error("adapters.field_probe_ports", "The scratch field could not open: %s.", tostring(err))
