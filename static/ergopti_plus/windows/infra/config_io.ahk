@@ -2196,6 +2196,7 @@ SetScriptShortcutChordsOn(On, Path := "", ReloadFn := 0) {
 		Row := ManifestSparseOperation("shortcuts.script_control.chords_enabled", On ? true : false)
 		if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, [Row], "the script chords switch")
 				return false
+		NotifyFeature(t("notify.script_control"), On ? true : false)
 		return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
 }
 

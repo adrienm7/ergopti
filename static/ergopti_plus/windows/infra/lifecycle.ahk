@@ -80,6 +80,12 @@ global _LifecycleAiShutdownAttempt := 0
 global LIFECYCLE_FLUSH_EXIT_POLL_MS := 100
 global LIFECYCLE_FLUSH_EXIT_BUDGET_MS := 10000
 global _LifecycleFlushExitRetryArmed := false
+;
+; How long a Quit waits for a running writer: [ui] user_quit_deadline_ms of
+; _shared/modules/timings/constants.toml, pinned by test_quit_admission.ahk. The
+; poll is the macOS menu's.
+global LIFECYCLE_USER_QUIT_DEADLINE_MS := 12000
+global LIFECYCLE_USER_QUIT_POLL_MS := 250
 
 ; Drains every registered custom-combination prefix key (see
 ; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS) BEFORE a suspend flips. AHK prefix flags
@@ -983,6 +989,7 @@ _LifecycleRetryExitNow(Code, *) {
 	_LifecycleFlushExitRetryArmed := false
 	try LoggerInfo("Lifecycle", "Keystats flush settled; retrying the deferred exit.")
 	ExitApp(Code)
+	QuitRequest_ExitReturned(_LifecycleQuitRetryOwned, NotifyQuitRefused)
 }
 
 _LifecycleAbandonExitRetry(*) {
@@ -991,6 +998,7 @@ _LifecycleAbandonExitRetry(*) {
 	try LoggerError("Lifecycle",
 		"Deferred exit abandoned: the keystats flush did not settle within {1} ms.",
 		LIFECYCLE_FLUSH_EXIT_BUDGET_MS)
+	QuitRequest_RetryAbandoned(NotifyQuitRefused)
 }
 
 ; This admission protects only the exact unsettled successor retirement.
@@ -1004,6 +1012,7 @@ _LifecycleRetrySupersededExit(Code, Record, *) {
 			|| !Record["stop_acknowledged"]
 		return false
 	ExitApp(Code)
+	QuitRequest_ExitReturned(_LifecycleQuitRetryOwned, NotifyQuitRefused)
 }
 
 Ergopti_OnShutdown(reason, code) {
@@ -1548,8 +1557,48 @@ UpdateTrayIcon() {
 ActivateReload(*) {
 		ReloadPreservingSuspend()
 }
+; The tray's Quit and the script_quit action: what happens is decided by the
+; admission the other two drivers share (infra/quit_admission.ahk).
 ActivateExitApp(*) {
-		ExitApp()
+		global LIFECYCLE_USER_QUIT_DEADLINE_MS, LIFECYCLE_USER_QUIT_POLL_MS
+		return QuitRequest_Run(Map(
+				"facts", _LifecycleQuitFacts,
+				"schedule", _LifecycleQuitSchedule,
+				"now", () => A_TickCount,
+				"timeout", LIFECYCLE_USER_QUIT_DEADLINE_MS,
+				"poll", LIFECYCLE_USER_QUIT_POLL_MS,
+				"warn", (Text) => LoggerWarn("Lifecycle", "{1}", Text),
+				"exit", () => ExitApp(),
+				"retry_owned", _LifecycleQuitRetryOwned,
+				"notify", NotifyQuitRefused))
+}
+; The facts of one Quit, read from their owners. MenuCommandConfigBusy is the
+; shutdown's own lease question: a terminal transition of a reload or a retained
+; barrier is what OnExit proceeds through, so neither delays Quit.
+_LifecycleQuitFacts() {
+		return Map("owner_available", 1,
+				"exit_pending", _LifecycleQuitRetryOwned() ? 1 : 0,
+				"reload_pending", (ReloadTerminalHandoffPending() is Map) ? 1 : 0,
+				"writer_active", MenuCommandConfigBusy() ? 1 : 0,
+				"publication_pending", (HSE_TerminalTransactionPending() || _ConfigFullSaveHasPending()) ? 1 : 0)
+}
+_LifecycleQuitSchedule(Ms, Callback) {
+		try {
+				TimerArmOneShotMs(Callback, Ms)
+				return true
+		} catch as Err {
+				try LoggerError("Lifecycle", "The Quit poll could not be armed: {1}.", Err.Message)
+				return false
+		}
+}
+; Whether something already retries a refused exit by itself: the keystats flush,
+; or the retirement of a reload successor that resumes the same exit.
+_LifecycleQuitRetryOwned() {
+		global _LifecycleFlushExitRetryArmed
+		if _LifecycleFlushExitRetryArmed
+				return true
+		Record := ReloadTerminalHandoffPending()
+		return (Record is Map) && Record.Get("stop_mode", "") == "abandon" && HasMethod(Record.Get("resume_exit", 0), "Call")
 }
 WindowSpy(*) {
 		SplitPath(A_AhkPath, , &ahkDir)

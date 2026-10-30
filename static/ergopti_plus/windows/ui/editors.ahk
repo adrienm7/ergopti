@@ -804,6 +804,12 @@ ToggleHotstringsPreviewSwitch(Key, WriterFn := 0, NotifyFn := 0, RebuildFn := 0)
 	TooltipHide("PreviewSwitch", true)
 	if (Key == "preview_ai_enabled" && !Candidate && IsSet(LLM_Engine_CancelTimer))
 		LLM_Engine_CancelTimer()
+	static NoticeKeys := Map("preview_star_enabled", "menu.hotstrings.notify_bubble_star",
+		"preview_autocorrect_enabled", "menu.hotstrings.notify_bubble_autocorrect",
+		"preview_ai_enabled", "menu.hotstrings.notify_bubble_ai",
+		"preview_colored_tooltips", "menu.hotstrings.notify_bubble_colored")
+	if NoticeKeys.Has(Key)
+		NotifyFeature(t(NoticeKeys[Key]), Candidate)
 	return true
 }
 

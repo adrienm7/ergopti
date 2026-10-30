@@ -87,7 +87,10 @@ _HS_AllSectionsRow(AllOn, Apply) {
 _HS_CategorySelectionApply(Targets, Enabled) {
 	if Targets.Length != 1
 		throw ValueError("A category submenu selects exactly its own category.")
-	return ToggleCategoryAllSections(Targets[1], Enabled)
+	Applied := ToggleCategoryAllSections(Targets[1], Enabled)
+	if Applied
+		NotifyFeature(GetCategoryTitle(Targets[1]), Enabled)
+	return Applied
 }
 
 /**

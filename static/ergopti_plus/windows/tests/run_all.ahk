@@ -348,6 +348,7 @@ InstallHotstringHooks()
 
 ; ── Adapter contract: include all port adapters so contract vector tests can call them ──
 #Include ../adapters/notifier.ahk
+#Include ../infra/quit_admission.ahk
 #Include ../adapters/timer_scheduler.ahk
 #Include ../adapters/file_system.ahk
 #Include ../adapters/window_info.ahk
@@ -626,6 +627,7 @@ InstallSendNoOps()
 #Include unit/modules/updater/test_updater_release_list_budget.ahk
 #Include unit/modules/updater/test_updater_check_only_fallback.ahk
 #Include unit/modules/updater/test_updater_check_session_vectors.ahk
+#Include unit/infra/lifecycle/test_quit_admission.ahk
 ; The About row actions; menu_init.ahk is included with the tray root below.
 #Include ../ui/menu/menu_actions.ahk
 #Include unit/modules/updater/test_about_menu_channel_rows.ahk

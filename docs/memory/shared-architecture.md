@@ -390,8 +390,10 @@ stop job or drops a marker the relay checks). The contract test
 `_shared/lua/test/quit_admission_contract.lua` is replayed by both drivers; a new
 cause is a new fact there, never a driver-local `if`. Linux reads "a writer is
 active" from `infra/scope_registry.lua`, where every scope module registers a
-probe over the owner it keeps. Windows has no refusal notice yet (its OnExit
-gates veto silently, bounded to five attempts).
+probe over the owner it keeps. Windows ports the decision in
+`infra/quit_admission.ahk` and adds one refusal: an OnExit gate can still veto the
+admitted exit, which returns from `ExitApp`, so a veto with no retry owner gets the
+same notice.
 
 ### project-a-row-a-platform-lacks-is-hidden-or-greyed
 
