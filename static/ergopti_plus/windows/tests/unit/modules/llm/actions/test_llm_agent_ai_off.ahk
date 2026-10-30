@@ -1,11 +1,14 @@
 ﻿; tests/unit/modules/llm/actions/test_llm_agent_ai_off.ahk
 
 ; ==============================================================================
-; MODULE: LLM Agent With the AI Menu Off
+; MODULE: LLM Agent With the AI Off, or Its Prediction Bridge Stopped
 ; DESCRIPTION:
-; With the AI menu off the agent triages a typing pause without predicting,
-; the typing feed follows the mode and the pause, a missing local model
-; only offers manual recovery, and the tool cache honours its exact TTL.
+; With the AI off the automatic mode is disarmed: no pause, no triage, no request
+; in flight, and the next keystroke after the switch-on arms it again. With the
+; AI on and the prediction bridge stopped, the agent triages a typing pause
+; without predicting and the typing feed follows the mode and the pause. A missing
+; local model only offers manual recovery, and the tool cache honours its exact
+; TTL.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -75,10 +78,10 @@ _LAG_AssertNoPrediction(Fx, Before) {
 	AssertEqual(Before["tooltips"], After["tooltips"], "no prediction tooltip or spinner")
 }
 
-; The root cause: turning the AI menu off stops the prediction bridge, and the
-; bridge used to drop every keystroke then, so the automatic mode never saw one.
-_LAG_AutoWithAiOff() {
-	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+; The prediction bridge can be stopped with the AI on (its backend is not ready):
+; it used to drop every keystroke then, so the automatic mode never saw one.
+_LAG_AutoWithBridgeOff() {
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
 		Fx.App := "Slack"
 		TooltipHide("AgentTest", true)
@@ -87,7 +90,7 @@ _LAG_AutoWithAiOff() {
 			global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
 			Before := _LAG_PredictionSnapshot(Fx)
 			Pause := _LAG_TypeThroughBridge(Fx, LAG_TYPED . "x")
-			AssertTrue(HasMethod(Pause, "Call"), "with the AI off, typing arms the agent's pause")
+			AssertTrue(HasMethod(Pause, "Call"), "with the bridge stopped, typing arms the agent's pause")
 			AssertTrue(_LLM_Bridge_AgentFeeding, "the bridge feeds the agent alone")
 			AssertEqual(1, _LPP_LinesWith(Lines, "INFO", "feeds the AI agent's typing observer only"),
 				"which is logged once")
@@ -114,10 +117,10 @@ _LAG_AutoWithAiOff() {
 		}
 	}
 }
-Test("LLM agent: with the AI menu off, a typing pause is triaged and nothing predicts", _LAG_AutoWithAiOff)
+Test("LLM agent: with the prediction bridge stopped, a typing pause is triaged and nothing predicts", _LAG_AutoWithBridgeOff)
 
-_LAG_ActionModeWithAiOff() {
-	_LAG_Run(_LAG_Menu("action", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+_LAG_ActionModeWithBridgeOff() {
+	_LAG_Run(_LAG_Menu("action", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
 		TooltipHide("AgentTest", true)
 		_LAG_WithBridgeOff(_Typing)
@@ -133,10 +136,10 @@ _LAG_ActionModeWithAiOff() {
 		}
 	}
 }
-Test("LLM agent: with the AI menu off, the agent on action watches no typing", _LAG_ActionModeWithAiOff)
+Test("LLM agent: with the prediction bridge stopped, the agent on action watches no typing", _LAG_ActionModeWithBridgeOff)
 
 _LAG_ModeChangesStopTheFeed() {
-	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
 		TooltipHide("AgentTest", true)
 		_LAG_WithBridgeOff(_Typing)
@@ -170,7 +173,7 @@ Test("LLM agent: leaving the automatic mode stops the typing feed, entering it s
 	_LAG_ModeChangesStopTheFeed)
 
 _LAG_PauseStopsTheFeed() {
-	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
 		TooltipHide("AgentTest", true)
 		AssertTrue(InStr(_DriverFuncBody("Ergopti_OnSuspendEnter"), '"llm-agent-typing", LLM_Agent_OnSuspend') > 0,
@@ -201,6 +204,105 @@ _LAG_PauseStopsTheFeed() {
 	}
 }
 Test("LLM agent: a pause stops the typing feed, the resume lets it start again", _LAG_PauseStopsTheFeed)
+
+; With the AI off the automatic mode is disarmed from the first keystroke.
+_LAG_AiOffDisarmsAuto() {
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		TooltipHide("AgentTest", true)
+		_LAG_WithBridgeOff(_Typing)
+		_Typing() {
+			global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding, _LLM_Agent_Generation
+			Before := _LAG_PredictionSnapshot(Fx)
+			AssertFalse(LLM_Agent_WatchesTyping(), "the mode is auto, but the AI is off")
+			AssertEqual("", _LAG_TypeThroughBridge(Fx, LAG_TYPED), "typing arms no pause")
+			AssertFalse(_LLM_Bridge_AgentFeeding, "the bridge feeds nothing")
+			AssertEqual("", _LLM_Bridge_AgentBuffer, "and keeps no context")
+			AssertEqual(0, Fx.Scheduled.Length, "no timer at all")
+			AssertFalse(LLM_Agent_OnTyping(LAG_TYPED), "a direct observation arms nothing either")
+			AssertFalse(_LLM_Agent_OnPause(_LLM_Agent_Generation, LAG_TYPED), "and a pause already armed triages nothing")
+			AssertEqual(0, Fx.Remote.Length, "no System 1 request")
+			_LAG_AssertNoPrediction(Fx, Before)
+		}
+	}
+}
+Test("LLM agent: with the AI off the automatic mode arms no pause and triages nothing (ai-off-auto)", _LAG_AiOffDisarmsAuto)
+
+; The switch-off drops the armed pause; the first keystroke after the switch-on
+; arms it again, with no reload.
+_LAG_SwitchOffDropsThePause() {
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		TooltipHide("AgentTest", true)
+		_LAG_WithBridgeOff(_Typing)
+		_Typing() {
+			global _LLM_Menu, _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
+			Old := _LAG_TypeThroughBridge(Fx, LAG_TYPED)
+			AssertTrue(HasMethod(Old, "Call"), "precondition: the pause is armed")
+			_LLM_Menu["enabled"] := false
+			LLM_Agent_OnAiSwitchedOff()
+			AssertEqual(0, Fx.Scheduled[Fx.Scheduled.Length]["period"], "the switch-off cancels the armed pause")
+			AssertFalse(_LLM_Bridge_AgentFeeding, "stops the feed")
+			AssertEqual("", _LLM_Bridge_AgentBuffer, "and drops its context")
+			AssertFalse(Old.Call(), "the pause armed before fires for nothing")
+			AssertEqual(0, Fx.Remote.Length, "no triage")
+			_LLM_Menu["enabled"] := true
+			Pause := _LAG_TypeThroughBridge(Fx, "Envoie le devis à Paul demain")
+			AssertTrue(HasMethod(Pause, "Call"), "the first keystroke after the switch-on arms it again")
+			AssertEqual("Envoie le devis à Paul demain", _LLM_Bridge_AgentBuffer, "on a fresh context")
+			AssertTrue(Pause.Call(), "and its pause triages")
+			AssertEqual(1, Fx.Remote.Length, "one System 1 request")
+		}
+	}
+}
+Test("LLM agent: the switch-off drops the pause, the switch-on re-arms at the next keystroke (ai-off-auto)",
+	_LAG_SwitchOffDropsThePause)
+
+; A triage or a System 2 request in flight is withdrawn by the switch-off. Told is
+; whether the switch's commit reached the agent: the gate holds without it.
+_LAG_InFlightWithdrawn(Told, Phase) {
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_Menu
+		TooltipHide("AgentTest", true)
+		Pause := _LAG_Type(Fx, LAG_TYPED)
+		AssertTrue(Pause.Call(), "precondition: System 1 was asked")
+		if (Phase == "system2") {
+			Fx.Remote[1]["on_success"].Call("INTENT: calendar`nPROBABILITY: 0.86")
+			AssertEqual(2, Fx.Remote.Length, "precondition: System 2 was asked")
+		}
+		_LLM_Menu["enabled"] := false
+		if Told
+			LLM_Agent_OnAiSwitchedOff()
+		Asked := Fx.Remote.Length
+		Fx.Remote[Asked]["on_success"].Call(Phase == "system2" ? LAG_ANSWER : "INTENT: calendar`nPROBABILITY: 0.86")
+		AssertEqual(Asked, Fx.Remote.Length, "the late answer wakes nothing")
+		if Told || Phase == "triage"
+			AssertFalse(IsObject(_LPP_LastFinalRender()), "and offers nothing")
+	}
+}
+Test("LLM agent: the switch-off withdraws a triage in flight (ai-off-auto)", _LAG_InFlightWithdrawn.Bind(true, "triage"))
+Test("LLM agent: the AI gate withdraws a triage even unannounced (ai-off-auto)", _LAG_InFlightWithdrawn.Bind(false, "triage"))
+Test("LLM agent: the switch-off withdraws a System 2 request in flight (ai-off-auto)", _LAG_InFlightWithdrawn.Bind(true, "system2"))
+
+; A manual flow's spinner goes with the switch-off, when no bridge would hide it.
+_LAG_SwitchOffRetiresManualFlow() {
+	_LAG_Run(_LAG_Menu("action", "", "cerebras"), _LTN_Screen(LAG_SELECTION), _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_Menu, _Stub_LlmPresentedRecord
+		Hidden := []
+		AssertTrue(_LAG_Invoke("llm_agent_selection"), "precondition: the request left")
+		Record := { Lifecycle: { OfferId: "agent_" . _LLM_Agent_Generation } }
+		_Stub_LlmPresentedRecord := Record
+		_LLM_Menu["enabled"] := false
+		_AAG_WithFn(LLM_Tooltip_HideExact, (Self, Shown) => Hidden.Push(Shown), LLM_Agent_OnAiSwitchedOff)
+		AssertEqual(1, Hidden.Length, "the agent's tooltip is hidden")
+		AssertEqual(ObjPtr(Record), ObjPtr(Hidden[1]), "that one")
+		Fx.Remote[1]["on_success"].Call(LAG_ANSWER)
+		AssertFalse(IsObject(_LPP_LastFinalRender()), "the late answer offers nothing")
+	}
+}
+Test("LLM agent: the switch-off retires a manual flow and its tooltip (ai-off-auto)", _LAG_SwitchOffRetiresManualFlow)
 
 
 _LAG_MissingLocalModelOffersOnlyCurrentFlow() {
@@ -259,7 +361,7 @@ Test("LLM agent: actual automatic local triage missing-model notice has no modal
 	_LAG_AutomaticMissingModelNotifiesWithoutModal)
 /** A native Backspace and its AI admission must erase the same complete scalar. */
 _LAG_UnicodePhysicalBackspace(Active) {
-	Menu := _LAG_Menu(Active ? "off" : "auto", "cerebras", "cerebras", false)
+	Menu := _LAG_Menu(Active ? "off" : "auto", "cerebras", "cerebras")
 	_LAG_Run(Menu, _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
 		_Typing() {
@@ -345,7 +447,7 @@ Test("LLM agent: tool cache expires across tick wrap (tools-cache-wrap)",
 
 ; A caret move changes the typing location even when only the agent observes.
 _LAG_CaretContext(Key, Reset) {
-	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
 		_LAG_WithBridgeOff(_Typing)
 		_Typing() {
