@@ -406,10 +406,17 @@ const bodyFrom = (source, name) => {
 for (const name of ['LLM_Engine_OnKeystroke', 'LLM_Engine_StartTimer']) {
 	const body = bodyFrom(keystrokes, name);
 	check(
-		body.includes('LLM_Engine_LiveOverride()') && body.includes('LLM_Engine_LiveDebounceMs()'),
-		`${name} must arm live mode's override and debounce`
+		body.includes('LLM_Engine_LiveOverride()') && body.includes('_LLM_Engine_PlanInput('),
+		`${name} must arm live mode's override and take its delay from the request plan`
 	);
 }
+// The request plan owns the delay, so live mode's debounce reaches it here.
+check(
+	bodyFrom(keystrokes, '_LLM_Engine_PlanInput').includes(
+		'"live_debounce_ms", LLM_Engine_LiveIsActive() ? LLM_Live_Config()["debounce_ms"] : false'
+	),
+	"the request plan must receive live mode's debounce while live mode is on"
+);
 check(
 	bodyOf(read('infra/lifecycle.ahk'), 'Ergopti_OnSuspendEnter').includes('"llm-live-mode"'),
 	'pausing must turn live mode off'
