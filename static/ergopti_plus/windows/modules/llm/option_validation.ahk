@@ -286,9 +286,13 @@ LLM_Option_NormalizeAppProfileOverrides(Value) {
 global LLM_OLLAMA_PORT_MIN := 1024
 global LLM_OLLAMA_PORT_MAX := 65535
 
-/** Normalizes the one Ollama port domain shared by menu, engine and client. */
+/**
+ * Normalizes the one Ollama port domain shared by menu, engine and client. The
+ * stock port (llm_ollama_port) is refused: a user's own Ollama keeps it, and
+ * Ergopti's daemon must never meet that Ollama.
+ */
 LLM_Option_TryNormalizeOllamaPort(Value, &Normalized) {
-	global LLM_OLLAMA_PORT_MIN, LLM_OLLAMA_PORT_MAX
+	global LLM_OLLAMA_PORT_MIN, LLM_OLLAMA_PORT_MAX, LLM_Defaults
 	Normalized := false
 	if !IsInteger(Value)
 		return false
@@ -296,6 +300,9 @@ LLM_Option_TryNormalizeOllamaPort(Value, &Normalized) {
 	catch
 		return false
 	if Candidate < LLM_OLLAMA_PORT_MIN || Candidate > LLM_OLLAMA_PORT_MAX
+		return false
+	if IsSet(LLM_Defaults) && LLM_Defaults is Map && LLM_Defaults.Has("llm_ollama_port")
+			&& Candidate == LLM_Defaults["llm_ollama_port"]
 		return false
 	Normalized := Candidate
 	return true

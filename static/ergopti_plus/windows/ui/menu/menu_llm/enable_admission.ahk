@@ -118,8 +118,22 @@ LLM_Menu_RequestEnableAdmission(Port := 0, CancelPending := true) {
 	return true
 }
 
-_LLM_Menu_EnableProbe(Callback, Owner) {
-	return LLM_OllamaIsRunning_Async(Callback, Owner, true)
+/** Only Ergopti's live daemon can admit an enable; otherwise it starts first. */
+_LLM_Menu_EnableProbe(Callback, Owner, ProbeFn := 0, StartOwnedFn := 0, OwnedFn := 0) {
+	if HasMethod(OwnedFn, "Call") ? OwnedFn.Call() : LLM_OllamaManagedOriginRequired() {
+		Probe := HasMethod(ProbeFn, "Call") ? ProbeFn : LLM_OllamaIsRunning_Async
+		return Probe.Call(Callback, Owner, true)
+	}
+	Start := HasMethod(StartOwnedFn, "Call") ? StartOwnedFn : _LLM_Menu_EnableStartOwned
+	return Start.Call()
+}
+
+/** Retires the pending request, then re-requests it once the daemon is READY. */
+_LLM_Menu_EnableStartOwned() {
+	global _LLM_Menu
+	LLM_Menu_CancelEnableAdmission()
+	return LLM_Deps_CheckAndInstall(_LLM_Menu.Get("model", ""),
+		(*) => LLM_Menu_RequestEnableAdmission(0, false))
 }
 
 ; This writer runs inside the actual borrowed config lease, after full-save
