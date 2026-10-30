@@ -85,7 +85,7 @@
 			"host": 1
 		},
 		"static/ergopti_plus/windows/modules/updater/core.ahk": {
-			"host": 4
+			"host": 3
 		},
 		"static/ergopti_plus/windows/modules/updater/self_update.ahk": {
 			"host": 1,
