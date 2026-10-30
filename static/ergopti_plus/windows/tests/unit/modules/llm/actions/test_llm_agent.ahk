@@ -781,7 +781,9 @@ _LAG_AiOffRefuses() {
 	Screen := _LTN_Screen(LAG_SELECTION)
 	_LAG_Run(_LAG_Menu("action", "", "cerebras", false), Screen, _Body)
 	_Body(Fx, Lines, Sent) {
-		global _LLM_Menu
+		global _LLM_Menu, _LOGGER_DEDUP_KEY
+		; An earlier suite may have logged this very refusal within the dedup window.
+		_LOGGER_DEDUP_KEY := ""
 		AssertFalse(_LAG_Invoke("llm_agent_selection"), "the AI is off, the selection is refused")
 		AssertEqual(t("llm.manual_prediction.disabled"), _LPP_PendingNotice(), "with the notice of the other AI actions")
 		AssertEqual(0, Screen.Reads, "before anything is read")
