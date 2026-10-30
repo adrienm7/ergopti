@@ -123,12 +123,24 @@ _TNC_PacVerdict() {
 	NumPut("UChar", 0xFF, Wide, 0), NumPut("UChar", 0xFE, Wide, 1)
 	AssertEqual("ok", NetworkCheck_JudgePac(200, Wide), "a UTF-16 PAC is accepted as the download accepts it")
 	; A valid script padded past the limit, so only the size can refuse it
-	Big := Buffer(1048577, 0x20)
+	Big := Buffer(NetworkCheck_PacMaxBytes() + 1, 0x20)
 	DllCall("RtlMoveMemory", "Ptr", Big, "Ptr", Good, "UPtr", Good.Size)
 	AssertEqual("error", NetworkCheck_JudgePac(200, Big), "over the size limit")
 }
 
 Test("NetworkCheck: the PAC verdict follows the managed download's rules (network-check)", _TNC_PacVerdict)
+
+; The ceiling is the shared policy's, not a copy: a different value there moves it.
+_TNC_PacCeilingIsThePolicys() {
+	global _SharedDir
+	Policy := JsonParse(FileRead(_SharedDir . "\modules\network\proxy_policy.json", "UTF-8"))
+	Maximum := Policy["native_pac"]["max_script_bytes"]
+	AssertTrue(Maximum > 0, "the policy names a PAC ceiling")
+	AssertEqual(Maximum, NetworkCheck_PacMaxBytes())
+	Body := _DriverFuncBody("NetworkCheck_PacMaxBytes")
+	AssertTrue(InStr(Body, "max_script_bytes") > 0, "the ceiling is read from the policy")
+}
+Test("NetworkCheck: the PAC ceiling is the shared policy's (PAR-71)", _TNC_PacCeilingIsThePolicys)
 
 
 
