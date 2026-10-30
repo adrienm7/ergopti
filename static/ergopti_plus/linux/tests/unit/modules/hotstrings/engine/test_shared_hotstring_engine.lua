@@ -111,6 +111,13 @@ helpers.describe("shared hotstring engine — suffix matching", function()
 		result = feed({ bundled, lower }, { "s", "r", "u" })
 		helpers.assert_true(result ~= nil and result.replacement == "sur",
 			"a lower-priority end-char entry leaves the immediate one firing")
+		-- An exact-case personal "SRU" cannot fire on a typed "sru", so it must not
+		-- take the bundled correction away from it.
+		local exact = { auto_expand = false, trigger = "SRU", replacement = "S.R.U.", priority = 50,
+			is_case_sensitive = true, is_case_sensitive_strict = true }
+		result = feed({ bundled, exact }, { "s", "r", "u" })
+		helpers.assert_true(result ~= nil and result.replacement == "sur",
+			"an end-char entry the typed text cannot fire shadows nothing")
 	end)
 
 	helpers.it("the same trigger WITH auto_expand does fire there", function()
