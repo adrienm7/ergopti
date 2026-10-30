@@ -298,6 +298,21 @@ into its item below or into the matching existing item.
 - [ ] **Container note.** `tools/test/test-managed-ollama-protocol.cjs` stops in a cloud container on Git's
       "dubious ownership" when run as a non-root user over a root-owned checkout; give the test its own
       `safe.directory` for its child Git calls instead of relying on the host configuration.
+- [ ] **Remap guardian killed at every developer start (worker `fix/macos-guardian-adhoc`).** [CODE]
+      [PHYS-M] macOS killed an ErgoptiPlus process ~3 s after "Registering the remap guardian" (CODESIGNING 4,
+      Launch Constraint Violation) and the guardian only ran after the 10 s throttle. Done: an ad hoc build
+      removes its exact legacy agent and its Background Items record, proves the old guardian gone, then
+      registers; the register role names it `developer_adhoc_reregistered` (deferred while leases are live or
+      approval is pending, refused when a removal is not proven), the driver logs it and `field_login_items`
+      reports `guardian_registration`. Left [PHYS-M]: the next field run must show that note, no
+      `ErgoptiPlus` codesigning kill in `field_app_health`, and `guardian_state` ready with a `guardian_wait`
+      under 10 s.
+- [ ] **Timed reload lost the app (2026-10-30 21:06).** [CODE] [PHYS-M] Accepted reload, lease revocation
+      requested, an error window, then nothing: no boot, no crash report. Done: every coordinator stage and
+      teardown step writes `reload_breadcrumb.txt` synchronously, the next boot appends `boot` and the macOS
+      collector copies it; the error window stays closed during a reload or quit. `driver_reload` stays
+      disabled (`reload_lost_the_app`). Left [PHYS-M]: reload by hand from the menu until one is lost, run the
+      collector, and fix the stage the trail's last line names; then enable `driver_reload` again.
 
 ## Maintainer: remote branch cleanup (run on your machine; the cloud container's proxy refuses ref deletion and tag pushes)
 
