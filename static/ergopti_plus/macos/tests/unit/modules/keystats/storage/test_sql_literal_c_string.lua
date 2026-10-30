@@ -118,13 +118,14 @@ helpers.describe("keystats SQL literals survive the sqlite3_exec C string (sql-l
 		local Literal = require("sqlite.literal")
 		local escaped = "'" .. Literal.escape(SENTINEL) .. "'"
 		helpers.assert_eq(evaluate_literal(escaped), SENTINEL)
-		-- Each quoting helper's own declaration selects its file (aggregator,
-		-- outbox, reader, writer) without naming a path a move would break.
+		-- Each quoting helper's own declaration selects its file (outbox,
+		-- reader) without naming a path a move would break. The aggregator and
+		-- the writer have no helper of their own: their statements come from
+		-- the shared keystats.queries catalogue, which quotes a text slot
+		-- through sqlite.literal; the writer test above decodes its output.
 		for _, symbol in ipairs({
-			"local function sq(s)",
 			"local function _sq(s)",
 			"local function _q(s)",
-			"local function _sql_str(s)",
 		}) do
 			local source = helpers.read_driver_source(symbol)
 			helpers.assert_true(source ~= nil and source ~= "", symbol .. " must be readable")
