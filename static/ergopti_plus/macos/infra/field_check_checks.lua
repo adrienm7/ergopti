@@ -827,6 +827,7 @@ end
 local Probes = require("infra.field_check_probes")
 local LayoutRows = require("infra.field_check_layout_rows")
 local LocalServerProbe = require("infra.field_check_local_servers")
+local Session = require("infra.field_check_session")
 
 --- Check identity → definition(ports, report, finish), as run by infra.field_check.
 M.checks = {
@@ -854,6 +855,9 @@ M.checks = {
 	prediction_tooltip = Probes.prediction_tooltip,
 	layout_rows = LayoutRows.layout_rows,
 	local_servers = LocalServerProbe.local_servers,
+	boot_cost = Session.boot_cost,
+	idle_cost = Session.idle_cost,
+	fifo_safety = Session.fifo_safety,
 }
 
 --- The Debug menu checks the field run does not ask for, each with the
