@@ -178,3 +178,35 @@ _TUCO_FeedResponse() {
 		"the feed uses the validator-free list transport: an API ETag never reaches it")
 }
 Test("updater check-only: the feed response gives the channel's release or a failure (PAR-14)", _TUCO_FeedResponse)
+
+_TUCO_BackgroundFeed() {
+	Body(Store, Clock) {
+		global UPDATER_REQUEST_ORIGIN_BACKGROUND, UPDATER_LATEST_RELEASE, UPDATER_LAST_NOTIFIED_TAG
+		SavedLatest := IsSet(UPDATER_LATEST_RELEASE) ? UPDATER_LATEST_RELEASE : ""
+		SavedTag := UPDATER_LAST_NOTIFIED_TAG
+		try {
+			UPDATER_LATEST_RELEASE := "", UPDATER_LAST_NOTIFIED_TAG := ""
+			Feed := [], Shown := []
+			Show := (Text) => Shown.Push(Text)
+			Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_BACKGROUND, false)
+			_Updater_HandleBackgroundResult("", "1.0.0", Request, 0, false,
+				(Channel, FeedRequest, OnJson) => Feed.Push(OnJson), Show)
+			AssertEqual(1, Feed.Length, "an API failure reads the public feed")
+			AssertFalse(_UCSch_Record(Store).Has("last_check_at"), "nothing is recorded before the feed answers")
+			Feed[1].Call('{"tag_name":"v2.0.0","published_at":""}', Request)
+			AssertEqual(1, Shown.Length, "a newer release is announced")
+			AssertContains(Shown[1], t("update_check.check_only"), "and says it cannot be installed yet")
+			AssertFalse(IsObject(UPDATER_LATEST_RELEASE), "the tray's install row never offers it")
+			AssertEqual(0, _UCSch_Record(Store)["failures"], "the feed answered: no failure backoff")
+			; The same release is announced once.
+			Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_BACKGROUND, false)
+			_Updater_HandleBackgroundResult('{"tag_name":"v2.0.0"}', "1.0.0", Request, 0, true, 0, Show)
+			AssertEqual(1, Shown.Length, "already notified")
+		} finally {
+			UPDATER_LATEST_RELEASE := SavedLatest, UPDATER_LAST_NOTIFIED_TAG := SavedTag
+		}
+	}
+	_UCSch_With(Map("seed", "7f3a9c21e5b04d68"), 1700000000, 1699990000, 86400, Body)
+}
+Test("updater check-only: a background check reads the feed and announces once, without an install (PAR-14)",
+	_TUCO_BackgroundFeed)
