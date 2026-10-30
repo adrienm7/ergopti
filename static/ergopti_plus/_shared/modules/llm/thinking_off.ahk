@@ -28,6 +28,9 @@
 ;    it lives.
 ; 6. A family may say its models accept only the default sampling
 ;    (default_sampling_only): the driver then sends no temperature.
+; 7. Ollama has its own field, think (LLM_ThinkingOffOllamaThink): false, or
+;    the family's effort level when Ollama takes one (ollama_think_levels),
+;    since gpt-oss ignores think false.
 ;
 ; The shared Lua implementation is _shared/lua/llm/thinking_off.lua. Both
 ; replay _shared/tests/corpus/llm/thinking_off_vectors.json.
@@ -61,6 +64,9 @@ global LLM_THINKING_OFF_MAX_REFUSALS := 200
 ; Added keys too generic to name a refusal alone: matched with their parent
 global LLM_THINKING_OFF_GENERIC_KEYS := Map("type", 1, "effort", 1, "enabled", 1)
 
+; An Ollama think level: a lowercase word
+global LLM_THINKING_OFF_OLLAMA_LEVEL_PATTERN := "^[a-z]+$"
+
 
 
 
@@ -75,19 +81,30 @@ global LLM_THINKING_OFF_GENERIC_KEYS := Map("type", 1, "effort", 1, "enabled", 1
  * Validates thinking_off.json.
  * @param {String} Text The file's JSON source.
  * @returns {Array} Families, each Map("models", Array of globs, "controls",
- *     Array of Map("kind", "intent", "level")).
+ *     Array of Map("kind", "intent", "level")), with ExpirySec and
+ *     OllamaLevels (Map of the think levels Ollama takes).
  * @throws {Error} A malformed table, refused whole.
  */
 LLM_ThinkingOffParseFamilies(Text) {
-	global LLM_THINKING_OFF_GLOB_PATTERN, LLM_THINKING_OFF_KINDS
+	global LLM_THINKING_OFF_GLOB_PATTERN, LLM_THINKING_OFF_KINDS, LLM_THINKING_OFF_OLLAMA_LEVEL_PATTERN
 	Root := JsonParse(Text)
 	if !(Root is Map) || !(Root.Get("families", 0) is Array) || Root["families"].Length == 0
 		throw ValueError("thinking_off.json holds no families array.")
 	Days := Root.Get("refusal_expiry_days", 0)
 	if !(Days is Integer) || Days <= 0
 		throw ValueError("thinking_off.json refusal_expiry_days must be a positive integer.")
+	Levels := Root.Get("ollama_think_levels", 0)
+	if !(Levels is Array) || Levels.Length == 0
+		throw ValueError("thinking_off.json ollama_think_levels must be a non-empty array.")
+	OllamaLevels := Map()
+	for Level in Levels {
+		if !(Level is String) || !RegExMatch(Level, LLM_THINKING_OFF_OLLAMA_LEVEL_PATTERN)
+			throw ValueError("thinking_off.json ollama_think_levels holds an invalid level.")
+		OllamaLevels[Level] := 1
+	}
 	Families := []
 	Families.ExpirySec := Days * 86400
+	Families.OllamaLevels := OllamaLevels
 	for Index, Family in Root["families"] {
 		Where := "family " . Index
 		if !(Family is Map)
@@ -276,6 +293,30 @@ _LLM_ThinkingOffFamilyOf(Families, Model) {
 LLM_ThinkingOffDefaultSamplingOnly(Families, Model) {
 	Index := _LLM_ThinkingOffFamilyOf(Families, Model)
 	return Index ? Families[Index]["default_sampling_only"] : false
+}
+
+/**
+ * The think value of an Ollama chat body for a model: its family's first
+ * control Ollama carries. A toggle or an off intent is false; an effort level
+ * Ollama takes (ollama_think_levels) is that level, since gpt-oss ignores
+ * false; no family or no such control is false.
+ * @param {Array} Families LLM_ThinkingOffParseFamilies's output ([] when unreadable).
+ * @param {String} Model The model id.
+ * @returns {String} The JSON source of the value: false or a quoted level.
+ */
+LLM_ThinkingOffOllamaThink(Families, Model) {
+	Index := _LLM_ThinkingOffFamilyOf(Families, Model)
+	if !Index
+		return "false"
+	Levels := Families.HasOwnProp("OllamaLevels") ? Families.OllamaLevels : Map()
+	for Control in Families[Index]["controls"] {
+		Kind := Control["kind"]
+		if (Kind == "toggle") || (Kind == "effort" && Control["intent"] == "off")
+			return "false"
+		if (Kind == "effort") && (Control["level"] is String) && Levels.Has(Control["level"])
+			return JsonStringLiteral(Control["level"])
+	}
+	return "false"
 }
 
 /**

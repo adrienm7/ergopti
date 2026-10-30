@@ -1275,10 +1275,10 @@ function M.new(deps, presets, ram_getter)
 			model = target_model,
 			messages = {{ role = "user", content = "ok" }},
 			stream = false,
-			think = false,
+			-- Its one token must not open a reasoning block
+			think = require("modules.llm.thinking_families").ollama_think(target_model),
 			options = {
 				num_predict = 1,
-				think = false,
 				thinking_budget = 0,
 			},
 		}
