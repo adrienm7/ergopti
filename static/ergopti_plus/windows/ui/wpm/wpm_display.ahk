@@ -14,6 +14,8 @@
 #Requires Autohotkey v2.0+
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
+#Include ../../infra/menu_row_order.ahk
+
 
 
 
@@ -437,8 +439,7 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
 ; "magickey" → "magickey", "distancesreductionQU" → "distancesreduction").
 ; Returns "" when no known base category can be derived.
 _WPMWidget_SectionBaseCategory(SectionName) {
-    static KnownCats := ["autocorrection", "magickey", "distancesreduction",
-                         "sfbsreduction", "rolls", "personal"]
+    static KnownCats := MenuRowOrderList("hotstring_config_categories")
     Lower := StrLower(SectionName)
     for _, Cat in KnownCats {
         if (SubStr(Lower, 1, StrLen(Cat)) == Cat)

@@ -42,11 +42,17 @@ global _HCW_CATEGORY_LIST := []
 ; Shape: { Key, Label }
 global _HCW_GROUP_LIST := []
 
-; The bundled common categories (always present, in display order).
-global _HCW_COMMON_CATS := [
-	"magickey", "autocorrection", "rolls",
-	"sfbsreduction", "distancesreduction"
-]
+#Include ../../infra/menu_row_order.ahk
+
+; The bundled common categories (always present), in the shared display order;
+; "personal" closes that order but has its own group, built from the user's files.
+_HCW_CommonCategories() {
+	Common := []
+	for Category in MenuRowOrderList("hotstring_config_categories")
+		if (Category != "personal")
+			Common.Push(Category)
+	return Common
+}
 
 ; Override-only categories (no TOML file) — colour / delay live in
 ; hotstrings_config.toml under the category key (e.g. llm_prediction).
@@ -89,11 +95,11 @@ _HCW_InitLocaleStrings() {
 ; 2. Personal TOML files discovered from PersonalHotstringsDir (Group: "personal")
 ; 3. Extension TOML files discovered from the extensions root (Group: "ext:<id>")
 _HCW_BuildCategoryList(Publish := true) {
-	global _HCW_CATEGORY_LIST, _HCW_COMMON_CATS, _HCW_CATEGORY_LABELS
+	global _HCW_CATEGORY_LIST, _HCW_CATEGORY_LABELS
 	List := []
 
 	; --- Common categories ---
-	for _, Cat in _HCW_COMMON_CATS {
+	for _, Cat in _HCW_CommonCategories() {
 		Label := _HCW_CATEGORY_LABELS.Has(Cat) ? _HCW_CATEGORY_LABELS[Cat] : Cat
 		List.Push({
 			Key:         Cat,
