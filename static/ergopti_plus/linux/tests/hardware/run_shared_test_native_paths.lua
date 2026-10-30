@@ -15,6 +15,9 @@ package.path = table.concat({ driver .. "/?.lua", driver .. "/?/init.lua",
 require("compat.utf8").install()
 local uv = require("luv")
 assert(not pcall(require, "lfs"), "the actual child provider must not contain LuaFileSystem")
+-- The helpers isolate HOME into a scratch directory as they load; the home
+-- classifier case judges the account's own HOME, read before that.
+local native_home = assert(os.getenv("HOME"))
 local helpers = require("tests.helpers")
 local ok, failure = xpcall(function()
     if mode == "outdated" then
@@ -46,7 +49,7 @@ local ok, failure = xpcall(function()
         require("test.onboarding_answers_contract").register(helpers, { driver = "linux" })
     elseif mode == "home_classifier" then
         helpers.it("native outside home is not accepted through a rewritten scratch root", function()
-            local home, temporary = assert(os.getenv("HOME")), assert(os.getenv("TMPDIR"))
+            local home, temporary = native_home, assert(os.getenv("TMPDIR"))
             local real_home, real_temporary = assert(uv.fs_realpath(home)), assert(uv.fs_realpath(temporary))
             helpers.assert_true(real_home ~= real_temporary
                 and real_home:sub(1, #real_temporary + 1) ~= real_temporary .. "/",
