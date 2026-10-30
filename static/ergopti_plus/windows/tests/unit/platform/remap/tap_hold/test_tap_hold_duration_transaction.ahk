@@ -347,7 +347,7 @@ Test("tap-hold duration: held prompt rejects replaced source and rebased target 
 _THD_FutureSource() {
 	return Chr(0xFEFF)
 		. '# the unknown root is user data`nfuture.version = "001" # keep root spelling`n'
-		. '[tap_hold]`nexplicit_delays = true`ninherit_defaults = false # explicit opt-out`n'
+		. '[_meta]`nschema_version = 1`n[tap_hold]`ninherit_defaults = false # explicit opt-out`n'
 		. '[tap_hold.keys.caps_lock] # keep key header`n'
 		. 'enabled = false # keep the literal Boolean`n'
 		. 'tap_action = "escape"`nhold_modifier = "ctrl"`n'
@@ -434,9 +434,9 @@ _THD_AliasAndNoOpSources(TargetPath) {
 	global TapHold
 	_THD_Reset()
 	Sources := [
-		Chr(0xFEFF) . '# root dotted leaf`ntap_hold.explicit_delays = true`ntap_hold.keys.caps_lock.time_activation_seconds = 0.2`nfuture = "001"`n',
-		Chr(0xFEFF) . '[tap_hold]`nexplicit_delays = true`n["tap_hold"."keys"."caps_lock"] # quoted exact owner`ntime_activation_seconds = 0.2`nfuture_note = "001"`n',
-		Chr(0xFEFF) . '[tap_hold]`nexplicit_delays = true`nkeys = { caps_lock = { time_activation_seconds = 0.2, enabled = false }, tab = { tap_action = "copy" } }`n'
+		Chr(0xFEFF) . '# root dotted leaf`n_meta.schema_version = 1`ntap_hold.keys.caps_lock.time_activation_seconds = 0.2`nfuture = "001"`n',
+		Chr(0xFEFF) . '[_meta]`nschema_version = 1`n[tap_hold]`n["tap_hold"."keys"."caps_lock"] # quoted exact owner`ntime_activation_seconds = 0.2`nfuture_note = "001"`n',
+		Chr(0xFEFF) . '[_meta]`nschema_version = 1`n[tap_hold]`nkeys = { caps_lock = { time_activation_seconds = 0.2, enabled = false }, tab = { tap_action = "copy" } }`n'
 	]
 	for Source in Sources {
 		TapHold := _THGT_FreshState()
@@ -665,7 +665,8 @@ _THD_GlobalChangeAndResetFollowTheModel(TargetPath) {
 	AssertEqual(0.45, TapHoldDuration(TapHold, "tab"), "a key with its own delay is not moved by the global change")
 	Content := _THGT_Writes[1]["content"]
 	AssertContains(Content, "time_activation_seconds = 0.31", "the global delay is persisted at the root")
-	AssertContains(Content, "explicit_delays = true", "a written file flags every delay in it as the user's own")
+	AssertContains(Content, "schema_version = 1", "a written file says every delay in it is the user's own")
+	Assert(!InStr(Content, "explicit_delays"), "the retired marker is never written")
 	AssertEqual(1, _THD_ResetWrite("tab"), "the reset goes through the actual owner")
 	AssertFalse(TapHoldHasOwnDuration(TapHold, "tab"))
 	AssertEqual(0.31, TapHoldDuration(TapHold, "tab"), "a reset key follows the global delay again")
@@ -710,7 +711,7 @@ Test("tap-hold delay: the global and reset writers refuse invalid input before s
 	() => _THHS_WithNativeFixture(_THD_GlobalAndResetRefuseInvalidInput))
 
 ; A per-key write on a file an earlier build wrote also finishes the migration: the
-; shipped delays copied in by that build go, the file is flagged, and the delay being
+; shipped delays copied in by that build go, the file is stamped, and the delay being
 ; set is kept whatever its value.
 _THD_PerKeyWriteMigratesRetiredDelays(TargetPath) {
 	global TapHold, _THGT_Writes
@@ -728,8 +729,28 @@ _THD_PerKeyWriteMigratesBody(TargetPath) {
 	Written := _THGT_Writes[1]["content"]
 	Assert(!InStr(Written, "time_activation_seconds = 0.35"), "the copied Caps Lock delay is removed")
 	AssertContains(Written, "time_activation_seconds = 0.45", "the user's own delay stays")
-	AssertContains(Written, "explicit_delays = true")
+	AssertContains(Written, "schema_version = 1")
+	Assert(!InStr(Written, "explicit_delays"), "the retired marker is never written")
 	AssertContains(Written, "[tap_hold.keys.left_alt]")
 }
 Test("tap-hold delay: a per-key write removes the delays an earlier build copied into the file (PAR-15)",
 	() => _THHS_WithNativeFixture(_THD_PerKeyWriteMigratesRetiredDelays))
+
+; Nothing a newer build saved is rewritten from this build's memory: neither the
+; whole-file writer (the global delay) nor the one-leaf writer starts from it.
+_THD_NewerFileRefusesEveryWriter(TargetPath) {
+	_THD_Reset()
+	_THD_WithPhysicalSource(TargetPath, '[_meta]`nschema_version = 2`n[tap_hold.keys.caps_lock]`ntap_action = "escape"`n',
+		_THD_NewerFileRefusesBody)
+}
+
+_THD_NewerFileRefusesBody(TargetPath) {
+	global _THGT_Writes
+	Before := FSReadUtf8Exact(TargetPath)
+	AssertEqual(false, _THD_Write("caps_lock", 0.3), "the one-leaf writer refuses")
+	AssertEqual(false, _THD_GlobalWrite(0.3), "the whole-file writer refuses")
+	AssertEqual(0, _THGT_Writes.Length, "nothing was staged")
+	AssertTrue(FSUtf8ExactMatches(TargetPath, Before), "the newer file is preserved")
+}
+Test("tap-hold delay: a file saved by a newer build refuses every writer (tap-hold-versioned-file)",
+	() => _THHS_WithNativeFixture(_THD_NewerFileRefusesEveryWriter))

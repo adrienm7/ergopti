@@ -951,6 +951,9 @@ HotstringsOverridesBoot()
 ; config.toml leaves and records once the owner exists. After the delays: the
 ; file is rewritten from memory, which must hold the migrated delays by then.
 HotstringsDelimitersBoot()
+; Versions the file once, before anything reads it; a file this build cannot
+; version is left alone and refuses every later write of this session.
+TapHoldMigrateFile(_ConfigDir . _AhkSubDir . "tap_hold.toml", _SharedDir . "\tap_hold\defaults.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")
 BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",

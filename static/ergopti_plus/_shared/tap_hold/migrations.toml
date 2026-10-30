@@ -2,8 +2,9 @@
 # Versioned tap_hold.toml: the ordered, data-only migration registry.
 #
 # READ AT RUNTIME, ON EVERY BOOT, BY THE LINUX DRIVER through
-# _shared/lua/tap_hold/migrate.lua. Windows does not read it yet (see "Windows"
-# below); macOS has no tap_hold.toml. This is NOT the config.toml registry
+# _shared/lua/tap_hold/migrate.lua AND BY THE WINDOWS DRIVER through
+# windows/platform/remap/tap_hold_migration.ahk; macOS has no tap_hold.toml.
+# This is NOT the config.toml registry
 # (_shared/core/config_schema/migrations.toml): that one is validated at every
 # Windows boot by windows/infra/config_migrate.ahk, which refuses an op it does
 # not know, and no op of its closed set can drop a value only when it equals
@@ -35,17 +36,14 @@
 #       Deletes one key; a section left without keys disappears.
 # Every op is idempotent, so replaying a step on its own output changes nothing.
 #
-# On disk the migration is a line-preserving edit, never a re-render: the driver
-# turns the step into explicit ops of the config.toml engine's closed set
-# (``delete`` of each retired ``time_activation_seconds`` line, of the flag and of
-# the old stamp, then ``set_if_absent`` of ``[_meta] schema_version``) and applies
-# them with the engine's own record editor, so comments, order and formatting
-# survive. Windows config_migrate.ahk already knows both of those ops.
-#
-# Windows: replaying this registry needs a reader for the file plus the two
-# ops above in windows/platform/remap/tap_hold_loader.ahk and
-# tap_hold_writer.ahk; until then Windows keeps writing
-# ``[tap_hold] explicit_delays = true`` and ignores ``[_meta]``.
+# On disk the migration is a line-preserving edit, never a re-render, so comments,
+# order and formatting survive. Linux turns the step into explicit ops of the
+# config.toml engine's closed set (``delete`` of each retired
+# ``time_activation_seconds`` line, of the flag and of the old stamp, then
+# ``set_if_absent`` of ``[_meta] schema_version``) and applies them with the
+# engine's record editor; Windows hands the same edit to its semantic document
+# owner (TOML_BuildConfigDocumentCandidate), which also edits a dotted or inline
+# spelling where it is.
 # The corpus _shared/tests/corpus/tap_hold_migrations/ pins the semantics.
 
 [registry]
