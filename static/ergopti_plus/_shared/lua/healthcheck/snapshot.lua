@@ -275,6 +275,26 @@ function M.load_config(shared)
 	}
 end
 
+--- Names the slowest collectors of one synchronous collection, so an
+--- over-budget line says which section held the main thread (the 2026-10-30
+--- macOS field report had 29 collections of 100 to 230 ms and no owner).
+--- @param timings table List of { name = string, ms = number } in run order.
+--- @param count integer How many to name: the schema's phase_a_slowest_named.
+--- @return string text `; slowest: system=120.3 ms, ...`, empty without timings.
+function M.slowest_collectors(timings, count)
+	assert(type(timings) == "table" and type(count) == "number" and count >= 1 and count % 1 == 0,
+		"slowest_collectors: a timing list and a positive integer count are required")
+	local ranked = {}
+	for index, entry in ipairs(timings) do ranked[index] = entry end
+	if #ranked == 0 then return "" end
+	table.sort(ranked, function(a, b) return a.ms > b.ms end)
+	local parts = {}
+	for index = 1, math.min(count, #ranked) do
+		parts[index] = string.format("%s=%.1f ms", ranked[index].name, ranked[index].ms)
+	end
+	return "; slowest: " .. table.concat(parts, ", ")
+end
+
 --- True when a schema entry (a section, a field or a probe) applies to a driver.
 --- @param entry table
 --- @param driver string
