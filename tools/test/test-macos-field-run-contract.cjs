@@ -362,12 +362,54 @@ function reportFolder(paths) {
 			const declared = new Set(
 				spec.steps.filter((step) => step.kind === 'field_check').map((step) => step.check)
 			);
+			// A Debug menu check that waits for a person runs as its automatic sibling
+			const substitutes = Object.fromEntries(
+				[
+					...(source.match(/M\.FIELD_RUN_SUBSTITUTES = \{([^}]*)\}/)?.[1] ?? '').matchAll(
+						/(\w+)\s*=\s*"(\w+)"/g
+					)
+				].map((match) => [match[1], match[2]])
+			);
+			assert.equal(substitutes.key_accounting, 'typing_selftest');
 			for (const name of names)
-				assert(declared.has(name), `no field run step runs the check ${name}`);
+				assert(
+					declared.has(name) || declared.has(substitutes[name]),
+					`no field run step runs the check ${name}`
+				);
+			assert(
+				spec.steps.every((step) => !step.person),
+				'the field run is automatic: no step may wait for a person'
+			);
 			for (const verdict of ['pass', 'fail', 'skip', 'timeout', 'needs_person', 'needs_typing'])
 				assert(spec.verdicts.includes(verdict), `verdict ${verdict} is not declared`);
 			for (const step of spec.steps.filter((item) => item.person))
 				assert(spec.verdicts.includes(step.person), `${step.id} names an undeclared verdict`);
+			// The maintainer reads what each step proves in the declaration and in TODO.md
+			const todo = fs.readFileSync(path.join(ROOT, 'TODO.md'), 'utf8');
+			for (const step of spec.steps) {
+				assert(
+					typeof step.proves === 'string' && /^[A-Z].{20,240}\.$/.test(step.proves),
+					`${step.id} has no one-sentence proves line`
+				);
+				if (step.kind === 'field_check' && !names.includes(step.check))
+					assert.fail(`${step.id} runs the undeclared check ${step.check}`);
+			}
+			// The Debug menu's own checks are described in their window; the
+			// field run's own probes are listed in TODO.md's Mac todo.
+			const debugMenuSteps = new Set([
+				'field_lease',
+				'field_owned_runtime',
+				'field_network',
+				'field_toolchain',
+				'field_login_items',
+				'field_composer'
+			]);
+			for (const step of spec.steps.filter((item) => item.kind === 'field_check'))
+				if (!debugMenuSteps.has(step.id) && !step.person)
+					assert(
+						todo.includes(`\`${step.id}\``),
+						`TODO.md's Mac todo does not describe ${step.id}`
+					);
 			for (const id of [
 				'diagnostics',
 				'ollama_runtime',

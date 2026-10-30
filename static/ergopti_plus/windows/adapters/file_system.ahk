@@ -1,6 +1,7 @@
 ﻿; adapters/file_system.ahk
 
 #Include %A_LineFile%\..\..\infra\file_read_activity.ahk
+#Include %A_LineFile%\..\file_system_ports.ahk
 
 ; ==============================================================================
 ; MODULE: FileSystem Adapter (AutoHotkey)
@@ -1143,3 +1144,120 @@ FSUtf8Bytes(Content) {
 	DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr, "Ptr", Encoded.Ptr, "UPtr", Size)
 	return Bytes
 }
+
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 2/ Classified read and publication =======
+; ==================================================
+; ==================================================
+
+; The methods of _shared/lua/file_system/ports.lua. AutoHotkey has no multiple
+; return, so a result is a Map: read_with_status gives content, status and
+; detail, a publication gives committed and detail.
+global FS_STATUS_OK := "ok"
+global FS_STATUS_ABSENT := "absent"
+global FS_STATUS_ERROR := "error"
+
+; Reports one fixed failure category: never a path, never file content.
+_FSReportFailure(OnError, Category) {
+	if HasMethod(OnError, "Call")
+		OnError.Call(Category)
+	return Category
+}
+
+; Reads a classified source a publication can later be conditioned on.
+; @param Path {String} File path.
+; @param OnError {Func|0} Receives the fixed category of an unreadable source.
+; @returns {Map} content ("" unless ok), status (FS_STATUS_*), detail.
+FSReadWithStatus(Path, OnError := 0) {
+	NativeOpenError := 0
+	Content := FSConfigReadUtf8Exact(Path, &NativeOpenError)
+	if (Content is String)
+		return Map("content", Content, "status", FS_STATUS_OK, "detail", "")
+	if (NativeOpenError == 2 || NativeOpenError == 3)
+		return Map("content", "", "status", FS_STATUS_ABSENT, "detail", "")
+	return Map("content", "", "status", FS_STATUS_ERROR,
+		"detail", _FSReportFailure(OnError, "the source cannot be read"))
+}
+
+; Whether a path still holds the classified source a caller read.
+_FSSourceIsUnchanged(Path, Expected) {
+	Current := FSReadWithStatus(Path)
+	return Current["status"] == Expected["status"]
+		&& (Expected["status"] != FS_STATUS_OK || Current["content"] == Expected["content"])
+}
+
+; Publishes through a same-directory stage named as FSAtomicTempOwnerIsGone expects.
+; The check and the rename are not one kernel operation: a writer of another
+; process is excluded by the configuration lease, not here.
+_FSPublishIfUnchanged(Path, Content, Expected, OnError, AdmissionFn) {
+	static StageSerial := 0
+	Refuse(Category) => Map("committed", false, "detail", _FSReportFailure(OnError, Category))
+	if !FSPathIsAdmissible(Path) || !(Content is String) || !(Expected is Map)
+			|| !Expected.Has("status") || (Expected["status"] != FS_STATUS_ABSENT
+				&& (Expected["status"] != FS_STATUS_OK || !(Expected.Get("content", 0) is String)))
+		return Refuse("a publication needs a path, a string payload and a source precondition")
+	if !_FSSourceIsUnchanged(Path, Expected)
+		return Refuse("the source changed since it was read")
+	Stage := Path . "." . A_ScriptHwnd . "-" . (++StageSerial) . ".tmp"
+	if !FSWriteDurable(Stage, Content)
+		return Refuse("the publication stage cannot be written")
+	Committed := Expected["status"] == FS_STATUS_ABSENT
+		? FSConfigAtomicMoveCreate(Stage, Path, AdmissionFn)
+		: FSConfigAtomicMoveReplace(Stage, Path, , AdmissionFn)
+	if Committed
+		return Map("committed", true, "detail", "")
+	FSDelete(Stage)
+	return Refuse("the publication was refused")
+}
+
+; Atomic replacement, refused when the file no longer matches `Expected`.
+; @param Path {String} Destination.
+; @param Content {String} Complete replacement text.
+; @param Expected {Map} status and, for FS_STATUS_OK, content.
+; @param OnError {Func|0} Receives the fixed category of a refusal.
+; @returns {Map} committed, detail.
+FSWriteIfUnchanged(Path, Content, Expected, OnError := 0) {
+	return _FSPublishIfUnchanged(Path, Content, Expected, OnError, 0)
+}
+
+; The same publication with a final logical admission checked just before commit.
+; @param Admission {Func} Returns 1 to admit; required.
+; @returns {Map} committed, detail.
+FSWriteIfUnchangedAdmitted(Path, Content, Expected, OnError, Admission) {
+	if !HasMethod(Admission, "Call")
+		return Map("committed", false, "detail", _FSReportFailure(OnError, "publication admission required"))
+	return _FSPublishIfUnchanged(Path, Content, Expected, OnError, Admission)
+}
+
+; The owner's own method identities, without IO. Windows offers no optional
+; capability, so the removers are 0.
+; @returns {Map} owner, reader, writer, publisher, remover, admitted_remover,
+;   exact_remover, delete.
+FSConfigurationPorts() {
+	return Map("owner", FILE_SYSTEM_OWNER, "reader", FILE_SYSTEM_OWNER["read_with_status"],
+		"writer", FILE_SYSTEM_OWNER["write_if_unchanged"],
+		"publisher", FILE_SYSTEM_OWNER["write_if_unchanged_admitted"],
+		"remover", 0, "admitted_remover", 0, "exact_remover", 0,
+		"delete", FILE_SYSTEM_OWNER["delete"])
+}
+
+; The owner the shared spec describes. ADAPTER_FILE_SYSTEM stays the five portable
+; methods of FileSystem.spec.js. Checked when the file loads: a missing method or a
+; half-offered capability would otherwise fail late, inside a publication.
+global FILE_SYSTEM_OWNER := Map(
+	"read", FSRead,
+	"write", FSWrite,
+	"append", FSAppend,
+	"exists", FSExists,
+	"delete", FSDelete,
+	"read_with_status", FSReadWithStatus,
+	"write_if_unchanged", FSWriteIfUnchanged,
+	"write_if_unchanged_admitted", FSWriteIfUnchangedAdmitted,
+	"configuration_ports", FSConfigurationPorts
+)
+FSPortsCheckOwner(FILE_SYSTEM_OWNER)

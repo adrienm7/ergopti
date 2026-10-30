@@ -61,7 +61,14 @@ function M.load(occupied)
 		if descriptor then discovery[id] = descriptor
 		else Logger.error("llm.local_server_catalogue", "local_servers.json: %s; that server is never probed.", reason) end
 	end
-	return order, servers, published, discovery, Policy.request_fields(root)
+	-- The family controls a local server carries, on top of request_fields
+	local dialect, dialect_reason = require("llm.thinking_off").parse_dialect(root.thinking_dialect)
+	if not dialect then
+		Logger.error("llm.local_server_catalogue", "local_servers.json thinking_dialect is invalid (%s); only request_fields apply.",
+			tostring(dialect_reason))
+		dialect = {}
+	end
+	return order, servers, published, discovery, Policy.request_fields(root), dialect
 end
 
 return M

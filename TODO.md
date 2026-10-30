@@ -98,6 +98,46 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    `boot_profiler` and `perf` artifacts on the Mac and measure MLX adoption, WPM `mouseMoved` traffic, Terminal
    identity lookup, keystats app attribution, canvas/AX work and the remaining synchronous shell helpers before
    optimizing any of them from source reading alone.
+6. **Field run checks (`field_run/NN_<step>.json`, each step's `proves` line in
+   `static/ergopti_plus/macos/data/field_run.json`).** A failing step's codes are `fail_<check step>`; read the
+   step's report and log window before the day log. The read-only checks added for the field run alone:
+   - `field_permissions`: Accessibility is granted (fail otherwise); Input Monitoring, Screen Recording and
+     secure input are named; Automation is skipped (no query without a prompt); the bundle identifier is a
+     declared one; the running bundle's strict signature is valid; the signing identity (team or ad hoc)
+     says whether a rebuild keeps the grants.
+   - `field_event_taps`: each keymap tap (keyDown, loopbackKeyUp, flagsChanged, mouse) is enabled, by name;
+     the tap watchdog runs; the worst of five 100 ms timers is under 250 ms late; the session's holds over
+     250 ms and 1 s, late keys and the Lua heap are named.
+   - `field_input_sources`: the selected source and the enabled list (as the text-input system holds them, not
+     the preference) are readable; the Ergopti layouts enabled are counted; every installed Ergopti `.keylayout`
+     parses with `xmllint` and every Ergopti bundle `Info.plist` with `plutil -lint` (a failure names the count).
+   - `field_storage`: the keystats database passes `PRAGMA quick_check` opened `-readonly` (a damage names the
+     number of issue lines only); `config.toml`, `config_karabiner.toml`, the personal hotstrings and personal
+     info files each parse with the driver's TOML reader, read-only; today's log exists; the logs folder takes a
+     probe file (removed at once); the auto-reload file watcher owner is published (FSEvents accepted it).
+   - `field_launcher_roles`: the launcher resolves; `--managed-http-worker` with malformed arguments exits 64
+     at once (any other exit or a timeout: the role did not dispatch); the same worker carries one direct GET,
+     with the request `native_http.py` sends, to a loopback server the check opens and closes. An exit 64 there
+     (the 2026-10-30 `native_child_status=64`), a refusal stage or `not_reached` names where it broke.
+   - `field_network_hosts`: one HEAD, one after the other, to the root of every host of
+     `_shared/data/identifiers.json` (`github`, `github_api` for the update feed, `huggingface`, `ollama`,
+     `ollama_registry`) through the managed transport a download uses (route lookup, PAC or proxy, TLS); any
+     answer below 500 passes, a failure names the native reason by the host's key. Nothing is downloaded.
+   - `field_app_health` (after the AI steps): no crash report of the last day in the driver's `crash_reports`
+     folder nor in `~/Library/Logs/DiagnosticReports` for ErgoptiPlus, Hammerspoon or Ollama (each fails with
+     its count); the app's resident memory (MB) and CPU share from `ps` are named.
+   - `field_ai_local` (after the AI steps, read-only): the owned Ollama binary passes `codesign --verify
+--strict`; a running server lists its models (not running: skip, never started here); one token is
+     predicted from the check's own text with the smallest catalogue model already installed (none: skip, never
+     a download); the MLX runtime and the catalogue models in its cache are counted.
+   - `key_accounting` (automatic, no person): the app opens its own scratch text field, brings it to the
+     front and types `wkjx` there only, checking before each key that the field still has the focus (a lost
+     focus stops the sequence with its code; no key reaches another app); the passive tap must see each key
+     once, the field must hold exactly `wkjx`, the previous app must get the focus back. Synthetic keys are
+     posted, tagged, through `adapters/synthetic_input.lua` (keymap and keystats treat them as the driver's
+     output) after Karabiner: the virtual keyboard path and the ledger's double count are `physical_keys_only`.
+   - `field_menu_build`: one rebuild of the menu tree, as a state change triggers it, must be accepted by
+     AppKit; its duration in ms, the number of top-level rows and the three slowest rows (`id:ms`) are named.
 
 ## Maintainer requests of 2026-10-30 (coordinator session; everything here is to be done)
 

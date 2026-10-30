@@ -113,11 +113,17 @@ local function load_catalogue()
 		if descriptor then discovery[id] = descriptor
 		else Logger.error(LOG, "local_servers.json: %s; that server is never probed.", reason) end
 	end
-	return order, servers, shaped and #order == #source.server_order, discovery, AuthPolicy.request_fields(root)
+	-- The family controls a local server carries, on top of request_fields
+	local dialect, dialect_reason = require("llm.thinking_off").parse_dialect(root.thinking_dialect)
+	if not dialect then
+		Logger.error(LOG, "local_servers.json thinking_dialect is invalid (%s); only request_fields apply.", tostring(dialect_reason))
+		dialect = {}
+	end
+	return order, servers, shaped and #order == #source.server_order, discovery, AuthPolicy.request_fields(root), dialect
 end
 
 local config_published
-M.ORDER, M.SERVERS, config_published, M.DISCOVERY, M.REQUEST_FIELDS = load_catalogue()
+M.ORDER, M.SERVERS, config_published, M.DISCOVERY, M.REQUEST_FIELDS, M.THINKING_DIALECT = load_catalogue()
 
 --- Reports admission of the original local catalogue, including a valid empty list.
 --- Runtime mutations and server reachability cannot grant inventory authority.

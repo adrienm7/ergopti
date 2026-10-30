@@ -146,7 +146,9 @@ end
 
 --- Runs the native network helper (one HEAD through the managed transport).
 --- @param callback function fn(exit_code|nil, stdout); nil when it cannot start.
-local function network_chain(callback)
+--- @param mode string|nil "--hosts" for one HEAD per declared host.
+--- @param timeout_s number|nil Seconds before the helper is terminated.
+local function network_chain(callback, mode, timeout_s)
 	local python = require("adapters.python_interpreter").resolve()
 	local source = debug.getinfo(1, "S").source or ""
 	local root = (source:sub(1, 1) == "@" and source:sub(2) or source):match("^(.*)/adapters/field_check_ports%.lua$")
@@ -155,7 +157,9 @@ local function network_chain(callback)
 		callback(nil, "")
 		return
 	end
-	exec(python, { "-B", root .. "/modules/llm/managed_network_check.py" }, 40, callback)
+	local args = { "-B", root .. "/modules/llm/managed_network_check.py" }
+	if mode then args[#args + 1] = mode end
+	exec(python, args, timeout_s or 40, callback)
 end
 
 
@@ -244,7 +248,7 @@ M.exec = exec
 --- The ports of the real Mac.
 --- @return table ports
 function M.new()
-	return {
+	local ports = {
 		path_exists = FileSystem.exists,
 		exec = exec,
 		home = function() return os.getenv("HOME") end,
@@ -253,7 +257,9 @@ function M.new()
 		health_counts = function() return require("infra.key_event_health").counts() end,
 		count_keys = count_keys,
 		fetch_pac = fetch_pac,
-		network_chain = network_chain,
+		network_chain = function(callback) return network_chain(callback) end,
+		-- Five hosts of at most 15 s each, one after the other
+		host_heads = function(callback) return network_chain(callback, "--hosts", 100) end,
 		route_plan = route_plan,
 		timer_probe = timer_probe,
 		after = function(seconds, callback)
@@ -265,6 +271,12 @@ function M.new()
 		login_startup_status = login_startup_status,
 		composer_env = function() return (require("modules.keymap.composer_check").env()) end,
 	}
+	-- The field run's own checks (infra/field_check_probes.lua) read more facts
+	for name, port in pairs(require("adapters.field_probe_ports").new()) do
+		if ports[name] ~= nil then error("field check ports: duplicate port " .. name, 2) end
+		ports[name] = port
+	end
+	return ports
 end
 
 return M

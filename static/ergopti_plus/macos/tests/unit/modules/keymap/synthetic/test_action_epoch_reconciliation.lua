@@ -268,6 +268,7 @@ local function load_fixture()
 
 	return {
 		keymap = keymap,
+		taps = taps,
 		state = state,
 		calls = calls,
 		advance = function() epoch = {} end,
@@ -531,6 +532,27 @@ helpers.describe("keymap action epochs", function()
 		helpers.assert_true(not fixture.state.buffer:find("ae", 1, true),
 			"the post-resume key must not join text from before the pause boundary")
 		fixture.keymap.stop()
+	end)
+
+	helpers.it("tap_states reads each tap's native state without changing it", function()
+		local fixture = load_fixture()
+		local states = fixture.keymap.tap_states()
+		helpers.assert_true(states.started)
+		helpers.assert_true(states.watchdog)
+		local names = {}
+		for index, entry in ipairs(states.taps) do
+			names[index] = entry.name
+			helpers.assert_eq(entry.state, "enabled", entry.name .. " must read enabled after start")
+		end
+		helpers.assert_eq(table.concat(names, ","), "keyDown,loopbackKeyUp,flagsChanged,mouse")
+		-- macOS disabling the keyDown tap is what the field run must name
+		fixture.taps[1]:stop()
+		states = fixture.keymap.tap_states()
+		helpers.assert_eq(states.taps[1].state, "disabled")
+		helpers.assert_eq(states.taps[3].state, "enabled")
+		helpers.assert_true(not fixture.taps[1]:isEnabled(), "reading the states must not revive a tap")
+		fixture.keymap.stop()
+		helpers.assert_true(not fixture.keymap.tap_states().started)
 	end)
 
 	helpers.it("start and stop register the stable listener exactly once", function()

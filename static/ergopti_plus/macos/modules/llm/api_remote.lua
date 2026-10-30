@@ -304,8 +304,9 @@ local function register_local_servers()
 				default_model = "",
 				format        = "openai",
 				model_extras  = {},
-				-- local_servers.json request_fields turn every model's thinking off
-				thinking_dialect = {},
+				-- local_servers.json request_fields turn every model's thinking off;
+				-- its thinking_dialect adds a family's level on top
+				thinking_dialect = LocalServers.THINKING_DIALECT or {},
 				local_server  = true,
 				request_fields = LocalServers.REQUEST_FIELDS,
 			}
@@ -2268,7 +2269,7 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 	--- @param r table HTTP response.
 	-- Declared before on_response, which re-sends the payload once when the
 	-- provider refuses a thinking field (filled where the payload is built)
-	local thinking_retry = { added = {}, retried = false, payload = nil, url = nil, headers = nil }
+	local thinking_retry = { added = {}, retried = false, payload = nil, resend = nil }
 	local function on_response(r)
 		if my_identity ~= _identity_generation or find_active_entry() ~= identity_entry then
 			Logger.debug(LOG, "[%s] #%d response discarded after remote identity changed.",
@@ -2287,13 +2288,7 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 			if not r.ok and not thinking_retry.retried and thinking_retry.payload
 				and thinking_refusal(entry.provider, model, status, body, thinking_retry.added, thinking_retry.payload) then
 				thinking_retry.retried = true
-				local again = JsonCodec.encode(thinking_retry.payload)
-				if again and request_authorized("Raw text", current, function(reason)
-					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail", reason) end
-				end) then
-					_infer_client.post(thinking_retry.url, thinking_retry.headers, again, on_response)
-					return
-				end
+				if thinking_retry.resend(on_response) then return end
 			end
 			if not r.ok then
 				Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%s body=%s",
@@ -2438,7 +2433,15 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 	end
 
 	local headers = build_headers(provider.format, entry.token or "")
-	thinking_retry.url, thinking_retry.headers = url, headers
+	-- Sends the payload once more, after a refused thinking field
+	thinking_retry.resend = function(callback)
+		local again = JsonCodec.encode(thinking_retry.payload)
+		if not again or not request_authorized("Raw text", current, function(reason)
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail", reason) end
+		end) then return false end
+		_infer_client.post(url, headers, again, callback)
+		return true
+	end
 
 	Logger.debug(LOG, "[%s] #%d POST -> %s (provider=%s, %d chars prompt)",
 		model, req_id, redact_url(url), provider.format, #(user_prompt or ""))
@@ -2714,16 +2717,20 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 		-- the action that captured this private request. Check its own authority
 		-- at the actual transport boundary, independently of provider selection.
 		if not request_authorized(label, current, fail) then return end
+		--- Sends the body once more, after a refused thinking field.
+		--- @return boolean sent
+		local function resend(callback)
+			local again = JsonCodec.encode(body)
+			if not again or not request_authorized(label, current, fail) then return false end
+			client.post(url, build_headers(provider.format, token), again, callback)
+			return true
+		end
 		local function on_answer(r)
 			Logger.pcall(LOG, function()
 				local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 				if not r.ok and not retried and thinking_refusal(provider_id, model, r.status, r.body, added, body) then
 					retried = true
-					local again = JsonCodec.encode(body)
-					if again and request_authorized(label, current, fail) then
-						client.post(url, build_headers(provider.format, token), again, on_answer)
-						return
-					end
+					if resend(on_answer) then return end
 				end
 				if not r.ok then
 					local message = extract_server_message(r.body)

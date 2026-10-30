@@ -10,6 +10,11 @@ real download, then prints one line per step on stdout:
 
 Every value comes from a closed vocabulary (a native failure stage or reason,
 an HTTP status class); no URL, host, user name or PAC content is ever printed.
+
+With --hosts it instead sends one HEAD to the root of every external host the
+drivers declare (_shared/data/identifiers.json), one after the other, and
+prints one "step host_<name> <state> <value>" line each: the field run's
+reachability check. A host is named by its declared key, never by its name.
 """
 
 import importlib.util
@@ -20,11 +25,15 @@ from pathlib import Path
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
 SHARED_ROOT = DRIVER_ROOT.parent / "_shared"
 RELEASE = SHARED_ROOT / "modules/llm/managed_python_release.json"
+IDENTIFIERS = SHARED_ROOT / "data/identifiers.json"
 BOOTSTRAP = DRIVER_ROOT / "modules/llm/managed_bootstrap_http.py"
 
 # Seconds for the whole request, then for each read.
 TIMEOUT = 20.0
 IDLE_TIMEOUT = 10.0
+
+# Seconds for one host's HEAD in --hosts mode; the field run bounds the sum.
+HOST_TIMEOUT = 15.0
 
 
 def emit(step, state, value):
@@ -108,9 +117,39 @@ def main():
     emit("digest", "skip", "head_only")
 
 
-if __name__ == "__main__":
+def declared_hosts():
+    """The declared external hosts as (key, root URL), in key order."""
+    hosts = json.loads(IDENTIFIERS.read_text(encoding="utf-8"))["hosts"]
+    return [(key, "https://" + host + "/") for key, host in sorted(hosts.items())]
+
+
+def host_step(bootstrap, key, url):
+    """One HEAD to a host's root: any HTTP answer below 500 proves the route and TLS."""
+    step = "host_" + key
     try:
-        main()
+        with bootstrap._native_request(
+            url,
+            headers=(("Accept-Encoding", "identity"),),
+            method="HEAD",
+            timeout=HOST_TIMEOUT,
+            idle_timeout=IDLE_TIMEOUT,
+            direct=bootstrap._direct_route(url),
+        ) as response:
+            emit(step, "pass" if response.status < 500 else "fail", "http_" + str(response.status))
+    except Exception as failure:
+        emit(step, "fail", getattr(failure, "reason", "unavailable"))
+
+
+def main_hosts():
+    bootstrap = load_bootstrap()
+    for key, url in declared_hosts():
+        host_step(bootstrap, key, url)
+
+
+if __name__ == "__main__":
+    hosts_mode = sys.argv[1:] == ["--hosts"]
+    try:
+        main_hosts() if hosts_mode else main()
     except Exception:
-        emit("transfer", "fail", "internal")
+        emit("hosts" if hosts_mode else "transfer", "fail", "internal")
         sys.exit(1)

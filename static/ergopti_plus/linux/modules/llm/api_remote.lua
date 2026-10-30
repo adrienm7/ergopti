@@ -211,14 +211,14 @@ local function catalogue()
 	local closed = fh and fh:close()
 	local cloud_published
 	_catalogue, cloud_published = M.parse_catalogue(text)
-	local order, servers, local_published, _, request_fields = LocalCatalogue.load(_catalogue.providers)
+	local order, servers, local_published, _, request_fields, local_dialect = LocalCatalogue.load(_catalogue.providers)
 	_catalogue.config_cloud_published = cloud_published == true and type(text) == "string" and closed == true
 	_catalogue.config_local_published = local_published == true
 	_catalogue.local_servers = servers
 	for _, id in ipairs(order) do
 		local desc = servers[id]
 		_catalogue.providers[id] = { id = id, label = desc.label, base_url = desc.base_url,
-			default_model = "", format = "openai", model_extras = {}, thinking_dialect = {}, request_fields = request_fields }
+			default_model = "", format = "openai", model_extras = {}, thinking_dialect = local_dialect or {}, request_fields = request_fields }
 		_catalogue.order[#_catalogue.order + 1] = id
 	end
 	return _catalogue
