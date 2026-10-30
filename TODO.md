@@ -94,11 +94,15 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    boundaries: hosted gates cannot execute Darwin poll/FD behaviour or the hidden `FSEventStreamStart` result.
    `swift test` there needs full Xcode.app, not just the Command Line Tools (`no such module 'XCTest'`
    otherwise); confirmed on a CLT-only checkout 2026-10-29, see
-   [macos-hammerspoon memory](docs/memory/macos-hammerspoon.md).
+   [macos-hammerspoon memory](docs/memory/macos-hammerspoon.md). Needs the maintainer to install Xcode.app once; the field
+   run cannot install it (an App Store download behind an Apple ID).
 5. **Production Hammerspoon profile (from the former root TODO.md).** Collect the `hotpath_profiler`,
    `boot_profiler` and `perf` artifacts on the Mac and measure MLX adoption, WPM `mouseMoved` traffic, Terminal
    identity lookup, keystats app attribution, canvas/AX work and the remaining synchronous shell helpers before
-   optimizing any of them from source reading alone.
+   optimizing any of them from source reading alone. The field run now collects part of it with no person:
+   `field_boot_cost` (boot wall, CPU, slowest stages), `field_idle_cost` (idle CPU share, memory) and
+   `field_slow_lines` (the day's slow HotPath segments by own time, ingest ticks, preferences saves). Left
+   for hands: a working day of typing before the run, so the slow lines have something to measure.
 6. **Field run checks (`field_run/NN_<step>.json`, each step's `proves` line in
    `static/ergopti_plus/macos/data/field_run.json`).** A failing step's codes are `fail_<check step>`; read the
    step's report and log window before the day log. The read-only checks added for the field run alone:
