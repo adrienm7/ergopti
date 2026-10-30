@@ -438,6 +438,7 @@ InstallSendNoOps()
 #Include unit/infra/lifecycle/test_build_commit.ahk
 #Include unit/modules/updater/test_version_display_strips_build_metadata.ahk
 #Include unit/infra/logger/test_logger_daily_rotation.ahk
+#Include unit/infra/logger/test_logger_volume.ahk
 ; The logs-folder resolver and the Debug menu log openers built on it
 ; (logs-dir-resolver). log_openers.ahk is definitions only.
 #Include ../ui/log_openers.ahk

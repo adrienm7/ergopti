@@ -519,8 +519,10 @@ PerfCounters_Flush() {
 	if Refused > 0
 		try LoggerWarn("Perf", "Interval counters refused {1} increment(s) beyond the registry capacity.", Refused)
 	State := PerfProcessState()
+	; The log-volume figures ride on this record as they ride on the macOS memory
+	; record: both are process-wide and one record per interval is what is read back.
 	try LoggerEvidence("Perf",
-		"Process state: working_set_mb={1} peak_working_set_mb={2} private_mb={3} handles={4} gdi_objects={5} user_objects={6}.",
+		"Process state: working_set_mb={1} peak_working_set_mb={2} private_mb={3} handles={4} gdi_objects={5} user_objects={6}. Log volume over {7} s: {8}.",
 		State.WorkingSetMb, State.PeakWorkingSetMb, State.PrivateMb, State.Handles,
-		State.GdiObjects, State.UserObjects)
+		State.GdiObjects, State.UserObjects, IntervalMs // 1000, LoggerVolumeText(LoggerVolumeInterval()))
 }
