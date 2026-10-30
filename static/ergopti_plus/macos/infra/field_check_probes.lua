@@ -394,8 +394,11 @@ end
 
 local SQLITE = "/usr/bin/sqlite3"
 
--- A large database takes a while to scan; the step deadline covers it.
-local SQLITE_TIMEOUT = 45
+-- A large database takes a while to scan; the step deadline covers both scans.
+local SQLITE_TIMEOUT = 40
+
+-- Seconds before the second scan that confirms a reported issue.
+M.SQLITE_RECHECK_SECONDS = 2
 
 --- Counts the non-empty lines of a command output.
 --- @param text any Output.
@@ -409,8 +412,8 @@ local function line_count(text)
 end
 
 --- The keystats database, the configuration files, the logs and the watchers.
---- The database is opened read-only (sqlite3 -readonly) and checked with PRAGMA
---- quick_check, whose only healthy answer is "ok"; each configuration file goes
+--- The database is opened read-only and without a lock (immutable URI) and
+--- checked with PRAGMA quick_check, whose only healthy answer is "ok"; each configuration file goes
 --- through the driver's own TOML reader without being written; the logs folder
 --- takes one probe file that is removed at once; the file watcher owner must be
 --- published, since FSEvents refusing a stream leaves every edit unseen.
@@ -440,18 +443,46 @@ function M.storage(ports, report, finish)
 		report.step("keystats_db", STATE.skip, "absent")
 		return finish()
 	end
-	ports.exec(SQLITE, { "-readonly", database.path, "PRAGMA quick_check;" }, SQLITE_TIMEOUT,
-		function(code, output)
-			local answer = tostring(output or ""):gsub("%s+$", "")
-			if code == 0 and answer == "ok" then
-				report.step("keystats_db", STATE.pass, "quick_check_ok")
-			elseif code == 0 then
-				report.step("keystats_db", STATE.fail, "issues_" .. line_count(answer))
-			else
-				report.step("keystats_db", STATE.fail, failure_token(code))
-			end
-			finish()
+	-- immutable=1 takes no lock: the ingest writes in rollback-journal mode, and
+	-- a reader's shared lock made its COMMIT fail with "database is locked"
+	-- (2026-10-30 20:52:44, during this step). Without a lock a write can land
+	-- mid-scan, so a reported issue counts only when a second scan sees it too.
+	local uri = M.immutable_uri(database.path)
+	local function quick_check(callback)
+		ports.exec(SQLITE, { "-readonly", uri, "PRAGMA quick_check;" }, SQLITE_TIMEOUT, function(code, output)
+			callback(code, (tostring(output or ""):gsub("%s+$", "")))
 		end)
+	end
+	quick_check(function(code, answer)
+		if code == 0 and answer == "ok" then
+			report.step("keystats_db", STATE.pass, "quick_check_ok")
+			return finish()
+		end
+		if code ~= 0 then
+			report.step("keystats_db", STATE.fail, failure_token(code))
+			return finish()
+		end
+		ports.after(M.SQLITE_RECHECK_SECONDS, function()
+			quick_check(function(again_code, again)
+				if again_code == 0 and again == "ok" then
+					report.step("keystats_db", STATE.info, "concurrent_write")
+				elseif again_code == 0 then
+					report.step("keystats_db", STATE.fail, "issues_" .. line_count(again))
+				else
+					report.step("keystats_db", STATE.fail, failure_token(again_code))
+				end
+				finish()
+			end)
+		end)
+	end)
+end
+
+--- The URI SQLite opens without any lock, for a file another connection writes.
+--- @param path string Absolute database path.
+--- @return string uri
+function M.immutable_uri(path)
+	local escaped = path:gsub("[%%%?#%s]", function(char) return string.format("%%%02X", char:byte()) end)
+	return "file:" .. escaped .. "?immutable=1"
 end
 
 
