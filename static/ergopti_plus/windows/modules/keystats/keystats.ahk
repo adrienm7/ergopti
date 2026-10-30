@@ -321,7 +321,6 @@ KL_WriteAtomic(path, content) {
     static MOVEFILE_WRITE_THROUGH    := 0x8
     static FLAGS := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
     ; Age delays orphan cleanup; the producer-window check protects slow writes.
-    static STALE_TEMP_MS := 60000
     static WriteSeq := 0
 
     WriteSeq += 1
@@ -332,7 +331,7 @@ KL_WriteAtomic(path, content) {
     ; OS-call purity ratchet (tests/meta/suite/test_ahk_os_purity_ratchet.ahk) counts
     ; direct OS calls outside adapters/, and this needs none.
     tmp := path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
-    _KL_ReapStaleTemps(path, STALE_TEMP_MS)
+    _KL_ReapStaleTemps(path, StaleTempAgeMs())
     ; A rename only makes the stage atomic; it cannot tell whether an out-of-
     ; space write produced every byte. Publish only a flushed, byte-exact stage
     ; so state.json/device.json can never be atomically replaced with valid-

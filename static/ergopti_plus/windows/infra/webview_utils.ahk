@@ -557,7 +557,7 @@ class WebViewHost {
 				; and the teardown below silently called SetTimer("", 0) inside a bare
 				; try. SetTimer keys on the callback object, so that is what to hold.
 				this.SafetyTimer := this._SafetyFlush.Bind(this)
-				SetTimer(this.SafetyTimer, -2500)
+				SetTimer(this.SafetyTimer, -TimingsGet("ui", "webview_host_safety_flush_ms"))
 
 				try LoggerSuccess("WebViewHost", "{1} shown via WebView2.", this.AppId)
 				return true

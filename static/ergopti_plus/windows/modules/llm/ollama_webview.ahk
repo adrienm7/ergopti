@@ -366,7 +366,7 @@ OllamaWV_Create(kind, subtitle) {
 	; The "ready" message from JS triggers OllamaWV_OnWebMessage which
 	; flushes the queue. As a safety net, also flush after 2 s in case
 	; the message bridge misfires.
-	SetTimer(OllamaWV_FlushQueue.Bind(captured_epoch), -2000)
+	SetTimer(OllamaWV_FlushQueue.Bind(captured_epoch), -TimingsGet("ui", "webview_page_safety_flush_ms"))
 
 	; Queue the initial setKind so it fires once the page is ready
 	OllamaWV_EvalJS("setKind(" OllamaWV_JSStr(kind) "," OllamaWV_JSStr("") "," OllamaWV_JSStr(subtitle) ")")

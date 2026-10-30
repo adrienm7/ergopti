@@ -1228,14 +1228,13 @@ KLPF_WriteAtomic(path, content) {
 		static FLAGS := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
 		static RETRY_DELAY_MS            := 50
 		; Age delays orphan cleanup; the producer-window check protects slow writes.
-		static STALE_TEMP_MS             := 60000
 		static WriteSeq := 0
 
 		WriteSeq += 1
 		; A_ScriptHwnd rather than a GetCurrentProcessId DllCall: unique per process
 		; all the same, and it keeps the OS-call purity ratchet at its baseline.
 		tmp := path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
-		_KLPF_ReapStaleTemps(path, STALE_TEMP_MS)
+		_KLPF_ReapStaleTemps(path, StaleTempAgeMs())
 		; MoveFileExW protects the directory entry, not the staged bytes. A
 		; short write would otherwise publish syntactically valid but truncated
 		; dashboard JSON after its atomic rename. Keep the prior blob when the

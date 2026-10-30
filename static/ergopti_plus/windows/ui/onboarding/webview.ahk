@@ -224,7 +224,7 @@ _Onboarding_TryWeb() {
 
 	; Safety: if the page never posts "ready" (rare), flush the queue anyway so
 	; the wizard is not left blank.
-	SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_SafetyFlush, SessionEpoch), -2500)
+	SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_SafetyFlush, SessionEpoch), -TimingsGet("ui", "webview_host_safety_flush_ms"))
 	return true
 }
 

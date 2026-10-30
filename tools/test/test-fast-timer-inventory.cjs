@@ -34,7 +34,9 @@
  *    delay is typed again (the gesture poll `-100` six times, the safety flush
  *    `-2000` three times) and drifts. A delay is a key of the shared timing
  *    registry (_shared/modules/timings/constants.toml) read through Timings.
- *    Zero is the "yield to the event loop" idiom and stays allowed. The sites
+ *    Zero is the "yield to the event loop" idiom and stays allowed, and so is
+ *    an AutoHotkey `-1`: SetTimer(Fn, 0) deletes a timer, so -1 is how that
+ *    language spells the same yield, and it is no duration to tune. The sites
  *    that exist today are frozen per file in timer-literal-baseline.json, which
  *    can only shrink: node tools/test/test-fast-timer-inventory.cjs
  *    --update-timer-baseline rewrites it, and refuses while anything has grown.
@@ -188,6 +190,8 @@ const LITERAL_SKIPPED_DIRECTORIES = new Set([
 ]);
 const LITERAL_EXTENSIONS = /\.(?:ahk|lua|js|cjs|mjs)$/;
 const NONZERO = /^-?(?:\d+\.?\d*|\.\d+)$/;
+// SetTimer(Fn, -1) runs Fn on the next message pump turn: AutoHotkey's yield.
+const AHK_NEXT_TICK = -1;
 
 // Lua: the delay is the first argument of a timer constructor.
 const LUA_TIMER = /\b(?:doAfter|doEvery|after|every|sleep)\(\s*(-?[0-9][0-9.]*)\s*[,)]/g;
@@ -210,7 +214,13 @@ function literalDelayCount(ext, text) {
 			if (line.startsWith(';')) continue;
 			for (const m of line.matchAll(CALL)) {
 				const parts = splitArgs(m[1]);
-				if (parts.length >= 2 && NONZERO.test(parts[1].trim()) && Number(parts[1]) !== 0) count++;
+				if (
+					parts.length >= 2 &&
+					NONZERO.test(parts[1].trim()) &&
+					Number(parts[1]) !== 0 &&
+					Number(parts[1]) !== AHK_NEXT_TICK
+				)
+					count++;
 			}
 			for (const m of line.matchAll(AHK_SLEEP)) if (Number(m[1]) > 0) count++;
 		} else if (ext === '.lua') {
@@ -271,6 +281,8 @@ function literalSelfTest() {
 	};
 	expect('AHK one-shot literal', '.ahk', 'SetTimer(Fn.Bind(1, 2), -100)', 1);
 	expect('AHK zero delay', '.ahk', 'SetTimer(Fn, 0)', 0);
+	expect('AHK next tick', '.ahk', 'SetTimer(Fn.Bind(1, 2), -1)', 0);
+	expect('AHK two ms is a delay', '.ahk', 'SetTimer(Fn, -2)', 1);
 	expect('AHK registry delay', '.ahk', 'SetTimer(Fn, -TimingsGet("ui", "x_ms"))', 0);
 	expect('AHK Sleep literal', '.ahk', '    Sleep 50', 1);
 	expect('AHK Sleep call form', '.ahk', 'Sleep(20)', 1);
