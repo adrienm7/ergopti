@@ -723,8 +723,12 @@ the shared runtime repair before the daemon starts: the shared proxy policy
 routes the registry URL, and only a `system` route calls the owned GIO lookup
 (`adapters/system_proxy.lua`); the first selection becomes `HTTPS_PROXY` of the
 daemon. A proxy the user exported wins and is never overridden; DIRECT and a
-machine without a desktop proxy add nothing; any other lookup failure refuses
-the start (`runtime_proxy_unavailable`). Ollama has no failover, so only the first
+machine without a desktop proxy add nothing. A GIO lookup that fails or times
+out (an unusable PAC: GIO names no finer step) sends that origin direct with one
+WARNING naming `native_proxy_lookup` or `native_proxy_budget`, stages the shared
+policy's `falls_back_direct` admits from `pac_unavailable_fallback`; a failure of
+Ergopti's own helper child still refuses the start (`runtime_proxy_unavailable`).
+Ollama has no failover, so only the first
 selection is used, and a PAC that sends blob hosts elsewhere than the registry
 is not followed.
 
