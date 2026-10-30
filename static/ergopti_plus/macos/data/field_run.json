@@ -118,6 +118,13 @@
 			"proves": "Without a person: the app types a fixed sequence into its own scratch field only, the tap sees each key once, the field holds it exactly and the previous app gets the focus back."
 		},
 		{
+			"id": "field_capslock_chord",
+			"kind": "field_check",
+			"check": "capslock_chord",
+			"deadline_seconds": 10,
+			"proves": "Ctrl+Caps Lock: the secondary_capslock slot is bound when assigned, and a physical Ctrl+Caps Lock pressed during this session reached it (pressed once before the run, it fails never_delivered when macOS does not fire a Caps Lock hotkey)."
+		},
+		{
 			"id": "field_menu_build",
 			"kind": "field_check",
 			"check": "menu_build",

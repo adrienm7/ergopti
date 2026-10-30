@@ -645,6 +645,16 @@ function M.new()
 		ollama_predict = ollama_predict,
 		menu_rebuild = menu_rebuild,
 		scratch_typing = scratch_typing,
+		capslock_chord_facts = function()
+			local Shortcuts = require("modules.shortcuts.keyboard_shortcuts")
+			local counts = require("infra.capslock_chord_evidence").counts()
+			return {
+				action = Shortcuts.get_action("secondary_capslock"),
+				bound = Shortcuts.is_slot_bound("secondary_capslock"),
+				presses = counts.presses,
+				deliveries = counts.deliveries,
+			}
+		end,
 	}
 end
 

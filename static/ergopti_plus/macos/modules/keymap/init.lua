@@ -45,6 +45,7 @@ local KeystrokeIntegrity = require("infra.keystroke_integrity")
 local KeyEventHealth = require("infra.key_event_health")
 local UnicodeCarrier = require("adapters.unicode_carrier")
 local EventClock = require("adapters.event_clock")
+local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 local ConfigKeys = require("config_keys")
 
@@ -2226,6 +2227,9 @@ end)
 -- key independently via its own keycode and derive shift_side from the pair.
 local SHIFT_KC_LEFT  = 56
 local SHIFT_KC_RIGHT = 60
+-- kVK_CapsLock: its flagsChanged with Control held is a Ctrl+Caps Lock press,
+-- counted so the field run can judge the secondary_capslock slot.
+local CAPS_LOCK_KC   = 57
 local _shift_left_down   = false
 local _shift_right_down  = false
 -- When both shifts are held simultaneously, shift_side reflects the most
@@ -2274,6 +2278,8 @@ shift_tap = eventtap.new(
 			elseif kc == SHIFT_KC_RIGHT then
 				_shift_right_down = not _shift_right_down
 				if _shift_right_down then _shift_last_side = "right" end
+			elseif kc == CAPS_LOCK_KC and f.ctrl then
+				CapsLockChordEvidence.note_press()
 			end
 
 			-- Hard reconcile: if the OS says shift is not down, neither side
