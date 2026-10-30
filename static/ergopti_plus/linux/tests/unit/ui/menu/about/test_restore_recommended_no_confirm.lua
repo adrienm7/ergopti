@@ -190,7 +190,7 @@ helpers.describe("restore-recommended-no-confirm: Configuration (Linux)", functi
 			local ok, err = pcall(function()
 				package.loaded["infra.global_scope"] = {
 					participants = function() calls[#calls + 1] = "participants"; return {} end,
-					apply = function(mode) calls[#calls + 1] = mode; return true, { reverted = nil } end,
+					apply = function(mode, _, done) calls[#calls + 1] = mode; done(true, { reverted = nil }); return true end,
 				}
 				local ctx = { _version = "test", on_quit = function() end, is_paused = function() return false end }
 				local row = tray_row(ctx, "menu.configuration.title", case.key)
