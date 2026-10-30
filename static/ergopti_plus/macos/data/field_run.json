@@ -1,5 +1,5 @@
 {
-	"_comment": "Developer field run: tools/dev/collect-macos-field-report.sh asks a developer ErgoptiPlus.app (infra/dev_source.lua) to run every Debug field check, the diagnostics collection and the AI download flows, then copies the results it wrote. Read at run time by infra/field_run.lua, which starts only in developer source mode, and by the collector through plutil. The folder is relative to the clone root; a step's deadline is in seconds and never exceeds what is left of the request's own deadline. An AI step with progress_max_seconds is a download: its deadline is the longest it may stay without progress, each window with progress grants another, and progress_max_seconds bounds it; the default request deadline covers every step at its bound, and the collector waits that long plus its own grace. A step that needs a person is reported with that verdict and its reason, never run with a stand-in.",
+	"_comment": "Developer field run: tools/dev/collect-macos-field-report.sh asks a developer ErgoptiPlus.app (infra/dev_source.lua) to run every Debug field check, the diagnostics collection and the AI download flows, then copies the results it wrote. Read at run time by infra/field_run.lua, which starts only in developer source mode, and by the collector through plutil. The folder is relative to the clone root; a step's deadline is in seconds and never exceeds what is left of the request's own deadline. An AI step with progress_max_seconds is a download: its deadline is the longest it may stay without progress, each window with progress grants another, and progress_max_seconds bounds it; the default request deadline covers every step at its bound, and the collector waits that long plus its own grace. A step that needs a person is reported with that verdict and its reason, never run with a stand-in. Each step's proves line says in one sentence what its pass shows; TODO.md's Mac todo repeats them for the maintainer.",
 	"schema": 1,
 	"folder": "build/field-run",
 	"files": {
@@ -18,59 +18,97 @@
 	"verdicts": ["pass", "fail", "skip", "timeout", "needs_person", "needs_typing"],
 	"reasons": ["malformed", "unknown_step", "bad_deadline", "busy", "duplicate_request", "failed"],
 	"steps": [
-		{ "id": "field_lease", "kind": "field_check", "check": "lease", "deadline_seconds": 45 },
+		{
+			"id": "field_lease",
+			"kind": "field_check",
+			"check": "lease",
+			"deadline_seconds": 45,
+			"proves": "The Karabiner lease is healthy: CLI present, lease phase, guardian ready, no lease failure or key loss this session."
+		},
 		{
 			"id": "field_owned_runtime",
 			"kind": "field_check",
 			"check": "owned_runtime",
-			"deadline_seconds": 60
+			"deadline_seconds": 60,
+			"proves": "The Ergopti-owned Karabiner runtime is still dormant, and what of it and of the stock Karabiner is installed or running."
 		},
-		{ "id": "field_network", "kind": "field_check", "check": "network", "deadline_seconds": 60 },
+		{
+			"id": "field_network",
+			"kind": "field_check",
+			"check": "network",
+			"deadline_seconds": 60,
+			"proves": "The managed download chain works: system proxy kinds, PAC download, route lookup, TLS trust and one HEAD transfer."
+		},
 		{
 			"id": "field_toolchain",
 			"kind": "field_check",
 			"check": "toolchain",
-			"deadline_seconds": 90
+			"deadline_seconds": 90,
+			"proves": "The timer service, the Shortcuts tool, Homebrew and the Karabiner-Elements signature and Gatekeeper verdict behave as assumed."
 		},
 		{
 			"id": "field_login_items",
 			"kind": "field_check",
 			"check": "login_items",
-			"deadline_seconds": 90
+			"deadline_seconds": 90,
+			"proves": "What starts Ergopti or Hammerspoon at login, and whether each entry belongs to this copy."
 		},
-		{ "id": "field_composer", "kind": "field_check", "check": "composer", "deadline_seconds": 90 },
+		{
+			"id": "field_composer",
+			"kind": "field_check",
+			"check": "composer",
+			"deadline_seconds": 90,
+			"proves": "The layout composer installs, enables and removes its check layout through the real path."
+		},
+		{
+			"id": "field_permissions",
+			"kind": "field_check",
+			"check": "permissions",
+			"deadline_seconds": 30,
+			"proves": "Accessibility is granted, the other privacy grants are named, and the running bundle's identifier and strict signature are the declared ones."
+		},
 		{
 			"id": "key_accounting",
 			"kind": "field_check",
 			"check": "key_accounting",
 			"deadline_seconds": 45,
 			"person": "needs_typing",
-			"reason": "synthetic_input_unsafe"
+			"reason": "synthetic_input_unsafe",
+			"proves": "Quartz sees key presses and the ledger credits them once; needs a person typing, so it is not run."
 		},
-		{ "id": "diagnostics", "kind": "diagnostics", "deadline_seconds": 60 },
+		{
+			"id": "diagnostics",
+			"kind": "diagnostics",
+			"deadline_seconds": 60,
+			"proves": "The Debug menu's bug-report snapshot collects completely; its codes count its warnings and errors."
+		},
 		{
 			"id": "ollama_runtime",
 			"kind": "ai",
 			"deadline_seconds": 240,
-			"progress_max_seconds": 600
+			"progress_max_seconds": 600,
+			"proves": "The Ollama runtime installs or is reused through the AI menu's install path."
 		},
 		{
 			"id": "ollama_model",
 			"kind": "ai",
 			"deadline_seconds": 240,
-			"progress_max_seconds": 2400
+			"progress_max_seconds": 2400,
+			"proves": "The Ollama server starts, pulls the smallest catalogue model (an installed one first) and lists it."
 		},
 		{
 			"id": "mlx_runtime",
 			"kind": "ai",
 			"deadline_seconds": 300,
-			"progress_max_seconds": 1200
+			"progress_max_seconds": 1200,
+			"proves": "The MLX environment bootstraps or is reused through the backend selection path."
 		},
 		{
 			"id": "mlx_model",
 			"kind": "ai",
 			"deadline_seconds": 240,
-			"progress_max_seconds": 2400
+			"progress_max_seconds": 2400,
+			"proves": "The MLX model download and serve path works with the smallest installed catalogue model, and the active-model file is put back."
 		}
 	],
 	"guard_step": "config_guard"
