@@ -236,8 +236,10 @@ LayoutRegistry_FindEntry(Index, Id) {
  * @param {string} Text - .keylayout content, read as UTF-8 without conversion.
  */
 LayoutRegistry_Verify(Entry, Text) {
+	; A recorded row may hold no size (the shared rule asks id, sha256 and version):
+	; the checksum below then vouches for the copy alone.
 	Size := StrPut(Text, "UTF-8") - 1
-	if (Size != Entry["size"])
+	if Entry.Has("size") && (Size != Entry["size"])
 		throw Error(Format("The layout '{1}' has {2} bytes instead of {3}.", Entry["id"], Size, Entry["size"]))
 	Digest := CryptoSha256(Text)
 	if (Digest != Entry["sha256"])
