@@ -160,6 +160,22 @@ downloaded again`). Ollama deletes that layer before it reports the
   (`"menu.llm.local_servers.none|LM Studio, llama.cpp"`) to the new key. The
   panel's own report (`local_server_panel.ahk` line 572) keeps
   `menu.llm.local_servers.none` with the host.
+- Maintainer decisions of 2026-10-31 for the PC (recorded in
+  `docs/memory/maintainer-decisions.md`):
+  - Build the timer-delay ceiling on Windows: a relative timer delay above
+    2^53 ms, infinite or NaN is refused before `SetTimer`, as
+    `_shared/lua/number_policy.lua` `MAX_TIMER_DELAY_MS` does; replay
+    `_shared/tests/corpus/timer/delay_ceiling_vectors.json` in an AHK test.
+  - Build the key-chord policy on Windows from
+    `_shared/tests/corpus/tap_hold/key_combination_chords.json` (the macOS and
+    Linux replay is `_shared/lua/test/key_combination_chords_contract.lua`),
+    with an AHK test replaying the same cases.
+  - Item 109, branded debug GUI: still blocked while AHK 2.0.26 has no
+    supported invisible Variables/KeyHistory snapshot; yours to settle.
+  - A real `Comments` field in `ErgoptiPlus.exe`'s version information,
+    through a version `.res` resource built with the exe.
+  - The `WH_KEYBOARD_LL` probe of `input_probe.ahk` stays in the release exe;
+    nothing to remove.
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 

@@ -42,3 +42,21 @@ when the file holds one (`rewrite_configured`). There is no migration or
 adoption marker (sole user, clean state): a file without the row leaves the
 native value in force, and nothing is copied between the stores. Only a
 shipped locale code is adopted.
+
+## Decisions without code of 2026-10-31
+
+- **Published release notes** that carry agent session lines are rewritten
+  once by the coordinator; `build_changelog.py` already strips them from new
+  notes.
+- **The `WH_KEYBOARD_LL` probe** (`windows/.../input_probe.ahk`) stays in the
+  release exe, flagged or not by a corporate proxy.
+- **Windows builds the timer-delay ceiling and key-chord policies** that macOS
+  and Linux replay (`_shared/tests/corpus/timer/delay_ceiling_vectors.json`,
+  `_shared/tests/corpus/tap_hold/key_combination_chords.json`); the work is in
+  the PC handoff.
+- **`dev` history is kept as it is**: the October 22 commits whose message
+  belongs to another change are not rewritten.
+- **Item 109 (branded debug GUI) and a real `Comments` field in the exe's
+  version resource** go to the PC agent (handoff).
+- **L115 is closed**: the provider error envelope guard did not reproduce
+  under WSL LuaJIT (6 of 6 runs pass); reopen only on a new failing run.
