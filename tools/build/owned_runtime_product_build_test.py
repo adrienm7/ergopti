@@ -203,8 +203,8 @@ class DaemonReportBuildControls(unittest.TestCase):
         )
 
     def test_default_source_rosters_are_exact_and_report_is_additive(self):
-        self.assertEqual(len(product.HELPER_SOURCES), 9)
-        self.assertEqual(len(product.VALIDATOR_SOURCES), 6)
+        self.assertEqual(len(product.HELPER_SOURCES), 10)
+        self.assertEqual(len(product.VALIDATOR_SOURCES), 7)
         self.assertEqual(product.product_source_paths(), product.SOURCE_PATHS)
         expected = tuple(
             product.SWIFT + "OwnedVirtualHIDDaemonReport" + name + ".swift"

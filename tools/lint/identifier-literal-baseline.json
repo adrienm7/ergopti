@@ -4,26 +4,8 @@
 		"static/ergopti_plus/macos/launcher/Package.swift": {
 			"host": 1
 		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeBootstrapStageOwner.swift": {
-			"bundle_id_or_label": 2
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeFirstInstallOwner.swift": {
-			"bundle_id_or_label": 2
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallJournal.swift": {
-			"bundle_id_or_label": 1
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallOwner.swift": {
-			"bundle_id_or_label": 8
-		},
 		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimePublisherIdentity.swift": {
 			"bundle_id_or_label": 4
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeServiceLifecycleLock.swift": {
-			"bundle_id_or_label": 1
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift": {
-			"bundle_id_or_label": 1
 		},
 		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeCoreProvisionOwnerTests.swift": {
 			"bundle_id_or_label": 8
