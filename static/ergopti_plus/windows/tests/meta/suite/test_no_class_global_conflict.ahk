@@ -67,26 +67,8 @@ _MetaListAhkFilesCC(Dir) {
 ; =====================================
 ; =====================================
 
-; One registered failure per conflict. Bound at registration: the nested
-; function this replaces read copies of the loop's values, one slot every
-; iteration overwrote, so every failing test described the last conflict.
-; @param ClassName {String} The class name declared global.
-; @param DeclFile {String} The file holding the `global` declaration.
-; @param ClassFiles {Array} The files defining the class.
-_MetaConflictFail(ClassName, DeclFile, ClassFiles) {
-	FileList := ""
-	for F in ClassFiles {
-		FileList .= F . ", "
-	}
-	Msg := "global " . ClassName
-		. " in " . DeclFile
-		. " conflicts with class defined in: "
-		. SubStr(FileList, 1, -2)
-	; AssertEqual("", non-empty) fails with the conflict description as the diff
-	AssertEqual("", Msg)
-}
-
-_MetaRunClassGlobalConflictTests() {
+; Runs inside its test: scanning the tree at registration taxed every runner boot.
+_MetaNoClassGlobalConflict() {
 	SplitPath(A_ScriptDir, , &_DriverRootRaw)
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 
@@ -147,30 +129,23 @@ _MetaRunClassGlobalConflictTests() {
 		}
 	}
 
-	; Register one test per conflict found (each is a hard failure).
-	; AssertEqual("", actual) is the canonical failure pattern in this suite —
-	; a non-empty actual string means a violation was detected.
-	if Conflicts.Length = 0 {
-		; The clean case used to register an EMPTY body. It could not fail whether the
-		; scan had examined every class in the driver or none at all — and "none at
-		; all" is what a renamed token or a moved tree produces, which is exactly when
-		; this guard is needed. Assert the scan saw the classes instead.
-		_MetaNoConflict() {
-			Assert(ClassNames.Count > 20,
-				"the class scan found only " . ClassNames.Count . " class definition(s) across the "
-				. "driver — it is looking for something that is no longer there, so finding no "
-				. "conflicts proves nothing")
-		}
-		Test("meta class/global conflict: no conflicting `global ClassName` declarations found ("
-			. ClassNames.Count . " classes scanned)", _MetaNoConflict)
-	} else {
-		for Conflict in Conflicts {
-			Test(
-				"meta class/global conflict: `global " . Conflict.name . "` in " . Conflict.file,
-				_MetaConflictFail.Bind(Conflict.name, Conflict.file, ClassNames[Conflict.name])
-			)
-		}
+	; The clean case once registered an EMPTY body. It could not fail whether the
+	; scan had examined every class in the driver or none at all — and "none at
+	; all" is what a renamed token or a moved tree produces, which is exactly when
+	; this guard is needed. Assert the scan saw the classes first.
+	Assert(ClassNames.Count > 20,
+		"the class scan found only " . ClassNames.Count . " class definition(s) across the "
+		. "driver — it is looking for something that is no longer there, so finding no "
+		. "conflicts proves nothing")
+	Report := ""
+	for Conflict in Conflicts {
+		FileList := ""
+		for F in ClassNames[Conflict.name]
+			FileList .= F . ", "
+		Report .= "`nglobal " . Conflict.name . " in " . Conflict.file
+			. " conflicts with class defined in: " . SubStr(FileList, 1, -2)
 	}
+	; AssertEqual("", non-empty) fails with every conflict description as the diff.
+	AssertEqual("", Report)
 }
-
-_MetaRunClassGlobalConflictTests()
+Test("meta class/global conflict: no conflicting `global ClassName` declarations", _MetaNoClassGlobalConflict)
