@@ -1891,6 +1891,25 @@ declaration too: `test_field_run.lua` and `test-macos-field-run-contract.cjs`
 refuse a check with no step. A step that needs a person is declared with
 `person`/`reason` and reported, never driven with synthetic input.
 
+### project-karabiner-strict-signature-finder-detritus
+
+A `com.apple.FinderInfo` xattr on the Karabiner-Elements bundle root makes
+`codesign --verify --strict` refuse a bundle that Gatekeeper accepts (Notarized
+Developer ID, team G43BCU2T37; maintainer's Mac 2026-10-27, ledger L43).
+`infra/field_check_checks.lua` (`only_finder_detritus`) therefore reports a
+trusted bundle whose only strict failure is that detritus as
+`info strict_only:finder_detritus`, not a failure. Action: treat any other
+strict cause as a real signature failure; do not widen the benign list.
+
+### project-macos-privacy-grants-read-through-the-launcher
+
+Hammerspoon has no Input Monitoring query that cannot prompt, so the grant
+read `unknown` in issue #104 (ledger L32). The field check asks the launcher
+role `--input-monitoring status` (`InputMonitoringAccessWorker.swift`), which
+calls `IOHIDCheckAccess` (reads TCC only) and never `IOHIDRequestAccess` (the
+call that asks). Action: add any further privacy read the same way, through a
+non-prompting native query in a launcher role.
+
 ### project-macos-field-run-step-details
 
 Each step's `proves` line in `field_run.json` says what a pass shows; this
