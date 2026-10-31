@@ -22,6 +22,7 @@
 --- ==============================================================================
 
 local Report = require("field_check_report")
+local TableUtil = require("table_util")
 
 local M = {}
 
@@ -106,9 +107,7 @@ function M.pac_fallback(ports, report, finish)
 			return finish()
 		end
 		report.step("pac_fallback_log", PASS)
-		local stages = {}
-		for stage in pairs(summary.stages) do stages[#stages + 1] = stage end
-		table.sort(stages)
+		local stages = TableUtil.sorted_keys(summary.stages)
 		report.step("pac_fallback_stages", INFO, #stages > 0 and table.concat(stages, ",") or "none")
 		report.step("pac_fallback_counts", INFO, summary.warnings .. ":" .. summary.worked .. ":" .. summary.failed)
 		local state, value = M.verdict(summary, is_fallback_stage)
