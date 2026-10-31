@@ -241,16 +241,16 @@
 			"os": "macos",
 			"tool": "Microsoft Edge, Chrome, Brave",
 			"programs": [],
-			"used_for": "Host of a cloned web app in `--app=URL` mode (`macos/apps/App Cloner.app/Contents/Resources/clone_app.sh:614-628`)",
-			"today": "The user's browser",
-			"current_class": "HOST",
+			"used_for": "Named by the App Cloner as the host of a cloned web app in `--app=URL` mode; the clone script never started one",
+			"today": "Not used: a PWA clone hosts its URL in its own WKWebView launcher, so no browser is looked for or started and no App Cloner text names one (`macos/apps/App Cloner.app/Contents/Resources/clone_app.sh` 6.b)",
+			"current_class": "NA",
 			"version_needed": "any Chromium",
-			"if_missing": "Cloning a web app fails with a message",
+			"if_missing": "Nothing: no feature depends on a browser",
 			"pin_possible": "No (not redistributable as a runtime we control; Chromium is possible but 150 MB+)",
 			"decision": "OPT",
 			"decision_text": "OPT: the feature names the browser it found and is off without one",
 			"alternative": null,
-			"status": "follow_up"
+			"status": "done"
 		},
 		{
 			"os": "macos",

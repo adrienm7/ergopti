@@ -391,7 +391,7 @@ on pwaSuggestionFor(bundleId, appPath)
 end pwaSuggestionFor
 
 -- Validate a URL specifically for PWA mode. Stricter than validateOpenArg:
--- requires http(s) since Edge --app= only accepts navigable web URLs.
+-- requires http(s) since the WKWebView clone only loads navigable web URLs.
 on validatePWAURL(inputVal, u)
 	if inputVal is "" then return (err_pwa_required of u)
 	set v to my toLower(inputVal)
