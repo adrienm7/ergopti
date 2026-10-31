@@ -47,6 +47,8 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_eq(state.driver_control and state.driver_control.pid, 4242)
 		helpers.assert_type(state.driver_control.reload, "function")
 		helpers.assert_type(state.callbacks.on_usr1, "function")
+		-- The collector's field run session starts with the daemon's own pid.
+		helpers.assert_eq(state.field_run and state.field_run.pid, 4242)
 	end)
 	helpers.it("(signal-census) the E2E children expect every native signal Main installs", function()
 		-- The E2E children count the active libuv signal handles before playing a
