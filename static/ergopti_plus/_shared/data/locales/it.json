@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inattivi: consenti ErgoptiPlus negli Elementi login",
 	"menu.tapholds.guardian_unavailable": "🔴 Inattivi: l’helper in background di ErgoptiPlus non è registrato (controlla gli Elementi login, poi esci da ErgoptiPlus e riaprilo)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ Vecchie regole di ErgoptiPlus bloccano le tue impostazioni: rimuovile…",
+	"menu.tapholds.close_other_karabiner": "Chiudi gli altri Karabiner mentre Ergopti è attivo (ripristinati in pausa o all’uscita)",
 	"menu.tapholds.vhid_incompatible": "⚠️ Tap-hold in pausa: è installata un’altra versione del driver Karabiner e macOS ne attiva solo una",
 	"menu.tapholds.vhid_not_active": "⚠️ Tap-hold in pausa: consenti il driver della tastiera virtuale Karabiner in Impostazioni di Sistema",
 	"menu.tapholds.open_login_items": "Apri le impostazioni degli Elementi login…",

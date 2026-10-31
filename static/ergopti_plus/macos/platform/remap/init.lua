@@ -4194,6 +4194,7 @@ local function publish_settings_state(candidate)
 	_state.sticky_timeout_ms = candidate.sticky_timeout_ms
 	_state.simultaneous_threshold_ms = candidate.simultaneous_threshold_ms
 	_state.combo_symmetric = candidate.combo_symmetric
+	_state.close_other_instances = candidate.close_other_instances
 end
 
 --- Persists and then publishes one detached settings candidate.
@@ -5177,6 +5178,35 @@ end
 function M.user_karabiner_closed()
 	if not M._owned.selected() then return false end
 	return require("adapters.runtime_owner_ports").marker().get() == true
+end
+
+--- The user's consent to closing their own Karabiner while Ergopti runs.
+--- @return boolean consent
+function M.get_close_other_instances()
+	if not require_state("get_close_other_instances") then return false end
+	return _state.close_other_instances == true
+end
+
+--- Sets and persists `[karabiner] close_other_instances`, then applies the
+--- activation rule so a runtime that waited on the consent starts.
+--- @param value boolean Desired consent.
+--- @return boolean committed
+function M.set_close_other_instances(value)
+	if not require_state("set_close_other_instances") then return false end
+	if type(value) ~= "boolean" then
+		Logger.error(LOG, "set_close_other_instances(): value must be a boolean.")
+		return false
+	end
+	local committed = commit_state_mutation(function(candidate)
+		candidate.close_other_instances = value
+	end)
+	if committed then
+		Logger.info(LOG, "Close other Karabiner instances: %s.", value and "on" or "off")
+		if M._owned.selected() and M._owned.reconcile() ~= true then
+			Logger.error(LOG, "Owned Karabiner runtime could not follow the close option.")
+		end
+	end
+	return committed
 end
 
 --- Returns whether the key combinations are switched on: the persisted
@@ -6819,6 +6849,7 @@ function M._owned.bind()
 	M._owned.owner = Owner
 	-- A second capture cannot start in this Lua VM, so a resume reloads the driver.
 	M._owned.activation = require("platform.remap.runtime_activation").new(OwnerPorts.activation(Owner,
+		function() return _state ~= nil and _state.close_other_instances == true end,
 		function()
 			Logger.info(LOG, "Reloading so that Ergopti's own Karabiner runtime starts again.")
 			hs.reload()
@@ -6999,6 +7030,7 @@ function M.init(file_system)
 	_state = {
 		enabled                   = user_cfg.enabled,
 		runtime                   = runtime,
+		close_other_instances     = user_cfg.close_other_instances,
 		tap_holds_enabled         = user_cfg.tap_holds_enabled ~= false,
 		mod_combos_enabled        = user_cfg.mod_combos_enabled,
 		tap_hold_config           = user_cfg.tap_hold_config,

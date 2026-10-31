@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 未生效：请在登录项中允许 ErgoptiPlus",
 	"menu.tapholds.guardian_unavailable": "🔴 未生效：ErgoptiPlus 后台辅助程序未注册（请检查登录项，然后退出并重新打开 ErgoptiPlus）",
 	"menu.tapholds.legacy_rules_pending": "⚠️ 旧版 ErgoptiPlus 规则阻止了您的设置：移除…",
+	"menu.tapholds.close_other_karabiner": "Ergopti 运行时关闭其他 Karabiner（暂停或退出时恢复）",
 	"menu.tapholds.vhid_incompatible": "⚠️ 点按/长按已暂停：已安装另一版本的 Karabiner 驱动，而 macOS 只启用一个",
 	"menu.tapholds.vhid_not_active": "⚠️ 点按/长按已暂停：请在系统设置中允许 Karabiner 虚拟键盘驱动",
 	"menu.tapholds.open_login_items": "打开登录项设置…",

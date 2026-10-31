@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Nieaktywne: zezwól na ErgoptiPlus w Rzeczach otwieranych podczas logowania",
 	"menu.tapholds.guardian_unavailable": "🔴 Nieaktywne: pomocnik ErgoptiPlus działający w tle nie jest zarejestrowany (sprawdź Rzeczy otwierane podczas logowania, a następnie zamknij i ponownie otwórz ErgoptiPlus)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ Stare reguły ErgoptiPlus blokują Twoje ustawienia: usuń je…",
+	"menu.tapholds.close_other_karabiner": "Zamykaj inne Karabiner, gdy działa Ergopti (przywracane po wstrzymaniu lub zamknięciu)",
 	"menu.tapholds.vhid_incompatible": "⚠️ Dotknięcie-przytrzymanie wstrzymane: zainstalowano inną wersję sterownika Karabiner, a macOS włącza tylko jedną",
 	"menu.tapholds.vhid_not_active": "⚠️ Dotknięcie-przytrzymanie wstrzymane: zezwól na sterownik wirtualnej klawiatury Karabiner w Ustawieniach systemowych",
 	"menu.tapholds.open_login_items": "Otwórz ustawienia Rzeczy otwieranych podczas logowania…",

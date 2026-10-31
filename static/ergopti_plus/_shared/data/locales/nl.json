@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inactief: sta ErgoptiPlus toe bij Inloggen",
 	"menu.tapholds.guardian_unavailable": "🔴 Inactief: het achtergrondhulpprogramma van ErgoptiPlus is niet geregistreerd (controleer Inloggen, stop ErgoptiPlus en open het opnieuw)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ Oude ErgoptiPlus-regels blokkeren je instellingen: verwijderen…",
+	"menu.tapholds.close_other_karabiner": "Andere Karabiner sluiten zolang Ergopti draait (hersteld bij pauzeren of stoppen)",
 	"menu.tapholds.vhid_incompatible": "⚠️ Tik-vasthouden gepauzeerd: een andere Karabiner-driverversie is geïnstalleerd en macOS activeert er maar één",
 	"menu.tapholds.vhid_not_active": "⚠️ Tik-vasthouden gepauzeerd: sta het virtuele Karabiner-toetsenbordstuurprogramma toe in Systeeminstellingen",
 	"menu.tapholds.open_login_items": "Instellingen voor Inloggen openen…",

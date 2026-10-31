@@ -1394,6 +1394,14 @@ unavailable = "hide"
 
 # Ergopti's own Karabiner runtime (ADR 011): the user's Karabiner-Elements is
 # closed while Ergopti runs, or the one-driver-version rule blocks the runtime.
+[[menu.tap_hold_close_other_karabiner_rows]]
+type = "check"
+id = "tap_hold_close_other_karabiner"
+i18n = "menu.tapholds.close_other_karabiner"
+checked_when = ["close_other_karabiner"]
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.tap_hold_user_karabiner_closed_rows]]
 type = "label"
 id = "tap_hold_user_karabiner_closed"

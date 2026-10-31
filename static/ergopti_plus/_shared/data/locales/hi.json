@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 निष्क्रिय: लॉगिन आइटम में ErgoptiPlus को अनुमति दें",
 	"menu.tapholds.guardian_unavailable": "🔴 निष्क्रिय: ErgoptiPlus का पृष्ठभूमि सहायक पंजीकृत नहीं है (लॉगिन आइटम जाँचें, फिर ErgoptiPlus बंद करके दोबारा खोलें)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ ErgoptiPlus के पुराने नियम आपकी सेटिंग्स रोक रहे हैं: उन्हें हटाएँ…",
+	"menu.tapholds.close_other_karabiner": "Ergopti चलने तक अन्य Karabiner बंद करें (रोकने या बंद करने पर बहाल)",
 	"menu.tapholds.vhid_incompatible": "⚠️ Tap-holds रुके हैं: Karabiner ड्राइवर का दूसरा संस्करण स्थापित है और macOS केवल एक चलाता है",
 	"menu.tapholds.vhid_not_active": "⚠️ Tap-holds रुके हैं: System Settings में Karabiner वर्चुअल कीबोर्ड ड्राइवर को अनुमति दें",
 	"menu.tapholds.open_login_items": "लॉगिन आइटम सेटिंग्स खोलें…",

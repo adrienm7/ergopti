@@ -37,11 +37,13 @@ local SWITCH_KEYS = {
 }
 
 -- The texts about the user's own Karabiner-Elements, which Ergopti's own runtime
--- acts on (ADR 011, the maintainer's rule of 2026-10-31): that it is closed
--- while Ergopti runs, and that its driver version blocks Ergopti's runtime.
+-- acts on (ADR 011, the maintainer's rule of 2026-10-31): the consent to close
+-- it while Ergopti runs, that it is closed, and that its driver version blocks
+-- Ergopti's runtime.
 -- They must name the product the user installed, or the user cannot tell what
 -- disappeared or what to change.
 local USER_KARABINER_KEYS = {
+	["menu.tapholds.close_other_karabiner"] = true,
 	["notify.karabiner.user_closed"] = true,
 	["menu.tapholds.vhid_incompatible"] = true,
 	["menu.tapholds.vhid_not_active"] = true,
