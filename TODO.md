@@ -1255,7 +1255,8 @@ not open software work.
   Ergopti runs and is not paused it always uses its own Karabiner runtime and closes a running user
   Karabiner-Elements; paused or quit, it stops its runtime and restarts the user's Karabiner only if it
   closed it (a persisted marker, so a crash or forced quit still restores it). No Tap-Hold or other
-  switch takes part, and the shared-mode merge into the user's `karabiner.json` is retired.
+  feature switch takes part; the default-on consent row « close other Karabiner apps while Ergopti is
+  running » stays. The shared-mode merge into the user's `karabiner.json` is retired.
 - **Maintainer workflow**: partial work is delivered into dev after the feasible container or CI
   work, with native or device gaps documented here rather than holding a branch.
 

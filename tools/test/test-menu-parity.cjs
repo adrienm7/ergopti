@@ -682,6 +682,12 @@ const OPENS_SUBMENU = {
 			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
 		},
 		{
+			menu: 'tap_hold_close_other_karabiner_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
 			menu: 'tap_hold_user_karabiner_closed_rows',
 			platforms: ['hs'],
 			kind: 'compose',

@@ -62,8 +62,10 @@ handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
    Karabiner-Elements, and tells the user so; paused or quit, it stops its
    runtime and restarts the user's Karabiner if, and only if, it closed it. A
    persisted marker records the close, so a crash or a forced quit still gives
-   it back. No menu switch takes part; `[karabiner] close_other_instances` is
-   retired and only reported as outdated. Because one Lua VM cannot start a
+   it back. No feature switch (Tap-Hold or another) takes part; the consent
+   row « close other Karabiner apps while Ergopti is running (restored when
+   paused or quit) » stays, on by default (`[karabiner] close_other_instances`),
+   and unticked it keeps ours from running beside theirs. Because one Lua VM cannot start a
    second capture (decision 8), a resume after a pause reloads the driver.
    The owner is `platform/remap/runtime_activation.lua`.
 4. **Branding and signing (question 2).** The pqrs branding of the

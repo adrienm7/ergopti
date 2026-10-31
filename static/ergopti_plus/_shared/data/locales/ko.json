@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 비활성: 로그인 항목에서 ErgoptiPlus를 허용하세요",
 	"menu.tapholds.guardian_unavailable": "🔴 비활성: ErgoptiPlus 백그라운드 도우미가 등록되지 않았습니다(로그인 항목을 확인한 다음 ErgoptiPlus를 종료했다가 다시 여세요)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ 이전 ErgoptiPlus 규칙이 설정을 막고 있습니다: 제거…",
+	"menu.tapholds.close_other_karabiner": "Ergopti가 실행되는 동안 다른 Karabiner 닫기(일시 중지 또는 종료 시 복원)",
 	"menu.tapholds.vhid_incompatible": "⚠️ 탭-홀드 일시 중지: 다른 버전의 Karabiner 드라이버가 설치되어 있으며 macOS는 하나만 활성화합니다",
 	"menu.tapholds.vhid_not_active": "⚠️ 탭-홀드 일시 중지: 시스템 설정에서 Karabiner 가상 키보드 드라이버를 허용하세요",
 	"menu.tapholds.open_login_items": "로그인 항목 설정 열기…",

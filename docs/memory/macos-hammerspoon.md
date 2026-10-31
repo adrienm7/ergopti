@@ -971,7 +971,8 @@ runtime (`shared` or `owned`), so a guardian never fences an owned token
 through a stock tool that may not exist, which would retry forever.
 The activation rule has one owner, `platform/remap/runtime_activation.lua`
 (maintainer, 2026-10-31): Ergopti running and not paused starts ours, which
-always closes theirs; a pause stops ours. Theirs is restored
+closes theirs under the default-on consent row (`close_other_instances`;
+unticked, the owner reports `other_karabiner_running`); a pause stops ours. Theirs is restored
 (`register-core-agents`, the inverse of the quit step) only when the
 `closed-other-karabiner` marker records that Ergopti closed it, so a user who
 quit their own Karabiner never sees Ergopti start it; the marker is a file, so

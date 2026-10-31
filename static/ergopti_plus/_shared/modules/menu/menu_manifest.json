@@ -1564,6 +1564,20 @@
 			"unavailable": "hide"
 		}
 	],
+	"tap_hold_close_other_karabiner_rows": [
+		{
+			"type": "check",
+			"id": "tap_hold_close_other_karabiner",
+			"i18n": "menu.tapholds.close_other_karabiner",
+			"checked_when": [
+				"close_other_karabiner"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"tap_hold_user_karabiner_closed_rows": [
 		{
 			"type": "label",
