@@ -72,3 +72,12 @@ only by static and JS tests. Once it lands on `dev`:
 2. Run `collect-windows-field-report.ps1` and the runtime layer of
    `test-windows-field-report-contract.cjs` with `pwsh`.
 3. Push the field report so the coordinator can read it.
+
+## Found tonight for the PC agent
+
+- Item 139 on Windows: `infra/toml/toml_loader.ahk` prints user-chosen pack and
+  category names in clear (`LoggerDone` at lines 496 and 584) and the extension
+  TOML path (`LoggerStart` at 638, `LoggerSuccess` at 755). macOS and Linux mask
+  them through `_shared/lua/diagnostics/private_label.lua` (placeholder pinned
+  to `redaction.json` `config_name_placeholder`); Windows needs an AHK twin and
+  a meta test.
