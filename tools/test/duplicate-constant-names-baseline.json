@@ -56,7 +56,7 @@
 	"MS_PER_SEC": {
 		"files": [
 			"linux/ui/hotstrings_config_window/bridge.lua",
-			"linux/ui/menu/menu_builder.lua",
+			"linux/ui/menu/menu_hotstrings.lua",
 			"macos/adapters/http_client.lua",
 			"macos/modules/updater/auto_check.lua"
 		],
