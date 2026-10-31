@@ -26,6 +26,8 @@ and makes stale details harder to notice.
 - [Linux, web, and release](linux-web-release.md) — Linux input contracts,
   native port boundaries, CI runner prerequisites, website details,
   deployment, and release assets.
+- [Maintainer decisions](maintainer-decisions.md) — settled product choices
+  (labels, policies, scope) that should not be raised again.
 - [Rejected proposals](rejected_proposals.md) — measured ideas that should not
   be raised again without changed evidence.
 
