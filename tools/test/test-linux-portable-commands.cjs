@@ -498,16 +498,11 @@ const PROGRAMS = {
 	),
 	// The driver reads /proc instead; the hardware lanes probe procps first.
 	ps: optionalTool('procps process listing of the hardware lanes', HOST),
-	pgrep: why(
-		`procps process lookup of the local-server detection test; installed by CI: ${DISTRO_PREP}`,
-		TEST,
-		{ proof: { file: DISTRO_PREP, token: '\\bprocps(-ng)? curl ;;' }, probed: true }
-	),
 	ss: why(
 		`iproute2 listening sockets of the local-server detection test; installed by CI: ${DISTRO_PREP}`,
 		TEST,
 		{
-			proof: { file: DISTRO_PREP, token: '\\biproute2?(-ss)? procps(-ng)? curl ;;' },
+			proof: { file: DISTRO_PREP, token: '\\biproute2?(-ss)? curl ;;' },
 			probed: true
 		}
 	),
