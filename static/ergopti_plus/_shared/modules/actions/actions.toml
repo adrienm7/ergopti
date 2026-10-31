@@ -1347,9 +1347,11 @@ emit_ahk_mods = ["ctrl"]
 emit_linux = "ctrl+Delete"
 
 [sg_actions.space]
-platform = "ahk,linux"
+platform = "all"
 emit_ahk_key = "Space"
 emit_ahk_mods = []
+emit_hs_key = "space"
+emit_hs_mods = []
 emit_linux = "space"
 
 [sg_actions.caps_lock]
