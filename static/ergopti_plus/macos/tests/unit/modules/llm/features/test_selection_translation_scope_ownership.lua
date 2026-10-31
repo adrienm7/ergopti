@@ -15,6 +15,8 @@ require("config_keys")
 require("adapter_errors") -- the adapters compare its ids
 require("file_system.ports") -- the file-system owner checks itself against it when it loads
 require("infra.dev_source") -- the updater identity reads it; it only caches this process's mode
+require("llm.api_url_template") -- pure: the remote backend fills per-account addresses with it
+require("llm.api_token_exchange") -- pure: the remote backend reads auth blocks with it
 local World = require("tests.support.modules.llm.selection_translation_fixture")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
 local SharedLogger = require("logger")
