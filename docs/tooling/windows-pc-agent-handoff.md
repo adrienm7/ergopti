@@ -128,6 +128,18 @@ downloaded again`). Ollama deletes that layer before it reports the
   (`fix/linux-todo-final`; shared value rule `llm/vision.lua`
   `compose_parameter`). Windows needs the same two steps, with an AHK test
   that fails while the backend is typed.
+- Owned runtimes inventory on Windows: `tools/test/test-owned-runtimes-inventory.cjs`
+  derives every program the macOS and Linux drivers start
+  (`tools/test/lib/spawned-tools.cjs`) and fails when one has no row in
+  `docs/design/owned-runtimes.md`. The Windows table (section 5) has no such
+  check: AHK spawns through `Run`, `RunWait`, `ComObject("WScript.Shell").Exec`
+  and the PowerShell workers, so the extractor needs an AHK reader for those
+  shapes (`curl.exe`, `tar.exe`, `taskkill.exe`, `powershell.exe`, `winget`)
+  before section 5 can be checked the same way.
+- The macOS and Linux CI timing: the release preflight now writes the run's
+  lane, job and per-step elapsed tables into its job summary
+  (`tools/ci/run-timing.cjs --step-summary`); nothing to do on the PC, but the
+  Windows lane's slowest steps are read there from now on.
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 
