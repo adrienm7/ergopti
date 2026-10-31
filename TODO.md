@@ -267,10 +267,15 @@ into its item below or into the matching existing item.
       `SLOW_SAVE_REPORT_MS`, ingest `REPORT_THRESHOLD_MS`, or the budget the line states); lifecycle events;
       and a ranked top 10. One vector per driver spelling
       (`tools/test/fixtures/field-log-analyse/vectors.json`) fails the test when a source stops writing a
-      template it reads. Left: no budget is declared for boot, reload, menu rebuild, LLM latency or the
-      tooltip display, so those say "no budget declared" until the code declares one; the Windows driver
-      logs no per-request LLM latency (only timeouts); `tools/test/features/test-infrastructure/suite.json`
-      on dev lists ordinal 537 before 485 (0ba0e905), which stops `npm run test:js` before any check.
+      template it reads. The `[budgets]` section of `_shared/modules/timings/constants.toml` now declares boot,
+      reload, menu rebuild, local and remote AI request and prediction display budgets from the measured
+      macOS logs; the driver that takes each measure writes "Over budget: <what> took N ms (budget B ms)."
+      (`_shared/lua/perf_budget.lua`, `windows/infra/perf_budget.ahk`), and Windows writes one
+      `LLM request: kind= provider= family= outcome= in N ms.` line per prediction
+      (`modules/llm/llm_request_latency.ahk`). Left [PHYS-M] [PHYS-L] [PHYS-W]: the Lua and AHK suites
+      did not run where this was written (no Lua or AutoHotkey there): run `npm run test:hs`, `test:linux`
+      and the AHK suite; the Linux driver measures no reload or menu rebuild yet, the Windows one no menu
+      rebuild, so those budgets are judged on macOS only.
 - [ ] **macOS field holds of 2026-10-30 (worker `perf/macos-field-holds`).** [CODE] [PHYS-M] From the field
       report `mac-2026-10-30_210120` (141 holds over 250 ms). Done: the unjournaled-ledger admission scans data.sql
       with native finds (17 s hold, append prepare=17225 ms; about 15x faster); the personal-row alias check of a
