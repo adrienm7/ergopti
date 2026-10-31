@@ -150,4 +150,6 @@ ready (3 step(s)).` and `build/field-run/ready.json` names the driver's pid.
     longer a rendered type);
   - `tests/meta/ui/menu/test_list_providers_touch_no_menu.ahk` (unchanged,
     covers the renderer);
+  - `tests/unit/ui/menu/test_menu_row_order.ahk` (edited: the corpus keeps one
+    list vector since the `llm_menu_rows` rule was retired);
   - then `run_all.ahk` again: every menu goes through the edited renderer.
