@@ -20,7 +20,8 @@ local function with_source(source, callback)
 			write(path, source)
 			local backup = engine.backup_path(path, "wrap-source-kinds")
 			local receipt = table.pack(pcall(callback, path, backup, preferences, cleanup, engine, require("adapters.file_system")))
-			for _, owned in ipairs({ backup, backup .. ".ergoptiplus-write-lock-v1" }) do
+			local backup_lock = assert(require("adapters.write_lock_path").for_canonical(backup, os.getenv("HOME")))
+			for _, owned in ipairs({ backup, backup_lock }) do
 				local removed, reason, code = os.remove(owned)
 				assert(removed or code == 2, "owned backup cleanup failed: " .. tostring(reason))
 			end

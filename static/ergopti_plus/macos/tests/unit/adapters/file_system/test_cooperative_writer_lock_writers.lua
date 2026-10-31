@@ -38,7 +38,7 @@ helpers.describe("adapters.file_system: cooperative writer lock", function()
 		with_fixture(function(fixture)
 			local path = os.tmpname():gsub("\\", "/")
 			local alias = dot_alias(fixture, path)
-			local lock_path = path .. fixture.WRITE_LOCK_SUFFIX
+			local lock_path = fixture.write_lock_path(path)
 			os.remove(lock_path)
 			local lock_calls = 0
 			local adapter = fixture.make_adapter(nil, nil, nil, nil, function()
@@ -84,15 +84,17 @@ helpers.describe("adapters.file_system: cooperative writer lock", function()
 			local released, release_err = adapter.release_write_locks(group)
 			os.remove(first)
 			os.remove(second)
-			os.remove(first .. fixture.WRITE_LOCK_SUFFIX)
-			os.remove(second .. fixture.WRITE_LOCK_SUFFIX)
+			os.remove(fixture.write_lock_path(first))
+			os.remove(fixture.write_lock_path(second))
 
 			helpers.assert_true(group ~= nil, tostring(detail))
 			helpers.assert_eq(committed, true)
 			helpers.assert_eq(lock_calls, 2,
 				"distinct destinations must retain independent native lock owners")
 			helpers.assert_eq(released, true, tostring(release_err))
-			helpers.assert_eq(group.routes[1].resolved < group.routes[2].resolved, true,
+			-- The order is the lock key's, which every cooperating writer derives alike.
+			helpers.assert_eq(group.routes[1].lock_path, fixture.write_lock_path(group.routes[1].resolved))
+			helpers.assert_eq(group.routes[1].lock_path < group.routes[2].lock_path, true,
 				"distinct logical lock keys must keep a deterministic acquisition order")
 		end)
 	end)
@@ -101,7 +103,7 @@ helpers.describe("adapters.file_system: cooperative writer lock", function()
 		with_fixture(function(fixture)
 			local path = os.tmpname():gsub("\\", "/")
 			local alias = dot_alias(fixture, path)
-			local lock_path = path .. fixture.WRITE_LOCK_SUFFIX
+			local lock_path = fixture.write_lock_path(path)
 			os.remove(path)
 			os.remove(lock_path)
 			local lock_calls = 0
@@ -154,7 +156,7 @@ helpers.describe("adapters.file_system: cooperative writer lock", function()
 
 	local function run_nested_competitor(fixture, use_unconditional_writer)
 		local path = os.tmpname():gsub("\\", "/")
-		local lock_path = path .. fixture.WRITE_LOCK_SUFFIX
+		local lock_path = fixture.write_lock_path(path)
 		os.remove(path)
 		os.remove(lock_path)
 		seed(path, "v0")
@@ -255,7 +257,7 @@ helpers.describe("adapters.file_system: cooperative writer lock", function()
 	helpers.it("serializes create-only publication against an absent-source conditional writer", function()
 		with_fixture(function(fixture)
 			local path = os.tmpname():gsub("\\", "/")
-			local lock_path = path .. fixture.WRITE_LOCK_SUFFIX
+			local lock_path = fixture.write_lock_path(path)
 			os.remove(path)
 			os.remove(lock_path)
 
@@ -324,7 +326,7 @@ helpers.describe("adapters.file_system: cooperative writer lock", function()
 	helpers.it("checks the expected source only after lock acquisition and releases after rename", function()
 		with_fixture(function(fixture)
 			local path = os.tmpname():gsub("\\", "/")
-			local lock_path = path .. fixture.WRITE_LOCK_SUFFIX
+			local lock_path = fixture.write_lock_path(path)
 			os.remove(path)
 			os.remove(lock_path)
 			seed(path, "v0")
@@ -389,7 +391,7 @@ helpers.describe("adapters.file_system: cooperative writer lock", function()
 	helpers.it("releases after rename failure so the next cooperating writer can progress", function()
 		with_fixture(function(fixture)
 			local path = os.tmpname():gsub("\\", "/")
-			local lock_path = path .. fixture.WRITE_LOCK_SUFFIX
+			local lock_path = fixture.write_lock_path(path)
 			os.remove(path)
 			os.remove(lock_path)
 			seed(path, "old")
@@ -447,7 +449,7 @@ helpers.describe("adapters.file_system: cooperative writer lock", function()
 	helpers.it("keeps one stable regular lock inode and rejects a directory at that pathname", function()
 		with_fixture(function(fixture)
 			local path = os.tmpname():gsub("\\", "/")
-			local lock_path = path .. fixture.WRITE_LOCK_SUFFIX
+			local lock_path = fixture.write_lock_path(path)
 			os.remove(path)
 			os.remove(lock_path)
 			local adapter = fixture.make_adapter()
@@ -469,7 +471,7 @@ helpers.describe("adapters.file_system: cooperative writer lock", function()
 			os.remove(lock_path)
 
 			local directory_target = os.tmpname():gsub("\\", "/")
-			local directory_lock = directory_target .. fixture.WRITE_LOCK_SUFFIX
+			local directory_lock = fixture.write_lock_path(directory_target)
 			os.remove(directory_target)
 			os.remove(directory_lock)
 			assert(fixture.HOST_MKDIR(directory_lock))
