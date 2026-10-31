@@ -111,3 +111,36 @@ _LAAA_Unfilled() {
 	} finally LLM_API_PROVIDERS := Prior
 }
 Test("Windows API requests: an unfilled per-account address is refused", _LAAA_Unfilled)
+
+
+
+
+
+; =========================================
+; =========================================
+; ======= 3/ Access-token providers =======
+; =========================================
+; =========================================
+
+; macOS and Linux exchange the key of a provider declaring an auth block
+; (test_api_access_token.lua); the Windows driver refuses it with a reason.
+_LAAA_TokenExchange() {
+	global LLM_API_PROVIDERS, _LLM_Menu
+	Form := _WAA_Form("openai")
+	try {
+		Providers := LLM_Menu_DeepClone(LLM_API_PROVIDERS)
+		Providers["ibm_fixture"] := Map("Label", "IBM fixture", "BaseUrl", "https://us-south.ml.cloud.ibm.com/ml/gateway/v1",
+			"DefaultModel", "", "Format", "openai", "ModelExtras", Map(), "ThinkingDialect", Map(), "TokenExchange", true)
+		LLM_API_PROVIDERS := Providers
+		Form.Answers := ["ibm_fixture", "unused", "unused", "unused"]
+		AssertFalse(Form.Run(), "the form refuses the provider")
+		AssertEqual(1, Form.Inputs.Length, "nothing is asked after the provider")
+		AssertEqual(1, Form.Notices.Length)
+		AssertEqual(t("menu.llm.api_provider_token_exchange_unavailable"), Form.Notices[1])
+		Form.AssertNoSave()
+		AssertEqual("", _LLMRemoteResolveEntry(Map("Provider", "ibm_fixture",
+			"BaseUrl", "https://us-south.ml.cloud.ibm.com/ml/gateway/v1", "Token", "ibm-api-key", "Model", "m")),
+			"the stored key is never sent as Bearer")
+	} finally Form.Restore()
+}
+Test("Windows API Add: an access-token provider is refused with its reason", _LAAA_TokenExchange)

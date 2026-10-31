@@ -1764,6 +1764,7 @@
 	"menu.llm.api_prompt_provider": "Identificador de proveedor ({1}):",
 	"menu.llm.api_prompt_token": "Token / clave de API (oculto):",
 	"menu.llm.api_prompt_url": "URL base:",
+	"menu.llm.api_provider_token_exchange_unavailable": "Este proveedor cambia su clave por un token de acceso de corta duración, algo que la versión de Windows aún no sabe hacer: añádalo en macOS o Linux.",
 	"menu.llm.api_providers_unavailable": "No se pudo cargar la lista de proveedores de API, por lo que no se puede añadir ninguna entrada. Comprueba que api_providers.json existe y es válido.",
 	"menu.llm.api_remove_confirm_body": "El token API guardado se eliminará permanentemente.",
 	"menu.llm.api_remove_confirm_title": "¿Eliminar entrada API \"%s\"?",
