@@ -855,27 +855,28 @@ Added October 22 (from the agents' reports; details in their commits):
 - [ ] **106.** [PHYS-M] Genuine Apple Shortcuts invocation with bounded cancellation; only the refusal-in-time probe
       exists (116). A genuine run needs a shortcut the maintainer owns and names; `field_toolchain`'s
       `shortcuts_list` and `shortcuts_refusal` are what a program can prove.
-- [ ] **97/98.** [CODE] Native physical-position capture and all-owner collision admission. The
-      MediaStore device contract now exists (`_shared/lua/keystats/media_identity.lua`: `device` is a
-      decimal u64 string, as macOS fills it), so the Linux identity is no longer blocked on policy;
-      the candidate is the owned descriptor's `st_rdev` from `fstat`, never a path or event-node
-      number. Not added on 30 October because nothing on Linux would read it yet: no Linux producer
-      calls `sqlite_writer.insert_media_events`, and `keyboard_hook.capture_position` hands the editor
-      `native_code` and `mods` only. Decide the consumer first (Linux media-key metrics, or a
-      per-device physical binding), then add the identity with it. macOS (checked 31 October): the
-      consumers exist (`keystats/media_store` replays through `aggregator/core.media_policy`, the
-      shortcut editor reads `physical_capture.position_available`), but the only producer of positions
-      and media events is `modules/keystats/physical_capture.lua`, which only the owned Karabiner
-      runtime starts (`adapters/runtime_capture_port.lua`, dormant behind
-      `[karabiner] runtime = "owned"`): native capture on macOS is item 31's "production capture owner", not separate work.
-      The star setting migration is dropped (no users, no legacy migration).
+- [ ] **97/98.** [CODE] Native physical-position capture and all-owner collision admission. Linux has its first
+      consumer: media-key metrics. The keyboard hook names each event's source, `evdev_reader.device_identity` reads
+      the owned descriptor's `st_rdev` through `fstat` (never a path or an event-node number), and keystats records
+      play/pause, next, previous and brightness as `physical_media_press`/`release` with that device, flushed with
+      their derived rows in the session flush (`sqlite_writer` media family), never on the numeric heatmap. Left:
+      `keyboard_hook.capture_position` still hands the shortcut editor `native_code` and `mods` only (a per-device
+      physical binding, item 108). macOS (checked 31 October): the consumers exist (`keystats/media_store` replays
+      through `aggregator/core.media_policy`, the shortcut editor reads `physical_capture.position_available`), but
+      the only producer of positions and media events is `modules/keystats/physical_capture.lua`, which only the
+      owned Karabiner runtime starts (`adapters/runtime_capture_port.lua`, dormant behind
+      `[karabiner] runtime = "owned"`): native capture on macOS is item 31's "production capture owner", not separate
+      work. The star setting migration is dropped (no users, no legacy migration).
 - [ ] **107.** [PHYS-L] Forced number-row output is settled by design on macOS and Linux: both apply the
       number-row ordering and edge keys by rebuilding the layout, not by retyping keys in a hook (macOS
       fc5d3a11df, `number_row_live.lua` and `layout_rows_build.lua`, proved by the field run's
       `field_layout_rows`; Linux `docs/design/linux-number-row-runtime.md`), so the hook's input+XI2+writer
       join is deliberately unreachable (nothing passes `numberRowMode`) and is not owed. Left for Linux only:
       mutter and KWin reloading a `~/.config/xkb` layout (W1 to W4 of that note).
-- [ ] **108.** [CODE] Item 97's collision/source/modifier/output joins.
+- [ ] **108.** [CODE] The collision, source, modifier and output joins of a per-device physical binding (a shortcut
+      bound to a key position on one device). The Linux media-key metrics, the device identity's first consumer
+      (item 97), count a key and bind nothing, so they need none of these joins; they are owed only once a per-device
+      binding is designed.
 - [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible Variables/KeyHistory snapshot.
 - [ ] **L115.** [CODE] Provider error envelope guard: not reproducible under WSL LuaJIT (6 of 6 runs pass); leave it
       or close it (maintainer).
