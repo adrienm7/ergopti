@@ -132,12 +132,18 @@ local function load_coordinator(options)
 		end,
 		fatal_exit_code = 70,
 		schedule = function(delay, callback)
+			-- The reload deadline has its own bound; it never joins the call order
+			if delay == 30 then
+				calls.reload_deadline_callback = callback
+				return { stop = function() calls.reload_deadline_stopped = true; return true end }
+			end
 			calls.watchdog_delay = delay
 			calls.watchdog_callback = callback
 			append("arm-watchdog")
 			return { stop = function() calls.watchdog_stopped = true; return true end }
 		end,
 		user_exit_deadline_seconds = 12,
+		reload_deadline_seconds = 30,
 		mark_reload = function()
 			calls.marks = calls.marks + 1
 			append("mark-reload")
@@ -866,5 +872,68 @@ helpers.describe("controlled termination coordinator", function()
 		raising_calls.lease_callback(true, "stopped")
 		helpers.assert_eq(raising_calls.reloads, 1, "a failing breadcrumb never blocks the reload")
 		helpers.assert_eq(raising_calls.fatal_exits, 0)
+	end)
+
+	-- A reload whose fence never answered left the app up with its Karabiner
+	-- remaps revoked, forever: only a user quit had a deadline (reload-deadline).
+	helpers.it("reloads natively when a controlled reload's fence never settles (reload-deadline)", function()
+		local stages = {}
+		local coordinator, calls = load_coordinator({ record_stage = function(_, stage) stages[#stages + 1] = stage end })
+		helpers.assert_true(coordinator.request_reload("field_run_timed_reload", "argument"))
+		helpers.assert_eq(type(calls.reload_deadline_callback), "function", "the reload arms its own deadline")
+		helpers.assert_nil(calls.watchdog_callback, "the user-quit watchdog is not armed by a reload")
+		helpers.assert_eq(calls.reloads, 0)
+
+		calls.reload_deadline_callback()
+		helpers.assert_eq(calls.reloads, 1, "the stuck reload reloads natively")
+		helpers.assert_eq(calls.reload_arguments[1], "argument")
+		helpers.assert_eq(calls.marks, 1, "the next boot still knows it follows a reload")
+		helpers.assert_eq(calls.teardowns, 0, "no local teardown runs without the exact fence")
+		helpers.assert_eq(calls.fatal_exits, 0)
+		helpers.assert_true(not coordinator.is_pending())
+		helpers.assert_eq(stages[#stages - 1], "reload_deadline")
+		helpers.assert_eq(stages[#stages], "hs_reload_called")
+
+		-- The fence answering late is inert
+		calls.lease_callback(true, "late")
+		helpers.assert_eq(calls.reloads, 1)
+		helpers.assert_eq(calls.teardowns, 0)
+	end)
+
+	helpers.it("disarms the reload deadline once the reload settles, aborts or becomes an exit (reload-deadline)", function()
+		local settled, settled_calls = load_coordinator()
+		helpers.assert_true(settled.request_reload("menu"))
+		settled_calls.lease_callback(true, "stopped")
+		helpers.assert_eq(settled_calls.reloads, 1)
+		helpers.assert_true(settled_calls.reload_deadline_stopped == true)
+		settled_calls.reload_deadline_callback()
+		helpers.assert_eq(settled_calls.reloads, 1, "a late deadline after the reload is inert")
+
+		local aborted, aborted_calls = load_coordinator()
+		helpers.assert_true(aborted.request_reload("menu"))
+		aborted_calls.lease_callback(false, "refused")
+		helpers.assert_true(aborted_calls.reload_deadline_stopped == true)
+		aborted_calls.reload_deadline_callback()
+		helpers.assert_eq(aborted_calls.reloads, 0)
+
+		local upgraded, upgraded_calls = load_coordinator()
+		helpers.assert_true(upgraded.request_reload("menu"))
+		helpers.assert_true(upgraded.request_exit("quit", 0))
+		helpers.assert_true(upgraded_calls.reload_deadline_stopped == true)
+		upgraded_calls.reload_deadline_callback()
+		helpers.assert_eq(upgraded_calls.reloads, 0, "an exit is never turned back into a reload")
+		helpers.assert_true(upgraded.is_pending())
+	end)
+
+	helpers.it("refuses initialization without a positive reload deadline (reload-deadline)", function()
+		package.loaded["infra.termination_coordinator"] = nil
+		local coordinator = require("infra.termination_coordinator")
+		local noop = function() return true end
+		helpers.assert_eq(coordinator.init({
+			request_lease = noop, drain_input = noop, teardown = noop, begin_drain = noop,
+			finalize_teardown = noop, reload = noop, exit = noop, fatal_exit = noop,
+			mark_reload = noop, clear_reload = noop, schedule = noop, fatal_exit_code = 70,
+			user_exit_deadline_seconds = 12,
+		}), false)
 	end)
 end)
