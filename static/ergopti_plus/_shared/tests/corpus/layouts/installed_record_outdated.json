@@ -19,7 +19,7 @@
 		{
 			"id": "ergopti_v1",
 			"member": "\"ergopti_v1\" : {\"id\":\"ergopti_v1\",\"version\":\"1.0\"}",
-			"detail": "it has no verified checksum, version or size"
+			"detail": "it has no verified sha256 and version"
 		},
 		{
 			"id": "retired_scalar",
