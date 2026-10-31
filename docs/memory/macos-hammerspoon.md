@@ -1142,6 +1142,26 @@ because Hammerspoon's exit status 0 makes the launcher quit with a fatal exit.
 The Karabiner physical-key ledger keeps draining when metrics are disabled.
 Only process shutdown tears it down.
 
+### project-macos-ax-reads-unanswered-and-self
+
+Each Accessibility read an application leaves unanswered holds the main
+thread for the whole 0.5 s messaging timeout, so a reader that asks several
+in a row multiplies it (2026-10-31: 2515 ms for the tooltip caret, 1512 ms for
+the post-wake capture of loginwindow). Stop a cascade at the first unanswered
+read and go through `adapters/accessibility_permission` (`is_askable`,
+`is_unanswering`, `note_read`, `mark_unanswered`): one cooldown
+(`unresponsive_ax_backoff_ms`) shared by every reader. Reads of this process's
+own windows can wait out the timeout too, as its AX server answers on the
+waiting thread: use a native signal (a webview's `windowCallback`
+`focusChange`) once a first read proved the window.
+
+### project-macos-keylayout-numeric-references
+
+A generated `.keylayout` writes every XML-special and control character as a
+numeric reference (`&#x0026;`), as the shipped layouts do: the number-row build
+that wrote `&amp;` read back as typing nothing on that key on macOS
+(2026-10-31, key 26). `layouts/keylayout_rows.lua` `escape_attribute` owns it.
+
 ### project-macos-reload-during-git-pull
 
 Auto-reload watchers must debounce and hold reload while any bulk writer is
