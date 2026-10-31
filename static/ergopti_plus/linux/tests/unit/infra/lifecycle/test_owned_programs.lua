@@ -54,8 +54,43 @@ helpers.describe("owned_programs: the private runtime's programs only", function
 		package.loaded["logger.shim"], package.preload["logger.shim"] = loaded, preload
 		helpers.assert_true(ok, tostring(program))
 		helpers.assert_eq(program, "sqlite3")
-		helpers.assert_true(read("adapters/sqlite_process_worker.lua"):find('owned_programs").resolve("sqlite3")', 1, true) ~= nil,
-			"the worker must use the logging-free resolver")
+	end)
+
+	helpers.it("the SQLite helper process execs the program the logging-free resolver names (owned-runtimes-programs)", function()
+		-- The worker replaces itself through execvp: an ffi double records the
+		-- call, and an owned_programs double offers only resolve, so a worker
+		-- reaching the logging path() or a bare "sqlite3" fails here.
+		local execs, resolved = {}, {}
+		local fake_ffi = {
+			cdef = function() end,
+			cast = function(_, value) return value end,
+			new = function() return {} end,
+			C = {
+				prctl = function() return 0 end,
+				getppid = function() return 4242 end,
+				umask = function() return 0 end,
+				execvp = function(file, argv) execs[#execs + 1] = { file = file, database = argv[5] } return -1 end,
+			},
+		}
+		local names = { "ffi", "infra.private_sqlite_file", "infra.owned_programs", "adapters.sqlite_process_worker" }
+		local saved, saved_path = {}, package.path
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local ok, err = pcall(function()
+			package.loaded["ffi"] = fake_ffi
+			package.loaded["infra.private_sqlite_file"] = { admit = function() return true end, creation_mask = 63 }
+			package.loaded["infra.owned_programs"] = setmetatable({
+				resolve = function(name) resolved[#resolved + 1] = name return "/opt/runtime/bin/" .. name end,
+			}, { __index = function(_, key) error("the worker must not reach owned_programs." .. tostring(key)) end })
+			package.loaded["adapters.sqlite_process_worker"] = nil
+			local Worker = require("adapters.sqlite_process_worker")
+			return Worker.run("4242", "/private/keystats.db")
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		package.path = saved_path
+		helpers.assert_eq(ok, false, "a refused exec must raise")
+		helpers.assert_true(tostring(err):find("SQLite process replacement refused", 1, true) ~= nil, tostring(err))
+		helpers.assert_eq(resolved, { "sqlite3" })
+		helpers.assert_eq(execs, { { file = "/opt/runtime/bin/sqlite3", database = "/private/keystats.db" } })
 	end)
 
 	helpers.it("refuses a program the prefix does not carry and a relative prefix (owned-runtimes-programs)", function()
