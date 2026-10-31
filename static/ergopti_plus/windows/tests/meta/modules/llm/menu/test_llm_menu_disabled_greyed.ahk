@@ -200,7 +200,7 @@ _LMDG_ToggleRouteRefusesDecoy(Kind) {
 	else if Kind == "string-renderer"
 		Render := "Decoy() {`nAudit := '(`nif ItemType == " . Chr(34) . "toggle" . Chr(34) . " {`nItemCount += _MR_RenderToggle(Result, Item, ManifestKey, Commands, StateGetters)`n}`n)'`n}"
 	else if Kind == "wrong-target"
-		Build := StrReplace(Build, '"", Commands, StateGetters, StagedHandle, GroupDisabled)', '"", Commands, StateGetters, OtherHandle, GroupDisabled)')
+		Build := StrReplace(Build, 'ListProviders, Commands, StateGetters, StagedHandle, GroupDisabled)', 'ListProviders, Commands, StateGetters, OtherHandle, GroupDisabled)')
 	else if Kind == "early-return"
 		Build := StrReplace(Build, 'Commands["llm_toggle"] := LLM_Menu_OnToggle', 'if !_LLM_Menu["enabled"]`nreturn StagedHandle`nCommands["llm_toggle"] := LLM_Menu_OnToggle')
 	else if Kind == "comment-renderer"
