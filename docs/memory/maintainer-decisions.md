@@ -70,3 +70,17 @@ the first is decided and the second kept as `alternative`. WebView2 stays the
 Evergreen system runtime (2026-10-27). Edit the JSON, then run
 `node tools/codegen/codegen-owned-runtimes.cjs`; never hand-edit the generated
 tables of `docs/design/owned-runtimes.md`. Do not re-raise per-row choices.
+
+## One shared config template for the three drivers (2026-10-31, PAR-73)
+
+The default `config.toml` of the three drivers is generated once, in
+`_shared/_generated/config_template.toml`: a shared key appears once, a
+driver-only key or a default the drivers disagree on is written
+`platform.<driver>.<key>`, and each driver's table order is
+`[platform.<driver>] sections`. The `{windows,macos,linux}/_generated/config_template.toml`
+files stay committed as byte-exact projections
+(`tools/lib/config-template-projection.cjs`, proved by
+`test-config-template-shared.cjs`) because the .deb/.rpm, the macOS .app and
+the AHK smoke test ship or seed them. No driver reads a template at run time:
+the effective defaults come from the features manifest. Change them only
+through `npm run build:manifest`.

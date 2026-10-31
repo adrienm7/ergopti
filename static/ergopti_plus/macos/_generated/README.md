@@ -6,7 +6,7 @@ Run the corresponding npm script to regenerate.
 | File                    | Generator script         | Status                                        |
 | ----------------------- | ------------------------ | --------------------------------------------- |
 | `features_manifest.lua` | `npm run build:manifest` | ✅ Wired — read via `lib/manifest_reader.lua` |
-| `config_template.toml`  | `npm run build:manifest` | ⚠️ **No macOS runtime reader** — generated, schema-validated and shipped inside every `.app`, read by nothing. Only Windows copies a template on first boot (`windows/lib/first_boot.ahk`) |
+| `config_template.toml`  | `npm run build:manifest` | ⚠️ **No macOS runtime reader** — the macOS projection of `_shared/_generated/config_template.toml` (the default config of the three drivers, written once), schema-validated and shipped inside every `.app`; the field launch gate and the boot E2E seed a neutral config with it |
 
 There is **no** `terminators.lua` here. The terminator catalogue is generated once,
 shared, at `_shared/lua/keymap/terminators_catalogue.lua`, and this driver reaches it
