@@ -85,7 +85,7 @@ _LSMR_PausedActionsAndSearching() {
 	AssertTrue(Rows[3]["disabled"])
 	Options["sweeping"] := false
 	Rows := LocalServerMenuRows(Options)
-	AssertEqual("menu.llm.local_servers.none|LM Studio, llama.cpp", Rows[3]["label"])
+	AssertEqual("menu.llm.local_servers.none_detected", Rows[3]["label"])
 }
 Test("local server menu: pause suppresses actions and retains honest search status", _LSMR_PausedActionsAndSearching)
 
