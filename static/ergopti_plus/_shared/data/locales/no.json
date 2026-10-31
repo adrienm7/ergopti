@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "Oppstartsfeil: filen _generated/features_manifest.ahk mangler eller er skadet.\n\nKjør `npm run build:manifest` fra prosjektmappen og start skriptet på nytt.",
 	"startup.manifest_window_title": "manifest mangler",
 	"startup.native_logger_unavailable": "ErgoptiPlus kan ikke starte fordi den innebygde loggtjenesten ikke er tilgjengelig. Start ErgoptiPlus via programstarteren.",
+	"startup.winps_missing": "Fant ikke {3} {1}. Oppdateringer, lokal KI, diagnostikk og de andre funksjonene som bruker det, avvises til det er installert.",
+	"startup.winps_too_old": "{3} er for gammel ({2}): Ergopti+ krever {1}. Oppdateringer, lokal KI, diagnostikk og de andre funksjonene som bruker det, avvises til det er oppdatert.",
 	"system_actions.new_text_file_name": "Ny tekstfil",
 	"system_actions.no_disk_to_eject": "Ingen disk å løse ut.",
 	"system_actions.no_file_selected": "Ingen fil er valgt i filbehandleren.",

@@ -1798,6 +1798,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/infra/toml/test_parsetomlgroupconfig_missing_file_cache_key_mismatch.ahk
 #Include unit/modules/hotstrings/personal/test_per_entry_priority_divergence_cache_vs_toml.ahk
 #Include unit/adapters/shell_runner/test_plc_closure_callable.ahk
+#Include unit/adapters/shell_runner/test_win_ps_version_check.ahk
 #Include unit/modules/llm/servers/test_remote_parse_first_content_match.ahk
 #Include unit/modules/hotstrings/engine/test_stale_cache_survives_reset_and_pause.ahk
 #Include unit/modules/hotstrings/engine/test_time_activation_fails_open_on_missing_prev_char.ahk

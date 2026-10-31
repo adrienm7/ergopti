@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "שגיאת הפעלה: הקובץ _generated/features_manifest.ahk חסר או פגום.\n\nהפעל `npm run build:manifest` מתיקיית הפרויקט ולאחר מכן הפעל מחדש את הסקריפט.",
 	"startup.manifest_window_title": "manifest חסר",
 	"startup.native_logger_unavailable": "לא ניתן להפעיל את ErgoptiPlus מכיוון ששירות הרישום המקורי שלו אינו זמין. יש להפעיל את ErgoptiPlus דרך המשגר שלו.",
+	"startup.winps_missing": "{3} {1} לא נמצא. עדכונים, הבינה המלאכותית המקומית, האבחון ושאר התכונות שמשתמשות בו נדחים עד שיותקן.",
+	"startup.winps_too_old": "{3} ישן מדי ({2}): Ergopti+ דורש {1}. עדכונים, הבינה המלאכותית המקומית, האבחון ושאר התכונות שמשתמשות בו נדחים עד שיעודכן.",
 	"system_actions.new_text_file_name": "קובץ טקסט חדש",
 	"system_actions.no_disk_to_eject": "אין כונן להוצאה.",
 	"system_actions.no_file_selected": "לא נבחר אף קובץ במנהל הקבצים.",

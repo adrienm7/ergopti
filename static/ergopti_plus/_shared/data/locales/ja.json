@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "起動エラー：_generated/features_manifest.ahk ファイルが見つからないか破損しています。\n\nプロジェクトディレクトリで `npm run build:manifest` を実行し、スクリプトを再起動してください。",
 	"startup.manifest_window_title": "manifest が見つかりません",
 	"startup.native_logger_unavailable": "ネイティブのログ記録サービスを利用できないため、ErgoptiPlus を起動できません。専用ランチャーから ErgoptiPlus を起動してください。",
+	"startup.winps_missing": "{3} {1} が見つかりません。インストールされるまで、更新、ローカル AI、診断など、これを使う機能は拒否されます。",
+	"startup.winps_too_old": "{3} が古すぎます ({2})。Ergopti+ には {1} が必要です。更新されるまで、更新、ローカル AI、診断など、これを使う機能は拒否されます。",
 	"system_actions.new_text_file_name": "新規テキストファイル",
 	"system_actions.no_disk_to_eject": "取り出せるディスクはありません。",
 	"system_actions.no_file_selected": "ファイルマネージャーでファイルが選択されていません。",

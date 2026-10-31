@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "Startup error: the _generated/features_manifest.ahk file is missing or corrupted.\n\nRun `npm run build:manifest` from the project directory, then restart the script.",
 	"startup.manifest_window_title": "manifest missing",
 	"startup.native_logger_unavailable": "ErgoptiPlus cannot start because its native logging worker is unavailable. Start ErgoptiPlus through its launcher.",
+	"startup.winps_missing": "{3} {1} was not found. Updates, the local AI, diagnostics and the other features that use it are refused until it is installed.",
+	"startup.winps_too_old": "{3} is too old ({2}): Ergopti+ needs {1}. Updates, the local AI, diagnostics and the other features that use it are refused until it is updated.",
 	"system_actions.new_text_file_name": "New text file",
 	"system_actions.no_disk_to_eject": "No disk to eject.",
 	"system_actions.no_file_selected": "No file is selected in the file manager.",

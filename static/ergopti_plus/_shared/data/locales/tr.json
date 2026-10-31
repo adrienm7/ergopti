@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "Başlangıç hatası: _generated/features_manifest.ahk dosyası eksik veya bozuk.\n\nProje dizininden `npm run build:manifest` komutunu çalıştırın ve betiği yeniden başlatın.",
 	"startup.manifest_window_title": "manifest eksik",
 	"startup.native_logger_unavailable": "Yerel günlük hizmeti kullanılamadığı için ErgoptiPlus başlatılamıyor. ErgoptiPlus'ı kendi başlatıcısı üzerinden başlatın.",
+	"startup.winps_missing": "{3} {1} bulunamadı. Yüklenene kadar güncellemeler, yerel yapay zekâ, tanılama ve onu kullanan diğer özellikler reddedilir.",
+	"startup.winps_too_old": "{3} çok eski ({2}): Ergopti+ için {1} gerekir. Güncellenene kadar güncellemeler, yerel yapay zekâ, tanılama ve onu kullanan diğer özellikler reddedilir.",
 	"system_actions.new_text_file_name": "Yeni metin dosyası",
 	"system_actions.no_disk_to_eject": "Çıkarılacak disk yok.",
 	"system_actions.no_file_selected": "Dosya yöneticisinde seçili dosya yok.",

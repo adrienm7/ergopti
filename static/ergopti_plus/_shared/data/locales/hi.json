@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "स्टार्टअप त्रुटि: _generated/features_manifest.ahk फ़ाइल अनुपस्थित या दूषित है।\n\nप्रोजेक्ट डायरेक्टरी से `npm run build:manifest` चलाएं, फिर स्क्रिप्ट को पुनः प्रारंभ करें।",
 	"startup.manifest_window_title": "manifest अनुपस्थित",
 	"startup.native_logger_unavailable": "ErgoptiPlus शुरू नहीं हो सकता क्योंकि उसकी मूल लॉगिंग सेवा उपलब्ध नहीं है। ErgoptiPlus को उसके लॉन्चर से शुरू करें।",
+	"startup.winps_missing": "{3} {1} नहीं मिला। इंस्टॉल होने तक अपडेट, स्थानीय AI, डायग्नोस्टिक्स और इसका उपयोग करने वाली अन्य सुविधाएँ अस्वीकार की जाती हैं।",
+	"startup.winps_too_old": "{3} बहुत पुराना है ({2}): Ergopti+ को {1} चाहिए। अपडेट होने तक अपडेट, स्थानीय AI, डायग्नोस्टिक्स और इसका उपयोग करने वाली अन्य सुविधाएँ अस्वीकार की जाती हैं।",
 	"system_actions.new_text_file_name": "नई टेक्स्ट फ़ाइल",
 	"system_actions.no_disk_to_eject": "निकालने के लिए कोई डिस्क नहीं है।",
 	"system_actions.no_file_selected": "फ़ाइल प्रबंधक में कोई फ़ाइल चयनित नहीं है।",

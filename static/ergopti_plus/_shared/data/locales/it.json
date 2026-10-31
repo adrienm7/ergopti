@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "Errore di avvio: il file _generated/features_manifest.ahk è assente o corrotto.\n\nEsegui `npm run build:manifest` dalla directory del progetto, poi riavvia lo script.",
 	"startup.manifest_window_title": "manifest assente",
 	"startup.native_logger_unavailable": "ErgoptiPlus non può avviarsi perché il servizio di registrazione nativo non è disponibile. Avvia ErgoptiPlus tramite il suo launcher.",
+	"startup.winps_missing": "{3} {1} non è stato trovato. Gli aggiornamenti, l’IA locale, la diagnostica e le altre funzioni che lo usano sono rifiutati finché non viene installato.",
+	"startup.winps_too_old": "{3} è troppo vecchio ({2}): Ergopti+ richiede {1}. Gli aggiornamenti, l’IA locale, la diagnostica e le altre funzioni che lo usano sono rifiutati finché non viene aggiornato.",
 	"system_actions.new_text_file_name": "Nuovo file di testo",
 	"system_actions.no_disk_to_eject": "Nessun disco da espellere.",
 	"system_actions.no_file_selected": "Nessun file è selezionato nel gestore di file.",

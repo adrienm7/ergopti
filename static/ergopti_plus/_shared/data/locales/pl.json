@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "Błąd uruchomienia: plik _generated/features_manifest.ahk jest nieobecny lub uszkodzony.\n\nUruchom `npm run build:manifest` z katalogu projektu i zrestartuj skrypt.",
 	"startup.manifest_window_title": "brak manifestu",
 	"startup.native_logger_unavailable": "Nie można uruchomić ErgoptiPlus, ponieważ natywna usługa rejestrowania jest niedostępna. Uruchom ErgoptiPlus za pomocą jego programu uruchamiającego.",
+	"startup.winps_missing": "Nie znaleziono {3} {1}. Aktualizacje, lokalna AI, diagnostyka i inne funkcje, które go używają, są odrzucane do czasu jego instalacji.",
+	"startup.winps_too_old": "{3} jest za stary ({2}): Ergopti+ wymaga {1}. Aktualizacje, lokalna AI, diagnostyka i inne funkcje, które go używają, są odrzucane do czasu jego aktualizacji.",
 	"system_actions.new_text_file_name": "Nowy plik tekstowy",
 	"system_actions.no_disk_to_eject": "Brak dysków do wysunięcia.",
 	"system_actions.no_file_selected": "W menedżerze plików nie zaznaczono żadnego pliku.",
