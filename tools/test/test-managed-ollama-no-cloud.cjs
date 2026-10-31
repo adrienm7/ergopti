@@ -92,7 +92,7 @@ check(
 			'the CLI must share the actual serve environment owner'
 		);
 		const collector = read('tools/test/test-managed-ollama-protocol.cjs');
-		assert.match(collector, /\['test_ollama_model_pull\.ps1', 8\]/);
+		assert.match(collector, /\['test_ollama_model_pull\.ps1', 10\]/);
 		assert.match(collector, /\['test_ollama_model_environment\.ps1', 3\]/);
 		assert.equal(collector.split('\n\treceiveWindowsModelEnvironment();').length - 1, 3);
 	}
