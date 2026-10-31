@@ -95,6 +95,12 @@ _GBA_HandlerMap() {
 		Handlers[C[1]] := C[2]
 		Pos := Found + StrLen(C[0])
 	}
+	; Since the generated command ids, a row is keyed by its constant rather than a literal.
+	Pos := 1
+	while (Found := RegExMatch(Body, 'MenuCommand\.([A-Z0-9_]+)\s*,\s*\(\*\)\s*=>\s*(\w+)\(', &C, Pos)) {
+		Handlers[MenuCommand.%C[1]%] := C[2]
+		Pos := Found + StrLen(C[0])
+	}
 	return Handlers
 }
 
