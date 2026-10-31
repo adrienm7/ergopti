@@ -129,9 +129,17 @@ helpers.describe("prediction tooltip probe", function()
 		helpers.assert_eq(steps.prediction_shown.value, "tooltip_not_shown")
 	end)
 
-	helpers.it("fails predictions off and a model not on this Mac without typing", function()
+	helpers.it("skips predictions the user turned off without typing (llm-disabled-is-skip)", function()
+		local world = { readiness = { enabled = false, installed = false, backend = "mlx" }, typed = typed_as("") }
+		local steps, result = run("prediction_tooltip", world)
+		helpers.assert_true(result.passed, "a user's choice to turn predictions off is not a defect")
+		helpers.assert_eq(steps.prediction_ready.state, "skip")
+		helpers.assert_eq(steps.prediction_ready.value, "llm_disabled")
+		helpers.assert_nil(world.keys, "nothing is typed when predictions are off")
+	end)
+
+	helpers.it("fails a model not on this Mac without typing", function()
 		for _, case in ipairs({
-			{ readiness = { enabled = false, installed = false, backend = "ollama" }, code = "llm_disabled" },
 			{ readiness = { enabled = true, installed = false, backend = "api" }, code = "no_installed_model" },
 		}) do
 			local world = { readiness = case.readiness, typed = typed_as("") }

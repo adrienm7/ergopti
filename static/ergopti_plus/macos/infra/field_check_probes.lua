@@ -1115,13 +1115,15 @@ end
 --- model already installed (nothing is started or downloaded), the step's own
 --- text is typed as selftest keys into the scratch field and the prediction
 --- tooltip must show; the time from the last key to the tooltip is named.
---- Predictions off, a model that is not on this Mac and a tooltip that never
---- showed each fail with their own code.
+--- Predictions the user turned off skip with `llm_disabled`: the check never
+--- turns them on, since that would start a model the run promises not to load.
+--- A model that is not on this Mac and a tooltip that never showed each fail
+--- with their own code.
 function M.prediction_tooltip(ports, report, finish)
 	ports.prediction_readiness(function(facts)
 		report.step("prediction_backend", STATE.info, facts.backend or "unknown")
 		if not facts.enabled then
-			report.step("prediction_ready", STATE.fail, "llm_disabled")
+			report.step("prediction_ready", STATE.skip, "llm_disabled")
 			return finish()
 		end
 		if not facts.installed then
