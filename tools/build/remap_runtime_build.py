@@ -1252,6 +1252,23 @@ _SIGNED_PRODUCTS = (
 )
 
 
+def leaf_extraction_command(prefix, architecture, target):
+    """Return the codesign command writing a slice's certificates as prefix0, prefix1, ...
+
+    codesign takes the optional prefix only attached with "="; given as its
+    own argument it is read as a second target (run 41249928898: "No such
+    file or directory").
+    """
+    return [
+        "/usr/bin/codesign",
+        "--display",
+        "--extract-certificates=" + str(prefix),
+        "--architecture",
+        architecture,
+        str(target),
+    ]
+
+
 def _signing_targets(destination, executable):
     """Return each signing level's (path, resource seal it may write).
 
@@ -1898,15 +1915,7 @@ class _SigningSink(_PreparationSink):
                             require(not os.path.lexists(work / (prefix + "0")), "signed_collision")
                             phase(
                                 label + "_" + architecture + "_leaf",
-                                [
-                                    "/usr/bin/codesign",
-                                    "--display",
-                                    "--extract-certificates",
-                                    str(work / prefix),
-                                    "--architecture",
-                                    architecture,
-                                    target,
-                                ],
+                                leaf_extraction_command(work / prefix, architecture, target),
                                 certificate=prefix + "0",
                             )
                 boundary()
