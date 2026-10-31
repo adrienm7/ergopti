@@ -197,10 +197,10 @@ jobs:
       # every 30 s. A hosted runner cannot fit the 300 s Mac calibration (the
       # core translation unit alone exceeds two minutes), so this lane selects
       # the hosted runner deadline (remap_runtime_build.py
-      # HOSTED_RUNNER_SECONDS, 40 min). The step timeout is only a backstop.
+      # HOSTED_RUNNER_SECONDS, 60 min). The step timeout is only a backstop.
       - name: Build, sign and seal the owned runtime in its installer helper
         working-directory: ergopti
-        timeout-minutes: 50
+        timeout-minutes: 70
         env:
           ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN: ${{ github.token }}
           PYTHONUNBUFFERED: '1'
