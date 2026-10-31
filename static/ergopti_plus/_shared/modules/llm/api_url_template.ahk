@@ -13,9 +13,6 @@
 
 #Requires AutoHotkey v2.0
 
-; Longest value one placeholder takes: a DNS name.
-global API_URL_TEMPLATE_MAX_VALUE_LENGTH := 253
-
 
 
 
@@ -25,6 +22,15 @@ global API_URL_TEMPLATE_MAX_VALUE_LENGTH := 253
 ; ======= 1/ Public API ===========
 ; =================================
 ; =================================
+
+/**
+ * The longest value one placeholder takes: a DNS name. A function, so it
+ * holds whatever the include order of the driver or the suite.
+ * @returns {Integer}
+ */
+ApiUrlTemplateMaxValueLength() {
+	return 253
+}
 
 /**
  * Whether an address still holds a placeholder: such an address never reaches
@@ -66,8 +72,7 @@ ApiUrlTemplateFields(Template) {
  * @returns {Boolean}
  */
 ApiUrlTemplateValidValue(Value) {
-	global API_URL_TEMPLATE_MAX_VALUE_LENGTH
-	return (Value is String) && StrLen(Value) > 0 && StrLen(Value) <= API_URL_TEMPLATE_MAX_VALUE_LENGTH
+	return (Value is String) && StrLen(Value) > 0 && StrLen(Value) <= ApiUrlTemplateMaxValueLength()
 		&& RegExMatch(Value, "^[A-Za-z0-9][A-Za-z0-9._-]*$") > 0
 }
 

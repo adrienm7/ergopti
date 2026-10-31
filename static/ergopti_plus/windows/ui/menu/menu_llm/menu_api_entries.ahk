@@ -282,16 +282,44 @@ _LLM_Menu_PromptApiEntry(EditId, Port := 0) {
 		return false
 	provider := LLM_API_PROVIDERS[provider_id]
 
-	; Step 2 — base URL (prefilled with the provider default).
-	def_url := existing != "" ? _LLM_MenuApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
-	ib := InputFn.Call(t("menu.llm.api_prompt_url"), t("menu.llm.api_window_title"),
-		"w520 h130", def_url)
-	if (ib.Result != "OK")
-		return false
-	if !Owner.Current(Receipt)
-		return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
-			"the originating private configuration changed during a prompt")
-	new_url := Trim(ib.Value)
+	; Step 2 — base URL (prefilled with the provider default). A new entry of a
+	; per-account provider asks one value per placeholder of its address instead.
+	Template := ApiUrlTemplateFields(provider["BaseUrl"])
+	if (existing == "" && Template["fields"].Length > 0) {
+		Values := Map()
+		for Name in Template["fields"] {
+			ib := InputFn.Call(t("menu.llm.api_prompt_field." . Name), t("menu.llm.api_window_title"),
+				"w520 h130", "")
+			if (ib.Result != "OK")
+				return false
+			if !Owner.Current(Receipt)
+				return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+					"the originating private configuration changed during a prompt")
+			Values[Name] := Trim(ib.Value)
+			if !ApiUrlTemplateValidValue(Values[Name]) {
+				LoggerError("LLM.menu", "API entry address refused: the '{1}' value cannot fill it.", Name)
+				Body := t("menu.llm.api_prompt_field_invalid"), Title := t("common.error_title")
+				if HasMethod(NotifyFn, "Call")
+					NotifyFn.Call(Body, Title)
+				else
+					Ui_MsgBox(Body, Title, "Icon!")
+				return false
+			}
+		}
+		new_url := ApiUrlTemplateExpand(provider["BaseUrl"], Values)["url"]
+		LoggerInfo("LLM.menu", "API entry address filled for provider '{1}' ({2} account field(s)).",
+			provider_id, Template["fields"].Length)
+	} else {
+		def_url := existing != "" ? _LLM_MenuApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
+		ib := InputFn.Call(t("menu.llm.api_prompt_url"), t("menu.llm.api_window_title"),
+			"w520 h130", def_url)
+		if (ib.Result != "OK")
+			return false
+		if !Owner.Current(Receipt)
+			return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+				"the originating private configuration changed during a prompt")
+		new_url := Trim(ib.Value)
+	}
 
 	; Step 3 — token. InputBox does not natively mask, so we use the Hide
 	; flag (HIDE) so the cleartext doesn't sit on screen / clipboard.
