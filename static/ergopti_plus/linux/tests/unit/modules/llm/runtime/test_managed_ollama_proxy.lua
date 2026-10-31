@@ -7,7 +7,8 @@
 --- real shared route plan and origin inventory, and a controlled system lookup:
 --- the PAC-only network that refused every pull, the blob host a PAC sends
 --- direct, two relays the daemon cannot hold, the user-exported proxy that must
---- stay untouched, and each refusal.
+--- stay untouched, the user's proxy override (through the real policy binding)
+--- and each refusal.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -37,7 +38,7 @@ local function world(options)
 	local Proxy = helpers.load_module("modules.llm.managed_ollama_proxy")
 	w.module = Proxy
 	w.port = Proxy.new({
-		policy = policy(), environment = function() return w.rows end, timeout_ms = 3000, owner = "test-owner",
+		policy = w.policy or policy(), environment = function() return w.rows end, timeout_ms = 3000, owner = "test-owner",
 		origins = w.origins or ORIGINS,
 		lookup = function(url, lookup_options, callback)
 			w.lookups = w.lookups + 1
@@ -330,4 +331,67 @@ it("no origin URL and no proxy ever reach the log", function()
 			and not line:find("secret", 1, true) and not line:find("leak", 1, true)
 			and not line:find(BLOB:gsub("^https://", ""), 1, true), line)
 	end
+end)
+
+--- The real Linux policy binding over a stubbed storage holding `stored`.
+local function bound_policy(stored)
+	local saved = { storage = package.loaded["adapters.storage"], binding = package.loaded["infra.proxy_policy"] }
+	package.loaded["adapters.storage"] = { get = function(key, default)
+		if key == "network.proxy_override" then return stored end
+		return default
+	end }
+	package.loaded["infra.proxy_policy"] = nil
+	local active = assert(require("infra.proxy_policy").load())
+	return active, function()
+		package.loaded["adapters.storage"], package.loaded["infra.proxy_policy"] = saved.storage, saved.binding
+	end
+end
+
+it("a relay override becomes the daemon relay, over an exported one, with no lookup", function()
+	local active, restore = bound_policy("http://override.corp.example:8080")
+	local ok, failure = pcall(function()
+		local w = world({ policy = active, rows = { "PATH=/usr/bin", "HTTPS_PROXY=http://exported.example:3128" },
+			receipt = { ok = true, proxies = { "http://pac.corp.example:3128" } } })
+		local result = w:run()
+		eq(result.ok, true)
+		eq(#result.environment, 1)
+		eq(result.environment[1], "HTTPS_PROXY=http://override.corp.example:8080")
+		eq(w.lookups, 0)
+	end)
+	restore()
+	assert(ok, failure)
+end)
+
+it("a direct override bypasses every inherited relay, with no lookup", function()
+	local active, restore = bound_policy("direct")
+	local ok, failure = pcall(function()
+		local w = world({ policy = active, rows = { "PATH=/usr/bin", "HTTPS_PROXY=http://exported.example:3128" } })
+		local result = w:run()
+		eq(result.ok, true)
+		eq(table.concat(result.environment, " "), "NO_PROXY=* no_proxy=*")
+		eq(w.lookups, 0)
+	end)
+	restore()
+	assert(ok, failure)
+end)
+
+it("an automatic override keeps the PAC lookup, and an invalid one refuses the start", function()
+	local active, restore = bound_policy("")
+	local ok, failure = pcall(function()
+		local w = world({ policy = active, receipt = { ok = true, proxies = { "http://pac.corp.example:3128" } } })
+		eq(w:run().environment[1], "HTTPS_PROXY=http://pac.corp.example:3128")
+		eq(w.lookups, #ORIGINS)
+	end)
+	restore()
+	assert(ok, failure)
+	active, restore = bound_policy("proxy.corp.example:3128")
+	ok, failure = pcall(function()
+		local w = world({ policy = active })
+		local result = w:run()
+		eq(result.ok, false)
+		eq(result.error, "proxy_route_invalid")
+		eq(w.lookups, 0)
+	end)
+	restore()
+	assert(ok, failure)
 end)

@@ -28,6 +28,9 @@
 ---    Any other failure or a refused plan refuses the start with a classified
 ---    reason instead of launching a daemon that would fail its first pull.
 --- 5. Logs name the outcome only: never an origin URL or the proxy.
+--- 6. The user's proxy override (network/proxy_override.lua, which the policy
+---    binding applies) wins over both: a relay becomes the daemon's
+---    HTTPS_PROXY, and "direct" bypasses every relay the daemon would inherit.
 --- ==============================================================================
 
 local M = {}
@@ -91,6 +94,20 @@ local function environment_of(plan, rows)
 	return environment
 end
 
+--- The daemon rows of a proxy override route: its relay for every origin, or
+--- a bypass of every relay the daemon would otherwise inherit.
+--- @param route table Override route of the shared policy.
+--- @param rows table Process environment rows.
+--- @return table environment
+local function override_environment(route, rows)
+	if route.mode == "direct" then
+		local environment = {}
+		for _, name in ipairs(M.BYPASS_VARIABLES) do environment[#environment + 1] = name .. "=*" end
+		return environment
+	end
+	return environment_of({ proxy = route.proxy, no_proxy = function() return "" end }, rows)
+end
+
 --- Builds the proxy port of the runtime repair.
 --- @param deps table { policy, lookup, environment, timeout_ms, owner, origins }
 --- @return function port Called as port(budget, authorized, done) -> operation.
@@ -146,6 +163,12 @@ function M.new(deps)
 		if not route then
 			Logger.error(LOG, "Managed Ollama proxy route refused: %s", tostring(route_error))
 			finish({ ok = false, error = "proxy_route_invalid" })
+			return operation
+		end
+		if route.source == "override" then
+			Logger.info(LOG, "Managed Ollama proxy lookup skipped: the proxy override names a %s route.",
+				route.mode == "direct" and "direct" or "relay")
+			finish({ ok = true, environment = override_environment(route, rows) })
 			return operation
 		end
 		if route.mode ~= "system" then

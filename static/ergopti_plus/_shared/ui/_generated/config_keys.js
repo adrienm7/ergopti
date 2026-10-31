@@ -503,6 +503,7 @@
 			PREVIEW_AUTOCORRECT_ENABLED: "preview_autocorrect_enabled",
 			PREVIEW_COLORED_TOOLTIPS: "preview_colored_tooltips",
 			PREVIEW_STAR_ENABLED: "preview_star_enabled",
+			PROXY_OVERRIDE: "proxy_override",
 			QUIT: "quit",
 			RELOAD: "reload",
 			RELOAD_USER_HOTSTRING_SOURCE: "reload_user_hotstring_source",

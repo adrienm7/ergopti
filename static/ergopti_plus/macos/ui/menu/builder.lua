@@ -824,6 +824,7 @@ function M.generate(ctx, menu_mods, actions)
 				[COMMAND.FIELD_CHECK_LEASE] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LEASE) end,
 				[COMMAND.FIELD_CHECK_OWNED_RUNTIME] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_OWNED_RUNTIME) end,
 				[COMMAND.FIELD_CHECK_NETWORK] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_NETWORK) end,
+				[COMMAND.PROXY_OVERRIDE] = function() require("ui.proxy_override").run() end,
 				[COMMAND.FIELD_CHECK_TOOLCHAIN] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_TOOLCHAIN) end,
 				[COMMAND.FIELD_CHECK_LOGIN_ITEMS] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LOGIN_ITEMS) end,
 				[COMMAND.FIELD_CHECK_KEY_ACCOUNTING] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_KEY_ACCOUNTING) end,

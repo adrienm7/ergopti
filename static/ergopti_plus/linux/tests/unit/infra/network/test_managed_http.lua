@@ -53,9 +53,10 @@ local function fresh()
 	end
 	local policy = assert(policy_module.new(data))
 	local route = policy.route
-	policy.route = function(...)
+	policy.route = function(url, environment)
 		if state.on_route then state.on_route() end
-		return route(...)
+		-- The Linux binding hands the stored proxy override as the third argument.
+		return route(url, environment, state.override)
 	end
 	local coordinator = assert(module.new({
 		policy = policy,
@@ -141,6 +142,38 @@ local function refused_proxy()
 			curl_exit = 7, http_status = 0, proxy_connect_status = 0 },
 	}
 end
+
+helpers.describe("managed_http: proxy override routes", function()
+	helpers.it("a relay override dispatches curl through it, over an exported relay, with no system lookup", function()
+		local coordinator, state = fresh()
+		state.environment.HTTPS_PROXY = "http://environment.invalid:81"
+		state.override = { mode = "relay", relay = "http://override.invalid:8080" }
+		start(coordinator)
+		helpers.assert_eq(#state.proxy, 0, "the override must skip the PAC lookup")
+		helpers.assert_eq(#state.curls, 1)
+		local selection = state.curls[1].options.proxy_selection
+		helpers.assert_eq(selection.mode, "selected")
+		helpers.assert_eq(selection.proxy, "http://override.invalid:8080")
+		helpers.assert_eq(selection.bypass, "environment")
+	end)
+
+	helpers.it("a direct override dispatches curl direct with no system lookup", function()
+		local coordinator, state = fresh()
+		state.override = { mode = "direct" }
+		start(coordinator)
+		helpers.assert_eq(#state.proxy, 0)
+		helpers.assert_eq(#state.curls, 1)
+		helpers.assert_eq(state.curls[1].options.proxy_selection.mode, "direct")
+	end)
+
+	helpers.it("an automatic override keeps the system lookup", function()
+		local coordinator, state = fresh()
+		state.override = { mode = "automatic" }
+		start(coordinator)
+		helpers.assert_eq(#state.proxy, 1)
+		helpers.assert_eq(#state.curls, 0)
+	end)
+end)
 
 helpers.describe("managed_http: actual public ownership sequencing", function()
 	for _, source in ipairs({ "proxy", "curl" }) do

@@ -759,8 +759,9 @@ Added October 22 (from the agents' reports; details in their commits):
       (`field_slow_lines`) and (3) (`field_local_servers`); (4) is in "macOS main-thread holds"; (7) is "PAC
       unusable: direct fallback". (5) the receiving-facts inverse oracle passes (100 tests, count fixed in
       25dd84e4) and the Go transport replays the six PAC/WPAD stages (49e77217); (6) the network check downloads
-      the pinned input and checks its SHA-256 (eae26498). Left [CODE]: (2) an explicit proxy override field; [CI]
-      the macOS lane compiles the Swift and runs the Go cells.
+      the pinned input and checks its SHA-256 (eae26498); (2) Debug > "Proxy for downloads…" overrides the route on
+      macOS and Linux (Windows half: [handoff](docs/tooling/windows-pc-agent-handoff.md)). Left [CI]: the macOS lane
+      compiles the Swift and runs the Go cells.
 - [ ] **Developer mode on the three OS (maintainer decision, 27 October).** [CODE] [PHYS-W] [PHYS-M] [PHYS-L] Done:
       macOS `bash tools/dev/run-macos-dev-app.sh`, Linux `bash tools/dev/run-linux-dev.sh`, Windows
       `tools\dev\run-windows-dev.ps1`; inventory in `docs/design/developer-mode.md`. Left: (1) [PHYS-W] the

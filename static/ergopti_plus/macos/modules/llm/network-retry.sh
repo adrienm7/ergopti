@@ -19,6 +19,34 @@
 # EX_CONFIG: the client cannot apply the configured native route. It does not
 # identify a PAC evaluation failure, and callers must not infer one from it.
 OPAQUE_NETWORK_REFUSAL_EXIT_CODE=78
+# The user's proxy override (Issue #101 point 2; the Lua prelude validates it
+# with network/proxy_override.lua and exports ERGOPTI_PROXY_OVERRIDE). It is
+# applied before the inherited route is captured, so a relay becomes the
+# explicit route every activation below keeps, and no PAC, WPAD or system lookup
+# runs; "direct" drops every relay and the activations never read the system
+# settings. Empty means automatic: nothing below changes. A set override is
+# exported so an installer script sourcing this file again sees the same one.
+OPAQUE_NETWORK_ROUTE_OVERRIDE=""
+case "${ERGOPTI_PROXY_OVERRIDE:-}" in
+	"") ;;
+	direct)
+		OPAQUE_NETWORK_ROUTE_OVERRIDE=direct
+		export ERGOPTI_PROXY_OVERRIDE
+		unset http_proxy HTTP_PROXY https_proxy HTTPS_PROXY all_proxy ALL_PROXY
+		export NO_PROXY="*" no_proxy="*"
+		;;
+	http://*|https://*|socks5://*|socks5h://*)
+		OPAQUE_NETWORK_ROUTE_OVERRIDE=relay
+		export ERGOPTI_PROXY_OVERRIDE
+		unset all_proxy ALL_PROXY
+		export https_proxy="$ERGOPTI_PROXY_OVERRIDE" HTTPS_PROXY="$ERGOPTI_PROXY_OVERRIDE"
+		export http_proxy="$ERGOPTI_PROXY_OVERRIDE" HTTP_PROXY="$ERGOPTI_PROXY_OVERRIDE"
+		;;
+	*)
+		# The prelude never exports another value; refuse rather than guess.
+		OPAQUE_NETWORK_ROUTE_OVERRIDE=invalid
+		;;
+esac
 # Capture the caller's route before the default/native-curl activation exports
 # system static values. Those exports cannot later become an explicit override.
 OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE="${https_proxy:-${HTTPS_PROXY:-${all_proxy:-${ALL_PROXY:-}}}}"
@@ -349,7 +377,10 @@ sha256_file_digest() {
 managed_bootstrap_download() {
 	local url="$1" output="$2" digest="$3" size="${4:-}" transfer="${5:-resumable}" replace_owner="${6:-}"
 	case "$transfer" in resilient|resumable) ;; *) return 64 ;; esac
-	if [ -n "${ERGOPTI_LAUNCHER_EXECUTABLE:-}" ] && [ -z "$OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE" ]; then
+	# The signed native worker reads the system routes itself: a proxy override
+	# (relay or direct) takes the environment-driven path below instead.
+	if [ -n "${ERGOPTI_LAUNCHER_EXECUTABLE:-}" ] && [ -z "$OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE" ] \
+		&& [ -z "$OPAQUE_NETWORK_ROUTE_OVERRIDE" ]; then
 		if [ ! -x "${ERGOPTI_BOOTSTRAP_PYTHON:-}" ]; then
 			if ! managed_bootstrap_launcher_available; then
 				log_error "The native download input owner is unavailable. No download was started."
@@ -600,6 +631,29 @@ opaque_automatic_mode_from_scutil() {
 	'
 }
 
+# Names the proxy override in the child log once per activation and refuses
+# an override value the prelude cannot have exported. A direct override also
+# completes the activation: the system settings are never read. The lines name
+# the kind of route only, never the relay.
+apply_route_override_activation() {
+	case "$OPAQUE_NETWORK_ROUTE_OVERRIDE" in
+		"") return 0 ;;
+		direct)
+			log_info "Downloads go direct: the proxy override in the Ergopti settings says so."
+			apply_client_network_environment
+			export NO_PROXY="*" no_proxy="*"
+			return 0 ;;
+		relay)
+			log_info "Downloads use the relay the proxy override in the Ergopti settings names."
+			return 0 ;;
+		*)
+			OPAQUE_NETWORK_FAILURE_PROVENANCE=verified
+			OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS=unavailable
+			log_error "The proxy override in the Ergopti settings is not valid. No download was started."
+			return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE" ;;
+	esac
+}
+
 # uv, HTTPX/HuggingFace and the owned Ollama Go daemon have no native,
 # per-request full-URL PAC adapter. An explicit HTTPS environment route remains
 # supported; a system automatic route must be refused before any child starts.
@@ -608,6 +662,8 @@ apply_opaque_system_network() {
 	local relay snapshot mode mode_name settings line
 	OPAQUE_NETWORK_FAILURE_PROVENANCE=""
 	OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS=""
+	apply_route_override_activation || return $?
+	if [ "$OPAQUE_NETWORK_ROUTE_OVERRIDE" = direct ]; then return 0; fi
 	relay="$OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE"
 	if [ -n "$relay" ]; then
 		# Go does not consume ALL_PROXY. Materialize the selected environment
@@ -680,6 +736,8 @@ apply_system_network() {
 		return $?
 	fi
 	local settings line
+	apply_route_override_activation || return $?
+	if [ "$OPAQUE_NETWORK_ROUTE_OVERRIDE" = direct ]; then return 0; fi
 	if [ -z "${http_proxy:-}${HTTP_PROXY:-}${https_proxy:-}${HTTPS_PROXY:-}${all_proxy:-}${ALL_PROXY:-}" ]; then
 		# Reuse the native getter; explicit inherited routes never trigger it.
 		settings="$(opaque_system_proxy_snapshot 2>/dev/null | system_network_from_scutil)" || settings=""

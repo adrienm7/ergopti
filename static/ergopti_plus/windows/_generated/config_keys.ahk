@@ -493,6 +493,7 @@ class MenuCommand {
 	static PREVIEW_AUTOCORRECT_ENABLED := "preview_autocorrect_enabled"
 	static PREVIEW_COLORED_TOOLTIPS := "preview_colored_tooltips"
 	static PREVIEW_STAR_ENABLED := "preview_star_enabled"
+	static PROXY_OVERRIDE := "proxy_override"
 	static QUIT := "quit"
 	static RELOAD := "reload"
 	static RELOAD_USER_HOTSTRING_SOURCE := "reload_user_hotstring_source"

@@ -1,0 +1,7 @@
+{
+	"_comment": "Single source of the proxy override setting (Issue #101 point 2): its storage key, its default (automatic: the system settings, PAC included) and the token that forces every download direct. Any other value is one relay URL, validated by network/route_plan.lua. Read by network/proxy_override.lua on macOS and Linux.",
+	"schema_version": 1,
+	"storage_key": "network.proxy_override",
+	"default": "",
+	"direct": "direct"
+}

@@ -83,6 +83,8 @@ local function _build_debug(ctx)
 		[COMMAND.COMPOSER_CHECK] = call_ctx("on_composer_check"),
 		-- Self-contained like the report rows: the check reads its own settings and ports
 		[COMMAND.FIELD_CHECK_NETWORK] = function() require("ui.field_check.network_check").run() end,
+		-- Self-contained too: the shared edit flow reads and writes its own setting
+		[COMMAND.PROXY_OVERRIDE] = function() require("ui.proxy_override").run() end,
 		-- Self-contained: the report reads the daemon state the webview manager
 		-- already holds, so the daemon supplies no callback for them
 		[require("config_keys").COMMAND.REPORT_BUG]      = function() require("ui.healthcheck.report").report_bug() end,
