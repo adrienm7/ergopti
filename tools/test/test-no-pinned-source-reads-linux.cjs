@@ -36,8 +36,11 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // through helpers.fresh_module instead of dofile or loadfile on its path.
 // 65 → 61 files and 122 → 116 reads: six describe labels named their module
 // by path; they name it by module now.
+// 61 → 61 files and 116 → 111 reads: the input_reader half of the keycode
+// single-source test loads the reader over a shared-table double instead of
+// reading its source.
 const BASELINE = 61;
-const READ_BASELINE = 116;
+const READ_BASELINE = 111;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];
