@@ -8,7 +8,11 @@
 # the revision the runtime is built from, and the accept test needs the Darwin
 # socket contract, so they compile on a hosted Mac against the exact upstream
 # checkout. The portable tests run in the shared lane (run-hs274-diagnostics-
-# tests.cjs). The signed runtime artifact job (WP5) joins this workflow later.
+# tests.cjs). The runtime-artifact job (WP5) builds, signs and packages the
+# owned runtime on a manual dispatch only, because it needs the stable signing
+# identity; it uploads the artifact and its pin, and the maintainer publishes
+# that exact file as the release asset the pin names
+# (tools/build/remap_runtime_publish.py apply writes the pin).
 
 name: Remap runtime build
 
@@ -17,6 +21,11 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      runtime_artifact:
+        description: Build, sign and package the owned runtime artifact (needs the signing secrets)
+        type: boolean
+        default: false
   push:
     branches:
       - dev
@@ -88,3 +97,121 @@ jobs:
           python3 "$diagnostics/hs274_raw_patch.py" "$GITHUB_WORKSPACE/upstream" --stream
           compile hs274-accept-test
           "$build/hs274-accept-test"
+
+  runtime-artifact:
+    name: 'Owned runtime artifact (signed, reproducible)'
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.runtime_artifact }}
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - name: Acquire the Ergopti sources
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          path: ergopti
+
+      # The runtime is signed with the stable self-signed identity the
+      # application uses, so the capture requirement pinned in the manifest
+      # (the launcher's certificate leaf) and the runtime's leaf are one.
+      - name: Import the stable signing identity
+        env:
+          MACOS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.MACOS_SIGNING_CERTIFICATE_BASE64 }}
+          MACOS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$MACOS_SIGNING_CERTIFICATE_BASE64" ] || [ -z "$MACOS_SIGNING_CERTIFICATE_PASSWORD" ]; then
+            echo "::error::the owned runtime is signed with the stable identity: MACOS_SIGNING_CERTIFICATE_BASE64 and _PASSWORD are required"
+            exit 1
+          fi
+          work="$RUNNER_TEMP/runtime-signing"
+          mkdir -m 700 "$work"
+          keychain="$work/runtime.keychain-db"
+          password="$(od -An -tx1 -N24 /dev/urandom | tr -d ' \n')"
+          (umask 077 && printf '%s' "$MACOS_SIGNING_CERTIFICATE_BASE64" | base64 --decode > "$work/identity.p12")
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$work/identity.p12" -k "$keychain" -f pkcs12 -P "$MACOS_SIGNING_CERTIFICATE_PASSWORD" -T /usr/bin/codesign > /dev/null
+          rm -f "$work/identity.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" > /dev/null
+          existing="$(security list-keychains -d user | sed -E 's/^[[:space:]]*"(.*)"$/\1/')"
+          # shellcheck disable=SC2086
+          security list-keychains -d user -s "$keychain" $existing
+          identity="$(security find-identity -p codesigning "$keychain" | sed -nE 's/^[[:space:]]*[0-9]+\)[[:space:]]+([0-9A-F]{40})[[:space:]].*$/\1/p' | sort -u)"
+          [ "$(printf '%s\n' "$identity" | grep -c .)" = 1 ] || { echo "::error::expected one code-signing identity, got: $identity"; exit 1; }
+          security find-certificate -a -p "$keychain" | openssl x509 -outform DER -out "$work/leaf.der"
+          chmod 600 "$keychain"
+          chmod 644 "$work/leaf.der"
+          leaf="$(shasum -a 1 "$work/leaf.der" | cut -d' ' -f1 | tr 'a-f' 'A-F')"
+          [ "$leaf" = "$identity" ] || { echo "::error::the exported leaf $leaf is not the signing identity $identity"; exit 1; }
+          echo "Signing the owned runtime with the stable certificate SHA-1 $identity"
+          {
+            echo "RUNTIME_SIGNING_IDENTITY=$identity"
+            echo "RUNTIME_SIGNING_KEYCHAIN=$keychain"
+            echo "RUNTIME_SIGNING_LEAF=$work/leaf.der"
+          } >> "$GITHUB_ENV"
+
+      - name: Build and sign the owned runtime
+        working-directory: ergopti
+        env:
+          ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          owner="$RUNNER_TEMP/runtime-owner"
+          mkdir -m 700 "$owner"
+          echo "RUNTIME_OWNER=$owner" >> "$GITHUB_ENV"
+          python3 tools/build/remap_runtime_build.py "$PWD" "$owner" --sign-owned --budget 5400 \
+            --signing-identity "$RUNTIME_SIGNING_IDENTITY" \
+            --signing-keychain "$RUNTIME_SIGNING_KEYCHAIN" \
+            --signing-public-leaf "$RUNTIME_SIGNING_LEAF"
+
+      - name: Package the signed runtime reproducibly
+        working-directory: ergopti
+        run: |
+          set -euo pipefail
+          signed="$RUNTIME_OWNER/.signed-runtime-preparation"
+          for product in Runtime/ErgoptiPlus-Remap-Core.app Runtime/ErgoptiPlus-Remap-Console.app Runtime/bin/ergoptiplus_remap_cli; do
+            codesign --verify --strict --verbose=2 "$signed/$product"
+            codesign -d -r- "$signed/$product" 2>&1 | sed -n 's/^designated => /designated => /p'
+          done
+          python3 tools/build/remap_runtime_publish.py package "$signed" "$RUNNER_TEMP/runtime-artifact" --repository "$GITHUB_REPOSITORY"
+          # A second package of the same tree must give the same bytes.
+          python3 tools/build/remap_runtime_publish.py package "$signed" "$RUNNER_TEMP/runtime-artifact-again" --repository "$GITHUB_REPOSITORY"
+          cmp "$RUNNER_TEMP/runtime-artifact/runtime-pin.json" "$RUNNER_TEMP/runtime-artifact-again/runtime-pin.json"
+          {
+            echo '### Owned runtime artifact'
+            echo
+            echo '```json'
+            cat "$RUNNER_TEMP/runtime-artifact/runtime-pin.json"
+            echo '```'
+            echo
+            echo 'Publish the uploaded file as the release asset at source_url, then run'
+            echo '`python3 tools/build/remap_runtime_publish.py apply runtime-pin.json`.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the owned runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: owned-remap-runtime
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ runner.temp }}/runtime-artifact/
+
+      - name: Upload the build receipts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: owned-remap-runtime-receipts
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/runtime-owner/*.json
+            ${{ runner.temp }}/runtime-owner/*.jsonl
+            ${{ runner.temp }}/runtime-owner/*.stdout
+            ${{ runner.temp }}/runtime-owner/*.stderr
+
+      - name: Retire the signing keychain
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          if [ -n "${RUNTIME_SIGNING_KEYCHAIN:-}" ]; then security delete-keychain "$RUNTIME_SIGNING_KEYCHAIN"; fi
