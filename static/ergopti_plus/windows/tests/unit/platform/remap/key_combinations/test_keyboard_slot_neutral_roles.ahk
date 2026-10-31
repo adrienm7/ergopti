@@ -184,6 +184,38 @@ _KSNR_CapsLockIsThePhysicalKey() {
 }
 Test("neutral slots: Win + Caps Lock keeps its scan-code hotkey", _KSNR_CapsLockIsThePhysicalKey)
 
+; A Win chord Windows holds reaches AutoHotkey only through its hook, where the
+; inert scan-code hotkeys of the layout tables hid a textual #s: Win+S opened
+; Windows Search with the slot set. The live check win-s-open-target presses it.
+_KSNR_WinSlotBindsItsPhysicalKey() {
+	global RemappedList, KeyboardShortcutAssignments
+	SavedList := RemappedList
+	HadAssignments := IsSet(KeyboardShortcutAssignments)
+	if HadAssignments
+		SavedAssignments := KeyboardShortcutAssignments
+	State := MagicEditorState()
+	SavedPhysical := State["ordinary_physical"], SavedInitialized := State["initialized"]
+	Expected := Format("SC{:03X}", GetKeySC("s"))
+	RemappedList := Map()
+	KeyboardShortcutAssignments := Map("meta_s", "copy_selected_path")
+	State["ordinary_physical"] := Map(), State["initialized"] := false
+	try {
+		AssertEqual(Expected, KeyboardSlotWinScan("meta_s"), "a letter the emulation leaves still binds its key")
+		AssertEqual("", KeyboardSlotWinScan("meta_sc029"), "a key spelled by its scan keeps that spelling")
+		AssertEqual("", KeyboardSlotWinScan("meta_capslock"), "so does Caps Lock")
+		AssertEqual("", KeyboardSlotWinScan("magic_editor"), "the contextual slot names no chord")
+		KeyboardShortcutsBindAll()
+		AssertTrue(State["ordinary_physical"].Has(Expected), "the Win slot joins the physical broker on its key")
+		AssertEqual("meta_s", State["ordinary_physical"][Expected]["slot"], "the broker runs that slot")
+		AssertFalse(HOTKEY_REGISTRAR_SPECS.Has("#s"), "no textual Win chord is registered for the slot")
+	} finally {
+		RemappedList := SavedList
+		KeyboardShortcutAssignments := HadAssignments ? SavedAssignments : unset
+		State["ordinary_physical"] := SavedPhysical, State["initialized"] := SavedInitialized
+	}
+}
+Test("neutral slots: a Win slot binds its physical key, not a textual chord (win-s-open-target)", _KSNR_WinSlotBindsItsPhysicalKey)
+
 ; Boot order: the slots read RemappedList, and the Win broker acquires its keys once.
 _KSNR_SlotsBindBetweenLayoutAndBroker() {
 	Src := _DriverSourceNoComments()

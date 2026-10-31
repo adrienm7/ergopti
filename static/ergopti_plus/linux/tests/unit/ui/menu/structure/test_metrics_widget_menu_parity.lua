@@ -28,7 +28,7 @@ require("test.metrics_widget_menu_contract").register(helpers, {
 			uses_graph = function() return values.metrics_widget_graph end,
 		}
 		local ok, result = xpcall(function()
-			local rows = helpers.load_module("ui.menu.menu_builder").build({
+			local rows = helpers.load_module("ui.menu.builder").build({
 				keystats = {
 					is_enabled = function() return values.keystats_enabled end,
 					get_privacy_state = function() return {} end,
@@ -71,7 +71,7 @@ helpers.describe("Metrics widget commands", function()
 				}
 				package.loaded["ui.wpm.widget"] = widget
 				local ok, err = xpcall(function()
-					local rows = helpers.load_module("ui.menu.menu_builder").build({
+					local rows = helpers.load_module("ui.menu.builder").build({
 						keystats = { is_enabled = function() return true end,
 							get_privacy_state = function() return {} end },
 						on_menu_changed = function() calls.rebuild = calls.rebuild + 1 end,
@@ -119,7 +119,7 @@ helpers.describe("declared inert Metrics migration statuses", function()
 			end
 		end
 		logger.cancel_migration = function() calls.cancel = calls.cancel + 1; return receipt end
-		local rows = helpers.load_module("ui.menu.menu_builder").build({ keystats = logger })
+		local rows = helpers.load_module("ui.menu.builder").build({ keystats = logger })
 		local i18n = require("infra.i18n")
 		for _, row in ipairs(rows) do
 			if row.title == i18n.get("menu.metrics.title") then return row.menu[#row.menu], calls end
@@ -497,7 +497,7 @@ end)
 local function metrics_parent_fixture(body)
 	-- These real modules capture one another. A preceding registered fixture may
 	-- reload locale alone; retain a fresh coherent native chain for this case.
-	local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.menu_builder" }
+	local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
 	local previous, original_i18n_safe = {}, rawget(_G, "i18n_safe")
 	for module, value in pairs(package.loaded) do previous[module] = value end
 	for _, module in ipairs(names) do rawset(package.loaded, module, nil) end
@@ -505,7 +505,7 @@ local function metrics_parent_fixture(body)
 	-- Complete the genuine discovery/read phase before a requested test locale;
 	-- the Language child must not lazily initialize it back to the saved locale.
 	require("infra.i18n").init()
-	local native = helpers.load_module("ui.menu.menu_builder")
+	local native = helpers.load_module("ui.menu.builder")
 	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
 	local language = locale.current_locale();locale.set_locale("en")
 	local observed = {builds=0,parents=0,getters=0}
@@ -548,7 +548,7 @@ helpers.describe("Metrics absent native module keeps genuine shared status child
 			return result
 		end
 		local ok, detail = xpcall(function()
-			local rows = helpers.load_module("ui.menu.menu_builder").build({})
+			local rows = helpers.load_module("ui.menu.builder").build({})
 			local parent
 			for _,row in ipairs(rows)do if row.title==require("infra.i18n").get("menu.metrics.title")then parent=row end end
 			helpers.assert_true(parent ~= nil);helpers.assert_nil(parent.checked)
@@ -585,7 +585,7 @@ helpers.describe("Metrics absent parent final source fence", function()
 			if key=="linux_metrics_absent_rows" then deliveries=deliveries+1 end
 			return result
 		end
-		local ok, rows=pcall(helpers.load_module("ui.menu.menu_builder").build,{})
+		local ok, rows=pcall(helpers.load_module("ui.menu.builder").build,{})
 		i18n.get,renderer.group_row,renderer.render_rows,root.top_level=old_get,old_group,old_render,top
 		helpers.assert_type(rows,"table","the protected native build returns actual rows, never an error receipt")
 		helpers.assert_true(ok);helpers.assert_eq(calls,1);helpers.assert_eq(deliveries,1)
@@ -604,7 +604,7 @@ helpers.describe("Metrics absent native failure receipt", function()
 			if key == "linux_metrics_absent_rows" then calls=calls+1;error(sentinel,0) end
 			return original(rows,key)
 		end
-		local ok, detail = pcall(helpers.load_module("ui.menu.menu_builder").build,{})
+		local ok, detail = pcall(helpers.load_module("ui.menu.builder").build,{})
 		renderer.render_rows = original
 		helpers.assert_eq(ok,false)
 		helpers.assert_true(rawequal(detail,sentinel),"the actual renderer exception must not become rows or a different error")

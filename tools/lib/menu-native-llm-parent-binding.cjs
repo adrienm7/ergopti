@@ -56,7 +56,7 @@ function nativeLlmParentPublication(source, builderSource, definition, topLevel,
 	)
 		return false;
 	const child =
-		'main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, list_providers) or {}';
+		'main_menu = ManifestMenu.build("llm_menu", "LLM", nil, group_builders, render_ctx, list_providers) or {}';
 	const parent =
 		'local parent_row = ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, { llm_parent_enabled = function() return state.llm_enabled or nil end, })';
 	// The health dot the manifest's top-level entry declares joins the caption
@@ -1745,18 +1745,17 @@ function closedCompletedChildFlow(unit, role, parseTree = luaProducerTree) {
 	const statements =
 		role === 'agent'
 			? [
-					'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {})',
+					'local children = ManifestMenu.build("agent_menu", "Agent", nil, nil, menu_ctx, providers)',
 					'return NativeParent.finish(parent, children)'
 				]
 			: [
 					'local items = {}',
-					'local rendered = ManifestMenu and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers) or {}',
+					'local rendered = ManifestMenu and ManifestMenu.build("llm_menu", "LLM", nil, group_builders, llm_ctx, providers) or {}',
 					'for _, row in ipairs(rendered) do items[#items + 1] = row end',
 					'return NativeParent.finish(parent, items)',
 					'local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_llm_absent_rows", {}, {}, {})',
 					'if not status_rows then return {} end',
-					'return NativeParent.finish(parent, ManifestMenu.render_rows(status_rows, "linux_llm_absent_rows"))',
-					'for _, rendered in ipairs(ManifestMenu.render_rows({ row }, id)) do target[#target + 1] = rendered end'
+					'return NativeParent.finish(parent, ManifestMenu.render_rows(status_rows, "linux_llm_absent_rows"))'
 				];
 	let tree, patterns;
 	try {
@@ -1871,7 +1870,7 @@ function closedLlmContext(caller) {
 		'llm_ctx.state_getters["llm_scope_ready"] = scope_ready',
 		'llm_ctx.state_getters["config_newer_schema"] = newer_schema',
 		'llm_ctx[key] = value',
-		'ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers)'
+		'ManifestMenu.build("llm_menu", "LLM", nil, group_builders, llm_ctx, providers)'
 	];
 	const allowed = new Set();
 	for (const statement of statements) {
@@ -2291,7 +2290,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 		manifest[kind + '_menu'].length === 0
 	)
 		return false;
-	const builder = lex(sources['linux/ui/menu/menu_builder.lua']);
+	const builder = lex(sources['linux/ui/menu/builder.lua']);
 	const agent = lex(sources['linux/ui/menu/agent_rows.lua']);
 	if (
 		!builder ||
@@ -2346,7 +2345,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 	if (
 		!closedChangedOwner(wholeAgentProducer) ||
 		!closedLlmContext(wholeLlmCaller) ||
-		!closedHelperReferences(agent, ['system_rows', 'disabled_app_rows', 'append'])
+		!closedHelperReferences(agent, ['system_rows', 'disabled_app_rows'])
 	)
 		return false;
 	if (
@@ -2362,7 +2361,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 		) ||
 		!one(
 			wholeAgentProducer,
-			'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {}) return NativeParent.finish(parent, children)'
+			'local children = ManifestMenu.build("agent_menu", "Agent", nil, nil, menu_ctx, providers) return NativeParent.finish(parent, children)'
 		) ||
 		!one(
 			wholeLlmCaller,
@@ -2370,7 +2369,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 		) ||
 		!one(
 			wholeLlmCaller,
-			'local rendered = ManifestMenu and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers) or {} for _, row in ipairs(rendered) do items[#items + 1] = row end'
+			'local rendered = ManifestMenu and ManifestMenu.build("llm_menu", "LLM", nil, group_builders, llm_ctx, providers) or {} for _, row in ipairs(rendered) do items[#items + 1] = row end'
 		)
 	)
 		return false;
@@ -2480,7 +2479,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 			!one(producer, '["llm.agent_mode"] = AgentSettings.get_mode,') ||
 			!one(
 				producer,
-				'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {})'
+				'local children = ManifestMenu.build("agent_menu", "Agent", nil, nil, menu_ctx, providers)'
 			) ||
 			positions(producer, 'children =').length !== 1 ||
 			positions(producer, 'parent =').length !== 1 ||
@@ -2515,7 +2514,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 			positions(caller, 'parent =').length !== 1 ||
 			!one(
 				caller,
-				'local rendered = ManifestMenu and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers) or {}'
+				'local rendered = ManifestMenu and ManifestMenu.build("llm_menu", "LLM", nil, group_builders, llm_ctx, providers) or {}'
 			) ||
 			!one(caller, 'for _, row in ipairs(rendered) do items[#items + 1] = row end') ||
 			!one(caller, 'if llm.toggle then llm.toggle(ctx.on_menu_changed) end') ||

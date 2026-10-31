@@ -271,7 +271,7 @@ local function with_canonical_finish(scenario, fresh_writer_after_inverse)
 			-- conditional-remove fixture does; all payload IO remains real.
 			io.open = function(target, mode)
 				local opened, open_error = original_open(target, mode)
-				if opened == nil or target ~= path .. physical.WRITE_LOCK_SUFFIX or mode ~= "a+" then
+				if opened == nil or target ~= physical.write_lock_path(path) or mode ~= "a+" then
 					return opened, open_error
 				end
 				return { close = function()
@@ -307,7 +307,7 @@ local function with_canonical_finish(scenario, fresh_writer_after_inverse)
 		end, debug.traceback)
 		io.open = original_open
 		os.remove(path)
-		os.remove(path .. physical.WRITE_LOCK_SUFFIX)
+		os.remove(physical.write_lock_path(path))
 		if not called then error(detail, 0) end
 	end)
 end

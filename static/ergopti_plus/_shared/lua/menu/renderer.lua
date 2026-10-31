@@ -30,9 +30,10 @@
 --- FEATURES & RATIONALE:
 --- 1. Single renderer: every submenu is built by the same loop — structure lives
 ---    in the manifest, not in per-submenu Lua code.
---- 2. Dynamic escape hatch: items whose ``type`` is ``"dynamic"`` are routed to a
----    caller-supplied table of handler functions so platform-specific UI stays in
----    the caller.
+--- 2. No escape hatch: the retired ``dynamic`` type handed a row back to the
+---    caller, and the menu compiler refuses it now. A row whose contents are
+---    runtime data is a ``list``, whose provider returns DATA drawn here; only the
+---    legacy ``action`` type still hands its id to a caller handler.
 --- 3. A FACTORY, not a singleton. Each driver builds one instance at require
 ---    time. An ``M.init``-style singleton would have to warn-and-ignore a second
 ---    call per the module-init convention, and the test harness legitimately
@@ -1569,8 +1570,8 @@ function M.new(deps)
 	---
 	--- ``manifest_key``      — key in menu_manifest.json (e.g. ``"shortcuts_menu"``)
 	--- ``category``          — human-readable category name for debug logs
-	--- ``dynamic_handlers``  — table of id → function(items, ctx) for ``action`` and
-	---   ``dynamic`` entries. Each handler appends its items to the list in place.
+	--- ``action_handlers``   — table of id → function(items, ctx) for ``action``
+	---   entries. Each handler appends its items to the list in place.
 	--- ``group_builders``    — optional table of group_id → function(ctx) → table|nil
 	---   for ``group`` entries. Returns ``{title, menu}``, a raw items list, or nil.
 	--- ``list_providers``    — optional table of list_id → function(ctx) → rows for
@@ -1582,13 +1583,13 @@ function M.new(deps)
 	--- ``ctx``               — menu context passed through to handlers.
 	--- @param manifest_key string
 	--- @param category string
-	--- @param dynamic_handlers table
+	--- @param action_handlers table|nil
 	--- @param group_builders table|nil
 	--- @param ctx table
 	--- @param list_providers table|nil
 	--- @return table
-	function R.build(manifest_key, category, dynamic_handlers, group_builders, ctx, list_providers)  -- luacheck: ignore 212
-		dynamic_handlers = dynamic_handlers or {}
+	function R.build(manifest_key, category, action_handlers, group_builders, ctx, list_providers)  -- luacheck: ignore 212
+		action_handlers  = action_handlers or {}
 		group_builders   = group_builders or {}
 		list_providers   = list_providers or {}
 		local menu_def    = get_menu_def(manifest_key)
@@ -1715,9 +1716,9 @@ function M.new(deps)
 
 			elseif t == "action" then
 				local action_id = type(item.id) == "string" and item.id or ""
-				if action_id ~= "" and type(dynamic_handlers[action_id]) == "function" then
+				if action_id ~= "" and type(action_handlers[action_id]) == "function" then
 					flush_sep()
-					local ok = call_isolated(manifest_key, action_id, dynamic_handlers[action_id], result, ctx)
+					local ok = call_isolated(manifest_key, action_id, action_handlers[action_id], result, ctx)
 					if ok then item_count = item_count + 1 end
 				else
 					-- A manifest entry with an id but no matching handler renders one
@@ -1872,7 +1873,7 @@ function M.new(deps)
 			elseif t == "list" then
 				local list_id = type(item.id) == "string" and item.id or ""
 				if list_id == "" or type(list_providers[list_id]) ~= "function" then
-					-- Same class of bug as the "action" and "dynamic" branches: an entry
+					-- Same class of bug as the "action" branch: an entry
 					-- whose provider is missing either belongs on this platform (and the
 					-- caller's list_providers table has a hole) or needs a `platforms`
 					-- restriction. Silence here is a menu section that vanishes.
@@ -1897,9 +1898,9 @@ function M.new(deps)
 				-- The declarative row: everything about it is in the manifest, and
 				-- the driver supplies only a NAMED behaviour.
 				--
-				-- WHY THIS TYPE EXISTS. Every other type that carries behaviour —
-				-- "action", "dynamic" — hands the manifest key to a driver function
-				-- that builds the row itself. That is why 639 rows lived outside this
+				-- WHY THIS TYPE EXISTS. The other types that carried behaviour —
+				-- "action", and "dynamic" until it was retired — hand the manifest key
+				-- to a driver function that builds the row itself. That is why 639 rows lived outside this
 				-- file: the manifest described the SLOT and three drivers each wrote
 				-- the row. And they wrote it differently — Linux appended " ✓" to the
 				-- title while its own tray adapter has supported a native GTK check
@@ -1926,19 +1927,6 @@ function M.new(deps)
 					flush_sep()
 					table.insert(result, rendered[1])
 					item_count = item_count + 1
-				end
-
-			elseif t == "dynamic" then
-				local dyn_id = type(item.id) == "string" and item.id or ""
-				if dyn_id ~= "" and type(dynamic_handlers[dyn_id]) == "function" then
-					flush_sep()
-					local ok = call_isolated(manifest_key, dyn_id, dynamic_handlers[dyn_id], result, ctx)
-					if ok then item_count = item_count + 1 end
-				else
-					-- Same class of bug as the "action" branch above: a misclassified or
-					-- drifted id-bearing entry with no handler must never fail silently.
-					Logger.warn(LOG, "No 'dynamic' handler registered for id '%s' in '%s' — item skipped.",
-						tostring(dyn_id), manifest_key)
 				end
 
 			else

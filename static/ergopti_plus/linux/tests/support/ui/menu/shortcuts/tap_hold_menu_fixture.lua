@@ -75,7 +75,7 @@ local function build(calls, picked, user_text)
 			return true
 		end,
 	}
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local changed = 0
 	local items = mb.build({ _version = "test", on_quit = function() end, tap_holds = Manager, is_paused = function() return false end,
 		on_menu_changed = function() changed = changed + 1 end })

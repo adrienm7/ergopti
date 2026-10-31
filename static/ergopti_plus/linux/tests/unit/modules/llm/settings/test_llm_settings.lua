@@ -240,7 +240,7 @@ end)
 --- @param options table Independent count/state, refusal and declaration mutations.
 --- @param callback function Observations asserted outside delivered callbacks.
 local function with_auto_menu(options, callback)
-	local names = { "infra.llm_preferences", "modules.llm.settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.menu_builder" }
+	local names = { "infra.llm_preferences", "modules.llm.settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.builder" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local storage = PreferencesFixture.new({initial = {
@@ -252,7 +252,7 @@ local function with_auto_menu(options, callback)
 	package.loaded["infra.llm_preferences"] = storage
 	package.loaded["modules.llm.settings"] = nil
 	package.loaded["modules.llm.profile_settings"] = nil
-	package.loaded["ui.menu.menu_builder"] = nil
+	package.loaded["ui.menu.builder"] = nil
 	local settings = require("modules.llm.settings")
 	local profiles = require("modules.llm.profile_settings")
 	settings._reset()
@@ -292,7 +292,7 @@ local function with_auto_menu(options, callback)
 		on_menu_changed = function() observed.redraws = observed.redraws + 1 end,
 	}
 	local ok, err = xpcall(function()
-		local items = helpers.load_module("ui.menu.menu_builder").build(context)
+		local items = helpers.load_module("ui.menu.builder").build(context)
 		local function find(rows, title)
 			for index, row in ipairs(rows or {}) do
 				if row.title == title then return row, rows, index end

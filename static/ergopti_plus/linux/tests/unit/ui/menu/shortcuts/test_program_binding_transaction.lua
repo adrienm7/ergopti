@@ -49,11 +49,11 @@ local function menu_rows(gestures, path, extra)
 	end
 	-- Select genuine source records through the renderer's actual root and reader.
 	root.top_level = selected
-	package.loaded["ui.menu.menu_builder"] = nil
+	package.loaded["ui.menu.builder"] = nil
 	local ctx = { gestures = gestures, shortcuts = shortcuts,
 		is_paused = function() return false end, on_quit = function() end }
 	for name, value in pairs(extra or {}) do ctx[name] = value end
-	return require("ui.menu.menu_builder").build(ctx)
+	return require("ui.menu.builder").build(ctx)
 end
 
 local function with_case(spec, body)

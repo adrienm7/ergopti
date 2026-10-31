@@ -251,15 +251,18 @@ local function input_monitoring_access(callback)
 end
 
 --- Facts about the pieces of the owned runtime that are not installed yet:
---- whether the artifact manifest is pinned, whether the installed-source module
---- can be reached (it is loaded, never acquired), and what a close of the official
---- Karabiner would meet. Nothing is started, closed or changed.
---- @param callback function fn({ unpinned = integer|nil, source = boolean, helper_present = boolean, active = integer|nil }).
+--- whether the artifact manifest is pinned and which driver version it names,
+--- whether the installed-source module can be reached (it is loaded, never
+--- acquired), and what a close of the official Karabiner would meet. Nothing is started, closed or changed.
+--- @param callback function fn({ unpinned = integer|nil, source = boolean, helper_present = boolean,
+---   active = integer|nil, virtual_hid_version = string|nil }).
 local function owned_readiness(callback)
 	local source_available = require("adapters.installed_physical_source").new().available()
 	require("adapters.karabiner_coexistence").new().describe(function(facts)
+		local OwnerPorts = require("adapters.runtime_owner_ports")
 		callback({
-			unpinned = require("adapters.runtime_owner_ports").unpinned_count(),
+			unpinned = OwnerPorts.unpinned_count(),
+			virtual_hid_version = OwnerPorts.virtual_hid_version(),
 			source = source_available == true,
 			helper_present = facts.helper_present,
 			active = facts.active_processes,

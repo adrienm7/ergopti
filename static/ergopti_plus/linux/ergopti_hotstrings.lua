@@ -216,7 +216,7 @@ local tray_menu = RuntimeGuard.optional_require("adapters.tray_menu")
 local event_loop = require("adapters.event_loop")
 
 -- Menu builder (builds rich submenus from daemon state).
-local menu_builder = RuntimeGuard.optional_require("ui.menu.menu_builder")
+local menu_builder = RuntimeGuard.optional_require("ui.menu.builder")
 
 -- LLM prediction engine (optional — daemon runs without it).
 local prediction_engine = RuntimeGuard.optional_require("modules.llm.prediction_engine")
@@ -274,6 +274,12 @@ local shutdown = ShutdownCoordinator.new({
 			name = "local reload control",
 			stop = function()
 				return not privacy_owners.driver_control or privacy_owners.driver_control:stop() == true
+			end,
+		},
+		{
+			name = "field run session",
+			stop = function()
+				return not privacy_owners.field_run or privacy_owners.field_run:stop() == true
 			end,
 		},
 		{
@@ -3109,6 +3115,8 @@ local function main()
 		device, opts.layout, mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
 	if not privacy_owners.startup_checkpoint() then return end
 	local boot_ms = BootProfiler.complete()
+	-- The Reload this boot completes, if any, from its request in the previous daemon.
+	require("infra.reload_timing").complete()
 	if not privacy_owners.startup_checkpoint() then return end
 	emit_diagnostic_snapshot(boot_ms, opts, ok_i18n and i18n_mod or nil, privacy_owners.startup.snapshot)
 	privacy_owners.startup.snapshot = nil
@@ -3119,6 +3127,9 @@ local function main()
 			if boot_catalogue_complete then return true end
 			return false, "refused"
 		end })
+	if not privacy_owners.startup_checkpoint() then return end
+	-- Optional too: the field report collector's no-click checks (infra/field_run.lua).
+	privacy_owners.field_run = require("infra.field_run").start({ pid = require("luv").os_getpid() })
 	if not privacy_owners.startup_checkpoint() then return end
 	privacy_owners.finish_startup()
 	if not privacy_owners.startup_checkpoint() then return end

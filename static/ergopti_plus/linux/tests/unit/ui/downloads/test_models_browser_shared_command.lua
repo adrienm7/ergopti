@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- Exercises the browser provider with its unrelated tray surfaces isolated.
 --- @param callback function Receives native rows and observable browser ports.
 local function with_browser(callback)
-	local names = { "ui.menu.menu_builder", "ui.menu.llm_backend_rows", "infra.manifest_menu", "infra.paths", "infra.i18n",
+	local names = { "ui.menu.builder", "ui.menu.llm_backend_rows", "infra.manifest_menu", "infra.paths", "infra.i18n",
 		"window_titles", "action_parameter_label", "hotstrings.extensions", "hotstrings.languages",
 		"_generated.locale_table", "keymap.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal",
@@ -59,14 +59,13 @@ local function with_browser(callback)
 		end
 		root.top_level = selected
 		local facade = {}; for key, value in pairs(native) do facade[key] = value end
-		facade.build = function(_, _, dynamic_handlers)
-			local rows = {}
-			dynamic_handlers.llm_model(rows)
-			return rows
+		facade.build = function(_, _, _, _, _, providers)
+			-- The model row is list DATA: the shared renderer materialises it.
+			return native.render_rows(providers.llm_model(), "llm_model")
 		end
 		package.loaded["infra.manifest_menu"] = facade
-		package.loaded["ui.menu.menu_builder"] = nil
-		local Builder = require("ui.menu.menu_builder")
+		package.loaded["ui.menu.builder"] = nil
+		local Builder = require("ui.menu.builder")
 		local ctx = {
 			llm = {
 				is_enabled = function() return false end,

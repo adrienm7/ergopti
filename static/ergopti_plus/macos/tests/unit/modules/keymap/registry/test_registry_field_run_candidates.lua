@@ -79,3 +79,27 @@ helpers.describe("registry: field run hotstring candidates", function()
 		end)
 	end)
 end)
+
+helpers.describe("registry: field run candidates read each group and section once (field-run-candidates-hold)", function()
+	helpers.it("asks a section's state and a group's origin once, not once per mapping", function()
+		with_registry(function(Registry)
+			for index = 1, 200 do
+				local trigger = "w" .. string.char(96 + (index - 1) % 26 + 1) .. string.char(96 + (index - 1) // 26 + 1)
+				Registry.add(trigger, trigger:upper(), { is_word = true, section = "common" })
+			end
+			Registry.sort_mappings()
+			local Groups = package.loaded["modules.keymap.registry_groups"]
+			local section_reads, origin_reads = 0, 0
+			local is_section_enabled, file_origin = Registry.is_section_enabled, Groups.file_origin
+			Registry.is_section_enabled = function(...) section_reads = section_reads + 1; return true end
+			Groups.file_origin = function(...) origin_reads = origin_reads + 1; return file_origin(...) end
+			local ok, candidates = pcall(Registry.field_run_candidates)
+			Registry.is_section_enabled, Groups.file_origin = is_section_enabled, file_origin
+			helpers.assert_true(ok, tostring(candidates))
+			helpers.assert_eq(#candidates, 200)
+			-- Per mapping, these reads held the main thread for 1810 ms (field run 2026-10-31).
+			helpers.assert_eq(section_reads, 1, "one settings read per section")
+			helpers.assert_eq(origin_reads, 1, "one origin read per group")
+		end)
+	end)
+end)

@@ -173,7 +173,7 @@ for (const [driver, file, pattern, role] of [
 	],
 	[
 		'linux',
-		'menu_builder.lua',
+		'builder.lua',
 		/NumberRowPolicy\.native_rows\(ManifestMenu, render_ctx\.commands, \{/,
 		'live'
 	]

@@ -33,6 +33,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include ../_generated/config_migration_ops.ahk
 #Include config_migrate_records.ahk
 
 #Include config_registry_cache.ahk
@@ -54,25 +55,6 @@ ConfigMigrateRegistryPath() {
 	global _SharedDir
 	static Relative := "core/config_schema/migrations.toml"
 	return _SharedDir . "\" . StrReplace(Relative, "/", "\")
-}
-
-; Required and optional fields of each op of the closed set.
-_ConfigMigrateOpFields() {
-	static Fields := Map(
-		"rename", [["section", "key"], ["to_section", "to_key"]],
-		"rename_prefix", [["section", "prefix", "to_prefix"], []],
-		"copy_if_absent", [["section", "key"], ["to_section", "to_key"]],
-		"move_ergopti_variant", [["section", "key", "to_key", "base_key", "alt_gr_key", "source_key", "false_variant", "true_variant"], ["neutral_variant"]],
-		"move_chord_action", [["section", "key", "to_section", "action", "conditional_key", "disabled_action", "platform"], []],
-		"move_section", [["section", "to_section"], []],
-		"merge_into", [["section", "to_section"], []],
-		"map_value", [["section", "key", "map"], []],
-		"wrap_value", [["section", "key", "to_key"], []],
-		"encode_value", [["section", "key", "to_section", "to_key", "encoding"], []],
-		"delete", [["section"], ["key"]],
-		"set_if_absent", [["section", "key", "value"], []]
-	)
-	return Fields
 }
 
 ; A positive integral number; a TOML 3.0 counts as 3 on every interpreter.
@@ -108,7 +90,7 @@ _ConfigMigrateParse(Source, Label) {
 _ConfigMigrateValidateOp(Op, Where) {
 	if !(Op is Map) || !Op.Has("op") || !(Op["op"] is String)
 		throw Error(Where . ": an op must be an inline table with an op name")
-	Fields := _ConfigMigrateOpFields()
+	Fields := ConfigMigrateOpFieldsData()
 	if !Fields.Has(Op["op"])
 		throw Error(Where . ": unknown op '" . Op["op"] . "'")
 	Allowed := Map("op", true)

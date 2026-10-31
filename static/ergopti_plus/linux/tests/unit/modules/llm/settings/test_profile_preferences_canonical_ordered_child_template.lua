@@ -415,7 +415,7 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 			.. '"\n[llm.profiles]\nactive = "' .. (options.active or "basic") .. '"\nauto_profile_for_model = false\n'
 		with_config(initial, function(settings, path)
 			with_idle_live_owner(settings, function(live_owner)
-				local names = { "infra.manifest_menu", "infra.i18n", "ui.menu.menu_builder", "ui.prompt_editor.bridge" }
+				local names = { "infra.manifest_menu", "infra.i18n", "ui.menu.builder", "ui.prompt_editor.bridge" }
 				local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 				local ok, err = xpcall(function()
 					local document = read("modules/menu/menu_manifest.json")
@@ -440,7 +440,7 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 							get_current_model = function() return "small" end, get_prediction_model = function() return "small" end,
 							get_live = live_owner.get_live, set_live = live_owner.set_live },
 						on_menu_changed = function() redraws = redraws + 1 end }
-					local builder = helpers.load_module("ui.menu.menu_builder")
+					local builder = helpers.load_module("ui.menu.builder")
 					local function find(rows)
 						for _, row in ipairs(rows or {}) do
 							if row.menu then

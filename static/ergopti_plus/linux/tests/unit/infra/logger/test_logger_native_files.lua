@@ -12,6 +12,23 @@ local helpers = require("tests.helpers")
 local native = require("luv")
 local Shell = require("adapters.shell_runner")
 local AppDirs = require("app_dirs")
+local SubFiles = require("_generated.logger_sub_files")
+
+-- The marker line the child logs; its topical file comes from the routing
+-- table (the sink's substring rule), so a renamed file needs no edit here.
+local MARKER_TAG = "[keystats]"
+
+--- The sub-file a line is routed to, by the sink's own rule.
+--- @param line string Complete log line.
+--- @return string name
+local function routed_file(line)
+	for _, entry in ipairs(SubFiles) do
+		for _, pattern in ipairs(entry.patterns) do
+			if line:find(pattern, 1, true) then return entry.name end
+		end
+	end
+	error("no sub-file routes " .. line)
+end
 
 --- Runs an isolated real logger operation under a native process deadline.
 --- @param endpoint string Endpoint to replace with a FIFO, or "regular".
@@ -23,7 +40,7 @@ local function run_endpoint(endpoint)
 	local date = os.date("%Y-%m-%d")
 	local main = root .. "/logs/" .. AppDirs.files.unified_prefix .. date .. AppDirs.files.extension
 	local errors = root .. "/logs/" .. AppDirs.files.errors_prefix .. date .. AppDirs.files.extension
-	local topical = root .. "/logs/ErgoptiPlus_keystats.log"
+	local topical = root .. "/logs/" .. routed_file(MARKER_TAG .. " native-special-file-marker")
 	local targets = {
 		bootstrap = root .. "/logs/" .. AppDirs.files.bootstrap_log,
 		main = main,

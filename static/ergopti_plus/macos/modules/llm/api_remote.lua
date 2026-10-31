@@ -38,6 +38,7 @@ local M = {}
 local Logger         = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local Timings        = require("infra.timings")
+local PerfBudget     = require("perf_budget")
 local Paths          = require("infra.paths")
 local Profiles       = require("modules.llm.profiles")
 local Parser         = require("modules.llm.parser")
@@ -2975,6 +2976,8 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 				end
 				Logger.info(LOG, "%s answer of provider '%s' received in %dms (%d char(s)).",
 					label, provider_id, ms, #text)
+				PerfBudget.judge(Logger, LOG, "llm.remote", ms,
+					function() return Timings.ms("budgets", "llm_remote_request_ms") end)
 				ApiCommon.protected_call(on_text, "on_text", text)
 			end)
 		end
@@ -3056,6 +3059,8 @@ function M.request_backboard(provider_id, spec, on_answer, on_fail, use, current
 					return
 				end
 				Logger.info(LOG, "Agent answer of provider '%s' received in %dms.", provider_id, ms)
+				PerfBudget.judge(Logger, LOG, "llm.remote", ms,
+					function() return Timings.ms("budgets", "llm_remote_request_ms") end)
 				ApiCommon.protected_call(on_answer, "on_answer", decoded)
 			end)
 		end, function(reason) fail(reason) end, current)
@@ -3101,6 +3106,8 @@ local function post_decisions(client, provider_id, base, token, body, on_answers
 				return
 			end
 			Logger.info(LOG, "Decisions answer of provider '%s' received in %dms.", provider_id, ms)
+			PerfBudget.judge(Logger, LOG, "llm.remote", ms,
+				function() return Timings.ms("budgets", "llm_remote_request_ms") end)
 			on_answers(answers, ms)
 		end)
 	end)

@@ -251,7 +251,7 @@ helpers.describe("LLM user profiles: tray reachability", function()
 		})
 		local rebuilds = 0
 		local opened_window = nil
-		local menu_builder = helpers.load_module("ui.menu.menu_builder")
+		local menu_builder = helpers.load_module("ui.menu.builder")
 		local paused = false
 		local context = {
 			is_paused = function() return paused end,
@@ -346,7 +346,7 @@ helpers.describe("LLM user profiles: tray reachability", function()
 			logger = require("logger.shim"),
 		}))
 		replace("infra.manifest_menu", renderer)
-		menu_builder = helpers.load_module("ui.menu.menu_builder")
+		menu_builder = helpers.load_module("ui.menu.builder")
 		local changed = find(menu_builder.build(context), require("infra.i18n").get("button.cancel"))
 		helpers.assert_not_nil(changed, "the actual Create provider follows its changed declaration")
 		editor_accepted = false
@@ -412,7 +412,7 @@ helpers.describe("LLM profile settings: a prompt named by a binding", function()
 		local ok, err = xpcall(function()
 			local settings = load_settings({ ["llm.profiles.auto_profile_for_model"] = false })
 			with_idle_live_owner(settings, function(live_owner)
-				local menu_builder = helpers.load_module("ui.menu.menu_builder")
+				local menu_builder = helpers.load_module("ui.menu.builder")
 				local menu = menu_builder.build({
 					llm = {
 						is_enabled = function() return true end,
@@ -484,7 +484,7 @@ helpers.describe("shared Clone Profile command", function()
 				return nil
 			end
 			local i18n = require("infra.i18n")
-			local builder = helpers.load_module("ui.menu.menu_builder")
+			local builder = helpers.load_module("ui.menu.builder")
 			local row = find(builder.build(context), i18n.get("menu.profiles.clone_builtin"))
 			helpers.assert_not_nil(row)
 			helpers.assert_eq(row.fn(), true)
@@ -529,7 +529,7 @@ helpers.describe("shared Clone Profile command", function()
 				platform = "linux", manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
 				json_decode = function() return manifest end, i18n = i18n, logger = require("logger.shim"),
 			})))
-			builder = helpers.load_module("ui.menu.menu_builder")
+			builder = helpers.load_module("ui.menu.builder")
 			local changed = find(builder.build(context), i18n.get("button.cancel"))
 			helpers.assert_not_nil(changed, "the real Clone provider must follow only the shared declaration")
 			helpers.assert_eq(changed.fn(), false)
@@ -590,8 +590,8 @@ helpers.describe("Linux automatic profile toggle: actual menu owner", function()
 					if nested then return nested end
 				end
 			end
-			replace("ui.menu.menu_builder", nil)
-			local builder = helpers.load_module("ui.menu.menu_builder")
+			replace("ui.menu.builder", nil)
+			local builder = helpers.load_module("ui.menu.builder")
 			local menu = builder.build(context)
 			local row = find(menu, require("infra.i18n").get("menu.profiles.auto_detect"))
 			helpers.assert_not_nil(row, "the actual profile provider exposes its checkbox")

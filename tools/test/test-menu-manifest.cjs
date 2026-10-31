@@ -39,6 +39,39 @@ const REPO_ROOT = resolve(__dirname, '..', '..');
 const SHARED = resolve(REPO_ROOT, 'static/ergopti_plus/_shared');
 const MENU_PATH = resolve(SHARED, 'modules/menu/menu_manifest.json');
 const MANIFEST_PATH = resolve(SHARED, 'modules/features/manifest.toml');
+// The hand-edited tray-menu source: the [menu] tables live here, not in MANIFEST_PATH.
+const { MENU_SOURCE_PATH } = require('../lib/menu-source.cjs');
+
+/**
+ * The feature manifest and the menu source as one TOML text, for a compiler
+ * fixture that mutates either. Valid TOML: menu.toml holds only [menu].
+ * @param {string} sharedDir The _shared/ tree to read.
+ * @returns {string} The combined source.
+ */
+function combinedCompilerSource(sharedDir = SHARED) {
+	return (
+		readSourceFile(resolve(sharedDir, 'modules/features/manifest.toml')) +
+		'\n' +
+		readSourceFile(resolve(sharedDir, 'modules/menu/menu.toml'))
+	);
+}
+
+/**
+ * Writes one combined source to a compiler fixture's two inputs. The generator
+ * reads features from manifest.toml and only [menu] from menu.toml, so the same
+ * text in both compiles exactly as the one file the menu lived in until
+ * 2026-10-31.
+ * @param {string} fixtureRoot The fixture repository root.
+ * @param {string} text The combined source.
+ */
+function writeCompilerSources(fixtureRoot, text) {
+	const fs = require('fs');
+	const sharedDir = resolve(fixtureRoot, 'static/ergopti_plus/_shared');
+	for (const rel of ['modules/features/manifest.toml', 'modules/menu/menu.toml']) {
+		fs.mkdirSync(dirname(resolve(sharedDir, rel)), { recursive: true });
+		fs.writeFileSync(resolve(sharedDir, rel), text);
+	}
+}
 const LOCALES_DIR = resolve(SHARED, 'data/locales');
 
 // "linux" is expressible even though no row declares it yet: I2 fixes the
@@ -352,9 +385,9 @@ function checkChoiceProjection() {
 		);
 		fs.mkdirSync(path.dirname(manifest), { recursive: true });
 		fs.mkdirSync(path.dirname(output), { recursive: true });
-		const original = readSourceFile(MANIFEST_PATH);
+		const original = combinedCompilerSource();
 		const execute = (source) => {
-			fs.writeFileSync(manifest, source);
+			writeCompilerSources(fixture, source);
 			return spawnSync(process.execPath, ['tools/build/build-menu-manifest.js'], {
 				cwd: fixture,
 				encoding: 'utf8'
@@ -1010,7 +1043,7 @@ function checkWordExpanderControls() {
 			'local delay_menu'
 		],
 		[
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'["word_expanders"] = function()',
 			'["magic_key_config"] = function()'
 		]
@@ -1062,7 +1095,7 @@ function checkInfoBarControl() {
 		],
 		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'group_builders["llm_display"] = function',
 			'group_builders["llm_navigation"] = function'
 		]
@@ -1116,8 +1149,8 @@ function checkAutoTemperatureControl() {
 	assert.deepEqual(definition[1].disabled_when, ['llm_auto_raise_ready']);
 	assert.equal(
 		root.llm_menu.find((row) => row.id === 'llm_generation').type,
-		'dynamic',
-		'the Linux inline caller delivers the shared child without a private list policy'
+		'list',
+		'the Linux inline caller delivers the shared child as list row DATA'
 	);
 	for (const [file, first, last] of [
 		[
@@ -1127,8 +1160,8 @@ function checkAutoTemperatureControl() {
 		],
 		['macos/ui/menu/menu_llm/temperature_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
-			'linux/ui/menu/menu_builder.lua',
-			'dynamic_handlers["llm_generation"] = function',
+			'linux/ui/menu/builder.lua',
+			'providers["llm_generation"] = function',
 			"-- The category switch, the submenu's first row"
 		]
 	]) {
@@ -1193,7 +1226,7 @@ function checkTokenStreamingControl() {
 		],
 		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'group_builders["llm_display"] = function',
 			'group_builders["llm_navigation"] = function'
 		]
@@ -1252,7 +1285,7 @@ function checkShowAllControl() {
 		],
 		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'group_builders["llm_display"] = function',
 			'group_builders["llm_navigation"] = function'
 		]
@@ -1357,9 +1390,9 @@ function checkAutomaticTriggerControls() {
 		['windows/ui/menu/menu_llm/menu_settings.ahk', 'LLM_Menu_BuildTriggerMenu(', '\n}'],
 		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'group_builders["llm_trigger"] = function',
-			'dynamic_handlers["llm_profile"] = function'
+			'providers["llm_profile"] = function'
 		]
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', file));
@@ -1411,7 +1444,7 @@ function checkUpdateFrequencyControl() {
 			'ManifestMenu.choice_row'
 		],
 		[
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'local function _frequency_picker(',
 			'\nend',
 			'ManifestMenu.choice_row'
@@ -1485,7 +1518,7 @@ function checkIndentationControl() {
 			'DisplayPolicy.indentation_intent',
 			'SettingsManager.publication_guard'
 		],
-		['linux/ui/menu/menu_builder.lua', 'DisplayPolicy.indentation_intent', 'current.source']
+		['linux/ui/menu/builder.lua', 'DisplayPolicy.indentation_intent', 'current.source']
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', file));
 		assert(
@@ -1582,9 +1615,9 @@ function checkPrivacyTriggerControls() {
 		['windows/ui/menu/menu_llm/menu_settings.ahk', 'LLM_Menu_BuildTriggerMenu(', '\n}'],
 		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'group_builders["llm_trigger"] = function',
-			'dynamic_handlers["llm_profile"] = function'
+			'providers["llm_profile"] = function'
 		]
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', file));
@@ -1793,7 +1826,7 @@ checkPrivacyTriggerControls();
 			'macos/ui/menu/menu_hotstrings_custom.lua',
 			'ManifestMenu.command_row("personal_hotstring_commands"'
 		],
-		['linux/ui/menu/menu_builder.lua', 'ManifestMenu.command_row("personal_hotstring_commands"']
+		['linux/ui/menu/builder.lua', 'ManifestMenu.command_row("personal_hotstring_commands"']
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
 		assert(
@@ -1920,7 +1953,7 @@ checkPrivacyTriggerControls();
 				).test(source)
 		);
 	const linuxMenu = require('../lib/linux-menu-parts.cjs');
-	for (const file of ['macos/ui/menu/builder.lua', 'linux/ui/menu/menu_builder.lua']) {
+	for (const file of ['macos/ui/menu/builder.lua', 'linux/ui/menu/builder.lua']) {
 		const source =
 			file === linuxMenu.LINUX_MENU_ROOT
 				? linuxMenu.linuxMenuRootSource(resolve(REPO_ROOT, 'static/ergopti_plus'))
@@ -2008,7 +2041,7 @@ function profileFrameOwnerSource(source, platform) {
 						['function', 'M', '.', 'new', '(']
 					]
 				: [
-						['dynamic_handlers', '[', 'llm_profile', ']', '=', 'function'],
+						['providers', '[', 'llm_profile', ']', '=', 'function'],
 						['group_builders', '[', 'llm_display', ']', '=', 'function']
 					];
 	function matches(at, values) {
@@ -2104,7 +2137,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	for (const file of [
 		'windows/ui/menu/menu_llm/menu_profiles.ahk',
 		'macos/ui/menu/menu_llm/profiles_manager.lua',
-		'linux/ui/menu/menu_builder.lua'
+		'linux/ui/menu/builder.lua'
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
 		assert(
@@ -2162,7 +2195,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	for (const file of [
 		'windows/ui/menu/menu_llm/menu_profiles.ahk',
 		'macos/ui/menu/menu_llm/profiles_manager.lua',
-		'linux/ui/menu/menu_builder.lua'
+		'linux/ui/menu/builder.lua'
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
 		assert(
@@ -2222,7 +2255,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	for (const file of [
 		'windows/ui/menu/menu_hotstring_switches.ahk',
 		'macos/ui/menu/menu_hotstrings.lua',
-		'linux/ui/menu/menu_builder.lua'
+		'linux/ui/menu/builder.lua'
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
 		assert(
@@ -2258,7 +2291,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		'the canonical declaration owns identity, label, live readiness and platform policy'
 	);
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
 	);
 	const start = source.indexOf('local function _build_shortcuts(ctx)');
 	const end = source.indexOf('local function _tap_hold_key_label', start);
@@ -2304,7 +2337,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		'the independent trio owns order, labels, native readiness and placement'
 	);
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
 	);
 	const start = source.indexOf('local case_methods = {');
 	const end = source.indexOf('local helper_methods = {', start);
@@ -2358,7 +2391,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		'the independent helper trio owns captions, order, readiness and placement'
 	);
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
 	);
 	const start = source.indexOf('local helper_methods = {');
 	const end = source.indexOf('local handlers = {}', start);
@@ -2421,7 +2454,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	const providers = [
 		['windows/ui/menu/menu_llm/menu_settings.ahk', '_MR_GetMenuDef("llm_navigation_rows")'],
 		['macos/ui/menu/menu_llm/init.lua', 'ManifestMenu.get_array("llm_navigation_rows")'],
-		['linux/ui/menu/menu_builder.lua', 'ManifestMenu.get_array("llm_navigation_rows")']
+		['linux/ui/menu/builder.lua', 'ManifestMenu.get_array("llm_navigation_rows")']
 	];
 	for (const [native, read] of providers) {
 		const source = readSourceFile(resolve(SHARED, '..', native));
@@ -2494,7 +2527,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		],
 		[
 			'linux',
-			'ui/menu/menu_builder.lua',
+			'ui/menu/builder.lua',
 			// Linux passes its live owner: the rows apply where the session can.
 			'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands, {'
 		]
@@ -2593,7 +2626,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'--- Builds the tap / hold rows of one hand'
 		],
 		[
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'ManifestMenu.template_rows',
 			'tap_hold_key_native',
 			'tap_hold_key_tap',
@@ -2718,7 +2751,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'handwritten inert-status declaration'
 		);
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
 	);
 	const begin = source.indexOf('local function _migration_row(k)');
 	const end = source.indexOf('--- Renders the rows of the metrics submenu', begin);
@@ -2795,7 +2828,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/gesture_slot_modes.json'))
 	);
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
-	const declared = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declared = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const expected = corpus.rows.map(({ value, ...row }) => row);
 	assert.deepEqual(
 		corpus.rows.map((row) => row.value),
@@ -3001,7 +3034,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			]
 		],
 		[
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'local function hand_rows(hand)',
 			'local providers = {',
 			['tap_hold_key_delay', 'tap_hold_key_delay_caption']
@@ -3311,7 +3344,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/gesture_slot_controls.json'))
 	);
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
-	const declared = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declared = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	for (const [section, rows] of Object.entries(corpus.sections)) {
 		assert.deepEqual(declared[section], rows, 'handwritten controls source: ' + section);
 		assert.deepEqual(generated[section], rows, 'actual generated controls: ' + section);
@@ -3600,7 +3633,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/gesture_system_refresh.json'))
 	);
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
-	const source = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const source = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	assert.deepEqual(source[corpus.section], corpus.rows, 'independent refresh source declaration');
 	assert.deepEqual(generated[corpus.section], corpus.rows, 'actual generated refresh declaration');
 	assert.deepEqual(corpus.platform_rows, {
@@ -3762,7 +3795,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/gesture_swipe_template.json'))
 	);
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
-	const declared = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declared = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	assert.deepEqual(declared[corpus.section], corpus.rows, 'handwritten complete swipe source');
 	assert.deepEqual(generated[corpus.section], corpus.rows, 'actual generated swipe template');
 	assert.deepEqual(corpus.child_sections, {
@@ -3918,7 +3951,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	const corpus = JSON.parse(
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/gesture_swipe_template.json'))
 	);
-	const records = parseToml(readSourceFile(MANIFEST_PATH)).menu[corpus.section];
+	const records = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu[corpus.section];
 	function assertSwipeRecords(actual) {
 		assert.deepEqual(actual, corpus.rows, 'exact independently handwritten full-slot declaration');
 	}
@@ -4018,7 +4051,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	assert.equal(corpus.version_index, 1);
 	assert.equal(corpus.separator_index, 2);
 	assert.equal(corpus.channel_index, 3);
-	const source = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const source = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	assert.deepEqual(source[corpus.section], corpus.rows);
 	assert.deepEqual(JSON.parse(readSourceFile(MENU_PATH))[corpus.section], corpus.rows);
 	function sequence(tokens, values) {
@@ -4059,7 +4092,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	for (const [driver, file] of [
 		['ahk', 'windows/ui/menu/menu_init.ahk'],
 		['hs', 'macos/ui/menu/menu_about.lua'],
-		['linux', 'linux/ui/menu/menu_builder.lua']
+		['linux', 'linux/ui/menu/builder.lua']
 	]) {
 		const text = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
 		wiring(text, driver);
@@ -4104,7 +4137,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		for (const [platform, path] of [
 			['ahk', 'windows/ui/menu/menu_init.ahk'],
 			['hs', 'macos/ui/menu/menu_about.lua'],
-			['linux', 'linux/ui/menu/menu_builder.lua']
+			['linux', 'linux/ui/menu/builder.lua']
 		])
 			assert.equal(row.native_sources[platform], path);
 	}
@@ -4137,7 +4170,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	const expected = JSON.parse(
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/custom_profile_children.json'))
 	);
-	const declared = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declared = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	assert.deepEqual(declared[expected.section], expected.declaration);
 	assert.deepEqual(generated[expected.section], expected.declaration);
@@ -4177,7 +4210,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 	for (const [platform, file] of [
 		['hs', 'macos/ui/menu/menu_llm/profiles_manager.lua'],
-		['linux', 'linux/ui/menu/menu_builder.lua']
+		['linux', 'linux/ui/menu/builder.lua']
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
 		wiring(source, platform);
@@ -4251,7 +4284,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/linux_numeric_custom_tail.json'))
 	);
 	const section = 'llm_numeric_custom_rows';
-	const declared = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declared = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	function declaration(candidate) {
 		assert.deepEqual(candidate[section], expected.declaration);
@@ -4280,12 +4313,11 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			['llm_trigger', 'delay_choices'],
 			['llm_generation', 'choices']
 		]) {
-			const registry = owner === 'llm_trigger' ? 'group_builders' : 'dynamic_handlers';
-			const parameters = owner === 'llm_trigger' ? '' : 'target';
-			const begin = source.indexOf(registry + '["' + owner + '"] = function(' + parameters + ')');
+			const registry = owner === 'llm_trigger' ? 'group_builders' : 'providers';
+			const begin = source.indexOf(registry + '["' + owner + '"] = function()');
 			assert(begin >= 0, 'actual numeric provider ' + owner);
 			const rest = source.slice(begin + 1);
-			const end = rest.indexOf('dynamic_handlers[');
+			const end = rest.indexOf('providers[');
 			const body = source.slice(begin, end < 0 ? source.length : begin + 1 + end);
 			const tokens = scriptTokens(body, '.lua').map((t) => t.value);
 			function has(seq) {
@@ -4344,7 +4376,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		}
 	}
 	const native = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
 	);
 	wiring(native);
 	for (const mutate of [
@@ -4375,7 +4407,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			assert(edge);
 			assert.equal(edge.kind, 'compose');
 			assert.deepEqual([...edge.platforms], ['linux']);
-			assert.equal(edge.native_sources.linux, 'linux/ui/menu/menu_builder.lua');
+			assert.equal(edge.native_sources.linux, 'linux/ui/menu/builder.lua');
 		}
 	}
 	edges(graph);
@@ -4438,7 +4470,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	const owners = {
 		ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk',
 		hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
-		linux: 'linux/ui/menu/menu_builder.lua'
+		linux: 'linux/ui/menu/builder.lua'
 	};
 	const { scriptTokens } = require('../lib/script-source.cjs');
 	function sequence(tokens, values) {
@@ -4580,13 +4612,13 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				? '_LLM_Menu_ProfileRows() {'
 				: platform === 'hs'
 					? 'local function build_profile_menu('
-					: 'dynamic_handlers["llm_profile"] = function';
+					: 'providers["llm_profile"] = function';
 		const unrelatedOwner =
 			platform === 'ahk'
 				? '_LLM_Menu_UnrelatedRows() {'
 				: platform === 'hs'
 					? 'local function unrelated_build_profile_menu('
-					: 'dynamic_handlers["unrelated_profile"] = function';
+					: 'providers["unrelated_profile"] = function';
 		const fakeOwner = source.replace(
 			ownerMarker,
 			(platform === 'ahk' ? '; ' : '-- ') + ownerMarker + '\n' + unrelatedOwner
@@ -4604,7 +4636,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		if (platform === 'linux') {
 			const foreignHandler = source.replace(
 				ownerMarker,
-				'local decoy = {dynamic_handlers={}}; decoy.' + ownerMarker
+				'local decoy = {providers={}}; decoy.' + ownerMarker
 			);
 			assert.notEqual(foreignHandler, source);
 			assert.throws(
@@ -4958,7 +4990,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			);
 		}
 		const linux = readSourceFile(
-			resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua')
+			resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
 		);
 		assert(!linux.includes('"' + expected.section + '"'));
 	}
@@ -5041,7 +5073,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/linux_absent_modules.json'))
 	);
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
 	);
 	assert.equal(expected.owners.length, 5);
 	assert.equal(
@@ -5106,7 +5138,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'MenuRenderer_TemplateRows',
 			['trigger', 'display']
 		],
-		['linux', 'ui/menu/menu_builder.lua', 'ManifestMenu.template_rows', ['trigger']]
+		['linux', 'ui/menu/builder.lua', 'ManifestMenu.template_rows', ['trigger']]
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative));
 		for (const key of keys)
@@ -5129,7 +5161,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	);
 	for (const [driver, relative, extension, section] of [
 		['macos', 'ui/menu/menu_llm/profiles_manager.lua', '.lua', 'llm_profile_lua_frame'],
-		['linux', 'ui/menu/menu_builder.lua', '.lua', 'llm_profile_lua_frame'],
+		['linux', 'ui/menu/builder.lua', '.lua', 'llm_profile_lua_frame'],
 		['windows', 'ui/menu/menu_llm/menu_profiles.ahk', '.ahk', 'llm_profile_windows_frame']
 	]) {
 		assert.ok(Array.isArray(profile.sections[section]) && profile.sections[section].length > 0);
@@ -5168,7 +5200,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	);
 	const menu = JSON.parse(readSourceFile(MENU_PATH));
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
 	);
 	const tokens = scriptTokens(source, '.lua');
 	const sections = ['selection_case_boundary', 'selection_helper_boundary'];
@@ -5275,7 +5307,11 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		assert.deepEqual(declared[0].platforms, ['ahk', 'hs', 'linux']);
 	}
 	for (const row of menu.llm_menu.filter((row) => ['llm_model', 'llm_profile'].includes(row.id)))
-		assert.equal(row.type, 'dynamic', 'other dynamic child families keep their existing API');
+		assert.equal(
+			row.type,
+			'list',
+			'the model and profile rows are list rows whose providers supply DATA'
+		);
 	for (const id of ['llm_generation_settings']) {
 		const rows = menu.llm_menu.filter((row) => row.id === id);
 		assert.equal(rows.length, 1, 'the complete fixed parent has one genuine identity');
@@ -5413,7 +5449,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 					',',
 					'LLM',
 					',',
-					'handlers',
+					'nil',
 					',',
 					'group_builders'
 				]),
@@ -5441,7 +5477,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 					',',
 					'LLM',
 					',',
-					'dynamic_handlers',
+					'nil',
 					',',
 					'group_builders'
 				]),
@@ -5466,11 +5502,15 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 					',',
 					'LLM',
 					',',
-					'DynamicHandlers',
+					'Map',
+					'(',
+					')',
 					',',
 					'_LLM_Menu_GroupBuilders',
 					'(',
-					')'
+					')',
+					',',
+					'ListProviders'
 				]),
 				'actual outer Windows canonical renderer'
 			);
@@ -5478,7 +5518,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 	for (const [platform, relative] of [
 		['hs', 'macos/ui/menu/menu_llm/init.lua'],
-		['linux', 'linux/ui/menu/menu_builder.lua'],
+		['linux', 'linux/ui/menu/builder.lua'],
 		['ahk', 'windows/ui/menu/menu_llm/menu_main.ahk']
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', relative));
@@ -5524,7 +5564,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 	for (const [platform, relative, root] of [
 		['hs', 'macos/ui/menu/menu_llm/init.lua', 'child_group_for("llm_'],
-		['linux', 'linux/ui/menu/menu_builder.lua', 'group_builders["llm_'],
+		['linux', 'linux/ui/menu/builder.lua', 'group_builders["llm_'],
 		['ahk', 'windows/ui/menu/menu_llm/menu_main.ahk', 'MenuRenderer_Build("llm_menu"']
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', relative));
@@ -6464,7 +6504,7 @@ console.log(
 	}
 	const sharedRoot = resolve(SHARED, 'lua');
 	const mac = 'macos/ui/menu/magic_key_source_menu.lua',
-		linux = 'linux/ui/menu/menu_builder.lua';
+		linux = 'linux/ui/menu/builder.lua';
 	for (const rel of [mac, linux]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', rel));
 		const reached = delegatedMenuSources([{ rel, src: source }], sharedRoot).find(
@@ -6606,7 +6646,7 @@ console.log(
 			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'
 		);
 		const en = path.join(fixture, 'static/ergopti_plus/_shared/data/locales/en.json');
-		const original = readSourceFile(manifest);
+		const original = combinedCompilerSource(path.join(fixture, 'static/ergopti_plus/_shared'));
 		const addition = corpus.rows
 			.map(
 				(row) =>
@@ -6618,7 +6658,7 @@ console.log(
 			)
 			.join('');
 		const compile = (text) => {
-			fs.writeFileSync(manifest, text);
+			writeCompilerSources(fixture, text);
 			return spawnSync(process.execPath, ['tools/build/build-menu-manifest.js'], {
 				cwd: fixture,
 				encoding: 'utf8'
@@ -6740,7 +6780,7 @@ console.log(
 			'.lua',
 			['word_expander', 'preview', 'delays']
 		],
-		['../linux/ui/menu/menu_builder.lua', '.lua', ['word_expander', 'preview', 'delays']]
+		['../linux/ui/menu/builder.lua', '.lua', ['word_expander', 'preview', 'delays']]
 	];
 	for (const [file, extension, names] of owners) {
 		const source = readSourceFile(resolve(SHARED, file));
@@ -6942,7 +6982,7 @@ console.log(
 		['../windows/ui/menu/menu_hotstrings.ahk', '.ahk', ['content_frame', 'empty_file']],
 		['../macos/ui/menu/menu_hotstrings.lua', '.lua', ['bulk_controls']],
 		['../macos/ui/menu/builder.lua', '.lua', ['content_frame']],
-		['../linux/ui/menu/menu_builder.lua', '.lua', ['content_frame', 'bulk_controls']]
+		['../linux/ui/menu/builder.lua', '.lua', ['content_frame', 'bulk_controls']]
 	];
 	for (const [file, extension, names] of owners) {
 		const source = readSourceFile(resolve(SHARED, file));
@@ -7089,7 +7129,7 @@ console.log(
 			fixture,
 			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'
 		);
-		const original = readSourceFile(manifest);
+		const original = combinedCompilerSource(path.join(fixture, 'static/ergopti_plus/_shared'));
 		const compile = (rows, extra = '') => {
 			const addition = rows
 				.map(
@@ -7101,7 +7141,7 @@ console.log(
 						'\n'
 				)
 				.join('');
-			fs.writeFileSync(manifest, original + addition + extra);
+			writeCompilerSources(fixture, original + addition + extra);
 			return spawnSync(process.execPath, ['tools/build/build-menu-manifest.js'], {
 				cwd: fixture,
 				encoding: 'utf8'
@@ -7171,7 +7211,7 @@ console.log(
 	const files = {
 		ahk: resolve(SHARED, '../windows/ui/menu/menu_shortcuts.ahk'),
 		hs: resolve(SHARED, '../macos/ui/menu/menu_shortcuts.lua'),
-		linux: resolve(SHARED, '../linux/ui/menu/menu_builder.lua')
+		linux: resolve(SHARED, '../linux/ui/menu/builder.lua')
 	};
 	const frames = {
 		shortcut_wrap_frame: [
@@ -8352,7 +8392,7 @@ console.log(
 			]
 		],
 		[
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'local function _build_language(ctx)',
 			[
 				'local locales = i18n.list_locales()',
@@ -8572,7 +8612,7 @@ console.log(
 		],
 		[
 			'linux',
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'local function _build_debug(ctx)',
 			'rows',
 			'return ManifestMenu.group_row("top_level", "debug", rows, render_ctx.state_getters)'
@@ -8831,7 +8871,7 @@ console.log(
 		],
 		[
 			'linux',
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'local function _build_configuration(ctx)',
 			'rows',
 			'return ManifestMenu.group_row("top_level", "configuration", rows, render_ctx.state_getters)'
@@ -9302,7 +9342,7 @@ console.log(
 	}
 	for (const [driver, file, signature] of [
 		['hs', 'macos/ui/menu/menu_metrics.lua', 'function M.build(ctx)'],
-		['linux', 'linux/ui/menu/menu_builder.lua', 'local function _build_metrics(ctx)']
+		['linux', 'linux/ui/menu/builder.lua', 'local function _build_metrics(ctx)']
 	]) {
 		const source = readSourceFile(path.join(base, file));
 		const native = ownerBody(source, signature);
@@ -9528,9 +9568,9 @@ console.log(
 				)
 				.join('');
 		// Both genuine outputs require their complete canonical startup source closure.
-		const canonical = readSourceFile(MANIFEST_PATH);
+		const canonical = combinedCompilerSource();
 		const compile = (rows) => {
-			fs.writeFileSync(manifest, canonical + toml(rows));
+			writeCompilerSources(fixture, canonical + toml(rows));
 			return spawnSync(process.execPath, ['tools/build/build-menu-manifest.js'], {
 				cwd: fixture,
 				encoding: 'utf8',
@@ -9721,7 +9761,7 @@ console.log(
 			]
 		],
 		[
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'.lua',
 			'local function _manifest_hotstring_rows(ctx, config)',
 			[
@@ -9807,7 +9847,7 @@ console.log(
 // action submenu frame they once rendered is gone from the declaration.
 {
 	const assert = require('node:assert/strict');
-	const records = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const records = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	for (const name of ['tap_hold_action_picker_frame', 'tap_hold_action_picker_boundary']) {
 		assert.equal(records[name], undefined, 'retired action submenu declaration: ' + name);
@@ -9828,7 +9868,7 @@ console.log(
 	const corpus = JSON.parse(
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/gesture_system_status_captions.json'))
 	);
-	const declaration = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declaration = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	const expected = {
 		gesture_system_status_macos_frame: [
@@ -10029,7 +10069,7 @@ console.log(
 			}
 		]
 	};
-	const records = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const records = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	for (const [name, rows] of Object.entries(declaration)) {
 		assert.deepEqual(records[name], rows, 'independently specified root-badge declaration');
@@ -10246,7 +10286,7 @@ console.log(
 			}
 		]
 	};
-	const canonical = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const canonical = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const projected = JSON.parse(readSourceFile(MENU_PATH));
 	for (const [key, rows] of Object.entries(declaration)) {
 		assert.deepEqual(canonical[key], rows, 'independent finished kind/role/placement declaration');
@@ -10386,7 +10426,7 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
-	const declaration = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declaration = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	const expected = {
 		layout_switching_frame: [
@@ -10590,7 +10630,7 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const { nativeLayoutTemplatePublication } = require('../lib/menu-native-layout-binding.cjs');
-	const declaration = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declaration = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	const native = readSourceFile(
 		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua')
@@ -10699,7 +10739,7 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const { nativeLayoutTemplatePublication } = require('../lib/menu-native-layout-binding.cjs');
-	const declaration = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declaration = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const source = readSourceFile(
 		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua')
 	);
@@ -10799,7 +10839,7 @@ console.log(
 	const parsedPolicy = parseTomlSource(
 		readSourceFile(resolve(SHARED, 'modules/menu/startup_tray.toml'))
 	);
-	const parsedMenu = parseTomlSource(readSourceFile(MANIFEST_PATH)).menu;
+	const parsedMenu = parseTomlSource(readSourceFile(MENU_SOURCE_PATH)).menu;
 	assert.equal(Object.getPrototypeOf(parsedPolicy), null, 'exercise genuine parser-owned records');
 	assert.equal(
 		startup.render(parsedMenu, parsedPolicy, locales),
@@ -10868,7 +10908,7 @@ console.log(
 	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
 	const { publishesSelectedMenuGroup } = require('../lib/menu-shared-delegation.cjs');
 	const { scriptTokens } = require('../lib/script-source.cjs');
-	const records = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const records = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	const frame = 'llm_profile_parent_frame_ahk';
 	const group = 'llm_profile_parent_ahk';
@@ -11505,7 +11545,7 @@ console.log(
 			return false;
 		}
 	}
-	const source = readSourceFile(path.join(base, 'linux/ui/menu/menu_builder.lua'));
+	const source = readSourceFile(path.join(base, 'linux/ui/menu/builder.lua'));
 	assert.equal(
 		admits(source),
 		true,
@@ -11851,7 +11891,7 @@ console.log(
 	const assert = require('node:assert/strict');
 	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
 	);
 	const menu = JSON.parse(readSourceFile(MENU_PATH));
 	const native = [{ src: source }];
@@ -11936,7 +11976,7 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
-	const canonical = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const canonical = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const row = canonical.top_level.find((item) => item.id === 'hotstrings');
 	assert.equal(row.type, 'group');
 	assert.equal(row.i18n, 'menu.hotstrings.title');
@@ -12161,7 +12201,7 @@ console.log(
 	);
 	for (const [platform, file] of [
 		['hs', 'macos/ui/menu/menu_hotstrings.lua'],
-		['linux', 'linux/ui/menu/menu_builder.lua']
+		['linux', 'linux/ui/menu/builder.lua']
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', file));
 		const admits = (candidate) => publishesMenuTemplate(candidate, '.lua', section);
@@ -12772,23 +12812,15 @@ console.log(
 			]
 		},
 		{ type: '---' },
-		{ type: 'dynamic', id: 'agent_system1', i18n: 'menu.agent.system1' },
-		{ type: 'dynamic', id: 'agent_system2', i18n: 'menu.agent.system2' },
+		// One declaration per System row for every driver since 2026-10-31: the
+		// `dynamic` copy the Lua drivers drew and the `list` copy Windows drew were
+		// the same row declared twice by type alone.
+		{ type: 'list', id: 'agent_system1', i18n: 'menu.agent.system1' },
+		{ type: 'list', id: 'agent_system2', i18n: 'menu.agent.system2' },
 		{ type: '---' }
 	];
-	const receivedPrefix = originalPrefix.flatMap((row) =>
-		row.type === 'dynamic'
-			? [
-					{ ...row, platforms: ['hs', 'linux'], unavailable: 'hide' },
-					{ ...row, type: 'list', platforms: ['ahk'], unavailable: 'hide' }
-				]
-			: [row]
-	);
-	const windowsPrefix = receivedPrefix.filter(
-		(row) => !row.platforms || row.platforms.includes('ahk')
-	);
 	const originalApps = {
-		type: 'dynamic',
+		type: 'list',
 		id: 'agent_disabled_apps',
 		i18n: 'menu.agent.disabled_apps'
 	};
@@ -12804,7 +12836,7 @@ console.log(
 	assert.deepEqual(
 		manifest[apps],
 		[
-			...receivedPrefix,
+			...originalPrefix,
 			{ ...originalApps, platforms: ['hs', 'linux'], unavailable: 'hide' },
 			appsCommand
 		],
@@ -12816,11 +12848,11 @@ console.log(
 				.filter((row) => !row.platforms || row.platforms.includes(platform))
 				.map(({ platforms, unavailable, ...row }) => row),
 			[...originalPrefix, originalApps],
-			platform + ': the original native-visible dynamic menu projection is preserved'
+			platform + ': the original native-visible menu projection is preserved'
 		);
 	assert.deepEqual(
 		manifest[apps].filter((row) => !row.platforms || row.platforms.includes('ahk')),
-		[...windowsPrefix, appsCommand],
+		[...originalPrefix, appsCommand],
 		'Windows receives one final command at the original apps position'
 	);
 	const renderer = readSourceFile(
@@ -13028,26 +13060,16 @@ console.log(
 		);
 		assert.deepEqual(
 			visible,
-			[
-				{
-					type: 'list',
-					id: system,
-					i18n: 'menu.agent.' + system.slice(6),
-					platforms: ['ahk'],
-					unavailable: 'hide'
-				}
-			],
-			'one current Windows list declaration owns ' + system
+			[{ type: 'list', id: system, i18n: 'menu.agent.' + system.slice(6) }],
+			'one current list declaration owns ' + system
 		);
 		for (const platform of ['hs', 'linux'])
 			assert.deepEqual(
-				manifest.agent_menu
-					.filter(
-						(row) => row.id === system && (!row.platforms || row.platforms.includes(platform))
-					)
-					.map(({ platforms, unavailable, ...row }) => row),
-				[{ type: 'dynamic', id: system, i18n: 'menu.agent.' + system.slice(6) }],
-				platform + ': original System dynamic ownership remains exact'
+				manifest.agent_menu.filter(
+					(row) => row.id === system && (!row.platforms || row.platforms.includes(platform))
+				),
+				visible,
+				platform + ': the same single System list declaration is drawn'
 			);
 	}
 	assert.equal(
@@ -13166,7 +13188,8 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
-	const recipe = parseToml(readSourceFile(MANIFEST_PATH)).menu.shortcut_extension_construction_ahk;
+	const recipe = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu
+		.shortcut_extension_construction_ahk;
 	assert.deepEqual(recipe, {
 		kind: 'owned_native_menu',
 		platform: 'ahk',
@@ -13285,4 +13308,68 @@ console.log(
 		preparedReads = reads;
 	for (let offset = 0; offset <= source.length; offset++) position(offset);
 	assert.equal(reads, preparedReads, 'coordinate queries must not rescan the source');
+}
+
+// The `dynamic` row type is retired: the tray menu is defined in the shared
+// manifest only, and a `dynamic` row handed its id back to platform code, which
+// then chose the row's label, children, order and greying per OS. The ratchet
+// is zero, in the source tables, in the generated file and in the compiler.
+{
+	const assert = require('node:assert/strict');
+	const availability = require('../lib/menu-row-availability.cjs');
+	const found = [];
+	const walk = (value, where) => {
+		if (Array.isArray(value)) return value.forEach((child, i) => walk(child, `${where}[${i}]`));
+		if (!value || typeof value !== 'object') return;
+		if (value.type === 'dynamic') found.push(`${where} (${value.id ?? '?'})`);
+		for (const [key, child] of Object.entries(value)) walk(child, `${where}.${key}`);
+	};
+	walk(parseToml(readFileSync(MENU_SOURCE_PATH, 'utf8')).menu, 'menu.toml menu');
+	walk(JSON.parse(readFileSync(MENU_PATH, 'utf8')), 'menu_manifest.json');
+	assert.deepEqual(found, [], 'no menu row may be declared `dynamic`; declare a `list` row');
+	assert.equal(availability.RETIRED_ROW_TYPES.has('dynamic'), true);
+	// The compiler refuses one at any depth, top-level row or nested template row.
+	assert.doesNotThrow(() =>
+		availability.validateNoRetiredRows({ demo: [{ type: 'list', id: 'demo_rows' }] })
+	);
+	for (const menu of [
+		{ demo: [{ type: 'dynamic', id: 'demo_rows' }] },
+		{ demo: { rows: [{ type: 'group', id: 'g', items: [{ type: 'dynamic', id: 'x' }] }] } }
+	]) {
+		assert.throws(() => availability.validateNoRetiredRows(menu), /'dynamic' rows are retired/);
+		// build-menu-manifest.js reaches it through validateGreyedRows.
+		assert.throws(() => availability.validateMenuAvailability(menu), /'dynamic' rows are retired/);
+	}
+	// The generated header no longer documents the type as available.
+	const header = JSON.parse(readFileSync(MENU_PATH, 'utf8'))._comment3;
+	assert.equal(header.includes("'dynamic' = "), false);
+	console.log(
+		'[OK] retired `dynamic` rows: none declared, none generated, and the compiler refuses one.'
+	);
+}
+
+// The tray menu is defined in one findable file, _shared/modules/menu/menu.toml.
+// Its tables were interleaved with the feature tables of the feature manifest
+// until 2026-10-31, where a reader looking for a row had 9 500 lines to search;
+// a [menu] table back in that file would split the definition in two again.
+{
+	const assert = require('node:assert/strict');
+	const features = readSourceFile(MANIFEST_PATH);
+	const headers = features
+		.split('\n')
+		.map((line, index) => [index + 1, line])
+		.filter(([, line]) => /^\s*\[\[?\s*menu\s*(?:[.\]])/.test(line));
+	assert.deepEqual(
+		headers,
+		[],
+		'features/manifest.toml declares features only; [menu] tables belong in modules/menu/menu.toml'
+	);
+	assert.equal(Object.hasOwn(parseToml(features), 'menu'), false);
+	const menu = parseToml(readSourceFile(MENU_SOURCE_PATH));
+	assert.deepEqual(Object.keys(menu), ['menu'], 'menu.toml declares the [menu] tables only');
+	// The check itself refuses both header spellings.
+	for (const line of ['[menu]', '[[menu.demo]]', '  [ menu.demo ]'])
+		assert.equal(/^\s*\[\[?\s*menu\s*(?:[.\]])/.test(line), true, line);
+	assert.equal(/^\s*\[\[?\s*menu\s*(?:[.\]])/.test('[menus]'), false);
+	console.log('[OK] the tray menu is declared in menu.toml only, never in the feature manifest.');
 }

@@ -542,7 +542,7 @@ const CHANNEL_CONSUMERS = [
 	'macos/launcher/Sources/ErgoptiPlus/UpdateChannelFeed.swift',
 	'linux/modules/updater/manager.lua',
 	'linux/ui/changelog/bridge.lua',
-	'linux/ui/menu/menu_builder.lua',
+	'linux/ui/menu/builder.lua',
 	'_shared/lua/updater/channels.lua',
 	'_shared/lua/updater/release_parser.lua',
 	'_shared/ui/update_channels.js',

@@ -347,9 +347,8 @@ luajit ergopti_hotstrings.lua --dry-run    # log matches, inject nothing
 luajit ergopti_hotstrings.lua --tray       # the real thing, with a tray icon
 ```
 
-`bin/ergopti-hotstrings` does the same after exporting `LUA_PATH`, but it prefers
-an installed tree if `/usr/lib/ergopti` exists — call the entry file directly
-when iterating on a checkout. With no `~/.config/ergopti/hotstrings/`, the daemon
+`bin/ergopti-hotstrings` does the same after exporting `LUA_PATH`, always from
+the tree it lives in, even when a package is installed. With no `~/.config/ergopti/hotstrings/`, the daemon
 falls back to the TOML definitions bundled in `_shared/modules/hotstrings/`.
 
 | Flag                      | Effect                                                                                            |

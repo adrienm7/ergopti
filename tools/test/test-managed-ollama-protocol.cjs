@@ -10,6 +10,24 @@ const fs = require('node:fs');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { pythonExecutable } = require('../lib/python.cjs');
+const { trustCheckout } = require('./lib/git-safe-directory.cjs');
+
+// Children list this checkout's files with git. Run by a user who does not own
+// the checkout (a cloud container cloned as root), git refused it as "dubious
+// ownership" and the gate stopped there: trust this one checkout for the gate's
+// own children, never in the user's Git configuration.
+assert.deepEqual(
+	trustCheckout({ GIT_CONFIG_COUNT: '2' }, '/checkout'),
+	{
+		GIT_CONFIG_COUNT: '3',
+		GIT_CONFIG_KEY_2: 'safe.directory',
+		GIT_CONFIG_VALUE_2: '/checkout'
+	},
+	'an existing command-scope Git entry keeps its index'
+);
+assert.throws(() => trustCheckout({ GIT_CONFIG_COUNT: 'x' }, '/checkout'));
+assert.throws(() => trustCheckout({}, 'relative'));
+Object.assign(process.env, trustCheckout(process.env, path.resolve(__dirname, '../..')));
 
 // Standalone selectors reuse the existing Windows component receivers;
 // the default still receives every original platform control below.
@@ -422,7 +440,7 @@ if (process.platform !== 'win32') {
 	// Real files and CLI; modeled host admission grants no native macOS credit.
 	cases.push(['tools/test/macos_managed_ollama_catalogue_refusal_test.py', 12]);
 	cases.push(['tools/test/macos_native_ollama_api_test.py', 20]);
-	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 98]);
+	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 100]);
 	cases.push(['tools/test/macos_native_http_clock_passive_receiving_controls.py', 21]);
 	const clockResult = spawnSync(
 		process.execPath,
@@ -446,7 +464,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_ollama_hint_metadata_test.py', 19]);
 	cases.push(['tools/diagnostics/macos_ollama_serve_command_receiving_test.py', 2]);
 	cases.push(['tools/diagnostics/macos_native_python_probe_io_test.py', 3]);
-	cases.push(['tools/test/macos_managed_ollama_pull_caller_test.py', 15]);
+	cases.push(['tools/test/macos_managed_ollama_pull_caller_test.py', 18]);
 	cases.push(['tools/test/macos_managed_ollama_cleanup_test.py', 37]);
 	cases.push(['tools/test/managed_source_alias_test.py', 23]);
 	cases.push(['tools/diagnostics/macos_owned_image_alias_test.py', 28]);
@@ -675,7 +693,7 @@ assert.equal(admission.signal, null, 'the Lua 5.4 admission must retire');
 assert.equal(admission.status, 0, admission.stderr || admission.stdout);
 for (const [script, expected] of [
 	['tools/test/managed_ollama_pull_receipt_test.lua', 41],
-	['tools/test/managed_ollama_pull_adapter_test.lua', 50],
+	['tools/test/managed_ollama_pull_adapter_test.lua', 60],
 	['tools/test/managed_native_python_test.lua', 8],
 	['tools/test/managed_ollama_cleanup_receipt_test.lua', 102]
 ]) {

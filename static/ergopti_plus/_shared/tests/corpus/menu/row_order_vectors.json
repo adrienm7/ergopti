@@ -45,18 +45,6 @@
 				"distancesreduction",
 				"personal"
 			]
-		},
-		{
-			"id": "llm-menu-rows",
-			"rule": "llm_menu_rows",
-			"order": [
-				"llm_model",
-				"llm_profile",
-				"llm_trigger",
-				"llm_generation_settings",
-				"llm_display",
-				"llm_navigation"
-			]
 		}
 	],
 	"refusals": [

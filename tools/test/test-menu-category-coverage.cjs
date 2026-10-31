@@ -989,7 +989,7 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 		),
 		false
 	);
-	const linux = readSourceFile(path.join(SP, 'linux/ui/menu/menu_builder.lua'));
+	const linux = readSourceFile(path.join(SP, 'linux/ui/menu/builder.lua'));
 	assert.equal(
 		nativeTemplateBinding(linux, '.lua', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1),
 		true

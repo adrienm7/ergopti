@@ -212,17 +212,25 @@ match($0, /Slow preferences save [0-9]+ ms/) {
 }
 /Lease-bound input startup failed/ { lease++ }
 /Layout [a-z]+ detected change before its baseline/ { early++ }
+/database is locked/ { locked++ }
+/Some shortcuts are still unregistered after/ { unregistered++ }
+/rebinding every shortcut \(retry/ { rebinds++ }
 END {
 	for (k in n) printf "segment %s %d %.2f %.2f\n", k, n[k], t[k], m[k]
 	printf "ingest %d %d\nprefs %d %d\n", ic, im, pc, pm
 	printf "lease_bound %d\nearly_layout %d\n", lease, early
+	printf "db_locked %d\nshortcuts_unregistered %d\nshortcut_rebinds %d\n", locked, unregistered, rebinds
 }
 ]=]
+
+-- The counted lines the awk summary ends with.
+M.LOG_COUNTERS = { lease_bound = true, early_layout = true, db_locked = true, shortcuts_unregistered = true,
+	shortcut_rebinds = true }
 
 --- Reads the awk summary.
 --- @param text any
 --- @return table|nil summary { segments = { { name, count, own_ms, worst_ms } } by own time, ingest = { count, worst_ms },
----   prefs = { ... }, lease_bound = count, early_layout = count }
+---   prefs = { ... }, lease_bound, early_layout, db_locked, shortcuts_unregistered, shortcut_rebinds (counts) }
 function M.parse_slow_summary(text)
 	local summary = { segments = {} }
 	for line in tostring(text or ""):gmatch("[^\n]+") do
@@ -236,10 +244,11 @@ function M.parse_slow_summary(text)
 			summary[kind] = { count = tonumber(kind_count), worst_ms = tonumber(kind_worst) }
 		end
 		local counter, counted = line:match("^([%a_]+) (%d+)$")
-		if counter == "lease_bound" or counter == "early_layout" then summary[counter] = tonumber(counted) end
+		if M.LOG_COUNTERS[counter] then summary[counter] = tonumber(counted) end
 	end
-	if summary.ingest == nil or summary.prefs == nil or summary.lease_bound == nil or summary.early_layout == nil then
-		return nil
+	if summary.ingest == nil or summary.prefs == nil then return nil end
+	for counter in pairs(M.LOG_COUNTERS) do
+		if summary[counter] == nil then return nil end
 	end
 	table.sort(summary.segments, function(a, b) return a.own_ms > b.own_ms end)
 	return summary
@@ -276,6 +285,14 @@ function M.slow_lines(ports, report, finish)
 		report.step("log_lease_bound_failures", summary.lease_bound == 0 and PASS or FAIL, summary.lease_bound)
 		report.step("log_layout_change_before_baseline", summary.early_layout == 0 and PASS or FAIL,
 			summary.early_layout)
+		-- The Mac field report of 2026-10-30 21:01 left these to the next day's log:
+		-- the keystats ingest's "database is locked" (quick_check opens immutable=1
+		-- since 8084562373), and shortcuts left unregistered after a layout flip's
+		-- full rebind (a retry line alone is information).
+		report.step("log_keystats_database_locked", summary.db_locked == 0 and PASS or FAIL, summary.db_locked)
+		report.step("log_shortcuts_still_unregistered", summary.shortcuts_unregistered == 0 and PASS or FAIL,
+			summary.shortcuts_unregistered)
+		report.step("log_shortcut_rebind_retries", INFO, summary.shortcut_rebinds)
 		finish()
 	end)
 end

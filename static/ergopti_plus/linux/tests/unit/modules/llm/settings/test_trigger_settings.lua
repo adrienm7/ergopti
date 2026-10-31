@@ -284,7 +284,7 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 	helpers.it("renders the declared trigger submenu and changes a privacy filter", function()
 		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
 		local i18n = require("infra.i18n")
-		local menu_builder = helpers.load_module("ui.menu.menu_builder")
+		local menu_builder = helpers.load_module("ui.menu.builder")
 		local menu = menu_builder.build({
 			is_paused = function() return false end,
 			llm = {
@@ -321,7 +321,7 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 	helpers.it("offers the minimum request interval next to the idle time and saves a preset (request-floor-setting)", function()
 		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
 		local i18n = require("infra.i18n")
-		local menu_builder = helpers.load_module("ui.menu.menu_builder")
+		local menu_builder = helpers.load_module("ui.menu.builder")
 		local menu = menu_builder.build({
 			is_paused = function() return false end,
 			llm = {
@@ -354,7 +354,7 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 	helpers.it("offers the \"never\" idle time as macOS does and shows it as the current choice (llm-debounce-never)", function()
 		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
 		local i18n = require("infra.i18n")
-		local menu_builder = helpers.load_module("ui.menu.menu_builder")
+		local menu_builder = helpers.load_module("ui.menu.builder")
 		local function build()
 			return menu_builder.build({
 				is_paused = function() return false end,
@@ -469,8 +469,8 @@ local function with_trigger_menu(options, body)
 		}))
 		replace("infra.manifest_menu", renderer)
 	end
-	replace("ui.menu.menu_builder", nil)
-	local menu = require("ui.menu.menu_builder").build({
+	replace("ui.menu.builder", nil)
+	local menu = require("ui.menu.builder").build({
 		is_paused = function() return options.paused == true end,
 		on_menu_changed = function() observed.redraws = observed.redraws + 1 end,
 		llm = {

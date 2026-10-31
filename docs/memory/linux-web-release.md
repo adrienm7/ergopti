@@ -35,6 +35,15 @@ at LuaJIT's 200-local ceiling ("main function has more than 200 local
 variables" at load): new hook state goes into an existing table such as
 `LayerPointer`, never into new top-level locals.
 
+### project-linux-touchpad-gestures-share-the-touches-with-the-desktop
+
+The gesture reader decodes the touchpad evdev node without a grab, so the desktop
+(GNOME 47 and later) acts on the same touches: the nine two-finger slots fight
+with scrolling (the decoder refuses a scrolling pair as a swipe, rule 1, and the
+reader start names each bound two-finger slot), and no code here can stop the
+desktop's own gesture without taking the grab. Under Wayland no external process
+can move, focus or close a window, so no Linux tool can add those actions there.
+
 ### project-linux-a-field-must-be-named-at-every-boundary
 
 Linux input records cross evdev, resolver, injector, and Lua boundaries. Preserve
@@ -49,6 +58,16 @@ it. Tests must execute selection through injection.
 
 Provider APIs may return a single computed label wrapped as a list. Normalize at
 the adapter boundary rather than spreading shape checks through the driver.
+
+### project-linux-luaposix-stat-is-lstat
+
+luaposix's legacy `posix.stat(path)` reports a symlink itself (`type = "link"`,
+the link's own inode) and its `mtime` in whole seconds; it never follows the
+link. A module that prefers `posix.stat` and falls back to `stat -L` therefore
+behaves differently on a host where luaposix is installed. Action: when a path
+must be judged by what it points to, use `luv.fs_stat` or `stat -L`, never
+`posix.stat`; a test of that path injects a `posix` port with these semantics
+so it fails on a host without luaposix too.
 
 ### project-linux-keymap-before-libxkbcommon-1-8
 
@@ -220,7 +239,7 @@ grouping, in `--no-grab` mode) needs a real-machine check.
 ### project-linux-the-menu-builder-is-pinned-token-by-token
 
 `tools/lib/menu-native-llm-parent-binding.cjs` and the language-owner binding
-read `ui/menu/menu_builder.lua` token by token. A new top-level `local` (an
+read `ui/menu/builder.lua` token by token. A new top-level `local` (an
 import, a helper table, a function) in that file turns `test-menu-parity` and
 `test-hotstring-category-submenu-order` red. Put helpers in their own module and
 call them with an inline `require(...)` at the call site, as

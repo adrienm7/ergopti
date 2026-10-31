@@ -33,6 +33,7 @@
 
 local Identifiers = require("identifiers")
 local Logger = require("infra.logger")
+local MainThreadHold = require("infra.main_thread_hold")
 local KePaths = require("platform.remap.ke_paths")
 local LeaseMemorySnapshot = require("platform.remap.lease_memory_snapshot")
 local RuntimeVhid = require("platform.remap.runtime_vhid")
@@ -48,7 +49,6 @@ local OWNED_RUNTIME_DIR = "/Library/Application Support/ErgoptiPlus/Runtime"
 local OWNED_JOB_FILE = "/Library/LaunchDaemons/" .. Identifiers.service_labels.macos_core .. ".plist"
 local OWNED_JOB = "system/" .. Identifiers.service_labels.macos_core
 local STOCK_APP = "/Applications/Karabiner-Elements.app"
-local VHID_EXTENSION = "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"
 
 --- Seconds the key accounting check watches the keyboard.
 M.KEY_ACCOUNTING_SECONDS = 30
@@ -84,19 +84,29 @@ local function count_lines(text)
 	return count
 end
 
---- Extracts the activation state of the virtual keyboard driver from the
---- output of `systemextensionsctl list`, as a token such as activated_enabled.
---- @param output any Command output.
---- @return string state "absent" when the extension is not listed.
-function M.parse_driver_state(output)
-	for line in tostring(output or ""):gmatch("[^\r\n]+") do
-		if line:find(VHID_EXTENSION, 1, true) then
-			local state = line:match("%[([%a%s]+)%]")
-			if not state then return "unknown" end
-			return (state:gsub("%s+", "_"))
-		end
-	end
-	return "absent"
+--- The driver as the owned runtime owner reads it (platform/remap/runtime_vhid.lua):
+--- the active copy when macOS still lists an older one, and the owner's verdict
+--- against the driver version the runtime manifest pins. One parser, so the field
+--- report shows exactly what the owner's admission would decide.
+--- @param code integer|nil Exit status of `systemextensionsctl list`.
+--- @param output any Its output.
+--- @return table report runtime_vhid.parse report.
+--- @return string state Token such as activated_enabled, absent or unreadable.
+function M.read_driver(code, output)
+	local report = RuntimeVhid.parse(code == 0 and output or nil)
+	return report, report.state == "present" and report.activation or report.state
+end
+
+--- Names the owner's verdict on the installed driver.
+--- @param report table runtime_vhid.parse report.
+--- @param code integer|nil Exit status of the listing.
+--- @param pinned any Driver version the runtime manifest pins, nil when unpinned.
+--- @return string verdict compatible, unreadable, unpinned or a runtime_vhid reason.
+function M.driver_verdict(report, code, pinned)
+	if code ~= 0 then return "unreadable" end
+	if type(pinned) ~= "string" or pinned == "" then return "unpinned" end
+	local verdict = RuntimeVhid.assess(report, pinned)
+	return verdict.ok and "compatible" or verdict.reason
 end
 
 --- Extracts a dotted version number from a command line tool's output.
@@ -190,6 +200,15 @@ function M.lease_with_facts(ports, report, finish, remap, waited)
 	local deploy = ports.deploy_facts()
 	report.step("deploy_write_ms", STATE.info, deploy and math.floor(deploy.write_ms + 0.5) or "none")
 	report.step("deploy_kb", STATE.info, deploy and math.floor(deploy.bytes / 1024 + 0.5) or "none")
+	-- The swallowed-keys item's open decision: a write that is itself a key-delaying
+	-- hold means karabiner.json must shrink; a shorter one is kept as is.
+	if deploy == nil then
+		report.step("deploy_write_verdict", STATE.info, "none")
+	elseif deploy.write_ms < MainThreadHold.COUNT_MS then
+		report.step("deploy_write_verdict", STATE.pass, "keep")
+	else
+		report.step("deploy_write_verdict", STATE.fail, "shrink")
+	end
 	-- Starvation is their open explanation: the free memory names it.
 	local function memory_then_finish()
 		ports.exec(LeaseMemorySnapshot.TOOL, {}, COMMAND_TIMEOUT, function(code, output)
@@ -222,7 +241,8 @@ function M.owned_runtime(ports, report, finish)
 	ports.exec("/bin/launchctl", { "print", OWNED_JOB }, COMMAND_TIMEOUT, function(code)
 		report.step("job_loaded", STATE.info, code == 0 and "loaded" or (code == nil and "timeout" or "not_loaded"))
 		ports.exec("/usr/bin/systemextensionsctl", { "list" }, COMMAND_TIMEOUT, function(ext_code, ext_out)
-			report.step("driver_state", STATE.info, ext_code == 0 and M.parse_driver_state(ext_out) or "unreadable")
+			local driver, driver_state = M.read_driver(ext_code, ext_out)
+			report.step("driver_state", STATE.info, driver_state)
 			ports.exec("/usr/bin/pgrep", { "-f", "org.pqrs/Karabiner" }, COMMAND_TIMEOUT, function(stock_code, stock_out)
 				report.step("stock_running", STATE.info, stock_code == nil and "timeout" or count_lines(stock_out))
 				ports.exec("/usr/bin/pgrep", { "-f", "ErgoptiPlus/Runtime" }, COMMAND_TIMEOUT, function(own_code, own_out)
@@ -231,6 +251,7 @@ function M.owned_runtime(ports, report, finish)
 						local unpinned = facts.unpinned
 						report.step("artifact_pin", STATE.info,
 							unpinned == nil and "unreadable" or (unpinned == 0 and "pinned" or ("unpinned_" .. unpinned)))
+						report.step("driver_verdict", STATE.info, M.driver_verdict(driver, ext_code, facts.virtual_hid_version))
 						report.step("installed_source", STATE.info, facts.source and "reachable" or "unavailable")
 						report.step("other_karabiner_helper", STATE.info, yes_no(facts.helper_present))
 						report.step("other_karabiner_active", STATE.info, facts.active == nil and "unknown" or facts.active)
@@ -757,14 +778,14 @@ end
 function M.login_items(ports, report, finish)
 	local app_path = ports.app_path()
 	report.step("this_copy_known", STATE.info, yes_no(app_path ~= nil))
-	-- What an ad hoc build did to its stale guardian registrations before this
-	-- lifecycle's registration (RemapGuardianRegistrationNote), with that
-	-- registration's own answer. A refused reset leaves the stale definition
-	-- whose spawn macOS killed (field run 2026-10-30); a reset whose registration
-	-- was not ready at once is the same 10 s throttle again.
+	-- What an ad hoc build did with its guardian registrations in this
+	-- lifecycle (RemapGuardianRegistrationNote), with that registration's own
+	-- answer. A refused removal leaves a Background Items record whose spawn
+	-- macOS kills (field runs 2026-10-30 and 2026-10-31); a legacy-only
+	-- registration that is not ready leaves remapping without a guardian.
 	local note, status = ports.guardian_registration_note()
 	local failed = note == "developer_adhoc_reset_refused"
-		or (note == "developer_adhoc_reregistered" and status ~= "ready")
+		or (note == "developer_adhoc_legacy_only" and status ~= "ready")
 	report.step("guardian_registration", failed and STATE.fail or STATE.info,
 		(note or "no_reset") .. ":" .. (status or "unknown"))
 
@@ -838,6 +859,7 @@ local Probes = require("infra.field_check_probes")
 local LayoutRows = require("infra.field_check_layout_rows")
 local LocalServerProbe = require("infra.field_check_local_servers")
 local Session = require("infra.field_check_session")
+local PacFallback = require("infra.field_check_pac_fallback")
 
 --- Check identity → definition(ports, report, finish), as run by infra.field_check.
 M.checks = {
@@ -869,6 +891,7 @@ M.checks = {
 	idle_cost = Session.idle_cost,
 	fifo_safety = Session.fifo_safety,
 	slow_lines = Session.slow_lines,
+	pac_fallback = PacFallback.pac_fallback,
 }
 
 --- The Debug menu checks the field run does not ask for, each with the

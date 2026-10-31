@@ -66,7 +66,7 @@ local function genuine_shared_providers(damage)
 	local loaded, getenv = {}, os.getenv
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
-		"ui.menu.menu_builder", "keymap.magic_key_source", "modules.hotstrings.magic_key_source",
+		"ui.menu.builder", "keymap.magic_key_source", "modules.hotstrings.magic_key_source",
 		"infra.hotstring_preferences", "modules.shortcuts.tap_keys", "infra.config_paths",
 		"adapters.storage", "modules.keymap.layout_registry", "modules.hotstrings.input_reader",
 		"menu.renderer", "infra.paths", "json" }
@@ -94,7 +94,7 @@ local function genuine_shared_providers(damage)
 		assert(preferences._set_file_for_test(path))
 		local source = require("modules.hotstrings.magic_key_source")
 		assert(source.get() == "auto")
-		local builder = require("ui.menu.menu_builder")
+		local builder = require("ui.menu.builder")
 		local layout, slot
 		for index = 1, 100 do
 			local name, value = debug.getupvalue(builder.build, index)
@@ -172,7 +172,7 @@ local function genuine_trigger_providers(damage, default_source)
 	local original_i18n_safe = rawget(_G, "i18n_safe")
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
-		"ui.menu.menu_builder", "modules.hotstrings.magic_key", "infra.manifest_reader",
+		"ui.menu.builder", "modules.hotstrings.magic_key", "infra.manifest_reader",
 		"infra.hotstring_preferences", "infra.config_paths", "adapters.storage",
 		"menu.renderer", "infra.paths", "json" }
 	local directory, path, filesystem, directory_created
@@ -200,7 +200,7 @@ local function genuine_trigger_providers(damage, default_source)
 		local magic = require("modules.hotstrings.magic_key")
 		assert(magic.is_customised() == not default_source)
 		if not default_source then assert(magic.get() == "§") end
-		local builder = require("ui.menu.menu_builder")
+		local builder = require("ui.menu.builder")
 		local function upvalue(owner, wanted)
 			for index = 1, 100 do
 				local name, value = debug.getupvalue(owner, index)
@@ -313,7 +313,7 @@ local function genuine_gesture_providers(damage)
 	local original_i18n_safe = rawget(_G, "i18n_safe")
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
-		"ui.menu.menu_builder", "ui.gesture_conflicts", "modules.gestures.manager",
+		"ui.menu.builder", "ui.gesture_conflicts", "modules.gestures.manager",
 		"adapters.storage", "infra.paths", "json", "menu.renderer" }
 	local directory, filesystem, created
 	local restore = function() end
@@ -331,7 +331,7 @@ local function genuine_gesture_providers(damage)
 		local manifest = require("infra.manifest_menu")
 		local native = require("modules.gestures.manager")
 		local producer = require("ui.gesture_conflicts")
-		local builder = require("ui.menu.menu_builder")
+		local builder = require("ui.menu.builder")
 		local closure, slot
 		for index = 1, 100 do
 			local name, value = debug.getupvalue(builder.build, index)
@@ -444,7 +444,7 @@ local function genuine_language_providers(damage, exercise)
 	local loaded, getenv, original_safe = {}, os.getenv, rawget(_G, "i18n_safe")
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
-		"ui.menu.menu_builder", "infra.paths", "json", "menu.renderer",
+		"ui.menu.builder", "infra.paths", "json", "menu.renderer",
 		"infra.hotstring_preferences", "infra.config_paths", "adapters.storage",
 		"modules.hotstrings.magic_key", "modules.hotstrings.magic_key_source" }
 	local directory, path, filesystem, created
@@ -464,7 +464,7 @@ local function genuine_language_providers(damage, exercise)
 		local file = assert(io.open(path, "wb")); assert(file:write(bytes)); assert(file:close())
 		require("infra.i18n").init()
 		assert(require("infra.hotstring_preferences")._set_file_for_test(path))
-		local manifest, builder = require("infra.manifest_menu"), require("ui.menu.menu_builder")
+		local manifest, builder = require("infra.manifest_menu"), require("ui.menu.builder")
 		local function upvalue(owner, wanted)
 			if type(owner) ~= "function" then return nil end
 			for index = 1, 100 do
@@ -674,8 +674,8 @@ local function genuine_language_providers(damage, exercise)
 		-- Import the actual native owner after its real observers are installed.
 		-- The public native loop pins raw facade methods at import, so a later
 		-- wrapper must not masquerade as the already retained render owner.
-		package.loaded["ui.menu.menu_builder"] = nil
-		builder = require("ui.menu.menu_builder")
+		package.loaded["ui.menu.builder"] = nil
+		builder = require("ui.menu.builder")
 		closure, slot = upvalue(builder.build, "_build_hotstrings")
 		body, body_slot = upvalue(closure, "_manifest_hotstring_rows")
 		notification, notification_slot = upvalue(body, "show_error")
@@ -779,12 +779,12 @@ end
 --- Every list id the menu builder registers a provider for.
 --- @return table Set of ids.
 local function registered_providers(omitted_delegate)
-	local handle = assert(io.open(helpers.driver_root() .. "/ui/menu/menu_builder.lua", "r"))
+	local handle = assert(io.open(helpers.driver_root() .. "/ui/menu/builder.lua", "r"))
 	local source = helpers.expand_config_keys(handle:read("*a"))
 	handle:close()
 	-- Providers may be owned by a directly required native menu module. Scan
 	-- those actual delegates, rather than every source file in the tree.
-	local sources, visited = { source }, { ["ui.menu.menu_builder"] = true }
+	local sources, visited = { source }, { ["ui.menu.builder"] = true }
 	local index = 1
 	while index <= #sources do
 		for name in sources[index]:gmatch('require%("(ui%.menu%.[a-z0-9_%.]+)"%)') do

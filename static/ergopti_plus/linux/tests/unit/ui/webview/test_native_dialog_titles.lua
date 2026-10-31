@@ -62,6 +62,26 @@ local function scenario(body)
 end
 
 h.describe("native dialog captions (linux-native-titles)", function()
+	for _, backend in ipairs({ "zenity", "kdialog" }) do
+		h.it("(linux-native-titles) the choice prompt brands its caption and hides the value column: " .. backend, function()
+			local Shell = require("adapters.shell_runner")
+			local held = Shell.has_command
+			Shell.has_command = function(name) return name == backend end
+			package.loaded["ui.choice_prompt"] = nil
+			local ok, command = pcall(function()
+				return require("ui.choice_prompt").command("Vision provider", "Pick one",
+					{ { value = "openai", label = "OpenAI" } })
+			end)
+			Shell.has_command = held
+			package.loaded["ui.choice_prompt"] = nil
+			h.assert_true(ok, tostring(command))
+			local expected = backend == "zenity"
+				and "zenity --list --no-markup --hide-header --title='ErgoptiPlus — Vision provider'"
+					.. " --text='Pick one' --column='' --column='' --hide-column=1 --print-column=1 'openai' 'OpenAI' 2>/dev/null"
+				or "kdialog --title 'ErgoptiPlus — Vision provider' --menu 'Pick one' 'openai' 'OpenAI' 2>/dev/null"
+			h.assert_eq(command, expected)
+		end)
+	end
 	h.it("(linux-native-titles) the text prompt brands chrome while retaining masking, choices and exact value", function()
 		scenario(function(observed)
 			observed.answer, observed.status = " exact value \n", 0
@@ -137,7 +157,7 @@ end)
 
 h.describe("native menu dialog captions", function()
 	h.it("(linux-native-titles) real Uninstall callbacks brand confirmation and failure without changing body or refusal", function()
-		local names = { "ui.menu.menu_builder", "ui.menu.uninstall", "infra.installation", "ui.modal", "ui.menu.llm_backend_rows" }
+		local names = { "ui.menu.builder", "ui.menu.uninstall", "infra.installation", "ui.modal", "ui.menu.llm_backend_rows" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local original_execute = os.execute
@@ -159,7 +179,7 @@ h.describe("native menu dialog captions", function()
 		end
 		local ok, err = xpcall(function()
 			local i18n = require("infra.i18n")
-			local items = require("ui.menu.menu_builder").build({ _version = "9.9.9", on_quit = function() end, llm = { is_enabled = function() return false end } })
+			local items = require("ui.menu.builder").build({ _version = "9.9.9", on_quit = function() end, llm = { is_enabled = function() return false end } })
 			local found
 			for _, item in ipairs(items) do
 				for _, row in ipairs(item.menu or {}) do
@@ -285,6 +305,8 @@ h.describe("native caption consumer inventory", function()
 			["ui/llm_enable_refusal.lua"] = 2,
 			-- The one-click check runner owns the caption of every check report.
 			["ui/field_check/window.lua"] = 1,
+			-- The list prompt's zenity and kdialog captions are proven by the choice prompt cases.
+			["ui/choice_prompt.lua"] = 2,
 		}
 		local observed = {}
 		local root = h.driver_root()

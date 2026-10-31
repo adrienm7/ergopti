@@ -3,7 +3,7 @@
 /**
  * Follows the Linux tray root across its per-section modules.
  *
- * `linux/ui/menu/menu_builder.lua` keeps the tray root and binds each section
+ * `linux/ui/menu/builder.lua` keeps the tray root and binds each section
  * builder from its own module:
  *
  *     local _build_quit = require("ui.menu.menu_quit").build
@@ -26,7 +26,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { scriptTokens } = require('./script-source.cjs');
 
-const LINUX_MENU_ROOT = 'linux/ui/menu/menu_builder.lua';
+const LINUX_MENU_ROOT = 'linux/ui/menu/builder.lua';
 const PART_MODULE = /^ui\.menu\.menu_([a-z][a-z_]*)$/;
 
 /** The repository-relative file of one part module, or null for a foreign name. */
@@ -397,9 +397,9 @@ function composeLinuxMenuRoot(sources) {
 	const blocks = [];
 	for (let at = 0; at < t.length; at++) {
 		if (t[at].kind !== 'string' || !PART_MODULE.test(t[at].value)) continue;
-		if (t[at].value === 'ui.menu.menu_builder') {
+		if (t[at].value === 'ui.menu.builder') {
 			// The root's own log source is the one other place its name appears.
-			if (spells(root, at - 3, 'local LOG = "ui.menu.menu_builder"') === at + 1) continue;
+			if (spells(root, at - 3, 'local LOG = "ui.menu.builder"') === at + 1) continue;
 			return refuse(LINUX_MENU_ROOT + ': the root names itself outside its LOG');
 		}
 		const binding = partBinding(root, at - 5);

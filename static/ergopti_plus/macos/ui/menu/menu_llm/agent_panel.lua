@@ -444,29 +444,30 @@ function M.build(ctx)
 		if not ok_list then Logger.error(LOG, "Local model listing raised: %s.", tostring(list_error)) end
 	end
 
-	--- Wraps a row provider as a dynamic handler of the renderer.
-	--- @param id string Row id, for the warnings.
-	--- @param provider function Returns the rows.
-	--- @return function handler
+	--- Wraps a row provider as the declared `list` provider of the renderer: the
+	--- rows are DATA, drawn by the shared renderer at the declared place. A
+	--- refused frame refuses the whole submenu rather than drawing it short.
+	--- @param provider function Returns the rows, or nil when a frame is refused.
+	--- @return function list_provider
 	local refused_frame = false
-	local function dynamic(id, provider)
-		return function(result)
+	local function listed(provider)
+		return function()
 			local ok, rows = pcall(provider)
 			if not ok then refused_frame = true; error(rows, 0) end
-			if rows == nil then refused_frame = true; return end
-			for _, row in ipairs(ManifestMenu.render_rows(rows, id)) do result[#result + 1] = row end
+			if rows == nil then refused_frame = true; return {} end
+			return rows
 		end
 	end
-	local submenu = ManifestMenu.build("agent_menu", "AI agent", {
-		agent_system1 = dynamic(require("config_keys").LEAF.AGENT_SYSTEM1, function() return system_rows(ctx, SYSTEMS.agent_system1, selections.agent_system1) end),
-		agent_system2 = dynamic(require("config_keys").LEAF.AGENT_SYSTEM2, function() return system_rows(ctx, SYSTEMS.agent_system2, selections.agent_system2) end),
-		agent_disabled_apps = dynamic(require("config_keys").LEAF.AGENT_DISABLED_APPS, function() return disabled_apps_rows(ctx) end),
-	}, nil, {
+	local submenu = ManifestMenu.build("agent_menu", "AI agent", nil, nil, {
 		commands = { agent_mode = function(id) return set_mode(ctx, id) end },
 		state_getters = {
 			[require("config_keys").KEY.LLM_AGENT_MODE] = function() return ctx.state.llm_agent_mode end,
 			agent_mode_ready = function() return type(ctx.settings_mgr) == "table" and type(ctx.settings_mgr.apply_setting_transaction) == "function" end,
 		},
+	}, {
+		[require("config_keys").LEAF.AGENT_SYSTEM1] = listed(function() return system_rows(ctx, SYSTEMS.agent_system1, selections.agent_system1) end),
+		[require("config_keys").LEAF.AGENT_SYSTEM2] = listed(function() return system_rows(ctx, SYSTEMS.agent_system2, selections.agent_system2) end),
+		[require("config_keys").LEAF.AGENT_DISABLED_APPS] = listed(function() return disabled_apps_rows(ctx) end),
 	})
 	if not submenu or refused_frame then return nil end
 	local children = ManifestMenu.native_child_rows(submenu)

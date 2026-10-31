@@ -164,9 +164,7 @@ check('every budget is the value its declaration holds', () => {
 	assert.equal(
 		described.budgets['main_thread.hold'],
 		Number(
-			read('static/ergopti_plus/macos/infra/logger.lua').match(
-				/^local SLOW_TIMER_CALLBACK_COUNT_MS = (\d+)/m
-			)[1]
+			read('static/ergopti_plus/macos/infra/main_thread_hold.lua').match(/^\s*COUNT_MS = (\d+)/m)[1]
 		)
 	);
 	assert.equal(
@@ -185,6 +183,19 @@ check('every budget is the value its declaration holds', () => {
 			)[1]
 		)
 	);
+	// The [budgets] section: every key the analyser judges a measure against.
+	const section = toml.slice(toml.indexOf('\n[budgets]'));
+	const key = (name) => Number(section.match(new RegExp(`^${name} = (\\d+)`, 'm'))[1]);
+	for (const [prefix, name] of [
+		['boot.total', 'boot_total_ms'],
+		['reload.total', 'driver_reload_ms'],
+		['reload.request_to_boot', 'driver_reload_ms'],
+		['menu.rebuild', 'menu_rebuild_ms'],
+		['llm.local:', 'llm_local_request_ms'],
+		['llm.remote:', 'llm_remote_request_ms'],
+		['llm.ttft', 'prediction_display_ms']
+	])
+		assert.equal(described.budgets[prefix], key(name), `${prefix} reads [budgets] ${name}`);
 	const windows = read('static/ergopti_plus/windows/infra/hotpath_profiler.ahk');
 	assert.equal(
 		described.segments['UIA.SelectionPoll'],
@@ -204,7 +215,7 @@ try {
 			);
 		};
 		copy('static/ergopti_plus/_shared/modules/timings/constants.toml');
-		copy('static/ergopti_plus/macos/infra/logger.lua');
+		copy('static/ergopti_plus/macos/infra/main_thread_hold.lua');
 		copy('static/ergopti_plus/macos/infra/preferences.lua', (text) =>
 			text.replace(/^local SLOW_SAVE_REPORT_MS = /m, 'local SAVE_REPORT_MS = ')
 		);
@@ -238,6 +249,7 @@ try {
 		`===== ${stamp('09:00:00')} — ErgoptiPlus session opened =====`,
 		`${stamp('09:00:01')} [INFO] [BootProfile] Boot timing started.`,
 		`${stamp('09:00:03')} [INFO] [BootProfile] Boot complete in 2410 ms (since process start).`,
+		`${stamp('09:00:04')} [INFO] [BootProfile] Complete configured menu usable at 1980 ms since process start; input initialization pending=0.`,
 		`${stamp('09:10:00')} [ERROR] [Updater] The release list could not be read: HTTP 502.`,
 		`${stamp('09:11:00')} [ERROR] [Updater] The release list could not be read: HTTP 504.`,
 		`${stamp('09:12:00')} [ERROR] [Keystats] Session reset refused: pending text was not accepted.`,
@@ -248,6 +260,8 @@ try {
 		'',
 		`===== ${stamp('09:20:02')} — ErgoptiPlus session opened =====`,
 		`${stamp('09:20:04')} [INFO] [BootProfile] Boot complete in 1900 ms (since process start).`,
+		`${stamp('09:25:00')} [INFO] [LLM] LLM request: kind=remote provider=mistral family=mistral-small outcome=ok in 3400 ms.`,
+		`${stamp('09:25:00')} [WARNING] [LLM] Over budget: llm.remote took 3400 ms (budget 3000 ms).`,
 		`${stamp('09:30:00')} [INFO] [ComposerCheck] Composer check result: check=composer verdict=fail steps=4 layout=fail`,
 		`${stamp('09:40:00')} [INFO] [ComposerCheck] Composer check result: check=composer verdict=pass steps=4 layout=pass`,
 		'  a continuation line'
@@ -285,11 +299,18 @@ try {
 			'the Windows per-segment budget applies'
 		);
 		assert.equal(row('latency:Hook.KeyDown').verdict, 'within');
-		assert.equal(row('boot.total').verdict, 'no_budget');
+		assert.equal(row('boot.total').verdict, 'within', 'within [budgets] boot_total_ms');
+		assert.equal(row('menu.usable').verdict, 'no_budget');
+		assert.equal(row('llm.remote:mistral').verdict, 'over');
 		assert.equal(row('boot.total').count, 2);
 		assert.equal(row('boot.total').p95, 2410);
-		assert.equal(row('reload.total').worst[0].value, 4000, 'from the request to the next boot');
-		assert.match(markdown, /\| boot\.total \| 2 \| .* \| no budget declared \|/);
+		assert.equal(
+			row('reload.request_to_boot').worst[0].value,
+			4000,
+			'from the request to the next boot'
+		);
+		assert.match(markdown, /\| menu\.usable \| 1 \| .* \| no budget declared \|/);
+		assert.match(markdown, /\| boot\.total \| 2 \| .*\u2705 within/);
 		assert.match(markdown, /\| hotpath:HSE\.Dispatch \| 1 \| .*❌ over \(1\)/);
 	});
 
@@ -316,9 +337,10 @@ try {
 		assert.equal(first.score, 10);
 		assert.equal(second.score, 5);
 		assert(
-			!document.top_fixes.some((item) => item.what.startsWith('[HotPath]')),
-			'a measure is ranked once'
+			!document.top_fixes.some((item) => /^\[(HotPath|LLM)\]/.test(item.what)),
+			'a measure is ranked once, not again through its warning'
 		);
+		assert(document.top_fixes.some((item) => item.what.startsWith('llm.remote:mistral over')));
 	});
 
 	check('a log outside the report folder is refused', () => {

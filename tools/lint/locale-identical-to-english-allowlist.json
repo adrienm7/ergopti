@@ -447,7 +447,23 @@
 		},
 		"hs_config.unit_ms": {
 			"reason": "unit-or-abbreviation",
-			"locales": ["cs", "da", "de", "es", "fr", "it", "ko", "nl", "no", "pl", "pt", "sv", "tr"]
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"hi",
+				"it",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"sv",
+				"tr"
+			]
 		},
 		"input_probe.hook_line": {
 			"reason": "symbol-or-placeholder-only",
@@ -832,6 +848,10 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
 		},
+		"linux_shell.install.label_lfs": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it"]
+		},
 		"llm.agent.label.calendar": {
 			"reason": "symbol-or-placeholder-only",
 			"locales": "*"
@@ -930,6 +950,10 @@
 		"menu.extensions.header": {
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
+		},
+		"menu.gestures.recommended_info": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
 		},
 		"menu.hotstrings.cascade_max_arrows_unit": {
 			"reason": "loanword-or-cognate",
@@ -1239,7 +1263,7 @@
 		},
 		"model_browser.filter_backend": {
 			"reason": "loanword-or-cognate",
-			"locales": ["de", "nl"]
+			"locales": ["cs", "da", "de", "nl", "no", "pl", "sv"]
 		},
 		"model_browser.unit_gb": {
 			"reason": "unit-or-abbreviation",
@@ -2349,7 +2373,22 @@
 		},
 		"ui_apps.value_ms": {
 			"reason": "unit-or-abbreviation",
-			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"hi",
+				"it",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"sv",
+				"tr"
+			]
 		},
 		"ui_typing.apps_some": {
 			"reason": "loanword-or-cognate",

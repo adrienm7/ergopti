@@ -258,6 +258,30 @@ helpers.describe("native keyboard source proof ownership", function()
 		end)
 	end)
 
+	helpers.it("trusts a fresh process's identity over this process's lagging view (rows-probe-fresh-identity)", function()
+		helpers.with_stub_scope(MODULES, function()
+			local context = fixture()
+			-- A subprocess just selected SOURCE; this process still answers the previous one.
+			context.source = "com.apple.keyboardlayout.ergopti.plus"
+			local operation = context.request({ source_id = SOURCE, codes = { 41 }, identity = "fresh_process" })
+			helpers.assert_eq(context.calls.spawned, 1, "the launcher reads the selected source itself")
+			context.finish(context.receipt())
+			helpers.assert_true(operation.is_settled())
+			helpers.assert_eq(context.results[1].reason, nil)
+			helpers.assert_eq(context.results[1].receipt.levels[1].text, ";")
+
+			local stale = fixture()
+			stale.source = "com.apple.keyboardlayout.ergopti.plus"
+			stale.request({ source_id = SOURCE, codes = { 41 } })
+			helpers.assert_eq(stale.calls.spawned, nil, "this process's own identity is still compared")
+			helpers.assert_eq(stale.results[1].reason, "source_changed")
+
+			local unknown = fixture()
+			unknown.request({ source_id = SOURCE, codes = { 41 }, identity = "guessed" })
+			helpers.assert_eq(unknown.results[1].reason, "invalid_request")
+		end)
+	end)
+
 	helpers.it("retains pending SIGTERM and fences a late successful result", function()
 		helpers.with_stub_scope(MODULES, function()
 			local context = fixture()

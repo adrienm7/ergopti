@@ -37,25 +37,38 @@ local UNKNOWN_SERVICE_STATUS = 113
 -- The runtime manifest, relative to this module's directory.
 local MANIFEST_RELATIVE = "../vendor/remap-runtime/manifest.lua"
 
+--- Reads the shipped runtime manifest.
+--- @return table|nil manifest Nil when it cannot be read.
+local function load_manifest()
+	local directory = NativePath.directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./"
+	local loaded, manifest = pcall(dofile, directory .. MANIFEST_RELATIVE)
+	if not loaded or type(manifest) ~= "table" then return nil end
+	return manifest
+end
+
 --- Reads and judges the shipped runtime manifest.
 --- @return table|nil pinned The owner's pinned facts.
 --- @return string|nil reason Why there are none.
 local function pinned_artifact()
-	local directory = NativePath.directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./"
-	local loaded, manifest = pcall(dofile, directory .. MANIFEST_RELATIVE)
-	if not loaded or type(manifest) ~= "table" then
-		return nil, "the runtime manifest could not be read"
-	end
+	local manifest = load_manifest()
+	if not manifest then return nil, "the runtime manifest could not be read" end
 	return require("platform.remap.runtime_manifest").pinned(manifest)
 end
 
 --- How many pin fields of the shipped runtime manifest are still unpinned.
 --- @return integer|nil count Nil when the manifest cannot be read.
 function M.unpinned_count()
-	local directory = NativePath.directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./"
-	local loaded, manifest = pcall(dofile, directory .. MANIFEST_RELATIVE)
-	if not loaded or type(manifest) ~= "table" then return nil end
+	local manifest = load_manifest()
+	if not manifest then return nil end
 	return #require("platform.remap.runtime_manifest").unpinned(manifest)
+end
+
+--- The VirtualHIDDevice version the shipped manifest pins.
+--- @return string|nil version Nil when unreadable or not pinned.
+function M.virtual_hid_version()
+	local manifest = load_manifest()
+	if not manifest then return nil end
+	return require("platform.remap.runtime_manifest").virtual_hid_version(manifest)
 end
 
 --- The ports of the real Mac.

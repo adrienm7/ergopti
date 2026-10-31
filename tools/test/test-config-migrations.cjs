@@ -38,6 +38,7 @@ const fs = require('fs');
 const path = require('path');
 const TOML = require('smol-toml');
 const { shared } = require('../lib/paths.cjs');
+const { parseOpFields } = require('../codegen/codegen-config-migration-ops.cjs');
 
 const REGISTRY_PATH = shared('core/config_schema/migrations.toml');
 const CORPUS_DIR = shared('tests/corpus/config_migrations');
@@ -47,44 +48,9 @@ const DRIVERS = ['ahk', 'hs', 'linux'];
 const OUTCOMES = ['migrated', 'current', 'newer', 'invalid', 'unsupported'];
 const BARE = /^[A-Za-z0-9_-]+$/;
 
-// Required and optional fields of each op of the closed set.
-const OPS = {
-	rename: { required: ['section', 'key'], optional: ['to_section', 'to_key'] },
-	rename_prefix: { required: ['section', 'prefix', 'to_prefix'], optional: [] },
-	copy_if_absent: { required: ['section', 'key'], optional: ['to_section', 'to_key'] },
-	move_ergopti_variant: {
-		required: [
-			'section',
-			'key',
-			'to_key',
-			'base_key',
-			'alt_gr_key',
-			'source_key',
-			'false_variant',
-			'true_variant'
-		],
-		optional: ['neutral_variant']
-	},
-	move_chord_action: {
-		required: [
-			'section',
-			'key',
-			'to_section',
-			'action',
-			'conditional_key',
-			'disabled_action',
-			'platform'
-		],
-		optional: []
-	},
-	move_section: { required: ['section', 'to_section'], optional: [] },
-	merge_into: { required: ['section', 'to_section'], optional: [] },
-	map_value: { required: ['section', 'key', 'map'], optional: [] },
-	wrap_value: { required: ['section', 'key', 'to_key'], optional: [] },
-	encode_value: { required: ['section', 'key', 'to_section', 'to_key', 'encoding'], optional: [] },
-	delete: { required: ['section'], optional: ['key'] },
-	set_if_absent: { required: ['section', 'key', 'value'], optional: [] }
-};
+// Required and optional fields of each op of the closed set: the registry's
+// header comment is their one source, and the Windows table is generated from it.
+const OPS = parseOpFields(fs.readFileSync(REGISTRY_PATH, 'utf8'));
 
 const failures = [];
 
@@ -1161,6 +1127,21 @@ const luaEngine = readSource(shared('lua/config_migrate.lua'));
 if (!luaEngine.includes(`M.REGISTRY_PATH = "${REGISTRY_RELATIVE}"`)) {
 	fail('wiring', `_shared/lua/config_migrate.lua must name the registry as "${REGISTRY_RELATIVE}"`);
 }
+// The Lua engine still keeps its own table, so it is compared field by field
+// with the op set the registry declares.
+const luaOpsBlock = /^local OPS = \{\n([\s\S]*?)^\}/m.exec(luaEngine.replace(/\r\n/g, '\n'));
+const luaOps = {};
+for (const row of (luaOpsBlock ? luaOpsBlock[1] : '').split('\n')) {
+	const match = /^\s*(\w+)\s*=\s*\{ required = \{(.*?)\}, optional = \{(.*?)\} \},$/.exec(row);
+	if (!match) continue;
+	const names = (text) => [...text.matchAll(/"(\w+)"/g)].map((name) => name[1]);
+	luaOps[match[1]] = { required: names(match[2]), optional: names(match[3]) };
+}
+for (const name of new Set([...Object.keys(OPS), ...Object.keys(luaOps)])) {
+	if (JSON.stringify(OPS[name]) !== JSON.stringify(luaOps[name])) {
+		fail('wiring', `_shared/lua/config_migrate.lua OPS.${name} differs from the registry's op set`);
+	}
+}
 const luaContract = readSource(shared('lua/test/config_migrate_contract.lua'));
 for (const corpus of ['config_migrations', 'config_migration_registries']) {
 	if (!luaContract.includes(`/tests/corpus/${corpus}"`)) {
@@ -1175,6 +1156,27 @@ if (!ahkEngine.includes(`static Relative := "${REGISTRY_RELATIVE}"`)) {
 		'wiring',
 		`windows/infra/config_migrate.ahk must name the registry as "${REGISTRY_RELATIVE}"`
 	);
+}
+// The field table has one Windows owner: the generated file the no-drift gate
+// compares with its generator. A hand-written Map here would be a second copy.
+if (
+	!ahkEngine.includes('#Include ../_generated/config_migration_ops.ahk') ||
+	!ahkEngine.includes('Fields := ConfigMigrateOpFieldsData()') ||
+	/"rename_prefix",\s*\[\[/.test(ahkEngine)
+) {
+	fail(
+		'wiring',
+		'windows/infra/config_migrate.ahk must read its op fields from _generated/config_migration_ops.ahk'
+	);
+}
+// The table validates the registry, so a cached validated registry must not
+// outlive it.
+if (
+	!readSource(shared('..', 'windows', 'infra', 'config_registry_cache.ahk')).includes(
+		'\\_generated\\config_migration_ops.ahk'
+	)
+) {
+	fail('wiring', 'the registry cache identity must hash _generated/config_migration_ops.ahk');
 }
 const ahkSuite = readSource(
 	shared(

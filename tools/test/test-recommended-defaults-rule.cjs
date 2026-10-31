@@ -79,7 +79,8 @@ for (const platform of ['ahk', 'hs', 'linux'])
 
 // 3. The menu says why and how to avoid the double action, behind « Infos… ».
 const en = JSON.parse(read('_shared/data/locales/en.json'));
-const doc = parseToml(read('_shared/modules/features/manifest.toml'));
+// The menu rows live in the tray-menu source, beside the generated manifest.
+const doc = { menu: require('../lib/menu-source.cjs').readMenuTables(parseToml) };
 const gesturesMenu = (doc.menu && doc.menu.gestures_menu) || [];
 const infoRow = gesturesMenu.find((r) => r.id === 'gesture_recommended_info');
 assert.ok(infoRow && infoRow.type === 'command', 'the Gestures menu declares the Infos command');
@@ -145,7 +146,7 @@ const DIALOG_OWNERS = [
 		absent: []
 	},
 	{
-		file: 'linux/ui/menu/menu_builder.lua',
+		file: 'linux/ui/menu/builder.lua',
 		register: /COMMAND\.GESTURE_RECOMMENDED_INFO\] = function\(\)\n([\s\S]*?)\n\tend\n/,
 		body: /COMMAND\.GESTURE_RECOMMENDED_INFO\] = function\(\)\n([\s\S]*?)\n\tend\n/,
 		helper: 'show_info(',

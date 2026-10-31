@@ -60,7 +60,7 @@ function M.assert_selection(helpers)
 				return assign(name, id, model, admission)
 			end
 			local okay, detail = xpcall(function()
-				local rows = require("ui.menu.menu_builder").build({ llm = owner, webview = f.host,
+				local rows = require("ui.menu.builder").build({ llm = owner, webview = f.host,
 					is_paused = function() return false end,
 					on_menu_changed = function() refreshes = refreshes + 1 end })
 				local profile = assert(find(rows, "Manual contract"), "actual profile parent exists")

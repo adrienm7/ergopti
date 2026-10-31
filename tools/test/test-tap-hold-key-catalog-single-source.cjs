@@ -246,7 +246,7 @@ const READERS = [
 		retired: [/tap_hold_keys_catalog/, /LEFT_HAND_IDS/, /_load_left_hand_from_catalog/]
 	},
 	{
-		file: 'linux/ui/menu/menu_builder.lua',
+		file: 'linux/ui/menu/builder.lua',
 		reads: /\.key_catalog\(\)/,
 		retired: [/KEY_ORDER/]
 	},
@@ -346,6 +346,8 @@ const manifest = TOML.parse(
 		(_header, section) => `[[feature_records]]\nsection_path = \"${section}\"`
 	)
 );
+// The menu rows live in the tray-menu source, beside the generated manifest.
+manifest.menu = require('../lib/menu-source.cjs').readMenuTables(TOML.parse);
 const combinations = manifest.menu.shortcuts_menu.find((row) => row.id === 'key_combinations');
 const linuxManager = stripLineComments(
 	read(path.join(SP, 'linux/platform/remap/tap_hold_manager.lua')),

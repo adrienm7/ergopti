@@ -39,6 +39,8 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "diagnostics"))
 		helpers.assert_true(position(state.events, "layout.publish") < position(state.events, "boot.complete"))
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "hook.pump"))
+		-- (linux-reload-budget) The Reload this boot ends is measured to its completion.
+		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "reload.complete"))
 		helpers.assert_eq(state.pumps, 1)
 		helpers.assert_eq(state.pump_services, true)
 		helpers.assert_eq(state.loop_after_complete, false)
@@ -47,6 +49,8 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_eq(state.driver_control and state.driver_control.pid, 4242)
 		helpers.assert_type(state.driver_control.reload, "function")
 		helpers.assert_type(state.callbacks.on_usr1, "function")
+		-- The collector's field run session starts with the daemon's own pid.
+		helpers.assert_eq(state.field_run and state.field_run.pid, 4242)
 	end)
 	helpers.it("(signal-census) the E2E children expect every native signal Main installs", function()
 		-- The E2E children count the active libuv signal handles before playing a

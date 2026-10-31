@@ -273,6 +273,8 @@ local BootFatal          = require("adapters.boot_fatal")
 -- Tell a reload apart from a real quit. The coordinator marks the sentinel only
 -- after the old exact Karabiner token is fenced and immediately before the real
 -- reload. Shared Karabiner processes remain live; the old Ergopti lease does not.
+-- Taken before the clear: a reload this boot follows is measured at its end.
+local _reload_started_epoch_ms = reload_guard.take_started()
 reload_guard.clear()
 local _native_hs_reload = hs.reload
 hs.reload = function(...)
@@ -1223,6 +1225,7 @@ do
 			reload_deadline_seconds = require("infra.timings").sec("ui", "reload_deadline_ms"),
 			record_stage = ReloadBreadcrumb.record,
 			mark_reload = function()
+				reload_guard.mark_started(TimerScheduler.now() * 1000)
 				reload_guard.mark_reload()
 				return reload_guard.is_reloading() == true
 			end,
@@ -2361,6 +2364,13 @@ end)
 
 Boot.mark("Boot complete (post-init deferrals scheduled)")
 Boot.complete()
+-- The reload this boot follows, from its reload call to this boot's end.
+if _reload_started_epoch_ms then
+	local reload_ms = TimerScheduler.now() * 1000 - _reload_started_epoch_ms
+	Logger.info(LOG, "Reload completed in %.0f ms (reload call to boot complete).", reload_ms)
+	require("perf_budget").judge(Logger, LOG, "reload", math.max(0, reload_ms),
+		function() return require("infra.timings").ms("budgets", "driver_reload_ms") end)
+end
 -- Permanent phase counters (hot path, menu, boot sub-stages, config parses,
 -- child processes): one summary line per family every interval, never at boot.
 require("infra.phase_stats").start()

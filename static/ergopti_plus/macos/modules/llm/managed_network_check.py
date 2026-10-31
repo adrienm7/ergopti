@@ -1,10 +1,13 @@
 # modules/llm/managed_network_check.py
-"""One harmless HEAD request through the managed download chain.
+"""One harmless HEAD request, then one verified download, through the managed chain.
 
 The Debug menu's network check runs this helper with the interpreter the
 driver already uses. It sends one HEAD request for the first pinned managed
 input through the same signed native transport, route lookup and TLS trust as a
-real download, then prints one line per step on stdout:
+real download; when that answers, it downloads the input (about 3 MB) through
+the same chain into a private scratch folder and checks its pinned SHA-256 and
+size, as an installation does, then removes it. It prints one line per step on
+stdout:
 
     step <id> <state> <value>
 
@@ -27,6 +30,8 @@ on the wrong route. Only verdicts are printed, never a host or a digest.
 import importlib.util
 import json
 import sys
+import tempfile
+import time
 from pathlib import Path
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
@@ -39,6 +44,10 @@ BOOTSTRAP = DRIVER_ROOT / "modules/llm/managed_bootstrap_http.py"
 # Seconds for the whole request, then for each read.
 TIMEOUT = 20.0
 IDLE_TIMEOUT = 10.0
+
+# Seconds for the verified download after the HEAD. With TIMEOUT it stays
+# under the 40 s the field run gives this helper (adapters/field_check_ports.lua).
+DIGEST_TIMEOUT = 15.0
 
 # Seconds for one host's HEAD in --hosts mode; the field run bounds the sum.
 HOST_TIMEOUT = 15.0
@@ -103,9 +112,37 @@ def failure_steps(failure):
     emit("transfer", "fail", reason)
 
 
+def digest_step(bootstrap, source):
+    """Download the pinned input through the chain and check its SHA-256 and size.
+
+    Issue #101 follow-up (6): a HEAD proves the route and TLS, not that the
+    bytes the chain delivers are the pinned ones (a company proxy that
+    rewrites or truncates a download answers a HEAD normally).
+    """
+    with tempfile.TemporaryDirectory(prefix="ergopti-network-check-") as folder:
+        try:
+            bootstrap.download(
+                source["url"],
+                Path(folder) / "input",
+                source["sha256"],
+                source["bytes"],
+                time.monotonic() + DIGEST_TIMEOUT,
+                IDLE_TIMEOUT,
+            )
+        except bootstrap.BootstrapFailure as failure:
+            emit("digest", "fail", "mismatch" if failure.reason == "integrity" else failure.reason)
+            return
+        except Exception as failure:
+            emit("digest", "fail", getattr(failure, "reason", "unavailable"))
+            return
+    emit("digest", "pass", "sha256")
+
+
 def main():
     bootstrap = load_bootstrap()
-    url = json.loads(RELEASE.read_text(encoding="utf-8"))["source"]["url"]
+    source = json.loads(RELEASE.read_text(encoding="utf-8"))["source"]
+    url = source["url"]
+    reached = False
     try:
         with bootstrap._native_request(
             url,
@@ -122,9 +159,13 @@ def main():
                 "pass" if response.status < 400 else "fail",
                 "http_" + str(response.status),
             )
+            reached = response.status < 400
     except Exception as failure:
         failure_steps(failure)
-    emit("digest", "skip", "head_only")
+    if reached:
+        digest_step(bootstrap, source)
+    else:
+        emit("digest", "skip", "not_reached")
 
 
 # The path a host is probed at when its root does not prove reachability: the

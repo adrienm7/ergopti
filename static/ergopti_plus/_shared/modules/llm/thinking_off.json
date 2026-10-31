@@ -91,8 +91,15 @@
 			"_source": "https://developers.openai.com/api/docs/models/gpt-5.1"
 		},
 		{
-			"_family": "GPT-5: minimal is the lowest effort",
-			"models": ["gpt-5", "gpt-5-2025-*"],
+			"_family": "GPT-5, GPT-5 mini and GPT-5 nano: minimal is the lowest effort (mini and nano are the GPT-5 reasoning models of the same 2025-08-07 release, whose pages list reasoning token support and no other effort scale)",
+			"models": [
+				"gpt-5",
+				"gpt-5-2025-*",
+				"gpt-5-mini",
+				"gpt-5-mini-2025-*",
+				"gpt-5-nano",
+				"gpt-5-nano-2025-*"
+			],
 			"controls": [
 				{
 					"kind": "effort",
@@ -100,7 +107,7 @@
 					"level": "minimal"
 				}
 			],
-			"_source": "https://developers.openai.com/api/docs/models/gpt-5"
+			"_source": "https://developers.openai.com/api/docs/models/gpt-5 (Reasoning.effort supports: minimal, low, medium, and high), https://developers.openai.com/api/docs/models/gpt-5-mini, https://developers.openai.com/api/docs/models/gpt-5-nano (read 2026-10-31)"
 		},
 		{
 			"_family": "o-series: low is the lowest effort",
@@ -395,15 +402,10 @@
 			"_source": "https://api-docs.deepseek.com/guides/thinking_mode"
 		},
 		{
-			"_family": "Hermes 4: hybrid, thinking can be turned off",
+			"_family": "Hermes 4: hybrid, but it reasons only when asked (the chat template flag thinking=True or its deep-thinking system prompt), so nothing is sent",
 			"models": ["hermes-4*"],
-			"controls": [
-				{
-					"kind": "toggle",
-					"intent": "off"
-				}
-			],
-			"_source": "https://huggingface.co/NousResearch/Hermes-4-70B"
+			"controls": [],
+			"_source": "https://huggingface.co/NousResearch/Hermes-4-70B README (Reasoning mode can be activated with the chat template via the flag thinking=True or by using the following system prompt; read 2026-10-31)"
 		},
 		{
 			"_family": "NVIDIA Nemotron 3: hybrid, enable_thinking is on unless turned off",
