@@ -65,6 +65,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-manifest-parity.cjs"],
 			"repro": "node tools/test/test-manifest-parity.cjs"
+		},
+		{
+			"id": "js-feature-requirements",
+			"ordinal": 544,
+			"name": "every feature declares per OS what it needs, derived from the Karabiner generator inputs and the driver source signatures, and the generated table is in sync",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-feature-requirements.cjs"],
+			"repro": "npm run test:feature-requirements"
 		}
 	]
 }

@@ -172,6 +172,14 @@ const PIPELINE = [
 		generated: ['static/ergopti_plus/windows/_generated/prompt_builder.ahk']
 	},
 	{
+		name: 'codegen:feature-requirements — regenerate the feature requirements table',
+		run() {
+			const { ok, stderr } = runNpmScript('codegen:feature-requirements');
+			return { ok, detail: ok ? undefined : stderr };
+		},
+		generated: ['docs/design/feature-requirements.md']
+	},
+	{
 		name: 'codegen:llm-profiles-data:ahk — regenerate llm_profiles_data.ahk',
 		run() {
 			const { ok, stderr } = runNpmScript('codegen:llm-profiles-data:ahk');

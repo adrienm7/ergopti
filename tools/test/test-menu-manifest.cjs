@@ -1551,6 +1551,11 @@ function checkNumericChoiceSchema() {
 		default: 0,
 		recommended: 0,
 		input_altering: false,
+		requires: {
+			macos: ['mlx', 'ollama'],
+			linux: ['evdev', 'ollama', 'uinput', 'xdotool'],
+			windows: ['ollama', 'webview2']
+		},
 		description_key: 'menu.llm.indent_label',
 		type: 'number',
 		choice_values: corpus.choices.map((choice) => choice.value)

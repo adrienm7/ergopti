@@ -83,6 +83,44 @@ local LEGACY_LAYER_KEYS_FILE = "legacy_layer_keys.json"
 -- carrying a historical ErgoptiPlus signature that no released block proves.
 M.REFUSAL_LEGACY_CONFLICTS = "legacy_conflicts"
 
+-- Which manifest features reach Karabiner, from what this generator reads: each
+-- state field M.build_karabiner_json reads, mapped to the features it feeds.
+-- This mapping is the single source of the macOS `karabiner` requirement
+-- (_shared/modules/features/requirements.toml); test-feature-requirements.cjs
+-- fails when the generator reads a field missing here, when a field here is no
+-- longer read, and when a feature's declared `requires.macos` disagrees.
+-- Selectors: `a.b` one feature, `a.b.*` a section's features, `a.b.**` all
+-- under it. A field that feeds no feature gives its reason.
+M.REQUIREMENT_STATE_FEATURES = {
+	tap_holds_enabled         = { "tap_holds.enabled" },
+	-- The per-key bindings and the tap timeout belong to the Tap-Holds switch;
+	-- they live in config_karabiner.toml and have no manifest row of their own.
+	tap_hold_config           = { "tap_holds.enabled" },
+	tap_hold_timeout_ms       = { "tap_holds.enabled" },
+	mod_combos_enabled        = { "mod_combos.*" },
+	mod_combos_config         = { "mod_combos.*" },
+	simultaneous_threshold_ms = { "mod_combos.simultaneous_threshold_ms" },
+	combo_symmetric           = { "mod_combos.symmetric" },
+	script_chords             = { "shortcuts.script_control.*" },
+	virtual_keyboard_type     = { "layout.virtual_keyboard" },
+	virtual_keyboard_product  = { "layout.virtual_keyboard" },
+	nav_layer                 = { reason = "layers.toml is deployed whenever the integration is on; it has no manifest switch, and the features that enter it reach Karabiner on their own" },
+}
+
+-- The modules that reach Karabiner without this generator: through the remap
+-- facade injected as `_karabiner`, the variable bridge platform.remap.ke_variables
+-- (layer and CapsWord state live inside Karabiner) or the physical key ledger the
+-- generated rules append to. requirements.toml holds the signature that finds
+-- them; every caller is listed here with its features or its reason.
+M.REQUIREMENT_FACADE_FEATURES = {
+	["modules/gestures/actions.lua"]        = { "gestures.*" },
+	["modules/shortcuts/script_control.lua"] = { "shortcuts.script_control.*" },
+	["platform/remap/watchers.lua"]         = { "shortcuts.caps_word.**" },
+	["modules/keystats/kc_bridge.lua"]      = { "metrics.**" },
+	["platform/remap/init.lua"]             = { reason = "the remap engine that runs this generator; its feature inputs are the state fields above" },
+	["platform/remap/generator.lua"]        = { reason = "this generator writes the physical key ledger rules; metrics reads them through kc_bridge" },
+}
+
 -- The eight modifier keys: Shift, Control, Option and Command on each side.
 local ACTUAL_MODIFIER_KEY_CODES = {
 	left_option  = true, right_option  = true,
