@@ -35,6 +35,15 @@ at LuaJIT's 200-local ceiling ("main function has more than 200 local
 variables" at load): new hook state goes into an existing table such as
 `LayerPointer`, never into new top-level locals.
 
+### project-linux-touchpad-gestures-share-the-touches-with-the-desktop
+
+The gesture reader decodes the touchpad evdev node without a grab, so the desktop
+(GNOME 47 and later) acts on the same touches: the nine two-finger slots fight
+with scrolling (the decoder refuses a scrolling pair as a swipe, rule 1, and the
+reader start names each bound two-finger slot), and no code here can stop the
+desktop's own gesture without taking the grab. Under Wayland no external process
+can move, focus or close a window, so no Linux tool can add those actions there.
+
 ### project-linux-a-field-must-be-named-at-every-boundary
 
 Linux input records cross evdev, resolver, injector, and Lua boundaries. Preserve
