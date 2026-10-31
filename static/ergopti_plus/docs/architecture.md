@@ -138,6 +138,7 @@ graph TD
         MACOS_process_lifecycle["ProcessLifecycle.lua"]
         MACOS_program_providers["ProgramProviders.lua"]
         MACOS_python_interpreter["PythonInterpreter.lua"]
+        MACOS_reload_breadcrumb["ReloadBreadcrumb.lua"]
         MACOS_running_application["RunningApplication.lua"]
         MACOS_runtime_capture_port["RuntimeCapturePort.lua"]
         MACOS_runtime_owner_ports["RuntimeOwnerPorts.lua"]
