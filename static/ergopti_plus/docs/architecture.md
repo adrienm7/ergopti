@@ -71,6 +71,7 @@ graph TD
         LINUX_sqlite_process_worker["SqliteProcessWorker.lua"]
         LINUX_storage["Storage.lua"]
         LINUX_system_proxy["SystemProxy.lua"]
+        LINUX_tcp_probe["TcpProbe.lua"]
         LINUX_timer_scheduler["TimerScheduler.lua"]
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_uinput_writer["UinputWriter.lua"]
