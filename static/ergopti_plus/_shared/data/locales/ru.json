@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "Контрольная сумма проверена. Установка Ollama…",
 	"ollama.deps_task_create_failed": "Невозможно создать задачу hs.task.",
 	"ollama.deps_task_start_failed": "Невозможно запустить задачу hs.task.",
+	"ollama.digest_mismatch": "Загрузка %s дважды оказалась повреждённой: контрольная сумма не совпала. Прокси или нестабильная сеть могут исказить загрузку; проверьте подключение и повторите попытку.",
 	"ollama.download_cancelled": "Загрузка Ollama отменена",
 	"ollama.download_error": "Ошибка загрузки %s",
 	"ollama.download_subtitle": "Получение весов из Ollama Hub…",

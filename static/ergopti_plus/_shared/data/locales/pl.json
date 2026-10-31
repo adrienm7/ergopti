@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "Suma kontrolna zweryfikowana. Instalowanie Ollama…",
 	"ollama.deps_task_create_failed": "Nie można utworzyć zadania hs.task.",
 	"ollama.deps_task_start_failed": "Nie można uruchomić zadania hs.task.",
+	"ollama.digest_mismatch": "Pobieranie %s zostało dwukrotnie uszkodzone: suma kontrolna się nie zgadzała. Serwer proxy lub niestabilna sieć mogą zmienić pobierany plik; sprawdź połączenie i spróbuj ponownie.",
 	"ollama.download_cancelled": "Pobieranie Ollama anulowane",
 	"ollama.download_error": "Błąd pobierania %s",
 	"ollama.download_subtitle": "Pobieranie wag z Ollama Hub…",

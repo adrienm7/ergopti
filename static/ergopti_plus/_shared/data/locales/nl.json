@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "Controlesom geverifieerd. Ollama wordt geïnstalleerd…",
 	"ollama.deps_task_create_failed": "Kan hs.task niet aanmaken.",
 	"ollama.deps_task_start_failed": "Kan hs.task niet starten.",
+	"ollama.digest_mismatch": "De download van %s was twee keer beschadigd: de controlesom klopte niet. Een proxy of een instabiel netwerk kan een download wijzigen; controleer de verbinding en probeer het opnieuw.",
 	"ollama.download_cancelled": "Ollama-download geannuleerd",
 	"ollama.download_error": "Downloadfout voor %s",
 	"ollama.download_subtitle": "Gewichten ophalen van Ollama Hub…",
