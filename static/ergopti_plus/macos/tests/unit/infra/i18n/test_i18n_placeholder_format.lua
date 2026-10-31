@@ -25,9 +25,13 @@ helpers.describe("i18n.format: {n} placeholders are substituted, not printed", f
 	-- minimal lib.i18n, so asking it for lib.i18n hands back the stub and the
 	-- test would be checking the stub's own substitution rather than the
 	-- implementation this regression is about.
+	-- It is loaded by its module name, so a move of the file keeps the test, and
+	-- the previous instance is put back so no later test sees this one.
 	local function load_i18n_with(strings)
+		local previous = package.loaded["infra.i18n"]
 		package.loaded["infra.i18n"] = nil
-		local i18n = dofile(helpers.driver_root() .. "/infra/i18n.lua")
+		local i18n = require("infra.i18n")
+		package.loaded["infra.i18n"] = previous
 		i18n.get = function(key) return strings[key] end
 		return i18n
 	end
