@@ -204,7 +204,7 @@ local function route_plan(callback)
 end
 
 --- The installed relay beside the launcher in the application bundle; nil in a
---- source checkout, where the relay is not built.
+--- source checkout, or a bundle built before the relay shipped.
 --- @return string|nil path
 local function relay_executable()
 	local launcher = require("platform.remap.lease_helper").resolve()
@@ -222,8 +222,9 @@ local function relay_probe(upstream, callback)
 	local NetworkEnv = require("modules.llm.network_env")
 	local policy = NetworkEnv.proxy_auth_relay()
 	local origins = NetworkEnv.route_origins("ollama")
+	if not policy or not origins then return callback(nil, "relay_unavailable") end
 	local executable = relay_executable()
-	if not policy or not origins or not executable then return callback(nil, "relay_unavailable") end
+	if not executable then return callback({ status = require("network.proxy_auth_relay").NOT_INSTALLED }) end
 	local Timings = require("infra.timings")
 	local args = policy.probe_args(upstream, policy.authority(origins[1]), {
 		dial_ms = Timings.ms("adapters", "proxy_relay_dial_timeout_ms"),

@@ -364,7 +364,7 @@ To do on the PC:
 
 1. Bundle `ergopti-proxy-relay.exe` (`GOOS=windows GOARCH=amd64`, and arm64 if
    shipped) beside the other vendor helpers, signed with the rest (item 132).
-   A missing binary is the refusal `relay_unavailable`.
+   Without it the launch keeps the proxy as named, with a WARNING (`not_installed`).
 2. `ollama-runtime-launch.ps1`: where `Test-ErgoptiRelayTunnel` returns
    `windows_login`, run the relay `probe` instead (it proves the sign-in). On
    `required`, start the daemon through `run` instead of dropping
@@ -376,7 +376,7 @@ To do on the PC:
    `network.failure.proxy_windows_login` only if a path can still reach it.
 4. `network_check.ahk`: Linux and macOS now report a ninth step,
    `proxy_relay` (`field_check_network.lua` `PLAN_STEPS`), with values
-   `not_needed`, `required_negotiate`, `required_ntlm`, `direct`,
+   `not_needed`, `required_negotiate`, `required_ntlm`, `relay_not_installed`, `direct`,
    `not_applicable` or a refusal reason. The Windows list is pinned to
    `STEP_IDS` only (`test-network-field-check-parity.cjs`), so adding it is your
    choice; the label `field_check.step.proxy_relay` exists.

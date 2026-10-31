@@ -94,7 +94,7 @@ it("an invalid contract is refused", function()
 	eq(Relay.new(broken), nil, "the caller-side refusal is required")
 end)
 
-it("a relay that is not installed is refused by name without a child", function()
+it("a relay that is not installed answers not_installed without a child", function()
 	local Binding = helpers.load_module("infra.proxy_auth_relay")
 	assert(Binding.load(), "the shipped contract must load")
 	local timings = Binding.timings()
@@ -110,7 +110,9 @@ it("a relay that is not installed is refused by name without a child", function(
 	Binding.executable = original
 	assert(ok, operation)
 	eq(#answers, 1)
-	eq(answers[1].answer, nil)
-	eq(answers[1].reason, "relay_unavailable")
+	eq(answers[1].answer.status, Relay.NOT_INSTALLED)
+	eq(answers[1].reason, nil)
+	-- The Go relay never prints it: a probe line claiming it is off contract.
+	eq(select(2, policy.read_probe(0, '{"schema":1,"status":"not_installed"}\n')), "relay_unavailable")
 	eq(operation.is_settled(), true)
 end)
