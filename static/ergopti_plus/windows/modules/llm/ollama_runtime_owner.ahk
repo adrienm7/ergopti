@@ -428,6 +428,9 @@ class OllamaRuntimeOwner {
 		if !FileExist(Path)
 			return false
 		Image := FSReadUtf8ExactBounded(Path, 4096)
+		; The launcher readmits its image exclusively for an instant: not ready yet.
+		if !(Image is String)
+			return false
 		return Map("receipt", JsonParse(Image), "image_sha256", CryptoSha256(Image))
 	}
 
