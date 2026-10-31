@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "تم التحقق من المجموع الاختباري. جارٍ تثبيت Ollama…",
 	"ollama.deps_task_create_failed": "تعذر إنشاء مهمة hs.task.",
 	"ollama.deps_task_start_failed": "تعذر بدء مهمة hs.task.",
+	"ollama.digest_mismatch": "تلف تنزيل %s مرتين: لم يتطابق المجموع الاختباري. قد يغيّر خادم وكيل أو شبكة غير مستقرة التنزيل؛ تحقّق من الاتصال ثم أعد المحاولة.",
 	"ollama.download_cancelled": "تم إلغاء تنزيل Ollama",
 	"ollama.download_error": "خطأ في تنزيل %s",
 	"ollama.download_subtitle": "جارٍ جلب الأوزان من Ollama Hub…",

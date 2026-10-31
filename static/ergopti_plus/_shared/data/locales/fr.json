@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "Somme de contrôle vérifiée. Installation d’Ollama…",
 	"ollama.deps_task_create_failed": "Impossible de créer la tâche hs.task.",
 	"ollama.deps_task_start_failed": "Impossible de démarrer la tâche hs.task.",
+	"ollama.digest_mismatch": "Le téléchargement de %s a été corrompu deux fois : sa somme de contrôle ne correspondait pas. Un proxy ou un réseau instable peut altérer un téléchargement ; vérifiez la connexion, puis réessayez.",
 	"ollama.download_cancelled": "Téléchargement Ollama interrompu",
 	"ollama.download_error": "Erreur lors du téléchargement de %s",
 	"ollama.download_subtitle": "Récupération des poids depuis Ollama Hub…",

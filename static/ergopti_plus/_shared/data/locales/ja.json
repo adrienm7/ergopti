@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "チェックサムを確認しました。Ollama をインストールしています…",
 	"ollama.deps_task_create_failed": "hs.taskを作成できません。",
 	"ollama.deps_task_start_failed": "hs.taskを起動できません。",
+	"ollama.digest_mismatch": "%s のダウンロードが 2 回破損しました。チェックサムが一致しませんでした。プロキシや不安定なネットワークがダウンロードを改変することがあります。接続を確認してから、もう一度お試しください。",
 	"ollama.download_cancelled": "Ollama ダウンロードがキャンセルされました",
 	"ollama.download_error": "%s のダウンロードエラー",
 	"ollama.download_subtitle": "Ollama Hubから重みを取得中…",

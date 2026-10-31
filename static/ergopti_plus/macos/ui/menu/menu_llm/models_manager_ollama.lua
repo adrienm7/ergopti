@@ -1776,7 +1776,12 @@ function M.new(deps, presets, ram_getter)
 						tostring(code), pull_cause)
 				end
 				local connection_error = pull_output:lower():find("could not connect") or pull_output:lower():find("connection refused")
-				
+				-- Ollama deletes a layer whose sha256 does not match before it
+				-- reports the mismatch, so one more pull downloads it afresh
+				-- (field run 2026-10-31: a fresh 366 MB layer failed its check).
+				local digest_mismatch = pull_output:find("OLLAMA_PULL_ERROR digest_mismatch", 1, true) ~= nil
+				local digest_retried = type(opts) == "table" and opts.digest_mismatch_retried == true
+
 				if network_report then
 					pcall(notifications.notify, i18n.get("ollama.fail_title"),
 						i18n.get(network_report.message_key), "error")
@@ -1786,6 +1791,25 @@ function M.new(deps, presets, ram_getter)
 						i18n.get("ollama.upgrade_required_body"), "warning")
 				elseif connection_error then
 					pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.service_disconnected"), "error")
+					complete_progress_ui(owner, false, target_model)
+				elseif digest_mismatch and not digest_retried then
+					local retry_opts = {}
+					for key, value in pairs(type(opts) == "table" and opts or {}) do retry_opts[key] = value end
+					retry_opts.digest_mismatch_retried = true
+					opts = retry_opts
+					if do_retry() == true then
+						Logger.warn(LOG, "The Ollama pull of %s failed its digest check; Ollama removed the layer, so it is pulled once more.",
+							tostring(target_model))
+					else
+						Logger.error(LOG, "The Ollama pull of %s failed its digest check and its single retry could not start.",
+							tostring(target_model))
+						pcall(notifications.notify, i18n.get("ollama.fail_title"),
+							string.format(i18n.get("ollama.digest_mismatch"), target_model), "error")
+						complete_progress_ui(owner, false, target_model)
+					end
+				elseif digest_mismatch then
+					pcall(notifications.notify, i18n.get("ollama.fail_title"),
+						string.format(i18n.get("ollama.digest_mismatch"), target_model), "error")
 					complete_progress_ui(owner, false, target_model)
 				elseif pac_fallback then
 					-- Both causes: the PAC could not be used, then the direct try failed too.

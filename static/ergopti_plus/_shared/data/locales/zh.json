@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "校验和已验证。正在安装 Ollama…",
 	"ollama.deps_task_create_failed": "无法创建 hs.task 任务。",
 	"ollama.deps_task_start_failed": "无法启动 hs.task 任务。",
+	"ollama.digest_mismatch": "%s 的下载两次损坏：校验和不匹配。代理或不稳定的网络可能会篡改下载内容；请检查连接后重试。",
 	"ollama.download_cancelled": "Ollama 下载已取消",
 	"ollama.download_error": "下载 %s 时出错",
 	"ollama.download_subtitle": "正在从 Ollama Hub 获取权重…",

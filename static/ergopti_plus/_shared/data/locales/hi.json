@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "चेकसम सत्यापित। Ollama इंस्टॉल हो रहा है…",
 	"ollama.deps_task_create_failed": "hs.task बनाने में विफल।",
 	"ollama.deps_task_start_failed": "hs.task शुरू करने में विफल।",
+	"ollama.digest_mismatch": "%s का डाउनलोड दो बार दूषित हुआ: उसका चेकसम मेल नहीं खाया। कोई प्रॉक्सी या अस्थिर नेटवर्क डाउनलोड को बदल सकता है; कनेक्शन जाँचें, फिर से प्रयास करें।",
 	"ollama.download_cancelled": "Ollama डाउनलोड रद्द किया गया",
 	"ollama.download_error": "%s के लिए डाउनलोड त्रुटि",
 	"ollama.download_subtitle": "Ollama Hub से वेट फेच किए जा रहे हैं…",
