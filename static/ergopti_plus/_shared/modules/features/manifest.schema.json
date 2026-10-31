@@ -202,7 +202,7 @@
 		"feature_entry": {
 			"type": "object",
 			"additionalProperties": false,
-			"required": ["id", "description_key", "input_altering"],
+			"required": ["id", "description_key", "input_altering", "requires"],
 			"properties": {
 				"id": {
 					"type": "string",
@@ -279,6 +279,29 @@
 					},
 					"minItems": 1,
 					"uniqueItems": true
+				},
+				"requires": {
+					"type": "object",
+					"additionalProperties": false,
+					"minProperties": 1,
+					"properties": {
+						"macos": {
+							"type": "array",
+							"items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+							"uniqueItems": true
+						},
+						"linux": {
+							"type": "array",
+							"items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+							"uniqueItems": true
+						},
+						"windows": {
+							"type": "array",
+							"items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+							"uniqueItems": true
+						}
+					},
+					"description": "What the feature needs outside its driver, per OS it is available on (hs = macos, ahk = windows), as ids of requirements.toml; an empty list means nothing external. tools/test/test-feature-requirements.cjs derives the same lists from the drivers and fails on any difference."
 				},
 				"choice_values": {
 					"type": "array",
