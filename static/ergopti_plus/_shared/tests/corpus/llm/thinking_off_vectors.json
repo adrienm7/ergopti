@@ -1215,6 +1215,25 @@
 			"added": []
 		},
 		{
+			"id": "openrouter_nousresearch_hermes-4-70b",
+			"provider": "openrouter",
+			"model": "nousresearch/hermes-4-70b",
+			"body": {
+				"model": "nousresearch/hermes-4-70b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "nousresearch/hermes-4-70b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 32
+		},
+		{
 			"id": "openrouter_openai_gpt-oss-120b",
 			"provider": "openrouter",
 			"model": "openai/gpt-oss-120b",
