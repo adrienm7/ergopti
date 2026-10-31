@@ -221,6 +221,33 @@ ready (3 step(s)).` and `build/field-run/ready.json` names the driver's pid.
     list vector since the `llm_menu_rows` rule was retired);
   - then `run_all.ahk` again: every menu goes through the edited renderer.
 
+## Proxy override field: the Windows half (Issue #101 point 2, 31 October)
+
+macOS and Linux now have Debug > "Proxy for downloads…": empty (automatic, the
+default), `direct`, or one relay URL such as `http://proxy.example.com:3128`
+(http, https, socks5, socks5h, with a port). Its storage key and default are
+`_shared/modules/network/proxy_override.json`; the value grammar is
+`_shared/lua/network/proxy_override.lua` (a relay is valid exactly when
+`route_plan.lua` `valid_route` accepts it). The shared proxy policy applies it
+right after loopback and before an exported relay and the PAC/WPAD lookup
+(`proxy_policy.lua` `policy.route`, third argument). The menu row is in
+`menu.toml` with `platforms = ["hs", "linux"]` and
+`platform_reason.proxy_override_not_yet_on_windows`; the only Windows file the
+change touched is the generated `windows/_generated/config_keys.ahk`
+(`MenuCommand.PROXY_OVERRIDE`). Still to do under AutoHotkey:
+
+- Read the stored value with an AHK twin of the parser (refuse anything else,
+  never read it as automatic) and apply it before WinINet/PAC in the managed
+  routes (`ui/field_check/network_check.ahk`, `modules/updater/self_update.ahk`,
+  `modules/llm/ollama_managed_bootstrap.ahk` and the route plan twin
+  `vendor/ergopti_route_plan.ps1`): a relay is every origin's route, `direct`
+  is DIRECT for every origin, loopback stays direct.
+- The menu row: add `"ahk"` to the row's platforms, drop its `reason_key`
+  (and the locale key if nothing else uses it), and a handler with the same
+  prompt, validation and the `proxy_override.*` messages.
+- AHK tests replaying `_shared/lua/test/network_proxy_override_contract.lua`'s
+  vectors (accepted relays, refused values, precedence).
+
 ## Seven more local AI servers (31 October)
 
 `local_servers.json` gained SGLang, KoboldCpp, text-generation-webui, GPT4All,

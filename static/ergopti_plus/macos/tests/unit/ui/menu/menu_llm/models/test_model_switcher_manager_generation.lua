@@ -784,6 +784,8 @@ helpers.describe("model manager generation fences", function()
 			"ui.menu.menu_llm.models_manager_mlx_download", "modules.llm.network_env",
 			-- FileSystem captures hs when it loads; bind it to this fixture's probe.
 			"adapters.file_system",
+			-- Storage captures hs too: the prelude reads the proxy override through it.
+			"adapters.storage",
 		}
 		local saved_io_open = io.open
 		local saved_os_execute = os.execute
@@ -798,6 +800,8 @@ helpers.describe("model manager generation fences", function()
 			local hs_fixture = {
 				-- Without hs.fs, FileSystem.exists() locates the bundled policy through test(1).
 				execute = helpers.existence_probe_execute(),
+				-- The prelude reads the proxy override setting: none is stored.
+				settings = {get = function() return nil end},
 				json = {
 					decode = function(raw)
 						return {
@@ -1021,6 +1025,8 @@ helpers.describe("model manager generation fences", function()
 			"ui.menu.menu_llm.models_manager_ollama", "modules.llm.network_env",
 			-- FileSystem captures hs when it loads; bind it to this fixture's probe.
 			"adapters.file_system",
+			-- Storage captures hs too: the prelude reads the proxy override through it.
+			"adapters.storage",
 		}
 		local pull_done
 		local pull_tasks, progress_shows = {}, 0
@@ -1029,6 +1035,8 @@ helpers.describe("model manager generation fences", function()
 		local hs_fixture = {
 			-- The pull's network prelude locates the bundled policy through test(1).
 			execute = helpers.existence_probe_execute(function() return "", true end),
+			-- The prelude reads the proxy override setting: none is stored.
+			settings = {get = function() return nil end},
 			-- The pull reads the shared route inventory through the real file adapter.
 			fs = require("tests.stubs.hs").fs,
 			http = {asyncPost = function() http_posts = http_posts + 1 end},
