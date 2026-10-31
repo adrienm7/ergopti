@@ -18,8 +18,6 @@
 
 local M = {}
 
-local Writer = require("toml_codec.writer")
-
 M.MESSAGE_KEY = "dialog.bulk_toggle.save_failed"
 
 --- Shows the generic save failure unless a case-twin notice already named it.
@@ -29,7 +27,8 @@ M.MESSAGE_KEY = "dialog.bulk_toggle.save_failed"
 function M.present(translate, show)
 	assert(type(translate) == "function", "a save failure notice needs the locale lookup")
 	assert(type(show) == "function", "a save failure notice needs its presenter")
-	if Writer.take_case_twin_notice() ~= nil then return false end
+	-- Resolved per call: the notice lives in the writer instance that refused.
+	if require("toml_codec.writer").take_case_twin_notice() ~= nil then return false end
 	show(translate(M.MESSAGE_KEY))
 	return true
 end
