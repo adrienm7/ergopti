@@ -493,11 +493,8 @@ Nothing left.
 
 ### G. Constants, delays, colours, labels (value order)
 
-- [ ] **PAR-79/PAR-83 macOS remainder.** [CODE] [CI: Swift] Once the `[launcher]` timing registry
-      (`LauncherTimings.generated.swift`, `tools/test/launcher-sleep-literal-baseline.json`) lands on dev: move the
-      seven sleeps of the `OwnedRuntime*` and `OwnedVirtualHIDDaemonReport*` Swift files onto `[launcher]` keys and
-      shrink the baseline with `--shrink`. Their identifier copies are done (`identifiers.json` `signing_ids`). The
-      Windows remainder of PAR-79, PAR-81 and PAR-83 is in [the PC handoff](docs/tooling/windows-pc-agent-handoff.md).
+The macOS part of PAR-79/PAR-83 is done; the Windows remainder of PAR-79, PAR-81 and PAR-83 is in
+[the PC handoff](docs/tooling/windows-pc-agent-handoff.md).
 
 ## Backlog (one line each)
 
