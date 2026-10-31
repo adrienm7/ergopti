@@ -860,6 +860,32 @@ Added October 22 (from the agents' reports; details in their commits):
       `shortcuts_list` and `shortcuts_refusal` are what a program can prove.
 - [ ] **107.** [CODE] macOS forced output. Linux is settled by design (the number row is applied by rebuilding the
       layout, `docs/design/linux-number-row-runtime.md`); its W1 to W4 are in the layout emulation item.
+- [ ] **93. Linux ordered pairs.** [PHYS-L] XI2 property cookies proven on Xvfb in WSL and again on
+      30 October in an Ubuntu 24.04 container (Xvfb 21.1.12, `run_xi2_property_cookies.py`: created,
+      modified, deleted); the saved Xi packet is retired (libXi as a package dependency declined by
+      the maintainer). Nothing else is provable on Xvfb: it reads no kernel device, so the join of a
+      uinput Writer edge with the server's XKB/XI2 modifier state needs Xorg or a compositor reading
+      real evdev nodes, and physical input needs a real kernel and desktop.
+- [ ] **97/98.** [CODE] Native physical-position capture and all-owner collision admission. The
+      MediaStore device contract now exists (`_shared/lua/keystats/media_identity.lua`: `device` is a
+      decimal u64 string, as macOS fills it), so the Linux identity is no longer blocked on policy;
+      the candidate is the owned descriptor's `st_rdev` from `fstat`, never a path or event-node
+      number. Not added on 30 October because nothing on Linux would read it yet: no Linux producer
+      calls `sqlite_writer.insert_media_events`, and `keyboard_hook.capture_position` hands the editor
+      `native_code` and `mods` only. Decide the consumer first (Linux media-key metrics, or a
+      per-device physical binding), then add the identity with it. The star setting migration is
+      dropped (no users, no legacy migration).
+- [ ] **106.** [PHYS-M] Genuine Apple Shortcuts invocation with bounded cancellation; only the
+      refusal-in-time probe exists (in 116). _Hands:_ a genuine run needs a shortcut the maintainer
+      owns and names (the `shortcuts` command cannot create or import one without a dialog, and running an
+      arbitrary shortcut of theirs is not read-only); `field_toolchain`'s `shortcuts_list` and
+      `shortcuts_refusal` are what a program can prove.
+- [ ] **107.** [PHYS-L] Forced number-row output is settled by design on macOS and Linux: both apply the
+      number-row ordering and edge keys by rebuilding the layout, not by retyping keys in a hook (macOS
+      fc5d3a11df, `number_row_live.lua` and `layout_rows_build.lua`, proved by the field run's
+      `field_layout_rows`; Linux `docs/design/linux-number-row-runtime.md`), so the hook's input+XI2+writer
+      join is deliberately unreachable (nothing passes `numberRowMode`) and is not owed. Left for Linux only:
+      mutter and KWin reloading a `~/.config/xkb` layout (W1 to W4 of that note).
 - [ ] **108.** [CODE] Item 97's collision/source/modifier/output joins.
 - [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible Variables/KeyHistory snapshot.
 - [ ] **L115.** [CODE] Provider error envelope guard: not reproducible under WSL LuaJIT (6 of 6 runs pass); leave it
