@@ -506,7 +506,7 @@ helpers.describe("init: controlled reload owns the native shutdown handoff", fun
 		end)
 	end)
 
-	helpers.it("fails the exact controlled waiter when MLX cleanup is refused (HS-008)", function()
+	helpers.it("reloads natively once when MLX cleanup is refused (HS-008)", function()
 		run_isolated({ mlx_stop_mode = "deferred" }, function(state, hs_stub)
 			helpers.assert_eq(hs_stub.reload("mlx-cleanup-refused"), true)
 			helpers.assert_eq(type(state.mlx_stop_callback), "function")
@@ -514,17 +514,19 @@ helpers.describe("init: controlled reload owns the native shutdown handoff", fun
 
 			local exact_callback = state.mlx_stop_callback
 			helpers.assert_eq(exact_callback(false, "cleanup_refused"), false)
-			helpers.assert_eq(state.fatal_exit_calls, 1,
-				"a negative exact teardown terminal must leave pending state through fatal exit")
-			helpers.assert_true(type(state.fatal_exit_code) == "number" and state.fatal_exit_code ~= 0)
-			helpers.assert_eq(state.native_reload_calls, 0)
+			-- A reload replaces its Lua state natively instead of losing the app
+			-- (reload-teardown-failed); an exit keeps the fatal backstop
+			helpers.assert_eq(state.native_reload_calls, 1,
+				"a negative exact teardown terminal must leave pending state through a native reload")
+			helpers.assert_eq(state.fatal_exit_calls, 0)
 			helpers.assert_eq(state.drain_calls, 0,
 				"logger drain cannot start after listener absence was refused")
 			helpers.assert_eq(state.logger_stop_calls, 0)
 
 			exact_callback(false, "duplicate")
-			helpers.assert_eq(state.fatal_exit_calls, 1,
+			helpers.assert_eq(state.native_reload_calls, 1,
 				"the same shutdown waiter cannot publish two negative terminals")
+			helpers.assert_eq(state.fatal_exit_calls, 0)
 		end)
 	end)
 
