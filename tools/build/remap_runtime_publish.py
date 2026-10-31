@@ -1,10 +1,15 @@
 # tools/build/remap_runtime_publish.py
 """Package the signed owned runtime reproducibly and pin it in the manifest.
 
-The hosted build (`remap_runtime_build.py --sign-owned`) leaves the signed
-products under `<owner>/.signed-runtime-preparation/Runtime/`. This tool turns
-that tree into the one downloadable artifact of ADR 011 (WP5) and writes the
-`runtime.*` pin of `static/ergopti_plus/macos/vendor/remap-runtime/manifest.json`.
+The hosted build (`remap_runtime_build.py --package-owned`) leaves the signed
+privileged helper, with the runtime products sealed in its
+`Contents/Resources/OwnedRuntime/`, at
+`<owner>/production_runtime_package/ErgoptiPlus-Runtime-Installer.app`. This
+tool turns that helper into the one downloadable artifact of ADR 011 (WP5) and
+writes the `runtime.*` pin of
+`static/ergopti_plus/macos/vendor/remap-runtime/manifest.json`. The launcher
+stages the helper of the verified download for the administrator install, so
+the artifact is the helper itself, never the loose products.
 
 Reproducible means: the same signed tree always gives the same bytes. Entries
 are sorted, owners are 0, times are 0, the gzip header carries no name and no
@@ -25,8 +30,9 @@ import tarfile
 
 # The version of the owned runtime artifact. It names the upstream release the
 # fork re-anchors on (16.3.0) and the Ergopti revision of that fork; bump the
-# last number whenever the signed products change.
-RUNTIME_VERSION = "16.3.0-ergopti.1"
+# last number whenever the signed products or the artifact shape change (.2:
+# the artifact became the signed installer helper instead of Runtime/).
+RUNTIME_VERSION = "16.3.0-ergopti.2"
 FILE_PREFIX = "ErgoptiPlus-Remap-Runtime-"
 FILE_SUFFIX = ".tar.gz"
 RELEASE_TAG_PREFIX = "remap-runtime-v"
@@ -45,15 +51,24 @@ def _default_repository():
 
 
 DEFAULT_REPOSITORY = _default_repository()
-TOP = "Runtime"
-# The three signed products, as remap_runtime_build.py's _SIGNED_PRODUCTS names
-# them; an artifact without one of them is not the runtime.
+# The signed helper bundle the packaging leaves (owned_runtime_product_build.py
+# _package_live) and the launcher stages (OwnedRuntimeDownloadedHelper.swift).
+TOP = "ErgoptiPlus-Runtime-Installer.app"
+PRODUCTS = TOP + "/Contents/Resources/OwnedRuntime"
+# The helper's executable and the three signed products it seals, as
+# remap_runtime_build.py's _SIGNED_PRODUCTS names them; an artifact without one
+# of them is not the runtime. platform/remap/runtime_artifact_fetch.lua PRODUCTS
+# lists the same paths.
 REQUIRED_MEMBERS = (
-    "Runtime/ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core",
-    "Runtime/ErgoptiPlus-Remap-Console.app/Contents/MacOS/ErgoptiPlus-Remap-Console",
-    "Runtime/bin/ergoptiplus_remap_cli",
+    TOP + "/Contents/MacOS/ErgoptiPlus-Runtime-Installer",
+    PRODUCTS + "/ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core",
+    PRODUCTS + "/ErgoptiPlus-Remap-Console.app/Contents/MacOS/ErgoptiPlus-Remap-Console",
+    PRODUCTS + "/bin/ergoptiplus_remap_cli",
 )
 ALLOWED_MODES = (0o755, 0o644)
+# The packaging keeps the signed inventory's directory modes, 0755 or 0700
+# (owned_runtime_product_build.py), and the signature covers no directory mode.
+ALLOWED_DIRECTORY_MODES = (0o755, 0o700)
 MAX_MEMBERS = 2048
 MAX_TOTAL_BYTES = 512 * 1024 * 1024
 MANIFEST_RELATIVE = "static/ergopti_plus/macos/vendor/remap-runtime/manifest.json"
@@ -94,10 +109,10 @@ def source_url(repository=DEFAULT_REPOSITORY, version=RUNTIME_VERSION):
 
 
 def inventory(root):
-    """Lists the tree under root/Runtime as sorted (relative, path, info) rows."""
+    """Lists the helper bundle under root as sorted (relative, path, info) rows."""
     root = Path(root)
     top = root / TOP
-    _require(top.is_dir() and not top.is_symlink(), "the signed tree has no Runtime directory")
+    _require(top.is_dir() and not top.is_symlink(), "the signed tree has no " + TOP)
     rows = []
     pending = [top]
     total = 0
@@ -122,7 +137,9 @@ def inventory(root):
     for relative, _, info in rows:
         mode = stat.S_IMODE(info.st_mode)
         if stat.S_ISDIR(info.st_mode):
-            _require(mode == 0o755, "directory mode is not 0755: " + relative)
+            _require(
+                mode in ALLOWED_DIRECTORY_MODES, "directory mode is not 0755 or 0700: " + relative
+            )
         else:
             _require(mode in ALLOWED_MODES, "file mode is not 0755 or 0644: " + relative)
     names = {relative for relative, _, _ in rows}
@@ -168,7 +185,7 @@ def verify_archive(data, pin):
             path = PurePosixPath(member.name)
             _require(
                 not path.is_absolute() and ".." not in path.parts and path.parts[:1] == (TOP,),
-                "member outside Runtime: " + member.name,
+                "member outside " + TOP + ": " + member.name,
             )
             _require(
                 member.isdir() or member.isreg(),
@@ -217,7 +234,7 @@ def main(arguments=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
     pack = commands.add_parser("package", help="build the artifact and runtime-pin.json")
-    pack.add_argument("signed_root", type=Path, help="directory that holds the signed Runtime/")
+    pack.add_argument("signed_root", type=Path, help="directory that holds the signed " + TOP)
     pack.add_argument("output", type=Path)
     pack.add_argument("--repository", default=DEFAULT_REPOSITORY)
     apply = commands.add_parser("apply", help="write runtime-pin.json into the manifest")
