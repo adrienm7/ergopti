@@ -85,7 +85,10 @@ const PARAMETER_KINDS = new Set([
 	'llm_vision',
 	'llm_language',
 	'app',
-	'program'
+	'program',
+	'command',
+	'path',
+	'apple_shortcut'
 ]);
 
 const SG_FIELDS = new Set([

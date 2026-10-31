@@ -43,7 +43,13 @@
 #             rule pinned by _shared/tests/corpus/action_parameters/app_vectors.json),
 #             or "program" (versioned JSON containing an absolute executable
 #             and literal ordered arguments; rule pinned independently by
-#             _shared/tests/corpus/action_parameters/program_vectors.json).
+#             _shared/tests/corpus/action_parameters/program_vectors.json),
+#             or "command" (versioned JSON: a shell command line, hidden or in
+#             a terminal, and what to do with its output), "path" (an
+#             absolute file or folder path) or "apple_shortcut" (versioned
+#             JSON: a Shortcuts identifier and name, its input and output);
+#             rule pinned by
+#             _shared/tests/corpus/action_parameters/user_action_vectors.json.
 #   confirm   true for a destructive action that must ask before it runs. Each
 #             driver's dispatcher asks, off the input thread, and runs the
 #             action only on the explicit answer: macOS execute_single
@@ -809,6 +815,36 @@ platform = "ahk,hs"
 # Versioned absolute executable plus a literal argument vector, owned by the action lifecycle.
 platform = "all"
 parameter = "program"
+
+[sg_actions.run_command]
+# A shell command line the user typed, run by /bin/sh -l -c (a login shell's
+# environment: /etc/profile and ~/.profile, so macOS path_helper's PATH) either
+# hidden, its exit code logged, a failure notified with its first stderr line
+# and its stdout optionally typed or copied, or in a new terminal window (macOS
+# Terminal, Linux the session's terminal). Bounded by
+# [gestures] run_command_timeout_ms and [limits] run_command_output_bytes. The
+# command text is user configuration and never logged (see README, security).
+# Windows is pending: docs/tooling/windows-pc-agent-handoff.md.
+platform = "hs,linux"
+parameter = "command"
+
+[sg_actions.open_path]
+# A file or folder opened with its default application (macOS `open`, Linux
+# xdg-open, else gio open), chosen in the native file/folder picker. A path
+# that no longer exists is refused with a named notice. Windows is pending:
+# docs/tooling/windows-pc-agent-handoff.md.
+platform = "hs,linux"
+parameter = "path"
+
+[sg_actions.run_apple_shortcut]
+# One shortcut of the user's Shortcuts library, picked from `shortcuts list`
+# and stored by its identifier, run with `shortcuts run` (optionally given the
+# selection as text input, its text output typed or copied), bounded by
+# [gestures] apple_shortcut_run_timeout_ms. The identifier is revalidated by
+# adapters/apple_shortcuts.lua before each run: a deleted or renamed shortcut
+# is refused with a named reason. Apple Shortcuts exists only on macOS.
+platform = "hs"
+parameter = "apple_shortcut"
 
 [sg_actions.open_app]
 # Opens the application stored for the binding: macOS `open -a` (a name or
@@ -1756,7 +1792,10 @@ items = [
     "clear_clipboard",
     "center_mouse",
     "open_app",
+    "open_path",
     "run_program",
+    "run_command",
+    "run_apple_shortcut",
     "quit_frontmost_app",
     "force_quit_frontmost",
     "empty_trash",

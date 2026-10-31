@@ -31,6 +31,7 @@ local VALUES = {
 	http_diagnostic_bytes = 65536,
 	proxy_packet_bytes = 65536,
 	shortcuts_reply_bytes = 65536,
+	user_action_output_bytes = 65536,
 	log_prepare_tick_bytes = 65536,
 	shell_captured_output_bytes = 4194304,
 	toml_source_chunk_bytes = 65536,

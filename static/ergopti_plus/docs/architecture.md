@@ -87,6 +87,7 @@ graph TD
         MACOS_accessibility_permission["AccessibilityPermission.lua"]
         MACOS_app_launcher["AppLauncher.lua"]
         MACOS_apple_shortcuts["AppleShortcuts.lua"]
+        MACOS_apple_shortcuts_cli["AppleShortcutsCli.lua"]
         MACOS_apple_shortcuts_native["AppleShortcutsNative.lua"]
         MACOS_application_notifier["ApplicationNotifier.lua"]
         MACOS_boot_fatal["BootFatal.lua"]

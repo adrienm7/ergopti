@@ -5,7 +5,8 @@
 --- DESCRIPTION:
 --- Lets the user pick the application an open_app binding launches: a zenity
 --- or kdialog file dialog over the system's desktop entries, answered with the
---- desktop-file id gtk-launch takes (firefox, org.gnome.Nautilus).
+--- desktop-file id gtk-launch takes (firefox, org.gnome.Nautilus). The same
+--- dialogs pick the file or folder an open_path binding opens (pick_path).
 ---
 --- FEATURES & RATIONALE:
 --- 1. A desktop entry, not an executable: gtk-launch starts it the way the
@@ -109,6 +110,48 @@ function M.pick(shell, title)
 	local id = M.desktop_id(chosen)
 	if not id then return nil, "the chosen file is not a desktop entry" end
 	return id
+end
+
+--- The picker command line that chooses one file or folder for open_path.
+--- @param shell table Shell-runner authority (has_command, quote).
+--- @param title string Window title, already composed.
+--- @param folder boolean True to choose a folder.
+--- @param start string The folder the picker opens on.
+--- @return string|nil command Nil when neither zenity nor kdialog exists.
+function M.path_picker_command(shell, title, folder, start)
+	if shell.has_command("zenity") then
+		return "zenity --file-selection" .. (folder and " --directory" or "")
+			.. " --title=" .. shell.quote(title) .. " --filename=" .. shell.quote(start) .. " 2>/dev/null"
+	end
+	if shell.has_command("kdialog") then
+		return "kdialog " .. (folder and "--getexistingdirectory " or "--getopenfilename ")
+			.. shell.quote(start) .. " --title " .. shell.quote(title) .. " 2>/dev/null"
+	end
+	return nil
+end
+
+--- Opens the first available picker over one file or one folder.
+--- @param shell table Shell-runner authority (has_command, exec_checked, quote).
+--- @param title string Already-translated dialog title.
+--- @param folder boolean True to choose a folder.
+--- @param start string The folder the picker opens on.
+--- @param modal function|nil Test seam replacing ui/modal's run.
+--- @return string|nil path The chosen path, as the picker printed it.
+--- @return string|nil error_message Why nothing was chosen.
+function M.pick_path(shell, title, folder, start, modal)
+	if type(shell) ~= "table" or type(shell.has_command) ~= "function"
+		or type(shell.exec_checked) ~= "function" or type(shell.quote) ~= "function" then
+		return nil, "shell runner is unavailable"
+	end
+	local command = M.path_picker_command(shell, WindowTitles.compose(title), folder == true, start)
+	if not command then return nil, "neither zenity nor kdialog is available" end
+	local completed, output = (modal or require("ui.modal").run)(function() return shell.exec_checked(command) end)
+	if completed ~= true or type(output) ~= "string" then return nil, "path selection was cancelled or refused" end
+	-- Remove the picker's single LF delimiter; a line break inside a chosen
+	-- name stays and the open_path validator refuses it.
+	local chosen = output:gsub("\n$", "")
+	if chosen == "" then return nil, "path selection was cancelled" end
+	return chosen
 end
 
 return M
