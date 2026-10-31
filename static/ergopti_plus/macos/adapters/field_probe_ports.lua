@@ -787,17 +787,20 @@ local function boot_facts()
 	return { complete_ms = Boot.boot_complete_ms(), cpu_ms = Boot.boot_cpu_ms(), slowest = Boot.slowest_stages(3) }
 end
 
---- The file system calls the FIFO check drives, in a folder of its own.
+--- The file system calls the FIFO check drives, in a folder of its own. The
+--- writers' refusals are the check's expected outcome: they reach it as a
+--- category, never as an ERROR line of the session.
 --- @return table { dir, mode, exists, append, write }
 local function fifo()
 	local FileSystem = require("adapters.file_system")
 	local tmp = (os.getenv("TMPDIR") or "/tmp"):gsub("/+$", "")
+	local function expected_refusal() end
 	return {
 		dir = tmp .. "/ergopti-field-fifo-" .. tostring(hs.processInfo.processID),
 		mode = FileSystem.followed_mode,
 		exists = FileSystem.exists,
-		append = FileSystem.append,
-		write = FileSystem.write,
+		append = function(path, content) return FileSystem.append(path, content, expected_refusal) end,
+		write = function(path, content) return FileSystem.write(path, content, expected_refusal) end,
 	}
 end
 
