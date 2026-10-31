@@ -2024,13 +2024,6 @@ baseline` line (item 38).
 - `field_fifo_safety` works in its own folder under `TMPDIR`, attaches a reader
   first so a regressed guard cannot freeze the app, checks `followed_mode`
   gives `named_pipe` and `exists` sees it, and removes the folder.
-- `field_apple_shortcuts` runs before `field_owned_pause`: the
-  `run_apple_shortcut` action lists the Shortcuts library through its own
-  owner and `shortcuts list --show-identifiers` (`shortcuts_listed`, the
-  count), then runs the shortcut named `Ergopti Field Test` end to end
-  (`field_test_run`, the owner's closed category). Without that shortcut
-  `field_test_shortcut` skips as `absent`: the maintainer creates it once in
-  Shortcuts as a shortcut that does nothing.
 - `field_local_servers` runs after `field_ai_local`: a missing descriptor is
   `undescribed_<n>` (else `servers_catalogue`); the sweep is the AI menu's own
   (process, settings file, listening port, then `GET /models`) and names each
