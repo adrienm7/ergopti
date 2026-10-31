@@ -1402,17 +1402,24 @@ class TapHoldScopeOwner {
 		; the per-key ones are deleted below with the rest of each key's fields.
 		Rows := [{ Section: "tap_hold", Key: "inherit_defaults", Delete: true },
 			{ Section: "tap_hold", Key: ConfigLeaf.TIME_ACTIVATION_SECONDS, Delete: true }]
-		for KeyId, Fields in _TH_OwnedDocumentKeys(Existing) {
-			for Field in Fields
-				Rows.Push({ Section: "tap_hold.keys." . KeyId, Key: Field, Delete: true })
-		}
+		PresetKeys := Map()
 		if this.mode == "recommended" {
 			if !FileExist(this.defaults)
 				throw Error("The canonical tap-hold preset is missing.")
 			Preset := LoadTapHoldToml(this.defaults)
 			if TOML_UnreadableFile(this.defaults) || Preset["keys"].Count == 0
 				throw Error("The canonical tap-hold preset is unreadable or empty.")
-			for KeyId, Fields in Preset["keys"] {
+			PresetKeys := Preset["keys"]
+		}
+		; A field the preset also sets gets its value row below: two rows on one path
+		; are refused, so this deletes only what the preset leaves out.
+		for KeyId, Fields in _TH_OwnedDocumentKeys(Existing) {
+			for Field in Fields
+				if !(PresetKeys.Has(KeyId) && PresetKeys[KeyId].Has(Field))
+					Rows.Push({ Section: "tap_hold.keys." . KeyId, Key: Field, Delete: true })
+		}
+		if this.mode == "recommended" {
+			for KeyId, Fields in PresetKeys {
 				for Field, Value in Fields {
 					if !Kinds.Has(Field)
 						throw Error("The canonical tap-hold preset contains an unknown field.")
@@ -1634,7 +1641,9 @@ TapHoldImportImage(Path, Defaults, KeyIds) {
 		Section := "tap_hold.keys." . KeyId
 		if Existing.Has(KeyId) {
 			for Field in Existing[KeyId] {
-				if Kinds.Has(Field)
+				; A field the preset also sets gets its value row below: two rows on
+				; one path are refused, so this deletes only what the preset leaves out.
+				if Kinds.Has(Field) && !Preset["keys"][KeyId].Has(Field)
 					Rows.Push({ Section: Section, Key: Field, Delete: true })
 			}
 		}
