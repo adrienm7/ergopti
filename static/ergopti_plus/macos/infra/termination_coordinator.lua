@@ -16,8 +16,10 @@
 --- 3. Fail Closed: a rejected or failed fence leaves the current Lua environment
 ---    and its consumers running, except an unowned reload whose fence is
 ---    refused after its request, which reloads natively (item 10). Once the
----    fence commits, any teardown failure exits non-zero because already-stopped
----    owners cannot be rolled back safely.
+---    fence commits, a failed exit teardown exits non-zero because
+---    already-stopped owners cannot be rolled back safely; a reload whose
+---    sentinel is committed reloads natively instead, since the fresh Lua state
+---    discards what the partial teardown left.
 --- 4. Reload Truth: the reload sentinel is committed before local teardown and
 ---    cleared again if the native reload call itself fails.
 --- 5. Drained Diagnostics: after local owners stop, terminal action waits for the
@@ -192,8 +194,23 @@ end
 --- @param transaction table Active terminal transaction.
 --- @param detail any Exact causal failure detail retained for inspection.
 --- @return boolean Always false if the native fatal exit unexpectedly returns.
+local reload_natively
+
 local function fail_after_teardown(transaction, detail)
 	transaction.terminal_failure = tostring(detail or "post-teardown failure")
+	-- A reload whose local teardown failed before the log drain replaces the
+	-- whole Lua state anyway: the native reload discards what the partial
+	-- teardown left, exactly as the reload deadline does without any teardown.
+	-- The fatal exit instead lost the app, since Hammerspoon reports status 0 and
+	-- the launcher quits with it (field run 2026-10-31: both reloads lost the app,
+	-- for 57 s and 170 s). A failure after the drain keeps the fatal backstop.
+	if transaction.kind == "reload" and transaction.reload_marked == true
+		and not transaction.drain_started and not transaction.settled then
+		reload_natively(transaction, "reload_after_failed_teardown", string.format(
+			"Controlled reload could not complete its teardown (%s); reloading natively, the guardian fences the lease on the worker's EOF.",
+			transaction.terminal_failure))
+		return false
+	end
 	return force_post_teardown_exit(transaction)
 end
 
@@ -514,8 +531,6 @@ local function begin_input_drain(transaction)
 	end
 	return true
 end
-
-local reload_natively
 
 local function finish_transaction(transaction, fenced, detail)
 	if _transaction ~= transaction or transaction.settled then return end
