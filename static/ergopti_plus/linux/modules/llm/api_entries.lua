@@ -485,6 +485,16 @@ function M.active()
 	return id ~= "" and M.get(id) or nil
 end
 
+--- Starts the access-token exchange of the entry predictions now use, when
+--- its provider exchanges keys, so the first request after a key change finds
+--- the token (api_remote.prewarm_access).
+local function prewarm_active_access()
+	local active = M.active()
+	if not active then return end
+	local called, problem = pcall(function() return require("modules.llm.api_remote").prewarm_access(active) end)
+	if not called then pcall(Logger.error, LOG, "Access-token prewarm of API entry '%s' raised: %s", active.id, tostring(problem)) end
+end
+
 --- Adds an entry, optionally selecting it in the same private publication.
 --- @param fields table { provider, token, label, model?, base_url? }
 --- @param select boolean|nil Defaults to true; false preserves the prediction selection.
@@ -545,6 +555,7 @@ function M.add(fields, select, admit)
 	local receipt = {}
 	_source_receipts[receipt] = { owner = current, source = current.source, path = publication.path }
 	pcall(Logger.info, LOG, "API entry '%s' (%s) added; selected=%s.", entry.id, entry.provider, tostring(select ~= false))
+	if select ~= false then prewarm_active_access() end
 	return entry, nil, true, receipt
 end
 
@@ -557,6 +568,7 @@ function M.set_active(id)
 	state().active_id = id
 	if persist() then
 		state().dangling_active_id = nil
+		prewarm_active_access()
 		return true
 	end
 	state().active_id = previous
@@ -584,6 +596,7 @@ function M.set_model(id, model)
 			if persist() then
 				current.dangling_active_id = nil
 				pcall(Logger.info, LOG, "API entry '%s' model set to '%s'.", id, model)
+				prewarm_active_access()
 				return true
 			end
 			current.entries[index], current.active_id = entry, previous
