@@ -717,7 +717,7 @@
 		},
 		{
 			"id": "js-user-action-vectors",
-			"ordinal": 554,
+			"ordinal": 556,
 			"name": "the run_command, open_path and run_apple_shortcut parameter rule is one shared corpus both Lua suites replay",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-user-action-vectors-shared.cjs"],
