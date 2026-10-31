@@ -211,3 +211,100 @@ helpers.describe("Access-token providers: the catalogue block", function()
 		helpers.assert_eq(#parsed.order, 0)
 	end)
 end)
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ The wait =====================
+-- =========================================
+-- =========================================
+
+-- The first prediction after start or a key change used to be refused while
+-- the token was fetched ("the access token is being fetched"): the request
+-- now waits for the exchange inside its own exchange epoch (access-token-lease).
+helpers.describe("Access-token providers: the first request waits for the token (access-token-lease)", function()
+	helpers.it("a chat waits for the exchange, then is sent with the token (access-token-lease)", function()
+		with_remote(function(remote, calls, clock)
+			local result
+			local dispatched = remote.chat(ENTRY, nil, MESSAGES, nil, nil, function(text, err) result = { text, err } end)
+			helpers.assert_eq(dispatched, true, "the request is owned while it waits")
+			helpers.assert_nil(result, "not refused: " .. tostring(result and result[2]))
+			helpers.assert_eq(#calls, 1, "the exchange first")
+			answer(calls, 1, 200, { access_token = "iam-token", expires_in = 3600 })
+			helpers.assert_eq(#calls, 2, "then the completion")
+			helpers.assert_eq(calls[2].url, IBM.base_url .. "/chat/completions")
+			helpers.assert_eq(calls[2].headers.Authorization, "Bearer iam-token")
+			answer(calls, 2, 200, { choices = { { message = { content = "suite" } } } })
+			helpers.assert_type(result, "table", table.concat(clock.logs, " | "))
+			helpers.assert_eq(result[1], "suite")
+		end)
+	end)
+
+	helpers.it("a cancelled chat is never sent nor answered once the token arrives (access-token-lease)", function()
+		with_remote(function(remote, calls)
+			local answered = false
+			remote.chat(ENTRY, nil, MESSAGES, nil, nil, function() answered = true end)
+			helpers.assert_eq(remote.cancel(), true)
+			answer(calls, 1, 200, { access_token = "iam-token", expires_in = 3600 })
+			helpers.assert_eq(#calls, 1, "no completion after the cancellation")
+			helpers.assert_eq(answered, false)
+		end)
+	end)
+
+	helpers.it("a refused exchange answers the waiting chat with its reason (access-token-lease)", function()
+		with_remote(function(remote, calls)
+			local result
+			remote.chat(ENTRY, nil, MESSAGES, nil, nil, function(text, err) result = { text, err } end)
+			answer(calls, 1, 400, { errorMessage = "Provided API key could not be found" })
+			helpers.assert_eq(#calls, 1, "no completion")
+			helpers.assert_eq(result[1], "")
+			helpers.assert_eq(result[2], "the token exchange answered HTTP 400")
+		end)
+	end)
+
+	helpers.it("the model listing waits for the token too (access-token-lease)", function()
+		with_remote(function(remote, calls)
+			local listed
+			local get_url, get_headers
+			package.loaded["adapters.http_client"].get = function(url, headers, _, callback)
+				get_url, get_headers = url, headers
+				callback({ ok = true, status = 200, body = Json.encode({ data = { { id = "ibm/granite-4-h-small" } } }) })
+				return true
+			end
+			remote.list_models(ENTRY, function(state) listed = state end)
+			helpers.assert_nil(listed, "not failed while the token is fetched")
+			answer(calls, 1, 200, { access_token = "iam-token", expires_in = 3600 })
+			helpers.assert_eq(get_url, IBM.base_url .. "/models")
+			helpers.assert_eq(get_headers.Authorization, "Bearer iam-token")
+			helpers.assert_eq(listed.state, "listed")
+		end)
+	end)
+
+	helpers.it("a key change starts the exchange before any request (access-token-lease)", function()
+		with_remote(function(remote, calls)
+			helpers.assert_eq(remote.prewarm_access(ENTRY), true)
+			helpers.assert_eq(#calls, 1)
+			helpers.assert_eq(calls[1].url, "https://iam.cloud.ibm.com/identity/token")
+			helpers.assert_eq(remote.prewarm_access(ENTRY), true, "a pending exchange is not asked twice")
+			helpers.assert_eq(#calls, 1)
+			helpers.assert_eq(remote.prewarm_access({ id = "o", provider = "openai", token = "sk", model = "m" }), false)
+		end)
+	end)
+
+	helpers.it("every entry change that selects an entry prewarms its access token (access-token-lease)", function()
+		local fh = assert(io.open(helpers.driver_root() .. "/modules/llm/api_entries.lua", "r"))
+		local src = fh:read("*a")
+		fh:close()
+		local definition = src:find("local function prewarm_active_access", 1, true)
+		helpers.assert_true(definition ~= nil, "the prewarm helper exists")
+		for _, name in ipairs({ "function M.add(", "function M.set_active(", "function M.set_model(" }) do
+			local start = assert(src:find(name, 1, true), name)
+			local finish = assert(src:find("\nend\n", start, true), name)
+			helpers.assert_true(definition < start, name .. " reads the helper declared above it")
+			helpers.assert_true(src:sub(start, finish):find("prewarm_active_access()", 1, true) ~= nil,
+				name .. " starts the exchange of the entry it selects")
+		end
+	end)
+end)
