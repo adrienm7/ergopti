@@ -112,18 +112,37 @@ helpers.describe("the remap bridge reaches the owned runtime only after an opt-i
 		helpers.assert_true(source:find('require("platform.remap.runtime_owner")', 1, true) ~= nil)
 	end)
 
-	helpers.it("binds and starts the owner only inside the opt-in start function", function()
+	helpers.it("binds the owner only inside the opt-in bind function", function()
 		local source = init_source()
 		local _, inits = source:gsub("Owner%.init%(", "")
 		helpers.assert_eq(inits, 1)
-		local start = source:find("function M._owned.start()", 1, true)
+		local bind = source:find("function M._owned.bind()", 1, true)
 		local bound = source:find("Owner.init(", 1, true)
-		helpers.assert_true(start ~= nil and bound ~= nil and start < bound)
-		local calls = {}
-		for at in source:gmatch("()M%._owned%.start%(%)") do calls[#calls + 1] = at end
-		helpers.assert_eq(#calls, 2, "the definition and one call")
-		local gate = source:find("if M._owned.selected() and _state.enabled then\n\t\tif M._owned.start()", 1, true)
-		helpers.assert_true(gate ~= nil, "the single call sits behind the opt-in and the integration switch")
+		helpers.assert_true(bind ~= nil and bound ~= nil and bind < bound)
+		local reconcile = source:find("function M._owned.reconcile()", 1, true)
+		helpers.assert_true(reconcile ~= nil and source:find("local activation = M._owned.bind()", reconcile, true) ~= nil)
+	end)
+
+	helpers.it("reaches the activation rule only behind the opt-in, at boot and from both switches", function()
+		local source = init_source()
+		helpers.assert_true(source:find("if M._owned.selected() then\n\t\tif M._owned.reconcile() ~= true then", 1, true)
+			~= nil, "the boot call sits behind the opt-in")
+		local tap_holds = source:find("function M.set_tap_holds_enabled(value)", 1, true)
+		local tap_end = source:find("\nend\n", tap_holds, true)
+		local follow = source:find("if M._owned.selected() and M._owned.reconcile() ~= true then", tap_holds, true)
+		helpers.assert_true(follow ~= nil and follow < tap_end, "the Tap-Hold switch follows the rule")
+		local enabled = source:find("function M.set_enabled(value, on_done, onboarding_gate)", 1, true)
+		local wrap = source:find("if M._owned.selected() then\n\t\t-- « Ergopti uses Karabiner » is half", enabled, true)
+		helpers.assert_true(wrap ~= nil and wrap < source:find("if _bulk_settings_transaction then", enabled, true),
+			"« Ergopti uses Karabiner » follows the rule once settled")
+	end)
+
+	helpers.it("gives a closed Karabiner back on a quit but never on a reload", function()
+		local source = init_source()
+		helpers.assert_true(source:find(
+			'if M._owned.activation and M._owned.teardown_reason ~= "hammerspoon_reload" then', 1, true) ~= nil)
+		local revoke = source:find("function M.revoke(reason, on_done)", 1, true)
+		helpers.assert_true(source:find("M._owned.teardown_reason = reason", revoke, true) ~= nil)
 	end)
 
 	helpers.it("selects the shared runtime when the preference is absent", function()
