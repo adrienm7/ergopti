@@ -342,7 +342,13 @@ if (process.platform === 'linux') {
 		for (const name of [
 			'bin/luajit',
 			'bin/curl',
+			'bin/sqlite3',
+			'bin/openssl',
+			'bin/zstd',
 			'lib/lua/5.1/luv.so',
+			'lib/lua/5.1/lfs.so',
+			'lib/lua/5.1/posix/sys/stat.so',
+			'share/lua/5.1/posix/init.lua',
 			'lib/gio/modules/libgiolibproxy.so',
 			'share/glib-2.0/schemas/gschemas.compiled'
 		]) {
