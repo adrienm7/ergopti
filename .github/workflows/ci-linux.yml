@@ -4514,16 +4514,9 @@ jobs:
       # that layout rather than flattening it.
       - name: Package the installable bundle
         shell: bash
-        run: |
-          set -euo pipefail
-          bash tools/build/write_build_stamp.sh verify build/linux/_shared
-          tar -czf "build/linux/$LINUX_BUNDLE_ASSET" -C build/linux linux _shared bin install.sh
-          (cd build/linux && sha256sum "$LINUX_BUNDLE_ASSET" > "$LINUX_BUNDLE_ASSET.sha256")
-          (cd build/linux && sha256sum --check "$LINUX_BUNDLE_ASSET.sha256")
-          echo "Bundle contents:"
-          tar -tzf "build/linux/$LINUX_BUNDLE_ASSET" | sed -n '1,20p'
-          bundle_entries=$(tar -tzf "build/linux/$LINUX_BUNDLE_ASSET" | wc -l)
-          echo "... $bundle_entries entries"
+        # The tarball carries the private runtime the container staged, inside
+        # linux/, so install.sh runs the same pinned programs as every package.
+        run: bash tools/build/build-linux-bundle-archive.sh "$LINUX_BUNDLE_ASSET"
 
       - name: Sign the update asset (detached signature)
         # PAR-30: the updaters verify <asset>.sig against the key in
@@ -5075,7 +5068,7 @@ jobs:
           node tools/test/linux-ci-evidence.cjs record \
               --job install-linux --output "$RUNNER_TEMP/linux-ci-evidence/smoke-deb-install.json" \
               --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
-              --session installed-package --interpreter "$(/usr/lib/ergopti/runtime/bin/luajit -v 2>&1 | head -1)" \
+              --session installed-package --interpreter "$(bash -c 'source /usr/lib/ergopti/network-runtime-env.sh /usr/lib/ergopti/runtime /usr/lib/ergopti 2>/dev/null && exec /usr/lib/ergopti/runtime/bin/luajit -v' 2>&1 | head -1)" \
               --subject smoke-deb-install=1
 
       - name: Upload mandatory .deb smoke evidence (deb)
@@ -5287,13 +5280,14 @@ jobs:
           name: assets-linux
           path: pkg
 
-      - name: Install LuaJIT for the archive launcher (archive)
+      - name: Install the GLib stack for the archive launcher (archive)
         if: env.INSTALL_KIND == 'archive'
-        # The unpacked tree runs with the host's LuaJIT and its GLib stack, as
-        # the build job's former tarball smoke did.
+        # The tarball brings its own LuaJIT, luv and curl (linux/runtime); the
+        # host keeps GLib, as for every package. No host LuaJIT, so a launcher
+        # that still reached for one fails here.
         shell: bash
         run: |
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-luv curl pkg-config \
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y pkg-config \
             libglib2.0-dev glib-networking dconf-gsettings-backend \
             gsettings-desktop-schemas
 
@@ -5343,8 +5337,11 @@ jobs:
               ls -la "$root" || true
               exit 1
           fi
+          # The installed private runtime's environment, then the standalone
+          # layout's LUA_PATH (_shared beside linux/, not inside it).
+          source "$root/linux/network-runtime-env.sh" "$root/linux/runtime" "$root/linux"
           export LUA_PATH="$root/linux/?.lua;$root/linux/?/init.lua;$root/_shared/lua/?.lua;$root/_shared/lua/?/init.lua;;"
-          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+          "$ERGOPTI_RUNTIME_PREFIX/bin/luajit" static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
               "$root/_shared"
 
       - name: Record mandatory archive smoke evidence (archive)
@@ -5354,7 +5351,7 @@ jobs:
           node tools/test/linux-ci-evidence.cjs record \
               --job install-linux --output "$RUNNER_TEMP/linux-ci-evidence/smoke-tarball-install.json" \
               --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
-              --session installed-package --interpreter "$(luajit -v 2>&1 | head -1)" \
+              --session installed-package --interpreter "$(bash -c 'source "$1/network-runtime-env.sh" "$1/runtime" "$1" 2>/dev/null && exec "$1/runtime/bin/luajit" -v' installed "$HOME/.local/lib/ergopti/linux" 2>&1 | head -1)" \
               --subject smoke-tarball-install=1
 
       - name: Upload mandatory archive smoke evidence (archive)
