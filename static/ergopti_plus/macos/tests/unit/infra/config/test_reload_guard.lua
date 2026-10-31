@@ -66,6 +66,22 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 		helpers.assert_eq(rg.is_reloading(), false)
 	end)
 
+	helpers.it("hands the recorded reload start to the next boot once", function()
+		local rg = fresh()
+		helpers.assert_eq(rg.take_started(), nil, "a boot that follows no reload measures none")
+		rg.mark_started(1761850000123)
+		helpers.assert_eq(rg.take_started(), 1761850000123)
+		helpers.assert_eq(rg.take_started(), nil, "the start is taken back once")
+	end)
+
+	helpers.it("refuses a reload start that is not a positive time", function()
+		local rg = fresh()
+		for _, value in ipairs({ 0, -1, "now" }) do
+			helpers.assert_eq(pcall(rg.mark_started, value), false, tostring(value))
+		end
+		helpers.assert_eq(rg.take_started(), nil)
+	end)
+
 	helpers.it("clears terminal rollback state without logging after sink finalization", function()
 		local previous_logger = package.loaded["infra.logger"]
 		local debug_calls = 0

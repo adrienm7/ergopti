@@ -11,6 +11,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\llm_request_latency.ahk
 
 
 
@@ -587,6 +588,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; constraint as HS where the remote backend stays non-stream).
 	model_tag := ""
 	log_model := ""
+	; The API provider id, for the latency line only; "" for Ollama.
+	provider_id := ""
 	dispatch_fn := ""
 	dispatch_stream_fn := ""
 	; A rewrite is shown whole or not at all: a streamed partial is the raw
@@ -604,6 +607,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		}
 		model_tag := (entry is Map and entry.Has("Model")) ? entry["Model"] : (entry.HasOwnProp("Model") ? entry.Model : "")
 		log_model := model_tag
+		provider_id := (entry is Map) ? entry.Get("Provider", "") : (entry.HasOwnProp("Provider") ? entry.Provider : "")
 		remote_transport := _LLM_Engine_ResolveRemoteTransport()
 		dispatch_fn := (temp, on_succ, on_fail) =>
 			remote_transport.Call(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, call_tokens, "", 0, request_current)
@@ -641,6 +645,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 			"semantic_signature", request_semantic_signature,
 			"backend",       backend,
 			"model",         log_model,
+			"provider",      provider_id,
 			"system_prompt", system_prompt,
 			"requested",     n_predictions,
 			"base_temp",     req_temp,
@@ -672,6 +677,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		"semantic_signature", request_semantic_signature,
 		"backend",           backend,
 		"model",             log_model,
+		"provider",          provider_id,
 		"system_prompt",     system_prompt,
 		"slots",             [],
 		"requested",         n_predictions,
@@ -1097,6 +1103,9 @@ _LLM_Engine_FinalizeRequest(state) {
 		; the audit trail captures the failure instead of silently
 		; dropping. The tooltip auto-dismisses via its own timer.
 		try LoggerWarn("LLM", "All variants failed for model {1} — no tooltip rendered.", state["model"])
+		if state.Get("request_start", 0) > 0
+			try LLM_RequestLatency_Report(state["backend"], state.Get("provider", ""), state["model"],
+				state["request_start"], "failed")
 		; The request check rejects a logger reentry; the exact presentation
 		; fence also protects a replacement admitted inside the hide path.
 		if (_LLM_Engine_IsCurrent(state) and IsObject(Origin))
@@ -1124,6 +1133,8 @@ _LLM_Engine_FinalizeRequest(state) {
 	try LoggerInfo("LLM", Format("Prediction request #{1} received — {2} suggestion(s), generation_chain={3} ms.",
 		state["request_id"], state["slots"].Length,
 		RequestStarted > 0 ? TickElapsed(RequestStarted) : "unknown"))
+	if RequestStarted > 0
+		try LLM_RequestLatency_Report(state["backend"], state.Get("provider", ""), state["model"], RequestStarted, "ok")
 	global _LLM_Ollama_IsReady
 	if state.Get("backend", "") == "ollama"
 		_LLM_Ollama_IsReady := true
