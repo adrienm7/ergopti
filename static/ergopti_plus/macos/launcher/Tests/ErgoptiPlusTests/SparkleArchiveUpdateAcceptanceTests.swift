@@ -729,7 +729,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		checkpoint("wait." + name)
 		let target = root.appendingPathComponent(name + ".json")
 		let deadline = Date().addingTimeInterval(seconds)
-		while !manager.fileExists(atPath: target.path), Date() < deadline { Thread.sleep(forTimeInterval: 0.1) }
+		while !manager.fileExists(atPath: target.path), Date() < deadline { Thread.sleep(forTimeInterval: LauncherTimings.testCensusPoll.seconds) }
 		guard manager.fileExists(atPath: target.path),
 			let packet = try JSONSerialization.jsonObject(with: Data(contentsOf: target)) as? [String: Any] else {
 			throw Failure.deadline(name)
@@ -1332,9 +1332,9 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			attempt("kernel-process-census") {
 				let deadline = Date().addingTimeInterval(15)
 				let roots = cacheOwned ? [root, cache] : [root]
-				while !(try census(roots, root: root)).isEmpty, Date() < deadline { Thread.sleep(forTimeInterval: 0.1) }
+				while !(try census(roots, root: root)).isEmpty, Date() < deadline { Thread.sleep(forTimeInterval: LauncherTimings.testCensusPoll.seconds) }
 				guard try census(roots, root: root).isEmpty else { throw Failure.evidence("installer-or-relaunch-retirement") }
-				Thread.sleep(forTimeInterval: 0.25)
+				Thread.sleep(forTimeInterval: LauncherTimings.testLateRelaunchSettle.seconds)
 				guard try census(roots, root: root).isEmpty else { throw Failure.evidence("late-native-relaunch") }
 			}
 			// Job and census commands were acquired during cleanup and retain the
