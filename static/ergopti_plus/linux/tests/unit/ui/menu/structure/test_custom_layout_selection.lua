@@ -17,7 +17,7 @@ local Json = require("json")
 --- @param body function Receives the current rendered menu and native settlement.
 local function scenario(options, body)
 	local previous = {}
-	for _, name in ipairs({ "modules.keymap.layout_registry", "ui.menu.menu_builder" }) do
+	for _, name in ipairs({ "modules.keymap.layout_registry", "ui.menu.builder" }) do
 		previous[name] = package.loaded[name]
 		package.loaded[name] = nil
 	end
@@ -59,7 +59,7 @@ local function scenario(options, body)
 				return native_select(id, done, deps)
 			end,
 		}
-		local builder, layouts = require("ui.menu.menu_builder"), nil
+		local builder, layouts = require("ui.menu.builder"), nil
 		local index = 1
 		while true do
 			local name, value = debug.getupvalue(builder.build, index)
@@ -94,7 +94,7 @@ local function scenario(options, body)
 		body(world)
 	end, debug.traceback)
 	for name, module in pairs(previous) do package.loaded[name] = module end
-	for _, name in ipairs({ "modules.keymap.layout_registry", "ui.menu.menu_builder" }) do
+	for _, name in ipairs({ "modules.keymap.layout_registry", "ui.menu.builder" }) do
 		if previous[name] == nil then package.loaded[name] = nil end
 	end
 	if not ok then error(detail, 0) end

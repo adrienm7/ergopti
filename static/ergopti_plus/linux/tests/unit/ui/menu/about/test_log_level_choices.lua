@@ -33,7 +33,7 @@ local function build(selected, setter)
 		get_base_delay = function() return 0.75 end,
 		has_base_delay_override = function() return false end,
 	}
-	local rows = helpers.load_module("ui.menu.menu_builder").build({
+	local rows = helpers.load_module("ui.menu.builder").build({
 		config = config, log_level = selected, on_set_log_level = setter,
 		on_toggle_pause = function() end, on_quit = function() end,
 	})
@@ -162,7 +162,7 @@ end)
 local function debug_parent_fixture(body)
 	-- These real modules capture one another. A preceding registered fixture may
 	-- reload locale alone; retain a fresh coherent native chain for this case.
-	local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.menu_builder" }
+	local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
 	local previous, original_i18n_safe = {}, rawget(_G, "i18n_safe")
 	for module, value in pairs(package.loaded) do previous[module] = value end
 	for _, module in ipairs(names) do rawset(package.loaded, module, nil) end
@@ -170,7 +170,7 @@ local function debug_parent_fixture(body)
 	-- Complete the genuine discovery/read phase before a requested test locale;
 	-- the Language child must not lazily initialize it back to the saved locale.
 	require("infra.i18n").init()
-	local native = helpers.load_module("ui.menu.menu_builder")
+	local native = helpers.load_module("ui.menu.builder")
 	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
 	local language = locale.current_locale()
 	local callbacks = {}

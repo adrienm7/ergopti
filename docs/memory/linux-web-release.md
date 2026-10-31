@@ -229,7 +229,7 @@ grouping, in `--no-grab` mode) needs a real-machine check.
 ### project-linux-the-menu-builder-is-pinned-token-by-token
 
 `tools/lib/menu-native-llm-parent-binding.cjs` and the language-owner binding
-read `ui/menu/menu_builder.lua` token by token. A new top-level `local` (an
+read `ui/menu/builder.lua` token by token. A new top-level `local` (an
 import, a helper table, a function) in that file turns `test-menu-parity` and
 `test-hotstring-category-submenu-order` red. Put helpers in their own module and
 call them with an inline `require(...)` at the call site, as

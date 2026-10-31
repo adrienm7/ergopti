@@ -19,7 +19,7 @@ local Preferences = require("tests.support.llm_preferences_fixture")
 --- @param public_policy boolean|nil Keep the current public declaration when true.
 local function with_world(body, public_policy)
 	local names = { "modules.llm.prediction_engine", "modules.llm.agent_settings",
-		"ui.menu.menu_builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }
+		"ui.menu.builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local renderer, build, group_row, top, agent_index, public_agent
@@ -80,7 +80,7 @@ end
 local function parent(ctx, kind)
 	local title = require("infra.i18n").get("menu." .. kind .. ".title")
 	local found
-	for _, row in ipairs(require("ui.menu.menu_builder").build(ctx)) do
+	for _, row in ipairs(require("ui.menu.builder").build(ctx)) do
 		if type(row.title) == "string" and row.title:sub(1, #title) == title then
 			helpers.assert_nil(found, "the actual outer parent must be unique")
 			found = row
@@ -467,7 +467,7 @@ helpers.describe("Linux shared AI outer parents with published available compone
 		for index, row in ipairs(root.top_level) do if row.id == "agent" then original, position = row, index end end
 		local build, group_row = renderer.build, renderer.group_row
 		local names = { "modules.llm.prediction_engine", "modules.llm.agent_settings",
-			"ui.menu.menu_builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }
+			"ui.menu.builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local replaced = false

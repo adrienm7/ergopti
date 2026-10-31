@@ -68,7 +68,7 @@ end
 --- @param ctx_extra table|nil
 --- @return table|nil rows, table|nil parent
 local function hotstrings_rows(config, ctx_extra)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local ctx = { config = config, _version = "9.9.9" }
 	for k, v in pairs(ctx_extra or {}) do ctx[k] = v end
 

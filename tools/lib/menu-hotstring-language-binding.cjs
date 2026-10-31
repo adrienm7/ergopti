@@ -67,7 +67,7 @@ const files = {
 		'macos/ui/menu/menu_hotstrings_custom.lua',
 		'macos/ui/menu/menu_hotstrings.lua'
 	],
-	linux: ['linux/ui/menu/menu_builder.lua']
+	linux: ['linux/ui/menu/builder.lua']
 };
 
 /** Records native block depth while keeping strings and field names inert. */

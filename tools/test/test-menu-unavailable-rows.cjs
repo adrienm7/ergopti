@@ -910,7 +910,7 @@ console.log(
 	// not a removed capability. Strip comments and require each actual owner to
 	// exist before checking prompt, setting and persistence routes.
 	const numericPaths = {
-		linux: path.join(SP, 'linux/ui/menu/menu_builder.lua'),
+		linux: path.join(SP, 'linux/ui/menu/builder.lua'),
 		mac: path.join(SP, 'macos/ui/menu/menu_llm/settings_manager.lua'),
 		windows: path.join(SP, 'windows/ui/menu/menu_llm/menu_settings.ahk'),
 		persist: path.join(SP, 'windows/ui/menu/menu_llm/persist.ahk')

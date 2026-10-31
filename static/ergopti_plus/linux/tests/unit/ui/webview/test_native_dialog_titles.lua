@@ -137,7 +137,7 @@ end)
 
 h.describe("native menu dialog captions", function()
 	h.it("(linux-native-titles) real Uninstall callbacks brand confirmation and failure without changing body or refusal", function()
-		local names = { "ui.menu.menu_builder", "ui.menu.uninstall", "infra.installation", "ui.modal", "ui.menu.llm_backend_rows" }
+		local names = { "ui.menu.builder", "ui.menu.uninstall", "infra.installation", "ui.modal", "ui.menu.llm_backend_rows" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local original_execute = os.execute
@@ -159,7 +159,7 @@ h.describe("native menu dialog captions", function()
 		end
 		local ok, err = xpcall(function()
 			local i18n = require("infra.i18n")
-			local items = require("ui.menu.menu_builder").build({ _version = "9.9.9", on_quit = function() end, llm = { is_enabled = function() return false end } })
+			local items = require("ui.menu.builder").build({ _version = "9.9.9", on_quit = function() end, llm = { is_enabled = function() return false end } })
 			local found
 			for _, item in ipairs(items) do
 				for _, row in ipairs(item.menu or {}) do

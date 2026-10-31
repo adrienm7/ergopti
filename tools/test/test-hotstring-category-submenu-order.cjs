@@ -93,12 +93,12 @@ const DRIVERS = [
 	{
 		driver: 'linux',
 		helper: {
-			file: 'linux/ui/menu/menu_builder.lua',
+			file: 'linux/ui/menu/builder.lua',
 			from: 'local function all_sections_row(ids)',
 			to: '\n\tend'
 		},
 		call: 'all_sections_row(',
-		files: ['linux/ui/menu/menu_builder.lua']
+		files: ['linux/ui/menu/builder.lua']
 	}
 ];
 
@@ -119,7 +119,7 @@ const CATEGORY_REGIONS = [
 	},
 	{
 		driver: 'linux',
-		file: 'linux/ui/menu/menu_builder.lua',
+		file: 'linux/ui/menu/builder.lua',
 		from: 'local render_ctx = { commands = {\n\t\t\t["hotstring_category_enable_all"]',
 		to: '\n\t\treturn {'
 	}
@@ -155,7 +155,7 @@ const PERSONAL_REGIONS = [
 	},
 	{
 		driver: 'linux',
-		file: 'linux/ui/menu/menu_builder.lua',
+		file: 'linux/ui/menu/builder.lua',
 		from: '["hotstring_personal"] = function()',
 		to: '["hotstring_extensions"] = function()',
 		tokens: ['group_row(name)']
@@ -182,7 +182,7 @@ const LANGUAGE_REGIONS = [
 	},
 	{
 		driver: 'linux',
-		file: 'linux/ui/menu/menu_builder.lua',
+		file: 'linux/ui/menu/builder.lua',
 		from: 'local function language_rows()',
 		to: '\n\tend'
 	}

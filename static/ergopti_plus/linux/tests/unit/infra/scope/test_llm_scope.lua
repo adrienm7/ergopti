@@ -261,7 +261,7 @@ helpers.describe("Linux terminal LLM scope", function()
 			local root = renderer.get_root()
 			local old_rows = root.llm_menu
 			local old_top = root.top_level
-			local old_builder = package.loaded["ui.menu.menu_builder"]
+			local old_builder = package.loaded["ui.menu.builder"]
 			local execute = os.execute
 			local scope = require("infra.llm_scope")
 			local old_apply = scope.apply
@@ -281,8 +281,8 @@ helpers.describe("Linux terminal LLM scope", function()
 					return execute(command)
 				end
 				scope.apply = function(selected) return owner.apply(selected) end
-				package.loaded["ui.menu.menu_builder"] = nil
-				local rows = require("ui.menu.menu_builder").build({ llm = engine,
+				package.loaded["ui.menu.builder"] = nil
+				local rows = require("ui.menu.builder").build({ llm = engine,
 					on_menu_changed = function() changed = changed + 1 end })
 				local action
 				local function find(items)
@@ -304,7 +304,7 @@ helpers.describe("Linux terminal LLM scope", function()
 				helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).llm.unknown, "keep")
 			end)
 			root.llm_menu, root.top_level, scope.apply, os.execute = old_rows, old_top, old_apply, execute
-			package.loaded["ui.menu.menu_builder"] = old_builder
+			package.loaded["ui.menu.builder"] = old_builder
 			if not ok then error(err, 0) end
 		end)
 	end)

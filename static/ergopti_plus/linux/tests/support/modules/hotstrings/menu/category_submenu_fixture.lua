@@ -58,7 +58,7 @@ end
 --- @param ctx_extra table|nil
 --- @return table|nil row
 local function rolls_row(config, ctx_extra)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local ctx = { config = config, _version = "9.9.9" }
 	for k, v in pairs(ctx_extra or {}) do ctx[k] = v end
 
@@ -108,7 +108,7 @@ local function with_file_command(body, change_label)
 		body()
 	end, debug.traceback)
 	package.loaded["infra.manifest_menu"] = saved
-	package.loaded["ui.menu.menu_builder"] = nil
+	package.loaded["ui.menu.builder"] = nil
 	if not ok then error(err, 0) end
 end
 

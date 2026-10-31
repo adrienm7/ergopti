@@ -33,7 +33,7 @@ const path = require('path');
 const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SOURCE = path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'ui', 'menu', 'menu_builder.lua');
+const SOURCE = path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'ui', 'menu', 'builder.lua');
 const EN = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json');
 
 // Measured at 30 calls when this landed. Set below that so ordinary growth does
@@ -107,7 +107,7 @@ if (calls.length < MIN_CALLS) {
 }
 for (const k of missing) {
 	failures.push(
-		`menu_builder.lua asks for "${k}", which en.json does not define — it would render as the raw key`
+		`ui/menu/builder.lua asks for "${k}", which en.json does not define — it would render as the raw key`
 	);
 }
 if (frenchLiterals.length > FRENCH_LITERAL_BASELINE) {

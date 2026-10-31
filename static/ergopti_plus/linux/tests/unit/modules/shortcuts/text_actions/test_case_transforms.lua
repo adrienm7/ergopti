@@ -90,7 +90,7 @@ local function with_caps_word_menu(body)
 			'[shortcuts]\nenabled = false\n[foreign]\nvalue = "keep"\n', function(path)
 				manager.init({ persist = true, config_path = path, capture_text_owner = capture_text_owner })
 				local changed = { count = 0 }
-				local builder = helpers.load_module("ui.menu.menu_builder")
+				local builder = helpers.load_module("ui.menu.builder")
 				local function row()
 					local rows = builder.build({ _version = "0.0.0-dev.12", shortcuts = manager,
 						paused = false, is_paused = function() return true end,
@@ -315,7 +315,7 @@ local function with_case_menu(body)
 			observed.replacement = transform(observed.selected or "été")
 			return true
 		end
-		local builder = helpers.load_module("ui.menu.menu_builder")
+		local builder = helpers.load_module("ui.menu.builder")
 		local function rows()
 			return builder.build({ _version = "0.0.0-dev.12", shortcuts = manager,
 				paused = false, is_paused = function() return true end,
@@ -670,7 +670,7 @@ helpers.describe("shared selection helper command ownership", function()
 	helpers.it("uses actual helper captions in all 21 locales (selection-helper-command)", function()
 		-- Each binding captures its locale owner at load time. The full suite may
 		-- have replaced that owner; reload the whole chain and restore it together.
-		local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.menu_builder" }
+		local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
 		local previous_modules = {}
 		for _, name in ipairs(names) do
 			previous_modules[name] = package.loaded[name]

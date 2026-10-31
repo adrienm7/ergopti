@@ -15,7 +15,7 @@
  *
  * WHY A RATCHET AND NOT A BAN:
  * Measured on 2026-08-01, the three drivers are in completely different places.
- * Linux already builds 97 of its 100 rows inside menu_builder.lua. Windows
+ * Linux already builds 97 of its 100 rows inside ui/menu/builder.lua. Windows
  * builds 8 of 230 inside the renderer, macOS 29 of 330. Banning the bypass today
  * would mean rewriting two menu layers in one change, so the count is frozen
  * instead: the migration can proceed row by row, and nothing new accumulates
@@ -81,17 +81,17 @@ const MEASURE = process.argv.includes('--measure');
 // ── linux 2 → 124 on 2026-08-05, and that is NOT a regression ──
 //
 // Read the number before reading the jump. Until today this file listed
-// `ui/menu/menu_builder.lua` as "the Linux renderer", so every one of that file's
+// `ui/menu/builder.lua` as "the Linux renderer", so every one of that file's
 // row sites counted as INSIDE and Linux read 2/2 — a number that could not move
 // no matter how much of the menu was hand-built, because the hand-building WAS
 // the renderer by definition. Linux is the only driver whose renderer is entirely
 // shared (_shared/lua/menu/renderer.lua, bound by infra/manifest_menu.lua), and
-// menu_builder.lua is a CALLER of it, exactly as menu_shortcuts.lua is on macOS —
+// ui/menu/builder.lua is a CALLER of it, exactly as menu_shortcuts.lua is on macOS —
 // which this file has always counted as outside.
 //
 // So the definition was wrong and the measurement was vacuous. Nothing got worse
 // today; the dial started working. The debt was 136 when the definition changed
-// (134 sites in menu_builder.lua plus the 2 in ergopti_hotstrings.lua the old
+// (134 sites in ui/menu/builder.lua plus the 2 in ergopti_hotstrings.lua the old
 // baseline named) and is frozen here at the 124 measured after the kanata and
 // updates submenus moved onto `list` providers — freezing at the pre-migration
 // figure would have quietly given back the twelve rows those two blocks cost.
@@ -725,7 +725,7 @@ for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 // ==================================================
 
 // The count above cannot see the Linux migration at all. It treats
-// menu_builder.lua as "the Linux renderer", so all 134 of that file's row sites
+// ui/menu/builder.lua as "the Linux renderer", so all 134 of that file's row sites
 // count as INSIDE and Linux reads 2/2 no matter what moves. Repointing it would
 // take Linux from 2 to 134 — a change of DEFINITION that reads as a regression,
 // and a judgment about what the number means rather than a fact to be measured.
@@ -741,7 +741,7 @@ for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 const LIST_PROVIDERS_FLOOR = { linux: 7 };
 
 const MENU_MANIFEST = path.join(DRIVERS, '_shared', 'modules', 'menu', 'menu_manifest.json');
-const LINUX_SRC = path.join(DRIVERS, 'linux', 'ui', 'menu', 'menu_builder.lua');
+const LINUX_SRC = path.join(DRIVERS, 'linux', 'ui', 'menu', 'builder.lua');
 if (fs.existsSync(LINUX_SRC) && fs.existsSync(MENU_MANIFEST)) {
 	const menuManifest = JSON.parse(fs.readFileSync(MENU_MANIFEST, 'utf8'));
 	const src = readSourceFile(LINUX_SRC);

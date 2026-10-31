@@ -145,7 +145,7 @@ helpers.describe("Linux gesture scope transaction", function()
 	-- act at once, with no question, because the owner's backup is the way back.
 	helpers.it("gesture-scope: the real menu opens with switch, restore and clear, each applied at once", function()
 		with_scope(function(_, gestures, controls, path)
-			local menu_name = "ui.menu.menu_builder"
+			local menu_name = "ui.menu.builder"
 			local previous_menu = package.loaded[menu_name]
 			local previous_execute = os.execute
 			local ok, err = pcall(function()

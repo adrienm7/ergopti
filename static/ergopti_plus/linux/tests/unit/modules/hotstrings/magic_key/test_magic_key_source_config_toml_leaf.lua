@@ -257,7 +257,7 @@ helpers.describe("magic key source: the keyboard-layout menu", function()
 		with_source("[hotstrings]\nmagic_key_source = \"KeyJ\"\n", function(Source)
 			wire(Source, { active = true, replace = true, typed_ok = true })
 			local I18n = require("infra.i18n")
-			local builder = helpers.load_module("ui.menu.menu_builder")
+			local builder = helpers.load_module("ui.menu.builder")
 			local ok, items = pcall(builder.build, { on_quit = function() end, magic_key_source = Source })
 			Source._reset_for_test()
 			if not ok then error(items, 0) end
@@ -407,7 +407,7 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 	--- @param source string Initial canonical document.
 	--- @param body function body(Config, path, state, row).
 	local function with_replace(source, body)
-		local names = { "modules.hotstrings.loader", "modules.hotstrings.hotstrings_config", "ui.menu.menu_builder" }
+		local names = { "modules.hotstrings.loader", "modules.hotstrings.hotstrings_config", "ui.menu.builder" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local state = { published = {}, notified = 0, redraw = 0, paused = false, reject = false }

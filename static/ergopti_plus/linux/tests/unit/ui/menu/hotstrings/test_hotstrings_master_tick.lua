@@ -172,7 +172,7 @@ local function with_wizard(answer, scenario)
 			end
 			--- The real tray's Hotstrings row.
 			function world.row()
-				local mb = helpers.load_module("ui.menu.menu_builder")
+				local mb = helpers.load_module("ui.menu.builder")
 				local title = require("infra.i18n").get("menu.hotstrings.title")
 				local ctx = { config = Config, _version = "9.9.9", dyn_hotstrings = world.dyn }
 				for _, item in ipairs(mb.build(ctx) or {}) do

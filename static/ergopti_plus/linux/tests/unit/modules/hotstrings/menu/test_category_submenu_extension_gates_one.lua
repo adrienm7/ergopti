@@ -34,7 +34,7 @@ local helpers, fake_config =
 
 helpers.describe("extension category gates: one acknowledged batch", function()
 	local function gate_action(config, enabled, changed)
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local label = require("infra.i18n").get(enabled and "menu.hotstrings.check_all" or "menu.hotstrings.uncheck_all")
 		local extension = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
 		local found
@@ -269,7 +269,7 @@ end)
 
 helpers.describe("hotstring delay rows: durable owner acknowledgement", function()
 	local function delay_action(config, kind, changed)
-		local builder = helpers.load_module("ui.menu.menu_builder")
+		local builder = helpers.load_module("ui.menu.builder")
 		local ctx = { config = config, _version = "9.9.9", paused = false, on_menu_changed = changed }
 		local key = kind == "global" and "menu.hotstrings.tooltip_default" or "menu.hotstrings.delay_magic_key"
 		local title = require("infra.i18n").get(key) .. " : "

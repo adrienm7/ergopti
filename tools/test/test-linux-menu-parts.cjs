@@ -5,7 +5,7 @@
  *
  * tools/lib/linux-menu-parts.cjs binds each
  * `local _build_x = require("ui.menu.menu_x").build` of
- * linux/ui/menu/menu_builder.lua to that module's builder and recomposes the
+ * linux/ui/menu/builder.lua to that module's builder and recomposes the
  * root the menu gates analyse. This gate proves the two halves of that
  * contract: a faithful split recomposes token for token into the root it came
  * from, and every other wiring is refused rather than composed.
@@ -14,6 +14,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 const { scriptTokens } = require('../lib/script-source.cjs');
 const {
@@ -62,6 +63,37 @@ assert.equal(
 	false,
 	'a missing root is refused'
 );
+controls += 1;
+
+// M3.3: once every section moved to its own menu_*.lua, the root took the macOS
+// root's name, so the `menu_` prefix names parts only and both drivers read
+// `ui/menu/builder.lua` as the tray root. Nothing may still load the old name.
+assert.equal(
+	LINUX_MENU_ROOT,
+	'linux/ui/menu/builder.lua',
+	'the Linux root has the macOS root name'
+);
+assert.ok(
+	fs.existsSync(path.join(SP, 'macos/ui/menu/builder.lua')),
+	'the macOS root it mirrors exists'
+);
+assert.ok(
+	!fs.existsSync(path.join(SP, 'linux/ui/menu/menu_builder.lua')),
+	'the pre-split root file is gone'
+);
+const oldRootReaders = [];
+(function walk(dir) {
+	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+		const full = path.join(dir, entry.name);
+		if (entry.isDirectory()) walk(full);
+		else if (
+			entry.name.endsWith('.lua') &&
+			/ui[./]menu[./]menu_builder\b/.test(fs.readFileSync(full, 'utf8'))
+		)
+			oldRootReaders.push(path.relative(SP, full));
+	}
+})(path.join(SP, 'linux'));
+assert.deepEqual(oldRootReaders, [], 'no Linux source loads the pre-split root name');
 controls += 1;
 
 console.log(

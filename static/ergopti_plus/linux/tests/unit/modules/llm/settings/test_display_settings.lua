@@ -151,7 +151,7 @@ end)
 --- @param options table Fixture state, writer refusal and shared label mutation.
 --- @param callback function Observations asserted outside native callbacks.
 local function with_info_menu(options, callback)
-	local names = { "infra.llm_preferences", "modules.llm.display_settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.menu_builder" }
+	local names = { "infra.llm_preferences", "modules.llm.display_settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.builder" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local settings, storage = load_settings({
@@ -211,7 +211,7 @@ local function with_info_menu(options, callback)
 		return native_many(...)
 	end
 	local ok, err = xpcall(function()
-		local items = helpers.load_module("ui.menu.menu_builder").build({
+		local items = helpers.load_module("ui.menu.builder").build({
 			_version = "0.0.0-dev.12",
 			llm = { is_enabled = function() return observed.active end, toggle = function() return true end,
 				get_backend = function() return observed.backend end,

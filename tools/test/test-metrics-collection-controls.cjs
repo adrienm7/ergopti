@@ -78,7 +78,7 @@ const wiring = {
 		]
 	},
 	linux: {
-		menu: `${PLUS}/linux/ui/menu/menu_builder.lua`,
+		menu: `${PLUS}/linux/ui/menu/builder.lua`,
 		patterns: [
 			/\["metrics_suspend"\]\s*=/,
 			/\["metrics_reset_session"\]\s*=/,
@@ -100,7 +100,7 @@ check('linux pause state', () => {
 	assert(/^local _suspended = false$/m.test(source), 'Linux keystats keeps a state of its own');
 	assert(/function M\.suspend_collection\(\)/.test(source), 'Linux exposes suspend_collection');
 	assert(/function M\.resume_collection\(\)/.test(source), 'Linux exposes resume_collection');
-	const menu = read(`${PLUS}/linux/ui/menu/menu_builder.lua`);
+	const menu = read(`${PLUS}/linux/ui/menu/builder.lua`);
 	const row = menu.slice(
 		menu.indexOf('["metrics_suspend"]'),
 		menu.indexOf('["reset_wpm_position"]')
