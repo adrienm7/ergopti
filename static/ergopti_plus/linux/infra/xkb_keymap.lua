@@ -49,6 +49,7 @@
 
 local M = {}
 local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 
@@ -206,13 +207,13 @@ local function split_items(text)
 			if c == "[" or c == "{" or c == "(" then depth = depth + 1
 			elseif c == "]" or c == "}" or c == ")" then depth = depth - 1
 			elseif c == "," and depth == 0 then
-				items[#items + 1] = text:sub(start, i - 1):match("^%s*(.-)%s*$")
+				items[#items + 1] = TextUtils.trim(text:sub(start, i - 1))
 				start = i + 1
 			end
 			i = i + 1
 		end
 	end
-	items[#items + 1] = text:sub(start):match("^%s*(.-)%s*$")
+	items[#items + 1] = TextUtils.trim(text:sub(start))
 	return items
 end
 
