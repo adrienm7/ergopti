@@ -226,7 +226,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 			guard OwnedVirtualHIDDaemonReportClock.remains(began) else {
 				_ = ergopti_owned_program_cancel(owned); return false // Retained native owner remains explicit cleanup debt.
 			}
-			Thread.sleep(forTimeInterval: 0.01)
+			Thread.sleep(forTimeInterval: LauncherTimings.vhidReportQueryPoll.seconds)
 		}
 		return false
 	}
@@ -316,7 +316,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 		let owner = acquire(); _ = owner.start()
 		while true {
 			switch owner.poll() {
-			case .pending: Thread.sleep(forTimeInterval: 0.02)
+			case .pending: Thread.sleep(forTimeInterval: LauncherTimings.vhidReportMainPoll.seconds)
 			case .historical(let values):
 				let fields = [values.driverActivated, values.driverConnected, values.driverVersionMismatched, values.virtualHIDKeyboardReady, values.virtualHIDPointingReady]
 				let bytes = Data(("OWNED_VHD_DAEMON_REPORT|1|historical-observer-connection|" + fields.map { $0 ? "1" : "0" }.joined(separator: "|") + "|remote-cleanup-unobserved\n").utf8)
