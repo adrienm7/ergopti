@@ -1,5 +1,5 @@
 {
-	"_comment": "Single source of the reasoning controls of each model family, independent of the provider that serves it. A model id is normalized (lowercase, last path segment, an Ollama :tag dropped) and matched against each family's globs (* is the only wildcard); the first family wins. Its controls are tried in order and the first control kind the provider's dialect carries applies (api_providers.json thinking_dialect: kind -> body fields, $level replaced by the control's level); a family with no control, or a provider without that kind, sends nothing. intent off turns thinking off; lowest is the lowest level when the family cannot turn it off. A family with default_sampling_only true accepts only the default sampling: the drivers send it no temperature (Anthropic answers HTTP 400 to any other value on these models). Kinds: toggle (hybrid models: on or off), effort (reasoning_effort scale), anthropic_thinking, anthropic_effort, gemini_budget, gemini_level. Local servers turn thinking off for every model through local_servers.json request_fields, and their thinking_dialect adds a family's level on top. Every Ollama chat body sends think from the family's first control Ollama carries: a toggle or an off intent sends false, an effort level listed in ollama_think_levels sends that level (gpt-oss ignores think false and takes low: docs.ollama.com/capabilities/thinking), anything else (no family, no such control) sends false. A provider answering HTTP 400 that names an injected field gets the request once more without it, and that field is remembered as refused for that provider and model, across restarts (at most 200 pairs), until refusal_expiry_days pass, so a later provider fix is picked up. Resolved by _shared/lua/llm/thinking_off.lua and _shared/modules/llm/thinking_off.ahk, pinned by _shared/tests/corpus/llm/thinking_off_vectors.json. Sources checked 2026-10-30.",
+	"_comment": "Single source of the reasoning controls of each model family, independent of the provider that serves it. A model id is normalized (lowercase, last path segment, an Ollama :tag dropped) and matched against each family's globs (* is the only wildcard); the first family wins. Its controls are tried in order and the first control kind the provider's dialect carries applies (api_providers.json thinking_dialect: kind -> body fields, $level replaced by the control's level); a family with no control, or a provider without that kind, sends nothing. intent off turns thinking off; lowest is the lowest level when the family cannot turn it off. A family with default_sampling_only true accepts only the default sampling: the drivers send it no temperature (Anthropic answers HTTP 400 to any other value on these models). Kinds: toggle (hybrid models: on or off), effort (reasoning_effort scale), anthropic_thinking, anthropic_effort, gemini_budget, gemini_level. Local servers turn thinking off for every model through local_servers.json request_fields, and their thinking_dialect adds a family's level on top. Every Ollama chat body sends think from the family's first control Ollama carries: a toggle or an off intent sends false, an effort level listed in ollama_think_levels sends that level (gpt-oss ignores think false and takes low: docs.ollama.com/capabilities/thinking), anything else (no family, no such control) sends false. A provider answering HTTP 400 that names an injected field gets the request once more without it, and that field is remembered as refused for that provider and model, across restarts (at most 200 pairs), until refusal_expiry_days pass, so a later provider fix is picked up. Resolved by _shared/lua/llm/thinking_off.lua and _shared/modules/llm/thinking_off.ahk, pinned by _shared/tests/corpus/llm/thinking_off_vectors.json. Sources checked 2026-10-30, the generic names and Kimi 2026-10-31.",
 	"refusal_expiry_days": 30,
 	"ollama_think_levels": ["low", "medium", "high"],
 	"capability_listing": {
@@ -328,10 +328,11 @@
 				"deepseek-r1*",
 				"phi-4-reasoning*",
 				"minimax-m2*",
-				"magistral*"
+				"magistral*",
+				"kimi-k2.7-code*"
 			],
 			"controls": [],
-			"_source": "https://docs.fireworks.ai/api-reference/post-chatcompletions"
+			"_source": "https://docs.fireworks.ai/api-reference/post-chatcompletions; kimi-k2.7-code: https://platform.kimi.ai/docs/guide/use-thinking-models.md (thinking.type only enabled, passing disabled errors; read 2026-10-31)"
 		},
 		{
 			"_family": "MiniMax M3.1 Flash: thinking cannot be disabled (400), low is the lowest effort",
@@ -357,10 +358,19 @@
 			"_source": "https://docs.together.ai/docs/reasoning-models-guide"
 		},
 		{
-			"_family": "Qwen3 2507: the Instruct models never think and the Thinking models always do, so nothing applies",
-			"models": ["qwen3-*-instruct-2507*", "qwen3-*-thinking-2507*"],
+			"_family": "Qwen models with a single mode: Qwen3 2507 and Qwen3-Next Instruct and Qwen3-Coder never think, the Thinking models and the thinking-only Qwen3.7 Max preview and Qwen3.8 2.4T always do, so nothing applies",
+			"models": [
+				"qwen3-*-instruct-2507*",
+				"qwen3-*-thinking-2507*",
+				"qwen3-next-*-instruct*",
+				"qwen3-next-*-thinking*",
+				"qwen3-coder*",
+				"qwen3.7-max-preview*",
+				"qwen3.7-max-2026-05-17*",
+				"qwen3.8-2.4t-a95b*"
+			],
 			"controls": [],
-			"_source": "https://huggingface.co/Qwen/Qwen3-30B-A3B-Instruct-2507"
+			"_source": "https://huggingface.co/Qwen/Qwen3-30B-A3B-Instruct-2507, https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct (supports only instruct (non-thinking) mode), https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Thinking (supports only thinking mode), https://huggingface.co/Qwen/Qwen3-Coder-480B-A35B-Instruct (supports only non-thinking mode), https://www.alibabacloud.com/help/en/model-studio/deep-thinking (qwen3.7-max-preview, qwen3.7-max-2026-05-17: only thinking mode; qwen3.8-2.4t-a95b: thinking mode only; read 2026-10-31)"
 		},
 		{
 			"_family": "Qwen3, Qwen3.5, Qwen3.6: hybrid, thinking can be turned off",
@@ -440,15 +450,22 @@
 			"_source": "https://docs.volcengine.com/docs/82379/1449737"
 		},
 		{
-			"_family": "Generic: an unknown model whose name looks like a reasoning family gets thinking off through the provider's toggle (a field the provider refuses is dropped and remembered, see _comment)",
-			"models": ["*qwen3*", "*deepseek*", "*-r1*", "*think*", "*reasoning*"],
-			"controls": [
-				{
-					"kind": "toggle",
-					"intent": "off"
-				}
-			],
-			"_source": "heuristic of api_remote.is_thinking_model"
+			"_family": "Kimi K2.5 and K2.6: hybrid, thinking can be turned off (Moonshot's own toggle, thinking.type, is not in its dialect: Kimi K3 there takes reasoning_effort and K3.1 Pro must not be sent thinking; the K2 series retires in December 2026)",
+			"models": ["kimi-k2.5*", "kimi-k2.6*"],
+			"controls": [{ "kind": "toggle", "intent": "off" }],
+			"_source": "https://platform.kimi.ai/docs/guide/use-thinking-models.md (kimi-k2.6 thinking.type enabled (default) or disabled, reasoning_effort not supported), https://www.alibabacloud.com/help/en/model-studio/deep-thinking (kimi-k2.6, kimi-k2.5: hybrid thinking mode; read 2026-10-31)"
+		},
+		{
+			"_family": "Generic thinking-only names: an unknown model named like a reasoning-only variant (an R1 distillation, a Thinking or Reasoning edition, or a non-reasoning twin) has no thinking switch, so nothing is sent",
+			"models": ["*-r1*", "*think*", "*reasoning*"],
+			"controls": [],
+			"_source": "https://www.alibabacloud.com/help/en/model-studio/deep-thinking (deepseek-r1 distillation models: thinking-only mode), https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Thinking (supports only thinking mode), https://docs.x.ai/docs/guides/reasoning (reasoning cannot be disabled; read 2026-10-31)"
+		},
+		{
+			"_family": "Generic hybrid names: an unknown Qwen3 or DeepSeek model (a provider prefix such as qwen.qwen3-32b or databricks-deepseek) gets thinking off through the provider's toggle (a field the provider refuses is dropped and remembered, see _comment)",
+			"models": ["*qwen3*", "*deepseek*"],
+			"controls": [{ "kind": "toggle", "intent": "off" }],
+			"_source": "https://www.alibabacloud.com/help/en/model-studio/deep-thinking (Qwen3 and DeepSeek V4: hybrid), https://api-docs.deepseek.com/guides/thinking_mode (thinking.type enabled or disabled; read 2026-10-31)"
 		}
 	]
 }
