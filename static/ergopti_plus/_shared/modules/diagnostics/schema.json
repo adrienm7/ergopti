@@ -83,6 +83,11 @@
 			"timeout_ms": 10000,
 			"platforms": ["macos"]
 		},
+		"local_state": {
+			"timeout_ms": 2000,
+			"local": true,
+			"platforms": ["macos"]
+		},
 		"appleevent_transport": {
 			"label": "healthcheck.deep_tests.appleevents",
 			"platforms": ["macos"],
@@ -521,7 +526,10 @@
 				{
 					"id": "wifi_signal",
 					"type": "text",
-					"platforms": ["macos"]
+					"platforms": ["macos"],
+					"probe": {
+						"macos": "local_state"
+					}
 				}
 			]
 		},
@@ -573,7 +581,10 @@
 			"fields": [
 				{
 					"id": "modules_failed",
-					"type": "list"
+					"type": "list",
+					"probe": {
+						"macos": "local_state"
+					}
 				},
 				{
 					"id": "modules_disabled",
@@ -581,7 +592,10 @@
 				},
 				{
 					"id": "modules_ok",
-					"type": "list"
+					"type": "list",
+					"probe": {
+						"macos": "local_state"
+					}
 				},
 				{
 					"id": "log_level",
@@ -1544,6 +1558,81 @@
 								}
 							}
 						},
+						"local_state": {
+							"kind": "object",
+							"fields": {
+								"state": {
+									"kind": "enum",
+									"values": [
+										"pending",
+										"ok",
+										"error",
+										"timeout",
+										"disabled",
+										"unsupported",
+										"not_run",
+										"cancelled",
+										"unknown"
+									],
+									"default": "unknown"
+								},
+								"cleanup": {
+									"kind": "enum",
+									"values": ["pending", "settled", "unknown"],
+									"default": "unknown"
+								},
+								"ms": {
+									"kind": "number"
+								},
+								"native_status": {
+									"kind": "integer",
+									"minimum": -2147483648,
+									"maximum": 2147483647
+								},
+								"source_sha256": {
+									"kind": "hash"
+								},
+								"runtime_source_sha256": {
+									"kind": "hash"
+								},
+								"receiver_source_sha256": {
+									"kind": "hash"
+								},
+								"sender_source_sha256": {
+									"kind": "hash"
+								},
+								"sender_context": {
+									"kind": "enum",
+									"values": ["driver_spawned_osascript"]
+								},
+								"qualification_scope": {
+									"kind": "enum",
+									"values": ["local_runtime_nonce"]
+								},
+								"detail": {
+									"kind": "enum",
+									"values": [
+										"probe_busy",
+										"cleanup_debt",
+										"clock_refused",
+										"deadline_expired",
+										"unsupported",
+										"opt_in_required",
+										"not_embedded",
+										"isolated_environment_required",
+										"cancelled",
+										"native_refused",
+										"invalid_frame",
+										"transport_refused"
+									]
+								},
+								"runtime_pid": {
+									"kind": "integer",
+									"minimum": 1,
+									"maximum": 2147483647
+								}
+							}
+						},
 						"appleevent_transport": {
 							"kind": "object",
 							"fields": {
@@ -2080,6 +2169,81 @@
 										}
 									},
 									"bluetooth": {
+										"kind": "object",
+										"fields": {
+											"state": {
+												"kind": "enum",
+												"values": [
+													"pending",
+													"ok",
+													"error",
+													"timeout",
+													"disabled",
+													"unsupported",
+													"not_run",
+													"cancelled",
+													"unknown"
+												],
+												"default": "unknown"
+											},
+											"cleanup": {
+												"kind": "enum",
+												"values": ["pending", "settled", "unknown"],
+												"default": "unknown"
+											},
+											"ms": {
+												"kind": "number"
+											},
+											"native_status": {
+												"kind": "integer",
+												"minimum": -2147483648,
+												"maximum": 2147483647
+											},
+											"source_sha256": {
+												"kind": "hash"
+											},
+											"runtime_source_sha256": {
+												"kind": "hash"
+											},
+											"receiver_source_sha256": {
+												"kind": "hash"
+											},
+											"sender_source_sha256": {
+												"kind": "hash"
+											},
+											"sender_context": {
+												"kind": "enum",
+												"values": ["driver_spawned_osascript"]
+											},
+											"qualification_scope": {
+												"kind": "enum",
+												"values": ["local_runtime_nonce"]
+											},
+											"detail": {
+												"kind": "enum",
+												"values": [
+													"probe_busy",
+													"cleanup_debt",
+													"clock_refused",
+													"deadline_expired",
+													"unsupported",
+													"opt_in_required",
+													"not_embedded",
+													"isolated_environment_required",
+													"cancelled",
+													"native_refused",
+													"invalid_frame",
+													"transport_refused"
+												]
+											},
+											"runtime_pid": {
+												"kind": "integer",
+												"minimum": 1,
+												"maximum": 2147483647
+											}
+										}
+									},
+									"local_state": {
 										"kind": "object",
 										"fields": {
 											"state": {
