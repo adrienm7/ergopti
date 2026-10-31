@@ -605,11 +605,17 @@ if (!/export LUA_PATH=/.test(pkgbuildSrc)) {
 // it is missing, so none of these checks can pass against an empty slice.
 const packageLinux = pipeline.locate('package-linux');
 const WORKFLOW = `${packageLinux.file} (job package-linux)`;
-const workflowSrc = packageLinux.body;
+// The archive step runs the tracked bundle builder: judge what it runs, with
+// its own names for the asset ($ASSET) and the packed tree ($STAGE).
+const ARCHIVE_BUILDER = 'tools/build/build-linux-bundle-archive.sh';
+const viaBuilder = packageLinux.body.includes(`bash ${ARCHIVE_BUILDER} "$LINUX_BUNDLE_ASSET"`);
+const workflowSrc = viaBuilder ? read(ARCHIVE_BUILDER) : packageLinux.body;
+const ASSET = viaBuilder ? '\\$ASSET' : '\\$LINUX_BUNDLE_ASSET';
+const TREE = viaBuilder ? '"\\$STAGE"' : 'build\\/linux';
 
 // Tolerant of a shell line continuation: the archive command may be written on
 // one line or split across two, and the members are what matter either way.
-const tarLine = workflowSrc.match(/tar -czf[\s\S]{0,200}?-C build\/linux ([^\n]*)/);
+const tarLine = workflowSrc.match(new RegExp(`tar -czf[\\s\\S]{0,200}?-C ${TREE} ([^\\n]*)`));
 if (!tarLine) {
 	errors.push(
 		`${WORKFLOW}: the Linux release must archive the driver bundle. Publishing ` +
@@ -627,15 +633,27 @@ if (!tarLine) {
 	}
 }
 
-if (!/sha256sum "\$LINUX_BUNDLE_ASSET" > "\$LINUX_BUNDLE_ASSET\.sha256"/.test(workflowSrc)) {
+if (!new RegExp(`sha256sum "${ASSET}" > "${ASSET}\\.sha256"`).test(workflowSrc)) {
 	errors.push(
 		`${WORKFLOW}: the canonical Linux bundle must publish a filename-bound SHA-256 record.`
 	);
 }
-if (!/sha256sum --check "\$LINUX_BUNDLE_ASSET\.sha256"/.test(workflowSrc)) {
+if (!new RegExp(`sha256sum --check "${ASSET}\\.sha256"`).test(workflowSrc)) {
 	errors.push(`${WORKFLOW}: CI must verify the generated Linux bundle checksum before upload.`);
 }
-if (!/build\/linux\/\$\{\{ env\.LINUX_BUNDLE_ASSET \}\}\.sha256/.test(workflowSrc)) {
+// The release tarball carries the private runtime install.sh installs with the
+// driver (owned runtimes, PIN): the source install runs no host LuaJIT or curl.
+if (
+	!viaBuilder ||
+	!workflowSrc.includes(
+		'stage-linux-private-runtime.sh" "$BUILD_DIR/AppDir" "$STAGE/linux/runtime"'
+	)
+) {
+	errors.push(
+		`${WORKFLOW}: the release archive must be packed by ${ARCHIVE_BUILDER} with the private runtime in linux/runtime.`
+	);
+}
+if (!/build\/linux\/\$\{\{ env\.LINUX_BUNDLE_ASSET \}\}\.sha256/.test(packageLinux.body)) {
 	errors.push(`${WORKFLOW}: the Linux checksum must be included in the release artifact upload.`);
 }
 

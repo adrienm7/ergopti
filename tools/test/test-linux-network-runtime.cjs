@@ -203,9 +203,13 @@ function portable() {
 				'-DWITH_SHARED_LIBUV=OFF'
 			]);
 			assert.match(installer, /linux\/native_modules\/luv\.so/);
+			const launcher = read(`${DRIVER}/install/standalone_launcher.sh`);
+			// A checkout install admits its compiled luv; a release install
+			// sources the private runtime it carries instead.
+			assert.match(launcher, /^\s*ergopti_admit_native_modules "\$DRIVER_ROOT" optional$/m);
 			assert.match(
-				read(`${DRIVER}/install/standalone_launcher.sh`),
-				/^ergopti_admit_native_modules "\$DRIVER_ROOT" optional$/m
+				launcher,
+				/source "\$DRIVER_ROOT\/network-runtime-env\.sh" "\$DRIVER_ROOT\/runtime" "\$DRIVER_ROOT"/
 			);
 			assert.match(
 				read(`${DRIVER}/install/native_modules_env.sh`),
