@@ -77,15 +77,16 @@ this, and timing probes inside the timer can hide it. So a dialog is pressed wit
 `LiveClickDialogButton`, never `ControlClick`, and the typist cancels the menu of
 a right click.
 
-### project-live-checks-menu-click-replay-fails-on-a-real-race
+### project-live-checks-menu-click-replay-exercises-two-close-races
 
-`menu-click-replay` fails intermittently, alone as well as in a run (4 of 6 alone
-on 2026-10-31), and its verdict is right: the successor's close request runs OnExit
-on top of a log flush it interrupted, `LoggerPrepareShutdown` refuses
-(`phase=repair, flush_active=1, append_owners=1`), and the reload is handed back
-with an error. The owner under OnExit can only resume once OnExit returns, so
-waiting inside it cannot work. Action: the fix is a retry of the same reload that
-keeps the successor, not a looser check; do not mask the error in the check.
+The successor's close request can run OnExit on top of any thread. Over a log or
+keystats flush, the owner under OnExit can only resume once OnExit returns, so
+waiting inside it cannot work: `ReloadTerminalHandoffDeferClaim` puts the reload
+back to pending and retries the same exit once the owner settled, keeping the
+successor, which asks only once. Over `MenuStartupCommands.Drain`, the rows not
+reached yet are handed to the next successor by `TakeForReload`. Each metrics
+toggle reloads, so this check chains about five reloads. Action: when it fails
+again, read the phase in the log; do not mask the error in the check.
 
 ### project-live-checks-versions-window-needs-memory
 
