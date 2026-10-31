@@ -7,14 +7,19 @@
 --- the first time it is needed, verifies it, and keeps it in Ergopti's own folder
 --- so that every later start uses that same copy without the network. It never
 --- writes to /Applications or to the user's Karabiner folders, and it installs
---- nothing privileged: the verified payload is what the installer publishes.
+--- nothing privileged: the verified payload is the signed privileged helper
+--- `ErgoptiPlus-Runtime-Installer.app`, with the runtime products sealed in its
+--- `Contents/Resources/OwnedRuntime/`. The launcher stages that helper for the
+--- administrator install (OwnedRuntimeDownloadedHelper.swift), and only once
+--- the receipt below names the pinned digest.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Pinned Or Nothing: only the `runtime` group of a complete manifest pin is
 ---    fetched. An unpinned manifest is the named refusal `artifact_unpinned`.
 --- 2. Verified Before Use: the download must have the pinned size and SHA-256,
 ---    and its member list must be closed (only directories and regular files,
----    all under `Runtime/`, no absolute path or `..`) before it is extracted.
+---    all under the helper bundle, no absolute path or `..`) before it is
+---    extracted.
 --- 3. Then Always That One: a receipt naming the digest is written last, after
 ---    the payload is complete. A receipt that matches the pin and a payload
 ---    with every product means no network at all on later starts.
@@ -36,11 +41,18 @@ M.DOWNLOAD_TIMEOUT_SEC = 600
 --- Seconds any other step may take.
 M.STEP_TIMEOUT_SEC = 60
 
---- The products a payload must hold, relative to the payload root.
+--- The one top-level member of the artifact: the signed privileged helper.
+M.HELPER = "ErgoptiPlus-Runtime-Installer.app"
+local SEALED = M.HELPER .. "/Contents/Resources/OwnedRuntime/"
+
+--- The products a payload must hold, relative to the payload root: the
+--- helper's executable and the three runtime products it seals
+--- (tools/build/remap_runtime_publish.py REQUIRED_MEMBERS).
 M.PRODUCTS = {
-	"Runtime/ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core",
-	"Runtime/ErgoptiPlus-Remap-Console.app/Contents/MacOS/ErgoptiPlus-Remap-Console",
-	"Runtime/bin/ergoptiplus_remap_cli",
+	M.HELPER .. "/Contents/MacOS/ErgoptiPlus-Runtime-Installer",
+	SEALED .. "ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core",
+	SEALED .. "ErgoptiPlus-Remap-Console.app/Contents/MacOS/ErgoptiPlus-Remap-Console",
+	SEALED .. "bin/ergoptiplus_remap_cli",
 }
 
 --- Stable reasons of a refused fetch.
@@ -94,7 +106,7 @@ function M.closed_listing(verbose, names)
 	local name_count, seen = 0, {}
 	for name in tostring(names):gmatch("[^\n]+") do
 		name_count = name_count + 1
-		if name:sub(1, 1) == "/" or name:find("%.%.") or not (name == "Runtime/" or name:find("^Runtime/")) then
+		if name:sub(1, 1) == "/" or name:find("%.%.") or name:sub(1, #M.HELPER + 1) ~= M.HELPER .. "/" then
 			return false, name
 		end
 		seen[name] = true
@@ -162,7 +174,7 @@ function M.new(ports)
 
 	--- The kept payload root of a pin, or nil when it is not kept.
 	--- @param pin table Runtime pin.
-	--- @return string|nil payload Absolute path of the folder holding Runtime/.
+	--- @return string|nil payload Absolute path of the folder holding the helper.
 	function fetcher.payload_for(pin)
 		if not complete_pin(pin) then return nil end
 		local home = ports.expand(M.home_for(pin.version))
