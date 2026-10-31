@@ -1402,10 +1402,6 @@ end
 local IGNORED_WIN_SLOW_PROBE_MS = 250
 --- Stage at which the last probe failed, for the prewarm warning (L23).
 local _probe_failed_stage = nil
---- An application whose focused window outlived the Accessibility messaging
---- timeout, and until when it is not asked again: { pid, until_sec }.
-local UNRESPONSIVE_AX_BACKOFF_SEC = Timings.sec("adapters", "unresponsive_ax_backoff_ms")
-local _unresponsive_ax = nil
 
 --- Logs one line naming every probe stage's milliseconds when the probe was slow.
 --- @param started number Monotonic nanoseconds at the probe start.
@@ -1459,20 +1455,18 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	local ok_pid, front_pid = false, nil
 	if ok_front and front then ok_pid, front_pid = pcall(function() return front:pid() end) end
 	if not ok_pid then front_pid = nil end
-	if _unresponsive_ax and (_unresponsive_ax.pid ~= front_pid or now >= _unresponsive_ax.until_sec) then
-		_unresponsive_ax = nil
-	end
-	if _unresponsive_ax then
+	-- The cooldown is shared with every Accessibility reader of the driver, so
+	-- an application the tooltip or the context capture found unanswering is
+	-- not asked here either. This process's own windows stay asked: the field
+	-- run's selftest types into one.
+	if AccessibilityPermission.is_unanswering(front_pid, now) then
 		_probe_failed_stage = "focused_window"
 		return mark_ignored_win_unknown()
 	end
 	local window_started = TimerScheduler.now_ns()
 	local ok_win, win = pcall(hs.window.focusedWindow)
 	if not ok_win or not win then
-		if front_pid and (TimerScheduler.now_ns() - window_started) / 1e9
-			>= AccessibilityPermission.MESSAGING_TIMEOUT_SEC * 0.9 then
-			_unresponsive_ax = { pid = front_pid, until_sec = now + UNRESPONSIVE_AX_BACKOFF_SEC }
-		end
+		AccessibilityPermission.note_read(front_pid, (TimerScheduler.now_ns() - window_started) / 1e9, now)
 		return stage("focused_window", true)
 	end
 	stage("focused_window")
