@@ -565,15 +565,15 @@
 			"tool": "lgi, GTK 3, WebKitGTK 4.1, libayatana-appindicator",
 			"programs": [],
 			"used_for": "Windows, web views, tray (`linux/vendor/README.md`; `docs/memory/linux-web-release.md:632`)",
-			"today": "Host (appindicator bundled in the AppImage; GTK and WebKitGTK deliberately not)",
+			"today": "Host, checked at start (`linux/infra/gui_stack.lua`): a --tray launch without GTK 3 or libayatana-appindicator3 refuses in words with EX_UNAVAILABLE; without lgi or WebKitGTK 4.1 the windows are told unavailable once",
 			"current_class": "SYS",
 			"version_needed": "GTK 3, WebKit2GTK 4.1",
-			"if_missing": "No window or no tray; a clear message exists",
+			"if_missing": "Tray: the start is refused, the library named; windows: told once at start, hotstrings and the tray run",
 			"pin_possible": "Not reasonably: they must match the host's GLib, GL and glibc",
 			"decision": "SYS",
 			"decision_text": "SYS: check at start, refuse in words (the AppImage preflight already does this for glibc)",
 			"alternative": null,
-			"status": "follow_up"
+			"status": "done"
 		},
 		{
 			"os": "linux",
