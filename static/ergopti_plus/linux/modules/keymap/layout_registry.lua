@@ -68,6 +68,8 @@ local REQUEST_OWNER = "layout_registry"
 
 -- Interpreter of the user installer, looked up in PATH like the installers do.
 local PYTHON = "python3"
+-- The git a clone run asks for its registry changes, resolved through PATH.
+local GIT = "git"
 
 -- Oldest Python the installer supports (the installers' floor).
 local MIN_PYTHON = { 3, 8 }
@@ -331,6 +333,21 @@ local function default_deps(settings)
 	return {
 		settings = settings,
 		local_source = require("infra.installation").is_source_run(),
+		-- The asynchronous runner: the refresh shares the daemon's loop with the
+		-- grabbed keyboard, so a blocking git would delay keys.
+		registry_changes = function(dir, callback)
+			ProcessRunner.run(GIT, Catalogue.registry_changes_args(dir), { timeout_ms = settings.timeout_ms },
+				function(result)
+					if result.exit_code == 0 and result.error == nil then
+						callback(result.stdout or "", nil)
+					elseif result.not_found then
+						callback(nil, "git is not installed")
+					else
+						local stderr = TextUtils.trim(result.stderr or "")
+						callback(nil, tostring(result.error) .. (stderr ~= "" and (": " .. stderr) or ""))
+					end
+				end)
+		end,
 		transport = {
 			get = function(url, headers, timeout_ms, callback)
 				local is_index = url:sub(-#settings.index_file) == settings.index_file

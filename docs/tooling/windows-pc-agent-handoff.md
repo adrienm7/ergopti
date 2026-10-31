@@ -215,6 +215,19 @@ downloaded again`). Ollama deletes that layer before it reports the
   stale `Catalogue["order"].Length` 4 -> 13; check
   `test_local_server_panel_view_preparation.ahk`. (7) `LocalServerPortsDescriptor`
   accepts the `vllm`/`tabbyapi` descriptors and ignores the `fingerprint` key.
+- Layout catalogue in a source run (2026-10-31): `LayoutCatalogue_Refresh`
+  (`windows/modules/keymap/keylayout/layout_catalogue_refresh.ahk`) still shows
+  the shipped registry whenever `Updater_IsLocalSource()` is true. Port the
+  macOS/Linux rule: in a source run, run
+  `git --no-optional-locks -C <registry folder> status --porcelain --untracked-files=all -- .`
+  asynchronously (the argv of `Catalogue.registry_changes_args`); empty output
+  takes the release's conditional remote request (cache and ETag), non-empty
+  output keeps the bundled branch, a missing or failing git keeps it and logs
+  an ERROR naming the failure. Add a test beside `test_layout_catalogue.ahk`
+  (an unmodified clone issues one index request); inject the git result into
+  `tests/fixtures/layout_manager_command_body.ahk:313`. Then set the Windows row
+  of `docs/design/developer-mode.md` to "works like the release" and drop its
+  "(the remote catalogue is pending on Windows …)" parenthesis.
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 

@@ -44,6 +44,10 @@ local LOG = "layout_registry"
 -- Folder macOS reads the current user's keyboard layouts from.
 local USER_LAYOUTS_DIR = "~/Library/Keyboard Layouts"
 
+-- The git a clone run asks for its registry changes. /usr/bin/git is on every
+-- macOS (the Xcode command line tools shim); a clone was made with a git.
+local GIT = "/usr/bin/git"
+
 -- Stable failure codes the layout manager translates.
 M.FAILURE_BUSY = "busy"
 M.FAILURE_UNKNOWN_LAYOUT = "unknown_layout"
@@ -147,6 +151,18 @@ local function default_deps(settings)
 	return {
 		settings = settings,
 		local_source = require("modules.updater").is_local_source(),
+		-- An asynchronous task (ShellRunner.run), never a blocking shell call: the refresh
+		-- runs on the main thread that also delivers the keys.
+		registry_changes = function(dir, callback)
+			require("adapters.shell_runner").run(GIT, Catalogue.registry_changes_args(dir), function(ok, out, stderr)
+				if ok then
+					callback(out or "", nil)
+				else
+					local detail = type(stderr) == "string" and stderr:gsub("%s+$", "") or ""
+					callback(nil, detail ~= "" and detail or "git did not run")
+				end
+			end)
+		end,
 		transport = {
 			get = function(url, headers, _timeout_ms, callback)
 				client.get(url, headers, function(result)
