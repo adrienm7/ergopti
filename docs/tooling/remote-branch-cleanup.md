@@ -47,3 +47,5 @@ under another id:
   `tmp/wip-issue104` aec2fb58cb (by 2be257c9f5), `tmp/wip-fr-uncommitted`
   0d7e53b28b (by 708bc6671d), `tmp/wip-todo-ae-par30` 41f72525cf (the PAR-30
   Linux gate landed as cd824ccf8e).
+
+Done on 2026-10-31: 262 branches deleted, 222 tips archived under the tag prefix `archive/2026-10-31/`.

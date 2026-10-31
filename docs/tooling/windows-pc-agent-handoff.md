@@ -115,6 +115,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
 
 - Tell the coordinator through this file (a line under this section) how
   many branches were deleted and how many archive tags were pushed.
+- Done by the PC agent on 2026-10-31: 262 branches deleted, 222 archive tags pushed. Seven branches with a commit under two hours old were kept: `fix/dev-js-reds-3`, `integrate/linux-proof-1`, `-2`, `-3`, `integrate/overnight-linux-1`, `integrate/overnight-macos-1`, `integrate/swift-proof-14`. Delete them yourself or tell the PC agent when they are finished.
 - Remove the "Run the archive-then-delete script" box from TODO.md's
   "Maintainer: remote branch cleanup" section and point
   `docs/tooling/remote-branch-cleanup.md` at the new tag prefix.
