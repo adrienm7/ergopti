@@ -791,8 +791,8 @@ function nativeFunctionReferenceKeys(source) {
 				[
 					'shadowed actual frame producer',
 					source.replace(
-						'local declared_bundle_rows = timed("menu_keyboard_layout.bundle_frame", bundle_frame_rows)',
-						'local bundle_frame_rows; local declared_bundle_rows = timed("menu_keyboard_layout.bundle_frame", bundle_frame_rows)'
+						'local declared_bundle_rows = bundle_frame_rows()',
+						'local bundle_frame_rows; local declared_bundle_rows = bundle_frame_rows()'
 					)
 				]
 			]) {
