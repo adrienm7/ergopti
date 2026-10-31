@@ -102,6 +102,16 @@ helpers.describe("context tracker: dead or unwatchable focused elements (ax-dead
 			"the unanswered element is not retried on every later focus change")
 	end)
 
+	-- 2026-10-31 14:09: a watcher left on an element whose removal went
+	-- unanswered made the next focus on that element an ERROR with a traceback
+	-- (ax-already-registered).
+	helpers.it("commits the watch of an element this observer already watches (ax-already-registered)", function()
+		local result = focus_through(nil, "context_tracker.lua:655: Notification has already been registered\nstack traceback:\n\t[C]: in field '?'")
+		helpers.assert_true(result.rendered:find("[ERROR]", 1, true) == nil, result.rendered)
+		helpers.assert_eq(result.removed, { "first", "second" },
+			"the already-watched element is owned, so the next focus removes its watcher")
+	end)
+
 	helpers.it("keeps any other watcher failure an ERROR", function()
 		local result = focus_through(nil, "context_tracker.lua:631: observer refused the watcher")
 		helpers.assert_contains(result.rendered, "[ERROR]")
