@@ -294,6 +294,14 @@ predicate, and describe foreign error objects with `ErrorDescription`, never
 separately; a signal is a failure (SIGTERM is status 143), and ESRCH on a
 process group means already gone.
 
+### project-linux-a-corrupt-store-moves-aside-without-replacing
+
+A malformed JSON store is set aside through `infra/corrupt_aside.lua`
+(`<path>.corrupt`, then `.corrupt.1`, ...) with the no-replace move, never with
+`os.rename`, which replaces an older set-aside or the one another process makes
+at the same instant. `api_entries.lua` used `os.rename` until 2026-10-31;
+`agent_learning.lua` and the storage adapter already refused to replace.
+
 ### project-linux-idle-loop-costs
 
 An active libuv idle handle makes the loop poll with a zero timeout, so the

@@ -226,9 +226,10 @@ local function state()
 	if read_status == "absent" then return _state end
 	local root = Json.decode_lossless(text)
 	if type(root) ~= "table" or type(root.entries) ~= "table" then
-		local aside = M.path() .. ".corrupt"
-		local moved = os.rename(M.path(), aside)
-		if moved == true then
+		-- Never os.rename: it replaces an older set-aside, or one a second
+		-- process makes at the same instant.
+		local aside = require("infra.corrupt_aside").preserve(M.path())
+		if aside ~= nil then
 			_state.source = { status = "absent", content = "" }
 			Logger.error(LOG, "API entries file is malformed — kept at %s, starting empty.", aside)
 		else
