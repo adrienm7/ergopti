@@ -2956,8 +2956,12 @@ _SR_CaptureSweepStale(Directory, CurrentPid) {
 			local capture := Map("TmpFile", A_LoopFileFullPath . "\output.tmp",
 				"CaptureDir", A_LoopFileFullPath . "\")
 			local refusal := 0, diagnostic := ""
-			try refusal := _SR_CaptureRemove(capture)
-			catch as Err
+			try {
+				; A folder reached through a link is not this adapter's to empty.
+				if !InStr(A_LoopFileAttrib, "L")
+					_SR_CaptureSweepMembers(A_LoopFileFullPath)
+				refusal := _SR_CaptureRemove(capture)
+			} catch as Err
 				diagnostic := Err.Message
 			if !refusal && diagnostic = "" {
 				removed += 1
@@ -2979,4 +2983,15 @@ _SR_CaptureSweepStale(Directory, CurrentPid) {
 		_SR_LogAt("Warn", "{1} stale capture folder(s) could not be removed ({2}); the next start retries.",
 			kept, first_refusal)
 	return Map("removed", removed, "kept", kept)
+}
+
+; Deletes the files an exited owner left in its capture folder. A managed HTTP
+; request stages more than the capture file there, and its transport.json holds
+; the request's headers and body in clear: left alone, they outlive the crash and
+; the folder refuses removal at every later start. A file another process still
+; holds stays; the folder's own removal then reports the refusal.
+; @param Folder {String} The capture folder of an exited owner.
+_SR_CaptureSweepMembers(Folder) {
+	Loop Files Folder . "\*", "F"
+		DllCall("Kernel32\DeleteFileW", "WStr", A_LoopFileFullPath, "Int")
 }
