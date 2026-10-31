@@ -476,7 +476,7 @@
 		},
 		{
 			"id": "macos-proxy-relay-shell",
-			"ordinal": 551,
+			"ordinal": 552,
 			"name": "macOS Ollama daemon starts under the proxy sign-in relay when the proxy demands NTLM or Negotiate",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-proxy-relay-shell.cjs"],
