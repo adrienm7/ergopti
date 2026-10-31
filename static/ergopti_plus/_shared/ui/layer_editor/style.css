@@ -29,11 +29,11 @@
 	--sub: var(--theme-sub);
 	--accent: var(--theme-accent);
 	--accent-soft: var(--theme-accent-soft);
-	--recommended: #2e9d4f;
+	--recommended: var(--theme-hue-2e9d4f);
 	--recommended-soft: rgba(46, 157, 79, 0.14);
-	--custom: #c77700;
+	--custom: var(--theme-hue-c77700);
 	--custom-soft: rgba(199, 119, 0, 0.16);
-	--invalid: #d70015;
+	--invalid: var(--theme-hue-d70015);
 	--invalid-soft: rgba(215, 0, 21, 0.12);
 	--radius: 8px;
 }

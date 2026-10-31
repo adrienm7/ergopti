@@ -141,7 +141,9 @@
 			'#metrics_rebuild_banner.failed{background:rgba(220,53,69,0.16);border-color:rgba(220,53,69,0.5)}' +
 			'#metrics_rebuild_banner .track{height:6px;border-radius:3px;background:rgba(127,127,127,0.25);' +
 			'margin-top:6px;overflow:hidden}' +
-			'#metrics_rebuild_banner .fill{height:100%;width:0;background:#3b82f6;transition:width .4s ease}' +
+			'#metrics_rebuild_banner .fill{height:100%;width:0;background:' +
+			ThemeTokens.color('hue-3b82f6') +
+			';transition:width .4s ease}' +
 			'#metrics_rebuild_banner .notice{margin-top:4px;opacity:.8}';
 		document.head.appendChild(style);
 		root = document.createElement('div');

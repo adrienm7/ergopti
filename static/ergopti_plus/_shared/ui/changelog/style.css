@@ -38,7 +38,7 @@ body {
 /* ========================================= */
 
 #sidebar {
-	background: #111113;
+	background: var(--theme-hue-111113);
 	border-right: 1px solid var(--theme-gray5-dark);
 	display: flex;
 	flex-direction: column;
@@ -83,7 +83,7 @@ body {
 .channel-btn.active {
 	background: rgba(10, 132, 255, 0.18);
 	border-color: rgba(10, 132, 255, 0.55);
-	color: #4da6ff;
+	color: var(--theme-hue-4da6ff);
 }
 
 #release-list {
@@ -110,16 +110,16 @@ body {
 }
 
 .release-item:hover {
-	background: #1e1e20;
+	background: var(--theme-hue-1e1e20);
 }
 
 .release-item.selected {
-	background: #1e2a38;
-	border-left-color: #4da6ff;
+	background: var(--theme-hue-1e2a38);
+	border-left-color: var(--theme-hue-4da6ff);
 }
 
 .release-item.prerelease .release-item-tag {
-	color: #bf7af0;
+	color: var(--theme-hue-bf7af0);
 }
 
 .release-item-tag {
@@ -149,7 +149,7 @@ body {
 .badge-prerelease {
 	background: rgba(10, 132, 255, 0.18);
 	border: 1px solid rgba(10, 132, 255, 0.35);
-	color: #4da6ff;
+	color: var(--theme-hue-4da6ff);
 }
 
 .badge-latest {
@@ -189,7 +189,7 @@ body {
 	align-items: center;
 	background: rgba(10, 132, 255, 0.08);
 	border-bottom: 1px solid rgba(10, 132, 255, 0.3);
-	color: #c8c8cc;
+	color: var(--theme-hue-c8c8cc);
 	flex-shrink: 0;
 	flex-wrap: wrap;
 	font-size: 12px;
@@ -213,7 +213,7 @@ body {
 	background: rgba(10, 132, 255, 0.18);
 	border: 1px solid rgba(10, 132, 255, 0.55);
 	border-radius: 6px;
-	color: #4da6ff;
+	color: var(--theme-hue-4da6ff);
 	cursor: pointer;
 	font-size: 12px;
 	font-weight: 500;
@@ -277,7 +277,7 @@ body {
 	background: rgba(10, 132, 255, 0.14);
 	border: 1px solid rgba(10, 132, 255, 0.5);
 	border-radius: 7px;
-	color: #4da6ff;
+	color: var(--theme-hue-4da6ff);
 	cursor: pointer;
 	display: none;
 	font-size: 12px;
@@ -311,7 +311,7 @@ body {
 	align-items: center;
 	background: rgba(10, 132, 255, 0.08);
 	border-bottom: 1px solid rgba(10, 132, 255, 0.3);
-	color: #c8c8cc;
+	color: var(--theme-hue-c8c8cc);
 	flex-shrink: 0;
 	flex-wrap: wrap;
 	font-size: 12px;
@@ -338,7 +338,7 @@ body {
 	background: rgba(10, 132, 255, 0.18);
 	border: 1px solid rgba(10, 132, 255, 0.55);
 	border-radius: 6px;
-	color: #4da6ff;
+	color: var(--theme-hue-4da6ff);
 	cursor: pointer;
 	font-size: 12px;
 	font-weight: 500;
@@ -398,7 +398,7 @@ body {
 	padding-bottom: 6px;
 }
 #release-body h3 {
-	color: #d0d0d4;
+	color: var(--theme-hue-d0d0d4);
 	font-size: 14px;
 }
 #release-body h4 {
@@ -407,7 +407,7 @@ body {
 }
 
 #release-body p {
-	color: #c8c8cc;
+	color: var(--theme-hue-c8c8cc);
 	font-size: 13px;
 	line-height: 1.7;
 	margin-bottom: 10px;
@@ -415,7 +415,7 @@ body {
 
 #release-body ul,
 #release-body ol {
-	color: #c8c8cc;
+	color: var(--theme-hue-c8c8cc);
 	font-size: 13px;
 	line-height: 1.7;
 	margin: 6px 0 12px 20px;
@@ -428,14 +428,14 @@ body {
 #release-body code {
 	background: var(--theme-gray5-dark);
 	border-radius: 4px;
-	color: #bf7af0;
+	color: var(--theme-hue-bf7af0);
 	font-family: 'SF Mono', 'Fira Mono', monospace;
 	font-size: 12px;
 	padding: 1px 5px;
 }
 
 #release-body pre {
-	background: #111113;
+	background: var(--theme-hue-111113);
 	border: 1px solid var(--theme-gray5-dark);
 	border-radius: 8px;
 	margin: 12px 0;
@@ -445,13 +445,13 @@ body {
 
 #release-body pre code {
 	background: none;
-	color: #c8c8cc;
+	color: var(--theme-hue-c8c8cc);
 	font-size: 12px;
 	padding: 0;
 }
 
 #release-body blockquote {
-	border-left: 3px solid #4da6ff;
+	border-left: 3px solid var(--theme-hue-4da6ff);
 	color: var(--theme-grey-888);
 	font-size: 13px;
 	font-style: italic;
@@ -466,7 +466,7 @@ body {
 }
 
 #release-body a {
-	color: #4da6ff;
+	color: var(--theme-hue-4da6ff);
 	cursor: pointer;
 	text-decoration: none;
 }
@@ -495,7 +495,7 @@ body {
 }
 
 #release-body em {
-	color: #bbb;
+	color: var(--theme-grey-bbb);
 }
 
 #release-body table {
@@ -513,13 +513,13 @@ body {
 }
 
 #release-body th {
-	background: #111113;
+	background: var(--theme-hue-111113);
 	color: var(--theme-grey-aaa);
 	font-weight: 600;
 }
 
 #release-body td {
-	color: #c8c8cc;
+	color: var(--theme-hue-c8c8cc);
 }
 
 .empty-notes {
@@ -566,7 +566,7 @@ body {
 }
 
 #release-body details:not(.release-section) > summary {
-	color: #d0d0d4;
+	color: var(--theme-hue-d0d0d4);
 	cursor: pointer;
 	font-size: 13px;
 	font-weight: 600;
@@ -606,7 +606,7 @@ body {
 	animation: spin 0.9s linear infinite;
 	border: 3px solid var(--theme-gray5-dark);
 	border-radius: 50%;
-	border-top-color: #4da6ff;
+	border-top-color: var(--theme-hue-4da6ff);
 	height: 32px;
 	width: 32px;
 }
@@ -645,7 +645,7 @@ body {
 	background: rgba(10, 132, 255, 0.12);
 	border: 1px solid rgba(10, 132, 255, 0.45);
 	border-radius: 7px;
-	color: #4da6ff;
+	color: var(--theme-hue-4da6ff);
 	cursor: pointer;
 	font-size: 12px;
 	font-weight: 500;

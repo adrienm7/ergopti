@@ -22,7 +22,7 @@ body {
 
 body {
 	background: var(--theme-white);
-	color: #1a1a1a;
+	color: var(--theme-grey-1a1a1a);
 	font-family:
 		'Segoe UI',
 		-apple-system,
@@ -85,7 +85,7 @@ body {
 }
 
 #release-notes code {
-	background: #f3f3f3;
+	background: var(--theme-grey-f3f3f3);
 	border-radius: 3px;
 	font-family: Consolas, 'SF Mono', monospace;
 	font-size: 0.92em;
@@ -93,7 +93,7 @@ body {
 }
 
 #release-notes pre {
-	background: #f3f3f3;
+	background: var(--theme-grey-f3f3f3);
 	border-radius: 4px;
 	overflow-x: auto;
 	padding: 0.7em 1em;
@@ -118,7 +118,7 @@ body {
 }
 
 #release-notes a {
-	color: #0969da;
+	color: var(--theme-hue-0969da);
 	cursor: pointer;
 	text-decoration: none;
 }
@@ -144,7 +144,7 @@ body {
 }
 
 #release-notes th {
-	background: #f5f5f5;
+	background: var(--theme-grey-f5f5f5);
 	font-weight: 600;
 }
 

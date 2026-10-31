@@ -72,13 +72,13 @@ h1 {
 
 .catalogue-status.is-error,
 .result.is-error {
-	color: #b3261e;
+	color: var(--theme-hue-b3261e);
 }
 
 .result {
-	background: #eef6ee;
+	background: var(--theme-hue-eef6ee);
 	border-radius: 6px;
-	color: #1e5e22;
+	color: var(--theme-hue-1e5e22);
 	flex-shrink: 0;
 	font-size: 12px;
 	margin: 0 0 8px;
@@ -86,7 +86,7 @@ h1 {
 }
 
 .result.is-error {
-	background: #fbeceb;
+	background: var(--theme-hue-fbeceb);
 }
 
 /* ============================= */
@@ -134,7 +134,7 @@ h1 {
 }
 
 .badge {
-	background: #ececf0;
+	background: var(--theme-hue-ececf0);
 	border-radius: 10px;
 	color: var(--theme-grey-555);
 	font-size: 10px;
@@ -144,22 +144,22 @@ h1 {
 .badge-installed,
 .badge-builtin,
 .badge-provided {
-	background: #e3f1e4;
-	color: #1e5e22;
+	background: var(--theme-hue-e3f1e4);
+	color: var(--theme-hue-1e5e22);
 }
 
 .badge-update {
-	background: #fff1d6;
-	color: #7a4b00;
+	background: var(--theme-hue-fff1d6);
+	color: var(--theme-hue-7a4b00);
 }
 
 .badge-active {
-	background: #dceaff;
-	color: #0b4ea2;
+	background: var(--theme-hue-dceaff);
+	color: var(--theme-hue-0b4ea2);
 }
 
 .layout-meta {
-	color: #777;
+	color: var(--theme-grey-777);
 	display: flex;
 	flex-wrap: wrap;
 	font-size: 11px;
@@ -233,7 +233,7 @@ button.link {
 
 button.danger {
 	background: var(--theme-gray5);
-	color: #b3261e;
+	color: var(--theme-hue-b3261e);
 }
 
 .btns {
@@ -251,7 +251,7 @@ button.danger {
 
 @media (prefers-color-scheme: dark) {
 	body {
-		background: #1e1e1e;
+		background: var(--theme-grey-1e1e1e);
 		color: var(--theme-grey-ddd);
 	}
 
@@ -276,6 +276,6 @@ button.danger {
 	}
 
 	button.danger {
-		color: #ff6b61;
+		color: var(--theme-hue-ff6b61);
 	}
 }

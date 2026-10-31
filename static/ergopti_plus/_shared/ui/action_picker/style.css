@@ -479,7 +479,7 @@ body {
 }
 
 #param-error {
-	color: #d70015;
+	color: var(--theme-hue-d70015);
 }
 
 .param-buttons {

@@ -16,21 +16,21 @@
 	--background: var(--theme-dialog-background);
 	--panel: var(--theme-dialog-panel);
 	--border: var(--theme-dialog-border);
-	--code: #f3f3f3;
+	--code: var(--theme-grey-f3f3f3);
 	--pre-background: var(--theme-dialog-code-background);
 	--pre-text: var(--theme-dialog-code-text);
 	--accent: var(--theme-dialog-accent);
 	--accent-text: var(--theme-dialog-accent-text);
 	--ok: var(--theme-dialog-ok);
 	--fail: var(--theme-dialog-fail);
-	--pending: #9a6700;
+	--pending: var(--theme-hue-9a6700);
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--label: #b0b0b0;
-		--code: #2d2d2d;
-		--pending: #d29922;
+		--label: var(--theme-grey-b0b0b0);
+		--code: var(--theme-grey-2d2d2d);
+		--pending: var(--theme-hue-d29922);
 	}
 }
 

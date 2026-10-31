@@ -12,19 +12,19 @@
  */
 
 :root {
-	--bg: #1e1e1e;
-	--bg-alt: #262629;
-	--bg-head: #2d2d30;
-	--row-hover: #2f3137;
-	--row-sel: #094771;
-	--row-sel-border: #1f6feb;
-	--text: #d4d4d6;
-	--text-dim: #8a8a90;
-	--border: #3a3a3d;
-	--accent: #4ea1ff;
-	--installed: #3fb950;
-	--chip-chat: #2d4a63;
-	--chip-completion: #4a3a2d;
+	--bg: var(--theme-grey-1e1e1e);
+	--bg-alt: var(--theme-hue-262629);
+	--bg-head: var(--theme-hue-2d2d30);
+	--row-hover: var(--theme-hue-2f3137);
+	--row-sel: var(--theme-hue-094771);
+	--row-sel-border: var(--theme-hue-1f6feb);
+	--text: var(--theme-hue-d4d4d6);
+	--text-dim: var(--theme-hue-8a8a90);
+	--border: var(--theme-hue-3a3a3d);
+	--accent: var(--theme-hue-4ea1ff);
+	--installed: var(--theme-hue-3fb950);
+	--chip-chat: var(--theme-hue-2d4a63);
+	--chip-completion: var(--theme-hue-4a3a2d);
 }
 
 * {
@@ -141,7 +141,7 @@ thead th.sorted-desc::after {
 }
 
 tbody td {
-	border-bottom: 1px solid #2a2a2d;
+	border-bottom: 1px solid var(--theme-hue-2a2a2d);
 	overflow: hidden;
 	padding: 8px 10px;
 	text-overflow: ellipsis;
@@ -200,7 +200,7 @@ tbody tr.active .name-cell::after {
 .chip {
 	background: var(--chip-chat);
 	border-radius: 10px;
-	color: #cfe3f5;
+	color: var(--theme-hue-cfe3f5);
 	display: inline-block;
 	font-size: 11px;
 	padding: 2px 8px;
@@ -208,7 +208,7 @@ tbody tr.active .name-cell::after {
 
 .chip.completion {
 	background: var(--chip-completion);
-	color: #f0dcc0;
+	color: var(--theme-hue-f0dcc0);
 }
 
 .src-link {
@@ -249,7 +249,7 @@ tbody tr.active .name-cell::after {
 	background: var(--accent);
 	border: none;
 	border-radius: 6px;
-	color: #06243f;
+	color: var(--theme-hue-06243f);
 	cursor: pointer;
 	font-size: 13px;
 	font-weight: 600;
@@ -257,7 +257,7 @@ tbody tr.active .name-cell::after {
 }
 
 #btn-use:disabled {
-	background: #3a3a3d;
+	background: var(--theme-hue-3a3a3d);
 	color: var(--text-dim);
 	cursor: default;
 }
