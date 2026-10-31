@@ -16,6 +16,11 @@ _EDOT_Quote(Text) {
 
 _EDOT_Generated(Symbol) {
 	global _DriverDir
+	; Masking every generated file for each symbol of each child cost seconds per
+	; case, and no test rewrites a generated file during a run.
+	static Owners := Map()
+	if Owners.Has(Symbol)
+		return Owners[Symbol]
 	Found := ""
 	loop files _DriverDir . "\_generated\*.ahk" {
 		Text := FSReadStrict(A_LoopFileFullPath), Code := _DriverMaskNonCode(&Text)
@@ -26,6 +31,7 @@ _EDOT_Generated(Symbol) {
 		}
 	}
 	AssertTrue(Found != "", "The canonical generated owner must exist: " . Symbol)
+	Owners[Symbol] := Found
 	return Found
 }
 
