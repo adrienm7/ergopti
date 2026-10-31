@@ -16,7 +16,7 @@ import signal
 import sys
 import time
 
-SOURCE_SHA = "f6d1235b634b04d2ad85fd6c707929555e1c9e775a7c5c166ef1a9689f809c5b"
+SOURCE_SHA = "e04f66563b8f6c93f3ad045463f38dba0841c4646f5664ed0832e77f29dba658"
 _source_path = Path(__file__).resolve().with_name("operational_core_source.py")
 _source_info = _source_path.lstat()
 _source_bytes = _source_path.read_bytes()
