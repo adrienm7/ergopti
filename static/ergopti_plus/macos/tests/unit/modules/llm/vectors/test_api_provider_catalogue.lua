@@ -23,6 +23,7 @@ local shared_lua = helpers.shared("lua/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
 local ThinkingOff = require("llm.thinking_off")
+local UrlTemplate = require("llm.api_url_template")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -85,10 +86,18 @@ helpers.describe("api_providers.json: every concrete provider is usable and cove
 	for _, id in ipairs(catalogue.provider_order) do
 		local desc = catalogue.providers[id]
 		if CHAT_FORMATS[desc.format] and id ~= "openai_compat" then
+			-- A per-account address is a template the add-entry form fills; its model is the user's
+			local fields, malformed = UrlTemplate.fields(desc.base_url)
+			local per_account = #fields > 0
 			helpers.it(id .. ": an https base_url, a default model and a dialect its format carries", function()
 				helpers.assert_true(desc.base_url:match("^https://[^%s]*[^/%s]$") ~= nil,
 					id .. ": https, no trailing slash: " .. desc.base_url)
-				helpers.assert_true(type(desc.default_model) == "string" and desc.default_model ~= "", id .. ": default model")
+				helpers.assert_nil(malformed, id .. ": template")
+				if per_account then
+					helpers.assert_eq(desc.default_model, "", id .. ": the model of a per-account provider is the user's")
+				else
+					helpers.assert_true(type(desc.default_model) == "string" and desc.default_model ~= "", id .. ": default model")
+				end
 				local dialect, problem = ThinkingOff.parse_dialect(desc.thinking_dialect)
 				helpers.assert_true(dialect ~= nil, id .. ": " .. tostring(problem))
 				if desc.format == "openai" then
@@ -98,10 +107,10 @@ helpers.describe("api_providers.json: every concrete provider is usable and cove
 				end
 			end)
 
-			helpers.it(id .. ": its default model has a thinking-off vector", function()
+			helpers.it(id .. ": its default model, or any model of a per-account provider, has a thinking-off vector", function()
 				local found = false
 				for _, vector in ipairs(thinking.resolve_vectors) do
-					if vector.provider == id and vector.model == desc.default_model then found = true end
+					if vector.provider == id and (per_account or vector.model == desc.default_model) then found = true end
 				end
 				helpers.assert_true(found, id .. ": no resolve vector for " .. desc.default_model)
 			end)
@@ -117,7 +126,8 @@ helpers.describe("api_providers.json: every concrete provider is usable and cove
 				for _, vector in ipairs(recorded) do
 					helpers.assert_eq(vector.format, desc.format, vector.name .. ": format")
 					helpers.assert_true(type(vector.source) == "string" and vector.source ~= "", vector.name .. ": source")
-					helpers.assert_true(holds(vector.expect, desc.default_model), vector.name .. ": lists " .. desc.default_model)
+					helpers.assert_true(per_account or holds(vector.expect, desc.default_model),
+						vector.name .. ": lists " .. desc.default_model)
 				end
 			end)
 		end
