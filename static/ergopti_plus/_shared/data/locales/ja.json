@@ -3715,7 +3715,7 @@
 	"platform_reason.layer_spotlight_is_macos": "macOS のみ：この操作は macOS の検索機能である Spotlight を開きます。Windows や Linux では、代わりにお使いのデスクトップ独自の検索ショートカットをキーの組み合わせとして割り当ててください。",
 	"platform_reason.layer_pointer_source_is_not_linux": "Linux では利用できません：Linux のフックはマウスを占有せずに監視するため、レイヤーの割り当てが置き換えるはずのボタン入力を取り消せません。マウスを占有するとデスクトップからポインターが奪われます。",
 	"platform_reason.debug_surface_is_each_drivers_own": "各ドライバーは自身の実行環境で診断します。AutoHotkey は Window Spy、変数一覧、キー履歴を備え、Hammerspoon は Lua コンソールを備えます。他の実行環境には開くべき同等物がありません。",
-	"platform_reason.proxy_override_not_yet_on_windows": "Windows ではまだ使えません: Windows ではダウンロードは Windows のプロキシ設定に従います。",
+	"platform_reason.proxy_override_follows_windows_settings": "Windows では、ダウンロードは Windows の設定（ネットワークとインターネット > プロキシ）のプロキシに従います。そこで手動プロキシを入力できます。",
 	"platform_reason.chord_families_are_each_platforms": "ドライバーが割り当てる組み合わせの系統は、そのプラットフォームのものです。Windows は AltGr と CapsLock の組み合わせをまとめ、個人用ショートカットのファイルを持ちます。macOS は Ctrl と Cmd のショートカットをまとめます。各ドライバーは自分が割り当てる系統だけを並べます。",
 	"platform_reason.metrics_extras_are_not_on_linux": "Linux では非対応：このドライバーにはアプリケーションごとの除外一覧がありません。",
 	"platform_reason.wpm_readout_needs_a_menubar": "Windows では非対応：これらの項目はメニューバー（macOS）または通知領域（Linux）の WPM 表示を設定します。Windows には相当するものがなく、フローティングウィジェットが WPM 表示です。",

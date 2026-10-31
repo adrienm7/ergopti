@@ -3715,7 +3715,7 @@
 	"platform_reason.layer_spotlight_is_macos": "Только macOS: это действие открывает Spotlight — поиск macOS. В Windows или Linux назначьте вместо этого собственное сочетание клавиш поиска вашего рабочего стола.",
 	"platform_reason.layer_pointer_source_is_not_linux": "Не в Linux: хук Linux наблюдает за мышью, не захватывая её, и потому не может отменить нажатие кнопки, которое заменила бы привязка слоя. Захват мыши лишил бы рабочий стол указателя.",
 	"platform_reason.debug_surface_is_each_drivers_own": "Каждый драйвер отлаживается через собственную среду выполнения: AutoHotkey даёт Window Spy, список переменных и историю клавиш, а Hammerspoon — консоль Lua. У остальных сред нет ничего равнозначного, что можно было бы открыть.",
-	"platform_reason.proxy_override_not_yet_on_windows": "Пока не в Windows: там загрузки следуют настройкам прокси Windows.",
+	"platform_reason.proxy_override_follows_windows_settings": "В Windows загрузки используют прокси из параметров Windows (Сеть и Интернет > Прокси), где можно указать прокси вручную.",
 	"platform_reason.chord_families_are_each_platforms": "Семейства сочетаний, которые драйвер назначает, принадлежат его платформе: Windows группирует комбинации с AltGr и CapsLock и ведёт файл личных сочетаний, macOS группирует сочетания с Ctrl и Cmd. Каждый драйвер перечисляет только то семейство, которое назначает.",
 	"platform_reason.metrics_extras_are_not_on_linux": "Недоступно в Linux: у этого драйвера нет списка исключённых приложений.",
 	"platform_reason.wpm_readout_needs_a_menubar": "Не в Windows: эти строки управляют показом слов в минуту в строке меню (macOS) или в области уведомлений (Linux). В Windows аналога нет; её указатель — плавающий виджет.",

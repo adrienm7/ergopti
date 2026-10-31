@@ -1056,14 +1056,14 @@ i18n = "menu.debug.field_check_network"
 # company PAC included), direct, or one relay every managed download uses. Its
 # key and default are _shared/modules/network/proxy_override.json; the shared
 # proxy policy applies it before an exported relay and the PAC lookup. Windows
-# downloads still follow the WinINet settings until its half of the item lands
-# (docs/tooling/windows-pc-agent-handoff.md).
+# downloads follow the WinINet settings; the AutoHotkey half is in
+# docs/tooling/windows-pc-agent-handoff.md.
 [[menu.debug_menu]]
 type = "command"
 id = "proxy_override"
 i18n = "menu.debug.proxy_override"
 platforms = ["hs", "linux"]
-reason_key = "platform_reason.proxy_override_not_yet_on_windows"
+reason_key = "platform_reason.proxy_override_follows_windows_settings"
 
 # The composed-layout check installs the shipped check composition through the
 # composer's save path, verifies it and removes it again; every driver routes it.

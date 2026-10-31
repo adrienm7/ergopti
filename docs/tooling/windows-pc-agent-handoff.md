@@ -232,7 +232,7 @@ default), `direct`, or one relay URL such as `http://proxy.example.com:3128`
 right after loopback and before an exported relay and the PAC/WPAD lookup
 (`proxy_policy.lua` `policy.route`, third argument). The menu row is in
 `menu.toml` with `platforms = ["hs", "linux"]` and
-`platform_reason.proxy_override_not_yet_on_windows`; the only Windows file the
+`platform_reason.proxy_override_follows_windows_settings`; the only Windows file the
 change touched is the generated `windows/_generated/config_keys.ahk`
 (`MenuCommand.PROXY_OVERRIDE`). Still to do under AutoHotkey:
 

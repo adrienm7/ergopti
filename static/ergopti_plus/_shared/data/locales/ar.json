@@ -3715,7 +3715,7 @@
 	"platform_reason.layer_spotlight_is_macos": "macOS فقط: يفتح هذا الإجراء Spotlight، أداة البحث في macOS. على Windows أو Linux، اربط بدلاً من ذلك اختصار البحث الخاص بسطح المكتب لديك كتركيبة مفاتيح.",
 	"platform_reason.layer_pointer_source_is_not_linux": "ليس في Linux: يراقب خطاف Linux الفأرة دون الاستيلاء عليها، فلا يستطيع إلغاء ضغطة الزر التي يستبدلها ربط الطبقة. الاستيلاء على الفأرة سيسحب المؤشر من سطح المكتب.",
 	"platform_reason.debug_surface_is_each_drivers_own": "يصحّح كل مشغّل أخطاءه عبر بيئة تشغيله: يوفّر AutoHotkey أداة Window Spy وقائمة بالمتغيّرات وسجلًّا للمفاتيح، ويوفّر Hammerspoon وحدة تحكّم Lua. أما البيئات الأخرى فليس لديها ما يعادلها لفتحه.",
-	"platform_reason.proxy_override_not_yet_on_windows": "ليس على Windows بعد: هناك تتبع التنزيلات إعدادات الوكيل في Windows.",
+	"platform_reason.proxy_override_follows_windows_settings": "على Windows، تتبع التنزيلات الوكيل المحدد في إعدادات Windows (الشبكة والإنترنت > الوكيل)، حيث يمكن إدخال وكيل يدويًا.",
 	"platform_reason.chord_families_are_each_platforms": "تنتمي عائلات الاختصارات التي يربطها كل مشغّل إلى منصّته: يجمع Windows تركيبات AltGr وCapsLock ويحتفظ بملف اختصارات شخصية، ويجمع macOS اختصارات Ctrl وCmd. ولا يعرض أي مشغّل سوى العائلة التي يربطها.",
 	"platform_reason.metrics_extras_are_not_on_linux": "غير متاح على Linux: لا يوفّر هذا المشغّل قائمة استبعاد حسب التطبيق.",
 	"platform_reason.wpm_readout_needs_a_menubar": "ليس على Windows: تضبط هذه الأسطر عرض الكلمات في الدقيقة في شريط القوائم (macOS) أو في منطقة الإشعارات (Linux). لا يملك Windows ما يعادلهما، فمؤشّره هو الأداة العائمة.",

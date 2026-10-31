@@ -30,6 +30,7 @@ function buildCommand(fakeBinary, logFile) {
 	const sharedRoot = SHARED_LUA_ROOT.replace(/\\/g, '/');
 	const source = [
 		`package.path = ${JSON.stringify(`${moduleRoot}/?.lua;${moduleRoot}/?/init.lua;${sharedRoot}/?.lua;${sharedRoot}/?/init.lua;`)} .. package.path`,
+		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
 		// Hammerspoon always provides hs.fs.attributes, and FileSystem.exists
 		// refuses to classify a path without a metadata probe. Plain Lua has no
 		// stat, so this host stand-in reports the regular files the builder

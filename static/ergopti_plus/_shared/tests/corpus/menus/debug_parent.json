@@ -15,6 +15,7 @@
 			"Test Karabiner lease",
 			"Test owned Karabiner runtime (dormant check)",
 			"Test network (PAC, proxy, download)",
+			"Proxy for downloads…",
 			"Test the composed layout",
 			"Test key accounting (30 s)",
 			"Test third-party tools (Shortcuts, Homebrew, timer)",
@@ -31,6 +32,7 @@
 			"System diagnostics",
 			"Show a window for every error",
 			"Test network (PAC, proxy, download)",
+			"Proxy for downloads…",
 			"Test the composed layout",
 			"Report a bug",
 			"Suggest a feature"
@@ -52,6 +54,7 @@
 			"Tester le bail Karabiner",
 			"Tester le runtime Karabiner propre (contrôle dormant)",
 			"Tester le réseau (PAC, proxy, téléchargement)",
+			"Proxy des téléchargements…",
 			"Tester la disposition composée",
 			"Tester le comptage des touches (30 s)",
 			"Tester les outils tiers (Raccourcis, Homebrew, minuterie)",
@@ -68,6 +71,7 @@
 			"Diagnostic système",
 			"Afficher une fenêtre à chaque erreur",
 			"Tester le réseau (PAC, proxy, téléchargement)",
+			"Proxy des téléchargements…",
 			"Tester la disposition composée",
 			"Signaler un bug",
 			"Proposer une fonctionnalité"

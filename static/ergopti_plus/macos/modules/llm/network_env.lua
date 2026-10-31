@@ -114,16 +114,13 @@ end
 
 -- The shared proxy override declaration, relative to the driver root.
 local OVERRIDE_RELATIVE = "/../_shared/modules/network/proxy_override.json"
-local _override_setting = nil
 
---- The shared proxy override declaration, read once.
+--- Reads and validates the shared proxy override declaration.
 --- @return table|nil setting
 --- @return string|nil err Why the declaration cannot be used.
-function M.proxy_override_setting()
-	if _override_setting then return _override_setting, nil end
+local function load_override_setting()
 	local root = driver_root()
 	if not root then return nil, "the bundled proxy override owner is missing" end
-	-- Read directly: this runs inside prelude builders whose callers double the file system.
 	local file = io.open(root .. OVERRIDE_RELATIVE, "rb")
 	local bytes = file and file:read("*a")
 	if file then file:close() end
@@ -132,8 +129,18 @@ function M.proxy_override_setting()
 	if not decoded then return nil, "the shared proxy override declaration is unreadable" end
 	local setting, reason = ProxyOverride.new(data)
 	if not setting then return nil, "the shared proxy override declaration is invalid (" .. tostring(reason) .. ")" end
-	_override_setting = setting
 	return setting, nil
+end
+
+-- Read once, when the module loads, like the policy path: the file ships beside
+-- it in the bundle, and prelude builders run under callers that double io.open.
+local _override_setting, _override_error = load_override_setting()
+
+--- The shared proxy override declaration.
+--- @return table|nil setting
+--- @return string|nil err Why the declaration cannot be used.
+function M.proxy_override_setting()
+	return _override_setting, _override_error
 end
 
 --- The stored override in its canonical form: "" (automatic), "direct" or a relay.
