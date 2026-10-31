@@ -4020,7 +4020,9 @@ function permissionProblems(files) {
 		`${COMMON_BOX}:common-verdict`,
 		`${ENTRY}:macos`,
 		`${MACOS_BOX}:e2e-hs`,
-		`${MACOS_BOX}:package-macos`
+		`${MACOS_BOX}:package-macos`,
+		// The release preflight reads the run's own jobs for the timing summary.
+		`${RELEASE_BOX}:publication-plan`
 	]);
 	for (const entry of files) {
 		const lines = entry.text.split('\n');
@@ -4042,13 +4044,15 @@ function permissionProblems(files) {
 		}
 		for (const candidate of pipeline.jobsOfText(entry.text, entry.rel)) {
 			const value = pipeline.field(candidate.body, 'permissions');
+			// The Release caller grants its preflight's actions: read too.
 			const expected =
-				(entry.rel === RELEASE_BOX && candidate.id === 'release') ||
-				(entry.rel === ENTRY && candidate.id === PUBLICATION)
-					? 'contents: write'
-					: evidenceReaders.has(`${entry.rel}:${candidate.id}`)
-						? 'contents: read actions: read'
-						: null;
+				entry.rel === ENTRY && candidate.id === PUBLICATION
+					? 'contents: write actions: read'
+					: entry.rel === RELEASE_BOX && candidate.id === 'release'
+						? 'contents: write'
+						: evidenceReaders.has(`${entry.rel}:${candidate.id}`)
+							? 'contents: read actions: read'
+							: null;
 			if (value !== expected) {
 				problems.push(
 					`${entry.rel} job ${candidate.id} must ${expected ? `grant exactly ${expected}` : 'not widen the permissions'}, got: ${value}`
@@ -4190,7 +4194,8 @@ assert.deepEqual(
 for (const [rel, id] of [
 	[ENTRY, 'core'],
 	[COMMON_BOX, 'common-e2e'],
-	[COMMON_BOX, 'common-verdict']
+	[COMMON_BOX, 'common-verdict'],
+	[RELEASE_BOX, 'publication-plan']
 ]) {
 	const matches = pipeline.jobsOfText(pipeline.file(rel), rel).filter((job) => job.id === id);
 	assert.equal(matches.length, 1, id + ' has one actual permission owner');
