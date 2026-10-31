@@ -378,7 +378,11 @@ class FieldRunSession {
 
 	Refuse(Id, Reason) {
 		LoggerWarn(FIELD_RUN_TAG, "Field run request {1} refused: {2}.", Id == "" ? "without an identifier" : Id, Reason)
-		this.Publish(this.Path("refused"), Map("schema", this.Spec["schema"], "request_id", Id, "reason", Reason))
+		; A request without a valid identifier is refused without one, as on macOS and Linux
+		Refusal := Map("schema", this.Spec["schema"], "reason", Reason)
+		if Id != ""
+			Refusal["request_id"] := Id
+		this.Publish(this.Path("refused"), Refusal)
 	}
 
 	Begin(Request, Dir) {

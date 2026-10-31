@@ -69,6 +69,13 @@ check('the shared declaration is well formed', () => {
 			'result'
 		].sort()
 	);
+	for (const [name, keys] of Object.entries(protocol.optional_keys)) {
+		assert(name in protocol.documents, `optional keys of an undeclared document ${name}`);
+		for (const key of keys)
+			assert(!protocol.documents[name].includes(key), `${name}.${key} is both`);
+	}
+	// The guard a driver runs after the last step is a kind, never a declared step.
+	assert(protocol.step_kinds.includes('guard'));
 	for (const [name, keys] of Object.entries(protocol.documents)) {
 		assert(keys.includes('schema'), `${name} carries the schema`);
 		assert.equal(new Set(keys).size, keys.length, `${name} lists a key twice`);
@@ -113,6 +120,7 @@ check('every driver steps file declares steps the protocol accepts', () => {
 				protocol.step_kinds.includes(step.kind),
 				`${label} has an undeclared kind ${step.kind}`
 			);
+			assert.notEqual(step.kind, 'guard', `${label}: the guard is not a declared step`);
 			assert(
 				Number.isInteger(step.deadline_seconds) && step.deadline_seconds > 0,
 				`${label} deadline`
