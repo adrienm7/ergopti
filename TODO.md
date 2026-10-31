@@ -1411,8 +1411,9 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       Field run (branch `fix/macos-overnight-d`): (1) is `field_slow_lines` (the segment the day's
       `Slow <segment>` lines charge most, the slow ingest ticks and preferences saves with their worst
       duration); (3) is `field_local_servers` (each server's answer and port source); the PAC route of (7)
-      shows in `field_network`'s route steps, but a PAC that fails on purpose needs a PAC the maintainer
-      breaks. (2), (4), (5), (6) are code.
+      shows in `field_network`'s route steps, and `field_pac_fallback` judges the fallback lines of the
+      field run's own downloads (`no_pac_failure` when the PAC worked: forcing the failure still needs
+      a PAC the maintainer breaks). (2), (4), (5), (6) are code.
 - [ ] **macOS input follow-ups (swallowed keys).** [CODE] Done: late keys pass through (ed2d9fe65c),
       AXValue read once per burst (34765cde7c), no error window for a lease failure that recovered
       within 60 s (fcf4af85dc), `key_*` counters in the diagnostics (6f2daed2e5). Lease token reuse
