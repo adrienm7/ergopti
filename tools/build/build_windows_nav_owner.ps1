@@ -17,6 +17,9 @@ FEATURES & RATIONALE:
 	a deterministic manifest fingerprint.
 4. Release-safe output: an explicit -UpdateTracked is required to replace the
 	tracked DLL and regenerate its manifest.
+5. Pinned publisher toolset: only -UpdateTracked requires the exact MSVC toolset
+	and Windows SDK that reproduce the tracked bytes. A check run compiles and
+	tests with whatever the host has, since hosted images move on by themselves.
 ==============================================================================
 #>
 
@@ -112,6 +115,29 @@ function Import-MsvcEnvironment {
 # ======= 2/ Process Execution =======
 # ====================================
 # ====================================
+
+<#
+.SYNOPSIS
+Refuses to publish the tracked DLL from a toolset other than the pinned one.
+#>
+function Assert-PinnedPublisherToolset {
+	param(
+		[Parameter(Mandatory = $true)]
+		[string]$MsvcToolset,
+
+		[Parameter(Mandatory = $true)]
+		[string]$WindowsSdk
+	)
+
+	$actualToolset = [string]$env:VCToolsVersion
+	$actualSdk = ([string]$env:WindowsSDKVersion).TrimEnd("\")
+	if ($actualToolset -cne $MsvcToolset -or $actualSdk -cne $WindowsSdk) {
+		throw (
+			"-UpdateTracked needs MSVC $MsvcToolset and Windows SDK $WindowsSdk, found " +
+			"MSVC '$actualToolset' and SDK '$actualSdk'. See docs/tooling/windows-native-dll.md.")
+	}
+	Write-Host "[native] Publisher toolset verified: MSVC $actualToolset, Windows SDK $actualSdk."
+}
 
 <#
 .SYNOPSIS
@@ -504,7 +530,13 @@ function Write-TrackedManifest {
 		[string]$RecipeExecutable,
 
 		[Parameter(Mandatory = $true)]
-		[string[]]$RecipeArguments
+		[string[]]$RecipeArguments,
+
+		[Parameter(Mandatory = $true)]
+		[string]$MsvcToolset,
+
+		[Parameter(Mandatory = $true)]
+		[string]$WindowsSdk
 	)
 
 	$manifest = [ordered]@{
@@ -516,6 +548,8 @@ function Write-TrackedManifest {
 		build_recipe = [ordered]@{
 			executable = $RecipeExecutable
 			arguments = @($RecipeArguments)
+			msvc_toolset = $MsvcToolset
+			windows_sdk = $WindowsSdk
 		}
 	}
 	# Compact JSON avoids the version-specific indentation emitted by Windows
@@ -556,7 +590,13 @@ function Assert-TrackedManifest {
 		[string]$ExpectedRecipeExecutable,
 
 		[Parameter(Mandatory = $true)]
-		[string[]]$ExpectedRecipeArguments
+		[string[]]$ExpectedRecipeArguments,
+
+		[Parameter(Mandatory = $true)]
+		[string]$ExpectedMsvcToolset,
+
+		[Parameter(Mandatory = $true)]
+		[string]$ExpectedWindowsSdk
 	)
 
 	if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
@@ -606,8 +646,14 @@ function Assert-TrackedManifest {
 	Assert-StringArrayContract -Label "Manifest fingerprint file" -Actual @($manifest.fingerprint_files) -Expected $ExpectedFingerprintFiles
 
 	$recipeProperties = @($manifest.build_recipe.PSObject.Properties.Name)
-	if ($recipeProperties -notcontains "executable" -or $recipeProperties -notcontains "arguments") {
-		throw "The tracked provenance manifest contains an incomplete build recipe."
+	foreach ($recipeProperty in @("executable", "arguments", "msvc_toolset", "windows_sdk")) {
+		if ($recipeProperties -notcontains $recipeProperty) {
+			throw "The tracked provenance manifest contains an incomplete build recipe."
+		}
+	}
+	if ([string]$manifest.build_recipe.msvc_toolset -cne $ExpectedMsvcToolset -or
+		[string]$manifest.build_recipe.windows_sdk -cne $ExpectedWindowsSdk) {
+		throw "The tracked provenance manifest names another toolset than the pinned one."
 	}
 	if ([string]$manifest.build_recipe.executable -cne $ExpectedRecipeExecutable) {
 		throw "The tracked provenance manifest names the wrong recipe executable."
@@ -664,6 +710,9 @@ $manifestPath = Join-Path $vendorDir "ergopti_nav_owner.manifest.json"
 $manifestSchemaVersion = 1
 $vendorDllRelativePath = "static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll"
 $buildScriptRelativePath = "tools/build/build_windows_nav_owner.ps1"
+# The one toolset that publishes the tracked DLL; see docs/tooling/windows-native-dll.md.
+$pinnedMsvcToolset = "14.29.30133"
+$pinnedWindowsSdk = "10.0.19041.0"
 
 foreach ($requiredSource in @($sourcePath, $editorSourcePath, $traceSourcePath, $traceTestSourcePath, $replaySourcePath, $replayTestSourcePath, $outputSourcePath, $outputTestSourcePath, $headerPath, $definitionPath, $testSourcePath, $captureTestSourcePath, $cmakePath)) {
 	if (-not (Test-Path -LiteralPath $requiredSource -PathType Leaf)) {
@@ -738,6 +787,9 @@ $sourceFingerprintBeforeBuild = Get-SourceRecipeFingerprint `
 	-RecipeArguments $dllRecipeArguments
 
 Import-MsvcEnvironment
+if ($UpdateTracked) {
+	Assert-PinnedPublisherToolset -MsvcToolset $pinnedMsvcToolset -WindowsSdk $pinnedWindowsSdk
+}
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 New-Item -ItemType Directory -Force -Path $vendorDir | Out-Null
 
@@ -857,7 +909,9 @@ if ($UpdateTracked) {
 		-DllHash $publishedHash `
 		-FingerprintFiles $fingerprintFiles `
 		-RecipeExecutable "cl.exe" `
-		-RecipeArguments $dllRecipeArguments
+		-RecipeArguments $dllRecipeArguments `
+		-MsvcToolset $pinnedMsvcToolset `
+		-WindowsSdk $pinnedWindowsSdk
 }
 Assert-TrackedManifest `
 	-Path $manifestPath `
@@ -867,7 +921,9 @@ Assert-TrackedManifest `
 	-ExpectedSourceFingerprint $sourceFingerprint `
 	-ExpectedFingerprintFiles $fingerprintFiles `
 	-ExpectedRecipeExecutable "cl.exe" `
-	-ExpectedRecipeArguments $dllRecipeArguments
+	-ExpectedRecipeArguments $dllRecipeArguments `
+	-ExpectedMsvcToolset $pinnedMsvcToolset `
+	-ExpectedWindowsSdk $pinnedWindowsSdk
 $sourceFingerprintAfterValidation = Get-SourceRecipeFingerprint `
 	-RepoRoot $repoRoot `
 	-FingerprintFiles $fingerprintFiles `

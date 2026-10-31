@@ -26,6 +26,11 @@
 
 
 
+; ERGOPTI_NAV_KEY_HIDDEN of native/nav_event_owner/nav_event_owner.h.
+global KS_NATIVE_KEY_HIDDEN := 0x02
+; The key's scan code on every layout, including those that map it to Kana.
+global KS_SC_RIGHT_ALT := 0x138
+
 ; ===========================================
 ; ===========================================
 ; ======= 1/ Adapter Functions ==============
@@ -54,6 +59,61 @@ KS_IsUp(KeyName) {
 	} catch {
 		return 1
 	}
+}
+
+; The native press ledger, bound once the owner's DLL has started; 0 before. It
+; answers what AutoHotkey cannot see: a press the owner captured or consumed, or
+; replayed with its marker, never reaches the physical state (see the "Native
+; press ledger" section of docs/design/windows-input-hooks.md).
+; @param Bind {Func} Optional: replaces the query, taking a scan code and giving
+;        an object with flags and sequence.
+; @return {Func|Integer} The query, or 0 while no owner has started.
+KS_NativeKeyPressPort(Bind := unset) {
+	static Query := 0
+	if IsSet(Bind)
+		Query := Bind
+	return Query
+}
+
+; What the ledger holds for one key, or 0 with no owner or no scan code.
+_KS_NativeKeyPress(KeyName) {
+	Query := KS_NativeKeyPressPort()
+	if !Query
+		return 0
+	; A layout that maps right Alt to Kana gives VK_RMENU no scan code, and the
+	; standard AltGr check names that key: the ledger holds it by its own code.
+	global KS_SC_RIGHT_ALT
+	Sc := KeyName = "RAlt" ? KS_SC_RIGHT_ALT : GetKeySC(KeyName)
+	return (Sc > 0 && Sc <= 0x1FF) ? Query.Call(Sc) : 0
+}
+
+; Returns 1 when the key is held for the user: physically down for AutoHotkey,
+; or held in the native ledger through a press it never saw. A consumer that
+; must treat a replayed edge as physical reads this one, not KS_IsDown.
+; @param KeyName {String} Platform key identifier (e.g. "SC138", "RAlt").
+; @return {Integer} 1 if the key is held, 0 otherwise.
+KS_IsHeld(KeyName) {
+	global KS_NATIVE_KEY_HIDDEN
+	if KS_IsDown(KeyName)
+		return 1
+	Press := _KS_NativeKeyPress(KeyName)
+	return (Press && (Press.flags & KS_NATIVE_KEY_HIDDEN)) ? 1 : 0
+}
+
+; KS_IsHeld for either Shift: one scan code cannot name both.
+; @return {Integer} 1 if a Shift is held, 0 otherwise.
+KS_ShiftIsHeld() {
+	return (KS_IsHeld("SC02A") || KS_IsHeld("SC036")) ? 1 : 0
+}
+
+; The press number of a key held now: higher means pressed later. 0 when the
+; ledger never saw this press, so an order read from it is known only when every
+; key compared has a number.
+; @param KeyName {String} Platform key identifier.
+; @return {Integer} The press number, or 0.
+KS_PressSequence(KeyName) {
+	Press := _KS_NativeKeyPress(KeyName)
+	return Press ? Press.sequence : 0
 }
 
 ; Captures native CapsLock intent once before callbacks can write the LED.
