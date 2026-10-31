@@ -157,7 +157,13 @@
 			"TestRedirectPolicyStopsAfterTenHops",
 			"TestWrapCheckedKeepsOriginalCheckedDialerWithoutCapability",
 			"TestServeEnvironmentDisablesOllamaCloud",
-			"TestServeEnvironmentRefusesInvalidDeclarations"
+			"TestServeEnvironmentRefusesInvalidDeclarations",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_proxy_budget",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_proxy_candidates",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_pac_download",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_pac_evaluation",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_proxy_routes",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_wpad_discovery"
 		]
 	}
 }

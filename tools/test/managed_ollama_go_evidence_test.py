@@ -88,7 +88,19 @@ SERVE_ENVIRONMENT_IDENTITIES = [
     "TestServeEnvironmentDisablesOllamaCloud",
     "TestServeEnvironmentRefusesInvalidDeclarations",
 ]
-ADDED_IDENTITIES = ADDRESS_POLICY_IDENTITIES + SERVE_ENVIRONMENT_IDENTITIES
+# Literal identities of the PAC and WPAD lookup stages the shared inventory
+# gained after the frozen e941 source (issue #101 follow-up 5).
+LOOKUP_STAGE_IDENTITIES = [
+    "TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_proxy_budget",
+    "TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_proxy_candidates",
+    "TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_pac_download",
+    "TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_pac_evaluation",
+    "TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_proxy_routes",
+    "TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_wpad_discovery",
+]
+ADDED_IDENTITIES = (
+    ADDRESS_POLICY_IDENTITIES + SERVE_ENVIRONMENT_IDENTITIES + LOOKUP_STAGE_IDENTITIES
+)
 FROZEN = ROOT / "tools/test/fixtures/managed-ollama-go/linux-44.jsonl"
 PACKAGE = "ergopti/nativehttp"
 
@@ -152,7 +164,7 @@ class NativeGoEvidenceTests(unittest.TestCase):
             self.fail("The frozen original failure-stage subtests must be explicitly enrolled")
         self.assertEqual(POLICY["required_passes"], subjects)
         self.assertEqual(
-            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (82, 47, 35)
+            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (88, 47, 41)
         )
         self.assertEqual((fact["failed"], fact["skipped"], fact["package_completed"]), (0, 0, True))
         for name in added + ADDED_IDENTITIES:
