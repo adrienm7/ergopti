@@ -158,6 +158,10 @@ PRIVATE_USE_FIRST = 0xF0000
 
 NO_SYMBOL = "NoSymbol"
 
+# macOS codes of the numeric keypad. XKB keeps its own keypad symbols, so a
+# layout's keypad keys are not placed and not reported (see Conversion.unplaced).
+KEYPAD_CODES = range(65, 93)
+
 
 class KeylayoutError(ValueError):
     """The .keylayout is malformed or uses a construct the converter rejects."""
@@ -168,10 +172,19 @@ class KeylayoutError(ValueError):
 # ---------------------------------------------------------------------------
 
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+# XML lets an attribute value sit in double or single quotes; both are read.
 _TAG_RE = re.compile(
-    r"<(/?)([A-Za-z][A-Za-z0-9]*)((?:\s+[A-Za-z_:][\w:.-]*\s*=\s*\"[^\"]*\")*)\s*(/?)>"
+    r"<(/?)([A-Za-z][A-Za-z0-9]*)"
+    r"((?:\s+[A-Za-z_:][\w:.-]*\s*=\s*(?:\"[^\"]*\"|'[^']*'))*)\s*(/?)>"
 )
-_ATTR_RE = re.compile(r"([A-Za-z_:][\w:.-]*)\s*=\s*\"([^\"]*)\"")
+_ATTR_RE = re.compile(r"([A-Za-z_:][\w:.-]*)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')")
+# The elements a conversion reads. A tag of one of them that the grammar above
+# cannot read is refused: skipping it silently dropped keys or whole keyMaps.
+_KNOWN_ELEMENTS = (
+    "keyboard|layouts|layout|modifierMap|keyMapSelect|modifier|keyMapSet|keyMap|key|"
+    "actions|action|when|terminators"
+)
+_KNOWN_TAG_START_RE = re.compile(r"<(/?)(?:%s)(?=[\s/>])" % _KNOWN_ELEMENTS)
 _ENTITY_RE = re.compile(r"&(#x[0-9A-Fa-f]+|#[0-9]+|lt|gt|amp|quot|apos);")
 _NAMED_ENTITIES = {"lt": "<", "gt": ">", "amp": "&", "quot": '"', "apos": "'"}
 
@@ -391,9 +404,20 @@ def parse_keylayout(text: str) -> Keylayout:
     current_action: Optional[Action] = None
     in_terminators = False
 
+    read_starts = set()
+    for match in _TAG_RE.finditer(body):
+        read_starts.add(match.start())
+    for start in _KNOWN_TAG_START_RE.finditer(body):
+        if start.start() not in read_starts:
+            line = body.count("\n", 0, start.start()) + 1
+            raise KeylayoutError("malformed tag on line %d of the comment-free text" % line)
+
     for match in _TAG_RE.finditer(body):
         closing, tag, raw_attrs, self_closing = match.groups()
-        attrs = {name: decode_entities(value) for name, value in _ATTR_RE.findall(raw_attrs)}
+        attrs = {
+            name: decode_entities(double if double or not single else single)
+            for name, double, single in _ATTR_RE.findall(raw_attrs)
+        }
         if closing:
             if tag == "modifierMap":
                 current_modifier_map = None
@@ -582,6 +606,12 @@ class Conversion:
         # works on keysyms, so two keys typing the same keysym cannot be told
         # apart; the first output wins and the conflict is reported here.
         self.conflicts: List[Tuple[str, str, str]] = []
+        # macOS codes of keys the layout defines (an output that types
+        # something, or an action) that the shared keycode table names no XKB
+        # key for, keypad excepted: what they type is not on the Linux layout.
+        # A JIS or ABNT key is the usual case. Reported, so a registry layout
+        # that has one fails its conversion test instead of losing keys.
+        self.unplaced: List[int] = []
 
 
 class _Converter:
@@ -896,11 +926,26 @@ def convert_layout(
     ):
         converter.dead_trigger(state)
     result = converter.result
+    result.unplaced = unplaced_codes(layout, keycodes)
     result.symbols_text = converter.symbols(template, layout_id, display_name)
     result.compose_text = converter.compose()
     result.borrowed = dict(converter.borrowed)
     result.dead_triggers = dict(converter.dead_triggers)
     return result
+
+
+def unplaced_codes(layout: Keylayout, keycodes: Sequence[Tuple[str, int]]) -> List[int]:
+    """Codes of defined keys the keycode table places nowhere (keypad excepted)."""
+    placed = {code for _xkb, code in keycodes}
+    found = set()
+    for maps in layout.key_map_sets.values():
+        for entries in maps.values():
+            for code, (kind, value) in entries.items():
+                if code in placed or code in KEYPAD_CODES:
+                    continue
+                if kind == "action" or is_printable(value):
+                    found.add(code)
+    return sorted(found)
 
 
 def write_package(result: Conversion, out_dir: Path, layout_id: str) -> List[Path]:

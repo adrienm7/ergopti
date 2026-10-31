@@ -191,9 +191,15 @@ var LayoutComposer = (function () {
 	const FNV_OFFSET = 0x811c9dc5;
 	const FNV_PRIME = 0x01000193;
 
+	// XML lets an attribute value sit in double or single quotes; both are read.
 	const TAG_PATTERN =
-		/<(\/?)([A-Za-z][A-Za-z0-9]*)((?:\s+[A-Za-z_:][\w:.-]*\s*=\s*"[^"]*")*)\s*(\/?)>/g;
-	const ATTRIBUTE_PATTERN = /([A-Za-z_:][\w:.-]*)\s*=\s*"([^"]*)"/g;
+		/<(\/?)([A-Za-z][A-Za-z0-9]*)((?:\s+[A-Za-z_:][\w:.-]*\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>/g;
+	const ATTRIBUTE_PATTERN = /([A-Za-z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+	// A tag of an element the readers walk that TAG_PATTERN cannot read is
+	// refused: skipping it silently dropped keys or whole keyMaps. Twin of
+	// _KNOWN_ELEMENTS in keylayout_to_xkb.py and KNOWN_ELEMENTS in keylayout.lua.
+	const KNOWN_TAG_START_PATTERN =
+		/<\/?(?:keyboard|layouts|layout|modifierMap|keyMapSelect|modifier|keyMapSet|keyMap|key|actions|action|when|terminators)(?=[\s/>])/g;
 	const ENTITY_PATTERN = /&(#x[0-9A-Fa-f]+|#[0-9]+|lt|gt|amp|quot|apos);/g;
 	const NAMED_ENTITIES = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" };
 	const CONTROL_PATTERN = /[\u0000-\u001F\u007F-\u009F]/;
@@ -234,7 +240,8 @@ var LayoutComposer = (function () {
 		const out = {};
 		ATTRIBUTE_PATTERN.lastIndex = 0;
 		let match;
-		while ((match = ATTRIBUTE_PATTERN.exec(raw)) !== null) out[match[1]] = decodeEntities(match[2]);
+		while ((match = ATTRIBUTE_PATTERN.exec(raw)) !== null)
+			out[match[1]] = decodeEntities(match[2] !== undefined ? match[2] : match[3]);
 		return out;
 	}
 
@@ -280,8 +287,18 @@ var LayoutComposer = (function () {
 		let currentKeyMap = null;
 		let currentAction = null;
 		let inTerminators = false;
+		const readStarts = new Set();
 		TAG_PATTERN.lastIndex = 0;
 		let match;
+		while ((match = TAG_PATTERN.exec(body)) !== null) readStarts.add(match.index);
+		KNOWN_TAG_START_PATTERN.lastIndex = 0;
+		while ((match = KNOWN_TAG_START_PATTERN.exec(body)) !== null) {
+			if (!readStarts.has(match.index)) {
+				const line = body.slice(0, match.index).split('\n').length;
+				throw new ComposerError('keylayout_malformed_tag', `line ${line}`);
+			}
+		}
+		TAG_PATTERN.lastIndex = 0;
 		while ((match = TAG_PATTERN.exec(body)) !== null) {
 			const tag = match[2];
 			if (match[1] === '/') {
