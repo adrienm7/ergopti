@@ -217,7 +217,7 @@ class DaemonReportBuildControls(unittest.TestCase):
                 "Clock",
                 "Reference",
             )
-        )
+        ) + (product.SWIFT + "LauncherTimings.generated.swift",)
         self.assertEqual(product.REPORT_SWIFT_SOURCES, expected)
         selected = product.product_source_paths(daemon_report=True)
         self.assertEqual(len(selected), len(set(selected)))
