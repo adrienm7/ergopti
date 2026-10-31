@@ -1,0 +1,182 @@
+{
+	"_comment": "Token exchange of the providers whose requests carry a short-lived access token (api_providers.json auth): the blocks a catalogue may declare, the form each stored key gives, the answers read, and when a cached token is refreshed. _shared/lua/llm/api_token_exchange.lua replays this corpus in the macOS and Linux unit suites.",
+	"min_expires_seconds": 60,
+	"max_expires_seconds": 86400,
+	"ibm": {
+		"kind": "token_exchange",
+		"token_url": "https://iam.cloud.ibm.com/identity/token",
+		"body": { "grant_type": "urn:ibm:params:oauth:grant-type:apikey", "apikey": "{key}" },
+		"token_field": "access_token",
+		"expires_field": "expires_in",
+		"default_expires_seconds": 3600,
+		"refresh_margin_seconds": 300
+	},
+	"google": {
+		"kind": "token_exchange",
+		"token_url": "https://oauth2.googleapis.com/token",
+		"body": {
+			"grant_type": "refresh_token",
+			"client_id": "{key.client_id}",
+			"client_secret": "{key.client_secret}",
+			"refresh_token": "{key.refresh_token}"
+		},
+		"token_field": "access_token",
+		"expires_field": "expires_in",
+		"default_expires_seconds": 3600,
+		"refresh_margin_seconds": 300
+	},
+	"parse": [
+		{ "name": "the IBM block", "block": "ibm", "valid": true },
+		{ "name": "the Google block", "block": "google", "valid": true },
+		{ "name": "another kind", "block": "ibm", "set": { "kind": "oauth" }, "valid": false },
+		{
+			"name": "an http token address",
+			"block": "ibm",
+			"set": { "token_url": "http://iam.cloud.ibm.com/identity/token" },
+			"valid": false
+		},
+		{
+			"name": "a body that never reads the key",
+			"block": "ibm",
+			"set": { "body": { "grant_type": "x" } },
+			"valid": false
+		},
+		{
+			"name": "an unknown placeholder",
+			"block": "ibm",
+			"set": { "body": { "apikey": "{secret}" } },
+			"valid": false
+		},
+		{
+			"name": "a bad field name",
+			"block": "ibm",
+			"set": { "body": { "api-key": "{key}" } },
+			"valid": false
+		},
+		{
+			"name": "a lifetime below the minimum",
+			"block": "ibm",
+			"set": { "default_expires_seconds": 30 },
+			"valid": false
+		},
+		{
+			"name": "a margin of half the default lifetime",
+			"block": "ibm",
+			"set": { "refresh_margin_seconds": 1800 },
+			"valid": false
+		},
+		{
+			"name": "a fractional lifetime",
+			"block": "ibm",
+			"set": { "default_expires_seconds": 3600.5 },
+			"valid": false
+		}
+	],
+	"requests": [
+		{
+			"name": "the IBM API key goes in apikey, encoded",
+			"block": "ibm",
+			"key": "abc+def/ghi=&x",
+			"body": "apikey=abc%2Bdef%2Fghi%3D%26x&grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey"
+		},
+		{
+			"name": "the Google credentials file gives its three fields",
+			"block": "google",
+			"key": "{\"type\": \"authorized_user\", \"client_id\": \"123.apps.googleusercontent.com\", \"client_secret\": \"s3cr3t\", \"refresh_token\": \"1//0g-x_y\"}",
+			"body": "client_id=123.apps.googleusercontent.com&client_secret=s3cr3t&grant_type=refresh_token&refresh_token=1%2F%2F0g-x_y"
+		},
+		{
+			"name": "a credentials file without its refresh token",
+			"block": "google",
+			"key": "{\"client_id\": \"123\", \"client_secret\": \"s\"}",
+			"reason": "the key holds no refresh_token field"
+		},
+		{
+			"name": "a plain key where the credentials file is expected",
+			"block": "google",
+			"key": "not-json",
+			"reason": "the key holds no client_id field"
+		},
+		{ "name": "an empty key", "block": "ibm", "key": "", "reason": "the key is empty" }
+	],
+	"answers": [
+		{
+			"name": "a token and its lifetime",
+			"block": "ibm",
+			"status": 200,
+			"json": { "access_token": "eyJ.token", "expires_in": 3600, "token_type": "Bearer" },
+			"now": 1000,
+			"token": "eyJ.token",
+			"expires_at": 4600
+		},
+		{
+			"name": "no lifetime takes the default",
+			"block": "google",
+			"status": 200,
+			"json": { "access_token": "ya29.token" },
+			"now": 1000,
+			"token": "ya29.token",
+			"expires_at": 4600
+		},
+		{
+			"name": "a lifetime below the minimum is raised to it",
+			"block": "ibm",
+			"status": 200,
+			"json": { "access_token": "t", "expires_in": 5 },
+			"now": 1000,
+			"token": "t",
+			"expires_at": 1060
+		},
+		{
+			"name": "an HTTP refusal",
+			"block": "ibm",
+			"status": 400,
+			"json": { "errorMessage": "Provided API key could not be found" },
+			"now": 1000,
+			"reason": "the token exchange answered HTTP 400"
+		},
+		{
+			"name": "no token",
+			"block": "ibm",
+			"status": 200,
+			"json": { "expires_in": 3600 },
+			"now": 1000,
+			"reason": "the token exchange answered no access_token"
+		},
+		{
+			"name": "a token holding a space",
+			"block": "ibm",
+			"status": 200,
+			"json": { "access_token": "a b" },
+			"now": 1000,
+			"reason": "the token exchange answered no access_token"
+		}
+	],
+	"states": [
+		{
+			"name": "fresh",
+			"block": "ibm",
+			"expires_at": 4600,
+			"now": 1000,
+			"usable": true,
+			"refresh": false
+		},
+		{
+			"name": "within the margin",
+			"block": "ibm",
+			"expires_at": 4600,
+			"now": 4300,
+			"usable": true,
+			"refresh": true
+		},
+		{
+			"name": "expired",
+			"block": "ibm",
+			"expires_at": 4600,
+			"now": 4600,
+			"usable": false,
+			"refresh": true
+		},
+		{ "name": "never fetched", "block": "ibm", "now": 1000, "usable": false, "refresh": true }
+	]
+}
