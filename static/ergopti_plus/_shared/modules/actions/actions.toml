@@ -533,9 +533,10 @@ emit_ahk_mods = ["super"]
 [sg_actions.minimize_all]
 # Windows minimizes with Win+M (Win+D is show_desktop, which toggles back);
 # macOS minimizes every window of every visible app through System Events.
-# Linux is not implemented, not impossible: EWMH has no "minimize all" request,
-# so it needs a per-window pass (xdotool on X11; nothing on Wayland).
-platform = "ahk,hs"
+# EWMH has no "minimize all" request, so Linux minimizes each window wmctrl
+# lists with xdotool, which only an X11 session lets another process do.
+platform = "all"
+requires_linux = ["session:x11", "tool:wmctrl", "tool:xdotool"]
 emit_ahk_key = "m"
 emit_ahk_mods = ["super"]
 
@@ -858,9 +859,11 @@ requires_linux = ["tool:gio"]
 confirm = true
 
 [sg_actions.eject_all_disks]
-# Linux is not implemented, not impossible: udisksctl can unmount and power off
-# each removable drive, but telling them apart needs a parsed lsblk listing.
-platform = "hs,ahk"
+# Linux unmounts each partition of every removable or hot-plugged disk lsblk
+# lists and powers the drive off through udisksctl, never a disk the running
+# system is mounted from.
+platform = "all"
+requires_linux = ["tool:lsblk", "tool:udisksctl"]
 
 [sg_actions.clear_notifications]
 # Best effort: the notification daemons that expose a command (dunst, mako,
@@ -1035,18 +1038,17 @@ parameter = "url"
 
 [sg_actions.pick_color]
 # macOS reads the pixel through screencapture (parent-scoped pixel owner).
-# Linux: Wayland forbids reading the screen outside a portal that asks the user
-# to pick, which is a different interaction; an X11-only reader (the pointer
-# position, then a 1x1 capture) is possible but not implemented.
-platform = "ahk,hs"
+# Linux runs the first installed picker of its session: hyprpicker under a
+# wlroots Wayland compositor, xcolor or gpick under X11 (GNOME and KDE under
+# Wayland give no other process the screen without a portal question).
+platform = "all"
 
 [sg_actions.open_emoji_picker]
 # Windows opens its panel with Win+., macOS its Character Viewer (Ctrl+Cmd+Space,
-# run by the shortcut layer's mouse owner). Linux is not implemented, not
-# impossible: its desktops share no emoji chooser (GNOME's opens inside GTK text
-# fields, KDE ships the plasma-emojier application), so it needs a per-desktop
-# cascade.
-platform = "hs,ahk"
+# run by the shortcut layer's mouse owner). Linux desktops share no chooser, so
+# Linux runs the installed ones in turn: plasma-emojier (KDE), IBus's emoji
+# panel (GNOME), Smile.
+platform = "all"
 emit_ahk = "#."
 
 [sg_actions.take_note]
