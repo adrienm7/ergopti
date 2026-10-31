@@ -97,7 +97,7 @@ meta tests pin names, not behaviour. Run, in order:
    `LLM request: kind=local|remote provider=… family=… outcome=ok in N ms.`,
    and `Over budget: llm.… took …` only past `[budgets]`.
 3. Start `tools/dev/run-windows-dev.ps1`; the log shows `Developer field run
-   ready (3 step(s)).` and `build/field-run/ready.json` names the driver's pid.
+ready (3 step(s)).` and `build/field-run/ready.json` names the driver's pid.
 4. Run `collect-windows-field-report.ps1` (Windows PowerShell 5.1, then
    `pwsh`): `field_run/` holds `accepted.json`, `01_field_boot_cost.json`,
    `02_field_network.json`, `03_field_composer.json` and `done.json`;
