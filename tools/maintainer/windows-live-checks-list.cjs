@@ -537,6 +537,28 @@ const CHECKS = [
 		}
 	},
 	{
+		id: 'reload-over-a-log-flush',
+		title: 'A reload whose close request lands on a log flush keeps its successor and completes',
+		async run(context) {
+			const { session, pid: first } = await bootEnglish(context, 'flush');
+			await session.run('hold_log_flush');
+			await session.run('click', [RELOAD_ROW], 180000, { followReload: true });
+			const settled = await session.quiesce(first);
+			const refused = session.logLines('Reload refused after launch');
+			const errors = session.loggedErrors();
+			if (refused.length > 0) return fail(refused[0]);
+			if (errors.length > 0) return fail(`the log holds an error: ${errors[0]}`);
+			if (!settled.reloaded) return fail('the driver did not reload');
+			if (session.logLines('Reload deferred while the log flush').length !== 1)
+				return fail('the close request did not land on the held flush');
+			const dialogs = await session.run('dialogs');
+			if (dialogs !== 'dialogs=') return fail(`a dialog is on screen: ${dialogs}`);
+			return pass(
+				`the reload was deferred once and completed; one driver: ${driverCount(session) === 1}`
+			);
+		}
+	},
+	{
 		id: 'win-s-open-target',
 		title:
 			'Win+S on a selection: a missing path and a bare file name are reported, a folder is opened',

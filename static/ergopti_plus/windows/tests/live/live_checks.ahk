@@ -114,6 +114,26 @@ LiveCmdPump(Args) {
 	return "pumped"
 }
 
+/**
+ * Makes the next close request land on a running log flush: the race otherwise
+ * depends on timing, and passes most runs. The owner is released only after OnExit
+ * refused, as a real flush under OnExit resumes only once OnExit returned.
+ */
+LiveCmdHoldLogFlush(Args) {
+	global _LOGGER_FLUSH_ACTIVE
+	_LOGGER_FLUSH_ACTIVE := true
+	SetTimer(_LiveReleaseLogFlush, 20)
+	return "held"
+}
+
+_LiveReleaseLogFlush() {
+	global _LOGGER_FLUSH_ACTIVE, _LifecycleShutdownVetoAttempts
+	if _LifecycleShutdownVetoAttempts == 0
+		return
+	SetTimer(_LiveReleaseLogFlush, 0)
+	_LOGGER_FLUSH_ACTIVE := false
+}
+
 
 
 
@@ -678,6 +698,7 @@ LiveRegister("add_delimiter", LiveCmdAddDelimiter)
 LiveRegister("keyboard_layouts", LiveCmdKeyboardLayouts)
 LiveRegister("edit_layout", LiveCmdEditLayout)
 LiveRegister("layout_row", LiveCmdLayoutRow)
+LiveRegister("hold_log_flush", LiveCmdHoldLogFlush)
 LiveRegister("info", LiveCmdInfo)
 LiveRegister("tree", LiveCmdTree)
 LiveRegister("rows", LiveCmdRows)

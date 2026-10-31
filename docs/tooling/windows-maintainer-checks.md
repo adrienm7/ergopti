@@ -64,6 +64,7 @@ real CapsLock state, which that driver's CapsLock tap-hold would see.
 | `reload-click-joins`                    | Menu-click replay; item 142                                | `test_menu_reload_replay.ahk`                        |
 | `reload-command`                        | Local reload command (idle, paused, during a reload)       | `test_driver_control.ahk`                            |
 | `menu-click-replay`                     | Menu-click replay                                          | `test_menu_reload_replay*.ahk`                       |
+| `reload-over-a-log-flush`               | Menu-click replay                                          | `test_reload_terminal_pending.ahk`                   |
 | `private-browsing-click-during-startup` | Private-browsing metrics filter                            | `test_menu_command_deferral.ahk`                     |
 | `private-browsing-click-during-write`   | Private-browsing metrics filter                            | same                                                 |
 | `tap-delay-row`                         | Tap delay row                                              | `test_tap_hold_duration_transaction.ahk`             |
