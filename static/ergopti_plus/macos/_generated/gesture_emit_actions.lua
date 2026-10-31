@@ -52,6 +52,7 @@ return {
 	{ id = "sel_up", key = "up", mods = { "shift" } },
 	{ id = "sel_word_next", key = "right", mods = { "shift", "alt" } },
 	{ id = "sel_word_prev", key = "left", mods = { "shift", "alt" } },
+	{ id = "space", key = "space", mods = {  } },
 	{ id = "spotlight", key = "space", mods = { "cmd" } },
 	{ id = "tab", key = "tab", mods = {  } },
 	{ id = "tab_close", key = "w", mods = { "cmd" } },
