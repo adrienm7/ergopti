@@ -75,6 +75,12 @@ only by static and JS tests. Once it lands on `dev`:
 
 ## Found tonight for the PC agent
 
+- False-green ratchet red on dev since 9aa90d28a5's batch:
+  `tools/test/find-false-greens.cjs` reports an unfloored source-scan loop in
+  `windows/tests/unit/infra/config/scope/test_hotstring_dynamic_menu_scope.ahk:26`
+  (the loop never asserts it matched anything). Assert the match count after
+  the loop, then rerun the ratchet.
+
 - AI menu label: four messages now quote each locale's `menu.llm.title`
   (« Intelligence Artificielle », “Artificial Intelligence”) instead of an
   « AI menu » no tray draws; the title itself is unchanged. No AHK test pins
