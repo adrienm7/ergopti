@@ -1015,13 +1015,16 @@ emit_linux = "Print"
 [sg_actions.screen_capture_instant]
 # The frontmost window, saved to the screenshots folder: GestureScreenshotInstant
 # on Windows, the shortcut layer's capture_frontmost_window on macOS (what the
-# key left of 1 ran before it became a tap key). Linux is not implemented, not
-# impossible: the focused window is readable on X11 and through each Wayland
-# compositor's own tool.
-platform = "ahk,hs"
+# key left of 1 ran before it became a tap key), and Linux's window capture
+# cascade (screenshot_window_save).
+platform = "all"
 
 [sg_actions.ocr_screenshot]
-platform = "ahk"
+# Windows presses PowerToys Text Extractor's Win+Shift+T; Linux captures a
+# region through its screenshot cascade and reads it with tesseract. Both
+# leave the text on the clipboard.
+platform = "ahk,linux"
+requires_linux = ["tool:tesseract"]
 emit_ahk = "#+t"
 
 [sg_actions.open_chatgpt]
