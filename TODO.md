@@ -748,8 +748,7 @@ Added October 22 (from the agents' reports; details in their commits):
       [PHYS-L] on a real desktop with the package installed: the unit is stopped, the tray appears, a saved `.lua`
       restarts the daemon, the tray's Reload restarts it, a second `run-linux-dev.sh` reports "already running"; (4)
       maintainer decision: should the layout catalogue fetch the remote registry in a developer run (today the clone's
-      registry, by design of `local_source`); (5) [CODE] `bin/ergopti-hotstrings` run from a clone still prefers
-      `/usr/lib/ergopti` when a package is installed; fix or retire that branch.
+      registry, by design of `local_source`).
 - [ ] **Keystats rename leftovers.** [CODE] The rename is done (180a53e4de, 1 283 files, 579 paths). Left:
       the comment in `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` (a compiled
       script: `osadecompile` it, edit the comment, `osacompile -o` it back, on a Mac); persisted names
