@@ -468,7 +468,7 @@
 		},
 		{
 			"id": "go-proxy-relay-gate",
-			"ordinal": 547,
+			"ordinal": 548,
 			"name": "Go proxy sign-in relay gate cannot pass vacuously (missing toolchain, no test files, skipped test)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-go-proxy-relay-gate.cjs"],

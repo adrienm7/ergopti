@@ -604,7 +604,7 @@
 		},
 		{
 			"id": "js-owned-runtimes-doc",
-			"ordinal": 547,
+			"ordinal": 549,
 			"name": "Owned runtimes document tables are generated from _shared/data/owned_runtimes.json and in sync",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-owned-runtimes-doc.cjs"],
