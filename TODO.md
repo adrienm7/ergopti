@@ -641,8 +641,10 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       `ergopti_network_routes.ps1` `New-ErgoptiPacDirectFallback` (d20d328751); an explicit inherited relay wins and a
       relay the PAC names that then fails is not retried direct. Left: on a network whose PAC is unreachable, an
       Ollama pull and the MLX install (Mac) log the WARNING with the stage, then the direct success line; the same pull
-      on the PC and on Linux; maintainer decision for Linux: following a PAC list such as `PROXY a; DIRECT` needs a
-      reachability probe of `a` before the daemon starts (today only its first entry is kept).
+      on the PC and on Linux. Linux walks a PAC list such as `PROXY a; DIRECT` before the daemon starts: a relay
+      followed by another entry is kept only when a 1 s TCP connect to it completes (timings
+      `llm.managed_proxy_probe_timeout_ms`). The maintainer's decision named Linux only: the macOS
+      (`resolve_system_route_for_probe`) and Windows daemon starts still export the first entry.
 - [ ] **Linux X11 window list.** [CI] `getAll()` covered by the Openbox receipts (962a25a973), passing on Xvfb and
       Openbox in a container. Left: the first hosted run; Flatpak: wmctrl is only a documented host program.
 

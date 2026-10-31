@@ -105,6 +105,11 @@ dependency_bootstrap_timeout_ms = 1800000
 # LX: modules/llm/runtime_factory.lua managed proxy lookup.
 managed_proxy_lookup_timeout_ms = 30000
 
+# Longest TCP connect to a relay a PAC names before another entry ("PROXY a;
+# DIRECT"): an unreachable relay sends the managed Ollama server to the next
+# entry, as a browser does. LX: modules/llm/managed_ollama_proxy.lua.
+managed_proxy_probe_timeout_ms = 1000
+
 # HTTP polling interval when the remote driver polls a streaming response.
 # AHK: api_remote.ahk LLM_REMOTE_POLL_MS / api_ollama.ahk LLM_OLLAMA_POLL_MS.
 poll_interval_ms = 50

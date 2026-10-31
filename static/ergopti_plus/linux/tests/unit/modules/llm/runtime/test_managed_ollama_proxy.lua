@@ -40,6 +40,19 @@ local function world(options)
 	w.port = Proxy.new({
 		policy = w.policy or policy(), environment = function() return w.rows end, timeout_ms = 3000, owner = "test-owner",
 		origins = w.origins or ORIGINS,
+		probe_timeout_ms = 1000, relay_address = require("adapters.tcp_probe").relay_address,
+		probe = function(host, port, timeout_ms, callback)
+			w.probes = w.probes or {}
+			w.probes[#w.probes + 1] = { host = host, port = port, timeout_ms = timeout_ms }
+			local probe_child = { settled = false }
+			function probe_child.is_settled() return probe_child.settled end
+			function probe_child.on_settled(listener) probe_child.listener = listener; return true end
+			function probe_child.cancel() return true end
+			local answer = w.reachable and w.reachable[host .. ":" .. port]
+			probe_child.settled = true
+			callback(answer == true, answer == true and nil or "timeout")
+			return probe_child
+		end,
 		lookup = function(url, lookup_options, callback)
 			w.lookups = w.lookups + 1
 			w.urls[#w.urls + 1] = url
@@ -80,8 +93,9 @@ it("a PAC-only network yields the PAC proxy as HTTPS_PROXY", function()
 	assert(#w.lookup_options.environment_exclusions > 0, "the lookup must ignore the proxy variables")
 end)
 
-it("only the first selection is used and a socks proxy is kept as named", function()
-	local w = world({ receipt = { ok = true, proxies = { "socks5://gate.corp.example:1080", "http://other:1" } } })
+it("a reachable first selection wins over the later ones and a socks proxy is kept as named", function()
+	local w = world({ receipt = { ok = true, proxies = { "socks5://gate.corp.example:1080", "http://other:1" } },
+		reachable = { ["gate.corp.example:1080"] = true } })
 	eq(w:run().environment[1], "HTTPS_PROXY=socks5://gate.corp.example:1080")
 end)
 
@@ -394,4 +408,35 @@ it("an automatic override keeps the PAC lookup, and an invalid one refuses the s
 	end)
 	restore()
 	assert(ok, failure)
+end)
+
+it("a PAC list whose first relay is unreachable falls through to DIRECT, probed once with the shared deadline", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://down.corp.example:3128", "direct://" } } })
+	local result = w:run()
+	eq(result.ok, true)
+	eq(#result.environment, 0)
+	eq(#w.probes, #ORIGINS)
+	eq(w.probes[1].host, "down.corp.example")
+	eq(w.probes[1].port, 3128)
+	eq(w.probes[1].timeout_ms, 1000)
+end)
+
+it("a reachable first relay is kept, and a relay with nothing after it is never probed", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://up.corp.example:3128", "direct://" } },
+		reachable = { ["up.corp.example:3128"] = true } })
+	eq(w:run().environment[1], "HTTPS_PROXY=http://up.corp.example:3128")
+	local single = world({ receipt = { ok = true, proxies = { "http://only.corp.example:3128" } } })
+	eq(single:run().environment[1], "HTTPS_PROXY=http://only.corp.example:3128")
+	eq(single.probes, nil)
+end)
+
+it("an unreachable relay moves to the next relay, not straight to DIRECT", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://down.corp.example:3128",
+		"http://up.corp.example:8080", "direct://" } }, reachable = { ["up.corp.example:8080"] = true } })
+	eq(w:run().environment[1], "HTTPS_PROXY=http://up.corp.example:8080")
+end)
+
+it("the shared probe deadline is the timings registry's one second", function()
+	local Timings = require("infra.timings")
+	eq(Timings.ms("llm", "managed_proxy_probe_timeout_ms"), 1000)
 end)
