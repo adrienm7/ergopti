@@ -671,6 +671,37 @@ jobs:
             ${{ env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT }}/
           if-no-files-found: error
 
+      # The real relay, launcher and SSPI through the fake corporate network; the
+      # stub daemon is built with the repository's one Go pin. --required makes a
+      # case that could not run a failure here, never a silent skip.
+      - name: Read the pinned Go toolchain
+        if: matrix.lot == 'Native cohorts and contracts'
+        id: go-pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const v=require('./static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').go_version; if(!/^go\d+\.\d+\.\d+$/.test(v)) throw new Error('invalid Go pin'); console.log('version='+v.slice(2))" >> "$GITHUB_OUTPUT"
+
+      - name: Install the pinned Go toolchain
+        if: matrix.lot == 'Native cohorts and contracts'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.go-pin.outputs.version }}
+          check-latest: false
+          cache: false
+
+      - name: Run the proxy relay end to end through the fake network
+        if: matrix.lot == 'Native cohorts and contracts'
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { throw "AutoHotkey64.exe not found." }
+          $env:ERGOPTI_AHK_EXE = $ahk
+          node tools/test/test-windows-proxy-relay-e2e.cjs --required
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # The receipt and evidence owners stay adjacent and run even on failure.
       - name: Run native desktop AHK cohorts
         if: matrix.lot == 'Native cohorts and contracts'
@@ -927,6 +958,25 @@ jobs:
       - name: Build and test native full-URL PAC evaluator
         shell: pwsh
         run: ./tools/build/build_windows_network_pac.ps1 -Publish
+
+      # The committed relay must be exactly what its sources build under the pin.
+      - name: Read the pinned Go toolchain
+        id: go-pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const v=require('./static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').go_version; if(!/^go\d+\.\d+\.\d+$/.test(v)) throw new Error('invalid Go pin'); console.log('version='+v.slice(2))" >> "$GITHUB_OUTPUT"
+
+      - name: Install the pinned Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.go-pin.outputs.version }}
+          check-latest: false
+          cache: false
+
+      - name: Prove the bundled proxy relay reproduces from its sources
+        shell: pwsh
+        run: ./tools/build/build_windows_proxy_relay.ps1 -Verify
 
       - name: Install Node dependencies
         run: npm ci

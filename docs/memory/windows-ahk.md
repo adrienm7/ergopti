@@ -1382,3 +1382,29 @@ letter means the key that types it under the Ergopti emulation
 because a Win slot on such a key joins the physical broker, which acquires its
 keys once. Moving the binding earlier silently returns every emulated letter to the
 host layout's key; keep the order pinned by `test_keyboard_slot_neutral_roles.ahk`.
+
+### project-job-accounting-counts-the-console-host
+
+A console process started with `CREATE_NO_WINDOW` still gets a `conhost.exe`, created
+as its child and inside its job, so `ActiveProcesses` of a ShellRunner tree-owned
+PowerShell starts at 2. A "sole member of my job" check must enumerate the job
+(class 3, not the accounting count) and exclude only its own host, by exact parent and
+System32 image. Model tests that stub the observation class cannot see this: only a
+real job can (`npm run test:windows-proxy-relay-e2e`).
+
+### project-delete-lease-excludes-a-second-lease
+
+A handle opened with DELETE access and without `FILE_SHARE_DELETE` (every managed
+lease: `OpenDirectory(path, true)`, `Open-OllamaReadFile path true`) makes a second
+open of the same file fail with a sharing violation, unless that open asks for no DELETE
+and shares DELETE. A worker beside the running launcher, such as the pull worker,
+therefore observes (`OpenObservedDirectory`, `OpenObservedFile`) and never leases.
+
+### project-netonly-gives-sspi-a-known-identity
+
+`CreateProcessWithLogonW` with `LOGON_NETCREDENTIALS_ONLY` starts a process whose local
+identity stays the user's and whose outbound SSPI identity is any domain, user and
+password given, unverified, with no administrator right. A fake server can then check a
+real NTLMv2 proof against a known password (`tools/test/lib/windows-job-host.ps1`). Its
+command line is limited to 1024 characters, and SSPI's Negotiate without a domain sends
+raw NTLM and refuses an answer wrapped in SPNEGO (`SEC_E_INVALID_TOKEN`).

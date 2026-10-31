@@ -819,6 +819,29 @@ const RULES = [
 			].includes(f)
 	},
 	{
+		gate: 'windows-proxy-relay-e2e',
+		why: 'only the real launcher, relay and SSPI through the fake network show a managed start and pull work on Windows',
+		match: (f) =>
+			f.startsWith('static/ergopti_plus/_shared/go/native_http/proxyrelay/') ||
+			f.startsWith('static/ergopti_plus/_shared/go/native_http/cmd/ergopti-proxy-relay/') ||
+			f.startsWith('tools/test/fixtures/ollama-stub/') ||
+			[
+				'static/ergopti_plus/_shared/modules/network/proxy_auth_relay.json',
+				'static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1',
+				'static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1',
+				'static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1',
+				'static/ergopti_plus/windows/modules/llm/ollama_runtime_owner.ahk',
+				'static/ergopti_plus/windows/tests/live/managed_relay_owner.ahk',
+				'static/ergopti_plus/windows/vendor/ergopti_route_plan.ps1',
+				'static/ergopti_plus/windows/vendor/ergopti-proxy-relay.exe',
+				'static/ergopti_plus/windows/vendor/ergopti-proxy-relay.json',
+				'tools/test/lib/fake-network.cjs',
+				'tools/test/lib/windows-job-host.ps1',
+				'tools/test/lib/windows-owned-runtime.cjs',
+				'tools/test/test-windows-proxy-relay-e2e.cjs'
+			].includes(f)
+	},
+	{
 		gate: 'linux-network-runtime',
 		why: 'managed networking requires actual LuaJIT luv, GIO modules, compiled schemas and installed helper paths',
 		match: (f) =>
@@ -983,6 +1006,7 @@ const GATE_COMMANDS = {
 	'linux-network-runtime': { npm: 'test:linux:network-runtime' },
 	'go-route-plan': { npm: 'test:go-route-plan' },
 	'go-proxy-relay': { npm: 'test:go-proxy-relay' },
+	'windows-proxy-relay-e2e': { npm: 'test:windows-proxy-relay-e2e', platform: 'win32' },
 	'linux-nix-native': { npm: 'test:linux:nix-native', platform: 'linux' },
 	'linux-updater-temp-native': { npm: 'test:linux:updater-temp-native', platform: 'linux' },
 	'linux-updater-archive-native': { npm: 'test:linux:updater-archive-native', platform: 'linux' },

@@ -481,6 +481,31 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-proxy-relay-shell.cjs"],
 			"repro": "node tools/test/test-macos-proxy-relay-shell.cjs"
+		},
+		{
+			"id": "fake-network-controls",
+			"ordinal": 553,
+			"name": "The fake corporate network refuses a wrong NTLM password and ends each proxy mode as it claims",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-fake-network.cjs"],
+			"repro": "node tools/test/test-fake-network.cjs"
+		},
+		{
+			"id": "windows-proxy-relay-bundle",
+			"ordinal": 554,
+			"name": "The bundled Windows proxy relay is the one its sources and manifest name",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-proxy-relay-bundle.cjs"],
+			"repro": "node tools/test/test-windows-proxy-relay-bundle.cjs"
+		},
+		{
+			"id": "windows-proxy-relay-e2e",
+			"ordinal": 555,
+			"name": "Windows proxy relay end to end: real relay, launcher and SSPI through the fake network",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-proxy-relay-e2e.cjs"],
+			"repro": "node tools/test/test-windows-proxy-relay-e2e.cjs",
+			"platforms": ["win32"]
 		}
 	]
 }
