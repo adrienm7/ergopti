@@ -89,6 +89,9 @@ M.OWNED = {
 	VIRTUAL_HID_LABEL = Identifiers.service_labels.macos_virtual_hid,
 	CONFIG_HOME = "~/Library/Application Support/ErgoptiPlus",
 	CONFIG_FILE = "~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json",
+	-- The downloaded, verified runtime artifact, one folder per pinned version
+	-- (platform/remap/runtime_artifact_fetch.lua). Never /Applications.
+	ARTIFACT_HOME = "~/Library/Application Support/ErgoptiPlus/RemapRuntime",
 }
 
 --- Rejects a runtime name that is not one of the two.
