@@ -703,8 +703,20 @@ the hook falls back to the Tab key's other owners when its criterion refuses
 native cycle routes on extended scan code zero
 (`LLM_NAV_EVENT_OWNER_PARKED_CYCLE_ROUTES`), so no hook order cycles twice or
 never (`test_llm_nav_cycle_windows.ahk`, `test-windows-llm-nav-cycle.cjs`).
-Action: when the DLL is next rebuilt, drop the cycle routes from its contract
-together with the parked table.
+Action: when the plan shape is next changed, drop the cycle routes from the DLL's
+contract together with the parked table.
+
+### project-native-press-ledger-is-the-held-state-ahk-cannot-see
+
+A press the native owner captured, consumed or replayed never moves AutoHotkey's
+physical state. `KS_IsHeld` adds exactly those presses (`key_press_ledger.h`,
+`ErgoptiNav_QueryKeyPress`), and `KS_PressSequence` gives the press order, 0 when
+the ledger did not see the press. Query right Alt by 0x138, never `GetKeySC("RAlt")`:
+a layout mapping it to Kana gives that VK no scan code. RawInput is no alternative:
+a key a low-level hook swallows raises no `WM_INPUT` (measured with injected input).
+Action: a consumer that must treat a replayed edge as physical reads `KS_IsHeld`;
+the DLL is published only through `-UpdateTracked` on the pinned toolset
+(`docs/tooling/windows-native-dll.md`).
 
 ### project-nav-owner-start-registers-before-its-epoch
 

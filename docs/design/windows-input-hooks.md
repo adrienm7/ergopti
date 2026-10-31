@@ -3,12 +3,11 @@
 # Windows input hooks: items 49 (hook order) and 50 (SendEvent against SendInput)
 
 Status on 2026-10-23. Two Debug menu rows measure these questions on the real
-machine. The native DLL (`ergopti_nav_owner.dll`) and its manifest are now
-regenerated through the official builder on a machine with Visual Studio Build
-Tools 2019 (MSVC 14.29.30133): the recipe pins no compiler version, only the
-exact flags and the source fingerprint, and that toolchain reproduces the DLL
-tracked before this change byte for byte, so a rebuild here is legitimate. See
-"Native hook-order reassertion" below.
+machine. The native DLL (`ergopti_nav_owner.dll`) and its manifest are
+regenerated through the official builder, pinned to Visual Studio Build Tools 2019
+(MSVC 14.29.30133, SDK 10.0.19041.0), which reproduces a tracked DLL byte for byte
+([windows-native-dll](../tooling/windows-native-dll.md)). See "Native hook-order
+reassertion" below.
 
 ## The two checks
 
@@ -239,18 +238,61 @@ Why the order no longer decides anything:
 - The owner reinstalls its hook after every burst (above), which only narrows the
   window in which AutoHotkey decides first; it no longer guards correctness.
 
-### What still needs a genuine MSVC DLL (item 91)
+### What needed a genuine MSVC DLL (item 91)
 
 None of this can be done from AutoHotkey, which cannot read `dwExtraInfo`:
 
-1. A native physical-state query, so that the AltGr prefix (`IsRealAltGrPress`),
-   the KLE Shift read and the tap-hold roll can treat a replayed edge as physical.
-2. The single-hook or RawInput source for simultaneous and first-key hold
-   arbitration, and with it AltGr hook provenance.
-3. Event-specific capture, source pin, authenticated event stream, non-hook
-   handler conversion and chained or repeat semantics, all built on 1.
-4. Removing the parked cycle routes, which only the DLL's `NavPlanIsValid`
-   requires.
+1. Done (2026-10-31): the native physical-state query, read by the AltGr prefix
+   (`IsRealAltGrPress`), the KLE Shift read and the tap-hold roll. See "Native press
+   ledger".
+2. Done for the source and for first-key order, with AltGr hook provenance exposed
+   but not consumed. Simultaneous input stays off on Windows.
+3. Open: event-specific capture, source pin, authenticated event stream, non-hook
+   handler conversion and chained or repeat semantics.
+4. Open: removing the parked cycle routes, which only the DLL's `NavPlanIsValid`
+   requires. It changes the twelve-entry plan shape across the adapter and its
+   tests, for no change of behaviour.
+
+### Native press ledger (2026-10-31)
+
+`native/nav_event_owner/key_press_ledger.h` keeps the keys down now, per scan code,
+and `ErgoptiNav_QueryKeyPress` reads one: real down, hidden from AutoHotkey, system
+alias down, and a press number. It stores no history and no text: a key is forgotten
+at its release.
+
+| Edge at the hook                         | Effect                                                     |
+| ---------------------------------------- | ---------------------------------------------------------- |
+| Hardware, passed on                      | Real down with a press number; released by its up          |
+| Hardware, consumed by navigation         | Also hidden; released by its up                            |
+| Hardware, captured for a terminal output | Also hidden; a captured up waits for its replay            |
+| Replay marker                            | Hidden down, and its up ends the hold                      |
+| Raw scan above the byte (0x21D, 0x22A)   | System alias only: never touches the real key of that code |
+| Any other injected edge                  | Ignored: AutoHotkey output and other programs press no key |
+
+A captured up retires by itself once no capture holds edges, so a replay that can no
+longer come strands nothing. A marker on lower-integrity input earns nothing.
+
+**Why one hook and no RawInput.** Measured on this PC: with a low-level hook swallowing
+an injected key, `WM_INPUT` did not arrive for it (2 swallowed, 0 `WM_INPUT`; 2 without
+the hook, with `hDevice` 0). So on that path RawInput is no source upstream of the hook
+chain: it would miss what the owner captures and what AutoHotkey swallows, while adding
+`RegisterRawInputDevices` to a bundle corporate engines already distrust. A hardware
+press was not measured; there is none to send from a harness.
+
+**Consumers, and why each is safe.** `KS_IsHeld` is `GetKeyState(.., "P")` or "hidden in
+the ledger". It differs from the physical read only for a press the owner took from
+AutoHotkey, so with no owner running, or no capture, nothing changes:
+
+- `IsRealAltGrPress`: standard AltGr asks about `RAlt`, Kana about `SC138`, and the
+  ledger holds both as 0x138, by code, since a Kana layout gives `VK_RMENU` no scan code.
+- `_KLE_OnAltGr` Shift and `_TapHoldRollScIsDown`.
+- `KeyCombinationHeldFirstKey`: the key pressed first among those held. If any held key
+  has no number (no owner running, or pressed while AutoHotkey's hook ran first and
+  swallowed it) the order is unknown and the catalogue decides, as before.
+
+The other rows of the terminal capture table are not switched, and neither is
+`TapHoldUserLCtrlHeld`, which could use the alias flag: a Ctrl+Alt+Del leaves a release
+no hook sees, and a stale real LCtrl would turn AltGr alone into the user's Ctrl.
 
 The physical terminal capture list above stays open: it says what a user sees
 during a capture, a separate question from the order.
@@ -267,11 +309,10 @@ Do not re-apply them.
 
 ## Left (needs more hardware or a design decision)
 
-- A native physical-state query (a new ABI) so that a consumer which must treat
-  a replayed edge as physical (AltGr prefix, KLE shift read, tap-hold roll) can
-  ask the only component that knows: AutoHotkey cannot read `dwExtraInfo`.
-  Event-specific capture, source pin, authenticated event stream, non-hook
-  handler conversion and chained/repeat semantics build on it.
+- Event-specific capture, source pin, authenticated event stream, non-hook handler
+  conversion and chained/repeat semantics, on the press ledger.
+- With a real keyboard: a fake LCtrl arriving as raw 0x21D (only the AutoHotkey source
+  says so here), a key held alone then joined, AltGr on both families during a capture.
 - Physical runs of the terminal capture list (below, item 4) on the
   maintainer's keyboard.
 - A second-process rival injector for a true OS-level interleave measurement.
