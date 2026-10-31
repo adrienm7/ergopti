@@ -71,8 +71,10 @@ const SKIPPED_DIRECTORIES = new Set([
 ]);
 const MIN_SOURCE_FILES = 1000;
 
+// The generated macos/_generated/registry_limits.lua serves the modules
+// loaded before infra.timings with the same call shape.
 const READER_CALL =
-	/\b(?:Timings\.(?:ms|sec|count)|TimingsGet(?:Sec)?)\(\s*"([A-Za-z_]\w*)"\s*,\s*"([A-Za-z_]\w*)"\s*\)/g;
+	/(?:\b(?:Timings\.(?:ms|sec|count)|TimingsGet(?:Sec)?)|"_generated\.registry_limits"\)\.count)\(\s*"([A-Za-z_]\w*)"\s*,\s*"([A-Za-z_]\w*)"\s*\)/g;
 
 /**
  * Every production source file of the drivers, as repository-relative paths.
@@ -252,6 +254,22 @@ function selfTest() {
 		analyse(
 			{ ui: { live_ms: 1 } },
 			[reader, { rel: 'w.ahk', text: 'X := TimingsGet("ui", "typo_ms")' }],
+			[],
+			[]
+		),
+		1
+	);
+	expectErrors(
+		'a generated-table reader of a missing key',
+		analyse(
+			{ ui: { live_ms: 1 } },
+			[
+				reader,
+				{
+					rel: 'e.lua',
+					text: 'require("_generated.registry_limits").count("limits", "typo_bytes")'
+				}
+			],
 			[],
 			[]
 		),
