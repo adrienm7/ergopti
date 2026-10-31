@@ -372,8 +372,8 @@ BUDGETS = (
     ),
     (
         "main_thread.hold",
-        "static/ergopti_plus/macos/infra/logger.lua",
-        r"(?m)^local SLOW_TIMER_CALLBACK_COUNT_MS = (\d+)",
+        "static/ergopti_plus/macos/infra/main_thread_hold.lua",
+        r"(?m)^\s*COUNT_MS = (\d+),",
         True,
     ),
     (
