@@ -950,6 +950,15 @@ local function access_slot(provider_id, key)
 	return _access[id]
 end
 
+--- Arms fn for the next timer tick: one slice of a signed assertion
+--- (api_token_exchange.drive).
+--- @param fn function
+--- @return boolean committed
+local function schedule_access_slice(fn)
+	local _, committed = TimerScheduler.after(0, fn)
+	return committed == true
+end
+
 --- Exchanges a cleartext key for an access token, once at a time;
 --- on_done(ok, reason) runs when the exchange settles.
 --- @param provider_id string
@@ -966,34 +975,42 @@ local function refresh_access(provider_id, key, on_done)
 		slot.waiters = {}
 		for _, waiter in ipairs(waiters) do invoke_token_callback(waiter, ok, reason) end
 	end
-	local request, reason = TokenExchange.request(provider.auth, key)
-	if not request then
-		slot.failure, slot.retry_at = reason, TimerScheduler.now() + ACCESS_RETRY_SECONDS
-		Logger.error(LOG, "Access token of provider '%s' cannot be asked: %s.", tostring(provider_id), reason)
-		return settle(false, reason)
-	end
 	slot.pending = true
-	Logger.start(LOG, "Exchanging the key of provider '%s' for an access token…", tostring(provider_id))
-	local dispatched = _access_client.post(request.url, request.headers, request.body, function(r)
-		r = type(r) == "table" and r or {}
-		local raw = type(r.body) == "string" and r.body ~= "" and r.body or r.error_body
-		local decoded_ok, decoded = pcall(JsonCodec.decode, type(raw) == "string" and raw or "")
-		local token, why = TokenExchange.read(provider.auth, r.status, decoded_ok and decoded or nil, TimerScheduler.now())
-		if token then
-			slot.token, slot.expires_at, slot.failure, slot.retry_at = token.token, token.expires_at, nil, nil
-			Logger.success(LOG, "Access token of provider '%s' received (valid %d s).", tostring(provider_id),
-				math.floor(token.expires_at - TimerScheduler.now()))
-			return settle(true, nil)
-		end
-		slot.failure, slot.retry_at = why, TimerScheduler.now() + ACCESS_RETRY_SECONDS
-		Logger.error(LOG, "Access token of provider '%s' refused: %s.", tostring(provider_id), why)
-		return settle(false, why)
-	end)
-	if not dispatched then
-		slot.failure, slot.retry_at = "the token exchange could not be sent", TimerScheduler.now() + ACCESS_RETRY_SECONDS
-		Logger.error(LOG, "Access token of provider '%s' cannot be asked: the request was not sent.", tostring(provider_id))
-		return settle(false, slot.failure)
-	end
+	-- A service-account key's assertion is signed one slice per timer tick
+	-- (api_token_exchange.drive): the pure-Lua signature takes a few hundred
+	-- milliseconds, which would otherwise hold the keyboard's event taps
+	TokenExchange.drive(TokenExchange.begin(provider.auth, key, os.time()), schedule_access_slice,
+		function(request, reason)
+			if not request then
+				slot.failure, slot.retry_at = reason, TimerScheduler.now() + ACCESS_RETRY_SECONDS
+				Logger.error(LOG, "Access token of provider '%s' cannot be asked: %s.", tostring(provider_id), reason)
+				return settle(false, reason)
+			end
+			Logger.start(LOG, "Exchanging the key of provider '%s' for an access token…", tostring(provider_id))
+			local dispatched = _access_client.post(request.url, request.headers, request.body, function(r)
+				r = type(r) == "table" and r or {}
+				local raw = type(r.body) == "string" and r.body ~= "" and r.body or r.error_body
+				local decoded_ok, decoded = pcall(JsonCodec.decode, type(raw) == "string" and raw or "")
+				local token, why = TokenExchange.read(provider.auth, r.status, decoded_ok and decoded or nil,
+					TimerScheduler.now())
+				if token then
+					slot.token, slot.expires_at, slot.failure, slot.retry_at = token.token, token.expires_at, nil, nil
+					Logger.success(LOG, "Access token of provider '%s' received (valid %d s).", tostring(provider_id),
+						math.floor(token.expires_at - TimerScheduler.now()))
+					return settle(true, nil)
+				end
+				slot.failure, slot.retry_at = why, TimerScheduler.now() + ACCESS_RETRY_SECONDS
+				Logger.error(LOG, "Access token of provider '%s' refused: %s.", tostring(provider_id), why)
+				return settle(false, why)
+			end)
+			if not dispatched then
+				slot.failure = "the token exchange could not be sent"
+				slot.retry_at = TimerScheduler.now() + ACCESS_RETRY_SECONDS
+				Logger.error(LOG, "Access token of provider '%s' cannot be asked: the request was not sent.",
+					tostring(provider_id))
+				return settle(false, slot.failure)
+			end
+		end)
 end
 
 --- The access token a provider's requests carry now for a cleartext key,

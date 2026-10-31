@@ -1,7 +1,8 @@
 {
-	"_comment": "Token exchange of the providers whose requests carry a short-lived access token (api_providers.json auth): the blocks a catalogue may declare, the form each stored key gives, the answers read, and when a cached token is refreshed. _shared/lua/llm/api_token_exchange.lua replays this corpus in the macOS and Linux unit suites.",
+	"_comment": "Token exchange of the providers whose requests carry a short-lived access token (api_providers.json auth): the blocks a catalogue may declare, the form each stored key gives (a service-account key's signed assertion uses the test keys of tests/corpus/crypto/rs256_vectors.json), the answers read, and when a cached token is refreshed. _shared/lua/llm/api_token_exchange.lua replays this corpus in the macOS and Linux unit suites.",
 	"min_expires_seconds": 60,
 	"max_expires_seconds": 86400,
+	"unix_now": 1700000000,
 	"ibm": {
 		"kind": "token_exchange",
 		"token_url": "https://iam.cloud.ibm.com/identity/token",
@@ -23,7 +24,19 @@
 		"token_field": "access_token",
 		"expires_field": "expires_in",
 		"default_expires_seconds": 3600,
-		"refresh_margin_seconds": 300
+		"refresh_margin_seconds": 300,
+		"assertion": {
+			"key_type": "service_account",
+			"body": {
+				"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+				"assertion": "{assertion}"
+			},
+			"issuer_field": "client_email",
+			"private_key_field": "private_key",
+			"key_id_field": "private_key_id",
+			"scope": "https://www.googleapis.com/auth/cloud-platform",
+			"lifetime_seconds": 3600
+		}
 	},
 	"parse": [
 		{ "name": "the IBM block", "block": "ibm", "valid": true },
@@ -70,6 +83,135 @@
 			"block": "ibm",
 			"set": { "default_expires_seconds": 3600.5 },
 			"valid": false
+		},
+		{
+			"name": "an assertion of another key type name",
+			"block": "google",
+			"set": {
+				"assertion": {
+					"key_type": "service-account",
+					"body": {
+						"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+						"assertion": "{assertion}"
+					},
+					"issuer_field": "client_email",
+					"private_key_field": "private_key",
+					"key_id_field": "private_key_id",
+					"scope": "https://www.googleapis.com/auth/cloud-platform",
+					"lifetime_seconds": 3600
+				}
+			},
+			"valid": false
+		},
+		{
+			"name": "an assertion body that never reads the assertion",
+			"block": "google",
+			"set": {
+				"assertion": {
+					"key_type": "service_account",
+					"body": {
+						"grant_type": "x"
+					},
+					"issuer_field": "client_email",
+					"private_key_field": "private_key",
+					"key_id_field": "private_key_id",
+					"scope": "https://www.googleapis.com/auth/cloud-platform",
+					"lifetime_seconds": 3600
+				}
+			},
+			"valid": false
+		},
+		{
+			"name": "an assertion body that sends the stored key",
+			"block": "google",
+			"set": {
+				"assertion": {
+					"key_type": "service_account",
+					"body": {
+						"assertion": "{key}"
+					},
+					"issuer_field": "client_email",
+					"private_key_field": "private_key",
+					"key_id_field": "private_key_id",
+					"scope": "https://www.googleapis.com/auth/cloud-platform",
+					"lifetime_seconds": 3600
+				}
+			},
+			"valid": false
+		},
+		{
+			"name": "an assertion valid over an hour",
+			"block": "google",
+			"set": {
+				"assertion": {
+					"key_type": "service_account",
+					"body": {
+						"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+						"assertion": "{assertion}"
+					},
+					"issuer_field": "client_email",
+					"private_key_field": "private_key",
+					"key_id_field": "private_key_id",
+					"scope": "https://www.googleapis.com/auth/cloud-platform",
+					"lifetime_seconds": 7200
+				}
+			},
+			"valid": false
+		},
+		{
+			"name": "an assertion scope that is no https address",
+			"block": "google",
+			"set": {
+				"assertion": {
+					"key_type": "service_account",
+					"body": {
+						"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+						"assertion": "{assertion}"
+					},
+					"issuer_field": "client_email",
+					"private_key_field": "private_key",
+					"key_id_field": "private_key_id",
+					"scope": "cloud-platform",
+					"lifetime_seconds": 3600
+				}
+			},
+			"valid": false
+		},
+		{
+			"name": "an assertion without an issuer field",
+			"block": "google",
+			"set": {
+				"assertion": {
+					"key_type": "service_account",
+					"body": {
+						"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+						"assertion": "{assertion}"
+					},
+					"private_key_field": "private_key",
+					"key_id_field": "private_key_id",
+					"scope": "https://www.googleapis.com/auth/cloud-platform",
+					"lifetime_seconds": 3600
+				}
+			},
+			"valid": false
+		},
+		{
+			"name": "an assertion without a key id field",
+			"block": "google",
+			"set": {
+				"assertion": {
+					"key_type": "service_account",
+					"body": {
+						"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+						"assertion": "{assertion}"
+					},
+					"issuer_field": "client_email",
+					"private_key_field": "private_key",
+					"scope": "https://www.googleapis.com/auth/cloud-platform",
+					"lifetime_seconds": 3600
+				}
+			},
+			"valid": true
 		}
 	],
 	"requests": [
@@ -97,7 +239,70 @@
 			"key": "not-json",
 			"reason": "the key holds no client_id field"
 		},
-		{ "name": "an empty key", "block": "ibm", "key": "", "reason": "the key is empty" }
+		{ "name": "an empty key", "block": "ibm", "key": "", "reason": "the key is empty" },
+		{
+			"name": "a service-account key is exchanged for its signed assertion",
+			"block": "google",
+			"service_account": {
+				"type": "service_account",
+				"client_email": "ergopti-test@example-project.iam.gserviceaccount.com",
+				"private_key_id": "0123abcd4567ef",
+				"private_key_of": "rsa2048_pkcs8"
+			},
+			"body": "assertion=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjAxMjNhYmNkNDU2N2VmIn0.eyJpc3MiOiJlcmdvcHRpLXRlc3RAZXhhbXBsZS1wcm9qZWN0LmlhbS5nc2VydmljZWFjY291bnQuY29tIiwic2NvcGUiOiJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9hdXRoL2Nsb3VkLXBsYXRmb3JtIiwiYXVkIjoiaHR0cHM6Ly9vYXV0aDIuZ29vZ2xlYXBpcy5jb20vdG9rZW4iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MTcwMDAwMzYwMH0.fCRCD_775g9zo6DnVOIW14Cao_6gqrP9UrVria5FL2IHIW4K4JR3veYt-6wHJysO7gBzE4ZeuZc60Z-uHJ6FdqqgdTcWA2uf8Tw4s5WO707Tt330SGnwsdNBVNSYkl1Q1WltQDBxqGSypM7Pz8Qzltm1ot1c6xxJiIWKO78iRcf8GS6ztVvYGhPCxw7vA8sAyDNsdLTtv5dHk5pnTvUFwsSblxQWlnzTgKgQIkqTVRXtQwe5M5UGzfNLqWIjv2jb_mjDTNydB2jFYGx-dCU5M5ntSdItCgb7GvbsEyBkoA_gvJ9C0g-ioxUZuEckKKUAlo-yr0RwFZgoln-IvMo1nA&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer"
+		},
+		{
+			"name": "a service-account key without a key id still signs",
+			"block": "google",
+			"service_account": {
+				"type": "service_account",
+				"client_email": "ergopti-test@example-project.iam.gserviceaccount.com",
+				"private_key_of": "rsa2048_pkcs8"
+			},
+			"body": "assertion=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJlcmdvcHRpLXRlc3RAZXhhbXBsZS1wcm9qZWN0LmlhbS5nc2VydmljZWFjY291bnQuY29tIiwic2NvcGUiOiJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9hdXRoL2Nsb3VkLXBsYXRmb3JtIiwiYXVkIjoiaHR0cHM6Ly9vYXV0aDIuZ29vZ2xlYXBpcy5jb20vdG9rZW4iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MTcwMDAwMzYwMH0.HMspkmIBP8m7W_qZJLnucWdIcyxwOKVhobrajEzrC5tQOBgSX7fijdmSchXJ7U6Wj0ZEaryDn0bjJKS-mVe_6BvWkfJeSgdtvn0vgnM8BJGxi2pBe3UVbvLR5tXloB-JSJ_RaiPU-We_PFzRZLw9Bsytgr_DNOeh9hlieLuTm9Sx_36HZgB_kuCWEL8DAQgjGhRil7Pkc6JDHJyZt7epA0AkRvwdgqfItCO38ZWHwMU3zb6wOFNj6D-psyjJb0phG9vfrSVEnZ2wPVL4IRHNpClDthJC69rm8mg9oJBnP_0BtqL42vt7vrhbYA9peAW5JPqVhwcQCPoEH8ijOgn2XA&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer"
+		},
+		{
+			"name": "a service-account key without its private key",
+			"block": "google",
+			"service_account": {
+				"type": "service_account",
+				"client_email": "ergopti-test@example-project.iam.gserviceaccount.com",
+				"private_key_id": "0123abcd4567ef"
+			},
+			"reason": "the key holds no private_key field"
+		},
+		{
+			"name": "a service-account key without its client email",
+			"block": "google",
+			"service_account": {
+				"type": "service_account",
+				"private_key_id": "0123abcd4567ef",
+				"private_key_of": "rsa2048_pkcs8"
+			},
+			"reason": "the key holds no client_email field"
+		},
+		{
+			"name": "a service-account key holding no PEM",
+			"block": "google",
+			"service_account": {
+				"type": "service_account",
+				"client_email": "ergopti-test@example-project.iam.gserviceaccount.com",
+				"private_key_id": "0123abcd4567ef",
+				"private_key": "MIIE"
+			},
+			"reason": "the private key is no PEM block"
+		},
+		{
+			"name": "a service-account key where the block takes none",
+			"block": "ibm",
+			"service_account": {
+				"type": "service_account",
+				"client_email": "ergopti-test@example-project.iam.gserviceaccount.com",
+				"private_key_id": "0123abcd4567ef",
+				"private_key_of": "rsa2048_pkcs8"
+			},
+			"body_prefix": "apikey=%7B"
+		}
 	],
 	"answers": [
 		{

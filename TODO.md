@@ -291,13 +291,14 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
 - [ ] **Every known cloud AI provider in `api_providers.json`, on the three OS.** Done: about forty providers
       (official documentation read 2026-10-30, each descriptor's `_source`), the per-account providers whose
       `base_url` is a template (b5d321a4a3, form on the three OS), IBM watsonx.ai and Google Vertex AI with a token
-      exchange on macOS and Linux (b56a4dc44d). Not added, with reasons in the commits: GitHub Models, Lambda, 01.AI,
-      Aleph Alpha, Liquid AI, Writer, Tencent Hunyuan, BytePlus ModelArk, Cloudflare AI Gateway. Left:
+      exchange on macOS and Linux (b56a4dc44d), Vertex AI service-account keys signed RS256 on macOS and Linux
+      (`feat/llm-vertex-jwt`; Windows signer in the PC hand-off). Not added, with reasons in the commits: GitHub
+      Models, Lambda, 01.AI, Aleph Alpha, Liquid AI, Writer, Tencent Hunyuan, BytePlus ModelArk, Cloudflare AI
+      Gateway. Left:
   - Run the AHK suite on the PC (`test_llm_api_url_template.ahk`, `test_llm_api_add_account_address.ahk`).
   - [CODE] Windows token exchange (AutoHotkey, the PC's): Windows refuses watsonx and Vertex AI with
     `menu.llm.api_provider_token_exchange_unavailable`; port the async form POST and token cache of
     `api_token_exchange.lua`.
-  - [CODE] A Vertex service-account key (signed JWT) is not taken: only `authorized_user` credentials are exchanged.
   - [CODE] (Windows, the PC's) the native `llm_vision` prompt of the screen actions still lists every backend on a
     line; macOS and Linux pick it in a list, then ask the optional model (noted in the PC hand-off).
   - Inferred, not read: Chutes and Featherless `chat_template_kwargs.enable_thinking` on Qwen, SambaNova

@@ -396,3 +396,43 @@ To do on the PC:
 5. Physical checks on a corporate network: a model pull behind an NTLM-only and
    a Negotiate proxy; Debug > Test network; quitting Ergopti during a pull leaves
    no relay and no daemon behind.
+
+## Vertex AI service-account keys and the vision token wait (31 October)
+
+Branch `feat/llm-vertex-jwt`. macOS and Linux now exchange a Google
+service-account key file (`"type": "service_account"`) for an access token:
+`api_token_exchange.lua` reads the optional `auth.assertion` block of the
+`vertex` row of `api_providers.json`, signs an RS256 JWT (`iss` client_email,
+`kid` private_key_id, `scope`, `aud` the catalogue's `token_url`, `exp` one hour
+after `iat`) with the key's `private_key`, and posts it as
+`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`. The key file's own
+`token_uri` is never followed. The signer is pure Lua
+(`_shared/lua/crypto/sha256.lua`, `crypto/rsa_pkcs1.lua`) and is sliced over
+timer ticks so the event loop is never held. No `.ahk` edit was made.
+
+To do on the PC, after the Windows token exchange itself (the TODO's
+"[CODE] Windows token exchange" line, still open):
+
+1. Sign natively with CNG through `DllCall` rather than porting the Lua
+   bignum: `CryptStringToBinaryW` (PEM body to DER), `CryptDecodeObjectEx` with
+   `PKCS_PRIVATE_KEY_INFO` then `PKCS_RSA_PRIVATE_KEY` (or `CNG_RSA_PRIVATE_KEY_BLOB`
+   on Windows 8+), `BCryptImportKeyPair` (`BCRYPT_RSAPRIVATE_BLOB`), SHA-256
+   with `BCryptHash`, then `BCryptSignHash` with `BCRYPT_PAD_PKCS1` and
+   `BCRYPT_SHA256_ALGORITHM`. Zero the DER and blob buffers after import; never
+   log the key or the assertion.
+2. Build the header and claims with the same fixed field order as
+   `assertion_input()` (`{"alg":"RS256","typ":"JWT","kid":...}`, then
+   `iss, scope, aud, iat, exp`), base64url without padding, so the corpus
+   bodies match byte for byte.
+3. Replay `_shared/tests/corpus/crypto/rs256_vectors.json` (SHA-256 digests,
+   signatures under PKCS#8 and PKCS#1 keys of 2048 and 3072 bits, and the
+   refused keys with their reasons) and the new `parse`/`requests` rows of
+   `_shared/tests/corpus/llm/api_token_exchange_vectors.json` (the
+   service-account rows build their key file from the test keys; the PEM
+   bodies are stored without armour, wrap them in their `label`).
+4. Until then Windows keeps refusing `vertex` and `watsonx` with
+   `menu.llm.api_provider_token_exchange_unavailable`, so the Linux change that
+   makes the first screen action wait for its access token
+   (`vision_request.prepare_target`) has no Windows twin to write yet; when the
+   exchange lands, the native `llm_vision` request must wait for the token the
+   same way instead of refusing while it is fetched.
