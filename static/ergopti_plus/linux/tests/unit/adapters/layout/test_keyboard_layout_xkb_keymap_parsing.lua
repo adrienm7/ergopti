@@ -521,8 +521,10 @@ helpers.describe("xkb_keymap: quoted symbol-list metadata", function()
 		{ name = "retains an earlier real explicit list", body = [[key <AC01> { symbols[Group1]=[ a, A ], type="symbols[Group1]=[z,Z]" };]], expected = alphabetic },
 		{ name = "preserves explicit priority over an earlier fallback", body = [[key <AC01> { [ z, Z ], symbols[Group1]=[ a, A ] };]], expected = alphabetic },
 		{ name = "preserves explicit Group1 priority over Group2", body = [[key <AC01> { symbols[Group2]=[ z, Z ], symbols[Group1]=[ a, A ] };]], expected = alphabetic },
-		{ name = "preserves the existing fallback index behavior", body = [[key <AC01> { type[Group1]="Readback [ z, Z ] type", [ a, A ] };]], expected = { AC01 = { "Group1" } } },
-		{ name = "preserves the existing Group2-only fallback behavior", body = [[key <AC01> { symbols[Group2]=[ z, Z ] };]], expected = { AC01 = { "Group2" } } },
+		-- `type[Group1]=` is an index, not a keysym list (it used to read as { "Group1" }).
+		{ name = "never reads a type index as a keysym list", body = [[key <AC01> { type[Group1]="Readback [ z, Z ] type", [ a, A ] };]], expected = alphabetic },
+		-- A key defining group 2 only types nothing in group 1 (it used to read as { "Group2" }).
+		{ name = "a Group2-only key has no group-1 list", body = [[key <AC01> { symbols[Group2]=[ z, Z ] };]], expected = {} },
 		{ name = "preserves an empty explicit capture", body = [[key <AC01> { [ z, Z ], symbols[Group1]=[] };]], expected = { AC01 = { false } } },
 		{ name = "preserves raw keysym spelling and NoSymbol", body = [[key <AC01> { symbols[Group1]=[ U00E9, NoSymbol, A ] };]], expected = { AC01 = { "U00E9", false, "A" } } },
 		{ name = "ignores a fake list after an escaped quote", body = [[key <AC01> { type="Readback \" symbols[Group1]=[z,Z] type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
@@ -530,7 +532,8 @@ helpers.describe("xkb_keymap: quoted symbol-list metadata", function()
 		{ name = "retains metadata after odd backslashes", body = [[key <AC01> { type="Readback \\\" symbols[Group1]=[z,Z] type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
 		{ name = "ignores braces and fake lists in the same type", body = [[key <AC01> { type="Readback } symbols[Group1]=[z,Z] { type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
 		{ name = "ignores fake lists in multiple metadata strings", body = [[key <AC01> { type="symbols[Group1]=[z,Z]", name="symbols[Group1]=[s,S]", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
-		{ name = "preserves first outside-string match precedence", body = [[key <AC01> { mysymbols[Group1]=[ z, Z ], symbols[Group1]=[ a, A ] };]], expected = { AC01 = { "z", "Z" } } },
+		-- `mysymbols` is not the symbols field (it used to win as the first match).
+		{ name = "reads only the symbols field, not a longer name ending in it", body = [[key <AC01> { mysymbols[Group1]=[ z, Z ], symbols[Group1]=[ a, A ] };]], expected = alphabetic },
 		{ name = "retains the no-list contract", body = [[key <AC01> { type="Readback [ z, Z ] type" };]], expected = {} },
 	}
 	for _, spec in ipairs(cases) do
@@ -748,3 +751,76 @@ helpers.describe("keyboard_layout: exact native authority and preserved logical 
 	end)
 end)
 
+
+
+
+
+-- ===============================================================
+-- ===============================================================
+-- ======= 8/ Groups, aliases and multi-keysym levels =============
+-- ===============================================================
+-- ===============================================================
+
+helpers.describe("xkb_keymap: every group, the real grammar", function()
+	local DUMP = [[
+xkb_keymap {
+xkb_keycodes "evdev" {
+	<AC01> = 38;
+	<AD01> = 24;
+	<BKSL> = 51;
+	<LSGT> = 94;
+	alias <AC12> = <BKSL>;
+	alias <ZZZZ> = <AC12>;
+	<I372> = 380;
+};
+xkb_symbols "fr+us" {
+	key <AC01> { [ q, Q ], [ a, A ] };
+	key <AD01> { type[Group1]= "FOUR_LEVEL", symbols[Group1]= [ a, A, ae, AE ], symbols[Group2]= [ q, Q ] };
+	key <AC12> { symbols[1]= [ asterisk, mu ], symbols[2]= [ backslash, bar ] };
+	key <LSGT> { [ less, greater ] };
+	key <I372> { [ { a, b }, c ] };
+};
+};
+]]
+
+	helpers.it("(xkb-groups) reads the implicit and the explicit spelling of every group", function()
+		local kb = helpers.load_module("infra.xkb_keymap")
+		local groups = kb.parse_groups(DUMP)
+		helpers.assert_eq(groups.AC01, { { "q", "Q" }, { "a", "A" } })
+		helpers.assert_eq(groups.AD01, { { "a", "A", "ae", "AE" }, { "q", "Q" } })
+		helpers.assert_eq(groups.AC12, { { "asterisk", "mu" }, { "backslash", "bar" } })
+	end)
+
+	helpers.it("(xkb-groups) answers for the active group, wrapping a key that defines fewer", function()
+		local kb = helpers.load_module("infra.xkb_keymap")
+		local function at(group)
+			local found = {}
+			for _, entry in ipairs(kb.parse(DUMP, group)) do
+				found[entry.keycode .. ":" .. entry.level] = entry.keysym
+			end
+			return found
+		end
+		local first, second = at(1), at(2)
+		helpers.assert_eq(first["30:1"], "q")
+		helpers.assert_eq(second["30:1"], "a")
+		helpers.assert_eq(second["16:1"], "q")
+		helpers.assert_eq(second["43:1"], "backslash")
+		-- <LSGT> defines one group: group 2 wraps to it, as XKB's GroupsWrap does.
+		helpers.assert_eq(second["86:1"], "less")
+		helpers.assert_eq(at(3)["30:1"], "q", "group 3 of a two-group key wraps to group 1")
+		helpers.assert_eq(select(1, pcall(kb.parse, DUMP, 0)), false)
+	end)
+
+	helpers.it("(xkb-groups) resolves aliases, chained ones included", function()
+		local kb = helpers.load_module("infra.xkb_keymap")
+		local codes = kb.parse_keycodes(DUMP)
+		helpers.assert_eq(codes.AC12, 43)
+		helpers.assert_eq(codes.ZZZZ, 43)
+		helpers.assert_eq(codes.I372, 372)
+	end)
+
+	helpers.it("(xkb-groups) a level of several keysyms is one level no single press types", function()
+		local kb = helpers.load_module("infra.xkb_keymap")
+		helpers.assert_eq(kb.parse_symbols(DUMP).I372, { false, "c" })
+	end)
+end)
