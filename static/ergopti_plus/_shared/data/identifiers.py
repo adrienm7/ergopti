@@ -17,6 +17,14 @@ BUNDLE_IDS = {
     "hammerspoon": "com.ergoptiplus.app.hammerspoon",
 }
 
+SIGNING_IDS = {
+    "runtime_installer": "com.ergoptiplus.app.runtime-installer",
+    "installed_physical_source": "com.ergoptiplus.app.installed-physical-source",
+    "remap_core": "com.ergoptiplus.remap.core",
+    "remap_console": "com.ergoptiplus.remap.console",
+    "remap_cli": "com.ergoptiplus.remap.cli",
+}
+
 SERVICE_LABELS = {
     "macos_core": "com.ergoptiplus.runtime.core",
     "macos_remap_guardian": "com.ergoptiplus.remap-guardian",
