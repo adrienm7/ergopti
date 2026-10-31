@@ -74,6 +74,7 @@ local AuthPolicy     = require("llm.local_server_auth")
 local ThinkingOff    = require("llm.thinking_off")
 local ThinkingFamilies = require("modules.llm.thinking_families")
 local ModelCapabilities = require("llm.model_capabilities")
+local TableUtil = require("table_util")
 local Storage        = require("adapters.storage")
 local ProviderConfig = require("llm.provider_config_policy")
 local Json           = require("json")
@@ -1516,9 +1517,8 @@ local function refresh_capabilities(provider_id, provider, base, token)
 				Logger.warn(LOG, "Capability listing of provider %s could not be read (%s).", tostring(provider_id), tostring(reason))
 				return finish(nil)
 			end
-			local count = 0
-			for _ in pairs(records) do count = count + 1 end
-			Logger.info(LOG, "Capability listing of provider %s: %d model(s) described.", tostring(provider_id), count)
+			Logger.info(LOG, "Capability listing of provider %s: %d model(s) described.", tostring(provider_id),
+				TableUtil.count(records))
 			finish(records)
 		end)
 		if dispatched ~= true then

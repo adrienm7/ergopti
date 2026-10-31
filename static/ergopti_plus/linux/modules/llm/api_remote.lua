@@ -48,6 +48,7 @@ local Classifier = require("llm.remote_response_classifier")
 local AuthPolicy = require("llm.local_server_auth")
 local ThinkingOff = require("llm.thinking_off")
 local ModelCapabilities = require("llm.model_capabilities")
+local TableUtil = require("table_util")
 local ApiModelListing = require("llm.api_model_listing")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local ProviderConfig = require("llm.provider_config_policy")
@@ -1222,9 +1223,8 @@ function M.refresh_capabilities(entry)
 					Logger.warn(LOG, "Capability listing of provider %s could not be read (%s).", provider_id, tostring(reason))
 					return finish(nil)
 				end
-				local count = 0
-				for _ in pairs(records) do count = count + 1 end
-				Logger.info(LOG, "Capability listing of provider %s: %d model(s) described.", provider_id, count)
+				Logger.info(LOG, "Capability listing of provider %s: %d model(s) described.", provider_id,
+					TableUtil.count(records))
 				finish(records)
 			end)
 		if dispatched ~= true then
