@@ -226,7 +226,7 @@ GestureActionParameterPrompt(ActionName) {
 								WrapPairDescribe(_WS_BUILTIN_PAIRS))
 				case "text":
 						return StrReplace(t("dialog.gestures.param_text"), "{1}",
-								SendInputVocabulary()["text_max_code_points"])
+								SendKeysVocabulary()["text_max_code_points"])
 				case "key", "shortcut":
 						return StrReplace(t("dialog.gestures.param_" . GestureActionParameterSpec(ActionName)),
 								"{1}", SendInputDescribeKeys())
@@ -267,7 +267,7 @@ GestureClearPickedParameter() {
 ; @returns {String}
 GestureSendInputErrorText(Spec) {
 		return StrReplace(t("dialog.gestures.param_err_" . Spec), "{1}",
-				SendInputVocabulary()["text_max_code_points"])
+				SendKeysVocabulary()["text_max_code_points"])
 }
 
 ; Builds a detached action-parameter candidate. Cancel is represented by false;
