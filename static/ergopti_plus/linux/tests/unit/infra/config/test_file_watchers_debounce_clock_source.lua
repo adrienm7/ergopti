@@ -28,32 +28,63 @@ local helpers, native_ok, native_luv, CAN_STAT =
 -- 6. Debounce clock source (root-cause guard, runs in every environment)
 -- ======================================================================
 
--- The behavioural timing tests above are stat-gated and skipped where stat(1)
--- is unavailable. This source guard runs everywhere and encodes the root cause:
--- the debounce deadline must be computed from a monotonic WALL clock, never
--- os.clock(). On Linux os.clock() is CPU time, which barely advances in an
--- I/O-bound daemon, so a deadline derived from it never lines up with real
--- elapsed time and the reload either never fires or fires immediately.
+-- The root cause this guards: the debounce deadline must come from the
+-- monotonic WALL clock, never os.clock(). On Linux os.clock() is CPU time,
+-- which barely advances in an I/O-bound daemon, so a deadline derived from it
+-- never lines up with real elapsed time and the reload either never fires or
+-- fires immediately. The module is loaded fresh with no injected clock, so its
+-- default source is the one under test: a controlled infra.monotonic moves,
+-- os.clock is frozen.
 helpers.describe("file_watchers debounce clock source", function()
-
-	local function read_file(path)
-		local fh = io.open(path, "r")
-		if not fh then return "" end
-		local s = fh:read("*a")
-		fh:close()
-		return s
+	if not native_ok or not CAN_STAT then
+		print("  [debounce clock source not executed: native luv or stat(1) unavailable]")
+		return
 	end
 
-	local src = read_file(helpers.driver_root() .. "/infra/file_watchers.lua")
-
 	helpers.it("computes the debounce deadline from the monotonic clock, not os.clock", function()
-		helpers.assert_true(src ~= "", "could not read infra/file_watchers.lua")
-		helpers.assert_true(src:find('require("infra.monotonic")', 1, true) ~= nil,
-			"file_watchers must source its clock from lib.monotonic")
-		helpers.assert_true(src:find("os.clock", 1, true) == nil,
-			"file_watchers must not use os.clock() — CPU time breaks the debounce on Linux")
-		helpers.assert_true(src:find("_now_ms()", 1, true) ~= nil,
-			"the debounce deadline must be set and checked through the injectable wall clock")
+		local restore = helpers.keep_loaded({ "infra.monotonic", "infra.file_watchers" })
+		local Monotonic = require("infra.monotonic")
+		local wall, fired = 1000000, 0
+		local clock = setmetatable({ now_ms = function() return wall end }, { __index = Monotonic })
+		local original_clock = os.clock
+		local root = assert(native_luv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti_fw_clock_XXXXXX"))
+		local source = root .. "/clock.toml"
+		local watcher
+		local ok, err = xpcall(function()
+			local handle = assert(io.open(source, "w"))
+			assert(handle:write('[personal.clock]\ntrigger = "before"\n'))
+			assert(handle:close())
+			assert(native_luv.fs_utime(source, 1700000000, 1700000000))
+			package.loaded["infra.monotonic"] = clock
+			os.clock = function() return 0 end
+			watcher = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			watcher.start({ personal_dir = root, on_reload = function() fired = fired + 1 end })
+			watcher.pump()
+			helpers.assert_eq(fired, 0, "the unmodified source must not reload")
+			handle = assert(io.open(source, "w"))
+			assert(handle:write('[personal.clock]\ntrigger = "after"\n'))
+			assert(handle:close())
+			assert(native_luv.fs_utime(source, 1700000001, 1700000001))
+			watcher.pump()
+			helpers.assert_eq(fired, 0, "a changed file must wait for the debounce window")
+			-- CPU time racing ahead must not settle the window...
+			os.clock = function() return 3600 end
+			watcher.pump()
+			helpers.assert_eq(fired, 0, "the CPU clock must not decide the debounce")
+			-- ...and wall time passing must, with the CPU clock frozen again.
+			os.clock = function() return 0 end
+			wall = wall + 600
+			watcher.pump()
+			helpers.assert_eq(fired, 1, "the monotonic wall clock must settle the debounce")
+		end, debug.traceback)
+		os.clock = original_clock
+		local stopped, stop_error = true, nil
+		if watcher then stopped, stop_error = pcall(watcher.stop) end
+		restore()
+		os.remove(source)
+		native_luv.fs_rmdir(root)
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_true(stopped, tostring(stop_error))
 	end)
 
 end)
