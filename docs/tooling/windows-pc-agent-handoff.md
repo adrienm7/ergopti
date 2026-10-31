@@ -92,6 +92,16 @@ only by static and JS tests. Once it lands on `dev`:
   `macos/modules/llm/managed_ollama_pull.py` `ERROR_CLASSES`), one automatic
   retry on `digest_mismatch`, then `ollama.digest_mismatch` (the key exists in
   all 21 locales), with an AHK test that fails without the retry.
+- PAR-41 on macOS (`ctrl_g` to the `secondary_g` slot) needs a config schema
+  v20 step (`shortcuts.keys.ctrl_g` copied into `shortcuts.keyboard.secondary_g`,
+  `true` to `open_chatgpt`, `false` to `none`, then deleted, for `hs` only). A
+  bump moves every driver's stamp: the AHK tests that treat 19 as current
+  (`tests/unit/infra/config/persistence/test_config_snapshot_inline_records.ahk`,
+  `test_config_semantic_snapshot.ahk`,
+  `tests/unit/infra/config/migration/test_config_journal_boot.ahk`,
+  `test_config_journal_nul_suffix.ahk`) must move to 20 and pass under
+  AutoHotkey first. The macOS side follows (manifest slot, `open_chatgpt` on
+  `hs` in `actions.toml`, the fixed `ctrl_g` hotkey and its menu row retired).
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 

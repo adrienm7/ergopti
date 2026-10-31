@@ -706,6 +706,19 @@ PAR-12 and PAR-14 are in "Windows manual checks for the maintainer", PAR-15's in
       keyboard slots on Windows: 7b09ad75b2, 141494ee23). Left: macOS `ctrl_g` to `open_url`, later.
 - [ ] **PAR-52. Release notes on the update windows.** [PHYS-M] [PHYS-L] Done on the three OS (Windows f5786f5399).
       Left: a visual check on a Mac (in the Mac hardware session) and on a Linux desktop.
+- [ ] **PAR-41. One shortcut data model.** [CODE] Design note written
+      (`docs/design/one-shortcut-model.md`, 4ca41ed2e9): one action slot per chord with neutral role-based ids.
+      Done on macOS and Linux (sixth integration batch): schema v15 `v14_to_v15` migration of the slots and
+      Ctrl-letter switches, role table with per-driver families, manifest slots, both drivers adopt the role
+      names, migrated-config binding proof, AHK fixtures pinned to v15, per-slot parameters carried by
+      `rename_prefix`. Left: the Windows adoption; macOS `ctrl_g` to its slot is a schema v20 step, Windows PC agent first
+      (the AHK tests that treat 19 as current move to 20; details in `docs/tooling/windows-pc-agent-handoff.md`).
+- [x] **PAR-45. Notifications: one behaviour for toggles and refusals.** [CODE] Done on macOS and Linux
+      (shared `feature_notice.lua`, Linux quit refusal). Left: Windows `NotifyFeature(label, enabled)` around
+      `NotifierSend` at the same call sites, and a Windows quit-refusal path firing `notify.quit_refused`.
+- [ ] **PAR-52. Release notes on macOS and Linux update windows.** [CODE] Done on macOS and Linux
+      (80a5a650a6): shared `release_notes/pane.js` in the `update_check` page, repository-only links. Left:
+      the Windows host (section "Windows side"), a visual check on a Mac and a Linux desktop.
 
 ### D. Instrumentation and diagnostics
 
