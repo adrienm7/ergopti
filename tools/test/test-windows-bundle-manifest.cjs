@@ -387,7 +387,21 @@ const UNIVERSE_PREFIXES = [
 	`${DRIVER_REL}/modules/llm/ollama-model-pull.ps1`,
 	`${DRIVER_REL}/_generated`
 ];
-const universe = new Map(tracked(UNIVERSE_PREFIXES).map((rel) => [arcnameOf(rel), rel]));
+// A generated .ahk is an #Include Ahk2Exe compiles in, like every other driver
+// source this universe leaves out: naming one (the source-run registry cache
+// identity hashes config_migration_ops.ahk) is not a read the bundle must serve.
+const isCompiledGeneratedSource = (rel) =>
+	rel.startsWith(`${DRIVER_REL}/_generated/`) && rel.endsWith('.ahk');
+const universeSources = tracked(UNIVERSE_PREFIXES);
+assert.ok(
+	universeSources.some(isCompiledGeneratedSource),
+	'the compiled generated sources this universe leaves out still exist'
+);
+const universe = new Map(
+	universeSources
+		.filter((rel) => !isCompiledGeneratedSource(rel))
+		.map((rel) => [arcnameOf(rel), rel])
+);
 const universeArcs = [...universe.keys()];
 
 // =================================================
