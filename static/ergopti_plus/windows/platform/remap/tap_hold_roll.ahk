@@ -375,8 +375,8 @@ TapHoldRollOtherKey(HotkeyName := unset, Ports := 0) {
 	}
 }
 
-; Whether the key of a scan code is physically down.
+; Whether the key of a scan code is held, a replayed press included.
 _TapHoldRollScIsDown(Sc) {
-	return GetKeyState(Format("SC{:03X}", Sc), "P")
+	return KS_IsHeld(Format("SC{:03X}", Sc))
 }
 

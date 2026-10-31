@@ -51,7 +51,7 @@ global ALTGR_BASE_ROWS := ""
 global CTRL_ALT_NUMPAD := ""
 
 ; The physical-state port is shared by captured criteria and direct gate calls.
-global _ALTGR_PHYSICAL_STATE_QUERY := KS_IsDown
+global _ALTGR_PHYSICAL_STATE_QUERY := KS_IsHeld
 
 ; ``{Plain, Shifted}`` callables of every key of two parallel spec tables.
 _AltGrTableFromSpec(Plain, Shifted, DeadTables) {
