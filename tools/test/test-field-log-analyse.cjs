@@ -164,9 +164,7 @@ check('every budget is the value its declaration holds', () => {
 	assert.equal(
 		described.budgets['main_thread.hold'],
 		Number(
-			read('static/ergopti_plus/macos/infra/logger.lua').match(
-				/^local SLOW_TIMER_CALLBACK_COUNT_MS = (\d+)/m
-			)[1]
+			read('static/ergopti_plus/macos/infra/main_thread_hold.lua').match(/^\s*COUNT_MS = (\d+)/m)[1]
 		)
 	);
 	assert.equal(
@@ -217,7 +215,7 @@ try {
 			);
 		};
 		copy('static/ergopti_plus/_shared/modules/timings/constants.toml');
-		copy('static/ergopti_plus/macos/infra/logger.lua');
+		copy('static/ergopti_plus/macos/infra/main_thread_hold.lua');
 		copy('static/ergopti_plus/macos/infra/preferences.lua', (text) =>
 			text.replace(/^local SLOW_SAVE_REPORT_MS = /m, 'local SAVE_REPORT_MS = ')
 		);
