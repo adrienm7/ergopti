@@ -880,9 +880,11 @@ function M.install(ctx)
 		-- the old async pre-probe but synchronously with a hard 1 s curl timeout, so
 		-- it can never stall the boot path the way the async callback could.
 		if not (deps.active_tasks and deps.active_tasks["mlx_server"]) then
-			local ok_probe, body = pcall(hs.execute,
-				"/usr/bin/curl --silent --max-time 1 --no-keepalive " ..
-				"-H 'Connection: close' http://127.0.0.1:" .. target_port .. "/v1/models")
+			local SystemCurl = require("adapters.system_curl")
+			local ok_probe, body = SystemCurl.check("the MLX adoption probe"), nil
+			if ok_probe then ok_probe, body = pcall(hs.execute,
+				SystemCurl.PATH .. " --silent --max-time 1 --no-keepalive " ..
+				"-H 'Connection: close' http://127.0.0.1:" .. target_port .. "/v1/models") end
 			if not current_or_cancel() then return false end
 			if ok_probe and probe_matches_target(body) then
 				if reset_mlx_endpoints("Cross-session adoption") ~= true then

@@ -386,6 +386,11 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 			tostring(executable), refusal)
 		return refused_handle(private)
 	end
+	-- The system curl is checked at its point of use; the gate logs and tells.
+	local SystemCurl = require("adapters.system_curl")
+	if executable == SystemCurl.PATH and not SystemCurl.check("a spawned transfer") then
+		return refused_handle(private)
+	end
 	local handle = {}
 	local _task  = nil
 	local _protocol_task = nil
