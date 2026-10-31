@@ -669,6 +669,7 @@
 			"suspended",
 			"today_log_open_failed",
 			"too_large",
+			"too_old",
 			"touchpad_no_event_node",
 			"touchpad_no_multitouch_slot",
 			"touchpad_not_pointing_device",
