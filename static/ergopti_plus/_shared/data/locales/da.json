@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "Kontrolsum bekræftet. Installerer Ollama…",
 	"ollama.deps_task_create_failed": "Kunne ikke oprette hs.task.",
 	"ollama.deps_task_start_failed": "Kunne ikke starte hs.task.",
+	"ollama.digest_mismatch": "Downloadet af %s blev beskadiget to gange: kontrolsummen passede ikke. En proxy eller et ustabilt netværk kan ændre et download; kontrollér forbindelsen, og prøv igen.",
 	"ollama.download_cancelled": "Ollama-download annulleret",
 	"ollama.download_error": "Downloadfejl for %s",
 	"ollama.download_subtitle": "Henter vægte fra Ollama Hub…",
