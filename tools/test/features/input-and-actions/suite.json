@@ -714,6 +714,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-keylayout-row-options.cjs"],
 			"repro": "npm run test:keylayout-row-options"
+		},
+		{
+			"id": "js-user-action-vectors",
+			"ordinal": 554,
+			"name": "the run_command, open_path and run_apple_shortcut parameter rule is one shared corpus both Lua suites replay",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-user-action-vectors-shared.cjs"],
+			"repro": "npm run test:user-action-vectors-shared"
 		}
 	]
 }

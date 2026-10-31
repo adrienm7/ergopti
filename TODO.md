@@ -117,6 +117,117 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
 6. **Field run checks (`field_run/NN_<step>.json`).** Read each red step with its `proves` line in
    `static/ergopti_plus/macos/data/field_run.json` and the codes in
    [macos-hammerspoon memory](docs/memory/macos-hammerspoon.md) ("project-macos-field-run-step-details").
+7. **Field run checks (`field_run/NN_<step>.json`, each step's `proves` line in
+   `static/ergopti_plus/macos/data/field_run.json`).** A failing step's codes are `fail_<check step>`; read the
+   step's report and log window before the day log. The read-only checks added for the field run alone:
+   - `field_permissions`: Accessibility is granted (fail otherwise); Input Monitoring, Screen Recording and
+     secure input are named; Automation is skipped (no query without a prompt); the bundle identifier is a
+     declared one; the running bundle's strict signature is valid; the signing identity (team or ad hoc)
+     says whether a rebuild keeps the grants.
+   - `field_event_taps`: each keymap tap (keyDown, loopbackKeyUp, flagsChanged, mouse) is enabled, by name;
+     the tap watchdog runs; the worst of five 100 ms timers is under 250 ms late; the session's holds over
+     250 ms and 1 s, late keys and the Lua heap are named.
+   - `field_input_sources`: the selected source and the enabled list (as the text-input system holds them, not
+     the preference) are readable; the Ergopti layouts enabled are counted; every installed Ergopti `.keylayout`
+     parses with `xmllint` (read as XML 1.0, its C0 control references blanked) and every Ergopti bundle `Info.plist` with `plutil -lint` (a failure names the count).
+   - `field_storage`: the keystats database passes `PRAGMA quick_check` opened `-readonly` and lock-free
+     (`immutable=1`, so the ingest never meets a lock; an issue counts when a second scan sees it) (a damage names the
+     number of issue lines only); `config.toml`, `config_karabiner.toml`, the personal hotstrings and personal
+     info files each parse with the driver's TOML reader, read-only; today's log exists; the logs folder takes a
+     probe file (removed at once); the auto-reload file watcher owner is published (FSEvents accepted it);
+     the keystats cache is under `~/Library/Caches/ergopti_plus/` with no TMPDIR copy left
+     (`keystats_cache_place`: `caches`, `legacy_left`, `outside_caches`).
+   - `field_launcher_roles`: the launcher resolves; `--managed-http-worker` with malformed arguments exits 64
+     at once (any other exit or a timeout: the role did not dispatch); the same worker carries one direct GET,
+     with the request `native_http.py` sends, to a loopback server the check opens and closes. An exit 64 there
+     (the 2026-10-30 `native_child_status=64`), a refusal stage or `not_reached` names where it broke.
+   - `field_network_hosts`: one HEAD, one after the other, to the root of every host of
+     `_shared/data/identifiers.json` (`github`, `github_api` for the update feed, `huggingface`, `ollama`,
+     `ollama_registry`) (the registry at `/v2/`, whose root answers 503) through the managed transport (route lookup, PAC or proxy,
+     TLS); any
+     answer below 500 passes, a failure names the native reason by the host's key. Nothing is downloaded.
+   - `field_app_health` (after the AI steps): no crash report since the current app start (the launcher's
+     `ps` elapsed time, `app_uptime_s`) in the driver's `crash_reports`
+     folder (absent: none) nor in `~/Library/Logs/DiagnosticReports` for the app's processes (ErgoptiPlus and
+     its launcher roles, Hammerspoon, Ollama, Python, Karabiner): they fail as `<process>:<count>`, the three
+     newest are listed with closed tokens (hang or crash, exception, signal, termination namespace); an
+     earlier start's reports of the last day and other apps' reports are counted only; the app's resident memory (MB) and CPU share from `ps` are named.
+   - `field_ai_local` (after the AI steps, read-only): the owned Ollama binary passes `codesign --verify
+--strict`; a running server lists its models (not running: skip, never started here); one token is
+     predicted from the check's own text with the smallest catalogue model already installed (none: skip, never
+     a download); the MLX runtime and the catalogue models in its cache are counted.
+   - `key_accounting` (automatic, no person): the app opens its own scratch text field, brings it to the
+     front and types `wkjx` there only, checking before each key that the field still has the focus (a lost
+     focus stops the sequence with its code; no key reaches another app); the passive tap must see each key
+     once, the field must hold exactly `wkjx`, the previous app must get the focus back. The keys are
+     selftest keys (`SyntheticInput.emit_selftest_key_stroke`): the keymap decodes them as typing only while
+     the developer runtime's published scratch window has the focus and consumes them anywhere else (one
+     `keymap.selftest_gate` warning per run names why), keystats never counts them, and the typing stops
+     before a key while the keymap taps are off (`keymap_tap_off`). They are posted after Karabiner: the
+     virtual keyboard path and the ledger's double count are `physical_keys_only`.
+   - `hotstring_roundtrip` (automatic, after `key_accounting`): the first shipped, enabled, terminator
+     hotstring with a plain lowercase trigger no other file registers is typed as selftest keys into the
+     scratch field, after a Space and followed by Space; the field must hold exactly the Space and its
+     expansion (plus the Space unless Space is a consumed terminator), and `terminator_to_text_ms` is named.
+     Codes: `keymap_absent`, `no_enabled_trigger`, `space_not_terminator`, `not_expanded`,
+     `mismatch_<n>_bytes`, `typing_incomplete`.
+   - `prediction_tooltip` (automatic): with predictions on and the active model already on this Mac (Ollama
+     listed by a running server, or an MLX model in the cache; nothing is started or downloaded),
+     `le chat dort sur le ` is typed into the scratch field and the prediction tooltip must show within 45 s;
+     `keystroke_to_tooltip_ms` (last key to tooltip) is named. Predictions the user turned off skip with
+     `llm_disabled` (the check never turns them on). Failure codes: `no_installed_model`
+     (a remote backend included), `tooltip_not_shown`, `typing_incomplete`.
+   - `driver_reload` (last step): the configuration is put back, the run's state goes to `resume.json`, the
+     driver reloads through the termination coordinator, and the reloaded driver's field run resumes, naming
+     the reload's duration (request to a ready field run, `reload_ms` in the report) and taking a fresh
+     configuration snapshot for the guard. A reload refused, or accepted and never started, fails by name.
+   - `field_menu_build`: one rebuild of the menu tree, as a state change triggers it, must be accepted by
+     AppKit; its duration in ms, the number of top-level rows and the three slowest rows (`id:ms`) are named.
+   - `field_boot_cost` (after `field_composer`): the boot that started the app completed; its wall and CPU
+     totals and its slowest stage are named, the three slowest stages in its log window.
+   - `field_idle_cost`: over 30 quiet seconds the driver's process CPU share must stay at or under 3 %
+     (`idle_cpu_percent`); resident memory and its growth, Lua heap growth and main-thread holds over 250 ms
+     in the window are named.
+   - `field_slow_lines`: one `awk` pass over today's log (a summary only reaches the task's pipe) tallies
+     the HotPath `Slow <segment>: X ms own` lines by segment, and the `Slow ingest tick`,
+     `Slow preferences save`, `Slow ignored-window probe` and over-budget diagnostics lines; `slow_dominant`
+     names the segment with the most own time (the five largest in the log window), the four others are
+     `count:worst_ms` with the worst line's largest stage (`slow_*_stage`, `slow_diagnostics_collector`) and
+     metadata forks (`slow_*_forks`, `count:ms`); `slow_hold_phase` and `slow_layout_menu_phase` name the
+     busiest phase inside the day's main-thread holds and the busiest `menu_keyboard_layout.*` stage
+     (`name:ms`); `log_lease_bound_failures` and
+     `log_layout_change_before_baseline` fail when a `Lease-bound input startup failed` or a
+     `Layout … detected change before its baseline` line is in the day log (item 38).
+   - `field_fifo_safety`: in a folder of its own under `TMPDIR`, a FIFO (a reader attached first, so a
+     regressed guard cannot freeze the app) is named `named_pipe` by `followed_mode`, `exists` sees it, and
+     both `append` and the atomic `write` refuse it and leave it in place; the folder is removed.
+   - `field_apple_shortcuts` (before `field_owned_pause`): the run_apple_shortcut action lists the
+     Shortcuts library through its own owner and `shortcuts list --show-identifiers` (`shortcuts_listed`,
+     the count), then runs the shortcut named `Ergopti Field Test` end to end (`field_test_run`, the
+     owner's closed category). Without that shortcut `field_test_shortcut` is skipped as `absent`: create it
+     once in Shortcuts as a shortcut that does nothing.
+   - `field_local_servers` (after `field_ai_local`, read-only): every server of
+     `_shared/modules/llm/local_servers.json` must have a discovery descriptor the driver accepts
+     (`servers_catalogue`, else `undescribed_<n>`); one detection sweep, the AI menu's own (process,
+     settings file, listening port, then `GET /models`), names each server as `server_<id>`:
+     `up:<port source>:<models>`, `not_running:<port source>`, `needs_key:...` or `no_answer:...`. A
+     server added to the shared list is reported by the next run with no driver change.
+   - `field_pac_fallback` (after the AI downloads): one `awk` pass over today's log counts the PAC-then-direct
+     lines every writer prints (shell admission, Swift spool, Python receiver, Ollama pull):
+     `pac_fallback_counts` is `warnings:worked:failed`, `pac_fallback_stages` the stages named;
+     `pac_fallback_outcome` is `no_pac_failure` (information) on a network whose PAC works, passes as
+     `direct_worked`, and fails on `no_outcome`, `direct_failed` or `unlisted_stage:<stage>` (a stage outside
+     `proxy_policy.json` `pac_unavailable_fallback`).
+   - `field_layout_rows` (after `field_idle_cost`): from the Ergo-L file the app ships, a loose layout typing
+     the symbols first is written as `~/Library/Keyboard Layouts/ErgoptiFieldRows-<n>.keylayout` under a new
+     name and id, enabled through the enabled-sources preference, selected, and read back from a fresh
+     process (`rows_build:keys_13` when the launcher's keyboard probe types its thirteen base cells); a second
+     build that also moves the edge keys replaces it live and retires it (`rows_replace`, the design note's
+     M4); then the user's selected source is selected again, every check build is disabled and deleted
+     (`rows_retire`), and the selected id and the `AppleEnabledInputSources` list must be identical to the
+     ones read before (`rows_restore`). `rows_ghosts` counts builds the system keeps listing until logout
+     (M5a). A failure names its code: `requires_logout`, `select_refused`, `readback_mismatch`; the step's log
+     window names each build and the source id the probe read.
 
 ## Maintainer requests of 2026-10-30 (coordinator session; everything here is to be done)
 

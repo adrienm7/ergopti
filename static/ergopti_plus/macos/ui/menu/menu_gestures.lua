@@ -304,7 +304,8 @@ function M.build(ctx)
 		local parameter = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, current) or ""
 		if type(gestures.get_action_parameter_spec) ~= "function"
 			or gestures.get_action_parameter_spec(current) ~= "program" then
-			actionLbl = ParameterLabel.format(actionLbl, parameter)
+			actionLbl = ParameterLabel.for_spec(actionLbl, type(gestures.get_action_parameter_spec) == "function"
+				and gestures.get_action_parameter_spec(current) or nil, parameter)
 		end
 
 		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES

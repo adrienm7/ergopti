@@ -33,6 +33,7 @@ local DesktopNavigation = require("desktop_navigation")
 local SendInput     = require("send_input")
 local AppParameter  = require("app_parameter")
 local ProgramParameter = require("program_parameter")
+local UserActionParameter = require("user_action_parameter")
 local _program_revision = 0
 local _program_parameters_owned = false
 local PromptAction  = require("llm.prompt_action")
@@ -1483,6 +1484,32 @@ sg("open_app", function(binding)
 	end
 	return System.open_app(value, current_action_parent())
 end)
+-- The user's own command line, file or folder, and Apple shortcut: each value
+-- is decoded by _shared/lua/user_action_parameter and never logged.
+local USER_ACTIONS = {
+	run_command = function(fields, parent)
+		return require("modules.gestures.user_actions").run_command(fields, parent,
+			M.send_vocabulary().text_max_code_points)
+	end,
+	open_path = function(fields, parent)
+		return require("modules.gestures.user_actions").open_path(fields, parent)
+	end,
+	run_apple_shortcut = function(fields, parent)
+		return require("modules.gestures.apple_shortcut_action").run(fields, parent,
+			M.send_vocabulary().text_max_code_points)
+	end,
+}
+for user_action, run_user_action in pairs(USER_ACTIONS) do
+	sg(user_action, function(binding)
+		local fields = UserActionParameter.parse(M.get_action_parameter_spec(user_action),
+			M.get_action_parameter(binding, user_action))
+		if not fields then
+			Logger.warn(LOG, "%s ignored for binding '%s': no valid value is stored.", user_action, tostring(binding))
+			return false
+		end
+		return run_user_action(fields, current_action_parent())
+	end)
+end
 
 -- Applications and Stats
 -- Each window action toggles one page through ui/window_toggle: closed opens
@@ -2458,6 +2485,8 @@ function M.validate_action_parameter(action, value)
 	-- Syntax only: whether the application is installed is checked when it opens
 	if spec == "app" then return AppParameter.is_valid(value) end
 	if spec == "program" then return ProgramParameter.parse(value, "posix") ~= nil end
+	-- Syntax only: whether the path or the shortcut still exists is checked when it runs
+	if UserActionParameter.KINDS[spec] then return UserActionParameter.parse(spec, value) ~= nil end
 	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
@@ -2480,6 +2509,7 @@ function M.parameter_prompt(action)
 	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
 	if spec == "app" then return i18n.get("dialog.gestures.param_app") end
 	if spec == "program" then return i18n.get("dialog.gestures.param_program") end
+	if UserActionParameter.KINDS[spec] then return i18n.get(UserActionParameter.PROMPT_KEYS[spec]) end
 	if spec == "text" then
 		return fill_placeholder(i18n.get("dialog.gestures.param_text"),
 			tostring(M.send_vocabulary().text_max_code_points))
@@ -2527,6 +2557,11 @@ function M.parameter_error(action)
 	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
 	if spec == "app" then return i18n.get("dialog.gestures.param_err_app") end
 	if spec == "program" then return i18n.get("dialog.gestures.param_err_program") end
+	if spec == "command" then
+		return fill_placeholder(i18n.get(UserActionParameter.ERROR_KEYS.command),
+			tostring(UserActionParameter.MAX_COMMAND_BYTES))
+	end
+	if UserActionParameter.KINDS[spec] then return i18n.get(UserActionParameter.ERROR_KEYS[spec]) end
 	if SendInput.KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(M.send_vocabulary().text_max_code_points))

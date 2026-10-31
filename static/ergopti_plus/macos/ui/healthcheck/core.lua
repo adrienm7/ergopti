@@ -269,7 +269,13 @@ local ADAPTER_SPECS = {
 	},
 	{
 		id       = "adapters.apple_shortcuts_native",
-		contract = { "available", "create", "is_chosen_program", "revalidate_program" },
+		contract = { "available", "create", "is_chosen_program", "revalidate_program", "cli_identity" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.apple_shortcuts_cli",
+		contract = { "parse_list", "reply", "observed_rows", "bounded_list_command", "list_blocking", "ports" },
+		-- The run_apple_shortcut action and its editor list and run through it.
 		wired    = true,
 	},
 	{

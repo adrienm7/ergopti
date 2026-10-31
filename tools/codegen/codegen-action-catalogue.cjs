@@ -107,7 +107,10 @@ const PARAMETER_KINDS = new Set([
 	'llm_vision',
 	'llm_language',
 	'app',
-	'program'
+	'program',
+	'command',
+	'path',
+	'apple_shortcut'
 ]);
 
 const SG_FIELDS = new Set([
@@ -284,7 +287,10 @@ function validateAbsence(row, driver, claimed, where) {
 	if (!Array.isArray(equivalent) || equivalent.length === 0) {
 		throw new Error(`${where}: equivalent_${driver} must be a non-empty array of action ids`);
 	}
-	if (equivalent.some((id) => typeof id !== 'string') || new Set(equivalent).size !== equivalent.length) {
+	if (
+		equivalent.some((id) => typeof id !== 'string') ||
+		new Set(equivalent).size !== equivalent.length
+	) {
 		throw new Error(`${where}: equivalent_${driver} must list distinct action ids`);
 	}
 }

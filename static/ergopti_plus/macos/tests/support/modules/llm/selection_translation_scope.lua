@@ -74,7 +74,7 @@ local OWNED = {
 	"manifest_reader",
 	"perf_budget",
 	"platform.remap.lease_helper",
-	"program_parameter",
+	"program_parameter", "user_action_parameter",
 	"script_chords",
 	"send_input",
 	"tap_hold.key_combinations",
