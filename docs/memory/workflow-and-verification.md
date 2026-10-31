@@ -71,6 +71,44 @@ updater source requires resealing
 `tools/ci/windows-updater-original-diagnostic-cohort-inputs.json` with
 `tools/ci/seal-windows-updater-original-source.cjs`.
 
+### project-hook-failure-from-a-foreign-dirty-file
+
+When a pre-commit hook fails because of another agent's uncommitted file,
+wait until that file is committed, or commit through a private index
+(`GIT_INDEX_FILE` seeded from `HEAD`, only the owned paths added) with the
+hooks still running, then move the branch with a compare-and-swap
+`git update-ref <ref> <new> <old>`. Never use `--no-verify`: it skips the gates
+for the owned paths too. Quality over speed: never weaken a test to land.
+
+### project-pre-commit-formatters-and-reseal
+
+Run the pinned ruff 0.15.8 and Prettier on the changed files before every
+commit. After touching a sealed Windows updater source, reseal with
+`node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`.
+
+### project-todo-checklist-conventions
+
+The root `TODO.md` is the only checklist: open work only, with no separate
+handoff file (an agent writes what is left into the item itself). A finished
+item is removed and its lessons go to `docs/memory`; its history stays in Git
+(`git log --follow -p -- TODO.md`; the file before the 2026-10-31 pass is
+`git show 1aa287427a:TODO.md`, before the 2026-10-30 pass
+`git show 7f80d3d141:TODO.md`). Item numbers are stable and never reused. Tags:
+**[CODE]** software to write or adopt; **[CI]** only a hosted or native CI run
+qualifies it; **[PHYS-W]**, **[PHYS-M]**, **[PHYS-L]** needs a real Windows PC,
+Mac or Linux machine. Open questions sit in TODO's "Questions for the
+maintainer", each naming the default kept meanwhile; an answer moves into the
+item or into [maintainer decisions](maintainer-decisions.md).
+
+### project-physical-qualification-stays-open
+
+Unless an item says otherwise, native macOS and Linux qualification and every
+physical-device acceptance stay OPEN and their qualification flags false:
+portable tests, containers and software-supplied events are never physical
+evidence. The maintainer has a Windows PC (physical tests on request) and a
+work Mac (reproduce on CI first, then ask for at most one short command); there
+is no Linux machine.
+
 ### project-preserve-external-runtimes-during-tests
 
 Tests and probes never kill an external Ollama server, the personal locator or
