@@ -114,7 +114,7 @@ def report_module_map(repository):
 
 LUA_ARCHIVE_SHA256 = "9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30"
 NATIVE_BACKEND = "tools/diagnostics/hs274_native_build.py"
-NATIVE_BACKEND_SHA256 = "9695174913fec75b4f0ea1b58b1fed70a06f31fc88dcc7b521ca93eb730d9fe6"
+NATIVE_BACKEND_SHA256 = "4960f60eeda958560dec20f908d56c990943b5d37b223075acef80e230590677"
 HAMMERSPOON_COMMIT = "1469832361b4c3687ec7d589c1b4efe4d3b742ee"
 # Actual Hammerspoon1.1.1 vendored source, not a standard-Lua ABI assumption.
 HAMMERSPOON_HEADERS = (
