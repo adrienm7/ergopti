@@ -325,7 +325,9 @@ a worker that ended at the same second.
 The same rule applies to `tests/run_all.ahk`: concurrent `--only` invocations
 from the same checkout replace the earlier runner through `#SingleInstance
 Force`. Its predecessor can exit0 with an unfinished test plan. Serialize these
-invocations and require a complete manifest before accepting a zero exit.
+invocations and require a complete manifest before accepting a zero exit, or run
+them under the interpreter's `/force` switch, as
+[the parallel runner](../tooling/windows-ahk-parallel-tests.md) does.
 
 ### project-ahk-getmenustate-counts-rows-in-the-high-byte
 

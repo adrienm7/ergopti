@@ -531,6 +531,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-no-pinned-source-reads-linux.cjs"],
 			"repro": "npm run test:no-pinned-source-reads-linux"
+		},
+		{
+			"id": "js-ahk-parallel-runner",
+			"ordinal": 547,
+			"name": "parallel AHK runner reads results by exact test name",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-ahk-parallel.cjs"],
+			"repro": "npm run test:ahk-parallel-tool"
 		}
 	]
 }
