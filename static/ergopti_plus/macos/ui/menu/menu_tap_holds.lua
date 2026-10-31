@@ -1046,37 +1046,27 @@ local function legacy_rules_rows(karabiner)
 	})
 end
 
---- The consent row of Ergopti's own Karabiner runtime (ADR 011): while it is
---- ticked, turning tap-holds on closes the user's own Karabiner-Elements, and
---- turning them off gives it back. It exists only on a boot that runs the owned
---- runtime; Windows and Linux have no Karabiner, as the provider row's
---- `platform_reason.remap_engine_is_per_driver` says.
+--- The row that tells the user Ergopti closed their own Karabiner-Elements
+--- while it runs and gives it back on pause or quit (ADR 011, the maintainer's
+--- rule of 2026-10-31). Windows and Linux have no Karabiner, as the provider
+--- row's `platform_reason.remap_engine_is_per_driver` says.
 --- @param karabiner table Remap facade.
---- @param update_menu function|nil Menu refresh callback.
---- @return table rows Empty unless the owned runtime runs.
-local function close_other_karabiner_rows(karabiner, update_menu)
-	if type(karabiner.owned_runtime_selected) ~= "function" or karabiner.owned_runtime_selected() ~= true
-		or type(karabiner.get_close_other_instances) ~= "function" then return {} end
-	local consent = karabiner.get_close_other_instances() == true
-	return { {
-		label = i18n.get("menu.tapholds.close_other_karabiner"),
-		checked = consent,
-		action = function()
-			Logger.info(LOG, "Close other Karabiner instances toggled to %s from the Tap-Holds menu.", tostring(not consent))
-			commit_menu_setting(karabiner, "Close other Karabiner instances", function()
-				return karabiner.set_close_other_instances(not consent)
-			end, update_menu)
-		end,
-	} }
+--- @return table rows Empty unless Ergopti holds the user's Karabiner closed.
+local function user_karabiner_closed_rows(karabiner)
+	if type(karabiner.user_karabiner_closed) ~= "function" then return {} end
+	local ok, closed = pcall(karabiner.user_karabiner_closed)
+	if not ok or closed ~= true then return {} end
+	return ManifestMenu.template_rows("tap_hold_user_karabiner_closed_rows", {}) or {}
 end
 
 --- Why Ergopti's own runtime cannot run, for the blocks the user can act on.
 --- Only one VirtualHIDDevice version can be active on a Mac, so a user
 --- Karabiner with another driver version blocks it (ADR 011), and a driver
 --- macOS has not approved blocks it until it is allowed in System Settings.
-local VHID_BLOCK_KEYS = {
-	virtual_hid_incompatible = "menu.tapholds.vhid_incompatible",
-	virtual_hid_not_active = "menu.tapholds.vhid_not_active",
+-- Literal template names, so the menu parity gate sees each publication.
+local VHID_BLOCK_ROWS = {
+	virtual_hid_incompatible = function() return ManifestMenu.template_rows("tap_hold_vhid_incompatible_rows", {}) end,
+	virtual_hid_not_active = function() return ManifestMenu.template_rows("tap_hold_vhid_not_active_rows", {}) end,
 }
 
 --- The disabled row that explains a VirtualHIDDevice block of the owned runtime.
@@ -1086,9 +1076,9 @@ local function owned_runtime_block_rows(karabiner)
 	if type(karabiner.owned_runtime_status) ~= "function" then return {} end
 	local ok, status = pcall(karabiner.owned_runtime_status)
 	if not ok or type(status) ~= "table" or status.state ~= "unavailable" then return {} end
-	local key = VHID_BLOCK_KEYS[status.reason]
-	if not key then return {} end
-	return { { label = i18n.get(key), disabled = true } }
+	local rows = VHID_BLOCK_ROWS[status.reason]
+	if not rows then return {} end
+	return rows() or {}
 end
 
 --- Builds the Tap-holds row and its submenu.
@@ -1130,7 +1120,7 @@ function M.build(ctx)
 			local rows = legacy_rules_rows(karabiner)
 			for _, row in ipairs(guardian_status_rows(karabiner, tap_holds_on)) do rows[#rows + 1] = row end
 			for _, row in ipairs(owned_runtime_block_rows(karabiner)) do rows[#rows + 1] = row end
-			for _, row in ipairs(close_other_karabiner_rows(karabiner, update_menu)) do rows[#rows + 1] = row end
+			for _, row in ipairs(user_karabiner_closed_rows(karabiner)) do rows[#rows + 1] = row end
 			rows[#rows + 1] = build_delay_item(karabiner, update_menu)
 			rows[#rows + 1] = build_sticky_delay_item(karabiner, update_menu)
 			return rows

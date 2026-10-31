@@ -37,6 +37,8 @@ end
 --- @return table fetcher
 --- @return table world { commands, files }
 local function fake(overrides)
+	-- Another module's stub of the path table must not decide where the artifact goes.
+	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["platform.remap.runtime_artifact_fetch"] = nil
 	local Fetch = require("platform.remap.runtime_artifact_fetch")
 	local world = { commands = {}, files = {} }
@@ -222,6 +224,7 @@ helpers.describe("owned runtime artifact fetch: then always that one", function(
 	end)
 
 	helpers.it("lets a caller that asks during a fetch wait for that same fetch", function()
+		package.loaded["platform.remap.ke_paths"] = nil
 		package.loaded["platform.remap.runtime_artifact_fetch"] = nil
 		local Fetch = require("platform.remap.runtime_artifact_fetch")
 		local held, runs = nil, 0

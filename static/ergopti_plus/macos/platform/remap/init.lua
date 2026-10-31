@@ -211,7 +211,7 @@ local _state = nil
 -- present only after an explicit opt-in with `[karabiner] runtime = "owned"`;
 -- default boot never requires that module. `paths` is the runtime-selected
 -- path table.
-M._owned = { owner = nil, activation = nil, paths = require("platform.remap.ke_paths") }
+M._owned = { owner = nil, activation = nil, paused = false, paths = require("platform.remap.ke_paths") }
 
 --- True when this boot opted in to the owned runtime.
 --- @return boolean owned
@@ -3676,16 +3676,6 @@ function M.set_enabled(value, on_done, onboarding_gate)
 		return false
 	end
 	local target_enabled = value == true
-	if M._owned.selected() then
-		-- « Ergopti uses Karabiner » is half of the activation rule: follow it once settled.
-		local caller_done = on_done
-		on_done = function(...)
-			if M._owned.reconcile() ~= true then
-				Logger.error(LOG, "Owned Karabiner runtime could not follow « Ergopti uses Karabiner ».")
-			end
-			if type(caller_done) == "function" then return caller_done(...) end
-		end
-	end
 	if _bulk_settings_transaction then
 		local phase = _bulk_settings_transaction.phase
 		if phase == "rollback-persistence" or phase == "rollback-regeneration" or phase == "rollback-sibling" then
@@ -4204,7 +4194,6 @@ local function publish_settings_state(candidate)
 	_state.sticky_timeout_ms = candidate.sticky_timeout_ms
 	_state.simultaneous_threshold_ms = candidate.simultaneous_threshold_ms
 	_state.combo_symmetric = candidate.combo_symmetric
-	_state.close_other_instances = candidate.close_other_instances
 end
 
 --- Persists and then publishes one detached settings candidate.
@@ -5161,13 +5150,7 @@ function M.set_tap_holds_enabled(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_holds_enabled = value
 	end, nil, require("config_keys").KEY.TAP_HOLDS_ENABLED)
-	if committed then
-		Logger.info(LOG, "Tap-Holds feature: %s.", value and "on" or "off")
-		-- The Tap-Hold switch is what runs or stops Ergopti's own runtime.
-		if M._owned.selected() and M._owned.reconcile() ~= true then
-			Logger.error(LOG, "Owned Karabiner runtime could not follow the Tap-Hold switch.")
-		end
-	end
+	if committed then Logger.info(LOG, "Tap-Holds feature: %s.", value and "on" or "off") end
 	return committed
 end
 
@@ -5188,33 +5171,12 @@ function M.owned_runtime_status()
 	return { state = status.state, reason = status.reason }
 end
 
---- The user's consent to closing their own Karabiner while Tap-Hold is on.
---- @return boolean consent
-function M.get_close_other_instances()
-	if not require_state("get_close_other_instances") then return false end
-	return _state.close_other_instances == true
-end
-
---- Sets and persists `[karabiner] close_other_instances`, then applies the
---- activation rule so a running runtime that waited on the consent starts.
---- @param value boolean Desired consent.
---- @return boolean committed
-function M.set_close_other_instances(value)
-	if not require_state("set_close_other_instances") then return false end
-	if type(value) ~= "boolean" then
-		Logger.error(LOG, "set_close_other_instances(): value must be a boolean.")
-		return false
-	end
-	local committed = commit_state_mutation(function(candidate)
-		candidate.close_other_instances = value
-	end)
-	if committed then
-		Logger.info(LOG, "Close other Karabiner instances: %s.", value and "on" or "off")
-		if M._owned.selected() and M._owned.reconcile() ~= true then
-			Logger.error(LOG, "Owned Karabiner runtime could not follow the close option.")
-		end
-	end
-	return committed
+--- Whether Ergopti closed the user's own Karabiner-Elements and has not given
+--- it back yet, for the menu row that says so.
+--- @return boolean closed
+function M.user_karabiner_closed()
+	if not M._owned.selected() then return false end
+	return require("adapters.runtime_owner_ports").marker().get() == true
 end
 
 --- Returns whether the key combinations are switched on: the persisted
@@ -6644,6 +6606,11 @@ end
 --- @param on_done function|nil Callback fn(ok, reason) after PAUSED or failure.
 --- @param onboarding_gate table|nil Private exact-settlement continuation token.
 function M.pause(on_done, onboarding_gate)
+	if onboarding_gate == nil and M._owned.selected() and M._owned.paused ~= true then
+		-- Ergopti paused: its own runtime stops and a Karabiner it closed comes back.
+		M._owned.paused = true
+		if M._owned.reconcile() ~= true then Logger.error(LOG, "Owned Karabiner runtime could not follow the pause.") end
+	end
 	if not _state or not _state.enabled then
 		invoke_public_callback("pause", on_done, false, "integration-disabled")
 		return false
@@ -6755,6 +6722,11 @@ end
 --- acknowledgement names the same ACTIVE token.
 --- @param on_done function|nil Callback fn(ok, reason) after the full transaction.
 function M.resume(on_done)
+	if M._owned.selected() and M._owned.paused == true then
+		-- Ergopti resumes: its own runtime runs again and closes the user's Karabiner.
+		M._owned.paused = false
+		if M._owned.reconcile() ~= true then Logger.error(LOG, "Owned Karabiner runtime could not follow the resume.") end
+	end
 	if not _state or not _state.enabled then
 		invoke_public_callback("resume", on_done, false, "integration-disabled")
 		return false
@@ -6845,17 +6817,19 @@ function M._owned.bind()
 		return nil
 	end
 	M._owned.owner = Owner
-	-- The user's consent to closing an official Karabiner is the hidden key, whose
-	-- absent default is the decided `true`; it is never assumed here.
+	-- A second capture cannot start in this Lua VM, so a resume reloads the driver.
 	M._owned.activation = require("platform.remap.runtime_activation").new(OwnerPorts.activation(Owner,
-		function() return _state ~= nil and _state.close_other_instances == true end))
+		function()
+			Logger.info(LOG, "Reloading so that Ergopti's own Karabiner runtime starts again.")
+			hs.reload()
+		end))
 	Logger.success(LOG, "Owned Karabiner runtime bound.")
 	return M._owned.activation
 end
 
---- Applies the activation rule (platform/remap/runtime_activation.lua): Tap-Hold
---- on runs the owned runtime, closing the user's Karabiner with consent; Tap-Hold
---- off keeps it inactive and gives back a Karabiner Ergopti closed. Admission
+--- Applies the activation rule (platform/remap/runtime_activation.lua): while
+--- Ergopti runs and is not paused its own runtime is active and closes the
+--- user's Karabiner; paused, it stops and gives back a Karabiner it closed. Admission
 --- failure is reported by the owner with a named reason and leaves the bridge
 --- fail-closed: nothing falls back to the shared runtime. When admission
 --- succeeds, the configuration is generated and deployed to the owned path.
@@ -6864,7 +6838,8 @@ function M._owned.reconcile()
 	local activation = M._owned.bind()
 	if not activation then return false end
 	local epoch = _lifecycle_epoch
-	local action = activation.reconcile(require("platform.remap.runtime_activation").wanted(_state), function()
+	local lifecycle = { running = _running == true and not _shutdown_requested, paused = M._owned.paused == true }
+	local action = activation.reconcile(require("platform.remap.runtime_activation").wanted(lifecycle), function()
 		if epoch ~= _lifecycle_epoch or not _running then return end
 		if _state.enabled == true and not M.regenerate() then
 			Logger.error(LOG, "Owned Karabiner runtime was admitted but its configuration could not be requested.")
@@ -7024,7 +6999,6 @@ function M.init(file_system)
 	_state = {
 		enabled                   = user_cfg.enabled,
 		runtime                   = runtime,
-		close_other_instances     = user_cfg.close_other_instances,
 		tap_holds_enabled         = user_cfg.tap_holds_enabled ~= false,
 		mod_combos_enabled        = user_cfg.mod_combos_enabled,
 		tap_hold_config           = user_cfg.tap_hold_config,
