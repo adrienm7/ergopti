@@ -339,6 +339,7 @@
 	"dialog.app_picker.stopped_suffix": " (fermata)",
 	"dialog.app_picker.title": "Selezione applicazione",
 	"dialog.bulk_toggle.save_failed": "Impossibile salvare la modifica nel file di configurazione.\nÈ stata annullata. Chiudi qualsiasi app che trattiene il file e riprova.",
+	"dialog.config_save.case_twin": "L'impostazione {1} compare nel file di configurazione in due grafie che differiscono solo per le maiuscole, quindi ErgoptiPlus non può sapere quale modificare.\nLa modifica non è stata salvata. Usa «{2}» nel menu per rimuovere la grafia in più e riprova.",
 	"dialog.config_folder.hint": "Tutti i file personali (personal_shortcuts.ahk, personal_hotstrings.toml…) verranno cercati in questa cartella. Lascia vuoto per usare la cartella predefinita.",
 	"dialog.config_folder.label": "Percorso:",
 	"dialog.config_folder.select_title": "Seleziona cartella configurazione",

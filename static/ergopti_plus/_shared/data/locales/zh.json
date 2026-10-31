@@ -339,6 +339,7 @@
 	"dialog.app_picker.stopped_suffix": " (已停止)",
 	"dialog.app_picker.title": "应用选择",
 	"dialog.bulk_toggle.save_failed": "无法将更改保存到配置文件。\n更改已撤销。请关闭占用该文件的所有应用后重试。",
+	"dialog.config_save.case_twin": "设置 {1} 在配置文件中有两种仅大小写不同的写法，ErgoptiPlus 无法确定应更改哪一种。\n您的更改未保存。请使用菜单中的“{2}”删除多余的写法，然后重试。",
 	"dialog.config_folder.hint": "所有个人文件（personal_shortcuts.ahk, personal_hotstrings.toml…） 将在此文件夹中搜索。留空则使用默认文件夹。",
 	"dialog.config_folder.label": "路径：",
 	"dialog.config_folder.select_title": "选择配置文件夹",

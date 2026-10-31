@@ -339,6 +339,7 @@
 	"dialog.app_picker.stopped_suffix": " (parado)",
 	"dialog.app_picker.title": "Seleção de aplicativos",
 	"dialog.bulk_toggle.save_failed": "Não foi possível guardar a alteração no ficheiro de configuração.\nFoi revertida. Feche qualquer aplicação que esteja a manter o ficheiro aberto e tente novamente.",
+	"dialog.config_save.case_twin": "A definição {1} aparece no ficheiro de configuração em duas grafias que diferem apenas nas maiúsculas, pelo que o ErgoptiPlus não consegue saber qual alterar.\nA sua alteração não foi guardada. Use «{2}» no menu para remover a grafia a mais e tente novamente.",
 	"dialog.config_folder.hint": "Todos os arquivos pessoais (personal_shortcuts.ahk, personal_hotstrings.toml…) serão buscados nesta pasta. Deixe vazio para usar a pasta padrão.",
 	"dialog.config_folder.label": "Caminho:",
 	"dialog.config_folder.select_title": "Selecionar pasta de configuração",

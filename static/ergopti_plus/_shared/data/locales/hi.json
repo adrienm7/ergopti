@@ -339,6 +339,7 @@
 	"dialog.app_picker.stopped_suffix": " (बंद)",
 	"dialog.app_picker.title": "अनुप्रयोग चयन",
 	"dialog.bulk_toggle.save_failed": "बदलाव को कॉन्फ़िगरेशन फ़ाइल में सहेजा नहीं जा सका।\nउसे वापस ले लिया गया है। फ़ाइल को रोकने वाले ऐप बंद करें और फिर कोशिश करें।",
+	"dialog.config_save.case_twin": "सेटिंग {1} कॉन्फ़िगरेशन फ़ाइल में दो वर्तनियों में मौजूद है जिनमें केवल बड़े-छोटे अक्षरों का अंतर है, इसलिए ErgoptiPlus तय नहीं कर सकता कि किसे बदले।\nआपका बदलाव सहेजा नहीं गया। अतिरिक्त वर्तनी हटाने के लिए मेनू में \"{2}\" का उपयोग करें और फिर कोशिश करें।",
 	"dialog.config_folder.hint": "सभी व्यक्तिगत फ़ाइलें (personal_shortcuts.ahk, personal_hotstrings.toml…) इस फ़ोल्डर में खोजी जाएंगी। डिफ़ॉल्ट फ़ोल्डर का उपयोग करने के लिए खाली छोड़ें।",
 	"dialog.config_folder.label": "पथ:",
 	"dialog.config_folder.select_title": "कॉन्फ़िगरेशन फ़ोल्डर चुनें",

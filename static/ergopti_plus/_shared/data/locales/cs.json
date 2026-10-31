@@ -339,6 +339,7 @@
 	"dialog.app_picker.stopped_suffix": " (zastaveno)",
 	"dialog.app_picker.title": "Výběr aplikace",
 	"dialog.bulk_toggle.save_failed": "Změnu se nepodařilo uložit do konfiguračního souboru.\nByla vrácena zpět. Zavřete všechny aplikace, které soubor drží otevřený, a zkuste to znovu.",
+	"dialog.config_save.case_twin": "Nastavení {1} je v konfiguračním souboru uvedeno ve dvou zápisech, které se liší jen velikostí písmen, takže ErgoptiPlus nepozná, který změnit.\nVaše změna nebyla uložena. Pomocí položky „{2}“ v nabídce odstraňte nadbytečný zápis a zkuste to znovu.",
 	"dialog.config_folder.hint": "Všechny osobní soubory (personal_shortcuts.ahk, personal_hotstrings.toml…) budou hledány v této složce. Ponechte prázdné pro použití výchozí složky.",
 	"dialog.config_folder.label": "Cesta:",
 	"dialog.config_folder.select_title": "Vybrat konfigurační složku",

@@ -339,6 +339,7 @@
 	"dialog.app_picker.stopped_suffix": "（停止中）",
 	"dialog.app_picker.title": "アプリケーション選択",
 	"dialog.bulk_toggle.save_failed": "変更を設定ファイルに保存できませんでした。\n変更は元に戻されました。ファイルを開いているアプリをすべて閉じて、もう一度お試しください。",
+	"dialog.config_save.case_twin": "設定 {1} は、大文字と小文字だけが異なる 2 つの表記で設定ファイルに含まれているため、ErgoptiPlus はどちらを変更すべきか判断できません。\n変更は保存されませんでした。メニューの「{2}」で余分な表記を削除してから、もう一度お試しください。",
 	"dialog.config_folder.hint": "すべての個人ファイル (personal_shortcuts.ahk, personal_hotstrings.toml…) はこのフォルダーで検索されます。デフォルトフォルダーを使用するには空白のままにしてください。",
 	"dialog.config_folder.label": "パス:",
 	"dialog.config_folder.select_title": "設定フォルダーを選択",

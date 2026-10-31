@@ -47,6 +47,34 @@ return function(helpers, fixture)
 				if vector.writes == 0 then helpers.assert_eq(disk, vector.input) end
 			end)
 		end
+		-- The callers only learn "not saved" and blame a held file: the writer alone
+		-- can name the twin and the cleanup, once per save and its preflight.
+		helpers.it("toml-writer-case-twins a refused twin reports its setting once", function()
+			local path = os.tmpname()
+			local notices = {}
+			local cases = {
+				{ "[a]\nb = 1\nB = 2\n", "a", "b" },
+				{ "[Script]\nlevel = 1\n[script]\nlevel = 2\n", "script", "level" },
+				{ "root = { b = 1, B = 2 }\n", "root", "b" },
+			}
+			Writer.set_case_twin_reporter(function(message) notices[#notices + 1] = message end)
+			for index, case in ipairs(cases) do
+				local handle = assert(io.open(path, "wb"))
+				handle:write(case[1]); handle:close()
+				local row = { section = case[2], key = case[3], value = 3 }
+				helpers.assert_eq((Writer.prepare_batch(path, { row })), false, case[1])
+				helpers.assert_eq((Writer.prepare_batch(path, { row })), false, case[1])
+				helpers.assert_eq(#notices, index, "the preflight and the save show one notice")
+				helpers.assert_true(not notices[index]:find("{", 1, true), "no placeholder reaches the user")
+				helpers.assert_true(notices[index]:find(case[2], 1, true) ~= nil, "the notice names the setting")
+			end
+			local handle = assert(io.open(path, "wb"))
+			handle:write("[a]\nb = 1\n"); handle:close()
+			helpers.assert_eq((Writer.prepare_batch(path, { { section = "a", key = "b", value = 3 } })), true)
+			helpers.assert_eq(#notices, #cases, "a save that goes through shows nothing")
+			Writer.set_case_twin_reporter(function() end)
+			os.remove(path)
+		end)
 		helpers.it("toml-noop-parity revalidates an unchanged source before acknowledgement", function()
 			local reads, publications = 0, 0
 			local ok = Writer.batch_write("/controlled/noop-stale.toml", {

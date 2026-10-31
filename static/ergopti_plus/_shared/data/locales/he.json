@@ -339,6 +339,7 @@
 	"dialog.app_picker.stopped_suffix": " (מופסק)",
 	"dialog.app_picker.title": "בחירת יישומים",
 	"dialog.bulk_toggle.save_failed": "לא ניתן היה לשמור את השינוי בקובץ התצורה.\nהוא בוטל. סגור כל יישום שמחזיק את הקובץ ונסה שוב.",
+	"dialog.config_save.case_twin": "ההגדרה {1} מופיעה בקובץ התצורה בשני איותים השונים זה מזה רק באותיות גדולות וקטנות, ולכן ErgoptiPlus אינו יכול לדעת איזה מהם לשנות.\nהשינוי שלך לא נשמר. השתמש ב-\"{2}\" בתפריט כדי להסיר את האיות העודף ונסה שוב.",
 	"dialog.config_folder.hint": "כל הקבצים האישיים (personal_shortcuts.ahk, personal_hotstrings.toml…) יחופשו בתיקייה זו. השאר ריק כדי להשתמש בתיקיית ברירת המחדל.",
 	"dialog.config_folder.label": "נתיב:",
 	"dialog.config_folder.select_title": "בחר תיקיית הגדרות",

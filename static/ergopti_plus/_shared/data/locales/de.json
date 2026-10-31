@@ -339,6 +339,7 @@
 	"dialog.app_picker.stopped_suffix": " (gestoppt)",
 	"dialog.app_picker.title": "Anwendungsauswahl",
 	"dialog.bulk_toggle.save_failed": "Die Änderung konnte nicht in der Konfigurationsdatei gespeichert werden.\nSie wurde rückgängig gemacht. Schließen Sie jede App, die die Datei festhält, und versuchen Sie es erneut.",
+	"dialog.config_save.case_twin": "Die Einstellung {1} steht in der Konfigurationsdatei in zwei Schreibweisen, die sich nur durch die Groß- und Kleinschreibung unterscheiden, daher kann ErgoptiPlus nicht erkennen, welche geändert werden soll.\nIhre Änderung wurde nicht gespeichert. Entfernen Sie die überzählige Schreibweise mit „{2}“ im Menü und versuchen Sie es erneut.",
 	"dialog.config_folder.hint": "Alle persönlichen Dateien (personal_shortcuts.ahk, personal_hotstrings.toml…) werden in diesem Ordner gesucht. Leer lassen für den Standardordner.",
 	"dialog.config_folder.label": "Pfad:",
 	"dialog.config_folder.select_title": "Konfigurationsordner auswählen",

@@ -1319,6 +1319,10 @@ do
 	local ConfigMigrate = require("config_migrate")
 	require("toml_codec.writer").set_sparse_defaults(
 		config_paths.get("ConfigTomlPath"), require("infra.manifest_reader"))
+	require("toml_codec.writer").set_case_twin_reporter(function(message)
+		local sent, notice_error = require("infra.notifications").notify(i18n.get("paths_editor.save_failed_title"), message, "error")
+		if not sent then error(tostring(notice_error)) end
+	end)
 	local catalogue_ok, action_catalogue = pcall(require, "_generated.action_catalogue")
 	local context, context_error
 	if catalogue_ok then

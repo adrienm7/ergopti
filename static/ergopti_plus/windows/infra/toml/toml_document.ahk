@@ -1102,8 +1102,13 @@ _TOML_ConfigAdmitRow(Document, Records, Physical, Parts, Update) {
 	}
 	; The explicit cleanup names one exact offered line, as the Lua cleanup's own cut
 	; does: refusing it would leave the user no way out of the twin refused here.
-	if Twin && !WholeValue
-		throw ValueError("Case twins in the source leave " . Name . " without one destination")
+	if Twin && !WholeValue {
+		; The named setting travels with the refusal: only it tells the user what
+		; to clean up, where any other refused write reads as a held file.
+		Refused := ValueError("Case twins in the source leave " . Name . " without one destination")
+		Refused.CaseTwinSetting := Name
+		throw Refused
+	}
 	if Existing["found"] && !IsSet(Desired) && _TOML_ConfigScalarKind(Existing["value"]) == ""
 		return Canonical
 	if Existing["found"] && _TOML_ConfigScalarKind(Existing["value"]) == ""
