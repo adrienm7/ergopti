@@ -465,6 +465,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-route-plan.cjs"],
 			"repro": "node tools/test/test-windows-route-plan.cjs"
+		},
+		{
+			"id": "go-proxy-relay-gate",
+			"ordinal": 547,
+			"name": "Go proxy sign-in relay gate cannot pass vacuously (missing toolchain, no test files, skipped test)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-go-proxy-relay-gate.cjs"],
+			"repro": "node tools/test/test-go-proxy-relay-gate.cjs"
 		}
 	]
 }

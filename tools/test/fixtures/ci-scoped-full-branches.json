@@ -1097,6 +1097,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Qualify the Go proxy sign-in relay",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Install prerequisites for Qualify the installed managed Ollama route plan",
 			"protocol": 9
 		},

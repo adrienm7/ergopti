@@ -81,6 +81,9 @@ const NOT_SUITE_ENTRIES = new Set([
 	// and verify-change run it, and the suite runs its vacuity gate
 	// (test-go-route-plan-gate.cjs) instead.
 	'tools/test/run-go-route-plan.cjs',
+	// The Go relay needs Go with cgo; the Linux network-ai CI shard and
+	// verify-change run it, and the suite runs test-go-proxy-relay-gate.cjs.
+	'tools/test/run-go-proxy-relay.cjs',
 	// Actual staged package/kernel admission is mandatory in its planner and CI lane.
 	'tools/test/run-linux-portable-network-native.cjs',
 	// Retained descriptor hashing has its own mandatory actual Linux qualification.
