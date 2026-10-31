@@ -102,6 +102,16 @@ downloaded again`). Ollama deletes that layer before it reports the
   `test_config_journal_nul_suffix.ahk`) must move to 20 and pass under
   AutoHotkey first. The macOS side follows (manifest slot, `open_chatgpt` on
   `hs` in `actions.toml`, the fixed `ctrl_g` hotkey and its menu row retired).
+- Local servers on Windows: GPT4All's Windows executable is `chat.exe` in the
+  installer's `gpt4all\bin` folder (the CMake target `chat`), so the Linux
+  command-line fragment `gpt4all/bin/chat` of `local_servers.json` matches it
+  only if the Windows process rows use forward slashes; and Lemonade's Windows
+  settings file is `%USERPROFILE%\.config\lemonade\config.json`
+  (lemonade-sdk `docs/guide/configuration/README.md`), declared for `linux` and
+  `macos` only. Check both against `LocalServerPortsDescriptor`, add `windows`
+  to that `config_files` entry if the AHK reader expands `~` to the profile, and
+  add a Windows case to `_shared/tests/corpus/llm/local_server_ports.json` (its
+  count is pinned at 28 in `test_local_server_ports.ahk` and the Lua contract).
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 
