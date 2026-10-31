@@ -88,6 +88,16 @@ only by static and JS tests. Once it lands on `dev`:
   closed `reason` from `_shared/modules/logger/vocabulary.json` (add it there
   deliberately, then `npm run codegen:contracts`) and put the detail in the
   message.
+
+- Two more shared gates are red on dev from Windows files:
+  `tools/test/test-repo-url-single-source.cjs` refuses the typed repository URL
+  in the `;@Ahk2Exe-Set Comments` directive of `windows/ErgoptiPlus.ahk:12`
+  (193250e0e7). The URL comes from `_shared/modules/updater/defaults.json`; a
+  compile-time directive cannot read it, so either drop the URL from the comment
+  or give the gate a reviewed exemption for that one directive.
+  `tools/test/test-config-key-literals.cjs` counts 7 hand-typed config keys in
+  `windows/infra/key_combinations.ahk` against a baseline of 1: use the
+  generated `ConfigKey`/`ConfigLeaf` constants.
 - Three new assignable actions are `hs,linux` (`run_command`, `open_path`) and
   `hs` (`run_apple_shortcut`, macOS only) in `actions.toml`
   (`feat/actions-command-path-shortcut`). Their Windows half, under
