@@ -980,48 +980,7 @@ not open software work.
       `TestIdleDeadlinePhysicallyRetiresPeer`, macOS Swift
       `testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope` (failed once on macOS 26).
 
-## Decided, do not re-raise
-
-- **Delta updates (item 22)**: withdrawn by the maintainer; full signed downloads stay below 20 MB.
-  Full signed, checksummed downloads keep one install and rollback path, without delta-base
-  selection, patch rebuild or extra fallbacks. Reconsider only if release size or measured
-  repeated-download cost grows.
-- **Report a bug has no review screen**: the report is reviewable on GitHub (October 21).
-- **Not defects after native review**: L48, L83 and the release-notes CR handling on Windows; L30,
-  L85, L88 and L18 on macOS.
-- **Configuration file style (October 20)**: `config.toml` keeps the 5/3 blank-line style everywhere
-  (templates and the Windows writer); `windows/_generated/config_template.toml` changes only
-  through `npm run build:manifest`; the release list and its ETag persist across restarts.
-- **Credentialed redirects** are not followed, by design (L42).
-- **Unsigned stable Windows releases** are authorised until SignPath signing is integrated (item
-  132).
-- **The AHK suite watchdog** is not raised to make a run finish; shard the suite instead.
-- **Obsolete configuration scalars** are preserved until explicit cleanup; ordinary saves refuse a
-  colliding subtree (ADR-009).
-- **Unicode general categories and graphemes** are out of scope for the metrics character classes
-  (L137); there is no Lua 5.4 AT-SPI backend, the FFI needs LuaJIT (L67).
-- **A stored layout or number-row choice is never rewritten** by a layout change: where it cannot
-  apply it stays ticked, greyed and suffixed « — non appliqué », and applies again by itself.
-- **Moving the Karabiner lease token out of the rule text** is impossible: Karabiner compares
-  variables only to fixed values. Fewer recovery deploys need fewer lease failures first.
-- **Do not deduplicate the macOS Swift launcher XCTest classes between E2E and Build.** The managed
-  native E2E cells run the SDK, logger and daily-log cohorts on macOS 15 (Apple silicon and Intel);
-  Build's full Swift run repeats them on macOS 26 (`macos-latest`). Skipping them in Build saves
-  about 42 s of 364 s of test time (measured 2026-10-20, run 39388400901) and nothing on the
-  critical path, and drops their only macOS 26 coverage. Job, lot and step names state each cell's
-  macOS version, read from `HOSTS` in `tools/ci/macos-stage-roles.cjs`.
-- **Windows unit shards are grouped by test category, not by duration.** A new test file with no
-  category fails a gate; a minute more of wall time buys a CI whose red job says what broke.
-- **Ergopti's own Karabiner follows Ergopti running, not a menu switch (2026-10-31, ADR 011).** While
-  Ergopti runs and is not paused it always uses its own Karabiner runtime and closes a running user
-  Karabiner-Elements; paused or quit, it stops its runtime and restarts the user's Karabiner only if it
-  closed it (a persisted marker, so a crash or forced quit still restores it). No Tap-Hold or other
-  feature switch takes part; the default-on consent row « close other Karabiner apps while Ergopti is
-  running » stays. The shared-mode merge into the user's `karabiner.json` is retired.
-- **Maintainer workflow**: partial work is delivered into dev after the feasible container or CI
-  work, with native or device gaps documented here rather than holding a branch.
-
 ## Questions for the maintainer
 
 Each names the default kept meanwhile. Answer here; the agent then moves the decision into the item
-or under "Decided, do not re-raise".
+or into [maintainer decisions](docs/memory/maintainer-decisions.md).
