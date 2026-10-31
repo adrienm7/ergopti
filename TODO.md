@@ -189,7 +189,8 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    - `prediction_tooltip` (automatic): with predictions on and the active model already on this Mac (Ollama
      listed by a running server, or an MLX model in the cache; nothing is started or downloaded),
      `le chat dort sur le ` is typed into the scratch field and the prediction tooltip must show within 45 s;
-     `keystroke_to_tooltip_ms` (last key to tooltip) is named. Codes: `llm_disabled`, `no_installed_model`
+     `keystroke_to_tooltip_ms` (last key to tooltip) is named. Predictions the user turned off skip with
+     `llm_disabled` (the check never turns them on). Failure codes: `no_installed_model`
      (a remote backend included), `tooltip_not_shown`, `typing_incomplete`.
    - `driver_reload` (last step): the configuration is put back, the run's state goes to `resume.json`, the
      driver reloads through the termination coordinator, and the reloaded driver's field run resumes, naming
