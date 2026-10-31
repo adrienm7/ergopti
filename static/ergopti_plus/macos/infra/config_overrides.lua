@@ -4,8 +4,7 @@
 --- MODULE: User Config Overrides
 --- DESCRIPTION:
 --- Loads the [script] section from the driver-specific config.toml and applies
---- its scalar values to hs.settings. A row with a native alias (locale, log
---- level, error window) is adopted earlier by infra.script_scope.
+--- its scalar values to hs.settings.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Optional File: a missing config.toml is a valid no-op.
@@ -175,15 +174,9 @@ function M.apply(file_path)
 	end
 
 	Logger.start(LOG, "Applying user overrides from '%s'…", file_path)
-	-- The [script] rows with a native alias (locale, log level, error window)
-	-- already won at start through infra.script_scope.adopt_configured(); this
-	-- loop must not also store them under their bare TOML key, which no reader
-	-- consults.
-	local aliases = require("infra.script_scope").alias_names()
 	local applied = 0
 	for _, row in ipairs(candidates) do
 		local section_name, key, value, accepted = row.section, row.key, row.value, row.accepted
-		if aliases[section_name .. "." .. tostring(key)] then goto continue_override end
 		if not admit_known_value(row) then goto continue_override end
 		if not accepted then
 			Logger.warn(LOG, "Ignoring non-scalar override in [%s].", section_name)
