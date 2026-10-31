@@ -90,7 +90,8 @@ M.REFUSAL_LEGACY_CONFLICTS = "legacy_conflicts"
 -- fails when the generator reads a field missing here, when a field here is no
 -- longer read, and when a feature's declared `requires.macos` disagrees.
 -- Selectors: `a.b` one feature, `a.b.*` a section's features, `a.b.**` all
--- under it. A field that feeds no feature gives its reason.
+-- under it. A field that feeds no feature says why (`why`, not `reason`, which
+-- the logger gate reserves for closed log reasons).
 M.REQUIREMENT_STATE_FEATURES = {
 	tap_holds_enabled         = { "tap_holds.enabled" },
 	-- The per-key bindings and the tap timeout belong to the Tap-Holds switch;
@@ -104,7 +105,7 @@ M.REQUIREMENT_STATE_FEATURES = {
 	script_chords             = { "shortcuts.script_control.*" },
 	virtual_keyboard_type     = { "layout.virtual_keyboard" },
 	virtual_keyboard_product  = { "layout.virtual_keyboard" },
-	nav_layer                 = { reason = "layers.toml is deployed whenever the integration is on; it has no manifest switch, and the features that enter it reach Karabiner on their own" },
+	nav_layer                 = { why = "layers.toml is deployed whenever the integration is on; it has no manifest switch, and the features that enter it reach Karabiner on their own" },
 }
 
 -- The modules that reach Karabiner without this generator: through the remap
@@ -117,8 +118,8 @@ M.REQUIREMENT_FACADE_FEATURES = {
 	["modules/shortcuts/script_control.lua"] = { "shortcuts.script_control.*" },
 	["platform/remap/watchers.lua"]         = { "shortcuts.caps_word.**" },
 	["modules/keystats/kc_bridge.lua"]      = { "metrics.**" },
-	["platform/remap/init.lua"]             = { reason = "the remap engine that runs this generator; its feature inputs are the state fields above" },
-	["platform/remap/generator.lua"]        = { reason = "this generator writes the physical key ledger rules; metrics reads them through kc_bridge" },
+	["platform/remap/init.lua"]             = { why = "the remap engine that runs this generator; its feature inputs are the state fields above" },
+	["platform/remap/generator.lua"]        = { why = "this generator writes the physical key ledger rules; metrics reads them through kc_bridge" },
 }
 
 -- The eight modifier keys: Shift, Control, Option and Command on each side.
