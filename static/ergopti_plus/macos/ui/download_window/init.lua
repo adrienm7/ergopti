@@ -717,7 +717,8 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
             local o_speed = clean_line:match("(%d+%.?%d*%s*[KMG]?B/s)")
             if o_speed then speed_str = o_speed end
 
-            local o_eta = clean_line:match("%s+(%d+[hms%d]+)%s*$")
+            -- A unit letter is required: a bare trailing number is a byte count
+            local o_eta = clean_line:match("%s+(%d+[%dhms]*[hms])%s*$")
             if o_eta then eta_str = o_eta end
         end
 

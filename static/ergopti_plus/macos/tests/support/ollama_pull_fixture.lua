@@ -149,7 +149,10 @@ local function with_fixture(options, callback)
 			if options.show_replaced then progress.shows = progress.shows + 1 end
 			return options.show_result ~= false
 		end,
-		update = function() progress.updates = (progress.updates or 0) + 1 end,
+		update = function(pct, bytes_done, bytes_total, line)
+			progress.updates = (progress.updates or 0) + 1
+			progress.last_update = { pct = pct, done = bytes_done, total = bytes_total, line = line }
+		end,
 		complete = function() progress.completes = progress.completes + 1; return true end,
 	}
 	package.loaded["adapters.task_lifecycle"] = {
