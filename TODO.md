@@ -570,10 +570,16 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       The karabiner_model comparison of 16.0.0 with 9312593e now covers the manipulators, the
       configuration reader and the event queue; `(owned-revision-config-keys)` pins the generated
       keys both revisions read alike. The `field_owned_runtime` step reports the owner's own verdict
-      on the installed VirtualHIDDevice (`driver_verdict`). Left: WP5 (the hosted runtime build pins
-      `runtime.*` and `capture.requirement` in `vendor/remap-runtime/manifest.json`), the driver-only
-      VirtualHIDDevice update offer (signed payload supplier), WP8 native acceptance, WP9 real-Mac
-      acceptance, WP10 enable and retire (with the menu text for the close option).
+      on the installed VirtualHIDDevice (`driver_verdict`). Since 2026-10-31: the hosted `runtime-artifact`
+      job (manual dispatch) and the reproducible packager, `capture.requirement` pinned, the first-run
+      fetch into `~/Library/Application Support/ErgoptiPlus/RemapRuntime/`, the running/paused/quit rule
+      with its consent row and closed-Karabiner notice, the VirtualHIDDevice block rows, and the owned-boot
+      migration out of the user's `karabiner.json`. Left: a green hosted runtime build and its `runtime.*`
+      pin; [CI] the artifact as the signed `ErgoptiPlus-Runtime-Installer.app` (`--package-owned`) with
+      the staging taking the downloaded helper instead of the bundle's
+      (`OwnedVirtualHIDDaemonReportMainOperation.swift`); the per-OS feature requirements table (needs the
+      generator's inputs mapped to feature paths); the driver-only VirtualHIDDevice update offer; WP8
+      native and WP9 real-Mac acceptance; then the `RUNTIME_DEFAULT` flip and the shared-mode deletion.
       Next: the maintainer's `bash tools/dev/collect-macos-field-report.sh` (`field_owned_runtime`, and on an
       owned boot `field_owned_start`: artifact verified, runtime ready, the user's Karabiner closed; then
       `field_owned_pause`: the controlled pause stops ours and gives theirs back, the resume follows the run
