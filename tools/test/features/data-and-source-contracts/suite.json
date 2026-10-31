@@ -604,7 +604,7 @@
 		},
 		{
 			"id": "js-launcher-sleep-registry",
-			"ordinal": 547,
+			"ordinal": 548,
 			"name": "every Swift launcher sleep takes its duration from the [launcher] timing registry section",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-launcher-sleep-registry.cjs"],
