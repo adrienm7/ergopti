@@ -19,6 +19,9 @@
 ---    keys that fired it woke them straight back up.
 --- 5. force_quit_frontmost killed unasked (decision of 2026-09-29), and a kill
 ---    confirmed in a dialog must target the window active before the question.
+--- 6. minimize_all, eject_all_disks, open_emoji_picker and pick_color were
+---    declared for Windows and macOS only. Their Linux commands run here in a real shell against stub
+---    tools, so a quoting slip or a filter that ejects the system disk fails.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -62,6 +65,51 @@ local function with_modules(stubs, body)
 	local ok, err = pcall(body)
 	for name in pairs(stubs) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end
+end
+
+--- Runs `script` with `sh` in a PATH whose first folder holds the stub tools.
+--- Every stub appends its name and arguments to the log the result returns.
+--- @param script string Shell text, as the driver would background it.
+--- @param stubs table name -> shell body run after the call is logged.
+--- @return string log One "name arg arg" line per stub call.
+--- @return string dir The stub folder (for files a stub wrote).
+local function run_with_stubs(script, stubs)
+	local dir = os.tmpname()
+	os.remove(dir)
+	-- LuaJIT's os.execute returns the status number, Lua 5.4's a boolean.
+	local made = os.execute("mkdir '" .. dir .. "'")
+	helpers.assert_true(made == true or made == 0, "the stub folder must be created")
+	for name, body in pairs(stubs) do
+		local fh = assert(io.open(dir .. "/" .. name, "w"))
+		fh:write("#!/bin/sh\necho \"" .. name .. " $*\" >> \"" .. dir .. "/calls.log\"\n" .. body .. "\n")
+		fh:close()
+		os.execute("chmod +x '" .. dir .. "/" .. name .. "'")
+	end
+	local script_file = dir .. "/script.sh"
+	local fh = assert(io.open(script_file, "w"))
+	fh:write(script .. "\n")
+	fh:close()
+	os.execute("PATH='" .. dir .. ":/usr/bin:/bin' STUBS='" .. dir .. "' sh '" .. script_file .. "' </dev/null >/dev/null 2>&1")
+	local log_fh = io.open(dir .. "/calls.log", "r")
+	local log = log_fh and log_fh:read("*a") or ""
+	if log_fh then log_fh:close() end
+	return log, dir
+end
+
+--- The shell text one action backgrounds, without its backgrounding suffix.
+--- @param Gestures table
+--- @param action string
+--- @param answer function|nil Result of each recorded command.
+--- @return string
+local function backgrounded(Gestures, action, answer)
+	local text
+	with_recorded_shell(function(commands)
+		Gestures.execute_action(action, "tap_3")
+		local run = launched(commands)
+		helpers.assert_eq(#run, 1, action .. " must background exactly one command")
+		text = run[1]:gsub(" 2>/dev/null &$", "")
+	end, answer)
+	return text
 end
 
 local EXPECTED = {
@@ -331,5 +379,79 @@ helpers.describe("Linux system actions", function()
 				end)
 			end)
 		end
+	end)
+
+	helpers.it("minimize_all minimizes every listed window but the sticky ones (action-parity-linux-system)", function()
+		local log = run_with_stubs(backgrounded(Gestures, "minimize_all"), {
+			wmctrl = 'printf "%s\\n" "0x01 0 host Editor" "0x02 -1 host Panel" "0x03 1 host Browser"',
+			xdotool = ":",
+		})
+		helpers.assert_eq(log, "wmctrl -l\nxdotool windowminimize 0x01\nxdotool windowminimize 0x03\n")
+	end)
+
+	helpers.it("eject_all_disks powers off the removable disks, never the system's own (action-parity-linux-system)",
+		function()
+			-- sda: the internal disk. sdb: a USB key with one mounted partition and
+			-- one that is not. sdc: a hot-plugged disk the system runs from.
+			-- sdd: a removable disk with a space in its mount point. sr0: a rom.
+			local lsblk = table.concat({
+				'case "$*" in',
+				'  "-nrpo NAME,TYPE,RM,HOTPLUG") printf "%s\\n" "/dev/sda disk 0 0" "/dev/sda1 part 0 0"'
+					.. ' "/dev/sdb disk 1 1" "/dev/sdb1 part 1 1" "/dev/sdc disk 0 1" "/dev/sdd disk 1 0" "/dev/sr0 rom 1 0";;',
+				'  "-nrpo MOUNTPOINT /dev/sdb") printf "%s\\n" "" "/media/ana/KEY" "";;',
+				'  "-nrpo MOUNTPOINT /dev/sdc") printf "%s\\n" "" "/boot/efi" "/";;',
+				'  "-nrpo MOUNTPOINT /dev/sdd") printf "%s\\n" "/media/ana/My\\\\x20Disk";;',
+				'  "-nrpo NAME,MOUNTPOINT /dev/sdb") printf "%s\\n" "/dev/sdb " "/dev/sdb1 /media/ana/KEY" "/dev/sdb2 ";;',
+				'  "-nrpo NAME,MOUNTPOINT /dev/sdd") printf "%s\\n" "/dev/sdd /media/ana/My\\\\x20Disk";;',
+				"esac",
+			}, "\n")
+			local log = run_with_stubs(backgrounded(Gestures, "eject_all_disks"), { lsblk = lsblk, udisksctl = ":" })
+			local calls = {}
+			for line in log:gmatch("[^\n]+") do
+				if line:find("^udisksctl") then calls[#calls + 1] = line end
+			end
+			helpers.assert_eq(calls, {
+				"udisksctl unmount -b /dev/sdb1",
+				"udisksctl power-off -b /dev/sdb",
+				"udisksctl unmount -b /dev/sdd",
+				"udisksctl power-off -b /dev/sdd",
+			})
+		end)
+
+	helpers.it("open_emoji_picker chains the installed choosers and logs when there is none (action-parity-linux-system)",
+		function()
+			local installed = { ibus = true, smile = true }
+			local answer = function(command)
+				local binary = command:match("command %-v '([^']+)'")
+				if binary then return installed[binary] == true end
+				return true
+			end
+			helpers.assert_eq(backgrounded(Gestures, "open_emoji_picker", answer), "{ ibus emoji || smile; }")
+			installed = {}
+			with_recorded_shell(function(commands)
+				Gestures.execute_action("open_emoji_picker", "tap_3")
+				helpers.assert_eq(#launched(commands), 0, "no chooser installed: nothing is started")
+			end, answer)
+		end)
+
+	helpers.it("pick_color runs the picker of the session it is in (action-parity-linux-system)", function()
+		local real_getenv = os.getenv
+		local wayland = nil
+		os.getenv = function(name)
+			if name == "WAYLAND_DISPLAY" then return wayland end
+			return real_getenv(name)
+		end
+		local answer = function(command)
+			if command:find("command -v", 1, true) then return true end
+			return true
+		end
+		local ok, err = pcall(function()
+			helpers.assert_eq(backgrounded(Gestures, "pick_color", answer),
+				"{ xcolor --selection clipboard || gpick --single --output --no-newline | xclip -selection clipboard; }")
+			wayland = "wayland-0"
+			helpers.assert_eq(backgrounded(Gestures, "pick_color", answer), "{ hyprpicker --autocopy --format=hex; }")
+		end)
+		os.getenv = real_getenv
+		if not ok then error(err, 0) end
 	end)
 end)
