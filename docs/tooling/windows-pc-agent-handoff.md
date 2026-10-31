@@ -75,15 +75,11 @@ only by static and JS tests. Once it lands on `dev`:
 
 ## Found tonight for the PC agent
 
-- AI menu label: `menu.llm.title` is now sentence case (`✨ Artificial
-intelligence`, `✨ Intelligence artificielle`; also es, pt, tr), and four
-  messages quote it instead of an « AI menu » no tray draws. No AHK test pins
+- AI menu label: four messages now quote each locale's `menu.llm.title`
+  (« Intelligence Artificielle », “Artificial Intelligence”) instead of an
+  « AI menu » no tray draws; the title itself is unchanged. No AHK test pins
   the literal: they resolve `t("menu.llm.title")`. Still to do under
-  AutoHotkey: the comment of
-  `tests/meta/modules/llm/menu/test_llm_menu_init_order.ahk` (line 10) names
-  « Intelligence Artificielle »; run the live check `test-prediction-ai-off`
-  of `tools/maintainer/windows-live-checks-list.cjs`, whose tray regex is now
-  `re:Artificial intelligence$`; and confirm the action picker's count default
+  AutoHotkey: confirm the action picker's count default
   (`dialog.action_picker.count_default`, `ui/action_picker_webview.ahk`) reads
   the new text.
 
