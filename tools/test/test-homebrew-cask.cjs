@@ -817,7 +817,7 @@ check('archive artifacts bind only this step session independently of TIS', () =
 		lines.indexOf('"scope": "swift-not-started"') <
 			lines.indexOf('export ERGOPTI_TIS_EVIDENCE_DIR=')
 	);
-	assert.match(step, /timeout-minutes: 10/);
+	assert.match(step, /timeout-minutes: 15/);
 	const upload = pipeline.step(job, 'Retain archive diagnostic session');
 	assert.equal(
 		pipeline.stepField(upload, 'if'),

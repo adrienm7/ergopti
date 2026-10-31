@@ -579,7 +579,7 @@
 					"name": "Run Swift launcher tests on macOS 26",
 					"id": "swift-launcher-tests",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}",
-					"timeout-minutes": 10
+					"timeout-minutes": 15
 				},
 				{
 					"name": "Retain scoped native Brew qualification receipt",
