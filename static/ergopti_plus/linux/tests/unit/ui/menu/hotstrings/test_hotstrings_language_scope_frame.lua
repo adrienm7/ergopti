@@ -23,7 +23,7 @@ local function fixture(body)
 	local native = require("infra.i18n")
 	native.init()
 	local renderer = require("infra.manifest_menu")
-	local builder = require("ui.menu.menu_builder")
+	local builder = require("ui.menu.builder")
 	local build = upvalue(builder.build, "_build_hotstrings")
 	local source = renderer.get_root()
 	local saved_frame, saved_parent, saved_check = source.hotstring_language_frame,

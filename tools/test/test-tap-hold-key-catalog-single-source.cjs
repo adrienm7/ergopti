@@ -246,7 +246,7 @@ const READERS = [
 		retired: [/tap_hold_keys_catalog/, /LEFT_HAND_IDS/, /_load_left_hand_from_catalog/]
 	},
 	{
-		file: 'linux/ui/menu/menu_builder.lua',
+		file: 'linux/ui/menu/builder.lua',
 		reads: /\.key_catalog\(\)/,
 		retired: [/KEY_ORDER/]
 	},

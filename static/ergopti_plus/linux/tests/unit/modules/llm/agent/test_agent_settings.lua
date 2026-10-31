@@ -169,7 +169,7 @@ local function build_menu(world, answers)
 	local ok, rows = pcall(function()
 		-- Both bind the scenario's freshly loaded agent settings.
 		package.loaded["ui.menu.agent_rows"] = nil
-		local menu_builder = helpers.load_module("ui.menu.menu_builder")
+		local menu_builder = helpers.load_module("ui.menu.builder")
 		return menu_builder.build({ llm = world.engine, on_menu_changed = function() world.redraws =
 			(world.redraws or 0) + 1 end })
 	end)
@@ -1314,7 +1314,7 @@ helpers.describe("AI agent settings: current disabled public policy", function()
 					if state == "absent" then context.llm = nil end
 					local native_i18n = require("infra.i18n")
 					local caption, found = native_i18n.get("menu.agent.title"), nil
-					for _, row in ipairs(helpers.load_module("ui.menu.menu_builder").build(context)) do
+					for _, row in ipairs(helpers.load_module("ui.menu.builder").build(context)) do
 						if type(row.title) == "string" and row.title:sub(1, #caption) == caption then
 							helpers.assert_nil(found, "the current public row must be unique")
 							found = row

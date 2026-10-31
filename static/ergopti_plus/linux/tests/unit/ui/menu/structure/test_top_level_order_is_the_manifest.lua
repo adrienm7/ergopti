@@ -31,9 +31,9 @@ local helpers = require("tests.helpers")
 --- not from the test's own location, which moves when a test does.
 --- @return string File contents.
 local function builder_source()
-	local path = helpers.driver_root() .. "/ui/menu/menu_builder.lua"
+	local path = helpers.driver_root() .. "/ui/menu/builder.lua"
 	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "ui/menu/menu_builder.lua must be readable at " .. path)
+	helpers.assert_true(fh ~= nil, "ui/menu/builder.lua must be readable at " .. path)
 	local src = fh:read("*a")
 	fh:close()
 	return src

@@ -13,7 +13,7 @@ const { verifyQuitSplit } = require('../lib/linux-menu-split.cjs');
  * @param menuSources the tray root and its split modules as they are on disk
  */
 module.exports = function (sources, manifest, menuSources) {
-	const file = 'linux/ui/menu/menu_builder.lua',
+	const file = 'linux/ui/menu/builder.lua',
 		source = sources[file];
 	const composed = composeLinuxMenuRoot(menuSources);
 	assert.equal(composed.ok, true, 'the tray root composes: ' + composed.reason);

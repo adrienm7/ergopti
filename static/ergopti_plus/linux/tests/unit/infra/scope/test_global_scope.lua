@@ -193,8 +193,8 @@ helpers.describe("Linux global scope: the Configuration row", function()
 			participants = function() calls[#calls + 1] = "participants"; return {} end,
 			apply = function(mode, _, done) calls[#calls + 1] = mode; done(true, { reverted = nil }); return true end,
 		}
-		package.loaded["ui.menu.menu_builder"] = nil
-		local items = require("ui.menu.menu_builder").build(ctx)
+		package.loaded["ui.menu.builder"] = nil
+		local items = require("ui.menu.builder").build(ctx)
 		local i18n = require("infra.i18n")
 		for _, item in ipairs(items) do
 			if item.title == i18n.get("menu.configuration.title") then
@@ -210,7 +210,7 @@ helpers.describe("Linux global scope: the Configuration row", function()
 	-- retired it (restore-recommended-no-confirm). Zenity answers No here, so a
 	-- question that came back would also stop the composition.
 	helpers.it("composes at once and asks nothing", function()
-		local saved_builder, saved_global = package.loaded["ui.menu.menu_builder"], package.loaded["infra.global_scope"]
+		local saved_builder, saved_global = package.loaded["ui.menu.builder"], package.loaded["infra.global_scope"]
 		local execute, asked, calls = os.execute, {}, {}
 		local ok, err = pcall(function()
 			local row = restore_row({ _version = "test", on_quit = function() end,
@@ -224,14 +224,14 @@ helpers.describe("Linux global scope: the Configuration row", function()
 			row.fn()
 		end)
 		os.execute = execute
-		package.loaded["ui.menu.menu_builder"], package.loaded["infra.global_scope"] = saved_builder, saved_global
+		package.loaded["ui.menu.builder"], package.loaded["infra.global_scope"] = saved_builder, saved_global
 		if not ok then error(err, 0) end
 		helpers.assert_eq(#asked, 0, "restoring the recommended values asks nothing")
 		helpers.assert_eq(calls, { "participants", "recommended" })
 	end)
 
 	helpers.it("refuses while paused without asking", function()
-		local saved_builder, saved_global = package.loaded["ui.menu.menu_builder"], package.loaded["infra.global_scope"]
+		local saved_builder, saved_global = package.loaded["ui.menu.builder"], package.loaded["infra.global_scope"]
 		local execute, calls, asked = os.execute, {}, 0
 		local ok, err = pcall(function()
 			local row = restore_row({ _version = "test", on_quit = function() end,
@@ -243,7 +243,7 @@ helpers.describe("Linux global scope: the Configuration row", function()
 			row.fn()
 		end)
 		os.execute = execute
-		package.loaded["ui.menu.menu_builder"], package.loaded["infra.global_scope"] = saved_builder, saved_global
+		package.loaded["ui.menu.builder"], package.loaded["infra.global_scope"] = saved_builder, saved_global
 		if not ok then error(err, 0) end
 		helpers.assert_eq(asked, 0)
 		helpers.assert_eq(calls, {})
@@ -257,7 +257,7 @@ end)
 local function with_real_tap_holds(source, body)
 	local names = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_loader",
 		"platform.remap.tap_hold_writer", "infra.tap_hold_scope", "infra.config_paths", "infra.global_scope",
-		"ui.menu.menu_builder" }
+		"ui.menu.builder" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local dir = os.tmpname()
@@ -313,7 +313,7 @@ helpers.describe("Linux global scope: the Configuration clear", function()
 					return execute(command)
 				end
 				local i18n = require("infra.i18n")
-				local items = require("ui.menu.menu_builder").build({ _version = "test", on_quit = function() end,
+				local items = require("ui.menu.builder").build({ _version = "test", on_quit = function() end,
 					is_paused = function() return false end, tap_holds = Manager })
 				local rows
 				for _, item in ipairs(items) do

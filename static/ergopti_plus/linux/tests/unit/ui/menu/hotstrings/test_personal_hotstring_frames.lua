@@ -24,7 +24,7 @@ end
 local function with_personal_frame(scenario, options)
 	options = options or {}
 	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
-		"ui.menu.menu_builder", "adapters.storage", "ui.hotstring_editor.bridge" }
+		"ui.menu.builder", "adapters.storage", "ui.hotstring_editor.bridge" }
 	local previous, saved_getenv = {}, os.getenv
 	for name, value in pairs(package.loaded) do previous[name] = value end
 	local scratch, native, owner, receipt, acquired, store
@@ -48,7 +48,7 @@ local function with_personal_frame(scenario, options)
 		assert(native.scope_apply(owner, receipt, options.locale or "en"))
 		local renderer = require("infra.manifest_menu")
 		local bridge = require("ui.hotstring_editor.bridge")
-		local builder = require("ui.menu.menu_builder")
+		local builder = require("ui.menu.builder")
 		local build_hotstrings = upvalue(builder.build, "_build_hotstrings")
 		local files = require("infra.paths")
 		local corpus_file = assert(io.open(files.shared("tests/corpus/menus/hotstring_personal_frames.json"), "rb"))

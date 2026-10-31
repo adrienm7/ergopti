@@ -361,7 +361,7 @@ helpers.describe("gesture slots in the tray (Linux)", function()
 		M.init({ enabled = false, persist = false })
 		M._test_begin_reading({})
 		helpers.assert_true(M.enable(), "the test reader must permit enabling gestures")
-		local menu_builder = helpers.load_module("ui.menu.menu_builder")
+		local menu_builder = helpers.load_module("ui.menu.builder")
 		local items, opened = nil, 0
 		-- Building a tray does not open a GTK window. Use the same owned native
 		-- webview edge as the dispatcher cases, even when real lgi is installed.

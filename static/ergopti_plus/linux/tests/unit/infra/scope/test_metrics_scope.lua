@@ -192,9 +192,9 @@ helpers.describe("Linux metrics scope rendered commands", function()
 			}
 			with_scope(function(_, collector)
 				local i18n = require("infra.i18n")
-				package.loaded["ui.menu.menu_builder"] = nil
+				package.loaded["ui.menu.builder"] = nil
 				local passed, detail = pcall(function()
-					local rows = require("ui.menu.menu_builder").build({ keystats = collector,
+					local rows = require("ui.menu.builder").build({ keystats = collector,
 						paused = false, is_paused = function() return false end })
 					local submenu
 					for _, row in ipairs(rows) do
@@ -253,8 +253,8 @@ helpers.describe("Linux metrics scope rendered commands", function()
 							end
 							return execute(command)
 						end
-						package.loaded["ui.menu.menu_builder"] = nil
-						local rows = require("ui.menu.menu_builder").build({ keystats = collector,
+						package.loaded["ui.menu.builder"] = nil
+						local rows = require("ui.menu.builder").build({ keystats = collector,
 							paused = false, is_paused = function() return paused end,
 							on_menu_changed = function() changed = changed + 1 end })
 						local action

@@ -129,7 +129,7 @@ end
 function M.shortcut_to_label(sc, none_label)
 	-- `common.none`, not a French word written here: this is a menu label, and the
 	-- other two drivers already read that key for the same row (Windows in
-	-- menu_settings.ahk, Linux in menu_builder.lua). A literal is a translation of
+	-- menu_settings.ahk, Linux in ui/menu/builder.lua). A literal is a translation of
 	-- exactly one of the twenty-one languages the menu is drawn in.
 	if type(sc) ~= "table" then return none_label or i18n.get("common.none") end
 	local ordered_mods = {}

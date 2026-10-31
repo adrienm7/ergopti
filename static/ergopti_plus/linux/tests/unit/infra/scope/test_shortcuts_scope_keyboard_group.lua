@@ -98,7 +98,7 @@ helpers.describe("Linux keyboard group scope", function()
 				end
 				local i18n = require("infra.i18n")
 				local function groups()
-					local menu = require("ui.menu.menu_builder").build({ shortcuts = require("modules.shortcuts.manager"),
+					local menu = require("ui.menu.builder").build({ shortcuts = require("modules.shortcuts.manager"),
 						paused = false, is_paused = function() return controls.paused end,
 						on_menu_changed = function() changed = changed + 1 end })
 					local found = {}

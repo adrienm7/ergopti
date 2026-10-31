@@ -46,7 +46,7 @@ local function with_private_config(body)
 		local collector = assert(loadfile(helpers.driver_root() .. "/modules/keystats/keystats.lua"))()
 		-- loadfile bypasses require, so the section modules are reloaded here.
 		require("tests.support.menu_part_reload").forget_parts()
-		local menu = assert(loadfile(helpers.driver_root() .. "/ui/menu/menu_builder.lua"))()
+		local menu = assert(loadfile(helpers.driver_root() .. "/ui/menu/builder.lua"))()
 		assert(collector.set_enabled(true))
 		body(collector, menu)
 	end, debug.traceback)
@@ -112,7 +112,7 @@ helpers.describe("metrics privacy menu publication", function()
 				local value, rebuilds, writes = initial, 0, 0
 				-- loadfile bypasses require, so the section modules are reloaded here.
 				require("tests.support.menu_part_reload").forget_parts()
-				local menu = assert(loadfile(helpers.driver_root() .. "/ui/menu/menu_builder.lua"))()
+				local menu = assert(loadfile(helpers.driver_root() .. "/ui/menu/builder.lua"))()
 				local context = { keystats = {
 					is_enabled = function() return true end,
 					get_privacy_state = function() return { encrypt = value } end,

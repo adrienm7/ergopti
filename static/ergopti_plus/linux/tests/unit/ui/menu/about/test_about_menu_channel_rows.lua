@@ -99,7 +99,7 @@ local function build(up, changed, source_run)
 	local real_is_source_run = Installation.is_source_run
 	Version.identity = function() return IDENTITY end
 	Installation.is_source_run = function() return source_run == true end
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local ok, items = pcall(mb.build, {
 		_version = "0.0.0-dev.140",
 		updater = up,
@@ -723,7 +723,7 @@ end)
 --- Exercises the real About provider with unrelated tray surfaces isolated.
 --- @param alternative boolean True to independently replace the declaration's label and reason.
 local function with_source_command(alternative, callback)
-	local names = { "ui.menu.menu_builder", "infra.manifest_menu", "infra.paths", "infra.i18n",
+	local names = { "ui.menu.builder", "infra.manifest_menu", "infra.paths", "infra.i18n",
 		"window_titles", "action_parameter_label", "hotstrings.extensions", "hotstrings.languages",
 		"_generated.locale_table", "keymap.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal", "ui.text_prompt",
@@ -788,8 +788,8 @@ local function with_source_command(alternative, callback)
 			TIMING = timing, get_menu_label = function() error("A source checkout has no live update label.") end,
 			get_state = function() return "idle" end,
 			check_for_updates = effect, install = effect, get_cached_release = function() return nil end }
-		package.loaded["ui.menu.menu_builder"] = nil
-		local rows = require("ui.menu.menu_builder").build({ updater = up, on_quit = effect,
+		package.loaded["ui.menu.builder"] = nil
+		local rows = require("ui.menu.builder").build({ updater = up, on_quit = effect,
 			on_menu_changed = effect, webview = { show = effect } })
 		local title = alternative and labels["common.restore_recommended"] or "menu.about.check_for_updates"
 		local reason = alternative and "Canonical alternate reason" or "Source checkout"
@@ -938,7 +938,7 @@ helpers.describe("About version separator shared fragment (Linux)", function()
 	helpers.it("refuses the actual updater block when its required fragment is missing", function()
 		with_version_fragment(nil, function()
 			local up, calls = fake_updater("dev")
-			local actual = helpers.load_module("ui.menu.menu_builder")._about_update_rows({updater = up})
+			local actual = helpers.load_module("ui.menu.builder")._about_update_rows({updater = up})
 			helpers.assert_eq(actual, {})
 			helpers.assert_eq(#calls.set, 0)
 			helpers.assert_eq(calls.checks, 0)

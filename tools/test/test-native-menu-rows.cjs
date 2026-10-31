@@ -321,7 +321,9 @@ function inventory(driver) {
 	}
 	const required = LEGACY.drivers[driver].sourceFiles
 		.filter((rel) => !retired.includes(rel))
-		.map((rel) => rel.replace(CURRENT_SOURCE_RENAME.from, CURRENT_SOURCE_RENAME.to));
+		.map((rel) =>
+			CURRENT_SOURCE_RENAMES.reduce((name, rename) => name.replace(rename.from, rename.to), rel)
+		);
 	assert.ok(
 		traversed.size >= required.length,
 		`${driver}: source coverage ${traversed.size}/${required.length} is incomplete`
@@ -401,8 +403,12 @@ const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
 	windows: Object.freeze(['windows/modules/shortcuts/ctrl.ahk'])
 });
 
-// The frozen oracle keeps the pre-rename spelling; the current tree uses the new one.
-const CURRENT_SOURCE_RENAME = Object.freeze({ from: /keylogger/g, to: 'keystats' });
+// The frozen oracle keeps the pre-rename spellings; the current tree uses the new ones.
+// The Linux tray root took the macOS name once its sections moved to menu_*.lua.
+const CURRENT_SOURCE_RENAMES = Object.freeze([
+	Object.freeze({ from: /keylogger/g, to: 'keystats' }),
+	Object.freeze({ from: /^linux\/ui\/menu\/menu_builder\.lua$/, to: 'linux/ui/menu/builder.lua' })
+]);
 
 const SOURCE_COUNTS = {};
 const errors = [];

@@ -216,7 +216,7 @@ local tray_menu = RuntimeGuard.optional_require("adapters.tray_menu")
 local event_loop = require("adapters.event_loop")
 
 -- Menu builder (builds rich submenus from daemon state).
-local menu_builder = RuntimeGuard.optional_require("ui.menu.menu_builder")
+local menu_builder = RuntimeGuard.optional_require("ui.menu.builder")
 
 -- LLM prediction engine (optional — daemon runs without it).
 local prediction_engine = RuntimeGuard.optional_require("modules.llm.prediction_engine")
