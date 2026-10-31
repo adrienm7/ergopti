@@ -335,6 +335,56 @@ downloaded again`). Ollama deletes that layer before it reports the
   `tests/fixtures/layout_manager_command_body.ahk:313`. Then set the Windows row
   of `docs/design/developer-mode.md` to "works like the release" and drop its
   "(the remote catalogue is pending on Windows …)" parenthesis.
+- PAR-53, slow segments judged on their own time (2026-10-31 night, nothing
+  left on macOS or Linux): `HotPath_LogIfSlow` in
+  `windows/infra/hotpath_profiler.ahk` still compares the wall clock
+  (`ElapsedMs > SlowMs`) and only prints `[excl …, nested …]` once that wall
+  clock is over. macOS and Linux judge the exclusive time and bill a slow
+  child to itself, not to its parent, through `_shared/lua/hotpath_segments.lua`
+  `new_nesting` (an open stack, not a ring of closed segments), and log
+  `Slow %s: %.2f ms own, %.2f ms total, parent %s (%d similar since the last line).`
+  with the segment's rate gate. To do: keep a stack of open segments
+  (`HotPath_Now` pushes, `HotPath_LogIfSlow` pops and adds its total to the
+  parent's nested time), compare own time with the threshold, write the same
+  line (parent `none` at top level), drop `_HotPathNestedMs` and its ring, and
+  replay `_shared/tests/corpus/diagnostics/hotpath_nesting_vectors.json`
+  (`slow` and `reports` per case, the Lua replay is
+  `_shared/lua/test/hotpath_nesting_replay.lua`) in a new test beside
+  `tests/unit/infra/dispatch/test_hotpath_per_segment_threshold.ahk`. The
+  `slow_child_is_reported_with_its_parent_and_the_parent_is_not_billed` case
+  fails on today's code.
+- PAR-63, the rest of the 2026-10-18 test items (Windows only): behaviour tests
+  for the dynamic hotstrings (each rule family, the dates, and a replay of every
+  case of `_shared/tests/corpus/dynamic_hotstrings/prefix_vectors.json` rather
+  than today's subset), then move the root runners `windows/tests/run_*.ahk` to
+  `windows/tests/runners/` with their `#Include` paths and every caller
+  (`package.json` scripts, `tools/test/*.cjs`, the Windows CI lane, the docs
+  that name them).
+- PAR-76 R23: rewrite `windows/modules/keymap/keylayout/keylayout_parser.ahk` to
+  the canonical form `_shared/lua/layouts/keylayout.lua` reads (this also
+  closes the ".keylayout raw grammar" note above), and replay
+  `_shared/tests/corpus/keylayout/` whole.
+- Keystats rename, the Windows test spellings: `windows/tests/unit/modules/keystats/test_keylogger_fire_publication_owner.ahk`
+  (its header still says `tests/unit/modules/keylogger/`, its test names and the
+  `keylogger-fire-owner` receipt), its fixture
+  `windows/tests/fixtures/keylogger_fire_publication_owner_body.ahk`, the
+  `#Include` in `test_keystats_journal_flush_retry.ahk` and
+  `test_buffer_snapshot_publication_owner.ahk`, and the `[keylogger]` section
+  of `windows/tests/unit/infra/toml/test_toml_reader_publication.ahk`. Rename
+  to `keystats` unless `[keylogger]` there pins a real retired section a
+  migration still reads; then say so in a comment. The macOS-only leftover is
+  the compiled comment of `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt`
+  (its `main.applescript` source already says keystats); it needs `osacompile`
+  on a Mac, not the PC.
+- Config policy items 33 and 42 (Windows): the cleanup (`windows/infra/config_unused_keys.ahk`)
+  still cannot offer bare root keys nor an unknown `[[x]]` generation, which the
+  Lua engine does (`_shared/lua/config_unused_keys.lua`, pinned by
+  `_shared/lua/test/config_cleanup_roots_contract.lua`: a dotted, an inline and
+  an array-of-tables obsolete root, each removed with its comment while
+  `[_future]` and the literal and case-twin roots stay). Port the three images
+  into an AHK test first. Then the physical keyboard slot parameters
+  (`keyboard__win_SC03A__x`) need their binding row so the cleanup stops
+  listing them.
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 
