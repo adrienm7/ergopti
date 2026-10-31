@@ -28,6 +28,7 @@ const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.j
 const pipeline = require('./ci-full-default.cjs');
 const Mac = require('./fixtures/macos-stage-source.cjs');
 const MacRoles = require('../ci/macos-stage-roles.cjs');
+const { guardianReceipt, guardianRecord } = require('./fixtures/macos-guardian-receipt.cjs');
 
 /** Checks actual stage metadata and the typed matrix producer used by that stage. */
 /** XCTest classes the SDK accepted-owner step runs, in its census order. */
@@ -430,6 +431,20 @@ for (const platform of ['windows', 'macos']) {
 						...(release ? scenarios.map((scenario) => ['macos-15-intel', scenario]) : [])
 					];
 		const coldOn = (runner) => ({ ...coldBootstrapRecord(), runner });
+		// Independently authored lots: four lots over one runner pair (CI), two
+		// per runner when Intel launches too (release).
+		const lots = release
+			? [
+					['macos-15', 'clean__karabiner_config'],
+					['macos-latest', 'upgraded'],
+					['macos-15-intel', 'clean__karabiner_config'],
+					['macos-15-intel', 'upgraded']
+				]
+			: [
+					['macos-15', 'clean'],
+					['macos-15', 'karabiner_config'],
+					['macos-latest', 'upgraded']
+				];
 		const state = {
 			platform,
 			release,
@@ -437,6 +452,10 @@ for (const platform of ['windows', 'macos']) {
 			sha: 'a'.repeat(40),
 			// The macOS 15 cold cell and the macOS 26 lot each record one receipt.
 			coldBootstrap: platform === 'macos' ? [coldOn('macos-15'), coldOn('macos-latest')] : [],
+			guardian:
+				platform === 'macos'
+					? lots.map(([runner, lot]) => ({ ...guardianRecord(), runner, lot }))
+					: [],
 			needs: Object.fromEntries(jobs.map((job) => [job, { result: 'success' }])),
 			evidence: layout.map(([runner, scenario]) => ({
 				schema_version: 1,
@@ -497,6 +516,19 @@ for (const platform of ['windows', 'macos']) {
 			});
 			rejects((value) => {
 				value.coldBootstrap[1].runner = 'macos-15-intel';
+			});
+			// One guardian acceptance per lot: none missing, duplicated, moved to
+			// another runner, from another commit or with a failed step.
+			rejects((value) => value.guardian.pop());
+			rejects((value) => value.guardian.push(structuredClone(value.guardian[0])));
+			rejects((value) => {
+				value.guardian[0].runner = 'macos-latest';
+			});
+			rejects((value) => {
+				value.guardian[0].sha = 'c'.repeat(40);
+			});
+			rejects((value) => {
+				value.guardian[0].receipt.unregistration_verified = false;
 			});
 		}
 		rejects((value) => {
@@ -2995,6 +3027,71 @@ console.log(
 		!accepts(reordered),
 		'an early fresh-profile edit cannot stand in for the installed upgrade boundary'
 	);
+}
+
+// Items 13/35: every field the guardian collector proves is required, and the
+// record is written only from an admitted receipt of a canonical lot.
+{
+	const {
+		verifyGuardianReceipt,
+		recordGuardianMac,
+		readGuardianEvidence
+	} = require('./desktop-ci-evidence.cjs');
+	verifyGuardianReceipt(guardianReceipt());
+	const refuses = (mutate) => {
+		const receipt = guardianReceipt();
+		mutate(receipt);
+		assert.throws(() => verifyGuardianReceipt(receipt));
+	};
+	for (const field of Object.keys(guardianReceipt()).filter(
+		(field) => field !== 'full_git_bootstrap_verified'
+	))
+		refuses((receipt) => delete receipt[field]);
+	for (const verb of ['rejected', 'rejected_unregister'])
+		refuses((receipt) => (receipt[verb].exit = 0));
+	for (const verb of ['registered', 'observed', 'repeated', 'unregistered', 'repeated_unregister'])
+		refuses((receipt) => (receipt[verb].exit = 1));
+	refuses((receipt) => (receipt.observed.stdout = 'absent\n'));
+	refuses((receipt) => (receipt.unregistered.stdout = ''));
+	refuses((receipt) => (receipt.job_status_after_rejected_unregister = 113));
+	refuses((receipt) => (receipt.initial_job_status = 0));
+	refuses((receipt) => (receipt.job_status_after_unregister = 0));
+	refuses((receipt) => (receipt.job_status_after_repeated_unregister = 0));
+	refuses((receipt) => (receipt.final_job_status = 0));
+	refuses((receipt) => (receipt.unregistration_verified = false));
+	refuses((receipt) => (receipt.job_absent_after_cleanup = false));
+	refuses((receipt) => receipt.cleanup_errors.push('Owned guardian safety bootout was refused'));
+	refuses((receipt) => (receipt.primary_error = 'Invalid helper identity caused registration'));
+
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'guardian-evidence-'));
+	const saved = { sha: process.env.GITHUB_SHA, runner: process.env.MATRIX_RUNNER };
+	try {
+		process.env.GITHUB_SHA = 'a'.repeat(40);
+		process.env.MATRIX_RUNNER = 'macos-15';
+		const source = path.join(directory, 'receipt.json');
+		fs.writeFileSync(source, JSON.stringify(guardianReceipt()));
+		const lotDirectory = path.join(directory, 'launch-gate', 'guardian-acceptance');
+		fs.mkdirSync(lotDirectory, { recursive: true });
+		const output = path.join(lotDirectory, 'guardian-evidence.json');
+		recordGuardianMac(source, 'clean', output);
+		assert.deepEqual(readGuardianEvidence(directory), [guardianRecord()]);
+		// A second record of the same lot, a non-canonical lot or a failed receipt is refused.
+		assert.throws(() => recordGuardianMac(source, 'clean', output));
+		assert.throws(() => recordGuardianMac(source, 'Clean', path.join(directory, 'other.json')));
+		const failed = guardianReceipt();
+		failed.cleanup_errors = ['Owned guardian absence after cleanup was not confirmed'];
+		fs.writeFileSync(source, JSON.stringify(failed));
+		assert.throws(() => recordGuardianMac(source, 'upgraded', path.join(directory, 'failed.json')));
+		assert.equal(fs.existsSync(path.join(directory, 'failed.json')), false);
+	} finally {
+		for (const [key, name] of [
+			['sha', 'GITHUB_SHA'],
+			['runner', 'MATRIX_RUNNER']
+		])
+			if (saved[key] === undefined) delete process.env[name];
+			else process.env[name] = saved[key];
+		fs.rmSync(directory, { recursive: true, force: true });
+	}
 }
 
 require('./test-macos-stage-roles.cjs');
