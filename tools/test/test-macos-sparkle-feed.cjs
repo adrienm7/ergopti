@@ -1640,7 +1640,7 @@ try {
 		);
 		assert.match(
 			source,
-			/let copiedForeignPayload = try Data\(contentsOf: foreignArchives\.appendingPathComponent\("ErgoptiPlus.app.tar.xz"\)\)/
+			/let copiedForeignPayload = try Data\(contentsOf: foreignArchives\.appendingPathComponent\("\\\(Identifiers\.App\.bundle\)\.tar\.xz"\)\)/
 		);
 		assert.match(
 			source,
