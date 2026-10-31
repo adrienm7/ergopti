@@ -691,6 +691,7 @@ _LLM_Deps_State := "ready"
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/remote_formats.ahk
 #Include ..\..\_shared\modules\llm\local_server_auth.ahk
+#Include ..\..\_shared\modules\llm\api_url_template.ahk
 #Include ..\..\_shared\modules\llm\model_capabilities.ahk
 #Include ..\..\_shared\modules\llm\thinking_off.ahk
 #Include ..\..\_shared\modules\llm\local_server_discovery.ahk
@@ -745,6 +746,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/api/test_llm_aux_request_ownership.ahk
 #Include unit/modules/llm/api/test_llm_api_test_entry.ahk
 #Include unit/modules/llm/api/test_llm_api_entry_names.ahk
+#Include unit/modules/llm/api/test_llm_api_url_template.ahk
 #Include unit/modules/llm/menu/test_llm_menu_backend_model_labels.ahk
 #Include unit/modules/llm/menu/test_llm_menu_model_hardware.ahk
 #Include unit/modules/llm/menu/test_llm_menu_build_submenu.ahk
