@@ -7,12 +7,14 @@
 --- The maintainer's rule of 2026-10-31 (ADR 011 decision 3, as revised) ties it
 --- to Ergopti running, not to any menu switch:
 ---   - Ergopti running and not paused: its own runtime is active, and a user
----     Karabiner-Elements that runs is closed through Karabiner's own quit;
+---     Karabiner-Elements that runs is closed through Karabiner's own quit
+---     while the user's consent (the Tap-Holds row, on by default) holds;
+---     without it the owner reports `other_karabiner_running` and ours waits;
 ---   - Ergopti paused or quit: its runtime stops, and the user's Karabiner is
 ---     given back if, and only if, Ergopti closed it.
 ---
 --- FEATURES & RATIONALE:
---- 1. One Predicate: `wanted` is running and not paused, nothing else.
+--- 1. One Predicate: `wanted` is running and not paused; no feature switch.
 --- 2. Only What We Closed: the closer given to the runtime owner is wrapped so
 ---    that a successful close writes a persisted marker and tells the user;
 ---    the restore runs only when that marker exists and clears it once
@@ -76,8 +78,9 @@ end
 ---   owner: platform/remap/runtime_owner.lua (start, stop, status);
 ---   restore(fn(ok)): Karabiner's own registration of its core agents;
 ---   marker: { get() -> boolean, clear() -> boolean };
----   reload(): asks for a reload of the driver, the only way to start a second capture.
---- @param ports table owner, restore, marker, reload.
+---   reload(): asks for a reload of the driver, the only way to start a second capture;
+---   close_other_instances() -> boolean: the user's consent, the Tap-Holds row.
+--- @param ports table owner, restore, marker, reload, close_other_instances.
 --- @return table activation { reconcile, restore_if_closed }.
 function M.new(ports)
 	assert(type(ports) == "table", "Missing activation ports")
@@ -87,6 +90,7 @@ function M.new(ports)
 	assert(type(ports.marker) == "table" and type(ports.marker.get) == "function"
 		and type(ports.marker.clear) == "function", "Missing closed-Karabiner marker")
 	assert(type(ports.reload) == "function", "Missing driver reload port")
+	assert(type(ports.close_other_instances) == "function", "Missing close consent port")
 	local activation = {}
 	local restoring = false
 	local started_once = false
@@ -127,12 +131,13 @@ function M.new(ports)
 				return "reload"
 			end
 			Logger.info(LOG, "Ergopti runs: starting its own Karabiner runtime.")
-			local accepted = ports.owner.start({ close_other_instances = true }, function(admitted)
-				if admitted ~= true then return end
-				-- Only an admitted runtime goes on to its capture, the part that cannot start twice.
-				started_once = true
-				if on_admitted then on_admitted() end
-			end)
+			local accepted = ports.owner.start({ close_other_instances = ports.close_other_instances() == true },
+				function(admitted)
+					if admitted ~= true then return end
+					-- Only an admitted runtime goes on to its capture, the part that cannot start twice.
+					started_once = true
+					if on_admitted then on_admitted() end
+				end)
 			if accepted ~= true then Logger.error(LOG, "The owned runtime refused to start in state %s.", state) end
 			return "start"
 		end

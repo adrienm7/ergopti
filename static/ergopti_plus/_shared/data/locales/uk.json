@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Неактивно: дозвольте ErgoptiPlus в «Об’єктах входу»",
 	"menu.tapholds.guardian_unavailable": "🔴 Неактивно: фоновий помічник ErgoptiPlus не зареєстровано (перевірте «Об’єкти входу», а потім закрийте й знову відкрийте ErgoptiPlus)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ Старі правила ErgoptiPlus блокують ваші налаштування: видалити їх…",
+	"menu.tapholds.close_other_karabiner": "Закривати інші Karabiner, поки працює Ergopti (відновлюються під час паузи або виходу)",
 	"menu.tapholds.vhid_incompatible": "⚠️ Натискання-утримання призупинено: встановлено іншу версію драйвера Karabiner, а macOS вмикає лише одну",
 	"menu.tapholds.vhid_not_active": "⚠️ Натискання-утримання призупинено: дозвольте драйвер віртуальної клавіатури Karabiner у Системних параметрах",
 	"menu.tapholds.open_login_items": "Відкрити параметри «Об’єктів входу»…",

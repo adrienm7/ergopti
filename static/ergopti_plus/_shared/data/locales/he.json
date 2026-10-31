@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 לא פעיל: אשרו את ErgoptiPlus בפריטי התחברות",
 	"menu.tapholds.guardian_unavailable": "🔴 לא פעיל: עוזר הרקע של ErgoptiPlus אינו רשום (בדקו את פריטי התחברות, ואז צאו מ-ErgoptiPlus ופתחו אותו שוב)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ כללי ErgoptiPlus ישנים חוסמים את ההגדרות שלך: להסיר אותם…",
+	"menu.tapholds.close_other_karabiner": "סגור מופעי Karabiner אחרים כל עוד Ergopti פועל (ישוחזרו בהשהיה או ביציאה)",
 	"menu.tapholds.vhid_incompatible": "⚠️ Tap-holds מושהים: מותקנת גרסה אחרת של מנהל ההתקן של Karabiner ו-macOS מפעיל רק אחת",
 	"menu.tapholds.vhid_not_active": "⚠️ Tap-holds מושהים: אשר את מנהל ההתקן של המקלדת הווירטואלית של Karabiner בהגדרות המערכת",
 	"menu.tapholds.open_login_items": "פתיחת הגדרות פריטי התחברות…",
