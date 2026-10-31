@@ -1362,6 +1362,11 @@ _LLMRemoteResolveEntry(Entry) {
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
     if (BaseUrl == "")
         BaseUrl := _LLMRemote_DefaultBaseUrl(ProviderId, Provider)
+    ; A per-account address is filled when the entry is added; its template never leaves
+    if ApiUrlTemplateHasPlaceholder(BaseUrl) {
+        try LoggerError("LLM.remote", "API entry of provider '{1}' has no account address: add it again from the provider list.", ProviderId)
+        return ""
+    }
     if !(BaseUrl is String) || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
         return ""
     Token := _LLMRemoteEntryGet(Entry, "Token", "")
@@ -2237,8 +2242,14 @@ _LLMRemote_CatalogDescriptorIsValid(providerId, desc) {
         return false
 
     ; The compatibility row is a user-supplied endpoint/model template. Every
-    ; shipped concrete provider must be immediately usable from the catalogue.
-    if (providerId != "openai_compat" and (Trim(baseUrl) = "" or Trim(defaultModel) = ""))
+    ; shipped concrete provider must be immediately usable from the catalogue,
+    ; except that a per-account address (a template the add-entry form fills)
+    ; leaves the model to the user.
+    Template := ApiUrlTemplateFields(baseUrl)
+    if !Template["valid"]
+        return false
+    if (providerId != "openai_compat" and (Trim(baseUrl) = ""
+            or (Template["fields"].Length = 0 and Trim(defaultModel) = "")))
         return false
     if (baseUrl != "" and !RegExMatch(baseUrl, "i)^https?://[^[:space:]]+$"))
         return false

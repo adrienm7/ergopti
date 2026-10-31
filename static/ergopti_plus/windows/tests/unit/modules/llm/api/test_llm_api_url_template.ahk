@@ -30,9 +30,8 @@ _LAUT_Corpus() {
 }
 
 _LAUT_Fields() {
-	global API_URL_TEMPLATE_MAX_VALUE_LENGTH
 	Corpus := _LAUT_Corpus()
-	AssertEqual(Corpus["max_value_length"], API_URL_TEMPLATE_MAX_VALUE_LENGTH, "the value bound")
+	AssertEqual(Corpus["max_value_length"], ApiUrlTemplateMaxValueLength(), "the value bound")
 	Assert(Corpus["fields"].Length >= 6, "the fields vectors must not be empty")
 	for Vector in Corpus["fields"] {
 		Parsed := ApiUrlTemplateFields(Vector["template"])

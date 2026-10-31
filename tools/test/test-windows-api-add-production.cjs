@@ -45,15 +45,21 @@ function admission(source) {
 	const capture = form.indexOf('Receipt := Owner.Capture()');
 	const inputs = [...form.matchAll(/ib := InputFn\.Call\(/g)].map((match) => match.index);
 	const fences = [...form.matchAll(/if !Owner\.Current\(Receipt\)/g)].map((match) => match.index);
-	assert.equal(inputs.length, 4, 'provider, URL, secret and model retain the actual modal order');
-	assert.equal(fences.length, 4, 'each returned modal answer retains its originating source');
+	// Provider, then the account fields of a per-account address or the URL,
+	// then secret and model: five call sites, each fenced
+	assert.equal(
+		inputs.length,
+		5,
+		'provider, account field or URL, secret and model retain the actual modal order'
+	);
+	assert.equal(fences.length, 5, 'each returned modal answer retains its originating source');
 	assert(capture >= 0 && capture < inputs[0]);
 	for (let i = 0; i < inputs.length; i += 1) {
 		assert(inputs[i] < fences[i]);
 		if (i + 1 < inputs.length) assert(fences[i] < inputs[i + 1]);
 	}
 	const commit = form.indexOf('Committed := LLM_Menu_CommitApiEntriesMutation(');
-	assert(commit > fences[3], 'the existing transaction receives only a current completed form');
+	assert(commit > fences[4], 'the existing transaction receives only a current completed form');
 	assert(form.includes('Receipt, Owner, (*) => true)'), 'the WAL keeps the exact old source owner');
 	assert(form.includes('if !((Committed is Integer) && Committed == 1)'));
 	assert(!form.includes('_LLM_Menu_PersistApiEntries('), 'the form cannot bypass the joint writer');
@@ -75,7 +81,7 @@ admission(menu);
 let refusals = 0;
 const form = subject(menu);
 const fence = 'if !Owner.Current(Receipt)';
-for (let index = 0; index < 4; index += 1) {
+for (let index = 0; index < 5; index += 1) {
 	let occurrence = -1;
 	for (let cursor = 0; cursor <= index; cursor += 1)
 		occurrence = form.indexOf(fence, occurrence + 1);
