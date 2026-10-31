@@ -4,33 +4,7 @@
 
 Updated: 2026-10-31. Latest stable: [v1.0.8](https://github.com/adrienm7/ergopti/releases/tag/v1.0.8)
 (released 2026-10-30 from main; v1.0.7 was main 18d69a24c0). **Next step: the two machine lists below, the PC one on the
-Windows PC and the Mac one on the Mac.** Open work only: a finished item is removed, its lessons go to
-[docs/memory](docs/memory/README.md), and the history stays in Git
-(`git log --follow -p -- TODO.md`). On 2026-10-31 every item was checked against the code and
-`git log origin/dev`: the finished ones were removed, the others cut down to what is left, and duplicates merged
-(the file before that pass is `git show 1aa287427a:TODO.md`; the one before the 2026-10-30 pass is
-`git show 7f80d3d141:TODO.md`). Item numbers are stable and never reused. This file is the only
-checklist: open questions are in "Questions for the maintainer" at the end, and there are no separate
-handoff files (an agent writes what is left into the item itself).
-
-Tags: **[CODE]** software to write or adopt; **[CI]** only a hosted or native CI run qualifies it;
-**[PHYS-W]**, **[PHYS-M]**, **[PHYS-L]** needs a real Windows PC, Mac or Linux machine.
-
-**Generic caveat, stated once.** Unless an item says otherwise, native macOS and Linux qualification
-and every physical-device acceptance remain OPEN and their qualification flags stay false; portable
-tests, containers and software-supplied events are never physical evidence. The maintainer has a
-Windows PC (physical tests on request) and a work Mac (reproduce on CI first, then at most one short
-command); there is no Linux machine.
-
-**Rules for every agent.** dev and main stay linear (rebase or cherry-pick, never `git merge`); a
-release is a push to `main` carrying a `Release-As: X.Y.Z` trailer; Codex agents push to dev, so
-fetch and rebase first, and preflight on `tmp/preflight-dev` with
-`gh workflow run ci.yml --ref tmp/preflight-dev -f os_lanes=all`; a hook failure caused by someone
-else's dirty file is waited out or bypassed with a private index plus compare-and-swap `update-ref`
-running the hooks, never with `--no-verify`; never weaken a test; quality over speed. Run the pinned
-ruff 0.15.8 and Prettier before every commit. After touching
-a sealed Windows updater source, reseal with
-`node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`. Procedures:
+Windows PC and the Mac one on the Mac.** Conventions, tags and the rules for every agent:
 [workflow and verification memory](docs/memory/workflow-and-verification.md).
 
 ## PC Windows todo (run by the agent on the Windows PC)
