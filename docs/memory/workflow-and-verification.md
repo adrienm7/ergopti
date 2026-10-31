@@ -410,6 +410,26 @@ Vendor-header C++ tests of the owned runtime compile only in
 `remap-runtime-build.yml`, against Karabiner-Elements at the revision of
 `remap_runtime_patch.py`.
 
+### project-linux-container-host-only-reds
+
+These reds on the Linux container are host limits, not bugs. Lua
+`local-server-detection-native` needs `ss` (install iproute2). macOS
+`new commits beyond origin/dev are clean` fails when the checkout or its
+worktree admin folder is not owned by the running user: the suite isolates
+`HOME`, so a global `safe.directory` is not read, and the same ownership breaks
+the JS catalogue and clock-evidence gates' `git` calls. JS
+`test-ahk-tap-follower`, `test-linux-install-sandbox`,
+`test-linux-runtime-native-registration`, `test-macos-managed-bootstrap-http`,
+`test-managed-ollama-protocol`, `test-managed-remote-retirement` (no pwsh),
+`test-linux-deb-package-owner` (refuses root) and
+`test-drift-guard-covers-every-output` (worktrees only, node_modules symlink).
+As root, Lua fails every EACCES, unreadable or denied case, Linux test 102,
+four `test_sqlite_first_open` native cases, the macOS screenshot EACCES, the two
+mlx-repair unreadable neighbour cases, errors-log refuses denied, and the eight
+`release-arming-physical` cases (they refuse root). Confirm a red with
+`setpriv --reuid=65534 --regid=65534 --clear-groups` and `XDG_RUNTIME_DIR`
+set. Run the macOS suite per group: one process slows down progressively there.
+
 ### project-js-gate-host-limits-on-windows
 
 On a Windows host the full JS gate has a known set of host-bound reds that are
