@@ -216,6 +216,39 @@ _DSFR_Moved(Root) {
 Test("driver symbols: actual file moves and deletion invalidate prior source locations (driver-production-symbol)",
 	_DSFR_With.Bind(_DSFR_Moved))
 
+; The per-file memory must answer from an aged, unchanged file without reading it
+; (the exclusive lock proves no read happened) and must drop it once a new stamp
+; or a fresh, racy write says the bytes may differ.
+_DSFR_RememberedSource(Root) {
+	Path := _DSFR_Write(Root, "one\first.ahk", "ExportSubject() {`nreturn 37`n}`n")
+	Aged := DateAdd(A_Now, -1, "Hours")
+	FileSetTime(Aged, Path)
+	AssertEqual(Path, _DriverProductionFileForSymbol("ExportSubject", Root))
+	Handle := DllCall("CreateFileW", "str", Path, "uint", 0x80000000, "uint", 0,
+		"ptr", 0, "uint", 3, "uint", 0, "ptr", 0, "ptr")
+	Assert(Handle != -1, "the fixture must own a real exclusive native source lock")
+	try {
+		AssertEqual(Path, _DriverProductionFileForSymbol("ExportSubject", Root),
+			"an unchanged aged source is answered without another read")
+		_DSFR_Failure(() => _DriverProductionFileForSymbol("OtherSubject", Root), "No production definition")
+	} finally DllCall("CloseHandle", "ptr", Handle)
+	FileDelete(Path)
+	_DSFR_Write(Root, "one\first.ahk", "OtherExport() {`nreturn 37`n}`n")
+	FileSetTime(Aged, Path)
+	_DSFR_Failure(() => _DriverProductionFileForSymbol("ExportSubject", Root), "No production definition")
+	AssertEqual(Path, _DriverProductionFileForSymbol("OtherExport", Root),
+		"a size change under the same modification time invalidates the memory")
+	FileDelete(Path)
+	_DSFR_Write(Root, "one\first.ahk", "ExportSubjecT() {`nreturn 37`n}`n")
+	AssertEqual(Path, _DriverProductionFileForSymbol("ExportSubject", Root),
+		"a fresh write is never answered from the memory")
+	FileDelete(Path)
+	_DSFR_Write(Root, "one\first.ahk", "OtherSubjecT() {`nreturn 37`n}`n")
+	_DSFR_Failure(() => _DriverProductionFileForSymbol("ExportSubject", Root), "No production definition")
+}
+Test("driver symbols: unchanged sources are remembered and any new stamp or racy write invalidates them (driver-production-symbol)",
+	_DSFR_With.Bind(_DSFR_RememberedSource))
+
 _DSFR_Unreadable(Root) {
 	Expected := _DSFR_Write(Root, "one\first.ahk", "ExportSubject() {`nreturn 37`n}`n")
 	Locked := _DSFR_Write(Root, "two\locked.ahk", "OtherSubject() {`nreturn 1`n}`n")

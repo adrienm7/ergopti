@@ -1317,6 +1317,9 @@ TestMsgBoxCount(Record := false) {
 ; retaining production registration while following module moves by symbol.
 ; A fresh complete census refuses missing, duplicate and unreadable sources;
 ; no first match or cached path may hide a moved or newly duplicated export.
+; Each lookup walks the tree again, but _DriverSymbolScanCount reuses what an
+; unchanged file already taught: a child fixture resolves dozens of symbols per
+; case, and rereading and masking the whole tree each time cost minutes per test.
 ; @param Name {String} Unqualified function name; AHK identity ignores case.
 ; @param Root {String} Driver root; the suite's windows parent by default.
 ; @returns {String} Absolute path of the unique production definition.
@@ -1334,13 +1337,8 @@ _DriverProductionFileForSymbol(Name, Root := "") {
 		Path := A_LoopFileFullPath
 		if !_DriverIsProductionSource(Path)
 			continue
-		Source := FileRead(Path, "UTF-8")
-		; A definition needs the exact "Name(" text, so a miss skips the scanners.
-		if !InStr(Source, Name . "(")
-			continue
-		Code := _DriverMaskNonCode(&Source)
-		Count := _DriverTopLevelDefinitionCount(&Code, Name)
-		Loop Count
+		Stamp := A_LoopFileTimeModified . ":" . A_LoopFileSize
+		Loop _DriverSymbolScanCount(Path, Stamp, A_LoopFileTimeModified, Name)
 			Matches.Push(Path)
 	}
 	if Matches.Length == 0
@@ -1348,6 +1346,40 @@ _DriverProductionFileForSymbol(Name, Root := "") {
 	if Matches.Length != 1
 		throw Error("Multiple production definitions for function '" . Name . "': " . Matches.Length . ".")
 	return Matches[1]
+}
+
+; How many exported definitions of Name one source file holds, remembered per
+; file for as long as its modification time and size stand. Those stamps have a
+; one-second grain, so a file written within the racy window is read afresh and
+; not remembered: a rewrite of the same size in the same second cannot go unseen
+; (the same rule as Git's racy index entries). Masking cannot add a name, so a
+; raw substring miss answers zero without paying for the mask.
+_DriverSymbolScanCount(Path, Stamp, Modified, Name) {
+	static Entries := Map(), RacyWindowSeconds := 2
+	Entry := Entries.Get(Path, 0)
+	if !IsObject(Entry) || Entry.Stamp != Stamp {
+		if Entries.Has(Path)
+			Entries.Delete(Path)
+		Counts := Map()
+		Counts.CaseSense := "Off"
+		Entry := {Stamp: Stamp, Source: FileRead(Path, "UTF-8"), Code: "", Counts: Counts}
+		if DateDiff(A_Now, Modified, "Seconds") > RacyWindowSeconds
+			Entries[Path] := Entry
+	}
+	if Entry.Counts.Has(Name)
+		return Entry.Counts[Name]
+	if !InStr(Entry.Source, Name)
+		Count := 0
+	else {
+		if Entry.Code == "" {
+			Source := Entry.Source
+			Entry.Code := _DriverMaskNonCode(&Source)
+		}
+		Code := Entry.Code
+		Count := _DriverTopLevelDefinitionCount(&Code, Name)
+	}
+	Entry.Counts[Name] := Count
+	return Count
 }
 
 ; Definition syntax comes from the existing signature scanner. Prefix brace
