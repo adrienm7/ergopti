@@ -1220,6 +1220,7 @@ do
 				return hs.timer.doAfter(delay, callback)
 			end,
 			user_exit_deadline_seconds = require("infra.timings").sec("ui", "user_quit_deadline_ms"),
+			reload_deadline_seconds = require("infra.timings").sec("ui", "reload_deadline_ms"),
 			record_stage = ReloadBreadcrumb.record,
 			mark_reload = function()
 				reload_guard.mark_reload()

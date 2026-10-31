@@ -798,6 +798,15 @@ ollama_deps_poll_ms = 3000
 # HS: infra/termination_coordinator.lua request_user_exit deadline.
 user_quit_deadline_ms = 12000
 
+# Deadline for a controlled reload (menu, source watcher, field run). An
+# in-process reload takes about 1 s. Past this bound, a reload whose stages never
+# settled reloads natively instead of staying up with the Karabiner remaps
+# already revoked; the previous worker's stdin EOF lets the guardian fence its
+# exact lease. It exceeds the 7 s lease STOPPED timeout for the same reason as
+# user_quit_deadline_ms.
+# HS: infra/termination_coordinator.lua reload deadline.
+reload_deadline_ms = 12000
+
 # macOS: delay before the editor of a personal information file opens after its
 # menu row is clicked, so the menu has closed.
 # HS: ui/menu/menu_hotstrings.lua.
