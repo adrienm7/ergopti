@@ -2966,6 +2966,36 @@ jobs:
           done
           exit "$lot_status"
 
+      # Items 13/35: the complete guardian acceptance collector, on every launch
+      # lot's runner, after its scenarios and their reset. It installs the
+      # package this run built, registers the remap guardian headless, reads it
+      # back, registers again, refuses a foreign launcher identity for both
+      # verbs, retires it and proves the job absent; the runner is then
+      # restored. The verdict requires one admitted receipt per lot.
+      - name: Register and retire the installed remap guardian
+        env:
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (!cancelled()) }}
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/launch-gate/guardian-acceptance"
+          mkdir -p "$output"
+          test ! -e /Applications/ErgoptiPlus.app
+          stamp="0083;$(printf '%x' "$(date +%s)");Safari;$(uuidgen)"
+          node tools/build/macos-release-archives.cjs --ci-install "$RUNNER_TEMP/package" /Applications "$stamp" \
+              > "$output/package-install.json"
+          xattr -r -w com.apple.quarantine "$stamp" /Applications/ErgoptiPlus.app
+          xattr -dr com.apple.quarantine /Applications/ErgoptiPlus.app
+          set +e
+          python3 tools/diagnostics/macos_helper_registration.py /Applications/ErgoptiPlus.app "$output/receipt.json"
+          collector_status=$?
+          set -e
+          python3 tools/diagnostics/macos_launch_reset.py restore "$RUNNER_TEMP/launch-fresh-runner.json"
+          test "$collector_status" -eq 0
+          node tools/test/desktop-ci-evidence.cjs record-guardian-macos \
+              "$output/receipt.json" "$MACOS_STAGE_SCENARIO" "$output/guardian-evidence.json"
+        timeout-minutes: 5
+
       - name: Retain source-bound AppleEvent launch qualification receipt
         env:
           SEED_TAG: 'v0.0.0-dev.24'
