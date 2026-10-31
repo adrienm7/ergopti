@@ -24,21 +24,33 @@ local helpers = require("tests.helpers")
 -- =========================================================================
 
 helpers.describe("api_ollama: no require-time Ollama start", function()
-	helpers.it("api_ollama source has no top-level TimerScheduler.after(0, ensure_ollama)", function()
-		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
-		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/modules/llm/api_ollama.lua"
-
-		local fh = io.open(src_file, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open api_ollama.lua at: " .. src_file)
-		local src = fh:read("*a")
-		fh:close()
-
-		-- The old bug: module-level call to schedule ensure_ollama_running
-		helpers.assert_true(
-			src:find("TimerScheduler.after(0, function() pcall(ensure_ollama_running)", 1, true) == nil,
-			"api_ollama.lua must not schedule ensure_ollama_running() at require-time"
-		)
+	helpers.it("requiring api_ollama schedules no timer, so it cannot start Ollama at boot", function()
+		-- The old bug ran TimerScheduler.after(0, ensure_ollama_running) at
+		-- module level. Every scheduling call api_ollama's own code makes while
+		-- the module loads is recorded; dependencies it requires (the keystats
+		-- watchers) keep the real adapter, and so does reading the clock.
+		local Real = require("adapters.timer_scheduler")
+		local scheduled = {}
+		-- The file the loader itself resolves for the module, never a typed path.
+		local own_source = "@" .. assert(package.searchpath("modules.llm.api_ollama", package.path))
+		local function own_call() return debug.getinfo(3, "S").source == own_source end
+		local recorder = setmetatable({
+			after = function(delay, ...)
+				if not own_call() then return Real.after(delay, ...) end
+				scheduled[#scheduled + 1] = "after(" .. tostring(delay) .. ")"
+			end,
+			every = function(interval, ...)
+				if not own_call() then return Real.every(interval, ...) end
+				scheduled[#scheduled + 1] = "every(" .. tostring(interval) .. ")"
+			end,
+		}, { __index = Real })
+		local saved = package.loaded["adapters.timer_scheduler"]
+		package.loaded["adapters.timer_scheduler"] = recorder
+		local ok, loaded = pcall(helpers.load_with_stubs, "modules.llm.api_ollama")
+		package.loaded["adapters.timer_scheduler"] = saved
+		helpers.assert_true(ok, tostring(loaded))
+		helpers.assert_eq(0, #scheduled,
+			"api_ollama must not schedule anything at require-time: " .. table.concat(scheduled, ", "))
 	end)
 
 	helpers.it("api_ollama exposes M.ensure_running() for explicit invocation", function()
@@ -49,20 +61,8 @@ helpers.describe("api_ollama: no require-time Ollama start", function()
 		)
 	end)
 
-	helpers.it("llm init calls ApiOllama.ensure_running() only when backend is ollama", function()
-		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
-		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/modules/llm/init.lua"
-
-		local fh = io.open(src_file, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open llm/init.lua at: " .. src_file)
-		local src = fh:read("*a")
-		fh:close()
-
-		-- Must reference ensure_running() at least once
-		helpers.assert_true(
-			src:find("ensure_running()", 1, true) ~= nil,
-			"llm/init.lua must call ApiOllama.ensure_running() when backend resolves to ollama"
-		)
-	end)
+	-- Who calls ensure_running() is behaviour-tested where it is decided: the
+	-- backend start gate tests (test_backend_ollama_start_gate) drive llm/init's
+	-- set_backend and auto-detection and prove an MLX or API identity never
+	-- starts Ollama while an admitted Ollama one starts it once.
 end)
