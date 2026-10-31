@@ -81,6 +81,17 @@ only by static and JS tests. Once it lands on `dev`:
   them through `_shared/lua/diagnostics/private_label.lua` (placeholder pinned
   to `redaction.json` `config_name_placeholder`); Windows needs an AHK twin and
   a meta test.
+- Ollama digest mismatch on Windows: the macOS field run of 2026-10-31 saw a
+  fresh 366 MB layer fail its sha256 check (`digest mismatch, file must be
+  downloaded again`). Ollama deletes that layer before it reports the
+  mismatch, so macOS now pulls once more and then fails with the localized
+  `ollama.digest_mismatch` (3939a569ad). The Windows managed pull
+  (`modules/llm/ollama_managed_bootstrap.ahk`, `_PullResult` and the menu pull
+  `_MenuPulled`) only reads the exit code and fails as `model_pull`. It needs
+  the pull output classified (the closed vocabulary of
+  `macos/modules/llm/managed_ollama_pull.py` `ERROR_CLASSES`), one automatic
+  retry on `digest_mismatch`, then `ollama.digest_mismatch` (the key exists in
+  all 21 locales), with an AHK test that fails without the retry.
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 
