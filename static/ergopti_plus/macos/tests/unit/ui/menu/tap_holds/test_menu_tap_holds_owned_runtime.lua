@@ -90,6 +90,32 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 		helpers.assert_nil(row.fn)
 	end)
 
+	helpers.it("shows the saved consent on an owned boot and toggles it through the facade", function()
+		local CONSENT = "menu.tapholds.close_other_karabiner"
+		local function find(rows)
+			for _, row in ipairs(rows) do if row.title == CONSENT then return row end end
+			return nil
+		end
+		helpers.assert_nil(find(tap_hold_rows(true)), "absent on the shared runtime")
+		local written = {}
+		local extra = {
+			owned_runtime_selected = function() return true end,
+			get_close_other_instances = function() return true end,
+			set_close_other_instances = function(value) written[#written + 1] = value; return true end,
+			regenerate = function() return true end,
+		}
+		local row = find(tap_hold_rows(true, extra))
+		helpers.assert_true(row ~= nil, "the consent row must be drawn on an owned boot")
+		helpers.assert_eq(row.checked, true)
+		row.fn()
+		helpers.assert_eq(written, { false })
+		extra.get_close_other_instances = function() return false end
+		local unticked = find(tap_hold_rows(true, extra))
+		helpers.assert_eq(unticked.checked, false)
+		unticked.fn()
+		helpers.assert_eq(written, { false, true })
+	end)
+
 	helpers.it("explains a VirtualHIDDevice block above the closed-Karabiner row and nothing otherwise", function()
 		local function rows_for(status)
 			return tap_hold_rows(true, {

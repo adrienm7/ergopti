@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Neaktivní: povolte ErgoptiPlus v Položkách přihlášení",
 	"menu.tapholds.guardian_unavailable": "🔴 Neaktivní: pomocník ErgoptiPlus na pozadí není zaregistrován (zkontrolujte Položky přihlášení a poté ErgoptiPlus ukončete a znovu otevřete)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ Stará pravidla ErgoptiPlus blokují vaše nastavení: odstranit je…",
+	"menu.tapholds.close_other_karabiner": "Zavřít ostatní Karabiner, dokud běží Ergopti (obnoveny při pozastavení nebo ukončení)",
 	"menu.tapholds.vhid_incompatible": "⚠️ Klepnutí-přidržení pozastaveno: je nainstalována jiná verze ovladače Karabiner a macOS zapne jen jednu",
 	"menu.tapholds.vhid_not_active": "⚠️ Klepnutí-přidržení pozastaveno: povolte ovladač virtuální klávesnice Karabiner v Nastavení systému",
 	"menu.tapholds.open_login_items": "Otevřít nastavení Položek přihlášení…",

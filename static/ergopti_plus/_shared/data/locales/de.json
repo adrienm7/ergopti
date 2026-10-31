@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inaktiv: ErgoptiPlus in den Anmeldeobjekten erlauben",
 	"menu.tapholds.guardian_unavailable": "🔴 Inaktiv: Der Hintergrundhelfer von ErgoptiPlus ist nicht registriert (Anmeldeobjekte prüfen, dann ErgoptiPlus beenden und erneut öffnen)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ Alte ErgoptiPlus-Regeln blockieren Ihre Einstellungen: entfernen…",
+	"menu.tapholds.close_other_karabiner": "Andere Karabiner schließen, solange Ergopti läuft (beim Pausieren oder Beenden wiederhergestellt)",
 	"menu.tapholds.vhid_incompatible": "⚠️ Tap-Holds pausiert: Eine andere Karabiner-Treiberversion ist installiert, macOS aktiviert nur eine",
 	"menu.tapholds.vhid_not_active": "⚠️ Tap-Holds pausiert: Erlaube den virtuellen Karabiner-Tastaturtreiber in den Systemeinstellungen",
 	"menu.tapholds.open_login_items": "Einstellungen für Anmeldeobjekte öffnen…",

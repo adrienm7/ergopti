@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inaktive: tillad ErgoptiPlus under Login-emner",
 	"menu.tapholds.guardian_unavailable": "🔴 Inaktive: ErgoptiPlus’ baggrundshjælper er ikke registreret (kontrollér Login-emner, og afslut og åbn derefter ErgoptiPlus igen)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ Gamle ErgoptiPlus-regler blokerer dine indstillinger: fjern dem…",
+	"menu.tapholds.close_other_karabiner": "Luk andre Karabiner, mens Ergopti kører (gendannes ved pause eller afslutning)",
 	"menu.tapholds.vhid_incompatible": "⚠️ Tap-holds er sat på pause: en anden Karabiner-driverversion er installeret, og macOS aktiverer kun én",
 	"menu.tapholds.vhid_not_active": "⚠️ Tap-holds er sat på pause: tillad Karabiners virtuelle tastaturdriver i Systemindstillinger",
 	"menu.tapholds.open_login_items": "Åbn indstillinger for Login-emner…",

@@ -115,11 +115,13 @@ end
 
 --- The ports of the activation rule (platform/remap/runtime_activation.lua).
 --- @param owner table The bound runtime owner module.
+--- @param close_other_instances function fn() -> boolean, the user's consent.
 --- @param reload function fn() asking for a driver reload.
 --- @return table ports
-function M.activation(owner, reload)
+function M.activation(owner, close_other_instances, reload)
 	return {
 		owner = owner,
+		close_other_instances = close_other_instances,
 		restore = require("adapters.karabiner_coexistence").new().restore,
 		marker = M.marker(),
 		reload = reload,
