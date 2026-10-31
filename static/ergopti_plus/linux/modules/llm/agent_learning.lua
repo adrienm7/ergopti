@@ -22,7 +22,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Json = require("json")
 local LearningStore = require("llm.agent_learning_store")
-local NoReplaceMove = require("infra.no_replace_move")
+local CorruptAside = require("infra.corrupt_aside")
 local RegularFileReader = require("infra.regular_file_reader")
 local RegularFileWriter = require("infra.regular_file_writer")
 local NativePath = require("native_path")
@@ -72,14 +72,7 @@ end
 --- @param path string
 --- @return boolean preserved
 local function preserve_corrupt(path)
-	local candidate, suffix = path .. ".corrupt", 0
-	while true do
-		local called, moved, failure = pcall(NoReplaceMove.move, path, candidate)
-		if called and moved == true then return true end
-		if not called or failure ~= "EEXIST" then return false end
-		suffix = suffix + 1
-		candidate = path .. ".corrupt." .. suffix
-	end
+	return CorruptAside.preserve(path) ~= nil
 end
 
 --- Reads the file into memory once.
