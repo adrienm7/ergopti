@@ -633,9 +633,11 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       macOS in code (launcher role `--managed-proxy-route`, per-origin route plan, field step
       `field_ollama_blob_host`); Windows: the route plan is ported (`vendor/ergopti_route_plan.ps1`), wired into the
       owned daemon start (743181a933), and the curl relay names and the healthcheck PAC limit read `proxy_policy.json`.
-      Left: a real-PAC pull on the Mac (Debug > Test network) and on the PC; maintainer decision: an option for
-      NTLM/Negotiate relays (a local authenticating forwarder, or none; today such a relay is never exported and the
-      pull refuses with `network.failure.proxy_windows_login`).
+      Left: a real-PAC pull on the Mac (Debug > Test network) and on the PC. Decided 2026-10-31: a local
+      authenticating relay ([proxy-auth-relay.md](docs/design/proxy-auth-relay.md)); built in Go with tests, the Linux
+      daemon starts under it and the macOS and Linux network checks report `proxy_relay`. Left: packaging the binary
+      per OS, the macOS daemon start (`network-retry.sh`, through its generator), Windows
+      ([handoff](docs/tooling/windows-pc-agent-handoff.md)), and a pull behind real NTLM and Negotiate proxies.
 - [ ] **PAC unusable: direct fallback.** [PHYS-M] [PHYS-W] [PHYS-L] Done on the three OS: macOS (`network-retry.sh`,
       Swift spool and worker, Python receiver), Linux for the Ollama daemon start (50b424b997, afc7fa23db), Windows
       `ergopti_network_routes.ps1` `New-ErgoptiPacDirectFallback` (d20d328751); an explicit inherited relay wins and a
