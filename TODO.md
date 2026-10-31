@@ -253,8 +253,17 @@ into its item below or into the matching existing item.
       Windows step `collector_checks`, macOS `macos-field-shell-checks.sh`) and the last run of each tray
       check clicked today (runs and failures counted). Left [PHYS-W] [PHYS-L]: one real run of each
       collector; the Windows runtime layer of `test-windows-field-report-contract.cjs` runs only where pwsh
-      is installed. The Linux and Windows tray checks still need a click: their drivers have no request
-      protocol like the macOS field run, so a collector cannot run them without the user.
+      is installed.
+- [ ] **Windows field run without a click.** [CODE] [PHYS-W] Done: the shared protocol
+      `_shared/data/field_run_protocol.json` (files, verdicts, refusal reasons, identifiers, required keys;
+      the macOS declaration is pinned to it) and its Windows side: `infra/field_run.ahk`, started in
+      developer source mode only, runs `windows/data/field_run_steps.json` (boot cost against [budgets]
+      boot_total_ms, the network check, the composer check) without their windows; the collector writes the
+      request, waits for done, copies `field_run/` and writes `field_run_checks.txt`, which the analysis
+      marks, and skips with a verdict line when no developer driver of the clone is ready. Left [PHYS-W]:
+      AutoHotkey never ran this code (written without Windows): start `tools/dev/run-windows-dev.ps1`, run
+      the collector, and check that the three results and done.json arrive; then run the AHK suite and
+      parse. The Linux side is the Linux worker's (`fix/linux-input-config-2`).
 - [ ] **Field log analysis.** [CODE] Done: `tools/dev/field-log-analyse.py` (Python 3.8, stdlib) runs at the end
       of every collector on the scrubbed day logs only and writes `analysis.md` and `analysis.json` at the top
       of the report: errors and warnings grouped by module and template with first and last time, an example

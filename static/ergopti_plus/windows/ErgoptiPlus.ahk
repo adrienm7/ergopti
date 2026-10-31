@@ -674,6 +674,7 @@ BootProfile_Stamp("Module includes initialised")
 #Include infra/suspend_handoff.ahk
 ; Before boot.ahk: a developer run reads the installed build's paths.toml.
 #Include infra/dev_source.ahk
+#Include infra/field_run.ahk
 #Include infra/boot.ahk
 BootProfile_Stamp("Paths and shared configuration loaded")
 #Include infra/feature_state.ahk
@@ -1476,6 +1477,11 @@ try {
 		LoggerInfo("ErgoptiPlus", "Developer source mode; the driver runs from {1} (clone root from {2}).",
 			_DriverDir, DevSource_Resolution()["origin"])
 		DevSourceWatcher_Start(_DriverDir, ReloadPreservingSuspend)
+		; The collector's field run (infra/field_run.ahk) is optional too: the
+		; driver keeps running without it.
+		try FieldRun_Start(DevSource_Root())
+		catch as _FieldRunErr
+			LoggerError("FieldRun", "The developer field run could not start: {1}.", _FieldRunErr.Message)
 	}
 } catch as _DevSourceErr
 	LoggerError("ErgoptiPlus", "Developer source mode refused: {1}.", _DevSourceErr.Message)
