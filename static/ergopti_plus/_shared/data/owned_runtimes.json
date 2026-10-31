@@ -947,7 +947,7 @@
 		},
 		{
 			"os": "linux",
-			"tool": "`cat`, `grep`, `head`, `tail`, `sed`, `wc`, `date`, `sleep`, `readlink`, `find`, `ps`, `pgrep`, `ss`, `setsid`, `tr`, `lsblk`",
+			"tool": "`cat`, `grep`, `head`, `tail`, `sed`, `wc`, `date`, `sleep`, `readlink`, `find`, `ss`, `setsid`, `tr`, `lsblk`",
 			"programs": [
 				"cat",
 				"grep",
@@ -959,15 +959,13 @@
 				"sleep",
 				"readlink",
 				"find",
-				"ps",
-				"pgrep",
 				"ss",
 				"setsid",
 				"tr",
 				"lsblk"
 			],
-			"used_for": "Small queries and filters: system facts, file watching, the local AI servers' ports and processes, the updater relay, the uninstall detach (`linux/modules/keystats/system_metrics.lua`, `linux/infra/file_watchers.lua`, `linux/modules/llm/local_server_ports.lua`, `linux/modules/updater/restarter.lua`, `linux/ui/menu/uninstall.lua`, `linux/modules/gestures/system_actions.lua`, `linux/modules/gestures/manager.lua`)",
-			"today": "System (coreutils, procps, iproute2, util-linux)",
+			"used_for": "Small queries and filters: system facts, file watching, the local AI servers' listening ports, the updater relay, the uninstall detach (`linux/modules/keystats/system_metrics.lua`, `linux/infra/file_watchers.lua`, `linux/modules/llm/local_server_ports.lua`, `linux/modules/updater/restarter.lua`, `linux/ui/menu/uninstall.lua`, `linux/modules/gestures/system_actions.lua`, `linux/modules/gestures/manager.lua`)",
+			"today": "System (coreutils, iproute2, util-linux)",
 			"current_class": "SYS",
 			"version_needed": "POSIX",
 			"if_missing": "Named failure; a fact is reported unknown",
@@ -1340,8 +1338,8 @@
 		{
 			"os": "windows",
 			"tool": "`taskkill.exe`, `cmd.exe`, `reg` through AHK",
-			"programs": ["taskkill.exe", "cmd.exe", "reg"],
-			"used_for": "Process tree stop of Ergopti's own children, shell actions (`windows/adapters/shell_runner.ahk:794`, `windows/modules/gestures/actions.ahk:954`)",
+			"programs": ["taskkill.exe", "cmd.exe", "reg", "conhost"],
+			"used_for": "Process tree stop of Ergopti's own children, shell actions (`windows/adapters/shell_runner.ahk:794`, `windows/modules/gestures/actions.ahk:954`); `conhost.exe` is never launched, only recognised as the console host of a hidden Ollama child (`windows/modules/llm/ollama-runtime-launch.ps1`)",
 			"today": "System",
 			"current_class": "SYS",
 			"version_needed": "n/a",

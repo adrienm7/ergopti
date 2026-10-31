@@ -1406,7 +1406,7 @@
 	"menu.debug.hook_probe": "キーボードフックの順序を記録",
 	"menu.debug.composer_check": "合成したレイアウトをテスト",
 	"platform_reason.action_apple_shortcuts_are_macos": "macOSのみ：Appleのショートカットは macOS にしかありません。ほかのシステムでは、代わりにコマンドかプログラムを実行してください。",
-	"platform_reason.action_windows_runs_shell_through_run_program": "Windows では「プログラムを実行」で同じことができます。コマンドを引数にした cmd.exe か powershell.exe、または開くファイルやフォルダーを引数にした explorer.exe です。",
+	"platform_reason.action_windows_runs_shell_through_run_program": "Windows では「プログラムを実行」で同じことができます。コマンドを引数にした cmd.exe、または開くファイルやフォルダーを引数にした explorer.exe です。",
 	"platform_reason.input_probe_is_autohotkey_specific": "これらのチェックは AutoHotkey の SendInput とそのキーボードフックを計測します。どちらも Windows ドライバーにしかありません。",
 	"input_probe.title": "入力チェック",
 	"input_probe.confirm": "このチェックは小さなウィンドウを開き、約 {1} 秒間そこに入力します。その間、ほかの場所で入力やクリックをしないでください。続行しますか?",
