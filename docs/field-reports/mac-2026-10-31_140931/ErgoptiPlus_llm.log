@@ -1,0 +1,247 @@
+2026-10-31 09:54:29:111 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-10-31 09:54:29:111 [DEBUG] [llm.core] Backend: mlx.
+2026-10-31 09:54:29:142 [DEBUG] [keymap.llm_bridge] Star preview: on.
+2026-10-31 09:54:29:142 [DEBUG] [keymap.llm_bridge] Autocorrect preview: on.
+2026-10-31 09:54:29:142 [DEBUG] [keymap.llm_bridge] Colored tooltips: on.
+2026-10-31 09:54:29:142 [DEBUG] [llm.core] User profiles: 0 custom profile(s).
+2026-10-31 09:54:29:142 [DEBUG] [llm.core] set_active_profile: runtime LLM disabled — skipping warmup for 'batch_advanced'.
+2026-10-31 09:54:29:142 [DEBUG] [llm.core] Streaming: on.
+2026-10-31 09:54:29:142 [INFO] [llm.prediction_engine] Model set: 'Qwen3.5-2B' (backend: mlx).
+2026-10-31 09:54:29:142 [DEBUG] [llm.core] Runtime LLM gate: disabled.
+2026-10-31 09:54:29:142 [INFO] [llm.prediction_engine] LLM disabled.
+2026-10-31 09:54:29:142 [DEBUG] [llm.prediction_engine] Ollama daemon recovery superseded: prediction runtime disabled.
+2026-10-31 09:54:29:143 [DEBUG] [llm.warmup_controller] Warmup retry chain cancelled (gen bumped to 1).
+2026-10-31 09:54:29:143 [DEBUG] [llm.api_mlx] stop_warmup() — gen bumped to 1, self-retry chain stopped.
+2026-10-31 09:54:29:143 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 4, in-flight warmup invalidated.
+2026-10-31 09:54:29:143 [DEBUG] [llm.api_remote] Remote warmup stopped (generation 1).
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] AI preview: on.
+2026-10-31 09:54:29:144 [DEBUG] [keymap.llm_bridge] LLM chain after hotstring: on.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Auto temperature raise: on.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Inactivity timer delay updated: 0.500s.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Request interval updated: 0.300s.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Backend label: 'MLX 🚀'.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Model display name: 'Qwen3.5-2B'.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Context window: 500 chars.
+2026-10-31 09:54:29:144 [DEBUG] [keymap.llm_bridge] LLM context reset on nav: yes.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Temperature: 0.1.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Max words: 15 (0 = unlimited).
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Min words: 3.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Prediction count: 3.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Sequential mode: off.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Streaming: on.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Streaming multi: on.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Navigation modifiers: [].
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Info bar: visible.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Validation modifiers: [].
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Prediction indent: 0.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Excluded apps: 0 configured.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Application profile overrides: 0 configured.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] URL bar filter: off.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Secure field filter: on.
+2026-10-31 09:54:29:144 [DEBUG] [llm.prediction_engine] Instant on word end: on.
+2026-10-31 09:54:29:144 [DEBUG] [llm.agent_runner] System 1: ''.
+2026-10-31 09:54:29:144 [DEBUG] [llm.agent_runner] System 2: ''.
+2026-10-31 09:54:29:144 [DEBUG] [llm.agent_runner] Agent mode: 'off'.
+2026-10-31 09:54:29:144 [DEBUG] [llm.agent_runner] Agent excluded applications: 0.
+2026-10-31 09:54:29:174 [DEBUG] [llm.core] ↑ "Backend: %s." repeated 1 more time between 2026-10-31 09:54:29:142 and 2026-10-31 09:54:29:142 (last: Backend: mlx.).
+2026-10-31 09:54:29:174 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 2 more times between 2026-10-31 09:54:29:142 and 2026-10-31 09:54:29:142 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 3).).
+2026-10-31 09:54:29:195 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-10-31 09:54:29:195 [DEBUG] [llm.core] Backend: mlx.
+2026-10-31 09:54:29:195 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-10-31 09:54:29:248 [DONE] [menu_llm.models] Loaded models catalogue (18 providers) from ~/perso/ergopti/static/ergopti_plus/_shared/modules/llm/models.json.
+2026-10-31 09:54:29:248 [DEBUG] [llm.core] ↑ "Streaming: %s." repeated 1 more time between 2026-10-31 09:54:29:144 and 2026-10-31 09:54:29:144 (last: Streaming: on.).
+2026-10-31 09:54:29:268 [DEBUG] [llm.prediction_engine] Prediction count: 3.
+2026-10-31 09:54:29:268 [DEBUG] [llm.prediction_engine] Max words: 15 (0 = unlimited).
+2026-10-31 09:54:29:268 [DEBUG] [llm.prediction_engine] Min words: 3.
+2026-10-31 09:54:29:268 [DEBUG] [llm.core] Streaming: on.
+2026-10-31 09:54:29:268 [DEBUG] [llm.prediction_engine] Streaming: on.
+2026-10-31 09:54:29:268 [DEBUG] [llm.prediction_engine] Streaming multi: on.
+2026-10-31 09:54:29:268 [DEBUG] [llm.core] User profiles: 0 custom profile(s).
+2026-10-31 09:54:29:268 [DEBUG] [llm.core] set_active_profile: runtime LLM disabled — skipping warmup for 'batch_advanced'.
+2026-10-31 09:54:29:268 [DEBUG] [menu_llm] Resolving model name on startup: 'Qwen3.5-2B' -> 'Qwen3.5-2B-4bit'.
+2026-10-31 09:54:29:268 [DEBUG] [llm.prediction_engine] Model display name: 'Qwen3.5-2B'.
+2026-10-31 09:54:29:268 [DEBUG] [menu_llm] Model power on startup: 2.
+2026-10-31 09:54:29:273 [DEBUG] [llm.local_model_offer] Local model installer registered.
+2026-10-31 09:54:29:275 [DEBUG] [llm.agent_runner] Agent mode persister registered.
+2026-10-31 09:54:29:437 [DEBUG] [llm.api_remote] API entries set (1 entry/entries).
+2026-10-31 09:54:29:437 [DEBUG] [llm.api_remote] Active API entry id: 'local-omlx'.
+2026-10-31 09:54:29:437 [DEBUG] [llm.api_remote] Pre-warmed Keychain token for active API entry 'local-omlx'.
+2026-10-31 09:54:31:686 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-10-31 09:54:31:686 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-10-31 09:54:31:697 [DEBUG] [menu_llm] Building prediction count menu…
+2026-10-31 09:55:28:999 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-10-31 09:55:28:999 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-10-31 09:55:29:010 [DEBUG] [menu_llm] Building prediction count menu…
+2026-10-31 09:55:30:643 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-10-31 09:55:30:643 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-10-31 09:55:30:655 [DEBUG] [menu_llm] Building prediction count menu…
+2026-10-31 09:55:49:799 [INFO] [menu_llm.runtime_offer] A user-owned Ollama (app) is installed; Ergopti leaves it untouched and uses its own.
+2026-10-31 09:55:49:805 [INFO] [menu_llm.runtime_offer] Installing Ergopti's own Ollama 0.40.4: the install button was the user's choice.
+2026-10-31 09:56:57:165 [DEBUG] [llm.api_ollama] The local server returned a readable model list.
+2026-10-31 09:58:33:523 [ERROR] [menu_llm.ollama] Managed model pull retirement is pending (operation_files_not_removed); exact task slot retained.
+2026-10-31 09:58:33:523 [ERROR] [menu_llm.ollama] The Ollama pull of granite4:350m-h ended (code 1) but its task could not be settled; last output: OLLAMA_PULL_OUTCOME error_row.
+2026-10-31 09:58:33:540 [DEBUG] [menu_llm.mlx] Scanning MLX installed models cache…
+2026-10-31 09:58:33:542 [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-2B
+2026-10-31 09:58:33:544 [DEBUG] [menu_llm.mlx] MLX installed models scan complete: 2 model(s).
+2026-10-31 09:58:37:476 [INFO] [menu_llm.mlx] Ensuring MLX server for model Qwen3.5-2B…
+2026-10-31 09:58:37:535 [INFO] [llm.api_mlx] Endpoint discovery state reset; awaiting the new server's PGID.
+2026-10-31 09:58:37:535 [DEBUG] [llm.api_mlx] Model HF path set to 'mlx-community/Qwen3.5-2B-4bit'.
+2026-10-31 09:58:37:535 [INFO] [menu_llm.mlx] Starting MLX server process for model Qwen3.5-2B — output prefixed [MLX-SERVER] in ~/perso/ergopti/ergopti_plus/ErgoptiPlus_2026-10-31.log
+2026-10-31 09:58:37:537 [DEBUG] [menu_llm.mlx] MLX server bash_cmd: export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; export HF_HUB_DISABLE_XET=1; export HF_HUB_OFFLINE=1; export TRANSFORMERS_OFFLINE=1; export PYTHONUNBUFFERED=1; PYTHON_BIN="~/Library/Application Support/Ergopti/mlx-venv/bin/python"; if [ ! -x "$PYTHON_BIN" ]; then echo "[MLX] ❌ venv introuvable : $PYTHON_BIN"; exit 1; fi; echo "[MLX] Python utilisé: $PYTHON_BIN"; MLX_PID_FILE=/tmp/mlx_server.pid; MLX_PGID_FILE=/tmp/mlx_server.pgid; if [ -f "$MLX_PGID_FILE" ]; then OLD_PGID=$(cat "$MLX_PGID_FILE" 2>/dev/null | tr -d '[:space:]'); echo "[MLX] Skipping PGID-kill of $OLD_PGID — PID-based kill is safer on macOS."; rm -f "$MLX_PGID_FILE"; fi; if [ -f "$MLX_PID_FILE" ]; then OLD_PID=$(cat "$MLX_PID_FILE" 2>/dev/null | tr -d '[:space:]'); if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then OLD_COMM=$(ps -o ucomm= -p "$OLD_PID" 2>/dev/null | tr -d '[:space:]'); OLD_ARGS=$(ps -o args= -p "$OLD_PID" 2>/dev/null); if echo "$OLD_COMM" | grep -qi python && echo "$OLD_ARGS" | grep -q mlx_lm; then echo "[MLX] Killing previous server PID $OLD_PID (verified python+mlx_lm)…"; kill -9 "$OLD_PID" 2>/dev/null || true; else echo "[MLX] ⚠️  PID $OLD_PID is alive but not a python+mlx_lm process (comm='$OLD_COMM') — refusing to kill (PID was recycled, likely Hammerspoon)."; fi; else echo "[MLX] PID file stale (PID $OLD_PID not running)."; fi; rm -f "$MLX_PID_FILE"; fi; PGREP_PIDS=$(ps -axo pid=,ucomm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}' || true); if [ -n "$PGREP_PIDS" ]; then echo "[MLX] mlx_lm process(es) still alive (PIDs: $PGREP_PIDS) — killing…"; echo "$PGREP_PIDS" | xargs kill -9 2>/dev/null || true; sleep 1; fi; sleep 3; LSOF_ATTEMPTS=0; while true; do STALE_PIDS=$(lsof -ti TCP:3460 2>/dev/null || true); if [ -z "$STALE_PIDS" ]; then echo "[MLX] Port 3460 free — starting server."; break; fi; LSOF_ATTEMPTS=$((LSOF_ATTEMPTS + 1)); echo "[MLX] Port 3460 still occupied attempt $LSOF_ATTEMPTS (PIDs: $STALE_PIDS) — killing…"; echo "$STALE_PIDS" | xargs kill -9 2>/dev/null || true; if [ "$LSOF_ATTEMPTS" -ge 10 ]; then echo "[MLX] ❌ Port 3460 still occupied after 10 attempts — giving up."; exit 1; fi; sleep 0.5; done; MLX_FIFO=$(mktemp -u /tmp/mlx_out.XXXXXX); mkfifo "$MLX_FIFO"; MLX_PID=''; MLX_PGID=''; MLX_STOP_PENDING=0; MLX_CLEANED=0; OWN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d '[:space:]'); PARENT_PGID=$(ps -o pgid= -p $PPID 2>/dev/null | tr -d '[:space:]'); cleanup_mlx_child() { if [ "$MLX_CLEANED" -eq 1 ]; then return 0; fi; MLX_CLEANED=1; trap '' TERM INT HUP; if [ -n "$MLX_PID" ] && kill -0 "$MLX_PID" 2>/dev/null; then KILL_TARGET="$MLX_PID"; if [ -n "$MLX_PGID" ] && [ "$MLX_PGID" != "$OWN_PGID" ] && [ "$MLX_PGID" != "$PARENT_PGID" ]; then KILL_TARGET="-$MLX_PGID"; fi; kill -TERM -- "$KILL_TARGET" 2>/dev/null || true; STOP_ATTEMPTS=0; while kill -0 -- "$KILL_TARGET" 2>/dev/null && [ "$STOP_ATTEMPTS" -lt 20 ]; do STOP_ATTEMPTS=$((STOP_ATTEMPTS + 1)); sleep 0.1; done; if kill -0 -- "$KILL_TARGET" 2>/dev/null; then kill -KILL -- "$KILL_TARGET" 2>/dev/null || true; fi; wait "$MLX_PID" 2>/dev/null || true; fi; rm -f "$MLX_FIFO"; }; trap 'MLX_STOP_PENDING=1' TERM INT HUP; set -m; REPO_ID="mlx-community/Qwen3.5-2B-4bit"; CACHE_NAME="models--$(echo "$REPO_ID" | sed 's|/|--|g')"; CACHE_ROOT="$HOME/.cache/huggingface/hub/$CACHE_NAME"; SNAPSHOT_DIR=$(ls -dt "$CACHE_ROOT/snapshots/"*/ 2>/dev/null | head -1); if [ -n "$SNAPSHOT_DIR" ] && [ -d "$SNAPSHOT_DIR" ]; then MODEL_ARG="${SNAPSHOT_DIR%/}"; echo "[MLX] Using local snapshot path: $MODEL_ARG"; printf '%s\n' "$MODEL_ARG" > '~/perso/config/ergopti_plus/hammerspoon/mlx_active_model.txt'; REVISION=$(basename "$MODEL_ARG"); mkdir -p "$CACHE_ROOT/refs"; if [ ! -f "$CACHE_ROOT/refs/main" ]; then echo "$REVISION" > "$CACHE_ROOT/refs/main"; echo "[MLX] Wrote refs/main = $REVISION (was missing — required by HF offline mode)."; fi; else MODEL_ARG="$REPO_ID"; echo "[MLX] No local snapshot found for $REPO_ID — falling back to repo id."; printf '%s\n' "$REPO_ID" > '~/perso/config/ergopti_plus/hammerspoon/mlx_active_model.txt'; fi; "$PYTHON_BIN" -m mlx_lm server --model "$MODEL_ARG" --port 3460 --decode-concurrency 1 --prompt-concurrency 1 > "$MLX_FIFO" 2>&1 & MLX_PID=$!; trap 'cleanup_mlx_child' EXIT; trap 'cleanup_mlx_child; exit 15' TERM INT HUP; if [ "$MLX_STOP_PENDING" -eq 1 ]; then cleanup_mlx_child; exit 15; fi; set +m; MLX_PGID=$(ps -o pgid= -p $MLX_PID 2>/dev/null | tr -d ' ' || echo ''); echo "[MLX] Server started with PID $MLX_PID PGID $MLX_PGID."; echo "$MLX_PID" > "$MLX_PID_FILE"; if [ -n "$MLX_PGID" ] && [ "$MLX_PGID" != "$OWN_PGID" ] && [ "$MLX_PGID" != "$PARENT_PGID" ]; then echo "$MLX_PGID" > "$MLX_PGID_FILE"; echo "[MLX] Persisted PGID $MLX_PGID (isolated from Hammerspoon group $PARENT_PGID)."; else echo "[MLX] ⚠️  set -m did not isolate python (MLX_PGID=$MLX_PGID, own=$OWN_PGID, parent=$PARENT_PGID) — NOT persisting PGID. Will rely on PID-only kill on next switch."; rm -f "$MLX_PGID_FILE"; fi; while IFS= read -r LINE; do OUT="$(date +%H:%M:%S) [MLX-SERVER] $LINE"; printf '%s\n' "$OUT"; printf '%s\n' "$OUT" >> ~/perso/ergopti/ergopti_plus/ErgoptiPlus_2026-10-31.log; done < "$MLX_FIFO"; wait "$MLX_PID"; MLX_STATUS=$?; rm -f "$MLX_FIFO"; exit "$MLX_STATUS"
+2026-10-31 09:58:37:539 [INFO] [menu_llm.mlx] MLX server task started for model ‘Qwen3.5-2B’.
+2026-10-31 09:58:37:561 [DEBUG] [menu_llm.mlx] MLX server stream chunk (94 bytes).
+2026-10-31 09:58:37:561 [DEBUG] [menu_llm.mlx] MLX server: [MLX] Python utilisé: ~/Library/Application Support/Ergopti/mlx-venv/bin/python
+2026-10-31 09:58:40:782 [DEBUG] [llm.api_mlx] Active server PGID guard set to 90343.
+2026-10-31 09:58:40:782 [DEBUG] [llm.api_mlx] Sweeping zombie mlx_lm Python process(es) via ps+awk (excluding PGID 90343)…
+2026-10-31 09:58:40:864 [DEBUG] [llm.api_mlx] Zombie sweep found no stray mlx_lm process.
+2026-10-31 09:58:42:523 [DEBUG] [menu_llm.mlx] MLX server stop signal accepted; awaiting exact task completion.
+2026-10-31 09:58:42:531 [DEBUG] [menu_llm] ↑ "Building LLM menu item (build_item)…" repeated 1 more time between 2026-10-31 09:55:49:606 and 2026-10-31 09:55:49:606.
+2026-10-31 09:58:42:531 [INFO] [menu_llm.mlx] MLX server process exited with code 15.
+2026-10-31 09:58:42:534 [DEBUG] [menu_llm] ↑ "Menu state: paused=false, llm_enabled=false, is_disabled=true" repeated 1 more time between 2026-10-31 09:55:49:606 and 2026-10-31 09:55:49:606.
+2026-10-31 09:58:42:534 [DEBUG] [menu_llm.mlx] MLX listener shutdown kill dispatched on port 3460.
+2026-10-31 09:58:42:534 [INFO] [llm.api_mlx] Endpoint discovery state reset; no server launch follows.
+2026-10-31 09:58:42:534 [INFO] [menu_llm.models] MLX server stopped safely.
+2026-10-31 09:58:42:534 [DEBUG] [menu_llm] ↑ "Building prediction count menu…" repeated 1 more time between 2026-10-31 09:55:49:626 and 2026-10-31 09:55:49:626.
+2026-10-31 09:58:42:534 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-10-31 09:58:42:606 [DEBUG] [llm.api_ollama] [gemma4:e2b] #1 PROMPT (7 chars) mode_line=true -> <text withheld>
+2026-10-31 09:58:44:987 [DEBUG] [llm.api_ollama] [gemma4:e2b] #1 HTTP_RESPONSE status=200, body_len=323
+2026-10-31 09:58:44:988 [DEBUG] [llm.api_ollama] [gemma4:e2b] #1 RAW (2381ms, 4 chars) -> What
+2026-10-31 09:58:46:117 [TRACE] [llm.local_server_ports] Scanning 4 local server process(es)…
+2026-10-31 09:58:46:167 [DEBUG] [llm.local_server_ports] Local server 'omlx': not running (no running process): not probed.
+2026-10-31 09:58:46:167 [INFO] [llm.local_server_ports] Local server ports: omlx=off, lmstudio=off, llamacpp=62812/cli, jan=off.
+2026-10-31 09:58:46:167 [DONE] [llm.local_server_ports] Local server process scan settled.
+2026-10-31 09:58:46:167 [DEBUG] [llm.api_remote] Local server 'omlx' is not probed: no running process.
+2026-10-31 09:58:46:167 [DEBUG] [llm.api_remote] Local server 'llamacpp' probed at http://127.0.0.1:62812/v1 (port from cli).
+2026-10-31 09:58:46:169 [DEBUG] [llm.api_remote] Local server 'llamacpp' probe answered HTTP 200.
+2026-10-31 09:58:46:169 [INFO] [llm.local_servers] Local servers swept: llamacpp=up at http://127.0.0.1:62812/v1 (port from cli).
+2026-10-31 09:59:38:650 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-10-31 09:59:38:650 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-10-31 09:59:38:667 [DEBUG] [menu_llm] Building prediction count menu…
+2026-10-31 10:02:10:369 [DEBUG] [menu_llm.mlx] ↑ "MLX server stream chunk (%d bytes)." repeated 9 more times between 2026-10-31 09:58:37:591 and 2026-10-31 09:58:42:522 (last: MLX server stream chunk (99 bytes).).
+2026-10-31 10:02:10:757 [DEBUG] [menu_llm.mlx] ↑ "MLX server: %s" repeated 9 more times between 2026-10-31 09:58:37:591 and 2026-10-31 09:58:42:522 (last: MLX server: 09:58:42 [MLX-SERVER] 2026-10-31 09:58:42,507 - INFO - Starting httpd at 127.0.0.1 on port 3460...).
+2026-10-31 10:02:11:259 [DEBUG] [menu_llm.mlx] ↑ "Scanning MLX installed models cache…" repeated 1 more time between 2026-10-31 09:58:42:548 and 2026-10-31 09:58:42:548.
+2026-10-31 10:02:11:259 [DEBUG] [menu_llm.mlx] ↑ "MLX model detected in cache: %s" repeated 3 more times between 2026-10-31 09:58:33:543 and 2026-10-31 09:58:42:548 (last: MLX model detected in cache: Qwen3.5-4B).
+2026-10-31 10:02:11:283 [DEBUG] [menu_llm.mlx] ↑ "MLX installed models scan complete: %d model(s)." repeated 1 more time between 2026-10-31 09:58:42:549 and 2026-10-31 09:58:42:549 (last: MLX installed models scan complete: 2 model(s).).
+2026-10-31 10:02:11:482 [DEBUG] [llm.api_ollama] ↑ "The local server returned a readable model list." repeated 1 more time between 2026-10-31 09:58:42:599 and 2026-10-31 09:58:42:599.
+2026-10-31 10:02:13:188 [DEBUG] [llm.local_server_ports] ↑ "Local server '%s': %s." repeated 3 more times between 2026-10-31 09:58:46:167 and 2026-10-31 09:58:46:167 (last: Local server 'jan': not running (no running process): not probed.).
+2026-10-31 10:02:17:501 [DEBUG] [llm.api_remote] ↑ "Local server '%s' is not probed: %s." repeated 2 more times between 2026-10-31 09:58:46:167 and 2026-10-31 09:58:46:167 (last: Local server 'jan' is not probed: no running process.).
+2026-10-31 10:09:38:985 [DEBUG] [menu_llm] ↑ "Building LLM menu item (build_item)…" repeated 20 more times between 2026-10-31 09:59:49:604 and 2026-10-31 10:02:13:803.
+2026-10-31 10:09:38:985 [DEBUG] [menu_llm] ↑ "Menu state: paused=false, llm_enabled=false, is_disabled=true" repeated 20 more times between 2026-10-31 09:59:49:604 and 2026-10-31 10:02:13:803.
+2026-10-31 10:09:38:985 [DEBUG] [menu_llm] ↑ "Building prediction count menu…" repeated 20 more times between 2026-10-31 09:59:49:616 and 2026-10-31 10:02:13:817.
+2026-10-31 14:12:21:257 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-10-31 14:12:21:257 [DEBUG] [llm.core] Backend: mlx.
+2026-10-31 14:12:21:287 [DEBUG] [keymap.llm_bridge] Star preview: on.
+2026-10-31 14:12:21:287 [DEBUG] [keymap.llm_bridge] Autocorrect preview: on.
+2026-10-31 14:12:21:287 [DEBUG] [keymap.llm_bridge] Colored tooltips: on.
+2026-10-31 14:12:21:288 [DEBUG] [llm.core] User profiles: 0 custom profile(s).
+2026-10-31 14:12:21:288 [DEBUG] [llm.core] set_active_profile: runtime LLM disabled — skipping warmup for 'batch_advanced'.
+2026-10-31 14:12:21:288 [DEBUG] [llm.core] Streaming: on.
+2026-10-31 14:12:21:288 [INFO] [llm.prediction_engine] Model set: 'Qwen3.5-2B' (backend: mlx).
+2026-10-31 14:12:21:288 [DEBUG] [llm.core] Runtime LLM gate: disabled.
+2026-10-31 14:12:21:288 [INFO] [llm.prediction_engine] LLM disabled.
+2026-10-31 14:12:21:288 [DEBUG] [llm.prediction_engine] Ollama daemon recovery superseded: prediction runtime disabled.
+2026-10-31 14:12:21:288 [DEBUG] [llm.warmup_controller] Warmup retry chain cancelled (gen bumped to 1).
+2026-10-31 14:12:21:288 [DEBUG] [llm.api_mlx] stop_warmup() — gen bumped to 1, self-retry chain stopped.
+2026-10-31 14:12:21:288 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 4, in-flight warmup invalidated.
+2026-10-31 14:12:21:289 [DEBUG] [llm.api_remote] Remote warmup stopped (generation 1).
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] AI preview: on.
+2026-10-31 14:12:21:289 [DEBUG] [keymap.llm_bridge] LLM chain after hotstring: on.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Auto temperature raise: on.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Inactivity timer delay updated: 0.500s.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Request interval updated: 0.300s.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Backend label: 'MLX 🚀'.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Model display name: 'Qwen3.5-2B'.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Context window: 500 chars.
+2026-10-31 14:12:21:289 [DEBUG] [keymap.llm_bridge] LLM context reset on nav: yes.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Temperature: 0.1.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Max words: 15 (0 = unlimited).
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Min words: 3.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Prediction count: 3.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Sequential mode: off.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Streaming: on.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Streaming multi: on.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Navigation modifiers: [].
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Info bar: visible.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Validation modifiers: [].
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Prediction indent: 0.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Excluded apps: 0 configured.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Application profile overrides: 0 configured.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] URL bar filter: off.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Secure field filter: on.
+2026-10-31 14:12:21:289 [DEBUG] [llm.prediction_engine] Instant on word end: on.
+2026-10-31 14:12:21:289 [DEBUG] [llm.agent_runner] System 1: ''.
+2026-10-31 14:12:21:289 [DEBUG] [llm.agent_runner] System 2: ''.
+2026-10-31 14:12:21:289 [DEBUG] [llm.agent_runner] Agent mode: 'off'.
+2026-10-31 14:12:21:289 [DEBUG] [llm.agent_runner] Agent excluded applications: 0.
+2026-10-31 14:12:21:327 [DEBUG] [llm.core] ↑ "Backend: %s." repeated 1 more time between 2026-10-31 14:12:21:288 and 2026-10-31 14:12:21:288 (last: Backend: mlx.).
+2026-10-31 14:12:21:328 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 2 more times between 2026-10-31 14:12:21:288 and 2026-10-31 14:12:21:288 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 3).).
+2026-10-31 14:12:21:346 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-10-31 14:12:21:346 [DEBUG] [llm.core] Backend: mlx.
+2026-10-31 14:12:21:346 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-10-31 14:12:21:393 [DONE] [menu_llm.models] Loaded models catalogue (18 providers) from ~/perso/ergopti/static/ergopti_plus/_shared/modules/llm/models.json.
+2026-10-31 14:12:21:393 [DEBUG] [llm.core] ↑ "Streaming: %s." repeated 1 more time between 2026-10-31 14:12:21:289 and 2026-10-31 14:12:21:289 (last: Streaming: on.).
+2026-10-31 14:12:21:410 [DEBUG] [llm.prediction_engine] Prediction count: 3.
+2026-10-31 14:12:21:410 [DEBUG] [llm.prediction_engine] Max words: 15 (0 = unlimited).
+2026-10-31 14:12:21:410 [DEBUG] [llm.prediction_engine] Min words: 3.
+2026-10-31 14:12:21:410 [DEBUG] [llm.core] Streaming: on.
+2026-10-31 14:12:21:410 [DEBUG] [llm.prediction_engine] Streaming: on.
+2026-10-31 14:12:21:410 [DEBUG] [llm.prediction_engine] Streaming multi: on.
+2026-10-31 14:12:21:410 [DEBUG] [llm.core] User profiles: 0 custom profile(s).
+2026-10-31 14:12:21:410 [DEBUG] [llm.core] set_active_profile: runtime LLM disabled — skipping warmup for 'batch_advanced'.
+2026-10-31 14:12:21:410 [DEBUG] [menu_llm] Resolving model name on startup: 'Qwen3.5-2B' -> 'Qwen3.5-2B-4bit'.
+2026-10-31 14:12:21:410 [DEBUG] [llm.prediction_engine] Model display name: 'Qwen3.5-2B'.
+2026-10-31 14:12:21:411 [DEBUG] [menu_llm] Model power on startup: 2.
+2026-10-31 14:12:21:415 [DEBUG] [llm.local_model_offer] Local model installer registered.
+2026-10-31 14:12:21:417 [DEBUG] [llm.agent_runner] Agent mode persister registered.
+2026-10-31 14:12:21:586 [DEBUG] [llm.api_remote] API entries set (1 entry/entries).
+2026-10-31 14:12:21:586 [DEBUG] [llm.api_remote] Active API entry id: 'local-omlx'.
+2026-10-31 14:12:21:586 [DEBUG] [llm.api_remote] Pre-warmed Keychain token for active API entry 'local-omlx'.
+2026-10-31 14:12:23:923 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-10-31 14:12:23:923 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-10-31 14:12:23:935 [DEBUG] [menu_llm] Building prediction count menu…
+2026-10-31 14:13:36:620 [DEBUG] [keymap.llm_bridge] Hotstring 'h' → 'heure' [star].
+2026-10-31 14:13:39:138 [DEBUG] [keymap.llm_bridge] Escape trap armed (persistent).
+2026-10-31 14:13:40:309 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-10-31 14:13:40:309 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-10-31 14:13:40:323 [DEBUG] [menu_llm] Building prediction count menu…
+2026-10-31 14:13:40:520 [INFO] [menu_llm.runtime_offer] A user-owned Ollama (app) is installed; Ergopti leaves it untouched and uses its own.
+2026-10-31 14:13:40:530 [INFO] [menu_llm.runtime_offer] Installing Ergopti's own Ollama 0.40.4: the install button was the user's choice.
+2026-10-31 14:14:44:878 [DEBUG] [menu_llm.mlx] Scanning MLX installed models cache…
+2026-10-31 14:14:44:880 [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-2B
+2026-10-31 14:14:44:882 [DEBUG] [keymap.llm_bridge] ↑ "Hotstring '%s' → '%s' [%s]." repeated 1 more time between 2026-10-31 14:13:36:623 and 2026-10-31 14:13:36:623 (last: Hotstring 'h' → 'heure' [star].).
+2026-10-31 14:14:44:882 [DEBUG] [menu_llm.mlx] MLX installed models scan complete: 2 model(s).
+2026-10-31 14:14:48:871 [INFO] [menu_llm.mlx] Ensuring MLX server for model Qwen3.5-2B…
+2026-10-31 14:14:48:965 [INFO] [llm.api_mlx] Endpoint discovery state reset; awaiting the new server's PGID.
+2026-10-31 14:14:48:965 [DEBUG] [llm.api_mlx] Model HF path set to 'mlx-community/Qwen3.5-2B-4bit'.
+2026-10-31 14:14:48:965 [INFO] [menu_llm.mlx] Starting MLX server process for model Qwen3.5-2B — output prefixed [MLX-SERVER] in ~/perso/ergopti/ergopti_plus/ErgoptiPlus_2026-10-31.log
+2026-10-31 14:14:48:969 [DEBUG] [menu_llm.mlx] MLX server bash_cmd: export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; export HF_HUB_DISABLE_XET=1; export HF_HUB_OFFLINE=1; export TRANSFORMERS_OFFLINE=1; export PYTHONUNBUFFERED=1; PYTHON_BIN="~/Library/Application Support/Ergopti/mlx-venv/bin/python"; if [ ! -x "$PYTHON_BIN" ]; then echo "[MLX] ❌ venv introuvable : $PYTHON_BIN"; exit 1; fi; echo "[MLX] Python utilisé: $PYTHON_BIN"; MLX_PID_FILE=/tmp/mlx_server.pid; MLX_PGID_FILE=/tmp/mlx_server.pgid; if [ -f "$MLX_PGID_FILE" ]; then OLD_PGID=$(cat "$MLX_PGID_FILE" 2>/dev/null | tr -d '[:space:]'); echo "[MLX] Skipping PGID-kill of $OLD_PGID — PID-based kill is safer on macOS."; rm -f "$MLX_PGID_FILE"; fi; if [ -f "$MLX_PID_FILE" ]; then OLD_PID=$(cat "$MLX_PID_FILE" 2>/dev/null | tr -d '[:space:]'); if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then OLD_COMM=$(ps -o ucomm= -p "$OLD_PID" 2>/dev/null | tr -d '[:space:]'); OLD_ARGS=$(ps -o args= -p "$OLD_PID" 2>/dev/null); if echo "$OLD_COMM" | grep -qi python && echo "$OLD_ARGS" | grep -q mlx_lm; then echo "[MLX] Killing previous server PID $OLD_PID (verified python+mlx_lm)…"; kill -9 "$OLD_PID" 2>/dev/null || true; else echo "[MLX] ⚠️  PID $OLD_PID is alive but not a python+mlx_lm process (comm='$OLD_COMM') — refusing to kill (PID was recycled, likely Hammerspoon)."; fi; else echo "[MLX] PID file stale (PID $OLD_PID not running)."; fi; rm -f "$MLX_PID_FILE"; fi; PGREP_PIDS=$(ps -axo pid=,ucomm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}' || true); if [ -n "$PGREP_PIDS" ]; then echo "[MLX] mlx_lm process(es) still alive (PIDs: $PGREP_PIDS) — killing…"; echo "$PGREP_PIDS" | xargs kill -9 2>/dev/null || true; sleep 1; fi; sleep 3; LSOF_ATTEMPTS=0; while true; do STALE_PIDS=$(lsof -ti TCP:3460 2>/dev/null || true); if [ -z "$STALE_PIDS" ]; then echo "[MLX] Port 3460 free — starting server."; break; fi; LSOF_ATTEMPTS=$((LSOF_ATTEMPTS + 1)); echo "[MLX] Port 3460 still occupied attempt $LSOF_ATTEMPTS (PIDs: $STALE_PIDS) — killing…"; echo "$STALE_PIDS" | xargs kill -9 2>/dev/null || true; if [ "$LSOF_ATTEMPTS" -ge 10 ]; then echo "[MLX] ❌ Port 3460 still occupied after 10 attempts — giving up."; exit 1; fi; sleep 0.5; done; MLX_FIFO=$(mktemp -u /tmp/mlx_out.XXXXXX); mkfifo "$MLX_FIFO"; MLX_PID=''; MLX_PGID=''; MLX_STOP_PENDING=0; MLX_CLEANED=0; OWN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d '[:space:]'); PARENT_PGID=$(ps -o pgid= -p $PPID 2>/dev/null | tr -d '[:space:]'); cleanup_mlx_child() { if [ "$MLX_CLEANED" -eq 1 ]; then return 0; fi; MLX_CLEANED=1; trap '' TERM INT HUP; if [ -n "$MLX_PID" ] && kill -0 "$MLX_PID" 2>/dev/null; then KILL_TARGET="$MLX_PID"; if [ -n "$MLX_PGID" ] && [ "$MLX_PGID" != "$OWN_PGID" ] && [ "$MLX_PGID" != "$PARENT_PGID" ]; then KILL_TARGET="-$MLX_PGID"; fi; kill -TERM -- "$KILL_TARGET" 2>/dev/null || true; STOP_ATTEMPTS=0; while kill -0 -- "$KILL_TARGET" 2>/dev/null && [ "$STOP_ATTEMPTS" -lt 20 ]; do STOP_ATTEMPTS=$((STOP_ATTEMPTS + 1)); sleep 0.1; done; if kill -0 -- "$KILL_TARGET" 2>/dev/null; then kill -KILL -- "$KILL_TARGET" 2>/dev/null || true; fi; wait "$MLX_PID" 2>/dev/null || true; fi; rm -f "$MLX_FIFO"; }; trap 'MLX_STOP_PENDING=1' TERM INT HUP; set -m; REPO_ID="mlx-community/Qwen3.5-2B-4bit"; CACHE_NAME="models--$(echo "$REPO_ID" | sed 's|/|--|g')"; CACHE_ROOT="$HOME/.cache/huggingface/hub/$CACHE_NAME"; SNAPSHOT_DIR=$(ls -dt "$CACHE_ROOT/snapshots/"*/ 2>/dev/null | head -1); if [ -n "$SNAPSHOT_DIR" ] && [ -d "$SNAPSHOT_DIR" ]; then MODEL_ARG="${SNAPSHOT_DIR%/}"; echo "[MLX] Using local snapshot path: $MODEL_ARG"; printf '%s\n' "$MODEL_ARG" > '~/perso/config/ergopti_plus/hammerspoon/mlx_active_model.txt'; REVISION=$(basename "$MODEL_ARG"); mkdir -p "$CACHE_ROOT/refs"; if [ ! -f "$CACHE_ROOT/refs/main" ]; then echo "$REVISION" > "$CACHE_ROOT/refs/main"; echo "[MLX] Wrote refs/main = $REVISION (was missing — required by HF offline mode)."; fi; else MODEL_ARG="$REPO_ID"; echo "[MLX] No local snapshot found for $REPO_ID — falling back to repo id."; printf '%s\n' "$REPO_ID" > '~/perso/config/ergopti_plus/hammerspoon/mlx_active_model.txt'; fi; "$PYTHON_BIN" -m mlx_lm server --model "$MODEL_ARG" --port 3460 --decode-concurrency 1 --prompt-concurrency 1 > "$MLX_FIFO" 2>&1 & MLX_PID=$!; trap 'cleanup_mlx_child' EXIT; trap 'cleanup_mlx_child; exit 15' TERM INT HUP; if [ "$MLX_STOP_PENDING" -eq 1 ]; then cleanup_mlx_child; exit 15; fi; set +m; MLX_PGID=$(ps -o pgid= -p $MLX_PID 2>/dev/null | tr -d ' ' || echo ''); echo "[MLX] Server started with PID $MLX_PID PGID $MLX_PGID."; echo "$MLX_PID" > "$MLX_PID_FILE"; if [ -n "$MLX_PGID" ] && [ "$MLX_PGID" != "$OWN_PGID" ] && [ "$MLX_PGID" != "$PARENT_PGID" ]; then echo "$MLX_PGID" > "$MLX_PGID_FILE"; echo "[MLX] Persisted PGID $MLX_PGID (isolated from Hammerspoon group $PARENT_PGID)."; else echo "[MLX] ⚠️  set -m did not isolate python (MLX_PGID=$MLX_PGID, own=$OWN_PGID, parent=$PARENT_PGID) — NOT persisting PGID. Will rely on PID-only kill on next switch."; rm -f "$MLX_PGID_FILE"; fi; while IFS= read -r LINE; do OUT="$(date +%H:%M:%S) [MLX-SERVER] $LINE"; printf '%s\n' "$OUT"; printf '%s\n' "$OUT" >> ~/perso/ergopti/ergopti_plus/ErgoptiPlus_2026-10-31.log; done < "$MLX_FIFO"; wait "$MLX_PID"; MLX_STATUS=$?; rm -f "$MLX_FIFO"; exit "$MLX_STATUS"
+2026-10-31 14:14:48:971 [INFO] [menu_llm.mlx] MLX server task started for model ‘Qwen3.5-2B’.
+2026-10-31 14:14:48:997 [DEBUG] [menu_llm.mlx] MLX server stream chunk (94 bytes).
+2026-10-31 14:14:48:997 [DEBUG] [menu_llm.mlx] MLX server: [MLX] Python utilisé: ~/Library/Application Support/Ergopti/mlx-venv/bin/python
+2026-10-31 14:14:52:261 [DEBUG] [llm.api_mlx] Active server PGID guard set to 34566.
+2026-10-31 14:14:52:261 [DEBUG] [llm.api_mlx] Sweeping zombie mlx_lm Python process(es) via ps+awk (excluding PGID 34566)…
+2026-10-31 14:14:52:371 [DEBUG] [llm.api_mlx] Zombie sweep found no stray mlx_lm process.
+2026-10-31 14:14:54:019 [DEBUG] [menu_llm.mlx] MLX server stop signal accepted; awaiting exact task completion.
+2026-10-31 14:14:54:028 [INFO] [menu_llm.mlx] MLX server process exited with code 15.
+2026-10-31 14:14:54:031 [DEBUG] [menu_llm.mlx] MLX listener shutdown kill dispatched on port 3460.
+2026-10-31 14:14:54:031 [INFO] [llm.api_mlx] Endpoint discovery state reset; no server launch follows.
+2026-10-31 14:14:54:031 [INFO] [menu_llm.models] MLX server stopped safely.
+2026-10-31 14:14:54:031 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-10-31 14:14:54:078 [ERROR] [llm.api_ollama] The local server's model list is unavailable: HTTP 0 (Network request failed: Connection failed: Could not connect to the server. - http://127.0.0.1:11435/api/tags).
+2026-10-31 14:14:55:224 [TRACE] [llm.local_server_ports] Scanning 11 local server process(es)…
+2026-10-31 14:14:55:346 [DEBUG] [llm.local_server_ports] Local server 'omlx': not running (no running process): not probed.
+2026-10-31 14:14:55:346 [INFO] [llm.local_server_ports] Local server ports: omlx=off, lmstudio=off, llamacpp=off, jan=off, sglang=off, koboldcpp=off, textgen_webui=off, gpt4all=off, lemonade=off, docker_model_runner=off, exo=off.
+2026-10-31 14:14:55:346 [DONE] [llm.local_server_ports] Local server process scan settled.
+2026-10-31 14:14:55:346 [DEBUG] [llm.api_remote] Local server 'omlx' is not probed: no running process.
+2026-10-31 14:14:55:346 [INFO] [llm.local_servers] Local servers swept: none answers.
+2026-10-31 14:17:07:558 [DEBUG] [keymap.llm_bridge] LLM context cleared on navigation.
+2026-10-31 14:18:21:558 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-10-31 14:18:21:558 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-10-31 14:18:21:571 [DEBUG] [menu_llm] Building prediction count menu…
+2026-10-31 14:18:22:836 [DEBUG] [menu_llm.mlx] ↑ "MLX server stream chunk (%d bytes)." repeated 9 more times between 2026-10-31 14:14:49:023 and 2026-10-31 14:14:54:019 (last: MLX server stream chunk (99 bytes).).
+2026-10-31 14:18:22:856 [DEBUG] [menu_llm.mlx] ↑ "MLX server: %s" repeated 9 more times between 2026-10-31 14:14:49:023 and 2026-10-31 14:14:54:019 (last: MLX server: 14:14:54 [MLX-SERVER] 2026-10-31 14:14:54,001 - INFO - Starting httpd at 127.0.0.1 on port 3460...).
+2026-10-31 14:18:23:071 [DEBUG] [menu_llm.mlx] ↑ "Scanning MLX installed models cache…" repeated 1 more time between 2026-10-31 14:14:54:073 and 2026-10-31 14:14:54:073.
+2026-10-31 14:18:23:072 [DEBUG] [menu_llm.mlx] ↑ "MLX model detected in cache: %s" repeated 3 more times between 2026-10-31 14:14:44:881 and 2026-10-31 14:14:54:073 (last: MLX model detected in cache: Qwen3.5-4B).
+2026-10-31 14:18:23:072 [DEBUG] [menu_llm.mlx] ↑ "MLX installed models scan complete: %d model(s)." repeated 1 more time between 2026-10-31 14:14:54:074 and 2026-10-31 14:14:54:074 (last: MLX installed models scan complete: 2 model(s).).
+2026-10-31 14:18:23:112 [DEBUG] [llm.local_server_ports] ↑ "Local server '%s': %s." repeated 10 more times between 2026-10-31 14:14:55:346 and 2026-10-31 14:14:55:346 (last: Local server 'exo': not running (no running process): not probed.).
+2026-10-31 14:18:23:114 [DEBUG] [llm.api_remote] ↑ "Local server '%s' is not probed: %s." repeated 10 more times between 2026-10-31 14:14:55:346 and 2026-10-31 14:14:55:346 (last: Local server 'exo' is not probed: no running process.).
