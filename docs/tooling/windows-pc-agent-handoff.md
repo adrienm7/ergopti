@@ -75,6 +75,13 @@ only by static and JS tests. Once it lands on `dev`:
 
 ## Found tonight for the PC agent
 
+- Three of your evening commits were adjusted on dev by the coordinator: 738478ff68
+  was reverted (the per-builder `timed()` phases of `menu_keyboard_layout.lua` it
+  reads were themselves reverted in 153b73cb8c, so the menu parity proof failed);
+  `js-ahk-parallel-runner` moved from ordinal 547 (taken) to 553; the
+  `test:ahk-parallel` alias is listed in NOT_SUITE_ENTRIES of
+  `tools/test/test-npm-aliases-match-the-suite.cjs`. Pull before your next push.
+
 - Logger scalar gate red on dev since the PC batch of 2026-10-31 evening:
   `tools/test/test-logger-scalars-single-source.cjs` reports 3 free-form reason
   literals in `windows/infra/lifecycle.ahk` against a baseline of 2. Use a
