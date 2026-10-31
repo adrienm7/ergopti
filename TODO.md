@@ -215,47 +215,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       teardown reloads natively (e6426e2ec5), and `driver_reload` is enabled again. Left: the next field run shows
       `driver_reload` pass and `reload.request_to_boot` under its 4000 ms budget.
 
-## Maintainer: remote branch cleanup (run on your machine; the cloud container's proxy refuses ref deletion and tag pushes)
+## Maintainer: remote branch cleanup
 
-The fix/<os> integration is on dev (2026-10-29), so it can run now. The script first tags the three fix
-branches, because their audit handovers cite their original commits and their `.bundle` archives need them as
-prerequisites, and the tmp branches whose commits never landed on dev (see the next section). The Mac field
-branch is not kept, since every problem it
-reported is fixed. It then deletes every remote branch except `dev`, `main`, `sparkle-appcasts` and
-`gh-pages`.
-
-```sh
-git fetch origin --prune
-for b in fix/macos fix/linux fix/windows \
-    tmp/wip-todo-ae tmp/wip-todo-ae-par30 tmp/wip-todo-af tmp/wip-todo-ag tmp/wip-todo-ag2 tmp/wip-todo-ag3 \
-    tmp/wip-todo-ah tmp/wip-ci-fix tmp/wip-fr-uncommitted tmp/wip-field-auto tmp/wip-field-run-checklist \
-    tmp/wip-issue103 tmp/wip-issue104; do
-  if git rev-parse -q --verify "origin/$b" >/dev/null; then
-    git tag -f "archive/${b//\//-}" "origin/$b"
-  fi
-done
-git push origin 'refs/tags/archive/*:refs/tags/archive/*'
-git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin \
-  | grep -vxE 'HEAD|dev|main|sparkle-appcasts|gh-pages' \
-  | xargs -r -n 20 git push origin --delete
-```
-
-The resulting tags are `archive/fix-macos`, `archive/fix-linux`, `archive/fix-windows` and one
-`archive/tmp-wip-<name>` per branch of "Commits never landed on dev" below.
-
-## Commits never landed on dev (on tmp branches, archived by the cleanup above)
-
-`git cherry -v origin/dev <branch>` on 2026-10-31, after removing those that landed under another id
-(`tmp/wip-todo-ag`, `-ag2`, `-ae`, `tmp/wip-field-auto`, `tmp/wip-field-run-checklist` and 358e211a10 are on dev).
-After the cleanup, read them through the `archive/tmp-wip-<name>` tags.
-
-- `tmp/wip-todo-ah`: a408a29790 (AHK shard split) only, handed to the PC ("PC Windows todo" step 3); the `hs.*` cache
-  reset and the four Linux and macOS speed-ups landed on 2026-10-31 (`fix/todo-final-p4-ci`). `tmp/wip-ci-fix` is
-  fully on dev under other ids (2fb196a022, 767cf0cb7a, 9c496d384d with the fixture-owned machine id, 9b7abbe580,
-  7feb5a211b, 376b28db82): nothing to land.
-- Reference only: `tmp/wip-issue103` b449da5713 (an old reseal), `tmp/wip-issue104` aec2fb58cb (replaced by
-  2be257c9f5), `tmp/wip-fr-uncommitted` 0d7e53b28b (replaced by 708bc6671d), `tmp/wip-todo-ae-par30` 41f72525cf
-  (the PAR-30 Linux gate landed as cd824ccf8e).
+- [ ] Run the archive-then-delete script of [docs/tooling/remote-branch-cleanup.md](docs/tooling/remote-branch-cleanup.md)
+      on your machine (the cloud proxy refuses ref deletion and tag pushes).
 
 ## Linux open items from the July plan
 
