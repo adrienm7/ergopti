@@ -32,6 +32,7 @@ local TextUtils = require("text_utils")
 local Logger = require("logger.shim")
 local EntryNames = require("llm.api_entry_names")
 local ApiModelListing = require("llm.api_model_listing")
+local UrlTemplate = require("llm.api_url_template")
 local BackendBrands = require("modules.llm.backend_brands")
 
 local LOG = "ui.menu.llm_backend_rows"
@@ -145,9 +146,25 @@ end
 local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	local heading = tr("menu.llm.api_dialog_title") .. " — " .. provider.label
 	local base_url = ""
+	local fields = UrlTemplate.fields(provider.base_url)
+	if #fields > 0 then
+		-- A per-account address: one value per placeholder, filled into the entry's own URL
+		local values = {}
+		for _, name in ipairs(fields) do
+			local label = tr("menu.llm.api_prompt_field." .. name)
+			local value = dialogs.prompt(heading, label, "")
+			if not value then return end
+			values[name] = TextUtils.trim(value)
+			if not UrlTemplate.valid_value(values[name]) then
+				dialogs.error(label .. " " .. tr("menu.llm.api_prompt_field_invalid"), heading)
+				return
+			end
+		end
+		base_url = assert(UrlTemplate.expand(provider.base_url, values))
+		Logger.info(LOG, "API entry address filled for provider '%s' (%d account field(s)).", provider.id, #fields)
 	-- OpenAI selects the wire schema, not a fixed host. Keep its declared
 	-- default visible while allowing the same custom endpoint as the generic form.
-	if provider.base_url == "" or provider.id == "openai" then
+	elseif provider.base_url == "" or provider.id == "openai" then
 		base_url = dialogs.prompt(heading, tr("menu.llm.api_prompt_url"), provider.base_url)
 		if not base_url or base_url == "" then return end
 		if not remote.normalize_base_url(base_url) then
