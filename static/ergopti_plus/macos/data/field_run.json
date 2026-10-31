@@ -247,7 +247,7 @@
 			"kind": "field_check",
 			"check": "app_health",
 			"deadline_seconds": 30,
-			"proves": "No crash report of the last day from the driver or from macOS for the app's processes, each named with its kind; other apps' reports, memory and CPU are named, and where the memory goes: the physical footprint and its peak, the largest resident regions and the Lua heap."
+			"proves": "No crash report of the last day from the driver or from macOS for the app's processes, each named with its kind; other apps' reports, memory and CPU are named, and where it goes (footprint, largest regions, Lua heap)."
 		},
 		{
 			"id": "driver_reload",
