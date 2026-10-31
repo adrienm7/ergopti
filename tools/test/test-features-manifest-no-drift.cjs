@@ -81,6 +81,7 @@ const EXPECTED_TARGETS = [
 	'static/ergopti_plus/macos/_generated/config_template.toml',
 	'static/ergopti_plus/windows/_generated/config_template.toml',
 	'static/ergopti_plus/linux/_generated/config_template.toml',
+	'static/ergopti_plus/_shared/_generated/config_template.toml',
 	'static/ergopti_plus/macos/_generated/logger_sub_files.lua',
 	'static/ergopti_plus/linux/_generated/logger_sub_files.lua',
 	'static/ergopti_plus/windows/_generated/logger_sub_files.ahk',
