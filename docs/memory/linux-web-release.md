@@ -432,7 +432,9 @@ OwnedProcess and `uv.spawn` calls, Python `subprocess`, every shell script) and
 checks each program against one list, `PROGRAMS`, by scope (driver, test, host).
 Action: read `/proc` or `/sys` instead of running a program (the process
 snapshot of `adapters/process_lifecycle.lua` reads `/proc/<pid>/stat` rather
-than forking `ps`); when one is needed, add it to `PROGRAMS` with a proof the
+than forking `ps`, and the local-server scan reads `/proc/<pid>/cmdline`
+because Alpine's busybox `pgrep`, first on PATH even with procps-ng installed,
+has no `-a` or `-i`); when one is needed, add it to `PROGRAMS` with a proof the
 gate checks for every scope it is used in: a file token (installed by the prep
 script or a CI job, declared in the package recipes and `install.sh`, or `sh`,
 which both container entry points run in every bare image), each bound to the
