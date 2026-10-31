@@ -293,11 +293,7 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
   - [CODE] Windows token exchange (AutoHotkey, the PC's): Windows refuses watsonx and Vertex AI with
     `menu.llm.api_provider_token_exchange_unavailable`; port the async form POST and token cache of
     `api_token_exchange.lua`.
-  - [CODE] The first prediction after start (or a key change) on an access-token provider is refused while the token
-    is fetched (the start prewarm already begins the exchange; a key change does not). Waiting instead needs
-    `resolve_active_entry` to return a lease that owns the pending exchange: today `deliver_resolved` answers
-    synchronously with a settled lease, which its five callers may cancel. A Vertex service-account key (signed
-    JWT) is not taken.
+  - [CODE] A Vertex service-account key (signed JWT) is not taken: only `authorized_user` credentials are exchanged.
   - [CODE] The listing reader takes `data` (and `models` for Gemini) only: DashScope's native listing and Writer's
     `models[]` would need a per-provider listing shape on the three OS.
   - [CODE] (Windows, the PC's) the native `llm_vision` prompt of the screen actions still lists every backend on a
