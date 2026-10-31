@@ -233,17 +233,25 @@ module.exports = function (sources, manifest, menuSources) {
 		]
 	);
 	// Actual imported facade and package table must exist before dependent raw captures.
+	// The removal captures are menu_about's own imports, which the composed root
+	// carries ahead of that part; each case moves an owner the root holds to just
+	// after them, so the captures read it before it exists.
+	const movedAfterCaptures = (owner, cause) => {
+		const from = source.indexOf(owner),
+			to = source.indexOf(removalCaptureBlock) + removalCaptureBlock.length + 1;
+		assert.ok(from >= 0 && to > from + owner.length, cause + ': the owner precedes the captures');
+		const before = source.slice(from, to);
+		return [before, before.slice(owner.length) + owner, cause];
+	};
 	cases.push(
-		[
-			'local separator_modules = package.loaded\nlocal separator_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "top_level_separator_receiver")\nlocal separator_render = type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")\nlocal separator_array = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_array")\nlocal separator_root = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")\nlocal header_template = type(ManifestMenu) == "table" and rawget(ManifestMenu, "template_rows")\nlocal header_command = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_row")\nlocal uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")\nlocal uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")\nlocal uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")',
-			'local separator_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "top_level_separator_receiver")\nlocal separator_render = type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")\nlocal separator_array = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_array")\nlocal separator_root = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")\nlocal header_template = type(ManifestMenu) == "table" and rawget(ManifestMenu, "template_rows")\nlocal header_command = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_row")\nlocal uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")\nlocal uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")\nlocal uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")\nlocal separator_modules = package.loaded',
+		movedAfterCaptures(
+			'local separator_modules = package.loaded\n',
 			'removal capture cannot precede the genuine package-table local'
-		],
-		[
-			'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")\nif not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end\n\n-- The imported facade and its actual functions own every later boundary read.\nlocal separator_modules = package.loaded\nlocal separator_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "top_level_separator_receiver")\nlocal separator_render = type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")\nlocal separator_array = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_array")\nlocal separator_root = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")\nlocal header_template = type(ManifestMenu) == "table" and rawget(ManifestMenu, "template_rows")\nlocal header_command = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_row")\nlocal uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")\nlocal uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")\nlocal uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")',
-			'\n-- The imported facade and its actual functions own every later boundary read.\nlocal separator_modules = package.loaded\nlocal separator_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "top_level_separator_receiver")\nlocal separator_render = type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")\nlocal separator_array = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_array")\nlocal separator_root = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")\nlocal header_template = type(ManifestMenu) == "table" and rawget(ManifestMenu, "template_rows")\nlocal header_command = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_row")\nlocal uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")\nlocal uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")\nlocal uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")\nlocal ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")\nif not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end',
+		),
+		movedAfterCaptures(
+			'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")\nif not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end\n',
 			'removal capture cannot precede the genuine facade import and boot guard'
-		]
+		)
 	);
 	let controls = 0;
 	for (const [name, credits] of ports) {
