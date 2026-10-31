@@ -2378,8 +2378,6 @@
 	"ollama.model_ready": "%s तैयार है!",
 	"ollama.model_repair": "मॉडल क्षतिग्रस्त प्रतीत हो रहा है। पुनः डाउनलोड का प्रयास किया जा रहा है: %s",
 	"ollama.model_repair_title": "Ollama मॉडल की मरम्मत की जा रही है",
-	"ollama.not_detected_body": "कृपया Ollama स्थापित करें और पुनः प्रयास करें।",
-	"ollama.not_detected_title": "Ollama का पता नहीं चला",
 	"ollama.service_disconnected": "Ollama सेवा प्रतिक्रिया देना बंद कर दी।",
 	"ollama.service_ready": "Ollama सेवा तैयार है ✅",
 	"ollama.service_stopped": "Ollama सेवा बंद हो गई। शुरू किया जा रहा है…",

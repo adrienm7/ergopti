@@ -854,7 +854,7 @@ function buildScriptProblems(source, externals) {
 		)
 	) {
 		problems.push(
-			`${BUILD_REL}: the Ollama binary is back in the bundle; the first Ollama selection downloads it (modules/llm/ensure-ollama-deps.sh)`
+			`${BUILD_REL}: the Ollama binary is back in the bundle; the first Ollama selection installs Ergopti's own runtime (modules/llm/ensure-ollama-native-deps.sh)`
 		);
 	}
 	// Maximum deflate is still the plain zip ditto, Sparkle and Homebrew read

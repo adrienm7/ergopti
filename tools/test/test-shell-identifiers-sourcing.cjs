@@ -228,7 +228,9 @@ for (const file of scripts) {
 		fs.rmSync(scratch, { recursive: true, force: true });
 	}
 }
-assert.ok(counts.runtime >= 4, `only ${counts.runtime} runtime script(s) source identifiers.sh`);
+// Two runtime scripts remain since the stock Ollama installers (ensure-ollama-deps.sh's
+// download, ollama_install.sh) were retired; fewer means the listing broke.
+assert.ok(counts.runtime >= 2, `only ${counts.runtime} runtime script(s) source identifiers.sh`);
 
 const appimage = fs.readFileSync(path.join(ROOT, 'tools/build/appimage-oldest-lts.sh'), 'utf8');
 const mounts = [...appimage.matchAll(/-v "\$PROJECT_ROOT:\/src(:ro)?"/g)];

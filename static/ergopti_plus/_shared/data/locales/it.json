@@ -2378,8 +2378,6 @@
 	"ollama.model_ready": "%s è pronto!",
 	"ollama.model_repair": "Il modello sembra corrotto. Tentativo di re-download: %s",
 	"ollama.model_repair_title": "Riparazione modello Ollama",
-	"ollama.not_detected_body": "Installa Ollama e riprova.",
-	"ollama.not_detected_title": "Ollama non rilevato",
 	"ollama.service_disconnected": "Il servizio Ollama ha smesso di rispondere.",
 	"ollama.service_ready": "Servizio Ollama pronto ✅",
 	"ollama.service_stopped": "Servizio Ollama arrestato. Avvio in corso…",

@@ -4,52 +4,22 @@
 --- MODULE: Ollama Executable Resolver
 --- DESCRIPTION:
 --- Resolves the one Ollama executable used by every API, menu, and bootstrap
---- path. The app no longer bundles Ollama, so the resolver looks for an
---- source-bound optional install hint, then the official Ollama.app (system
---- then user Applications), Homebrew, the copy Ergopti downloads on demand
---- into its own Application Support folder, then PATH.
+--- path: Ergopti's own pinned runtime (owned-runtimes row "Ollama", decision
+--- PIN). A user's own Ollama (the app, Homebrew, PATH) is not looked for: it
+--- is never selected, started, stopped or modified.
 ---
 --- FEATURES & RATIONALE:
---- 1. Stock candidates use one filesystem attribute
----    read. Optional runtime metadata is a provisional hint; the native server
----    owner independently verifies its actual catalogue, bytes and signature.
---- 2. Optional metadata is received asynchronously; cheap attributes invalidate
----    its provisional cache. Source admission always runs again in Python.
---- 3. Single owner: the on-demand installer receives its target folder from
----    managed_install_dir(), so the download lands exactly where this resolver
----    looks for it.
---- 4. No configured override: the configuration has no Ollama path setting,
----    so the resolver starts with the official application bundle.
+--- 1. Optional runtime metadata is a provisional hint received asynchronously;
+---    the native server owner independently verifies its actual catalogue,
+---    bytes and signature, and source admission always runs again in Python.
+--- 2. No configured override: the configuration has no Ollama path setting.
 --- ==============================================================================
 
-local Identifiers = require("identifiers")
 local M = {}
 
 local hs = hs
 
-local EXECUTABLE_NAME = "ollama"
-
--- The official Ollama.app keeps its CLI beside the runtime libraries in
--- Contents/Resources (ollama/ollama scripts/build_darwin.sh).
-local APP_BUNDLE_CLI = "Ollama.app/Contents/Resources/" .. EXECUTABLE_NAME
-
-local HOMEBREW_CANDIDATES = {
-	"/opt/homebrew/bin/" .. EXECUTABLE_NAME,
-	"/usr/local/bin/" .. EXECUTABLE_NAME,
-}
-
--- Relative to HOME. Shares the Application Support folder of the MLX runtime
--- (ensure-mlx-deps.sh) so every downloaded AI runtime lives in one place.
-local MANAGED_RELATIVE_DIR = "Library/Application Support/Ergopti/ollama"
-
--- Official download page offered when the user prefers a manual install.
-M.DOWNLOAD_PAGE_URL = "https://" .. Identifiers.hosts.ollama .. "/download"
-
-M.SOURCE_APP = "app"
-M.SOURCE_USER_APP = "user_app"
-M.SOURCE_HOMEBREW = "homebrew"
-M.SOURCE_MANAGED = "managed"
-M.SOURCE_PATH = "path"
+-- The one source the resolver names.
 M.SOURCE_NATIVE_MANAGED = "native_managed"
 
 
@@ -86,59 +56,10 @@ end
 
 
 
--- =========================================
--- =========================================
--- ======= 2/ Candidate Order ==============
--- =========================================
--- =========================================
-
---- Returns the folder the on-demand installer publishes Ollama into.
---- @return string|nil directory Absolute folder, or nil without a usable HOME.
-function M.managed_install_dir()
-	local home = home_directory()
-	if not home then return nil end
-	return home .. "/" .. MANAGED_RELATIVE_DIR
-end
-
---- Returns the executable the on-demand installer publishes.
---- @return string|nil path
-function M.managed_executable_path()
-	local directory = M.managed_install_dir()
-	if not directory then return nil end
-	return directory .. "/" .. EXECUTABLE_NAME
-end
-
---- Lists every candidate in resolution order, without probing any of them.
---- @return table candidates Array of { path = string, source = string }.
-function M.candidates()
-	local list = {}
-	local function add(path, source)
-		if type(path) == "string" and path ~= "" then
-			list[#list + 1] = { path = path, source = source }
-		end
-	end
-	local home = home_directory()
-	add("/Applications/" .. APP_BUNDLE_CLI, M.SOURCE_APP)
-	if home then add(home .. "/Applications/" .. APP_BUNDLE_CLI, M.SOURCE_USER_APP) end
-	for _, candidate in ipairs(HOMEBREW_CANDIDATES) do add(candidate, M.SOURCE_HOMEBREW) end
-	add(M.managed_executable_path(), M.SOURCE_MANAGED)
-	local path_ok, raw_path = pcall(os.getenv, "PATH")
-	if path_ok and type(raw_path) == "string" then
-		for directory in raw_path:gmatch("[^:]+") do
-			if directory:sub(1, 1) == "/" then
-				add(directory:gsub("/+$", "") .. "/" .. EXECUTABLE_NAME, M.SOURCE_PATH)
-			end
-		end
-	end
-	return list
-end
-
-
-
 
 -- ===================================
 -- ===================================
--- ======= 3/ Resolution =============
+-- ======= 2/ Resolution =============
 -- ===================================
 -- ===================================
 
@@ -166,10 +87,8 @@ function M.native_candidate()
 end
 
 --- Resolves the one Ollama Ergopti uses: its own pinned runtime. A user's own
---- Ollama (the app, Homebrew, PATH, or the former on-demand copy) is never
---- selected, started, stopped or modified, even when it is installed and
---- running: Ergopti installs and pins its own version (maintainer decision,
---- issue #104). candidates() still names those locations for diagnostics only.
+--- Ollama is never looked for, selected, started, stopped or modified, even
+--- when it is installed and running (maintainer decision, issue #104).
 --- @return string|nil executable_path
 --- @return string|nil error_message
 --- @return string|nil source SOURCE_NATIVE_MANAGED, or nil.
@@ -193,19 +112,6 @@ function M.pinned_version()
 	assert(type(decoded) == "table" and type(decoded.version) == "string"
 		and decoded.version:match("^%d+%.%d+%.%d+$"), "managed Ollama runtime contract names no version")
 	return decoded.version
-end
-
---- Names the first user-owned Ollama found, for a log line only. Nothing ever
---- executes, signals or reads from what it returns.
---- @return string|nil path
---- @return string|nil source
-function M.find_user_installation()
-	for _, candidate in ipairs(M.candidates()) do
-		if candidate.source ~= M.SOURCE_MANAGED and is_executable_file(candidate.path) then
-			return candidate.path, candidate.source
-		end
-	end
-	return nil
 end
 
 return M
