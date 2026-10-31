@@ -30,6 +30,7 @@ local FsDir  = require("infra.fs_dir")
 local TextUtils = require("infra.text_utils")
 local NativePath = require("native_path")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
+local WriteLockPath = require("adapters.write_lock_path")
 
 local LOG = "adapters.file_system"
 
@@ -38,7 +39,6 @@ local _temp_sequence = 0
 
 local STAGING_LOCK_SUFFIX = ".ergoptiplus-stage-lock"
 local STAGING_PAYLOAD_NAME = "payload"
-local WRITE_LOCK_SUFFIX = ".ergoptiplus-write-lock-v1"
 local ENOENT_ERROR_CODE = 2
 local MAX_SYMLINK_HOPS = 32
 local MAX_STAGING_RESERVATION_ATTEMPTS = 64
@@ -48,7 +48,8 @@ local LS_BIN = "/bin/ls"
 -- Native advisory locks may permit same-process re-entry depending on the
 -- primitive Hammerspoon exposes. This registry is therefore authoritative for
 -- in-process ownership regardless of kernel re-entry semantics. The handle is
--- retained until explicit release; the stable empty lock file remains.
+-- retained until explicit release; the stable empty lock file remains in the
+-- per-user lock directory.
 local _held_write_locks = {}
 -- A staging owner whose exact release did not commit remains authoritative
 -- across later writes. No successor may reserve another sidecar until this
@@ -111,10 +112,13 @@ end
 --- Derives the one lexical identity used for both the native lock pathname and
 --- the authoritative same-process registry. Destination operations retain their
 --- resolved spelling; only ownership collapses equivalent `.`/`..` spellings.
+--- The pathname sits in the per-user lock directory (adapters/write_lock_path),
+--- so every cooperating writer derives the same inode.
 --- @param resolved_path string Symlink-resolved destination spelling.
---- @return string lock_path Canonical cooperative lock pathname.
+--- @return string|nil lock_path Canonical cooperative lock pathname.
+--- @return string|nil error_message Why no lock pathname can be derived.
 local function cooperative_write_lock_path(resolved_path)
-	return normalize_path(resolved_path) .. WRITE_LOCK_SUFFIX
+	return WriteLockPath.for_canonical(normalize_path(resolved_path), os.getenv("HOME"))
 end
 
 --- Runs one fixed local metadata command and preserves the complete native
@@ -1335,7 +1339,7 @@ function M.create_if_absent(path, content)
 	return created, status, result_detail
 end
 
---- Acquires the stable adjacent native advisory mutex used by all cooperating writers.
+--- Acquires the stable native advisory mutex used by all cooperating writers.
 --- The lock pathname is never removed: unlink/recreate would split contenders
 --- across different inodes. The same-process registry remains authoritative
 --- even if the current native primitive would re-grant an existing owner.
@@ -1350,11 +1354,20 @@ acquire_cooperative_write_lock = function(resolved_path)
 		return nil, "hs.fs.lock/unlock are unavailable; cooperative publication is unsupported"
 	end
 
-	local lock_path = cooperative_write_lock_path(resolved_path)
+	local lock_path, path_err = cooperative_write_lock_path(resolved_path)
+	if lock_path == nil then return nil, path_err end
 	if _held_write_locks[lock_path] ~= nil then
 		return nil, "cooperative write lock is already held by this Hammerspoon process"
 	end
 
+	-- prepare_parent_for_create() resolves a symlinked home or Application
+	-- Support before it creates the missing lock directory components.
+	if M.directory_status(parent_dir(lock_path)) ~= "present" then
+		local directory_ready, directory_err = M.prepare_parent_for_create(lock_path)
+		if directory_ready ~= true then
+			return nil, "cooperative write-lock directory unavailable: " .. tostring(directory_err)
+		end
+	end
 	local before, inspect_err = inspect_path(lock_path)
 	if inspect_err ~= nil then return nil, inspect_err end
 	if before ~= nil and before.mode ~= "file" then
@@ -1482,7 +1495,8 @@ function M.acquire_write_locks(paths)
 		if type(resolved_path) ~= "string" or resolved_path == "" then
 			return nil, false, tostring(resolve_err or "path resolution failed")
 		end
-		local lock_path = cooperative_write_lock_path(resolved_path)
+		local lock_path, lock_path_err = cooperative_write_lock_path(resolved_path)
+		if lock_path == nil then return nil, false, tostring(lock_path_err) end
 		if lock_seen[lock_path] then
 			return nil, false,
 				"multiple requested paths share cooperative write lock '" .. lock_path .. "'"

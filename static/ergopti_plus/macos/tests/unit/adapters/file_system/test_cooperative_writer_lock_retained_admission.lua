@@ -27,7 +27,7 @@ helpers.describe("conditional publication retained admission", function()
 				local original_open, original_rename = io.open, os.rename
 				local held = {}
 				io.open = function(name, mode)
-					if name == control.target .. fixture.WRITE_LOCK_SUFFIX and mode == "a+" then
+					if name == fixture.write_lock_path(control.target) and mode == "a+" then
 						local handle = { close = function()
 							control.closes = control.closes + 1
 							local closed = not control.blocked
@@ -56,8 +56,8 @@ helpers.describe("conditional publication retained admission", function()
 				end
 				local called, detail = xpcall(function() body(path, fs, control, seed, fixture) end, debug.traceback)
 				io.open, os.rename = original_open, original_rename
-				for _, name in ipairs({ path, path .. ".backup", path .. fixture.WRITE_LOCK_SUFFIX,
-					path .. ".backup" .. fixture.WRITE_LOCK_SUFFIX }) do os.remove(name) end
+				for _, name in ipairs({ path, path .. ".backup", fixture.write_lock_path(path),
+					fixture.write_lock_path(path .. ".backup") }) do os.remove(name) end
 				fixture.HOST_RMDIR(dir)
 				if not called then error(detail, 0) end
 			end)

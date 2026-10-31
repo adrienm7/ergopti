@@ -26,7 +26,7 @@ helpers.describe("FileSystem conditional removal ownership", function()
 				helpers.assert_eq(adapter.read_with_status(path), nil)
 			end, debug.traceback)
 			os.remove = original_remove
-			original_remove(path); original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			original_remove(path); original_remove(fixture.write_lock_path(path))
 			if not ok then error(failure, 0) end
 		end)
 	end)
@@ -56,7 +56,7 @@ helpers.describe("FileSystem conditional removal ownership", function()
 			local ok, failure = xpcall(function()
 				io.open = function(target, mode)
 					local opened, detail = original_open(target, mode)
-					if target ~= path .. fixture.WRITE_LOCK_SUFFIX or mode ~= "a+" then return opened, detail end
+					if target ~= fixture.write_lock_path(path) or mode ~= "a+" then return opened, detail end
 					return { close = function() if release_refused then return false end; return opened:close() end }
 				end
 				os.remove = function(target) if target == path then unlinks = unlinks + 1 end; return original_remove(target) end
@@ -77,7 +77,7 @@ helpers.describe("FileSystem conditional removal ownership", function()
 				helpers.assert_eq(unlinks, 1)
 			end, debug.traceback)
 			io.open, os.remove = original_open, original_remove
-			original_remove(path); original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			original_remove(path); original_remove(fixture.write_lock_path(path))
 			if not ok then error(failure, 0) end
 		end)
 	end)
@@ -100,7 +100,7 @@ helpers.describe("FileSystem conditional removal ownership", function()
 			local adapter = fixture.make_adapter()
 			helpers.assert_eq(adapter.remove_if_unchanged(path, { status = "ok", content = "owned" }), false)
 			helpers.assert_eq(adapter.read(path), "foreign")
-			assert(os.remove(path)); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			assert(os.remove(path)); os.remove(fixture.write_lock_path(path))
 		end)
 	end)
 end)
@@ -171,7 +171,7 @@ helpers.describe("FileSystem private publication physical ownership", function()
 				io.open, os.remove = original_open, original_remove
 				retained = false
 				pcall(adapter.write, path, "fixture cleanup")
-				original_remove(path); original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+				original_remove(path); original_remove(fixture.write_lock_path(path))
 				if not ok then error(failure, 0) end
 			end)
 		end)
@@ -203,7 +203,7 @@ helpers.describe("FileSystem private publication physical ownership", function()
 				helpers.assert_eq(receipt.matches_source(), true, "restored exact owned inode remains a positive control")
 			end, debug.traceback)
 			os.remove(path); os.remove(foreign_path); os.remove(owned_backup)
-			os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			os.remove(fixture.write_lock_path(path))
 			if not ok then error(failure, 0) end
 		end)
 	end)
@@ -240,7 +240,7 @@ helpers.describe("FileSystem private publication physical ownership", function()
 			end, debug.traceback)
 			os.rename = original_rename
 			os.remove(path); os.remove(foreign_path); os.remove(owned_backup)
-			os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			os.remove(fixture.write_lock_path(path))
 			if not ok then error(failure, 0) end
 		end)
 	end)
@@ -297,7 +297,7 @@ helpers.describe("FileSystem retained private receipt source fences", function()
 			if receipt then pcall(receipt.retry) end
 			pcall(adapter.write, path, "fixture cleanup")
 			original_remove(path); original_remove(foreign_path); original_remove(owned_backup)
-			original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			original_remove(fixture.write_lock_path(path))
 			if not ok then error(failure, 0) end
 		end)
 	end)
@@ -347,7 +347,7 @@ helpers.describe("FileSystem retained private receipt source fences", function()
 			original_remove(path)
 			if receipt then pcall(receipt.retry) end
 			pcall(adapter.write, path, "fixture cleanup")
-			original_remove(path); original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			original_remove(path); original_remove(fixture.write_lock_path(path))
 			if not ok then error(failure, 0) end
 		end)
 	end)
@@ -432,7 +432,7 @@ helpers.describe("FileSystem retained staging identity", function()
 					retained = false
 					local restored, restore_failure = pcall(restore)
 					if restored and receipt then pcall(receipt.retry) end
-					original_remove(path); original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+					original_remove(path); original_remove(fixture.write_lock_path(path))
 					if not restored then error(restore_failure, 0) end
 					if not ok then error(failure, 0) end
 				end)
@@ -490,7 +490,7 @@ helpers.describe("FileSystem initial staging capture ordering", function()
 			io.open = original_open
 			local restored, detail = pcall(restore)
 			if restored and receipt then pcall(receipt.retry) end
-			original_remove(path); original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			original_remove(path); original_remove(fixture.write_lock_path(path))
 			if not restored then error(detail, 0) end
 			if not ok then error(failure, 0) end
 		end)
@@ -551,7 +551,7 @@ helpers.describe("FileSystem initial staging capture ordering", function()
 			io.open, os.remove, os.rename, hs.fs.rmdir = original_open, original_remove, original_rename, native_rmdir
 			local restored, detail = pcall(restore)
 			if restored and receipt then pcall(receipt.retry) end
-			original_remove(path); original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			original_remove(path); original_remove(fixture.write_lock_path(path))
 			if not restored then error(detail, 0) end
 			if not ok then error(failure, 0) end
 		end)
@@ -609,7 +609,7 @@ helpers.describe("FileSystem unavailable initial staging identity", function()
 				original_remove(backup)
 				if payload then original_remove(payload) end
 				if directory then fixture.HOST_RMDIR(directory) end
-				original_remove(path); original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+				original_remove(path); original_remove(fixture.write_lock_path(path))
 				if not ok then error(failure, 0) end
 			end)
 		end)
@@ -635,7 +635,7 @@ helpers.describe("conditional removal cleanup bridge", function()
 			local ok, err = xpcall(function()
 				io.open = function(target, mode)
 					local opened, detail = original_open(target, mode)
-					if target ~= path .. fixture.WRITE_LOCK_SUFFIX or mode ~= "a+" then return opened, detail end
+					if target ~= fixture.write_lock_path(path) or mode ~= "a+" then return opened, detail end
 					return { close = function() if refused then return false end; return opened:close() end }
 				end
 				os.remove = function(target) if target == path then unlinks = unlinks + 1 end; return original_remove(target) end
@@ -672,7 +672,7 @@ helpers.describe("conditional removal cleanup bridge", function()
 				helpers.assert_eq(unlinks, 2)
 			end, debug.traceback)
 			io.open, os.remove = original_open, original_remove
-			original_remove(path); original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			original_remove(path); original_remove(fixture.write_lock_path(path))
 			if not ok then error(err, 0) end
 		end)
 	end)
@@ -730,7 +730,7 @@ helpers.describe("conditional removal cleanup bridge", function()
 			helpers.assert_eq(categories, { "removal" })
 			adapter.read_with_status = original_read
 			helpers.assert_eq(adapter.read(path), "owned")
-			assert(os.remove(path)); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			assert(os.remove(path)); os.remove(fixture.write_lock_path(path))
 		end)
 	end)
 end)
@@ -768,7 +768,7 @@ helpers.describe("FileSystem final logical removal admission", function()
 					end)
 				os.remove, adapter.read_with_status = remove, read
 				local actual, status = adapter.read_with_status(path)
-				remove(path); remove(path .. fixture.WRITE_LOCK_SUFFIX)
+				remove(path); remove(fixture.write_lock_path(path))
 				helpers.assert_eq(called, true)
 				helpers.assert_eq(removed, mode == "true", tostring(detail))
 				helpers.assert_eq(admissions, 1)
@@ -795,7 +795,7 @@ helpers.describe("FileSystem admitted removal retains release ownership", functi
 				local remove, open = os.remove, io.open
 				io.open = function(target, mode)
 					local handle, detail = open(target, mode)
-					if target ~= path .. fixture.WRITE_LOCK_SUFFIX or mode ~= "a+" then return handle, detail end
+					if target ~= fixture.write_lock_path(path) or mode ~= "a+" then return handle, detail end
 					return { close = function() if release_refused then return false end; return handle:close() end }
 				end
 				os.remove = function(target)
@@ -812,7 +812,7 @@ helpers.describe("FileSystem admitted removal retains release ownership", functi
 				allowed, release_refused = false, false
 				local cleaned = cleanup()
 				local cleaned_again = cleanup()
-				remove(path); remove(path .. fixture.WRITE_LOCK_SUFFIX)
+				remove(path); remove(fixture.write_lock_path(path))
 				helpers.assert_eq(called, true, tostring(detail))
 				helpers.assert_eq(removed, false)
 				helpers.assert_eq(receipt.removed, accepted)
@@ -856,7 +856,7 @@ helpers.describe("FileSystem admitted removal captures exact source before callb
 			os.remove, adapter.read_with_status = remove, read
 			local file = assert(io.open(path, "rb"))
 			local actual = assert(file:read("*a")); assert(file:close())
-			remove(path); remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			remove(path); remove(fixture.write_lock_path(path))
 			helpers.assert_eq(called, true)
 			helpers.assert_eq(removed, false)
 			helpers.assert_eq(actual, "external-successor")
