@@ -295,6 +295,44 @@ const KIND_PATTERNS = {
 	)
 };
 
+/**
+ * Returns the module path of the go.mod nearest above a Go source file.
+ * @param {string} file Repository-relative .go path.
+ * @returns {string|null} The declared module path, or null without a go.mod.
+ */
+function goModulePath(file) {
+	for (let dir = path.dirname(file); dir && dir !== '.'; dir = path.dirname(dir)) {
+		const mod = path.join(ROOT, dir, 'go.mod');
+		if (fs.existsSync(mod)) {
+			const declared = fs.readFileSync(mod, 'utf8').match(/^module\s+(\S+)\s*$/m);
+			return declared ? declared[1] : null;
+		}
+	}
+	return null;
+}
+
+/**
+ * Tells whether a Go line imports a package of the file's own module.
+ * @param {string} line Source line.
+ * @param {string} module Module path from go.mod.
+ * @returns {boolean}
+ */
+function isOwnModuleImport(line, module) {
+	const spec = line.match(/^\s*(?:import\s+)?(?:[A-Za-z_][A-Za-z0-9_]*\s+)?"([^"]+)"\s*$/);
+	return spec !== null && (spec[1] === module || spec[1].startsWith(module + '/'));
+}
+
+// The exemption admits only an import of the file's own module, never a host typed elsewhere.
+for (const [line, admitted] of [
+	['\t"example.org/m/pkg"', true],
+	['import "example.org/m"', true],
+	['\talias "example.org/m/pkg"', true],
+	['\t"example.org/other/pkg"', false],
+	['\turl := "https://example.org/m/pkg"', false]
+])
+	if (isOwnModuleImport(line, 'example.org/m') !== admitted)
+		failures.push(`Go own-module import probe misread: ${line}`);
+
 /** Counts the typed identifier copies on code lines, per file and kind. */
 function countIdentifierLiterals() {
 	const counts = {};
@@ -307,8 +345,12 @@ function countIdentifierLiterals() {
 		.filter((file) => IDENTIFIER_SOURCE.test(file) && !IDENTIFIER_EXEMPT.test(file));
 	for (const file of listed) {
 		const lines = fs.readFileSync(path.join(ROOT, file), 'utf8').split('\n');
+		const ownModule = file.endsWith('.go') ? goModulePath(file) : null;
 		for (const line of lines) {
 			if (COMMENT_LINE.test(line)) continue;
+			// Go imports a package of its own module by the module path go.mod
+			// declares; the language fixes that spelling, so it is no typed host.
+			if (ownModule && isOwnModuleImport(line, ownModule)) continue;
 			for (const [kind, pattern] of Object.entries(KIND_PATTERNS)) {
 				const hits = line.match(pattern);
 				if (!hits) continue;
