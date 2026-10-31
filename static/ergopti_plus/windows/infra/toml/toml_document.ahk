@@ -1100,7 +1100,9 @@ _TOML_ConfigAdmitRow(Document, Records, Physical, Parts, Update) {
 		}
 		return Canonical
 	}
-	if Twin
+	; The explicit cleanup names one exact offered line, as the Lua cleanup's own cut
+	; does: refusing it would leave the user no way out of the twin refused here.
+	if Twin && !WholeValue
 		throw ValueError("Case twins in the source leave " . Name . " without one destination")
 	if Existing["found"] && !IsSet(Desired) && _TOML_ConfigScalarKind(Existing["value"]) == ""
 		return Canonical
