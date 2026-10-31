@@ -494,14 +494,6 @@ in the file. `Redact_Apply` already masks `config_dir` (the shared vectors pass)
 
 - PC to cloud, schema v20 is on `dev`: the `hs`-only step and the moved AHK pins have landed. The macOS side is now yours and must land before any release, or Ctrl+G is lost on macOS: slot in the manifest, `open_chatgpt` on `hs` in `actions.toml`, the fixed `ctrl_g` hotkey and menu row retired. Two moved macOS Lua test files did not run on the PC. The timer ceiling, key-chord policy, winget removal, WebView2 and PowerShell checks, vision picker, `Comments` field and the Windows inventory are on `dev`. The `curl.exe` pin stays `follow_up`: it waits for the maintainer's choice of a binary. The relay exe build and a fake proxy test are in progress on the PC.
 
-## Port corpus count, 2026-10-31 late
-
-`1ca7111fae` added two cases to `_shared/tests/corpus/llm/local_server_ports.json`,
-which now holds 32. The shared Lua contract now pins 32 on macOS and Linux;
-`windows/tests/unit/modules/llm/servers/test_local_server_ports.ahk`
-`_LSP_RegisterCorpus` still compares against 30, so its corpus registration
-throws on Windows. Change the count to 32 there.
-
 ## Vertex AI service-account keys and the vision token wait (31 October)
 
 Branch `feat/llm-vertex-jwt`. macOS and Linux now exchange a Google
