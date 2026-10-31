@@ -110,13 +110,13 @@ local function is_printable(text)
 	return true
 end
 
---- Escapes an attribute value the way the composer writes one.
+--- Escapes an attribute value the way the composer writes one: every XML
+--- special and control character as a numeric reference. Written `&amp;`, the
+--- '&' Ergo-L's 7 key types once moved read back as typing nothing on macOS
+--- (field run 2026-10-31, readback_mismatch on key 26); the shipped layouts
+--- never use a named entity.
 local function escape_attribute(value)
-	return (value:gsub("[&<>\"%c]", function(c)
-		if c == "&" then return "&amp;" end
-		if c == "<" then return "&lt;" end
-		if c == ">" then return "&gt;" end
-		if c == '"' then return "&quot;" end
+	return (value:gsub("[&<>\"'%c]", function(c)
 		return string.format("&#x%04X;", c:byte())
 	end))
 end
