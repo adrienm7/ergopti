@@ -62,6 +62,36 @@ on the PC; push the branch and say so, dev integration stays with the coordinato
 Every commit keeps the AHK UTF-8 BOM (repository encoding gate), reseals a touched updater source and
 passes the Windows CI lane (`gh workflow run ci.yml --ref <branch> -f os_lanes=windows`).
 
+### Windows manual checks for the maintainer (batched by the PC agent, 2026-10-31)
+
+Decisions of 2026-10-30: app categories follow macOS and Linux with no migration, the shared TOML writer is the
+reference, the installed-record corpus follows Lua. A `metrics\app_categories.json` is no longer read.
+
+- [ ] Tray > Gestures: one « Infos… » row, no long text row, and it opens the dialog.
+- [ ] Ollama or oMLX on a non-default port with the process scan failing: the server is still found.
+- [ ] Type `axa` then Space fast, 20 times: always `AXA`.
+- [ ] Type `sru` with a personal `sru` -> `SRU` final entry: `SRU`. Type a hotstring containing `{left}`: the caret moves.
+- [ ] With live Ollama, token-by-token predictions display correctly, then enable the row (PAR-12).
+- [ ] System Ollama on 11434, AI on: Ergopti's listens on 11435 and the other one is untouched.
+- [ ] Type `fb` + Space, Enter and ★ with the abbreviation and brand packs, at 1, 2 and 3 arrows, consumed and not.
+- [ ] Type on a real keyboard with the composed layout (Debug > "Test the composed layout").
+- [ ] Block api.github.com and run an update check: the Atom fallback reports the version.
+- [ ] "Create a GitHub issue" signed in: the form opens with no "Whoops" page.
+- [ ] Install a build with 5d6beccf83, update to the next one: the exe restarts, the three scripts are in
+      `%LOCALAPPDATA%\Ergopti\vendor\`, the command line shows `-File` and no `-EncodedCommand`.
+- [ ] `tools\dev\run-windows-dev.ps1` with the exe running: the exe closes, the tray appears, saving an `.ahk` reloads
+      once. `npm run dev:windows` from Git Bash and cmd; double-click `ErgoptiPlus.ahk` with and without the exe.
+- [ ] The ten window-toggle actions, also without WebView2: no orphan WebView2 process.
+- [ ] Win+S targets (browser, mail, Regedit, Settings, web search); Backspace word start in Windows Terminal with
+      Claude Code, Notepad Ctrl+Backspace, browser Ctrl+L, AltGr+Backspace on AZERTY and Kana; native pair popup;
+      Versions Retry button.
+- [ ] Brightness joined source; retired Metrics shortcuts across a three-OS full save and an installed upgrade.
+- [ ] Corporate network: Debug > diagnostics (`github_api`, `proxy_pac`), a model pull behind a PAC, the Windows
+      security warning for the native CA case, and decide whether NTLM relays get an option.
+- [ ] Accounts: SignPath application (`docs/tooling/signpath-foundation-application.md`); update-signing key
+      (`docs/tooling/update-signing.md`), one release with `off`, then `required`; VirusTotal and Defender submissions.
+- [ ] Testers: retry the download behind a block page, and retest number-row, key-combination and priority-100 setups.
+
 ## Mac todo (run by the agent on the Mac)
 
 Check out `dev` (or the branch to test) and run `bash tools/dev/collect-macos-field-report.sh`. It creates
@@ -809,7 +839,7 @@ check `composer_ready=pass:enabled`; "still reads off after 5 fresh read(s)" mea
 
 Work done on Linux and macOS only; the AHK side is built and run live on the Windows PC.
 
-- [ ] **PRIVACY: private hotstring text reaches AI prompts on Windows.** [CODE] Fixed on macOS (private
+- [x] **PRIVACY: private hotstring text reaches AI prompts on Windows.** [CODE] Fixed on macOS (private
       expansions now hidden from every prompt) and Linux (separate AI context). Read-only look at Windows:
       `_HSE_MirrorCanonicalEffectToLlm` (`hotstring_dispatch.ahk`) and `_HSE_MirrorLiteralEditToLlm`
       (`hotstring_send.ahk`) copy `Effect.InsertedText` into `_LLM_Bridge_Buffer` and the agent buffer, and the
@@ -817,12 +847,12 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       to Ollama or a remote provider. Add `IsPrivate` to those Effects, clear both buffers on a private effect
       and keep appending later typing (as Linux); AHK test: a private expansion then a prediction request
       carries no secret. Do this first on the PC.
-- [ ] **Hosted Windows unit failures.** [CODE] Run 40235626114 (e2aa642f8c) still fails `meta`,
+- [x] **Hosted Windows unit failures.** [CODE] Run 40235626114 (e2aa642f8c) still fails `meta`,
       `config-scope-features`, `core` and `keymap-gestures` (likely the gesture greying, dbc29c5077);
       `hotstrings-shortcuts` passes since the second round of fixes. `test_hotstrings_scope.ahk:520` (expected 0.5, got 1.0) is
       unexplained: print `_HotstringsOverrides["autocorrection"].Sections[family]` after
       `HotstringsOverridesApplyBase()`.
-- [ ] **AI off disarms the AI keys and the agent's manual actions.** [CODE] Done on Linux and macOS
+- [x] **AI off disarms the AI keys and the agent's manual actions.** [CODE] Done on Linux and macOS
       (bc2048765a, 6d96986979). Windows: `AiActionIsAi`/`AiActionBlocked` in `modules/gestures/config.ahk`;
       split `TapHoldTapAction` (`platform/remap/tap_hold_loader.ahk`) so a blocked AI tap returns the native
       tap, configured readers in `menu_taphold.ahk` and `tap_hold_writer.ahk` use the new
@@ -832,7 +862,7 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       `_LLM_Agent_ManualRefusal` passes `LLM_Menu_AiEnabled()`; `requires_ahk = ["ai:on"]` on the two agent
       actions with the codegen token and the picker greying; tests `test_ai_action_gate.ahk`,
       `test_llm_agent.ahk`, `test_llm_agent_requester.ahk`; reseal.
-- [ ] **One app-category file on the three OS (PAR-34).** [CODE] Windows keeps `app_categories.json` in the
+- [x] **One app-category file on the three OS (PAR-34).** [CODE] Windows keeps `app_categories.json` in the
       metrics dir and accepts legacy flat string values the Lua codec refuses, and it preserves unknown
       members the codec drops. Align the location (decision pending), the record shape and the score range,
       and replay `_shared/tests/corpus/metrics/app_category_store_vectors.json` in AHK.
@@ -840,7 +870,7 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       the AHK agent runner arms no typing pause and refuses a triage or request in flight while the AI is
       off, cancels the pause at the switch-off and re-arms on the next keystroke; rewrite
       `test_llm_agent_ai_off.ahk` (it feeds the agent with the AI off on purpose) to assert that.
-- [ ] **Release notes in the update-check window (PAR-52).** [CODE] `windows/ui/update_check/init.ahk`:
+- [x] **Release notes in the update-check window (PAR-52).** [CODE] `windows/ui/update_check/init.ahk`:
       seed `state.notes = {body, owner, repo}` in the `available` message (from `UPDATER_LATEST_RELEASE.Body`,
       `UPDATER_GH_OWNER`, `UPDATER_GH_REPO`, as `_Updater_ReleaseNotesSeed`), serve `open_url` in the
       `available` phase through the allowlist behind `_Updater_OpenManualUrl`, add `"open_url", "available"` to
@@ -852,7 +882,7 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       `vendor/ergopti_updater_download.ps1` (`CreateFileW`, `GetFileInformationByHandle`, from bdfa026d16). Check
       whether a bundled type already declaring them could be reused, then lower it back. The same build log notes
       `key_state_polling` dropped to 59: lower its script ceiling from 62 once a Windows build confirms 59.
-- [ ] **Windows counterparts of the 26 October work.** [CODE] The Lua side is on dev: - read `[logger] hotpath_slow_ms` in `hotpath_profiler.ahk`; - drop the dead crash kind (`error_dialog/init.ahk`, `ERROR_REPORT_KINDS`, then the shared `KINDS` and the
+- [x] **Windows counterparts of the 26 October work.** [CODE] The Lua side is on dev: - read `[logger] hotpath_slow_ms` in `hotpath_profiler.ahk`; - drop the dead crash kind (`error_dialog/init.ahk`, `ERROR_REPORT_KINDS`, then the shared `KINDS` and the
       `crash_multi_line_without_recent_issues` vector together); - read the 14-colour palette from `native_theme.toml`; - use `dialog.action_picker.requires_ai` for the greyed AI actions; - port `llm/request_plan` (debounce, batching) with its vectors, accept -1 "never", never hold explicit
       requests, read `llm.trigger.min_request_interval_ms` with a menu row, then delete
       `rate_limit_min_interval_ms` from `inference.json`; - `tap_hold.toml` v0→v1 migration (`_shared/tap_hold/migrations.toml`) in the loader and writer, stop
@@ -863,7 +893,7 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
 
 - [ ] **Versioned `tap_hold.toml` migrator.** [CODE] Linux done (`_shared/tap_hold/migrations.toml`,
       macOS has no tap_hold.toml); in progress: byte-preserving rewrite (agent AE); Windows side on the PC.
-- [ ] **Registry op that re-encodes a value.** [CODE] Windows `config_migrate.ahk` first (PC), then the Lua
+- [x] **Registry op that re-encodes a value.** [CODE] Windows `config_migrate.ahk` first (PC), then the Lua
       engines, then delete the macOS `[llm.profiles] user_profiles` reader import (0146a938c5).
 
 ## Big item 1: Windows corporate networks and trust (items 62, 132)
@@ -1090,7 +1120,7 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       image/TTS/audio.
       The AHK suite and parse of this change must run in hosted Windows CI (no AutoHotkey in the cloud
       container).
-- [ ] **Retire the orphaned Windows gesture-notice entries.** [CODE] The gesture status submenu and notice
+- [x] **Retire the orphaned Windows gesture-notice entries.** [CODE] The gesture status submenu and notice
       are gone (dbc29c5077); the `gesture_conflict_dismissed.*` storage entries they wrote stay in user
       state. Remove them in a config migration.
 - [ ] **Review the machine translations of October 25.** [I18N] New keys (gesture recommendation notes,
@@ -1100,7 +1130,7 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       base is user-settable everywhere, section delays are stored as `delay_offset` or `delay_unlimited`,
       old absolute values migrate keeping the effective delay, shared vectors `base_delay_vectors.json`.
       Left: run the Windows corpus test on the PC.
-- [ ] **PAR-8. Word delimiters in config leaves on Windows.** [CODE] Done: the consume choice is the
+- [x] **PAR-8. Word delimiters in config leaves on Windows.** [CODE] Done: the consume choice is the
       leaf `[hotstrings.terminator_consume]` on macOS and Linux (76716e7); Windows writes built-in states
       through the live config writer and moves the old override strings at boot (2d734b6); macOS and
       Linux end a word on a user delimiter when deciding a repeat, as Windows does (1748df6: Linux
@@ -1139,7 +1169,7 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       Ctrl-letter switches, role table with per-driver families, manifest slots, both drivers adopt the role
       names, migrated-config binding proof, AHK fixtures pinned to v15, per-slot parameters carried by
       `rename_prefix`. Left: the Windows adoption, macOS `ctrl_g` to `open_url` later.
-- [ ] **PAR-45. Notifications: one behaviour for toggles and refusals.** [CODE] Done on macOS and Linux
+- [x] **PAR-45. Notifications: one behaviour for toggles and refusals.** [CODE] Done on macOS and Linux
       (shared `feature_notice.lua`, Linux quit refusal). Left: Windows `NotifyFeature(label, enabled)` around
       `NotifierSend` at the same call sites, and a Windows quit-refusal path firing `notify.quit_refused`.
 - [ ] **PAR-52. Release notes on macOS and Linux update windows.** [CODE] Done on macOS and Linux
@@ -1156,13 +1186,13 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [x] **PAR-54. PhaseStats and child-process timing.** [CODE] Done on macOS and Linux (`process.<program>`,
       `toml.parse`, `menu.rebuild`, `boot.stage`, `boot.stage_cpu`). Windows: port `phase_stats_core.lua` with
       the same phases (`boot_profiler.ahk` already measures stages).
-- [ ] **PAR-55. Crash reports: one content, one cap, one notice.** [CODE] Done on macOS and Linux (shared
+- [x] **PAR-55. Crash reports: one content, one cap, one notice.** [CODE] Done on macOS and Linux (shared
       `crash_report.lua`, vectors `diagnostics/crash_report_vectors.json`, 20 newest kept). Left: Windows
       `crash_report_worker.ahk` adopting the same fields, names and cap.
 - [ ] **PAR-56. Log-volume metrics on all three drivers.** [CODE] Done on macOS and Linux (per-level,
       dropped, suppressed and collapsed counts in the shared logger core, on the interval evidence record).
       Left: Windows `_LoggerEmit` counting the same seven figures in the same order.
-- [ ] **PAR-57. Retention read from timings on Windows.** [CODE] `logger.ahk:112` is a literal 14. Read
+- [x] **PAR-57. Retention read from timings on Windows.** [CODE] `logger.ahk:112` is a literal 14. Read
       `Timings` and extend `test-logger-scalars-single-source.cjs`. Audit G5.
 
 ### E. Tests and corpora
@@ -1178,21 +1208,21 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       consumers of `http/get_redirect_vectors.json`, `native_presentations/original_captions.json`,
       `route_plan_vectors.json`.
       Windows (30 Oct): `get_redirect_vectors` (`test_corpus_updater_redirect.ahk`) and `original_captions` (`test_window_title_captions.ahk`) were already replayed; `route_plan_vectors.json` is now replayed by the PowerShell twin `vendor/ergopti_route_plan.ps1` (`test-windows-route-plan.cjs`).
-- [ ] **PAR-60. Hotstring `family_samples.json` plus chaining, synthetic-output and erase vectors.** [CODE]
+- [x] **PAR-60. Hotstring `family_samples.json` plus chaining, synthetic-output and erase vectors.** [CODE]
       Done on macOS and Linux (`family_samples.json`, `sequence_vectors.json`, `cascade_vectors.json` in both
       E2E harnesses). Left: a Windows `family_samples` consumer.
-- [ ] **PAR-61. Tap-versus-hold decision corpus.** [CODE] Done on macOS and Linux (`decision_vectors.json`,
+- [x] **PAR-61. Tap-versus-hold decision corpus.** [CODE] Done on macOS and Linux (`decision_vectors.json`,
       23 vectors, shared contract). Left: a Windows consumer through its tap-hold engine.
 - [ ] **PAR-63. Remaining 2026-10-18 test items.** [CODE] Done on Linux and macOS (personal-info editor,
       field masking, native-only number row; model records, downloads, keystats corpus and the toggle gaps
       were already covered). Left: Windows dynamic hotstrings, Windows root runners and the
       `test-driver-tree-parity.cjs:19` exclusion.
-- [ ] **PAR-64. Installed-record and layout corpora on Windows.** [CODE] Windows replays 1 of 4 files.
+- [x] **PAR-64. Installed-record and layout corpora on Windows.** [CODE] Windows replays 1 of 4 files.
       Replay extensions, preservation and updates. Audit L6.
 
 ### F. Centralisation and hexagonal architecture (value order)
 
-- [ ] **PAR-65. Extract the LLM request plan to `_shared/lua/llm/request_plan`.** [CODE] Phase 1 done on macOS
+- [x] **PAR-65. Extract the LLM request plan to `_shared/lua/llm/request_plan`.** [CODE] Phase 1 done on macOS
       and Linux: `debounce.lua` and `batching.lua` with request-transcript vectors (`_shared/tests/corpus/llm/`)
       replayed by both drivers (48be669def, 7442ab5edd, d18f573791; the decisions of October 26 are on
       `work/todo-af`). Left: the Windows twin replaying the vectors, then the HttpClient, TimerScheduler and
@@ -1203,7 +1233,7 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [ ] **PAR-67. Shared keystats query catalogue and walker.** [CODE] Reader catalogue, shared walker and
       aggregation vectors done; `meta.rev` shared and a gate refuses SQL spelled by hand in both Lua drivers.
       In progress: write-statement catalogue with typed slots (agent). Windows: adopt it later.
-- [ ] **PAR-68. Hotstring override parser into `_shared` on `toml_codec`.** [CODE] Done on macOS and Linux
+- [x] **PAR-68. Hotstring override parser into `_shared` on `toml_codec`.** [CODE] Done on macOS and Linux
       (shared `hotstrings/overrides.lua`, `override_parse_vectors.json`). macOS now reads a duplicate key or
       header as invalid TOML (was last-wins). Left: Windows `_ParseOverrides` replaying the vectors.
 - [ ] **PAR-71. Finish the route-plan rollout and make `proxy_policy.json` the codegen source.** [CODE] Done on
