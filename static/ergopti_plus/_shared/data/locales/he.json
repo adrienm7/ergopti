@@ -1764,6 +1764,7 @@
 	"menu.llm.api_prompt_provider": "מזהה ספק ({1}):",
 	"menu.llm.api_prompt_token": "טוקן / מפתח API (מוסתר):",
 	"menu.llm.api_prompt_url": "כתובת URL בסיסית:",
+	"menu.llm.api_provider_token_exchange_unavailable": "ספק זה מחליף את המפתח שלו באסימון גישה קצר מועד, דבר שגרסת Windows עדיין אינה יודעת לעשות: הוסיפו אותו ב-macOS או ב-Linux.",
 	"menu.llm.api_providers_unavailable": "לא ניתן היה לטעון את רשימת ספקי ה-API, ולכן לא ניתן להוסיף רשומת API. ודא ש-api_providers.json קיים ותקין.",
 	"menu.llm.api_remove_confirm_body": "אסימון ה־API השמור יימחק לצמיתות.",
 	"menu.llm.api_remove_confirm_title": "למחוק את רשומת ה־API \"%s\"?",

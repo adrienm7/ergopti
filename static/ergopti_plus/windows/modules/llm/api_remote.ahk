@@ -1358,6 +1358,10 @@ _LLMRemoteResolveEntry(Entry) {
     if !LLM_API_PROVIDERS.Has(ProviderId)
         return ""
     Provider := LLM_API_PROVIDERS[ProviderId]
+    if Provider.Get("TokenExchange", false) {
+        try LoggerError("LLM.remote", "API entry of provider '{1}' is refused: its key is exchanged for an access token, which the Windows driver does not do yet.", ProviderId)
+        return ""
+    }
     ProvFmt  := Provider["Format"]
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
     if (BaseUrl == "")
@@ -2433,6 +2437,10 @@ _LLMRemote_LoadCatalog() {
             continue
         }
         candidateProviders[pid] := Map(
+            ; An auth block exchanges the key for a short-lived access token,
+            ; which this driver does not do yet: such a provider is refused
+            ; by the API form and the request resolver, never sent its key
+            "TokenExchange", desc.Has("auth"),
             "ThinkingDialect", Dialect,
             "Label", desc["label"],
             "BaseUrl", desc["base_url"],
