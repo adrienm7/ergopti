@@ -39,8 +39,12 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // 61 → 61 files and 116 → 111 reads: the input_reader half of the keycode
 // single-source test loads the reader over a shared-table double instead of
 // reading its source.
-const BASELINE = 61;
-const READ_BASELINE = 111;
+// 61 → 55 files and 111 → 100 reads: the managed_http fixture group loads
+// http_client, system_proxy, managed_http_deadline and the shared proxy
+// policy by module name, and its import-isolation test fails the import
+// through package.preload instead of matching dofile paths.
+const BASELINE = 55;
+const READ_BASELINE = 100;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];

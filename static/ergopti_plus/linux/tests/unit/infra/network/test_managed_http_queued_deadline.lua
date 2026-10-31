@@ -178,7 +178,7 @@ local function fresh_client(config)
   for _, name in ipairs(names) do package.loaded[name] = nil end
  package.loaded.luv = fake
  package.loaded["infra.monotonic"] = { now_ms = function() return state.time end }
- local policy_module = dofile(assert(Paths.shared("lua/network/proxy_policy.lua")))
+ local policy_module = helpers.fresh_module("network.proxy_policy")
  local file = assert(io.open(assert(Paths.shared("modules/network/proxy_policy.json")), "rb"))
  local data = Json.decode(file:read("*a")); file:close()
  local policy = assert(policy_module.new(data))
@@ -187,7 +187,7 @@ local function fresh_client(config)
   shared_root = function() return assert(Paths.shared_root()) end,
   shared = function(path) return assert(Paths.shared(path)) end }
  package.loaded["infra.managed_http_deadline"] = { start = deadline_port(state, config) }
- return dofile(driver_root .. "/adapters/http_client.lua")
+ return helpers.fresh_module("adapters.http_client")
  end)
  for _, name in ipairs(names) do package.loaded[name] = saved[name] end
  if not ok then error(client, 0) end
