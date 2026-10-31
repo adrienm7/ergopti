@@ -109,7 +109,9 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //                    document through preferences instead of reading it.)
 //           18 → 17 (2026-10-31: the M-14 warning test fails real requests on
 //                    three backends instead of comparing source positions.)
-const BASELINE = 17;
+//           17 → 16 (2026-10-31: the menu probe loop guard became a repaint-
+//                    count case in test_health_probe_generation.)
+const BASELINE = 16;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -159,7 +161,9 @@ const BASELINE = 17;
 //              through preferences instead of reading it.)
 //       63 → 61 (2026-10-31: the M-14 warning test fails real requests on three
 //              backends instead of comparing source positions.)
-const READ_BASELINE = 61;
+//       61 → 59 (2026-10-31: the menu probe loop guard became a repaint-count
+//              case in test_health_probe_generation.)
+const READ_BASELINE = 59;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
