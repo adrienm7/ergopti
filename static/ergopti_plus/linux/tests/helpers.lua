@@ -117,6 +117,20 @@ function M.load_module(module_name)
 	return require(module_name)
 end
 
+--- Loads a fresh instance of a module by name and leaves the package cache as
+--- it found it, as dofile on its path would, so a test can run private copies
+--- without naming the file a move would break.
+--- @param module_name string Dotted Lua module name to load.
+--- @return any The module's return value.
+function M.fresh_module(module_name)
+	local cached = package.loaded[module_name]
+	package.loaded[module_name] = nil
+	local ok, result = pcall(require, module_name)
+	package.loaded[module_name] = cached
+	if not ok then error(result, 0) end
+	return result
+end
+
 --- Loads a fresh module with one dependency explicitly present or unavailable.
 --- Restores the dependency cache and preload even when the module raises.
 --- @param module_name string Module whose captured dependency is under test.

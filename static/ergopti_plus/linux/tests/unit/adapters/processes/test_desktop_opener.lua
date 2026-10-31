@@ -275,7 +275,7 @@ h.describe("desktop-confirmation worker pure validation", function()
 		package.loaded.luv = nil
 		package.preload.luv = function() calls = calls + 1; error("native worker load refused") end
 		local ok, err = pcall(function()
-			local worker = assert(loadfile(h.driver_root() .. "/adapters/desktop_opener_worker.lua"))()
+			local worker = h.fresh_module("adapters.desktop_opener_worker")
 			for _, argv in ipairs({ false, {}, { "" }, { "bad\0target", "30000" }, { "target", "extra" },
 				{ "target", "0" }, { "target", "-1" }, { "target", "1.5" }, { "target", "30000", "extra" },
 				{ "target", "30000", field = "extra" }, { "target", [3] = "extra" } }) do
