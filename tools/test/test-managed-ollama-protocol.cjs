@@ -10,6 +10,24 @@ const fs = require('node:fs');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { pythonExecutable } = require('../lib/python.cjs');
+const { trustCheckout } = require('./lib/git-safe-directory.cjs');
+
+// Children list this checkout's files with git. Run by a user who does not own
+// the checkout (a cloud container cloned as root), git refused it as "dubious
+// ownership" and the gate stopped there: trust this one checkout for the gate's
+// own children, never in the user's Git configuration.
+assert.deepEqual(
+	trustCheckout({ GIT_CONFIG_COUNT: '2' }, '/checkout'),
+	{
+		GIT_CONFIG_COUNT: '3',
+		GIT_CONFIG_KEY_2: 'safe.directory',
+		GIT_CONFIG_VALUE_2: '/checkout'
+	},
+	'an existing command-scope Git entry keeps its index'
+);
+assert.throws(() => trustCheckout({ GIT_CONFIG_COUNT: 'x' }, '/checkout'));
+assert.throws(() => trustCheckout({}, 'relative'));
+Object.assign(process.env, trustCheckout(process.env, path.resolve(__dirname, '../..')));
 
 // Standalone selectors reuse the existing Windows component receivers;
 // the default still receives every original platform control below.
