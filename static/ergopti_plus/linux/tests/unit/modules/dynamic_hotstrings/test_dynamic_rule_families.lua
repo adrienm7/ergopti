@@ -283,7 +283,7 @@ end
 --- @param dh table The manager to hand the builder.
 --- @return table|nil
 local function dynamic_submenu(dh)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local first = dh.rule_families()[1].label
 	local found = nil
 

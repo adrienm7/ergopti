@@ -38,8 +38,16 @@ const BASELINE = 'tools/test/native-menu-rows-baseline.json';
 const tool = fs.readFileSync(path.join(ROOT, TOOL), 'utf8');
 const corpusBytes = fs.readFileSync(path.join(ROOT, CORPUS));
 const legacy = JSON.parse(corpusBytes);
-// The frozen oracle keeps the pre-rename spelling; the tree under test uses the new one.
+// The frozen oracle keeps the pre-rename spellings; the tree under test uses the new ones
+// (the Linux tray root took the macOS name once its sections moved to menu_*.lua).
+const currentName = (rel) =>
+	rel
+		.replace(/keylogger/g, 'keystats')
+		.replace(/^linux\/ui\/menu\/menu_builder\.lua$/, 'linux/ui/menu/builder.lua');
 const currentTree = JSON.parse(JSON.stringify(legacy).replace(/keylogger/g, 'keystats'));
+for (const driver of DRIVERS)
+	currentTree.drivers[driver].sourceFiles =
+		currentTree.drivers[driver].sourceFiles.map(currentName);
 const registry = loadInventory(ROOT).checks;
 for (const name of ['test-native-menu-rows.cjs', 'test-native-menu-census-admission.cjs']) {
 	const entries = registry.filter((check) => check.args.includes('tools/test/' + name));
@@ -99,7 +107,7 @@ function reset() {
 function rows(driver, count) {
 	const known = legacy.drivers[driver].excerpts
 		.flatMap((excerpt) =>
-			excerpt.lines.map((entry) => ({ rel: excerpt.path, source: entry.source }))
+			excerpt.lines.map((entry) => ({ rel: currentName(excerpt.path), source: entry.source }))
 		)
 		.filter((entry) => {
 			// The immutable legacy classifier still receives every original excerpt.

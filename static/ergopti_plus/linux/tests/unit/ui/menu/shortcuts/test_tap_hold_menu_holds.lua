@@ -434,7 +434,7 @@ helpers.describe("declared native command reaches the actual Linux writer", func
 				if command:find("zenity --error", 1, true) then notices = notices + 1; return 1 end
 				return previous_execute(command)
 			end
-			local items = helpers.load_module("ui.menu.menu_builder").build({
+			local items = helpers.load_module("ui.menu.builder").build({
 				_version = "test", on_quit = function() end, tap_holds = Manager,
 				on_menu_changed = function() refreshes = refreshes + 1 end,
 			})
@@ -736,7 +736,7 @@ helpers.describe("declared complete per-key delay tail", function()
 				if command:find("zenity --error", 1, true) then notices = notices + 1; return 1 end
 				return previous_execute(command)
 			end
-			local items = helpers.load_module("ui.menu.menu_builder").build({ _version = "test",
+			local items = helpers.load_module("ui.menu.builder").build({ _version = "test",
 				on_quit = function() end, tap_holds = Manager, is_paused = function() return false end,
 				on_menu_changed = function() refreshes = refreshes + 1 end })
 			local i18n = require("infra.i18n")

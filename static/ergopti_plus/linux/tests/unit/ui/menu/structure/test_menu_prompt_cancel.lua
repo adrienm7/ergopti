@@ -143,7 +143,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 			-- The builder captures TextPrompt at load time. Earlier adapter tests
 			-- reload Shell, so bind this public owner to the current authority.
 			helpers.load_module("ui.text_prompt")
-			local mb = helpers.load_module("ui.menu.menu_builder")
+			local mb = helpers.load_module("ui.menu.builder")
 			local delay = find_delay_row(mb, th)
 			helpers.assert_true(delay ~= nil,
 				"a delay row shelling out to zenity --entry must exist — "
@@ -166,7 +166,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 			-- The builder captures TextPrompt at load time. Earlier adapter tests
 			-- reload Shell, so bind this public owner to the current authority.
 			helpers.load_module("ui.text_prompt")
-			local mb = helpers.load_module("ui.menu.menu_builder")
+			local mb = helpers.load_module("ui.menu.builder")
 			local delay = find_delay_row(mb, th)
 			helpers.assert_true(delay ~= nil, "a delay row must exist")
 			writer_calls = {}

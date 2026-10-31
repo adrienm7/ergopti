@@ -44,7 +44,7 @@ function M.with_configuration(body)
 		end
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.llm%.") or name:match("^infra%.llm_") or name == "infra.config_paths"
-				or name == "adapters.storage" or name == "ui.menu.menu_builder" or name == "ui.numeric_prompt.bridge"
+				or name == "adapters.storage" or name == "ui.menu.builder" or name == "ui.numeric_prompt.bridge"
 				or name == "ui.paths_editor.bridge" then package.loaded[name] = nil end
 		end
 		local Json, Codec = require("json"), require("toml_codec")
@@ -81,7 +81,7 @@ function M.with_configuration(body)
 		package.loaded["adapters.notifier"] = { send = function(message) notifications[#notifications + 1] = message; return true end }
 		local i18n = require("infra.i18n"); i18n.init()
 		local prompt = require("ui.numeric_prompt.bridge")
-		local builder = require("ui.menu.menu_builder")
+		local builder = require("ui.menu.builder")
 		local function find(rows, predicate)
 			for _, row in ipairs(rows or {}) do
 				if predicate(row) then return row end

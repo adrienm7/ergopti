@@ -74,7 +74,7 @@ local CORPUS = "/../_shared/tests/corpus/config_migrations"
 local REFUSAL_ERRORS = {
 	{ "toml_writer", "batch_write: publication to '~/.config/ergopti/config.toml' failed" },
 	{ "hotstrings.terminator_settings", "Word-delimiter settings were not persisted: " },
-	{ "ui.menu.menu_builder", "Word-delimiter change was rolled back because persistence failed." },
+	{ "ui.menu.builder", "Word-delimiter change was rolled back because persistence failed." },
 }
 
 --- The REFUSAL_ERRORS entry an error line is, if any.

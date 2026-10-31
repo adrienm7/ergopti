@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Linux Menu Quit Row
 --- DESCRIPTION:
---- Builds the tray's Quit row. The root (ui/menu/menu_builder.lua) holds it
+--- Builds the tray's Quit row. The root (ui/menu/builder.lua) holds it
 --- back and appends it last, after the manifest's declared order.
 --- ==============================================================================
 

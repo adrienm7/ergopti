@@ -82,7 +82,7 @@ end
 --- @param config table
 --- @return table|nil
 local function rolls_row(config)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local found = nil
 	local function search(list)
 		for _, item in ipairs(list or {}) do

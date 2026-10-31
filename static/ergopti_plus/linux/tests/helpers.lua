@@ -76,7 +76,7 @@ function M.driver_root()
 end
 
 --- Returns the tray root's source followed by every section module it binds.
---- ui/menu/menu_builder.lua binds each section builder from its own
+--- ui/menu/builder.lua binds each section builder from its own
 --- ui/menu/menu_<section>.lua; a test that looks for a builder's code by text
 --- finds it in whichever of these files now holds it.
 --- @return string The root's text, then each bound module's text, in binding order.
@@ -88,7 +88,7 @@ function M.read_menu_source()
 		assert(handle:close())
 		return text
 	end
-	local texts, seen = { read("menu_builder") }, {}
+	local texts, seen = { read("builder") }, {}
 	for name in texts[1]:gmatch('require%("ui%.menu%.(menu_[a-z_]+)"%)') do
 		if not seen[name] then
 			seen[name] = true

@@ -388,7 +388,7 @@ end)
 
 -- Uses the actual native builder closure and genuine shared factory; no provider stand-in.
 local function with_magic_frame(language, stored, mode, body)
-	local names = { "infra.manifest_menu", "ui.menu.menu_builder", "modules.hotstrings.magic_key", "infra.i18n", "infra.locale", "locale.core", "ui.text_prompt" }
+	local names = { "infra.manifest_menu", "ui.menu.builder", "modules.hotstrings.magic_key", "infra.i18n", "infra.locale", "locale.core", "ui.text_prompt" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local storage, restore_storage, restore_manifest
@@ -423,8 +423,8 @@ local function with_magic_frame(language, stored, mode, body)
 		end
 		package.loaded["infra.manifest_menu"] = renderer
 		package.loaded["modules.hotstrings.magic_key"] = nil
-		package.loaded["ui.menu.menu_builder"] = nil
-		local native = require("ui.menu.menu_builder")
+		package.loaded["ui.menu.builder"] = nil
+		local native = require("ui.menu.builder")
 		local function upvalue(fn, wanted)
 			for index = 1, math.huge do
 				local name, value = debug.getupvalue(fn, index)

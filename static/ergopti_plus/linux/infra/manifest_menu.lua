@@ -11,7 +11,7 @@
 --- the renderer lived inside the macOS driver, 561 lines that read as Hammerspoon
 --- code and were not — one `hs.json.decode` and a platform token were the whole
 --- of it. Linux built its tray menu by hand instead, and the top-level parity
---- gate had to read `menu_builder.lua`'s real `_build_*` calls to compare the two
+--- gate had to read `ui/menu/builder.lua`'s real `_build_*` calls to compare the two
 --- at all. Three rows only became visible that way: `kanata`, `updates` and
 --- `apps`, all built here and none of them described by the manifest.
 ---

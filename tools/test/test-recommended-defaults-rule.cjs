@@ -146,7 +146,7 @@ const DIALOG_OWNERS = [
 		absent: []
 	},
 	{
-		file: 'linux/ui/menu/menu_builder.lua',
+		file: 'linux/ui/menu/builder.lua',
 		register: /COMMAND\.GESTURE_RECOMMENDED_INFO\] = function\(\)\n([\s\S]*?)\n\tend\n/,
 		body: /COMMAND\.GESTURE_RECOMMENDED_INFO\] = function\(\)\n([\s\S]*?)\n\tend\n/,
 		helper: 'show_info(',

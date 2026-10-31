@@ -108,7 +108,7 @@ end
 -- Fresh backend and builder modules must capture this exact private owner, not
 -- a prior module whose source path or cached entries belong to another test.
 local API_SOURCE_MODULES = {
-	"modules.llm.api_entries", "ui.menu.llm_backend_rows", "ui.menu.menu_builder",
+	"modules.llm.api_entries", "ui.menu.llm_backend_rows", "ui.menu.builder",
 }
 
 --- Builds with a genuine private API source and restores the complete module cohort.
@@ -127,7 +127,7 @@ local function with_api_source(scenario)
 		local entries = require("modules.llm.api_entries")
 		entries._set_path_for_test(path)
 		require("ui.menu.llm_backend_rows")
-		local builder = require("ui.menu.menu_builder")
+		local builder = require("ui.menu.builder")
 		return scenario(builder, entries, path)
 	end, debug.traceback)
 	local closed = true
@@ -784,7 +784,7 @@ helpers.describe("menu certification: private API source lifecycle", function()
 	helpers.it("restores the genuine previous cohort after builder construction refuses", function()
 		local previous = {}
 		for _, name in ipairs(API_SOURCE_MODULES) do previous[name] = rawget(package.loaded, name) end
-		local name = "ui.menu.menu_builder"
+		local name = "ui.menu.builder"
 		local preload = rawget(package.preload, name)
 		local private_path
 		rawset(package.preload, name, function()
@@ -963,7 +963,7 @@ helpers.describe("linux-absent-module templates: actual native branches", functi
 			-- The already constructed genuine backend retains its private source owner.
 			-- Only the new builder's optional renderer admission is withdrawn.
 			helpers.assert_eq(entries.path(), path)
-			local name, builder_name = "infra.manifest_menu", "ui.menu.menu_builder"
+			local name, builder_name = "infra.manifest_menu", "ui.menu.builder"
 			local prior, preload = rawget(package.loaded, name), rawget(package.preload, name)
 			local old_builder = rawget(package.loaded, builder_name)
 			local ok, detail = xpcall(function()
@@ -1458,7 +1458,7 @@ helpers.describe("menu certification: current disabled public Agent policy", fun
 				helpers.assert_eq(declaration.i18n, "menu.agent.title")
 				helpers.assert_eq(declaration.reason_key, "menu.agent.not_ready")
 				for _, name in ipairs({ "modules.llm.prediction_engine", "modules.llm.agent_settings",
-					"ui.menu.menu_builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }) do
+					"ui.menu.builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }) do
 					package.loaded[name] = nil
 				end
 				require("tests.support.llm_preferences_fixture").with(function()
@@ -1480,7 +1480,7 @@ helpers.describe("menu certification: current disabled public Agent policy", fun
 					end
 					local caption = i18n.get("menu.agent.title")
 					local found
-					for _, row in ipairs(require("ui.menu.menu_builder").build(context)) do
+					for _, row in ipairs(require("ui.menu.builder").build(context)) do
 						if type(row.title) == "string" and row.title:sub(1, #caption) == caption then
 							helpers.assert_nil(found, "the actual public Agent row must be unique")
 							found = row
@@ -1577,8 +1577,8 @@ helpers.describe("fixed feature-parent family: actual Linux builder (fixed-featu
 						end
 						return feature_template(key, ...)
 					end
-					builder = helpers.load_module("ui.menu.menu_builder")
-					helpers.assert_true(rawequal(builder, require("ui.menu.menu_builder")), "the actual native builder captures the final genuine delegation spies")
+					builder = helpers.load_module("ui.menu.builder")
+					helpers.assert_true(rawequal(builder, require("ui.menu.builder")), "the actual native builder captures the final genuine delegation spies")
 					local source_file = assert(io.open(path, "rb")); local source = source_file:read("*a"); assert(source_file:close())
 					local function parent_at_tray()
 						return find_item(builder.build(absent_context()), i18n.get(contract.key))

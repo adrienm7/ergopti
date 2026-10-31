@@ -322,7 +322,7 @@ helpers.describe("Linux terminal shortcut scope", function()
 						end
 						return execute(command)
 					end
-					local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
+					local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
 						is_paused = function() return controls.paused end,
 						on_menu_changed = function() changed = changed + 1 end })
 					local submenu
@@ -369,7 +369,7 @@ helpers.describe("Linux Shortcuts restore row", function()
 					if command:find("zenity --question", 1, true) then questions = questions + 1; return 1 end
 					return execute(command)
 				end
-				local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
+				local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
 					is_paused = function() return controls.paused end,
 					on_menu_changed = function() changed = changed + 1 end })
 				local i18n = require("infra.i18n")
@@ -409,7 +409,7 @@ helpers.describe("Linux Shortcuts wrap group", function()
 			local top = root.top_level
 			local passed, err = pcall(function()
 				root.top_level = declared_parent(top, "shortcuts")
-				local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
+				local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
 					is_paused = function() return controls.paused end })
 				local i18n = require("infra.i18n")
 				local submenu
@@ -530,7 +530,7 @@ helpers.describe("Linux script chords in the Shortcuts scope", function()
 				end
 				local i18n = require("infra.i18n")
 				local function group()
-					local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
+					local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
 						is_paused = function() return controls.paused end,
 						on_menu_changed = function() changed = changed + 1 end })
 					for _, item in ipairs(menu) do
