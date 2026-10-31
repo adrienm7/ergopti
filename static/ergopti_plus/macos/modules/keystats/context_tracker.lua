@@ -24,6 +24,7 @@ local Logger = require("infra.logger")
 local i18n   = require("infra.i18n")
 local SecureFieldDetector = require("adapters.secure_field_detector")
 local TimerScheduler = require("adapters.timer_scheduler")
+local AXResponsiveness = require("adapters.accessibility_permission")
 local LOG    = "keystats.context_tracker"
 local M      = {}
 
@@ -683,6 +684,7 @@ local function reject_ax_observer_candidate(detail, app_pid)
 	mark_context("secure", false)
 	local text = tostring(detail)
 	if text:match("^[^\n]*Messaging failed") then
+		AXResponsiveness.mark_unanswered(app_pid)
 		-- kAXErrorCannotComplete: the application did not answer Accessibility,
 		-- as one still launching or one without an Accessibility server does.
 		-- This is the application's state, not a driver fault, and the next
@@ -716,6 +718,15 @@ function M.update_ax_observer(app_pid)
 	end
 
 	if not app_pid then return true end
+	-- An application that just left a read unanswered would hold the main
+	-- thread for the messaging timeout on each of the reads below
+	if hs.processInfo == nil or app_pid ~= hs.processInfo.processID then
+		if not AXResponsiveness.is_askable(app_pid) then
+			Logger.debug(LOG, "Accessibility observer not attached to PID %s: it left a read unanswered moments ago; the next activation attaches again.",
+				tostring(app_pid))
+			return false
+		end
+	end
 
 	Logger.trace(LOG, "Attaching accessibility observer to PID %s…", tostring(app_pid))
 
@@ -977,7 +988,20 @@ function M.update_private_status()
 	-- payload this module handles, and the browser window watchers keep firing while paused.
 	if _is_paused() then return end
 
-	local win = hs.window.focusedWindow()
+	-- Each window read below waits out the messaging timeout on an application
+	-- that does not answer, as loginwindow right after a wake (1512 ms, field
+	-- run 2026-10-31): one unanswered read skips the others.
+	local pid = AXResponsiveness.frontmost_pid()
+	local win = nil
+	if AXResponsiveness.is_askable(pid) then
+		local started_ns = hs.timer.absoluteTime()
+		win = hs.window.focusedWindow()
+		if AXResponsiveness.note_read(pid, (hs.timer.absoluteTime() - started_ns) / 1e9) then
+			Logger.debug(LOG, "Focused-window read of PID %s waited out the Accessibility timeout; window details skipped.",
+				tostring(pid))
+			win = nil
+		end
+	end
 	_state.is_fullscreen        = false
 	_state.session_document_path = nil
 

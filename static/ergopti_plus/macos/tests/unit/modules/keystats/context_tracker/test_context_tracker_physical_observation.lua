@@ -94,7 +94,9 @@ helpers.describe("context tracker dormant physical observation", function()
 			c.focus(nil); helpers.assert_eq(state.is_secure_field, false)
 			helpers.assert_eq(tracker.close_active_app(), false, "The tiny native interval rounds to zero milliseconds")
 			helpers.assert_eq(#c.records, 0); helpers.assert_eq(c.decision_calls, 0)
-			helpers.assert_eq(c.clock, 103, "Only the three pre-existing legacy timing reads run")
+			-- Plus the two that time the focused-window read, which skips an
+			-- application that waits out the Accessibility timeout
+			helpers.assert_eq(c.clock, 105, "Only the three pre-existing legacy timing reads and the window read's two run")
 		end)
 	end)
 
@@ -114,7 +116,8 @@ helpers.describe("context tracker dormant physical observation", function()
 			c.activate(); c.on_query = nil
 			helpers.assert_eq(#c.records, 3)
 			helpers.assert_eq(c.records[2].at, 102)
-			helpers.assert_eq(last(c.records), { kind = "physical_context", revision = 3, at = 105,
+			-- at = 107: the focused-window read is timed with the same clock
+			helpers.assert_eq(last(c.records), { kind = "physical_context", revision = 3, at = 107,
 				source = "activation", stage = "complete", complete = true, allowed = true,
 				app = { name = "Editor", bundle_id = "test.editor", path = "/Applications/Editor.app", pid = 4242 },
 				private = false, secure = false })
