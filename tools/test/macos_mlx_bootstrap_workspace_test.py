@@ -97,6 +97,9 @@ class WorkspaceOwnership(unittest.TestCase):
                 "set -eu\nset -o pipefail\n"
                 + f"SCRIPT_DIR={shlex.quote(str(SOURCE.parent))}\n"
                 + "ERGOPTI_NATIVE_ARCH=arm64\nPYTHON_VERSION=3.11\n"
+                # The production owner loads the shared digest and download
+                # helpers first; the overrides below replace only the ports.
+                + 'source "$SCRIPT_DIR/network-retry.sh"\n'
                 + 'source "$SCRIPT_DIR/uv-release.sh"\n'
                 + 'source "$SCRIPT_DIR/managed-python-release.sh"\n'
                 + 'export MANAGED_EXPECTED_REQUEST="$MANAGED_PYTHON_REQUEST"\n'
