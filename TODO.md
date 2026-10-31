@@ -574,7 +574,9 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       `runtime.*` and `capture.requirement` in `vendor/remap-runtime/manifest.json`), the driver-only
       VirtualHIDDevice update offer (signed payload supplier), WP8 native acceptance, WP9 real-Mac
       acceptance, WP10 enable and retire (with the menu text for the close option).
-      Next: the maintainer's `bash tools/dev/collect-macos-field-report.sh` (`field_owned_runtime`).
+      Next: the maintainer's `bash tools/dev/collect-macos-field-report.sh` (`field_owned_runtime`, and on an
+      owned boot `field_owned_activation`: artifact downloaded and verified, inactive with Tap-Hold off, ready
+      with it on, the user's Karabiner closed then given back, the switch restored).
 
 ## Big item 3: Windows input-hook architecture (items 49, 91, 50)
 
