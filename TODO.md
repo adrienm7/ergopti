@@ -605,76 +605,15 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       Ollama pull and the MLX install (Mac) log the WARNING with the stage, then the direct success line; the same pull
       on the PC and on Linux; maintainer decision for Linux: following a PAC list such as `PROXY a; DIRECT` needs a
       reachability probe of `a` before the daemon starts (today only its first entry is kept).
-- [ ] **AppImage self-contained.** [CI] Built on ubuntu:22.04 (glibc 2.35 floor, no bundled libc or loader, foreign
-      loader refused, dce846a0bd). Both rows reproduced in a container on 31 October (Docker, registry mirror,
-      proxy CA in the image): the build gives the 16 MB image and its `.zsync`; unpacked `--help`, the glibc ceiling
-      (42 ELF files at most GLIBC_2.35) and the library closure pass; the catalogue smoke shows the XEmbed tray, the
-      status window and the menu on buttons 1 and 3 (`/dev/fuse` must be 0666, as on the runners); the 11-image
-      sweep runs on Ubuntu 22.04 to 26.04, Debian 12 and 13, Fedora, openSUSE Leap and Arch, and refuses in words
-      on Debian 11 (glibc 2.31) and Alpine (musl). Left: the hosted run itself.
 - [ ] **Linux X11 window list.** [CI] `getAll()` covered by the Openbox receipts (962a25a973), passing on Xvfb and
       Openbox in a container. Left: the first hosted run; Flatpak: wmctrl is only a documented host program.
-- [ ] **Windows config policy (items 33, 42) and the TOML parse cost.** [CODE] Done: the Windows
-      keyboard binding publication (ef238c2758), the macOS Karabiner obsolete-leaf intent
-      (54a537b724), the Windows retired cleanup projections (300790cb37), the Linux `--config FILE.toml`
-      watcher (3dd420292d), per-row admission of outdated API providers on Windows. Left: native macOS
-      qualification of the Hotstrings category boot publication and of the obsolete-leaf setters; the
-      Windows cleanup still cannot offer bare root keys or unknown `[[x]]` generations; the Linux
-      symlink watcher case under a real luaposix `posix.stat`. Parse cost: every document-mode write
-      parses source, expected model and final candidate, and every start pays two builds after
-      ready; reuse one parse per transaction before adding any cache.
 
 Not started:
 
-- [ ] **Ollama redirect policy and Go compile (decision 5).** [CODE] [CI] Code done (cda1e10c5e): an
-      unresolved download host is left to the proxy or the native worker; private, loopback,
-      link-local and CGNAT addresses and names resolving to them stay refused; the build recipe
-      patches upstream `ValidateRedirectTarget`. The hosted Go cell (`go vet`, `go test` through
-      `build-macos-managed-ollama.py`) passed on a throwaway branch (run 40021624397). Left: the same
-      cell on the final source before a release.
-- [ ] **Ergopti-started Ollama behind a PAC proxy.** [CODE] Linux done (89d22d782c, fake-lookup
-      tests). macOS in code (launcher role `--managed-proxy-route`, 06addb2e3f; per-origin route
-      plan 1fd254d92e and 749e00c4c8); Swift compiled and tested on the hosted macOS cell. Windows
-      is covered by the WinHTTP transport (62). Left: a real-PAC pull on the maintainer's Mac (Debug >
-      Test network). The network check already has its `route_plan` step (shared
-      `field_check_network.lua`); the blob host inventory check is the field-run step
-      `field_ollama_blob_host` since 30 October (`blob_host` fails `unplanned_host` when the registry
-      redirects a blob to a host `route_origins.json` does not plan).
-      The daemon start now looks up every inventory origin (it read only the single-origin variable,
-      so `pac_probe_client = "ollama"` never resolved at start; fixed with the fallback below).
-      Windows (30 Oct): the launcher looks up both `route_origins.json` "ollama" origins natively and starts the daemon with HTTPS_PROXY/NO_PROXY from the shared route plan (57276199); a relay demanding a Windows login is never exported and the pull refuses with a named reason, the start stays (local models offline). Left: [PHYS-W] a pull behind a PAC; maintainer decision: an option for NTLM relays (a local authenticating forwarder, or none).
-- [ ] **PAC unusable: direct fallback (maintainer decision).** [CODE] [PHYS-M] macOS done on dev
-      (7634296b28, cbaa14ad46, 7af4e65b10): when the PAC or WPAD route lookup fails at a stage listed in
-      `proxy_policy.json` `pac_unavailable_fallback` (PAC download, evaluation, WPAD discovery, lookup
-      budget, empty route), `network-retry.sh`, the Swift spool and native worker, and the Python
-      receiver go direct (no relay, loopback exclusions kept) with one WARNING naming the stage, then
-      log that the direct connection worked or an error naming both causes; the Ollama pull shows
-      `network.failure.pac_unreachable_direct_failed`; the Debug network check reports the lookup as
-      `info direct_pac_download` (or the stage met). Decision: an explicit inherited relay
-      (`HTTPS_PROXY` and the others) wins and never falls back; a relay the PAC names that then fails
-      is NOT retried direct (only the PAC's own list, such as `PROXY a; DIRECT`, is followed), on
-      every OS. Mac: the field run proves it with no hands, `field_pac_fallback` (the WARNING with its stage,
-      then the direct success line or the two-cause error, after the field run's own Ollama and MLX downloads;
-      `no_pac_failure` on a network whose PAC works) and `field_network` (the `route_lookup` info step); left
-      [CI] the Swift change compiles in the macOS cell. Linux follows it for the Ollama daemon start (fe9199b9, 838af0c0:
-      the shared policy's `falls_back_direct` read by `managed_ollama_proxy.lua`): a GIO lookup that
-      fails or times out sends that origin direct with a WARNING naming `native_proxy_lookup` or
-      `native_proxy_budget`; a pull that daemon then fails to fetch shows
-      `network.failure.pac_unreachable_direct_failed` and logs the stage (`pac-direct-fallback-pull`).
-      Linux left: GIO names no finer stage than the lookup, and the daemon holds one relay, so a PAC list such as
-      `PROXY a; DIRECT` keeps only its first entry (following it needs a reachability probe of `a`
-      before the daemon starts, a new network behaviour to decide); [PHYS-L] a pull on a PAC-only network whose PAC is
-      unreachable. Deferred: Windows (`ergopti_network_routes.ps1` still refuses with `pac_failed` or
-      `wpad_failed`) must follow the same policy.
-      Windows (30 Oct): no longer deferred, `ergopti_network_routes.ps1` `New-ErgoptiPacDirectFallback` goes direct at the policy's stages; [PHYS-W] confirm on a network whose PAC is unreachable.
 - [ ] **AppImage self-contained.** [CODE] `.zsync` and update information are done (10c016e51f,
       6fb83014e3). Built on ubuntu:22.04 (glibc 2.35 floor, no bundled libc or loader, musl refused in words,
       tray closure kept); the build refuses a foreign loader or a staged C library (dce846a0bd). Left: hosted
       CI evidence of the Build and `install-linux` AppImage rows on the distro matrix.
-- [ ] **Linux X11 window list.** [CODE] `getAll()` is covered by the Openbox receipts (962a25a973),
-      run on Xvfb and Openbox in a Linux container on 30 October: `x11_window_list_names_owned_clients`
-      lists the three owned clients and all 34 native window receipts pass. Left: the first hosted
-      run; Flatpak: wmctrl is only a documented host program.
 
 ## Cross-OS parity, centralisation and constants (audit of 2026-10-24)
 
@@ -702,8 +641,6 @@ PAR-12 and PAR-14 are in "Windows manual checks for the maintainer", PAR-15's in
 
 ### C. UI-only gaps, reasons and docs
 
-- [ ] **PAR-41. One shortcut data model.** [CODE] Done on the three OS (schema migration of the slots, role-named
-      keyboard slots on Windows: 7b09ad75b2, 141494ee23). Left: macOS `ctrl_g` to `open_url`, later.
 - [ ] **PAR-52. Release notes on the update windows.** [PHYS-M] [PHYS-L] Done on the three OS (Windows f5786f5399).
       Left: a visual check on a Mac (in the Mac hardware session) and on a Linux desktop.
 - [ ] **PAR-41. One shortcut data model.** [CODE] Design note written
@@ -713,12 +650,6 @@ PAR-12 and PAR-14 are in "Windows manual checks for the maintainer", PAR-15's in
       names, migrated-config binding proof, AHK fixtures pinned to v15, per-slot parameters carried by
       `rename_prefix`. Left: the Windows adoption; macOS `ctrl_g` to its slot is a schema v20 step, Windows PC agent first
       (the AHK tests that treat 19 as current move to 20; details in `docs/tooling/windows-pc-agent-handoff.md`).
-- [x] **PAR-45. Notifications: one behaviour for toggles and refusals.** [CODE] Done on macOS and Linux
-      (shared `feature_notice.lua`, Linux quit refusal). Left: Windows `NotifyFeature(label, enabled)` around
-      `NotifierSend` at the same call sites, and a Windows quit-refusal path firing `notify.quit_refused`.
-- [ ] **PAR-52. Release notes on macOS and Linux update windows.** [CODE] Done on macOS and Linux
-      (80a5a650a6): shared `release_notes/pane.js` in the `update_check` page, repository-only links. Left:
-      the Windows host (section "Windows side"), a visual check on a Mac and a Linux desktop.
 
 ### D. Instrumentation and diagnostics
 
@@ -760,25 +691,6 @@ PAR-12 and PAR-14 are in "Windows manual checks for the maintainer", PAR-15's in
 - [ ] **PAR-81. Theme tokens and palette codegen.** [CODE] Done, with the Windows palette from the generated theme
       (1a53f8ccc5). Left: moving the literals of `tools/lint/hex-literal-baseline.json` (40 files, mostly CSS and
       TOML) onto tokens with per-page pixel diffs.
-- [ ] **PAR-83. Identifiers and hosts in one file.** [CODE] Lua and AHK (944ae6b5e6) generate from
-      `_shared/data/identifiers.json`. Left: the copies of `tools/lint/identifier-literal-baseline.json` (Swift 19, JS
-      15, Python 9, native headers 8, shell 6, AHK 3, PowerShell 2, Lua 1).
-- [ ] **PAR-79. Replace repeated timer literals with registry keys.** [CODE] Done on Lua and JS
-      (ed257e285a): registry keys for the repeated delays, the literal gate in `test-fast-timer-inventory.cjs`
-      with a shrink-only `timer-literal-baseline.json`. Left: 139 AHK sites (`STALE_TEMP_MS` x5, gesture poll
-      `-100` x6, safety flush `-2000` x3...), ~25 Swift `usleep`, 40 baselined Lua/JS sites.
-- [ ] **PAR-80. `[limits]` section for byte caps.** [CODE] Done (7376321788): `[limits]` with the process
-      output, declaration file and changelog caps, a retyping gate with a shrink-only baseline. Left: the AHK
-      caps, `MAX_TEXT_BYTES` and `MAX_BODY_BYTES` (public module fields).
-- [ ] **PAR-81. Theme tokens and palette codegen.** [CODE] Done: `_shared/ui/theme.css` linked by the
-      shared pages; `_shared/data/native_theme.toml` generating `_shared/lua/native_theme_data.lua` for the macOS
-      and Linux palettes; the dead macOS download-window page removed; hex lint with a shrink-only baseline
-      (`tools/lint/hex-literal-baseline.json`, 53 files). Left: an AHK emitter replacing the typed palette in
-      `hcw_helpers.ahk` (then retire `test-color-presets-parity.cjs`), and moving the baselined literals onto
-      tokens with per-page pixel diffs.
-- [ ] **PAR-82. Hard-coded UI string gate.** [CODE] New `tools/test/test-no-hardcoded-ui-strings.cjs`
-      (TrayTip, MsgBox, alert, title literals fail unless allowlisted; reuse
-      `tools/lint/audit-gui-titles.cjs`), including the Linux `install.sh` echo table. Audit K6, I9.
 - [ ] **PAR-83. Identifiers and hosts in one file.** [CODE] Done for Lua (948ebef074, bb1899206e):
       `_shared/data/identifiers.json` generating `_shared/lua/identifiers.lua`, typed copies held to a
       shrink-only baseline. Emitters exist for JS, shell, Python, AHK and Swift; the JS pages, the macOS
@@ -808,9 +720,6 @@ PAR-12 and PAR-14 are in "Windows manual checks for the maintainer", PAR-15's in
 
 Added October 22 (from the agents' reports; details in their commits):
 
-- [ ] **Keystats rename leftovers.** [CODE] The rename is done (180a53e4de). Left: declare each persisted name once
-      and make tests read it instead of pinning spellings; the Encryptor `main.scpt` comment is a Mac line of "Mac
-      hardware session" (7. Edge cases).
 - [ ] **Issue #101: Mac follow-ups.** [CODE] [PHYS-M] Fixed, to confirm on the Mac: the ATS key for an `http://`
       company PAC, direct route when the PAC names none, no retry of a refused route, the lookup's failing step
       named, the lease line cap, the Ollama 412 upgrade request, the diagnostics PAC probe. The field run answers (1)
@@ -818,10 +727,6 @@ Added October 22 (from the agents' reports; details in their commits):
       unusable: direct fallback". Left [CODE]: (2) an explicit proxy override field; (5) rebuild the inverse oracle
       of `macos_native_http_receiving_facts_test`, compile the Swift on macOS CI, add Go table cases for the new
       stages; (6) the network check's digest step is skipped (HEAD only).
-- [ ] **macOS input follow-ups (swallowed keys).** [PHYS-M] Done: late keys pass through, AXValue read once per burst,
-      no error window for a lease failure that recovered within 60 s, `key_*` counters; lease token reuse refused (ADR
-      012). Left: the field run's lease check names `deploy_write_ms` and `deploy_kb`: if the write is long, shrink
-      the 743 KB `karabiner.json` instead.
 - [ ] **Developer mode on the three OS (maintainer decision, 27 October).** [CODE] [PHYS-W] [PHYS-M] [PHYS-L] Done:
       macOS `bash tools/dev/run-macos-dev-app.sh`, Linux `bash tools/dev/run-linux-dev.sh`, Windows
       `tools\dev\run-windows-dev.ps1`; inventory in `docs/design/developer-mode.md`. Left: (1) [PHYS-W] the
@@ -835,36 +740,23 @@ Added October 22 (from the agents' reports; details in their commits):
       maintainer decision: should the layout catalogue fetch the remote registry in a developer run (today the clone's
       registry, by design of `local_source`); (5) [CODE] `bin/ergopti-hotstrings` run from a clone still prefers
       `/usr/lib/ergopti` when a package is installed; fix or retire that branch.
-- [ ] **macOS swallowed-keys check on v1.0.6.** [PHYS-M] The fixes (03a2c2fa4b, d026f3e024,
-      a414e83fb7, 19fa9fa872, 89cbcae90b, 9b500a9e8c, c21e920d7e, bb6fcc2cc2) shipped in v1.0.6;
-      they need a Mac day of typing with the `key_event_health` counters (`infra/key_event_health.lua`,
-      written to the driver log). _Hands:_ the day of typing. Once typed, the field run's
-      `diagnostics` step carries the `key_*` counters and `field_event_taps` the late keys of the
-      session, so no reading by hand is left.
 - [ ] **Keystats rename leftovers.** [CODE] The rename is done (180a53e4de, 1 283 files, 579 paths). Left:
       the comment in `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` (a compiled
       script: `osadecompile` it, edit the comment, `osacompile -o` it back, on a Mac); persisted names
       read from their one declaration: macOS metrics state names (9dc1404758), the Linux topical log
       file (from the generated sub-file table); left [PC] the Windows tests' spellings.
-- [ ] **Issue #101: Mac follow-ups.** [PHYS-M] Fixed, to confirm on the Mac with the next release:
-      ATS key so the URLSession can fetch an `http://` company PAC (c0c29cd8ab); direct route when the
-      PAC lookup names no route (719c7fcd76); no retry of a refused route (ace928dc1c); the lookup now
-      names its failing step (363a63f79d: `native_proxy_budget`, `native_pac_download`, ...); lease
-      line cap judged per line (5deb892d58); Ollama 412 upgrade request shown (08aaeaf3c2);
-      diagnostics PAC probe on the three OS (f798aae1f9); one-click Debug checks (lease, owned
-      runtime, network, 30 s key accounting). Left: (1) read the Mac's next log lines `Slow ingest
-tick`, `Slow preferences save` and `Field check result:` to name the dominant main-thread
+      tick`, `Slow preferences save`and`Field check result:`to name the dominant main-thread
       phase before slicing it; (2) an explicit proxy override field; (3) local server probes (oMLX,
-      Jan) all answer "Network request failed"; (4) `keymap/utils.lua` ignored-window TTL probe
+      Jan) all answer "Network request failed"; (4)`keymap/utils.lua`ignored-window TTL probe
       (1 s): bound it only after measuring the AX call time (secure-field cache); (5) rebuild the
-      inverse oracle of `macos_native_http_receiving_facts_test` (red since 719c7fcd76), compile the
+      inverse oracle of`macos_native_http_receiving_facts_test`(red since 719c7fcd76), compile the
       Swift on macOS CI, add Go table cases for the new stages; (6) the network check's digest step
       is skipped (HEAD only); (7) PAC fetch/evaluation failures now fall back to a direct connection on
       macOS (item "PAC unusable: direct fallback"): confirm on the Mac.
-      Field run (branch `fix/macos-overnight-d`): (1) is `field_slow_lines` (the segment the day's
-      `Slow <segment>` lines charge most, the slow ingest ticks and preferences saves with their worst
-      duration); (3) is `field_local_servers` (each server's answer and port source); the PAC route of (7)
-      shows in `field_network`'s route steps, and `field_pac_fallback` judges the fallback lines of the
+      Field run (branch`fix/macos-overnight-d`): (1) is `field_slow_lines`(the segment the day's
+     `Slow <segment>`lines charge most, the slow ingest ticks and preferences saves with their worst
+      duration); (3) is`field_local_servers`(each server's answer and port source); the PAC route of (7)
+      shows in`field_network`'s route steps, and `field_pac_fallback` judges the fallback lines of the
       field run's own downloads (`no_pac_failure` when the PAC worked: forcing the failure still needs
       a PAC the maintainer breaks). (2), (4), (5), (6) are code.
 - [ ] **macOS input follow-ups (swallowed keys).** [CODE] Done: late keys pass through (ed2d9fe65c),
@@ -877,41 +769,6 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       `deploy_write_verdict` decides: `keep` under the 250 ms key-delaying hold
       (`infra/main_thread_hold.lua`), `shrink` (fail) from it on; only `shrink` leaves code to write
       (make the 743 KB file smaller).
-- [ ] **Linux correction parity remainders.** [CODE] Done (06bbbe5985): Backspace pops the word, erased
-      n-grams get `e`, synthetic output chains. Erased and synthetic vectors in the shared corpus, replayed on
-      macOS and Linux (ee2eab6b1e, `keystats/correction_erased_vectors.json`). Left [PC]: the AHK replayer
-      (`KLW_WalkTypingEntry`); Windows word separators are wider than Linux's three.
-- [ ] **Developer mode on the three OS (maintainer decision, 27 October).** [CODE] [PHYS-M] [PHYS-W] Each app
-      runs the clone with the built app's helpers, config and AI runtimes, reloads a saved source file, and
-      starts with one command; the updater, uninstall and remote layout catalogue stay off in a source run.
-      Inventory per feature: `docs/design/developer-mode.md`. Commands: macOS `bash tools/dev/run-macos-dev-app.sh`
-      (done: guardian 6f667b3380, network receiver c0e3359a19); Linux `bash tools/dev/run-linux-dev.sh` (done in
-      branch `tmp/wip-devmode3`: Reload relays the runner, a saved driver or `_shared/lua` `.lua` restarts the
-      daemon, the native archive backend is built into the clone); Windows `tools\dev\run-windows-dev.ps1`,
-      run with `powershell -ExecutionPolicy Bypass -File` (same branch: `infra/dev_source.ahk` reloads on a saved
-      `.ahk`, the run reads `%APPDATA%\Ergopti\paths.toml` like the exe). Left: (1) [PHYS-W] on the PC with the exe installed and
-      running, run the command from a PowerShell in the clone: the exe closes by itself (taskkill without /F; if it
-      stays, the script names it and stops), the tray icon appears, Debug logs say "Developer source mode; the driver
-      runs from <clone>\static\ergopti_plus\windows (clone root from the developer variable)" and "Developer source
-      watcher started"; the config is the
-      exe's (same hotstrings, same `paths.toml` choice, no onboarding); save any driver `.ahk` with a harmless
-      comment change: within about 2 s the driver reloads once and keeps a Pause; the tray's Reload still works;
-      AI menus (Ollama), the metrics window (WebView2, sqlite3.dll) and Alt+Tab navigation (ergopti_nav_owner.dll)
-      work; Start at login in this mode registers the interpreter and the clone's script, and that login start
-      derives the root, so it is a developer run too (wanted, maintainer decision of 27 October): confirm it. (2) [PHYS-W] check that
-      `npm run dev:windows` works from Git Bash and from cmd (it calls Windows PowerShell 5.1). (2b) [PHYS-W]
-      double-click works: quit the exe from its tray, double-click `static\ergopti_plus\windows\ErgoptiPlus.ahk`
-      in Explorer: the same Debug lines appear, the "Developer source mode" one ending "(clone root from the
-      script location)",
-      a saved `.ahk` reloads, About shows the updater off and Uninstall greyed; then start the exe and
-      double-click again while it runs: the source run yields after about 3 s (no second tray icon, a
-      "Another instance owns the single-owner mutex" WARNING in `bootstrap.log`) and the exe keeps running. (3) [PHYS-M] the Mac lines of the hardware session cover the macOS
-      mode. (4) Linux, on a real desktop with the package installed: the unit is stopped, the tray appears, a
-      saved `.lua` restarts the daemon (`Debounced source reload firing` then a new boot), the tray's Reload
-      restarts it, and a second `run-linux-dev.sh` while one runs reports "already running". (5) [CODE] decide
-      whether the layout catalogue should fetch the remote registry in a developer run (today all three read the
-      clone's registry, by design of `local_source`). (6) [CODE] `bin/ergopti-hotstrings` run from a clone still
-      prefers `/usr/lib/ergopti` when a package is installed; fix or retire that branch.
 - [ ] **Owned, pinned third-party runtimes on the three OS (maintainer decision, 27 October).** [CODE] Ergopti
       installs and runs its own pinned Ollama, MLX environment, Karabiner runtime and any other third-party runtime,
       and never uses, stops or modifies the user's copy. Ollama: done on the three OS (next item). MLX: already
@@ -981,21 +838,9 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
 - [ ] **93. Linux ordered pairs.** [PHYS-L] XI2 property cookies proven on Xvfb (`run_xi2_property_cookies.py`).
       Nothing else is provable on Xvfb: the join of a uinput Writer edge with the server's XKB/XI2 modifier state
       needs Xorg or a compositor reading real evdev nodes.
-- [ ] **97/98.** [CODE] Native physical-position capture and all-owner collision admission. The MediaStore device
-      contract exists (`_shared/lua/keystats/media_identity.lua`); the Linux candidate is the owned descriptor's
-      `st_rdev`. Left (decision first): the consumer (Linux media-key metrics, or a per-device physical binding), then
-      the identity with it.
 - [ ] **106.** [PHYS-M] Genuine Apple Shortcuts invocation with bounded cancellation; only the refusal-in-time probe
       exists (116). A genuine run needs a shortcut the maintainer owns and names; `field_toolchain`'s
       `shortcuts_list` and `shortcuts_refusal` are what a program can prove.
-- [ ] **107.** [CODE] macOS forced output. Linux is settled by design (the number row is applied by rebuilding the
-      layout, `docs/design/linux-number-row-runtime.md`); its W1 to W4 are in the layout emulation item.
-- [ ] **93. Linux ordered pairs.** [PHYS-L] XI2 property cookies proven on Xvfb in WSL and again on
-      30 October in an Ubuntu 24.04 container (Xvfb 21.1.12, `run_xi2_property_cookies.py`: created,
-      modified, deleted); the saved Xi packet is retired (libXi as a package dependency declined by
-      the maintainer). Nothing else is provable on Xvfb: it reads no kernel device, so the join of a
-      uinput Writer edge with the server's XKB/XI2 modifier state needs Xorg or a compositor reading
-      real evdev nodes, and physical input needs a real kernel and desktop.
 - [ ] **97/98.** [CODE] Native physical-position capture and all-owner collision admission. The
       MediaStore device contract now exists (`_shared/lua/keystats/media_identity.lua`: `device` is a
       decimal u64 string, as macOS fills it), so the Linux identity is no longer blocked on policy;
@@ -1010,11 +855,6 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       runtime starts (`adapters/runtime_capture_port.lua`, dormant behind
       `[karabiner] runtime = "owned"`): native capture on macOS is item 31's "production capture owner", not separate work.
       The star setting migration is dropped (no users, no legacy migration).
-- [ ] **106.** [PHYS-M] Genuine Apple Shortcuts invocation with bounded cancellation; only the
-      refusal-in-time probe exists (in 116). _Hands:_ a genuine run needs a shortcut the maintainer
-      owns and names (the `shortcuts` command cannot create or import one without a dialog, and running an
-      arbitrary shortcut of theirs is not read-only); `field_toolchain`'s `shortcuts_list` and
-      `shortcuts_refusal` are what a program can prove.
 - [ ] **107.** [PHYS-L] Forced number-row output is settled by design on macOS and Linux: both apply the
       number-row ordering and edge keys by rebuilding the layout, not by retyping keys in a hook (macOS
       fc5d3a11df, `number_row_live.lua` and `layout_rows_build.lua`, proved by the field run's
@@ -1025,10 +865,6 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
 - [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible Variables/KeyHistory snapshot.
 - [ ] **L115.** [CODE] Provider error envelope guard: not reproducible under WSL LuaJIT (6 of 6 runs pass); leave it
       or close it (maintainer).
-- [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible
-      Variables/KeyHistory snapshot.
-- [ ] **L115.** [CODE] Provider error envelope guard: not reproducible under WSL LuaJIT (6 of 6
-      runs pass); leave it or close it.
 - Optional, not planned: XKB angle-name gaps and raw-input grammar (L118-L120); concurrent JSON
   backup replacement (L52, L60); ALSA fallback (L63); multi-group XKB recovery (L100); a real
   `Comments` exe field through a version `.res` resource.
