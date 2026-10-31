@@ -65,6 +65,15 @@ jobs:
           persist-credentials: false
           path: ergopti
 
+      # The native phase owner kills a child at the calibration deadline by
+      # walking the Darwin process table; these real-child tests prove it here.
+      - name: Run the native phase owner tests
+        working-directory: ergopti
+        run: |
+          set -euo pipefail
+          python3 tools/build/remap_runtime_phase_deadline_test.py
+          python3 tools/build/remap_runtime_build_test.py
+
       - name: Compile and run each vendor-header test
         working-directory: ergopti
         run: |
@@ -182,10 +191,16 @@ jobs:
             echo "RUNTIME_SIGNING_LEAF=$work/leaf.der"
           } >> "$GITHUB_ENV"
 
+      # The calibration deadline is enforced by the native phase owner: a child
+      # still running at it is killed with its process tree and the build is
+      # refused with phase_deadline, while each phase streams a progress line
+      # every 30 s. The step timeout is only a backstop above that deadline.
       - name: Build, sign and seal the owned runtime in its installer helper
         working-directory: ergopti
+        timeout-minutes: 20
         env:
           ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN: ${{ github.token }}
+          PYTHONUNBUFFERED: '1'
         run: |
           set -euo pipefail
           owner="$RUNNER_TEMP/runtime-owner"

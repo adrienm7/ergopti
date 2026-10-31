@@ -20,7 +20,7 @@ import time
 import uuid
 
 BASE_PATH = Path(__file__).resolve().parents[1] / "diagnostics/hs274_native_build.py"
-BASE_SHA256 = "9695174913fec75b4f0ea1b58b1fed70a06f31fc88dcc7b521ca93eb730d9fe6"
+BASE_SHA256 = "4960f60eeda958560dec20f908d56c990943b5d37b223075acef80e230590677"
 PROVIDER_SHA256 = "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a"
 
 
@@ -83,6 +83,10 @@ BASELINE_PHASES = (
     "cli_build",
 )
 PRODUCT_MAX_BYTES = 128 * 1024 * 1024
+# One universal build compiles each heavy C++23 translation unit once per
+# architecture; two concurrent compiler jobs keep a 3-core 7 GB hosted runner
+# out of swap, where an unbounded build crawled for hours.
+XCODEBUILD_JOBS = 2
 # The complete canonical factory already bounds its actual tracked leaves at 8 MiB.
 SOURCE_TREE_MAX_BYTES = 8 * 1024 * 1024
 
@@ -740,6 +744,8 @@ def build_command(executable, project):
         executable,
         "-configuration",
         "Release",
+        "-jobs",
+        str(XCODEBUILD_JOBS),
         "-alltargets",
         "SYMROOT=" + str(Path(project) / "build"),
         "ARCHS=arm64 x86_64",
@@ -1721,7 +1727,7 @@ class _SigningSink(_PreparationSink):
 
 
 PRODUCTION_RELATIVE = "tools/build/owned_runtime_product_build.py"
-PRODUCTION_SHA256 = "df7ca3937d5ea724914671669ffde015140f9abc0ffff87e6ac7daa5f0cf2fa0"
+PRODUCTION_SHA256 = "90ad1ca7d98e4b67d69b474bc7cbbdd494f8e47b0b6cda59b83aefcc4bd60ac0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -2446,6 +2452,10 @@ def _compile_owned_product_images(
                 if not registered:
                     _finish_dispatch_span(token, error)
                 raise
+            # Builds run one at a time: three concurrent universal xcodebuilds
+            # overcommit a hosted runner's memory and never reach the deadline
+            # check. The retained owner still drains through the finally below.
+            complete(owners[-1], observations=True)
         for entry in owners:
             complete(entry, observations=True)
         current()
