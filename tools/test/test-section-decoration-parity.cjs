@@ -19,7 +19,7 @@
  *      builder must route through the kernel (M.decorate_section / M.section /
  *      MenuUtils.build_section_header). Only the kernel file itself may contain
  *      the literal.
- *   4. No section header the feature manifest declares carries a dash of its
+ *   4. No section header the menu source (menu.toml) declares carries a dash of its
  *      own in any locale: the kernel frames it, and « Main gauche — Tap / Hold »
  *      read « — Main gauche — Tap / Hold — » (section-header-no-inner-dash).
  * ==============================================================================
@@ -129,10 +129,12 @@ if (offenders.length === 0) {
 }
 
 // --- 4. Section header labels carry no dash of their own --------------------
-const MANIFEST = path.join(REPO_ROOT, 'static/ergopti_plus/_shared/modules/features/manifest.toml');
 const LOCALE_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/_shared/data/locales');
 const HEADER_KEY = /type\s*=\s*"section_header"\s*\n\s*i18n\s*=\s*"([^"]+)"/g;
-const headerKeys = [...fs.readFileSync(MANIFEST, 'utf8').matchAll(HEADER_KEY)].map((m) => m[1]);
+// The section headers are menu rows: they live in the tray-menu source.
+const headerKeys = [...require('../lib/menu-source.cjs').readMenuSource().matchAll(HEADER_KEY)].map(
+	(m) => m[1]
+);
 const dashed = [];
 for (const file of fs.readdirSync(LOCALE_DIR).filter((f) => f.endsWith('.json'))) {
 	const strings = JSON.parse(
@@ -154,7 +156,7 @@ if (headerKeys.length > 0 && dashed.length === 0) {
 	console.log(
 		`  ${FAIL_SYMBOL}  section headers the kernel frames must not add a dash (section-header-no-inner-dash)`
 	);
-	if (headerKeys.length === 0) console.log('       - no section_header found in the manifest');
+	if (headerKeys.length === 0) console.log('       - no section_header found in menu.toml');
 	for (const line of dashed) console.log(`       - ${line}`);
 }
 
