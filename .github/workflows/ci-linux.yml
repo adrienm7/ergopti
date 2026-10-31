@@ -4482,6 +4482,21 @@ jobs:
             libglib2.0-dev glib-networking dconf-gsettings-backend \
             gsettings-desktop-schemas
 
+      # The bundle builds the proxy sign-in relay (docs/design/proxy-auth-relay.md)
+      # with the repository's one Go pin, the one the managed Ollama build uses.
+      - name: Read the pinned Go toolchain
+        id: go-pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const v=require('./static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').go_version; if(!/^go\d+\.\d+\.\d+$/.test(v)) throw new Error('invalid Go pin'); console.log('version='+v.slice(2))" >> "$GITHUB_OUTPUT"
+      - name: Install the pinned Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.go-pin.outputs.version }}
+          check-latest: false
+          cache: false
+
       - name: Assemble the driver bundle
         shell: bash
         env:
@@ -4654,7 +4669,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.local/share/flatpak
-          key: flatpak-runtimes-${{ steps.flatpak-runtime.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+          # The golang SDK extension builds the proxy sign-in relay: a cache saved
+          # before it was installed must not be restored without it.
+          key: flatpak-runtimes-golang-${{ steps.flatpak-runtime.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
 
       - name: Install the Flatpak toolchain
         shell: bash
@@ -4669,7 +4686,8 @@ jobs:
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           version='${{ steps.flatpak-runtime.outputs.version }}'
           for attempt in 1 2; do
-              if timeout 12m flatpak install --user -y flathub "org.freedesktop.Platform//$version" "org.freedesktop.Sdk//$version"; then
+              if timeout 12m flatpak install --user -y flathub "org.freedesktop.Platform//$version" "org.freedesktop.Sdk//$version" \
+                  "org.freedesktop.Sdk.Extension.golang//$version"; then
                   break
               fi
               echo "::warning::Flatpak runtime download attempt $attempt of 2 failed or exceeded 12 minutes"

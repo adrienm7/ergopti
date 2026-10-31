@@ -7,8 +7,9 @@
 #   1. Copies the linux driver sources + _shared/ tree into build/linux/
 #   2. Copies install.sh
 #   3. Copies the versioned standalone launcher
-#   4. Verifies all required files exist (integrity check)
-#   5. Runs a smoke test: luajit ergopti_hotstrings.lua --help (exit 0 check)
+#   4. Builds the native archive backend and the proxy sign-in relay (Go, cgo)
+#   5. Verifies all required files exist (integrity check)
+#   6. Runs a smoke test: luajit ergopti_hotstrings.lua --help (exit 0 check)
 #
 # The output at build/linux/ is a self-contained directory that mirrors the
 # installed structure under ~/.local/lib/ergopti/.
@@ -90,6 +91,11 @@ copy_tree "${LINUX_SRC}/" "${BUILD_DIR}/linux/" --exclude vendor
 # enter this bundle. The helper refuses an already occupied destination.
 bash "${SCRIPT_DIR}/build-linux-native-output.sh" --output-directory "${BUILD_DIR}/linux/bin"
 
+# The local NTLM/Negotiate relay (docs/design/proxy-auth-relay.md) lives beside
+# the archive backend, where infra/proxy_auth_relay.lua resolves it. Every
+# package made from this bundle carries it; the Flatpak rebuilds it in its SDK.
+bash "${SCRIPT_DIR}/build-proxy-relay.sh" --output "${BUILD_DIR}/linux/bin/ergopti-proxy-relay"
+
 # ============================================================================
 # 3. Copy the shared runtime tree
 # ============================================================================
@@ -153,6 +159,7 @@ echo "--- Integrity check ---"
 
 REQUIRED_FILES=(
 	"linux/bin/libergopti_archive_publication.so"
+	"linux/bin/ergopti-proxy-relay"
 	"linux/ergopti_hotstrings.lua"
 	"linux/modules/hotstrings/engine.lua"
 	"linux/modules/hotstrings/loader.lua"
