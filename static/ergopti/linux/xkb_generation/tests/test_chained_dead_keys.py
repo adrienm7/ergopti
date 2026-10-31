@@ -76,9 +76,7 @@ class ChainedDeadKeyTests(unittest.TestCase):
         cls.compose = parse_compose(cls.result.compose_text)
 
     def test_the_keys_send_the_keysyms_the_expectations_name(self):
-        names = dict(
-            (code, xkb) for xkb, code in keylayout_to_xkb.load_keycodes(KEYCODES_PATH, "iso")
-        )
+        names = {code: xkb for xkb, code in keylayout_to_xkb.load_keycodes(KEYCODES_PATH, "iso")}
         base = {code: self.result.key_symbols[names[code]][0] for code in (0, 2, 3, 4, 5, 8)}
         self.assertEqual(
             base,
