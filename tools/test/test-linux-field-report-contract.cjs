@@ -283,17 +283,17 @@ function read(folder, name) {
 		});
 
 		await check(
-			"the field run asks the daemon itself, with the driver's own folder and names",
+			"the field run asks the daemon itself, with the shared declaration's folders and names",
 			() => {
 				assert.match(collector, /^\. "\$REPO_ROOT\/tools\/dev\/linux-field-run\.sh"$/m);
 				assert.match(collector, /^field_linux_run "\$\{REPO_ROOT\}" "\$\{out\}"/m);
 				const runner = fs.readFileSync(path.join(ROOT, FIELD_RUN), 'utf8');
 				assert.match(runner, /require\("infra\.field_run"\)/);
-				assert.match(runner, /require\("app_dirs"\)\.folder_name/);
+				assert.match(runner, /FieldRun\.load\(/);
 				assert.doesNotMatch(
 					runner.replace(/^\s*#.*$/gm, ''),
-					/field-run"|ready\.json|request\.json|done\.json/,
-					'no second copy of the folder or a file name'
+					/field-run|ready\.json|request\.json|done\.json|"schema":1|\["all"\]/,
+					'no second copy of a folder, a file name, the schema or the every-step word'
 				);
 			}
 		);
