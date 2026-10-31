@@ -19,6 +19,7 @@ local hs = hs
 local Logger = require("infra.logger")
 local Paths = require("infra.paths")
 local NativePath = require("native_path")
+local TextUtils = require("text_utils")
 local I18nSeed = require("webview.i18n_seed")
 local DeferredWork = require("infra.deferred_work")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -154,7 +155,9 @@ local _locales_base_url = (function()
 	-- path cannot carry verbatim (a quote would also end the injected string)
 	-- are percent-encoded rather than rewritten.
 	if NativePath.separators() ~= "/" then locales = locales:gsub("\\", "/") end
-	locales = locales:gsub("[^%w%-%._~/:]", function(byte) return string.format("%%%02X", byte:byte()) end)
+	-- The "/" and ":" separators stay; every segment between them goes
+	-- through the shared encoder.
+	locales = locales:gsub("[^/:]+", TextUtils.percent_encode)
 	if not locales:match("^/") then locales = "/" .. locales end
 	return "file://" .. locales
 end)()
