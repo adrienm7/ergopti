@@ -128,17 +128,21 @@ function validate(data) {
 	const sources = portable.flatpak_sources;
 	if (
 		!sources ||
-		Object.keys(sources).join(',') !== 'luv,schemas,krb5,curl,duktape,libproxy,glib_networking'
+		Object.keys(sources).join(',') !==
+			'luv,schemas,krb5,curl,duktape,libproxy,glib_networking,luafilesystem,luaposix,sqlite,zstd,openssl,luajit'
 	)
 		throw new TypeError('Incomplete portable native source inventory.');
 	for (const [name, source] of Object.entries(sources)) {
+		// SQLite publishes its amalgamation only on its own site; every other
+		// source is a GitHub repository or release asset.
+		const host = name === 'sqlite' ? 'www\\.sqlite\\.org' : 'github\\.com';
 		if (
-			!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_./-]+$/.test(source.url) ||
+			!new RegExp(`^https://${host}/[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+$`).test(source.url) ||
 			source.url.includes('..')
 		)
 			throw new TypeError('Invalid portable native source identity.');
 		if (
-			name === 'duktape'
+			ARCHIVE_SOURCES.has(name)
 				? !/^[a-f0-9]{64}$/.test(source.sha256)
 				: !/^[a-f0-9]{40}$/.test(source.commit)
 		)
@@ -165,6 +169,9 @@ function requirements(data, format) {
 }
 
 /** Native Flatpak recipes use pinned canonical sources, never the build host ABI. */
+/** Sources pinned as a release archive by SHA-256; the others are Git commits. */
+const ARCHIVE_SOURCES = new Set(['duktape', 'sqlite', 'zstd', 'openssl']);
+
 function flatpakModules(data) {
 	validate(data);
 	const sources = data.network_runtime.portable.flatpak_sources;
@@ -257,6 +264,58 @@ function flatpakModules(data) {
 				'-Dinstalled_tests=false'
 			],
 			source: 'glib_networking'
+		},
+		// The programs and Lua modules the driver runs from its own prefix only
+		// (linux/infra/owned_programs.lua), the ones the other formats stage
+		// from the oldest supported LTS. The command-line programs link their
+		// library statically, so no second libcrypto or libsqlite3 shadows the
+		// runtime's own in /app/lib.
+		{
+			name: 'owned-luafilesystem',
+			buildsystem: 'simple',
+			'build-commands': [
+				'gcc -O2 -shared -fPIC -I/app/include/luajit-2.1 src/lfs.c -o lfs.so',
+				'install -Dm755 lfs.so /app/lib/lua/5.1/lfs.so'
+			],
+			source: 'luafilesystem'
+		},
+		{
+			name: 'owned-luaposix',
+			buildsystem: 'simple',
+			'build-commands': [
+				'/app/bin/luajit build-aux/luke LUA_INCDIR=/app/include/luajit-2.1',
+				'/app/bin/luajit build-aux/luke install INST_LIBDIR=/app/lib/lua/5.1 INST_LUADIR=/app/share/lua/5.1'
+			],
+			'post-install': [
+				'test -f /app/lib/lua/5.1/posix/sys/stat.so',
+				'test -f /app/share/lua/5.1/posix/init.lua'
+			],
+			source: 'luaposix'
+		},
+		{
+			name: 'owned-sqlite3',
+			buildsystem: 'simple',
+			'build-commands': [
+				'gcc -O2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION shell.c sqlite3.c -o sqlite3 -lm',
+				'install -Dm755 sqlite3 /app/bin/sqlite3'
+			],
+			source: 'sqlite'
+		},
+		{
+			name: 'owned-zstd',
+			buildsystem: 'simple',
+			'build-commands': ['make -C programs zstd', 'install -Dm755 programs/zstd /app/bin/zstd'],
+			source: 'zstd'
+		},
+		{
+			name: 'owned-openssl',
+			buildsystem: 'simple',
+			'build-commands': [
+				'./Configure no-shared no-tests --prefix=/app/lib/ergopti-openssl --openssldir=/app/lib/ergopti-openssl',
+				'make build_programs',
+				'install -Dm755 apps/openssl /app/bin/openssl'
+			],
+			source: 'openssl'
 		}
 	];
 	return modules
@@ -268,10 +327,9 @@ function flatpakModules(data) {
 			// Meson's SDK default can be lib64; the installed environment admits lib.
 			if (recipe.buildsystem === 'meson') recipe['config-opts'].unshift('--libdir=lib');
 			const input = sources[source];
-			const pinned =
-				source === 'duktape'
-					? { type: 'archive', url: input.url, sha256: input.sha256 }
-					: { type: 'git', url: input.url, commit: input.commit };
+			const pinned = ARCHIVE_SOURCES.has(source)
+				? { type: 'archive', url: input.url, sha256: input.sha256 }
+				: { type: 'git', url: input.url, commit: input.commit };
 			// HTTP content encoding must not change bytes before digest verification.
 			// The archive unpacker still owns decompression after authentication.
 			if (pinned.type === 'archive') pinned['disable-http-decompression'] = true;

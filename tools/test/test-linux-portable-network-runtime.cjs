@@ -145,7 +145,13 @@ try {
 	for (const file of [
 		'bin/luajit',
 		'bin/curl',
+		'bin/sqlite3',
+		'bin/openssl',
+		'bin/zstd',
 		'lib/lua/5.1/luv.so',
+		'lib/lua/5.1/lfs.so',
+		'lib/lua/5.1/posix/sys/stat.so',
+		'share/lua/5.1/posix/init.lua',
 		`${observedLibdir}/gio/modules/libgiolibproxy.so`,
 		`${observedLibdir}/gio/modules/libgiognutls.so`,
 		'share/glib-2.0/schemas/gschemas.compiled'
@@ -199,7 +205,7 @@ passed++;
 // A required GSS build must carry its own SDK dependency before curl.
 const kerberos = allModules.find((module) => module.name === 'network-krb5');
 assert.ok(kerberos, 'Flatpak GSS requires a pinned Kerberos build before curl');
-assert.equal(allModules.length, 7);
+assert.equal(allModules.length, 12);
 assert.equal(allModules.filter((module) => module.name === 'network-krb5').length, 1);
 assert.ok(
 	allModules.indexOf(kerberos) < allModules.findIndex((module) => module.name === 'network-curl')
@@ -295,7 +301,12 @@ assert.deepEqual(
 		'network-curl',
 		'network-duktape',
 		'network-libproxy',
-		'network-gio-proxy'
+		'network-gio-proxy',
+		'owned-luafilesystem',
+		'owned-luaposix',
+		'owned-sqlite3',
+		'owned-zstd',
+		'owned-openssl'
 	]
 );
 assert.deepEqual(
@@ -307,7 +318,12 @@ assert.deepEqual(
 		'https://github.com/curl/curl.git',
 		'https://github.com/svaarala/duktape/releases/download/v2.7.0/duktape-2.7.0.tar.xz',
 		'https://github.com/libproxy/libproxy.git',
-		'https://github.com/GNOME/glib-networking.git'
+		'https://github.com/GNOME/glib-networking.git',
+		'https://github.com/lunarmodules/luafilesystem.git',
+		'https://github.com/luaposix/luaposix.git',
+		'https://www.sqlite.org/2024/sqlite-amalgamation-3460100.zip',
+		'https://github.com/facebook/zstd/releases/download/v1.5.6/zstd-1.5.6.tar.gz',
+		'https://github.com/openssl/openssl/releases/download/openssl-3.0.15/openssl-3.0.15.tar.gz'
 	]
 );
 // Duktape 2.7's Makefile omits libm on both shared-library links. Keep it after
@@ -501,7 +517,13 @@ if (process.platform === 'linux') {
 		for (const name of [
 			'bin/luajit',
 			'bin/curl',
+			'bin/sqlite3',
+			'bin/openssl',
+			'bin/zstd',
 			'lib/lua/5.1/luv.so',
+			'lib/lua/5.1/lfs.so',
+			'lib/lua/5.1/posix/sys/stat.so',
+			'share/lua/5.1/posix/init.lua',
 			'lib/gio/modules/libgiolibproxy.so',
 			'share/glib-2.0/schemas/gschemas.compiled'
 		]) {
@@ -730,7 +752,10 @@ spec=importlib.util.spec_from_file_location('owned_stager',sys.argv[1]);m=import
 class BoundaryReached(Exception):pass
 with tempfile.TemporaryDirectory(prefix='ergopti-gio-metadata-') as temporary:
  root=pathlib.Path(temporary);sources=root/'sources';sources.mkdir()
- for name in ['luajit','curl','luv.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']:(sources/name).write_bytes(b'independent query control only')
+ for name in ['luajit','curl','sqlite3','openssl','zstd','luv.so','lfs.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']:(sources/name).write_bytes(b'independent query control only')
+ (sources/'posix-c').mkdir();(sources/'posix-c/ctype.so').write_bytes(b'independent query control only')
+ (sources/'posix-lua').mkdir();(sources/'posix-lua/init.lua').write_bytes(b'independent query control only')
+ lua_modules={'luv':'luv.so','lfs':'lfs.so','posix.ctype':'posix-c/ctype.so','posix':'posix-lua/init.lua'}
  schema=root/'runtime schemas';schema.mkdir();(schema/'gschemas.compiled').write_bytes(b'independent schema acquisition control only')
  catalogue=root/'catalogue.json';catalogue.write_text(json.dumps({'network_runtime':{'portable':{'gio_modules':['libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so']}},'archive_digest_runtime':{'soname':'libcrypto.so.3','portable_dlopen_roots':['libcrypto.so.3']}}))
  real_uname=m.os.uname;m.os.uname=lambda:types.SimpleNamespace(machine='x86_64')
@@ -740,7 +765,12 @@ with tempfile.TemporaryDirectory(prefix='ergopti-gio-metadata-') as temporary:
    appdir=root/('package'+str(index));driver=appdir/'usr/lib/ergopti';(driver/'platform/network').mkdir(parents=True);(driver/'platform/network/runtime_probe.lua').write_bytes(b'no execution in query witness')
    queries=[];copies=[];closure=[];crypto_queries=[]
    def controlled_run(arguments,**options):
-    if arguments[0]==str(sources/'luajit'):return str(sources/'luv.so')
+    if arguments[0]==str(sources/'luajit'):
+     # The Lua module locations the build host's LuaJIT answers; a require
+     # check answers nothing.
+     for module,file in lua_modules.items():
+      if 'searchpath("'+module+'"' in arguments[2]:return str(sources/file)
+     return ''
     # Separate explicit crypto command-contract model; dummy bytes/SONAME output
     # never qualify native OpenSSL ABI, ELF inspection, staging or digest behavior.
     if arguments==['pkg-config','--variable=libdir','libcrypto']:
@@ -755,7 +785,7 @@ with tempfile.TemporaryDirectory(prefix='ergopti-gio-metadata-') as temporary:
     assert arguments==['pkg-config','--variable=schemasdir','gio-2.0'],'Desktop development metadata must not be required'
     return value
    def boundary(*arguments):
-    assert [pathlib.Path(item) for item in arguments[0]]==[sources/name for name in ['luajit','curl','luv.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']],'Explicit crypto source must join the unchanged closure seeds'
+    assert [pathlib.Path(item) for item in arguments[0]]==[sources/name for name in ['luajit','curl','sqlite3','openssl','zstd','luv.so','lfs.so','posix-c/ctype.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']],'Explicit crypto source must join the owned program and Lua module seeds'
     closure.append(True);raise BoundaryReached()
    m.run=controlled_run;m.copy_unique=lambda source,destination,owners:copies.append((pathlib.Path(source),pathlib.Path(destination)));m.copy_elf_closure=boundary
    try:m.stage(str(appdir),str(catalogue),'unused owned template')
