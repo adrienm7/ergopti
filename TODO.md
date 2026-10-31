@@ -1442,7 +1442,8 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
 - [ ] **139. Personal identities in logs.** [CODE] Done: email, URL-credential, foreign-profile
       rules (5ef12e8a2a) and config-directory name masking (20e845692b); opt-in redacted day log
       attachment (1c6f891ed3, item 138). Left: emitter-side pack labels (the TomlLoader SUCCESS line
-      prints the pack label; check the macOS and Linux loaders), write-time masking in the three
+      prints the pack label; check the macOS and Linux loaders: checked 30 October, the macOS registry already
+      masks it, `file_label` and the Lua and TOML start/success lines go through `PrivateLabel.mask`), write-time masking in the three
       loggers, historical logs on disk stay unmasked (the collector masks at export), GitHub field
       editability after a form reload needs a real draft.
 - [ ] **142 gaps.** [CODE] Windows: a Reload click during a pending reload now follows the join rule
