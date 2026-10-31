@@ -15,7 +15,6 @@ import plistlib
 import re
 import shutil
 import stat
-import subprocess
 import sys
 import time
 import uuid
@@ -163,24 +162,7 @@ def _held_current(previous, current):
     )
 
 
-def _extended_attributes(path):
-    """List a file's extended attribute names on Darwin, naming who touched it."""
-    if sys.platform != "darwin":
-        return ""
-    try:
-        result = subprocess.run(
-            ["/usr/bin/xattr", str(path)],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            timeout=10,
-        )
-    except (OSError, subprocess.SubprocessError) as error:
-        return " xattr unavailable: " + error.__class__.__name__
-    return " xattr [" + ",".join(result.stdout.decode("utf-8", "replace").split()) + "]"
-
-
-def _report_identity_change(kind, path, previous, current, absolute=None):
+def _report_identity_change(kind, path, previous, current):
     """Name a changed retained file and its changed fields on the build log.
 
     The boundary journal is capped and full before the native builds start, so
@@ -203,8 +185,7 @@ def _report_identity_change(kind, path, previous, current, absolute=None):
         + str(path)
         + " ("
         + ",".join(axes)
-        + ")"
-        + ("" if absolute is None else _extended_attributes(absolute)),
+        + ")",
         file=sys.stderr,
         flush=True,
     )
@@ -763,7 +744,6 @@ def current_inputs(snapshot, deadline, *, maximum=BASE.MAX_INPUT_BYTES):
                     previous.path,
                     (previous.identity, previous.data),
                     (current.identity, current.data),
-                    snapshot.root / previous.path,
                 )
             _REQUIRE(_held_current(previous, current), "source_identity", "Retained source changed")
             check_deadline(deadline)
@@ -881,7 +861,6 @@ def current_product(snapshot, root):
                     snapshot.path,
                     (snapshot.identity, snapshot.data),
                     (current.identity, current.data),
-                    Path(root) / snapshot.path,
                 )
             _REQUIRE(
                 _held_current(snapshot, current),
@@ -896,7 +875,6 @@ def current_product(snapshot, root):
                 snapshot.path,
                 (snapshot.identity, snapshot.data),
                 None if current is None else (current.identity, current.data),
-                Path(root) / snapshot.path,
             )
         raise
 
@@ -1167,6 +1145,21 @@ _SIGNED_PRODUCTS = (
     ),
     ("Runtime/bin/ergoptiplus_remap_cli", "com.ergoptiplus.remap.cli", None),
 )
+
+
+def signing_identity_listed(text, identity):
+    """Return whether find-identity lists the pinned SHA-1 exactly once.
+
+    The stable identity is self-signed, so find-identity always suffixes it
+    with "(CSSMERR_TP_NOT_TRUSTED)" (run 41232985096); codesign signs with it
+    regardless, and the designated requirement pins the certificate leaf, not
+    system trust. Any other status, such as an expired or revoked
+    certificate, is still refused.
+    """
+    matches = re.findall(
+        r'(?m)^\s*\d+\) ([A-Fa-f0-9]{40}) "[^\n]*"(?: \(CSSMERR_TP_NOT_TRUSTED\))?\s*$', text
+    )
+    return sum(value.upper() == identity for value in matches) == 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -1660,12 +1653,7 @@ class _SigningSink(_PreparationSink):
                     identity_text = (identity_stdout + identity_stderr).decode("utf-8", "strict")
                 except UnicodeError as error:
                     raise self.module.ArtifactRefusal("signing_credentials") from error
-                matches = re.findall(
-                    r"(?m)^\s*\d+\) ([A-Fa-f0-9]{40}) \"[^\n]*\"\s*$", identity_text
-                )
-                require(
-                    sum(value.upper() == identity for value in matches) == 1, "signing_credentials"
-                )
+                require(signing_identity_listed(identity_text, identity), "signing_credentials")
                 for index, (destination, identifier, executable) in enumerate(_SIGNED_PRODUCTS):
                     primary = (
                         destination + "/Contents/MacOS/" + executable if executable else destination
@@ -2398,7 +2386,7 @@ def _compile_owned_product_images(
         for path, identity in tool_inputs:
             observed = _identity(path.stat())
             if observed != identity:
-                _report_identity_change("native tool", path, (identity, b""), (observed, b""), path)
+                _report_identity_change("native tool", path, (identity, b""), (observed, b""))
             _REQUIRE(
                 path.resolve(strict=True) == path
                 and _held_identity(observed) == _held_identity(identity),
@@ -3991,7 +3979,16 @@ def main(arguments=None):
                 or type(result.signing) is SigningFailure
                 or type(result.packaging) is ProductionFailure
             ):
-                print("Protected runtime packaging refused", file=sys.stderr)
+                codes = [
+                    stage + "=" + outcome.code
+                    for stage, outcome in (
+                        ("preparation", result.preparation),
+                        ("signing", result.signing),
+                        ("packaging", result.packaging),
+                    )
+                    if type(outcome) in (PreparationFailure, SigningFailure, ProductionFailure)
+                ]
+                print("Protected runtime packaging refused: " + ", ".join(codes), file=sys.stderr)
                 return 2
             print("PASS native validated packaged products; installation and capture unqualified")
             return 0
