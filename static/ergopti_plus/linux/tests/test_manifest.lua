@@ -685,6 +685,7 @@ return {
 	"tests.unit.modules.llm.remote.test_api_entry_names_vectors",
 	"tests.unit.modules.llm.remote.test_api_test_admission",
 	"tests.unit.modules.llm.remote.test_remote_providers",
+	"tests.unit.modules.llm.remote.test_api_access_token",
 	"tests.unit.modules.llm.agent.test_agent_flow",
 	"tests.unit.modules.llm.agent.test_agent_connectors",
 	"tests.unit.modules.llm.agent.test_agent_connector_lifecycle",
