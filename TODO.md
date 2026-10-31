@@ -547,17 +547,27 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       consumed and never delivered key is reported ("typed key(s) swallowed"), the v1.0.6 fixes shipped, and the
       field run fails `swallowed_keys` on any such key and carries the `key_*` counters. Left: a Mac day of typing,
       then the field report; Debug > Report a bug right when a letter disappears.
-- [ ] **31. HS-274 exact physical key accounting with an owned Karabiner runtime.** [CODE] Work packages WP3-WP10
-      (production consumer, headless producer v2, reproducible runtime, launchd ownership, owned configuration, native
-      and real-Mac acceptance, enable and retire); media keys without a macOS keycode; VirtualHIDDevice
-      incompatibility blocks owned mode with an explanation. Plan:
-      [ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md). Estimate 30-40 agent-days plus hardware
-      time. Status 2026-10-24: WP3 largely done and dormant; WP6 Lua owner and WP7 owned deploy done, dormant behind the
-      hidden `[karabiner] runtime = "owned"`. Left: WP5 artifact manifest (hosted macOS run), a closer for another
-      running Karabiner, the production capture owner, the Swift lease worker's owned CLI path, who starts the Console
-      (Lua or `InstalledPhysicalSourceBridge`), `UninstallWorker.swift`, the karabiner_model diff 16.0.0 to 9312593e,
-      WP8-WP10. The maintainer's decision of 27 October makes it the default (see "Owned, pinned third-party
-      runtimes").
+- [ ] **31. HS-274 exact physical key accounting with an owned Karabiner runtime.** [CODE] Work
+      packages WP3-WP10 (production consumer, headless producer v2, reproducible runtime, launchd
+      ownership, owned configuration, native and real-Mac acceptance, enable and retire); media keys
+      without a macOS keycode; VirtualHIDDevice incompatibility blocks owned mode with an
+      explanation. Plan: [ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md).
+      Estimate 30-40 agent-days plus hardware time. The owned runtime stays dormant at default
+      startup.
+      Status 2026-10-31 (checked against the tree): WP3, WP6 and WP7 are built and dormant behind
+      the hidden `[karabiner] runtime = "owned"`: the Lua owner (`runtime_owner.lua`, read-only
+      admission, named reasons), the consented closer (`adapters/karabiner_coexistence.lua`, hidden
+      `close_other_instances`), the production capture owner (`adapters/runtime_capture_port.lua`),
+      one Console owner (ADR 011 decision 8, the launcher's `--installed-physical-source` role), the
+      Swift lease worker's owned CLI path, the uninstall of the owned runtime and the owned deploy.
+      The karabiner_model comparison of 16.0.0 with 9312593e now covers the manipulators, the
+      configuration reader and the event queue; `(owned-revision-config-keys)` pins the generated
+      keys both revisions read alike. The `field_owned_runtime` step reports the owner's own verdict
+      on the installed VirtualHIDDevice (`driver_verdict`). Left: WP5 (the hosted runtime build pins
+      `runtime.*` and `capture.requirement` in `vendor/remap-runtime/manifest.json`), the driver-only
+      VirtualHIDDevice update offer (signed payload supplier), WP8 native acceptance, WP9 real-Mac
+      acceptance, WP10 enable and retire (with the menu text for the close option).
+      Next: the maintainer's `bash tools/dev/collect-macos-field-report.sh` (`field_owned_runtime`).
 
 ## Big item 3: Windows input-hook architecture (items 49, 91, 50)
 
@@ -746,18 +756,18 @@ Added October 22 (from the agents' reports; details in their commits):
       read from their one declaration: macOS metrics state names (9dc1404758), the Linux topical log
       file (from the generated sub-file table); left [PC] the Windows tests' spellings.
       tick`, `Slow preferences save`and`Field check result:`to name the dominant main-thread
-      phase before slicing it; (2) an explicit proxy override field; (3) local server probes (oMLX,
-      Jan) all answer "Network request failed"; (4)`keymap/utils.lua`ignored-window TTL probe
-      (1 s): bound it only after measuring the AX call time (secure-field cache); (5) rebuild the
-      inverse oracle of`macos_native_http_receiving_facts_test`(red since 719c7fcd76), compile the
-      Swift on macOS CI, add Go table cases for the new stages; (6) the network check's digest step
-      is skipped (HEAD only); (7) PAC fetch/evaluation failures now fall back to a direct connection on
-      macOS (item "PAC unusable: direct fallback"): confirm on the Mac.
-      Field run (branch`fix/macos-overnight-d`): (1) is `field_slow_lines`(the segment the day's
-     `Slow <segment>`lines charge most, the slow ingest ticks and preferences saves with their worst
-      duration); (3) is`field_local_servers`(each server's answer and port source); the PAC route of (7)
-      shows in`field_network`'s route steps, and `field_pac_fallback` judges the fallback lines of the
-      field run's own downloads (`no_pac_failure` when the PAC worked: forcing the failure still needs
+  phase before slicing it; (2) an explicit proxy override field; (3) local server probes (oMLX,
+  Jan) all answer "Network request failed"; (4)`keymap/utils.lua`ignored-window TTL probe
+  (1 s): bound it only after measuring the AX call time (secure-field cache); (5) rebuild the
+  inverse oracle of`macos_native_http_receiving_facts_test`(red since 719c7fcd76), compile the
+  Swift on macOS CI, add Go table cases for the new stages; (6) the network check's digest step
+  is skipped (HEAD only); (7) PAC fetch/evaluation failures now fall back to a direct connection on
+  macOS (item "PAC unusable: direct fallback"): confirm on the Mac.
+  Field run (branch`fix/macos-overnight-d`): (1) is `field_slow_lines`(the segment the day's
+ `Slow <segment>`lines charge most, the slow ingest ticks and preferences saves with their worst
+  duration); (3) is`field_local_servers`(each server's answer and port source); the PAC route of (7)
+  shows in`field_network`'s route steps, and `field_pac_fallback` judges the fallback lines of the
+  field run's own downloads (`no_pac_failure` when the PAC worked: forcing the failure still needs
       a PAC the maintainer breaks). (2), (4), (5), (6) are code.
 - [ ] **macOS input follow-ups (swallowed keys).** [CODE] Done: late keys pass through (ed2d9fe65c),
       AXValue read once per burst (34765cde7c), no error window for a lease failure that recovered
