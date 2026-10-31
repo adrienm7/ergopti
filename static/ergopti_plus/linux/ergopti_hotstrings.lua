@@ -277,6 +277,12 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "field run session",
+			stop = function()
+				return not privacy_owners.field_run or privacy_owners.field_run:stop() == true
+			end,
+		},
+		{
 			name = "tray action authority",
 			stop = function()
 				return not privacy_owners.menu_rebuild or privacy_owners.menu_rebuild.stop() == true
@@ -3108,6 +3114,9 @@ local function main()
 			if boot_catalogue_complete then return true end
 			return false, "refused"
 		end })
+	if not privacy_owners.startup_checkpoint() then return end
+	-- Optional too: the field report collector's no-click checks (infra/field_run.lua).
+	privacy_owners.field_run = require("infra.field_run").start({ pid = require("luv").os_getpid() })
 	if not privacy_owners.startup_checkpoint() then return end
 	privacy_owners.finish_startup()
 	if not privacy_owners.startup_checkpoint() then return end
