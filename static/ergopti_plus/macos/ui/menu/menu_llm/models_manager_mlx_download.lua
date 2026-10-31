@@ -1140,6 +1140,10 @@ function M.install(ctx)
 
 			local clean_repo = repo:gsub("[%c%s]", "")
 			local network_prelude, network_err = NetworkEnv.managed_http_prelude("MLX")
+			-- A proxy override routes the download through the environment-driven
+			-- client (huggingface_hub reads the exported relay), not the native worker.
+			local managed_transport, transport_err = NetworkEnv.uses_managed_transport()
+			if managed_transport == nil then network_prelude, network_err = nil, transport_err end
 			local native_directory_literal = quote_native_network_directory()
 			if not network_prelude or type(native_directory_literal) ~= "string" then
 				Logger.error(LOG, "The MLX model download cannot start: %s.", tostring(network_err or "MLX native network directory quotation refused"))
@@ -1174,9 +1178,11 @@ function M.install(ctx)
 			py:write("atexit.register(_write_exit, 1)\n")
 			py:write("try:\n")
 			py:write("    import truststore; truststore.inject_into_ssl()\n")
-			py:write("    sys.path.insert(0, " .. native_directory_literal .. ")\n")
-			py:write("    from managed_http import install_huggingface_transport\n")
-			py:write("    install_huggingface_transport()\n")
+			if managed_transport then
+				py:write("    sys.path.insert(0, " .. native_directory_literal .. ")\n")
+				py:write("    from managed_http import install_huggingface_transport\n")
+				py:write("    install_huggingface_transport()\n")
+			end
 			py:write("    from huggingface_hub import snapshot_download\n")
 			py:write("except Exception:\n")
 			py:write("    print('--- ERREUR DEPENDANCES ---', flush=True)\n")
