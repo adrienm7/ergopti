@@ -113,11 +113,12 @@ local function tell(deps, body_key, component, level)
 end
 
 --- Runs the start check of a --tray launch.
---- @param deps table { indicator, i18n, notifier, print, load_lgi, logger }.
+--- @param deps table { i18n, notifier, print, load_lgi, logger, indicator }; indicator
+---   is platform.tray.appindicator unless a test supplies a double.
 --- @return integer|nil The exit status when the daemon must not start, nil to continue.
 function M.check_at_start(deps)
 	local Logger = deps.logger or require("logger.shim")
-	local tray = M.tray_missing(deps.indicator)
+	local tray = M.tray_missing(deps.indicator or require("platform.tray.appindicator"))
 	if tray then
 		Logger.error(LOG, "Start refused: the tray needs %s, which this system does not provide.", tray)
 		tell(deps, M.TRAY_BODY_KEY, tray, "error")
