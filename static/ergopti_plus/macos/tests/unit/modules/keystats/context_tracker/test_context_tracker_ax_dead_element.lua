@@ -72,7 +72,7 @@ local function focus_through(remove_error, add_error)
 	end)
 	Logger.set_sink(nil)
 	if not ok then error(err, 0) end
-	return { rendered = table.concat(lines, "\n"), removed = removed }
+	return { rendered = table.concat(lines, "\n"), removed = removed, counts = tracker.ax_value_watch_counts() }
 end
 
 helpers.describe("context tracker: dead or unwatchable focused elements (ax-dead-element)", function()
@@ -110,11 +110,14 @@ helpers.describe("context tracker: dead or unwatchable focused elements (ax-dead
 		helpers.assert_true(result.rendered:find("[ERROR]", 1, true) == nil, result.rendered)
 		helpers.assert_eq(result.removed, { "first", "second" },
 			"the already-watched element is owned, so the next focus removes its watcher")
+		helpers.assert_eq(result.counts, { already_watched = 1, failed = 0 },
+			"the field run reads this boot's already-registered commits (ax-watch-since-boot)")
 	end)
 
 	helpers.it("keeps any other watcher failure an ERROR", function()
 		local result = focus_through(nil, "context_tracker.lua:631: observer refused the watcher")
 		helpers.assert_contains(result.rendered, "[ERROR]")
+		helpers.assert_eq(result.counts.failed, 1, "the field run fails this boot on it (ax-watch-since-boot)")
 		helpers.assert_contains(result.rendered, "Replacement AXValueChanged watcher setup failed")
 	end)
 end)
