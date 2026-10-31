@@ -89,6 +89,8 @@ class FixturePorts:
         self.official = OFFICIAL
         self.produce_failure = None
         self.catalogue_tamper = None
+        # Ad hoc signing gives every rebuild a new binary, so a new archive.
+        self.binary = BINARY
 
     def machine(self):
         return "arm64"
@@ -115,7 +117,7 @@ class FixturePorts:
         if self.produce_failure:
             raise subprocess.CalledProcessError(1, ["build-macos-managed-ollama.py"])
         filename = self.test.contract["assets"]["macos-arm64"]["filename"]
-        native_archive(output / filename)
+        native_archive(output / filename, self.binary)
         (output / (filename + ".provenance.json")).write_text("{}\n")
 
     def generate(self, root, source, official, go, receipt, archive, channel, output):
@@ -134,7 +136,7 @@ class FixturePorts:
             "source_commit": contract["source_commit"],
             "capability": contract["capability"],
             "native_http_capability": contract["native_http_capability"],
-            "binary_sha256": sha256(BINARY),
+            "binary_sha256": sha256(self.binary),
             "runtime_libraries_sha256": {LIBRARY: sha256(b"library fixture\n")},
             "provenance_sha256": sha256(receipt.read_bytes()),
         }
@@ -194,20 +196,39 @@ class DevManagedOllamaTests(unittest.TestCase):
             code = self.stager.stage(self.root, self.ports)
         return code, streams[0].getvalue() + streams[1].getvalue()
 
-    def install(self):
-        """Run the real installer CLI; return its exit code and stderr."""
-        target = self.home / "Library/Application Support/Ergopti/ollama-native-http"
+    def install(self, signatures=None):
+        """Run the real installer CLI; return its exit code and stderr.
 
-        def rename_exclusive(_, source, __, destination, ___):
-            if os.path.lexists(destination):
-                return -1
-            os.rename(source, destination)
-            return 0
+        renameatx_np is modeled for RENAME_EXCL and RENAME_SWAP; signatures
+        lists codesign exit codes in call order (all valid when None).
+        """
+        target = self.home / "Library/Application Support/Ergopti/ollama-native-http"
+        self.renames = []
+
+        def rename_at(_, source, __, destination, flags):
+            self.renames.append(flags)
+            if flags == 0x00000004:
+                if os.path.lexists(destination):
+                    return -1
+                os.rename(source, destination)
+                return 0
+            if flags == 0x00000002:
+                if not (os.path.lexists(source) and os.path.lexists(destination)):
+                    return -1
+                parked = os.fsdecode(destination) + ".swap-fixture"
+                os.rename(destination, parked)
+                os.rename(source, destination)
+                os.rename(parked, source)
+                return 0
+            return -1
 
         library = mock.Mock()
-        library.renameatx_np.side_effect = rename_exclusive
+        library.renameatx_np.side_effect = rename_at
         codesign = mock.Mock()
-        codesign.return_value.wait.return_value = 0
+        if signatures is None:
+            codesign.return_value.wait.return_value = 0
+        else:
+            codesign.return_value.wait.side_effect = list(signatures)
         codesign.return_value.poll.return_value = 0
         arguments = [
             RUNTIME,
@@ -302,6 +323,81 @@ class DevManagedOllamaTests(unittest.TestCase):
         with self.assertRaises(self.stager.StageRefusal):
             self.stage()
         self.assertFalse(self.output.exists() or self.archive.exists())
+
+    def rebuild(self):
+        """Edit a pinned source and restage: the ad hoc rebuild has a new archive."""
+        changed = self.root / self.contract["source_fingerprint_paths"][1]
+        changed.write_bytes(changed.read_bytes() + b"\n// edited\n")
+        self.ports.binary = BINARY + b"rebuilt\n"
+        self.assertEqual(self.stage()[0], 0)
+
+    def receipt_of(self, target):
+        return json.loads((target / ".ergopti-managed-runtime.json").read_text())
+
+    def test_a_rebuild_replaces_the_runtime_its_earlier_build_installed(self):
+        # dev-ollama-rebuild-replaces: every dev pull ended in exit 78 because
+        # the earlier owned install's receipt binds the earlier archive.
+        self.assertEqual(self.stage()[0], 0)
+        code, stderr, target = self.install()
+        self.assertEqual(code, 0, stderr)
+        earlier = self.receipt_of(target)
+        self.rebuild()
+        code, stderr, target = self.install()
+        self.assertEqual(code, 0, stderr)
+        self.assertIn("replaced an earlier owned install", stderr)
+        self.assertEqual((target / "ollama").read_bytes(), BINARY + b"rebuilt\n")
+        receipt = self.receipt_of(target)
+        self.assertNotEqual(receipt["asset_sha256"], earlier["asset_sha256"])
+        self.assertEqual(receipt["binary_sha256"], sha256(BINARY + b"rebuilt\n"))
+        self.assertEqual(self.renames, [0x00000002])
+        self.assertEqual(
+            sorted(path.name for path in target.parent.iterdir()), ["ollama-native-http"]
+        )
+
+    def test_a_modified_earlier_runtime_is_never_displaced(self):
+        self.assertEqual(self.stage()[0], 0)
+        self.assertEqual(self.install()[0], 0)
+        target = self.install()[2]
+        (target / "ollama").write_bytes(BINARY + b"edited by hand\n")
+        self.rebuild()
+        code, stderr, target = self.install()
+        self.assertEqual((code, stderr), (78, "Managed Ollama runtime admission refused.\n"))
+        self.assertEqual((target / "ollama").read_bytes(), BINARY + b"edited by hand\n")
+        self.assertEqual(self.renames, [])
+
+    def test_a_folder_without_an_ergopti_receipt_is_never_displaced(self):
+        self.assertEqual(self.stage()[0], 0)
+        target = self.home / "Library/Application Support/Ergopti/ollama-native-http"
+        target.mkdir(parents=True)
+        (target / "ollama").write_bytes(BINARY)
+        code, stderr, _ = self.install()
+        self.assertEqual((code, stderr), (78, "Managed Ollama runtime admission refused.\n"))
+        self.assertEqual(sorted(path.name for path in target.iterdir()), ["ollama"])
+        self.assertEqual(self.renames, [])
+
+    def test_a_live_operation_keeps_the_earlier_runtime(self):
+        self.assertEqual(self.stage()[0], 0)
+        target = self.install()[2]
+        (target / (".ergopti-image-" + "0" * 32)).write_bytes(BINARY)
+        self.rebuild()
+        self.assertEqual(self.install()[0], 78)
+        self.assertEqual((target / "ollama").read_bytes(), BINARY)
+
+    def test_a_replacement_that_fails_in_place_restores_the_earlier_runtime(self):
+        self.assertEqual(self.stage()[0], 0)
+        target = self.install()[2]
+        earlier = self.receipt_of(target)
+        self.rebuild()
+        # Both stage verifications pass, the one in place fails (each
+        # verification waits twice on its codesign child).
+        code, stderr, target = self.install(signatures=[0, 0, 0, 0, 1, 1])
+        self.assertEqual((code, stderr), (78, "Managed Ollama runtime admission refused.\n"))
+        self.assertEqual(self.renames, [0x00000002, 0x00000002])
+        self.assertEqual(self.receipt_of(target), earlier)
+        self.assertEqual((target / "ollama").read_bytes(), BINARY)
+        self.assertEqual(
+            sorted(path.name for path in target.parent.iterdir()), ["ollama-native-http"]
+        )
 
     def test_the_installer_refuses_a_local_archive_that_differs_from_the_catalogue(self):
         self.assertEqual(self.stage()[0], 0)
