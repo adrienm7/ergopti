@@ -408,6 +408,21 @@
 		},
 		{
 			"os": "macos",
+			"tool": "`git`",
+			"programs": ["git"],
+			"used_for": "Source runs only: whether the clone's layout registry differs from HEAD (`git status --porcelain`)",
+			"today": "The developer's",
+			"current_class": "OPT",
+			"version_needed": "Any with `--no-optional-locks`",
+			"if_missing": "The clone's registry is shown and an ERROR names the git failure",
+			"pin_possible": "No",
+			"decision": "OPT",
+			"decision_text": "OPT (source runs only)",
+			"alternative": null,
+			"status": "done"
+		},
+		{
+			"os": "macos",
 			"tool": "Shell (`sh`, `bash`)",
 			"programs": ["sh", "bash"],
 			"used_for": "`/bin/sh`, `/bin/bash`, `/usr/bin/env` for the bundled scripts",
@@ -1092,6 +1107,21 @@
 			"pin_possible": "Built here",
 			"decision": "NA",
 			"decision_text": "Not applicable (built here)",
+			"alternative": null,
+			"status": "done"
+		},
+		{
+			"os": "linux",
+			"tool": "`git`",
+			"programs": ["git"],
+			"used_for": "Source runs only: whether the clone's layout registry differs from HEAD (`git status --porcelain`)",
+			"today": "The developer's (distribution package)",
+			"current_class": "OPT",
+			"version_needed": "Any with `--no-optional-locks`",
+			"if_missing": "The clone's registry is shown and an ERROR names the git failure",
+			"pin_possible": "No",
+			"decision": "OPT",
+			"decision_text": "OPT (source runs only)",
 			"alternative": null,
 			"status": "done"
 		},
