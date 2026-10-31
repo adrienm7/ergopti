@@ -4070,9 +4070,17 @@ description_key = "menu.layout.menubar_icon"
 # codegen tools/build/build-menu-manifest.js emits _shared/modules/menu/
 # menu_manifest.json from these [menu.*] tables, and a drift gate keeps the two
 # in sync. Both drivers read the generated JSON at runtime (unchanged). Item
-# types: toggle / feature / action / dynamic / group / section_header /
-# letter_picker / choice / "---" separator. platforms = ["ahk"|"hs"] gates per
-# driver.
+# types: toggle / feature / action / group / section_header / list / check /
+# command / letter_picker / choice / "---" separator. platforms =
+# ["ahk"|"hs"|"linux"] gates per driver.
+#
+# There is no `dynamic` type any more (retired 2026-10-31). It handed the row id
+# back to platform code, which then decided what to draw there, so a row could be
+# added, renamed or reshaped per OS without this file changing. The six last
+# ones (llm_model, llm_profile, llm_generation, agent_system1, agent_system2,
+# agent_disabled_apps) are `list` rows: the driver supplies the row DATA of the
+# named provider and the shared renderer draws it. The generator refuses a
+# `dynamic` row, and test-menu-manifest fails on one.
 #
 # A `choice` is one enum feature (`path`) drawn as ONE row titled by `i18n`,
 # with one row per value beneath it and the current value ticked. The values are

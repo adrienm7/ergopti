@@ -13275,3 +13275,41 @@ console.log(
 	for (let offset = 0; offset <= source.length; offset++) position(offset);
 	assert.equal(reads, preparedReads, 'coordinate queries must not rescan the source');
 }
+
+// The `dynamic` row type is retired: the tray menu is defined in the shared
+// manifest only, and a `dynamic` row handed its id back to platform code, which
+// then chose the row's label, children, order and greying per OS. The ratchet
+// is zero, in the source tables, in the generated file and in the compiler.
+{
+	const assert = require('node:assert/strict');
+	const availability = require('../lib/menu-row-availability.cjs');
+	const found = [];
+	const walk = (value, where) => {
+		if (Array.isArray(value)) return value.forEach((child, i) => walk(child, `${where}[${i}]`));
+		if (!value || typeof value !== 'object') return;
+		if (value.type === 'dynamic') found.push(`${where} (${value.id ?? '?'})`);
+		for (const [key, child] of Object.entries(value)) walk(child, `${where}.${key}`);
+	};
+	walk(parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu, 'manifest.toml menu');
+	walk(JSON.parse(readFileSync(MENU_PATH, 'utf8')), 'menu_manifest.json');
+	assert.deepEqual(found, [], 'no menu row may be declared `dynamic`; declare a `list` row');
+	assert.equal(availability.RETIRED_ROW_TYPES.has('dynamic'), true);
+	// The compiler refuses one at any depth, top-level row or nested template row.
+	assert.doesNotThrow(() =>
+		availability.validateNoRetiredRows({ demo: [{ type: 'list', id: 'demo_rows' }] })
+	);
+	for (const menu of [
+		{ demo: [{ type: 'dynamic', id: 'demo_rows' }] },
+		{ demo: { rows: [{ type: 'group', id: 'g', items: [{ type: 'dynamic', id: 'x' }] }] } }
+	]) {
+		assert.throws(() => availability.validateNoRetiredRows(menu), /'dynamic' rows are retired/);
+		// build-menu-manifest.js reaches it through validateGreyedRows.
+		assert.throws(() => availability.validateMenuAvailability(menu), /'dynamic' rows are retired/);
+	}
+	// The generated header no longer documents the type as available.
+	const header = JSON.parse(readFileSync(MENU_PATH, 'utf8'))._comment3;
+	assert.equal(header.includes("'dynamic' = "), false);
+	console.log(
+		'[OK] retired `dynamic` rows: none declared, none generated, and the compiler refuses one.'
+	);
+}
