@@ -723,7 +723,6 @@
 	"healthcheck.field.runtime": "סביבת הריצה",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "מנוע תצוגת האינטרנט",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "דגם",
 	"healthcheck.field.cpu": "מעבד",
 	"healthcheck.field.cpu_cores": "ליבות לוגיות",

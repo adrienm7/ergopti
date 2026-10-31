@@ -723,7 +723,6 @@
 	"healthcheck.field.runtime": "ランタイム",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Web ビューエンジン",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "モデル",
 	"healthcheck.field.cpu": "プロセッサ",
 	"healthcheck.field.cpu_cores": "論理コア",

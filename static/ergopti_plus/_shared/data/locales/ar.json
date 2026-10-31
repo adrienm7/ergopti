@@ -723,7 +723,6 @@
 	"healthcheck.field.runtime": "بيئة التشغيل",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "محرك عرض الويب",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "الطراز",
 	"healthcheck.field.cpu": "المعالج",
 	"healthcheck.field.cpu_cores": "الأنوية المنطقية",
