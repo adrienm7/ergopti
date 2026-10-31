@@ -1953,3 +1953,13 @@ or under "Decided, do not re-raise".
   "Sticky", like the `menu.tapholds.sticky_*` strings. Use a French term such as « rémanent »?
 - **Dutch "Rolls".** `category.rolls` and `hs_config.cat_rolls` keep "Rolls" (Dutch "Rollen" means
   "roles"). Another Dutch word?
+- **A hand-written `config.toml` `[script]` row on macOS and Linux.** Windows reads `locale` from
+  `config.toml` at start. macOS (`hs.settings` `i18n_locale`) and Linux (`storage.json`) read only their
+  native alias store, so a `locale`, `log_level` or `show_error_dialog` typed into `config.toml` is
+  ignored at start; only the Script scope writes both stores (`script_scope_runtime.lua`). Making
+  `config.toml` win at start would switch most users back to French: installs copied
+  `_generated/config_template.toml`, which ships `locale = "fr"`, while the wizard and the language
+  menu persist only the native value. A safe change on both Lua drivers needs (a) every writer (menu,
+  wizard) to write the `config.toml` leaf too, (b) one adoption at the first start of that build that
+  writes the native value in use into `config.toml`, with a marker, and only then (c) the start
+  reading `config.toml`. Kept meanwhile: the native store is the start authority on macOS and Linux.
