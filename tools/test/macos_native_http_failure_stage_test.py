@@ -499,6 +499,99 @@ class NetworkCheckHelper(unittest.TestCase):
         )
 
 
+class NetworkCheckDigest(unittest.TestCase):
+    """Issue #101 follow-up (6): the check proves the pinned input's SHA-256, not only a HEAD."""
+
+    def setUp(self):
+        self.helper = load("network_check_digest", MACOS / "modules/llm/managed_network_check.py")
+        self.release = json.loads(
+            (
+                ROOT / "static/ergopti_plus/_shared/modules/llm/managed_python_release.json"
+            ).read_text()
+        )["source"]
+
+    def run_check(self, head=200, download=None):
+        """Runs main over a stand-in transport; download is None (success) or a failure reason."""
+        calls = []
+
+        class Failure(Exception):
+            def __init__(self, reason):
+                self.reason = reason
+                super().__init__(reason)
+
+        class Response:
+            route_fallback = None
+            route_kind = "direct"
+
+            def __init__(self, status):
+                self.status = status
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+        class Bootstrap:
+            BootstrapFailure = Failure
+
+            @staticmethod
+            def _direct_route(url):
+                return False
+
+            @staticmethod
+            def _native_request(url, **options):
+                if isinstance(head, str):
+                    failure = Exception(head)
+                    failure.reason = head
+                    raise failure
+                return Response(head)
+
+            @staticmethod
+            def download(url, output, digest, size, deadline, idle_timeout):
+                calls.append((url, Path(output), digest, size))
+                if download is not None:
+                    raise Failure(download)
+                Path(output).write_bytes(b"verified")
+                return output
+
+        captured = io.StringIO()
+        with mock.patch.object(self.helper, "load_bootstrap", return_value=Bootstrap):
+            with contextlib.redirect_stdout(captured):
+                self.helper.main()
+        return captured.getvalue().splitlines(), calls
+
+    def test_a_verified_download_passes_the_digest_step(self):
+        lines, calls = self.run_check()
+        self.assertEqual(lines[-1], "step digest pass sha256")
+        self.assertEqual(len(calls), 1)
+        url, output, digest, size = calls[0]
+        self.assertEqual(
+            (url, digest, size),
+            (self.release["url"], self.release["sha256"], self.release["bytes"]),
+        )
+        self.assertTrue(output.is_absolute())
+        self.assertFalse(output.exists(), "the downloaded copy is removed")
+        self.assertFalse(output.parent.exists(), "the scratch folder is removed")
+
+    def test_a_wrong_digest_or_a_failed_download_fails_the_digest_step(self):
+        for reason, verdict in (("integrity", "mismatch"), ("deadline", "deadline")):
+            with self.subTest(reason=reason):
+                lines, _ = self.run_check(download=reason)
+                self.assertEqual(lines[-1], "step digest fail " + verdict)
+
+    def test_no_download_after_a_failed_head(self):
+        for head in ("connect", 404):
+            with self.subTest(head=head):
+                lines, calls = self.run_check(head=head)
+                self.assertEqual(lines[-1], "step digest skip not_reached")
+                self.assertEqual(calls, [])
+
+    def test_the_head_and_the_download_fit_the_field_run_helper_timeout(self):
+        # adapters/field_check_ports.lua network_chain: 40 s before the helper is killed
+        self.assertLess(self.helper.TIMEOUT + self.helper.DIGEST_TIMEOUT, 40)
+
+
 class HostReachability(unittest.TestCase):
     """The field run's --hosts mode: one HEAD per declared host, named by its key."""
 

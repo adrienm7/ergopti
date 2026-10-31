@@ -38,7 +38,7 @@
 			"kind": "field_check",
 			"check": "network",
 			"deadline_seconds": 60,
-			"proves": "The managed download chain works: system proxy kinds, PAC download, route lookup, TLS trust and one HEAD transfer."
+			"proves": "The managed download chain works: system proxy kinds, PAC download, route lookup, TLS trust, one HEAD transfer and one download of the pinned input whose SHA-256 and size match its pin."
 		},
 		{
 			"id": "field_toolchain",
