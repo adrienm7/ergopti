@@ -281,6 +281,16 @@ _LLM_Menu_PromptApiEntry(EditId, Port := 0) {
 			LLM_API_PROVIDERS, &provider_id, NotifyFn)
 		return false
 	provider := LLM_API_PROVIDERS[provider_id]
+	if provider.Get("TokenExchange", false) {
+		; macOS and Linux exchange such a key for an access token; this driver does not yet
+		LoggerWarn("LLM.menu", "API entry refused: provider '{1}' needs an access-token exchange.", provider_id)
+		Body := t("menu.llm.api_provider_token_exchange_unavailable"), Title := t("common.error_title")
+		if HasMethod(NotifyFn, "Call")
+			NotifyFn.Call(Body, Title)
+		else
+			Ui_MsgBox(Body, Title, "Icon!")
+		return false
+	}
 
 	; Step 2 — base URL (prefilled with the provider default). A new entry of a
 	; per-account provider asks one value per placeholder of its address instead.
