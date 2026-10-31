@@ -534,7 +534,7 @@
 		},
 		{
 			"id": "js-ahk-parallel-runner",
-			"ordinal": 553,
+			"ordinal": 557,
 			"name": "parallel AHK runner reads results by exact test name",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ahk-parallel.cjs"],
