@@ -45,7 +45,8 @@
 --- 7. init-boot-mlx: the boot ran its MLX port cleanup (lsof, a curl probe of up
 ---    to 1 s, ps) on every boot, the AI off included; it only serves the AI
 ---    warmup. An AI-off boot runs no such shell, and a boot whose AI is on and
----    consented in this Mac's preferences runs it once.
+---    consented in this Mac's preferences runs it once. Only the AI-off boot
+---    skips the LLM backend bootstrap, and logs that it did.
 --- ==============================================================================
 
 local M = {}
@@ -56,6 +57,8 @@ local ON_WINDOWS = package.config:sub(1, 1) == "\\"
 -- a configured boot.
 local WIZARD_MARKER = "Onboarding wizard opened."
 local BOOTED_MARKER = "Hammerspoon boot SUCCESSFUL."
+-- The INFO line init.lua logs when an AI-off boot skips the LLM backend bootstrap.
+local LLM_SKIPPED_MARKER = "LLM boot disabled at startup"
 
 
 
@@ -575,6 +578,18 @@ local function started_pythons(output)
 	return boot, action
 end
 
+--- Whether a child's boot, before its action, logged a line holding `marker`.
+--- @param output string Child output.
+--- @param marker string Plain text.
+--- @return boolean logged
+local function boot_logged(output, marker)
+	for line in output:gmatch("[^\n]+") do
+		if line:match("^E2E_PHASE ") then return false end
+		if line:find(marker, 1, true) then return true end
+	end
+	return false
+end
+
 --- How many MLX port cleanup shells a child started during its boot: the
 --- world records each task start, and the cleanup is the one that lists the
 --- port's listeners (modules/llm/boot_cleanup.lua).
@@ -668,6 +683,13 @@ function M.run(check, options)
 							.. " MLX port cleanup(s), expected 1"
 					elseif not scenario.ai_enabled and cleanups ~= 0 then
 						ctx.problems[#ctx.problems + 1] = action .. ": the AI-off boot ran the MLX port cleanup"
+					end
+					-- The LLM backend bootstrap is skipped, and said so, on an AI-off boot only.
+					local skipped = boot_logged(output, LLM_SKIPPED_MARKER)
+					if skipped == scenario.ai_enabled then
+						ctx.problems[#ctx.problems + 1] = action .. (scenario.ai_enabled
+							and ": the AI-on boot skipped the LLM backend bootstrap"
+							or ": the AI-off boot never skipped the LLM backend bootstrap")
 					end
 				end
 				local runtime = action == "boot" and scenario.ai_runtime and scenario.ai_runtime(ctx.arch) or nil
