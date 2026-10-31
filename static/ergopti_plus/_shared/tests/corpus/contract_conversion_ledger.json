@@ -2150,7 +2150,7 @@
 		},
 		{
 			"contract": "toml_noop_contract.lua",
-			"lua_sites": 3,
+			"lua_sites": 4,
 			"data_driven": [
 				{
 					"case": "toml-noop-parity",
@@ -2164,6 +2164,10 @@
 				},
 				{
 					"case": "toml-noop-parity refuses an unchanged source after the session fence",
+					"reason": "global_state"
+				},
+				{
+					"case": "toml-writer-case-twins a refused twin reports its setting once",
 					"reason": "global_state"
 				}
 			]
