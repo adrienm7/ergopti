@@ -59,6 +59,16 @@ it. Tests must execute selection through injection.
 Provider APIs may return a single computed label wrapped as a list. Normalize at
 the adapter boundary rather than spreading shape checks through the driver.
 
+### project-linux-luaposix-stat-is-lstat
+
+luaposix's legacy `posix.stat(path)` reports a symlink itself (`type = "link"`,
+the link's own inode) and its `mtime` in whole seconds; it never follows the
+link. A module that prefers `posix.stat` and falls back to `stat -L` therefore
+behaves differently on a host where luaposix is installed. Action: when a path
+must be judged by what it points to, use `luv.fs_stat` or `stat -L`, never
+`posix.stat`; a test of that path injects a `posix` port with these semantics
+so it fails on a host without luaposix too.
+
 ### project-linux-keymap-before-libxkbcommon-1-8
 
 `xkbcli dump-keymap-{wayland,x11}` only exists from libxkbcommon 1.8; Ubuntu
