@@ -670,6 +670,12 @@ function declaredLinuxUninstallCaptionOwner(unit) {
 	);
 }
 
+/**
+ * Admits the closed top-level grammar of a Linux menu module. For the tray root
+ * it reads the root composed by tools/lib/linux-menu-parts.cjs, which carries
+ * each part's own imports ahead of that part, so the import table below covers
+ * every import a part holds as well as the root's own.
+ */
 function closedModuleExport(unit, lex, rootPositions) {
 	if (!unit) return false;
 	const imports = {
