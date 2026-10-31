@@ -42,10 +42,12 @@ local function fake(overrides)
 	package.loaded["platform.remap.runtime_artifact_fetch"] = nil
 	local Fetch = require("platform.remap.runtime_artifact_fetch")
 	local world = { commands = {}, files = {} }
-	local listing_names = table.concat({ "Runtime/", "Runtime/bin/", Fetch.PRODUCTS[1], Fetch.PRODUCTS[2],
-		Fetch.PRODUCTS[3] }, "\n") .. "\n"
-	local listing_verbose = "drwxr-xr-x 0 0 0 0 Jan 1 1970 Runtime/\ndrwxr-xr-x 0 0 0 0 Jan 1 1970 Runtime/bin/\n"
+	local helper = "ErgoptiPlus-Runtime-Installer.app/"
+	local listing_names = table.concat({ helper, helper .. "Contents/", Fetch.PRODUCTS[1], Fetch.PRODUCTS[2],
+		Fetch.PRODUCTS[3], Fetch.PRODUCTS[4] }, "\n") .. "\n"
+	local listing_verbose = "drwxr-xr-x 0 0 0 0 Jan 1 1970 a/\ndrwxr-xr-x 0 0 0 0 Jan 1 1970 a/Contents/\n"
 		.. "-rwxr-xr-x 0 0 0 9 Jan 1 1970 a\n-rwxr-xr-x 0 0 0 9 Jan 1 1970 b\n-rwxr-xr-x 0 0 0 9 Jan 1 1970 c\n"
+		.. "-rwxr-xr-x 0 0 0 9 Jan 1 1970 d\n"
 	local answers = {
 		stat = function() return 0, "4096\n" end,
 		shasum = function(args) return 0, DIGEST .. "  " .. args[3] .. "\n" end,
@@ -179,8 +181,10 @@ helpers.describe("owned runtime artifact fetch: named refusals", function()
 
 	helpers.it("refuses an archive holding a link before extracting it", function()
 		local fetcher, world = fake({ tar = function(args)
-			if args[1] == "-tvzf" then return 0, "lrwxr-xr-x 0 0 0 0 Jan 1 1970 Runtime/x -> /etc\n" end
-			return 0, "Runtime/x\n"
+			if args[1] == "-tvzf" then
+				return 0, "lrwxr-xr-x 0 0 0 0 Jan 1 1970 ErgoptiPlus-Runtime-Installer.app/x -> /etc\n"
+			end
+			return 0, "ErgoptiPlus-Runtime-Installer.app/x\n"
 		end })
 		local result = ensure(fetcher, pin())
 		helpers.assert_eq(result.value, "artifact_members_refused")
@@ -254,10 +258,38 @@ helpers.describe("owned runtime artifact fetch: then always that one", function(
 		helpers.assert_eq(answers, { { false, "artifact_download_failed" }, { false, "artifact_download_failed" } })
 	end)
 
-	helpers.it("judges a listing closed only with every product under Runtime/", function()
+	helpers.it("judges a listing closed only with every product under the helper bundle", function()
 		local _, _, Fetch = fake()
+		local helper = "ErgoptiPlus-Runtime-Installer.app/"
 		helpers.assert_eq((Fetch.closed_listing("-x\n", "/etc/passwd\n")), false)
-		helpers.assert_eq((Fetch.closed_listing("-x\n", "Runtime/../x\n")), false)
-		helpers.assert_eq((Fetch.closed_listing("dx\n", "Runtime/\n")), false)
+		helpers.assert_eq((Fetch.closed_listing("-x\n", helper .. "../x\n")), false)
+		helpers.assert_eq((Fetch.closed_listing("dx\n", helper .. "\n")), false)
+		-- A sibling whose name only starts like the helper is outside it.
+		helpers.assert_eq((Fetch.closed_listing("-x\n", "ErgoptiPlus-Runtime-Installer.appx/y\n")), false)
+		local verbose, names = {}, { helper }
+		verbose[1] = "d"
+		for _, product in ipairs(Fetch.PRODUCTS) do
+			verbose[#verbose + 1] = "-"
+			names[#names + 1] = product
+		end
+		helpers.assert_true((Fetch.closed_listing(table.concat(verbose, "\n"), table.concat(names, "\n"))))
+		-- The loose Runtime/ tree of the earlier artifact shape is not the runtime.
+		helpers.assert_eq((Fetch.closed_listing("d\n-\n-\n-\n", "Runtime/\n"
+			.. "Runtime/ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core\n"
+			.. "Runtime/ErgoptiPlus-Remap-Console.app/Contents/MacOS/ErgoptiPlus-Remap-Console\n"
+			.. "Runtime/bin/ergoptiplus_remap_cli\n")), false)
+	end)
+
+	helpers.it("names the helper executable and the products it seals", function()
+		local _, _, Fetch = fake()
+		helpers.assert_eq(Fetch.HELPER, "ErgoptiPlus-Runtime-Installer.app")
+		helpers.assert_eq(Fetch.PRODUCTS, {
+			"ErgoptiPlus-Runtime-Installer.app/Contents/MacOS/ErgoptiPlus-Runtime-Installer",
+			"ErgoptiPlus-Runtime-Installer.app/Contents/Resources/OwnedRuntime/ErgoptiPlus-Remap-Core.app/Contents/MacOS/"
+				.. "ErgoptiPlus-Remap-Core",
+			"ErgoptiPlus-Runtime-Installer.app/Contents/Resources/OwnedRuntime/ErgoptiPlus-Remap-Console.app/Contents/MacOS/"
+				.. "ErgoptiPlus-Remap-Console",
+			"ErgoptiPlus-Runtime-Installer.app/Contents/Resources/OwnedRuntime/bin/ergoptiplus_remap_cli",
+		})
 	end)
 end)
