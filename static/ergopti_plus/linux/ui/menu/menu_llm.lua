@@ -10,6 +10,7 @@
 
 local M = {}
 
+local SaveFailure = require("config_save_failure")
 local Logger = require("logger.shim")
 local TextPrompt = require("ui.text_prompt")
 local PrivacyPolicy = require("llm.trigger_policy")
@@ -65,7 +66,7 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 		Logger.error(LOG, "Numeric setting '%s' refused: its opening configuration is no longer current.", name)
 		local okay, notifier = pcall(require, "adapters.notifier")
 		if okay and type(notifier.send) == "function" then
-			pcall(notifier.send, i18n_safe("dialog.bulk_toggle.save_failed"), { level = "error" })
+			pcall(SaveFailure.present, i18n_safe, function(message) notifier.send(message, { level = "error" }) end)
 		end
 		return false
 	end
@@ -668,7 +669,7 @@ local function _build_llm(ctx)
 						local called, committed = pcall(set, option)
 						if not called or committed ~= true then
 							Logger.error(LOG, "Prediction modifier choice was not durably acknowledged.")
-							show_error(i18n_safe("dialog.bulk_toggle.save_failed"))
+							SaveFailure.present(i18n_safe, show_error)
 							return false
 						end
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end

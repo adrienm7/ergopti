@@ -708,7 +708,8 @@ function closedModuleExport(unit, lex, rootPositions) {
 		VersionLabel: 'updater.version_label',
 		Schedule: 'updater.schedule',
 		AgentSettings: 'modules.llm.agent_settings',
-		TextUtils: 'text_utils'
+		TextUtils: 'text_utils',
+		SaveFailure: 'config_save_failure'
 	};
 	const constants = new Set(['M', 'LOG', 'MS_PER_SEC', 'PERSONAL_CATEGORY', 'ok_mm']);
 	const tokens = unit.tokens,
