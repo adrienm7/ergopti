@@ -214,6 +214,12 @@ module.exports = function (sources, manifest, menuSources) {
 			'withdrawn post-translation caption ownership check'
 		]
 	);
+	// The save failure notice is read from its one owner, never a foreign module.
+	cases.push([
+		'local SaveFailure = require("config_save_failure")',
+		'local SaveFailure = require("foreign_save_failure")',
+		'foreign save failure notice owner'
+	]);
 	// Genuine About container, context and finished subtree must transport the command.
 	cases.push(
 		[
