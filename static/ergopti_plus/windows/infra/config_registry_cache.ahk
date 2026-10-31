@@ -172,7 +172,7 @@ ConfigRegistryCacheCodeIdentity() {
 	if A_IsCompiled
 		return CryptoSha256Bytes(FSReadBytesStrict(A_ScriptFullPath))
 	SplitPath(A_LineFile, , &Directory)
-	Files := [Directory . "\config_migrate.ahk", A_LineFile]
+	Files := [Directory . "\config_migrate.ahk", Directory . "\..\_generated\config_migration_ops.ahk", A_LineFile]
 	loop files Directory . "\toml\*.ahk", "F"
 		Files.Push(A_LoopFileFullPath)
 	Identity := "typed-registry-cache-v1`n" . A_AhkVersion . "`n"

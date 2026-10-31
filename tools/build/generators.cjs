@@ -145,6 +145,10 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-config-migration-ops.cjs',
+		outputs: ['static/ergopti_plus/windows/_generated/config_migration_ops.ahk']
+	},
+	{
 		script: 'codegen/codegen-slot-roles.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/lua/shortcuts/slot_roles_data.lua',
