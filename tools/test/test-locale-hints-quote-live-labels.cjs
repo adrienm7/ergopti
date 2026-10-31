@@ -12,7 +12,9 @@
  * métriques », and the Windows dialog shown when Metrics is off went on sending
  * users to « ❌ Métriques désactivées (cliquer pour activer) », a row that no
  * longer exists in any language. Nothing links the two strings, so nothing
- * noticed. Each pair below is a hint and the label keys it must quote.
+ * noticed. The same drift sent AI messages to an « AI menu » whose tray label
+ * is « ✨ Intelligence artificielle ». Each pair below is a hint and the label
+ * keys it must quote; a prose hint may drop the label's leading icon.
  * ==============================================================================
  */
 
@@ -27,12 +29,22 @@ const LOCALES = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'lo
 // A floor, so a scan that reads nothing cannot pass.
 const MIN_LOCALES = 21;
 
-// Each hint and the menu labels, in click order, it must quote verbatim.
+// A label's leading icon and its space, which a sentence naming the menu omits.
+const LEADING_ICON = /^\p{Extended_Pictographic}\uFE0F?\s+/u;
+
+// Each hint and the menu labels, in click order, it must quote verbatim; with
+// withoutIcon, the labels are quoted without their leading icon.
 const HINTS = [
 	{
 		hint: 'keystats_ui.metrics_disabled_body',
 		labels: ['menu.metrics.title', 'menu.metrics.enable']
-	}
+	},
+	...[
+		'dialog.action_picker.count_default',
+		'mlx.repair_reveal_hint',
+		'mlx.cause_unsupported_alternatives',
+		'ollama.runtime_missing_body'
+	].map((hint) => ({ hint, labels: ['menu.llm.title'], withoutIcon: true }))
 ];
 
 const errors = [];
@@ -47,7 +59,7 @@ if (files.length < MIN_LOCALES) {
 let checked = 0;
 for (const file of files) {
 	const catalogue = JSON.parse(fs.readFileSync(path.join(LOCALES, file), 'utf8'));
-	for (const { hint, labels } of HINTS) {
+	for (const { hint, labels, withoutIcon } of HINTS) {
 		const text = catalogue[hint];
 		if (typeof text !== 'string' || text === '') {
 			errors.push(`${file}: ${hint} is missing`);
@@ -55,9 +67,16 @@ for (const file of files) {
 		}
 		let from = 0;
 		for (const key of labels) {
-			const label = catalogue[key];
-			if (typeof label !== 'string' || label === '') {
+			const raw = catalogue[key];
+			if (typeof raw !== 'string' || raw === '') {
 				errors.push(`${file}: ${key} is missing, so ${hint} has nothing to quote`);
+				continue;
+			}
+			const label = withoutIcon ? raw.replace(LEADING_ICON, '') : raw;
+			if (withoutIcon && label === raw) {
+				errors.push(
+					`${file}: ${key} ("${raw}") has no leading icon to drop — update ${hint}'s pairing`
+				);
 				continue;
 			}
 			const at = text.indexOf(label, from);
