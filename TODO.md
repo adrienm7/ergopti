@@ -822,6 +822,80 @@ Added October 22 (from the agents' reports; details in their commits):
       maintainer decision: should the layout catalogue fetch the remote registry in a developer run (today the clone's
       registry, by design of `local_source`); (5) [CODE] `bin/ergopti-hotstrings` run from a clone still prefers
       `/usr/lib/ergopti` when a package is installed; fix or retire that branch.
+- [ ] **macOS swallowed-keys check on v1.0.6.** [PHYS-M] The fixes (03a2c2fa4b, d026f3e024,
+      a414e83fb7, 19fa9fa872, 89cbcae90b, 9b500a9e8c, c21e920d7e, bb6fcc2cc2) shipped in v1.0.6;
+      they need a Mac day of typing with the `key_event_health` counters (`infra/key_event_health.lua`,
+      written to the driver log). _Hands:_ the day of typing. Once typed, the field run's
+      `diagnostics` step carries the `key_*` counters and `field_event_taps` the late keys of the
+      session, so no reading by hand is left.
+- [ ] **Keystats rename leftovers.** [CODE] The rename is done (180a53e4de, 1 283 files, 579 paths). Left:
+      the comment in `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` (a compiled
+      script: `osadecompile` it, edit the comment, `osacompile -o` it back, on a Mac); persisted names
+      read from their one declaration: macOS metrics state names (9dc1404758), the Linux topical log
+      file (from the generated sub-file table); left [PC] the Windows tests' spellings.
+- [ ] **Issue #101: Mac follow-ups.** [PHYS-M] Fixed, to confirm on the Mac with the next release:
+      ATS key so the URLSession can fetch an `http://` company PAC (c0c29cd8ab); direct route when the
+      PAC lookup names no route (719c7fcd76); no retry of a refused route (ace928dc1c); the lookup now
+      names its failing step (363a63f79d: `native_proxy_budget`, `native_pac_download`, ...); lease
+      line cap judged per line (5deb892d58); Ollama 412 upgrade request shown (08aaeaf3c2);
+      diagnostics PAC probe on the three OS (f798aae1f9); one-click Debug checks (lease, owned
+      runtime, network, 30 s key accounting). Left: (1) read the Mac's next log lines `Slow ingest
+tick`, `Slow preferences save` and `Field check result:` to name the dominant main-thread
+      phase before slicing it; (2) an explicit proxy override field; (3) local server probes (oMLX,
+      Jan) all answer "Network request failed"; (4) `keymap/utils.lua` ignored-window TTL probe
+      (1 s): bound it only after measuring the AX call time (secure-field cache); (5) rebuild the
+      inverse oracle of `macos_native_http_receiving_facts_test` (red since 719c7fcd76), compile the
+      Swift on macOS CI, add Go table cases for the new stages; (6) the network check's digest step
+      is skipped (HEAD only); (7) PAC fetch/evaluation failures now fall back to a direct connection on
+      macOS (item "PAC unusable: direct fallback"): confirm on the Mac.
+      Field run (branch `fix/macos-overnight-d`): (1) is `field_slow_lines` (the segment the day's
+      `Slow <segment>` lines charge most, the slow ingest ticks and preferences saves with their worst
+      duration); (3) is `field_local_servers` (each server's answer and port source); the PAC route of (7)
+      shows in `field_network`'s route steps, but a PAC that fails on purpose needs a PAC the maintainer
+      breaks. (2), (4), (5), (6) are code.
+- [ ] **macOS input follow-ups (swallowed keys).** [CODE] Done: late keys pass through (ed2d9fe65c),
+      AXValue read once per burst (34765cde7c), no error window for a lease failure that recovered
+      within 60 s (fcf4af85dc), `key_*` counters in the diagnostics (6f2daed2e5). Lease token reuse
+      was analysed and refused (ADR 012): a reused token could never reach READY because the
+      revocation tombstone is monotone; reuse needs a native acknowledged rearm, decided NOT to
+      build for now. The next Mac log carries `Lease token decision=` and `written in N ms`, and since
+      30 October the field run's lease check names `deploy_write_ms` and `deploy_kb`: if the write is
+      short, keep it; if long, shrink the 743 KB file instead.
+- [ ] **Linux correction parity remainders.** [CODE] Done (06bbbe5985): Backspace pops the word, erased
+      n-grams get `e`, synthetic output chains. Erased and synthetic vectors in the shared corpus, replayed on
+      macOS and Linux (ee2eab6b1e, `keystats/correction_erased_vectors.json`). Left [PC]: the AHK replayer
+      (`KLW_WalkTypingEntry`); Windows word separators are wider than Linux's three.
+- [ ] **Developer mode on the three OS (maintainer decision, 27 October).** [CODE] [PHYS-M] [PHYS-W] Each app
+      runs the clone with the built app's helpers, config and AI runtimes, reloads a saved source file, and
+      starts with one command; the updater, uninstall and remote layout catalogue stay off in a source run.
+      Inventory per feature: `docs/design/developer-mode.md`. Commands: macOS `bash tools/dev/run-macos-dev-app.sh`
+      (done: guardian 6f667b3380, network receiver c0e3359a19); Linux `bash tools/dev/run-linux-dev.sh` (done in
+      branch `tmp/wip-devmode3`: Reload relays the runner, a saved driver or `_shared/lua` `.lua` restarts the
+      daemon, the native archive backend is built into the clone); Windows `tools\dev\run-windows-dev.ps1`,
+      run with `powershell -ExecutionPolicy Bypass -File` (same branch: `infra/dev_source.ahk` reloads on a saved
+      `.ahk`, the run reads `%APPDATA%\Ergopti\paths.toml` like the exe). Left: (1) [PHYS-W] on the PC with the exe installed and
+      running, run the command from a PowerShell in the clone: the exe closes by itself (taskkill without /F; if it
+      stays, the script names it and stops), the tray icon appears, Debug logs say "Developer source mode; the driver
+      runs from <clone>\static\ergopti_plus\windows (clone root from the developer variable)" and "Developer source
+      watcher started"; the config is the
+      exe's (same hotstrings, same `paths.toml` choice, no onboarding); save any driver `.ahk` with a harmless
+      comment change: within about 2 s the driver reloads once and keeps a Pause; the tray's Reload still works;
+      AI menus (Ollama), the metrics window (WebView2, sqlite3.dll) and Alt+Tab navigation (ergopti_nav_owner.dll)
+      work; Start at login in this mode registers the interpreter and the clone's script, and that login start
+      derives the root, so it is a developer run too (wanted, maintainer decision of 27 October): confirm it. (2) [PHYS-W] check that
+      `npm run dev:windows` works from Git Bash and from cmd (it calls Windows PowerShell 5.1). (2b) [PHYS-W]
+      double-click works: quit the exe from its tray, double-click `static\ergopti_plus\windows\ErgoptiPlus.ahk`
+      in Explorer: the same Debug lines appear, the "Developer source mode" one ending "(clone root from the
+      script location)",
+      a saved `.ahk` reloads, About shows the updater off and Uninstall greyed; then start the exe and
+      double-click again while it runs: the source run yields after about 3 s (no second tray icon, a
+      "Another instance owns the single-owner mutex" WARNING in `bootstrap.log`) and the exe keeps running. (3) [PHYS-M] the Mac lines of the hardware session cover the macOS
+      mode. (4) Linux, on a real desktop with the package installed: the unit is stopped, the tray appears, a
+      saved `.lua` restarts the daemon (`Debounced source reload firing` then a new boot), the tray's Reload
+      restarts it, and a second `run-linux-dev.sh` while one runs reports "already running". (5) [CODE] decide
+      whether the layout catalogue should fetch the remote registry in a developer run (today all three read the
+      clone's registry, by design of `local_source`). (6) [CODE] `bin/ergopti-hotstrings` run from a clone still
+      prefers `/usr/lib/ergopti` when a package is installed; fix or retire that branch.
 - [ ] **Owned, pinned third-party runtimes on the three OS (maintainer decision, 27 October).** [CODE] Ergopti
       installs and runs its own pinned Ollama, MLX environment, Karabiner runtime and any other third-party runtime,
       and never uses, stops or modifies the user's copy. Ollama: done on the three OS (next item). MLX: already
