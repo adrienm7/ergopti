@@ -51,7 +51,9 @@ function M.new(engine, profiles)
 		http = require("adapters.http_client"), owned_timer = timer, timings = Timings,
 		serve_environment = serve_environment,
 		network = { policy = proxy_policy, lookup = require("adapters.system_proxy").lookup_owned,
-			timeout_ms = Timings.ms("llm", "managed_proxy_lookup_timeout_ms"), origins = origins },
+			timeout_ms = Timings.ms("llm", "managed_proxy_lookup_timeout_ms"), origins = origins,
+			probe = require("adapters.tcp_probe").probe, relay_address = require("adapters.tcp_probe").relay_address,
+			probe_timeout_ms = Timings.ms("llm", "managed_proxy_probe_timeout_ms") },
 		environment = function()
 			local values = native.os_environ()
 			if type(values) ~= "table" then return nil end

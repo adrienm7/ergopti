@@ -18,7 +18,11 @@
 ---    redirect host) is looked up, one after the other under one owner. The
 ---    daemon holds one relay: the plan exports it with a NO_PROXY entry for
 ---    each origin the PAC sends direct, and refuses two different relays.
---- 3. Ollama has no failover: only the first selection of each origin is used.
+--- 3. Ollama has no failover of its own, so the PAC list is walked here, the
+---    way a browser does: a relay followed by another entry ("PROXY a; DIRECT")
+---    is kept only when a TCP connect to it completes within the shared probe
+---    deadline (timings llm.managed_proxy_probe_timeout_ms); otherwise the next
+---    entry is tried. The last entry is kept unprobed: nothing follows it.
 ---    DIRECT, or a machine without a desktop proxy source, is a direct route.
 --- 4. An unusable desktop configuration (GIO could not resolve the origin, or
 ---    ran out of time: a PAC it could not fetch or evaluate) sends that origin
@@ -109,13 +113,18 @@ local function override_environment(route, rows)
 end
 
 --- Builds the proxy port of the runtime repair.
---- @param deps table { policy, lookup, environment, timeout_ms, owner, origins }
+--- @param deps table { policy, lookup, environment, timeout_ms, owner, origins,
+---   probe = fn(host, port, timeout_ms, callback) -> child (adapters/tcp_probe.lua),
+---   relay_address = fn(relay) -> host, port, probe_timeout_ms }
 --- @return function port Called as port(budget, authorized, done) -> operation.
 function M.new(deps)
 	assert(type(deps) == "table" and type(deps.policy) == "table" and type(deps.lookup) == "function"
 		and type(deps.environment) == "function" and type(deps.owner) == "string"
 		and type(deps.timeout_ms) == "number" and deps.timeout_ms > 0
-		and type(deps.origins) == "table" and #deps.origins > 0, "managed proxy dependencies unavailable")
+		and type(deps.origins) == "table" and #deps.origins > 0
+		and type(deps.probe) == "function" and type(deps.relay_address) == "function"
+		and type(deps.probe_timeout_ms) == "number" and deps.probe_timeout_ms > 0,
+		"managed proxy dependencies unavailable")
 	-- The registry decides whether an exported relay already covers the daemon.
 	assert(deps.origins[1] == M.REGISTRY_URL, "managed proxy origin inventory does not start with the registry")
 	local policy, lookup, owner, origins = deps.policy, deps.lookup, deps.owner, deps.origins
@@ -179,7 +188,7 @@ function M.new(deps)
 		local entries = {}
 		-- The first lookup stage that sent an origin direct, for the pull's error.
 		local fallback = nil
-		local dispatch
+		local dispatch, choose
 
 		--- Settles the plan once every origin has a route.
 		local function conclude()
@@ -222,10 +231,43 @@ function M.new(deps)
 				fallback = fallback or stage
 				choices = { { mode = "direct" } }
 			end
-			local first = choices[1]
+			choose(index, choices, 1)
+		end
+
+		--- Keeps the first usable entry of one origin's PAC list, from `at` on.
+		--- @param index number Origin index.
+		--- @param choices table Ordered selections of the shared policy.
+		--- @param at number Entry to try.
+		choose = function(index, choices, at)
+			local choice = choices[at]
+			local function keep(route)
+				entries[index] = { origin = origins[index], route = route }
+				if index == #origins then conclude() else dispatch(index + 1) end
+			end
 			-- DIRECT, or the explicit "no native proxy source" acknowledgement.
-			entries[index] = { origin = origins[index], route = first.mode == "selected" and first.proxy or "direct" }
-			if index == #origins then conclude() else dispatch(index + 1) end
+			if choice.mode ~= "selected" then keep("direct"); return end
+			if at == #choices then keep(choice.proxy); return end
+			local host, port = deps.relay_address(choice.proxy)
+			if not host then
+				Logger.error(LOG, "Managed Ollama proxy entry %d of origin %d has no probe address.", at, index)
+				finish({ ok = false, error = "proxy_route_invalid" })
+				return
+			end
+			step = step + 1
+			local mine = step
+			local child, probe_error = deps.probe(host, port, deps.probe_timeout_ms, function(reachable, reason)
+				if operation.finished then return end
+				if reachable then keep(choice.proxy); return end
+				Logger.warn(LOG, "Managed Ollama proxy entry %d of origin %d unreachable (%s within %d ms): next PAC entry.",
+					at, index, tostring(reason), deps.probe_timeout_ms)
+				choose(index, choices, at + 1)
+			end)
+			if not child then
+				Logger.error(LOG, "Managed Ollama proxy probe not started: %s", tostring(probe_error))
+				finish({ ok = false, error = "proxy_lookup_unavailable" })
+				return
+			end
+			if step == mine then inner = child end
 		end
 
 		--- Looks up one origin under the remaining budget.

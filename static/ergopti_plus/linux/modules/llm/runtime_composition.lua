@@ -117,7 +117,8 @@ function M.new(deps)
 	end
 	if network~=nil then
 		local proxy_port=require('modules.llm.managed_ollama_proxy').new({policy=network.policy,lookup=network.lookup,
-			environment=environment,timeout_ms=network.timeout_ms,owner='ollama-runtime-proxy',origins=network.origins})
+			environment=environment,timeout_ms=network.timeout_ms,owner='ollama-runtime-proxy',origins=network.origins,
+			probe=network.probe,relay_address=network.relay_address,probe_timeout_ms=network.probe_timeout_ms})
 		function p.network(budget,authorized,done) return proxy_port(budget,authorized,done) end
 	end
 	function p.probe(url,budget,authorized,done)
