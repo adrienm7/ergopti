@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "체크섬이 확인되었습니다. Ollama 설치 중…",
 	"ollama.deps_task_create_failed": "hs.task를 생성할 수 없습니다.",
 	"ollama.deps_task_start_failed": "hs.task를 시작할 수 없습니다.",
+	"ollama.digest_mismatch": "%s 다운로드가 두 번 손상되었습니다. 체크섬이 일치하지 않았습니다. 프록시나 불안정한 네트워크가 다운로드를 변경할 수 있으니 연결을 확인한 후 다시 시도하세요.",
 	"ollama.download_cancelled": "Ollama 다운로드 취소됨",
 	"ollama.download_error": "%s 다운로드 오류",
 	"ollama.download_subtitle": "Ollama Hub에서 가중치 가져오는 중…",

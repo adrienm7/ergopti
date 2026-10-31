@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "Sağlama toplamı doğrulandı. Ollama yükleniyor…",
 	"ollama.deps_task_create_failed": "hs.task oluşturulamıyor.",
 	"ollama.deps_task_start_failed": "hs.task başlatılamıyor.",
+	"ollama.digest_mismatch": "%s indirmesi iki kez bozuldu: sağlama toplamı eşleşmedi. Bir proxy veya kararsız bir ağ indirmeyi bozabilir; bağlantıyı kontrol edip yeniden deneyin.",
 	"ollama.download_cancelled": "Ollama indirmesi iptal edildi",
 	"ollama.download_error": "%s indirme hatası",
 	"ollama.download_subtitle": "Ollama Hub'dan ağırlıklar alınıyor…",

@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "Prüfsumme bestätigt. Ollama wird installiert…",
 	"ollama.deps_task_create_failed": "hs.task konnte nicht erstellt werden.",
 	"ollama.deps_task_start_failed": "hs.task konnte nicht gestartet werden.",
+	"ollama.digest_mismatch": "Der Download von %s war zweimal beschädigt: Die Prüfsumme stimmte nicht. Ein Proxy oder ein instabiles Netzwerk kann einen Download verfälschen; prüfen Sie die Verbindung und versuchen Sie es erneut.",
 	"ollama.download_cancelled": "Ollama-Download abgebrochen",
 	"ollama.download_error": "Downloadfehler für %s",
 	"ollama.download_subtitle": "Gewichte werden vom Ollama Hub abgerufen…",
