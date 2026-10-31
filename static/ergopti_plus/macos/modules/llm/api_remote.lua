@@ -79,6 +79,7 @@ local Storage        = require("adapters.storage")
 local ProviderConfig = require("llm.provider_config_policy")
 local Json           = require("json")
 local ApiModelListing = require("llm.api_model_listing")
+local UrlTemplate    = require("llm.api_url_template")
 local LOG            = "llm.api_remote"
 -- One probe client per local server, created at its first sweep with the
 -- registry's local_server_probe_timeout_ms and pinned for the life of the
@@ -115,8 +116,11 @@ local function catalog_descriptor_is_valid(provider_id, desc)
 	end
 	if desc.label:match("^%s*$") then return false end
 	if not CATALOG_FORMATS[desc.format] then return false end
+	-- A per-account address (a template the add-entry form fills) leaves the model to the user
+	local fields, malformed = UrlTemplate.fields(desc.base_url)
+	if malformed then return false end
 	if provider_id ~= "openai_compat"
-		and (desc.base_url:match("^%s*$") or desc.default_model:match("^%s*$"))
+		and (desc.base_url:match("^%s*$") or (#fields == 0 and desc.default_model:match("^%s*$")))
 	then
 		return false
 	end
@@ -1156,6 +1160,10 @@ local function resolve_base_url(entry, provider)
 		-- The default address of a local server is where the last scan found it
 		local scan = LocalServers.is_local(entry.provider) and LocalServers.port_scan(entry.provider) or nil
 		raw = scan and scan.running and scan.base_url or provider.base_url
+	end
+	-- A per-account address is filled when the entry is added; its template never leaves
+	if UrlTemplate.has_placeholder(raw) then
+		return nil, "the entry has no account address: add it again from the provider list"
 	end
 	return normalize_base_url(raw)
 end
