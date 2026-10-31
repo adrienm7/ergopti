@@ -31,6 +31,8 @@ local REASON = "model_browser.reason_ollama_missing"
 
 -- The error of the last owned runtime repair that failed, nil after a success.
 local _failure = nil
+-- The sign-in relay's closed refusal behind that failure, nil for any other.
+local _relay_refusal = nil
 -- The origin of the daemon the last successful repair started, and the PAC
 -- lookup stage that made it go direct, nil when its routes were looked up.
 local _fallback_origin, _fallback_stage = nil, nil
@@ -40,18 +42,20 @@ local _last_cause = nil
 local _resolver = nil
 
 --- Records the result of one owned runtime repair.
---- @param result table { ok, error?, origin?, direct_fallback? } as the repair controller reports it.
+--- @param result table { ok, error?, relay_refusal?, origin?, direct_fallback? } as the repair controller reports it.
 function M.note_repair(result)
 	if type(result) ~= "table" then return end
 	if result.ok == true then
 		if _failure ~= nil then Logger.info(LOG, "Local Ollama repair succeeded; its failure is cleared.") end
-		_failure = nil
+		_failure, _relay_refusal = nil, nil
 		-- A failed repair leaves the daemon an earlier one started, and its routes.
 		_fallback_stage = type(result.direct_fallback) == "string" and result.direct_fallback or nil
 		_fallback_origin = _fallback_stage and result.origin or nil
 	elseif result.ok == false and result.error ~= "runtime_cancelled" then
 		_failure = tostring(result.error)
-		Logger.warn(LOG, "Local Ollama repair failed (%s); the page greys Ollama.", _failure)
+		_relay_refusal = type(result.relay_refusal) == "string" and result.relay_refusal or nil
+		Logger.warn(LOG, "Local Ollama repair failed (%s%s); the page greys Ollama.", _failure,
+			_relay_refusal and ": " .. _relay_refusal or "")
 	end
 end
 
@@ -112,12 +116,18 @@ function M.capture(llm, ports)
 		Logger.info(LOG, "Local Ollama install state: %s.", cause)
 	end
 	local available = cause ~= "install_failed" and cause ~= "absent"
-	return available, (not available) and REASON or nil, cause
+	local reason = (not available) and REASON or nil
+	-- A proxy sign-in the relay could not give names its own fix to the user.
+	if cause == "install_failed" and _relay_refusal then
+		local relay = require("infra.proxy_auth_relay").load()
+		if relay then reason = relay.message_key(_relay_refusal) end
+	end
+	return available, reason, cause
 end
 
 --- Test seam: forgets the recorded failure and fallback, the resolver and the last cause.
 function M._reset()
-	_failure, _resolver, _last_cause = nil, nil, nil
+	_failure, _resolver, _last_cause, _relay_refusal = nil, nil, nil, nil
 	_fallback_origin, _fallback_stage = nil, nil
 end
 

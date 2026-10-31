@@ -28,6 +28,12 @@
 ---    Any other failure or a refused plan refuses the start with a classified
 ---    reason instead of launching a daemon that would fail its first pull.
 --- 5. Logs name the outcome only: never an origin URL or the proxy.
+--- 6. A plain http relay the plan selected is probed once for the registry
+---    (docs/design/proxy-auth-relay.md): a proxy that demands an NTLM or
+---    Negotiate sign-in the daemon cannot give is answered by Ergopti's local
+---    relay, proven by the probe's own sign-in; the stage then names that relay
+---    so the daemon starts under it. A refused sign-in refuses the start with
+---    the relay's closed reason instead of a daemon whose pulls would fail.
 --- ==============================================================================
 
 local M = {}
@@ -92,13 +98,18 @@ local function environment_of(plan, rows)
 end
 
 --- Builds the proxy port of the runtime repair.
---- @param deps table { policy, lookup, environment, timeout_ms, owner, origins }
+--- @param deps table { policy, lookup, environment, timeout_ms, owner, origins, relay }
+---   relay = { policy (network/proxy_auth_relay.lua), probe(upstream, authority,
+---   options, callback) -> operation|nil, reason, timeout_ms }.
 --- @return function port Called as port(budget, authorized, done) -> operation.
 function M.new(deps)
 	assert(type(deps) == "table" and type(deps.policy) == "table" and type(deps.lookup) == "function"
 		and type(deps.environment) == "function" and type(deps.owner) == "string"
 		and type(deps.timeout_ms) == "number" and deps.timeout_ms > 0
 		and type(deps.origins) == "table" and #deps.origins > 0, "managed proxy dependencies unavailable")
+	local relay = deps.relay
+	assert(type(relay) == "table" and type(relay.policy) == "table" and type(relay.probe) == "function"
+		and type(relay.timeout_ms) == "number" and relay.timeout_ms > 0, "managed proxy relay dependencies unavailable")
 	-- The registry decides whether an exported relay already covers the daemon.
 	assert(deps.origins[1] == M.REGISTRY_URL, "managed proxy origin inventory does not start with the registry")
 	local policy, lookup, owner, origins = deps.policy, deps.lookup, deps.owner, deps.origins
@@ -158,6 +169,52 @@ function M.new(deps)
 		local fallback = nil
 		local dispatch
 
+		--- Asks the selected relay whether it demands a sign-in the daemon cannot
+		--- give, then settles the stage with the relay the daemon starts under.
+		--- @param plan table Settled route plan with a relay.
+		--- @param upstream string The plain http relay the probe signs in to.
+		local function probe_relay(plan, upstream)
+			local remaining = budget.remaining_ms()
+			if type(remaining) ~= "number" or remaining <= 0 then
+				finish({ ok = false, error = "proxy_timeout" })
+				return
+			end
+			local authority = relay.policy.authority(M.REGISTRY_URL)
+			step = step + 1
+			local mine = step
+			local child, probe_error = relay.probe(upstream, authority, {
+				owner = owner .. "-relay", timeout_ms = math.ceil(math.min(relay.timeout_ms, remaining)),
+				authorized = authorized,
+			}, function(answer, reason)
+				if operation.finished then return end
+				if not authorized() then
+					Logger.info(LOG, "Managed Ollama proxy relay probe finished: start no longer authorized.")
+					finish({ ok = false, error = "proxy_cancelled" })
+					return
+				end
+				if not answer then
+					Logger.error(LOG, "Managed Ollama proxy sign-in relay refused: %s", tostring(reason))
+					finish({ ok = false, error = "proxy_relay_refused", relay_refusal = reason })
+					return
+				end
+				local result = { ok = true, environment = environment_of(plan, rows), direct_fallback = fallback }
+				if answer.status == "required" then
+					Logger.info(LOG, "Managed Ollama proxy demands a %s sign-in: the daemon starts under the local relay.",
+						answer.scheme)
+					result.relay = { upstream = upstream, scheme = answer.scheme }
+				else
+					Logger.info(LOG, "Managed Ollama proxy relay not needed: the proxy demands no Windows sign-in.")
+				end
+				finish(result)
+			end)
+			if not child then
+				Logger.error(LOG, "Managed Ollama proxy relay probe not started: %s", tostring(probe_error))
+				finish({ ok = false, error = "proxy_relay_refused", relay_refusal = "relay_unavailable" })
+				return
+			end
+			if step == mine then inner = child end
+		end
+
 		--- Settles the plan once every origin has a route.
 		local function conclude()
 			local plan, reason = RoutePlan.plan(entries)
@@ -172,6 +229,10 @@ function M.new(deps)
 				local direct = plan.no_proxy()
 				Logger.info(LOG, "Managed Ollama proxy lookup finished: proxy selected, %d direct origin(s).",
 					direct == "" and 0 or select(2, direct:gsub(",", "")) + 1)
+				-- Only a plain http relay without credentials can demand a sign-in
+				-- the daemon cannot answer; userinfo is Basic, which it sends itself.
+				local upstream = relay.policy.upstream(plan.proxy)
+				if upstream then probe_relay(plan, upstream); return end
 			end
 			finish({ ok = true, environment = environment_of(plan, rows), direct_fallback = fallback })
 		end
