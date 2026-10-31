@@ -105,7 +105,9 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //                    prediction_engine.lua.)
 //           20 → 19 (2026-10-31: the physical shortcut hook test loads its
 //                    module by name.)
-const BASELINE = 19;
+//           19 → 18 (2026-10-31: the table-valued scalar test flattens a
+//                    document through preferences instead of reading it.)
+const BASELINE = 18;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -151,7 +153,9 @@ const BASELINE = 19;
 //              prediction_engine.lua.)
 //       65 → 64 (2026-10-31: the physical shortcut hook test loads its module
 //              by name.)
-const READ_BASELINE = 64;
+//       64 → 63 (2026-10-31: the table-valued scalar test flattens a document
+//              through preferences instead of reading it.)
+const READ_BASELINE = 63;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
