@@ -823,9 +823,12 @@ Added October 22 (from the agents' reports; details in their commits):
       hosted run.
 - [ ] **Test parity across the drivers.** [CODE] Done: Windows CapsWord behaviour tests, dynamic hotstrings, the
       shared HTTP-redirect corpus on Windows (c64788227a), macOS audit-named tests renamed, neutral-installation gate,
-      many Windows source scans turned into behaviour tests on 2026-10-30. Left: Windows replay of the timer-ceiling
-      and key-chord corpora (needs a decision to build those policies on Windows), and the rest of the source
-      assertions to behaviour (audit item 14).
+      many Windows source scans turned into behaviour tests on 2026-10-30; on 2026-10-31 the macOS app launcher
+      quoting and clipboard round-trip tests became behaviour tests (macOS pinned-read ratchet 27 -> 24 files, 75
+      -> 70 reads) and Linux got its own pinned-read ratchet (74 files, 136 reads,
+      `tools/test/test-no-pinned-source-reads-linux.cjs`). Left: Windows replay of the timer-ceiling and key-chord
+      corpora (needs a decision to build those policies on Windows), and the rest of the source assertions to
+      behaviour (audit item 14), driving both Lua ratchets down.
 - [ ] **116. Guided third-party validation report.** [PHYS-M] `field_toolchain` runs it with no person (timer,
       Shortcuts, Homebrew, Karabiner signature and Gatekeeper); the next field report answers it. Package provenance
       beyond the signature check is open.
