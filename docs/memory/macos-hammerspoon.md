@@ -1059,6 +1059,25 @@ only the in-memory `guardian_state()`; the remap readiness wait stays the one
 native poller and the one path that deploys the retained regeneration on
 `ready`. Do not add a second status probe or deploy path for the dialog.
 
+### project-macos-launcher-log-stays-in-the-default-folder
+
+`launcher.log` and `hammerspoon-fatal.txt` are written by the native launcher
+before any configuration is read, so they stay in `~/Library/Logs/ergopti_plus`
+whatever `LogsDirPath` says; only the daily and topical logs move. The macOS
+field-report collector looked for them in the moved folder and skipped them
+without a trace, so no 2026-10-30 report carried `launcher.log` and the reload
+lost at 21:06 kept no record of how the launcher saw its runtime end. Read them
+from `LOG_DEFAULT_DIR` (`tools/dev/field-report-paths.py`).
+
+### project-macos-controlled-reload-has-a-deadline
+
+A controlled reload arms `ui.reload_deadline_ms` when accepted. Still
+unsettled then, it reloads natively without the local teardown, naming the
+stage it waited on; the previous worker's stdin EOF lets the guardian fence the
+exact lease. Without it, a fence that never answered left the app up with its
+remaps revoked indefinitely. A pre-fence refusal still aborts and keeps the Lua
+environment live.
+
 ### project-hs-kc-ledger-process-lifecycle
 
 The Karabiner physical-key ledger keeps draining when metrics are disabled.
