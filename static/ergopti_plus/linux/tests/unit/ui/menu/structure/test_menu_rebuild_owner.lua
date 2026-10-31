@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Factory = dofile(helpers.driver_root() .. "/ui/menu/rebuild_owner.lua")
+local Factory = helpers.fresh_module("ui.menu.rebuild_owner")
 
 local function fixture()
 	local state = { builds = 0, publications = 0, actions = 0, errors = {}, value = "initial", active = true, lost = 0 }
@@ -282,7 +282,7 @@ helpers.describe("menu rebuild: clicks during a refresh", function()
 		package.loaded["logger.shim"] = { info = function() end, error = function() end,
 			warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end }
 		local ok, err = pcall(function()
-			local Owner = dofile(helpers.driver_root() .. "/ui/menu/rebuild_owner.lua")
+			local Owner = helpers.fresh_module("ui.menu.rebuild_owner")
 			local state = fixture(); local owner = Owner.new(state.options)
 			owner.request(); helpers.assert_true(owner.pump())
 			local old = state.visible[1].menu[1].fn
