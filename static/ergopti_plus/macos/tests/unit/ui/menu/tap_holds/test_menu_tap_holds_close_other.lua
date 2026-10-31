@@ -106,4 +106,30 @@ helpers.describe("Tap-Holds: the close other Karabiner consent", function()
 		unticked.fn()
 		helpers.assert_eq(written, { false, true })
 	end)
+	helpers.it("explains a VirtualHIDDevice block above the consent and nothing otherwise", function()
+		local function rows_for(status)
+			return tap_hold_rows(true, {
+				owned_runtime_selected = function() return true end,
+				get_close_other_instances = function() return true end,
+				owned_runtime_status = function() return status end,
+			})
+		end
+		local function find(rows, title)
+			for index, row in ipairs(rows) do if row.title == title then return row, index end end
+			return nil
+		end
+		local blocked = rows_for({ state = "unavailable", reason = "virtual_hid_incompatible" })
+		local row, at = find(blocked, "menu.tapholds.vhid_incompatible")
+		helpers.assert_true(row ~= nil, "the driver-version block must be explained")
+		helpers.assert_eq(row.disabled, true)
+		local _, consent_at = find(blocked, LABEL)
+		helpers.assert_true(at < consent_at, "the explanation comes first")
+		helpers.assert_true(find(rows_for({ state = "unavailable", reason = "virtual_hid_not_active" }),
+			"menu.tapholds.vhid_not_active") ~= nil)
+		for _, status in ipairs({ { state = "ready" }, { state = "unavailable", reason = "other_karabiner_running" } }) do
+			local rows = rows_for(status)
+			helpers.assert_nil(find(rows, "menu.tapholds.vhid_incompatible"))
+			helpers.assert_nil(find(rows, "menu.tapholds.vhid_not_active"))
+		end
+	end)
 end)
