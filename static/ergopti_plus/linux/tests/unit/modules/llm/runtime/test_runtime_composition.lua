@@ -103,8 +103,15 @@ test('stale logical HTTP response does not publish callback or erase capability'
 	w.authorized=false;w.http.done({ok=true});eq(count,0);eq(o,w.op)
 end)
 
-local function network()return{policy={route=function()return{mode='system',environment_exclusions={}}end,environment_names=function()return{}end,
-	selection=function()return nil end},lookup=function()end,timeout_ms=7,origins={'https://registry.ollama.ai'}}end
+local function relay_policy()
+	local file=assert(io.open(assert(require('infra.paths').shared('modules/network/proxy_auth_relay.json')),'rb'))
+	local bytes=file:read('*a');assert(file:close())
+	return assert(require('network.proxy_auth_relay').new(require('json').decode(bytes)))
+end
+local function network(relay_executable)return{policy={route=function()return{mode='system',environment_exclusions={}}end,environment_names=function()return{}end,
+	selection=function()return nil end},lookup=function()end,timeout_ms=7,origins={'https://registry.ollama.ai'},
+	relay={policy=relay_policy(),probe=function()end,timeout_ms=9,executable=function()return relay_executable end,
+		timings=function()return{dial_ms=11,handshake_ms=12,idle_ms=13,probe_ms=14}end}}end
 test('without a network dependency the composition has no proxy stage',function()local w=fixture();eq(w.controller.ports.network,nil)end)
 test('a network dependency adds the proxy stage and refuses an incomplete one',function()
 	local w=fixture({network=network()});eq(type(w.controller.ports.network),'function')
@@ -135,6 +142,28 @@ test('the bypass rows of the route plan replace the inherited bypass copies',fun
 		if entry=='http_proxy=keep'then kept=true end
 	end
 	eq(#bypass,2);eq(bypass[1],'NO_PROXY=intranet,blob.example');eq(bypass[2],'no_proxy=intranet,blob.example');eq(kept,true)
+end)
+-- docs/design/proxy-auth-relay.md: the relay serves the daemon for its lifetime.
+test('(proxy-auth-relay) a proxy that demands a sign-in starts the daemon under the relay',function()
+	local w=fixture({network=network('/opt/ergopti/bin/ergopti-proxy-relay')})
+	w.options.environment={'HTTPS_PROXY=http://proxy.corp.example:3128'}
+	w.options.relay={upstream='http://proxy.corp.example:3128',scheme='negotiate'}
+	w.controller.ports.start_service('/managed/ollama',{'serve'},w.options,function()end)
+	eq(w.service.binary,'/opt/ergopti/bin/ergopti-proxy-relay')
+	eq(table.concat(w.service.args,' '),'run --upstream http://proxy.corp.example:3128 --variable HTTPS_PROXY'
+		..' --dial-timeout-ms 11 --handshake-timeout-ms 12 --idle-timeout-ms 13 -- /managed/ollama serve')
+	eq(w.service.opts.timeout_ms,false)
+end)
+test('(proxy-auth-relay) a relay that is not installed refuses the start by name',function()
+	local w=fixture({network=network(nil)})
+	w.options.relay={upstream='http://proxy.corp.example:3128',scheme='ntlm'}
+	local result
+	local o=w.controller.ports.start_service('/managed/ollama',{'serve'},w.options,function(r)result=r end)
+	eq(w.service,nil);eq(o:is_settled(),true);eq(result.error,'runtime_proxy_relay_unavailable')
+end)
+test('(proxy-auth-relay) a network dependency without the relay binding is refused',function()
+	local incomplete=network('/x');incomplete.relay=nil
+	eq(pcall(fixture,{network=incomplete}),false)
 end)
 test('a network dependency without the origin inventory is refused',function()
 	local incomplete=network();incomplete.origins=nil

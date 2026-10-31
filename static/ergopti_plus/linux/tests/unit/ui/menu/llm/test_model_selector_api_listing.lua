@@ -206,6 +206,34 @@ helpers.describe("Ollama install state on Linux", function()
 		State._reset()
 	end)
 
+	-- docs/design/proxy-auth-relay.md: a refused proxy sign-in names its own fix.
+	helpers.it("(proxy-auth-relay) a refused proxy sign-in greys Ollama with the relay's message", function()
+		local State = helpers.load_module("modules.llm.ollama_install_state")
+		State._reset()
+		local live = ports({ managed = "installed" })
+		live.failure = State.failure
+		local cases = {
+			sign_in_unavailable = "network.relay.sign_in_unavailable",
+			ntlm_requires_windows = "network.relay.ntlm_requires_windows",
+			sign_in_rejected = "network.relay.sign_in_rejected",
+			upstream_scheme_unsupported = "network.relay.scheme_unsupported",
+			relay_unavailable = "network.relay.failed",
+			upstream_timeout = "network.relay.failed",
+		}
+		for refusal, key in pairs(cases) do
+			State.note_repair({ ok = false, error = "runtime_proxy_relay_refused", relay_refusal = refusal })
+			local available, reason = State.capture(llm(), live)
+			helpers.assert_eq(available, false, refusal)
+			helpers.assert_eq(reason, key, refusal)
+		end
+		State.note_repair({ ok = false, error = "runtime_install_failed" })
+		local _, reason = State.capture(llm(), live)
+		helpers.assert_eq(reason, "model_browser.reason_ollama_missing", "another failure keeps the generic reason")
+		State.note_repair({ ok = true })
+		helpers.assert_eq(State.capture(llm(), live), true)
+		State._reset()
+	end)
+
 	helpers.it("(linux-ollama-install-state) the page binding greys the Ollama group with that reason", function()
 		local source = assert(io.open(helpers.driver_root() .. "/ui/model_browser/bridge.lua", "r"))
 		local code = source:read("*a"); source:close()

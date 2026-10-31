@@ -25,14 +25,23 @@ local function policy()
 	return assert(require("network.proxy_policy").new(require("json").decode(bytes)))
 end
 
+local function relay_policy()
+	local file = assert(io.open(assert(Paths.shared("modules/network/proxy_auth_relay.json")), "rb"))
+	local bytes = file:read("*a")
+	assert(file:close())
+	return assert(require("network.proxy_auth_relay").new(require("json").decode(bytes)))
+end
+
 local ORIGINS = assert(require("infra.route_origins").client("ollama"))
 local BLOB = ORIGINS[2]
 
 --- One port over a scripted lookup. `world.receipt` is what the desktop answers
 --- for every origin; `world.receipts[url]` overrides it for one origin.
 local function world(options)
+	-- `probe_answer` is what the relay probe answers ({ answer, reason });
+	-- by default the proxy demands no sign-in.
 	local w = { rows = { "PATH=/usr/bin" }, authorized = true, remaining = 5000, lookups = 0, results = {},
-		urls = {}, receipts = {} }
+		urls = {}, receipts = {}, probes = {}, probe_answer = { { status = "not_needed" } } }
 	for key, value in pairs(options or {}) do w[key] = value end
 	local Proxy = helpers.load_module("modules.llm.managed_ollama_proxy")
 	w.module = Proxy
@@ -52,6 +61,18 @@ local function world(options)
 			if receipt then callback(receipt) end
 			return w.child
 		end,
+		relay = { policy = relay_policy(), timeout_ms = 4000,
+			probe = function(upstream, authority, probe_options, callback)
+				w.probes[#w.probes + 1] = { upstream = upstream, authority = authority, options = probe_options }
+				w.probe_callback = callback
+				if w.probe_error then return nil, w.probe_error end
+				local child = { settled = true }
+				function child.is_settled() return child.settled end
+				function child.on_settled(listener) listener(); return true end
+				function child.cancel() return true end
+				if w.probe_answer then callback(w.probe_answer[1], w.probe_answer[2]) end
+				return child
+			end },
 	})
 	function w:run()
 		local budget = { remaining_ms = function() return w.remaining end }
@@ -330,4 +351,88 @@ it("no origin URL and no proxy ever reach the log", function()
 			and not line:find("secret", 1, true) and not line:find("leak", 1, true)
 			and not line:find(BLOB:gsub("^https://", ""), 1, true), line)
 	end
+end)
+
+-- ========== Sign-in relay (docs/design/proxy-auth-relay.md) ==========
+
+local REGISTRY_AUTHORITY = ORIGINS[1]:gsub("^https://", "") .. ":443"
+
+it("(proxy-auth-relay) a plain http relay is probed once for the registry and needs no relay", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } } })
+	local result = w:run()
+	eq(result.ok, true)
+	eq(result.relay, nil)
+	eq(result.environment[1], "HTTPS_PROXY=http://proxy.corp.example:3128")
+	eq(#w.probes, 1)
+	eq(w.probes[1].upstream, "http://proxy.corp.example:3128")
+	eq(w.probes[1].authority, REGISTRY_AUTHORITY)
+	eq(w.probes[1].options.owner, "test-owner-relay")
+	eq(w.probes[1].options.timeout_ms, 4000)
+end)
+
+it("(proxy-auth-relay) a proxy that demands Negotiate starts the daemon under the relay", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } },
+		probe_answer = { { status = "required", scheme = "negotiate" } } })
+	local result = w:run()
+	eq(result.ok, true)
+	eq(result.relay.upstream, "http://proxy.corp.example:3128")
+	eq(result.relay.scheme, "negotiate")
+	-- The plan's own rows stay: the relay replaces HTTPS_PROXY in the child only.
+	eq(result.environment[1], "HTTPS_PROXY=http://proxy.corp.example:3128")
+end)
+
+it("(proxy-auth-relay) a refused sign-in refuses the start with the relay's reason", function()
+	for _, reason in ipairs({ "sign_in_unavailable", "ntlm_requires_windows", "sign_in_rejected", "relay_unavailable" }) do
+		local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } },
+			probe_answer = { nil, reason } })
+		local result = w:run()
+		eq(result.ok, false)
+		eq(result.error, "proxy_relay_refused")
+		eq(result.relay_refusal, reason)
+	end
+end)
+
+it("(proxy-auth-relay) a probe that cannot start is the named relay_unavailable", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } },
+		probe_error = "proxy-auth-relay-probe-unavailable" })
+	local result = w:run()
+	eq(result.ok, false)
+	eq(result.relay_refusal, "relay_unavailable")
+end)
+
+it("(proxy-auth-relay) Basic credentials, socks and direct routes are never probed", function()
+	for _, proxy in ipairs({ "http://user:pw@proxy.corp.example:3128", "socks5://gate.corp.example:1080", "direct://" }) do
+		local w = world({ receipt = { ok = true, proxies = { proxy } } })
+		eq(w:run().ok, true)
+		eq(#w.probes, 0)
+	end
+end)
+
+it("(proxy-auth-relay) the probe bound is the smaller of its timeout and the budget left", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } }, remaining = 1500 })
+	w:run()
+	eq(w.probes[1].options.timeout_ms, 1500)
+	local spent = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } } })
+	local lookups = 0
+	spent.remaining = 5000
+	local original = spent.port
+	spent.receipts[BLOB] = { ok = true, proxies = { "http://proxy.corp.example:3128" } }
+	-- The budget runs out between the last lookup and the probe.
+	local budget = { remaining_ms = function() lookups = lookups + 1; return lookups > #ORIGINS and 0 or 5000 end }
+	original(budget, function() return true end, function(result) spent.results[#spent.results + 1] = result end)
+	eq(spent.results[1].error, "proxy_timeout")
+	eq(#spent.probes, 0)
+end)
+
+it("(proxy-auth-relay) a start withdrawn during the probe discards its answer", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } },
+		probe_answer = false })
+	w:run()
+	eq(#w.results, 0)
+	eq(#w.probes, 1)
+	w.authorized = false
+	w.probe_callback({ status = "required", scheme = "ntlm" })
+	eq(#w.results, 1)
+	eq(w.results[1].ok, false)
+	eq(w.results[1].error, "proxy_cancelled")
 end)
