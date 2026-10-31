@@ -394,11 +394,21 @@ emit_linux = "ctrl+Tab"
 
 # --- Navigation navigateur ---
 
+# The browsers' own history keys: Alt+Left and Alt+Right on Windows and Linux
+# (Firefox, Chromium, GNOME Files, Dolphin), Cmd+Left and Cmd+Right on macOS
+# (Safari, Chrome, Firefox). Cmd+[ is macOS's other spelling, but it names a
+# character, and the key typing "[" moves with the keyboard layout.
 [sg_actions.nav_back]
-platform = "ahk"
+platform = "all"
+emit_hs_key = "left"
+emit_hs_mods = ["cmd"]
+emit_linux = "alt+Left"
 
 [sg_actions.nav_forward]
-platform = "ahk"
+platform = "all"
+emit_hs_key = "right"
+emit_hs_mods = ["cmd"]
+emit_linux = "alt+Right"
 
 # --- Fenêtres ---
 
