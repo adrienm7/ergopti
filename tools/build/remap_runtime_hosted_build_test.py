@@ -1,10 +1,12 @@
-# tools/build/remap_runtime_phase_deadline_test.py
-"""Pin the hard calibration deadline of the native phase owner the runtime build uses.
+# tools/build/remap_runtime_hosted_build_test.py
+"""Pin the controls the owned runtime build needs on a hosted macOS runner.
 
 A hosted run once waited two hours on three xcodebuild children because the
 phase owner only compared the clock after the child exited. These tests run
 real children: a phase still running at its deadline is killed with its whole
 process tree, refused with a named code and receipt, and progress is streamed.
+They also pin the background-ctime tolerance of held files and the parse of
+the self-signed identity that find-identity reports as not trusted.
 """
 
 import contextlib
@@ -225,6 +227,44 @@ class IdentityChangeReportControls(unittest.TestCase):
         with contextlib.redirect_stderr(log):
             BUILD.current_product(held, self.root)
         self.assertEqual(log.getvalue(), "")
+
+
+class SigningIdentityListingControls(unittest.TestCase):
+    """find-identity output for the stable self-signed identity (run 41232985096)."""
+
+    IDENTITY = "759D8AAE58886BAC8886D834F9EEAE52274051BC"
+    LISTING = (
+        "Policy: Code Signing\n"
+        "  Matching identities\n"
+        '  1) 759D8AAE58886BAC8886D834F9EEAE52274051BC "ErgoptiPlus Self-Signed"'
+        " (CSSMERR_TP_NOT_TRUSTED)\n"
+        "     1 identities found\n"
+        "\n"
+        "  Valid identities only\n"
+        "     0 valid identities found\n"
+    )
+
+    def test_untrusted_self_signed_identity_is_listed(self):
+        self.assertTrue(BUILD.signing_identity_listed(self.LISTING, self.IDENTITY))
+
+    def test_trusted_identity_is_listed(self):
+        listing = self.LISTING.replace(" (CSSMERR_TP_NOT_TRUSTED)", "")
+        self.assertTrue(BUILD.signing_identity_listed(listing, self.IDENTITY))
+
+    def test_other_certificate_status_is_refused(self):
+        for status in ("CSSMERR_TP_CERT_EXPIRED", "CSSMERR_TP_CERT_REVOKED"):
+            with self.subTest(status=status):
+                listing = self.LISTING.replace("CSSMERR_TP_NOT_TRUSTED", status)
+                self.assertFalse(BUILD.signing_identity_listed(listing, self.IDENTITY))
+
+    def test_absent_or_duplicated_identity_is_refused(self):
+        self.assertFalse(BUILD.signing_identity_listed(self.LISTING, "A" * 40))
+        twice = self.LISTING.replace(
+            "     1 identities found",
+            '  2) 759D8AAE58886BAC8886D834F9EEAE52274051BC "Copy" (CSSMERR_TP_NOT_TRUSTED)\n'
+            "     2 identities found",
+        )
+        self.assertFalse(BUILD.signing_identity_listed(twice, self.IDENTITY))
 
 
 if __name__ == "__main__":
