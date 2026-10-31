@@ -111,7 +111,8 @@ end
 local function network(relay_executable)return{policy={route=function()return{mode='system',environment_exclusions={}}end,environment_names=function()return{}end,
 	selection=function()return nil end},lookup=function()end,timeout_ms=7,origins={'https://registry.ollama.ai'},
 	relay={policy=relay_policy(),probe=function()end,timeout_ms=9,executable=function()return relay_executable end,
-		timings=function()return{dial_ms=11,handshake_ms=12,idle_ms=13,probe_ms=14}end}}end
+		timings=function()return{dial_ms=11,handshake_ms=12,idle_ms=13,probe_ms=14}end},
+	probe=function()end,relay_address=function()end,probe_timeout_ms=3}end
 test('without a network dependency the composition has no proxy stage',function()local w=fixture();eq(w.controller.ports.network,nil)end)
 test('a network dependency adds the proxy stage and refuses an incomplete one',function()
 	local w=fixture({network=network()});eq(type(w.controller.ports.network),'function')
@@ -168,6 +169,8 @@ end)
 test('a network dependency without the origin inventory is refused',function()
 	local incomplete=network();incomplete.origins=nil
 	eq(pcall(fixture,{network=incomplete}),false)
+	local unprobed=network();unprobed.probe=nil
+	eq(pcall(fixture,{network=unprobed}),false)
 end)
 test('proxy rows naming another variable or carrying a newline dispatch no process',function()
 	for _,row in ipairs({'OLLAMA_HOST=0.0.0.0:1','ALL_PROXY=socks5://x:1','HTTPS_PROXY=a\nB=c',42})do
