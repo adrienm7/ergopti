@@ -935,6 +935,10 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
 		},
+		"menu.gestures.recommended_info": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
 		"menu.hotstrings.cascade_max_arrows_unit": {
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
