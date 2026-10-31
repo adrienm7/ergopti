@@ -1,20 +1,21 @@
---- tests/unit/ui/menu/tap_holds/test_menu_tap_holds_close_other.lua
+--- tests/unit/ui/menu/tap_holds/test_menu_tap_holds_owned_runtime.lua
 
 --- ==============================================================================
---- MODULE: Tap-Holds Close Other Karabiner Row
+--- MODULE: Tap-Holds Rows Of Ergopti's Own Karabiner Runtime
 --- DESCRIPTION:
---- On a boot that runs Ergopti's own Karabiner runtime, the Tap-Holds submenu
---- carries the consent row « close other Karabiner while tap-holds are on »
---- (ADR 011 decision 3), ticked from the remap facade and toggling it there.
---- On the shared runtime the row does not exist: the option would do nothing.
+--- With Ergopti's own Karabiner runtime, the Tap-Holds submenu says what the
+--- runtime did to the user's Mac: that their Karabiner-Elements is closed while
+--- Ergopti runs and comes back on pause or quit, and why the runtime cannot run
+--- when the one-driver-version rule of the VirtualHIDDevice blocks it.
 ---
---- ROOT CAUSE ENCODED: the consent was a hidden key only a hand edit could
---- change, so a user could not keep their own Karabiner without editing TOML.
+--- ROOT CAUSE ENCODED: a user whose Karabiner disappeared while Ergopti ran, or
+--- whose tap-holds stopped because of a driver conflict, had only the log to
+--- learn why.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-local LABEL = "menu.tapholds.close_other_karabiner"
+local LABEL = "notify.karabiner.user_closed"
 
 --- Loads the menu module over a fresh picker cache and a remap double.
 --- @param integration_enabled boolean « Ergopti uses Karabiner ».
@@ -69,7 +70,7 @@ local function tap_hold_rows(integration_enabled, extra)
 	return built.submenu
 end
 
---- Finds the consent row.
+--- Finds the closed-Karabiner row.
 --- @param rows table Rendered submenu rows.
 --- @return table|nil row
 local function consent_row(rows)
@@ -79,38 +80,20 @@ local function consent_row(rows)
 	return nil
 end
 
-helpers.describe("Tap-Holds: the close other Karabiner consent", function()
-	helpers.it("is absent on the shared runtime", function()
+helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
+	helpers.it("says the user's Karabiner is closed only while Ergopti holds it closed", function()
 		helpers.assert_nil(consent_row(tap_hold_rows(true)))
-		helpers.assert_nil(consent_row(tap_hold_rows(true, { owned_runtime_selected = function() return false end,
-			get_close_other_instances = function() return true end })))
+		helpers.assert_nil(consent_row(tap_hold_rows(true, { user_karabiner_closed = function() return false end })))
+		local row = consent_row(tap_hold_rows(true, { user_karabiner_closed = function() return true end }))
+		helpers.assert_true(row ~= nil, "the closed-Karabiner row must be drawn")
+		helpers.assert_eq(row.disabled, true)
+		helpers.assert_nil(row.fn)
 	end)
 
-	helpers.it("shows the saved consent on an owned boot and toggles it through the facade", function()
-		local written = {}
-		local regenerations = 0
-		local extra = {
-			owned_runtime_selected = function() return true end,
-			get_close_other_instances = function() return true end,
-			set_close_other_instances = function(value) written[#written + 1] = value; return true end,
-			regenerate = function() regenerations = regenerations + 1; return true end,
-		}
-		local row = consent_row(tap_hold_rows(true, extra))
-		helpers.assert_true(row ~= nil, "the consent row must be drawn on an owned boot")
-		helpers.assert_eq(row.checked, true)
-		row.fn()
-		helpers.assert_eq(written, { false })
-		extra.get_close_other_instances = function() return false end
-		local unticked = consent_row(tap_hold_rows(true, extra))
-		helpers.assert_eq(unticked.checked, false)
-		unticked.fn()
-		helpers.assert_eq(written, { false, true })
-	end)
-	helpers.it("explains a VirtualHIDDevice block above the consent and nothing otherwise", function()
+	helpers.it("explains a VirtualHIDDevice block above the closed-Karabiner row and nothing otherwise", function()
 		local function rows_for(status)
 			return tap_hold_rows(true, {
-				owned_runtime_selected = function() return true end,
-				get_close_other_instances = function() return true end,
+				user_karabiner_closed = function() return true end,
 				owned_runtime_status = function() return status end,
 			})
 		end

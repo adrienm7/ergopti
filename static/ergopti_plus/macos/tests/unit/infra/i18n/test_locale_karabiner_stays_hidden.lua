@@ -8,7 +8,9 @@
 --- show — a row, a section header, or a dialog one of its rows opens — may name
 --- it, in any locale, except the few that exist precisely because the user
 --- may decide about it: the F2 « Ergopti uses Karabiner » switch, its removal
---- command, the hint explaining greyed tap-holds, and the removal notice. The
+--- command, the hint explaining greyed tap-holds, the removal notice, and the
+--- texts about the user's own Karabiner-Elements that Ergopti closed or whose
+--- driver version blocks Ergopti's runtime. The
 --- keys are collected from what the tray actually draws: every i18n key the
 --- menu modules pass to i18n.get, and every label key the shared menu
 --- manifest declares for this platform.
@@ -32,6 +34,17 @@ local SWITCH_KEYS = {
 	["menu.tapholds.karabiner_off_hint"] = true,
 	["notify.karabiner.removed"] = true,
 	["menu.layout.virtual_keyboard"] = true,
+}
+
+-- The texts about the user's own Karabiner-Elements, which Ergopti's own runtime
+-- acts on (ADR 011, the maintainer's rule of 2026-10-31): that it is closed
+-- while Ergopti runs, and that its driver version blocks Ergopti's runtime.
+-- They must name the product the user installed, or the user cannot tell what
+-- disappeared or what to change.
+local USER_KARABINER_KEYS = {
+	["notify.karabiner.user_closed"] = true,
+	["menu.tapholds.vhid_incompatible"] = true,
+	["menu.tapholds.vhid_not_active"] = true,
 }
 
 -- The Debug menu's field checks exist so the maintainer can test the remap
@@ -115,9 +128,11 @@ helpers.describe("no macOS tray text names Karabiner, in any locale", function()
 			"the scan must reach the tap-holds dialogs, or it proves nothing about them")
 		local drawn = {}
 		for _, key in ipairs(keys) do drawn[key] = true end
-		for key in pairs(SWITCH_KEYS) do
-			helpers.assert_true(drawn[key] == true,
-				key .. " is exempted only because the tray draws it; it must still be drawn")
+		for _, exempt in ipairs({ SWITCH_KEYS, USER_KARABINER_KEYS }) do
+			for key in pairs(exempt) do
+				helpers.assert_true(drawn[key] == true,
+					key .. " is exempted only because the tray draws it; it must still be drawn")
+			end
 		end
 	end)
 
@@ -128,7 +143,7 @@ helpers.describe("no macOS tray text names Karabiner, in any locale", function()
 			for _, key in ipairs(tray_keys()) do
 				local value = locale[key]
 				if type(value) == "string" and not SWITCH_KEYS[key]
-					and not DEBUG_FIELD_CHECK_KEYS[key] then
+					and not DEBUG_FIELD_CHECK_KEYS[key] and not USER_KARABINER_KEYS[key] then
 					helpers.assert_nil(value:lower():find("karabiner", 1, true),
 						key .. " names the remap engine in " .. code .. ".json: " .. value)
 				end
