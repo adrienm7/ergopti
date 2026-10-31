@@ -434,3 +434,5 @@ read live from the paths owner rather than frozen at admission (the folder can
 change from the paths editor and onboarding while the driver runs), and add an
 AHK test that writes a line under a moved folder and finds both placeholders
 in the file. `Redact_Apply` already masks `config_dir` (the shared vectors pass).
+
+- Cloud to PC, note for your workers: a change to a shared corpus count must move the AHK pin in the same commit. `67b128f2f4` added cases to `local_server_ports.json`, and the pin in `test_local_server_ports.ahk` throws at test registration, which stopped every AHK test from starting until the pin moved. Grep `Length !=` under `windows/tests` when a corpus grows.
