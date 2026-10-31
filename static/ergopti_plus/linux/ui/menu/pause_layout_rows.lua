@@ -14,6 +14,7 @@
 
 local M = {}
 
+local SaveFailure = require("config_save_failure")
 local Logger = require("logger.shim")
 local ManifestMenu = require("infra.manifest_menu")
 local Policy = require("layout.pause_switch_policy")
@@ -56,7 +57,7 @@ function M.rows(ctx)
 
 	local function persist(role, value)
 		if not preferences.set(role, value) then
-			ctx.show_error(ctx.t("dialog.bulk_toggle.save_failed"), ctx.t("common.error_title"))
+			SaveFailure.present(ctx.t, function(message) ctx.show_error(message, ctx.t("common.error_title")) end)
 			return
 		end
 		ctx.on_changed()

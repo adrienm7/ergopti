@@ -10,6 +10,7 @@
 
 local M = {}
 
+local SaveFailure = require("config_save_failure")
 local Logger = require("logger.shim")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
@@ -81,7 +82,7 @@ local function _build_tap_holds(ctx)
 	local KeyCatalog = require("tap_hold.key_catalog")
 
 	local function changed(ok)
-		if not ok then show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title")) end
+		if not ok then SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 
