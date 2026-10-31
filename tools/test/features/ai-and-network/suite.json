@@ -165,10 +165,10 @@
 		{
 			"id": "js-0312",
 			"ordinal": 325,
-			"name": "Ollama bootstrap bounds and authenticates network acquisition",
+			"name": "The stock Ollama installer is retired; only Ergopti's runtime is verified",
 			"cmd": "node",
-			"args": ["tools/test/test-ollama-bootstrap-network-hardening.cjs"],
-			"repro": "npm run test:ollama-bootstrap-network-hardening"
+			"args": ["tools/test/test-ollama-stock-installer-retired.cjs"],
+			"repro": "npm run test:ollama-stock-installer-retired"
 		},
 		{
 			"id": "js-0313",

@@ -2191,8 +2191,10 @@ function M.new(deps, presets, ram_getter)
 			end
 			return false
 		end
-		pcall(hs.urlevent.openURL, OllamaBinary.DOWNLOAD_PAGE_URL)
-		pcall(notifications.notify, i18n.get("ollama.not_detected_title"), i18n.get("ollama.not_detected_body"), "warning")
+		-- Only Ergopti's own runtime is ever used: name its install path, never
+		-- the stock Ollama download page (owned-runtimes row "Ollama", PIN).
+		pcall(notifications.notify, i18n.get("ollama.runtime_missing_title"),
+			i18n.get("ollama.runtime_missing_body"), "warning")
 		return false
 	end
 

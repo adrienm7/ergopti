@@ -2379,8 +2379,6 @@
 	"ollama.model_ready": "%s מוכן!",
 	"ollama.model_repair": "המודל נראה פגום. מנסה הורדה מחדש: %s",
 	"ollama.model_repair_title": "מתקן מודל Ollama",
-	"ollama.not_detected_body": "אנא התקן את Ollama ונסה שוב.",
-	"ollama.not_detected_title": "Ollama לא זוהה",
 	"ollama.service_disconnected": "שירות Ollama הפסיק להגיב.",
 	"ollama.service_ready": "שירות Ollama מוכן ✅",
 	"ollama.service_stopped": "שירות Ollama נעצר. מפעיל…",
