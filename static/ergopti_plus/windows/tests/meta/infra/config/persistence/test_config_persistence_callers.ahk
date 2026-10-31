@@ -866,12 +866,10 @@ _CPC_MetricsBootCacheHandoff(Source, &CacheName := "") {
 		Line := A_LoopField
 		if Depth == 0
 			Top .= Line . "`n"
-		loop parse Line {
-			if A_LoopField == "{"
-				Depth += 1
-			else if A_LoopField == "}"
-				Depth -= 1
-		}
+		; Depth is only read between lines, so per-line counts are equivalent.
+		StrReplace(Line, "{", , , &Opens)
+		StrReplace(Line, "}", , , &Closes)
+		Depth += Opens - Closes
 	}
 	if !RegExMatch(Top,
 		"m)^[\t ]*(?:global[\t ]+)?([A-Za-z_][A-Za-z0-9_]*)[\t ]*:=[\t ]*CS_Load\([\t ]*\)[\t ]*$", &Producer)
