@@ -2378,8 +2378,6 @@
 	"ollama.model_ready": "%s 준비 완료!",
 	"ollama.model_repair": "모델이 손상된 것 같습니다. 재다운로드 시도 중: %s",
 	"ollama.model_repair_title": "Ollama 모델 복구 중",
-	"ollama.not_detected_body": "Ollama를 설치하고 다시 시도하세요.",
-	"ollama.not_detected_title": "Ollama가 감지되지 않음",
 	"ollama.service_disconnected": "Ollama 서비스가 응답을 중지했습니다.",
 	"ollama.service_ready": "Ollama 서비스 준비 완료 ✅",
 	"ollama.service_stopped": "Ollama 서비스가 중지되었습니다. 시작 중…",
