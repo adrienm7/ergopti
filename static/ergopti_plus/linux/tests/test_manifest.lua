@@ -790,6 +790,7 @@ return {
 	"tests.unit.ui.menu.llm.test_api_selection_errors",
 	"tests.unit.ui.menu.llm.test_api_add_admission",
 	"tests.unit.ui.menu.llm.test_llm_backend_rows_shared_inert_empty",
+	"tests.unit.ui.menu.llm.test_api_account_address",
 	"tests.unit.ui.menu.llm.test_llm_enable_refusal",
 	"tests.unit.ui.menu.llm.test_llm_menu_prediction_count",
 	"tests.unit.ui.downloads.test_models_browser_shared_command",

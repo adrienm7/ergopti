@@ -52,6 +52,7 @@ local TableUtil = require("table_util")
 local ApiModelListing = require("llm.api_model_listing")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local ProviderConfig = require("llm.provider_config_policy")
+local UrlTemplate = require("llm.api_url_template")
 
 local LOG = "modules.llm.api_remote"
 
@@ -108,8 +109,12 @@ local function descriptor_is_valid(id, desc)
 		if type(desc[key]) ~= "string" then return false end
 	end
 	if desc.label:match("^%s*$") or not FORMAT_USES[desc.format] then return false end
-	-- Only the generic OpenAI-compatible entry leaves its URL and model to the user.
-	if id ~= "openai_compat" and (desc.base_url:match("^%s*$") or desc.default_model:match("^%s*$")) then
+	-- Only the generic OpenAI-compatible entry leaves its URL to the user; a
+	-- per-account address (a template the add-entry form fills) leaves the model
+	local fields, malformed = UrlTemplate.fields(desc.base_url)
+	if malformed then return false end
+	if id ~= "openai_compat" and (desc.base_url:match("^%s*$")
+		or (#fields == 0 and desc.default_model:match("^%s*$"))) then
 		return false
 	end
 	if desc.base_url ~= "" and not desc.base_url:match("^https?://%S+$") then return false end
@@ -388,6 +393,10 @@ function M.endpoint(entry, model)
 	if base_raw == provider.base_url and type(Servers) == "table" and type(Servers.port_scan) == "function" then
 		local scan = Servers.port_scan(entry.provider)
 		if scan and scan.running and type(scan.base_url) == "string" then base_raw = scan.base_url end
+	end
+	-- A per-account address is filled when the entry is added; its template never leaves
+	if UrlTemplate.has_placeholder(base_raw) then
+		return nil, "the entry has no account address: add it again from the provider list"
 	end
 	local base, reason = M.normalize_base_url(base_raw)
 	if not base then return nil, reason end
