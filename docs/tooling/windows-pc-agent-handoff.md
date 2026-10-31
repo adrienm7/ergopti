@@ -414,3 +414,23 @@ Read through "Found tonight"; all of it is taken in two PC lots, do not redo. Al
 - The macOS and Linux case-twin notice comes from one writer hook, but their menu callers still show the old generic message too. That part is open on the Lua side and cloud-owned if you take it.
 
 The owned-runtimes commit of `b8894bb73c` overlapped a PC commit; the PC drops its own and follows your registry. The field report is still to come, after the suite.
+
+## Configuration folder names in the log file (item 139, 31 October)
+
+macOS and Linux now mask the configuration folder at write time: the logger's
+redactor receives the folder the path owner resolves at boot and every folder
+the user moves to afterwards (`Logger.follow_config_dir` in
+`macos/infra/logger.lua`, called by `macos/infra/config_paths.lua`;
+`logger_sink.follow_config_dir` in `linux/infra/logger_sink.lua`, called by
+`linux/infra/config_paths.lua`). Every line then shows the folder as
+`config_placeholder` and each name below it as `config_name_placeholder` from
+`_shared/modules/diagnostics/redaction.json`, except `config_known_names`.
+
+Windows still builds its redaction context without `config_dir`
+(`windows/infra/logger.ahk`, the `Context := Map("home", …, "user", …)` of the
+privacy admission), so a log line keeps "C:\Users\…\Sync\Jean Dupont\famille.toml"
+past the home placeholder. To do: give that context the configuration folder,
+read live from the paths owner rather than frozen at admission (the folder can
+change from the paths editor and onboarding while the driver runs), and add an
+AHK test that writes a line under a moved folder and finds both placeholders
+in the file. `Redact_Apply` already masks `config_dir` (the shared vectors pass).
