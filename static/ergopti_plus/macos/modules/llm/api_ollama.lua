@@ -2129,6 +2129,8 @@ local function request_prebuilt(client, label, body, on_text, on_fail, continuat
 						return
 					end
 					Logger.info(LOG, "%s answer of the local server received in %dms (%d char(s)).", label, ms, #text)
+					require("perf_budget").judge(Logger, LOG, "llm.local", ms,
+						function() return require("infra.timings").ms("budgets", "llm_local_request_ms") end)
 					if not request_current() then
 						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
 					end
