@@ -80,7 +80,7 @@ helpers.describe("reload breadcrumb", function()
 		helpers.assert_eq(lines_of(path), { "accepted 5000.000", "hs_reload_called 5000.000", "boot 6000.000" })
 
 		local file = assert(io.open(path, "wb"))
-		file:write(string.rep("x", breadcrumb.MAX_BYTES + 1))
+		file:write(string.rep("x", breadcrumb.TRAIL_MAX_BYTES + 1))
 		file:close()
 		helpers.assert_eq(breadcrumb.record_boot(), false, "boots without a reload never grow it unbounded")
 		os.remove(path)
