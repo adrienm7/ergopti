@@ -382,24 +382,36 @@ local SELECT_TOKENS = { shift = "anyShift", caps = "caps", option = "anyOption",
 --- @return function apply(rewritten_body) -> body
 local function split_shortcuts(body, canonical, copies)
 	if #copies == 0 then return function(text) return text end end
-	if #canonical.key_map_sets ~= 1 then
-		fail("several_key_map_sets: a press shares a moved keyMap and the layout has several keyMapSets")
-	end
 	local positions, positions_err = Keylayout.positions(body)
 	if not positions then fail(positions_err) end
 	local set = positions.key_map_sets[canonical.map_set]
 	local modifiers_id = positions.default_modifiers
 	if set == nil or modifiers_id == nil then fail('no <layout first="0"> modifiers or keyMapSet') end
+	-- Every keyMapSet reads the same modifierMap through its <layout>, so a new
+	-- index must be free in all of them, and each set gets its own verbatim copy:
+	-- an ISO/ANSI pair (bépo) keeps each keyboard's Cmd and Ctrl cells.
+	local set_ids = TableUtil.sorted_keys(positions.key_map_sets)
 	local next_index = 0
-	for index in pairs(set.maps) do if index >= next_index then next_index = index + 1 end end
+	for _, id in ipairs(set_ids) do
+		for index in pairs(positions.key_map_sets[id].maps) do
+			if index >= next_index then next_index = index + 1 end
+		end
+	end
 	local maps, selects = {}, {}
+	for _, id in ipairs(set_ids) do maps[id] = {} end
 	for _, copy in ipairs(copies) do
-		local map = set.maps[copy.index]
-		if map == nil or map.stop == nil then fail("keyMap index " .. copy.index .. " is not in the text") end
-		local original = body:sub(map.start, map.stop - 1)
+		if set.maps[copy.index] == nil then fail("keyMap index " .. copy.index .. " is not in the text") end
 		local index = next_index
 		next_index = next_index + 1
-		maps[#maps + 1] = "\n    " .. original:gsub('^([^>]-%sindex%s*=%s*)"[^"]*"', '%1"' .. index .. '"', 1)
+		for _, id in ipairs(set_ids) do
+			local map = positions.key_map_sets[id].maps[copy.index]
+			if map ~= nil then
+				if map.stop == nil then fail("keyMap index " .. copy.index .. " is not in the text") end
+				local original = body:sub(map.start, map.stop - 1)
+				local list = maps[id]
+				list[#list + 1] = "\n    " .. original:gsub('^([^>]-%sindex%s*=%s*)"[^"]*"', '%1"' .. index .. '"', 1)
+			end
+		end
 		for _, press in ipairs(copy.presses) do
 			local tokens = {}
 			for _, name in ipairs(press) do tokens[#tokens + 1] = SELECT_TOKENS[name] end
@@ -410,16 +422,18 @@ local function split_shortcuts(body, canonical, copies)
 	return function(text)
 		local after, after_err = Keylayout.positions(text)
 		if not after then fail(after_err) end
-		local close = after.key_map_sets[canonical.map_set].close_start
 		local modifier_map = after.modifier_maps[modifiers_id]
-		if close == nil then fail("the keyMapSet is not closed") end
 		if modifier_map == nil or modifier_map.self_closing then fail("modifierMap '" .. modifiers_id .. "' is empty") end
 		-- First match wins: the exact presses go first, so nothing else changes. The
-		-- later position is edited first so the earlier one stays valid.
-		local insertions = {
-			{ at = close, text = table.concat(maps) .. "\n  " },
-			{ at = modifier_map.open_stop, text = table.concat(selects) },
-		}
+		-- later positions are edited first so the earlier ones stay valid.
+		local insertions = { { at = modifier_map.open_stop, text = table.concat(selects) } }
+		for _, id in ipairs(set_ids) do
+			if #maps[id] > 0 then
+				local close = after.key_map_sets[id] and after.key_map_sets[id].close_start
+				if close == nil then fail("the keyMapSet '" .. id .. "' is not closed") end
+				insertions[#insertions + 1] = { at = close, text = table.concat(maps[id]) .. "\n  " }
+			end
+		end
 		table.sort(insertions, function(a, b) return a.at > b.at end)
 		for _, insertion in ipairs(insertions) do
 			text = text:sub(1, insertion.at - 1) .. insertion.text .. text:sub(insertion.at)
