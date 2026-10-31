@@ -56,11 +56,14 @@ local function fake(overrides)
 			return 0, ""
 		end,
 		mv = function(args)
+			-- Collected first: adding keys to a table during its pairs() walk is undefined in Lua
+			local moved = {}
 			for path in pairs(world.files) do
-				if path:sub(1, #args[1]) == args[1] then
-					world.files[args[2] .. path:sub(#args[1] + 1)] = world.files[path]
-					world.files[path] = nil
-				end
+				if path:sub(1, #args[1]) == args[1] then moved[#moved + 1] = path end
+			end
+			for _, path in ipairs(moved) do
+				world.files[args[2] .. path:sub(#args[1] + 1)] = world.files[path]
+				world.files[path] = nil
 			end
 			return 0, ""
 		end,
