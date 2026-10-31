@@ -118,7 +118,10 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //                    path; they named keymap/init.lua only as a sample event.)
 //           13 → 12 (2026-10-31: the prompt editor test requires the real
 //                    ui_builder by module name.)
-const BASELINE = 12;
+//           12 → 11 (2026-10-31: the ShellRunner GC pin test drops its three
+//                    signature scans; its spawned-handle cases fail when the F7
+//                    signature returns.)
+const BASELINE = 11;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -176,7 +179,10 @@ const BASELINE = 12;
 //              path; they named keymap/init.lua only as a sample event.)
 //       55 → 54 (2026-10-31: the prompt editor test requires the real
 //              ui_builder by module name.)
-const READ_BASELINE = 54;
+//       54 → 51 (2026-10-31: the ShellRunner GC pin test drops its three
+//              signature scans; its spawned-handle cases fail when the F7
+//              signature returns.)
+const READ_BASELINE = 51;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
