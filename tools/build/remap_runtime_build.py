@@ -15,6 +15,7 @@ import plistlib
 import re
 import shutil
 import stat
+import subprocess
 import sys
 import time
 import uuid
@@ -141,9 +142,45 @@ def _identity(info):
 
 
 _IDENTITY_AXES = ("dev", "ino", "uid", "mode", "nlink", "size", "mtime", "ctime")
+# A held file stays current when its bytes and every identity field but ctime
+# are unchanged. macOS changes the ctime of untouched files in the background
+# (an extended attribute added to a generated project.pbxproj between two
+# phases, run 41227533352); the inode, size, mtime and bytes still pin the
+# exact incarnation, so a ctime-only change is not a replaced or edited input.
+_CTIME_AXIS = _IDENTITY_AXES.index("ctime")
 
 
-def _report_identity_change(kind, path, previous, current):
+def _held_identity(identity):
+    return identity[:_CTIME_AXIS] + identity[_CTIME_AXIS + 1 :]
+
+
+def _held_current(previous, current):
+    """Compare two captures of one held file, tolerating only a ctime change."""
+    return (
+        current.path == previous.path
+        and current.data == previous.data
+        and _held_identity(current.identity) == _held_identity(previous.identity)
+    )
+
+
+def _extended_attributes(path):
+    """List a file's extended attribute names on Darwin, naming who touched it."""
+    if sys.platform != "darwin":
+        return ""
+    try:
+        result = subprocess.run(
+            ["/usr/bin/xattr", str(path)],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return " xattr unavailable: " + error.__class__.__name__
+    return " xattr [" + ",".join(result.stdout.decode("utf-8", "replace").split()) + "]"
+
+
+def _report_identity_change(kind, path, previous, current, absolute=None):
     """Name a changed retained file and its changed fields on the build log.
 
     The boundary journal is capped and full before the native builds start, so
@@ -158,8 +195,16 @@ def _report_identity_change(kind, path, previous, current):
         )
         if previous[1] != current[1]:
             axes += ("data",)
+    tolerated = axes == ("ctime",)
     print(
-        "[owned-build] " + kind + " changed: " + str(path) + " (" + ",".join(axes) + ")",
+        "[owned-build] "
+        + kind
+        + (" ctime changed, bytes and incarnation unchanged: " if tolerated else " changed: ")
+        + str(path)
+        + " ("
+        + ",".join(axes)
+        + ")"
+        + ("" if absolute is None else _extended_attributes(absolute)),
         file=sys.stderr,
         flush=True,
     )
@@ -718,8 +763,9 @@ def current_inputs(snapshot, deadline, *, maximum=BASE.MAX_INPUT_BYTES):
                     previous.path,
                     (previous.identity, previous.data),
                     (current.identity, current.data),
+                    snapshot.root / previous.path,
                 )
-            _REQUIRE(current == previous, "source_identity", "Retained source changed")
+            _REQUIRE(_held_current(previous, current), "source_identity", "Retained source changed")
             check_deadline(deadline)
 
 
@@ -829,8 +875,16 @@ def current_product(snapshot, root):
     try:
         with _observe_span("products"):
             current = product_snapshot(Path(root) / snapshot.path, root)
+            if current != snapshot and _held_current(snapshot, current):
+                _report_identity_change(
+                    "retained product",
+                    snapshot.path,
+                    (snapshot.identity, snapshot.data),
+                    (current.identity, current.data),
+                    Path(root) / snapshot.path,
+                )
             _REQUIRE(
-                current == snapshot,
+                _held_current(snapshot, current),
                 "source_identity",
                 "Native product changed across a foreign phase",
             )
@@ -842,6 +896,7 @@ def current_product(snapshot, root):
                 snapshot.path,
                 (snapshot.identity, snapshot.data),
                 None if current is None else (current.identity, current.data),
+                Path(root) / snapshot.path,
             )
         raise
 
@@ -2343,9 +2398,10 @@ def _compile_owned_product_images(
         for path, identity in tool_inputs:
             observed = _identity(path.stat())
             if observed != identity:
-                _report_identity_change("native tool", path, (identity, b""), (observed, b""))
+                _report_identity_change("native tool", path, (identity, b""), (observed, b""), path)
             _REQUIRE(
-                path.resolve(strict=True) == path and observed == identity,
+                path.resolve(strict=True) == path
+                and _held_identity(observed) == _held_identity(identity),
                 "source_identity",
                 "Native tool image changed across actual compilation",
             )
