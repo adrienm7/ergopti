@@ -75,6 +75,9 @@ REPORT_SWIFT_SOURCES = tuple(
         "Clock",
         "Reference",
     )
+) + (
+    # The worker's request poll reads its duration from the [launcher] registry.
+    SWIFT + "LauncherTimings.generated.swift",
 )
 REPORT_C_SOURCES = (
     LAUNCHER + "CPOSIXCompatibility/CPOSIXCompatibility.c",

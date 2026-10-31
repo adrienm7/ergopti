@@ -41,7 +41,7 @@ final class OwnedRuntimeCoreExitObservationTests: XCTestCase {
 		let deadline = ProcessInfo.processInfo.systemUptime + 5
 		var observed = monitor.observe()
 		while observed == .waiting, ProcessInfo.processInfo.systemUptime < deadline {
-			Thread.sleep(forTimeInterval: 0.01); observed = monitor.observe()
+			Thread.sleep(forTimeInterval: LauncherTimings.testPoll.seconds); observed = monitor.observe()
 		}
 		XCTAssertEqual(observed, .exited)
 		XCTAssertEqual(try child.waitForOrdinaryExit(), 0)
@@ -115,7 +115,7 @@ private final class NativeOwnedCat {
 			if result == pid { status = observed; return true }
 			if result == -1 && errno != EINTR { lost = true; return false }
 			if ProcessInfo.processInfo.systemUptime >= deadline { return false }
-			usleep(10_000)
+			usleep(LauncherTimings.testPoll.microseconds)
 		} while true
 	}
 	func waitForOrdinaryExit() throws -> Int32 {
