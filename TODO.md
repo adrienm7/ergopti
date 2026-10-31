@@ -168,8 +168,13 @@ into its item below or into the matching existing item.
       Windows step `collector_checks`, macOS `macos-field-shell-checks.sh`) and the last run of each tray
       check clicked today (runs and failures counted). Left [PHYS-W] [PHYS-L]: one real run of each
       collector; the Windows runtime layer of `test-windows-field-report-contract.cjs` runs only where pwsh
-      is installed. The Linux and Windows tray checks still need a click: their drivers have no request
-      protocol like the macOS field run, so a collector cannot run them without the user.
+      is installed. Linux no longer needs a click (branch `fix/linux-input-config-2`): the daemon owns the
+      macOS field run's protocol (`linux/infra/field_run.lua`, `linux/data/field_run.json`, the same file
+      names, verdicts and reasons, pinned against macOS by a test) and runs its composer and network checks
+      headless; `tools/dev/linux-field-run.sh` sends the request from the collector and prints a mark per
+      step (`tests/hardware/run_field_run_live.lua`, CI step "Run the field checks without a click"). The
+      Windows tray checks still need a click (another worker owns that side and the shared declaration;
+      the Linux side moves onto it if its names differ).
 - [ ] **Field log analysis.** [CODE] Done: `tools/dev/field-log-analyse.py` (Python 3.8, stdlib) runs at the end
       of every collector on the scrubbed day logs only and writes `analysis.md` and `analysis.json` at the top
       of the report: errors and warnings grouped by module and template with first and last time, an example
@@ -1266,8 +1271,11 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       once `run_all.ahk` is clean. The Linux reload as a daemon restart with the TTL-bound pending
       record is in (docs/design/driver-control-pending-record.md) and is now proven across real
       processes on the relay path (`tests/hardware/run_reload_restart_live.lua`, CI step "Restart
-      the daemon through the local reload control"); left for it: a restart through the systemd
-      user unit on a real session [PHYS-L].
+      the daemon through the local reload control") and on the systemd unit path
+      (`tests/hardware/run_reload_restart_systemd.lua`: a real cgroup named after the unit, the exact
+      `systemctl --user --no-block restart`, the successor completing the record, with a stand-in for the
+      user manager this container cannot run; not a CI step). Left for it: one restart under a real
+      user manager on a real session [PHYS-L].
 - [ ] **Linux CI installs packages inside short test steps.** [CI] 18 steps moved and skipped when the
       suite is deferred (c52cb916a7, 285d3363a1); `Qualify three actual XI2 property cookies` and
       `The whole daemon, live` already had their install steps; the LuaJIT XI2 qualification, the
