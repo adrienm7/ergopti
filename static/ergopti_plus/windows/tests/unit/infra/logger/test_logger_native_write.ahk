@@ -564,6 +564,28 @@ _LNWPrivacyConfigDirNames() {
 }
 Test("Logger privacy: names under the configuration directory are masked at write time", _LNWPrivacyConfigDirNames)
 
+; Item 139: every identity rule the collector applies at export also holds on
+; the disk, as the Linux and macOS sinks prove for their own write boundary.
+_LNWPrivacyIdentities() {
+	global _SharedDir
+	State := _LoggerPrivacyState(), Saved := [State["config"], State["root"]]
+	FileObject := _LNWPrivacyFile(), Receipt := Map("text", "")
+	try {
+		State["root"] := _SharedDir, State["config"] := _LNWPrivacyContext("privacy-user")
+		Prefix := "2026-10-10 09:00:00:123 [WARNING] [logger] "
+		Body := "Sent to someone@example.org via https://bob:hunter2pass@proxy.example:8080 from C:\Users\OtherPerson\x"
+		AssertTrue(_LoggerAppendComplete("C:\private-recording-log.txt", Prefix . Body . "`r`n", false,
+			(*) => FileObject, (*) => true, (*) => true, _LNWPrivacyWrite.Bind(Receipt), [Prefix . Body]))
+		for Private in ["someone@example.org", "hunter2pass", "bob:", "OtherPerson"]
+			AssertFalse(InStr(Receipt["text"], Private, true), "'" . Private . "' reached the file: " . Receipt["text"])
+		AssertContains(Receipt["text"], State["config"]["rules"]["email_placeholder"])
+		AssertContains(Receipt["text"], Prefix, "the line's metadata is kept")
+	} finally {
+		State["config"] := Saved[1], State["root"] := Saved[2]
+	}
+}
+Test("Logger privacy: an email, a URL credential and another account's folder are masked at write time", _LNWPrivacyIdentities)
+
 _LNWPrivacyRegister() {
 	local PrivacyUser
 	for PrivacyUser in ["privacy-user", "2026", "ERROR", "logger"]
