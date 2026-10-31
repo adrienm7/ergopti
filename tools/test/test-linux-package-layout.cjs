@@ -122,7 +122,14 @@ for (const pkg of PACKAGERS) {
 	// ...and it roots the shared Lua tree on LUA_PATH relative to that root.
 	// This one IS universal: it is written relative to DRIVER_ROOT, so every
 	// format spells it identically no matter where its prefix lands.
-	if (!src.includes(`SHARED_LUA="${SHARED_LUA_EXPR}"`)) {
+	// A wrapper that sources the private runtime environment delegates it to
+	// that one owner, which must then spell it the same way.
+	const viaRuntimeEnvironment =
+		src.includes('source "$DRIVER_ROOT/network-runtime-env.sh"') &&
+		read('tools/build/templates/linux-portable-runtime-env.sh').includes(
+			`SHARED_LUA="${SHARED_LUA_EXPR}"`
+		);
+	if (!src.includes(`SHARED_LUA="${SHARED_LUA_EXPR}"`) && !viaRuntimeEnvironment) {
 		errors.push(
 			`${tag}: wrapper must set SHARED_LUA="${SHARED_LUA_EXPR}" for LUA_PATH resolution.`
 		);
