@@ -2377,8 +2377,6 @@
 	"ollama.model_ready": "%s готова!",
 	"ollama.model_repair": "Модель пошкоджена. Спроба повторного завантаження: %s",
 	"ollama.model_repair_title": "Відновлення моделі Ollama",
-	"ollama.not_detected_body": "Встановіть Ollama і спробуйте знову.",
-	"ollama.not_detected_title": "Ollama не виявлено",
 	"ollama.service_disconnected": "Служба Ollama перестала відповідати.",
 	"ollama.service_ready": "Служба Ollama готова ✅",
 	"ollama.service_stopped": "Служба Ollama зупинена. Запуск…",

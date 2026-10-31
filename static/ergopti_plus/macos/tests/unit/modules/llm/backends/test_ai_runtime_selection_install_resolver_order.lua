@@ -12,9 +12,9 @@
 ---    Application Support copy or the retired ERGOPTI_OLLAMA_BIN.
 --- 2. Boot checks and non-selection checks settle "missing" without a task.
 --- 3. The first selection installs exactly once; a re-selection reuses it.
---- 4. The Ollama offer: accept downloads into the folder the resolver then
----    finds, decline opens the website and keeps the AI off with a message,
----    and a checksum failure surfaces the localized error.
+--- 4. The stock download is retired: no checker entry downloads it, the
+---    resolver names no stock location, and the verifier task of Ergopti's own
+---    runtime surfaces its failures in localized words.
 --- 5. The typing path never reaches runtime detection.
 --- ==============================================================================
 
@@ -47,8 +47,7 @@ local with_environment = Fixture.with_environment
 -- =================================
 
 -- Ergopti always uses its own pinned Ollama (maintainer decision, issue #104):
--- no user location resolves, whatever is installed there; the list stays only
--- to name a user's installation in a diagnostic.
+-- no user location resolves, whatever is installed there.
 helpers.describe("Ollama resolver (ai-runtime-resolver, ollama-owned-runtime)", function()
 	for index, expected in ipairs(CANDIDATES) do
 		helpers.it("never resolves a user's Ollama at " .. expected.source .. " (" .. index .. ")", scoped(function()
@@ -62,12 +61,6 @@ helpers.describe("Ollama resolver (ai-runtime-resolver, ollama-owned-runtime)", 
 			helpers.assert_nil(path)
 			helpers.assert_nil(source)
 			helpers.assert_true(type(err) == "string" and err:find("Ergopti's own Ollama", 1, true) ~= nil)
-			local named = Resolver.find_user_installation()
-			if expected.source == "managed" then
-				helpers.assert_eq(named, CANDIDATES[index + 1].path, "the former copy is not a user's install")
-			else
-				helpers.assert_eq(named, expected.path)
-			end
 		end))
 	end
 
@@ -98,11 +91,17 @@ helpers.describe("Ollama resolver (ai-runtime-resolver, ollama-owned-runtime)", 
 		end)
 	end)
 
-	helpers.it("names the managed folder the installer publishes into", scoped(function()
-		local Resolver = helpers.load_with_stubs("modules.llm.ollama_binary",
-			{ fs = fake_fs(new_state()) })
-		helpers.assert_eq(Resolver.managed_install_dir(), MANAGED_DIR)
-		helpers.assert_eq(Resolver.managed_executable_path(), MANAGED_BIN)
+	-- Owned-runtimes rows "Ollama" and "Ollama installers (legacy)": the stock
+	-- locations and the on-demand download folder are no longer named at all.
+	helpers.it("names no stock location and offers no stock download (ollama-stock-retired)", scoped(function()
+		local state = new_state()
+		state.executables[MANAGED_BIN] = true
+		local Resolver = helpers.load_with_stubs("modules.llm.ollama_binary", { fs = fake_fs(state) })
+		helpers.assert_nil(Resolver.candidates)
+		helpers.assert_nil(Resolver.find_user_installation)
+		helpers.assert_nil(Resolver.managed_install_dir)
+		helpers.assert_nil((Resolver.resolve()), "the former download folder " .. MANAGED_DIR .. " never resolves")
+		helpers.assert_nil(load_ollama_checker(state).install_for_selection)
 	end))
 end)
 
@@ -161,7 +160,7 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 		helpers.assert_eq(source, "native_managed", "only the native source kind may launch this owner")
 		local results = {}
 		local ok, primary = xpcall(function()
-			helpers.assert_true(checker.install_for_selection(function(value) results[#results + 1] = value end))
+			helpers.assert_true(checker.check_and_install_deps(function(value) results[#results + 1] = value end))
 			helpers.assert_eq(state.tasks[1].args[5], NATIVE_BIN)
 			helpers.assert_eq(state.tasks[1].args[6], "")
 			state.tasks[1].done(0, "", "")
@@ -194,7 +193,7 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 		if not closed then error(cleanup, 0) end
 	end))
 
-	helpers.it("surfaces a checksum mismatch as the localized error", scoped(function()
+	helpers.it("surfaces a checksum failure marker as the localized error", scoped(function()
 		local state = new_state()
 		local errors = {}
 		local checker = load_ollama_checker(state)
@@ -204,20 +203,18 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 		package.loaded["ui.download_window"] = window
 		checker = load_ollama_checker(state)
 		package.loaded["ui.download_window"] = window
-		helpers.assert_true(checker.install_for_selection())
+		helpers.assert_true(Fixture.start_verification(state, checker))
 		state.tasks[1].done(1, "OLLAMA_INSTALLING\nOLLAMA_ERROR_CHECKSUM\n",
 			"[OLLAMA-DEPS] ERROR: Ollama archive SHA-256 checksum mismatch; refusing extraction.\n")
 		helpers.assert_eq(checker.get_state(), "failed")
 		helpers.assert_eq(checker.get_failure_message(),
 			require("infra.i18n").get("ollama.error_checksum"))
-		helpers.assert_nil(require("modules.llm.ollama_binary").resolve(),
-			"a refused archive must leave nothing for the resolver to find")
 	end))
 
 	helpers.it("(ollama-install-stream-error) retains a split streamed failure when completion has no bytes", scoped(function()
 		local state = new_state()
 		local checker = load_ollama_checker(state)
-		helpers.assert_true(checker.install_for_selection())
+		helpers.assert_true(Fixture.start_verification(state, checker))
 		local task = state.tasks[1]
 		helpers.assert_type(task.stream, "function", "the production bootstrap must expose its streaming callback")
 		task.stream(task, "", "archive extraction failed: no space ")
@@ -230,7 +227,7 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 	helpers.it("(ollama-install-stream-error) uses a localized fallback only when no diagnostic exists", scoped(function()
 		local state = new_state()
 		local checker = load_ollama_checker(state)
-		helpers.assert_true(checker.install_for_selection())
+		helpers.assert_true(Fixture.start_verification(state, checker))
 		state.tasks[1].done(1, "", "")
 		helpers.assert_eq(checker.get_failure_message(), require("infra.i18n").get("download_window.error_unknown"))
 	end))
@@ -238,7 +235,7 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 	helpers.it("(ollama-install-stream-error) retains the first full cause before trailing progress markers", scoped(function()
 		local state = new_state()
 		local checker = load_ollama_checker(state)
-		helpers.assert_true(checker.install_for_selection())
+		helpers.assert_true(Fixture.start_verification(state, checker))
 		local task = state.tasks[1]
 		helpers.assert_type(task.stream, "function")
 		task.stream(task, "", "archive extraction failed: no space left on device\n")

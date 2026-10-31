@@ -2191,8 +2191,13 @@ function M.new(deps, presets, ram_getter)
 			end
 			return false
 		end
-		pcall(hs.urlevent.openURL, OllamaBinary.DOWNLOAD_PAGE_URL)
-		pcall(notifications.notify, i18n.get("ollama.not_detected_title"), i18n.get("ollama.not_detected_body"), "warning")
+		-- Only Ergopti's own runtime is ever used: the notice carries the click
+		-- that offers its install, never the stock Ollama download page
+		-- (owned-runtimes row "Ollama", PIN).
+		local ok, err = pcall(function()
+			return require("ui.menu.menu_llm.runtime_install_offer").notify_if_missing("ollama")
+		end)
+		if not ok then Logger.error(LOG, "The missing Ollama runtime notice raised: %s.", tostring(err)) end
 		return false
 	end
 

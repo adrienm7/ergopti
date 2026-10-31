@@ -174,20 +174,6 @@ for (const name of fs.readdirSync(path.resolve(__dirname, '../diagnostics'))) {
 	);
 }
 
-const archiveModes = spawnSync(
-	pythonExecutable(),
-	['tools/test/macos_official_ollama_archive_modes_test.py'],
-	{ cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', timeout: 30000 }
-);
-assert.equal(archiveModes.error, undefined, 'the actual archive mode receiver must start');
-assert.equal(archiveModes.signal, null, 'the actual archive mode receiver must retire');
-assert.equal(archiveModes.status, 0, archiveModes.stderr || archiveModes.stdout);
-assert.match(archiveModes.stderr, /Ran 4 tests in/);
-assert.match(archiveModes.stderr, /\bOK\b/);
-assert.doesNotMatch(archiveModes.stderr, /skipped=/);
-process.stdout.write(archiveModes.stdout);
-process.stdout.write(archiveModes.stderr);
-
 // The receiver gains a case with each new network field check: the count is
 // read from its own test methods, so a case that stops running still fails.
 const FAILURE_STAGES_TEST = 'tools/test/macos_native_http_failure_stage_test.py';
