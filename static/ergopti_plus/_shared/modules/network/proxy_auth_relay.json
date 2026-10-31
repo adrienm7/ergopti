@@ -1,0 +1,29 @@
+{
+	"schema_version": 1,
+	"relay_user": "ergopti",
+	"token_bytes": 32,
+	"schemes": ["negotiate", "ntlm"],
+	"posix_schemes": ["negotiate"],
+	"limits": {
+		"max_header_bytes": 32768,
+		"max_body_bytes": 65536,
+		"max_challenge_bytes": 16384,
+		"max_auth_rounds": 3
+	},
+	"exit_codes": { "ok": 0, "invalid_arguments": 2, "refused": 3 },
+	"probe_statuses": ["not_needed", "required", "refused"],
+	"refusals": {
+		"invalid_arguments": "network.relay.failed",
+		"upstream_invalid": "network.relay.failed",
+		"upstream_unreachable": "network.relay.failed",
+		"upstream_timeout": "network.relay.failed",
+		"upstream_protocol": "network.relay.failed",
+		"upstream_scheme_unsupported": "network.relay.scheme_unsupported",
+		"ntlm_requires_windows": "network.relay.ntlm_requires_windows",
+		"sign_in_unavailable": "network.relay.sign_in_unavailable",
+		"sign_in_rejected": "network.relay.sign_in_rejected",
+		"relay_listen_failed": "network.relay.failed",
+		"child_start_failed": "network.relay.failed",
+		"relay_unavailable": "network.relay.failed"
+	}
+}
