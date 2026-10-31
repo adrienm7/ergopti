@@ -601,6 +601,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-log-analyse.cjs"],
 			"repro": "npm run test:field-log-analyse"
+		},
+		{
+			"id": "js-field-run-protocol",
+			"ordinal": 543,
+			"name": "every driver and collector shares one field run request and result protocol, and the macOS field run keeps its keys",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-field-run-protocol.cjs"],
+			"repro": "npm run test:field-run-protocol"
 		}
 	]
 }
