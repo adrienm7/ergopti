@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "Servicebestand van eigen runtime aanwezig",
 	"field_check.step.job_loaded": "Service van eigen runtime geladen",
 	"field_check.step.driver_state": "Virtueel toetsenbordstuurprogramma",
+	"field_check.step.driver_verdict": "Compatibiliteit van het virtuele toetsenbordstuurprogramma",
 	"field_check.step.stock_app": "Karabiner-Elements-app geïnstalleerd",
 	"field_check.step.stock_running": "Karabiner-Elements-processen actief",
 	"field_check.step.owned_running": "Processen van eigen runtime actief",

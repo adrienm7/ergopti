@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "자체 런타임 서비스 파일 있음",
 	"field_check.step.job_loaded": "자체 런타임 서비스 로드됨",
 	"field_check.step.driver_state": "가상 키보드 드라이버",
+	"field_check.step.driver_verdict": "가상 키보드 드라이버 호환성",
 	"field_check.step.stock_app": "Karabiner-Elements 앱 설치됨",
 	"field_check.step.stock_running": "Karabiner-Elements 프로세스 실행 중",
 	"field_check.step.owned_running": "자체 런타임 프로세스 실행 중",

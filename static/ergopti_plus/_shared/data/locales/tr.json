@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "Kendi çalışma zamanı hizmet dosyası mevcut",
 	"field_check.step.job_loaded": "Kendi çalışma zamanı hizmeti yüklü",
 	"field_check.step.driver_state": "Sanal klavye sürücüsü",
+	"field_check.step.driver_verdict": "Sanal klavye sürücüsü uyumluluğu",
 	"field_check.step.stock_app": "Karabiner-Elements uygulaması kurulu",
 	"field_check.step.stock_running": "Karabiner-Elements işlemleri çalışıyor",
 	"field_check.step.owned_running": "Kendi çalışma zamanı işlemleri çalışıyor",

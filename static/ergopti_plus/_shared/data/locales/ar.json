@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "ملف خدمة البيئة الخاصة موجود",
 	"field_check.step.job_loaded": "خدمة البيئة الخاصة محمّلة",
 	"field_check.step.driver_state": "تعريف لوحة المفاتيح الافتراضية",
+	"field_check.step.driver_verdict": "توافق برنامج تشغيل لوحة المفاتيح الافتراضية",
 	"field_check.step.stock_app": "تطبيق Karabiner-Elements مثبّت",
 	"field_check.step.stock_running": "عمليات Karabiner-Elements قيد التشغيل",
 	"field_check.step.owned_running": "عمليات البيئة الخاصة قيد التشغيل",

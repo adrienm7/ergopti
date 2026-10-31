@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "独自ランタイムのサービスファイルあり",
 	"field_check.step.job_loaded": "独自ランタイムのサービスはロード済み",
 	"field_check.step.driver_state": "仮想キーボードドライバ",
+	"field_check.step.driver_verdict": "仮想キーボードドライバの互換性",
 	"field_check.step.stock_app": "Karabiner-Elements アプリはインストール済み",
 	"field_check.step.stock_running": "Karabiner-Elements のプロセスは実行中",
 	"field_check.step.owned_running": "独自ランタイムのプロセスは実行中",

@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "Tjänstefil för egen runtime finns",
 	"field_check.step.job_loaded": "Tjänst för egen runtime inläst",
 	"field_check.step.driver_state": "Virtuell tangentbordsdrivrutin",
+	"field_check.step.driver_verdict": "Kompatibilitet för virtuell tangentbordsdrivrutin",
 	"field_check.step.stock_app": "Karabiner-Elements-appen installerad",
 	"field_check.step.stock_running": "Karabiner-Elements-processer körs",
 	"field_check.step.owned_running": "Processer för egen runtime körs",
