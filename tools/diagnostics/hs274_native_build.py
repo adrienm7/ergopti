@@ -865,6 +865,23 @@ def _last_action(path):
     return ""
 
 
+def _swap_usage():
+    """Return Darwin swap usage, the signal that concurrent compilers overcommit memory."""
+    if sys.platform != "darwin":
+        return ""
+    try:
+        result = subprocess.run(
+            ["sysctl", "-n", "vm.swapusage"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=PROCESS_TABLE_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return ", swap unavailable: " + error.__class__.__name__
+    return ", swap " + result.stdout.decode("ascii", "replace").strip()
+
+
 def _progress_line(started, deadline, output):
     now = time.monotonic()
     try:
@@ -872,10 +889,11 @@ def _progress_line(started, deadline, output):
     except OSError:
         size = -1
     load = os.getloadavg()[0] if hasattr(os, "getloadavg") else float("nan")
-    return "running %.0f s, %.0f s of budget left, load %.2f, stdout %d bytes, last: %s" % (
+    return "running %.0f s, %.0f s of budget left, load %.2f%s, stdout %d bytes, last: %s" % (
         now - started,
         deadline - now,
         load,
+        _swap_usage(),
         size,
         _last_action(output),
     )

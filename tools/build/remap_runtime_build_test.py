@@ -332,7 +332,8 @@ class PreparationControls(unittest.TestCase):
 
     def test_owned_compilation_admits_only_its_two_named_deadlines(self):
         self.assertEqual(SUBJECT.OWNED_BUDGETS, (300, SUBJECT.HOSTED_RUNNER_SECONDS))
-        for value in [True, 301, 2399, 2401, 300.0, 2400.0, 0]:
+        hosted = SUBJECT.HOSTED_RUNNER_SECONDS
+        for value in [True, 301, hosted - 1, hosted + 1, 300.0, float(hosted), 0]:
             self.refusal(
                 "invalid_budget",
                 lambda: SUBJECT.compile_owned(
@@ -385,7 +386,10 @@ class PreparationControls(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stdout, "")
         self.assertEqual(
-            result.stderr, "Owned runtime compilation refused: dependency_unreleased\n"
+            result.stderr,
+            "Owned runtime compilation refused: dependency_unreleased\n"
+            "Owned runtime refusal detail: "
+            "Complete pristine source inputs are absent from dependency-only preparation\n",
         )
         receipt = json.loads((self.root / "owned-build-refusal.json").read_text())
         self.assertEqual(
