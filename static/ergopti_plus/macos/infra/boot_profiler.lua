@@ -33,6 +33,7 @@ local PhaseStats  = require("infra.phase_stats")
 local Logger      = require("infra.logger")
 local Timer       = require("adapters.timer_scheduler")
 local BootJournal = require("adapters.boot_journal")
+local PerfBudget  = require("perf_budget")
 local LOG         = "BootProfile"
 
 -- Monotonic nanoseconds captured at the previous mark and at M.begin(). A nil
@@ -246,6 +247,9 @@ function M.complete()
 	-- with the wall total above.
 	pcall(Logger.evidence, LOG, "Boot CPU: %.0f ms of process CPU over %.0f ms of boot.",
 		M.cpu_ms(), total)
+	-- Read here, not at load: the profiler starts before the timings registry.
+	PerfBudget.judge(Logger, LOG, "boot", total,
+		function() return require("infra.timings").ms("budgets", "boot_total_ms") end)
 end
 
 --- Logs the time since the previous mark and since M.begin().

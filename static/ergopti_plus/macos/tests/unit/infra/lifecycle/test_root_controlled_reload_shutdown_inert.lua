@@ -167,6 +167,9 @@ local function run_isolated(options, assertions)
 				return true
 			end,
 			is_reloading = function() return reload_marked end,
+			-- The reload's duration: recorded at the reload call, taken back at boot
+			mark_started = function(epoch_ms) state.reload_started_ms = epoch_ms end,
+			take_started = function() return nil end,
 		}
 
 		local LeaseController = {
@@ -235,6 +238,8 @@ local function run_isolated(options, assertions)
 					state.cancel_all_calls = state.cancel_all_calls + 1
 					return true
 				end,
+				-- The wall clock the reload duration is measured with
+				now = function() return 1000 end,
 			},
 			["adapters.synthetic_input"] = {
 				when_idle = function(callback)

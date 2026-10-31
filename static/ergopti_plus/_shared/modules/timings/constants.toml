@@ -972,6 +972,56 @@ hotpath_slow_ms = 5
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Performance budgets
+# ──────────────────────────────────────────────────────────────────────
+#
+# How long one measured operation may take before the driver that measures it
+# logs "Over budget: <what> took N ms (budget B ms)." at WARNING, and before the
+# field log analyser (tools/dev/field-log-analyse.py) judges it over. Values
+# are taken from the macOS field logs of 2026-10-30 (report
+# mac-2026-10-30_191337: 38 boots, 27 reloads, 54 menu rebuilds), so a healthy
+# day passes and a regression does not. The wording of the warning is
+# _shared/lua/perf_budget.lua (macOS, Linux) and infra/perf_budget.ahk.
+
+[budgets]
+
+# Boot, process or VM start to "Boot complete". Measured p50 1667 ms, the
+# slowest healthy boot 2834 ms; the two 25 s and 32 s boots waited for the
+# Accessibility grant. 2500 ms is 1.5 times the median.
+# HS: infra/boot_profiler.lua. LX: infra/boot_profiler.lua. AHK: ErgoptiPlus.ahk.
+boot_total_ms = 2500
+
+# One driver reload, from its request to the next boot's completion. Measured
+# p50 2433 ms (teardown, VM re-exec and boot); 4000 ms leaves the boot budget
+# plus the teardown's 1.5 s.
+# HS: init.lua (through infra/reload_guard.lua).
+driver_reload_ms = 4000
+
+# One rebuild of the menu tree. It runs on the main thread, and from 250 ms key
+# events reach the taps late ([logger]'s main-thread hold count threshold,
+# infra/logger.lua SLOW_TIMER_CALLBACK_COUNT_MS); measured p50 283 ms, so the
+# budget names a defect the log already shows.
+# HS: ui/menu/init.lua.
+menu_rebuild_ms = 250
+
+# One request to a local AI server (Ollama, MLX, a local OpenAI-compatible
+# server), request to answer. Measured local time to first token p50 1573 ms.
+# HS: modules/llm/api_ollama.lua. AHK: modules/llm/llm_request_latency.ahk.
+llm_local_request_ms = 2000
+
+# One request to a cloud AI provider, request to answer. Measured 706 to 1479 ms;
+# 3000 ms leaves room for a provider's own queue.
+# HS: modules/llm/api_remote.lua. LX: modules/llm/api_remote.lua.
+# AHK: modules/llm/llm_request_latency.ahk.
+llm_remote_request_ms = 3000
+
+# A streamed prediction: chain start to the tooltip's first display (TTFT).
+# Measured p50 1573 ms, max 1582 ms.
+# HS: ui/tooltip/tooltip_llm.lua.
+prediction_display_ms = 2000
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Adapters shared by the Linux and macOS drivers
 # ──────────────────────────────────────────────────────────────────────
 
