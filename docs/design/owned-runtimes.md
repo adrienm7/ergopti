@@ -221,6 +221,17 @@ runtime (pinned with Ahk2Exe 1.1.37.02a2 and SHA-256 in
   as written (Tap-Hold on means the runtime runs and quits the other
   instance), so the ADR stands; it is the one declared exception to "never
   stop the user's copy".
+- **Revised by the maintainer (2026-10-31), superseding the line above:** the
+  rule follows Ergopti running, not the Tap-Hold section. Ergopti running (not
+  paused) always uses its own pinned runtime and closes a running user
+  Karabiner; Ergopti paused or quit stops its runtime and restarts the user's
+  Karabiner only if it closed it, remembered in a persisted marker so a crash
+  is recovered. The owned runtime is the only path: the shared-mode merge into
+  the user's `karabiner.json` is retired (an owned boot removes the rules an
+  earlier build merged). Still the one declared exception to "never stop the
+  user's copy", and the VirtualHIDDevice stays shared system-wide: a user
+  Karabiner with another driver version blocks the owned runtime with a named,
+  explained state.
 
 ### 6.2 Ollama (all three OS)
 
