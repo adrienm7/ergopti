@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import sys
 
-RECEIVER_SHA = "b27145ce2834247b0352b68b966c3d5470dd350dd5cdc2a9b3ce7207a4b2a213"
+RECEIVER_SHA = "ee4aee56e65dd585a3d49d9d4b2277ee6a7dd6e271faa2f5ad47ee3ac8657d4f"
 _path = Path(__file__).resolve().with_name("receive_core_sdk.py")
 _before = _path.lstat()
 _data = _path.read_bytes()

@@ -17,6 +17,7 @@ import shutil
 import stat
 import sys
 import time
+import traceback
 import uuid
 
 BASE_PATH = Path(__file__).resolve().parents[1] / "diagnostics/hs274_native_build.py"
@@ -186,6 +187,32 @@ def _report_identity_change(kind, path, previous, current):
         + " ("
         + ",".join(axes)
         + ")",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
+def _report_refusal_origin(stage, error):
+    """Name the exception type, code and innermost builder line of a refusal.
+
+    Signing maps every refusal, and any OSError, to one closed code, and a
+    dozen checks share that code; the source line tells them apart on the log.
+    """
+    frames = [
+        frame
+        for frame in traceback.extract_tb(error.__traceback__)
+        if Path(frame.filename).name == Path(__file__).name
+    ]
+    where = "line %d (%s)" % (frames[-1].lineno, frames[-1].name) if frames else "unknown line"
+    print(
+        "[owned-build] "
+        + stage
+        + " refused by "
+        + error.__class__.__name__
+        + " "
+        + str(getattr(error, "code", ""))
+        + " at "
+        + where,
         file=sys.stderr,
         flush=True,
     )
@@ -1475,13 +1502,20 @@ class _SigningSink(_PreparationSink):
                                 )
                                 path = directory / entry.name
                                 relative = str(path.relative_to(signed))
-                                require(
+                                known = (
                                     relative in fixed_directories
                                     or relative in signature_directories
                                     or relative in held
-                                    or relative in signature_files,
-                                    "signed_inventory",
+                                    or relative in signature_files
                                 )
+                                if not known:
+                                    print(
+                                        "[owned-build] signed tree gained an unowned entry: "
+                                        + relative,
+                                        file=sys.stderr,
+                                        flush=True,
+                                    )
+                                require(known, "signed_inventory")
                                 info = path.lstat()
                                 require(
                                     info.st_uid == os.getuid()
@@ -1538,12 +1572,30 @@ class _SigningSink(_PreparationSink):
                     allowed_directories = set(previous_directories) | fixed_directories
                     if target_resources is not None:
                         allowed_directories.add(str(PurePosixPath(target_resources).parent))
+                    if set(actual_directories) != allowed_directories:
+                        print(
+                            "[owned-build] signed tree directories differ: extra "
+                            + ",".join(sorted(set(actual_directories) - allowed_directories))
+                            + " missing "
+                            + ",".join(sorted(allowed_directories - set(actual_directories))),
+                            file=sys.stderr,
+                            flush=True,
+                        )
                     require(set(actual_directories) == allowed_directories, "signed_inventory")
                     for relative, stamp in previous_directories.items():
                         require(actual_directories[relative] == stamp, "signed_inventory")
                     allowed_files = set(previous_files) | set(held)
                     if target_resources is not None:
                         allowed_files.add(target_resources)
+                    if set(actual_files) != allowed_files:
+                        print(
+                            "[owned-build] signed tree files differ: extra "
+                            + ",".join(sorted(set(actual_files) - allowed_files))
+                            + " missing "
+                            + ",".join(sorted(allowed_files - set(actual_files))),
+                            file=sys.stderr,
+                            flush=True,
+                        )
                     require(set(actual_files) == allowed_files, "signed_inventory")
                     for relative, observation in actual_files.items():
                         tick(deadline)
@@ -1577,7 +1629,15 @@ class _SigningSink(_PreparationSink):
                                 "signed_content",
                             )
                             if relative in previous_files:
-                                require(observation == previous_files[relative], "signed_inventory")
+                                prior = previous_files[relative]
+                                if observation != prior:
+                                    _report_identity_change(
+                                        "signed file",
+                                        relative,
+                                        (prior.identity, prior.data),
+                                        (observation.identity, observation.data),
+                                    )
+                                require(observation == prior, "signed_inventory")
                     previous_files, previous_directories = actual_files, actual_directories
 
                 def work_current():
@@ -1802,6 +1862,7 @@ class _SigningSink(_PreparationSink):
                         self._distribution_claim = None
             current()
         except (BASE.NativeBuildError, self.module.ArtifactRefusal, OSError) as error:
+            _report_refusal_origin("signing", error)
             code = getattr(error, "code", "signed_inventory")
             if code == "phase_deadline":
                 code = "deadline"
