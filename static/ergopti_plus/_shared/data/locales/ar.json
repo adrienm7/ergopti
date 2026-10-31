@@ -3931,9 +3931,6 @@
 	"platform_reason.action_line_deletion_is_macos": "macOS فقط: يحذف Cmd+Delete حتى بداية السطر أو نهايته في حقول النص في macOS. لا تملك حقول النص في Windows وLinux مثل هذا المفتاح: حدّد حتى طرف السطر بـ Shift+Home أو Shift+End ثم احذف.",
 	"platform_reason.action_lookup_is_macos_dictionary": "macOS فقط: يفتح «البحث» لوحة قاموس النظام للكلمة الموجودة تحت المؤشر. لا توجد في Windows وLinux لوحة قاموس للنظام.",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "macOS فقط: تبدّل هذه الإجراءات طبقة التنقل المحفوظة داخل Karabiner-Elements. في Windows وLinux تتبع الطبقة المفتاح المضغوط ولا يوجد مفتاح تبديل لضبطه.",
-	"platform_reason.action_not_yet_on_linux": "ليس في Linux بعد: لا شيء يمنع ذلك، لكن برنامج تشغيل Linux لا ينفّذه حتى الآن.",
-	"platform_reason.action_not_yet_on_macos": "ليس في macOS بعد: لا شيء يمنع ذلك، لكن برنامج تشغيل macOS لا ينفّذه حتى الآن.",
-	"platform_reason.action_not_yet_on_windows": "ليس في Windows بعد: لا شيء يمنع ذلك، لكن برنامج تشغيل Windows لا ينفّذه حتى الآن.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "لا يسمح هذا النظام لأي تطبيق بإغلاق الإشعارات: امسحها في مركز الإشعارات الذي يفتحه الإجراء المكافئ.",
 	"platform_reason.action_office_bold_key_is_windows": "Windows فقط: يجعل Microsoft Office الفرنسي النص عريضاً بـ Ctrl+G حيث تستخدم التطبيقات الأخرى Ctrl+B، لذا يختار هذا الإجراء المفتاح حسب التطبيق. في macOS ‏(Cmd+B) وLinux ‏(Ctrl+B) تعمل تركيبة واحدة في كل مكان: عيّنها من «اختصارات».",
 	"platform_reason.action_pointer_cannot_be_moved_on_linux": "ليس في Linux: لا يسمح Wayland لأي تطبيق بتحريك المؤشر، وليس لهذا الإجراء إصدار مقصور على جلسات X11.",
@@ -3945,5 +3942,13 @@
 	"platform_reason.action_spaces_are_edited_in_mission_control": "ليس في macOS: تُضاف Spaces وتُزال في Mission Control، الذي لا يسمح macOS لأي تطبيق آخر بالتحكم فيه.",
 	"platform_reason.action_window_overview_is_each_systems": "لكل نظام عرض عام خاص للنوافذ: Mission Control وApp Exposé في macOS، وعرض المهام في Windows. وكل سطح مكتب في Linux يعيّن عرضه الخاص، فعيّن هناك مفتاح سطح مكتبك كتركيبة مفاتيح.",
 	"platform_reason.action_window_switching_is_not_macos": "ليس في macOS: يتنقّل هذا الإجراء بين النوافذ على طريقة Alt+Tab في Windows وLinux. يبدّل macOS التطبيقات بـ Cmd+Tab ويتنقّل بين نوافذ تطبيق واحد: استخدم الإجراء المكافئ.",
-	"platform_reason.action_word_deletion_modifier_differs": "يحذف كل نظام الكلمة بمفتاح التعديل الخاص به (Option في macOS، وCtrl في Windows وLinux)، لذا يدرج كل منها إجراءه الخاص: استخدم الإجراء المكافئ."
+	"platform_reason.action_word_deletion_modifier_differs": "يحذف كل نظام الكلمة بمفتاح التعديل الخاص به (Option في macOS، وCtrl في Windows وLinux)، لذا يدرج كل منها إجراءه الخاص: استخدم الإجراء المكافئ.",
+	"platform_reason.action_app_windows_unreachable_on_wayland": "ليس في Linux: لا يسمح Wayland لأي تطبيق بسرد نوافذ تطبيق آخر أو تنشيطها، فلا يمكن تمييز نوافذ التطبيق النشط عن غيرها؛ ويتنقّل الإجراء المكافئ بين كل النوافذ.",
+	"platform_reason.action_desktop_count_belongs_to_the_desktop": "ليس في Linux: عدد سطوح المكتب جزء من إعدادات كل بيئة سطح مكتب (يضيفها GNOME ويزيلها بنفسه، ويحتفظ KDE وXfce بعدد ثابت)، ولا يمنح Wayland أي تطبيق طلباً لتغييره.",
+	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "ليس في Linux: تُبقي كل بيئة سطح مكتب Linux الجلسة مستيقظة بمانع الخمول الخاص بها (وضع العرض في KDE وXfce، وإضافة Caffeine في GNOME)؛ فعّله هناك.",
+	"platform_reason.action_key_is_its_own_binding_here": "ليس صفاً مستقلاً في هذا النظام: يرسل الإجراء المكافئ المفتاح نفسه.",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "مفتاح تبديل في macOS فقط: يختار Windows «تكرار» من قائمة العرض Win+P، ويختاره GNOME وKDE من مبدّل الشاشات الخاص بهما Super+P؛ عيّن ذلك المفتاح كتركيبة مفاتيح.",
+	"platform_reason.action_sticky_keys_are_the_systems": "لهذا النظام «المفاتيح الثابتة» في إعدادات إمكانية الوصول، فتجعل كل مفتاح تعديل يعمل لمفتاح واحد؛ فعّلها هناك.",
+	"platform_reason.action_take_note_uses_notepad": "Windows فقط: يفتح هذا الإجراء ملف ملاحظات اليوم في المفكرة، المحرر المرفق بكل Windows. لدى macOS «ملاحظة سريعة» خاصة به (Fn+Q)، ولا يملك Linux محرراً مرفقاً بكل بيئات سطح المكتب.",
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "في macOS يقرأ «النص المباشر» نص أي لقطة أو صورة: التقط واحدة بالإجراء المكافئ ثم حدّد نصها."
 }

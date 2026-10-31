@@ -3931,9 +3931,6 @@
 	"platform_reason.action_line_deletion_is_macos": "macOS 전용: Cmd+Delete는 macOS 텍스트 필드에서 줄의 처음이나 끝까지 지웁니다. Windows와 Linux 텍스트 필드에는 그런 키가 없습니다: Shift+Home 또는 Shift+End로 줄 끝까지 선택한 뒤 지우세요.",
 	"platform_reason.action_lookup_is_macos_dictionary": "macOS 전용: 찾아보기는 포인터 아래 단어에 대한 시스템 사전 패널을 엽니다. Windows와 Linux에는 시스템 사전 패널이 없습니다.",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "macOS 전용: 이 동작들은 Karabiner-Elements 안에 보관되는 탐색 레이어를 전환합니다. Windows와 Linux에서는 레이어가 누르고 있는 키를 따르며 설정할 스위치가 없습니다.",
-	"platform_reason.action_not_yet_on_linux": "아직 Linux에는 없습니다: 막는 것은 없지만 Linux 드라이버가 아직 구현하지 않았습니다.",
-	"platform_reason.action_not_yet_on_macos": "아직 macOS에는 없습니다: 막는 것은 없지만 macOS 드라이버가 아직 구현하지 않았습니다.",
-	"platform_reason.action_not_yet_on_windows": "아직 Windows에는 없습니다: 막는 것은 없지만 Windows 드라이버가 아직 구현하지 않았습니다.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "이 시스템은 어떤 앱도 알림을 닫지 못하게 합니다: 대응하는 동작이 여는 알림 센터에서 지우세요.",
 	"platform_reason.action_office_bold_key_is_windows": "Windows 전용: 프랑스어 Microsoft Office는 다른 앱이 Ctrl+B를 쓰는 곳에서 Ctrl+G로 굵게 하므로, 이 동작은 앱에 따라 키를 고릅니다. macOS(Cmd+B)와 Linux(Ctrl+B)에서는 한 조합이 어디서나 통합니다: \"단축키\"에서 지정하세요.",
 	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Linux에는 없음: Wayland는 어떤 앱도 포인터를 움직이지 못하게 하며, 이 동작에는 X11 세션 전용 버전이 없습니다.",
@@ -3945,5 +3942,13 @@
 	"platform_reason.action_spaces_are_edited_in_mission_control": "macOS에는 없음: Spaces는 Mission Control에서 추가·제거되며, macOS는 다른 앱이 이를 조작하도록 허용하지 않습니다.",
 	"platform_reason.action_window_overview_is_each_systems": "시스템마다 고유한 창 개요가 있습니다: macOS의 Mission Control과 App Exposé, Windows의 작업 보기. Linux 데스크톱은 각자 따로 지정하므로, 거기서는 데스크톱의 키를 키 조합으로 지정하세요.",
 	"platform_reason.action_window_switching_is_not_macos": "macOS에는 없음: 이 동작은 Windows와 Linux의 Alt+Tab처럼 창을 차례로 넘깁니다. macOS는 Cmd+Tab으로 앱을 전환하고 한 앱의 창을 차례로 넘깁니다: 대응하는 동작을 사용하세요.",
-	"platform_reason.action_word_deletion_modifier_differs": "시스템마다 단어를 지우는 수정 키가 다르므로(macOS는 Option, Windows와 Linux는 Ctrl) 각자 자신의 동작을 나열합니다: 대응하는 동작을 사용하세요."
+	"platform_reason.action_word_deletion_modifier_differs": "시스템마다 단어를 지우는 수정 키가 다르므로(macOS는 Option, Windows와 Linux는 Ctrl) 각자 자신의 동작을 나열합니다: 대응하는 동작을 사용하세요.",
+	"platform_reason.action_app_windows_unreachable_on_wayland": "Linux에는 없음: Wayland는 어떤 앱도 다른 앱의 창을 나열하거나 활성화하지 못하게 하므로 활성 앱의 창을 다른 창과 구별할 수 없습니다. 대응하는 동작은 모든 창을 차례로 넘깁니다.",
+	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Linux에는 없음: 데스크톱 수는 각 데스크톱 환경의 설정에 속하며(GNOME은 스스로 늘리고 줄이고, KDE와 Xfce는 고정된 수를 유지), Wayland는 어떤 앱에도 이를 바꾸는 요청을 주지 않습니다.",
+	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Linux에는 없음: 각 Linux 데스크톱은 자체 유휴 억제 기능(KDE와 Xfce의 프레젠테이션 모드, GNOME의 Caffeine 확장)으로 세션을 깨워 둡니다. 거기서 켜세요.",
+	"platform_reason.action_key_is_its_own_binding_here": "이 시스템에서는 별도 행이 아닙니다: 대응하는 동작이 같은 키를 보냅니다.",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "전환은 macOS 전용: Windows는 Win+P 프로젝션 메뉴에서 복제를, GNOME과 KDE는 자체 Super+P 디스플레이 전환기에서 고릅니다. 그 키를 키 조합으로 지정하세요.",
+	"platform_reason.action_sticky_keys_are_the_systems": "이 시스템의 손쉬운 사용 설정에는 각 수정 키를 한 번만 적용하는 고정 키가 있습니다. 거기서 켜세요.",
+	"platform_reason.action_take_note_uses_notepad": "Windows 전용: 이 동작은 모든 Windows에 들어 있는 메모장에서 그날의 메모 파일을 엽니다. macOS에는 자체 빠른 메모(Fn+Q)가 있고, Linux에는 모든 데스크톱에 들어 있는 편집기가 없습니다.",
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "macOS에서는 라이브 텍스트가 모든 스크린샷이나 이미지의 텍스트를 읽습니다: 대응하는 동작으로 찍은 뒤 그 텍스트를 선택하세요."
 }
