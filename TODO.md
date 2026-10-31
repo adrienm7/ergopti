@@ -270,14 +270,19 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       (b5c0c0de37), the dynamic-rule preview guard (c17aa3e5d7), the slowest diagnostics collectors named
       (71a8b87f65), the keyboard-layout row stages timed (236ea82e52), a menu rebuild on an input-source
       notification only for a visible change (933707a1ae), the keystats journal published without forks (L16,
-      016ef6adc5) and the deferred keystats start sliced (L18, 58f82e9fdc). Left, from the next field report: (1) the
-      remaining menu rebuilds through the `menu_keyboard_layout.*` phases; (2) preferences save `sparse` (about
-      280 ms) and `write` (600 to 800 ms, 4 metadata forks), not reproduced off the Mac (L17: the slow-save line
-      names its prepare stage and `lua_heap`); (3) keystats append `write` 150 to 350 ms and the ledger read on the
-      main thread (L16: no `Slow ingest tick` while typing, `worst_hold_site` in the field run); (4) the healthcheck
-      collector behind 100 to 230 ms, and the ignored-window AX probe (L23, Issue #101 point 4): bound it once a
-      `Slow ignored-window probe` line names the stage; (5) the one-off holds of `field_run`, `error_dialog`,
-      `keymap/utils` timers and `menu_state` (shell.ioreg 146 ms); L18: `keystats_start_ms` under 100 ms.
+      016ef6adc5), the deferred keystats start sliced (L18, 58f82e9fdc), the atomic writer's source listings and
+      `cp -p` in one fork (two forks per replacement instead of four: preferences save `write`, keystats append),
+      and `field_slow_lines` naming what decides each part below (6c30779ec3). Left, from the next field report
+      (no manual action: the field run reports it): (1) the remaining menu rebuilds: `slow_layout_menu_phase` names
+      the `menu_keyboard_layout.*` stage to slice, `slow_hold_phase` the busiest phase of every hold; (2)
+      preferences save `sparse` (about 280 ms) and `write` (L17): `slow_preferences_save_stage` and
+      `slow_preferences_save_forks` (`count:ms` of the worst save) say whether the remaining fork or a prepare
+      stage holds it; (3) keystats append `write` and the ledger read (L16): `slow_ingest_ticks`,
+      `slow_ingest_stage`, `slow_ingest_forks`, and `worst_hold_site` in `field_event_taps`; (4) the healthcheck
+      collector (`slow_diagnostics`, `slow_diagnostics_collector`) and the ignored-window AX probe (L23, Issue #101
+      point 4: `slow_ignored_window_probes`, `slow_ignored_window_stage`), bound the named stage; (5) the one-off
+      holds of `field_run`, `error_dialog`, `keymap/utils` timers and `menu_state` (shell.ioreg 146 ms):
+      `worst_hold_site` and `slow_hold_phase`; L18: `keystats_start_ms` under 100 ms.
 - [ ] **Thinking off for every model on every backend and OS (merged with "Reasoning off in every AI request:
       verify the open rules").** Done on the three OS: model families of `thinking_off.json` crossed with each
       provider's dialect, the resolved Ollama `think` per family (98b9a2ad57), persisted and expiring refusals,
