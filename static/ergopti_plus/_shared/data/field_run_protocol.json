@@ -3,7 +3,7 @@
 		"The field run protocol every driver and field report collector shares: a collector writes a request file the running driver picks up, the driver runs its declared steps with no person, writes one result per step and a done marker, and the collector copies them. macOS was first (macos/data/field_run.json, read by infra/field_run.lua); its protocol keys must stay equal to these (tools/test/test-field-run-protocol.cjs).",
 		"Each driver declares its own steps in its own file (steps_file); a step is {id, kind, deadline_seconds, proves} plus check for a field_check step. A result is written as <results>/<request_id>/<NN>_<step id>.json, NN the step's two-digit position in the run.",
 		"The folder: a developer run from a clone uses folder.clone (relative to the clone root); an installed driver uses folder.<os>, the base an environment variable and the segments joined to it. A collector looks in the developer folder first, then the installed one.",
-		"Documents lists the keys each file carries; a driver may add keys, never drop one. Every value a driver writes is a closed code, a count, a duration or a time: no typed text, path, URL or user name."
+		"Documents lists the keys each file carries; a driver may add keys, never drop one. A refusal carries request_id only when the request had a valid one (optional_keys). The guard kind is the configuration guard a driver runs after the last step (macOS and Linux config_guard); it is never a declared step. Every value a driver writes is a closed code, a count, a duration or a time: no typed text, path, URL or user name."
 	],
 	"schema": 1,
 	"files": {
@@ -25,7 +25,7 @@
 	"all_steps": "all",
 	"verdicts": ["pass", "fail", "skip", "timeout", "needs_person", "needs_typing"],
 	"reasons": ["malformed", "unknown_step", "bad_deadline", "busy", "duplicate_request", "failed"],
-	"step_kinds": ["field_check", "diagnostics", "ai", "reload"],
+	"step_kinds": ["field_check", "diagnostics", "ai", "reload", "guard"],
 	"folder": {
 		"clone": "build/field-run",
 		"linux": { "base": "XDG_RUNTIME_DIR", "segments": ["ergopti_plus", "field-run"] },
@@ -39,7 +39,7 @@
 	"documents": {
 		"ready": ["schema", "driver", "pid", "steps"],
 		"request": ["schema", "request_id", "steps"],
-		"refused": ["schema", "request_id", "reason"],
+		"refused": ["schema", "reason"],
 		"running": ["schema", "request_id"],
 		"accepted": ["schema", "request_id", "pid", "steps", "deadline_seconds", "started_at"],
 		"result": [
@@ -57,5 +57,6 @@
 		],
 		"done": ["schema", "request_id", "pid", "interrupted", "finished_at", "verdicts", "order"]
 	},
+	"optional_keys": { "refused": ["request_id"] },
 	"drivers": ["macos", "linux", "windows"]
 }
