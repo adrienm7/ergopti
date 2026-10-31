@@ -87,6 +87,12 @@ PRODUCT_MAX_BYTES = 128 * 1024 * 1024
 # architecture; two concurrent compiler jobs keep a 3-core 7 GB hosted runner
 # out of swap, where an unbounded build crawled for hours.
 XCODEBUILD_JOBS = 2
+# The 300 s calibration deadline fits a maintainer Mac. On a hosted 3-core
+# runner the core C++23 translation unit alone still compiles after 139 s
+# (run 41223799621), so the hosted lane selects this one other admitted
+# deadline; it still bounds the whole owned build with a hard kill.
+HOSTED_RUNNER_SECONDS = 2400
+OWNED_BUDGETS = (BASE.CALIBRATION_SECONDS, HOSTED_RUNNER_SECONDS)
 # The complete canonical factory already bounds its actual tracked leaves at 8 MiB.
 SOURCE_TREE_MAX_BYTES = 8 * 1024 * 1024
 
@@ -2612,7 +2618,7 @@ def _validate_owned_record(record, profile):
         and record["status"] == "passed"
         and record["qualification"] == "unsigned_actual_owned_four_target_compilation"
         and type(record["budget_seconds"]) is int
-        and record["budget_seconds"] == 300
+        and record["budget_seconds"] in OWNED_BUDGETS
     )
     if profile is _CURRENT_OWNED_RECORD_PROFILE:
         require(
@@ -3227,9 +3233,9 @@ def _compile_owned(
     authenticates.
     """
     _REQUIRE(
-        type(seconds) is int and seconds == 300,
+        type(seconds) is int and seconds in OWNED_BUDGETS,
         "invalid_budget",
-        "Owned calibration requires 300 seconds",
+        "Owned compilation requires the 300 s calibration or the hosted runner deadline",
     )
     owner = _OWNER(owner)
     owner_identity = _directory_identity(owner.lstat()) if prepare else None
@@ -3802,7 +3808,12 @@ def main(arguments=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("repository", type=Path)
     parser.add_argument("owner", type=Path)
-    parser.add_argument("--budget", type=int, default=300)
+    parser.add_argument("--budget", type=int, default=BASE.CALIBRATION_SECONDS)
+    parser.add_argument(
+        "--hosted-runner-budget",
+        action="store_true",
+        help="compile with the hosted runner deadline instead of the calibration",
+    )
     parser.add_argument("--preflight", action="store_true")
     parser.add_argument("--ready", action="store_true")
     parser.add_argument("--compile-owned", action="store_true")
@@ -3818,6 +3829,8 @@ def main(arguments=None):
     parser.add_argument("--upstream", type=Path)
     parser.add_argument("--observe-products", type=Path)
     options = parser.parse_args(arguments)
+    if options.hosted_runner_budget:
+        options.budget = HOSTED_RUNNER_SECONDS
     try:
         selected = (
             int(options.preflight)

@@ -330,6 +330,29 @@ class PreparationControls(unittest.TestCase):
                 lambda: SUBJECT.preflight(Path(__file__).resolve().parents[2], self.root, value),
             )
 
+    def test_owned_compilation_admits_only_its_two_named_deadlines(self):
+        self.assertEqual(SUBJECT.OWNED_BUDGETS, (300, SUBJECT.HOSTED_RUNNER_SECONDS))
+        for value in [True, 301, 2399, 2401, 300.0, 2400.0, 0]:
+            self.refusal(
+                "invalid_budget",
+                lambda: SUBJECT.compile_owned(
+                    Path(__file__).resolve().parents[2], self.root, value
+                ),
+            )
+
+    def test_hosted_runner_flag_selects_its_deadline(self):
+        seen = []
+        with mock.patch.object(
+            SUBJECT, "compile_owned", side_effect=lambda r, o, s, u: seen.append(s) or {}
+        ):
+            try:
+                SUBJECT.main(
+                    [str(self.root), str(self.root), "--compile-owned", "--hosted-runner-budget"]
+                )
+            except BaseException:
+                pass
+        self.assertEqual(seen, [SUBJECT.HOSTED_RUNNER_SECONDS])
+
     def test_baseline_stdout_exact_actual_19_phases(self):
         stdout = "PASS unsigned pinned Core-Service and CLI compilation; native capture and installation unexecuted\n"
         stdout += "".join("PHASE " + name + " seconds=0.125\n" for name in BASELINE_PHASES)
@@ -636,12 +659,19 @@ class OwnedRecordControls(unittest.TestCase):
                 record = self.record(fresh)
                 self.assertIsNone(SUBJECT.validate_owned_record(record))
 
+    def test_hosted_runner_deadline_record_is_admitted(self):
+        record = self.record()
+        record["budget_seconds"] = SUBJECT.HOSTED_RUNNER_SECONDS
+        self.assertIsNone(SUBJECT.validate_owned_record(record))
+
     def test_exact_record_keyset_and_schema(self):
         for operation in (
             lambda r: r.update(extra=True),
             lambda r: r.pop("pins"),
             lambda r: r.update(schema=True),
             lambda r: r.update(budget_seconds=300.0),
+            lambda r: r.update(budget_seconds=301),
+            lambda r: r.update(budget_seconds=float(SUBJECT.HOSTED_RUNNER_SECONDS)),
         ):
             record = self.record()
             operation(record)
