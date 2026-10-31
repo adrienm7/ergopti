@@ -39,14 +39,9 @@ local LOG = "infra.reload_timing"
 local STAMP_FORMAT = "ERGOPTI_RELOAD_REQUEST_V1\nrequested_at_ms=%d\n"
 local STAMP_PATTERN = "^ERGOPTI_RELOAD_REQUEST_V1\nrequested_at_ms=(%d+)\n$"
 
--- luv.gettimeofday() reports seconds and microseconds.
-local MS_PER_SECOND = 1000
-local US_PER_MS = 1000
-
---- Reads the wall clock in epoch milliseconds; tests replace it.
+--- Reads the wall clock in epoch milliseconds (the daemon's one reader); tests replace it.
 local function wall_clock_ms()
-	local seconds, microseconds = require("luv").gettimeofday()
-	return seconds * MS_PER_SECOND + math.floor(microseconds / US_PER_MS)
+	return require("modules.keystats.calendar").wall_ms()
 end
 
 local _clock = wall_clock_ms

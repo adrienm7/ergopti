@@ -21,6 +21,9 @@
 ---    vendor/remap-runtime/manifest.json pins completely; an unpinned manifest is a
 ---    named refusal, never a guessed driver version.
 --- 5. One Command Runner: bounded commands reuse the field check's runner.
+--- 6. Fetched Into Ergopti's Folder: the first admission downloads and verifies
+---    the pinned artifact through platform/remap/runtime_artifact_fetch.lua,
+---    then every later one reuses that copy without the network.
 --- ==============================================================================
 
 local M = {}
@@ -71,6 +74,60 @@ function M.virtual_hid_version()
 	return require("platform.remap.runtime_manifest").virtual_hid_version(manifest)
 end
 
+local fetcher
+
+--- Downloads and verifies the pinned artifact the first time, then reuses it.
+--- One fetcher serves admission and the field run, so they share one fetch.
+--- @param callback function fn(ok, payload|reason, explanation).
+function M.fetch_artifact(callback)
+	local manifest = load_manifest()
+	if not manifest then
+		return callback(false, "artifact_unpinned", "the runtime manifest could not be read")
+	end
+	fetcher = fetcher or require("platform.remap.runtime_artifact_fetch").new({
+		exec = FieldCheckPorts.exec,
+		exists = FileSystem.exists,
+		read = FileSystem.read,
+		write = function(path, content) return FileSystem.write(path, content) == true end,
+		expand = FileSystem.expand_path,
+	})
+	fetcher.ensure(manifest.runtime, callback)
+end
+
+--- The persisted record that Ergopti closed the user's own Karabiner.
+--- @return table marker { get, set, clear }.
+function M.marker()
+	local path = FileSystem.expand_path(require("platform.remap.ke_paths").OWNED.CLOSED_OTHER_MARKER)
+	return {
+		get = function() return FileSystem.exists(path) == true end,
+		set = function()
+			return FileSystem.prepare_parent_for_create(path) == true and FileSystem.write(path, "closed\n") == true
+		end,
+		clear = function() return FileSystem.delete(path) == true end,
+	}
+end
+
+--- Tells the user that Ergopti closed their Karabiner and when it comes back.
+local function announce_closed()
+	local i18n = require("infra.i18n")
+	require("infra.notifications").notify(i18n.get("notify.karabiner.user_closed"), nil, "info")
+end
+
+--- The ports of the activation rule (platform/remap/runtime_activation.lua).
+--- @param owner table The bound runtime owner module.
+--- @param close_other_instances function fn() -> boolean, the user's consent.
+--- @param reload function fn() asking for a driver reload.
+--- @return table ports
+function M.activation(owner, close_other_instances, reload)
+	return {
+		owner = owner,
+		close_other_instances = close_other_instances,
+		restore = require("adapters.karabiner_coexistence").new().restore,
+		marker = M.marker(),
+		reload = reload,
+	}
+end
+
 --- The ports of the real Mac.
 --- @return table ports For platform.remap.runtime_owner.init.
 function M.new()
@@ -99,10 +156,12 @@ function M.new()
 		},
 		coexistence = {
 			detect = Coexistence.detect,
-			close = Coexistence.close,
+			close = require("platform.remap.runtime_activation").remembering_close(Coexistence.close, M.marker(),
+				announce_closed),
 		},
 		artifact = {
 			pinned = pinned_artifact,
+			fetch = M.fetch_artifact,
 		},
 		capture = require("adapters.runtime_capture_port").new(),
 		timer = require("adapters.timer_scheduler"),

@@ -515,13 +515,6 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	],
 	[MACOS_BOX, 'package-macos', 'Retain launcher build diagnostics', 'always()'],
 	[MACOS_BOX, 'package-macos', 'Retain application build diagnostics', 'always()'],
-	[
-		MACOS_BOX,
-		'cold-bootstrap-native',
-		'Receive actual official cold Ollama without stock Python',
-		"${{ !cancelled() && steps.cold-app.outcome == 'success' }}"
-	],
-	[MACOS_BOX, 'cold-bootstrap-native', 'Retain official cold Ollama receipt only', 'always()'],
 	[MACOS_BOX, 'cold-bootstrap-native', 'Retain native cold bootstrap evidence', 'always()']
 ].map(macConditionEntry);
 const WINDOWS_FILE_RETENTION = [
@@ -4020,7 +4013,9 @@ function permissionProblems(files) {
 		`${COMMON_BOX}:common-verdict`,
 		`${ENTRY}:macos`,
 		`${MACOS_BOX}:e2e-hs`,
-		`${MACOS_BOX}:package-macos`
+		`${MACOS_BOX}:package-macos`,
+		// The release preflight reads the run's own jobs for the timing summary.
+		`${RELEASE_BOX}:publication-plan`
 	]);
 	for (const entry of files) {
 		const lines = entry.text.split('\n');
@@ -4042,13 +4037,15 @@ function permissionProblems(files) {
 		}
 		for (const candidate of pipeline.jobsOfText(entry.text, entry.rel)) {
 			const value = pipeline.field(candidate.body, 'permissions');
+			// The Release caller grants its preflight's actions: read too.
 			const expected =
-				(entry.rel === RELEASE_BOX && candidate.id === 'release') ||
-				(entry.rel === ENTRY && candidate.id === PUBLICATION)
-					? 'contents: write'
-					: evidenceReaders.has(`${entry.rel}:${candidate.id}`)
-						? 'contents: read actions: read'
-						: null;
+				entry.rel === ENTRY && candidate.id === PUBLICATION
+					? 'contents: write actions: read'
+					: entry.rel === RELEASE_BOX && candidate.id === 'release'
+						? 'contents: write'
+						: evidenceReaders.has(`${entry.rel}:${candidate.id}`)
+							? 'contents: read actions: read'
+							: null;
 			if (value !== expected) {
 				problems.push(
 					`${entry.rel} job ${candidate.id} must ${expected ? `grant exactly ${expected}` : 'not widen the permissions'}, got: ${value}`
@@ -4190,7 +4187,8 @@ assert.deepEqual(
 for (const [rel, id] of [
 	[ENTRY, 'core'],
 	[COMMON_BOX, 'common-e2e'],
-	[COMMON_BOX, 'common-verdict']
+	[COMMON_BOX, 'common-verdict'],
+	[RELEASE_BOX, 'publication-plan']
 ]) {
 	const matches = pipeline.jobsOfText(pipeline.file(rel), rel).filter((job) => job.id === id);
 	assert.equal(matches.length, 1, id + ' has one actual permission owner');
@@ -4828,20 +4826,6 @@ for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
 	assert.ok(problems.some((problem) => problem.includes('STEP_CONDITIONS lists ' + key)));
 }
 
-const officialColdHead = '      - name: Receive actual official cold Ollama without stock Python\n';
-for (const condition of [
-	'always()',
-	'${{ !cancelled() }}',
-	"${{ !cancelled() && steps.cold-app.outcome != 'failure' }}"
-]) {
-	mustCatch(
-		'official cold runtime receiver broadened admission ' + condition,
-		MACOS_BOX,
-		macConditionalPrefix(officialColdHead),
-		officialColdHead + `        if: ${condition}\n`,
-		stepProblems
-	);
-}
 // Upload only closed receipts: the owned script corpus contains newline names,
 // and recursively uploading its private fixture tree also exposes unnecessary data.
 const NATIVE_INVENTORY_ARTIFACT = 'Retain native Hammerspoon provider inventory';

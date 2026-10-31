@@ -89,6 +89,12 @@ M.OWNED = {
 	VIRTUAL_HID_LABEL = Identifiers.service_labels.macos_virtual_hid,
 	CONFIG_HOME = "~/Library/Application Support/ErgoptiPlus",
 	CONFIG_FILE = "~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json",
+	-- The downloaded, verified runtime artifact, one folder per pinned version
+	-- (platform/remap/runtime_artifact_fetch.lua). Never /Applications.
+	ARTIFACT_HOME = "~/Library/Application Support/ErgoptiPlus/RemapRuntime",
+	-- Written when Ergopti closed the user's own Karabiner, cleared once it was
+	-- given back (platform/remap/runtime_activation.lua).
+	CLOSED_OTHER_MARKER = "~/Library/Application Support/ErgoptiPlus/karabiner/closed-other-karabiner",
 }
 
 --- Rejects a runtime name that is not one of the two.

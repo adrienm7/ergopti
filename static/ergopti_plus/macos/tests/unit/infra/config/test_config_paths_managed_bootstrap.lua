@@ -130,7 +130,7 @@ local function with_memory_files(initial, fn)
 		return true
 	end
 	memory.fs.lock, memory.fs.unlock = function() return true end, function() return true end
-	memory.execute = function(command)
+	memory.execute = require("tests.support.fused_metadata_command").answering(function(command)
 		if command:find("/bin/cp -p ", 1, true) == 1 then
 			local source, destination = command:match("^/bin/cp %-p '([^']*)' '([^']*)'$")
 			local prior = source and entries[source]
@@ -147,7 +147,7 @@ local function with_memory_files(initial, fn)
 			if path and entries[path] then return "memory namespace header\n", true, "exit", 0 end
 		end
 		return "", false, "exit", 1
-	end
+	end)
 	local real_open, real_remove, real_rename = io.open, os.remove, os.rename
 	io.open = function(path, mode)
 		if mode == "r" or mode == "rb" then

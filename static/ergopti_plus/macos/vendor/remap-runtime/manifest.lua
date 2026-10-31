@@ -2,9 +2,10 @@
 
 --- Reads the owned runtime artifact pin (ADR 011, WP5) from manifest.json, so
 --- the Lua owner and the build gate read the same bytes. A field that is still
---- null is not pinned yet: the digest of the runtime and the designated
---- requirement exist only after the hosted runtime build has produced and signed
---- the artifact, and platform/remap/runtime_manifest.lua refuses anything less.
+--- null is not pinned yet: the digest of the runtime exists only after the hosted
+--- runtime build has produced and signed the artifact
+--- (tools/build/remap_runtime_publish.py writes it), and
+--- platform/remap/runtime_manifest.lua refuses anything less.
 local JsonCodec = require("adapters.json_codec")
 local NativePath = require("native_path")
 local source = debug.getinfo(1, "S").source:sub(2)

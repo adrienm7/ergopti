@@ -569,6 +569,27 @@ helpers.describe("field run: a run", function()
 		end)
 	end)
 
+	helpers.it("runs work a step queued for after the run only once done is written", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local session
+			local seen = {}
+			local state = world({
+				field_owned_pause = function(_, finish, current)
+					helpers.assert_true(session:after_run(function()
+						seen[#seen + 1] = current.files[FOLDER .. "/results/r21/done.json"] ~= nil
+					end))
+					finish("pass", { "ok" }, {})
+				end,
+			})
+			session = started(FieldRun, state)
+			helpers.assert_eq(session:after_run(function() end), false, "no run, nothing to queue")
+			state.request({ schema = 1, request_id = "r21", steps = Json.array({ "field_owned_pause" }) })
+			state.advance(0)
+			helpers.assert_eq(seen, { true }, "the queued work runs once, after the done marker")
+		end)
+	end)
+
 	helpers.it("refuses a second request while a run is pending, and a repeated id", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()

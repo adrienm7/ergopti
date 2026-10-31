@@ -33,6 +33,10 @@ local function wall_ms()
 	return os.time() * MS_PER_SECOND
 end
 
+--- Epoch milliseconds, the daemon's one wall-clock reader (the reload duration
+--- across a restart reads it too, infra/reload_timing.lua).
+M.wall_ms = wall_ms
+
 --- Captures a single calendar observation for one producer invocation.
 --- @return table { wall_ms, mono_ms, date, ts }.
 function M.capture()

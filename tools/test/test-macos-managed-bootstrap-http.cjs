@@ -162,23 +162,17 @@ assert.doesNotMatch(coldReceipt.stderr, /skipped=/);
 process.stdout.write(coldReceipt.stdout);
 process.stdout.write(coldReceipt.stderr);
 
-const officialColdReceipt = spawnSync(
-	pythonExecutable(),
-	['tools/diagnostics/macos_cold_ollama_bootstrap_test.py'],
-	{ cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', timeout: 30000 }
-);
-assert.equal(officialColdReceipt.error, undefined, 'the official cold receipt receiver must start');
-assert.equal(officialColdReceipt.signal, null, 'the official cold receipt receiver must retire');
-assert.equal(
-	officialColdReceipt.status,
-	0,
-	officialColdReceipt.stderr || officialColdReceipt.stdout
-);
-assert.match(officialColdReceipt.stderr, /Ran 36 tests in/);
-assert.match(officialColdReceipt.stderr, /\bOK\b/);
-assert.doesNotMatch(officialColdReceipt.stderr, /skipped=/);
-process.stdout.write(officialColdReceipt.stdout);
-process.stdout.write(officialColdReceipt.stderr);
+// (retired-stock-cold-ollama-lane) The stock installer's cold lane is retired: no
+// product path calls ollama_deps_checker.install_for_selection() since
+// bc09e4584c, so no CI receiver may drive it and prove a path users never take.
+for (const name of fs.readdirSync(path.resolve(__dirname, '../diagnostics'))) {
+	if (!/\.(lua|py)$/.test(name)) continue;
+	const text = fs.readFileSync(path.resolve(__dirname, '../diagnostics', name), 'utf8');
+	assert(
+		!(/ollama_deps_checker/.test(text) && /\.install_for_selection\(/.test(text)),
+		`tools/diagnostics/${name} drives the stock Ollama installer no product path calls`
+	);
+}
 
 const archiveModes = spawnSync(
 	pythonExecutable(),

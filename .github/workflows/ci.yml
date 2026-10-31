@@ -522,6 +522,7 @@ jobs:
     uses: ./.github/workflows/ci-release.yml
     permissions:
       contents: write
+      actions: read
     with:
       os_lanes: ${{ inputs.os_lanes || 'all' }}
       lane_results: ${{ toJSON(needs) }}

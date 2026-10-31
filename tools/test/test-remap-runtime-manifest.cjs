@@ -25,6 +25,13 @@
  *    all present. Nothing else may be null.
  * 3. Cross-Pinned Driver: the VirtualHIDDevice pin must equal the digest the
  *    runtime build tooling (tools/build/remap_runtime_source.py) verifies.
+ * 4. Pinned Capture Requirement: the capture verifies the launcher it starts
+ *    against `capture.requirement`, which is the designated requirement the
+ *    stable self-signed identity gives the launcher (the release build log
+ *    prints it). It names the launcher bundle identifier of identifiers.json
+ *    and one certificate leaf, and is never null again.
+ * 5. The packager that writes the runtime pin (tools/build/remap_runtime_publish.py)
+ *    runs its own suite here, so a non-reproducible artifact fails this gate.
  * ==============================================================================
  */
 
@@ -46,7 +53,9 @@ const UNBUILT_RUNTIME = [
 	'runtime.sha256',
 	'runtime.size'
 ];
-const UNBUILT = new Set([...UNBUILT_RUNTIME, 'capture.requirement']);
+const UNBUILT = new Set(UNBUILT_RUNTIME);
+const IDENTIFIERS = path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.json');
+const PUBLISH_TEST = path.join(ROOT, 'tools/build/remap_runtime_publish_test.py');
 
 /**
  * Reads the dotted field paths from the Lua validator.
@@ -171,6 +180,14 @@ const complete = {
 check(judge(complete, paths, true).length === 0, 'a complete pin passes --require-pinned');
 check(judge(complete, paths, false).length === 0, 'a complete pin passes the default check');
 const unbuilt = JSON.parse(JSON.stringify(complete));
+const requirementNulled = JSON.parse(JSON.stringify(complete));
+requirementNulled.capture.requirement = null;
+check(
+	judge(requirementNulled, paths, false).some((message) =>
+		message.includes('capture.requirement may not be null')
+	),
+	'a nulled capture requirement is refused'
+);
 for (const dotted of UNBUILT) {
 	const [group, key] = dotted.split('.');
 	unbuilt[group][key] = null;
@@ -210,7 +227,17 @@ check(
 );
 for (const message of judge(manifest, paths, requirePinned)) check(false, message);
 
-// 3. The driver pin equals what the build tooling verifies.
+// 3. The capture requirement names the launcher and one certificate leaf.
+const launcherId = JSON.parse(fs.readFileSync(IDENTIFIERS, 'utf8')).bundle_ids.launcher;
+const requirement = /^identifier "([^"]+)" and certificate leaf = H"([0-9a-f]{40})"$/.exec(
+	String(manifest.capture.requirement)
+);
+check(
+	requirement !== null && requirement[1] === launcherId,
+	`the capture requirement names the launcher ${launcherId} and one lower-case certificate leaf`
+);
+
+// 4. The driver pin equals what the build tooling verifies.
 const verified = buildToolingPackage(fs.readFileSync(BUILD_SOURCE, 'utf8'));
 check(verified !== null, 'remap_runtime_source.py still verifies a VirtualHIDDevice package row');
 if (verified) {
@@ -229,6 +256,15 @@ if (verified) {
 		'the VirtualHIDDevice address names the pinned version and file'
 	);
 }
+
+// 5. The packager suite.
+const publish = require('child_process').spawnSync('python3', ['-I', PUBLISH_TEST], {
+	encoding: 'utf8'
+});
+check(
+	publish.status === 0,
+	`the runtime packager suite passes${publish.status === 0 ? '' : `: ${publish.stderr || publish.error}`}`
+);
 
 if (failures.length > 0) {
 	console.error(`\n[FAIL] owned runtime manifest: ${failures.length} problem(s)`);
