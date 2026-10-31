@@ -467,8 +467,13 @@ function M.prepare_access(entry, on_ready)
 	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
 	if not (provider and provider.auth) then return on_ready(true, nil) end
 	local slot = access_slot(entry)
-	if TokenExchange.state(provider.auth, slot.token and slot or nil, Monotonic.now_sec()) then
+	local now = Monotonic.now_sec()
+	if TokenExchange.state(provider.auth, slot.token and slot or nil, now) then
 		return on_ready(true, nil)
+	end
+	if not slot.pending and slot.retry_at and now < slot.retry_at then
+		-- A refused exchange waits its pause: the reason answers at once
+		return on_ready(false, slot.failure)
 	end
 	refresh_access(provider, entry, on_ready)
 end
