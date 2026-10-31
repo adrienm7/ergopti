@@ -28,10 +28,6 @@ local function load_contract()
 	return data.entries
 end
 
-local function preferences_source()
-	return helpers.driver_root() .. "infra/preferences.lua"
-end
-
 local function deep_equal(a, b)
 	if type(a) ~= type(b) then return false end
 	if type(a) ~= "table" then return a == b end
@@ -113,24 +109,22 @@ helpers.describe("LLM menu persistence contract", function()
 	end)
 end)
 
-helpers.describe("LLM menu persistence — preferences.lua wiring", function()
-	helpers.it("maps every HS contract flat_key through KEY_MAP or NESTED_KEY_MAP", function()
-		local fh = io.open(preferences_source(), "r")
-		helpers.assert_true(fh ~= nil, "preferences.lua not found")
-		local body = fh:read("*a")
-		fh:close()
+helpers.describe("LLM menu persistence — preferences ownership", function()
+	helpers.it("resolves every HS contract path to its flat_key through the preference owner", function()
+		-- Asks the owner, not its text: a flat key named in a comment or a dead
+		-- table entry would satisfy a source search and still load nothing.
+		local prefs = helpers.load_with_stubs("infra.preferences")
+		local checked = 0
 		for _, entry in ipairs(load_contract()) do
 			local hs = entry.hs
-			if type(hs) ~= "table" or not hs.flat_key then
-				goto continue
+			if type(hs) == "table" and hs.flat_key then
+				local path = hs.section .. "." .. (hs.nested_key or (hs.path and hs.path .. "." .. hs.key or hs.key))
+				helpers.assert_eq(prefs.flat_key_for(path), hs.flat_key,
+					"preferences must own " .. path .. " as " .. hs.flat_key .. " (" .. entry.id .. ")")
+				checked = checked + 1
 			end
-			local fk = hs.flat_key
-			helpers.assert_true(
-				body:find('"' .. fk .. '"', 1, true) or body:find(fk .. " ", 1, true),
-				"preferences.lua must reference " .. fk .. " (" .. entry.id .. ")"
-			)
-			::continue::
 		end
+		helpers.assert_true(checked >= 20, "the contract must name its HS flat keys")
 	end)
 end)
 
