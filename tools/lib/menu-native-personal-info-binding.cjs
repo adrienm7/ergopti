@@ -245,7 +245,7 @@ const LINUX_BODY = `
 								end)
 								if not called or committed ~= true then
 									Logger.error(LOG, "Dynamic hotstring family refused (%s).", called and "owner-not-committed" or "owner-error")
-									show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+									SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 									return false
 								end
 								-- A prefix family is matched by the ORDINARY engine, which
@@ -274,7 +274,7 @@ const LINUX_BODY = `
 				local called, committed = pcall(function() return dyn.set_scope_enabled(enabled, config) end)
 				if not called or committed ~= true then
 					Logger.error(LOG, "Dynamic hotstring scope refused (%s).", called and "owner-not-committed" or "owner-error")
-					show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+					SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 					return false
 				end
 				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end

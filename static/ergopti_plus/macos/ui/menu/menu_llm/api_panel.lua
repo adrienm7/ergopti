@@ -19,6 +19,7 @@
 
 local M = {}
 
+local SaveFailure = require("config_save_failure")
 local llm_mod       = require("modules.llm")
 local i18n          = require("infra.i18n")
 local Logger        = require("infra.logger")
@@ -104,8 +105,9 @@ end
 
 local function notify_persistence_failure(label)
 	Logger.error(LOG, "%s was rejected; runtime state was restored.", tostring(label))
-	pcall_log("notify(api persistence failure)", notifications.notify,
-		i18n.get("common.error_title"), i18n.get("dialog.bulk_toggle.save_failed"), "error")
+	pcall_log("notify(api persistence failure)", SaveFailure.present, i18n.get, function(message)
+		notifications.notify(i18n.get("common.error_title"), message, "error")
+	end)
 end
 
 --- The automatic name of every entry, by id: <provider>/<model>, with the
