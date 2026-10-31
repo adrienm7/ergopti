@@ -138,6 +138,24 @@ helpers.describe("lease check", function()
 		helpers.assert_eq(run("lease", quiet).deploy_write_ms.value, "none", "no deploy this session is named")
 	end)
 
+	helpers.it("decides whether karabiner.json must shrink from its write time (lease-deploy-verdict)", function()
+		local hold = require("infra.main_thread_hold").COUNT_MS
+		local function verdict(write_ms)
+			local ports, world = make_ports({ deploy_facts = function() return { bytes = 760832, write_ms = write_ms } end })
+			world.existing[CLI] = true
+			return run("lease", ports).deploy_write_verdict
+		end
+		local short = verdict(41.6)
+		helpers.assert_eq(short.state, "pass")
+		helpers.assert_eq(short.value, "keep")
+		local long = verdict(hold)
+		helpers.assert_eq(long.state, "fail")
+		helpers.assert_eq(long.value, "shrink")
+		local quiet = run("lease", make_ports()).deploy_write_verdict
+		helpers.assert_eq(quiet.state, "info")
+		helpers.assert_eq(quiet.value, "none")
+	end)
+
 	helpers.it("names the free memory, for the starvation hypothesis (lease-memory-free)", function()
 		local ports, world = make_ports()
 		world.existing[CLI] = true
