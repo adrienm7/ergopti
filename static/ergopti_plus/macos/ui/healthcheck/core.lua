@@ -647,6 +647,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.system_curl",
+		contract = { "check", "message_for", "parse_version", "verdict_for" },
+		-- Every curl start goes through ShellRunner.spawn or TaskLifecycle.native.
+		wired    = true,
+	},
+	{
 		id       = "adapters.task_environment",
 		contract = { "sanitize" },
 		wired    = true,
