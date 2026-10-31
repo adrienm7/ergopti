@@ -8,11 +8,15 @@ package.path = source .. "/static/ergopti_plus/macos/?.lua;" .. source .. "/stat
 local configured = input.config
 local logs = 0
 local logger = setmetatable({}, { __index = function() return function() logs = logs + 1 end end })
-package.loaded["infra.logger"] = logger
 package.loaded["infra.config_paths"] = { get_config_dir = function() return configured end }
 package.loaded["infra.paths"] = { shared = function(relative)
     return source .. "/static/ergopti_plus/_shared/" .. relative
 end }
+-- The shared module reads its catalogue cap from [limits] when it loads, and the
+-- registry logs its own load: bind it under a silent logger before counting starts.
+package.loaded["infra.logger"] = setmetatable({}, { __index = function() return function() end end })
+require("infra.timings").count("limits", "program_catalogue_bytes")
+package.loaded["infra.logger"] = logger
 local Adapter = require("adapters.program_providers")
 local Directories = require("infra.fs_dir")
 local cases, case_facts = {}, {}
