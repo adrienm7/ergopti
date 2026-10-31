@@ -34,8 +34,10 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // a fresh module load over a stamp and a debounce driven by a controlled clock.
 // 72 → 65 files and 135 → 122 reads: eight tests load their module by name
 // through helpers.fresh_module instead of dofile or loadfile on its path.
-const BASELINE = 65;
-const READ_BASELINE = 122;
+// 65 → 61 files and 122 → 116 reads: six describe labels named their module
+// by path; they name it by module now.
+const BASELINE = 61;
+const READ_BASELINE = 116;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];

@@ -14,7 +14,7 @@ local helpers, TomlCodec, binding_source_fixture =
 
 
 
-helpers.describe("modules/gestures/manager.lua", function()
+helpers.describe("modules.gestures.manager", function()
 
   -- ==========================================================================
   -- 1. Module structural
