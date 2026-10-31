@@ -730,9 +730,7 @@ Added October 22 (from the agents' reports; details in their commits):
       watcher started"; a second source run yields after about 3 s with a "single-owner mutex" WARNING; Start at login
       in this mode is a developer run too, by decision); (2) [PHYS-M] the Mac hardware session covers macOS; (3)
       [PHYS-L] on a real desktop with the package installed: the unit is stopped, the tray appears, a saved `.lua`
-      restarts the daemon, the tray's Reload restarts it, a second `run-linux-dev.sh` reports "already running"; (4)
-      maintainer decision: should the layout catalogue fetch the remote registry in a developer run (today the clone's
-      registry, by design of `local_source`).
+      restarts the daemon, the tray's Reload restarts it, a second `run-linux-dev.sh` reports "already running".
 - [ ] **Keystats rename leftovers.** [CODE] The rename is done (180a53e4de, 1 283 files, 579 paths). Left:
       the comment in `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` (a compiled
       script: `osadecompile` it, edit the comment, `osacompile -o` it back, on a Mac); persisted names

@@ -134,3 +134,6 @@ helpers.describe("layout registry store (linux)", function()
 		helpers.assert_eq(store.catalogue().index, nil)
 	end)
 end)
+
+require("test.layout_catalogue_source_contract")(helpers, RegistryStore, require("layouts.catalogue"), Json,
+	assert(require("modules.keymap.layout_registry").settings()))
