@@ -111,7 +111,10 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //                    three backends instead of comparing source positions.)
 //           17 → 16 (2026-10-31: the menu probe loop guard became a repaint-
 //                    count case in test_health_probe_generation.)
-const BASELINE = 16;
+//           16 → 15 (2026-10-31: the LLM menu persistence and regression tests
+//                    ask preferences.flat_key_for instead of searching its
+//                    text.)
+const BASELINE = 15;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -163,7 +166,9 @@ const BASELINE = 16;
 //              backends instead of comparing source positions.)
 //       61 → 59 (2026-10-31: the menu probe loop guard became a repaint-count
 //              case in test_health_probe_generation.)
-const READ_BASELINE = 59;
+//       59 → 57 (2026-10-31: the LLM menu persistence and regression tests ask
+//              preferences.flat_key_for instead of searching its text.)
+const READ_BASELINE = 57;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
