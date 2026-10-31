@@ -74,6 +74,32 @@ function M.virtual_hid_version()
 	return require("platform.remap.runtime_manifest").virtual_hid_version(manifest)
 end
 
+--- The persisted record that Ergopti closed the user's own Karabiner.
+--- @return table marker { get, set, clear }.
+function M.marker()
+	local path = FileSystem.expand_path(require("platform.remap.ke_paths").OWNED.CLOSED_OTHER_MARKER)
+	return {
+		get = function() return FileSystem.exists(path) == true end,
+		set = function()
+			return FileSystem.prepare_parent_for_create(path) == true and FileSystem.write(path, "closed\n") == true
+		end,
+		clear = function() return FileSystem.delete(path) == true end,
+	}
+end
+
+--- The ports of the activation rule (platform/remap/runtime_activation.lua).
+--- @param owner table The bound runtime owner module.
+--- @param close_other_instances function fn() -> boolean, the user's consent.
+--- @return table ports
+function M.activation(owner, close_other_instances)
+	return {
+		owner = owner,
+		restore = require("adapters.karabiner_coexistence").new().restore,
+		marker = M.marker(),
+		close_other_instances = close_other_instances,
+	}
+end
+
 --- The ports of the real Mac.
 --- @return table ports For platform.remap.runtime_owner.init.
 function M.new()
@@ -109,7 +135,7 @@ function M.new()
 		},
 		coexistence = {
 			detect = Coexistence.detect,
-			close = Coexistence.close,
+			close = require("platform.remap.runtime_activation").remembering_close(Coexistence.close, M.marker()),
 		},
 		artifact = {
 			pinned = pinned_artifact,
