@@ -447,7 +447,23 @@
 		},
 		"hs_config.unit_ms": {
 			"reason": "unit-or-abbreviation",
-			"locales": ["ar", "cs", "da", "de", "es", "fr", "hi", "it", "ko", "nl", "no", "pl", "pt", "sv", "tr"]
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"hi",
+				"it",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"sv",
+				"tr"
+			]
 		},
 		"input_probe.hook_line": {
 			"reason": "symbol-or-placeholder-only",
@@ -2357,7 +2373,22 @@
 		},
 		"ui_apps.value_ms": {
 			"reason": "unit-or-abbreviation",
-			"locales": ["ar", "cs", "da", "de", "es", "fr", "hi", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"hi",
+				"it",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"sv",
+				"tr"
+			]
 		},
 		"ui_typing.apps_some": {
 			"reason": "loanword-or-cognate",
