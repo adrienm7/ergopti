@@ -3418,6 +3418,24 @@ jobs:
               exit 1
           fi
         timeout-minutes: 3
+      # The local NTLM/Negotiate relay (docs/design/proxy-auth-relay.md): fake
+      # upstream proxies, CONNECT, refusals and the real GSS-API without a ticket.
+      - name: Qualify the Go proxy sign-in relay
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
+          npm run --silent test:go-proxy-relay | tee "$RUNNER_TEMP/go-proxy-relay.log"
+          else
+              exit 1
+          fi
+        timeout-minutes: 3
       # The installed Ollama proxy stage, on the wrapper's module path, against a
       # real PAC that routes the registry and the blob host differently.
       - name: Install prerequisites for Qualify the installed managed Ollama route plan
