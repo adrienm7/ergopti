@@ -27,6 +27,7 @@ local M = {}
 
 local Logger = require("infra.logger")
 local KePaths = require("platform.remap.ke_paths")
+local NativePath = require("native_path")
 
 local LOG = "remap.runtime_artifact_fetch"
 
@@ -139,7 +140,7 @@ function M.new(ports)
 	local function step(executable, args, timeout, reason, detail, continue)
 		ports.exec(executable, args, timeout, function(code, stdout, stderr)
 			if code ~= 0 then
-				return settle(false, reason, detail .. " (" .. executable:match("[^/]+$") .. " status "
+				return settle(false, reason, detail .. " (" .. NativePath.basename(executable) .. " status "
 					.. tostring(code) .. (stderr and stderr ~= "" and (": " .. stderr:gsub("%s+$", "")) or "") .. ")")
 			end
 			continue(stdout or "")
