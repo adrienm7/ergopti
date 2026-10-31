@@ -660,19 +660,34 @@ local function scratch_typing(keys, callback, options)
 			callback(outcome)
 		end)
 	end
+	-- The scratch window's focus as macOS reports it to the window itself: nil
+	-- until its first report. Read without Accessibility, unlike
+	-- hs.window.focusedWindow, which asks this very process and once waited out
+	-- the whole messaging timeout right after the preview tooltip showed, so
+	-- the round trip stopped at its third key (field run 2026-10-31 14:13:39).
+	local native_focus = nil
+	-- The scratch window's id, proven through Accessibility at the first key
+	local proven_window_id = nil
 	--- True while the scratch field's window is the focused one of this process.
 	--- @return boolean focused, string|integer reason_or_window_id
 	local function scratch_has_focus()
 		local front = hs.application.frontmostApplication()
 		if not front or front:pid() ~= hs.processInfo.processID then return false, "not_frontmost" end
+		if native_focus == false then return false, "window_unfocused" end
+		if proven_window_id ~= nil then return true, proven_window_id end
 		local focused, own = hs.window.focusedWindow(), OwnWindow.for_webview(view)
 		if not focused or not own or focused:id() ~= own:id() then return false, "window_unfocused" end
-		return true, own:id()
+		proven_window_id = own:id()
+		return true, proven_window_id
 	end
 	local ok, err = pcall(function()
 		local screen = hs.screen.mainScreen():frame()
 		view = hs.webview.new({ x = screen.x + screen.w / 2 - 180, y = screen.y + 80, w = 360, h = 90 },
 			{ developerExtrasEnabled = false })
+		-- Bound before the window shows, so its first focus report is seen
+		view:windowCallback(function(action, _, state)
+			if action == "focusChange" then native_focus = state == true end
+		end)
 		-- The shared chrome keeps the normal level: the field is focused before
 		-- each key and the run aborts when it loses the focus, so floating it
 		-- would only leave it above the windows the user opens meanwhile
