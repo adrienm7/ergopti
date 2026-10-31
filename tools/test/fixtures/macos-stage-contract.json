@@ -960,6 +960,10 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}"
 				},
 				{
+					"uses": "actions/setup-go@v5",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}"
+				},
+				{
 					"name": "Require actual arm64 cold runtime prerequisites on macOS 26",
 					"id": "lot-cold-prerequisites",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}",
@@ -992,6 +996,10 @@
 				},
 				{
 					"uses": "actions/setup-python@v5",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}"
+				},
+				{
+					"uses": "actions/setup-go@v5",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}"
 				},
 				{
