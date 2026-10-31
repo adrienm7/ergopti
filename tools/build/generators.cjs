@@ -326,9 +326,11 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/linux/_generated/gesture_emit_actions.lua']
 	},
 	{
+		// Also splices the availability table between the README's GENERATED markers.
 		script: 'codegen/codegen-action-catalogue.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/lua/actions/catalogue_data.lua',
+			'static/ergopti_plus/_shared/modules/actions/README.md',
 			'static/ergopti_plus/macos/_generated/action_catalogue.lua',
 			'static/ergopti_plus/linux/_generated/action_catalogue.lua',
 			'static/ergopti_plus/windows/_generated/action_catalogue.ahk'
