@@ -83,14 +83,18 @@ module.exports = function verifyHotstringLanguageOwners(base, manifest) {
 				controls++;
 			}
 		}
-		const languageFile = files[platform][0],
-			language = sources[languageFile];
 		const signature =
 			platform === 'ahk'
 				? '_HS_LanguageRows() {'
 				: platform === 'hs'
 					? 'local function build_hotstrings_rows(ctx, menu_mods)'
 					: 'local function _manifest_hotstring_rows(ctx, config)';
+		// On Linux the owner lives in whichever tray module now holds it.
+		const languageFile =
+				platform === 'linux'
+					? Object.keys(sources).find((file) => sources[file].includes(signature))
+					: files[platform][0],
+			language = sources[languageFile];
 		assert.equal(language.split(signature).length - 1, 1, 'unique actual physical owner preimage');
 		const emptyOwner =
 			platform === 'ahk' ? signature + '\nreturn []\n}' : signature + '\nreturn nil\nend';
@@ -256,7 +260,6 @@ module.exports = function verifyHotstringLanguageOwners(base, manifest) {
 			controls++;
 		}
 		if (platform !== 'ahk') {
-			const actual = sources[languageFile];
 			for (const [before, after, reason] of [
 				[
 					'group_receiver("top_level", "hotstrings")',
@@ -294,12 +297,14 @@ module.exports = function verifyHotstringLanguageOwners(base, manifest) {
 					'actual declared array first-variable multiassignment poisoned'
 				]
 			]) {
+				// On Linux each anchor lives in whichever tray module now holds it.
+				const owner =
+					platform === 'linux'
+						? Object.keys(sources).find((file) => sources[file].includes(before))
+						: languageFile;
+				const actual = sources[owner];
 				assert.equal(actual.split(before).length - 1, 1, reason + ': exact actual source preimage');
-				assert.equal(
-					admits({ ...sources, [languageFile]: actual.replace(before, after) }),
-					false,
-					reason
-				);
+				assert.equal(admits({ ...sources, [owner]: actual.replace(before, after) }), false, reason);
 				assert.equal(admits(), true, reason + ': genuine source inverse restores');
 				controls++;
 			}
@@ -433,9 +438,12 @@ function verifyIndependentHotstringMutants(base, manifest) {
 	for (const control of reviewerCases) {
 		const platform = control.platform;
 		const sources = readOwnerSources(base, platform);
+		// On Linux the producer lives in whichever tray module now holds it.
 		const sourceFile = control.control.includes('import shadowed')
 			? files[platform][2]
-			: files[platform][0];
+			: platform === 'linux'
+				? Object.keys(sources).find((file) => sources[file].includes(control.signature))
+				: files[platform][0];
 		const target =
 			platform === 'ahk' ? 'hotstring_language_parent_windows' : 'hotstring_language_parent_lua';
 		assert.equal(
