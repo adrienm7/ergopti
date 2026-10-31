@@ -513,6 +513,7 @@ local function with_fixture(plan, callback)
 				prelude = function() return "", nil end,
 				opaque_prelude = function() return "", nil end,
 				managed_http_prelude = function() return "", nil end,
+				uses_managed_transport = function() return true, nil end,
 			}
 			package.loaded["modules.llm"] = {
 				DEFAULT_STATE = {llm_num_predictions = 1},

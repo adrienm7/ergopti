@@ -144,6 +144,7 @@ return {
 	"tests.unit.infra.network.test_network_proxy_policy_contract",
 	"tests.unit.infra.network.test_network_route_plan_contract",
 	"tests.unit.infra.network.test_proxy_auth_relay",
+	"tests.unit.infra.network.test_network_proxy_override_contract",
 	"tests.meta.architecture.test_curl_engine_scan",
 	"tests.unit.modules.gestures.programs.test_native_worker_owner",
 	"tests.unit.adapters.layout.test_physical_chord_source_currency",
