@@ -169,6 +169,24 @@ function M.resolve_target(backend, model)
 	return Remote.endpoint(entry, model)
 end
 
+--- Resolves a vision target once its key's access token is usable: at once
+--- for a local backend, a provider sending its key as is or a fresh token,
+--- else when the exchange of the access lease (api_remote.prepare_access)
+--- settles, so the first vision request to watsonx or Vertex AI waits for
+--- its token instead of being refused while it is fetched.
+--- @param backend string The binding's backend id.
+--- @param model string The resolved vision model.
+--- @param on_target function on_target(target|nil, reason|nil), called exactly once.
+function M.prepare_target(backend, model, on_target)
+	if type(on_target) ~= "function" then error("vision_request.prepare_target requires a callback", 2) end
+	local entry = backend ~= Vision.LOCAL_BACKEND and M.entry_for(backend) or nil
+	if not entry then return on_target(M.resolve_target(backend, model)) end
+	require("modules.llm.api_remote").prepare_access(entry, function(ok, reason)
+		if not ok then return on_target(nil, reason or "the access token could not be fetched") end
+		on_target(M.resolve_target(backend, model))
+	end)
+end
+
 
 
 
