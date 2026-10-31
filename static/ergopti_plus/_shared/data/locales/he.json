@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "קובץ השירות של סביבת הריצה העצמית קיים",
 	"field_check.step.job_loaded": "שירות סביבת הריצה העצמית נטען",
 	"field_check.step.driver_state": "מנהל התקן מקלדת וירטואלית",
+	"field_check.step.driver_verdict": "תאימות מנהל התקן מקלדת וירטואלית",
 	"field_check.step.stock_app": "אפליקציית Karabiner-Elements מותקנת",
 	"field_check.step.stock_running": "תהליכי Karabiner-Elements פועלים",
 	"field_check.step.owned_running": "תהליכי סביבת הריצה העצמית פועלים",

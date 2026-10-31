@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "Soubor služby vlastního běhového prostředí je přítomen",
 	"field_check.step.job_loaded": "Služba vlastního běhového prostředí načtena",
 	"field_check.step.driver_state": "Ovladač virtuální klávesnice",
+	"field_check.step.driver_verdict": "Kompatibilita ovladače virtuální klávesnice",
 	"field_check.step.stock_app": "Aplikace Karabiner-Elements nainstalována",
 	"field_check.step.stock_running": "Procesy Karabiner-Elements běží",
 	"field_check.step.owned_running": "Procesy vlastního běhového prostředí běží",

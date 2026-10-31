@@ -96,6 +96,10 @@ helpers.describe("owned runtime manifest: what ships", function()
 		helpers.assert_contains(reason, "5 more")
 	end)
 
+	helpers.it("hands the field check the pinned driver version while the runtime is unbuilt", function()
+		helpers.assert_eq(load_module().virtual_hid_version(shipped()), "8.5.0")
+	end)
+
 	helpers.it("names the upstream revision the plan anchors the fork on", function()
 		helpers.assert_eq(shipped().runtime.upstream_revision, "9312593e1a3bf72b94c63c524ebabe2637442e8a")
 	end)
@@ -122,6 +126,25 @@ helpers.describe("owned runtime manifest: a complete pin", function()
 			capture = { requirement = 'identifier "com.ergoptiplus.app"', batch_limit = 64, frame_limit = 65536,
 				history_capacity = 4096 },
 		})
+	end)
+
+	helpers.it("names the driver version only while every driver field is pinned", function()
+		local Manifest = load_module()
+		helpers.assert_eq(Manifest.virtual_hid_version(complete()), "8.5.0")
+		for _, field in ipairs(Manifest.FIELDS) do
+			local manifest = complete()
+			set(manifest, field[1], nil)
+			if field[1]:find("^virtual_hid_device%.") then
+				helpers.assert_nil(Manifest.virtual_hid_version(manifest), field[1])
+			else
+				helpers.assert_eq(Manifest.virtual_hid_version(manifest), "8.5.0", field[1])
+			end
+		end
+		local foreign = complete()
+		foreign.virtual_hid_device.source_url = "https://example.test/dl/other.pkg"
+		helpers.assert_nil(Manifest.virtual_hid_version(foreign))
+		helpers.assert_nil(Manifest.virtual_hid_version({ schema = 2 }))
+		helpers.assert_nil(Manifest.virtual_hid_version(nil))
 	end)
 
 	helpers.it("treats every field as required: removing or nulling any one unpins the manifest", function()

@@ -31,7 +31,7 @@
 			"kind": "field_check",
 			"check": "owned_runtime",
 			"deadline_seconds": 60,
-			"proves": "The Ergopti-owned Karabiner runtime is still dormant, and what of it and of the stock Karabiner is installed or running."
+			"proves": "The Ergopti-owned Karabiner runtime is still dormant, what of it and of the stock Karabiner is installed or running, and whether the owner would accept the installed VirtualHIDDevice."
 		},
 		{
 			"id": "field_network",

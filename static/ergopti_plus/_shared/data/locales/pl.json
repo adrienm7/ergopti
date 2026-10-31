@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "Plik usługi własnego środowiska obecny",
 	"field_check.step.job_loaded": "Usługa własnego środowiska załadowana",
 	"field_check.step.driver_state": "Sterownik klawiatury wirtualnej",
+	"field_check.step.driver_verdict": "Zgodność sterownika wirtualnej klawiatury",
 	"field_check.step.stock_app": "Aplikacja Karabiner-Elements zainstalowana",
 	"field_check.step.stock_running": "Procesy Karabiner-Elements działają",
 	"field_check.step.owned_running": "Procesy własnego środowiska działają",

@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "Файл службы собственной среды найден",
 	"field_check.step.job_loaded": "Служба собственной среды загружена",
 	"field_check.step.driver_state": "Драйвер виртуальной клавиатуры",
+	"field_check.step.driver_verdict": "Совместимость драйвера виртуальной клавиатуры",
 	"field_check.step.stock_app": "Приложение Karabiner-Elements установлено",
 	"field_check.step.stock_running": "Процессы Karabiner-Elements запущены",
 	"field_check.step.owned_running": "Процессы собственной среды запущены",
