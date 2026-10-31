@@ -5,10 +5,10 @@
 --- DESCRIPTION:
 --- The real-kernel harnesses (modifier custody, input owner, simultaneous
 --- configuration, hook text custody, the live daemon) build their "physical
---- keyboards" from a copy of the production writer. When the writer gained relative axes for the navigation
---- layer's wheel, every such source advertised EV_REL, the hook refused to grab
---- it and "The whole daemon, live" failed at "Hook owns both real virtual source
---- grabs" with nothing logged. These cases replay the writer's device setup
+--- keyboards" from a copy of the production writer. When the writer gained
+--- relative axes for the navigation layer's wheel, every such source advertised
+--- EV_REL, the hook refused to grab it and "The whole daemon, live" failed at
+--- "Hook owns both real virtual source grabs" with nothing logged. These cases replay the writer's device setup
 --- through a recorder and judge the event mask with the hook's own grab policy.
 --- ==============================================================================
 
