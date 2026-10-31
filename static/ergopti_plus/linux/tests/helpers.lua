@@ -79,7 +79,7 @@ end
 --- ui/menu/builder.lua binds each section builder from its own
 --- ui/menu/menu_<section>.lua; a test that looks for a builder's code by text
 --- finds it in whichever of these files now holds it.
---- @return string The root's text, then each bound module's text, in binding order.
+--- @return string The root's text, then each module it or a part binds, in binding order.
 function M.read_menu_source()
 	local directory = M.driver_root() .. "/ui/menu/"
 	local function read(name)
@@ -88,12 +88,16 @@ function M.read_menu_source()
 		assert(handle:close())
 		return text
 	end
-	local texts, seen = { read("builder") }, {}
-	for name in texts[1]:gmatch('require%("ui%.menu%.(menu_[a-z_]+)"%)') do
-		if not seen[name] then
-			seen[name] = true
-			texts[#texts + 1] = read(name)
+	-- A part may bind another part (the dialogs), which the root no longer names.
+	local texts, seen, index = { read("builder") }, {}, 1
+	while texts[index] do
+		for name in texts[index]:gmatch('require%("ui%.menu%.(menu_[a-z_]+)"%)') do
+			if not seen[name] then
+				seen[name] = true
+				texts[#texts + 1] = read(name)
+			end
 		end
+		index = index + 1
 	end
 	return table.concat(texts, "\n")
 end
