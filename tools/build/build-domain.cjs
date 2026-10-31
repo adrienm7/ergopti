@@ -134,6 +134,7 @@ const PIPELINE = [
 			return { ok, detail: ok ? undefined : stderr };
 		},
 		generated: [
+			'static/ergopti_plus/_shared/_generated/config_template.toml',
 			'static/ergopti_plus/windows/_generated/features_manifest.ahk',
 			'static/ergopti_plus/windows/_generated/config_template.toml',
 			'static/ergopti_plus/macos/_generated/features_manifest.lua',

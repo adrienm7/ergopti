@@ -2,21 +2,22 @@
 // scripts/build-features-manifest.js
 // Reads the shared features manifest and produces, for each driver, both:
 //   1. A native-language manifest module (AHK Map / Lua table) consumed at boot.
-//   2. A default config.toml template copied verbatim into the user's config
-//      directory on first boot.
+//   2. A default config.toml template: one shared file, and each driver's
+//      projection of it (tools/lib/config-template-projection.cjs).
 //
 // Inputs:
 //   static/ergopti_plus/_shared/modules/features/manifest.toml
 //   static/ergopti_plus/_shared/tap_hold/defaults.toml
 //
 // Outputs:
+//   static/ergopti_plus/_shared/_generated/config_template.toml  (three drivers, once)
 //   static/ergopti_plus/windows/_generated/features_manifest.ahk
-//   static/ergopti_plus/windows/_generated/config_template.toml
+//   static/ergopti_plus/windows/_generated/config_template.toml  (projection)
 //   static/ergopti_plus/_shared/lua/features/manifest_data.lua  (macOS + Linux, once)
 //   static/ergopti_plus/macos/_generated/features_manifest.lua  (projection call)
-//   static/ergopti_plus/macos/_generated/config_template.toml
+//   static/ergopti_plus/macos/_generated/config_template.toml    (projection)
 //   static/ergopti_plus/linux/_generated/features_manifest.lua  (projection call)
-//   static/ergopti_plus/linux/_generated/config_template.toml
+//   static/ergopti_plus/linux/_generated/config_template.toml    (projection)
 //
 // Usage:
 //   npm run build:manifest
@@ -29,6 +30,7 @@ import { fileURLToPath } from 'url';
 import sharedPaths from '../lib/paths.cjs';
 import scopeMetadata from '../lib/configuration-scopes.cjs';
 import configKeys from '../lib/_generated/config_keys.cjs';
+import ConfigTemplate from '../lib/config-template-projection.cjs';
 
 const { KEY } = configKeys;
 
@@ -41,6 +43,7 @@ const MANIFEST_PATH = shared('modules/features/manifest.toml');
 const OUT_AHK_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/windows/_generated');
 const OUT_HS_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/macos/_generated');
 const OUT_LINUX_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/linux/_generated');
+const OUT_SHARED_CONFIG_TEMPLATE = shared('_generated/config_template.toml');
 const OUT_SHARED_LUA_DATA = resolve(
 	REPO_ROOT,
 	'static/ergopti_plus/_shared/lua/features/manifest_data.lua'
@@ -729,9 +732,6 @@ function renderLuaDriverManifest(platform) {
 // ======================================================
 // ======================================================
 
-const CONFIG_TOP_HEADER_SPACING = 5;
-const CONFIG_NESTED_HEADER_SPACING = 3;
-
 function tomlValueLiteral(value) {
 	if (typeof value === 'boolean') return value ? 'true' : 'false';
 	if (typeof value === 'number') {
@@ -758,18 +758,14 @@ function tomlValueLiteral(value) {
 	throw new Error(`cannot represent value in TOML literal: ${typeof value}`);
 }
 
-// Group features by section path, then emit each section as a TOML block.
+// Group features by section path into the tables of one driver's template.
 // Features whose default is a table become their own sub-section
 // [section.id]. Features whose default is a primitive become a flat key
-// inside [section].
-function renderConfigTemplate(manifest, sections, features, platform) {
-	const banner = `# _generated/config_template.toml
-# AUTO-GENERATED from _shared/modules/features/manifest.toml.
-# DO NOT EDIT BY HAND — run \`npm run build:manifest\` to refresh.
-# This is the default v2 config copied into config/ergopti_plus/${platform}/
-# on first boot. After that, the user owns the copy.
-`;
-
+// inside [section]. Each table and key carries its rank in the manifest's
+// authored order, the same on every driver, so the three views merge into
+// the shared template (tools/lib/config-template-projection.cjs).
+function driverTemplateSections(features, platform) {
+	const rankOf = new Map(features.map((f, index) => [f, index]));
 	const platformFeatures = features.filter((f) => f.platforms.includes(platform));
 
 	// Index features by section for stable emission order.
@@ -779,23 +775,7 @@ function renderConfigTemplate(manifest, sections, features, platform) {
 		bySection.get(f.section).push(f);
 	}
 
-	const lines = [banner];
-
-	// House spacing shared with the Windows flat writer and the Lua codec
-	// (`toml_codec/codec.lua`): five blank lines before a top-level header,
-	// three before a nested one. The template must already carry it, otherwise
-	// the first save rewrites every separator of a fresh file.
-	const pushHeader = (header) => {
-		if (lines.length > 1) {
-			const spacing = header.includes('.')
-				? CONFIG_NESTED_HEADER_SPACING
-				: CONFIG_TOP_HEADER_SPACING;
-			// The previous block already ended with one blank line.
-			for (let i = 1; i < spacing; i++) lines.push('');
-		}
-		lines.push(`[${header}]`);
-	};
-
+	const sections = [];
 	// Iterate sections in flatten order so the rendered TOML reflects the
 	// manifest's authored order. We render sections that have at least one
 	// feature for this platform; pure-metadata sections (no features) are
@@ -818,24 +798,67 @@ function renderConfigTemplate(manifest, sections, features, platform) {
 		});
 
 		if (flatEntries.length > 0) {
-			pushHeader(sectionPath);
-			for (const e of flatEntries) {
-				lines.push(`${e.id} = ${tomlValueLiteral(resolveDefault(e, platform))}`);
-			}
-			lines.push('');
+			sections.push({
+				header: sectionPath,
+				rank: [rankOf.get(flatEntries[0])],
+				rows: flatEntries.map((e) => ({
+					key: e.id,
+					literal: tomlValueLiteral(resolveDefault(e, platform)),
+					rank: [rankOf.get(e)]
+				}))
+			});
 		}
 
 		for (const e of tableEntries) {
-			pushHeader(`${sectionPath}.${e.id}`);
-			const def = resolveDefault(e, platform);
-			for (const [k, v] of Object.entries(def)) {
-				lines.push(`${k} = ${tomlValueLiteral(v)}`);
-			}
-			lines.push('');
+			sections.push({
+				header: `${sectionPath}.${e.id}`,
+				rank: [rankOf.get(e)],
+				rows: Object.entries(resolveDefault(e, platform)).map(([k, v], position) => ({
+					key: k,
+					literal: tomlValueLiteral(v),
+					rank: [rankOf.get(e), position]
+				}))
+			});
 		}
 	}
+	return sections;
+}
 
-	return lines.join('\n');
+/**
+ * One driver's config template, rendered straight from the manifest. The
+ * shared template's projection must spell exactly this.
+ * @param {object[]} features Flattened features.
+ * @param {string} platform "ahk", "hs" or "linux".
+ * @returns {string}
+ */
+function renderDriverConfigTemplate(features, platform) {
+	const sections = driverTemplateSections(features, platform).map(({ header, rows }) => ({
+		header,
+		rows: rows.map((row) => [row.key, row.literal])
+	}));
+	return ConfigTemplate.renderDriverTemplate(platform, sections);
+}
+
+/**
+ * The shared config template and each driver's projection of it. Throws when
+ * a projection does not spell the template rendered for that driver from the
+ * manifest, so a lossy merge never reaches a user's first config.
+ * @param {object[]} features Flattened features.
+ * @returns {{shared: string, drivers: Record<string, string>}}
+ */
+function configTemplates(features) {
+	const views = Object.fromEntries(
+		PLATFORMS.map((platform) => [platform, driverTemplateSections(features, platform)])
+	);
+	const shared = ConfigTemplate.renderSharedTemplate(views);
+	const drivers = {};
+	for (const platform of PLATFORMS) {
+		drivers[platform] = ConfigTemplate.projectDriverTemplate(shared, platform);
+		if (drivers[platform] !== renderDriverConfigTemplate(features, platform)) {
+			throw new Error(`the shared config template does not project to the ${platform} template`);
+		}
+	}
+	return { shared, drivers };
 }
 
 // ========================================
@@ -883,35 +906,44 @@ export function luaDriverManifest(platform) {
 	};
 }
 
+/**
+ * Each driver's config template rendered from the manifest without the shared
+ * template, for the test that proves the projection loses nothing.
+ * @returns {Record<string, string>}
+ */
+export function directDriverConfigTemplates() {
+	const { features } = loadFeatureModel();
+	return Object.fromEntries(
+		PLATFORMS.map((platform) => [platform, renderDriverConfigTemplate(features, platform)])
+	);
+}
+
 function main() {
 	console.log('Loading manifest…');
 	const { manifest, sections, features } = loadFeatureModel();
 	console.log(`Parsed ${sections.length} section(s), ${features.length} feature(s).`);
+	// The one default config of the three drivers. Each driver's template is a
+	// projection of it, kept as a file because packaging ships it byte for byte:
+	// the Linux packages copy it to /etc/ergopti/config.toml, every macOS .app
+	// carries it, and the Windows startup smoke test seeds its neutral run with it.
+	const templates = configTemplates(features);
+	writeOutput(OUT_SHARED_CONFIG_TEMPLATE, templates.shared);
 
 	// AHK outputs
 	writeOutput(
 		resolve(OUT_AHK_DIR, 'features_manifest.ahk'),
 		renderAhkManifest(manifest, sections, features)
 	);
-	writeOutput(
-		resolve(OUT_AHK_DIR, 'config_template.toml'),
-		renderConfigTemplate(manifest, sections, features, 'ahk')
-	);
+	writeOutput(resolve(OUT_AHK_DIR, 'config_template.toml'), templates.drivers.ahk);
 	// HS outputs
 	writeOutput(OUT_SHARED_LUA_DATA, renderSharedLuaData(manifest, sections, features));
 	writeOutput(resolve(OUT_HS_DIR, 'features_manifest.lua'), renderLuaDriverManifest('hs'));
-	writeOutput(
-		resolve(OUT_HS_DIR, 'config_template.toml'),
-		renderConfigTemplate(manifest, sections, features, 'hs')
-	);
+	writeOutput(resolve(OUT_HS_DIR, 'config_template.toml'), templates.drivers.hs);
 	// Linux outputs. The driver went without a features manifest for a long
 	// time, which is why its keystats had none of the privacy toggles the
 	// other two read from the shared source — it had nowhere to read them from.
 	writeOutput(resolve(OUT_LINUX_DIR, 'features_manifest.lua'), renderLuaDriverManifest('linux'));
-	writeOutput(
-		resolve(OUT_LINUX_DIR, 'config_template.toml'),
-		renderConfigTemplate(manifest, sections, features, 'linux')
-	);
+	writeOutput(resolve(OUT_LINUX_DIR, 'config_template.toml'), templates.drivers.linux);
 	console.log('Done.');
 }
 
