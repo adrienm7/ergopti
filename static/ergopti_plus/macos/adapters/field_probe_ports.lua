@@ -605,6 +605,15 @@ local function menu_rebuild()
 	return menu.timed_rebuild()
 end
 
+--- The AXValueChanged watcher outcomes of this driver boot, or nil before the
+--- context tracker is loaded.
+--- @return table|nil counts { already_watched, failed }
+local function ax_value_watch_counts()
+	local tracker = package.loaded["modules.keystats.context_tracker"]
+	if type(tracker) ~= "table" or type(tracker.ax_value_watch_counts) ~= "function" then return nil end
+	return tracker.ax_value_watch_counts()
+end
+
 --- True when the keymap taps that decode a selftest key, and consume it
 --- anywhere but the scratch window, are running.
 --- @return boolean running
@@ -889,6 +898,7 @@ function M.new()
 		read_text = function(path) return require("adapters.file_system").read(path) end,
 		loopback_server = loopback_server,
 		crash_counts = crash_counts,
+		ax_value_watch_counts = ax_value_watch_counts,
 		pid = function() return hs.processInfo.processID end,
 		-- The app started with its launcher, which outlives a driver reload;
 		-- a driver run without one (a bare Hammerspoon) started with itself.
