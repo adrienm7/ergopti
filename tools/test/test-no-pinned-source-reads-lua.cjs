@@ -182,7 +182,10 @@ const BASELINE = 11;
 //       54 → 51 (2026-10-31: the ShellRunner GC pin test drops its three
 //              signature scans; its spawned-handle cases fail when the F7
 //              signature returns.)
-const READ_BASELINE = 51;
+//       51 → 48 (2026-10-31: the dedup single-source test drives one answer
+//              through each of the three backends and checks the flag each
+//              hands to ApiCommon.insert_prediction.)
+const READ_BASELINE = 48;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
