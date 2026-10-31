@@ -803,6 +803,58 @@ def explicit_digest_sources(catalogue):
     return sources
 
 
+# The programs the private prefix carries, run by the driver from there only
+# (linux/infra/owned_programs.lua). luajit runs the daemon, curl every HTTP
+# request, sqlite3 the keystats writer, openssl the keystats key derivation and
+# zstd unpacks the Ollama archive. The owned-runtimes registry decides each PIN.
+OWNED_PROGRAMS = ("luajit", "curl", "sqlite3", "openssl", "zstd")
+
+
+def lua_search(luajit, name, path):
+    """Ask the build host's LuaJIT where it loads one module from.
+
+    The spelling LuaJIT found, not its target: Debian links each luaposix C
+    module to a versioned library in the multiarch directory, and walking the
+    target's parent stages that whole directory.
+    """
+    found = Path(run([luajit, "-e", f'io.write(assert(package.searchpath("{name}", package.{path})))']))
+    if not found.is_absolute():
+        raise RuntimeRefused("Native Lua module location refused.")
+    regular_source(found)
+    return found
+
+
+def stage_lua_modules(luajit, prefix, owners):
+    """Stage luv, lfs and luaposix as the build host's LuaJIT loads them.
+
+    luaposix is a Lua package (share/lua/5.1/posix) over C modules
+    (lib/lua/5.1/posix), both copied whole: its init requires its parts
+    lazily, so a partial copy fails only on the first signal or stat.
+    """
+    run([luajit, "-e", 'local uv=require("luv"); assert(type(uv.spawn)=="function")'])
+    run([luajit, "-e", 'local l=require("lfs"); assert(type(l.attributes)=="function")'])
+    run([luajit, "-e", 'local s=require("posix.sys.stat"); assert(type(s.stat)=="function")'])
+    sources = []
+    for name in ("luv", "lfs"):
+        source = regular_source(lua_search(luajit, name, "cpath"))
+        copy_unique(source, prefix / "lib/lua/5.1" / f"{name}.so", owners)
+        sources.append(source)
+    trees = (
+        (lua_search(luajit, "posix.ctype", "cpath").parent, prefix / "lib/lua/5.1/posix", "*.so"),
+        (lua_search(luajit, "posix", "path").parent, prefix / "share/lua/5.1/posix", "*.lua"),
+    )
+    for root, destination, pattern in trees:
+        found = sorted(root.rglob(pattern))
+        if not found:
+            raise RuntimeRefused("Native luaposix tree absent from the build host.")
+        for entry in found:
+            source = regular_source(entry)
+            copy_unique(source, destination / entry.relative_to(root), owners)
+            if pattern == "*.so":
+                sources.append(source)
+    return sources
+
+
 def stage(appdir, catalogue, template):
     global _STAGE_DEADLINE
     _STAGE_DEADLINE = time.monotonic() + 180
@@ -817,22 +869,13 @@ def stage(appdir, catalogue, template):
         policy = catalogue_data["network_runtime"]["portable"]
         owners = {}
         binaries = []
-        for name in ["luajit", "curl"]:
+        for name in OWNED_PROGRAMS:
             source = shutil.which(name)
             if source is None:
                 raise RuntimeRefused("Required native packaging executable absent.")
             copy_unique(source, prefix / "bin" / name, owners)
             binaries.append(source)
-        luv_path = run(
-            [
-                binaries[0],
-                "-e",
-                'local p=assert(package.searchpath("luv",package.cpath)); '
-                'local uv=require("luv"); assert(type(uv.spawn)=="function"); io.write(p)',
-            ]
-        )
-        luv_source = regular_source(luv_path)
-        copy_unique(luv_source, prefix / "lib/lua/5.1/luv.so", owners)
+        lua_modules = stage_lua_modules(binaries[0], prefix, owners)
         # pkg-config reports the actual build host's GIO module location; no
         # distribution-specific /usr/lib spelling is inferred.
         module_directory = Path(run(["pkg-config", "--variable=giomoduledir", "gio-2.0"]).strip())
@@ -856,7 +899,9 @@ def stage(appdir, catalogue, template):
             copy_unique(
                 source, prefix / "lib" / catalogue_data["archive_digest_runtime"]["soname"], owners
             )
-        copy_elf_closure([*binaries, luv_source, *modules, *digest_sources], prefix / "lib", owners)
+        copy_elf_closure(
+            [*binaries, *lua_modules, *modules, *digest_sources], prefix / "lib", owners
+        )
         # Not through the closure walk: it would stage GTK with them.
         for name, source in sorted(tray_sources().items()):
             copy_unique(source, prefix / "lib" / name, owners)
@@ -901,6 +946,19 @@ def inspect_installed(prefix, driver):
         "selection_scope": "native-selection",
     }:
         raise RuntimeRefused("Installed native packaging admission refused.")
+    run(
+        [
+            bash_executable(),
+            "-c",
+            'set -euo pipefail; source "$1" "$2" "$3"; '
+            '"$2/bin/luajit" -e \'require("lfs"); require("posix"); require("posix.sys.stat"); require("luv")\'; '
+            '"$2/bin/sqlite3" -version; "$2/bin/openssl" version; "$2/bin/zstd" --version',
+            "ergopti-owned-programs",
+            str(driver / "network-runtime-env.sh"),
+            str(prefix),
+            str(driver),
+        ]
+    )
     curl_version = run(
         [
             bash_executable(),

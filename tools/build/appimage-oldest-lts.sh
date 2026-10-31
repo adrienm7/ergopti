@@ -57,7 +57,8 @@ container_build() {
 	# cmake, make, git and the LuaJIT headers build the .rpm's luv binding below.
 	apt_install bash ca-certificates curl binutils file gcc libc6-dev pkg-config python3 \
 		cmake make git libluajit-5.1-dev \
-		luajit lua-luv libssl-dev libglib2.0-dev libglib2.0-bin glib-networking \
+		luajit lua-luv lua-filesystem lua-posix sqlite3 openssl zstd \
+		libssl-dev libglib2.0-dev libglib2.0-bin glib-networking \
 		dconf-gsettings-backend gsettings-desktop-schemas libayatana-appindicator3-1
 	# The runner's Node, mounted read-only: the release's own is too old for the
 	# build scripts, and Node itself ships nothing into the image.
