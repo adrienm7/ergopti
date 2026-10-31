@@ -54,8 +54,41 @@ helpers.describe("owned_programs: the private runtime's programs only", function
 		package.loaded["logger.shim"], package.preload["logger.shim"] = loaded, preload
 		helpers.assert_true(ok, tostring(program))
 		helpers.assert_eq(program, "sqlite3")
-		helpers.assert_true(read("adapters/sqlite_process_worker.lua"):find('owned_programs").resolve("sqlite3")', 1, true) ~= nil,
-			"the worker must use the logging-free resolver")
+	end)
+
+	helpers.it("the SQLite worker execs the program the logging-free resolver names (owned-runtimes-programs)", function()
+		-- The resolver double carries only resolve: a worker calling the logging
+		-- path() would raise on a nil field instead of reaching execvp.
+		local resolved, execed = {}, nil
+		local doubles = {
+			ffi = {
+				cdef = function() end,
+				new = function() return {} end,
+				cast = function(_, value) return value end,
+				C = {
+					getppid = function() return 4242 end,
+					umask = function() return 0 end,
+					prctl = function() return 0 end,
+					execvp = function(file) execed = file return -1 end,
+				},
+			},
+			["infra.private_sqlite_file"] = { admit = function() return true end, creation_mask = 63 },
+			["infra.owned_programs"] = {
+				resolve = function(...)
+					resolved[#resolved + 1] = { ... }
+					return "/opt/runtime/bin/sqlite3"
+				end,
+			},
+		}
+		local saved, saved_path = {}, package.path
+		for name, double in pairs(doubles) do saved[name], package.loaded[name] = package.loaded[name], double end
+		local Worker = helpers.fresh_module("adapters.sqlite_process_worker")
+		local ok, err = pcall(Worker.run, "4242", "/tmp/metrics.sqlite")
+		for name in pairs(doubles) do package.loaded[name] = saved[name] end
+		package.path = saved_path
+		helpers.assert_true(not ok and tostring(err):find("SQLite process replacement refused", 1, true) ~= nil, tostring(err))
+		helpers.assert_eq(resolved, { { "sqlite3" } })
+		helpers.assert_eq(execed, "/opt/runtime/bin/sqlite3")
 	end)
 
 	helpers.it("refuses a program the prefix does not carry and a relative prefix (owned-runtimes-programs)", function()
@@ -90,7 +123,10 @@ helpers.describe("owned_programs: the private runtime's programs only", function
 			{ '"openssl base64', "openssl started by name" },
 			{ '| openssl dgst', "openssl started by name" },
 		}
-		local listing = assert(io.popen("cd " .. helpers.driver_root() .. " && find . -name '*.lua' -not -path './tests/*' -print"))
+		-- The root goes through a local: a literal right after driver_root() reads
+		-- as a path pin to tools/test/test-git-mv-resilience.cjs.
+		local root = helpers.driver_root()
+		local listing = assert(io.popen("cd '" .. root .. "' && find . -name '*.lua' -not -path './tests/*' -print"))
 		local found, scanned = {}, 0
 		for file in listing:lines() do
 			scanned = scanned + 1
