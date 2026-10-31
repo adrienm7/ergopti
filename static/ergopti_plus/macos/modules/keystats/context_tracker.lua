@@ -641,6 +641,10 @@ local AX_DEAD_ELEMENT = "AXUIElementRef is invalid"
 local AX_RELEASED_ON_REMOVAL = { [AX_DEAD_ELEMENT] = true, ["Messaging failed"] = true }
 local AX_UNWATCHABLE_ELEMENT = { ["Illegal argument"] = true, ["Notification unsupported"] = true,
 	[AX_DEAD_ELEMENT] = true, ["Messaging failed"] = true }
+--- kAXErrorNotificationAlreadyRegistered: this observer still watches the
+--- element, as after a removal released on "Messaging failed" above. The watch
+--- the caller asked for exists, so it commits instead of raising an ERROR.
+local AX_ALREADY_WATCHED = "Notification has already been registered"
 
 --- Returns the AX message of a watcher error, without its location or traceback.
 --- @param detail any xpcall error value.
@@ -658,6 +662,10 @@ local function mutate_ax_value_watcher(observer, method, element, label)
 	local message = not ok and ax_watcher_error(result) or nil
 	if method == "removeWatcher" and AX_RELEASED_ON_REMOVAL[message] then
 		Logger.debug(LOG, "%s: the element is released without a confirmed removal (%s).", label, message)
+		return true
+	end
+	if method == "addWatcher" and message == AX_ALREADY_WATCHED then
+		Logger.debug(LOG, "%s: the element is already watched by this observer.", label)
 		return true
 	end
 	if method == "addWatcher" and AX_UNWATCHABLE_ELEMENT[message] then
