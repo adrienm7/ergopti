@@ -602,7 +602,33 @@ end
 local function menu_rebuild()
 	local menu = package.loaded["ui.menu"]
 	if type(menu) ~= "table" or type(menu.timed_rebuild) ~= "function" then return nil end
-	return menu.timed_rebuild()
+	-- The rebuild is synchronous, so each layout phase's total grows by what
+	-- this rebuild spent in it: the slowest names the stage to fix.
+	local PhaseStats = require("infra.phase_stats")
+	local layout = package.loaded["ui.menu.menu_keyboard_layout"]
+	local phases = type(layout) == "table" and type(layout.PHASES) == "table" and layout.PHASES or {}
+	local function totals()
+		local values = {}
+		for _, name in ipairs(phases) do
+			local figures = PhaseStats.figures(name)
+			values[name] = figures and figures.total_ms or 0
+		end
+		return values
+	end
+	local before = totals()
+	local outcome = menu.timed_rebuild()
+	if type(outcome) ~= "table" then return outcome end
+	local after, slowest = totals(), nil
+	for _, name in ipairs(phases) do
+		local spent = after[name] - before[name]
+		-- A phase flush between the two reads restarts the totals.
+		if spent < 0 then spent = after[name] end
+		if spent > 0 and (slowest == nil or spent > slowest.ms) then slowest = { id = name, ms = spent } end
+	end
+	local result = {}
+	for key, value in pairs(outcome) do result[key] = value end
+	result.layout_slowest = slowest
+	return result
 end
 
 --- The AXValueChanged watcher outcomes of this driver boot, or nil before the
