@@ -320,10 +320,23 @@ function M.new(deps, presets, ram_getter)
 		return true
 	end
 
-	local function update_progress_ui(owner, pct, message)
+	local function update_progress_ui(owner, pct, message, bytes_done, bytes_total)
 		if not owns_progress_ui(owner) then return end
 		if type(message) ~= "string" or message == "" then return end
-		pcall(download_window.update, tonumber(pct) or 0, nil, nil, message)
+		pcall(download_window.update, tonumber(pct) or 0, bytes_done, bytes_total, message)
+	end
+
+	--- The byte counts of the managed pull's last "OLLAMA_PULL_BYTES <done> <total>"
+	--- line (managed_ollama_pull.py), or nil when the chunk carries none.
+	--- @param text string Sanitized stream chunk.
+	--- @return number|nil done, number|nil total
+	local function last_pull_bytes(text)
+		local done, total
+		for d, t in text:gmatch("OLLAMA_PULL_BYTES (%d+) (%d+)") do
+			done, total = tonumber(d), tonumber(t)
+		end
+		if not done or not total or total <= 0 or done > total then return nil, nil end
+		return done, total
 	end
 
 	local function complete_progress_ui(owner, success, title, error_kind)
@@ -1810,7 +1823,11 @@ function M.new(deps, presets, ram_getter)
 				for line in out:gmatch("([^\n]+)") do
 					if line:len() > 0 then last_line = line end
 				end
-				if last_line ~= "" then update_progress_ui(owner, 0, last_line) end
+				-- The managed pull reports bytes, not a percent: the window
+				-- computes the percent, speed and time left from them
+				local done, total = last_pull_bytes(out)
+				local pct = done and (done * 100 / total) or 0
+				if last_line ~= "" then update_progress_ui(owner, pct, last_line, done, total) end
 				print("[Ollama Pull] " .. out)
 			end
 			return true

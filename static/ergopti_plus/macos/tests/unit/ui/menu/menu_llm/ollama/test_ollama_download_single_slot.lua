@@ -119,6 +119,18 @@ helpers.describe("HS-010 Ollama download shared slot", function()
 		end)
 	end
 
+	helpers.it("(ollama-pull-byte-progress) turns the managed pull's byte lines into the window's percent", function()
+		with_fixture({}, function(f)
+			helpers.assert_true(start_pull(f, "model-A"))
+			f.pulls[1].on_stream(nil, "OLLAMA_PULL_BYTES 1000 4000\nOLLAMA_PULL_BYTES 3000 4000\n", "")
+			local last = f.progress.last_update
+			helpers.assert_not_nil(last, "a byte line updates the window")
+			helpers.assert_eq(last.pct, 75, "the percent comes from the last byte line")
+			helpers.assert_eq(last.done, 3000)
+			helpers.assert_eq(last.total, 4000)
+		end)
+	end)
+
 	helpers.it("(ollama-terminal-model-argument) quotes custom repositories in the manual command", function()
 		with_fixture({}, function(f)
 			local repo = [[owner's/model; $(printf EXPANDED) `printf EXPANDED`]]
