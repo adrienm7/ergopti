@@ -2377,8 +2377,6 @@
 	"ollama.model_ready": "%s hazır!",
 	"ollama.model_repair": "Model bozulmuş görünüyor. Yeniden indirme deneniyor: %s",
 	"ollama.model_repair_title": "Ollama modeli onarılıyor",
-	"ollama.not_detected_body": "Lütfen Ollama'yı kurun ve tekrar deneyin.",
-	"ollama.not_detected_title": "Ollama tespit edilemedi",
 	"ollama.service_disconnected": "Ollama servisi yanıt vermeyi durdurdu.",
 	"ollama.service_ready": "Ollama servisi hazır ✅",
 	"ollama.service_stopped": "Ollama servisi durdu. Başlatılıyor…",

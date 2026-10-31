@@ -2377,8 +2377,6 @@
 	"ollama.model_ready": "%s er klar!",
 	"ollama.model_repair": "Modellen ser ødelagt ut. Forsøker på nytt: %s",
 	"ollama.model_repair_title": "Reparerer Ollama-modell",
-	"ollama.not_detected_body": "Installer Ollama og prøv igjen.",
-	"ollama.not_detected_title": "Ollama ikke oppdaget",
 	"ollama.service_disconnected": "Ollama-tjenesten svarer ikke.",
 	"ollama.service_ready": "Ollama-tjeneste klar ✅",
 	"ollama.service_stopped": "Ollama-tjeneste stoppet. Starter…",

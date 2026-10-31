@@ -2377,8 +2377,6 @@
 	"ollama.model_ready": "%s jest gotowy!",
 	"ollama.model_repair": "Model wydaje się uszkodzony. Próba ponownego pobrania: %s",
 	"ollama.model_repair_title": "Naprawa modelu Ollama",
-	"ollama.not_detected_body": "Zainstaluj Ollama i spróbuj ponownie.",
-	"ollama.not_detected_title": "Ollama nie wykryte",
 	"ollama.service_disconnected": "Usługa Ollama przestała odpowiadać.",
 	"ollama.service_ready": "Usługa Ollama gotowa ✅",
 	"ollama.service_stopped": "Usługa Ollama zatrzymana. Uruchamianie…",
