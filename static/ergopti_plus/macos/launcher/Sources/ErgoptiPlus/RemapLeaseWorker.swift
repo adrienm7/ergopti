@@ -123,9 +123,12 @@ private let kProtocolReadBytes = 4_096
 let kCLIDiagnosticReadBytes = 4_096
 let kMaximumCLIDiagnosticChunksPerDrain = 16
 private let kBoundaryPollMaximumEINTRRetries = 3
-private let kChildPollMicroseconds: useconds_t = 50_000
-private let kProcessTerminationGraceSeconds: TimeInterval = 0.05
-private let kFenceRetryDelays: [useconds_t] = [50_000, 100_000, 250_000, 1_000_000]
+private let kChildPollMicroseconds = LauncherTimings.leaseChildPoll.microseconds
+private let kProcessTerminationGraceSeconds = LauncherTimings.processTerminationGrace.seconds
+private let kFenceRetryDelays: [useconds_t] = [
+	LauncherTimings.fenceRetryFirst.microseconds, LauncherTimings.fenceRetrySecond.microseconds,
+	LauncherTimings.fenceRetryThird.microseconds, LauncherTimings.fenceRetryLast.microseconds,
+]
 private let kMaximumWorkerFenceRecoveryAttempts = 3
 /// Lower inclusive byte bound for canonical ASCII decimal identity text.
 private let kASCIIDigitZero: UInt8 = 48
@@ -2045,7 +2048,7 @@ final class SpawnedLeaseInner {
 	func terminateOwnedProcessGroupAndReap() {
 		if reaped { return }
 		_ = Darwin.killpg(processGroupID, SIGTERM)
-		usleep(useconds_t(kProcessTerminationGraceSeconds * 1_000_000))
+		usleep(LauncherTimings.processTerminationGrace.microseconds)
 		_ = Darwin.killpg(processGroupID, SIGKILL)
 		reapBlocking()
 	}
