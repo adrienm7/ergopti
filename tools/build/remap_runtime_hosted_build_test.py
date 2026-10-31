@@ -497,6 +497,26 @@ class LinkeditRoundingControls(unittest.TestCase):
         self.assertFalse(admitted(0x0100000C, 5000000, 5288064, 5000000))
 
 
+class LeafExtractionControls(unittest.TestCase):
+    """The certificate prefix is attached to its option, never a second target."""
+
+    def test_prefix_is_attached_and_the_target_is_the_only_operand(self):
+        command = BUILD.leaf_extraction_command(
+            Path("/work/signing_0_0_x86_64_leaf_"), "x86_64", "/signed/Core.app"
+        )
+        self.assertEqual(
+            command,
+            [
+                "/usr/bin/codesign",
+                "--display",
+                "--extract-certificates=/work/signing_0_0_x86_64_leaf_",
+                "--architecture",
+                "x86_64",
+                "/signed/Core.app",
+            ],
+        )
+
+
 class RefusalOriginControls(unittest.TestCase):
     """Signing collapses a dozen checks into one code; the report names the line."""
 
