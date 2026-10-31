@@ -1005,17 +1005,6 @@
 					"shell": "bash"
 				},
 				{
-					"name": "Receive actual official cold Ollama without stock Python",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' && (!cancelled() && steps.cold-app.outcome == 'success') }}",
-					"timeout-minutes": 35,
-					"shell": "bash"
-				},
-				{
-					"name": "Retain official cold Ollama receipt only",
-					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' && (always()) }}"
-				},
-				{
 					"name": "Retain native cold bootstrap evidence",
 					"uses": "actions/upload-artifact@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' && (always()) }}"
