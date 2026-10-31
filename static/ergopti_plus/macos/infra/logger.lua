@@ -1812,8 +1812,8 @@ local _capture_installed = false
 -- tap, the Karabiner lease heartbeat and each typed key behind it. macOS
 -- disables an event tap that waits about a second, so a shorter hold is
 -- invisible to the user and a longer one is named in the log.
-local SLOW_TIMER_CALLBACK_REPORT_MS = 1000
-local SLOW_TIMER_CALLBACK_COUNT_MS = 250
+local SLOW_TIMER_CALLBACK_REPORT_MS = require("infra.main_thread_hold").REPORT_MS
+local SLOW_TIMER_CALLBACK_COUNT_MS = require("infra.main_thread_hold").COUNT_MS
 -- One report per callback site per minute: a callback that stalls on every
 -- tick would otherwise write a line per tick.
 local SLOW_TIMER_CALLBACK_REPEAT_SEC = 60
