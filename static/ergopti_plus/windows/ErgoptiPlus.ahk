@@ -1466,6 +1466,7 @@ if _LLM_Menu_RuntimeActivated
 _MenuPopulationPublished.Start()
 _DriverBootPhase := "ready"
 SetTimer(ShellRunner_CheckWinPsAtStart, -1)
+SetTimer(HTTP_CheckCurlAtStart, -1)
 HealthCheck_StartWindowControl()
 ; The local reload command is optional: a control that cannot start is
 ; reported and the ready driver keeps running without it.
