@@ -35,6 +35,8 @@ _COMMANDS = {
     0xE,
 }
 _LINK_DATA = {0x26, 0x29, 0x80000033, 0x80000034}
+# Fat slice alignments as powers of two: the x86_64 and arm64 page sizes.
+_PAGE_ALIGNMENTS = {12, 14}
 
 
 class MachORefusal(ValueError):
@@ -268,9 +270,15 @@ def _images(image, deadline):
 
 
 def _compare(original, signed, deadline):
+    _require((original.cpu, original.subtype) == (signed.cpu, signed.subtype), "content")
+    # codesign rewrites the universal container and may re-align a slice to
+    # either page size (run 41245238523: lipo and codesign disagreed on one
+    # slice). Alignment only places a slice; _images proves each offset honours
+    # it and the slice bytes are compared below, so only a page alignment, or
+    # an unchanged thin image, is admitted.
     _require(
-        (original.cpu, original.subtype, original.alignment)
-        == (signed.cpu, signed.subtype, signed.alignment),
+        (original.alignment is None and signed.alignment is None)
+        or (original.alignment in _PAGE_ALIGNMENTS and signed.alignment in _PAGE_ALIGNMENTS),
         "content",
     )
     _require(signed.signature is not None, "signature")

@@ -359,6 +359,48 @@ class MachODifferenceControls(unittest.TestCase):
         self.assertIn("Mach-O difference report failed: TypeError", log.getvalue())
 
 
+class MachOAlignmentControls(unittest.TestCase):
+    """codesign may re-align a fat slice to a page size; nothing else may change."""
+
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location(
+            "remap_runtime_macho_alignment_subject",
+            Path(__file__).with_name("remap_runtime_macho.py"),
+        )
+        self.macho = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.macho)
+
+    def outcome(self, original, signed):
+        def thin(cpu, subtype, alignment):
+            return types.SimpleNamespace(
+                cpu=cpu, subtype=subtype, alignment=alignment, signature=None
+            )
+
+        with self.assertRaises(self.macho.MachORefusal) as caught:
+            self.macho._compare(thin(*original), thin(*signed), 10**9)
+        return caught.exception.code
+
+    def test_page_realignment_passes_the_slice_identity_check(self):
+        # Run 41245238523: lipo and codesign disagreed on one slice's alignment.
+        # Past the identity check, the unsigned stub stops at "signature".
+        x86, arm = 0x01000007, 0x0100000C
+        for original, signed in (((x86, 3, 14), (x86, 3, 12)), ((arm, 0, 12), (arm, 0, 14))):
+            with self.subTest(original=original, signed=signed):
+                self.assertEqual(self.outcome(original, signed), "signature")
+        self.assertEqual(self.outcome((x86, 3, None), (x86, 3, None)), "signature")
+
+    def test_cpu_subtype_or_non_page_alignment_changes_are_refused(self):
+        x86 = 0x01000007
+        for original, signed in (
+            ((x86, 3, 12), (0x0100000C, 3, 12)),
+            ((x86, 3, 12), (x86, 4, 12)),
+            ((x86, 3, 12), (x86, 3, 16)),
+            ((x86, 3, None), (x86, 3, 12)),
+        ):
+            with self.subTest(original=original, signed=signed):
+                self.assertEqual(self.outcome(original, signed), "content")
+
+
 class RefusalOriginControls(unittest.TestCase):
     """Signing collapses a dozen checks into one code; the report names the line."""
 
