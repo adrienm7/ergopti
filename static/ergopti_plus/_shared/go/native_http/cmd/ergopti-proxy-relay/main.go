@@ -44,6 +44,23 @@ func logTo(stream io.Writer) proxyrelay.Logger {
 	}
 }
 
+// emit prints the probe's one JSON line and returns its exit code; the line's
+// bytes are pinned by _shared/tests/corpus/network/proxy_auth_relay_probe_vectors.json.
+func emit(stdout io.Writer, result proxyrelay.ProbeResult) int {
+	line, _ := json.Marshal(struct {
+		Schema int `json:"schema"`
+		proxyrelay.ProbeResult
+	}{1, result})
+	fmt.Fprintln(stdout, string(line))
+	switch {
+	case result.Status != proxyrelay.ProbeRefused:
+		return exitOK
+	case result.Reason == proxyrelay.RefusalInvalidArguments:
+		return exitInvalidArguments
+	}
+	return exitRefused
+}
+
 func milliseconds(value int) time.Duration { return time.Duration(value) * time.Millisecond }
 
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
@@ -82,20 +99,13 @@ func run(arguments []string, stdout, stderr io.Writer) int {
 			return exitInvalidArguments
 		}
 		result := proxyrelay.Probe(context.Background(), upstream, *authority, proxyrelay.DefaultAuthenticator(), timings)
-		line, _ := json.Marshal(struct {
-			Schema int `json:"schema"`
-			proxyrelay.ProbeResult
-		}{1, result})
-		fmt.Fprintln(stdout, string(line))
+		code := emit(stdout, result)
 		if result.Status == proxyrelay.ProbeRefused {
 			log("relay_probe_refused", result.Reason)
-			if result.Reason == proxyrelay.RefusalInvalidArguments {
-				return exitInvalidArguments
-			}
-			return exitRefused
+		} else {
+			log("relay_probe_"+result.Status, result.Scheme)
 		}
-		log("relay_probe_"+result.Status, result.Scheme)
-		return exitOK
+		return code
 	case "run":
 		timings := proxyrelay.Timings{Dial: milliseconds(*dial), Handshake: milliseconds(*handshake), Idle: milliseconds(*idle)}
 		if *authority != "" || len(names) == 0 || flags.NArg() == 0 || !timings.Valid() {

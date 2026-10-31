@@ -68,10 +68,10 @@ or a proxy the user exported keep their current behaviour.
 
 ## Sign-in backends (never a stored or prompted password)
 
-| OS      | Negotiate                                                      | NTLM                         |
-| ------- | -------------------------------------------------------------- | ---------------------------- |
-| Windows | SSPI `Negotiate`, current logon (`secur32.dll`, `syscall`)     | SSPI `NTLM`, current logon   |
-| macOS   | GSS-API SPNEGO, `GSS.framework` loaded with `dlopen` (cgo)     | refused: `ntlm_requires_windows` |
+| OS      | Negotiate                                                        | NTLM                             |
+| ------- | ---------------------------------------------------------------- | -------------------------------- |
+| Windows | SSPI `Negotiate`, current logon (`secur32.dll`, `syscall`)       | SSPI `NTLM`, current logon       |
+| macOS   | GSS-API SPNEGO, `GSS.framework` loaded with `dlopen` (cgo)       | refused: `ntlm_requires_windows` |
 | Linux   | GSS-API SPNEGO, `libgssapi_krb5.so.2` loaded with `dlopen` (cgo) | refused: `ntlm_requires_windows` |
 
 The service name is `HTTP@<proxy host>`. macOS and Linux use an existing
