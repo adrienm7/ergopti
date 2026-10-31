@@ -744,6 +744,11 @@ capsword_check_interval_ms = 100
 # HS: karabiner/watchers.lua LAYOUT_POLL_SEC.
 layout_poll_ms = 2000
 
+# Layout poll interval while no input event reached the system since the last
+# read: a switch no person made is still seen within it.
+# HS: karabiner/watchers.lua LAYOUT_IDLE_POLL_SEC.
+layout_idle_poll_ms = 30000
+
 # UI-restore poll interval (window position persistence).
 # HS: lib/ui_restore.lua POLL_INTERVAL_SEC.
 ui_restore_poll_ms = 1000

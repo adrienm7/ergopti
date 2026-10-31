@@ -2003,8 +2003,10 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
   accept it; the slowest rows are `id:ms`, three of them.
 - `field_boot_cost` runs after `field_composer`; the three slowest stages are in
   its log window.
-- `field_idle_cost`: 30 quiet seconds, bound 3 % (`idle_cpu_percent`); holds
-  over 250 ms in the window are named.
+- `field_idle_cost`: 30 quiet seconds started from a collected heap
+  (`idle_pre_collect_ms`), bound 3 % (`idle_cpu_percent`); the timer callbacks
+  that ran (`idle_timer_1..3` as `file:line:count:ms`, `idle_timer_ms`,
+  `idle_other_cpu_ms` for the rest) and holds over 250 ms are named.
 - `field_slow_lines`: one `awk` pass over today's log (only a summary reaches
   the task's pipe) tallies HotPath `Slow <segment>: X ms own` lines and the
   `Slow ingest tick`, `Slow preferences save`, `Slow ignored-window probe` and

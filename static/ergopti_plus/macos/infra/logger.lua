@@ -1887,6 +1887,61 @@ function M.worst_timer_hold()
 	return { ms = _worst_hold.ms, site = _worst_hold.site }
 end
 
+-- Timer-callback time per site while an accounting window is open, nil when
+-- none is: the field run's idle check names the callbacks that wake the app.
+local _callback_accounting = nil
+-- Site of each callback seen in the window: naming walks debug info, and a
+-- pump that ticks every 250 ms would pay it on every tick.
+local _accounting_sites = setmetatable({}, { __mode = "k" })
+
+--- Opens the timer-callback accounting window. One window at a time: a second
+--- opener would read the first one's callbacks as its own.
+function M.begin_callback_accounting()
+	if _callback_accounting ~= nil then
+		error("Logger.begin_callback_accounting: an accounting window is already open", 2)
+	end
+	_callback_accounting = {}
+end
+
+--- Closes the accounting window and returns what ran in it.
+--- @return table sites { { site = "path:line", count, ms } }, most time first.
+function M.end_callback_accounting()
+	local sites = _callback_accounting
+	if sites == nil then error("Logger.end_callback_accounting: no accounting window is open", 2) end
+	_callback_accounting = nil
+	local list = {}
+	for site, entry in pairs(sites) do
+		list[#list + 1] = { site = site, count = entry.count, ms = entry.ns / NANOSECONDS_PER_MILLISECOND }
+	end
+	table.sort(list, function(a, b)
+		if a.ms ~= b.ms then return a.ms > b.ms end
+		return a.site < b.site
+	end)
+	return list
+end
+
+--- Adds one timer callback to the open accounting window.
+--- @param fn function The callback that ran.
+--- @param started integer Monotonic start, nanoseconds.
+--- @param modal_before integer Modal wait total when the callback started.
+local function account_timer_callback(fn, started, modal_before)
+	local ok_now, now = pcall(_callback_clock)
+	if not ok_now or type(now) ~= "number" then return end
+	local site = _accounting_sites[fn]
+	if site == nil then
+		local ok_site, described = pcall(describe_callback_site, fn)
+		site = ok_site and described or "?"
+		_accounting_sites[fn] = site
+	end
+	local entry = _callback_accounting[site]
+	if entry == nil then
+		entry = { count = 0, ns = 0 }
+		_callback_accounting[site] = entry
+	end
+	entry.count = entry.count + 1
+	entry.ns = entry.ns + math.max(0, now - started - (_modal_wait_ns - modal_before))
+end
+
 --- Reports one timer callback that held the main thread past the threshold.
 --- @param fn function The callback that ran.
 --- @param kind string Timer family label.
@@ -1965,6 +2020,12 @@ local function _guard_timer_cb(fn, kind)
 		-- A main-thread hold has no error to report, yet it is what disabled the
 		-- event taps and cost the Karabiner lease in issue #99 (13.4 s inside one
 		-- ingest flush). Naming the callback makes the next log say which one.
+		if started and _callback_accounting ~= nil then
+			local accounted, account_err = pcall(account_timer_callback, fn, started, modal_before)
+			if not accounted then
+				M.error("runtime", "Timer callback accounting failed: %s", ErrorDescription.describe(account_err))
+			end
+		end
 		if started then
 			local reported, report_err = pcall(report_slow_timer_callback, fn, kind, started, modal_before, heap_before_kb)
 			if not reported then
