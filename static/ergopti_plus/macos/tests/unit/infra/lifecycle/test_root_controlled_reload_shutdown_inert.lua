@@ -215,6 +215,7 @@ local function run_isolated(options, assertions)
 				return true
 			end,
 			terminate_helper_processes = function() return true end,
+			retire_owned_ollama = function(callback) callback(true, "fixture daemon retired"); return true end,
 			terminate_orphan_mlx_server = function() return true end,
 		}
 

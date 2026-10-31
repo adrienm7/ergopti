@@ -75,7 +75,8 @@ local function fixture(options)
 	end
 	local env = setmetatable({
 		_local_teardown_state = transaction.new_state(), _local_teardown_started = false,
-		_mlx_teardown_pending = false, _mlx_teardown_settled = false,
+		_awaited_teardown_owners = { mlx = { pending = false, settled = false },
+			ollama = { pending = false, settled = false } },
 		TimerScheduler = scheduler, TeardownTransaction = transaction, Logger = logger, LOG = "topinit-control",
 		HS_BOOT_READY_SETTING_KEY = "test-ready", Storage = { set = function() return true end },
 		package = { loaded = loaded }, require = function() state.requires = state.requires + 1; error("must not acquire dormant owner") end,
@@ -86,6 +87,7 @@ local function fixture(options)
 		loaded["ui.menu.menu_llm"] = {
 			stop_mlx_server = function(callback) state.mlx_calls = state.mlx_calls + 1; state.mlx_callback = callback; return true end,
 			terminate_helper_processes = function() return true end,
+			retire_owned_ollama = function(callback) callback(true, "fixture daemon retired"); return true end,
 			terminate_orphan_mlx_server = function() return true end,
 		}
 	end
@@ -175,6 +177,10 @@ helpers.describe("loaded-only physical owner termination", function()
 		helpers.assert_eq(s.steps, 0)
 		s.mlx_callback(true)
 		s.receipts = {}
+		-- The owned Ollama daemon is awaited next; the fixture's retires at once
+		local _, ollama_phase = s.teardown("reload", s.ready)
+		helpers.assert_eq(ollama_phase, "pending")
+		helpers.assert_eq(s.stop_calls, 0, "the physical owner waits for the Ollama daemon too")
 		local _, next_phase = s.teardown("reload", s.ready)
 		helpers.assert_eq(next_phase, "pending")
 		helpers.assert_eq(s.stop_calls, 1)
