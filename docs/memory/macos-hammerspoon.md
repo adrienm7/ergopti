@@ -1083,22 +1083,23 @@ remaps revoked indefinitely. An unowned reload whose fence is refused reloads
 natively the same way, since the revocation cannot be undone in that VM; an
 owned reload (`request_reload_owned`) and an exit keep their exact abort.
 
-### project-hs-adhoc-guardian-reregisters-before-registering
+### project-hs-adhoc-guardian-runs-legacy-only
 
 An ad hoc build (no TeamIdentifier: every developer build, and the ad hoc ZIP
-release) changes cdhash on each rebuild, and launchd spawned the guardian under
-the definition recorded for the previous one: macOS killed it about 3 s after
-registration (CODESIGNING 4, Launch Constraint Violation, parent launchd) and
-only the relaunch after the 10 s ThrottleInterval survived (field run
-2026-10-30, with this copy's legacy plist and its Background Items record both
-present). `resetAdhocRemapGuardianRegistration` therefore removes the exact own
-legacy plist and `unregister()`s an enabled record, then proves the job gone
-(launchctl 113, singleton lock free) before `register()`. Live lease records
-and a pending approval keep the registration. The register role prints the
-note (`developer_adhoc_*`) on a second line; the driver logs it and
+release) must never `register()` the guardian's Background Items job: launchd
+spawns it under a launch constraint an ad hoc bundle cannot meet, and macOS
+kills the spawn about 3 s later (CODESIGNING 4, Launch Constraint Violation,
+parent launchd). Removing both earlier registrations and proving the previous
+guardian gone first did not help (field run 2026-10-31, the `.ips` at the
+second of the fresh `register()`); the per-user legacy agent was healthy in
+every launch. `resolveAdhocRemapGuardianRegistration` therefore unregisters a
+record an earlier build left (unless lease records are live), proves that job
+gone (launchctl 113, singleton lock free), and runs the legacy agent only. A
+pending approval stays the user's. The register role prints the note
+(`developer_adhoc_*`) on a second line; the driver logs it and
 `field_login_items` reports it as `guardian_registration`. A Developer ID build
-never takes the reset. Its launchctl steps and waits are counted by
-`test-hardening-d-native-timeout-contract.cjs`.
+keeps the Background Items registration. Its launchctl steps and waits are
+counted by `test-hardening-d-native-timeout-contract.cjs`.
 
 ### project-macos-reload-breadcrumb
 
