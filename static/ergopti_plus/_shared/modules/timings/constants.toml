@@ -1053,6 +1053,17 @@ unresponsive_ax_backoff_ms = 30000
 # LX: platform/window_switch_worker.lua.
 window_switch_worker_sleep_ms = 10
 
+# Local authenticating proxy relay (docs/design/proxy-auth-relay.md). The caller
+# passes each value on the relay's command line. dial: one TCP connect to the
+# selected proxy; handshake: a CONNECT with its NTLM/Negotiate legs, and a
+# client's request head; idle: an open tunnel with no byte in either direction;
+# probe: the whole probe child, from start to its JSON line.
+# LX: modules/llm/managed_ollama_proxy.lua. HS: adapters/field_check_ports.lua.
+proxy_relay_dial_timeout_ms = 10000
+proxy_relay_handshake_timeout_ms = 15000
+proxy_relay_idle_timeout_ms = 300000
+proxy_relay_probe_timeout_ms = 30000
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Byte limits
