@@ -264,7 +264,10 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-registry-constants.cjs',
-		outputs: ['static/ergopti_plus/macos/_generated/registry_limits.lua']
+		outputs: [
+			'static/ergopti_plus/macos/_generated/registry_limits.lua',
+			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherTimings.generated.swift'
+		]
 	},
 	{
 		script: 'codegen/codegen-logger-sub-files.cjs',

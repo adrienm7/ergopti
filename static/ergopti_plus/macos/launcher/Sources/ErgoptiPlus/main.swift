@@ -246,7 +246,7 @@ enum LauncherLog {
 	static let maximumFileBytes: off_t = 1_048_576
 	private static let queue = DispatchQueue(label: "com.ergoptiplus.launcher-log")
 	private static let lockTimeoutSeconds: TimeInterval = 0.25
-	private static let lockRetryMicroseconds: useconds_t = 1_000
+	private static let lockRetryMicroseconds = LauncherTimings.fileLockRetry.microseconds
 
 	/// Absolute launcher.log path, exported so the Lua runtime can append its
 	/// own fatal line and named in every fatal alert.
@@ -650,7 +650,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			proceed()
 		case .heldByAnotherLauncher where attempt < kLauncherLockRetryAttempts:
 			Task { @MainActor [weak self] in
-				try? await Task.sleep(nanoseconds: UInt64(kLauncherLockRetryIntervalSeconds * 1_000_000_000))
+				try? await Task.sleep(nanoseconds: LauncherTimings.instanceLockRetry.nanoseconds)
 				self?.acquireSoleLauncherOwnership(attempt: attempt + 1, then: proceed)
 			}
 		case .heldByAnotherLauncher:

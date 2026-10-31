@@ -49,7 +49,7 @@ private let kStoppedSiblingObservationSeconds: TimeInterval = 0.2
 /// Grace before test cleanup force-kills its exact sibling child.
 private let kSiblingTerminationGraceSeconds: TimeInterval = 0.5
 /// Marker polling interval used only by the POSIX test witness.
-private let kSiblingProgressPollMicroseconds: useconds_t = 10_000
+private let kSiblingProgressPollMicroseconds = LauncherTimings.testPoll.microseconds
 
 /// Keeps one unrelated test process and its execution-progress witness together.
 private struct ProgressingTestSibling {
@@ -499,7 +499,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		}
 		XCTAssertTrue(observedExclusiveLock,
 			"the real guardian process must own the singleton before the test proceeds")
-		usleep(350_000)
+		usleep(LauncherTimings.testGuardianSettle.microseconds)
 		XCTAssertTrue(process.isRunning,
 			"a guardian backed only by GCD sources must not fall out of an empty RunLoop")
 
@@ -1552,7 +1552,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 				guard let data = try? Data(contentsOf: recordURL),
 					let observed = LeaseGuardianRecord.parse(data)
 				else {
-					usleep(5_000)
+					usleep(LauncherTimings.testRecordPoll.microseconds)
 					continue
 				}
 				let descriptor = Darwin.open(recordURL.path, O_RDWR | O_CLOEXEC | O_NOFOLLOW)
@@ -1934,7 +1934,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			_ = Darwin.unlink(fixture.paths.recordPath(token: record.token))
 			Darwin.close(descriptor)
 		}
-		usleep(100_000)
+		usleep(LauncherTimings.testGuardianRetireSettle.microseconds)
 		runtime = nil
 	}
 
@@ -4092,7 +4092,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let writerDescriptor = sockets[0]
 		DispatchQueue.global(qos: .userInitiated).async {
 			for sequence in UInt32(1)...UInt32(3) {
-				usleep(50_000)
+				usleep(LauncherTimings.testLeaseLineInterval.microseconds)
 				guard writeLeaseLine(
 					"HEARTBEAT 1 \(sequence)",
 					to: writerDescriptor
@@ -6397,7 +6397,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 				processID > 0 {
 				return processID
 			}
-			usleep(10_000)
+			usleep(LauncherTimings.testPoll.microseconds)
 		} while ProcessInfo.processInfo.systemUptime < deadline
 		return nil
 	}
@@ -6411,7 +6411,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let deadline = ProcessInfo.processInfo.systemUptime + timeout
 		repeat {
 			if FileManager.default.fileExists(atPath: url.path) { return true }
-			usleep(10_000)
+			usleep(LauncherTimings.testPoll.microseconds)
 		} while ProcessInfo.processInfo.systemUptime < deadline
 		return FileManager.default.fileExists(atPath: url.path)
 	}
@@ -6428,7 +6428,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			let waited = waitpid(processID, &status, WUNTRACED | WNOHANG)
 			if waited == processID { return status & 0x7F == 0x7F }
 			if waited == -1 && errno != EINTR { return false }
-			usleep(10_000)
+			usleep(LauncherTimings.testPoll.microseconds)
 		} while ProcessInfo.processInfo.systemUptime < deadline
 		return false
 	}
@@ -6442,7 +6442,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let deadline = ProcessInfo.processInfo.systemUptime + timeout
 		repeat {
 			if !isAlive(processID) { return true }
-			usleep(10_000)
+			usleep(LauncherTimings.testPoll.microseconds)
 		} while ProcessInfo.processInfo.systemUptime < deadline
 		return !isAlive(processID)
 	}

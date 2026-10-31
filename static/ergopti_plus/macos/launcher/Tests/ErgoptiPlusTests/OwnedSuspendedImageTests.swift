@@ -133,7 +133,7 @@ private final class SuspendedImageNativeSession {
 	}
 	func wait(until predicate: () -> Bool) throws {
 		let deadline = Date().addingTimeInterval(15)
-		repeat { try poll(); if predicate() { return }; usleep(1_000) } while Date() < deadline
+		repeat { try poll(); if predicate() { return }; usleep(LauncherTimings.testFastPoll.microseconds) } while Date() < deadline
 		throw NSError(domain: "SuspendedImageNativeTimeout", code: 1)
 	}
 	func send(_ command: String) throws { try input.fileHandleForWriting.write(contentsOf: Data((command + "\n").utf8)) }

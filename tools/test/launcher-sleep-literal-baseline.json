@@ -1,0 +1,12 @@
+{
+	"_comment": "Launcher Swift files whose sleeps still spell a duration literal (tools/test/test-launcher-sleep-registry.cjs). Counts may only go down; lower them with --shrink.",
+	"files": {
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreLaunchctl.swift": 1,
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreProvisionOwner.swift": 1,
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeUserConsoleOwner.swift": 1,
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift": 2,
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportWorker.swift": 2,
+		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeCoreExitObservationTests.swift": 2,
+		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift": 3
+	}
+}

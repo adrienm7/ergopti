@@ -73,6 +73,21 @@ local function collect_expressions(source, declaration, comment)
 	return expressions
 end
 
+-- Units of a generated LauncherTimings duration, per registry millisecond.
+local LAUNCHER_TIMING_UNITS = { microseconds = 1000, seconds = 0.001 }
+
+--- Resolves a LauncherTimings.<member>.<unit> term through the registry key the
+--- generated Swift file projects: leaseChildPoll is [launcher] lease_child_poll_ms.
+--- @param member string Swift member name.
+--- @param unit string "microseconds" or "seconds".
+--- @return number value
+local function launcher_timing(member, unit)
+	local per_ms = LAUNCHER_TIMING_UNITS[unit]
+	helpers.assert_not_nil(per_ms, "unsupported LauncherTimings unit: " .. unit)
+	local key = member:gsub("(%u)", function(c) return "_" .. c:lower() end) .. "_ms"
+	return require("infra.timings").ms("launcher", key) * per_ms
+end
+
 --- Evaluates a sum of numeric literals and named constants.
 --- @param expressions table Name to expression text.
 --- @param name string Constant to evaluate.
@@ -88,8 +103,11 @@ local function evaluate(expressions, name, seen)
 	for term in expression:gmatch("[^+]+") do
 		local token = term:match("^%s*(.-)%s*$")
 		local literal = tonumber((token:gsub("_", "")))
+		local member, unit = token:match("^LauncherTimings%.([%a][%w]*)%.(%a+)$")
 		if literal then
 			total = total + literal
+		elseif member then
+			total = total + launcher_timing(member, unit)
 		else
 			helpers.assert_true(token:match("^[%a_][%w_]*$") ~= nil,
 				"lease budget term must be a literal or a constant: " .. token)

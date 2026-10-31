@@ -1148,3 +1148,73 @@ shell_captured_output_bytes = 4194304
 # bytes. Read through macos/_generated/registry_limits.lua.
 # HS: adapters/toml_cache.lua.
 toml_source_chunk_bytes = 65536
+
+[launcher]
+
+# Every sleep and poll interval of the Swift launcher (macos/launcher), its
+# fixtures and its tests. The launcher cannot parse this file, so
+# tools/codegen/codegen-registry-constants.cjs projects the section onto
+# LauncherTimings.generated.swift; tools/test/test-launcher-sleep-registry.cjs
+# refuses a literal sleep duration and a key no Swift file reads. macOS only:
+# Windows and Linux have no native launcher.
+
+# Retry of a contended launcher.log or logger datagram file lock, inside its
+# 250 ms lock budget. Swift: main.swift LauncherLog, LoggerDatagramWorker.swift.
+file_lock_retry_ms = 1
+
+# Pause between tries of the sole-launcher lock while an update relaunch hands
+# it over (50 tries). Swift: main.swift, LauncherInstanceOwnership.swift.
+instance_lock_retry_ms = 100
+
+# Poll of the remap lease guardian while it arms, and of its singleton lock.
+# Swift: RemapLeaseGuardian.swift.
+guardian_arm_poll_ms = 10
+guardian_singleton_retry_ms = 10
+
+# Poll of a lease worker child, and the grace a terminated child gets before
+# it is killed. Swift: RemapLeaseWorker.swift; their sum is held under the
+# private command budget by macos/tests/meta/architecture/test_native_lease_budget_parity.lua.
+lease_child_poll_ms = 50
+process_termination_grace_ms = 50
+
+# Back-off between Karabiner fence transport retries, the last one repeated.
+# Swift: RemapLeaseWorker.swift kFenceRetryDelays.
+fence_retry_first_ms = 50
+fence_retry_second_ms = 100
+fence_retry_third_ms = 250
+fence_retry_last_ms = 1000
+
+# Poll of the stopped automation query guardian, and of the automation
+# permission while Shortcuts Events launches. Swift: OwnedAutomationQueryWorker.swift.
+automation_guardian_poll_ms = 20
+automation_permission_poll_ms = 50
+
+# Poll of the uninstall lease record until the fenced worker retires it.
+# Swift: UninstallWorker.swift.
+uninstall_lease_poll_ms = 10
+
+# Test fixtures compiled into the launcher: the automation query fixture's
+# hold, the owned program fixture's poll, and the managed Ollama listener's
+# reap poll and its progress and stall chunk pauses.
+# Swift: OwnedAutomationQueryWorker.swift, OwnedProgramNativeFixture.swift,
+# ManagedOllamaListenerFixture.swift.
+automation_fixture_wait_ms = 30000
+program_fixture_poll_ms = 1
+ollama_fixture_reap_poll_ms = 10
+ollama_fixture_progress_part_ms = 400
+ollama_fixture_stall_part_ms = 1500
+
+# The launcher tests' polls (a fast one for local pipes and files, the usual
+# one for child processes and a lease record poll) and their settle waits: the
+# guardian kept alive after it owns its singleton, the retired guardian's
+# record, the lease writer's line interval and a slow proxy settings read.
+# Swift: Tests/ErgoptiPlusTests. SparkleArchiveUpdateAcceptanceTests.swift
+# drives a separately compiled application without importing the launcher
+# module, so its sleeps stay in tools/test/launcher-sleep-literal-baseline.json.
+test_fast_poll_ms = 1
+test_poll_ms = 10
+test_record_poll_ms = 5
+test_guardian_settle_ms = 350
+test_guardian_retire_settle_ms = 100
+test_lease_line_interval_ms = 50
+test_slow_settings_read_ms = 20

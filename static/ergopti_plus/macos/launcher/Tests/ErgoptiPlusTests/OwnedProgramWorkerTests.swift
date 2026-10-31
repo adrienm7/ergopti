@@ -115,7 +115,7 @@ final class OwnedProgramTestSession {
 		repeat {
 			try poll()
 			if predicate() { return }
-			usleep(1_000)
+			usleep(LauncherTimings.testFastPoll.microseconds)
 		} while Date() < deadline
 		throw NSError(domain: "OwnedProgramNativeTimeout", code: 1)
 	}

@@ -107,7 +107,7 @@ final class POSIXCompatibilityTests: XCTestCase {
 				rawStatus: &rawStatus,
 				errorCode: &errorCode
 			)
-			if readResult == 0 { usleep(1_000) }
+			if readResult == 0 { usleep(LauncherTimings.testFastPoll.microseconds) }
 		} while readResult == 0 && Date() < deadline
 
 		XCTAssertEqual(readResult, 1)

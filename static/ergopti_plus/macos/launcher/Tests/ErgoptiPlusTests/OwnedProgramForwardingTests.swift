@@ -29,7 +29,7 @@ final class OwnedProgramForwardingTests: XCTestCase {
 		try session.send("CANCEL")
 		try session.closeInput()
 		let deadline = Date().addingTimeInterval(10)
-		while session.process.isRunning && Date() < deadline { usleep(1_000) }
+		while session.process.isRunning && Date() < deadline { usleep(LauncherTimings.testFastPoll.microseconds) }
 		if session.process.isRunning { session.process.terminate() }
 		session.process.waitUntilExit()
 		XCTAssertEqual(session.process.terminationReason, .exit)

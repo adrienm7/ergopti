@@ -117,7 +117,7 @@ private final class AutomationQueryTestSession {
 		repeat {
 			try poll()
 			if predicate() { return }
-			usleep(1000)
+			usleep(LauncherTimings.testFastPoll.microseconds)
 		} while ProcessInfo.processInfo.systemUptime < deadline
 		throw NSError(domain: "query-native-timeout", code: 1,
 			userInfo: [NSLocalizedDescriptionKey: timeoutFacts(ordinal: ordinal)])
@@ -355,7 +355,7 @@ final class OwnedAutomationQueryWorkerTests: XCTestCase {
 		defer { Darwin.close(descriptor) }
 		let original = try XCTUnwrap(OwnedAutomationQueryWorker.SourceGeneration.descriptor(descriptor))
 		XCTAssertEqual(OwnedAutomationQueryWorker.SourceGeneration.path(current.path), original)
-		usleep(1000)
+		usleep(LauncherTimings.testFastPoll.microseconds)
 		try FileManager.default.moveItem(at: current, to: retained)
 		try Data("replacement owned source fixture".utf8).write(to: current)
 		XCTAssertNotEqual(OwnedAutomationQueryWorker.SourceGeneration.path(current.path), original)

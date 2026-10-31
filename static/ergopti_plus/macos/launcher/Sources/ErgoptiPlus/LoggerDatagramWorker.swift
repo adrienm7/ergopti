@@ -87,7 +87,7 @@ final class LoggerRecordSink {
 	private static let maximumTopicCount = 16
 	private static let maximumTopicNameBytes = 96
 	private static let lockTimeoutSeconds: TimeInterval = 0.25
-	private static let lockRetryMicroseconds: useconds_t = 1_000
+	private static let lockRetryMicroseconds = LauncherTimings.fileLockRetry.microseconds
 
 	private var directoryDescriptor: Int32 = -1
 	private var directoryPath: String?

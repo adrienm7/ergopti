@@ -251,7 +251,7 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 						fixtureCanRetire = false
 						throw CocoaError(.executableRuntimeMismatch)
 					}
-					usleep(10_000)
+					usleep(LauncherTimings.testPoll.microseconds)
 				}
 				guard teeRetired else {
 					fixtureCanRetire = false
