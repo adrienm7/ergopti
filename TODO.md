@@ -584,10 +584,12 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       job (manual dispatch) and the reproducible packager, `capture.requirement` pinned, the first-run
       fetch into `~/Library/Application Support/ErgoptiPlus/RemapRuntime/`, the running/paused/quit rule
       with its consent row and closed-Karabiner notice, the VirtualHIDDevice block rows (no migration out of
-      the user's `karabiner.json`: the maintainer starts from a clean state). Left: a green hosted runtime build and its `runtime.*`
-      pin; [CI] the artifact as the signed `ErgoptiPlus-Runtime-Installer.app` (`--package-owned`) with
-      the staging taking the downloaded helper instead of the bundle's
-      (`OwnedVirtualHIDDaemonReportMainOperation.swift`); the per-OS feature requirements table (needs the
+      the user's `karabiner.json`: the maintainer starts from a clean state). Since 2026-10-31 too: the
+      artifact is the signed `ErgoptiPlus-Runtime-Installer.app` with the products sealed inside
+      (`runtime-artifact` runs `--package-owned`, version `16.3.0-ergopti.2`), and the administrator staging
+      takes the helper of the verified download (`OwnedRuntimeDownloadedHelper.swift`, named refusals, no
+      bundle fallback). Left: [CI] the macOS lane on that Swift and a green hosted runtime build of the new
+      shape, then its `runtime.*` pin; the per-OS feature requirements table (needs the
       generator's inputs mapped to feature paths); the driver-only VirtualHIDDevice update offer; WP8
       native and WP9 real-Mac acceptance; then the `RUNTIME_DEFAULT` flip and the shared-mode deletion.
       Next: the maintainer's `bash tools/dev/collect-macos-field-report.sh` (`field_owned_runtime`, and on an
