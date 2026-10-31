@@ -249,8 +249,8 @@ runtime (pinned with Ahk2Exe 1.1.37.02a2 and SHA-256 in
   its runtime and restarts the user's
   Karabiner only if it closed it, remembered in a persisted marker so a crash
   is recovered. The owned runtime is the only path: the shared-mode merge into
-  the user's `karabiner.json` is retired (an owned boot removes the rules an
-  earlier build merged). Still the one declared exception to "never stop the
+  the user's `karabiner.json` is retired, with no migration: the only
+  Karabiner user starts from a clean state (maintainer, 2026-10-31). Still the one declared exception to "never stop the
   user's copy", and the VirtualHIDDevice stays shared system-wide: a user
   Karabiner with another driver version blocks the owned runtime with a named,
   explained state.

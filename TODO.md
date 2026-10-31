@@ -582,8 +582,8 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       on the installed VirtualHIDDevice (`driver_verdict`). Since 2026-10-31: the hosted `runtime-artifact`
       job (manual dispatch) and the reproducible packager, `capture.requirement` pinned, the first-run
       fetch into `~/Library/Application Support/ErgoptiPlus/RemapRuntime/`, the running/paused/quit rule
-      with its consent row and closed-Karabiner notice, the VirtualHIDDevice block rows, and the owned-boot
-      migration out of the user's `karabiner.json`. Left: a green hosted runtime build and its `runtime.*`
+      with its consent row and closed-Karabiner notice, the VirtualHIDDevice block rows (no migration out of
+      the user's `karabiner.json`: the maintainer starts from a clean state). Left: a green hosted runtime build and its `runtime.*`
       pin; [CI] the artifact as the signed `ErgoptiPlus-Runtime-Installer.app` (`--package-owned`) with
       the staging taking the downloaded helper instead of the bundle's
       (`OwnedVirtualHIDDaemonReportMainOperation.swift`); the per-OS feature requirements table (needs the
