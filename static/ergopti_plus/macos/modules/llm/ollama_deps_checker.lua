@@ -656,6 +656,11 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 		end
 		Logger.info(LOG, "Ollama download accepted; installing into %s.", install_dir)
 	end
+	-- The managed installer downloads with the system curl, checked at this use.
+	if install_dir ~= nil then
+		local curl_ok, curl_refusal = require("adapters.system_curl").check("the Ollama download")
+		if not curl_ok then return settle_preflight_failure(curl_refusal) end
+	end
 	if not _pause_controller.is_current(token, authorization) then
 		return settle_stale_intent()
 	end
