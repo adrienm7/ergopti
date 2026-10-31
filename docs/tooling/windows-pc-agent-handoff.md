@@ -148,6 +148,14 @@ downloaded again`). Ollama deletes that layer before it reports the
   lane, job and per-step elapsed tables into its job summary
   (`tools/ci/run-timing.cjs --step-summary`); nothing to do on the PC, but the
   Windows lane's slowest steps are read there from now on.
+- Thinking off (the TODO item is closed on macOS and Linux): the generic names
+  are split (`*-r1*`, `*think*`, `*reasoning*` send nothing; `*qwen3*`,
+  `*deepseek*` keep the toggle), Kimi K2.5/K2.6 is a toggle family, and the
+  single-mode Qwen models (Qwen3-Next, Qwen3-Coder, Qwen3.7 Max preview) send
+  nothing. `thinking_off.ahk` reads the same JSON, so only its suite must run:
+  `test_llm_thinking_off.ahk` (twelve new resolve vectors, family indexes
+  36 -> 38), plus the still unexecuted `model_capabilities.ahk`, `vision.ahk`
+  `think` and `LLM_OllamaThink` tests.
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 
