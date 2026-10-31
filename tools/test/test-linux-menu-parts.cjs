@@ -65,6 +65,96 @@ assert.equal(
 );
 controls += 1;
 
+// M3.3: the root holds only the imports it reads itself; every other one lives
+// in the part that reads it, and the composed root carries it once, ahead of
+// its first reader.
+const rootTokens = scriptTokens(sources[LINUX_MENU_ROOT], '.lua');
+const rootReads = (name) =>
+	rootTokens.filter(
+		(token, at) =>
+			token.kind === 'identifier' &&
+			token.value === name &&
+			!['.', ':'].includes(rootTokens[at - 1]?.value)
+	).length;
+const rootImports = [
+	...sources[LINUX_MENU_ROOT].matchAll(/^local ([A-Za-z_][A-Za-z_0-9]*) = require\(/gm)
+].map((match) => match[1]);
+assert.ok(rootImports.includes('Version'), 'the root keeps the imports it reads');
+for (const name of rootImports)
+	assert.ok(rootReads(name) > 1, 'the root holds ' + name + ' only for a part: move it there');
+assert.ok(
+	!/require\("ui\.menu\.menu_dialogs"\)/.test(sources[LINUX_MENU_ROOT]),
+	'the parts bind the dialogs they use, not the root'
+);
+for (const statement of [
+	'local TextPrompt = require("ui.text_prompt")',
+	'local WindowTitles = require("window_titles")',
+	'local uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")'
+])
+	assert.equal(
+		whole.split(statement).length - 1,
+		1,
+		'the composed root declares a part-only import once: ' + statement
+	);
+assert.ok(
+	whole.indexOf('local WindowTitles = require("window_titles")') <
+		whole.indexOf('local function zenity_plain('),
+	'a part-only import precedes the definitions that read it'
+);
+const partOnly = (file, before, after) => ({
+	...sources,
+	[file]: sources[file].replace(before, () => after)
+});
+const partOnlyCases = [
+	[
+		'the root reads a name only a part declares',
+		partOnly(
+			LINUX_MENU_ROOT,
+			'local function header_facade_current()',
+			'local function _reads_part_import() return TextPrompt end\nlocal function header_facade_current()'
+		)
+	],
+	[
+		'two parts declare one name from different modules',
+		partOnly(
+			'linux/ui/menu/menu_metrics.lua',
+			'local TextPrompt = require("ui.text_prompt")',
+			'local TextPrompt = require("ui.foreign_prompt")'
+		)
+	],
+	[
+		'a part reads a name a later part declares',
+		partOnly(
+			'linux/ui/menu/menu_layouts.lua',
+			'local function _build_layouts(ctx)',
+			'local function _layouts_reads_later() return PrivacyPolicy end\nlocal function _build_layouts(ctx)'
+		)
+	],
+	[
+		'a part binds a dialog the dialogs module does not export',
+		partOnly(
+			'linux/ui/menu/menu_quit.lua',
+			'local LOG = "ui.menu.menu_quit"',
+			'local foreign_dialog = require("ui.menu.menu_dialogs").foreign_dialog\nlocal LOG = "ui.menu.menu_quit"'
+		)
+	],
+	[
+		'part modules bind each other in a cycle',
+		partOnly(
+			'linux/ui/menu/menu_dialogs.lua',
+			'local LOG = "ui.menu.menu_dialogs"',
+			'local layouts_probe = require("ui.menu.menu_layouts").layouts_probe\nlocal LOG = "ui.menu.menu_dialogs"'
+		)
+	]
+];
+for (const [cause, changed] of partOnlyCases) {
+	assert.notDeepEqual(changed, sources, cause + ': the case changes a source');
+	const refused = composeLinuxMenuRoot(changed);
+	assert.equal(refused.ok, false, cause + ': refused');
+	assert.equal(typeof refused.reason, 'string', cause + ': refusal reason');
+	controls += 1;
+}
+
 // M3.3: once every section moved to its own menu_*.lua, the root took the macOS
 // root's name, so the `menu_` prefix names parts only and both drivers read
 // `ui/menu/builder.lua` as the tray root. Nothing may still load the old name.
