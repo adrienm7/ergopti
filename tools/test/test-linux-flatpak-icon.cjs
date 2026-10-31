@@ -38,6 +38,25 @@ try {
 	const payload = path.join(staging, 'payload');
 	const manifest = parse(fs.readFileSync(path.join(staging, 'org.ergopti.Ergopti.yml'), 'utf8'));
 	const id = manifest['app-id'];
+	// The manifest and AppStream file take the host and repository from their single
+	// sources (identifiers.sh, the updater defaults); both must expand to real URLs.
+	const github = JSON.parse(
+		fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.json'), 'utf8')
+	).hosts.github;
+	const updater = JSON.parse(
+		fs.readFileSync(
+			path.join(ROOT, 'static/ergopti_plus/_shared/modules/updater/defaults.json'),
+			'utf8'
+		)
+	).github;
+	const luajit = manifest.modules.find((module) => module.name === 'luajit');
+	assert.equal(luajit?.sources?.[0]?.url, `https://${github}/LuaJIT/LuaJIT.git`);
+	assert.equal(luajit.sources[0].branch, 'v2.1');
+	const metainfo = fs.readFileSync(path.join(payload, `share/metainfo/${id}.metainfo.xml`), 'utf8');
+	assert.equal(
+		metainfo.match(/<url type="homepage">([^<]+)<\/url>/)?.[1],
+		`https://${github}/${updater.owner}/${updater.repo}`
+	);
 	const desktop = fs.readFileSync(path.join(payload, `share/applications/${id}.desktop`), 'utf8');
 	assert.equal(desktop.match(/^Icon=(.+)$/m)?.[1], id);
 	const canonical = fs.readFileSync(path.join(BUILD, '_shared/assets/ergopti_tray.png'));

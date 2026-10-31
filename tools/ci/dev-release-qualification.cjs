@@ -3,6 +3,21 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+
+/**
+ * The release pages of the repository the updater follows, on the shared GitHub
+ * host. Read on use: the many closed fixtures that copy this module for its
+ * receipt validators never build a notice and so carry neither source.
+ * @returns {string} The releases URL, without a trailing slash.
+ */
+function releasesUrl() {
+	const { hosts } = require('../lib/identifiers.cjs');
+	const { shared } = require('../lib/paths.cjs');
+	const { github } = JSON.parse(
+		fs.readFileSync(shared('modules', 'updater', 'defaults.json'), 'utf8')
+	);
+	return `https://${hosts.github}/${github.owner}/${github.repo}/releases`;
+}
 const POLICY_PATH = path.resolve(
 	__dirname,
 	'../../.github/ci/dev_release_qualification_exceptions.json'
@@ -785,7 +800,9 @@ function stablePublicationNotice(id, context, sha, now = new Date()) {
 				.join(' ') +
 			' ' +
 			spec.mandatory +
-			' Windows unsigned disclosure remains separate. [Qualification records](https://github.com/adrienm7/ergopti/releases/tag/' +
+			' Windows unsigned disclosure remains separate. [Qualification records](' +
+			releasesUrl() +
+			'/tag/' +
 			spec.tag +
 			') retain source-bound missing-proof receipts. Only stable ' +
 			spec.tag +
@@ -802,7 +819,9 @@ function stablePublicationNotice(id, context, sha, now = new Date()) {
 			.join(' ') +
 		' ' +
 		'Compilation, packaging, macOS signing, source and asset integrity, installation and all other tests remain required. Windows signature evidence is disclosed separately. ' +
-		'[Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.0) retain the exact source-bound deferred scopes. Packaging does not prove native feature acceptance. This exception applies only to v1.0.0 before 2026-10-10T02:00:00Z.' +
+		'[Qualification records](' +
+		releasesUrl() +
+		'/tag/v1.0.0) retain the exact source-bound deferred scopes. Packaging does not prove native feature acceptance. This exception applies only to v1.0.0 before 2026-10-10T02:00:00Z.' +
 		' Known macOS reports remain under investigation: Karabiner lease failures (including watchdog exit 73 and PONG/READY timeouts), and an active Homebrew upgrade leaving Hammerspoon running without ErgoptiPlus. This release does not claim those reports repaired.'
 	);
 }
@@ -1032,6 +1051,7 @@ function main(argv) {
 	}
 }
 module.exports = {
+	releasesUrl,
 	LAUNCH_QUALIFICATION_MATRIX,
 	STABLE_V102_POLICY_PATH,
 	STABLE_V102_PROFILE_ID,

@@ -15,7 +15,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
-const { parseClosedJson, environmentContext } = require('./dev-release-qualification.cjs');
+const {
+	releasesUrl,
+	parseClosedJson,
+	environmentContext
+} = require('./dev-release-qualification.cjs');
+const { app } = require('../lib/identifiers.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const POLICY = parseClosedJson(
 	fs.readFileSync(path.join(ROOT, '.github/ci/stable_windows_signing_exception.json'), 'utf8')
@@ -111,7 +116,7 @@ function receipt(context, source, checkout, sha256, now = new Date(), policy = P
 		source_sha: source,
 		tag: context.tag,
 		version: context.version,
-		artifact: 'ErgoptiPlus.exe',
+		artifact: app.exe,
 		sha256,
 		signature: 'NotSigned',
 		qualified: false,
@@ -152,11 +157,15 @@ function notice(source, tag) {
 	return (
 		'WINDOWS AUTHENTICODE UNSIGNED / qualified:false (source ' +
 		source +
-		'): ErgoptiPlus.exe has no Windows code-signing certificate for this ' +
+		'): ' +
+		app.exe +
+		' has no Windows code-signing certificate for this ' +
 		tag +
 		' release. ' +
 		'All tests, build, package, source and asset integrity, and installation checks remain mandatory. ' +
-		'Windows may show an unknown-publisher warning. [Signature evidence](https://github.com/adrienm7/ergopti/releases/download/' +
+		'Windows may show an unknown-publisher warning. [Signature evidence](' +
+		releasesUrl() +
+		'/download/' +
 		tag +
 		'/windows-signing-qualification.json). ' +
 		'Future signing requires SignPath Foundation enrollment and qualified GitHub integration.'
@@ -195,7 +204,7 @@ function main(args, env = process.env) {
 		if (env.ERGOPTI_WINDOWS_SIGNING_CONFIGURED === 'true') refuse();
 		requireFreshUnsigned(env.ERGOPTI_WINDOWS_CREATE_RELEASE);
 		const value = parseClosedJson(fs.readFileSync(filename, 'utf8'));
-		const image = fs.readFileSync(path.join(directory, 'ErgoptiPlus.exe'));
+		const image = fs.readFileSync(path.join(directory, app.exe));
 		validateReceipt(
 			value,
 			context,

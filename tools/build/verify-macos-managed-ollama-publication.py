@@ -5,14 +5,22 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 from pathlib import Path
 import stat
 import tarfile
 import zipfile
 
+# The app bundle name and the release host are declared once, in this checkout.
+IDENTIFIERS = json.loads(
+    (
+        Path(__file__).resolve().parents[2] / "static/ergopti_plus/_shared/data/identifiers.json"
+    ).read_text(encoding="utf-8")
+)
+APP_BUNDLE = IDENTIFIERS["app"]["bundle"]
 CATALOGUE = "managed_ollama_release.json"
 BUNDLE_CATALOGUE = (
-    "ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/_shared/modules/llm/" + CATALOGUE
+    APP_BUNDLE + "/Contents/Resources/static/ergopti_plus/_shared/modules/llm/" + CATALOGUE
 )
 
 
@@ -99,7 +107,9 @@ def verify(options):
         _, asset = policy.select_asset(contract_bytes, catalogue_bytes, host)
         archive = OWNER.source_file(assets, asset["filename"])
         expected_url = (
-            "https://github.com/"
+            "https://"
+            + IDENTIFIERS["hosts"]["github"]
+            + "/"
             + expected_plan["repository"]
             + "/releases/download/"
             + expected_plan["tag"]
@@ -112,7 +122,7 @@ def verify(options):
             or inputs.admit(archive) != asset["sha256"]
         ):
             raise ValueError("A native release asset or its exact download URL differs")
-    for filename in ("ErgoptiPlus.app.zip", "ErgoptiPlus.app.tar.xz"):
+    for filename in (APP_BUNDLE + ".zip", APP_BUNDLE + ".tar.xz"):
         archive = OWNER.source_file(assets, filename)
         inputs.admit(archive)
         bound_catalogue(archive, catalogue_bytes)
