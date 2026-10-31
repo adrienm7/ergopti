@@ -1217,16 +1217,16 @@ ollama_fixture_progress_part_ms = 400
 ollama_fixture_stall_part_ms = 1500
 
 # The launcher tests' polls (a fast one for local pipes and files, the usual
-# one for child processes and a lease record poll) and their settle waits: the
-# guardian kept alive after it owns its singleton, the retired guardian's
-# record, the lease writer's line interval and a slow proxy settings read.
-# Swift: Tests/ErgoptiPlusTests. SparkleArchiveUpdateAcceptanceTests.swift
-# drives a separately compiled application without importing the launcher
-# module, so its sleeps stay in tools/test/launcher-sleep-literal-baseline.json.
+# one for child processes, a lease record poll and a native census poll) and
+# their settle waits: the guardian kept alive after it owns its singleton, the
+# retired guardian's record, the lease writer's line interval, a late native
+# relaunch and a slow proxy settings read. Swift: Tests/ErgoptiPlusTests.
 test_fast_poll_ms = 1
 test_poll_ms = 10
 test_record_poll_ms = 5
+test_census_poll_ms = 100
 test_guardian_settle_ms = 350
 test_guardian_retire_settle_ms = 100
 test_lease_line_interval_ms = 50
+test_late_relaunch_settle_ms = 250
 test_slow_settings_read_ms = 20
