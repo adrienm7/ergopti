@@ -7,6 +7,8 @@ const {
 	parseTap,
 	foldResults,
 	takeChunk,
+	guidedChunkSeconds,
+	defaultWorkers,
 	formatReport,
 	parseArguments
 } = require('./ahk-parallel.cjs');
@@ -63,6 +65,21 @@ assert.deepEqual(takeChunk(['p', 'q', 'r', 's'], { p: 1, q: 1, r: 1, s: 1 }, lim
 	'q',
 	'r'
 ]);
+
+// Much work left spends the full budget; the tail shrinks to the floor, so workers end together.
+const sizing = { chunkSeconds: 300, minChunkSeconds: 60, unknownTestMs: 1000 };
+assert.equal(guidedChunkSeconds(['a'], { a: 3600000 }, 2, sizing), 300);
+assert.equal(guidedChunkSeconds(['a'], { a: 800000 }, 2, sizing), 200);
+assert.equal(guidedChunkSeconds(['a'], { a: 1000 }, 2, sizing), 60);
+assert.equal(guidedChunkSeconds(['a', 'b'], {}, 1, sizing), 60);
+assert.equal(guidedChunkSeconds(['a'], { a: 1000 }, 2, { ...sizing, chunkSeconds: 30 }), 30);
+
+// The default follows the CPUs until free memory is what limits it, and never reaches zero.
+const GB = 1024 * 1024 * 1024;
+assert.equal(defaultWorkers(8, 32 * GB), 4);
+assert.equal(defaultWorkers(8, 2 * GB), 2);
+assert.equal(defaultWorkers(8, 0.5 * GB), 1);
+assert.equal(defaultWorkers(1, 32 * GB), 1);
 
 const report = formatReport(
 	{

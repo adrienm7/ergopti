@@ -7,7 +7,7 @@ drives native AutoHotkey and Win32; macOS and Linux run their own Lua suites.
 
 ```powershell
 npm run test:ahk-parallel                                  # run, or resume
-npm run test:ahk-parallel -- --workers=6                   # default: half the logical CPUs
+npm run test:ahk-parallel -- --workers=6                   # default: half the CPUs, fewer on low memory
 npm run test:ahk-parallel -- --only="config transition"    # a subset of the plan
 npm run test:ahk-parallel -- --fresh                       # forget the ledger first
 npm run test:ahk-parallel -- --rerun-failures              # each failure alone, one at a time
@@ -21,13 +21,16 @@ Everything lives in the ignored `.ahk-parallel/` folder (`--run-dir` moves it).
   tied to the commit: on another HEAD the runner refuses it unless you pass
   `--fresh` or, knowingly, `--accept-stale`.
 - **Chunks.** Each process parses the whole suite before its first test, so a
-  chunk is sized by what its tests took last time (`durations.json`, five
-  minutes by default) rather than by a count.
+  chunk is sized by what its tests took last time (`durations.json`) rather than
+  by a count: five minutes while much work remains, then half of a worker's
+  share down to one minute, so the workers finish together.
 - **A process that dies or hangs** past its 30-minute cap marks the test it died
   in as failed; the rest of its chunk goes back to the queue.
 - **Failures.** Parallel neighbours can disturb tests that use the keyboard, the
   clipboard or a shared native resource. Read a failure as real only once
-  `--rerun-failures` reproduces it alone.
+  `--rerun-failures` reproduces it alone. That run answers for those failures
+  only, in its exit status and its summary, and needs `--accept-stale` once HEAD
+  has moved.
 
 Two mechanisms make the parallelism sound. Workers run under `/force`, the
 interpreter's switch for `#SingleInstance Off`, so they do not replace one
