@@ -822,11 +822,9 @@ Added October 22 (from the agents' reports; details in their commits):
       session, and typing on a physical keyboard; [CODE] the Bépo base needs a Bépo `.keylayout` in the registry:
       the upstream file is `bepo 1.1.bundle/Contents/Resources/bepo.keylayout` of
       `https://cdn.bepo.fr/macosx/fr-dvorak-bepo-macosx-1.1rc2.dmg` (ISO default map set, SHA-256
-      1ae285b4…30b6ba), but its chained dead keys break the XKB conversion: `test_registry_conversion.py` reports 66
-      unreachable (state, action) outputs (a dead key pressed inside a dead state sends its own keysym, while the
-      Compose line names the base one) and 6 conflicting sequences (`<infinity> <asciicircum>` and five more), in the
-      Python converter and its byte-identical Lua twin alike, so the fix touches both and the shipped Ergopti
-      XCompose; maintainer decision: CC BY-SA 3.0 or GFDL for the vendored copy (bepo.fr dual-licenses it); the
+      1ae285b4…30b6ba), whose chained dead keys now convert with no conflict and every output typable (both
+      converters, measured on that file outside the repository); left only the maintainer decision: CC BY-SA 3.0 or
+      GFDL for the vendored copy (bepo.fr dual-licenses it), then its registry entry; the
       onboarding control is 3337d99bc8 on `tmp/wip-todo-af`. The row switches (`layout.emulate_*_row`)
       stay Windows-only: they mix Ergopti rows with the OS layout, which has no `.keylayout` source on macOS or
       Linux; an Ergopti bundle source types digits on both levels, so its rows stay greyed on macOS.
