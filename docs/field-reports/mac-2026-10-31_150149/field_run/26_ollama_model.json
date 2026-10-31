@@ -1,0 +1,1 @@
+{"codes":["runtime_absent"],"deadline_ms":4855824,"elapsed_ms":2,"finished_at":"2026-10-31T14:05:10Z","index":26,"kind":"ai","log_window":{"lines":[],"truncated":false},"report":{},"request_id":"mac-2026-10-31_150149","schema":1,"started_at":"2026-10-31T14:05:10Z","step":"ollama_model","verdict":"skip"}

@@ -1,0 +1,3387 @@
+{
+ "continuations": 42,
+ "counters": {
+  "counter:menu.refresh_requested": 33,
+  "counter:runtime.timer_hold_over_1000ms": 3,
+  "counter:runtime.timer_hold_over_250ms": 45
+ },
+ "error_keys": [
+  "ERROR|adapters.file_system|append(): destination is not a regular file (named pipe).",
+  "ERROR|adapters.file_system|write(): cannot preserve metadata for '<*>' — destination is not a regular file.",
+  "ERROR|keymap.layout_rows_build|The number-row layout for '<*>' was not applied (readback_mismatch): key <*> types '<*>', the build holds text '<*>'.",
+  "ERROR|ollama_deps|Ollama bootstrap failed (exit=<*>) — Ergopti n'<*>'Ollama (catalogue de publication ou contrôle d'<*>'a été installé. Envoyez le rapport de diagnostic.",
+  "ERROR|llm.api_ollama|The local server's model list is unavailable: HTTP <*> (Network request failed: Connection failed: Could not connect to the server. - http://<*>/api/tags).",
+  "ERROR|adapters.keyboard_source_probe|Native keyboard source proof refused: source_changed.",
+  "ERROR|keymap.layout_rows_build|The number-row layout for '<*>' was not applied (readback_mismatch): the keyboard probe answered source_changed.",
+  "ERROR|menu_llm.ollama|Managed model pull retirement is pending (operation_files_not_removed); exact task slot retained.",
+  "ERROR|menu_llm.ollama|The Ollama pull of granite4:<*>m-h ended (code <*>) but its task could not be settled; last output: OLLAMA_PULL_OUTCOME error_row.",
+  "ERROR|keystats.context_tracker|Replacement AXValueChanged watcher setup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:<*>: Notification has already been registered",
+  "ERROR|ollama_deps|Ollama bootstrap ended with exit=<*> (no signal, path=native_runtime_pty); output received: streamed stdout=<*> stderr=<*> bytes, final stdout=<*> stderr=<*> bytes; last <*> line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract | [NATIVE-BOOTSTRAP] stage: python_download | # native_http_route kind=direct attempt=<*>/<*> | # native_http_route kind=direct attempt=<*>/<*> | {\"<*>\":<*>,\"<*>\":true,\"<*>\":\"<*>\"} | [NATIVE-BOOTSTRAP] stage: python_install | cpython-<*>-macos-aarch6<*>-none is already installed | [NATIVE-BOOTSTRAP] stage: python_find | [OLLAMA-DEPS] stage: runtime_install | Managed Ollama runtime admission refused. | [OLLAMA-DEPS] ERROR: stage runtime_install ended with exit <*>.",
+  "ERROR|ollama_deps|Ollama bootstrap ended with exit=<*> (no signal, path=native_runtime_pty); output received: streamed stdout=<*> stderr=<*> bytes, final stdout=<*> stderr=<*> bytes; last <*> line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract | [NATIVE-BOOTSTRAP] stage: python_download | # native_http_route kind=direct attempt=<*>/<*> | # native_http_route kind=direct attempt=<*>/<*> | {\"<*>\":true,\"<*>\":\"<*>\",\"<*>\":<*>} | [NATIVE-BOOTSTRAP] stage: python_install | cpython-<*>-macos-aarch6<*>-none is already installed | [NATIVE-BOOTSTRAP] stage: python_find | [OLLAMA-DEPS] stage: runtime_install | Managed Ollama runtime admission refused. | [OLLAMA-DEPS] ERROR: stage runtime_install ended with exit <*>.",
+  "WARNING|menu|Over budget: menu.rebuild took <*> ms (budget <*> ms).",
+  "WARNING|keymap.utils|Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> ms).",
+  "WARNING|adapters.field_check_ports|PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.",
+  "WARNING|menu.keyboard_layout|Failed to switch active layout to '<*>' / '<*>' (tis_id=Ergopti Field Rows, reason=invalid_output, result=MISS).",
+  "WARNING|runtime|An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB.",
+  "WARNING|HotPath|Slow preview.rebuild: <*> ms own, <*> ms total, parent keydown (<*> similar since the last line).",
+  "WARNING|runtime|An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keymap/llm_bridge.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB.",
+  "WARNING|shortcuts.script_control|Script-control eventtap was disabled by macOS — re-enabling.",
+  "WARNING|managed_ollama_hint|Owned Ollama runtime metadata refused (exit=<*>): refused: RuntimeRefusal at managed_ollama_hint.py:<*> candidate",
+  "WARNING|download_window|Progress UI flipped to error state: Ergopti n'<*>'Ollama (catalogue de publication ou contrôle d'<*>'a été installé. Envoyez le rapport de diagnostic.",
+  "WARNING|shortcuts.keyboard_shortcuts|Shortcut Ctrl+. (slot '<*>') could not be registered (key '<*>' is not in the active keyboard layout); the other shortcuts stay active and it is retried.",
+  "WARNING|adapters.hotkey_registrar|bind(): the OS refused '<*>' — nil.",
+  "WARNING|shortcuts.keyboard_shortcuts|Shortcut Ctrl+. (slot '<*>') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.",
+  "WARNING|runtime|An hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/field_run.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB.",
+  "WARNING|karabiner.lease|Karabiner lease <*> heartbeat <*> had no clean local CLI transport.",
+  "WARNING|keymap.utils|Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> application=<*> app_name=<*> title=<*> context_watchers=<*> secure_field=<*> destination=<*> ms).",
+  "WARNING|keystats.log_manager|Slow ingest tick <*> ms (drain=<*> foreign=<*> outbox=<*> read=<*> build=<*> apply=<*> commit=<*> append=<*> notify=<*> ms; entries=<*> statements=<*>)."
+ ],
+ "errors": [
+  {
+   "count": 3,
+   "example": "2026-10-31 09:58:46:051 [ERROR] [adapters.file_system] append(): destination is not a regular file (named pipe).",
+   "first": "2026-10-31 09:58:46:051",
+   "key": "ERROR|adapters.file_system|append(): destination is not a regular file (named pipe).",
+   "last": "2026-10-31 15:05:19:983",
+   "level": "ERROR",
+   "module": "adapters.file_system",
+   "new": false,
+   "perf": false,
+   "template": "append(): destination is not a regular file (named pipe)."
+  },
+  {
+   "count": 3,
+   "example": "2026-10-31 09:58:46:054 [ERROR] [adapters.file_system] write(): cannot preserve metadata for '/private/var/folders/j8/6707b4c95nz1ygz8g6s7m3fc0000gp/T/ergopti-field-fifo-77295/pipe' — destination is not a regular file.",
+   "first": "2026-10-31 09:58:46:054",
+   "key": "ERROR|adapters.file_system|write(): cannot preserve metadata for '<*>' — destination is not a regular file.",
+   "last": "2026-10-31 15:05:19:985",
+   "level": "ERROR",
+   "module": "adapters.file_system",
+   "new": false,
+   "perf": false,
+   "template": "write(): cannot preserve metadata for '<*>' — destination is not a regular file."
+  },
+  {
+   "count": 2,
+   "example": "2026-10-31 14:13:22:548 [ERROR] [keymap.layout_rows_build] The number-row layout for 'ergol' was not applied (readback_mismatch): key 26 types '', the build holds text '&'.",
+   "first": "2026-10-31 14:13:22:548",
+   "key": "ERROR|keymap.layout_rows_build|The number-row layout for '<*>' was not applied (readback_mismatch): key <*> types '<*>', the build holds text '<*>'.",
+   "last": "2026-10-31 15:03:18:699",
+   "level": "ERROR",
+   "module": "keymap.layout_rows_build",
+   "new": false,
+   "perf": false,
+   "template": "The number-row layout for '<*>' was not applied (readback_mismatch): key <*> types '<*>', the build holds text '<*>'."
+  },
+  {
+   "count": 2,
+   "example": "2026-10-31 14:14:44:840 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=78) — Ergopti n'a pas pu vérifier sa version épinglée d'Ollama (catalogue de publication ou contrôle d'intégrité) : rien n'a été installé. Envoyez le rapport de diagnostic.",
+   "first": "2026-10-31 14:14:44:840",
+   "key": "ERROR|ollama_deps|Ollama bootstrap failed (exit=<*>) — Ergopti n'<*>'Ollama (catalogue de publication ou contrôle d'<*>'a été installé. Envoyez le rapport de diagnostic.",
+   "last": "2026-10-31 15:05:10:129",
+   "level": "ERROR",
+   "module": "ollama_deps",
+   "new": false,
+   "perf": false,
+   "template": "Ollama bootstrap failed (exit=<*>) — Ergopti n'<*>'Ollama (catalogue de publication ou contrôle d'<*>'a été installé. Envoyez le rapport de diagnostic."
+  },
+  {
+   "count": 2,
+   "example": "2026-10-31 14:14:54:078 [ERROR] [llm.api_ollama] The local server's model list is unavailable: HTTP 0 (Network request failed: Connection failed: Could not connect to the server. - http://127.0.0.1:11435/api/tags).",
+   "first": "2026-10-31 14:14:54:078",
+   "key": "ERROR|llm.api_ollama|The local server's model list is unavailable: HTTP <*> (Network request failed: Connection failed: Could not connect to the server. - http://<*>/api/tags).",
+   "last": "2026-10-31 15:05:18:880",
+   "level": "ERROR",
+   "module": "llm.api_ollama",
+   "new": false,
+   "perf": false,
+   "template": "The local server's model list is unavailable: HTTP <*> (Network request failed: Connection failed: Could not connect to the server. - http://<*>/api/tags)."
+  },
+  {
+   "count": 1,
+   "example": "2026-10-31 09:55:29:076 [ERROR] [adapters.keyboard_source_probe] Native keyboard source proof refused: source_changed.",
+   "first": "2026-10-31 09:55:29:076",
+   "key": "ERROR|adapters.keyboard_source_probe|Native keyboard source proof refused: source_changed.",
+   "last": "2026-10-31 09:55:29:076",
+   "level": "ERROR",
+   "module": "adapters.keyboard_source_probe",
+   "new": false,
+   "perf": false,
+   "template": "Native keyboard source proof refused: source_changed."
+  },
+  {
+   "count": 1,
+   "example": "2026-10-31 09:55:29:429 [ERROR] [keymap.layout_rows_build] The number-row layout for 'ergol' was not applied (readback_mismatch): the keyboard probe answered source_changed.",
+   "first": "2026-10-31 09:55:29:429",
+   "key": "ERROR|keymap.layout_rows_build|The number-row layout for '<*>' was not applied (readback_mismatch): the keyboard probe answered source_changed.",
+   "last": "2026-10-31 09:55:29:429",
+   "level": "ERROR",
+   "module": "keymap.layout_rows_build",
+   "new": false,
+   "perf": false,
+   "template": "The number-row layout for '<*>' was not applied (readback_mismatch): the keyboard probe answered source_changed."
+  },
+  {
+   "count": 1,
+   "example": "2026-10-31 09:58:33:523 [ERROR] [menu_llm.ollama] Managed model pull retirement is pending (operation_files_not_removed); exact task slot retained.",
+   "first": "2026-10-31 09:58:33:523",
+   "key": "ERROR|menu_llm.ollama|Managed model pull retirement is pending (operation_files_not_removed); exact task slot retained.",
+   "last": "2026-10-31 09:58:33:523",
+   "level": "ERROR",
+   "module": "menu_llm.ollama",
+   "new": false,
+   "perf": false,
+   "template": "Managed model pull retirement is pending (operation_files_not_removed); exact task slot retained."
+  },
+  {
+   "count": 1,
+   "example": "2026-10-31 09:58:33:523 [ERROR] [menu_llm.ollama] The Ollama pull of granite4:350m-h ended (code 1) but its task could not be settled; last output: OLLAMA_PULL_OUTCOME error_row.",
+   "first": "2026-10-31 09:58:33:523",
+   "key": "ERROR|menu_llm.ollama|The Ollama pull of granite4:<*>m-h ended (code <*>) but its task could not be settled; last output: OLLAMA_PULL_OUTCOME error_row.",
+   "last": "2026-10-31 09:58:33:523",
+   "level": "ERROR",
+   "module": "menu_llm.ollama",
+   "new": false,
+   "perf": false,
+   "template": "The Ollama pull of granite4:<*>m-h ended (code <*>) but its task could not be settled; last output: OLLAMA_PULL_OUTCOME error_row."
+  },
+  {
+   "count": 1,
+   "example": "2026-10-31 14:09:14:863 [ERROR] [keystats.context_tracker] Replacement AXValueChanged watcher setup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:655: Notification has already been registered",
+   "first": "2026-10-31 14:09:14:863",
+   "key": "ERROR|keystats.context_tracker|Replacement AXValueChanged watcher setup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:<*>: Notification has already been registered",
+   "last": "2026-10-31 14:09:14:863",
+   "level": "ERROR",
+   "module": "keystats.context_tracker",
+   "new": false,
+   "perf": false,
+   "template": "Replacement AXValueChanged watcher setup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:<*>: Notification has already been registered"
+  },
+  {
+   "count": 1,
+   "example": "2026-10-31 14:14:44:840 [ERROR] [ollama_deps] Ollama bootstrap ended with exit=78 (no signal, path=native_runtime_pty); output received: streamed stdout=562 stderr=0 bytes, final stdout=0 stderr=0 bytes; last 12 line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract |…",
+   "first": "2026-10-31 14:14:44:840",
+   "key": "ERROR|ollama_deps|Ollama bootstrap ended with exit=<*> (no signal, path=native_runtime_pty); output received: streamed stdout=<*> stderr=<*> bytes, final stdout=<*> stderr=<*> bytes; last <*> line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract | [NATIVE-BOOTSTRAP] stage: python_download | # native_http_route kind=direct attempt=<*>/<*> | # native_http_route kind=direct attempt=<*>/<*> | {\"<*>\":<*>,\"<*>\":true,\"<*>\":\"<*>\"} | [NATIVE-BOOTSTRAP] stage: python_install | cpython-<*>-macos-aarch6<*>-none is already installed | [NATIVE-BOOTSTRAP] stage: python_find | [OLLAMA-DEPS] stage: runtime_install | Managed Ollama runtime admission refused. | [OLLAMA-DEPS] ERROR: stage runtime_install ended with exit <*>.",
+   "last": "2026-10-31 14:14:44:840",
+   "level": "ERROR",
+   "module": "ollama_deps",
+   "new": false,
+   "perf": false,
+   "template": "Ollama bootstrap ended with exit=<*> (no signal, path=native_runtime_pty); output received: streamed stdout=<*> stderr=<*> bytes, final stdout=<*> stderr=<*> bytes; last <*> line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract | [NATIVE-BOOTSTRAP] stage: python_download | # native_http_route kind=direct attempt=<*>/<*> | # native_http_route kind=direct attempt=<*>/<*> | {\"<*>\":<*>,\"<*>\":true,\"<*>\":\"<*>\"} | [NATIVE-BOOTSTRAP] stage: python_install | cpython-<*>-macos-aarch6<*>-none is already installed | [NATIVE-BOOTSTRAP] stage: python_find | [OLLAMA-DEPS] stage: runtime_install | Managed Ollama runtime admission refused. | [OLLAMA-DEPS] ERROR: stage runtime_install ended with exit <*>."
+  },
+  {
+   "count": 1,
+   "example": "2026-10-31 15:05:10:129 [ERROR] [ollama_deps] Ollama bootstrap ended with exit=78 (no signal, path=native_runtime_pty); output received: streamed stdout=562 stderr=0 bytes, final stdout=0 stderr=0 bytes; last 12 line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract |…",
+   "first": "2026-10-31 15:05:10:129",
+   "key": "ERROR|ollama_deps|Ollama bootstrap ended with exit=<*> (no signal, path=native_runtime_pty); output received: streamed stdout=<*> stderr=<*> bytes, final stdout=<*> stderr=<*> bytes; last <*> line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract | [NATIVE-BOOTSTRAP] stage: python_download | # native_http_route kind=direct attempt=<*>/<*> | # native_http_route kind=direct attempt=<*>/<*> | {\"<*>\":true,\"<*>\":\"<*>\",\"<*>\":<*>} | [NATIVE-BOOTSTRAP] stage: python_install | cpython-<*>-macos-aarch6<*>-none is already installed | [NATIVE-BOOTSTRAP] stage: python_find | [OLLAMA-DEPS] stage: runtime_install | Managed Ollama runtime admission refused. | [OLLAMA-DEPS] ERROR: stage runtime_install ended with exit <*>.",
+   "last": "2026-10-31 15:05:10:129",
+   "level": "ERROR",
+   "module": "ollama_deps",
+   "new": true,
+   "perf": false,
+   "template": "Ollama bootstrap ended with exit=<*> (no signal, path=native_runtime_pty); output received: streamed stdout=<*> stderr=<*> bytes, final stdout=<*> stderr=<*> bytes; last <*> line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract | [NATIVE-BOOTSTRAP] stage: python_download | # native_http_route kind=direct attempt=<*>/<*> | # native_http_route kind=direct attempt=<*>/<*> | {\"<*>\":true,\"<*>\":\"<*>\",\"<*>\":<*>} | [NATIVE-BOOTSTRAP] stage: python_install | cpython-<*>-macos-aarch6<*>-none is already installed | [NATIVE-BOOTSTRAP] stage: python_find | [OLLAMA-DEPS] stage: runtime_install | Managed Ollama runtime admission refused. | [OLLAMA-DEPS] ERROR: stage runtime_install ended with exit <*>."
+  },
+  {
+   "count": 10,
+   "example": "2026-10-31 14:12:24:026 [WARNING] [menu] Over budget: menu.rebuild took 314 ms (budget 250 ms).",
+   "first": "2026-10-31 14:12:24:026",
+   "key": "WARNING|menu|Over budget: menu.rebuild took <*> ms (budget <*> ms).",
+   "last": "2026-10-31 15:08:51:513",
+   "level": "WARNING",
+   "module": "menu",
+   "new": false,
+   "perf": true,
+   "template": "Over budget: menu.rebuild took <*> ms (budget <*> ms)."
+  },
+  {
+   "count": 5,
+   "example": "2026-10-31 09:53:16:432 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).",
+   "first": "2026-10-31 09:53:16:432",
+   "key": "WARNING|keymap.utils|Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> ms).",
+   "last": "2026-10-31 15:01:35:268",
+   "level": "WARNING",
+   "module": "keymap.utils",
+   "new": false,
+   "perf": false,
+   "template": "Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> ms)."
+  },
+  {
+   "count": 3,
+   "example": "2026-10-31 09:54:33:379 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.",
+   "first": "2026-10-31 09:54:33:379",
+   "key": "WARNING|adapters.field_check_ports|PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.",
+   "last": "2026-10-31 15:02:16:192",
+   "level": "WARNING",
+   "module": "adapters.field_check_ports",
+   "new": false,
+   "perf": false,
+   "template": "PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found."
+  },
+  {
+   "count": 3,
+   "example": "2026-10-31 09:55:29:189 [WARNING] [menu.keyboard_layout] Failed to switch active layout to 'Ergopti Field Rows' / 'Ergopti Field Rows' (tis_id=Ergopti Field Rows, reason=invalid_output, result=MISS).",
+   "first": "2026-10-31 09:55:29:189",
+   "key": "WARNING|menu.keyboard_layout|Failed to switch active layout to '<*>' / '<*>' (tis_id=Ergopti Field Rows, reason=invalid_output, result=MISS).",
+   "last": "2026-10-31 15:03:18:565",
+   "level": "WARNING",
+   "module": "menu.keyboard_layout",
+   "new": false,
+   "perf": false,
+   "template": "Failed to switch active layout to '<*>' / '<*>' (tis_id=Ergopti Field Rows, reason=invalid_output, result=MISS)."
+  },
+  {
+   "count": 2,
+   "example": "2026-10-31 09:53:15:921 [WARNING] [runtime] An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:364) held the main thread for 1512 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 51->51 MB.",
+   "first": "2026-10-31 09:53:15:921",
+   "key": "WARNING|runtime|An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB.",
+   "last": "2026-10-31 15:01:36:785",
+   "level": "WARNING",
+   "module": "runtime",
+   "new": false,
+   "perf": true,
+   "template": "An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB."
+  },
+  {
+   "count": 2,
+   "example": "2026-10-31 14:13:36:620 [WARNING] [HotPath] Slow preview.rebuild: 7.89 ms own, 7.89 ms total, parent keydown (0 similar since the last line).",
+   "first": "2026-10-31 14:13:36:620",
+   "key": "WARNING|HotPath|Slow preview.rebuild: <*> ms own, <*> ms total, parent keydown (<*> similar since the last line).",
+   "last": "2026-10-31 15:03:31:646",
+   "level": "WARNING",
+   "module": "HotPath",
+   "new": false,
+   "perf": true,
+   "template": "Slow preview.rebuild: <*> ms own, <*> ms total, parent keydown (<*> similar since the last line)."
+  },
+  {
+   "count": 2,
+   "example": "2026-10-31 14:13:39:139 [WARNING] [runtime] An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keymap/llm_bridge.lua:236) held the main thread for 2515 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 40->40 MB.",
+   "first": "2026-10-31 14:13:39:139",
+   "key": "WARNING|runtime|An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keymap/llm_bridge.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB.",
+   "last": "2026-10-31 15:03:34:163",
+   "level": "WARNING",
+   "module": "runtime",
+   "new": false,
+   "perf": true,
+   "template": "An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keymap/llm_bridge.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB."
+  },
+  {
+   "count": 2,
+   "example": "2026-10-31 14:13:39:656 [WARNING] [shortcuts.script_control] Script-control eventtap was disabled by macOS — re-enabling.",
+   "first": "2026-10-31 14:13:39:656",
+   "key": "WARNING|shortcuts.script_control|Script-control eventtap was disabled by macOS — re-enabling.",
+   "last": "2026-10-31 15:03:34:695",
+   "level": "WARNING",
+   "module": "shortcuts.script_control",
+   "new": false,
+   "perf": false,
+   "template": "Script-control eventtap was disabled by macOS — re-enabling."
+  },
+  {
+   "count": 2,
+   "example": "2026-10-31 14:13:40:746 [WARNING] [managed_ollama_hint] Owned Ollama runtime metadata refused (exit=78): refused: RuntimeRefusal at managed_ollama_hint.py:39 candidate",
+   "first": "2026-10-31 14:13:40:746",
+   "key": "WARNING|managed_ollama_hint|Owned Ollama runtime metadata refused (exit=<*>): refused: RuntimeRefusal at managed_ollama_hint.py:<*> candidate",
+   "last": "2026-10-31 15:03:35:701",
+   "level": "WARNING",
+   "module": "managed_ollama_hint",
+   "new": false,
+   "perf": false,
+   "template": "Owned Ollama runtime metadata refused (exit=<*>): refused: RuntimeRefusal at managed_ollama_hint.py:<*> candidate"
+  },
+  {
+   "count": 2,
+   "example": "2026-10-31 14:14:44:840 [WARNING] [download_window] Progress UI flipped to error state: Ergopti n'a pas pu vérifier sa version épinglée d'Ollama (catalogue de publication ou contrôle d'intégrité) : rien n'a été installé. Envoyez le rapport de diagnostic.",
+   "first": "2026-10-31 14:14:44:840",
+   "key": "WARNING|download_window|Progress UI flipped to error state: Ergopti n'<*>'Ollama (catalogue de publication ou contrôle d'<*>'a été installé. Envoyez le rapport de diagnostic.",
+   "last": "2026-10-31 15:05:10:129",
+   "level": "WARNING",
+   "module": "download_window",
+   "new": false,
+   "perf": false,
+   "template": "Progress UI flipped to error state: Ergopti n'<*>'Ollama (catalogue de publication ou contrôle d'<*>'a été installé. Envoyez le rapport de diagnostic."
+  },
+  {
+   "count": 2,
+   "example": "2026-10-31 14:18:24:886 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.",
+   "first": "2026-10-31 14:18:24:886",
+   "key": "WARNING|shortcuts.keyboard_shortcuts|Shortcut Ctrl+. (slot '<*>') could not be registered (key '<*>' is not in the active keyboard layout); the other shortcuts stay active and it is retried.",
+   "last": "2026-10-31 15:08:51:058",
+   "level": "WARNING",
+   "module": "shortcuts.keyboard_shortcuts",
+   "new": false,
+   "perf": false,
+   "template": "Shortcut Ctrl+. (slot '<*>') could not be registered (key '<*>' is not in the active keyboard layout); the other shortcuts stay active and it is retried."
+  },
+  {
+   "count": 2,
+   "example": "2026-10-31 14:18:26:245 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.",
+   "first": "2026-10-31 14:18:26:245",
+   "key": "WARNING|adapters.hotkey_registrar|bind(): the OS refused '<*>' — nil.",
+   "last": "2026-10-31 15:08:52:062",
+   "level": "WARNING",
+   "module": "adapters.hotkey_registrar",
+   "new": false,
+   "perf": false,
+   "template": "bind(): the OS refused '<*>' — nil."
+  },
+  {
+   "count": 2,
+   "example": "2026-10-31 14:18:26:245 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.",
+   "first": "2026-10-31 14:18:26:245",
+   "key": "WARNING|shortcuts.keyboard_shortcuts|Shortcut Ctrl+. (slot '<*>') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.",
+   "last": "2026-10-31 15:08:52:062",
+   "level": "WARNING",
+   "module": "shortcuts.keyboard_shortcuts",
+   "new": false,
+   "perf": false,
+   "template": "Shortcut Ctrl+. (slot '<*>') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried."
+  },
+  {
+   "count": 1,
+   "example": "2026-10-31 09:55:44:252 [WARNING] [runtime] An hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/field_run.lua:610) held the main thread for 1810 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 32->32 MB.",
+   "first": "2026-10-31 09:55:44:252",
+   "key": "WARNING|runtime|An hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/field_run.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB.",
+   "last": "2026-10-31 09:55:44:252",
+   "level": "WARNING",
+   "module": "runtime",
+   "new": false,
+   "perf": true,
+   "template": "An hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/field_run.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB."
+  },
+  {
+   "count": 1,
+   "example": "2026-10-31 10:48:26:000 [WARNING] [karabiner.lease] Karabiner lease 0adf0f18109444b7b9f632389103396a heartbeat 253 had no clean local CLI transport.",
+   "first": "2026-10-31 10:48:26:000",
+   "key": "WARNING|karabiner.lease|Karabiner lease <*> heartbeat <*> had no clean local CLI transport.",
+   "last": "2026-10-31 10:48:26:000",
+   "level": "WARNING",
+   "module": "karabiner.lease",
+   "new": false,
+   "perf": false,
+   "template": "Karabiner lease <*> heartbeat <*> had no clean local CLI transport."
+  },
+  {
+   "count": 1,
+   "example": "2026-10-31 14:17:08:261 [WARNING] [keymap.utils] Slow ignored-window probe 266 ms (watchers=0 focused_window=265 application=0 app_name=0 title=0 context_watchers=0 secure_field=0 destination=0 ms).",
+   "first": "2026-10-31 14:17:08:261",
+   "key": "WARNING|keymap.utils|Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> application=<*> app_name=<*> title=<*> context_watchers=<*> secure_field=<*> destination=<*> ms).",
+   "last": "2026-10-31 14:17:08:261",
+   "level": "WARNING",
+   "module": "keymap.utils",
+   "new": false,
+   "perf": false,
+   "template": "Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> application=<*> app_name=<*> title=<*> context_watchers=<*> secure_field=<*> destination=<*> ms)."
+  },
+  {
+   "count": 1,
+   "example": "2026-10-31 14:20:08:381 [WARNING] [keystats.log_manager] Slow ingest tick 691 ms (drain=0 foreign=0 outbox=690 read=0 build=0 apply=0 commit=0 append=0 notify=0 ms; entries=0 statements=0).",
+   "first": "2026-10-31 14:20:08:381",
+   "key": "WARNING|keystats.log_manager|Slow ingest tick <*> ms (drain=<*> foreign=<*> outbox=<*> read=<*> build=<*> apply=<*> commit=<*> append=<*> notify=<*> ms; entries=<*> statements=<*>).",
+   "last": "2026-10-31 14:20:08:381",
+   "level": "WARNING",
+   "module": "keystats.log_manager",
+   "new": true,
+   "perf": true,
+   "template": "Slow ingest tick <*> ms (drain=<*> foreign=<*> outbox=<*> read=<*> build=<*> apply=<*> commit=<*> append=<*> notify=<*> ms; entries=<*> statements=<*>)."
+  }
+ ],
+ "field_checks": {
+  "counts": {
+   "fail": 3,
+   "info": 1,
+   "pass": 28
+  },
+  "items": [
+   {
+    "failures": 1,
+    "id": "lease",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:02:16:057",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "owned_runtime",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:02:16:159",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "network",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:02:24:136",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "toolchain",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:02:25:560",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "login_items",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:02:45:721",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "composer",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:02:47:058",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "boot_cost",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:02:47:066",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "idle_cost",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:17:145",
+    "verdict": "pass"
+   },
+   {
+    "failures": 3,
+    "id": "layout_rows",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:19:316",
+    "verdict": "fail"
+   },
+   {
+    "failures": 0,
+    "id": "permissions",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:19:515",
+    "verdict": "pass"
+   },
+   {
+    "failures": 1,
+    "id": "event_taps",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:20:305",
+    "verdict": "fail"
+   },
+   {
+    "failures": 0,
+    "id": "input_sources",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:20:410",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "storage",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:21:033",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "launcher_roles",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:21:127",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "network_hosts",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:23:579",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "ollama_blob_host",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:24:867",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "typing_selftest",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:30:875",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "capslock_chord",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:30:884",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "gesture_frames",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:30:895",
+    "verdict": "pass"
+   },
+   {
+    "failures": 3,
+    "id": "hotstring_roundtrip",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:35:092",
+    "verdict": "fail"
+   },
+   {
+    "failures": 1,
+    "id": "prediction_tooltip",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:35:127",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "menu_build",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:03:35:445",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "ai_local",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:05:18:880",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "slow_lines",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:05:18:960",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "fifo_safety",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:05:20:047",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "local_servers",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:05:20:169",
+    "verdict": "pass"
+   },
+   {
+    "failures": 1,
+    "id": "app_health",
+    "runs": 3,
+    "source": "log",
+    "time": "2026-10-31 15:05:21:718",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "pac_fallback",
+    "runs": 2,
+    "source": "log",
+    "time": "2026-10-31 15:05:18:864",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "owned_start",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-10-31 15:02:16:163",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "owned_pause",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-10-31 15:05:21:724",
+    "verdict": "pass"
+   },
+   {
+    "id": "privacy_pane_urls",
+    "source": "privacy_pane_urls",
+    "verdict": "info"
+   },
+   {
+    "id": "system_bash",
+    "source": "system_bash",
+    "verdict": "pass"
+   }
+  ]
+ },
+ "lifecycle": {
+  "network_failure": {
+   "count": 5,
+   "events": [
+    {
+     "line": "2026-10-31 09:54:33:379 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.",
+     "time": "2026-10-31 09:54:33:379"
+    },
+    {
+     "line": "2026-10-31 14:12:24:122 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.",
+     "time": "2026-10-31 14:12:24:122"
+    },
+    {
+     "line": "2026-10-31 14:14:54:078 [ERROR] [llm.api_ollama] The local server's model list is unavailable: HTTP 0 (Network request failed: Connection failed: Could not connect to the server. - http://127.0.0.1:11435/api/tags).",
+     "time": "2026-10-31 14:14:54:078"
+    },
+    {
+     "line": "2026-10-31 15:02:16:192 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.",
+     "time": "2026-10-31 15:02:16:192"
+    },
+    {
+     "line": "2026-10-31 15:05:18:880 [ERROR] [llm.api_ollama] The local server's model list is unavailable: HTTP 0 (Network request failed: Connection failed: Could not connect to the server. - http://127.0.0.1:11435/api/tags).",
+     "time": "2026-10-31 15:05:18:880"
+    }
+   ],
+   "first": "2026-10-31 09:54:33:379",
+   "last": "2026-10-31 15:05:18:880"
+  },
+  "reload": {
+   "count": 3,
+   "events": [
+    {
+     "line": "2026-10-31 09:53:32:812 [INFO] [infra.termination_coordinator] Controlled reload requested (reason: hammerspoon_reload).",
+     "time": "2026-10-31 09:53:32:812"
+    },
+    {
+     "line": "2026-10-31 14:09:31:496 [INFO] [infra.termination_coordinator] Controlled reload requested (reason: watcher).",
+     "time": "2026-10-31 14:09:31:496"
+    },
+    {
+     "line": "2026-10-31 15:01:49:656 [INFO] [infra.termination_coordinator] Controlled reload requested (reason: watcher).",
+     "time": "2026-10-31 15:01:49:656"
+    }
+   ],
+   "first": "2026-10-31 09:53:32:812",
+   "last": "2026-10-31 15:01:49:656"
+  },
+  "sleep_wake": {
+   "count": 4,
+   "events": [
+    {
+     "line": "2026-10-31 09:53:15:921 [INFO] [gestures] Wake-from-sleep detected (event=0) — recycling watchers",
+     "time": "2026-10-31 09:53:15:921"
+    },
+    {
+     "line": "2026-10-31 10:19:38:422 [INFO] [gestures] Wake-from-sleep detected (event=0) — recycling watchers",
+     "time": "2026-10-31 10:19:38:422"
+    },
+    {
+     "line": "2026-10-31 14:09:13:841 [INFO] [gestures] Wake-from-sleep detected (event=0) — recycling watchers",
+     "time": "2026-10-31 14:09:13:841"
+    },
+    {
+     "line": "2026-10-31 15:01:34:668 [INFO] [gestures] Wake-from-sleep detected (event=0) — recycling watchers",
+     "time": "2026-10-31 15:01:34:668"
+    }
+   ],
+   "first": "2026-10-31 09:53:15:921",
+   "last": "2026-10-31 15:01:34:668"
+  },
+  "start": {
+   "count": 4,
+   "events": [
+    {
+     "line": "===== 2026-10-31 09:54:27:969 — ErgoptiPlus session opened =====",
+     "time": "2026-10-31 09:54:27:969"
+    },
+    {
+     "line": "===== 2026-10-31 14:12:20:177 — ErgoptiPlus session opened =====",
+     "time": "2026-10-31 14:12:20:177"
+    },
+    {
+     "line": "===== 2026-10-31 15:01:50:841 — ErgoptiPlus session opened =====",
+     "time": "2026-10-31 15:01:50:841"
+    },
+    {
+     "line": "===== 2026-10-31 15:02:12:204 — ErgoptiPlus session opened =====",
+     "time": "2026-10-31 15:02:12:204"
+    }
+   ],
+   "first": "2026-10-31 09:54:27:969",
+   "last": "2026-10-31 15:02:12:204"
+  },
+  "stop": {
+   "count": 1,
+   "events": [
+    {
+     "line": "2026-10-31 15:01:50:134 [INFO] [init] Hammerspoon local teardown started (reload).",
+     "time": "2026-10-31 15:01:50:134"
+    }
+   ],
+   "first": "2026-10-31 15:01:50:134",
+   "last": "2026-10-31 15:01:50:134"
+  }
+ },
+ "lines": 6894,
+ "logs": [
+  "ErgoptiPlus_2026-10-31.log"
+ ],
+ "performance": [
+  {
+   "budget": {
+    "inclusive": true,
+    "source": "static/ergopti_plus/macos/infra/main_thread_hold.lua",
+    "value": 250.0
+   },
+   "count": 29,
+   "kind": "occurrences",
+   "max": 2515.0,
+   "mean": 720.8965517241379,
+   "metric": "main_thread.hold",
+   "over": 29,
+   "p50": 502.0,
+   "p95": 2515.0,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": ".../static/ergopti_plus/macos/modules/keymap/llm_bridge.lua:236",
+     "time": "2026-10-31 14:13:39:139",
+     "value": 2515.0
+    },
+    {
+     "context": ".../static/ergopti_plus/macos/modules/keymap/llm_bridge.lua:236",
+     "time": "2026-10-31 15:03:34:163",
+     "value": 2515.0
+    },
+    {
+     "context": "...so/ergopti/static/ergopti_plus/macos/infra/field_run.lua:610",
+     "time": "2026-10-31 09:55:44:252",
+     "value": 1810.0
+    },
+    {
+     "context": ".../static/ergopti_plus/macos/modules/keystats/watchers.lua:364",
+     "time": "2026-10-31 15:01:36:785",
+     "value": 1515.0
+    },
+    {
+     "context": ".../static/ergopti_plus/macos/modules/keystats/watchers.lua:364",
+     "time": "2026-10-31 09:53:15:921",
+     "value": 1512.0
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 250.0
+   },
+   "count": 10,
+   "kind": "occurrences",
+   "max": 472.5,
+   "mean": 326.83000000000004,
+   "metric": "menu.rebuild",
+   "over": 9,
+   "p50": 291.3,
+   "p95": 472.5,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:59:38:742",
+     "value": 472.5
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:08:49:414",
+     "value": 415.2
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:18:21:639",
+     "value": 392.6
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:24:025",
+     "value": 314.1
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:55:29:074",
+     "value": 300.8
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 4000.0
+   },
+   "count": 3,
+   "kind": "occurrences",
+   "max": 169967.0000000042,
+   "mean": 76260.33333333423,
+   "metric": "reload.request_to_boot",
+   "over": 2,
+   "p50": 56506.00000000122,
+   "p95": 169967.0000000042,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:09:31:496",
+     "value": 169967.0000000042
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:53:32:812",
+     "value": 56506.00000000122
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:49:656",
+     "value": 2307.9999999972642
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": true,
+    "source": "static/ergopti_plus/macos/modules/keystats/ingest_trace.lua",
+    "value": 500.0
+   },
+   "count": 1,
+   "kind": "occurrences",
+   "max": 691.0,
+   "mean": 691.0,
+   "metric": "keystats.ingest",
+   "over": 1,
+   "p50": 691.0,
+   "p95": 691.0,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:20:08:381",
+     "value": 691.0
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "stated in the log line",
+    "value": 5.0
+   },
+   "count": 6,
+   "kind": "occurrences",
+   "max": 173.5,
+   "mean": 123.60000000000001,
+   "metric": "healthcheck.sync",
+   "over": 6,
+   "p50": 95.1,
+   "p95": 173.5,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:55:29:675",
+     "value": 173.5
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:13:23:040",
+     "value": 153.3
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:03:19:143",
+     "value": 145.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:13:40:506",
+     "value": 95.1
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:03:35:545",
+     "value": 89.1
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 5.0
+   },
+   "count": 2,
+   "kind": "occurrences",
+   "max": 8.24,
+   "mean": 8.065,
+   "metric": "hotpath:preview.rebuild",
+   "over": 2,
+   "p50": 7.89,
+   "p95": 8.24,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 15:03:31:646",
+     "value": 8.24
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:13:36:620",
+     "value": 7.89
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 2500.0
+   },
+   "count": 4,
+   "kind": "occurrences",
+   "max": 2074.0,
+   "mean": 1768.0,
+   "metric": "boot.total",
+   "over": 0,
+   "p50": 1609.0,
+   "p95": 2074.0,
+   "verdict": "within",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:21:463",
+     "value": 2074.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:29:318",
+     "value": 1821.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:964",
+     "value": 1609.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:13:377",
+     "value": 1568.0
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 4000.0
+   },
+   "count": 1,
+   "kind": "occurrences",
+   "max": 1835.0,
+   "mean": 1835.0,
+   "metric": "reload.total",
+   "over": 0,
+   "p50": 1835.0,
+   "p95": 1835.0,
+   "verdict": "within",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:965",
+     "value": 1835.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 1353.0,
+   "mean": 1266.75,
+   "metric": "boot.cpu",
+   "over": 0,
+   "p50": 1200.0,
+   "p95": 1353.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:21:463",
+     "value": 1353.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:29:319",
+     "value": 1320.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:965",
+     "value": 1200.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:13:377",
+     "value": 1194.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 402.4,
+   "mean": 384.875,
+   "metric": "boot.stage:Config-dependent module requires",
+   "over": 0,
+   "p50": 373.8,
+   "p95": 402.4,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:611",
+     "value": 402.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:28:418",
+     "value": 391.9
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:230",
+     "value": 373.8
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:594",
+     "value": 371.4
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 222.8,
+   "mean": 199.10000000000002,
+   "metric": "boot.stage:Hotstring groups registered (personal + dynamic + common)",
+   "over": 0,
+   "p50": 185.4,
+   "p95": 222.8,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:28:927",
+     "value": 222.8
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:21:084",
+     "value": 205.3
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:647",
+     "value": 185.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:13:027",
+     "value": 182.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 215.6,
+   "mean": 201.9,
+   "metric": "boot.stage:UI: menu.start (menubar + state sync + engines + LLM handler)",
+   "over": 0,
+   "p50": 191.9,
+   "p95": 215.6,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:21:445",
+     "value": 215.6
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:29:305",
+     "value": 211.3
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:952",
+     "value": 191.9
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:13:362",
+     "value": 188.8
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 167.0,
+   "mean": 152.975,
+   "metric": "boot.stage:Shortcuts pre-start",
+   "over": 0,
+   "p50": 153.7,
+   "p95": 167.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:28:655",
+     "value": 167.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:835",
+     "value": 161.2
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:804",
+     "value": 153.7
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:417",
+     "value": 130.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 91.9,
+   "mean": 82.60000000000001,
+   "metric": "boot.stage:UI: karabiner.init",
+   "over": 0,
+   "p50": 80.9,
+   "p95": 91.9,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:29:093",
+     "value": 91.9
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:21:229",
+     "value": 83.7
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:13:172",
+     "value": 80.9
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:760",
+     "value": 73.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 62.5,
+   "mean": 52.05,
+   "metric": "boot.stage:Keymap engine started",
+   "over": 0,
+   "p50": 53.6,
+   "p95": 62.5,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:29:000",
+     "value": 62.5
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:13:091",
+     "value": 58.9
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:21:145",
+     "value": 53.6
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:686",
+     "value": 33.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 52.4,
+   "mean": 47.625,
+   "metric": "boot.stage:Config schema migration",
+   "over": 0,
+   "p50": 47.7,
+   "p95": 52.4,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:28:471",
+     "value": 52.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:279",
+     "value": 48.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:659",
+     "value": 47.7
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:637",
+     "value": 42.4
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 41.5,
+   "mean": 11.825,
+   "metric": "boot.stage:TOML hotstring cache wired",
+   "over": 0,
+   "p50": 1.8,
+   "p95": 41.5,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:28:026",
+     "value": 41.5
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:208",
+     "value": 2.3
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:50:856",
+     "value": 1.8
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:222",
+     "value": 1.7
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 37.0,
+   "mean": 32.625,
+   "metric": "boot.stage:TOML discovery + ordering",
+   "over": 0,
+   "p50": 32.0,
+   "p95": 37.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:28:704",
+     "value": 37.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:878",
+     "value": 32.3
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:461",
+     "value": 32.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:844",
+     "value": 29.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 13.0,
+   "mean": 10.5,
+   "metric": "boot.stage:Path: native asynchronous logger transport committed",
+   "over": 0,
+   "p50": 10.1,
+   "p95": 13.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:191",
+     "value": 13.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:27:981",
+     "value": 10.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:215",
+     "value": 10.1
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:50:851",
+     "value": 8.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 11.4,
+   "mean": 9.725,
+   "metric": "boot.stage:File watchers armed",
+   "over": 0,
+   "p50": 9.3,
+   "p95": 11.4,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:21:460",
+     "value": 11.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:29:315",
+     "value": 9.7
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:13:373",
+     "value": 9.3
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:961",
+     "value": 8.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 8.0,
+   "mean": 6.05,
+   "metric": "boot.stage:Accessibility permission",
+   "over": 0,
+   "p50": 7.4,
+   "p95": 8.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:28:487",
+     "value": 8.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:650",
+     "value": 8.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:673",
+     "value": 7.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:287",
+     "value": 0.8
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 7.3,
+   "mean": 3.475,
+   "metric": "boot.stage:Factory-reset recovery reconciled",
+   "over": 0,
+   "p50": 2.2,
+   "p95": 7.3,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:205",
+     "value": 7.3
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:50:854",
+     "value": 2.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:27:984",
+     "value": 2.2
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:220",
+     "value": 2.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 7.2,
+   "mean": 5.675,
+   "metric": "boot.stage:Final mapping sort + tail-index rebuild",
+   "over": 0,
+   "p50": 5.0,
+   "p95": 7.2,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:28:937",
+     "value": 7.2
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:21:090",
+     "value": 5.8
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:652",
+     "value": 5.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:13:032",
+     "value": 4.7
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 7.1,
+   "mean": 6.3,
+   "metric": "boot.stage:First-launch guard (onboarding check)",
+   "over": 0,
+   "p50": 5.9,
+   "p95": 7.1,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:28:479",
+     "value": 7.1
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:286",
+     "value": 6.9
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:666",
+     "value": 5.9
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:642",
+     "value": 5.3
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 5.3,
+   "mean": 4.975,
+   "metric": "boot.stage:MLX server cleanup started asynchronously",
+   "over": 0,
+   "p50": 5.1,
+   "p95": 5.3,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:28:661",
+     "value": 5.3
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:841",
+     "value": 5.1
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:424",
+     "value": 5.1
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:810",
+     "value": 4.4
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 4.8,
+   "mean": 4.35,
+   "metric": "boot.stage:LLM backend bootstrap",
+   "over": 0,
+   "p50": 4.2,
+   "p95": 4.8,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:429",
+     "value": 4.8
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:845",
+     "value": 4.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:28:666",
+     "value": 4.2
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:814",
+     "value": 4.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 4.2,
+   "mean": 1.45,
+   "metric": "boot.stage:Path: runtime error capture installed",
+   "over": 0,
+   "p50": 0.6,
+   "p95": 4.2,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:196",
+     "value": 4.2
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:218",
+     "value": 0.8
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:50:851",
+     "value": 0.6
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:27:982",
+     "value": 0.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 3.2,
+   "mean": 2.275,
+   "metric": "boot.stage:Path: log file open (retention purge deferred)",
+   "over": 0,
+   "p50": 1.7,
+   "p95": 3.2,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:177",
+     "value": 3.2
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:50:842",
+     "value": 2.5
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:27:970",
+     "value": 1.7
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:204",
+     "value": 1.7
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 2.6,
+   "mean": 2.45,
+   "metric": "boot.stage:Boot complete (post-init deferrals scheduled)",
+   "over": 0,
+   "p50": 2.4,
+   "p95": 2.6,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:13:376",
+     "value": 2.6
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:29:318",
+     "value": 2.5
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:21:463",
+     "value": 2.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:964",
+     "value": 2.3
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 0.7,
+   "mean": 0.6,
+   "metric": "boot.stage:Script control engine started (panic-button eventtap)",
+   "over": 0,
+   "p50": 0.6,
+   "p95": 0.7,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:12:805",
+     "value": 0.7
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:20:835",
+     "value": 0.6
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:418",
+     "value": 0.6
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:28:656",
+     "value": 0.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "occurrences",
+   "max": 0.5,
+   "mean": 0.4,
+   "metric": "boot.stage:UI: menu ready",
+   "over": 0,
+   "p50": 0.4,
+   "p95": 0.5,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:29:306",
+     "value": 0.5
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:21:447",
+     "value": 0.5
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:13:363",
+     "value": 0.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:01:51:953",
+     "value": 0.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 687.0,
+   "mean": 339.48545454545456,
+   "metric": "phase:menu.rebuild",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 10:04:29:328",
+     "value": 687.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 462.91,
+   "mean": 142.38484848484848,
+   "metric": "phase:menu_item.keyboard_layout",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 10:04:29:329",
+     "value": 462.91
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 374.75,
+   "mean": 38.78272727272727,
+   "metric": "phase:menu_keyboard_layout.sources",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 10:04:29:330",
+     "value": 374.75
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 10,
+   "kind": "occurrences",
+   "max": 274.3,
+   "mean": 130.17000000000002,
+   "metric": "menu.submenu:keyboard_layout",
+   "over": 0,
+   "p50": 80.4,
+   "p95": 274.3,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:59:38:742",
+     "value": 274.3
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:08:49:414",
+     "value": 237.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:18:21:639",
+     "value": 183.1
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:55:29:074",
+     "value": 132.5
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:13:40:398",
+     "value": 102.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 241.53,
+   "mean": 52.728181818181824,
+   "metric": "phase:menu_item.shortcuts",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:53:52:256",
+     "value": 241.53
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 190.0,
+   "mean": 102.2548484848485,
+   "metric": "phase:menu_keyboard_layout.rows",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 10:04:29:330",
+     "value": 190.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 10,
+   "kind": "occurrences",
+   "max": 70.5,
+   "mean": 45.18,
+   "metric": "menu.submenu:gestures",
+   "over": 0,
+   "p50": 41.1,
+   "p95": 70.5,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:18:21:639",
+     "value": 70.5
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:31:785",
+     "value": 51.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:03:35:444",
+     "value": 49.1
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:13:40:398",
+     "value": 44.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:08:49:414",
+     "value": 43.6
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 70.46,
+   "mean": 45.43666666666667,
+   "metric": "phase:menu_item.gestures",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:53:52:256",
+     "value": 70.46
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 10,
+   "kind": "occurrences",
+   "max": 49.7,
+   "mean": 44.31,
+   "metric": "menu.submenu:shortcuts",
+   "over": 0,
+   "p50": 47.0,
+   "p95": 49.7,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:18:21:639",
+     "value": 49.7
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:24:025",
+     "value": 49.0
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:59:38:742",
+     "value": 47.7
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:08:49:414",
+     "value": 47.7
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:13:40:398",
+     "value": 47.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 40.23,
+   "mean": 30.742424242424246,
+   "metric": "phase:menu_item.hotstrings",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 09:59:29:330",
+     "value": 40.23
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 9,
+   "kind": "occurrences",
+   "max": 40.2,
+   "mean": 32.56666666666667,
+   "metric": "menu.submenu:hotstrings",
+   "over": 0,
+   "p50": 32.5,
+   "p95": 40.2,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:55:30:720",
+     "value": 40.2
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:59:38:742",
+     "value": 37.3
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:55:29:074",
+     "value": 36.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:24:025",
+     "value": 34.1
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:13:40:398",
+     "value": 32.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 9,
+   "kind": "occurrences",
+   "max": 38.2,
+   "mean": 31.43333333333333,
+   "metric": "menu.submenu:llm",
+   "over": 0,
+   "p50": 30.2,
+   "p95": 38.2,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 09:59:38:742",
+     "value": 38.2
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 14:13:40:398",
+     "value": 35.4
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:03:35:444",
+     "value": 32.1
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:55:30:720",
+     "value": 30.6
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:08:49:414",
+     "value": 30.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 38.18,
+   "mean": 31.99969696969697,
+   "metric": "phase:menu_item.llm",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 10:04:29:329",
+     "value": 38.18
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 33.33,
+   "mean": 8.82060606060606,
+   "metric": "phase:menu_item.metrics",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:473",
+     "value": 33.33
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 2,
+   "kind": "occurrences",
+   "max": 33.3,
+   "mean": 31.95,
+   "metric": "menu.submenu:metrics",
+   "over": 0,
+   "p50": 30.6,
+   "p95": 33.3,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:24:025",
+     "value": 33.3
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:15:884",
+     "value": 30.6
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 28.24,
+   "mean": 8.451818181818183,
+   "metric": "phase:menu_item.about",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 10:04:29:329",
+     "value": 28.24
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 10,
+   "kind": "occurrences",
+   "max": 18.3,
+   "mean": 5.2,
+   "metric": "menu.app_exclusions",
+   "over": 0,
+   "p50": 0.9,
+   "p95": 18.3,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-10-31 14:12:23:923",
+     "value": 18.3
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 15:02:15:790",
+     "value": 17.6
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:54:31:685",
+     "value": 9.5
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:55:28:999",
+     "value": 3.2
+    },
+    {
+     "context": "",
+     "time": "2026-10-31 09:59:38:650",
+     "value": 0.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 9.96,
+   "mean": 4.053636363636363,
+   "metric": "phase:menu_item.debug",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:473",
+     "value": 9.96
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 8.24,
+   "mean": 1.1127272727272728,
+   "metric": "phase:menu_item.tap_holds",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 10:04:29:329",
+     "value": 8.24
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 3.44,
+   "mean": 2.2181818181818183,
+   "metric": "phase:menu_item.configuration",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:473",
+     "value": 3.44
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 1.42,
+   "mean": 0.8445454545454546,
+   "metric": "phase:menu_keyboard_layout.bundles",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 10:04:29:330",
+     "value": 1.42
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 0.31,
+   "mean": 0.20515151515151517,
+   "metric": "phase:menu_keyboard_layout.variants",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 10:04:29:330",
+     "value": 0.31
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 0.21,
+   "mean": 0.17,
+   "metric": "phase:menu_item.apps",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:384",
+     "value": 0.21
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 0.05,
+   "mean": 0.03878787878787879,
+   "metric": "phase:menu_item.language",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:473",
+     "value": 0.05
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 0.01,
+   "mean": 0.008181818181818182,
+   "metric": "phase:menu_item.quit",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:384",
+     "value": 0.01
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 33,
+   "kind": "summaries",
+   "max": 0.01,
+   "mean": 0.01,
+   "metric": "phase:menu_item.reload",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:384",
+     "value": 0.01
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 20013.15,
+   "mean": 20010.486666666668,
+   "metric": "phase:process.sfltool",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:387",
+     "value": 20013.15
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 42,
+   "kind": "summaries",
+   "max": 7889.05,
+   "mean": 684.8100000000001,
+   "metric": "phase:process.python3",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:387",
+     "value": 7889.05
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 80,
+   "kind": "summaries",
+   "max": 3325.3,
+   "mean": 280.468625,
+   "metric": "phase:process.ErgoptiPlus",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 09:59:29:331",
+     "value": 3325.3
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 2322,
+   "kind": "summaries",
+   "max": 1733.02,
+   "mean": 27.329246339362616,
+   "metric": "phase:process.defaults",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:53:52:258",
+     "value": 1733.02
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 2,
+   "kind": "summaries",
+   "max": 1607.83,
+   "mean": 1567.0549999999998,
+   "metric": "phase:process.vmmap",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:475",
+     "value": 1607.83
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 9,
+   "kind": "summaries",
+   "max": 1056.34,
+   "mean": 386.0366666666667,
+   "metric": "phase:process.sh",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 09:59:29:331",
+     "value": 1056.34
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 72,
+   "kind": "summaries",
+   "max": 760.39,
+   "mean": 75.17333333333333,
+   "metric": "phase:boot.stage",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:468",
+     "value": 760.39
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 48,
+   "kind": "summaries",
+   "max": 756.81,
+   "mean": 68.31333333333333,
+   "metric": "phase:boot.requires",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:468",
+     "value": 756.81
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 752.3,
+   "mean": 684.1966666666667,
+   "metric": "phase:process.spctl",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:387",
+     "value": 752.3
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 607.8,
+   "mean": 597.8366666666667,
+   "metric": "phase:process.sqlite3",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:387",
+     "value": 607.8
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 12,
+   "kind": "summaries",
+   "max": 591.32,
+   "mean": 84.10666666666667,
+   "metric": "phase:process.pgrep",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:475",
+     "value": 591.32
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 72,
+   "kind": "summaries",
+   "max": 441.52,
+   "mean": 53.436666666666675,
+   "metric": "phase:boot.stage_cpu",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:468",
+     "value": 441.52
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 275.81,
+   "mean": 104.56666666666666,
+   "metric": "phase:process.systemextensionsctl",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:475",
+     "value": 275.81
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 167.13,
+   "mean": 152.39666666666668,
+   "metric": "phase:process.brew",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 09:59:29:331",
+     "value": 167.13
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 10,
+   "kind": "summaries",
+   "max": 164.59,
+   "mean": 82.146,
+   "metric": "phase:process.codesign",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:475",
+     "value": 164.59
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 114.71,
+   "mean": 106.28333333333332,
+   "metric": "phase:shell.other",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:476",
+     "value": 114.71
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 112.94,
+   "mean": 90.29666666666667,
+   "metric": "phase:shell.systemextensionsctl",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:388",
+     "value": 112.94
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 105.95,
+   "mean": 92.11000000000001,
+   "metric": "phase:process.bash",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:475",
+     "value": 105.95
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 94.24,
+   "mean": 65.29333333333334,
+   "metric": "phase:shell.ioreg",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:476",
+     "value": 94.24
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 93.82,
+   "mean": 81.16666666666667,
+   "metric": "phase:shell.curl",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:476",
+     "value": 93.82
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 6,
+   "kind": "summaries",
+   "max": 91.89,
+   "mean": 66.68666666666667,
+   "metric": "phase:process.shortcuts",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:475",
+     "value": 91.89
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 53,
+   "kind": "summaries",
+   "max": 87.92,
+   "mean": 42.220377358490566,
+   "metric": "phase:shell.ls",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:388",
+     "value": 87.92
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 72.73,
+   "mean": 38.048,
+   "metric": "phase:process.awk",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:387",
+     "value": 72.73
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 13,
+   "kind": "summaries",
+   "max": 71.86,
+   "mean": 41.95846153846154,
+   "metric": "phase:shell.cp",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:476",
+     "value": 71.86
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 68.82,
+   "mean": 63.36666666666667,
+   "metric": "phase:shell.sw_vers",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 09:59:29:333",
+     "value": 68.82
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 12,
+   "kind": "summaries",
+   "max": 64.82,
+   "mean": 31.406666666666666,
+   "metric": "phase:process.mkdir",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:475",
+     "value": 64.82
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 9,
+   "kind": "summaries",
+   "max": 64.77,
+   "mean": 40.36,
+   "metric": "phase:shell.mkdir",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:476",
+     "value": 64.77
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 61.13,
+   "mean": 58.93333333333334,
+   "metric": "phase:process.Application",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:475",
+     "value": 61.13
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 50.96,
+   "mean": 50.96,
+   "metric": "phase:process.open",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:387",
+     "value": 50.96
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 49.6,
+   "mean": 38.56666666666666,
+   "metric": "phase:shell.find",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:476",
+     "value": 49.6
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 11,
+   "kind": "summaries",
+   "max": 38.15,
+   "mean": 14.981818181818182,
+   "metric": "phase:process.ps",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:475",
+     "value": 38.15
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 6,
+   "kind": "summaries",
+   "max": 33.52,
+   "mean": 13.233333333333334,
+   "metric": "phase:process.grep",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:387",
+     "value": 33.52
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 24,
+   "kind": "summaries",
+   "max": 32.87,
+   "mean": 6.03,
+   "metric": "phase:process.xmllint",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 09:59:29:331",
+     "value": 32.87
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 2,
+   "kind": "summaries",
+   "max": 31.79,
+   "mean": 22.689999999999998,
+   "metric": "phase:process.memory_pressure",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:475",
+     "value": 31.79
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 6,
+   "kind": "summaries",
+   "max": 20.65,
+   "mean": 11.88,
+   "metric": "phase:hotstring_load.common_file",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:471",
+     "value": 20.65
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 12,
+   "kind": "summaries",
+   "max": 14.49,
+   "mean": 6.390000000000001,
+   "metric": "phase:process.plutil",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:387",
+     "value": 14.49
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 29,
+   "kind": "summaries",
+   "max": 10.4,
+   "mean": 2.27551724137931,
+   "metric": "phase:hotpath.keydown",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:382",
+     "value": 10.4
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 9.11,
+   "mean": 7.493333333333332,
+   "metric": "phase:process.launchctl",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:475",
+     "value": 9.11
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 8.71,
+   "mean": 8.17,
+   "metric": "phase:process.scutil",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 09:59:29:331",
+     "value": 8.71
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 8,
+   "kind": "summaries",
+   "max": 8.24,
+   "mean": 2.49,
+   "metric": "phase:hotpath.preview.rebuild",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:382",
+     "value": 8.24
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 12,
+   "kind": "summaries",
+   "max": 8.24,
+   "mean": 1.8849999999999998,
+   "metric": "phase:preview.total",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:386",
+     "value": 8.24
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 7.27,
+   "mean": 7.27,
+   "metric": "phase:process.mkfifo",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 09:59:29:331",
+     "value": 7.27
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 86,
+   "kind": "summaries",
+   "max": 5.6,
+   "mean": 1.255581395348837,
+   "metric": "phase:toml.parse",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 14:17:21:477",
+     "value": 5.6
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 12,
+   "kind": "summaries",
+   "max": 1.34,
+   "mean": 0.56,
+   "metric": "phase:preview.providers",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:386",
+     "value": 1.34
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 8,
+   "kind": "summaries",
+   "max": 0.1,
+   "mean": 0.035,
+   "metric": "phase:hotpath.hotstring.match",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:382",
+     "value": 0.1
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 12,
+   "kind": "summaries",
+   "max": 0.04,
+   "mean": 0.015,
+   "metric": "phase:preview.resolve",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-10-31 15:07:13:386",
+     "value": 0.04
+    }
+   ]
+  }
+ ],
+ "previous": "mac-2026-10-31_140931",
+ "records": 6844,
+ "schema": 1,
+ "span": {
+  "first": "2026-10-31 00:08:36:583",
+  "last": "2026-10-31 15:08:52:096"
+ },
+ "top_fixes": [
+  {
+   "count": 29,
+   "detail": "max 2515 ms at 2026-10-31 14:13:39:139",
+   "kind": "slow",
+   "score": 87,
+   "what": "main_thread.hold over its 250 ms budget"
+  },
+  {
+   "count": 9,
+   "detail": "max 472 ms at 2026-10-31 09:59:38:742",
+   "kind": "slow",
+   "score": 27,
+   "what": "menu.rebuild over its 250 ms budget"
+  },
+  {
+   "count": 6,
+   "detail": "max 174 ms at 2026-10-31 09:55:29:675",
+   "kind": "slow",
+   "score": 18,
+   "what": "healthcheck.sync over its 5 ms budget"
+  },
+  {
+   "count": 3,
+   "detail": "2026-10-31 09:58:46:051 [ERROR] [adapters.file_system] append(): destination is not a regular file (named pipe).",
+   "kind": "error",
+   "score": 15,
+   "what": "[adapters.file_system] append(): destination is not a regular file (named pipe)."
+  },
+  {
+   "count": 3,
+   "detail": "2026-10-31 09:58:46:054 [ERROR] [adapters.file_system] write(): cannot preserve metadata for '/private/var/folders/j8/6707b4c95nz1ygz8g6s7m3fc0000gp/T/ergopti-field-fifo-77295/pipe' — destination is not a regular file.",
+   "kind": "error",
+   "score": 15,
+   "what": "[adapters.file_system] write(): cannot preserve metadata for '<*>' — destination is not a regular file."
+  },
+  {
+   "count": 2,
+   "detail": "2026-10-31 14:13:22:548 [ERROR] [keymap.layout_rows_build] The number-row layout for 'ergol' was not applied (readback_mismatch): key 26 types '', the build holds text '&'.",
+   "kind": "error",
+   "score": 10,
+   "what": "[keymap.layout_rows_build] The number-row layout for '<*>' was not applied (readback_mismatch): key <*> types '<*>', the build holds text '<*>'."
+  },
+  {
+   "count": 2,
+   "detail": "2026-10-31 14:14:54:078 [ERROR] [llm.api_ollama] The local server's model list is unavailable: HTTP 0 (Network request failed: Connection failed: Could not connect to the server. - http://127.0.0.1:11435/api/tags).",
+   "kind": "error",
+   "score": 10,
+   "what": "[llm.api_ollama] The local server's model list is unavailable: HTTP <*> (Network request failed: Connection failed: Could not connect to the server. - http://<*>/api/tags)."
+  },
+  {
+   "count": 2,
+   "detail": "2026-10-31 14:14:44:840 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=78) — Ergopti n'a pas pu vérifier sa version épinglée d'Ollama (catalogue de publication ou contrôle d'intégrité) : rien n'a été installé. Envoyez le rapport de diagnostic.",
+   "kind": "error",
+   "score": 10,
+   "what": "[ollama_deps] Ollama bootstrap failed (exit=<*>) — Ergopti n'<*>'Ollama (catalogue de publication ou contrôle d'<*>'a été installé. Envoyez le rapport de diagnostic."
+  },
+  {
+   "count": 2,
+   "detail": "max 8.24 ms at 2026-10-31 15:03:31:646",
+   "kind": "slow",
+   "score": 6,
+   "what": "hotpath:preview.rebuild over its 5 ms budget"
+  },
+  {
+   "count": 2,
+   "detail": "max 169967 ms at 2026-10-31 14:09:31:496",
+   "kind": "slow",
+   "score": 6,
+   "what": "reload.request_to_boot over its 4000 ms budget"
+  }
+ ]
+}
