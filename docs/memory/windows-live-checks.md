@@ -77,6 +77,16 @@ this, and timing probes inside the timer can hide it. So a dialog is pressed wit
 `LiveClickDialogButton`, never `ControlClick`, and the typist cancels the menu of
 a right click.
 
+### project-live-checks-menu-click-replay-fails-on-a-real-race
+
+`menu-click-replay` fails intermittently, alone as well as in a run (4 of 6 alone
+on 2026-10-31), and its verdict is right: the successor's close request runs OnExit
+on top of a log flush it interrupted, `LoggerPrepareShutdown` refuses
+(`phase=repair, flush_active=1, append_owners=1`), and the reload is handed back
+with an error. The owner under OnExit can only resume once OnExit returns, so
+waiting inside it cannot work. Action: the fix is a retry of the same reload that
+keeps the successor, not a looser check; do not mask the error in the check.
+
 ### project-live-checks-versions-window-needs-memory
 
 `Changelog_Open` opens its WebView2 form only when `WebView_ShouldUseNativeFallback()`
