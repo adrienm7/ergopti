@@ -1050,6 +1050,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 				leasesAreEmpty: { order.append("leases"); return true },
 				guardianHealth: { XCTFail("no lease keeps the record"); return false },
 				guardianHasExited: { order.append("exit:\(service.unregisterCalls)"); return true },
+				ownLegacyAgentLoaded: { false },
 				ensureLegacy: {
 					order.append("legacy:\(service.status == .enabled)")
 					return true
@@ -1068,6 +1069,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			leasesAreEmpty: { true },
 			guardianHealth: { false },
 			guardianHasExited: { true },
+			ownLegacyAgentLoaded: { false },
 			ensureLegacy: { false },
 			report: { _ in }
 		)
@@ -1084,6 +1086,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			leasesAreEmpty: { false },
 			guardianHealth: { true },
 			guardianHasExited: { XCTFail("live leases"); return true },
+			ownLegacyAgentLoaded: { false },
 			ensureLegacy: { XCTFail("a healthy guardian keeps its leases"); return true },
 			report: { _ in }
 		), RemapGuardianRegistrationOutcome(status: .ready, note: .adhocResetDeferred))
@@ -1096,6 +1099,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			leasesAreEmpty: { true },
 			guardianHealth: { true },
 			guardianHasExited: { true },
+			ownLegacyAgentLoaded: { false },
 			ensureLegacy: { XCTFail("approval is the user's"); return true },
 			report: { _ in }
 		), RemapGuardianRegistrationOutcome(status: .requiresApproval, note: .adhocResetDeferred))
@@ -1110,6 +1114,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			leasesAreEmpty: { true },
 			guardianHealth: { false },
 			guardianHasExited: { XCTFail("refused"); return true },
+			ownLegacyAgentLoaded: { false },
 			ensureLegacy: { true },
 			report: { _ in }
 		), RemapGuardianRegistrationOutcome(status: .ready, note: .adhocResetRefused))
@@ -1121,10 +1126,90 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			leasesAreEmpty: { true },
 			guardianHealth: { false },
 			guardianHasExited: { false },
+			ownLegacyAgentLoaded: { false },
 			ensureLegacy: { true },
 			report: { _ in }
 		), RemapGuardianRegistrationOutcome(status: .ready, note: .adhocResetRefused))
 		XCTAssertEqual(draining.registerCalls, 0)
+	}
+
+	/// Installed-app CI, 2026-10-31: the first registration of an ad hoc build
+	/// loads its legacy agent, after which Background Items reads `.enabled`
+	/// for the shared label. The repeat registration took that for a stale
+	/// record, failed to remove it and answered `developer_adhoc_reset_refused`;
+	/// it now recognises its own agent and stays legacy only. A record that is
+	/// not this app's agent is still removed, and still named when refused.
+	func testAdhocRepeatRegistrationKeepsItsOwnLegacyAgent() throws {
+		guard #available(macOS 13.0, *) else { return }
+		let service = ScriptedModernGuardianService(
+			status: .notRegistered,
+			unregistrationError: NSError(domain: kRemapGuardianServiceErrorDomain, code: 1)
+		)
+		var legacyLoaded = false
+		func register() -> RemapGuardianRegistrationOutcome {
+			return resolveAdhocRemapGuardianRegistration(
+				service: service,
+				leasesAreEmpty: { true },
+				guardianHealth: { legacyLoaded },
+				guardianHasExited: { false },
+				ownLegacyAgentLoaded: { legacyLoaded },
+				ensureLegacy: {
+					// macOS then reports the label the legacy agent holds as enabled.
+					legacyLoaded = true
+					service.status = .enabled
+					return true
+				},
+				report: { _ in }
+			)
+		}
+		let ready = RemapGuardianRegistrationOutcome(status: .ready, note: .adhocLegacyOnly)
+		XCTAssertEqual(register(), ready)
+		XCTAssertEqual(service.status, .enabled)
+		XCTAssertEqual(register(), ready, "the repeat registration keeps its own agent")
+		XCTAssertEqual(service.unregisterCalls, 0, "its own agent is never removed as a stale record")
+		XCTAssertEqual(service.registerCalls, 0)
+
+		let stale = ScriptedModernGuardianService(
+			status: .enabled,
+			unregistrationError: NSError(domain: kRemapGuardianServiceErrorDomain, code: 1)
+		)
+		XCTAssertEqual(resolveAdhocRemapGuardianRegistration(
+			service: stale,
+			leasesAreEmpty: { true },
+			guardianHealth: { false },
+			guardianHasExited: { XCTFail("refused"); return true },
+			ownLegacyAgentLoaded: { false },
+			ensureLegacy: { true },
+			report: { _ in }
+		), RemapGuardianRegistrationOutcome(status: .ready, note: .adhocResetRefused))
+		XCTAssertEqual(stale.unregisterCalls, 1, "a record that is not this app's agent is still removed")
+	}
+
+	/// A legacy plist written for another executable, or one launchd does not
+	/// hold, is not this app's loaded agent.
+	func testOwnLegacyAgentNeedsItsExactPlistAndALoadedLabel() throws {
+		let home = FileManager.default.temporaryDirectory
+			.appendingPathComponent("ergopti-own-legacy-" + UUID().uuidString)
+		let agents = home.appendingPathComponent("Library/LaunchAgents")
+		try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let executable = "/Applications/" + Identifiers.App.bundle + "/Contents/MacOS/" + Identifiers.App.name
+		let plist = agents.appendingPathComponent(kRemapGuardianPlistName)
+		XCTAssertFalse(legacyRemapGuardianIsOwnLoadedAgent(executablePath: executable,
+			runner: ScriptedGuardianLaunchctlRunner(results: [true]), homeDirectory: home.path),
+			"no plist installed")
+		try Data(legacyGuardianPlist(executablePath: "/Other/App").utf8).write(to: plist)
+		XCTAssertFalse(legacyRemapGuardianIsOwnLoadedAgent(executablePath: executable,
+			runner: ScriptedGuardianLaunchctlRunner(results: [true]), homeDirectory: home.path),
+			"a plist for another executable")
+		try Data(legacyGuardianPlist(executablePath: executable).utf8).write(to: plist)
+		XCTAssertFalse(legacyRemapGuardianIsOwnLoadedAgent(executablePath: executable,
+			runner: ScriptedGuardianLaunchctlRunner(results: [false]), homeDirectory: home.path),
+			"launchd does not hold the label")
+		let loaded = ScriptedGuardianLaunchctlRunner(results: [true])
+		XCTAssertTrue(legacyRemapGuardianIsOwnLoadedAgent(executablePath: executable,
+			runner: loaded, homeDirectory: home.path))
+		XCTAssertEqual(loaded.calls, [["print", "gui/\(getuid())/" + kRemapGuardianLabel]])
 	}
 
 	/// Only a signature without a team is ad hoc: Developer ID builds keep

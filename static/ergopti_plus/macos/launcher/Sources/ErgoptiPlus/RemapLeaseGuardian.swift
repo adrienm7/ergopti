@@ -1876,6 +1876,21 @@ func removeLegacyRemapGuardian(
 	return Darwin.unlink(path) == 0
 }
 
+/// True when the job under the guardian label is this app's own per-user
+/// legacy agent: its exact plist bytes for this executable are installed and
+/// launchd holds the label. A record an earlier build left fails the byte check.
+func legacyRemapGuardianIsOwnLoadedAgent(
+	executablePath: String,
+	runner: GuardianLaunchctlRunning = PosixGuardianLaunchctlRunner(),
+	homeDirectory: String = NSHomeDirectory()
+) -> Bool {
+	let path = homeDirectory + "/Library/LaunchAgents/" + kRemapGuardianPlistName
+	guard let data = legacyGuardianPlist(executablePath: executablePath).data(using: .utf8),
+		legacyGuardianPlistMatches(data, path: path)
+	else { return false }
+	return runner.run(arguments: ["print", "gui/\(getuid())/" + kRemapGuardianLabel])
+}
+
 /// Performs one side-effect-free exact health observation.
 func legacyGuardianIsHealthy(_ paths: LeaseGuardianPaths) -> Bool {
 	let singleton = Darwin.open(
@@ -2393,13 +2408,18 @@ func resolveModernRemapGuardianRegistration(
 /// registration); every field launch then came up on the legacy agent. A
 /// record an earlier build left is removed so launchd stops respawning it;
 /// live lease records keep it, since removing a running guardian fences them,
-/// and a pending approval stays the user's decision.
+/// and a pending approval stays the user's decision. Background Items reads
+/// `.enabled` while this app's own legacy agent holds the shared label, so a
+/// repeat registration recognises that agent first and keeps it: removing it
+/// as a stale record was refused and reported `developer_adhoc_reset_refused`
+/// (installed-app CI, 2026-10-31).
 @available(macOS 13.0, *)
 func resolveAdhocRemapGuardianRegistration(
 	service: RemapGuardianModernService,
 	leasesAreEmpty: () -> Bool,
 	guardianHealth: () -> Bool,
 	guardianHasExited: () -> Bool,
+	ownLegacyAgentLoaded: () -> Bool,
 	ensureLegacy: () -> Bool,
 	report: (String) -> Void
 ) -> RemapGuardianRegistrationOutcome {
@@ -2415,6 +2435,12 @@ func resolveAdhocRemapGuardianRegistration(
 		report("ad hoc build: Login Items approval is pending; the registration is not changed")
 		return RemapGuardianRegistrationOutcome(status: .requiresApproval, note: .adhocResetDeferred)
 	case .enabled:
+		// An ad hoc build never registers the job: the label is held by the
+		// legacy agent this build installed, not by a stale record.
+		if ownLegacyAgentLoaded() {
+			report("ad hoc build: the enabled status is this app's own legacy agent; it is kept")
+			return legacyOutcome(.adhocLegacyOnly)
+		}
 		guard leasesAreEmpty() else {
 			report("ad hoc build: lease records are live; the Background Items record is kept")
 			if guardianHealth() {
@@ -2580,6 +2606,7 @@ func remapGuardianRegistrationOutcome(
 					leasesAreEmpty: { remapGuardianLeaseRecordsAreEmpty(paths) },
 					guardianHealth: { legacyGuardianIsHealthy(paths) },
 					guardianHasExited: { remapGuardianJobHasExited(paths) },
+					ownLegacyAgentLoaded: { legacyRemapGuardianIsOwnLoadedAgent(executablePath: executablePath) },
 					ensureLegacy: { ensureLegacyRemapGuardianRegistered(executablePath: executablePath) },
 					report: { LauncherLog.write($0) }
 				)
