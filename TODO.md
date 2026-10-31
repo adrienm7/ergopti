@@ -498,7 +498,8 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
   (big item 2, "Dropped letters on macOS").
 - **L32** [CODE] [CI] Permissions read `unknown` and 843 MB resident (issue #104). Done: the schema enum
   (cce99afbc7), Input Monitoring through the launcher role `--input-monitoring status` (58961fd2b2, f7faaa0558).
-  Left: the macOS Build stage compiles and runs its XCTest; the resident size breakdown.
+  The resident size breakdown is in `field_app_health` (`memory_footprint_mb`, `memory_region_1..5`, `lua_heap_mb`).
+  Left: the macOS Build stage compiles and runs its XCTest; [PHYS-M] read the breakdown in the next field report.
 - **L42** [PHYS-M] 03_field_network off the company network: the route stage, the URL-free warning, the PAC fallback
   verdicts (`pac_download info:unreachable_direct`, `pac_script skip:not_fetched`) and the route kind marker
   `route_lookup pass:selected:direct` are in code (5d93e78e90, 1dfaec8298, ec15345d22, 8fedb505dd). Left: off the
