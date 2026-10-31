@@ -80,6 +80,7 @@ _FTI_Inventory() {
 		"this.CollectionTimer",          "100",   ; bounded diagnostic progress/guided transitions; disarmed on worker retirement
 		"_TooltipDequeuePollFn",        "100",   ; only armed during a dequeue cycle
 		"this.Timer",                    "150",   ; exact managed Ollama session/debt/READY custody; canceled on retirement
+		"this.PollTimer",                "?",     ; field run request watch, only while a field report folder is declared; timings [ui] field_run_poll_ms
 		"AwakeCheckMouseMoved",         "150",   ; only armed in awake mode
 		'Callbacks["motion"]',          "?",     ; only armed while CapsWord is on and set to end on pointer motion; timings [ui] capsword_check_interval_ms (100), one cursor read
 		"_LLM_Menu_ApiTestProgressTick", "150",  ; only armed while the API test progress is showing
