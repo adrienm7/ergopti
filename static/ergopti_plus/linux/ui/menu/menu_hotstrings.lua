@@ -41,8 +41,14 @@ local function language_label(code)
 	return Languages.label(code, LocaleTable)
 end
 
+-- Delays are stored in seconds and typed in milliseconds: seconds is what the
+-- cascade and the TOMLs speak, milliseconds is what a person means by "wait a
+-- bit longer". The conversion happens only at this boundary.
 local MS_PER_SEC = 1000
 
+-- The category id of the user's own hotstrings — the stem of personal.toml, and
+-- the same name the editor bridge writes under. Named here so the default-section
+-- picker reads the sections of that pack rather than guessing at a spelling.
 local PERSONAL_CATEGORY = "personal"
 
 --- Delegates the personal-information editor source admission to the shared module.
