@@ -83,7 +83,7 @@ end
 --- @param default_model string|nil The backend's default model ("" or nil for none).
 --- @return string value
 function M.compose_parameter(backend, typed, default_model)
-	local model = tostring(typed or ""):match("^%s*(.-)%s*$")
+	local model = TextUtils.trim(tostring(typed or ""))
 	if model ~= "" then return backend .. "|" .. model end
 	if type(default_model) == "string" and default_model ~= "" then return backend end
 	return backend .. "|"
