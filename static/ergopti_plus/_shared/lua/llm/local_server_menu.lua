@@ -29,6 +29,19 @@ function M.host_of(base_url)
 	return tostring(base_url):match("^%a[%w+.-]*://([^/]+)") or tostring(base_url)
 end
 
+--- The name of the server a verdict answered for: the row's own label, or the
+--- label of the row of the same address its response fingerprinted
+--- (llm.local_server_fingerprint), so vLLM on oMLX's port is named vLLM.
+--- @param servers table View id -> { label }.
+--- @param id string The row.
+--- @param verdict table|nil Its published verdict.
+--- @return string
+function M.label_of(servers, id, verdict)
+	local named = type(verdict) == "table" and verdict.server or nil
+	if type(named) == "string" and type(servers[named]) == "table" then return servers[named].label end
+	return servers[id].label
+end
+
 --- Builds one catalogue server's model and configuration choices.
 local function server_items(options, id, verdict)
 	local items, disabled = {}, options.paused or nil
@@ -71,7 +84,7 @@ function M.rows(options)
 	if unavailable then rows[#rows + 1] = { label = options.tr("healthcheck.status.failed"), disabled = true } end
 	for _, id in ipairs(options.detected) do
 		local verdict = options.result(id)
-		local label = options.servers[id].label .. " 🖥️ — " .. M.host_of(verdict.base_url)
+		local label = M.label_of(options.servers, id, verdict) .. " 🖥️ — " .. M.host_of(verdict.base_url)
 		if verdict.status == Discovery.STATUS_NEEDS_KEY then
 			label = options.format("menu.llm.local_servers.needs_key", label)
 		end
@@ -80,7 +93,7 @@ function M.rows(options)
 			items = server_items(options, id, verdict) }
 	end
 	if #options.detected == 0 and not unavailable then
-		-- A finished sweep says one sentence: the eleven server names stay in the
+		-- A finished sweep says one sentence: the catalogue's server names stay in the
 		-- local servers panel and the "other address" submenu, not in this row.
 		if options.sweeping then
 			local labels = {}
@@ -115,7 +128,7 @@ function M.page_rows(options)
 	local live = not options.paused
 	for _, id in ipairs(options.detected) do
 		local verdict = options.result(id)
-		local label = options.servers[id].label
+		local label = M.label_of(options.servers, id, verdict)
 		local actions = {}
 		if live then
 			actions[#actions + 1] = { id = "set_key", text = options.tr("menu.llm.local_servers.api_key"),

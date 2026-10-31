@@ -397,6 +397,34 @@
 			"expected": {
 				"running": false
 			}
+		},
+		{
+			"name": "TabbyAPI start.py with --port",
+			"server": "tabbyapi",
+			"os": "linux",
+			"ps": "4500 python3 /home/u/tabbyAPI/start.py --port 5050",
+			"files": {},
+			"expected": {
+				"running": true,
+				"pids": [4500],
+				"source": "cli",
+				"port": 5050,
+				"base_url": "http://127.0.0.1:5050/v1"
+			}
+		},
+		{
+			"name": "vllm serve with --port, and no oMLX process",
+			"server": "vllm",
+			"os": "macos",
+			"ps": "4600 /Users/u/.venv/bin/python3 /Users/u/.venv/bin/vllm serve Qwen/Qwen3-8B --port 8100",
+			"files": {},
+			"expected": {
+				"running": true,
+				"pids": [4600],
+				"source": "cli",
+				"port": 8100,
+				"base_url": "http://127.0.0.1:8100/v1"
+			}
 		}
 	]
 }

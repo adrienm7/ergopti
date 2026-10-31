@@ -84,3 +84,16 @@ files stay committed as byte-exact projections
 the AHK smoke test ship or seed them. No driver reads a template at run time:
 the effective defaults come from the features manifest. Change them only
 through `npm run build:manifest`.
+
+## Shared local-server ports are told apart by response fingerprint (2026-10-31)
+
+vLLM shares 8000 with oMLX and TabbyAPI 5000 with text-generation-webui. Each
+row of a shared default address declares `fingerprint { model_field, equals }`
+in `_shared/modules/llm/local_servers.json`, matched against the `owned_by` of
+`GET /v1/models` (`vllm`, `tabbyAPI`, `omlx`, `user`).
+`_shared/lua/llm/local_server_fingerprint.lua` and the shared discovery
+controller keep one row per answering address: the fingerprinted row, else the
+address's default row (first in `server_order`), which is also kept on 401/403.
+A generic entry at a shared address belongs to the default row only. A merged
+row per port and order-only affinity were rejected; add a new port collision
+as a new fingerprinted row.
