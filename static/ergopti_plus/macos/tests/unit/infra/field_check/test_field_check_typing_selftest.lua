@@ -136,6 +136,15 @@ helpers.describe("menu build probe", function()
 		helpers.assert_eq(steps.menu_slowest_1.value, "llm:201.3")
 		helpers.assert_eq(steps.menu_slowest_2.value, "hotstrings:120.0")
 		helpers.assert_nil(steps.menu_slowest_3)
+		helpers.assert_eq(steps.menu_layout_slowest.value, "none")
+	end)
+
+	helpers.it("(menu-rebuild-2026-10-31) names the costliest keyboard-layout stage of the rebuild", function()
+		local ports, world = make_ports()
+		world.menu.layout_slowest = { id = "menu_keyboard_layout.number_row", ms = 61.04 }
+		local steps = run("menu_build", ports)
+		helpers.assert_eq(steps.menu_layout_slowest.state, "info")
+		helpers.assert_eq(steps.menu_layout_slowest.value, "number_row:61.0")
 	end)
 
 	helpers.it("fails a refused rebuild and a menu that does not exist", function()

@@ -1037,6 +1037,12 @@ function M.menu_build(ports, report, finish)
 				tostring(entry.id) .. ":" .. string.format("%.1f", tonumber(entry.ms) or 0))
 		end
 	end
+	-- The keyboard-layout row was the slowest one in the 2026-10-31 field
+	-- run: its costliest stage of this rebuild is the one to slice next.
+	local layout = outcome.layout_slowest
+	report.step("menu_layout_slowest", STATE.info, type(layout) == "table"
+		and tostring(layout.id):gsub("^menu_keyboard_layout%.", "") .. ":" .. string.format("%.1f", tonumber(layout.ms) or 0)
+		or "none")
 	finish()
 end
 

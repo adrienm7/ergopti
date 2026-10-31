@@ -214,6 +214,11 @@ end
 -- ================================
 -- ================================
 
+-- The last decode of each shared JSON file, with the exact text it came from:
+-- the settings are resolved for every registry call (twice per keyboard-layout
+-- menu rebuild), and identical bytes decode to the identical, read-only value.
+local _shared_json = {}
+
 --- Reads and decodes one shared JSON file.
 --- @param rel string Path under _shared/.
 --- @return table|nil value
@@ -222,9 +227,12 @@ local function read_shared_json(rel)
 	local path = Paths.shared(rel)
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	if type(raw) ~= "string" then return nil, "_shared/" .. rel .. " is unreadable" end
+	local known = _shared_json[path]
+	if known ~= nil and known.raw == raw then return known.decoded, nil end
 	-- The shared json.lua answers nil to invalid JSON rather than raising.
 	local ok, decoded = pcall(Json.decode, raw)
 	if not ok or type(decoded) ~= "table" then return nil, "_shared/" .. rel .. " is not valid JSON" end
+	_shared_json[path] = { raw = raw, decoded = decoded }
 	return decoded, nil
 end
 
