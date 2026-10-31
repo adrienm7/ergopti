@@ -3919,9 +3919,6 @@
 	"platform_reason.action_line_deletion_is_macos": "Pouze macOS: Cmd+Delete maže v textových polích macOS až na začátek nebo konec řádku. Textová pole ve Windows a Linuxu takovou klávesu nemají: označte text k okraji řádku zkratkou Shift+Home nebo Shift+End a pak ho smažte.",
 	"platform_reason.action_lookup_is_macos_dictionary": "Pouze macOS: Vyhledat otevře systémový panel slovníku pro slovo pod ukazatelem. Windows a Linux systémový panel slovníku nemají.",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Pouze macOS: tyto akce přepínají navigační vrstvu uloženou v Karabiner-Elements. Ve Windows a Linuxu vrstva sleduje drženou klávesu a nemá žádný přepínač.",
-	"platform_reason.action_not_yet_on_linux": "Zatím ne v Linuxu: nic tomu nebrání, ale ovladač pro Linux to zatím neumí.",
-	"platform_reason.action_not_yet_on_macos": "Zatím ne v macOS: nic tomu nebrání, ale ovladač pro macOS to zatím neumí.",
-	"platform_reason.action_not_yet_on_windows": "Zatím ne ve Windows: nic tomu nebrání, ale ovladač pro Windows to zatím neumí.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Tento systém žádné aplikaci nedovolí zavírat oznámení: vymažte je v centru oznámení, které otevře odpovídající akce.",
 	"platform_reason.action_office_bold_key_is_windows": "Pouze Windows: francouzský Microsoft Office dává tučné písmo zkratkou Ctrl+G, kde jiné aplikace používají Ctrl+B, proto tato akce volí klávesu podle aplikace. V macOS (Cmd+B) a Linuxu (Ctrl+B) funguje jedna kombinace všude: přiřaďte ji v části „Klávesové zkratky“.",
 	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Ne v Linuxu: Wayland žádné aplikaci nedovolí pohnout ukazatelem a tato akce nemá verzi omezenou na relace X11.",
@@ -3933,5 +3930,13 @@
 	"platform_reason.action_spaces_are_edited_in_mission_control": "Ne v macOS: Spaces se přidávají a odebírají v Mission Control, které macOS nedovolí ovládat žádné jiné aplikaci.",
 	"platform_reason.action_window_overview_is_each_systems": "Každý systém má vlastní přehled oken: Mission Control a App Exposé v macOS, Zobrazení úkolů ve Windows. Každé prostředí Linuxu přiřazuje vlastní: přiřaďte tam klávesu svého prostředí jako kombinaci kláves.",
 	"platform_reason.action_window_switching_is_not_macos": "Ne v macOS: tato akce prochází okna jako Alt+Tab ve Windows a Linuxu. macOS přepíná aplikace zkratkou Cmd+Tab a prochází okna jedné aplikace: použijte odpovídající akci.",
-	"platform_reason.action_word_deletion_modifier_differs": "Každý systém maže slovo vlastním modifikátorem (Option v macOS, Ctrl ve Windows a Linuxu), proto každý uvádí vlastní akci: použijte odpovídající akci."
+	"platform_reason.action_word_deletion_modifier_differs": "Každý systém maže slovo vlastním modifikátorem (Option v macOS, Ctrl ve Windows a Linuxu), proto každý uvádí vlastní akci: použijte odpovídající akci.",
+	"platform_reason.action_app_windows_unreachable_on_wayland": "Ne v Linuxu: Wayland žádné aplikaci nedovolí vypsat ani aktivovat okna jiné aplikace, takže okna aktivní aplikace nelze odlišit od ostatních; odpovídající akce prochází všechna okna.",
+	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Ne v Linuxu: počet ploch patří k nastavení každého prostředí (GNOME je sám přidává a odebírá, KDE a Xfce drží pevný počet) a Wayland žádné aplikaci nedává požadavek, jak ho změnit.",
+	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Ne v Linuxu: každé prostředí Linuxu drží relaci vzhůru vlastním blokováním nečinnosti (režimem prezentace v KDE a Xfce, rozšířením Caffeine v GNOME); zapněte ho tam.",
+	"platform_reason.action_key_is_its_own_binding_here": "Na tomto systému to není samostatný řádek: odpovídající akce posílá stejnou klávesu.",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Přepínač pouze v macOS: Windows volí Duplikovat v nabídce promítání Win+P, GNOME a KDE ve vlastním přepínači obrazovek Super+P; přiřaďte tuto klávesu jako kombinaci kláves.",
+	"platform_reason.action_sticky_keys_are_the_systems": "Tento systém má v nastavení usnadnění Jedním prstem (lepivé klávesy), díky nimž každý modifikátor platí pro jednu klávesu; zapněte je tam.",
+	"platform_reason.action_take_note_uses_notepad": "Pouze Windows: tato akce otevře soubor poznámek dne v Poznámkovém bloku, editoru, který má každý Windows. macOS má vlastní Rychlou poznámku (Fn+Q) a Linux nemá editor, který by měla všechna prostředí.",
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "V macOS čte Živý text text každého snímku nebo obrázku: pořiďte snímek odpovídající akcí a pak označte jeho text."
 }

@@ -3919,9 +3919,6 @@
 	"platform_reason.action_line_deletion_is_macos": "Только macOS: Cmd+Delete удаляет до начала или конца строки в текстовых полях macOS. В текстовых полях Windows и Linux такой клавиши нет: выделите до края строки сочетанием Shift+Home или Shift+End, затем удалите.",
 	"platform_reason.action_lookup_is_macos_dictionary": "Только macOS: «Найти» открывает системную панель словаря для слова под указателем. В Windows и Linux нет системной панели словаря.",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Только macOS: эти действия переключают навигационный слой, хранящийся в Karabiner-Elements. В Windows и Linux слой следует за удерживаемой клавишей, и переключателя у него нет.",
-	"platform_reason.action_not_yet_on_linux": "Пока нет в Linux: ничто этому не мешает, но драйвер Linux пока этого не делает.",
-	"platform_reason.action_not_yet_on_macos": "Пока нет в macOS: ничто этому не мешает, но драйвер macOS пока этого не делает.",
-	"platform_reason.action_not_yet_on_windows": "Пока нет в Windows: ничто этому не мешает, но драйвер Windows пока этого не делает.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Эта система не позволяет ни одному приложению закрывать уведомления: очистите их в центре уведомлений, который открывает равноценное действие.",
 	"platform_reason.action_office_bold_key_is_windows": "Только Windows: французский Microsoft Office выделяет полужирным сочетанием Ctrl+G там, где другие приложения используют Ctrl+B, поэтому это действие выбирает клавишу по приложению. В macOS (Cmd+B) и Linux (Ctrl+B) одно сочетание работает везде: назначьте его в разделе «Сочетания клавиш».",
 	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Не в Linux: Wayland не позволяет ни одному приложению перемещать указатель, а у этого действия нет версии только для сеансов X11.",
@@ -3933,5 +3930,13 @@
 	"platform_reason.action_spaces_are_edited_in_mission_control": "Не в macOS: Spaces добавляются и удаляются в Mission Control, которым macOS не даёт управлять ни одному другому приложению.",
 	"platform_reason.action_window_overview_is_each_systems": "У каждой системы свой обзор окон: Mission Control и App Exposé в macOS, Представление задач в Windows. Каждая среда Linux назначает свой: назначьте там клавишу своей среды как сочетание клавиш.",
 	"platform_reason.action_window_switching_is_not_macos": "Не в macOS: это действие перебирает окна, как Alt+Tab в Windows и Linux. macOS переключает приложения сочетанием Cmd+Tab и перебирает окна одного приложения: используйте равноценное действие.",
-	"platform_reason.action_word_deletion_modifier_differs": "Каждая система удаляет слово своим модификатором (Option в macOS, Ctrl в Windows и Linux), поэтому каждая перечисляет своё действие: используйте равноценное действие."
+	"platform_reason.action_word_deletion_modifier_differs": "Каждая система удаляет слово своим модификатором (Option в macOS, Ctrl в Windows и Linux), поэтому каждая перечисляет своё действие: используйте равноценное действие.",
+	"platform_reason.action_app_windows_unreachable_on_wayland": "Не в Linux: Wayland не позволяет ни одному приложению перечислять или активировать окна другого, поэтому окна активного приложения не отличить от остальных; равноценное действие перебирает все окна.",
+	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Не в Linux: число рабочих столов относится к настройкам каждой среды (GNOME сам добавляет и убирает их, KDE и Xfce держат постоянное число), а Wayland не даёт ни одному приложению запроса, чтобы его изменить.",
+	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Не в Linux: каждая среда Linux не даёт сеансу уснуть своим блокировщиком простоя (режимом презентации в KDE и Xfce, расширением Caffeine в GNOME); включите его там.",
+	"platform_reason.action_key_is_its_own_binding_here": "В этой системе это не отдельная строка: равноценное действие посылает ту же клавишу.",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Переключатель только в macOS: Windows выбирает «Повторяющийся» в меню проецирования Win+P, а GNOME и KDE — в своём переключателе экранов Super+P; назначьте эту клавишу как сочетание клавиш.",
+	"platform_reason.action_sticky_keys_are_the_systems": "В этой системе есть залипание клавиш в настройках специальных возможностей: каждый модификатор действует на одну клавишу; включите его там.",
+	"platform_reason.action_take_note_uses_notepad": "Только Windows: это действие открывает файл заметок дня в Блокноте — редакторе, который есть в каждой Windows. В macOS есть своя «Быстрая заметка» (Fn+Q), а в Linux нет редактора, который был бы во всех средах.",
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "В macOS функция «Живой текст» читает текст любого снимка или изображения: сделайте снимок равноценным действием, затем выделите его текст."
 }

@@ -3919,9 +3919,6 @@
 	"platform_reason.action_line_deletion_is_macos": "macOS のみ：Cmd+Delete は macOS のテキスト欄で行頭または行末まで削除します。Windows と Linux のテキスト欄にはこのキーがありません：Shift+Home または Shift+End で行の端まで選択してから削除してください。",
 	"platform_reason.action_lookup_is_macos_dictionary": "macOS のみ：調べる は、ポインタの下の単語についてシステムの辞書パネルを開きます。Windows と Linux にはシステムの辞書パネルがありません。",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "macOS のみ：これらの操作は Karabiner-Elements 内に保持されるナビゲーションレイヤーを切り替えます。Windows と Linux ではレイヤーは押し続けているキーに従い、設定するスイッチはありません。",
-	"platform_reason.action_not_yet_on_linux": "Linux ではまだ使えません：妨げるものはありませんが、Linux ドライバーはまだ実装していません。",
-	"platform_reason.action_not_yet_on_macos": "macOS ではまだ使えません：妨げるものはありませんが、macOS ドライバーはまだ実装していません。",
-	"platform_reason.action_not_yet_on_windows": "Windows ではまだ使えません：妨げるものはありませんが、Windows ドライバーはまだ実装していません。",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "このシステムはどのアプリにも通知を閉じることを許しません：同等の操作で開く通知センターで消去してください。",
 	"platform_reason.action_office_bold_key_is_windows": "Windows のみ：フランス語版 Microsoft Office は他のアプリが Ctrl+B を使うところで Ctrl+G で太字にするため、この操作はアプリに応じてキーを選びます。macOS（Cmd+B）と Linux（Ctrl+B）では 1 つの組み合わせがどこでも使えます：「ショートカット」から割り当ててください。",
 	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Linux にはありません：Wayland はどのアプリにもポインタの移動を許さず、この操作には X11 セッション限定の版もありません。",
@@ -3933,5 +3930,13 @@
 	"platform_reason.action_spaces_are_edited_in_mission_control": "macOS にはありません：Spaces は Mission Control で追加・削除され、macOS は他のアプリにその操作を許しません。",
 	"platform_reason.action_window_overview_is_each_systems": "システムごとに独自のウインドウ一覧があります：macOS の Mission Control と App Exposé、Windows のタスクビュー。Linux のデスクトップはそれぞれ独自に割り当てるので、そこではデスクトップのキーをキーの組み合わせとして割り当ててください。",
 	"platform_reason.action_window_switching_is_not_macos": "macOS にはありません：この操作は Windows や Linux の Alt+Tab のようにウインドウを順に切り替えます。macOS は Cmd+Tab でアプリを切り替え、1 つのアプリのウインドウを順に切り替えます：同等の操作を使ってください。",
-	"platform_reason.action_word_deletion_modifier_differs": "システムごとに単語を削除する修飾キーが異なる（macOS は Option、Windows と Linux は Ctrl）ため、それぞれ独自の操作を並べています：同等の操作を使ってください。"
+	"platform_reason.action_word_deletion_modifier_differs": "システムごとに単語を削除する修飾キーが異なる（macOS は Option、Windows と Linux は Ctrl）ため、それぞれ独自の操作を並べています：同等の操作を使ってください。",
+	"platform_reason.action_app_windows_unreachable_on_wayland": "Linux にはありません：Wayland はどのアプリにも他のアプリのウインドウの一覧取得やアクティブ化を許さないため、アクティブなアプリのウインドウを他と区別できません。同等の操作はすべてのウインドウを順に切り替えます。",
+	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Linux にはありません：デスクトップの数は各デスクトップ環境の設定に属し（GNOME は自動で増減し、KDE と Xfce は固定数を保ちます）、Wayland はどのアプリにもそれを変える要求を与えません。",
+	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Linux にはありません：各 Linux デスクトップは独自のアイドル抑止（KDE と Xfce のプレゼンテーションモード、GNOME の Caffeine 拡張）でセッションを起動したままにします。そちらで有効にしてください。",
+	"platform_reason.action_key_is_its_own_binding_here": "このシステムでは独立した行ではありません：同等の操作が同じキーを送ります。",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "切り替えは macOS のみ：Windows は Win+P の投影メニューで「複製」を選び、GNOME と KDE は独自の Super+P ディスプレイ切り替えで選びます。そのキーをキーの組み合わせとして割り当ててください。",
+	"platform_reason.action_sticky_keys_are_the_systems": "このシステムのアクセシビリティ設定には固定キー機能があり、各修飾キーを 1 回だけ有効にします。そちらで有効にしてください。",
+	"platform_reason.action_take_note_uses_notepad": "Windows のみ：この操作は、すべての Windows に付属するメモ帳でその日のメモファイルを開きます。macOS には独自のクイックメモ（Fn+Q）があり、Linux にはすべてのデスクトップに付属するエディターがありません。",
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "macOS では、テキスト認識表示があらゆるスクリーンショットや画像の文字を読み取ります：同等の操作で撮影し、その文字を選択してください。"
 }

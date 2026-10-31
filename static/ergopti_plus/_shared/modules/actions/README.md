@@ -92,23 +92,23 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `system_app_switcher` | ⇥ System Alt+Tab | no, R3; use `app_switcher` | yes | no, R3; use `app_switcher` |
 | `app_previous` | ⇥ Previous app — all screens | no, R3; use `app_switcher` | yes | no, R3; use `app_switcher` |
 | `app_previous_screen` | ⇥ Previous app — this screen | no, R3; use `app_switcher` | yes | no, R3; use `app_switcher` |
-| `app_window_previous` | ◱ → Next window, no switcher (Alt+Esc) | no, R4; use `win_next` | no, R2; use `win_app_next` | yes |
-| `alt_tab_windows` | ◱ Previous window — all screens | yes | yes | no, R5; use `win_next` |
+| `app_window_previous` | ◱ → Next window, no switcher (Alt+Esc) | no, R4 | no, R2; use `win_app_next` | yes |
+| `alt_tab_windows` | ◱ Previous window — all screens | yes | yes | no, R4; use `win_next` |
 | `alt_tab_monitor` | ◱ Previous window — this screen | yes | yes | yes (session:x11, tool:timeout, tool:xdotool, tool:xrandr, tool:xprop, tool:xwininfo, tool:sha256sum) |
 | `cmd_shift_tab` | ⇥ Least recent app — all screens | no, R3; use `app_switcher` | yes | no, R3; use `app_switcher` |
-| `copy` | ⎘ Copy | yes | no, R6 | yes |
-| `paste` | ⎘ Paste | yes | no, R6 | yes |
+| `copy` | ⎘ Copy | yes | no, R5 | yes |
+| `paste` | ⎘ Paste | yes | no, R5 | yes |
 | `paste_plain` | ⎘ Paste without formatting | yes | yes | yes |
-| `cut` | ⎘ Cut | yes | no, R6 | yes |
-| `undo` | ↩ Undo | yes | no, R6 | yes |
-| `redo` | ↪ Redo | yes | no, R6 | yes |
-| `select_all` | ⬚ Select all | yes | no, R6 | yes |
-| `find` | 🔍 Find | yes | no, R6 | yes |
-| `save` | ⌘S Save | no, R6 | yes | no, R6 |
-| `opt_backspace` | ⌫ ⌥+Backspace | no, R7; use `ctrl_backspace` | yes | no, R7; use `ctrl_backspace` |
-| `opt_delete_fwd` | ⌦ ⌥+Delete | no, R7; use `ctrl_delete` | yes | no, R7; use `ctrl_delete` |
-| `cmd_backspace` | ⌫ ⌘+Backspace | no, R8 | yes | no, R8 |
-| `cmd_delete_fwd` | ⌦ ⌘+Delete | no, R8 | yes | no, R8 |
+| `cut` | ⎘ Cut | yes | no, R5 | yes |
+| `undo` | ↩ Undo | yes | no, R5 | yes |
+| `redo` | ↪ Redo | yes | no, R5 | yes |
+| `select_all` | ⬚ Select all | yes | no, R5 | yes |
+| `find` | 🔍 Find | yes | no, R5 | yes |
+| `save` | ⌘S Save | no, R5 | yes | no, R5 |
+| `opt_backspace` | ⌫ ⌥+Backspace | no, R6; use `ctrl_backspace` | yes | no, R6; use `ctrl_backspace` |
+| `opt_delete_fwd` | ⌦ ⌥+Delete | no, R6; use `ctrl_delete` | yes | no, R6; use `ctrl_delete` |
+| `cmd_backspace` | ⌫ ⌘+Backspace | no, R7 | yes | no, R7 |
+| `cmd_delete_fwd` | ⌦ ⌘+Delete | no, R7 | yes | no, R7 |
 | `enter` | ↵ Enter | yes | yes | yes |
 | `tab` | ⇥ Tab | yes | yes | yes |
 | `escape` | ⎋ Escape | yes | yes | yes |
@@ -125,26 +125,26 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `nav_forward` | → Forward (navigation) | yes | yes | yes |
 | `win_prev` | ◱ ← Previous window, all apps (cycle) | yes | no, R2; use `win_app_prev` | yes |
 | `win_next` | ◱ → Next window, all apps (cycle) | yes | no, R2; use `win_app_next` | yes |
-| `win_app_prev` | ◱ ← Previous window of the active app | yes | yes | no, R9 |
-| `win_app_next` | ◱ → Next window of the active app | yes | yes | no, R9 |
+| `win_app_prev` | ◱ ← Previous window of the active app | yes | yes | no, R8; use `win_prev` |
+| `win_app_next` | ◱ → Next window of the active app | yes | yes | no, R8; use `win_next` |
 | `close_window` | ◱ × Close window | yes | yes | yes |
 | `fullscreen` | 📺 Fullscreen | yes | yes | yes |
 | `snap_left` | ◧ ← Snap left | yes | yes | yes |
 | `snap_right` | ◨ → Snap right | yes | yes | yes |
 | `maximize` | 🔲 Maximize | yes | yes | yes |
-| `space_prev` | ▢ ← Previous Space | no, R10; use `desktop_prev` | yes | no, R10; use `desktop_prev` |
-| `space_next` | ▢ → Next Space | no, R10; use `desktop_next` | yes | no, R10; use `desktop_next` |
-| `space_prev_wrap` | ▢ ← Previous Space (circular) | no, R10; use `desktop_prev_wrap` | yes | no, R10; use `desktop_prev_wrap` |
-| `space_next_wrap` | ▢ → Next Space (circular) | no, R10; use `desktop_next_wrap` | yes | no, R10; use `desktop_next_wrap` |
-| `mission_control` | ▢ Mission Control | no, R11; use `task_view` | yes | no, R11 |
-| `app_expose` | ◱ App Exposé | no, R11; use `task_view` | yes | no, R11 |
-| `desktop_prev` | ▢ ← Previous desktop | yes | no, R10; use `space_prev` | yes |
-| `desktop_next` | ▢ → Next desktop | yes | no, R10; use `space_next` | yes |
-| `desktop_prev_wrap` | ▢ ← Previous desktop (circular) | yes | no, R10; use `space_prev_wrap` | yes (session:workspaces) |
-| `desktop_next_wrap` | ▢ → Next desktop (circular) | yes | no, R10; use `space_next_wrap` | yes (session:workspaces) |
-| `desktop_new` | ▢ + New desktop | yes | no, R12 | no, R9 |
-| `desktop_close` | ▢ × Close desktop | yes | no, R12 | no, R9 |
-| `task_view` | ▢ Task View | yes | no, R11; use `mission_control` | no, R11 |
+| `space_prev` | ▢ ← Previous Space | no, R9; use `desktop_prev` | yes | no, R9; use `desktop_prev` |
+| `space_next` | ▢ → Next Space | no, R9; use `desktop_next` | yes | no, R9; use `desktop_next` |
+| `space_prev_wrap` | ▢ ← Previous Space (circular) | no, R9; use `desktop_prev_wrap` | yes | no, R9; use `desktop_prev_wrap` |
+| `space_next_wrap` | ▢ → Next Space (circular) | no, R9; use `desktop_next_wrap` | yes | no, R9; use `desktop_next_wrap` |
+| `mission_control` | ▢ Mission Control | no, R10; use `task_view` | yes | no, R10 |
+| `app_expose` | ◱ App Exposé | no, R10; use `task_view` | yes | no, R10 |
+| `desktop_prev` | ▢ ← Previous desktop | yes | no, R9; use `space_prev` | yes |
+| `desktop_next` | ▢ → Next desktop | yes | no, R9; use `space_next` | yes |
+| `desktop_prev_wrap` | ▢ ← Previous desktop (circular) | yes | no, R9; use `space_prev_wrap` | yes (session:workspaces) |
+| `desktop_next_wrap` | ▢ → Next desktop (circular) | yes | no, R9; use `space_next_wrap` | yes (session:workspaces) |
+| `desktop_new` | ▢ + New desktop | yes | no, R11 | no, R12 |
+| `desktop_close` | ▢ × Close desktop | yes | no, R11 | no, R12 |
+| `task_view` | ▢ Task View | yes | no, R10; use `mission_control` | no, R10 |
 | `minimize_all` | ◱ Minimize all | yes | yes | yes (session:x11, tool:wmctrl, tool:xdotool) |
 | `arrow_up` | ↑ Arrow Up | yes | yes | yes |
 | `arrow_down` | ↓ Arrow Down | yes | yes | yes |
@@ -160,10 +160,10 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `para_next` | ¶ ↓ Next paragraph | yes | yes | yes |
 | `doc_start` | ⤒ Document start | yes | yes | yes |
 | `doc_end` | ⤓ Document end | yes | yes | yes |
-| `home` | ⇱ Home | no, R4; use `line_start` | yes | yes |
-| `end` | ⇲ End | no, R4; use `line_end` | yes | yes |
-| `page_up` | ⇞ Page Up | no, R4 | yes | yes |
-| `page_down` | ⇟ Page Down | no, R4 | yes | yes |
+| `home` | ⇱ Home | no, R13 | yes | yes |
+| `end` | ⇲ End | no, R13 | yes | yes |
+| `page_up` | ⇞ Page Up | no, R13; use `send_key` | yes | yes |
+| `page_down` | ⇟ Page Down | no, R13; use `send_key` | yes | yes |
 | `sel_up` | ✎ ↑ Select Up | yes | yes | yes |
 | `sel_down` | ✎ ↓ Select Down | yes | yes | yes |
 | `sel_left` | ✎ ← Select Left | yes | yes | yes |
@@ -219,31 +219,31 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `screenshot_region_save` | 📸 ⬚ Save region | yes | yes | yes |
 | `screenshot_fullscreen_clipboard` | 📸 🖥 Copy screen | yes | yes | yes |
 | `screenshot_fullscreen_save` | 📸 🖥 Save screen | yes | yes | yes |
-| `screen_record` | ⏺ Screen recording | yes | no, R13; use `screen_capture` | no, R13; use `screen_capture` |
+| `screen_record` | ⏺ Screen recording | yes | no, R14; use `screen_capture` | no, R14; use `screen_capture` |
 | `lock_screen` | 🔒 Lock screen | yes | yes | yes |
 | `notification_center` | 🔔 Notifications | yes | yes | yes |
-| `spotlight` | 🔍 Spotlight | no, R14 | yes | no, R14 |
+| `spotlight` | 🔍 Spotlight | no, R15 | yes | no, R15 |
 | `show_desktop` | 🖥 Show desktop | yes | yes | yes (session:x11, tool:wmctrl) |
 | `sleep_displays` | 🌙 Put the displays to sleep | yes | yes | yes (session:x11, tool:xset) |
 | `toggle_dark_mode` | 🌓 Dark mode (on/off) | yes | yes | yes (tool:gsettings) |
 | `mic_mute_toggle` | 🎙 Mute/unmute the microphone | yes | yes | yes (tool:pactl) |
 | `clear_clipboard` | 📋 Clear the clipboard | yes | yes | yes |
-| `center_mouse` | 🖱 Center the mouse on the screen | yes | yes | no, R15 |
+| `center_mouse` | 🖱 Center the mouse on the screen | yes | yes | no, R16 |
 | `open_app` | 🚀 Open an application [configurable] | yes | yes | yes (tool:gtk-launch) |
 | `run_program` | ▶️ Run a program [configurable] | yes | yes | yes |
 | `quit_frontmost_app` | ✕ Quit the active app | yes | yes | yes (session:x11, tool:xdotool, tool:xprop) |
 | `force_quit_frontmost` | ⚠ Force quit the active app | yes | yes | yes (session:x11, tool:xdotool, tool:xprop) |
 | `empty_trash` | 🗑 Empty the trash | yes | yes | yes (tool:gio) |
 | `eject_all_disks` | ⏏ Eject all disks | yes | yes | yes (tool:lsblk, tool:udisksctl) |
-| `clear_notifications` | 🔕 Clear notifications | no, R16; use `notification_center` | no, R16; use `notification_center` | yes |
-| `remove_quarantine_selection` | 🛡 Remove the quarantine from the selected files | no, R17; use `unblock_file_selection` | yes | no, R17 |
-| `unblock_file_selection` | 🛡 Unblock the selected files | yes | no, R17; use `remove_quarantine_selection` | no, R17 |
-| `make_executable_selection` | ⚙ Make the selected files executable | no, R18 | yes | yes |
-| `open_terminal_here` | ⌨ Open a terminal here | yes | yes | no, R19 |
-| `new_text_file_here` | 📄 New text file here | yes | yes | no, R19 |
+| `clear_notifications` | 🔕 Clear notifications | no, R17; use `notification_center` | no, R17; use `notification_center` | yes |
+| `remove_quarantine_selection` | 🛡 Remove the quarantine from the selected files | no, R18; use `unblock_file_selection` | yes | no, R18 |
+| `unblock_file_selection` | 🛡 Unblock the selected files | yes | no, R18; use `remove_quarantine_selection` | no, R18 |
+| `make_executable_selection` | ⚙ Make the selected files executable | no, R19 | yes | yes |
+| `open_terminal_here` | ⌨ Open a terminal here | yes | yes | no, R20 |
+| `new_text_file_here` | 📄 New text file here | yes | yes | no, R20 |
 | `screen_capture` | 📸 System screenshot tool | yes | yes | yes |
 | `screen_capture_instant` | 📸 Instant capture (window) | yes | yes | yes |
-| `ocr_screenshot` | 📷 OCR screenshot (Win+Shift+T) | yes | no, R20 | yes (tool:tesseract) |
+| `ocr_screenshot` | 📷 OCR screenshot (Win+Shift+T) | yes | no, R21; use `screen_capture` | yes (tool:tesseract) |
 | `open_chatgpt` | Open ChatGPT (URL set in menu) | yes | yes | yes (tool:xdg-open) |
 | `open_url` | 🌐 Open a link [configurable] | yes | yes | yes (tool:xdg-open) |
 | `open_downloads` | 📥 Downloads folder | yes | yes | yes (tool:xdg-open, tool:xdg-user-dir) |
@@ -251,39 +251,39 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `open_system_settings` | ⚙ System settings | yes | yes | yes |
 | `pick_color` | 🎨 HEX colour under cursor | yes | yes | yes |
 | `open_emoji_picker` | 😀 Emoji picker | yes | yes | yes |
-| `take_note` | 📝 Take a note | yes | no, R20 | no, R9 |
-| `activity_simulation` | 🖱 Simulate activity (anti-sleep) | yes | yes | no, R9 |
-| `display_mirror_toggle` | 🖥 Mirror displays (on/off) | no, R4 | yes | no, R9 |
+| `take_note` | 📝 Take a note | yes | no, R22 | no, R22 |
+| `activity_simulation` | 🖱 Simulate activity (anti-sleep) | yes | yes | no, R23 |
+| `display_mirror_toggle` | 🖥 Mirror displays (on/off) | no, R24 | yes | no, R24 |
 | `search_web` | 🔍 Web search [configurable] | yes | yes | yes (tool:xclip, tool:xdg-open) |
 | `copy_selected_path` | 📋 Copy the path, or open / search the selection | yes | yes | yes (tool:xclip, tool:xdg-open) |
-| `teleport_mouse` | 🖱 Teleport mouse | yes | yes | no, R15 |
-| `spotlight_mouse` | 🔦 Mouse spotlight | yes | yes | no, R21 |
+| `teleport_mouse` | 🖱 Teleport mouse | yes | yes | no, R16 |
+| `spotlight_mouse` | 🔦 Mouse spotlight | yes | yes | no, R25 |
 | `toggle_capslock` | ⇪ Toggle CapsLock | yes | yes | yes |
-| `microsoft_bold` | 𝐁 Ctrl+B Microsoft (→ Ctrl+G) | yes | no, R22 | no, R22 |
-| `one_shot_shift` | ⇧ OneShotShift | yes | no, R5; use `sticky_shift` | no, R9 |
-| `caps_word` | ⇪★ CapsWord | yes | no, R5; use `capsword` | yes |
-| `ctrl_backspace` | ⌫ Ctrl+BackSpace | yes | no, R7; use `opt_backspace` | yes |
-| `ctrl_delete` | ⌦ Ctrl+Delete | yes | no, R7; use `opt_delete_fwd` | yes |
+| `microsoft_bold` | 𝐁 Ctrl+B Microsoft (→ Ctrl+G) | yes | no, R26 | no, R26 |
+| `one_shot_shift` | ⇧ OneShotShift | yes | no, R4; use `sticky_shift` | no, R27 |
+| `caps_word` | ⇪★ CapsWord | yes | no, R4; use `capsword` | yes |
+| `ctrl_backspace` | ⌫ Ctrl+BackSpace | yes | no, R6; use `opt_backspace` | yes |
+| `ctrl_delete` | ⌦ Ctrl+Delete | yes | no, R6; use `opt_delete_fwd` | yes |
 | `space` | ␣ Space | yes | yes | yes |
-| `caps_lock` | ⇪ CapsLock | yes | no, R5; use `toggle_capslock` | yes |
-| `layer_on` | 🗂 Nav layer ON | no, R23 | yes | no, R23 |
-| `layer_off` | 🗂 Nav layer OFF | no, R23 | yes | no, R23 |
-| `capsword` | ⇪★ CapsWord | no, R5; use `caps_word` | yes | no, R5; use `caps_word` |
-| `sticky_shift` | 📌 Sticky Shift | no, R5; use `one_shot_shift` | yes | no, R9 |
-| `sticky_ctrl` | 📌 Sticky Ctrl | no, R4 | yes | no, R9 |
-| `sticky_cmd` | 📌 Sticky Cmd | no, R4 | yes | no, R9 |
-| `sticky_option` | 📌 Sticky Option | no, R4 | yes | no, R9 |
-| `sticky_cmd_shift` | 📌 Sticky Cmd+Shift | no, R4 | yes | no, R9 |
-| `sticky_cmd_option` | 📌 Sticky Cmd+Option | no, R4 | yes | no, R9 |
-| `sticky_cmd_ctrl` | 📌 Sticky Cmd+Ctrl | no, R4 | yes | no, R9 |
-| `sticky_option_shift` | 📌 Sticky Option+Shift | no, R4 | yes | no, R9 |
-| `sticky_option_ctrl` | 📌 Sticky Option+Ctrl | no, R4 | yes | no, R9 |
-| `sticky_ctrl_shift` | 📌 Sticky Ctrl+Shift | no, R4 | yes | no, R9 |
-| `sticky_cmd_option_shift` | 📌 Sticky Cmd+Option+Shift | no, R4 | yes | no, R9 |
-| `sticky_cmd_option_ctrl` | 📌 Sticky Cmd+Option+Ctrl | no, R4 | yes | no, R9 |
-| `sticky_cmd_shift_ctrl` | 📌 Sticky Cmd+Shift+Ctrl | no, R4 | yes | no, R9 |
-| `sticky_option_shift_ctrl` | 📌 Sticky Option+Shift+Ctrl | no, R4 | yes | no, R9 |
-| `sticky_hyper` | 📌 Sticky Hyper | no, R4 | yes | no, R9 |
+| `caps_lock` | ⇪ CapsLock | yes | no, R4; use `toggle_capslock` | yes |
+| `layer_on` | 🗂 Nav layer ON | no, R28 | yes | no, R28 |
+| `layer_off` | 🗂 Nav layer OFF | no, R28 | yes | no, R28 |
+| `capsword` | ⇪★ CapsWord | no, R4; use `caps_word` | yes | no, R4; use `caps_word` |
+| `sticky_shift` | 📌 Sticky Shift | no, R4; use `one_shot_shift` | yes | no, R27 |
+| `sticky_ctrl` | 📌 Sticky Ctrl | no, R27 | yes | no, R27 |
+| `sticky_cmd` | 📌 Sticky Cmd | no, R27 | yes | no, R27 |
+| `sticky_option` | 📌 Sticky Option | no, R27 | yes | no, R27 |
+| `sticky_cmd_shift` | 📌 Sticky Cmd+Shift | no, R27 | yes | no, R27 |
+| `sticky_cmd_option` | 📌 Sticky Cmd+Option | no, R27 | yes | no, R27 |
+| `sticky_cmd_ctrl` | 📌 Sticky Cmd+Ctrl | no, R27 | yes | no, R27 |
+| `sticky_option_shift` | 📌 Sticky Option+Shift | no, R27 | yes | no, R27 |
+| `sticky_option_ctrl` | 📌 Sticky Option+Ctrl | no, R27 | yes | no, R27 |
+| `sticky_ctrl_shift` | 📌 Sticky Ctrl+Shift | no, R27 | yes | no, R27 |
+| `sticky_cmd_option_shift` | 📌 Sticky Cmd+Option+Shift | no, R27 | yes | no, R27 |
+| `sticky_cmd_option_ctrl` | 📌 Sticky Cmd+Option+Ctrl | no, R27 | yes | no, R27 |
+| `sticky_cmd_shift_ctrl` | 📌 Sticky Cmd+Shift+Ctrl | no, R27 | yes | no, R27 |
+| `sticky_option_shift_ctrl` | 📌 Sticky Option+Shift+Ctrl | no, R27 | yes | no, R27 |
+| `sticky_hyper` | 📌 Sticky Hyper | no, R27 | yes | no, R27 |
 | `open_metrics_typing` | 📊 Typing stats | yes | yes | yes |
 | `open_metrics_apps` | 📊 App stats | yes | yes | yes |
 | `open_hotstrings_editor` | ⌨ Hotstrings editor | yes | yes | yes |
@@ -306,31 +306,31 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `script_reload` | ↻ Reload | yes | yes | yes |
 | `script_save_reload` | ↻ Save and reload | yes | yes | yes |
 | `script_quit` | ✕ Quit | yes | yes | yes |
-| `open_console` | ▤ Console | no, R24 | yes | no, R24 |
-| `open_window_spy` | Window Spy | yes | no, R24 | no, R24 |
-| `open_list_vars` | Variable state | yes | no, R24 | no, R24 |
-| `open_key_history` | Key history | yes | no, R24 | no, R24 |
+| `open_console` | ▤ Console | no, R29 | yes | no, R29 |
+| `open_window_spy` | Window Spy | yes | no, R29 | no, R29 |
+| `open_list_vars` | Variable state | yes | no, R29 | no, R29 |
+| `open_key_history` | Key history | yes | no, R29 | no, R29 |
 
 ### Continuous swipes (axis actions)
 
 | Action | Label | Windows | macOS | Linux |
 | --- | --- | --- | --- | --- |
-| `tabs` | ⧉ Tabs | no, R25; use `tab_prev`, `tab_next` | yes | no, R25; use `tab_prev`, `tab_next` |
-| `char` | A Characters | no, R25; use `arrow_left`, `arrow_right` | yes | no, R25; use `arrow_left`, `arrow_right` |
-| `char_sel` | ✎ A Sel. Characters | no, R25; use `sel_left`, `sel_right` | yes | no, R25; use `sel_left`, `sel_right` |
-| `line_arrow` | ↕ Lines (Arrows) | no, R25; use `arrow_up`, `arrow_down` | yes | no, R25; use `arrow_up`, `arrow_down` |
-| `line_sel` | ✎ ↕ Sel. Lines | no, R25; use `sel_up`, `sel_down` | yes | no, R25; use `sel_up`, `sel_down` |
-| `words` | W Words | no, R25; use `word_prev`, `word_next` | yes | no, R25; use `word_prev`, `word_next` |
-| `words_sel` | ✎ W Sel. Words | no, R25; use `sel_word_prev`, `sel_word_next` | yes | no, R25; use `sel_word_prev`, `sel_word_next` |
-| `windows` | ◱ Windows | no, R25; use `win_prev`, `win_next` | yes | no, R25; use `win_prev`, `win_next` |
-| `spaces` | ▢ Spaces | no, R25; use `desktop_prev`, `desktop_next` | yes | no, R25; use `desktop_prev`, `desktop_next` |
-| `volume` | 🔊 Volume | no, R25; use `vol_down`, `vol_up` | yes | no, R25; use `vol_down`, `vol_up` |
-| `brightness` | ☀ Brightness | no, R25; use `brightness_down`, `brightness_up` | yes | no, R25; use `brightness_down`, `brightness_up` |
-| `tracks` | ♫ Tracks | no, R25; use `track_prev`, `track_next` | yes | no, R25; use `track_prev`, `track_next` |
-| `lines` | ↕ Lines (Alt) | no, R25; use `line_up`, `line_down` | yes | no, R25; use `line_up`, `line_down` |
-| `line_bounds` | ↔ Line (start/end) | no, R25; use `line_start`, `line_end` | yes | no, R25; use `line_start`, `line_end` |
-| `paragraphs` | ¶ Paragraphs | no, R25; use `para_prev`, `para_next` | yes | no, R25; use `para_prev`, `para_next` |
-| `document` | 📄 Document (start/end) | no, R25; use `doc_start`, `doc_end` | yes | no, R25; use `doc_start`, `doc_end` |
+| `tabs` | ⧉ Tabs | no, R30; use `tab_prev`, `tab_next` | yes | no, R30; use `tab_prev`, `tab_next` |
+| `char` | A Characters | no, R30; use `arrow_left`, `arrow_right` | yes | no, R30; use `arrow_left`, `arrow_right` |
+| `char_sel` | ✎ A Sel. Characters | no, R30; use `sel_left`, `sel_right` | yes | no, R30; use `sel_left`, `sel_right` |
+| `line_arrow` | ↕ Lines (Arrows) | no, R30; use `arrow_up`, `arrow_down` | yes | no, R30; use `arrow_up`, `arrow_down` |
+| `line_sel` | ✎ ↕ Sel. Lines | no, R30; use `sel_up`, `sel_down` | yes | no, R30; use `sel_up`, `sel_down` |
+| `words` | W Words | no, R30; use `word_prev`, `word_next` | yes | no, R30; use `word_prev`, `word_next` |
+| `words_sel` | ✎ W Sel. Words | no, R30; use `sel_word_prev`, `sel_word_next` | yes | no, R30; use `sel_word_prev`, `sel_word_next` |
+| `windows` | ◱ Windows | no, R30; use `win_prev`, `win_next` | yes | no, R30; use `win_prev`, `win_next` |
+| `spaces` | ▢ Spaces | no, R30; use `desktop_prev`, `desktop_next` | yes | no, R30; use `desktop_prev`, `desktop_next` |
+| `volume` | 🔊 Volume | no, R30; use `vol_down`, `vol_up` | yes | no, R30; use `vol_down`, `vol_up` |
+| `brightness` | ☀ Brightness | no, R30; use `brightness_down`, `brightness_up` | yes | no, R30; use `brightness_down`, `brightness_up` |
+| `tracks` | ♫ Tracks | no, R30; use `track_prev`, `track_next` | yes | no, R30; use `track_prev`, `track_next` |
+| `lines` | ↕ Lines (Alt) | no, R30; use `line_up`, `line_down` | yes | no, R30; use `line_up`, `line_down` |
+| `line_bounds` | ↔ Line (start/end) | no, R30; use `line_start`, `line_end` | yes | no, R30; use `line_start`, `line_end` |
+| `paragraphs` | ¶ Paragraphs | no, R30; use `para_prev`, `para_next` | yes | no, R30; use `para_prev`, `para_next` |
+| `document` | 📄 Document (start/end) | no, R30; use `doc_start`, `doc_end` | yes | no, R30; use `doc_start`, `doc_end` |
 
 ### Reasons
 
@@ -339,27 +339,32 @@ actions that do the same on that OS. The modifier + key shortcuts
 | R1 | `platform_reason.action_lookup_is_macos_dictionary` | macOS only: Look Up opens the system dictionary panel on the word under the pointer. Windows and Linux have no system dictionary panel. |
 | R2 | `platform_reason.action_window_switching_is_not_macos` | Not on macOS: this steps through windows the Alt+Tab way of Windows and Linux. macOS switches applications with Cmd+Tab and cycles the windows of one application: use the equivalent action. |
 | R3 | `platform_reason.action_application_switching_is_macos` | macOS only: macOS switches between applications, each holding its windows. Windows and Linux switch between windows with Alt+Tab: use the equivalent action. |
-| R4 | `platform_reason.action_not_yet_on_windows` | Not on Windows yet: nothing prevents it there, but the Windows driver does not implement it so far. |
-| R5 | `platform_reason.action_same_action_under_another_name` | This system offers the same action under another name: use the equivalent action. |
-| R6 | `platform_reason.action_shortcut_is_a_modifier_chord_here` | Not a separate action on this system: it is one of its modifier + key combinations (Cmd on macOS, Ctrl on Windows and Linux), listed under “Shortcuts”. |
-| R7 | `platform_reason.action_word_deletion_modifier_differs` | Each system deletes a word with its own modifier (Option on macOS, Ctrl on Windows and Linux), so each lists its own action: use the equivalent action. |
-| R8 | `platform_reason.action_line_deletion_is_macos` | macOS only: Cmd+Delete deletes to the start or the end of the line in macOS text fields. Windows and Linux text fields have no such key: select to the line edge with Shift+Home or Shift+End, then delete. |
-| R9 | `platform_reason.action_not_yet_on_linux` | Not on Linux yet: nothing prevents it there, but the Linux driver does not implement it so far. |
-| R10 | `platform_reason.action_spaces_and_desktops_are_one_thing` | Spaces on macOS and desktops on Windows and Linux are the same virtual desktops under two names: use the equivalent action. |
-| R11 | `platform_reason.action_window_overview_is_each_systems` | Each system has its own window overview: Mission Control and App Exposé on macOS, Task View on Windows. Linux desktops each bind their own, so bind your desktop's key as a keystroke there. |
-| R12 | `platform_reason.action_spaces_are_edited_in_mission_control` | Not on macOS: Spaces are added and removed in Mission Control, which macOS lets no other application drive. |
-| R13 | `platform_reason.action_recording_starts_from_the_capture_tool` | This system records the screen from its own capture tool (the macOS Screenshot toolbar, the GNOME or KDE screenshot tool), which the equivalent action opens. |
-| R14 | `platform_reason.layer_spotlight_is_macos` | macOS only: this action opens Spotlight, the search of macOS. On Windows or Linux, bind your desktop's own search shortcut as a keystroke instead. |
-| R15 | `platform_reason.action_pointer_cannot_be_moved_on_linux` | Not on Linux: Wayland lets no application move the pointer, and this action has no version limited to X11 sessions. |
-| R16 | `platform_reason.action_notifications_are_cleared_from_their_centre` | This system lets no application dismiss notifications: clear them in the notification centre, which the equivalent action opens. |
-| R17 | `platform_reason.action_download_mark_is_each_systems` | Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file. |
-| R18 | `platform_reason.action_executable_permission_is_unix` | Not on Windows: a file runs there because of its extension, not because of an executable permission. |
-| R19 | `platform_reason.action_file_manager_folder_is_unreadable_on_linux` | Not on Linux: its file managers tell no other application which folder they show. |
-| R20 | `platform_reason.action_not_yet_on_macos` | Not on macOS yet: nothing prevents it there, but the macOS driver does not implement it so far. |
-| R21 | `platform_reason.action_screen_overlay_is_not_on_linux` | Not on Linux: drawing over every window needs an overlay surface that Wayland compositors give no application. |
-| R22 | `platform_reason.action_office_bold_key_is_windows` | Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”. |
-| R23 | `platform_reason.action_navigation_layer_switch_is_karabiner` | macOS only: these switch the navigation layer kept inside Karabiner-Elements. On Windows and Linux the layer follows the key held down and has no switch to set. |
-| R24 | `platform_reason.debug_surface_is_each_drivers_own` | Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open. |
-| R25 | `platform_reason.action_continuous_swipe_is_macos` | macOS only: a continuous swipe follows the fingers while they move, which only the macOS driver reads. Windows gets finished gestures from its touchpad settings and Linux acts once a swipe ends: use the equivalent single-step actions. |
+| R4 | `platform_reason.action_same_action_under_another_name` | This system offers the same action under another name: use the equivalent action. |
+| R5 | `platform_reason.action_shortcut_is_a_modifier_chord_here` | Not a separate action on this system: it is one of its modifier + key combinations (Cmd on macOS, Ctrl on Windows and Linux), listed under “Shortcuts”. |
+| R6 | `platform_reason.action_word_deletion_modifier_differs` | Each system deletes a word with its own modifier (Option on macOS, Ctrl on Windows and Linux), so each lists its own action: use the equivalent action. |
+| R7 | `platform_reason.action_line_deletion_is_macos` | macOS only: Cmd+Delete deletes to the start or the end of the line in macOS text fields. Windows and Linux text fields have no such key: select to the line edge with Shift+Home or Shift+End, then delete. |
+| R8 | `platform_reason.action_app_windows_unreachable_on_wayland` | Not on Linux: Wayland lets no application list or focus the windows of another one, so the windows of the active application cannot be told apart from the others; the equivalent action steps through every window. |
+| R9 | `platform_reason.action_spaces_and_desktops_are_one_thing` | Spaces on macOS and desktops on Windows and Linux are the same virtual desktops under two names: use the equivalent action. |
+| R10 | `platform_reason.action_window_overview_is_each_systems` | Each system has its own window overview: Mission Control and App Exposé on macOS, Task View on Windows. Linux desktops each bind their own, so bind your desktop's key as a keystroke there. |
+| R11 | `platform_reason.action_spaces_are_edited_in_mission_control` | Not on macOS: Spaces are added and removed in Mission Control, which macOS lets no other application drive. |
+| R12 | `platform_reason.action_desktop_count_belongs_to_the_desktop` | Not on Linux: the number of desktops belongs to each desktop's own settings (GNOME adds and removes them by itself, KDE and Xfce keep a set count), and Wayland gives no application a request to change it. |
+| R13 | `platform_reason.action_key_is_its_own_binding_here` | Not a separate row on this system: the equivalent action sends the same key. |
+| R14 | `platform_reason.action_recording_starts_from_the_capture_tool` | This system records the screen from its own capture tool (the macOS Screenshot toolbar, the GNOME or KDE screenshot tool), which the equivalent action opens. |
+| R15 | `platform_reason.layer_spotlight_is_macos` | macOS only: this action opens Spotlight, the search of macOS. On Windows or Linux, bind your desktop's own search shortcut as a keystroke instead. |
+| R16 | `platform_reason.action_pointer_cannot_be_moved_on_linux` | Not on Linux: Wayland lets no application move the pointer, and this action has no version limited to X11 sessions. |
+| R17 | `platform_reason.action_notifications_are_cleared_from_their_centre` | This system lets no application dismiss notifications: clear them in the notification centre, which the equivalent action opens. |
+| R18 | `platform_reason.action_download_mark_is_each_systems` | Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file. |
+| R19 | `platform_reason.action_executable_permission_is_unix` | Not on Windows: a file runs there because of its extension, not because of an executable permission. |
+| R20 | `platform_reason.action_file_manager_folder_is_unreadable_on_linux` | Not on Linux: its file managers tell no other application which folder they show. |
+| R21 | `platform_reason.action_text_recognition_is_live_text_on_macos` | On macOS, Live Text reads the text of any capture or image: take one with the equivalent action, then select its text. |
+| R22 | `platform_reason.action_take_note_uses_notepad` | Windows only: this opens the day's notes file in Notepad, the editor every Windows ships. macOS has its own Quick Note (Fn+Q), and Linux has no editor every desktop ships. |
+| R23 | `platform_reason.action_keep_awake_is_the_desktops_inhibitor` | Not on Linux: each Linux desktop keeps a session awake through its own idle inhibitor (the presentation mode of KDE and Xfce, a Caffeine extension on GNOME); turn it on there. |
+| R24 | `platform_reason.action_mirroring_is_the_systems_projection_menu` | macOS only as a toggle: Windows chooses Duplicate in its Win+P projection menu, and GNOME and KDE in their own Super+P display switcher; bind that key as a keystroke. |
+| R25 | `platform_reason.action_screen_overlay_is_not_on_linux` | Not on Linux: drawing over every window needs an overlay surface that Wayland compositors give no application. |
+| R26 | `platform_reason.action_office_bold_key_is_windows` | Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”. |
+| R27 | `platform_reason.action_sticky_keys_are_the_systems` | This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there. |
+| R28 | `platform_reason.action_navigation_layer_switch_is_karabiner` | macOS only: these switch the navigation layer kept inside Karabiner-Elements. On Windows and Linux the layer follows the key held down and has no switch to set. |
+| R29 | `platform_reason.debug_surface_is_each_drivers_own` | Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open. |
+| R30 | `platform_reason.action_continuous_swipe_is_macos` | macOS only: a continuous swipe follows the fingers while they move, which only the macOS driver reads. Windows gets finished gestures from its touchpad settings and Linux acts once a swipe ends: use the equivalent single-step actions. |
 
 <!-- END GENERATED availability -->

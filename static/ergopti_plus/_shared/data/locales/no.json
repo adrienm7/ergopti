@@ -3919,9 +3919,6 @@
 	"platform_reason.action_line_deletion_is_macos": "Bare macOS: Cmd+Delete sletter til begynnelsen eller slutten av linjen i tekstfelt på macOS. Tekstfelt på Windows og Linux har ingen slik tast: merk til linjekanten med Shift+Home eller Shift+End, og slett deretter.",
 	"platform_reason.action_lookup_is_macos_dictionary": "Bare macOS: Slå opp åpner systemets ordbokspanel for ordet under pekeren. Windows og Linux har ikke noe ordbokspanel i systemet.",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Bare macOS: disse handlingene slår av og på navigasjonslaget som Karabiner-Elements holder. På Windows og Linux følger laget tasten som holdes nede, og har ingen bryter å stille.",
-	"platform_reason.action_not_yet_on_linux": "Ikke på Linux ennå: ingenting hindrer det, men Linux-driveren gjennomfører det ikke ennå.",
-	"platform_reason.action_not_yet_on_macos": "Ikke på macOS ennå: ingenting hindrer det, men macOS-driveren gjennomfører det ikke ennå.",
-	"platform_reason.action_not_yet_on_windows": "Ikke på Windows ennå: ingenting hindrer det, men Windows-driveren gjennomfører det ikke ennå.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Dette systemet lar ingen app lukke varslinger: fjern dem i varslingssenteret, som den tilsvarende handlingen åpner.",
 	"platform_reason.action_office_bold_key_is_windows": "Bare Windows: fransk Microsoft Office gjør tekst fet med Ctrl+G der andre apper bruker Ctrl+B, så denne handlingen velger tasten etter app. På macOS (Cmd+B) og Linux (Ctrl+B) virker én kombinasjon overalt: tilordne den fra «Snarveier».",
 	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Ikke på Linux: Wayland lar ingen app flytte pekeren, og denne handlingen har ingen utgave begrenset til X11-økter.",
@@ -3933,5 +3930,13 @@
 	"platform_reason.action_spaces_are_edited_in_mission_control": "Ikke på macOS: Spaces legges til og fjernes i Mission Control, som macOS ikke lar noen annen app styre.",
 	"platform_reason.action_window_overview_is_each_systems": "Hvert system har sin egen vindusoversikt: Mission Control og App Exposé på macOS, Oppgavevisning på Windows. Hvert Linux-skrivebord tilordner sin egen: tilordne der skrivebordets tast som tastekombinasjon.",
 	"platform_reason.action_window_switching_is_not_macos": "Ikke på macOS: denne handlingen går gjennom vinduene slik Alt+Tab gjør på Windows og Linux. macOS bytter app med Cmd+Tab og går gjennom vinduene i én app: bruk den tilsvarende handlingen.",
-	"platform_reason.action_word_deletion_modifier_differs": "Hvert system sletter et ord med sin egen modifikator (Option på macOS, Ctrl på Windows og Linux), så hvert viser sin egen handling: bruk den tilsvarende handlingen."
+	"platform_reason.action_word_deletion_modifier_differs": "Hvert system sletter et ord med sin egen modifikator (Option på macOS, Ctrl på Windows og Linux), så hvert viser sin egen handling: bruk den tilsvarende handlingen.",
+	"platform_reason.action_app_windows_unreachable_on_wayland": "Ikke på Linux: Wayland lar ingen app liste opp eller aktivere vinduene til en annen, så vinduene til den aktive appen kan ikke skilles fra de andre; den tilsvarende handlingen går gjennom alle vinduer.",
+	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Ikke på Linux: antallet skrivebord hører til innstillingene i hvert skrivebordsmiljø (GNOME legger dem til og fjerner dem selv, KDE og Xfce har et fast antall), og Wayland gir ingen app en forespørsel om å endre det.",
+	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Ikke på Linux: hvert Linux-skrivebord holder en økt våken med sin egen hvilesperre (presentasjonsmodusen i KDE og Xfce, en Caffeine-utvidelse i GNOME); slå den på der.",
+	"platform_reason.action_key_is_its_own_binding_here": "Ikke en egen rad på dette systemet: den tilsvarende handlingen sender den samme tasten.",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Bare macOS som bryter: Windows velger Dupliser i projeksjonsmenyen Win+P, og GNOME og KDE i sin egen skjermvelger Super+P; tilordne den tasten som tastekombinasjon.",
+	"platform_reason.action_sticky_keys_are_the_systems": "Dette systemet har Trege taster i tilgjengelighetsinnstillingene, som får hver modifikator til å gjelde én tast; slå dem på der.",
+	"platform_reason.action_take_note_uses_notepad": "Bare Windows: denne handlingen åpner dagens notatfil i Notisblokk, redigeringsprogrammet som følger med hver Windows. macOS har sitt eget Hurtignotat (Fn+Q), og Linux har ikke noe redigeringsprogram som følger med alle skrivebord.",
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "På macOS leser Livetekst teksten i ethvert skjermbilde eller bilde: ta et med den tilsvarende handlingen, og merk så teksten."
 }
