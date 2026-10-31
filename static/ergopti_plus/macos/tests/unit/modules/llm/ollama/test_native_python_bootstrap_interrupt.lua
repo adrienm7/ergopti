@@ -41,7 +41,7 @@ end
 -- reaches its second allocation stage. "refuse" fails the first download.
 local CALLER = [[
 set -eu
-SCRIPT_DIR="$FX/src"
+SCRIPT_DIR="$FX/macos/modules/llm"
 source "$SCRIPT_DIR/network-retry.sh"
 source "$SCRIPT_DIR/native_python_bootstrap.sh"
 managed_bootstrap_download() {
@@ -89,10 +89,14 @@ local function run(mode, extra)
 	root = root .. "-bootstrap-interrupt-" .. mode
 	local llm = helpers.driver_root() .. "modules/llm/"
 	local _, prepared = command("rm -rf " .. quote(root) .. " && mkdir -p " .. quote(root .. "/home")
-		.. " " .. quote(root .. "/tmp") .. " " .. quote(root .. "/src")
+		.. " " .. quote(root .. "/tmp") .. " " .. quote(root .. "/macos/modules/llm")
+		.. " " .. quote(root .. "/_shared/data")
 		.. " && cp " .. quote(llm .. "native_python_bootstrap.sh") .. " " .. quote(llm .. "uv-release.sh")
 		.. " " .. quote(llm .. "network-retry.sh")
-		.. " " .. quote(llm .. "managed-python-release.sh") .. " " .. quote(root .. "/src/"))
+		.. " " .. quote(llm .. "managed-python-release.sh") .. " " .. quote(root .. "/macos/modules/llm/")
+		-- The release pins name their host through the shared identifiers, three
+		-- folders above modules/llm as in the bundle.
+		.. " && cp " .. quote(helpers.shared("data/identifiers.sh")) .. " " .. quote(root .. "/_shared/data/"))
 	helpers.assert_eq(prepared, 0, "fixture copies the real bootstrap sources")
 	write(root .. "/run.sh", CALLER)
 	write(root .. "/driver.sh", DRIVER)

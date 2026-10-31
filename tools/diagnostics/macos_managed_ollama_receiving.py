@@ -749,6 +749,7 @@ class Receiver:
             "macos/modules/llm/managed_ollama_runtime.py",
             "macos/modules/llm/managed-python-release.sh",
             "macos/modules/llm/managed-python-downloads.json",
+            "_shared/data/identifiers.sh",
         ]
         for relative in relatives:
             self.copy_source("static/ergopti_plus/" + relative, payload / relative)
