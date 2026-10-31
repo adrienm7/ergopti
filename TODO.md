@@ -148,9 +148,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       016ef6adc5), the deferred keystats start sliced (L18, 58f82e9fdc), the atomic writer's source listings and
       `cp -p` in one fork (two forks per replacement instead of four: preferences save `write`, keystats append),
       and `field_slow_lines` naming what decides each part below (6c30779ec3). Left, from the next field report
-      (no manual action: the field run reports it): (1) the remaining menu rebuilds: `slow_layout_menu_phase` names
-      the `menu_keyboard_layout.*` stage to slice (per-builder phases were reverted on 2026-10-31: they changed the call
-      shapes the menu parity proofs read; time the builders without changing those calls), `slow_hold_phase` the busiest phase of every hold; (2)
+      (no manual action: the field run reports it): (1) the remaining menu rebuilds (322 ms on 2026-10-31, the
+      keyboard-layout row 141.5 ms of it; its number-row and magic-key builders no longer decode unchanged registry
+      JSON nor walk every candidate per row): `menu_layout_slowest` in `field_menu_build` names the row's costliest
+      `menu_keyboard_layout.*` stage of the rebuild, `slow_hold_phase` the busiest phase of every hold; (2)
       preferences save `sparse` (about 280 ms) and `write` (L17): `slow_preferences_save_stage` and
       `slow_preferences_save_forks` (`count:ms` of the worst save) say whether the remaining fork or a prepare
       stage holds it; (3) keystats append `write` and the ledger read (L16): `slow_ingest_ticks`,
