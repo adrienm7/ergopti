@@ -352,10 +352,15 @@ function loadPublicationProducer(filename, filesystem) {
 					throw new Error('Native publication tools are forbidden by the contract fixture');
 				}
 			};
+		// The shared identifiers name the release host; they read no fixture file.
 		if (
-			['node:path', 'node:crypto', '../lib/paths.cjs', '../lib/owned-descriptor-read.cjs'].includes(
-				name
-			)
+			[
+				'node:path',
+				'node:crypto',
+				'../lib/paths.cjs',
+				'../lib/identifiers.cjs',
+				'../lib/owned-descriptor-read.cjs'
+			].includes(name)
 		)
 			return resolve(name);
 		throw new Error('Unowned publication fixture dependency: ' + name);

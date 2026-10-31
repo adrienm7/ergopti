@@ -33,6 +33,7 @@ const os = require('os');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 const crypto = require('node:crypto');
+const { app } = require('../lib/identifiers.cjs');
 const { parse: parseToml } = require('smol-toml');
 const {
 	createStartupCodeFixture,
@@ -214,7 +215,7 @@ class LiveSession {
 			'\uFEFF#Requires AutoHotkey v2.0+\n_DriverStartupSmokeInspect := LiveServe\n' +
 				'_DriverStartupSmokeInspectShell := LiveShellHook\n' +
 				sources +
-				'\n#Include ErgoptiPlus.ahk\n',
+				`\n#Include ${app.ahk}\n`,
 			'utf8'
 		);
 		prepareStartupPersonalInclude(this.code.windows, this.config);
