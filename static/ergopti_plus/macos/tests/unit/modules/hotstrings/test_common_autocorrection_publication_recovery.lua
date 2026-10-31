@@ -154,7 +154,8 @@ helpers.describe("common autocorrection native consumer recovery", function()
 			helpers.assert_true(f.Config.init(f.options))
 			local original = f.source
 			terminal_fixture(f.Config, function(terminal)
-				helpers.assert_true(terminal.coordinator.request_reload("delayed"))
+				-- An exit: an unowned reload refused at its fence reloads natively instead
+				helpers.assert_true(terminal.coordinator.request_exit("delayed", 0))
 				helpers.assert_nil(f.Config.capture_terminal_admission())
 				helpers.assert_eq(f.Config.reload(), false)
 				helpers.assert_eq(f.Config.acquire({}), false)

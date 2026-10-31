@@ -14,8 +14,10 @@
 --- 2. Single Transaction: concurrent reload/quit requests share one fence;
 ---    an exit request safely supersedes an earlier reload request.
 --- 3. Fail Closed: a rejected or failed fence leaves the current Lua environment
----    and its consumers running. Once the fence commits, any teardown failure
----    exits non-zero because already-stopped owners cannot be rolled back safely.
+---    and its consumers running, except an unowned reload whose fence is
+---    refused after its request, which reloads natively (item 10). Once the
+---    fence commits, any teardown failure exits non-zero because already-stopped
+---    owners cannot be rolled back safely.
 --- 4. Reload Truth: the reload sentinel is committed before local teardown and
 ---    cleared again if the native reload call itself fails.
 --- 5. Drained Diagnostics: after local owners stop, terminal action waits for the
@@ -36,7 +38,9 @@
 ---    accepted. A reload still unsettled then (a lease fence that never answers,
 ---    a stuck drain or teardown) reloads natively, naming the stage it waited
 ---    on, instead of leaving the app up with its Karabiner remaps revoked; the
----    previous worker's stdin EOF lets the guardian fence its exact lease.
+---    previous worker's stdin EOF lets the guardian fence its exact lease. An
+---    unowned reload whose fence is refused reloads natively the same way: the
+---    revocation already stopped its remaps and cannot be undone in this VM.
 --- ==============================================================================
 
 local M = {}
@@ -511,10 +515,20 @@ local function begin_input_drain(transaction)
 	return true
 end
 
+local reload_natively
+
 local function finish_transaction(transaction, fenced, detail)
 	if _transaction ~= transaction or transaction.settled then return end
 	if fenced ~= true then
 		breadcrumb(transaction, "lease_fence_refused")
+		if transaction.kind == "reload" and type(transaction.on_aborted) ~= "function" then
+			-- The revocation already stopped this VM's remaps and cannot be undone:
+			-- aborting left the app up with no remaps. A fresh VM takes a new lease.
+			-- An owned reload keeps its exact abort: its caller compensates.
+			return reload_natively(transaction, "reload_fence_refused", string.format(
+				"Controlled reload: the exact Karabiner revocation was not proven (%s); reloading natively, the guardian fences the lease on the worker's EOF.",
+				tostring(detail)))
+		end
 		abort_transaction(transaction,
 			"exact Karabiner revocation was not proven: " .. tostring(detail))
 		return
@@ -535,25 +549,20 @@ local function finish_transaction(transaction, fenced, detail)
 	transaction.completion_ok = begin_input_drain(transaction)
 end
 
---- Reloads natively a controlled reload that did not settle in time, naming the
---- stage it waited on. Native hs.reload replaces the Lua state without the local
---- teardown; the previous worker's stdin EOF then lets the guardian fence the
---- exact lease, as for any uncontrolled reload.
+--- Settles a reload that cannot complete under control by replacing the Lua
+--- state natively, without the local teardown. The previous worker's stdin EOF
+--- then lets the guardian fence the exact lease, as for any uncontrolled reload.
 --- @param transaction table The reload.
-local function expire_reload(transaction)
-	transaction.reload_deadline = nil
-	if _transaction ~= transaction or transaction.settled or transaction.kind ~= "reload" then return end
-	local stage = M.pending_stage()
-	breadcrumb(transaction, "reload_deadline")
+--- @param stage string Breadcrumb stage naming why.
+--- @param message string The error line, written while the logger still runs.
+reload_natively = function(transaction, stage, message)
+	disarm_reload_deadline(transaction)
+	breadcrumb(transaction, stage)
 	transaction.settled = true
 	transaction.completion_ok = false
 	_transaction = nil
 	-- Once the drain started, a log line would reopen the synchronous sink
-	if not transaction.drain_started then
-		pcall(Logger.error, LOG,
-			"Controlled reload did not settle within %.1f s (waiting on %s); reloading natively, the guardian fences the lease on the worker's EOF.",
-			_deps.reload_deadline_seconds, stage)
-	end
+	if not transaction.drain_started then pcall(Logger.error, LOG, "%s", message) end
 	if not transaction.reload_marked then
 		local marked_ok, marked = xpcall(_deps.mark_reload, debug.traceback)
 		transaction.reload_marked = marked_ok and marked == true
@@ -566,6 +575,17 @@ local function expire_reload(transaction)
 	breadcrumb(transaction, "hs_reload_raised")
 	transaction.terminal_failure = tostring(reload_result)
 	xpcall(function() return _deps.fatal_exit(_deps.fatal_exit_code) end, debug.traceback)
+end
+
+--- Reloads natively a controlled reload that did not settle in time, naming the
+--- stage it waited on.
+--- @param transaction table The reload.
+local function expire_reload(transaction)
+	transaction.reload_deadline = nil
+	if _transaction ~= transaction or transaction.settled or transaction.kind ~= "reload" then return end
+	reload_natively(transaction, "reload_deadline", string.format(
+		"Controlled reload did not settle within %.1f s (waiting on %s); reloading natively, the guardian fences the lease on the worker's EOF.",
+		_deps.reload_deadline_seconds, M.pending_stage()))
 end
 
 --- Arms the deadline of a newly accepted reload.

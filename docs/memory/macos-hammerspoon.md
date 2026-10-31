@@ -1075,8 +1075,9 @@ A controlled reload arms `ui.reload_deadline_ms` when accepted. Still
 unsettled then, it reloads natively without the local teardown, naming the
 stage it waited on; the previous worker's stdin EOF lets the guardian fence the
 exact lease. Without it, a fence that never answered left the app up with its
-remaps revoked indefinitely. A pre-fence refusal still aborts and keeps the Lua
-environment live.
+remaps revoked indefinitely. An unowned reload whose fence is refused reloads
+natively the same way, since the revocation cannot be undone in that VM; an
+owned reload (`request_reload_owned`) and an exit keep their exact abort.
 
 ### project-hs-kc-ledger-process-lifecycle
 
