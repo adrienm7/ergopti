@@ -723,7 +723,6 @@
 	"healthcheck.field.runtime": "Çalışma ortamı",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Web görünümü motoru",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "Model",
 	"healthcheck.field.cpu": "İşlemci",
 	"healthcheck.field.cpu_cores": "Mantıksal çekirdekler",

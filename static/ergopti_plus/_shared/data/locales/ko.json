@@ -723,7 +723,6 @@
 	"healthcheck.field.runtime": "런타임",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "웹 보기 엔진",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "모델",
 	"healthcheck.field.cpu": "프로세서",
 	"healthcheck.field.cpu_cores": "논리 코어",
