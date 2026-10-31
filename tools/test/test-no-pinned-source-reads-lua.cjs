@@ -93,7 +93,11 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //           27 → 24 (2026-10-31: the app launcher quoting and clipboard round
 //                    trip tests became behaviour tests; the i18n placeholder test
 //                    loads its module by name.)
-const BASELINE = 24;
+//           24 → 22 (2026-10-31: the Ollama require-time test records the
+//                    scheduling calls of a fresh load; the streaming payload
+//                    declaration-order scan became a completion behaviour case
+//                    in test_api_ollama_stream_retirement.)
+const BASELINE = 22;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -130,7 +134,8 @@ const BASELINE = 24;
 //              take a selector at three call sites and a path at the fourth;
 //              splitting it in two let the fixer take the driver half.)
 //       75 → 70 (2026-10-31: the three files of the file baseline's 27 → 24.)
-const READ_BASELINE = 70;
+//       70 → 67 (2026-10-31: the two files of the file baseline's 24 → 22.)
+const READ_BASELINE = 67;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
