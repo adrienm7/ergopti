@@ -22,13 +22,15 @@ _HSCS_TrayMapLiteral(Source, Name) {
 		throw Error("The tray boot owner has no Map declaration for " . Name . ".")
 	; A real declaration names generated path constants; read each through its owner
 	; so the JSON reading below stays the strict gate for any other non-literal value.
-	Literal := RegExReplace(Found[1], ",\s*$"), Position := 1
+	Literal := RegExReplace(Found[1], ",\s*$"), Position := 1, Resolved := 0
 	while RegExMatch(Literal, "\b(ConfigKey|ConfigLeaf)\.([A-Z0-9_]+)\b", &Constant, Position) {
 		Owner := Constant[1] == "ConfigKey" ? ConfigKey : ConfigLeaf
 		Value := JsonStringLiteral(Owner.%Constant[2]%)
 		Literal := SubStr(Literal, 1, Constant.Pos - 1) . Value . SubStr(Literal, Constant.Pos + Constant.Len)
 		Position := Constant.Pos + StrLen(Value)
+		Resolved += 1
 	}
+	Assert(Resolved > 0, "both tray maps name generated constants: " . Name)
 	Values := JsonParse("[" . Literal . "]")
 	if !(Values is Array) || Mod(Values.Length, 2)
 		throw Error("The tray boot Map declaration has incomplete pairs: " . Name . ".")
