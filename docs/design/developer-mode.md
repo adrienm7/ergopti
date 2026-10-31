@@ -155,5 +155,5 @@ edit without a word.
   stopped, the tray appears, typing expands, a saved `.lua` restarts the daemon
   (log line `Debounced source reload firing`), and the tray's Reload restarts
   it. The relay's successor writes no terminal output; read the log file.
-- Windows [PHYS-W]: see `TODO.md`, item "Developer mode on the
-  three OS".
+- Windows [PHYS-W]: see `TODO.md`, the developer-mode line of "To confirm
+  on the Windows PC".
