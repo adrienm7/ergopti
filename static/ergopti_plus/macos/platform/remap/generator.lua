@@ -93,18 +93,18 @@ M.REFUSAL_LEGACY_CONFLICTS = "legacy_conflicts"
 -- under it. A field that feeds no feature says why (`why`, not `reason`, which
 -- the logger gate reserves for closed log reasons).
 M.REQUIREMENT_STATE_FEATURES = {
-	tap_holds_enabled         = { "tap_holds.enabled" },
+	tap_holds_enabled         = { "tap_holds.enabled" }, -- config-key-literal-ok: a manifest feature selector
 	-- The per-key bindings and the tap timeout belong to the Tap-Holds switch;
 	-- they live in config_karabiner.toml and have no manifest row of their own.
-	tap_hold_config           = { "tap_holds.enabled" },
-	tap_hold_timeout_ms       = { "tap_holds.enabled" },
+	tap_hold_config           = { "tap_holds.enabled" }, -- config-key-literal-ok: a manifest feature selector
+	tap_hold_timeout_ms       = { "tap_holds.enabled" }, -- config-key-literal-ok: a manifest feature selector
 	mod_combos_enabled        = { "mod_combos.*" },
 	mod_combos_config         = { "mod_combos.*" },
-	simultaneous_threshold_ms = { "mod_combos.simultaneous_threshold_ms" },
-	combo_symmetric           = { "mod_combos.symmetric" },
+	simultaneous_threshold_ms = { "mod_combos.simultaneous_threshold_ms" }, -- config-key-literal-ok: a manifest feature selector
+	combo_symmetric           = { "mod_combos.symmetric" }, -- config-key-literal-ok: a manifest feature selector
 	script_chords             = { "shortcuts.script_control.*" },
-	virtual_keyboard_type     = { "layout.virtual_keyboard" },
-	virtual_keyboard_product  = { "layout.virtual_keyboard" },
+	virtual_keyboard_type     = { "layout.virtual_keyboard" }, -- config-key-literal-ok: a manifest feature selector
+	virtual_keyboard_product  = { "layout.virtual_keyboard" }, -- config-key-literal-ok: a manifest feature selector
 	nav_layer                 = { why = "layers.toml is deployed whenever the integration is on; it has no manifest switch, and the features that enter it reach Karabiner on their own" },
 }
 
