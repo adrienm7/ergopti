@@ -151,18 +151,31 @@ local function run_metadata_command(command, operation)
 	return output
 end
 
---- Captures the extended ACL entries without including the pathname-bearing
---- first ls line. LC_ALL=C keeps the representation stable across locales.
+--- Builds the listing whose lines after the pathname-bearing first one are the
+--- extended ACL entries. LC_ALL=C keeps the representation stable across locales.
+--- @param path string Regular-file pathname.
+--- @return string command
+local function acl_inspection_command(path)
+	return "LC_ALL=C " .. LS_BIN .. " -led " .. TextUtils.shell_quote(path)
+end
+
+--- Keeps the ACL entries of one `ls -led` listing, dropping its first line.
+--- @param output string Listing of one file.
+--- @return string fingerprint
+local function acl_from_listing(output)
+	local newline = output:find("\n", 1, true)
+	if newline == nil then return "" end
+	return output:sub(newline + 1)
+end
+
+--- Captures the extended ACL entries of one file in its own command.
 --- @param path string Regular-file pathname.
 --- @return string|nil fingerprint
 --- @return string|nil error_message
 local function read_acl_fingerprint(path)
-	local command = "LC_ALL=C " .. LS_BIN .. " -led " .. TextUtils.shell_quote(path)
-	local output, command_err = run_metadata_command(command, "ACL inspection")
+	local output, command_err = run_metadata_command(acl_inspection_command(path), "ACL inspection")
 	if output == nil then return nil, command_err end
-	local newline = output:find("\n", 1, true)
-	if newline == nil then return "" end
-	return output:sub(newline + 1)
+	return acl_from_listing(output)
 end
 
 --- Captures every extended attribute as raw bytes through Hammerspoon's
@@ -214,9 +227,11 @@ end
 --- used only while rechecking the source; a staged replacement necessarily has
 --- a different inode.
 --- @param path string Regular-file pathname.
+--- @param acl string|nil ACL fingerprint already listed by the caller's own
+---   command; nil lists it here.
 --- @return table|nil snapshot
 --- @return string|nil error_message
-local function capture_security_metadata(path)
+local function capture_security_metadata(path, acl)
 	if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
 		return nil, "hs.fs.attributes is unavailable"
 	end
@@ -226,8 +241,11 @@ local function capture_security_metadata(path)
 		return nil, tostring(attributes_err or "metadata source is not a regular file")
 	end
 
-	local acl, acl_err = read_acl_fingerprint(path)
-	if acl == nil then return nil, acl_err end
+	if acl == nil then
+		local acl_err
+		acl, acl_err = read_acl_fingerprint(path)
+		if acl == nil then return nil, acl_err end
+	end
 	local xattrs, xattr_err = read_xattr_snapshot(path)
 	if xattrs == nil then return nil, xattr_err end
 	return {
@@ -292,20 +310,35 @@ end
 --- metadata before its content is replaced. cp -p preserves mode, ownership,
 --- flags, ACLs, and xattrs; explicit snapshots catch its documented best-effort
 --- ownership behavior and any partial metadata copy before publication.
+---
+--- The source's ACL listing before the copy, the copy and the listing after it
+--- run in ONE command: each command is a fork the main thread waits for, and the
+--- Mac field log showed a preferences save spending 600 to 800 ms in four of
+--- them (ledger L17). The in-process attribute and xattr reads still bracket
+--- the command, so every "before" read precedes the copy and every "after" read
+--- follows it. A NUL, which no listing can contain, separates the two listings.
 --- @param source_path string Existing resolved destination.
 --- @param staging_path string Absent private payload pathname.
 --- @return table|nil expected_metadata
 --- @return string|nil error_message
 local function seed_staging_metadata(source_path, staging_path)
-	local expected, capture_err = capture_security_metadata(source_path)
-	if expected == nil then return nil, capture_err end
-	local command = COPY_BIN .. " -p "
+	local command = acl_inspection_command(source_path)
+		.. " && printf '\\000' && " .. COPY_BIN .. " -p "
 		.. TextUtils.shell_quote(source_path) .. " "
 		.. TextUtils.shell_quote(staging_path)
-	local _, copy_err = run_metadata_command(command, "metadata-preserving copy")
-	if copy_err ~= nil then return nil, copy_err end
+		.. " && " .. acl_inspection_command(source_path)
+	local before, before_err = capture_security_metadata(source_path, "")
+	if before == nil then return nil, before_err end
+	local output, copy_err = run_metadata_command(command, "metadata-preserving copy")
+	if output == nil then return nil, copy_err end
+	local separator = output:find("\0", 1, true)
+	if separator == nil or output:find("\0", separator + 1, true) ~= nil then
+		return nil, "metadata-preserving copy returned malformed ACL listings"
+	end
+	local expected = before
+	expected.acl = acl_from_listing(output:sub(1, separator - 1))
 
-	local current, current_err = capture_security_metadata(source_path)
+	local current, current_err = capture_security_metadata(source_path, acl_from_listing(output:sub(separator + 1)))
 	if current == nil then return nil, current_err end
 	local unchanged, compare_err = security_metadata_equal(expected, current, true)
 	if not unchanged then return nil, "metadata source changed during copy: " .. tostring(compare_err) end
