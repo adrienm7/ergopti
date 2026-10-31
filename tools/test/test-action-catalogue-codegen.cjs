@@ -121,10 +121,7 @@ rejects(
 // at all, to say why; the picker of that OS dropped them without a word.
 rejects(
 	'missing reason',
-	mutate(
-		'reason_linux = "platform_reason.action_lookup_is_macos_dictionary"\n',
-		''
-	),
+	mutate('reason_linux = "platform_reason.action_lookup_is_macos_dictionary"\n', ''),
 	/not on Linux, so reason_linux must name/
 );
 rejects(
@@ -192,7 +189,9 @@ rejects(
 		const locale = JSON.parse(fs.readFileSync(path.join(LOCALES, file), 'utf8'));
 		for (const key of keys) {
 			check(
-				typeof locale[key] === 'string' && locale[key].trim() !== '' && !locale[key].includes('{H}'),
+				typeof locale[key] === 'string' &&
+					locale[key].trim() !== '' &&
+					!locale[key].includes('{H}'),
 				`${file}: reason ${key} is missing, empty or still holds its {H} placeholder`
 			);
 		}
