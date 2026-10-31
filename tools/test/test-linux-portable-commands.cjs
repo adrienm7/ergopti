@@ -440,7 +440,8 @@ const PROGRAMS = {
 		{ proof: { file: CI_LINUX, token: 'pulseaudio-utils', scopes: HOST }, probed: DRIVER }
 	),
 	kdialog: optionalTool('KDE dialogs'),
-	amixer: optionalTool('ALSA volume metric'),
+	wpctl: optionalTool('PipeWire mute metric, read when pactl does not answer'),
+	amixer: optionalTool('ALSA mute metric when neither PulseAudio nor PipeWire answers'),
 	nmcli: optionalTool('network metric'),
 	iwgetid: optionalTool('Wi-Fi metric'),
 	'gnome-extensions': optionalTool('AppIndicator extension on GNOME'),
