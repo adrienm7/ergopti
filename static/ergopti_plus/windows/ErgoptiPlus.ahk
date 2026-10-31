@@ -9,7 +9,7 @@
 ;@Ahk2Exe-SetCopyright Copyright (c) 2024 Adrien MOYAUX (MIT License) - https://ergopti.fr
 ;@Ahk2Exe-SetOrigFilename ErgoptiPlus.exe
 ;@Ahk2Exe-SetInternalName ErgoptiPlus
-;@Ahk2Exe-Set Comments, Open-source keyboard companion. Source code: https://github.com/adrienm7/ergopti
+;@Ahk2Exe-Set Comments, Open-source keyboard companion.
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 ; No process starts with a tray icon: the driver path reveals it once the custom
 ; icon and the safe bootstrap menu are in place, and a detached worker never does.
