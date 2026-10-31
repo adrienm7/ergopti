@@ -54,7 +54,9 @@ local MAX_DATAGRAM_BYTES = 60000
 local MAX_RECORD_LINE_BYTES = 8000
 local MAX_BATCH_RECORDS = 64
 local MAX_PREPARE_STEPS_PER_TICK = 64
-local MAX_PREPARE_BYTES_PER_TICK = 65536
+-- The registry's generated table, not infra.timings: the timings reader logs
+-- through this transport.
+local MAX_PREPARE_BYTES_PER_TICK = require("_generated.registry_limits").count("limits", "log_prepare_tick_bytes")
 local MAX_ENQUEUED_LINE_BYTES = MAX_PREPARE_BYTES_PER_TICK
 local DEFAULT_ROUTE_OVERLAP_BYTES = 256
 local MAX_ROUTE_OVERLAP_BYTES = 4096
