@@ -17,6 +17,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { verify } = require('./desktop-ci-evidence.cjs');
 const { coldBootstrapRecord } = require('./fixtures/macos-cold-bootstrap-receipt.cjs');
+const { guardianRecordsForPlan } = require('./fixtures/macos-guardian-receipt.cjs');
 const pipeline = require('./ci-full-default.cjs');
 const macRole = require('./fixtures/macos-stage-source.cjs');
 const macPlans = require('../ci/macos-stage-roles.cjs');
@@ -33,6 +34,11 @@ function state(needs) {
 		evidence: [],
 		// Both cold-receiving cells (macOS 15 and the macOS 26 lot) recorded.
 		coldBootstrap: [coldBootstrapRecord(), { ...coldBootstrapRecord(), runner: 'macos-latest' }],
+		guardian: guardianRecordsForPlan(
+			'a'.repeat(40),
+			['clean', 'karabiner_config', 'upgraded'],
+			false
+		),
 		needs
 	};
 }

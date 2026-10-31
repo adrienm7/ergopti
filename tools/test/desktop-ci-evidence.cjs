@@ -456,6 +456,104 @@ function recordColdMac(receiptFile, output) {
 	);
 }
 
+// The collector's actual verbs, with the exit each must report (64 is the
+// helper's refusal of a foreign launcher identity).
+const GUARDIAN_INVOCATIONS = {
+	rejected: 64,
+	registered: 0,
+	observed: 0,
+	repeated: 0,
+	rejected_unregister: 64,
+	unregistered: 0,
+	repeated_unregister: 0
+};
+
+/**
+ * Checks one receipt of tools/diagnostics/macos_helper_registration.py: the
+ * installed helper registered the remap guardian headless, read it back,
+ * refused a foreign identity for both verbs, retired it, and left no job.
+ * The collector refuses each wrong step itself; this re-reads the receipt so a
+ * partial or edited one can never stand for a completed acceptance.
+ * @param {object} receipt Parsed collector receipt.
+ * @throws {Error} When any step is missing, failed, or left state behind.
+ */
+function verifyGuardianReceipt(receipt) {
+	assert.equal(receipt.kind, 'native-helper-registration', 'Not a guardian acceptance receipt');
+	assert.equal(receipt.primary_error, undefined, 'Guardian acceptance reported an error');
+	for (const [verb, exit] of Object.entries(GUARDIAN_INVOCATIONS))
+		assert.equal(receipt[verb] && receipt[verb].exit, exit, `Guardian ${verb} exit differs`);
+	assert.equal(receipt.observed.stdout, 'ready\n', 'Guardian readiness was not read back');
+	assert.equal(
+		receipt.unregistered.stdout,
+		'unregistered\n',
+		'Guardian removal was not acknowledged'
+	);
+	assert.equal(
+		receipt.job_status_after_rejected_unregister,
+		0,
+		'A refused removal dropped the job'
+	);
+	// launchctl's exit for the absent job, read before registration, must be
+	// the one read after each removal and after cleanup.
+	assert.ok(Number.isInteger(receipt.initial_job_status) && receipt.initial_job_status !== 0);
+	for (const status of [
+		receipt.job_status_after_unregister,
+		receipt.job_status_after_repeated_unregister,
+		receipt.final_job_status
+	])
+		assert.equal(status, receipt.initial_job_status, 'The guardian job was not proved absent');
+	assert.equal(receipt.unregistration_verified, true, 'Guardian retirement was not verified');
+	assert.equal(receipt.job_absent_after_cleanup, true, 'The guardian job outlived the collector');
+	assert.deepEqual(receipt.cleanup_errors, [], 'Guardian cleanup reported errors');
+}
+
+/** Records one launch lot's admitted guardian acceptance with its commit and runner. */
+function recordGuardianMac(receiptFile, lot, output) {
+	const receipt = JSON.parse(fs.readFileSync(receiptFile, 'utf8'));
+	verifyGuardianReceipt(receipt);
+	macRoles.lotScenarios(lot);
+	assert.match(process.env.GITHUB_SHA || '', /^[a-f0-9]{40}$/, 'Invalid commit');
+	assert.ok(process.env.MATRIX_RUNNER, 'Missing runner');
+	fs.writeFileSync(
+		output,
+		JSON.stringify({
+			schema_version: 1,
+			platform: 'macos',
+			sha: process.env.GITHUB_SHA,
+			runner: process.env.MATRIX_RUNNER,
+			lot,
+			receipt
+		}) + '\n',
+		{ flag: 'wx' }
+	);
+}
+
+/** Reads the guardian acceptance records, kept apart from launch records. */
+function readGuardianEvidence(directory) {
+	return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+		const file = path.join(directory, entry.name);
+		if (entry.isDirectory()) return readGuardianEvidence(file);
+		return entry.name === 'guardian-evidence.json'
+			? [JSON.parse(fs.readFileSync(file, 'utf8'))]
+			: [];
+	});
+}
+
+/** Requires exactly one admitted guardian acceptance per launch lot of the plan. */
+function verifyGuardianRecords(records, sha, lots) {
+	assert.deepEqual(
+		records.map((record) => `${record.runner}/${record.lot}`).sort(),
+		lots.slice().sort(),
+		'Missing, duplicate or unexpected guardian acceptance'
+	);
+	for (const record of records) {
+		assert.equal(record.schema_version, 1, 'Unknown guardian evidence schema');
+		assert.equal(record.platform, 'macos', 'Foreign platform');
+		assert.equal(record.sha, sha, 'Foreign commit');
+		verifyGuardianReceipt(record.receipt);
+	}
+}
+
 /** Keeps cold evidence separate from packaged-launch and other native records. */
 function readColdBootstrapEvidence(directory) {
 	return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -476,6 +574,7 @@ function verify({
 	scenarios,
 	release,
 	coldBootstrap,
+	guardian,
 	qualificationContext = null,
 	qualificationNow = new Date()
 }) {
@@ -504,6 +603,14 @@ function verify({
 			coldBootstrap,
 			sha,
 			cells.filter(macRoles.receivesColdBootstrap).map((cell) => cell.runner)
+		);
+	if (platform === 'macos')
+		verifyGuardianRecords(
+			guardian,
+			sha,
+			cells
+				.filter((cell) => cell.role === 'launch')
+				.map((cell) => `${cell.runner}/${cell.scenario}`)
 		);
 	const expected =
 		platform === 'windows'
@@ -711,6 +818,9 @@ if (require.main === module) {
 	if (command === 'record-cold-macos') {
 		assert.equal(args.length, 2);
 		recordColdMac(...args);
+	} else if (command === 'record-guardian-macos') {
+		assert.equal(args.length, 3);
+		recordGuardianMac(...args);
 	} else if (command === 'record-windows-upgrade') {
 		assert.equal(args.length, 3);
 		recordWindowsUpgrade(...args);
@@ -746,6 +856,7 @@ if (require.main === module) {
 			needs: JSON.parse(process.env.NEEDS),
 			evidence: readEvidence(directory),
 			coldBootstrap: platform === 'macos' ? readColdBootstrapEvidence(directory) : [],
+			guardian: platform === 'macos' ? readGuardianEvidence(directory) : [],
 			sha: process.env.GITHUB_SHA,
 			scenarios,
 			release,
@@ -770,6 +881,10 @@ module.exports = {
 	verifyColdBootstrapRecords,
 	recordColdMac,
 	readColdBootstrapEvidence,
+	verifyGuardianReceipt,
+	verifyGuardianRecords,
+	recordGuardianMac,
+	readGuardianEvidence,
 	recordWindowsUpgrade,
 	currentSchemaVersion
 };

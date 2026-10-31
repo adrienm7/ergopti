@@ -263,6 +263,11 @@ try {
 		evidence: records,
 		// The macOS 15 cold cell and the macOS 26 lot each record one receipt.
 		coldBootstrap: [coldBootstrap, { ...coldBootstrap, runner: 'macos-latest' }],
+		guardian: require('./fixtures/macos-guardian-receipt.cjs').guardianRecordsForPlan(
+			sha,
+			scenarios,
+			true
+		),
 		needs: Object.fromEntries(
 			[
 				'test-hs',
