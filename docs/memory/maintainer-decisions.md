@@ -21,3 +21,12 @@ Dutch names the rolls category "Rolbewegingen" (`category.rolls`,
 `ergopti/hotstrings/rolls.toml`): "Rollen" means "roles". The locale
 completeness gate fails if Dutch falls back to the English "Rolls", which is no
 longer allowlisted.
+
+## The local servers "none" row is one sentence (2026-10-31)
+
+When a finished sweep found no local AI server, the menu row says
+`menu.llm.local_servers.none_detected` (« Aucun serveur local détecté ») and
+lists no server; the names stay in the local servers panel and the "other
+address" submenu. The row of a running sweep (`searching`) keeps the list. The
+shared `_shared/lua/llm/local_server_menu.lua` owns the rule; the Windows twin
+follows through the PC handoff.

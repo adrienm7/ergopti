@@ -3652,6 +3652,7 @@
 	"menu.llm.backend_unknown": "Bilinmiyor",
 	"menu.llm.local_servers.header": "Yerel sunucular (OpenAI uyumlu API)",
 	"menu.llm.local_servers.none": "Hiçbir yerel sunucu yanıt vermiyor ({1})",
+	"menu.llm.local_servers.none_detected": "Yerel sunucu algılanmadı",
 	"menu.llm.local_servers.searching": "Yerel sunucular aranıyor ({1})…",
 	"menu.llm.local_servers.needs_key": "{1} — API anahtarı gerekli",
 	"menu.llm.local_servers.no_models": "Kullanılabilir model yok",

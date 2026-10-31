@@ -3652,6 +3652,7 @@
 	"menu.llm.backend_unknown": "לא ידוע",
 	"menu.llm.local_servers.header": "שרתים מקומיים (API תואם OpenAI)",
 	"menu.llm.local_servers.none": "אף שרת מקומי אינו עונה ({1})",
+	"menu.llm.local_servers.none_detected": "לא זוהה שרת מקומי",
 	"menu.llm.local_servers.searching": "מחפש שרתים מקומיים ({1})…",
 	"menu.llm.local_servers.needs_key": "{1} — נדרש מפתח API",
 	"menu.llm.local_servers.no_models": "אין מודל זמין",

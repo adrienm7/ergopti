@@ -148,6 +148,18 @@ downloaded again`). Ollama deletes that layer before it reports the
   lane, job and per-step elapsed tables into its job summary
   (`tools/ci/run-timing.cjs --step-summary`); nothing to do on the PC, but the
   Windows lane's slowest steps are read there from now on.
+- Local servers "none" row on Windows (maintainer decision of 2026-10-31):
+  a finished sweep that found no server says one sentence,
+  `menu.llm.local_servers.none_detected` (all 21 locales), instead of
+  `menu.llm.local_servers.none` with the eleven server labels; the names stay
+  in the panel and the "other address" submenu. macOS and Linux read the
+  shared `_shared/lua/llm/local_server_menu.lua`. The Windows twin
+  `_shared/modules/llm/local_server_menu.ahk` (`Key := ... "menu.llm.local_servers.none"`
+  with `Labels`) needs the same split: `searching` keeps the list,
+  `none_detected` takes none; move `test_local_server_menu.ahk` line 88
+  (`"menu.llm.local_servers.none|LM Studio, llama.cpp"`) to the new key. The
+  panel's own report (`local_server_panel.ahk` line 572) keeps
+  `menu.llm.local_servers.none` with the host.
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 

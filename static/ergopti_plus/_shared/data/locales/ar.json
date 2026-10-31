@@ -3652,6 +3652,7 @@
 	"menu.llm.backend_unknown": "غير معروف",
 	"menu.llm.local_servers.header": "الخوادم المحلية (واجهة API متوافقة مع OpenAI)",
 	"menu.llm.local_servers.none": "لا يستجيب أي خادم محلي ({1})",
+	"menu.llm.local_servers.none_detected": "لم يُكتشف أي خادم محلي",
 	"menu.llm.local_servers.searching": "جارٍ البحث عن الخوادم المحلية ({1})…",
 	"menu.llm.local_servers.needs_key": "{1} — مفتاح API مطلوب",
 	"menu.llm.local_servers.no_models": "لا يوجد نموذج متاح",
