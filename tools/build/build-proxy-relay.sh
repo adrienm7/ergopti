@@ -53,7 +53,7 @@ export GOTOOLCHAIN=local GOPROXY=off GOFLAGS=-mod=readonly GOWORK=off CGO_ENABLE
 GOOS_HOST="$(go env GOOS)"
 GOARCH_HOST="$(go env GOARCH)"
 [[ "$GOOS_HOST" == linux || "$GOOS_HOST" == darwin ]] \
-	|| { echo "[ERR] The proxy relay builder runs on Linux or macOS (Windows: see the PC handoff)" >&2; exit 1; }
+	|| { echo "[ERR] The proxy relay builder runs on Linux or macOS (Windows: tools/build/build_windows_proxy_relay.ps1)" >&2; exit 1; }
 export GOARCH="${GOARCH_TARGET:-$GOARCH_HOST}"
 [[ -z "$COMPILER" ]] || export CC="$COMPILER"
 [[ "$(go env CGO_ENABLED)" == 1 ]] || { echo "[ERR] cgo is unavailable: Negotiate would never sign in" >&2; exit 1; }

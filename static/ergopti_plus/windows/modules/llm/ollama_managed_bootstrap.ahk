@@ -16,6 +16,8 @@
 global LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT := 3
 ; The local sign-in relay beside the other vendor helpers (ergopti-proxy-relay).
 global LLM_OLLAMA_PROXY_RELAY_EXECUTABLE := "ergopti-proxy-relay.exe"
+; Its build identity (tools/build/build_windows_proxy_relay.ps1), read for the expected digest.
+global LLM_OLLAMA_PROXY_RELAY_MANIFEST := "ergopti-proxy-relay.json"
 
 ; The launcher's proxy dependencies under vendor/, in the order of its
 ; Get-OllamaRuntimeVendorNames: both sides hash name and digest in this order
@@ -258,6 +260,22 @@ LLM_OllamaPullRefusalKey(Text, ContractPath := "") {
 	return Refusals.Has(Found[1]) ? Refusals[Found[1]] : Refusals["relay_unavailable"]
 }
 
+/**
+ * The digest the bundled relay must have, from its manifest. A binary without a
+ * readable manifest is an invalid install, not an absent relay.
+ * @param {String} ManifestPath ergopti-proxy-relay.json beside the binary.
+ * @returns {String} The lowercase SHA-256 of the binary.
+ */
+LLM_OllamaProxyRelayDigest(ManifestPath) {
+	Text := FSReadUtf8ExactBounded(ManifestPath, 4096)
+	if !(Text is String)
+		throw ValueError("The bundled proxy relay has no readable manifest.")
+	Digest := JsonParse(Text).Get("exe_sha256", "")
+	if !(Digest is String) || !RegExMatch(Digest, "^[0-9a-f]{64}$")
+		throw ValueError("The bundled proxy relay manifest names no digest.")
+	return Digest
+}
+
 /** One source-bound managed bootstrap, retaining physical debt independently. */
 class OllamaManagedBootstrap {
 	/** Captures every native source before admission; no installation occurs here. */
@@ -375,13 +393,13 @@ class OllamaManagedBootstrap {
 			"ProxyRelayHandshakeMs", TimingsGet("adapters", "proxy_relay_handshake_timeout_ms"),
 			"ProxyRelayIdleMs", TimingsGet("adapters", "proxy_relay_idle_timeout_ms"),
 			"ProxyRelayProbeMs", TimingsGet("adapters", "proxy_relay_probe_timeout_ms"))
-		; Optional until the relay ships in the bundle (docs/design/proxy-auth-relay.md).
-		; Hashed once: this image is megabytes and the launcher holds it against
-		; replacement, while this.Sources is rehashed on each tick before READY.
+		; Absent only in a checkout without the binary (docs/design/proxy-auth-relay.md).
+		; The expected digest is the manifest's: hashing the file here would admit
+		; whatever sits at this path. The launcher compares and holds the image.
 		Relay := Vendor . "\" . LLM_OLLAMA_PROXY_RELAY_EXECUTABLE
 		if FileExist(Relay) {
 			RuntimeProxy["ProxyRelayPath"] := Relay
-			RuntimeProxy["ProxyRelaySha256"] := this._Hash(Relay)
+			RuntimeProxy["ProxyRelaySha256"] := LLM_OllamaProxyRelayDigest(Vendor . "\" . LLM_OLLAMA_PROXY_RELAY_MANIFEST)
 		}
 		this.Runtime := OllamaRuntimeOwner(Map("launcher", Directory . "\ollama-runtime-launch.ps1",
 			"helper", Helper, "helper_sha256", this.Sources[Helper],

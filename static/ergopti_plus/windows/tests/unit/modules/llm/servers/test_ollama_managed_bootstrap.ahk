@@ -417,6 +417,29 @@ _G4B_PullRelayRefusalNamesItself() {
 }
 Test("managed bootstrap: a relay refusal names its own message (proxy-auth-relay)", _G4B_PullRelayRefusalNamesItself)
 
+; The launcher compares the relay's image with what this returns, so a value read
+; from the file itself would admit any binary placed at the path.
+_G4B_RelayDigestComesFromItsManifest() {
+	Path := A_Temp . "\ergopti-g4-relay-" . A_TickCount . ".json"
+	Digest := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	try {
+		FileAppend('{"schema_version":1,"exe_sha256":"' . Digest . '"}', Path, "UTF-8-RAW")
+		AssertEqual(Digest, LLM_OllamaProxyRelayDigest(Path))
+		FileDelete(Path)
+		FileAppend('{"schema_version":1,"exe_sha256":"not a digest"}', Path, "UTF-8-RAW")
+		AssertThrows(() => LLM_OllamaProxyRelayDigest(Path), "a manifest naming no digest is refused")
+		FileDelete(Path)
+		AssertThrows(() => LLM_OllamaProxyRelayDigest(Path), "a binary without its manifest is refused")
+		; The bundled pair agrees: this is what a real launch compares.
+		Published := LLM_OllamaProxyRelayDigest(_VendorDir . "\" . LLM_OLLAMA_PROXY_RELAY_MANIFEST)
+		AssertEqual(Published, CryptoSha256Bytes(FSReadBytesStrict(_VendorDir . "\" . LLM_OLLAMA_PROXY_RELAY_EXECUTABLE)))
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("managed bootstrap: the relay digest is its manifest's, never the file's own (proxy-relay-e2e)", _G4B_RelayDigestComesFromItsManifest)
+
 ; The closing line of a pull whose fresh layer failed its sha256 check, after the
 ; progress frames that always say "pulling manifest".
 _G4B_DigestOutput() {

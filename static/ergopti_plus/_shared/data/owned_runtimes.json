@@ -1264,6 +1264,21 @@
 		},
 		{
 			"os": "windows",
+			"tool": "`ergopti-proxy-relay.exe`",
+			"programs": ["ergopti-proxy-relay.exe"],
+			"used_for": "Local NTLM/Negotiate sign-in for the managed Ollama (`windows/vendor/ergopti-proxy-relay.exe`, `windows/vendor/ergopti-proxy-relay.json`)",
+			"today": "Shipped, manifest",
+			"current_class": "PIN",
+			"version_needed": "pinned",
+			"if_missing": "The pull refuses with the named Windows sign-in message",
+			"pin_possible": "Done",
+			"decision": "PIN",
+			"decision_text": "PIN (done)",
+			"alternative": null,
+			"status": "done"
+		},
+		{
+			"os": "windows",
 			"tool": "`ergopti_nav_owner.dll`",
 			"programs": ["ergopti_nav_owner.dll"],
 			"used_for": "Navigation-layer ownership (`windows/vendor/ergopti_nav_owner.manifest.json`)",

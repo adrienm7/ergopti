@@ -93,8 +93,8 @@ a timeout, a foreign line) is the caller's `relay_unavailable`. A relay binary
 that is not installed is the binding's `not_installed` status, not a refusal:
 the client keeps the proxy as named, as before the relay existed, with one
 WARNING, and the network check reports `relay_not_installed`. Every Linux
-package and the macOS application now ship the relay; `not_installed` remains
-for a source checkout and for Windows until the PC wiring lands.
+package, the macOS application and the Windows bundle ship the relay;
+`not_installed` remains for a source checkout.
 
 ## Security
 
@@ -119,8 +119,13 @@ for a source checkout and for Windows until the PC wiring lands.
   because its repair reports the reason on the model page. The Debug network
   check reports the same probe (`proxy_relay`). The Swift-owned managed daemon
   (`managed_ollama_serve.py`) does not use the relay yet.
-- Windows: [windows-pc-agent-handoff.md](../tooling/windows-pc-agent-handoff.md)
-  (the PC agent owns `.ahk` and the PowerShell route plan).
+- Windows: `ollama-runtime-launch.ps1` runs the same probe where the tunnel probe
+  answers `windows_login`, and on `required` starts the daemon under `run`, the
+  listener admitted only as the child of that exact relay from the admitted image.
+  A refused sign-in keeps the daemon without the proxy and refuses only the pull,
+  by the closed reason in the receipt (`proxy_relay`). Whether Linux should converge
+  on this is an open maintainer decision; the live evidence is in
+  [proxy-relay-testing.md](../tooling/proxy-relay-testing.md).
 
 ## Packaging
 
@@ -135,6 +140,10 @@ one Go pin (`managed_ollama_runtime.json` `go_version`) or the module's
   `libc.so.6` (`check-elf-glibc-ceiling.cjs`). The Flatpak never takes a
   host-built ELF: it rebuilds the relay from the shipped Go sources with the
   SDK's `org.freedesktop.Sdk.Extension.golang`.
+- Windows: `tools/build/build_windows_proxy_relay.ps1` builds the amd64 binary with
+  the Go pin, without cgo, and publishes it with its manifest into `windows/vendor`,
+  committed like the PAC worker. The owner passes the manifest's digest and the
+  launcher refuses another image. Nested vendor binaries ship unsigned for now.
 - macOS: `build_macos_app.sh` builds an arm64 and an x86_64 slice with each
   architecture's clang, joins them with `lipo` into
   `Contents/MacOS/ergopti-proxy-relay` and signs it as nested code before the
@@ -142,6 +151,5 @@ one Go pin (`managed_ollama_runtime.json` `go_version`) or the module's
 
 ## Not covered
 
-- The Windows bundle (PC handoff).
 - Channel bindings, Kerberos delegation, and mutual authentication of the
   proxy: the tunnel carries TLS to the origin, which authenticates the origin.
