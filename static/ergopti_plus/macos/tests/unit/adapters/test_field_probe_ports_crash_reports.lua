@@ -24,7 +24,7 @@ local function write(path, text)
 end
 
 helpers.describe("field run crash report port", function()
-	helpers.it("names this app's reports with closed tokens and logs no error for an absent folder", function()
+	helpers.it("names this app's reports since the app start with closed tokens and logs no error for an absent folder", function()
 		local lfs = require("lfs")
 		local home = os.tmpname()
 		os.remove(home)
@@ -41,6 +41,10 @@ helpers.describe("field run crash report port", function()
 		write(reports .. "/Hammerspoon-2026-10-01.ips", "{}\n")
 		local old = os.time() - 3 * 86400
 		lfs.touch(reports .. "/Hammerspoon-2026-10-01.ips", old, old)
+		-- Written by the start before the current one (crashes-since-app-start).
+		write(reports .. "/ErgoptiPlus-2026-10-30-101010.ips", "{}\n")
+		local earlier = os.time() - 7200
+		lfs.touch(reports .. "/ErgoptiPlus-2026-10-30-101010.ips", earlier, earlier)
 		local entries = {}
 		for name in lfs.dir(reports) do
 			if name ~= "." and name ~= ".." then entries[#entries + 1] = name end
@@ -57,7 +61,7 @@ helpers.describe("field run crash report port", function()
 			hs.fs.__set_entries(reports, entries)
 			local saved = os.getenv
 			os.getenv = function(name) if name == "HOME" then return home end return saved(name) end
-			local ok, result = pcall(function() return require("adapters.field_probe_ports").new().crash_counts() end)
+			local ok, result = pcall(function() return require("adapters.field_probe_ports").new().crash_counts(os.time() - 3600) end)
 			os.getenv = saved
 			hs.fs.__reset_entries()
 			assert(ok, result)
@@ -67,6 +71,8 @@ helpers.describe("field run crash report port", function()
 		helpers.assert_eq(counts.driver, 0)
 		helpers.assert_eq(counts.other, 1)
 		helpers.assert_eq(#counts.owned, 2, "the old Hammerspoon report is not counted")
+		helpers.assert_eq(counts.earlier.ergoptiplus, 1, "an earlier start's report is counted apart")
+		helpers.assert_eq(counts.driver_earlier, 0)
 		local kinds = {}
 		for _, entry in ipairs(counts.owned) do kinds[entry.process] = entry.kind end
 		helpers.assert_eq(kinds.ergoptiplus, "crash:exc_crash:sigkill:codesigning")
