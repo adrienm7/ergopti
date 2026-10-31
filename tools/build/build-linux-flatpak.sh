@@ -190,9 +190,8 @@ cleanup:
 
 modules:
   # org.freedesktop.Platform does not ship LuaJIT, and the daemon is a LuaJIT
-  # program — so it is built here rather than assumed. Upstream's v2.1 branch is
-  # the maintained line; a release build should pin `commit:` instead of
-  # `branch:` so the bundle is reproducible.
+  # program — so it is built here rather than assumed, from the v2.1 commit
+  # pinned in linux_native_runtime.json (owned runtimes: LuaJIT is PIN).
   - name: luajit
     buildsystem: simple
     build-commands:
@@ -205,12 +204,12 @@ modules:
     sources:
       - type: git
 MANIFEST_EOF
-# Only the host expands: the rest of the manifest stays a quoted here-document.
-printf '        url: %s\n' "https://$ERGOPTI_HOST_GITHUB/LuaJIT/LuaJIT.git" >> "$MANIFEST_FILE"
-cat >> "$MANIFEST_FILE" << 'MANIFEST_EOF'
-        branch: v2.1
-
-MANIFEST_EOF
+# The pinned source is read from the runtime catalogue, the one place the other
+# owned modules are pinned too.
+node - "$PROJECT_ROOT/static/ergopti_plus/_shared/data/linux_native_runtime.json" >> "$MANIFEST_FILE" << 'LUAJIT_SOURCE_EOF'
+const source = require(process.argv[2]).network_runtime.portable.flatpak_sources.luajit;
+process.stdout.write(`        url: ${source.url}\n        commit: ${source.commit}\n\n`);
+LUAJIT_SOURCE_EOF
 # Additional native modules come from the canonical runtime generator, using
 # exact upstream commits/distribution hashes. Do not maintain a second recipe.
 node - "$PROJECT_ROOT" >> "$MANIFEST_FILE" << 'NETWORK_MODULES_EOF'
