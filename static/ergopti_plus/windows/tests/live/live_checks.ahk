@@ -149,7 +149,7 @@ _LiveAnswerInputBox(Seen, Answer, Hwnd) {
 	Seen.Initial := ControlGetText("Edit1", "ahk_id " . Hwnd)
 	Seen.Prompt := ControlGetText("Static1", "ahk_id " . Hwnd)
 	ControlSetText(Answer, "Edit1", "ahk_id " . Hwnd)
-	ControlClick("Button1", "ahk_id " . Hwnd)
+	LiveClickDialogButton("Button1", Hwnd)
 }
 
 /**
@@ -244,7 +244,7 @@ LiveCmdClickConfirming(Args) {
 
 _LiveConfirm(Seen, Hwnd) {
 	Seen.Title := WinGetTitle("ahk_id " . Hwnd)
-	ControlClick("Button1", "ahk_id " . Hwnd)
+	LiveClickDialogButton("Button1", Hwnd)
 }
 
 /**
@@ -270,7 +270,7 @@ LiveCmdWindowTitles(Args) {
 _LiveReadAndAcknowledge(Seen, Hwnd) {
 	Seen.Title := WinGetTitle("ahk_id " . Hwnd)
 	Seen.Class := WinGetClass("ahk_id " . Hwnd)
-	ControlClick("Button1", "ahk_id " . Hwnd)
+	LiveClickDialogButton("Button1", Hwnd)
 }
 
 
@@ -593,7 +593,7 @@ LiveCmdAddDelimiter(Args) {
 _LiveAnswerDelimiter(Char, Consume, Hwnd) {
 	ControlSetText(Char, "Edit1", "ahk_id " . Hwnd)
 	ControlSetChecked(Consume ? 1 : 0, "Button1", "ahk_id " . Hwnd)
-	ControlClick("Button2", "ahk_id " . Hwnd)
+	LiveClickDialogButton("Button2", Hwnd)
 }
 
 /** The keyboard layouts installed for this user, as handles in hexadecimal. */
