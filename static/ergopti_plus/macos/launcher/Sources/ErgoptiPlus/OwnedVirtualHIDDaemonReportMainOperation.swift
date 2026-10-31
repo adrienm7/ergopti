@@ -75,10 +75,17 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 	private static func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'" }
 	private static func appleQuote(_ value: String) -> String { "\"" + value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\"" }
 	private func prepareAndPrompt() {
-		guard sourceCurrent(), let resources = Bundle.main.resourceURL else { lock.lock(); refused = true; lock.unlock(); return }
+		guard sourceCurrent() else { lock.lock(); refused = true; lock.unlock(); return }
 		var selfImage = ergopti_vhd_report_self_image()
 		guard ergopti_vhd_report_self_image_capture(&selfImage) == 0, selfImage.pid == creator, sourceCurrent() else { markRefused(); return }
-		let helper = resources.appendingPathComponent("OwnedRuntimeInstaller/ErgoptiPlus-Runtime-Installer.app")
+		// The helper of the verified download only (ADR 011 WP5), never the bundle's copy.
+		let helper: URL
+		switch OwnedRuntimeDownloadedHelper.current() {
+		case .success(let located): helper = located
+		case .failure(let refusal):
+			LauncherLog.write("owned runtime: installer helper refused (\(refusal.rawValue)): \(refusal.explanation).")
+			markRefused(); return
+		}
 		var helperIdentity = stat(); let helperStatus = lstat(helper.path, &helperIdentity), helperError = errno
 		guard helperStatus == 0, helperIdentity.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else { _ = helperError; markRefused(); return }
 		lock.lock(); sourceAttempted = true; lock.unlock()
