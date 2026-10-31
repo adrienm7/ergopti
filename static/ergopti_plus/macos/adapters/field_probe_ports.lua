@@ -378,10 +378,13 @@ local function crash_kind(path, name)
 end
 
 --- The crash reports of the last day: the driver's own, and macOS's split into
---- this app's processes (each named, newest first) and every other one.
+--- this app's processes (each named, newest first) and every other one. The
+--- driver's and this app's reports written before `since` are counted apart:
+--- they belong to an earlier start of the app.
 --- An absent folder holds no report: it is not listed, so no error is logged.
---- @return table counts { driver, owned = { { process, kind } }, other }
-local function crash_counts()
+--- @param since number|nil Epoch seconds of the current app start; nil judges the whole day.
+--- @return table counts { driver, driver_earlier, owned = { { process, kind } }, earlier = { process = n }, other }
+local function crash_counts(since)
 	local FileSystem = require("adapters.file_system")
 	local FsDir = require("infra.fs_dir")
 	local now = os.time()
@@ -393,8 +396,12 @@ local function crash_counts()
 			if type(modified) == "number" and now - modified <= CRASH_WINDOW_SECONDS then visit(name, modified) end
 		end
 	end
-	local counts = { driver = 0, owned = {}, other = 0 }
-	recent(require("infra.logger").crash_reports_dir():gsub("/+$", ""), function() counts.driver = counts.driver + 1 end)
+	local counts = { driver = 0, driver_earlier = 0, owned = {}, earlier = {}, other = 0 }
+	local function current(modified) return since == nil or modified >= since end
+	recent(require("infra.logger").crash_reports_dir():gsub("/+$", ""), function(_, modified)
+		if current(modified) then counts.driver = counts.driver + 1
+		else counts.driver_earlier = counts.driver_earlier + 1 end
+	end)
 	local home = os.getenv("HOME")
 	if home then
 		local dir = home .. "/Library/Logs/DiagnosticReports"
@@ -404,6 +411,10 @@ local function crash_counts()
 				if lower:match(entry[1]) then process = entry[2] break end
 			end
 			if not process then counts.other = counts.other + 1 return end
+			if not current(modified) then
+				counts.earlier[process] = (counts.earlier[process] or 0) + 1
+				return
+			end
 			counts.owned[#counts.owned + 1] = { process = process, kind = crash_kind(dir .. "/" .. name, name),
 				modified = modified }
 		end)
@@ -861,6 +872,13 @@ function M.new()
 		loopback_server = loopback_server,
 		crash_counts = crash_counts,
 		pid = function() return hs.processInfo.processID end,
+		-- The app started with its launcher, which outlives a driver reload;
+		-- a driver run without one (a bare Hammerspoon) started with itself.
+		app_start_pid = function()
+			local launcher = tonumber((os.getenv("ERGOPTI_LAUNCHER_PID") or ""):match("^%d+$"))
+			return launcher or hs.processInfo.processID
+		end,
+		now = os.time,
 		ai_facts = ai_facts,
 		ollama_refresh = ollama_refresh,
 		ollama_installed_model = ollama_installed_model,
