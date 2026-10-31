@@ -176,6 +176,7 @@ local function pending_coordinator(kind)
 		schedule = forbidden,
 		fatal_exit_code = 70,
 		user_exit_deadline_seconds = 12,
+		reload_deadline_seconds = 12,
 	}))
 	local requested = kind == "reload" and coordinator.request_reload("field-admission-reload")
 		or kind == "exit" and coordinator.request_exit("field-admission-exit")

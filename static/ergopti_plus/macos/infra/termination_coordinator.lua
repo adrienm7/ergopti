@@ -32,6 +32,11 @@
 --- 9. Breadcrumb: each stage is handed to the optional `record_stage` (the
 ---    synchronous reload breadcrumb), so a reload that loses the app names the
 ---    stage it was lost in although its queued log lines are gone.
+--- 10. Bounded Reload: a controlled reload arms its own deadline when it is
+---    accepted. A reload still unsettled then (a lease fence that never answers,
+---    a stuck drain or teardown) reloads natively, naming the stage it waited
+---    on, instead of leaving the app up with its Karabiner remaps revoked; the
+---    previous worker's stdin EOF lets the guardian fence its exact lease.
 --- ==============================================================================
 
 local M = {}
@@ -57,6 +62,16 @@ local _admission_abort_active = false
 local function breadcrumb(transaction, stage)
 	if _deps == nil or _deps.record_stage == nil then return end
 	pcall(_deps.record_stage, transaction.kind, stage)
+end
+
+--- Stops a reload's deadline timer once its transaction has settled or become
+--- an exit. A refused stop is retained: the callback checks its transaction.
+--- @param transaction table The transition.
+local function disarm_reload_deadline(transaction)
+	local timer = transaction.reload_deadline
+	if timer == nil then return end
+	transaction.reload_deadline = nil
+	if type(timer) == "table" and type(timer.stop) == "function" then pcall(timer.stop, timer) end
 end
 
 local function require_state(func_name)
@@ -120,6 +135,7 @@ end
 
 local function abort_transaction(transaction, detail, legacy_notify)
 	if transaction.settled then return false end
+	disarm_reload_deadline(transaction)
 	breadcrumb(transaction, "aborted")
 	transaction.settled = true
 	transaction.completion_ok = false
@@ -148,6 +164,7 @@ end
 --- @return boolean Always false if the injected fatal exit itself returns.
 local function force_post_teardown_exit(transaction)
 	if transaction.settled then return false end
+	disarm_reload_deadline(transaction)
 	breadcrumb(transaction, "fatal_exit")
 	transaction.settled = true
 	transaction.completion_ok = false
@@ -200,6 +217,7 @@ local function invoke_terminal(transaction)
 			return force_post_teardown_exit(transaction)
 		end
 		breadcrumb(transaction, "hs_reload_returned")
+		disarm_reload_deadline(transaction)
 
 		-- hs.reload() schedules replacement of the Lua state and is allowed to
 		-- return to its caller while that native transition is pending. A protected
@@ -517,6 +535,53 @@ local function finish_transaction(transaction, fenced, detail)
 	transaction.completion_ok = begin_input_drain(transaction)
 end
 
+--- Reloads natively a controlled reload that did not settle in time, naming the
+--- stage it waited on. Native hs.reload replaces the Lua state without the local
+--- teardown; the previous worker's stdin EOF then lets the guardian fence the
+--- exact lease, as for any uncontrolled reload.
+--- @param transaction table The reload.
+local function expire_reload(transaction)
+	transaction.reload_deadline = nil
+	if _transaction ~= transaction or transaction.settled or transaction.kind ~= "reload" then return end
+	local stage = M.pending_stage()
+	breadcrumb(transaction, "reload_deadline")
+	transaction.settled = true
+	transaction.completion_ok = false
+	_transaction = nil
+	-- Once the drain started, a log line would reopen the synchronous sink
+	if not transaction.drain_started then
+		pcall(Logger.error, LOG,
+			"Controlled reload did not settle within %.1f s (waiting on %s); reloading natively, the guardian fences the lease on the worker's EOF.",
+			_deps.reload_deadline_seconds, stage)
+	end
+	if not transaction.reload_marked then
+		local marked_ok, marked = xpcall(_deps.mark_reload, debug.traceback)
+		transaction.reload_marked = marked_ok and marked == true
+	end
+	breadcrumb(transaction, "hs_reload_called")
+	local reload_ok, reload_result = xpcall(function()
+		return _deps.reload(table.unpack(transaction.arguments, 1, transaction.arguments.n))
+	end, debug.traceback)
+	if reload_ok then return end
+	breadcrumb(transaction, "hs_reload_raised")
+	transaction.terminal_failure = tostring(reload_result)
+	xpcall(function() return _deps.fatal_exit(_deps.fatal_exit_code) end, debug.traceback)
+end
+
+--- Arms the deadline of a newly accepted reload.
+--- @param transaction table The reload.
+local function arm_reload_deadline(transaction)
+	local armed, timer = pcall(_deps.schedule, _deps.reload_deadline_seconds, function()
+		local ok, err = xpcall(expire_reload, debug.traceback, transaction)
+		if not ok then pcall(Logger.error, LOG, "Controlled reload deadline raised: %s.", tostring(err)) end
+	end)
+	if armed and timer ~= nil then
+		transaction.reload_deadline = timer
+	else
+		pcall(Logger.error, LOG, "Controlled reload deadline could not be armed: %s.", tostring(timer))
+	end
+end
+
 local function request(kind, reason, arguments, exit_code, on_aborted, require_fresh, prepared_admission)
 	if not require_state("request_" .. kind) then return false end
 	if type(reason) ~= "string" or reason == "" then
@@ -550,6 +615,7 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 			_transaction.exit_code = exit_code
 			_transaction.arguments = table.pack()
 			breadcrumb(_transaction, "upgraded_to_exit")
+			disarm_reload_deadline(_transaction)
 			Logger.info(LOG, "Pending controlled reload upgraded to an exit request.")
 			if _transaction.teardown_completed then
 				-- The drain remains live and includes records emitted by this added
@@ -585,6 +651,7 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 	}
 	_transaction = transaction
 	breadcrumb(transaction, "accepted")
+	if kind == "reload" then arm_reload_deadline(transaction) end
 	-- Who asked is the first question about any reload or quit in a user log, and
 	-- the reason was stored on the transaction without ever being written out.
 	-- Protected: a failing logger has no other sink to report to, and must never
@@ -686,6 +753,10 @@ function M.init(deps)
 	end
 	if type(deps.user_exit_deadline_seconds) ~= "number" or deps.user_exit_deadline_seconds <= 0 then
 		Logger.error(LOG, "M.init(): user_exit_deadline_seconds must be a positive number.")
+		return false
+	end
+	if type(deps.reload_deadline_seconds) ~= "number" or deps.reload_deadline_seconds <= 0 then
+		Logger.error(LOG, "M.init(): reload_deadline_seconds must be a positive number.")
 		return false
 	end
 	_deps = deps

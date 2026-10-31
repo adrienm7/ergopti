@@ -77,6 +77,7 @@ local function terminal_fixture(config, body)
 			fatal_exit_code = 70,
 			schedule = function() f.watchdogs = f.watchdogs + 1; return { stop = function() return true end } end,
 			user_exit_deadline_seconds = 12,
+			reload_deadline_seconds = 12,
 			mark_reload = function() return true end, clear_reload = function() return true end,
 		}))
 		f.coordinator = coordinator
