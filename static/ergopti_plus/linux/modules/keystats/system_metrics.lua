@@ -19,7 +19,9 @@
 --- systemd desktop that knows both. Network through the first of nmcli, iwgetid
 --- or /proc/net/wireless that answers — three because distributions disagree
 --- about which is installed, and a metric that works on one distribution is a
---- metric nobody can compare.
+--- metric nobody can compare. Audio mute through the first sound stack that
+--- answers: PulseAudio (or PipeWire's pulse server) through pactl, PipeWire's
+--- own wpctl, then the ALSA mixer of a system with neither sound server.
 ---
 --- WHAT IT DELIBERATELY LEAVES AT ZERO, AND WHY:
 --- `space_switches` counts virtual-desktop changes, which X11 and each Wayland
@@ -149,19 +151,71 @@ local function read_locked()
 	return nil
 end
 
---- Whether audio output is muted.
---- @return boolean|nil
-local function read_muted()
-	if Shell.has_command("pactl") then
-		-- pactl translates yes/no through gettext; machine parsing needs C locale.
-		local out = Shell.exec_line("LC_ALL=C pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null")
-		if out and out:find("yes", 1, true) then return true end
-		if out and out:find("no", 1, true) then return false end
+--- The ALSA simple controls whose playback switch is the output's mute, in order.
+local ALSA_CONTROLS = { "Master", "PCM" }
+
+--- Reads one ALSA control's playback switches: muted when every channel is off.
+--- @param control string Simple mixer control name.
+--- @return boolean|nil nil when the control has no playback switch here.
+local function alsa_control_muted(control)
+	local out = Shell.exec("LC_ALL=C amixer sget " .. Shell.quote(control) .. " 2>/dev/null")
+	local on, off = 0, 0
+	for line in (type(out) == "string" and out or ""):gmatch("[^\n]+") do
+		-- A channel line ends with its switch: "Front Left: Playback 30 [47%] [-34.50dB] [on]".
+		local switch = line:find("Playback", 1, true) and line:match("%[(o[nf]f?)%]%s*$")
+		if switch == "on" then on = on + 1 elseif switch == "off" then off = off + 1 end
 	end
-	if Shell.has_command("amixer") then
-		local out = Shell.exec_line("amixer get Master 2>/dev/null | tail -1")
-		if out and out:find("%[off%]") then return true end
-		if out and out:find("%[on%]") then return false end
+	if on + off == 0 then return nil end
+	return on == 0
+end
+
+-- The mute readers, in the order a session answers them. Each command is a
+-- machine query run under the C locale: pactl translates yes/no through gettext.
+local AUDIO_READERS = {
+	{ source = "pulseaudio", command = "pactl", read = function()
+		if not Shell.has_command("pactl") then return nil end
+		local state = (Shell.exec_line("LC_ALL=C pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null") or "")
+			:match("^Mute:%s*(%a+)%s*$")
+		if state == "yes" then return true end
+		if state == "no" then return false end
+		return nil
+	end },
+	{ source = "pipewire", command = "wpctl", read = function()
+		if not Shell.has_command("wpctl") then return nil end
+		local out = Shell.exec_line("LC_ALL=C wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null") or ""
+		if not out:match("^Volume:%s*%d") then return nil end
+		return out:find("[MUTED]", 1, true) ~= nil
+	end },
+	{ source = "alsa", command = "amixer", read = function()
+		if not Shell.has_command("amixer") then return nil end
+		for _, control in ipairs(ALSA_CONTROLS) do
+			local muted = alsa_control_muted(control)
+			if muted ~= nil then return muted end
+		end
+		return nil
+	end },
+}
+
+-- The sound stack that answered last, so a change of answering source is said once.
+local _audio_source = nil
+
+--- Whether audio output is muted, from the first sound stack that answers.
+--- @return boolean|nil nil when no sound stack answers, which is not "unmuted".
+local function read_muted()
+	for _, reader in ipairs(AUDIO_READERS) do
+		-- Each reader probes its own program, so the probe sits beside the call.
+		local muted = reader.read()
+		if muted ~= nil then
+			if _audio_source ~= reader.source then
+				_audio_source = reader.source
+				Logger.info(LOG, "Audio mute is read from %s (%s).", reader.source, reader.command)
+			end
+			return muted
+		end
+	end
+	if _audio_source ~= false then
+		_audio_source = false
+		Logger.warn(LOG, "No sound stack answers (pactl, wpctl, amixer); muted time is not measured.")
 	end
 	return nil
 end
@@ -371,6 +425,7 @@ function M._reset()
 	_events = {}
 	_last = new_last()
 	_wireless_path = WIRELESS_PATH
+	_audio_source = nil
 end
 
 --- Test seam: reads the wireless listing from `path` instead of the kernel's.
