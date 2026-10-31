@@ -543,7 +543,7 @@
 				"it": "Rollate",
 				"ja": "ロール",
 				"ko": "롤",
-				"nl": "Rolls",
+				"nl": "Rolbewegingen",
 				"no": "Rolls",
 				"pl": "Rolady",
 				"pt": "Rolagens",

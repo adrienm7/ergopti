@@ -13,3 +13,11 @@ the delay strings say « modificateur rémanent ». Other Latin-script locales k
 their own wording. The French rows of
 `_shared/tests/corpus/menus/script_action_original_catalogue_projection.json`
 pin the labels.
+
+## Dutch rolls are "Rolbewegingen" (2026-10-31)
+
+Dutch names the rolls category "Rolbewegingen" (`category.rolls`,
+`hs_config.cat_rolls`, and the `nl` description of the registry's
+`ergopti/hotstrings/rolls.toml`): "Rollen" means "roles". The locale
+completeness gate fails if Dutch falls back to the English "Rolls", which is no
+longer allowlisted.

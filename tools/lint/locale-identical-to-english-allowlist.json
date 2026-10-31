@@ -104,10 +104,6 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
 		},
-		"category.rolls": {
-			"reason": "loanword-or-cognate",
-			"locales": ["nl"]
-		},
 		"changelog_window.badge_prerelease": {
 			"reason": "loanword-or-cognate",
 			"locales": ["it", "nl"]
@@ -400,10 +396,6 @@
 		"hs_config.cat_autocorrection": {
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
-		},
-		"hs_config.cat_rolls": {
-			"reason": "loanword-or-cognate",
-			"locales": ["nl"]
 		},
 		"hs_config.color_cyan": {
 			"reason": "loanword-or-cognate",

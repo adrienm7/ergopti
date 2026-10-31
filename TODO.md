@@ -1292,8 +1292,6 @@ or under "Decided, do not re-raise".
   tools: OPT), the base utilities on both OS (SYS); macOS `/usr/bin/python3` helpers (PIN on the managed
   Python); and whether the rows become a machine-readable `_shared/data/owned_runtimes.json`. Kept meanwhile:
   every tool as it is used today; a new spawn needs a row (the inventory test).
-- **Dutch "Rolls".** `category.rolls` and `hs_config.cat_rolls` keep "Rolls" (Dutch "Rollen" means
-  "roles"). Another Dutch word?
 - **A hand-written `config.toml` `[script]` row on macOS and Linux.** Windows reads `locale` from
   `config.toml` at start. macOS (`hs.settings` `i18n_locale`) and Linux (`storage.json`) read only their
   native alias store, so a `locale`, `log_level` or `show_error_dialog` typed into `config.toml` is

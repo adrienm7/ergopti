@@ -89,7 +89,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "628454ee3efec37ddbb1b94468a5a7e36d157e59514737945c21d27d141e2bae",
+				"sha256": "833630c9d45fb1c7af96c32289a28385b04c5ac323682765e8a7916482c1dad8",
 				"files": [
 					{
 						"path": "ergopti.keylayout",
@@ -118,8 +118,8 @@
 					{
 						"path": "hotstrings/rolls.toml",
 						"file": "ergopti/hotstrings/rolls.toml",
-						"size": 10191,
-						"sha256": "77112f9249d9f5fde5c7d37f4a5dea5e0fe4501c9e3578f361145157aadd599e"
+						"size": 10199,
+						"sha256": "b8b15765876fac1e1b931b990592c5249aaeea7f4fbe4aea03847d9bf249ea84"
 					},
 					{
 						"path": "hotstrings/sfbsreduction.toml",
@@ -206,7 +206,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "6168e0023b8e2c86646154f0e420c8ba953a4ee488789f4bd2200fc126c3dba3",
+				"sha256": "9128beaa29ad37bae4a9633e5e8c965cee30467dddc28ada0ad9ddff6387968c",
 				"files": [
 					{
 						"path": "ergopti_ansi.keylayout",
@@ -235,8 +235,8 @@
 					{
 						"path": "hotstrings/rolls.toml",
 						"file": "ergopti/hotstrings/rolls.toml",
-						"size": 10191,
-						"sha256": "77112f9249d9f5fde5c7d37f4a5dea5e0fe4501c9e3578f361145157aadd599e"
+						"size": 10199,
+						"sha256": "b8b15765876fac1e1b931b990592c5249aaeea7f4fbe4aea03847d9bf249ea84"
 					},
 					{
 						"path": "hotstrings/sfbsreduction.toml",
@@ -323,7 +323,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "00ebd20a825bfb949c94ef49eca127d0bf7736b707ccfddfe9f0b56ffcccd504",
+				"sha256": "81e58889702c96761f4773e7e87792b23c43786e09c047e79403aa52bac2922c",
 				"files": [
 					{
 						"path": "ergopti_plus.keylayout",
@@ -352,8 +352,8 @@
 					{
 						"path": "hotstrings/rolls.toml",
 						"file": "ergopti/hotstrings/rolls.toml",
-						"size": 10191,
-						"sha256": "77112f9249d9f5fde5c7d37f4a5dea5e0fe4501c9e3578f361145157aadd599e"
+						"size": 10199,
+						"sha256": "b8b15765876fac1e1b931b990592c5249aaeea7f4fbe4aea03847d9bf249ea84"
 					},
 					{
 						"path": "hotstrings/sfbsreduction.toml",
@@ -440,7 +440,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "99e6ea0f7e08f21273dc7a4bc36000954e02f9679cc4eaebf32b03f38c65071f",
+				"sha256": "6e72e2ce30fa18e3addc2cacbf2c2da65e6c3a197e086fd0b9913d93b6ea1018",
 				"files": [
 					{
 						"path": "ergopti_plus_ansi.keylayout",
@@ -469,8 +469,8 @@
 					{
 						"path": "hotstrings/rolls.toml",
 						"file": "ergopti/hotstrings/rolls.toml",
-						"size": 10191,
-						"sha256": "77112f9249d9f5fde5c7d37f4a5dea5e0fe4501c9e3578f361145157aadd599e"
+						"size": 10199,
+						"sha256": "b8b15765876fac1e1b931b990592c5249aaeea7f4fbe4aea03847d9bf249ea84"
 					},
 					{
 						"path": "hotstrings/sfbsreduction.toml",
