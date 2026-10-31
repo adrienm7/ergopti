@@ -799,8 +799,8 @@ local function fifo()
 		dir = tmp .. "/ergopti-field-fifo-" .. tostring(hs.processInfo.processID),
 		mode = FileSystem.followed_mode,
 		exists = FileSystem.exists,
-		append = function(path, content) return FileSystem.append(path, content, expected_refusal) end,
-		write = function(path, content) return FileSystem.write(path, content, expected_refusal) end,
+		append = function(path, content) return FileSystem.append_reporting_to(path, content, expected_refusal) end,
+		write = function(path, content) return FileSystem.write_reporting_to(path, content, expected_refusal) end,
 	}
 end
 

@@ -18,8 +18,10 @@ helpers.describe("field run FIFO check writers (fifo-expected-refusal)", functio
 			package.loaded["adapters.file_system"] = {
 				followed_mode = function() return "present", "named pipe" end,
 				exists = function() return true end,
-				append = function(_, _, on_error) owners.append = on_error; return false end,
-				write = function(_, _, on_error) owners.write = on_error; return false, "not a regular file" end,
+				append = function() error("the check must not log its expected refusal") end,
+				write = function() error("the check must not log its expected refusal") end,
+				append_reporting_to = function(_, _, on_error) owners.append = on_error; return false end,
+				write_reporting_to = function(_, _, on_error) owners.write = on_error; return false, "not a regular file" end,
 			}
 			package.loaded["adapters.field_probe_ports"] = nil
 			local Ports = helpers.load_with_stubs("adapters.field_probe_ports")
