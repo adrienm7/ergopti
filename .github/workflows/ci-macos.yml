@@ -1978,6 +1978,12 @@ jobs:
       # The full launcher XCTest run on macOS 26. The Managed Ollama cells run
       # many of the same classes on macOS 15; keep both: they are deliberate
       # cross-version coverage of one launcher, not duplicates to skip here.
+      # Budget, measured on hosted macOS 26: the nine green runs of 2026-10-28 to
+      # 31 took 346 to 579 s (main run 41075976093: 579 s, of which 123 s cold
+      # SwiftPM build and 177 s HomebrewArchiveAcceptanceTests); 10 minutes failed
+      # twice on 2026-10-28 while a real PAC trust test was running. A separate job
+      # would add another cold build and take one of the five macOS runners, so the
+      # step gets about 1.5 times the slowest green run instead.
       - name: Run Swift launcher tests on macOS 26
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         id: swift-launcher-tests
@@ -2071,7 +2077,7 @@ jobs:
               echo "::error::the XCTest process ended without its successful suite summary"
               exit 1
           fi
-        timeout-minutes: 10
+        timeout-minutes: 15
 
       - name: Retain scoped native Brew qualification receipt
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}
