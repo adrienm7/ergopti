@@ -610,7 +610,8 @@ local function with_shortcut_presentation(language, scenario)
 		local context = {
 			state = { shortcuts = true, chatgpt_url = "https://hand.original/", wrap_symbol_states = {}, custom_wrap_symbols = {} },
 			shortcuts = {
-				list_shortcuts = function() return { { id = "ctrl_g", label = "Hand Ctrl+G", enabled = true } } end,
+				-- No fixed Ctrl chord remains (schema v20): the editor heads the Ctrl group alone.
+				list_shortcuts = function() return {} end,
 				is_enabled = function() return true end,
 				set_wrap_pairs_getter = function() effects.catalogue_wires = effects.catalogue_wires + 1 end,
 				set_chatgpt_url = function(url) effects.urls[#effects.urls + 1] = url end,
@@ -638,7 +639,7 @@ end
 
 helpers.describe("complete declared Shortcut presentation", function()
 	for _, language in ipairs({ "en", "fr" }) do
-		helpers.it("keeps the original wrap and Ctrl+G hierarchy in " .. language, function()
+		helpers.it("keeps the original wrap and ChatGPT URL editor hierarchy in " .. language, function()
 			with_shortcut_presentation(language, function(f)
 				local file = assert(io.open(helpers.shared("tests/corpus/menus/shortcut_presentation_frames.json"), "rb"))
 				local raw = assert(file:read("*a")); assert(file:close())

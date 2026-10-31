@@ -632,6 +632,9 @@ M.features = {
 		path = "shortcuts.keyboard.secondary_e", id = "secondary_e", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_e", platforms = { "hs" }, recommended = "open_file_manager", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
+		path = "shortcuts.keyboard.secondary_g", id = "secondary_g", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_g", platforms = { "hs" }, recommended = "open_chatgpt", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
 		path = "shortcuts.keyboard.secondary_h", id = "secondary_h", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_h", platforms = { "hs" }, recommended = "screenshot_region_clipboard", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
@@ -1104,9 +1107,6 @@ M.features = {
 	},
 	{
 		path = "shortcuts.keys.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_g", id = "ctrl_g", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_g", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.keys.cmd_star", id = "cmd_star", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_cmd_star", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",

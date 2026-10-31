@@ -221,6 +221,7 @@ two disagree in either direction.
 | `shortcuts.keyboard.secondary_a`                              | —               | n/a                                              | n/a                  |
 | `shortcuts.keyboard.secondary_d`                              | —               | n/a                                              | n/a                  |
 | `shortcuts.keyboard.secondary_e`                              | —               | n/a                                              | n/a                  |
+| `shortcuts.keyboard.secondary_g`                              | —               | n/a                                              | n/a                  |
 | `shortcuts.keyboard.secondary_h`                              | —               | n/a                                              | n/a                  |
 | `shortcuts.keyboard.secondary_i`                              | —               | n/a                                              | n/a                  |
 | `shortcuts.keyboard.secondary_m`                              | —               | n/a                                              | n/a                  |
@@ -379,7 +380,6 @@ two disagree in either direction.
 | `ui.menubar_icon`                                             | —               | n/a                                              | n/a                  |
 | `tap_holds.enabled`                                           | `karabiner`     | `evdev`, `uinput`                                | n/a                  |
 | `shortcuts.keys.wrap_text_if_selected`                        | —               | n/a                                              | n/a                  |
-| `shortcuts.keys.ctrl_g`                                       | —               | n/a                                              | n/a                  |
 | `shortcuts.keys.cmd_star`                                     | —               | n/a                                              | n/a                  |
 | `category_enabled.autocorrection`                             | n/a             | n/a                                              | —                    |
 | `category_enabled.distances_reduction`                        | n/a             | n/a                                              | —                    |

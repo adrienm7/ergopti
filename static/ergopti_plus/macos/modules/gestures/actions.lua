@@ -1412,6 +1412,20 @@ sg("open_downloads", owner_action("modules.shortcuts.actions.apps", "open_downlo
 sg("open_file_manager", owner_action("modules.shortcuts.actions.apps", "open_finder"))
 sg("open_system_settings", owner_action("modules.shortcuts.actions.apps", "open_settings"))
 sg("copy_selected_path", owner_action("modules.shortcuts.actions.apps", "copy_or_open_path"))
+-- Formerly the fixed Ctrl+G hotkey (schema v20 made it the secondary_g slot).
+-- The URL is the one shortcuts.chatgpt_url setting the Shortcuts menu edits,
+-- read live from its owner so every binding opens the same configured page.
+sg("open_chatgpt", function()
+	local ok_bindings, Bindings = pcall(require, "modules.shortcuts.bindings")
+	local ok_apps, Apps = pcall(require, "modules.shortcuts.actions.apps")
+	if not ok_bindings or type(Bindings.get_chatgpt_url) ~= "function"
+		or not ok_apps or type(Apps.open_chatgpt) ~= "function" then
+		Logger.error(LOG, "Action 'open_chatgpt' is unavailable: %s.",
+			tostring(not ok_bindings and Bindings or Apps))
+		return false
+	end
+	return Apps.open_chatgpt(Bindings.get_chatgpt_url(), current_action_parent())
+end)
 sg("pick_color", owner_action("modules.shortcuts.actions.system_pixel", "copy_pixel_color"))
 -- Keep-awake is one session for the machine, whoever starts it: the shortcut
 -- layer owns it (its Bindings lifecycle pauses and resumes it) and it stops by
