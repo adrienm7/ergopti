@@ -1,0 +1,26 @@
+# static/layouts/registry/bepo/meta.toml
+# bépo 1.1rc2 by the bépo community (bepo.fr), vendored unmodified from the
+# upstream macOS disk image: bepo.keylayout is byte-identical to
+# "bepo 1.1.bundle/Contents/Resources/bepo.keylayout" of source_url, and
+# source_sha256 is that file's digest. Licence: CC BY-SA 3.0, see LICENSE and
+# the attribution in NOTICE next to this file.
+
+name = "bépo"
+family = "bepo"
+# The registry compares x.y.z versions; upstream names this, its only 1.1
+# macOS release, 1.1rc2.
+version = "1.1.0"
+author = "bépo community (bepo.fr)"
+licence = "CC-BY-SA-3.0"
+licence_file = "LICENSE"
+homepage = "https://bepo.fr"
+languages = ["fr"]
+variants = []
+source_url = "https://cdn.bepo.fr/macosx/fr-dvorak-bepo-macosx-1.1rc2.dmg"
+source_sha256 = "1ae285b4d523e3969474eab01084fdf09145f00cdb4daae1245ac2d52e30b6ba"
+# Windows emulates registry layouts in AutoHotkey; its replay of bépo's chained
+# dead keys is checked by the PC agent first (docs/tooling/windows-pc-agent-handoff.md).
+platforms = ["linux", "macos"]
+# The ISO default map set: the key left of 1 is macOS code 10 and the ISO key
+# left of Z code 50 (the Apple ISO numbering).
+keycode_convention = "iso"

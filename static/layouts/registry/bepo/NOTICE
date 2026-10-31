@@ -1,0 +1,18 @@
+bépo keyboard layout for macOS, version 1.1rc2
+
+Copyright © 2009-2019 bepo.fr, the bépo community (https://bepo.fr).
+
+bepo.keylayout is the file "bepo 1.1.bundle/Contents/Resources/bepo.keylayout"
+of the upstream disk image
+https://cdn.bepo.fr/macosx/fr-dvorak-bepo-macosx-1.1rc2.dmg, vendored
+unmodified (SHA-256
+1ae285b4d523e3969474eab01084fdf09145f00cdb4daae1245ac2d52e30b6ba).
+
+bepo.fr publishes this layout under two licences, CC BY-SA 3.0 and the GNU
+Free Documentation License; ErgoptiPlus redistributes it under the Creative
+Commons Attribution-ShareAlike 3.0 Unported licence, whose text is LICENSE
+next to this file (https://creativecommons.org/licenses/by-sa/3.0/).
+
+What ErgoptiPlus derives from it on a user's machine (the XKB symbols and
+XCompose files on Linux, the emulation on Windows) is an adaptation of this
+work and stays under the same licence.

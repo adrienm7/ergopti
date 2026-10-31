@@ -3,6 +3,58 @@
 	"schema_version": 1,
 	"layouts": [
 		{
+			"id": "bepo",
+			"name": "bépo",
+			"family": "bepo",
+			"keyboard_name": "bépo",
+			"version": "1.1.0",
+			"file": "bepo/bepo.keylayout",
+			"sha256": "1ae285b4d523e3969474eab01084fdf09145f00cdb4daae1245ac2d52e30b6ba",
+			"size": 165121,
+			"licence": "CC-BY-SA-3.0",
+			"homepage": "https://bepo.fr",
+			"author": "bépo community (bepo.fr)",
+			"languages": [
+				"fr"
+			],
+			"variants": [],
+			"platforms": [
+				"linux",
+				"macos"
+			],
+			"keycode_convention": "iso",
+			"source_url": "https://cdn.bepo.fr/macosx/fr-dvorak-bepo-macosx-1.1rc2.dmg",
+			"extension": {
+				"id": "bepo",
+				"name": "bépo",
+				"version": "1.1.0",
+				"description": {},
+				"sha256": "72cf07f08d9303dbc63cbe0cfead5876115e56396d69b0837c30687daf274438",
+				"files": [
+					{
+						"path": "LICENSE",
+						"file": "bepo/LICENSE",
+						"size": 22602,
+						"sha256": "ffc536051779cef3914d7e20d0fa2abf1ecb6a5342d65499fd0ea5aca8fd40f4"
+					},
+					{
+						"path": "bepo.keylayout",
+						"file": "bepo/bepo.keylayout",
+						"size": 165121,
+						"sha256": "1ae285b4d523e3969474eab01084fdf09145f00cdb4daae1245ac2d52e30b6ba"
+					},
+					{
+						"path": "manifest.toml",
+						"file": "bepo/manifest.toml",
+						"size": 140,
+						"sha256": "cc319a1acd45bd716606fa3422020a362dcd8ad994b06092dd322ee6e125a066"
+					}
+				]
+			},
+			"source_sha256": "1ae285b4d523e3969474eab01084fdf09145f00cdb4daae1245ac2d52e30b6ba",
+			"licence_file": "LICENSE"
+		},
+		{
 			"id": "ergol",
 			"name": "Ergo-L",
 			"family": "ergol",

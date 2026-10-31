@@ -162,9 +162,53 @@ class RegistryConversionTests(unittest.TestCase):
                         for prefix in result.dead_sequences.get(state, []):
                             checked += 1
                             if compose.get(tuple(prefix) + (keysym,)) != output:
-                                missing.append("%s %s -> %r" % (" ".join(prefix), keysym, output))
+                                missing.append(f"{' '.join(prefix)} {keysym} -> {output!r}")
             self.assertEqual(missing, [], layout_id)
         self.assertGreater(checked, 1000)
+
+
+class BepoConversionTests(unittest.TestCase):
+    """The vendored bépo (chained dead keys up to three deep) converts whole.
+
+    Every output a key types inside a reachable dead state is checked by the
+    written-keysym test above, which covers bépo with the other registry
+    layouts; these pin what that layout added: it is in the registry, no two
+    actions collide on a sequence, and the chains that used to break compose.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = convert_registry_layout("bepo")
+        cls.compose = parse_compose(cls.result.compose_text)
+
+    def test_bepo_is_a_registry_layout_on_linux(self):
+        entry = next(entry for entry in registry_entries() if entry["id"] == "bepo")
+        self.assertIn("linux", entry["platforms"])
+        self.assertEqual(entry["licence"], "CC-BY-SA-3.0")
+        self.assertEqual(entry["keycode_convention"], "iso")
+
+    def test_no_compose_conflict(self):
+        self.assertEqual(self.result.conflicts, [])
+
+    def test_chained_dead_keys_compose_from_the_keysym_their_key_sends(self):
+        science = self.result.dead_triggers["scientifique"]
+        circumflex = self.result.dead_triggers["circonflexe"]
+        # The circumflex dead key and the plain "^" no longer share a sequence
+        # inside the science dead key.
+        self.assertEqual(self.compose[(science, circumflex)], "→")
+        self.assertEqual(self.compose[(science, "asciicircum")], "⃗")
+        # A dead key pressed twice composes from its own dead keysym.
+        breve = self.result.dead_triggers["breve"]
+        self.assertEqual(self.compose[(breve, breve)], "̑")
+        self.assertEqual(
+            max(
+                len(sequence)
+                for sequences in self.result.dead_sequences.values()
+                for sequence in sequences
+            ),
+            3,
+            "bépo chains reach three dead keys deep",
+        )
 
 
 class ErgolCompletenessTests(unittest.TestCase):
