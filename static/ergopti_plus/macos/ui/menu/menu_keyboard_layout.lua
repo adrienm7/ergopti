@@ -50,6 +50,13 @@ M.DEFAULT_STATE = {
 	layout_virtual_keyboard     = Manifest.default_for(require("config_keys").KEY.LAYOUT_VIRTUAL_KEYBOARD),
 }
 
+-- The phases one build records, so the field run's menu step names the one
+-- that costs (number_row and magic_key run inside rows).
+M.PHASES = {
+	"menu_keyboard_layout.sources", "menu_keyboard_layout.bundles", "menu_keyboard_layout.variants",
+	"menu_keyboard_layout.rows", "menu_keyboard_layout.number_row", "menu_keyboard_layout.magic_key",
+}
+
 
 
 
@@ -298,7 +305,11 @@ local function number_row_rows(state, save_prefs, update_menu, render_ctx)
 	local ManifestMenu = require("infra.manifest_menu")
 	if type(state) ~= "table" then return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
 	local Live = require("modules.keymap.number_row_live")
+	-- Timed here rather than around the call: the menu parity proofs read the
+	-- provider call shapes of M.build.
+	local started = PhaseStats.now()
 	local available, reason = Live.available()
+	PhaseStats.stop("menu_keyboard_layout.number_row", started)
 	local function stored()
 		return { order = state.layout_number_row_mode, edges = state.layout_number_row_reorder_edges == true }
 	end

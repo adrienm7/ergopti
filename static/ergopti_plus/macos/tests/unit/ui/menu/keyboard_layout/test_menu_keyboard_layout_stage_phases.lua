@@ -26,9 +26,19 @@ helpers.describe("Keyboard layout row build stages", function()
 		assert(ok, row)
 		helpers.assert_true(type(row) == "table" and type(row.menu) == "table" and #row.menu > 0,
 			"the timed build must still reach the tray populated")
+		-- number_row and magic_key are timed inside their own builders, so the
+		-- provider call shapes the menu parity proofs read stay as they are.
 		helpers.assert_eq(stopped, {
 			"menu_keyboard_layout.sources", "menu_keyboard_layout.bundles",
-			"menu_keyboard_layout.variants", "menu_keyboard_layout.rows",
+			"menu_keyboard_layout.variants", "menu_keyboard_layout.number_row",
+			"menu_keyboard_layout.magic_key", "menu_keyboard_layout.rows",
 		})
+		-- The field run's menu step reads this list to name the costly stage.
+		local layout = require("ui.menu.menu_keyboard_layout")
+		local declared = {}
+		for _, name in ipairs(layout.PHASES) do declared[name] = true end
+		for _, name in ipairs(stopped) do
+			helpers.assert_true(declared[name] == true, name .. " must be declared in PHASES")
+		end
 	end)
 end)

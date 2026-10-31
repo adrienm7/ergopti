@@ -58,6 +58,10 @@ function M.new(ports)
 	local catalogue = { index = nil, source = Catalogue.SOURCE_NONE, error = nil }
 	local bundled = nil
 	local bundled_read = false
+	-- The exact inputs `bundled` was decoded from (text, decoder, size bound): a
+	-- source checkout rereads the file on every call, and identical inputs
+	-- decode to the identical index.
+	local bundled_key = nil
 
 	--- The last refresh outcome: { index, source, error }.
 	--- @return table
@@ -68,6 +72,7 @@ function M.new(ports)
 		catalogue = { index = nil, source = Catalogue.SOURCE_NONE, error = nil }
 		bundled = nil
 		bundled_read = false
+		bundled_key = nil
 	end
 
 	--- Writes one file, creating its folder first.
@@ -85,6 +90,10 @@ function M.new(ports)
 	end
 
 	--- The shipped index, reread for source checkouts so Refresh sees local edits.
+	--- Only a changed text is decoded again: the keyboard-layout menu asks for
+	--- it on every rebuild, and decoding the unchanged index there cost most of
+	--- the number-row rows (2026-10-31 field run, menu.rebuild over budget).
+	--- The index is shared read-only, as the packaged app always shared it.
 	--- @param deps table
 	--- @return table|nil
 	function store.bundled_index(deps)
@@ -96,11 +105,19 @@ function M.new(ports)
 			return nil
 		end
 		local text = deps.read(deps.bundled_dir .. deps.settings.index_file)
-		local index, _, detail = Catalogue.decode_index(text, deps.decode_json, deps.settings.max_file_bytes)
+		local max_bytes = deps.settings.max_file_bytes
+		local key = bundled_key
+		if type(text) == "string" and key ~= nil and key.text == text
+			and key.decode == deps.decode_json and key.max_bytes == max_bytes then
+			return bundled
+		end
+		local index, _, detail = Catalogue.decode_index(text, deps.decode_json, max_bytes)
 		if not index then
 			Logger.error(LOG, "The layout index shipped with the %s is unusable: %s.", ports.shipped_noun, tostring(detail))
 		end
 		bundled = index
+		bundled_key = type(text) == "string"
+			and { text = text, decode = deps.decode_json, max_bytes = max_bytes } or nil
 		return index
 	end
 
