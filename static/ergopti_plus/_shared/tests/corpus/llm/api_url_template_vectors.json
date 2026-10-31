@@ -1,0 +1,83 @@
+{
+	"_comment": "Address templates of the per-account providers of api_providers.json: the placeholders a template asks for, the values that may fill one, and the address filled. _shared/lua/llm/api_url_template.lua (macOS and Linux unit suites) and its port _shared/modules/llm/api_url_template.ahk (AHK suite) each replay this corpus.",
+	"max_value_length": 253,
+	"fields": [
+		{ "template": "https://api.openai.com/v1", "fields": [], "valid": true },
+		{
+			"template": "https://{resource}.openai.azure.com/openai/v1",
+			"fields": ["resource"],
+			"valid": true
+		},
+		{
+			"template": "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
+			"fields": ["account_id"],
+			"valid": true
+		},
+		{ "template": "https://{a}.example.com/{b}/{a}", "fields": ["a", "b"], "valid": true },
+		{ "template": "https://{Resource}.example.com", "fields": [], "valid": false },
+		{ "template": "https://{resource.example.com", "fields": [], "valid": false },
+		{ "template": "https://example.com/}", "fields": [], "valid": false },
+		{ "template": "", "fields": [], "valid": true }
+	],
+	"values": [
+		{ "value": "my-resource", "valid": true },
+		{ "value": "us-east-1", "valid": true },
+		{ "value": "0123456789abcdef0123456789abcdef", "valid": true },
+		{ "value": "dbc-a1b2345c-d6e7.cloud.databricks.com", "valid": true },
+		{ "value": "myorg_account1", "valid": true },
+		{ "value": "", "valid": false },
+		{ "value": "-leading", "valid": false },
+		{ "value": ".leading", "valid": false },
+		{ "value": "has space", "valid": false },
+		{ "value": "evil.com/path", "valid": false },
+		{ "value": "user@host", "valid": false },
+		{ "value": "host:443", "valid": false },
+		{ "value": "a?b", "valid": false },
+		{ "value": "a#b", "valid": false },
+		{ "value": "a%2fb", "valid": false },
+		{ "value": "café", "valid": false },
+		{ "value_repeat": "a", "count": 253, "valid": true },
+		{ "value_repeat": "a", "count": 254, "valid": false }
+	],
+	"expand": [
+		{
+			"template": "https://{resource}.openai.azure.com/openai/v1",
+			"values": { "resource": "contoso" },
+			"url": "https://contoso.openai.azure.com/openai/v1"
+		},
+		{
+			"template": "https://bedrock-runtime.{region}.amazonaws.com/openai/v1",
+			"values": { "region": "eu-west-3" },
+			"url": "https://bedrock-runtime.eu-west-3.amazonaws.com/openai/v1"
+		},
+		{
+			"template": "https://{a}.example.com/{b}/{a}",
+			"values": { "a": "x", "b": "y" },
+			"url": "https://x.example.com/y/x"
+		},
+		{
+			"template": "https://{resource}.openai.azure.com/openai/v1",
+			"values": {},
+			"url": null,
+			"field": "resource"
+		},
+		{
+			"template": "https://{resource}.openai.azure.com/openai/v1",
+			"values": { "resource": "evil.com/x?" },
+			"url": null,
+			"field": "resource"
+		},
+		{
+			"template": "https://{a}.example.com/{b}",
+			"values": { "a": "x", "b": "" },
+			"url": null,
+			"field": "b"
+		},
+		{ "template": "https://api.openai.com/v1", "values": {}, "url": "https://api.openai.com/v1" }
+	],
+	"placeholder": [
+		{ "url": "https://{resource}.openai.azure.com/openai/v1", "has": true },
+		{ "url": "https://contoso.openai.azure.com/openai/v1", "has": false },
+		{ "url": "", "has": false }
+	]
+}
