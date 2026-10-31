@@ -758,30 +758,70 @@ function M.parse_usage(output)
 	return tonumber(rss), tonumber((cpu:gsub(",", ".")))
 end
 
+--- Reads `ps -o etime=` output (`[[dd-]hh:]mm:ss`).
+--- @param output any Command output.
+--- @return number|nil seconds Elapsed seconds since the process started.
+function M.parse_elapsed(output)
+	local days, rest = tostring(output or ""):match("^%s*(%d+)%-([%d:]+)%s*$")
+	rest = rest or tostring(output or ""):match("^%s*([%d:]+)%s*$")
+	if not rest then return nil end
+	local parts = {}
+	for part in rest:gmatch("%d+") do parts[#parts + 1] = tonumber(part) end
+	if #parts < 2 or #parts > 3 or rest:find("::", 1, true) then return nil end
+	local hours = #parts == 3 and parts[1] or 0
+	return ((tonumber(days) or 0) * 24 + hours) * 3600 + parts[#parts - 1] * 60 + parts[#parts]
+end
+
 --- The app's resident memory and CPU share while the field run waits between
 --- steps, and the crash reports of the last day: the driver's own (a Lua
 --- fatal it caught) and the ones macOS wrote for this app's processes (the app
 --- and its launcher roles, Hammerspoon, Ollama, Python, Karabiner), which fail
 --- by process and are listed with their closed kind (hang or crash, exception,
 --- signal, termination namespace); other apps' reports are counted only.
+--- Only a report written since the current app start fails: an earlier start's
+--- reports are counted as information, since a fix cannot rewrite them (the
+--- 2026-10-31 run failed on 13 reports of builds it had replaced). An app start
+--- that cannot be read fails and judges the whole day.
 function M.app_health(ports, report, finish)
-	local crashes = ports.crash_counts()
-	report.step("driver_crash_reports_24h", (crashes.driver or 0) == 0 and STATE.pass or STATE.fail, crashes.driver or 0)
+	local start_pid = ports.app_start_pid()
+	ports.exec(PS, { "-o", "etime=", "-p", tostring(start_pid) }, PROBE_COMMAND_TIMEOUT, function(start_code, start_output)
+		local elapsed = M.parse_elapsed(start_code == 0 and start_output or "")
+		-- etime truncates to the second: one more keeps a report of the first second.
+		local since = elapsed and (ports.now() - elapsed - 1) or nil
+		if elapsed then
+			report.step("app_uptime_s", STATE.info, elapsed)
+		else
+			report.step("app_uptime_s", STATE.fail, failure_token(start_code))
+		end
+		M.app_health_with_start(ports, report, finish, since)
+	end)
+end
+
+--- The crash and usage half of app_health once the app start is known.
+--- @param since number|nil Epoch seconds of the current app start.
+function M.app_health_with_start(ports, report, finish, since)
+	local crashes = ports.crash_counts(since)
+	report.step("driver_crash_reports_since_start", (crashes.driver or 0) == 0 and STATE.pass or STATE.fail,
+		crashes.driver or 0)
+	report.step("driver_crash_reports_earlier_24h", STATE.info, crashes.driver_earlier or 0)
 	-- One of this app's processes fails the step; every other app's report is information
 	local owned = crashes.owned or {}
-	local per_process, names = {}, {}
+	local function by_process(counts)
+		local names, parts = {}, {}
+		for name in pairs(counts) do names[#names + 1] = name end
+		table.sort(names)
+		for _, name in ipairs(names) do parts[#parts + 1] = name .. ":" .. counts[name] end
+		return #parts == 0 and 0 or table.concat(parts, "+")
+	end
+	local per_process = {}
 	for _, entry in ipairs(owned) do
-		if not per_process[entry.process] then names[#names + 1] = entry.process end
 		per_process[entry.process] = (per_process[entry.process] or 0) + 1
 	end
-	table.sort(names)
-	local parts = {}
-	for _, name in ipairs(names) do parts[#parts + 1] = name .. ":" .. per_process[name] end
-	report.step("app_crash_reports_24h", #owned == 0 and STATE.pass or STATE.fail,
-		#owned == 0 and 0 or table.concat(parts, "+"))
+	report.step("app_crash_reports_since_start", #owned == 0 and STATE.pass or STATE.fail, by_process(per_process))
 	for index = 1, math.min(#owned, M.CRASHES_LISTED) do
 		report.step("app_crash_" .. index, STATE.info, owned[index].process .. ":" .. owned[index].kind)
 	end
+	report.step("app_crash_reports_earlier_24h", STATE.info, by_process(crashes.earlier or {}))
 	report.step("other_crash_reports_24h", STATE.info, crashes.other or 0)
 	ports.exec(PS, { "-o", "rss=,%cpu=", "-p", tostring(ports.pid()) }, PROBE_COMMAND_TIMEOUT, function(code, output)
 		local rss, cpu = M.parse_usage(code == 0 and output or "")
