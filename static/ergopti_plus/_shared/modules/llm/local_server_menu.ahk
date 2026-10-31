@@ -54,11 +54,15 @@ LocalServerMenuRows(Options) {
 			"items", _LocalServerMenuItems(Options, Id, Verdict)))
 	}
 	if Options["detected"].Length == 0 && !Unavailable {
-		Labels := ""
-		for Id in Options["order"]
-			Labels .= (Labels == "" ? "" : ", ") . Options["servers"][Id]["label"]
-		Key := Options["sweeping"] ? "menu.llm.local_servers.searching" : "menu.llm.local_servers.none"
-		Rows.Push(Map("label", Fmt.Call(Key, Labels), "disabled", true))
+		; A finished sweep says one sentence: the catalogue's server names stay in the
+		; local servers panel and the "other address" submenu, not in this row.
+		if Options["sweeping"] {
+			Labels := ""
+			for Id in Options["order"]
+				Labels .= (Labels == "" ? "" : ", ") . Options["servers"][Id]["label"]
+			Rows.Push(Map("label", Fmt.Call("menu.llm.local_servers.searching", Labels), "disabled", true))
+		} else
+			Rows.Push(Map("label", Tr.Call("menu.llm.local_servers.none_detected"), "disabled", true))
 	}
 	Rescan := Map("label", Tr.Call("menu.llm.local_servers.rescan"), "disabled", Paused)
 	if !Paused
