@@ -208,10 +208,10 @@ function M.new(ports, policy)
 			local pending=entry.result_listeners;entry.result_listeners={}
 			for _,callback in ipairs(pending) do notify(callback,request.result) end
 		end
-		fail = function(reason)
+		fail = function(reason, relay_refusal)
 			if entry.promoted then return end
 			if not failing then
-				failing=true; request.result={ok=false,error=reason or 'runtime_refused'}
+				failing=true; request.result={ok=false,error=reason or 'runtime_refused', relay_refusal=relay_refusal}
 				announce_result()
 			end
 			entry.stage='cleanup'; clean()
@@ -323,7 +323,7 @@ function M.new(ports, policy)
 			service=acquire('service', function(done)
 				return P.start_service(executable, {'serve'}, {origin=entry.origin,
 					host=entry.host, timeout_ms=false, authorized=service_authorized,
-					environment=entry.service_environment or {},
+					environment=entry.service_environment or {}, relay=entry.relay,
 					owner='ollama-runtime-' .. tostring(sequence)}, done)
 			end)
 			if not service_live() then fail('runtime_service_unavailable'); return end
@@ -385,7 +385,13 @@ function M.new(ports, policy)
 							-- The lookup stage that sent an origin direct: a later pull
 							-- that fails names both causes (PAC unusable, direct failed).
 							entry.direct_fallback=type(answer.direct_fallback)=='string' and answer.direct_fallback or nil
+							-- A proxy that demands a sign-in the daemon cannot give: the
+							-- daemon starts under the local relay (proxy-auth-relay.md).
+							entry.relay=type(answer.relay)=='table' and answer.relay or nil
 							begin_service()
+						elseif held.delivered and type(answer)=='table' and type(answer.relay_refusal)=='string' then
+							-- The relay's closed reason reaches the page as its own message.
+							fail('runtime_proxy_relay_refused', answer.relay_refusal)
 						else
 							fail('runtime_proxy_unavailable')
 						end
