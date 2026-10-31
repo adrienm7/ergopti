@@ -248,6 +248,17 @@ change touched is the generated `windows/_generated/config_keys.ahk`
 - AHK tests replaying `_shared/lua/test/network_proxy_override_contract.lua`'s
   vectors (accepted relays, refused values, precedence).
 
+## bépo in the layout registry (31 October)
+
+`static/layouts/registry/bepo/` vendors bépo 1.1rc2 unmodified under CC BY-SA
+3.0 (LICENSE and NOTICE beside it), with `platforms = ["linux", "macos"]`. Its
+dead keys chain up to three deep (`latin`, `scientifique`, `exposant` and
+`crochet` inside other dead states). Before adding `"windows"` to its
+`meta.toml` and rebuilding the index, check that the AutoHotkey emulation
+types its chained sequences (for example science dead key then circumflex dead
+key types "→", breve twice types the combining inverted breve) and run the
+registry emulation tests over it.
+
 ## Seven more local AI servers (31 October)
 
 `local_servers.json` gained SGLang, KoboldCpp, text-generation-webui, GPT4All,
