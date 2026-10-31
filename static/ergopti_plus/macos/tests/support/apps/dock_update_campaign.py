@@ -159,7 +159,6 @@ exec(compile(sys.stdin.read(),'actual embedded Dock worker','exec'))
                 DEST=str(app),
                 UNIQUE_ID="probe." + name,
                 SOURCE_APP=str(source_app),
-                PWA_BROWSER="",
                 USER_DATA_DIR=str(profile),
                 PATH=str(binaries) + os.pathsep + os.environ.get("PATH", ""),
                 PROBE_ARGS_PATH=str(argument_receipt),
@@ -187,7 +186,7 @@ exec(compile(sys.stdin.read(),'actual embedded Dock worker','exec'))
             receipts.append({"exit": process.returncode, "stderr": errors})
             receipt_path, profile = argument_receipts[process.pid]
             actual_arguments = json.loads(receipt_path.read_text(encoding="utf-8"))
-            admitted = len(actual_arguments) == 5 and actual_arguments[4] == str(profile)
+            admitted = len(actual_arguments) == 4 and actual_arguments[3] == str(profile)
             checks["required_user_data_argument_reaches_actual_worker"] = (
                 checks.get("required_user_data_argument_reaches_actual_worker", True) and admitted
             )
@@ -280,7 +279,6 @@ exec(compile(sys.stdin.read(),'actual embedded Dock worker','exec'))
             str(exceptional[3] / "A.app"),
             "probe.A",
             str(source_app),
-            "",
             str(profile),
         ]
         previous_arguments, previous_home, original_load = (

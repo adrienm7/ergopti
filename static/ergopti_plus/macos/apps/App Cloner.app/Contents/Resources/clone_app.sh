@@ -588,18 +588,16 @@ LAUNCHER="$MACOS/launcher"
 
 # ====================================================================
 # ====================================================================
-# ======= 6.b/ PWA mode — clone is an Edge web app ===================
+# ======= 6.b/ PWA mode — clone is a WKWebView web app ===============
 # ====================================================================
 # ====================================================================
 
 # When the user ticks «mode PWA» the clone is no longer a stub that re-
-# launches the source desktop app. Instead it spawns Microsoft Edge (or
-# Chrome / Brave as fallback) in --app=URL mode with an isolated user-data
-# dir. The result is a chromeless, single-window web app — fully isolated
-# from the user's main browser session, and from any other clone — that
-# can be logged into independently. This is the only reliable way to get
-# multiple sandboxed apps (Teams new, Outlook for Mac) running side by
-# side on macOS without Microsoft's signing key.
+# launches the source desktop app. It hosts the URL itself in a WKWebView,
+# so no browser is looked for or started (owned-runtimes row "Microsoft
+# Edge, Chrome, Brave"): the result is a chromeless, single-window web app,
+# isolated from the user's browser session and from any other clone, that
+# can be logged into independently.
 if [[ "$PWA_MODE" == "1" ]]; then
 	# WKWebView mode: the launcher hosts the web app directly via WebKit, no
 	# Edge/Chrome dependency at runtime. The clone IS the app — Mission Control
@@ -607,12 +605,8 @@ if [[ "$PWA_MODE" == "1" ]]; then
 	# the bundle stays small (~tens of KB) so signing is trivial.
 	log "PWA mode: WKWebView launcher (no external browser)"
 
-	# Per-clone WKWebView data store — keeps cookies/localStorage of each
-	# PWA isolated. With WKWebView, the default data store is per-bundle, so
-	# each clone (different bundle-id) is naturally isolated. We still keep
-	# this directory for the launcher's hint files (target_space_uuid, etc).
-	PWA_PROFILE_DIR="$HOME/Library/Application Support/AppCloner/${safe_name}_pwa"
-	mkdir -p "$PWA_PROFILE_DIR"
+	# The default WKWebView data store is per bundle id, so each clone keeps
+	# its own cookies and localStorage without a profile folder.
 
 	# Patch the stub Info.plist with media usage descriptions. The user-facing
 	# strings are shown by macOS the first time the WKWebView requests camera
@@ -1125,7 +1119,7 @@ LSR=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.
 # to the Finder's path-based lookup which tends to find a stale system
 # icon. The `book` field — an NSURL bookmark blob — is what manual
 # drag-to-Dock generates and what makes the entry survive moves.
-python3 - "$DEST" "$UNIQUE_ID" "$SOURCE_APP" "${PWA_BROWSER:-}" "$USER_DATA_DIR" <<'DOCKEOF'
+python3 - "$DEST" "$UNIQUE_ID" "$SOURCE_APP" "$USER_DATA_DIR" <<'DOCKEOF'
 import sys, plistlib, os, subprocess, time, fcntl, stat
 from contextlib import contextmanager
 from urllib.parse import quote
@@ -1133,8 +1127,7 @@ from urllib.parse import quote
 app_path     = sys.argv[1]
 bundle_id    = sys.argv[2]
 source_app   = sys.argv[3]
-pwa_browser  = sys.argv[4]  # path to Edge/Chrome app, or "" for native mode
-user_data_dir = sys.argv[5]
+user_data_dir = sys.argv[4]
 plist_path   = os.path.expanduser("~/Library/Preferences/com.apple.dock.plist")
 lsr          = ("/System/Library/Frameworks/CoreServices.framework"
                 "/Frameworks/LaunchServices.framework/Support/lsregister")
@@ -1265,7 +1258,7 @@ with dock_update_lock():
         except Exception:
             return ""
 
-    def copy_space_assignment(src_app_path, clone_bundle_id, browser_app_path, dock_plist):
+    def copy_space_assignment(src_app_path, clone_bundle_id, dock_plist):
         try:
             src_bundle_id = _read_bundle_id(src_app_path)
             if not src_bundle_id:
@@ -1291,30 +1284,10 @@ with dock_update_lock():
             assignments[clone_bundle_id] = space_uuid
             dock_plist["workspaces-application-assignments"] = assignments
             print(f"Space assignment: {src_bundle_id} → {clone_bundle_id} (Space {space_uuid})")
-
-            # For PWA mode, write two files into the profile dir that the Swift
-            # launcher reads on every click to enforce the Space pinning:
-            #   * target_space_uuid — static UUID of the source app's Space at clone
-            #     time. Used as the primary lookup; survives across reboots.
-            #   * source_bundle_id — fallback for dynamic resolution. If the user
-            #     moves Teams to a different Space later, the launcher uses this
-            #     bundle-id to query com.apple.spaces and follow the move.
-            # We never touch the browser's own Space assignment — Edge stays pinned
-            # wherever the user set it.
-            if browser_app_path:
-                profile_dir = os.path.expanduser(
-                    f"~/Library/Application Support/AppCloner/{os.path.basename(app_path).removesuffix('.app')}_pwa"
-                )
-                os.makedirs(profile_dir, exist_ok=True)
-                with open(os.path.join(profile_dir, "target_space_uuid"), 'w') as fh:
-                    fh.write(space_uuid)
-                with open(os.path.join(profile_dir, "source_bundle_id"), 'w') as fh:
-                    fh.write(src_bundle_id)
-                print(f"Space hint written: uuid={space_uuid}  source={src_bundle_id}")
         except Exception as e:
             print(f"Space assignment copy skipped ({e})")
 
-    copy_space_assignment(source_app, bundle_id, pwa_browser, dock)
+    copy_space_assignment(source_app, bundle_id, dock)
 
     with open(plist_path, 'wb') as f:
         plistlib.dump(dock, f)
