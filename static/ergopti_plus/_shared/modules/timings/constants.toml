@@ -777,6 +777,11 @@ magic_key_capture_timeout_ms = 10000
 # AHK: ui/editors.ahk MagicKeySourceCapture.
 magic_key_capture_poll_ms = 10
 
+# Windows: how often a developer driver looks for a field run request in its
+# clone (_shared/data/field_run_protocol.json); a request waits at most this long.
+# AHK: infra/field_run.ahk.
+field_run_poll_ms = 1000
+
 # Hammerspoon reload debounce after a config file change, and the settle poll
 # while Git holds the tree.
 # HS: ui/menu/menu_watchers.lua DEBOUNCE_SEC.

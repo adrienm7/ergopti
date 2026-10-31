@@ -41,6 +41,9 @@ const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
 // The analyser and the declarations it reads its budgets from.
 const ANALYSER = 'tools/dev/field-log-analyse.py';
+// The field run protocol every driver shares, and the Windows steps.
+const FIELD_RUN_PROTOCOL = 'static/ergopti_plus/_shared/data/field_run_protocol.json';
+const FIELD_RUN_STEPS = 'static/ergopti_plus/windows/data/field_run_steps.json';
 const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml';
 const GUARD =
 	"if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { Fail 'This collector runs on Windows only.' }\n";
@@ -178,6 +181,38 @@ check("the collector's own checks print one verdict line each", () => {
 		assert.match(code, new RegExp(`Invoke-Step '${name}' \\{`));
 });
 
+check('the field run speaks the shared protocol and never starts a driver', () => {
+	const body = code.match(/^function Invoke-FieldRun \{\n([\s\S]*?)^\}$/m);
+	assert(body, 'no Invoke-FieldRun');
+	const protocol = JSON.parse(fs.readFileSync(path.join(ROOT, FIELD_RUN_PROTOCOL), 'utf8'));
+	assert.match(body[1], /'data', 'field_run_protocol\.json'/);
+	assert.match(body[1], /\$Protocol\.steps_file\.windows/);
+	assert.match(body[1], /\$Protocol\.folder\.clone/);
+	for (const name of Object.values(protocol.files))
+		assert(!code.includes(`'${name}'`), `the collector spells the file name ${name} itself`);
+	for (const kind of ['ready', 'request', 'refused', 'accepted', 'done', 'results'])
+		assert.match(body[1], new RegExp(`\\$Files\\.${kind}\\b`), `the ${kind} file`);
+	assert.match(body[1], /\$Protocol\.result_file_pattern/);
+	assert.doesNotMatch(
+		code,
+		/run-windows-dev\.ps1'|& .*run-windows-dev/,
+		'it never starts a driver'
+	);
+	// Every outcome is one verdict line the analysis marks.
+	for (const line of [
+		'check=field_run verdict=skip codes=no_ready_driver',
+		'check=field_run verdict=fail codes=not_accepted',
+		'check=field_run verdict=timeout codes=no_done_marker',
+		'check=field_run verdict=fail codes=driver_gone'
+	])
+		assert(body[1].includes(line), line);
+	assert.match(body[1], /check=\$\(\$Result\.step\) verdict=\$\(\$Result\.verdict\)/);
+	assert(
+		code.indexOf('try { Invoke-FieldRun }') > code.indexOf("Invoke-Step 'collector_checks'"),
+		'the field run comes after the facts it would otherwise delay'
+	);
+});
+
 check('the proxy facts say set or unset, never an address', () => {
 	const winhttp = code.match(/Invoke-Step 'proxy_winhttp' \{\n([\s\S]*?)\n\t\}\n/)[1];
 	assert.match(winhttp, /'WinHTTP: direct' \} else \{ 'WinHTTP: set' \}/);
@@ -194,7 +229,7 @@ check('the proxy facts say set or unset, never an address', () => {
 check('the header names what the collector does not cover', () => {
 	assert.match(source, /^# NOT COVERED, AND WHY:$/m);
 	for (const topic of [
-		'No field run.',
+		'The field run needs a developer driver',
 		'No diagnostics export.',
 		'Not the live checks.',
 		'LogsDirPath'
@@ -310,6 +345,8 @@ function fixture(name, start = 'dev') {
 		COLLISIONS,
 		BUNDLED_SAMPLE,
 		ANALYSER,
+		FIELD_RUN_PROTOCOL,
+		FIELD_RUN_STEPS,
 		...sources
 	]) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
@@ -440,6 +477,11 @@ try {
 			);
 			assert.equal(analysis.performance.find((row) => row.metric === 'boot.total').max, 900);
 			assert.match(result.stdout, /Check verdicts summary: /);
+			// No developer driver runs in the fixture: the field run is a skip, not a wait.
+			assert.equal(
+				fs.readFileSync(path.join(folders[0], 'field_run_checks.txt'), 'utf8'),
+				'check=field_run verdict=skip codes=no_ready_driver\n'
+			);
 			assert.doesNotMatch(fs.readFileSync(path.join(folders[0], 'steps.txt'), 'utf8'), /\r/);
 			const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD').split('\n');
 			assert(
