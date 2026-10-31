@@ -23,9 +23,13 @@
  * Face), the bundle ids, the service labels and the ErgoptiPlus.ahk/.exe/.app
  * names. Their code-line copies per file are held to
  * tools/lint/identifier-literal-baseline.json, which may only go down
- * (`--shrink` writes a lower count back). The Lua sites of macOS and Linux are
- * already converted to _shared/lua/identifiers.lua; the AHK, Swift, shell and
- * Python files stay in the baseline until their generators exist.
+ * (`--shrink` writes a lower count back). The Lua sites of macOS and Linux read
+ * _shared/lua/identifiers.lua, the shell scripts _shared/data/identifiers.sh
+ * (tools/test/test-shell-identifiers-sourcing.cjs), the Node tools
+ * tools/lib/identifiers.cjs and the Swift tests Identifiers.generated.swift.
+ * What stays in the baseline has no generated copy to read (AHK, PowerShell,
+ * C++, Objective-C, the SwiftPM manifest), is a source-bound owned-runtime
+ * input, or names an upstream Go module path rather than a host.
  * ==============================================================================
  */
 

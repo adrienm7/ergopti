@@ -31,6 +31,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
+const { app } = require('../lib/identifiers.cjs');
 
 const POLICY_PATH = path.join(__dirname, 'windows-exe-av-surface.json');
 const RT_RCDATA = 10;
@@ -354,7 +355,7 @@ if (require.main === module) {
 	if (positional.length !== 1) {
 		process.stderr.write(
 			'Usage: node tools/ci/windows-exe-av-surface.cjs [--breakdown] [--sources <windows dir>] ' +
-				'[--record <counts.json>] <ErgoptiPlus.exe>\n'
+				`[--record <counts.json>] <${app.exe}>\n`
 		);
 		process.exit(2);
 	}

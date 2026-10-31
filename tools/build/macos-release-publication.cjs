@@ -13,6 +13,7 @@ const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const { resolveArchives } = require('./macos-release-archives.cjs');
 const { shared } = require('../lib/paths.cjs');
+const { hosts } = require('../lib/identifiers.cjs');
 const { readOwnedDescriptor } = require('../lib/owned-descriptor-read.cjs');
 
 const RECEIPT = 'macos-publication.json';
@@ -293,7 +294,7 @@ function generateAppcast(env, options = {}) {
 			.replaceAll('"', '&quot;')
 			.replaceAll('<', '&lt;')
 			.replaceAll('>', '&gt;');
-	const url = `https://github.com/${env.GH_OWNER}/${env.GH_REPO}/releases/download/v${env.ERGOPTI_VERSION}/${selected.name}`;
+	const url = `https://${hosts.github}/${env.GH_OWNER}/${env.GH_REPO}/releases/download/v${env.ERGOPTI_VERSION}/${selected.name}`;
 	// Publication follows the explicit release source revision, not the clock.
 	const revision = env.GITHUB_SHA ?? 'HEAD';
 	if (
@@ -324,7 +325,7 @@ function generateAppcast(env, options = {}) {
      xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <title>Ergopti</title>
-    <link>https://github.com/${escape(env.GH_OWNER)}/${escape(env.GH_REPO)}</link>
+    <link>https://${hosts.github}/${escape(env.GH_OWNER)}/${escape(env.GH_REPO)}</link>
     <item>
       <title>Ergopti ${escape(env.ERGOPTI_VERSION)}</title>
       <pubDate>${escape(published)}</pubDate>

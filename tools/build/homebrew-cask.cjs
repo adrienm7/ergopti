@@ -49,6 +49,7 @@
 const fs = require('fs');
 const path = require('path');
 
+const identifiers = require('../lib/identifiers.cjs');
 const { bindings } = require('./macos-release-publication.cjs');
 const { loadChannels, REGISTRY_PATH } = require('./release-channel.cjs');
 
@@ -61,10 +62,10 @@ const APPCAST_BRANCH = 'sparkle-appcasts';
 // Release asset and bundle name (tools/build/build_macos_app.sh)
 const ASSET_NAME = bindings().find((archive) => archive.format === 'zip')?.name;
 if (!ASSET_NAME) throw new Error('The historical macOS cask binding is absent.');
-const APP_NAME = 'ErgoptiPlus.app';
+const APP_NAME = identifiers.app.bundle;
 
 // Launcher bundle identifier (tools/build/build_macos_app.sh BUNDLE_ID)
-const BUNDLE_ID = 'com.ergoptiplus.app';
+const BUNDLE_ID = identifiers.bundle_ids.launcher;
 
 // Base cask token; channels other than the most stable one add @<id>
 const TOKEN_BASE = 'ergoptiplus';
@@ -128,7 +129,7 @@ function renderCask(tag, sha256, assetName = ASSET_NAME) {
 		`  version "${version}"`,
 		`  sha256 "${sha256}"`,
 		'',
-		`  url "https://github.com/${SOURCE_REPOSITORY}/releases/download/v#{version}/${assetName}"`,
+		`  url "https://${identifiers.hosts.github}/${SOURCE_REPOSITORY}/releases/download/v#{version}/${assetName}"`,
 		`  name "Ergopti+${suffix}"`,
 		'  desc "Ergopti keyboard layout companion: hotstrings, tap-holds, gestures and AI"',
 		'  homepage "https://ergopti.fr/"',

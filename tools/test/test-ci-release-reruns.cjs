@@ -97,6 +97,12 @@ const MANAGED_PUBLICATION_ASSETS = [
 // Source dependencies are real copied files. The fixture creator never imports
 // production admission or generation code to choose its expected metadata.
 const MANAGED_PUBLICATION_SOURCES = [
+	// The publication owners name the release host and the bundle through the
+	// shared identifiers and the repository through the updater defaults.
+	'tools/lib/identifiers.cjs',
+	'tools/lib/paths.cjs',
+	'static/ergopti_plus/_shared/data/identifiers.json',
+	'static/ergopti_plus/_shared/modules/updater/defaults.json',
 	'tools/build/verify-macos-managed-ollama-publication.py',
 	'tools/build/stage-macos-managed-ollama-catalogue.py',
 	'tools/build/build-macos-managed-ollama.py',

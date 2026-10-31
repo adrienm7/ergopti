@@ -28,6 +28,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { expandIdentifiers } = require('../lib/shell-identifiers.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED_ROOT = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
@@ -414,6 +415,10 @@ const THIRD_PARTY_SOURCES = new Map([
 		'build-linux-flatpak.sh: the Flatpak runtime ships no LuaJIT, so the manifest builds it from upstream'
 	],
 	[
+		'luvit/luv',
+		'build-linux-packaged-luv.sh: the .rpm builds its LuaJIT luv binding from the pinned upstream recipe'
+	],
+	[
 		'pqrs-org/Karabiner-Elements',
 		'remap_runtime_build.py: the owned runtime authenticates and builds the pinned Karabiner-Elements upstream source'
 	]
@@ -433,7 +438,9 @@ for (const entry of fs.readdirSync(PACKAGING_DIR, { withFileTypes: true })) {
 	if (!/\.(sh|cjs|js|py)$/.test(entry.name) && entry.name !== 'PKGBUILD') continue;
 
 	const full = path.join(PACKAGING_DIR, entry.name);
-	const src = fs.readFileSync(full, 'utf8');
+	// A shell recipe spells the host through identifiers.sh: judge the URL it builds.
+	const raw = fs.readFileSync(full, 'utf8');
+	const src = entry.name.endsWith('.sh') ? expandIdentifiers(raw) : raw;
 	packagingFilesScanned++;
 
 	for (const m of src.matchAll(GITHUB_URL_RE)) {

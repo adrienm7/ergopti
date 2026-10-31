@@ -81,6 +81,19 @@ done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
+# The external hosts are declared once in _shared/data/identifiers.json.
+# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
+. "$PROJECT_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# The homepage is the repository the runtime updater follows.
+ERGOPTI_REPOSITORY="$(node - "$PROJECT_ROOT/static/ergopti_plus/_shared/modules/updater/defaults.json" <<'NODE'
+const { github } = require(process.argv[2]);
+if (!github || ![github.owner, github.repo].every((value) =>
+	typeof value === 'string' && /^[A-Za-z0-9._-]+$/.test(value))) {
+	throw new Error('The canonical update repository is invalid.');
+}
+process.stdout.write(`${github.owner}/${github.repo}`);
+NODE
+)"
 # A caller that runs several builds at once gives each its own output directory.
 BUILD_DIR="${ERGOPTI_LINUX_BUILD_DIR:-$PROJECT_ROOT/build/linux}"
 case "$BUILD_DIR" in
@@ -191,7 +204,10 @@ modules:
       - test -x /app/bin/luajit
     sources:
       - type: git
-        url: https://github.com/LuaJIT/LuaJIT.git
+MANIFEST_EOF
+# Only the host expands: the rest of the manifest stays a quoted here-document.
+printf '        url: %s\n' "https://$ERGOPTI_HOST_GITHUB/LuaJIT/LuaJIT.git" >> "$MANIFEST_FILE"
+cat >> "$MANIFEST_FILE" << 'MANIFEST_EOF'
         branch: v2.1
 
 MANIFEST_EOF
@@ -331,7 +347,7 @@ echo "  Application icon: $(basename "$ICON_FILE")"
 # a function of WHEN the packager ran rather than of what it read.
 METAINFO_FILE="$PAYLOAD_DIR/share/metainfo/${APP_ID}.metainfo.xml"
 
-cat > "$METAINFO_FILE" << 'METAINFO_EOF'
+cat > "$METAINFO_FILE" << METAINFO_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>org.ergopti.Ergopti</id>
@@ -340,7 +356,7 @@ cat > "$METAINFO_FILE" << 'METAINFO_EOF'
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <developer_name>Ergopti Contributors</developer_name>
-  <url type="homepage">https://github.com/adrienm7/ergopti</url>
+  <url type="homepage">https://${ERGOPTI_HOST_GITHUB}/${ERGOPTI_REPOSITORY}</url>
   <launchable type="desktop-id">org.ergopti.Ergopti.desktop</launchable>
   <description>
     <p>
