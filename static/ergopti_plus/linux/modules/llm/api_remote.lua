@@ -53,6 +53,7 @@ local ApiModelListing = require("llm.api_model_listing")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local ProviderConfig = require("llm.provider_config_policy")
 local UrlTemplate = require("llm.api_url_template")
+local TokenExchange = require("llm.api_token_exchange")
 
 local LOG = "modules.llm.api_remote"
 
@@ -179,15 +180,23 @@ function M.parse_catalogue(text)
 	for _, id in ipairs(root.provider_order) do
 		local desc = type(id) == "string" and root.providers[id] or nil
 		local thinking_dialect, thinking_reason = nil, nil
-		if type(desc) == "table" then thinking_dialect, thinking_reason = ThinkingOff.parse_dialect(desc.thinking_dialect) end
+		local auth, auth_reason = nil, nil
+		if type(desc) == "table" then
+			thinking_dialect, thinking_reason = ThinkingOff.parse_dialect(desc.thinking_dialect)
+			auth, auth_reason = TokenExchange.parse(desc.auth)
+		end
 		if catalogue.providers[id] then
 			Logger.warn(LOG, "api_providers.json: provider '%s' is listed twice; the first is kept.", id)
 		elseif descriptor_is_valid(id, desc) and not thinking_dialect then
 			-- A half-read dialect would let some models think: refuse the provider whole
 			Logger.error(LOG, "api_providers.json: providers.%s.thinking_dialect is invalid (%s) — skipped.",
 				tostring(id), tostring(thinking_reason))
+		elseif descriptor_is_valid(id, desc) and auth_reason then
+			-- Sent as Bearer, the stored key itself would be refused: refuse the provider whole
+			Logger.error(LOG, "api_providers.json: providers.%s.auth is invalid (%s) — skipped.", tostring(id), auth_reason)
 		elseif descriptor_is_valid(id, desc) then
 			catalogue.providers[id] = {
+				auth = auth,
 				id = id,
 				label = desc.label,
 				base_url = desc.base_url,
@@ -370,6 +379,101 @@ local function model_of(entry, provider)
 	return provider.default_model
 end
 
+-- Access tokens of the providers that exchange the stored key (auth in
+-- api_providers.json), per provider and key: { token, expires_at, pending,
+-- waiters, failure, retry_at }. In memory only, and never logged.
+local _access = {}
+-- Seconds before a failed exchange is tried again, so a refused key does
+-- not reach the token service on every keystroke
+local ACCESS_RETRY_SECONDS = 60
+
+--- The access slot of an entry.
+--- @param entry table
+--- @return table
+local function access_slot(entry)
+	local key = tostring(entry.provider) .. "\0" .. tostring(entry.token)
+	_access[key] = _access[key] or { waiters = {} }
+	return _access[key]
+end
+
+--- Exchanges an entry's stored key for an access token, once at a time;
+--- on_done(ok, reason) runs when the exchange settles.
+--- @param provider table A catalogue provider with an auth block.
+--- @param entry table
+--- @param on_done function|nil
+local function refresh_access(provider, entry, on_done)
+	local slot = access_slot(entry)
+	if type(on_done) == "function" then slot.waiters[#slot.waiters + 1] = on_done end
+	if slot.pending then return end
+	local function settle(ok, reason)
+		slot.pending = false
+		local waiters = slot.waiters
+		slot.waiters = {}
+		for _, waiter in ipairs(waiters) do
+			local called, problem = pcall(waiter, ok, reason)
+			if not called then Logger.error(LOG, "Access token waiter failed: %s", tostring(problem)) end
+		end
+	end
+	local request, reason = TokenExchange.request(provider.auth, entry.token)
+	if not request then
+		slot.failure, slot.retry_at = reason, Monotonic.now_sec() + ACCESS_RETRY_SECONDS
+		Logger.error(LOG, "Access token of provider '%s' cannot be asked: %s.", provider.id, reason)
+		return settle(false, reason)
+	end
+	slot.pending = true
+	Logger.start(LOG, "Exchanging the key of provider '%s' for an access token…", provider.id)
+	local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
+		result = type(result) == "table" and result or {}
+		local raw = type(result.body) == "string" and result.body ~= "" and result.body or result.error_body
+		local decoded_ok, decoded = pcall(Json.decode, type(raw) == "string" and raw or "")
+		local token, why = TokenExchange.read(provider.auth, result.status, decoded_ok and decoded or nil, Monotonic.now_sec())
+		if token then
+			slot.token, slot.expires_at, slot.failure, slot.retry_at = token.token, token.expires_at, nil, nil
+			Logger.success(LOG, "Access token of provider '%s' received (valid %d s).", provider.id,
+				math.floor(token.expires_at - Monotonic.now_sec()))
+			return settle(true, nil)
+		end
+		slot.failure, slot.retry_at = why, Monotonic.now_sec() + ACCESS_RETRY_SECONDS
+		Logger.error(LOG, "Access token of provider '%s' refused: %s.", provider.id, why)
+		return settle(false, why)
+	end)
+	if not dispatched then
+		slot.failure, slot.retry_at = "the token exchange could not be sent", Monotonic.now_sec() + ACCESS_RETRY_SECONDS
+		Logger.error(LOG, "Access token of provider '%s' cannot be asked: the request was not sent.", provider.id)
+		return settle(false, slot.failure)
+	end
+end
+
+--- The access token an entry's requests carry now, refreshing it in the
+--- background when it nears its end.
+--- @param provider table
+--- @param entry table
+--- @return string|nil token, string|nil reason
+local function access_token(provider, entry)
+	local slot = access_slot(entry)
+	local now = Monotonic.now_sec()
+	local usable, refresh = TokenExchange.state(provider.auth, slot.token and slot or nil, now)
+	if refresh and not slot.pending and (slot.retry_at == nil or now >= slot.retry_at) then
+		refresh_access(provider, entry)
+	end
+	if usable then return slot.token, nil end
+	return nil, slot.failure or "the access token is being fetched: try again in a moment"
+end
+
+--- Fetches an entry's access token when its provider exchanges keys, then
+--- runs on_ready(ok, reason); at once for any other provider.
+--- @param entry table
+--- @param on_ready function
+function M.prepare_access(entry, on_ready)
+	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
+	if not (provider and provider.auth) then return on_ready(true, nil) end
+	local slot = access_slot(entry)
+	if TokenExchange.state(provider.auth, slot.token and slot or nil, Monotonic.now_sec()) then
+		return on_ready(true, nil)
+	end
+	refresh_access(provider, entry, on_ready)
+end
+
 --- The address and headers of one request to an entry's provider, per format:
 --- openai (and every OpenAI-compatible provider) base_url/chat/completions with
 --- a Bearer key, anthropic base_url/messages with x-api-key, gemini
@@ -403,6 +507,12 @@ function M.endpoint(entry, model)
 	local token = entry.token
 	if not M.token_allowed(entry.provider, token, entry.base_url) then return nil, "the API key is missing or invalid" end
 	if type(model) ~= "string" or model == "" then return nil, "no model is configured" end
+	if provider.auth then
+		-- The stored key is exchanged for the short-lived token the requests carry
+		local access, access_reason = access_token(provider, entry)
+		if not access then return nil, access_reason end
+		token = access
+	end
 
 	local headers = { ["Content-Type"] = "application/json" }
 	local url
@@ -1301,16 +1411,27 @@ function M.test(entry, on_done, admission)
 		return false
 	end
 	if not admitted() then return false end
-	return M.chat(entry, nil, {
-		{ role = "system", content = spec.system_prompt },
-		{ role = "user", content = spec.user_text },
-	}, { temperature = spec.temperature, max_tokens = spec.max_tokens, authorized = admission }, nil, function(text, err, third)
-		local elapsed = Monotonic.now_ms() - started
-		-- The third value is the usage of a completion, a failure's receipt only beside err.
-		local receipt = err ~= nil and third or nil
-		if receipt == nil then on_done(err == nil, err or text, elapsed)
-		else on_done(err == nil, err or text, elapsed, receipt) end
+	local function send()
+		return M.chat(entry, nil, {
+			{ role = "system", content = spec.system_prompt },
+			{ role = "user", content = spec.user_text },
+		}, { temperature = spec.temperature, max_tokens = spec.max_tokens, authorized = admission }, nil, function(text, err, third)
+			local elapsed = Monotonic.now_ms() - started
+			-- The third value is the usage of a completion, a failure's receipt only beside err.
+			local receipt = err ~= nil and third or nil
+			if receipt == nil then on_done(err == nil, err or text, elapsed)
+			else on_done(err == nil, err or text, elapsed, receipt) end
+		end)
+	end
+	if not (provider and provider.auth) then return send() end
+	-- The key test waits for the access token instead of failing while it is fetched
+	local sent = true
+	M.prepare_access(entry, function(ok, reason)
+		if not admitted() then return end
+		if ok then sent = send() ~= false
+		else on_done(false, reason, Monotonic.now_ms() - started) end
 	end)
+	return sent
 end
 
 --- Forgets the loaded catalogue and the Backboard assistants (tests).
@@ -1323,6 +1444,7 @@ function M._reset_for_test(thinking_refused_file)
 	end
 	_assistants = {}
 	_capabilities = {}
+	_access = {}
 end
 
 --- Hands in the HttpClient that sends and cancels inference requests (engine init).
