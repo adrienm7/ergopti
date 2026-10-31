@@ -311,6 +311,12 @@ _LSCF_InstallSource(Fixture) {
 	_LSPB_Stamp(Fixture.World)
 }
 
+; The sweep probes each catalogue server, then the configured entry behind them.
+_LSCF_CatalogueCount() {
+	global _SharedDir
+	return JsonParse(FSReadUtf8Exact(_SharedDir . "\modules\llm\local_servers.json"))["server_order"].Length
+}
+
 _LSCF_JoinedConfiguredView(Status := 200) {
 	global _SharedDir, _LLM_Menu, LLM_LOCAL_API_SERVERS, LLM_API_PROVIDERS
 	Fixture := _LSPN_Fixture()
@@ -321,12 +327,13 @@ _LSCF_JoinedConfiguredView(Status := 200) {
 		Fixture.ConfiguredBody := Corpus["omlx_models_body"]
 		Fixture.NativeSpawn := _LSCF_ConfiguredChildFactory.Bind(Fixture)
 		AssertTrue(Fixture.Native.Rescan())
-		AssertEqual(5, Fixture.Native.Order.Length)
-		AssertEqual(5, Fixture.Requests.Length)
-		AssertEqual(4, LLM_LOCAL_API_SERVERS.Count, "ephemeral views cannot register local provider capabilities")
+		Servers := _LSCF_CatalogueCount()
+		AssertEqual(Servers + 1, Fixture.Native.Order.Length)
+		AssertEqual(Servers + 1, Fixture.Requests.Length)
+		AssertEqual(Servers, LLM_LOCAL_API_SERVERS.Count, "ephemeral views cannot register local provider capabilities")
 		AssertFalse(LLM_API_PROVIDERS.Has("configured:generic-active"))
-		AssertContains(Fixture.Configs[5], "http://127.0.0.1:19423/custom/v1/models")
-		AssertFalse(InStr(Fixture.Configs[5], "Authorization:", true), "an explicit empty key must not become a blank Bearer header")
+		AssertContains(Fixture.Configs[Servers + 1], "http://127.0.0.1:19423/custom/v1/models")
+		AssertFalse(InStr(Fixture.Configs[Servers + 1], "Authorization:", true), "an explicit empty key must not become a blank Bearer header")
 		Verdict := Fixture.Native.Result("configured:generic-active")
 		AssertEqual(Status == 200 ? "up" : "needs_key", Verdict["status"])
 		Rows := _LSPV_PreparedRows(Fixture)
@@ -366,8 +373,9 @@ _LSCF_RemovedViewRetainsDebt() {
 		_LSCF_InstallSource(Fixture)
 		Fixture.Owner.Options["timeout_ms"] := 60000
 		AssertTrue(Fixture.Native.Rescan())
-		AssertEqual(5, Fixture.Requests.Length)
-		Child := Fixture.Children[5]
+		Servers := _LSCF_CatalogueCount()
+		AssertEqual(Servers + 1, Fixture.Requests.Length)
+		Child := Fixture.Children[Servers + 1]
 		Child.TerminateAllowed := false
 		Id := "configured:generic-active"
 		Job := Fixture.Native.Jobs[Id]
@@ -382,7 +390,7 @@ _LSCF_RemovedViewRetainsDebt() {
 		Fixture.NativeSpawn := _LSPN_ReadyChildFactory.Bind(Fixture)
 		AssertTrue(Fixture.Native.Rescan())
 		Fixture.Native.RetryPending()
-		AssertEqual(4, Fixture.Native.Order.Length)
+		AssertEqual(Servers, Fixture.Native.Order.Length)
 		AssertTrue(Fixture.Native.Jobs.Get(Id, 0) == Job, "removed logical membership cannot release the exact unsettled native job")
 		AssertTrue(Fixture.Owner.Records.Get(Id, 0) == NativeRecord, "the original child and artifact owner survive cancellation refusal")
 		AssertFalse(Fixture.Native.Capture(Id), "removed views cannot mint an action receipt")
