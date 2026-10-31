@@ -390,6 +390,32 @@ function Converter:base_keysym(action_id)
 	return self.keysyms[text] or text
 end
 
+--- Keysyms ending a Compose sequence for `action_id` in a dead-key state.
+--- A key pressed inside a dead-key state sends what it sends from the neutral state: a
+--- dead key sends its own dead keysym, and an action whose one-character id is not
+--- what it types sends its output. Naming only base_keysym left those untypable and
+--- made a plain action and a dead-key action with the same base keysym collide. The
+--- base keysym stays first when a key sends it; a dead key also using the action adds
+--- its trigger; an action no key uses keeps its base keysym. Twin of state_keysyms in
+--- keylayout_to_xkb.py.
+function Converter:state_keysyms(action_id)
+	local typed = self:keysyms_typing_action(action_id)
+	local base = self:base_keysym(action_id)
+	if #typed == 0 then return { base } end
+	local has_base = false
+	for _, keysym in ipairs(typed) do if keysym == base then has_base = true end end
+	if not has_base then
+		local copy = {}
+		for i, keysym in ipairs(typed) do copy[i] = keysym end
+		return copy
+	end
+	local result = { base }
+	for _, keysym in ipairs(typed) do
+		if keysym ~= base and self.dead_trigger_values[keysym] then result[#result + 1] = keysym end
+	end
+	return result
+end
+
 --- Keysym a dead key entering `state` produces.
 function Converter:dead_trigger(state)
 	if self.dead_triggers[state] ~= nil then return self.dead_triggers[state] end
@@ -557,19 +583,10 @@ function Converter:compose()
 
 	local first = true
 	local emitted = {}
-	local conflicts, unreachable = {}, {}
+	local conflicts = {}
 	for _, state in ipairs(TableUtil.sorted_keys(outputs)) do
 		if sequences[state] ~= nil then
 			sort_pairs(outputs[state])
-			for _, item in ipairs(outputs[state]) do
-				-- An action no key uses cannot be typed on macOS either.
-				local typed = self:keysyms_typing_action(item[1])
-				if #typed > 0 then
-					local base, found = self:base_keysym(item[1]), false
-					for _, keysym in ipairs(typed) do if keysym == base then found = true end end
-					if not found then unreachable[#unreachable + 1] = { state, item[1] } end
-				end
-			end
 			for _, prefix in ipairs(sequences[state]) do
 				if not first then lines[#lines + 1] = "" end
 				first = false
@@ -578,20 +595,22 @@ function Converter:compose()
 				local head = table.concat(head_parts, " ")
 				lines[#lines + 1] = head .. "\t: " .. compose_string(self.layout.terminators[state] or "")
 				for _, item in ipairs(outputs[state]) do
-					local sequence = head .. " <" .. self:base_keysym(item[1]) .. ">"
-					if emitted[sequence] ~= nil then
-						if emitted[sequence] ~= item[2] then
-							conflicts[#conflicts + 1] = { sequence, emitted[sequence], item[2] }
+					for _, keysym in ipairs(self:state_keysyms(item[1])) do
+						local sequence = head .. " <" .. keysym .. ">"
+						if emitted[sequence] ~= nil then
+							if emitted[sequence] ~= item[2] then
+								conflicts[#conflicts + 1] = { sequence, emitted[sequence], item[2] }
+							end
+						else
+							emitted[sequence] = item[2]
+							lines[#lines + 1] = sequence .. "\t: " .. compose_string(item[2])
 						end
-					else
-						emitted[sequence] = item[2]
-						lines[#lines + 1] = sequence .. "\t: " .. compose_string(item[2])
 					end
 				end
 			end
 		end
 	end
-	self.conflicts, self.unreachable = conflicts, unreachable
+	self.conflicts = conflicts
 	return 'include "%L"\n\n' .. table.concat(lines, "\n") .. "\n"
 end
 
@@ -654,7 +673,7 @@ end
 ---   template = string (xkb_symbols.txt),
 ---   layout_id = string (letters, digits, "_"), display_name = string,
 ---   hints = { keysym_overrides = { {text, keysym}... }, base_level_only = { text... } } | nil }
---- @return table|nil result { symbols_text, compose_text, conflicts, unreachable }
+--- @return table|nil result { symbols_text, compose_text, conflicts }
 --- @return string|nil err
 function M.convert(canonical, options)
 	if type(canonical) ~= "table" or canonical.schema ~= 1 then return nil, "canonical keylayout must be schema 1" end
@@ -684,7 +703,6 @@ function M.convert(canonical, options)
 			symbols_text = symbols_text,
 			compose_text = compose_text,
 			conflicts = converter.conflicts,
-			unreachable = converter.unreachable,
 			rows = rows_report,
 		}
 	end)
