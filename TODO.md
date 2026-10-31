@@ -605,9 +605,12 @@ Added October 22 (from the agents' reports; details in their commits):
       quoting and clipboard round-trip tests became behaviour tests (macOS pinned-read ratchet 27 -> 24 files, 75
       -> 70 reads) and Linux got its own pinned-read ratchet (`tools/test/test-no-pinned-source-reads-linux.cjs`);
       later that day two macOS tests (api_ollama's require-time scheduling and streaming payload removal) and two
-      Linux ones (version stamp, debounce clock) became behaviour tests: macOS 22 files / 67 reads, Linux 72 / 135.
-      Left: the rest of the source assertions to behaviour (audit item 14), driving both Lua ratchets down; the
-      Windows timer-ceiling and key-chord policies are in the PC handoff.
+      Linux ones (version stamp, debounce clock) became behaviour tests: macOS 22 files / 67 reads, Linux 72 / 135;
+      a later pass took them to macOS 11 / 51 and Linux 61 / 111 (helpers.fresh_module replaces dofile by path on
+      Linux). Left: the rest of the source assertions to behaviour (audit item 14): on macOS mostly init.lua scans,
+      which need a boot harness, and the dedup single-source test (needs the three backends' HTTP fixtures); on
+      Linux the managed_http dofile group, pinned by test_managed_http_fixture_import_isolation; the Windows
+      timer-ceiling and key-chord policies are in the PC handoff.
 - [ ] **116. Guided third-party validation report.** [PHYS-M] `field_toolchain` runs it with no person (timer,
       Shortcuts, Homebrew, Karabiner signature and Gatekeeper); the next field report answers it. Package provenance
       beyond the signature check is open.
