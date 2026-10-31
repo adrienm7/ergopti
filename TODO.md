@@ -56,8 +56,8 @@ on the PC; push the branch and say so, dev integration stays with the coordinato
    `tools/dev/run-windows-dev.ps1` started, and the runtime layer of `test-windows-field-report-contract.cjs`; the
    expected files and refusals are steps 3 to 7 of the handoff's field run section. Push the report.
 3. **Windows code left** (AutoHotkey, so the PC's): the [CODE] parts that name Windows in "Maintainer requests of
-   2026-10-30" (provider token exchange), "Cross-OS parity" (PAR-53, PAR-58, PAR-63, PAR-74, PAR-76 R23, PAR-79,
-   PAR-80, PAR-81, PAR-83), "Wave 2" (config cleanup offers) and the antivirus ceiling of "Windows side to do on the
+   2026-10-30" (provider token exchange), "Cross-OS parity" (PAR-53, PAR-58, PAR-63, PAR-74, PAR-76 R23; PAR-79, PAR-81
+   and PAR-83 are in the handoff), "Wave 2" (config cleanup offers) and the antivirus ceiling of "Windows side to do on the
    PC" below. Two more from the cloud pass of 2026-10-31: (a) `test-windows-bundle-manifest` is red on dev because
    `infra/config_registry_cache.ahk` `ConfigRegistryCacheCodeIdentity` names `..\_generated\config_migration_ops.ahk`
    (c95a93ed00), which is never shipped; the read only happens in a source run (`A_IsCompiled` returns first), so
@@ -698,27 +698,12 @@ Nothing left.
 
 ### G. Constants, delays, colours, labels (value order)
 
-- [ ] **PAR-79. Replace repeated timer literals with registry keys.** [CODE] Lua and JS done; AHK moved to the
-      registry (e7a548149f). Left: the 36 AHK sites left in `tools/test/timer-literal-baseline.json` (the PC's) and
-      about 37 `usleep` calls in the Swift launcher sources.
-- [ ] **PAR-80. `[limits]` section for byte caps.** [CODE] Done, with the AHK process output caps (daedb449ce) and
-      `MAX_BODY_BYTES` reading `[limits]`. Left: the eight Lua constants of `tools/test/limit-literal-baseline.json`.
-- [ ] **PAR-81. Theme tokens and palette codegen.** [CODE] Done, with the Windows palette from the generated theme
-      (1a53f8ccc5). Left: moving the literals of `tools/lint/hex-literal-baseline.json` (40 files, mostly CSS and
-      TOML) onto tokens with per-page pixel diffs.
-- [ ] **PAR-83. Identifiers and hosts in one file.** [CODE] Done for Lua (948ebef074, bb1899206e):
-      `_shared/data/identifiers.json` generating `_shared/lua/identifiers.lua`, typed copies held to a
-      shrink-only baseline. Emitters exist for JS, shell, Python, AHK and Swift; the JS pages, the macOS
-      Lua and Python sites and the launcher constants read them (33600679a4, db7bc54668 [CI: Swift]). Left
-      (`tools/lint/identifier-literal-baseline.json`): the AHK copies; the macOS owned-runtime Swift files,
-      whose signing ids are derived from the launcher id (`.runtime-installer`, `.installed-physical-source`,
-      `remap.core`/`console`/`cli`: declare them in `identifiers.json` first, which regenerates the Windows
-      AHK copy) and whose `OwnedRuntimePublisherIdentity` raw values must stay literals (pin them with a
-      test instead); the Swift test fixtures' app names; the runtime shell scripts
-      (`ensure-ollama-deps.sh`, `_shared/.../ollama_install.sh`, `linux/install.sh`, the generated
-      `managed-python-release.sh`), for which `test-shell-identifiers-sourcing.cjs` accepts only the
-      build scripts' repo-root sourcing form; `Package.swift` (a SwiftPM manifest cannot read sources);
-      the `tools/` build scripts.
+- [ ] **PAR-79/PAR-83 macOS remainder.** [CODE] [CI: Swift] Once the owned-runtime change now in CI lands: move the
+      nine sleeps of the `OwnedRuntime*` and `OwnedVirtualHIDDaemonReport*` Swift files onto `[launcher]` keys
+      (`tools/test/launcher-sleep-literal-baseline.json`, shrink with `--shrink`), and their identifier copies
+      (`tools/lint/identifier-literal-baseline.json`): declare the derived signing ids in `identifiers.json`
+      first and pin the `OwnedRuntimePublisherIdentity` raw values with a test. The Windows remainder of PAR-79,
+      PAR-81 and PAR-83 is in [the PC handoff](docs/tooling/windows-pc-agent-handoff.md).
 
 ## Backlog (one line each)
 
