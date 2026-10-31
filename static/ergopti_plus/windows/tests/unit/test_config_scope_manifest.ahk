@@ -435,8 +435,9 @@ _ScopeObsoleteSource(Literal, Parent := false) {
 }
 
 ; The four preview switches are active by default, so a hotstrings clear writes
-; their off value (the manifest's cleared value) after the user's own rows
-; instead of deleting them. Keys follow the manifest order.
+; their off value (the manifest's cleared value) instead of deleting them. A new
+; key opens its section, as the shared batch-write corpus pins (the vector
+; header-scalar-new-key-gets-the-precise-numeric-literal); keys follow the manifest order.
 _ScopePreviewOffRows() {
 	return "preview_ai_enabled = false`npreview_autocorrect_enabled = false`n"
 		. "preview_colored_tooltips = false`npreview_star_enabled = false`n"
@@ -548,7 +549,7 @@ _ScopeObsoleteParentClear(Literal) {
 		Assert(Outdated.Has("hotstrings`nautocorrection"))
 		Receipt := ConfigScopeApply("hotstrings", "clear", Map(), Fixture.options)
 		AssertEqual("pending", Receipt["status"])
-		AssertEqual(StrReplace(Source, "[layout]`n", _ScopePreviewOffRows() . "[layout]`n"), FSReadUtf8Exact(Fixture.path),
+		AssertEqual(StrReplace(Source, "[hotstrings]`n", "[hotstrings]`n" . _ScopePreviewOffRows()), FSReadUtf8Exact(Fixture.path),
 			"neutral descendants cannot replace an obsolete table parent")
 		AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]))
 		Refusal.Call("native refusal")
@@ -690,7 +691,7 @@ _ScopeObsoleteGlobal(Mode) {
 			AssertEqual("pending", Receipt["status"])
 			Assert(Backups >= 4, "the genuine global file cohort crosses its coordinated backup boundary")
 			AssertEqual(1, Launches)
-			Expected := StrReplace(StrReplace(Source, "ergopti_alt_gr = true`n", ""), "[layout]`n", _ScopePreviewOffRows() . "[layout]`n")
+			Expected := StrReplace(StrReplace(Source, "ergopti_alt_gr = true`n", ""), "[hotstrings]`n", "[hotstrings]`n" . _ScopePreviewOffRows())
 				. '[shortcuts.keyboard]`nmagic_editor = "none"`n'
 				. '[shortcuts.script_control]`nscript_altgr_backspace = "none"`n'
 				. 'script_altgr_delete = "none"`nscript_altgr_enter = "none"`nscript_altgr_escape = "none"`n'
