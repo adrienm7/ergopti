@@ -267,6 +267,41 @@ class SigningIdentityListingControls(unittest.TestCase):
         self.assertFalse(BUILD.signing_identity_listed(twice, self.IDENTITY))
 
 
+class SigningTargetControls(unittest.TestCase):
+    """Each signing level names the one resource seal codesign may write."""
+
+    def test_bundle_executable_level_may_write_the_bundle_seal(self):
+        seal = "Runtime/ErgoptiPlus-Remap-Core.app/Contents/_CodeSignature/CodeResources"
+        self.assertEqual(
+            BUILD._signing_targets("Runtime/ErgoptiPlus-Remap-Core.app", "ErgoptiPlus-Remap-Core"),
+            (
+                (
+                    "Runtime/ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core",
+                    seal,
+                ),
+                ("Runtime/ErgoptiPlus-Remap-Core.app", seal),
+            ),
+        )
+
+    def test_bare_executable_writes_no_seal(self):
+        self.assertEqual(
+            BUILD._signing_targets("Runtime/bin/ergoptiplus_remap_cli", None),
+            (("Runtime/bin/ergoptiplus_remap_cli", None),),
+        )
+
+    def test_every_signed_product_has_a_seal_at_each_bundle_level(self):
+        for destination, _, executable in BUILD._SIGNED_PRODUCTS:
+            with self.subTest(destination=destination):
+                levels = BUILD._signing_targets(destination, executable)
+                self.assertEqual(len(levels), 2 if executable else 1)
+                self.assertEqual(
+                    {seal for _, seal in levels},
+                    {destination + "/Contents/_CodeSignature/CodeResources"}
+                    if executable
+                    else {None},
+                )
+
+
 class RefusalOriginControls(unittest.TestCase):
     """Signing collapses a dozen checks into one code; the report names the line."""
 

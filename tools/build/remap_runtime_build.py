@@ -1174,6 +1174,23 @@ _SIGNED_PRODUCTS = (
 )
 
 
+def _signing_targets(destination, executable):
+    """Return each signing level's (path, resource seal it may write).
+
+    A bundled product signs its main executable, then its bundle. codesign
+    given a bundle's main executable signs the enclosing bundle and writes its
+    resource seal too (run 41239491355), so both levels may write exactly that
+    one CodeResources; a bare executable writes none.
+    """
+    if not executable:
+        return ((destination, None),)
+    resources = destination + "/Contents/_CodeSignature/CodeResources"
+    return (
+        (destination + "/Contents/MacOS/" + executable, resources),
+        (destination, resources),
+    )
+
+
 def signing_identity_listed(text, identity):
     """Return whether find-identity lists the pinned SHA-1 exactly once.
 
@@ -1718,21 +1735,13 @@ class _SigningSink(_PreparationSink):
                     primary = (
                         destination + "/Contents/MacOS/" + executable if executable else destination
                     )
-                    targets = (
-                        ((primary, False), (destination, True))
-                        if executable
-                        else ((primary, False),)
-                    )
                     requirement = (
                         'identifier "' + identifier + '" and certificate leaf = H"' + identity + '"'
                     )
-                    for level, (relative, bundle) in enumerate(targets):
+                    for level, (relative, resources) in enumerate(
+                        _signing_targets(destination, executable)
+                    ):
                         target = str(signed / relative)
-                        resources = (
-                            destination + "/Contents/_CodeSignature/CodeResources"
-                            if bundle
-                            else None
-                        )
                         label = "signing_" + str(index) + "_" + str(level)
                         phase(
                             label + "_sign",
