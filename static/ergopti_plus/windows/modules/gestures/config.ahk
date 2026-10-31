@@ -296,9 +296,11 @@ GesturePromptActionParameter(BindingId, ActionName) {
 				return _GesturePickProgram(BindingId, ActionName, Title, Existing)
 		if (Spec = "app")
 				return _GesturePickApplication(BindingId, ActionName, Prompt)
+		if (Spec = "llm_vision")
+				return _GesturePickVision(BindingId, ActionName, Title, Existing)
 		loop {
 				; The wrap-pair, shortcut and prompt-choice prompts list a catalogue under their text.
-				Listed := (Spec = "wrap_pair" || Spec = "shortcut" || Spec = "llm_prompt" || Spec = "llm_vision")
+				Listed := (Spec = "wrap_pair" || Spec = "shortcut" || Spec = "llm_prompt")
 				Size := Listed ? "w680 h300" : (Spec = "key") ? "w680 h220" : "w680 h160"
 				Result := Ui_InputBox(Prompt, Title, Size, Existing)
 				if (Result.Result != "OK")
@@ -314,6 +316,88 @@ GesturePromptActionParameter(BindingId, ActionName) {
 								"value", Value)
 				Ui_MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
 				Existing := Value
+		}
+}
+
+; The steps of the native vision prompt, replaced by recorders in the unit suite.
+global _GestureVisionPromptPorts := 0
+
+; Asks for a screen action's vision parameter as the action picker page does:
+; the backend picked in a list (about forty with the API catalogue), then the
+; optional model typed with the backend's default shown. Cancel at either step
+; cancels. macOS and Linux ask the same two steps.
+; @returns {Map|false} The parameter candidate, false when cancelled.
+_GesturePickVision(BindingId, ActionName, Title, Existing) {
+		global _GestureVisionPromptPorts
+		Ports := (_GestureVisionPromptPorts is Map) ? _GestureVisionPromptPorts
+				: Map("pick", _GestureVisionPickBackend, "ask", Ui_InputBox, "refuse", Ui_MsgBox)
+		Choices := LLM_Vision_BackendChoices()
+		Prior := LLM_Vision_Parse(Existing)
+		loop {
+				Selected := (Prior is Map) ? Prior["backend"] : ""
+				Backend := Ports["pick"].Call(Title, t("dialog.action_picker.vision_provider_label"), Choices, Selected)
+				if (Backend == "")
+						return false
+				DefaultModel := ""
+				for Choice in Choices {
+						if (Choice["value"] == Backend)
+								DefaultModel := Choice["defaultModel"]
+				}
+				Hint := (DefaultModel != "")
+						? StrReplace(t("dialog.action_picker.vision_model_default"), "{1}", DefaultModel)
+						: t("dialog.action_picker.vision_model_required")
+				Initial := ((Prior is Map) && Prior["backend"] == Backend) ? Prior.Get("model", "") : ""
+				Answer := Ports["ask"].Call(t("dialog.action_picker.vision_model_label") . "`n" . Hint,
+						Title, "w680 h160", Initial)
+				if (Answer.Result != "OK")
+						return false
+				Value := LLM_Vision_ComposeParameter(Backend, Answer.Value, DefaultModel)
+				ErrorText := ""
+				if GestureValidateActionParameter(ActionName, Value, &ErrorText)
+						return Map("has_value", true,
+								"key", GestureActionParameterKey(BindingId, ActionName),
+								"value", Value)
+				Ports["refuse"].Call(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
+				Prior := Map("backend", Backend)
+		}
+}
+
+; The native list of the vision backends.
+; @param {String} Title The window's title.
+; @param {String} Label The list's caption.
+; @param {Array} Choices Maps ("value", "label").
+; @param {String} Selected The value selected first; "" selects the first row.
+; @returns {String} The picked value, "" when cancelled.
+_GestureVisionPickBackend(Title, Label, Choices, Selected) {
+		Labels := []
+		Current := 1
+		for Index, Choice in Choices {
+				Labels.Push(Choice["label"])
+				if (Choice["value"] == Selected)
+						Current := Index
+		}
+		Result := ""
+		W := Gui_Create("", Title)
+		W.Add("Text", "xm", Label)
+		List := W.Add("ListBox", "xm w560 r16 Choose" . Current, Labels)
+		List.OnEvent("DoubleClick", Accept)
+		W.Add("Button", "xm Default", t("button.ok")).OnEvent("Click", Accept)
+		W.Add("Button", "x+8", t("button.cancel")).OnEvent("Click", Retire)
+		W.OnEvent("Close", Retire)
+		W.OnEvent("Escape", Retire)
+		; Read before Show: a click thread can retire the window before this
+		; thread resumes, and a destroyed Gui has no Hwnd left to wait on.
+		PickerHwnd := W.Hwnd
+		W.Show()
+		WinWaitClose("ahk_id " . PickerHwnd)
+		return Result
+		Accept(*) {
+				if (List.Value > 0)
+						Result := Choices[List.Value]["value"]
+				Retire()
+		}
+		Retire(*) {
+				W.Destroy()
 		}
 }
 

@@ -133,6 +133,23 @@ LLM_Vision_BackendChoicesText() {
 }
 
 /**
+ * The binding value of a picked backend and a typed model, as
+ * _shared/lua/llm/vision.lua compose_parameter: an empty model keeps the backend's
+ * default, and a backend with no default yields "<backend>|", which validation
+ * refuses so the user is told a model is required.
+ * @param {String} Backend The picked backend id.
+ * @param {String} Typed The typed model, trimmed here.
+ * @param {String} DefaultModel The backend's default model, "" for none.
+ * @returns {String}
+ */
+LLM_Vision_ComposeParameter(Backend, Typed, DefaultModel) {
+	Model := Trim(Typed)
+	if (Model != "")
+		return Backend . "|" . Model
+	return (DefaultModel != "") ? Backend : Backend . "|"
+}
+
+/**
  * Runs one screen reading. The capture and the requests are asynchronous; this
  * call applies the refusals, supersedes any flow in progress and starts the
  * capture.

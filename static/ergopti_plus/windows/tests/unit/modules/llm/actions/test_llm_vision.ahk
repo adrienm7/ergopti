@@ -321,6 +321,96 @@ _LVS_ParameterKind() {
 }
 Test("LLM vision: the llm_vision parameter validates, lists and prompts", _LVS_ParameterKind)
 
+_LVS_ComposeParameter() {
+	AssertEqual("openai", LLM_Vision_ComposeParameter("openai", "  ", "gpt-x"), "an empty model keeps the default")
+	AssertEqual("openai|m", LLM_Vision_ComposeParameter("openai", " m ", "gpt-x"), "a typed model is trimmed and kept")
+	AssertEqual("cerebras|", LLM_Vision_ComposeParameter("cerebras", "", ""), "no default and no model stays refusable")
+	AssertFalse(LLM_Vision_IsValid("cerebras|"), "which validation refuses")
+}
+Test("LLM vision: the value of a picked backend and a typed model", _LVS_ComposeParameter)
+
+; Replays the two steps through the real prompt entry. Answers are consumed in
+; order; "" as a pick and a non-OK Result are the user's cancel.
+_LVS_PromptTwoSteps(Picks, Asks, Seed := "") {
+	global _GestureVisionPromptPorts, GestureActionParameters
+	Binding := "keyboard__primary_shift_i"
+	Key := GestureActionParameterKey(Binding, "llm_screen_full")
+	Run := { Picks: [], Asks: [], Refusals: [], Result: 0 }
+	PickAt := 0, AskAt := 0
+	Saved := _GestureVisionPromptPorts
+	Had := GestureActionParameters.Has(Key)
+	Prior := Had ? GestureActionParameters[Key] : ""
+	Pick(Title, Label, Choices, Selected) {
+		Run.Picks.Push(Map("label", Label, "count", Choices.Length, "selected", Selected))
+		return Picks[++PickAt]
+	}
+	Ask(Prompt, Title, Options, Default) {
+		Run.Asks.Push(Map("prompt", Prompt, "default", Default))
+		return Asks[++AskAt]
+	}
+	Refuse(Text, Title, Options) {
+		Run.Refusals.Push(Text)
+	}
+	_GestureVisionPromptPorts := Map("pick", Pick, "ask", Ask, "refuse", Refuse)
+	try {
+		if (Seed != "")
+			GestureActionParameters[Key] := Seed
+		else if Had
+			GestureActionParameters.Delete(Key)
+		Run.Result := GesturePromptActionParameter(Binding, "llm_screen_full")
+	} finally {
+		_GestureVisionPromptPorts := Saved
+		if Had
+			GestureActionParameters[Key] := Prior
+		else if GestureActionParameters.Has(Key)
+			GestureActionParameters.Delete(Key)
+	}
+	return Run
+}
+
+_LVS_NativePromptPicksTheBackend() {
+	Default := LLM_Vision_Config()["default_models"]["local"]
+	Run := _LVS_PromptTwoSteps(["local"], [{ Result: "OK", Value: "" }])
+	AssertEqual(1, Run.Picks.Length, "the backend is picked in a list, not typed")
+	AssertEqual(t("dialog.action_picker.vision_provider_label"), Run.Picks[1]["label"], "under the page's label")
+	AssertEqual(LLM_Vision_BackendChoices().Length, Run.Picks[1]["count"], "from the page's list")
+	AssertFalse(InStr(Run.Asks[1]["prompt"], "`nopenai"), "the model step does not print the backends")
+	AssertContains(Run.Asks[1]["prompt"], Default, "it shows the backend's default model")
+	AssertEqual("local", Run.Result["value"], "an empty model stores the bare backend")
+
+	Run := _LVS_PromptTwoSteps(["openai"], [{ Result: "OK", Value: " gpt-x " }], "openai|gpt-y")
+	AssertEqual("openai", Run.Picks[1]["selected"], "the stored backend is selected first")
+	AssertEqual("gpt-y", Run.Asks[1]["default"], "the stored model is offered")
+	AssertEqual("openai|gpt-x", Run.Result["value"], "a typed model is stored")
+
+	Run := _LVS_PromptTwoSteps(["local"], [{ Result: "OK", Value: "m" }], "openai|gpt-y")
+	AssertEqual("", Run.Asks[1]["default"], "another backend's model is not offered")
+
+	AssertFalse(_LVS_PromptTwoSteps([""], []).Result, "cancel at the list cancels")
+	Run := _LVS_PromptTwoSteps(["local"], [{ Result: "Cancel", Value: "x" }])
+	AssertFalse(Run.Result, "cancel at the model cancels")
+}
+Test("LLM vision: the native prompt picks the backend, then asks the optional model", _LVS_NativePromptPicksTheBackend)
+
+; A backend with no default needs a model: refused in words, then asked again.
+_LVS_NativePromptRequiresAModel() {
+	Bare := ""
+	for Choice in LLM_Vision_BackendChoices() {
+		if (Choice["defaultModel"] == "") {
+			Bare := Choice["value"]
+			break
+		}
+	}
+	Assert(Bare != "", "the catalogue holds a backend with no default model")
+	Run := _LVS_PromptTwoSteps([Bare, Bare], [{ Result: "OK", Value: "" }, { Result: "OK", Value: "m" }])
+	AssertEqual(1, Run.Refusals.Length, "the empty model is refused")
+	AssertEqual(t("dialog.gestures.param_err_llm_vision"), Run.Refusals[1], "with the kind's refusal")
+	AssertContains(Run.Asks[1]["prompt"], t("dialog.action_picker.vision_model_required"), "the step said it is required")
+	AssertEqual(Bare, Run.Picks[2]["selected"], "the second round keeps the backend")
+	AssertEqual(Bare . "|m", Run.Result["value"], "then stores the typed model")
+}
+Test("LLM vision: a backend with no default refuses an empty model", _LVS_NativePromptRequiresAModel)
+
 _LVS_ActionsAreRegistered() {
 	global GESTURE_ACTIONS
 	for ActionId, Kind in LLM_VisionActions() {
