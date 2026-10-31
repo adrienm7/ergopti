@@ -3624,9 +3624,12 @@ jobs:
           elif [ "$mode" = full ]; then
           set -euo pipefail
           curl -fsSL https://ollama.com/install.sh | sh
-          (ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &) || true
-          for _ in $(seq 1 60); do curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break; sleep 1; done
-          ollama pull qwen2.5:0.5b
+          # The Linux client asks only Ergopti's own port (defaults.json); a
+          # daemon the installer may start on the stock port is left alone.
+          port="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["llm_ollama_owned_port"])' static/ergopti_plus/_shared/modules/llm/defaults.json)"
+          (OLLAMA_HOST="127.0.0.1:$port" ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &) || true
+          for _ in $(seq 1 60); do curl -sf "http://127.0.0.1:$port/api/tags" >/dev/null && break; sleep 1; done
+          OLLAMA_HOST="127.0.0.1:$port" ollama pull qwen2.5:0.5b
           cd static/ergopti_plus/linux
           HOME="$(mktemp -d)" XDG_CONFIG_HOME= \
             LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' \
