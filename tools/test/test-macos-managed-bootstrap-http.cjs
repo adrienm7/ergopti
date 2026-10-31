@@ -4,6 +4,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { pythonExecutable } = require('../lib/python.cjs');
@@ -193,15 +194,24 @@ assert.doesNotMatch(archiveModes.stderr, /skipped=/);
 process.stdout.write(archiveModes.stdout);
 process.stdout.write(archiveModes.stderr);
 
-const failureStages = spawnSync(
-	pythonExecutable(),
-	['tools/test/macos_native_http_failure_stage_test.py'],
-	{ cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', timeout: 30000 }
-);
+// The receiver gains a case with each new network field check: the count is
+// read from its own test methods, so a case that stops running still fails.
+const FAILURE_STAGES_TEST = 'tools/test/macos_native_http_failure_stage_test.py';
+const failureStageCases = (
+	fs
+		.readFileSync(path.resolve(__dirname, '../..', FAILURE_STAGES_TEST), 'utf8')
+		.match(/^ {4}def test_\w+\(self\):/gm) || []
+).length;
+assert.ok(failureStageCases > 0, `${FAILURE_STAGES_TEST} declares no test method`);
+const failureStages = spawnSync(pythonExecutable(), [FAILURE_STAGES_TEST], {
+	cwd: path.resolve(__dirname, '../..'),
+	encoding: 'utf8',
+	timeout: 30000
+});
 assert.equal(failureStages.error, undefined, 'the failed-frame stage receiver must start');
 assert.equal(failureStages.signal, null, 'the failed-frame stage receiver must retire');
 assert.equal(failureStages.status, 0, failureStages.stderr || failureStages.stdout);
-assert.match(failureStages.stderr, /Ran 18 tests in/);
+assert.match(failureStages.stderr, new RegExp(`Ran ${failureStageCases} tests? in`));
 assert.match(failureStages.stderr, /\bOK\b/);
 assert.doesNotMatch(failureStages.stderr, /skipped=/);
 process.stdout.write(failureStages.stdout);
