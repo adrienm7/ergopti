@@ -217,7 +217,7 @@ function restrictionIdentity(owner) {
 function readCoverage(src) {
 	const parsed = parseToml(src);
 	if (!parsed.menu || typeof parsed.menu !== 'object' || Array.isArray(parsed.menu))
-		throw new Error('manifest.toml is missing the [menu] tables');
+		throw new Error('the coverage source is missing the [menu] tables');
 	validateMenuAvailability(parsed.menu);
 	const english = JSON.parse(
 		fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/locales/en.json'), 'utf8')
@@ -333,7 +333,11 @@ function run() {
 	}
 	let coverage;
 	try {
-		coverage = readCoverage(fs.readFileSync(MANIFEST, 'utf8'));
+		// The feature tables and the menu tables are one coverage: concatenating
+		// the two sources is valid TOML, since menu.toml holds only [menu].
+		coverage = readCoverage(
+			fs.readFileSync(MANIFEST, 'utf8') + '\n' + require('../lib/menu-source.cjs').readMenuSource()
+		);
 	} catch (error) {
 		console.error('\x1b[31m[ERROR] platform coverage:\x1b[0m');
 		console.error('    - ' + error.message);
