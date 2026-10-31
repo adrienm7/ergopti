@@ -832,6 +832,10 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
 		},
+		"linux_shell.install.label_lfs": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it"]
+		},
 		"llm.agent.label.calendar": {
 			"reason": "symbol-or-placeholder-only",
 			"locales": "*"
