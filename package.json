@@ -622,6 +622,7 @@
 		"test:windows-replay-consumers": "node ./tools/test/test-windows-replay-consumers.cjs",
 		"test:go-route-plan-gate": "node ./tools/test/test-go-route-plan-gate.cjs",
 		"test:go-proxy-relay-gate": "node ./tools/test/test-go-proxy-relay-gate.cjs",
+		"test:macos-proxy-relay-shell": "node ./tools/test/test-macos-proxy-relay-shell.cjs",
 		"test:proxy-policy-single-source": "node ./tools/test/test-proxy-policy-single-source.cjs",
 		"test:contract-vector-ledger": "node ./tools/test/test-contract-vector-ledger.cjs",
 		"test:file-system-port-wired": "node ./tools/test/test-file-system-port-wired.cjs",
