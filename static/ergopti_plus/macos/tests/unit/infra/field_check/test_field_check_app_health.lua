@@ -11,7 +11,11 @@
 ---    processes, fails, naming each process and listing the newest with its
 ---    kind; an earlier start's reports and other apps' reports are only
 ---    counted (the 2026-10-30 20:51 run read a bare system count of 11, the
----    2026-10-31 run failed on 13 reports of replaced builds).
+---    2026-10-31 run failed on 13 reports of replaced builds);
+--- 3. where the resident memory goes (ledger L32: 843 MB with no breakdown):
+---    the physical footprint and the largest resident regions of vmmap's
+---    summary, and the Lua heap, as information; an unreadable vmmap is a
+---    named skip.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -20,15 +24,42 @@ local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks
 
 --- Builds scripted ports; `world` records every command.
 --- @return table ports, table world
+local VMMAP = table.concat({
+	"Process:         Hammerspoon [9531]",
+	"Physical footprint:         212.3M",
+	"Physical footprint (peak):  1.1G",
+	"",
+	"                                VIRTUAL RESIDENT    DIRTY  SWAPPED VOLATILE   NONVOL    EMPTY   REGION ",
+	"REGION TYPE                        SIZE     SIZE     SIZE     SIZE     SIZE     SIZE     SIZE    COUNT (non-coalesced) ",
+	"===========                     ======= ========    =====  ======= ========   ======    =====  ======= ",
+	"Activity Tracing                   256K      32K      32K       0K       0K      32K       0K        1 ",
+	"IOSurface                         48.5M    48.5M    48.5M       0K       0K       0K       0K       12 ",
+	"MALLOC_SMALL                      72.0M    50.2M    50.2M     144K       0K       0K       0K        9         see MALLOC ZONE table below",
+	"WebKit Malloc                    192.0M    20.0M    20.0M       0K       0K       0K       0K        4 ",
+	"__TEXT                           512.0M   300.1M       0K       0K       0K       0K       0K      620 ",
+	"mapped file                        1.2G     3.0M       0K       0K       0K       0K       0K       88 ",
+	"MALLOC_TINY                       16.0M    10.0M    10.0M       0K       0K       0K       0K        3 ",
+	"===========                     ======= ========    =====  ======= ========   ======    =====  ======= ",
+	"TOTAL                              2.1G   432.0M   128.8M     144K       0K      32K       0K      737 ",
+	"",
+	"                                 VIRTUAL   RESIDENT      DIRTY    SWAPPED ALLOCATION      BYTES DIRTY+SWAP          REGION",
+	"MALLOC ZONE                         SIZE       SIZE       SIZE       SIZE      COUNT  ALLOCATED  FRAG SIZE  % FRAG   COUNT",
+	"===========                      =======  =========  =========  =========  =========  =========  =========  ======  ======",
+	"DefaultMallocZone_0x100000000       88.0M      60.2M      60.2M       144K     120000      40.0M      20.3M     34%      12",
+}, "\n") .. "\n"
+
 local function make_ports()
 	local world = { commands = {}, ps = { 0, "  412736   1,7\n" }, etime = { 0, "   01:02:05\n" },
+		vmmap = { 0, VMMAP }, heap_kb = 51200,
 		crashes = { driver = 0, owned = {}, other = 4 } }
 	local ports = {
 		exec = function(executable, args, _, callback)
 			world.commands[#world.commands + 1] = executable .. " " .. table.concat(args, " ")
-			local answer = args[2] == "etime=" and world.etime or world.ps
+			local answer = executable == "/usr/bin/vmmap" and world.vmmap
+				or args[2] == "etime=" and world.etime or world.ps
 			callback(answer[1], answer[2], "")
 		end,
+		lua_heap_kb = function() return world.heap_kb end,
 		pid = function() return 9531 end,
 		app_start_pid = function() return 9400 end,
 		now = function() return 1000000 end,
@@ -145,5 +176,36 @@ helpers.describe("app health probe", function()
 		helpers.assert_eq(steps.app_cpu_pct.state, "skip")
 		world.ps = { nil, "" }
 		helpers.assert_eq(run(ports).app_rss_mb.value, "timeout")
+	end)
+
+	helpers.it("names where the resident memory goes (resident-breakdown)", function()
+		local ports, world = make_ports()
+		local steps, result = run(ports)
+		helpers.assert_true(result.passed, "the breakdown is information")
+		helpers.assert_eq(world.commands[3], "/usr/bin/vmmap --summary 9531")
+		helpers.assert_eq(steps.memory_footprint_mb.state, "info")
+		helpers.assert_eq(steps.memory_footprint_mb.value, "212")
+		helpers.assert_eq(steps.memory_footprint_peak_mb.value, "1126")
+		helpers.assert_eq(steps.memory_resident_total_mb.value, "432")
+		helpers.assert_eq(steps.memory_region_1.value, "__TEXT:300")
+		helpers.assert_eq(steps.memory_region_2.value, "MALLOC_SMALL:50")
+		helpers.assert_eq(steps.memory_region_3.value, "IOSurface:48")
+		helpers.assert_eq(steps.memory_region_4.value, "WebKit_Malloc:20")
+		helpers.assert_eq(steps.memory_region_5.value, "MALLOC_TINY:10")
+		helpers.assert_nil(steps.memory_region_6, "the malloc zone table is not a region row")
+		helpers.assert_eq(steps.lua_heap_mb.value, "50.0")
+	end)
+
+	helpers.it("skips an unreadable vmmap by name and still measures the Lua heap", function()
+		local ports, world = make_ports()
+		world.vmmap = { 1, "vmmap cannot examine process 9531\n" }
+		local steps, result = run(ports)
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.memory_footprint_mb.state, "skip")
+		helpers.assert_eq(steps.memory_footprint_mb.value, "exit_1")
+		helpers.assert_nil(steps.memory_region_1)
+		helpers.assert_eq(steps.lua_heap_mb.value, "50.0")
+		world.vmmap = { 0, "no summary here\n" }
+		helpers.assert_eq(run(ports).memory_footprint_mb.value, "unparsed")
 	end)
 end)
