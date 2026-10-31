@@ -72,11 +72,12 @@ FIELD_RUN_GRACE_SECONDS=120
 # How long the developer app may take to publish its readiness, and then to
 # accept the request it was sent. Right after a reboot the 12:02 run of
 # 2026-10-28 saw the ready app hold its main thread 138 s (keystats ledger
-# replay) before it took the request, past the former 60 s. A field run test
-# shortens the acceptance budget through FIELD_RUN_ACCEPT_SECONDS_OVERRIDE.
-FIELD_RUN_READY_SECONDS=240
+# replay) before it took the request, past the former 60 s. The field run
+# contract test shortens the budgets and the poll through the *_OVERRIDE
+# variables, so a case that waits on purpose does not wait minutes.
+FIELD_RUN_READY_SECONDS="${FIELD_RUN_READY_SECONDS_OVERRIDE:-240}"
 FIELD_RUN_ACCEPT_SECONDS="${FIELD_RUN_ACCEPT_SECONDS_OVERRIDE:-300}"
-FIELD_RUN_POLL_SECONDS=5
+FIELD_RUN_POLL_SECONDS="${FIELD_RUN_POLL_SECONDS_OVERRIDE:-5}"
 
 fail() { printf '[field-report] ERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '[field-report] %s\n' "$*"; }
@@ -530,7 +531,8 @@ step security_agents sh -c '
 step fileless_bash_probe bash -c '
 	[ "$(uname -s)" = Darwin ] || { printf "skipped: not a Mac\n"; exit 0; }
 	dir="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-bash-probe.XXXXXX")" || exit 1
-	printf "%s\n" "printf \"started\\n\"; sleep 12; printf \"survived\\n\"" > "$dir/probe.sh"
+	# The test fixture shortens the run with FIELD_FILELESS_PROBE_SECONDS_OVERRIDE.
+	printf "%s\n" "printf \"started\\n\"; sleep ${FIELD_FILELESS_PROBE_SECONDS_OVERRIDE:-12}; printf \"survived\\n\"" > "$dir/probe.sh"
 	cp "$dir/probe.sh" "$dir/unlinked.sh"
 	# Both shapes run at once: the kill came about 10 s in, so 12 s covers it.
 	start=$(date +%s)

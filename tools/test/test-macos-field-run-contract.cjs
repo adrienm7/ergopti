@@ -161,7 +161,16 @@ function fixture(name, { onDev = false } = {}) {
 	);
 	fs.mkdirSync(bin, { recursive: true });
 	fs.mkdirSync(home, { recursive: true });
-	const env = { ...process.env, ...GIT_IDENTITY, HOME: home };
+	// The fixture app answers within a second and the Mac-only fileless probe is
+	// irrelevant here: a 1 s poll and an instant probe keep each collector run
+	// short without changing any decision the cases assert.
+	const env = {
+		...process.env,
+		...GIT_IDENTITY,
+		HOME: home,
+		FIELD_RUN_POLL_SECONDS_OVERRIDE: '1',
+		FIELD_FILELESS_PROBE_SECONDS_OVERRIDE: '0'
+	};
 	const run = (...args) => {
 		const result = spawnSync('git', args, { cwd: clone, encoding: 'utf8', env });
 		assert.equal(result.status, 0, `git ${args.join(' ')}: ${result.stderr}`);
@@ -450,6 +459,19 @@ function reportFolder(paths) {
 					/FIELD_RUN_DEADLINE_SECONDS/,
 					'no second, fixed run deadline'
 				);
+				// The fixture shortens these through overrides; a real run keeps the
+				// budgets the field runs of 2026-10-28 settled on.
+				for (const [name, value] of [
+					['FIELD_RUN_READY_SECONDS', 240],
+					['FIELD_RUN_ACCEPT_SECONDS', 300],
+					['FIELD_RUN_POLL_SECONDS', 5]
+				])
+					assert.match(
+						collector,
+						new RegExp(`^${name}="\\$\\{${name}_OVERRIDE:-${value}\\}"$`, 'm'),
+						`${name} defaults to ${value} s`
+					);
+				assert.match(collector, /sleep \$\{FIELD_FILELESS_PROBE_SECONDS_OVERRIDE:-12\}/);
 				const { min, default: fallback, max } = spec.deadline_seconds;
 				assert(min <= fallback && fallback <= max, 'deadline_seconds needs min <= default <= max');
 				const bounds = spec.steps.reduce(
@@ -669,6 +691,9 @@ function reportFolder(paths) {
 					// A git pull rewrote the launcher after the build: the ready app is stale.
 					const future = new Date(Date.now() + 3600 * 1000);
 					fs.utimesSync(stale.launcherSource, future, future);
+					// The stand-in runner opens no app: the readiness wait that follows
+					// the rebuild gives up, so its budget is short here.
+					stale.env.FIELD_RUN_READY_SECONDS_OVERRIDE = '3';
 					const result = await runCollector(stale);
 					assert.match(result.stdout, /Building and opening the developer app/);
 					assert.equal(
