@@ -533,3 +533,24 @@ To do on the PC, after the Windows token exchange itself (the TODO's
    (`vision_request.prepare_target`) has no Windows twin to write yet; when the
    exchange lands, the native `llm_vision` request must wait for the token the
    same way instead of refusing while it is fetched.
+
+## Actions Windows can gain (31 October)
+
+Branch `feat/action-parity` ported catalogue actions to macOS and Linux and gave
+every row that misses an OS a localized `reason_<os>` (table in
+`_shared/modules/actions/README.md`). These Windows rows point at an equivalent
+today, but Windows could run them itself; each one is a row of `actions.toml`
+(add `ahk` to `platform`, drop its `reason_ahk`/`equivalent_ahk`) plus a handler
+in `windows/modules/gestures/actions.ahk`:
+
+- `home`, `end`, `page_up`, `page_down`: plain keystrokes (`emit_ahk_key`
+  `Home`, `End`, `PgUp`, `PgDn`).
+- `app_window_previous`: Alt+Escape, which Windows answers as Linux does.
+- `sticky_ctrl` and the other 13 sticky combinations: the one-shot logic of
+  `one_shot_shift`, for the other modifiers.
+- `display_mirror_toggle`: today its reason points at the Win+P menu; a
+  toggle needs QueryDisplayConfig/SetDisplayConfig.
+
+When one lands, rewrite its reason (or remove it) and rerun
+`npm run codegen:action-catalogue`; `test-action-catalogue-codegen.cjs`
+refuses a reason on an OS the row claims.
