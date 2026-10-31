@@ -269,12 +269,63 @@ helpers.describe("owned runtime check", function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.field_check_checks"] = nil
 			local Checks = require("infra.field_check_checks")
-			helpers.assert_eq(Checks.parse_driver_state("nothing here\n"), "absent")
-			helpers.assert_eq(Checks.parse_driver_state("x org.pqrs.Karabiner-DriverKit-VirtualHIDDevice (1/1) [activated waiting for user]"),
-				"activated_waiting_for_user")
-			helpers.assert_eq(Checks.parse_driver_state("org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"), "unknown")
 			helpers.assert_eq(Checks.parse_version("karabiner_cli 16.0.0 (x)"), "16.0.0")
 		end)
+	end)
+
+	--- Runs the check over one driver listing and one pinned driver version.
+	--- @param code integer|nil systemextensionsctl exit status.
+	--- @param listing string Its output.
+	--- @param pinned string|nil Manifest version of the driver.
+	--- @return table steps
+	local function driver_steps(code, listing, pinned)
+		local ports, world = make_ports({ owned_readiness = function(callback)
+			callback({ unpinned = 6, source = false, helper_present = false, active = 0, virtual_hid_version = pinned })
+		end })
+		world.outputs["/usr/bin/systemextensionsctl list"] = { code, listing }
+		return (run("owned_runtime", ports))
+	end
+
+	local HEADER = "1 extension(s)\n--- com.apple.system_extension.driver_extension\n"
+		.. "enabled\tactive\tteamID\tbundleID (version)\tname\t[state]\n"
+	local function line(flags, team, version, state)
+		return flags .. "\t" .. team .. "\torg.pqrs.Karabiner-DriverKit-VirtualHIDDevice (" .. version .. "/" .. version
+			.. ")\torg.pqrs.Karabiner-DriverKit-VirtualHIDDevice\t[" .. state .. "]\n"
+	end
+
+	-- (field-driver-owner-parser) The check once read the first listed copy with its
+	-- own parser, so an older copy macOS keeps until reboot hid the active driver
+	-- the owner's admission reads.
+	helpers.it("reads the active driver the owner reads, not an older listed copy", function()
+		local listing = HEADER .. line("\t", "G43BCU2T37", "5.0.0", "terminated waiting to uninstall on reboot")
+			.. line("*\t*", "G43BCU2T37", "8.5.0", "activated enabled")
+		local steps = driver_steps(0, listing, "8.5.0")
+		helpers.assert_eq(steps.driver_state.value, "activated_enabled")
+		helpers.assert_eq(steps.driver_verdict.value, "compatible")
+		helpers.assert_eq(steps.driver_verdict.state, "info")
+	end)
+
+	helpers.it("names the owner's refusal of the installed driver", function()
+		local function verdict(code, listing, pinned) return driver_steps(code, listing, pinned).driver_verdict.value end
+		helpers.assert_eq(verdict(0, HEADER .. line("*\t*", "G43BCU2T37", "1.8.0", "activated enabled"), "8.5.0"),
+			"virtual_hid_incompatible")
+		helpers.assert_eq(verdict(0, HEADER .. line("*\t*", "ABCDEFGHIJ", "8.5.0", "activated enabled"), "8.5.0"),
+			"virtual_hid_incompatible")
+		helpers.assert_eq(verdict(0, HEADER .. line("*\t", "G43BCU2T37", "8.5.0", "activated waiting for user"), "8.5.0"),
+			"virtual_hid_not_active")
+		helpers.assert_eq(verdict(0, "0 extension(s)\n", "8.5.0"), "virtual_hid_absent")
+		helpers.assert_eq(verdict(0, "garbage\n", "8.5.0"), "virtual_hid_unreadable")
+		helpers.assert_eq(verdict(1, "", "8.5.0"), "unreadable")
+		helpers.assert_eq(verdict(0, HEADER .. line("*\t*", "G43BCU2T37", "8.5.0", "activated enabled"), nil),
+			"unpinned")
+	end)
+
+	helpers.it("reports the driver listing state in the owner's words", function()
+		helpers.assert_eq(driver_steps(0, "0 extension(s)\n", "8.5.0").driver_state.value, "absent")
+		helpers.assert_eq(driver_steps(0, "garbage\n", "8.5.0").driver_state.value, "unreadable")
+		helpers.assert_eq(driver_steps(nil, "", "8.5.0").driver_state.value, "unreadable")
+		helpers.assert_eq(driver_steps(0, HEADER .. line("*\t", "G43BCU2T37", "8.5.0", "activated waiting for user"),
+			"8.5.0").driver_state.value, "activated_waiting_for_user")
 	end)
 end)
 

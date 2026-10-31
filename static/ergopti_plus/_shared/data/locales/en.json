@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "Owned runtime service file present",
 	"field_check.step.job_loaded": "Owned runtime service loaded",
 	"field_check.step.driver_state": "Virtual keyboard driver",
+	"field_check.step.driver_verdict": "Virtual keyboard driver compatibility",
 	"field_check.step.stock_app": "Karabiner-Elements app installed",
 	"field_check.step.stock_running": "Karabiner-Elements processes running",
 	"field_check.step.owned_running": "Owned runtime processes running",

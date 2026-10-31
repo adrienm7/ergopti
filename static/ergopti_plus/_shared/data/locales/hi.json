@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "अपने रनटाइम की सेवा फ़ाइल मौजूद है",
 	"field_check.step.job_loaded": "अपने रनटाइम की सेवा लोड है",
 	"field_check.step.driver_state": "वर्चुअल कीबोर्ड ड्राइवर",
+	"field_check.step.driver_verdict": "वर्चुअल कीबोर्ड ड्राइवर संगतता",
 	"field_check.step.stock_app": "Karabiner-Elements ऐप इंस्टॉल है",
 	"field_check.step.stock_running": "Karabiner-Elements प्रोसेस चल रहे हैं",
 	"field_check.step.owned_running": "अपने रनटाइम के प्रोसेस चल रहे हैं",

@@ -93,4 +93,11 @@ helpers.describe("owned runtime ports", function()
 		helpers.assert_contains(reason, "not pinned")
 		helpers.assert_contains(reason, "runtime.version")
 	end)
+
+	helpers.it("names the shipped driver version and the unpinned count from the same manifest", function()
+		load_ports(function() return 0, "" end)
+		local Ports = package.loaded["adapters.runtime_owner_ports"]
+		helpers.assert_eq(Ports.virtual_hid_version(), "8.5.0")
+		helpers.assert_eq(Ports.unpinned_count(), 6)
+	end)
 end)

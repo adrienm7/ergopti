@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "Tjenestefil for egen runtime finnes",
 	"field_check.step.job_loaded": "Tjeneste for egen runtime lastet",
 	"field_check.step.driver_state": "Virtuell tastaturdriver",
+	"field_check.step.driver_verdict": "Kompatibilitet for virtuell tastaturdriver",
 	"field_check.step.stock_app": "Karabiner-Elements-appen installert",
 	"field_check.step.stock_running": "Karabiner-Elements-prosesser kjører",
 	"field_check.step.owned_running": "Prosesser for egen runtime kjører",

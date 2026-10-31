@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "自有运行时服务文件存在",
 	"field_check.step.job_loaded": "自有运行时服务已加载",
 	"field_check.step.driver_state": "虚拟键盘驱动程序",
+	"field_check.step.driver_verdict": "虚拟键盘驱动程序兼容性",
 	"field_check.step.stock_app": "Karabiner-Elements 应用已安装",
 	"field_check.step.stock_running": "Karabiner-Elements 进程正在运行",
 	"field_check.step.owned_running": "自有运行时进程正在运行",
