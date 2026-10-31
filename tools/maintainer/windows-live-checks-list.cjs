@@ -792,8 +792,9 @@ const CHECKS = [
 				},
 				{ name: 'a left click', between: [['mouse', 'left']], gap: 0 },
 				{
-					// The edit control's context menu would take the next word (its "c"
-					// is Copy): the next word goes to a fresh target instead.
+					// The typist cancels the edit control's context menu, which would hold
+					// the driver's only thread. The next word still goes to a fresh target,
+					// away from the right click.
 					name: 'a right click',
 					between: [['mouse', 'right']],
 					gap: 0,
