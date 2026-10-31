@@ -11,7 +11,11 @@
 local helpers = require("tests.helpers")
 local json = require("json")
 
+-- The servers these tests drive. Every other catalogue server is stopped in
+-- the fake scan (with_backend), so a longer catalogue changes no scenario.
 local SERVERS = { "omlx", "lmstudio", "llamacpp", "jan" }
+local DRIVEN = {}
+for _, id in ipairs(SERVERS) do DRIVEN[id] = true end
 
 --- Reads a shared JSON file.
 --- @param relative string Path under _shared/.
@@ -64,6 +68,9 @@ local function with_backend(scenario)
 		local scan_overrides = {}
 		local scans = require("tests.support.modules.llm.backends.local_server_scan_fake").install(api, scan_overrides)
 		local LocalServers = require("modules.llm.local_servers")
+		for _, id in ipairs(LocalServers.ORDER) do
+			if not DRIVEN[id] then scan_overrides[id] = { running = false, pids = {}, detail = "no running process" } end
+		end
 		local world = { probes = {}, posts = {}, scan_overrides = scan_overrides, scans = scans }
 		local probe_clients = get_upvalue(api._probe_local_target, "_local_probe_clients")
 		assert(type(probe_clients) == "table", "the probe clients must be reachable")
