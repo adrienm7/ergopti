@@ -270,6 +270,32 @@ local function owned_readiness(callback)
 	end)
 end
 
+--- The owned runtime's activation rule, driven by the field run
+--- (infra/field_check_owned_activation.lua): the switch it flips, the owner's
+--- state and the user Karabiner it may close and give back.
+--- @return table port
+local function owned_activation()
+	-- Resolved per call: building the ports must not load the remap bridge.
+	local function Remap() return require("platform.remap") end
+	local function owner_status()
+		local owner = Remap()._owned and Remap()._owned.owner
+		if not owner then return { state = "unbound" } end
+		return owner.status()
+	end
+	return {
+		selected = function()
+			return type(Remap().owned_runtime_selected) == "function" and Remap().owned_runtime_selected() == true
+		end,
+		tap_holds = function() return Remap().get_tap_holds_enabled() == true end,
+		set_tap_holds = function(value) return Remap().set_tap_holds_enabled(value) == true end,
+		owner_state = function() return owner_status().state end,
+		owner_reason = function() return owner_status().reason end,
+		fetch = function(callback) require("adapters.runtime_owner_ports").fetch_artifact(callback) end,
+		other_active = function(callback) require("adapters.karabiner_coexistence").new().detect(callback) end,
+		marker = function() return require("adapters.runtime_owner_ports").marker().get() end,
+	}
+end
+
 --- The bounded command runner, shared with adapters/runtime_owner_ports.lua.
 M.exec = exec
 
@@ -314,6 +340,7 @@ function M.new()
 			if committed ~= true then error("field check: the wait timer could not be armed", 0) end
 		end,
 		owned_readiness = owned_readiness,
+		owned_activation = owned_activation(),
 		app_path = app_path,
 		login_startup_status = login_startup_status,
 		input_monitoring_access = input_monitoring_access,
