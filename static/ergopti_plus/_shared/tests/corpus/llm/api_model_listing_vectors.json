@@ -589,6 +589,11 @@
 		"volcengine": "Ark documents no OpenAI-style GET /api/v3/models (models are found in the console or the AK/SK-signed control API): the page offers the catalogue models and a typed id.",
 		"qianfan": "The documented example lists only deepseek-v3.2 and the route needs a key: none recorded that holds the default model.",
 		"spark": "No model listing is documented for spark-api-open.xf-yun.com/v1: the page offers the catalogue models and a typed id.",
-		"baichuan": "No model listing is documented (platform.baichuan-ai.com docs-v2 api): the page offers the catalogue models and a typed id."
+		"baichuan": "No model listing is documented (platform.baichuan-ai.com docs-v2 api): the page offers the catalogue models and a typed id.",
+		"azure": "GET <base_url>/models answers with the resource's key only, and the docs do not say whether it lists the deployments: none recorded.",
+		"bedrock": "The bedrock-runtime address has no /models (bedrock-mantle lists, under another host): the page offers a typed model id.",
+		"cloudflare": "Workers AI lists its models at /ai/models/search in Cloudflare's own shape, which the listing reader does not take: the page offers a typed model id.",
+		"databricks": "No OpenAI-style listing is documented for serving-endpoints: the page offers a typed model id.",
+		"snowflake": "No listing is documented for the Cortex OpenAI-compatible address: the page offers a typed model id."
 	}
 }

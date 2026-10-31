@@ -2627,6 +2627,145 @@
 				"temperature": 0.7
 			},
 			"added": []
+		},
+		{
+			"id": "azure_gpt-5.1",
+			"provider": "azure",
+			"model": "gpt-5.1",
+			"body": { "model": "gpt-5.1", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 7,
+			"kind": "effort"
+		},
+		{
+			"id": "azure_gpt-4.1-mini",
+			"provider": "azure",
+			"model": "gpt-4.1-mini",
+			"body": { "model": "gpt-4.1-mini", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "gpt-4.1-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "bedrock_openai.gpt-oss-20b-1:0",
+			"provider": "bedrock",
+			"model": "openai.gpt-oss-20b-1:0",
+			"body": {
+				"model": "openai.gpt-oss-20b-1:0",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai.gpt-oss-20b-1:0",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 11
+		},
+		{
+			"id": "cloudflare_@cf_meta_llama-3.1-8b-instruct",
+			"provider": "cloudflare",
+			"model": "@cf/meta/llama-3.1-8b-instruct",
+			"body": {
+				"model": "@cf/meta/llama-3.1-8b-instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "@cf/meta/llama-3.1-8b-instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "databricks_system.ai.gpt-oss-120b",
+			"provider": "databricks",
+			"model": "system.ai.gpt-oss-120b",
+			"body": {
+				"model": "system.ai.gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "system.ai.gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "databricks_databricks-gpt-oss-120b",
+			"provider": "databricks",
+			"model": "databricks-gpt-oss-120b",
+			"body": {
+				"model": "databricks-gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "databricks-gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "snowflake_claude-haiku-4-5",
+			"provider": "snowflake",
+			"model": "claude-haiku-4-5",
+			"body": {
+				"model": "claude-haiku-4-5",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "claude-haiku-4-5",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "snowflake_openai-gpt-5.1",
+			"provider": "snowflake",
+			"model": "openai-gpt-5.1",
+			"body": { "model": "openai-gpt-5.1", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "openai-gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
 		}
 	],
 	"refusal_vectors": [

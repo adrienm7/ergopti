@@ -1,5 +1,5 @@
 {
-	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver. `format` is openai, anthropic, gemini, backboard (Backboard's assistant/thread API, key in X-API-Key, models written <llm_provider>/<model_name>) or decisions (TypeSafe's System One protocol: typed questions in, answers with probabilities out; base_url is the full endpoint and the key goes in Authorization: Bearer). A decisions provider serves Jev, which is not a chat model: it is offered only as the agent's System 1. The request shapes of backboard and decisions live in _shared/lua/llm/remote_formats.lua. `thinking_dialect` (optional) says how the provider carries each reasoning control kind of _shared/modules/llm/thinking_off.json: kind -> body fields deep-merged into the request (a field the body already sets wins), the string $level replaced by the model family's level. A kind the provider does not list is never sent (openai_compat lists none: it may point at a strict endpoint). Sources: platform.claude.com build-with-claude/thinking and effort, developers.openai.com guides/reasoning, ai.google.dev thinking, docs.x.ai reasoning, docs.mistral.ai reasoning, api-docs.deepseek.com thinking_mode, docs.cohere.com compatibility-api, inference-docs.cerebras.ai reasoning, openrouter.ai reasoning-tokens, console.groq.com reasoning, docs.together.ai reasoning-models-guide, docs.fireworks.ai post-chatcompletions (checked 2026-10-30). Every provider after fireworks names the official pages its address, key, listing, default model and dialect were read from in its _source (checked 2026-10-30).",
+	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver. `format` is openai, anthropic, gemini, backboard (Backboard's assistant/thread API, key in X-API-Key, models written <llm_provider>/<model_name>) or decisions (TypeSafe's System One protocol: typed questions in, answers with probabilities out; base_url is the full endpoint and the key goes in Authorization: Bearer). A decisions provider serves Jev, which is not a chat model: it is offered only as the agent's System 1. The request shapes of backboard and decisions live in _shared/lua/llm/remote_formats.lua. `thinking_dialect` (optional) says how the provider carries each reasoning control kind of _shared/modules/llm/thinking_off.json: kind -> body fields deep-merged into the request (a field the body already sets wins), the string $level replaced by the model family's level. A kind the provider does not list is never sent (openai_compat lists none: it may point at a strict endpoint). Sources: platform.claude.com build-with-claude/thinking and effort, developers.openai.com guides/reasoning, ai.google.dev thinking, docs.x.ai reasoning, docs.mistral.ai reasoning, api-docs.deepseek.com thinking_mode, docs.cohere.com compatibility-api, inference-docs.cerebras.ai reasoning, openrouter.ai reasoning-tokens, console.groq.com reasoning, docs.together.ai reasoning-models-guide, docs.fireworks.ai post-chatcompletions (checked 2026-10-30). Every provider after fireworks names the official pages its address, key, listing, default model and dialect were read from in its _source (checked 2026-10-30). A base_url holding {name} placeholders is a per-account address (_shared/lua/llm/api_url_template.lua): the add-entry form asks one value per placeholder (menu.llm.api_prompt_field.<name>) and stores the filled address in the entry; such a provider has no default_model, its model being the user's deployment or chosen model.",
 	"provider_order": [
 		"openai",
 		"anthropic",
@@ -44,6 +44,11 @@
 		"qianfan",
 		"spark",
 		"baichuan",
+		"azure",
+		"bedrock",
+		"cloudflare",
+		"databricks",
+		"snowflake",
 		"backboard",
 		"typesafe",
 		"openrouter_jev",
@@ -420,6 +425,44 @@
 			"default_model": "Baichuan4-Air",
 			"format": "openai",
 			"_source": "https://platform.baichuan-ai.com/docs-v2/api (no thinking control documented)"
+		},
+		"azure": {
+			"label": "Azure OpenAI (Foundry)",
+			"base_url": "https://{resource}.openai.azure.com/openai/v1",
+			"default_model": "",
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } },
+			"_source": "https://learn.microsoft.com/en-us/azure/foundry/openai/api-version-lifecycle (v1 API, the key accepted as Bearer, the model is the deployment name), https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/reasoning"
+		},
+		"bedrock": {
+			"label": "Amazon Bedrock",
+			"base_url": "https://bedrock-runtime.{region}.amazonaws.com/openai/v1",
+			"default_model": "",
+			"format": "openai",
+			"_source": "https://docs.aws.amazon.com/bedrock/latest/userguide/inference-chat-completions.html, https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html (a long-term Bedrock API key as Bearer; short-term keys last 12 h at most; no reasoning control documented)"
+		},
+		"cloudflare": {
+			"label": "Cloudflare Workers AI",
+			"base_url": "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
+			"default_model": "",
+			"format": "openai",
+			"_source": "https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/ (an API token with Workers AI Read as Bearer; AI Gateway's /compat address is deprecated for this one; no reasoning control documented)"
+		},
+		"databricks": {
+			"label": "Databricks",
+			"base_url": "https://{workspace}/serving-endpoints",
+			"default_model": "",
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } },
+			"_source": "https://docs.databricks.com/aws/en/machine-learning/model-serving/query-reason-models (a personal access token as Bearer; the model is the serving endpoint name)"
+		},
+		"snowflake": {
+			"label": "Snowflake Cortex",
+			"base_url": "https://{account}.snowflakecomputing.com/api/v2/cortex/v1",
+			"default_model": "",
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } },
+			"_source": "https://docs.snowflake.com/en/user-guide/snowflake-cortex/open_ai_sdk (a programmatic access token as Bearer, 15 days by default; reasoning_effort none to high on OpenAI models), https://docs.snowflake.com/en/user-guide/programmatic-access-tokens"
 		},
 		"backboard": {
 			"label": "Backboard",
