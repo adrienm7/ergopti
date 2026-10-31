@@ -26,7 +26,7 @@ _CMJ_CapturedTransitionRejectsCallerNulSuffix(Side) {
 	Bundle := false
 	PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
 	try {
-		AssertEqual(17, ConfigMigrateCurrentVersion(), "the handwritten images require the actual v17 registry")
+		AssertEqual(19, ConfigMigrateCurrentVersion(), "the handwritten images require the actual v19 registry")
 		ConfigurationFile := Path
 		AssertTrue(FSWriteDurable(Path, Source))
 		BeforeBytes := FileRead(Path, "RAW")
@@ -139,7 +139,7 @@ _CMJ_CapturedImageRejectsCallerNulSuffix(Request, Side, WithBom := false) {
 	PhysicalSource := WithBom ? Chr(0xFEFF) . Source : Source
 	Bundle := false, PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
 	try {
-		AssertEqual(17, ConfigMigrateCurrentVersion(), "the handwritten images require the actual v17 registry")
+		AssertEqual(19, ConfigMigrateCurrentVersion(), "the handwritten images require the actual v19 registry")
 		ConfigurationFile := Path
 		AssertTrue(!WithBom || Request == "capture_read", "the BOM subject belongs only to logical captured read")
 		AssertTrue(FSWriteDurable(Path, PhysicalSource))
@@ -309,7 +309,7 @@ _CMJ_UpstreamExactCallerNul(Kind) {
 	Source := '[_meta]`nschema_version = 19`n[layout]`nergopti_base = true`n'
 	PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
 	try {
-		AssertEqual(17, ConfigMigrateCurrentVersion(), "the independent current image requires the actual v17 registry")
+		AssertEqual(19, ConfigMigrateCurrentVersion(), "the independent current image requires the actual v19 registry")
 		AssertTrue(FSWriteDurable(Path, Source))
 		BeforeBytes := FileRead(Path, "RAW")
 		AssertEqual(StrLen(Source), BeforeBytes.Size)
