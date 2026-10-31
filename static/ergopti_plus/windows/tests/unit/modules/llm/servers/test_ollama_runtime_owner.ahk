@@ -58,7 +58,7 @@ class _ORT_Fixture {
 			"clock", ObjBindMethod(this, "Clock"),
 			"on_retired", ObjBindMethod(this, "Retire"), "on_error", ObjBindMethod(this, "Error")))
 		this.Receipt := Map("launcher_pid", 5001, "child_pid", 5002, "child_created_filetime", 133700000000000000, "leases_held", 1,
-			"ready_file_identity", "34567890:3456789012345678")
+			"ready_file_identity", "34567890:3456789012345678", "proxy_mode", "direct", "proxy_tunnel", "none")
 		for Name in ["runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256", "origin"]
 			this.Receipt[Name] := this.Target[Name]
 	}
@@ -390,6 +390,23 @@ _ORT_CancelForeignReceipt() {
 	AssertEqual(F.RetireTarget["ready_file_identity"], "", "A different runtime ticket cannot authorize receipt deletion.")
 	AssertEqual(F.RetireTarget["ready_image_sha256"], "")
 }
+
+; The fixture's receipt held 11 fields while the launcher wrote 13 from 743181a933,
+; so the real runtime could never be admitted as ready and every test stayed green.
+_ORT_ReceiptFieldsAreExact() {
+	F := _ORT_Fixture()
+	try {
+		for Name in OLLAMA_RUNTIME_RECEIPT_FIELDS
+			AssertTrue(F.Receipt.Has(Name), "The fixture writes what the launcher writes: " . Name)
+		AssertEqual(OLLAMA_RUNTIME_RECEIPT_FIELDS.Length, F.Receipt.Count)
+		AssertTrue(F.Run())
+		F.Receipt["unknown_field"] := "foreign"
+		AssertFalse(F.Owner.ObserveReady(), "A foreign field refuses the image.")
+		F.Receipt.Delete("unknown_field")
+		AssertTrue(F.Owner.ObserveReady(), "The launcher's exact fields are admitted.")
+	} finally F.Owner.Stop()
+}
+Test("Ollama runtime: readiness admits exactly the launcher's receipt fields (ollama-runtime-receipt-fields)", _ORT_ReceiptFieldsAreExact)
 
 _ORT_MissingCreationIdentity() {
 	F := _ORT_Fixture()

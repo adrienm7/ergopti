@@ -243,6 +243,19 @@ const ahkCode = /global LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT := (\d+)/.exec(bootstra
 assert.ok(pullCode && ahkCode, 'both sides declare the login exit code');
 assert.equal(ahkCode[1], pullCode[1], 'one login exit code');
 
+// The AHK owner admits a readiness receipt only with exactly these fields: a
+// field the launcher adds alone leaves the daemon never ready, with no error.
+const receiptOwner = fs.readFileSync(path.join(ROOT, LLM_DIR, 'ollama_runtime_owner.ahk'), 'utf8');
+const launcherReceipt = /\$receipt = \[ordered\]@\{([\s\S]*?)\}\r?\n/.exec(launcher);
+const ownerReceipt = /global OLLAMA_RUNTIME_RECEIPT_FIELDS := \[([^\]]*)\]/.exec(receiptOwner);
+assert.ok(launcherReceipt && ownerReceipt, 'both sides declare the receipt fields');
+const launcherFields = [...launcherReceipt[1].matchAll(/(?:^|[;{\s])([a-z_]+) = /g)].map(
+	(match) => match[1]
+);
+const ownerFields = [...ownerReceipt[1].matchAll(/"([a-z_]+)"/g)].map((match) => match[1]);
+assert.ok(launcherFields.length > 0, 'the launcher receipt was read');
+assert.deepEqual([...ownerFields].sort(), [...launcherFields].sort(), 'one receipt field list');
+
 async function main() {
 	const daemon = runPowerShell(DAEMON, {
 		ERGOPTI_DAEMON_CASES: JSON.stringify(

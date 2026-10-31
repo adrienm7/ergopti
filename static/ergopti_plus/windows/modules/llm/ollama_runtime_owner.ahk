@@ -13,6 +13,13 @@
 
 #Include ../../adapters/ollama_identity.ahk
 
+; Every field of the readiness receipt ollama-runtime-launch.ps1 writes: a foreign
+; or older image must not be admitted, and a field the launcher adds must be added
+; here (test-windows-route-plan.cjs compares the two lists).
+global OLLAMA_RUNTIME_RECEIPT_FIELDS := ["runtime_ticket", "ticket", "root_identity", "version_identity",
+	"manifest_sha256", "origin", "launcher_pid", "child_pid", "child_created_filetime", "ready_file_identity",
+	"leases_held", "proxy_mode", "proxy_tunnel"]
+
 /** Holds one exact server task; accepted launch never means AI is enabled. */
 class OllamaRuntimeOwner {
 	/**
@@ -216,7 +223,7 @@ class OllamaRuntimeOwner {
 					|| !RegExMatch(Observation.Get("image_sha256", ""), "^[0-9a-f]{64}$")
 				return false
 			Receipt := Observation.Get("receipt", 0)
-			if !(Receipt is Map) || Receipt.Count != 11
+			if !this._ReceiptHasExactFields(Receipt)
 				return false
 			Target := Record["target"]
 			for Name in ["runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256", "origin"]
@@ -324,7 +331,7 @@ class OllamaRuntimeOwner {
 			return false
 		Receipt := Observation.Get("receipt", 0)
 		Task := Record["task"]
-		if !(Receipt is Map) || Receipt.Count != 11 || !IsObject(Task) || !this._Current(Record)
+		if !this._ReceiptHasExactFields(Receipt) || !IsObject(Task) || !this._Current(Record)
 				|| !this._ReadyDeadline(Record)
 			return false
 		Target := Record["target"]
@@ -391,6 +398,17 @@ class OllamaRuntimeOwner {
 		; A timer may retire this exact task while the clock is observed.
 		return Elapsed >= 0 && Elapsed < Record["target"]["deadline_ms"]
 			&& this._Owns(Record) && !Record["cancelled"] && !Record["terminal"] && !A_IsSuspended
+	}
+
+	_ReceiptHasExactFields(Receipt) {
+		global OLLAMA_RUNTIME_RECEIPT_FIELDS
+		if !(Receipt is Map) || Receipt.Count != OLLAMA_RUNTIME_RECEIPT_FIELDS.Length
+			return false
+		for Name in OLLAMA_RUNTIME_RECEIPT_FIELDS {
+			if !Receipt.Has(Name)
+				return false
+		}
+		return true
 	}
 
 	_NativeReadReady(Target) {
