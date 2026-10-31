@@ -600,7 +600,7 @@
 			"name": "Owned runtimes inventory lists every program the macOS and Linux drivers start, each with a proposal",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-owned-runtimes-inventory.cjs"],
-			"repro": "node tools/test/test-owned-runtimes-inventory.cjs"
+			"repro": "npm run test:owned-runtimes-inventory"
 		}
 	]
 }

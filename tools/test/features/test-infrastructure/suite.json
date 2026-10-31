@@ -530,7 +530,7 @@
 			"name": "no new location-pinned source reads in Linux tests (ratchet)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-no-pinned-source-reads-linux.cjs"],
-			"repro": "node tools/test/test-no-pinned-source-reads-linux.cjs"
+			"repro": "npm run test:no-pinned-source-reads-linux"
 		}
 	]
 }
