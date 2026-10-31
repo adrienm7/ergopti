@@ -1912,46 +1912,83 @@ function M.read_screen(action, value)
 		show_notice(VISION_NO_MODEL_KEY, "no_model")
 		return false
 	end
-	local target, target_err = VisionRequest.resolve_target(parsed.backend, model)
-	if not target then
-		Logger.warn(LOG, "Screen reading refused: %s.", tostring(target_err))
-		show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
-		return false
-	end
 	if not _capture_screen then
 		Logger.error(LOG, "Screen reading refused: no capture surface was injected.")
 		return false
 	end
+	--- Starts the capture once the target is resolved.
+	--- @param target table|nil VisionRequest.resolve_target() output.
+	--- @param target_err string|nil Why there is no target.
+	--- @param flow table|nil The flow that waited for the target; nil when resolved at once.
+	--- @return boolean started
+	local function begin_screen_read(target, target_err, flow)
+		if not target then
+			if flow and _vision_flow == flow then _vision_flow = nil end
+			Logger.warn(LOG, "Screen reading refused: %s.", tostring(target_err))
+			show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
+			return false
+		end
+		if not flow then
+			M.drop_vision("superseded")
+			_debounce.cancel()
+			if _predicting or #_suggestions > 0 then M.dismiss() end
+			flow = { generation = _vision_generation }
+			_vision_flow = flow
+		end
+		flow.waiting = nil
+		local spec = {
+			action = action,
+			label = i18n.get("sg_actions." .. action),
+			backend = parsed.backend,
+			model = model,
+			target = target,
+			config = config,
+			answers = config[screen_action.answers],
+		}
+		Logger.info(LOG, "Screen reading requested (action=%s, mode=%s, backend=%s, model=%s).",
+			action, mode, parsed.backend, model)
+		local started, handle, capture_err = pcall(_capture_screen, mode, config.max_image_edge, function(outcome)
+			-- A capture that finished before the handle came back is taken up below.
+			if not flow.capture then flow.early = outcome; return end
+			finish_capture(flow, spec, outcome)
+		end)
+		if not started or type(handle) ~= "table" then
+			if _vision_flow == flow then _vision_flow = nil end
+			Logger.error(LOG, "Screen capture could not start: %s", tostring(started and capture_err or handle))
+			show_notice(VISION_CAPTURE_FAILED_KEY, "capture_failed")
+			return false
+		end
+		flow.capture = handle
+		if flow.early then finish_capture(flow, spec, flow.early) end
+		return true
+	end
+
+	-- A provider exchanging its key (watsonx, Vertex AI) has no endpoint until
+	-- its access token arrives: the request waits for it through the access
+	-- lease, and the capture starts once the address is known, so nothing is
+	-- captured for a request that is then refused
+	local settled_now, accepted = false, false
+	local waiting = nil
+	VisionRequest.prepare_target(parsed.backend, model, function(target, target_err)
+		if waiting == nil then
+			settled_now = true
+			accepted = begin_screen_read(target, target_err, nil)
+			return
+		end
+		if _runtime_closed or _scope_owner or not vision_current(waiting) then
+			if _vision_flow == waiting then _vision_flow = nil end
+			Logger.info(LOG, "Screen reading's access token arrived after the action was dropped.")
+			return
+		end
+		begin_screen_read(target, target_err, waiting)
+	end)
+	if settled_now then return accepted end
 	M.drop_vision("superseded")
 	_debounce.cancel()
 	if _predicting or #_suggestions > 0 then M.dismiss() end
-
-	local spec = {
-		action = action,
-		label = i18n.get("sg_actions." .. action),
-		backend = parsed.backend,
-		model = model,
-		target = target,
-		config = config,
-		answers = config[screen_action.answers],
-	}
-	local flow = { generation = _vision_generation }
-	_vision_flow = flow
-	Logger.info(LOG, "Screen reading requested (action=%s, mode=%s, backend=%s, model=%s).",
-		action, mode, parsed.backend, model)
-	local started, handle, capture_err = pcall(_capture_screen, mode, config.max_image_edge, function(outcome)
-		-- A capture that finished before the handle came back is taken up below.
-		if not flow.capture then flow.early = outcome; return end
-		finish_capture(flow, spec, outcome)
-	end)
-	if not started or type(handle) ~= "table" then
-		if _vision_flow == flow then _vision_flow = nil end
-		Logger.error(LOG, "Screen capture could not start: %s", tostring(started and capture_err or handle))
-		show_notice(VISION_CAPTURE_FAILED_KEY, "capture_failed")
-		return false
-	end
-	flow.capture = handle
-	if flow.early then finish_capture(flow, spec, flow.early) end
+	waiting = { generation = _vision_generation, waiting = true }
+	_vision_flow = waiting
+	Logger.info(LOG, "Screen reading waits for the access token of '%s'.", parsed.backend)
 	return true
 end
 
