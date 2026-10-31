@@ -502,7 +502,7 @@ helpers.describe("resume_all must not re-enable user-disabled gestures or shortc
 		-- Selected by a declaration unique to modules/shortcuts/bindings.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function get_frontmost_app_name")
+		local src = helpers.read_driver_source("local _chatgpt_url = nil")
 		helpers.assert_true(src ~= nil, "modules/shortcuts/bindings.lua source must be locatable")
 		if not src then return end
 		helpers.assert_true(src:find("function M.is_started", 1, true) ~= nil,

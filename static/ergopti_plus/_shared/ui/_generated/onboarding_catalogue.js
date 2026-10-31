@@ -3076,6 +3076,22 @@
 										]
 									},
 									{
+										"path": "shortcuts.keyboard.secondary_g",
+										"value": "open_chatgpt",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"text": "Ctrl + G"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.open_chatgpt"
+											}
+										]
+									},
+									{
 										"path": "shortcuts.keyboard.secondary_h",
 										"value": "screenshot_region_clipboard",
 										"default": "none",
@@ -3344,22 +3360,6 @@
 										"value_label": [
 											{
 												"key": "shortcuts.label_wrap_text"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_g",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + G"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_g"
 											}
 										]
 									},

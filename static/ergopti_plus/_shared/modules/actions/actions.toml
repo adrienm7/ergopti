@@ -1012,8 +1012,9 @@ platform = "ahk"
 emit_ahk = "#+t"
 
 [sg_actions.open_chatgpt]
-# macOS binds its Ctrl+G switch to its own owner of the same URL.
-platform = "ahk,linux"
+# Opens the configured shortcuts.chatgpt_url on every driver; macOS runs it
+# through its parent-scoped apps owner (the Ctrl+G slot since schema v20).
+platform = "all"
 requires_linux = ["tool:xdg-open"]
 
 [sg_actions.open_url]

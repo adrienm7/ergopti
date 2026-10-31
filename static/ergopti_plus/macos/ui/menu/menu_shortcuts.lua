@@ -562,34 +562,6 @@ function M.build(ctx)
 					local mi = make_shortcut_item(s, shortcuts, ctx)
 					if s.id == require("config_keys").LEAF.WRAP_TEXT_IF_SELECTED then
 						wrap_item = mi
-					elseif s.id:sub(1, 5) == "ctrl_" then
-						table.insert(ctrl_items, mi)
-						-- Inject ChatGPT URL editor inline below ctrl_g
-						if s.id == "ctrl_g" then
-							local chatgpt_action = not paused and function()
-									local ok_p, clicked, url = pcall(dialog.text_prompt,
-										i18n.get("dialog.shortcuts.chatgpt_title"),
-										i18n.get("dialog.shortcuts.chatgpt_prompt"),
-										state.chatgpt_url, i18n.get("button.ok"), i18n.get("button.cancel"))
-									if ok_p and clicked == i18n.get("button.ok") and type(url) == "string" and url ~= "" then
-										state.chatgpt_url = url
-										if type(shortcuts.set_chatgpt_url) == "function" then
-											pcall(shortcuts.set_chatgpt_url, url)
-										end
-										if ctx.save_prefs() ~= true then return false end
-										ctx.updateMenu()
-									end
-								end or nil
-							local editor_rows = ManifestMenu.template_rows("shortcut_chatgpt_editor_frame", {
-								[require("config_keys").COMMAND.SHORTCUT_CHATGPT_EDITOR] = function(...)
-									if type(chatgpt_action) ~= "function" then return false end
-									return chatgpt_action(...)
-								end,
-							}, { shortcut_chatgpt_editor_ready = function() return not paused end }, {})
-							if not editor_rows then return nil end
-							if paused then editor_rows[1].action = nil end
-							for _, row in ipairs(editor_rows) do ctrl_items[#ctrl_items + 1] = row end
-						end
 					elseif s.id:sub(1, 4) == "cmd_" then
 						table.insert(cmd_items, mi)
 					end
@@ -597,6 +569,32 @@ function M.build(ctx)
 			end
 		end
 	end
+
+	-- The ChatGPT URL editor heads the Ctrl group: the URL belongs to the
+	-- open_chatgpt action, which the Ctrl+G slot runs by default (schema v20).
+	local chatgpt_action = not paused and function()
+			local ok_p, clicked, url = pcall(dialog.text_prompt,
+				i18n.get("dialog.shortcuts.chatgpt_title"),
+				i18n.get("dialog.shortcuts.chatgpt_prompt"),
+				state.chatgpt_url, i18n.get("button.ok"), i18n.get("button.cancel"))
+			if ok_p and clicked == i18n.get("button.ok") and type(url) == "string" and url ~= "" then
+				state.chatgpt_url = url
+				if type(shortcuts.set_chatgpt_url) == "function" then
+					pcall(shortcuts.set_chatgpt_url, url)
+				end
+				if ctx.save_prefs() ~= true then return false end
+				ctx.updateMenu()
+			end
+		end or nil
+	local editor_rows = ManifestMenu.template_rows("shortcut_chatgpt_editor_frame", {
+		[require("config_keys").COMMAND.SHORTCUT_CHATGPT_EDITOR] = function(...)
+			if type(chatgpt_action) ~= "function" then return false end
+			return chatgpt_action(...)
+		end,
+	}, { shortcut_chatgpt_editor_ready = function() return not paused end }, {})
+	if not editor_rows then return nil end
+	if paused then editor_rows[1].action = nil end
+	for _, row in ipairs(editor_rows) do ctrl_items[#ctrl_items + 1] = row end
 
 
 	-- =====================================================
