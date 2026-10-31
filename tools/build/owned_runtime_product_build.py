@@ -33,6 +33,7 @@ HELPER_SOURCES = (
     SWIFT + "OwnedRuntimeInstallJournal.swift",
     SWIFT + "OwnedRuntimeServiceLifecycleLock.swift",
     SWIFT + "LauncherConstants.swift",
+    SWIFT + "Identifiers.generated.swift",
 )
 VALIDATOR_SOURCES = (
     "tools/build/owned-runtime-installer/BuildValidationMain.swift",
@@ -41,6 +42,7 @@ VALIDATOR_SOURCES = (
     SWIFT + "OwnedRuntimeInstallWorker.swift",
     SWIFT + "OwnedRuntimePublisherIdentity.swift",
     SWIFT + "LauncherConstants.swift",
+    SWIFT + "Identifiers.generated.swift",
 )
 LIFECYCLE_C = LAUNCHER + "CPOSIXCompatibility/OwnedRuntimeLifecycleContract.c"
 LIFECYCLE_HEADER = LAUNCHER + "CPOSIXCompatibility/include/OwnedRuntimeLifecycleContract.h"
