@@ -221,6 +221,12 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      settings file, listening port, then `GET /models`), names each server as `server_<id>`:
      `up:<port source>:<models>`, `not_running:<port source>`, `needs_key:...` or `no_answer:...`. A
      server added to the shared list is reported by the next run with no driver change.
+   - `field_pac_fallback` (after the AI downloads): one `awk` pass over today's log counts the PAC-then-direct
+     lines every writer prints (shell admission, Swift spool, Python receiver, Ollama pull):
+     `pac_fallback_counts` is `warnings:worked:failed`, `pac_fallback_stages` the stages named;
+     `pac_fallback_outcome` is `no_pac_failure` (information) on a network whose PAC works, passes as
+     `direct_worked`, and fails on `no_outcome`, `direct_failed` or `unlisted_stage:<stage>` (a stage outside
+     `proxy_policy.json` `pac_unavailable_fallback`).
    - `field_layout_rows` (after `field_idle_cost`): from the Ergo-L file the app ships, a loose layout typing
      the symbols first is written as `~/Library/Keyboard Layouts/ErgoptiFieldRows-<n>.keylayout` under a new
      name and id, enabled through the enabled-sources preference, selected, and read back from a fresh
@@ -597,6 +603,67 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       matrix.
 - [ ] **Linux X11 window list.** [CI] `getAll()` covered by the Openbox receipts (962a25a973), passing on Xvfb and
       Openbox in a container. Left: the first hosted run; Flatpak: wmctrl is only a documented host program.
+- [ ] **Windows config policy (items 33, 42) and the TOML parse cost.** [CODE] Done: the Windows
+      keyboard binding publication (ef238c2758), the macOS Karabiner obsolete-leaf intent
+      (54a537b724), the Windows retired cleanup projections (300790cb37), the Linux `--config FILE.toml`
+      watcher (3dd420292d), per-row admission of outdated API providers on Windows. Left: native macOS
+      qualification of the Hotstrings category boot publication and of the obsolete-leaf setters; the
+      Windows cleanup still cannot offer bare root keys or unknown `[[x]]` generations; the Linux
+      symlink watcher case under a real luaposix `posix.stat`. Parse cost: every document-mode write
+      parses source, expected model and final candidate, and every start pays two builds after
+      ready; reuse one parse per transaction before adding any cache.
+
+Not started:
+
+- [ ] **Ollama redirect policy and Go compile (decision 5).** [CODE] [CI] Code done (cda1e10c5e): an
+      unresolved download host is left to the proxy or the native worker; private, loopback,
+      link-local and CGNAT addresses and names resolving to them stay refused; the build recipe
+      patches upstream `ValidateRedirectTarget`. The hosted Go cell (`go vet`, `go test` through
+      `build-macos-managed-ollama.py`) passed on a throwaway branch (run 40021624397). Left: the same
+      cell on the final source before a release.
+- [ ] **Ergopti-started Ollama behind a PAC proxy.** [CODE] Linux done (89d22d782c, fake-lookup
+      tests). macOS in code (launcher role `--managed-proxy-route`, 06addb2e3f; per-origin route
+      plan 1fd254d92e and 749e00c4c8); Swift compiled and tested on the hosted macOS cell. Windows
+      is covered by the WinHTTP transport (62). Left: a real-PAC pull on the maintainer's Mac (Debug >
+      Test network). The network check already has its `route_plan` step (shared
+      `field_check_network.lua`); the blob host inventory check is the field-run step
+      `field_ollama_blob_host` since 30 October (`blob_host` fails `unplanned_host` when the registry
+      redirects a blob to a host `route_origins.json` does not plan).
+      The daemon start now looks up every inventory origin (it read only the single-origin variable,
+      so `pac_probe_client = "ollama"` never resolved at start; fixed with the fallback below).
+      Windows (30 Oct): the launcher looks up both `route_origins.json` "ollama" origins natively and starts the daemon with HTTPS_PROXY/NO_PROXY from the shared route plan (57276199); a relay demanding a Windows login is never exported and the pull refuses with a named reason, the start stays (local models offline). Left: [PHYS-W] a pull behind a PAC; maintainer decision: an option for NTLM relays (a local authenticating forwarder, or none).
+- [ ] **PAC unusable: direct fallback (maintainer decision).** [CODE] [PHYS-M] macOS done on dev
+      (7634296b28, cbaa14ad46, 7af4e65b10): when the PAC or WPAD route lookup fails at a stage listed in
+      `proxy_policy.json` `pac_unavailable_fallback` (PAC download, evaluation, WPAD discovery, lookup
+      budget, empty route), `network-retry.sh`, the Swift spool and native worker, and the Python
+      receiver go direct (no relay, loopback exclusions kept) with one WARNING naming the stage, then
+      log that the direct connection worked or an error naming both causes; the Ollama pull shows
+      `network.failure.pac_unreachable_direct_failed`; the Debug network check reports the lookup as
+      `info direct_pac_download` (or the stage met). Decision: an explicit inherited relay
+      (`HTTPS_PROXY` and the others) wins and never falls back; a relay the PAC names that then fails
+      is NOT retried direct (only the PAC's own list, such as `PROXY a; DIRECT`, is followed), on
+      every OS. Mac: the field run proves it with no hands, `field_pac_fallback` (the WARNING with its stage,
+      then the direct success line or the two-cause error, after the field run's own Ollama and MLX downloads;
+      `no_pac_failure` on a network whose PAC works) and `field_network` (the `route_lookup` info step); left
+      [CI] the Swift change compiles in the macOS cell. Linux follows it for the Ollama daemon start (fe9199b9, 838af0c0:
+      the shared policy's `falls_back_direct` read by `managed_ollama_proxy.lua`): a GIO lookup that
+      fails or times out sends that origin direct with a WARNING naming `native_proxy_lookup` or
+      `native_proxy_budget`; a pull that daemon then fails to fetch shows
+      `network.failure.pac_unreachable_direct_failed` and logs the stage (`pac-direct-fallback-pull`).
+      Linux left: GIO names no finer stage than the lookup, and the daemon holds one relay, so a PAC list such as
+      `PROXY a; DIRECT` keeps only its first entry (following it needs a reachability probe of `a`
+      before the daemon starts, a new network behaviour to decide); [PHYS-L] a pull on a PAC-only network whose PAC is
+      unreachable. Deferred: Windows (`ergopti_network_routes.ps1` still refuses with `pac_failed` or
+      `wpad_failed`) must follow the same policy.
+      Windows (30 Oct): no longer deferred, `ergopti_network_routes.ps1` `New-ErgoptiPacDirectFallback` goes direct at the policy's stages; [PHYS-W] confirm on a network whose PAC is unreachable.
+- [ ] **AppImage self-contained.** [CODE] `.zsync` and update information are done (10c016e51f,
+      6fb83014e3). Built on ubuntu:22.04 (glibc 2.35 floor, no bundled libc or loader, musl refused in words,
+      tray closure kept); the build refuses a foreign loader or a staged C library (dce846a0bd). Left: hosted
+      CI evidence of the Build and `install-linux` AppImage rows on the distro matrix.
+- [ ] **Linux X11 window list.** [CODE] `getAll()` is covered by the Openbox receipts (962a25a973),
+      run on Xvfb and Openbox in a Linux container on 30 October: `x11_window_list_names_owned_clients`
+      lists the three owned clients and all 34 native window receipts pass. Left: the first hosted
+      run; Flatpak: wmctrl is only a documented host program.
 
 ## Cross-OS parity, centralisation and constants (audit of 2026-10-24)
 

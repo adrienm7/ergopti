@@ -838,6 +838,7 @@ local Probes = require("infra.field_check_probes")
 local LayoutRows = require("infra.field_check_layout_rows")
 local LocalServerProbe = require("infra.field_check_local_servers")
 local Session = require("infra.field_check_session")
+local PacFallback = require("infra.field_check_pac_fallback")
 
 --- Check identity → definition(ports, report, finish), as run by infra.field_check.
 M.checks = {
@@ -869,6 +870,7 @@ M.checks = {
 	idle_cost = Session.idle_cost,
 	fifo_safety = Session.fifo_safety,
 	slow_lines = Session.slow_lines,
+	pac_fallback = PacFallback.pac_fallback,
 }
 
 --- The Debug menu checks the field run does not ask for, each with the
