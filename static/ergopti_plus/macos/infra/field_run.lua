@@ -914,6 +914,17 @@ function Session:reload_restored_state()
 	end
 end
 
+--- Runs, once, the work a step queued for after the run (M.after_run).
+--- @param run table The run that ended.
+local function run_after_work(run)
+	local work = run.after_run or {}
+	run.after_run = {}
+	for _, item in ipairs(work) do
+		local ok, failure = pcall(item)
+		if not ok then Logger.error(LOG, "Field run after-run work failed: %s.", tostring(failure)) end
+	end
+end
+
 --- Publishes the done marker and frees the session for the next request.
 --- @return boolean finished
 function Session:finish()
@@ -933,10 +944,33 @@ function Session:finish()
 	else
 		Logger.error(LOG, "Field run %s finished, but its done marker was not written.", run.request.request_id)
 	end
+	run_after_work(run)
 	return written
 end
 
+--- Queues work for after this session's running field run (see M.after_run).
+--- @param work function fn() run once, after the results are published.
+--- @return boolean queued False when no run is active.
+function Session:after_run(work)
+	assert(type(work) == "function", "field run: after-run work must be a function")
+	local run = self.run
+	if run == nil then return false end
+	run.after_run = run.after_run or {}
+	run.after_run[#run.after_run + 1] = work
+	return true
+end
+
 M.Session = Session
+
+--- Queues work for after the running field run has written its done marker:
+--- a step whose effect would cut the run short (the owned runtime's resume
+--- reloads the driver) defers it here. Refused when no run is active.
+--- @param work function fn() run once, after the results are published.
+--- @return boolean queued
+function M.after_run(work)
+	if _session == nil then return false end
+	return _session:after_run(work)
+end
 
 
 
