@@ -287,6 +287,7 @@
 	"field_check.step.transfer": "Pedido de teste ao servidor de download",
 	"field_check.step.digest": "Verificação de integridade do download",
 	"field_check.step.route_plan": "Rota de cada origem de transferência do daemon do Ollama (direta ou através de um intermediário)",
+	"field_check.step.proxy_relay": "Início de sessão exigido pelo proxy escolhido (nenhum, ou fornecido pelo relé local do Ergopti)",
 	"launcher.fatal.stage_detail": "Etapa: {1}\nCausa: {2}\nOs detalhes foram salvos em {3}.",
 	"launcher.fatal.component_detail": "Componente: {1}\nCausa: {2}\nOs detalhes foram salvos em:\n{3}",
 	"menu.llm.deps_download_page_failed": "Não foi possível abrir a página de download do Ollama.",
