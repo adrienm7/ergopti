@@ -36,6 +36,9 @@ const NOT_OK = 'not ok';
 // by the time its tests took last run instead of by a fixed count.
 const DEFAULTS = Object.freeze({
 	chunkSeconds: 300,
+	minChunkSeconds: 60,
+	workerMemoryMb: 500,
+	reservedMemoryMb: 1024,
 	chunkMaxTests: 1000,
 	unknownTestMs: 1000,
 	processCapMinutes: 30,
@@ -127,6 +130,42 @@ function takeChunk(names, durations, limits) {
 }
 
 /**
+ * Sizes the next chunk so that workers finish together: a full budget while much
+ * work remains, then half of a worker's share, so the last chunks are short. The
+ * floor keeps a chunk worth the seconds its process spends parsing the suite.
+ * @param {string[]} names Remaining names.
+ * @param {Object<string, number>} durations Known durations in ms, by name.
+ * @param {number} workers Worker count.
+ * @param {{chunkSeconds: number, minChunkSeconds: number, unknownTestMs: number}} limits Sizing limits.
+ * @returns {number} Seconds for the next chunk.
+ */
+function guidedChunkSeconds(names, durations, workers, limits) {
+	let remainingMs = 0;
+	for (const name of names) {
+		const known = durations[name];
+		remainingMs += known === undefined ? limits.unknownTestMs : known;
+	}
+	const halfShareSeconds = remainingMs / workers / 2 / 1000;
+	return Math.max(
+		Math.min(limits.minChunkSeconds, limits.chunkSeconds),
+		Math.min(limits.chunkSeconds, halfShareSeconds)
+	);
+}
+
+/**
+ * Picks the default worker count: half the logical CPUs, fewer when free memory
+ * cannot hold them (a worker holds about 350 MB, more while it runs a child).
+ * @param {number} cpuCount Logical CPUs.
+ * @param {number} freeBytes Free physical memory.
+ * @returns {number} At least one worker.
+ */
+function defaultWorkers(cpuCount, freeBytes) {
+	const freeMb = freeBytes / (1024 * 1024);
+	const memoryWorkers = Math.floor((freeMb - DEFAULTS.reservedMemoryMb) / DEFAULTS.workerMemoryMb);
+	return Math.max(1, Math.min(Math.floor(cpuCount / 2), memoryWorkers));
+}
+
+/**
  * Formats the slowest tests and files of a ledger.
  * @param {object} ledger Ledger with entries and plan rows.
  * @param {number} rows Rows per table.
@@ -171,7 +210,7 @@ function writeLedger(file, ledger) {
 
 function parseArguments(argv) {
 	const options = {
-		workers: Math.max(1, Math.floor(os.cpus().length / 2)),
+		workers: defaultWorkers(os.cpus().length, os.freemem()),
 		runDir: DEFAULT_RUN_DIR,
 		only: '',
 		fresh: false,
@@ -353,11 +392,15 @@ async function main() {
 	const selected = Object.keys(ledger.plan).filter(
 		(name) => !options.only || name.toLowerCase().includes(options.only.toLowerCase())
 	);
+	// A rerun answers for the failures it reran: a partial ledger's other planned
+	// tests have no result, and that says nothing about whether those failures hold.
+	let checked = selected;
 	if (options.rerunFailures) {
 		// Alone and one at a time: what still fails here does not owe it to a neighbour.
 		const failures = selected.filter(
 			(name) => ledger.entries[name] && ledger.entries[name].status === NOT_OK
 		);
+		checked = [...failures];
 		console.log(`Rerunning ${failures.length} failure(s) alone.`);
 		for (const name of failures) delete ledger.entries[name];
 		await runQueue(context, failures, 1, (queue) => queue.splice(0, 1));
@@ -367,7 +410,10 @@ async function main() {
 			`Plan ${selected.length}, left ${queue.length}, ${options.workers} worker(s), run dir ${options.runDir}.`
 		);
 		await runQueue(context, queue, options.workers, (remaining) =>
-			takeChunk(remaining, durations, options)
+			takeChunk(remaining, durations, {
+				...options,
+				chunkSeconds: guidedChunkSeconds(remaining, durations, options.workers, options)
+			})
 		);
 	}
 	for (const [name, entry] of Object.entries(ledger.entries))
@@ -376,14 +422,14 @@ async function main() {
 	for (let id = 1; id <= options.workers; id += 1)
 		fs.rmSync(path.join(options.runDir, `w${id}`), { recursive: true, force: true });
 	console.log(formatReport(ledger, DEFAULTS.reportRows));
-	const failures = selected.filter(
+	const failures = checked.filter(
 		(name) => ledger.entries[name] && ledger.entries[name].status === NOT_OK
 	);
-	const absent = selected.filter((name) => !ledger.entries[name]);
+	const absent = checked.filter((name) => !ledger.entries[name]);
 	for (const name of failures) console.log(`not ok - ${name} ${ledger.entries[name].detail}`);
 	if (absent.length) console.log(`${absent.length} planned test(s) have no result.`);
 	console.log(
-		`${selected.length - failures.length - absent.length}/${selected.length} green. Ledger: ${ledgerFile}`
+		`${checked.length - failures.length - absent.length}/${checked.length} green. Ledger: ${ledgerFile}`
 	);
 	return failures.length || absent.length ? 1 : 0;
 }
@@ -398,4 +444,12 @@ if (require.main === module) {
 	);
 }
 
-module.exports = { parseTap, foldResults, takeChunk, formatReport, parseArguments };
+module.exports = {
+	parseTap,
+	foldResults,
+	takeChunk,
+	guidedChunkSeconds,
+	defaultWorkers,
+	formatReport,
+	parseArguments
+};
