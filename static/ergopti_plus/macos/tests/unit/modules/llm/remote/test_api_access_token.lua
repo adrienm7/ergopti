@@ -7,10 +7,13 @@
 --- Vertex AI) never receives the stored key: the real remote backend exchanges
 --- it for an access token, reuses that token while it is fresh, makes the key
 --- test wait for it, and does not ask the token service again for a minute
---- after a refusal. The HTTP clients are faked.
+--- after a refusal. A Vertex AI service-account key is exchanged for an
+--- RS256-signed assertion, signed one slice per timer tick. The HTTP clients
+--- and the timer are faked.
 ---
 --- ROOT CAUSE ENCODED:
---- Sent as Bearer, the stored key itself was refused with HTTP 401.
+--- Sent as Bearer, the stored key itself was refused with HTTP 401. A
+--- service-account key was refused ("the key holds no client_id field").
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -73,6 +76,44 @@ local function reply(post, status, body)
 	post.callback({ ok = status >= 200 and status < 300, status = status, body = json.encode(body), headers = {} })
 end
 
+--- Replaces the scheduler's after() with a queue while body runs.
+--- @param api table The loaded remote backend.
+--- @param body function body(drain) where drain() runs every queued tick and returns their count.
+local function with_ticks(api, body)
+	local scheduler = find_upvalue(api.prepare_access, "TimerScheduler")
+	assert(type(scheduler) == "table", "TimerScheduler must be reachable")
+	local original, queue = scheduler.after, {}
+	scheduler.after = function(_, fn)
+		queue[#queue + 1] = fn
+		return {}, true
+	end
+	local function drain()
+		local ran = 0
+		while #queue > 0 do
+			table.remove(queue, 1)()
+			ran = ran + 1
+		end
+		return ran
+	end
+	local ok, err = pcall(body, drain)
+	scheduler.after = original
+	if not ok then error(err, 0) end
+end
+
+--- A Google service-account key file holding the corpus's 2048-bit test key.
+--- @return string key, string pem_body
+local function service_account_key()
+	local fh = assert(io.open(SHARED .. "tests/corpus/crypto/rs256_vectors.json", "r"))
+	local spec = json.decode(fh:read("*a")).keys.rsa2048_pkcs8
+	fh:close()
+	local lines = {}
+	for i = 1, #spec.body, 64 do lines[#lines + 1] = spec.body:sub(i, i + 63) end
+	local pem = "-----BEGIN PRIVATE KEY-----\n" .. table.concat(lines, "\n") .. "\n-----END PRIVATE KEY-----\n"
+	return json.encode({ type = "service_account", project_id = "p1", private_key_id = "kid1",
+		private_key = pem, client_email = "sa@p1.iam.gserviceaccount.com",
+		token_uri = "https://attacker.example/token" }), spec.body
+end
+
 local SPEC = { system_prompt = "Reply with exactly: OK", user_text = "ping", temperature = 0, max_tokens = 16 }
 
 
@@ -127,5 +168,26 @@ helpers.describe("Access-token providers (macOS)", function()
 		helpers.assert_eq(#posts, 1, "no second exchange at once")
 		helpers.assert_eq(again[1], false)
 		helpers.assert_eq(again[2], "the token exchange answered HTTP 400")
+	end)
+
+	helpers.it("a Vertex AI service-account key is exchanged for a signed assertion, one slice per tick", function()
+		local api, posts = load_api()
+		with_ticks(api, function(drain)
+			local key, pem_body = service_account_key()
+			local got
+			api.prepare_access("vertex", key, function(ok, reason, token) got = { ok, reason, token } end)
+			helpers.assert_eq(#posts, 0, "nothing is sent before the assertion is signed")
+			local ticks = drain()
+			helpers.assert_true(ticks > 10, "the signature is spread over " .. ticks .. " tick(s)")
+			helpers.assert_eq(#posts, 1)
+			-- The catalogue's address, never the key file's own token_uri
+			helpers.assert_eq(posts[1].url, "https://oauth2.googleapis.com/token")
+			helpers.assert_true(posts[1].body:match("^assertion=[%w_%-]+%.[%w_%-]+%.[%w_%-]+"
+				.. "&grant_type=urn%%3Aietf%%3Aparams%%3Aoauth%%3Agrant%-type%%3Ajwt%-bearer$") ~= nil, posts[1].body)
+			helpers.assert_true(not posts[1].body:find(pem_body:sub(1, 24), 1, true), "the key never leaves")
+			reply(posts[1], 200, { access_token = "ya29.sa", expires_in = 3599 })
+			helpers.assert_eq(got[1], true)
+			helpers.assert_eq(got[3], "ya29.sa")
+		end)
 	end)
 end)

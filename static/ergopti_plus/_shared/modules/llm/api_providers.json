@@ -503,9 +503,21 @@
 				"token_field": "access_token",
 				"expires_field": "expires_in",
 				"default_expires_seconds": 3600,
-				"refresh_margin_seconds": 300
+				"refresh_margin_seconds": 300,
+				"assertion": {
+					"key_type": "service_account",
+					"body": {
+						"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+						"assertion": "{assertion}"
+					},
+					"issuer_field": "client_email",
+					"private_key_field": "private_key",
+					"key_id_field": "private_key_id",
+					"scope": "https://www.googleapis.com/auth/cloud-platform",
+					"lifetime_seconds": 3600
+				}
 			},
-			"_source": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/start/openai (OpenAI-compatible endpoint, Google Cloud access tokens only, reasoning_effort minimal, low, medium, high), https://docs.cloud.google.com/vertex-ai/generative-ai/docs/migrate/openai/auth-and-credentials, https://developers.google.com/identity/protocols/oauth2/web-server#offline (the key is the authorized_user credentials file gcloud auth application-default login writes; a service-account key, which needs a signed JWT, is not taken)"
+			"_source": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/start/openai (OpenAI-compatible endpoint, Google Cloud access tokens only, reasoning_effort minimal, low, medium, high), https://docs.cloud.google.com/vertex-ai/generative-ai/docs/migrate/openai/auth-and-credentials, https://developers.google.com/identity/protocols/oauth2/web-server#offline (an authorized_user credentials file, which gcloud auth application-default login writes, is refreshed), https://developers.google.com/identity/protocols/oauth2/service-account#httprest (a service-account key file is exchanged for a JWT signed RS256 with its private_key: iss client_email, kid private_key_id, scope, aud the token address, exp at most an hour after iat)"
 		},
 		"backboard": {
 			"label": "Backboard",

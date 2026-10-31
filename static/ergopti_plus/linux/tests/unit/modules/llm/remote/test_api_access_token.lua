@@ -7,11 +7,13 @@
 --- Vertex AI) never receives the stored key: the driver exchanges it for an
 --- access token, sends that token as Bearer, refreshes it before it ends,
 --- waits for it in the key test, and does not ask the token service again for
---- a minute after a refusal. The real api_remote runs over a scripted HTTP
---- client.
+--- a minute after a refusal. A Vertex AI service-account key is exchanged
+--- for an RS256-signed assertion, signed one slice per timer tick. The real
+--- api_remote runs over a scripted HTTP client and timer.
 ---
 --- ROOT CAUSE ENCODED:
---- Sent as Bearer, the stored key itself was refused with HTTP 401.
+--- Sent as Bearer, the stored key itself was refused with HTTP 401. A
+--- service-account key was refused ("the key holds no client_id field").
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -27,10 +29,17 @@ local MESSAGES = { { role = "system", content = "S" }, { role = "user", content 
 --- Runs body against the real api_remote over a scripted HTTP client and clock.
 --- @param body function body(remote, calls, clock)
 local function with_remote(body)
-	local names = { "adapters.http_client", "modules.llm.api_remote", "infra.monotonic", "logger.shim" }
+	local names = { "adapters.http_client", "modules.llm.api_remote", "infra.monotonic", "logger.shim",
+		"adapters.timer_scheduler" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-	local calls, clock = {}, { now = 1000 }
+	local calls, clock = {}, { now = 1000, ticks = {} }
+	package.loaded["adapters.timer_scheduler"] = {
+		after = function(_, fn)
+			clock.ticks[#clock.ticks + 1] = fn
+			return { armed = true }
+		end,
+	}
 	package.loaded["adapters.http_client"] = {
 		post = function(url, headers, request_body, callback)
 			calls[#calls + 1] = { url = url, headers = headers, body = request_body, callback = callback }
@@ -70,6 +79,33 @@ local function with_remote(body)
 	end)
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 	if not ok then error(err, 0) end
+end
+
+--- Runs the armed timer callbacks until none is left.
+--- @param clock table
+--- @return integer ticks How many ran.
+local function drain_ticks(clock)
+	local ran = 0
+	while #clock.ticks > 0 do
+		local fn = table.remove(clock.ticks, 1)
+		fn()
+		ran = ran + 1
+	end
+	return ran
+end
+
+--- A Google service-account key file holding the corpus's 2048-bit test key.
+--- @return string key, string pem_body
+local function service_account_key()
+	local fh = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/crypto/rs256_vectors.json", "r"))
+	local spec = Json.decode(fh:read("*a")).keys.rsa2048_pkcs8
+	fh:close()
+	local lines = {}
+	for i = 1, #spec.body, 64 do lines[#lines + 1] = spec.body:sub(i, i + 63) end
+	local pem = "-----BEGIN PRIVATE KEY-----\n" .. table.concat(lines, "\n") .. "\n-----END PRIVATE KEY-----\n"
+	return Json.encode({ type = "service_account", project_id = "p1", private_key_id = "kid1",
+		private_key = pem, client_email = "sa@p1.iam.gserviceaccount.com",
+		token_uri = "https://attacker.example/token" }), spec.body
 end
 
 --- Answers call `index` with a status and a JSON body.
@@ -194,6 +230,32 @@ helpers.describe("Access-token providers: the shipped rows", function()
 			helpers.assert_nil(remote.endpoint(entry, entry.model))
 			helpers.assert_eq(calls[1].url, "https://oauth2.googleapis.com/token")
 			helpers.assert_eq(calls[1].body, "client_id=cid&client_secret=cs&grant_type=refresh_token&refresh_token=rt")
+		end)
+	end)
+
+	helpers.it("a Vertex AI service-account key is exchanged for a signed assertion, one slice per tick", function()
+		with_remote(function(remote, calls, clock)
+			local key, pem_body = service_account_key()
+			local entry = { id = "sa", provider = "vertex", model = "google/gemini-3.5-flash", token = key,
+				base_url = "https://aiplatform.googleapis.com/v1/projects/p1/locations/global/endpoints/openapi" }
+			local ready
+			remote.prepare_access(entry, function(ok, reason) ready = { ok, reason } end)
+			helpers.assert_eq(#calls, 0, "nothing is sent before the assertion is signed")
+			helpers.assert_nil(ready)
+			local ticks = drain_ticks(clock)
+			helpers.assert_true(ticks > 10, "the signature is spread over " .. ticks .. " tick(s)")
+			helpers.assert_eq(#calls, 1, table.concat(clock.logs, " | "))
+			-- The catalogue's address, never the key file's own token_uri
+			helpers.assert_eq(calls[1].url, "https://oauth2.googleapis.com/token")
+			helpers.assert_true(calls[1].body:match("^assertion=[%w_%-]+%.[%w_%-]+%.[%w_%-]+"
+				.. "&grant_type=urn%%3Aietf%%3Aparams%%3Aoauth%%3Agrant%-type%%3Ajwt%-bearer$") ~= nil, calls[1].body)
+			for _, line in ipairs(clock.logs) do
+				helpers.assert_true(not line:find(pem_body:sub(1, 24), 1, true), "no log line holds the private key")
+			end
+			answer(calls, 1, 200, { access_token = "ya29.sa", expires_in = 3599 })
+			helpers.assert_eq(ready[1], true)
+			local endpoint = remote.endpoint(entry, entry.model)
+			helpers.assert_eq(endpoint.headers.Authorization, "Bearer ya29.sa")
 		end)
 	end)
 end)
