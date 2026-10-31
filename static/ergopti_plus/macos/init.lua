@@ -375,6 +375,12 @@ if config_paths_ready ~= true then
 	abort_pre_runtime_boot("config_paths", CONFIG_PATH_BOOT_FAILURE, "dialog.fatal_error.cannot_start")
 	return
 end
+-- config.toml's [script] rows (locale, log level, error window) win over the
+-- saved values at start, as on Windows. i18n started above from the saved
+-- locale, before the config path existed, so it adopts the configured one now,
+-- before any menu is built.
+require("infra.script_scope").adopt_configured()
+i18n.adopt_saved_locale()
 -- Configuration consumers may perform reads during require; path ownership comes first.
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")

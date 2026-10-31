@@ -11,14 +11,57 @@ local ConfigKeys = require("config_keys")
 local _owner, _sequence = nil, 0
 require("infra.scope_registry").register("script_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
+--- Native storage alias of each directly declared script row.
+local ALIAS_NAMES = {
+	[ConfigKeys.KEY.SCRIPT_LOCALE] = "locale",
+	[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = ConfigKeys.KEY.SCRIPT_LOG_LEVEL,
+	[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG,
+}
+
+--- Native field owner module of each directly declared script row.
+local NATIVE_OWNERS = {
+	[ConfigKeys.KEY.SCRIPT_LOCALE] = "infra.i18n",
+	[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = "infra.script_settings",
+	[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = "ui.error_dialog.bridge",
+}
+
 --- Binds the actual native aliases; policy and available rows come from metadata.
 --- @return table aliases Canonical path -> native alias/field owner.
 local function aliases()
-	return {
-		[ConfigKeys.KEY.SCRIPT_LOCALE] = { alias = "locale", native = require("infra.i18n") },
-		[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = { alias = ConfigKeys.KEY.SCRIPT_LOG_LEVEL, native = require("infra.script_settings") },
-		[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = { alias = ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG, native = require("ui.error_dialog.bridge") },
-	}
+	local bound = {}
+	for path, alias in pairs(ALIAS_NAMES) do bound[path] = { alias = alias, native = require(NATIVE_OWNERS[path]) } end
+	return bound
+end
+
+--- Returns the native alias names alone, without loading their field owners,
+--- for the start adoption that runs before those owners initialise.
+--- @return table aliases Canonical path -> { alias }.
+function M.alias_names()
+	local names = {}
+	for path, alias in pairs(ALIAS_NAMES) do names[path] = { alias = alias } end
+	return names
+end
+
+--- Makes config.toml's [script] rows win over the saved values at start.
+--- Runs before the error window, the log level and i18n read their alias.
+--- @return table|nil adopted Canonical path -> adopted value.
+function M.adopt_configured()
+	return require("script_config_authority").adopt({
+		path = require("infra.config_paths").config("config.toml"), manifest = Manifest, platform = "linux",
+		aliases = M.alias_names(), storage = require("adapters.storage"), logger = Logger, log = "infra.script_scope" })
+end
+
+--- Rewrites the config.toml row a menu or wizard change replaces, when the
+--- file holds it, so the next start keeps the change. Call before storing it.
+--- @param path string Canonical script path.
+--- @param value any New value.
+--- @return boolean committed
+function M.rewrite_configured(path, value)
+	assert(ALIAS_NAMES[path] ~= nil, "not a native script row: " .. tostring(path))
+	local committed, detail = require("script_config_authority").rewrite({
+		path = require("infra.config_paths").config("config.toml"), manifest = Manifest, key = path, value = value })
+	if committed ~= true then Logger.error("infra.script_scope", "%s was not changed: %s.", path, tostring(detail)) end
+	return committed == true
 end
 
 --- Creates the direct participant's existing file transaction and native fences.
