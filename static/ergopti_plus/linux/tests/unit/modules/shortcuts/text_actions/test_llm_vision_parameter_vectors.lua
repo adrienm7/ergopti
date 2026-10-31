@@ -143,7 +143,7 @@ helpers.describe("llm_vision parameter: what the binding editors show", function
 
 	-- Local API capabilities extend the ordinary provider list in shared order.
 	local local_catalogue = read_json("modules/llm/local_servers.json")
-	for _, id in ipairs({ "omlx", "lmstudio", "llamacpp", "jan" }) do
+	for _, id in ipairs(local_catalogue.server_order) do
 		vision_ids[#vision_ids + 1] = id
 		providers.providers[id] = { label = local_catalogue.servers[id].label, format = "openai" }
 	end
