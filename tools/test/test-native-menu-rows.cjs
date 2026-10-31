@@ -175,9 +175,9 @@ function admittedSourceRetirements(driver, traversed) {
 		'_LLM_Menu_LiveModeRows',
 		'_LLM_Menu_MakeLiveModeHandler'
 	]);
-	const declarations = path.join(SP, '_shared/modules/features/manifest.toml');
+	// The menu declarations live in the tray-menu source, beside the compiled file.
 	const compiled = path.join(SP, '_shared/modules/menu/menu_manifest.json');
-	const toml = fs.readFileSync(declarations, 'utf8');
+	const toml = require('../lib/menu-source.cjs').readMenuSource();
 	assert.ok(toml.trim(), 'retired live-menu admission requires nonempty source declarations');
 	const manifest = JSON.parse(fs.readFileSync(compiled, 'utf8'));
 	assert.ok(
