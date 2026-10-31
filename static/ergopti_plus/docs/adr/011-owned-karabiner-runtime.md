@@ -56,6 +56,16 @@ handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
    Confirmed by the maintainer on 2026-10-27 under the owned-runtimes rule
    (`docs/design/owned-runtimes.md`): Tap-Hold on quits the user's Karabiner;
    Tap-Hold off never activates the owned runtime beside theirs.
+   **Revised by the maintainer on 2026-10-31**, superseding the Tap-Hold
+   trigger and the option: the rule follows Ergopti running. While Ergopti runs
+   and is not paused it always uses its own runtime and closes a running user
+   Karabiner-Elements, and tells the user so; paused or quit, it stops its
+   runtime and restarts the user's Karabiner if, and only if, it closed it. A
+   persisted marker records the close, so a crash or a forced quit still gives
+   it back. No menu switch takes part; `[karabiner] close_other_instances` is
+   retired and only reported as outdated. Because one Lua VM cannot start a
+   second capture (decision 8), a resume after a pause reloads the driver.
+   The owner is `platform/remap/runtime_activation.lua`.
 4. **Branding and signing (question 2).** The pqrs branding of the
    VirtualHIDDevice (hidden manager application, notification, Driver
    Extensions entry) is acceptable. Ergopti does not get an Apple Developer ID:
