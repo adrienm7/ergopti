@@ -344,8 +344,8 @@ The rows in state `to do` are the work; this is the order.
    found (off without one), and check `/usr/bin/curl` once with a clear
    refusal.
 5. Windows: WebView2 stays the system Evergreen runtime (decided 2026-10-27),
-   with a minimum-version check and a clear refusal; pin `curl.exe`; keep
-   PowerShell 5.1 as a checked system dependency.
+   with a minimum-version check and a clear refusal; keep `curl.exe`
+   (decided 2026-11-01) and PowerShell 5.1 as checked system dependencies.
 6. Done: the rows are the machine-readable registry
    `_shared/data/owned_runtimes.json`, which both the generated tables and
    `tools/test/test-owned-runtimes-inventory.cjs` read; the test fails when a
