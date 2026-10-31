@@ -1458,7 +1458,7 @@
 	"menu.gestures.recommended_info": "Info…",
 	"menu.gestures.recommended_reason_linux": "On Linux, three- and four-finger swipes are not recommended: the touchpad is read, not grabbed, so your desktop (GNOME, KDE, Hyprland, COSMIC) also acts on them.",
 	"menu.gestures.recommended_reason_macos": "On macOS, the three-finger tap is also the system's Look up: turn Look up off in the Trackpad settings before using it, otherwise both actions run.",
-	"menu.gestures.recommended_reason_windows": "On Windows, a gesture can be used only while the touchpad settings send it to Ergopti. Ergopti sets this up itself (Configure automatically); a gesture that is not assigned is greyed out. Ergopti replaces the system's action: no double action.",
+	"menu.gestures.recommended_reason_windows": "On Windows, a gesture can be used only while the touchpad settings send it to Ergopti. Ergopti sets this up itself (Auto-configure); a gesture that is not assigned is greyed out. Ergopti replaces the system's action: no double action.",
 	"menu.gestures.manual_tutorial": "📋 Manual setup tutorial",
 	"menu.gestures.mode_incremental": "Incremental send (distance)",
 	"menu.gestures.mode_prefix": "Mode: ",
