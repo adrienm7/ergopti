@@ -268,7 +268,7 @@ function M.register(helpers, driver)
 							builds = builds + 1; return { menu = child }
 						end }, { state_getters = { ready = function() reads = reads + 1; return state end } })
 						helpers.assert_eq(#rows, 1)
-						local caption = ({ en = "✨ Artificial intelligence", fr = "✨ Intelligence artificielle" })[language]
+						local caption = ({ en = "✨ Artificial Intelligence", fr = "✨ Intelligence Artificielle" })[language]
 						local reason = ({ en = "AI unavailable", fr = "IA indisponible" })[language]
 						helpers.assert_eq(rows[1].title, state and caption or (caption .. " — " .. reason))
 						if state then helpers.assert_nil(rows[1].disabled) else helpers.assert_eq(rows[1].disabled, true) end
@@ -287,7 +287,7 @@ function M.register(helpers, driver)
 					return { menu = child, disabled = true }
 				end }, { state_getters = { ready = function() return true end } })
 				helpers.assert_eq(#rows, 1); helpers.assert_eq(rows[1].disabled, true)
-				helpers.assert_eq(rows[1].title, "✨ Artificial intelligence")
+				helpers.assert_eq(rows[1].title, "✨ Artificial Intelligence")
 				helpers.assert_true(rawequal(rows[1].menu, child))
 			end)
 		end)
