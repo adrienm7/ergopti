@@ -203,6 +203,38 @@ local function route_plan(callback)
 	dispatch(1)
 end
 
+--- The installed relay beside the launcher in the application bundle; nil in a
+--- source checkout, where the relay is not built.
+--- @return string|nil path
+local function relay_executable()
+	local launcher = require("platform.remap.lease_helper").resolve()
+	if not launcher then return nil end
+	local path = NativePath.dirname(launcher) .. "/" .. require("network.proxy_auth_relay").EXECUTABLE_NAME
+	return FileSystem.exists(path) and path or nil
+end
+
+--- Probes the relay the route plan selected for the registry, as the daemon's
+--- start would (docs/design/proxy-auth-relay.md). The answer is the shared
+--- policy's: not needed, required with its scheme, or a closed refusal.
+--- @param upstream string Plain http relay (policy.upstream()).
+--- @param callback function fn(answer|nil, reason|nil).
+local function relay_probe(upstream, callback)
+	local NetworkEnv = require("modules.llm.network_env")
+	local policy = NetworkEnv.proxy_auth_relay()
+	local origins = NetworkEnv.route_origins("ollama")
+	local executable = relay_executable()
+	if not policy or not origins or not executable then return callback(nil, "relay_unavailable") end
+	local Timings = require("infra.timings")
+	local args = policy.probe_args(upstream, policy.authority(origins[1]), {
+		dial_ms = Timings.ms("adapters", "proxy_relay_dial_timeout_ms"),
+		handshake_ms = Timings.ms("adapters", "proxy_relay_handshake_timeout_ms"),
+	})
+	if not args then return callback(nil, "relay_unavailable") end
+	exec(executable, args, Timings.sec("adapters", "proxy_relay_probe_timeout_ms"), function(code, output)
+		callback(policy.read_probe(code, output))
+	end)
+end
+
 --- Measures how late the timer service fires.
 --- @param seconds number Delay asked of the timer.
 --- @param callback function fn(late_ms) with the lateness in milliseconds.
@@ -336,6 +368,8 @@ function M.new()
 		blob_host = function(model, callback) return network_chain(callback, { "--ollama-blob", model }, 40) end,
 		smallest_ollama_model = function() return M.smallest_model("ollama") end,
 		route_plan = route_plan,
+		relay_probe = relay_probe,
+		relay_policy = function() return require("modules.llm.network_env").proxy_auth_relay() end,
 		timer_probe = timer_probe,
 		after = function(seconds, callback)
 			local _, committed = Timer.after(seconds, callback)

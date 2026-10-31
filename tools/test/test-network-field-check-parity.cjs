@@ -62,7 +62,7 @@ check('Windows reports the same steps in the same order as macOS and Linux', () 
 const planSteps = identities(/M\.PLAN_STEPS = \{([^}]*)\}/.exec(luaSource)?.[1] ?? '');
 
 check('the macOS and Linux only steps are declared apart from the shared list', () => {
-	assert.deepEqual(planSteps, ['route_plan']);
+	assert.deepEqual(planSteps, ['route_plan', 'proxy_relay']);
 	for (const step of planSteps)
 		assert.equal(luaSteps.includes(step), false, `${step} is in the Windows list`);
 });
