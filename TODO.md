@@ -219,6 +219,12 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      settings file, listening port, then `GET /models`), names each server as `server_<id>`:
      `up:<port source>:<models>`, `not_running:<port source>`, `needs_key:...` or `no_answer:...`. A
      server added to the shared list is reported by the next run with no driver change.
+   - `field_pac_fallback` (after the AI downloads): one `awk` pass over today's log counts the PAC-then-direct
+     lines every writer prints (shell admission, Swift spool, Python receiver, Ollama pull):
+     `pac_fallback_counts` is `warnings:worked:failed`, `pac_fallback_stages` the stages named;
+     `pac_fallback_outcome` is `no_pac_failure` (information) on a network whose PAC works, passes as
+     `direct_worked`, and fails on `no_outcome`, `direct_failed` or `unlisted_stage:<stage>` (a stage outside
+     `proxy_policy.json` `pac_unavailable_fallback`).
    - `field_layout_rows` (after `field_idle_cost`): from the Ergo-L file the app ships, a loose layout typing
      the symbols first is written as `~/Library/Keyboard Layouts/ErgoptiFieldRows-<n>.keylayout` under a new
      name and id, enabled through the enabled-sources preference, selected, and read back from a fresh
@@ -1088,8 +1094,8 @@ Not started:
       The daemon start now looks up every inventory origin (it read only the single-origin variable,
       so `pac_probe_client = "ollama"` never resolved at start; fixed with the fallback below).
       Windows (30 Oct): the launcher looks up both `route_origins.json` "ollama" origins natively and starts the daemon with HTTPS_PROXY/NO_PROXY from the shared route plan (57276199); a relay demanding a Windows login is never exported and the pull refuses with a named reason, the start stays (local models offline). Left: [PHYS-W] a pull behind a PAC; maintainer decision: an option for NTLM relays (a local authenticating forwarder, or none).
-- [ ] **PAC unusable: direct fallback (maintainer decision).** [CODE] [PHYS-M] macOS done on branch
-      `tmp/wip-pac-fallback`: when the PAC or WPAD route lookup fails at a stage listed in
+- [ ] **PAC unusable: direct fallback (maintainer decision).** [CODE] [PHYS-M] macOS done on dev
+      (7634296b28, cbaa14ad46, 7af4e65b10): when the PAC or WPAD route lookup fails at a stage listed in
       `proxy_policy.json` `pac_unavailable_fallback` (PAC download, evaluation, WPAD discovery, lookup
       budget, empty route), `network-retry.sh`, the Swift spool and native worker, and the Python
       receiver go direct (no relay, loopback exclusions kept) with one WARNING naming the stage, then
@@ -1098,10 +1104,10 @@ Not started:
       `info direct_pac_download` (or the stage met). Decision: an explicit inherited relay
       (`HTTPS_PROXY` and the others) wins and never falls back; a relay the PAC names that then fails
       is NOT retried direct (only the PAC's own list, such as `PROXY a; DIRECT`, is followed), on
-      every OS. Mac must confirm: on the company network, an Ollama pull and the MLX install log the
-      WARNING with `native_pac_download` or `native_pac_evaluation`, then the direct success line (or
-      the two-cause error), Debug > Test network shows the `route_lookup` info step, and the Swift
-      change compiles in the macOS cell. Linux follows it for the Ollama daemon start (fe9199b9, 838af0c0:
+      every OS. Mac: the field run proves it with no hands, `field_pac_fallback` (the WARNING with its stage,
+      then the direct success line or the two-cause error, after the field run's own Ollama and MLX downloads;
+      `no_pac_failure` on a network whose PAC works) and `field_network` (the `route_lookup` info step); left
+      [CI] the Swift change compiles in the macOS cell. Linux follows it for the Ollama daemon start (fe9199b9, 838af0c0:
       the shared policy's `falls_back_direct` read by `managed_ollama_proxy.lua`): a GIO lookup that
       fails or times out sends that origin direct with a WARNING naming `native_proxy_lookup` or
       `native_proxy_budget`; a pull that daemon then fails to fetch shows

@@ -208,6 +208,13 @@
 			"proves": "The MLX model download and serve path works with the smallest installed catalogue model, and the active-model file is put back."
 		},
 		{
+			"id": "field_pac_fallback",
+			"kind": "field_check",
+			"check": "pac_fallback",
+			"deadline_seconds": 20,
+			"proves": "Each AI download whose PAC or WPAD could not be used named a pac_unavailable_fallback stage, then logged that the direct connection worked; a working PAC reports no_pac_failure."
+		},
+		{
 			"id": "field_ai_local",
 			"kind": "field_check",
 			"check": "ai_local",
