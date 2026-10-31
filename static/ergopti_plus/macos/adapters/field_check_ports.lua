@@ -271,7 +271,7 @@ local function owned_readiness(callback)
 end
 
 --- The owned runtime's activation rule, driven by the field run
---- (infra/field_check_owned_activation.lua): the switch it flips, the owner's
+--- (infra/field_check_owned_activation.lua): the pause it takes, the owner's
 --- state and the user Karabiner it may close and give back.
 --- @return table port
 local function owned_activation()
@@ -286,8 +286,10 @@ local function owned_activation()
 		selected = function()
 			return type(Remap().owned_runtime_selected) == "function" and Remap().owned_runtime_selected() == true
 		end,
-		tap_holds = function() return Remap().get_tap_holds_enabled() == true end,
-		set_tap_holds = function(value) return Remap().set_tap_holds_enabled(value) == true end,
+		paused = function() return require("modules.shortcuts.script_control").is_paused() == true end,
+		-- The same transactional pause and resume as the pause key.
+		pause = function() return require("modules.shortcuts.script_control").pause_all() end,
+		resume = function() return require("modules.shortcuts.script_control").resume_all() end,
 		owner_state = function() return owner_status().state end,
 		owner_reason = function() return owner_status().reason end,
 		fetch = function(callback) require("adapters.runtime_owner_ports").fetch_artifact(callback) end,
@@ -341,6 +343,8 @@ function M.new()
 		end,
 		owned_readiness = owned_readiness,
 		owned_activation = owned_activation(),
+		-- Work that must wait until the field run has written its results.
+		after_run = function(work) return require("infra.field_run").after_run(work) end,
 		app_path = app_path,
 		login_startup_status = login_startup_status,
 		input_monitoring_access = input_monitoring_access,
