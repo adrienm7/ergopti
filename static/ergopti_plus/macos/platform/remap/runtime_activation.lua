@@ -3,28 +3,29 @@
 --- ==============================================================================
 --- MODULE: Owned Runtime Activation Rule
 --- DESCRIPTION:
---- The one place that decides whether Ergopti's own Karabiner runtime runs
---- (ADR 011 decisions 2 and 3, confirmed by the maintainer on 2026-10-27 and
---- 2026-10-31):
----   - Tap-Hold on: Ergopti closes the user's own Karabiner-Elements through
----     its consented closer and runs its own runtime;
----   - Tap-Hold off: Ergopti never activates its runtime, and the user's own
----     Karabiner stays untouched;
----   - turning Tap-Hold off (or Ergopti stopping) restores the user's Karabiner
----     if, and only if, Ergopti closed it.
+--- The one place that decides whether Ergopti's own Karabiner runtime runs.
+--- The maintainer's rule of 2026-10-31 (ADR 011 decision 3, as revised) ties it
+--- to Ergopti running, not to any menu switch:
+---   - Ergopti running and not paused: its own runtime is active, and a user
+---     Karabiner-Elements that runs is closed through Karabiner's own quit;
+---   - Ergopti paused or quit: its runtime stops, and the user's Karabiner is
+---     given back if, and only if, Ergopti closed it.
 ---
 --- FEATURES & RATIONALE:
---- 1. One Predicate: `wanted` is the single definition of « Tap-Hold on »:
----    « Ergopti uses Karabiner » and the Tap-Hold switch are both on.
+--- 1. One Predicate: `wanted` is running and not paused, nothing else.
 --- 2. Only What We Closed: the closer given to the runtime owner is wrapped so
----    that a successful close writes a persisted marker; the restore runs only
----    when that marker exists and clears it once Karabiner's own registration
----    step succeeded. A user who never ran Karabiner, or quit it themselves,
----    never sees it started by Ergopti.
---- 3. Crash Safe: the marker is a file, so a boot after a crash with Tap-Hold
----    off still gives the user their Karabiner back.
---- 4. Ports Only: the owner, the closer, the marker and the options are ports,
----    so the whole rule is tested with fakes.
+---    that a successful close writes a persisted marker and tells the user;
+---    the restore runs only when that marker exists and clears it once
+---    Karabiner's own registration step succeeded. A user who never ran
+---    Karabiner, or quit it themselves, never sees it started by Ergopti.
+--- 3. Crash Safe: the marker is a file, so after a crash or a forced quit the
+---    next start still knows that the user's Karabiner is Ergopti's to give
+---    back, at the next pause or quit.
+--- 4. One Capture Per Lua VM: the launcher's capture session cannot start twice
+---    in one Lua VM (ADR 011 decision 8), so a resume after a stop asks for a
+---    reload, and the reloaded driver starts the runtime as it starts on boot.
+--- 5. Ports Only: the owner, the closer, the marker, the notifier and the
+---    reload are ports, so the whole rule is tested with fakes.
 --- ==============================================================================
 
 local M = {}
@@ -33,20 +34,24 @@ local Logger = require("infra.logger")
 
 local LOG = "remap.runtime_activation"
 
---- Whether the owned runtime should run for these settings.
---- @param state table|nil Bridge settings ({ enabled, tap_holds_enabled }).
+local ACTIVE = { starting = true, admitted = true, peers_starting = true, ready = true, stopping = true }
+
+--- Whether the owned runtime should run.
+--- @param lifecycle table|nil { running = boolean, paused = boolean }.
 --- @return boolean wanted
-function M.wanted(state)
-	return type(state) == "table" and state.enabled == true and state.tap_holds_enabled ~= false
+function M.wanted(lifecycle)
+	return type(lifecycle) == "table" and lifecycle.running == true and lifecycle.paused ~= true
 end
 
---- Wraps a closer so that a successful close is remembered in the marker.
+--- Wraps a closer so that a successful close is remembered and announced.
 --- @param close function fn(callback(ok)) Karabiner's own quit.
 --- @param marker table { set } port.
+--- @param announce function|nil fn() telling the user their Karabiner was closed.
 --- @return function close Same contract.
-function M.remembering_close(close, marker)
+function M.remembering_close(close, marker, announce)
 	assert(type(close) == "function", "Missing Karabiner closer")
 	assert(type(marker) == "table" and type(marker.set) == "function", "Missing closed-Karabiner marker")
+	assert(announce == nil or type(announce) == "function", "Invalid closed-Karabiner announcement")
 	return function(callback)
 		close(function(ok)
 			if ok == true then
@@ -55,6 +60,10 @@ function M.remembering_close(close, marker)
 						.. "it will not be restored automatically.")
 				else
 					Logger.info(LOG, "Recorded that Ergopti closed the user's Karabiner.")
+				end
+				if announce then
+					local shown, failure = pcall(announce)
+					if not shown then Logger.error(LOG, "The closed-Karabiner notice failed: %s.", tostring(failure)) end
 				end
 			end
 			callback(ok)
@@ -67,8 +76,8 @@ end
 ---   owner: platform/remap/runtime_owner.lua (start, stop, status);
 ---   restore(fn(ok)): Karabiner's own registration of its core agents;
 ---   marker: { get() -> boolean, clear() -> boolean };
----   close_other_instances() -> boolean, the user's consent.
---- @param ports table owner, restore, marker, close_other_instances.
+---   reload(): asks for a reload of the driver, the only way to start a second capture.
+--- @param ports table owner, restore, marker, reload.
 --- @return table activation { reconcile, restore_if_closed }.
 function M.new(ports)
 	assert(type(ports) == "table", "Missing activation ports")
@@ -77,16 +86,16 @@ function M.new(ports)
 	assert(type(ports.restore) == "function", "Missing Karabiner restore port")
 	assert(type(ports.marker) == "table" and type(ports.marker.get) == "function"
 		and type(ports.marker.clear) == "function", "Missing closed-Karabiner marker")
-	assert(type(ports.close_other_instances) == "function", "Missing close option port")
+	assert(type(ports.reload) == "function", "Missing driver reload port")
 	local activation = {}
 	local restoring = false
+	local started_once = false
 
 	--- Gives the user's Karabiner back when Ergopti closed it.
 	--- @param callback function|nil fn(restored|nil): true restored, false refused, nil nothing to do.
 	function activation.restore_if_closed(callback)
 		local done = callback or function() end
-		if ports.marker.get() ~= true then return done(nil) end
-		if restoring then return done(nil) end
+		if ports.marker.get() ~= true or restoring then return done(nil) end
 		restoring = true
 		Logger.start(LOG, "Restoring the user's Karabiner, which Ergopti closed…")
 		ports.restore(function(ok)
@@ -103,33 +112,36 @@ function M.new(ports)
 		end)
 	end
 
-	--- Brings the runtime in line with the settings.
-	--- @param wanted boolean Result of M.wanted for the current settings.
+	--- Brings the runtime in line with the lifecycle.
+	--- @param wanted boolean Result of M.wanted.
 	--- @param on_admitted function|nil fn() called once when a start is admitted.
-	--- @return string action `start`, `starting`, `stop` or `idle`.
+	--- @return string action `start`, `starting`, `reload`, `stop` or `idle`.
 	function activation.reconcile(wanted, on_admitted)
 		local state = ports.owner.status().state
 		if wanted then
-			if state == "starting" or state == "admitted" or state == "peers_starting" or state == "ready" then
-				return "starting"
+			if ACTIVE[state] and state ~= "stopping" then return "starting" end
+			if started_once then
+				-- This VM already ran a capture: only a reloaded driver can start one.
+				Logger.info(LOG, "Ergopti resumes: reloading to start its own Karabiner runtime again.")
+				ports.reload()
+				return "reload"
 			end
-			Logger.info(LOG, "Tap-Hold is on: running Ergopti's own Karabiner runtime.")
-			local accepted = ports.owner.start({ close_other_instances = ports.close_other_instances() == true },
-				function(admitted)
-					if admitted == true and on_admitted then on_admitted() end
-				end)
+			Logger.info(LOG, "Ergopti runs: starting its own Karabiner runtime.")
+			local accepted = ports.owner.start({ close_other_instances = true }, function(admitted)
+				if admitted ~= true then return end
+				-- Only an admitted runtime goes on to its capture, the part that cannot start twice.
+				started_once = true
+				if on_admitted then on_admitted() end
+			end)
 			if accepted ~= true then Logger.error(LOG, "The owned runtime refused to start in state %s.", state) end
 			return "start"
 		end
-		local active = state ~= "idle" and state ~= "stopped" and state ~= "uninitialized"
-			and state ~= "unavailable" and state ~= "failed"
-		if active then
-			Logger.info(LOG, "Tap-Hold is off: stopping Ergopti's own Karabiner runtime.")
+		if ACTIVE[state] then
+			Logger.info(LOG, "Ergopti pauses: stopping its own Karabiner runtime.")
 			-- The owner calls this once its capture is observed retired, even when that is at once.
 			ports.owner.stop(function() activation.restore_if_closed() end)
 			return "stop"
 		end
-		-- Nothing of ours runs; a crash may still have left the user's Karabiner closed.
 		activation.restore_if_closed()
 		return "idle"
 	end

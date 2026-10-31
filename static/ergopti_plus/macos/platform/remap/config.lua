@@ -115,15 +115,11 @@ local INTEGRATION_KEY = "integration_enabled"
 M.RUNTIME_DEFAULT = KePaths.RUNTIME_SHARED
 local RUNTIME_KEY = "runtime"
 
---- Hidden `[karabiner] close_other_instances`: whether the owned runtime may ask
---- an official Karabiner-Elements that is running to quit (ADR 011, decision 3).
---- It is the user's consent: `true` (the absent default, as the maintainer
---- decided) lets the owned runtime close it, `false` makes the owned runtime
---- report `other_karabiner_running` instead. It is a Tap-Holds menu row on an
---- owned boot only; a value that is not a boolean refuses the file. It is
---- written only once it differs from the default or is already in the file.
-M.CLOSE_OTHER_INSTANCES_DEFAULT = true
-local CLOSE_OTHER_KEY = "close_other_instances"
+-- `[karabiner] close_other_instances` was the hidden consent of the owned
+-- runtime's closer until the maintainer's rule of 2026-10-31 (ADR 011): while
+-- Ergopti runs it always closes the user's Karabiner and gives it back on pause
+-- or quit. A file that still carries the key is told so; it decides nothing.
+local RETIRED_CLOSE_OTHER_KEY = "close_other_instances"
 -- Builds before 2026-09-22 defaulted to off and wrote `[karabiner] enabled =
 -- false` on first launch; later builds ignored it. It is not the user's
 -- answer to the switch, so it is ignored and retained until explicit cleanup.
@@ -136,6 +132,10 @@ local function report_retired_integration(integration, path)
 	if type(integration) == "table" and integration[LEGACY_INTEGRATION_KEY] ~= nil then
 		Outdated.report_in_file(path, { INTEGRATION_SECTION, LEGACY_INTEGRATION_KEY },
 			"the retired integration key is ignored; integration_enabled owns consent", Logger)
+	end
+	if type(integration) == "table" and integration[RETIRED_CLOSE_OTHER_KEY] ~= nil then
+		Outdated.report_in_file(path, { INTEGRATION_SECTION, RETIRED_CLOSE_OTHER_KEY },
+			"the retired close consent is ignored; Ergopti closes the user's Karabiner while it runs", Logger)
 	end
 end
 
@@ -580,16 +580,6 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		end
 		runtime = value
 	end
-	local close_other_instances = M.CLOSE_OTHER_INSTANCES_DEFAULT
-	if integration ~= nil and integration[CLOSE_OTHER_KEY] ~= nil then
-		local value = integration[CLOSE_OTHER_KEY]
-		if type(value) ~= "boolean" then
-			Logger.error(LOG, "[%s] %s in '%s' must be true or false, got %s — refusing the unsafe user config.",
-				INTEGRATION_SECTION, CLOSE_OTHER_KEY, user_config_path, tostring(value))
-			return nil, "error"
-		end
-		close_other_instances = value
-	end
 	report_retired_integration(integration, user_config_path)
 
 	-- Saves are sparse against the neutral state: an absent table, key, slot or
@@ -701,7 +691,6 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	return {
 		enabled                   = integration_enabled,
 		runtime                   = runtime,
-		close_other_instances     = close_other_instances,
 		tap_holds_enabled         = tap_holds_enabled,
 		mod_combos_enabled        = mod_combos_enabled,
 		tap_hold_config           = tap_hold_config,
@@ -907,14 +896,6 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		if state.enabled ~= nil then
 			assert(type(state.enabled) == "boolean", "the Karabiner integration switch must be a boolean")
 			table_at(document, INTEGRATION_SECTION)[INTEGRATION_KEY] = state.enabled
-		end
-		-- The close consent is written once the user changed it, and kept in sync after.
-		if state.close_other_instances ~= nil then
-			assert(type(state.close_other_instances) == "boolean", "the close consent must be a boolean")
-			if state.close_other_instances ~= M.CLOSE_OTHER_INSTANCES_DEFAULT
-				or (type(integration) == "table" and integration[CLOSE_OTHER_KEY] ~= nil) then
-				table_at(document, INTEGRATION_SECTION)[CLOSE_OTHER_KEY] = state.close_other_instances
-			end
 		end
 		if not preserve_array(document.tap_holds, { ConfigKeys.KEY.TAP_HOLDS },
 			(state.tap_holds_enabled == nil or state.tap_holds_enabled == Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED))

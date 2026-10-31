@@ -3,16 +3,18 @@
 --- ==============================================================================
 --- MODULE: Owned Runtime Activation Rule
 --- DESCRIPTION:
---- Pins platform/remap/runtime_activation.lua, the maintainer's rule for a Mac
---- that may already run its own Karabiner-Elements: Tap-Hold on closes theirs
---- (with consent) and runs Ergopti's; Tap-Hold off never runs Ergopti's and
---- leaves theirs untouched; turning Tap-Hold off gives theirs back if Ergopti
---- closed it, and only then.
+--- Pins platform/remap/runtime_activation.lua, the maintainer's rule of
+--- 2026-10-31 for a Mac that may already run its own Karabiner-Elements: while
+--- Ergopti runs and is not paused, Ergopti's runtime is active and theirs is
+--- closed; paused or quit, Ergopti's stops and theirs comes back if Ergopti
+--- closed it, and only then. No menu switch takes part.
 ---
 --- ROOT CAUSES ENCODED: (a) a restore without a record of the close would
 --- start a Karabiner the user had quit themselves; (b) a stop that forgot the
 --- restore would leave the user without their own rules; (c) a crash between
---- the close and the restore must not lose the record.
+--- the close and the restore must not lose the record; (d) a second capture
+--- cannot start in one Lua VM, so a resume after a stop must reload instead of
+--- failing with capture_start_refused.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -26,13 +28,13 @@ local function fake(initial_state)
 	package.loaded["platform.remap.runtime_activation"] = nil
 	local Activation = require("platform.remap.runtime_activation")
 	local world = { state = initial_state or "idle", starts = {}, stops = 0, restores = 0, marker = false,
-		restore_result = true, consent = true }
+		restore_result = true, reloads = 0, admit = true }
 	local owner = {
 		status = function() return { state = world.state } end,
 		start = function(options, on_settled)
 			world.starts[#world.starts + 1] = options
-			world.state = "starting"
-			world.settle_start = on_settled
+			world.state = world.admit and "ready" or "unavailable"
+			on_settled(world.admit)
 			return true
 		end,
 		stop = function(observer)
@@ -52,7 +54,7 @@ local function fake(initial_state)
 			get = function() return world.marker end,
 			clear = function() world.marker = false; return true end,
 		},
-		close_other_instances = function() return world.consent end,
+		reload = function() world.reloads = world.reloads + 1 end,
 	})
 	return activation, world, Activation
 end
@@ -67,13 +69,14 @@ end
 -- ================================
 -- ================================
 
-helpers.describe("owned runtime activation: what Tap-Hold on means", function()
-	helpers.it("is on only when Ergopti uses Karabiner and Tap-Hold is on", function()
+helpers.describe("owned runtime activation: what « wanted » means", function()
+	helpers.it("is running and not paused, and nothing else", function()
 		local _, _, Activation = fake()
-		helpers.assert_eq(Activation.wanted({ enabled = true, tap_holds_enabled = true }), true)
-		helpers.assert_eq(Activation.wanted({ enabled = true }), true)
-		helpers.assert_eq(Activation.wanted({ enabled = true, tap_holds_enabled = false }), false)
-		helpers.assert_eq(Activation.wanted({ enabled = false, tap_holds_enabled = true }), false)
+		helpers.assert_eq(Activation.wanted({ running = true, paused = false }), true)
+		helpers.assert_eq(Activation.wanted({ running = true }), true)
+		helpers.assert_eq(Activation.wanted({ running = true, paused = true }), false)
+		helpers.assert_eq(Activation.wanted({ running = false }), false)
+		helpers.assert_eq(Activation.wanted({ running = true, tap_holds_enabled = false }), true)
 		helpers.assert_eq(Activation.wanted(nil), false)
 	end)
 end)
@@ -82,21 +85,19 @@ end)
 
 
 
--- ==============================
--- ==============================
--- ======= 2/ Tap-Hold On =======
--- ==============================
--- ==============================
+-- =================================
+-- =================================
+-- ======= 2/ Running: Close =======
+-- =================================
+-- =================================
 
-helpers.describe("owned runtime activation: Tap-Hold on", function()
-	helpers.it("runs Ergopti's runtime with the user's close consent", function()
+helpers.describe("owned runtime activation: Ergopti runs", function()
+	helpers.it("starts Ergopti's runtime, which always closes the user's Karabiner", function()
 		local activation, world = fake()
-		helpers.assert_eq(activation.reconcile(true), "start")
+		local admitted = 0
+		helpers.assert_eq(activation.reconcile(true, function() admitted = admitted + 1 end), "start")
 		helpers.assert_eq(world.starts, { { close_other_instances = true } })
-		world.consent = false
-		world.state = "idle"
-		activation.reconcile(true)
-		helpers.assert_eq(world.starts[2], { close_other_instances = false })
+		helpers.assert_eq(admitted, 1)
 	end)
 
 	helpers.it("does not start a second time while the runtime starts or runs", function()
@@ -107,27 +108,20 @@ helpers.describe("owned runtime activation: Tap-Hold on", function()
 		end
 	end)
 
-	helpers.it("tells the caller once the runtime is admitted", function()
-		local activation, world = fake()
-		local admitted = 0
-		activation.reconcile(true, function() admitted = admitted + 1 end)
-		world.settle_start(false, "other_karabiner_running")
-		helpers.assert_eq(admitted, 0)
-		world.state = "unavailable"
-		activation.reconcile(true, function() admitted = admitted + 1 end)
-		world.settle_start(true)
-		helpers.assert_eq(admitted, 1)
-	end)
-
-	helpers.it("records a close only when Karabiner's own quit succeeded", function()
+	helpers.it("records and announces a close only when Karabiner's own quit succeeded", function()
 		local _, _, Activation = fake()
-		local marked = 0
+		local marked, announced = 0, 0
 		local marker = { set = function() marked = marked + 1; return true end }
+		local announce = function() announced = announced + 1 end
 		local answers = {}
-		Activation.remembering_close(function(callback) callback(false) end, marker)(function(ok) answers[1] = ok end)
-		helpers.assert_eq(marked, 0)
-		Activation.remembering_close(function(callback) callback(true) end, marker)(function(ok) answers[2] = ok end)
-		helpers.assert_eq(marked, 1)
+		Activation.remembering_close(function(callback) callback(false) end, marker, announce)(function(ok)
+			answers[1] = ok
+		end)
+		helpers.assert_eq({ marked, announced }, { 0, 0 })
+		Activation.remembering_close(function(callback) callback(true) end, marker, announce)(function(ok)
+			answers[2] = ok
+		end)
+		helpers.assert_eq({ marked, announced }, { 1, 1 })
 		helpers.assert_eq(answers, { false, true })
 	end)
 end)
@@ -136,13 +130,13 @@ end)
 
 
 
--- ===============================
--- ===============================
--- ======= 3/ Tap-Hold Off =======
--- ===============================
--- ===============================
+-- ============================================
+-- ============================================
+-- ======= 3/ Paused Or Quit: Give Back =======
+-- ============================================
+-- ============================================
 
-helpers.describe("owned runtime activation: Tap-Hold off", function()
+helpers.describe("owned runtime activation: Ergopti paused", function()
 	helpers.it("stops Ergopti's runtime and gives back the Karabiner it closed", function()
 		local activation, world = fake("ready")
 		world.marker = true
@@ -159,17 +153,18 @@ helpers.describe("owned runtime activation: Tap-Hold off", function()
 		local idle, idle_world = fake("idle")
 		helpers.assert_eq(idle.reconcile(false), "idle")
 		helpers.assert_eq(#idle_world.starts, 0)
-		helpers.assert_eq(idle_world.stops, 0)
 		helpers.assert_eq(idle_world.restores, 0)
 	end)
 
-	helpers.it("gives back a Karabiner left closed by a crash on the next boot with Tap-Hold off", function()
+	helpers.it("keeps the record after a crash and gives the Karabiner back at the next pause", function()
 		local activation, world = fake("idle")
 		world.marker = true
-		helpers.assert_eq(activation.reconcile(false), "idle")
+		helpers.assert_eq(activation.reconcile(true), "start")
+		helpers.assert_eq(world.marker, true, "a start keeps the record of the earlier close")
+		helpers.assert_eq(world.restores, 0)
+		activation.reconcile(false)
 		helpers.assert_eq(world.restores, 1)
-		helpers.assert_eq(world.stops, 0)
-		helpers.assert_eq(#world.starts, 0)
+		helpers.assert_eq(world.marker, false)
 	end)
 
 	helpers.it("keeps the record when the restore is refused, so a later try can succeed", function()
@@ -183,5 +178,36 @@ helpers.describe("owned runtime activation: Tap-Hold off", function()
 		activation.restore_if_closed(function(restored) answer = restored end)
 		helpers.assert_eq(answer, true)
 		helpers.assert_eq(world.marker, false)
+	end)
+end)
+
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 4/ Resume: One Capture Per VM =======
+-- =============================================
+-- =============================================
+
+helpers.describe("owned runtime activation: Ergopti resumes", function()
+	helpers.it("reloads instead of starting a second capture in the same Lua VM", function()
+		local activation, world = fake()
+		activation.reconcile(true)
+		activation.reconcile(false)
+		helpers.assert_eq(activation.reconcile(true), "reload")
+		helpers.assert_eq(world.reloads, 1)
+		helpers.assert_eq(#world.starts, 1)
+	end)
+
+	helpers.it("starts again in place when no earlier start reached the capture", function()
+		local activation, world = fake()
+		world.admit = false
+		activation.reconcile(true)
+		world.admit = true
+		helpers.assert_eq(activation.reconcile(true), "start")
+		helpers.assert_eq(world.reloads, 0)
+		helpers.assert_eq(#world.starts, 2)
 	end)
 end)
