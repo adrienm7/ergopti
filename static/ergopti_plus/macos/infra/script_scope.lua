@@ -43,10 +43,15 @@ end
 --- Runs once the config path is known and before any alias reader starts.
 --- @return table|nil adopted Canonical path -> adopted value.
 function M.adopt_configured()
+	-- The log level is left to infra.config_overrides: it already writes the
+	-- configured level into this same alias and admits every spelling of a
+	-- logger threshold, and init re-applies the level after it.
+	local adopted = M.alias_names()
+	adopted[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = nil
 	return require("script_config_authority").adopt({
 		path = require("infra.config_paths").get("ConfigTomlPath"),
 		file_adapter = require("adapters.file_system"), manifest = Manifest, platform = "hs",
-		aliases = M.alias_names(), storage = require("adapters.storage"),
+		aliases = adopted, storage = require("adapters.storage"),
 		logger = require("infra.logger"), log = "script_scope" })
 end
 
