@@ -160,7 +160,9 @@ jobs:
           owner="$RUNNER_TEMP/runtime-owner"
           mkdir -m 700 "$owner"
           echo "RUNTIME_OWNER=$owner" >> "$GITHUB_ENV"
-          python3 tools/build/remap_runtime_build.py "$PWD" "$owner" --sign-owned --budget 5400 \
+          # The owned build admits exactly its 300 s calibration budget
+          # (remap_runtime_build.py _compile_owned); any other value is refused.
+          python3 tools/build/remap_runtime_build.py "$PWD" "$owner" --sign-owned --budget 300 \
             --signing-identity "$RUNTIME_SIGNING_IDENTITY" \
             --signing-keychain "$RUNTIME_SIGNING_KEYCHAIN" \
             --signing-public-leaf "$RUNTIME_SIGNING_LEAF"
