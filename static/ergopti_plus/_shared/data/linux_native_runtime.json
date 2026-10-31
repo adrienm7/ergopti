@@ -83,7 +83,8 @@
 			"lua-luv",
 			"openssl",
 			"sqlite3",
-			"xdg-utils"
+			"xdg-utils",
+			"libsecret-tools"
 		],
 		"rpm": [
 			"luajit >= 2.1",
@@ -102,7 +103,8 @@
 			"util-linux",
 			"openssl",
 			"sqlite",
-			"xdg-utils"
+			"xdg-utils",
+			"libsecret"
 		],
 		"arch": [
 			"luajit",
@@ -124,7 +126,8 @@
 			"zenity",
 			"lua51-lgi",
 			"webkit2gtk-4.1",
-			"python"
+			"python",
+			"libsecret"
 		],
 		"nix_library_path": [
 			"libayatana-appindicator",
