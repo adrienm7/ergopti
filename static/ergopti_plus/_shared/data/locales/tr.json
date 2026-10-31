@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Etkin değil: Giriş Öğeleri'nde ErgoptiPlus'a izin verin",
 	"menu.tapholds.guardian_unavailable": "🔴 Etkin değil: ErgoptiPlus arka plan yardımcısı kayıtlı değil (Giriş Öğeleri'ni kontrol edin, ardından ErgoptiPlus'tan çıkıp yeniden açın)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ Eski ErgoptiPlus kuralları ayarlarınızı engelliyor: kaldır…",
+	"menu.tapholds.close_other_karabiner": "Ergopti çalışırken diğer Karabiner uygulamalarını kapat (duraklatınca veya çıkınca geri açılır)",
 	"menu.tapholds.vhid_incompatible": "⚠️ Dokunma-basılı tutma duraklatıldı: başka bir Karabiner sürücü sürümü kurulu ve macOS yalnızca birini etkinleştirir",
 	"menu.tapholds.vhid_not_active": "⚠️ Dokunma-basılı tutma duraklatıldı: Sistem Ayarları’nda Karabiner sanal klavye sürücüsüne izin verin",
 	"menu.tapholds.open_login_items": "Giriş Öğeleri ayarlarını aç…",
