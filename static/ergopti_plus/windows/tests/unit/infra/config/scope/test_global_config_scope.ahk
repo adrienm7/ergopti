@@ -190,8 +190,8 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
-Test("global-config-scope: real Restore dispatch publishes twelve stores and compensates refusal", _GlobalScopeComposition.Bind("recommended"))
-Test("global-config-scope: real Clear dispatch removes owned overrides and compensates every file", _GlobalScopeComposition.Bind("clear"))
+Test("global-config-scope: real Restore dispatch publishes twelve stores and compensates refusal", _RRNC_NoDialog.Bind("Configuration", _GlobalScopeComposition.Bind("recommended")))
+Test("global-config-scope: real Clear dispatch removes owned overrides and compensates every file", _RRNC_NoDialog.Bind("Configuration", _GlobalScopeComposition.Bind("clear")))
 Test("global-config-scope: recommendations preserve absent consent", _GlobalScopeComposition.Bind("recommended", "absent"))
 Test("global-config-scope: late backup refusal publishes nothing", _GlobalScopeComposition.Bind("clear", "backup"))
 Test("global-config-scope: external last-file edit preserves the foreign version", _GlobalScopeComposition.Bind("clear", "external"))

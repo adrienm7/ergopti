@@ -206,7 +206,7 @@ _HotstringsScopeManifestRows() {
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
-Test("hotstrings-scope: the Hotstrings menu draws both scope rows and runs the owner", _HotstringsScopeManifestRows)
+Test("hotstrings-scope: the Hotstrings menu draws both scope rows and runs the owner", _RRNC_NoDialog.Bind("Hotstrings", _HotstringsScopeManifestRows))
 
 _HotstringsScopeRefusals() {
 	for Scenario in ["backup", "inventory", "external"] {
