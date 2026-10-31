@@ -396,3 +396,23 @@ To do on the PC:
 5. Physical checks on a corporate network: a model pull behind an NTLM-only and
    a Negotiate proxy; Debug > Test network; quitting Ergopti during a pull leaves
    no relay and no daemon behind.
+
+## Configuration folder names in the log file (item 139, 31 October)
+
+macOS and Linux now mask the configuration folder at write time: the logger's
+redactor receives the folder the path owner resolves at boot and every folder
+the user moves to afterwards (`Logger.follow_config_dir` in
+`macos/infra/logger.lua`, called by `macos/infra/config_paths.lua`;
+`logger_sink.follow_config_dir` in `linux/infra/logger_sink.lua`, called by
+`linux/infra/config_paths.lua`). Every line then shows the folder as
+`config_placeholder` and each name below it as `config_name_placeholder` from
+`_shared/modules/diagnostics/redaction.json`, except `config_known_names`.
+
+Windows still builds its redaction context without `config_dir`
+(`windows/infra/logger.ahk`, the `Context := Map("home", …, "user", …)` of the
+privacy admission), so a log line keeps "C:\Users\…\Sync\Jean Dupont\famille.toml"
+past the home placeholder. To do: give that context the configuration folder,
+read live from the paths owner rather than frozen at admission (the folder can
+change from the paths editor and onboarding while the driver runs), and add an
+AHK test that writes a line under a moved folder and finds both placeholders
+in the file. `Redact_Apply` already masks `config_dir` (the shared vectors pass).

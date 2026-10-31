@@ -820,8 +820,11 @@ Added October 22 (from the agents' reports; details in their commits):
       (macOS and Linux `PrivateLabel.mask`, Windows at write time, 9390f45b2d); the macOS and Linux loggers apply the
       shared redactor (`diagnostics/redact.lua`: emails, URL credentials, other accounts' folders) to each line as it
       is written (`macos/infra/logger.lua` `redact_message`, `linux/infra/logger_sink.lua`; logs written before it
-      stay unmasked on disk and the collector masks them at export). Left: GitHub field editability after a form
-      reload needs a real draft.
+      stay unmasked on disk and the collector masks them at export). The configuration folder and the names under it
+      are masked at write time on macOS and Linux too, following the folder the user moves to at runtime
+      (`follow_config_dir`, placeholders from `redaction.json`). Left: the same on Windows (the AHK logger's privacy
+      context has no `config_dir`; [PC handoff](docs/tooling/windows-pc-agent-handoff.md)), and GitHub field
+      editability after a form reload needs a real draft.
 - [ ] **93. Linux ordered pairs.** [PHYS-L] XI2 property cookies proven on Xvfb (`run_xi2_property_cookies.py`).
       Nothing else is provable on Xvfb: the join of a uinput Writer edge with the server's XKB/XI2 modifier state
       needs Xorg or a compositor reading real evdev nodes.
