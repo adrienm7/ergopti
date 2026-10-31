@@ -138,9 +138,14 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		local label = type(gestures.get_action_label) == "function"
 			and gestures.get_action_label(action) or action
 		local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", label)
-		-- The prompt belongs to the parameter kind (the gestures manager owns it).
-		-- Escaped: a wrap-pair sample such as <…> would be read as Pango markup.
-		value = prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
+		if spec == "llm_vision" then
+			-- A backend is picked from a list, as on the action picker page.
+			value = require("ui.vision_parameter_prompt").ask(title, prior)
+		else
+			-- The prompt belongs to the parameter kind (the gestures manager owns it).
+			-- Escaped: a wrap-pair sample such as <…> would be read as Pango markup.
+			value = prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
+		end
 	end
 	if value == nil or (spec == "llm_language" and value == "") then return false end
 	if type(gestures.validate_action_parameter) ~= "function"

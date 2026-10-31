@@ -16,6 +16,7 @@ return {
 	"tests.unit.modules.llm.agent.test_agent_learning_source",
 	"tests.unit.modules.llm.agent.test_agent_learning_store",
 	"tests.unit.ui.editors.action_picker.test_close_successor",
+	"tests.unit.ui.editors.test_vision_parameter_prompt",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_modal_error_outcome",
 	"tests.unit.modules.llm.agent.test_agent_file_receipts",
 	"tests.unit.ui.downloads.test_model_browser_inventory_owner",
