@@ -187,6 +187,7 @@ class DevManagedOllamaTests(unittest.TestCase):
         self.home = self.root / "home"
         self.home.mkdir()
         self.ports = FixturePorts(self)
+        self.swaps = []
 
     def stage(self):
         streams = io.StringIO(), io.StringIO()
@@ -198,7 +199,17 @@ class DevManagedOllamaTests(unittest.TestCase):
         """Run the real installer CLI; return its exit code and stderr."""
         target = self.home / "Library/Application Support/Ergopti/ollama-native-http"
 
-        def rename_exclusive(_, source, __, destination, ___):
+        def rename_exclusive(_, source, __, destination, flags):
+            if flags == 0x00000002:
+                # RENAME_SWAP: both names must exist and trade places atomically
+                if not (os.path.lexists(source) and os.path.lexists(destination)):
+                    return -1
+                parked = os.fsencode(os.fsdecode(destination) + ".swap")
+                os.rename(destination, parked)
+                os.rename(source, destination)
+                os.rename(parked, source)
+                self.swaps.append(os.fsdecode(destination))
+                return 0
             if os.path.lexists(destination):
                 return -1
             os.rename(source, destination)
@@ -288,6 +299,41 @@ class DevManagedOllamaTests(unittest.TestCase):
             self.stage()
         self.assertFalse(self.output.exists())
         self.assertEqual(self.install()[:2], (78, "OLLAMA_MANAGED_CATALOGUE_MISSING\n"))
+
+    def test_a_rebuild_replaces_the_runtime_an_earlier_build_installed(self):
+        # dev-ollama-upgrade (field run 2026-10-31 14:13): a source pull rebuilt
+        # the staged Ollama and the installer refused the runtime the previous
+        # build had installed, so the owned Ollama never started again.
+        self.assertEqual(self.stage()[0], 0)
+        code, stderr, target = self.install()
+        self.assertEqual(code, 0, stderr)
+        earlier = json.loads((target / ".ergopti-managed-runtime.json").read_text())
+        changed = self.root / self.contract["source_fingerprint_paths"][1]
+        changed.write_bytes(changed.read_bytes() + b"\n// edited\n")
+        self.assertEqual(self.stage()[0], 0)
+        code, stderr, target = self.install()
+        self.assertEqual(code, 0, stderr)
+        current = json.loads((target / ".ergopti-managed-runtime.json").read_text())
+        self.assertNotEqual(current["catalogue_sha256"], earlier["catalogue_sha256"])
+        self.assertEqual(self.swaps, [str(target)], "the earlier runtime is swapped out atomically")
+        self.assertEqual(sorted(p.name for p in target.parent.iterdir()), [target.name],
+                         "the swapped-out runtime is removed")
+        # Installing again keeps the current runtime as it is
+        self.assertEqual(self.install()[0], 0)
+        self.assertEqual(self.swaps, [str(target)])
+
+    def test_never_displaces_a_runtime_without_an_ergopti_receipt(self):
+        self.assertEqual(self.stage()[0], 0)
+        code, stderr, target = self.install()
+        self.assertEqual(code, 0, stderr)
+        receipt = target / ".ergopti-managed-runtime.json"
+        for content in ("not json", json.dumps({"schema_version": 1}),
+                        json.dumps(dict(json.loads(receipt.read_text()), host="macos-x86_64"))):
+            receipt.write_text(content)
+            code, stderr, _ = self.install()
+            self.assertEqual((code, stderr), (78, "Managed Ollama runtime admission refused.\n"), content)
+            self.assertEqual(self.swaps, [])
+            self.assertEqual(receipt.read_text(), content, "a refused runtime is left as it was")
 
     def test_refuses_an_official_archive_that_differs_from_its_pin(self):
         self.ports.official = b"tampered official archive\n"
