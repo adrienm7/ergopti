@@ -21,7 +21,7 @@ two disagree in either direction.
 | `evdev`     | kernel      | linux                 | Read access to `/dev/input/event*` (the input group), for the exclusive keyboard grab and the touchpad                    |
 | `uinput`    | kernel      | linux                 | Write access to `/dev/uinput` (the udev rule of `install/setup_permissions.sh`), the output channel of every injected key |
 | `xdotool`   | program     | linux                 | xdotool, X11 only: pointer, window and screen queries and actions                                                         |
-| `wmctrl`    | program     | linux                 | wmctrl, X11 only: workspace switching                                                                                     |
+| `wmctrl`    | program     | linux                 | wmctrl, X11 only: workspace switching and the window list minimize_all walks                                              |
 | `zenity`    | program     | linux                 | zenity, or kdialog on KDE: the confirmation dialogs a feature shows itself                                                |
 | `ollama`    | runtime     | macos, linux, windows | The Ollama inference server that runs the local models                                                                    |
 | `mlx`       | runtime     | macos                 | The MLX (mlx-lm) Python environment Ergopti creates for on-device inference on Apple silicon                              |
