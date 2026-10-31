@@ -493,6 +493,27 @@ _G4B_PullErrorClasses() {
 }
 Test("managed bootstrap: the pull output classes are the macOS vocabulary (ollama-digest-mismatch)", _G4B_PullErrorClasses)
 
+; The CLI writes its closing Error line to stderr: the real tree-owned capture must
+; hold it, or the classifier above reads nothing on a real pull.
+_G4B_RealCaptureHoldsStderr() {
+	Done := false, Code := -1, Output := ""
+	OnDone(ExitCode, Stdout, Stderr := "") {
+		Code := ExitCode, Output := Stdout, Done := true
+	}
+	Task := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
+		["-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
+			"[Console]::Error.WriteLine('Error: digest mismatch, file must be downloaded again'); exit 7"],
+		OnDone, , , LLM_OLLAMA_PULL_CAPTURE_BYTES, true, true)
+	AssertTrue(Task.start(), "the real child must start")
+	Deadline := A_TickCount + 20000
+	while !Done && A_TickCount < Deadline
+		Sleep(20)
+	AssertTrue(Done, "the real child must finish")
+	AssertEqual(7, Code)
+	AssertEqual("digest_mismatch", LLM_OllamaPullErrorClass(Output), "the capture holds stderr: " . Output)
+}
+Test("managed bootstrap: the real pull capture holds the CLI's stderr (ollama-digest-mismatch)", _G4B_RealCaptureHoldsStderr)
+
 ; Past its ceiling the shell runner reads no body and reports exit 63, so a pull
 ; of a few minutes would fail after it succeeded.
 _G4B_PullCaptureHoldsHoursOfFrames() {
