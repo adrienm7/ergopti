@@ -5178,6 +5178,16 @@ function M.owned_runtime_selected()
 	return M._owned.selected()
 end
 
+--- The owned runtime owner's state and stable reason, for the menu row that
+--- explains a block (the one-driver-version rule of the VirtualHIDDevice).
+--- @return table|nil status { state, reason } or nil when no owner is bound.
+function M.owned_runtime_status()
+	local owner = M._owned.owner
+	if not owner then return nil end
+	local status = owner.status()
+	return { state = status.state, reason = status.reason }
+end
+
 --- The user's consent to closing their own Karabiner while Tap-Hold is on.
 --- @return boolean consent
 function M.get_close_other_instances()

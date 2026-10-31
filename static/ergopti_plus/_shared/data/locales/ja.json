@@ -2074,6 +2074,8 @@
 	"menu.tapholds.guardian_unavailable": "🔴 無効：ErgoptiPlus のバックグラウンドヘルパーが登録されていません（ログイン項目を確認してから、ErgoptiPlus を終了してもう一度開いてください）",
 	"menu.tapholds.legacy_rules_pending": "⚠️ ErgoptiPlus の古いルールが設定を妨げています：削除…",
 	"menu.tapholds.close_other_karabiner": "タップホールドが有効な間はほかの Karabiner を閉じる（無効にすると元に戻す）",
+	"menu.tapholds.vhid_incompatible": "⚠️ タップホールドは一時停止中：別のバージョンの Karabiner ドライバがインストールされており、macOS は1つしか有効にしません",
+	"menu.tapholds.vhid_not_active": "⚠️ タップホールドは一時停止中：システム設定で Karabiner の仮想キーボードドライバを許可してください",
 	"menu.tapholds.open_login_items": "ログイン項目の設定を開く…",
 	"menu.tapholds.show_login_items_steps": "ErgoptiPlus を許可する手順を表示…",
 	"menu.tapholds.saved_until_guardian": "💾 キーボード設定を保存しました：ログイン項目で ErgoptiPlus が許可されると適用されます（クリックして設定を開く）。",
