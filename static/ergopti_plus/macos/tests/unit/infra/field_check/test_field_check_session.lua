@@ -33,6 +33,9 @@ local function idle_ports(cpu_used_ms)
 		end,
 		hold_counts = function() return { over_250ms = 0 } end,
 		lua_heap_kb = function() return 4096 end,
+		collect_garbage = function() end,
+		begin_callback_accounting = function() end,
+		end_callback_accounting = function() return {} end,
 	}
 end
 
@@ -49,6 +52,39 @@ helpers.describe("field check session: costs and edge cases a program can answer
 		local spinning = Report.new_report("idle_cost")
 		Session.idle_cost(idle_ports(Session.IDLE_WINDOW_SECONDS * 1000 * 0.2), spinning, function() end)
 		helpers.assert_eq(steps_of(spinning).idle_cpu_percent.state, Report.STATE_FAIL)
+	end)
+
+	helpers.it("(idle-window-wakers) starts from a collected heap and names the timers that ran", function()
+		local ports = idle_ports(90)
+		local events = {}
+		local cpu_ms = ports.cpu_ms
+		ports.cpu_ms = function()
+			events[#events + 1] = "cpu"
+			return cpu_ms()
+		end
+		ports.collect_garbage = function() events[#events + 1] = "collect" end
+		ports.begin_callback_accounting = function() events[#events + 1] = "begin" end
+		ports.end_callback_accounting = function()
+			events[#events + 1] = "end"
+			return {
+				{ site = "/Users/someone/ergopti/macos/platform/remap/watchers.lua:1201", count = 15, ms = 60.4 },
+				{ site = "/Users/someone/ergopti/macos/modules/diagnostics/hid_diagnostic_mailbox.lua:271",
+					count = 120, ms = 12.2 },
+			}
+		end
+		local report = Report.new_report("idle_cost")
+		Session.idle_cost(ports, report, function() end)
+		local steps = steps_of(report)
+		-- The field run's own garbage is collected before the CPU clock starts,
+		-- and the accounting window closes before it stops.
+		helpers.assert_eq(table.concat(events, ","), "collect,cpu,begin,end,cpu")
+		helpers.assert_eq(steps.idle_timer_1.value, "watchers.lua:1201:15:60")
+		helpers.assert_eq(steps.idle_timer_2.value, "hid_diagnostic_mailbox.lua:271:120:12")
+		helpers.assert_eq(steps.idle_timer_3.value, "none")
+		helpers.assert_eq(steps.idle_timer_callbacks.value, "135")
+		helpers.assert_eq(steps.idle_timer_ms.value, "73")
+		helpers.assert_eq(steps.idle_other_cpu_ms.value, "17")
+		helpers.assert_true(steps.idle_pre_collect_ms ~= nil, "the collection's cost is reported")
 	end)
 
 	helpers.it("names the boot's totals, and fails a boot that never completed", function()
