@@ -1330,7 +1330,17 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       `tools/lint/audit-gui-titles.cjs`), including the Linux `install.sh` echo table. Audit K6, I9.
 - [ ] **PAR-83. Identifiers and hosts in one file.** [CODE] Done for Lua (948ebef074, bb1899206e):
       `_shared/data/identifiers.json` generating `_shared/lua/identifiers.lua`, typed copies held to a
-      shrink-only baseline. Left: an AHK emitter and the AHK, Swift, shell, Python and JS-page copies.
+      shrink-only baseline. Emitters exist for JS, shell, Python, AHK and Swift; the JS pages, the macOS
+      Lua and Python sites and the launcher constants read them (33600679a4, db7bc54668 [CI: Swift]). Left
+      (`tools/lint/identifier-literal-baseline.json`): the AHK copies; the macOS owned-runtime Swift files,
+      whose signing ids are derived from the launcher id (`.runtime-installer`, `.installed-physical-source`,
+      `remap.core`/`console`/`cli`: declare them in `identifiers.json` first, which regenerates the Windows
+      AHK copy) and whose `OwnedRuntimePublisherIdentity` raw values must stay literals (pin them with a
+      test instead); the Swift test fixtures' app names; the runtime shell scripts
+      (`ensure-ollama-deps.sh`, `_shared/.../ollama_install.sh`, `linux/install.sh`, the generated
+      `managed-python-release.sh`), for which `test-shell-identifiers-sourcing.cjs` accepts only the
+      build scripts' repo-root sourcing form; `Package.swift` (a SwiftPM manifest cannot read sources);
+      the `tools/` build scripts.
 
 ## Backlog (one line each)
 
