@@ -870,6 +870,26 @@ LoggerPrepareShutdown(&Refusal := 0, FlushFn := 0) {
 	return true
 }
 
+; True once no thread holds a flush, an append or a repair: the only state a
+; shutdown refusal can be waiting for without a sink having refused anything.
+; @returns {Boolean} False while an interrupted owner still has to resume.
+LoggerFlushSettled() {
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_APPEND_OWNERS, _LOGGER_APPEND_DEBT_REPAIRS
+	PreviousCritical := Critical("On")
+	try return !_LOGGER_FLUSH_ACTIVE && _LOGGER_APPEND_OWNERS.Count == 0
+		&& _LOGGER_APPEND_DEBT_REPAIRS.Count == 0
+	finally Critical(PreviousCritical)
+}
+
+; An owner under OnExit can only resume once OnExit returns, so such a refusal
+; ends by itself. A sink that refused holds no owner and is a real refusal.
+; @param Refusal {Map|Integer} The evidence LoggerPrepareShutdown returned.
+; @returns {Boolean} True when the refusal names an interrupted owner.
+LoggerShutdownRefusalSettles(Refusal) {
+	return (Refusal is Map) && (Refusal["flush_active"] || Refusal["append_owners"] > 0
+		|| Refusal["append_repairs"] > 0)
+}
+
 ; Sample existing ownership and queue counts at the refusing caller's boundary.
 ; Paths, queue names, message bodies, file objects, and handles never leave here.
 ; Records the closed stage of a refused append and returns false.

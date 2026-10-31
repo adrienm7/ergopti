@@ -79,7 +79,12 @@ global _LifecycleAiShutdownAttempt := 0
 ; shutdown veto: only the retried ExitApp passes through the gates again.
 global LIFECYCLE_FLUSH_EXIT_POLL_MS := 100
 global LIFECYCLE_FLUSH_EXIT_BUDGET_MS := 10000
+; A successor prompts after about 2 s of waiting: a reload retry looks often.
+global LIFECYCLE_RELOAD_RETRY_POLL_MS := 20
 global _LifecycleFlushExitRetryArmed := false
+; The retried reload re-enters OnExit through ExitApp, which reports "Exit": the
+; successor asks to close once only, and nothing else can raise its reason again.
+global _LifecycleReloadExitRetrying := false
 ;
 ; How long a Quit waits for a running writer: [ui] user_quit_deadline_ms of
 ; _shared/modules/timings/constants.toml, pinned by test_quit_admission.ahk. The
@@ -914,8 +919,11 @@ LifecycleShutdownVetoHonored() {
 ; ceiling, LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS, is read through
 ; LifecycleShutdownVetoHonored, the one rule the layout poll also consults.
 ; @param Gate {String} Short name of the refusing gate, for the exhaustion line.
+; @param RequireNativeRetirement {Boolean} Honor the veto beyond the ceiling.
+; @param ReloadRetry {Object|Integer} A refusal that settles by itself: the same
+;     reload is retried and its successor kept (ReloadTerminalHandoffDeferClaim).
 ; @returns {Integer} 1 to veto the exit, 0 to let it proceed regardless.
-_LifecycleRefuseShutdown(Gate, RequireNativeRetirement := false) {
+_LifecycleRefuseShutdown(Gate, RequireNativeRetirement := false, ReloadRetry := 0) {
 	global _LifecycleShutdownVetoAttempts, _LifecycleShutdownReason
 	global _LifecycleAiShutdownAttempt
 	try UninstallCancel()
@@ -937,12 +945,16 @@ _LifecycleRefuseShutdown(Gate, RequireNativeRetirement := false) {
 	}
 	_LifecycleShutdownVetoAttempts += 1
 	if Honored {
-		; The successor that asked is now waiting on this window. Stop it and hand
-		; the transition back, or it prompts until someone answers.
-		try ReloadTerminalHandoffRefuseForShutdown(_LifecycleShutdownReason, Gate)
-		catch as Err
-			try LoggerError("Lifecycle",
-				"Refused reload could not be handed back: {1}.", Err.Message)
+		; The successor that asked is now waiting on this window. Unless the same
+		; reload will be retried, stop it and hand the transition back, or it
+		; prompts until someone answers.
+		if !((ReloadRetry is Object)
+				&& ReloadTerminalHandoffDeferClaim(_LifecycleShutdownReason, ReloadRetry)) {
+			try ReloadTerminalHandoffRefuseForShutdown(_LifecycleShutdownReason, Gate)
+			catch as Err
+				try LoggerError("Lifecycle",
+					"Refused reload could not be handed back: {1}.", Err.Message)
+		}
 		; Cancellation retires only this exact AI attempt. Existing terminal,
 		; reload and cleanup barriers keep their independent authority.
 		if IsSet(LLM_Menu_ApiPrivateRefuseShutdown)
@@ -1001,6 +1013,24 @@ _LifecycleAbandonExitRetry(*) {
 	QuitRequest_RetryAbandoned(NotifyQuitRefused)
 }
 
+; What a refusal that settles by itself needs to retry the same reload.
+; @param SettledFn {Func} Whether the interrupted owner has finished.
+; @param Code {Integer} The refused exit code, reused by the retry.
+; @returns {Object} The retry ReloadTerminalHandoffDeferClaim takes.
+_LifecycleReloadRetry(SettledFn, Code) {
+	global LIFECYCLE_FLUSH_EXIT_BUDGET_MS, LIFECYCLE_RELOAD_RETRY_POLL_MS
+	return {Settled: SettledFn, Run: _LifecycleRetryReloadExit.Bind(Code),
+		BudgetMs: LIFECYCLE_FLUSH_EXIT_BUDGET_MS, PollMs: LIFECYCLE_RELOAD_RETRY_POLL_MS}
+}
+
+_LifecycleRetryReloadExit(Code, *) {
+	global _LifecycleReloadExitRetrying
+	_LifecycleReloadExitRetrying := true
+	; A refused retry returns here; an accepted one ends the process.
+	try ExitApp(Code)
+	finally _LifecycleReloadExitRetrying := false
+}
+
 ; This admission protects only the exact unsettled successor retirement.
 _LifecycleRefuseNativeRetirement(Gate) {
 	return _LifecycleRefuseShutdown(Gate, true)
@@ -1017,6 +1047,11 @@ _LifecycleRetrySupersededExit(Code, Record, *) {
 
 Ergopti_OnShutdown(reason, code) {
 		global _LifecycleShutdownReason, _LifecycleAiShutdownAttempt
+		global _LifecycleReloadExitRetrying
+		if _LifecycleReloadExitRetrying {
+			_LifecycleReloadExitRetrying := false
+			reason := "Reload"
+		}
 		if IsSet(LLM_Menu_ApiPrivateBeginShutdown)
 			_LifecycleAiShutdownAttempt := LLM_Menu_ApiPrivateBeginShutdown()
 		_LifecycleShutdownReason := reason
@@ -1155,10 +1190,13 @@ Ergopti_OnShutdown(reason, code) {
 			; A flush or journal handoff in progress settles on its own, so the
 			; same exit is retried once it ends instead of asking the user again.
 			; Braces: a one-line try would claim this else as its own clause.
+			KeystatsRetry := 0
 			if (KeystatsFlushReason == "flush_in_progress" || KeystatsFlushReason == "journal_busy") {
 				try LoggerInfo("Lifecycle",
 					"Shutdown deferred while a keystats flush settles ({1}).", KeystatsFlushReason)
 				_LifecycleArmFlushExitRetry(reason, code)
+				if (TerminalHandoff is Map)
+					KeystatsRetry := _LifecycleReloadRetry(KL_FlushHandoffSettled, code)
 			} else {
 				try LoggerError("Lifecycle",
 					"Shutdown refused because keystats persistence debt is not durable yet ({1}).",
@@ -1167,7 +1205,7 @@ Ergopti_OnShutdown(reason, code) {
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return _LifecycleRefuseShutdown("keystats persistence debt is not durable yet")
+			return _LifecycleRefuseShutdown("keystats persistence debt is not durable yet", false, KeystatsRetry)
 		}
 		AppCategoriesReady := false
 		try AppCategoriesReady := KL_AppCat_PrepareShutdown()
@@ -1263,17 +1301,26 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Logger shutdown preflight failed: {1}.", Err.Message)
 		if !LoggerReady {
 			; The evidence says whether the refusal was a flush this exit interrupted,
-			; which ends by itself, or a sink that really refused.
-			try LoggerError("Lifecycle",
-				"Shutdown refused because diagnostic records are not durable yet (phase={1}, flush_active={2}, append_owners={3}, last_append_failure={4}).",
-				LoggerRefusal is Map ? LoggerRefusal["phase"] : "raised",
-				LoggerRefusal is Map ? LoggerRefusal["flush_active"] : "?",
-				LoggerRefusal is Map ? LoggerRefusal["append_owners"] : "?",
-				LoggerRefusal is Map ? LoggerRefusal["last_append_failure"] : "?")
+			; which ends by itself and retries the same reload, or a sink that really
+			; refused.
+			LoggerRetry := 0
+			if (TerminalHandoff is Map) && LoggerShutdownRefusalSettles(LoggerRefusal) {
+				LoggerRetry := _LifecycleReloadRetry(LoggerFlushSettled, code)
+				try LoggerInfo("Lifecycle",
+					"Reload deferred while the log flush it interrupted settles (phase={1}, flush_active={2}, append_owners={3}).",
+					LoggerRefusal["phase"], LoggerRefusal["flush_active"], LoggerRefusal["append_owners"])
+			} else {
+				try LoggerError("Lifecycle",
+					"Shutdown refused because diagnostic records are not durable yet (phase={1}, flush_active={2}, append_owners={3}, last_append_failure={4}).",
+					LoggerRefusal is Map ? LoggerRefusal["phase"] : "raised",
+					LoggerRefusal is Map ? LoggerRefusal["flush_active"] : "?",
+					LoggerRefusal is Map ? LoggerRefusal["append_owners"] : "?",
+					LoggerRefusal is Map ? LoggerRefusal["last_append_failure"] : "?")
+			}
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return _LifecycleRefuseShutdown("diagnostic records are not durable yet")
+			return _LifecycleRefuseShutdown("diagnostic records are not durable yet", false, LoggerRetry)
 		}
 		; The reload-specific durable commit is still allowed to refuse. It must
 		; precede every producer stop; a later veto refuses the pending reload
