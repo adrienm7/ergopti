@@ -211,7 +211,7 @@ local _state = nil
 -- present only after an explicit opt-in with `[karabiner] runtime = "owned"`;
 -- default boot never requires that module. `paths` is the runtime-selected
 -- path table.
-M._owned = { owner = nil, paths = require("platform.remap.ke_paths") }
+M._owned = { owner = nil, activation = nil, paths = require("platform.remap.ke_paths") }
 
 --- True when this boot opted in to the owned runtime.
 --- @return boolean owned
@@ -3676,6 +3676,16 @@ function M.set_enabled(value, on_done, onboarding_gate)
 		return false
 	end
 	local target_enabled = value == true
+	if M._owned.selected() then
+		-- « Ergopti uses Karabiner » is half of the activation rule: follow it once settled.
+		local caller_done = on_done
+		on_done = function(...)
+			if M._owned.reconcile() ~= true then
+				Logger.error(LOG, "Owned Karabiner runtime could not follow « Ergopti uses Karabiner ».")
+			end
+			if type(caller_done) == "function" then return caller_done(...) end
+		end
+	end
 	if _bulk_settings_transaction then
 		local phase = _bulk_settings_transaction.phase
 		if phase == "rollback-persistence" or phase == "rollback-regeneration" or phase == "rollback-sibling" then
@@ -5150,7 +5160,13 @@ function M.set_tap_holds_enabled(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_holds_enabled = value
 	end, nil, require("config_keys").KEY.TAP_HOLDS_ENABLED)
-	if committed then Logger.info(LOG, "Tap-Holds feature: %s.", value and "on" or "off") end
+	if committed then
+		Logger.info(LOG, "Tap-Holds feature: %s.", value and "on" or "off")
+		-- The Tap-Hold switch is what runs or stops Ergopti's own runtime.
+		if M._owned.selected() and M._owned.reconcile() ~= true then
+			Logger.error(LOG, "Owned Karabiner runtime could not follow the Tap-Hold switch.")
+		end
+	end
 	return committed
 end
 
@@ -6764,44 +6780,50 @@ end
 -- ============================
 -- ============================
 
---- Binds the owned runtime owner to the real Mac ports and admits the runtime.
---- Admission failure is reported by the owner with a named reason and leaves the
---- bridge fail-closed: nothing falls back to the shared runtime. When admission
---- succeeds, the configuration is generated and deployed to the owned path.
---- @return boolean started False when the owner could not be bound.
-function M._owned.start()
+--- Binds the owned runtime owner and its activation rule once, to the real Mac
+--- ports. Nothing is started here.
+--- @return table|nil activation Nil when the owner could not be bound.
+function M._owned.bind()
+	if M._owned.activation then return M._owned.activation end
 	local Owner = require("platform.remap.runtime_owner")
-	Logger.start(LOG, "Opting in to the owned Karabiner runtime…")
-	local ports_ok, ports = pcall(function() return require("adapters.runtime_owner_ports").new() end)
+	Logger.start(LOG, "Binding the owned Karabiner runtime…")
+	local OwnerPorts = require("adapters.runtime_owner_ports")
+	local ports_ok, ports = pcall(OwnerPorts.new)
 	if not ports_ok then
 		Logger.error(LOG, "Owned Karabiner runtime ports could not be built: %s.", tostring(ports))
-		return false
+		return nil
 	end
 	if not Owner.init(ports) then
 		Logger.error(LOG, "Owned Karabiner runtime owner was already bound; the bridge stays fail-closed.")
-		return false
+		return nil
 	end
 	M._owned.owner = Owner
-	local epoch = _lifecycle_epoch
 	-- The user's consent to closing an official Karabiner is the hidden key, whose
 	-- absent default is the decided `true`; it is never assumed here.
-	local accepted = Owner.start({ close_other_instances = _state.close_other_instances == true },
-		function(admitted, reason, explanation)
-			if epoch ~= _lifecycle_epoch or not _running then return end
-			if admitted ~= true then
-				Logger.error(LOG, "Owned Karabiner runtime refused (%s): %s Remapping stays off.",
-					tostring(reason), tostring(explanation))
-				return
-			end
-			if _state.enabled == true and not M.regenerate() then
-				Logger.error(LOG, "Owned Karabiner runtime was admitted but its configuration could not be requested.")
-			end
-		end)
-	if accepted ~= true then
-		Logger.error(LOG, "Owned Karabiner runtime admission could not start.")
-		return false
-	end
-	Logger.success(LOG, "Owned Karabiner runtime admission requested.")
+	M._owned.activation = require("platform.remap.runtime_activation").new(OwnerPorts.activation(Owner,
+		function() return _state ~= nil and _state.close_other_instances == true end))
+	Logger.success(LOG, "Owned Karabiner runtime bound.")
+	return M._owned.activation
+end
+
+--- Applies the activation rule (platform/remap/runtime_activation.lua): Tap-Hold
+--- on runs the owned runtime, closing the user's Karabiner with consent; Tap-Hold
+--- off keeps it inactive and gives back a Karabiner Ergopti closed. Admission
+--- failure is reported by the owner with a named reason and leaves the bridge
+--- fail-closed: nothing falls back to the shared runtime. When admission
+--- succeeds, the configuration is generated and deployed to the owned path.
+--- @return boolean applied False when the owner could not be bound.
+function M._owned.reconcile()
+	local activation = M._owned.bind()
+	if not activation then return false end
+	local epoch = _lifecycle_epoch
+	local action = activation.reconcile(require("platform.remap.runtime_activation").wanted(_state), function()
+		if epoch ~= _lifecycle_epoch or not _running then return end
+		if _state.enabled == true and not M.regenerate() then
+			Logger.error(LOG, "Owned Karabiner runtime was admitted but its configuration could not be requested.")
+		end
+	end)
+	Logger.info(LOG, "Owned Karabiner runtime activation: %s.", action)
 	return true
 end
 
@@ -7162,9 +7184,9 @@ function M.init(file_system)
 	-- hs.reload() within the same Hammerspoon session.
 	-- The owned runtime is installed by its own installer, not by the wizard that
 	-- offers the official application.
-	if M._owned.selected() and _state.enabled then
-		if M._owned.start() ~= true then
-			Logger.error(LOG, "Owned Karabiner runtime could not be started; remapping stays off.")
+	if M._owned.selected() then
+		if M._owned.reconcile() ~= true then
+			Logger.error(LOG, "Owned Karabiner runtime could not be bound; remapping stays off.")
 		end
 	end
 	if _state.enabled and not M._owned.selected() and not _wizard_ran_this_session then
@@ -7199,7 +7221,14 @@ local function stop_local_resources()
 			Logger.error(LOG, "Owned Karabiner runtime is still retained after teardown.")
 			all_stopped = false
 		else
-			M._owned.owner = nil
+			-- Ours no longer runs. On a quit a Karabiner Ergopti closed is given
+			-- back; a reload brings ours straight back and must not hand the
+			-- keyboards to theirs in between. The marker survives a quit that ends
+			-- before this settles, and the next boot with Tap-Hold off restores it.
+			if M._owned.activation and M._owned.teardown_reason ~= "hammerspoon_reload" then
+				M._owned.activation.restore_if_closed()
+			end
+			M._owned.owner, M._owned.activation = nil, nil
 		end
 	end
 	-- The module-level contract owns timers, installer tasks, partials, and mounts
@@ -7278,6 +7307,8 @@ end
 --- @param on_done function|nil Callback fn(fenced, reason).
 --- @return boolean True when exact revocation was accepted.
 function M.revoke(reason, on_done)
+	-- A reload starts the same rule again at once; only a quit gives a closed Karabiner back.
+	M._owned.teardown_reason = reason
 	if _enabled_transition ~= nil and _enabled_transition.file ~= nil then
 		local transaction = _enabled_transition
 		if transaction.before_lifecycle() ~= true then

@@ -92,6 +92,9 @@ M.OWNED = {
 	-- The downloaded, verified runtime artifact, one folder per pinned version
 	-- (platform/remap/runtime_artifact_fetch.lua). Never /Applications.
 	ARTIFACT_HOME = "~/Library/Application Support/ErgoptiPlus/RemapRuntime",
+	-- Written when Ergopti closed the user's own Karabiner, cleared once it was
+	-- given back (platform/remap/runtime_activation.lua).
+	CLOSED_OTHER_MARKER = "~/Library/Application Support/ErgoptiPlus/karabiner/closed-other-karabiner",
 }
 
 --- Rejects a runtime name that is not one of the two.

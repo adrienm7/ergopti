@@ -21,6 +21,10 @@
 ---    into a stable reason. Nothing is retried and nothing is forced.
 --- 4. Read-Only Description: `describe` reports what a close would do without
 ---    doing it, for the one-click field check.
+--- 5. Restore Is The Inverse: `restore` runs Karabiner's own
+---    `register-core-agents`, the exact inverse of the required quit step, so
+---    a Karabiner Ergopti closed comes back as the user had it. Only the
+---    activation rule calls it, and only when Ergopti recorded the close.
 --- ==============================================================================
 
 local M = {}
@@ -64,10 +68,13 @@ local function count_lines(text)
 	return count
 end
 
+--- Karabiner's own step that registers its core agents again.
+M.RESTORE_STEP = "register-core-agents"
+
 --- Creates the detector and closer.
 --- @param dependencies table|nil Optional test seams: exec(executable, args, timeout, fn(code, output)),
 ---   exists(path) -> boolean, timer (after, cancel).
---- @return table port { detect, close, describe }.
+--- @return table port { detect, close, restore, describe }.
 function M.new(dependencies)
 	dependencies = dependencies or {}
 	local exec = dependencies.exec or require("adapters.field_check_ports").exec
@@ -135,6 +142,23 @@ function M.new(dependencies)
 		end
 		Logger.warn(LOG, "Asking the official Karabiner-Elements to quit, as the close option consents (ADR 011).")
 		run_steps(1, callback)
+	end
+
+	--- Gives the user's Karabiner back after Ergopti closed it.
+	--- @param callback function fn(ok).
+	function port.restore(callback)
+		if not exists(KePaths.NON_PRIVILEGED_AGENTS) then
+			Logger.error(LOG, "The official Karabiner's agents helper is missing; it cannot be restored.")
+			return callback(false)
+		end
+		Logger.info(LOG, "Asking the official Karabiner-Elements to register its agents again.")
+		exec(KePaths.NON_PRIVILEGED_AGENTS, { M.RESTORE_STEP }, M.COMMAND_TIMEOUT_SEC, function(code)
+			if code ~= 0 then
+				Logger.error(LOG, "Karabiner's own %s failed (status %s).", M.RESTORE_STEP, tostring(code))
+				return callback(false)
+			end
+			callback(true)
+		end)
 	end
 
 	--- Describes, without acting, what a close would do.
