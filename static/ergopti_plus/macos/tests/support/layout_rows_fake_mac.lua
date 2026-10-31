@@ -65,6 +65,7 @@ function M.new(options)
 		confirm_enabled = function(name, _, done) done(true, { listed = true, enabled = mac.enabled[name] ~= nil }) end,
 		select_source = function(name, _, done)
 			log("select " .. name)
+			if options.unselectable and options.unselectable[name] then return done(false, "MISS", "invalid_output") end
 			mac.selected = name
 			done(true, "0")
 		end,
