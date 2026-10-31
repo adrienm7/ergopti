@@ -10,6 +10,9 @@ local RAW = [[{"version":1,"providers":[
 {"id":"executable","mode":"executable","extensions":[],"commands":{"hs":[]},"prefix":[]}
 ]}]]
 local CONFIG = "/Users/élise/ErgoptiPlus"
+-- The real registry reader, bound before the fixture stubs infra.paths: the
+-- shared module reads its catalogue cap from [limits] when it loads
+local Timings = require("infra.timings")
 local ROOT = CONFIG .. "/scripts"
 
 local function with_native(body, catalogue)
@@ -38,6 +41,7 @@ local function with_native(body, catalogue)
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.config_paths"] = { get_config_dir = function() return native.config end }
 		package.loaded["infra.paths"] = { shared = function(relative) return "/shared/" .. relative end }
+		package.loaded["infra.timings"] = Timings
 		_G.hs = { fs = {
 			symlinkAttributes = function(path)
 				if native.on_lstat then native.on_lstat(path) end

@@ -1115,3 +1115,21 @@ input_source_id_bytes = 1024
 # PAC cap (_shared/lua/network/pac_check.lua MAX_BYTES), so an oversized PAC is
 # seen as oversized rather than truncated. LX: adapters/network_check_ports.lua.
 network_check_body_bytes = 1048577
+
+# Largest program provider catalogue (the owned launcher's JSON list of the
+# programs a script action may run) either driver reads.
+# Lua: _shared/lua/program_providers.lua.
+program_catalogue_bytes = 65536
+
+# Largest diagnostic file of one curl transfer (its JSON write-out and redirect
+# receipt) the Linux HTTP client reads back. LX: adapters/curl_http_client.lua.
+http_diagnostic_bytes = 65536
+
+# Largest request or answer packet of the Linux system proxy helper.
+# LX: adapters/system_proxy.lua.
+proxy_packet_bytes = 65536
+
+# Largest native reply of the Apple Shortcuts role (the list of shortcuts or
+# one run's result), also the limit the request passes to the launcher.
+# HS: adapters/apple_shortcuts.lua.
+shortcuts_reply_bytes = 65536
