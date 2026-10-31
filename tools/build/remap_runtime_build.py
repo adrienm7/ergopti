@@ -20,7 +20,7 @@ import time
 import uuid
 
 BASE_PATH = Path(__file__).resolve().parents[1] / "diagnostics/hs274_native_build.py"
-BASE_SHA256 = "4960f60eeda958560dec20f908d56c990943b5d37b223075acef80e230590677"
+BASE_SHA256 = "bebd311d6299529a54f7fc414f1353074ad798ca07ee7494eeb14f2f8fbd9277"
 PROVIDER_SHA256 = "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a"
 
 
@@ -88,10 +88,10 @@ PRODUCT_MAX_BYTES = 128 * 1024 * 1024
 # out of swap, where an unbounded build crawled for hours.
 XCODEBUILD_JOBS = 2
 # The 300 s calibration deadline fits a maintainer Mac. On a hosted 3-core
-# runner the core C++23 translation unit alone still compiles after 139 s
-# (run 41223799621), so the hosted lane selects this one other admitted
-# deadline; it still bounds the whole owned build with a hard kill.
-HOSTED_RUNNER_SECONDS = 2400
+# runner the universal core build alone takes 1090 s (run 41224698238), so
+# the hosted lane selects this one other admitted deadline; it still bounds
+# the whole owned build with a hard kill.
+HOSTED_RUNNER_SECONDS = 3600
 OWNED_BUDGETS = (BASE.CALIBRATION_SECONDS, HOSTED_RUNNER_SECONDS)
 # The complete canonical factory already bounds its actual tracked leaves at 8 MiB.
 SOURCE_TREE_MAX_BYTES = 8 * 1024 * 1024
@@ -137,6 +137,31 @@ def _identity(info):
         info.st_size,
         info.st_mtime_ns,
         info.st_ctime_ns,
+    )
+
+
+_IDENTITY_AXES = ("dev", "ino", "uid", "mode", "nlink", "size", "mtime", "ctime")
+
+
+def _report_identity_change(kind, path, previous, current):
+    """Name a changed retained file and its changed fields on the build log.
+
+    The boundary journal is capped and full before the native builds start, so
+    a currentness refusal otherwise reaches the log as a bare code. Only the
+    relative path and field names are printed; the refusal itself is unchanged.
+    """
+    if current is None:
+        axes = ("unavailable",)
+    else:
+        axes = tuple(
+            name for name, old, new in zip(_IDENTITY_AXES, previous[0], current[0]) if old != new
+        )
+        if previous[1] != current[1]:
+            axes += ("data",)
+    print(
+        "[owned-build] " + kind + " changed: " + str(path) + " (" + ",".join(axes) + ")",
+        file=sys.stderr,
+        flush=True,
     )
 
 
@@ -687,6 +712,13 @@ def current_inputs(snapshot, deadline, *, maximum=BASE.MAX_INPUT_BYTES):
         for previous in snapshot.files:
             check_deadline(deadline)
             current = _ordinary(snapshot.root / previous.path, snapshot.root, maximum)
+            if current != previous:
+                _report_identity_change(
+                    "retained source",
+                    previous.path,
+                    (previous.identity, previous.data),
+                    (current.identity, current.data),
+                )
             _REQUIRE(current == previous, "source_identity", "Retained source changed")
             check_deadline(deadline)
 
@@ -805,6 +837,12 @@ def current_product(snapshot, root):
     except BASE.NativeBuildError as error:
         if _product_refusal_cut(error) == "held_product_changed":
             _observe_product_difference(snapshot, current)
+            _report_identity_change(
+                "retained product",
+                snapshot.path,
+                (snapshot.identity, snapshot.data),
+                None if current is None else (current.identity, current.data),
+            )
         raise
 
 
@@ -1733,7 +1771,7 @@ class _SigningSink(_PreparationSink):
 
 
 PRODUCTION_RELATIVE = "tools/build/owned_runtime_product_build.py"
-PRODUCTION_SHA256 = "90ad1ca7d98e4b67d69b474bc7cbbdd494f8e47b0b6cda59b83aefcc4bd60ac0"
+PRODUCTION_SHA256 = "02667d7563253a02f8710385e9729a081642a7654a81b1efb0fb3bd725863afa"
 
 
 @dataclass(frozen=True, slots=True)
@@ -2303,8 +2341,11 @@ def _compile_owned_product_images(
         for previous, root in retained:
             current_product(previous, root)
         for path, identity in tool_inputs:
+            observed = _identity(path.stat())
+            if observed != identity:
+                _report_identity_change("native tool", path, (identity, b""), (observed, b""))
             _REQUIRE(
-                path.resolve(strict=True) == path and _identity(path.stat()) == identity,
+                path.resolve(strict=True) == path and observed == identity,
                 "source_identity",
                 "Native tool image changed across actual compilation",
             )
@@ -4019,6 +4060,7 @@ def main(arguments=None):
             )
         else:
             print("Owned runtime compilation refused: " + error.code, file=sys.stderr)
+        print("Owned runtime refusal detail: " + str(error), file=sys.stderr)
         return 1
 
 

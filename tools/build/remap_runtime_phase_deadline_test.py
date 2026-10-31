@@ -161,5 +161,39 @@ class PhaseDeadlineControls(unittest.TestCase):
         self.assertEqual(command[command.index("-jobs") + 1], "2")
 
 
+class IdentityChangeReportControls(unittest.TestCase):
+    """A currentness refusal names the changed retained file and its fields."""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp(prefix="identity-change-")).resolve()
+        self.addCleanup(shutil.rmtree, self.root, True)
+
+    def test_metadata_only_change_of_a_held_product_is_named(self):
+        image = self.root / "build/Release/product"
+        image.parent.mkdir(parents=True)
+        image.write_bytes(b"compiled image\n")
+        held = BUILD.product_snapshot(image, self.root)
+        os.chmod(image, 0o700)
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            with self.assertRaises(BASE.NativeBuildError) as caught:
+                BUILD.current_product(held, self.root)
+        self.assertEqual(caught.exception.code, "source_identity")
+        line = log.getvalue()
+        self.assertIn("[owned-build] retained product changed: build/Release/product (", line)
+        self.assertIn("mode", line)
+        self.assertIn("ctime", line)
+        self.assertNotIn("data", line)
+
+    def test_unchanged_product_reports_nothing(self):
+        image = self.root / "product"
+        image.write_bytes(b"compiled image\n")
+        held = BUILD.product_snapshot(image, self.root)
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            BUILD.current_product(held, self.root)
+        self.assertEqual(log.getvalue(), "")
+
+
 if __name__ == "__main__":
     unittest.main()
