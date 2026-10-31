@@ -1082,6 +1082,79 @@ ConfigMigrateWithRegistryProof(Body) {
 	}
 }
 
+; Whether two registries are the same closed model, node for node: plain Maps with
+; the same case rule and exactly the same keys, dense plain Arrays, exact TOML_Bool
+; values, strings compared with case and numbers by value. Every liveness check
+; visits each of the registry's nodes, so this walk avoids what costs a call per
+; node: strings are compared in their parent's loop, and one Get replaces Has plus
+; an index. test_config_migrate_same_registry.ahk holds it to the plain definition.
+; NativeLive binds this owner: a replaced comparison refuses every liveness check.
+ConfigMigrateSameRegistry(Left, Right) {
+	static MapBase := Map.Prototype, ArrayBase := Array.Prototype, Absent := {}
+	if !IsObject(Left) {
+		if Left is String
+			return (Right is String) && Left == Right
+		return (Right is Integer || Right is Float) && Left = Right
+	}
+	Base := ObjGetBase(Left)
+	if Base == MapBase {
+		if !IsObject(Right) || ObjGetBase(Right) != MapBase || ObjOwnPropCount(Left) || ObjOwnPropCount(Right)
+				|| Left.Count != Right.Count || Left.CaseSense != Right.CaseSense
+			return false
+		ExactRight := Right
+		if Right.CaseSense != "On" {
+			ExactRight := Map()
+			ExactRight.CaseSense := "On"
+			for Key, Value in Right
+				ExactRight[Key] := Value
+		}
+		for Key, Value in Left {
+			Other := ExactRight.Get(Key, Absent)
+			if Value is String {
+				if !(Other is String) || Value !== Other
+					return false
+			} else if !ConfigMigrateSameRegistry(Value, Other)
+				return false
+		}
+		return true
+	}
+	if Base == ArrayBase {
+		if !IsObject(Right) || ObjGetBase(Right) != ArrayBase || ObjOwnPropCount(Left) || ObjOwnPropCount(Right)
+				|| Left.Length != Right.Length
+			return false
+		loop Left.Length {
+			; A missing cell reads as Absent, which no value equals: Absent is
+			; neither a string nor a plain container, on either side.
+			Value := Left.Get(A_Index, Absent), Other := Right.Get(A_Index, Absent)
+			if Value is String {
+				if !(Other is String) || Value !== Other
+					return false
+			} else if !ConfigMigrateSameRegistry(Value, Other)
+				return false
+		}
+		return true
+	}
+	if Left is TOML_Bool {
+		if !IsObject(Right) || Base != TOML_Bool.Prototype || ObjGetBase(Right) != TOML_Bool.Prototype
+			return false
+		for Value in [Left, Right] {
+			Count := 0
+			for Name in ObjOwnProps(Value) {
+				if Name != "Value"
+					return false
+				Descriptor := Object.Prototype.GetOwnPropDesc.Call(Value, Name)
+				if !Descriptor.HasOwnProp("Value") || !(Descriptor.Value is Integer)
+					return false
+				Count += 1
+			}
+			if Count != 1
+				return false
+		}
+		return Left.Value == Right.Value
+	}
+	return false
+}
+
 ; One private issuer owns both read-only preparation and actual boot completion.
 ; Query requests expose checking closures, never mutable rows or phase setters.
 ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle := unset) {
@@ -1092,7 +1165,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		registry_path: ConfigMigrateRegistryPath, registry: ConfigMigrateShippedRegistry,
 		decode: TOML_ParseDocument, classify: _ConfigMigrateClassifyDocument,
 		migrate: ConfigMigrateRun, key: FileReadActivityKey,
-		clone: ManifestCloneValue, same: ConfigMigrateSameValue,
+		clone: ManifestCloneValue, same: ConfigMigrateSameValue, same_registry: ConfigMigrateSameRegistry,
 		terminal_owns: _ConfigWriteTerminalOwnsExact, variant_refusal: _ConfigMigrateVariantBootRefusal,
 		move: FSConfigAtomicMoveReplace, generic_move: FSAtomicMoveReplace, noop: FSNativeAcknowledge, settlement_port: ConfigTransitionProductionPort, settlement_inspect: ConfigTransitionInspect, settlement_result: ConfigTransitionResultIs, settlement_matches: FSUtf8ExactMatches, settlement_debt: _ConfigPublicationHasRecoveryDebt, settlement_refusal: TOML_WriteRefusal, settlement_bounds: _ConfigTransitionPresenceHashIsValid, config_write: TOML_ConfigBatchWrite, generic_write: TOML_BatchWrite, recovery_images: _ConfigTransitionNativeRecoveryImages
 	}
@@ -1112,6 +1185,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			&& Native.settlement_bounds == _ConfigTransitionPresenceHashIsValid
 			&& Native.migrate == ConfigMigrateRun && Native.key == FileReadActivityKey
 			&& Native.clone == ManifestCloneValue && Native.same == ConfigMigrateSameValue
+			&& Native.same_registry == ConfigMigrateSameRegistry
 			&& Native.terminal_owns == _ConfigWriteTerminalOwnsExact
 			&& Native.variant_refusal == _ConfigMigrateVariantBootRefusal
 			&& Native.move == FSConfigAtomicMoveReplace && Native.generic_move == FSAtomicMoveReplace && Native.noop == FSNativeAcknowledge
@@ -1120,67 +1194,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 	}
 
 	PlainContainer(Value, Prototype) {
-		; ObjOwnPropCount avoids an enumerator per node: SameRegistry visits
-		; every node of the registry on each liveness check (~27 % faster).
 		return IsObject(Value) && ObjGetBase(Value) == Prototype && !ObjOwnPropCount(Value)
-	}
-
-	SameRegistry(Left, Right) {
-		; NativeLive still binds the canonical scalar owner before comparison.
-		if Left is String
-			return (Right is String) && Left == Right
-		if Left is Integer || Left is Float
-			return (Right is Integer || Right is Float) && Left = Right
-		if Left is Map {
-			if !PlainContainer(Left, Map.Prototype) || !PlainContainer(Right, Map.Prototype)
-					|| Left.Count != Right.Count || Left.CaseSense != Right.CaseSense
-				return false
-			ExactRight := Right
-			if Right.CaseSense != "On" {
-				ExactRight := Map()
-				ExactRight.CaseSense := "On"
-				for Key, Value in Right
-					ExactRight[Key] := Value
-			}
-			for Key, Value in Left {
-				if !ExactRight.Has(Key) || !SameRegistry(Value, ExactRight[Key])
-					return false
-			}
-			return true
-		}
-		if Left is Array {
-			if !PlainContainer(Left, Array.Prototype) || !PlainContainer(Right, Array.Prototype)
-					|| Left.Length != Right.Length
-				return false
-			loop Left.Length {
-				if !Left.Has(A_Index) || !Right.Has(A_Index)
-						|| !SameRegistry(Left[A_Index], Right[A_Index])
-					return false
-			}
-			return true
-		}
-		if Left is TOML_Bool {
-			if !IsObject(Right) || ObjGetBase(Left) != TOML_Bool.Prototype
-					|| ObjGetBase(Right) != TOML_Bool.Prototype
-				return false
-			for Value in [Left, Right] {
-				Count := 0
-				for Name in ObjOwnProps(Value) {
-					if Name != "Value"
-						return false
-					Descriptor := Object.Prototype.GetOwnPropDesc.Call(Value, Name)
-					if !Descriptor.HasOwnProp("Value") || !(Descriptor.Value is Integer)
-						return false
-					Count += 1
-				}
-				if Count != 1
-					return false
-			}
-			return Left.Value == Right.Value
-		}
-		if IsObject(Left) || IsObject(Right)
-			return false
-		return Native.same.Call(Left, Right)
 	}
 
 	RegistryLive(Row, Fresh := false) {
@@ -1202,7 +1216,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 				return true
 			ConfigMigrateRegistryDeepCompares += 1
 			CompareStarted := PerfStage_Begin()
-			Same := SameRegistry(CurrentRegistry, Row.registry_shadow)
+			Same := ConfigMigrateSameRegistry(CurrentRegistry, Row.registry_shadow)
 			PerfStage_End("ConfigMigrate.registry_deep_compare", CompareStarted)
 			if !Same
 				return false
@@ -1443,11 +1457,11 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			FreshRegistry := Native.load_registry.Call(Native.registry_path.Call())
 			PerfStage_End("ConfigMigrate.row_load_registry", StageTicks)
 			StageTicks := PerfStage_Begin()
-			if !SameRegistry(FreshRegistry, Row.registry)
+			if !ConfigMigrateSameRegistry(FreshRegistry, Row.registry)
 				throw Error("The default registry differs from its native source")
 			; Rows built from the same registry source share one private shadow,
 			; so a proof scope compares the live registry with it only once.
-			if !(SharedShadow is Map) || !SameRegistry(FreshRegistry, SharedShadow)
+			if !(SharedShadow is Map) || !ConfigMigrateSameRegistry(FreshRegistry, SharedShadow)
 				SharedShadow := Native.clone.Call(FreshRegistry)
 			PerfStage_End("ConfigMigrate.row_compare_and_shadow", StageTicks)
 			Row.registry_shadow := SharedShadow
