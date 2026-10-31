@@ -3116,7 +3116,7 @@ local function main()
 	if not privacy_owners.startup_checkpoint() then return end
 	local boot_ms = BootProfiler.complete()
 	-- The Reload this boot completes, if any, from its request in the previous daemon.
-	require("infra.reload_timing").complete()
+	local reload_ms = require("infra.reload_timing").complete()
 	if not privacy_owners.startup_checkpoint() then return end
 	emit_diagnostic_snapshot(boot_ms, opts, ok_i18n and i18n_mod or nil, privacy_owners.startup.snapshot)
 	privacy_owners.startup.snapshot = nil
@@ -3129,7 +3129,9 @@ local function main()
 		end })
 	if not privacy_owners.startup_checkpoint() then return end
 	-- Optional too: the field report collector's no-click checks (infra/field_run.lua).
-	privacy_owners.field_run = require("infra.field_run").start({ pid = require("luv").os_getpid() })
+	-- A timed reload step resumes here, in the successor, with the reload just measured.
+	privacy_owners.field_run = require("infra.field_run").start({ pid = require("luv").os_getpid(),
+		reload = perform_reload, reload_ms = reload_ms })
 	if not privacy_owners.startup_checkpoint() then return end
 	privacy_owners.finish_startup()
 	if not privacy_owners.startup_checkpoint() then return end
