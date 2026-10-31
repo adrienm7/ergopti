@@ -74,6 +74,26 @@ function M.virtual_hid_version()
 	return require("platform.remap.runtime_manifest").virtual_hid_version(manifest)
 end
 
+local fetcher
+
+--- Downloads and verifies the pinned artifact the first time, then reuses it.
+--- One fetcher serves admission and the field run, so they share one fetch.
+--- @param callback function fn(ok, payload|reason, explanation).
+function M.fetch_artifact(callback)
+	local manifest = load_manifest()
+	if not manifest then
+		return callback(false, "artifact_unpinned", "the runtime manifest could not be read")
+	end
+	fetcher = fetcher or require("platform.remap.runtime_artifact_fetch").new({
+		exec = FieldCheckPorts.exec,
+		exists = FileSystem.exists,
+		read = FileSystem.read,
+		write = function(path, content) return FileSystem.write(path, content) == true end,
+		expand = FileSystem.expand_path,
+	})
+	fetcher.ensure(manifest.runtime, callback)
+end
+
 --- The persisted record that Ergopti closed the user's own Karabiner.
 --- @return table marker { get, set, clear }.
 function M.marker()
@@ -105,13 +125,6 @@ end
 function M.new()
 	local exec = FieldCheckPorts.exec
 	local Coexistence = require("adapters.karabiner_coexistence").new()
-	local fetcher = require("platform.remap.runtime_artifact_fetch").new({
-		exec = exec,
-		exists = FileSystem.exists,
-		read = FileSystem.read,
-		write = function(path, content) return FileSystem.write(path, content) == true end,
-		expand = FileSystem.expand_path,
-	})
 	return {
 		fs = {
 			exists = FileSystem.exists,
@@ -139,13 +152,7 @@ function M.new()
 		},
 		artifact = {
 			pinned = pinned_artifact,
-			fetch = function(callback)
-				local manifest = load_manifest()
-				if not manifest then
-					return callback(false, "artifact_unpinned", "the runtime manifest could not be read")
-				end
-				fetcher.ensure(manifest.runtime, callback)
-			end,
+			fetch = M.fetch_artifact,
 		},
 		capture = require("adapters.runtime_capture_port").new(),
 		timer = require("adapters.timer_scheduler"),

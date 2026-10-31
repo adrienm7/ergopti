@@ -866,6 +866,7 @@ M.checks = {
 	network = M.network,
 	lease = M.lease,
 	owned_runtime = M.owned_runtime,
+	owned_activation = require("infra.field_check_owned_activation").run,
 	key_accounting = M.key_accounting,
 	toolchain = M.toolchain,
 	login_items = M.login_items,
