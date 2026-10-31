@@ -226,7 +226,7 @@
 			"kind": "field_check",
 			"check": "slow_lines",
 			"deadline_seconds": 20,
-			"proves": "One bounded pass over today's log names the main-thread segment the slow HotPath lines charge most, counts the slow ingest ticks and preferences saves, and finds no failed lease-bound start nor boot layout misread."
+			"proves": "One bounded pass over today's log names the main-thread segment the slow HotPath lines charge most, counts slow ingest ticks and saves, and finds no failed lease-bound start, boot layout misread, keystats lock or shortcut left unregistered."
 		},
 		{
 			"id": "field_fifo_safety",
