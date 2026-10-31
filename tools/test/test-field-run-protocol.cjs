@@ -13,7 +13,9 @@
  *    clone folder;
  * 3. every driver steps file that exists declares steps the protocol accepts:
  *    unique ids, declared kinds, positive integer deadlines, a check name for
- *    a field check and one sentence of what its pass proves.
+ *    a field check and one sentence of what its pass proves;
+ * 4. the Linux field run (linux/infra/field_run.lua) has its steps file and
+ *    repeats no protocol key in it: it reads the protocol from this file.
  * ==============================================================================
  */
 
@@ -120,6 +122,13 @@ check('every driver steps file declares steps the protocol accepts', () => {
 		}
 	}
 	assert(found >= 1, 'no driver steps file exists');
+});
+
+check('the Linux field run declares its steps and repeats no protocol key', () => {
+	const relative = protocol.steps_file.linux;
+	assert(fs.existsSync(path.join(ROOT, relative)), `${relative} is missing`);
+	for (const key of Object.keys(read(relative)))
+		assert(key === '_comment' || !(key in protocol), `${relative} repeats the protocol key ${key}`);
 });
 
 console.log(`[OK] field run protocol (${checks} checks).`);
