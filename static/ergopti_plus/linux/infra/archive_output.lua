@@ -707,7 +707,9 @@ local function new_private_tar_feeder(backend, listing_max_output_bytes, ollama_
 		if ollama_zstd == true then
 			if mode ~= "extract" or type(work_dir) ~= "string" or work_dir:sub(1, 1) ~= "/"
 				or work_dir:find("\0", 1, true) then return nil end
-			args = { "--zstd", "--extract", "--file", "-", "--directory", work_dir,
+			local zstd = require("infra.owned_programs").zstd_tar_option()
+			if not zstd then return nil end
+			args = { zstd, "--extract", "--file", "-", "--directory", work_dir,
 				"--no-same-owner", "--no-same-permissions" }
 		elseif mode == "names" then args = { "-tzf", "-" }
 		elseif mode == "verbose" then args = { "-tvzf", "-" }
