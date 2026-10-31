@@ -202,6 +202,24 @@ add, remove or rename a row in `menu.toml`; read paths through
 `tools/lib/paths.cjs` (`MENU_SOURCE_REL`) or `tools/lib/menu-source.cjs`.
 `test-menu-manifest.cjs` refuses a `[menu]` table in the feature manifest.
 
+### project-feature-requirements-are-derived-from-generator-inputs
+
+Each manifest feature's `requires = { macos, linux, windows }` is checked
+against a derivation, never against prose. A source scan of macOS modules only
+sees shortcuts and bindings: gestures, CapsWord, script chords and the metrics
+ledger reach Karabiner through the injected remap facade (`_karabiner`),
+`platform.remap.ke_variables` and `karabiner_kc.log`, so the `karabiner` use is
+the generator's own `M.REQUIREMENT_STATE_FEATURES` (each `state.<field>` it
+reads) plus `M.REQUIREMENT_FACADE_FEATURES`. Linux and Windows uses come from
+the source signatures of `_shared/modules/features/requirements.toml`, with
+comments stripped (a replaced `xdotool key` still named in a comment is no
+use). Action: when the generator reads a new state field or a module starts
+calling the facade or spawning a vocabulary program, map it to its features
+(or give the plumbing reason), update the `requires` lists the gate names, and
+run `npm run codegen:feature-requirements`; a driver-wide need (Hammerspoon,
+AutoHotkey, LuaJIT, GTK) or an OS tool (PowerShell 5.1, osascript) is not a
+vocabulary id.
+
 ### project-a-caller-owned-menu-is-still-the-renderers-to-fill
 
 Owning a native menu object does not transfer content ownership. The shared
