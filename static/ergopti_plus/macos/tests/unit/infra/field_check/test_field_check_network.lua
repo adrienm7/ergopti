@@ -23,7 +23,7 @@ local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks
 local PAC_URL = "http://pac.intranet.example/proxy.pac"
 local SCUTIL_PAC = "<dictionary> {\n  ProxyAutoConfigEnable : 1\n  ProxyAutoConfigURLString : " .. PAC_URL .. "\n}\n"
 local GOOD_PAC = "function FindProxyForURL(url, host) { return 'DIRECT'; }"
-local HELPER_OK = "step route_lookup pass selected\nstep tls pass trusted\nstep transfer pass http_200\nstep digest skip head_only\n"
+local HELPER_OK = "step route_lookup pass selected\nstep tls pass trusted\nstep transfer pass http_200\nstep digest pass sha256\n"
 
 --- Runs the network check over scripted answers.
 --- @param world table { scutil, pac_status, pac_body, helper_code, helper_output }
@@ -67,7 +67,7 @@ helpers.describe("network check", function()
 		helpers.assert_eq(steps.pac_script.value, "valid")
 		helpers.assert_eq(steps.route_lookup.value, "selected")
 		helpers.assert_eq(steps.transfer.value, "http_200")
-		helpers.assert_eq(steps.digest.state, "skip")
+		helpers.assert_eq(steps.digest.state, "pass")
 		helpers.assert_eq(seen[1], PAC_URL)
 	end)
 
@@ -99,7 +99,7 @@ helpers.describe("network check", function()
 
 	helpers.it("names the native stage that made the download go direct, and passes when direct works", function()
 		local steps, result = run({ scutil = SCUTIL_PAC, pac_status = 200, pac_body = GOOD_PAC, helper_code = 0,
-			helper_output = "step route_lookup info direct_pac_evaluation\nstep tls pass trusted\nstep transfer pass http_200\nstep digest skip head_only\n" })
+			helper_output = "step route_lookup info direct_pac_evaluation\nstep tls pass trusted\nstep transfer pass http_200\nstep digest pass sha256\n" })
 		helpers.assert_true(result.passed)
 		helpers.assert_eq(steps.route_lookup.state, "info")
 		helpers.assert_eq(steps.route_lookup.value, "direct_pac_evaluation")
@@ -108,11 +108,21 @@ helpers.describe("network check", function()
 
 	helpers.it("fails the transfer when the direct attempt after an unusable PAC fails too", function()
 		local steps, result = run({ scutil = SCUTIL_PAC, pac_status = 0, pac_body = nil, helper_code = 0,
-			helper_output = "step route_lookup info direct_pac_download\nstep tls skip not_reached\nstep transfer fail connect\nstep digest skip head_only\n" })
+			helper_output = "step route_lookup info direct_pac_download\nstep tls skip not_reached\nstep transfer fail connect\nstep digest skip not_reached\n" })
 		helpers.assert_true(not result.passed)
 		helpers.assert_eq(steps.pac_download.state, "info")
 		helpers.assert_eq(steps.route_lookup.value, "direct_pac_download")
 		helpers.assert_eq(steps.transfer.value, "connect")
+	end)
+
+	-- Issue #101 follow-up (6): a HEAD that answers proves nothing about the bytes
+	helpers.it("fails the check when the downloaded input does not match its pin", function()
+		local steps, result = run({ scutil = "", helper_code = 0,
+			helper_output = "step route_lookup pass selected\nstep tls pass trusted\nstep transfer pass http_200\nstep digest fail mismatch\n" })
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(steps.transfer.state, "pass")
+		helpers.assert_eq(steps.digest.state, "fail")
+		helpers.assert_eq(steps.digest.value, "mismatch")
 	end)
 
 	helpers.it("reports a route plan lookup at a fallback stage as direct, any other as failed", function()
