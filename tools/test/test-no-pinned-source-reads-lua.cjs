@@ -97,7 +97,10 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //                    scheduling calls of a fresh load; the streaming payload
 //                    declaration-order scan became a completion behaviour case
 //                    in test_api_ollama_stream_retirement.)
-const BASELINE = 22;
+//           22 → 21 (2026-10-31: the llm_bridge choke-point test drives
+//                    apply_prediction through a recording expander instead of
+//                    reading the bridge.)
+const BASELINE = 21;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -135,7 +138,10 @@ const BASELINE = 22;
 //              splitting it in two let the fixer take the driver half.)
 //       75 → 70 (2026-10-31: the three files of the file baseline's 27 → 24.)
 //       70 → 67 (2026-10-31: the two files of the file baseline's 24 → 22.)
-const READ_BASELINE = 67;
+//       67 → 66 (2026-10-31: the llm_bridge choke-point test drives
+//              apply_prediction through a recording expander instead of reading
+//              the bridge.)
+const READ_BASELINE = 66;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
