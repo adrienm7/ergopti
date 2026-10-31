@@ -1094,8 +1094,14 @@ Not started:
       Windows (30 Oct): no longer deferred, `ergopti_network_routes.ps1` `New-ErgoptiPacDirectFallback` goes direct at the policy's stages; [PHYS-W] confirm on a network whose PAC is unreachable.
 - [ ] **AppImage self-contained.** [CODE] `.zsync` and update information are done (10c016e51f,
       6fb83014e3). Built on ubuntu:22.04 (glibc 2.35 floor, no bundled libc or loader, musl refused in words,
-      tray closure kept); the build refuses a foreign loader or a staged C library (dce846a0bd). Left: hosted
-      CI evidence of the Build and `install-linux` AppImage rows on the distro matrix.
+      tray closure kept); the build refuses a foreign loader or a staged C library (dce846a0bd). Reproduced in a
+      Linux container on 31 October (Docker, ubuntu:22.04 from a registry mirror with the proxy CA): the Build
+      row's `appimage-oldest-lts.sh build` makes the 16 MB image and its matching `.zsync`; the
+      `install-linux` AppImage row passes unpacked `--help`, the glibc ceiling (42 ELF files at most
+      GLIBC_2.35, no bundled libc) and the library closure, the catalogue smoke (XEmbed tray, status
+      window, menu on buttons 1 and 3; it needs `/dev/fuse` 0666, as on the runners) and the 11-image sweep
+      (runs on Ubuntu 22.04 to 26.04, Debian 12 and 13, Fedora, openSUSE Leap, Arch; refused in words on
+      Debian 11's glibc 2.31 and on Alpine's musl). Left: the hosted CI run itself.
 - [ ] **Linux X11 window list.** [CODE] `getAll()` is covered by the Openbox receipts (962a25a973),
       run on Xvfb and Openbox in a Linux container on 30 October: `x11_window_list_names_owned_clients`
       lists the three owned clients and all 34 native window receipts pass. Left: the first hosted
