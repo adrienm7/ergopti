@@ -185,6 +185,38 @@ class IdentityChangeReportControls(unittest.TestCase):
         self.assertIn("ctime", line)
         self.assertNotIn("data", line)
 
+    def test_ctime_only_change_of_a_held_product_stays_current(self):
+        image = self.root / "duktape.xcodeproj/project.pbxproj"
+        image.parent.mkdir(parents=True)
+        image.write_bytes(b"generated project\n")
+        held = BUILD.product_snapshot(image, self.root)
+        time.sleep(0.01)
+        # chmod to the same mode changes only ctime, as a background xattr does.
+        os.chmod(image, image.stat().st_mode & 0o7777)
+        self.assertNotEqual(image.stat().st_ctime_ns, held.identity[7])
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            BUILD.current_product(held, self.root)
+        self.assertIn(
+            "[owned-build] retained product ctime changed, bytes and incarnation unchanged: "
+            "duktape.xcodeproj/project.pbxproj (ctime)",
+            log.getvalue(),
+        )
+
+    def test_rewritten_bytes_of_a_held_product_are_refused(self):
+        image = self.root / "product"
+        image.write_bytes(b"compiled image\n")
+        held = BUILD.product_snapshot(image, self.root)
+        time.sleep(0.01)
+        with open(image, "r+b") as stream:
+            stream.write(b"C")
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            with self.assertRaises(BASE.NativeBuildError) as caught:
+                BUILD.current_product(held, self.root)
+        self.assertEqual(caught.exception.code, "source_identity")
+        self.assertIn("data", log.getvalue())
+
     def test_unchanged_product_reports_nothing(self):
         image = self.root / "product"
         image.write_bytes(b"compiled image\n")
