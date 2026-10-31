@@ -83,7 +83,7 @@ only by static and JS tests. Once it lands on `dev`:
   a meta test.
 - Ollama digest mismatch on Windows: the macOS field run of 2026-10-31 saw a
   fresh 366 MB layer fail its sha256 check (`digest mismatch, file must be
-  downloaded again`). Ollama deletes that layer before it reports the
+downloaded again`). Ollama deletes that layer before it reports the
   mismatch, so macOS now pulls once more and then fails with the localized
   `ollama.digest_mismatch` (3939a569ad). The Windows managed pull
   (`modules/llm/ollama_managed_bootstrap.ahk`, `_PullResult` and the menu pull
@@ -174,3 +174,12 @@ ready (3 step(s)).` and `build/field-run/ready.json` names the driver's pid.
   - `tests/unit/ui/menu/test_menu_row_order.ahk` (edited: the corpus keeps one
     list vector since the `llm_menu_rows` rule was retired);
   - then `run_all.ahk` again: every menu goes through the edited renderer.
+
+## Seven more local AI servers (31 October)
+
+`local_servers.json` gained SGLang, KoboldCpp, text-generation-webui, GPT4All,
+AMD Lemonade, Docker Model Runner and exo (57a95dbada). Two Windows tests still
+count the old catalogue and will go red until they read it:
+`test_local_server_auth.ahk` (expects 4 descriptors) and
+`test_local_server_panel_view_preparation.ahk` (4 and 5 orders, 4 providers).
+Make them read the catalogue, then run the local servers panel once.
