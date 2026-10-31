@@ -25,6 +25,7 @@
 local M = {}
 
 local RoutePlan = require("network.route_plan")
+local TextUtils = require("text_utils")
 
 --- The closed refusal reasons.
 M.INVALID = "proxy-override-invalid"
@@ -48,7 +49,7 @@ function M.new(data)
 	function override.parse(value)
 		if value == nil then value = data.default end
 		if type(value) ~= "string" then return nil, M.INVALID end
-		value = value:match("^%s*(.-)%s*$")
+		value = TextUtils.trim(value)
 		if value == "" then return { mode = "automatic" } end
 		if value:lower() == direct then return { mode = "direct" } end
 		if value == "direct" or not RoutePlan.valid_route(value) then return nil, M.INVALID end

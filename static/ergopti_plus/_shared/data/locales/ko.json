@@ -3715,7 +3715,7 @@
 	"platform_reason.layer_spotlight_is_macos": "macOS 전용: 이 동작은 macOS의 검색 기능인 Spotlight를 엽니다. Windows 또는 Linux에서는 대신 사용 중인 데스크톱의 검색 단축키를 키 조합으로 지정하세요.",
 	"platform_reason.layer_pointer_source_is_not_linux": "Linux에서는 사용할 수 없음: Linux 후크는 마우스를 독점하지 않고 관찰만 하므로, 레이어 바인딩이 대체할 버튼 입력을 취소할 수 없습니다. 마우스를 독점하면 데스크톱에서 포인터를 빼앗게 됩니다.",
 	"platform_reason.debug_surface_is_each_drivers_own": "각 드라이버는 자신의 런타임으로 디버깅합니다. AutoHotkey는 Window Spy와 변수 목록, 키 기록을 제공하고 Hammerspoon은 Lua 콘솔을 제공합니다. 다른 런타임에는 열 만한 대응물이 없습니다.",
-	"platform_reason.proxy_override_not_yet_on_windows": "아직 Windows에서는 지원되지 않습니다: Windows에서는 다운로드가 Windows 프록시 설정을 따릅니다.",
+	"platform_reason.proxy_override_follows_windows_settings": "Windows에서는 다운로드가 Windows 설정(네트워크 및 인터넷 > 프록시)의 프록시를 따르며, 그곳에서 수동 프록시를 입력할 수 있습니다.",
 	"platform_reason.chord_families_are_each_platforms": "드라이버가 묶는 조합 계열은 그 플랫폼의 것입니다. Windows는 AltGr과 CapsLock 조합을 묶고 개인 단축키 파일을 두며, macOS는 Ctrl과 Cmd 단축키를 묶습니다. 각 드라이버는 자신이 묶는 계열만 나열합니다.",
 	"platform_reason.metrics_extras_are_not_on_linux": "Linux에서는 사용할 수 없습니다: 이 드라이버에는 애플리케이션별 제외 목록이 없습니다.",
 	"platform_reason.wpm_readout_needs_a_menubar": "Windows 제외: 이 항목들은 메뉴 막대(macOS) 또는 알림 영역(Linux)의 WPM 표시를 설정합니다. Windows에는 이에 해당하는 것이 없으며, 떠 있는 위젯이 표시기입니다.",

@@ -1268,7 +1268,7 @@
 				"hs",
 				"linux"
 			],
-			"reason_key": "platform_reason.proxy_override_not_yet_on_windows"
+			"reason_key": "platform_reason.proxy_override_follows_windows_settings"
 		},
 		{
 			"type": "command",

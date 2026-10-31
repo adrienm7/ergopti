@@ -3715,7 +3715,7 @@
 	"platform_reason.layer_spotlight_is_macos": "Yalnızca macOS: Bu eylem, macOS'un arama özelliği olan Spotlight'ı açar. Windows veya Linux'ta bunun yerine masaüstünüzün kendi arama kısayolunu tuş bileşimi olarak atayın.",
 	"platform_reason.layer_pointer_source_is_not_linux": "Linux’ta yok: Linux kancası fareyi tutmadan izler; bu yüzden bir katman bağlamasının yerine geçeceği düğme basışını iptal edemez. Fareyi tutmak imleci masaüstünden alırdı.",
 	"platform_reason.debug_surface_is_each_drivers_own": "Her sürücü kendi çalışma ortamıyla hata ayıklar: AutoHotkey Window Spy'ı, bir değişken listesini ve tuş geçmişini sunar, Hammerspoon bir Lua konsolu sunar. Diğer ortamlarda açılacak bir karşılık yoktur.",
-	"platform_reason.proxy_override_not_yet_on_windows": "Henüz Windows'ta yok: orada indirmeler Windows proxy ayarlarını izler.",
+	"platform_reason.proxy_override_follows_windows_settings": "Windows'ta indirmeler Windows ayarlarındaki proxy'yi izler (Ağ ve İnternet > Proxy); orada elle bir proxy girilebilir.",
 	"platform_reason.chord_families_are_each_platforms": "Bir sürücünün bağladığı tuş birleşimi aileleri kendi platformuna aittir: Windows AltGr ve CapsLock birleşimlerini gruplar ve kişisel kısayol dosyası tutar, macOS Ctrl ve Cmd kısayollarını gruplar. Her sürücü yalnızca bağladığı aileyi listeler.",
 	"platform_reason.metrics_extras_are_not_on_linux": "Linux'ta kullanılamaz: bu sürücüde uygulama başına dışlama listesi yoktur.",
 	"platform_reason.wpm_readout_needs_a_menubar": "Windows'ta yok: bu satırlar menü çubuğundaki (macOS) veya bildirim alanındaki (Linux) dakikadaki sözcük göstergesini ayarlar. Windows'ta bunun karşılığı yoktur; göstergesi yüzen pencere öğesidir.",
