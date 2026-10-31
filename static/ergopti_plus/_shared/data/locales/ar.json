@@ -2379,8 +2379,6 @@
 	"ollama.model_ready": "%s جاهز!",
 	"ollama.model_repair": "يبدو النموذج تالفاً. جارٍ محاولة إعادة التنزيل: %s",
 	"ollama.model_repair_title": "جارٍ إصلاح نموذج Ollama",
-	"ollama.not_detected_body": "يرجى تثبيت Ollama والمحاولة مرة أخرى.",
-	"ollama.not_detected_title": "لم يتم اكتشاف Ollama",
 	"ollama.service_disconnected": "توقفت خدمة Ollama عن الاستجابة.",
 	"ollama.service_ready": "خدمة Ollama جاهزة ✅",
 	"ollama.service_stopped": "خدمة Ollama متوقفة. جارٍ التشغيل…",

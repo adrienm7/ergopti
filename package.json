@@ -568,7 +568,7 @@
 		"test:encryptor-launch": "node ./tools/test/test-encryptor-launch.cjs",
 		"test:app-cloner-generated-literals": "node ./tools/test/test-app-cloner-generated-literals.cjs",
 		"test:app-cloner-dock-url": "node ./tools/test/test-app-cloner-dock-url.cjs",
-		"test:ollama-bootstrap-network-hardening": "node ./tools/test/test-ollama-bootstrap-network-hardening.cjs",
+		"test:ollama-stock-installer-retired": "node ./tools/test/test-ollama-stock-installer-retired.cjs",
 		"test:mlx-download-trust-activation": "node ./tools/test/test-mlx-download-trust-activation.cjs",
 		"test:macos-native-http-receiving": "node ./tools/test/test-macos-native-http-receiving.cjs",
 		"test:macos-managed-bootstrap-http": "node ./tools/test/test-macos-managed-bootstrap-http.cjs",
