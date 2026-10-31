@@ -1214,7 +1214,8 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       Done on macOS and Linux (sixth integration batch): schema v15 `v14_to_v15` migration of the slots and
       Ctrl-letter switches, role table with per-driver families, manifest slots, both drivers adopt the role
       names, migrated-config binding proof, AHK fixtures pinned to v15, per-slot parameters carried by
-      `rename_prefix`. Left: the Windows adoption, macOS `ctrl_g` to `open_url` later.
+      `rename_prefix`. Left: the Windows adoption; macOS `ctrl_g` to its slot is a schema v20 step, Windows PC agent first
+      (the AHK tests that treat 19 as current move to 20; details in `docs/tooling/windows-pc-agent-handoff.md`).
 - [x] **PAR-45. Notifications: one behaviour for toggles and refusals.** [CODE] Done on macOS and Linux
       (shared `feature_notice.lua`, Linux quit refusal). Left: Windows `NotifyFeature(label, enabled)` around
       `NotifierSend` at the same call sites, and a Windows quit-refusal path firing `notify.quit_refused`.
