@@ -226,7 +226,7 @@
 			"kind": "field_check",
 			"check": "slow_lines",
 			"deadline_seconds": 20,
-			"proves": "One bounded pass over today's log names the main-thread segment the slow HotPath lines charge most, counts the slow ingest ticks and preferences saves, and finds no failed lease-bound start nor boot layout misread."
+			"proves": "One pass over today's log names the busiest slow HotPath segment and hold phase, the largest stage and forks of the worst ingest tick, preferences save, window probe and diagnostics, and no failed lease-bound start or layout misread."
 		},
 		{
 			"id": "field_fifo_safety",

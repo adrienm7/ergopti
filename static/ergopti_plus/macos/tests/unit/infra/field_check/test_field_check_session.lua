@@ -66,24 +66,42 @@ helpers.describe("field check session: costs and edge cases a program can answer
 
 	helpers.it("names the dominant slow segment of the day log, through the awk summary", function()
 		local summary = assert(Session.parse_slow_summary(
-			"segment keymap.keydown 2 15.75 12.50\nsegment hotstrings.match 1 40.00 40.00\ningest 1 230\nprefs 0 0\n"
+			"segment keymap.keydown 2 15.75 12.50\nsegment hotstrings.match 1 40.00 40.00\ningest 1 230\n"
+				.. "stage ingest read\nforks ingest 0 0\nprefs 0 0\nprobe 0 0\ndiagnostics 0 0\n"
 				.. "lease_bound 0\nearly_layout 0\n"))
 		helpers.assert_eq(summary.segments[1].name, "hotstrings.match")
 		helpers.assert_eq(summary.prefs.count, 0)
 		helpers.assert_nil(Session.parse_slow_summary("segment x 1 1.00 1.00\n"), "a summary without its totals is refused")
+		helpers.assert_nil(Session.parse_slow_summary("ingest 1 230\nprefs 0 0\nprobe 0 0\ndiagnostics 0 0\n"
+			.. "lease_bound 0\nearly_layout 0\n"), "a kind seen without its stage line is refused")
 		local report = Report.new_report("slow_lines")
 		Session.slow_lines({
 			today_log_path = function() return "/logs/today.log" end,
 			exec = function(executable, args, _, callback)
 				helpers.assert_eq(executable, "/usr/bin/awk")
 				helpers.assert_eq(args[2], "/logs/today.log")
-				callback(0, "segment keymap.keydown 2 15.75 12.50\ningest 3 230\nprefs 1 88\nlease_bound 2\nearly_layout 0\n")
+				callback(0, "segment keymap.keydown 2 15.75 12.50\ningest 3 230\nstage ingest read\nforks ingest 2 90\n"
+					.. "prefs 1 88\nstage prefs write\nforks prefs 4 70\nprobe 1 400\nstage probe title\nforks probe 0 0\n"
+					.. "diagnostics 2 230\nstage diagnostics system\nforks diagnostics 0 0\n"
+					.. "phase menu_item.keyboard_layout 500.00\nphase menu_keyboard_layout.rows 300.50\n"
+					.. "phase menu_keyboard_layout.sources 20.00\nlease_bound 2\nearly_layout 0\n")
 			end,
 		}, report, function() end)
 		local steps = steps_of(report)
 		helpers.assert_eq(steps.slow_dominant.value, "keymap.keydown")
 		helpers.assert_eq(steps.slow_ingest_ticks.value, "3:230")
 		helpers.assert_eq(steps.slow_preferences_saves.value, "1:88")
+		-- (main-thread-holds-field-decisions) each part waiting on field data has its deciding step.
+		helpers.assert_eq(steps.slow_ingest_stage.value, "read")
+		helpers.assert_eq(steps.slow_ingest_forks.value, "2:90")
+		helpers.assert_eq(steps.slow_preferences_save_stage.value, "write")
+		helpers.assert_eq(steps.slow_preferences_save_forks.value, "4:70")
+		helpers.assert_eq(steps.slow_ignored_window_probes.value, "1:400")
+		helpers.assert_eq(steps.slow_ignored_window_stage.value, "title")
+		helpers.assert_eq(steps.slow_diagnostics.value, "2:230")
+		helpers.assert_eq(steps.slow_diagnostics_collector.value, "system")
+		helpers.assert_eq(steps.slow_hold_phase.value, "menu_item.keyboard_layout:500")
+		helpers.assert_eq(steps.slow_layout_menu_phase.value, "menu_keyboard_layout.rows:300")
 		helpers.assert_eq(steps.log_lease_bound_failures.state, Report.STATE_FAIL)
 		helpers.assert_eq(steps.log_lease_bound_failures.value, "2")
 		helpers.assert_eq(steps.log_layout_change_before_baseline.state, Report.STATE_PASS)
@@ -107,6 +125,21 @@ helpers.describe("field check session: costs and edge cases a program can answer
 			"10:01 [WARN] HotPath: Slow keymap.keydown: 3.25 ms own, 4.00 ms total, parent none (2 similar since the last line).",
 			"10:02 [WARN] keystats: Slow ingest tick 230 ms (12 ms; entries=4 statements=9).",
 			"10:03 [WARN] preferences: Slow preferences save 88 ms (prepare=1 write=80 ms; operations=2).",
+			"10:03 [WARN] preferences: Slow preferences save 900 ms (prepare=300 write=600 ms; operations=1; "
+				.. "prepare: snapshot=2 decode=5 models=0 sparse=280 wrap=1 rows=0 gestures=0 llm=0 shortcuts=0 "
+				.. "hotstrings=12 ms; proposed=3; metadata_commands=4 in 590 ms; lua_heap=40->41 MB).",
+			"10:02 [WARN] keystats: Slow ingest tick 340 ms (drain=1 foreign=0 outbox=2 read=40 build=3 apply=4 "
+				.. "commit=5 append=280 notify=0 ms; append: write=270 ms; metadata_commands=2 in 260 ms; "
+				.. "entries=4 statements=9).",
+			"10:07 [WARN] keymap.utils: Slow ignored-window probe 420 ms (frontmost=1 focused=400 title=19 ms).",
+			"10:08 [INFO] healthcheck: The synchronous diagnostics took 230.6 ms, over the 5 ms budget; "
+				.. "slowest: system=180.2 ms, layout=30.1 ms.",
+			"10:09 [WARN] runtime: An hs.timer.doAfter callback (ui/menu/menu_builder.lua:12) held the main thread "
+				.. "for 1200 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases "
+				.. "inside the hold: menu_item.keyboard_layout=900.0 ms, menu_keyboard_layout.rows=700.5 ms. "
+				.. "Lua heap 40->41 MB.",
+			"10:10 [INFO] runtime: Main-thread hold of 300 ms in an hs.timer.doAfter callback (x.lua:1). Phases "
+				.. "inside the hold: menu_keyboard_layout.sources=250.0 ms. Lua heap 40->40 MB.",
 			"10:04 [ERROR] remap: Lease-bound input startup failed: lease-stopping.",
 			"10:05 [INFO] remap.watchers: Layout poll detected change before its baseline: 'A' → 'B'.",
 			"10:06 [INFO] remap.watchers: Layout poll detected change: 'B' → 'C'.",
@@ -120,8 +153,23 @@ helpers.describe("field check session: costs and edge cases a program can answer
 		helpers.assert_eq(summary.segments[1].name, "keymap.keydown")
 		helpers.assert_eq(summary.segments[1].count, 2)
 		helpers.assert_eq(summary.segments[1].worst_ms, 12.5)
-		helpers.assert_eq(summary.ingest.worst_ms, 230)
-		helpers.assert_eq(summary.prefs.count, 1)
+		helpers.assert_eq(summary.prefs.count, 2)
+		-- (main-thread-holds-field-decisions) the worst line of each kind names its largest stage.
+		helpers.assert_eq(summary.prefs.worst_ms, 900)
+		helpers.assert_eq(summary.prefs.stage, "write")
+		helpers.assert_eq(summary.prefs.forks, 4)
+		helpers.assert_eq(summary.prefs.fork_ms, 590)
+		helpers.assert_eq(summary.ingest.worst_ms, 340)
+		helpers.assert_eq(summary.ingest.stage, "append")
+		helpers.assert_eq(summary.ingest.forks, 2)
+		helpers.assert_eq(summary.probe.count, 1)
+		helpers.assert_eq(summary.probe.stage, "focused")
+		helpers.assert_eq(summary.diagnostics.worst_ms, 230)
+		helpers.assert_eq(summary.diagnostics.stage, "system")
+		helpers.assert_eq(summary.phases[1].name, "menu_item.keyboard_layout")
+		helpers.assert_eq(summary.phases[2].name, "menu_keyboard_layout.rows")
+		helpers.assert_eq(summary.phases[3].name, "menu_keyboard_layout.sources")
+		helpers.assert_eq(summary.phases[3].ms, 250)
 		helpers.assert_eq(summary.lease_bound, 1)
 		helpers.assert_eq(summary.early_layout, 1, "only the change before the baseline is the misread")
 	end)

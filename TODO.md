@@ -207,9 +207,13 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      (`idle_cpu_percent`); resident memory and its growth, Lua heap growth and main-thread holds over 250 ms
      in the window are named.
    - `field_slow_lines`: one `awk` pass over today's log (a summary only reaches the task's pipe) tallies
-     the HotPath `Slow <segment>: X ms own` lines by segment, and the `Slow ingest tick` and
-     `Slow preferences save` lines; `slow_dominant` names the segment with the most own time (the five
-     largest in the log window), the two others are `count:worst_ms`; `log_lease_bound_failures` and
+     the HotPath `Slow <segment>: X ms own` lines by segment, and the `Slow ingest tick`,
+     `Slow preferences save`, `Slow ignored-window probe` and over-budget diagnostics lines; `slow_dominant`
+     names the segment with the most own time (the five largest in the log window), the four others are
+     `count:worst_ms` with the worst line's largest stage (`slow_*_stage`, `slow_diagnostics_collector`) and
+     metadata forks (`slow_*_forks`, `count:ms`); `slow_hold_phase` and `slow_layout_menu_phase` name the
+     busiest phase inside the day's main-thread holds and the busiest `menu_keyboard_layout.*` stage
+     (`name:ms`); `log_lease_bound_failures` and
      `log_layout_change_before_baseline` fail when a `Lease-bound input startup failed` or a
      `Layout … detected change before its baseline` line is in the day log (item 38).
    - `field_fifo_safety`: in a folder of its own under `TMPDIR`, a FIFO (a reader attached first, so a
