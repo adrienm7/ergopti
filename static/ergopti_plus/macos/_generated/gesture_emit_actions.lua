@@ -36,6 +36,8 @@ return {
 	{ id = "escape", key = "escape", mods = {  } },
 	{ id = "fullscreen", key = "f", mods = { "cmd", "ctrl" } },
 	{ id = "home", key = "home", mods = {  } },
+	{ id = "nav_back", key = "left", mods = { "cmd" } },
+	{ id = "nav_forward", key = "right", mods = { "cmd" } },
 	{ id = "opt_backspace", key = "delete", mods = { "alt" } },
 	{ id = "opt_delete_fwd", key = "forwarddelete", mods = { "alt" } },
 	{ id = "page_down", key = "pagedown", mods = {  } },
