@@ -20,7 +20,9 @@
  *    declared check, writes only declared verdicts and refusal reasons, starts
  *    in developer source mode only and stops with the driver;
  * 5. the Linux field run (linux/infra/field_run.lua) has its steps file and
- *    repeats no protocol key in it: it reads the protocol from this file.
+ *    repeats no protocol key in it: it reads the protocol from this file;
+ * 6. every driver that declares a reload step writes the resume document with
+ *    each key the declaration lists for it, before it asks for the reload.
  * ==============================================================================
  */
 
@@ -66,10 +68,7 @@ check('the shared declaration is well formed', () => {
 		assert.doesNotThrow(() => new RegExp(protocol[key]), key);
 	assert.deepEqual(
 		Object.keys(protocol.documents).sort(),
-		[
-			...Object.keys(protocol.files).filter((name) => !['results', 'resume'].includes(name)),
-			'result'
-		].sort()
+		[...Object.keys(protocol.files).filter((name) => name !== 'results'), 'result'].sort()
 	);
 	for (const [name, keys] of Object.entries(protocol.optional_keys)) {
 		assert(name in protocol.documents, `optional keys of an undeclared document ${name}`);
@@ -194,6 +193,33 @@ check('the Linux field run declares its steps and repeats no protocol key', () =
 	assert(fs.existsSync(path.join(ROOT, relative)), `${relative} is missing`);
 	for (const key of Object.keys(read(relative)))
 		assert(key === '_comment' || !(key in protocol), `${relative} repeats the protocol key ${key}`);
+});
+
+check('every reload step writes the declared resume document', () => {
+	const sources = {
+		macos: 'static/ergopti_plus/macos/infra/field_run.lua',
+		linux: 'static/ergopti_plus/linux/infra/field_run.lua'
+	};
+	let drivers = 0;
+	for (const [os, relative] of Object.entries(protocol.steps_file)) {
+		if (!fs.existsSync(path.join(ROOT, relative))) continue;
+		if (!read(relative).steps.some((step) => step.kind === 'reload')) continue;
+		drivers++;
+		assert(os in sources, `${os} declares a reload step this gate cannot read`);
+		const source = fs.readFileSync(path.join(ROOT, sources[os]), 'utf8');
+		const body = source.match(/^function Session:reload_step\([^)]*\)\n([\s\S]*?)^end$/m);
+		assert(body, `${sources[os]} has no reload step`);
+		// The resume document is the publish whose path is the resume file.
+		const publish = body[1].match(
+			/self:publish\((?:"resume", )?resume_path, \{([\s\S]*?)\}\) then/
+		);
+		assert(publish, `${sources[os]}: the reload step publishes no resume document`);
+		for (const key of protocol.documents.resume)
+			assert.match(publish[1], new RegExp(`\\b${key} =`), `${os} resume document lacks ${key}`);
+		const reloadAt = body[1].search(/pcall\(ports\.reload(?:_driver)?,/);
+		assert(reloadAt > body[1].indexOf(publish[0]), `${os} asks for the reload before the resume`);
+	}
+	assert.equal(drivers, 2, 'macOS and Linux each declare a reload step');
 });
 
 console.log(`[OK] field run protocol (${checks} checks).`);
