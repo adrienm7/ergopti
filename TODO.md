@@ -1390,8 +1390,9 @@ Added October 22 (from the agents' reports; details in their commits):
       session, so no reading by hand is left.
 - [ ] **Keystats rename leftovers.** [CODE] The rename is done (180a53e4de, 1 283 files, 579 paths). Left:
       the comment in `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` (a compiled
-      script: recompile on a Mac); declare each persisted name once and make tests read it instead
-      of pinning spellings, so the next rename is cheap.
+      script: `osadecompile` it, edit the comment, `osacompile -o` it back, on a Mac); persisted names
+      read from their one declaration: macOS metrics state names (9dc1404758), the Linux topical log
+      file (from the generated sub-file table); left [PC] the Windows tests' spellings.
 - [ ] **Issue #101: Mac follow-ups.** [PHYS-M] Fixed, to confirm on the Mac with the next release:
       ATS key so the URLSession can fetch an `http://` company PAC (c0c29cd8ab); direct route when the
       PAC lookup names no route (719c7fcd76); no retry of a refused route (ace928dc1c); the lookup now
