@@ -39,7 +39,15 @@ const OUTPUT_SWIFT = path.join(
 	'macos/launcher/Sources/ErgoptiPlus/Identifiers.generated.swift'
 );
 
-const GROUPS = ['app', 'bundle_ids', 'service_labels', 'hosts', 'dev_source', 'field_report'];
+const GROUPS = [
+	'app',
+	'bundle_ids',
+	'signing_ids',
+	'service_labels',
+	'hosts',
+	'dev_source',
+	'field_report'
+];
 const VALUE_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 // The field report names are repository paths and a branch prefix: slash-
 // separated plain segments, with an optional final slash for a prefix.
@@ -102,6 +110,7 @@ const BANNER = (comment) =>
 const SHELL_PREFIX = {
 	app: 'ERGOPTI_APP',
 	bundle_ids: 'ERGOPTI_BUNDLE_ID',
+	signing_ids: 'ERGOPTI_SIGNING_ID',
 	service_labels: 'ERGOPTI_SERVICE_LABEL',
 	hosts: 'ERGOPTI_HOST',
 	dev_source: 'ERGOPTI_DEV_SOURCE',
@@ -150,6 +159,7 @@ ${GROUPS.map((group) => {
 const SWIFT_ENUM = {
 	app: 'App',
 	bundle_ids: 'BundleIds',
+	signing_ids: 'SigningIds',
 	service_labels: 'ServiceLabels',
 	hosts: 'Hosts',
 	dev_source: 'DevSource',

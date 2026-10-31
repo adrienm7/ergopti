@@ -22,6 +22,13 @@ class Identifiers {
 		static LAUNCHER := "com.ergoptiplus.app"
 		static HAMMERSPOON := "com.ergoptiplus.app.hammerspoon"
 	}
+	class SigningIds {
+		static RUNTIME_INSTALLER := "com.ergoptiplus.app.runtime-installer"
+		static INSTALLED_PHYSICAL_SOURCE := "com.ergoptiplus.app.installed-physical-source"
+		static REMAP_CORE := "com.ergoptiplus.remap.core"
+		static REMAP_CONSOLE := "com.ergoptiplus.remap.console"
+		static REMAP_CLI := "com.ergoptiplus.remap.cli"
+	}
 	class ServiceLabels {
 		static MACOS_CORE := "com.ergoptiplus.runtime.core"
 		static MACOS_REMAP_GUARDIAN := "com.ergoptiplus.remap-guardian"
