@@ -807,6 +807,18 @@ const RULES = [
 			].includes(f)
 	},
 	{
+		gate: 'go-proxy-relay',
+		why: 'the local NTLM/Negotiate relay (docs/design/proxy-auth-relay.md) is proven only under go test',
+		match: (f) =>
+			f.startsWith('static/ergopti_plus/_shared/go/native_http/proxyrelay/') ||
+			f.startsWith('static/ergopti_plus/_shared/go/native_http/cmd/ergopti-proxy-relay/') ||
+			[
+				'static/ergopti_plus/_shared/modules/network/proxy_auth_relay.json',
+				'static/ergopti_plus/_shared/tests/corpus/network/proxy_auth_relay_probe_vectors.json',
+				'tools/test/run-go-proxy-relay.cjs'
+			].includes(f)
+	},
+	{
 		gate: 'linux-network-runtime',
 		why: 'managed networking requires actual LuaJIT luv, GIO modules, compiled schemas and installed helper paths',
 		match: (f) =>
@@ -970,6 +982,7 @@ const GATE_COMMANDS = {
 	'linux-http-stream': { npm: 'test:linux:http-stream' },
 	'linux-network-runtime': { npm: 'test:linux:network-runtime' },
 	'go-route-plan': { npm: 'test:go-route-plan' },
+	'go-proxy-relay': { npm: 'test:go-proxy-relay' },
 	'linux-nix-native': { npm: 'test:linux:nix-native', platform: 'linux' },
 	'linux-updater-temp-native': { npm: 'test:linux:updater-temp-native', platform: 'linux' },
 	'linux-updater-archive-native': { npm: 'test:linux:updater-archive-native', platform: 'linux' },
