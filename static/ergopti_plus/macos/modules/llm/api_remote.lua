@@ -72,6 +72,7 @@ local ProviderUses   = require("modules.llm.provider_uses")
 local LocalServers   = require("modules.llm.local_servers")
 local LocalServerPorts = require("modules.llm.local_server_ports")
 local AuthPolicy     = require("llm.local_server_auth")
+local LocalServerMenu = require("llm.local_server_menu")
 local ThinkingOff    = require("llm.thinking_off")
 local ThinkingFamilies = require("modules.llm.thinking_families")
 local ModelCapabilities = require("llm.model_capabilities")
@@ -3771,7 +3772,10 @@ function M.local_server_views()
 		if target and descriptor then
 			local scan = M.is_local_server(id) and LocalServers.port_scan(id) or nil
 			local verdict = LocalServers.result(id)
-			local view = { id = id, display_name = descriptor.label, base_url = target.base_url,
+			-- A row whose response names another row of its address shows that name
+			local catalogued = LocalServers.SERVERS[id] ~= nil
+			local view = { id = id, base_url = target.base_url,
+				display_name = catalogued and LocalServerMenu.label_of(LocalServers.SERVERS, id, verdict) or descriptor.label,
 				port = tonumber(target.base_url:match("^%a[%w+.-]*://[^/]-:(%d+)")), port_source = target.port_source }
 			if target.port_source ~= "user" and scan and scan.running == false then
 				view.reason = "not_running"

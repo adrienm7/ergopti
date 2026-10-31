@@ -58,6 +58,9 @@ local LAUNCHES = {
 	{ server = "exo", script = "venv/bin/exo", args = { "--api-port", "47808" }, port = 47808, source = "cli" },
 	{ server = "llamacpp", script = "models/Qwen3-4B.llamafile", args = { "--server", "--port", "47809" },
 		port = 47809, source = "cli" },
+	{ server = "vllm", script = "venv/bin/vllm", args = { "serve", "Qwen/Qwen3-4B", "--port", "47810" },
+		port = 47810, source = "cli" },
+	{ server = "tabbyapi", script = "tabbyAPI/start.py", args = { "--port", "47811" }, port = 47811, source = "cli" },
 }
 
 --- Writes a file, creating its folders.

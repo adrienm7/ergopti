@@ -208,6 +208,27 @@ downloaded again`). Ollama deletes that layer before it reports the
   clean, then `node tools/test/test-config-template-shared.cjs` (it needs `lua`
   on PATH, or `LUA=<path>`). A future first-boot copy in AHK copies the
   projected Windows file, never re-renders defaults.
+- Local-server fingerprints (2026-10-31; same data as macOS and Linux, no
+  `.ahk` touched): (1) port `_shared/lua/llm/local_server_fingerprint.lua` as
+  `_shared/modules/llm/local_server_fingerprint.ahk`: `Parse(Root, Order)`
+  groups rows sharing a `base_url` (first in `server_order` is the default)
+  and refuses a fingerprint on an unshared address, a duplicate in one group,
+  a `model_field` outside `^[A-Za-z_][A-Za-z0-9_]*$` or an empty `equals`;
+  `Identify(Body, Id, Identities)` returns the one row of Id's group whose rule
+  matches a `data[]` object exactly. (2) In `local_server_discovery.ahk`, keep
+  per answering address the identified row, else the group's default; turn the
+  others into `{status: down, shadowed_by}`, set `server` on a kept row the
+  listing names differently, and count both in the verdict-change check; pass
+  the identities from `windows/modules/llm/local_servers.ahk`. (3) Port
+  `label_of` into `local_server_menu.ahk` and use it for row, page-row and view
+  labels. (4) `local_server_auth.ahk`: record `address_default` and make
+  `EntryMatches` refuse a generic openai/openai_compat entry for a non-default
+  row. (5) Replay `_shared/tests/corpus/llm/local_server_fingerprint.json` in a
+  new `test_local_server_fingerprint.ahk`. (6) Counts: `test_local_server_ports.ahk`
+  cases 28 -> 30; `test_local_server_auth.ahk` `affinity_cases` 24 -> 28 and its
+  stale `Catalogue["order"].Length` 4 -> 13; check
+  `test_local_server_panel_view_preparation.ahk`. (7) `LocalServerPortsDescriptor`
+  accepts the `vllm`/`tabbyapi` descriptors and ignores the `fingerprint` key.
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 
