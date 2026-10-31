@@ -130,4 +130,17 @@ function M.pinned(manifest)
 	}
 end
 
+--- The VirtualHIDDevice version the manifest pins, before the runtime itself is
+--- built. The driver group is pinned from the pqrs release alone, so the field
+--- check can judge the installed driver with the owner's own verdict while the
+--- runtime and the capture requirement still wait for the hosted build.
+--- @param manifest any Decoded manifest.
+--- @return string|nil version Nil unless every virtual_hid_device field is pinned.
+function M.virtual_hid_version(manifest)
+	for _, path in ipairs(M.unpinned(manifest)) do
+		if path:find("^virtual_hid_device%.") then return nil end
+	end
+	return manifest.virtual_hid_device.version
+end
+
 return M

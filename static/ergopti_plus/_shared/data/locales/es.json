@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "Archivo de servicio del runtime propio presente",
 	"field_check.step.job_loaded": "Servicio del runtime propio cargado",
 	"field_check.step.driver_state": "Controlador de teclado virtual",
+	"field_check.step.driver_verdict": "Compatibilidad del controlador de teclado virtual",
 	"field_check.step.stock_app": "Aplicación Karabiner-Elements instalada",
 	"field_check.step.stock_running": "Procesos de Karabiner-Elements en ejecución",
 	"field_check.step.owned_running": "Procesos del runtime propio en ejecución",

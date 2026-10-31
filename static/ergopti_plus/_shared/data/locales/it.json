@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "File di servizio del runtime proprio presente",
 	"field_check.step.job_loaded": "Servizio del runtime proprio caricato",
 	"field_check.step.driver_state": "Driver della tastiera virtuale",
+	"field_check.step.driver_verdict": "Compatibilità del driver della tastiera virtuale",
 	"field_check.step.stock_app": "App Karabiner-Elements installata",
 	"field_check.step.stock_running": "Processi di Karabiner-Elements in esecuzione",
 	"field_check.step.owned_running": "Processi del runtime proprio in esecuzione",

@@ -237,6 +237,7 @@
 	"field_check.step.job_file": "Файл служби власного середовища знайдено",
 	"field_check.step.job_loaded": "Службу власного середовища завантажено",
 	"field_check.step.driver_state": "Драйвер віртуальної клавіатури",
+	"field_check.step.driver_verdict": "Сумісність драйвера віртуальної клавіатури",
 	"field_check.step.stock_app": "Застосунок Karabiner-Elements встановлено",
 	"field_check.step.stock_running": "Процеси Karabiner-Elements запущено",
 	"field_check.step.owned_running": "Процеси власного середовища запущено",
