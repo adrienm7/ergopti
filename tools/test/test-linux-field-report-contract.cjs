@@ -43,6 +43,7 @@ const APP_DIRS = 'static/ergopti_plus/_shared/lua/app_dirs.lua';
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
 const SHELL_CHECKS = 'tools/dev/linux-field-shell-checks.sh';
+const FIELD_RUN = 'tools/dev/linux-field-run.sh';
 const SERVICE = 'static/ergopti_plus/linux/ergopti-hotstrings.service';
 // The analyser and the declarations it reads its budgets from.
 const ANALYSER = 'tools/dev/field-log-analyse.py';
@@ -137,6 +138,7 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 		COLLISIONS,
 		BUNDLED_SAMPLE,
 		SHELL_CHECKS,
+		FIELD_RUN,
 		SERVICE,
 		ANALYSER,
 		...ANALYSER_SOURCES
@@ -276,9 +278,25 @@ function read(folder, name) {
 
 		await check('the header says what the collector does not cover and why', () => {
 			assert.match(collector, /^# NOT COVERED, AND WHY:$/m);
-			assert.match(collector, /No field run\. The Linux daemon has no request protocol/);
+			assert.match(collector, /A daemon that is not running gets no field run/);
 			assert.match(collector, /No diagnostics export\./);
 		});
+
+		await check(
+			"the field run asks the daemon itself, with the driver's own folder and names",
+			() => {
+				assert.match(collector, /^\. "\$REPO_ROOT\/tools\/dev\/linux-field-run\.sh"$/m);
+				assert.match(collector, /^field_linux_run "\$\{REPO_ROOT\}" "\$\{out\}"/m);
+				const runner = fs.readFileSync(path.join(ROOT, FIELD_RUN), 'utf8');
+				assert.match(runner, /require\("infra\.field_run"\)/);
+				assert.match(runner, /require\("app_dirs"\)\.folder_name/);
+				assert.doesNotMatch(
+					runner.replace(/^\s*#.*$/gm, ''),
+					/field-run"|ready\.json|request\.json|done\.json/,
+					'no second copy of the folder or a file name'
+				);
+			}
+		);
 
 		await check(
 			'started on dev, the report goes to field/linux-<today>-dev, names its base and is pushed',
@@ -364,6 +382,9 @@ function read(folder, name) {
 						new RegExp(`^check=${id} verdict=(pass|fail|skip) codes=[a-z0-9_,]+$`, 'm')
 					);
 				assert.match(own, /^check=daemon_unit verdict=fail codes=enabled_systemctl_fixture/m);
+				// No daemon runs in the fixture: the field run says so and the rest goes on.
+				assert.match(read(folder, 'field_run.txt'), /^field_run=(no_daemon|unresolved)$/m);
+				assert.match(steps, /^field_run\s+exit=[01]$/m);
 				// The analysis reads the scrubbed copy and marks every verdict.
 				assert.match(steps, /^analysis\s+exit=0$/m);
 				const analysis = JSON.parse(read(folder, 'analysis.json'));
