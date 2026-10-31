@@ -4,8 +4,8 @@
 --- MODULE: Keyboard-Only Fixture Sources For The Kernel Harnesses
 --- DESCRIPTION:
 --- The real-kernel harnesses (modifier custody, input owner, simultaneous
---- configuration) build their "physical keyboards" from a copy of the
---- production writer. When the writer gained relative axes for the navigation
+--- configuration, hook text custody, the live daemon) build their "physical
+--- keyboards" from a copy of the production writer. When the writer gained relative axes for the navigation
 --- layer's wheel, every such source advertised EV_REL, the hook refused to grab
 --- it and "The whole daemon, live" failed at "Hook owns both real virtual source
 --- grabs" with nothing logged. These cases replay the writer's device setup
@@ -19,7 +19,8 @@ local Finder = require("modules.hotstrings.device_finder")
 local KeyboardSource = require("tests.hardware.keyboard_source_writer")
 
 local WRITER_PATH = helpers.driver_root() .. "/adapters/uinput_writer.lua"
-local HARNESSES = { "run_modifier_custody.lua", "run_input_owner_real.lua", "run_simultaneous_configuration_real.lua" }
+local HARNESSES = { "run_modifier_custody.lua", "run_input_owner_real.lua", "run_simultaneous_configuration_real.lua",
+	"run_hook_text_custody.lua", "run_daemon_live.lua" }
 
 --- Opens a writer copy on a recorder and returns the EV_* mask it registered.
 --- @param writer table A writer module instance.
@@ -70,7 +71,8 @@ helpers.describe("keyboard-only fixture sources", function()
 			file:close()
 			helpers.assert_true(text:find('require("tests.hardware.keyboard_source_writer").load(', 1, true) ~= nil,
 				name .. " must create keyboard-only sources")
-			helpers.assert_true(text:find('loadfile("adapters/uinput_writer.lua")', 1, true) == nil,
+			helpers.assert_true(text:find('loadfile("adapters/uinput_writer.lua")', 1, true) == nil
+				and text:find('package.loaded["adapters.uinput_writer"] = nil', 1, true) == nil,
 				name .. " still loads the pointer-capable production writer as a source")
 		end
 	end)
