@@ -1756,6 +1756,8 @@
 	"menu.llm.api_no_entry": "لم يتم تكوين أي نقطة نهاية API",
 	"menu.llm.api_prompt_field.account": "معرّف الحساب (الجزء الذي يسبق ‎.snowflakecomputing.com):",
 	"menu.llm.api_prompt_field.account_id": "معرّف الحساب:",
+	"menu.llm.api_prompt_field.location": "الموقع (مثلًا global):",
+	"menu.llm.api_prompt_field.project": "معرّف مشروع Google Cloud:",
 	"menu.llm.api_prompt_field.region": "المنطقة (مثلًا us-east-1):",
 	"menu.llm.api_prompt_field.resource": "اسم المورد (الجزء الذي يسبق ‎.openai.azure.com):",
 	"menu.llm.api_prompt_field.workspace": "مضيف مساحة العمل (مثلًا dbc-1234.cloud.databricks.com):",

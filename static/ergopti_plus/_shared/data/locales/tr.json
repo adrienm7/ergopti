@@ -1756,6 +1756,8 @@
 	"menu.llm.api_no_entry": "Yapılandırılmış API uç noktası yok",
 	"menu.llm.api_prompt_field.account": "Hesap tanımlayıcısı (.snowflakecomputing.com öncesindeki kısım):",
 	"menu.llm.api_prompt_field.account_id": "Hesap kimliği:",
+	"menu.llm.api_prompt_field.location": "Konum (örneğin global):",
+	"menu.llm.api_prompt_field.project": "Google Cloud proje kimliği:",
 	"menu.llm.api_prompt_field.region": "Bölge (örneğin us-east-1):",
 	"menu.llm.api_prompt_field.resource": "Kaynak adı (.openai.azure.com öncesindeki kısım):",
 	"menu.llm.api_prompt_field.workspace": "Çalışma alanı ana bilgisayarı (örneğin dbc-1234.cloud.databricks.com):",

@@ -594,6 +594,8 @@
 		"bedrock": "The bedrock-runtime address has no /models (bedrock-mantle lists, under another host): the page offers a typed model id.",
 		"cloudflare": "Workers AI lists its models at /ai/models/search in Cloudflare's own shape, which the listing reader does not take: the page offers a typed model id.",
 		"databricks": "No OpenAI-style listing is documented for serving-endpoints: the page offers a typed model id.",
-		"snowflake": "No listing is documented for the Cortex OpenAI-compatible address: the page offers a typed model id."
+		"snowflake": "No listing is documented for the Cortex OpenAI-compatible address: the page offers a typed model id.",
+		"watsonx": "The gateway lists the models an administrator configured, behind the IAM token: none recorded.",
+		"vertex": "No listing is documented for the OpenAI-compatible endpoint: the page offers a typed model id (google/<model>)."
 	}
 }
