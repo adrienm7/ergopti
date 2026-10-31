@@ -116,7 +116,9 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //                    text.)
 //           15 → 13 (2026-10-31: the two watcher tests feed a synthetic source
 //                    path; they named keymap/init.lua only as a sample event.)
-const BASELINE = 13;
+//           13 → 12 (2026-10-31: the prompt editor test requires the real
+//                    ui_builder by module name.)
+const BASELINE = 12;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -172,7 +174,9 @@ const BASELINE = 13;
 //              preferences.flat_key_for instead of searching its text.)
 //       57 → 55 (2026-10-31: the two watcher tests feed a synthetic source
 //              path; they named keymap/init.lua only as a sample event.)
-const READ_BASELINE = 55;
+//       55 → 54 (2026-10-31: the prompt editor test requires the real
+//              ui_builder by module name.)
+const READ_BASELINE = 54;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
