@@ -150,11 +150,14 @@ end
 -- Read canonical data before individual fixtures replace file and environment ports.
 -- The shared TOML writer splices the refused setting into this notice's {1}: a stub
 -- that echoes the key would hide that name, so the baseline carries the real format.
-do
+-- It is read on first use: a suite that re-roots the driver has no locale tree.
+local CASE_TWIN_KEY = "dialog.config_save.case_twin"
+setmetatable(M.I18N_PLACEHOLDER_FORMATS, { __index = function(formats, key)
+	if key ~= CASE_TWIN_KEY then return nil end
 	local english = require("json").decode(SourceFile.read(M.shared("data/locales/en.json")))
-	M.I18N_PLACEHOLDER_FORMATS["dialog.config_save.case_twin"] =
-		assert(english["dialog.config_save.case_twin"], "the case-twin notice is localized")
-end
+	rawset(formats, key, assert(english[key], "the case-twin notice is localized"))
+	return formats[key]
+end })
 local logger_privacy_policy = SourceFile.read(M.shared("modules/diagnostics/redaction.json"))
 local logger_privacy_owners = setmetatable({}, { __mode = "k" })
 
