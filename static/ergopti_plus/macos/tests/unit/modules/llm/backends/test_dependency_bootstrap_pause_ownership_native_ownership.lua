@@ -183,26 +183,12 @@ helpers.describe("HS-012 dependency bootstrap native ownership", function()
 	helpers.it("never replays a found executable's fast path as a download", function()
 		local fixture = load_fixture({ terminate_mode = "pending" })
 		local binary = package.loaded["modules.llm.ollama_binary"]
-		binary.managed_install_dir = function() return "/fixture/managed/ollama" end
 		helpers.assert_true(fixture.checker.check_and_install_deps())
 		helpers.assert_eq(fixture.tasks[1].args[6], "")
 		pause_remove_and_replay(fixture, binary)
 		helpers.assert_eq(#fixture.tasks, 1,
 			"a fast path had no consent: its replay must not download Ollama")
 		helpers.assert_eq(fixture.checker.get_state(), "missing")
-	end)
-
-	helpers.it("replays an accepted download as the same download", function()
-		local fixture = load_fixture({ terminate_mode = "pending" })
-		local binary = package.loaded["modules.llm.ollama_binary"]
-		binary.managed_install_dir = function() return "/fixture/managed/ollama" end
-		binary.resolve = function() return nil, "no executable Ollama binary was found", nil end
-		helpers.assert_true(fixture.checker.install_for_selection())
-		helpers.assert_eq(fixture.tasks[1].args[6], "/fixture/managed/ollama")
-		pause_remove_and_replay(fixture, binary)
-		helpers.assert_eq(#fixture.tasks, 2)
-		helpers.assert_eq(fixture.tasks[2].args[6], "/fixture/managed/ollama",
-			"the user's accepted download resumes after the pause")
 	end)
 
 	helpers.it("rejects a resume-stage callback from a different epoch", function()

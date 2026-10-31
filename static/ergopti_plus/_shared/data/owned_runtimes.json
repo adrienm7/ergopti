@@ -152,30 +152,30 @@
 			"tool": "Ollama",
 			"programs": ["ollama"],
 			"used_for": "Local inference server",
-			"today": "Two paths: stock candidates in this order: `/Applications/Ollama.app`, `~/Applications`, Homebrew, `PATH` (`macos/modules/llm/ollama_binary.lua:121-129`); managed forked build 0.40.4 with native HTTP (`_shared/modules/llm/managed_ollama_runtime.json`)",
-			"current_class": "HOST",
+			"today": "The managed forked build 0.40.4 with native HTTP on its own port is the only path: the resolver names no stock candidate (`macos/modules/llm/ollama_binary.lua`), and a model requirement without it names Ergopti's own install, not the stock download page",
+			"current_class": "PIN",
 			"version_needed": "0.40.4",
 			"if_missing": "AI features unavailable; a different user version changes API behaviour",
 			"pin_possible": "Yes, done for managed. MIT, 168 MB",
 			"decision": "PIN",
 			"decision_text": "PIN: remove the stock candidates, always run the managed copy on a private port",
 			"alternative": null,
-			"status": "follow_up"
+			"status": "done"
 		},
 		{
 			"os": "macos",
 			"tool": "Ollama installers (legacy)",
 			"programs": [],
-			"used_for": "`curl ... | sh`, `brew install ollama`, `ollama serve` (`macos/modules/llm/ensure-ollama-deps.sh:104`; `_shared/modules/llm/install/ollama_install.sh:112-164`)",
-			"today": "Selected when the stock choice is made (`macos/modules/llm/ollama_deps_checker.lua:573`)",
-			"current_class": "HOST",
+			"used_for": "Formerly the stock download in `macos/modules/llm/ensure-ollama-deps.sh` and the shared `_shared/modules/llm/install/ollama_install.sh` (`curl ... | sh`, `brew install ollama`, `ollama serve`)",
+			"today": "Deleted: `ollama_install.sh` is gone and `ensure-ollama-deps.sh` only verifies the resolved runtime, refusing an empty one with exit 64; `install_for_selection()` is gone from `ollama_deps_checker.lua`",
+			"current_class": "NA",
 			"version_needed": "n/a",
 			"if_missing": "n/a",
 			"pin_possible": "n/a",
 			"decision": "DELETE",
 			"decision_text": "Delete with the stock path",
 			"alternative": null,
-			"status": "follow_up"
+			"status": "done"
 		},
 		{
 			"os": "macos",

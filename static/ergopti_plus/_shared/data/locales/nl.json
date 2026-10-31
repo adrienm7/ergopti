@@ -2378,8 +2378,6 @@
 	"ollama.model_ready": "%s is gereed!",
 	"ollama.model_repair": "Model lijkt beschadigd. Opnieuw downloaden: %s",
 	"ollama.model_repair_title": "Ollama-model herstellen",
-	"ollama.not_detected_body": "Installeer Ollama en probeer het opnieuw.",
-	"ollama.not_detected_title": "Ollama niet gevonden",
 	"ollama.service_disconnected": "Ollama-service reageert niet meer.",
 	"ollama.service_ready": "Ollama-service gereed ✅",
 	"ollama.service_stopped": "Ollama-service gestopt. Starten…",
