@@ -1530,17 +1530,15 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       per-device physical binding), then add the identity with it. The star setting migration is
       dropped (no users, no legacy migration).
 - [ ] **106.** [PHYS-M] Genuine Apple Shortcuts invocation with bounded cancellation; only the
-      refusal-in-time probe exists (in 116).
+      refusal-in-time probe exists (in 116). _Hands:_ a genuine run needs a shortcut the maintainer
+      owns and names (the `shortcuts` command cannot create or import one without a dialog, and running an
+      arbitrary shortcut of theirs is not read-only); `field_toolchain`'s `shortcuts_list` and
+      `shortcuts_refusal` are what a program can prove.
 - [ ] **107.** [CODE] macOS forced output. Linux is settled by design: the number-row ordering and
       edge keys are applied by rebuilding the layout (`docs/design/linux-number-row-runtime.md`), so
       the hook's input+XI2+writer join is deliberately unreachable (nothing passes `numberRowMode`)
       and is not owed; left for Linux only [PHYS-L] mutter and KWin reloading a `~/.config/xkb`
       layout (W1 to W4 of that note).
-      refusal-in-time probe exists (in 116). _Hands:_ a genuine run needs a shortcut the maintainer
-      owns and names (the `shortcuts` command cannot create or import one without a dialog, and running an
-      arbitrary shortcut of theirs is not read-only); `field_toolchain`'s `shortcuts_list` and
-      `shortcuts_refusal` are what a program can prove.
-- [ ] **107.** [CODE] macOS forced output, Linux input+XI2+writer join.
 - [ ] **108.** [CODE] Item 97's collision/source/modifier/output joins.
 - [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible
       Variables/KeyHistory snapshot.
