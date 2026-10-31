@@ -15,7 +15,6 @@ const ROW_TYPES = new Set([
 	'toggle',
 	'feature',
 	'action',
-	'dynamic',
 	'group',
 	'include',
 	'label',
@@ -28,6 +27,37 @@ const ROW_TYPES = new Set([
 	'check',
 	'native_content'
 ]);
+
+// Row types the compiler refuses anywhere in the [menu] tables. `dynamic` handed
+// its id back to platform code, which then decided alone what to draw there:
+// the label, the children, the order and the greying lived in three drivers, so
+// a row could be added or renamed on one OS without the manifest changing. The
+// tray menu is defined in the shared manifest only (maintainer, 2026-10-31): a
+// row whose contents are runtime data is a `list`, whose provider supplies DATA
+// that the shared renderer draws.
+const RETIRED_ROW_TYPES = new Set(['dynamic']);
+
+/**
+ * Refuses a retired row type anywhere in the [menu] tables. The walk is
+ * recursive because templates, frames and provider status nest rows.
+ * @param {object} menu The parsed [menu] tables.
+ */
+function validateNoRetiredRows(menu) {
+	const walk = (value, where) => {
+		if (Array.isArray(value)) {
+			value.forEach((child, index) => walk(child, `${where}[${index}]`));
+			return;
+		}
+		if (!value || typeof value !== 'object') return;
+		if (RETIRED_ROW_TYPES.has(value.type))
+			throw new Error(
+				`${where} (id "${value.id ?? '?'}"): '${value.type}' rows are retired — declare a ` +
+					"'list' row whose provider supplies row DATA, or a declarative row"
+			);
+		for (const [key, child] of Object.entries(value)) walk(child, `${where}.${key}`);
+	};
+	walk(menu, 'menu');
+}
 
 /** Counts ordered scalar slots with the native renderers' percent-token rules. */
 function nativeCountSlots(format) {
@@ -165,6 +195,8 @@ function classifyMenuRow(row, where) {
 
 /** Validates actual canonical menu tables without projecting or writing them. */
 function validateMenuAvailability(menu) {
+	// Before any other check: a retired row type names itself, not a symptom.
+	validateNoRetiredRows(menu);
 	for (const [key, rows] of Object.entries(menu)) {
 		if (!Array.isArray(rows)) continue;
 		for (const row of rows) {
@@ -727,6 +759,8 @@ function validateChildTemplates(menu, captionFormat) {
 }
 
 module.exports = {
+	RETIRED_ROW_TYPES,
+	validateNoRetiredRows,
 	classifyMenuRow,
 	validateMenuAvailability,
 	validateChildTemplates,

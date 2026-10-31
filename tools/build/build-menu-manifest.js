@@ -55,14 +55,15 @@ const HEADER = {
 	_comment3:
 		"item types: 'toggle' = a category's first-row checkbox (its master gate, one i18n key), " +
 		"'feature' = manifest-path toggle, " +
-		"'action' = stateless button, 'dynamic' = rendered by platform code, " +
+		"'action' = stateless button, " +
 		"'group' = named submenu, 'include' = reused child-template section, " +
 		"'native_content' = completed native objects ordered by an admitted composition, " +
 		"'label' = inert provider-template caption, 'section_header' = disabled header, '---' = separator, " +
 		"'list' = rows supplied at build time by a named provider, 'letter_picker' = " +
 		'the A-Z chooser. The last two were in use and undocumented here, which matters ' +
 		"because 'list' is the ONLY type that moves provider DATA from the driver into the " +
-		"renderer — 'dynamic' hands the rendering straight back to platform code. " +
+		"renderer. There is no 'dynamic' type: it handed the rendering back to platform code, " +
+		'and the generator refuses it. ' +
 		"'choice' = one enum feature (path) as one row with its values beneath it; its " +
 		"'choices' are projected from the feature's enum_values or registered owner by this generator; " +
 		'an optional custom_command/custom_i18n (and custom_unit_i18n) closes them with a free-entry row.',
@@ -94,6 +95,8 @@ const PLATFORMS = ['ahk', 'hs', 'linux'];
  *     `disabled_reason_key`, read on `command`/`check` rows and identified labelled groups. `reason_key` cannot carry
  *     that reason too, since a restricted row keeps it for the platforms it
  *     leaves out (the health check reads it there).
+ * It also refuses a retired `dynamic` row anywhere in the tables, before any of
+ * the above: the tray menu is defined in this manifest only.
  * @param {object} menu The parsed [menu] tables.
  */
 function validateGreyedRows(menu) {
@@ -108,7 +111,7 @@ function validateProviderStatus(menu) {
 			if (row.status_rows === undefined) continue;
 			const where = `menu.${key} row "${row.id || row.type}"`;
 			if (
-				!['dynamic', 'list'].includes(row.type) ||
+				row.type !== 'list' ||
 				typeof row.id !== 'string' ||
 				row.id === '' ||
 				!row.status_rows ||
