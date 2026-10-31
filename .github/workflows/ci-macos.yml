@@ -3060,6 +3060,15 @@ jobs:
         with:
           python-version: '3.13'
 
+      # The application bundles the proxy sign-in relay, built with Go; the
+      # module's go.mod names the floor, the runner never downloads a module.
+      - uses: actions/setup-go@v5
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}
+        with:
+          go-version-file: static/ergopti_plus/_shared/go/native_http/go.mod
+          check-latest: false
+          cache: false
+
       - name: Require actual arm64 cold runtime prerequisites on macOS 26
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}
         id: lot-cold-prerequisites
@@ -3140,6 +3149,15 @@ jobs:
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
         with:
           python-version: '3.13'
+
+      # The application bundles the proxy sign-in relay, built with Go; the
+      # module's go.mod names the floor, the runner never downloads a module.
+      - uses: actions/setup-go@v5
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
+        with:
+          go-version-file: static/ergopti_plus/_shared/go/native_http/go.mod
+          check-latest: false
+          cache: false
 
       - name: Require actual arm64 cold runtime prerequisites
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}

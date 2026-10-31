@@ -120,6 +120,13 @@ jobs:
       # first. This app is a build scaffold, never published: it is signed ad
       # hoc (no certificate secret reaches this step) and carries a throwaway
       # Sparkle key; only the helper the next steps package leaves this job.
+      # The scaffold bundles the proxy sign-in relay, built with Go.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ergopti/static/ergopti_plus/_shared/go/native_http/go.mod
+          check-latest: false
+          cache: false
+
       - name: Build the application scaffold the packaging writes into
         working-directory: ergopti
         env:

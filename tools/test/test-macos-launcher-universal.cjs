@@ -179,6 +179,12 @@ if (!assemblyFunction) {
 		fs.mkdirSync(launcher, { recursive: true });
 		fs.writeFileSync(product, 'launcher');
 		fs.writeFileSync(path.join(launcher, 'com.ergoptiplus.remap-guardian.plist'), 'plist');
+		// The proxy relay builder stands in for Go: it writes the slice it is asked for.
+		fs.mkdirSync(path.join(fixture, 'tools/build'), { recursive: true });
+		fs.writeFileSync(
+			path.join(fixture, 'tools/build/build-proxy-relay.sh'),
+			'while [ $# -gt 0 ]; do [ "$1" = --output ] && : > "$2"; shift; done\n'
+		);
 		const replay = (frameworks, failTraversal = false) => {
 			fs.rmSync(buildRoot, { recursive: true, force: true });
 			fs.rmSync(path.join(fixture, 'app'), { recursive: true, force: true });
