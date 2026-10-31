@@ -127,13 +127,9 @@ end
 -- own virtual keyboard keeps the production name, and the two must not be
 -- confused. The daemon is pinned to this one with --device, because the
 -- finder rightly skips uinput devices as synthetic.
-local DeviceNames = require("infra.device_names")
-local production_name = DeviceNames.VIRTUAL_KEYBOARD
-DeviceNames.VIRTUAL_KEYBOARD = TEST_KEYBOARD
-package.loaded["adapters.uinput_writer"] = nil
-local Keyboard = require("adapters.uinput_writer")
-DeviceNames.VIRTUAL_KEYBOARD = production_name
-package.loaded["adapters.uinput_writer"] = nil
+-- Keyboard-only: the production device also carries the navigation wheel's
+-- relative axes, which the daemon's grab policy refuses on a source.
+local Keyboard = require("tests.hardware.keyboard_source_writer").load(TEST_KEYBOARD)
 
 if not Keyboard.is_available() then abort("/dev/uinput is not writable") end
 Keyboard.use_ffi_backend()
