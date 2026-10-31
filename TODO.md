@@ -1626,8 +1626,8 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       consumers exist (`keystats/media_store` replays through `aggregator/core.media_policy`, the
       shortcut editor reads `physical_capture.position_available`), but the only producer of positions
       and media events is `modules/keystats/physical_capture.lua`, which only the owned Karabiner
-      runtime starts (`adapters/runtime_capture_port.lua`, dormant behind `[karabiner] runtime =
-      "owned"`): native capture on macOS is item 31's "production capture owner", not separate work.
+      runtime starts (`adapters/runtime_capture_port.lua`, dormant behind
+      `[karabiner] runtime = "owned"`): native capture on macOS is item 31's "production capture owner", not separate work.
       The star setting migration is dropped (no users, no legacy migration).
 - [ ] **106.** [PHYS-M] Genuine Apple Shortcuts invocation with bounded cancellation; only the
       refusal-in-time probe exists (in 116). _Hands:_ a genuine run needs a shortcut the maintainer
