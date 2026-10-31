@@ -1,7 +1,7 @@
 --- tests/unit/ui/menu/shortcuts/test_tap_hold_edit_owner.lua
 
 local helpers = require("tests.helpers")
-local MODULES = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_writer", "ui.menu.menu_builder", "ui.action_picker.bridge" }
+local MODULES = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_writer", "ui.menu.builder", "ui.action_picker.bridge" }
 local INITIAL = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.caps_lock]\ntap_action = "enter"\ntime_activation_seconds = 0.2\n'
 local function read(path)
 	local f = io.open(path, "rb"); if not f then return nil end

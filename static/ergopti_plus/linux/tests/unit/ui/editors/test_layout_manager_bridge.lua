@@ -72,7 +72,7 @@ end)
 --- Captures actual provider data while forwarding its status and rendering to the real binding.
 --- @param callback function Receives the native build, fixture state and binding.
 local function with_empty_layout(callback)
-	local names = { "ui.menu.menu_builder", "infra.manifest_menu", "infra.i18n", "modules.keymap.layout_registry" }
+	local names = { "ui.menu.builder", "infra.manifest_menu", "infra.i18n", "modules.keymap.layout_registry" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local ok, err = xpcall(function()
@@ -84,7 +84,7 @@ local function with_empty_layout(callback)
 			select = function() state.selections = state.selections + 1; return true end,
 		}
 		local binding = require("infra.manifest_menu")
-		local module = helpers.load_module("ui.menu.menu_builder")
+		local module = helpers.load_module("ui.menu.builder")
 		local native_build = binding.build
 		binding.build = function(key, title, dynamic, click, ctx, providers)
 			if key == "layout_menu" then

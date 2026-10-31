@@ -43,8 +43,8 @@ end
 --- @return table|nil row
 local function configuration_row(ctx, row_key)
 	local i18n = require("infra.i18n")
-	package.loaded["ui.menu.menu_builder"] = nil
-	for _, section in ipairs(require("ui.menu.menu_builder").build(ctx)) do
+	package.loaded["ui.menu.builder"] = nil
+	for _, section in ipairs(require("ui.menu.builder").build(ctx)) do
 		if type(section.title) == "string"
 			and section.title:find(i18n.get("menu.configuration.title"), 1, true) == 1 then
 			for _, row in ipairs(section.menu or {}) do
@@ -61,7 +61,7 @@ end
 --- @param report table The report it answers with.
 --- @return table shown Every zenity command the click ran.
 local function click(row_key, committed, report)
-	local names = { "infra.global_scope", "ui.menu.menu_builder" }
+	local names = { "infra.global_scope", "ui.menu.builder" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local shown

@@ -90,7 +90,7 @@ end
 --- @param dyn table|nil Dynamic-hotstrings manager double.
 --- @return table|nil
 local function hotstrings_menu(config, dyn, paused, snapshot_paused)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local i18n = require("infra.i18n")
 	local title = i18n.get("menu.hotstrings.title")
 	local ctx = { config = config, _version = "9.9.9", dyn_hotstrings = dyn or fake_dyn(true, true),
@@ -254,10 +254,10 @@ local function with_bulk_error_receipts(body)
 		end
 		return execute(command)
 	end
-	local before_builder = package.loaded["ui.menu.menu_builder"]
+	local before_builder = package.loaded["ui.menu.builder"]
 	local ok, err = pcall(body, notices, function() return releases end)
 	Modal.run, os.execute = modal_run, execute
-	package.loaded["ui.menu.menu_builder"] = before_builder
+	package.loaded["ui.menu.builder"] = before_builder
 	if not ok then error(err, 0) end
 end
 
@@ -423,7 +423,7 @@ local function dynamic_family_row(dynamic, section)
 	local context = { config = config, _version = "9.9.9", dyn_hotstrings = dynamic,
 		paused = false, is_paused = function() return false end,
 		on_menu_changed = function() seen.refreshes = seen.refreshes + 1 end }
-	local builder = helpers.load_module("ui.menu.menu_builder")
+	local builder = helpers.load_module("ui.menu.builder")
 	local title = require("infra.i18n").get("category.dynamic_hotstrings")
 	local label
 	for _, family in ipairs(dynamic.rule_families()) do
@@ -600,7 +600,7 @@ end)
 --- Retains the actual engine and installs a fresh genuine renderer cohort.
 local function with_dynamic_section_frame(body)
 	with_dynamic_family_owners(function(owner)
-		local names = { "infra.manifest_menu", "ui.menu.menu_builder" }
+		local names = { "infra.manifest_menu", "ui.menu.builder" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local called, detail = xpcall(function()
 			local translator = require("infra.i18n")
@@ -664,12 +664,12 @@ local function with_personal_info_leaf(body)
 		local translator = require("infra.i18n")
 		package.loaded["infra.manifest_menu"] = nil
 		local renderer = assert(require("infra.manifest_menu"))
-		local builder = helpers.load_module("ui.menu.menu_builder")
+		local builder = helpers.load_module("ui.menu.builder")
 		-- Receive the real Hotstrings parent only: a withdrawn template must not
 		-- dispatch unrelated full-tray producers before the leaf assertions.
 		local get_upvalue = assert(debug.getupvalue)
 		local source = debug.getinfo(builder.build, "S").source
-		assert(source:match("/ui/menu/menu_builder%.lua$"), "actual native builder file required")
+		assert(source:match("/ui/menu/builder%.lua$"), "actual native builder file required")
 		local build_hotstrings, matches = nil, 0
 		for index = 1, math.huge do
 			local name, value = get_upvalue(builder.build, index)

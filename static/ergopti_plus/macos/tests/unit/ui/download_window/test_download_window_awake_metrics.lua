@@ -151,6 +151,24 @@ helpers.describe("download progress uses the active operation awake duration", f
 		end)
 	end)
 
+	helpers.it("never reads a managed pull's trailing byte count as the time left", function()
+		with_window(function(window, w)
+			w.show(); w.ready(); w.sample(1)
+			window.update(0, nil, nil, "OLLAMA_PULL_BYTES 195153921 366195616")
+			local code = w.last_update()
+			helpers.assert_true(code ~= nil and code:find("366195616", 1, true) == nil,
+				"a bare number is a byte count, never an ETA: " .. tostring(code))
+		end)
+	end)
+
+	helpers.it("shows the managed pull's bytes as percent, size and time left", function()
+		with_window(function(window, w)
+			w.show(); w.ready(); w.sample(2.5)
+			window.update(50, 5000000, 10000000, "OLLAMA_PULL_BYTES 5000000 10000000")
+			helpers.assert_eq(w.last_update(), 'update(50,"5 Mo / 10 Mo","2 Mo/s","2s",null)')
+		end)
+	end)
+
 	helpers.it("does not publish queued metrics from a retired readiness timer", function()
 		with_window(function(window, w)
 			w.show(); w.sample(2.5)

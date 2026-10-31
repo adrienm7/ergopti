@@ -38,8 +38,16 @@ const BASELINE = 'tools/test/native-menu-rows-baseline.json';
 const tool = fs.readFileSync(path.join(ROOT, TOOL), 'utf8');
 const corpusBytes = fs.readFileSync(path.join(ROOT, CORPUS));
 const legacy = JSON.parse(corpusBytes);
-// The frozen oracle keeps the pre-rename spelling; the tree under test uses the new one.
+// The frozen oracle keeps the pre-rename spellings; the tree under test uses the new ones
+// (the Linux tray root took the macOS name once its sections moved to menu_*.lua).
+const currentName = (rel) =>
+	rel
+		.replace(/keylogger/g, 'keystats')
+		.replace(/^linux\/ui\/menu\/menu_builder\.lua$/, 'linux/ui/menu/builder.lua');
 const currentTree = JSON.parse(JSON.stringify(legacy).replace(/keylogger/g, 'keystats'));
+for (const driver of DRIVERS)
+	currentTree.drivers[driver].sourceFiles =
+		currentTree.drivers[driver].sourceFiles.map(currentName);
 const registry = loadInventory(ROOT).checks;
 for (const name of ['test-native-menu-rows.cjs', 'test-native-menu-census-admission.cjs']) {
 	const entries = registry.filter((check) => check.args.includes('tools/test/' + name));
@@ -79,10 +87,10 @@ function reset() {
 	write(CORPUS, corpusBytes);
 	write(BASELINE, JSON.stringify(legacy.baseline, null, '\t') + '\n');
 	// Current retirement needs real declaration and lexer inputs on every reset.
-	write(
-		'static/ergopti_plus/_shared/modules/features/manifest.toml',
-		'[menu]\nowner = "retained"\n'
-	);
+	// The menu declarations live in the tray-menu source, read through its owner.
+	write('static/ergopti_plus/_shared/modules/menu/menu.toml', '[menu]\nowner = "retained"\n');
+	for (const owner of ['tools/lib/menu-source.cjs', 'tools/lib/paths.cjs'])
+		write(owner, fs.readFileSync(path.join(ROOT, owner)));
 	write(
 		'static/ergopti_plus/_shared/modules/menu/menu_manifest.json',
 		JSON.stringify({
@@ -99,7 +107,7 @@ function reset() {
 function rows(driver, count) {
 	const known = legacy.drivers[driver].excerpts
 		.flatMap((excerpt) =>
-			excerpt.lines.map((entry) => ({ rel: excerpt.path, source: entry.source }))
+			excerpt.lines.map((entry) => ({ rel: currentName(excerpt.path), source: entry.source }))
 		)
 		.filter((entry) => {
 			// The immutable legacy classifier still receives every original excerpt.
@@ -286,12 +294,13 @@ try {
 	// The frozen historical paths remain unchanged. Only the recorded orphan
 	// may be absent, with independently authored current declaration controls.
 	const retired = 'macos/ui/menu/menu_llm/live_mode_panel.lua';
-	const features = 'static/ergopti_plus/_shared/modules/features/manifest.toml';
+	// The menu declarations live in the tray-menu source.
+	const menuSource = 'static/ergopti_plus/_shared/modules/menu/menu.toml';
 	const generated = 'static/ergopti_plus/_shared/modules/menu/menu_manifest.json';
 	const lexer = 'tools/lib/script-source.cjs';
 	const retiredFixture = () => {
 		reset();
-		write(features, '[menu]\nowner = "retained"\n');
+		write(menuSource, '[menu]\nowner = "retained"\n');
 		write(
 			generated,
 			JSON.stringify({
@@ -318,7 +327,7 @@ try {
 		'_LLM_Menu_MakeLiveModeHandler'
 	]) {
 		retiredFixture();
-		write(features, `[menu]\nowner = "${symbol}"\n`);
+		write(menuSource, `[menu]\nowner = "${symbol}"\n`);
 		refusesBoth(/retired live-menu declaration reappeared/);
 		retiredFixture();
 		const m = { top_level: [{ id: 'llm' }], llm_menu: [{ id: symbol }] };
@@ -378,9 +387,9 @@ try {
 		'empty-compiled'
 	]) {
 		retiredFixture();
-		if (damaged === 'missing-features') fs.rmSync(path.join(fixture, features));
-		if (damaged === 'empty-features') write(features, '');
-		if (damaged === 'comment-only-features') write(features, '# no declarations\n');
+		if (damaged === 'missing-features') fs.rmSync(path.join(fixture, menuSource));
+		if (damaged === 'empty-features') write(menuSource, '');
+		if (damaged === 'comment-only-features') write(menuSource, '# no declarations\n');
 		if (damaged === 'missing-compiled') fs.rmSync(path.join(fixture, generated));
 		if (damaged === 'malformed-compiled') write(generated, '{ malformed');
 		if (damaged === 'empty-compiled') write(generated, '{}');
@@ -395,7 +404,7 @@ try {
 	);
 	refusesBoth(/source coverage .* is incomplete/);
 	retiredFixture();
-	write(features, '[menu]\nowner = "llm_live_prompt_toggle"\n# llm_live_mode is retired\n');
+	write(menuSource, '[menu]\nowner = "llm_live_prompt_toggle"\n# llm_live_mode is retired\n');
 	const retained = currentTree.drivers.macos.sourceFiles.find((p) => p !== retired);
 	fs.appendFileSync(
 		path.join(sourceRoot, retained),

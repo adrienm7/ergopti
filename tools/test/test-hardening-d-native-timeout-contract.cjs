@@ -299,30 +299,32 @@ const launchctlTimeout = swiftSeconds(guardian, 'kLegacyLaunchctlTimeoutSeconds'
 					'ensureLegacyRemapGuardianRegistered — the count no longer reads the registration'
 			);
 		}
-		// An ad hoc build first replaces its stale registrations (field run
-		// 2026-10-30): the exact legacy removal's launchctl steps, then the proof
-		// that the previous guardian exited. The modern path's own health wait
-		// precedes the legacy fallback the count above reads.
+		// An ad hoc build runs the legacy agent only (field run 2026-10-31): it
+		// may remove an earlier build's record and proves that job exited before
+		// the legacy registration. The modern path's own health wait precedes
+		// the legacy fallback the count above reads; the two paths are
+		// exclusive, so counting both bounds either.
 		const outcome = swiftFuncBody(guardian, 'remapGuardianRegistrationOutcome');
-		const removal = swiftFuncBody(guardian, 'removeLegacyRemapGuardian');
+		const adhoc = swiftFuncBody(guardian, 'resolveAdhocRemapGuardianRegistration');
 		const exited = swiftFuncBody(guardian, 'remapGuardianJobHasExited');
 		const exitWait = swiftFuncBody(guardian, 'waitForRemapGuardianUnregistrationObservation');
 		let resetSteps = NaN;
 		let resetWaits = NaN;
-		if (!outcome || !removal || !exited || !exitWait) {
+		if (!outcome || !adhoc || !exited || !exitWait) {
 			errors.push(
-				`${GUARDIAN_FILE}: the ad hoc registration reset (remapGuardianRegistrationOutcome, ` +
-					'removeLegacyRemapGuardian, remapGuardianJobHasExited) could not be read'
+				`${GUARDIAN_FILE}: the ad hoc registration (remapGuardianRegistrationOutcome, ` +
+					'resolveAdhocRemapGuardianRegistration, remapGuardianJobHasExited) could not be read'
 			);
 		} else if (
-			!outcome.includes('resetAdhocRemapGuardianRegistration(') ||
-			!outcome.includes('removeLegacyRemapGuardian(executablePath:') ||
+			!outcome.includes('resolveAdhocRemapGuardianRegistration(') ||
 			!outcome.includes('remapGuardianJobHasExited(paths)') ||
-			!outcome.includes('waitForLegacyGuardianHealth(')
+			!outcome.includes('waitForLegacyGuardianHealth(') ||
+			count(adhoc, 'guardianHasExited()') !== 1 ||
+			/(?<!un)register\(\)/.test(adhoc)
 		) {
 			errors.push(
-				`${GUARDIAN_FILE}: remapGuardianRegistrationOutcome no longer spends the reset and ` +
-					'health wait this budget counts'
+				`${GUARDIAN_FILE}: remapGuardianRegistrationOutcome no longer spends the ad hoc exit ` +
+					'proof and health wait this budget counts'
 			);
 		} else {
 			const timeoutDefault = guardian.match(
@@ -334,12 +336,12 @@ const launchctlTimeout = swiftSeconds(guardian, 'kLegacyLaunchctlTimeoutSeconds'
 						'kLegacyLaunchctlTimeoutSeconds by default'
 				);
 			}
-			resetSteps = count(removal, 'runner.run(arguments:') + count(exited, 'exitStatus(arguments:');
+			resetSteps = count(exited, 'exitStatus(arguments:');
 			resetWaits = count(exited, 'waitForRemapGuardianUnregistrationObservation(') + 1;
-			if (resetSteps < 3 || resetWaits < 2) {
+			if (resetSteps < 1 || resetWaits < 2) {
 				errors.push(
-					`${GUARDIAN_FILE}: found ${resetSteps} reset launchctl step(s) and ${resetWaits} ` +
-						'wait(s) — the count no longer reads the ad hoc reset'
+					`${GUARDIAN_FILE}: found ${resetSteps} exit-proof launchctl step(s) and ${resetWaits} ` +
+						'wait(s) — the count no longer reads the ad hoc registration'
 				);
 			}
 		}

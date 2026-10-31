@@ -196,7 +196,7 @@ for (const rel of WRAP_RESET_CONSUMERS) {
 for (const rel of [
 	'macos/ui/menu/menu_hotstrings_management.lua',
 	'windows/ui/menu/menu_hotstrings.ahk',
-	'linux/ui/menu/menu_builder.lua'
+	'linux/ui/menu/builder.lua'
 ]) {
 	const text = readSourceFile(path.join(SP, rel));
 	for (const owner of ['word_expanders_menu', 'word_expanders_restore', 'word_expander_entries']) {

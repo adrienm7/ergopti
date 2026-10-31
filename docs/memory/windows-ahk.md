@@ -751,6 +751,17 @@ usable either: the LCtrl tap-hold turns them into a tap (Paste). Action: add
 any new external trigger as a caller of that primitive, never by relaxing the
 Tab policy (`test_llm_tab_accept_policy.ahk`).
 
+### project-ahk-windows-held-win-chords-need-a-scan-variant
+
+A textual Win chord is registered with RegisterHotKey when free. When Windows
+holds it (Win+S, Win+E, Win+H) AutoHotkey falls back to its hook, and the hook
+reads a key that has any scan-code hotkey from the scan-code table, so `#s` never
+fires beside the inert `SC01F` of the layout tables and Windows keeps the chord.
+Measured: `#j`, which Windows leaves free, fired; `#s` and `#e` did not; `#SC01F`
+did. Keyboard slots therefore bind `KeyboardSlotWinScan`. Action: any other owner
+of a Win chord (`Hotkey("#x")`, a frozen `#vkNN`) binds the `#SCnnn` variant and
+tests it with a real press on a chord Windows holds.
+
 ### project-ahk-ai-off-disarms-ai-keys
 
 A key bound to an `llm_*` action is unarmed while the AI is off, so it stays the

@@ -8,7 +8,6 @@
 global MENU_ROW_ORDER_DATA := Map(
 	"hotstring_group_classes", ["standard", "ergopti", "dynamic"],
 	"hotstring_config_categories", ["magickey", "autocorrection", "rolls", "sfbsreduction", "distancesreduction", "personal"],
-	"llm_menu_rows", ["llm_model", "llm_profile", "llm_trigger", "llm_generation_settings", "llm_display", "llm_navigation"],
 	"model_tag_emoji", ["🏆", "⚡", "🧠💭", "🧠", "💻", "🌐", "🖼️", "⭐"],
 	"menu_chord_modifiers", ["shift", "cmd", "alt", "ctrl"]
 )

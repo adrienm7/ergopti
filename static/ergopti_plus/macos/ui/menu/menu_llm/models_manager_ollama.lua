@@ -320,10 +320,23 @@ function M.new(deps, presets, ram_getter)
 		return true
 	end
 
-	local function update_progress_ui(owner, pct, message)
+	local function update_progress_ui(owner, pct, message, bytes_done, bytes_total)
 		if not owns_progress_ui(owner) then return end
 		if type(message) ~= "string" or message == "" then return end
-		pcall(download_window.update, tonumber(pct) or 0, nil, nil, message)
+		pcall(download_window.update, tonumber(pct) or 0, bytes_done, bytes_total, message)
+	end
+
+	--- The byte counts of the managed pull's last "OLLAMA_PULL_BYTES <done> <total>"
+	--- line (managed_ollama_pull.py), or nil when the chunk carries none.
+	--- @param text string Sanitized stream chunk.
+	--- @return number|nil done, number|nil total
+	local function last_pull_bytes(text)
+		local done, total
+		for d, t in text:gmatch("OLLAMA_PULL_BYTES (%d+) (%d+)") do
+			done, total = tonumber(d), tonumber(t)
+		end
+		if not done or not total or total <= 0 or done > total then return nil, nil end
+		return done, total
 	end
 
 	local function complete_progress_ui(owner, success, title, error_kind)
@@ -1763,7 +1776,12 @@ function M.new(deps, presets, ram_getter)
 						tostring(code), pull_cause)
 				end
 				local connection_error = pull_output:lower():find("could not connect") or pull_output:lower():find("connection refused")
-				
+				-- Ollama deletes a layer whose sha256 does not match before it
+				-- reports the mismatch, so one more pull downloads it afresh
+				-- (field run 2026-10-31: a fresh 366 MB layer failed its check).
+				local digest_mismatch = pull_output:find("OLLAMA_PULL_ERROR digest_mismatch", 1, true) ~= nil
+				local digest_retried = type(opts) == "table" and opts.digest_mismatch_retried == true
+
 				if network_report then
 					pcall(notifications.notify, i18n.get("ollama.fail_title"),
 						i18n.get(network_report.message_key), "error")
@@ -1773,6 +1791,25 @@ function M.new(deps, presets, ram_getter)
 						i18n.get("ollama.upgrade_required_body"), "warning")
 				elseif connection_error then
 					pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.service_disconnected"), "error")
+					complete_progress_ui(owner, false, target_model)
+				elseif digest_mismatch and not digest_retried then
+					local retry_opts = {}
+					for key, value in pairs(type(opts) == "table" and opts or {}) do retry_opts[key] = value end
+					retry_opts.digest_mismatch_retried = true
+					opts = retry_opts
+					if do_retry() == true then
+						Logger.warn(LOG, "The Ollama pull of %s failed its digest check; Ollama removed the layer, so it is pulled once more.",
+							tostring(target_model))
+					else
+						Logger.error(LOG, "The Ollama pull of %s failed its digest check and its single retry could not start.",
+							tostring(target_model))
+						pcall(notifications.notify, i18n.get("ollama.fail_title"),
+							string.format(i18n.get("ollama.digest_mismatch"), target_model), "error")
+						complete_progress_ui(owner, false, target_model)
+					end
+				elseif digest_mismatch then
+					pcall(notifications.notify, i18n.get("ollama.fail_title"),
+						string.format(i18n.get("ollama.digest_mismatch"), target_model), "error")
 					complete_progress_ui(owner, false, target_model)
 				elseif pac_fallback then
 					-- Both causes: the PAC could not be used, then the direct try failed too.
@@ -1810,7 +1847,11 @@ function M.new(deps, presets, ram_getter)
 				for line in out:gmatch("([^\n]+)") do
 					if line:len() > 0 then last_line = line end
 				end
-				if last_line ~= "" then update_progress_ui(owner, 0, last_line) end
+				-- The managed pull reports bytes, not a percent: the window
+				-- computes the percent, speed and time left from them
+				local done, total = last_pull_bytes(out)
+				local pct = done and (done * 100 / total) or 0
+				if last_line ~= "" then update_progress_ui(owner, pct, last_line, done, total) end
 				print("[Ollama Pull] " .. out)
 			end
 			return true

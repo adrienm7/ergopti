@@ -21,7 +21,7 @@
  *                sits above that boundary.
  *   gestures   — unrestricted at the top level, so visible on Linux, while the
  *                manifest projected exactly ONE row of gestures_menu for Linux:
- *                a bare separator. menu_builder.lua has always built a toggle,
+ *                a bare separator. ui/menu/builder.lua has always built a toggle,
  *                both bulk actions and every slot. Same shape of omission as
  *                kanata/updates/apps, one level deeper.
  *   extensions — a section_header with no platforms, introducing a single row
@@ -106,26 +106,26 @@ const OPENS_SUBMENU = {
 			menu: 'slot_binding_frame',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		}
 	],
 	tap_keys: {
 		menu: 'slot_binding_frame',
 		platforms: ['linux'],
 		kind: 'compose',
-		native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		native_sources: { linux: 'linux/ui/menu/builder.lua' }
 	},
 	script_control_shortcuts: {
 		menu: 'slot_binding_frame',
 		platforms: ['linux'],
 		kind: 'compose',
-		native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		native_sources: { linux: 'linux/ui/menu/builder.lua' }
 	},
 	gesture_slots_linux: {
 		menu: 'slot_binding_frame',
 		platforms: ['linux'],
 		kind: 'compose',
-		native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		native_sources: { linux: 'linux/ui/menu/builder.lua' }
 	},
 	magic_key_source: {
 		menu: 'magic_key_source_menu',
@@ -206,14 +206,14 @@ const OPENS_SUBMENU = {
 			menu: 'selection_case_boundary',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		},
 		'selection_case_commands',
 		{
 			menu: 'selection_helper_boundary',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		},
 		'selection_helper_commands'
 	],
@@ -306,7 +306,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
 				hs: 'macos/ui/menu/menu_shortcuts.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		{
@@ -319,13 +319,13 @@ const OPENS_SUBMENU = {
 			menu: 'shortcut_wrap_live_control',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		},
 		{
 			menu: 'linux_shortcuts_absent_rows',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		}
 	],
 	personal_shortcuts: {
@@ -359,7 +359,7 @@ const OPENS_SUBMENU = {
 			observed_construction: true,
 			native_sources: {
 				ahk: 'windows/infra/manifest_menu.ahk',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		{
@@ -424,7 +424,7 @@ const OPENS_SUBMENU = {
 			menu: 'linux_metrics_absent_rows',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		}
 	],
 	// Its native state branches compose readouts into the existing Metrics menu.
@@ -433,7 +433,7 @@ const OPENS_SUBMENU = {
 			menu,
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		})
 	),
 	keyboard_layout: 'layout_menu',
@@ -444,7 +444,7 @@ const OPENS_SUBMENU = {
 			menu: 'linux_hotstrings_absent_rows',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		}
 	],
 	// The personal provider renders the shared editor command head on every driver.
@@ -472,7 +472,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		{
@@ -492,7 +492,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		{
@@ -502,7 +502,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		{
@@ -512,7 +512,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		{
@@ -552,7 +552,7 @@ const OPENS_SUBMENU = {
 			menu: 'linux_gestures_absent_rows',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		}
 	],
 	gesture_slots_2: [
@@ -709,7 +709,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/builder.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		{
@@ -718,7 +718,7 @@ const OPENS_SUBMENU = {
 			kind: 'compose',
 			native_sources: {
 				hs: 'macos/ui/menu/menu_hotstrings.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		{
@@ -734,7 +734,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/builder.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		}
 	],
@@ -748,7 +748,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		{
@@ -758,7 +758,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		{
@@ -768,7 +768,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		}
 	],
@@ -780,14 +780,14 @@ const OPENS_SUBMENU = {
 		native_sources: {
 			ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 			hs: 'macos/ui/menu/menu_hotstrings_management.lua',
-			linux: 'linux/ui/menu/menu_builder.lua'
+			linux: 'linux/ui/menu/builder.lua'
 		}
 	},
 	magic_key_reset_if_custom: {
 		menu: 'hotstrings_magic_trigger_reset',
 		platforms: ['linux'],
 		kind: 'compose',
-		native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		native_sources: { linux: 'linux/ui/menu/builder.lua' }
 	},
 	// The native delay providers open the same declared configuration command.
 	delays_colors: [
@@ -799,7 +799,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		{
@@ -809,7 +809,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		}
 	],
@@ -822,7 +822,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		{
@@ -832,7 +832,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		'preview_magic_control',
@@ -876,7 +876,7 @@ const OPENS_SUBMENU = {
 			kind: 'compose',
 			native_sources: {
 				hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		// The per-application overrides the Lua providers append after that frame.
@@ -902,7 +902,7 @@ const OPENS_SUBMENU = {
 			kind: 'compose',
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		},
 		'llm_trigger_menu',
@@ -910,13 +910,13 @@ const OPENS_SUBMENU = {
 			menu: 'llm_debounce_never_row',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		},
 		{
 			menu: 'llm_numeric_custom_rows',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		}
 	],
 	llm_generation_settings: [
@@ -954,7 +954,7 @@ const OPENS_SUBMENU = {
 			menu: 'llm_numeric_custom_rows',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		}
 	],
 	// The language selector. Its rows inherit `top_level/language`'s visibility,
@@ -980,7 +980,7 @@ const OPENS_SUBMENU = {
 			native_sources: {
 				ahk: 'windows/ui/menu/menu_init.ahk',
 				hs: 'macos/ui/menu/menu_about.lua',
-				linux: 'linux/ui/menu/menu_builder.lua'
+				linux: 'linux/ui/menu/builder.lua'
 			}
 		}
 	],
@@ -994,7 +994,7 @@ const OPENS_SUBMENU = {
 			menu: 'linux_llm_absent_rows',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		}
 	],
 	// The AI agent submenu (_shared/modules/llm/agent.json), on every driver.
@@ -1330,7 +1330,7 @@ OPENS_SUBMENU.personal_default_choices = {
 	native_sources: {
 		ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 		hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
-		linux: 'linux/ui/menu/menu_builder.lua'
+		linux: 'linux/ui/menu/builder.lua'
 	}
 };
 
@@ -1442,7 +1442,7 @@ const MENU_KEYS = Object.keys(manifest).filter((k) => Array.isArray(manifest[k])
 for (const [driver, relative] of [
 	['windows', 'windows/ui/menu/menu_hotstrings.ahk'],
 	['macos', 'macos/ui/menu/menu_hotstrings_custom.lua'],
-	['linux', 'linux/ui/menu/menu_builder.lua']
+	['linux', 'linux/ui/menu/builder.lua']
 ]) {
 	if (!personalCommandReference(readSourceFile(path.join(SP, relative)), driver))
 		errors.push(
@@ -1782,7 +1782,7 @@ const {
 			'lost original absent checked field'
 		],
 		[
-			'main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, list_providers) or {}',
+			'main_menu = ManifestMenu.build("llm_menu", "LLM", nil, group_builders, render_ctx, list_providers) or {}',
 			'main_menu = {}',
 			'unused child producer'
 		],
@@ -2135,7 +2135,7 @@ const {
 	const files = {
 		ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 		hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
-		linux: 'linux/ui/menu/menu_builder.lua'
+		linux: 'linux/ui/menu/builder.lua'
 	};
 	const coordinates = {
 		ahk: [
@@ -3470,7 +3470,7 @@ const linuxAiSources = {
 			readSourceFile(path.join(SP, file))
 		])
 	),
-	'linux/ui/menu/menu_builder.lua': linuxMenuRootSource(SP)
+	'linux/ui/menu/builder.lua': linuxMenuRootSource(SP)
 };
 const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-parent-binding.cjs');
 require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
@@ -3491,7 +3491,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 		);
 
 		// New schema protection changes only the genuine toggle admission branch.
-		const readonlyFile = 'linux/ui/menu/menu_builder.lua';
+		const readonlyFile = 'linux/ui/menu/builder.lua';
 		const readonlyBuilder = linuxAiSources[readonlyFile];
 		const readonlyControls = [
 			[
@@ -3562,7 +3562,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 		}
 
 		// The adopted unavailable top row is an inert declaration projection, before Quit.
-		const builderFile = 'linux/ui/menu/menu_builder.lua';
+		const builderFile = 'linux/ui/menu/builder.lua';
 		const builder = linuxAiSources[builderFile];
 		const disabledBranch = `				elseif row.disabled == true then
 					rows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true,
@@ -3734,7 +3734,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 		};
 		assert.equal(admits(linuxAiSources, topDuplicate), false, 'duplicate genuine tray declaration');
 		const producerFile =
-			kind === 'agent' ? 'linux/ui/menu/agent_rows.lua' : 'linux/ui/menu/menu_builder.lua';
+			kind === 'agent' ? 'linux/ui/menu/agent_rows.lua' : 'linux/ui/menu/builder.lua';
 		const replacements = [
 			[
 				producerFile,
@@ -3761,10 +3761,10 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 					(kind === 'agent' ? 'children' : 'items') +
 					') end return nil'
 			],
-			['linux/ui/menu/menu_builder.lua', '["' + kind + '"]', '["withdrawn_' + kind + '"]'],
-			['linux/ui/menu/menu_builder.lua', 'rows[#rows + 1] = build(ctx)', 'build(ctx)'],
+			['linux/ui/menu/builder.lua', '["' + kind + '"]', '["withdrawn_' + kind + '"]'],
+			['linux/ui/menu/builder.lua', 'rows[#rows + 1] = build(ctx)', 'build(ctx)'],
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'local rendered = separator_render(rows, "top_level")',
 				'local rendered = {}'
 			],
@@ -3797,7 +3797,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'closed disabled branch mutation exists'
 			);
 			replacements.push([
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				disabledRow,
 				disabledRow.replace(before, after)
 			]);
@@ -3807,7 +3807,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				[producerFile, 'llm.set_agent_mode(id)', 'true'],
 				[
 					producerFile,
-					'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {})',
+					'local children = ManifestMenu.build("agent_menu", "Agent", nil, nil, menu_ctx, providers)',
 					'local children = {}'
 				],
 				[
@@ -3819,12 +3819,12 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 
 		replacements.push(
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'function M.build(ctx)\n',
 				'function M.build(ctx)\ndo return {} end\n'
 			],
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'local build = builders[id]',
 				'local build = builders[id]\nlocal build = function() return nil end'
 			]
@@ -3873,12 +3873,12 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 
 		replacements.push(
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'local function _build_agent(ctx)\n',
 				'local function _build_agent(ctx)\ndo return nil end\n'
 			],
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'\nreturn M\n',
 				'\nM.build = function() return {} end\nreturn M\n'
 			],
@@ -3888,7 +3888,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'\nM.build = function() return nil end\nreturn M\n'
 			],
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'\nreturn M\n',
 				'\nM["build"] = function() return {} end\nreturn M\n'
 			],
@@ -3906,27 +3906,27 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 			]);
 		replacements.push(
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'local NumberRowPolicy = require("layout.number_row_policy")',
 				'local NumberRowPolicy = require("foreign.owner")'
 			],
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'NumberRowPolicy.native_rows(ManifestMenu',
 				'foreign_native_rows(ManifestMenu'
 			],
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'local function _grey_for_pause(row)\n',
 				'local function _grey_for_pause(row)\ndo return nil end\n'
 			],
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'local function _row_is_for_linux(row)\n',
 				'local function _row_is_for_linux(row)\ndo return false end\n'
 			],
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'\nreturn M\n',
 				'\nlocal unrelated = error("withdrawing real module")\nreturn M\n'
 			],
@@ -3934,24 +3934,24 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 		);
 		replacements.push(
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'["agent"]           = _build_agent,',
 				'["agent"]           = _build_agent,\n["agent"] = function() return nil end,'
 			],
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'rows[#rows + 1] = build(ctx)',
 				'rows[#rows + 1] = build(ctx) and {}'
 			],
 			[
 				'linux/ui/menu/agent_rows.lua',
-				'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {})',
-				'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {}) and { { title = "synthetic" } }'
+				'local children = ManifestMenu.build("agent_menu", "Agent", nil, nil, menu_ctx, providers)',
+				'local children = ManifestMenu.build("agent_menu", "Agent", nil, nil, menu_ctx, providers) and { { title = "synthetic" } }'
 			],
 			[
 				'linux/ui/menu/agent_rows.lua',
-				'\tend\n\tlocal handlers = {}',
-				'\tend\n\tlocal changed = function() return nil end\n\tlocal handlers = {}'
+				'\tend\n\tlocal providers = {}',
+				'\tend\n\tlocal changed = function() return nil end\n\tlocal providers = {}'
 			],
 			[
 				'linux/ui/menu/agent_rows.lua',
@@ -3959,13 +3959,13 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'menu_ctx.commands.agent_mode = function() return false end\nlocal children = ManifestMenu.build('
 			],
 			[
-				'linux/ui/menu/menu_builder.lua',
+				'linux/ui/menu/builder.lua',
 				'local rendered = ManifestMenu\n\t\tand ManifestMenu.build("llm_menu"',
 				'llm_ctx.commands["llm_toggle"] = function() return false end\nlocal rendered = ManifestMenu\n\t\tand ManifestMenu.build("llm_menu"'
 			]
 		);
 		replacements.push([
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'\nreturn M\n',
 			'\nlocal foreign = require("foreign.native_owner")\nreturn M\n'
 		]);
@@ -4035,9 +4035,8 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'local llm = ctx.llm\n\t' + statement
 			]);
 
-		const rootRegistration =
-			kind === 'agent' ? 'local handlers = {}' : 'local dynamic_handlers = {}';
-		const rootName = kind === 'agent' ? 'handlers' : 'dynamic_handlers';
+		const rootRegistration = 'local providers = {}';
+		const rootName = 'providers';
 		for (const statement of ['local ' + rootName + ' = {}', rootName + ' = {}'])
 			replacements.push([producerFile, rootRegistration, rootRegistration + '\n\t' + statement]);
 		if (kind === 'llm')
@@ -4138,7 +4137,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 	const proof = require('../lib/menu-native-llm-parent-binding.cjs');
 	const macFile = 'macos/ui/menu/builder.lua';
 	const layoutFile = 'macos/ui/menu/menu_keyboard_layout.lua';
-	const linuxFile = 'linux/ui/menu/menu_builder.lua';
+	const linuxFile = 'linux/ui/menu/builder.lua';
 	const mac = readSourceFile(path.join(SP, macFile));
 	const layout = readSourceFile(path.join(SP, layoutFile));
 	const linux = readSourceFile(path.join(SP, linuxFile));
@@ -4342,7 +4341,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 {
 	const assert = require('node:assert/strict');
 	const { nativeLinuxHeaderPublication } = require('../lib/menu-native-llm-parent-binding.cjs');
-	const source = linuxAiSources['linux/ui/menu/menu_builder.lua'];
+	const source = linuxAiSources['linux/ui/menu/builder.lua'];
 	const admits = (candidate = source, declarations = manifest, platform = 'linux') =>
 		nativeLinuxHeaderPublication(candidate, declarations, platform);
 	assert.equal(admits(), true, 'actual physical Linux root retains both guarded header frames');
@@ -4583,7 +4582,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 // This credits only the reviewed leaf and immediate transport, not a whole native parent.
 const personalInfoProviders = {
 	hs: { id: 'hotstring_categories_standard', file: 'macos/ui/menu/menu_hotstrings.lua' },
-	linux: { id: 'hotstring_categories_dynamic', file: 'linux/ui/menu/menu_builder.lua' }
+	linux: { id: 'hotstring_categories_dynamic', file: 'linux/ui/menu/builder.lua' }
 };
 const personalInfoSources = Object.fromEntries(
 	Object.entries(personalInfoProviders).map(([platform, { file }]) => [
@@ -5622,7 +5621,7 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // could not answer by id, and both Lua drivers had implemented the row for
 // months while the manifest said neither had the concept.
 // linux raised 5 → 7 on 2026-08-05: the kanata and updates submenus became the
-// first blocks of menu_builder.lua whose rows the renderer MATERIALISES, through
+// first blocks of ui/menu/builder.lua whose rows the renderer MATERIALISES, through
 // `list` providers. Routing a menu through the renderer and moving its rows out of the
 // driver are two different things, and only the second one moves the bypass
 // ratchet — this number counts the first.
@@ -5917,7 +5916,7 @@ for (const [driver, root] of Object.entries(DRIVER_ROOTS)) {
 	const { src, delegated } = driverSource(root);
 	const keys = new Set([...src.matchAll(/ManifestMenu\.build\(\s*"([a-z_]+)"/g)].map((m) => m[1]));
 	// This parent now completes admitted canonical DATA without invoking Build.
-	const languageFile = driver === 'hs' ? 'ui/menu/builder.lua' : 'ui/menu/menu_builder.lua';
+	const languageFile = 'ui/menu/builder.lua';
 	if (languageParentSource(readSourceFile(path.join(root, languageFile)), driver))
 		keys.add('language_menu');
 	renderedCounts[driver] = keys.size;
@@ -6002,7 +6001,7 @@ for (const platform of PLATFORMS) {
 	const assert = require('node:assert/strict');
 	const headerRoot =
 		require('../lib/menu-native-llm-parent-binding.cjs').declaredLinuxTopLevelPublication;
-	const headerSource = readSourceFile(path.join(SP, 'linux/ui/menu/menu_builder.lua'));
+	const headerSource = readSourceFile(path.join(SP, 'linux/ui/menu/builder.lua'));
 	assert.equal(headerRoot(headerSource), true, 'actual complete shared header root is admitted');
 	for (const [before, after, reason] of [
 		[
@@ -6238,7 +6237,7 @@ function languageParentSource(source, driver) {
 			]
 		],
 		[
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'local function _build_language(ctx)',
 			[
 				'local locales = i18n.list_locales()',
@@ -6273,7 +6272,7 @@ function languageParentSource(source, driver) {
 	const assert = require('node:assert/strict');
 	for (const [driver, file] of [
 		['hs', 'macos/ui/menu/builder.lua'],
-		['linux', 'linux/ui/menu/menu_builder.lua']
+		['linux', 'linux/ui/menu/builder.lua']
 	]) {
 		const source = readSourceFile(path.join(SP, file));
 		assert(
@@ -6479,7 +6478,7 @@ function languageParentSource(source, driver) {
 		],
 		[
 			'linux',
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'local function _build_debug(ctx)',
 			'rows',
 			'return ManifestMenu.group_row("top_level", "debug", rows, render_ctx.state_getters)'
@@ -6745,7 +6744,7 @@ function languageParentSource(source, driver) {
 		],
 		[
 			'linux',
-			'linux/ui/menu/menu_builder.lua',
+			'linux/ui/menu/builder.lua',
 			'local function _build_configuration(ctx)',
 			'rows',
 			'return ManifestMenu.group_row("top_level", "configuration", rows, render_ctx.state_getters)'
@@ -7002,7 +7001,7 @@ function languageParentSource(source, driver) {
 	}
 	for (const [driver, file, signature] of [
 		['hs', 'macos/ui/menu/menu_metrics.lua', 'function M.build(ctx)'],
-		['linux', 'linux/ui/menu/menu_builder.lua', 'local function _build_metrics(ctx)']
+		['linux', 'linux/ui/menu/builder.lua', 'local function _build_metrics(ctx)']
 	]) {
 		const source = readSourceFile(path.join(base, file));
 		const native = ownerBody(source, signature);
@@ -7359,7 +7358,7 @@ function languageParentSource(source, driver) {
 			return false;
 		}
 	}
-	const source = readSourceFile(path.join(base, 'linux/ui/menu/menu_builder.lua'));
+	const source = readSourceFile(path.join(base, 'linux/ui/menu/builder.lua'));
 	assert.equal(
 		admits(source),
 		true,
@@ -7863,7 +7862,7 @@ module.exports.receivingParser = luaPublicationParser;
 			'function M.build(ctx, dialogs)'
 		),
 		parser.body(
-			parser.lex(linuxAiSources['linux/ui/menu/menu_builder.lua']),
+			parser.lex(linuxAiSources['linux/ui/menu/builder.lua']),
 			'local function _build_llm(ctx)'
 		)
 	];

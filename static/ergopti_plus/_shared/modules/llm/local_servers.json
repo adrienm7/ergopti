@@ -1,6 +1,18 @@
 {
-	"_comment": "Single source of truth for the local servers the AI menu detects: servers the user installed and runs, which answer the OpenAI Chat Completions dialect (GET <base_url>/models, POST <base_url>/chat/completions). The driver never installs or starts them: it lists one only when its models endpoint answers, and sends it the requests of the openai format of api_providers.json, with no key unless the user gives one or the server's own settings file holds one (discovery.config_files key_key, read only for a running loopback server and never logged). A server's id must not be a provider id of api_providers.json. base_url is each project's documented default port on 127.0.0.1, the IPv4 loopback every one of them binds by default; _source names where it was read. The IP literal, as for Ollama and MLX, keeps the probe off the name localhost, which a client may resolve to ::1 first (where these servers do not listen), send through the system proxy, or answer slowly (#99). llama-server (llama.cpp) and LocalAI both listen on port 8080 by default, so one probe covers both and the row names both. A server is probed only while its process runs (discovery.process_names: the executable's file name; discovery.command_lines: a command-line fragment), at the port its command line passes (discovery.port_flags, discovery.address_flags), else the port of its settings file (discovery.config_files: per OS, dir or the folder named in dir_file, file, dotted port_key, optional dotted key_key), else a port its process listens on, and only then at base_url's default port (_shared/lua/llm/local_server_ports.lua). When the process list cannot be read, a server is still probed at the port of its settings file, else at a port a process of its name listens on, else at base_url's default port.",
-	"server_order": ["omlx", "lmstudio", "llamacpp", "jan"],
+	"_comment": "Single source of truth for the local servers the AI menu detects: servers the user installed and runs, which answer the OpenAI Chat Completions dialect (GET <base_url>/models, POST <base_url>/chat/completions). The driver never installs or starts them: it lists one only when its models endpoint answers, and sends it the requests of the openai format of api_providers.json, with no key unless the user gives one or the server's own settings file holds one (discovery.config_files key_key, read only for a running loopback server and never logged). A server's id must not be a provider id of api_providers.json. base_url is each project's documented default port on 127.0.0.1, the IPv4 loopback every one of them binds by default; _source names where it was read. The IP literal, as for Ollama and MLX, keeps the probe off the name localhost, which a client may resolve to ::1 first (where these servers do not listen), send through the system proxy, or answer slowly (#99). llama-server (llama.cpp), LocalAI and llamafile all listen on port 8080 by default with the same --port flag, so one probe covers them and the row names them together. No two rows share a default address: a generic entry the user configured at that address would otherwise belong to two servers. A server whose API always needs a key or answers outside the OpenAI dialect (AnythingLLM: a workspace slug as the model) is not listed. A server is probed only while its process runs (discovery.process_names: the executable's file name; discovery.command_lines: a command-line fragment), at the port its command line passes (discovery.port_flags, discovery.address_flags), else the port of its settings file (discovery.config_files: per OS, dir or the folder named in dir_file, file, dotted port_key, optional dotted key_key), else a port its process listens on, and only then at base_url's default port (_shared/lua/llm/local_server_ports.lua). When the process list cannot be read, a server is still probed at the port of its settings file, else at a port a process of its name listens on, else at base_url's default port.",
+	"server_order": [
+		"omlx",
+		"lmstudio",
+		"llamacpp",
+		"jan",
+		"sglang",
+		"koboldcpp",
+		"textgen_webui",
+		"gpt4all",
+		"lemonade",
+		"docker_model_runner",
+		"exo"
+	],
 	"thinking_dialect": {
 		"_comment": "How a local server carries the reasoning controls of the model families of thinking_off.json, merged after request_fields (which turn thinking off for every model) and never over a field already set: a family's effort level travels in chat_template_kwargs, where gpt-oss chat templates read reasoning_effort (llama.cpp server, vLLM, mlx-lm); a template that does not know a key ignores it.",
 		"toggle": { "chat_template_kwargs": { "enable_thinking": false } },
@@ -44,15 +56,16 @@
 			}
 		},
 		"llamacpp": {
-			"label": "llama.cpp / LocalAI",
+			"label": "llama.cpp / LocalAI / llamafile",
 			"base_url": "http://127.0.0.1:8080/v1",
-			"_source": "github.com/ggml-org/llama.cpp tools/server/README.md (--host default 127.0.0.1, --port default 8080; GET /v1/models, POST /v1/chat/completions; images with --mmproj). github.com/mudler/LocalAI core/cli/run.go (LOCALAI_ADDRESS default :8080).",
+			"_source": "github.com/ggml-org/llama.cpp tools/server/README.md (--host default 127.0.0.1, --port default 8080; GET /v1/models, POST /v1/chat/completions; images with --mmproj). github.com/mudler/LocalAI core/cli/run.go (LOCALAI_ADDRESS default :8080). github.com/mozilla-ai/llamafile docs/api.md and docs/cli_arguments.md (--server, --host, --port default 127.0.0.1:8080; GET /v1/models, POST /v1/chat/completions; a key only with --api-key).",
 			"auth": "optional",
 			"discovery": {
-				"process_names": ["llama-server", "local-ai"],
+				"process_names": ["llama-server", "local-ai", "llamafile"],
 				"port_flags": ["--port"],
 				"address_flags": ["--address"],
-				"_source": "llama.cpp tools/server/README.md (--port); LocalAI core/cli/run.go (--address [host]:port). Neither keeps a settings file."
+				"_source": "llama.cpp tools/server/README.md (--port); LocalAI core/cli/run.go (--address [host]:port). Neither keeps a settings file. llamafile docs/cli_arguments.md (--port); a model packaged as <Model>.llamafile runs under that name or through the APE loader (docs/technical_details.md), so its file suffix is matched in the command line.",
+				"command_lines": [".llamafile"]
 			}
 		},
 		"jan": {
@@ -63,6 +76,103 @@
 			"discovery": {
 				"process_names": ["Jan"],
 				"_source": "Jan sets its API server port in the app; its settings layout is undocumented, so its listening ports are read."
+			}
+		},
+		"sglang": {
+			"label": "SGLang",
+			"base_url": "http://127.0.0.1:30000/v1",
+			"_source": "github.com/sgl-project/sglang docs/docs/advanced_features/server_arguments.mdx (--host 127.0.0.1, --port 30000) and python/sglang/srt/entrypoints/http_server.py (GET /v1/models, POST /v1/chat/completions); a key only with --api-key.",
+			"auth": "optional",
+			"discovery": {
+				"command_lines": ["sglang.launch_server", "sglang serve"],
+				"port_flags": ["--port"],
+				"_source": "python -m sglang.launch_server and the sglang serve console script (python/pyproject.toml, python/sglang/cli/serve.py), both with --port. Its optional --config file is YAML at no default path."
+			}
+		},
+		"koboldcpp": {
+			"label": "KoboldCpp",
+			"base_url": "http://127.0.0.1:5001/v1",
+			"_source": "github.com/LostRuins/koboldcpp koboldcpp.py (defaultport 5001; /v1/models and /v1/chat/completions); a key only with --password or KCPP_PASSWORD.",
+			"auth": "optional",
+			"discovery": {
+				"command_lines": ["koboldcpp"],
+				"port_flags": ["--port"],
+				"_source": "The Linux release files are koboldcpp-linux-x64 and its -nocuda and -oldpc builds (README), and a source run is koboldcpp.py, so the name is matched in the command line; --port. A .kcpps settings file has no fixed path (--config)."
+			}
+		},
+		"textgen_webui": {
+			"label": "text-generation-webui",
+			"base_url": "http://127.0.0.1:5000/v1",
+			"_source": "github.com/oobabooga/textgen modules/shared.py (--api, --api-port default 5000, --api-key default empty) and modules/api/script.py (GET /v1/models, POST /v1/chat/completions).",
+			"auth": "optional",
+			"discovery": {
+				"command_lines": ["one_click.py", "server.py --api", "text-generation-webui/server.py"],
+				"port_flags": ["--api-port"],
+				"_source": "start_linux.sh runs one_click.py, which starts server.py with the flags of user_data/CMD_FLAGS.txt (plain text, not a settings file this reader can use); --api-port, or OPENEDAI_PORT."
+			}
+		},
+		"gpt4all": {
+			"label": "GPT4All",
+			"base_url": "http://127.0.0.1:4891/v1",
+			"_source": "github.com/nomic-ai/gpt4all gpt4all-chat/src/server.cpp (listens on 127.0.0.1:4891; GET /v1/models, POST /v1/chat/completions) and docs.gpt4all.io gpt4all_api_server/home.html; no key. The server is off until Enable Local API Server is set.",
+			"auth": "optional",
+			"discovery": {
+				"process_names": ["gpt4all"],
+				"command_lines": ["gpt4all/bin/chat"],
+				"_source": "The Linux executable is the CMake target chat in the installer's gpt4all/bin folder; on macOS gpt4all-chat/CMakeLists.txt sets OUTPUT_NAME gpt4all, so the app runs gpt4all.app/Contents/MacOS/gpt4all. Its port setting lives in a Qt INI file this reader does not parse, so its listening port is read."
+			}
+		},
+		"lemonade": {
+			"label": "AMD Lemonade",
+			"base_url": "http://127.0.0.1:13305/v1",
+			"_source": "github.com/lemonade-sdk/lemonade docs/guide/configuration/README.md (Settings Reference: port 13305, host localhost) and docs/api/openai.md (GET /v1/models, POST /v1/chat/completions); a key only with LEMONADE_API_KEY.",
+			"auth": "optional",
+			"discovery": {
+				"process_names": ["lemond", "lemonade-server"],
+				"port_flags": ["--port"],
+				"config_files": [
+					{
+						"os": ["linux", "macos"],
+						"dir": "~/.config/lemonade",
+						"file": "config.json",
+						"port_key": "port"
+					},
+					{
+						"os": ["macos"],
+						"dir": "/Library/Application Support/lemonade/.config",
+						"file": "config.json",
+						"port_key": "port"
+					},
+					{
+						"os": ["linux"],
+						"dir": "/var/lib/lemonade",
+						"file": "config.json",
+						"port_key": "port"
+					}
+				],
+				"_source": "The server is lemond (data/lemond.service.in; --port in src/cpp/server/cli_parser.cpp), formerly lemonade-server; config.json holds sparse overrides, in ~/.config/lemonade for a standalone lemond or a macOS user install, /Library/Application Support/lemonade/.config for a macOS system install and /var/lib/lemonade for the Linux packaged service (docs/guide/configuration/README.md)."
+			}
+		},
+		"docker_model_runner": {
+			"label": "Docker Model Runner",
+			"base_url": "http://127.0.0.1:12434/engines/v1",
+			"_source": "docs.docker.com/ai/model-runner/api-reference and get-started (TCP on port 12434 by default for Docker Engine; GET /engines/v1/models, POST /engines/v1/chat/completions); the Authorization header is ignored.",
+			"auth": "optional",
+			"discovery": {
+				"process_names": ["model-runner"],
+				"port_flags": ["--port"],
+				"_source": "On Docker Engine the runner is the docker-model-runner container whose entrypoint is /app/model-runner (github.com/docker/model-runner Dockerfile, cmd/cli/pkg/standalone/containers.go), visible in the host's process list; docker model install-runner --port moves it."
+			}
+		},
+		"exo": {
+			"label": "exo",
+			"base_url": "http://127.0.0.1:52415/v1",
+			"_source": "github.com/exo-explore/exo src/exo/main.py (--api-port default 52415), src/exo/api/listening_socket.py (binds 0.0.0.0) and src/exo/api/main.py (GET /v1/models, POST /v1/chat/completions); no key.",
+			"auth": "optional",
+			"discovery": {
+				"process_names": ["exo"],
+				"port_flags": ["--api-port"],
+				"_source": "The exo console script (pyproject.toml), usually through uv run exo; --api-port. Its ~/.config/exo folder holds no documented port."
 			}
 		}
 	}

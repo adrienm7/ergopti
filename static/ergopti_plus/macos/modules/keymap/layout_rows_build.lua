@@ -318,7 +318,11 @@ function M.replace(source, rows, on_done, deps)
 							return abandon(M.FAILURE_SELECT, "a fresh process does not see the build selected ("
 								.. tostring(seen_reason or (now and now.id)) .. ")")
 						end
-						deps.probe({ source_id = now.id, codes = readback_codes(codes) }, function(receipt, probe_reason)
+						-- now.id comes from a fresh process: Hammerspoon's own view can
+						-- still name the previous source (field run 2026-10-31).
+						local request = { source_id = now.id, codes = readback_codes(codes),
+							identity = require("adapters.keyboard_source_probe").IDENTITY_FRESH_PROCESS }
+						deps.probe(request, function(receipt, probe_reason)
 							if receipt == nil then
 								return abandon(M.FAILURE_READBACK, "the keyboard probe answered " .. tostring(probe_reason))
 							end

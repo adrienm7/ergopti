@@ -14,6 +14,41 @@
 
 
 
+; A section scalar with a case twin has no one destination, as in the shared Lua
+; writer: an edit is refused whole, a save that leaves the row alone still works,
+; and the cleanup offers the twin, which is how the user gets out. Runs with the
+; twin in the source and ends with it removed by that cleanup.
+_CUK_TwinRefusesEditUntilCleanup(Path, BindingId, Known, Twin, Stamp) {
+	global GestureActionParameters
+	Notices := []
+	Before := FSReadUtf8Exact(Path)
+	AssertFalse(GestureSetActionParameter(BindingId, "open_url", "https://changed.example", 0,
+		(Message, Options) => Notices.Push(Message)), "a case twin leaves the edit without one destination")
+	AssertEqual(Before, FSReadUtf8Exact(Path), "the refused edit leaves the file bytes unchanged")
+	AssertEqual(1, Notices.Length, "the refused edit is told to the user, not only logged")
+	AssertEqual("https://known.example", GestureActionParameters[Known], "the refused edit leaves the live value")
+	AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+
+	; A full save carries this row unchanged, so the twin does not block it.
+	AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0,
+		() => [{ Section: "layout", Key: "ergopti_altgr", Value: false }]))
+	AssertFalse(Before == FSReadUtf8Exact(Path), "the full save really wrote the file")
+	Parsed := ConfigTomlDecodeSnapshot(FSReadUtf8Exact(Path)).Document
+	AssertEqual("https://known.example", Parsed["action_parameters"][Known])
+	AssertEqual("https://unjudged.example", Parsed["action_parameters"][Twin], "a full save keeps the twin")
+
+	Offered := []
+	for Entry in ConfigUnusedKeysFind(Path)["keys"] {
+		if Entry["section"] == "action_parameters" && Entry["key"] == Twin
+			Offered.Push(Entry)
+	}
+	AssertEqual(1, Offered.Length, "the cleanup offers the twin, so the user can get out")
+	AssertEqual("removed", ConfigUnusedKeysRemove(Path, Offered, Stamp)["status"], "the cleanup removes the offered twin")
+	Parsed := ConfigTomlDecodeSnapshot(FSReadUtf8Exact(Path)).Document
+	AssertFalse(Parsed["action_parameters"].Has(Twin))
+	AssertEqual("https://known.example", Parsed["action_parameters"][Known], "the cleanup removes only the twin")
+}
+
 _CUK_RetiredGestureBindingOwnership() {
 	Target := ManifestBuildFeaturesMap()
 	Owner := ""
@@ -105,10 +140,13 @@ _CUK_RetiredGestureBindingsPreserveWholeSource() {
 		ConfigurationFile := Path
 		_IniCache := ParseConfigTomlFile(Path)
 		GesturesReadConfig()
+		_CUK_TwinRefusesEditUntilCleanup(Path, "gesture__tap_3", Known, Twin, "20990101-000177")
+		_IniCache := ParseConfigTomlFile(Path)
+		GesturesReadConfig()
 		AssertTrue(GestureSetActionParameter("gesture__tap_3", "open_url", "https://changed.example"))
 		AssertEqual("On", GestureActionParameters.CaseSense)
 		AssertEqual("https://changed.example", GestureActionParameters[Known])
-		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		AssertFalse(GestureActionParameters.Has(Twin))
 		BeforeRefusal := FSReadUtf8Exact(Path)
 		AssertFalse(GestureSetActionParameter("gesture__removed_gesture_slot", "open_url", "https://must-not-publish.example"))
 		AssertEqual(BeforeRefusal, FSReadUtf8Exact(Path), "ordinary refusal preserves exact persisted bytes")
@@ -118,10 +156,10 @@ _CUK_RetiredGestureBindingsPreserveWholeSource() {
 		AssertContains(Saved, Retired . ' = "https://obsolete.example" # explicit cleanup owns this row')
 		AssertContains(Saved, "# independent user comment")
 		Parsed := ConfigTomlDecodeSnapshot(Saved).Document
-		AssertEqual(4, Parsed["action_parameters"].Count, "complete handwritten preserved parameter model")
+		AssertEqual(3, Parsed["action_parameters"].Count, "complete handwritten preserved parameter model")
 		AssertEqual("https://obsolete.example", Parsed["action_parameters"][Retired])
 		AssertEqual("https://changed.example", Parsed["action_parameters"][Known])
-		AssertEqual("https://unjudged.example", Parsed["action_parameters"][Twin])
+		AssertFalse(Parsed["action_parameters"].Has(Twin))
 		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__primary_k__open_url"])
 		AssertEqual("independent", Parsed["future"]["keep"])
 
@@ -134,7 +172,7 @@ _CUK_RetiredGestureBindingsPreserveWholeSource() {
 		AfterCleanup := ConfigTomlDecodeSnapshot(FSReadUtf8Exact(Path)).Document
 		AssertFalse(AfterCleanup["action_parameters"].Has(Retired), "only explicit cleanup removes retirement")
 		AssertEqual("https://changed.example", AfterCleanup["action_parameters"][Known])
-		AssertEqual("https://unjudged.example", AfterCleanup["action_parameters"][Twin])
+		AssertFalse(AfterCleanup["action_parameters"].Has(Twin))
 	} finally {
 		_ConfigBootRejectedOverrides := PreviousRejected
 		_ConfigFullSaveCoordinator(Coordinator)
@@ -240,10 +278,13 @@ _CUK_RetiredScriptBindingsPreserveWholeSourceBody() {
 		ConfigurationFile := Path
 		_IniCache := ParseConfigTomlFile(Path)
 		GesturesReadConfig()
+		_CUK_TwinRefusesEditUntilCleanup(Path, "script__script_altgr_enter", Known, Twin, "20990101-000277")
+		_IniCache := ParseConfigTomlFile(Path)
+		GesturesReadConfig()
 		AssertTrue(GestureSetActionParameter("script__script_altgr_enter", "open_url", "https://changed.example"))
 		AssertEqual("On", GestureActionParameters.CaseSense)
 		AssertEqual("https://changed.example", GestureActionParameters[Known])
-		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		AssertFalse(GestureActionParameters.Has(Twin))
 		BeforeRefusal := FSReadUtf8Exact(Path)
 		AssertFalse(GestureSetActionParameter("script__removed_script_slot", "open_url", "https://must-not-publish.example"))
 		AssertEqual(BeforeRefusal, FSReadUtf8Exact(Path), "ordinary refusal preserves exact persisted bytes")
@@ -253,10 +294,10 @@ _CUK_RetiredScriptBindingsPreserveWholeSourceBody() {
 		AssertContains(Saved, Retired . ' = "https://obsolete.example" # explicit cleanup owns this row')
 		AssertContains(Saved, "# independent user comment")
 		Parsed := ConfigTomlDecodeSnapshot(Saved).Document
-		AssertEqual(4, Parsed["action_parameters"].Count, "complete handwritten preserved parameter model")
+		AssertEqual(3, Parsed["action_parameters"].Count, "complete handwritten preserved parameter model")
 		AssertEqual("https://obsolete.example", Parsed["action_parameters"][Retired])
 		AssertEqual("https://changed.example", Parsed["action_parameters"][Known])
-		AssertEqual("https://unjudged.example", Parsed["action_parameters"][Twin])
+		AssertFalse(Parsed["action_parameters"].Has(Twin))
 		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__primary_k__open_url"])
 		AssertEqual("independent", Parsed["future"]["keep"])
 
@@ -269,7 +310,7 @@ _CUK_RetiredScriptBindingsPreserveWholeSourceBody() {
 		AfterCleanup := ConfigTomlDecodeSnapshot(FSReadUtf8Exact(Path)).Document
 		AssertFalse(AfterCleanup["action_parameters"].Has(Retired), "only explicit cleanup removes retirement")
 		AssertEqual("https://changed.example", AfterCleanup["action_parameters"][Known])
-		AssertEqual("https://unjudged.example", AfterCleanup["action_parameters"][Twin])
+		AssertFalse(AfterCleanup["action_parameters"].Has(Twin))
 	} finally {
 		_ConfigBootRejectedOverrides := PreviousRejected
 		_ConfigFullSaveCoordinator(Coordinator)
@@ -370,10 +411,13 @@ _CUK_RetiredTapBindingsPreserveWholeSourceBody() {
 		ConfigurationFile := Path
 		_IniCache := ParseConfigTomlFile(Path)
 		GesturesReadConfig()
+		_CUK_TwinRefusesEditUntilCleanup(Path, "tap_key__number_row_left", Known, Twin, "20990101-000277")
+		_IniCache := ParseConfigTomlFile(Path)
+		GesturesReadConfig()
 		AssertTrue(GestureSetActionParameter("tap_key__number_row_left", "open_url", "https://changed.example"))
 		AssertEqual("On", GestureActionParameters.CaseSense)
 		AssertEqual("https://changed.example", GestureActionParameters[Known])
-		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		AssertFalse(GestureActionParameters.Has(Twin))
 		BeforeRefusal := FSReadUtf8Exact(Path)
 		AssertFalse(GestureSetActionParameter("tap_key__removed_tap_key", "open_url", "https://must-not-publish.example"))
 		AssertEqual(BeforeRefusal, FSReadUtf8Exact(Path), "ordinary refusal preserves exact persisted bytes")
@@ -383,10 +427,10 @@ _CUK_RetiredTapBindingsPreserveWholeSourceBody() {
 		AssertContains(Saved, Retired . ' = "https://obsolete.example" # explicit cleanup owns this row')
 		AssertContains(Saved, "# independent user comment")
 		Parsed := ConfigTomlDecodeSnapshot(Saved).Document
-		AssertEqual(4, Parsed["action_parameters"].Count, "complete handwritten preserved parameter model")
+		AssertEqual(3, Parsed["action_parameters"].Count, "complete handwritten preserved parameter model")
 		AssertEqual("https://obsolete.example", Parsed["action_parameters"][Retired])
 		AssertEqual("https://changed.example", Parsed["action_parameters"][Known])
-		AssertEqual("https://unjudged.example", Parsed["action_parameters"][Twin])
+		AssertFalse(Parsed["action_parameters"].Has(Twin))
 		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__primary_k__open_url"])
 		AssertEqual("independent", Parsed["future"]["keep"])
 
@@ -399,7 +443,7 @@ _CUK_RetiredTapBindingsPreserveWholeSourceBody() {
 		AfterCleanup := ConfigTomlDecodeSnapshot(FSReadUtf8Exact(Path)).Document
 		AssertFalse(AfterCleanup["action_parameters"].Has(Retired), "only explicit cleanup removes retirement")
 		AssertEqual("https://changed.example", AfterCleanup["action_parameters"][Known])
-		AssertEqual("https://unjudged.example", AfterCleanup["action_parameters"][Twin])
+		AssertFalse(AfterCleanup["action_parameters"].Has(Twin))
 	} finally {
 		_ConfigBootRejectedOverrides := PreviousRejected
 		_ConfigFullSaveCoordinator(Coordinator)

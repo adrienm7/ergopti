@@ -110,6 +110,13 @@ function M.prepare(model, port, python_bin)
 	if not generated or type(nonce) ~= "string" or #nonce ~= 36 or not nonce:match("^[%w%-]+$") then return nil, false end
 	local allocated, path = pcall(FileSystem.create_secure_temp_file)
 	if not allocated or type(path) ~= "string" then return nil, false end
+	-- The receipt and nonce also travel on the command line: a request the
+	-- owner refuses while reading it still publishes that refusal, so the
+	-- task slot is released (Mac field report 2026-10-30 21:01).
+	arguments[#arguments + 1] = "--receipt-path"
+	arguments[#arguments + 1] = path
+	arguments[#arguments + 1] = "--nonce"
+	arguments[#arguments + 1] = nonce
 	local observed = identity(path)
 	local attempted, retired, cleaned, expected, cleanup_retry = false, false, false, "", nil
 	local cleanup_receipt, cleanup_removed = nil, false

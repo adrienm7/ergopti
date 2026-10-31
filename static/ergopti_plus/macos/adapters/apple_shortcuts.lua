@@ -11,7 +11,8 @@
 local Json = require("json")
 local Unicode = require("compat.utf8")
 local Parameter = require("program_parameter")
-local M = { MAX_BYTES = 65536, MAX_CHOICES = 64, MAX_NAME_BYTES = 4096 }
+local Timings = require("infra.timings")
+local M = { MAX_BYTES = Timings.count("limits", "shortcuts_reply_bytes"), MAX_CHOICES = 64, MAX_NAME_BYTES = 4096 }
 
 local function fields(value, allowed, count)
 	if type(value) ~= "table" or Json.is_null(value) or Json.is_array(value) then return false end

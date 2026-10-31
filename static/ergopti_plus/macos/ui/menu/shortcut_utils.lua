@@ -129,7 +129,7 @@ end
 function M.shortcut_to_label(sc, none_label)
 	-- `common.none`, not a French word written here: this is a menu label, and the
 	-- other two drivers already read that key for the same row (Windows in
-	-- menu_settings.ahk, Linux in menu_builder.lua). A literal is a translation of
+	-- menu_settings.ahk, Linux in ui/menu/builder.lua). A literal is a translation of
 	-- exactly one of the twenty-one languages the menu is drawn in.
 	if type(sc) ~= "table" then return none_label or i18n.get("common.none") end
 	local ordered_mods = {}
@@ -286,8 +286,43 @@ function M.action_parameter_title(label)
 	return template:sub(1, at - 1) .. tostring(label) .. template:sub(at + 3)
 end
 
+--- Asks for a screen action's vision parameter as the action picker page does:
+--- the backend picked from a list, then the optional model typed with the
+--- backend's default shown. A typed entry used to print every backend on its own
+--- line, about forty with the API catalogue.
+--- @param gestures table The gestures facade (llm_vision_choices).
+--- @param title string The prompt's title.
+--- @param prior string The value shown first.
+--- @return string|nil value Nil when the user cancelled.
+function M.ask_vision_parameter(gestures, title, prior)
+	local Vision = require("llm.vision")
+	local choices = gestures.llm_vision_choices()
+	local parsed = type(prior) == "string" and Vision.parse(prior) or nil
+	local labels, ordered = {}, {}
+	-- The stored backend first: dialog_util.choose preselects its first choice.
+	for _, choice in ipairs(choices) do
+		if parsed and choice.value == parsed.backend then table.insert(ordered, 1, choice) else ordered[#ordered + 1] = choice end
+	end
+	for index, choice in ipairs(ordered) do labels[index] = choice.label end
+	local save_btn, cancel_btn = i18n.get("button.save"), i18n.get("button.cancel")
+	local picked = dialog.choose(title, i18n.get("dialog.action_picker.vision_provider_label"), labels,
+		cancel_btn, save_btn)
+	if picked == nil then return nil end
+	local chosen = ordered[picked]
+	local default_model = chosen.defaultModel or ""
+	local hint = default_model ~= ""
+		and i18n.get("dialog.action_picker.vision_model_default"):gsub("{1}", function() return default_model end)
+		or i18n.get("dialog.action_picker.vision_model_required")
+	local initial = parsed and parsed.backend == chosen.value and parsed.model or ""
+	local prompt_ok, button, typed = pcall(dialog.text_prompt, title,
+		i18n.get("dialog.action_picker.vision_model_label") .. "\n" .. hint, initial, save_btn, cancel_btn)
+	if not prompt_ok or button ~= save_btn then return nil end
+	return Vision.compose_parameter(chosen.value, typed, default_model)
+end
+
 --- Asks for one parameter value the way its kind is chosen: an application is
---- picked in the /Applications chooser, every other kind is typed.
+--- picked in the /Applications chooser, a vision backend in a list, every other
+--- kind is typed.
 --- @param gestures table The gestures facade.
 --- @param action string The action being configured.
 --- @param spec string Its parameter kind.
@@ -295,6 +330,7 @@ end
 --- @param prior string The value shown first.
 --- @return string|nil value Nil when the user cancelled.
 function M.ask_parameter_value(gestures, action, spec, title, prior)
+	if spec == "llm_vision" then return M.ask_vision_parameter(gestures, title, prior) end
 	local prompt = gestures.parameter_prompt(action)
 	if spec == "app" then
 		return dialog.choose_application(prompt, title)

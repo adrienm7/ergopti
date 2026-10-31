@@ -15,11 +15,8 @@
  * 1. Copy detection: four consecutive entries of a rule (the whole rule when shorter), in rule order, spelled
  *    as quoted list items, as `name = position` pairs or as AutoHotkey
  *    `"name", position` Map arguments, are a hard-coded order.
- * 2. Rows pinned to the manifest: the llm_menu_rows rule, which a native menu
- *    uses when the manifest cannot be read, must equal the manifest's own rows
- *    for the macOS driver, so the data cannot drift from the order it mirrors.
- * 3. The detector is mutation-tested on candidate text, so it cannot go blind.
- * 4. Windows is pinned twice: its generated table must equal the JSON rule by
+ * 2. The detector is mutation-tested on candidate text, so it cannot go blind.
+ * 3. Windows is pinned twice: its generated table must equal the JSON rule by
  *    rule, and the reader must keep loading that table.
  * ==============================================================================
  */
@@ -167,24 +164,6 @@ assert(
 	'infra/menu_row_order.ahk must load the generated table'
 );
 
-const manifest = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'menu', 'menu_manifest.json'), 'utf8')
-);
-const macosRows = manifest.llm_menu
-	.filter(
-		(row) =>
-			typeof row.id === 'string' &&
-			row.id !== '' &&
-			(row.type === 'dynamic' || row.type === 'group') &&
-			(row.platforms === undefined || row.platforms.includes('hs'))
-	)
-	.map((row) => row.id);
-assert.deepEqual(
-	data.rules.llm_menu_rows.order,
-	macosRows,
-	'llm_menu_rows must list the macOS rows of menu_manifest.json llm_menu in manifest order'
-);
-
 console.log(
-	`PASS menu row order single source: ${Object.keys(data.rules).length} rules, no driver copy, llm rows match the manifest`
+	`PASS menu row order single source: ${Object.keys(data.rules).length} rules, no driver copy`
 );

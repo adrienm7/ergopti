@@ -74,7 +74,7 @@ _LSP_Replay(Vector, Catalogue) {
 _LSP_RegisterCorpus() {
 	global _SharedDir
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\llm\local_server_ports.json", "UTF-8"))
-	if Corpus["version"] != 1 || Corpus["cases"].Length != 17
+	if Corpus["version"] != 1 || Corpus["cases"].Length != 28
 		throw Error("The independent port discovery corpus requires explicit review.")
 	Catalogue := _LSP_Catalogue()
 	for Id in Catalogue["server_order"]

@@ -64,7 +64,7 @@
 					{
 						"metric": "boot.total",
 						"value": 1734.0,
-						"declared": null,
+						"declared": 2500.0,
 						"budget": null
 					}
 				]
@@ -129,7 +129,7 @@
 					{
 						"metric": "menu.rebuild",
 						"value": 279.5,
-						"declared": null,
+						"declared": 250.0,
 						"budget": null
 					},
 					{
@@ -199,7 +199,7 @@
 			"driver": "macos",
 			"source": "static/ergopti_plus/macos/ui/healthcheck/core.lua",
 			"template": "The synchronous diagnostics took %.1f ms, over the %d ms budget%s.",
-			"line": "2026-10-30 10:00:00:123 [INFO] [healthcheck] The synchronous diagnostics took 164.7 ms, over the 5 ms budget; slowest: keymap=98.2 ms, ai=31.0 ms.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [healthcheck] The synchronous diagnostics took 164.7 ms, over the 5 ms budget; slowest: keystats=61.2 ms, karabiner=40.0 ms.",
 			"expect": {
 				"measures": [
 					{
@@ -219,7 +219,7 @@
 			"expect": {
 				"measures": [
 					{
-						"metric": "llm.request:remote",
+						"metric": "llm.parsed:remote",
 						"value": 1479.0,
 						"declared": null,
 						"budget": null
@@ -235,9 +235,9 @@
 			"expect": {
 				"measures": [
 					{
-						"metric": "llm.request:mistral",
+						"metric": "llm.remote:mistral",
 						"value": 812.0,
-						"declared": null,
+						"declared": 3000.0,
 						"budget": null
 					}
 				]
@@ -251,9 +251,9 @@
 			"expect": {
 				"measures": [
 					{
-						"metric": "llm.request:ollama",
+						"metric": "llm.local:ollama",
 						"value": 950.0,
-						"declared": null,
+						"declared": 2000.0,
 						"budget": null
 					}
 				]
@@ -285,7 +285,7 @@
 					{
 						"metric": "llm.ttft",
 						"value": 1484.0,
-						"declared": null,
+						"declared": 2000.0,
 						"budget": null
 					}
 				]
@@ -483,7 +483,7 @@
 					{
 						"metric": "boot.total",
 						"value": 812.0,
-						"declared": null,
+						"declared": 2500.0,
 						"budget": null
 					},
 					{
@@ -512,9 +512,9 @@
 			"expect": {
 				"measures": [
 					{
-						"metric": "llm.request:remote",
+						"metric": "llm.remote:completion",
 						"value": 640.0,
-						"declared": null,
+						"declared": 3000.0,
 						"budget": null
 					}
 				]
@@ -533,7 +533,7 @@
 			"driver": "linux",
 			"source": "static/ergopti_plus/linux/ui/menu/menu_reload.lua",
 			"template": "Reload requested from the tray menu…",
-			"line": "2026-10-30 10:00:00:123 [INFO] [ui.menu.menu_reload] Reload requested from the tray menu…",
+			"line": "2026-10-30 10:00:00:123 [INFO] [menu] Reload requested from the tray menu…",
 			"expect": {
 				"lifecycle": ["reload"]
 			}
@@ -551,7 +551,7 @@
 			"driver": "linux",
 			"source": "static/ergopti_plus/linux/ui/healthcheck/bridge.lua",
 			"template": "The synchronous diagnostics took %.1f ms, over the %d ms budget%s.",
-			"line": "2026-10-30 10:00:00:123 [INFO] [healthcheck] The synchronous diagnostics took 12.0 ms, over the 5 ms budget; slowest: layout=7.5 ms.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [healthcheck] The synchronous diagnostics took 12.0 ms, over the 5 ms budget.",
 			"expect": {
 				"measures": [
 					{
@@ -694,7 +694,7 @@
 					{
 						"metric": "boot.total",
 						"value": 2410.0,
-						"declared": null,
+						"declared": 2500.0,
 						"budget": null
 					}
 				]
@@ -785,7 +785,7 @@
 			"driver": "windows",
 			"source": "static/ergopti_plus/windows/ui/healthcheck/core.ahk",
 			"template": "The synchronous diagnostics took {1} ms, over the {2} ms budget{3}.",
-			"line": "2026-10-30 10:00:00:123 [INFO] [Healthcheck] The synchronous diagnostics took 41 ms, over the 5 ms budget; slowest: Keymap=30 ms.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [Healthcheck] The synchronous diagnostics took 41 ms, over the 5 ms budget.",
 			"expect": {
 				"measures": [
 					{
@@ -850,6 +850,91 @@
 		},
 		{
 			"driver": "macos",
+			"source": "static/ergopti_plus/macos/init.lua",
+			"template": "Reload completed in %.0f ms (reload call to boot complete).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [init] Reload completed in 3120 ms (reload call to boot complete).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "reload.total",
+						"value": 3120.0,
+						"declared": 4000.0,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/_shared/lua/perf_budget.lua",
+			"template": "Over budget: %s took %d ms (budget %d ms).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [menu] Over budget: menu.rebuild took 283 ms (budget 250 ms).",
+			"expect": {
+				"measures": [],
+				"template": "Over budget: menu.rebuild took <*> ms (budget <*> ms)."
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/_shared/lua/perf_budget.lua",
+			"template": "Over budget: %s took %d ms (budget %d ms).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [BootProfile] Over budget: boot took 2900 ms (budget 2500 ms).",
+			"expect": {
+				"measures": []
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/infra/perf_budget.ahk",
+			"template": "Over budget: {1} took {2} ms (budget {3} ms).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [LLM] Over budget: llm.remote took 3400 ms (budget 3000 ms).",
+			"expect": {
+				"measures": []
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/modules/llm/llm_request_latency.ahk",
+			"template": "LLM request: kind={1} provider={2} family={3} outcome={4} in {5} ms.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [LLM] LLM request: kind=remote provider=mistral family=mistral-small outcome=ok in 640 ms.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "llm.remote:mistral",
+						"value": 640.0,
+						"declared": 3000.0,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/modules/llm/llm_request_latency.ahk",
+			"template": "LLM request: kind={1} provider={2} family={3} outcome={4} in {5} ms.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [LLM] LLM request: kind=local provider=ollama family=qwen3.5 outcome=ok in 2210 ms.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "llm.local:ollama",
+						"value": 2210.0,
+						"declared": 2000.0,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/modules/llm/llm_request_latency.ahk",
+			"template": "LLM request: kind={1} provider={2} family={3} outcome={4} in {5} ms.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [LLM] LLM request: kind=local provider=ollama family=qwen3.5 outcome=failed in 30010 ms.",
+			"expect": {
+				"measures": []
+			}
+		},
+		{
+			"driver": "macos",
 			"source": "static/ergopti_plus/macos/infra/logger.lua",
 			"template": " — ErgoptiPlus session opened =====",
 			"line": "===== 2026-10-30 00:01:05:952 — ErgoptiPlus session opened =====",
@@ -884,6 +969,38 @@
 			"line": "  continued body line",
 			"expect": {
 				"kind": "continuation"
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/ui/menu/timed_build.lua",
+			"template": "Menu tree rebuilt in %.1f ms (%d top-level item(s)).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [ui.menu.timed_build] Menu tree rebuilt in 96.4 ms (19 top-level item(s)).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "menu.rebuild",
+						"value": 96.4,
+						"declared": 250.0,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/infra/reload_timing.lua",
+			"template": "Reload completed in %.0f ms (reload request to boot complete).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [infra.reload_timing] Reload completed in 2650 ms (reload request to boot complete).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "reload.total",
+						"value": 2650.0,
+						"declared": 4000.0,
+						"budget": null
+					}
+				]
 			}
 		}
 	]

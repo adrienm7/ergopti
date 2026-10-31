@@ -20,21 +20,40 @@ sys.modules[specification.name] = CALLER
 specification.loader.exec_module(CALLER)
 
 
+def reserved_receipt(folder):
+    """Reserve the empty private receipt file the menu creates before a pull."""
+    path = Path(folder) / "receipt"
+    path.touch(mode=0o600)
+    path.chmod(0o600)
+    return path
+
+
+def pull_argv(receipt, nonce):
+    """Build the command line the adapter passes, receipt path and nonce included."""
+    return [
+        "managed_ollama_pull.py",
+        "--admission-timeout",
+        "5",
+        "--idle-timeout",
+        "5",
+        "--retirement-timeout",
+        "5",
+        "--maximum-bytes",
+        "1024",
+        "--receipt-path",
+        str(receipt),
+        "--nonce",
+        nonce,
+    ]
+
+
 class RefusalLineTests(unittest.TestCase):
     def test_refusal_names_its_check_and_never_a_path(self):
         # Field run of 2026-10-30 20:47: the pull exited 78 with a bare
         # "admission refused" line and no trace of which check refused it.
-        argv = [
-            "managed_ollama_pull.py",
-            "--admission-timeout",
-            "5",
-            "--idle-timeout",
-            "5",
-            "--retirement-timeout",
-            "5",
-            "--maximum-bytes",
-            "1024",
-        ]
+        root = tempfile.TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        argv = pull_argv(reserved_receipt(root.name), "0" * 36)
         diagnostic = __import__("io").StringIO()
 
         def refuse(deadline):
@@ -58,21 +77,9 @@ class RefusalLineTests(unittest.TestCase):
         # left its receipt empty, so the menu never released the task slot.
         root = tempfile.TemporaryDirectory()
         self.addCleanup(root.cleanup)
-        path = Path(root.name) / "receipt"
-        path.touch(mode=0o600)
-        path.chmod(0o600)
+        path = reserved_receipt(root.name)
         nonce = "0" * 36
-        argv = [
-            "managed_ollama_pull.py",
-            "--admission-timeout",
-            "5",
-            "--idle-timeout",
-            "5",
-            "--retirement-timeout",
-            "5",
-            "--maximum-bytes",
-            "1024",
-        ]
+        argv = pull_argv(path, nonce)
 
         def refuse(*unused):
             raise CALLER.AUTH.AuthorityRefusal()
@@ -97,6 +104,65 @@ class RefusalLineTests(unittest.TestCase):
         self.assertIs(receipt["source_admitted"], False)
         self.assertIs(receipt["daemon_operation_retired"], True)
         self.assertEqual(receipt["operation"], "")
+
+    def test_refused_request_still_publishes_to_the_command_line_receipt(self):
+        # Mac field report 2026-10-30 21:01: a pull refused while reading its
+        # stdin request left the receipt empty, so its task slot stayed owned.
+        root = tempfile.TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        path = reserved_receipt(root.name)
+        nonce = "1" * 36
+
+        def refuse(deadline):
+            raise CALLER.POLICY.RuntimeRefusal("protocol")
+
+        with (
+            patch.object(CALLER, "request", side_effect=refuse),
+            patch.object(CALLER, "execute") as execute,
+            patch.object(sys, "stderr", __import__("io").StringIO()),
+            patch.object(sys, "argv", pull_argv(path, nonce)),
+        ):
+            self.assertEqual(CALLER.main(), 78)
+        execute.assert_not_called()
+        receipt = json.loads(path.read_text())
+        self.assertEqual(receipt["nonce"], nonce)
+        self.assertEqual(receipt["worker_status"], 78)
+        self.assertIs(receipt["source_admitted"], False)
+        self.assertIs(receipt["daemon_operation_retired"], True)
+
+    def test_request_naming_another_receipt_or_nonce_is_refused(self):
+        root = tempfile.TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        path = reserved_receipt(root.name)
+        nonce = "2" * 36
+        for request in (
+            {"receipt_path": str(path) + "-other", "nonce": nonce, "anchor": "/x"},
+            {"receipt_path": str(path), "nonce": "3" * 36, "anchor": "/x"},
+        ):
+            path.unlink()
+            reserved_receipt(root.name)
+            with (
+                patch.object(CALLER, "request", return_value=request),
+                patch.object(CALLER, "execute") as execute,
+                patch.object(sys, "stderr", __import__("io").StringIO()),
+                patch.object(sys, "argv", pull_argv(path, nonce)),
+            ):
+                self.assertEqual(CALLER.main(), 78)
+            execute.assert_not_called()
+            self.assertEqual(json.loads(path.read_text())["nonce"], nonce)
+
+    def test_command_line_without_an_absolute_receipt_or_a_nonce_is_refused(self):
+        root = tempfile.TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        path = reserved_receipt(root.name)
+        for receipt, nonce in (("receipt", "4" * 36), (str(path), "short")):
+            with (
+                patch.object(CALLER, "request") as request,
+                patch.object(sys, "argv", pull_argv(receipt, nonce)),
+            ):
+                self.assertEqual(CALLER.main(), 64)
+            request.assert_not_called()
+        self.assertEqual(path.read_bytes(), b"")
 
     def test_non_byte_rows_print_closed_vocabulary_lines(self):
         # Field run of 2026-10-30 23:10: the pull exited 1 after its last byte

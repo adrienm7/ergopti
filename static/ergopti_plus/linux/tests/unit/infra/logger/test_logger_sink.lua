@@ -782,6 +782,20 @@ helpers.describe("linux-logger-privacy", function()
 		end)
 	end)
 
+	-- Item 139: every rule the collector applies at export is applied as the line
+	-- is written, so a log on disk never holds them in clear text.
+	helpers.it("linux-logger-privacy: an email, a URL credential and another account's folder are masked at write time", function()
+		with_private_log_sink({ resolved_home = "/home/CanonicalAccount" }, function(Sink, state, logger)
+			helpers.assert_eq(Sink.install(logger), true)
+			state.emit("Sent to someone@example.org via https://bob:hunter2pass@proxy.example:8080 from /home/OtherPerson/x", "warn")
+			local line = state.console[1]
+			helpers.assert_true(not line:find("someone@example.org", 1, true), line)
+			helpers.assert_true(not line:find("hunter2pass", 1, true), line)
+			helpers.assert_true(not line:find("OtherPerson", 1, true), line)
+			helpers.assert_contains(line, "<email>")
+		end)
+	end)
+
 	helpers.it("linux-logger-privacy: missing account home refuses even when directory fallback exists", function()
 		with_private_log_sink({ missing_home = true }, function(Sink, state, logger)
 			helpers.assert_nil(state.account_home())
@@ -978,7 +992,17 @@ helpers.describe("linux-logger-topical-fan-out", function()
 			Logger.info("modules.llm.inference", "marker-llm")
 			Logger.info("modules.hotstrings.injector", "marker-hotstrings")
 			Logger.info("sink_test", "marker-unrouted")
-			local keystats = read_file(dir .. "/ErgoptiPlus_keystats.log")
+			-- The keystats file name comes from the routing table, not a spelling here.
+			local keystats_file
+			for _, entry in ipairs(require("_generated.logger_sub_files")) do
+				for _, pattern in ipairs(entry.patterns) do
+					if keystats_file == nil and ("[modules.keystats.keystats]"):find(pattern, 1, true) then
+						keystats_file = entry.name
+					end
+				end
+			end
+			helpers.assert_not_nil(keystats_file, "a sub-file must route the keystats module")
+			local keystats = read_file(dir .. "/" .. keystats_file)
 			local llm = read_file(dir .. "/ErgoptiPlus_llm.log")
 			local hotstrings = read_file(dir .. "/ErgoptiPlus_hotstrings.log")
 			helpers.assert_not_nil(keystats, "the keystats topic file must exist")
@@ -1030,7 +1054,7 @@ helpers.describe("linux-logger-topical-fan-out", function()
 	helpers.it("linux-logger-topical-fan-out: a refused topic handle is retired without silencing the main log", function()
 		with_sink("refuse", function(_, Logger, dir)
 			os.execute("mkdir '" .. dir .. "/ErgoptiPlus_menu.log'")
-			Logger.info("ui.menu.menu_builder", "marker-menu-refused")
+			Logger.info("ui.menu.builder", "marker-menu-refused")
 			Logger.info("modules.llm.inference", "marker-llm-after")
 			local main = read_file(dir .. "/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log")
 			helpers.assert_contains(main, "marker-menu-refused")

@@ -175,7 +175,7 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 		-- the whole point: before this, the manifest could not promise Linux this
 		-- row, and the restriction said no Lua driver had the concept while both
 		-- did.
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		helpers.assert_true(mb ~= nil)
 
 		local source = helpers.read_menu_source()
@@ -190,7 +190,7 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 	end)
 
 	helpers.it("keeps the rest of the tray when the shortcuts module is absent", function()
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local tree = mb.build({ _version = "9.9.9" })
 
 		-- Not "it did not throw": that would pass just as well if build returned an

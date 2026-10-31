@@ -110,7 +110,7 @@ _MMDW_MenubarColorsLoadBearing() {
 		; one it already knows how to draw. Both are rendered; `feature` is not,
 		; which is what this states instead of naming the single type that happened
 		; to satisfy it.
-		RenderedTypes := Map("dynamic", true, "check", true, "command", true, "list", true, "action", true)
+		RenderedTypes := Map("check", true, "command", true, "list", true, "action", true)
 		Assert(RenderedTypes.Has(Entry["type"]),
 			"menubar_colors is type=" . Entry["type"] . ", which the renderer does not materialise — "
 			. "`feature` is left to the caller, so the row disappears with nothing "
@@ -239,18 +239,19 @@ Test("menu-metrics-disabled-when: the manifest metrics switch reaches Windows (F
 
 ; The prior assertion reads the GENERATED menu_manifest.json, which can drift
 ; from its own source: an earlier fix pass hand-edited the generated JSON
-; instead of manifest.toml, and regenerating undid it. This reads the TRUE
-; source so a regeneration cannot silently take the switch away from Windows.
+; instead of its TOML source, and regenerating undid it. This reads the TRUE
+; source, menu.toml (the [menu] tables left the feature manifest on
+; 2026-10-31), so a regeneration cannot silently take the switch away from Windows.
 _MMDW_ManifestTomlSourceReachesAhk() {
 	SplitPath(A_ScriptDir, , &WinDir)
 	SplitPath(WinDir, , &EpDir)
-	TomlPath := EpDir . "\_shared\modules\features\manifest.toml"
+	TomlPath := EpDir . "\_shared\modules\menu\menu.toml"
 	Toml := ""
 	try Toml := FileRead(TomlPath, "UTF-8")
-	Assert(Toml != "", "manifest.toml must be readable")
+	Assert(Toml != "", "menu.toml must be readable")
 
 	HeaderPos := InStr(Toml, "[[menu.metrics_menu]]")
-	Assert(HeaderPos > 0, "manifest.toml must declare a [[menu.metrics_menu]] table")
+	Assert(HeaderPos > 0, "menu.toml must declare a [[menu.metrics_menu]] table")
 	NextTablePos := InStr(Toml, "[[", , HeaderPos + StrLen("[[menu.metrics_menu]]"))
 	Body := (NextTablePos > 0) ? SubStr(Toml, HeaderPos, NextTablePos - HeaderPos) : SubStr(Toml, HeaderPos)
 	Assert(InStr(Body, 'type = "toggle"') > 0,
@@ -259,7 +260,7 @@ _MMDW_ManifestTomlSourceReachesAhk() {
 	if (PlatPos > 0) {
 		PlatList := SubStr(Body, PlatPos, InStr(Body, "]", , PlatPos) - PlatPos + 1)
 		Assert(RegExMatch(PlatList, 'i)"ahk"'),
-			'manifest.toml`'s [[menu.metrics_menu]] toggle entry must reach "ahk" — it is the only metrics switch there (F2). Found: ' . PlatList)
+			'menu.toml`'s [[menu.metrics_menu]] toggle entry must reach "ahk" — it is the only metrics switch there (F2). Found: ' . PlatList)
 	}
 }
 Test("menu-metrics-disabled-when: manifest.toml SOURCE keeps the metrics switch on Windows, not just the generated JSON (F2)", _MMDW_ManifestTomlSourceReachesAhk)

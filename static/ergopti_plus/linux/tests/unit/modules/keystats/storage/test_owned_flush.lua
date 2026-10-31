@@ -414,7 +414,7 @@ helpers.describe("owned SQLite collector flush", function()
 		it("rendered session reset preserves its real " .. phase .. " acknowledgement", function()
 			with_collector(function(k, ops)
 				local Logger, I18n = require("logger.shim"), require("infra.i18n")
-				local startup, menu_name = "ui.menu.start_at_login", "ui.menu.menu_builder"
+				local startup, menu_name = "ui.menu.start_at_login", "ui.menu.builder"
 				local old_startup, old_menu = package.loaded[startup], package.loaded[menu_name]
 				package.loaded[startup] = { command_available = function() return false end,
 					enabled = function() return false end }
@@ -438,7 +438,7 @@ helpers.describe("owned SQLite collector flush", function()
 						elseif phase == "stopping" then assert_false(k.stop()) end
 						helpers.assert_true(k.has_flush_debt())
 					end
-					local menu = helpers.load_module("ui.menu.menu_builder").build({ keystats = k })
+					local menu = helpers.load_module("ui.menu.builder").build({ keystats = k })
 					local reset
 					for _, parent in ipairs(menu) do
 						if parent.title == I18n.get("menu.metrics.title") then
@@ -1263,7 +1263,7 @@ helpers.describe("one-click rendered reset with native SQLite", function()
 				k.init({ sqlite_path = database })
 				require("tests.support.metrics_consent_fixture").enable(k)
 				k.on_keydown("a", math.floor(require("infra.monotonic").now_ms()), "owned")
-				local menu = helpers.load_module("ui.menu.menu_builder").build({ keystats = k })
+				local menu = helpers.load_module("ui.menu.builder").build({ keystats = k })
 				local reset
 				for _, parent in ipairs(menu) do
 					if parent.title == i18n.get("menu.metrics.title") then

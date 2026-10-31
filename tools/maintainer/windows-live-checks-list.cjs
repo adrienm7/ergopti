@@ -132,6 +132,21 @@ async function waitForLog(session, fragment, before, timeoutMs) {
 }
 
 /**
+ * Closes Windows Search if it holds the foreground: a Win+S the driver missed
+ * opens it, and left there it takes the keys and the focus of the checks after.
+ * @returns {boolean} Whether it was open.
+ */
+function closeWindowsSearch() {
+	const script = `Add-Type -Namespace LiveChecks -Name Foreground -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern int GetWindowThreadProcessId(IntPtr h, out int p);'; $owner = 0; [void][LiveChecks.Foreground]::GetWindowThreadProcessId([LiveChecks.Foreground]::GetForegroundWindow(), [ref]$owner); if ((Get-Process -Id $owner).ProcessName -eq 'SearchHost') { (New-Object -ComObject WScript.Shell).SendKeys('{ESC}'); Start-Sleep -Milliseconds 600; 'closed' }`;
+	const out = spawnSync('powershell.exe', ['-NoProfile', '-Command', script], {
+		encoding: 'utf8',
+		windowsHide: true,
+		timeout: 30000
+	});
+	return (out.stdout || '').includes('closed');
+}
+
+/**
  * Closes the Explorer windows showing a folder, so a check leaves none behind.
  * @param {string} folder The folder a check opened.
  */
@@ -390,7 +405,7 @@ const CHECKS = [
 			pid = (await session.quiesce(pid)).pid;
 			const recommended = live.configSnapshot(session);
 			const winKeys = Object.keys(recommended).filter((key) =>
-				/^shortcuts\.keyboard\.win_/.test(key)
+				/^shortcuts\.keyboard\.meta_/.test(key)
 			);
 			if (winKeys.length < 3)
 				return notExecuted(`the recommended preset set ${winKeys.length} Win slots`);
@@ -400,7 +415,7 @@ const CHECKS = [
 			const cleared = live.configSnapshot(session);
 			const clearChanges = live.diffSnapshots(recommended, cleared);
 			const stray = clearChanges.filter(
-				(change) => !/^shortcuts\.keyboard(_[a-z]+)?\.win_/.test(change.key)
+				(change) => !/^shortcuts\.keyboard(_[a-z]+)?\.meta_/.test(change.key)
 			);
 			if (clearChanges.length === 0) return fail('Clear all in the Win group changed nothing');
 			if (stray.length > 0)
@@ -533,7 +548,7 @@ const CHECKS = [
 			const { session } = await bootEnglish(
 				context,
 				'wins',
-				'[category_enabled]\nshortcuts = true\n[shortcuts.keyboard]\nmeta_s = "search_web"\n'
+				'[category_enabled]\nshortcuts = true\n[shortcuts.keyboard]\nmeta_s = "copy_selected_path"\n'
 			);
 			await session.run('pump', ['2500']);
 			await session.run('edit_open');
@@ -555,23 +570,29 @@ const CHECKS = [
 				}
 			];
 			const seen = [];
-			for (const item of cases) {
-				await session.run('edit_select', [item.text]);
-				const before = new Set(session.logLines(''));
-				session.type([
-					['mode', 'event'],
-					['level', '100'],
-					['gap', '80'],
-					['key', '#s'],
-					['wait', '800']
-				]);
-				const found = await waitForLog(session, item.expect, before, 12000);
-				if (!found) {
-					const logged = session.logLines('[Search]').slice(-3).join(' | ');
-					seen.push(`${item.name}: no log line "${item.expect}" (Search log: ${logged})`);
+			try {
+				for (const item of cases) {
+					await session.run('edit_select', [item.text]);
+					const before = new Set(session.logLines(''));
+					session.type([
+						['mode', 'event'],
+						['level', '100'],
+						['gap', '80'],
+						['key', '#s'],
+						['wait', '800']
+					]);
+					const found = await waitForLog(session, item.expect, before, 12000);
+					if (closeWindowsSearch()) {
+						seen.push(`${item.name}: Windows Search opened, the driver did not take Win+S`);
+					} else if (!found) {
+						const logged = session.logLines('[Search]').slice(-3).join(' | ');
+						seen.push(`${item.name}: no log line "${item.expect}" (Search log: ${logged})`);
+					}
 				}
+			} finally {
+				closeWindowsSearch();
+				closeExplorerWindows(folder);
 			}
-			closeExplorerWindows(folder);
 			await session.run('edit_close');
 			if (seen.length > 0) return fail(seen.join('; '));
 			return pass(

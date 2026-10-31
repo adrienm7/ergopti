@@ -237,6 +237,14 @@ _LAY_NumberRowRows(WriterFn := 0, RefreshFn := 0, NotifyFn := 0) {
 			Item["disabled"] := true
 			if Value == "symbols" && !Expected["symbols"]
 				Item["disabled_reason_key"] := "platform_reason.number_row_source_unavailable"
+			; A closed layout gate makes the stored ordering inert on every layout. It
+			; says so in the words of the edge-keys row below, whatever the foreground
+			; layout could do once the gate opens (number-row-inert-choice).
+			else if !Expected.Get("master", true) && Value != "native"
+					&& StrCompare(Value, Expected["mode"], true) == 0 {
+				Item["disabled_reason_key"] := "platform_reason.number_row_no_ordering"
+				Item["label"] := Item["label"] . t("menu.layout.number_row_not_applied")
+			}
 		}
 	}
 	Edges := _LAY_NumberRowEdgesRow(Definition[2], Expected, RefreshFn)

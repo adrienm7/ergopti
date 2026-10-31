@@ -75,7 +75,7 @@ def request(deadline):
         or not isinstance(value["model"], str)
         or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9./_:-]*", value["model"]) is None
         or not isinstance(value["nonce"], str)
-        or re.fullmatch(r"[A-Za-z0-9-]{36}", value["nonce"]) is None
+        or re.fullmatch(NONCE_PATTERN, value["nonce"]) is None
         or not isinstance(value["receipt_path"], str)
         or not Path(value["receipt_path"]).is_absolute()
     ):
@@ -324,12 +324,21 @@ def execute(
     return status
 
 
+# The caller's operation identity, a hs.host.uuid() string.
+NONCE_PATTERN = r"[A-Za-z0-9-]{36}"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--admission-timeout", type=float, required=True)
     parser.add_argument("--idle-timeout", type=float, required=True)
     parser.add_argument("--retirement-timeout", type=float, required=True)
     parser.add_argument("--maximum-bytes", type=int, required=True)
+    # The reserved receipt and the nonce also travel on the command line, so a
+    # request refused while it is read still closes the caller's task slot
+    # (Mac field report 2026-10-30 21:01: such a pull left the receipt empty).
+    parser.add_argument("--receipt-path", required=True)
+    parser.add_argument("--nonce", required=True)
     options = parser.parse_args()
     if (
         any(
@@ -341,6 +350,8 @@ def main():
             )
         )
         or not 1 <= options.maximum_bytes <= 65536
+        or not Path(options.receipt_path).is_absolute()
+        or re.fullmatch(NONCE_PATTERN, options.nonce) is None
     ):
         return 64
     cancellation = Cancellation()
@@ -348,12 +359,14 @@ def main():
         signal.signal(name, cancellation.signal)
     deadline = time.monotonic() + options.admission_timeout
     try:
-        value = request(deadline)
-        with RECEIPT.ReservedReceipt(value["receipt_path"]) as private_receipt:
+        with RECEIPT.ReservedReceipt(options.receipt_path) as private_receipt:
             # Set once execute() may submit work: from then on only its own
             # receipt can prove the daemon side retired.
             dispatched = False
             try:
+                value = request(deadline)
+                if value["receipt_path"] != options.receipt_path or value["nonce"] != options.nonce:
+                    raise POLICY.RuntimeRefusal("protocol")
 
                 def emit(progress):
                     # Native error/status strings may include request URLs. UI
@@ -412,11 +425,11 @@ def main():
                     files.close()
             except Cancelled:
                 if not dispatched:
-                    publish_pre_dispatch_refusal(private_receipt, value["nonce"], 130)
+                    publish_pre_dispatch_refusal(private_receipt, options.nonce, 130)
                 raise
             except Exception:
                 if not dispatched:
-                    publish_pre_dispatch_refusal(private_receipt, value["nonce"], 78)
+                    publish_pre_dispatch_refusal(private_receipt, options.nonce, 78)
                 raise
     except Cancelled:
         return 130

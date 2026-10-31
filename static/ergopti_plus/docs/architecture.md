@@ -168,6 +168,7 @@ graph TD
         MACOS_webview_result["WebviewResult.lua"]
         MACOS_window_info["WindowInfo.lua"]
         MACOS_window_manager["WindowManager.lua"]
+        MACOS_write_lock_path["WriteLockPath.lua"]
     end
 
     subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]

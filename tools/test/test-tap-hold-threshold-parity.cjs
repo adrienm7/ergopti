@@ -211,7 +211,7 @@ for (const [file, needles] of [
 		['WriteTapHoldGlobalDuration', 'WriteTapHoldDurationReset']
 	],
 	[
-		['linux', 'ui', 'menu', 'menu_builder.lua'],
+		['linux', 'ui', 'menu', 'builder.lua'],
 		['set_global_threshold', 'tap_hold_key_delay_use_global']
 	],
 	[

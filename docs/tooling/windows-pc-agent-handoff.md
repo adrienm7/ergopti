@@ -81,3 +81,131 @@ only by static and JS tests. Once it lands on `dev`:
   them through `_shared/lua/diagnostics/private_label.lua` (placeholder pinned
   to `redaction.json` `config_name_placeholder`); Windows needs an AHK twin and
   a meta test.
+- Ollama digest mismatch on Windows: the macOS field run of 2026-10-31 saw a
+  fresh 366 MB layer fail its sha256 check (`digest mismatch, file must be
+downloaded again`). Ollama deletes that layer before it reports the
+  mismatch, so macOS now pulls once more and then fails with the localized
+  `ollama.digest_mismatch` (3939a569ad). The Windows managed pull
+  (`modules/llm/ollama_managed_bootstrap.ahk`, `_PullResult` and the menu pull
+  `_MenuPulled`) only reads the exit code and fails as `model_pull`. It needs
+  the pull output classified (the closed vocabulary of
+  `macos/modules/llm/managed_ollama_pull.py` `ERROR_CLASSES`), one automatic
+  retry on `digest_mismatch`, then `ollama.digest_mismatch` (the key exists in
+  all 21 locales), with an AHK test that fails without the retry.
+- PAR-41 on macOS (`ctrl_g` to the `secondary_g` slot) needs a config schema
+  v20 step (`shortcuts.keys.ctrl_g` copied into `shortcuts.keyboard.secondary_g`,
+  `true` to `open_chatgpt`, `false` to `none`, then deleted, for `hs` only). A
+  bump moves every driver's stamp: the AHK tests that treat 19 as current
+  (`tests/unit/infra/config/persistence/test_config_snapshot_inline_records.ahk`,
+  `test_config_semantic_snapshot.ahk`,
+  `tests/unit/infra/config/migration/test_config_journal_boot.ahk`,
+  `test_config_journal_nul_suffix.ahk`) must move to 20 and pass under
+  AutoHotkey first. The macOS side follows (manifest slot, `open_chatgpt` on
+  `hs` in `actions.toml`, the fixed `ctrl_g` hotkey and its menu row retired).
+- Local servers on Windows: GPT4All's Windows executable is `chat.exe` in the
+  installer's `gpt4all\bin` folder (the CMake target `chat`), so the Linux
+  command-line fragment `gpt4all/bin/chat` of `local_servers.json` matches it
+  only if the Windows process rows use forward slashes; and Lemonade's Windows
+  settings file is `%USERPROFILE%\.config\lemonade\config.json`
+  (lemonade-sdk `docs/guide/configuration/README.md`), declared for `linux` and
+  `macos` only. Check both against `LocalServerPortsDescriptor`, add `windows`
+  to that `config_files` entry if the AHK reader expands `~` to the profile, and
+  add a Windows case to `_shared/tests/corpus/llm/local_server_ports.json` (its
+  count is pinned at 28 in `test_local_server_ports.ahk` and the Lua contract).
+- Menu rebuild budget on Windows: macOS and Linux now write
+  `Menu tree rebuilt in N ms (M top-level item(s)).` on each tray rebuild and
+  judge it against `[budgets] menu_rebuild_ms` through `perf_budget` (Linux
+  `ui/menu/timed_build.lua`, `fix/linux-todo-final`). The Windows rebuild
+  (`ui/menu/menu_rebuild.ahk`) writes neither, so `field-log-analyse.py` judges
+  no Windows menu rebuild: time it, write the same line and call
+  `infra/perf_budget.ahk` with `menu.rebuild`, with an AHK test that fails
+  without the line.
+- Screen action vision backend on Windows: the native parameter prompt of
+  `llm_vision` (`modules/gestures/config.ahk`, `param_llm_vision`) still
+  prints every vision backend on its own line, about forty with the API
+  catalogue, for the user to type one. macOS and Linux now pick the backend
+  in a list and then ask the optional model, as the action picker page does
+  (`fix/linux-todo-final`; shared value rule `llm/vision.lua`
+  `compose_parameter`). Windows needs the same two steps, with an AHK test
+  that fails while the backend is typed.
+
+## Field report analysis, budgets and field run: written without AutoHotkey
+
+Branch `feat/field-report-analysis-3` (171d233f76, 33c3091d9b and the protocol
+fix after them). Nothing below ever ran under AutoHotkey or `pwsh`; the JS and
+meta tests pin names, not behaviour. Run, in order:
+
+1. Parse and the full AHK suite: `infra/perf_budget.ahk`,
+   `modules/llm/llm_request_latency.ahk` (included by `prediction_exec.ahk`,
+   which the LLM suites load), `infra/field_run.ahk`, and the edits in
+   `ErgoptiPlus.ahk` (boot budget, field run start) and `infra/lifecycle.ahk`
+   (field run stop).
+2. A prediction with Ollama and one with an API provider: the log carries
+   `LLM request: kind=local|remote provider=… family=… outcome=ok in N ms.`,
+   and `Over budget: llm.… took …` only past `[budgets]`.
+3. Start `tools/dev/run-windows-dev.ps1`; the log shows `Developer field run
+ready (3 step(s)).` and `build/field-run/ready.json` names the driver's pid.
+4. Run `collect-windows-field-report.ps1` (Windows PowerShell 5.1, then
+   `pwsh`): `field_run/` holds `accepted.json`, `01_field_boot_cost.json`,
+   `02_field_network.json`, `03_field_composer.json` and `done.json`;
+   `field_run_checks.txt` has three `check=` lines; `analysis.md` marks them.
+   No window opens and nothing asks for a key.
+5. Refusals: a `request.json` with `"steps":["nope"]` gets `refused.json` with
+   `unknown_step`; a second request while one runs gets `busy`; the same
+   `request_id` twice gets `duplicate_request`.
+6. Reload the developer driver during step 3 of a run: the next start writes
+   `done.json` with `"interrupted":true` for that run.
+7. Run `test-windows-field-report-contract.cjs` with `pwsh` installed: its
+   runtime layer expects the `no_ready_driver` skip line in a fixture clone.
+
+- Branch `feat/menu-no-dynamic` (retired `dynamic` menu rows) changed
+  `windows/ui/menu/menu_llm/menu_main.ahk` without running AutoHotkey: the
+  model and profile rows are now `list` rows (`LLM_Menu_BuildSubmenu` passes
+  `ListProviders` bound to `_LLM_Menu_EmitCapturedRow`, and
+  `_LLM_MenuLayout_Rows` keeps the rows that declare `disabled_when_off`), and
+  `agent_system1` / `agent_system2` are one `list` declaration for every driver
+  (no `platforms`). Run these AHK tests and fix what fails:
+  - `tests/meta/modules/llm/menu/test_llm_menu_layout_shared.ahk` (edited: row
+    filter, `list` type policy and its withdrawal messages);
+  - `tests/meta/modules/llm/menu/test_llm_menu_disabled_greyed.ahk` (edited:
+    the `MenuRenderer_Build` statement regex);
+  - `tests/unit/modules/llm/prediction/test_llm_live_mode.ahk` (edited: the
+    same regex in `_LLV_GenerationRoute`);
+  - `tests/unit/modules/llm/actions/test_llm_agent_requester.ahk` (edited: the
+    System row has no `platforms` to save and restore);
+  - unchanged but covering the edited code:
+    `tests/unit/modules/llm/menu/test_llm_menu_build_submenu.ahk`,
+    `tests/unit/ui/menu/test_manifest_menu_parent_groups.ahk`,
+    `tests/unit/modules/llm/actions/test_llm_agent_system_menu.ahk`,
+    `tests/unit/modules/llm/menu/test_llm_menu_test_prediction.ahk`,
+    `tests/meta/modules/llm/menu/test_llm_menu_build_critical.ahk`,
+    `tests/meta/modules/llm/menu/test_llm_menu_build_coordinator.ahk`,
+    `tests/meta/modules/llm/menu/test_llm_menu_caller_child_full_root.ahk`,
+    `tests/unit/ui/menu/test_manifest_menu_no_double_separator.ahk`;
+  - then the full `run_all.ahk` and `e2e/run_e2e.ahk`, and open the AI submenu
+    once: the model button, the profile submenu and both agent Systems must
+    sit where they did, with the same labels.
+- Same branch, follow-ups also written without AutoHotkey: `infra/manifest_menu.ahk`
+  lost its `dynamic` branch (a stale `dynamic` row is now an unknown type), and
+  the tray menu moved to `_shared/modules/menu/menu.toml`. Run:
+  - `tests/unit/ui/menu/test_manifest_menu_declarations_are_read.ahk` (edited:
+    a retired `dynamic` row is drawn as nothing and not dispatched);
+  - `tests/unit/ui/menu/test_manifest_menu_no_double_separator.ahk` (edited:
+    action handlers only);
+  - `tests/meta/modules/keystats/metrics/test_menu_metrics_disabled_when.ahk`
+    (edited: reads `[[menu.metrics_menu]]` from `menu.toml`; `dynamic` is no
+    longer a rendered type);
+  - `tests/meta/ui/menu/test_list_providers_touch_no_menu.ahk` (unchanged,
+    covers the renderer);
+  - `tests/unit/ui/menu/test_menu_row_order.ahk` (edited: the corpus keeps one
+    list vector since the `llm_menu_rows` rule was retired);
+  - then `run_all.ahk` again: every menu goes through the edited renderer.
+
+## Seven more local AI servers (31 October)
+
+`local_servers.json` gained SGLang, KoboldCpp, text-generation-webui, GPT4All,
+AMD Lemonade, Docker Model Runner and exo (57a95dbada). Two Windows tests still
+count the old catalogue and will go red until they read it:
+`test_local_server_auth.ahk` (expects 4 descriptors) and
+`test_local_server_panel_view_preparation.ahk` (4 and 5 orders, 4 providers).
+Make them read the catalogue, then run the local servers panel once.

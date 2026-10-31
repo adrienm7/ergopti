@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * The menu manifest is meant to be the single source of the menu's SHAPE. It was
  * that for two drivers: Windows and macOS both render from it. Linux builds its
- * tray menu by hand in ui/menu/menu_builder.lua, and the manifest carried no
+ * tray menu by hand in ui/menu/builder.lua, and the manifest carried no
  * `linux` platform value anywhere — so Linux "matched" only because an
  * unrestricted row defaults to every platform, and nothing could tell the
  * difference between "Linux has this row" and "nobody said".
@@ -66,7 +66,7 @@ const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json');
-const LINUX_BUILDER = path.join(SP, 'linux', 'ui', 'menu', 'menu_builder.lua');
+const LINUX_BUILDER = path.join(SP, 'linux', 'ui', 'menu', 'builder.lua');
 
 // The separator id, which carries no identity and cannot be compared by name.
 const SEPARATOR = '---';
@@ -213,7 +213,7 @@ const built = new Set(linuxBuilt);
 const missingOnLinux = [...declared].filter((id) => !built.has(id));
 if (missingOnLinux.length > 0) {
 	errors.push(
-		`the manifest declares ${missingOnLinux.length} top-level row(s) for Linux that menu_builder.lua ` +
+		`the manifest declares ${missingOnLinux.length} top-level row(s) for Linux that ui/menu/builder.lua ` +
 			`does not build: ${missingOnLinux.join(', ')}. The manifest is the shape every driver is ` +
 			'measured against, so a row declared and not built is a promise nothing keeps.'
 	);
@@ -222,7 +222,7 @@ if (missingOnLinux.length > 0) {
 const undeclared = [...built].filter((id) => !declared.has(id));
 if (undeclared.length > 0) {
 	errors.push(
-		`menu_builder.lua builds ${undeclared.length} top-level row(s) the manifest does not declare for ` +
+		`ui/menu/builder.lua builds ${undeclared.length} top-level row(s) the manifest does not declare for ` +
 			`Linux: ${undeclared.join(', ')}. This is the direction that stayed invisible for as long as ` +
 			'the manifest carried no linux value at all — kanata, updates and apps were all found this ' +
 			'way. Add the row with platforms = ["linux"], or widen the restriction that excludes it.'
@@ -240,7 +240,7 @@ if (undeclared.length > 0) {
 const HOLDS_QUIT_LAST = /quit_row = build\(ctx\)/.test(linuxSrc);
 if (!HOLDS_QUIT_LAST && KNOWN_ORDER_DIVERGENCES.linux) {
 	errors.push(
-		'a Linux order divergence is recorded, but menu_builder.lua no longer holds Quit back — ' +
+		'a Linux order divergence is recorded, but ui/menu/builder.lua no longer holds Quit back — ' +
 			'either it follows the declaration exactly now (remove the entry) or the rule was ' +
 			'renamed and this gate has stopped seeing it'
 	);
@@ -582,7 +582,7 @@ if (errors.length > 0) {
 console.log(
 	`\x1b[32m[OK] top-level menu shape agrees: manifest projects ${projections.ahk.length} row(s) for ` +
 		`Windows, ${projections.hs.length} for macOS, ${projections.linux.length} for Linux; ` +
-		`menu_builder.lua builds exactly those ${linuxBuilt.length}, and the macOS and Windows roots ` +
+		`ui/menu/builder.lua builds exactly those ${linuxBuilt.length}, and the macOS and Windows roots ` +
 		'build exactly the rows their driver is declared for.\x1b[0m'
 );
 for (const [driver, why] of Object.entries(KNOWN_ORDER_DIVERGENCES)) {

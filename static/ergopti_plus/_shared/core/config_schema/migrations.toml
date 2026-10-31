@@ -20,7 +20,9 @@
 # names the drivers whose files the ops apply to ("ahk", "hs", "linux"); any
 # other driver only moves its stamp through that version. ``ops`` is an array
 # drawn from a CLOSED set, addressed by explicit section/key (a section is a
-# [header] path, a key is one bare segment inside it):
+# [header] path, a key is one bare segment inside it). The op lines below are
+# parsed, as written, into the Windows field table by
+# tools/codegen/codegen-config-migration-ops.cjs: ``field?`` is optional.
 #   { op = "rename", section, key, to_section?, to_key? }
 #       Moves one value. Absent source: no-op. Existing target: the target
 #       keeps its value and the source is dropped.
@@ -45,6 +47,12 @@
 #       actions or occupied namespaces retain every source byte and its owner.
 #       Historical [section.key] mods/key tables use the same exact contract.
 #       All destinations must be represented before any source is removed.
+#   { op = "move_ergopti_variant", section, key, to_key, base_key, alt_gr_key,
+#     source_key, false_variant, true_variant, neutral_variant? }
+#       Replaces the boolean key by to_key, holding true_variant or false_variant.
+#       An absent key is a no-op. base_key, alt_gr_key and source_key are read as
+#       witnesses and stay. A malformed participant, an occupied namespace or a
+#       to_key disagreeing with the boolean refuses the migration ("invalid").
 #   { op = "move_section", section, to_section }
 #       Moves a section and every section below it. Same conflict rule.
 #   { op = "merge_into", section, to_section }

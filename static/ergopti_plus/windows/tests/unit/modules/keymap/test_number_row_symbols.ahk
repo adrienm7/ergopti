@@ -625,6 +625,56 @@ _NRP_EdgesRowReadsTheIntentView() {
 Test("number row: the edge-keys checkbox shows the stored choice while the layout is off (number-row-edges-row-intent)",
 	_KLT_WithEmulation.Bind(_NRP_EdgesRowReadsTheIntentView))
 
+; With the layout off, a stored ordering the foreground layout could apply used to
+; show ticked and greyed with no word of why, unlike one the layout makes inert:
+; the live check saw it under a US or an AZERTY foreground, and no other
+; (number-row-inert-choice).
+_NRP_ClosedGateSaysTheStoredOrderingIsNotApplied(Foreground, Mode, Index) {
+	global Features, CategoryEnabled, LayerEnabled, _NumberRowAvailabilityCache
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(), _NumberRowAvailabilityCache]
+	Other := Index == 2 ? 3 : 2
+	Rows(Open) {
+		Features := Map("layout", Map("emulated_layout", "", "ergopti_base", false, "ergopti_alt_gr", false,
+			"ergopti_variant", "none", "direct_access_digits", Mode, "number_row_reorder_edges", true))
+		CategoryEnabled := Map("Layout", Open)
+		LayerEnabled := false
+		GateState := MasterGateState()
+		GateState["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => Open)
+		return _LAY_NumberRowRows((*) => false, (*) => 0, (*) => true)[1]["items"]
+	}
+	Check(Hkl) {
+		Items := Rows(false)
+		AssertEqual("", NumberRowAvailability(Hkl, false)[Mode], "this layout could apply the choice, which is the premise")
+		AssertTrue(Items[Index]["checked"], "the stored choice keeps its tick")
+		AssertTrue(Items[Index].Get("disabled", false), "and is greyed")
+		AssertEqual("platform_reason.number_row_no_ordering", Items[Index].Get("disabled_reason_key", ""), "and says why")
+		AssertEqual(t("menu.layout.number_row_" . Mode) . t("menu.layout.number_row_not_applied"), Items[Index]["label"])
+		AssertFalse(Items[Other]["checked"])
+		AssertFalse(InStr(Items[Other]["label"], t("menu.layout.number_row_not_applied")) > 0, "only the stored choice says it")
+		Items := Rows(true)
+		AssertEqual(t("menu.layout.number_row_" . Mode), Items[Index]["label"], "with the layout on the choice applies and says nothing")
+		AssertEqual("", Items[Index].Get("disabled_reason_key", ""))
+	}
+	try {
+		_NumberRowAvailabilityCache := Map()
+		Foreground.Call(Check)
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+		_NumberRowAvailabilityCache := Saved[5]
+	}
+}
+Test("number row: with the layout off a stored « symbols first » says it is not applied on a QWERTY foreground (number-row-inert-choice)",
+	_KLT_WithEmulation.Bind(_NRP_ClosedGateSaysTheStoredOrderingIsNotApplied.Bind(_NRP_WithQwertyShapedForeground, "symbols", 3)))
+Test("number row: with the layout off a stored « digits first » says it is not applied on an AZERTY foreground (number-row-inert-choice)",
+	_KLT_WithEmulation.Bind(_NRP_ClosedGateSaysTheStoredOrderingIsNotApplied.Bind(_NRP_WithAzertyShapedForeground, "digits", 2)))
+
 ; No driver source keeps a table of edge-key characters any more: every edge
 ; key is read from the effective layout (number-row-edge-keys).
 _NRP_NoHardcodedEdgeTable() {

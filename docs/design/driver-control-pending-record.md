@@ -71,5 +71,12 @@ writes the pending record, arms the real detached relay and exits; the relay
 starts the launcher and the successor, a new pid, completes the request,
 refuses it with its own boot's reason, or reports a timeout when it was ready
 past a short deadline. The host is not the whole daemon (no keyboard or tray).
-A restart through the systemd user unit still needs a user session with the
-unit installed: a field check.
+
+`linux/tests/hardware/run_reload_restart_systemd.lua` runs the unit path: the
+host sits in a real cgroup named `ergopti-hotstrings.service`, so the restarter
+reads a real `/proc/self/cgroup`, asks for exactly one
+`systemctl --user --no-block restart ergopti-hotstrings.service` and does not end
+itself; the successor, started back in the unit, completes the record. No user
+manager runs in a container that did not boot with systemd, so a `systemctl`
+first in PATH plays it for that one call. A restart under a real user manager
+stays a field check.

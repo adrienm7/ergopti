@@ -16,6 +16,9 @@
 ---    it; the successor completes both.
 --- 3. No silent fallback. When no restart can be requested the request fails
 ---    and the daemon keeps running; it never reloads half of itself in process.
+--- 4. Measured end to end. The request time is stamped before the restart
+---    (infra/reload_timing.lua) and the successor reports the whole reload at
+---    its boot completion; a refused or abandoned restart retires the stamp.
 --- ==============================================================================
 
 local M = {}
@@ -26,12 +29,14 @@ local LOG = "infra.reload_restart"
 
 --- Builds the reload owner.
 --- @param opts table { gestures = table|nil, restart = function(reason) -> boolean,
----   cancel = function() -> boolean, detail|nil }
+---   cancel = function() -> boolean, detail|nil, timing = table|nil }; timing defaults to
+---   infra.reload_timing (mark() and clear()).
 --- @return function perform `perform(trigger)` -> started, why
 --- @return function in_flight `in_flight()` -> whether a restart was requested and owns the process
 --- @return function abandon `abandon()` -> cancelled, detail: a Quit that wins over the reload
 function M.new(opts)
 	assert(type(opts) == "table" and type(opts.restart) == "function", "the reload owner needs its restart")
+	local timing = opts.timing or require("infra.reload_timing")
 	local in_flight = false
 	local function perform(trigger)
 		if in_flight then
@@ -48,8 +53,10 @@ function M.new(opts)
 			return false, "postponed"
 		end
 		Logger.info(LOG, "Reload requested by %s — restarting the daemon…", trigger)
+		timing.mark()
 		local called, started = pcall(opts.restart, "reload")
 		if not called or started ~= true then
+			timing.clear()
 			Logger.error(LOG, "Reload requested by %s failed: no restart could be requested (%s).", trigger,
 				tostring(called and "refused" or started))
 			return false, "failed"
@@ -64,6 +71,7 @@ function M.new(opts)
 		local cancelled, detail = opts.cancel()
 		if cancelled == true then
 			in_flight = false
+			timing.clear()
 			Logger.info(LOG, "The reload in flight was abandoned.")
 			return true
 		end
