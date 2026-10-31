@@ -92,9 +92,9 @@ reads the same file. A relay that ran but did not answer by contract (a crash,
 a timeout, a foreign line) is the caller's `relay_unavailable`. A relay binary
 that is not installed is the binding's `not_installed` status, not a refusal:
 the client keeps the proxy as named, as before the relay existed, with one
-WARNING, and the network check reports `relay_not_installed`. This holds only
-until the binary ships in every package; then `not_installed` becomes a
-refusal.
+WARNING, and the network check reports `relay_not_installed`. Every Linux
+package and the macOS application now ship the relay; `not_installed` remains
+for a source checkout and for Windows until the PC wiring lands.
 
 ## Security
 
@@ -110,16 +110,38 @@ refusal.
 - Linux: `modules/llm/managed_ollama_proxy.lua` probes the selected relay for
   the registry authority once the route plan settles, and on `required` the
   daemon is started under `run`.
-- macOS: the same shared policy; the Debug network check (`field_check_ports.lua`
-  route plan port) reports whether the selected proxy needs the relay. The
-  daemon start in `network-retry.sh` is generated and follows in its owner.
+- macOS: the stock daemon start (`modules/llm/ollama_server_command.lua`) runs
+  `ollama serve` through `run_with_proxy_sign_in_relay` (`network-retry.sh`),
+  which probes the relay the system settings named and, on `required`, starts
+  the daemon under `run`. A refused sign-in is logged by its closed reason and
+  the daemon starts without the relay, as a failed route lookup already does
+  there, so the models on disk keep working; Linux refuses the start instead,
+  because its repair reports the reason on the model page. The Debug network
+  check reports the same probe (`proxy_relay`). The Swift-owned managed daemon
+  (`managed_ollama_serve.py`) does not use the relay yet.
 - Windows: [windows-pc-agent-handoff.md](../tooling/windows-pc-agent-handoff.md)
   (the PC agent owns `.ahk` and the PowerShell route plan).
 
+## Packaging
+
+`tools/build/build-proxy-relay.sh` is the one builder: offline, cgo required,
+no-replace output, a smoke run of the host slice. CI installs the repository's
+one Go pin (`managed_ollama_runtime.json` `go_version`) or the module's
+`go.mod` floor through `actions/setup-go`.
+
+- Linux: `build-linux-driver.sh` builds it into `linux/bin/`, beside the archive
+  backend, so the .deb, .rpm, tarball and AppImage carry it at
+  `<driver>/bin/ergopti-proxy-relay`. It needs at most `GLIBC_2.34` and only
+  `libc.so.6` (`check-elf-glibc-ceiling.cjs`). The Flatpak never takes a
+  host-built ELF: it rebuilds the relay from the shipped Go sources with the
+  SDK's `org.freedesktop.Sdk.Extension.golang`.
+- macOS: `build_macos_app.sh` builds an arm64 and an x86_64 slice with each
+  architecture's clang, joins them with `lipo` into
+  `Contents/MacOS/ergopti-proxy-relay` and signs it as nested code before the
+  launcher, in the full application and the Git-checkout helper.
+
 ## Not covered
 
-- Packaging the binary in each release (Linux packages, the macOS app, the
-  Windows bundle) and its hosted build cells; until then the caller warns and
-  keeps the proxy as named (`not_installed` above).
+- The Windows bundle (PC handoff).
 - Channel bindings, Kerberos delegation, and mutual authentication of the
   proxy: the tunnel carries TLS to the origin, which authenticates the origin.
