@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "סכום הביקורת אומת. מתקין את Ollama…",
 	"ollama.deps_task_create_failed": "לא ניתן ליצור hs.task.",
 	"ollama.deps_task_start_failed": "לא ניתן להפעיל hs.task.",
+	"ollama.digest_mismatch": "ההורדה של %s נפגמה פעמיים: סכום הביקורת לא תאם. שרת proxy או רשת לא יציבה עלולים לשבש הורדה; בדקו את החיבור ונסו שוב.",
 	"ollama.download_cancelled": "הורדת Ollama בוטלה",
 	"ollama.download_error": "שגיאת הורדה עבור %s",
 	"ollama.download_subtitle": "מביא משקלים מ-Ollama Hub…",

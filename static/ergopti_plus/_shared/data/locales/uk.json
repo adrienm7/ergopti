@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "Контрольну суму перевірено. Встановлення Ollama…",
 	"ollama.deps_task_create_failed": "Неможливо створити завдання hs.task.",
 	"ollama.deps_task_start_failed": "Неможливо запустити завдання hs.task.",
+	"ollama.digest_mismatch": "Завантаження %s двічі виявилося пошкодженим: контрольна сума не збіглася. Проксі або нестабільна мережа можуть спотворити завантаження; перевірте з’єднання та спробуйте ще раз.",
 	"ollama.download_cancelled": "Завантаження Ollama скасовано",
 	"ollama.download_error": "Помилка завантаження %s",
 	"ollama.download_subtitle": "Отримання ваг з Ollama Hub…",

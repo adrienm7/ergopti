@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "Kontrollsumma verifierad. Installerar Ollama…",
 	"ollama.deps_task_create_failed": "Kunde inte skapa hs.task.",
 	"ollama.deps_task_start_failed": "Kunde inte starta hs.task.",
+	"ollama.digest_mismatch": "Nedladdningen av %s blev skadad två gånger: kontrollsumman stämde inte. En proxy eller ett instabilt nätverk kan ändra en nedladdning; kontrollera anslutningen och försök igen.",
 	"ollama.download_cancelled": "Ollama-nedladdning avbruten",
 	"ollama.download_error": "Nedladdningsfel för %s",
 	"ollama.download_subtitle": "Hämtar vikter från Ollama Hub…",

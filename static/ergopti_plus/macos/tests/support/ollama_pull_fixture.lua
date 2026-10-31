@@ -44,6 +44,8 @@ local function with_fixture(options, callback)
 	local progress = { shows = 0, completes = 0, aborts = 0, retry_starts = 0 }
 	local notifications = 0
 	local notification_records = {}
+	-- Every one-shot timer the manager scheduled, for a test to deliver.
+	local timers = {}
 	local error_records = {}
 	local http_callback
 	local terminate_mode = options.terminate_mode or "self"
@@ -88,7 +90,9 @@ local function with_fixture(options, callback)
 	package.loaded["adapters.timer_scheduler"] = {
 		awake_time = function() return 0 end,
 		after = function(_, fn)
-			return { callback = fn, timer = {}, observers = {} }, true
+			local handle = { callback = fn, timer = {}, observers = {} }
+			timers[#timers + 1] = handle
+			return handle, true
 		end,
 		cancel = function(handle)
 			handle.timer = nil
@@ -269,6 +273,7 @@ local function with_fixture(options, callback)
 			native_window = function() return native_window end,
 			notifications = function() return notifications end,
 			notification_records = notification_records,
+			timers = timers,
 			error_records = error_records,
 			http_callback = function() return http_callback end,
 			set_terminate_mode = function(mode) terminate_mode = mode end,
