@@ -2766,6 +2766,83 @@
 				"temperature": 0.7
 			},
 			"added": []
+		},
+		{
+			"id": "watsonx_ibm_granite-4-h-small",
+			"provider": "watsonx",
+			"model": "ibm/granite-4-h-small",
+			"body": {
+				"model": "ibm/granite-4-h-small",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "ibm/granite-4-h-small",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "watsonx_openai_gpt-oss-120b",
+			"provider": "watsonx",
+			"model": "openai/gpt-oss-120b",
+			"body": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 11
+		},
+		{
+			"id": "vertex_google_gemini-3.5-flash",
+			"provider": "vertex",
+			"model": "google/gemini-3.5-flash",
+			"body": {
+				"model": "google/gemini-3.5-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "google/gemini-3.5-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 16,
+			"kind": "gemini_level"
+		},
+		{
+			"id": "vertex_google_gemini-2.5-flash",
+			"provider": "vertex",
+			"model": "google/gemini-2.5-flash",
+			"body": {
+				"model": "google/gemini-2.5-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "google/gemini-2.5-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 13
 		}
 	],
 	"refusal_vectors": [

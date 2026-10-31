@@ -1756,6 +1756,8 @@
 	"menu.llm.api_no_entry": "Geen API-eindpunt geconfigureerd",
 	"menu.llm.api_prompt_field.account": "Account-ID (het deel vóór .snowflakecomputing.com):",
 	"menu.llm.api_prompt_field.account_id": "Account-ID:",
+	"menu.llm.api_prompt_field.location": "Locatie (bijvoorbeeld global):",
+	"menu.llm.api_prompt_field.project": "Google Cloud-project-ID:",
 	"menu.llm.api_prompt_field.region": "Regio (bijvoorbeeld us-east-1):",
 	"menu.llm.api_prompt_field.resource": "Resourcenaam (het deel vóór .openai.azure.com):",
 	"menu.llm.api_prompt_field.workspace": "Werkruimtehost (bijvoorbeeld dbc-1234.cloud.databricks.com):",

@@ -1756,6 +1756,8 @@
 	"menu.llm.api_no_entry": "कोई API एंडपॉइंट कॉन्फ़िगर नहीं किया गया",
 	"menu.llm.api_prompt_field.account": "खाता पहचानकर्ता (.snowflakecomputing.com से पहले का भाग):",
 	"menu.llm.api_prompt_field.account_id": "खाता आईडी:",
+	"menu.llm.api_prompt_field.location": "स्थान (उदाहरण के लिए global):",
+	"menu.llm.api_prompt_field.project": "Google Cloud प्रोजेक्ट आईडी:",
 	"menu.llm.api_prompt_field.region": "क्षेत्र (उदाहरण के लिए us-east-1):",
 	"menu.llm.api_prompt_field.resource": "संसाधन का नाम (.openai.azure.com से पहले का भाग):",
 	"menu.llm.api_prompt_field.workspace": "वर्कस्पेस होस्ट (उदाहरण के लिए dbc-1234.cloud.databricks.com):",

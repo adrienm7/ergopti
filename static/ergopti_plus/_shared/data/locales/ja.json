@@ -1756,6 +1756,8 @@
 	"menu.llm.api_no_entry": "API エンドポイントが未設定",
 	"menu.llm.api_prompt_field.account": "アカウント識別子（.snowflakecomputing.com の前の部分）：",
 	"menu.llm.api_prompt_field.account_id": "アカウント ID：",
+	"menu.llm.api_prompt_field.location": "ロケーション（例: global）：",
+	"menu.llm.api_prompt_field.project": "Google Cloud プロジェクト ID：",
 	"menu.llm.api_prompt_field.region": "リージョン（例: us-east-1）：",
 	"menu.llm.api_prompt_field.resource": "リソース名（.openai.azure.com の前の部分）：",
 	"menu.llm.api_prompt_field.workspace": "ワークスペースのホスト（例: dbc-1234.cloud.databricks.com）：",

@@ -1,5 +1,5 @@
 {
-	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver. `format` is openai, anthropic, gemini, backboard (Backboard's assistant/thread API, key in X-API-Key, models written <llm_provider>/<model_name>) or decisions (TypeSafe's System One protocol: typed questions in, answers with probabilities out; base_url is the full endpoint and the key goes in Authorization: Bearer). A decisions provider serves Jev, which is not a chat model: it is offered only as the agent's System 1. The request shapes of backboard and decisions live in _shared/lua/llm/remote_formats.lua. `thinking_dialect` (optional) says how the provider carries each reasoning control kind of _shared/modules/llm/thinking_off.json: kind -> body fields deep-merged into the request (a field the body already sets wins), the string $level replaced by the model family's level. A kind the provider does not list is never sent (openai_compat lists none: it may point at a strict endpoint). Sources: platform.claude.com build-with-claude/thinking and effort, developers.openai.com guides/reasoning, ai.google.dev thinking, docs.x.ai reasoning, docs.mistral.ai reasoning, api-docs.deepseek.com thinking_mode, docs.cohere.com compatibility-api, inference-docs.cerebras.ai reasoning, openrouter.ai reasoning-tokens, console.groq.com reasoning, docs.together.ai reasoning-models-guide, docs.fireworks.ai post-chatcompletions (checked 2026-10-30). Every provider after fireworks names the official pages its address, key, listing, default model and dialect were read from in its _source (checked 2026-10-30). A base_url holding {name} placeholders is a per-account address (_shared/lua/llm/api_url_template.lua): the add-entry form asks one value per placeholder (menu.llm.api_prompt_field.<name>) and stores the filled address in the entry; such a provider has no default_model, its model being the user's deployment or chosen model.",
+	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver. `format` is openai, anthropic, gemini, backboard (Backboard's assistant/thread API, key in X-API-Key, models written <llm_provider>/<model_name>) or decisions (TypeSafe's System One protocol: typed questions in, answers with probabilities out; base_url is the full endpoint and the key goes in Authorization: Bearer). A decisions provider serves Jev, which is not a chat model: it is offered only as the agent's System 1. The request shapes of backboard and decisions live in _shared/lua/llm/remote_formats.lua. `thinking_dialect` (optional) says how the provider carries each reasoning control kind of _shared/modules/llm/thinking_off.json: kind -> body fields deep-merged into the request (a field the body already sets wins), the string $level replaced by the model family's level. A kind the provider does not list is never sent (openai_compat lists none: it may point at a strict endpoint). Sources: platform.claude.com build-with-claude/thinking and effort, developers.openai.com guides/reasoning, ai.google.dev thinking, docs.x.ai reasoning, docs.mistral.ai reasoning, api-docs.deepseek.com thinking_mode, docs.cohere.com compatibility-api, inference-docs.cerebras.ai reasoning, openrouter.ai reasoning-tokens, console.groq.com reasoning, docs.together.ai reasoning-models-guide, docs.fireworks.ai post-chatcompletions (checked 2026-10-30). Every provider after fireworks names the official pages its address, key, listing, default model and dialect were read from in its _source (checked 2026-10-30). A base_url holding {name} placeholders is a per-account address (_shared/lua/llm/api_url_template.lua): the add-entry form asks one value per placeholder (menu.llm.api_prompt_field.<name>) and stores the filled address in the entry; such a provider has no default_model, its model being the user's deployment or chosen model. An auth block (_shared/lua/llm/api_token_exchange.lua) says the requests carry a short-lived access token exchanged from the stored key, never the key: macOS and Linux exchange and refresh it, the Windows driver refuses such a provider with its reason until it does.",
 	"provider_order": [
 		"openai",
 		"anthropic",
@@ -49,6 +49,8 @@
 		"cloudflare",
 		"databricks",
 		"snowflake",
+		"watsonx",
+		"vertex",
 		"backboard",
 		"typesafe",
 		"openrouter_jev",
@@ -463,6 +465,47 @@
 			"format": "openai",
 			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } },
 			"_source": "https://docs.snowflake.com/en/user-guide/snowflake-cortex/open_ai_sdk (a programmatic access token as Bearer, 15 days by default; reasoning_effort none to high on OpenAI models), https://docs.snowflake.com/en/user-guide/programmatic-access-tokens"
+		},
+		"watsonx": {
+			"label": "IBM watsonx.ai",
+			"base_url": "https://{region}.ml.cloud.ibm.com/ml/gateway/v1",
+			"default_model": "",
+			"format": "openai",
+			"auth": {
+				"kind": "token_exchange",
+				"token_url": "https://iam.cloud.ibm.com/identity/token",
+				"body": { "grant_type": "urn:ibm:params:oauth:grant-type:apikey", "apikey": "{key}" },
+				"token_field": "access_token",
+				"expires_field": "expires_in",
+				"default_expires_seconds": 3600,
+				"refresh_margin_seconds": 300
+			},
+			"_source": "https://www.ibm.com/docs/en/watsonx/saas?topic=generation-inferencing-gateway-models (the model gateway: OpenAI-compatible chat completions, Bearer token, models written provider/model, an administrator configures them), https://cloud.ibm.com/docs/account?topic=account-iamtoken_from_apikey (API key to IAM token, form-encoded; no reasoning control documented)"
+		},
+		"vertex": {
+			"label": "Google Vertex AI",
+			"base_url": "https://aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/endpoints/openapi",
+			"default_model": "",
+			"format": "openai",
+			"thinking_dialect": {
+				"gemini_level": { "reasoning_effort": "$level" },
+				"effort": { "reasoning_effort": "$level" }
+			},
+			"auth": {
+				"kind": "token_exchange",
+				"token_url": "https://oauth2.googleapis.com/token",
+				"body": {
+					"grant_type": "refresh_token",
+					"client_id": "{key.client_id}",
+					"client_secret": "{key.client_secret}",
+					"refresh_token": "{key.refresh_token}"
+				},
+				"token_field": "access_token",
+				"expires_field": "expires_in",
+				"default_expires_seconds": 3600,
+				"refresh_margin_seconds": 300
+			},
+			"_source": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/start/openai (OpenAI-compatible endpoint, Google Cloud access tokens only, reasoning_effort minimal, low, medium, high), https://docs.cloud.google.com/vertex-ai/generative-ai/docs/migrate/openai/auth-and-credentials, https://developers.google.com/identity/protocols/oauth2/web-server#offline (the key is the authorized_user credentials file gcloud auth application-default login writes; a service-account key, which needs a signed JWT, is not taken)"
 		},
 		"backboard": {
 			"label": "Backboard",
