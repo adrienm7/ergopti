@@ -258,54 +258,147 @@ function M.apply_tint(requested_tint)
 	})
 end
 
---- Resolves the best screen coordinates to display the tooltip.
---- @return table|nil Table containing x, y, and optionally h and type.
-function M.resolve_anchor()
-	local ok_ax, position_ax = pcall(function()
+-- The AX error of a read the application did not answer within the
+-- process-wide messaging timeout (kAXErrorCannotComplete).
+local AX_UNANSWERED = "Messaging failed"
+
+-- How long an application that left a read unanswered is not asked again. Each
+-- unanswered read holds the main thread for the whole messaging timeout; the
+-- caret cascade made five in one render (2515 ms, field run 2026-10-31).
+local AX_UNANSWERED_COOLDOWN_SEC = 5
+
+-- pid -> secondsSinceEpoch until which its windows are not queried
+local _ax_unanswered_until = {}
+
+-- Raised inside the AX cascade to stop it at the first unanswered read
+local UNANSWERED_SENTINEL = {}
+
+--- Returns the frontmost application's pid without an Accessibility query.
+--- @return number|nil pid Nil when the workspace does not name one.
+local function frontmost_pid()
+	local ok, pid = pcall(function()
+		local app = hs.application.frontmostApplication()
+		if app == nil or type(app.pid) ~= "function" then return nil end
+		return app:pid()
+	end)
+	return ok and type(pid) == "number" and pid or nil
+end
+
+--- Whether the frontmost application can be asked Accessibility questions.
+--- This process never can: its own AX server answers on the main thread this
+--- query blocks, so each read waits out the whole messaging timeout.
+--- @param pid number|nil Frontmost application's pid.
+--- @return boolean askable
+local function ax_askable(pid)
+	if pid == nil then return true end
+	local own = hs.processInfo and hs.processInfo.processID or nil
+	if own ~= nil and pid == own then return false end
+	local until_at = _ax_unanswered_until[pid]
+	if until_at == nil then return true end
+	if hs.timer.secondsSinceEpoch() < until_at then return false end
+	_ax_unanswered_until[pid] = nil
+	return true
+end
+
+--- Reads one AX value and stops the cascade at an unanswered read.
+--- @param element userdata|table AX element.
+--- @param method string attributeValue or parameterizedAttributeValue.
+--- @return any value
+local function ax_read(element, method, ...)
+	local value, err = element[method](element, ...)
+	if value == nil and type(err) == "string" and err:find(AX_UNANSWERED, 1, true) then
+		error(UNANSWERED_SENTINEL, 0)
+	end
+	return value
+end
+
+--- Resolves the caret, line or input-box anchor through Accessibility.
+--- @return table|nil anchor
+--- @return boolean unanswered True when the application left a read unanswered.
+local function resolve_ax_anchor()
+	local ok, position = pcall(function()
 		local ax_engine = require("hs.axuielement")
-		local focused_element = ax_engine.systemWideElement():attributeValue("AXFocusedUIElement")
+		local focused_element = ax_read(ax_engine.systemWideElement(), "attributeValue", "AXFocusedUIElement")
 		if not focused_element then return nil end
 
-		local text_range = focused_element:attributeValue("AXSelectedTextRange")
+		local text_range = ax_read(focused_element, "attributeValue", "AXSelectedTextRange")
 		if text_range and type(text_range) == "table" then
-			local bounds = focused_element:parameterizedAttributeValue("AXBoundsForRange", { location = text_range.location, length = 0 })
+			local bounds = ax_read(focused_element, "parameterizedAttributeValue", "AXBoundsForRange", { location = text_range.location, length = 0 })
 			if bounds and type(bounds) == "table" and bounds.x and bounds.y and bounds.h and bounds.h > 0 and bounds.h < Config.layout.max_caret_height then
 				return { x = bounds.x, y = bounds.y, h = bounds.h, type = "caret" }
 			end
 		end
 
-		local line_number = focused_element:attributeValue("AXInsertionPointLineNumber")
+		local line_number = ax_read(focused_element, "attributeValue", "AXInsertionPointLineNumber")
 		if line_number then
-			local line_range = focused_element:parameterizedAttributeValue("AXRangeForLine", line_number)
+			local line_range = ax_read(focused_element, "parameterizedAttributeValue", "AXRangeForLine", line_number)
 			if line_range then
-				local bounds = focused_element:parameterizedAttributeValue("AXBoundsForRange", line_range)
+				local bounds = ax_read(focused_element, "parameterizedAttributeValue", "AXBoundsForRange", line_range)
 				if bounds and type(bounds) == "table" and bounds.x and bounds.y and bounds.h and bounds.h > 0 and bounds.h < Config.layout.max_caret_height then
 					return { x = bounds.x, y = bounds.y, h = bounds.h, type = "caret" }
 				end
 			end
 		end
 
-		local container_frame = focused_element:attributeValue("AXFrame")
+		local container_frame = ax_read(focused_element, "attributeValue", "AXFrame")
 		if container_frame and type(container_frame) == "table" and container_frame.x and container_frame.y and container_frame.w and container_frame.h then
 			return { x = container_frame.x + container_frame.w / 2, y = container_frame.y + container_frame.h, h = 0, type = "input_box" }
 		end
 
 		return nil
 	end)
-
-	if ok_ax and type(position_ax) == "table" then return position_ax end
-
-	local active_window = hs.window.focusedWindow()
-	if active_window then
-		local ok_frame, window_frame = pcall(function() return active_window:frame() end)
-		if ok_frame and window_frame and type(window_frame) == "table" then
-			return { x = window_frame.x + window_frame.w / 2, y = window_frame.y + window_frame.h - Config.layout.window_bottom_inset, h = 0, type = "window" }
-		end
+	if not ok then
+		local unanswered = position == UNANSWERED_SENTINEL
+			or (type(position) == "string" and position:find(AX_UNANSWERED, 1, true) ~= nil)
+		return nil, unanswered
 	end
-
-	return nil
+	return type(position) == "table" and position or nil, false
 end
 
+--- Resolves the tooltip anchor and the screen it belongs on, asking the
+--- frontmost application at most one unanswered Accessibility read per render.
+--- @return table|nil anchor Table containing x, y, and optionally h and type.
+--- @return table screen_frame Frame of the focused window's screen or the main one.
+function M.resolve_placement()
+	local pid = frontmost_pid()
+	local askable = ax_askable(pid)
+	local anchor, unanswered = nil, false
+	if askable then anchor, unanswered = resolve_ax_anchor() end
+	if unanswered and pid ~= nil then
+		_ax_unanswered_until[pid] = hs.timer.secondsSinceEpoch() + AX_UNANSWERED_COOLDOWN_SEC
+		Logger.debug(LOG, "Frontmost application (PID %s) left an Accessibility read unanswered; tooltip placed without it for %d s.",
+			tostring(pid), AX_UNANSWERED_COOLDOWN_SEC)
+	end
+
+	-- hs.window.focusedWindow is an Accessibility read of the same application
+	local window_screen = nil
+	if askable and not unanswered then
+		local active_window = hs.window.focusedWindow()
+		if active_window then
+			if anchor == nil then
+				local ok_frame, window_frame = pcall(function() return active_window:frame() end)
+				if ok_frame and window_frame and type(window_frame) == "table" then
+					anchor = { x = window_frame.x + window_frame.w / 2, y = window_frame.y + window_frame.h - Config.layout.window_bottom_inset, h = 0, type = "window" }
+				end
+			end
+			if type(active_window.screen) == "function" then
+				pcall(function() window_screen = active_window:screen() end)
+			end
+		end
+	end
+	return anchor, (window_screen or hs.screen.mainScreen()):frame()
+end
+
+--- Resolves the best screen coordinates to display the tooltip.
+--- @return table|nil Table containing x, y, and optionally h and type.
+function M.resolve_anchor()
+	return (M.resolve_placement())
+end
+
+--- Forgets every application that left a read unanswered (tests only).
+function M.reset_ax_unanswered_for_tests()
+	_ax_unanswered_until = {}
+end
 
 
 
@@ -433,14 +526,7 @@ function M.render(blocks, state, start_watchers_callback)
 		end
 
 		local canvas_height = current_y - Config.layout.line_spacing + Config.layout.pad_y
-		local anchor = M.resolve_anchor()
-		local focused_window = hs.window.focusedWindow()
-		local window_screen = nil
-		
-		if focused_window and type(focused_window.screen) == "function" then 
-			pcall(function() window_screen = focused_window:screen() end) 
-		end
-		local screen_frame = (window_screen or hs.screen.mainScreen()):frame()
+		local anchor, screen_frame = M.resolve_placement()
 
 		local placed = M.compute_position(anchor, { w = canvas_width, h = canvas_height }, screen_frame)
 		local pos_x, pos_y = placed.x, placed.y
@@ -701,13 +787,7 @@ function M.render_stacked(rows, state, start_watchers_callback)
 		end
 
 		-- Resolve position (same anchor cascade as render()).
-		local anchor = M.resolve_anchor()
-		local focused_window = hs.window.focusedWindow()
-		local window_screen
-		if focused_window and type(focused_window.screen) == "function" then
-			pcall(function() window_screen = focused_window:screen() end)
-		end
-		local screen_frame = (window_screen or hs.screen.mainScreen()):frame()
+		local anchor, screen_frame = M.resolve_placement()
 
 		local pos_x, pos_y
 		if anchor then
