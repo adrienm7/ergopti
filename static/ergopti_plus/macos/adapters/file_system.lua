@@ -2368,12 +2368,21 @@ end
 --- Writes content atomically through the canonical two-argument FileSystem port.
 --- @param path string Absolute destination path.
 --- @param content string UTF-8 content.
---- @param on_error function|nil Receives the fixed failure category instead of
----        the log, for a caller that provokes the refusal (the field run's FIFO
----        check, whose expected refusals were logged as ERROR).
 --- @return boolean written
 --- @return string|nil error_message
-function M.write(path, content, on_error)
+function M.write(path, content)
+	local written, detail = write_atomic(path, content, nil, nil)
+	return written, detail
+end
+
+--- Same as M.write, for a caller that provokes the refusal: on_error receives
+--- the fixed failure category instead of the log. Kept apart so the FileSystem
+--- port keeps its two-argument write.
+--- @param path string Destination path.
+--- @param content string UTF-8 content.
+--- @param on_error function Receives the failure category.
+--- @return boolean written, string|nil detail
+function M.write_reporting(path, content, on_error)
 	local written, detail = write_atomic(path, content, nil, on_error)
 	return written, detail
 end
@@ -2440,13 +2449,14 @@ function M.write_if_unchanged_admitted(path, content, expected_source, on_error,
 	return write_atomic(path, content, captured, on_error, admission)
 end
 
---- Appends content to a file, creating it if it does not exist.
+--- Appends content to a file, creating it if it does not exist, for a caller
+--- that provokes the refusal: on_error receives the fixed failure category
+--- instead of the log (M.append is the port's two-argument form).
 --- @param path    string Absolute path to the file.
 --- @param content string UTF-8 content to append.
---- @param on_error function|nil Receives the fixed failure category instead of
----        the log, as for M.write.
+--- @param on_error function|nil Receives the failure category; nil logs it.
 --- @return boolean true on success, false on any error.
-function M.append(path, content, on_error)
+function M.append_reporting(path, content, on_error)
 	local report = OperationReporter.new(on_error, Logger, LOG)
 	if type(path) ~= "string" or path == "" then
 		report("append", "error", "append(): path must be a non-empty string.")
@@ -2496,6 +2506,14 @@ function M.append(path, content, on_error)
 		return false
 	end
 	return result == true
+end
+
+--- Appends content to a file, creating it if it does not exist.
+--- @param path    string Absolute path to the file.
+--- @param content string UTF-8 content to append.
+--- @return boolean true on success, false on any error.
+function M.append(path, content)
+	return M.append_reporting(path, content, nil)
 end
 
 --- Returns true if a file or directory exists at the given path.

@@ -37,7 +37,7 @@ local function append_to(mode, on_error)
 				function file:close() return true end
 				return file
 			end
-			result = adapter.append("/virtual/destination", "line\n", on_error)
+			result = adapter.append_reporting("/virtual/destination", "line\n", on_error)
 			io.open = previous_open
 		end)
 	end, debug.traceback)
