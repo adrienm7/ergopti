@@ -33,6 +33,7 @@
 
 local Identifiers = require("identifiers")
 local Logger = require("infra.logger")
+local MainThreadHold = require("infra.main_thread_hold")
 local KePaths = require("platform.remap.ke_paths")
 local LeaseMemorySnapshot = require("platform.remap.lease_memory_snapshot")
 local RuntimeVhid = require("platform.remap.runtime_vhid")
@@ -190,6 +191,15 @@ function M.lease_with_facts(ports, report, finish, remap, waited)
 	local deploy = ports.deploy_facts()
 	report.step("deploy_write_ms", STATE.info, deploy and math.floor(deploy.write_ms + 0.5) or "none")
 	report.step("deploy_kb", STATE.info, deploy and math.floor(deploy.bytes / 1024 + 0.5) or "none")
+	-- The swallowed-keys item's open decision: a write that is itself a key-delaying
+	-- hold means karabiner.json must shrink; a shorter one is kept as is.
+	if deploy == nil then
+		report.step("deploy_write_verdict", STATE.info, "none")
+	elseif deploy.write_ms < MainThreadHold.COUNT_MS then
+		report.step("deploy_write_verdict", STATE.pass, "keep")
+	else
+		report.step("deploy_write_verdict", STATE.fail, "shrink")
+	end
 	-- Starvation is their open explanation: the free memory names it.
 	local function memory_then_finish()
 		ports.exec(LeaseMemorySnapshot.TOOL, {}, COMMAND_TIMEOUT, function(code, output)
