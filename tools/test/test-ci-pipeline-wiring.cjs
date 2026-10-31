@@ -1093,7 +1093,7 @@ const STEP_CONDITIONS = [
 	[
 		LINUX_BOX,
 		'install-linux',
-		'Install LuaJIT for the archive launcher (archive)',
+		'Install the GLib stack for the archive launcher (archive)',
 		"env.INSTALL_KIND == 'archive'"
 	],
 	[
