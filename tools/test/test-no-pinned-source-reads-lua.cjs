@@ -125,7 +125,11 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //                    read engine.lua and modelled the gate in local functions,
 //                    while test_peak_override_needs_sustained_hold drives the
 //                    engine through a 4-frame peak at 120 Hz.)
-const BASELINE = 10;
+//           10 → 9 (2026-10-31: the MLX boot cleanup gate is judged by the
+//                    installed-application boot scenarios, which count the
+//                    port cleanup shells an AI-off and an AI-on boot start,
+//                    instead of reading init.lua.)
+const BASELINE = 9;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -191,7 +195,9 @@ const BASELINE = 10;
 //              hands to ApiCommon.insert_prediction.)
 //       48 → 47 (2026-10-31: the peak-override model test is retired, see
 //              the file count above.)
-const READ_BASELINE = 47;
+//       47 → 45 (2026-10-31: the MLX boot cleanup gate moved to the boot
+//              scenarios, see the file count above.)
+const READ_BASELINE = 45;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).

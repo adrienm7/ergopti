@@ -42,6 +42,10 @@
 ---    active developer folder's python3, and that copy was x86_64 only. The
 ---    migrated Mac keeps those Intel Pythons (and an Intel Homebrew in
 ---    /usr/local); a Python helper started after the boot must pick the arm64 one.
+--- 7. init-boot-mlx: the boot ran its MLX port cleanup (lsof, a curl probe of up
+---    to 1 s, ps) on every boot, the AI off included; it only serves the AI
+---    warmup. An AI-off boot runs no such shell, and a boot whose AI is on and
+---    consented in this Mac's preferences runs it once.
 --- ==============================================================================
 
 local M = {}
@@ -166,6 +170,19 @@ local function neutral_defaults(ctx)
 	write_home(ctx.home, ".config/ergopti_plus/hammerspoon/config.toml",
 		assert(read(ctx.driver .. "/_generated/config_template.toml"), "config template missing"))
 	ctx.world.install_karabiner(ctx.root .. "/machine", ctx.home)
+end
+
+--- The neutral defaults with the AI turned on, in config.toml and in the
+--- consent this Mac's preferences keep: the boot the MLX port cleanup serves.
+--- @param ctx table Scenario context.
+local function ai_consented(ctx)
+	neutral_defaults(ctx)
+	local path = ctx.home .. "/.config/ergopti_plus/hammerspoon/config.toml"
+	local toml, replaced = assert(read(path), "config.toml missing"):gsub("\n%[llm%]\nenabled = false\n",
+		"\n[llm]\nenabled = true\n", 1)
+	assert(replaced == 1, "the config template no longer opens [llm] with enabled = false")
+	write_home(ctx.home, ".config/ergopti_plus/hammerspoon/config.toml", toml)
+	ctx.settings = { ["ergopti.llm.enabled"] = true }
 end
 
 --- A saved widget position whose X coordinate survived but whose Y did not.
@@ -313,7 +330,10 @@ end
 local function scenarios(repo)
 	local list = {
 		{ name = "a fresh install opens the first-run wizard", steps = { "boot" }, marker = WIZARD_MARKER },
-		{ name = "the neutral defaults boot", setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER },
+		{ name = "the neutral defaults boot", setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
+			ai_enabled = false },
+		{ name = "the AI turned on and consented boots its MLX port cleanup (init-boot-mlx)", setup = ai_consented,
+			steps = { "boot" }, marker = BOOTED_MARKER, ai_enabled = true },
 		{ name = "the layout menu selects French through its native fallback (native-layout-selection)",
 			setup = neutral_defaults, steps = { "select_layout_natively" }, marker = BOOTED_MARKER,
 			machine = "native_layout_selection", facts = { layout_set_attempts = "1", layout_native_selections = "1",
@@ -371,6 +391,9 @@ local function scenarios(repo)
 			-- The legacy preference keys of an unstamped release turn the AI off
 			ai_runtime = case.stamped and function(arch) return missing_ai_runtime(case, arch) end or nil,
 		}
+		-- An AI-on release carries no consent in this Mac's preferences, so only
+		-- an AI-off one is judged on the port cleanup.
+		if not (case.stamped and case.enables_ai) then list[#list].ai_enabled = false end
 	end
 	if #list < 6 then error("boot scenarios: the migration corpus holds fewer than three macOS releases") end
 	local turns_ai_on = false
@@ -552,6 +575,20 @@ local function started_pythons(output)
 	return boot, action
 end
 
+--- How many MLX port cleanup shells a child started during its boot: the
+--- world records each task start, and the cleanup is the one that lists the
+--- port's listeners (modules/llm/boot_cleanup.lua).
+--- @param output string Child output.
+--- @return integer count E2E_TASK lines before E2E_PHASE that run lsof on a port.
+local function boot_port_cleanups(output)
+	local count = 0
+	for line in output:gmatch("[^\n]+") do
+		if line:match("^E2E_PHASE ") then break end
+		if line:match("^E2E_TASK ") and line:find("lsof -nP -iTCP:", 1, true) then count = count + 1 end
+	end
+	return count
+end
+
 --- Whether a boot told the user that the AI runtime it needs is missing: a
 --- notification naming that runtime (a product name, never translated).
 --- @param output string Child output.
@@ -622,6 +659,16 @@ function M.run(check, options)
 				end
 				if action == "python_helper" and #action_pythons == 0 then
 					ctx.problems[#ctx.problems + 1] = action .. ": the Python helper started no Python"
+				end
+				-- init-boot-mlx: the port cleanup belongs to an AI-on boot only.
+				if action == "boot" and scenario.ai_enabled ~= nil then
+					local cleanups = boot_port_cleanups(output)
+					if scenario.ai_enabled and cleanups ~= 1 then
+						ctx.problems[#ctx.problems + 1] = action .. ": the AI-on boot ran " .. cleanups
+							.. " MLX port cleanup(s), expected 1"
+					elseif not scenario.ai_enabled and cleanups ~= 0 then
+						ctx.problems[#ctx.problems + 1] = action .. ": the AI-off boot ran the MLX port cleanup"
+					end
 				end
 				local runtime = action == "boot" and scenario.ai_runtime and scenario.ai_runtime(ctx.arch) or nil
 				if runtime and not notified_missing_runtime(output, runtime) then
