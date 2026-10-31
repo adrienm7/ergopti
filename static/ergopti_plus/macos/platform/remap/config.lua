@@ -119,8 +119,9 @@ local RUNTIME_KEY = "runtime"
 --- an official Karabiner-Elements that is running to quit (ADR 011, decision 3).
 --- It is the user's consent: `true` (the absent default, as the maintainer
 --- decided) lets the owned runtime close it, `false` makes the owned runtime
---- report `other_karabiner_running` instead. Like `runtime` it is not a menu row
---- until the owned runtime ships; a value that is not a boolean refuses the file.
+--- report `other_karabiner_running` instead. It is a Tap-Holds menu row on an
+--- owned boot only; a value that is not a boolean refuses the file. It is
+--- written only once it differs from the default or is already in the file.
 M.CLOSE_OTHER_INSTANCES_DEFAULT = true
 local CLOSE_OTHER_KEY = "close_other_instances"
 -- Builds before 2026-09-22 defaulted to off and wrote `[karabiner] enabled =
@@ -906,6 +907,14 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		if state.enabled ~= nil then
 			assert(type(state.enabled) == "boolean", "the Karabiner integration switch must be a boolean")
 			table_at(document, INTEGRATION_SECTION)[INTEGRATION_KEY] = state.enabled
+		end
+		-- The close consent is written once the user changed it, and kept in sync after.
+		if state.close_other_instances ~= nil then
+			assert(type(state.close_other_instances) == "boolean", "the close consent must be a boolean")
+			if state.close_other_instances ~= M.CLOSE_OTHER_INSTANCES_DEFAULT
+				or (type(integration) == "table" and integration[CLOSE_OTHER_KEY] ~= nil) then
+				table_at(document, INTEGRATION_SECTION)[CLOSE_OTHER_KEY] = state.close_other_instances
+			end
 		end
 		if not preserve_array(document.tap_holds, { ConfigKeys.KEY.TAP_HOLDS },
 			(state.tap_holds_enabled == nil or state.tap_holds_enabled == Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED))

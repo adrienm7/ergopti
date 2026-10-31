@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 לא פעיל: אשרו את ErgoptiPlus בפריטי התחברות",
 	"menu.tapholds.guardian_unavailable": "🔴 לא פעיל: עוזר הרקע של ErgoptiPlus אינו רשום (בדקו את פריטי התחברות, ואז צאו מ-ErgoptiPlus ופתחו אותו שוב)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ כללי ErgoptiPlus ישנים חוסמים את ההגדרות שלך: להסיר אותם…",
+	"menu.tapholds.close_other_karabiner": "סגור מופעי Karabiner אחרים כל עוד Tap-holds פעילים (ישוחזרו אחר כך)",
 	"menu.tapholds.open_login_items": "פתיחת הגדרות פריטי התחברות…",
 	"menu.tapholds.show_login_items_steps": "הצגת השלבים לאישור ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 הגדרות המקלדת נשמרו: הן יחולו ברגע ש-ErgoptiPlus יאושר בפריטי התחברות (לחצו לפתיחת ההגדרות).",

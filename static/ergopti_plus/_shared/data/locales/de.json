@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inaktiv: ErgoptiPlus in den Anmeldeobjekten erlauben",
 	"menu.tapholds.guardian_unavailable": "🔴 Inaktiv: Der Hintergrundhelfer von ErgoptiPlus ist nicht registriert (Anmeldeobjekte prüfen, dann ErgoptiPlus beenden und erneut öffnen)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ Alte ErgoptiPlus-Regeln blockieren Ihre Einstellungen: entfernen…",
+	"menu.tapholds.close_other_karabiner": "Andere Karabiner schließen, solange Tap-Holds aktiv sind (danach wiederhergestellt)",
 	"menu.tapholds.open_login_items": "Einstellungen für Anmeldeobjekte öffnen…",
 	"menu.tapholds.show_login_items_steps": "Schritte zum Erlauben von ErgoptiPlus anzeigen…",
 	"menu.tapholds.saved_until_guardian": "💾 Tastatureinstellungen gespeichert: Sie gelten, sobald ErgoptiPlus in den Anmeldeobjekten erlaubt ist (klicken, um die Einstellungen zu öffnen).",
