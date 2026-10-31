@@ -820,8 +820,10 @@ Added October 22 (from the agents' reports; details in their commits):
       retry are in (07a601c97e plus the retry commit); confirm on a hosted run (target under 5 min). Windows
       Integration still adds 4-5 min on the critical path; the macOS lane (about 58 min) must stay within the
       five-runner budget.
-- [ ] **CI structure.** [CODE] Slowest-test summary and `tools/ci/run-timing.cjs` shipped (e1aa4a5f48, cab1170446).
-      Left: a per-step elapsed summary inside the CI run itself.
+- [ ] **CI structure.** [CI] Slowest-test summary and `tools/ci/run-timing.cjs` shipped (e1aa4a5f48, cab1170446);
+      the release preflight writes the run's lane, job and per-step elapsed tables into its job summary
+      (`run-timing.cjs --step-summary`, step "Summarize where the run's time went"). Left: read it on the first
+      hosted run.
 - [ ] **Test parity across the drivers.** [CODE] Done: Windows CapsWord behaviour tests, dynamic hotstrings, the
       shared HTTP-redirect corpus on Windows (c64788227a), macOS audit-named tests renamed, neutral-installation gate,
       many Windows source scans turned into behaviour tests on 2026-10-30. Left: Windows replay of the timer-ceiling
