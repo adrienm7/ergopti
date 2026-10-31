@@ -3,14 +3,34 @@
 --- Catalogue discovery uses actual private source ownership and retained native GETs.
 local helpers = require("tests.helpers")
 local Json = require("json")
+-- The shipped catalogue. These cases drive four of its servers; the others
+-- are stopped by the scan fake below, so a longer catalogue changes no case.
+local CATALOGUE = Json.decode(assert(io.open(require("infra.paths").shared("modules/llm/local_servers.json"), "rb")):read("*a"))
+local DRIVEN = { omlx = true, lmstudio = true, llamacpp = true, jan = true }
+--- The probed sources of one sweep: the driven servers and configured rows.
+--- @param servers table modules.llm.local_servers
+--- @return table ids
+local function probed(servers)
+	local ids = {}
+	for _, id in ipairs(servers.order()) do
+		if DRIVEN[id] or id:match("^configured:") then ids[#ids + 1] = id end
+	end
+	return ids
+end
 local function isolated(body)
 	local names = { "modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.api_remote",
 		"adapters.http_client", "adapters.event_loop", "ui.menu.local_server_rows", "ui.menu.llm_backend_rows",
 		"modules.llm.local_server_ports" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
-	-- Every catalogue server runs at its catalogue address (test_local_server_ports covers the scan)
+	-- The four servers these cases drive run at their catalogue address; every
+	-- other catalogue server is stopped, so a longer catalogue changes no case
+	-- (test_local_server_ports covers the scan, test_local_server_detection_native
+	-- the real process list).
 	local scan_overrides = {}
+	for _, id in ipairs(CATALOGUE.server_order) do
+		if not DRIVEN[id] then scan_overrides[id] = { running = false, pids = {} } end
+	end
 	require("tests.support.modules.llm.local_server_scan_fake").install(scan_overrides)
 	-- Native scheduling is covered independently by test_local_server_startup.
 	package.loaded["adapters.event_loop"] = { defer = function(fn) fn(); return true end }
@@ -70,7 +90,7 @@ helpers.describe("Linux local server discovery ownership", function()
 			helpers.assert_eq(published, 1)
 			helpers.assert_eq(table.concat(servers.detected(), ","), "omlx")
 			local views = servers.views()
-			helpers.assert_eq(views[1], { id = "omlx", display_name = "oMLX", port = 8181, port_source = "config",
+			helpers.assert_eq(views[1], { id = "omlx", display_name = CATALOGUE.servers.omlx.label, port = 8181, port_source = "config",
 				base_url = "http://127.0.0.1:8181/v1", models = { "qwen3" }, status = "up" })
 			helpers.assert_eq(views[2].reason, "not_running")
 			local endpoint = assert(require("modules.llm.api_remote").endpoint(
@@ -293,7 +313,7 @@ helpers.describe("local discovery constructor and terminal source fences", funct
 			for _,call in ipairs(calls) do call.finish(models("foreign-old-model")) end
 			helpers.assert_eq(published,1,"the finished joint negative verdict remains observable")
 			helpers.assert_eq(#servers.detected(),0)
-			for _,id in ipairs(servers.order()) do helpers.assert_eq(servers.result(id).status,"down") end
+			for _,id in ipairs(probed(servers)) do helpers.assert_eq(servers.result(id).status,"down") end
 		end)
 	end)
 end)
@@ -333,7 +353,7 @@ helpers.describe("Configured explicit loopback discovery views (local-configured
 				local id="configured:"..entry.id
 				helpers.assert_true(servers.rescan(function() return true end))
 				helpers.assert_eq(#calls,5,"the explicit configured loopback source is appended after the four declared defaults")
-				helpers.assert_eq(table.concat(servers.order(),","),"omlx,lmstudio,llamacpp,jan,"..id)
+				helpers.assert_eq(table.concat(servers.order(),","),table.concat(CATALOGUE.server_order,",")..","..id)
 				helpers.assert_eq(calls[5].url,"http://127.0.0.1:54321/v1/models")
 				helpers.assert_nil(calls[5].headers.Authorization)
 				for index=1,4 do calls[index].finish({ok=false,status=0,body=""}) end
@@ -362,7 +382,7 @@ helpers.describe("Configured discovery view custody (local-configured-view)", fu
 			local receipt=servers.capture(id)
 			helpers.assert_true(entries.remove(entry.id))
 			servers.rescan(function() return true end)
-			helpers.assert_eq(#servers.order(),4)
+			helpers.assert_eq(#servers.order(),#CATALOGUE.server_order)
 			helpers.assert_eq(calls[5].cancelled,1,"removed source does not lose its original physical debt")
 			helpers.assert_eq(servers.is_current(receipt),false)
 			helpers.assert_nil(servers.apply(receipt,{model="late"},function() return true end))
@@ -460,7 +480,7 @@ helpers.describe("Configured native menu publication (local-configured-view)", f
 			local id="configured:"..entry.id
 			local saved=assert(servers.apply(servers.capture(id),{base_url="http://localhost:8000/v1"},function() return true end))
 			helpers.assert_eq(saved.entry.id,entry.id);helpers.assert_eq(saved.entry.provider,"openai")
-			helpers.assert_eq(#servers.order(),4);helpers.assert_eq(servers.target("omlx").entry_id,entry.id)
+			helpers.assert_eq(#servers.order(),#CATALOGUE.server_order);helpers.assert_eq(servers.target("omlx").entry_id,entry.id)
 			helpers.assert_nil(servers.target(id));helpers.assert_eq(#entries.list(),1)
 		end)
 	end)
@@ -492,7 +512,10 @@ helpers.describe("Native discovery infrastructure receipts (local-probe-unavaila
 				local failed=find(rows,require("infra.i18n").get("healthcheck.status.failed"))
 				helpers.assert_true(failed and failed.disabled,"actual menu exposes infrastructure failure")
 				helpers.assert_eq(#rows,5,"one failure row replaces the no-server summary")
-				local none=require("infra.i18n").get("menu.llm.local_servers.none"):gsub("{1}","oMLX, LM Studio, llama.cpp / LocalAI, Jan")
+				local catalogue=require("json").decode(assert(io.open(require("infra.paths").shared("modules/llm/local_servers.json"),"rb")):read("*a"))
+				local labels={}
+				for _,id in ipairs(catalogue.server_order) do labels[#labels+1]=catalogue.servers[id].label end
+				local none=require("infra.i18n").get("menu.llm.local_servers.none"):gsub("{1}",(table.concat(labels,", "):gsub("%%","%%%%")))
 				helpers.assert_nil(find(rows,none),"infrastructure refusal cannot become a no-server claim")
 				helpers.assert_eq(servers.cancel(),false,"no flag acknowledges still retained native debt")
 				if failure~="throw" and failure~="unsupported" then
@@ -574,7 +597,7 @@ helpers.describe("Native empty models presentation (local-empty-models)",functio
 			build()
 			for _,call in ipairs(calls) do call.finish({ok=true,status=200,body='{"object":"list","data":[]}'}) end
 			helpers.assert_eq(#servers.detected(),5)
-			for _,id in ipairs(servers.order()) do
+			for _,id in ipairs(probed(servers)) do
 				helpers.assert_eq(servers.result(id).status,"up");helpers.assert_eq(#servers.result(id).models,0)
 				helpers.assert_nil(servers.apply(servers.capture(id),{model="invented"},function() return true end))
 			end
@@ -600,7 +623,7 @@ helpers.describe("Native empty models presentation (local-empty-models)",functio
 			isolated(function(servers,_,calls)
 				servers.rescan(function() return true end)
 				for _,call in ipairs(calls) do call.finish({ok=control.status==200,status=control.status,body=control.body}) end
-				for _,id in ipairs(servers.order()) do helpers.assert_eq(servers.result(id).status,"down") end
+				for _,id in ipairs(probed(servers)) do helpers.assert_eq(servers.result(id).status,"down") end
 				helpers.assert_eq(#servers.detected(),0)
 				local rows=require("ui.menu.local_server_rows").rows({get_backend=function() return "ollama" end,
 					can_configure_local_servers=function() return true end,is_enabled=function() return true end},{},function() end,{is_paused=function() return false end})
