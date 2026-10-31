@@ -296,13 +296,24 @@ function M.replace(source, rows, on_done, deps)
 
 		--- Undoes this build: the previous layout types again, the build goes.
 		local function abandon(code, detail)
-			local back = previous and previous.name or source.keyboard_name
-			deps.select_source(back, back, function()
+			local function retire_build()
 				retire(deps, build, function(retired)
 					if retired then table.remove(record.pending_removal) end
 					write_record(deps, record)
 					finish(false, code, detail)
 				end)
+			end
+			if previous == nil then
+				return deps.select_source(source.keyboard_name, source.keyboard_name, retire_build)
+			end
+			-- The previous build may no longer be selectable (macOS refused it,
+			-- invalid_output, field run 2026-10-31): the source layout then types,
+			-- rather than the failed build this undo retires.
+			deps.select_source(previous.name, previous.name, function(selected, _, reason)
+				if selected then return retire_build() end
+				Logger.warn(LOG, "The previous build '%s' could not be selected again (%s); selecting '%s'.",
+					tostring(previous.name), tostring(reason), tostring(source.keyboard_name))
+				deps.select_source(source.keyboard_name, source.keyboard_name, retire_build)
 			end)
 		end
 
