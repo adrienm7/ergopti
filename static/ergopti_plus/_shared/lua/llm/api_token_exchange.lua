@@ -26,6 +26,8 @@
 local M = {}
 
 local Json = require("json")
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 
 -- Bounds of the lifetimes, in seconds: an answer outside them is brought
 -- back inside, so a token is never refreshed on every request.
@@ -100,13 +102,6 @@ end
 -- ====================================
 -- ====================================
 
---- Percent-encodes one form value (RFC 3986 unreserved characters kept).
---- @param text string
---- @return string
-local function form_encode(text)
-	return (text:gsub("[^%w%-%._~]", function(char) return string.format("%%%02X", char:byte()) end))
-end
-
 --- The exchange request of one stored key.
 --- @param auth table parse() output.
 --- @param key any The stored key.
@@ -116,9 +111,7 @@ function M.request(auth, key)
 	if type(auth) ~= "table" then error("api_token_exchange.request requires a parsed auth block", 2) end
 	if type(key) ~= "string" or key == "" then return nil, "the key is empty" end
 	local fields
-	local names = {}
-	for name in pairs(auth.body) do names[#names + 1] = name end
-	table.sort(names)
+	local names = TableUtil.sorted_keys(auth.body)
 	local pairs_out = {}
 	for _, name in ipairs(names) do
 		local missing
@@ -137,7 +130,7 @@ function M.request(auth, key)
 			return found
 		end)
 		if missing then return nil, "the key holds no " .. missing .. " field" end
-		pairs_out[#pairs_out + 1] = form_encode(name) .. "=" .. form_encode(value)
+		pairs_out[#pairs_out + 1] = TextUtils.percent_encode(name) .. "=" .. TextUtils.percent_encode(value)
 	end
 	return {
 		url = auth.token_url,
