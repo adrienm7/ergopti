@@ -655,6 +655,12 @@ local function ax_watcher_error(detail)
 	return first:match(":%d+: (.+)$") or first
 end
 
+-- Outcomes of this process's AXValueChanged mutations. The field run reports
+-- them for the running process only: the ERROR the 2026-10-31 17:37 report
+-- still carried came from a process booted before the fix reached dev (its
+-- traceback lines are the pre-fix file's), which a daily log cannot tell apart.
+local _ax_value_watch_counts = { already_watched = 0, failed = 0 }
+
 local function mutate_ax_value_watcher(observer, method, element, label)
 	local ok, result = xpcall(function()
 		return observer[method](observer, element, "AXValueChanged")
@@ -666,6 +672,7 @@ local function mutate_ax_value_watcher(observer, method, element, label)
 		return true
 	end
 	if method == "addWatcher" and message == AX_ALREADY_WATCHED then
+		_ax_value_watch_counts.already_watched = _ax_value_watch_counts.already_watched + 1
 		Logger.debug(LOG, "%s: the element is already watched by this observer.", label)
 		return true
 	end
@@ -673,8 +680,18 @@ local function mutate_ax_value_watcher(observer, method, element, label)
 		Logger.debug(LOG, "%s skipped: the element cannot be watched (%s).", label, message)
 		return false
 	end
+	_ax_value_watch_counts.failed = _ax_value_watch_counts.failed + 1
 	Logger.error(LOG, "%s failed: %s.", label, tostring(result))
 	return false
+end
+
+--- This process's AXValueChanged watcher outcomes, for the field run.
+--- @return table counts { already_watched, failed } since the module loaded.
+function M.ax_value_watch_counts()
+	return {
+		already_watched = _ax_value_watch_counts.already_watched,
+		failed = _ax_value_watch_counts.failed,
+	}
 end
 
 --- Rejects one observer candidate while retaining ambiguous cleanup debt.
