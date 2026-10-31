@@ -402,7 +402,7 @@ After the cleanup, read them through the `archive/tmp-wip-<name>` tags.
 - `tmp/wip-todo-af`: 3337d99bc8 (Linux number-row order onboarding; it reads `number_row_live.available()`) and
   4fcb4a979a (logger scalar), then `tmp/wip-todo-ag3` d5cf3ba50b (its strings; it conflicts in the 21 locales unless
   the AF commits come first). 8634b1ff80 is superseded by dfb197a1ea; do not land it.
-- `tmp/wip-todo-ah`: a408a29790 (AHK shard split) only, handed to the PC ("PC Windows todo" step 3); the hs.* cache
+- `tmp/wip-todo-ah`: a408a29790 (AHK shard split) only, handed to the PC ("PC Windows todo" step 3); the `hs.*` cache
   reset and the four Linux and macOS speed-ups landed on 2026-10-31 (`fix/todo-final-p4-ci`). `tmp/wip-ci-fix` is
   fully on dev under other ids (2fb196a022, 767cf0cb7a, 9c496d384d with the fixture-owned machine id, 9b7abbe580,
   7feb5a211b, 376b28db82): nothing to land.
