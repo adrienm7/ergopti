@@ -665,6 +665,34 @@ function Converter:apply_rows(rows)
 		edges = { stored = edges_stored, applies = edges_apply, reason = edges_stored and edges_reason or "" } }
 end
 
+-- macOS codes of the numeric keypad, which XKB keeps (KEYPAD_CODES in the Python twin).
+local KEYPAD_FIRST, KEYPAD_LAST = 65, 92
+
+--- Codes of keys the layout defines (a typing output or an action) that the
+--- keycode table names no XKB key for, keypad excepted, ascending. Twin of
+--- unplaced_codes in keylayout_to_xkb.py.
+--- @param canonical table
+--- @param keycodes table Array of { xkb_name, mac_code }.
+--- @return table codes
+local function unplaced_codes(canonical, keycodes)
+	local placed, found, codes = {}, {}, {}
+	for _, key in ipairs(keycodes) do placed[key[2]] = true end
+	for _, set in ipairs(canonical.key_map_sets or {}) do
+		for _, map in ipairs(set.key_maps or {}) do
+			for _, key in ipairs(map.keys or {}) do
+				local code = key.code
+				if not placed[code] and not (code >= KEYPAD_FIRST and code <= KEYPAD_LAST) and not found[code]
+					and (key.action ~= nil or (type(key.output) == "string" and is_printable(key.output))) then
+					found[code] = true
+					codes[#codes + 1] = code
+				end
+			end
+		end
+	end
+	table.sort(codes)
+	return codes
+end
+
 --- Converts a canonical keylayout to XKB symbols and XCompose text.
 --- @param canonical table The schema-1 form (layouts/keylayout.lua).
 --- @param options table {
@@ -673,7 +701,7 @@ end
 ---   template = string (xkb_symbols.txt),
 ---   layout_id = string (letters, digits, "_"), display_name = string,
 ---   hints = { keysym_overrides = { {text, keysym}... }, base_level_only = { text... } } | nil }
---- @return table|nil result { symbols_text, compose_text, conflicts }
+--- @return table|nil result { symbols_text, compose_text, conflicts, unplaced }
 --- @return string|nil err
 function M.convert(canonical, options)
 	if type(canonical) ~= "table" or canonical.schema ~= 1 then return nil, "canonical keylayout must be schema 1" end
@@ -703,6 +731,7 @@ function M.convert(canonical, options)
 			symbols_text = symbols_text,
 			compose_text = compose_text,
 			conflicts = converter.conflicts,
+			unplaced = unplaced_codes(canonical, options.keycodes),
 			rows = rows_report,
 		}
 	end)
