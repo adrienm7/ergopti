@@ -969,6 +969,26 @@ product name: `pgrep -f Karabiner-Elements` also matches an installed but idle
 root daemon and would block owned mode forever. A lease record names its
 runtime (`shared` or `owned`), so a guardian never fences an owned token
 through a stock tool that may not exist, which would retry forever.
+The activation rule has one owner, `platform/remap/runtime_activation.lua`
+(maintainer, 2026-10-31): Ergopti running and not paused starts ours, which
+closes theirs under the default-on consent row (`close_other_instances`;
+unticked, the owner reports `other_karabiner_running`); a pause stops ours. Theirs is restored
+(`register-core-agents`, the inverse of the quit step) only when the
+`closed-other-karabiner` marker records that Ergopti closed it, so a user who
+quit their own Karabiner never sees Ergopti start it; the marker is a file, so
+a crash or forced quit is recovered at the next pause or quit. Teardown
+restores on a quit and never on a reload (`M.revoke` reason
+`hammerspoon_reload`). A resume after a pause reloads the driver, because one
+Lua VM cannot start a second capture; the field run therefore defers the
+resume with `FieldRun.after_run`. Action: never tie the owned runtime to a menu
+switch, route pause and resume through `M._owned.reconcile`, and never call the
+closer's `restore` without the marker. The pinned artifact is fetched
+by `platform/remap/runtime_artifact_fetch.lua` into
+`~/Library/Application Support/ErgoptiPlus/RemapRuntime/<version>/` (size, then
+SHA-256, then a closed member list, receipt last); the privileged installer
+still reads only the payload sealed in its own signed bundle, so a downloaded
+`Runtime/` tree cannot be installed without changing the artifact to the
+signed installer helper.
 
 ### project-hs-karabiner-switch-precedes-lease-and-guardian
 

@@ -359,6 +359,8 @@
 		"test:action-labels-have-locale-keys": "node ./tools/test/test-action-labels-have-locale-keys.cjs",
 		"test:linux-shared-path-resolver": "node ./tools/test/test-linux-shared-path-resolver.cjs",
 		"test:shared-root-resolvers": "node ./tools/test/test-shared-root-resolvers.cjs",
+		"test:no-pinned-source-reads-linux": "node ./tools/test/test-no-pinned-source-reads-linux.cjs",
+		"test:owned-runtimes-inventory": "node ./tools/test/test-owned-runtimes-inventory.cjs",
 		"test:no-pinned-source-reads-lua": "node ./tools/test/test-no-pinned-source-reads-lua.cjs",
 		"test:ahk-test-coverage": "node ./tools/test/test-ahk-test-coverage.cjs",
 		"test:e2e-gate-symmetry": "node ./tools/test/test-e2e-gate-symmetry.cjs",

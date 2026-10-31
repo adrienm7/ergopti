@@ -234,7 +234,9 @@ function validateWorkflow(workflow) {
 	const preflight = releaseJobs['publication-plan'];
 	assert.equal(preflight.needs, undefined);
 	assert.equal(preflight.if, undefined);
-	assert.ok(!preflight.permissions && !JSON.stringify(preflight).includes('secrets.'));
+	// Its one grant reads the run's own jobs for the timing summary; it holds no secret.
+	assert.deepEqual(preflight.permissions, { contents: 'read', actions: 'read' });
+	assert.ok(!JSON.stringify(preflight).includes('secrets.'));
 	const download = preflight.steps.find((step) => step.uses === 'actions/download-artifact@v4');
 	assert.equal(download.with.name, upload.with.name);
 	assert.equal(download.with.path, 'publication-plan');

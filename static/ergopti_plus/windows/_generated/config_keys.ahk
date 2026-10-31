@@ -525,6 +525,7 @@ class MenuCommand {
 	static SUSPEND := "suspend"
 	static SYSTEM_GESTURE_SETTINGS := "system_gesture_settings"
 	static TAPHOLDS_TOGGLE := "tapholds_toggle"
+	static TAP_HOLD_CLOSE_OTHER_KARABINER := "tap_hold_close_other_karabiner"
 	static TAP_HOLD_KEY_DELAY := "tap_hold_key_delay"
 	static TAP_HOLD_KEY_DELAY_USE_GLOBAL := "tap_hold_key_delay_use_global"
 	static TAP_HOLD_KEY_HOLD_ACTION := "tap_hold_key_hold_action"

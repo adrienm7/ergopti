@@ -1441,6 +1441,82 @@ function testRunTiming() {
 		'timing: jobs are read in pages of thirty until the count is reached',
 		read.length === 3 && endpoints.length === 2 && endpoints[1].endsWith('per_page=30&page=2')
 	);
+	// (ci-step-timing-summary) the run writes its own per-step elapsed summary.
+	const markdown = timing.renderMarkdown(summary);
+	check(
+		'timing: the job summary has a lane, job and step table',
+		markdown.includes('| macOS | 40m 00s | 1 |') &&
+			markdown.includes('| Linux / Build | 10m 00s | 10m 00s | success |') &&
+			markdown.includes('| Build | Linux / Build | 9m 00s | - |')
+	);
+	check(
+		'timing: a pipe in a name cannot break the table',
+		timing
+			.renderMarkdown({ ...summary, steps: [{ ...summary.steps[0], step: 'a | b' }] })
+			.includes('| a \\| b |')
+	);
+	const written = [];
+	const logged = [];
+	const env = {
+		GITHUB_RUN_ID: '9',
+		GITHUB_REPOSITORY: 'owner/repo',
+		GITHUB_STEP_SUMMARY: '/summary.md'
+	};
+	const answered = timing.writeStepSummary({
+		env,
+		top: 40,
+		readApi: (endpoint) => {
+			endpoints.push(endpoint);
+			return {
+				total_count: 2,
+				jobs: [original, job('Release / Verify', 1, '2026-10-23T01:30:00Z', null)]
+			};
+		},
+		append: (file, text) => written.push([file, text]),
+		log: (line) => logged.push(line)
+	});
+	check(
+		'timing: the step summary reads the current run of the current repository',
+		answered === true &&
+			endpoints[endpoints.length - 1].startsWith('repos/owner/repo/actions/runs/9/jobs?')
+	);
+	check(
+		'timing: the unfinished summarizing job is left out of the summary',
+		written.length === 1 &&
+			written[0][0] === '/summary.md' &&
+			!written[0][1].includes('Release / Verify')
+	);
+	written.length = 0;
+	const unread = timing.writeStepSummary({
+		env,
+		top: 40,
+		readApi: () => {
+			throw new Error('HTTP 403: Resource not accessible by integration');
+		},
+		append: (file, text) => written.push([file, text]),
+		log: (line) => logged.push(line)
+	});
+	check(
+		'timing: an unreadable API is written into the summary and warned, not hidden',
+		unread === false &&
+			written[0][1].includes('HTTP 403') &&
+			logged.some(
+				(line) => line.startsWith('::warning title=CI timing::') && line.includes('HTTP 403')
+			)
+	);
+	let outside = false;
+	try {
+		timing.writeStepSummary({
+			env: { GITHUB_RUN_ID: '9' },
+			top: 40,
+			readApi() {},
+			append() {},
+			log() {}
+		});
+	} catch {
+		outside = true;
+	}
+	check('timing: the step summary refuses to run outside GitHub Actions', outside);
 }
 testRunTiming();
 

@@ -245,3 +245,38 @@ helpers.describe("other Karabiner: the read-only description", function()
 		helpers.assert_eq(answer(port.describe), { helper_present = false, active_processes = nil })
 	end)
 end)
+
+
+
+
+
+-- ==========================
+-- ==========================
+-- ======= 4/ Restore =======
+-- ==========================
+-- ==========================
+
+helpers.describe("other Karabiner: giving it back", function()
+	helpers.it("runs only Karabiner's own registration of its core agents", function()
+		local port, world = load_port(function() return 0, "" end)
+		helpers.assert_eq(answer(port.restore), true)
+		helpers.assert_eq(used(world), { "Karabiner-Elements Non-Privileged Agents v2 register-core-agents" })
+	end)
+
+	helpers.it("is the exact inverse of the required quit step", function()
+		local _, world = load_port(function() return 0, "" end)
+		local required
+		for _, step in ipairs(world.closer.QUIT_STEPS) do
+			if step.required then required = step.argument end
+		end
+		helpers.assert_eq("un" .. world.closer.RESTORE_STEP, required)
+	end)
+
+	helpers.it("names a failed registration and an absent helper as a refusal", function()
+		local port = load_port(function() return 1, "" end)
+		helpers.assert_eq(answer(port.restore), false)
+		local absent, world = load_port(function() return 0, "" end, function(w) w.helper = false end)
+		helpers.assert_eq(answer(absent.restore), false)
+		helpers.assert_eq(#world.calls, 0)
+	end)
+end)

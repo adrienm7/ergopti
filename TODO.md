@@ -207,9 +207,13 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      (`idle_cpu_percent`); resident memory and its growth, Lua heap growth and main-thread holds over 250 ms
      in the window are named.
    - `field_slow_lines`: one `awk` pass over today's log (a summary only reaches the task's pipe) tallies
-     the HotPath `Slow <segment>: X ms own` lines by segment, and the `Slow ingest tick` and
-     `Slow preferences save` lines; `slow_dominant` names the segment with the most own time (the five
-     largest in the log window), the two others are `count:worst_ms`; `log_lease_bound_failures` and
+     the HotPath `Slow <segment>: X ms own` lines by segment, and the `Slow ingest tick`,
+     `Slow preferences save`, `Slow ignored-window probe` and over-budget diagnostics lines; `slow_dominant`
+     names the segment with the most own time (the five largest in the log window), the four others are
+     `count:worst_ms` with the worst line's largest stage (`slow_*_stage`, `slow_diagnostics_collector`) and
+     metadata forks (`slow_*_forks`, `count:ms`); `slow_hold_phase` and `slow_layout_menu_phase` name the
+     busiest phase inside the day's main-thread holds and the busiest `menu_keyboard_layout.*` stage
+     (`name:ms`); `log_lease_bound_failures` and
      `log_layout_change_before_baseline` fail when a `Lease-bound input startup failed` or a
      `Layout … detected change before its baseline` line is in the day log (item 38).
    - `field_fifo_safety`: in a folder of its own under `TMPDIR`, a FIFO (a reader attached first, so a
@@ -267,14 +271,19 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       (b5c0c0de37), the dynamic-rule preview guard (c17aa3e5d7), the slowest diagnostics collectors named
       (71a8b87f65), the keyboard-layout row stages timed (236ea82e52), a menu rebuild on an input-source
       notification only for a visible change (933707a1ae), the keystats journal published without forks (L16,
-      016ef6adc5) and the deferred keystats start sliced (L18, 58f82e9fdc). Left, from the next field report: (1) the
-      remaining menu rebuilds through the `menu_keyboard_layout.*` phases; (2) preferences save `sparse` (about
-      280 ms) and `write` (600 to 800 ms, 4 metadata forks), not reproduced off the Mac (L17: the slow-save line
-      names its prepare stage and `lua_heap`); (3) keystats append `write` 150 to 350 ms and the ledger read on the
-      main thread (L16: no `Slow ingest tick` while typing, `worst_hold_site` in the field run); (4) the healthcheck
-      collector behind 100 to 230 ms, and the ignored-window AX probe (L23, Issue #101 point 4): bound it once a
-      `Slow ignored-window probe` line names the stage; (5) the one-off holds of `field_run`, `error_dialog`,
-      `keymap/utils` timers and `menu_state` (shell.ioreg 146 ms); L18: `keystats_start_ms` under 100 ms.
+      016ef6adc5), the deferred keystats start sliced (L18, 58f82e9fdc), the atomic writer's source listings and
+      `cp -p` in one fork (two forks per replacement instead of four: preferences save `write`, keystats append),
+      and `field_slow_lines` naming what decides each part below (6c30779ec3). Left, from the next field report
+      (no manual action: the field run reports it): (1) the remaining menu rebuilds: `slow_layout_menu_phase` names
+      the `menu_keyboard_layout.*` stage to slice, `slow_hold_phase` the busiest phase of every hold; (2)
+      preferences save `sparse` (about 280 ms) and `write` (L17): `slow_preferences_save_stage` and
+      `slow_preferences_save_forks` (`count:ms` of the worst save) say whether the remaining fork or a prepare
+      stage holds it; (3) keystats append `write` and the ledger read (L16): `slow_ingest_ticks`,
+      `slow_ingest_stage`, `slow_ingest_forks`, and `worst_hold_site` in `field_event_taps`; (4) the healthcheck
+      collector (`slow_diagnostics`, `slow_diagnostics_collector`) and the ignored-window AX probe (L23, Issue #101
+      point 4: `slow_ignored_window_probes`, `slow_ignored_window_stage`), bound the named stage; (5) the one-off
+      holds of `field_run`, `error_dialog`, `keymap/utils` timers and `menu_state` (shell.ioreg 146 ms):
+      `worst_hold_site` and `slow_hold_phase`; L18: `keystats_start_ms` under 100 ms.
 - [ ] **Thinking off for every model on every backend and OS (merged with "Reasoning off in every AI request:
       verify the open rules").** Done on the three OS: model families of `thinking_off.json` crossed with each
       provider's dialect, the resolved Ollama `think` per family (98b9a2ad57), persisted and expiring refusals,
@@ -570,11 +579,20 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       The karabiner_model comparison of 16.0.0 with 9312593e now covers the manipulators, the
       configuration reader and the event queue; `(owned-revision-config-keys)` pins the generated
       keys both revisions read alike. The `field_owned_runtime` step reports the owner's own verdict
-      on the installed VirtualHIDDevice (`driver_verdict`). Left: WP5 (the hosted runtime build pins
-      `runtime.*` and `capture.requirement` in `vendor/remap-runtime/manifest.json`), the driver-only
-      VirtualHIDDevice update offer (signed payload supplier), WP8 native acceptance, WP9 real-Mac
-      acceptance, WP10 enable and retire (with the menu text for the close option).
-      Next: the maintainer's `bash tools/dev/collect-macos-field-report.sh` (`field_owned_runtime`).
+      on the installed VirtualHIDDevice (`driver_verdict`). Since 2026-10-31: the hosted `runtime-artifact`
+      job (manual dispatch) and the reproducible packager, `capture.requirement` pinned, the first-run
+      fetch into `~/Library/Application Support/ErgoptiPlus/RemapRuntime/`, the running/paused/quit rule
+      with its consent row and closed-Karabiner notice, the VirtualHIDDevice block rows (no migration out of
+      the user's `karabiner.json`: the maintainer starts from a clean state). Left: a green hosted runtime build and its `runtime.*`
+      pin; [CI] the artifact as the signed `ErgoptiPlus-Runtime-Installer.app` (`--package-owned`) with
+      the staging taking the downloaded helper instead of the bundle's
+      (`OwnedVirtualHIDDaemonReportMainOperation.swift`); the per-OS feature requirements table (needs the
+      generator's inputs mapped to feature paths); the driver-only VirtualHIDDevice update offer; WP8
+      native and WP9 real-Mac acceptance; then the `RUNTIME_DEFAULT` flip and the shared-mode deletion.
+      Next: the maintainer's `bash tools/dev/collect-macos-field-report.sh` (`field_owned_runtime`, and on an
+      owned boot `field_owned_start`: artifact verified, runtime ready, the user's Karabiner closed; then
+      `field_owned_pause`: the controlled pause stops ours and gives theirs back, the resume follows the run
+      and reloads, so the next run's `field_owned_start` proves close-on-resume).
 
 ## Big item 3: Windows input-hook architecture (items 49, 91, 50)
 
@@ -728,9 +746,6 @@ Nothing left.
       Fixed on the three OS (4741950f04: Windows forgets a final output at commit, a final entry whose output equals
       the typed text claims it, an immediate correction yields to a waiting final entry of higher priority). Left:
       the manual check line on the PC.
-- [ ] **macOS cold official-Ollama lane.** [CI] since bc09e4584c no product path calls the stock
-      `ollama_deps_checker.install_for_selection()`, so the macOS "official cold Ollama without stock Python" lane only
-      proves the official installer still works cold. Repoint it at the native install or retire it.
 - [ ] **"Create a GitHub issue" button is broken.** [PHYS-W] [PHYS-M] [PHYS-L] Fixed on the three OS (4e63c54c8a:
       4000 bytes, which holds even through the signed-out `/login?return_to=` re-encoding; measured anonymously).
       Left: a click while signed in opens the prefilled form with no "Whoops" page.
@@ -777,9 +792,11 @@ Added October 22 (from the agents' reports; details in their commits):
       and never uses, stops or modifies the user's copy. Ollama: done on the three OS (next item). MLX: already
       Ergopti's own. Karabiner on macOS: item 31 as the default, with the rule: tap-hold on quits the user's Karabiner
       and runs ours; tap-hold off with theirs present never activates ours (rewords ADR 011 decision 3). WebView2
-      stays the system copy, with a version check and a clear refusal. Left: item 31, and the inventory of every
-      external tool on Linux and Windows (ydotool, xdotool, wmctrl, curl, Python, PowerShell modules, WebView2) with
-      a decision per tool.
+      stays the system copy, with a version check and a clear refusal. The inventory with a proposal per tool is
+      `docs/design/owned-runtimes.md`; its macOS and Linux tables are checked against every program the drivers
+      start (`tools/test/test-owned-runtimes-inventory.cjs`; ydotool is no longer started at run time). Left: item
+      31; the maintainer's decision per row (see "Questions for the maintainer"); the same code-derived check for
+      the Windows driver (PC agent).
 - [ ] **Ergopti's own Ollama on Windows and Linux too.** [PHYS-W] [PHYS-L] Done in code on the three OS (Linux
       32fa07be7f, Windows f016081056 and 597cbbe983: owned port `llm_ollama_owned_port` = 11435, 11434 refused, only
       the owned runtime launched). Left: with a system Ollama on 11434, Ergopti's listens on 11435 and the other is
@@ -829,13 +846,18 @@ Added October 22 (from the agents' reports; details in their commits):
       retry are in (07a601c97e plus the retry commit); confirm on a hosted run (target under 5 min). Windows
       Integration still adds 4-5 min on the critical path; the macOS lane (about 58 min) must stay within the
       five-runner budget.
-- [ ] **CI structure.** [CODE] Slowest-test summary and `tools/ci/run-timing.cjs` shipped (e1aa4a5f48, cab1170446).
-      Left: a per-step elapsed summary inside the CI run itself.
+- [ ] **CI structure.** [CI] Slowest-test summary and `tools/ci/run-timing.cjs` shipped (e1aa4a5f48, cab1170446);
+      the release preflight writes the run's lane, job and per-step elapsed tables into its job summary
+      (`run-timing.cjs --step-summary`, step "Summarize where the run's time went"). Left: read it on the first
+      hosted run.
 - [ ] **Test parity across the drivers.** [CODE] Done: Windows CapsWord behaviour tests, dynamic hotstrings, the
       shared HTTP-redirect corpus on Windows (c64788227a), macOS audit-named tests renamed, neutral-installation gate,
-      many Windows source scans turned into behaviour tests on 2026-10-30. Left: Windows replay of the timer-ceiling
-      and key-chord corpora (needs a decision to build those policies on Windows), and the rest of the source
-      assertions to behaviour (audit item 14).
+      many Windows source scans turned into behaviour tests on 2026-10-30; on 2026-10-31 the macOS app launcher
+      quoting and clipboard round-trip tests became behaviour tests (macOS pinned-read ratchet 27 -> 24 files, 75
+      -> 70 reads) and Linux got its own pinned-read ratchet (74 files, 136 reads,
+      `tools/test/test-no-pinned-source-reads-linux.cjs`). Left: Windows replay of the timer-ceiling and key-chord
+      corpora (needs a decision to build those policies on Windows), and the rest of the source assertions to
+      behaviour (audit item 14), driving both Lua ratchets down.
 - [ ] **116. Guided third-party validation report.** [PHYS-M] `field_toolchain` runs it with no person (timer,
       Shortcuts, Homebrew, Karabiner signature and Gatekeeper); the next field report answers it. Package provenance
       beyond the signature check is open.
@@ -1248,6 +1270,12 @@ not open software work.
   macOS version, read from `HOSTS` in `tools/ci/macos-stage-roles.cjs`.
 - **Windows unit shards are grouped by test category, not by duration.** A new test file with no
   category fails a gate; a minute more of wall time buys a CI whose red job says what broke.
+- **Ergopti's own Karabiner follows Ergopti running, not a menu switch (2026-10-31, ADR 011).** While
+  Ergopti runs and is not paused it always uses its own Karabiner runtime and closes a running user
+  Karabiner-Elements; paused or quit, it stops its runtime and restarts the user's Karabiner only if it
+  closed it (a persisted marker, so a crash or forced quit still restores it). No Tap-Hold or other
+  feature switch takes part; the default-on consent row « close other Karabiner apps while Ergopti is
+  running » stays. The shared-mode merge into the user's `karabiner.json` is retired.
 - **Maintainer workflow**: partial work is delivered into dev after the feasible container or CI
   work, with native or device gaps documented here rather than holding a branch.
 
@@ -1256,6 +1284,13 @@ not open software work.
 Each names the default kept meanwhile. Answer here; the agent then moves the decision into the item
 or under "Decided, do not re-raise".
 
+- **Owned runtimes on macOS and Linux: one decision per row of `docs/design/owned-runtimes.md`.** The proposals
+  are written there (sections 3, 4, 7): Linux `sqlite3` and `openssl` CLI (PIN, or the libsqlite3 FFI path and a
+  Lua primitive), `curl` (PIN or SYS), `tar --zstd` (PIN a decoder or repack), `python3` for the XKB install (PIN
+  the managed Python or port to Lua), the desktop tools (`xdotool`, `wmctrl`, `zenity`, screenshot and clipboard
+  tools: OPT), the base utilities on both OS (SYS); macOS `/usr/bin/python3` helpers (PIN on the managed
+  Python); and whether the rows become a machine-readable `_shared/data/owned_runtimes.json`. Kept meanwhile:
+  every tool as it is used today; a new spawn needs a row (the inventory test).
 - **"Sticky" in French and Latin-script locales.** The sticky-modifier labels keep the English
   "Sticky", like the `menu.tapholds.sticky_*` strings. Use a French term such as « rémanent »?
 - **Dutch "Rolls".** `category.rolls` and `hs_config.cat_rolls` keep "Rolls" (Dutch "Rollen" means

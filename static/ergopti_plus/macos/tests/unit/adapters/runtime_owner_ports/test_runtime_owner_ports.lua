@@ -98,6 +98,6 @@ helpers.describe("owned runtime ports", function()
 		load_ports(function() return 0, "" end)
 		local Ports = package.loaded["adapters.runtime_owner_ports"]
 		helpers.assert_eq(Ports.virtual_hid_version(), "8.5.0")
-		helpers.assert_eq(Ports.unpinned_count(), 6)
+		helpers.assert_eq(Ports.unpinned_count(), 5)
 	end)
 end)

@@ -52,6 +52,10 @@ jobs:
   publication-plan:
     name: 'Verify all lanes and original plan'
     runs-on: ubuntu-latest
+    # Reading the run's own jobs for the timing summary needs actions: read.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       release: ${{ steps.plan.outputs.release }}
       version: ${{ steps.plan.outputs.version }}
@@ -67,6 +71,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: '.node-version'
+
+      # Every lane has finished here, so the run's per-step elapsed times are
+      # known; written before the verdict so a red verdict keeps them too.
+      - name: Summarize where the run's time went
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/ci/run-timing.cjs --step-summary
 
       - name: Download the original validated plan
         uses: actions/download-artifact@v4

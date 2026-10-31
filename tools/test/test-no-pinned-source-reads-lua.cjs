@@ -90,7 +90,10 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //                    baseline stayed at 32, and the eight new reads (five files)
 //                    became read_driver_unit(symbol) or a contract taking a source
 //                    reader; the slack is closed so the next pin cannot land.)
-const BASELINE = 27;
+//           27 → 24 (2026-10-31: the app launcher quoting and clipboard round
+//                    trip tests became behaviour tests; the i18n placeholder test
+//                    loads its module by name.)
+const BASELINE = 24;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -126,7 +129,8 @@ const BASELINE = 27;
 //              served both the driver tree and _shared/, so it would have had to
 //              take a selector at three call sites and a path at the fourth;
 //              splitting it in two let the fixer take the driver half.)
-const READ_BASELINE = 75;
+//       75 → 70 (2026-10-31: the three files of the file baseline's 27 → 24.)
+const READ_BASELINE = 70;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).

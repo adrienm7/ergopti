@@ -356,3 +356,64 @@ helpers.describe("owned runtime owner: results that arrive late", function()
 		helpers.assert_eq(owner.start({ close_other_instances = true }), false)
 	end)
 end)
+
+
+
+
+
+-- ========================================
+-- ========================================
+-- ======= 6/ The First-Start Fetch =======
+-- ========================================
+-- ========================================
+
+helpers.describe("owned runtime owner: the pinned artifact is fetched first", function()
+	helpers.it("names a refused fetch and observes nothing else", function()
+		local owner, world = Fixture.load_owner(), Fixture.new_world()
+		local listings = 0
+		local listing = world.ports.system_extensions.listing
+		world.ports.system_extensions.listing = function(callback) listings = listings + 1; return listing(callback) end
+		world.ports.artifact.fetch = function(callback)
+			callback(false, "artifact_digest_mismatch", "the download digest is not the pin")
+		end
+		owner.init(world.ports)
+		local admitted, reason, explanation = admit(owner)
+		helpers.assert_eq(admitted, false)
+		helpers.assert_eq(reason, "artifact_fetch_failed")
+		helpers.assert_contains(explanation, "artifact_digest_mismatch")
+		helpers.assert_eq(listings, 0)
+		helpers.assert_eq(world.calls.close, 0)
+	end)
+
+	helpers.it("admits after a fetch and names the waiting payload when the install is missing", function()
+		local KePaths = require("platform.remap.ke_paths")
+		local owner, world = Fixture.load_owner(), Fixture.new_world()
+		local fetched = 0
+		world.ports.artifact.fetch = function(callback)
+			fetched = fetched + 1
+			callback(true, "/home/user/Library/Application Support/ErgoptiPlus/RemapRuntime/1/payload")
+		end
+		owner.init(world.ports)
+		helpers.assert_eq((admit(owner)), true)
+		helpers.assert_eq(fetched, 1)
+		owner.stop()
+		world.files[KePaths.OWNED.CORE_SERVICE] = nil
+		local admitted, reason, explanation = admit(owner)
+		helpers.assert_eq(admitted, false)
+		helpers.assert_eq(reason, "runtime_not_installed")
+		helpers.assert_contains(explanation, "RemapRuntime/1/payload")
+	end)
+
+	helpers.it("ignores a fetch that settles after a stop", function()
+		local owner, world = Fixture.load_owner(), Fixture.new_world()
+		local held
+		world.ports.artifact.fetch = function(callback) held = callback end
+		owner.init(world.ports)
+		local settled = false
+		helpers.assert_true(owner.start({ close_other_instances = true }, function() settled = true end))
+		owner.stop()
+		held(true, "/payload")
+		helpers.assert_eq(settled, false)
+		helpers.assert_eq(owner.status().state, "stopped")
+	end)
+end)
