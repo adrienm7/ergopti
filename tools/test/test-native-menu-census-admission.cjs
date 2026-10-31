@@ -379,7 +379,7 @@ try {
 		'empty-compiled'
 	]) {
 		retiredFixture();
-		if (damaged === 'missing-features') fs.rmSync(path.join(fixture, features));
+		if (damaged === 'missing-features') fs.rmSync(path.join(fixture, menuSource));
 		if (damaged === 'empty-features') write(menuSource, '');
 		if (damaged === 'comment-only-features') write(menuSource, '# no declarations\n');
 		if (damaged === 'missing-compiled') fs.rmSync(path.join(fixture, generated));
