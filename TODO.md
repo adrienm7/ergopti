@@ -797,6 +797,10 @@ Added October 22 (from the agents' reports; details in their commits):
 - [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible Variables/KeyHistory snapshot.
 - [ ] **L115.** [CODE] Provider error envelope guard: not reproducible under WSL LuaJIT (6 of 6 runs pass); leave it
       or close it (maintainer).
+- [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible
+      Variables/KeyHistory snapshot.
+- [ ] **L115.** [CODE] Provider error envelope guard: not reproducible under WSL LuaJIT (6 of 6
+      runs pass); leave it or close it.
 - Optional, not planned: XKB angle-name gaps and raw-input grammar (L118-L120); concurrent JSON
   backup replacement (L52, L60); ALSA fallback (L63); multi-group XKB recovery (L100); a real
   `Comments` exe field through a version `.res` resource.
