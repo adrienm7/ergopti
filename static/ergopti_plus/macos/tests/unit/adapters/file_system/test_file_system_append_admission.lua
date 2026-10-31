@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- Runs append() over a native metadata double and an io.open spy.
 --- @param mode string|nil hs.fs.attributes mode for the destination, nil when absent.
 --- @return boolean result, integer opens, table errors
-local function append_to(mode)
+local function append_to(mode, on_error)
 	local previous_hs, previous_open = _G.hs, io.open
 	local result, opens, errors = nil, 0, {}
 	local ok, failure = xpcall(function()
@@ -37,7 +37,7 @@ local function append_to(mode)
 				function file:close() return true end
 				return file
 			end
-			result = adapter.append("/virtual/destination", "line\n")
+			result = adapter.append("/virtual/destination", "line\n", on_error)
 			io.open = previous_open
 		end)
 	end, debug.traceback)
@@ -68,5 +68,16 @@ helpers.describe("FileSystem append admits only regular files (append-regular-fi
 		local result, opens = append_to(nil)
 		helpers.assert_eq(result, true)
 		helpers.assert_eq(opens, 1)
+	end)
+
+	-- 2026-10-31: the field run's FIFO check provokes this refusal on purpose,
+	-- and each run logged it as an ERROR of the session (append-expected-refusal).
+	helpers.it("hands the refusal to a caller that expects it instead of logging it (append-expected-refusal)", function()
+		local categories = {}
+		local result, opens, errors = append_to("named pipe", function(category) categories[#categories + 1] = category end)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(opens, 0)
+		helpers.assert_eq(#errors, 0, "an expected refusal is not an ERROR line")
+		helpers.assert_eq(categories, { "append" })
 	end)
 end)
