@@ -12,9 +12,9 @@ final class OwnedRuntimeInstallOwner {
 	}
 	// Fixed native product identity, rather than selectable paths or application defaults.
 	private static let products = [
-		Product(path: "ErgoptiPlus-Remap-Core.app", identifier: "com.ergoptiplus.remap.core", executableRelative: "Contents/MacOS/ErgoptiPlus-Remap-Core"),
-		Product(path: "ErgoptiPlus-Remap-Console.app", identifier: "com.ergoptiplus.remap.console", executableRelative: "Contents/MacOS/ErgoptiPlus-Remap-Console"),
-		Product(path: "bin/ergoptiplus_remap_cli", identifier: "com.ergoptiplus.remap.cli", executableRelative: nil)
+		Product(path: "ErgoptiPlus-Remap-Core.app", identifier: Identifiers.SigningIds.remapCore, executableRelative: "Contents/MacOS/ErgoptiPlus-Remap-Core"),
+		Product(path: "ErgoptiPlus-Remap-Console.app", identifier: Identifiers.SigningIds.remapConsole, executableRelative: "Contents/MacOS/ErgoptiPlus-Remap-Console"),
+		Product(path: "bin/ergoptiplus_remap_cli", identifier: Identifiers.SigningIds.remapCli, executableRelative: nil)
 	]
 	private static let parent = URL(fileURLWithPath: "/Library/Application Support/ErgoptiPlus", isDirectory: true)
 	private let lock = NSLock()
@@ -36,12 +36,12 @@ final class OwnedRuntimeInstallOwner {
 
 	/// No caller arguments: only an already administrator-staged launcher can acquire installation custody.
 	static func acquire() -> OwnedRuntimeInstallOwner? {
-		guard geteuid() == 0, getuid() == 0, Bundle.main.bundleIdentifier == "com.ergoptiplus.app.runtime-installer",
+		guard geteuid() == 0, getuid() == 0, Bundle.main.bundleIdentifier == Identifiers.SigningIds.runtimeInstaller,
 			Bundle.main.bundleURL.pathExtension == "app", let resources = Bundle.main.resourceURL else { return nil }
 		guard let publisher = OwnedRuntimePublisherIdentity.currentStagedInstaller() else { return nil }
 		var principal: SecCode?
 		guard SecCodeCopySelf([], &principal) == errSecSuccess, let principal,
-			let leaf = signingLeaf(principal: principal, identifier: "com.ergoptiplus.app.runtime-installer"), publisher.current(), leaf == publisher.leaf else { return nil }
+			let leaf = signingLeaf(principal: principal, identifier: Identifiers.SigningIds.runtimeInstaller), publisher.current(), leaf == publisher.leaf else { return nil }
 		do {
 			let helper = try OwnedRuntimeInstallTree(root: Bundle.main.bundleURL, protected: true)
 			let payload = resources.appendingPathComponent("OwnedRuntime", isDirectory: true)
@@ -80,7 +80,7 @@ final class OwnedRuntimeInstallOwner {
 		}
 	}
 	static func validateSignedInstallerForBuild(at helper: URL, leaf: Data) throws {
-		let identifier = "com.ergoptiplus.app.runtime-installer"
+		let identifier = Identifiers.SigningIds.runtimeInstaller
 		guard helper.pathExtension == "app", Set(try FileManager.default.contentsOfDirectory(atPath: helper.path)) == ["Contents"] else {
 			throw OwnedRuntimeInstallFailure.signature
 		}
@@ -125,7 +125,7 @@ final class OwnedRuntimeInstallOwner {
 	}
 	/// The fixed native module has its own exact bundle file type and signed role, never an executable grant.
 	static func validateSignedInstalledSourceForBuild(at module: URL, leaf: Data) throws {
-		let identifier = "com.ergoptiplus.app.installed-physical-source"
+		let identifier = Identifiers.SigningIds.installedPhysicalSource
 		guard module.lastPathComponent == "installed_physical_source.so" else { throw OwnedRuntimeInstallFailure.signature }
 		let parent = try OwnedRuntimeInstallTree(root: module.deletingLastPathComponent(), protected: false)
 		try parent.verify()
@@ -226,7 +226,7 @@ final class OwnedRuntimeInstallOwner {
 		lock.lock(); defer { lock.unlock() }
 		guard state == .held, staging == nil else { throw OwnedRuntimeInstallFailure.destination }
 		do {
-			guard publisher.current(), Self.signingLeaf(principal: principal, identifier: "com.ergoptiplus.app.runtime-installer") == leaf else { throw OwnedRuntimeInstallFailure.principal }
+			guard publisher.current(), Self.signingLeaf(principal: principal, identifier: Identifiers.SigningIds.runtimeInstaller) == leaf else { throw OwnedRuntimeInstallFailure.principal }
 			try helper.verify(); try source.verify()
 			// Parent provisioning and administrative authorization remain separate explicit installer work.
 			let parent = try OwnedRuntimeInstallTree(root: Self.parent, protected: true, includeChildren: false)
@@ -241,7 +241,7 @@ final class OwnedRuntimeInstallOwner {
 				throw OwnedRuntimeInstallFailure.destination
 			}
 			errno = 0
-			guard fstatat(daemonDescriptor, "com.ergoptiplus.runtime.core.plist", &existing, AT_SYMLINK_NOFOLLOW) == -1,
+			guard fstatat(daemonDescriptor, Identifiers.ServiceLabels.macosCore + ".plist", &existing, AT_SYMLINK_NOFOLLOW) == -1,
 				errno == ENOENT else { throw OwnedRuntimeInstallFailure.destination }
 			let stage = Self.parent.appendingPathComponent(".runtime-install-" + UUID().uuidString, isDirectory: true)
 			let journal = Self.parent.appendingPathComponent(".runtime-install-journal")
@@ -260,7 +260,7 @@ final class OwnedRuntimeInstallOwner {
 			try parent.verifyAnchor()
 			let protectedStage = try OwnedRuntimeInstallTree(root: stage, protected: true)
 			try protectedStage.verify()
-			guard publisher.current(), Self.signingLeaf(principal: principal, identifier: "com.ergoptiplus.app.runtime-installer") == leaf else { throw OwnedRuntimeInstallFailure.principal }
+			guard publisher.current(), Self.signingLeaf(principal: principal, identifier: Identifiers.SigningIds.runtimeInstaller) == leaf else { throw OwnedRuntimeInstallFailure.principal }
 			guard let scratch else { throw OwnedRuntimeInstallFailure.cleanupPending }
 			try scratch.publishRuntime(); filesPublished = true
 			let installed = try OwnedRuntimeInstallTree(root: destination, protected: true)
@@ -290,7 +290,7 @@ final class OwnedRuntimeInstallOwner {
 		lock.lock(); defer { lock.unlock() }
 		guard state == .cleanupPending, !filesPublished, let scratch, let descriptor = journalDescriptor,
 			let parent = installParent, let parentDescriptor = installParentDescriptor,
-			publisher.current(), Self.signingLeaf(principal: principal, identifier: "com.ergoptiplus.app.runtime-installer") == leaf else { return false }
+			publisher.current(), Self.signingLeaf(principal: principal, identifier: Identifiers.SigningIds.runtimeInstaller) == leaf else { return false }
 		do { try helper.verify(); try parent.verifyAnchor() } catch { return false }
 		guard scratch.retire() else { return false }
 		let journal = Self.parent.appendingPathComponent(".runtime-install-journal")
