@@ -1031,13 +1031,19 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		end,
 	}
 	-- Each step names itself in the reload breadcrumb before it runs, so a step
-	-- that loses the app is the trail's last line.
+	-- that loses the app is the trail's last line, and names a refusal after it:
+	-- the logged refusal is queued and was lost with both 2026-10-31 reloads.
 	for _, step in ipairs(steps) do
 		local run, stage = step.run, "step_" .. step.name
 		step.run = function()
 			-- A diagnostic never fails a step, even before its owner is wired
 			pcall(function() return ReloadBreadcrumb.record(termination_kind, stage) end)
-			return run()
+			local results = table.pack(xpcall(run, debug.traceback))
+			if results[1] ~= true or results[2] == false then
+				pcall(function() return ReloadBreadcrumb.record(termination_kind, "failed_" .. stage) end)
+			end
+			if results[1] ~= true then error(results[2], 0) end
+			return table.unpack(results, 2, results.n)
 		end
 	end
 	-- The logger pump is intentionally NOT finalized here. The coordinator first
