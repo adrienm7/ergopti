@@ -186,26 +186,41 @@ PATTERNS = (
         ),
         "ms",
     ),
-    # LLM: per backend, from the module (llm.api_remote -> remote) or the line.
+    # LLM: llm.local:<backend> and llm.remote:<provider> carry the budgets of
+    # their kind; a parse time (macOS) names the module's backend.
     (
-        "llm.request:",
+        "llm.parsed:",
         re.compile(r"^\[[^\]]+\] #\d+ PARSED -> \d+ result\(s\) in (?P<ms>\d+) ?ms"),
         "ms",
     ),
     (
-        "llm.request:",
+        "llm.remote:",
+        re.compile(r"^(?:\w+ )?answer of provider '(?P<name>[^']+)' received in (?P<ms>\d+) ?ms"),
+        "ms",
+    ),
+    (
+        "llm.local:",
+        re.compile(r"^(?:\w+ )?answer of the local server received in (?P<ms>\d+) ?ms"),
+        "ms",
+    ),
+    # Windows: kind, provider and family in one line (llm_request_latency.ahk).
+    (
+        "llm.",
         re.compile(
-            r"^(?:\w+ )?answer of (?:provider '(?P<name>[^']+)'|the local server) received in (?P<ms>\d+) ?ms"
+            r"^LLM request: kind=(?P<kind>local|remote) provider=(?P<name>[a-z0-9_.:-]+) "
+            r"family=[a-z0-9_.:-]+ outcome=ok in (?P<ms>\d+) ms\.$"
         ),
         "ms",
     ),
     ("llm.stream", re.compile(r"^\d+ prediction\(s\) received in (?P<ms>\d+) ?ms from '"), "ms"),
     ("llm.ttft", re.compile(r"^TTFT captured: (?P<ms>\d+(?:\.\d+)?) ms"), "ms"),
     (
-        "llm.request:",
+        "llm.remote:completion",
         re.compile(r"^Remote completion received \(\d+ chars in (?P<ms>\d+) ms\)"),
         "ms",
     ),
+    # macOS: the reload this boot follows, measured by the driver itself.
+    ("reload.total", re.compile(r"^Reload completed in (?P<ms>\d+) ms"), "ms"),
     (
         "llm.timeout:",
         re.compile(r"^(?:curl request|Streaming) timed out after (?P<ms>\d+) ms"),
@@ -239,6 +254,8 @@ FIELD_CHECK = re.compile(r"\bcheck=(?P<id>[a-z0-9_]+) verdict=(?P<verdict>[a-z_]
 RELOAD_REQUEST = re.compile(
     r"^(?:Controlled )?[Rr]eload requested\b(?! \u2014 re-scanning)|^Reloading\b"
 )
+# The overrun warning every driver writes (_shared/lua/perf_budget.lua).
+OVER_BUDGET = re.compile(r"^Over budget: [\w.:-]+ took \d+ ms \(budget \d+ ms\)\.$")
 LEASE_TOTALS = re.compile(r"(?P<count>\d+) Karabiner lease failure\(s\)")
 
 # Lifecycle: (category, regex on the body, minimum level or None). One record
@@ -318,10 +335,35 @@ LEVEL_RANK = {
 # ======= 2/ Budgets ========================
 # ===========================================
 
+
 # Every budget is read from the code that declares it: (metric prefix, source
 # path, pattern whose first group is the value in ms, inclusive). Inclusive
 # when the driver reports the event from the value on (>=), not past it (>).
+def toml_key(section, key):
+    """Returns the pattern of one key of one section of a TOML declaration.
+
+    Args:
+        section: The section name.
+        key: The key.
+
+    Returns:
+        A pattern whose first group is the key's number.
+    """
+    return r"(?ms)^\[{}\]\s*$(?:(?!^\[).)*?^{}\s*=\s*(\d+(?:\.\d+)?)".format(
+        re.escape(section), re.escape(key)
+    )
+
+
+TIMINGS = "static/ergopti_plus/_shared/modules/timings/constants.toml"
+# A prefix ending with ":" covers every metric of that family.
 BUDGETS = (
+    ("boot.total", TIMINGS, toml_key("budgets", "boot_total_ms"), False),
+    ("reload.total", TIMINGS, toml_key("budgets", "driver_reload_ms"), False),
+    ("reload.request_to_boot", TIMINGS, toml_key("budgets", "driver_reload_ms"), False),
+    ("menu.rebuild", TIMINGS, toml_key("budgets", "menu_rebuild_ms"), False),
+    ("llm.local:", TIMINGS, toml_key("budgets", "llm_local_request_ms"), False),
+    ("llm.remote:", TIMINGS, toml_key("budgets", "llm_remote_request_ms"), False),
+    ("llm.ttft", TIMINGS, toml_key("budgets", "prediction_display_ms"), False),
     (
         "hotpath:",
         "static/ergopti_plus/_shared/modules/timings/constants.toml",
@@ -423,7 +465,9 @@ def budget_for(metric, budgets, segments):
             return {"value": value, "source": source, "inclusive": inclusive}
         return None
     for prefix, (value, source, inclusive) in budgets.items():
-        if prefix != "hotpath:" and metric == prefix:
+        if prefix == "hotpath:":
+            continue
+        if metric == prefix or (prefix.endswith(":") and metric.startswith(prefix)):
             return {"value": value, "source": source, "inclusive": inclusive}
     return None
 
@@ -497,7 +541,9 @@ def measures(record):
             continue
         seen.add(metric)
         name = match.groupdict().get("name")
-        if metric.endswith(":"):
+        if match.groupdict().get("kind"):
+            metric = "llm.{}:{}".format(match.group("kind"), name)
+        elif metric.endswith(":"):
             if metric.startswith("llm."):
                 suffix = name or backend_of(record["module"])
             else:
@@ -762,6 +808,9 @@ class Analysis:
             return
         key = self._group(item, template_of(body), 1, time, time)
         self.last_group = key
+        # A driver's own overrun warning is ranked through its measure, once.
+        if key and OVER_BUDGET.match(body):
+            self.perf_groups.add(key)
         for measure in measures(item):
             self.samples.setdefault(measure["metric"], []).append(
                 {
@@ -809,7 +858,7 @@ class Analysis:
         elif body.startswith("Boot complete in ") and self.reload_pending is not None:
             seconds = seconds_between(self.reload_pending, time)
             if seconds is not None:
-                self.samples.setdefault("reload.total", []).append(
+                self.samples.setdefault("reload.request_to_boot", []).append(
                     {
                         "value": seconds * 1000.0,
                         "time": self.reload_pending,

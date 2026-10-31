@@ -36,7 +36,7 @@ _CUK_RetiredRootVector(Kind, WithRootNeighbors := true) {
 		. "[_future]`nflag = false`nzero = 0`nvalues = [1, 2]`nempty = []`n"
 		. "stamp = 2026-10-05T10:20:30Z`n" . '"literal.dot" = "keep" # exact future comment' . "`n"
 	return Map("source", Root . Source . Tables,
-		"expected", Chr(0xFEFF) . Root . "# retired " . Kind . " root`n`n" . Tables)
+		"expected", Root . "# retired " . Kind . " root`n`n" . Tables)
 }
 
 _CUK_RetiredRootTypedNeighbors(Document) {
@@ -103,6 +103,24 @@ Test("config cleanup: privately captured inline namespace uses actual verified p
 	_CUK_RetiredRootActualCleanup.Bind("inline"))
 Test("config cleanup: privately captured table-array root removes all exact generations (config-retired-root)",
 	_CUK_RetiredRootActualCleanup.Bind("array"))
+
+; The whole-root cut has its own rendering path, so it carries the same rule.
+_CUK_RetiredRootKeepsSourceBom() {
+	Folder := _CUK_RetiredNewDir(), Path := Folder . "\config.toml"
+	Vector := _CUK_RetiredRootVector("dotted")
+	Source := Chr(0xFEFF) . Vector["source"]
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual(1, Rows.Length)
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000301", 0, 0, Source)
+		AssertEqual("removed", Result["status"])
+		AssertEqual(Chr(0xFEFF) . Vector["expected"], FSReadUtf8Exact(Path), "a source with a byte order mark keeps it")
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: a removed retired root leaves a source's byte order mark in place (config-retired-root)",
+	_CUK_RetiredRootKeepsSourceBom)
 
 _CUK_RetiredRootPrivatePage() {
 	Folder := _CUK_RetiredNewDir(), Path := Folder . "\config.toml"

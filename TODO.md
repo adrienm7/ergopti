@@ -255,8 +255,35 @@ into its item below or into the matching existing item.
       Windows step `collector_checks`, macOS `macos-field-shell-checks.sh`) and the last run of each tray
       check clicked today (runs and failures counted). Left [PHYS-W] [PHYS-L]: one real run of each
       collector; the Windows runtime layer of `test-windows-field-report-contract.cjs` runs only where pwsh
-      is installed. The Linux and Windows tray checks still need a click: their drivers have no request
-      protocol like the macOS field run, so a collector cannot run them without the user.
+      is installed.
+- [ ] **Windows field run without a click.** [CODE] [PHYS-W] Done: the shared protocol
+      `_shared/data/field_run_protocol.json` (files, verdicts, refusal reasons, identifiers, required keys;
+      the macOS declaration is pinned to it) and its Windows side: `infra/field_run.ahk`, started in
+      developer source mode only, runs `windows/data/field_run_steps.json` (boot cost against [budgets]
+      boot_total_ms, the network check, the composer check) without their windows; the collector writes the
+      request, waits for done, copies `field_run/` and writes `field_run_checks.txt`, which the analysis
+      marks, and skips with a verdict line when no developer driver of the clone is ready. Left [PHYS-W]:
+      AutoHotkey never ran this code (written without Windows): start `tools/dev/run-windows-dev.ps1`, run
+      the collector, and check that the three results and done.json arrive; then run the AHK suite and
+      parse. The Linux side is the Linux worker's (`fix/linux-input-config-2`).
+      is installed. Linux no longer needs a click (branch `fix/linux-input-config-2`): the daemon owns the
+      macOS field run's protocol (`linux/infra/field_run.lua`, `linux/data/field_run.json`, the same file
+      names, verdicts and reasons, pinned against macOS by a test) and runs its composer and network checks
+      headless; `tools/dev/linux-field-run.sh` sends the request from the collector and prints a mark per
+      step (`tests/hardware/run_field_run_live.lua`, CI step "Run the field checks without a click"). The
+      Windows tray checks still need a click (another worker owns that side and the shared declaration;
+      the Linux side moves onto it if its names differ).
+      is installed. Linux no longer needs a click (branch `fix/linux-input-config-3`): the daemon reads the
+      shared protocol `_shared/data/field_run_protocol.json` (file names, verdicts, reasons, identifier
+      and code rules, folders, the keys of each document) and only its steps from
+      `linux/data/field_run_steps.json` (`linux/infra/field_run.lua`), and runs its composer and network
+      checks headless; `tools/dev/linux-field-run.sh` sends the request from the collector, to the clone's
+      folder first, then the installed one, and prints a mark per step
+      (`tests/hardware/run_field_run_live.lua`, CI step "Run the field checks without a click"). The
+      Windows tray checks still need a click (another worker owns that side). Open in the shared
+      declaration: `step_kinds` has no `guard`, the kind macOS and Linux write for `config_guard`, and
+      `documents.refused` lists `request_id`, which both drivers leave out for a request without a valid
+      one.
 - [ ] **Field log analysis.** [CODE] Done: `tools/dev/field-log-analyse.py` (Python 3.8, stdlib) runs at the end
       of every collector on the scrubbed day logs only and writes `analysis.md` and `analysis.json` at the top
       of the report: errors and warnings grouped by module and template with first and last time, an example
@@ -269,10 +296,15 @@ into its item below or into the matching existing item.
       `SLOW_SAVE_REPORT_MS`, ingest `REPORT_THRESHOLD_MS`, or the budget the line states); lifecycle events;
       and a ranked top 10. One vector per driver spelling
       (`tools/test/fixtures/field-log-analyse/vectors.json`) fails the test when a source stops writing a
-      template it reads. Left: no budget is declared for boot, reload, menu rebuild, LLM latency or the
-      tooltip display, so those say "no budget declared" until the code declares one; the Windows driver
-      logs no per-request LLM latency (only timeouts); `tools/test/features/test-infrastructure/suite.json`
-      on dev lists ordinal 537 before 485 (0ba0e905), which stops `npm run test:js` before any check.
+      template it reads. The `[budgets]` section of `_shared/modules/timings/constants.toml` now declares boot,
+      reload, menu rebuild, local and remote AI request and prediction display budgets from the measured
+      macOS logs; the driver that takes each measure writes "Over budget: <what> took N ms (budget B ms)."
+      (`_shared/lua/perf_budget.lua`, `windows/infra/perf_budget.ahk`), and Windows writes one
+      `LLM request: kind= provider= family= outcome= in N ms.` line per prediction
+      (`modules/llm/llm_request_latency.ahk`). Left [PHYS-M] [PHYS-L] [PHYS-W]: the Lua and AHK suites
+      did not run where this was written (no Lua or AutoHotkey there): run `npm run test:hs`, `test:linux`
+      and the AHK suite; the Linux driver measures no reload or menu rebuild yet, the Windows one no menu
+      rebuild, so those budgets are judged on macOS only.
 - [ ] **macOS field holds of 2026-10-30 (worker `perf/macos-field-holds`).** [CODE] [PHYS-M] From the field
       report `mac-2026-10-30_210120` (141 holds over 250 ms). Done: the unjournaled-ledger admission scans data.sql
       with native finds (17 s hold, append prepare=17225 ms; about 15x faster); the personal-row alias check of a
@@ -1493,8 +1525,11 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       once `run_all.ahk` is clean. The Linux reload as a daemon restart with the TTL-bound pending
       record is in (docs/design/driver-control-pending-record.md) and is now proven across real
       processes on the relay path (`tests/hardware/run_reload_restart_live.lua`, CI step "Restart
-      the daemon through the local reload control"); left for it: a restart through the systemd
-      user unit on a real session [PHYS-L].
+      the daemon through the local reload control") and on the systemd unit path
+      (`tests/hardware/run_reload_restart_systemd.lua`: a real cgroup named after the unit, the exact
+      `systemctl --user --no-block restart`, the successor completing the record, with a stand-in for the
+      user manager this container cannot run; not a CI step). Left for it: one restart under a real
+      user manager on a real session [PHYS-L].
 - [ ] **Linux CI installs packages inside short test steps.** [CI] 18 steps moved and skipped when the
       suite is deferred (c52cb916a7, 285d3363a1); `Qualify three actual XI2 property cookies` and
       `The whole daemon, live` already had their install steps; the LuaJIT XI2 qualification, the

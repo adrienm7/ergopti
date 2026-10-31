@@ -79,7 +79,9 @@ local function manifest_rows()
 		"menu_manifest.json must have an 'llm_menu' array")
 	local rows = {}
 	for _, row in ipairs(data.llm_menu) do
-		if type(row) == "table" and (row.type == "dynamic" or row.type == "group") then
+		-- The settings rows are the ones declaring a greying policy, whatever their
+		-- type: the model and profile rows are `list` rows since 2026-10-31.
+		if type(row) == "table" and type(row.disabled_when_off) == "boolean" then
 			local visible = true
 			if type(row.platforms) == "table" then
 				visible = false
@@ -180,9 +182,17 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 		local src = read_source("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
 		helpers.assert_true(src:find('ManifestMenu%.build%("llm_menu"') ~= nil,
 			"init.lua must build this menu through the shared renderer")
-		helpers.assert_true(src:find("MenuLayout%.row_ids%(%)") ~= nil,
-			"init.lua must register one handler per DECLARED row, taken from the manifest — " ..
-			"a hardcoded id list here would be a fourth copy of the row set")
+		-- The settings rows that are not groups are declared `list` rows: init.lua
+		-- supplies their DATA under the declared id and hands the renderer no
+		-- handler table, so no row is placed by platform code.
+		for _, row in ipairs(manifest_rows()) do
+			if row.type == "list" then
+				helpers.assert_true(src:find("list_providers%." .. row.id .. "%s*=%s*function") ~= nil,
+					"init.lua must supply the declared list row '" .. row.id .. "' as provider DATA")
+			end
+		end
+		helpers.assert_true(src:find('ManifestMenu%.build%("llm_menu", "LLM", nil, group_builders') ~= nil,
+			"init.lua must pass the renderer no dynamic handler table — the row type is retired")
 		-- The rows used to be appended to the menu as they were built, which is why
 		-- the model row sat ninth here and second on Windows from one shared spec.
 		helpers.assert_true(src:find("table%.insert%(main_menu") == nil,
@@ -217,7 +227,7 @@ helpers.describe("shared fixed LLM group declarations", function()
 				helpers.assert_eq(row.health_dot, nil)
 				additional_groups = additional_groups + 1
 			else
-				helpers.assert_eq(row.type, "dynamic", "all other native parent contracts retain their existing shape")
+				helpers.assert_eq(row.type, "list", "the model and profile rows are list rows whose providers supply DATA")
 			end
 		end
 		helpers.assert_eq(count, 3)

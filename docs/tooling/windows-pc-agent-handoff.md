@@ -81,3 +81,60 @@ only by static and JS tests. Once it lands on `dev`:
   them through `_shared/lua/diagnostics/private_label.lua` (placeholder pinned
   to `redaction.json` `config_name_placeholder`); Windows needs an AHK twin and
   a meta test.
+
+## Field report analysis, budgets and field run: written without AutoHotkey
+
+Branch `feat/field-report-analysis-3` (171d233f76, 33c3091d9b and the protocol
+fix after them). Nothing below ever ran under AutoHotkey or `pwsh`; the JS and
+meta tests pin names, not behaviour. Run, in order:
+
+1. Parse and the full AHK suite: `infra/perf_budget.ahk`,
+   `modules/llm/llm_request_latency.ahk` (included by `prediction_exec.ahk`,
+   which the LLM suites load), `infra/field_run.ahk`, and the edits in
+   `ErgoptiPlus.ahk` (boot budget, field run start) and `infra/lifecycle.ahk`
+   (field run stop).
+2. A prediction with Ollama and one with an API provider: the log carries
+   `LLM request: kind=local|remote provider=… family=… outcome=ok in N ms.`,
+   and `Over budget: llm.… took …` only past `[budgets]`.
+3. Start `tools/dev/run-windows-dev.ps1`; the log shows `Developer field run
+ready (3 step(s)).` and `build/field-run/ready.json` names the driver's pid.
+4. Run `collect-windows-field-report.ps1` (Windows PowerShell 5.1, then
+   `pwsh`): `field_run/` holds `accepted.json`, `01_field_boot_cost.json`,
+   `02_field_network.json`, `03_field_composer.json` and `done.json`;
+   `field_run_checks.txt` has three `check=` lines; `analysis.md` marks them.
+   No window opens and nothing asks for a key.
+5. Refusals: a `request.json` with `"steps":["nope"]` gets `refused.json` with
+   `unknown_step`; a second request while one runs gets `busy`; the same
+   `request_id` twice gets `duplicate_request`.
+6. Reload the developer driver during step 3 of a run: the next start writes
+   `done.json` with `"interrupted":true` for that run.
+7. Run `test-windows-field-report-contract.cjs` with `pwsh` installed: its
+   runtime layer expects the `no_ready_driver` skip line in a fixture clone.
+
+- Branch `feat/menu-no-dynamic` (retired `dynamic` menu rows) changed
+  `windows/ui/menu/menu_llm/menu_main.ahk` without running AutoHotkey: the
+  model and profile rows are now `list` rows (`LLM_Menu_BuildSubmenu` passes
+  `ListProviders` bound to `_LLM_Menu_EmitCapturedRow`, and
+  `_LLM_MenuLayout_Rows` keeps the rows that declare `disabled_when_off`), and
+  `agent_system1` / `agent_system2` are one `list` declaration for every driver
+  (no `platforms`). Run these AHK tests and fix what fails:
+  - `tests/meta/modules/llm/menu/test_llm_menu_layout_shared.ahk` (edited: row
+    filter, `list` type policy and its withdrawal messages);
+  - `tests/meta/modules/llm/menu/test_llm_menu_disabled_greyed.ahk` (edited:
+    the `MenuRenderer_Build` statement regex);
+  - `tests/unit/modules/llm/prediction/test_llm_live_mode.ahk` (edited: the
+    same regex in `_LLV_GenerationRoute`);
+  - `tests/unit/modules/llm/actions/test_llm_agent_requester.ahk` (edited: the
+    System row has no `platforms` to save and restore);
+  - unchanged but covering the edited code:
+    `tests/unit/modules/llm/menu/test_llm_menu_build_submenu.ahk`,
+    `tests/unit/ui/menu/test_manifest_menu_parent_groups.ahk`,
+    `tests/unit/modules/llm/actions/test_llm_agent_system_menu.ahk`,
+    `tests/unit/modules/llm/menu/test_llm_menu_test_prediction.ahk`,
+    `tests/meta/modules/llm/menu/test_llm_menu_build_critical.ahk`,
+    `tests/meta/modules/llm/menu/test_llm_menu_build_coordinator.ahk`,
+    `tests/meta/modules/llm/menu/test_llm_menu_caller_child_full_root.ahk`,
+    `tests/unit/ui/menu/test_manifest_menu_no_double_separator.ahk`;
+  - then the full `run_all.ahk` and `e2e/run_e2e.ahk`, and open the AI submenu
+    once: the model button, the profile submenu and both agent Systems must
+    sit where they did, with the same labels.

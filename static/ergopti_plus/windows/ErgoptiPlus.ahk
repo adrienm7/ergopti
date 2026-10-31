@@ -361,6 +361,7 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 #Include infra/error_policy.ahk
 #Include infra/error_report.ahk
 #Include infra/hotpath_profiler.ahk
+#Include infra/perf_budget.ahk
 #Include infra/registry.ahk
 #Include infra/app_state.ahk
 BootProfile_Stamp("Diagnostics and core state initialised")
@@ -673,6 +674,7 @@ BootProfile_Stamp("Module includes initialised")
 #Include infra/suspend_handoff.ahk
 ; Before boot.ahk: a developer run reads the installed build's paths.toml.
 #Include infra/dev_source.ahk
+#Include infra/field_run.ahk
 #Include infra/boot.ahk
 BootProfile_Stamp("Paths and shared configuration loaded")
 #Include infra/feature_state.ahk
@@ -1475,6 +1477,11 @@ try {
 		LoggerInfo("ErgoptiPlus", "Developer source mode; the driver runs from {1} (clone root from {2}).",
 			_DriverDir, DevSource_Resolution()["origin"])
 		DevSourceWatcher_Start(_DriverDir, ReloadPreservingSuspend)
+		; The collector's field run (infra/field_run.ahk) is optional too: the
+		; driver keeps running without it.
+		try FieldRun_Start(DevSource_Root())
+		catch as _FieldRunErr
+			LoggerError("FieldRun", "The developer field run could not start: {1}.", _FieldRunErr.Message)
 	}
 } catch as _DevSourceErr
 	LoggerError("ErgoptiPlus", "Developer source mode refused: {1}.", _DevSourceErr.Message)
@@ -1486,6 +1493,9 @@ _BootOpenStages := BootProfile_OpenStageNames()
 if (_BootOpenStages != "")
 	LoggerWarn("BootProfile", "Boot completed with unclosed stage(s): {1}.", _BootOpenStages)
 LoggerInfo("BootProfile", "Boot complete in {1} ms (since process start).", _BootTotalMs)
+try PerfBudget_Report("BootProfile", "boot", _BootTotalMs, TimingsGet("budgets", "boot_total_ms"))
+catch as _BootBudgetErr
+	LoggerError("BootProfile", "The boot could not be judged against its budget: {1}.", _BootBudgetErr.Message)
 ; Evidence, never collapsed: the per-stage table that boot-time comparisons need.
 LoggerEvidence("BootProfile", "Boot summary: total_ms={1} stage_ms: {2}.", _BootTotalMs,
 	BootProfile_StageSummary())

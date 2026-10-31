@@ -1071,12 +1071,11 @@ local function create_menu(deps)
 				local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
 				local is_disabled = (not state.llm_enabled) or paused
 				Logger.debug(LOG, string.format("Menu state: paused=%s, llm_enabled=%s, is_disabled=%s", tostring(paused), tostring(state.llm_enabled), tostring(is_disabled)))
-				-- Rows are collected under the id the manifest declares them with, and
-				-- the SHARED renderer places them. The order was the one thing the
-				-- shared spec always claimed to own and only Windows honoured: this
-				-- menu inserted its rows as it built them, so the model row sat ninth
-				-- here and second there, from one description.
-				local rows_by_id = {}
+				-- Rows are supplied as DATA under the `list` id the manifest declares
+				-- them with, and the SHARED renderer places and draws them. The order
+				-- was the one thing the shared spec always claimed to own and only
+				-- Windows honoured: this menu inserted its rows as it built them, so
+				-- the model row sat ninth here and second there, from one description.
 				local group_builders = {}
 				local list_providers = {}
 				local function child_group_for(id, children, disabled)
@@ -1112,14 +1111,6 @@ local function create_menu(deps)
 								return nil
 						end
 						return native[1]
-				end
-				local function row_for(id, row)
-						local bucket = rows_by_id[id]
-						if not bucket then
-								bucket = {}
-								rows_by_id[id] = bucket
-						end
-						bucket[#bucket + 1] = row
 				end
 
 
@@ -1231,37 +1222,35 @@ local function create_menu(deps)
 				})
 				-- An open page follows the state this rebuild publishes.
 				ModelSelectorPage.refresh()
-				row_for("llm_model", {
-						title    = rich_model_title,
+				local model_rows = { {
+						label    = rich_model_title,
 						disabled = MenuLayout.row_disabled("llm_model", is_disabled, paused),
-						fn       = function() return ModelSelectorPage.open() end,
-				})
+						action   = function() return ModelSelectorPage.open() end,
+				} }
 
 				-- Anchored to the model row it describes. It used to be inserted BEFORE
 				-- that row, because the row itself was placed further down.
 				if info and info.emojis and info.emojis:find("🧠💭") then
 						local info_rows = ManifestMenu.template_rows("llm_thinking_info", {}, {}, {})
 						if not info_rows then return {} end
-						for _, row in ipairs(ManifestMenu.render_rows(info_rows, "llm_model")) do row_for("llm_model", row) end
+						for _, row in ipairs(info_rows) do model_rows[#model_rows + 1] = row end
 				end
+				list_providers.llm_model = function() return model_rows end
 
 
 				local profiles_item = profiles_mgr.get_menu_item()
 				profiles_item.disabled = MenuLayout.row_disabled("llm_profile", is_disabled, paused)
 				-- The profile owner returns a DATA caption over completed native children.
-				-- Materialize only that parent; keep its existing child tree by identity.
+				-- The renderer materializes only that parent; `submenu` keeps the
+				-- existing child tree by identity.
 				ConfigGuard.protect(profiles_item.menu, config_reason)
-				local native_profile = ManifestMenu.render_rows({ {
+				local profile_rows = { {
 					label = profiles_item.label,
 					disabled = profiles_item.disabled or blocked_reason ~= nil or nil,
 					disabled_reason_key = blocked_reason,
 					submenu = profiles_item.menu,
-				} }, "llm_profile")
-				if #native_profile ~= 1 or not rawequal(native_profile[1].menu, profiles_item.menu) then
-					Logger.error(LOG, "Profile parent native handoff refused.")
-					return {}
-				end
-				row_for("llm_profile", native_profile[1])
+				} }
+				list_providers.llm_profile = function() return profile_rows end
 				local profile_boundary_rows = ManifestMenu.template_rows("llm_after_profile_boundary", {}, {}, {})
 				if not profile_boundary_rows then return {} end
 				list_providers.llm_after_profile_boundary = function() return profile_boundary_rows end
@@ -1955,21 +1944,6 @@ local function create_menu(deps)
 				do
 						local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 						if ok_mm and type(ManifestMenu.build) == "function" then
-								local handlers = {}
-								for _, id in ipairs(MenuLayout.row_ids()) do
-										handlers[id] = function(items)
-												local bucket = rows_by_id[id] or {}
-												-- A declared row nothing filled would render as nothing at
-												-- all, and the renderer would count it as handled — the one
-												-- failure the bijection gate cannot see from outside.
-												if #bucket == 0 then
-														Logger.warn(LOG, "Declared row '%s' has no content — nothing to place.", id)
-												end
-												for _, row in ipairs(bucket) do
-														items[#items + 1] = row
-												end
-										end
-								end
 								-- The restore alone: the AI menu's clear row was retired.
 								local render_ctx = {
 										commands      = {
@@ -2002,7 +1976,7 @@ local function create_menu(deps)
 												end,
 										},
 								}
-								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, list_providers) or {}
+								main_menu = ManifestMenu.build("llm_menu", "LLM", nil, group_builders, render_ctx, list_providers) or {}
 						else
 								Logger.error(LOG, "Manifest renderer unavailable — the IA submenu has no settings row.")
 						end
