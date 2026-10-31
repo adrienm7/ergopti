@@ -3652,6 +3652,7 @@
 	"menu.llm.backend_unknown": "अज्ञात",
 	"menu.llm.local_servers.header": "स्थानीय सर्वर (OpenAI-संगत API)",
 	"menu.llm.local_servers.none": "कोई स्थानीय सर्वर उत्तर नहीं दे रहा ({1})",
+	"menu.llm.local_servers.none_detected": "कोई स्थानीय सर्वर नहीं मिला",
 	"menu.llm.local_servers.searching": "स्थानीय सर्वर खोजे जा रहे हैं ({1})…",
 	"menu.llm.local_servers.needs_key": "{1} — API कुंजी आवश्यक",
 	"menu.llm.local_servers.no_models": "कोई मॉडल उपलब्ध नहीं",

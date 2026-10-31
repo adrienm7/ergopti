@@ -3652,6 +3652,7 @@
 	"menu.llm.backend_unknown": "Okänd",
 	"menu.llm.local_servers.header": "Lokala servrar (OpenAI-kompatibelt API)",
 	"menu.llm.local_servers.none": "Ingen lokal server svarar ({1})",
+	"menu.llm.local_servers.none_detected": "Ingen lokal server hittades",
 	"menu.llm.local_servers.searching": "Söker efter lokala servrar ({1})…",
 	"menu.llm.local_servers.needs_key": "{1} — API-nyckel krävs",
 	"menu.llm.local_servers.no_models": "Ingen modell tillgänglig",

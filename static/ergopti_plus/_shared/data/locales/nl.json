@@ -3652,6 +3652,7 @@
 	"menu.llm.backend_unknown": "Onbekend",
 	"menu.llm.local_servers.header": "Lokale servers (OpenAI-compatibele API)",
 	"menu.llm.local_servers.none": "Geen lokale server antwoordt ({1})",
+	"menu.llm.local_servers.none_detected": "Geen lokale server gedetecteerd",
 	"menu.llm.local_servers.searching": "Zoeken naar lokale servers ({1})…",
 	"menu.llm.local_servers.needs_key": "{1} — API-sleutel vereist",
 	"menu.llm.local_servers.no_models": "Geen model beschikbaar",
