@@ -649,7 +649,6 @@ Added October 22 (from the agents' reports; details in their commits):
       bound to a key position on one device). The Linux media-key metrics, the device identity's first consumer
       (item 97), count a key and bind nothing, so they need none of these joins; they are owed only once a per-device
       binding is designed.
-- Optional, not planned: XKB angle-name gaps and raw-input grammar (L118-L120); multi-group XKB recovery (L100).
 
 ## Maintainer checks
 

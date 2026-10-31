@@ -122,6 +122,24 @@ class RegistryConversionTests(unittest.TestCase):
             self.assertIn('xkb_symbols "%s"' % entry["id"], result.symbols_text)
             self.assertTrue(result.compose_text.startswith('include "%L"'), entry["id"])
             self.assertEqual(result.conflicts, [], entry["id"])
+            self.assertEqual(result.unplaced, [], entry["id"])
+
+    def test_a_key_the_keycode_table_cannot_place_is_reported(self):
+        """A JIS key (macOS 93 Yen, 94 underscore) has no XKB name in the table."""
+        text = registry_keylayout("ergol")
+        index0 = text.index('<keyMap index="0">') + len('<keyMap index="0">')
+        extra = (
+            '<key code="93" output="&#x00A5;"/><key code="94" action="a"/>'
+            '<key code="82" output="0"/><key code="95" output="&#x0001;"/>'
+        )
+        result = keylayout_to_xkb.convert(
+            text[:index0] + extra + text[index0:],
+            keylayout_to_xkb.load_keycodes(KEYCODES_PATH, "ansi"),
+            "probe",
+            "Probe",
+        )
+        # The keypad key (82) is XKB's own, and a control output types nothing.
+        self.assertEqual(result.unplaced, [93, 94])
 
     def test_every_dead_key_output_is_composed_from_the_keysym_its_key_sends(self):
         """Inside a dead state a key sends its own keysym, a dead key its trigger.

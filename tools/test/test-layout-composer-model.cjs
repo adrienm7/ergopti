@@ -753,6 +753,34 @@ for (const [id, reference] of Object.entries(REFERENCE)) {
 	);
 }
 
+// ---- The shared edge fixtures: single quotes read, a malformed tag refused ----
+// The two raw-grammar fixtures of _shared/tests/corpus/keylayout/edge_cases.json,
+// which the Lua and Python readers replay in full.
+{
+	const edge = JSON.parse(
+		fs.readFileSync(shared('tests/corpus/keylayout/edge_cases.json'), 'utf8')
+	).vectors;
+	const quoted = edge.find((vector) => vector.name.startsWith('single-quoted attributes'));
+	const malformed = edge.find((vector) => vector.name.startsWith('a key tag the grammar'));
+	check(Boolean(quoted && malformed), 'the raw-grammar edge fixtures are in the shared corpus');
+	if (quoted && malformed) {
+		const model = Composer.parseModel(quoted.keylayout);
+		check(model.name === "Mini's", `single-quoted name read as ${JSON.stringify(model.name)}`);
+		const keys = model.keyMapSets.get('s').get(0);
+		check(
+			keys.get(0) && keys.get(0).value === '"x"' && keys.get(1) && keys.get(1).value === 'y',
+			'single-quoted key outputs are read'
+		);
+		let refused = null;
+		try {
+			Composer.parseModel(malformed.keylayout);
+		} catch (error) {
+			refused = error.code;
+		}
+		check(refused === 'keylayout_malformed_tag', `a malformed key tag gave ${refused}`);
+	}
+}
+
 if (errors.length > 0) {
 	console.error(`test-layout-composer-model: ${errors.length} problem(s)`);
 	for (const message of errors.slice(0, 40)) console.error(`  - ${message}`);

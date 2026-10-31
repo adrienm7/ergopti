@@ -360,6 +360,16 @@ types its chained sequences (for example science dead key then circumflex dead
 key types "→", breve twice types the combining inverted breve) and run the
 registry emulation tests over it.
 
+## .keylayout raw grammar (31 October)
+
+The Lua reader (`_shared/lua/layouts/keylayout.lua`), the Python converter and
+the web composer now read single-quoted attribute values and refuse a tag of
+an element they walk (`key`, `keyMap`, `action`, `when`…) that their grammar
+cannot read, instead of skipping it and losing keys. Two fixtures pin it in
+`_shared/tests/corpus/keylayout/edge_cases.json` (the last two vectors).
+`windows/modules/keymap/keylayout/keylayout_parser.ahk` needs the same two
+rules and a test replaying those vectors.
+
 ## Seven more local AI servers (31 October)
 
 `local_servers.json` gained SGLang, KoboldCpp, text-generation-webui, GPT4All,
