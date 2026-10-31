@@ -1782,7 +1782,7 @@ const {
 			'lost original absent checked field'
 		],
 		[
-			'main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, list_providers) or {}',
+			'main_menu = ManifestMenu.build("llm_menu", "LLM", nil, group_builders, render_ctx, list_providers) or {}',
 			'main_menu = {}',
 			'unused child producer'
 		],
@@ -3807,7 +3807,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				[producerFile, 'llm.set_agent_mode(id)', 'true'],
 				[
 					producerFile,
-					'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {})',
+					'local children = ManifestMenu.build("agent_menu", "Agent", nil, nil, menu_ctx, providers)',
 					'local children = {}'
 				],
 				[
@@ -3945,13 +3945,13 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 			],
 			[
 				'linux/ui/menu/agent_rows.lua',
-				'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {})',
-				'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {}) and { { title = "synthetic" } }'
+				'local children = ManifestMenu.build("agent_menu", "Agent", nil, nil, menu_ctx, providers)',
+				'local children = ManifestMenu.build("agent_menu", "Agent", nil, nil, menu_ctx, providers) and { { title = "synthetic" } }'
 			],
 			[
 				'linux/ui/menu/agent_rows.lua',
-				'\tend\n\tlocal handlers = {}',
-				'\tend\n\tlocal changed = function() return nil end\n\tlocal handlers = {}'
+				'\tend\n\tlocal providers = {}',
+				'\tend\n\tlocal changed = function() return nil end\n\tlocal providers = {}'
 			],
 			[
 				'linux/ui/menu/agent_rows.lua',
@@ -4035,9 +4035,8 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'local llm = ctx.llm\n\t' + statement
 			]);
 
-		const rootRegistration =
-			kind === 'agent' ? 'local handlers = {}' : 'local dynamic_handlers = {}';
-		const rootName = kind === 'agent' ? 'handlers' : 'dynamic_handlers';
+		const rootRegistration = 'local providers = {}';
+		const rootName = 'providers';
 		for (const statement of ['local ' + rootName + ' = {}', rootName + ' = {}'])
 			replacements.push([producerFile, rootRegistration, rootRegistration + '\n\t' + statement]);
 		if (kind === 'llm')

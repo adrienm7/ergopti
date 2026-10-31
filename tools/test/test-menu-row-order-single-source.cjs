@@ -175,7 +175,9 @@ const macosRows = manifest.llm_menu
 		(row) =>
 			typeof row.id === 'string' &&
 			row.id !== '' &&
-			(row.type === 'dynamic' || row.type === 'group') &&
+			// The settings rows are the ones declaring a greying policy, whatever
+			// their type: the model and profile rows are `list` rows.
+			typeof row.disabled_when_off === 'boolean' &&
 			(row.platforms === undefined || row.platforms.includes('hs'))
 	)
 	.map((row) => row.id);
