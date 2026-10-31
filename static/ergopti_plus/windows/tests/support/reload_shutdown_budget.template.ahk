@@ -131,7 +131,7 @@ _RQSB_Refused(*) {
 ; =======================================
 
 _RQSB_RunCase() {
-	global RQSBProbe, RQSBMode, RQSBFacadeFailure
+	global RQSBProbe, RQSBMode, RQSBFacadeFailure, _LifecycleShutdownReason
 	Bundle := 0
 	ReadActivity := 0
 	Record := 0
@@ -147,6 +147,24 @@ _RQSB_RunCase() {
 			0, 0, _RQSB_Refused, _ConfigWriteTerminalRelease.Bind(Bundle)), "The exact process model is acquired.")
 		Record := ReloadTerminalHandoffPending()
 		_RQSB_Require(Record is Map, "The launched record must be registered.")
+		if RQSBMode == "transient-retry" {
+			; A gate interrupted a settling owner: the successor must survive the veto.
+			Settled := false, Retried := 0
+			Retry := {Settled: () => Settled, Run: () => Retried += 1, BudgetMs: 10000, PollMs: 20}
+			_LifecycleShutdownReason := "Reload"
+			_RQSB_Require(ReloadTerminalHandoffClaim("Reload") == Record, "The successor's close request claims the record.")
+			_RQSB_Require(_LifecycleRefuseShutdown("an interrupted flush", false, Retry) == 1,
+				"The transient refusal still vetoes this exit.")
+			_RQSB_Require(ReloadTerminalHandoffPending() == Record && RQSBProbe["terminated"] == 0,
+				"The refusal keeps the reload pending and leaves its successor alone.")
+			_RQSB_Drain()
+			_RQSB_Require(Retried == 0 && RQSBProbe["callbacks"] == 0, "No retry runs before the owner settles.")
+			Settled := true
+			_RQSB_Drain()
+			_RQSB_Require(Retried == 1, "The settled owner retries the same reload once.")
+			_RQSB_Require(RQSBProbe["callbacks"] == 0 && RQSBProbe["terminated"] == 0, "Nothing reports a refusal.")
+			_LifecycleShutdownReason := "Exit"
+		}
 		if RQSBMode == "pending-read" {
 			ReadActivity := FileReadActivityEnter(A_Temp . "/reload-budget-reader.toml")
 			_RQSB_Require(FileReadActivityBusy(), "The earlier READV4 veto has real activity metadata.")
