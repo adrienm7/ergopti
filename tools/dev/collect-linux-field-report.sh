@@ -25,23 +25,25 @@
 # analysis.json at the top of the report (errors grouped by template, every
 # measured duration against the budget its code declares, lifecycle events,
 # check verdicts, what to fix first) and prints the verdict marks and their
-# summary line: the collector's own checks (tools/dev/linux-field-shell-checks.sh)
-# and the tray checks clicked today.
+# summary line: the collector's own checks (tools/dev/linux-field-shell-checks.sh),
+# the field run and the tray checks clicked today.
+#
+# The field run: tools/dev/linux-field-run.sh asks the running daemon to run its
+# Debug field checks with no window (linux/infra/field_run.lua, the macOS field
+# run's protocol), copies one result per step into field_run/ and prints their
+# marks; no click is needed.
 #
 # The logs folder is the one the driver itself resolves
 # (infra/config_paths.lua get_logs_dir: the paths.logs_dir override, else
 # ${XDG_STATE_HOME:-~/.local/state}/ergopti_plus/logs), asked through luajit.
 #
 # NOT COVERED, AND WHY:
-# - No field run. The Linux daemon has no request protocol like the macOS
-#   developer app's (infra/field_run.lua): its Debug field checks (composed
-#   layout, network) run from the tray and show a zenity result a person
-#   closes, so running them would need the user. Each check writes one
-#   "check=<id> verdict=<...>" line to the day log: the checks clicked today
-#   are in digest_field_checks; the collector prints each run with the macOS
-#   marks (✅ pass, ❌ fail, ⏭️ skip, ⌨️ needs_typing, ⚠️ other) and a summary
-#   line, also kept in field_checks.txt, and the analysis marks the last run of
-#   each. The checks that need no person run from the collector itself.
+# - A daemon that is not running gets no field run: the collector says so and
+#   collects the rest. Each check also writes one "check=<id> verdict=<...>"
+#   line to the day log, whether the field run or a click ran it: those lines
+#   are in digest_field_checks, printed with the macOS marks (✅ pass, ❌ fail,
+#   ⏭️ skip, ⌨️ needs_typing, ⚠️ other) and a summary line, also kept in
+#   field_checks.txt, and the analysis marks the last run of each.
 # - No diagnostics export. The health check is a tray window, with no
 #   command-line form; the boot diagnostic snapshot (the one [Diagnostics]
 #   line) is in the day log and digest_snapshot.
@@ -74,6 +76,8 @@ set -e
 . "$REPO_ROOT/tools/dev/field-report-git.sh"
 # shellcheck source=linux-field-shell-checks.sh
 . "$REPO_ROOT/tools/dev/linux-field-shell-checks.sh"
+# shellcheck source=linux-field-run.sh
+. "$REPO_ROOT/tools/dev/linux-field-run.sh"
 set +e
 DRIVER_ROOT="$REPO_ROOT/static/ergopti_plus/linux"
 SHARED_LUA="$REPO_ROOT/static/ergopti_plus/_shared/lua"
@@ -312,6 +316,10 @@ step proxy sh -c 'for v in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_prox
 step crash_dumps sh -c 'command -v coredumpctl >/dev/null || { echo "no coredumpctl"; exit 0; }; coredumpctl list --since today --no-pager 2>&1 | grep -iE "luajit|ergopti|ydotool|ollama|COMMAND|No coredumps" || echo "no core dump today"'
 # The checks that need no person (tools/dev/linux-field-shell-checks.sh).
 step collector_checks field_linux_checks "${REPO_ROOT}"
+# The daemon's Debug field checks, run with no window (tools/dev/linux-field-run.sh).
+log "Field run: asking the daemon to run its field checks…"
+field_linux_run "${REPO_ROOT}" "${out}" 2>&1 | tee "${out}/field_run.txt" | sed 's/^/[field-report] /'
+printf '%-28s exit=%s\n' "field_run" "${PIPESTATUS[0]}" >> "${steps}"
 
 # ===========================================
 # ======= 3/ Logs, commit and push ==========
