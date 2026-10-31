@@ -121,8 +121,8 @@
 			"_source": "https://console.groq.com/docs/reasoning"
 		},
 		{
-			"_family": "gpt-oss: reasoning cannot be disabled, low is the lowest effort",
-			"models": ["gpt-oss*"],
+			"_family": "gpt-oss: reasoning cannot be disabled, low is the lowest effort (Databricks names it databricks-gpt-oss-* or system.ai.gpt-oss-*, Bedrock openai.gpt-oss-*)",
+			"models": ["gpt-oss*", "databricks-gpt-oss*", "*.gpt-oss*"],
 			"controls": [
 				{
 					"kind": "effort",
