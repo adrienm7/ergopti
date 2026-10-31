@@ -83,4 +83,17 @@ helpers.describe("gesture emit actions (macOS)", function()
 		helpers.assert_eq(table.concat(close_window.mods, ","), "cmd")
 	end)
 
+	helpers.it("goes back and forward in the browser history with Cmd+arrow (action-parity-nav-history)", function()
+		-- nav_back and nav_forward were Windows-only, though every macOS browser
+		-- answers Cmd+Left and Cmd+Right. Cmd+[ is not used: the key typing "["
+		-- moves with the keyboard layout, the arrows do not.
+		local by_id = {}
+		for _, row in ipairs(require("_generated.gesture_emit_actions")) do by_id[row.id] = row end
+		for id, key in pairs({ nav_back = "left", nav_forward = "right" }) do
+			helpers.assert_true(by_id[id] ~= nil, id .. " must be declared for macOS")
+			helpers.assert_eq(by_id[id].key, key, id .. " key")
+			helpers.assert_eq(table.concat(by_id[id].mods, ","), "cmd", id .. " modifiers")
+		end
+	end)
+
 end)

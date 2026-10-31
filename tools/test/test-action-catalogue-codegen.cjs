@@ -186,11 +186,14 @@ check(
 	ids(models.hs).includes('lookup') && !ids(models.linux).includes('lookup'),
 	'lookup is macOS-only'
 );
-const navKey = HEADER_KEY_PREFIX + 'navigation';
+// The Debug heading holds the AutoHotkey tools and the Hammerspoon console:
+// Linux has neither, so the heading is dropped there. (The Navigation heading
+// used to be the example; nav_back and nav_forward now exist on every OS.)
+const debugKey = HEADER_KEY_PREFIX + 'debug';
 const hasHeading = (m, key) => m.sgItems.some((i) => i.kind === 'heading' && i.key === key);
-check(hasHeading(models.ahk, navKey), 'Windows keeps the Navigation heading over its two rows');
-check(!hasHeading(models.hs, navKey), 'macOS must not show an empty Navigation heading');
-check(!hasHeading(models.linux, navKey), 'Linux must not show an empty Navigation heading');
+check(hasHeading(models.ahk, debugKey), 'Windows keeps the Debug heading over its tools');
+check(hasHeading(models.hs, debugKey), 'macOS keeps the Debug heading over its console');
+check(!hasHeading(models.linux, debugKey), 'Linux must not show an empty Debug heading');
 for (const [platform, m] of Object.entries(models)) {
 	for (let i = 0; i < m.sgItems.length; i++) {
 		const item = m.sgItems[i];
