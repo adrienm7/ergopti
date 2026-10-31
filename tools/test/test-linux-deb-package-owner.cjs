@@ -14,6 +14,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const { stageAppDir } = require('./lib/linux-private-runtime-fixture.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const bundle = path.join(ROOT, 'build/linux');
@@ -69,6 +70,9 @@ try {
 				0,
 				assembled.stderr || assembled.stdout || assembled.error?.message
 			);
+			// The driver build replaced build/linux whole; the .deb carries the
+			// AppImage's private runtime, an existence fixture for attributes.
+			stageAppDir(bundle);
 			const driver = path.join(bundle, 'linux');
 			const privateConfig = path.join(scratch, `config-${mask}.toml`);
 			fs.writeFileSync(privateConfig, 'private-fixture = true\n', { mode: 0o600 });

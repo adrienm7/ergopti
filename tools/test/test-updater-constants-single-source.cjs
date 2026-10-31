@@ -411,10 +411,6 @@ for (const drv of LUA_DRIVERS) {
 // an allow-list quietly becomes blanket permission.
 const THIRD_PARTY_SOURCES = new Map([
 	[
-		'luvit/luv',
-		'build-linux-packaged-luv.sh: the .rpm builds its LuaJIT luv binding from the pinned upstream recipe'
-	],
-	[
 		'pqrs-org/Karabiner-Elements',
 		'remap_runtime_build.py: the owned runtime authenticates and builds the pinned Karabiner-Elements upstream source'
 	]

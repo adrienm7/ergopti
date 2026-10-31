@@ -61,10 +61,8 @@
 	},
 	"package_requirements": {
 		"deb": [
-			"luajit (>= 2.1)",
 			"xclip",
 			"libnotify-bin",
-			"curl",
 			"libxkbcommon0",
 			"libxkbcommon-tools",
 			"at-spi2-core",
@@ -80,17 +78,12 @@
 			"gir1.2-webkit2-4.1",
 			"glib-networking",
 			"gsettings-desktop-schemas",
-			"lua-luv",
-			"openssl",
-			"sqlite3",
 			"xdg-utils",
 			"libsecret-tools"
 		],
 		"rpm": [
-			"luajit >= 2.1",
 			"xclip",
 			"libnotify",
-			"curl",
 			"libxkbcommon",
 			"libxkbcommon-utils",
 			"at-spi2-core",
@@ -101,8 +94,6 @@
 			"zenity",
 			"shadow-utils",
 			"util-linux",
-			"openssl",
-			"sqlite",
 			"xdg-utils",
 			"libsecret"
 		],
