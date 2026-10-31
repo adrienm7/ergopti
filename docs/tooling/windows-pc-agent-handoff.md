@@ -102,6 +102,14 @@ downloaded again`). Ollama deletes that layer before it reports the
   `test_config_journal_nul_suffix.ahk`) must move to 20 and pass under
   AutoHotkey first. The macOS side follows (manifest slot, `open_chatgpt` on
   `hs` in `actions.toml`, the fixed `ctrl_g` hotkey and its menu row retired).
+- Menu rebuild budget on Windows: macOS and Linux now write
+  `Menu tree rebuilt in N ms (M top-level item(s)).` on each tray rebuild and
+  judge it against `[budgets] menu_rebuild_ms` through `perf_budget` (Linux
+  `ui/menu/timed_build.lua`, `fix/linux-todo-final`). The Windows rebuild
+  (`ui/menu/menu_rebuild.ahk`) writes neither, so `field-log-analyse.py` judges
+  no Windows menu rebuild: time it, write the same line and call
+  `infra/perf_budget.ahk` with `menu.rebuild`, with an AHK test that fails
+  without the line.
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 
