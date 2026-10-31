@@ -62,9 +62,12 @@ function programsIn(source) {
 	const functions = new Set();
 	const literals = Spawned.luaLiterals(source);
 	for (const { value } of literals) {
-		for (const match of value.matchAll(/(?:^|[\s;{])([a-z_][a-z0-9_]*)\s*\(\)/g)) functions.add(match[1]);
+		for (const match of value.matchAll(/(?:^|[\s;{])([a-z_][a-z0-9_]*)\s*\(\)/g))
+			functions.add(match[1]);
 	}
-	return [...new Set(literals.flatMap((literal) => Spawned.literalPrograms(literal, functions)))].sort();
+	return [
+		...new Set(literals.flatMap((literal) => Spawned.literalPrograms(literal, functions)))
+	].sort();
 }
 
 /**
@@ -78,13 +81,21 @@ function tableOf(driver) {
 	assert(section, `${DOC} has no section "${SECTIONS[driver]}"`);
 	const rows = section
 		.split('\n')
-		.filter((line) => line.startsWith('| ') && !/^\|\s*-/.test(line) && !/^\|\s*Tool\s*\|/.test(line))
-		.map((line) => line.split('|').slice(1, -1).map((cell) => cell.trim()));
+		.filter(
+			(line) => line.startsWith('| ') && !/^\|\s*-/.test(line) && !/^\|\s*Tool\s*\|/.test(line)
+		)
+		.map((line) =>
+			line
+				.split('|')
+				.slice(1, -1)
+				.map((cell) => cell.trim())
+		);
 	assert(rows.length > 0, `the ${driver} table has no row`);
 	const names = new Set();
 	for (const [tool] of rows) {
 		// A row named in words ("curl", "openssl CLI") names its program too.
-		for (const word of tool.replace(/`[^`]*`/g, ' ').split(/[\s,()]+/)) if (word) names.add(word.toLowerCase());
+		for (const word of tool.replace(/`[^`]*`/g, ' ').split(/[\s,()]+/))
+			if (word) names.add(word.toLowerCase());
 		for (const match of tool.matchAll(/`([^`]+)`/g)) {
 			for (const word of match[1].split(/[\s,]+/)) names.add(word.replace(/.*\//, ''));
 		}
@@ -106,11 +117,24 @@ check('the extractor finds each spawn shape the drivers use', () => {
 		'local shot = "grim - | wl-copy || maim | xclip -selection clipboard"',
 		'local probe = "command -v kdialog >/dev/null"',
 		'Shell.run("LC_ALL=C exec nohup setsid x")',
-		'Shell.run(prefix .. " --quiet 2>/dev/null || fallback-tool --version")',
+		'Shell.run(prefix .. " --quiet 2>/dev/null || fallback-tool --version")'
 	].join('\n');
 	assert.deepEqual(programsIn(source), [
-		'awk', 'fallback-tool', 'grim', 'kdialog', 'maim', 'ollama', 'pactl', 'python3', 'setsid', 'sha256sum',
-		'wl-copy', 'wmctrl', 'xclip', 'xdotool', 'zenity',
+		'awk',
+		'fallback-tool',
+		'grim',
+		'kdialog',
+		'maim',
+		'ollama',
+		'pactl',
+		'python3',
+		'setsid',
+		'sha256sum',
+		'wl-copy',
+		'wmctrl',
+		'xclip',
+		'xdotool',
+		'zenity'
 	]);
 });
 
@@ -123,7 +147,7 @@ check('the extractor ignores logs, SQL, phases, comments and shell functions', (
 		'M.SLOW_AWK = [[ if (a && b) { print $1 } ]]',
 		'Shell.run("has() { command -v \\"$1\\"; }; has slurp && echo ok 2>/dev/null")',
 		'local x = "[ -z \\"$P\\" ] && echo \'none\' && exit 0"',
-		'return "ready", { chunk = data }',
+		'return "ready", { chunk = data }'
 	].join('\n');
 	assert.deepEqual(programsIn(source), []);
 });
@@ -137,14 +161,20 @@ for (const driver of Object.keys(SECTIONS)) {
 			.filter((name) => !names.has(name))
 			.sort()
 			.map((name) => `${name} (${derived.get(name).join(', ')})`);
-		assert.deepEqual(missing, [], `add a row with a proposal to ${DOC} section ${SECTIONS[driver]} for:\n`
-			+ missing.join('\n'));
+		assert.deepEqual(
+			missing,
+			[],
+			`add a row with a proposal to ${DOC} section ${SECTIONS[driver]} for:\n` + missing.join('\n')
+		);
 	});
 
 	check(`every ${driver} row ends with a proposal`, () => {
 		for (const row of tableOf(driver).rows) {
 			const proposal = row[row.length - 1];
-			assert(PROPOSALS.test(proposal) || NOT_USED.test(row[1]), `row "${row[0]}" has no proposal: ${proposal}`);
+			assert(
+				PROPOSALS.test(proposal) || NOT_USED.test(row[1]),
+				`row "${row[0]}" has no proposal: ${proposal}`
+			);
 		}
 	});
 }
