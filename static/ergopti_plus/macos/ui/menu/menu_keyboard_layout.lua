@@ -295,6 +295,7 @@ end
 --- @param render_ctx table The renderer context holding the row commands.
 --- @return table rows
 local function number_row_rows(state, save_prefs, update_menu, render_ctx)
+	local ManifestMenu = require("infra.manifest_menu")
 	if type(state) ~= "table" then return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
 	local Live = require("modules.keymap.number_row_live")
 	local available, reason = Live.available()
