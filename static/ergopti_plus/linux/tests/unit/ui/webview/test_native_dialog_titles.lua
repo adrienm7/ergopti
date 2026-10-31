@@ -14,7 +14,7 @@ local Shell = require("adapters.shell_runner")
 --- Owns module replacements and pipe restoration for one completed scenario.
 --- @param body function Receives effect observations and a shell authority.
 local function scenario(body)
-	local names = { "ui.text_prompt", "ui.app_chooser", "ui.config_dir_picker", "ui.gesture_conflicts",
+	local names = { "ui.text_prompt", "ui.choice_prompt", "ui.app_chooser", "ui.config_dir_picker", "ui.gesture_conflicts",
 		"modules.gestures.system_actions", "infra.i18n", "adapters.shell_runner", "ui.modal",
 		"adapters.storage", "adapters.event_loop", "adapters.keyboard_hook",
 		"ui.menu.programmatic_hotstrings", "infra.hotstring_preferences", "infra.manifest_menu" }
@@ -72,6 +72,32 @@ h.describe("native dialog captions (linux-native-titles)", function()
 			h.assert_eq(observed.commands[1], "zenity --entry --title='ErgoptiPlus — Native '\\''caption'\\'''"
 				.. " --text='Preserved <body>' --entry-text=' Initial ' --hide-text 'First choice' 'Second '\\''choice'\\''' 2>/dev/null")
 		end)
+	end)
+	h.it("(linux-native-titles) the choice list brands its caption on zenity and kdialog and returns only an offered value", function()
+		local offered = { { value = "openai", label = "OpenAI" }, { value = "local", label = "Local 'server'" } }
+		for _, case in ipairs({
+			{ backend = "zenity", head = "zenity --list --no-markup --hide-header --title='ErgoptiPlus — Native '\\''caption'\\'''" },
+			{ backend = "kdialog", head = "kdialog --title 'ErgoptiPlus — Native '\\''caption'\\''' --menu 'Pick one'" },
+		}) do
+			scenario(function(observed)
+				observed.backend, observed.answer, observed.status = case.backend, "local\n", 0
+				local value = require("ui.choice_prompt").pick("Native 'caption'", "Pick one", offered, "local")
+				h.assert_eq(value, "local")
+				h.assert_eq(observed.modals, 1)
+				local command = observed.commands[1]
+				h.assert_eq(command:sub(1, #case.head), case.head)
+				h.assert_true(command:find("'local' 'Local '\\''server'\\''' 'openai' 'OpenAI'", 1, true) ~= nil,
+					"the current choice is listed first: " .. command)
+			end)
+			scenario(function(observed)
+				observed.backend, observed.answer, observed.status = case.backend, "forged\n", 0
+				h.assert_eq(require("ui.choice_prompt").pick("Title", "Pick one", offered), nil)
+			end)
+			scenario(function(observed)
+				observed.backend, observed.answer, observed.status = case.backend, "", 1
+				h.assert_eq(require("ui.choice_prompt").pick("Title", "Pick one", offered), nil, "a dismissed list is no choice")
+			end)
+		end
 	end)
 	h.it("(linux-native-titles) a cancelled prompt remains nil and an accepted empty answer remains empty", function()
 		scenario(function(observed)
@@ -275,6 +301,8 @@ h.describe("native caption consumer inventory", function()
 	h.it("(linux-native-titles) every production CLI caption remains in the independently bounded owner inventory", function()
 		local expected = {
 			["ui/text_prompt.lua"] = 1,
+			-- The choice list case proves both captions (zenity and kdialog) and the offered-value rule.
+			["ui/choice_prompt.lua"] = 2,
 			["ui/app_chooser.lua"] = 2,
 			["ui/config_dir_picker.lua"] = 2,
 			["ui/gesture_conflicts.lua"] = 1,
