@@ -1133,8 +1133,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 	func testAdhocSignatureIsAnIdentifierWithoutATeam() {
 		let identifier = kSecCodeInfoIdentifier as String
 		let team = kSecCodeInfoTeamIdentifier as String
-		XCTAssertTrue(signingInformationIsAdhoc([identifier: "com.ergoptiplus.app"]))
-		XCTAssertFalse(signingInformationIsAdhoc([identifier: "com.ergoptiplus.app", team: "ABCDE12345"]))
+		XCTAssertTrue(signingInformationIsAdhoc([identifier: Identifiers.BundleIds.launcher]))
+		XCTAssertFalse(signingInformationIsAdhoc([identifier: Identifiers.BundleIds.launcher, team: "ABCDE12345"]))
 		XCTAssertFalse(signingInformationIsAdhoc([:]))
 	}
 
