@@ -3919,9 +3919,6 @@
 	"platform_reason.action_line_deletion_is_macos": "Yalnızca macOS: Cmd+Delete, macOS metin alanlarında satırın başına veya sonuna kadar siler. Windows ve Linux metin alanlarında böyle bir tuş yoktur: Shift+Home veya Shift+End ile satır kenarına kadar seçip ardından silin.",
 	"platform_reason.action_lookup_is_macos_dictionary": "Yalnızca macOS: Araştır, işaretçinin altındaki sözcük için sistem sözlüğü panelini açar. Windows ve Linux'ta sistem sözlüğü paneli yoktur.",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Yalnızca macOS: bu eylemler Karabiner-Elements içinde tutulan gezinme katmanını açıp kapatır. Windows ve Linux'ta katman basılı tutulan tuşu izler ve ayarlanacak bir anahtarı yoktur.",
-	"platform_reason.action_not_yet_on_linux": "Henüz Linux'ta yok: buna engel bir şey yok, ancak Linux sürücüsü bunu şimdilik uygulamıyor.",
-	"platform_reason.action_not_yet_on_macos": "Henüz macOS'te yok: buna engel bir şey yok, ancak macOS sürücüsü bunu şimdilik uygulamıyor.",
-	"platform_reason.action_not_yet_on_windows": "Henüz Windows'ta yok: buna engel bir şey yok, ancak Windows sürücüsü bunu şimdilik uygulamıyor.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Bu sistem hiçbir uygulamanın bildirimleri kapatmasına izin vermez: onları eşdeğer eylemin açtığı bildirim merkezinde temizleyin.",
 	"platform_reason.action_office_bold_key_is_windows": "Yalnızca Windows: Fransızca Microsoft Office, diğer uygulamaların Ctrl+B kullandığı yerde kalın yazıyı Ctrl+G ile yapar; bu yüzden bu eylem tuşu uygulamaya göre seçer. macOS'te (Cmd+B) ve Linux'ta (Ctrl+B) tek bir birleşim her yerde çalışır: onu “Kısayollar” bölümünden atayın.",
 	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Linux'ta yok: Wayland hiçbir uygulamanın işaretçiyi taşımasına izin vermez ve bu eylemin yalnızca X11 oturumlarıyla sınırlı bir sürümü yoktur.",
@@ -3933,5 +3930,13 @@
 	"platform_reason.action_spaces_are_edited_in_mission_control": "macOS'te yok: Spaces, macOS'in başka hiçbir uygulamanın yönetmesine izin vermediği Mission Control'de eklenir ve kaldırılır.",
 	"platform_reason.action_window_overview_is_each_systems": "Her sistemin kendi pencere genel görünümü vardır: macOS'te Mission Control ve App Exposé, Windows'ta Görev Görünümü. Her Linux masaüstü kendininkini atar: orada masaüstünüzün tuşunu tuş birleşimi olarak atayın.",
 	"platform_reason.action_window_switching_is_not_macos": "macOS'te yok: bu eylem pencereleri Windows ve Linux'taki Alt+Tab gibi dolaşır. macOS uygulamaları Cmd+Tab ile değiştirir ve tek bir uygulamanın pencerelerini dolaşır: eşdeğer eylemi kullanın.",
-	"platform_reason.action_word_deletion_modifier_differs": "Her sistem bir sözcüğü kendi değiştiricisiyle siler (macOS'te Option, Windows ve Linux'ta Ctrl), bu yüzden her biri kendi eylemini listeler: eşdeğer eylemi kullanın."
+	"platform_reason.action_word_deletion_modifier_differs": "Her sistem bir sözcüğü kendi değiştiricisiyle siler (macOS'te Option, Windows ve Linux'ta Ctrl), bu yüzden her biri kendi eylemini listeler: eşdeğer eylemi kullanın.",
+	"platform_reason.action_app_windows_unreachable_on_wayland": "Linux'ta yok: Wayland hiçbir uygulamanın başka bir uygulamanın pencerelerini listelemesine veya etkinleştirmesine izin vermez; bu yüzden etkin uygulamanın pencereleri diğerlerinden ayırt edilemez. Eşdeğer eylem tüm pencereleri dolaşır.",
+	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Linux'ta yok: masaüstü sayısı her masaüstü ortamının kendi ayarlarına aittir (GNOME bunları kendisi ekler ve kaldırır, KDE ve Xfce sabit bir sayı tutar) ve Wayland hiçbir uygulamaya bunu değiştirme isteği vermez.",
+	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Linux'ta yok: her Linux masaüstü oturumu kendi boşta kalma engelleyicisiyle uyanık tutar (KDE ve Xfce'nin sunum kipi, GNOME'da bir Caffeine uzantısı); onu orada açın.",
+	"platform_reason.action_key_is_its_own_binding_here": "Bu sistemde ayrı bir satır değil: eşdeğer eylem aynı tuşu gönderir.",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Yalnızca macOS'te anahtar olarak: Windows, Win+P yansıtma menüsünde Çoğalt'ı; GNOME ve KDE kendi Super+P ekran değiştiricisinde seçer. O tuşu tuş birleşimi olarak atayın.",
+	"platform_reason.action_sticky_keys_are_the_systems": "Bu sistemin erişilebilirlik ayarlarında, her değiştiriciyi tek tuşluk yapan Yapışkan Tuşlar vardır; onları orada açın.",
+	"platform_reason.action_take_note_uses_notepad": "Yalnızca Windows: bu eylem günün not dosyasını her Windows ile gelen düzenleyici Not Defteri'nde açar. macOS'in kendi Hızlı Not'u (Fn+Q) vardır, Linux'ta ise her masaüstüyle gelen bir düzenleyici yoktur.",
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "macOS'te Canlı Metin her ekran görüntüsünün veya resmin metnini okur: eşdeğer eylemle bir görüntü alın, ardından metnini seçin."
 }

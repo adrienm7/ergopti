@@ -3919,9 +3919,6 @@
 	"platform_reason.action_line_deletion_is_macos": "Apenas macOS: Cmd+Delete apaga até o início ou o fim da linha nos campos de texto do macOS. Os campos de texto do Windows e do Linux não têm essa tecla: selecione até a borda da linha com Shift+Home ou Shift+End e depois apague.",
 	"platform_reason.action_lookup_is_macos_dictionary": "Apenas macOS: Pesquisar abre o painel do dicionário do sistema sobre a palavra sob o ponteiro. Windows e Linux não têm painel de dicionário do sistema.",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Apenas macOS: estas ações alternam a camada de navegação mantida no Karabiner-Elements. No Windows e no Linux a camada segue a tecla mantida e não tem interruptor a ajustar.",
-	"platform_reason.action_not_yet_on_linux": "Ainda não no Linux: nada o impede, mas o driver do Linux ainda não o implementa.",
-	"platform_reason.action_not_yet_on_macos": "Ainda não no macOS: nada o impede, mas o driver do macOS ainda não o implementa.",
-	"platform_reason.action_not_yet_on_windows": "Ainda não no Windows: nada o impede, mas o driver do Windows ainda não o implementa.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Este sistema não deixa nenhum aplicativo dispensar notificações: apague-as na central de notificações, que a ação equivalente abre.",
 	"platform_reason.action_office_bold_key_is_windows": "Apenas Windows: o Microsoft Office em francês aplica negrito com Ctrl+G onde os outros aplicativos usam Ctrl+B, por isso esta ação escolhe a tecla conforme o aplicativo. No macOS (Cmd+B) e no Linux (Ctrl+B) uma única combinação serve em toda parte: atribua-a em «Atalhos».",
 	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Não no Linux: o Wayland não deixa nenhum aplicativo mover o ponteiro, e esta ação não tem uma versão limitada às sessões X11.",
@@ -3933,5 +3930,13 @@
 	"platform_reason.action_spaces_are_edited_in_mission_control": "Não no macOS: os Spaces são adicionados e removidos no Mission Control, que o macOS não deixa nenhum outro aplicativo controlar.",
 	"platform_reason.action_window_overview_is_each_systems": "Cada sistema tem sua própria visão geral das janelas: Mission Control e App Exposé no macOS, a Visão de Tarefas no Windows. Cada ambiente Linux atribui a sua: atribua ali a tecla do seu ambiente como combinação de teclas.",
 	"platform_reason.action_window_switching_is_not_macos": "Não no macOS: esta ação percorre as janelas à maneira do Alt+Tab do Windows e do Linux. O macOS alterna aplicativos com Cmd+Tab e percorre as janelas de um aplicativo: use a ação equivalente.",
-	"platform_reason.action_word_deletion_modifier_differs": "Cada sistema apaga uma palavra com seu próprio modificador (Option no macOS, Ctrl no Windows e no Linux), por isso cada um lista sua própria ação: use a ação equivalente."
+	"platform_reason.action_word_deletion_modifier_differs": "Cada sistema apaga uma palavra com seu próprio modificador (Option no macOS, Ctrl no Windows e no Linux), por isso cada um lista sua própria ação: use a ação equivalente.",
+	"platform_reason.action_app_windows_unreachable_on_wayland": "Não no Linux: o Wayland não deixa nenhum aplicativo listar nem ativar as janelas de outro, então as janelas do aplicativo ativo não se distinguem das outras; a ação equivalente percorre todas as janelas.",
+	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Não no Linux: o número de áreas de trabalho depende das configurações de cada ambiente (o GNOME as adiciona e remove sozinho, o KDE e o Xfce mantêm um número fixo), e o Wayland não dá a nenhum aplicativo um pedido para mudá-lo.",
+	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Não no Linux: cada ambiente Linux mantém a sessão acordada com seu próprio inibidor de inatividade (o modo de apresentação do KDE e do Xfce, uma extensão Caffeine no GNOME); ative-o lá.",
+	"platform_reason.action_key_is_its_own_binding_here": "Não é uma linha à parte neste sistema: a ação equivalente envia a mesma tecla.",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Apenas macOS como alternância: o Windows escolhe Duplicar no menu de projeção Win+P, e o GNOME e o KDE no seu próprio seletor de telas Super+P; atribua essa tecla como combinação de teclas.",
+	"platform_reason.action_sticky_keys_are_the_systems": "Este sistema tem Teclas de Aderência nas configurações de acessibilidade, que fazem cada modificador valer para uma só tecla; ative-as lá.",
+	"platform_reason.action_take_note_uses_notepad": "Apenas Windows: esta ação abre o arquivo de notas do dia no Bloco de Notas, o editor que vem com todo Windows. O macOS tem sua própria Nota Rápida (Fn+Q) e o Linux não tem um editor que venha com todos os ambientes.",
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "No macOS, o Texto ao Vivo lê o texto de qualquer captura ou imagem: faça uma com a ação equivalente e depois selecione seu texto."
 }

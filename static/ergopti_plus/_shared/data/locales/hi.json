@@ -3919,9 +3919,6 @@
 	"platform_reason.action_line_deletion_is_macos": "केवल macOS: Cmd+Delete macOS के टेक्स्ट फ़ील्ड में पंक्ति के आरंभ या अंत तक मिटाता है। Windows और Linux के टेक्स्ट फ़ील्ड में ऐसी कुंजी नहीं है: Shift+Home या Shift+End से पंक्ति के किनारे तक चुनें, फिर मिटाएँ।",
 	"platform_reason.action_lookup_is_macos_dictionary": "केवल macOS: Look Up पॉइंटर के नीचे वाले शब्द के लिए सिस्टम का शब्दकोश पैनल खोलता है। Windows और Linux में सिस्टम का शब्दकोश पैनल नहीं है।",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "केवल macOS: ये क्रियाएँ Karabiner-Elements में रखी नेविगेशन परत को बदलती हैं। Windows और Linux पर परत दबाकर रखी कुंजी का अनुसरण करती है और उसका कोई स्विच नहीं है।",
-	"platform_reason.action_not_yet_on_linux": "अभी Linux पर नहीं: इसमें कोई बाधा नहीं है, पर Linux ड्राइवर इसे अभी लागू नहीं करता।",
-	"platform_reason.action_not_yet_on_macos": "अभी macOS पर नहीं: इसमें कोई बाधा नहीं है, पर macOS ड्राइवर इसे अभी लागू नहीं करता।",
-	"platform_reason.action_not_yet_on_windows": "अभी Windows पर नहीं: इसमें कोई बाधा नहीं है, पर Windows ड्राइवर इसे अभी लागू नहीं करता।",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "यह सिस्टम किसी भी ऐप को सूचनाएँ हटाने नहीं देता: उन्हें सूचना केंद्र में साफ़ करें, जिसे समकक्ष क्रिया खोलती है।",
 	"platform_reason.action_office_bold_key_is_windows": "केवल Windows: फ़्रेंच Microsoft Office बोल्ड के लिए Ctrl+G का उपयोग करता है जहाँ अन्य ऐप Ctrl+B का, इसलिए यह क्रिया ऐप के अनुसार कुंजी चुनती है। macOS (Cmd+B) और Linux (Ctrl+B) पर एक ही संयोजन हर जगह काम करता है: इसे “शॉर्टकट” से बाँधें।",
 	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Linux पर नहीं: Wayland किसी भी ऐप को पॉइंटर हिलाने नहीं देता, और इस क्रिया का केवल X11 सत्रों वाला कोई संस्करण नहीं है।",
@@ -3933,5 +3930,13 @@
 	"platform_reason.action_spaces_are_edited_in_mission_control": "macOS पर नहीं: Spaces Mission Control में जोड़े और हटाए जाते हैं, जिसे macOS किसी और ऐप को चलाने नहीं देता।",
 	"platform_reason.action_window_overview_is_each_systems": "हर सिस्टम का अपना विंडो अवलोकन है: macOS पर Mission Control और App Exposé, Windows पर Task View। हर Linux डेस्कटॉप अपना अलग बाँधता है, इसलिए वहाँ अपने डेस्कटॉप की कुंजी को कुंजी संयोजन के रूप में बाँधें।",
 	"platform_reason.action_window_switching_is_not_macos": "macOS पर नहीं: यह क्रिया Windows और Linux के Alt+Tab की तरह विंडो एक-एक करके बदलती है। macOS Cmd+Tab से ऐप बदलता है और एक ऐप की विंडो एक-एक करके दिखाता है: समकक्ष क्रिया का उपयोग करें।",
-	"platform_reason.action_word_deletion_modifier_differs": "हर सिस्टम अपने मॉडिफ़ायर से शब्द मिटाता है (macOS पर Option, Windows और Linux पर Ctrl), इसलिए हर एक अपनी क्रिया दिखाता है: समकक्ष क्रिया का उपयोग करें।"
+	"platform_reason.action_word_deletion_modifier_differs": "हर सिस्टम अपने मॉडिफ़ायर से शब्द मिटाता है (macOS पर Option, Windows और Linux पर Ctrl), इसलिए हर एक अपनी क्रिया दिखाता है: समकक्ष क्रिया का उपयोग करें।",
+	"platform_reason.action_app_windows_unreachable_on_wayland": "Linux पर नहीं: Wayland किसी भी ऐप को दूसरे ऐप की विंडो की सूची बनाने या उन्हें सक्रिय करने नहीं देता, इसलिए सक्रिय ऐप की विंडो को बाक़ी से अलग नहीं किया जा सकता; समकक्ष क्रिया सभी विंडो एक-एक करके बदलती है।",
+	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Linux पर नहीं: डेस्कटॉप की संख्या हर डेस्कटॉप की अपनी सेटिंग्स का हिस्सा है (GNOME उन्हें ख़ुद जोड़ता-हटाता है, KDE और Xfce एक तय संख्या रखते हैं), और Wayland किसी ऐप को इसे बदलने का अनुरोध नहीं देता।",
+	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Linux पर नहीं: हर Linux डेस्कटॉप अपने निष्क्रियता अवरोधक से सत्र को जगाए रखता है (KDE और Xfce का प्रस्तुति मोड, GNOME पर Caffeine एक्सटेंशन); उसे वहीं चालू करें।",
+	"platform_reason.action_key_is_its_own_binding_here": "इस सिस्टम पर यह अलग पंक्ति नहीं है: समकक्ष क्रिया वही कुंजी भेजती है।",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "टॉगल केवल macOS पर: Windows अपने Win+P प्रोजेक्शन मेनू में Duplicate चुनता है, और GNOME व KDE अपने Super+P डिस्प्ले स्विचर में; उस कुंजी को कुंजी संयोजन के रूप में बाँधें।",
+	"platform_reason.action_sticky_keys_are_the_systems": "इस सिस्टम की सुलभता सेटिंग्स में Sticky Keys हैं, जो हर मॉडिफ़ायर को एक बार के लिए लागू करती हैं; उन्हें वहीं चालू करें।",
+	"platform_reason.action_take_note_uses_notepad": "केवल Windows: यह क्रिया दिन की नोट्स फ़ाइल Notepad में खोलती है, जो हर Windows के साथ आता है। macOS का अपना Quick Note (Fn+Q) है, और Linux में ऐसा कोई संपादक नहीं जो हर डेस्कटॉप के साथ आए।",
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "macOS पर Live Text किसी भी कैप्चर या चित्र का टेक्स्ट पढ़ लेता है: समकक्ष क्रिया से एक कैप्चर लें, फिर उसका टेक्स्ट चुनें।"
 }
