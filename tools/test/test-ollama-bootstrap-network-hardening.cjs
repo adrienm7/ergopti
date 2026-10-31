@@ -755,7 +755,13 @@ try {
 	);
 
 	// Exercise the actual CLI and path helper inside its own isolated root.
-	for (const relative of ['tools/codegen/codegen-ollama-release.cjs', 'tools/lib/paths.cjs']) {
+	for (const relative of [
+		'tools/codegen/codegen-ollama-release.cjs',
+		'tools/lib/paths.cjs',
+		// The release URL takes its host from the shared identifiers.
+		'tools/lib/identifiers.cjs',
+		sharedRel('data', 'identifiers.json')
+	]) {
 		const destination = path.join(projectionRoot, relative);
 		fs.mkdirSync(path.dirname(destination), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), destination);

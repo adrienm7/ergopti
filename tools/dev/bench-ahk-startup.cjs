@@ -24,6 +24,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { app } = require('../lib/identifiers.cjs');
 const {
 	createStartupCodeFixture,
 	prepareStartupPersonalInclude
@@ -68,7 +69,7 @@ async function main() {
 		if (menuLatency) {
 			// Only the private copied entry drops the synthetic onboarding pump.
 			// The live driver and the correctness smoke keep their original behavior.
-			const entry = path.join(code.windows, 'ErgoptiPlus.ahk');
+			const entry = path.join(code.windows, app.ahk);
 			const source = fs.readFileSync(entry, 'utf8');
 			const guard = 'while !TickExpired(_StartupSmokePumpStarted, 650)';
 			if (source.split(guard).length !== 2)
@@ -81,14 +82,14 @@ async function main() {
 		if (webviewWarmup) {
 			// The smoke boot skips the shared browser warm-up; the private copy runs it so
 			// its cost on the main thread is part of the measured startup.
-			const entry = path.join(code.windows, 'ErgoptiPlus.ahk');
+			const entry = path.join(code.windows, app.ahk);
 			const source = fs.readFileSync(entry, 'utf8');
 			const guard = 'if _DriverStartupSmokeDir == ""\n\tWebView_BeginBrowserWarmup()';
 			if (source.split(guard).length !== 2)
 				throw new Error('The private browser warm-up seam changed; refusing misleading timings.');
 			fs.writeFileSync(entry, source.replace(guard, 'WebView_BeginBrowserWarmup()'));
 		}
-		fs.writeFileSync(wrapper, '\uFEFF#Requires AutoHotkey v2.0+\n#Include ErgoptiPlus.ahk\n');
+		fs.writeFileSync(wrapper, `\uFEFF#Requires AutoHotkey v2.0+\n#Include ${app.ahk}\n`);
 		for (let sample = 0; sample < samples; sample++) {
 			const fixture = path.join(scratch, menuLatency ? 'reload' : String(sample));
 			const config = path.join(fixture, 'config');
