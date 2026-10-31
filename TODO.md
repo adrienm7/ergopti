@@ -58,7 +58,12 @@ on the PC; push the branch and say so, dev integration stays with the coordinato
 3. **Windows code left** (AutoHotkey, so the PC's): the [CODE] parts that name Windows in "Maintainer requests of
    2026-10-30" (provider token exchange), "Cross-OS parity" (PAR-53, PAR-58, PAR-63, PAR-74, PAR-76 R23, PAR-79,
    PAR-80, PAR-81, PAR-83), "Wave 2" (config cleanup offers) and the antivirus ceiling of "Windows side to do on the
-   PC" below.
+   PC" below. Two more from the cloud pass of 2026-10-31: (a) `test-windows-bundle-manifest` is red on dev because
+   `infra/config_registry_cache.ahk` `ConfigRegistryCacheCodeIdentity` names `..\_generated\config_migration_ops.ahk`
+   (c95a93ed00), which is never shipped; the read only happens in a source run (`A_IsCompiled` returns first), so
+   either resolve that path in a way the gate does not read as a runtime literal or teach the gate source-only reads;
+   (b) land a408a29790 (`tmp/wip-todo-ah`, "split the four longest AHK unit shards by sub-domain", edits
+   `ci-windows.yml`) and run the Windows lane on it.
 4. **Physical checks:** "Windows manual checks for the maintainer" just below and "Maintainer checks > Windows PC";
    report each line as pass, fail or not run.
 
@@ -263,9 +268,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       AutoHotkey never ran the Windows side (step 1 and 2 of "PC Windows todo"); a Linux run on a real desktop.
 - [ ] **Field log analysis.** Done: `tools/dev/field-log-analyse.py` on every collector, the `[budgets]` section and
       the "Over budget" lines (8d52300169); Linux measures and judges its reload (request to the successor's boot,
-      `infra/reload_timing.lua`) and its menu rebuild (`ui/menu/timed_build.lua`) as macOS does. Left: run
-      `npm run test:hs` and `test:linux` where Lua runs and the AHK suite on the PC; [CODE] (Windows, the PC's) the
-      Windows driver measures no menu rebuild, so that budget is judged on macOS and Linux only.
+      `infra/reload_timing.lua`) and its menu rebuild (`ui/menu/timed_build.lua`) as macOS does; `npm run test:hs` and
+      `test:linux` pass as a non-root user under the pinned Node (2026-10-31). Left: the AHK suite on the PC; [CODE]
+      (Windows, the PC's) the Windows driver measures no menu rebuild, so that budget is judged on macOS and Linux
+      only.
 - [ ] **macOS main-thread holds (field report `mac-2026-10-30_210120`; ledger L16, L17, L18, L23).** [CODE]
       [PHYS-M] Done: ledger admission with native finds (0b679b0b0d), the personal-row alias check indexed once
       (b5c0c0de37), the dynamic-rule preview guard (c17aa3e5d7), the slowest diagnostics collectors named
@@ -396,11 +402,10 @@ After the cleanup, read them through the `archive/tmp-wip-<name>` tags.
 - `tmp/wip-todo-af`: 3337d99bc8 (Linux number-row order onboarding; it reads `number_row_live.available()`) and
   4fcb4a979a (logger scalar), then `tmp/wip-todo-ag3` d5cf3ba50b (its strings; it conflicts in the 21 locales unless
   the AF commits come first). 8634b1ff80 is superseded by dfb197a1ea; do not land it.
-- `tmp/wip-todo-ah`: 53b1bc5375 (reset every `hs.*` cache entry between macOS test files) and five CI speed-ups
-  (Ubuntu archive reuse, AHK shard split, one macOS checkout per E2E cell, Intel E2E start, SwiftPM cache trial); run
-  them on `tmp/preflight-dev` before dev.
-- `tmp/wip-ci-fix`: f44fcc1e64, c9b90d11d7, ba13937b8c, 5009ad87b8 (Linux distribution-row CI fixtures): check each
-  against dev first, later fixes may have replaced them.
+- `tmp/wip-todo-ah`: a408a29790 (AHK shard split) only, handed to the PC ("PC Windows todo" step 3); the hs.* cache
+  reset and the four Linux and macOS speed-ups landed on 2026-10-31 (`fix/todo-final-p4-ci`). `tmp/wip-ci-fix` is
+  fully on dev under other ids (2fb196a022, 767cf0cb7a, 9c496d384d with the fixture-owned machine id, 9b7abbe580,
+  7feb5a211b, 376b28db82): nothing to land.
 - Reference only: `tmp/wip-issue103` b449da5713 (an old reseal), `tmp/wip-issue104` aec2fb58cb (replaced by
   2be257c9f5), `tmp/wip-fr-uncommitted` 0d7e53b28b (replaced by 708bc6671d), `tmp/wip-todo-ae-par30` 41f72525cf
   (the PAR-30 Linux gate landed as cd824ccf8e).
@@ -456,7 +461,11 @@ runs the branch cleanup below. Each pass left a full handover; read it first:
    - Run as a normal user with `USER` and `LOGNAME` set; the JS suite refuses root.
    - Use Node 22.22.2 and Ruff 0.15.8, and PowerShell 7 for the Windows host checks.
    - AutoHotkey under Wine is narrower evidence only; it does not replace Windows CI.
-   - **Host-only reds on the Linux container** (not bugs): JS `test-ahk-tap-follower`, `test-linux-install-sandbox`,
+   - **Host-only reds on the Linux container** (not bugs): Lua `local-server-detection-native` without `ss`
+     (install iproute2); macOS `new commits beyond origin/dev are clean` when the checkout or its worktree admin
+     folder is not owned by the running user (the suite isolates `HOME`, so a global `safe.directory` is not read;
+     the same ownership breaks the JS catalogue and clock-evidence gates' `git` calls); JS `test-ahk-tap-follower`,
+     `test-linux-install-sandbox`,
      `test-linux-runtime-native-registration`, `test-macos-managed-bootstrap-http`, `test-managed-ollama-protocol`,
      `test-managed-remote-retirement` (no pwsh), `test-linux-deb-package-owner` (refuses root),
      `test-drift-guard-covers-every-output` (worktrees only, node_modules symlink). Lua as root: every
@@ -484,10 +493,6 @@ runs the branch cleanup below. Each pass left a full handover; read it first:
      cases failed under Wine, cause unknown.
 - Linux (from its closeout): physical acceptance (evdev/uinput grabs, polkit, autostart, Wayland/X11) still needs a
   real machine.
-- CI: the macOS 26 "Run Swift launcher tests" step hit its 10-minute limit twice on 28 October, in main run
-  40764020578 and fix/macos run 40765470617. `HomebrewArchiveAcceptanceTests` alone took 289 s, and a real PAC
-  trust test was still running at the limit. Move the real-network cases into their own job, or raise the step
-  budget with a measured reason.
 
 ## Mac field session 2026-10-27: problem ledger
 
@@ -855,8 +860,10 @@ Added October 22 (from the agents' reports; details in their commits):
       shared HTTP-redirect corpus on Windows (c64788227a), macOS audit-named tests renamed, neutral-installation gate,
       many Windows source scans turned into behaviour tests on 2026-10-30; on 2026-10-31 the macOS app launcher
       quoting and clipboard round-trip tests became behaviour tests (macOS pinned-read ratchet 27 -> 24 files, 75
-      -> 70 reads) and Linux got its own pinned-read ratchet (74 files, 136 reads,
-      `tools/test/test-no-pinned-source-reads-linux.cjs`). Left: Windows replay of the timer-ceiling and key-chord
+      -> 70 reads) and Linux got its own pinned-read ratchet (`tools/test/test-no-pinned-source-reads-linux.cjs`);
+      later that day two macOS tests (api_ollama's require-time scheduling and streaming payload removal) and two
+      Linux ones (version stamp, debounce clock) became behaviour tests: macOS 22 files / 67 reads, Linux 72 / 135.
+      Left: Windows replay of the timer-ceiling and key-chord
       corpora (needs a decision to build those policies on Windows), and the rest of the source assertions to
       behaviour (audit item 14), driving both Lua ratchets down.
 - [ ] **116. Guided third-party validation report.** [PHYS-M] `field_toolchain` runs it with no person (timer,
@@ -869,7 +876,6 @@ Added October 22 (from the agents' reports; details in their commits):
       is written (`macos/infra/logger.lua` `redact_message`, `linux/infra/logger_sink.lua`; logs written before it
       stay unmasked on disk and the collector masks them at export). Left: GitHub field editability after a form
       reload needs a real draft.
-- [ ] **13/35.** [CODE] Enrol the complete guardian acceptance collector in main CI.
 - [ ] **93. Linux ordered pairs.** [PHYS-L] XI2 property cookies proven on Xvfb (`run_xi2_property_cookies.py`).
       Nothing else is provable on Xvfb: the join of a uinput Writer edge with the server's XKB/XI2 modifier state
       needs Xorg or a compositor reading real evdev nodes.
