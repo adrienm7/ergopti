@@ -47,8 +47,10 @@ enum LauncherTimings {
 	static let testFastPoll = RegistryDuration(section: "launcher", key: "test_fast_poll_ms", milliseconds: 1)
 	static let testPoll = RegistryDuration(section: "launcher", key: "test_poll_ms", milliseconds: 10)
 	static let testRecordPoll = RegistryDuration(section: "launcher", key: "test_record_poll_ms", milliseconds: 5)
+	static let testCensusPoll = RegistryDuration(section: "launcher", key: "test_census_poll_ms", milliseconds: 100)
 	static let testGuardianSettle = RegistryDuration(section: "launcher", key: "test_guardian_settle_ms", milliseconds: 350)
 	static let testGuardianRetireSettle = RegistryDuration(section: "launcher", key: "test_guardian_retire_settle_ms", milliseconds: 100)
 	static let testLeaseLineInterval = RegistryDuration(section: "launcher", key: "test_lease_line_interval_ms", milliseconds: 50)
+	static let testLateRelaunchSettle = RegistryDuration(section: "launcher", key: "test_late_relaunch_settle_ms", milliseconds: 250)
 	static let testSlowSettingsRead = RegistryDuration(section: "launcher", key: "test_slow_settings_read_ms", milliseconds: 20)
 }
