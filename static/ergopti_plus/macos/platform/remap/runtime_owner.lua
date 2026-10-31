@@ -85,6 +85,7 @@ M.REASON = {
 	OTHER_STILL_RUNNING = "other_karabiner_still_running",
 	PROBE_FAILED = "coexistence_probe_failed",
 	CONFIG_MISSING = "owned_configuration_missing",
+	ARTIFACT_FETCH_FAILED = "artifact_fetch_failed",
 	CAPTURE_REFUSED = "capture_start_refused",
 	CAPTURE_LOST = "capture_lost",
 	CAPTURE_TIMEOUT = "capture_start_timeout",
@@ -148,6 +149,8 @@ local function validate_ports(candidate)
 	end
 	assert(candidate.coexistence.close == nil or type(candidate.coexistence.close) == "function",
 		"Invalid owned runtime port: coexistence.close")
+	assert(candidate.artifact.fetch == nil or type(candidate.artifact.fetch) == "function",
+		"Invalid owned runtime port: artifact.fetch")
 	assert(candidate.observer == nil or type(candidate.observer) == "function", "Invalid owned runtime observer")
 end
 
@@ -160,6 +163,8 @@ end
 ---   coexistence.detect(fn(count|nil)) counts other active Karabiner processes and
 ---     coexistence.close(fn(ok)) (optional) asks them to quit;
 ---   artifact.pinned() -> table { virtual_hid_version, capture = start options|nil } or nil, reason;
+---   artifact.fetch(fn(ok, payload|reason, explanation)) (optional) downloads and verifies the
+---     pinned artifact into Ergopti's own folder the first time, then reuses it;
 ---   capture.start(options) -> boolean accepted; capture.stop(fn) -> settled boolean, fn(true)
 ---     once it settles; capture.status() -> table { state = starting|admitted|stopped };
 ---     capture.on_lost(fn) registers fn(reason) for a capture lost after it started.
@@ -320,6 +325,8 @@ local function check_jobs(attempt)
 	check(1)
 end
 
+local check_installed
+
 --- Starts admission: observes the machine and reaches `admitted` or names why not.
 --- Nothing is started, written or closed unless the close option asks for it.
 --- The user side of the runtime always runs with the physical capture, because the
@@ -355,11 +362,32 @@ function M.start(options, on_settled)
 		return true
 	end
 	attempt.pinned = pinned
+	if ports.artifact.fetch then
+		ports.artifact.fetch(function(fetched, payload, detail)
+			if run ~= attempt then return end
+			if fetched ~= true then
+				return settle_start(attempt, STATE.UNAVAILABLE, REASON.ARTIFACT_FETCH_FAILED,
+					"The pinned runtime artifact could not be fetched (" .. tostring(payload) .. "): "
+						.. tostring(detail) .. ".")
+			end
+			attempt.payload = payload
+			check_installed(attempt)
+		end)
+		return true
+	end
+	check_installed(attempt)
+	return true
+end
+
+--- Checks the installed files, then the VirtualHIDDevice, then the jobs.
+--- @param attempt table Current attempt.
+check_installed = function(attempt)
 	for _, path in ipairs(installed_paths()) do
 		if ports.fs.exists(path) ~= true then
-			settle_start(attempt, STATE.UNAVAILABLE, REASON.NOT_INSTALLED,
-				"The owned runtime is not installed: " .. path .. " is missing.")
-			return true
+			local waiting = attempt.payload and (" The verified artifact waits at " .. attempt.payload
+				.. " for the administrator install.") or ""
+			return settle_start(attempt, STATE.UNAVAILABLE, REASON.NOT_INSTALLED,
+				"The owned runtime is not installed: " .. path .. " is missing." .. waiting)
 		end
 	end
 	ports.system_extensions.listing(function(output)
@@ -368,13 +396,12 @@ function M.start(options, on_settled)
 			return settle_start(attempt, STATE.FAILED, REASON.LISTING_FAILED,
 				"The system extension listing could not be read.")
 		end
-		local verdict = Vhid.assess(Vhid.parse(output), pinned.virtual_hid_version)
+		local verdict = Vhid.assess(Vhid.parse(output), attempt.pinned.virtual_hid_version)
 		if not verdict.ok then
 			return settle_start(attempt, STATE.UNAVAILABLE, verdict.reason, verdict.explanation)
 		end
 		check_jobs(attempt)
 	end)
-	return true
 end
 
 

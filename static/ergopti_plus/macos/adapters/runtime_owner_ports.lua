@@ -21,6 +21,9 @@
 ---    vendor/remap-runtime/manifest.json pins completely; an unpinned manifest is a
 ---    named refusal, never a guessed driver version.
 --- 5. One Command Runner: bounded commands reuse the field check's runner.
+--- 6. Fetched Into Ergopti's Folder: the first admission downloads and verifies
+---    the pinned artifact through platform/remap/runtime_artifact_fetch.lua,
+---    then every later one reuses that copy without the network.
 --- ==============================================================================
 
 local M = {}
@@ -76,6 +79,13 @@ end
 function M.new()
 	local exec = FieldCheckPorts.exec
 	local Coexistence = require("adapters.karabiner_coexistence").new()
+	local fetcher = require("platform.remap.runtime_artifact_fetch").new({
+		exec = exec,
+		exists = FileSystem.exists,
+		read = FileSystem.read,
+		write = function(path, content) return FileSystem.write(path, content) == true end,
+		expand = FileSystem.expand_path,
+	})
 	return {
 		fs = {
 			exists = FileSystem.exists,
@@ -103,6 +113,13 @@ function M.new()
 		},
 		artifact = {
 			pinned = pinned_artifact,
+			fetch = function(callback)
+				local manifest = load_manifest()
+				if not manifest then
+					return callback(false, "artifact_unpinned", "the runtime manifest could not be read")
+				end
+				fetcher.ensure(manifest.runtime, callback)
+			end,
 		},
 		capture = require("adapters.runtime_capture_port").new(),
 		timer = require("adapters.timer_scheduler"),
