@@ -67,7 +67,7 @@ helpers.describe("field check session: costs and edge cases a program can answer
 	helpers.it("names the dominant slow segment of the day log, through the awk summary", function()
 		local summary = assert(Session.parse_slow_summary(
 			"segment keymap.keydown 2 15.75 12.50\nsegment hotstrings.match 1 40.00 40.00\ningest 1 230\nprefs 0 0\n"
-				.. "lease_bound 0\nearly_layout 0\n"))
+				.. "lease_bound 0\nearly_layout 0\ndb_locked 0\nshortcuts_unregistered 0\nshortcut_rebinds 0\n"))
 		helpers.assert_eq(summary.segments[1].name, "hotstrings.match")
 		helpers.assert_eq(summary.prefs.count, 0)
 		helpers.assert_nil(Session.parse_slow_summary("segment x 1 1.00 1.00\n"), "a summary without its totals is refused")
@@ -77,7 +77,8 @@ helpers.describe("field check session: costs and edge cases a program can answer
 			exec = function(executable, args, _, callback)
 				helpers.assert_eq(executable, "/usr/bin/awk")
 				helpers.assert_eq(args[2], "/logs/today.log")
-				callback(0, "segment keymap.keydown 2 15.75 12.50\ningest 3 230\nprefs 1 88\nlease_bound 2\nearly_layout 0\n")
+				callback(0, "segment keymap.keydown 2 15.75 12.50\ningest 3 230\nprefs 1 88\nlease_bound 2\nearly_layout 0\n"
+					.. "db_locked 1\nshortcuts_unregistered 0\nshortcut_rebinds 3\n")
 			end,
 		}, report, function() end)
 		local steps = steps_of(report)
@@ -87,6 +88,12 @@ helpers.describe("field check session: costs and edge cases a program can answer
 		helpers.assert_eq(steps.log_lease_bound_failures.state, Report.STATE_FAIL)
 		helpers.assert_eq(steps.log_lease_bound_failures.value, "2")
 		helpers.assert_eq(steps.log_layout_change_before_baseline.state, Report.STATE_PASS)
+		-- The day log answers the Mac field report's [PHYS-M] lines (2026-10-30 21:01)
+		helpers.assert_eq(steps.log_keystats_database_locked.state, Report.STATE_FAIL)
+		helpers.assert_eq(steps.log_keystats_database_locked.value, "1")
+		helpers.assert_eq(steps.log_shortcuts_still_unregistered.state, Report.STATE_PASS)
+		helpers.assert_eq(steps.log_shortcut_rebind_retries.state, Report.STATE_INFO)
+		helpers.assert_eq(steps.log_shortcut_rebind_retries.value, "3")
 	end)
 
 	helpers.it("the awk program reads the three line shapes the drivers write", function()
@@ -110,6 +117,11 @@ helpers.describe("field check session: costs and edge cases a program can answer
 			"10:04 [ERROR] remap: Lease-bound input startup failed: lease-stopping.",
 			"10:05 [INFO] remap.watchers: Layout poll detected change before its baseline: 'A' → 'B'.",
 			"10:06 [INFO] remap.watchers: Layout poll detected change: 'B' → 'C'.",
+			"10:07 [ERROR] keystats: Ingest batch rolled back: database is locked.",
+			"10:08 [WARN] shortcuts: A refused shortcut may be held by a chord of the previous layout; "
+				.. "rebinding every shortcut (retry 1).",
+			"10:09 [WARN] shortcuts: Some shortcuts are still unregistered after 3 retries; the next "
+				.. "keyboard-layout change retries them.",
 		}, "\n") .. "\n")
 		local pipe = assert(io.popen("/usr/bin/awk -f '" .. program .. "' '" .. log .. "'"))
 		local output = pipe:read("*a")
@@ -124,6 +136,9 @@ helpers.describe("field check session: costs and edge cases a program can answer
 		helpers.assert_eq(summary.prefs.count, 1)
 		helpers.assert_eq(summary.lease_bound, 1)
 		helpers.assert_eq(summary.early_layout, 1, "only the change before the baseline is the misread")
+		helpers.assert_eq(summary.db_locked, 1)
+		helpers.assert_eq(summary.shortcuts_unregistered, 1)
+		helpers.assert_eq(summary.shortcut_rebinds, 1)
 	end)
 
 	helpers.it("fails a FIFO the adapter opens, and removes its folder", function()
