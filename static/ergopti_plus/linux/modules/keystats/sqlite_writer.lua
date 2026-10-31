@@ -520,6 +520,13 @@ function M.register_device(device_id, device_name, os_name, os_version, host_sig
 	return accepted
 end
 
+--- Whether semantic media entries can be stored now: an open database whose media
+--- schema and five-key catalogue were admitted, with no unresolved media terminal.
+--- @return boolean available
+function M.media_available()
+	return M.is_available() and _media_policy ~= nil and _media_terminal_debt == nil
+end
+
 --- Stores already admitted semantic media entries in one native transaction.
 --- This port grants no native capture authority and never mutates pending input.
 --- @param device_id string Persisted collector partition, not a fabricated source device.
@@ -876,6 +883,26 @@ _raw_sql.system = function(device_id, events, first_id)
 			metadata_json = type(ev.metadata) == "table" and Json.encode(ev.metadata) or nil,
 		})
 	end
+	return table.concat(statements, "\n")
+end
+
+--- Plans admitted semantic media entries as raw events_system rows and their
+--- derived press and hold rows, so the flush that owns the raw source commits
+--- its projections in the same transaction (media never reaches the numeric
+--- heatmap tables).
+--- @param device_id string Persisted collector partition.
+--- @param events table Ordered physical_media_press/release entries.
+--- @param first_id integer First reserved raw-event identifier.
+--- @param threshold_ms integer Shared inclusive tap threshold.
+_raw_sql.media = function(device_id, events, first_id, threshold_ms)
+	assert(_media_policy ~= nil, "Semantic media policy is not admitted")
+	local statements, batch = {}, { media_ngram = {}, media_hold = {} }
+	MediaStore.replay(_media_policy, batch, events, threshold_ms)
+	for index, event in ipairs(events) do
+		statements[#statements + 1] = MediaStore.raw_sql(device_id, first_id + index - 1, event, Json.encode)
+	end
+	for _, row in pairs(batch.media_ngram) do statements[#statements + 1] = MediaStore.press_sql(device_id, row) end
+	for _, row in pairs(batch.media_hold) do statements[#statements + 1] = MediaStore.hold_sql(device_id, row) end
 	return table.concat(statements, "\n")
 end
 
@@ -1568,8 +1595,14 @@ function M.start_flush(device_id, payload)
 	payload.raw.windows = payload.raw.windows or {}
 	payload.raw.sessions = payload.raw.sessions or {}
 	payload.raw.system = payload.raw.system or {}
+	payload.raw.media = payload.raw.media or {}
+	-- Media rows need the admitted policy and the tap threshold their holds are split by.
+	if #payload.raw.media > 0 and (not M.media_available() or type(payload.media_threshold_ms) ~= "number") then
+		return nil
+	end
+	local media_threshold_ms = payload.media_threshold_ms
 	local path, count = _db_path, 0
-	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions", "system" }
+	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions", "system", "media" }
 	for _, name in ipairs(families) do
 		array(payload.raw[name])
 		count = count + #payload.raw[name]
@@ -1600,7 +1633,8 @@ function M.start_flush(device_id, payload)
 		for _, name in ipairs(families) do
 			local rows = payload.raw[name]
 			if #rows > 0 then
-				statements[#statements + 1] = assert(_raw_sql[name](device_id, rows, cursor))
+				statements[#statements + 1] = assert(_raw_sql[name](device_id, rows, cursor,
+					name == "media" and media_threshold_ms or nil))
 				cursor = cursor + #rows
 			end
 		end
