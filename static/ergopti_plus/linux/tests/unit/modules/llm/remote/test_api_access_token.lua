@@ -171,6 +171,36 @@ end)
 -- =========================================
 -- =========================================
 
+helpers.describe("Access-token providers: the shipped rows", function()
+	helpers.it("a watsonx entry exchanges its IBM API key at IBM's token service", function()
+		with_remote(function(remote, calls)
+			local entry = { id = "x", provider = "watsonx", token = "ibm-key", model = "ibm/granite-4-h-small",
+				base_url = "https://us-south.ml.cloud.ibm.com/ml/gateway/v1" }
+			helpers.assert_nil(remote.endpoint(entry, entry.model))
+			helpers.assert_eq(calls[1].url, "https://iam.cloud.ibm.com/identity/token")
+			helpers.assert_contains(calls[1].body, "apikey=ibm-key")
+			answer(calls, 1, 200, { access_token = "iam", expires_in = 3600 })
+			local endpoint = remote.endpoint(entry, entry.model)
+			helpers.assert_eq(endpoint.url, "https://us-south.ml.cloud.ibm.com/ml/gateway/v1/chat/completions")
+			helpers.assert_eq(endpoint.headers.Authorization, "Bearer iam")
+		end)
+	end)
+
+	helpers.it("a Vertex AI entry refreshes the token of its authorized_user credentials", function()
+		with_remote(function(remote, calls)
+			local entry = { id = "v", provider = "vertex", model = "google/gemini-3.5-flash",
+				token = Json.encode({ type = "authorized_user", client_id = "cid", client_secret = "cs", refresh_token = "rt" }),
+				base_url = "https://aiplatform.googleapis.com/v1/projects/p1/locations/global/endpoints/openapi" }
+			helpers.assert_nil(remote.endpoint(entry, entry.model))
+			helpers.assert_eq(calls[1].url, "https://oauth2.googleapis.com/token")
+			helpers.assert_eq(calls[1].body, "client_id=cid&client_secret=cs&grant_type=refresh_token&refresh_token=rt")
+		end)
+	end)
+end)
+
+
+
+
 helpers.describe("Access-token providers: the catalogue block", function()
 	helpers.it("a provider whose auth block is invalid is refused whole", function()
 		local Remote = helpers.load_module("modules.llm.api_remote")

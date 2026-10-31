@@ -1751,6 +1751,8 @@
 	"menu.llm.api_no_entry": "No API endpoint configured",
 	"menu.llm.api_prompt_field.account": "Account identifier (the part before .snowflakecomputing.com):",
 	"menu.llm.api_prompt_field.account_id": "Account ID:",
+	"menu.llm.api_prompt_field.location": "Location (for example global):",
+	"menu.llm.api_prompt_field.project": "Google Cloud project ID:",
 	"menu.llm.api_prompt_field.region": "Region (for example us-east-1):",
 	"menu.llm.api_prompt_field.resource": "Resource name (the part before .openai.azure.com):",
 	"menu.llm.api_prompt_field.workspace": "Workspace host (for example dbc-1234.cloud.databricks.com):",

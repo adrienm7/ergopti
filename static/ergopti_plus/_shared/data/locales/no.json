@@ -1756,6 +1756,8 @@
 	"menu.llm.api_no_entry": "Ingen API-endepunkt konfigurert",
 	"menu.llm.api_prompt_field.account": "Konto-ID (delen før .snowflakecomputing.com):",
 	"menu.llm.api_prompt_field.account_id": "Konto-ID:",
+	"menu.llm.api_prompt_field.location": "Plassering (for eksempel global):",
+	"menu.llm.api_prompt_field.project": "Google Cloud-prosjekt-ID:",
 	"menu.llm.api_prompt_field.region": "Region (for eksempel us-east-1):",
 	"menu.llm.api_prompt_field.resource": "Ressursnavn (delen før .openai.azure.com):",
 	"menu.llm.api_prompt_field.workspace": "Arbeidsområdets vert (for eksempel dbc-1234.cloud.databricks.com):",
