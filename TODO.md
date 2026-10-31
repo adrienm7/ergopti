@@ -773,9 +773,11 @@ Added October 22 (from the agents' reports; details in their commits):
       and never uses, stops or modifies the user's copy. Ollama: done on the three OS (next item). MLX: already
       Ergopti's own. Karabiner on macOS: item 31 as the default, with the rule: tap-hold on quits the user's Karabiner
       and runs ours; tap-hold off with theirs present never activates ours (rewords ADR 011 decision 3). WebView2
-      stays the system copy, with a version check and a clear refusal. Left: item 31, and the inventory of every
-      external tool on Linux and Windows (ydotool, xdotool, wmctrl, curl, Python, PowerShell modules, WebView2) with
-      a decision per tool.
+      stays the system copy, with a version check and a clear refusal. The inventory with a proposal per tool is
+      `docs/design/owned-runtimes.md`; its macOS and Linux tables are checked against every program the drivers
+      start (`tools/test/test-owned-runtimes-inventory.cjs`; ydotool is no longer started at run time). Left: item
+      31; the maintainer's decision per row (see "Questions for the maintainer"); the same code-derived check for
+      the Windows driver (PC agent).
 - [ ] **Ergopti's own Ollama on Windows and Linux too.** [PHYS-W] [PHYS-L] Done in code on the three OS (Linux
       32fa07be7f, Windows f016081056 and 597cbbe983: owned port `llm_ollama_owned_port` = 11435, 11434 refused, only
       the owned runtime launched). Left: with a system Ollama on 11434, Ergopti's listens on 11435 and the other is
@@ -1243,6 +1245,13 @@ not open software work.
 Each names the default kept meanwhile. Answer here; the agent then moves the decision into the item
 or under "Decided, do not re-raise".
 
+- **Owned runtimes on macOS and Linux: one decision per row of `docs/design/owned-runtimes.md`.** The proposals
+  are written there (sections 3, 4, 7): Linux `sqlite3` and `openssl` CLI (PIN, or the libsqlite3 FFI path and a
+  Lua primitive), `curl` (PIN or SYS), `tar --zstd` (PIN a decoder or repack), `python3` for the XKB install (PIN
+  the managed Python or port to Lua), the desktop tools (`xdotool`, `wmctrl`, `zenity`, screenshot and clipboard
+  tools: OPT), the base utilities on both OS (SYS); macOS `/usr/bin/python3` helpers (PIN on the managed
+  Python); and whether the rows become a machine-readable `_shared/data/owned_runtimes.json`. Kept meanwhile:
+  every tool as it is used today; a new spawn needs a row (the inventory test).
 - **"Sticky" in French and Latin-script locales.** The sticky-modifier labels keep the English
   "Sticky", like the `menu.tapholds.sticky_*` strings. Use a French term such as « rémanent »?
 - **Dutch "Rolls".** `category.rolls` and `hs_config.cat_rolls` keep "Rolls" (Dutch "Rollen" means
