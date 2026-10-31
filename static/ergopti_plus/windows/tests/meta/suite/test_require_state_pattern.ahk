@@ -117,7 +117,8 @@ _MetaListAhkFilesGuardV2(Dir) {
 	return Files
 }
 
-_MetaRunRequireStateTestsV2() {
+; Runs inside its test: scanning the tree at registration taxed every runner boot.
+_MetaGuardRatchet() {
 	global _REQUIRE_STATE_ALLOWLIST, _REQUIRE_STATE_BASELINE
 	SplitPath(A_ScriptDir, , &_DriverRootRaw)
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
@@ -161,20 +162,13 @@ _MetaRunRequireStateTestsV2() {
 	for Rel in Violations
 		Offenders .= (Offenders == "" ? "" : ", ") . Rel
 
-	ViolCount := Violations.Length
-	ScannedLabel := ScannedCount
-	_MetaGuardRatchet() {
-		; Non-vacuity floor. The original scan saw THREE files and could not
-		; fail; anything in this range proves it is still reaching the whole
-		; driver. Set below the current 59 so excluding a few more constants
-		; from the predicate does not trip it.
-		Assert(ScannedLabel >= 50,
-			"the guard scan must reach the whole driver (only " . ScannedLabel . " files with module-level state seen) — it previously scanned 3 and was therefore incapable of failing")
-		Assert(ViolCount <= _REQUIRE_STATE_BASELINE,
-			"files with unguarded module-level state rose to " . ViolCount . " (baseline " . _REQUIRE_STATE_BASELINE . "). This is a DRIFT signal, not a proven defect: check whether the new entry holds genuinely injected state (guard it) or is another lazy cache or flag (then it belongs in the allowlist WITH a reason). Do not raise the baseline. Offenders: " . Offenders)
-	}
-	Test("meta require_state: module-level state without an init guard does not increase (" . ViolCount . "/" . ScannedLabel . ")",
-		_MetaGuardRatchet)
+	; Non-vacuity floor. The original scan saw THREE files and could not
+	; fail; anything in this range proves it is still reaching the whole
+	; driver. Set below the current 59 so excluding a few more constants
+	; from the predicate does not trip it.
+	Assert(ScannedCount >= 50,
+		"the guard scan must reach the whole driver (only " . ScannedCount . " files with module-level state seen) — it previously scanned 3 and was therefore incapable of failing")
+	Assert(Violations.Length <= _REQUIRE_STATE_BASELINE,
+		"files with unguarded module-level state rose to " . Violations.Length . " (baseline " . _REQUIRE_STATE_BASELINE . "). This is a DRIFT signal, not a proven defect: check whether the new entry holds genuinely injected state (guard it) or is another lazy cache or flag (then it belongs in the allowlist WITH a reason). Do not raise the baseline. Offenders: " . Offenders)
 }
-
-_MetaRunRequireStateTestsV2()
+Test("meta require_state: module-level state without an init guard does not increase", _MetaGuardRatchet)

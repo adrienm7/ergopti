@@ -25,23 +25,12 @@
 ; ======================================
 ; ======================================
 
+; Native enumeration: this runs at registration, so a cmd.exe per subtree taxed
+; every runner boot.
 _MetaBrace_ListFiles(Dir) {
 	Files := []
-	TempFile := A_Temp . "\meta_brace_list.txt"
-	try FileDelete(TempFile)
-	RunWait('cmd /c dir /b /s /a-d "' . Dir . '" > "' . TempFile . '"', , "Hide")
-	try {
-		Raw := FileRead(TempFile)
-	} catch {
-		return Files
-	}
-	for Line in StrSplit(Raw, "`n", "`r") {
-		Line := Trim(Line)
-		if Line = ""
-			continue
-		Line := StrReplace(Line, "\", "/")
-		if not Line ~= "i)\.ahk$"
-			continue
+	Loop Files, Dir . "\*.ahk", "FR" {
+		Line := StrReplace(A_LoopFileFullPath, "\", "/")
 		; Skip test files — only validate production source
 		if Line ~= "i)/tests/"
 			continue
