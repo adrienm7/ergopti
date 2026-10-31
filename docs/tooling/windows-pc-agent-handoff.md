@@ -110,6 +110,14 @@ downloaded again`). Ollama deletes that layer before it reports the
   no Windows menu rebuild: time it, write the same line and call
   `infra/perf_budget.ahk` with `menu.rebuild`, with an AHK test that fails
   without the line.
+- Screen action vision backend on Windows: the native parameter prompt of
+  `llm_vision` (`modules/gestures/config.ahk`, `param_llm_vision`) still
+  prints every vision backend on its own line, about forty with the API
+  catalogue, for the user to type one. macOS and Linux now pick the backend
+  in a list and then ask the optional model, as the action picker page does
+  (`fix/linux-todo-final`; shared value rule `llm/vision.lua`
+  `compose_parameter`). Windows needs the same two steps, with an AHK test
+  that fails while the backend is typed.
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 
