@@ -20,7 +20,7 @@
 # REQUIREMENTS (runtime on the build host):
 #  - macOS 13+ (build script runs on macos-latest GitHub runner)
 #  - Xcode command-line tools (swift, codesign, iconutil, sips, plutil)
-#  - curl, unzip, zip, git, node
+#  - curl, unzip, zip, git, node, go (the proxy sign-in relay; CI installs the repository pin)
 #
 # RATIONALE:
 #  - The script is idempotent: every run wipes build/macos so the output is a
@@ -377,6 +377,21 @@ assemble_native_runtime() {
 	done
 	lipo -create "$switcher_build/arm64" "$switcher_build/x86_64" \
 		-output "$APP_PATH/Contents/MacOS/SystemSwitcherState"
+	# The local NTLM/Negotiate relay (docs/design/proxy-auth-relay.md): one
+	# universal binary beside the launcher, where field_check_ports.lua and
+	# network-retry.sh resolve it. Its cgo half opens GSS.framework with dlopen,
+	# so each slice is compiled with the clang of its own architecture.
+	local relay_build="$BUILD_DIR/proxy-relay"
+	mkdir -p "$relay_build"
+	local relay_arch
+	for relay_arch in arm64 amd64; do
+		local clang_arch="$relay_arch"
+		[ "$relay_arch" = amd64 ] && clang_arch=x86_64
+		bash "$REPO_ROOT/tools/build/build-proxy-relay.sh" --goarch "$relay_arch" \
+			--cc "xcrun clang -arch $clang_arch -mmacosx-version-min=12.0" --output "$relay_build/$relay_arch"
+	done
+	lipo -create "$relay_build/arm64" "$relay_build/amd64" \
+		-output "$APP_PATH/Contents/MacOS/ergopti-proxy-relay"
 	local remap_guardian_plist="$LAUNCHER_DIR/${ERGOPTI_SERVICE_LABEL_MACOS_REMAP_GUARDIAN}.plist"
 	[ -f "$remap_guardian_plist" ] || fail "Remap guardian LaunchAgent plist missing."
 	cp "$remap_guardian_plist" \
@@ -810,6 +825,9 @@ codesign_native_runtime() {
 	local switcher="$APP_PATH/Contents/MacOS/SystemSwitcherState"
 	[ -f "$switcher" ] || fail "Native switcher state helper is missing."
 	sign_code --identifier "$BUNDLE_ID.system-switcher-state" "$switcher"
+	local relay="$APP_PATH/Contents/MacOS/ergopti-proxy-relay"
+	[ -f "$relay" ] || fail "Proxy sign-in relay is missing."
+	sign_code --identifier "$BUNDLE_ID.proxy-relay" "$relay"
 	mkdir -p "$APP_PATH/Contents/Resources"
 	sha256_file_digest "$switcher" > "$APP_PATH/Contents/Resources/system-switcher-state.sha256"
 
@@ -884,7 +902,7 @@ zip_app() {
 # Produce the native runtime used by a Git checkout without acquiring any of
 # the full application's bundled drivers, language runtimes or model engines.
 build_native_helper() {
-	for cmd in swift xcrun shasum awk lipo codesign plutil zip find; do require_cmd "$cmd"; done
+	for cmd in swift xcrun shasum awk lipo codesign plutil zip find go; do require_cmd "$cmd"; done
 	check_signing_configuration
 	BUILD_DIR="$REPO_ROOT/build/macos-native-helper"
 	APP_PATH="$BUILD_DIR/$ERGOPTI_APP_BUNDLE"
@@ -919,7 +937,7 @@ main() {
 	[[ $# -eq 0 ]] || fail "Expected no arguments or --native-helper-only."
 	check_dev_source_configuration
 	select_launcher_archs
-	for cmd in curl unzip zip ditto tar swift xcrun awk lipo codesign iconutil sips plutil shasum git node; do
+	for cmd in curl unzip zip ditto tar swift xcrun awk lipo codesign iconutil sips plutil shasum git node go; do
 		require_cmd "$cmd"
 	done
 	check_signing_configuration
