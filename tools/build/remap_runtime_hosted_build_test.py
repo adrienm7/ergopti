@@ -16,6 +16,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -399,6 +400,101 @@ class MachOAlignmentControls(unittest.TestCase):
         ):
             with self.subTest(original=original, signed=signed):
                 self.assertEqual(self.outcome(original, signed), "content")
+
+
+class SignatureSlackControls(unittest.TestCase):
+    """codesign zero-pads its reserved signature space; the linker's is tight."""
+
+    OFFSET = 4096
+
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location(
+            "remap_runtime_macho_slack_subject",
+            Path(__file__).with_name("remap_runtime_macho.py"),
+        )
+        self.macho = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.macho)
+
+    def image(self, signed, padding, fill=b"\0"):
+        """Return file bytes and the reserved size of one minimal signature superblob."""
+        identifier = b"x\0\0\0"
+        directory = struct.pack(
+            ">9I4BI",
+            0xFADE0C02,
+            48 + 32,
+            0x20400,
+            0 if signed else 2,
+            48,
+            44,
+            0,
+            1,
+            self.OFFSET,
+            32,
+            2,
+            0,
+            12,
+            0,
+        )
+        directory += identifier + bytes(32)
+        blobs = [(0, directory)]
+        if signed:
+            blobs += [(2, struct.pack(">II", 0xFADE0C01, 12) + bytes(4))]
+            blobs += [(0x10000, struct.pack(">II", 0xFADE0B01, 12) + bytes(4))]
+        table_end = 12 + len(blobs) * 8
+        table, body, position = b"", b"", table_end
+        for slot, blob in blobs:
+            table += struct.pack(">II", slot, position)
+            body += blob
+            position += len(blob)
+        superblob = struct.pack(">III", 0xFADE0CC0, position, len(blobs)) + table + body
+        reserved = len(superblob) + padding
+        data = bytes(self.OFFSET) + superblob + fill * padding
+        return data, reserved
+
+    def check(self, signed, padding, fill=b"\0"):
+        data, reserved = self.image(signed, padding, fill)
+        self.macho._signature(data, self.OFFSET, reserved, signed, 10**9)
+
+    def test_codesign_reserved_zero_padding_is_admitted(self):
+        # Run 41247532775: codesign reserved far more than its superblob length.
+        self.check(True, 4096)
+
+    def test_codesign_padding_must_stay_zero(self):
+        with self.assertRaises(self.macho.MachORefusal) as caught:
+            self.check(True, 4096, b"\1")
+        self.assertEqual(caught.exception.code, "shape")
+
+    def test_linker_signature_stays_tight(self):
+        self.check(False, 15)
+        with self.assertRaises(self.macho.MachORefusal) as caught:
+            self.check(False, 16)
+        self.assertEqual(caught.exception.code, "signature")
+
+
+class LinkeditRoundingControls(unittest.TestCase):
+    """The signed __LINKEDIT vmsize is its size rounded to an admitted page."""
+
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location(
+            "remap_runtime_macho_linkedit_subject",
+            Path(__file__).with_name("remap_runtime_macho.py"),
+        )
+        self.macho = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.macho)
+
+    def test_observed_codesign_rounding_is_admitted(self):
+        # Run 41247532775: both slices as codesign laid them out.
+        admitted = self.macho._linkedit_vm_admitted
+        self.assertTrue(admitted(0x01000007, 5214208, 5304272, 5308416))
+        self.assertTrue(admitted(0x0100000C, 5275648, 5288064, 5292032))
+
+    def test_x86_64_admits_either_page_and_arm64_only_16k(self):
+        admitted = self.macho._linkedit_vm_admitted
+        self.assertTrue(admitted(0x01000007, 0, 5304272, 5304320))
+        self.assertFalse(admitted(0x0100000C, 0, 5304272, 5304320))
+        self.assertFalse(admitted(0x01000007, 0, 5304272, 5308416 + 16384))
+        self.assertTrue(admitted(0x0100000C, 6000000, 5288064, 6000000))
+        self.assertFalse(admitted(0x0100000C, 5000000, 5288064, 5000000))
 
 
 class RefusalOriginControls(unittest.TestCase):

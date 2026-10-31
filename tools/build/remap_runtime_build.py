@@ -1240,7 +1240,7 @@ class _PreparationSink:
 
 
 MACHO_RELATIVE = "tools/build/remap_runtime_macho.py"
-MACHO_SHA256 = "212fc3ee09287241b73fe48773730f3e2d532177f7e576a4b8dad2b40980f88c"
+MACHO_SHA256 = "2a695acf4c239d0746357a531cef542f9be0db4315f0b8fbaeaac0e98b013122"
 _SIGNED_PRODUCTS = (
     ("Runtime/ErgoptiPlus-Remap-Core.app", "com.ergoptiplus.remap.core", "ErgoptiPlus-Remap-Core"),
     (
