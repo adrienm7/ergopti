@@ -778,14 +778,14 @@ end
 function M.login_items(ports, report, finish)
 	local app_path = ports.app_path()
 	report.step("this_copy_known", STATE.info, yes_no(app_path ~= nil))
-	-- What an ad hoc build did to its stale guardian registrations before this
-	-- lifecycle's registration (RemapGuardianRegistrationNote), with that
-	-- registration's own answer. A refused reset leaves the stale definition
-	-- whose spawn macOS killed (field run 2026-10-30); a reset whose registration
-	-- was not ready at once is the same 10 s throttle again.
+	-- What an ad hoc build did with its guardian registrations in this
+	-- lifecycle (RemapGuardianRegistrationNote), with that registration's own
+	-- answer. A refused removal leaves a Background Items record whose spawn
+	-- macOS kills (field runs 2026-10-30 and 2026-10-31); a legacy-only
+	-- registration that is not ready leaves remapping without a guardian.
 	local note, status = ports.guardian_registration_note()
 	local failed = note == "developer_adhoc_reset_refused"
-		or (note == "developer_adhoc_reregistered" and status ~= "ready")
+		or (note == "developer_adhoc_legacy_only" and status ~= "ready")
 	report.step("guardian_registration", failed and STATE.fail or STATE.info,
 		(note or "no_reset") .. ":" .. (status or "unknown"))
 
