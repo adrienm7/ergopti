@@ -302,7 +302,7 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 		raw := IniCacheGet(Cache, "llm", "ollama_port")
 		; Earlier releases saved the stock port, which now belongs to the user's
 		; own Ollama: such a value is dropped once, as on macOS, and is no error.
-		if (raw == LLM_Defaults["llm_ollama_port"])
+		if LLM_Option_IsStockOllamaPort(raw)
 			LoggerInfo("LLM", "Saved Ollama port {1} is the stock port; Ergopti's own Ollama keeps its port.", raw)
 		else if !((raw is String) && raw == "_")
 			_LLM_Menu_PutValidatedPersistedOption(
