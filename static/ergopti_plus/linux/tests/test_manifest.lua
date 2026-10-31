@@ -266,6 +266,7 @@ return {
 	"tests.unit.infra.lifecycle.test_diagnostic_snapshot",
 	"tests.unit.infra.lifecycle.test_display_server",
 	"tests.unit.infra.lifecycle.test_driver_version",
+	"tests.unit.infra.lifecycle.test_gui_stack",
 	"tests.unit.infra.lifecycle.test_input_access",
 	"tests.unit.infra.lifecycle.test_input_capture_gate",
 	"tests.unit.infra.lifecycle.test_installation",

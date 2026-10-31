@@ -2336,6 +2336,12 @@ local function main()
 	BootProfiler.stage("tray")
 	if opts.tray and tray_menu then
 		Logger.info(LOG, "Tray icon requested — starting.")
+		-- GTK, libayatana-appindicator, lgi and WebKitGTK are the host's (owned
+		-- runtimes, SYS): a missing one is named here rather than leaving an
+		-- invisible daemon or windows that never open.
+		local refusal = require("infra.gui_stack").check_at_start({ indicator = require("platform.tray.appindicator"),
+			i18n = ok_i18n and i18n_mod or nil, notifier = notifier })
+		if refusal then os.exit(refusal) end
 		tray_menu.setIcon({ title = "Ergopti" })
 		if not privacy_owners.startup_checkpoint() then return end
 
