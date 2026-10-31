@@ -43,6 +43,7 @@ local NativePath = require("native_path")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
 local TimerScheduler = require("adapters.timer_scheduler")
+local PhaseStats = require("infra.phase_stats")
 local JsonCodec  = require("adapters.json_codec")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
@@ -3394,6 +3395,9 @@ function M.merge_and_deploy_config(
 		return false, detail, 1
 	end
 
+	-- The merge (read, decode, compare), the encode and the write are phases:
+	-- the field run names the one a late run loop or a hold spent its time in.
+	local merge_started = PhaseStats.now()
 	local merge_ok, merged, merge_err, source_snapshot, merge_changed, merge_refusal = pcall(
 		M.merge_into_existing_config,
 		hs_config,
@@ -3401,6 +3405,7 @@ function M.merge_and_deploy_config(
 		legacy_fingerprints,
 		legacy_context
 	)
+	PhaseStats.stop("karabiner.merge", merge_started)
 	if not merge_ok or type(merged) ~= "table" then
 		local detail = "merge failed: " .. tostring(merge_ok and merge_err or merged)
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
@@ -3450,7 +3455,9 @@ function M.merge_and_deploy_config(
 		return skip_identical("the managed rules on disk already match")
 	end
 
+	local encode_started = PhaseStats.now()
 	local encode_ok, content = pcall(hs.json.encode, merged, true)
+	PhaseStats.stop("karabiner.encode", encode_started)
 	if not encode_ok or type(content) ~= "string" then
 		local detail = "JSON encode failed: " .. tostring(content)
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
@@ -3470,6 +3477,7 @@ function M.merge_and_deploy_config(
 		source_snapshot
 	)
 	local write_ms = (TimerScheduler.awake_time() - write_started) * 1000
+	PhaseStats.add_ms("karabiner.write", write_ms)
 	if not call_ok or deployed ~= true then
 		local detail = "write failed: " .. tostring(call_ok and deploy_detail or deployed)
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)

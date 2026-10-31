@@ -42,7 +42,7 @@ local function make_ports()
 		timer_probe = function(seconds, callback)
 			world.probes = world.probes + 1
 			world.seconds = seconds
-			callback(world.lateness[world.probes] or 0)
+			callback(world.lateness[world.probes] or 0, world.phases and world.phases[world.probes] or nil)
 		end,
 	}
 	return ports, world
@@ -78,6 +78,20 @@ helpers.describe("event taps probe", function()
 		local quiet = run(ports)
 		helpers.assert_eq(quiet.worst_hold_ms.value, "none")
 		helpers.assert_eq(quiet.worst_hold_site.value, "none")
+	end)
+
+	helpers.it("(runloop-late-phase) names the phase that held the run loop during the latest probe", function()
+		local ports, world = make_ports()
+		world.lateness = { 3, 352, 2, 8, 4 }
+		world.phases = { nil, "karabiner.build=201.4 ms, karabiner.merge=96.0 ms", nil, "toml.parse=3.0 ms", nil }
+		local steps = run(ports)
+		helpers.assert_eq(steps.runloop_late_ms.state, "fail")
+		helpers.assert_eq(steps.runloop_late_phase.state, "info")
+		helpers.assert_eq(steps.runloop_late_phase.value, "karabiner.build:201",
+			"the longest phase of the latest probe names the source")
+		world.phases = nil
+		world.lateness = { 3, 5, 2, 8, 4 }
+		helpers.assert_eq(run(ports).runloop_late_phase.value, "none")
 	end)
 
 	helpers.it("passes with every tap enabled, the watchdog running and a punctual run loop", function()
