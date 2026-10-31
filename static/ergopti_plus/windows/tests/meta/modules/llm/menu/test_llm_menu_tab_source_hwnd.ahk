@@ -151,11 +151,15 @@ _TLTSH_RequestSourceIsBoundAndPublished() {
 		"source capture must produce one fail-closed HWND/focused-control snapshot")
 	Assert(InStr(CaptureBody, "WIGetFocusedControlToken()") > 0,
 		"source capture must use focused-control identity, not top-level HWND alone")
-	; The third bound argument is live mode's prompt override (or 0)
-	Assert(InStr(OnKeyBody, "LLM_Engine_FirePrediction.Bind(buffer, AcceptSource,") > 0,
+	; An armed timer answers to the request plan first, so the snapshot travels
+	; through the arm; the last bound argument is live mode's prompt override (or 0).
+	ArmBody := _DriverFuncBody("_LLM_Engine_FireArmed")
+	Assert(InStr(OnKeyBody, '_LLM_Engine_FireArmed.Bind(Decision["token"], buffer, AcceptSource,') > 0,
 		"per-keystroke debounce must bind the source snapshot into its timer closure")
-	Assert(InStr(StartBody, "LLM_Engine_FirePrediction.Bind(buffer, AcceptSource,") > 0,
+	Assert(InStr(StartBody, '_LLM_Engine_FireArmed.Bind(Decision["token"], buffer, AcceptSource,') > 0,
 		"hotstring-chain timer must bind its own source snapshot too")
+	Assert(InStr(ArmBody, "LLM_Engine_FirePrediction(Buffer, AcceptSource, Override)") > 0,
+		"an armed timer must hand its bound source snapshot to FirePrediction")
 	Assert(InStr(FireBody, '"request_accept_source"') > 0,
 		"FirePrediction must attach the bound source to the current request id")
 	Assert(InStr(SourceForRenderBody, 'RequestId == ""') > 0
@@ -217,10 +221,10 @@ _TLTSH_RequestSourceIsBoundAndPublished() {
 		"LLM_Engine_FirePrediction.Bind(buffer, AcceptSource")
 	AssertEqual(2, BoundTimers,
 		"both FirePrediction retry bindings must carry AcceptSource; a newly added raw Bind is an unowned-control regression")
-	; The two debounce timers reach FirePrediction through the request plan's token.
-	AssertEqual(2, _TLTSH_Count(DriverSrc,
-		'_LLM_Engine_FireArmed.Bind(Decision["token"], buffer, AcceptSource,'),
-		"both armed debounce timers must carry AcceptSource; a newly added raw Bind is an unowned-control regression")
+	AssertEqual(2, _TLTSH_Count(DriverSrc, '_LLM_Engine_FireArmed.Bind(Decision["token"], buffer, AcceptSource'),
+		"both armed debounce bindings must carry AcceptSource; a newly added raw Bind is an unowned-control regression")
+	AssertEqual(4, _TLTSH_Count(DriverSrc, "LLM_Engine_FirePrediction.Bind(") + _TLTSH_Count(DriverSrc, "_LLM_Engine_FireArmed.Bind("),
+		"exactly four timer bindings may reach FirePrediction, all counted above")
 	; The warmup and rate-limit re-arms replay a prompt action's own request.
 	AssertEqual(2, _TLTSH_Count(DriverSrc,
 		"LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)"),

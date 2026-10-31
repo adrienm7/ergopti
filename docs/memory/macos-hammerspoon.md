@@ -1059,6 +1059,55 @@ only the in-memory `guardian_state()`; the remap readiness wait stays the one
 native poller and the one path that deploys the retained regeneration on
 `ready`. Do not add a second status probe or deploy path for the dialog.
 
+### project-macos-launcher-log-stays-in-the-default-folder
+
+`launcher.log` and `hammerspoon-fatal.txt` are written by the native launcher
+before any configuration is read, so they stay in `~/Library/Logs/ergopti_plus`
+whatever `LogsDirPath` says; only the daily and topical logs move. The macOS
+field-report collector looked for them in the moved folder and skipped them
+without a trace, so no 2026-10-30 report carried `launcher.log` and the reload
+lost at 21:06 kept no record of how the launcher saw its runtime end. Read them
+from `LOG_DEFAULT_DIR` (`tools/dev/field-report-paths.py`).
+
+### project-macos-controlled-reload-has-a-deadline
+
+A controlled reload arms `ui.reload_deadline_ms` when accepted. Still
+unsettled then, it reloads natively without the local teardown, naming the
+stage it waited on; the previous worker's stdin EOF lets the guardian fence the
+exact lease. Without it, a fence that never answered left the app up with its
+remaps revoked indefinitely. An unowned reload whose fence is refused reloads
+natively the same way, since the revocation cannot be undone in that VM; an
+owned reload (`request_reload_owned`) and an exit keep their exact abort.
+
+### project-hs-adhoc-guardian-reregisters-before-registering
+
+An ad hoc build (no TeamIdentifier: every developer build, and the ad hoc ZIP
+release) changes cdhash on each rebuild, and launchd spawned the guardian under
+the definition recorded for the previous one: macOS killed it about 3 s after
+registration (CODESIGNING 4, Launch Constraint Violation, parent launchd) and
+only the relaunch after the 10 s ThrottleInterval survived (field run
+2026-10-30, with this copy's legacy plist and its Background Items record both
+present). `resetAdhocRemapGuardianRegistration` therefore removes the exact own
+legacy plist and `unregister()`s an enabled record, then proves the job gone
+(launchctl 113, singleton lock free) before `register()`. Live lease records
+and a pending approval keep the registration. The register role prints the
+note (`developer_adhoc_*`) on a second line; the driver logs it and
+`field_login_items` reports it as `guardian_registration`. A Developer ID build
+never takes the reset. Its launchctl steps and waits are counted by
+`test-hardening-d-native-timeout-contract.cjs`.
+
+### project-macos-reload-breadcrumb
+
+A controlled reload writes `reload_breadcrumb.txt` in the default logs folder
+synchronously, one `<stage> <ms since the Mac's boot>` line per coordinator
+stage and teardown step (`adapters/reload_breadcrumb.lua`), because a reload
+that loses the app discards its queued log lines (2026-10-30 21:06: the day log
+stopped at the lease revocation, no boot and no crash report followed). The
+next boot appends `boot`; the macOS field-report collector copies the file.
+The error window stays closed while `TerminationCoordinator.terminal_in_progress()`
+holds: one opened mid-reload in that run. Keep `driver_reload` disabled until a
+trail names the stage the app is lost in.
+
 ### project-hs-kc-ledger-process-lifecycle
 
 The Karabiner physical-key ledger keeps draining when metrics are disabled.
@@ -1805,3 +1854,19 @@ rewritten enabled loose layout applies after `TISRegisterInputSource` on its
 file (P8 a). SystemUIServer is `com.apple.SystemUIServer.agent` in `gui/<uid>`;
 a kickstart of `user/<uid>/com.apple.SystemUIServer` answers 113. The same
 Ergopti bundle in ~/Library and /Library makes macOS renumber one copy's ids.
+
+### project-keylayout-rows-keep-shortcut-keymaps
+
+A `.keylayout` without a Command or Control `keyMapSelect` (Ergo-L) sends Cmd+1
+and Ctrl+1 to `defaultIndex`, usually the plain keyMap 0. Rewriting that keyMap
+for the number-row options would therefore change the shortcuts too, while the
+XKB converter reads each level before its swap and keeps them.
+`layouts/keylayout_rows.lua` first routes every press with Cmd, Ctrl or Option
+that selected a rewritten keyMap to a verbatim copy of it (exact
+`keyMapSelect` entries inserted first, since the first match wins).
+`test-keylayout-row-options.cjs` proves the edited file against the converter
+on the registry layouts. Action: any other `.keylayout` rewrite (per-key edits)
+goes through the same copy, and tag positions come from `layouts.keylayout`
+(`positions`, `key_positions`): the single-reader gate refuses a second
+scanner. A macOS build of a changed layout always gets a new name and id
+(probe M3); `field_layout_rows` proves the live replace on the Mac.

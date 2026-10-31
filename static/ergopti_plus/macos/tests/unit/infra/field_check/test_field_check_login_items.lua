@@ -85,6 +85,7 @@ local function make_ports(overrides)
 		home = function() return HOME end,
 		app_path = function() return world.app end,
 		login_startup_status = function(callback) callback(world.startup) end,
+		guardian_registration_note = function() return world.registration_note, world.registration_status end,
 	}
 	for name, value in pairs(overrides or {}) do ports[name] = value end
 	return ports, world
@@ -364,5 +365,24 @@ helpers.describe("login items: the check", function()
 		world.outputs["/usr/bin/plutil -extract Label raw -o - -- " .. old] = { 1, "" }
 		local steps = run(ports)
 		helpers.assert_eq(steps.agent_item_2.value, "unnamed:other:unk")
+	end)
+
+	helpers.it("names the ad hoc guardian registration reset and fails a refused or slow one", function()
+		for _, case in ipairs({
+			{ "developer_adhoc_reregistered", "ready", true },
+			{ "developer_adhoc_reregistered", "unavailable", false },
+			{ "developer_adhoc_reset_deferred", "requires_approval", true },
+			{ "developer_adhoc_reset_refused", "ready", false },
+		}) do
+			local ports, world = make_ports()
+			populated(world)
+			world.registration_note, world.registration_status = case[1], case[2]
+			local steps, result = run(ports)
+			helpers.assert_eq(steps.guardian_registration.value, case[1] .. ":" .. case[2])
+			helpers.assert_eq(result.passed, case[3], case[1] .. ":" .. case[2])
+		end
+		local ports, world = make_ports()
+		populated(world)
+		helpers.assert_eq(run(ports).guardian_registration.value, "no_reset:unknown")
 	end)
 end)

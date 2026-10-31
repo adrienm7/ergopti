@@ -63,7 +63,11 @@ require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a
 const fs = require('fs');
 const path = require('path');
 const { scriptTokens } = require('../lib/script-source.cjs');
-const { readLinuxMenuSources, linuxMenuRootSource } = require('../lib/linux-menu-parts.cjs');
+const {
+	readLinuxMenuSources,
+	linuxMenuRootSource,
+	readSourceFile
+} = require('../lib/linux-menu-parts.cjs');
 const { checkParentSource } = require('../lib/menu-parent-source-gate.cjs');
 const {
 	delegatedMenuSources,
@@ -1397,14 +1401,14 @@ for (const [driver, method] of [
 
 const errors = [];
 
-const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+const manifest = JSON.parse(readSourceFile(MANIFEST));
 
 // Windows owns a leaf command in the actual Build; Lua retains genuine submenus.
 {
 	const assert = require('node:assert/strict');
 	const { nativeBuildCommandBinding } = require('../lib/menu-template-binding.cjs');
-	const source = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_llm/menu_agent.ahk'), 'utf8');
-	const renderer = fs.readFileSync(path.join(SP, 'windows/infra/manifest_menu.ahk'), 'utf8');
+	const source = readSourceFile(path.join(SP, 'windows/ui/menu/menu_llm/menu_agent.ahk'));
+	const renderer = readSourceFile(path.join(SP, 'windows/infra/manifest_menu.ahk'));
 	for (const [key, port] of [
 		['agent_disabled_apps', 1],
 		['agent_disabled_apps_count', 2]
@@ -1440,7 +1444,7 @@ for (const [driver, relative] of [
 	['macos', 'macos/ui/menu/menu_hotstrings_custom.lua'],
 	['linux', 'linux/ui/menu/menu_builder.lua']
 ]) {
-	if (!personalCommandReference(fs.readFileSync(path.join(SP, relative), 'utf8'), driver))
+	if (!personalCommandReference(readSourceFile(path.join(SP, relative)), driver))
 		errors.push(
 			`${driver}: the personal provider no longer renders its shared editor command head.`
 		);
@@ -1607,7 +1611,7 @@ function isComposedFragment(rows, kinds) {
 				Object.hasOwn(row, 'caption_joiner'))
 		) {
 			try {
-				const english = JSON.parse(fs.readFileSync(path.join(LOCALES, 'en.json'), 'utf8'));
+				const english = JSON.parse(readSourceFile(path.join(LOCALES, 'en.json')));
 				require('../lib/menu-row-availability.cjs').validateChildTemplates(
 					{ composed_caption: [row] },
 					(key) => (Object.hasOwn(english, key) ? english[key] : undefined)
@@ -1707,8 +1711,8 @@ const {
 {
 	const assert = require('node:assert/strict');
 	const { nativeLlmParentPublication } = require('../lib/menu-native-llm-parent-binding.cjs');
-	const source = fs.readFileSync(path.join(SP, 'macos/ui/menu/menu_llm/init.lua'), 'utf8');
-	const builder = fs.readFileSync(path.join(SP, 'macos/ui/menu/builder.lua'), 'utf8');
+	const source = readSourceFile(path.join(SP, 'macos/ui/menu/menu_llm/init.lua'));
+	const builder = readSourceFile(path.join(SP, 'macos/ui/menu/builder.lua'));
 	const rows = manifest.llm_native_parent;
 	const credits = (
 		candidate = source,
@@ -2051,7 +2055,7 @@ const {
 // A selected row never grants authority to additional, unconsumed group siblings.
 {
 	const assert = require('node:assert/strict');
-	const source = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'), 'utf8');
+	const source = readSourceFile(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'));
 	const key = 'hotstring_personal_default_parent',
 		rows = manifest[key];
 	const credits = (candidate, definition = rows) =>
@@ -2342,7 +2346,7 @@ const {
 		]
 	};
 	for (const [platform, file] of Object.entries(files)) {
-		const source = fs.readFileSync(path.join(SP, file), 'utf8');
+		const source = readSourceFile(path.join(SP, file));
 		const admits = (candidate = source, declarations = manifest, target = platform) =>
 			personalDefaultChoicePublication(candidate, target, declarations);
 		assert.equal(admits(), true, platform + ': genuine default-list typed check receiving');
@@ -2534,7 +2538,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 	const assert = require('node:assert/strict');
 	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
 	const file = 'linux/ui/menu/agent_rows.lua';
-	const native = fs.readFileSync(path.join(SP, file), 'utf8');
+	const native = readSourceFile(path.join(SP, file));
 	const owners = [
 		['agent_linux_disabled_app_remove', 'agent_disabled_app_remove', 1],
 		['agent_linux_disabled_app_remove', 'agent_disabled_app_caption', 2],
@@ -2666,7 +2670,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		])
 	];
 	for (const [file, platform, extension, section, key, port] of owners) {
-		const source = fs.readFileSync(path.join(SP, file), 'utf8');
+		const source = readSourceFile(path.join(SP, file));
 		const credit = (native, declarations = manifest, role = port) =>
 			nativeTemplateBinding(
 				native,
@@ -2794,7 +2798,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		}
 	];
 	for (const owner of owners) {
-		const native = fs.readFileSync(path.join(SP, owner.file), 'utf8');
+		const native = readSourceFile(path.join(SP, owner.file));
 		const extension = path.extname(owner.file);
 		const credits = (candidate, declarations = manifest, port = owner.port) =>
 			nativeTemplateBinding(
@@ -2860,7 +2864,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 	for (const [platform, file, child] of [
 		['hs', 'macos/ui/menu/menu_gestures.lua', 'gesture_system_macos_children']
 	]) {
-		const native = fs.readFileSync(path.join(SP, file), 'utf8');
+		const native = readSourceFile(path.join(SP, file));
 		const extension = path.extname(file);
 		const credits = (candidate, declarations = manifest) =>
 			publishesIncludedCommands(
@@ -2911,7 +2915,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		'macos/ui/menu/menu_llm/init.lua'
 	];
 	const sources = Object.fromEntries(
-		sourceFiles.map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
+		sourceFiles.map((file) => [file, readSourceFile(path.join(SP, file))])
 	);
 	const admits = (candidate, declarations = manifest, platform = 'hs') =>
 		nativeBadgeRootComposition(candidate, declarations, platform);
@@ -2926,11 +2930,11 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 			.slice(0, 3)
 			.map((file) => [
 				file,
-				fs.readFileSync(path.join(predecessorPath, file.replaceAll('/', '_') + '.txt'), 'utf8')
+				readSourceFile(path.join(predecessorPath, file.replaceAll('/', '_') + '.txt'))
 			])
 	);
 	const predecessorManifest = JSON.parse(
-		fs.readFileSync(path.join(predecessorPath, 'menu_manifest.json'), 'utf8')
+		readSourceFile(path.join(predecessorPath, 'menu_manifest.json'))
 	);
 	assert.equal(
 		predecessorControls.length,
@@ -3463,7 +3467,7 @@ const linuxAiSources = {
 	...Object.fromEntries(
 		['linux/ui/menu/ai_parent.lua', 'linux/ui/menu/agent_rows.lua'].map((file) => [
 			file,
-			fs.readFileSync(path.join(SP, file), 'utf8')
+			readSourceFile(path.join(SP, file))
 		])
 	),
 	'linux/ui/menu/menu_builder.lua': linuxMenuRootSource(SP)
@@ -4135,9 +4139,9 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 	const macFile = 'macos/ui/menu/builder.lua';
 	const layoutFile = 'macos/ui/menu/menu_keyboard_layout.lua';
 	const linuxFile = 'linux/ui/menu/menu_builder.lua';
-	const mac = fs.readFileSync(path.join(SP, macFile), 'utf8');
-	const layout = fs.readFileSync(path.join(SP, layoutFile), 'utf8');
-	const linux = fs.readFileSync(path.join(SP, linuxFile), 'utf8');
+	const mac = readSourceFile(path.join(SP, macFile));
+	const layout = readSourceFile(path.join(SP, layoutFile));
+	const linux = readSourceFile(path.join(SP, linuxFile));
 	const admitsMac = (source) => proof.nativeMacLayoutTopLevelPublication(source, layout, manifest);
 	const admitsLinux = (source) => proof.nativeLinuxTapHoldAbsentPublication(source, manifest);
 	assert.equal(
@@ -4584,7 +4588,7 @@ const personalInfoProviders = {
 const personalInfoSources = Object.fromEntries(
 	Object.entries(personalInfoProviders).map(([platform, { file }]) => [
 		platform,
-		fs.readFileSync(path.join(SP, file), 'utf8')
+		readSourceFile(path.join(SP, file))
 	])
 );
 
@@ -4819,10 +4823,7 @@ function shortcutConstructionPublication(sources, target, nativeFile) {
 		])
 	)
 		return false;
-	const canonical = fs.readFileSync(
-		path.join(ROOT, 'tools/test/test-ahk-loop-capture.cjs'),
-		'utf8'
-	);
+	const canonical = readSourceFile(path.join(ROOT, 'tools/test/test-ahk-loop-capture.cjs'));
 	const first = canonical.indexOf('function codeLines(src) {'),
 		last = canonical.indexOf('/**', first);
 	if (first < 0 || last <= first) return false;
@@ -4942,7 +4943,7 @@ function shortcutConstructionPublication(sources, target, nativeFile) {
 	const assert = require('node:assert/strict');
 	const files = ['windows/ui/menu/menu_shortcuts.ahk', 'windows/infra/manifest_menu.ahk'];
 	const actual = Object.fromEntries(
-		files.map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
+		files.map((file) => [file, readSourceFile(path.join(SP, file))])
 	);
 	const nativeFile = files[1];
 	const targets = [
@@ -5019,7 +5020,7 @@ function personalFrameSources() {
 			'windows/ui/menu/menu_init.ahk',
 			'windows/infra/manifest_menu.ahk',
 			'windows/adapters/tray_menu.ahk'
-		].map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
+		].map((file) => [file, readSourceFile(path.join(SP, file))])
 	);
 }
 
@@ -5302,33 +5303,33 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 										)
 									: opened.completed_parent?.[platform] === 'llm'
 										? require('../lib/menu-native-llm-parent-binding.cjs').nativeLlmParentPublication(
-												fs.readFileSync(path.join(SP, file), 'utf8'),
-												fs.readFileSync(path.join(SP, 'macos/ui/menu/builder.lua'), 'utf8'),
+												readSourceFile(path.join(SP, file)),
+												readSourceFile(path.join(SP, 'macos/ui/menu/builder.lua')),
 												manifest[target],
 												manifest.top_level,
 												platform
 											)
 										: opened.forwarded_template?.[platform] === 'layout'
 											? require('../lib/menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
-													fs.readFileSync(path.join(SP, file), 'utf8'),
+													readSourceFile(path.join(SP, file)),
 													target,
 													manifest[target]
 												)
 											: opened.personal_section_choice === true
 												? require('../lib/menu-hotstring-language-binding.cjs').personalSectionChoicePublication(
-														fs.readFileSync(path.join(SP, file), 'utf8'),
+														readSourceFile(path.join(SP, file)),
 														platform,
 														manifest
 													)
 												: opened.personal_default_choice === true
 													? require('../lib/menu-hotstring-language-binding.cjs').personalDefaultChoicePublication(
-															fs.readFileSync(path.join(SP, file), 'utf8'),
+															readSourceFile(path.join(SP, file)),
 															platform,
 															manifest
 														)
 													: opened.selected_group?.[platform]
 														? publishesSelectedMenuGroup(
-																fs.readFileSync(path.join(SP, file), 'utf8'),
+																readSourceFile(path.join(SP, file)),
 																path.extname(file),
 																target,
 																manifest[target],
@@ -5340,21 +5341,18 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 																		[
 																			'windows/ui/menu/menu_shortcuts.ahk',
 																			'windows/infra/manifest_menu.ahk'
-																		].map((owned) => [
-																			owned,
-																			fs.readFileSync(path.join(SP, owned), 'utf8')
-																		])
+																		].map((owned) => [owned, readSourceFile(path.join(SP, owned))])
 																	),
 																	target,
 																	file
 																)
 															: publishesTemplate(
-																	fs.readFileSync(path.join(SP, file), 'utf8'),
+																	readSourceFile(path.join(SP, file)),
 																	path.extname(file),
 																	target
 																) ||
 																publishesIncludedCommands(
-																	fs.readFileSync(path.join(SP, file), 'utf8'),
+																	readSourceFile(path.join(SP, file)),
 																	path.extname(file),
 																	target,
 																	manifest,
@@ -5523,7 +5521,7 @@ if (localeFiles.length < 15) {
 }
 
 for (const file of localeFiles) {
-	const table = JSON.parse(fs.readFileSync(path.join(LOCALES, file), 'utf8'));
+	const table = JSON.parse(readSourceFile(path.join(LOCALES, file)));
 	for (const entry of namedKeys) {
 		if (table[entry.key] !== undefined) continue;
 		errors.push(
@@ -5712,7 +5710,7 @@ function driverSource(root) {
 				if (entry.name === 'tests' || entry.name === '_generated') continue;
 				walk(full);
 			} else if (entry.name.endsWith('.lua')) {
-				const src = fs.readFileSync(full, 'utf8');
+				const src = readSourceFile(full);
 				out += src;
 				sources.push({ rel: path.relative(root, full), src });
 			}
@@ -5773,10 +5771,7 @@ function numberRowGetterSource(source) {
 	// A driver that applies the rows live (Linux) passes its owner as a third
 	// argument; the shared policy then answers the choice from that owner's getter.
 	if (callTail(['symbol:,', 'symbol:{'])) {
-		const shared = fs.readFileSync(
-			path.join(SP, '_shared/lua/layout/number_row_policy.lua'),
-			'utf8'
-		);
+		const shared = readSourceFile(path.join(SP, '_shared/lua/layout/number_row_policy.lua'));
 		if (
 			!contains(source, ['identifier:get_order', 'symbol:=', 'identifier:function']) ||
 			!contains(shared, [
@@ -5824,10 +5819,7 @@ function numberRowGetterSource(source) {
 		])
 	)
 		return '';
-	const sharedSource = fs.readFileSync(
-		path.join(SP, '_shared/lua/layout/number_row_policy.lua'),
-		'utf8'
-	);
+	const sharedSource = readSourceFile(path.join(SP, '_shared/lua/layout/number_row_policy.lua'));
 	if (
 		!contains(sharedSource, [
 			'identifier:function',
@@ -5926,7 +5918,7 @@ for (const [driver, root] of Object.entries(DRIVER_ROOTS)) {
 	const keys = new Set([...src.matchAll(/ManifestMenu\.build\(\s*"([a-z_]+)"/g)].map((m) => m[1]));
 	// This parent now completes admitted canonical DATA without invoking Build.
 	const languageFile = driver === 'hs' ? 'ui/menu/builder.lua' : 'ui/menu/menu_builder.lua';
-	if (languageParentSource(fs.readFileSync(path.join(root, languageFile), 'utf8'), driver))
+	if (languageParentSource(readSourceFile(path.join(root, languageFile)), driver))
 		keys.add('language_menu');
 	renderedCounts[driver] = keys.size;
 
@@ -6010,7 +6002,7 @@ for (const platform of PLATFORMS) {
 	const assert = require('node:assert/strict');
 	const headerRoot =
 		require('../lib/menu-native-llm-parent-binding.cjs').declaredLinuxTopLevelPublication;
-	const headerSource = fs.readFileSync(path.join(SP, 'linux/ui/menu/menu_builder.lua'), 'utf8');
+	const headerSource = readSourceFile(path.join(SP, 'linux/ui/menu/menu_builder.lua'));
 	assert.equal(headerRoot(headerSource), true, 'actual complete shared header root is admitted');
 	for (const [before, after, reason] of [
 		[
@@ -6283,7 +6275,7 @@ function languageParentSource(source, driver) {
 		['hs', 'macos/ui/menu/builder.lua'],
 		['linux', 'linux/ui/menu/menu_builder.lua']
 	]) {
-		const source = fs.readFileSync(path.join(SP, file), 'utf8');
+		const source = readSourceFile(path.join(SP, file));
 		assert(
 			languageParentSource(source, driver),
 			'the actual new Language route has genuine renderer ownership'
@@ -6341,18 +6333,18 @@ function languageParentSource(source, driver) {
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
 	const menu = JSON.parse(
-		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+		readSourceFile(path.join(base, '_shared/modules/menu/menu_manifest.json'))
 	);
 	assert.deepEqual(
 		menu.top_level.filter((row) => row.id === 'debug'),
 		[{ type: 'group', id: 'debug', i18n: 'menu.debug.title', rows: [] }]
 	);
 	const hand = JSON.parse(
-		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/debug_parent.json'), 'utf8')
+		readSourceFile(path.join(base, '_shared/tests/corpus/menus/debug_parent.json'))
 	);
 	for (const code of ['en', 'fr']) {
 		const locale = JSON.parse(
-			fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8')
+			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.debug.title']);
 		assert.equal(hand[code].linux[0], locale['menu.debug.log_level'] + ' : ℹ️ INFO');
@@ -6493,7 +6485,7 @@ function languageParentSource(source, driver) {
 			'return ManifestMenu.group_row("top_level", "debug", rows, render_ctx.state_getters)'
 		]
 	]) {
-		const source = fs.readFileSync(path.join(base, file), 'utf8');
+		const source = readSourceFile(path.join(base, file));
 		const outer =
 			driver === 'hs' ? ownerBody(source, 'function M.generate(ctx, menu_mods, actions)') : source;
 		const native = ownerBody(outer, signature);
@@ -6593,7 +6585,7 @@ function languageParentSource(source, driver) {
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
 	const menu = JSON.parse(
-		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+		readSourceFile(path.join(base, '_shared/modules/menu/menu_manifest.json'))
 	);
 	assert.deepEqual(
 		menu.top_level.filter((row) => row.id === 'configuration'),
@@ -6607,11 +6599,11 @@ function languageParentSource(source, driver) {
 		]
 	);
 	const hand = JSON.parse(
-		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/configuration_parent.json'), 'utf8')
+		readSourceFile(path.join(base, '_shared/tests/corpus/menus/configuration_parent.json'))
 	);
 	for (const code of ['en', 'fr']) {
 		const locale = JSON.parse(
-			fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8')
+			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.configuration.title']);
 		assert.deepEqual(hand[code].children, [
@@ -6759,7 +6751,7 @@ function languageParentSource(source, driver) {
 			'return ManifestMenu.group_row("top_level", "configuration", rows, render_ctx.state_getters)'
 		]
 	]) {
-		const source = fs.readFileSync(path.join(base, file), 'utf8');
+		const source = readSourceFile(path.join(base, file));
 		const outer =
 			driver === 'hs' ? ownerBody(source, 'function M.generate(ctx, menu_mods, actions)') : source;
 		const native = ownerBody(outer, signature);
@@ -6865,7 +6857,7 @@ function languageParentSource(source, driver) {
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
 	const menu = JSON.parse(
-		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+		readSourceFile(path.join(base, '_shared/modules/menu/menu_manifest.json'))
 	);
 	assert.deepEqual(
 		menu.top_level.filter((row) => row.id === 'metrics'),
@@ -6881,11 +6873,11 @@ function languageParentSource(source, driver) {
 		]
 	);
 	const hand = JSON.parse(
-		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/metrics_parent.json'), 'utf8')
+		readSourceFile(path.join(base, '_shared/tests/corpus/menus/metrics_parent.json'))
 	);
 	for (const code of ['en', 'fr']) {
 		const locale = JSON.parse(
-			fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8')
+			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code], locale['menu.metrics.title']);
 	}
@@ -7012,7 +7004,7 @@ function languageParentSource(source, driver) {
 		['hs', 'macos/ui/menu/menu_metrics.lua', 'function M.build(ctx)'],
 		['linux', 'linux/ui/menu/menu_builder.lua', 'local function _build_metrics(ctx)']
 	]) {
-		const source = fs.readFileSync(path.join(base, file), 'utf8');
+		const source = readSourceFile(path.join(base, file));
 		const native = ownerBody(source, signature);
 		const checked =
 			driver === 'hs' ? 'STATE_GETTERS' : '{ keystats_enabled = function() return on end }';
@@ -7144,10 +7136,10 @@ function languageParentSource(source, driver) {
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
 	const menu = JSON.parse(
-		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+		readSourceFile(path.join(base, '_shared/modules/menu/menu_manifest.json'))
 	);
 	const hand = JSON.parse(
-		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/linux_about_parent.json'), 'utf8')
+		readSourceFile(path.join(base, '_shared/tests/corpus/menus/linux_about_parent.json'))
 	);
 	assert.deepEqual(
 		menu.top_level.filter((row) => row.id === 'about'),
@@ -7186,7 +7178,7 @@ function languageParentSource(source, driver) {
 	);
 	for (const [code, prior] of Object.entries(hand.locales)) {
 		const labels = JSON.parse(
-			fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8')
+			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
 		);
 		assert.equal(labels['menu.about.title'], prior.about_parent);
 		assert.equal(labels['menu.about.changelog'], prior.changelog);
@@ -7367,7 +7359,7 @@ function languageParentSource(source, driver) {
 			return false;
 		}
 	}
-	const source = fs.readFileSync(path.join(base, 'linux/ui/menu/menu_builder.lua'), 'utf8');
+	const source = readSourceFile(path.join(base, 'linux/ui/menu/menu_builder.lua'));
 	assert.equal(
 		admits(source),
 		true,
@@ -7496,13 +7488,10 @@ function languageParentSource(source, driver) {
 	const assert = require('node:assert/strict');
 	const proof = require('../lib/menu-native-llm-parent-binding.cjs');
 	const expected = JSON.parse(
-		fs.readFileSync(
-			path.join(__dirname, 'fixtures/menu-macos-configuration-recovery-dispatch.json'),
-			'utf8'
-		)
+		readSourceFile(path.join(__dirname, 'fixtures/menu-macos-configuration-recovery-dispatch.json'))
 	);
-	const source = fs.readFileSync(path.join(SP, 'macos/ui/menu/builder.lua'), 'utf8');
-	const layout = fs.readFileSync(path.join(SP, 'macos/ui/menu/menu_keyboard_layout.lua'), 'utf8');
+	const source = readSourceFile(path.join(SP, 'macos/ui/menu/builder.lua'));
+	const layout = readSourceFile(path.join(SP, 'macos/ui/menu/menu_keyboard_layout.lua'));
 	const admits = (candidate) =>
 		proof.nativeMacLayoutTopLevelPublication(candidate, layout, manifest);
 	const count = (text, needle) => text.split(needle).length - 1;
@@ -7694,7 +7683,7 @@ function languageParentSource(source, driver) {
 // Native file IO composition stays retained; only its outer scalar policy moved.
 {
 	const assert = require('node:assert/strict');
-	const source = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'), 'utf8');
+	const source = readSourceFile(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'));
 	const {
 		personalFileCaptionPublication: bound
 	} = require('../lib/menu-hotstring-language-binding.cjs');
@@ -7777,7 +7766,7 @@ function languageParentSource(source, driver) {
 // The retained native folder frame only changes admitted scalar projection.
 {
 	const assert = require('node:assert/strict');
-	const source = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'), 'utf8');
+	const source = readSourceFile(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'));
 	const {
 		personalFolderCaptionPublication: bound
 	} = require('../lib/menu-hotstring-language-binding.cjs');
@@ -7837,7 +7826,7 @@ function languageParentSource(source, driver) {
 	const assert = require('node:assert/strict');
 	const Module = require('node:module');
 	const bindingFile = path.resolve(__dirname, '../lib/menu-native-llm-parent-binding.cjs');
-	const source = fs.readFileSync(bindingFile, 'utf8');
+	const source = readSourceFile(bindingFile);
 	const parserDeclaration = 'function luaProducerTree(source) {';
 	assert.equal(source.split(parserDeclaration).length - 1, 1, 'actual producer parser exists once');
 	const receivingSource =

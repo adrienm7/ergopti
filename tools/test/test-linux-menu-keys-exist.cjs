@@ -29,6 +29,8 @@
 
 const fs = require('fs');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SOURCE = path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'ui', 'menu', 'menu_builder.lua');
@@ -38,7 +40,7 @@ const EN = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales
 // not trip it, far enough above zero that a broken extraction fails loudly.
 const MIN_CALLS = 20;
 
-const src = fs.readFileSync(SOURCE, 'utf8');
+const src = readSourceFile(SOURCE);
 const en = JSON.parse(fs.readFileSync(EN, 'utf8'));
 
 // Accented literals still hardcoded in the builder. Exactly one is legitimate —

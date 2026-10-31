@@ -499,7 +499,7 @@ end
 --- a category); any other file ships with the driver.
 --- @param path string Absolute file path.
 --- @return string origin "user", "bundled" or "origin unknown".
-local function file_origin(path)
+function M.file_origin(path)
 	local loaded, ConfigPaths = pcall(require, "infra.config_paths")
 	if not loaded or type(ConfigPaths) ~= "table" or type(ConfigPaths.get_config_dir) ~= "function" then
 		return "origin unknown"
@@ -518,7 +518,7 @@ end
 local function file_label(name, path)
 	local group = _state.groups[name]
 	local order = group and group.group_order
-	return string.format("#%s (%s, '%s')", tostring(order or "?"), file_origin(path),
+	return string.format("#%s (%s, '%s')", tostring(order or "?"), M.file_origin(path),
 		PrivateLabel.mask(name))
 end
 
@@ -888,7 +888,7 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 	if added == 0 and enabled_sections == 0 and disabled_sections > 0 then
 		Logger.info(LOG, "TOML mapping file %s registered no mapping: its %d section(s) are disabled.",
 			label, disabled_sections)
-	elseif added == 0 and file_origin(path) == "user" then
+	elseif added == 0 and M.file_origin(path) == "user" then
 		-- A personal file the user created and has not filled yet.
 		Logger.info(LOG, "TOML mapping file %s holds no mapping yet.", label)
 	elseif added == 0 then

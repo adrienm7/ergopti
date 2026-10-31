@@ -465,6 +465,16 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.reload_breadcrumb",
+		contract = { "record", "record_boot", "path" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.keyboard_layout_files",
+		contract = { "write_new", "remove" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.crypto",
 		contract = { "sha256" },
 		wired    = true,

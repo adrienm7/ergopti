@@ -34,8 +34,12 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
 local Json = require("json")
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
-local _module_source = (debug.getinfo(1, "S").source or ""):gsub("^@", ""):gsub("\\", "/")
-local _native_network_directory = _module_source:match("^(.*)/ui/menu/menu_llm/[^/]+$")
+local NativePath = require("native_path")
+-- A backslash is a filename byte on macOS: only the host's separators split it.
+local _module_source = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
+local _source_sep = "[" .. NativePath.separators() .. "]"
+local _native_network_directory = _module_source:match("^(.*)" .. _source_sep .. "ui" .. _source_sep
+	.. "menu" .. _source_sep .. "menu_llm" .. _source_sep .. "[^" .. NativePath.separators() .. "]+$")
 _native_network_directory = _native_network_directory and (_native_network_directory .. "/platform/network")
 
 --- Quotes the Python import directory without a table-only native JSON encoder.

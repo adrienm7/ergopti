@@ -53,6 +53,8 @@ require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a
 
 const fs = require('fs');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 const assert = require('node:assert/strict');
 const { scriptTokens } = require('../lib/script-source.cjs');
 const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
@@ -551,7 +553,7 @@ function nativeFunctionReferenceKeys(source) {
 		),
 		false
 	);
-	const linux = fs.readFileSync(path.join(SP, 'linux/ui/menu/menu_builder.lua'), 'utf8');
+	const linux = readSourceFile(path.join(SP, 'linux/ui/menu/menu_builder.lua'));
 	assert.equal(
 		nativeTemplateBinding(linux, '.lua', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1),
 		true

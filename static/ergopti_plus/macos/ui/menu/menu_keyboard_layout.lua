@@ -286,6 +286,49 @@ local function build_install_item(scope_label, emoji_install, installed, latest_
 	return layout_declared_row("layout_bundle_install", { layout_install = do_install }, getters)
 end
 
+--- The number-row rows: the stored choice, applied to the layout typing now by
+--- rebuilding it live (modules/keymap/number_row_live.lua), or greyed with the
+--- reason while no layout of ours types. The choice is saved first, then applied.
+--- @param state table|nil Live menu state.
+--- @param save_prefs function|nil Persists the state.
+--- @param update_menu function|nil Redraws the menu.
+--- @param render_ctx table The renderer context holding the row commands.
+--- @return table rows
+local function number_row_rows(state, save_prefs, update_menu, render_ctx)
+	local ManifestMenu = require("infra.manifest_menu")
+	if type(state) ~= "table" then return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
+	local Live = require("modules.keymap.number_row_live")
+	local available, reason = Live.available()
+	local function stored()
+		return { order = state.layout_number_row_mode, edges = state.layout_number_row_reorder_edges == true }
+	end
+	local function store(key, value)
+		local previous = state[key]
+		state[key] = value
+		if type(save_prefs) ~= "function" or save_prefs() ~= true then
+			state[key] = previous
+			return false
+		end
+		Logger.info(LOG, "Number-row option %s set to %s.", key, tostring(value))
+		Live.apply(stored(), function(applied, code)
+			if not applied and code ~= Live.REASON_NO_SOURCE then
+				pcall(notifications.notify, i18n.get("layouts.rows_not_applied"), nil, "error")
+			end
+			schedule_menu_refresh(update_menu)
+		end)
+		return true
+	end
+	if not available then Logger.debug(LOG, "Number-row rows greyed: %s.", tostring(reason)) end
+	return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands, {
+		available = available,
+		reason_key = "platform_reason.number_row_live_no_layout",
+		get_order = function() return stored().order end,
+		get_edges = function() return stored().edges end,
+		set_order = function(value) return store("layout_number_row_mode", value) end,
+		set_edges = function(value) return store("layout_number_row_reorder_edges", value == true) end,
+	})
+end
+
 function M.build(ctx)
 	local update_menu  = ctx and ctx.updateMenu
 	local refresh_icon = ctx and ctx.refresh_icon
@@ -784,7 +827,7 @@ function M.build(ctx)
 	local active_rows = active_layout_rows()
 	if active_rows == nil then return nil end
 	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
-		["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end,
+		["number_row_policy"] = function() return number_row_rows(state, save_prefs, update_menu, render_ctx) end,
 		["custom_layouts"]   = function() return custom_rows end,
 		["active_layouts"]   = function() return active_rows end,
 		["layout_bundle"] = function() return declared_bundle_rows end,

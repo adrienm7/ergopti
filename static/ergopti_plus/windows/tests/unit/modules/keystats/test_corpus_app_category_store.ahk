@@ -11,19 +11,11 @@
 ; FEATURES & RATIONALE:
 ; 1. A decoded document holds { type, score } records in a Map keyed by the lower
 ;    case process name, so a vector's names are compared lower-cased.
-; 2. A case that disagrees is pinned in _KACS_PENDING with its reason, so a fix
-;    forces the inventory to shrink.
-; 3. Windows keeps a record's unknown members and the shared Lua codec drops them.
-;    No shared vector decides it, so the Windows behaviour is pinned here as such.
+; 2. No shared vector decides the fate of an unknown member: Windows follows the
+;    shared codec and drops it, which is pinned here.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-
-; The flat string form stays until the store's runtime no longer needs it: the
-; defaults and the discoveries are written as strings and 17 test files pin that.
-global _KACS_PENDING := Map(
-	"legacy_entry_that_is_a_string",
-	"Windows reads a flat string map, the form every other driver refuses; dropping it needs its first-run file, its discoveries and their tests rewritten")
 
 _KACS_Corpus() {
 	static Corpus := JsonParse(FileRead(A_ScriptDir . "\..\..\_shared\tests\corpus\metrics\app_category_store_vectors.json", "UTF-8"))
@@ -31,16 +23,11 @@ _KACS_Corpus() {
 }
 
 _KACS_Replay(Vector) {
-	global _KACS_PENDING
 	Model := 0
 	Refused := false
 	try Model := _KL_AppCat_DecodeStore(Vector["document"], "corpus")
 	catch Error
 		Refused := true
-	if _KACS_PENDING.Has(Vector["id"]) {
-		AssertFalse(Refused, Vector["id"] . " is now refused: remove it from _KACS_PENDING")
-		return
-	}
 	if (Vector.Has("refused") && Vector["refused"]) {
 		AssertTrue(Refused, Vector["id"] . " must be refused")
 		return
@@ -108,17 +95,17 @@ _KACS_EditCountIsCurrent() {
 }
 Test("app category store corpus: the edit count is current", _KACS_EditCountIsCurrent)
 
-_KACS_UnknownMembersSurviveAnEdit() {
+_KACS_UnknownMembersAreDropped() {
 	Source := '{"schema":"ergopti.app_categories","version":1,"apps":{"safari":{"type":"Web","score":0,"future":[1]}},"extra":true}'
 	Model := _KL_AppCat_DecodeStore(Source, "corpus")
 	Candidate := Model["categories"].Clone()
 	_KL_AppCat_SetRecord(Candidate, "Safari", "Work", 1)
-	Content := _KL_AppCat_RenderStore(Candidate, Model, true)
-	AssertContains(Content, '"future":[1]', "a record's unknown member survives")
-	AssertContains(Content, '"extra":true', "a document's unknown member survives")
+	Content := _KL_AppCat_RenderStore(Candidate, Model)
+	AssertFalse(InStr(Content, "future") > 0, "a record's unknown member is dropped")
+	AssertFalse(InStr(Content, "extra") > 0, "a document's unknown member is dropped")
 	AssertContains(Content, '"type":"Work"', "the edit itself is published")
 }
-Test("app category store: unknown members survive an edit (Windows keeps what the shared codec drops)", _KACS_UnknownMembersSurviveAnEdit)
+Test("app category store: unknown members are dropped at the next save, as the shared codec does", _KACS_UnknownMembersAreDropped)
 
 _KACS_Register() {
 	for Vector in _KACS_Corpus()["decode"]

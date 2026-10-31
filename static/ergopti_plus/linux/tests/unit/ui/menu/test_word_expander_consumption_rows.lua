@@ -25,9 +25,7 @@ helpers.describe("word expander consumption rows", function()
 	end)
 
 	helpers.it("the builder draws the rows and restores the choice", function()
-		local handle = assert(io.open("ui/menu/menu_builder.lua", "rb"))
-		local source = handle:read("*a")
-		handle:close()
+		local source = helpers.read_menu_source()
 		for _, needle in ipairs({
 			'["parameter_consume_children"] = consume_rows',
 			"Terminators.set_terminators_consume({ [key] = next_consume })",

@@ -3,10 +3,17 @@
 ; ==============================================================================
 ; MODULE: App Category Store Codec
 ; DESCRIPTION:
-; Owns the legacy string map and explicit versioned category-edit records.
-; Unedited legacy strings remain classifications, not historical score overrides.
-; Unknown JSON members retain their canonical parser-owned source fragments.
+; Reads and writes the document macOS and Linux share through
+; _shared/lua/keystats/app_category_store.lua: { schema, version, apps } holding
+; one { type, score } record per application, or the flat map of records it upgrades.
+; A flat string entry is refused (see KLAppCatFlatFormError), and a member the
+; codec does not know is dropped at the next save, as the shared codec does.
 ; ==============================================================================
+
+; A store written in the old Windows form: refused, kept untouched, never migrated.
+; The loader tells it apart from damage because the driver can classify without it.
+class KLAppCatFlatFormError extends ValueError {
+}
 
 _KL_AppCat_JsonSource(Content) {
 	return SubStr(Content, 1, 1) == Chr(0xFEFF) ? SubStr(Content, 2) : Content
@@ -21,22 +28,16 @@ _KL_AppCat_LabelValid(Label) {
 	return Label is String && Trim(Label, " `t`r`n") != ""
 }
 
-; The parser remains authoritative; original spans distinguish true from 1 and
-; retain unknown booleans/null without the keystats encoder's primitive aliases.
+; The parser remains authoritative; original spans distinguish true from 1.
 _KL_AppCat_DecodeStore(Content, Path := "") {
 	Source := _KL_AppCat_JsonSource(Content)
 	Document := JsonParse(Source)
 	if !(Document is Map)
 		throw TypeError("App categories require a JSON object.")
 	Members := JsonObjectMemberSpans(Source)
-	Legacy := true
-	for Key, Value in Document
-		if !(Value is String)
-			Legacy := false
-	; Legacy process keys were unrestricted, so a valid all-string map cannot
-	; acquire schema semantics merely because one process was named "schema".
-	Versioned := !Legacy && Document.Has("schema")
-		&& Document["schema"] == KLAppCatConst.STORE_SCHEMA
+	; Without this exact marker every member is an application, so an application
+	; named "schema" stays a record, as in the shared codec.
+	Versioned := Document.Has("schema") && Document["schema"] == KLAppCatConst.STORE_SCHEMA
 	if Versioned {
 		if !Document.Has("version") || !(Document["version"] is Integer)
 			|| Document["version"] != KLAppCatConst.STORE_VERSION
@@ -50,46 +51,53 @@ _KL_AppCat_DecodeStore(Content, Path := "") {
 		Apps := Document
 		AppMembers := Members
 	}
-	Categories := Map(), OriginalKeys := Map(), Records := Map()
+	Categories := Map(), OriginalKeys := Map()
 	for Key, Value in Apps {
 		if !(Key is String) || Key == ""
 			throw TypeError("An app category key must be a nonempty process name.")
 		CanonicalKey := StrLower(Key)
 		if Categories.Has(CanonicalKey)
 			throw ValueError("App category entries require distinct case-insensitive process names.")
-		if Value is String {
-			if Value == ""
-				throw ValueError("A legacy app category cannot be empty.")
-		} else if Value is Map {
-			Fields := JsonObjectMemberSpans(AppMembers[Key]["text"])
-			if !Value.Has("type") || !_KL_AppCat_LabelValid(Value["type"])
-				|| !Value.Has("score") || !_KL_AppCat_ScoreValid(Value["score"])
-				|| !RegExMatch(Trim(Fields["score"]["text"]), "^[-0-9]")
-				throw ValueError("An app category edit requires a label and finite score between -2 and 2.")
-			Records[CanonicalKey] := Fields
-		} else {
+		if Value is String
+			throw KLAppCatFlatFormError("The entry of '" . Key . "' is a flat string, not a { type, score } record.")
+		if !(Value is Map)
 			throw TypeError("Invalid app category entry or unknown store schema.")
-		}
-		Categories[CanonicalKey] := Value
+		Fields := JsonObjectMemberSpans(AppMembers[Key]["text"])
+		if !Value.Has("type") || !_KL_AppCat_LabelValid(Value["type"])
+			|| !Value.Has("score") || !_KL_AppCat_ScoreValid(Value["score"])
+			|| !RegExMatch(Trim(Fields["score"]["text"]), "^[-0-9]")
+			throw ValueError("An app category entry requires a label and a finite score between -2 and 2.")
+		Categories[CanonicalKey] := Map("type", Value["type"], "score", Value["score"])
 		OriginalKeys[CanonicalKey] := Key
 	}
-	return Map("path", Path, "source", Content, "versioned", Versioned,
-		"categories", Categories, "members", Members, "original_keys", OriginalKeys,
-		"records", Records)
+	return Map("path", Path, "source", Content, "versioned", Versioned, "refused", false,
+		"categories", Categories, "original_keys", OriginalKeys)
+}
+
+; The admitted model of a store refused for its flat form: it holds no entry, and
+; its mark stops every save until a reload admits the replaced file.
+_KL_AppCat_RefusedModel(Content, Path) {
+	return Map("path", Path, "source", Content, "versioned", false, "refused", true,
+		"categories", Map(), "original_keys", Map())
+}
+
+_KL_AppCat_StoreRefused() {
+	Model := KLAppCat.store_model
+	return Model is Map && Model["refused"]
 }
 
 _KL_AppCat_RecordLabel(Value) {
-	return Value is Map ? Value["type"] : Value
+	return Value["type"]
 }
 
-_KL_AppCat_RecordWithLabel(Value, Label) {
-	if !(Value is Map)
-		return Label
-	Candidate := Map()
-	for Key, Field in Value
-		Candidate[Key] := Field
-	Candidate["type"] := Label
-	return Candidate
+; The record of an application the user never edited.
+_KL_AppCat_NewRecord(Label) {
+	return Map("type", Label, "score", KLAppCatConst.UNEDITED_SCORE)
+}
+
+; What the driver ships for one application when the store holds nothing for it.
+_KL_AppCat_ShippedLabel(Key) {
+	return KLAppCatConst.DEFAULTS.Get(Key, KLAppCatConst.DISCOVERED_LABEL)
 }
 
 /**
@@ -103,16 +111,11 @@ _KL_AppCat_RecordWithLabel(Value, Label) {
 _KL_AppCat_SetRecord(Categories, App, Category, Score) {
 	if !(App is String) || App == "" || !_KL_AppCat_LabelValid(Category) || !_KL_AppCat_ScoreValid(Score)
 		throw ValueError("An app category edit requires a name, a label and a score in range.")
-	Key := StrLower(App)
-	Existing := Categories.Get(Key, "")
-	Record := Existing is Map ? _KL_AppCat_RecordWithLabel(Existing, Category) : Map("type", Category)
-	Record["score"] := Score
-	Categories[Key] := Record
+	Categories[StrLower(App)] := Map("type", Category, "score", Score)
 }
 
 /**
- * Renames a category on every application holding it. A legacy string entry keeps
- * its form: it is a classification and only its label changes.
+ * Renames a category on every application holding it.
  * @param {Map} Categories Candidate map.
  * @param {String} Old Category text to replace, compared exactly.
  * @param {String} New Nonblank replacement.
@@ -127,7 +130,7 @@ _KL_AppCat_RenameCategory(Categories, Old, New) {
 		if _KL_AppCat_RecordLabel(Value) == Old
 			Holders.Push(Key)
 	for Key in Holders
-		Categories[Key] := _KL_AppCat_RecordWithLabel(Categories[Key], New)
+		Categories[Key] := Map("type", New, "score", Categories[Key]["score"])
 	return Holders.Length
 }
 
@@ -156,52 +159,38 @@ _KL_AppCat_ImportMissing(Categories, Imported) {
 	return Added
 }
 
-_KL_AppCat_RenderRecord(Value, Fields) {
-	Parts := [JsonStringLiteral("type") . ":" . JsonStringLiteral(Value["type"]),
-		JsonStringLiteral("score") . ":" . String(Value["score"])]
-	for Key, Span in Fields
-		if !(Key == "type") && !(Key == "score")
-			Parts.Push(Span["member_text"])
-	return "{" . KL_JoinArray(Parts, ",") . "}"
+_KL_AppCat_RenderRecord(Value) {
+	return "{" . JsonStringLiteral("type") . ":" . JsonStringLiteral(Value["type"])
+		. "," . JsonStringLiteral("score") . ":" . String(Value["score"]) . "}"
 }
 
-_KL_AppCat_RenderStore(Categories, Model := 0, ForceVersion := false) {
-	Versioned := ForceVersion || (Model is Map && Model["versioned"])
+_KL_AppCat_RenderStore(Categories, Model := 0) {
 	Keys := [], Parts := []
-	for Key, Value in Categories {
+	for Key, Value in Categories
 		Keys.Push(Key)
-		if Value is Map
-			Versioned := true
-	}
 	for Key in KL_SortArray(Keys) {
-		Value := Categories[Key]
-		Fields := Model is Map ? Model["records"].Get(Key, Map()) : Map()
 		Name := Model is Map ? Model["original_keys"].Get(Key, Key) : Key
-		Encoded := Value is Map ? _KL_AppCat_RenderRecord(Value, Fields) : JsonStringLiteral(Value)
-		Parts.Push(JsonStringLiteral(Name) . ":" . Encoded)
+		Parts.Push(JsonStringLiteral(Name) . ":" . _KL_AppCat_RenderRecord(Categories[Key]))
 	}
 	Apps := "{" . KL_JoinArray(Parts, ",") . "}"
-	if !Versioned
-		return KL_JsonEncodeObject(Categories)
-	Parts := [JsonStringLiteral("schema") . ":" . JsonStringLiteral(KLAppCatConst.STORE_SCHEMA),
-		JsonStringLiteral("version") . ":" . String(KLAppCatConst.STORE_VERSION),
-		JsonStringLiteral("apps") . ":" . Apps]
-	if Model is Map && Model["versioned"] {
-		for Key, Span in Model["members"]
-			if !(Key == "schema") && !(Key == "version") && !(Key == "apps")
-				Parts.Push(Span["member_text"])
-	}
-	return "{" . KL_JoinArray(Parts, ",") . "}"
+	return "{" . JsonStringLiteral("schema") . ":" . JsonStringLiteral(KLAppCatConst.STORE_SCHEMA)
+		. "," . JsonStringLiteral("version") . ":" . String(KLAppCatConst.STORE_VERSION)
+		. "," . JsonStringLiteral("apps") . ":" . Apps . "}"
 }
 
-; Only an explicit record overrides already persisted history. Plain legacy
-; strings continue to classify future events through KL_AppCat_Get unchanged.
+; Only an edit overrides already persisted history. The first-run file and the
+; discoveries hold records too, but one still equal to what the driver ships says
+; nothing about the past: the events keep classifying that application.
 _KL_AppCat_ProjectStore(Model, Apps) {
 	Out := Map()
 	for App in Apps {
-		Value := Model["categories"].Get(StrLower(App), "")
-		if Value is Map
-			Out[App] := Map("type", Value["type"], "score", Value["score"])
+		Key := StrLower(App)
+		Value := Model["categories"].Get(Key, "")
+		if !(Value is Map)
+			continue
+		if Value["score"] == KLAppCatConst.UNEDITED_SCORE && Value["type"] == _KL_AppCat_ShippedLabel(Key)
+			continue
+		Out[App] := Map("type", Value["type"], "score", Value["score"])
 	}
 	return Out
 }
@@ -223,8 +212,8 @@ _KL_AppCat_MapsEqual(Left, Right) {
 }
 
 ; Get is the only public producer of unpersisted entries: non-default processes
-; absent from the admitted file enter as "unknown" until their deferred save.
+; absent from the admitted file enter as an unedited discovery until their deferred save.
 _KL_AppCat_IsDiscovery(Key, Value, Model) {
-	return Value is String && Value == "unknown" && !KLAppCatConst.DEFAULTS.Has(Key)
-		&& (!(Model is Map) || !Model["categories"].Has(Key))
+	return Value["type"] == KLAppCatConst.DISCOVERED_LABEL && Value["score"] == KLAppCatConst.UNEDITED_SCORE
+		&& !KLAppCatConst.DEFAULTS.Has(Key) && (!(Model is Map) || !Model["categories"].Has(Key))
 }

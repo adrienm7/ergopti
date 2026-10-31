@@ -577,6 +577,23 @@ function M.rebuild_media(device_id, threshold_ms)
 end
 
 --- Inserts a batch of keystroke events into the events_typing table.
+--- Renders one raw batch through its builder, refusing a batch the statement
+--- catalogue cannot render. A slot the catalogue refuses (a non-finite rate, a
+--- value of the wrong type) raises there by design; uncontained, that raise
+--- escaped insert_* as a Lua error where callers expect a false receipt and the
+--- pending source to stay unacknowledged for a retry.
+--- @param family string Key of _raw_sql.
+--- @return string|false sql
+local function _compose_raw(family, ...)
+	local composed, sql = pcall(_raw_sql[family], ...)
+	if not composed then
+		Logger.error(LOG, "Raw %s batch refused: a row cannot be rendered as its statement (%s).",
+			family, ErrorDescription.describe(sql))
+		return false
+	end
+	return sql
+end
+
 --- Each event is a single keystroke row.
 ---
 --- NOTE: the full keystats-walker processes individual keystrokes into
@@ -658,7 +675,7 @@ function M.insert_typing_events(device_id, events, derived)
 	if type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.typing(device_id, events, first_id, derived)
+	local sql = _compose_raw("typing", device_id, events, first_id, derived)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -689,7 +706,7 @@ function M.insert_hotstring_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.hotstrings(device_id, events, first_id)
+	local sql = _compose_raw("hotstrings", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -748,7 +765,7 @@ function M.insert_llm_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.llm(device_id, events, first_id)
+	local sql = _compose_raw("llm", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -785,7 +802,7 @@ function M.insert_shortcut_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.shortcuts(device_id, events, first_id)
+	local sql = _compose_raw("shortcuts", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -867,7 +884,7 @@ function M.insert_system_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.system(device_id, events, first_id)
+	local sql = _compose_raw("system", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -877,7 +894,7 @@ function M.insert_session_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.sessions(device_id, events, first_id)
+	local sql = _compose_raw("sessions", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -887,7 +904,7 @@ function M.insert_window_switch_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.windows(device_id, events, first_id)
+	local sql = _compose_raw("windows", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -897,7 +914,7 @@ function M.insert_app_switch_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.switches(device_id, events, first_id)
+	local sql = _compose_raw("switches", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end

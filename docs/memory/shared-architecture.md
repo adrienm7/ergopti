@@ -98,6 +98,18 @@ parameter passed through a helper. `(window-title-brand-once)` builds every
 manifest window in all 21 locales on each driver; open a new window by its app
 identity rather than a translated title.
 
+### project-a-cloud-provider-is-catalogue-data
+
+A cloud provider is a row of `_shared/modules/llm/api_providers.json`; the three
+drivers read it generically, so adding one needs no driver code. Two shapes
+carry what a plain key and address cannot: a `base_url` holding `{name}`
+placeholders is an address the add-entry form fills (`api_url_template.lua`,
+AHK port), and an `auth` block makes the requests carry an access token
+exchanged from the key (`api_token_exchange.lua`). Every row needs a
+thinking-off vector and a recorded listing or its reason
+(`test_api_provider_catalogue.lua`); read the provider's own documentation for
+each field and name it in the row's `_source`.
+
 ### feedback-ui-must-be-i18n
 
 All user-facing text uses the locale system in every supported language. English

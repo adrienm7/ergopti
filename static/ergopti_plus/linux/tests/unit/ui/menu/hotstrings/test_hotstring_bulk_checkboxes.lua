@@ -677,7 +677,11 @@ local function with_personal_info_leaf(body)
 			if name == "_build_hotstrings" then build_hotstrings, matches = value, matches + 1 end
 		end
 		assert(matches == 1 and type(build_hotstrings) == "function", "unique original native Hotstrings constructor required")
-		assert(debug.getinfo(build_hotstrings, "S").source == source, "constructor must belong to the actual builder file")
+		-- The root binds the constructor from its own module (ui/menu/menu_hotstrings.lua).
+		assert(rawequal(build_hotstrings, require("ui.menu.menu_hotstrings").build),
+			"constructor must be the one the actual builder binds")
+		assert(debug.getinfo(build_hotstrings, "S").source:match("/ui/menu/menu_hotstrings%.lua$"),
+			"constructor must belong to the actual Hotstrings module")
 		local opened = {}
 		local config, changes = fake_config(false, false)
 		local ctx = { config = config, _version = "9.9.9", dyn_hotstrings = owner.dynamic,

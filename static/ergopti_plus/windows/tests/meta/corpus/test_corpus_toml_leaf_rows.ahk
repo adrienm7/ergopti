@@ -20,10 +20,13 @@
 
 global _CTLR_VECTOR_COUNT := 12
 
-; None is decided: which rule the drivers share is a maintainer call.
+; These belong to the shared leaf-row planner above the writer, which Windows does
+; not have. The writer itself must not follow them: batch_write_vectors.json has it
+; keep an emptied inline parent (explicit-empty-inline-parent-kept-after-last-scalar-deletion)
+; and edit a member in place (inline-source-*), which this corpus's planner rewrites.
 global _CTLR_NO_PLANNER := "Windows has no leaf-row planner to refuse a malformed operation; each caller builds its own rows"
-global _CTLR_EMPTY_INLINE := "the Windows writer keeps an inline table emptied by deletions: the assignment is its physical declaration"
-global _CTLR_IN_PLACE := "the Windows writer edits an inline member in place and keeps the source spelling, where the shared planner rewrites the table whole"
+global _CTLR_EMPTY_INLINE := "the shared planner removes an inline table its deletions emptied; the shared writer, which Windows follows, keeps it"
+global _CTLR_IN_PLACE := "the shared planner rewrites the inline table whole; the shared writer, which Windows follows, edits the member in place"
 
 global _CTLR_PENDING := Map(
 	"inline-table-left-empty-by-deletions-is-removed", _CTLR_EMPTY_INLINE,
@@ -70,7 +73,7 @@ _CTLR_Difference(Vector, Typed) {
 	Refused := "", Content := ""
 	try {
 		Rows := _CTLR_Rows(Vector["operations"], Typed["operations"])
-		Content := _TCV_WithoutAddedBom(TOML_BuildConfigDocumentCandidate(Source, Rows, [])["content"], Source)
+		Content := TOML_BuildConfigDocumentCandidate(Source, Rows, [])["content"]
 	} catch Error as Err {
 		Refused := Err.Message
 	}

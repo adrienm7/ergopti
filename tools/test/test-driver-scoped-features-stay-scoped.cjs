@@ -33,6 +33,8 @@
 
 const fs = require('fs');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 
@@ -176,9 +178,6 @@ for (const [driver, file, pattern, role] of [
 		'live'
 	]
 ]) {
-	const native = fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus', driver, 'ui/menu', file),
-		'utf8'
-	);
+	const native = readSourceFile(path.join(ROOT, 'static/ergopti_plus', driver, 'ui/menu', file));
 	assert.match(native, pattern, `${driver}: actual ${role} native provider`);
 }

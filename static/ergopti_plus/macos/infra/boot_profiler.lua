@@ -54,6 +54,10 @@ local _last_cpu_ms   = nil
 local _start_cpu_ms  = nil
 local _stage_cpu_ms  = nil
 
+-- Boot CPU frozen at completion, and every completed stage's duration in order.
+local _boot_cpu_ms    = nil
+local _stage_durations = {}
+
 -- Open stage name and its start, the last completed stage, and completion.
 local _open_stage     = nil
 local _stage_start_ns = nil
@@ -181,7 +185,7 @@ function M.begin()
 	_last_cpu_ms  = _start_cpu_ms
 	_stage_cpu_ms = nil
 	_open_stage, _stage_start_ns, _last_completed, _complete = nil, nil, nil, false
-	_boot_complete_ms = nil
+	_boot_complete_ms, _boot_cpu_ms, _stage_durations = nil, nil, {}
 	pcall(Logger.info, LOG, "Boot timing started.")
 	pcall(BootJournal.append, "INFO", "Boot timing started.")
 end
@@ -235,6 +239,7 @@ function M.complete()
 	_complete = true
 	untrace_requires()
 	local total = _start_ns and (now_ns() - _start_ns) / NS_PER_MS or 0
+	_boot_cpu_ms = M.cpu_ms()
 	pcall(Logger.success, LOG, "Boot complete in %.0f ms.", total)
 	pcall(BootJournal.append, "SUCCESS", string.format("Boot complete in %.0f ms.", total))
 	-- Never collapsed: the CPU total is the figure a slow-boot report compares
@@ -271,6 +276,7 @@ function M.mark(phase_name)
 		or (cpu_now - _last_cpu_ms)
 	_last_cpu_ms = cpu_now
 	_open_stage, _stage_start_ns, _stage_cpu_ms, _last_completed = nil, nil, nil, name
+	_stage_durations[#_stage_durations + 1] = { name = name, ms = stage_ms }
 	local format = "Boot stage completed: %s in %.1f ms (+%.1f ms, total %.1f ms, cpu %.1f ms)."
 	pcall(Logger.success, LOG, format, name, stage_ms, delta, total, stage_cpu_ms)
 	pcall(BootJournal.append, "SUCCESS", string.format(format, name, stage_ms, delta, total, stage_cpu_ms))
@@ -290,6 +296,24 @@ end
 --- @return number|nil
 function M.boot_complete_ms()
 	return _boot_complete_ms
+end
+
+--- Process CPU milliseconds of the boot, frozen when it completed; nil before.
+--- @return number|nil
+function M.boot_cpu_ms()
+	return _boot_cpu_ms
+end
+
+--- The slowest completed boot stages, slowest first.
+--- @param count integer How many to return.
+--- @return table stages Array of { name, ms }.
+function M.slowest_stages(count)
+	local sorted = {}
+	for index, stage in ipairs(_stage_durations) do sorted[index] = { name = stage.name, ms = stage.ms } end
+	table.sort(sorted, function(a, b) return a.ms > b.ms end)
+	local out = {}
+	for index = 1, math.min(count, #sorted) do out[index] = sorted[index] end
+	return out
 end
 
 --- Returns the process CPU milliseconds consumed since M.begin().

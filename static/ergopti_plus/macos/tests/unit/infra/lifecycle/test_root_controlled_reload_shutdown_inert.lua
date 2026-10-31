@@ -348,11 +348,12 @@ local function run_isolated(options, assertions)
 				-- acknowledged parser; this fixture never opens a user override file.
 				parse = function(path) return require("toml_codec.reader").parse(path) end,
 			},
-			-- Keep this deadline independent of the native timing loader; the root
+			-- Keep these deadlines independent of the native timing loader; the root
 			-- coordinator reads no other timing in this early-boot fixture.
 			["infra.timings"] = {
 				sec = function(section, key)
-					helpers.assert_eq(section .. "." .. key, "ui.user_quit_deadline_ms")
+					local name = section .. "." .. key
+					helpers.assert_true(name == "ui.user_quit_deadline_ms" or name == "ui.reload_deadline_ms", name)
 					return 12
 				end,
 			},

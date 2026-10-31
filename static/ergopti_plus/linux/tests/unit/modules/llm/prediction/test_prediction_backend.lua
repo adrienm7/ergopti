@@ -305,9 +305,7 @@ helpers.describe("prediction backend: the model the menu shows profiles for", fu
 	end)
 
 	helpers.it("is what the AI menu resolves the automatic profile against", function()
-		local fh = assert(io.open("ui/menu/menu_builder.lua", "r"))
-		local source = fh:read("*a")
-		fh:close()
+		local source = helpers.read_menu_source()
 		local handler = source:match('dynamic_handlers%["llm_profile"%] = function%(target%)(.-)local function refresh')
 		helpers.assert_true(handler ~= nil and handler:find("get_prediction_model", 1, true) ~= nil,
 			"the profile rows must follow the model predictions use")

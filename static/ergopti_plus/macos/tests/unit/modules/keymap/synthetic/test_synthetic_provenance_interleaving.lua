@@ -402,3 +402,110 @@ helpers.describe("keymap synthetic provenance: explicit transactions under inter
 			"physical Backspace must edit the buffer while the tagged delete stays filtered")
 	end)
 end)
+
+
+--- Emits one real field-run selftest pair and returns its exact tagged events.
+--- The global poster's native owner is replaced by a recorder so the test hands
+--- each phase to the keymap taps itself, in the order Quartz would deliver them.
+--- @param fixture table
+--- @param key string
+--- @return table events { down, up }
+local function selftest_events(fixture, key)
+	local captured = nil
+	local saved_owner = package.loaded["adapters.synthetic_input_loopback_owner"]
+	package.loaded["adapters.synthetic_input_loopback_owner"] = {
+		new = function(_scheduler, events)
+			captured = events
+			return { start = function() return true end, cancel = function() return false end }
+		end,
+	}
+	local ok, err = pcall(fixture.synthetic.emit_selftest_key_stroke, {}, key)
+	package.loaded["adapters.synthetic_input_loopback_owner"] = saved_owner
+	helpers.assert_true(ok and err == true, "the selftest pair must be accepted: " .. tostring(err))
+	helpers.assert_not_nil(captured)
+	return captured
+end
+
+
+--- Loads the keymap with the selftest gate reading a scripted world.
+--- @param world table { dev, focused, publish }
+--- @return table fixture
+local function selftest_fixture(world)
+	package.loaded["infra.field_run_selftest"] = nil
+	local fixture = load_fixture()
+	local Gate = require("modules.keymap.selftest_gate")
+	Gate._ports = {
+		dev_source_active = function() return world.dev end,
+		focused_own_window_id = function() return world.focused end,
+	}
+	if world.publish then require("infra.field_run_selftest").publish(world.publish) end
+	return fixture
+end
+
+
+helpers.describe("keymap selftest gate: field-run keys decode as typing only in the scratch window", function()
+	local SCRATCH = 4242
+
+	--- Runs a selftest key through both taps and reads the buffer before "~".
+	--- @param world table Gate world.
+	--- @param prepare function|nil fn(fixture) run before the key is emitted.
+	--- @return string|nil buffer, boolean down_consumed, boolean up_consumed
+	local function type_selftest(world, prepare)
+		local down_consumed, up_consumed
+		local buffer = nil
+		local fixture = selftest_fixture(world)
+		fixture.keymap.register_interceptor(function(_event, observed, context)
+			if context and context.chars == "~" then buffer = observed end
+			return nil
+		end)
+		fixture.handle(physical_event(fixture, " ", 49))
+		local events
+		if prepare then events = prepare(fixture) else events = selftest_events(fixture, "a") end
+		down_consumed = fixture.handle(events[1])
+		up_consumed = fixture.handle_up(events[2])
+		fixture.handle(physical_event(fixture, "~"))
+		return buffer, down_consumed, up_consumed
+	end
+
+	helpers.it("decodes an admitted key as typing and passes it to the scratch field", function()
+		local buffer, down, up = type_selftest({ dev = true, focused = SCRATCH, publish = SCRATCH })
+		helpers.assert_true(not down, "an admitted key reaches the focused scratch field")
+		helpers.assert_true(not up)
+		helpers.assert_eq(buffer, " a", "an admitted selftest key enters the buffer like a typed one")
+	end)
+
+	helpers.it("consumes the key outside a developer runtime", function()
+		local buffer, down, up = type_selftest({ dev = false, focused = SCRATCH, publish = SCRATCH })
+		helpers.assert_true(down, "a refused selftest key must never reach an application")
+		helpers.assert_true(up)
+		helpers.assert_eq(buffer, " ")
+	end)
+
+	helpers.it("consumes the key while no typing step published its window", function()
+		local buffer, down, up = type_selftest({ dev = true, focused = SCRATCH })
+		helpers.assert_true(down)
+		helpers.assert_true(up)
+		helpers.assert_eq(buffer, " ")
+	end)
+
+	helpers.it("consumes the key while another window has the focus", function()
+		local buffer, down, up = type_selftest({ dev = true, focused = 7, publish = SCRATCH })
+		helpers.assert_true(down)
+		helpers.assert_true(up)
+		helpers.assert_eq(buffer, " ")
+	end)
+
+	helpers.it("treats an evicted selftest key as ordinary output, never as typing", function()
+		local buffer, down = type_selftest({ dev = true, focused = SCRATCH, publish = SCRATCH }, function(fixture)
+			fixture.synthetic.RECORD_LIMIT = 4
+			local events = selftest_events(fixture, "a")
+			-- Two newer pairs evict both unpinned selftest phases.
+			replacement_events(fixture, function(synthetic, batch)
+				helpers.assert_true(synthetic.keyStrokes(batch, "XY"))
+			end)
+			return events
+		end)
+		helpers.assert_true(not down, "an evicted key is the driver's ordinary output, passed untouched")
+		helpers.assert_eq(buffer, " ", "an evicted selftest key must not become typed text")
+	end)
+end)

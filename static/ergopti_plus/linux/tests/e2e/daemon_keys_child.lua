@@ -20,7 +20,8 @@
 --- tap-hold manager's action runner. {TICK} turns the scripted whole-second
 --- clock (ERGOPTI_E2E_CLOCK=seconds) over to the next second, no time passing.
 --- Selection-only tokens {SELECT}, {TAPKEY}, {WRAP} exercise the real hook
---- consumption callback when ERGOPTI_E2E_TAP_WRAP selects a scenario. A private
+--- consumption callback when ERGOPTI_E2E_TAP_WRAP selects a scenario;
+--- ERGOPTI_E2E_DYNAMIC=dates switches the built-in date rules on. A private
 --- compiled neutral config is explicitly enabled through its real owners;
 --- only PRIMARY and the focused field/action effects are desktop models.
 --- Prints SCREEN <quoted text> and, for selection scenarios, TAP_WRAP receipts.
@@ -48,15 +49,32 @@ require("tests.win_compat").install()
 local TAP_WRAP = os.getenv("ERGOPTI_E2E_TAP_WRAP") or "none"
 local selection = { primary = "", reads = 0, attempts = 0, queued = 0, executed = 0, focused = false }
 local selection_config = nil
-if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" then
+-- ERGOPTI_E2E_DYNAMIC=dates: the same private config with the built-in date
+-- rules switched on in the file, as a user's config.toml would hold them.
+local DYNAMIC = os.getenv("ERGOPTI_E2E_DYNAMIC") or "none"
+assert(DYNAMIC == "none" or DYNAMIC == "dates", "unknown dynamic hotstring scenario")
+--- The neutral template with the dynamic master and the three date sections on.
+--- @param content string
+--- @return string
+local function with_date_rules(content)
+	for _, section in ipairs({ "", ".date", ".date_fr", ".date_long_fr" }) do
+		local header = "[hotstrings.dynamic" .. section .. "]\nenabled = "
+		local at = assert(content:find(header .. "false", 1, true), "the template lost " .. header)
+		content = content:sub(1, at - 1) .. header .. "true" .. content:sub(at + #header + #"false")
+	end
+	return content
+end
+if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" or DYNAMIC ~= "none" then
 	local modes = { accepted = true, unassigned = true, modified = true, refused = true, reopened = true }
 	assert(TAP_WRAP == "none" or modes[TAP_WRAP], "unknown tap/wrap scenario")
 	local Paths = require("infra.config_paths")
 	local original = Paths.config
 	selection_config = os.tmpname()
 	local template = assert(io.open("_generated/config_template.toml", "rb"))
+	local content = template:read("*a")
+	if DYNAMIC == "dates" then content = with_date_rules(content) end
 	local file = assert(io.open(selection_config, "wb"))
-	assert(file:write(template:read("*a")))
+	assert(file:write(content))
 	assert(file:close())
 	template:close()
 	Paths.config = function(relative)
@@ -162,6 +180,30 @@ hook.pump = function() return 0 end
 -- write the count. The menu once held 103 058 rows — eight seconds of GTK at
 -- every rebuild — and nothing measured it.
 local MENU_ROWS_FILE = os.getenv("ERGOPTI_E2E_MENU_ROWS")
+--- How the composed root shows the unfinished AI agent (item 121): its row,
+--- the AI submenu beside it, and how many actions either row could run.
+--- @param items table Top-level rows the tray was handed.
+--- @return string receipt
+local function agent_receipt(items)
+	local i18n = require("infra.i18n")
+	local agent_title, ai_title = i18n.get("menu.agent.title"), i18n.get("menu.llm.title")
+	local function actions(row)
+		local n = type(row.fn) == "function" and 1 or 0
+		for _, child in ipairs(type(row.menu) == "table" and row.menu or {}) do n = n + actions(child) end
+		return n
+	end
+	local agent, ai
+	for _, item in ipairs(items) do
+		local title = type(item.title) == "string" and item.title or ""
+		if title:sub(1, #agent_title) == agent_title then agent = item end
+		if title:sub(1, #ai_title) == ai_title then ai = item end
+	end
+	if not agent then return "agent absent" end
+	return string.format("agent disabled=%s reason=%s actions=%d ai_actions=%s", tostring(agent.disabled == true),
+		tostring(agent.title:find(i18n.get("menu.agent.not_ready"), #agent_title + 1, true) ~= nil), actions(agent),
+		ai and (actions(ai) > 0 and "some" or "none") or "absent")
+end
+
 if MENU_ROWS_FILE then
 	arg[#arg + 1] = "--tray"
 	package.preload["platform.tray.appindicator"] = function()
@@ -180,6 +222,7 @@ if MENU_ROWS_FILE then
 			set_menu = function(items)
 				local fh = io.open(MENU_ROWS_FILE, "w")
 				fh:write(tostring(count(items)), "\n")
+				fh:write(agent_receipt(items), "\n")
 				fh:close()
 				return true
 			end,

@@ -28,6 +28,7 @@ return {
 		relative = "Library/Logs/ergopti_plus",
 		launcher_log = "launcher.log",
 		fatal_report = "hammerspoon-fatal.txt",
+		reload_breadcrumb = "reload_breadcrumb.txt",
 	},
 	linux = {
 		base_env = "XDG_STATE_HOME",

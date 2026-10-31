@@ -229,6 +229,10 @@ end
 -- total in the boot log, making a slow startup self-diagnosing (no profiler attach).
 local Boot               = require("infra.boot_profiler")
 local BootJournal        = require("adapters.boot_journal")
+local ReloadBreadcrumb   = require("adapters.reload_breadcrumb")
+-- A controlled reload's trail ends with this line when a boot followed it
+-- (field run 2026-10-30 21:06: the reload lost the app and no boot followed).
+ReloadBreadcrumb.record_boot()
 -- Observe the in-process getter before onboarding can defer the rest of boot.
 local scripting_observed, scripting_written = pcall(BootJournal.record_native_scripting_state, hs)
 if scripting_observed ~= true or scripting_written ~= true then
@@ -998,6 +1002,16 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 			return true
 		end,
 	}
+	-- Each step names itself in the reload breadcrumb before it runs, so a step
+	-- that loses the app is the trail's last line.
+	for _, step in ipairs(steps) do
+		local run, stage = step.run, "step_" .. step.name
+		step.run = function()
+			-- A diagnostic never fails a step, even before its owner is wired
+			pcall(function() return ReloadBreadcrumb.record(termination_kind, stage) end)
+			return run()
+		end
+	end
 	-- The logger pump is intentionally NOT finalized here. The coordinator first
 	-- asks its native worker to ACK this final announcement and every earlier
 	-- teardown record; only that asynchronous completion may call
@@ -1206,6 +1220,8 @@ do
 				return hs.timer.doAfter(delay, callback)
 			end,
 			user_exit_deadline_seconds = require("infra.timings").sec("ui", "user_quit_deadline_ms"),
+			reload_deadline_seconds = require("infra.timings").sec("ui", "reload_deadline_ms"),
+			record_stage = ReloadBreadcrumb.record,
 			mark_reload = function()
 				reload_guard.mark_reload()
 				return reload_guard.is_reloading() == true

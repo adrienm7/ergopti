@@ -161,7 +161,16 @@ function fixture(name, { onDev = false } = {}) {
 	);
 	fs.mkdirSync(bin, { recursive: true });
 	fs.mkdirSync(home, { recursive: true });
-	const env = { ...process.env, ...GIT_IDENTITY, HOME: home };
+	// The fixture app answers within a second and the Mac-only fileless probe is
+	// irrelevant here: a 1 s poll and an instant probe keep each collector run
+	// short without changing any decision the cases assert.
+	const env = {
+		...process.env,
+		...GIT_IDENTITY,
+		HOME: home,
+		FIELD_RUN_POLL_SECONDS_OVERRIDE: '1',
+		FIELD_FILELESS_PROBE_SECONDS_OVERRIDE: '0'
+	};
 	const run = (...args) => {
 		const result = spawnSync('git', args, { cwd: clone, encoding: 'utf8', env });
 		assert.equal(result.status, 0, `git ${args.join(' ')}: ${result.stderr}`);
@@ -450,6 +459,19 @@ function reportFolder(paths) {
 					/FIELD_RUN_DEADLINE_SECONDS/,
 					'no second, fixed run deadline'
 				);
+				// The fixture shortens these through overrides; a real run keeps the
+				// budgets the field runs of 2026-10-28 settled on.
+				for (const [name, value] of [
+					['FIELD_RUN_READY_SECONDS', 240],
+					['FIELD_RUN_ACCEPT_SECONDS', 300],
+					['FIELD_RUN_POLL_SECONDS', 5]
+				])
+					assert.match(
+						collector,
+						new RegExp(`^${name}="\\$\\{${name}_OVERRIDE:-${value}\\}"$`, 'm'),
+						`${name} defaults to ${value} s`
+					);
+				assert.match(collector, /sleep \$\{FIELD_FILELESS_PROBE_SECONDS_OVERRIDE:-12\}/);
 				const { min, default: fallback, max } = spec.deadline_seconds;
 				assert(min <= fallback && fallback <= max, 'deadline_seconds needs min <= default <= max');
 				const bounds = spec.steps.reduce(
@@ -518,6 +540,10 @@ function reportFolder(paths) {
 			);
 			assert.match(collector, /^run_started_epoch="\$\(date \+%s\)"$/m);
 			const dir = fs.mkdtempSync(path.join(scratch, 'ips-'));
+			// The home a real crash report records: the summary must print none of it.
+			// One constant, not a literal checkout path (test-dev-tool-paths.cjs).
+			const reportHome = '/Users/someone';
+			const reportExecutable = `${reportHome}/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus`;
 			const header = JSON.stringify({
 				app_name: 'ErgoptiPlus',
 				bug_type: '309',
@@ -530,7 +556,7 @@ function reportFolder(paths) {
 				codeSigningID: 'com.ergoptiplus.app',
 				codeSigningTeamID: '',
 				codeSigningFlags: 570556929,
-				procPath: '/Users/someone/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus',
+				procPath: reportExecutable,
 				exception: {
 					type: 'EXC_CRASH',
 					signal: 'SIGKILL',
@@ -542,7 +568,7 @@ function reportFolder(paths) {
 				usedImages: [
 					{
 						name: 'ErgoptiPlus',
-						path: '/Users/someone/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus'
+						path: reportExecutable
 					},
 					{ name: 'libsystem_kernel.dylib', path: '/usr/lib/system/libsystem_kernel.dylib' }
 				],
@@ -560,7 +586,7 @@ function reportFolder(paths) {
 						]
 					}
 				],
-				environment: { HOME: '/Users/someone' }
+				environment: { HOME: reportHome }
 			});
 			fs.writeFileSync(path.join(dir, 'ErgoptiPlus-2026-10-30-210130.ips'), `${header}\n${body}`);
 			fs.writeFileSync(path.join(dir, 'Safari-2026-10-30.ips'), `${header}\n${body}`);
@@ -665,6 +691,9 @@ function reportFolder(paths) {
 					// A git pull rewrote the launcher after the build: the ready app is stale.
 					const future = new Date(Date.now() + 3600 * 1000);
 					fs.utimesSync(stale.launcherSource, future, future);
+					// The stand-in runner opens no app: the readiness wait that follows
+					// the rebuild gives up, so its budget is short here.
+					stale.env.FIELD_RUN_READY_SECONDS_OVERRIDE = '3';
 					const result = await runCollector(stale);
 					assert.match(result.stdout, /Building and opening the developer app/);
 					assert.equal(
@@ -888,8 +917,15 @@ function reportFolder(paths) {
 
 		await check('Ctrl-C during the field run still commits its results and logs', async () => {
 			const paths = fixture('interrupted');
-			const logs = path.join(paths.home, 'Library/Logs/ergopti_plus');
+			// LogsDirPath moves the day logs; the launcher's own log stays in the default folder
+			const defaultLogs = path.join(paths.home, 'Library/Logs/ergopti_plus');
+			const logs = path.join(paths.home, 'moved-logs/ergopti_plus');
+			fs.mkdirSync(defaultLogs, { recursive: true });
 			fs.mkdirSync(logs, { recursive: true });
+			fs.writeFileSync(
+				path.join(defaultLogs, 'launcher.log'),
+				'[2026-10-30 21:06:03] embedded Hammerspoon exited with status 70\n'
+			);
 			const today = new Date();
 			const day = [
 				today.getFullYear(),
@@ -902,12 +938,20 @@ function reportFolder(paths) {
 					`${day} 10:00:00:000 [ERROR] [menu] Fixture menu failure 3.\n` +
 					`${day} 10:00:01:000 [WARNING] [preferences] Slow preferences save 900 ms (prepare=1 write=1 ms; operations=1; ).\n`
 			);
+			// The trail a lost reload left (adapters/reload_breadcrumb.lua), then the next boot
+			fs.writeFileSync(
+				path.join(defaultLogs, 'reload_breadcrumb.txt'),
+				'accepted 5000.000\nlease_fence_requested 5001.250\nboot 9000.000\n'
+			);
 			// A configuration folder moved by the launcher's paths.toml, as
 			// config_paths.lua reads it: the collisions must follow it.
 			const moved = path.join(paths.home, 'moved-config');
 			const pathsFile = path.join(paths.home, 'Library/Application Support/ErgoptiPlus');
 			fs.mkdirSync(pathsFile, { recursive: true });
-			fs.writeFileSync(path.join(pathsFile, 'paths.toml'), `ConfigDirPath = "${moved}/"\n`);
+			fs.writeFileSync(
+				path.join(pathsFile, 'paths.toml'),
+				`ConfigDirPath = "${moved}/"\nLogsDirPath = "${logs}/"\n`
+			);
 			const personal = path.join(moved, 'hotstrings');
 			fs.mkdirSync(personal, { recursive: true });
 			fs.writeFileSync(
@@ -967,6 +1011,21 @@ function reportFolder(paths) {
 				const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD');
 				assert.match(committed, /field_run\/01_field_lease\.json/);
 				assert.match(committed, /ErgoptiPlus_\d{4}-\d{2}-\d{2}\.log/);
+				assert.equal(
+					fs.readFileSync(path.join(folder, 'reload_breadcrumb.txt'), 'utf8'),
+					'accepted 5000.000\nlease_fence_requested 5001.250\nboot 9000.000\n',
+					'the reload trail travels as written'
+				);
+				assert.match(committed, /reload_breadcrumb\.txt/);
+				assert.match(
+					fs.readFileSync(path.join(folder, 'launcher.log'), 'utf8'),
+					/embedded Hammerspoon exited with status 70/,
+					'launcher.log is read from the default folder, not the moved one'
+				);
+				assert.match(
+					fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+					/^hammerspoon-fatal\.txt\s+missing$/m
+				);
 				assert.equal(git(paths.clone, 'status', '--porcelain', '--untracked-files=no'), '');
 			} finally {
 				driver.child.kill();

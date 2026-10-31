@@ -416,7 +416,7 @@ if (process.platform === 'win32') {
 
 const cases = [
 	['tools/test/managed_ollama_runtime_policy_test.py', 7],
-	['tools/test/managed_ollama_pull_test.py', 8]
+	['tools/test/managed_ollama_pull_test.py', 10]
 ];
 if (process.platform !== 'win32') {
 	// Real files and CLI; modeled host admission grants no native macOS credit.
@@ -446,7 +446,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_ollama_hint_metadata_test.py', 19]);
 	cases.push(['tools/diagnostics/macos_ollama_serve_command_receiving_test.py', 2]);
 	cases.push(['tools/diagnostics/macos_native_python_probe_io_test.py', 3]);
-	cases.push(['tools/test/macos_managed_ollama_pull_caller_test.py', 13]);
+	cases.push(['tools/test/macos_managed_ollama_pull_caller_test.py', 15]);
 	cases.push(['tools/test/macos_managed_ollama_cleanup_test.py', 37]);
 	cases.push(['tools/test/managed_source_alias_test.py', 23]);
 	cases.push(['tools/diagnostics/macos_owned_image_alias_test.py', 28]);
@@ -754,7 +754,7 @@ package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. shared .. "/?.
 _G.hs = require("hs")
 assert(loadfile(driver .. "/tests/unit/ui/menu/menu_llm/ollama/test_managed_ollama_pull_activation.lua"))()
 local results = require("tests.helpers").get_results()
-assert(results.failed == 0 and results.passed == 17, "all pull activation controls must pass")
+assert(results.failed == 0 and results.passed == 18, "all pull activation controls must pass")
 print("Managed pull activation controls passed: " .. results.passed)
 `;
 const pullResult = spawnSync(runtime, ['-e', pullProgram], {
@@ -765,7 +765,7 @@ const pullResult = spawnSync(runtime, ['-e', pullProgram], {
 assert.equal(pullResult.error, undefined, 'the original pull receiver must start');
 assert.equal(pullResult.signal, null, 'the original pull receiver must settle');
 assert.equal(pullResult.status, 0, pullResult.stderr || pullResult.stdout);
-assert.match(pullResult.stdout, /Managed pull activation controls passed: 17\s*$/);
+assert.match(pullResult.stdout, /Managed pull activation controls passed: 18\s*$/);
 process.stdout.write(pullResult.stdout);
 process.stdout.write(pullResult.stderr);
 process.stdout.write(

@@ -194,10 +194,11 @@ local function language_callback_fixture(body)
 		native.init()
 		local builder, renderer = require("ui.menu.menu_builder"), require("infra.manifest_menu")
 		local producer = language_callback_capture(builder.build, "_build_language")
-		local production_source = debug.getinfo(builder.build, "S").source
-		helpers.assert_eq(debug.getinfo(producer, "S").source, production_source,
-			"the actual loaded MenuBuilder must own the language producer")
-		helpers.assert_true(production_source:find("/ui/menu/menu_builder.lua", 1, true) ~= nil)
+		-- The root binds the producer from its own module (ui/menu/menu_language.lua).
+		local production_source = debug.getinfo(producer, "S").source
+		helpers.assert_true(rawequal(producer, require("ui.menu.menu_language").build),
+			"the actual loaded MenuBuilder must bind the language module's producer")
+		helpers.assert_true(production_source:find("/ui/menu/menu_language.lua", 1, true) ~= nil)
 		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/language_parent.json"), "rb"))
 		local raw = assert(file:read("*a"))
 		assert(file:close())

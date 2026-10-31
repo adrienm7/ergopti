@@ -91,9 +91,8 @@ def main():
     config_dir = override(paths, config["override_key"]) or folder(
         config["macos"]["base"], config["macos"]["segments"], app
     )
-    log_dir = override(paths, logs["override_key"]) or folder(
-        logs["macos"]["base"], logs["macos"]["segments"], app
-    )
+    default_log_dir = folder(logs["macos"]["base"], logs["macos"]["segments"], app)
+    log_dir = override(paths, logs["override_key"]) or default_log_dir
     declared = {entry["name"] for entry in routes["sub_files"] if "hs" in entry["platforms"]}
     unknown = sorted(set(arguments.topical) - declared)
     if unknown:
@@ -104,8 +103,14 @@ def main():
         "LOG_UNIFIED_PREFIX": files["unified_prefix"],
         "LOG_ERRORS_PREFIX": files["errors_prefix"],
         "LOG_EXTENSION": files["extension"],
+        # The launcher writes these before any configuration is read, so they
+        # stay in the default folder whatever LogsDirPath says.
+        "LOG_DEFAULT_DIR": default_log_dir,
         "LOG_LAUNCHER": logs["macos"]["launcher_log"],
+        "LOG_FATAL_REPORT": logs["macos"]["fatal_report"],
         "LOG_TOPICAL": " ".join(topical),
+        # Always in the default folder, whatever LogsDirPath says, like launcher.log.
+        "RELOAD_BREADCRUMB": os.path.join(default_log_dir, logs["macos"]["reload_breadcrumb"]),
         "PERSONAL_HOTSTRINGS": os.path.join(
             config_dir, config["hotstrings_dir"], config["personal_hotstrings_file"]
         ),

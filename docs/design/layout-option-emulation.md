@@ -3,7 +3,8 @@
 # Layout options on macOS and Linux, live, through one generated `.keylayout`
 
 Status: Linux implemented (X11, GNOME and KDE Wayland, scope acknowledgement;
-section 3.2), macOS still a design. It answers the TODO item « Number-row
+section 3.2); macOS implemented, waiting for the field run's `field_layout_rows`
+answer on a real Mac (section 3.1, "Implemented"). It answers the TODO item « Number-row
 and layout emulation on macOS and Linux, live » (maintainer request of
 27 October) in the form the maintainer settled on: the user picks a layout, the
 menu options and later per-key edits, and that produces **one custom
@@ -230,6 +231,28 @@ tests) or a new layout inside an already enabled bundle. Either way the versione
 (an in-place rewrite is cached), and the ghost left by a removed file (until logout) argues
 for adding layouts to a bundle rather than removing files; whether a layout added inside an
 already enabled bundle is selectable without the preferences route is exactly what P7 answers.
+
+Implemented (30 October), macOS:
+
+- `_shared/lua/layouts/keylayout_rows.lua` applies the options to the `.keylayout` text
+  (base, Shift, Caps, Shift+Caps keyMaps of the default keyMapSet). A Cmd, Ctrl or Option
+  press that selected one of those keyMaps (Ergo-L reaches Cmd and Ctrl through
+  `defaultIndex`) is first routed to a verbatim copy of it, so shortcuts keep the layout's
+  cells. `tools/test/test-keylayout-row-options.cjs` converts the edited file and requires
+  the converter's own output for the same options.
+- `macos/modules/keymap/layout_rows_build.lua` is the sequence above with the preferences
+  route in step 4 (P5) instead of `TISEnableInputSource`, and with step 6 as the launcher's
+  `--keyboard-source-probe` on the exact selected source (base level; the swap is visible
+  there). Builds are `~/Library/Keyboard Layouts/ErgoptiRows-<n>.keylayout`, named
+  `<keyboard name> <n>`, recorded in `<config>/layouts/rows_builds.json`.
+- The menu rows (`number_row_live.lua`) apply to the selected installed registry or composed
+  layout, or to the build typing for one; an Ergopti bundle types digits on both levels, so
+  its rows stay refused (`digits_on_both`).
+- The global scope's layout participant (`ui/menu/global_scope.lua`) settles only on the
+  read-back and reverts the rows when the system did not take the build.
+- The field run's `field_layout_rows` answers M4 to M6 on the maintainer's Mac with no
+  person: two builds from the shipped Ergo-L replace each other live, then the selected
+  source and `AppleEnabledInputSources` must be back byte for byte.
 
 ### 3.2 Linux
 

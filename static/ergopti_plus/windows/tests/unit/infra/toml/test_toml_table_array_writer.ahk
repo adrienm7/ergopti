@@ -412,7 +412,7 @@ _TBUI_RefusedHeaderFallsBackPerSection() {
 	Source := "[a]`nb.c = 1`n"
 	Updates := [{ Section: "a.b", Key: "d", Value: 2 }, { Section: "z", Key: "k", Value: 3 }]
 	Result := TOML_BuildConfigDocumentCandidate(Source, Updates, [])
-	AssertEqual(Chr(0xFEFF) . "[a]`nb.d = 2`nb.c = 1`n[z]`nk = 3`n", Result["content"])
+	AssertEqual("[a]`nb.d = 2`nb.c = 1`n[z]`nk = 3`n", Result["content"])
 	AssertEqual(3, Result["header_admission_parses"],
 		"the refused batch parse is followed by one parse per candidate header")
 }

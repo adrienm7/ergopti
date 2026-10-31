@@ -178,7 +178,38 @@ local function has_no_synthetic_heuristic(source)
 	return true
 end
 
+--- Checks that every read of the selftest class in production is a keymap tap
+--- site that consumes the key unless the selftest gate admits it.
+--- @param production string Comment-stripped production source.
+--- @param keymap string Comment-stripped keymap source.
+--- @return boolean valid
+local function selftest_sites_fail_closed(production, keymap)
+	local reads = count_literal(production, "provenance.selftest == true")
+	if reads ~= 3 or count_literal(keymap, "provenance.selftest == true") ~= reads then return false end
+	if count_literal(keymap, "SelftestGate.admits(provenance)") ~= reads then return false end
+	local consumed = count_literal(keymap, "if not SelftestGate.admits(provenance) then return true, fence_events end")
+		+ count_literal(keymap, "if not SelftestGate.admits(provenance) then\n\t\t\tHotPath.log_if_slow(\"keydown\", t0_hot)\n\t\t\treturn true\n")
+	return consumed == reads
+end
+
 helpers.describe("modules/keymap/init.lua: synthetic ledger is provenance-gated (audit-v5)", function()
+
+	-- The selftest class (SyntheticInput.emit_selftest_key_stroke) is the one
+	-- owned event the keymap may decode as typing. Each of its three tap sites
+	-- (keyDown, keyUp, flagsChanged) must consume it unless the gate admits it,
+	-- and no other production code may read the class.
+	helpers.it("decodes the selftest class only behind the fail-closed gate", function()
+		local production = strip_line_comments(helpers.read_driver_source())
+		local keymap = strip_line_comments(read_unit("local function invalidate_observed_context"))
+		helpers.assert_true(selftest_sites_fail_closed(production, keymap),
+			"every selftest read must be a keymap tap site that consumes a refused key")
+		local passing_mutant = keymap:gsub("SelftestGate%.admits%(provenance%) then return true, fence_events end",
+			"SelftestGate.admits(provenance) then return false, fence_events end", 1)
+		helpers.assert_true(not selftest_sites_fail_closed(production, passing_mutant),
+			"the guard must fail if a refused selftest key passes to the application")
+		helpers.assert_true(not selftest_sites_fail_closed(production .. "\nif provenance.selftest == true then end", keymap),
+			"the guard must fail if another module reads the selftest class")
+	end)
 
 	helpers.it("classifies exactly once with the physical fence before every raw route", function()
 		local src = read_unit("local function invalidate_observed_context")

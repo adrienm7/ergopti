@@ -47,9 +47,13 @@ local Formats = require("llm.remote_formats")
 local Classifier = require("llm.remote_response_classifier")
 local AuthPolicy = require("llm.local_server_auth")
 local ThinkingOff = require("llm.thinking_off")
+local ModelCapabilities = require("llm.model_capabilities")
+local TableUtil = require("table_util")
 local ApiModelListing = require("llm.api_model_listing")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local ProviderConfig = require("llm.provider_config_policy")
+local UrlTemplate = require("llm.api_url_template")
+local TokenExchange = require("llm.api_token_exchange")
 
 local LOG = "modules.llm.api_remote"
 
@@ -60,6 +64,9 @@ local PROBE_OWNER = "llm_remote_probe"
 -- The model selector page's provider listings: their own owner, so a listing
 -- never cancels a prediction or a test.
 local LISTING_OWNER = "llm_remote_listing"
+-- The capability listings (model_capabilities.lua): their own owner, so a
+-- background fetch never cancels or waits for a prediction, a test or a page.
+local CAPABILITY_OWNER = "llm_remote_capabilities"
 local ANTHROPIC_VERSION = "2023-06-01"
 -- What each format serves: "chat" (predictions, tone, translation, the screen
 -- answers' text step, the agent's System 2 and chat triage), "vision" (an image
@@ -103,8 +110,12 @@ local function descriptor_is_valid(id, desc)
 		if type(desc[key]) ~= "string" then return false end
 	end
 	if desc.label:match("^%s*$") or not FORMAT_USES[desc.format] then return false end
-	-- Only the generic OpenAI-compatible entry leaves its URL and model to the user.
-	if id ~= "openai_compat" and (desc.base_url:match("^%s*$") or desc.default_model:match("^%s*$")) then
+	-- Only the generic OpenAI-compatible entry leaves its URL to the user; a
+	-- per-account address (a template the add-entry form fills) leaves the model
+	local fields, malformed = UrlTemplate.fields(desc.base_url)
+	if malformed then return false end
+	if id ~= "openai_compat" and (desc.base_url:match("^%s*$")
+		or (#fields == 0 and desc.default_model:match("^%s*$"))) then
 		return false
 	end
 	if desc.base_url ~= "" and not desc.base_url:match("^https?://%S+$") then return false end
@@ -169,15 +180,23 @@ function M.parse_catalogue(text)
 	for _, id in ipairs(root.provider_order) do
 		local desc = type(id) == "string" and root.providers[id] or nil
 		local thinking_dialect, thinking_reason = nil, nil
-		if type(desc) == "table" then thinking_dialect, thinking_reason = ThinkingOff.parse_dialect(desc.thinking_dialect) end
+		local auth, auth_reason = nil, nil
+		if type(desc) == "table" then
+			thinking_dialect, thinking_reason = ThinkingOff.parse_dialect(desc.thinking_dialect)
+			auth, auth_reason = TokenExchange.parse(desc.auth)
+		end
 		if catalogue.providers[id] then
 			Logger.warn(LOG, "api_providers.json: provider '%s' is listed twice; the first is kept.", id)
 		elseif descriptor_is_valid(id, desc) and not thinking_dialect then
 			-- A half-read dialect would let some models think: refuse the provider whole
 			Logger.error(LOG, "api_providers.json: providers.%s.thinking_dialect is invalid (%s) — skipped.",
 				tostring(id), tostring(thinking_reason))
+		elseif descriptor_is_valid(id, desc) and auth_reason then
+			-- Sent as Bearer, the stored key itself would be refused: refuse the provider whole
+			Logger.error(LOG, "api_providers.json: providers.%s.auth is invalid (%s) — skipped.", tostring(id), auth_reason)
 		elseif descriptor_is_valid(id, desc) then
 			catalogue.providers[id] = {
+				auth = auth,
 				id = id,
 				label = desc.label,
 				base_url = desc.base_url,
@@ -360,6 +379,106 @@ local function model_of(entry, provider)
 	return provider.default_model
 end
 
+-- Access tokens of the providers that exchange the stored key (auth in
+-- api_providers.json), per provider and key: { token, expires_at, pending,
+-- waiters, failure, retry_at }. In memory only, and never logged.
+local _access = {}
+-- Seconds before a failed exchange is tried again, so a refused key does
+-- not reach the token service on every keystroke
+local ACCESS_RETRY_SECONDS = 60
+
+--- The access slot of an entry.
+--- @param entry table
+--- @return table
+local function access_slot(entry)
+	local key = tostring(entry.provider) .. "\0" .. tostring(entry.token)
+	_access[key] = _access[key] or { waiters = {} }
+	return _access[key]
+end
+
+--- Exchanges an entry's stored key for an access token, once at a time;
+--- on_done(ok, reason) runs when the exchange settles.
+--- @param provider table A catalogue provider with an auth block.
+--- @param entry table
+--- @param on_done function|nil
+local function refresh_access(provider, entry, on_done)
+	local slot = access_slot(entry)
+	if type(on_done) == "function" then slot.waiters[#slot.waiters + 1] = on_done end
+	if slot.pending then return end
+	local function settle(ok, reason)
+		slot.pending = false
+		local waiters = slot.waiters
+		slot.waiters = {}
+		for _, waiter in ipairs(waiters) do
+			local called, problem = pcall(waiter, ok, reason)
+			if not called then Logger.error(LOG, "Access token waiter failed: %s", tostring(problem)) end
+		end
+	end
+	local request, reason = TokenExchange.request(provider.auth, entry.token)
+	if not request then
+		slot.failure, slot.retry_at = reason, Monotonic.now_sec() + ACCESS_RETRY_SECONDS
+		Logger.error(LOG, "Access token of provider '%s' cannot be asked: %s.", provider.id, reason)
+		return settle(false, reason)
+	end
+	slot.pending = true
+	Logger.start(LOG, "Exchanging the key of provider '%s' for an access token…", provider.id)
+	local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
+		result = type(result) == "table" and result or {}
+		local raw = type(result.body) == "string" and result.body ~= "" and result.body or result.error_body
+		local decoded_ok, decoded = pcall(Json.decode, type(raw) == "string" and raw or "")
+		local token, why = TokenExchange.read(provider.auth, result.status, decoded_ok and decoded or nil, Monotonic.now_sec())
+		if token then
+			slot.token, slot.expires_at, slot.failure, slot.retry_at = token.token, token.expires_at, nil, nil
+			Logger.success(LOG, "Access token of provider '%s' received (valid %d s).", provider.id,
+				math.floor(token.expires_at - Monotonic.now_sec()))
+			return settle(true, nil)
+		end
+		slot.failure, slot.retry_at = why, Monotonic.now_sec() + ACCESS_RETRY_SECONDS
+		Logger.error(LOG, "Access token of provider '%s' refused: %s.", provider.id, why)
+		return settle(false, why)
+	end)
+	if not dispatched then
+		slot.failure, slot.retry_at = "the token exchange could not be sent", Monotonic.now_sec() + ACCESS_RETRY_SECONDS
+		Logger.error(LOG, "Access token of provider '%s' cannot be asked: the request was not sent.", provider.id)
+		return settle(false, slot.failure)
+	end
+end
+
+--- The access token an entry's requests carry now, refreshing it in the
+--- background when it nears its end.
+--- @param provider table
+--- @param entry table
+--- @return string|nil token, string|nil reason
+local function access_token(provider, entry)
+	local slot = access_slot(entry)
+	local now = Monotonic.now_sec()
+	local usable, refresh = TokenExchange.state(provider.auth, slot.token and slot or nil, now)
+	if refresh and not slot.pending and (slot.retry_at == nil or now >= slot.retry_at) then
+		refresh_access(provider, entry)
+	end
+	if usable then return slot.token, nil end
+	return nil, slot.failure or "the access token is being fetched: try again in a moment"
+end
+
+--- Fetches an entry's access token when its provider exchanges keys, then
+--- runs on_ready(ok, reason); at once for any other provider.
+--- @param entry table
+--- @param on_ready function
+function M.prepare_access(entry, on_ready)
+	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
+	if not (provider and provider.auth) then return on_ready(true, nil) end
+	local slot = access_slot(entry)
+	local now = Monotonic.now_sec()
+	if TokenExchange.state(provider.auth, slot.token and slot or nil, now) then
+		return on_ready(true, nil)
+	end
+	if not slot.pending and slot.retry_at and now < slot.retry_at then
+		-- A refused exchange waits its pause: the reason answers at once
+		return on_ready(false, slot.failure)
+	end
+	refresh_access(provider, entry, on_ready)
+end
+
 --- The address and headers of one request to an entry's provider, per format:
 --- openai (and every OpenAI-compatible provider) base_url/chat/completions with
 --- a Bearer key, anthropic base_url/messages with x-api-key, gemini
@@ -370,7 +489,7 @@ end
 --- decisions base_url is the full endpoint.
 --- @param entry table { provider, base_url?, token }
 --- @param model string The model the request names.
---- @return table|nil endpoint { url, headers, format }, string|nil reason
+--- @return table|nil endpoint { url, headers, format, provider, model }, string|nil reason
 function M.endpoint(entry, model)
 	if type(entry) ~= "table" then return nil, "no API entry" end
 	local provider = M.provider(entry.provider)
@@ -384,11 +503,21 @@ function M.endpoint(entry, model)
 		local scan = Servers.port_scan(entry.provider)
 		if scan and scan.running and type(scan.base_url) == "string" then base_raw = scan.base_url end
 	end
+	-- A per-account address is filled when the entry is added; its template never leaves
+	if UrlTemplate.has_placeholder(base_raw) then
+		return nil, "the entry has no account address: add it again from the provider list"
+	end
 	local base, reason = M.normalize_base_url(base_raw)
 	if not base then return nil, reason end
 	local token = entry.token
 	if not M.token_allowed(entry.provider, token, entry.base_url) then return nil, "the API key is missing or invalid" end
 	if type(model) ~= "string" or model == "" then return nil, "no model is configured" end
+	if provider.auth then
+		-- The stored key is exchanged for the short-lived token the requests carry
+		local access, access_reason = access_token(provider, entry)
+		if not access then return nil, access_reason end
+		token = access
+	end
 
 	local headers = { ["Content-Type"] = "application/json" }
 	local url
@@ -409,7 +538,9 @@ function M.endpoint(entry, model)
 		url = base .. "/chat/completions"
 		if token ~= "" then headers["Authorization"] = "Bearer " .. token end
 	end
-	return { url = url, headers = headers, format = provider.format }
+	-- The provider and model name the request at every boundary after this one:
+	-- complete_body (thinking off, request fields) reads them from the target.
+	return { url = url, headers = headers, format = provider.format, provider = entry.provider, model = model }
 end
 
 --- The system and user turns of a PromptBuilder message list.
@@ -530,6 +661,28 @@ function M.ollama_think(model)
 	return think
 end
 
+-- The capability listings by provider id (model_capabilities.lua cache)
+local _capabilities = {}
+
+--- The capability check of one provider's model for the resolver: nil when
+--- the provider has no listing.
+--- @param provider_id string
+--- @param model string
+--- @return function|nil lacks (kind, level, template) -> boolean
+local function capability_lacks(provider_id, model)
+	local config = thinking_families().capability
+	if not config or not config.providers[provider_id] then return nil end
+	local record = ModelCapabilities.record(ModelCapabilities.records(_capabilities, provider_id), model)
+	if not record then return nil end
+	return function(kind, level, template)
+		local lacking = ModelCapabilities.lacks(record, kind, level, template)
+		if lacking then
+			Logger.debug(LOG, "Model %s of provider '%s' lacks the %s control (its listing): skipped.", model, provider_id, kind)
+		end
+		return lacking
+	end
+end
+
 --- Completes a request body for a provider: a local server's request_fields
 --- of local_servers.json (OpenAI shape), then the model family's reasoning
 --- control (thinking_off.json) through the provider's thinking_dialect. A
@@ -544,7 +697,7 @@ function M.complete_body(provider_id, model, body)
 	if not provider then error("api_remote.complete_body: unknown provider " .. tostring(provider_id), 2) end
 	if provider.format == "openai" then AuthPolicy.apply_request_fields(body, provider.request_fields) end
 	local family, kind, added = ThinkingOff.apply(thinking_families(), provider.thinking_dialect, model, body,
-		thinking_refused()[provider_id .. "|" .. model])
+		thinking_refused()[provider_id .. "|" .. model], capability_lacks(provider_id, model))
 	if #added > 0 then
 		Logger.debug(LOG, "Thinking off: family %d applies to model %s through provider '%s' (%s).",
 			family, model, provider_id, kind)
@@ -628,6 +781,7 @@ function M.build_request(entry, messages, opts)
 	-- Reasoning off for every format: a local server's request fields, then
 	-- the provider's thinking_off rules, never over a field already set.
 	local _, added = M.complete_body(entry.provider, model, payload)
+	M.refresh_capabilities(entry)
 	local body = Json.encode(payload)
 	if type(body) ~= "string" then return nil, "request could not be encoded" end
 	return { url = endpoint.url, headers = endpoint.headers, body = body, format = provider.format, model = model,
@@ -1159,6 +1313,61 @@ function M.list_models(entry, on_done)
 	return true
 end
 
+--- Fetches a provider's capability listing when it is missing or stale: on
+--- the next event-loop tick and with its own HTTP owner, so the request that
+--- asked for it is never delayed. A failed fetch keeps the old listing.
+--- @param entry table The API entry whose key reads the listing.
+--- @return boolean scheduled
+function M.refresh_capabilities(entry)
+	local config = thinking_families().capability
+	local provider_id = type(entry) == "table" and entry.provider or nil
+	local listing = config and config.providers[provider_id]
+	if not listing or not ModelCapabilities.needs_fetch(_capabilities, provider_id, os.time(), config.ttl_sec) then
+		return false
+	end
+	local url, headers = listing_endpoint(entry)
+	if not url then return false end
+	local query = config.page_query[listing]
+	if query then url = url .. (url:find("?", 1, true) and "&" or "?") .. query end
+	ModelCapabilities.begin(_capabilities, provider_id)
+	local function finish(records)
+		ModelCapabilities.finish(_capabilities, provider_id, records, os.time())
+	end
+	local scheduled = require("adapters.event_loop").defer(function()
+		Logger.info(LOG, "Capability listing of provider %s requested.", provider_id)
+		local dispatched = HttpClient.get(url, headers,
+			{ owner = CAPABILITY_OWNER, timeout_ms = Timings.ms("llm", "request_timeout_ms"), follow_redirects = false },
+			function(result)
+				if type(result) ~= "table" or result.ok ~= true then
+					Logger.warn(LOG, "Capability listing of provider %s unavailable (status=%s): kept the old one.",
+						provider_id, tostring(type(result) == "table" and result.status or nil))
+					return finish(nil)
+				end
+				local decoded_ok, decoded = pcall(Json.decode, type(result.body) == "string" and result.body or "")
+				local records, reason = ModelCapabilities.parse(listing, decoded_ok and decoded or nil)
+				if not records then
+					Logger.warn(LOG, "Capability listing of provider %s could not be read (%s).", provider_id, tostring(reason))
+					return finish(nil)
+				end
+				Logger.info(LOG, "Capability listing of provider %s: %d model(s) described.", provider_id,
+					TableUtil.count(records))
+				finish(records)
+			end)
+		if dispatched ~= true then
+			Logger.warn(LOG, "Capability listing of provider %s could not be sent.", provider_id)
+			finish(nil)
+		end
+	end, 0)
+	if not scheduled then finish(nil) end
+	return scheduled == true
+end
+
+--- The capability cache (tests).
+--- @return table
+function M._capabilities_for_test()
+	return _capabilities
+end
+
 --- Sends the connectivity probe with one entry: the shared test_request as a
 --- chat (a Backboard entry as one message), or decisions_test to a decisions
 --- provider, which passes when the answer holds answers.
@@ -1207,16 +1416,27 @@ function M.test(entry, on_done, admission)
 		return false
 	end
 	if not admitted() then return false end
-	return M.chat(entry, nil, {
-		{ role = "system", content = spec.system_prompt },
-		{ role = "user", content = spec.user_text },
-	}, { temperature = spec.temperature, max_tokens = spec.max_tokens, authorized = admission }, nil, function(text, err, third)
-		local elapsed = Monotonic.now_ms() - started
-		-- The third value is the usage of a completion, a failure's receipt only beside err.
-		local receipt = err ~= nil and third or nil
-		if receipt == nil then on_done(err == nil, err or text, elapsed)
-		else on_done(err == nil, err or text, elapsed, receipt) end
+	local function send()
+		return M.chat(entry, nil, {
+			{ role = "system", content = spec.system_prompt },
+			{ role = "user", content = spec.user_text },
+		}, { temperature = spec.temperature, max_tokens = spec.max_tokens, authorized = admission }, nil, function(text, err, third)
+			local elapsed = Monotonic.now_ms() - started
+			-- The third value is the usage of a completion, a failure's receipt only beside err.
+			local receipt = err ~= nil and third or nil
+			if receipt == nil then on_done(err == nil, err or text, elapsed)
+			else on_done(err == nil, err or text, elapsed, receipt) end
+		end)
+	end
+	if not (provider and provider.auth) then return send() end
+	-- The key test waits for the access token instead of failing while it is fetched
+	local sent = true
+	M.prepare_access(entry, function(ok, reason)
+		if not admitted() then return end
+		if ok then sent = send() ~= false
+		else on_done(false, reason, Monotonic.now_ms() - started) end
 	end)
+	return sent
 end
 
 --- Forgets the loaded catalogue and the Backboard assistants (tests).
@@ -1228,6 +1448,8 @@ function M._reset_for_test(thinking_refused_file)
 		scope.epoch, scope.active, scope.used = scope.epoch + 1, nil, nil
 	end
 	_assistants = {}
+	_capabilities = {}
+	_access = {}
 end
 
 --- Hands in the HttpClient that sends and cancels inference requests (engine init).

@@ -30,6 +30,9 @@ global LIVE_POLL_MS := 25
 global LIVE_DEFAULT_TIMEOUT_MS := 20000
 global _LiveCommands := Map()
 global _LiveStopped := false
+; How long a pressed button's dialog may stay open before it is closed and reported.
+global LIVE_DIALOG_CLOSE_LIMIT_MS := 10000
+global _LiveUnclosedDialog := ""
 
 
 
@@ -256,9 +259,46 @@ _LiveDriveTick(State, Match, Action, *) {
 
 /** Waits for a LiveDriveWindow state to finish and throws what it recorded. */
 LiveAwaitDrive(State, What) {
+	global _LiveUnclosedDialog
 	LiveWaitFor(() => State.Done, What, State.Limit + 5000)
 	if State.Failed
 		throw Error(What . ": " . State.Error)
+	if _LiveUnclosedDialog != "" {
+		Unclosed := _LiveUnclosedDialog
+		_LiveUnclosedDialog := ""
+		throw Error(What . ": " . Unclosed)
+	}
+}
+
+/**
+ * Presses a dialog's button with the notification the button sends its window.
+ * A posted mouse click needs the button to keep its capture and focus between
+ * press and release: a window of another process taking the foreground in that
+ * moment cancels it, nothing is logged, and the thread that opened the dialog
+ * waits forever on top of the command that would report it. For the same reason a
+ * dialog still open after the limit is closed and reported, so the command resumes.
+ * @param {String} Control ClassNN of the button.
+ * @param {Integer} Hwnd The dialog.
+ */
+LiveClickDialogButton(Control, Hwnd) {
+	global LIVE_DIALOG_CLOSE_LIMIT_MS
+	Button := ControlGetHwnd(Control, "ahk_id " . Hwnd)
+	if !ControlGetEnabled(Button)
+		throw Error("the button " . Control . " is disabled")
+	Id := DllCall("GetDlgCtrlID", "Ptr", Button, "Int")
+	if !DllCall("PostMessageW", "Ptr", Hwnd, "UInt", 0x111, "UPtr", Id, "Ptr", Button, "Int")
+		throw OSError(A_LastError, A_ThisFunc, "The button press could not be posted.")
+	SetTimer(_LiveCloseUnanswered.Bind(Hwnd, Control), -LIVE_DIALOG_CLOSE_LIMIT_MS)
+}
+
+_LiveCloseUnanswered(Hwnd, Control, *) {
+	global _LiveUnclosedDialog, LIVE_DIALOG_CLOSE_LIMIT_MS
+	if !WinExist("ahk_id " . Hwnd)
+		return
+	_LiveUnclosedDialog := "the dialog '" . WinGetTitle("ahk_id " . Hwnd) . "' was still open "
+		. LIVE_DIALOG_CLOSE_LIMIT_MS . " ms after its button " . Control . " was pressed"
+	LiveTrace(_LiveUnclosedDialog)
+	WinClose("ahk_id " . Hwnd)
 }
 
 

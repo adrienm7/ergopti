@@ -10,6 +10,16 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+
+; Exit code of ollama-model-pull.ps1 when the relay demands a Windows login
+; (NTLM, Negotiate) the owned daemon cannot answer (Get-OllamaPullProxyLoginExitCode)
+global LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT := 3
+
+; The launcher's proxy dependencies under vendor/, in the order of its
+; Get-OllamaRuntimeVendorNames: both sides hash name and digest in this order
+global LLM_OLLAMA_RUNTIME_VENDOR_NAMES := ["ergopti_route_plan.ps1", "ergopti_network_routes.ps1",
+	"ergopti_windows_proxy_config.ps1", "ergopti_native_proxy_ex.ps1", "ergopti_network_pac.ps1"]
+
 #Include ollama_runtime_owner.ahk
 
 global _LLM_ManagedBootstrap := 0
@@ -257,10 +267,11 @@ class OllamaManagedBootstrap {
 		Updater := _SharedDir . "\modules\updater\defaults.json"
 		Policy := _SharedDir . "\modules\network\proxy_policy.json"
 		ServeEnvironment := _SharedDir . "\modules\llm\managed_ollama_environment.json"
+		RouteOrigins := _SharedDir . "\modules\network\route_origins.json"
 		Helper := Directory . "\ollama_managed_files.ps1"
 		Acquisition := Directory . "\ollama_managed_acquisition.ps1"
 		Vendor := _VendorDir
-		for Path in [Catalogue, Updater, Policy, ServeEnvironment, Helper, Acquisition,
+		for Path in [Catalogue, Updater, Policy, ServeEnvironment, RouteOrigins, Helper, Acquisition,
 			Directory . "\ollama_download_archive.ps1", Directory . "\ollama-runtime-launch.ps1",
 			Directory . "\ollama-model-pull.ps1"]
 			this.Sources[Path] := this._Hash(Path)
@@ -271,6 +282,15 @@ class OllamaManagedBootstrap {
 			Path := Vendor . "\" . Name
 			this.Sources[Path] := this._Hash(Path)
 			Inventory .= Name . "`n" . this.Sources[Path] . "`n"
+		}
+		; The launcher's proxy dependencies, in the order its
+		; Get-OllamaRuntimeVendorNames lists them (one digest over name and hash)
+		RuntimeInventory := ""
+		for Name in LLM_OLLAMA_RUNTIME_VENDOR_NAMES {
+			Path := Vendor . "\" . Name
+			if !this.Sources.Has(Path)
+				this.Sources[Path] := this._Hash(Path)
+			RuntimeInventory .= Name . "`n" . this.Sources[Path] . "`n"
 		}
 		Release := JsonParse(FSReadUtf8ExactBounded(Catalogue, 65536))
 		Defaults := JsonParse(FSReadUtf8ExactBounded(Updater, 65536))
@@ -297,6 +317,10 @@ class OllamaManagedBootstrap {
 		this.Runtime := OllamaRuntimeOwner(Map("launcher", Directory . "\ollama-runtime-launch.ps1",
 			"helper", Helper, "helper_sha256", this.Sources[Helper],
 			"environment", ServeEnvironment, "environment_sha256", this.Sources[ServeEnvironment],
+			"proxy", Map("VendorDirectory", Vendor, "VendorSha256", CryptoSha256(RuntimeInventory),
+				"ProxyPolicyPath", Policy, "ProxyPolicySha256", this.Sources[Policy],
+				"UpdaterDefaultsPath", Updater, "UpdaterDefaultsSha256", this.Sources[Updater],
+				"RouteOriginsPath", RouteOrigins, "RouteOriginsSha256", this.Sources[RouteOrigins]),
 			"on_retired", ObjBindMethod(this, "_RuntimeRetired"), "on_error", ObjBindMethod(this, "_Error")))
 	}
 
@@ -731,22 +755,25 @@ class OllamaManagedBootstrap {
 		return true
 	}
 
-	_MenuPullFail(Operation) {
+	_MenuPullFail(Operation, MessageKey := "ollama.runtime_repair_failed") {
 		if !(Operation is Map) || this.MenuPull != Operation || Operation["failed"]
 			return false
 		Operation["failed"] := true
-		LoggerError("LLM.managed", "Managed menu model download failed; cancelling its retained owners.")
+		LoggerError("LLM.managed", "Managed menu model download failed ({1}); cancelling its retained owners.", MessageKey)
 		try {
-			this._Ui("ollama.runtime_repair_failed")
+			this._Ui(MessageKey)
 			if !(this.Port is Map) && this.UiShown && !A_IsSuspended
-				OllamaWV_SetError(t("ollama.runtime_repair_failed"))
+				OllamaWV_SetError(t(MessageKey))
 		} finally this.Cancel()
 		return false
 	}
 
 	_MenuPulled(Operation, ExitCode, *) {
+		global LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT
 		if !this._MenuPullCurrent(Operation)
 			return false
+		if (ExitCode is Integer) && ExitCode == LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT
+			return this._MenuPullFail(Operation, "network.failure.proxy_windows_login")
 		if !(ExitCode is Integer) || ExitCode != 0
 			return this._MenuPullFail(Operation)
 		Done := ObjBindMethod(this, "_MenuPullModels", Operation)
@@ -834,8 +861,11 @@ class OllamaManagedBootstrap {
 	}
 
 	_PullResult(ExitCode, Stdout := "", Stderr := "") {
+		global LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT
 		if !this._Current()
 			return this.Cancel()
+		if (ExitCode is Integer) && ExitCode == LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT
+			return this._Fail("model_pull_proxy_login", "network.failure.proxy_windows_login")
 		if !(ExitCode is Integer) || ExitCode != 0
 			return this._Fail("model_pull")
 		return this._Models()
@@ -1009,7 +1039,7 @@ class OllamaManagedBootstrap {
 		return this.Cancel()
 	}
 
-	_Fail(Phase) {
+	_Fail(Phase, MessageKey := "ollama.runtime_repair_failed") {
 		global _LLM_Deps_Epoch
 		if this.Cancelled || A_IsSuspended || this.Epoch != _LLM_Deps_Epoch {
 			this.Cancel()
@@ -1017,7 +1047,7 @@ class OllamaManagedBootstrap {
 		}
 		if !this.Failed {
 			if !(this.Port is Map)
-				this._Ui("ollama.runtime_repair_failed")
+				this._Ui(MessageKey)
 			; UI can call the real cancellation path. Claim only current failure
 			; state under Critical; native cleanup and file-backed logs stay out.
 			Claimed := false
@@ -1035,12 +1065,12 @@ class OllamaManagedBootstrap {
 			LoggerError("LLM.managed", "Managed bootstrap failed at {1}; retained owners remain explicit.", Phase)
 			if !this.Cancelled && !A_IsSuspended && this.Epoch == _LLM_Deps_Epoch {
 				if !(this.Port is Map) && this.UiShown
-					OllamaWV_SetError(t("ollama.runtime_repair_failed"))
+					OllamaWV_SetError(t(MessageKey))
 				if !this.Cancelled && !A_IsSuspended && this.Epoch == _LLM_Deps_Epoch {
 					if HasMethod(this.OnFailed, "Call")
-						_LLM_Deps_PublishFailure(t("ollama.runtime_repair_failed"), this.OnFailed, this.Epoch)
+						_LLM_Deps_PublishFailure(t(MessageKey), this.OnFailed, this.Epoch)
 					else
-						_LLM_Deps_PublishFailure(t("ollama.runtime_repair_failed"), , this.Epoch)
+						_LLM_Deps_PublishFailure(t(MessageKey), , this.Epoch)
 				}
 			}
 		}

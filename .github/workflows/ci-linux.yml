@@ -3397,6 +3397,38 @@ jobs:
               exit 1
           fi
         timeout-minutes: 3
+      # The installed Ollama proxy stage, on the wrapper's module path, against a
+      # real PAC that routes the registry and the blob host differently.
+      - name: Install prerequisites for Qualify the installed managed Ollama route plan
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv dbus glib-networking gsettings-desktop-schemas
+          else
+              exit 1
+          fi
+        timeout-minutes: 20
+      - name: Qualify the installed managed Ollama route plan
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          python3 static/ergopti_plus/linux/tests/hardware/run_managed_ollama_route_plan.py
+          else
+              exit 1
+          fi
+        timeout-minutes: 3
       # Independent NIST vectors use retained, already unlinked descriptors.
       - name: Qualify native retained FD SHA-256
         if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
@@ -3592,9 +3624,12 @@ jobs:
           elif [ "$mode" = full ]; then
           set -euo pipefail
           curl -fsSL https://ollama.com/install.sh | sh
-          (ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &) || true
-          for _ in $(seq 1 60); do curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break; sleep 1; done
-          ollama pull qwen2.5:0.5b
+          # The Linux client asks only Ergopti's own port (defaults.json); a
+          # daemon the installer may start on the stock port is left alone.
+          port="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["llm_ollama_owned_port"])' static/ergopti_plus/_shared/modules/llm/defaults.json)"
+          (OLLAMA_HOST="127.0.0.1:$port" ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &) || true
+          for _ in $(seq 1 60); do curl -sf "http://127.0.0.1:$port/api/tags" >/dev/null && break; sleep 1; done
+          OLLAMA_HOST="127.0.0.1:$port" ollama pull qwen2.5:0.5b
           cd static/ergopti_plus/linux
           HOME="$(mktemp -d)" XDG_CONFIG_HOME= \
             LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' \

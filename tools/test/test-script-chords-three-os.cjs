@@ -39,6 +39,8 @@ require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a
 
 const fs = require('fs');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 const { parse } = require('smol-toml');
 const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
 
@@ -61,7 +63,7 @@ const check = (ok, message) => {
  */
 const read = (...parts) => {
 	const file = path.join(SP, ...parts);
-	return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/^﻿/, '') : '';
+	return fs.existsSync(file) ? readSourceFile(file).replace(/^﻿/, '') : '';
 };
 
 const PLATFORMS = ['ahk', 'hs', 'linux'];

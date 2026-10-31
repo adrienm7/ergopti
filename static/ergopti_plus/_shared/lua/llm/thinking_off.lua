@@ -32,12 +32,18 @@
 --- 7. Ollama has its own field, think (ollama_think): false, or the family's
 ---    effort level when Ollama takes one (ollama_think_levels), since
 ---    gpt-oss ignores think false.
+--- 8. A provider's model listing may say a model lacks a control
+---    (model_capabilities.lua): resolve skips it for the next one.
 ---
 --- The AutoHotkey port is _shared/modules/llm/thinking_off.ahk. Both replay
 --- _shared/tests/corpus/llm/thinking_off_vectors.json.
 --- ==============================================================================
 
+local TableUtil = require("table_util")
+
 local M = {}
+
+local ModelCapabilities = require("llm.model_capabilities")
 
 
 
@@ -137,7 +143,8 @@ end
 --- Validates the decoded thinking_off.json.
 --- @param raw any
 --- @return table|nil families Array of { models = { glob }, controls = { { kind, intent, level } } },
----     with expiry_sec and ollama_levels (set of the think levels Ollama takes).
+---     with expiry_sec, ollama_levels (set of the think levels Ollama takes)
+---     and capability (model_capabilities.lua parse_config).
 --- @return string|nil reason Why the table is refused.
 function M.parse_families(raw)
 	if not is_object(raw) or not is_list(raw.families) or raw.families[1] == nil then
@@ -192,6 +199,9 @@ function M.parse_families(raw)
 	end
 	families.expiry_sec = days * 86400
 	families.ollama_levels = ollama_levels
+	local capability, capability_reason = ModelCapabilities.parse_config(raw.capability_listing)
+	if not capability then return nil, "thinking_off.json " .. capability_reason end
+	families.capability = capability
 	return families, nil
 end
 
@@ -315,15 +325,18 @@ end
 --- @param dialect table parse_dialect() output.
 --- @param model string The model id as the request names it.
 --- @param refused table|nil Set of top-level field names refused for this provider and model.
+--- @param lacks function|nil (kind, level, template) -> true when the provider's
+---     model listing says the model lacks that control (model_capabilities.lua):
+---     it is skipped for the next one.
 --- @return integer|nil family 1-based index of the matching family.
 --- @return string|nil kind The control kind applied, nil when none is carried.
 --- @return table|nil fields The body fields, nil when nothing applies.
-function M.resolve(families, dialect, model, refused)
+function M.resolve(families, dialect, model, refused, lacks)
 	local index, family = family_of(families, model)
 	if not family then return nil, nil, nil end
 	for _, control in ipairs(family.controls) do
 		local template = dialect[control.kind]
-		if template then
+		if template and not (lacks and lacks(control.kind, control.level, template)) then
 			local fields = fill(template, control.level)
 			for field in pairs(refused or {}) do fields[field] = nil end
 			if next(fields) == nil then return index, control.kind, nil end
@@ -372,12 +385,13 @@ end
 --- @param model string The model id.
 --- @param body table The request body, changed in place.
 --- @param refused table|nil Refused top-level field names for this provider and model.
+--- @param lacks function|nil See resolve().
 --- @return integer|nil family The matching family.
 --- @return string|nil kind The control kind applied.
 --- @return table added Paths added to the body.
-function M.apply(families, dialect, model, body, refused)
+function M.apply(families, dialect, model, body, refused, lacks)
 	if type(body) ~= "table" then error("thinking_off.apply: the body must be a table", 2) end
-	local family, kind, fields = M.resolve(families, dialect, model, refused)
+	local family, kind, fields = M.resolve(families, dialect, model, refused, lacks)
 	return family, kind, fields and M.merge(body, fields) or {}
 end
 
@@ -469,9 +483,7 @@ end
 function M.record_refusal(refused, provider, model, field, now)
 	local key = provider .. "|" .. model
 	if not refused[key] then
-		local count = 0
-		for _ in pairs(refused) do count = count + 1 end
-		if count >= M.MAX_REFUSALS then return false end
+		if TableUtil.count(refused) >= M.MAX_REFUSALS then return false end
 		refused[key] = {}
 	end
 	refused[key][field] = now

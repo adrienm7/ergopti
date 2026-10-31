@@ -21,10 +21,18 @@ import os
 import re
 import sys
 
-OWNED_PROCESSES = re.compile(r"^(ergoptiplus|hammerspoon|ollama|python|karabiner)", re.IGNORECASE)
+# The application name and bundle come from the one identifier declaration.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+IDENTIFIERS = os.path.join(REPO_ROOT, "static/ergopti_plus/_shared/data/identifiers.json")
+with open(IDENTIFIERS, encoding="utf-8") as identifiers_file:
+    APP = json.load(identifiers_file)["app"]
+
+OWNED_PROCESSES = re.compile(
+    r"^(" + re.escape(APP["name"]) + r"|hammerspoon|ollama|python|karabiner)", re.IGNORECASE
+)
 # The images whose frames are the app's own code.
-OWNED_IMAGES = re.compile(r"^(ErgoptiPlus|Hammerspoon|LuaSkin|lua)$")
-OWNED_IMAGE_PATH = "/ErgoptiPlus.app/"
+OWNED_IMAGES = re.compile(r"^(" + re.escape(APP["name"]) + r"|Hammerspoon|LuaSkin|lua)$")
+OWNED_IMAGE_PATH = "/" + APP["bundle"] + "/"
 SAFE_VALUE = re.compile(r"^[A-Za-z0-9 _.:+\-()\[\]<>,=#$]{1,160}$")
 MAX_FRAMES = 12
 

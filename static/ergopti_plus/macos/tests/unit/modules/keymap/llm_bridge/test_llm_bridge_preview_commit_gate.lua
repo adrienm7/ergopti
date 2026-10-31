@@ -125,6 +125,7 @@ local function load_fixture(render_result, previews_enabled, options)
 	package.loaded["modules.keymap.utils"] = {
 		tokens_from_repl = function(value) return value end,
 		plain_text = function(value) return value end,
+		resolve_output = function(value) return value, false end,
 	}
 	local mapping = options.mapping or {
 		auto = false,

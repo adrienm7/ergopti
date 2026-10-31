@@ -73,6 +73,64 @@ const MANUAL_FIXTURES = [
 	'static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py'
 ];
 
+const LIVE_STEP = 'AI predictions against a real Ollama';
+const OLLAMA_DEFAULTS = 'static/ergopti_plus/_shared/modules/llm/defaults.json';
+
+/**
+ * The live step serves, polls and pulls on Ergopti's own Ollama port, read
+ * from its one source: since the Linux client asks only that port, a daemon
+ * on the stock one answered nothing and the model list held 0 models.
+ * @param {string} run The step's run text.
+ * @param {number} port The owned port the client asks.
+ * @param {string} defaultsFile The file the step must read it from.
+ */
+function validateLivePort(run, port, defaultsFile) {
+	assert.ok(Number.isInteger(port) && port > 0, 'the owned Ollama port must be declared');
+	assert.ok(
+		run.includes(defaultsFile) && run.includes('llm_ollama_owned_port'),
+		'the port comes from defaults.json'
+	);
+	assert.match(
+		run,
+		/\(OLLAMA_HOST="127\.0\.0\.1:\$port" ollama serve /,
+		'the daemon serves the owned port'
+	);
+	assert.match(
+		run,
+		/curl -sf "http:\/\/127\.0\.0\.1:\$port\/api\/tags"/,
+		'readiness polls the owned port'
+	);
+	assert.match(
+		run,
+		/OLLAMA_HOST="127\.0\.0\.1:\$port" ollama pull /,
+		'the model is pulled into that daemon'
+	);
+	assert.doesNotMatch(run, /127\.0\.0\.1:\d+/, 'no port literal in the step');
+}
+
+/** Checks the repository's live step, then that a stock-port spelling is refused. */
+function validateLiveOllama(root) {
+	const run = Pipeline.stepField(
+		Pipeline.step(Pipeline.open(root).job('e2e-linux'), LIVE_STEP),
+		'run'
+	);
+	const port = JSON.parse(
+		fs.readFileSync(path.join(root, OLLAMA_DEFAULTS), 'utf8')
+	).llm_ollama_owned_port;
+	validateLivePort(run, port, OLLAMA_DEFAULTS);
+	for (const stock of [
+		run.replace(/OLLAMA_HOST="127\.0\.0\.1:\$port" ollama serve/, 'ollama serve'),
+		run.replace('http://127.0.0.1:$port/api/tags', 'http://127.0.0.1:11434/api/tags'),
+		run.replace('OLLAMA_HOST="127.0.0.1:$port" ollama pull', 'ollama pull')
+	]) {
+		assert.notEqual(stock, run, 'the counterexample must change the step');
+		assert.throws(
+			() => validateLivePort(stock, port, OLLAMA_DEFAULTS),
+			'a stock-port daemon must be refused'
+		);
+	}
+}
+
 /** Registers manual external proof without weakening the original 64-case gate. */
 function validateManual(root) {
 	const pipeline = Pipeline.open(root);
@@ -323,6 +381,7 @@ function validateDiagnosticProjection(root) {
 
 function main() {
 	validate(ROOT);
+	validateLiveOllama(ROOT);
 	validatePhysicalReceipt(ROOT);
 	validateDiagnosticProjection(ROOT);
 	for (const platform of ['darwin', 'win32']) {

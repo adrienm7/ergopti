@@ -82,7 +82,7 @@ helpers.describe("typing self-test probe", function()
 		helpers.assert_eq(steps.ledger_credits.value, "0")
 		helpers.assert_eq(steps.karabiner_path.value, "physical_keys_only")
 		helpers.assert_eq(steps.double_count.state, "skip")
-		helpers.assert_eq(steps.keystats_effect.value, "tagged_synthetic_input")
+		helpers.assert_eq(steps.keystats_effect.value, "selftest_never_counted")
 	end)
 
 	helpers.it("fails a field that never had the focus, without typing", function()

@@ -2,6 +2,12 @@
 	"_comment": "Single source of the reasoning controls of each model family, independent of the provider that serves it. A model id is normalized (lowercase, last path segment, an Ollama :tag dropped) and matched against each family's globs (* is the only wildcard); the first family wins. Its controls are tried in order and the first control kind the provider's dialect carries applies (api_providers.json thinking_dialect: kind -> body fields, $level replaced by the control's level); a family with no control, or a provider without that kind, sends nothing. intent off turns thinking off; lowest is the lowest level when the family cannot turn it off. A family with default_sampling_only true accepts only the default sampling: the drivers send it no temperature (Anthropic answers HTTP 400 to any other value on these models). Kinds: toggle (hybrid models: on or off), effort (reasoning_effort scale), anthropic_thinking, anthropic_effort, gemini_budget, gemini_level. Local servers turn thinking off for every model through local_servers.json request_fields, and their thinking_dialect adds a family's level on top. Every Ollama chat body sends think from the family's first control Ollama carries: a toggle or an off intent sends false, an effort level listed in ollama_think_levels sends that level (gpt-oss ignores think false and takes low: docs.ollama.com/capabilities/thinking), anything else (no family, no such control) sends false. A provider answering HTTP 400 that names an injected field gets the request once more without it, and that field is remembered as refused for that provider and model, across restarts (at most 200 pairs), until refusal_expiry_days pass, so a later provider fix is picked up. Resolved by _shared/lua/llm/thinking_off.lua and _shared/modules/llm/thinking_off.ahk, pinned by _shared/tests/corpus/llm/thinking_off_vectors.json. Sources checked 2026-10-30.",
 	"refusal_expiry_days": 30,
 	"ollama_think_levels": ["low", "medium", "high"],
+	"capability_listing": {
+		"_comment": "Providers whose model listing says which reasoning controls a model takes, read by _shared/lua/llm/model_capabilities.lua and its AutoHotkey port: provider id -> listing dialect (openrouter: GET /models supported_parameters; anthropic: GET /v1/models capabilities; gemini: models.list thinking). A control the listing says a model lacks is skipped before sending. Each driver fetches a provider's listing off the prediction path, once per ttl_hours, with page_query (listing dialect -> the query that asks for its largest page) appended. A model the listing does not describe lacks nothing. Sources: openrouter.ai/docs/api-reference/list-available-models, platform.claude.com/docs/en/api/models/list, ai.google.dev/api/models (checked 2026-10-30).",
+		"ttl_hours": 24,
+		"providers": { "openrouter": "openrouter", "anthropic": "anthropic", "gemini": "gemini" },
+		"page_query": { "anthropic": "limit=1000", "gemini": "pageSize=1000" }
+	},
 	"families": [
 		{
 			"_family": "Claude Opus 5.5, Fable 5, Mythos 5: thinking cannot be disabled, low is the lowest effort",
@@ -115,8 +121,8 @@
 			"_source": "https://console.groq.com/docs/reasoning"
 		},
 		{
-			"_family": "gpt-oss: reasoning cannot be disabled, low is the lowest effort",
-			"models": ["gpt-oss*"],
+			"_family": "gpt-oss: reasoning cannot be disabled, low is the lowest effort (Databricks names it databricks-gpt-oss-* or system.ai.gpt-oss-*, Bedrock openai.gpt-oss-*)",
+			"models": ["gpt-oss*", "databricks-gpt-oss*", "*.gpt-oss*"],
 			"controls": [
 				{
 					"kind": "effort",
@@ -259,6 +265,18 @@
 			"_source": "https://inference-docs.cerebras.ai/capabilities/reasoning"
 		},
 		{
+			"_family": "GLM 5.3: forced thinking that cannot be disabled, low is the lowest effort",
+			"models": ["glm-5.3*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://docs.z.ai/guides/capabilities/thinking-mode"
+		},
+		{
 			"_family": "GLM 4.5 and later: hybrid, thinking can be turned off",
 			"models": ["glm-4.5*", "glm-4.6*", "glm-4.7*", "glm-5*"],
 			"controls": [
@@ -309,7 +327,19 @@
 			"_source": "https://docs.fireworks.ai/api-reference/post-chatcompletions"
 		},
 		{
-			"_family": "MiniMax M3: hybrid on Together",
+			"_family": "MiniMax M3.1 Flash: thinking cannot be disabled (400), low is the lowest effort",
+			"models": ["minimax-m3.1-flash*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://platform.minimax.io/docs/api-reference/text-openai-api"
+		},
+		{
+			"_family": "MiniMax M3: hybrid on Together and MiniMax",
 			"models": ["minimax-m3*"],
 			"controls": [
 				{
@@ -318,6 +348,12 @@
 				}
 			],
 			"_source": "https://docs.together.ai/docs/reasoning-models-guide"
+		},
+		{
+			"_family": "Qwen3 2507: the Instruct models never think and the Thinking models always do, so nothing applies",
+			"models": ["qwen3-*-instruct-2507*", "qwen3-*-thinking-2507*"],
+			"controls": [],
+			"_source": "https://huggingface.co/Qwen/Qwen3-30B-A3B-Instruct-2507"
 		},
 		{
 			"_family": "Qwen3, Qwen3.5, Qwen3.6: hybrid, thinking can be turned off",
@@ -368,6 +404,38 @@
 				}
 			],
 			"_source": "https://huggingface.co/NousResearch/Hermes-4-70B"
+		},
+		{
+			"_family": "NVIDIA Nemotron 3: hybrid, enable_thinking is on unless turned off",
+			"models": ["nemotron-3*"],
+			"controls": [
+				{
+					"kind": "toggle",
+					"intent": "off"
+				}
+			],
+			"_source": "https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b (chat_template_kwargs enable_thinking, default true)"
+		},
+		{
+			"_family": "Inception Mercury: reasoning cannot be disabled, instant is the lowest effort",
+			"models": ["mercury*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "instant"
+				}
+			],
+			"_source": "https://docs.inceptionlabs.ai/capabilities/reasoning-efforts"
+		},
+		{
+			"_family": "ByteDance Doubao Seed: hybrid, thinking can be turned off",
+			"models": ["doubao-seed*"],
+			"controls": [
+				{ "kind": "toggle", "intent": "off" },
+				{ "kind": "effort", "intent": "off", "level": "none" }
+			],
+			"_source": "https://docs.volcengine.com/docs/82379/1449737"
 		},
 		{
 			"_family": "Generic: an unknown model whose name looks like a reasoning family gets thinking off through the provider's toggle (a field the provider refuses is dropped and remembered, see _comment)",

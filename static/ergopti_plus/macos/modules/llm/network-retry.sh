@@ -195,7 +195,18 @@ PAC_ROUTE_BUDGET_SEC=20
 
 # The shared origin inventory, beside this file in the bundle and the checkout
 # (macos/modules/llm -> _shared/modules/network). A caller may override it.
-ROUTE_ORIGINS_FILE="${ROUTE_ORIGINS_FILE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../_shared/modules/network" 2>/dev/null && pwd)/route_origins.json}"
+# The folder is resolved inside an if: a failing command substitution in a
+# plain assignment ended every `set -e` caller that sourced this file, with no
+# line saying why, whenever the folder was missing. The unresolved path then
+# stays the default, and route_origins_for_client refuses it when it is used.
+if [ -z "${ROUTE_ORIGINS_FILE:-}" ]; then
+	if ROUTE_ORIGINS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../_shared/modules/network" 2>/dev/null && pwd)"; then
+		ROUTE_ORIGINS_FILE="$ROUTE_ORIGINS_DIR/route_origins.json"
+	else
+		ROUTE_ORIGINS_FILE="$(dirname "${BASH_SOURCE[0]}")/../../../_shared/modules/network/route_origins.json"
+	fi
+	unset ROUTE_ORIGINS_DIR
+fi
 
 # The origins one download client contacts, redirect targets included, as the
 # shared inventory (_shared/modules/network/route_origins.json) lists them.
@@ -323,6 +334,16 @@ EOF_ROUTE_PLAN
 	fi
 	log_info "Model downloads use the relay the automatic network settings name."
 	return 0
+}
+
+# Prints the SHA-256 hex digest of one file. shasum marks a line whose name
+# holds a backslash or a newline with a leading backslash before the digest,
+# so the first field alone was "\<digest>" for such a path and never matched.
+sha256_file_digest() {
+	local line
+	line="$(shasum -a 256 "$1")" || return 1
+	line="${line%% *}"
+	printf '%s\n' "${line#\\}"
 }
 
 managed_bootstrap_download() {

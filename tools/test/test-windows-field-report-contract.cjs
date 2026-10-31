@@ -291,6 +291,13 @@ function fixture(name, start = 'dev') {
 	const clone = path.join(base, 'clone');
 	const origin = path.join(base, 'origin.git');
 	const local = path.join(base, 'localappdata');
+	// The configuration folder is resolved from APPDATA, then USERPROFILE: a
+	// runner without them (pwsh on Linux) made the step throw, and on Windows
+	// the runner's own profile would be read.
+	const roaming = path.join(base, 'appdata');
+	const profile = path.join(base, 'profile');
+	fs.mkdirSync(roaming, { recursive: true });
+	fs.mkdirSync(profile, { recursive: true });
 	const sources = JSON.parse(
 		spawnSync(python, [path.join(ROOT, ANALYSER), '--repo', ROOT, '--describe'], {
 			encoding: 'utf8'
@@ -333,7 +340,7 @@ function fixture(name, start = 'dev') {
 		git(clone, 'switch', '-q', '-c', start);
 		git(clone, 'push', '-q', 'origin', start);
 	}
-	return { base, clone, origin, local, script };
+	return { base, clone, origin, local, roaming, profile, script };
 }
 
 /** Runs the real collector inside a fixture. */
@@ -352,7 +359,13 @@ function runCollector(paths, { push = false } = {}) {
 		encoding: 'utf8',
 		timeout: 120000,
 		windowsHide: true,
-		env: { ...process.env, ...GIT_IDENTITY, LOCALAPPDATA: paths.local }
+		env: {
+			...process.env,
+			...GIT_IDENTITY,
+			LOCALAPPDATA: paths.local,
+			APPDATA: paths.roaming,
+			USERPROFILE: paths.profile
+		}
 	});
 }
 
@@ -399,6 +412,11 @@ try {
 				new RegExp(`^${dayLog.replace(/\./g, '\\.')}\\s+copied \\(scrubbed\\)$`, 'm')
 			);
 			assert.match(steps, /^hotstring_collisions\s+exit=0$/m);
+			assert.match(
+				fs.readFileSync(path.join(folders[0], 'hotstring_collisions.txt'), 'utf8'),
+				/no personal hotstrings file at personal_hotstrings\.toml/,
+				'the fixture profile holds no personal file'
+			);
 			const dayLogCopy = fs.readFileSync(path.join(folders[0], dayLog), 'utf8');
 			assert.doesNotMatch(dayLogCopy, /TYPEDCANARY/, 'the pushed day log keeps no typed text');
 			assert.match(dayLogCopy, /keystroke <text withheld> typed while/);

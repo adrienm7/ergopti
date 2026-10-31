@@ -37,6 +37,8 @@
 
 const fs = require('fs');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 const assert = require('node:assert/strict');
 const os = require('node:os');
 
@@ -742,7 +744,7 @@ const MENU_MANIFEST = path.join(DRIVERS, '_shared', 'modules', 'menu', 'menu_man
 const LINUX_SRC = path.join(DRIVERS, 'linux', 'ui', 'menu', 'menu_builder.lua');
 if (fs.existsSync(LINUX_SRC) && fs.existsSync(MENU_MANIFEST)) {
 	const menuManifest = JSON.parse(fs.readFileSync(MENU_MANIFEST, 'utf8'));
-	const src = fs.readFileSync(LINUX_SRC, 'utf8');
+	const src = readSourceFile(LINUX_SRC);
 	// Each `local providers = { ["id"] = function … }` block is one migrated
 	// submenu. Keyed on that exact name because it is the sixth argument of
 	// ManifestMenu.build — the provider table — and naming it anything else would
