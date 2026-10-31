@@ -295,31 +295,29 @@ namespace Ergopti.Ollama {
    if(created<=0) throw new InvalidOperationException("Retained child has no creation identity.");
    return created;
   }
-  [DllImport("kernel32")] static extern IntPtr GetCurrentProcess();
   [DllImport("kernel32",SetLastError=true)] static extern bool IsProcessInJob(IntPtr p, IntPtr job, out bool inside);
   [DllImport("kernel32",SetLastError=true)] static extern bool QueryInformationJobObject(IntPtr job, int kind, byte[] data, uint size, IntPtr length);
-  [DllImport("kernel32",SetLastError=true)] static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
-  [DllImport("kernel32",SetLastError=true)] static extern bool CloseHandle(IntPtr handle);
-  [DllImport("kernel32",SetLastError=true,CharSet=CharSet.Unicode)] static extern bool QueryFullProcessImageNameW(IntPtr process, uint flags, System.Text.StringBuilder name, ref uint size);
   [DllImport("ntdll")] static extern int NtQueryInformationProcess(IntPtr process, int kind, long[] data, int size, IntPtr length);
   // A console process started without a window still has a conhost.exe, created as
   // its child and inside its job: it serves the leader and ends with it, so it is no
   // descendant to wait for. Only this process's own host is excluded, by exact parent.
+  // A member that cannot be read stays counted, so the start refuses rather than guesses.
   static bool IsOwnConsoleHost(uint pid, uint self) {
-   IntPtr process=OpenProcess(0x1000,false,pid);
-   if(process==IntPtr.Zero) return false;
    try {
-    var basic=new long[6];
-    if(NtQueryInformationProcess(process,0,basic,48,IntPtr.Zero)!=0 || basic[5]!=self) return false;
-    uint size=1024; var name=new System.Text.StringBuilder(1024);
-    if(!QueryFullProcessImageNameW(process,0,name,ref size)) return false;
-    var system=Environment.GetFolderPath(Environment.SpecialFolder.System);
-    return string.Equals(name.ToString(),System.IO.Path.Combine(system,"conhost.exe"),StringComparison.OrdinalIgnoreCase);
-   } finally { CloseHandle(process); }
+    using(var process=System.Diagnostics.Process.GetProcessById((int)pid)) {
+     var basic=new long[6];
+     if(NtQueryInformationProcess(process.Handle,0,basic,48,IntPtr.Zero)!=0 || basic[5]!=self) return false;
+     var system=Environment.GetFolderPath(Environment.SpecialFolder.System);
+     return string.Equals(process.MainModule.FileName,System.IO.Path.Combine(system,"conhost.exe"),StringComparison.OrdinalIgnoreCase);
+    }
+   }
+   catch(ArgumentException) { return false; }
+   catch(InvalidOperationException) { return false; }
+   catch(Win32Exception) { return false; }
   }
   public static uint ActiveProcesses() {
    bool inside;
-   if(!IsProcessInJob(GetCurrentProcess(),IntPtr.Zero,out inside)) throw new Win32Exception(Marshal.GetLastWin32Error());
+   if(!IsProcessInJob(System.Diagnostics.Process.GetCurrentProcess().Handle,IntPtr.Zero,out inside)) throw new Win32Exception(Marshal.GetLastWin32Error());
    if(!inside) throw new InvalidOperationException("Managed runtime has no canonical tree owner.");
    var data=new byte[8+8*1024];
    if(!QueryInformationJobObject(IntPtr.Zero,3,data,(uint)data.Length,IntPtr.Zero)) throw new Win32Exception(Marshal.GetLastWin32Error());
