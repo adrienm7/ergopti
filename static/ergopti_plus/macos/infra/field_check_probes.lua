@@ -918,6 +918,17 @@ function M.app_health_with_start(ports, report, finish, since)
 	end
 	report.step("app_crash_reports_earlier_24h", STATE.info, by_process(crashes.earlier or {}))
 	report.step("other_crash_reports_24h", STATE.info, crashes.other or 0)
+	-- This driver boot's AXValueChanged watcher errors: a daily log mixes in
+	-- processes booted on older code (the 2026-10-31 17:37:20 "already
+	-- registered" ERROR ran the pre-fix file until the 17:37:37 reload).
+	local watches = ports.ax_value_watch_counts()
+	if type(watches) ~= "table" then
+		report.step("ax_value_watch_errors_since_boot", STATE.skip, "not_loaded")
+	else
+		report.step("ax_value_watch_errors_since_boot", (watches.failed or 0) == 0 and STATE.pass or STATE.fail,
+			watches.failed or 0)
+		report.step("ax_value_watch_already_watched", STATE.info, watches.already_watched or 0)
+	end
 	ports.exec(PS, { "-o", "rss=,%cpu=", "-p", tostring(ports.pid()) }, PROBE_COMMAND_TIMEOUT, function(code, output)
 		local rss, cpu = M.parse_usage(code == 0 and output or "")
 		if not rss then

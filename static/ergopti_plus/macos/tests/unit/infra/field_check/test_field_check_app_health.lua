@@ -15,7 +15,11 @@
 --- 3. where the resident memory goes (ledger L32: 843 MB with no breakdown):
 ---    the physical footprint and the largest resident regions of vmmap's
 ---    summary, and the Lua heap, as information; an unreadable vmmap is a
----    named skip.
+---    named skip;
+--- 4. this driver boot's AXValueChanged watcher errors fail, and the watches
+---    committed on an already-registered element are counted: the 2026-10-31
+---    17:37 report carried an ERROR from a process booted on pre-fix code
+---    (ax-watch-since-boot).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -51,7 +55,8 @@ local VMMAP = table.concat({
 local function make_ports()
 	local world = { commands = {}, ps = { 0, "  412736   1,7\n" }, etime = { 0, "   01:02:05\n" },
 		vmmap = { 0, VMMAP }, heap_kb = 51200,
-		crashes = { driver = 0, owned = {}, other = 4 } }
+		crashes = { driver = 0, owned = {}, other = 4 },
+		ax_watches = { already_watched = 0, failed = 0 } }
 	local ports = {
 		exec = function(executable, args, _, callback)
 			world.commands[#world.commands + 1] = executable .. " " .. table.concat(args, " ")
@@ -67,6 +72,7 @@ local function make_ports()
 			world.since = since
 			return world.crashes
 		end,
+		ax_value_watch_counts = function() return world.ax_watches end,
 	}
 	return ports, world
 end
@@ -157,6 +163,23 @@ helpers.describe("app health probe", function()
 		helpers.assert_true(not result.passed)
 		helpers.assert_eq(steps.app_uptime_s.value, "exit_1")
 		helpers.assert_nil(world.since, "an unknown start judges the whole day")
+	end)
+
+	helpers.it("judges this boot's AXValueChanged watcher errors only (ax-watch-since-boot)", function()
+		local ports, world = make_ports()
+		world.ax_watches = { already_watched = 2, failed = 0 }
+		local steps, result = run(ports)
+		helpers.assert_true(result.passed, "a committed already-registered watch is no error")
+		helpers.assert_eq(steps.ax_value_watch_errors_since_boot.state, "pass")
+		helpers.assert_eq(steps.ax_value_watch_already_watched.value, "2")
+		world.ax_watches = { already_watched = 0, failed = 1 }
+		steps, result = run(ports)
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(steps.ax_value_watch_errors_since_boot.value, "1")
+		world.ax_watches = nil
+		steps = run(ports)
+		helpers.assert_eq(steps.ax_value_watch_errors_since_boot.state, "skip")
+		helpers.assert_eq(steps.ax_value_watch_errors_since_boot.value, "not_loaded")
 	end)
 
 	helpers.it("passes with other apps' crash reports only", function()
