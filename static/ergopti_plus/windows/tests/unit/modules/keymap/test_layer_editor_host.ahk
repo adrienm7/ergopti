@@ -153,7 +153,8 @@ _LEH_InvalidSavesWriteNothing() {
 		[Big, "invalid_payload"],
 		['[_meta]`nschema_version = 1`n[layers.nav.all]`n"KeyA" = "format_disk"`n', "unknown_action"],
 		['[_meta]`nschema_version = 1`n[layers.nav.all]`n"KeyA" = "keystroke:fn+KeyB"`n', "unavailable_on_os"],
-		['[_meta]`nschema_version = 1`n[layers.nav.all]`n"WheelUp" = "vol_up"`n', "unavailable_on_os"],
+		; A wheel direction binds on all three OS; a pointer button is what Linux still refuses.
+		['[_meta]`nschema_version = 1`n[layers.nav.all]`n"MouseMiddle" = "escape"`n', "unavailable_on_os"],
 		['[_meta]`nschema_version = 1`n[layers.nav.all]`n"KeyA" = { a = 1 }`n', "toml_invalid"]
 	]
 	Apply := _LEH_FakeApply()
