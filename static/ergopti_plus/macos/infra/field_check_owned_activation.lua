@@ -1,28 +1,27 @@
 --- infra/field_check_owned_activation.lua
 
 --- ==============================================================================
---- MODULE: Field Check Of The Owned Runtime Activation Rule
+--- MODULE: Field Checks Of The Owned Runtime Activation Rule
 --- DESCRIPTION:
 --- The developer field run's proof, on the maintainer's Mac and with no manual
---- action, of the maintainer's rule for Ergopti's own Karabiner runtime
---- (ADR 011; platform/remap/runtime_activation.lua):
---- 1. artifact: the pinned runtime artifact is downloaded and verified into
----    Ergopti's own folder, or was already;
---- 2. off_inactive: with Tap-Hold off, Ergopti's runtime is not active;
---- 3. on_active: with Tap-Hold on, Ergopti's runtime is ready (or the owner's
----    named reason why not);
---- 4. on_closed_other: a user Karabiner that ran with Tap-Hold off is closed
----    with Tap-Hold on, and the close is recorded;
---- 5. off_restored: turning Tap-Hold off again gives that Karabiner back and
----    clears the record.
+--- action, of the maintainer's rule of 2026-10-31 for Ergopti's own Karabiner
+--- runtime (ADR 011; platform/remap/runtime_activation.lua):
+--- 1. owned_start: Ergopti runs, so the pinned artifact is verified in its own
+---    folder, its runtime is ready, and a user Karabiner is closed with the
+---    close recorded. After a resume the driver reloads and starts the same
+---    way, so this check also proves close-on-resume on the run after a pause;
+--- 2. owned_pause: the field run's own controlled pause stops Ergopti's runtime
+---    and gives the user's Karabiner back, clearing the record. The resume is
+---    queued for after the run has written its results, because a resume
+---    reloads the driver (one capture per Lua VM) and must not cut the run.
+--- Restore-on-quit cannot run inside a field run, which ends with the app; it
+--- shares restore_if_closed with the pause and is pinned by the unit suite.
 ---
 --- FEATURES & RATIONALE:
---- 1. Self-Restoring: unlike the read-only Debug checks, this one changes the
----    Tap-Hold switch, so it always ends by writing back the value it found,
----    even after a failing step. Every wait is bounded by M.WAIT_SEC.
---- 2. Skips Honestly: a boot on the shared runtime skips every step with
----    `shared_runtime`; a Mac without a running user Karabiner skips the close
+--- 1. Skips Honestly: a boot on the shared runtime skips every step with
+---    `shared_runtime`; a Mac where no user Karabiner was closed skips the close
 ---    and restore steps with `no_user_karabiner`, never passes them.
+--- 2. Bounded: every wait ends after M.WAIT_SEC.
 --- 3. Ports Only: every fact and effect comes through `ports.owned_activation`
 ---    (adapters/field_check_ports.lua), so the portable suite drives each step.
 --- 4. Tokens Only: states, counts and reason tokens; no path or URL is reported.
@@ -39,86 +38,108 @@ M.WAIT_SEC = 45
 local ACTIVE = { starting = true, admitted = true, peers_starting = true, ready = true, stopping = true }
 local SETTLED_ON = { ready = true, unavailable = true, failed = true }
 
---- Runs the check.
+--- Polls until `settled(value)` holds or the wait ends.
+--- @param ports table Field check ports (after).
+--- @param read function fn(callback(value)) one observation.
+--- @param settled function fn(value) -> boolean.
+--- @param callback function fn(value, settled).
+local function wait_for(ports, read, settled, callback)
+	local waited = 0
+	local function look()
+		read(function(value)
+			if settled(value) or waited >= M.WAIT_SEC then return callback(value, settled(value)) end
+			waited = waited + M.POLL_SEC
+			ports.after(M.POLL_SEC, look)
+		end)
+	end
+	look()
+end
+
+--- Reports every step id as skipped with one reason.
+local function skip_all(report, ids, reason)
+	for _, id in ipairs(ids) do report.step(id, "skip", reason) end
+end
+
+--- Close-on-start: the artifact, the runtime and the user's Karabiner.
 --- @param ports table Field check ports; uses `owned_activation` and `after`.
 --- @param report table Step reporter.
 --- @param finish function Settles the check.
-function M.run(ports, report, finish)
+function M.start(ports, report, finish)
 	local port = ports.owned_activation
+	local ids = { "artifact", "runtime_ready", "user_karabiner_closed" }
 	if type(port) ~= "table" or port.selected() ~= true then
-		for _, id in ipairs({ "artifact", "off_inactive", "on_active", "on_closed_other", "off_restored" }) do
-			report.step(id, "skip", "shared_runtime")
-		end
+		skip_all(report, ids, "shared_runtime")
 		return finish()
 	end
-	local initial = port.tap_holds() == true
-
-	--- Writes back the switch the check found, then settles once.
-	local function done()
-		if port.tap_holds() ~= initial then port.set_tap_holds(initial) end
-		report.step("tap_holds_restored", port.tap_holds() == initial and "pass" or "fail", initial and "on" or "off")
-		finish()
-	end
-
-	--- Polls until `settled(state)` holds or the wait ends.
-	local function wait_for(settled, callback, waited)
-		waited = waited or 0
-		local state = port.owner_state()
-		if settled(state) or waited >= M.WAIT_SEC then return callback(state, settled(state)) end
-		ports.after(M.POLL_SEC, function() wait_for(settled, callback, waited + M.POLL_SEC) end)
-	end
-
-	--- Counts the running user Karabiner, as a token when unreadable.
-	local function others(callback)
-		port.other_active(function(count) callback(count) end)
-	end
-
 	port.fetch(function(ok, value)
 		report.step("artifact", ok and "pass" or "fail", ok and "verified" or tostring(value))
-		if not ok then
-			for _, id in ipairs({ "off_inactive", "on_active", "on_closed_other", "off_restored" }) do
-				report.step(id, "skip", "no_artifact")
-			end
-			return done()
+		if port.paused() then
+			skip_all(report, { "runtime_ready", "user_karabiner_closed" }, "paused")
+			return finish()
 		end
-		port.set_tap_holds(false)
-		wait_for(function(state) return not ACTIVE[state] end, function(off_state, off_settled)
-			report.step("off_inactive", off_settled and "pass" or "fail", off_state)
-			others(function(before)
-				report.step("user_karabiner_before", "info", before == nil and "unknown" or before)
-				port.set_tap_holds(true)
-				wait_for(function(state) return SETTLED_ON[state] == true end, function(on_state)
-					report.step("on_active", on_state == "ready" and "pass" or "fail",
-						on_state == "ready" and "ready" or (on_state .. ":" .. tostring(port.owner_reason())))
-					others(function(during)
-						if type(before) ~= "number" or before == 0 then
-							report.step("on_closed_other", "skip", "no_user_karabiner")
-						else
-							report.step("on_closed_other", during == 0 and port.marker() == true and "pass" or "fail",
-								during == nil and "unknown" or during)
-						end
-						port.set_tap_holds(false)
-						wait_for(function(state) return not ACTIVE[state] end, function()
-							if type(before) ~= "number" or before == 0 then
-								report.step("off_restored", "skip", "no_user_karabiner")
-								return done()
-							end
-							local waited = 0
-							local function look()
-								others(function(after)
-									local back = type(after) == "number" and after > 0 and port.marker() ~= true
-									if back or waited >= M.WAIT_SEC then
-										report.step("off_restored", back and "pass" or "fail", after == nil and "unknown" or after)
-										return done()
-									end
-									waited = waited + M.POLL_SEC
-									ports.after(M.POLL_SEC, look)
-								end)
-							end
-							look()
-						end)
-					end)
-				end)
+		local function state(callback) callback(port.owner_state()) end
+		wait_for(ports, state, function(value) return SETTLED_ON[value] == true end, function(value)
+			report.step("runtime_ready", value == "ready" and "pass" or "fail",
+				value == "ready" and "ready" or (tostring(value) .. ":" .. tostring(port.owner_reason())))
+			port.other_active(function(count)
+				if port.marker() ~= true then
+					-- Nothing was closed: a running user Karabiner here is the failure.
+					if type(count) == "number" and count > 0 then
+						report.step("user_karabiner_closed", "fail", count)
+					else
+						report.step("user_karabiner_closed", "skip", "no_user_karabiner")
+					end
+					return finish()
+				end
+				report.step("user_karabiner_closed", count == 0 and "pass" or "fail", count == nil and "unknown" or count)
+				finish()
+			end)
+		end)
+	end)
+end
+
+--- Restore-on-pause, then a resume queued for after the run.
+--- @param ports table Field check ports; uses `owned_activation`, `after` and `after_run`.
+--- @param report table Step reporter.
+--- @param finish function Settles the check.
+function M.pause(ports, report, finish)
+	local port = ports.owned_activation
+	local ids = { "paused", "runtime_stopped", "user_karabiner_restored", "resume_queued" }
+	if type(port) ~= "table" or port.selected() ~= true then
+		skip_all(report, ids, "shared_runtime")
+		return finish()
+	end
+	local was_paused = port.paused()
+	local closed_before = port.marker() == true
+	if not was_paused then port.pause() end
+	local function paused(callback) callback(port.paused()) end
+	wait_for(ports, paused, function(value) return value == true end, function(_, done)
+		report.step("paused", done and "pass" or "fail", done and "paused" or "not_paused")
+		local function state(callback) callback(port.owner_state()) end
+		wait_for(ports, state, function(value) return not ACTIVE[value] end, function(value, stopped)
+			report.step("runtime_stopped", stopped and "pass" or "fail", tostring(value))
+			local function restored(callback)
+				port.other_active(function(count) callback({ count = count, marker = port.marker() }) end)
+			end
+			local function finish_with_resume()
+				if was_paused then
+					report.step("resume_queued", "skip", "was_paused")
+				else
+					report.step("resume_queued", ports.after_run(port.resume) == true and "pass" or "fail",
+						"after_run")
+				end
+				finish()
+			end
+			if not closed_before then
+				report.step("user_karabiner_restored", "skip", "no_user_karabiner")
+				return finish_with_resume()
+			end
+			wait_for(ports, restored, function(value)
+				return type(value.count) == "number" and value.count > 0 and value.marker ~= true
+			end, function(value, back)
+				report.step("user_karabiner_restored", back and "pass" or "fail",
+					value.count == nil and "unknown" or value.count)
+				finish_with_resume()
 			end)
 		end)
 	end)

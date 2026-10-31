@@ -14,7 +14,7 @@
 	},
 	"max_request_bytes": 4096,
 	"request_id_pattern": "^[A-Za-z0-9_-]{1,64}$",
-	"deadline_seconds": { "default": 9100, "min": 60, "max": 9100 },
+	"deadline_seconds": { "default": 9200, "min": 60, "max": 9200 },
 	"log_window_max_lines": 200,
 	"verdicts": ["pass", "fail", "skip", "timeout", "needs_person", "needs_typing"],
 	"reasons": ["malformed", "unknown_step", "bad_deadline", "busy", "duplicate_request", "failed"],
@@ -34,11 +34,11 @@
 			"proves": "The Ergopti-owned Karabiner runtime is still dormant, what of it and of the stock Karabiner is installed or running, and whether the owner would accept the installed VirtualHIDDevice."
 		},
 		{
-			"id": "field_owned_activation",
+			"id": "field_owned_start",
 			"kind": "field_check",
-			"check": "owned_activation",
+			"check": "owned_start",
 			"deadline_seconds": 720,
-			"proves": "On an owned boot the pinned runtime is downloaded and verified, inactive with Tap-Hold off, ready with it on, closes the user's Karabiner and gives it back, then the switch is restored."
+			"proves": "While Ergopti runs, its pinned Karabiner runtime is downloaded and verified, ready, and holds the user's Karabiner closed with the close recorded (after a resume too)."
 		},
 		{
 			"id": "field_network",
@@ -255,6 +255,13 @@
 			"check": "app_health",
 			"deadline_seconds": 30,
 			"proves": "No crash report of the last day for the app's processes; other apps' reports, CPU and memory are named, with where it goes: footprint and peak, largest resident regions and the Lua heap."
+		},
+		{
+			"id": "field_owned_pause",
+			"kind": "field_check",
+			"check": "owned_pause",
+			"deadline_seconds": 150,
+			"proves": "The field run's own pause stops Ergopti's Karabiner runtime and gives the user's Karabiner back, and the resume is queued for after the run."
 		},
 		{
 			"id": "driver_reload",
