@@ -114,7 +114,7 @@ local function strip_comments(text)
 end
 
 --- Matches one element tag at `at` (the position of a "<"), the way
---- `</?Name (attr="v")* /?>` reads; nil when the text there is not such a tag.
+--- `</?Name (attr="v" | attr='v')* /?>` reads; nil when the text there is not such a tag.
 --- @param text string
 --- @param at number
 --- @return table|nil tag { closing, name, attrs, self_closing, next }
@@ -133,10 +133,12 @@ local function match_tag(text, at)
 		local attr = text:match("^[A-Za-z_:][%w_:.%-]*", after_space)
 		if not attr then break end
 		local cursor = after_space + #attr
-		local equals = text:match("^%s*=%s*\"", cursor)
+		-- XML lets an attribute value sit in double or single quotes.
+		local equals = text:match("^%s*=%s*[\"']", cursor)
 		if not equals then break end
+		local quote = equals:sub(-1)
 		local value_start = cursor + #equals
-		local value_end = text:find('"', value_start, true)
+		local value_end = text:find(quote, value_start, true)
 		if not value_end then break end
 		attrs[#attrs + 1] = { attr, decode_entities(text:sub(value_start, value_end - 1)) }
 		pos = value_end + 1
@@ -148,6 +150,23 @@ local function match_tag(text, at)
 	local map = {}
 	for _, pair in ipairs(attrs) do map[pair[1]] = pair[2] end
 	return { closing = closing, name = name, attrs = map, self_closing = self_closing, next = pos + 1 }
+end
+
+-- The elements a conversion reads. A tag of one of them that match_tag cannot
+-- read is refused: skipping it silently dropped keys or whole keyMaps. Twin of
+-- _KNOWN_ELEMENTS in keylayout_to_xkb.py.
+local KNOWN_ELEMENTS = {
+	keyboard = true, layouts = true, layout = true, modifierMap = true, keyMapSelect = true, modifier = true,
+	keyMapSet = true, keyMap = true, key = true, actions = true, action = true, when = true, terminators = true,
+}
+
+--- Whether the text at `at` (a "<") opens a tag of a known element.
+--- @param text string
+--- @param at number
+--- @return boolean
+local function known_tag_start(text, at)
+	local name = text:match("^</?([A-Za-z][A-Za-z0-9]*)[%s/>]", at)
+	return name ~= nil and KNOWN_ELEMENTS[name] == true
 end
 
 -- The text helpers a .keylayout editor shares with this reader
@@ -212,6 +231,10 @@ function M.parse(text)
 		if not open then break end
 		local tag = match_tag(body, open)
 		if not tag then
+			if known_tag_start(body, open) then
+				local _, newlines = body:sub(1, open):gsub("\n", "")
+				return nil, "malformed tag on line " .. (newlines + 1) .. " of the comment-free text"
+			end
 			pos = open + 1
 		else
 			pos = tag.next

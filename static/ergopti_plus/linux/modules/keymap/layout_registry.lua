@@ -504,6 +504,15 @@ local function convert(deps, entry, layout_path, on_done, rows)
 		rows = rows,
 	})
 	if not result then on_done(false, M.FAILURE_CONVERSION, convert_err) return end
+	-- What the conversion could not carry is named, never silently lost.
+	if #result.unplaced > 0 then
+		Logger.warn(LOG, "Layout '%s': %d key(s) have no Linux key name and are left out (macOS codes %s).",
+			entry.id, #result.unplaced, table.concat(result.unplaced, ", "))
+	end
+	if #result.conflicts > 0 then
+		Logger.warn(LOG, "Layout '%s': %d dead-key sequence(s) collide; the first output of each is kept.",
+			entry.id, #result.conflicts)
+	end
 	local out_dir = deps.local_dir .. entry.id .. "/"
 	for _, file in ipairs({
 		{ entry.id .. ".xkb", result.symbols_text },
