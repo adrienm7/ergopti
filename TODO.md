@@ -330,9 +330,6 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
 
 ## Maintainer: remote branch cleanup
 
-- [ ] Run the archive-then-delete script of [docs/tooling/remote-branch-cleanup.md](docs/tooling/remote-branch-cleanup.md)
-      on your machine (the cloud proxy refuses ref deletion and tag pushes).
-
 ## Linux open items from the July plan
 
 The July Linux driver plan (X11/Wayland hotstring engine, 2026-07-30) is retired; its rejected gesture routes are in
