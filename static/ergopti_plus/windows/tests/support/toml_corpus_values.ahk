@@ -84,7 +84,7 @@ _TCV_Rows(Plain, Typed) {
 
 /**
  * Compares a candidate with the shared expectation fields.
- * @param {String} Content The candidate, without a BOM the source did not hold.
+ * @param {String} Content The candidate.
  * @param {String} Source The vector's source bytes.
  * @param {Map} Expect The plain expect block.
  * @param {Map} TypedExpect The typed expect block.
@@ -121,9 +121,4 @@ _TCV_CandidateDifference(Content, Source, Expect, TypedExpect) {
 		}
 	}
 	return ""
-}
-
-/** Removes the BOM the Windows config writer publishes when the source held none. */
-_TCV_WithoutAddedBom(Content, Source) {
-	return (SubStr(Content, 1, 1) == Chr(0xFEFF) && SubStr(Source, 1, 1) != Chr(0xFEFF)) ? SubStr(Content, 2) : Content
 }

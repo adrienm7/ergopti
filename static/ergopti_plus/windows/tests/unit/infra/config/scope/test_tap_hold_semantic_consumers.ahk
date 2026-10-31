@@ -16,14 +16,14 @@ _THS_Source(Shape, Recommended := false) {
 	; A current file: the migration of an older one has its own suite, and every
 	; byte the reports and the imports must keep is authored here.
 	return "_meta.schema_version = 1`n" . Source . '["tap_hold.keys.caps_lock"]`ntap_action = "literal-dot-owner" # foreign namespace`n'
-		. '[Tap_hold.keys.caps_lock]`ntap_action = "case-owner" # foreign case`n'
+		. '[Tap_hold.keys.foreign]`ntap_action = "case-owner" # foreign case`n'
 		. '[[future.items]]`nname = "first"`n[[future.items]]`nname = "second"`n'
 		. '[private]`ntext = "001" # exact foreign data`n'
 }
 
 _THS_AssertForeign(Source) {
 	AssertContains(Source, '["tap_hold.keys.caps_lock"]`ntap_action = "literal-dot-owner" # foreign namespace')
-	AssertContains(Source, '[Tap_hold.keys.caps_lock]`ntap_action = "case-owner" # foreign case')
+	AssertContains(Source, '[Tap_hold.keys.foreign]`ntap_action = "case-owner" # foreign case')
 	AssertContains(Source, '[[future.items]]`nname = "first"`n[[future.items]]`nname = "second"')
 	AssertContains(Source, 'text = "001" # exact foreign data')
 }
@@ -78,6 +78,13 @@ _THS_ReportAndImport(Shape, Recommended) {
 				Failure := Err.Message
 			AssertContains(Failure, "holds the user's own setting", "the actual custom-key guard refuses before rendering")
 		}
+		; The shared writer inserts no new table through an inline owner.
+		if Shape == "inline" {
+			AssertThrows(TapHoldImportImage.Bind(Fixture.tap, Defaults, ["left_alt"]),
+				"an inline keys table takes no new key")
+			AssertTrue(FSUtf8ExactMatches(Fixture.tap, Source), "the refusal leaves the file untouched")
+			return
+		}
 		Image := TapHoldImportImage(Fixture.tap, Defaults, ["left_alt"])
 		AssertEqual(Source, Image["source_content"])
 		_THS_AssertForeign(Image["content"])
@@ -116,6 +123,13 @@ _THS_Scope(Shape, Mode) {
 		Fixture.options["reload"] := Launch
 		Commands := _TH_ScopeCommands(Fixture.options)
 		Receipt := (Commands[Mode == "clear" ? "scope_clear" : "scope_restore"])()
+		; The preset's other keys would be new tables through the inline owner, which
+		; the shared writer refuses: the command says so and the file stays.
+		if Shape == "inline" && Mode != "clear" {
+			AssertEqual("refused", Receipt["status"])
+			AssertTrue(FSUtf8ExactMatches(Fixture.tap, Source), "the refusal leaves the file untouched")
+			return
+		}
 		AssertEqual("pending", Receipt["status"], "the real submenu command reaches its two-file handoff")
 		AssertEqual(ObjPtr(Before), ObjPtr(TapHold), "pending publication preserves the running remapping map")
 		After := FSReadUtf8Exact(Fixture.tap)

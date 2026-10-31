@@ -1043,6 +1043,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/infra/config/transition/test_config_transition_temporal_custody.ahk
 #Include unit/infra/toml/test_toml_build_updated_content.ahk
 #Include unit/infra/toml/test_toml_writer_admission.ahk
+#Include unit/infra/toml/test_toml_writer_case_twins.ahk
 #Include unit/infra/toml/test_toml_table_array_writer.ahk
 #Include unit/infra/config/persistence/test_config_full_save_generation.ahk
 #Include unit/infra/config/persistence/test_config_full_save_terminal.ahk

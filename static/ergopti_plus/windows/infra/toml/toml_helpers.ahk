@@ -1157,17 +1157,17 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		if BuildOnly {
 				HotPath_LogIfSlow("Config.TomlBuild", _hpTomlWrite,
 					Updates.Length . " update(s)")
-				; Ordinary write mode opens its stage as UTF-8 (with BOM). Return the
-				; identical byte image so the transition does not silently change the
-				; repository's canonical encoding policy.
+				; Return the byte image ordinary write mode would stage, so a transition
+				; publishes exactly what a direct save would.
 				return Map("status", "ok", "kind", "rendered",
 					"content", Admitted["content"], "preserve_source", Admitted["preserve_source"])
 		}
 
 		; Admission may retain foreign physical records around canonical owned rows.
 		; Both detached and ordinary modes publish this one qualified image.
-		body := SubStr(Admitted["content"], 2)
 		FinalCandidate := Admitted["content"]
+		HasByteOrderMark := SubStr(FinalCandidate, 1, 1) == Chr(0xFEFF)
+		body := HasByteOrderMark ? SubStr(FinalCandidate, 2) : FinalCandidate
 		NativeNoop := Admitted["preserve_source"]
 		SchemaAdmission := DocumentMode ? (NativeNoop ? ConfigMigrateBoot(Path, "capture_noop")
 			: ConfigMigrateBoot(Path, "capture_write", FinalCandidate)) : 0
@@ -1196,7 +1196,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 
 		; A qualified image already on disk needs no stage or atomic replacement.
 		; Keep the generation acknowledgement while preserving its existing inode.
-		if FileExist(Path) && FSUtf8ExactMatches(Path, Chr(0xFEFF) . body) {
+		if FileExist(Path) && FSUtf8ExactMatches(Path, FinalCandidate) {
 				if !FSNativeAcknowledge(FinalAdmission) {
 					try LoggerError("TomlWrite", "Refusing unchanged-image acknowledgment: genuine native admission was withdrawn.")
 					return false
@@ -1224,7 +1224,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		StageOwned := false
 		StageWritten := false
 		try {
-				f := FileOpen(tmp, "w", "UTF-8")
+				f := FileOpen(tmp, "w", HasByteOrderMark ? "UTF-8" : "UTF-8-RAW")
 				if !f {
 						_TOML_InvalidateParseCache(Path)
 						; Logged, not merely returned. This branch fails without throwing, and
