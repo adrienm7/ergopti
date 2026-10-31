@@ -412,7 +412,7 @@ actions that do the same on that OS. The modifier + key shortcuts
 | R14 | `platform_reason.action_recording_starts_from_the_capture_tool` | This system records the screen from its own capture tool (the macOS Screenshot toolbar, the GNOME or KDE screenshot tool), which the equivalent action opens. |
 | R15 | `platform_reason.layer_spotlight_is_macos` | macOS only: this action opens Spotlight, the search of macOS. On Windows or Linux, bind your desktop's own search shortcut as a keystroke instead. |
 | R16 | `platform_reason.action_pointer_cannot_be_moved_on_linux` | Not on Linux: Wayland lets no application move the pointer, and this action has no version limited to X11 sessions. |
-| R17 | `platform_reason.action_windows_runs_shell_through_run_program` | On Windows, “Run a program” does the same: cmd.exe or powershell.exe with the command as its arguments, or explorer.exe with the file or folder to open. |
+| R17 | `platform_reason.action_windows_runs_shell_through_run_program` | On Windows, “Run a program” does the same: cmd.exe with the command as its arguments, or explorer.exe with the file or folder to open. |
 | R18 | `platform_reason.action_apple_shortcuts_are_macos` | macOS only: Apple Shortcuts exist only on macOS. Elsewhere, run a command or a program instead. |
 | R19 | `platform_reason.action_notifications_are_cleared_from_their_centre` | This system lets no application dismiss notifications: clear them in the notification centre, which the equivalent action opens. |
 | R20 | `platform_reason.action_download_mark_is_each_systems` | Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file. |
