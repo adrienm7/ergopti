@@ -331,3 +331,55 @@ The cloud finished the Lua, JS, shell, tools and Swift parts of PAR-79 to PAR-83
   `ollama_managed_files.ps1`, from `windows/_generated/identifiers.ahk` (no
   PowerShell copy is generated yet). Shrink with
   `node tools/test/test-repo-url-single-source.cjs --shrink`.
+
+## Local NTLM/Negotiate relay for the managed Ollama (31 October)
+
+Maintainer decision: Ergopti embeds a local authenticating relay instead of
+telling users to install Px or Cntlm. Design:
+[proxy-auth-relay.md](../design/proxy-auth-relay.md). Branch
+`feat/ntlm-proxy-relay`. The cloud side is done for macOS and Linux; Windows is
+yours (no `.ahk` or `.ps1` edit was made).
+
+Already built, with Go tests (`npm run test:go-proxy-relay`):
+
+- `_shared/go/native_http/cmd/ergopti-proxy-relay`, standard library only.
+  `GOOS=windows go vet` and `go test -c` pass; the SSPI path
+  (`proxyrelay/sspi_windows.go`, `secur32.dll` through `syscall`, current logon,
+  `Negotiate` then `NTLM`, service `HTTP/<proxy host>`) has never run on a real
+  Windows machine.
+- `probe --upstream http://host:port --authority registry.ollama.ai:443
+--dial-timeout-ms N --handshake-timeout-ms N` prints one JSON line, pinned by
+  `_shared/tests/corpus/network/proxy_auth_relay_probe_vectors.json`: exit 0
+  `not_needed` or `required` with its scheme (the sign-in succeeded on the
+  probe), exit 3 `refused` with a reason from
+  `_shared/modules/network/proxy_auth_relay.json`, exit 2 invalid arguments.
+- `run --upstream URL --variable HTTPS_PROXY <deadlines> --idle-timeout-ms N
+-- ollama.exe serve` binds `127.0.0.1:0`, sets `HTTPS_PROXY` of the child to
+  `http://ergopti:<per-run token>@127.0.0.1:<port>` and exits with the child's
+  code. On Windows a forwarded stop kills the child; keep both in the owned job
+  object so ending the relay also ends the daemon.
+- Deadlines: `constants.toml` `[adapters]` `proxy_relay_*_ms`.
+
+To do on the PC:
+
+1. Bundle `ergopti-proxy-relay.exe` (`GOOS=windows GOARCH=amd64`, and arm64 if
+   shipped) beside the other vendor helpers, signed with the rest (item 132).
+   A missing binary is the refusal `relay_unavailable`.
+2. `ollama-runtime-launch.ps1`: where `Test-ErgoptiRelayTunnel` returns
+   `windows_login`, run the relay `probe` instead (it proves the sign-in). On
+   `required`, start the daemon through `run` instead of dropping
+   `$proxy.Environment`; on `refused`, refuse the start with the reason.
+3. `ollama-model-pull.ps1` and `ollama_managed_bootstrap.ahk`: the
+   `proxy_windows_login` refusal becomes the relay's own message,
+   `t(<refusals[reason]>)` from `proxy_auth_relay.json` (keys
+   `network.relay.*`, already in all 21 locales). Keep
+   `network.failure.proxy_windows_login` only if a path can still reach it.
+4. `network_check.ahk`: Linux and macOS now report a ninth step,
+   `proxy_relay` (`field_check_network.lua` `PLAN_STEPS`), with values
+   `not_needed`, `required_negotiate`, `required_ntlm`, `direct`,
+   `not_applicable` or a refusal reason. The Windows list is pinned to
+   `STEP_IDS` only (`test-network-field-check-parity.cjs`), so adding it is your
+   choice; the label `field_check.step.proxy_relay` exists.
+5. Physical checks on a corporate network: a model pull behind an NTLM-only and
+   a Negotiate proxy; Debug > Test network; quitting Ergopti during a pull leaves
+   no relay and no daemon behind.
