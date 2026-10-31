@@ -169,7 +169,7 @@ final class OwnedRuntimeCoreProvisionOwner {
 			observed = OwnedRuntimeCoreServiceOwner.acquire(afterProvision: self)
 			if observed != nil { break }
 			if ProcessInfo.processInfo.systemUptime >= deadline { throw OwnedRuntimeInstallFailure.cleanupPending }
-			usleep(10_000)
+			usleep(LauncherTimings.ownedRuntimeCoreServicePoll.microseconds)
 		} while true
 		guard let core = observed, core.startedCoreObservation(forProvision: self),
 			custody.commitRegistered(core: core, owner: self) else { throw OwnedRuntimeInstallFailure.cleanupPending }

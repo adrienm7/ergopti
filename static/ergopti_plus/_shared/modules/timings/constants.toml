@@ -1211,6 +1211,23 @@ automation_permission_poll_ms = 50
 # Swift: UninstallWorker.swift.
 uninstall_lease_poll_ms = 10
 
+# The owned remap runtime's installer and owners: the poll of a signalled
+# launchctl child until it is reaped, of the core service's launchd
+# registration after provisioning (inside its 10 s deadline), and of the user
+# console program's native receipt. Swift: OwnedRuntimeCoreLaunchctl.swift,
+# OwnedRuntimeCoreProvisionOwner.swift, OwnedRuntimeUserConsoleOwner.swift.
+owned_runtime_child_reap_poll_ms = 10
+owned_runtime_core_service_poll_ms = 10
+owned_runtime_console_poll_ms = 25
+
+# The VirtualHIDDevice daemon report: the poll of its signed query program,
+# of the Main CLI request's owner, and of the request channel by the worker
+# and its withdrawal watcher. Swift: OwnedVirtualHIDDaemonReportMainOperation.swift,
+# OwnedVirtualHIDDaemonReportWorker.swift.
+vhid_report_query_poll_ms = 10
+vhid_report_main_poll_ms = 20
+vhid_report_request_poll_ms = 20
+
 # Test fixtures compiled into the launcher: the automation query fixture's
 # hold, the owned program fixture's poll, and the managed Ollama listener's
 # reap poll and its progress and stall chunk pauses.
