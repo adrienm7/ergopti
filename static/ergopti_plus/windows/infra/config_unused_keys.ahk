@@ -525,7 +525,7 @@ ConfigUnusedKeysRemove(FilePath, Keys, Stamp := "", BackupFn := 0, WriterFn := 0
 				}
 			}
 			if !Dropped
-				Updates.Push({ Section: Entry["section"], Key: Entry["key"], Delete: 1 })
+				Updates.Push({ Section: Entry["section"], Key: Entry["key"], Delete: 1, WholeValue: 1 })
 		}
 		; Deleting an absent path is a writer no-op that still acknowledges, so
 		; a row naming no record of this source would be reported removed while
