@@ -724,7 +724,6 @@
 	"healthcheck.field.runtime": "Entorno de ejecución",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Motor de vistas web",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "Modelo",
 	"healthcheck.field.cpu": "Procesador",
 	"healthcheck.field.cpu_cores": "Núcleos lógicos",

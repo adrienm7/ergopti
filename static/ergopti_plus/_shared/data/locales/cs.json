@@ -724,7 +724,6 @@
 	"healthcheck.field.runtime": "Běhové prostředí",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Webové zobrazovací jádro",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "Model",
 	"healthcheck.field.cpu": "Procesor",
 	"healthcheck.field.cpu_cores": "Logická jádra",

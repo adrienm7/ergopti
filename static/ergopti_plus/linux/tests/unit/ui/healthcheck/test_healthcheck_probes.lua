@@ -6,7 +6,8 @@
 --- The asynchronous half of the diagnostics snapshot, over controlled adapters:
 --- 1. github_api reads api.github.com's rate limit through the libuv HTTP
 ---    client, under its own owner so it never cancels the updater's request;
---- 2. system_details reads the kanata version and the logs volume's free space
+--- 2. system_details reads the logs volume's free space and starts no kanata
+---    (removed with the stale probe, owned-runtimes row)
 ---    from asynchronous children;
 --- 3. without libuv every probe answers "unsupported" instead of blocking the
 ---    event loop with a synchronous fallback;
@@ -135,16 +136,17 @@ helpers.describe("diagnostics probes (linux)", function()
 		end)
 	end)
 
-	helpers.it("reads the kanata version and the free space from asynchronous children", function()
+	helpers.it("reads the free space from one asynchronous df and starts no kanata (owned-runtimes-kanata-probe)", function()
 		with_probes(true, function(Probes, world)
 			local _, answers = start(Probes)
-			helpers.assert_eq(world.children[1].executable, "kanata")
-			helpers.assert_eq(world.children[2].executable, "df")
-			world.children[1].callback({ ok = true, stdout = "kanata 1.7.0\n" })
-			world.children[2].callback({ ok = true, stdout = "Filesystem 1024-blocks Used Available Capacity Mounted on\n"
+			for _, child in ipairs(world.children) do
+				helpers.assert_true(child.executable ~= "kanata", "the stale kanata probe is gone")
+			end
+			helpers.assert_eq(world.children[1].executable, "df")
+			world.children[1].callback({ ok = true, stdout = "Filesystem 1024-blocks Used Available Capacity Mounted on\n"
 				.. "/dev/nvme0n1p3 490000000 200000000 250000000 45% /home\n" })
 			helpers.assert_eq(answers.system_details.result.state, "ok")
-			helpers.assert_eq(answers.system_details.sections.versions.kanata, "kanata 1.7.0")
+			helpers.assert_nil(answers.system_details.sections.versions, "no kanata version section")
 			helpers.assert_eq(answers.system_details.sections.system.disk_free, 250000000 * 1024)
 		end)
 	end)
@@ -214,11 +216,11 @@ helpers.describe("diagnostics probes (linux)", function()
 			local run, answers = start(Probes)
 			run.cancel()
 			world.requests[1].callback({ status = 200, body = "{}" })
-			world.children[1].callback({ ok = true, stdout = "kanata 1.7.0\n" })
+			world.children[1].callback({ ok = true, stdout = "Filesystem\n/dev/x 1 1 1 1% /\n" })
 			helpers.assert_nil(answers.github_api, "nothing of a cancelled run reaches the page")
 			helpers.assert_nil(answers.system_details)
 			helpers.assert_eq(world.cancelled_owners, { "diagnostics.github" })
-			helpers.assert_eq(world.cancelled_children, 3, "kanata, df and the proxy settings query are stopped")
+			helpers.assert_eq(world.cancelled_children, 2, "df and the proxy settings query are stopped")
 			helpers.assert_true(cpu_timers(world)[1].cancelled == true, "the processor sample's timer is stopped")
 			helpers.assert_eq(world.cancelled_timers, 2, "the processor and configuration timers are stopped")
 			helpers.assert_nil(answers.configuration, "the configuration of a cancelled run is not published")

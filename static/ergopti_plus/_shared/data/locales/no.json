@@ -724,7 +724,6 @@
 	"healthcheck.field.runtime": "Kjøremiljø",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Nettvisningsmotor",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "Modell",
 	"healthcheck.field.cpu": "Prosessor",
 	"healthcheck.field.cpu_cores": "Logiske kjerner",

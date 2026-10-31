@@ -724,7 +724,6 @@
 	"healthcheck.field.runtime": "Środowisko uruchomieniowe",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Silnik widoku WWW",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "Model",
 	"healthcheck.field.cpu": "Procesor",
 	"healthcheck.field.cpu_cores": "Rdzenie logiczne",
