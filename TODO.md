@@ -759,7 +759,7 @@ Added October 22 (from the agents' reports; details in their commits):
       stays the system copy, with a version check and a clear refusal. The inventory with a proposal per tool is
       `docs/design/owned-runtimes.md`; its macOS and Linux tables are checked against every program the drivers
       start (`tools/test/test-owned-runtimes-inventory.cjs`; ydotool is no longer started at run time). Left: item
-      31; the maintainer's decision per row (see "Questions for the maintainer"); the same code-derived check for
+      31; the rows in state "to do" of `_shared/data/owned_runtimes.json` (`docs/design/owned-runtimes.md` section 7); the same code-derived check for
       the Windows driver (PC agent).
 - [ ] **Ergopti's own Ollama on Windows and Linux too.** [PHYS-W] [PHYS-L] Done in code on the three OS (Linux
       32fa07be7f, Windows f016081056 and 597cbbe983: owned port `llm_ollama_owned_port` = 11435, 11434 refused, only
@@ -1239,10 +1239,3 @@ not open software work.
 Each names the default kept meanwhile. Answer here; the agent then moves the decision into the item
 or under "Decided, do not re-raise".
 
-- **Owned runtimes on macOS and Linux: one decision per row of `docs/design/owned-runtimes.md`.** The proposals
-  are written there (sections 3, 4, 7): Linux `sqlite3` and `openssl` CLI (PIN, or the libsqlite3 FFI path and a
-  Lua primitive), `curl` (PIN or SYS), `tar --zstd` (PIN a decoder or repack), `python3` for the XKB install (PIN
-  the managed Python or port to Lua), the desktop tools (`xdotool`, `wmctrl`, `zenity`, screenshot and clipboard
-  tools: OPT), the base utilities on both OS (SYS); macOS `/usr/bin/python3` helpers (PIN on the managed
-  Python); and whether the rows become a machine-readable `_shared/data/owned_runtimes.json`. Kept meanwhile:
-  every tool as it is used today; a new spawn needs a row (the inventory test).

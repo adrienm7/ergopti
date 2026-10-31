@@ -190,6 +190,16 @@ downloaded again`). Ollama deletes that layer before it reports the
     through a version `.res` resource built with the exe.
   - The `WH_KEYBOARD_LL` probe of `input_probe.ahk` stays in the release exe;
     nothing to remove.
+- Owned runtimes on Windows (decided 2026-10-31; rows with `os = "windows"`
+  and status `follow_up` in `_shared/data/owned_runtimes.json`): delete the
+  winget Ollama.Ollama fallback in `windows/modules/llm/ollama_deps_checker.ahk`
+  (around lines 257 and 327-357); add a WebView2 Evergreen minimum-version
+  check with a clear refusal (keeping the native fallback); check the Windows
+  PowerShell 5.1 version at start and refuse in words; pin `curl.exe` (an own
+  SHA-256-checked copy; SYS is the noted alternative). When a row is done, set
+  its `status` to `done` and run `node tools/codegen/codegen-owned-runtimes.cjs`.
+  The Windows rows still need an AHK spawn reader in
+  `tools/test/lib/spawned-tools.cjs` before the inventory test checks them.
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 
