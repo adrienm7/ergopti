@@ -5,18 +5,19 @@
  * MODULE: Owned Runtimes Inventory Tests
  * DESCRIPTION:
  * Keeps the owned runtimes registry (_shared/data/owned_runtimes.json, which
- * docs/design/owned-runtimes.md renders) complete for the macOS and Linux
- * drivers: every external program the driver code starts, as derived from the
- * code by tools/test/lib/spawned-tools.cjs, is in the `programs` of one of
- * that driver's rows, each of which carries a decision, so a new spawn cannot
- * join the product without one.
+ * docs/design/owned-runtimes.md renders) complete for the three drivers: every
+ * external program the driver code starts, as derived from the code by
+ * tools/test/lib/spawned-tools.cjs, is in the `programs` of one of that
+ * driver's rows, each of which carries a decision, so a new spawn cannot join
+ * the product without one.
  *
  * FEATURES & RATIONALE:
  * 1. The extractor itself is pinned on small sources: it must find a program
  *    in each spawn shape the drivers use and nothing in a log line, an SQL
  *    statement, a phase name or a shell function.
- * 2. The registry's macOS and Linux rows name every derived program in their
+ * 2. The registry's rows name every program derived for their driver in their
  *    `programs` list. Rows are read from the JSON, not parsed from Markdown.
+ *    A Windows name compares without its `.exe` and without case.
  * 3. The registry load rejects a row whose decision is outside its closed
  *    vocabulary (tools/lib/owned-runtimes.cjs).
  * ==============================================================================
@@ -31,8 +32,10 @@ const Registry = require('../lib/owned-runtimes.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const DATA = path.relative(ROOT, Registry.DATA_PATH);
-// The drivers whose spawns the extractor derives; Windows has no AHK reader yet.
-const DRIVERS = Object.freeze(['macos', 'linux']);
+// The Windows driver starts few programs: most of its work is in-process. A
+// floor catches an extractor that stopped reading its sources.
+const MINIMUM_PROGRAMS = Object.freeze({ macos: 21, linux: 21, windows: 10 });
+const DRIVERS = Object.freeze(Object.keys(MINIMUM_PROGRAMS));
 
 let failures = 0;
 let checks = 0;
@@ -79,7 +82,10 @@ function programsIn(source) {
 function programsOf(registry, driver) {
 	const rows = registry.rows.filter((row) => row.os === driver);
 	assert(rows.length > 0, `${DATA} has no ${driver} row`);
-	return new Set(rows.flatMap((row) => row.programs));
+	const names = rows.flatMap((row) => row.programs);
+	return new Set(
+		driver === 'windows' ? names.map((name) => name.replace(/\.exe$/i, '').toLowerCase()) : names
+	);
 }
 
 check('the extractor finds each spawn shape the drivers use', () => {
@@ -131,13 +137,40 @@ check('the extractor ignores logs, SQL, phases, comments and shell functions', (
 	assert.deepEqual(programsIn(source), []);
 });
 
+check('the Windows extractor finds what starts and ignores names that only compare', () => {
+	const source = [
+		'; Run("commented-out.exe")',
+		"Run('notepad.exe \"' . Path . '\"')",
+		'Exe := A_WinDir . "\\System32\\curl.exe"',
+		'Run("explorer " . Folder)',
+		"RunWait('reg query HKCU')",
+		'"slack.exe",   "communication",',
+		'"zoom.exe", "teams.exe",',
+		'"KeePass.exe", true,',
+		'if WinActive("ahk_exe EXCEL.EXE") {',
+		'if (ProcName == "Code.exe") {',
+		"$Start = Join-Path $Root 'ollama.exe'",
+		'"i)\\.recovery\\.exe$", ".republish.exe")'
+	].join('\n');
+	assert.deepEqual([...Spawned.windowsPrograms(source)].sort(), [
+		'curl',
+		'explorer',
+		'notepad',
+		'ollama',
+		'reg'
+	]);
+});
+
 // A malformed registry or an undecided row fails here, before any check.
 const registry = Registry.load();
 
 for (const driver of DRIVERS) {
 	check(`the ${driver} rows list every program the ${driver} driver starts`, () => {
 		const derived = Spawned.spawnedTools(driver);
-		assert(derived.size > 20, `the extractor found only ${derived.size} ${driver} programs`);
+		assert(
+			derived.size >= MINIMUM_PROGRAMS[driver],
+			`the extractor found only ${derived.size} ${driver} programs`
+		);
 		const names = programsOf(registry, driver);
 		const missing = [...derived.keys()]
 			.filter((name) => !names.has(name))
