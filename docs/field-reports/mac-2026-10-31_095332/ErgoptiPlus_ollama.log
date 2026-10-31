@@ -1,0 +1,16 @@
+2026-10-31 09:54:29:111 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-10-31 09:54:29:143 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 4, in-flight warmup invalidated.
+2026-10-31 09:54:29:174 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 2 more times between 2026-10-31 09:54:29:142 and 2026-10-31 09:54:29:142 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 3).).
+2026-10-31 09:54:29:195 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-10-31 09:55:49:806 [START] [ollama_deps] Bootstrapping Ollama backend…
+2026-10-31 09:55:49:967 [INFO] [ollama_deps] Progress marker 'OLLAMA_INSTALLING' observed — updating UI.
+2026-10-31 09:55:50:017 [INFO] [ollama_deps] [script] [OLLAMA-DEPS] stage: python_bootstrap
+2026-10-31 09:56:56:083 [SUCCESS] [ollama_deps] Ollama binary provisioned; daemon readiness=true.
+2026-10-31 09:56:57:165 [DEBUG] [llm.api_ollama] The local server returned a readable model list.
+2026-10-31 09:56:57:583 [DEBUG] [ollama_deps] Auto-hide skipped — the progress window now belongs to another operation.
+2026-10-31 09:58:42:606 [DEBUG] [llm.api_ollama] [gemma4:e2b] #1 PROMPT (7 chars) mode_line=true -> <text withheld>
+2026-10-31 09:58:44:987 [DEBUG] [llm.api_ollama] [gemma4:e2b] #1 HTTP_RESPONSE status=200, body_len=323
+2026-10-31 09:58:44:988 [DEBUG] [llm.api_ollama] [gemma4:e2b] #1 RAW (2381ms, 4 chars) -> What
+2026-10-31 09:59:38:230 [INFO] [ollama_deps] ↑ "[script] %s" repeated 11 more times between 2026-10-31 09:55:50:096 and 2026-10-31 09:56:49:136 (last: [script] OLLAMA_INSTALLED).
+2026-10-31 09:59:38:240 [INFO] [ollama_deps] ↑ "Progress marker '%s' observed — updating UI." repeated 1 more time between 2026-10-31 09:56:49:136 and 2026-10-31 09:56:49:136 (last: Progress marker 'OLLAMA_VERIFIED' observed — updating UI.).
+2026-10-31 10:02:11:482 [DEBUG] [llm.api_ollama] ↑ "The local server returned a readable model list." repeated 1 more time between 2026-10-31 09:58:42:599 and 2026-10-31 09:58:42:599.
