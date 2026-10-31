@@ -474,7 +474,8 @@ s'appliquent seuls, les destructifs échouent silencieusement.
 ### 6.8 Menu tray
 
 Le manifeste `menu_manifest.json` est généré par une projection **verbatim** des tables
-`[menu.*]` du manifeste de fonctionnalités : aucune validation, aucune normalisation,
+`[menu.*]` de `_shared/modules/menu/menu.toml` (séparées du manifeste de fonctionnalités le
+2026-10-31) : aucune validation, aucune normalisation,
 aucune expansion de plateforme au build. Toute la sémantique vit dans deux « marcheurs »
 runtime, l'un AHK, l'autre Lua — c'est pourquoi ils peuvent diverger, et divergent.
 
@@ -800,18 +801,16 @@ C'est exactement le défaut de la couche B actuelle. Pour une touche nommée (`e
 
 ### 10.3 Ajouter une entrée de menu
 
-**Aujourd'hui**, selon ce que vous voulez :
+**Aujourd'hui** (2026-10-31), le menu tray est défini dans **un seul fichier**,
+`_shared/modules/menu/menu.toml` :
 
-- **Un toggle de fonctionnalité simple** : ajouter l'entrée dans `manifest.toml` (section
-  sémantique + `platforms`), ajouter une ligne `{"type":"feature","id":…}` dans la table
-  `[menu.<sous-menu>]`, `npm run build:domain`, puis vérifier que le marcheur générique de
-  votre driver gère bien ce type (⚠ le marcheur macOS **saute silencieusement** `toggle` et
-  `feature`, et lève un WARN sur `letter_picker`).
-- **Tout le reste** (coche liée à un état, libellé composé, liste dynamique, groupe radio,
-  dialogue, compteur) : le manifeste ne l'exprime pas. Vous ajoutez une ligne `dynamic` et
-  vous écrivez un handler dans `ui/menu/*` sur Windows et macOS, et dans
-  `modules/menu/menu_builder.lua` sur Linux — trois fois, en trois langues, avec les
-  libellés en dur sur Linux.
+- **Toute entrée** : ajouter la ligne dans la table `[[menu.<sous-menu>]]` voulue (`check`,
+  `command`, `choice`, `group`, `list`, `toggle`, `---`…), avec son `i18n`, son ordre, ses
+  `platforms`, `checked_when` / `disabled_when` et sa raison de grisage, puis
+  `npm run build:menu`. Chaque driver ne fournit que les **données** d'une ligne `list`
+  (modèles installés, profils, applications…) et le **handler** d'une commande déclarée.
+- Le type `dynamic` (ligne dessinée par le code du driver) est **retiré** : le générateur le
+  refuse. Une ligne dont le contenu est une donnée d'exécution est une `list`.
 - **Sur Windows uniquement** : tout item actionnable doit passer par `RegisterMenuItem` /
   `RegisterMenuItemInsert`, jamais par `Menu.Add` brut. AHK 2.0 perd silencieusement 30 à
   50 % des clics de menu tray sans ce contournement. **Non négociable.**
