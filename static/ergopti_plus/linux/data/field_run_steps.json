@@ -16,6 +16,12 @@
 			"check": "network",
 			"deadline_seconds": 90,
 			"proves": "The managed download chain works: proxy settings, PAC download and verdict, route lookup, TLS trust and one transfer, with the route of each Ollama origin."
+		},
+		{
+			"id": "driver_reload",
+			"kind": "reload",
+			"deadline_seconds": 60,
+			"proves": "The daemon restarts on request through its reload owner and the successor's field run resumes at the next step; the reload's duration, request to the successor's boot completion, is named."
 		}
 	]
 }
