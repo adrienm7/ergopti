@@ -113,14 +113,16 @@ helpers.describe("karabiner guardian unregistration receipts", function()
 			controller.init()
 			local answered
 			controller.register_guardian(function(status) answered = status end)
-			ctx.complete(1, 0, "ready\ndeveloper_adhoc_reregistered\n")
+			ctx.complete(1, 0, "ready\ndeveloper_adhoc_legacy_only\n")
 			helpers.assert_eq(answered, "ready")
 			local note, status = controller.guardian_registration_note()
-			helpers.assert_eq(note, "developer_adhoc_reregistered")
+			helpers.assert_eq(note, "developer_adhoc_legacy_only")
 			helpers.assert_eq(status, "ready")
 			helpers.assert_eq(controller.guardian_registration_required(), false)
 
-			for _, stdout in ipairs({ "ready\nunknown_note\n", "ready\ndeveloper_adhoc_reregistered", "ready\nready\n" }) do
+			-- The retired reset note is no longer a launcher answer.
+			for _, stdout in ipairs({ "ready\nunknown_note\n", "ready\ndeveloper_adhoc_legacy_only", "ready\nready\n",
+				"ready\ndeveloper_adhoc_reregistered\n" }) do
 				local refused, failure = load_controller()
 				refused.init()
 				local status, reason = "unset", nil
@@ -136,7 +138,7 @@ helpers.describe("karabiner guardian unregistration receipts", function()
 			probed.init()
 			local probe_status = "unset"
 			probed.probe_guardian_status(function(observed) probe_status = observed end)
-			probe_ctx.complete(1, 0, "ready\ndeveloper_adhoc_reregistered\n")
+			probe_ctx.complete(1, 0, "ready\ndeveloper_adhoc_legacy_only\n")
 			helpers.assert_nil(probe_status)
 		end)
 	end)
