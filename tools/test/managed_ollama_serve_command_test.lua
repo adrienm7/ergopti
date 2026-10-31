@@ -70,7 +70,14 @@ end }
 package.loaded["modules.llm.network_env"] = { prelude = function() network_calls = network_calls + 1; return "STATIC-PRELUDE; " end }
 package.loaded["modules.llm.managed_native_python"] = { resolve = function() return python end }
 package.loaded["adapters.python_interpreter"] = { resolve = function() return python end }
-package.loaded["app_dirs"] = { files = { unified_prefix = "ErgoptiPlus_", extension = ".log" } }
+-- The real app_dirs names the daily log. The real timing registry reads the
+-- production _shared/ tree, which the hs.fs double cannot walk to, and logs its
+-- own load: bind it under a silent logger before the command module needs it.
+package.loaded["infra.paths"] = { shared = function(relative)
+	return production .. "/static/ergopti_plus/_shared/" .. relative
+end }
+package.loaded["infra.logger"] = setmetatable({}, { __index = function() return function() end end })
+require("infra.timings")
 package.loaded["adapters.managed_ollama_hint"] = { get = function(directory)
 	local raw = files[receipt_path]
 	if not raw or #raw > 1048576 then return nil end
