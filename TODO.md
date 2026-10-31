@@ -326,6 +326,7 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       app-health census on an absent folder. Left, one line per family:
   - [PHYS-M] **Ctrl+. after a layout flip.** No "Some shortcuts are still unregistered" line after a "rebinding
     every shortcut (retry N)" line; if one follows, rebinding needs the `hs.keycodes.map` change notification.
+    `field_slow_lines` counts both in the day log (`log_shortcuts_still_unregistered`, `log_shortcut_rebind_retries`).
   - [PHYS-M] **Eventtaps refused at 10:07.** The errors now name `accessibility_trusted`; false means macOS withdrew
     the grant at run time.
   - [PHYS-M] **Personal hotstring reload rolled back (11:37).** The refusing step is now named; read it on the next
@@ -334,7 +335,7 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
   - [PHYS-M] **Screenshot without an image (10:15):** an interactive capture with empty stderr would be an Escape,
     to be settled as a cancel.
   - [PHYS-M] **Keystats ingest "database is locked"** once at 20:52; the `quick_check` now opens `immutable=1`
-    (8084562373): confirm it no longer appears.
+    (8084562373): confirm it no longer appears (`field_slow_lines` `log_keystats_database_locked` fails on one).
   - Key events lost upstream: see L24.
 - [ ] **Remap guardian killed at every developer start.** [PHYS-M] Done: an ad hoc build re-registers its guardian
       from scratch (2be257c9f5), `field_login_items` reports `guardian_registration`. Left: the next field run shows
