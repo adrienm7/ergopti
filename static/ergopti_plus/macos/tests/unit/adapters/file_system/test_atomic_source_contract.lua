@@ -24,10 +24,11 @@ helpers.describe("adapters.file_system: write() source uses temp+rename (F-MED-1
 		helpers.assert_true(fn_start ~= nil, "the shared atomic writer must exist")
 		local fn_end = src:find("\nfunction M.append", fn_start, true)
 		local body = src:sub(fn_start, fn_end)
-		local public_write = src:match("function M%.write%(path, content%)(.-)end") or ""
+		-- The optional third argument only routes an expected refusal to its caller
+		local public_write = src:match("function M%.write%(path, content, on_error%)(.-)end") or ""
 
-		helpers.assert_true(public_write:find("write_atomic(path, content, nil)", 1, true) ~= nil,
-			"the canonical two-argument port must delegate to the reviewed atomic writer")
+		helpers.assert_true(public_write:find("write_atomic(path, content, nil, on_error)", 1, true) ~= nil,
+			"the canonical two-argument port must delegate to the reviewed atomic writer, without a source precondition")
 		helpers.assert_true(body:find("reserve_staging_area(resolved_path)", 1, true) ~= nil,
 			"write() must exclusively reserve its staging pathname before opening it (F-MED-16)")
 		helpers.assert_true(body:find("os.rename(", 1, true) ~= nil,
