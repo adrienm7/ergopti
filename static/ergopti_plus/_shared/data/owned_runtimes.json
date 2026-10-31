@@ -1338,8 +1338,8 @@
 		{
 			"os": "windows",
 			"tool": "`taskkill.exe`, `cmd.exe`, `reg` through AHK",
-			"programs": ["taskkill.exe", "cmd.exe", "reg"],
-			"used_for": "Process tree stop of Ergopti's own children, shell actions (`windows/adapters/shell_runner.ahk:794`, `windows/modules/gestures/actions.ahk:954`)",
+			"programs": ["taskkill.exe", "cmd.exe", "reg", "conhost"],
+			"used_for": "Process tree stop of Ergopti's own children, shell actions (`windows/adapters/shell_runner.ahk:794`, `windows/modules/gestures/actions.ahk:954`); `conhost.exe` is never launched, only recognised as the console host of a hidden Ollama child (`windows/modules/llm/ollama-runtime-launch.ps1`)",
 			"today": "System",
 			"current_class": "SYS",
 			"version_needed": "n/a",
