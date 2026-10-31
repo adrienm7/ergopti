@@ -98,6 +98,8 @@ async function main() {
 			(_match, section) => `[[entries]]\nsection = "${section}"`
 		)
 	);
+	// The menu rows live in the tray-menu source, beside the generated manifest.
+	manifest.menu = require('../lib/menu-source.cjs').readMenuTables(parse);
 	assert(manifest.entries.length > 200, 'the real feature registry must be loaded');
 	// PAR-3: the metrics master switch is ONE key, `metrics.enabled`, read by
 	// all three drivers. A second spelling (`metrics.metrics_enabled` on

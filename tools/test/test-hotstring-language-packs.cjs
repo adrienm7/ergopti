@@ -81,7 +81,10 @@ for (const element of [].concat(manifest.features?.hotstrings ?? [])) {
 		if (Array.isArray(value)) featureRows[key] = (featureRows[key] ?? []).concat(value);
 	}
 }
-const gateKeys = manifest.menu?.hotstring_category_keys ?? {};
+// The menu rows live in the tray-menu source, beside the generated manifest.
+const gateKeys =
+	require('../lib/menu-source.cjs').readMenuTables((source) => tomlOwnData(parse(source)))
+		.hotstring_category_keys ?? {};
 
 /** Sections a hotstring file declares, in its [_meta] order, without separators. */
 const sectionsOf = (doc) => (doc._meta?.sections_order ?? []).filter((s) => s !== '-');

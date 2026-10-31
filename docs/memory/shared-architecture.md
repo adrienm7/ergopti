@@ -183,6 +183,17 @@ byte-identical order, unless the formatter itself requires order.
 Shared menu metadata has one canonical description per action. Drivers own
 rendering but must not fork labels or help text.
 
+### project-the-tray-menu-is-defined-in-menu-toml
+
+The tray menu is declared only in `_shared/modules/menu/menu.toml`;
+`npm run build:menu` compiles it into `menu_manifest.json`, which the three
+drivers read. A driver supplies the DATA of a named `list` provider and the
+handlers of declared commands, never a row of its own: the `dynamic` type,
+which handed a row back to platform code, is refused by the compiler. Action:
+add, remove or rename a row in `menu.toml`; read paths through
+`tools/lib/paths.cjs` (`MENU_SOURCE_REL`) or `tools/lib/menu-source.cjs`.
+`test-menu-manifest.cjs` refuses a `[menu]` table in the feature manifest.
+
 ### project-a-caller-owned-menu-is-still-the-renderers-to-fill
 
 Owning a native menu object does not transfer content ownership. The shared
