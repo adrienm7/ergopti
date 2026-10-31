@@ -22,6 +22,10 @@ M.PINNED = {
 	{ "layer_file_bytes", 65536 },
 	{ "number_row_level_text_bytes", 1024 },
 	{ "release_list_body_bytes", 2097152 },
+	{ "program_catalogue_bytes", 65536 },
+	{ "http_diagnostic_bytes", 65536 },
+	{ "proxy_packet_bytes", 65536 },
+	{ "shortcuts_reply_bytes", 65536 },
 }
 
 --- The shared modules and the field that publishes each key.
@@ -29,6 +33,7 @@ M.FIELDS = {
 	{ module = "keymap.layer_editor", field = "MAX_TEXT_BYTES", key = "layer_file_bytes" },
 	{ module = "layout.number_row_native", field = "MAX_TEXT_BYTES", key = "number_row_level_text_bytes" },
 	{ module = "updater.list_cache", field = "MAX_BODY_BYTES", key = "release_list_body_bytes" },
+	{ module = "program_providers", field = "MAX_CATALOGUE_BYTES", key = "program_catalogue_bytes" },
 }
 
 --- Registers the contract on one driver's suite.
