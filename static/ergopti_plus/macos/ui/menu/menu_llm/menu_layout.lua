@@ -57,14 +57,8 @@ local FALLBACK_GREYS_WHEN_OFF = {
 	llm_navigation          = true,
 }
 
---- Built-in fallback row ORDER — the order the two tables above cannot express.
-local FALLBACK_ROW_ORDER = require("menu.row_order").list("llm_menu_rows")
-
 -- Map of row id -> disabled_when_off (bool). nil until first load.
 local _policy = nil
-
--- Ordered list of the row ids this driver renders. nil until first load.
-local _ids = nil
 
 --- Whether a manifest row is visible on this driver. A row with no ``platforms``
 --- restriction is visible everywhere.
@@ -87,12 +81,12 @@ end
 local function load_policy()
 	if _policy then return _policy end
 
-	local policy, ids = nil, nil
+	local policy = nil
 	local ok_menu, ManifestMenu = pcall(require, "infra.manifest_menu")
 	if ok_menu and ManifestMenu and type(ManifestMenu.get_array) == "function" then
 		local rows = ManifestMenu.get_array(LLM_MENU_KEY)
 		if type(rows) == "table" then
-			policy, ids = {}, {}
+			policy = {}
 			for _, row in ipairs(rows) do
 				-- Only the settings rows carry a greying policy, and each declares
 				-- it: the separators, the commands and the boundary lists do not.
@@ -101,7 +95,6 @@ local function load_policy()
 				if type(row) == "table" and type(row.id) == "string"
 					and type(row.disabled_when_off) == "boolean" and is_for_this_driver(row) then
 					policy[row.id] = (row.disabled_when_off == true)
-					ids[#ids + 1] = row.id
 				end
 			end
 		end
@@ -109,14 +102,11 @@ local function load_policy()
 
 	if not policy or next(policy) == nil then
 		Logger.warn(LOG, "menu_manifest.json 'llm_menu' unreadable/empty — using built-in fallback greying policy.")
-		policy, ids = {}, {}
+		policy = {}
 		for id, v in pairs(FALLBACK_GREYS_WHEN_OFF) do policy[id] = v end
-		-- Deliberately ordered, unlike the two tables above: this list decides
-		-- what the caller registers a handler for, and pairs() order is not.
-		ids = FALLBACK_ROW_ORDER
 	end
 
-	_policy, _ids = policy, ids
+	_policy = policy
 	return _policy
 end
 
@@ -134,16 +124,6 @@ function M.greys_when_off(id)
 	local v = p[id]
 	if v == nil then return true end
 	return v
-end
-
---- The ids this driver's rows are declared with, in manifest order. The renderer
---- places the rows; this is what the caller registers a handler for. Derived from
---- the same read as the greying policy so the two can never disagree about which
---- rows exist.
---- @return table Ordered list of row ids.
-function M.row_ids()
-	load_policy()
-	return _ids
 end
 
 --- The backend health dot the AI title carries for a status, read from the

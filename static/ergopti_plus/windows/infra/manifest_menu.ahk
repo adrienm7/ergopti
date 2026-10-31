@@ -11,9 +11,10 @@
 ; 1. Single renderer: every submenu (shortcuts, metrics, layout, hotstrings,
 ;    gestures, tap_holds) is built by the same loop — structure lives in the
 ;    manifest, not in per-submenu AHK code.
-; 2. Dynamic escape hatch: items whose ``type`` is "dynamic" are routed
-;    to a caller-supplied Map of handler functions so platform-specific UI
-;    (file trees, dialogs, runtime state) stays in the caller.
+; 2. No escape hatch: the retired ``dynamic`` type handed a row back to the
+;    caller, and the menu compiler refuses it now. A row whose contents are
+;    runtime data is a ``list``, whose provider returns DATA drawn here; only
+;    the legacy ``action`` type still hands its id to a caller handler.
 ; 3. Platform filtering: entries with a ``platforms`` array that does not
 ;    include "ahk" are silently skipped.
 ; ==============================================================================
@@ -165,11 +166,10 @@ _MR_Get(Obj, Key, Default := "") {
 ;
 ; ``ManifestKey``   — key in ``menu_manifest.json`` (e.g. "shortcuts_menu")
 ; ``CategoryName``  — v1 PascalCase master-gate category (e.g. "Shortcuts")
-; ``DynamicHandlers`` — Map of id → Func to call for ``type:"dynamic"`` and
-;   ``type:"action"`` entries, which receive ``(Menu, CategoryName)``. A
-;   ``dynamic`` handler RETURNS its row DATA (an Array, possibly empty) and this
-;   renderer draws it at the entry's place, so no driver code places a row; an
-;   ``action`` handler still populates the menu in place.
+; ``DynamicHandlers`` — Map of id → Func to call for
+;   ``type:"action"`` entries, which receive ``(Menu, CategoryName)`` and
+;   populate the menu in place. The name is historical: the ``dynamic`` type
+;   it once also served is retired, and a stale one is an unknown type below.
 ; ``GroupBuilders`` — Map of group_id → Func to call for ``type:"group"`` entries.
 ;   Each builder receives no arguments and returns a Menu object (or ``false``
 ;   to skip the entry entirely).
@@ -356,7 +356,7 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 					Added := _MR_RenderRows(Result, Rows, Id, 1)
 					ItemCount += Added
 				} else {
-					; Same class of drift as the action and dynamic branches: a list
+					; Same class of drift as the action branch: a list
 					; entry with no provider is a whole menu section that vanishes
 					try LoggerWarn("MenuRenderer", "No provider for list item '{1}' in '{2}' — skipped.", Id, ManifestKey)
 				}
@@ -364,18 +364,6 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			} else if (ItemType == "check" or ItemType == "command") {
 				if !Object.Prototype.HasOwnProp.Call(_MR_RenderCommand, "Call")
 					ItemCount += _MR_RenderCommand(Result, Item, ManifestKey, Commands, StateGetters)
-
-			} else if ItemType == "dynamic" {
-				Id := _MR_Get(Item, "id")
-				if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
-					Rows := (DynamicHandlers[Id])(Result, CategoryName)
-					if !(Rows is Array)
-						throw Error("Dynamic item '" . Id . "' in '" . ManifestKey . "' returned no row data.")
-					_MR_RenderRows(Result, Rows, Id, 1)
-					ItemCount++
-				} else {
-					try LoggerWarn("MenuRenderer", "No handler for dynamic item '{1}' in '{2}' — skipped.", Id, ManifestKey)
-				}
 
 			} else {
 				try LoggerWarn("MenuRenderer", "Unknown item type '{1}' in '{2}' — skipped.", ItemType, ManifestKey)

@@ -427,7 +427,6 @@ local function build_fixture(backend, save_results, options)
 		end,
 	}
 	package.loaded["ui.menu.menu_llm.menu_layout"] = {
-		row_ids = function() return {} end,
 		row_disabled = function() return false end,
 		title_health_dot = function() return nil end,
 	}
