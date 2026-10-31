@@ -2371,8 +2371,6 @@
 	"ollama.model_ready": "%s の準備ができました！",
 	"ollama.model_repair": "モデルが破損しているようです。再ダウンロードを試みています：%s",
 	"ollama.model_repair_title": "Ollama モデルを修復中",
-	"ollama.not_detected_body": "Ollama をインストールして再試行してください。",
-	"ollama.not_detected_title": "Ollama が見つかりません",
 	"ollama.service_disconnected": "Ollama サービスが応答を停止しました。",
 	"ollama.service_ready": "Ollama サービス準備完了 ✅",
 	"ollama.service_stopped": "Ollama サービスが停止しています。起動中…",
