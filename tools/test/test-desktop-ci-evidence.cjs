@@ -2556,7 +2556,12 @@ console.log('Cold exact uint64 identity controls: 8 admissions, 60 refusals');
 
 /** Pins a native arm64 full application job after packaging and without publication. */
 function checkColdJob(body) {
-	const role = macRoleBody(body, 'cold-bootstrap-native', 7);
+	// Eight: the pinned Go floor joined so the application can build its proxy relay.
+	const role = macRoleBody(body, 'cold-bootstrap-native', 8);
+	assert.match(
+		role,
+		/uses: actions\/setup-go@v5\n(?:.*\n)*?\s+go-version-file: static\/ergopti_plus\/_shared\/go\/native_http\/go\.mod/
+	);
 	const prerequisites = pipeline.step(role, 'Require actual arm64 cold runtime prerequisites');
 	assert.match(prerequisites, /test -x \/usr\/bin\/sandbox-exec/);
 	assert.match(prerequisites, /test \"\$\(uname -m\)\" = arm64/);

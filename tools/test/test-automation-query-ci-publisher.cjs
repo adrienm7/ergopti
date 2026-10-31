@@ -66,7 +66,8 @@ try {
 		'launcher/ErgoptiPlus.entitlements',
 		'app/Contents/MacOS/ErgoptiPlus',
 		'app/Contents/MacOS/ErgoptiAutomationQuery',
-		'app/Contents/MacOS/SystemSwitcherState'
+		'app/Contents/MacOS/SystemSwitcherState',
+		'app/Contents/MacOS/ergopti-proxy-relay'
 	]) {
 		fs.mkdirSync(path.dirname(path.join(fixture, relative)), { recursive: true });
 		fs.writeFileSync(path.join(fixture, relative), 'controlled product');
@@ -82,15 +83,16 @@ BUNDLE_ID=com.ergoptiplus.app
 ERGOPTI_AUTOMATION_QUERY_CI_PUBLISH=1
 fail() { exit 1; }
 python3() { printf 'publisher:%s\n' "$2"; }
-query_signed=0 switcher_signed=0
+query_signed=0 switcher_signed=0 relay_signed=0
 sign_code() {
  for argument in "$@"; do :; done
  # Model the native host-signing precondition, not macOS signature validity.
  case "$argument" in
   "$APP_PATH/Contents/MacOS/ErgoptiAutomationQuery") query_signed=1 ;;
   "$APP_PATH/Contents/MacOS/SystemSwitcherState") switcher_signed=1 ;;
+  "$APP_PATH/Contents/MacOS/ergopti-proxy-relay") relay_signed=1 ;;
   "$APP_PATH/Contents/MacOS/ErgoptiPlus")
-   [ "$query_signed" = 1 ] && [ "$switcher_signed" = 1 ] || return 73 ;;
+   [ "$query_signed" = 1 ] && [ "$switcher_signed" = 1 ] && [ "$relay_signed" = 1 ] || return 73 ;;
  esac
  printf 'sign:%s\n' "$argument"
 }
@@ -114,10 +116,12 @@ codesign_native_runtime
 	assert(events[1].endsWith('/Contents/Frameworks/Sparkle.framework'));
 	assert(events[2].endsWith('/Contents/MacOS/ErgoptiAutomationQuery'));
 	assert(events[3].endsWith('/Contents/MacOS/SystemSwitcherState'));
-	assert(events[4].endsWith('/Contents/MacOS/ErgoptiPlus'));
-	assert(events[5] === 'publisher:seal');
-	assert(events[6].endsWith('/app'));
-	assert(events[7] === 'publisher:verify' && events.length === 8);
+	// The proxy sign-in relay is nested code: signed before the host.
+	assert(events[4].endsWith('/Contents/MacOS/ergopti-proxy-relay'));
+	assert(events[5].endsWith('/Contents/MacOS/ErgoptiPlus'));
+	assert(events[6] === 'publisher:seal');
+	assert(events[7].endsWith('/app'));
+	assert(events[8] === 'publisher:verify' && events.length === 9);
 } finally {
 	fs.rmSync(fixture, { recursive: true, force: true });
 }
