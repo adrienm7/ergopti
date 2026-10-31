@@ -455,6 +455,7 @@ return {
 	"tests.meta.architecture.test_logger_shim_only",
 	"tests.unit.infra.logger.test_account_name",
 	"tests.unit.infra.logger.test_logger_sink",
+	"tests.unit.infra.logger.test_logger_sink_config_dir_redaction",
 	"tests.unit.infra.logger.test_logger_sink_retention",
 	"tests.unit.ui.menu.structure.test_menu_builder_group_calls",
 	"tests.unit.ui.menu.structure.test_menu_choice_row",
