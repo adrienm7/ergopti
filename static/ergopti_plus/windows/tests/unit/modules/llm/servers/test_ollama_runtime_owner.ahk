@@ -23,6 +23,29 @@ Test("Ollama runtime: native spawn forwards canonical private slots", _ORT_Canon
 Test("Ollama runtime: native architecture uses closed host machine observation", _ORT_Architecture)
 Test("Ollama runtime: terminal during refused start cannot publish exit", _ORT_EarlyTerminal)
 Test("Ollama runtime: receipt read cannot renew the original readiness deadline", _ORT_Deadline)
+Test("Ollama runtime: a receipt held exclusively is not ready yet, and no error (proxy-relay-e2e)", _ORT_ReceiptHeldExclusively)
+
+; The launcher readmits its receipt exclusively for an instant before exposing it:
+; seen live, the read answered false and the JSON parser threw on it.
+_ORT_ReceiptHeldExclusively() {
+	Root := A_Temp . "\ergopti-ort-" . A_TickCount
+	DirCreate(Root)
+	Target := Map("managed_root", Root, "runtime_ticket", "22222222222222222222222222222222")
+	Path := Root . "\.runtime-" . Target["runtime_ticket"] . ".json"
+	Owner := _ORT_Fixture().Owner
+	try {
+		AssertFalse(Owner._NativeReadReady(Target), "no receipt file is not ready")
+		Held := FileOpen(Path, "w -rwd", "UTF-8-RAW")
+		Held.Write('{"runtime_ticket":"x"}')
+		Held.Close()
+		Held := FileOpen(Path, "r -rwd", "UTF-8-RAW")
+		try AssertFalse(Owner._NativeReadReady(Target), "an exclusive holder is not an error")
+		finally Held.Close()
+		Observation := Owner._NativeReadReady(Target)
+		AssertTrue(Observation is Map, "the released receipt is read")
+		AssertEqual("x", Observation["receipt"]["runtime_ticket"])
+	} finally DirDelete(Root, true)
+}
 
 class _ORT_Fixture {
 	__New() {
