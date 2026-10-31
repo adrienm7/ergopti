@@ -122,6 +122,19 @@ local function cpu_timers(world)
 	return timers
 end
 
+--- The desktop proxy children, in start order: the mode query, then the URL
+--- query once the mode answered. By executable, not position: the other probes
+--- start their own children before them.
+--- @param world table
+--- @return table|nil mode, table|nil url
+local function gsettings_children(world)
+	local found = {}
+	for _, child in ipairs(world.children) do
+		if child.executable == "gsettings" then found[#found + 1] = child end
+	end
+	return found[1], found[2]
+end
+
 helpers.describe("diagnostics probes (linux)", function()
 	helpers.it("reads GitHub's rate limit under the probe's own owner", function()
 		with_probes(true, function(Probes, world)
@@ -230,10 +243,10 @@ helpers.describe("diagnostics probes (linux)", function()
 	helpers.it("judges the desktop's PAC like the managed download without reporting its URL", function()
 		with_probes(true, function(Probes, world)
 			local _, answers = start(Probes)
-			local mode = world.children[3]
+			local mode, url = gsettings_children(world)
 			helpers.assert_eq(mode.executable, "gsettings")
 			mode.callback({ ok = true, stdout = "'auto'\n" })
-			local url = world.children[4]
+			url = select(2, gsettings_children(world))
 			url.callback({ ok = true, stdout = "'http://pac.example.invalid/a.pac'\n" })
 			local request = world.requests[2]
 			helpers.assert_eq(request.url, "http://pac.example.invalid/a.pac")
@@ -262,15 +275,15 @@ helpers.describe("diagnostics probes (linux)", function()
 	helpers.it("names the failing PAC step and answers when no PAC is configured", function()
 		with_probes(true, function(Probes, world)
 			local _, answers = start(Probes)
-			world.children[3].callback({ ok = true, stdout = "'auto'\n" })
-			world.children[4].callback({ ok = true, stdout = "'http://pac.example.invalid/a.pac'\n" })
+			gsettings_children(world).callback({ ok = true, stdout = "'auto'\n" })
+			select(2, gsettings_children(world)).callback({ ok = true, stdout = "'http://pac.example.invalid/a.pac'\n" })
 			world.requests[2].callback({ status = 200, body = "// r\233seau\nfunction FindProxyForURL() {}" })
 			helpers.assert_eq(answers.proxy_pac.result.state, "error")
 			helpers.assert_true(answers.proxy_pac.result.detail:find("not UTF-8", 1, true) ~= nil)
 		end)
 		with_probes(true, function(Probes, world)
 			local _, answers = start(Probes)
-			world.children[3].callback({ ok = true, stdout = "'none'\n" })
+			gsettings_children(world).callback({ ok = true, stdout = "'none'\n" })
 			helpers.assert_eq(answers.proxy_pac.result.state, "ok")
 			helpers.assert_eq(answers.proxy_pac.sections.network.proxy_pac, "No PAC configured")
 		end)
