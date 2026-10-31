@@ -105,6 +105,32 @@ check('its failure stages exist in the shared closed inventory', () => {
 	}
 });
 
+// Issue #101 follow-up (5): the PAC and WPAD stages reached the shared
+// inventory without a row in the Go replay, which then never proved them.
+check('the Go transport replays every shared failure stage with an allowed reason', () => {
+	const goTest = read(
+		path.join(
+			root,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'go',
+			'native_http',
+			'failure_stage_test.go'
+		)
+	);
+	const table =
+		/func TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement[\s\S]*?\n\t\}\n/.exec(goTest);
+	assert.ok(table, 'the Go replay table exists');
+	const rows = [...table[0].matchAll(/\{"(native_[a-z_]+)", "([a-z_]+)", (\d+)\}/g)];
+	for (const stage of stages) {
+		const row = rows.find((candidate) => candidate[1] === stage.code);
+		assert.ok(row, `${stage.code} has a Go replay row`);
+		assert.ok(stage.reasons.includes(row[2]), `${stage.code} replays an allowed reason`);
+	}
+	assert.equal(rows.length, stages.length, 'the Go replay names only shared stages, once each');
+});
+
 check('the refusal exit code is the one the shell policy treats as a refusal', () => {
 	const shell = /OPAQUE_NETWORK_REFUSAL_EXIT_CODE=(\d+)/.exec(policyText);
 	const swift = /static let unusableExit: Int32 = (\d+)/.exec(worker);
