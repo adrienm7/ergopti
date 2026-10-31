@@ -1148,8 +1148,10 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 ### D. Instrumentation and diagnostics
 
 - [ ] **PAR-53. Bring HotPath-style slow-segment logging to macOS and Linux.** [CODE] Done (shared
-      `hotpath_segments.lua`, always-on Linux spans, one warning per segment per 10 s). Left: nesting
-      attribution (Windows has it), the threshold question.
+      `hotpath_segments.lua`, always-on Linux spans, one warning per segment per 10 s, and nesting
+      attribution: a segment is judged on its own time and reported with its enclosing segment,
+      `hotpath_nesting_vectors.json` replayed on macOS and Linux). Left: Windows prints the exclusive
+      time but still judges and reports on the wall clock (`_HotPathNestedMs`); the threshold question.
 - [x] **PAR-54. PhaseStats and child-process timing.** [CODE] Done on macOS and Linux (`process.<program>`,
       `toml.parse`, `menu.rebuild`, `boot.stage`, `boot.stage_cpu`). Windows: port `phase_stats_core.lua` with
       the same phases (`boot_profiler.ahk` already measures stages).
