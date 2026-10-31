@@ -45,7 +45,7 @@
 ; A Features fixture shaped like the real manifest output: the sub-trees that
 ; used to live in the AHK silo (layout, shortcuts.personal, gestures,
 ; category_enabled) alongside the ones that never did (shortcuts.microsoft_bold,
-; shortcuts.gpt) inside the SAME top-level "shortcuts" key — the collision that
+; shortcuts.a_grave) inside the SAME top-level "shortcuts" key — the collision that
 ; a naive per-top-level-key prefix heuristic got wrong.
 _CFP_Fixture() {
 	return Map(
@@ -53,7 +53,7 @@ _CFP_Fixture() {
 		"gestures", Map("enabled", false, "swipe_3_down", "tab_close"),
 		"shortcuts", Map(
 			"microsoft_bold", false,
-			"gpt", Map("enabled", false, "link", "https://example"),
+			"a_grave", Map("enabled", false, "letter", "x"),
 			"personal", Map("laptop_broken_key", false)
 		),
 		"category_enabled", Map("hotstrings", false)
@@ -75,7 +75,7 @@ _CFP_HasUpdate(Updates, Section, Key, Value) {
 ; every per-leaf spot check still passed and only the total was wrong.
 ;
 ; Counting by key alone would not do: "enabled" legitimately appears in several
-; sections at once (gestures, shortcuts.gpt), and a test that forbade that would
+; sections at once (gestures, shortcuts.a_grave), and a test that forbade that would
 ; be asserting something untrue about the config format.
 _CFP_Emission(Updates) {
 	Lines := []
@@ -128,10 +128,10 @@ _CFP_CollectFeatureUpdates_SectionsMatchNesting() {
 	; Leaves that never lived in a silo must be unaffected by its removal.
 	AssertTrue(_CFP_HasUpdate(Updates, "shortcuts", "microsoft_bold", false),
 		"shortcuts.microsoft_bold must stay at [shortcuts]")
-	AssertTrue(_CFP_HasUpdate(Updates, "shortcuts.gpt", "enabled", false),
-		"shortcuts.gpt.enabled must stay at [shortcuts.gpt]")
-	AssertTrue(_CFP_HasUpdate(Updates, "shortcuts.gpt", "link", "https://example"),
-		"shortcuts.gpt.link must stay at [shortcuts.gpt]")
+	AssertTrue(_CFP_HasUpdate(Updates, "shortcuts.a_grave", "enabled", false),
+		"shortcuts.a_grave.enabled must stay at [shortcuts.a_grave]")
+	AssertTrue(_CFP_HasUpdate(Updates, "shortcuts.a_grave", "letter", "x"),
+		"shortcuts.a_grave.letter must stay at [shortcuts.a_grave]")
 }
 Test("config_io: _CollectFeatureUpdates writes each leaf to its walked section",
 	_CFP_CollectFeatureUpdates_SectionsMatchNesting)
@@ -148,8 +148,8 @@ _CFP_CollectFeatureUpdates_EmitsExactlyTheseWrites() {
 		. "gestures|enabled`n"
 		. "gestures|swipe_3_down`n"
 		. "layout|ergopti_base`n"
-		. "shortcuts.gpt|enabled`n"
-		. "shortcuts.gpt|link`n"
+		. "shortcuts.a_grave|enabled`n"
+		. "shortcuts.a_grave|letter`n"
 		. "shortcuts.personal|laptop_broken_key`n"
 		. "shortcuts|microsoft_bold"
 	AssertEqual(Expected, _CFP_Emission(Updates),
