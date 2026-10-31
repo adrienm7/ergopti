@@ -61,6 +61,10 @@ fi
 # shellcheck source=install/messages.sh
 source "${SRC_DRIVER}/install/messages.sh"
 
+# The external hosts are declared once, in _shared/data/identifiers.json. Both
+# layouts carry the generated shell copy in the _shared tree beside the driver.
+. "${DRIVERS_ROOT}/_shared/data/identifiers.sh"
+
 # Prints a section title between its bars.
 # @param $1 Message name, then its arguments.
 _section() {
@@ -534,7 +538,7 @@ _network_source_build_packages() {
 		*) return 1 ;;
 	esac
 }
-NATIVE_LUV_SOURCE_URL="https://github.com/luvit/luv.git"
+NATIVE_LUV_SOURCE_URL="https://$ERGOPTI_HOST_GITHUB/luvit/luv.git"
 NATIVE_LUV_SOURCE_REVISION="26e62e49b0230891ece45a78cc1f63c074e60020"
 NATIVE_LUV_CMAKE_OPTIONS=("-DLUA_BUILD_TYPE=System" "-DWITH_LUA_ENGINE=LuaJIT" "-DBUILD_MODULE=ON" "-DBUILD_SHARED_LIBS=OFF" "-DBUILD_STATIC_LIBS=OFF" "-DWITH_SHARED_LIBUV=OFF")
 # END GENERATED LINUX SOURCE NETWORK BUILD

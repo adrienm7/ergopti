@@ -11,6 +11,7 @@ const { spawnSync } = require('node:child_process');
 const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const {
 	SOURCE,
+	IDENTIFIERS,
 	SHELL_OUTPUT,
 	METADATA_OUTPUT,
 	LUA_LOCATOR_OUTPUT,
@@ -20,6 +21,10 @@ const {
 
 const root = path.resolve(__dirname, '../..');
 const data = JSON.parse(fs.readFileSync(path.join(root, SOURCE), 'utf8'));
+const identifiers = JSON.parse(fs.readFileSync(path.join(root, IDENTIFIERS), 'utf8'));
+// The projection expands the host from the generated shell identifiers.
+const shellURL = (value) =>
+	value.replace(`https://${identifiers.hosts.github}/`, 'https://${ERGOPTI_HOST_GITHUB}/');
 const key = 'cpython-3.11.16-darwin-aarch64-none';
 const url =
 	'https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.11.16%2B20260929-aarch64-apple-darwin-install_only_stripped.tar.gz';
@@ -40,8 +45,16 @@ assert.equal(data.downloads[key].sha256, digest);
 assert.equal(data.downloads[intelKey].url, intelURL);
 assert.equal(data.downloads[intelKey].sha256, intelDigest);
 assert.equal(data.downloads[intelKey].arch.family, 'x86_64');
-const output = render(data);
-assert.ok(output[SHELL_OUTPUT].includes(`MANAGED_PYTHON_URL="${url}"\n`));
+const output = render(data, identifiers);
+assert.equal(identifiers.hosts.github, 'github.com');
+assert.ok(
+	output[SHELL_OUTPUT].includes(
+		'\n. "$(dirname "${BASH_SOURCE[0]}")/../../../_shared/data/identifiers.sh" || return 78\n'
+	),
+	'the projection sources the shared host before it names a download'
+);
+assert.doesNotMatch(output[SHELL_OUTPUT], /https:\/\/github\.com/, 'no typed GitHub host');
+assert.ok(output[SHELL_OUTPUT].includes(`MANAGED_PYTHON_URL="${shellURL(url)}"\n`));
 assert.ok(output[SHELL_OUTPUT].includes(`MANAGED_PYTHON_SHA256="${digest}"\n`));
 assert.ok(
 	output[SHELL_OUTPUT].includes(
@@ -51,7 +64,7 @@ assert.ok(
 assert.ok(
 	output[SHELL_OUTPUT].includes('MANAGED_PYTHON_REQUEST="cpython-3.11.16-macos-aarch64-none"\n')
 );
-assert.ok(output[SHELL_OUTPUT].includes(`MANAGED_PYTHON_URL="${intelURL}"\n`));
+assert.ok(output[SHELL_OUTPUT].includes(`MANAGED_PYTHON_URL="${shellURL(intelURL)}"\n`));
 assert.ok(output[SHELL_OUTPUT].includes(`MANAGED_PYTHON_SHA256="${intelDigest}"\n`));
 assert.ok(
 	output[SHELL_OUTPUT].includes(
@@ -97,7 +110,7 @@ for (const [family, oldKey] of [
 	entry.url = entry.url.replace('3.11.16', '3.11.17');
 	later.downloads[`cpython-3.11.17-darwin-${family}-none`] = entry;
 }
-const laterLocator = render(later)[LUA_LOCATOR_OUTPUT];
+const laterLocator = render(later, identifiers)[LUA_LOCATOR_OUTPUT];
 assert.match(laterLocator, /cpython-3\.11\.17-macos-aarch64-none\/bin\/python3\.11/);
 assert.match(laterLocator, /cpython-3\.11\.17-macos-x86_64-none\/bin\/python3\.11/);
 assert.doesNotMatch(laterLocator, /3\.11\.16/);
@@ -156,8 +169,12 @@ for (const mutate of [
 ]) {
 	const candidate = structuredClone(data);
 	mutate(candidate);
-	assert.throws(() => render(candidate));
+	assert.throws(() => render(candidate, identifiers));
 }
+// A download on another host than the shared GitHub one is refused, and so is a
+// generation without the shared host.
+assert.throws(() => render(data, { hosts: { github: 'example.org' } }), /archive identity/);
+assert.throws(() => render(data, {}), /shared GitHub host/);
 
 // Windows forbids these filename characters; POSIX must preserve them as data.
 const nativePrefixes =
@@ -169,7 +186,12 @@ for (const prefix of nativePrefixes) {
 		path.join(os.tmpdir(), `ergopti-managed-python-projection-${prefix}-`)
 	);
 	try {
-		for (const relative of [SOURCE, 'static/ergopti_plus/macos/modules/llm/uv-release.sh']) {
+		for (const relative of [
+			SOURCE,
+			IDENTIFIERS,
+			'static/ergopti_plus/_shared/data/identifiers.sh',
+			'static/ergopti_plus/macos/modules/llm/uv-release.sh'
+		]) {
 			const target = path.join(temporary, relative);
 			fs.mkdirSync(path.dirname(target), { recursive: true });
 			fs.copyFileSync(path.join(root, relative), target);
@@ -257,6 +279,27 @@ for (const prefix of nativePrefixes) {
 			assert.equal(refused.status, 78);
 			assert.equal(refused.stdout, '');
 		}
+		// Without the shared identifiers the selection stops instead of naming a hostless URL.
+		const shellIdentifiers = path.join(
+			temporary,
+			'static/ergopti_plus/_shared/data/identifiers.sh'
+		);
+		const identifierBytes = fs.readFileSync(shellIdentifiers);
+		fs.unlinkSync(shellIdentifiers);
+		const hostless = spawnSync(
+			bashExecutable(),
+			[
+				'-c',
+				'source "$1" || exit $?; echo unqualified',
+				'ergopti-native-python-hostless',
+				bashPath(shell)
+			],
+			{ encoding: 'utf8', timeout: 10000, env: { ...process.env, ERGOPTI_NATIVE_ARCH: 'arm64' } }
+		);
+		assert.equal(hostless.error, undefined);
+		assert.equal(hostless.status, 78, hostless.stderr);
+		assert.equal(hostless.stdout, '');
+		fs.writeFileSync(shellIdentifiers, identifierBytes);
 		fs.appendFileSync(shell, '\n# Independent drift witness.\n');
 		const drifted = fs.readFileSync(shell);
 		assert.throws(() => generate(temporary, { check: true }), /projection drift/);
