@@ -1,0 +1,11 @@
+2026-10-31 09:53:15:921 [WARNING] [runtime] An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:364) held the main thread for 1512 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 51->51 MB.
+2026-10-31 09:53:16:432 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).
+2026-10-31 09:54:33:379 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-31 09:55:29:076 [ERROR] [adapters.keyboard_source_probe] Native keyboard source proof refused: source_changed.
+2026-10-31 09:55:29:189 [WARNING] [menu.keyboard_layout] Failed to switch active layout to 'Ergopti Field Rows' / 'Ergopti Field Rows' (tis_id=Ergopti Field Rows, reason=invalid_output, result=MISS).
+2026-10-31 09:55:29:429 [ERROR] [keymap.layout_rows_build] The number-row layout for 'ergol' was not applied (readback_mismatch): the keyboard probe answered source_changed.
+2026-10-31 09:55:44:252 [WARNING] [runtime] An hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/field_run.lua:610) held the main thread for 1810 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 32->32 MB.
+2026-10-31 09:58:33:523 [ERROR] [menu_llm.ollama] Managed model pull retirement is pending (operation_files_not_removed); exact task slot retained.
+2026-10-31 09:58:33:523 [ERROR] [menu_llm.ollama] The Ollama pull of granite4:350m-h ended (code 1) but its task could not be settled; last output: OLLAMA_PULL_OUTCOME error_row.
+2026-10-31 09:58:46:051 [ERROR] [adapters.file_system] append(): destination is not a regular file (named pipe).
+2026-10-31 09:58:46:054 [ERROR] [adapters.file_system] write(): cannot preserve metadata for '/private/var/folders/j8/6707b4c95nz1ygz8g6s7m3fc0000gp/T/ergopti-field-fifo-77295/pipe' — destination is not a regular file.
