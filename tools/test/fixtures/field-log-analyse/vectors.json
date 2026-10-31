@@ -970,6 +970,38 @@
 			"expect": {
 				"kind": "continuation"
 			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/ui/menu/timed_build.lua",
+			"template": "Menu tree rebuilt in %.1f ms (%d top-level item(s)).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [ui.menu.timed_build] Menu tree rebuilt in 96.4 ms (19 top-level item(s)).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "menu.rebuild",
+						"value": 96.4,
+						"declared": 250.0,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/infra/reload_timing.lua",
+			"template": "Reload completed in %.0f ms (reload request to boot complete).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [infra.reload_timing] Reload completed in 2650 ms (reload request to boot complete).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "reload.total",
+						"value": 2650.0,
+						"declared": 4000.0,
+						"budget": null
+					}
+				]
+			}
 		}
 	]
 }

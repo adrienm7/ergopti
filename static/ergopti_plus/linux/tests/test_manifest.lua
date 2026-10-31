@@ -251,6 +251,7 @@ return {
 	"tests.unit.infra.scope.test_keyboard_layout_scope",
 	"tests.unit.infra.scope.test_scope_owner",
 	"tests.unit.infra.lifecycle.test_daemon_restart",
+	"tests.unit.infra.lifecycle.test_reload_timing",
 	"tests.unit.infra.lifecycle.test_dev_source",
 	"tests.unit.infra.config.test_file_watchers_dev_source",
 	"tests.unit.infra.scope.test_dynamic_hotstrings_scope",

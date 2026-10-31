@@ -188,6 +188,9 @@ function M.run(options)
 				observed.driver_control = control_options
 				return { handle = function() return false end, stop = function() return true end }
 			end }
+		elseif name == "infra.reload_timing" then
+			-- The Reload this boot completes is reported once the boot is complete.
+			return { complete = function() record("reload.complete"); return nil end }
 		elseif name == "infra.field_run" then
 			-- The collector's no-click field run starts beside the reload control.
 			return { start = function(field_options)
