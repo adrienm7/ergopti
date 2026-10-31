@@ -859,8 +859,10 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       was analysed and refused (ADR 012): a reused token could never reach READY because the
       revocation tombstone is monotone; reuse needs a native acknowledged rearm, decided NOT to
       build for now. The next Mac log carries `Lease token decision=` and `written in N ms`, and since
-      30 October the field run's lease check names `deploy_write_ms` and `deploy_kb`: if the write is
-      short, keep it; if long, shrink the 743 KB file instead.
+      30 October the field run's lease check names `deploy_write_ms` and `deploy_kb`, and its
+      `deploy_write_verdict` decides: `keep` under the 250 ms key-delaying hold
+      (`infra/main_thread_hold.lua`), `shrink` (fail) from it on; only `shrink` leaves code to write
+      (make the 743 KB file smaller).
 - [ ] **Linux correction parity remainders.** [CODE] Done (06bbbe5985): Backspace pops the word, erased
       n-grams get `e`, synthetic output chains. Erased and synthetic vectors in the shared corpus, replayed on
       macOS and Linux (ee2eab6b1e, `keystats/correction_erased_vectors.json`). Left [PC]: the AHK replayer
