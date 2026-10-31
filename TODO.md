@@ -1616,11 +1616,12 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       owns and names (the `shortcuts` command cannot create or import one without a dialog, and running an
       arbitrary shortcut of theirs is not read-only); `field_toolchain`'s `shortcuts_list` and
       `shortcuts_refusal` are what a program can prove.
-- [ ] **107.** [CODE] macOS forced output. Linux is settled by design: the number-row ordering and
-      edge keys are applied by rebuilding the layout (`docs/design/linux-number-row-runtime.md`), so
-      the hook's input+XI2+writer join is deliberately unreachable (nothing passes `numberRowMode`)
-      and is not owed; left for Linux only [PHYS-L] mutter and KWin reloading a `~/.config/xkb`
-      layout (W1 to W4 of that note).
+- [ ] **107.** [PHYS-L] Forced number-row output is settled by design on macOS and Linux: both apply the
+      number-row ordering and edge keys by rebuilding the layout, not by retyping keys in a hook (macOS
+      fc5d3a11df, `number_row_live.lua` and `layout_rows_build.lua`, proved by the field run's
+      `field_layout_rows`; Linux `docs/design/linux-number-row-runtime.md`), so the hook's input+XI2+writer
+      join is deliberately unreachable (nothing passes `numberRowMode`) and is not owed. Left for Linux only:
+      mutter and KWin reloading a `~/.config/xkb` layout (W1 to W4 of that note).
 - [ ] **108.** [CODE] Item 97's collision/source/modifier/output joins.
 - [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible
       Variables/KeyHistory snapshot.
