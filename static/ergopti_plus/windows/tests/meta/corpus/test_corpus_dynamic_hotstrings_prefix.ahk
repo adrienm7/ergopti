@@ -111,3 +111,17 @@ _CorpusDynHS_CountDynamicSectionMatchesCorpus() {
 	Assert(Mismatches == "", "CountDynamicSection mismatches against the corpus:" . Mismatches)
 }
 Test("dynamic hotstrings prefix corpus — CountDynamicSection matches every prefix_count_vector", _CorpusDynHS_CountDynamicSectionMatchesCorpus)
+
+; The other half of the corpus: the Lua drivers replay spaced_prefix on it and
+; only its presence was checked here (PAR-63).
+_CorpusDynHS_SpacedPrefixMatchesCorpus() {
+	Corpus := JsonParse(FileRead(_CorpusDynHS_Root(), "UTF-8"))
+	Mismatches := ""
+	for Vector in Corpus["spaced_prefix_vectors"] {
+		Actual := SpacedPrefix(Vector["spaced"], Vector["raw_count"])
+		if !(Actual == Vector["expected"])
+			Mismatches .= "`n  [" . Vector["id"] . "] got '" . Actual . "', expected '" . Vector["expected"] . "'"
+	}
+	Assert(Mismatches == "", "SpacedPrefix mismatches against the corpus:" . Mismatches)
+}
+Test("dynamic hotstrings prefix corpus — SpacedPrefix matches every spaced_prefix_vector", _CorpusDynHS_SpacedPrefixMatchesCorpus)
