@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "Checksum verificato. Installazione di Ollama…",
 	"ollama.deps_task_create_failed": "Impossibile creare il task hs.task.",
 	"ollama.deps_task_start_failed": "Impossibile avviare il task hs.task.",
+	"ollama.digest_mismatch": "Il download di %s è risultato danneggiato due volte: il checksum non corrispondeva. Un proxy o una rete instabile possono alterare un download; controlla la connessione, poi riprova.",
 	"ollama.download_cancelled": "Download Ollama annullato",
 	"ollama.download_error": "Errore durante il download di %s",
 	"ollama.download_subtitle": "Recupero dei pesi da Ollama Hub…",

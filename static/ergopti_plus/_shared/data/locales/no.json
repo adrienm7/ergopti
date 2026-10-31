@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "Kontrollsum bekreftet. Installerer Ollama…",
 	"ollama.deps_task_create_failed": "Kunne ikke opprette hs.task.",
 	"ollama.deps_task_start_failed": "Kunne ikke starte hs.task.",
+	"ollama.digest_mismatch": "Nedlastingen av %s ble skadet to ganger: kontrollsummen stemte ikke. En proxy eller et ustabilt nettverk kan endre en nedlasting; sjekk tilkoblingen og prøv igjen.",
 	"ollama.download_cancelled": "Ollama-nedlasting avbrutt",
 	"ollama.download_error": "Nedlastingsfeil for %s",
 	"ollama.download_subtitle": "Henter vekter fra Ollama Hub…",

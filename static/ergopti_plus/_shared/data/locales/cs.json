@@ -2325,6 +2325,7 @@
 	"ollama.deps_step_verified": "Kontrolní součet ověřen. Instaluje se Ollama…",
 	"ollama.deps_task_create_failed": "Nelze vytvořit úlohu hs.task.",
 	"ollama.deps_task_start_failed": "Nelze spustit úlohu hs.task.",
+	"ollama.digest_mismatch": "Stahování %s bylo dvakrát poškozeno: kontrolní součet nesouhlasil. Proxy nebo nestabilní síť může stahovaná data změnit; zkontrolujte připojení a zkuste to znovu.",
 	"ollama.download_cancelled": "Stahování Ollama zrušeno",
 	"ollama.download_error": "Chyba stahování %s",
 	"ollama.download_subtitle": "Načítání vah z Ollama Hub…",
