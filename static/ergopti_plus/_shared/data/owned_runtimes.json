@@ -501,6 +501,21 @@
 			"status": "done"
 		},
 		{
+			"os": "macos",
+			"tool": "`git`",
+			"programs": ["git"],
+			"used_for": "Developer run only: is the clone's layout registry modified? (`macos/modules/keymap/layout_registry.lua`)",
+			"today": "System (Command Line Tools)",
+			"current_class": "SYS",
+			"version_needed": "any",
+			"if_missing": "The developer run uses the clone's registry and logs an ERROR",
+			"pin_possible": "No (developer tool)",
+			"decision": "SYS",
+			"decision_text": "SYS (developer runs only)",
+			"alternative": null,
+			"status": "done"
+		},
+		{
 			"os": "linux",
 			"tool": "LuaJIT",
 			"programs": [],
@@ -992,9 +1007,9 @@
 		},
 		{
 			"os": "linux",
-			"tool": "`pactl`, `amixer`, `playerctl`",
-			"programs": ["pactl", "amixer", "playerctl"],
-			"used_for": "Volume, mute and media gestures; keystats audio facts (`linux/modules/gestures/manager.lua`, `linux/modules/keystats/system_metrics.lua`)",
+			"tool": "`pactl`, `wpctl`, `amixer`, `playerctl`",
+			"programs": ["pactl", "wpctl", "amixer", "playerctl"],
+			"used_for": "Volume, mute (PipeWire, then ALSA when no sound server answers) and media gestures; keystats audio facts (`linux/modules/gestures/manager.lua`, `linux/modules/keystats/system_metrics.lua`)",
 			"today": "Optional",
 			"current_class": "OPT",
 			"version_needed": "n/a",
