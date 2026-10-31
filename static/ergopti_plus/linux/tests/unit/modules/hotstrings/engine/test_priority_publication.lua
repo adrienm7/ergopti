@@ -61,7 +61,7 @@ local function with_priority(body, no_engine)
 		return original_publish(...)
 	end
 	local ok, failure = xpcall(function()
-		local Config = dofile(helpers.driver_root() .. "/modules/hotstrings/hotstrings_config.lua")
+		local Config = helpers.fresh_module("modules.hotstrings.hotstrings_config")
 		package.loaded["modules.hotstrings.hotstrings_config"] = Config
 		Config.discover_extensions = function() return {} end
 		Config.language_packs = function() return {} end
