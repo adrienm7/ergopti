@@ -68,7 +68,7 @@
 		},
 		{
 			"id": "js-feature-requirements",
-			"ordinal": 544,
+			"ordinal": 546,
 			"name": "every feature declares per OS what it needs, derived from the Karabiner generator inputs and the driver source signatures, and the generated table is in sync",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-feature-requirements.cjs"],
