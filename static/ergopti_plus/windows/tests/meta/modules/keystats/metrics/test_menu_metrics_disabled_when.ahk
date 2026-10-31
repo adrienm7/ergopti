@@ -110,7 +110,7 @@ _MMDW_MenubarColorsLoadBearing() {
 		; one it already knows how to draw. Both are rendered; `feature` is not,
 		; which is what this states instead of naming the single type that happened
 		; to satisfy it.
-		RenderedTypes := Map("dynamic", true, "check", true, "command", true, "list", true, "action", true)
+		RenderedTypes := Map("check", true, "command", true, "list", true, "action", true)
 		Assert(RenderedTypes.Has(Entry["type"]),
 			"menubar_colors is type=" . Entry["type"] . ", which the renderer does not materialise — "
 			. "`feature` is left to the caller, so the row disappears with nothing "
