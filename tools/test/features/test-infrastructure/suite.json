@@ -523,6 +523,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-windows-sendinput-consumers.cjs"],
 			"repro": "node tools/test/test-windows-sendinput-consumers.cjs"
+		},
+		{
+			"id": "js-no-pinned-source-reads-linux",
+			"ordinal": 545,
+			"name": "no new location-pinned source reads in Linux tests (ratchet)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-no-pinned-source-reads-linux.cjs"],
+			"repro": "node tools/test/test-no-pinned-source-reads-linux.cjs"
 		}
 	]
 }
