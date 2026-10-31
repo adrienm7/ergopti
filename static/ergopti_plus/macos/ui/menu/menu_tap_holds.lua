@@ -1046,6 +1046,30 @@ local function legacy_rules_rows(karabiner)
 	})
 end
 
+--- The consent row of Ergopti's own Karabiner runtime (ADR 011): while it is
+--- ticked, turning tap-holds on closes the user's own Karabiner-Elements, and
+--- turning them off gives it back. It exists only on a boot that runs the owned
+--- runtime; Windows and Linux have no Karabiner, as the provider row's
+--- `platform_reason.remap_engine_is_per_driver` says.
+--- @param karabiner table Remap facade.
+--- @param update_menu function|nil Menu refresh callback.
+--- @return table rows Empty unless the owned runtime runs.
+local function close_other_karabiner_rows(karabiner, update_menu)
+	if type(karabiner.owned_runtime_selected) ~= "function" or karabiner.owned_runtime_selected() ~= true
+		or type(karabiner.get_close_other_instances) ~= "function" then return {} end
+	local consent = karabiner.get_close_other_instances() == true
+	return { {
+		label = i18n.get("menu.tapholds.close_other_karabiner"),
+		checked = consent,
+		action = function()
+			Logger.info(LOG, "Close other Karabiner instances toggled to %s from the Tap-Holds menu.", tostring(not consent))
+			commit_menu_setting(karabiner, "Close other Karabiner instances", function()
+				return karabiner.set_close_other_instances(not consent)
+			end, update_menu)
+		end,
+	} }
+end
+
 --- Builds the Tap-holds row and its submenu.
 ---
 --- `tap_holds_menu` in the shared manifest owns the structural sequence, the
@@ -1084,6 +1108,7 @@ function M.build(ctx)
 		["tap_hold_timings"] = function()
 			local rows = legacy_rules_rows(karabiner)
 			for _, row in ipairs(guardian_status_rows(karabiner, tap_holds_on)) do rows[#rows + 1] = row end
+			for _, row in ipairs(close_other_karabiner_rows(karabiner, update_menu)) do rows[#rows + 1] = row end
 			rows[#rows + 1] = build_delay_item(karabiner, update_menu)
 			rows[#rows + 1] = build_sticky_delay_item(karabiner, update_menu)
 			return rows
