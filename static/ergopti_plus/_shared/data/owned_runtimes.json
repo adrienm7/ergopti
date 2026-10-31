@@ -1337,9 +1337,9 @@
 		},
 		{
 			"os": "windows",
-			"tool": "`ergoptiplus.exe`, `ergoptiplus_new.exe`",
-			"programs": ["ergoptiplus.exe", "ergoptiplus_new.exe"],
-			"used_for": "Ergopti's own binary and its staged update (`windows/modules/updater/self_update.ahk`)",
+			"tool": "`ergoptiplus.exe`, `ergoptiplus_new.exe`, `ergopti-proxy-relay.exe`",
+			"programs": ["ergoptiplus.exe", "ergoptiplus_new.exe", "ergopti-proxy-relay.exe"],
+			"used_for": "Ergopti's own binary, its staged update and its sign-in proxy relay (`windows/modules/updater/self_update.ahk`, `windows/modules/llm/ollama_managed_bootstrap.ahk`)",
 			"today": "Ergopti's own",
 			"current_class": "NA",
 			"version_needed": "n/a",
