@@ -183,9 +183,9 @@ BootProfile_Stamp("Single-owner gate completed")
 
 ; Single source of truth for the driver's baseline (non-boosted) process
 ; priority class. Every restore site outside a transient boost — LLM_Menu_Init's
-; defensive reset, LLM_Deps_Fail, LLM_Deps_Cancel, _LLM_Deps_OnPollProbeResult —
+; defensive reset, LLM_Deps_Fail, LLM_Deps_Cancel —
 ; MUST reference this constant instead of a hardcoded "Normal" literal. Before
-; this fix those four sites restored to the OS default "Normal", silently
+; this fix those sites restored to the OS default "Normal", silently
 ; undoing the AboveNormal boot boost below the first time any of them ran
 ; (driver-baseline-priority-reverted-to-normal).
 global DRIVER_BASELINE_PRIORITY_CLASS := "AboveNormal"

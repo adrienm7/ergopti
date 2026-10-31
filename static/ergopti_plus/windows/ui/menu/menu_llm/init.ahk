@@ -312,10 +312,6 @@ LLM_Menu_Init(saved_opts := Map(), ActivateRuntime := true) {
 	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray, DRIVER_BASELINE_PRIORITY_CLASS
 	global _LLM_Menu_Loaded
 
-	; Defensive: a previous session that crashed mid-install would have
-	; left the AHK process at PriorityClass = High (we boost it in
-	; LLM_Deps_RunInstaller to keep typing responsive during winget,
-	; and lower it back in LLM_Deps_OnPollProbeResult on completion).
 	; Reset to the driver baseline at every boot so a fresh script never
 	; inherits a stale boost. MUST use the shared constant, not a hardcoded
 	; "Normal" literal — this call runs ~16 ms after ErgoptiPlus.ahk's boot
