@@ -279,9 +279,9 @@ into its item below or into the matching existing item.
       a suffix before its settings-reading section guard (preview.providers 1.7 ms per key); the synchronous
       diagnostics line names its slowest collectors on the three OS; the keyboard-layout row times its sources,
       bundles, variants and rows stages. Left, from the next field report: (1) menu rebuilds are 90 of the holds
-      (28 s, about 300 ms each, every ~67 s in the evening with keyboard_layout up to 420 ms): read the new
-      `menu_keyboard_layout.*` phases and find what asks for the periodic refresh (its requester is a DEBUG
-      line); (2) preferences save `sparse` (about 280 ms) and `write` (600 to 800 ms, 4 metadata forks) were not
+      (28 s, about 300 ms each, keyboard_layout up to 420 ms). The recurring evening ones followed
+      input-source notifications that changed nothing (26 in 3.5 min, same layout); the tap-key rows now
+      rebuild only on a visible change. Read the new `menu_keyboard_layout.*` phases for the rest; (2) preferences save `sparse` (about 280 ms) and `write` (600 to 800 ms, 4 metadata forks) were not
       reproduced off the Mac; (3) keystats append `write` 150 to 350 ms and the ledger read itself remain on the
       main thread; (4) name the collector behind the healthcheck 100 to 230 ms from its new line, and the
       ignored-window AX probe (500 ms timeout); (5) the one-off holds of `field_run`, `error_dialog`, `keymap/utils`
