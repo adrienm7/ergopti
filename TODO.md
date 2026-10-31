@@ -998,14 +998,20 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       explanation. Plan: [ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md).
       Estimate 30-40 agent-days plus hardware time. The owned runtime stays dormant at default
       startup.
-      Status 2026-10-24: WP3 largely done and dormant; WP6 Lua owner (`runtime_owner.lua`,
-      `runtime_vhid.lua`, read-only ports) and WP7 owned deploy done, dormant behind the hidden
-      `[karabiner] runtime = "owned"`; one-click Debug field checks shipped (lease, owned runtime
-      dormancy, network, 30 s key accounting). Left: WP5 artifact manifest (hosted macOS run), a
-      closer for another running Karabiner, the production capture owner, the Swift lease worker's
-      owned CLI path, who starts the Console (Lua or `InstalledPhysicalSourceBridge`: duplicates
-      otherwise), `UninstallWorker.swift`, the karabiner_model diff 16.0.0 to 9312593e, WP8-WP10.
-      Next: the maintainer sends the `Field check result:` log lines from the Mac.
+      Status 2026-10-31 (checked against the tree): WP3, WP6 and WP7 are built and dormant behind
+      the hidden `[karabiner] runtime = "owned"`: the Lua owner (`runtime_owner.lua`, read-only
+      admission, named reasons), the consented closer (`adapters/karabiner_coexistence.lua`, hidden
+      `close_other_instances`), the production capture owner (`adapters/runtime_capture_port.lua`),
+      one Console owner (ADR 011 decision 8, the launcher's `--installed-physical-source` role), the
+      Swift lease worker's owned CLI path, the uninstall of the owned runtime and the owned deploy.
+      The karabiner_model comparison of 16.0.0 with 9312593e now covers the manipulators, the
+      configuration reader and the event queue; `(owned-revision-config-keys)` pins the generated
+      keys both revisions read alike. The `field_owned_runtime` step reports the owner's own verdict
+      on the installed VirtualHIDDevice (`driver_verdict`). Left: WP5 (the hosted runtime build pins
+      `runtime.*` and `capture.requirement` in `vendor/remap-runtime/manifest.json`), the driver-only
+      VirtualHIDDevice update offer (signed payload supplier), WP8 native acceptance, WP9 real-Mac
+      acceptance, WP10 enable and retire (with the menu text for the close option).
+      Next: the maintainer's `bash tools/dev/collect-macos-field-report.sh` (`field_owned_runtime`).
 
 ## Big item 3: Windows input-hook architecture (items 49, 91, 50)
 
