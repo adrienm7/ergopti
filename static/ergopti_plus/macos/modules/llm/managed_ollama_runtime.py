@@ -411,6 +411,33 @@ def _native_verify(root, contract, asset, expected_receipt, deadline, *, alias_c
     return binary
 
 
+def earlier_owned_receipt(target, expected_receipt):
+    """The receipt of an earlier Ergopti install at ``target``, or None.
+
+    Only a real directory holding a well-formed receipt of this host, with the
+    exact fields the installer writes and another build's identity, is an
+    earlier owned install. Anything else stays a foreign or modified runtime.
+    """
+    if target.is_symlink() or not target.is_dir():
+        return None
+    path = target / POLICY.RECEIPT_BASENAME
+    if path.is_symlink() or not path.is_file():
+        return None
+    try:
+        data = POLICY.metadata_bytes(path.read_bytes())
+    except (POLICY.RuntimeRefusal, OSError, ValueError, TypeError):
+        return None
+    if (
+        not isinstance(data, dict)
+        or set(data) != set(expected_receipt)
+        or data.get("schema_version") != expected_receipt["schema_version"]
+        or data.get("host") != expected_receipt["host"]
+        or data == expected_receipt
+    ):
+        return None
+    return data
+
+
 def install(
     deadline,
     idle_timeout,
@@ -451,9 +478,18 @@ def install(
             raise POLICY.RuntimeRefusal("unavailable")
     target = owned_directory()
     expected_receipt = POLICY.receipt(contract_bytes, catalogue_bytes, host, asset)
+    earlier = None
     if target.exists() or target.is_symlink():
-        # An existing foreign/modified runtime is never displaced silently.
-        return native_verify(target, contract, asset, expected_receipt, deadline)
+        try:
+            return native_verify(target, contract, asset, expected_receipt, deadline)
+        except POLICY.RuntimeRefusal:
+            # An existing foreign/modified runtime is never displaced. The one an
+            # earlier build installed is replaced: a developer clone rebuilds its
+            # Ollama whenever a pinned source changes, and refusing that runtime
+            # kept the owned Ollama down for good (field run 2026-10-31).
+            earlier = earlier_owned_receipt(target, expected_receipt)
+            if earlier is None:
+                raise
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     if target.parent.is_symlink():
         raise POLICY.RuntimeRefusal("runtime")
@@ -508,8 +544,19 @@ def install(
             ctypes.c_uint,
         ]
         libc.renameatx_np.restype = ctypes.c_int
-        if libc.renameatx_np(-2, os.fsencode(stage), -2, os.fsencode(target), 0x00000004) != 0:
-            raise POLICY.RuntimeRefusal("publish")
+        if earlier is None:
+            if libc.renameatx_np(-2, os.fsencode(stage), -2, os.fsencode(target), 0x00000004) != 0:
+                raise POLICY.RuntimeRefusal("publish")
+        else:
+            # RENAME_SWAP trades the two directories atomically, so the owned
+            # path never stops naming a complete runtime. The swapped-out one
+            # must still be the earlier install; anything else goes back.
+            if libc.renameatx_np(-2, os.fsencode(stage), -2, os.fsencode(target), 0x00000002) != 0:
+                raise POLICY.RuntimeRefusal("publish")
+            if earlier_owned_receipt(stage, expected_receipt) != earlier:
+                libc.renameatx_np(-2, os.fsencode(stage), -2, os.fsencode(target), 0x00000002)
+                raise POLICY.RuntimeRefusal("publish")
+            # The earlier runtime now sits in the temporary folder, removed with it
     return native_verify(target, contract, asset, expected_receipt, deadline)
 
 
