@@ -8,7 +8,7 @@
  * Windows PowerShell twin (windows/vendor/ergopti_route_plan.ps1), which the
  * Lua, Go and shell twins already answer, then checks the owned Ollama
  * daemon's proxy environment over stub lookups and the relay tunnel probe
- * against a fake relay. PowerShell 7 runs it off Windows; the module keeps
+ * against the fake corporate network. PowerShell 7 runs it off Windows; the module keeps
  * Windows PowerShell 5.1 syntax, which the Windows CI lane runs.
  * ==============================================================================
  */
@@ -27,6 +27,7 @@ const VECTORS = path.join(
 	'static/ergopti_plus/_shared/tests/corpus/network/route_plan_vectors.json'
 );
 const ORIGINS = path.join(ROOT, 'static/ergopti_plus/_shared/modules/network/route_origins.json');
+const FAKE_NETWORK = path.join(__dirname, 'fake-network.cjs');
 
 const runtime =
 	process.platform === 'win32'
@@ -184,35 +185,13 @@ const DAEMON_CASES = [
 	}
 ];
 
-// The relay probe against a fake relay in its own process: the probe blocks
-// this one. Each tunnel target picks the answer.
-const RELAY = `
-const net = require('node:net');
-const answers = {
-	'open.example:443': 'HTTP/1.1 200 Connection established\\r\\n\\r\\n',
-	'ntlm.example:443': 'HTTP/1.1 407 Proxy Authentication Required\\r\\nProxy-Authenticate: NTLM\\r\\nProxy-Authenticate: Negotiate\\r\\nContent-Length: 0\\r\\n\\r\\n',
-	'kerberos.example:443': 'HTTP/1.1 407 Proxy Authentication Required\\r\\nproxy-authenticate: negotiate\\r\\n\\r\\n',
-	'basic.example:443': 'HTTP/1.1 407 Proxy Authentication Required\\r\\nProxy-Authenticate: Basic realm=\\"corp\\"\\r\\n\\r\\n',
-	'deny.example:443': 'HTTP/1.1 403 Forbidden\\r\\n\\r\\n'
-};
-const server = net.createServer((socket) => {
-	let head = '';
-	socket.on('data', (chunk) => {
-		head += chunk;
-		const match = /^CONNECT (\\S+) HTTP/.exec(head);
-		if (match && head.includes('\\r\\n\\r\\n')) socket.end(answers[match[1]] || 'HTTP/1.1 502 Bad Gateway\\r\\n\\r\\n');
-	});
-	socket.on('error', () => {});
-});
-server.listen(0, '127.0.0.1', () => console.log(server.address().port));
-`;
 const PROBE = `
 $ErrorActionPreference = 'Stop'
 . $env:ERGOPTI_ROUTE_PLAN_MODULE
-$Relay = 'http://127.0.0.1:' + $env:ERGOPTI_FAKE_RELAY_PORT
+$Relays = $env:ERGOPTI_FAKE_RELAYS | ConvertFrom-Json
 $Answers = [ordered]@{}
-foreach ($Name in @('open', 'ntlm', 'kerberos', 'basic', 'deny')) {
-	$Answers[$Name] = Test-ErgoptiRelayTunnel -Relay $Relay -Target ($Name + '.example:443') -TimeoutMs 5000
+foreach ($Name in @('open', 'ntlm', 'negotiate', 'negotiate_lowercase', 'basic', 'refusing')) {
+	$Answers[$Name] = Test-ErgoptiRelayTunnel -Relay $Relays.$Name -Target 'registry.example:443' -TimeoutMs 5000
 }
 $Answers['unreachable'] = Test-ErgoptiRelayTunnel -Relay 'http://127.0.0.1:1' -Target 'open.example:443' -TimeoutMs 2000
 $Answers | ConvertTo-Json -Compress
@@ -327,26 +306,39 @@ async function main() {
 		'run --upstream http://proxy.corp:3128 --variable HTTPS_PROXY --dial-timeout-ms 1 --handshake-timeout-ms 2 --idle-timeout-ms 3 --'
 	);
 
-	const relay = spawn(process.execPath, ['-e', RELAY], { stdio: ['ignore', 'pipe', 'inherit'] });
+	// One fake network per mode, in child processes: runPowerShell blocks this one.
+	const modes = ['open', 'ntlm', 'negotiate', 'negotiate_lowercase', 'basic', 'refusing'];
+	const children = modes.map((mode) =>
+		spawn(process.execPath, [FAKE_NETWORK, `--mode=${mode}`], {
+			stdio: ['pipe', 'pipe', 'inherit']
+		})
+	);
 	try {
-		const port = await new Promise((resolve, reject) => {
-			relay.stdout.once('data', (data) => resolve(String(data).trim()));
-			relay.once('exit', (code) => reject(new Error(`the fake relay exited with ${code}`)));
-		});
+		const addresses = await Promise.all(
+			children.map(
+				(child) =>
+					new Promise((resolve, reject) => {
+						child.stdout.once('data', (data) => resolve(JSON.parse(String(data)).proxy));
+						child.once('exit', (code) => reject(new Error(`the fake network exited with ${code}`)));
+					})
+			)
+		);
+		const relays = Object.fromEntries(modes.map((mode, index) => [mode, addresses[index]]));
 		assert.deepEqual(
-			runPowerShell(PROBE, { ERGOPTI_FAKE_RELAY_PORT: port }),
+			runPowerShell(PROBE, { ERGOPTI_FAKE_RELAYS: JSON.stringify(relays) }),
 			{
 				open: 'open',
 				ntlm: 'windows_login',
-				kerberos: 'windows_login',
+				negotiate: 'windows_login',
+				negotiate_lowercase: 'windows_login',
 				basic: 'credentials',
-				deny: 'refused',
+				refusing: 'refused',
 				unreachable: 'unreachable'
 			},
 			'the probe classifies every relay answer'
 		);
 	} finally {
-		relay.kill();
+		for (const child of children) child.kill();
 	}
 
 	console.log(
