@@ -650,6 +650,7 @@ return {
 	"tests.unit.modules.llm.vectors.test_thinking_off_vectors",
 	"tests.unit.modules.llm.vectors.test_api_provider_catalogue",
 	"tests.unit.modules.llm.vectors.test_api_url_template_vectors",
+	"tests.unit.modules.llm.vectors.test_api_token_exchange_vectors",
 	"tests.unit.modules.llm.vectors.test_model_capabilities_vectors",
 	"tests.unit.modules.llm.remote.test_api_entries",
 	"tests.unit.modules.llm.remote.test_api_entries_retired_provider",
