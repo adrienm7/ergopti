@@ -195,7 +195,18 @@ PAC_ROUTE_BUDGET_SEC=20
 
 # The shared origin inventory, beside this file in the bundle and the checkout
 # (macos/modules/llm -> _shared/modules/network). A caller may override it.
-ROUTE_ORIGINS_FILE="${ROUTE_ORIGINS_FILE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../_shared/modules/network" 2>/dev/null && pwd)/route_origins.json}"
+# The folder is resolved inside an if: a failing command substitution in a
+# plain assignment ended every `set -e` caller that sourced this file, with no
+# line saying why, whenever the folder was missing. The unresolved path then
+# stays the default, and route_origins_for_client refuses it when it is used.
+if [ -z "${ROUTE_ORIGINS_FILE:-}" ]; then
+	if ROUTE_ORIGINS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../_shared/modules/network" 2>/dev/null && pwd)"; then
+		ROUTE_ORIGINS_FILE="$ROUTE_ORIGINS_DIR/route_origins.json"
+	else
+		ROUTE_ORIGINS_FILE="$(dirname "${BASH_SOURCE[0]}")/../../../_shared/modules/network/route_origins.json"
+	fi
+	unset ROUTE_ORIGINS_DIR
+fi
 
 # The origins one download client contacts, redirect targets included, as the
 # shared inventory (_shared/modules/network/route_origins.json) lists them.
