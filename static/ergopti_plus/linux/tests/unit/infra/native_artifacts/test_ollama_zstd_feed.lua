@@ -61,7 +61,8 @@ end
 helpers.describe("Fixed Ollama zstd feeder", function()
 	helpers.it("extracts only the fixed zstd stdin command into the exact stage", function()
 		local result = receive("extract")
-		assert(helpers.deep_equal(result.args, { "--zstd", "--extract", "--file", "-", "--directory",
+		-- The private runtime's zstd (owned-runtimes-zstd), never the host tar's own support.
+		assert(helpers.deep_equal(result.args, { "--use-compress-program=zstd", "--extract", "--file", "-", "--directory",
 			"/controlled/ollama-stage", "--no-same-owner", "--no-same-permissions" }))
 		assert(result.options.max_output_bytes == nil, "existing generic process output bound remains authoritative")
 	end)
