@@ -473,6 +473,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-go-proxy-relay-gate.cjs"],
 			"repro": "node tools/test/test-go-proxy-relay-gate.cjs"
+		},
+		{
+			"id": "macos-proxy-relay-shell",
+			"ordinal": 551,
+			"name": "macOS Ollama daemon starts under the proxy sign-in relay when the proxy demands NTLM or Negotiate",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-proxy-relay-shell.cjs"],
+			"repro": "node tools/test/test-macos-proxy-relay-shell.cjs"
 		}
 	]
 }
