@@ -6294,10 +6294,15 @@ function M.regenerate(
 	-- Cheap enough to do unconditionally: load_available_actions memoises the
 	-- built list, so this walks the logical_char entries and mutates their key
 	-- codes in place rather than rebuilding 673 action tables.
+	-- Each stage is a phase: a late run loop or a hold names the stage that cost
+	-- (2026-10-31: 360 ms for a layout-settle regeneration that changed nothing).
+	local Phases = require("infra.phase_stats")
+	local stage_started = Phases.now()
 	if M.AVAILABLE_ACTIONS then
 		local layout_ok = resolve_current_layout_actions("Karabiner regeneration layout-action resolution")
 		if not layout_ok then return fail("layout-resolution-failed") end
 	end
+	Phases.stop("karabiner.layout_actions", stage_started)
 	context.built_layout_serial = _layout_event_serial
 	context.built_after_tis_settle = _layout_settled_serial >= context.built_layout_serial
 
@@ -6311,6 +6316,7 @@ function M.regenerate(
 
 	-- The navigation layer is data: layers.toml is read again for every
 	-- regeneration, so an edited file applies with the next one.
+	stage_started = Phases.now()
 	local ok_nav, nav_layer, nav_observation = pcall(NavLayer.load)
 	if not ok_nav then
 		Logger.error(LOG, "The navigation layer could not be read: %s.", tostring(nav_layer))
@@ -6330,6 +6336,8 @@ function M.regenerate(
 		_state.script_chords = chords
 	end
 
+	Phases.stop("karabiner.inputs", stage_started)
+	stage_started = Phases.now()
 	local ok_build, result, build_err, legacy_rules, legacy_context = pcall(
 		Generator.build_karabiner_json,
 		_state,
@@ -6345,8 +6353,10 @@ function M.regenerate(
 		return fail("generation-failed")
 	end
 
+	Phases.stop("karabiner.build", stage_started)
 	-- Counted before the call: a failed deploy may still have written.
 	_deploy_serial = _deploy_serial + 1
+	stage_started = Phases.now()
 	local deploy_ok, deployed, deploy_detail, _, deploy_refusal = xpcall(function()
 		if M._owned.selected() then
 			return Generator.deploy_owned_config(result, KARABINER_OUT)
@@ -6358,6 +6368,7 @@ function M.regenerate(
 			legacy_context
 		)
 	end, debug.traceback)
+	Phases.stop("karabiner.deploy", stage_started)
 	if not deploy_ok or deployed ~= true then
 		local deploy_failure = deploy_ok and deploy_detail or deployed
 		Logger.error(LOG, "Karabiner deploy failed → '%s': %s.",
