@@ -112,7 +112,7 @@ helpers.describe("menu preference rollback: restore runtime-owned values", funct
 		helpers.assert_eq(observed.display_labels, { "committed-display-model" },
 			"rollback must restore the committed model display label")
 		helpers.assert_eq(observed.chatgpt_urls, { "https://committed.example.test/" },
-			"rollback must restore the live Ctrl+G target")
+			"rollback must restore the live ChatGPT URL")
 		helpers.assert_eq(observed.editor_clears, 1,
 			"a committed false editor shortcut must clear the rejected live binding")
 		helpers.assert_eq(observed.editor_sets, 0,

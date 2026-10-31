@@ -3,10 +3,11 @@
 --- ==============================================================================
 --- MODULE: A Migrated Configuration Keeps Every Binding
 --- DESCRIPTION:
---- The v14 -> v15 step renames the retired slot ids. This replays an old macOS
---- configuration through the real migration engine and loads the result into the
---- real keyboard-slot owner: every binding is live under its role-named id and
---- no key is left unowned (nothing is reported as outdated).
+--- The v14 -> v15 step renames the retired slot ids, and the v19 -> v20 step
+--- turns the fixed Ctrl+G switch into the secondary_g slot (PAR-41). This replays
+--- old macOS configurations through the real migration engine and loads the
+--- result into the real keyboard-slot owner: every binding is live under its
+--- role-named id and no key is left unowned (nothing is reported as outdated).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -24,7 +25,7 @@ local MODULES = {
 }
 
 -- The only ids the stubbed catalogue offers; the manifest is the real one.
-local OFFERED = { lookup = true, none = true, llm_generate_prediction = true }
+local OFFERED = { lookup = true, none = true, llm_generate_prediction = true, open_chatgpt = true }
 
 --- Runs `scenario` against the real keyboard-shortcut owner over stubbed
 --- settings, registrar and catalogue, then restores every displaced module.
@@ -45,7 +46,9 @@ local function with_subject(store, scenario)
 		setEnabled = function() return true end,
 	}
 	package.loaded["adapters.file_system"] = {
-		read = function() return '{"keys":[{"id":"a","label":"A"},{"id":"space","label":"Space"}]}' end,
+		read = function()
+			return '{"keys":[{"id":"a","label":"A"},{"id":"g","label":"G"},{"id":"space","label":"Space"}]}'
+		end,
 	}
 	package.loaded["infra.paths"] = { shared = function() return "catalogue.json" end }
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -74,7 +77,7 @@ local ConfigOutdated = require("config_outdated")
 local Engine = require("config_migrate")
 local Codec = require("toml_codec")
 
--- Slots the stub catalogue of with_subject can own: keys "a" and "space".
+-- Slots the stub catalogue of with_subject can own: keys "a", "g" and "space".
 local OLD = table.concat({
 	"[_meta]", "schema_version = 14", "[shortcuts.keyboard]",
 	'cmd_a = "lookup"', 'hs_ctrl_a = "lookup"', 'hs_ctrl_space = "llm_generate_prediction"',
@@ -102,6 +105,38 @@ helpers.describe("keyboard shortcuts: a migrated configuration (migrated-binding
 			end)
 		end)
 		helpers.assert_eq(next(reported), nil, "no migrated key may be left unowned")
+	end)
+
+	helpers.it("(migrated-bindings) a v19 Ctrl+G switch becomes the secondary_g binding", function()
+		local registry = assert(Engine.load_registry(helpers.shared(Engine.REGISTRY_PATH)))
+		local catalogue = dofile(helpers.shared("../macos/_generated/action_catalogue.lua"))
+		local context = assert(Engine.load_context(helpers.shared("modules/actions/modifier_chords.json"), catalogue))
+		-- The stubbed owner below offers open_chatgpt; the real driver must too,
+		-- and the manifest must declare the slot it lands in.
+		helpers.assert_true(catalogue.actions.open_chatgpt ~= nil, "the macOS catalogue must offer open_chatgpt")
+		helpers.assert_eq(require("infra.manifest_reader").recommended_for("shortcuts.keyboard.secondary_g"),
+			"open_chatgpt", "the manifest must declare the macOS Ctrl+G slot")
+		for _, case in ipairs({ { switch = true, action = "open_chatgpt", bound = 1 },
+			{ switch = false, action = "none", bound = 0 } }) do
+			local source = "[_meta]\nschema_version = 19\n[shortcuts.keys]\nctrl_g = "
+				.. tostring(case.switch) .. "\n"
+			local plan = Engine.plan(source, registry, "hs", context)
+			helpers.assert_eq(plan.outcome, "migrated", tostring(plan.detail))
+			local decoded = Codec.decode(plan.candidate)
+			helpers.assert_nil(decoded.shortcuts.keys, "the retired switch must leave shortcuts.keys")
+			local migrated = decoded.shortcuts.keyboard
+			helpers.assert_eq(migrated, { secondary_g = case.action })
+			ConfigOutdated.reset_for_tests()
+			local reported = ConfigOutdated.collect_reports(function()
+				local observed = with_subject(migrated, function(subject)
+					helpers.assert_eq(subject.start(), true)
+					helpers.assert_eq(subject.get_action("secondary_g"), case.action)
+				end)
+				helpers.assert_eq(#observed.bound, case.bound,
+					"Ctrl+G is bound only while the slot holds an action")
+			end)
+			helpers.assert_eq(next(reported), nil, "the migrated slot may not be left unowned")
+		end
 	end)
 end)
 

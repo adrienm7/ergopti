@@ -1227,8 +1227,8 @@ requires_linux = ["tool:tesseract"]
 emit_ahk = "#+t"
 
 [sg_actions.open_chatgpt]
-# The shortcuts.chatgpt_url page; macOS opens it through the same owner as
-# its Ctrl+G shortcut (modules/shortcuts/bindings get_chatgpt_url).
+# Opens the configured shortcuts.chatgpt_url on every driver; macOS runs it
+# through its parent-scoped apps owner (the Ctrl+G slot since schema v20).
 platform = "all"
 requires_linux = ["tool:xdg-open"]
 

@@ -714,5 +714,4 @@ enabled = false
 
 [shortcuts.keys]
 wrap_text_if_selected = false
-ctrl_g = false
 cmd_star = false

@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 local function load_subject()
 	local controls = {
 		refuse_special = false,
-		refuse_native = false,
+		refuse_cmd_star = false,
 		delete_throws_once = false,
 	}
 	local counters = {created = 0, deleted = 0, stop_awake = 0}
@@ -52,7 +52,10 @@ local function load_subject()
 		bind_tap_keys = special_factory,
 		bind_layer_wheel = special_factory,
 		bind_wrap_text_if_selected = special_factory,
-		bind_cmd_star = special_factory,
+		bind_cmd_star = function()
+			if controls.refuse_cmd_star then return nil, "macOS refused Cmd+*" end
+			return special_factory()
+		end,
 		toggle_awake = function() end,
 		interactive_screenshot = function() end,
 		toggle_display_mirror = function() end,
@@ -92,16 +95,8 @@ local function load_subject()
 	package.loaded["infra.i18n"] = {get = function(key) return key end}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.shortcuts.bindings"] = nil
-	-- The registrar reads the active keymap through the hs it captured at load:
-	-- reload it under this scenario's stub so a cleared key is observed.
-	package.loaded["adapters.hotkey_registrar"] = nil
 
-	local subject = helpers.load_with_stubs("modules.shortcuts.bindings", {
-		hotkey = {bind = function()
-			if controls.refuse_native then return nil end
-			return handle()
-		end},
-	})
+	local subject = helpers.load_with_stubs("modules.shortcuts.bindings")
 	require("tests.support.shortcut_bindings_fixture").prefer_all(subject)
 	return subject, controls, counters
 end
@@ -156,59 +151,32 @@ helpers.describe("shortcut bindings: one refused hotkey fails alone (shortcut-re
 		helpers.assert_eq(next(subject.pending_bindings()), nil)
 	end)
 
-	helpers.it("names a hotkey macOS refuses in a WARNING and keeps the others (Ctrl+G 2026-10-28)", function()
+	-- 2026-10-28: a refused Ctrl+G left every shortcut dead. Ctrl+G is a keyboard
+	-- slot since schema v20; the isolation stays pinned on the remaining built-in.
+	helpers.it("names a hotkey macOS refuses in a WARNING and keeps the others", function()
 		local subject, controls = load_subject()
-		controls.refuse_native = true
+		controls.refuse_cmd_star = true
 		local warnings = {}
 		package.loaded["infra.logger"].warn = function(_, msg, ...)
 			warnings[#warnings + 1] = { msg = msg, args = { ... } }
 		end
 
 		helpers.assert_eq(subject.start(), true)
-		helpers.assert_eq(subject.is_bound("ctrl_g"), false)
-		helpers.assert_eq(subject.is_bound("cmd_star"), true,
+		helpers.assert_eq(subject.is_bound("cmd_star"), false)
+		helpers.assert_eq(subject.is_bound("wrap_text_if_selected"), true,
 			"a factory that does not use the refused chord stays bound")
-		local refusal = subject.pending_bindings().ctrl_g
-		helpers.assert_true(type(refusal) == "string" and refusal:find("Ctrl+G", 1, true) ~= nil,
+		local refusal = subject.pending_bindings().cmd_star
+		helpers.assert_true(type(refusal) == "string" and refusal:find("Cmd+*", 1, true) ~= nil,
 			"the refusal names the chord: " .. tostring(refusal))
 		local warned = false
 		for _, entry in ipairs(warnings) do
 			if tostring(entry.msg):find("could not be registered", 1, true)
-				and tostring(entry.args and entry.args[1]) == "ctrl_g" then warned = true end
+				and tostring(entry.args and entry.args[1]) == "cmd_star" then warned = true end
 		end
 		helpers.assert_true(warned, "the refusal is a WARNING naming the hotkey")
-	end)
-
-	helpers.it("defers a key the active layout cannot resolve instead of guessing its position", function()
-		local subject, _, counters = load_subject()
-		rawset(hs.keycodes.map, "g", nil)
-
-		helpers.assert_eq(subject.start(), true)
-		helpers.assert_eq(subject.is_bound("ctrl_g"), false,
-			"a key missing from the active keymap must not bind at a US-ANSI guess")
-		local refusal = subject.pending_bindings().ctrl_g
-		helpers.assert_true(type(refusal) == "string"
-			and refusal:find("not in the active keyboard layout", 1, true) ~= nil,
-			"the refusal says why: " .. tostring(refusal))
-
-		local created = counters.created
-		helpers.assert_eq(subject.bind_pending(false), false,
-			"an ordinary retry still waits for the layout")
-		helpers.assert_eq(counters.created, created)
-		hs.keycodes.map.g = 5
-		helpers.assert_eq(subject.bind_pending(false), true,
-			"the retry binds it once the layout resolves the key")
-		helpers.assert_eq(subject.is_bound("ctrl_g"), true)
-		hs.keycodes.__rebuild_map()
-	end)
-
-	helpers.it("binds a still-missing key at its US-ANSI position only on the final retry", function()
-		local subject = load_subject()
-		rawset(hs.keycodes.map, "g", nil)
-		helpers.assert_eq(subject.start(), true)
-		helpers.assert_eq(subject.bind_pending(true), true)
-		helpers.assert_eq(subject.is_bound("ctrl_g"), true)
-		hs.keycodes.__rebuild_map()
+		controls.refuse_cmd_star = false
+		helpers.assert_eq(subject.bind_pending(), true, "the retry binds it once macOS accepts it")
+		helpers.assert_eq(subject.is_bound("cmd_star"), true)
 	end)
 
 	helpers.it("still rolls everything back when the lifecycle changes mid-start", function()

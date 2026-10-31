@@ -285,6 +285,7 @@ global FEATURES_MANIFEST := Map(
         Map("path", "shortcuts.keyboard.secondary_a", "section", "shortcuts.keyboard", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
         Map("path", "shortcuts.keyboard.secondary_d", "section", "shortcuts.keyboard", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
         Map("path", "shortcuts.keyboard.secondary_e", "section", "shortcuts.keyboard", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
+        Map("path", "shortcuts.keyboard.secondary_g", "section", "shortcuts.keyboard", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
         Map("path", "shortcuts.keyboard.secondary_h", "section", "shortcuts.keyboard", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
         Map("path", "shortcuts.keyboard.secondary_i", "section", "shortcuts.keyboard", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
         Map("path", "shortcuts.keyboard.secondary_m", "section", "shortcuts.keyboard", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
@@ -404,7 +405,6 @@ global FEATURES_MANIFEST := Map(
         Map("path", "ui.menubar_icon", "section", "ui", "reason_key", "", "platforms", ["hs"]),
         Map("path", "tap_holds.enabled", "section", "tap_holds", "reason_key", "platform_reason.category_master_is_a_gate_on_windows", "platforms", ["hs", "linux"]),
         Map("path", "shortcuts.keys.wrap_text_if_selected", "section", "shortcuts.keys", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
-        Map("path", "shortcuts.keys.ctrl_g", "section", "shortcuts.keys", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
         Map("path", "shortcuts.keys.cmd_star", "section", "shortcuts.keys", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"])
     ]
 )

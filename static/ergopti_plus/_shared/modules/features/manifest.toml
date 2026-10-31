@@ -2551,6 +2551,17 @@ type = "action"
 description_key = "shortcuts.label_ctrl_e"
 
 [[features.shortcuts.keyboard]]
+id = "secondary_g"
+platforms = ["hs"]
+requires = { macos = [] }
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "open_chatgpt"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_g"
+
+[[features.shortcuts.keyboard]]
 id = "secondary_h"
 platforms = ["hs"]
 requires = { macos = [] }
@@ -4445,17 +4456,6 @@ recommended = true
 input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_wrap_text"
-platforms = ["hs"]
-requires = { macos = [] }
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_g"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_g"
 platforms = ["hs"]
 requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"

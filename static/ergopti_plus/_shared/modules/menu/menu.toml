@@ -3757,7 +3757,8 @@ i18n = "menu.shortcuts.wrap_symbols"
 platforms = ["linux"]
 unavailable = "hide"
 
-# macOS keeps this editor directly below its existing Ctrl+G action.
+# macOS heads its Ctrl group with this editor, beside the Ctrl+G slot whose
+# recommended action (open_chatgpt) opens the URL.
 [[menu.shortcut_chatgpt_editor_frame]]
 type = "command"
 id = "shortcut_chatgpt_editor"
