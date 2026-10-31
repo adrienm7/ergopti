@@ -582,16 +582,14 @@ if (packageDependencyChecks.some((value) => value == null || value === '' || val
 // Independent historical floors keep a catalogue edit from quietly dropping old requirements.
 const preservedRequirements = {
 	deb: [
-		...'luajit (>= 2.1), xclip, libnotify-bin, curl, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, zenity, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1'.split(
+		...'xclip, libnotify-bin, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, zenity, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1'.split(
 			', '
 		),
 		'libsecret-tools'
 	],
 	rpm: [
-		'luajit >= 2.1',
 		'xclip',
 		'libnotify',
-		'curl',
 		'libxkbcommon',
 		'libxkbcommon-utils',
 		'at-spi2-core',
@@ -608,6 +606,12 @@ const preservedRequirements = {
 	// the packages depend on it as install.sh does, never only recommend it.
 	arch: ['luajit', 'xclip', 'libnotify', 'curl', 'libxkbcommon', 'at-spi2-core', 'libsecret'],
 	nix_library_path: ['libayatana-appindicator', 'gtk3', 'glib', 'libxkbcommon', 'at-spi2-core']
+};
+// The .deb and the .rpm carry the AppImage's private runtime (owned runtimes,
+// PIN): a host package for any of these would let the host decide what runs.
+const privateRuntimePackages = {
+	deb: ['luajit (>= 2.1)', 'curl', 'lua-luv', 'openssl', 'sqlite3', 'libssl3t64 | libssl3'],
+	rpm: ['luajit >= 2.1', 'curl', 'openssl', 'sqlite']
 };
 try {
 	const data = JSON.parse(fs.readFileSync(path.join(ROOT, nativeRuntimeGenerator.SOURCE), 'utf8'));
@@ -628,6 +632,9 @@ try {
 		for (const requirement of floors)
 			if (!actual.includes(requirement))
 				errors.push(`${format} dropped historical requirement ${requirement}`);
+		for (const owned of privateRuntimePackages[format] || [])
+			if (actual.includes(owned))
+				errors.push(`${format} depends on the host ${owned} instead of its private runtime`);
 		if (actual.some((pkg) => /xvfb|x11-xkb-utils|(?:^|-)dev(?:el)?$|xkbcomp|setxkbmap/i.test(pkg)))
 			errors.push(`${format} leaked validation or development packages into end-user requirements`);
 	}

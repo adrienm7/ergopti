@@ -14,6 +14,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const { stageAppDir } = require('./lib/linux-private-runtime-fixture.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-package-recipe-'));
@@ -33,16 +34,11 @@ function run(script, args = []) {
 	});
 }
 const built = run('build-linux-driver.sh');
-// The .rpm publishes a LuaJIT luv binding; staging only needs an ELF to carry,
-// so the native build recipe stays out of this argument-order regression.
-const LUV_MODULE = path.join(scratch, 'luv.so');
-fs.writeFileSync(
-	LUV_MODULE,
-	Buffer.concat([Buffer.from([0x7f, 0x45, 0x4c, 0x46]), Buffer.from('fixture')])
-);
-const stagingArgs = (format) =>
-	format === 'rpm' ? ['--skip-rpm', '--luv-module', LUV_MODULE] : ['--skip-deb'];
+const stagingArgs = (format) => [`--skip-${format}`];
 assert.equal(built.status, 0, built.stderr || built.stdout || built.error?.message);
+// Both packagers carry the AppImage's private runtime; its native content is
+// the oldest-LTS stager's to prove, so an existence fixture stands in here.
+stageAppDir(BUILD);
 let refusals = 0;
 for (const format of ['deb', 'rpm']) {
 	const script = `build-linux-${format}.sh`;
