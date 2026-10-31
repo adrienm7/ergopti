@@ -1406,7 +1406,7 @@
 	"menu.debug.hook_probe": "记录键盘钩子顺序",
 	"menu.debug.composer_check": "测试组合键盘布局",
 	"platform_reason.action_apple_shortcuts_are_macos": "仅限 macOS：Apple 快捷指令只存在于 macOS。在其他系统上，请改为运行命令或程序。",
-	"platform_reason.action_windows_runs_shell_through_run_program": "在 Windows 上，“运行程序”可以做到同样的事：以命令为参数的 cmd.exe 或 powershell.exe，或以要打开的文件或文件夹为参数的 explorer.exe。",
+	"platform_reason.action_windows_runs_shell_through_run_program": "在 Windows 上，“运行程序”可以做到同样的事：以命令为参数的 cmd.exe，或以要打开的文件或文件夹为参数的 explorer.exe。",
 	"platform_reason.input_probe_is_autohotkey_specific": "这些检查测量 AutoHotkey 的 SendInput 及其键盘钩子,只有 Windows 驱动具备二者。",
 	"input_probe.title": "输入检查",
 	"input_probe.confirm": "此检查会打开一个小窗口并向其中输入约 {1} 秒。期间请勿在其他位置输入或点击。继续吗?",
