@@ -7,8 +7,12 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/adrienm7/ergopti/static/ergopti_plus/_shared/go/native_http/proxyrelay"
 )
 
 func openProxy(t *testing.T) string {
@@ -78,5 +82,49 @@ func TestRefusedProbeExitsThree(t *testing.T) {
 		"--dial-timeout-ms", "500", "--handshake-timeout-ms", "500"}, &stdout, &stderr)
 	if code != exitRefused || !strings.Contains(stdout.String(), `"reason":"upstream_unreachable"`) {
 		t.Fatalf("code %d stdout %q", code, stdout.String())
+	}
+}
+
+// The probe line is read by the Lua policy (network/proxy_auth_relay.lua)
+// against the same shared vectors, so both sides of the pipe agree byte for byte.
+func TestProbeLineMatchesTheSharedVectors(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "tests", "corpus", "network", "proxy_auth_relay_probe_vectors.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var corpus struct {
+		Vectors []struct {
+			ID       string `json:"id"`
+			ExitCode int    `json:"exit_code"`
+			Stdout   string `json:"stdout"`
+			Result   *struct {
+				Status string `json:"status"`
+				Scheme string `json:"scheme"`
+			} `json:"result"`
+			Reason  string `json:"reason"`
+			Emitted bool   `json:"emitted"`
+		} `json:"vectors"`
+	}
+	if err := json.Unmarshal(raw, &corpus); err != nil {
+		t.Fatal(err)
+	}
+	emitted := 0
+	for _, vector := range corpus.Vectors {
+		if !vector.Emitted {
+			continue
+		}
+		emitted++
+		result := proxyrelay.ProbeResult{Status: proxyrelay.ProbeRefused, Reason: vector.Reason}
+		if vector.Result != nil {
+			result = proxyrelay.ProbeResult{Status: vector.Result.Status, Scheme: vector.Result.Scheme}
+		}
+		var stdout bytes.Buffer
+		code := emit(&stdout, result)
+		if stdout.String() != vector.Stdout || code != vector.ExitCode {
+			t.Fatalf("%s: emitted %q exit %d, vector %q exit %d", vector.ID, stdout.String(), code, vector.Stdout, vector.ExitCode)
+		}
+	}
+	if emitted < 6 {
+		t.Fatalf("only %d emitted vectors", emitted)
 	}
 }
