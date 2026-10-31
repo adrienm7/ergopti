@@ -817,7 +817,9 @@ def lua_search(luajit, name, path):
     module to a versioned library in the multiarch directory, and walking the
     target's parent stages that whole directory.
     """
-    found = Path(run([luajit, "-e", f'io.write(assert(package.searchpath("{name}", package.{path})))']))
+    found = Path(
+        run([luajit, "-e", f'io.write(assert(package.searchpath("{name}", package.{path})))'])
+    )
     if not found.is_absolute():
         raise RuntimeRefused("Native Lua module location refused.")
     regular_source(found)
