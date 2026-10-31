@@ -146,6 +146,8 @@ class _G4B_Fixture {
 		this.UnknownTags := false
 		this.MissingAfterPull := false
 		this.PullExit := 0
+		; Each pull's [exit code, output], in order; 0 keeps PullExit for every pull.
+		this.PullScript := 0
 		this.Files := _G4B_Files(this)
 		this.Runtime := _G4B_Runtime(this)
 	}
@@ -186,6 +188,11 @@ class _G4B_Fixture {
 		this.Pulls += 1
 		AssertEqual(Target["origin"], "http://127.0.0.1:23456", "Pull keeps the captured managed origin.")
 		AssertEqual(Model, this.Model, "Pull keeps the consented model.")
+		if this.PullScript is Array {
+			Row := this.PullScript[this.Pulls]
+			Done.Call(Row[1], Row[2])
+			return true
+		}
 		Done.Call(this.PullExit)
 		return true
 	}
@@ -386,6 +393,134 @@ _G4B_PullProxyLogin() {
 		_LLM_Deps_FailureMessage := SavedMessage
 	}
 }
+
+; The closing line of a pull whose fresh layer failed its sha256 check, after the
+; progress frames that always say "pulling manifest".
+_G4B_DigestOutput() {
+	return "pulling manifest`rpulling 6a07: 100%`nError: digest mismatch, file must be downloaded again: want sha256:a, got sha256:b`n"
+}
+
+_G4B_DigestRetrySucceeds() {
+	F := _G4B_Fixture()
+	try {
+		F.Model := "qwen3:0.6b"
+		F.PullScript := [[1, _G4B_DigestOutput()], [0, ""]]
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(2, F.Pulls, "a digest mismatch is pulled once more")
+		AssertEqual(1, F.ReadyCalls, "the second pull completes the bootstrap")
+		AssertEqual(0, F.FailedCalls)
+	} finally F.Close()
+}
+Test("managed bootstrap: a digest mismatch is pulled once more (ollama-digest-mismatch)", _G4B_DigestRetrySucceeds)
+
+_G4B_DigestRetryFails() {
+	global _LLM_Deps_FailureMessage
+	SavedMessage := _LLM_Deps_FailureMessage
+	F := _G4B_Fixture()
+	try {
+		F.Model := "qwen3:0.6b"
+		F.PullScript := [[1, _G4B_DigestOutput()], [1, _G4B_DigestOutput()], [0, ""]]
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(2, F.Pulls, "only one automatic retry")
+		AssertEqual(1, F.FailedCalls)
+		AssertEqual(StrReplace(t("ollama.digest_mismatch"), "%s", F.Model), _LLM_Deps_FailureMessage,
+			"the failure names the mismatch and the model")
+	} finally {
+		F.Close()
+		_LLM_Deps_FailureMessage := SavedMessage
+	}
+}
+Test("managed bootstrap: a second digest mismatch names itself (ollama-digest-mismatch)", _G4B_DigestRetryFails)
+
+_G4B_OtherPullErrorNotRetried() {
+	F := _G4B_Fixture()
+	try {
+		F.Model := "qwen3:0.6b"
+		F.PullScript := [[1, "pulling manifest`nError: pull model manifest: file does not exist`n"], [0, ""]]
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(1, F.Pulls, "only a digest mismatch removed the layer it would download again")
+		AssertEqual(1, F.FailedCalls)
+	} finally F.Close()
+}
+Test("managed bootstrap: another pull error is not retried (ollama-digest-mismatch)", _G4B_OtherPullErrorNotRetried)
+
+_G4B_MenuDigestRetry(Script, ExpectedPulls, ExpectedPublished) {
+	F := _G4B_Fixture()
+	Published := 0
+	try {
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertTrue(F.Flow.Ready)
+		F.Model := "qwen3:0.6b"
+		F.PullScript := Script
+		F.Flow.PullModel(F.Model, (*) => Published += 1)
+		AssertEqual(ExpectedPulls, F.Pulls)
+		AssertEqual(ExpectedPublished, Published)
+		AssertEqual(ExpectedPublished == 1, F.Flow.Ready, "only the completed retry keeps the runtime")
+	} finally F.Close()
+}
+_G4B_MenuDigestRetrySucceeds() {
+	_G4B_MenuDigestRetry([[1, _G4B_DigestOutput()], [0, ""]], 2, 1)
+}
+Test("managed bootstrap: a menu pull retries a digest mismatch once (ollama-digest-mismatch)", _G4B_MenuDigestRetrySucceeds)
+_G4B_MenuDigestRetryFails() {
+	_G4B_MenuDigestRetry([[1, _G4B_DigestOutput()], [1, _G4B_DigestOutput()], [0, ""]], 2, 0)
+}
+Test("managed bootstrap: a menu pull stops at the second digest mismatch (ollama-digest-mismatch)", _G4B_MenuDigestRetryFails)
+
+_G4B_PullErrorClasses() {
+	for Row in [["Error: digest mismatch, file must be downloaded again", "digest_mismatch"],
+			["Error: write: no space left on device", "no_space"], ["Error: open: permission denied", "permission_denied"],
+			["Error: context canceled", "cancelled"], ["Error: max retries exceeded", "max_retries"],
+			["Error: pull model manifest: file does not exist", "manifest"], ["Error: something new", "other"],
+			["pulling manifest`npulling 6a07: 100%`nsuccess", ""], ["", ""]]
+		AssertEqual(Row[2], LLM_OllamaPullErrorClass(Row[1]), Row[1])
+	; The vocabulary is the macOS worker's; a drift shows here, marker and class alike.
+	global _SharedDir, LLM_OLLAMA_PULL_ERROR_CLASSES
+	Source := FileRead(_SharedDir . "\..\macos\modules\llm\managed_ollama_pull.py", "UTF-8")
+	AssertTrue(RegExMatch(Source, "s)ERROR_CLASSES = \((.*?)\n\)", &Block), "the macOS worker must declare its classes")
+	Position := 1, Index := 0
+	while RegExMatch(Block[1], '\("([^"]+)", "([^"]+)"\)', &Found, Position) {
+		Index += 1
+		AssertEqual(Found[1], LLM_OLLAMA_PULL_ERROR_CLASSES[Index][1])
+		AssertEqual(Found[2], LLM_OLLAMA_PULL_ERROR_CLASSES[Index][2])
+		Position := Found.Pos + Found.Len
+	}
+	AssertEqual(LLM_OLLAMA_PULL_ERROR_CLASSES.Length, Index, "every class of the macOS worker")
+}
+Test("managed bootstrap: the pull output classes are the macOS vocabulary (ollama-digest-mismatch)", _G4B_PullErrorClasses)
+
+; Past its ceiling the shell runner reads no body and reports exit 63, so a pull
+; of a few minutes would fail after it succeeded.
+_G4B_PullCaptureHoldsHoursOfFrames() {
+	global LLM_OLLAMA_PULL_CAPTURE_BYTES
+	FramesPerHour := 36000, FrameBytes := 200
+	AssertTrue(LLM_OLLAMA_PULL_CAPTURE_BYTES >= 8 * FramesPerHour * FrameBytes, "eight hours of frames fit")
+	F := _G4B_Fixture()
+	Captured := 0
+	Spawn(Executable, Arguments, Done, Chunk := 0, Adopt := 0, MaxOutputBytes := 0, *) {
+		Captured := MaxOutputBytes
+		throw Error("Synthetic spawn refusal after reading its ceiling")
+	}
+	try {
+		F.Start()
+		F.Flow.Plan["directory"] := "C:\managed-workers"
+		F.Flow.Plan["helper"] := "C:\managed-workers\ollama_managed_files.ps1"
+		F.Flow.Plan["helper_sha256"] := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		F.Flow.Plan["environment"] := "C:\captured\managed_ollama_environment.json"
+		F.Flow.Plan["environment_sha256"] := "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+		F.Flow.Sources["C:\managed-workers\ollama-runtime-launch.ps1"] := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		F.Runtime.PublishReady()
+		F.Flow.Target["ready_file_identity"] := "34567890:3456789012345678"
+		F.Flow.Target["ready_image_sha256"] := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		F.Flow._NativePull("qwen3:0.6b", (*) => 0, Spawn)
+		AssertEqual(LLM_OLLAMA_PULL_CAPTURE_BYTES, Captured, "the native pull spawns with the pull's own ceiling")
+	} finally F.Close()
+}
+Test("managed bootstrap: a pull's capture holds hours of progress frames (ollama-digest-mismatch)", _G4B_PullCaptureHoldsHoursOfFrames)
 
 _G4B_UnknownTags() {
 	F := _G4B_Fixture()

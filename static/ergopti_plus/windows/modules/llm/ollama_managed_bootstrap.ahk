@@ -29,6 +29,16 @@ global _LLM_ManagedBootstrap := 0
 global LLM_PULL_PERCENT_LISTENER := 0
 ; The end of a pull's capture read for its percentage: a few progress frames.
 global LLM_PULL_PERCENT_TAIL_BYTES := 4096
+; The ceiling of a pull's capture. Ollama prints a progress frame every 100 ms,
+; piped or not, and past the ceiling the shell runner reads no body and reports
+; exit 63: this bound must hold hours of frames, or a long pull fails after it
+; succeeded and its last line, the only one that names a failure, is lost.
+global LLM_OLLAMA_PULL_CAPTURE_BYTES := 67108864
+; What marks each class of a failed pull, first match wins: the closed vocabulary
+; of macos/modules/llm/managed_ollama_pull.py ERROR_CLASSES.
+global LLM_OLLAMA_PULL_ERROR_CLASSES := [["digest mismatch", "digest_mismatch"], ["no space left", "no_space"],
+	["permission denied", "permission_denied"], ["context canceled", "cancelled"],
+	["max retries", "max_retries"], ["manifest", "manifest"]]
 
 /** Dispatches explicit installation without an administrator/system fallback. */
 LLM_Deps_RunManagedInstaller(Model, Epoch, OnReady?, OnFailed?, Silent := false) {
@@ -208,6 +218,26 @@ LLM_OllamaPullPercent(Text) {
 	return Percent
 }
 
+/**
+ * Names why a pull failed from its captured output. Only the CLI's closing
+ * "Error:" line counts: a progress frame says "pulling manifest" on every pull.
+ * @param {String} Text The pull's output.
+ * @returns {String} A class of the closed vocabulary, "other", or "" without an error line.
+ */
+LLM_OllamaPullErrorClass(Text) {
+	global LLM_OLLAMA_PULL_ERROR_CLASSES
+	if !(Text is String) || !(Position := InStr(Text, "Error:", true, -1))
+		return ""
+	Message := SubStr(Text, Position + StrLen("Error:"))
+	if RegExMatch(Message, "[\r\n]", &LineEnd)
+		Message := SubStr(Message, 1, LineEnd.Pos - 1)
+	for Row in LLM_OLLAMA_PULL_ERROR_CLASSES {
+		if InStr(Message, Row[1])
+			return Row[2]
+	}
+	return "other"
+}
+
 /** One source-bound managed bootstrap, retaining physical debt independently. */
 class OllamaManagedBootstrap {
 	/** Captures every native source before admission; no installation occurs here. */
@@ -233,6 +263,7 @@ class OllamaManagedBootstrap {
 		this.EnableHandoff := 0
 		this.CleanupRunning := false
 		this.PullTask := 0
+		this.PullDigestRetried := false
 		this.MenuPull := 0
 		this.RuntimeRetired := false
 		this.RuntimeRetiring := false
@@ -679,18 +710,23 @@ class OllamaManagedBootstrap {
 			}
 			if !this._MenuPullCurrent(Operation)
 				return false
-			Done := ObjBindMethod(this, "_MenuPulled", Operation)
-			Accepted := this.Port is Map
-				? this.Port["pull"].Call(this.Target.Clone(), Tag, Done) : this._NativePull(Tag, Done)
-			if !this._True(Accepted) && this.MenuPull == Operation
-				return this._MenuPullFail(Operation)
-			if this._True(Accepted) && !(this.Port is Map) && this.PullTask is Map
-				this._PollMenuPullPercent(Operation, this.PullTask, "")
-			return this._True(Accepted)
+			return this._MenuPullDispatch(Operation)
 		} catch as Err {
 			this._MenuPullFail(Operation)
 			throw Err
 		}
+	}
+
+	/** Starts the operation's pull, its first or its retry, and observes its percentage. */
+	_MenuPullDispatch(Operation) {
+		Done := ObjBindMethod(this, "_MenuPulled", Operation)
+		Accepted := this.Port is Map
+			? this.Port["pull"].Call(this.Target.Clone(), Operation["tag"], Done) : this._NativePull(Operation["tag"], Done)
+		if !this._True(Accepted) && this.MenuPull == Operation
+			return this._MenuPullFail(Operation)
+		if this._True(Accepted) && !(this.Port is Map) && this.PullTask is Map
+			this._PollMenuPullPercent(Operation, this.PullTask, "")
+		return this._True(Accepted)
 	}
 
 	/**
@@ -761,21 +797,31 @@ class OllamaManagedBootstrap {
 		Operation["failed"] := true
 		LoggerError("LLM.managed", "Managed menu model download failed ({1}); cancelling its retained owners.", MessageKey)
 		try {
-			this._Ui(MessageKey)
+			this._Ui(MessageKey, Operation["tag"])
 			if !(this.Port is Map) && this.UiShown && !A_IsSuspended
-				OllamaWV_SetError(t(MessageKey))
+				OllamaWV_SetError(this._Message(MessageKey, Operation["tag"]))
 		} finally this.Cancel()
 		return false
 	}
 
-	_MenuPulled(Operation, ExitCode, *) {
+	_MenuPulled(Operation, ExitCode, Stdout := "", *) {
 		global LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT
 		if !this._MenuPullCurrent(Operation)
 			return false
 		if (ExitCode is Integer) && ExitCode == LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT
 			return this._MenuPullFail(Operation, "network.failure.proxy_windows_login")
-		if !(ExitCode is Integer) || ExitCode != 0
-			return this._MenuPullFail(Operation)
+		if !(ExitCode is Integer) || ExitCode != 0 {
+			ErrorClass := LLM_OllamaPullErrorClass(Stdout)
+			if ErrorClass != "digest_mismatch" {
+				LoggerError("LLM.managed", "Managed menu model download exited {1} (class '{2}').", ExitCode, ErrorClass)
+				return this._MenuPullFail(Operation)
+			}
+			if Operation.Get("digest_retried", false)
+				return this._MenuPullFail(Operation, "ollama.digest_mismatch")
+			Operation["digest_retried"] := true
+			this._LogDigestRetry()
+			return this._MenuPullDispatch(Operation)
+		}
 		Done := ObjBindMethod(this, "_MenuPullModels", Operation)
 		if this.Port is Map
 			return this.Port["models"].Call(Done)
@@ -822,7 +868,7 @@ class OllamaManagedBootstrap {
 		try {
 			Factory := HasMethod(SpawnFn, "Call") ? SpawnFn : ShellRunner_SpawnTreeOwned
 			Task := Factory.Call(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
-				Args, ObjBindMethod(this, "_Pulled", Owner), , , 65536, true, true)
+				Args, ObjBindMethod(this, "_Pulled", Owner), , , LLM_OLLAMA_PULL_CAPTURE_BYTES, true, true)
 			Owner["task"] := Task
 			Accepted := this._Current() && this._True(Task.start()) && this._Current()
 			Owner["accepted"] := Accepted
@@ -831,7 +877,7 @@ class OllamaManagedBootstrap {
 		} finally {
 			Owner["building"] := false
 			if Owner["terminal"] is Map
-				this._Pulled(Owner, Owner["terminal"]["exit"])
+				this._Pulled(Owner, Owner["terminal"]["exit"], Owner["terminal"]["stdout"])
 		}
 		if Accepted
 			return true
@@ -850,14 +896,14 @@ class OllamaManagedBootstrap {
 		if this.PullTask != Owner
 			return false
 		if Owner["building"] {
-			Owner["terminal"] := Map("exit", ExitCode)
+			Owner["terminal"] := Map("exit", ExitCode, "stdout", Stdout)
 			return false
 		}
 		Owner["task"] := 0
 		this.PullTask := 0
 		if Owner["accepted"] && HasMethod(Owner.Get("callback", 0), "Call")
-			return Owner["callback"].Call(ExitCode)
-		return Owner["accepted"] ? this._PullResult(ExitCode) : this.Cancel()
+			return Owner["callback"].Call(ExitCode, Stdout)
+		return Owner["accepted"] ? this._PullResult(ExitCode, Stdout) : this.Cancel()
 	}
 
 	_PullResult(ExitCode, Stdout := "", Stderr := "") {
@@ -866,9 +912,25 @@ class OllamaManagedBootstrap {
 			return this.Cancel()
 		if (ExitCode is Integer) && ExitCode == LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT
 			return this._Fail("model_pull_proxy_login", "network.failure.proxy_windows_login")
-		if !(ExitCode is Integer) || ExitCode != 0
-			return this._Fail("model_pull")
+		if !(ExitCode is Integer) || ExitCode != 0 {
+			ErrorClass := LLM_OllamaPullErrorClass(Stdout)
+			if ErrorClass != "digest_mismatch"
+				return this._Fail(ErrorClass == "" ? "model_pull" : "model_pull_" . ErrorClass)
+			if this.PullDigestRetried
+				return this._Fail("model_pull_digest_mismatch", "ollama.digest_mismatch", this.Model)
+			this.PullDigestRetried := true
+			this._LogDigestRetry()
+			if this.Port is Map
+				return this.Port["pull"].Call(this.Target.Clone(), this.Model, ObjBindMethod(this, "_PullResult"))
+			return this._NativePull()
+		}
 		return this._Models()
+	}
+
+	; Ollama deletes a layer whose sha256 does not match before it reports the
+	; mismatch, so one more pull downloads it afresh (macOS field run of 2026-10-31).
+	_LogDigestRetry() {
+		LoggerWarn("LLM.managed", "The model pull failed its digest check; Ollama removed the layer, so it is pulled once more.")
 	}
 
 	_Complete() {
@@ -1039,7 +1101,7 @@ class OllamaManagedBootstrap {
 		return this.Cancel()
 	}
 
-	_Fail(Phase, MessageKey := "ollama.runtime_repair_failed") {
+	_Fail(Phase, MessageKey := "ollama.runtime_repair_failed", Model := "") {
 		global _LLM_Deps_Epoch
 		if this.Cancelled || A_IsSuspended || this.Epoch != _LLM_Deps_Epoch {
 			this.Cancel()
@@ -1047,7 +1109,7 @@ class OllamaManagedBootstrap {
 		}
 		if !this.Failed {
 			if !(this.Port is Map)
-				this._Ui(MessageKey)
+				this._Ui(MessageKey, Model)
 			; UI can call the real cancellation path. Claim only current failure
 			; state under Critical; native cleanup and file-backed logs stay out.
 			Claimed := false
@@ -1065,12 +1127,12 @@ class OllamaManagedBootstrap {
 			LoggerError("LLM.managed", "Managed bootstrap failed at {1}; retained owners remain explicit.", Phase)
 			if !this.Cancelled && !A_IsSuspended && this.Epoch == _LLM_Deps_Epoch {
 				if !(this.Port is Map) && this.UiShown
-					OllamaWV_SetError(t(MessageKey))
+					OllamaWV_SetError(this._Message(MessageKey, Model))
 				if !this.Cancelled && !A_IsSuspended && this.Epoch == _LLM_Deps_Epoch {
 					if HasMethod(this.OnFailed, "Call")
-						_LLM_Deps_PublishFailure(t(MessageKey), this.OnFailed, this.Epoch)
+						_LLM_Deps_PublishFailure(this._Message(MessageKey, Model), this.OnFailed, this.Epoch)
 					else
-						_LLM_Deps_PublishFailure(t(MessageKey), , this.Epoch)
+						_LLM_Deps_PublishFailure(this._Message(MessageKey, Model), , this.Epoch)
 				}
 			}
 		}
@@ -1091,7 +1153,12 @@ class OllamaManagedBootstrap {
 		return LLM_Deps_CheckAndInstall(this.Model, Ready?, Failed?, true)
 	}
 
-	_Ui(Key) {
+	; A message that names the model carries it in its %s.
+	_Message(Key, Model := "") {
+		return Model == "" ? t(Key) : StrReplace(t(Key), "%s", Model)
+	}
+
+	_Ui(Key, Model := "") {
 		if this.Port is Map || this.Silent || !this._Current()
 			return
 		if !this.UiShown {
@@ -1099,7 +1166,7 @@ class OllamaManagedBootstrap {
 			this.UiShown := true
 			SetTimer(this.Timer, 150)
 		}
-		OllamaWV_SetStep(t(Key))
+		OllamaWV_SetStep(this._Message(Key, Model))
 	}
 
 	_Error(Kind, Err) {
