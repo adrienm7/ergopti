@@ -26,9 +26,14 @@ helpers.describe("Keyboard layout row build stages", function()
 		assert(ok, row)
 		helpers.assert_true(type(row) == "table" and type(row.menu) == "table" and #row.menu > 0,
 			"the timed build must still reach the tray populated")
+		-- The rows stage held up to 190 ms in the 2026-10-31 field run: its
+		-- builders are phases of their own, inside it
 		helpers.assert_eq(stopped, {
 			"menu_keyboard_layout.sources", "menu_keyboard_layout.bundles",
-			"menu_keyboard_layout.variants", "menu_keyboard_layout.rows",
+			"menu_keyboard_layout.variants", "menu_keyboard_layout.bundle_frame",
+			"menu_keyboard_layout.custom", "menu_keyboard_layout.active",
+			"menu_keyboard_layout.number_row", "menu_keyboard_layout.magic_key",
+			"menu_keyboard_layout.rows",
 		})
 	end)
 end)

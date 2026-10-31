@@ -820,21 +820,31 @@ function M.build(ctx)
 		for _, row in ipairs(rows) do missing[#missing + 1] = row end
 		return missing
 	end
-	local declared_bundle_rows = bundle_frame_rows()
+	-- The rows stage held up to 190 ms in the 2026-10-31 field run: each
+	-- builder below is its own phase, so the hold report names the slow one.
+	local function timed(phase, build, ...)
+		local started = PhaseStats.now()
+		local result = build(...)
+		PhaseStats.stop(phase, started)
+		return result
+	end
+	local declared_bundle_rows = timed("menu_keyboard_layout.bundle_frame", bundle_frame_rows)
 	if declared_bundle_rows == nil then return nil end
-	local custom_rows = custom_layout_rows(update_menu, ManifestMenu)
+	local custom_rows = timed("menu_keyboard_layout.custom", custom_layout_rows, update_menu, ManifestMenu)
 	if custom_rows == nil then return nil end
-	local active_rows = active_layout_rows()
+	local active_rows = timed("menu_keyboard_layout.active", active_layout_rows)
 	if active_rows == nil then return nil end
 	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
-		["number_row_policy"] = function() return number_row_rows(state, save_prefs, update_menu, render_ctx) end,
+		["number_row_policy"] = function()
+			return timed("menu_keyboard_layout.number_row", number_row_rows, state, save_prefs, update_menu, render_ctx)
+		end,
 		["custom_layouts"]   = function() return custom_rows end,
 		["active_layouts"]   = function() return active_rows end,
 		["layout_bundle"] = function() return declared_bundle_rows end,
 		["layout_switching"] = function() return switching_rows end,
 		-- The physical magic key, chosen by pressing it or from the candidates.
 		[require("config_keys").LEAF.MAGIC_KEY_SOURCE] = function()
-			return MagicKeySourceMenu.rows({
+			return timed("menu_keyboard_layout.magic_key", MagicKeySourceMenu.rows, {
 				state = state, save_prefs = save_prefs, keymap = ctx and ctx.keymap,
 				update_menu = update_menu, paused = ctx and ctx.paused,
 			})
