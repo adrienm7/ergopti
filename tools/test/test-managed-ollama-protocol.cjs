@@ -446,7 +446,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_ollama_hint_metadata_test.py', 19]);
 	cases.push(['tools/diagnostics/macos_ollama_serve_command_receiving_test.py', 2]);
 	cases.push(['tools/diagnostics/macos_native_python_probe_io_test.py', 3]);
-	cases.push(['tools/test/macos_managed_ollama_pull_caller_test.py', 15]);
+	cases.push(['tools/test/macos_managed_ollama_pull_caller_test.py', 18]);
 	cases.push(['tools/test/macos_managed_ollama_cleanup_test.py', 37]);
 	cases.push(['tools/test/managed_source_alias_test.py', 23]);
 	cases.push(['tools/diagnostics/macos_owned_image_alias_test.py', 28]);
@@ -675,7 +675,7 @@ assert.equal(admission.signal, null, 'the Lua 5.4 admission must retire');
 assert.equal(admission.status, 0, admission.stderr || admission.stdout);
 for (const [script, expected] of [
 	['tools/test/managed_ollama_pull_receipt_test.lua', 41],
-	['tools/test/managed_ollama_pull_adapter_test.lua', 50],
+	['tools/test/managed_ollama_pull_adapter_test.lua', 60],
 	['tools/test/managed_native_python_test.lua', 8],
 	['tools/test/managed_ollama_cleanup_receipt_test.lua', 102]
 ]) {
