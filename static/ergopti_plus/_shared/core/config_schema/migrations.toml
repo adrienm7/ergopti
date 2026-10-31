@@ -86,7 +86,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 19
+current_version = 20
 unstamped_version = 2
 
 
@@ -1021,4 +1021,14 @@ ops = [
 	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_m", map = [{ from = true, to = "activity_simulation" }, { from = false, to = "none" }] },
 	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_h", map = [{ from = true, to = "screen_capture" }, { from = false, to = "none" }] },
 	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_capslock", map = [{ from = true, to = "toggle_capslock" }, { from = false, to = "none" }] },
+]
+
+[steps.v19_to_v20]
+from = 19
+to = 20
+drivers = ["hs"]
+reason = "The macOS Ctrl+G switch becomes its keyboard slot, as the other switches did (PAR-41): on becomes open_chatgpt, off becomes none, and an action the user chose for the slot wins."
+ops = [
+	{ op = "rename", section = "shortcuts.keys", key = "ctrl_g", to_section = "shortcuts.keyboard", to_key = "secondary_g" },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "secondary_g", map = [{ from = true, to = "open_chatgpt" }, { from = false, to = "none" }] },
 ]
