@@ -272,6 +272,7 @@ local function admit_client_source(path)
   or normalized:find('/_shared/data/locales/en%.json$')
   or normalized:find('/_shared/modules/network/route_origins%.json$')
   or normalized:find('/_shared/modules/network/proxy_policy%.json$')
+  or normalized:find('/_shared/modules/network/proxy_override%.json$')
   or normalized:find('/_shared/data/http/transport_policy%.json$')
   or normalized:find('/_shared/data/http/header_policy%.json$')
   or normalized:find('/_shared/data/http/redirect_policy%.json$'),
