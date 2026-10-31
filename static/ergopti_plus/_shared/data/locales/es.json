@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "Error de inicio: el archivo _generated/features_manifest.ahk está ausente o dañado.\n\nEjecuta `npm run build:manifest` desde el directorio del proyecto y reinicia el script.",
 	"startup.manifest_window_title": "manifest ausente",
 	"startup.native_logger_unavailable": "ErgoptiPlus no puede iniciarse porque su servicio nativo de registro no está disponible. Inicie ErgoptiPlus mediante su lanzador.",
+	"startup.winps_missing": "No se encontró {3} {1}. Las actualizaciones, la IA local, los diagnósticos y las demás funciones que lo usan se rechazan hasta que se instale.",
+	"startup.winps_too_old": "{3} es demasiado antiguo ({2}): Ergopti+ necesita {1}. Las actualizaciones, la IA local, los diagnósticos y las demás funciones que lo usan se rechazan hasta que se actualice.",
 	"system_actions.new_text_file_name": "Nuevo archivo de texto",
 	"system_actions.no_disk_to_eject": "No hay ningún disco que expulsar.",
 	"system_actions.no_file_selected": "No hay ningún archivo seleccionado en el gestor de archivos.",

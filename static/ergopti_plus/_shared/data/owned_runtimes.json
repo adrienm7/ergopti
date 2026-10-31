@@ -1228,7 +1228,7 @@
 			"decision": "SYS",
 			"decision_text": "SYS: check the version at start and refuse; keep script text compatible with 5.1",
 			"alternative": null,
-			"status": "follow_up"
+			"status": "done"
 		},
 		{
 			"os": "windows",

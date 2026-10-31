@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "Startfehler: die Datei _generated/features_manifest.ahk fehlt oder ist beschädigt.\n\nFühre `npm run build:manifest` im Projektverzeichnis aus und starte das Skript neu.",
 	"startup.manifest_window_title": "Manifest fehlt",
 	"startup.native_logger_unavailable": "ErgoptiPlus kann nicht gestartet werden, da der native Protokollierungsdienst nicht verfügbar ist. Starten Sie ErgoptiPlus über den Launcher.",
+	"startup.winps_missing": "{3} {1} wurde nicht gefunden. Updates, die lokale KI, die Diagnose und die anderen Funktionen, die es nutzen, werden abgelehnt, bis es installiert ist.",
+	"startup.winps_too_old": "{3} ist zu alt ({2}): Ergopti+ benötigt {1}. Updates, die lokale KI, die Diagnose und die anderen Funktionen, die es nutzen, werden abgelehnt, bis es aktualisiert ist.",
 	"system_actions.new_text_file_name": "Neue Textdatei",
 	"system_actions.no_disk_to_eject": "Kein Laufwerk zum Auswerfen.",
 	"system_actions.no_file_selected": "Im Dateimanager ist keine Datei ausgewählt.",

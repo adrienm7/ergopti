@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "خطأ في بدء التشغيل: الملف _generated/features_manifest.ahk مفقود أو تالف.\n\nشغّل `npm run build:manifest` من مجلد المشروع، ثم أعد تشغيل السكريبت.",
 	"startup.manifest_window_title": "ملف manifest مفقود",
 	"startup.native_logger_unavailable": "لا يمكن بدء ErgoptiPlus لأن خدمة التسجيل الأصلية غير متاحة. شغّل ErgoptiPlus عبر المشغّل الخاص به.",
+	"startup.winps_missing": "تعذّر العثور على {3} {1}. تُرفض التحديثات والذكاء الاصطناعي المحلي والتشخيصات والميزات الأخرى التي تستخدمه إلى أن يُثبَّت.",
+	"startup.winps_too_old": "إصدار {3} قديم جدًا ({2}): يحتاج Ergopti+ إلى {1}. تُرفض التحديثات والذكاء الاصطناعي المحلي والتشخيصات والميزات الأخرى التي تستخدمه إلى أن يُحدَّث.",
 	"system_actions.new_text_file_name": "ملف نصي جديد",
 	"system_actions.no_disk_to_eject": "لا يوجد قرص لإخراجه.",
 	"system_actions.no_file_selected": "لم يتم تحديد أي ملف في مدير الملفات.",

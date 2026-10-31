@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "Opstartfout: het bestand _generated/features_manifest.ahk ontbreekt of is beschadigd.\n\nVoer `npm run build:manifest` uit vanuit de projectmap en start het script opnieuw.",
 	"startup.manifest_window_title": "manifest ontbreekt",
 	"startup.native_logger_unavailable": "ErgoptiPlus kan niet starten omdat de systeemeigen logboekservice niet beschikbaar is. Start ErgoptiPlus via het startprogramma.",
+	"startup.winps_missing": "{3} {1} is niet gevonden. Updates, de lokale AI, diagnostiek en de andere functies die het gebruiken worden geweigerd totdat het is geïnstalleerd.",
+	"startup.winps_too_old": "{3} is te oud ({2}): Ergopti+ heeft {1} nodig. Updates, de lokale AI, diagnostiek en de andere functies die het gebruiken worden geweigerd totdat het is bijgewerkt.",
 	"system_actions.new_text_file_name": "Nieuw tekstbestand",
 	"system_actions.no_disk_to_eject": "Geen schijf om uit te werpen.",
 	"system_actions.no_file_selected": "Er is geen bestand geselecteerd in de bestandsbeheerder.",

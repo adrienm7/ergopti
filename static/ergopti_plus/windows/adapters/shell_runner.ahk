@@ -338,6 +338,50 @@ ShellRunner_WinPsPath() {
 	return A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
 }
 
+; The version the workers' script text is written for.
+global SHELL_RUNNER_MIN_WIN_PS_VERSION := "5.1"
+
+; The program's name, from its one spelling: the compiled script's antivirus
+; surface counts every other copy.
+_ShellRunner_WinPsStem() {
+	SplitPath(ShellRunner_WinPsPath(), , , , &Stem)
+	return Stem
+}
+
+/**
+ * The installed version, from the registry, whose names ignore case: starting
+ * the program would cost a process at every start of the driver.
+ * @returns {String} "" when it is not installed.
+ */
+ShellRunner_WinPsVersion() {
+	Stem := _ShellRunner_WinPsStem()
+	return RegRead("HKLM\SOFTWARE\Microsoft\" . Stem . "\3\" . Stem . "Engine", Stem . "Version", "")
+}
+
+/**
+ * Says at start, in words, that the workers cannot run. Scheduled after the boot
+ * is ready, since a modal dialog freezes the auto-execute thread under it.
+ * @param {Func} VersionFn Test seam, ShellRunner_WinPsVersion by default.
+ * @param {Func} NoticeFn Test seam taking the text, a dialog by default.
+ * @returns {Boolean} True when the version is supported.
+ */
+ShellRunner_CheckWinPsAtStart(VersionFn := 0, NoticeFn := 0) {
+	global SHELL_RUNNER_MIN_WIN_PS_VERSION
+	Version := HasMethod(VersionFn, "Call") ? VersionFn.Call() : ShellRunner_WinPsVersion()
+	if (Version != "" && VerCompare(Version, SHELL_RUNNER_MIN_WIN_PS_VERSION) >= 0)
+		return true
+	Name := "Windows " . StrReplace(StrTitle(_ShellRunner_WinPsStem()), "shell", "Shell")
+	LoggerError("ShellRunner", "{1} {2} is required, found '{3}'.", Name, SHELL_RUNNER_MIN_WIN_PS_VERSION, Version)
+	Text := StrReplace(t(Version == "" ? "startup.winps_missing" : "startup.winps_too_old"),
+		"{1}", SHELL_RUNNER_MIN_WIN_PS_VERSION)
+	Text := StrReplace(StrReplace(Text, "{2}", Version), "{3}", Name)
+	if HasMethod(NoticeFn, "Call")
+		NoticeFn.Call(Text)
+	else
+		Ui_MsgBox(Text, Name, "Icon!")
+	return false
+}
+
 /**
  * The arguments a PowerShell stage starts with: no profile, no prompt, and
  * the execution policy its scripts and modules need, followed by Args.

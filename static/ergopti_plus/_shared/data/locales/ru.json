@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "Ошибка запуска: файл _generated/features_manifest.ahk отсутствует или повреждён.\n\nЗапустите `npm run build:manifest` из каталога проекта и перезапустите скрипт.",
 	"startup.manifest_window_title": "manifest отсутствует",
 	"startup.native_logger_unavailable": "ErgoptiPlus не может запуститься, потому что нативная служба журналирования недоступна. Запустите ErgoptiPlus через его средство запуска.",
+	"startup.winps_missing": "{3} {1} не найден. Обновления, локальный ИИ, диагностика и другие функции, которые его используют, отклоняются, пока он не будет установлен.",
+	"startup.winps_too_old": "{3} слишком старый ({2}): Ergopti+ нужен {1}. Обновления, локальный ИИ, диагностика и другие функции, которые его используют, отклоняются, пока он не будет обновлён.",
 	"system_actions.new_text_file_name": "Новый текстовый файл",
 	"system_actions.no_disk_to_eject": "Нет дисков для извлечения.",
 	"system_actions.no_file_selected": "В файловом менеджере не выбран ни один файл.",

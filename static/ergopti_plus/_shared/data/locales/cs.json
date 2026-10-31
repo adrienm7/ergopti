@@ -2904,6 +2904,8 @@
 	"startup.manifest_missing": "Chyba při spuštění: soubor _generated/features_manifest.ahk chybí nebo je poškozen.\n\nSpusťte `npm run build:manifest` z adresáře projektu a skript restartujte.",
 	"startup.manifest_window_title": "manifest chybí",
 	"startup.native_logger_unavailable": "ErgoptiPlus nelze spustit, protože nativní služba protokolování není dostupná. Spusťte ErgoptiPlus prostřednictvím jeho spouštěče.",
+	"startup.winps_missing": "{3} {1} nebyl nalezen. Aktualizace, místní AI, diagnostika a další funkce, které jej používají, jsou odmítnuty, dokud nebude nainstalován.",
+	"startup.winps_too_old": "{3} je příliš starý ({2}): Ergopti+ vyžaduje verzi {1}. Aktualizace, místní AI, diagnostika a další funkce, které jej používají, jsou odmítnuty, dokud nebude aktualizován.",
 	"system_actions.new_text_file_name": "Nový textový soubor",
 	"system_actions.no_disk_to_eject": "Žádný disk k vysunutí.",
 	"system_actions.no_file_selected": "Ve správci souborů není vybrán žádný soubor.",
