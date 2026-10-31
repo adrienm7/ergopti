@@ -23,20 +23,20 @@ MANIFEST = Path(__file__).resolve().parents[2] / SUBJECT.MANIFEST_RELATIVE
 
 
 def make_tree(root, *, extra=None):
-    """Writes a fake signed tree with the three products."""
+    """Writes a fake signed helper bundle with its executable and three products."""
     root = Path(root)
     for relative in SUBJECT.REQUIRED_MEMBERS:
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"\xcf\xfa\xed\xfe" + relative.encode())
         path.chmod(0o755)
-    plist = root / "Runtime/ErgoptiPlus-Remap-Core.app/Contents/Info.plist"
+    plist = root / SUBJECT.PRODUCTS / "ErgoptiPlus-Remap-Core.app/Contents/Info.plist"
     plist.write_bytes(b"<plist/>")
     plist.chmod(0o644)
     for path in sorted(root.rglob("*")):
         if path.is_dir():
             path.chmod(0o755)
-    (root / "Runtime").chmod(0o755)
+    (root / SUBJECT.TOP).chmod(0o755)
     if extra:
         extra(root)
     return root
@@ -76,7 +76,7 @@ class PublishTests(unittest.TestCase):
 
     def test_link_is_refused(self):
         def link(root):
-            os.symlink("bin", root / "Runtime/alias")
+            os.symlink("bin", root / SUBJECT.PRODUCTS / "alias")
 
         tree = make_tree(self.base / "a", extra=link)
         with self.assertRaisesRegex(SUBJECT.PublishRefusal, "alias"):
@@ -92,6 +92,54 @@ class PublishTests(unittest.TestCase):
         tree = make_tree(self.base / "a")
         (tree / SUBJECT.REQUIRED_MEMBERS[2]).chmod(0o775)
         with self.assertRaisesRegex(SUBJECT.PublishRefusal, "mode"):
+            SUBJECT.archive_bytes(tree)
+
+    def test_artifact_is_the_helper_bundle_alone(self):
+        def sibling(root):
+            module = root / "installed_physical_source.so"
+            module.write_bytes(b"module")
+            module.chmod(0o755)
+
+        data = SUBJECT.archive_bytes(make_tree(self.base / "a", extra=sibling))
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
+            names = archive.getnames()
+        self.assertEqual(SUBJECT.TOP, "ErgoptiPlus-Runtime-Installer.app")
+        self.assertTrue(all(n == SUBJECT.TOP or n.startswith(SUBJECT.TOP + "/") for n in names))
+        self.assertIn(SUBJECT.TOP + "/Contents/MacOS/ErgoptiPlus-Runtime-Installer", names)
+        self.assertNotIn("installed_physical_source.so", names)
+
+    def test_loose_runtime_tree_is_refused(self):
+        loose = self.base / "a/Runtime/bin"
+        loose.mkdir(parents=True)
+        with self.assertRaisesRegex(SUBJECT.PublishRefusal, "ErgoptiPlus-Runtime-Installer.app"):
+            SUBJECT.archive_bytes(self.base / "a")
+
+    def test_member_outside_the_helper_is_refused(self):
+        tree = make_tree(self.base / "a")
+        data = SUBJECT.archive_bytes(tree)
+        buffer = io.BytesIO()
+        with (
+            tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as source,
+            tarfile.open(fileobj=buffer, mode="w:gz") as target,
+        ):
+            for member in source.getmembers():
+                target.addfile(member, source.extractfile(member) if member.isreg() else None)
+            stray = tarfile.TarInfo("Runtime/bin/ergoptiplus_remap_cli")
+            stray.size = 0
+            target.addfile(stray, io.BytesIO(b""))
+        tampered = buffer.getvalue()
+        pin = {"size": len(tampered), "sha256": hashlib.sha256(tampered).hexdigest()}
+        with self.assertRaisesRegex(SUBJECT.PublishRefusal, "member outside"):
+            SUBJECT.verify_archive(tampered, pin)
+
+    def test_private_directory_mode_is_kept_and_group_writable_refused(self):
+        tree = make_tree(self.base / "a")
+        (tree / SUBJECT.PRODUCTS / "bin").chmod(0o700)
+        data = SUBJECT.archive_bytes(tree)
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
+            self.assertEqual(archive.getmember(SUBJECT.PRODUCTS + "/bin").mode, 0o700)
+        (tree / SUBJECT.PRODUCTS / "bin").chmod(0o775)
+        with self.assertRaisesRegex(SUBJECT.PublishRefusal, "directory mode"):
             SUBJECT.archive_bytes(tree)
 
     def test_package_writes_a_pin_the_archive_satisfies(self):
