@@ -723,6 +723,7 @@
 	"healthcheck.field.runtime": "Çalışma ortamı",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Web görünümü motoru",
+	"webview.runtime_too_old": "WebView2 Runtime çok eski ({2}): Ergopti+ için {1} veya daha yenisi gerekir. Güncelleyene kadar pencereler basit biçimleriyle açılır.",
 	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "Model",
 	"healthcheck.field.cpu": "İşlemci",

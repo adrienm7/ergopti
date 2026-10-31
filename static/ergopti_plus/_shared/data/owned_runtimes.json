@@ -1153,7 +1153,7 @@
 			"decision": "SYS",
 			"decision_text": "SYS with the existing fallback and a minimum-version check (Evergreen, decided 2026-10-27)",
 			"alternative": "PIN as Fixed Version (~150 MB per architecture)",
-			"status": "follow_up"
+			"status": "done"
 		},
 		{
 			"os": "windows",

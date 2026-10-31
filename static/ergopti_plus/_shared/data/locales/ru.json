@@ -723,6 +723,7 @@
 	"healthcheck.field.runtime": "Среда выполнения",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Движок веб-представлений",
+	"webview.runtime_too_old": "Среда WebView2 Runtime слишком старая ({2}): Ergopti+ нужна версия {1} или новее. Окна открываются в простом виде, пока вы её не обновите.",
 	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "Модель",
 	"healthcheck.field.cpu": "Процессор",
