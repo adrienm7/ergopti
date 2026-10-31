@@ -1028,8 +1028,9 @@ requires_linux = ["tool:tesseract"]
 emit_ahk = "#+t"
 
 [sg_actions.open_chatgpt]
-# macOS binds its Ctrl+G switch to its own owner of the same URL.
-platform = "ahk,linux"
+# The shortcuts.chatgpt_url page; macOS opens it through the same owner as
+# its Ctrl+G shortcut (modules/shortcuts/bindings get_chatgpt_url).
+platform = "all"
 requires_linux = ["tool:xdg-open"]
 
 [sg_actions.open_url]

@@ -1408,6 +1408,22 @@ sg("display_mirror_toggle", mouse_action("toggle_display_mirror"))
 -- The frontmost window saved to the screenshots folder, under the dispatching
 -- parent's screenshot owner: what the key left of 1 ran before it became a tap key.
 sg("screen_capture_instant", owner_action("modules.shortcuts.actions.system", "capture_frontmost_window"))
+-- The URL the Ctrl+G shortcut opens, read from its owner at each run so a
+-- changed shortcuts.chatgpt_url applies at once (Windows and Linux had this
+-- action; macOS only had the shortcut).
+sg("open_chatgpt", function()
+	local ok_bindings, Bindings = pcall(require, "modules.shortcuts.bindings")
+	if not ok_bindings or type(Bindings) ~= "table" or type(Bindings.get_chatgpt_url) ~= "function" then
+		Logger.error(LOG, "open_chatgpt: the ChatGPT URL owner is unavailable: %s.", tostring(Bindings))
+		return false
+	end
+	local ok_apps, Apps = pcall(require, "modules.shortcuts.actions.apps")
+	if not ok_apps or type(Apps) ~= "table" or type(Apps.open_chatgpt) ~= "function" then
+		Logger.error(LOG, "open_chatgpt: the application owner is unavailable: %s.", tostring(Apps))
+		return false
+	end
+	return Apps.open_chatgpt(Bindings.get_chatgpt_url(), current_action_parent())
+end)
 sg("open_downloads", owner_action("modules.shortcuts.actions.apps", "open_downloads"))
 sg("open_file_manager", owner_action("modules.shortcuts.actions.apps", "open_finder"))
 sg("open_system_settings", owner_action("modules.shortcuts.actions.apps", "open_settings"))
