@@ -251,10 +251,14 @@ managed Mac, and keep a field probe of the exact exec shape when changing it.
 ### project-macos-ai-runtimes-install-on-selection
 
 Neither AI runtime ships in the app or downloads at boot, on AI enable with
-another backend, or after an update: only `install_for_selection()` of
-`ollama_deps_checker`/`mlx_deps_checker` grants a download, its sole caller is
+another backend, or after an update: only `install_native_for_selection()` of
+`ollama_deps_checker` (under an issued `ollama_runtime_choice`) and
+`install_for_selection()` of `mlx_deps_checker` install, their sole caller is
 `ui/menu/menu_llm/runtime_install_offer.lua`, and any other check settles
-`missing` without a task. An installed runtime is reused by stat alone
+`missing` without a task. The stock Ollama download and its installers are
+retired (owned-runtimes row "Ollama installers (legacy)"):
+`ensure-ollama-deps.sh` only verifies the resolved runtime and exits 64 when
+none was resolved; never give it a download back. An installed runtime is reused by stat alone
 (Ollama: `ollama_binary.resolve()`; MLX: venv `bin/python` plus
 `.last_sync_hash`), so a new `uv.lock` in an update never re-syncs the venv.
 When the MLX import probe then fails on an installed venv,
@@ -278,10 +282,9 @@ flag, and a failed install comes back with its cause and the repair button
 row instead of carrying the click that opens its fix: hardening-g scans
 notifications as well as dialogs. The Ollama checker still builds its failure
 tail from the completion alone.
-The Ollama installer publishes the whole release archive (CLI plus the
-ggml/MLX libraries it loads from its own folder, as in
-`Ollama.app/Contents/Resources`) into the folder
-`ollama_binary.managed_install_dir()` names; never copy the lone binary. Add a
+The native Ollama installer publishes the whole runtime (CLI plus the
+libraries it loads from its own folder) into
+`ollama_binary.native_managed_install_dir()`; never copy the lone binary. Add a
 new runtime trigger through the router, and extend
 `test_ai_runtime_selection_install_*.lua` (`ai-runtime-*`).
 
@@ -1885,8 +1888,8 @@ flows through `infra/field_run.lua`: a request file in the clone folder that
 `static/ergopti_plus/macos/data/field_run.json` names, one JSON result per
 step, then a done marker. It starts only behind `infra/dev_source.lua`; a
 packaged runtime never loads it. Runtime installs go through
-`runtime_install_offer` (the only grantor), never `install_for_selection()`
-directly, or `ai-runtime-triggers` fails. Add a new Debug field check to the
+`runtime_install_offer` (the only grantor), never the checkers' install
+entries directly, or `ai-runtime-triggers` fails. Add a new Debug field check to the
 declaration too: `test_field_run.lua` and `test-macos-field-run-contract.cjs`
 refuse a check with no step. A step that needs a person is declared with
 `person`/`reason` and reported, never driven with synthetic input.

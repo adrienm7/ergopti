@@ -2378,8 +2378,6 @@
 	"ollama.model_ready": "%s je připraven!",
 	"ollama.model_repair": "Model se zdá poškozený. Pokus o opětovné stažení: %s",
 	"ollama.model_repair_title": "Oprava modelu Ollama",
-	"ollama.not_detected_body": "Nainstalujte Ollama a zkuste to znovu.",
-	"ollama.not_detected_title": "Ollama nenalezeno",
 	"ollama.service_disconnected": "Služba Ollama přestala reagovat.",
 	"ollama.service_ready": "Služba Ollama připravena ✅",
 	"ollama.service_stopped": "Služba Ollama zastavena. Spouštění…",
