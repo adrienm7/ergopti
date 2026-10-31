@@ -837,9 +837,11 @@ Added October 22 (from the agents' reports; details in their commits):
       beyond the signature check is open.
 - [ ] **139. Personal identities in logs.** [CODE] Done: email, URL-credential, foreign-profile rules,
       config-directory name masking, the opt-in redacted day log attachment, and pack labels masked on the three OS
-      (macOS and Linux `PrivateLabel.mask`, Windows at write time, 9390f45b2d). Left: write-time masking in the macOS
-      and Linux loggers (historical logs on disk stay unmasked; the collector masks at export); GitHub field
-      editability after a form reload needs a real draft.
+      (macOS and Linux `PrivateLabel.mask`, Windows at write time, 9390f45b2d); the macOS and Linux loggers apply the
+      shared redactor (`diagnostics/redact.lua`: emails, URL credentials, other accounts' folders) to each line as it
+      is written (`macos/infra/logger.lua` `redact_message`, `linux/infra/logger_sink.lua`; logs written before it
+      stay unmasked on disk and the collector masks them at export). Left: GitHub field editability after a form
+      reload needs a real draft.
 - [ ] **13/35.** [CODE] Enrol the complete guardian acceptance collector in main CI.
 - [ ] **93. Linux ordered pairs.** [PHYS-L] XI2 property cookies proven on Xvfb (`run_xi2_property_cookies.py`).
       Nothing else is provable on Xvfb: the join of a uinput Writer edge with the server's XKB/XI2 modifier state
