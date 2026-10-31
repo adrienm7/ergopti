@@ -852,7 +852,7 @@ helpers.describe("controlled termination coordinator", function()
 		local coordinator, calls = load_coordinator({ record_stage = function(kind, stage)
 			stages[#stages + 1] = kind .. ":" .. stage
 		end })
-		helpers.assert_true(coordinator.request_reload("first"))
+		helpers.assert_true(coordinator.request_reload_owned("first", function() end))
 		calls.lease_callback(false, "refused")
 		helpers.assert_eq(stages[#stages - 1], "reload:lease_fence_refused")
 		helpers.assert_eq(stages[#stages], "reload:aborted")
@@ -910,7 +910,7 @@ helpers.describe("controlled termination coordinator", function()
 		helpers.assert_eq(settled_calls.reloads, 1, "a late deadline after the reload is inert")
 
 		local aborted, aborted_calls = load_coordinator()
-		helpers.assert_true(aborted.request_reload("menu"))
+		helpers.assert_true(aborted.request_reload_owned("menu", function() end))
 		aborted_calls.lease_callback(false, "refused")
 		helpers.assert_true(aborted_calls.reload_deadline_stopped == true)
 		aborted_calls.reload_deadline_callback()
@@ -923,6 +923,37 @@ helpers.describe("controlled termination coordinator", function()
 		upgraded_calls.reload_deadline_callback()
 		helpers.assert_eq(upgraded_calls.reloads, 0, "an exit is never turned back into a reload")
 		helpers.assert_true(upgraded.is_pending())
+	end)
+
+	-- A refused fence aborted the reload and kept this VM, whose remaps the
+	-- revocation had already stopped for good (reload-fence-refused).
+	helpers.it("reloads natively when an unowned reload's fence is refused (reload-fence-refused)", function()
+		local stages = {}
+		local coordinator, calls = load_coordinator({ record_stage = function(_, stage) stages[#stages + 1] = stage end })
+		helpers.assert_true(coordinator.request_reload("watcher"))
+		calls.lease_callback(false, "timeout waiting for STOPPED")
+		helpers.assert_eq(calls.reloads, 1, "the refused reload reloads natively")
+		helpers.assert_eq(calls.marks, 1)
+		helpers.assert_eq(calls.teardowns, 0, "no local teardown runs without the exact fence")
+		helpers.assert_eq(calls.fatal_exits, 0)
+		helpers.assert_true(not coordinator.is_pending())
+		helpers.assert_true(calls.reload_deadline_stopped == true)
+		helpers.assert_eq(stages[#stages - 1], "reload_fence_refused")
+		helpers.assert_eq(stages[#stages], "hs_reload_called")
+
+		-- A refused exit still aborts and keeps the VM
+		local quit, quit_calls = load_coordinator()
+		helpers.assert_true(quit.request_exit("menu", 0))
+		quit_calls.lease_callback(false, "refused")
+		helpers.assert_eq(quit_calls.reloads, 0)
+		helpers.assert_eq(quit_calls.exits, 0)
+		helpers.assert_true(not quit.is_pending())
+
+		-- A native reload that raises takes the fatal backstop
+		local raising, raising_calls = load_coordinator({ reload_raises = true })
+		helpers.assert_true(raising.request_reload("watcher"))
+		raising_calls.lease_callback(false, "refused")
+		helpers.assert_eq(raising_calls.fatal_exits, 1)
 	end)
 
 	helpers.it("refuses initialization without a positive reload deadline (reload-deadline)", function()
