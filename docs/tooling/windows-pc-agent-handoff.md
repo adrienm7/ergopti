@@ -414,3 +414,11 @@ Read through "Found tonight"; all of it is taken in two PC lots, do not redo. Al
 - The macOS and Linux case-twin notice comes from one writer hook, but their menu callers still show the old generic message too. That part is open on the Lua side and cloud-owned if you take it.
 
 The owned-runtimes commit of `b8894bb73c` overlapped a PC commit; the PC drops its own and follows your registry. The field report is still to come, after the suite.
+
+## Port corpus count, 2026-10-31 late
+
+`1ca7111fae` added two cases to `_shared/tests/corpus/llm/local_server_ports.json`,
+which now holds 32. The shared Lua contract now pins 32 on macOS and Linux;
+`windows/tests/unit/modules/llm/servers/test_local_server_ports.ahk`
+`_LSP_RegisterCorpus` still compares against 30, so its corpus registration
+throws on Windows. Change the count to 32 there.
