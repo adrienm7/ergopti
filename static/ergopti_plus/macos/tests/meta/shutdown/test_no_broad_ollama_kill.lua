@@ -157,6 +157,7 @@ helpers.describe("Item 120: no broad Ollama termination", function()
 			"quit must retire Ollama through the owned-daemon stop")
 		local patterns = {}
 		for value in body:gmatch("pattern%s*=%s*\"([^\"]*)\"") do patterns[#patterns + 1] = value end
+		helpers.assert_eq(#patterns, 2, "the quit sweep pattern scan must find both helper patterns")
 		helpers.assert_eq(table.concat(patterns, ","), "ergopti_plus_expander,ergopti_plus_http_server",
 			"the quit sweeps name only Ergopti's own helpers")
 	end)
