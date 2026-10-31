@@ -383,7 +383,7 @@ The resulting tags are `archive/fix-macos`, `archive/fix-linux`, `archive/fix-wi
 (`tmp/wip-todo-ag`, `-ag2`, `-ae`, `tmp/wip-field-auto`, `tmp/wip-field-run-checklist` and 358e211a10 are on dev).
 After the cleanup, read them through the `archive/tmp-wip-<name>` tags.
 
-- `tmp/wip-todo-ah`: a408a29790 (AHK shard split) only, handed to the PC ("PC Windows todo" step 3); the hs.\* cache
+- `tmp/wip-todo-ah`: a408a29790 (AHK shard split) only, handed to the PC ("PC Windows todo" step 3); the `hs.*` cache
   reset and the four Linux and macOS speed-ups landed on 2026-10-31 (`fix/todo-final-p4-ci`). `tmp/wip-ci-fix` is
   fully on dev under other ids (2fb196a022, 767cf0cb7a, 9c496d384d with the fixture-owned machine id, 9b7abbe580,
   7feb5a211b, 376b28db82): nothing to land.
