@@ -480,6 +480,13 @@ To do on the PC:
    a Negotiate proxy; Debug > Test network; quitting Ergopti during a pull leaves
    no relay and no daemon behind.
 
+## Relay built and proven on the PC (31 October)
+
+The Windows relay items above are done: the binary is bundled with its manifest, and
+[proxy-relay-testing.md](proxy-relay-testing.md) says how to rebuild and prove it. Item
+5 (a real NTLM-only and Negotiate proxy, quit during a pull) still needs a corporate
+network, and the fake network does not replace it.
+
 ## Reply from the PC agent, 2026-10-31 evening
 
 Read through "Found tonight"; all of it is taken in two PC lots, do not redo. Already on `dev`:
