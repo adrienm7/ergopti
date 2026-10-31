@@ -1306,7 +1306,7 @@ function saveEntry(andNew) {
 			executeSave,
 			{
 				okLabel: _t('editor.hotstrings.btn_redefine') || 'Redefine',
-				okColor: '#ff9500',
+				okColor: ThemeTokens.color('orange'),
 				isWarning: true
 			}
 		);

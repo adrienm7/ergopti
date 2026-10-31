@@ -48,7 +48,7 @@
 	/* Score badge colors */
 	--score-pos-color: var(--theme-green);
 	--score-neg-color: var(--theme-red);
-	--score-neutral-color: #86868b;
+	--score-neutral-color: var(--theme-hue-86868b);
 	--score-pos-bg: rgba(52, 199, 89, 0.08);
 	--score-neg-bg: rgba(255, 59, 48, 0.08);
 	--score-neutral-bg: rgba(0, 0, 0, 0.04);
@@ -70,7 +70,7 @@
 
 		--score-pos-color: var(--theme-hue-32d74b);
 		--score-neg-color: var(--theme-red-dark);
-		--score-neutral-color: #bdbdbd;
+		--score-neutral-color: var(--theme-grey-bdbdbd);
 		--score-pos-bg: rgba(50, 215, 75, 0.08);
 		--score-neg-bg: rgba(255, 69, 58, 0.08);
 		--score-neutral-bg: rgba(255, 255, 255, 0.04);
@@ -224,7 +224,7 @@ h1 {
 	z-index: 999;
 }
 .app-modal-card {
-	background: #1a1a1a;
+	background: var(--theme-grey-1a1a1a);
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	border-radius: 12px;
 	color: var(--theme-grey-ddd);
