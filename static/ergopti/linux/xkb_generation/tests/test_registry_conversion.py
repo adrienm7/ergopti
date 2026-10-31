@@ -34,15 +34,6 @@ from support import (
 ERGOL_LEVEL_INDICES = [0, 2, 1, 1, 0, 3, 4]
 KEYPAD_CODES = range(65, 93)
 
-# (dead-key state, action) outputs the shipped Ergopti XCompose files cannot
-# reach: the action's key is itself a dead key, so it sends its dead keysym, not
-# the character its Compose line names. The golden test freezes those files
-# (docs/memory/linux-web-release.md); any other layout must have none, so a new
-# registry layout that hits this converter limit fails here instead of shipping
-# sequences nobody can type.
-ERGOPTI_FAMILY = {"ergopti", "ergopti_ansi", "ergopti_plus", "ergopti_plus_ansi"}
-ERGOPTI_UNREACHABLE = {("s1_circumflex", "^"), ("s1_circumflex", "¨"), ("s3_diaeresis", "¨")}
-
 _COMPOSE_LINE_RE = re.compile(r'^((?:<[^>]+>\s*)+):\s*"((?:[^"\\]|\\.)*)"\s*$')
 
 
@@ -132,14 +123,48 @@ class RegistryConversionTests(unittest.TestCase):
             self.assertTrue(result.compose_text.startswith('include "%L"'), entry["id"])
             self.assertEqual(result.conflicts, [], entry["id"])
 
-    def test_every_dead_key_output_is_reachable_from_its_own_key(self):
+    def test_every_dead_key_output_is_composed_from_the_keysym_its_key_sends(self):
+        """Inside a dead state a key sends its own keysym, a dead key its trigger.
+
+        Read from the written symbols (key_symbols), not from the converter's
+        choice of sequence keysym, so naming the character an action is called
+        after instead of what its key sends (the old chained-dead-key bug) fails.
+        A ``base_level_only`` output (Ergopti+'s magic key) is left out: inside a
+        dead state it still names its action's letter, a separate known limit
+        the shipped Ergopti files keep.
+        """
         entries = registry_entries()
         self.assertGreaterEqual(len(entries), 5)
-        self.assertTrue(ERGOPTI_FAMILY <= {entry["id"] for entry in entries})
+        checked = 0
         for entry in entries:
-            result = convert_registry_layout(entry["id"])
-            expected = ERGOPTI_UNREACHABLE if entry["id"] in ERGOPTI_FAMILY else set()
-            self.assertEqual(set(result.unreachable), expected, entry["id"])
+            layout_id = entry["id"]
+            layout = keylayout_to_xkb.parse_keylayout(registry_keylayout(layout_id))
+            result = convert_registry_layout(layout_id)
+            compose = parse_compose(result.compose_text)
+            level_indices = [layout.key_map_index(mods) for mods in keylayout_to_xkb.XKB_LEVELS]
+            keycodes = keylayout_to_xkb.load_keycodes(KEYCODES_PATH, entry["keycode_convention"])
+            magic = {
+                result.borrowed.get(text) or keylayout_to_xkb.unicode_keysym(text)
+                for text in entry.get("xkb", {}).get("base_level_only", [])
+            }
+            missing = []
+            for xkb, code in keycodes:
+                for level, index in enumerate(level_indices):
+                    key = layout.key_entry(index, code)
+                    keysym = result.key_symbols[xkb][level]
+                    if key is None or key[0] != "action" or keysym in magic:
+                        continue
+                    if keysym == keylayout_to_xkb.NO_SYMBOL:
+                        continue
+                    for state, (output, _next) in layout.actions[key[1]].whens.items():
+                        if state == "none" or not output:
+                            continue
+                        for prefix in result.dead_sequences.get(state, []):
+                            checked += 1
+                            if compose.get(tuple(prefix) + (keysym,)) != output:
+                                missing.append("%s %s -> %r" % (" ".join(prefix), keysym, output))
+            self.assertEqual(missing, [], layout_id)
+        self.assertGreater(checked, 1000)
 
 
 class ErgolCompletenessTests(unittest.TestCase):

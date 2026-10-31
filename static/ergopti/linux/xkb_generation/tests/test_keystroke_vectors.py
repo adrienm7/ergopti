@@ -53,13 +53,6 @@ SKIPPED = {
     # A shortcut on a dead key keeps the physical key on Windows; XKB has no
     # shortcut level distinct from the dead key it carries.
     "ergol_shortcut_dead_key": "no XKB counterpart",
-    # KNOWN LINUX GAP, frozen by the golden test: the committed Ergopti files
-    # name a dead key pressed inside a dead-key state after the character its
-    # action is named after (<dead_circumflex> <diaeresis> : "/"), but that key
-    # types dead_diaeresis, so the sequence cannot be typed. ^ ^ still works
-    # through the system table the files include; ^ then ¨ does not.
-    "ergopti_dead_circumflex_twice": "Ergopti's golden XCompose, see above",
-    "ergopti_chained_dead_keys": "Ergopti's golden XCompose, see above",
 }
 
 

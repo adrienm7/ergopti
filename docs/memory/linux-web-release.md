@@ -627,20 +627,21 @@ live in `~/.config/ergopti_plus/api_keys.json`, mode 0600, outside the
 possibly-synced config folder. Action: keep both live steps green for any
 change to the injector, the engine, the parser or the HTTP client.
 
-### project-ergopti-xcompose-chained-dead-keys-are-unreachable
+### project-xcompose-sequences-name-the-keysym-the-key-sends
 
-The committed Ergopti XCompose files name a dead key pressed inside a dead-key
-state after the character its action is named after (`<dead_circumflex>
-<diaeresis> : "/"`), but that key types `dead_diaeresis`, so the sequence can
-never be typed on Linux; `^ ^` only works through the `include "%L"` system
-table. The generic converter reproduces this on purpose (the Ergopti golden
-test pins those files byte for byte), and
-`xkb_generation/tests/test_keystroke_vectors.py` skips the two shared vectors
-by id. The converter reports such outputs in `Conversion.unreachable`;
-`test_registry_conversion.py` pins Ergopti's three and requires none for every
-other registry layout, so a new layout hitting the limit fails there. Action:
-fixing it is a deliberate regeneration of the Ergopti XKB files, golden files
-included, not a converter tweak.
+Inside a dead-key state a key sends what it sends from the neutral state: a
+dead key its dead keysym, any other key the keysym of what it types. Both
+converters (`keylayout_to_xkb.py` and its Lua twin `layouts/xkb_converter.lua`,
+`state_keysyms`) end each Compose sequence with those keysyms. Naming the
+character the action is called after instead (the historical rule) made Ergopti's
+`^ ^` and `^ ¨` untypable and gave Bépo's chained dead keys 62 untypable outputs
+and 6 conflicting sequences (a plain `^` and the circumflex dead key sharing
+`<asciicircum>`). The base keysym stays first when a key sends it, so every other
+line of the shipped Ergopti files is unchanged; the Ergopti+ magic key
+(`base_level_only`) still names its action's letter inside a dead state.
+Action: pin a new dead-key shape with a vector in
+`_shared/tests/corpus/keylayout/xkb_conversion_vectors.json` (both converters
+replay it) and keep `test_registry_conversion.py`'s written-keysym check green.
 
 ## Release artifacts
 

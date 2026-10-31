@@ -582,12 +582,6 @@ class Conversion:
         # works on keysyms, so two keys typing the same keysym cannot be told
         # apart; the first output wins and the conflict is reported here.
         self.conflicts: List[Tuple[str, str, str]] = []
-        # (dead-key state, action) outputs no key can reach: the Compose line
-        # names the character the action is called after, but every key using
-        # that action sends another keysym (a dead key pressed inside a
-        # dead-key state sends its own dead keysym). Reported, not fixed, so
-        # the shipped Ergopti files keep their historical sequences.
-        self.unreachable: List[Tuple[str, str]] = []
 
 
 class _Converter:
@@ -674,6 +668,29 @@ class _Converter:
         if len(text) == 1:
             return self.keysyms.get(text) or unicode_keysym(text)
         return self.keysyms.get(text, text)
+
+    def state_keysyms(self, action_id: str) -> List[str]:
+        """Keysyms ending a Compose sequence for ``action_id`` in a dead state.
+
+        A key pressed inside a dead-key state sends what it sends from the
+        neutral state: a dead key sends its own dead keysym, not the character
+        it types alone, and an action whose one-character id is not what it
+        types sends its output. Naming only the base keysym (base_keysym) left
+        those untypable (Ergopti's ^ ^) and made a plain action and a dead-key
+        action whose base keysyms agree collide on one sequence (Bépo's "^" and
+        circumflex dead key inside its science dead key). The base keysym
+        stays first when a key sends it, so those lines keep their historical
+        form; a dead key also using the action adds its own trigger, and an
+        action no key uses (untypable on macOS too) keeps its base keysym.
+        """
+        typed = self._keysyms_typing_action(action_id)
+        base = self.base_keysym(action_id)
+        if not typed:
+            return [base]
+        if base not in typed:
+            return list(typed)
+        dead = set(self.dead_triggers.values())
+        return [base] + [keysym for keysym in typed if keysym in dead and keysym != base]
 
     def dead_trigger(self, state: str) -> str:
         """Keysym a dead key entering ``state`` produces."""
@@ -810,11 +827,6 @@ class _Converter:
         for state in sorted(outputs):
             if state not in sequences:
                 continue
-            for action_id, _output in sorted(outputs[state]):
-                # An action no key uses cannot be typed on macOS either.
-                typed = self._keysyms_typing_action(action_id)
-                if typed and self.base_keysym(action_id) not in typed:
-                    self.result.unreachable.append((state, action_id))
             for prefix in sequences[state]:
                 if not first:
                     lines.append("")
@@ -824,13 +836,14 @@ class _Converter:
                     "%s\t: %s" % (head, compose_string(self.layout.terminators.get(state, "")))
                 )
                 for action_id, output in sorted(outputs[state]):
-                    sequence = "%s <%s>" % (head, self.base_keysym(action_id))
-                    if sequence in emitted:
-                        if emitted[sequence] != output:
-                            self.result.conflicts.append((sequence, emitted[sequence], output))
-                        continue
-                    emitted[sequence] = output
-                    lines.append("%s\t: %s" % (sequence, compose_string(output)))
+                    for keysym in self.state_keysyms(action_id):
+                        sequence = "%s <%s>" % (head, keysym)
+                        if sequence in emitted:
+                            if emitted[sequence] != output:
+                                self.result.conflicts.append((sequence, emitted[sequence], output))
+                            continue
+                        emitted[sequence] = output
+                        lines.append("%s\t: %s" % (sequence, compose_string(output)))
         return 'include "%L"\n\n' + "\n".join(lines) + "\n"
 
 
