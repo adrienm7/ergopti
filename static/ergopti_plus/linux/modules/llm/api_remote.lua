@@ -396,6 +396,14 @@ local function access_slot(entry)
 	return _access[key]
 end
 
+--- Arms fn for the next tick of the event loop: one slice of a signed
+--- assertion (api_token_exchange.drive).
+--- @param fn function
+--- @return boolean armed
+local function schedule_access_slice(fn)
+	return require("adapters.timer_scheduler").after(0, fn).armed == true
+end
+
 --- Exchanges an entry's stored key for an access token, once at a time;
 --- on_done(ok, reason) runs when the exchange settles.
 --- @param provider table A catalogue provider with an auth block.
@@ -414,34 +422,40 @@ local function refresh_access(provider, entry, on_done)
 			if not called then Logger.error(LOG, "Access token waiter failed: %s", tostring(problem)) end
 		end
 	end
-	local request, reason = TokenExchange.request(provider.auth, entry.token)
-	if not request then
-		slot.failure, slot.retry_at = reason, Monotonic.now_sec() + ACCESS_RETRY_SECONDS
-		Logger.error(LOG, "Access token of provider '%s' cannot be asked: %s.", provider.id, reason)
-		return settle(false, reason)
-	end
 	slot.pending = true
-	Logger.start(LOG, "Exchanging the key of provider '%s' for an access token…", provider.id)
-	local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
-		result = type(result) == "table" and result or {}
-		local raw = type(result.body) == "string" and result.body ~= "" and result.body or result.error_body
-		local decoded_ok, decoded = pcall(Json.decode, type(raw) == "string" and raw or "")
-		local token, why = TokenExchange.read(provider.auth, result.status, decoded_ok and decoded or nil, Monotonic.now_sec())
-		if token then
-			slot.token, slot.expires_at, slot.failure, slot.retry_at = token.token, token.expires_at, nil, nil
-			Logger.success(LOG, "Access token of provider '%s' received (valid %d s).", provider.id,
-				math.floor(token.expires_at - Monotonic.now_sec()))
-			return settle(true, nil)
-		end
-		slot.failure, slot.retry_at = why, Monotonic.now_sec() + ACCESS_RETRY_SECONDS
-		Logger.error(LOG, "Access token of provider '%s' refused: %s.", provider.id, why)
-		return settle(false, why)
-	end)
-	if not dispatched then
-		slot.failure, slot.retry_at = "the token exchange could not be sent", Monotonic.now_sec() + ACCESS_RETRY_SECONDS
-		Logger.error(LOG, "Access token of provider '%s' cannot be asked: the request was not sent.", provider.id)
-		return settle(false, slot.failure)
-	end
+	-- A service-account key's assertion is signed one slice per tick
+	-- (api_token_exchange.drive), so the key remapper's loop is never held
+	TokenExchange.drive(TokenExchange.begin(provider.auth, entry.token, os.time()), schedule_access_slice,
+		function(request, reason)
+			if not request then
+				slot.failure, slot.retry_at = reason, Monotonic.now_sec() + ACCESS_RETRY_SECONDS
+				Logger.error(LOG, "Access token of provider '%s' cannot be asked: %s.", provider.id, reason)
+				return settle(false, reason)
+			end
+			Logger.start(LOG, "Exchanging the key of provider '%s' for an access token…", provider.id)
+			local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
+				result = type(result) == "table" and result or {}
+				local raw = type(result.body) == "string" and result.body ~= "" and result.body or result.error_body
+				local decoded_ok, decoded = pcall(Json.decode, type(raw) == "string" and raw or "")
+				local token, why = TokenExchange.read(provider.auth, result.status, decoded_ok and decoded or nil,
+					Monotonic.now_sec())
+				if token then
+					slot.token, slot.expires_at, slot.failure, slot.retry_at = token.token, token.expires_at, nil, nil
+					Logger.success(LOG, "Access token of provider '%s' received (valid %d s).", provider.id,
+						math.floor(token.expires_at - Monotonic.now_sec()))
+					return settle(true, nil)
+				end
+				slot.failure, slot.retry_at = why, Monotonic.now_sec() + ACCESS_RETRY_SECONDS
+				Logger.error(LOG, "Access token of provider '%s' refused: %s.", provider.id, why)
+				return settle(false, why)
+			end)
+			if not dispatched then
+				slot.failure = "the token exchange could not be sent"
+				slot.retry_at = Monotonic.now_sec() + ACCESS_RETRY_SECONDS
+				Logger.error(LOG, "Access token of provider '%s' cannot be asked: the request was not sent.", provider.id)
+				return settle(false, slot.failure)
+			end
+		end)
 end
 
 --- The access token an entry's requests carry now, refreshing it in the

@@ -113,7 +113,11 @@ drivers read it generically, so adding one needs no driver code. Two shapes
 carry what a plain key and address cannot: a `base_url` holding `{name}`
 placeholders is an address the add-entry form fills (`api_url_template.lua`,
 AHK port), and an `auth` block makes the requests carry an access token
-exchanged from the key (`api_token_exchange.lua`). Every row needs a
+exchanged from the key (`api_token_exchange.lua`); its optional `assertion`
+block signs an RS256 JWT for a key of the named JSON type (a Google service
+account) with the pure-Lua `_shared/lua/crypto/` signer, which a driver must
+step through `api_token_exchange.drive` over timer ticks: a whole signature
+takes about 0.25 s of Lua 5.4 and would stall the event taps. Every row needs a
 thinking-off vector and a recorded listing or its reason
 (`test_api_provider_catalogue.lua`); read the provider's own documentation for
 each field and name it in the row's `_source`.
