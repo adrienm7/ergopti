@@ -239,7 +239,7 @@ final class OwnedRuntimeUserConsoleOwner {
 				finish(); return
 			}
 			// Exact native refusal or debt remains owned; elapsed time never fabricates process/EOF retirement.
-			usleep(25_000)
+			usleep(LauncherTimings.ownedRuntimeConsolePoll.microseconds)
 		}
 	}
 #if ERGOPTI_GUARDIAN_TEST_SUPPORT

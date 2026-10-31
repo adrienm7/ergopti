@@ -133,7 +133,7 @@ enum OwnedRuntimeCoreLaunchctl {
 			let result = waitpid(pid, &status, WNOHANG)
 			if result == pid { return ChildObservation(status: (status >> 8) & 0xff, bytes: output, timedOut: true) }
 			if result == -1 && errno != EINTR { throw OwnedRuntimeInstallFailure.cleanupPending }
-			usleep(10_000)
+			usleep(LauncherTimings.ownedRuntimeChildReapPoll.microseconds)
 		}
 		_ = Darwin.kill(pid, SIGKILL)
 		// Dedicated worker retains this exact child debt until native reap; no successor generation is admitted.
