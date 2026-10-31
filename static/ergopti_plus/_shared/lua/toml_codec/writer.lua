@@ -49,6 +49,11 @@ local case_twin_reporter = nil
 local case_twin_noticed = { setting = nil, at = 0 }
 -- The setting whose case twin refused the batch being prepared.
 local case_twin_setting = nil
+-- The setting the latest batch's refusal already named to the user, until a
+-- caller takes it instead of showing its own generic save failure; a caller
+-- answers in the same callback, so an older notice no longer covers it.
+local case_twin_shown = nil
+local case_twin_shown_at = 0
 
 local function case_twin_name(section, key)
 	return section == "" and key or section .. "." .. key
@@ -59,8 +64,10 @@ end
 local function report_case_twin(setting)
 	if case_twin_reporter == nil then return end
 	local now = os.time()
-	if case_twin_noticed.setting == setting and now - case_twin_noticed.at < CASE_TWIN_NOTICE_GAP_SECONDS then return end
-	case_twin_noticed.setting, case_twin_noticed.at = setting, now
+	if case_twin_noticed.setting == setting and now - case_twin_noticed.at < CASE_TWIN_NOTICE_GAP_SECONDS then
+		case_twin_shown, case_twin_shown_at = setting, now
+		return
+	end
 	-- Literal replacement: a setting name may hold characters gsub would interpret.
 	local message = i18n.get("dialog.config_save.case_twin")
 	local first, last = message:find("{1}", 1, true)
@@ -73,7 +80,12 @@ local function report_case_twin(setting)
 	first, last = message:find("{2}", 1, true)
 	if first then message = message:sub(1, first - 1) .. i18n.get("menu.global.clean_unused_keys") .. message:sub(last + 1) end
 	local shown, detail = pcall(case_twin_reporter, message)
-	if not shown then Logger.error(LOG, "The case-twin notice could not be shown: %s.", tostring(detail)) end
+	if not shown then
+		Logger.error(LOG, "The case-twin notice could not be shown: %s.", tostring(detail))
+		return
+	end
+	case_twin_noticed.setting, case_twin_noticed.at = setting, now
+	case_twin_shown, case_twin_shown_at = setting, now
 end
 local BasicString = require("toml_codec.basic_string")
 local RecordScanner = require("toml_codec.record_scanner")
@@ -1566,7 +1578,7 @@ end
 --- @return string|nil content Candidate bytes.
 --- @return table|nil source Exact publication precondition.
 function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
-	case_twin_setting = nil
+	case_twin_setting, case_twin_shown = nil, nil
 	local prepared, detail, content, source = prepare_batch_checked(path, updates, file_adapter, expected_source, on_error)
 	if not prepared and case_twin_setting then report_case_twin(case_twin_setting) end
 	return prepared, detail, content, source
@@ -1579,6 +1591,17 @@ end
 function M.set_case_twin_reporter(reporter)
 	if type(reporter) ~= "function" then error("a case-twin reporter must be a function") end
 	case_twin_reporter = reporter
+end
+
+--- Takes the case twin the latest batch's refusal already named to the user.
+--- A caller that would show its generic save failure shows nothing instead, so
+--- one refusal reaches the user once and names the setting.
+--- @return string|nil setting Dotted setting name, or nil when no notice was shown.
+function M.take_case_twin_notice()
+	local setting = case_twin_shown
+	case_twin_shown = nil
+	if setting == nil or os.time() - case_twin_shown_at >= CASE_TWIN_NOTICE_GAP_SECONDS then return nil end
+	return setting
 end
 
 --- Prepares and atomically publishes one explicit set/delete batch.

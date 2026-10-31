@@ -27,6 +27,7 @@
 --- ==============================================================================
 
 local M = {}
+local SaveFailure = require("config_save_failure")
 local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
@@ -67,7 +68,7 @@ local function save_failed(dialogs, entries, title)
 	if called and type(refusal) == "string" then
 		dialogs.error(fill(tr("menu.llm.api_key_no_secret_store"), { refusal }), title)
 	else
-		dialogs.error(tr("dialog.bulk_toggle.save_failed"), title)
+		SaveFailure.present(tr, function(message) dialogs.error(message, title) end)
 	end
 end
 
@@ -191,12 +192,12 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		local begin = llm.begin_api_selection
 		current, finish = llm.api_selection_is_current, llm.finish_api_selection
 		if type(begin) ~= "function" or type(current) ~= "function" or type(finish) ~= "function" then
-			dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+			SaveFailure.present(tr, function(message) dialogs.error(message, heading) end)
 			return false
 		end
 		local captured, receipt = pcall(begin)
 		if not captured or type(receipt) ~= "table" then
-			dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+			SaveFailure.present(tr, function(message) dialogs.error(message, heading) end)
 			return false
 		end
 		ticket = receipt
@@ -217,7 +218,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	if chat then
 		local retired, ack = pcall(finish, ticket, called and type(entry) == "table", called and settled == true)
 		if not retired or ack ~= true then
-			dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+			SaveFailure.present(tr, function(message) dialogs.error(message, heading) end)
 			return false
 		end
 	end
@@ -452,7 +453,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 					typed = type(typed) == "string" and TextUtils.trim(typed) or ""
 					if typed == "" then return false end
 					if llm.set_backend("api") ~= true then
-						dialogs.error(tr("dialog.bulk_toggle.save_failed"), tr("common.error_title"))
+						SaveFailure.present(tr, function(message) dialogs.error(message, tr("common.error_title")) end)
 						return false
 					end
 					if entries.set_model(entry.id, typed) ~= true then

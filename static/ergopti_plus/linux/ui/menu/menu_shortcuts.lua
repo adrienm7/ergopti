@@ -10,6 +10,7 @@
 
 local M = {}
 
+local SaveFailure = require("config_save_failure")
 local ParameterLabel = require("action_parameter_label")
 local RowDialect = require("menu.row_dialect")
 local Logger = require("logger.shim")
@@ -491,7 +492,7 @@ local function _build_shortcuts(ctx)
 			end
 			if not called or committed ~= true then
 				Logger.error(LOG, "The script chord switch did not acknowledge durable publication.")
-				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+				SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 				return false
 			end
 			require("ui.menu.feature_notice").feature(i18n_safe("notify.script_control"), not current)
@@ -524,7 +525,7 @@ local function _build_shortcuts(ctx)
 		local settings = AutoOff.settings()
 		local function changed(committed)
 			if committed ~= true then
-				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+				SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 				return false
 			end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -630,7 +631,7 @@ local function _build_shortcuts(ctx)
 		end
 		if not called or committed ~= true then
 			Logger.error(LOG, "The shortcuts master did not acknowledge durable publication.")
-			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 			return false
 		end
 		require("ui.menu.feature_notice").feature(i18n_safe("menu.shortcuts.title"), not current)
