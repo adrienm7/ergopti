@@ -96,7 +96,7 @@ private final class ManagedPACSourceFixture {
 			try input.fileHandleForWriting.close()
 			let receipt = try Self.read(output, deadline: deadline)
 			guard receipt["closed"] as? Bool == true else { throw ManagedWireFixtureError.refused }
-			while process.isRunning && ProcessInfo.processInfo.systemUptime < deadline { usleep(10_000) }
+			while process.isRunning && ProcessInfo.processInfo.systemUptime < deadline { usleep(LauncherTimings.testPoll.microseconds) }
 			guard !process.isRunning else { throw ManagedWireFixtureError.deadline }
 			process.waitUntilExit()
 			guard process.terminationStatus == 0 else { throw ManagedWireFixtureError.refused }
@@ -213,7 +213,7 @@ final class ManagedPACSourceTests: XCTestCase {
 		XCTAssertNil(ManagedPACSource.load(try fixture.url("utf8"), deadline: 0, certificates: []))
 		XCTAssertFalse(ManagedPACSource.hasDebt)
 		XCTAssertNil(ManagedPACSource.load(try fixture.url("held"), deadline: ProcessInfo.processInfo.systemUptime + 0.05, certificates: []))
-		while ManagedPACSource.hasDebt && ProcessInfo.processInfo.systemUptime < deadline { usleep(10_000) }
+		while ManagedPACSource.hasDebt && ProcessInfo.processInfo.systemUptime < deadline { usleep(LauncherTimings.testPoll.microseconds) }
 		XCTAssertFalse(ManagedPACSource.hasDebt)
 		XCTAssertEqual(ManagedPACSource.load(try fixture.url("utf8"), deadline: deadline, certificates: []),
 			try XCTUnwrap(fixture.profile["script"] as? String))
@@ -226,7 +226,7 @@ final class ManagedPACSourceTests: XCTestCase {
 		XCTAssertNil(ManagedProxyLookup.routes(url: url, budget: 0.01, maximumSelections: 128,
 			settingsProvider: {
 				reads += 1
-				Thread.sleep(forTimeInterval: 0.02)
+				Thread.sleep(forTimeInterval: LauncherTimings.testSlowSettingsRead.seconds)
 				return [kCFNetworkProxiesHTTPEnable as String: 0] as CFDictionary
 			}))
 		XCTAssertEqual(reads, 1)
