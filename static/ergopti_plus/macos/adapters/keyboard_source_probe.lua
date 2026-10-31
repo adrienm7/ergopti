@@ -65,11 +65,21 @@ local function only_fields(value, keys)
 	return true
 end
 
+-- Where the caller read `source_id`. Hammerspoon's own view of the selected
+-- source lags a selection another process made (field run 2026-10-31: a fresh
+-- process saw the new layout selected while this process still answered the
+-- previous one), so an identity a fresh process proved is not compared with it;
+-- the launcher reads the selected source on both sides of its own read.
+M.IDENTITY_THIS_PROCESS = "this_process"
+M.IDENTITY_FRESH_PROCESS = "fresh_process"
+local IDENTITIES = { [M.IDENTITY_THIS_PROCESS] = true, [M.IDENTITY_FRESH_PROCESS] = true }
+
 --- Copies a dense, unique native-code request before asynchronous work starts.
---- @param request table {source_id, codes}.
+--- @param request table {source_id, codes, identity?}; identity defaults to this process.
 --- @return table|nil validated Private snapshot.
 local function validate_request(request)
-	if not only_fields(request, { source_id = true, codes = true })
+	if not only_fields(request, { source_id = true, codes = true, identity = true })
+		or (request.identity ~= nil and not IDENTITIES[request.identity])
 		or type(request.source_id) ~= "string" or request.source_id == ""
 		or #request.source_id > MAX_SOURCE_BYTES or request.source_id:find("\0", 1, true)
 		or type(request.codes) ~= "table" then return nil end
@@ -83,7 +93,16 @@ local function validate_request(request)
 		codes[key] = code
 	end
 	if count == 0 or count ~= #request.codes or count > MAX_CODES then return nil end
-	return { source_id = request.source_id, codes = codes }
+	return { source_id = request.source_id, codes = codes,
+		identity = request.identity or M.IDENTITY_THIS_PROCESS }
+end
+
+--- Reports whether this process's view still names the request's source.
+--- @param snapshot table Private request snapshot.
+--- @return boolean current
+local function source_still_current(snapshot)
+	if snapshot.identity == M.IDENTITY_FRESH_PROCESS then return true end
+	return M.current_source_id() == snapshot.source_id
 end
 
 --- Validates exact ordered physical identities and explicit native dead proof.
@@ -116,7 +135,7 @@ end
 --- function returns; consumers must publish their cohort fence before calling.
 --- Cancellation closes delivery immediately, but returns true only after both
 --- exact native capabilities are gone, including asynchronous SIGTERM delivery.
---- @param request table {source_id=string, codes=number[]}.
+--- @param request table {source_id=string, codes=number[], identity=string|nil}.
 --- @param callback function fn(receipt|nil, reason|nil).
 --- @return table operation {cancel, is_settled, on_settled}.
 function M.request(request, callback)
@@ -181,7 +200,7 @@ function M.request(request, callback)
 		local result = owner.pending
 		owner.pending = nil
 		if owner.cancel_reason ~= nil then result = { reason = owner.cancel_reason } end
-		if result.receipt ~= nil and M.current_source_id() ~= snapshot.source_id then
+		if result.receipt ~= nil and not source_still_current(snapshot) then
 			result = { reason = "source_changed" }
 		end
 		owner.done = true
@@ -217,7 +236,7 @@ function M.request(request, callback)
 
 	if snapshot == nil then pending(nil, "invalid_request"); return operation end
 	Logger.start(LOG, "Reading direct physical output for the selected keyboard source.")
-	if M.current_source_id() ~= snapshot.source_id then pending(nil, "source_changed"); return operation end
+	if not source_still_current(snapshot) then pending(nil, "source_changed"); return operation end
 	local resolve_ok, executable, _, environment = xpcall(LauncherHelper.resolve, debug.traceback)
 	if not resolve_ok or type(executable) ~= "string" or executable == "" then
 		pending(nil, "helper_unavailable"); return operation
