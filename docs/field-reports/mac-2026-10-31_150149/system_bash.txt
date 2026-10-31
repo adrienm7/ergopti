@@ -1,0 +1,2 @@
+  bash=3.2.57(1)-release pipefail_status=1 printf_b= a \t b 
+check=system_bash verdict=pass codes=bash_3_2,pipefail_ok,printf_b_ok
