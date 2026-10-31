@@ -393,9 +393,6 @@ The resulting tags are `archive/fix-macos`, `archive/fix-linux`, `archive/fix-wi
 (`tmp/wip-todo-ag`, `-ag2`, `-ae`, `tmp/wip-field-auto`, `tmp/wip-field-run-checklist` and 358e211a10 are on dev).
 After the cleanup, read them through the `archive/tmp-wip-<name>` tags.
 
-- `tmp/wip-todo-af`: 3337d99bc8 (Linux number-row order onboarding; it reads `number_row_live.available()`) and
-  4fcb4a979a (logger scalar), then `tmp/wip-todo-ag3` d5cf3ba50b (its strings; it conflicts in the 21 locales unless
-  the AF commits come first). 8634b1ff80 is superseded by dfb197a1ea; do not land it.
 - `tmp/wip-todo-ah`: 53b1bc5375 (reset every `hs.*` cache entry between macOS test files) and five CI speed-ups
   (Ubuntu archive reuse, AHK shard split, one macOS checkout per E2E cell, Intel E2E start, SwiftPM cache trial); run
   them on `tmp/preflight-dev` before dev.
@@ -826,8 +823,7 @@ Added October 22 (from the agents' reports; details in their commits):
       unreachable (state, action) outputs (a dead key pressed inside a dead state sends its own keysym, while the
       Compose line names the base one) and 6 conflicting sequences (`<infinity> <asciicircum>` and five more), in the
       Python converter and its byte-identical Lua twin alike, so the fix touches both and the shipped Ergopti
-      XCompose; maintainer decision: CC BY-SA 3.0 or GFDL for the vendored copy (bepo.fr dual-licenses it); the
-      onboarding control is 3337d99bc8 on `tmp/wip-todo-af`. The row switches (`layout.emulate_*_row`)
+      XCompose; maintainer decision: CC BY-SA 3.0 or GFDL for the vendored copy (bepo.fr dual-licenses it). The row switches (`layout.emulate_*_row`)
       stay Windows-only: they mix Ergopti rows with the OS layout, which has no `.keylayout` source on macOS or
       Linux; an Ergopti bundle source types digits on both levels, so its rows stay greyed on macOS.
 - [ ] **Linux CI installs packages inside short test steps.** [CI] Every Linux test step now has its own install
