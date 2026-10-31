@@ -116,8 +116,16 @@ const launcher = fs.readFileSync(path.join(root, 'modules/llm/ollama-runtime-lau
 const worker = fs.readFileSync(path.join(root, 'modules/llm/ollama-model-pull.ps1'), 'utf8');
 assert.match(
 	launcher,
-	/child_created_filetime\s*=\s*\[Ergopti\.Ollama\.RuntimeObservation\]::CreationTime\(\$child\.Handle\)/
+	/child_created_filetime\s*=\s*\[Ergopti\.Ollama\.RuntimeObservation\]::CreationTime\(\$server\.Handle\)/
 );
+// The identity comes from a held handle: the retained child, or under the sign-in
+// relay the daemon that exact relay started, never a PID reopened elsewhere.
+assert.match(launcher, /\$server = \$child\b/);
+assert.match(
+	launcher,
+	/\$relayServer = Get-OllamaRelayServer \$child \$request\.port \$serverImage/
+);
+assert.match(launcher, /\$parent -ne \$Relay\.Id/);
 assert.match(
 	worker,
 	/Assert-OllamaModelProcess \$server \$receipt\.child_created_filetime \$request\.port/

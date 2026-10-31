@@ -218,6 +218,34 @@ $Answers['unreachable'] = Test-ErgoptiRelayTunnel -Relay 'http://127.0.0.1:1' -T
 $Answers | ConvertTo-Json -Compress
 `;
 
+// The relay's answers and command line, against the corpus the Go relay and the
+// Lua policy answer.
+const RELAY_CONTRACT = path.join(
+	ROOT,
+	'static/ergopti_plus/_shared/modules/network/proxy_auth_relay.json'
+);
+const RELAY_VECTORS = path.join(
+	ROOT,
+	'static/ergopti_plus/_shared/tests/corpus/network/proxy_auth_relay_probe_vectors.json'
+);
+const RELAY_POLICY = `
+$ErrorActionPreference = 'Stop'
+. $env:ERGOPTI_ROUTE_PLAN_MODULE
+$Contract = Get-Content -LiteralPath $env:ERGOPTI_RELAY_CONTRACT -Raw -Encoding UTF8 | ConvertFrom-Json
+$Corpus = Get-Content -LiteralPath $env:ERGOPTI_RELAY_VECTORS -Raw -Encoding UTF8 | ConvertFrom-Json
+$Answers = New-Object System.Collections.ArrayList
+foreach ($Case in $Corpus.vectors) {
+	$Answer = Read-ErgoptiRelayProbe ([int]$Case.exit_code) ([string]$Case.stdout) $Contract
+	[void]$Answers.Add(@{ id = $Case.id; status = $Answer['Status']; scheme = $Answer['Scheme']; reason = $Answer['Reason'] })
+}
+@{ answers = @($Answers);
+	upstream = @((New-ErgoptiRelayUpstream 'http://Proxy.Corp:3128/'), (New-ErgoptiRelayUpstream 'http://user:pw@proxy:3128'),
+		(New-ErgoptiRelayUpstream 'socks5://proxy:1080'), (New-ErgoptiRelayUpstream 'http://proxy:99999'));
+	probe = (New-ErgoptiRelayProbeArguments -Upstream 'http://proxy.corp:3128' -Authority 'registry.ollama.ai:443' -DialMs 1 -HandshakeMs 2);
+	run = (New-ErgoptiRelayRunPrefix -Upstream 'http://proxy.corp:3128' -Variable 'HTTPS_PROXY' -DialMs 1 -HandshakeMs 2 -IdleMs 3)
+} | ConvertTo-Json -Depth 4 -Compress
+`;
+
 // The launcher hashes its proxy dependencies in the order it lists them, and
 // the AHK bootstrap hashes the same names in its own list: a different order
 // or name refuses every launch. The pull's login exit code is mirrored too.
@@ -266,6 +294,38 @@ async function main() {
 	DAEMON_CASES.forEach((vector, index) => {
 		assert.deepEqual(daemon[index], vector.expect, `daemon: ${vector.name}`);
 	});
+
+	const relayPolicy = runPowerShell(RELAY_POLICY, {
+		ERGOPTI_RELAY_CONTRACT: RELAY_CONTRACT,
+		ERGOPTI_RELAY_VECTORS: RELAY_VECTORS
+	});
+	const relayVectors = JSON.parse(fs.readFileSync(RELAY_VECTORS, 'utf8')).vectors;
+	assert.ok(relayVectors.length > 0, 'the relay corpus was read');
+	assert.equal(relayPolicy.answers.length, relayVectors.length, 'every relay vector has an answer');
+	relayVectors.forEach((vector, index) => {
+		const answer = relayPolicy.answers[index];
+		assert.equal(answer.id, vector.id);
+		if (vector.reason) {
+			assert.equal(answer.status, 'refused', vector.id);
+			assert.equal(answer.reason, vector.reason, vector.id);
+		} else {
+			assert.equal(answer.status, vector.result.status, vector.id);
+			assert.equal(answer.scheme ?? undefined, vector.result.scheme, vector.id);
+		}
+	});
+	assert.deepEqual(
+		relayPolicy.upstream,
+		['http://proxy.corp:3128', '', '', ''],
+		'only a plain http relay'
+	);
+	assert.equal(
+		relayPolicy.probe,
+		'probe --upstream http://proxy.corp:3128 --authority registry.ollama.ai:443 --dial-timeout-ms 1 --handshake-timeout-ms 2'
+	);
+	assert.equal(
+		relayPolicy.run,
+		'run --upstream http://proxy.corp:3128 --variable HTTPS_PROXY --dial-timeout-ms 1 --handshake-timeout-ms 2 --idle-timeout-ms 3 --'
+	);
 
 	const relay = spawn(process.execPath, ['-e', RELAY], { stdio: ['ignore', 'pipe', 'inherit'] });
 	try {

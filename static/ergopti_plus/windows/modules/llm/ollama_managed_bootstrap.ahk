@@ -14,6 +14,8 @@
 ; Exit code of ollama-model-pull.ps1 when the relay demands a Windows login
 ; (NTLM, Negotiate) the owned daemon cannot answer (Get-OllamaPullProxyLoginExitCode)
 global LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT := 3
+; The local sign-in relay beside the other vendor helpers (ergopti-proxy-relay).
+global LLM_OLLAMA_PROXY_RELAY_EXECUTABLE := "ergopti-proxy-relay.exe"
 
 ; The launcher's proxy dependencies under vendor/, in the order of its
 ; Get-OllamaRuntimeVendorNames: both sides hash name and digest in this order
@@ -238,6 +240,24 @@ LLM_OllamaPullErrorClass(Text) {
 	return "other"
 }
 
+/**
+ * The message of a pull refused at its login exit code: the relay's own refusal
+ * when it names one, else the proxy that demands a Windows login no installed
+ * relay can answer.
+ * @param {String} Text The pull's output.
+ * @param {String} ContractPath proxy_auth_relay.json, whose refusals name each message.
+ * @returns {String} A locale key.
+ */
+LLM_OllamaPullRefusalKey(Text, ContractPath := "") {
+	global _SharedDir
+	if !(Text is String) || !RegExMatch(Text, "Managed model pull refused: proxy_relay ([a-z_]+)", &Found)
+		return "network.failure.proxy_windows_login"
+	if ContractPath == ""
+		ContractPath := _SharedDir . "\modules\network\proxy_auth_relay.json"
+	Refusals := JsonParse(FSReadUtf8ExactBounded(ContractPath, 8192))["refusals"]
+	return Refusals.Has(Found[1]) ? Refusals[Found[1]] : Refusals["relay_unavailable"]
+}
+
 /** One source-bound managed bootstrap, retaining physical debt independently. */
 class OllamaManagedBootstrap {
 	/** Captures every native source before admission; no installation occurs here. */
@@ -299,10 +319,11 @@ class OllamaManagedBootstrap {
 		Policy := _SharedDir . "\modules\network\proxy_policy.json"
 		ServeEnvironment := _SharedDir . "\modules\llm\managed_ollama_environment.json"
 		RouteOrigins := _SharedDir . "\modules\network\route_origins.json"
+		RelayContract := _SharedDir . "\modules\network\proxy_auth_relay.json"
 		Helper := Directory . "\ollama_managed_files.ps1"
 		Acquisition := Directory . "\ollama_managed_acquisition.ps1"
 		Vendor := _VendorDir
-		for Path in [Catalogue, Updater, Policy, ServeEnvironment, RouteOrigins, Helper, Acquisition,
+		for Path in [Catalogue, Updater, Policy, ServeEnvironment, RouteOrigins, RelayContract, Helper, Acquisition,
 			Directory . "\ollama_download_archive.ps1", Directory . "\ollama-runtime-launch.ps1",
 			Directory . "\ollama-model-pull.ps1"]
 			this.Sources[Path] := this._Hash(Path)
@@ -345,13 +366,27 @@ class OllamaManagedBootstrap {
 			"powershell", A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
 			"capture_bytes", 65536, "spawn", OllamaInstallFiles_Spawn,
 			"on_physical", ObjBindMethod(this, "_Physical"), "on_error", ObjBindMethod(this, "_Error")))
+		RuntimeProxy := Map("VendorDirectory", Vendor, "VendorSha256", CryptoSha256(RuntimeInventory),
+			"ProxyPolicyPath", Policy, "ProxyPolicySha256", this.Sources[Policy],
+			"UpdaterDefaultsPath", Updater, "UpdaterDefaultsSha256", this.Sources[Updater],
+			"RouteOriginsPath", RouteOrigins, "RouteOriginsSha256", this.Sources[RouteOrigins],
+			"ProxyRelayContractPath", RelayContract, "ProxyRelayContractSha256", this.Sources[RelayContract],
+			"ProxyRelayDialMs", TimingsGet("adapters", "proxy_relay_dial_timeout_ms"),
+			"ProxyRelayHandshakeMs", TimingsGet("adapters", "proxy_relay_handshake_timeout_ms"),
+			"ProxyRelayIdleMs", TimingsGet("adapters", "proxy_relay_idle_timeout_ms"),
+			"ProxyRelayProbeMs", TimingsGet("adapters", "proxy_relay_probe_timeout_ms"))
+		; Optional until the relay ships in the bundle (docs/design/proxy-auth-relay.md).
+		; Hashed once: this image is megabytes and the launcher holds it against
+		; replacement, while this.Sources is rehashed on each tick before READY.
+		Relay := Vendor . "\" . LLM_OLLAMA_PROXY_RELAY_EXECUTABLE
+		if FileExist(Relay) {
+			RuntimeProxy["ProxyRelayPath"] := Relay
+			RuntimeProxy["ProxyRelaySha256"] := this._Hash(Relay)
+		}
 		this.Runtime := OllamaRuntimeOwner(Map("launcher", Directory . "\ollama-runtime-launch.ps1",
 			"helper", Helper, "helper_sha256", this.Sources[Helper],
 			"environment", ServeEnvironment, "environment_sha256", this.Sources[ServeEnvironment],
-			"proxy", Map("VendorDirectory", Vendor, "VendorSha256", CryptoSha256(RuntimeInventory),
-				"ProxyPolicyPath", Policy, "ProxyPolicySha256", this.Sources[Policy],
-				"UpdaterDefaultsPath", Updater, "UpdaterDefaultsSha256", this.Sources[Updater],
-				"RouteOriginsPath", RouteOrigins, "RouteOriginsSha256", this.Sources[RouteOrigins]),
+			"proxy", RuntimeProxy,
 			"on_retired", ObjBindMethod(this, "_RuntimeRetired"), "on_error", ObjBindMethod(this, "_Error")))
 	}
 
@@ -636,6 +671,12 @@ class OllamaManagedBootstrap {
 			this.Target["ready_file_identity"] := Receipt["ready_file_identity"]
 			this.Target["ready_image_sha256"] := Record["ready_image_sha256"]
 		} finally Critical(PreviousCritical)
+		; A closed value, never a proxy or a token: what the network check would report.
+		RelayState := Receipt.Get("proxy_relay", "not_applicable")
+		if RelayState == "relay_not_installed"
+			LoggerWarn("LLM.managed", "The proxy demands a Windows sign-in and the local relay is not installed: pulls are refused.")
+		else if RelayState != "not_applicable"
+			LoggerInfo("LLM.managed", "Managed Ollama proxy sign-in relay: {1}.", RelayState)
 		if !this._Current()
 			return this.Cancel()
 		if this.Port is Map
@@ -809,7 +850,7 @@ class OllamaManagedBootstrap {
 		if !this._MenuPullCurrent(Operation)
 			return false
 		if (ExitCode is Integer) && ExitCode == LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT
-			return this._MenuPullFail(Operation, "network.failure.proxy_windows_login")
+			return this._MenuPullFail(Operation, LLM_OllamaPullRefusalKey(Stdout))
 		if !(ExitCode is Integer) || ExitCode != 0 {
 			ErrorClass := LLM_OllamaPullErrorClass(Stdout)
 			if ErrorClass != "digest_mismatch" {
@@ -911,7 +952,7 @@ class OllamaManagedBootstrap {
 		if !this._Current()
 			return this.Cancel()
 		if (ExitCode is Integer) && ExitCode == LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT
-			return this._Fail("model_pull_proxy_login", "network.failure.proxy_windows_login")
+			return this._Fail("model_pull_proxy_login", LLM_OllamaPullRefusalKey(Stdout))
 		if !(ExitCode is Integer) || ExitCode != 0 {
 			ErrorClass := LLM_OllamaPullErrorClass(Stdout)
 			if ErrorClass != "digest_mismatch"
