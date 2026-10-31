@@ -87,7 +87,9 @@ local VALUE_RULES = {
 --- @return table entry
 --- @return boolean available
 local function declared(manifest, path, platform)
-	local entry = assert(manifest.find_declared_entry_by_path(path),
+	local find = manifest.find_declared_entry_by_path or manifest.find_entry_by_path
+	assert(type(find) == "function", "script authority needs declaration metadata")
+	local entry = assert(find(path),
 		"script authority row has no declaration: " .. tostring(path))
 	for _, tag in ipairs(entry.platforms or {}) do
 		if tag == platform then return entry, true end
@@ -123,8 +125,9 @@ function M.adopt(options)
 	end
 	local adopted = {}
 	for _, path in ipairs(TableUtil.sorted_keys(options.aliases, TableUtil.by_text)) do
-		local entry, available = declared(options.manifest, path, options.platform)
 		local value = source_value(document, path)
+		local entry, available
+		if value ~= nil then entry, available = declared(options.manifest, path, options.platform) end
 		if value ~= nil and available then
 			local fits, reason = Outdated.manifest_value_fits(entry, value, options.platform, VALUE_RULES[path])
 			if not fits then

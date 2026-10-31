@@ -1531,6 +1531,8 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 			modules[name] = {}
 		end
 		modules["infra.session_lock"] = { protect = function() return true end }
+		-- Main lets config.toml's [script] rows win before the error window starts.
+		modules["infra.script_scope"] = { adopt_configured = function() return {} end }
 		-- Main writes a pre-sink fatal record only when startup is refused.
 		modules["infra.bootstrap_log"] = { append = function(reason) error("isolated Main must not refuse startup: " .. tostring(reason)) end }
 		modules["compat.utf8"] = { install = function() return false end }
