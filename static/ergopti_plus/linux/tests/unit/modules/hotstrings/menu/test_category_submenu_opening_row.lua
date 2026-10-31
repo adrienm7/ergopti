@@ -253,7 +253,7 @@ helpers.describe("personal category scope parity", function()
 				config.get_groups = function() return { "personal" } end
 				config.get_category = function(id) if id == "personal" then return category end end
 				config.is_group_enabled = function(id) return id == "personal" and posture end
-				local mb = helpers.load_module("ui.menu.menu_builder")
+				local mb = helpers.load_module("ui.menu.builder")
 				local captured = nil
 				local function find(rows)
 					for _, row in ipairs(rows or {}) do
@@ -320,7 +320,7 @@ helpers.describe("shared category file command", function()
 		with_file_command(function()
 			local calls = 0
 			local ctx = { on_open_file = function() calls = calls + 1; return true end }
-			local mb = helpers.load_module("ui.menu.menu_builder")
+			local mb = helpers.load_module("ui.menu.builder")
 			ctx.config = fake_config({})
 			local function find(rows)
 				for _, row in ipairs(rows or {}) do
@@ -523,7 +523,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		category.sections.hc.extension = { id = "ergopti", name = "Ergopti" }
 		local getter = config.get_category
 		config.get_category = function(id) if id == "rolls" then return category end; return getter(id) end
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local label = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
 		local found
 		local function find(rows)

@@ -121,12 +121,12 @@ helpers.describe("pause layout rows", function()
 
 	helpers.it("reaches the tray through the layout menu's provider", function()
 		local state = world({ enabled = true, on_pause = "xkb:fr+ergopti", on_resume = "" })
-		local names, saved = { "ui.menu.menu_builder", "infra.pause_layout_preferences" }, {}
+		local names, saved = { "ui.menu.builder", "infra.pause_layout_preferences" }, {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local ok, err = pcall(function()
 			package.loaded["infra.pause_layout_preferences"] = state.preferences
-			package.loaded["ui.menu.menu_builder"] = nil
-			local builder, layouts = require("ui.menu.menu_builder"), nil
+			package.loaded["ui.menu.builder"] = nil
+			local builder, layouts = require("ui.menu.builder"), nil
 			local index = 1
 			while true do
 				local name, value = debug.getupvalue(builder.build, index)

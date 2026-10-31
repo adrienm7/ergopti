@@ -15,7 +15,7 @@ local M = {}
 
 --- Builds the menu tree and records its duration. A raised error propagates
 --- unchanged and records nothing.
---- @param build function The menu builder (ui.menu.menu_builder.build).
+--- @param build function The menu builder (ui.menu.builder.build).
 --- @param ctx table Menu context.
 --- @return table items The tree the builder returned.
 function M.run(build, ctx)

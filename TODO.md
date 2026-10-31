@@ -395,10 +395,10 @@ The July Linux driver plan (X11/Wayland hotstring engine, 2026-07-30) is retired
 `docs/memory/rejected_proposals.md` and the ungrabbed-touchpad limits in `docs/memory/linux-web-release.md`.
 
 - M3.3: [CODE] the tray menu is split into one module per section (`ui/menu/menu_*.lua`, 2026-10-30 and 31, gates
-  read the root through `tools/lib/linux-menu-parts.cjs`). Left: renaming or deleting the root itself
-  (`require("ui.menu.menu_builder")` callers, `CURRENT_SOURCE_RETIREMENTS` in `test-native-menu-rows.cjs`, the
-  `linux_evidence.json` paths); a part may import only what the root holds, so hoisting the root's part-only
-  imports needs `closedModuleExport` in `tools/lib/menu-native-llm-parent-binding.cjs` to follow the parts.
+  read the root through `tools/lib/linux-menu-parts.cjs`), and the root took the macOS root's name,
+  `ui/menu/builder.lua` (the frozen census oracle maps the old name through `CURRENT_SOURCE_RENAMES`). Left: a part
+  may import only what the root holds, so hoisting the root's part-only imports needs `closedModuleExport` in
+  `tools/lib/menu-native-llm-parent-binding.cjs` to follow the parts.
 - Gestures [PHYS-L]: the menu greys the slots out of reach and the reader start names them (d627f511fc); recorded
   `libinput record` traces replay into the decoder (1870e62e1a). Left: a three-finger pad on a real machine and one
   recording from a real touchpad (`linux/HARDWARE.md` section 13).

@@ -48,8 +48,8 @@ end
 --- @return table|nil row
 local function tray_row(ctx, section_key, row_key)
 	local i18n = require("infra.i18n")
-	package.loaded["ui.menu.menu_builder"] = nil
-	for _, section in ipairs(require("ui.menu.menu_builder").build(ctx)) do
+	package.loaded["ui.menu.builder"] = nil
+	for _, section in ipairs(require("ui.menu.builder").build(ctx)) do
 		if type(section.title) == "string" and section.title:find(i18n.get(section_key), 1, true) == 1 then
 			for _, row in ipairs(section.menu or {}) do
 				if row.title == i18n.get(row_key) then return row end
@@ -63,7 +63,7 @@ end
 --- @param body function Receives the manager, the config path and the backups list.
 local function with_gestures(body)
 	Sandbox.with_config(GESTURE_SOURCE, function(path)
-		local names = { "modules.gestures.manager", "adapters.evdev_reader", "ui.menu.menu_builder" }
+		local names = { "modules.gestures.manager", "adapters.evdev_reader", "ui.menu.builder" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end }
@@ -129,7 +129,7 @@ end)
 --- scope transaction recorded.
 --- @param body function Receives the menu context and the scope calls.
 local function with_tap_holds(body)
-	local names = { "platform.remap.tap_hold_manager", "infra.tap_hold_scope", "ui.menu.menu_builder" }
+	local names = { "platform.remap.tap_hold_manager", "infra.tap_hold_scope", "ui.menu.builder" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local user_path = os.tmpname()
@@ -183,7 +183,7 @@ helpers.describe("restore-recommended-no-confirm: Configuration (Linux)", functi
 	for _, case in ipairs({ { key = "common.restore_recommended", mode = "recommended" },
 		{ key = "common.clear_to_system", mode = "clear" } }) do
 		helpers.it("the global " .. case.mode .. " composes every category without a question", function()
-			local names = { "infra.global_scope", "ui.menu.menu_builder" }
+			local names = { "infra.global_scope", "ui.menu.builder" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local calls = {}

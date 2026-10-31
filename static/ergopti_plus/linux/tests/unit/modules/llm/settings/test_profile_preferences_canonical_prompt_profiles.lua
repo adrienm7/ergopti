@@ -307,7 +307,7 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 			.. '"\n[llm.profiles]\nactive = "basic"\nauto_profile_for_model = false\n'
 		with_config(initial, function(settings, path)
 			with_idle_live_owner(settings, function(live_owner)
-				local names = { "infra.manifest_menu", "ui.menu.menu_builder", "ui.prompt_editor.bridge" }
+				local names = { "infra.manifest_menu", "ui.menu.builder", "ui.prompt_editor.bridge" }
 				local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 				local ok, err = pcall(function()
 					local document = read_json("modules/menu/menu_manifest.json")
@@ -340,7 +340,7 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 						confirmations = confirmations + 1
 						helpers.assert_eq({id,label}, {"user_canonical","Canonical"}); return confirmed
 					end }
-					local builder = helpers.load_module("ui.menu.menu_builder")
+					local builder = helpers.load_module("ui.menu.builder")
 					local function find(rows)
 						for _, row in ipairs(rows or {}) do
 							if row.title == "Canonical" then return row.menu or {} end
@@ -508,7 +508,7 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 		local initial='[llm]\nfuture = "keep"\nuser_profiles = "v1:' .. Base64.encode(Json.encode(custom and {profile()} or Json.array({})))
 			.. '"\n[llm.profiles]\nactive = "basic"\nauto_profile_for_model = false\n'
 		with_config(initial,function(settings,path)
-			local names={"infra.manifest_menu","infra.i18n","ui.menu.menu_builder"}
+			local names={"infra.manifest_menu","infra.i18n","ui.menu.builder"}
 			local saved={};for _,name in ipairs(names) do saved[name]=package.loaded[name] end
 			local ok,err=xpcall(function()
 				local document=read_json("modules/menu/menu_manifest.json")
@@ -529,7 +529,7 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 				local ctx={is_paused=function() return false end,llm={is_enabled=function() return true end,
 					get_models=function() return {} end,get_current_model=function() return "small" end,
 					get_prediction_model=function() return "small" end},on_menu_changed=function() redraws=redraws+1 end}
-				local builder=helpers.load_module("ui.menu.menu_builder")
+				local builder=helpers.load_module("ui.menu.builder")
 				local function find(rows)
 					for _,row in ipairs(rows or {}) do
 						if row.menu then

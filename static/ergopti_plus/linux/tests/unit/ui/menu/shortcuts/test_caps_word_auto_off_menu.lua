@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: CapsWord Auto-Off Submenu — Unit Tests (Linux)
 --- DESCRIPTION:
---- Renders the actual caps_word_auto_off group builder of menu_builder.lua
+--- Renders the actual caps_word_auto_off group builder of ui/menu/builder.lua
 --- through the shared renderer and the real settings owner: the delay choice,
 --- one checkbox per catalogue delimiter (separators kept), one per declared
 --- pointer kind, each change published to config.toml.
@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 
---- Loads the real group builder out of menu_builder.lua with its upvalues.
+--- Loads the real group builder out of ui/menu/builder.lua with its upvalues.
 --- @param upvalues table Values the builder closes over.
 --- @return function builder
 local function load_builder(upvalues)

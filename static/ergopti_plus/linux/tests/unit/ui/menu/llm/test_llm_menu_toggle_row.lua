@@ -58,7 +58,7 @@ end
 --- @param changed table|nil Receives a `count` of on_menu_changed calls.
 --- @return table items
 local function build(llm, changed)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	return mb.build({
 		_version = "0.0.0-dev.12",
 		llm = llm,
@@ -140,7 +140,7 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 		with_unavailable_source(function()
 			local kbd = helpers.load_module("modules.shortcuts.keyboard_shortcuts")
 			kbd._reset()
-			local mb = helpers.load_module("ui.menu.menu_builder")
+			local mb = helpers.load_module("ui.menu.builder")
 			local rows = submenu_of(mb.build({
 				_version = "0.0.0-dev.12",
 				shortcuts = require("modules.shortcuts.manager"),
@@ -172,7 +172,7 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 				helpers.assert_true(ok_kbd, tostring(kbd))
 				kbd._reset()
 				helpers.assert_eq(#kbd.available_slots("primary_"), 0, "the blind catalogue offers no slot")
-				local mb = helpers.load_module("ui.menu.menu_builder")
+				local mb = helpers.load_module("ui.menu.builder")
 				local items = mb.build({
 					_version = "0.0.0-dev.12",
 					shortcuts = require("modules.shortcuts.manager"),
@@ -267,7 +267,7 @@ local function with_slot_frame(locale, mutation, body)
 				return true
 			end,
 		}
-		local module = helpers.load_module_with_dependency("ui.menu.menu_builder", "infra.manifest_menu", renderer)
+		local module = helpers.load_module_with_dependency("ui.menu.builder", "infra.manifest_menu", renderer)
 		local build_rows = slot_builder_from(module)
 		function state.assign(option, picked)
 			state.assigned[#state.assigned + 1] = { option = option, picked = picked }

@@ -1,4 +1,4 @@
---- ui/menu/menu_builder.lua
+--- ui/menu/builder.lua
 
 --- ==============================================================================
 --- MODULE: Menu Builder (Linux)
@@ -55,7 +55,7 @@ local PrivacyPolicy = require("llm.trigger_policy")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
 local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
 local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
-local LOG = "ui.menu.menu_builder"
+local LOG = "ui.menu.builder"
 local COMMAND = require("config_keys").COMMAND
 
 

@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local ROOT = "ui.menu.menu_builder"
+local ROOT = "ui.menu.builder"
 local PART = "ui.menu.menu_reload_probe"
 local NEIGHBOUR = "ui.menu.reload_probe_neighbour"
 

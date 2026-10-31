@@ -2290,7 +2290,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 		manifest[kind + '_menu'].length === 0
 	)
 		return false;
-	const builder = lex(sources['linux/ui/menu/menu_builder.lua']);
+	const builder = lex(sources['linux/ui/menu/builder.lua']);
 	const agent = lex(sources['linux/ui/menu/agent_rows.lua']);
 	if (
 		!builder ||

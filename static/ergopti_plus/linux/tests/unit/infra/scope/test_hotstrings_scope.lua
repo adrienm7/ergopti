@@ -409,7 +409,7 @@ helpers.describe("hotstrings scope: refusals", function()
 						end
 						return execute(command)
 					end
-					local menu = require("ui.menu.menu_builder").build({ config = c.Config, paused = false,
+					local menu = require("ui.menu.builder").build({ config = c.Config, paused = false,
 						is_paused = function() return false end, dyn_hotstrings = c.dynamic,
 						tooltip_preview = c.preview_port, on_menu_changed = function() changed = changed + 1 end })
 					-- A direct row of the Hotstrings submenu: the word-delimiter
@@ -447,7 +447,7 @@ helpers.describe("hotstrings scope: refusals", function()
 					return execute(command)
 				end
 				local i18n = require("infra.i18n")
-				local menu = require("ui.menu.menu_builder").build({ config = c.Config, paused = false,
+				local menu = require("ui.menu.builder").build({ config = c.Config, paused = false,
 					is_paused = function() return false end, dyn_hotstrings = c.dynamic,
 					tooltip_preview = c.preview_port })
 				local action

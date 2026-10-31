@@ -340,12 +340,12 @@ helpers.describe("modules/gestures/manager.lua", function()
   -- ==========================================================================
 
   helpers.it("menu_builder renders gestures section when context present", function()
-    local ok_mb, menu_builder = pcall(require, "ui.menu.menu_builder")
-    -- Asserted, not skipped. ui/menu/menu_builder.lua ships with this driver, so
+    local ok_mb, menu_builder = pcall(require, "ui.menu.builder")
+    -- Asserted, not skipped. ui/menu/builder.lua ships with this driver, so
     -- "not available" can only mean it stopped loading — and the skip made that
     -- indistinguishable from a pass in six cases across three files.
     helpers.assert_true(ok_mb and menu_builder ~= nil,
-      "ui.menu.menu_builder must load: " .. tostring(menu_builder))
+      "ui.menu.builder must load: " .. tostring(menu_builder))
 
     M._test_begin_reading({})
     M.enable()
@@ -368,12 +368,12 @@ helpers.describe("modules/gestures/manager.lua", function()
   end)
 
   helpers.it("menu_builder handles nil gestures gracefully", function()
-    local ok_mb, menu_builder = pcall(require, "ui.menu.menu_builder")
-    -- Asserted, not skipped. ui/menu/menu_builder.lua ships with this driver, so
+    local ok_mb, menu_builder = pcall(require, "ui.menu.builder")
+    -- Asserted, not skipped. ui/menu/builder.lua ships with this driver, so
     -- "not available" can only mean it stopped loading — and the skip made that
     -- indistinguishable from a pass in six cases across three files.
     helpers.assert_true(ok_mb and menu_builder ~= nil,
-      "ui.menu.menu_builder must load: " .. tostring(menu_builder))
+      "ui.menu.builder must load: " .. tostring(menu_builder))
 
     local items = menu_builder.build({
       _version = "3.0.0",

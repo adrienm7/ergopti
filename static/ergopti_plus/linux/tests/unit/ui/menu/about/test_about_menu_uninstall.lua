@@ -70,7 +70,7 @@ local function build(quits, source_run, startup, paused)
 		package.loaded["ui.menu.start_at_login"] = previous_startup
 		Installation.is_source_run = real_is_source_run
 	end
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local ctx = {
 		_version = "9.9.9",
 		paused = paused == true,
@@ -217,7 +217,7 @@ end
 --- Native version, startup and transaction boundaries record effects only.
 local function with_about_parent(code, options, body)
 	options = options or {}
-	local names = { "ui.menu.menu_builder", "infra.manifest_menu", "infra.i18n", "infra.version",
+	local names = { "ui.menu.builder", "infra.manifest_menu", "infra.i18n", "infra.version",
 		"infra.installation", "ui.menu.start_at_login", "ui.menu.uninstall" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -275,7 +275,7 @@ local function with_about_parent(code, options, body)
 			if select(1, ...) == "about_menu" then state.finished_child = rows end
 			return rows
 		end
-		local builder = require("ui.menu.menu_builder")
+		local builder = require("ui.menu.builder")
 		local ctx = { _version = "9.9.9", paused = options.paused == true,
 			on_quit = function() state.quits = state.quits + 1; return "native quit result" end,
 			on_menu_changed = function() state.changed = state.changed + 1; return "native redraw result" end,

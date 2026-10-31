@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 --- Builds the tray around an enabled LLM double.
 --- @return table items
 local function build()
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	return mb.build({
 		_version = "0.0.0-dev.12",
 		llm = { is_enabled = function() return true end, toggle = function() return true end },
@@ -149,7 +149,7 @@ local function with_numeric_menu(options, exercise)
 			paused = paused, is_paused = function() return paused end,
 			webview = webview, on_quit = function() end,
 			on_menu_changed = function() log.changed = log.changed + 1 end }
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local rendered = mb.build(ctx)
 		exercise({ rows = rendered, declaration = declaration, renderer = renderer, strings = strings,
 			log = log, path = path, initial = initial, webview = webview,

@@ -317,11 +317,7 @@ for (const [driver, file, builder] of [
 		['macos', 'ui', 'menu', 'menu_shortcuts.lua'],
 		/\["script_control"\] = script_control_group/
 	],
-	[
-		'Linux',
-		['linux', 'ui', 'menu', 'menu_builder.lua'],
-		/group_builders\["script_control"\] = function/
-	]
+	['Linux', ['linux', 'ui', 'menu', 'builder.lua'], /group_builders\["script_control"\] = function/]
 ]) {
 	const source = read(...file);
 	check(builder.test(source), `${driver} must build the script_control group`);
