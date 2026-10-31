@@ -14,69 +14,153 @@
 --- the opposite ("keeping the dedup default in exactly one place"), which is the
 --- most misleading kind of wrong: the file states the invariant it breaks.
 ---
---- This is a §5.2 single-source-of-truth violation, and the guard is written for
---- the CLASS: it asserts that no backend redeclares the default as a literal,
---- rather than pinning the one file that did.
+--- The guard is written for the CLASS and by behaviour: each backend is loaded
+--- over an ApiCommon whose default is a sentinel, one answer is driven through
+--- its prediction parser, and the flag each backend hands to
+--- ApiCommon.insert_prediction must be that sentinel. A literal in any backend,
+--- at load time or at the call, hands over something else.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local json = require("json")
 
--- Every backend that participates in the dedup decision.
-local BACKENDS = {
-	"modules/llm/api_mlx_inference.lua",
-	"modules/llm/api_ollama.lua",
-	"modules/llm/api_remote.lua",
-}
+-- Neither true nor false: only a value read from ApiCommon can equal it.
+local SENTINEL = setmetatable({}, { __tostring = function() return "ApiCommon default" end })
+
+--- Returns one named closure upvalue, or nil when the closure does not own it.
+--- @param fn function Closure to inspect.
+--- @param target string Upvalue name.
+--- @return any value
+local function get_upvalue(fn, target)
+	for index = 1, 256 do
+		local name, value = debug.getupvalue(fn, index)
+		if not name then break end
+		if name == target then return value end
+	end
+	return nil
+end
+
+--- Loads a backend over a fresh ApiCommon whose default is SENTINEL and a parser
+--- that turns any answer into one prediction, then runs the scenario.
+--- @param module_name string Backend module.
+--- @param scenario function Receives (backend, flags): flags lists every dedup flag
+---        handed to ApiCommon.insert_prediction.
+local function with_backend(module_name, scenario)
+	helpers.with_stub_scope({ "modules.llm.api_common", "modules.llm.parser", module_name }, function()
+		local ApiCommon = require("modules.llm.api_common")
+		local Parser = require("modules.llm.parser")
+		ApiCommon.DEFAULT_DEDUPLICATION_ENABLED = SENTINEL
+		local flags = {}
+		local real_insert = ApiCommon.insert_prediction
+		ApiCommon.insert_prediction = function(results, pred, stats, dedup_enabled, ...)
+			flags[#flags + 1] = dedup_enabled
+			return real_insert(results, pred, stats, dedup_enabled == true, ...)
+		end
+		Parser.process_prediction = function() return { to_type = "fixture prediction" } end
+		scenario(helpers.load_with_stubs(module_name), flags)
+	end)
+end
+
+--- Asserts that exactly the ApiCommon default reached insert_prediction.
+--- @param flags table Flags recorded by with_backend.
+--- @param backend string Backend name for the message.
+local function assert_shared_flag(flags, backend)
+	helpers.assert_true(#flags >= 1, backend .. " must run its answer through insert_prediction")
+	for _, flag in ipairs(flags) do
+		helpers.assert_true(flag == SENTINEL, string.format(
+			"%s handed insert_prediction %s instead of ApiCommon.DEFAULT_DEDUPLICATION_ENABLED: "
+			.. "flipping the shared inference.json then changes some backends and not others",
+			backend, tostring(flag)))
+	end
+end
 
 
 
 
--- ==============================================
--- ==============================================
--- ======= 1/ No Backend Redeclares It ==========
--- ==============================================
--- ==============================================
+
+-- ================================================
+-- ================================================
+-- ======= 1/ Every Backend Reads ApiCommon =======
+-- ================================================
+-- ================================================
 
 helpers.describe("the deduplication default has a single source", function()
-	helpers.it("no backend assigns the dedup flag a literal", function()
-		local offenders = {}
-		for _, rel in ipairs(BACKENDS) do
-			-- rel is a loop variable, so the selector cannot be a fixed declaration;
-			-- read the whole production tree once and let the assertions below
-			-- locate their own evidence inside it.
-			local fh = io.open(helpers.driver_root() .. rel, "r")
-			helpers.assert_true(fh ~= nil, rel .. " must be readable")
-			if fh then
-				-- Selected by a declaration unique to api_mlx_inference.lua rather than
-		-- by path, so moving or splitting the module cannot break this.
-		local src = helpers.read_driver_source("function M.post_and_parse")
-		helpers.assert_true(src ~= nil, "api_mlx_inference source must be locatable")
-		if not src then return end
-				local code = src:gsub("%-%-[^\r\n]*", "")
-				if code:find("DEDUPLICATION_ENABLED%s*=%s*true")
-					or code:find("DEDUPLICATION_ENABLED%s*=%s*false") then
-					offenders[#offenders + 1] = rel
-				end
-			end
-		end
-
-		helpers.assert_true(#offenders == 0, string.format(
-			"%d backend(s) hardcode the dedup default instead of reading it from "
-			.. "ApiCommon: %s. Flipping the shared inference.json then changes some "
-			.. "backends and not others, and MLX — the default backend — was the one "
-			.. "ignoring it, so the setting appeared to do nothing",
-			#offenders, table.concat(offenders, ", ")))
+	helpers.it("MLX dedups with the ApiCommon default", function()
+		with_backend("modules.llm.api_mlx_inference", function(Inference, flags)
+			Inference.init({
+				stream = { generation = 0 }, cancel_streaming = function() return true end,
+				completions_endpoint = function() return "http://fixture/completions" end,
+				chat_endpoint = function() return "http://fixture/chat" end,
+				read_active_model_arg = function() return "fixture/model" end,
+				server_model_id = function() return nil end,
+				model_hf_path = function() return nil end,
+			})
+			local client = get_upvalue(Inference.post_and_parse, "_infer_client")
+			local scheduler = get_upvalue(Inference.post_and_parse, "TimerScheduler")
+			helpers.assert_type(client, "table", "the MLX HTTP owner must be reachable")
+			local original_post, original_after, original_cancel = client.post, scheduler.after, scheduler.cancel
+			scheduler.after = function() return { timer = {} }, true end
+			scheduler.cancel = function() return true end
+			local callback
+			client.post = function(_, _, _, done) callback = done end
+			local ok, err = pcall(function()
+				Inference.post_and_parse("fixture", "system", "typed context", "", 0.1, 16, 1, false,
+					function() end, function() end, {}, false, nil)
+				helpers.assert_type(callback, "function", "the request must be dispatched")
+				callback({ status = 200, body = json.encode({ choices = { { text = "answer" } } }) })
+			end)
+			client.post, scheduler.after, scheduler.cancel = original_post, original_after, original_cancel
+			if not ok then error(err, 0) end
+			assert_shared_flag(flags, "api_mlx_inference")
+		end)
 	end)
 
-	helpers.it("MLX reads the same ApiCommon default as its siblings", function()
-		-- Selected by a declaration unique to api_mlx_inference.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant into
-		-- a path error.
-		local src = helpers.read_driver_source("function M.post_and_parse")
-		helpers.assert_true(src ~= nil, "api_mlx_inference source must be locatable")
+	helpers.it("Ollama dedups with the ApiCommon default", function()
+		with_backend("modules.llm.api_ollama", function(Ollama, flags)
+			local post_and_parse = get_upvalue(Ollama.request_raw, "post_and_parse")
+			local client = get_upvalue(post_and_parse, "_infer_client")
+			helpers.assert_type(client, "table", "the Ollama HTTP owner must be reachable")
+			local original_post = client.post
+			local callback
+			client.post = function(_, _, _, done) callback = done end
+			local ok, err = pcall(function()
+				post_and_parse("fixture-model", "system", "typed context", "", 0.1, 16, 1, false,
+					function() end, function() end, {}, nil, false)
+				helpers.assert_type(callback, "function", "the request must be dispatched")
+				callback({ status = 200, body = json.encode({ message = { content = "answer" } }) })
+			end)
+			client.post = original_post
+			if not ok then error(err, 0) end
+			assert_shared_flag(flags, "api_ollama")
+		end)
+	end)
 
-		helpers.assert_true(src:find("ApiCommon%.DEFAULT_DEDUPLICATION_ENABLED") ~= nil,
-			"MLX must read ApiCommon.DEFAULT_DEDUPLICATION_ENABLED, the same symbol "
-			.. "api_ollama and api_remote already use")
+	helpers.it("the remote backend dedups with the ApiCommon default", function()
+		with_backend("modules.llm.api_remote", function(Remote, flags)
+			Remote.PROVIDERS.fixture = {
+				label = "Fixture", base_url = "https://default.invalid",
+				default_model = "fixture-model", format = "openai",
+			}
+			local client = get_upvalue(Remote.cancel_streaming, "_infer_client")
+			helpers.assert_type(client, "table", "the remote HTTP owner must be reachable")
+			local original_post = client.post
+			local callback
+			client.post = function(_, _, _, done) callback = done end
+			local ok, err = pcall(function()
+				Remote.set_entries({ { id = "entry", provider = "fixture", base_url = "https://a.invalid",
+					token = "plain-token", model = "fixture-model" } })
+				Remote.set_active_entry_id("entry")
+				Remote.fetch_batch("typed context", "", "fixture-model", 0.1, 16, 1, { batch = false },
+					function() end, function() end)
+				helpers.assert_type(callback, "function", "the request must be dispatched")
+				callback({ ok = true, status = 200, headers = {}, body = json.encode({
+					choices = { { index = 0, message = { role = "assistant", content = "answer" } } },
+				}) })
+			end)
+			client.post = original_post
+			Remote.PROVIDERS.fixture = nil
+			if not ok then error(err, 0) end
+			assert_shared_flag(flags, "api_remote")
+		end)
 	end)
 end)
