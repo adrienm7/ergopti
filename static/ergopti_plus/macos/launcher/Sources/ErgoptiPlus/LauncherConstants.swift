@@ -15,10 +15,10 @@
 import Darwin
 
 /// Signed application identity shared by bootstrap and guardian registration.
-let kErgoptiBundleId = "com.ergoptiplus.app"
+let kErgoptiBundleId = Identifiers.BundleIds.launcher
 /// Dedicated identity for the embedded GUI runtime. The outer bundle prohibits
 /// duplicate instances, so its child cannot reuse the launcher's identity.
-let kEmbeddedHammerspoonBundleId = "com.ergoptiplus.app.hammerspoon"
+let kEmbeddedHammerspoonBundleId = Identifiers.BundleIds.hammerspoon
 /// Hammerspoon preference key installed before the embedded runtime starts.
 let kHammerspoonConfigKey = "MJConfigFile"
 /// Process-wide private mask inherited by every launcher and headless role.
