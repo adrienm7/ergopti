@@ -83,7 +83,8 @@ _AOPR_CountFiles(Files) {
 ; the entire identifier so such helpers cannot masquerade as direct OS access.
 ; First-class references to real built-ins remain counted even without a call.
 _AOPR_IsOsToken(Line, Needle) {
-	return RegExMatch(Line, "i)(?<![\p{L}\p{N}_])" . Needle . "(?![\p{L}\p{N}_])") > 0
+	; The token holds the needle verbatim, so most lines need no regex at all.
+	return InStr(Line, Needle) && RegExMatch(Line, "i)(?<![\p{L}\p{N}_])" . Needle . "(?![\p{L}\p{N}_])") > 0
 }
 
 _AOPR_WholeIdentifiers() {
@@ -229,6 +230,9 @@ Test("meta: windows/ OS-call purity ratchet — entry point", _AOPR_RatchetEntry
 _AOPR_FamilyApiToken(Line, Needle) {
 	IsCall := SubStr(Needle, StrLen(Needle), 1) == "("
 	Name := IsCall ? SubStr(Needle, 1, StrLen(Needle) - 1) : Needle
+	; The token holds the name verbatim, so most lines need no regex at all.
+	if !InStr(Line, Name)
+		return false
 	Pattern := "i)(?<![A-Za-z0-9_])" . Name . "(?![A-Za-z0-9_])"
 	return RegExMatch(Line, Pattern . (IsCall ? "\s*\(" : "")) != 0
 }
