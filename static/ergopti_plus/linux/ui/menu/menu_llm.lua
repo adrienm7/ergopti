@@ -102,24 +102,11 @@ local function _build_llm(ctx)
 	-- twenty-one locales and read by nobody — instead of a generic « Activé » with
 	-- a " ✓" glued on, a mark that belongs to the tray rather than to the string.
 
+	-- The model, profile and generation rows are declared `list` rows: their
+	-- labels carry live values, so each provider below returns row DATA and the
+	-- shared renderer draws it at the declared place. No row here is native.
 	local providers = {}
-	local dynamic_handlers = {}
 	local group_builders = {}
-
-	--- Appends computed row data after the shared renderer materialises it.
-	---
-	--- LLM parent labels include live values, so they remain dynamic manifest
-	--- entries. They are still provider DATA, though: keeping `title` / `menu`
-	--- here would make this driver own the native row shape and bypass the one
-	--- renderer that is supposed to own it.
-	--- @param target table Native menu array supplied by the manifest renderer.
-	--- @param row table Provider row data ({label, items, disabled}).
-	--- @param id string Stable diagnostic id.
-	local function append_rendered_row(target, row, id)
-		for _, rendered in ipairs(ManifestMenu.render_rows({ row }, id)) do
-			target[#target + 1] = rendered
-		end
-	end
 
 	-- Inactivity and privacy controls. Unlike the model and generation lists,
 	-- this is one labelled submenu, so the manifest keeps its cross-driver
@@ -298,9 +285,9 @@ local function _build_llm(ctx)
 		return { items = child_rows, disabled = not enabled or nil }
 	end
 
-	dynamic_handlers["llm_profile"] = function(target)
+	providers["llm_profile"] = function()
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
-		if not ok_profiles then return end
+		if not ok_profiles then return {} end
 		local save_edit, edit_current, select_edit, delete_edit = require("ui.menu.profile_editor_request").capture(ProfileSettings)
 		-- The model predictions actually use: an API entry's when the API answers.
 		local current_model = llm.get_prediction_model and llm.get_prediction_model() or nil
@@ -521,24 +508,24 @@ local function _build_llm(ctx)
 			["llm_profile_builtin_rows"] = builtin_rows,
 			["llm_profile_custom_rows"] = custom_rows,
 		})
-		if not rows then return end
+		if not rows then return {} end
 		-- The per-application overrides end the submenu, as on Windows.
 		local override_rows = ManifestMenu.template_rows("llm_profile_lua_app_overrides", {}, {}, {
 			["llm_profile_app_overrides"] = app_override_rows,
 		})
-		if not override_rows then return end
+		if not override_rows then return {} end
 		for _, row in ipairs(override_rows) do rows[#rows + 1] = row end
 		-- The profile parent writes config.toml: it names the same cause as the
 		-- switch, and its retained rows recheck it at click time.
 		local ConfigGuard = require("ui.menu.llm_config_guard")
 		local blocked = ConfigGuard.reason()
 		ConfigGuard.protect(rows)
-		append_rendered_row(target, {
+		return { {
 			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective_label),
 			items = rows,
 			disabled = not enabled or blocked ~= nil or nil,
 			disabled_reason_key = enabled and blocked or nil,
-		}, "llm_profile")
+		} }
 	end
 
 	group_builders["llm_display"] = function()
@@ -780,7 +767,7 @@ local function _build_llm(ctx)
 	-- are chosen together (maintainer, 2026-10-27): the backend's emoji, then
 	-- the model. The menu lists no model and no API entry. Drawing the button
 	-- binds the page to this build's engine, dialogs and refresh.
-	dynamic_handlers["llm_model"] = function(target)
+	providers["llm_model"] = function()
 		LlmBackendRows.bind_page(llm, {
 			dialogs = page_dialogs, on_changed = ctx.on_menu_changed, delete_model = delete_model,
 			context = { paused = ctx.paused, is_paused = ctx.is_paused },
@@ -793,10 +780,10 @@ local function _build_llm(ctx)
 				return type(ctx.webview) == "table" and type(ctx.webview.show) == "function"
 			end,
 		})
-		if not row then return end
+		if not row then return {} end
 		-- The button stays enabled when config.toml refuses writes: the page it
 		-- opens greys every backend with that cause, as on Windows and macOS.
-		append_rendered_row(target, row, "llm_model")
+		return { row }
 	end
 
 	--- The suggestion count row: a generation parameter, the first one on every
@@ -835,12 +822,12 @@ local function _build_llm(ctx)
 	-- declared the last two as features for as long as it has existed and this
 	-- driver read them from the canonical defaults with no way to change either —
 	-- constants wearing the shape of settings.
-	dynamic_handlers["llm_generation"] = function(target)
+	providers["llm_generation"] = function()
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
 		if not ok_profiles then
 			Logger.error(LOG, "LLM profile settings unavailable — generation controls cannot read their current count: %s.",
 				tostring(ProfileSettings))
-			return
+			return {}
 		end
 		local ok_settings, Settings = pcall(require, "modules.llm.settings")
 		if not ok_settings then
@@ -926,7 +913,6 @@ local function _build_llm(ctx)
 		local generation_rows = ManifestMenu.build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
 			["llm_generation_values"] = function() return rows end,
 		})
-		for _, row in ipairs(generation_rows) do target[#target + 1] = row end
 		-- Whether a navigation or Escape clears the AI's typing context, the row
 		-- Windows and macOS show in the same submenu.
 		local function generation_ready()
@@ -947,7 +933,17 @@ local function _build_llm(ctx)
 				["llm_generation_ready"] = generation_ready,
 			},
 		}, {})
-		for _, row in ipairs(reset_rows) do target[#target + 1] = row end
+		-- Both declared blocks are rendered by their own manifest keys; they go
+		-- back to the llm_menu renderer as DATA, with their callbacks kept.
+		local built = {}
+		for _, row in ipairs(generation_rows) do built[#built + 1] = row end
+		for _, row in ipairs(reset_rows) do built[#built + 1] = row end
+		local data = ManifestMenu.native_child_rows(built)
+		if data == nil then
+			Logger.error(LOG, "LLM generation rows could not be handed back as row data — rows omitted.")
+			return {}
+		end
+		return data
 	end
 
 	-- The category switch, the submenu's first row: appindicator binds item.fn
@@ -998,7 +994,7 @@ local function _build_llm(ctx)
 	llm_ctx.state_getters["config_newer_schema"] = newer_schema
 
 	local rendered = ManifestMenu
-		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers)
+		and ManifestMenu.build("llm_menu", "LLM", nil, group_builders, llm_ctx, providers)
 		or {}
 	for _, row in ipairs(rendered) do items[#items + 1] = row end
 

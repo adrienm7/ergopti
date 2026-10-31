@@ -479,7 +479,7 @@
 			"type": "---"
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "llm_model",
 			"status_rows": {
 				"unavailable": [
@@ -505,7 +505,7 @@
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "llm_profile",
 			"i18n": "menu.profiles.profile_label_prefix",
 			"disabled_when_off": true,
@@ -546,7 +546,7 @@
 			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "llm_generation",
 			"platforms": [
 				"linux"
@@ -967,48 +967,20 @@
 			"type": "---"
 		},
 		{
-			"type": "dynamic",
-			"id": "agent_system1",
-			"i18n": "menu.agent.system1",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
-		},
-		{
 			"type": "list",
 			"id": "agent_system1",
-			"i18n": "menu.agent.system1",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "hide"
-		},
-		{
-			"type": "dynamic",
-			"id": "agent_system2",
-			"i18n": "menu.agent.system2",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			"i18n": "menu.agent.system1"
 		},
 		{
 			"type": "list",
 			"id": "agent_system2",
-			"i18n": "menu.agent.system2",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "hide"
+			"i18n": "menu.agent.system2"
 		},
 		{
 			"type": "---"
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "agent_disabled_apps",
 			"i18n": "menu.agent.disabled_apps",
 			"platforms": [
