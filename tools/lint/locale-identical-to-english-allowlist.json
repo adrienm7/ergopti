@@ -1239,7 +1239,7 @@
 		},
 		"model_browser.filter_backend": {
 			"reason": "loanword-or-cognate",
-			"locales": ["de", "nl"]
+			"locales": ["da", "de", "nl", "no", "sv"]
 		},
 		"model_browser.unit_gb": {
 			"reason": "unit-or-abbreviation",
