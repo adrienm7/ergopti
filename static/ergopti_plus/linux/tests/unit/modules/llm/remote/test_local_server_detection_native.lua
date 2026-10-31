@@ -7,7 +7,7 @@
 --- real server shows (python -m sglang.launch_server, the KoboldCpp
 --- release binary, a .llamafile, lemond, /app/model-runner, ...), each serving
 --- the OpenAI models endpoint on a loopback port. The production Linux scan
---- (modules/llm/local_server_ports.lua: real pgrep, real ss, a real settings
+--- (modules/llm/local_server_ports.lua: real /proc, real ss, a real settings
 --- file) must find each one at the port its command line, settings file or
 --- listening socket gives, and report every other server stopped.
 --- ==============================================================================
@@ -98,15 +98,11 @@ end
 
 helpers.describe("Local server detection against real processes (local-server-detection-native)", function()
 	helpers.it("(local-server-detection-native) the real Linux scan finds every catalogue launch at its port", function()
-		-- The driver finds processes with procps pgrep (-a -i, which busybox
-		-- lacks) and reads listening sockets with ss only: without them every
-		-- row would read as stopped or at its catalogue default
-		for _, program in ipairs({ "pgrep", "ss" }) do
-			local status = os.execute("command -v " .. program .. " >/dev/null 2>&1")
-			assert(status == 0 or status == true, program .. " is required to scan local servers")
-		end
-		local procps = os.execute("pgrep -a -i -f pgrep >/dev/null 2>&1")
-		assert(procps == 0 or procps == true, "pgrep must be procps' (-a -i), not busybox's")
+		-- The driver reads processes from /proc and listening sockets with ss
+		-- only (busybox has no ss): without it every row without a port in its
+		-- command line or settings file would read at its catalogue default
+		local status = os.execute("command -v ss >/dev/null 2>&1")
+		assert(status == 0 or status == true, "ss is required to scan local servers")
 		local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-local-servers-XXXXXX"))
 		local home = root .. "/home"
 		local processes, started = {}, {}
