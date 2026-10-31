@@ -1401,7 +1401,7 @@
 	"menu.debug.hook_probe": "Record keyboard hook order",
 	"menu.debug.composer_check": "Test the composed layout",
 	"platform_reason.action_apple_shortcuts_are_macos": "macOS only: Apple Shortcuts exist only on macOS. Elsewhere, run a command or a program instead.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "On Windows, “Run a program” does the same: cmd.exe or powershell.exe with the command as its arguments, or explorer.exe with the file or folder to open.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "On Windows, “Run a program” does the same: cmd.exe with the command as its arguments, or explorer.exe with the file or folder to open.",
 	"platform_reason.input_probe_is_autohotkey_specific": "These checks measure AutoHotkey's SendInput and its keyboard hook, which only the Windows driver has.",
 	"input_probe.title": "Input check",
 	"input_probe.confirm": "This check opens a small window and types into it for about {1} seconds. Do not type or click elsewhere meanwhile. Continue?",

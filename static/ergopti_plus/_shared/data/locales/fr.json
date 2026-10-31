@@ -1401,7 +1401,7 @@
 	"menu.debug.hook_probe": "Enregistrer l'ordre des hooks clavier",
 	"menu.debug.composer_check": "Tester la disposition composée",
 	"platform_reason.action_apple_shortcuts_are_macos": "macOS uniquement : les Raccourcis Apple n’existent que sous macOS. Ailleurs, lancez plutôt une commande ou un programme.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "Sous Windows, « Lancer un programme » fait de même : cmd.exe ou powershell.exe avec la commande en arguments, ou explorer.exe avec le fichier ou le dossier à ouvrir.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "Sous Windows, « Lancer un programme » fait de même : cmd.exe avec la commande en arguments, ou explorer.exe avec le fichier ou le dossier à ouvrir.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Ces vérifications mesurent SendInput d'AutoHotkey et son hook clavier, que seul le pilote Windows possède.",
 	"input_probe.title": "Vérification de la saisie",
 	"input_probe.confirm": "Cette vérification ouvre une petite fenêtre et y saisit du texte pendant environ {1} secondes. Ne tapez pas et ne cliquez pas ailleurs pendant ce temps. Continuer ?",

@@ -1406,7 +1406,7 @@
 	"menu.debug.hook_probe": "Zaznamenat pořadí klávesnicových hooků",
 	"menu.debug.composer_check": "Vyzkoušet složené rozložení",
 	"platform_reason.action_apple_shortcuts_are_macos": "Pouze macOS: Zkratky Apple existují jen v macOS. Jinde místo toho spusťte příkaz nebo program.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "Ve Windows totéž udělá „Spustit program“: cmd.exe nebo powershell.exe s příkazem jako argumenty, nebo explorer.exe se souborem či složkou k otevření.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "Ve Windows totéž udělá „Spustit program“: cmd.exe s příkazem jako argumenty, nebo explorer.exe se souborem či složkou k otevření.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Tyto kontroly měří SendInput z AutoHotkey a jeho klávesnicový hook, které má jen ovladač pro Windows.",
 	"input_probe.title": "Kontrola vstupu",
 	"input_probe.confirm": "Tato kontrola otevře malé okno a asi {1} s do něj píše. Mezitím nepište ani neklikejte jinde. Pokračovat?",
