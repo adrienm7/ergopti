@@ -702,8 +702,6 @@ Nothing left.
 
 ### F. Centralisation and hexagonal architecture (value order)
 
-- [ ] **PAR-73. Collapse generated per-driver artifacts.** Done: `[hs_timeouts]`, `action_catalogue.lua`,
-      `features_manifest.lua`. Left (maintainer decision): `config_template.toml`.
 - [ ] **PAR-74. Config-key and command-id constants by codegen.** [CODE] Lua, shared Lua, JS and Node done; Windows
       reads its menu, module, infra and UI keys from `windows/_generated/config_keys.ahk` (9e11b4b371, 94b5fd2e67,
       0839388a8b). Left (the PC's): 639 AHK literals in 82 files of the shrink-only

@@ -73,6 +73,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-feature-requirements.cjs"],
 			"repro": "npm run test:feature-requirements"
+		},
+		{
+			"id": "js-config-template-shared",
+			"ordinal": 548,
+			"name": "the one shared config template projects to every driver's template byte for byte and decodes to the same defaults in smol-toml and the Lua codec",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-config-template-shared.cjs"],
+			"repro": "npm run test:config-template-shared"
 		}
 	]
 }

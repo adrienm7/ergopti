@@ -186,6 +186,14 @@ downloaded again`). Ollama deletes that layer before it reports the
   its `status` to `done` and run `node tools/codegen/codegen-owned-runtimes.cjs`.
   The Windows rows still need an AHK spawn reader in
   `tools/test/lib/spawned-tools.cjs` before the inventory test checks them.
+- Shared config template (PAR-73, 2026-10-31): `windows/_generated/config_template.toml`
+  is now a generated projection of `_shared/_generated/config_template.toml`,
+  byte for byte unchanged and still not shipped in the exe (bundle exclude
+  group `shared-config-template`). No `.ahk` reads a template, so no AHK file
+  changes. On the PC, run `npm run build:manifest` and confirm `git status` is
+  clean, then `node tools/test/test-config-template-shared.cjs` (it needs `lua`
+  on PATH, or `LUA=<path>`). A future first-boot copy in AHK copies the
+  projected Windows file, never re-renders defaults.
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 
