@@ -807,10 +807,8 @@ function M.app_health_with_start(ports, report, finish, since)
 	-- One of this app's processes fails the step; every other app's report is information
 	local owned = crashes.owned or {}
 	local function by_process(counts)
-		local names, parts = {}, {}
-		for name in pairs(counts) do names[#names + 1] = name end
-		table.sort(names)
-		for _, name in ipairs(names) do parts[#parts + 1] = name .. ":" .. counts[name] end
+		local parts = {}
+		for _, name in ipairs(TableUtil.sorted_keys(counts)) do parts[#parts + 1] = name .. ":" .. counts[name] end
 		return #parts == 0 and 0 or table.concat(parts, "+")
 	end
 	local per_process = {}
