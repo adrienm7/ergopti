@@ -14,8 +14,8 @@
 /*    of the error, diagnostics and update pages, and the metrics dashboards.  */
 /*    A page maps its own token names onto them, so its rules are unchanged.   */
 /*                                                                             */
-/* A colour that only one page uses stays in that page; the census in          */
-/* tools/lint/hex-colours.cjs counts the literals that remain.                 */
+/* Every colour a page spells lives here, even one that a single page uses;    */
+/* tools/lint/hex-colours.cjs counts any literal a page types instead.         */
 /* =========================================================================== */
 
 /* ========================= */
@@ -88,6 +88,153 @@
 	--theme-hue-0d0d1a: #0d0d1a;
 	--theme-hue-0d1a0d: #0d1a0d;
 	--theme-hue-f4a460: #f4a460;
+
+	/* The colours a single page or script spelled before the palette held every page
+	   colour (PAR-81). Named after their value, like the hues above: no system colour
+	   holds them, and the name keeps a reader from mistaking one for a role. */
+	--theme-grey-0b0b0b: #0b0b0b;
+	--theme-grey-111: #111111;
+	--theme-grey-131313: #131313;
+	--theme-grey-1a1a1a: #1a1a1a;
+	--theme-grey-1e1e1e: #1e1e1e;
+	--theme-grey-242424: #242424;
+	--theme-grey-2d2d2d: #2d2d2d;
+	--theme-grey-777: #777777;
+	--theme-grey-a2a2a2: #a2a2a2;
+	--theme-grey-b0b0b0: #b0b0b0;
+	--theme-grey-bbb: #bbbbbb;
+	--theme-grey-bdbdbd: #bdbdbd;
+	--theme-grey-d0d0d0: #d0d0d0;
+	--theme-grey-e8e8e8: #e8e8e8;
+	--theme-grey-eaeaea: #eaeaea;
+	--theme-grey-f0f0f0: #f0f0f0;
+	--theme-grey-f1f1f1: #f1f1f1;
+	--theme-grey-f3f3f3: #f3f3f3;
+	--theme-grey-f5f5f5: #f5f5f5;
+	--theme-grey-f9f9f9: #f9f9f9;
+	--theme-hue-005cc5: #005cc5;
+	--theme-hue-008000: #008000;
+	--theme-hue-06243f: #06243f;
+	--theme-hue-094771: #094771;
+	--theme-hue-0969da: #0969da;
+	--theme-hue-0a3a6e: #0a3a6e;
+	--theme-hue-0b4ea2: #0b4ea2;
+	--theme-hue-0f172a: #0f172a;
+	--theme-hue-111113: #111113;
+	--theme-hue-12121e: #12121e;
+	--theme-hue-183060: #183060;
+	--theme-hue-1a1a1c: #1a1a1c;
+	--theme-hue-1a1a2e: #1a1a2e;
+	--theme-hue-1a2e1a: #1a2e1a;
+	--theme-hue-1a4bbf: #1a4bbf;
+	--theme-hue-1a8c3a: #1a8c3a;
+	--theme-hue-1b1b1d: #1b1b1d;
+	--theme-hue-1c3350: #1c3350;
+	--theme-hue-1e1608: #1e1608;
+	--theme-hue-1e1e20: #1e1e20;
+	--theme-hue-1e2a38: #1e2a38;
+	--theme-hue-1e2e1e: #1e2e1e;
+	--theme-hue-1e5e22: #1e5e22;
+	--theme-hue-1e96ff: #1e96ff;
+	--theme-hue-1f6feb: #1f6feb;
+	--theme-hue-22c55e: #22c55e;
+	--theme-hue-262629: #262629;
+	--theme-hue-2a2000: #2a2000;
+	--theme-hue-2a2a2d: #2a2a2d;
+	--theme-hue-2a4a7a: #2a4a7a;
+	--theme-hue-2d2d30: #2d2d30;
+	--theme-hue-2d4a63: #2d4a63;
+	--theme-hue-2e9d4f: #2e9d4f;
+	--theme-hue-2f3137: #2f3137;
+	--theme-hue-333335: #333335;
+	--theme-hue-333336: #333336;
+	--theme-hue-343436: #343436;
+	--theme-hue-3a1f1f: #3a1f1f;
+	--theme-hue-3a3a3d: #3a3a3d;
+	--theme-hue-3a6bd0: #3a6bd0;
+	--theme-hue-3b82f6: #3b82f6;
+	--theme-hue-3d3d41: #3d3d41;
+	--theme-hue-3fb950: #3fb950;
+	--theme-hue-4478e0: #4478e0;
+	--theme-hue-46464a: #46464a;
+	--theme-hue-48484a: #48484a;
+	--theme-hue-4a1c1a: #4a1c1a;
+	--theme-hue-4a3a14: #4a3a14;
+	--theme-hue-4a3a2d: #4a3a2d;
+	--theme-hue-4a9eff: #4a9eff;
+	--theme-hue-4cd964: #4cd964;
+	--theme-hue-4da6ff: #4da6ff;
+	--theme-hue-4db6ff: #4db6ff;
+	--theme-hue-4ea1ff: #4ea1ff;
+	--theme-hue-5856d6: #5856d6;
+	--theme-hue-5a5a5c: #5a5a5c;
+	--theme-hue-5a8dee: #5a8dee;
+	--theme-hue-5e5f60: #5e5f60;
+	--theme-hue-5eb1ff: #5eb1ff;
+	--theme-hue-636366: #636366;
+	--theme-hue-64b5f6: #64b5f6;
+	--theme-hue-73d98c: #73d98c;
+	--theme-hue-77dd77: #77dd77;
+	--theme-hue-7a4b00: #7a4b00;
+	--theme-hue-7a5500: #7a5500;
+	--theme-hue-7a7a80: #7a7a80;
+	--theme-hue-86868b: #86868b;
+	--theme-hue-8a8a90: #8a8a90;
+	--theme-hue-93b8f8: #93b8f8;
+	--theme-hue-9973f2: #9973f2;
+	--theme-hue-9a6700: #9a6700;
+	--theme-hue-9cdcfe: #9cdcfe;
+	--theme-hue-a0a0a6: #a0a0a6;
+	--theme-hue-a0bfff: #a0bfff;
+	--theme-hue-a8d8ff: #a8d8ff;
+	--theme-hue-aec6cf: #aec6cf;
+	--theme-hue-af52de: #af52de;
+	--theme-hue-b3261e: #b3261e;
+	--theme-hue-bf7af0: #bf7af0;
+	--theme-hue-c6d8f5: #c6d8f5;
+	--theme-hue-c77700: #c77700;
+	--theme-hue-c8c8cc: #c8c8cc;
+	--theme-hue-cb99c9: #cb99c9;
+	--theme-hue-cc55ff: #cc55ff;
+	--theme-hue-ccdddd: #ccdddd;
+	--theme-hue-cfe0ff: #cfe0ff;
+	--theme-hue-cfe3f5: #cfe3f5;
+	--theme-hue-d0d0d4: #d0d0d4;
+	--theme-hue-d0d0d5: #d0d0d5;
+	--theme-hue-d29922: #d29922;
+	--theme-hue-d4d4d6: #d4d4d6;
+	--theme-hue-d70015: #d70015;
+	--theme-hue-dceaff: #dceaff;
+	--theme-hue-dd1111: #dd1111;
+	--theme-hue-ddeeff: #ddeeff;
+	--theme-hue-e3f1e4: #e3f1e4;
+	--theme-hue-e65100: #e65100;
+	--theme-hue-e8e8ed: #e8e8ed;
+	--theme-hue-e8f0ff: #e8f0ff;
+	--theme-hue-e8f4ff: #e8f4ff;
+	--theme-hue-ebebee: #ebebee;
+	--theme-hue-ececf0: #ececf0;
+	--theme-hue-eef4ff: #eef4ff;
+	--theme-hue-eef6ee: #eef6ee;
+	--theme-hue-f0c040: #f0c040;
+	--theme-hue-f0dcc0: #f0dcc0;
+	--theme-hue-f0f4ff: #f0f4ff;
+	--theme-hue-f2bf4d: #f2bf4d;
+	--theme-hue-f5f8ff: #f5f8ff;
+	--theme-hue-fbeceb: #fbeceb;
+	--theme-hue-ff2d55: #ff2d55;
+	--theme-hue-ff3333: #ff3333;
+	--theme-hue-ff6961: #ff6961;
+	--theme-hue-ff6b00: #ff6b00;
+	--theme-hue-ff6b5f: #ff6b5f;
+	--theme-hue-ff6b61: #ff6b61;
+	--theme-hue-ff8e85: #ff8e85;
+	--theme-hue-ff9d9d: #ff9d9d;
+	--theme-hue-ffe5e3: #ffe5e3;
+	--theme-hue-fff1d6: #fff1d6;
+	--theme-hue-fff3e0: #fff3e0;
+	--theme-hue-fff8e1: #fff8e1;
+	--theme-hue-fff8ee: #fff8ee;
 }
 
 /* ======================================= */
