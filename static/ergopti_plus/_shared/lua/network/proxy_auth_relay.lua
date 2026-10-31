@@ -27,8 +27,13 @@ local M = {}
 --- The relay executable's file name in every installation.
 M.EXECUTABLE_NAME = "ergopti-proxy-relay"
 
---- The caller-side refusal of a relay that is not installed or did not answer.
+--- The caller-side refusal of a relay that ran and did not answer by contract.
 M.UNAVAILABLE = "relay_unavailable"
+
+--- The status a platform binding answers, without a child, when the relay is
+--- not installed. The Go relay never prints it; until the relay ships in every
+--- package, callers keep the proxy as named and log a WARNING.
+M.NOT_INSTALLED = "not_installed"
 
 --- Validates a decoded proxy_auth_relay.json.
 --- @param contract any

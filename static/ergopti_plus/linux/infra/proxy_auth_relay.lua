@@ -9,8 +9,8 @@
 --- timings registry, and an owned probe child.
 ---
 --- FEATURES & RATIONALE:
---- 1. A relay that is not installed is the named refusal "relay_unavailable"
----    when a proxy demands a sign-in; nothing is probed or started otherwise.
+--- 1. A relay that is not installed answers "not_installed" without a child;
+---    the caller logs it and keeps the proxy as named (proxy-auth-relay.md).
 --- 2. The probe child is an owned process: its exit and every handle close are
 ---    retained before its answer is delivered, and the start's owner cancels it.
 --- 3. Logs name the outcome only: never the proxy, the origin or the token.
@@ -86,7 +86,7 @@ function M.probe(upstream, authority, options, callback)
 	local executable = M.executable()
 	if not executable then
 		-- Not installed: answered by name without a child, synchronously.
-		callback(nil, SharedRelay.UNAVAILABLE)
+		callback({ status = SharedRelay.NOT_INSTALLED }, nil)
 		local done = { settled = true }
 		function done.is_settled() return true end
 		function done.on_settled(listener) listener(); return true end
