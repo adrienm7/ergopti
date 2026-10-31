@@ -156,8 +156,9 @@ local _locales_base_url = (function()
 	-- are percent-encoded rather than rewritten.
 	if NativePath.separators() ~= "/" then locales = locales:gsub("\\", "/") end
 	-- The "/" and ":" separators stay; every segment between them goes
-	-- through the shared encoder.
-	locales = locales:gsub("[^/:]+", TextUtils.percent_encode)
+	-- through the shared encoder. A function replacement's result is taken
+	-- literally, so the "%" the encoder writes is never read as a capture.
+	locales = locales:gsub("[^/:]+", function(segment) return TextUtils.percent_encode(segment) end)
 	if not locales:match("^/") then locales = "/" .. locales end
 	return "file://" .. locales
 end)()
