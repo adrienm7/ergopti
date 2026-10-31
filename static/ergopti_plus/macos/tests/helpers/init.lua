@@ -867,6 +867,7 @@ function M.make_logger_stub()
 		-- Every dialog_util modal runs through this wrapper; it has no clock here.
 		run_modal = function(fn, ...) return fn(...) end,
 		redact_message = function(text) return text end,
+		follow_config_dir = noop,
 		install_runtime_error_capture = noop,
 		init_log_path = noop,
 		-- The logs-folder resolver every consumer asks; a stub without it would
