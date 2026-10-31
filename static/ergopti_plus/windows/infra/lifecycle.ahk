@@ -1257,12 +1257,19 @@ Ergopti_OnShutdown(reason, code) {
 		}
 		LoggerReady := false
 		try _TooltipLogRenderAccounting("shutdown preflight")
-		try LoggerReady := LoggerPrepareShutdown()
+		LoggerRefusal := 0
+		try LoggerReady := LoggerPrepareShutdown(&LoggerRefusal)
 		catch as Err
 			try LoggerError("Lifecycle", "Logger shutdown preflight failed: {1}.", Err.Message)
 		if !LoggerReady {
+			; The evidence says whether the refusal was a flush this exit interrupted,
+			; which ends by itself, or a sink that really refused.
 			try LoggerError("Lifecycle",
-				"Shutdown refused because diagnostic records are not durable yet.")
+				"Shutdown refused because diagnostic records are not durable yet (phase={1}, flush_active={2}, append_owners={3}, last_append_failure={4}).",
+				LoggerRefusal is Map ? LoggerRefusal["phase"] : "raised",
+				LoggerRefusal is Map ? LoggerRefusal["flush_active"] : "?",
+				LoggerRefusal is Map ? LoggerRefusal["append_owners"] : "?",
+				LoggerRefusal is Map ? LoggerRefusal["last_append_failure"] : "?")
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
