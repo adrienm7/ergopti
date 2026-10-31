@@ -203,7 +203,12 @@ class ActualOwnerControls(unittest.TestCase):
             if descriptor == self.worker._output and original and not changed:
                 changed = True
                 data = self.binary.read_bytes()
+                before = self.binary.stat().st_mtime_ns
                 self.binary.write_bytes(data[:-1] + bytes([data[-1] ^ 1]))
+                # A same-size rewrite within the file system's clock tick keeps the
+                # timestamp, which the owner's after-read check compares: this case
+                # measures a detectable mutation, not that tick.
+                os.utime(self.binary, ns=(before + 1_000_000_000, before + 1_000_000_000))
             return original
 
         with patch.object(WORKER.os, "pread", side_effect=mutate):
