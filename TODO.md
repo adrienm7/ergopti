@@ -638,9 +638,7 @@ PAR-12 and PAR-14 are in "Windows manual checks for the maintainer", PAR-15's in
 
 ### A. Behaviour that differs without a good reason (fix first)
 
-- [ ] **Review the machine translations of October 25.** [I18N] New keys (gesture recommendation notes,
-      cascade depth, tap-hold defaults, missing-program messages) are hand-written in French and
-      machine-written in the 19 other locales.
+Nothing left.
 
 ### B. Missing features on one OS
 
