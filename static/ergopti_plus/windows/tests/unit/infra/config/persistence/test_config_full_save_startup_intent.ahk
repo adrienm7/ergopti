@@ -107,7 +107,7 @@ _CFGFS_DirectIntentBeforeBootRefusal(Explicit) {
 		Registry := ConfigMigrateShippedRegistry()
 		Source := "[_meta]`nschema_version = " . Registry["current"]
 			. "`n[full_save_test]`n" . 'value = "before"' . "`n"
-		Expected := Chr(0xFEFF) . "[_meta]`nschema_version = " . Registry["current"]
+		Expected := "[_meta]`nschema_version = " . Registry["current"]
 			. "`n[full_save_test]`n" . 'value = "after"' . "`n"
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
 		AssertEqual(Source, FSReadUtf8Exact(Path))
