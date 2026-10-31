@@ -12,7 +12,9 @@
 ---
 --- Fix (2026-06-19): in the table branch, check _reverse_scalar[sec:disk_key]
 --- first (top_scalar_fk). If found, store the whole table value and skip the
---- sub-path walk.
+--- sub-path walk. Those two shortcuts are retired, so the case below drives the
+--- public flatten_document with a table at another owned top-level scalar: the
+--- owner must judge it, where the sub-path walk dropped it without a word.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -23,39 +25,24 @@ local MetricsState = require("infra.metrics_state_keys")
 
 -- ==========================================================================
 -- ==========================================================================
--- ======= 1/ flatten_from_disk has top_scalar_fk check for table values ===
+-- ======= 1/ flatten_from_disk hands table values to their scalar owner ===
 -- ==========================================================================
 -- ==========================================================================
 
 helpers.describe("preferences flatten_from_disk: table-valued scalar keys", function()
-	helpers.it("source checks _reverse_scalar for table disk_val before sub-path walk", function()
-		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
-		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/infra/preferences.lua"
-
-		local fh = io.open(src_file, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open infra/preferences.lua at: " .. src_file)
-		local src = fh:read("*a")
-		fh:close()
-
-		-- The fix must check _reverse_scalar in the type=="table" branch using
-		-- a top-level sec:disk_key lookup
-		helpers.assert_true(
-			src:find("top_scalar_fk", 1, true) ~= nil,
-			"flatten_from_disk must check top_scalar_fk before sub-path walk"
-		)
-
-		-- Verify that the check comes INSIDE the type(disk_val)=="table" branch
-		local table_branch_pos = src:find('type(disk_val) == "table"', 1, true)
-		local top_scalar_pos   = src:find("top_scalar_fk", 1, true)
-		helpers.assert_true(
-			table_branch_pos ~= nil and top_scalar_pos ~= nil,
-			"both type(disk_val)==table branch and top_scalar_fk must exist"
-		)
-		helpers.assert_true(
-			top_scalar_pos > table_branch_pos,
-			"top_scalar_fk check must appear after the type(disk_val)==table branch start"
-		)
+	helpers.it("judges a table stored at an owned top-level scalar instead of dropping it", function()
+		-- A {mods, key} table at an owned section:key must reach that scalar's
+		-- owner. Without the early scalar lookup it falls into the sub-path walk,
+		-- which finds no inner owner and drops it with no outdated report, so the
+		-- setting silently reverts to its default at every boot.
+		local prefs = helpers.load_with_stubs("infra.preferences")
+		local flat
+		local reports = require("config_outdated").collect_reports(function()
+			flat = prefs.flatten_document({ hotstrings = { trigger_char = { mods = { "cmd" }, key = "x" } } })
+		end)
+		helpers.assert_eq(reports["hotstrings.trigger_char"], true,
+			"the owner must judge the table and report it outdated")
+		helpers.assert_nil(flat.trigger_char, "a table is not a trigger character")
 	end)
 
 	helpers.it("keeps retired dashboard paths out of the preference owner", function()
