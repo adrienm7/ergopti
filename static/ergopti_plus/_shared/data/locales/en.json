@@ -2131,6 +2131,8 @@
 	"menu.tapholds.guardian_unavailable": "🔴 Inactive: the ErgoptiPlus background helper is not registered (check Login Items, then quit and reopen ErgoptiPlus)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ Old ErgoptiPlus rules block your settings: remove them…",
 	"menu.tapholds.close_other_karabiner": "Close other Karabiner apps while tap-holds are on (restored when off)",
+	"menu.tapholds.vhid_incompatible": "⚠️ Tap-holds are off: another Karabiner driver version is installed and macOS runs only one",
+	"menu.tapholds.vhid_not_active": "⚠️ Tap-holds are off: allow the Karabiner virtual keyboard driver in System Settings",
 	"menu.tapholds.open_login_items": "Open Login Items settings…",
 	"menu.tapholds.show_login_items_steps": "Show the steps to allow ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 Keyboard settings saved: they apply once ErgoptiPlus is allowed in Login Items (click to open the settings).",

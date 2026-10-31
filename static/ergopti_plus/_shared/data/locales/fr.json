@@ -2131,6 +2131,8 @@
 	"menu.tapholds.guardian_unavailable": "🔴 Inactifs : l’assistant en arrière-plan d’ErgoptiPlus n’est pas enregistré (vérifiez Ouverture, puis quittez et rouvrez ErgoptiPlus)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ D’anciennes règles ErgoptiPlus bloquent vos réglages : les retirer…",
 	"menu.tapholds.close_other_karabiner": "Fermer les autres Karabiner tant que les tap-holds sont activés (rouverts ensuite)",
+	"menu.tapholds.vhid_incompatible": "⚠️ Tap-holds en pause : une autre version du pilote Karabiner est installée et macOS n’en active qu’une",
+	"menu.tapholds.vhid_not_active": "⚠️ Tap-holds en pause : autorisez le pilote de clavier virtuel Karabiner dans Réglages Système",
 	"menu.tapholds.open_login_items": "Ouvrir les réglages d’Ouverture…",
 	"menu.tapholds.show_login_items_steps": "Afficher les étapes pour autoriser ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 Réglages du clavier enregistrés : ils s’appliqueront dès qu’ErgoptiPlus sera autorisé dans Ouverture (cliquer pour ouvrir les réglages).",

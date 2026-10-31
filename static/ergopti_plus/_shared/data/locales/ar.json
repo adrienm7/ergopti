@@ -2074,6 +2074,8 @@
 	"menu.tapholds.guardian_unavailable": "🔴 غير نشط: المساعد الخلفي لـ ErgoptiPlus غير مسجَّل (تحقق من عناصر تسجيل الدخول، ثم أنهِ ErgoptiPlus وافتحه مرة أخرى)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ قواعد ErgoptiPlus القديمة تعطّل إعداداتك: إزالتها…",
 	"menu.tapholds.close_other_karabiner": "إغلاق نسخ Karabiner الأخرى أثناء تفعيل نقر-ضغط (تُستعاد بعد ذلك)",
+	"menu.tapholds.vhid_incompatible": "⚠️ نقر-ضغط متوقف: إصدار آخر من تعريف Karabiner مثبت ولا يفعّل macOS إلا إصدارًا واحدًا",
+	"menu.tapholds.vhid_not_active": "⚠️ نقر-ضغط متوقف: اسمح بتعريف لوحة المفاتيح الافتراضية لـ Karabiner في إعدادات النظام",
 	"menu.tapholds.open_login_items": "فتح إعدادات عناصر تسجيل الدخول…",
 	"menu.tapholds.show_login_items_steps": "عرض خطوات السماح لـ ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 تم حفظ إعدادات لوحة المفاتيح: ستُطبَّق بمجرد السماح لـ ErgoptiPlus في عناصر تسجيل الدخول (انقر لفتح الإعدادات).",

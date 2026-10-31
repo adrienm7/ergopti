@@ -1070,6 +1070,27 @@ local function close_other_karabiner_rows(karabiner, update_menu)
 	} }
 end
 
+--- Why Ergopti's own runtime cannot run, for the blocks the user can act on.
+--- Only one VirtualHIDDevice version can be active on a Mac, so a user
+--- Karabiner with another driver version blocks it (ADR 011), and a driver
+--- macOS has not approved blocks it until it is allowed in System Settings.
+local VHID_BLOCK_KEYS = {
+	virtual_hid_incompatible = "menu.tapholds.vhid_incompatible",
+	virtual_hid_not_active = "menu.tapholds.vhid_not_active",
+}
+
+--- The disabled row that explains a VirtualHIDDevice block of the owned runtime.
+--- @param karabiner table Remap facade.
+--- @return table rows Empty unless the owner reports such a block.
+local function owned_runtime_block_rows(karabiner)
+	if type(karabiner.owned_runtime_status) ~= "function" then return {} end
+	local ok, status = pcall(karabiner.owned_runtime_status)
+	if not ok or type(status) ~= "table" or status.state ~= "unavailable" then return {} end
+	local key = VHID_BLOCK_KEYS[status.reason]
+	if not key then return {} end
+	return { { label = i18n.get(key), disabled = true } }
+end
+
 --- Builds the Tap-holds row and its submenu.
 ---
 --- `tap_holds_menu` in the shared manifest owns the structural sequence, the
@@ -1108,6 +1129,7 @@ function M.build(ctx)
 		["tap_hold_timings"] = function()
 			local rows = legacy_rules_rows(karabiner)
 			for _, row in ipairs(guardian_status_rows(karabiner, tap_holds_on)) do rows[#rows + 1] = row end
+			for _, row in ipairs(owned_runtime_block_rows(karabiner)) do rows[#rows + 1] = row end
 			for _, row in ipairs(close_other_karabiner_rows(karabiner, update_menu)) do rows[#rows + 1] = row end
 			rows[#rows + 1] = build_delay_item(karabiner, update_menu)
 			rows[#rows + 1] = build_sticky_delay_item(karabiner, update_menu)
