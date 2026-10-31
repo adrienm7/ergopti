@@ -20,6 +20,7 @@
 
 local Report = require("field_check_report")
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 
 local M = {}
 
@@ -102,7 +103,7 @@ end
 function M.timer_site_name(site)
 	local path, line = tostring(site or ""):match("^(.-%.lua):(%d+)$")
 	if not path then return "unknown" end
-	return (path:match("([^/]+)$") or path) .. ":" .. line
+	return NativePath.basename(path) .. ":" .. line
 end
 
 --- One timer site as a step value: `<file>:<line>:<count>:<ms>`.
