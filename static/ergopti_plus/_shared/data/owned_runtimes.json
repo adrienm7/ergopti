@@ -947,7 +947,7 @@
 		},
 		{
 			"os": "linux",
-			"tool": "`cat`, `grep`, `head`, `tail`, `sed`, `wc`, `date`, `sleep`, `readlink`, `find`, `ps`, `pgrep`, `ss`, `setsid`, `lsblk`",
+			"tool": "`cat`, `grep`, `head`, `tail`, `sed`, `wc`, `date`, `sleep`, `readlink`, `find`, `ps`, `pgrep`, `ss`, `setsid`, `tr`, `lsblk`",
 			"programs": [
 				"cat",
 				"grep",
@@ -963,9 +963,10 @@
 				"pgrep",
 				"ss",
 				"setsid",
+				"tr",
 				"lsblk"
 			],
-			"used_for": "Small queries and filters: system facts, file watching, the local AI servers' ports and processes, the updater relay, the uninstall detach (`linux/modules/keystats/system_metrics.lua`, `linux/infra/file_watchers.lua`, `linux/modules/llm/local_server_ports.lua`, `linux/modules/updater/restarter.lua`, `linux/ui/menu/uninstall.lua`, `linux/modules/gestures/system_actions.lua`)",
+			"used_for": "Small queries and filters: system facts, file watching, the local AI servers' ports and processes, the updater relay, the uninstall detach (`linux/modules/keystats/system_metrics.lua`, `linux/infra/file_watchers.lua`, `linux/modules/llm/local_server_ports.lua`, `linux/modules/updater/restarter.lua`, `linux/ui/menu/uninstall.lua`, `linux/modules/gestures/system_actions.lua`, `linux/modules/gestures/manager.lua`)",
 			"today": "System (coreutils, procps, iproute2, util-linux)",
 			"current_class": "SYS",
 			"version_needed": "POSIX",
@@ -1056,6 +1057,21 @@
 			"tool": "`udisksctl`",
 			"programs": ["udisksctl"],
 			"used_for": "Unmounting and powering off the removable disks for the eject-all-disks action (`linux/modules/gestures/system_actions.lua`)",
+			"today": "Optional",
+			"current_class": "OPT",
+			"version_needed": "n/a",
+			"if_missing": "The picker greys the action with the missing tool",
+			"pin_possible": "Distribution package",
+			"decision": "OPT",
+			"decision_text": "OPT",
+			"alternative": null,
+			"status": "done"
+		},
+		{
+			"os": "linux",
+			"tool": "`tesseract`",
+			"programs": ["tesseract"],
+			"used_for": "Reading the text of a captured screen region for the OCR action (`linux/modules/gestures/manager.lua`)",
 			"today": "Optional",
 			"current_class": "OPT",
 			"version_needed": "n/a",

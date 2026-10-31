@@ -495,6 +495,22 @@ local SCREENSHOT_COMMANDS = {
 	["screenshot_window_save"] =
 		"gnome-screenshot -wf %s || spectacle -bnao %s || maim -i \"$(xdotool getactivewindow)\" %s",
 }
+-- The frontmost window saved at once, with no selection: what macOS and
+-- Windows name screen_capture_instant is this driver's window capture.
+SCREENSHOT_COMMANDS["screen_capture_instant"] = SCREENSHOT_COMMANDS["screenshot_window_save"]
+
+--- ocr_screenshot: the region the user draws, captured by the region cascade
+--- into a private temporary file, read by tesseract in every language it has
+--- installed (its own "osd" script detector is not a language), and the text
+--- left on the clipboard, Wayland first as for the captures. The capture is
+--- removed whatever happens; a cancelled selection leaves the clipboard alone.
+local OCR_COMMAND = "{ f=$(mktemp --suffix=.png) || exit 1; { "
+	.. SCREENSHOT_COMMANDS["screenshot_region_save"]:gsub("%%s", '"$f"')
+	.. "; } && [ -s \"$f\" ]"
+	.. " && langs=$(tesseract --list-langs 2>/dev/null | tail -n +2 | grep -vx osd | tr '\\n' '+')"
+	.. " && text=$(tesseract \"$f\" - ${langs:+-l \"${langs%+}\"} 2>/dev/null)"
+	.. " && { printf '%s' \"$text\" | wl-copy 2>/dev/null || printf '%s' \"$text\" | xclip -selection clipboard; };"
+	.. " rm -f \"$f\"; }"
 
 --- Where a saved screenshot lands, and under what name.
 ---
@@ -518,6 +534,7 @@ local SCREENSHOT_KIND = {
 	["screenshot_fullscreen_save"] = "full",
 	["screenshot_region_save"]     = "reg",
 	["screenshot_window_save"]     = "win",
+	["screen_capture_instant"]     = "win",
 }
 
 --- Actions this driver performs as one fixed shell command, by action id.
@@ -532,6 +549,7 @@ local DIRECT_COMMANDS = {
 	-- guessed ~/Downloads.
 	["open_downloads"]    = 'xdg-open "$(xdg-user-dir DOWNLOAD)"',
 	["open_file_manager"] = 'xdg-open "$HOME"',
+	["ocr_screenshot"]    = OCR_COMMAND,
 }
 
 --- The settings applications open_system_settings tries, in order: GNOME, KDE,

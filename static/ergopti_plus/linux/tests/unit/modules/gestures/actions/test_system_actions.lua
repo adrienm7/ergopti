@@ -19,8 +19,9 @@
 ---    keys that fired it woke them straight back up.
 --- 5. force_quit_frontmost killed unasked (decision of 2026-09-29), and a kill
 ---    confirmed in a dialog must target the window active before the question.
---- 6. minimize_all, eject_all_disks, open_emoji_picker and pick_color were
----    declared for Windows and macOS only. Their Linux commands run here in a real shell against stub
+--- 6. minimize_all, eject_all_disks, open_emoji_picker, pick_color,
+---    screen_capture_instant and ocr_screenshot were declared for Windows and
+---    macOS only. Their Linux commands run here in a real shell against stub
 ---    tools, so a quoting slip or a filter that ejects the system disk fails.
 --- ==============================================================================
 
@@ -454,4 +455,42 @@ helpers.describe("Linux system actions", function()
 		os.getenv = real_getenv
 		if not ok then error(err, 0) end
 	end)
+
+	helpers.it("screen_capture_instant saves the active window like screenshot_window_save (action-parity-linux-system)",
+		function()
+			local instant = backgrounded(Gestures, "screen_capture_instant")
+			helpers.assert_true(instant:find("gnome-screenshot -wf '", 1, true) ~= nil, instant)
+			helpers.assert_true(instant:find("/ergopti_win_", 1, true) ~= nil, "a window capture file name: " .. instant)
+		end)
+
+	helpers.it("ocr_screenshot puts the text of the drawn region on the clipboard (action-parity-linux-system)", function()
+		local log, dir = run_with_stubs(backgrounded(Gestures, "ocr_screenshot"), {
+			slurp = 'echo "10,10 50x20"',
+			grim = 'for last; do :; done; printf png > "$last"',
+			tesseract = 'case "$1" in --list-langs) printf "%s\\n" "List of available languages:" eng fra osd;;'
+				.. ' *) printf "Bonjour"; esac',
+			["wl-copy"] = 'cat > "$STUBS/clipboard"',
+		})
+		local clip_fh = io.open(dir .. "/clipboard", "r")
+		local clip = clip_fh and clip_fh:read("*a")
+		if clip_fh then clip_fh:close() end
+		helpers.assert_eq(clip, "Bonjour", "the recognised text reaches the clipboard; calls: " .. log)
+		helpers.assert_true(log:find("tesseract /[^ ]+%.png %- %-l eng%+fra\n") ~= nil,
+			"tesseract reads the capture in every installed language but osd: " .. log)
+		local leftover = io.popen("ls '" .. dir .. "' | grep -c png$"):read("*l")
+		helpers.assert_true(log:find("grim %-g 10,10 50x20 /") ~= nil, "the drawn region is captured: " .. log)
+		helpers.assert_eq(leftover, "0", "the temporary capture is removed")
+	end)
+
+	helpers.it("ocr_screenshot leaves the clipboard alone when the selection is cancelled (action-parity-linux-system)",
+		function()
+			local log, dir = run_with_stubs(backgrounded(Gestures, "ocr_screenshot"), {
+				slurp = "exit 1",
+				grim = "exit 1",
+				tesseract = 'printf "x"',
+				["wl-copy"] = 'cat > "$STUBS/clipboard"',
+			})
+			helpers.assert_nil(io.open(dir .. "/clipboard", "r"), "nothing reached the clipboard: " .. log)
+			helpers.assert_true(not log:find("tesseract", 1, true), "nothing was read: " .. log)
+		end)
 end)
