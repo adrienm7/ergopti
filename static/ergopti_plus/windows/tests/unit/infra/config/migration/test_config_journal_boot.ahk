@@ -692,7 +692,7 @@ _CMJ_PostBootDirectPublication(Metadata, Refuse) {
 	Original := '[_meta]`nschema_version = 19`n[llm]`nmodel = "user-model"`n'
 	Successor := Metadata . '`n[llm]`nmodel = "user-model"`n[future]`nkeep = [false, 1, "1"]`n'
 	try {
-		AssertEqual(17, ConfigMigrateCurrentVersion(), "the authored current source owns the actual v17 registry contract")
+		AssertEqual(19, ConfigMigrateCurrentVersion(), "the authored current source owns the actual v19 registry contract")
 		ConfigurationFile := Path
 		AssertTrue(FSWriteDurable(Path, Original))
 		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
@@ -713,7 +713,7 @@ _CMJ_PostBootDirectPublication(Metadata, Refuse) {
 				"exact genuine current source repair restores actual native publication")
 		}
 		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
-		AssertEqual(17, Document["_meta"]["schema_version"], "publication must retain the independent current stamp")
+		AssertEqual(19, Document["_meta"]["schema_version"], "publication must retain the independent current stamp")
 		AssertEqual("changed-model", Document["llm"]["model"])
 		Stages := 0
 		Loop Files, Path . ".*.tmp"
