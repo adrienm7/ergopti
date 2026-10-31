@@ -404,6 +404,19 @@ function M.active_models_manager()
 	return _active_models_mgr
 end
 
+--- Retires the owned Ollama daemon for the root teardown, calling back once
+--- the daemon's exact native retirement settles.
+--- @param on_settled function Called once with (settled, detail).
+--- @return boolean accepted True when retired or awaiting the callback.
+function M.retire_owned_ollama(on_settled)
+	local ApiOllama = require("modules.llm.api_ollama")
+	local accepted, state = ApiOllama.retire_owned_server(on_settled)
+	if accepted == true and state == "settled" then
+		on_settled(true, "owned Ollama daemon already retired")
+	end
+	return accepted == true
+end
+
 --- Retires the owned Ollama daemon and sweeps the local expander/HTTP helpers. Called by the root
 --- teardown shared by every controlled reload and quit path, so the quit entry
 --- points can never drift. Stock Karabiner processes are never owned by Ergopti.

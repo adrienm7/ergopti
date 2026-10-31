@@ -544,8 +544,13 @@ local LauncherGuard
 local _termination_coordinator_ready = false
 local _local_teardown_state = TeardownTransaction.new_state()
 local _local_teardown_started = false
-local _mlx_teardown_pending = false
-local _mlx_teardown_settled = false
+-- One record per local owner whose stop completes asynchronously (MLX server,
+-- owned Ollama daemon): the root teardown awaits each exact callback before
+-- its synchronous steps run.
+local _awaited_teardown_owners = {
+	mlx = { pending = false, settled = false },
+	ollama = { pending = false, settled = false },
+}
 -- Set only after the controlled path has drained and released the logger. The
 -- native shutdown callback still fires for hs.reload(); without this fence it
 -- would reopen the synchronous fallback sink and request the already-STOPPED
@@ -778,6 +783,62 @@ local function settle_loaded_physical_owner(on_teardown_ready)
 	return true
 end
 
+--- Starts or observes one asynchronous owner stop for the root teardown.
+--- The owner's module (ui.menu.menu_llm) calls back once with the exact result;
+--- that callback alone authorizes the coordinator's retry of the whole pass.
+--- @param owner table `{ key, label, method }` of `_awaited_teardown_owners`.
+--- @param on_teardown_ready function|nil Coordinator readiness callback.
+--- @return boolean accepted
+--- @return string|nil state `pending` while the exact callback is retained.
+local function await_teardown_owner(owner, on_teardown_ready)
+	local record = _awaited_teardown_owners[owner.key]
+	if record.settled then return true end
+	if record.pending then return true, "pending" end
+	local module = package.loaded["ui.menu.menu_llm"]
+	if module == nil then
+		record.settled = true
+		return true
+	end
+	if type(module[owner.method]) ~= "function" then
+		Logger.error(LOG, "%s teardown refused: %s is unavailable.", owner.label, owner.method)
+		return false
+	end
+	if type(on_teardown_ready) ~= "function" then
+		Logger.error(LOG, "%s teardown refused: readiness callback is unavailable.", owner.label)
+		return false
+	end
+	local callback_claimed = false
+	record.pending = true
+	local function on_settled(settled, detail)
+		if callback_claimed then return false end
+		callback_claimed = true
+		record.pending = false
+		record.settled = settled == true
+		local callback_ok, callback_error = xpcall(function()
+			return on_teardown_ready(settled == true, detail)
+		end, debug.traceback)
+		if not callback_ok then
+			Logger.error(LOG, "%s teardown readiness callback failed: %s.",
+				owner.label, tostring(callback_error))
+		end
+		return callback_ok and settled == true
+	end
+
+	local stop_ok, accepted_or_error = xpcall(function()
+		return module[owner.method](on_settled)
+	end, debug.traceback)
+	-- Exact synchronous completion outranks a later native return or throw;
+	-- the coordinator observed the callback and owns the authorized retry
+	if callback_claimed then return true, "pending" end
+	if not stop_ok or accepted_or_error ~= true then
+		record.pending = false
+		Logger.error(LOG, "%s teardown stop was refused: %s.", owner.label, tostring(accepted_or_error))
+		return false
+	end
+	Logger.debug(LOG, "%s teardown is awaiting exact task completion.", owner.label)
+	return true, "pending"
+end
+
 --- Releases every Lua-owned resource. This function never owns Karabiner's
 --- shared processes; controlled callers invoke it only after the exact token
 --- fence. The native shutdown callback intentionally does not call it because
@@ -798,53 +859,18 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 	local layout_accepted, layout_state = quit_layout_step.run(termination_kind, on_teardown_ready)
 	if layout_state == "pending" then return layout_accepted, layout_state end
 
-	-- The MLX task completion is asynchronous after terminate() accepts SIGTERM
-	-- Keep every remaining local owner alive until its exact callback proves the
-	-- captured listener absent, then let the coordinator retry this stateful pass
-	if not _mlx_teardown_settled then
-		if _mlx_teardown_pending then return true, "pending" end
-		local module = package.loaded["ui.menu.menu_llm"]
-		if module == nil then
-			_mlx_teardown_settled = true
-		elseif type(module.stop_mlx_server) ~= "function" then
-			Logger.error(LOG, "MLX teardown refused: stop_mlx_server is unavailable.")
-			return false
-		elseif type(on_teardown_ready) ~= "function" then
-			Logger.error(LOG, "MLX teardown refused: readiness callback is unavailable.")
-			return false
-		else
-			local callback_claimed = false
-			_mlx_teardown_pending = true
-			local function on_mlx_settled(settled, detail)
-				if callback_claimed then return false end
-				callback_claimed = true
-				_mlx_teardown_pending = false
-				_mlx_teardown_settled = settled == true
-				local callback_ok, callback_error = xpcall(function()
-					return on_teardown_ready(settled == true, detail)
-				end, debug.traceback)
-				if not callback_ok then
-					Logger.error(LOG, "MLX teardown readiness callback failed: %s.",
-						tostring(callback_error))
-				end
-				return callback_ok and settled == true
-			end
-
-			local stop_ok, accepted_or_error = xpcall(function()
-				return module.stop_mlx_server(on_mlx_settled)
-			end, debug.traceback)
-			-- Exact synchronous completion outranks a later native return or throw;
-			-- the coordinator observed the callback and owns the authorized retry
-			if callback_claimed then return true, "pending" end
-			if not stop_ok or accepted_or_error ~= true then
-				_mlx_teardown_pending = false
-				Logger.error(LOG, "MLX teardown stop was refused: %s.",
-					tostring(stop_ok and accepted_or_error or accepted_or_error))
-				return false
-			end
-			Logger.debug(LOG, "MLX teardown is awaiting exact task completion.")
-			return true, "pending"
-		end
+	-- The MLX task completion is asynchronous after terminate() accepts SIGTERM,
+	-- and the owned Ollama daemon retires only on its native RETIRED receipt after
+	-- stdin EOF. Keep every remaining local owner alive until each exact callback
+	-- settles, then let the coordinator retry this stateful pass. Without the
+	-- Ollama wait, the helper step refused on every reload while the daemon ran
+	-- (field run 2026-10-31: both reloads failed their teardown).
+	for _, owner in ipairs({
+		{ key = "mlx", label = "MLX", method = "stop_mlx_server" },
+		{ key = "ollama", label = "Owned Ollama", method = "retire_owned_ollama" },
+	}) do
+		local accepted, state = await_teardown_owner(owner, on_teardown_ready)
+		if accepted ~= true or state == "pending" then return accepted, state end
 	end
 
 	local physical_accepted, physical_state = settle_loaded_physical_owner(on_teardown_ready)
