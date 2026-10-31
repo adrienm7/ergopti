@@ -462,8 +462,8 @@ function deriveKarabiner(sources, detection, osFeatures, derived, errors) {
 		const entry = `${where} M.${STATE_TABLE}.${field}`;
 		if (!read.has(field)) errors.push(`${entry}: the generator never reads state.${field}`);
 		if (!Array.isArray(value)) {
-			if (typeof value.reason !== 'string' || value.reason.length === 0) {
-				errors.push(`${entry}: a field that feeds no feature states { reason = "..." }`);
+			if (typeof value.why !== 'string' || value.why.length === 0) {
+				errors.push(`${entry}: a field that feeds no feature states { why = "..." }`);
 			}
 			continue;
 		}
@@ -484,8 +484,8 @@ function deriveKarabiner(sources, detection, osFeatures, derived, errors) {
 		const entry = `${where} M.${FACADE_TABLE}["${file}"]`;
 		if (!hits.includes(file)) errors.push(`${entry}: the file does not call the remap facade`);
 		if (!Array.isArray(value)) {
-			if (typeof value.reason !== 'string' || value.reason.length === 0) {
-				errors.push(`${entry}: a caller that serves no feature states { reason = "..." }`);
+			if (typeof value.why !== 'string' || value.why.length === 0) {
+				errors.push(`${entry}: a caller that serves no feature states { why = "..." }`);
 			}
 			continue;
 		}
