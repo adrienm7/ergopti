@@ -87,7 +87,7 @@ helpers.describe("adapters.file_system: final logical publication admission", fu
 					os.rename, adapter.read_with_status = rename, read
 					local handle = assert(io.open(path, "rb"))
 					local actual = assert(handle:read("*a")); assert(handle:close())
-					os.remove(path); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+					os.remove(path); os.remove(fixture.write_lock_path(path))
 					helpers.assert_eq(called, true)
 					helpers.assert_eq(written, mode == "true", tostring(detail))
 					helpers.assert_eq(admissions, 1)
@@ -133,7 +133,7 @@ helpers.describe("FileSystem admitted publication captures exact source before c
 				os.rename, adapter.read_with_status = rename, read
 				local file = assert(io.open(path, "rb"))
 				local actual = assert(file:read("*a")); assert(file:close())
-				os.remove(path); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+				os.remove(path); os.remove(fixture.write_lock_path(path))
 				helpers.assert_eq(called, true)
 				helpers.assert_eq(written, false)
 				helpers.assert_eq(actual, "external-successor")

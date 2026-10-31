@@ -287,10 +287,14 @@ local function native_fixture(body)
 			end)
 			io.open = function(path, mode)
 				local handle, detail = saved_open(path, mode)
-				if not handle or mode ~= "a+" or path:sub(-#native.WRITE_LOCK_SUFFIX) ~= native.WRITE_LOCK_SUFFIX then
+				-- The lock lives in the per-user lock directory: map it back to its file.
+				local source = nil
+				for _, owned in ipairs({ f.alpha, f.overrides }) do
+					if path == native.write_lock_path(owned) then source = owned end
+				end
+				if not handle or mode ~= "a+" or source == nil then
 					return handle, detail
 				end
-				local source = path:sub(1, -#native.WRITE_LOCK_SUFFIX - 1)
 				local wrapper = { path = source, close = function()
 					increment(observations.closes, source)
 					if controls.release_refusal == source then return nil, "controlled native lock close refusal" end
@@ -339,7 +343,7 @@ local function native_fixture(body)
 				end
 				io.open, os.rename = saved_open, saved_rename
 				for _, handle in ipairs(handles) do pcall(function() handle:close() end) end
-				for _, path in ipairs({ f.alpha, f.overrides }) do os.remove(path .. native.WRITE_LOCK_SUFFIX) end
+				for _, path in ipairs({ f.alpha, f.overrides }) do os.remove(native.write_lock_path(path)) end
 				for path, active in pairs(held) do helpers.assert_eq(active, false, "fixture releases its native mutex " .. path) end
 			end
 		end })
