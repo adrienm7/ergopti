@@ -63,6 +63,10 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
 // The installer's functions print through its message reader.
 const MESSAGES_READER = require('./lib/shell-messages-fixture.cjs').readerSource();
+// The installer sources the shared hosts before its functions; so do the fixtures.
+const IDENTIFIERS_READER = `. ${JSON.stringify(
+	bashPath(path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'identifiers.sh'))
+)}\n`;
 const LAUNCHER = path.join(DRIVER, 'bin', 'ergopti-hotstrings');
 const INSTALLER = path.join(DRIVER, 'install.sh');
 const DEB_BUILDER = path.join(ROOT, 'tools', 'build', 'build-linux-deb.sh');
@@ -290,6 +294,7 @@ if (
 		const harness =
 			'set -u\n' +
 			MESSAGES_READER +
+			IDENTIFIERS_READER +
 			'_detect_pkg_manager() { echo apk; }\n' +
 			'sudo() { "$@"; }\n' +
 			dependencyFunctions +
@@ -350,7 +355,7 @@ if (
 					fs.rmSync(log, { force: true });
 					const result = spawnSync(bash, ['-s'], {
 						input:
-							`set -u\n${MESSAGES_READER}_detect_pkg_manager() { echo ${manager}; }\nsudo() { "$@"; }\n` +
+							`set -u\n${MESSAGES_READER}${IDENTIFIERS_READER}_detect_pkg_manager() { echo ${manager}; }\nsudo() { "$@"; }\n` +
 							dependencyFunctions +
 							`\n_check_or_install_library ${soname}\n`,
 						encoding: 'utf8',

@@ -316,7 +316,7 @@ _CFGFS_DefaultWriterPreservesObsoleteDriverNamespace() {
 	Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n[ahk.layout]`nergopti_base = false`n`n"
 		. "[layout]`nergopti_base = true`n`n"
 		. "[future_extension]`nkeep = 42`n"
-	Expected := Chr(0xFEFF) . Source . "[full_save_test]`n" . 'value = "old"' . "`n"
+	Expected := Source . "[full_save_test]`n" . 'value = "old"' . "`n"
 	try {
 		FileAppend(Source, Path, "UTF-8-RAW")
 		AssertEqual(Source, FSReadUtf8Exact(Path))
@@ -374,7 +374,7 @@ _CFGFS_DefaultWriterPreservesCompleteObsoletePrefix() {
 		. "[ahk.layout.deep]`n" . 'future = {enabled = true, label = "retain"}' . "`n`n"
 		. "[ahk_future]`nkeep = 42`n`n"
 	Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n" . Retired . "[full_save_test]`n" . 'value = "before"' . "`n"
-	Expected := Chr(0xFEFF) . "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n" . Retired . "[full_save_test]`n" . 'value = "old"' . "`n"
+	Expected := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n" . Retired . "[full_save_test]`n" . 'value = "old"' . "`n"
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
 		AssertEqual(Source, FSReadUtf8Exact(Path))

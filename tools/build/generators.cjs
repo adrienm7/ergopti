@@ -263,6 +263,10 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-registry-constants.cjs',
+		outputs: ['static/ergopti_plus/macos/_generated/registry_limits.lua']
+	},
+	{
 		script: 'codegen/codegen-logger-sub-files.cjs',
 		outputs: [
 			'static/ergopti_plus/macos/_generated/logger_sub_files.lua',

@@ -3057,7 +3057,7 @@ function render_charmix_kpi() {
 			(s) =>
 				`<div title="${s.label || (s.label || '') + ' ' + s.pct.toFixed(2) + '%'}" ` +
 				`style="flex-basis:${s.pct}%;background:${s.color};display:flex;align-items:center;justify-content:center;` +
-				`color:#0f172a;font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;">${s.label}</div>`
+				`color:${ThemeTokens.color('hue-0f172a')};font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;">${s.label}</div>`
 		)
 		.join('');
 	container.innerHTML =

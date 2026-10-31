@@ -46,11 +46,12 @@ _FreshSameSec_TieIsStale() {
 	global _SharedDir
 	_FreshSameSec_PrevShared := _SharedDir
 	_SharedDir := Base
-	TsvPath := _HotstringsCacheTsvPath()
-	TomlPath := _HotstringsCacheTomlPath("magickey")
+	; The cache paths resolve through the language index, so it must exist first.
 	IndexPath := HsDir . "\_index.toml"
 	FileCopy(_FreshSameSec_PrevShared . "\modules\hotstrings\_index.toml", IndexPath, true)
 	FileSetTime("20240101115900", IndexPath, "M")
+	TsvPath := _HotstringsCacheTsvPath()
+	TomlPath := _HotstringsCacheTomlPath("magickey")
 
 	try {
 		try FileDelete(TsvPath)
@@ -98,11 +99,12 @@ _FreshSameSec_NewerTsvStillFresh() {
 	global _SharedDir
 	_FreshSameSec_PrevShared := _SharedDir
 	_SharedDir := Base
-	TsvPath := _HotstringsCacheTsvPath()
-	TomlPath := _HotstringsCacheTomlPath("magickey")
+	; The cache paths resolve through the language index, so it must exist first.
 	IndexPath := HsDir . "\_index.toml"
 	FileCopy(_FreshSameSec_PrevShared . "\modules\hotstrings\_index.toml", IndexPath, true)
 	FileSetTime("20240101115900", IndexPath, "M")
+	TsvPath := _HotstringsCacheTsvPath()
+	TomlPath := _HotstringsCacheTomlPath("magickey")
 
 	try {
 		try FileDelete(TsvPath)

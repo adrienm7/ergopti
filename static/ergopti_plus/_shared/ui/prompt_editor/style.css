@@ -30,16 +30,16 @@
 	--hint: var(--theme-gray);
 	--accent: var(--theme-accent);
 	--danger: var(--theme-danger);
-	--chip-bg: #ddeeff;
-	--chip-c: #1a4bbf;
+	--chip-bg: var(--theme-hue-ddeeff);
+	--chip-c: var(--theme-hue-1a4bbf);
 	--chip-bd: rgba(26, 75, 191, 0.22);
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--hint: #636366;
-		--chip-bg: #183060;
-		--chip-c: #93b8f8;
+		--hint: var(--theme-hue-636366);
+		--chip-bg: var(--theme-hue-183060);
+		--chip-c: var(--theme-hue-93b8f8);
 		--chip-bd: rgba(147, 184, 248, 0.28);
 	}
 }

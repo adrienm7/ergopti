@@ -11,9 +11,9 @@
 --- their order and the separators between them are the manifest's `top_level`,
 --- which M.build dispatches through its builder table. Each section builder
 --- lives in its own ui/menu/menu_<section>.lua, bound here as
---- `require("ui.menu.menu_<section>").build`, and the zenity dialogs they share
---- in ui/menu/menu_dialogs.lua; this file keeps the header, the facade checks
---- and the tray assembly. tools/lib/linux-menu-parts.cjs admits only that
+--- `require("ui.menu.menu_<section>").build`, and each part binds the zenity
+--- dialogs it uses from ui/menu/menu_dialogs.lua and holds its own imports;
+--- this file keeps the header, the facade checks and the tray assembly. tools/lib/linux-menu-parts.cjs admits only that
 --- wiring for the menu gates.
 ---
 --- Items that depend on features not yet implemented on Linux
@@ -29,47 +29,13 @@
 --- ==============================================================================
 
 local M = {}
-local WindowTitles = require("window_titles")
-local NativePresentation = require("infra.native_presentation")
-local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
-local NumberRowPolicy = require("layout.number_row_policy")
-local ParameterLabel = require("action_parameter_label")
-local RowDialect = require("menu.row_dialect")
-
 local Logger = require("logger.shim")
-local Extensions = require("hotstrings.extensions")
-local PersonalFiles = require("hotstrings.personal_files")
-local PersonalFileMenu = require("menu.personal_files")
-local Languages = require("hotstrings.languages")
-local LocaleTable = require("_generated.locale_table")
-local MagicKey = require("modules.hotstrings.magic_key")
-local MagicKeySourceRows = require("keymap.magic_key_source")
-local MagicFrame = require("menu.frames.magic_frame")
-local ParentSource = require("menu.frames.parent_source")
-local PersonalInfoSource = require("menu.frames.personal_info_source")
-local PreviewSettings = require("modules.hotstrings.preview_settings")
-local RepeatKey = require("modules.hotstrings.repeat_key")
-local Modal = require("ui.modal")
-local TextPrompt = require("ui.text_prompt")
-local PrivacyPolicy = require("llm.trigger_policy")
-local LlmBackendRows = require("ui.menu.llm_backend_rows")
-local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
-local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
 local LOG = "ui.menu.builder"
-local COMMAND = require("config_keys").COMMAND
 
-
--- Single source of the driver version and of the build identity.
+-- Single source of the driver version and of the build identity. Every other
+-- import lives in the part module that reads it: the root holds only what the
+-- header, the facade checks and the tray assembly below read.
 local Version = require("infra.version")
-
--- The one answer to "installed build or source run".
-local Installation = require("infra.installation")
-
--- The shared wording of the About version row.
-local VersionLabel = require("updater.version_label")
-
--- The shared automatic-check schedule (frequency presets and their snap).
-local Schedule = require("updater.schedule")
 
 
 -- The shared manifest menu renderer, bound for this driver (infra/manifest_menu).
@@ -87,9 +53,6 @@ local separator_array = type(ManifestMenu) == "table" and rawget(ManifestMenu, "
 local separator_root = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")
 local header_template = type(ManifestMenu) == "table" and rawget(ManifestMenu, "template_rows")
 local header_command = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_row")
-local uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")
-local uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")
-local uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")
 
 
 --- Refuses facade or function withdrawal without invoking its replacement.
@@ -111,18 +74,6 @@ local function header_facade_current()
 		and type(header_template) == "function" and rawget(ManifestMenu, "template_rows") == header_template
 		and type(header_command) == "function" and rawget(ManifestMenu, "command_row") == header_command
 end
-
-local _fill = require("ui.menu.menu_dialogs")._fill
-local shell_quote = require("ui.menu.menu_dialogs").shell_quote
-local succeeded = require("ui.menu.menu_dialogs").succeeded
-local prompt_text = require("ui.menu.menu_dialogs").prompt_text
-local show_error = require("ui.menu.menu_dialogs").show_error
-local show_info = require("ui.menu.menu_dialogs").show_info
-local zenity_plain = require("ui.menu.menu_dialogs").zenity_plain
-local assign_parameterized_action = require("ui.menu.menu_dialogs").assign_parameterized_action
-local open_action_picker = require("ui.menu.menu_dialogs").open_action_picker
-local slot_binding_rows = require("ui.menu.menu_dialogs").slot_binding_rows
-local ask_yes_no = require("ui.menu.menu_dialogs").ask_yes_no
 
 
 

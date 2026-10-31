@@ -290,8 +290,6 @@ jobs:
           MACOS_STAGE_NEEDS: ${{ toJSON(needs) }}
         run: node tools/ci/macos-stage-roles.cjs admit e2e "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"
       # Retained original role: e2e-hs
-      - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}
 
       - name: Install the E2E interpreter
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}
@@ -341,8 +339,6 @@ jobs:
           if-no-files-found: warn
 
       # Retained original role: tooltip-canvas
-      - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}
       - uses: actions/setup-node@v4
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}
         with:
@@ -519,7 +515,13 @@ jobs:
           identity = official['assets'][contract['official_asset_key']]
           version = contract['go_version']
           assert re.fullmatch(r'go[0-9]+\.[0-9]+\.[0-9]+', version)
-          root = Path(tempfile.mkdtemp(prefix='managed-ollama-native-', dir=os.environ['RUNNER_TEMP']))
+          # The Intel XCTest cell restores its SwiftPM build tree, whose files name
+          # their absolute paths, so its root is the same directory on every run.
+          if os.environ['MACOS_STAGE_SCENARIO'] == 'xctest':
+              root = Path(os.environ['RUNNER_TEMP']) / 'managed-ollama-native-xctest'
+              root.mkdir(mode=0o700)
+          else:
+              root = Path(tempfile.mkdtemp(prefix='managed-ollama-native-', dir=os.environ['RUNNER_TEMP']))
           values = {
               'ERGOPTI_OLLAMA_BUILD_ROOT': str(root),
               'ERGOPTI_OLLAMA_SOURCE': str(root / 'source'),
@@ -654,6 +656,69 @@ jobs:
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/numeric-tls-controls.log
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/api-wire-controls.log
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/serve-lifecycle-controls.log
+      # Trial (run 40498535042): the Intel XCTest cell spent 215 s on one cold
+      # SwiftPM debug build, its tests 48 s. Only this cell caches the build
+      # tree. The key names every input the build reads (the launcher package
+      # with its resolved pins, the .github/ci policies Package.swift reads, the
+      # release context, the runner image and the Swift toolchain) and there is
+      # no fallback key, so a partial match never restores a stale tree.
+      # test-ci-pipeline-wiring refuses this cache in every other cell and job.
+      - name: Name the Intel XCTest SwiftPM build
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        id: swiftpm-xctest-key
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO == 'xctest') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ImageOS" && test -n "$ImageVersion"
+          inputs="$(
+            git ls-files -s static/ergopti_plus/macos/launcher .github/ci
+            printf 'image %s %s %s\n' "$ImageOS" "$ImageVersion" "$(uname -m)"
+            swift --version 2>&1
+            printf 'release %s %s %s %s %s\n' "$ERGOPTI_DEV_RELEASE_RELEASE" "$ERGOPTI_DEV_RELEASE_PRERELEASE" \
+              "$ERGOPTI_DEV_RELEASE_CHANNEL" "$ERGOPTI_DEV_RELEASE_TAG" "$ERGOPTI_DEV_RELEASE_VERSION"
+          )"
+          digest="$(printf '%s\n' "$inputs" | shasum -a 256 | cut -c1-32)"
+          echo "key=swiftpm-intel-xctest-$digest" >> "$GITHUB_OUTPUT"
+      - name: Restore the Intel XCTest SwiftPM build
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        id: swiftpm-xctest-cache
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO == 'xctest') }}
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/swift
+          key: ${{ steps.swiftpm-xctest-key.outputs.key }}
+      - name: Report the Intel XCTest SwiftPM build cache
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO == 'xctest') }}
+        shell: bash
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+          CACHE_HIT: ${{ steps.swiftpm-xctest-cache.outputs.cache-hit }}
+          CACHE_KEY: ${{ steps.swiftpm-xctest-key.outputs.key }}
+        run: |
+          set -euo pipefail
+          if [ "$CACHE_HIT" = true ]; then
+              echo "SwiftPM XCTest cache: hit ($CACHE_KEY)"
+          else
+              echo "SwiftPM XCTest cache: miss ($CACHE_KEY)"
+          fi
       # Runs on macOS 15; the launcher cell runs these classes again on macOS 26 on purpose.
       - name: Qualify actual SDK accepted-owner and deadline XCTest controls
         env:
@@ -858,6 +923,20 @@ jobs:
             ${{ runner.temp }}/number-row-source-evidence/tis-session.*/manifest.json
             ${{ runner.temp }}/number-row-source-evidence/tis-session.*/record-*.dat
             ${{ runner.temp }}/number-row-source-evidence/tis-session.*/refusal.json
+      # Saved only after a successful cold build and its tests, and only on a miss.
+      - name: Save the Intel XCTest SwiftPM build
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO == 'xctest' && steps.swiftpm-xctest-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/swift
+          key: ${{ steps.swiftpm-xctest-key.outputs.key }}
       - name: Qualify native input-source and launcher XCTest controls
         env:
           GOTOOLCHAIN: 'local'
@@ -1616,8 +1695,6 @@ jobs:
       # reviewer reads: this Ubuntu entry uses the Hammerspoon stub. The packaged
       # clean launch additionally qualifies the real native delayed-timer API.
       # Retained original role: item36-native
-      - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
       - uses: actions/setup-node@v4
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         with:
@@ -1733,8 +1810,6 @@ jobs:
       # This no-effect paired-process control runs independently of archive/PAC jobs.
       # It supplements every full/package/install gate and never publishes assets.
       # Retained original role: lease-silence-native
-      - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
       - uses: actions/setup-node@v4
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         with:
@@ -1764,8 +1839,6 @@ jobs:
       # Retained original role: launcher-native
       # The launcher XCTest and the native probes of the build host (macOS 26),
       # out of Build: Build packages the application only after this cell passed.
-      - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
 
       - name: Prepare Node for native policy fixtures and XCTest evidence
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
@@ -1905,6 +1978,12 @@ jobs:
       # The full launcher XCTest run on macOS 26. The Managed Ollama cells run
       # many of the same classes on macOS 15; keep both: they are deliberate
       # cross-version coverage of one launcher, not duplicates to skip here.
+      # Budget, measured on hosted macOS 26: the nine green runs of 2026-10-28 to
+      # 31 took 346 to 579 s (main run 41075976093: 579 s, of which 123 s cold
+      # SwiftPM build and 177 s HomebrewArchiveAcceptanceTests); 10 minutes failed
+      # twice on 2026-10-28 while a real PAC trust test was running. A separate job
+      # would add another cold build and take one of the five macOS runners, so the
+      # step gets about 1.5 times the slowest green run instead.
       - name: Run Swift launcher tests on macOS 26
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         id: swift-launcher-tests
@@ -1998,7 +2077,7 @@ jobs:
               echo "::error::the XCTest process ended without its successful suite summary"
               exit 1
           fi
-        timeout-minutes: 10
+        timeout-minutes: 15
 
       - name: Retain scoped native Brew qualification receipt
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}
@@ -2886,6 +2965,36 @@ jobs:
             python3 tools/diagnostics/macos_launch_reset.py restore "$RUNNER_TEMP/launch-fresh-runner.json"
           done
           exit "$lot_status"
+
+      # Items 13/35: the complete guardian acceptance collector, on every launch
+      # lot's runner, after its scenarios and their reset. It installs the
+      # package this run built, registers the remap guardian headless, reads it
+      # back, registers again, refuses a foreign launcher identity for both
+      # verbs, retires it and proves the job absent; the runner is then
+      # restored. The verdict requires one admitted receipt per lot.
+      - name: Register and retire the installed remap guardian
+        env:
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (!cancelled()) }}
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/launch-gate/guardian-acceptance"
+          mkdir -p "$output"
+          test ! -e /Applications/ErgoptiPlus.app
+          stamp="0083;$(printf '%x' "$(date +%s)");Safari;$(uuidgen)"
+          node tools/build/macos-release-archives.cjs --ci-install "$RUNNER_TEMP/package" /Applications "$stamp" \
+              > "$output/package-install.json"
+          xattr -r -w com.apple.quarantine "$stamp" /Applications/ErgoptiPlus.app
+          xattr -dr com.apple.quarantine /Applications/ErgoptiPlus.app
+          set +e
+          python3 tools/diagnostics/macos_helper_registration.py /Applications/ErgoptiPlus.app "$output/receipt.json"
+          collector_status=$?
+          set -e
+          python3 tools/diagnostics/macos_launch_reset.py restore "$RUNNER_TEMP/launch-fresh-runner.json"
+          test "$collector_status" -eq 0
+          node tools/test/desktop-ci-evidence.cjs record-guardian-macos \
+              "$output/receipt.json" "$MACOS_STAGE_SCENARIO" "$output/guardian-evidence.json"
+        timeout-minutes: 5
 
       - name: Retain source-bound AppleEvent launch qualification receipt
         env:

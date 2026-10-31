@@ -438,7 +438,7 @@ native_install_managed_python_without_python() {
 	local rc python_path
 	[ -f "$SCRIPT_DIR/managed-python-release.sh" ] || return 78
 	# shellcheck source=/dev/null
-	source "$SCRIPT_DIR/managed-python-release.sh"
+	source "$SCRIPT_DIR/managed-python-release.sh" || return 78
 	[ "$MANAGED_PYTHON_UV_RELEASE" = "$UV_RELEASE_VERSION" ] || return 78
 	case "$MANAGED_PYTHON_REQUEST" in cpython-"$PYTHON_VERSION".*-macos-aarch64-none) ;; *) return 78 ;; esac
 	[ -f "$SCRIPT_DIR/$MANAGED_PYTHON_DOWNLOADS_BASENAME" ] || return 78

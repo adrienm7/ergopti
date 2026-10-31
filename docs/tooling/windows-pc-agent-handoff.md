@@ -75,6 +75,20 @@ only by static and JS tests. Once it lands on `dev`:
 
 ## Found tonight for the PC agent
 
+- False-green ratchet red on dev since 9aa90d28a5's batch:
+  `tools/test/find-false-greens.cjs` reports an unfloored source-scan loop in
+  `windows/tests/unit/infra/config/scope/test_hotstring_dynamic_menu_scope.ahk:26`
+  (the loop never asserts it matched anything). Assert the match count after
+  the loop, then rerun the ratchet.
+
+- AI menu label: four messages now quote each locale's `menu.llm.title`
+  (« Intelligence Artificielle », “Artificial Intelligence”) instead of an
+  « AI menu » no tray draws; the title itself is unchanged. No AHK test pins
+  the literal: they resolve `t("menu.llm.title")`. Still to do under
+  AutoHotkey: confirm the action picker's count default
+  (`dialog.action_picker.count_default`, `ui/action_picker_webview.ahk`) reads
+  the new text.
+
 - Item 139 on Windows: `infra/toml/toml_loader.ahk` prints user-chosen pack and
   category names in clear (`LoggerDone` at lines 496 and 584) and the extension
   TOML path (`LoggerStart` at 638, `LoggerSuccess` at 755). macOS and Linux mask
@@ -140,6 +154,26 @@ downloaded again`). Ollama deletes that layer before it reports the
   lane, job and per-step elapsed tables into its job summary
   (`tools/ci/run-timing.cjs --step-summary`); nothing to do on the PC, but the
   Windows lane's slowest steps are read there from now on.
+- Thinking off (the TODO item is closed on macOS and Linux): the generic names
+  are split (`*-r1*`, `*think*`, `*reasoning*` send nothing; `*qwen3*`,
+  `*deepseek*` keep the toggle), Kimi K2.5/K2.6 is a toggle family, and the
+  single-mode Qwen models (Qwen3-Next, Qwen3-Coder, Qwen3.7 Max preview) send
+  nothing. `thinking_off.ahk` reads the same JSON, so only its suite must run:
+  `test_llm_thinking_off.ahk` (twelve new resolve vectors, family indexes
+  36 -> 38), plus the still unexecuted `model_capabilities.ahk`, `vision.ahk`
+  `think` and `LLM_OllamaThink` tests.
+- Local servers "none" row on Windows (maintainer decision of 2026-10-31):
+  a finished sweep that found no server says one sentence,
+  `menu.llm.local_servers.none_detected` (all 21 locales), instead of
+  `menu.llm.local_servers.none` with the eleven server labels; the names stay
+  in the panel and the "other address" submenu. macOS and Linux read the
+  shared `_shared/lua/llm/local_server_menu.lua`. The Windows twin
+  `_shared/modules/llm/local_server_menu.ahk` (`Key := ... "menu.llm.local_servers.none"`
+  with `Labels`) needs the same split: `searching` keeps the list,
+  `none_detected` takes none; move `test_local_server_menu.ahk` line 88
+  (`"menu.llm.local_servers.none|LM Studio, llama.cpp"`) to the new key. The
+  panel's own report (`local_server_panel.ahk` line 572) keeps
+  `menu.llm.local_servers.none` with the host.
 
 ## Field report analysis, budgets and field run: written without AutoHotkey
 
@@ -221,3 +255,24 @@ count the old catalogue and will go red until they read it:
 `test_local_server_auth.ahk` (expects 4 descriptors) and
 `test_local_server_panel_view_preparation.ahk` (4 and 5 orders, 4 providers).
 Make them read the catalogue, then run the local servers panel once.
+
+## Constants, colours and identifiers left for AutoHotkey (31 October)
+
+The cloud finished the Lua, JS, shell, tools and Swift parts of PAR-79 to PAR-83
+(branch `fix/todo-final-p3-constants`). What is left needs AutoHotkey:
+
+- PAR-79: the 36 AHK files (250 timer literals) of
+  `tools/test/timer-literal-baseline.json`. Read `TimingsGet`/`TimingsGetSec`
+  and shrink the baseline.
+- PAR-81: `windows/ui/hotstrings_config_window/hcw_mutations.ahk` and `webview.ahk` in
+  `tools/lint/hex-literal-baseline.json` (shrink with
+  `node tools/lint/lint-conventions.js --update-hex-baseline`), from the
+  generated `windows/_generated/native_theme.ahk`. The 24 colours of
+  `_shared/modules/tooltip/constants.toml` and `wpm_widget/constants.toml` stay
+  literals until the three drivers' readers can resolve a theme token; that
+  change starts with the AHK reader. The hotstring TOML category colours are user
+  data and stay.
+- PAR-83: the AHK copies in `tools/lint/identifier-literal-baseline.json`, and
+  `ollama_managed_files.ps1`, from `windows/_generated/identifiers.ahk` (no
+  PowerShell copy is generated yet). Shrink with
+  `node tools/test/test-repo-url-single-source.cjs --shrink`.

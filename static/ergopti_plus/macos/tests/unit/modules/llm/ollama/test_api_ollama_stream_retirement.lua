@@ -178,6 +178,26 @@ helpers.describe("Ollama stream retirement ownership", function()
 		end)
 	end
 
+	-- The completion callback once captured an undeclared payload path (a local
+	-- declared after the closure is the nil global inside it): its removal threw,
+	-- ShellRunner's pcall swallowed the throw and every streamed prediction was
+	-- lost. The real on_done must remove the very payload it was given and
+	-- publish the result.
+	helpers.it("(stream-tmpfile-before-on-done) completion removes its own payload and publishes", function()
+		with_stream(function(_, fixture)
+			fixture.request()
+			local task = fixture.tasks[1]
+			helpers.assert_true(exists(task.payload), "the payload exists while curl reads it")
+			task:emit('{"message":{"content":" and a useful"},"done":false}\n')
+			task:emit('{"message":{"content":" continuation"},"done":true}\n')
+			task:complete(0)
+			helpers.assert_eq(exists(task.payload), false, "on_done must remove the payload it owns")
+			helpers.assert_eq(fixture.partial_values[#fixture.partial_values], " and a useful continuation")
+			helpers.assert_eq(fixture.successes, 1)
+			helpers.assert_eq(fixture.failures, 0)
+		end)
+	end)
+
 	helpers.it("(stream-pending-retirement) retains the task and payload until exact completion", function()
 		with_stream(function(api, fixture)
 			fixture.request()

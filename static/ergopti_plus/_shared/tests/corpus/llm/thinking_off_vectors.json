@@ -1045,7 +1045,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 36,
+			"family": 38,
 			"kind": "toggle"
 		},
 		{
@@ -1091,7 +1091,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 36,
+			"family": 38,
 			"kind": "toggle"
 		},
 		{
@@ -2007,12 +2007,10 @@
 				"model": "qwen/qwen3-next-80b-a3b-instruct",
 				"max_tokens": 16,
 				"stream": false,
-				"temperature": 0.7,
-				"chat_template_kwargs": { "enable_thinking": false }
+				"temperature": 0.7
 			},
-			"added": [["chat_template_kwargs"]],
-			"family": 30,
-			"kind": "toggle"
+			"added": [],
+			"family": 29
 		},
 		{
 			"id": "nebius_Qwen_Qwen3-30B-A3B-Instruct-2507",
@@ -2623,7 +2621,7 @@
 				"thinking": { "type": "disabled" }
 			},
 			"added": [["thinking"]],
-			"family": 36,
+			"family": 38,
 			"kind": "toggle"
 		},
 		{
@@ -2904,6 +2902,217 @@
 			},
 			"added": [],
 			"family": 13
+		},
+		{
+			"id": "dashscope_qwen3-coder-plus",
+			"provider": "dashscope",
+			"model": "qwen3-coder-plus",
+			"body": {
+				"model": "qwen3-coder-plus",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen3-coder-plus",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 29
+		},
+		{
+			"id": "together_Qwen_Qwen3-Next-80B-A3B-Thinking",
+			"provider": "together",
+			"model": "Qwen/Qwen3-Next-80B-A3B-Thinking",
+			"body": {
+				"model": "Qwen/Qwen3-Next-80B-A3B-Thinking",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "Qwen/Qwen3-Next-80B-A3B-Thinking",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 29
+		},
+		{
+			"id": "dashscope_qwen3.7-max-preview",
+			"provider": "dashscope",
+			"model": "qwen3.7-max-preview",
+			"body": {
+				"model": "qwen3.7-max-preview",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen3.7-max-preview",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 29
+		},
+		{
+			"id": "dashscope_qwen3.7-max_hybrid",
+			"provider": "dashscope",
+			"model": "qwen3.7-max",
+			"body": { "model": "qwen3.7-max", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "qwen3.7-max",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "dashscope_kimi-k2.6",
+			"provider": "dashscope",
+			"model": "kimi-k2.6",
+			"body": { "model": "kimi-k2.6", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "kimi-k2.6",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 36,
+			"kind": "toggle"
+		},
+		{
+			"id": "together_moonshotai_Kimi-K2.6",
+			"provider": "together",
+			"model": "moonshotai/Kimi-K2.6",
+			"body": {
+				"model": "moonshotai/Kimi-K2.6",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "moonshotai/Kimi-K2.6",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": { "enabled": false }
+			},
+			"added": [["reasoning"]],
+			"family": 36,
+			"kind": "toggle"
+		},
+		{
+			"id": "moonshot_kimi-k2.6_no_toggle_in_dialect",
+			"provider": "moonshot",
+			"model": "kimi-k2.6",
+			"body": { "model": "kimi-k2.6", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "kimi-k2.6", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": [],
+			"family": 36
+		},
+		{
+			"id": "moonshot_kimi-k2.7-code_always_thinks",
+			"provider": "moonshot",
+			"model": "kimi-k2.7-code",
+			"body": { "model": "kimi-k2.7-code", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "kimi-k2.7-code",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 26
+		},
+		{
+			"id": "together_generic_r1_distill",
+			"provider": "together",
+			"model": "acme/Llama-3.3-R1-Distill-70B",
+			"body": {
+				"model": "acme/Llama-3.3-R1-Distill-70B",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "acme/Llama-3.3-R1-Distill-70B",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 37
+		},
+		{
+			"id": "xai_grok-4-fast-non-reasoning_generic",
+			"provider": "xai",
+			"model": "grok-4-fast-non-reasoning",
+			"body": {
+				"model": "grok-4-fast-non-reasoning",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "grok-4-fast-non-reasoning",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 37
+		},
+		{
+			"id": "openrouter_generic_thinking",
+			"provider": "openrouter",
+			"model": "acme/glm-4.1v-thinking-flash",
+			"body": {
+				"model": "acme/glm-4.1v-thinking-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "acme/glm-4.1v-thinking-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 37
+		},
+		{
+			"id": "bedrock_style_generic_qwen3_prefix",
+			"provider": "openrouter",
+			"model": "qwen.qwen3-32b-v1",
+			"body": {
+				"model": "qwen.qwen3-32b-v1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen.qwen3-32b-v1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": { "enabled": false }
+			},
+			"added": [["reasoning"]],
+			"family": 38,
+			"kind": "toggle"
 		}
 	],
 	"refusal_vectors": [

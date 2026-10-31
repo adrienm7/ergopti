@@ -2,6 +2,7 @@
 # tools/ci/ubuntu_apt.py
 """Acquire CI dependencies from the runner's signed Ubuntu archives only."""
 
+import errno
 import hashlib
 import json
 import os
@@ -11,7 +12,7 @@ import stat
 import subprocess
 import sys
 import tempfile
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 
 SOURCE = Path("/etc/apt/sources.list.d/ubuntu.sources")
@@ -22,6 +23,10 @@ MIRROR_URI = "mirror+file:/etc/apt/apt-mirrors.txt"
 PINNED_KEYRING = Path(__file__).with_name("ubuntu-archive-keyring.gpg")
 PIN_POLICY = Path(__file__).with_name("ubuntu-keyring.json")
 ORIGIN_MAX_BYTES = 65536
+# The cross-run archive cache, used only when a workflow has created it. Its
+# restored/ half holds the previous run's archives, its used/ half collects the
+# archives this run installed (.github/workflows/ci-linux.yml, E2E rows).
+DEB_CACHE = Path("/var/cache/ergopti-ubuntu-apt-debs")
 
 
 def authority_refused(role, metadata):
@@ -355,7 +360,127 @@ def write_private(path, raw, role):
         raise ValueError("Ubuntu private authority bytes changed")
 
 
-def acquire(raw, arguments, execute=subprocess.run, *, keyring=None, mirrors=None):
+# One --print-uris line: quoted URI, archive file name, size and a hash whose
+# algorithm APT chooses (MD5Sum on apt 2.8), so the hash is read separately.
+PRINTED_URI = re.compile(r"'[^'\s]+' ([A-Za-z0-9.+~%_-]+\.deb) ([0-9]+) [A-Za-z0-9]+:[0-9a-f]+")
+INDEX_FIELD = re.compile(r"(Filename|Size|SHA256): (\S+)")
+
+
+def planned_archives(listing):
+    """Parse the archives APT will fetch; an unknown line refuses the whole plan."""
+    plan = []
+    for line in listing.splitlines():
+        if not line.strip():
+            continue
+        match = PRINTED_URI.fullmatch(line.strip())
+        if match is None:
+            raise ValueError("APT download plan line refused")
+        plan.append((match.group(1), int(match.group(2))))
+    return plan
+
+
+def index_selectors(plan):
+    """The package=version selectors apt-cache needs for each planned archive."""
+    selectors = []
+    for name, _size in plan:
+        parts = name[: -len(".deb")].split("_")
+        if len(parts) != 3:
+            raise ValueError("APT archive name refused")
+        selectors.append(parts[0] + "=" + unquote(parts[1]))
+    return selectors
+
+
+def index_digests(stanzas, plan):
+    """Map each planned archive to the SHA256 the signed index records for it."""
+    sizes = dict(plan)
+    digests = {}
+    for stanza in stanzas.split("\n\n"):
+        fields = dict(
+            INDEX_FIELD.fullmatch(line).groups()
+            for line in stanza.splitlines()
+            if INDEX_FIELD.fullmatch(line)
+        )
+        name = fields.get("Filename", "").rsplit("/", 1)[-1]
+        if name in sizes and fields.get("Size") == str(sizes[name]) and "SHA256" in fields:
+            digests[name] = fields["SHA256"]
+    return digests
+
+
+def read_cached_archive(path, size):
+    """Read one regular cached archive of the planned size, never through a link."""
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        # A link in the cache is never followed; APT downloads that archive.
+        if error.errno == errno.ELOOP:
+            return None
+        raise
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size != size:
+            return None
+        chunks, length = [], 0
+        while length <= size:
+            block = os.read(descriptor, min(1 << 20, size + 1 - length))
+            if not block:
+                break
+            chunks.append(block)
+            length += len(block)
+        return b"".join(chunks) if length == size else None
+    finally:
+        os.close(descriptor)
+
+
+def import_cached_archives(plan, digests, restored, archives):
+    """Seed the private archive directory with cached files the signed index names.
+
+    APT reuses a file already in its archive directory after checking only its
+    size, so each cached file is admitted here only when its bytes match the
+    hash of the signed index this call just fetched. Anything else is left to
+    APT to download.
+    """
+    admitted = 0
+    for name, size in plan:
+        digest = digests.get(name)
+        raw = read_cached_archive(restored / name, size) if digest else None
+        if raw is None or hashlib.sha256(raw).hexdigest() != digest:
+            continue
+        with (archives / name).open("xb") as stream:
+            stream.write(raw)
+        admitted += 1
+    print("Ubuntu archive cache: %d of %d planned archives reused" % (admitted, len(plan)))
+
+
+def export_used_archives(plan, archives, used):
+    """Keep exactly the archives this call installed for the next run's cache."""
+    for name, _size in plan:
+        source, target = archives / name, used / name
+        if not target.exists():
+            target.write_bytes(source.read_bytes())
+
+
+def deb_cache_directories(root):
+    """The restored and used halves of a runner-owned cache; links are refused."""
+    root = Path(root)
+    halves = (root / "restored", root / "used")
+    for path in (root,) + halves:
+        if not stat.S_ISDIR(path.lstat().st_mode):
+            raise ValueError("Ubuntu archive cache directory refused")
+    return halves
+
+
+def acquire(
+    raw,
+    arguments,
+    execute=subprocess.run,
+    *,
+    keyring=None,
+    mirrors=None,
+    deb_cache=None,
+    capture=subprocess.run,
+):
     """Wait for each actual APT operation before disposing its private authorities."""
     raw = admitted_source(raw, mirrors)
     arguments = package_arguments(arguments)
@@ -379,7 +504,33 @@ def acquire(raw, arguments, execute=subprocess.run, *, keyring=None, mirrors=Non
         require_owned(directory.lstat(), "private-namespace", directory=True)
         prefix = command_prefix(directory)
         execute(prefix + ["update"], check=True)
+        plan = []
+        if deb_cache is not None:
+            restored, used = deb_cache_directories(deb_cache)
+            listing = capture(
+                prefix + ["--print-uris", "-qq", "install", *arguments],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            plan = planned_archives(listing)
+            digests = {}
+            if plan:
+                digests = index_digests(
+                    capture(
+                        ["/usr/bin/apt-cache"] + prefix[1:] + ["show", *index_selectors(plan)],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    ).stdout,
+                    plan,
+                )
+            archives = directory / "cache" / "archives"
+            (archives / "partial").mkdir(mode=0o755, parents=True)
+            import_cached_archives(plan, digests, restored, archives)
         execute(prefix + ["install", *arguments], check=True)
+        if deb_cache is not None:
+            export_used_archives(plan, archives, used)
     except BaseException as error:
         primary = error
         raise
@@ -409,7 +560,11 @@ def main(arguments):
     if source_uses_mirrors(raw):
         mirrors = read_owned_origin(MIRRORS, "mirrors")
     keyring = read_pinned_keyring()
-    acquire(raw, arguments, keyring=keyring, mirrors=mirrors)
+    deb_cache = DEB_CACHE if DEB_CACHE.exists() else None
+    if deb_cache is None:
+        acquire(raw, arguments, keyring=keyring, mirrors=mirrors)
+    else:
+        acquire(raw, arguments, keyring=keyring, mirrors=mirrors, deb_cache=deb_cache)
 
 
 if __name__ == "__main__":

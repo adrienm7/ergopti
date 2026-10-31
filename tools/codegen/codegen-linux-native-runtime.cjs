@@ -353,10 +353,8 @@ function render(data, read) {
 			LUV_CMAKE_OPTIONS.map((option) => JSON.stringify(option)).join(' ') +
 			')'
 	];
-	const luvRecipe = ['NATIVE_LUV_SOURCE_URL=' + JSON.stringify(luvSource.url), ...luvPin].join(
-		'\n'
-	);
-	// A new build script spells no host: it derives it from identifiers.sh.
+	// Neither the installer nor the build script spells the host: both source
+	// _shared/data/identifiers.sh and expand it at run time.
 	const githubPrefix = `https://${JSON.parse(read(IDENTIFIERS)).hosts.github}/`;
 	const luvRepository = luvSource.url.slice(githubPrefix.length);
 	if (
@@ -379,7 +377,7 @@ function render(data, read) {
 		'LINUX SOURCE NETWORK BUILD',
 		[
 			`_network_source_build_packages() {\n\tcase "$1" in\n${luvBuildRows.join('\n')}\n\t\t*) return 1 ;;\n\tesac\n}`,
-			luvRecipe
+			packagedLuvRecipe
 		].join('\n')
 	);
 	result[installer] = projectRegion(

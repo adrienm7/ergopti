@@ -24,6 +24,9 @@ local OWNERS = {
 	"phase_stats_core",
 	-- The renderer configuration and the paths walk split paths through this pure owner.
 	"native_path",
+	-- The renderer asks it which applications answer Accessibility; it
+	-- captures hs at require time, so each scenario loads it afresh.
+	"adapters.accessibility_permission",
 	"infra.vscode_bridge", "tooltip.layout", "tooltip.llm_line", "tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
 }
 
@@ -41,6 +44,7 @@ function M.load()
 	package.loaded["ui.tooltip.config"] = nil
 	package.loaded["toml_codec.reader"] = nil
 	package.loaded["infra.toml.reader"] = nil
+	package.loaded["adapters.accessibility_permission"] = nil
 	return helpers.load_with_stubs("ui.tooltip.renderer"), errors
 end
 

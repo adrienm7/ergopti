@@ -1045,7 +1045,8 @@ default_timeout_ms = 30000
 # Accessibility within the messaging timeout is not asked again, unless another
 # application comes to the front. Each unanswered read holds the main thread
 # for the whole timeout (field log 2026-10-30: 13 holds of 500 ms on one app).
-# HS: modules/keymap/utils.lua UNRESPONSIVE_AX_BACKOFF_SEC.
+# HS: adapters/accessibility_permission.lua unanswered_cooldown_sec (the
+# ignored-window probe, the tooltip anchor and the context capture).
 unresponsive_ax_backoff_ms = 30000
 
 # Linux: how long the window switch worker sleeps between two polls of its queue.
@@ -1133,3 +1134,18 @@ proxy_packet_bytes = 65536
 # one run's result), also the limit the request passes to the launcher.
 # HS: adapters/apple_shortcuts.lua.
 shortcuts_reply_bytes = 65536
+
+# Encoded log lines the macOS log transport prepares in one tick, also the
+# longest single line it enqueues. Read before infra.timings exists, through the
+# generated macos/_generated/registry_limits.lua. HS: adapters/log_transport.lua.
+log_prepare_tick_bytes = 65536
+
+# Output a synchronous macOS shell capture keeps before it stops the child and
+# reports the output limit. Read through macos/_generated/registry_limits.lua.
+# HS: adapters/shell_runner.lua.
+shell_captured_output_bytes = 4194304
+
+# Read granularity of the macOS TOML cache when it collects a source's exact
+# bytes. Read through macos/_generated/registry_limits.lua.
+# HS: adapters/toml_cache.lua.
+toml_source_chunk_bytes = 65536

@@ -143,12 +143,14 @@ function macStageProblems(source) {
 			macContract.jobs,
 			'Mac stage/role registration or predicate differs.'
 		);
-		const expectedLease = YAML.parse('job:\n' + LEASE_SILENCE_NATIVE_BODY).job.steps.map(
-			(step) => ({
+		// The E2E stage job checks out once before admission; the role does not
+		// check out the same commit again, so the original body's checkout is dropped.
+		const expectedLease = YAML.parse('job:\n' + LEASE_SILENCE_NATIVE_BODY)
+			.job.steps.filter((step) => step.uses !== 'actions/checkout@v4')
+			.map((step) => ({
 				...macRole.metadata(step, 'lease-silence-native'),
 				if: macRole.condition('lease-silence-native', step.if)
-			})
-		);
+			}));
 		assert.deepEqual(
 			YAML.parse(macRole.body(source, 'lease-silence-native')).steps,
 			expectedLease,
@@ -599,6 +601,14 @@ const STEP_CONDITIONS = [
 		'package-linux',
 		'Save the Flatpak runtimes',
 		"steps.flatpak-cache.outputs.cache-hit != 'true'"
+	],
+	// Each E2E row saves the Ubuntu archives it used only when the set changed.
+	[LINUX_BOX, 'e2e-linux', 'Name the used Ubuntu archive set', '${{ !cancelled() }}'],
+	[
+		LINUX_BOX,
+		'e2e-linux',
+		'Save the Ubuntu archive cache',
+		"${{ !cancelled() && steps.ubuntu-apt-used.outputs.count != '0' && steps.ubuntu-apt-used.outputs.key != steps.ubuntu-apt-cache.outputs.cache-matched-key }}"
 	],
 	[
 		LINUX_BOX,
@@ -3741,8 +3751,8 @@ for (const [what, from, to] of [
 	],
 	[
 		'Linux E2E forwards an integration predicate for a diagnostic build',
-		'      ci_attempt: ${{ github.run_attempt }}\n\n    steps:\n      - uses: actions/checkout@v4\n\n      - name: Install LuaJIT\n        # Bound',
-		'      ci_attempt: ${{ github.run_attempt }}\n      ci_integration_result: ${{ needs.integration-linux.result }}\n\n    steps:\n      - uses: actions/checkout@v4\n\n      - name: Install LuaJIT\n        # Bound'
+		'      ci_attempt: ${{ github.run_attempt }}\n\n    steps:\n      - uses: actions/checkout@v4\n\n      # The rows spent',
+		'      ci_attempt: ${{ github.run_attempt }}\n      ci_integration_result: ${{ needs.integration-linux.result }}\n\n    steps:\n      - uses: actions/checkout@v4\n\n      # The rows spent'
 	]
 ]) {
 	mustCatch(what, LINUX_BOX, from, to, graphProblems);

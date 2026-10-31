@@ -19,7 +19,7 @@ end
 local function fixture(options)
 	options = options or {}
 	local state = { native = {}, steps = 0, stop_calls = 0, retired_calls = 0,
-		requires = 0, receipts = {}, layout_calls = 0, mlx_calls = 0 }
+		requires = 0, receipts = {}, layout_calls = 0, mlx_calls = 0, stages = {} }
 	local noop = function() end
 	local logger = { info = noop, error = noop, debug = noop }
 	local native_hs = { timer = {} }
@@ -75,9 +75,12 @@ local function fixture(options)
 	end
 	local env = setmetatable({
 		_local_teardown_state = transaction.new_state(), _local_teardown_started = false,
-		_mlx_teardown_pending = false, _mlx_teardown_settled = false,
+		_awaited_teardown_owners = { mlx = { pending = false, settled = false },
+			ollama = { pending = false, settled = false } },
 		TimerScheduler = scheduler, TeardownTransaction = transaction, Logger = logger, LOG = "topinit-control",
-		HS_BOOT_READY_SETTING_KEY = "test-ready", Storage = { set = function() return true end },
+		HS_BOOT_READY_SETTING_KEY = "test-ready",
+		Storage = { set = function() return options.storage_result ~= false end },
+		ReloadBreadcrumb = { record = function(kind, stage) state.stages[#state.stages + 1] = kind .. ":" .. stage; return true end },
 		package = { loaded = loaded }, require = function() state.requires = state.requires + 1; error("must not acquire dormant owner") end,
 		_G = { script_watchers = nil },
 		quit_layout_step = { run = function() state.layout_calls = state.layout_calls + 1; return true end },
@@ -86,6 +89,7 @@ local function fixture(options)
 		loaded["ui.menu.menu_llm"] = {
 			stop_mlx_server = function(callback) state.mlx_calls = state.mlx_calls + 1; state.mlx_callback = callback; return true end,
 			terminate_helper_processes = function() return true end,
+			retire_owned_ollama = function(callback) callback(true, "fixture daemon retired"); return true end,
 			terminate_orphan_mlx_server = function() return true end,
 		}
 	end
@@ -165,6 +169,25 @@ helpers.describe("loaded-only physical owner termination", function()
 		helpers.assert_eq(s.requires, 0)
 	end)
 
+	-- Both 2026-10-31 reloads lost the step that refused: its ERROR line was
+	-- queued behind the drain that never ran (reload-breadcrumb-failed-step).
+	helpers.it("names a refusing teardown step in the reload breadcrumb (reload-breadcrumb-failed-step)", function()
+		local s = fixture({ absent = true, storage_result = false })
+		helpers.assert_eq(s.teardown("reload", s.ready), false)
+		helpers.assert_eq(s.steps, 1, "the siblings of a refusing step still run")
+		local failed, first_step
+		for index, stage in ipairs(s.stages) do
+			if stage == "reload:failed_step_boot-ready-setting" then failed = index end
+			if stage == "reload:step_boot-ready-setting" then first_step = index end
+		end
+		helpers.assert_true(first_step ~= nil and failed == first_step + 1,
+			"the refusal is named right after its step: " .. table.concat(s.stages, ","))
+		for _, stage in ipairs(s.stages) do
+			helpers.assert_true(stage == "reload:failed_step_boot-ready-setting" or not stage:find("failed_", 1, true),
+				"only the refusing step is named failed: " .. stage)
+		end
+	end)
+
 	helpers.it("preserves MLX prerequisite before requesting physical stop", function()
 		local s = fixture({ mlx = true })
 		local accepted, phase = s.teardown("reload", s.ready)
@@ -175,6 +198,10 @@ helpers.describe("loaded-only physical owner termination", function()
 		helpers.assert_eq(s.steps, 0)
 		s.mlx_callback(true)
 		s.receipts = {}
+		-- The owned Ollama daemon is awaited next; the fixture's retires at once
+		local _, ollama_phase = s.teardown("reload", s.ready)
+		helpers.assert_eq(ollama_phase, "pending")
+		helpers.assert_eq(s.stop_calls, 0, "the physical owner waits for the Ollama daemon too")
 		local _, next_phase = s.teardown("reload", s.ready)
 		helpers.assert_eq(next_phase, "pending")
 		helpers.assert_eq(s.stop_calls, 1)

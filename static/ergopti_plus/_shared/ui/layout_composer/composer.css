@@ -38,7 +38,7 @@
 }
 
 .composer .note {
-	color: #777;
+	color: var(--theme-grey-777);
 	font-size: 11px;
 	margin: 0 0 6px;
 }
@@ -61,7 +61,7 @@
 .composer-key-editor select,
 .composer-key-editor input {
 	background: var(--theme-white);
-	border: 1px solid #c8c8cc;
+	border: 1px solid var(--theme-hue-c8c8cc);
 	border-radius: 6px;
 	color: inherit;
 	font-size: 12px;
@@ -98,7 +98,7 @@
 
 .composer-key {
 	background: var(--theme-white);
-	border: 1px solid #c8c8cc;
+	border: 1px solid var(--theme-hue-c8c8cc);
 	color: var(--theme-label);
 	font-size: 14px;
 	height: 42px;
@@ -113,11 +113,11 @@
 }
 
 .composer-key.is-dead {
-	background: #fff1d6;
+	background: var(--theme-hue-fff1d6);
 }
 
 .composer-key.is-selected {
-	background: #dceaff;
+	background: var(--theme-hue-dceaff);
 }
 
 .composer-key-editor {
@@ -142,7 +142,7 @@
 }
 
 .composer-problems {
-	color: #b3261e;
+	color: var(--theme-hue-b3261e);
 	font-size: 12px;
 	margin: 8px 0;
 	padding-left: 18px;
@@ -180,14 +180,14 @@
 	}
 
 	.composer-key.is-dead {
-		background: #4a3a14;
+		background: var(--theme-hue-4a3a14);
 	}
 
 	.composer-key.is-selected {
-		background: #1c3350;
+		background: var(--theme-hue-1c3350);
 	}
 
 	.composer-problems {
-		color: #ff6b61;
+		color: var(--theme-hue-ff6b61);
 	}
 }

@@ -33,6 +33,7 @@ const SOURCE_NETWORK = path.join(LLM_ROOT, 'network-retry.sh');
 const SOURCE_RELEASE = path.join(LLM_ROOT, 'ollama-release.sh');
 // network-retry.sh reads the shared origin inventory from its bundle-relative path.
 const SOURCE_ROUTE_ORIGINS = path.join(ROOT, sharedRel('modules', 'network', 'route_origins.json'));
+const SOURCE_IDENTIFIERS = path.join(ROOT, sharedRel('data', 'identifiers.sh'));
 const MLX_SCRIPT = path.join(LLM_ROOT, 'ensure-mlx-deps.sh');
 const BUILD_SCRIPT = path.join(ROOT, 'tools', 'build', 'build_macos_app.sh');
 
@@ -102,6 +103,10 @@ function createFixture(mode, checksumMode) {
 	);
 	fs.mkdirSync(path.dirname(routeOrigins), { recursive: true });
 	fs.copyFileSync(SOURCE_ROUTE_ORIGINS, routeOrigins);
+	// The installer takes the GitHub host from the shared identifiers, as in the bundle.
+	const identifiers = path.join(fixtureRoot, '_shared', 'data', 'identifiers.sh');
+	fs.mkdirSync(path.dirname(identifiers), { recursive: true });
+	fs.copyFileSync(SOURCE_IDENTIFIERS, identifiers);
 	fs.writeFileSync(path.join(homeDir, 'curl-mode'), mode, 'utf8');
 	fs.writeFileSync(path.join(homeDir, 'checksum-mode'), checksumMode, 'utf8');
 
@@ -750,7 +755,13 @@ try {
 	);
 
 	// Exercise the actual CLI and path helper inside its own isolated root.
-	for (const relative of ['tools/codegen/codegen-ollama-release.cjs', 'tools/lib/paths.cjs']) {
+	for (const relative of [
+		'tools/codegen/codegen-ollama-release.cjs',
+		'tools/lib/paths.cjs',
+		// The release URL takes its host from the shared identifiers.
+		'tools/lib/identifiers.cjs',
+		sharedRel('data', 'identifiers.json')
+	]) {
 		const destination = path.join(projectionRoot, relative);
 		fs.mkdirSync(path.dirname(destination), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), destination);

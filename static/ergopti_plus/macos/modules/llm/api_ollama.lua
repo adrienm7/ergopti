@@ -672,6 +672,43 @@ function M.stop_owned_server()
 	return ok == true and settled == true
 end
 
+--- Retires the owned daemon for the root reload/quit teardown. Where
+--- `stop_owned_server` only refuses while the daemon exits after its stdin EOF,
+--- this awaits the exact native retirement of the retained task, then retries.
+--- @param on_settled function Called once with (settled, detail) when pending.
+--- @return boolean accepted
+--- @return string state "settled" when already retired, else "pending".
+function M.retire_owned_server(on_settled)
+	if type(on_settled) ~= "function" then
+		Logger.error(LOG, "Owned Ollama retirement refused: settlement callback is not callable.")
+		return false, "refused"
+	end
+	if M.stop_owned_server() == true then return true, "settled" end
+	local task = _ollama_serve_task or _ollama_ambiguous_task
+	if type(task) ~= "table" or type(task.onSettled) ~= "function" then
+		Logger.error(LOG, "Owned Ollama retirement refused: no retained daemon task can report its exit.")
+		return false, "refused"
+	end
+	local fired = false
+	local registered_ok, registered = pcall(task.onSettled, function()
+		if fired then return end
+		fired = true
+		-- The task's own completion observer has released its slot by now
+		local retried_ok, retired = pcall(M.stop_owned_server)
+		local settled = retried_ok and retired == true
+		if not settled then
+			Logger.error(LOG, "Owned Ollama daemon exited but its retirement did not settle: %s.",
+				tostring(retired))
+		end
+		on_settled(settled, settled and "owned Ollama daemon retired" or "owned Ollama retirement refused")
+	end)
+	if not registered_ok or registered ~= true then
+		Logger.error(LOG, "Owned Ollama retirement refused: the daemon task refused its exit observer.")
+		return false, "refused"
+	end
+	return true, "pending"
+end
+
 --- Quiesces one in-flight warmup while retaining its exact pre-pause intent.
 --- @return boolean settled
 function M.pause_warmup()

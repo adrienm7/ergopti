@@ -62,6 +62,7 @@ local function run(world, keys, options)
 		package.loaded["adapters.synthetic_input"] = {
 			emit_selftest_key_stroke = function(modifiers, key)
 				world.emitted[#world.emitted + 1] = key
+				if world.on_key then world.on_key(#world.emitted, view) end
 				world.published_at_key[#world.published_at_key + 1] = Selftest.window_id()
 				return true
 			end,
@@ -74,6 +75,7 @@ local function run(world, keys, options)
 			view[name] = function(self) return self end
 		end
 		view.delete = function() world.window_id_at_close = Selftest.window_id() end
+		view.windowCallback = function(self, fn) world.window_callback = fn; return self end
 		view.evaluateJavaScript = function(_, _, fn)
 			world.reads = (world.reads or 0) + 1
 			fn(world.field_text and world.field_text(world.reads) or table.concat(world.emitted))
@@ -126,10 +128,31 @@ helpers.describe("field run scratch typing", function()
 	end)
 
 	helpers.it("stops and retracts once the scratch window lost the focus", function()
-		local world = run({ taps = "enabled", focus = function(index) return index == 1 end }, { "w", "k" })
+		local world = { taps = "enabled" }
+		-- macOS reports the focus loss to the window itself after the first key
+		world.on_key = function(index, view)
+			if index == 1 then world.window_callback("focusChange", view, false) end
+		end
+		run(world, { "w", "k" })
 		helpers.assert_eq(table.concat(world.emitted, ","), "w")
 		helpers.assert_eq(world.outcome.aborted, "focus_lost_window_unfocused")
 		helpers.assert_nil(world.selftest.window_id())
+	end)
+
+	helpers.it("refuses the first key when Accessibility does not show the scratch window focused", function()
+		local world = run({ taps = "enabled", focus = function() return false end }, { "w", "k" })
+		helpers.assert_eq(#world.emitted, 0)
+		helpers.assert_eq(world.outcome.aborted, "window_unfocused")
+	end)
+
+	-- 2026-10-31 14:13:39: the focused-window read of this process waited out
+	-- the messaging timeout after the preview tooltip showed, and the round trip
+	-- stopped at its third key (scratch-focus-native).
+	helpers.it("keeps typing on the native focus once the first key proved the window (scratch-focus-native)", function()
+		local world = run({ taps = "enabled", focus = function(index) return index == 1 end }, { "w", "k", "a" })
+		helpers.assert_eq(table.concat(world.emitted, ","), "w,k,a",
+			"a later unanswered Accessibility read is not a focus loss")
+		helpers.assert_nil(world.outcome.aborted)
 	end)
 
 	helpers.it("names the time from the last key to the awaited text", function()

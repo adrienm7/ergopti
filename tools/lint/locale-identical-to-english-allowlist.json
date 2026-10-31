@@ -104,10 +104,6 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
 		},
-		"category.rolls": {
-			"reason": "loanword-or-cognate",
-			"locales": ["nl"]
-		},
 		"changelog_window.badge_prerelease": {
 			"reason": "loanword-or-cognate",
 			"locales": ["it", "nl"]
@@ -400,10 +396,6 @@
 		"hs_config.cat_autocorrection": {
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
-		},
-		"hs_config.cat_rolls": {
-			"reason": "loanword-or-cognate",
-			"locales": ["nl"]
 		},
 		"hs_config.color_cyan": {
 			"reason": "loanword-or-cognate",
@@ -1596,63 +1588,63 @@
 		},
 		"sg_actions.sticky_cmd": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_cmd_ctrl": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_cmd_option": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_cmd_option_ctrl": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_cmd_option_shift": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_cmd_shift": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_cmd_shift_ctrl": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_ctrl": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_ctrl_shift": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_hyper": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_option": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_option_ctrl": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_option_shift": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_option_shift_ctrl": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.sticky_shift": {
 			"reason": "brand-or-feature-name",
-			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
 		},
 		"sg_actions.tab": {
 			"reason": "keyboard-key-name",

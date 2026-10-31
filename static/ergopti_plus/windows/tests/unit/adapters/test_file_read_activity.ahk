@@ -212,6 +212,13 @@ _FRAI_CopyNativeModules(Directory, Fixture) {
 		Published[Name] := Destination
 	}
 	AssertEqual(Symbols.Count, Published.Count, "Every required native source owner must be present before launch.")
+	; The reader's adapter includes its ports from a sibling, which includes their
+	; generated contract: the child's tree keeps both real relative layouts.
+	SplitPath(_FRAI_NativeModuleSource("_FSReadUtf8ExactImpl").Path, , &AdapterDir)
+	SplitPath(Published["_FSReadUtf8ExactImpl"], , &PublishedDir)
+	FileCopy(AdapterDir . "\file_system_ports.ahk", PublishedDir . "\file_system_ports.ahk")
+	DirCreate(Directory . "\_generated")
+	FileCopy(AdapterDir . "\..\_generated\file_system_ports.ahk", Directory . "\_generated\file_system_ports.ahk")
 	return Published
 }
 
