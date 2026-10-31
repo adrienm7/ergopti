@@ -18,6 +18,59 @@ _DSNC_NativeIdentity() {
 }
 Test("driver symbols: native function identity ignores case (driver-symbol-case)", _DSNC_NativeIdentity)
 
+; The line-by-line definition the native comment stripper must keep matching.
+_DSNC_StripOracle(Src) {
+	Out := ""
+	for Line in StrSplit(Src, "`n", "`r")
+		if !RegExMatch(Line, "^\s*;")
+			Out .= Line . "`n"
+	return Out
+}
+
+_DSNC_StripMatchesLineContract() {
+	; Chr(59): a spaced semicolon ends an enclosed multi-line expression's line.
+	C := Chr(59)
+	for Sample in ["", "`n", C, "code", C . " a`ncode`n", "`r`n`t" . C . " a`r`n`r`nb " . C . " c`r`n",
+		"`n`n " . C . " a`n`n", "a`rb`n`r" . C . " c`n", "`f" . C . " a`nb", "`r`r" . C . "a`r`r`nb`r`r"]
+		AssertEqual(_DSNC_StripOracle(Sample), _StripFullLineComments(Sample), "stripper sample " . A_Index)
+	Actual := _DriverSourceConcat()
+	Assert(StrLen(Actual) > 100000, "the differential must cover the actual driver source")
+	Assert(_DSNC_StripOracle(Actual) == _StripFullLineComments(Actual),
+		"the native stripper must equal the line contract on the whole driver")
+}
+Test("source helpers: native comment stripping equals the line contract (meta-source-memo)", _DSNC_StripMatchesLineContract)
+
+; A cached mask must never answer for different text, including text of the same
+; length and a rewritten file: the memo is what a fixture writer could be fooled by.
+_DSNC_MaskMemoFollowsContent() {
+	Padding := "`n" . Format("{:2000}", "")
+	First := 'x := "aaa"' . Padding
+	Second := 'x := bbbbb' . Padding
+	AssertEqual(StrLen(First), StrLen(Second), "the fixture must exercise equal lengths")
+	FirstMask := _DriverMaskNonCode(&First)
+	AssertEqual(FirstMask, _DriverMaskNonCode(&First), "a repeated text keeps its mask")
+	AssertFalse(InStr(FirstMask, "aaa"), "a string literal is masked")
+	AssertContains(_DriverMaskNonCode(&Second), "bbbbb", "equal-length code must get its own mask")
+	Path := A_Temp . "\ergopti_mask_memo_" . DllCall("GetCurrentProcessId") . ".ahk"
+	try {
+		FileAppend(First, Path, "UTF-8")
+		Read := FileRead(Path, "UTF-8")
+		AssertFalse(InStr(_DriverMaskNonCode(&Read), "bbbbb"), "the first fixture bytes are scanned")
+		FileDelete(Path)
+		FileAppend(Second, Path, "UTF-8")
+		Read := FileRead(Path, "UTF-8")
+		AssertContains(_DriverMaskNonCode(&Read), "bbbbb", "a rewritten fixture must not see the earlier mask")
+	} finally {
+		try FileDelete(Path)
+	}
+	Block := "/*`nhidden`n*/`nvisible := 1" . Padding
+	AssertContains(_DriverMaskNonCode(&Block, true), "visible", "the block-only view keeps code")
+	Literal := 'x := "kept"`n/*`nhidden`n*/' . Padding
+	AssertContains(_DriverMaskNonCode(&Literal, true), "kept", "the block-only view keeps literals")
+	AssertFalse(InStr(_DriverMaskNonCode(&Literal), "kept"), "the two views must not share one memo")
+}
+Test("source helpers: the mask memo follows content, never a stale file (meta-source-memo)", _DSNC_MaskMemoFollowsContent)
+
 _DSNC_Extract(Variant, Indexed) {
 	Source := "CaseSubject() {`n`treturn 37`n}"
 	Original := Source

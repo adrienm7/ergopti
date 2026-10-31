@@ -328,11 +328,13 @@ _DriverSourceConcat() {
 ; no-prefix-keywait, where "; native Suspend() never disarms..." comments
 ; added by the Pattern-1 hardening campaign inflated a raw "Suspend(" count).
 _StripFullLineComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r")
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	return Out
+	if Src == ""
+		return ""
+	; Native passes keep the line contract: CR is trimmed around every LF and the
+	; text boundaries, and each surviving line ends in LF. `[^\S\n]` stops the
+	; leading whitespace from spanning a line, which a bare \s would do.
+	Lines := RegExReplace(Trim(Src, "`r"), "\r*\n\r*", "`n") . "`n"
+	return RegExReplace(Lines, "m`n)^[^\S\n]*;[^\n]*\n", "")
 }
 
 ; How a refused exit looks in Ergopti_OnShutdown source.
@@ -391,9 +393,30 @@ _DriverMaskBlockComments(&Src) {
 }
 
 ; Code-only consumers also exclude quoted data and single-line comments.
+; The memo is keyed by the text itself, never by a path, so a rewritten file or
+; a mutated fixture is simply a new key and no stale mask can be returned.
 _DriverMaskNonCode(&Src, BlockCommentsOnly := false) {
+	static Memo := [Map(), Map()], MemoChars := 0
 	if BlockCommentsOnly && !InStr(Src, "/*")
 		return Src
+	Length := StrLen(Src)
+	if Length < 1024
+		return _DriverComputeNonCodeMask(&Src, BlockCommentsOnly)
+	Masks := Memo[BlockCommentsOnly ? 1 : 2]
+	; A mask preserves offsets; the length check refuses a key cut short by NUL.
+	if Masks.Has(Src) && StrLen(Masks[Src]) == Length
+		return Masks[Src]
+	Mask := _DriverComputeNonCodeMask(&Src, BlockCommentsOnly)
+	; Whole-tree mutants must not accumulate without limit: past the budget a
+	; mask is only recomputed, which costs time but cannot change a result.
+	if MemoChars + Length <= 100000000 {
+		Masks[Src] := Mask
+		MemoChars += Length
+	}
+	return Mask
+}
+
+_DriverComputeNonCodeMask(&Src, BlockCommentsOnly) {
 	Quote := Chr(34)
 	; Atomic runs keep large fixture literals from exhausting the PCRE stack.
 	; Escaped delimiters remain separate atoms and cannot close their string.
@@ -421,6 +444,10 @@ _DriverMaskNonCode(&Src, BlockCommentsOnly := false) {
 ; PCRE replaces a supplementary character once, but source positions count its
 ; two UTF-16 units. Blank spans by native string length to keep aligned offsets.
 _DriverBlankNonNewlines(Text) {
+	static Blanks := Format("{:4096}", "")
+	; Nearly every token is a short one-line string or comment.
+	if StrLen(Text) <= 4096 && !InStr(Text, "`n") && !InStr(Text, "`r")
+		return SubStr(Blanks, 1, StrLen(Text))
 	Out := ""
 	Position := 1
 	while RegExMatch(Text, "[`r`n]", &Boundary, Position) {
@@ -1308,6 +1335,9 @@ _DriverProductionFileForSymbol(Name, Root := "") {
 		if !_DriverIsProductionSource(Path)
 			continue
 		Source := FileRead(Path, "UTF-8")
+		; A definition needs the exact "Name(" text, so a miss skips the scanners.
+		if !InStr(Source, Name . "(")
+			continue
 		Code := _DriverMaskNonCode(&Source)
 		Count := _DriverTopLevelDefinitionCount(&Code, Name)
 		Loop Count
