@@ -196,57 +196,134 @@ end
 local AWK = "/usr/bin/awk"
 -- Segments named in the log window, by total own time.
 M.SLOW_SEGMENTS_LOGGED = 5
+-- Line kinds whose worst line is broken down into its largest stage and its forks.
+M.SLOW_KINDS = { "ingest", "prefs", "probe", "diagnostics" }
+-- The keyboard-layout row's build phases (ui/menu/menu_keyboard_layout.lua).
+M.LAYOUT_MENU_PHASE_PREFIX = "menu_keyboard_layout."
 
 -- One pass over the day log, printing a summary only: a task's output is read
--- when it exits, so the lines themselves must never reach the pipe.
+-- when it exits, so the lines themselves must never reach the pipe. The worst
+-- line of each kind names its largest "<stage>=<ms>" part: that stage decides
+-- the fix of "macOS main-thread holds" (ledger L16, L17, L23), the totals and
+-- counters of the line are not stages. A hold line's phases are summed by name.
+-- POSIX awk only: macOS ships the BWK awk.
 M.SLOW_LINES_AWK = [=[
+function dominant(text, skip,   best, best_ms, token, eq, name, ms) {
+	best = "none"; best_ms = -1
+	while (match(text, /[A-Za-z_][A-Za-z0-9_.]*=[0-9.]+/)) {
+		token = substr(text, RSTART, RLENGTH); text = substr(text, RSTART + RLENGTH)
+		eq = index(token, "="); name = substr(token, 1, eq - 1); ms = substr(token, eq + 1) + 0
+		if (index(skip, " " name " ") == 0 && ms > best_ms) { best_ms = ms; best = name }
+	}
+	return best
+}
+function forks(text,   found) {
+	if (!match(text, /metadata_commands=[0-9]+ in [0-9]+ ms/)) return "0 0"
+	found = substr(text, RSTART + 18, RLENGTH - 21); sub(/ in /, " ", found)
+	return found
+}
+function keep(kind, ms) {
+	count[kind]++; if (ms > worst[kind] + 0) { worst[kind] = ms; line[kind] = $0 }
+}
 match($0, /Slow [^ :]+: [0-9.]+ ms own/) {
 	text = substr($0, RSTART + 5, RLENGTH - 12); split(text, part, ": ")
 	n[part[1]]++; t[part[1]] += part[2]; if (part[2] + 0 > m[part[1]] + 0) m[part[1]] = part[2]
 }
-match($0, /Slow ingest tick [0-9]+ ms/) {
-	v = substr($0, RSTART + 17, RLENGTH - 20) + 0; ic++; if (v > im) im = v
+match($0, /Slow ingest tick [0-9]+ ms/) { keep("ingest", substr($0, RSTART + 17, RLENGTH - 20) + 0) }
+match($0, /Slow preferences save [0-9]+ ms/) { keep("prefs", substr($0, RSTART + 22, RLENGTH - 25) + 0) }
+match($0, /Slow ignored-window probe [0-9]+ ms/) { keep("probe", substr($0, RSTART + 26, RLENGTH - 29) + 0) }
+match($0, /The synchronous diagnostics took [0-9.]+ ms/) {
+	keep("diagnostics", int(substr($0, RSTART + 33, RLENGTH - 36) + 0))
 }
-match($0, /Slow preferences save [0-9]+ ms/) {
-	v = substr($0, RSTART + 22, RLENGTH - 25) + 0; pc++; if (v > pm) pm = v
+match($0, /Phases inside the hold: [^;]*\. Lua heap/) {
+	text = substr($0, RSTART + 24, RLENGTH - 34)
+	while (match(text, /[A-Za-z_][A-Za-z0-9_.]*=[0-9.]+/)) {
+		token = substr(text, RSTART, RLENGTH); text = substr(text, RSTART + RLENGTH)
+		eq = index(token, "="); phase[substr(token, 1, eq - 1)] += substr(token, eq + 1)
+	}
 }
 /Lease-bound input startup failed/ { lease++ }
 /Layout [a-z]+ detected change before its baseline/ { early++ }
 END {
+	skip = " prepare operations proposed metadata_commands lua_heap entries statements "
 	for (k in n) printf "segment %s %d %.2f %.2f\n", k, n[k], t[k], m[k]
-	printf "ingest %d %d\nprefs %d %d\n", ic, im, pc, pm
+	split("ingest prefs probe diagnostics", kinds, " ")
+	for (i = 1; i <= 4; i++) {
+		k = kinds[i]; printf "%s %d %d\n", k, count[k], worst[k]
+		if (count[k] > 0) printf "stage %s %s\nforks %s %s\n", k, dominant(line[k], skip), k, forks(line[k])
+	}
+	for (k in phase) printf "phase %s %.2f\n", k, phase[k]
 	printf "lease_bound %d\nearly_layout %d\n", lease, early
 }
 ]=]
 
 --- Reads the awk summary.
 --- @param text any
---- @return table|nil summary { segments = { { name, count, own_ms, worst_ms } } by own time, ingest = { count, worst_ms },
----   prefs = { ... }, lease_bound = count, early_layout = count }
+--- @return table|nil summary { segments = { { name, count, own_ms, worst_ms } } by own time, phases = { { name, ms } }
+---   by time, and per kind of M.SLOW_KINDS { count, worst_ms, stage, forks, fork_ms }, lease_bound = count,
+---   early_layout = count }
 function M.parse_slow_summary(text)
-	local summary = { segments = {} }
+	local summary = { segments = {}, phases = {} }
+	local details = {}
 	for line in tostring(text or ""):gmatch("[^\n]+") do
 		local name, count, own, worst = line:match("^segment (%S+) (%d+) ([%d.]+) ([%d.]+)$")
 		if name then
 			summary.segments[#summary.segments + 1] = { name = name, count = tonumber(count), own_ms = tonumber(own),
 				worst_ms = tonumber(worst) }
 		end
+		local phase, phase_ms = line:match("^phase (%S+) ([%d.]+)$")
+		if phase then summary.phases[#summary.phases + 1] = { name = phase, ms = tonumber(phase_ms) } end
 		local kind, kind_count, kind_worst = line:match("^(%a+) (%d+) (%d+)$")
-		if kind == "ingest" or kind == "prefs" then
-			summary[kind] = { count = tonumber(kind_count), worst_ms = tonumber(kind_worst) }
+		if kind then summary[kind] = { count = tonumber(kind_count), worst_ms = tonumber(kind_worst) } end
+		local stage_kind, stage = line:match("^stage (%a+) (%S+)$")
+		if stage_kind then details[stage_kind] = details[stage_kind] or {}; details[stage_kind].stage = stage end
+		local fork_kind, fork_count, fork_ms = line:match("^forks (%a+) (%d+) (%d+)$")
+		if fork_kind then
+			details[fork_kind] = details[fork_kind] or {}
+			details[fork_kind].forks, details[fork_kind].fork_ms = tonumber(fork_count), tonumber(fork_ms)
 		end
 		local counter, counted = line:match("^([%a_]+) (%d+)$")
 		if counter == "lease_bound" or counter == "early_layout" then summary[counter] = tonumber(counted) end
 	end
-	if summary.ingest == nil or summary.prefs == nil or summary.lease_bound == nil or summary.early_layout == nil then
-		return nil
+	for _, kind in ipairs(M.SLOW_KINDS) do
+		local record = summary[kind]
+		if record == nil then return nil end
+		local detail = details[kind] or {}
+		-- A kind seen in the log always carries its stage and forks line.
+		if record.count > 0 and (detail.stage == nil or detail.forks == nil) then return nil end
+		record.stage, record.forks, record.fork_ms = detail.stage or "none", detail.forks or 0, detail.fork_ms or 0
 	end
+	if summary.lease_bound == nil or summary.early_layout == nil then return nil end
 	table.sort(summary.segments, function(a, b) return a.own_ms > b.own_ms end)
+	table.sort(summary.phases, function(a, b) return a.ms > b.ms end)
 	return summary
+end
+
+--- Returns the busiest hold phase whose name starts with a prefix, or nil.
+--- @param phases table Sorted { { name, ms } } of parse_slow_summary.
+--- @param prefix string|nil
+--- @return table|nil phase
+local function busiest_phase(phases, prefix)
+	for _, phase in ipairs(phases) do
+		if prefix == nil or phase.name:sub(1, #prefix) == prefix then return phase end
+	end
+	return nil
+end
+
+--- Formats a phase as "<name>:<ms>" in the step grammar, or "none".
+--- @param phase table|nil
+--- @return string
+local function phase_value(phase)
+	return phase and (phase.name .. ":" .. math.floor(phase.ms)) or "none"
 end
 
 --- Issue #101's first follow-up without a person: which main-thread phase the
 --- day's slow lines name most; and item 38's two lines that must not appear.
+--- For each part of "macOS main-thread holds" that waits on field data, the
+--- step that decides it: the hold phases (keyboard-layout row stages, one-off
+--- holds), the worst save's stage and forks (L17), the worst ingest tick's
+--- (L16), the worst ignored-window probe's stage (L23) and the slowest
+--- diagnostics collector.
 --- ports.today_log_path(), exec.
 function M.slow_lines(ports, report, finish)
 	local path = ports.today_log_path()
@@ -270,7 +347,18 @@ function M.slow_lines(ports, report, finish)
 		report.step("slow_dominant", INFO, dominant and dominant.name or "none")
 		report.step("slow_dominant_own_ms", INFO, dominant and math.floor(dominant.own_ms) or 0)
 		report.step("slow_ingest_ticks", INFO, summary.ingest.count .. ":" .. summary.ingest.worst_ms)
+		report.step("slow_ingest_stage", INFO, summary.ingest.stage)
+		report.step("slow_ingest_forks", INFO, summary.ingest.forks .. ":" .. summary.ingest.fork_ms)
 		report.step("slow_preferences_saves", INFO, summary.prefs.count .. ":" .. summary.prefs.worst_ms)
+		report.step("slow_preferences_save_stage", INFO, summary.prefs.stage)
+		report.step("slow_preferences_save_forks", INFO, summary.prefs.forks .. ":" .. summary.prefs.fork_ms)
+		report.step("slow_ignored_window_probes", INFO, summary.probe.count .. ":" .. summary.probe.worst_ms)
+		report.step("slow_ignored_window_stage", INFO, summary.probe.stage)
+		report.step("slow_diagnostics", INFO, summary.diagnostics.count .. ":" .. summary.diagnostics.worst_ms)
+		report.step("slow_diagnostics_collector", INFO, summary.diagnostics.stage)
+		report.step("slow_hold_phase", INFO, phase_value(busiest_phase(summary.phases)))
+		report.step("slow_layout_menu_phase", INFO,
+			phase_value(busiest_phase(summary.phases, M.LAYOUT_MENU_PHASE_PREFIX)))
 		-- Item 38: neither line may appear (a lease-bound start that failed, the boot's
 		-- layout misread of project-hs-layout-name-forms).
 		report.step("log_lease_bound_failures", summary.lease_bound == 0 and PASS or FAIL, summary.lease_bound)
