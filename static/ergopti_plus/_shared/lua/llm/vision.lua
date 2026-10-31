@@ -74,6 +74,21 @@ function M.parse(value)
 	return { backend = backend, model = model }, nil
 end
 
+--- Builds the binding value a native editor collected: a backend picked from a
+--- list, then a model typed (an empty one keeps the backend's default). A backend
+--- with no default and no model yields "<backend>|", which parse() refuses, so the
+--- editor's validation tells the user a model is required.
+--- @param backend string The picked backend id.
+--- @param typed string The typed model, trimmed here.
+--- @param default_model string|nil The backend's default model ("" or nil for none).
+--- @return string value
+function M.compose_parameter(backend, typed, default_model)
+	local model = tostring(typed or ""):match("^%s*(.-)%s*$")
+	if model ~= "" then return backend .. "|" .. model end
+	if type(default_model) == "string" and default_model ~= "" then return backend end
+	return backend .. "|"
+end
+
 --- Tells whether a binding value is syntactically valid.
 --- @param value string The stored parameter.
 --- @return boolean ok
