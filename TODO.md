@@ -162,11 +162,12 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      `ollama_registry`) (the registry at `/v2/`, whose root answers 503) through the managed transport (route lookup, PAC or proxy,
      TLS); any
      answer below 500 passes, a failure names the native reason by the host's key. Nothing is downloaded.
-   - `field_app_health` (after the AI steps): no crash report of the last day in the driver's `crash_reports`
+   - `field_app_health` (after the AI steps): no crash report since the current app start (the launcher's
+     `ps` elapsed time, `app_uptime_s`) in the driver's `crash_reports`
      folder (absent: none) nor in `~/Library/Logs/DiagnosticReports` for the app's processes (ErgoptiPlus and
      its launcher roles, Hammerspoon, Ollama, Python, Karabiner): they fail as `<process>:<count>`, the three
-     newest are listed with closed tokens (hang or crash, exception, signal, termination namespace); other
-     apps' reports are counted only; the app's resident memory (MB) and CPU share from `ps` are named.
+     newest are listed with closed tokens (hang or crash, exception, signal, termination namespace); an
+     earlier start's reports of the last day and other apps' reports are counted only; the app's resident memory (MB) and CPU share from `ps` are named.
    - `field_ai_local` (after the AI steps, read-only): the owned Ollama binary passes `codesign --verify
 --strict`; a running server lists its models (not running: skip, never started here); one token is
      predicted from the check's own text with the smallest catalogue model already installed (none: skip, never
