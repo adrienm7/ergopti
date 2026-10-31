@@ -73,6 +73,52 @@ only by static and JS tests. Once it lands on `dev`:
    `test-windows-field-report-contract.cjs` with `pwsh`.
 3. Push the field report so the coordinator can read it.
 
+## Do first: delete the merged remote branches (maintainer request, 31 October)
+
+The maintainer asked the PC agent to clean up the remote branches tonight:
+the cloud proxy refuses ref deletion and tag pushes, so only a local
+checkout can do it. The repository has about 276 remote branches. This run
+replaces the script of `docs/tooling/remote-branch-cleanup.md`. It keeps a
+tag for every branch whose tip is not already on `dev`, so no commit is lost.
+
+Keep these branches (still in use tonight by cloud workers or CI):
+`dev`, `main`, `sparkle-appcasts`, `gh-pages`, `fix/remap-runtime-build-hang`,
+`fix/guardian-repeat-registration`, `fix/common-lanes-1`,
+`fix/linux-proc-scan`, `docs/todo-shrink`, `integrate/swift-proof-15`,
+`integrate/swift-proof-15-dev-baseline`, `feat/owned-runtimes-macos-4`, and
+every branch the PC agent itself has checked out or still needs (add them to
+`KEEP` before running).
+
+In Git Bash, from the repository root, with no local change pending:
+
+```bash
+git fetch origin --prune
+KEEP='HEAD|dev|main|sparkle-appcasts|gh-pages|fix/remap-runtime-build-hang|fix/guardian-repeat-registration|fix/common-lanes-1|fix/linux-proc-scan|docs/todo-shrink|integrate/swift-proof-15|integrate/swift-proof-15-dev-baseline|feat/owned-runtimes-macos-4'
+git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin | grep -vxE "$KEEP" > branches-to-delete.txt
+wc -l branches-to-delete.txt
+while read -r b; do
+  if ! git merge-base --is-ancestor "origin/$b" origin/dev; then
+    git tag -f "archive/2026-10-31/$b" "origin/$b"
+  fi
+done < branches-to-delete.txt
+git push origin 'refs/tags/archive/2026-10-31/*:refs/tags/archive/2026-10-31/*'
+xargs -r -n 20 git push origin --delete < branches-to-delete.txt
+git fetch origin --prune
+git branch -r
+rm branches-to-delete.txt
+```
+
+Check before the delete line: `wc -l` prints the count; the tag push must
+succeed (stop if it fails, nothing is deleted yet). After it, `git branch -r`
+should list only the kept branches. A commit of a deleted branch stays
+readable through `archive/2026-10-31/<branch>`. Then:
+
+- Tell the coordinator through this file (a line under this section) how
+  many branches were deleted and how many archive tags were pushed.
+- Remove the "Run the archive-then-delete script" box from TODO.md's
+  "Maintainer: remote branch cleanup" section and point
+  `docs/tooling/remote-branch-cleanup.md` at the new tag prefix.
+
 ## Found tonight for the PC agent
 
 - Three of your evening commits were adjusted on dev by the coordinator: 738478ff68
