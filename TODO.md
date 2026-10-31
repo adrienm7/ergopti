@@ -284,16 +284,6 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       point 4: `slow_ignored_window_probes`, `slow_ignored_window_stage`), bound the named stage; (5) the one-off
       holds of `field_run`, `error_dialog`, `keymap/utils` timers and `menu_state` (shell.ioreg 146 ms):
       `worst_hold_site` and `slow_hold_phase`; L18: `keystats_start_ms` under 100 ms.
-- [ ] **Thinking off for every model on every backend and OS (merged with "Reasoning off in every AI request:
-      verify the open rules").** Done on the three OS: model families of `thinking_off.json` crossed with each
-      provider's dialect, the resolved Ollama `think` per family (98b9a2ad57), persisted and expiring refusals,
-      default-only sampling, and capability listings skipping a control a model lacks (c1c8a9c181). Left: run the
-      Windows suite on the PC (`model_capabilities.ahk`, `vision.ahk` `think`, `LLM_OllamaThink` are unexecuted);
-      verified 2026-10-31: OpenAI `gpt-5-mini`/`gpt-5-nano` matched no family and now take minimal (b8fb1c36),
-      Hermes 4 reasons only when asked and gets no toggle (07ce3db4), Fireworks DeepSeek V3.1 to V4.1 take `none`
-      or false as the family sends, Gemini's thinking table lists no 2.5 Flash image/TTS/audio model, and xAI's
-      reasoning page no longer lists `grok-3-mini` (kept, marked unverified). [CODE] Left to verify: the generic
-      name heuristic (`*qwen3*`, `*deepseek*`, `*-r1*`, `*think*`, `*reasoning*`) and Together/Kimi effort.
 - [ ] **Every known cloud AI provider in `api_providers.json`, on the three OS.** Done: about forty providers
       (official documentation read 2026-10-30, each descriptor's `_source`), the per-account providers whose
       `base_url` is a template (b5d321a4a3, form on the three OS), IBM watsonx.ai and Google Vertex AI with a token
