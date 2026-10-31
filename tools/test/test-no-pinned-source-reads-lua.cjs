@@ -129,7 +129,10 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //                    installed-application boot scenarios, which count the
 //                    port cleanup shells an AI-off and an AI-on boot start,
 //                    instead of reading init.lua.)
-const BASELINE = 9;
+//            9 → 8 (2026-10-31: the AI-off boot's skipped LLM bootstrap is
+//                    judged by the same boot scenarios instead of a search of
+//                    init.lua in test_llm_menu_regressions.)
+const BASELINE = 8;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -197,7 +200,9 @@ const BASELINE = 9;
 //              the file count above.)
 //       47 → 45 (2026-10-31: the MLX boot cleanup gate moved to the boot
 //              scenarios, see the file count above.)
-const READ_BASELINE = 45;
+//       45 → 44 (2026-10-31: the skipped LLM bootstrap moved to the boot
+//              scenarios, see the file count above.)
+const READ_BASELINE = 44;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
