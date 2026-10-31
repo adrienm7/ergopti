@@ -43,7 +43,14 @@ local function run(world, keys, options)
 			cancel = function(entry) entry.cancelled = true; return true end,
 		}
 		package.loaded["adapters.own_window"] = { for_webview = function() return { id = function() return SCRATCH_WINDOW end } end }
-		package.loaded["ui.ui_builder"] = { force_focus = function() end }
+		-- The shared chrome is its own owner's concern; the steps are recorded only
+		package.loaded["ui.ui_builder"] = {
+			force_focus = function() end,
+			window_chrome_steps = function()
+				world.chrome_applied = true
+				return {}
+			end,
+		}
 		package.loaded["modules.keymap"] = {
 			tap_states = function()
 				return { started = true, taps = { { name = "keyDown", state = world.taps }, { name = "loopbackKeyUp", state = world.taps } } }

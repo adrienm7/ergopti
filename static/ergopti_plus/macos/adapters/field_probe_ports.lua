@@ -348,8 +348,13 @@ local OWNED_CRASH_PROCESSES = {
 	{ "^python", "python" }, { "^karabiner", "karabiner" },
 }
 
--- Bytes of a report read for its closed tokens (the header and the exception).
-local CRASH_READ_BYTES = require("infra.timings").count("limits", "crash_report_head_bytes")
+--- Bytes of a report read for its closed tokens (the header and the exception).
+--- Read when a report is opened, not at load: the timing registry resolves the
+--- shared folder through hs.fs, which a port loaded for another probe may lack.
+--- @return number Bytes.
+local function crash_read_bytes()
+	return require("infra.timings").count("limits", "crash_report_head_bytes")
+end
 
 --- The closed tokens of one crash report: its kind (hang or crash), the
 --- exception type, the signal and the termination namespace macOS recorded.
@@ -361,7 +366,7 @@ local function crash_kind(path, name)
 	local tokens = { name:lower():match("%.hang$") and "hang" or (name:lower():match("%.spin$") and "spin" or "crash") }
 	local file = io.open(path, "rb")
 	if file then
-		local text = file:read(CRASH_READ_BYTES) or ""
+		local text = file:read(crash_read_bytes()) or ""
 		file:close()
 		for _, pattern in ipairs({ '"type"%s*:%s*"(EXC_[%u_]+)"', '"signal"%s*:%s*"(SIG%u+)"',
 			'"namespace"%s*:%s*"(%u[%u_]+)"' }) do
