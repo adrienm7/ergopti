@@ -267,5 +267,31 @@ class SigningIdentityListingControls(unittest.TestCase):
         self.assertFalse(BUILD.signing_identity_listed(twice, self.IDENTITY))
 
 
+class RefusalOriginControls(unittest.TestCase):
+    """Signing collapses a dozen checks into one code; the report names the line."""
+
+    def test_origin_names_type_code_and_innermost_builder_line(self):
+        try:
+            BUILD.check_deadline(0)
+        except BASE.NativeBuildError as error:
+            caught = error
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            BUILD._report_refusal_origin("signing", caught)
+        self.assertRegex(
+            log.getvalue(),
+            r"^\[owned-build\] signing refused by NativeBuildError phase_deadline "
+            r"at line \d+ \(check_deadline\)\n$",
+        )
+
+    def test_error_without_builder_frame_is_reported_as_unknown(self):
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            BUILD._report_refusal_origin("signing", OSError("modeled"))
+        self.assertEqual(
+            log.getvalue(), "[owned-build] signing refused by OSError  at unknown line\n"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
