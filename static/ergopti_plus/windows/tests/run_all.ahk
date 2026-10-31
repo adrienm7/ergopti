@@ -1306,6 +1306,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_ahk_os_purity_ratchet.ahk
 #Include meta/suite/test_ahk_os_purity_inputs.ahk
 #Include meta/infra/logger/test_logger_pairing.ahk
+#Include meta/infra/logger/test_logger_private_label.ahk
 #Include meta/modules/llm/servers/test_remote_generate_curl_dispatch.ahk
 #Include unit/platform/network/test_network_dispatch_nonblocking.ahk
 #Include unit/platform/network/test_managed_network_failure.ahk

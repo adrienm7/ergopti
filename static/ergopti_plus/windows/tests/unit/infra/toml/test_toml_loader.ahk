@@ -498,10 +498,12 @@ TestTL_LoadExtTomlFileUsesCurrentSection() {
 Test("LoadExtTomlFile: registers entries without undefined category/section locals",
 	TestTL_LoadExtTomlFileUsesCurrentSection)
 
-; The pack label is a name the user chose. The emitter prints the file instead,
-; which the logger masks when it sits under the configuration directory.
+; The pack label and its file are names the user chose (item 139). The redactor
+; masks a path only under the configuration directory, so the emitter prints the
+; placeholder and the file, kept here outside that directory, must not reach a line.
 TestTL_LoadExtDoesNotLogThePackLabel() {
 	TmpPath := A_ScriptDir . "\test_ext_label_log.toml"
+	Placeholder := LoggerUserNamePlaceholder()
 	Lines := []
 	try {
 		try FileDelete(TmpPath)
@@ -516,9 +518,10 @@ TestTL_LoadExtDoesNotLogThePackLabel() {
 	Loaded := false
 	for Line in Lines {
 		AssertFalse(InStr(Line, "PrivatePackLabel"), "The pack label reached the log: " . Line)
-		Loaded := Loaded || (InStr(Line, "entry(ies) loaded") && InStr(Line, TmpPath))
+		AssertFalse(InStr(Line, "test_ext_label_log"), "The pack file reached the log: " . Line)
+		Loaded := Loaded || (InStr(Line, "1 entry(ies) loaded") && InStr(Line, Placeholder))
 	}
-	AssertTrue(Loaded, "The success line names the file and the count")
+	AssertTrue(Loaded, "The success line carries the placeholder and the count")
 }
 Test("LoadExtTomlFile: the pack label stays out of the log", TestTL_LoadExtDoesNotLogThePackLabel)
 
@@ -533,6 +536,13 @@ TestTL_CategoryLogNameMasksUserCategories() {
 		_HotstringExtensionPaths := Map("my_pack", _ConfigDir . "extensions\my_pack\my_pack.toml")
 		AssertEqual(Placeholder, HotstringCategoryLogName("my_pack"), "an extension under the configuration directory")
 		AssertEqual(Placeholder, HotstringCategoryLogName("a__b"), "a personal file's owner backs no shipped file")
+		; A real file outside the configuration directory is still the user's.
+		OutsidePath := A_ScriptDir . "\test_ext_outside_config.toml"
+		try FileDelete(OutsidePath)
+		FileAppend("", OutsidePath, "UTF-8")
+		_HotstringExtensionPaths["outside_pack"] := OutsidePath
+		try AssertEqual(Placeholder, HotstringCategoryLogName("outside_pack"), "an extension outside the configuration directory")
+		finally FileDelete(OutsidePath)
 		AssertEqual("magickey", HotstringCategoryLogName("magickey"), "a shipped category stays readable")
 		AssertEqual("", HotstringCategoryLogName(""), "no category has nothing to mask")
 		; The real consumer: the widget module is not loaded in this suite, the keystats log is

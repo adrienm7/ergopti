@@ -388,6 +388,20 @@ LoggerUserNamePlaceholder() {
 	return Config["rules"]["config_name_placeholder"]
 }
 
+/**
+ * Masks a name the user chose for a log line, the twin of the Lua drivers'
+ * diagnostics/private_label.lua. The redactor masks such a name only as a path
+ * component under the configuration directory: a bare name, or a file elsewhere,
+ * needs the placeholder at the point of emission.
+ * @param Name {String} The name or path; only its type is checked, never its content.
+ * @returns {String} Always the policy's placeholder.
+ */
+LoggerMaskUserName(Name) {
+	if !(Name is String)
+		throw TypeError("The user-chosen name to mask must be a string.")
+	return LoggerUserNamePlaceholder()
+}
+
 /** Returns zero only before the shared source exists; invalid admission throws. */
 _LoggerPrivacyAdmitted() {
 	global _SharedDir
