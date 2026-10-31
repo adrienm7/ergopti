@@ -609,6 +609,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-owned-runtimes-doc.cjs"],
 			"repro": "npm run test:owned-runtimes-doc"
+		},
+		{
+			"id": "js-launcher-sleep-registry",
+			"ordinal": 551,
+			"name": "every Swift launcher sleep takes its duration from the [launcher] timing registry section",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-launcher-sleep-registry.cjs"],
+			"repro": "npm run test:launcher-sleep-registry"
 		}
 	]
 }
