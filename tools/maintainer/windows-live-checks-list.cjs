@@ -1300,7 +1300,7 @@ const CHECKS = [
 			if (before.enabled !== '0') return notExecuted('the AI is on in a default configuration');
 			const started = session.logLines('Test prediction #').length;
 			const state = await session.run('click_read_notice', [
-				're:Artificial intelligence$',
+				're:Artificial Intelligence$',
 				're:^Test a prediction'
 			]);
 			const expected = (await session.run('translate', ['llm.manual_prediction.disabled'])).replace(
