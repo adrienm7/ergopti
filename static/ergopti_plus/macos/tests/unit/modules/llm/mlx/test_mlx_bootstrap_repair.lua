@@ -796,7 +796,7 @@ helpers.describe("A Mac that cannot run MLX is told so and offered Ollama (mlx-b
 		helpers.assert_eq(world.dialogs[1].title, "MLX n’est pas disponible sur ce Mac")
 		helpers.assert_true(world.dialogs[1].body:find("Ce Mac : processeur Intel, macOS 15.", 1, true) ~= nil,
 			world.dialogs[1].body)
-		helpers.assert_true(world.dialogs[1].body:find("Ollama et les serveurs locaux du menu IA", 1, true) ~= nil,
+		helpers.assert_true(world.dialogs[1].body:find("Ollama et les serveurs locaux du menu «\u{00A0}Intelligence artificielle\u{00A0}»", 1, true) ~= nil,
 			world.dialogs[1].body)
 		helpers.assert_eq(world.dialogs[1].primary, "Utiliser Ollama")
 		helpers.assert_eq(world.alternatives, 1, "the button selects Ollama")
