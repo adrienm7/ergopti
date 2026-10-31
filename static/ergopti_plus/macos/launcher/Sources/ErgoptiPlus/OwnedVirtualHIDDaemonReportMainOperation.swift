@@ -108,7 +108,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 			let expectation = HelperExpectation(issuer: issuer, channel: channel, hashes: Set(hashes), stage: stage)
 			let leafHash = Insecure.SHA1.hash(data: leaf).map { String(format: "%02x", $0) }.joined()
 			let codeHashes = hashes.map { "cdhash H\"" + $0.map { String(format: "%02x", $0) }.joined() + "\"" }.sorted().joined(separator: " or ")
-			let requirement = "identifier \"com.ergoptiplus.app.runtime-installer\" and certificate leaf = H\"" + leafHash + "\" and (" + codeHashes + ")"
+			let requirement = "identifier \"" + Identifiers.SigningIds.runtimeInstaller + "\" and certificate leaf = H\"" + leafHash + "\" and (" + codeHashes + ")"
 			let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
 			guard source.releaseOwnedDescriptors(), sourceCurrent(), channel.current() else { markRefused(); return }
 			lock.lock(); sourceClosed = true; self.expectation = expectation; lock.unlock()
