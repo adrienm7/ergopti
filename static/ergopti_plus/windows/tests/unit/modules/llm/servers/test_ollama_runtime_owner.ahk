@@ -58,7 +58,7 @@ class _ORT_Fixture {
 			"clock", ObjBindMethod(this, "Clock"),
 			"on_retired", ObjBindMethod(this, "Retire"), "on_error", ObjBindMethod(this, "Error")))
 		this.Receipt := Map("launcher_pid", 5001, "child_pid", 5002, "child_created_filetime", 133700000000000000, "leases_held", 1,
-			"ready_file_identity", "34567890:3456789012345678", "proxy_mode", "direct", "proxy_tunnel", "none")
+			"ready_file_identity", "34567890:3456789012345678", "proxy_mode", "direct", "proxy_tunnel", "none", "proxy_relay", "not_applicable")
 		for Name in ["runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256", "origin"]
 			this.Receipt[Name] := this.Target[Name]
 	}
@@ -183,8 +183,28 @@ _ORT_Proxy() {
 		"UpdaterDefaultsPath", "C:\bundled\defaults.json",
 		"UpdaterDefaultsSha256", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 		"RouteOriginsPath", "C:\bundled\route_origins.json",
-		"RouteOriginsSha256", "0000000000000000000000000000000000000000000000000000000000000000")
+		"RouteOriginsSha256", "0000000000000000000000000000000000000000000000000000000000000000",
+		"ProxyRelayContractPath", "C:\bundled\proxy_auth_relay.json",
+		"ProxyRelayContractSha256", "1111111111111111111111111111111111111111111111111111111111111111",
+		"ProxyRelayDialMs", 10000, "ProxyRelayHandshakeMs", 15000, "ProxyRelayIdleMs", 300000, "ProxyRelayProbeMs", 30000)
 }
+
+; No relay is installed in the fixture: the launcher reads its empty default, and
+; an installed one reaches it with the digest it verifies before running it.
+_ORT_RelayPathIsOptional() {
+	F := _ORT_Fixture()
+	Assert(F.Run(), "A start without the relay is admitted.")
+	Assert(!InStr(_ORT_Args(F.Arguments), "-ProxyRelayPath"), "No relay installed, no relay path.")
+	Assert(F.Owner.Stop(), "Strict physical ACK releases owner.")
+	Options := Map("launcher", "C:\bundled\runtime.ps1", "helper", "C:\bundled\files.ps1",
+		"helper_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		"environment", "C:\bundled\managed_ollama_environment.json",
+		"environment_sha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+		"proxy", _ORT_Proxy(), "on_retired", (*) => true)
+	Options["proxy"]["ProxyRelayPath"] := "C:\bundled\vendor\ergopti-proxy-relay.exe"
+	AssertThrows(() => OllamaRuntimeOwner(Options), "An installed relay needs its digest.")
+}
+Test("Ollama runtime: the relay path is optional and needs its digest (proxy-auth-relay)", _ORT_RelayPathIsOptional)
 
 ; The owned daemon reads only HTTPS_PROXY and NO_PROXY: the launcher looks them
 ; up from these captures, so every launch carries them all.
@@ -198,7 +218,8 @@ _ORT_ProxyCaptures() {
 }
 
 _ORT_ProxyCapturesRequired() {
-	for Name in ["", "VendorDirectory", "VendorSha256", "RouteOriginsPath", "RouteOriginsSha256"] {
+	for Name in ["", "VendorDirectory", "VendorSha256", "RouteOriginsPath", "RouteOriginsSha256",
+			"ProxyRelayContractPath", "ProxyRelayContractSha256", "ProxyRelayDialMs", "ProxyRelayProbeMs"] {
 		Proxy := _ORT_Proxy()
 		if (Name != "")
 			Proxy.Delete(Name)

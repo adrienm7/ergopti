@@ -394,6 +394,29 @@ _G4B_PullProxyLogin() {
 	}
 }
 
+; A sign-in relay refusal reaches the user as the relay's own message, the login
+; message only when no relay could answer.
+_G4B_PullRelayRefusalNamesItself() {
+	global LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT, _LLM_Deps_FailureMessage
+	SavedMessage := _LLM_Deps_FailureMessage
+	F := _G4B_Fixture()
+	try {
+		F.Model := "qwen3:0.6b"
+		F.PullScript := [[LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT, "Managed model pull refused: proxy_relay sign_in_rejected`n"]]
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(1, F.FailedCalls)
+		AssertEqual(t("network.relay.sign_in_rejected"), _LLM_Deps_FailureMessage)
+	} finally {
+		F.Close()
+		_LLM_Deps_FailureMessage := SavedMessage
+	}
+	AssertEqual("network.failure.proxy_windows_login", LLM_OllamaPullRefusalKey("Managed model pull refused: proxy_windows_login"))
+	AssertEqual("network.relay.failed", LLM_OllamaPullRefusalKey("Managed model pull refused: proxy_relay not_a_reason"),
+		"an unknown reason is the relay that did not answer by contract")
+}
+Test("managed bootstrap: a relay refusal names its own message (proxy-auth-relay)", _G4B_PullRelayRefusalNamesItself)
+
 ; The closing line of a pull whose fresh layer failed its sha256 check, after the
 ; progress frames that always say "pulling manifest".
 _G4B_DigestOutput() {

@@ -108,6 +108,13 @@ function Invoke-OllamaManagedModelPull {
 			[Console]::Error.WriteLine('Managed model pull refused: proxy_windows_login')
 			return (Get-OllamaPullProxyLoginExitCode)
 		}
+		# The sign-in relay refused at the daemon's start: its closed reason names
+		# the message the AHK owner shows.
+		if ($receipt.proxy_tunnel -ceq 'relay_refused') {
+			if ($receipt.proxy_relay -cnotmatch '^[a-z_]+\z') { throw 'The receipt names no closed relay refusal.' }
+			[Console]::Error.WriteLine('Managed model pull refused: proxy_relay ' + $receipt.proxy_relay)
+			return (Get-OllamaPullProxyLoginExitCode)
+		}
 		$server = [Diagnostics.Process]::GetProcessById($receipt.child_pid)
 		$null = $server.Handle
 		Assert-OllamaModelProcess $server $receipt.child_created_filetime $request.port

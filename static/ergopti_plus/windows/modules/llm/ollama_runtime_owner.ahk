@@ -18,7 +18,7 @@
 ; here (test-windows-route-plan.cjs compares the two lists).
 global OLLAMA_RUNTIME_RECEIPT_FIELDS := ["runtime_ticket", "ticket", "root_identity", "version_identity",
 	"manifest_sha256", "origin", "launcher_pid", "child_pid", "child_created_filetime", "ready_file_identity",
-	"leases_held", "proxy_mode", "proxy_tunnel"]
+	"leases_held", "proxy_mode", "proxy_tunnel", "proxy_relay"]
 
 /** Holds one exact server task; accepted launch never means AI is enabled. */
 class OllamaRuntimeOwner {
@@ -40,12 +40,18 @@ class OllamaRuntimeOwner {
 		Proxy := Options.Get("proxy", 0)
 		if !(Proxy is Map)
 			throw TypeError("Runtime ownership requires the captured proxy dependencies.")
-		for Name in ["VendorDirectory", "ProxyPolicyPath", "UpdaterDefaultsPath", "RouteOriginsPath"]
+		for Name in ["VendorDirectory", "ProxyPolicyPath", "UpdaterDefaultsPath", "RouteOriginsPath", "ProxyRelayContractPath"]
 			if !this._LocalPath(Proxy.Get(Name, ""))
 				throw TypeError("Runtime proxy capture requires a local path.", -1, Name)
-		for Name in ["VendorSha256", "ProxyPolicySha256", "UpdaterDefaultsSha256", "RouteOriginsSha256"]
+		for Name in ["VendorSha256", "ProxyPolicySha256", "UpdaterDefaultsSha256", "RouteOriginsSha256", "ProxyRelayContractSha256"]
 			if !RegExMatch(Proxy.Get(Name, ""), "^[0-9a-f]{64}$")
 				throw TypeError("Runtime proxy capture requires its digest.", -1, Name)
+		for Name in ["ProxyRelayDialMs", "ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs"]
+			if !(Proxy.Get(Name, 0) is Integer) || Proxy.Get(Name, 0) <= 0
+				throw TypeError("Runtime proxy capture requires its relay deadlines.", -1, Name)
+		if Proxy.Has("ProxyRelayPath") && (!this._LocalPath(Proxy["ProxyRelayPath"])
+				|| !RegExMatch(Proxy.Get("ProxyRelaySha256", ""), "^[0-9a-f]{64}$"))
+			throw TypeError("An installed relay requires its local path and digest.")
 		if !HasMethod(Options.Get("on_retired", 0), "Call")
 			throw TypeError("Runtime ownership requires an independent physical retirement observer.")
 		for Name in ["spawn", "factory", "read_ready", "live_identity", "clock", "on_error", "on_retired"]
@@ -120,8 +126,14 @@ class OllamaRuntimeOwner {
 			Arguments.Push("-ServeEnvironmentPath", this.Options["environment"],
 				"-ServeEnvironmentSha256", this.Options["environment_sha256"])
 			for Name in ["VendorDirectory", "VendorSha256", "ProxyPolicyPath", "ProxyPolicySha256",
-					"UpdaterDefaultsPath", "UpdaterDefaultsSha256", "RouteOriginsPath", "RouteOriginsSha256"]
-				Arguments.Push("-" . Name, this.Options["proxy"][Name])
+					"UpdaterDefaultsPath", "UpdaterDefaultsSha256", "RouteOriginsPath", "RouteOriginsSha256",
+					"ProxyRelayContractPath", "ProxyRelayContractSha256", "ProxyRelayDialMs",
+					"ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs"]
+				Arguments.Push("-" . Name, String(this.Options["proxy"][Name]))
+			; No relay installed: the launcher reads the empty default.
+			if this.Options["proxy"].Has("ProxyRelayPath")
+				Arguments.Push("-ProxyRelayPath", this.Options["proxy"]["ProxyRelayPath"],
+					"-ProxyRelaySha256", this.Options["proxy"]["ProxyRelaySha256"])
 			Spawn := this.Options.Get("spawn", ObjBindMethod(this, "_NativeSpawn"))
 			Task := Spawn.Call(PowerShell, Arguments, ObjBindMethod(this, "_OnTerminal", Record),
 				ObjBindMethod(this, "_AdoptConstruction", Record))
