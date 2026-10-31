@@ -66,7 +66,8 @@ skip = ["tests/", "_generated/", "vendor/", "native/"]
 [drivers.windows]
 root = "windows"
 extensions = [".ahk", ".ps1"]
-skip = ["tests/", "_generated/", "vendor/", "native/"]
+# build/ holds the ignored inventory a packaging run writes; it names every asset.
+skip = ["tests/", "_generated/", "vendor/", "native/", "build/"]
 
 
 
