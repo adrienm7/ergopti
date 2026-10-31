@@ -144,11 +144,7 @@ end
 --- @return table source
 local function create_source(name)
 	assert(node_for(name) == nil, "owned source name must be absent")
-	local old_name = Names.VIRTUAL_KEYBOARD
-	Names.VIRTUAL_KEYBOARD = name
-	local loaded, writer = pcall(function() return assert(loadfile("adapters/uinput_writer.lua"))() end)
-	Names.VIRTUAL_KEYBOARD = old_name
-	assert(loaded, writer)
+	local writer = require("tests.hardware.keyboard_source_writer").load(name)
 	local source = { name = name, writer = writer }
 	sources[#sources + 1] = source
 	assert(writer.use_ffi_backend()); assert(writer.open())

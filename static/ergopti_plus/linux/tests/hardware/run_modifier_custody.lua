@@ -75,11 +75,7 @@ end
 --- @return table input
 local function create_source(name)
 	assert(node_for(name) == nil, "fixture source already exists")
-	local old_name = Names.VIRTUAL_KEYBOARD
-	Names.VIRTUAL_KEYBOARD = name
-	local loaded, source = pcall(function() return assert(loadfile("adapters/uinput_writer.lua"))() end)
-	Names.VIRTUAL_KEYBOARD = old_name
-	assert(loaded, source)
+	local source = require("tests.hardware.keyboard_source_writer").load(name)
 	local entry = { name = name, writer = source }
 	inputs[#inputs + 1] = entry
 	assert(source.use_ffi_backend(), "source FFI backend")

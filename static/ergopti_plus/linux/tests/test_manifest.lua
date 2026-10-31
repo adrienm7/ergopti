@@ -228,6 +228,7 @@ return {
 	"tests.unit.adapters.system.test_tray_indicator",
 	"tests.unit.adapters.system.test_tray_menu_adapter",
 	"tests.unit.adapters.synthetic_input.test_uinput_writer_struct_input_event",
+	"tests.unit.adapters.synthetic_input.test_keyboard_source_fixture",
 	"tests.unit.adapters.synthetic_input.test_uinput_writer_constructor_retirement_refusal",
 	"tests.unit.adapters.atspi.test_window_info_focus",
 	"tests.unit.adapters.system.test_wpm_surface_lifecycle",
