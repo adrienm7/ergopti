@@ -4,6 +4,9 @@
 --- These cases do not claim SDK, uv process-group or physical WebView qualification.
 local helpers = require("tests.helpers")
 local SCALAR = '{"version":1,"executable":"/private/tool","arguments":["two words",""]}'
+-- The real registry reader, bound before the fixture stubs infra.paths: the
+-- shared program providers read their catalogue cap from [limits] when they load
+local Timings = require("infra.timings")
 
 local function fixture(body)
 	local saved, old_hs = {}, _G.hs
@@ -16,6 +19,7 @@ local function fixture(body)
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.paths"] = { shared = function() return "/controlled/shared" end }
+		package.loaded["infra.timings"] = Timings
 		package.loaded["adapters.program_providers"] = { create = function()
 			local owner = { resolutions = 0, invalidations = 0, retired = false }
 			owner.discover = function() return { choices = { { key = "opaque-choice", label = "Reviewed provider" } } } end
