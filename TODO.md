@@ -336,9 +336,6 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
   - [PHYS-M] **Keystats ingest "database is locked"** once at 20:52; the `quick_check` now opens `immutable=1`
     (8084562373): confirm it no longer appears.
   - Key events lost upstream: see L24.
-- [ ] **Container note.** [CODE] `tools/test/test-managed-ollama-protocol.cjs` stops in a cloud container on Git's
-      "dubious ownership" when run as a non-root user over a root-owned checkout; give the test its own
-      `safe.directory` for its child Git calls.
 - [ ] **Remap guardian killed at every developer start.** [PHYS-M] Done: an ad hoc build re-registers its guardian
       from scratch (2be257c9f5), `field_login_items` reports `guardian_registration`. Left: the next field run shows
       `developer_adhoc_reregistered`, no `ErgoptiPlus` codesigning kill in `field_app_health`, and `guardian_state`
