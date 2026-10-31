@@ -386,7 +386,7 @@ function receiveWindowsModelEnvironment() {
 	if (moduleKey) delete env[moduleKey];
 	env.PSModulePath = path.join(psHome, 'Modules');
 	for (const [script, count] of [
-		['test_ollama_model_pull.ps1', 8],
+		['test_ollama_model_pull.ps1', 10],
 		['test_ollama_model_environment.ps1', 3]
 	]) {
 		const result = spawnSync(
@@ -410,8 +410,8 @@ function receiveWindowsModelEnvironment() {
 		assert.equal(result.stderr, '');
 		assert.equal(stdout.split('\n').filter((line) => line.startsWith('PASS ')).length, count);
 		assert.doesNotMatch(stdout, /^FAIL /m);
-		if (count === 8)
-			assert.match(stdout, /^Managed model import acceptance: 8 passed, 0 failed\.$/m);
+		if (count === 10)
+			assert.match(stdout, /^Managed model import acceptance: 10 passed, 0 failed\.$/m);
 		else assert.match(stdout, /^RESULT passed=3 failed=0 builder_only=false$/m);
 	}
 	process.stdout.write('WINDOWS-MODEL-ENVIRONMENT controls=11 native_children=true ollama=false\n');

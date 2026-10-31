@@ -91,8 +91,9 @@ function Invoke-OllamaManagedModelPull {
 		if ([Ergopti.Ollama.RuntimeObservation]::ActiveProcesses() -ne 1) { throw 'The model worker requires its sole canonical job.' }
 		$root = Open-OllamaManagedRoot $request.root $false
 		if ($root.identity -cne $request.root_identity) { throw 'The originating model root changed.' }
-		$handle = [Ergopti.Ollama.ManagedNative]::OpenDirectory($request.path, $true)
-		$stage = Open-OllamaPreparedStage $root $request.ticket $request.identity $request.manifest $false $request.path $handle
+		# The running launcher holds this version's DELETE leases: observe, never lease.
+		$handle = [Ergopti.Ollama.ManagedNative]::OpenObservedDirectory($request.path)
+		$stage = Open-OllamaPreparedStage $root $request.ticket $request.identity $request.manifest $false $request.path $handle $true
 		$ready = Open-OllamaReadFile ([IO.Path]::Combine($root.path, '.runtime-' + $request.runtime + '.json'))
 		if ([Ergopti.Ollama.ManagedNative]::Identity($ready.SafeFileHandle.DangerousGetHandle()) -cne $request.ready_identity -or
 			(Get-OllamaStreamHash $ready) -cne $request.ready_image) { throw 'The exact runtime readiness image changed.' }
