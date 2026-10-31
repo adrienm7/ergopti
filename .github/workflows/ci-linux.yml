@@ -4563,9 +4563,8 @@ jobs:
           logs="$RUNNER_TEMP/linux-packagers"
           mkdir -p "$logs"
           bash tools/build/build-linux-deb.sh > "$logs/deb.log" 2>&1 & deb=$!
-          # The .rpm publishes the luv binding the oldest-LTS container built.
-          bash tools/build/build-linux-rpm.sh --luv-module "$GITHUB_WORKSPACE/build/linux/packaged-luv/luv.so" \
-              > "$logs/rpm.log" 2>&1 & rpm=$!
+          # Both carry the private runtime the oldest-LTS container staged.
+          bash tools/build/build-linux-rpm.sh > "$logs/rpm.log" 2>&1 & rpm=$!
           failed=0
           for name in deb rpm; do
             status=0
@@ -4837,10 +4836,9 @@ jobs:
 
       - name: Tools the job itself needs (rpm)
         if: env.INSTALL_KIND == 'rpm'
-        # Deliberately NOT luajit: the .rpm declares `Requires: luajit >= 2.1`,
-        # so letting dnf resolve it from the package is what proves that
-        # declaration is right. Pre-installing it would hide a wrong Requires.
-        # git is for actions/checkout, findutils for the `find` below.
+        # Deliberately NOT luajit: the .rpm carries its own private runtime,
+        # and a host LuaJIT here would hide a package that still reached for
+        # one. git is for actions/checkout, findutils for the `find` below.
         shell: bash
         run: dnf install -y git findutils
 
@@ -5055,13 +5053,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          eval "$(grep -E '^(DRIVER_ROOT|SHARED_LUA)=|^export LUA_PATH=' /usr/bin/ergopti)"
-          if [ -z "${LUA_PATH:-}" ]; then
-              echo "::error::/usr/bin/ergopti no longer exports LUA_PATH — this check read nothing."
+          # Replay the wrapper's whole environment (its private runtime) and
+          # stop before its final exec of the launcher.
+          if [ "$(tail -n 1 /usr/bin/ergopti)" != 'exec bash "$DRIVER_ROOT/install/launch.sh" "$@"' ]; then
+              echo "::error::/usr/bin/ergopti no longer ends with its launcher exec — this replay would run it."
+              exit 1
+          fi
+          eval "$(sed '$d' /usr/bin/ergopti)"
+          if [ -z "${LUA_PATH:-}" ] || [ "${ERGOPTI_RUNTIME_PREFIX:-}" != /usr/lib/ergopti/runtime ]; then
+              echo "::error::/usr/bin/ergopti no longer exports LUA_PATH and its private runtime — this check read nothing."
               exit 1
           fi
           echo "LUA_PATH from the installed wrapper: $LUA_PATH"
-          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+          "$ERGOPTI_RUNTIME_PREFIX/bin/luajit" static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
               /usr/lib/ergopti/_shared
 
       - name: Record mandatory .deb smoke evidence (deb)
@@ -5071,7 +5075,7 @@ jobs:
           node tools/test/linux-ci-evidence.cjs record \
               --job install-linux --output "$RUNNER_TEMP/linux-ci-evidence/smoke-deb-install.json" \
               --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
-              --session installed-package --interpreter "$(luajit -v 2>&1 | head -1)" \
+              --session installed-package --interpreter "$(/usr/lib/ergopti/runtime/bin/luajit -v 2>&1 | head -1)" \
               --subject smoke-deb-install=1
 
       - name: Upload mandatory .deb smoke evidence (deb)
@@ -5123,18 +5127,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Replay the wrapper's whole environment, its native luv admission
+          # Replay the wrapper's whole environment, its private runtime
           # included, and stop before its final exec of the launcher.
           if [ "$(tail -n 1 /usr/bin/ergopti)" != 'exec bash "$DRIVER_ROOT/install/launch.sh" "$@"' ]; then
               echo "::error::/usr/bin/ergopti no longer ends with its launcher exec — this replay would run it."
               exit 1
           fi
           eval "$(sed '$d' /usr/bin/ergopti)"
-          if [ -z "${LUA_PATH:-}" ] || [[ "${LUA_CPATH:-}" != /usr/lib/ergopti/native_modules/* ]]; then
-              echo "::error::/usr/bin/ergopti no longer exports LUA_PATH and its native LUA_CPATH — this check read nothing."
+          if [ -z "${LUA_PATH:-}" ] || [[ "${LUA_CPATH:-}" != /usr/lib/ergopti/runtime/lib/lua/5.1/* ]]; then
+              echo "::error::/usr/bin/ergopti no longer exports LUA_PATH and its private LUA_CPATH — this check read nothing."
               exit 1
           fi
-          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+          "$ERGOPTI_RUNTIME_PREFIX/bin/luajit" static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
               /usr/lib/ergopti/_shared
 
       - name: Record mandatory .rpm smoke evidence (rpm)
