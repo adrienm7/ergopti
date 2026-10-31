@@ -29,6 +29,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")
 local SecureFieldDetector = require("adapters.secure_field_detector")
 local AccessibilityPermission = require("adapters.accessibility_permission")
+local FieldRunSelftest = require("infra.field_run_selftest")
 
 local LOG = "keymap.utils"
 
@@ -1100,6 +1101,9 @@ local _ignored_win_cache_value = nil
 -- (focus change, first call, or TTL elapsed). Watchers set this to true
 -- synchronously whenever the focused window/app is known to have changed.
 local _ignored_win_cache_dirty = true
+-- The field run's published scratch window when the cache was filled: a
+-- publication or retraction changes what a Hammerspoon window classifies as.
+local _ignored_win_cache_selftest_window = nil
 -- One cheap NSWorkspace watcher plus three narrowly scoped AX watchers. Never use
 -- hs.window.filter here: its first access enumerates every application's windows
 -- and has already stalled the Hammerspoon runloop for multiple seconds.
@@ -1422,6 +1426,7 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	_ignored_win_cache_time  = now
 	_ignored_win_cache_dirty = false
 	_ignored_win_cache_value = false
+	_ignored_win_cache_selftest_window = FieldRunSelftest.window_id()
 	_secure_field_cache_value = nil
 	_text_destination = nil
 	_probe_failed_stage = nil
@@ -1483,7 +1488,15 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 		return stage("app_name", true)
 	end
 	stage("app_name")
-	if app_name == "Hammerspoon" then
+	-- The field run's scratch window is the one Hammerspoon window that is a
+	-- typing destination: its hotstring check types into it (field run
+	-- 2026-10-31 saw its trigger left unexpanded there).
+	local scratch = false
+	if app_name == "Hammerspoon" and _ignored_win_cache_selftest_window ~= nil then
+		local ok_id, win_id = pcall(function() return win:id() end)
+		scratch = ok_id and win_id == _ignored_win_cache_selftest_window
+	end
+	if app_name == "Hammerspoon" and not scratch then
 		if not ensure_ignored_win_context_watchers(app, win, false) then
 			return stage("context_watchers", true)
 		end
@@ -1648,6 +1661,11 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 
 	if _ignored_win_cache_dirty or _ignored_win_cache_value == nil then
 		schedule_ignored_win_refresh()
+		return nil, _ignored_win_context_generation
+	end
+
+	if FieldRunSelftest.window_id() ~= _ignored_win_cache_selftest_window then
+		invalidate_ignored_win_cache()
 		return nil, _ignored_win_context_generation
 	end
 
