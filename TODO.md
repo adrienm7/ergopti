@@ -249,9 +249,6 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
 
 ## Maintainer requests of 2026-10-30 (coordinator session; everything here is to be done)
 
-- [ ] **Release notes leaked agent session links.** Done: `build_changelog.py` strips `Claude-Session` and
-      `Co-Authored-By` lines and any `claude.ai/code/session_` link (0ba0e90580), and the convention lint flags the
-      trailer. Left (maintainer decision): rewrite the bodies of the releases already published with such lines.
 - [ ] **Ergopti's own Ollama on macOS starts.** [PHYS-M] The serve owner was opened (6170813ea9); the readiness
       failure of the 18:26 run (`native_child_status=64`) was the alias path handed to the launcher's API worker,
       fixed in 6335790e5a, with the metadata wait (894585a213), the pull's closed stdin (b71b4a67db) and named
@@ -531,8 +528,7 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       string-surface ceilings and a per-build record with the exe SHA-256 in CI, the submission pack
       [windows-exe-false-positive-submission-pack.md](docs/tooling/windows-exe-false-positive-submission-pack.md).
       Left (maintainer): signing (132), VirusTotal lookup, Microsoft Defender and vendor submissions, the tester's
-      block page and retry (T1-T4); decide whether the `WH_KEYBOARD_LL` probe in `input_probe.ahk` stays in the
-      release exe. Playbook: [handoff](docs/tooling/windows-exe-flagged-by-proxy.md).
+      block page and retry (T1-T4). Playbook: [handoff](docs/tooling/windows-exe-flagged-by-proxy.md).
 
 ## Big item 2: macOS Karabiner input reliability (items 31, 117, 140)
 
@@ -798,10 +794,6 @@ Added October 22 (from the agents' reports; details in their commits):
       Linux; an Ergopti bundle source types digits on both levels, so its rows stay greyed on macOS.
 - [ ] **Linux CI installs packages inside short test steps.** [CI] Every Linux test step now has its own install
       step (17e80f2882). Left: hosted validation.
-- [ ] **History hygiene of October 22.** Commits with another agent's message, already on dev: c6db589c76 (macOS
-      cipher argv fix under a README subject), 90da28c725 (config snapshot test under a CI subject), 18ca214ead (also
-      deletes ten handoff files), 6d9c659 ("applied for now" instead of "apply now"). Keep, or rewrite dev once with a
-      lease: maintainer's call.
 - [ ] **36. Windows updater production coupling.** [CODE] The "original23" collector stays inactive until enrolled;
       its source preparation stays in Git (`49c62d77a1:docs/handovers/2026-10-12-group6-ci/`). Missing: the first
       trusted PowerShell host acquisition (a pre-host native binding with an approved image contract).
@@ -824,9 +816,8 @@ Added October 22 (from the agents' reports; details in their commits):
       -> 70 reads) and Linux got its own pinned-read ratchet (`tools/test/test-no-pinned-source-reads-linux.cjs`);
       later that day two macOS tests (api_ollama's require-time scheduling and streaming payload removal) and two
       Linux ones (version stamp, debounce clock) became behaviour tests: macOS 22 files / 67 reads, Linux 72 / 135.
-      Left: Windows replay of the timer-ceiling and key-chord
-      corpora (needs a decision to build those policies on Windows), and the rest of the source assertions to
-      behaviour (audit item 14), driving both Lua ratchets down.
+      Left: the rest of the source assertions to behaviour (audit item 14), driving both Lua ratchets down; the
+      Windows timer-ceiling and key-chord policies are in the PC handoff.
 - [ ] **116. Guided third-party validation report.** [PHYS-M] `field_toolchain` runs it with no person (timer,
       Shortcuts, Homebrew, Karabiner signature and Gatekeeper); the next field report answers it. Package provenance
       beyond the signature check is open.
@@ -864,11 +855,8 @@ Added October 22 (from the agents' reports; details in their commits):
       join is deliberately unreachable (nothing passes `numberRowMode`) and is not owed. Left for Linux only:
       mutter and KWin reloading a `~/.config/xkb` layout (W1 to W4 of that note).
 - [ ] **108.** [CODE] Item 97's collision/source/modifier/output joins.
-- [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible Variables/KeyHistory snapshot.
-- [ ] **L115.** [CODE] Provider error envelope guard: not reproducible under WSL LuaJIT (6 of 6 runs pass); leave it
-      or close it (maintainer).
 - Optional, not planned: XKB angle-name gaps and raw-input grammar (L118-L120); ALSA fallback (L63);
-  multi-group XKB recovery (L100); a real `Comments` exe field through a version `.res` resource.
+  multi-group XKB recovery (L100).
 
 ## Maintainer checks
 
