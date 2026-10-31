@@ -461,46 +461,29 @@ gesture routes are in `docs/memory/rejected_proposals.md`. Its notifier, LLM man
 HTTP transport items are done (`linux/adapters/notifier.lua`, `[sections.llm]` lists `linux`,
 `linux/modules/llm/api_remote.lua`). Still open on 2026-10-29:
 
-- M3.3: remove `linux/ui/menu/menu_builder.lua` in favour of the shared renderer. [CODE] Every submenu
-  already renders through `_shared/lua/menu/renderer.lua` (`infra/manifest_menu.lua`, 21
-  `ManifestMenu.build` calls), so what is left is splitting the 5 729-line file into per-section modules.
-  Started and reverted on 2026-10-30: the earlier plan here (repoint each reader to the new file) does
-  not hold. The menu gates are single-file data-flow analysers with mutation counterexamples:
-  `checkLinuxDeclaredAboutParent` (`test-menu-manifest.cjs`) needs `_build_about` and `M.build` in one
-  source, `test-menu-parity.cjs` names the file as the native source of ~90 rows, and
-  `fixtures/linux-native-caption-binding-counterexamples.cjs` and
-  `fixtures/hotstring-language-owner-counterexamples.cjs` trace helpers inside it. Moving only the 12 pure
-  dialog helpers and `i18n_safe` to a `menu_common.lua` (module bindings kept per file) turned
-  `test-menu-parity`, `test-menu-manifest`, `test-menu-action-handler-bijection` and
-  `test-hotstring-category-submenu-order` red, against a `dev` baseline where they pass. Measured facts
-  for whoever resumes:
-  - The dependency graph is clean: each top-level definition is reached by one builder or is shared, and
-    no builder assigns a shared local. Shared: the zenity dialogs, `_fill`, `shell_quote`, `succeeded`,
-    `prompt_text`, `assign_parameterized_action`, `open_action_picker`, `slot_binding_rows`,
-    `ask_yes_no`; module bindings (`ManifestMenu`, `Logger`, `COMMAND`...) must stay per file for the
-    gates. Splitting all 14 builders leaves a 438-line root.
-  - `i18n_safe` is a global that tests replace in `_G`: parts must read it at call time, never alias it.
-  - Tests reload the builder after swapping `package.loaded` entries, and walk
-    `build -> _build_<section> -> helper` by upvalue name, so the root must reload its parts when it
-    loads and keep the `_build_<section>` local names.
-  - The header builder shares the root's separator facade checks and belongs with the root.
-  - Decided by the coordinator on 2026-10-30: (a), teach the analysers to follow the module boundary as
-    they follow the macOS `ui/menu/menu_*.lua` modules, with new counterexamples, in their own
-    `tools/test` commits green on dev before any split; then one builder per commit, smallest first.
-  - Measured with the smallest step (Quit alone to `menu_quit.lua`, module bindings required in the
-    file): `test-menu-manifest` (lifecycle rows looked up in `menu_builder.lua`, line ~1917),
-    `test-menu-parity` via `fixtures/linux-native-caption-binding-counterexamples.cjs` ("complete native
-    root ... closed caption cohort") and `test-hotstring-category-submenu-order` via
-    `fixtures/hotstring-language-owner-counterexamples.cjs` turn red: the root analysers embed literal
-    multi-line fragments of the root and expect `["quit"] = _build_quit` to name a local function of the
-    same file. The analyser change is therefore a resolver in `tools/lib` (root binding
-    `local _build_x = require("ui.menu.menu_x").build` to that module's `local function _build_x`,
-    refusing any other wiring) used by `menu-native-root-binding*.cjs`, the caption and language-owner
-    fixtures and the lifecycle check, each with a counterexample placed in the split module.
-  - The root must not write `package.loaded`: with a `package.loaded[name] = nil` reload helper,
-    `test-menu-action-handler-bijection` also turns red (its template binding refuses that wiring).
-    Reloading the parts with the root, which the Lua tests need, must be done another way (a fresh
-    `loadfile` of each part, or the tests reloading the parts themselves).
+- M3.3: split `linux/ui/menu/menu_builder.lua` into one module per section builder. [CODE] Every
+  submenu already renders through `_shared/lua/menu/renderer.lua` (`infra/manifest_menu.lua`); the
+  split itself landed on 2026-10-30 (branch `fix/linux-menu-split-2`), option (a): the analysers follow
+  the module boundary.
+  - The root binds each builder as `local _build_x = require("ui.menu.menu_x").build` and the shared
+    zenity dialogs and binding helpers name by name from `ui/menu/menu_dialogs.lua`. It keeps the
+    imports, the facade, header and separator checks, the header builder, the pause greying and
+    `M.build` (about 480 lines).
+  - Gates read the root through `tools/lib/linux-menu-parts.cjs`. It admits only that wiring (part
+    modules hold the root's own imports, their `LOG`, local definitions, `M.<field>` exports and
+    `return M`) and recomposes the root the single-source analysers already read. `readSourceFile()`
+    is the by-path reader; directory scans keep reading files raw so a part is never counted twice.
+    `test-linux-menu-parts.cjs` and the caption-binding, language-owner and lifecycle checks carry
+    split-module counterexamples (`tools/test/lib/linux-menu-split.cjs`).
+  - Lua tests: the runner reloads the cached `ui.menu.menu_*` modules whenever the root's file runs
+    (`tests/support/menu_part_reload.lua`; the root never writes `package.loaded`), and text checks
+    read `helpers.read_menu_source()` (root, then each bound part).
+  - A part may import only what the root holds, so the root still carries imports only parts use
+    (`ParentSource`, `Version`...). Hoisting them would need the analysers' import whitelist
+    (`closedModuleExport` in `tools/lib/menu-native-llm-parent-binding.cjs`) to follow the parts too.
+  - Left: renaming or deleting the root itself (`require("ui.menu.menu_builder")` callers, the frozen
+    census oracle's `CURRENT_SOURCE_RETIREMENTS` in `test-native-menu-rows.cjs`, the
+    `linux_evidence.json` paths). The coordinator's plan named this last step; it was not started.
 - 20 of the 36 gesture slots are physically out of reach on some machines. [PHYS-L] The menu greys
   them; since 30 October the reader start also names every unreachable slot and warns for each bound
   one (`modules/gestures/slot_report.lua`, a binding written by hand never passes through the menu).
