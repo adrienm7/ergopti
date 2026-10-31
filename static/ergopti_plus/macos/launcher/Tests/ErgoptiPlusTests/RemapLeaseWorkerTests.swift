@@ -1421,7 +1421,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			withIntermediateDirectories: true,
 			attributes: [.posixPermissions: 0o700]
 		)
-		let executable = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+		let executable = "/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus"
 		let expectedPlist = try XCTUnwrap(legacyGuardianPlist(
 			executablePath: executable
 		).data(using: .utf8))
@@ -1456,7 +1456,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			attributes: [.posixPermissions: 0o700]
 		)
 		let staleExecutable = "/Applications/ErgoptiPlus-old.app/Contents/MacOS/ErgoptiPlus"
-		let currentExecutable = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+		let currentExecutable = "/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus"
 		let plistURL = launchAgents.appendingPathComponent(kRemapGuardianPlistName)
 		try XCTUnwrap(legacyGuardianPlist(
 			executablePath: staleExecutable
@@ -2925,7 +2925,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 	/// Proves the public worker accepts only the final mode/tombstone argv shape.
 	func testWorkerIdentityUsesOneModeAndOneTombstone() {
 		let arguments = [
-			"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+			"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 			kKarabinerLeaseWorkerFlag,
 			kCanonicalKarabinerCLIPath,
 			"ergopti_mode_\(token)",
@@ -3142,7 +3142,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 	/// Proves invalid identity data fails before any executable can be launched.
 	func testIdentityRejectsMismatchedNamesAndUnboundedHeartbeat() {
 		let base = [
-			"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+			"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 			kKarabinerLeaseWorkerFlag,
 			kCanonicalKarabinerCLIPath,
 			"ergopti_mode_\(token)",
@@ -3162,7 +3162,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			)
 		}
 		let innerBase = [
-			"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+			"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 			kKarabinerLeaseInnerFlag,
 			kCanonicalKarabinerCLIPath,
 			"ergopti_mode_\(token)",
@@ -3197,7 +3197,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		for (role, flag, suffix) in roles {
 			for runtime in LeaseRuntime.allCases {
 				let arguments = [
-					"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+					"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 					flag,
 					runtime.cliPath,
 					"ergopti_mode_\(token)",
@@ -3226,11 +3226,11 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			runtimeDirectory + "bin/ergoptiplus_remap_cli\u{0}",
 			"/Library/Application Support/ErgoptiPlus/bin/ergoptiplus_remap_cli",
 			"~/Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli",
-			"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+			"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 		]
 		for forbiddenPath in forbiddenPaths {
 			let arguments = [
-				"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+				"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 				kKarabinerLeaseWorkerFlag,
 				forbiddenPath,
 				"ergopti_mode_\(token)",
@@ -3341,7 +3341,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		]
 		for (role, flag, suffix) in roles {
 			let arguments = [
-				"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+				"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 				flag,
 				kCanonicalKarabinerCLIPath,
 				"ergopti_mode_\(token)",
@@ -3356,7 +3356,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		for forbiddenPath in forbiddenPaths {
 			for (role, flag, suffix) in roles {
 				let arguments = [
-					"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+					"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 					flag,
 					forbiddenPath,
 					"ergopti_mode_\(token)",
