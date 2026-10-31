@@ -1158,6 +1158,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		set_log_level             = function(level)
 			local L = require("infra.logger")
+			-- config.toml's [script] log_level wins at start: rewrite it first.
+			if not require("infra.script_scope").rewrite_configured(require("config_keys").KEY.SCRIPT_LOG_LEVEL, level) then
+				return false
+			end
 			local ok, committed = pcall(Storage.set, require("config_keys").LEAF.LOG_LEVEL, level)
 			if not ok or committed ~= true then
 				L.warn("menu", "Log level %s was refused by settings; the live level was left unchanged.", level)

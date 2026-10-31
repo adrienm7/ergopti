@@ -30,3 +30,15 @@ lists no server; the names stay in the local servers panel and the "other
 address" submenu. The row of a running sweep (`searching`) keeps the list. The
 shared `_shared/lua/llm/local_server_menu.lua` owns the rule; the Windows twin
 follows through the PC handoff.
+
+## config.toml `[script]` wins at start on macOS and Linux, without migration (2026-10-31)
+
+A `config.toml` `[script]` row (`locale`, `log_level`, `show_error_dialog`) wins
+over the native store (hs.settings, storage.json) at start, as on Windows:
+`_shared/lua/script_config_authority.lua` writes it into the native alias
+(`infra/script_scope.lua` `adopt_configured`) before the error window, the log
+level and i18n read it, and every menu or wizard change rewrites the row first
+when the file holds one (`rewrite_configured`). There is no migration or
+adoption marker (sole user, clean state): a file without the row leaves the
+native value in force, and nothing is copied between the stores. Only a
+shipped locale code is adopted.
