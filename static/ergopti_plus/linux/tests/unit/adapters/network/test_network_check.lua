@@ -43,6 +43,18 @@ local function deps(overrides)
 			return { "https://registry.ollama.ai", "https://blob.ollama.example" }
 		end,
 		selection = function(receipt) return require("infra.proxy_policy").load().selection(receipt) end,
+		-- The relay binding with the shipped contract and a scripted probe child.
+		relay = function()
+			local Binding = require("infra.proxy_auth_relay")
+			return { load = Binding.load, timings = Binding.timings,
+				probe = function(upstream, authority, options, callback)
+					calls.probes = calls.probes or {}
+					calls.probes[#calls.probes + 1] = { upstream = upstream, authority = authority, options = options }
+					local answer = calls.probe_answer or { { status = "not_needed" } }
+					callback(answer[1], answer[2])
+					return {}
+				end }
+		end,
 		lookup = function(url, options, callback)
 			calls.lookups[#calls.lookups + 1] = { url = url, options = options }
 			callback({ ok = true, proxies = { "direct://" } })
@@ -214,6 +226,40 @@ helpers.describe("network field check: the Linux ports", function()
 		helpers.assert_true(not tostring(mixed.route_plan.value):find("secret", 1, true), "no relay address in the report")
 	end)
 
+	-- docs/design/proxy-auth-relay.md: the step names what the daemon's start does.
+	helpers.it("(proxy-auth-relay) the proxy_relay step reports the sign-in the selected relay demands", function()
+		local function through(proxy, answer)
+			local collaborators, calls = deps({ lookup = function(url, _, callback)
+				callback({ ok = true, proxies = { url == FEED_URL and "direct://" or proxy } })
+				return {}
+			end })
+			calls.probe_answer = answer
+			local report = Report.new_report("network")
+			Shared.run(Ports.new(collaborators), report, function() end)
+			local steps = {}
+			for _, step in ipairs(report.result().steps) do steps[step.id] = step end
+			return steps.proxy_relay, calls, report.result()
+		end
+		local step, calls = through("http://proxy.corp.example:3128", { { status = "required", scheme = "negotiate" } })
+		helpers.assert_eq(step.state, "pass")
+		helpers.assert_eq(step.value, "required_negotiate")
+		helpers.assert_eq(calls.probes[1].upstream, "http://proxy.corp.example:3128")
+		helpers.assert_eq(calls.probes[1].authority, "registry.ollama.ai:443")
+		step = through("http://proxy.corp.example:3128", nil)
+		helpers.assert_eq(step.value, "not_needed")
+		local refused, _, result = through("http://proxy.corp.example:3128", { nil, "ntlm_requires_windows" })
+		helpers.assert_eq(refused.state, "fail")
+		helpers.assert_eq(refused.value, "ntlm_requires_windows")
+		helpers.assert_true(not result.passed)
+		local leaked = through("http://proxy.corp.example:3128", { nil, "proxy.corp.example" })
+		helpers.assert_eq(leaked.value, "relay_unavailable", "an unknown reason never reaches the report")
+		local basic, basic_calls = through("http://user:secret@proxy.corp.example:3128", nil)
+		helpers.assert_eq(basic.state, "skip")
+		helpers.assert_eq(basic.value, "not_applicable")
+		helpers.assert_eq(basic_calls.probes, nil)
+		helpers.assert_eq(through("direct://", nil).value, "direct")
+	end)
+
 	helpers.it("(linux-network-check) names as many Ollama origins as the shared inventory holds", function()
 		local origins = assert(require("infra.route_origins").client("ollama"))
 		helpers.assert_eq(#origins, #Shared.OLLAMA_ORIGIN_TOKENS)
@@ -356,10 +402,10 @@ helpers.describe("network field check window (Linux)", function()
 		with_window(Ports.new((deps())), function(Window, world)
 			helpers.assert_true(Window.run(world.services))
 			helpers.assert_eq(#world.evidence, 1)
-			helpers.assert_eq(world.evidence[1], "Network check result: check=network verdict=pass steps=8 "
+			helpers.assert_eq(world.evidence[1], "Network check result: check=network verdict=pass steps=9 "
 				.. "proxy_settings=info:none pac_download=skip:no_pac pac_script=skip:no_pac "
 				.. "route_lookup=pass:selected_direct tls=pass:trusted transfer=pass:http_200 digest=skip:get_only "
-				.. "route_plan=info:registry:direct+blob:direct")
+				.. "route_plan=info:registry:direct+blob:direct proxy_relay=skip:direct")
 			helpers.assert_eq(#world.dialogs, 0, "the dialog opens from a fresh turn of the loop")
 			world.flush()
 			helpers.assert_eq(world.dialogs[1].title, "[menu.debug.field_check_network]")

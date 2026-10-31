@@ -287,6 +287,7 @@
 	"field_check.step.transfer": "Тестовый запрос к серверу загрузки",
 	"field_check.step.digest": "Проверка целостности загрузки",
 	"field_check.step.route_plan": "Маршрут каждого источника загрузки демона Ollama (напрямую или через ретранслятор)",
+	"field_check.step.proxy_relay": "Вход, который требует выбранный прокси (не нужен или выполняется локальным ретранслятором Ergopti)",
 	"launcher.fatal.stage_detail": "Шаг: {1}\nПричина: {2}\nПодробности сохранены в {3}.",
 	"launcher.fatal.component_detail": "Компонент: {1}\nПричина: {2}\nПодробности сохранены в:\n{3}",
 	"menu.llm.deps_download_page_failed": "Не удалось открыть страницу загрузки Ollama.",
