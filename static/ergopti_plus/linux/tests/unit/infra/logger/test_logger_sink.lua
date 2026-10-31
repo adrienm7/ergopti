@@ -978,7 +978,17 @@ helpers.describe("linux-logger-topical-fan-out", function()
 			Logger.info("modules.llm.inference", "marker-llm")
 			Logger.info("modules.hotstrings.injector", "marker-hotstrings")
 			Logger.info("sink_test", "marker-unrouted")
-			local keystats = read_file(dir .. "/ErgoptiPlus_keystats.log")
+			-- The keystats file name comes from the routing table, not a spelling here.
+			local keystats_file
+			for _, entry in ipairs(require("_generated.logger_sub_files")) do
+				for _, pattern in ipairs(entry.patterns) do
+					if keystats_file == nil and ("[modules.keystats.keystats]"):find(pattern, 1, true) then
+						keystats_file = entry.name
+					end
+				end
+			end
+			helpers.assert_not_nil(keystats_file, "a sub-file must route the keystats module")
+			local keystats = read_file(dir .. "/" .. keystats_file)
 			local llm = read_file(dir .. "/ErgoptiPlus_llm.log")
 			local hotstrings = read_file(dir .. "/ErgoptiPlus_hotstrings.log")
 			helpers.assert_not_nil(keystats, "the keystats topic file must exist")
