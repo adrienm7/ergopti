@@ -117,8 +117,9 @@
 			"_source": "github.com/nomic-ai/gpt4all gpt4all-chat/src/server.cpp (listens on 127.0.0.1:4891; GET /v1/models, POST /v1/chat/completions) and docs.gpt4all.io gpt4all_api_server/home.html; no key. The server is off until Enable Local API Server is set.",
 			"auth": "optional",
 			"discovery": {
+				"process_names": ["gpt4all"],
 				"command_lines": ["gpt4all/bin/chat"],
-				"_source": "The Linux executable is the CMake target chat (gpt4all-chat/CMakeLists.txt names it gpt4all on Apple only) in the installer's gpt4all/bin folder; its port setting lives in a Qt INI file this reader does not parse, so its listening port is read."
+				"_source": "The Linux executable is the CMake target chat in the installer's gpt4all/bin folder; on macOS gpt4all-chat/CMakeLists.txt sets OUTPUT_NAME gpt4all, so the app runs gpt4all.app/Contents/MacOS/gpt4all. Its port setting lives in a Qt INI file this reader does not parse, so its listening port is read."
 			}
 		},
 		"lemonade": {
@@ -131,8 +132,14 @@
 				"port_flags": ["--port"],
 				"config_files": [
 					{
-						"os": ["linux"],
+						"os": ["linux", "macos"],
 						"dir": "~/.config/lemonade",
+						"file": "config.json",
+						"port_key": "port"
+					},
+					{
+						"os": ["macos"],
+						"dir": "/Library/Application Support/lemonade/.config",
 						"file": "config.json",
 						"port_key": "port"
 					},
@@ -143,7 +150,7 @@
 						"port_key": "port"
 					}
 				],
-				"_source": "The server is lemond (data/lemond.service.in; --port in src/cpp/server/cli_parser.cpp), formerly lemonade-server; config.json holds sparse overrides, in ~/.config/lemonade for a standalone lemond and /var/lib/lemonade for the packaged service (docs/guide/configuration/README.md)."
+				"_source": "The server is lemond (data/lemond.service.in; --port in src/cpp/server/cli_parser.cpp), formerly lemonade-server; config.json holds sparse overrides, in ~/.config/lemonade for a standalone lemond or a macOS user install, /Library/Application Support/lemonade/.config for a macOS system install and /var/lib/lemonade for the Linux packaged service (docs/guide/configuration/README.md)."
 			}
 		},
 		"docker_model_runner": {
