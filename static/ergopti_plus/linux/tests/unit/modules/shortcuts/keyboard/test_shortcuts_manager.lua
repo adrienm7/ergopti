@@ -8,7 +8,7 @@
 
 local helpers = require("tests.helpers")
 
-helpers.describe("modules/shortcuts/manager.lua", function()
+helpers.describe("modules.shortcuts.manager", function()
 
   -- ==========================================================================
   -- 1. Module structural
