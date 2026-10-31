@@ -280,9 +280,11 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       provider's dialect, the resolved Ollama `think` per family (98b9a2ad57), persisted and expiring refusals,
       default-only sampling, and capability listings skipping a control a model lacks (c1c8a9c181). Left: run the
       Windows suite on the PC (`model_capabilities.ahk`, `vision.ahk` `think`, `LLM_OllamaThink` are unexecuted);
-      [CODE] verify the unverified families against their documentation: `grok-3-mini`, `hermes-4`, the generic
-      name heuristic (`*qwen3*`, `*deepseek*`, `*-r1*`, `*think*`, `*reasoning*`), Together/Kimi effort, Fireworks
-      DeepSeek, OpenAI `gpt-5-mini`/`gpt-5-nano`, Gemini 2.5 Flash image/TTS/audio.
+      verified 2026-10-31: OpenAI `gpt-5-mini`/`gpt-5-nano` matched no family and now take minimal (b8fb1c36),
+      Hermes 4 reasons only when asked and gets no toggle (07ce3db4), Fireworks DeepSeek V3.1 to V4.1 take `none`
+      or false as the family sends, Gemini's thinking table lists no 2.5 Flash image/TTS/audio model, and xAI's
+      reasoning page no longer lists `grok-3-mini` (kept, marked unverified). [CODE] Left to verify: the generic
+      name heuristic (`*qwen3*`, `*deepseek*`, `*-r1*`, `*think*`, `*reasoning*`) and Together/Kimi effort.
 - [ ] **Every known cloud AI provider in `api_providers.json`, on the three OS.** Done: about forty providers
       (official documentation read 2026-10-30, each descriptor's `_source`), the per-account providers whose
       `base_url` is a template (b5d321a4a3, form on the three OS), IBM watsonx.ai and Google Vertex AI with a token
@@ -293,7 +295,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
     `menu.llm.api_provider_token_exchange_unavailable`; port the async form POST and token cache of
     `api_token_exchange.lua`.
   - [CODE] The first prediction after start (or a key change) on an access-token provider is refused while the token
-    is fetched; a Vertex service-account key (signed JWT) is not taken.
+    is fetched (the start prewarm already begins the exchange; a key change does not). Waiting instead needs
+    `resolve_active_entry` to return a lease that owns the pending exchange: today `deliver_resolved` answers
+    synchronously with a settled lease, which its five callers may cancel. A Vertex service-account key (signed
+    JWT) is not taken.
   - [CODE] The listing reader takes `data` (and `models` for Gemini) only: DashScope's native listing and Writer's
     `models[]` would need a per-provider listing shape on the three OS.
   - [CODE] (Windows, the PC's) the native `llm_vision` prompt of the screen actions still lists every backend on a
