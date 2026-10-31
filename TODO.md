@@ -316,12 +316,11 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       count the four old servers and were not run: run them and read the catalogue; (4) the "none" row lists
       eleven labels; (5) [PHYS-M] [PHYS-L] one run with some of them installed.
 - [ ] **Mac field report 2026-10-30 21:01, functional errors left open.** Fixed: shortcut full rebind on each
-      retry, pre-dispatch Ollama pull receipt, one model-list error per outage, MLX server stopped before a repair,
-      both schema versions named, the app-health census on an absent folder. Left, one line per family:
+      retry, pre-dispatch Ollama pull receipt (also for a request refused while read: `--receipt-path`, 2a2dde64),
+      one model-list error per outage, MLX server stopped before a repair, both schema versions named, the
+      app-health census on an absent folder. Left, one line per family:
   - [PHYS-M] **Ctrl+. after a layout flip.** No "Some shortcuts are still unregistered" line after a "rebinding
     every shortcut (retry N)" line; if one follows, rebinding needs the `hs.keycodes.map` change notification.
-  - [CODE] **Ollama pull refused while reading its request.** Such an exit leaves an empty receipt, so its task slot
-    stays owned; passing the receipt path on the command line would let the owner publish that refusal too.
   - [PHYS-M] **Eventtaps refused at 10:07.** The errors now name `accessibility_trusted`; false means macOS withdrew
     the grant at run time.
   - [PHYS-M] **Personal hotstring reload rolled back (11:37).** The refusing step is now named; read it on the next
