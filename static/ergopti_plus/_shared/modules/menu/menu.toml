@@ -1392,6 +1392,29 @@ i18n = "menu.tapholds.legacy_rules_pending"
 platforms = ["hs"]
 unavailable = "hide"
 
+# Ergopti's own Karabiner runtime (ADR 011): the user's Karabiner-Elements is
+# closed while Ergopti runs, or the one-driver-version rule blocks the runtime.
+[[menu.tap_hold_user_karabiner_closed_rows]]
+type = "label"
+id = "tap_hold_user_karabiner_closed"
+i18n = "notify.karabiner.user_closed"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_vhid_incompatible_rows]]
+type = "label"
+id = "tap_hold_vhid_incompatible"
+i18n = "menu.tapholds.vhid_incompatible"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_vhid_not_active_rows]]
+type = "label"
+id = "tap_hold_vhid_not_active"
+i18n = "menu.tapholds.vhid_not_active"
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.tap_hold_key_rows]]
 type = "include"
 section = "tap_hold_key_head"

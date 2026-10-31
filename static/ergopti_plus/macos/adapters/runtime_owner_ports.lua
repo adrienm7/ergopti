@@ -107,16 +107,22 @@ function M.marker()
 	}
 end
 
+--- Tells the user that Ergopti closed their Karabiner and when it comes back.
+local function announce_closed()
+	local i18n = require("infra.i18n")
+	require("infra.notifications").notify(i18n.get("notify.karabiner.user_closed"), nil, "info")
+end
+
 --- The ports of the activation rule (platform/remap/runtime_activation.lua).
 --- @param owner table The bound runtime owner module.
---- @param close_other_instances function fn() -> boolean, the user's consent.
+--- @param reload function fn() asking for a driver reload.
 --- @return table ports
-function M.activation(owner, close_other_instances)
+function M.activation(owner, reload)
 	return {
 		owner = owner,
 		restore = require("adapters.karabiner_coexistence").new().restore,
 		marker = M.marker(),
-		close_other_instances = close_other_instances,
+		reload = reload,
 	}
 end
 
@@ -148,7 +154,8 @@ function M.new()
 		},
 		coexistence = {
 			detect = Coexistence.detect,
-			close = require("platform.remap.runtime_activation").remembering_close(Coexistence.close, M.marker()),
+			close = require("platform.remap.runtime_activation").remembering_close(Coexistence.close, M.marker(),
+				announce_closed),
 		},
 		artifact = {
 			pinned = pinned_artifact,

@@ -680,6 +680,24 @@ const OPENS_SUBMENU = {
 			platforms: ['hs'],
 			kind: 'compose',
 			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_user_karabiner_closed_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_vhid_incompatible_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_vhid_not_active_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
 		}
 	],
 	// Both hand providers render this declared fixed command under every native key.

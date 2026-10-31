@@ -1564,6 +1564,39 @@
 			"unavailable": "hide"
 		}
 	],
+	"tap_hold_user_karabiner_closed_rows": [
+		{
+			"type": "label",
+			"id": "tap_hold_user_karabiner_closed",
+			"i18n": "notify.karabiner.user_closed",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_vhid_incompatible_rows": [
+		{
+			"type": "label",
+			"id": "tap_hold_vhid_incompatible",
+			"i18n": "menu.tapholds.vhid_incompatible",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_vhid_not_active_rows": [
+		{
+			"type": "label",
+			"id": "tap_hold_vhid_not_active",
+			"i18n": "menu.tapholds.vhid_not_active",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"tap_hold_key_rows": [
 		{
 			"type": "include",
