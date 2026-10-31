@@ -305,8 +305,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       SGLang 30000, KoboldCpp 5001, text-generation-webui 5000, GPT4All 4891, AMD Lemonade 13305 (its documented
       port, not 8000; `config.json` in `~/.config/lemonade` or `/var/lib/lemonade`), Docker Model Runner 12434
       (`/engines/v1`), exo 52415, and llamafile in the llama.cpp / LocalAI row; Linux detection proved on real
-      stand-in processes, pgrep, ss and a settings file (99121ade). Left: (1) vLLM and TabbyAPI share 8000 with
-      oMLX and 5000 with text-generation-webui, so a generic entry configured there would belong to two rows:
+      stand-in processes, pgrep, ss and a settings file (99121ade); macOS finds GPT4All's app executable and
+      Lemonade's user and system `config.json` (`test_local_server_ports_macos_apps.lua`; the Windows paths are in
+      the PC handoff). Left: (1) vLLM and TabbyAPI share 8000 with oMLX and 5000 with text-generation-webui, so a
+      generic entry configured there would belong to two rows:
       choose one merged row per port (the oMLX label changes on every OS) or order-aware affinity in
       `local_server_auth.entry_matches`; (2) AnythingLLM always needs a key and takes a workspace slug as the model,
       Msty documents no port or dialect: both stay out; Foundry Local (Windows) and `mlx_lm.server` (macOS) belong to
