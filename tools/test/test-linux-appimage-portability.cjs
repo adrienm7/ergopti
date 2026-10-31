@@ -309,8 +309,10 @@ const packageJob = workflow.slice(
 const containerBuild = packageJob.indexOf('run: bash tools/build/appimage-oldest-lts.sh build\n');
 assert.ok(containerBuild > packageJob.indexOf('run: bash tools/build/build-linux-driver.sh\n'));
 assert.ok(
-	containerBuild < packageJob.indexOf('tar -czf "build/linux/$LINUX_BUNDLE_ASSET"') &&
-		containerBuild < packageJob.indexOf('bash tools/build/build-linux-deb.sh'),
+	containerBuild <
+		packageJob.indexOf(
+			'run: bash tools/build/build-linux-bundle-archive.sh "$LINUX_BUNDLE_ASSET"'
+		) && containerBuild < packageJob.indexOf('bash tools/build/build-linux-deb.sh'),
 	'every package is made from the bundle after its native backend is rebuilt'
 );
 assert.ok(
