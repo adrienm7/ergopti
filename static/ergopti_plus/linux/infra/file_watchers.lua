@@ -568,7 +568,11 @@ _personal_metadata = function(path)
 		end
 		return { dev = attributes.dev, ino = attributes.ino, kind = attributes.type }
 	end
-	if posix and type(posix.stat) == "function" then
+	-- luaposix's posix.stat reports a symlink itself, never what it points to, so
+	-- without luv the selected file is read by the stat -L below instead: judged by
+	-- the link, it is never a regular file and the poll never sees it change.
+	local selected_root = _personal_file and path == _personal_root
+	if posix and type(posix.stat) == "function" and not selected_root then
 		local called, attributes = pcall(posix.stat, path)
 		if not called or type(attributes) ~= "table" or attributes.dev == nil or attributes.ino == nil then
 			return nil, "personal filesystem metadata is unavailable: " .. path
