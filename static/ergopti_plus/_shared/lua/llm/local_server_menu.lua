@@ -80,10 +80,16 @@ function M.rows(options)
 			items = server_items(options, id, verdict) }
 	end
 	if #options.detected == 0 and not unavailable then
-		local labels = {}
-		for _, id in ipairs(options.order) do labels[#labels + 1] = options.servers[id].label end
-		local key = options.sweeping and "menu.llm.local_servers.searching" or "menu.llm.local_servers.none"
-		rows[#rows + 1] = { label = options.format(key, table.concat(labels, ", ")), disabled = true }
+		-- A finished sweep says one sentence: the eleven server names stay in the
+		-- local servers panel and the "other address" submenu, not in this row.
+		if options.sweeping then
+			local labels = {}
+			for _, id in ipairs(options.order) do labels[#labels + 1] = options.servers[id].label end
+			rows[#rows + 1] = { label = options.format("menu.llm.local_servers.searching",
+				table.concat(labels, ", ")), disabled = true }
+		else
+			rows[#rows + 1] = { label = options.tr("menu.llm.local_servers.none_detected"), disabled = true }
+		end
 	end
 	rows[#rows + 1] = { label = options.tr("menu.llm.local_servers.rescan"), disabled = options.paused or nil,
 		action = not options.paused and options.actions.rescan or nil }

@@ -3652,6 +3652,7 @@
 	"menu.llm.backend_unknown": "알 수 없음",
 	"menu.llm.local_servers.header": "로컬 서버(OpenAI 호환 API)",
 	"menu.llm.local_servers.none": "응답하는 로컬 서버가 없습니다({1})",
+	"menu.llm.local_servers.none_detected": "감지된 로컬 서버가 없습니다",
 	"menu.llm.local_servers.searching": "로컬 서버 검색 중({1})…",
 	"menu.llm.local_servers.needs_key": "{1} — API 키 필요",
 	"menu.llm.local_servers.no_models": "사용할 수 있는 모델 없음",
