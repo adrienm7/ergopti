@@ -589,7 +589,10 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       across real processes and on the systemd unit path). Left: [CI] native macOS qualification of the Hotstrings
       category boot publication and of the obsolete-leaf setters; [CODE] (Windows, the PC's) the cleanup still cannot
       offer bare root keys or unknown `[[x]]` generations, and the physical keyboard slot parameters
-      (`keyboard__win_SC03A__x`); [PHYS-L] one daemon restart under a real user manager on a real session.
+      (`keyboard__win_SC03A__x`); [PHYS-L] one daemon restart under a real user manager on a real session, which a
+      Linux `driver_reload` field step (kind `reload` of `_shared/data/field_run_protocol.json`, its duration from
+      `infra/reload_timing.lua`) would prove with no person once [CODE] `infra/field_run.lua`, which runs
+      `field_check` steps only, resumes a run in the successor daemon.
 - [ ] **Ollama redirect policy and Go compile (decision 5).** [CI] Code done (cda1e10c5e); the hosted Go cell passed
       on a throwaway branch (run 40021624397). Left: the same cell on the final source before a release.
 - [ ] **Ergopti-started Ollama behind a PAC proxy (merged with PAR-71).** [PHYS-W] [PHYS-M] Linux done (89d22d782c);
