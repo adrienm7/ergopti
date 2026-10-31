@@ -1009,6 +1009,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/infra/config/persistence/test_config_cleanup_retired_bindings.ahk
 #Include unit/infra/config/migration/test_config_migrate.ahk
 #Include unit/infra/config/migration/test_config_migrate_variant_metadata.ahk
+#Include unit/infra/config/migration/test_config_migrate_same_registry.ahk
 #Include unit/infra/config/migration/test_config_journal_boot.ahk
 #Include unit/infra/config/migration/test_config_journal_ai_admission.ahk
 #Include unit/infra/config/migration/test_config_journal_settlement.ahk
