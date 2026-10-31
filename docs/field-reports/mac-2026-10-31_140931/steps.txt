@@ -1,0 +1,44 @@
+versions                     exit=0
+toolchain                    exit=0
+karabiner                    exit=0
+karabiner_signature          exit=0
+memory                       exit=0
+processes                    exit=0
+launchd                      exit=0
+listeners                    exit=0
+input_sources                exit=0
+user_layouts                 exit=0
+power                        exit=0
+proxy                        exit=0
+crash_reports                exit=0
+launch_agents                exit=0
+disk                         exit=0
+field_run                    exit=0
+native_runtime               exit=0
+crash_summaries              exit=0
+security_agents              exit=0
+fileless_bash_probe          exit=0
+privacy_pane_urls            exit=0
+system_bash                  exit=0
+probe_compile                exit=0
+probe_after_logout           exit=0
+probe_run                    exit=0
+probe_write_prefs            exit=0
+probe_replace_ergopti        exit=0
+ErgoptiPlus_2026-10-31.log   copied (scrubbed)
+ErgoptiPlus_errors_2026-10-31.log copied (scrubbed)
+ErgoptiPlus_llm.log          copied (scrubbed)
+ErgoptiPlus_ollama.log       copied (scrubbed)
+ErgoptiPlus_mlx.log          copied (scrubbed)
+ErgoptiPlus_boot.log         copied (scrubbed)
+ErgoptiPlus_karabiner.log    copied (scrubbed)
+ErgoptiPlus_menu.log         copied (scrubbed)
+digest_boot                  exit=0
+digest_slow                  exit=0
+digest_errors                exit=0
+digest_input                 exit=0
+digest_hotstrings            exit=0
+launcher.log                 copied (scrubbed)
+hammerspoon-fatal.txt        missing
+hotstring_collisions         exit=0
+analysis                     exit=0

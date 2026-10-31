@@ -1,0 +1,47 @@
+2026-10-31 09:53:15:921 [WARNING] [runtime] An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:364) held the main thread for 1512 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 51->51 MB.
+2026-10-31 09:53:16:432 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).
+2026-10-31 09:54:33:379 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-31 09:55:29:076 [ERROR] [adapters.keyboard_source_probe] Native keyboard source proof refused: source_changed.
+2026-10-31 09:55:29:189 [WARNING] [menu.keyboard_layout] Failed to switch active layout to 'Ergopti Field Rows' / 'Ergopti Field Rows' (tis_id=Ergopti Field Rows, reason=invalid_output, result=MISS).
+2026-10-31 09:55:29:429 [ERROR] [keymap.layout_rows_build] The number-row layout for 'ergol' was not applied (readback_mismatch): the keyboard probe answered source_changed.
+2026-10-31 09:55:44:252 [WARNING] [runtime] An hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/field_run.lua:610) held the main thread for 1810 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 32->32 MB.
+2026-10-31 09:58:33:523 [ERROR] [menu_llm.ollama] Managed model pull retirement is pending (operation_files_not_removed); exact task slot retained.
+2026-10-31 09:58:33:523 [ERROR] [menu_llm.ollama] The Ollama pull of granite4:350m-h ended (code 1) but its task could not be settled; last output: OLLAMA_PULL_OUTCOME error_row.
+2026-10-31 09:58:46:051 [ERROR] [adapters.file_system] append(): destination is not a regular file (named pipe).
+2026-10-31 09:58:46:054 [ERROR] [adapters.file_system] write(): cannot preserve metadata for '/private/var/folders/j8/6707b4c95nz1ygz8g6s7m3fc0000gp/T/ergopti-field-fifo-77295/pipe' — destination is not a regular file.
+2026-10-31 10:08:23:889 [WARNING] [keymap.utils] Slow ignored-window probe 502 ms (watchers=0 focused_window=502 ms).
+2026-10-31 10:19:57:157 [WARNING] [keymap.utils] Slow ignored-window probe 502 ms (watchers=0 focused_window=502 ms).
+2026-10-31 10:48:26:000 [WARNING] [karabiner.lease] Karabiner lease 0adf0f18109444b7b9f632389103396a heartbeat 253 had no clean local CLI transport.
+2026-10-31 14:09:14:863 [ERROR] [keystats.context_tracker] Replacement AXValueChanged watcher setup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:655: Notification has already been registered
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:655: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:654>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:654: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:814: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:795>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:793: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:787>.
+2026-10-31 14:12:24:026 [WARNING] [menu] Over budget: menu.rebuild took 314 ms (budget 250 ms).
+2026-10-31 14:12:24:122 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-31 14:13:22:319 [WARNING] [menu.keyboard_layout] Failed to switch active layout to 'Ergopti Field Rows' / 'Ergopti Field Rows' (tis_id=Ergopti Field Rows, reason=invalid_output, result=MISS).
+2026-10-31 14:13:22:548 [ERROR] [keymap.layout_rows_build] The number-row layout for 'ergol' was not applied (readback_mismatch): key 26 types '', the build holds text '&'.
+2026-10-31 14:13:36:620 [WARNING] [HotPath] Slow preview.rebuild: 7.89 ms own, 7.89 ms total, parent keydown (0 similar since the last line).
+2026-10-31 14:13:39:139 [WARNING] [runtime] An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keymap/llm_bridge.lua:236) held the main thread for 2515 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 40->40 MB.
+2026-10-31 14:13:39:656 [WARNING] [shortcuts.script_control] Script-control eventtap was disabled by macOS — re-enabling.
+2026-10-31 14:13:40:399 [WARNING] [menu] Over budget: menu.rebuild took 291 ms (budget 250 ms).
+2026-10-31 14:13:40:746 [WARNING] [managed_ollama_hint] Owned Ollama runtime metadata refused (exit=78): refused: RuntimeRefusal at managed_ollama_hint.py:39 candidate
+2026-10-31 14:14:44:840 [ERROR] [ollama_deps] Ollama bootstrap ended with exit=78 (no signal, path=native_runtime_pty); output received: streamed stdout=562 stderr=0 bytes, final stdout=0 stderr=0 bytes; last 12 line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract | [NATIVE-BOOTSTRAP] stage: python_download | # native_http_route kind=direct attempt=1/1 | # native_http_route kind=direct attempt=1/1 | {"version":1,"success":true,"reason":"complete"} | [NATIVE-BOOTSTRAP] stage: python_install | cpython-3.11.16-macos-aarch64-none is already installed | [NATIVE-BOOTSTRAP] stage: python_find | [OLLAMA-DEPS] stage: runtime_install | Managed Ollama runtime admission refused. | [OLLAMA-DEPS] ERROR: stage runtime_install ended with exit 78.
+2026-10-31 14:14:44:840 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=78) — Ergopti n'a pas pu vérifier sa version épinglée d'Ollama (catalogue de publication ou contrôle d'intégrité) : rien n'a été installé. Envoyez le rapport de diagnostic.
+2026-10-31 14:14:44:840 [WARNING] [download_window] Progress UI flipped to error state: Ergopti n'a pas pu vérifier sa version épinglée d'Ollama (catalogue de publication ou contrôle d'intégrité) : rien n'a été installé. Envoyez le rapport de diagnostic.
+2026-10-31 14:14:54:078 [ERROR] [llm.api_ollama] The local server's model list is unavailable: HTTP 0 (Network request failed: Connection failed: Could not connect to the server. - http://127.0.0.1:11435/api/tags).
+2026-10-31 14:14:55:159 [ERROR] [adapters.file_system] append(): destination is not a regular file (named pipe).
+2026-10-31 14:14:55:162 [ERROR] [adapters.file_system] write(): cannot preserve metadata for '/private/var/folders/j8/6707b4c95nz1ygz8g6s7m3fc0000gp/T/ergopti-field-fifo-29953/pipe' — destination is not a regular file.
+2026-10-31 14:17:08:261 [WARNING] [keymap.utils] Slow ignored-window probe 266 ms (watchers=0 focused_window=265 application=0 app_name=0 title=0 context_watchers=0 secure_field=0 destination=0 ms).
+2026-10-31 14:18:21:640 [WARNING] [menu] Over budget: menu.rebuild took 393 ms (budget 250 ms).
+2026-10-31 14:18:24:234 [WARNING] [menu] Over budget: menu.rebuild took 294 ms (budget 250 ms).
+2026-10-31 14:18:24:886 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-10-31 14:18:26:238 [WARNING] [menu] Over budget: menu.rebuild took 587 ms (budget 250 ms).
+2026-10-31 14:18:26:245 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.
+2026-10-31 14:18:26:245 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.

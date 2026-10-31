@@ -1,0 +1,35 @@
+[field-report]   ❌ check lease: fail
+[field-report]   ✅ check owned_runtime: pass
+[field-report]   ✅ check network: pass
+[field-report]   ✅ check toolchain: pass
+[field-report]   ✅ check login_items: pass
+[field-report]   ✅ check composer: pass
+[field-report]   ✅ check boot_cost: pass
+[field-report]   ✅ check idle_cost: pass
+[field-report]   ❌ check layout_rows: fail
+[field-report]   ✅ check permissions: pass
+[field-report]   ✅ check event_taps: pass
+[field-report]   ✅ check input_sources: pass
+[field-report]   ✅ check storage: pass
+[field-report]   ✅ check launcher_roles: pass
+[field-report]   ✅ check network_hosts: pass
+[field-report]   ✅ check ollama_blob_host: pass
+[field-report]   ✅ check typing_selftest: pass
+[field-report]   ✅ check capslock_chord: pass
+[field-report]   ✅ check gesture_frames: pass
+[field-report]   ❌ check hotstring_roundtrip: fail
+[field-report]   ✅ check prediction_tooltip: pass
+[field-report]   ✅ check menu_build: pass
+[field-report]   ✅ check ai_local: pass
+[field-report]   ✅ check slow_lines: pass
+[field-report]   ✅ check fifo_safety: pass
+[field-report]   ✅ check local_servers: pass
+[field-report]   ✅ check app_health: pass
+[field-report]   ✅ check pac_fallback: pass
+[field-report]   ⚠️ check privacy_pane_urls: info
+[field-report]   ✅ check system_bash: pass
+[field-report] Check verdicts summary: ✅ 26 pass, ❌ 3 fail, ⏭️ 0 skip, ⌨️ 0 needs_typing, ⚠️ 1 other.
+[field-report] Log analysis: 11 error group(s), 16 warning group(s), 5 measure(s) over budget; see analysis.md.
+[field-report]   fix first #1: main_thread.hold over its 250 ms budget (slow x19)
+[field-report]   fix first #2: menu.rebuild over its 250 ms budget (slow x6)
+[field-report]   fix first #3: healthcheck.sync over its 5 ms budget (slow x4)

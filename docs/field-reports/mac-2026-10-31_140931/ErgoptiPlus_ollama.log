@@ -1,0 +1,27 @@
+2026-10-31 09:54:29:111 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-10-31 09:54:29:143 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 4, in-flight warmup invalidated.
+2026-10-31 09:54:29:174 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 2 more times between 2026-10-31 09:54:29:142 and 2026-10-31 09:54:29:142 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 3).).
+2026-10-31 09:54:29:195 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-10-31 09:55:49:806 [START] [ollama_deps] Bootstrapping Ollama backend…
+2026-10-31 09:55:49:967 [INFO] [ollama_deps] Progress marker 'OLLAMA_INSTALLING' observed — updating UI.
+2026-10-31 09:55:50:017 [INFO] [ollama_deps] [script] [OLLAMA-DEPS] stage: python_bootstrap
+2026-10-31 09:56:56:083 [SUCCESS] [ollama_deps] Ollama binary provisioned; daemon readiness=true.
+2026-10-31 09:56:57:165 [DEBUG] [llm.api_ollama] The local server returned a readable model list.
+2026-10-31 09:56:57:583 [DEBUG] [ollama_deps] Auto-hide skipped — the progress window now belongs to another operation.
+2026-10-31 09:58:42:606 [DEBUG] [llm.api_ollama] [gemma4:e2b] #1 PROMPT (7 chars) mode_line=true -> <text withheld>
+2026-10-31 09:58:44:987 [DEBUG] [llm.api_ollama] [gemma4:e2b] #1 HTTP_RESPONSE status=200, body_len=323
+2026-10-31 09:58:44:988 [DEBUG] [llm.api_ollama] [gemma4:e2b] #1 RAW (2381ms, 4 chars) -> What
+2026-10-31 09:59:38:230 [INFO] [ollama_deps] ↑ "[script] %s" repeated 11 more times between 2026-10-31 09:55:50:096 and 2026-10-31 09:56:49:136 (last: [script] OLLAMA_INSTALLED).
+2026-10-31 09:59:38:240 [INFO] [ollama_deps] ↑ "Progress marker '%s' observed — updating UI." repeated 1 more time between 2026-10-31 09:56:49:136 and 2026-10-31 09:56:49:136 (last: Progress marker 'OLLAMA_VERIFIED' observed — updating UI.).
+2026-10-31 10:02:11:482 [DEBUG] [llm.api_ollama] ↑ "The local server returned a readable model list." repeated 1 more time between 2026-10-31 09:58:42:599 and 2026-10-31 09:58:42:599.
+2026-10-31 14:12:21:257 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-10-31 14:12:21:288 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 4, in-flight warmup invalidated.
+2026-10-31 14:12:21:328 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 2 more times between 2026-10-31 14:12:21:288 and 2026-10-31 14:12:21:288 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 3).).
+2026-10-31 14:12:21:346 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-10-31 14:13:40:532 [START] [ollama_deps] Bootstrapping Ollama backend…
+2026-10-31 14:13:40:700 [INFO] [ollama_deps] Progress marker 'OLLAMA_INSTALLING' observed — updating UI.
+2026-10-31 14:13:40:753 [INFO] [ollama_deps] [script] [OLLAMA-DEPS] stage: python_bootstrap
+2026-10-31 14:14:44:840 [ERROR] [ollama_deps] Ollama bootstrap ended with exit=78 (no signal, path=native_runtime_pty); output received: streamed stdout=562 stderr=0 bytes, final stdout=0 stderr=0 bytes; last 12 line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract | [NATIVE-BOOTSTRAP] stage: python_download | # native_http_route kind=direct attempt=1/1 | # native_http_route kind=direct attempt=1/1 | {"version":1,"success":true,"reason":"complete"} | [NATIVE-BOOTSTRAP] stage: python_install | cpython-3.11.16-macos-aarch64-none is already installed | [NATIVE-BOOTSTRAP] stage: python_find | [OLLAMA-DEPS] stage: runtime_install | Managed Ollama runtime admission refused. | [OLLAMA-DEPS] ERROR: stage runtime_install ended with exit 78.
+2026-10-31 14:14:44:840 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=78) — Ergopti n'a pas pu vérifier sa version épinglée d'Ollama (catalogue de publication ou contrôle d'intégrité) : rien n'a été installé. Envoyez le rapport de diagnostic.
+2026-10-31 14:14:54:078 [ERROR] [llm.api_ollama] The local server's model list is unavailable: HTTP 0 (Network request failed: Connection failed: Could not connect to the server. - http://127.0.0.1:11435/api/tags).
+2026-10-31 14:18:21:522 [INFO] [ollama_deps] ↑ "[script] %s" repeated 11 more times between 2026-10-31 14:13:40:845 and 2026-10-31 14:14:44:791 (last: [script] [OLLAMA-DEPS] ERROR: stage runtime_install ended with exit 78.).
