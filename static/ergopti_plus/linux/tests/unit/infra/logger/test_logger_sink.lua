@@ -782,6 +782,20 @@ helpers.describe("linux-logger-privacy", function()
 		end)
 	end)
 
+	-- Item 139: every rule the collector applies at export is applied as the line
+	-- is written, so a log on disk never holds them in clear text.
+	helpers.it("linux-logger-privacy: an email, a URL credential and another account's folder are masked at write time", function()
+		with_private_log_sink({ resolved_home = "/home/CanonicalAccount" }, function(Sink, state, logger)
+			helpers.assert_eq(Sink.install(logger), true)
+			state.emit("Sent to someone@example.org via https://bob:hunter2pass@proxy.example:8080 from /home/OtherPerson/x", "warn")
+			local line = state.console[1]
+			helpers.assert_true(not line:find("someone@example.org", 1, true), line)
+			helpers.assert_true(not line:find("hunter2pass", 1, true), line)
+			helpers.assert_true(not line:find("OtherPerson", 1, true), line)
+			helpers.assert_contains(line, "<email>")
+		end)
+	end)
+
 	helpers.it("linux-logger-privacy: missing account home refuses even when directory fallback exists", function()
 		with_private_log_sink({ missing_home = true }, function(Sink, state, logger)
 			helpers.assert_nil(state.account_home())
