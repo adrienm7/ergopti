@@ -498,6 +498,14 @@ const PROGRAMS = {
 	),
 	// The driver reads /proc instead; the hardware lanes probe procps first.
 	ps: optionalTool('procps process listing of the hardware lanes', HOST),
+	ss: why(
+		`iproute2 listening sockets of the local-server detection test; installed by CI: ${DISTRO_PREP}`,
+		TEST,
+		{
+			proof: { file: DISTRO_PREP, token: '\\biproute2?(-ss)? curl ;;' },
+			probed: true
+		}
+	),
 	node: why('reads the version for install.sh and falls back to "dev"', DRIVER_HOST, {
 		proof: { file: INSTALLER, token: '\\|\\| echo "dev"' }
 	}),
