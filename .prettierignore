@@ -24,6 +24,7 @@ static/ergopti_plus/_shared/go/native_http/proxy_policy.json
 static/ergopti_plus/_shared/modules/menu/menu_manifest.json
 static/ergopti_plus/macos/modules/llm/managed-python-downloads.json
 static/ergopti_plus/docs/architecture.md
+docs/design/owned-runtimes.md
 static/layouts/registry/index.json
 
 # The Claude skills tree is a generated mirror of .agents/skills
