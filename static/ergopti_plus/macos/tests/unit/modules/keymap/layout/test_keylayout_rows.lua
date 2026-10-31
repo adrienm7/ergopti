@@ -14,6 +14,7 @@
 local helpers = require("tests.helpers")
 local Json = require("json")
 local Rows = require("layouts.keylayout_rows")
+local Keylayout = require("layouts.keylayout")
 
 local REGISTRY_DIR = helpers.driver_root() .. "/../../layouts/registry/"
 
@@ -75,6 +76,25 @@ helpers.describe("keylayout rows: applying the number-row options to a .keylayou
 		end
 		-- Ctrl reached the plain keyMap through defaultIndex: it now has its own copy.
 		helpers.assert_contains(result.text, '<modifier keys="anyControl"/>')
+	end)
+
+	helpers.it("gives every keyMapSet of an ISO/ANSI layout its own copy of the shortcut keyMap (bépo)", function()
+		local text = read(REGISTRY_DIR .. "bepo/bepo.keylayout")
+		local before = assert(Keylayout.positions(text))
+		local result = assert(Rows.apply(text, { order = "digits", edges = false }, codes("iso")))
+		helpers.assert_eq(result.changed, true)
+		local after = assert(Keylayout.positions(result.text))
+		local sets = 0
+		for id, set in pairs(before.key_map_sets) do
+			sets = sets + 1
+			local count_before, count_after = 0, 0
+			for _ in pairs(set.maps) do count_before = count_before + 1 end
+			for _ in pairs(after.key_map_sets[id].maps) do count_after = count_after + 1 end
+			helpers.assert_true(count_after > count_before, "keyMapSet " .. id .. " received the copied keyMap")
+		end
+		helpers.assert_true(sets >= 2, "bépo carries an ISO and an ANSI keyMapSet")
+		-- The edited layout still parses into one consistent canonical form.
+		helpers.assert_true(Keylayout.parse(result.text) ~= nil)
 	end)
 
 	helpers.it("leaves a row whose keys disagree unchanged, with the reason", function()
