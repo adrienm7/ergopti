@@ -98,10 +98,15 @@ end
 
 helpers.describe("Local server detection against real processes (local-server-detection-native)", function()
 	helpers.it("(local-server-detection-native) the real Linux scan finds every catalogue launch at its port", function()
-		-- The driver reads listening sockets with ss only: without it every
-		-- listening-port row would fall back to its catalogue default
-		local ss_status = os.execute("command -v ss >/dev/null 2>&1")
-		assert(ss_status == 0 or ss_status == true, "ss (iproute2) is required to read the listening ports")
+		-- The driver finds processes with procps pgrep (-a -i, which busybox
+		-- lacks) and reads listening sockets with ss only: without them every
+		-- row would read as stopped or at its catalogue default
+		for _, program in ipairs({ "pgrep", "ss" }) do
+			local status = os.execute("command -v " .. program .. " >/dev/null 2>&1")
+			assert(status == 0 or status == true, program .. " is required to scan local servers")
+		end
+		local procps = os.execute("pgrep -a -i -f pgrep >/dev/null 2>&1")
+		assert(procps == 0 or procps == true, "pgrep must be procps' (-a -i), not busybox's")
 		local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-local-servers-XXXXXX"))
 		local home = root .. "/home"
 		local processes, started = {}, {}
