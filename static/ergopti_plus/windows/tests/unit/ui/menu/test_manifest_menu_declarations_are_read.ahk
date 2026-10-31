@@ -480,40 +480,29 @@ _MM_ForeignTemplateRead(Calls, *) {
 }
 Test("shortcut template: complete native admission, same handle and leading separators", _MM_AppendTemplateAdmitsWholeTreeBeforeDrawing)
 
-; A `dynamic` entry's handler returns its rows and MenuRenderer_Build draws them
-; at the entry: no driver code places a row (native-menu-rows census). A handler
-; that answers anything but row data refuses the whole build.
-_MM_DynamicRowsAreDrawnByTheRenderer() {
-	static KEY := "_test_dynamic_rows_menu"
+; The `dynamic` type is retired (2026-10-31): the menu compiler refuses it, and
+; a stale one reaching the renderer is an unknown type. It is drawn as nothing
+; and never handed to a handler registered under its id, so no driver code can
+; place a row through it again; the declared rows around it are unaffected.
+_MM_RetiredDynamicRowIsNotDispatched() {
+	static KEY := "_test_retired_dynamic_menu"
 	Root := _MR_GetManifestRoot()
 	Root[KEY] := [Map("type", "command", "id", "dyn_before", "i18n", "menu.llm.trigger_menu_title", "platforms", ["ahk"]),
 		Map("type", "dynamic", "id", "dyn_rows", "platforms", ["ahk"]),
 		Map("type", "command", "id", "dyn_after", "i18n", "menu.llm.generation_menu_title", "platforms", ["ahk"])]
 	Commands := Map("dyn_before", (*) => 0, "dyn_after", (*) => 0)
 	Seen := []
-	Rows := (Target, Category) => (Seen.Push(Target), [Map("label", "Returned row " . Category), Map("separator", true),
-		Map("label", "Second returned row")])
-	Rendered := 0, Refused := ""
+	Rows := (Target, Category) => (Seen.Push(Target), [Map("label", "Returned row " . Category)])
+	Rendered := 0
 	try {
 		Rendered := MenuRenderer_Build(KEY, "Probe", Map("dyn_rows", Rows), "", "", Commands)
-		AssertEqual(1, Seen.Length, "the handler runs once")
-		AssertTrue(Seen[1] == Rendered, "the handler receives the menu being built")
-		AssertEqual(5, TrayMenuItemCount(Rendered), "before, two returned rows and their separator, after")
-		AssertEqual("Returned row Probe", TrayMenuItemCaption(Rendered, 1), "the returned rows sit at the entry")
-		AssertEqual("Second returned row", TrayMenuItemCaption(Rendered, 3))
-		for Answer in ["", 0, Map("label", "not an array")] {
-			try MenuRenderer_Build(KEY, "Probe", Map("dyn_rows", ((Value) => (*) => Value)(Answer)), "", "", Commands)
-			catch as Err
-				Refused := Err.Message
-			AssertEqual("Dynamic item 'dyn_rows' in '" . KEY . "' returned no row data.", Refused,
-				"a handler that draws natively instead of returning rows is refused")
-			Refused := ""
-		}
+		AssertEqual(0, Seen.Length, "a retired dynamic row is never handed to a handler")
+		AssertEqual(2, TrayMenuItemCount(Rendered), "only the two declared commands are drawn")
 	} finally {
 		Root.Delete(KEY)
 		if Rendered is Menu
 			_CTC_ReleaseMenu(Rendered)
 	}
 }
-Test("manifest_menu: a dynamic entry's returned rows are drawn by the renderer (native-menu-rows)",
-	_MM_DynamicRowsAreDrawnByTheRenderer)
+Test("manifest_menu: a retired dynamic row is not dispatched to a handler (menu-no-dynamic)",
+	_MM_RetiredDynamicRowIsNotDispatched)

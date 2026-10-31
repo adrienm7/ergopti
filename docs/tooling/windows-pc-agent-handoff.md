@@ -138,3 +138,16 @@ ready (3 step(s)).` and `build/field-run/ready.json` names the driver's pid.
   - then the full `run_all.ahk` and `e2e/run_e2e.ahk`, and open the AI submenu
     once: the model button, the profile submenu and both agent Systems must
     sit where they did, with the same labels.
+- Same branch, follow-ups also written without AutoHotkey: `infra/manifest_menu.ahk`
+  lost its `dynamic` branch (a stale `dynamic` row is now an unknown type), and
+  the tray menu moved to `_shared/modules/menu/menu.toml`. Run:
+  - `tests/unit/ui/menu/test_manifest_menu_declarations_are_read.ahk` (edited:
+    a retired `dynamic` row is drawn as nothing and not dispatched);
+  - `tests/unit/ui/menu/test_manifest_menu_no_double_separator.ahk` (edited:
+    action handlers only);
+  - `tests/meta/modules/keystats/metrics/test_menu_metrics_disabled_when.ahk`
+    (edited: reads `[[menu.metrics_menu]]` from `menu.toml`; `dynamic` is no
+    longer a rendered type);
+  - `tests/meta/ui/menu/test_list_providers_touch_no_menu.ahk` (unchanged,
+    covers the renderer);
+  - then `run_all.ahk` again: every menu goes through the edited renderer.

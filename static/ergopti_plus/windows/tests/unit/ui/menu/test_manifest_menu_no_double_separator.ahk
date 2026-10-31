@@ -113,10 +113,8 @@ _MMNDS_EveryMenuHasNoMisplacedSeparator() {
 			}
 			Label := "Probe " . Key . " " . Id
 			Providers[Id] := ((L) => () => [Map("separator", true), Map("label", L), Map("separator", true)])(Label)
-			; A dynamic handler returns its rows; an action handler draws in place.
-			Handlers[Id] := _MR_Get(Item, "type") == "dynamic"
-				? ((L) => (*) => [Map("separator", true), Map("label", L), Map("separator", true)])(Label)
-				: ((L) => (M, *) => (M.Add(), M.Add(L, (*) => 0), M.Add()))(Label)
+			; An action handler draws in place (the dynamic type is retired).
+			Handlers[Id] := ((L) => (M, *) => (M.Add(), M.Add(L, (*) => 0), M.Add()))(Label)
 			Commands[_MR_Get(Item, "command") != "" ? _MR_Get(Item, "command") : Id] := (*) => 0
 		}
 		Root[PROBE_KEY] := Probe
