@@ -47,7 +47,7 @@ _LRPW_Run() {
 	RemapKey(Scan, "y")
 	State := MagicEditorState()
 	_LRPW_Require(State["layouts"][Scan].Length == 1, "a later remap must replace its original broker context")
-	Slot := "win_" . StrLower(Scan)
+	Slot := "meta_" . StrLower(Scan)
 	if _LRPW_Mode == "ordinary" {
 		KeyboardShortcutAssignments[Slot] := "copy"
 		_LRPW_Require(MagicEditorRecordOrdinaryPhysical(Slot, "copy"), "the explicit physical assignment must join")
