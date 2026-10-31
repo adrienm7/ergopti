@@ -32,7 +32,7 @@ helpers.describe("layout registry installed channel", function()
 				helpers.assert_eq(settings.branch, case[2])
 				local requests, result = {}, nil
 				Catalogue.refresh(settings, {
-					local_source = case[3], bundled_index = { layouts = {} },
+					clone_registry = case[3], bundled_index = { layouts = {} },
 					read_cache = function() return nil end, write_cache = function() error("404 cannot be cached") end,
 					decode_json = Json.decode,
 					transport = { get = function(url, _, _, callback)
