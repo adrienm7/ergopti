@@ -100,7 +100,10 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //           22 → 21 (2026-10-31: the llm_bridge choke-point test drives
 //                    apply_prediction through a recording expander instead of
 //                    reading the bridge.)
-const BASELINE = 21;
+//           21 → 20 (2026-10-31: the noise filter test answers real requests
+//                    through the prediction pipeline instead of reading
+//                    prediction_engine.lua.)
+const BASELINE = 20;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -141,7 +144,10 @@ const BASELINE = 21;
 //       67 → 66 (2026-10-31: the llm_bridge choke-point test drives
 //              apply_prediction through a recording expander instead of reading
 //              the bridge.)
-const READ_BASELINE = 66;
+//       66 → 65 (2026-10-31: the noise filter test answers real requests
+//              through the prediction pipeline instead of reading
+//              prediction_engine.lua.)
+const READ_BASELINE = 65;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
