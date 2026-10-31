@@ -338,8 +338,7 @@ equivalent_linux = ["app_switcher"]
 # switcher). On macOS it posted Cmd+` like win_next did, so both became
 # win_app_next there (config migration step v5_to_v6).
 platform = "linux"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-equivalent_ahk = ["win_next"]
+reason_ahk = "platform_reason.action_same_action_under_another_name"
 reason_hs = "platform_reason.action_window_switching_is_not_macos"
 equivalent_hs = ["win_app_next"]
 emit_linux = "alt+Escape"
@@ -524,11 +523,13 @@ emit_linux = "alt+Tab"
 # layout carrying a backquote.
 [sg_actions.win_app_prev]
 platform = "ahk,hs"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_linux = "platform_reason.action_app_windows_unreachable_on_wayland"
+equivalent_linux = ["win_prev"]
 
 [sg_actions.win_app_next]
 platform = "ahk,hs"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_linux = "platform_reason.action_app_windows_unreachable_on_wayland"
+equivalent_linux = ["win_next"]
 
 [sg_actions.close_window]
 platform = "all"
@@ -645,14 +646,14 @@ requires_linux = ["session:workspaces"]
 [sg_actions.desktop_new]
 platform = "ahk"
 reason_hs = "platform_reason.action_spaces_are_edited_in_mission_control"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_linux = "platform_reason.action_desktop_count_belongs_to_the_desktop"
 emit_ahk_key = "d"
 emit_ahk_mods = ["ctrl", "super"]
 
 [sg_actions.desktop_close]
 platform = "ahk"
 reason_hs = "platform_reason.action_spaces_are_edited_in_mission_control"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_linux = "platform_reason.action_desktop_count_belongs_to_the_desktop"
 emit_ahk_key = "F4"
 emit_ahk_mods = ["ctrl", "super"]
 
@@ -1176,7 +1177,8 @@ platform = "all"
 # region through its screenshot cascade and reads it with tesseract. Both
 # leave the text on the clipboard.
 platform = "ahk,linux"
-reason_hs = "platform_reason.action_not_yet_on_macos"
+reason_hs = "platform_reason.action_text_recognition_is_live_text_on_macos"
+equivalent_hs = ["screen_capture"]
 requires_linux = ["tool:tesseract"]
 emit_ahk = "#+t"
 
@@ -1210,8 +1212,8 @@ emit_ahk = "#."
 
 [sg_actions.take_note]
 platform = "ahk"
-reason_hs = "platform_reason.action_not_yet_on_macos"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_hs = "platform_reason.action_take_note_uses_notepad"
+reason_linux = "platform_reason.action_take_note_uses_notepad"
 
 [sg_actions.activity_simulation]
 # One keep-awake session per machine, stopped by the first physical input on
@@ -1219,7 +1221,7 @@ reason_linux = "platform_reason.action_not_yet_on_linux"
 # uinput device could nudge the pointer the same way (an idle inhibitor would
 # be a different feature).
 platform = "ahk,hs"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_linux = "platform_reason.action_keep_awake_is_the_desktops_inhibitor"
 
 [sg_actions.display_mirror_toggle]
 # macOS mirrors through the CoreGraphics display-configuration API. Windows and
@@ -1227,8 +1229,8 @@ reason_linux = "platform_reason.action_not_yet_on_linux"
 # mirroring, so the current topology has to be read first (QueryDisplayConfig
 # on Windows; xrandr or kscreen-doctor, depending on the session, on Linux).
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_mirroring_is_the_systems_projection_menu"
+reason_linux = "platform_reason.action_mirroring_is_the_systems_projection_menu"
 
 [sg_actions.surround_parens]
 # Wraps the current LINE in parentheses (Home, "(", End, ")"), not the
@@ -1492,7 +1494,7 @@ platform = "all"
 platform = "ahk"
 reason_hs = "platform_reason.action_same_action_under_another_name"
 equivalent_hs = ["sticky_shift"]
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.caps_word]
 # Linux toggles the shortcuts manager's CapsWord, which locks CapsLock as
@@ -1636,30 +1638,30 @@ requires_linux = ["session:x11", "tool:timeout", "tool:xdotool", "tool:xrandr", 
 
 [sg_actions.home]
 platform = "hs,linux"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-equivalent_ahk = ["line_start"]
+reason_ahk = "platform_reason.action_key_is_its_own_binding_here"
 emit_hs_key = "home"
 emit_hs_mods = []
 emit_linux = "Home"
 
 [sg_actions.end]
 platform = "hs,linux"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-equivalent_ahk = ["line_end"]
+reason_ahk = "platform_reason.action_key_is_its_own_binding_here"
 emit_hs_key = "end"
 emit_hs_mods = []
 emit_linux = "End"
 
 [sg_actions.page_up]
 platform = "hs,linux"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
+reason_ahk = "platform_reason.action_key_is_its_own_binding_here"
+equivalent_ahk = ["send_key"]
 emit_hs_key = "pageup"
 emit_hs_mods = []
 emit_linux = "Prior"
 
 [sg_actions.page_down]
 platform = "hs,linux"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
+reason_ahk = "platform_reason.action_key_is_its_own_binding_here"
+equivalent_ahk = ["send_key"]
 emit_hs_key = "pagedown"
 emit_hs_mods = []
 emit_linux = "Next"
@@ -1681,77 +1683,77 @@ emit_hs_mods = ["cmd"]
 platform = "hs"
 reason_ahk = "platform_reason.action_same_action_under_another_name"
 equivalent_ahk = ["one_shot_shift"]
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_ctrl]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_option]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd_shift]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd_option]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd_ctrl]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_option_shift]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_option_ctrl]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_ctrl_shift]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd_option_shift]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd_option_ctrl]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd_shift_ctrl]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_option_shift_ctrl]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_hyper]
 platform = "hs"
-reason_ahk = "platform_reason.action_not_yet_on_windows"
-reason_linux = "platform_reason.action_not_yet_on_linux"
+reason_ahk = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 # --- Debug ---
 

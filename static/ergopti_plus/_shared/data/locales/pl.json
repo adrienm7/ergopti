@@ -3931,9 +3931,6 @@
 	"platform_reason.action_line_deletion_is_macos": "Tylko macOS: Cmd+Delete usuwa do początku lub końca wiersza w polach tekstowych macOS. Pola tekstowe w Windows i Linuksie nie mają takiego klawisza: zaznacz do krawędzi wiersza skrótem Shift+Home lub Shift+End, a potem usuń.",
 	"platform_reason.action_lookup_is_macos_dictionary": "Tylko macOS: Sprawdź otwiera systemowy panel słownika dla słowa pod wskaźnikiem. Windows i Linux nie mają systemowego panelu słownika.",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Tylko macOS: te akcje przełączają warstwę nawigacji przechowywaną w Karabiner-Elements. W Windows i Linuksie warstwa podąża za przytrzymanym klawiszem i nie ma przełącznika do ustawienia.",
-	"platform_reason.action_not_yet_on_linux": "Jeszcze nie w systemie Linux: nic temu nie przeszkadza, ale sterownik Linux na razie tego nie obsługuje.",
-	"platform_reason.action_not_yet_on_macos": "Jeszcze nie w systemie macOS: nic temu nie przeszkadza, ale sterownik macOS na razie tego nie obsługuje.",
-	"platform_reason.action_not_yet_on_windows": "Jeszcze nie w systemie Windows: nic temu nie przeszkadza, ale sterownik Windows na razie tego nie obsługuje.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Ten system nie pozwala żadnej aplikacji zamykać powiadomień: wyczyść je w centrum powiadomień, które otwiera równoważna akcja.",
 	"platform_reason.action_office_bold_key_is_windows": "Tylko Windows: francuski Microsoft Office pogrubia tekst skrótem Ctrl+G, gdzie inne aplikacje używają Ctrl+B, więc ta akcja dobiera klawisz do aplikacji. W macOS (Cmd+B) i Linuksie (Ctrl+B) jedna kombinacja działa wszędzie: przypisz ją z sekcji „Skróty”.",
 	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Nie w Linuksie: Wayland nie pozwala żadnej aplikacji przesuwać wskaźnika, a ta akcja nie ma wersji ograniczonej do sesji X11.",
@@ -3945,5 +3942,13 @@
 	"platform_reason.action_spaces_are_edited_in_mission_control": "Nie w macOS: Spaces dodaje się i usuwa w Mission Control, którym macOS nie pozwala sterować żadnej innej aplikacji.",
 	"platform_reason.action_window_overview_is_each_systems": "Każdy system ma własny przegląd okien: Mission Control i App Exposé w macOS, Widok zadań w Windows. Każde środowisko Linux przypisuje własny: przypisz tam klawisz swojego środowiska jako kombinację klawiszy.",
 	"platform_reason.action_window_switching_is_not_macos": "Nie w macOS: ta akcja przechodzi przez okna tak jak Alt+Tab w Windows i Linux. macOS przełącza aplikacje skrótem Cmd+Tab i przechodzi przez okna jednej aplikacji: użyj równoważnej akcji.",
-	"platform_reason.action_word_deletion_modifier_differs": "Każdy system usuwa słowo własnym modyfikatorem (Option w macOS, Ctrl w Windows i Linux), więc każdy wymienia własną akcję: użyj równoważnej akcji."
+	"platform_reason.action_word_deletion_modifier_differs": "Każdy system usuwa słowo własnym modyfikatorem (Option w macOS, Ctrl w Windows i Linux), więc każdy wymienia własną akcję: użyj równoważnej akcji.",
+	"platform_reason.action_app_windows_unreachable_on_wayland": "Nie w Linuksie: Wayland nie pozwala żadnej aplikacji wyliczać ani aktywować okien innej, więc okien aktywnej aplikacji nie da się odróżnić od pozostałych; równoważna akcja przechodzi przez wszystkie okna.",
+	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Nie w Linuksie: liczba pulpitów należy do ustawień każdego środowiska (GNOME sam je dodaje i usuwa, KDE i Xfce trzymają stałą liczbę), a Wayland nie daje żadnej aplikacji żądania, by ją zmienić.",
+	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Nie w Linuksie: każde środowisko Linux utrzymuje sesję w gotowości własną blokadą bezczynności (trybem prezentacji w KDE i Xfce, rozszerzeniem Caffeine w GNOME); włącz ją tam.",
+	"platform_reason.action_key_is_its_own_binding_here": "Nie jest to osobny wiersz w tym systemie: równoważna akcja wysyła ten sam klawisz.",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Przełącznik tylko w macOS: Windows wybiera Duplikuj w menu projekcji Win+P, a GNOME i KDE we własnym przełączniku ekranów Super+P; przypisz ten klawisz jako kombinację klawiszy.",
+	"platform_reason.action_sticky_keys_are_the_systems": "Ten system ma Klawisze trwałe w ustawieniach ułatwień dostępu, dzięki którym każdy modyfikator działa na jeden klawisz; włącz je tam.",
+	"platform_reason.action_take_note_uses_notepad": "Tylko Windows: ta akcja otwiera plik notatek z danego dnia w Notatniku, edytorze dołączonym do każdego Windows. macOS ma własną Szybką notatkę (Fn+Q), a Linux nie ma edytora dołączonego do każdego środowiska.",
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "W macOS funkcja Tekst na żywo odczytuje tekst każdego zrzutu lub obrazu: zrób zrzut równoważną akcją, a potem zaznacz jego tekst."
 }

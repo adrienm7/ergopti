@@ -3931,9 +3931,6 @@
 	"platform_reason.action_line_deletion_is_macos": "仅限 macOS：Cmd+Delete 在 macOS 文本框中删除到行首或行尾。Windows 和 Linux 的文本框没有这样的键：请用 Shift+Home 或 Shift+End 选到行边缘，然后删除。",
 	"platform_reason.action_lookup_is_macos_dictionary": "仅限 macOS：查询会针对指针下的单词打开系统词典面板。Windows 和 Linux 没有系统词典面板。",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "仅限 macOS：这些操作切换保存在 Karabiner-Elements 中的导航层。在 Windows 和 Linux 上，该层跟随按住的键，没有可设置的开关。",
-	"platform_reason.action_not_yet_on_linux": "Linux 上暂不可用：没有任何限制，但 Linux 驱动尚未实现。",
-	"platform_reason.action_not_yet_on_macos": "macOS 上暂不可用：没有任何限制，但 macOS 驱动尚未实现。",
-	"platform_reason.action_not_yet_on_windows": "Windows 上暂不可用：没有任何限制，但 Windows 驱动尚未实现。",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "此系统不允许任何应用关闭通知：请在对应操作打开的通知中心里清除它们。",
 	"platform_reason.action_office_bold_key_is_windows": "仅限 Windows：法语版 Microsoft Office 用 Ctrl+G 加粗，而其他应用用 Ctrl+B，因此此操作按应用选择按键。在 macOS（Cmd+B）和 Linux（Ctrl+B）上一个组合到处通用：请在“快捷键”中绑定它。",
 	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Linux 上没有：Wayland 不允许任何应用移动指针，而此操作没有仅限 X11 会话的版本。",
@@ -3945,5 +3942,13 @@
 	"platform_reason.action_spaces_are_edited_in_mission_control": "macOS 上没有：Spaces 在调度中心中添加和移除，而 macOS 不允许其他应用操控它。",
 	"platform_reason.action_window_overview_is_each_systems": "每个系统都有自己的窗口概览：macOS 的调度中心和应用 Exposé，Windows 的任务视图。各 Linux 桌面各自绑定，请在那里把桌面的按键绑定为按键组合。",
 	"platform_reason.action_window_switching_is_not_macos": "macOS 上没有：此操作像 Windows 和 Linux 的 Alt+Tab 那样依次切换窗口。macOS 用 Cmd+Tab 切换应用，并在一个应用的窗口间切换：请使用对应的操作。",
-	"platform_reason.action_word_deletion_modifier_differs": "每个系统用自己的修饰键删除单词（macOS 用 Option，Windows 和 Linux 用 Ctrl），因此各自列出自己的操作：请使用对应的操作。"
+	"platform_reason.action_word_deletion_modifier_differs": "每个系统用自己的修饰键删除单词（macOS 用 Option，Windows 和 Linux 用 Ctrl），因此各自列出自己的操作：请使用对应的操作。",
+	"platform_reason.action_app_windows_unreachable_on_wayland": "Linux 上没有：Wayland 不允许任何应用列出或激活其他应用的窗口，因此无法把当前应用的窗口与其他窗口区分开；对应的操作会依次切换所有窗口。",
+	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Linux 上没有：桌面数量属于各桌面环境自己的设置（GNOME 自动增减，KDE 和 Xfce 保持固定数量），而 Wayland 不给任何应用更改它的请求。",
+	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Linux 上没有：每个 Linux 桌面都用自己的防休眠功能保持会话唤醒（KDE 和 Xfce 的演示模式，GNOME 的 Caffeine 扩展）；请在那里开启。",
+	"platform_reason.action_key_is_its_own_binding_here": "在此系统上不是单独的一行：对应的操作会发送相同的按键。",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "仅 macOS 提供开关：Windows 在 Win+P 投影菜单中选择“复制”，GNOME 和 KDE 在各自的 Super+P 显示器切换器中选择；请把该键绑定为按键组合。",
+	"platform_reason.action_sticky_keys_are_the_systems": "此系统的辅助功能设置中有粘滞键，可让每个修饰键只作用一次；请在那里开启。",
+	"platform_reason.action_take_note_uses_notepad": "仅限 Windows：此操作在每个 Windows 都自带的记事本中打开当天的笔记文件。macOS 有自己的快速备忘录（Fn+Q），而 Linux 没有所有桌面都自带的编辑器。",
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "在 macOS 上，实况文本可以读取任何截图或图片中的文字：用对应的操作截一张图，然后选择其中的文字。"
 }
