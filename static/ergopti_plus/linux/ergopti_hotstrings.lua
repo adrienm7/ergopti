@@ -1627,7 +1627,7 @@ local function main()
 	-- output, so this callback is the single place that prevents special keys
 	-- from disappearing and avoids a printable-key double count.
 	local capture_owned_scancodes = {}
-	local function handle_physical(scancode, _key_name, _char, value)
+	local function handle_physical(scancode, _key_name, _char, value, source)
 		if value ~= InputEvent.VALUE_DOWN then return end
 		capture_owned_scancodes[scancode] = nil
 		local allowed = not secure_focus_guard.blocks_text()
@@ -1639,6 +1639,12 @@ local function main()
 			keystats.suppress()
 		else
 			keystats.unsuppress()
+		end
+		-- A media key counts under its semantic identity, with the device its
+		-- owned descriptor reads, never on the numeric heatmap.
+		if keystats.media_id(scancode) then
+			keystats.record_media_press(app_id, scancode, keyboard_hook.source_device_identity(source))
+			return
 		end
 		keystats.record_physical_key(app_id, scancode, math.floor(Monotonic.now_ms()))
 	end
@@ -2287,12 +2293,16 @@ local function main()
 			or script_actions.is_paused() or input_capture_gate.blocks_text() then return nil end
 		return hold_token()
 	end
-	local function handle_hold(scancode, held_ms)
+	local function handle_hold(scancode, held_ms, source)
 		if capture_owned_scancodes[scancode] then
 			capture_owned_scancodes[scancode] = nil
 			return
 		end
 		if secure_focus_guard.blocks_text() then return end
+		if keystats.media_id(scancode) then
+			keystats.record_media_release(scancode, keyboard_hook.source_device_identity(source), held_ms)
+			return
+		end
 		keystats.record_hold(_cached_app_id or "Unknown", scancode, held_ms)
 	end
 	local on_hold = input_capture_gate.guard(handle_hold, function(scancode)

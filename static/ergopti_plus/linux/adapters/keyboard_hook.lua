@@ -98,8 +98,8 @@ local TEXT_CONTROL_CHAR = {
 -- Callbacks set by the caller via M.start().
 local _on_char      = nil   -- function(char_string, evdev_scancode)
 local _on_key       = nil   -- function(key_name_string, { mods = held_modifiers() } | shortcut detail)
-local _on_physical  = nil   -- function(evdev_scancode, key_name, char_or_nil, evdev_value)
-local _on_hold      = nil   -- function(evdev_scancode, held_ms)
+local _on_physical  = nil   -- function(evdev_scancode, key_name, char_or_nil, evdev_value, source_path)
+local _on_hold      = nil   -- function(evdev_scancode, held_ms, source_path)
 local _on_hold_admission = nil -- function() -> opaque token or nil
 local _hold_admission_session = nil
 local _on_desync    = nil   -- function() invalidates text derived before SYN_DROPPED
@@ -1692,7 +1692,7 @@ local function _dispatch_post_remap(ev, source)
 	-- not a new physical transition. This includes modifiers and CapsLock.
 	if _on_physical and ev.value ~= InputEvent.VALUE_REPEAT and ev.code > 0 then
 		if not _call_callback("physical-key callback", _on_physical,
-			ev.code, EvdevCodes.key_name(ev.code), char, ev.value) then
+			ev.code, EvdevCodes.key_name(ev.code), char, ev.value, source) then
 			-- The callback already triggered the emergency stop; the grabbed
 			-- event must still reach the application before giving up on it.
 			_number_row.abandon(row_plan, ev, false)
@@ -1740,7 +1740,7 @@ local function _dispatch_post_remap(ev, source)
 			-- descriptor or a lid close, and one such reading would dominate every
 			-- average it entered for the rest of the day.
 			local held_ms = math.min(math.max(0, Monotonic.now_ms() - down_at), MAX_PLAUSIBLE_HOLD_MS)
-			if not _call_callback("key-hold callback", _on_hold, ev.code, held_ms) then
+			if not _call_callback("key-hold callback", _on_hold, ev.code, held_ms, source) then
 				-- A release owns the application's key state: it must go back
 				-- even when the metrics consumer just died, or the key sticks
 				-- down over there while nothing is held here.
@@ -2913,6 +2913,14 @@ function M.release_caps_word_lock()
 	return _locks.end_word(true, nil)
 end
 
+--- The device number (st_rdev) of the keyboard source a physical callback named.
+--- @param path string The source path the callback received.
+--- @return string|nil device, string|nil reason
+function M.source_device_identity(path)
+	if type(path) ~= "string" or path == "" then return nil, "no source" end
+	return EvdevReader.device_identity(keyboard_slot(path))
+end
+
 --- Whether a CapsWord session owns a lock or unsettled CapsLock output.
 --- @return boolean
 function M.caps_word_lock_held()
@@ -3809,7 +3817,8 @@ end
 
 --- Starts the keyboard hook. Idempotent — safe to call while already running.
 --- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onHold?, onHoldAdmission?, onConsume?, onDesync?, onEmitRaw?, device?, pinned? }
----              onHold function     Receives an admitted physical scancode and held milliseconds.
+---              onHold function     Receives an admitted physical scancode, held milliseconds
+---                                  and the source path.
 ---              onHoldAdmission function Returns the current opaque plain-table policy token or nil.
 ---                                  Absence preserves legacy callers; refusal affects metrics only.
 ---              intercept boolean   Grab the device. Default false.
@@ -3820,7 +3829,7 @@ end
 ---                                  mods being held_modifiers() at the press,
 ---                                  and with ("shortcut", { key, mods }) for a chord.
 ---              onPhysical function  Called with (evdev_scancode, key_name, char_or_nil,
----                                  evdev_value) for every physical down/up transition.
+---                                  evdev_value, source_path) for every physical down/up transition.
 ---              onConsume function Called before pass-through with a key detail;
 ---                                  true suppresses its down/repeat/up in intercept mode.
 ---              onDesync function Called synchronously when evdev reports queue loss.
@@ -4382,6 +4391,7 @@ function M._test_drive(events, callbacks, intercept)
 		end,
 		poll  = function() return queue[at + 1] ~= nil end,
 		close = function() end,
+		device_number = cb.deviceNumber,
 		read_bits = function(_, request, count)
 			local provider = request % 0x100 == EvdevReader.EVIOCGLED_NR
 				and cb.ledState or cb.keyState
