@@ -411,10 +411,6 @@ for (const drv of LUA_DRIVERS) {
 // an allow-list quietly becomes blanket permission.
 const THIRD_PARTY_SOURCES = new Map([
 	[
-		'LuaJIT/LuaJIT',
-		'build-linux-flatpak.sh: the Flatpak runtime ships no LuaJIT, so the manifest builds it from upstream'
-	],
-	[
 		'luvit/luv',
 		'build-linux-packaged-luv.sh: the .rpm builds its LuaJIT luv binding from the pinned upstream recipe'
 	],
