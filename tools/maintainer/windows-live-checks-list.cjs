@@ -1314,6 +1314,37 @@ const CHECKS = [
 		}
 	},
 	{
+		id: 'ai-agent-unavailable-row',
+		title: 'AI agent in the composed tray: one disabled row says why, the AI submenu works',
+		async run(context) {
+			const { session } = await bootEnglish(context, 'agent');
+			const notReady = (await session.run('translate', ['menu.agent.not_ready'])).replace(
+				/^text=/,
+				''
+			);
+			await session.run('tree');
+			const tree = fs.readFileSync(path.join(session.live, 'tree.txt'), 'utf8').split('\n');
+			const agent = tree.filter((line) => /AI agent/.test(line));
+			if (agent.length !== 1) return fail(`the tree holds ${agent.length} AI agent rows`);
+			const [row] = agent;
+			const problems = [];
+			// The manifest declares the unfinished agent once (item 121): a plain root row.
+			if (/^\s|\[\+\]/.test(row)) problems.push(`the row is not a root leaf: ${row}`);
+			if (!row.includes(notReady)) problems.push(`the row does not say "${notReady}": ${row}`);
+			const shown = await session.run('rows', ['AI agent']);
+			if (!/\[disabled\]/.test(shown)) problems.push(`the row is enabled: ${shown}`);
+			// The AI submenu beside it keeps controls a person can use.
+			const usable = (await session.run('rows', ['.', 'Artificial Intelligence']))
+				.split(' | ')
+				.filter((line) => line && !line.includes('[disabled]'));
+			if (usable.length === 0) problems.push('the AI submenu has no enabled row');
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`disabled root row "${notReady}", ${usable.length} AI rows usable`);
+		}
+	},
+	{
 		id: 'test-prediction-ai-off',
 		title: 'AI > Test a prediction, with the AI off: refused, says why, sends nothing',
 		async run(context) {

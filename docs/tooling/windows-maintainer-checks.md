@@ -88,6 +88,35 @@ real CapsLock state, which that driver's CapsLock tap-hold would see.
 | `tap-hold-v1-migration`                 | tap_hold.toml backup and v1 stamp on an old file           | the `tap_hold_migrations` corpus                     |
 | `old-config-migration`                  | An old config.toml through the whole registry              | the `config_migrations` corpus                       |
 | `quit-refused-during-write`             | Quit during a configuration write                          | `test_quit_admission.ahk`                            |
+| Check                                   | TODO line                                                    | Also covered by                                      |
+| --------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------- |
+| `reload-click-joins`                    | Menu-click replay; item 142                                  | `test_menu_reload_replay.ahk`                        |
+| `reload-command`                        | Local reload command (idle, paused, during a reload)         | `test_driver_control.ahk`                            |
+| `menu-click-replay`                     | Menu-click replay                                            | `test_menu_reload_replay*.ahk`                       |
+| `private-browsing-click-during-startup` | Private-browsing metrics filter                              | `test_menu_command_deferral.ahk`                     |
+| `private-browsing-click-during-write`   | Private-browsing metrics filter                              | same                                                 |
+| `tap-delay-row`                         | Tap delay row                                                | `test_tap_hold_duration_transaction.ahk`             |
+| `keyboard-group-scope`                  | Keyboard group restore and clear                             | `test_keyboard_slot_group_scope.ahk`                 |
+| `taphold-pickers`                       | Tap-hold pickers                                             | none                                                 |
+| `keycombo-picker`                       | Key-combination picker                                       | `test_key_combinations.ahk`                          |
+| `keycombo-pair-saved`                   | Number row and key combinations: a pair saved and reloaded   | same                                                 |
+| `number-row-inert-choice`               | Number row: an inert choice ticked, greyed and suffixed      | `test_number_row_symbols.ahk`                        |
+| `window-titles`                         | Window titles                                                | `test_window_manager_present_window.ahk`             |
+| `versions-tabs`                         | Versions tabs                                                | `test-changelog-channel-sync.cjs`                    |
+| `win-s-open-target`                     | Win+S open target                                            | `test_open_target_vectors.ahk`, `test_shortcuts.ahk` |
+| `backspace-word-start`                  | Backspace word start                                         | `test_hotstring_backspace_word_start.ahk`            |
+| `capsword-auto-off`                     | CapsWord auto-off                                            | `test_capsword_state.ahk`, the shared corpus         |
+| `clear-restore-categories`              | Clear and Restore: per category and global, then restart     | `test_keyboard_slot_group_scope.ahk`                 |
+| `number-row-layouts`                    | Number row on each installed layout, each ordering           | `test_number_row_symbols.ahk`                        |
+| `hotstring-delays-recommended-cleared`  | Hotstrings: delays 0.5 s recommended, cleared back to 1.0    | `test_hotstring_delimiter_scope_preservation.ahk`    |
+| `handwritten-delimiters`                | Handwritten delimiters: Add, toggle, Delete, restart         | `test_terminator_admission.ahk`                      |
+| `consume-submenu`                       | The delimiters an expansion consumes                         | `test_hotstring_delimiter_global_transaction.ahk`    |
+| `ai-off-inert`                          | AI off (#97)                                                 | `test_llm_hotkeys_deferred_by_pause.ahk`             |
+| `ai-agent-unavailable-row`              | AI agent submenu composed-menu qualification (121, 123, 137) | `test_llm_agent.ahk`                                 |
+| `test-prediction-ai-off`                | Test a prediction refuses with the AI off                    | `test_llm_menu_test_prediction.ahk`                  |
+| `tap-hold-v1-migration`                 | tap_hold.toml backup and v1 stamp on an old file             | the `tap_hold_migrations` corpus                     |
+| `old-config-migration`                  | An old config.toml through the whole registry                | the `config_migrations` corpus                       |
+| `quit-refused-during-write`             | Quit during a configuration write                            | `test_quit_admission.ahk`                            |
 
 ## What stays manual
 
