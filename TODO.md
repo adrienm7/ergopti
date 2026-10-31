@@ -750,6 +750,35 @@ PAR-12 and PAR-14 are in "Windows manual checks for the maintainer", PAR-15's in
 - [ ] **PAR-83. Identifiers and hosts in one file.** [CODE] Lua and AHK (944ae6b5e6) generate from
       `_shared/data/identifiers.json`. Left: the copies of `tools/lint/identifier-literal-baseline.json` (Swift 19, JS
       15, Python 9, native headers 8, shell 6, AHK 3, PowerShell 2, Lua 1).
+- [ ] **PAR-79. Replace repeated timer literals with registry keys.** [CODE] Done on Lua and JS
+      (ed257e285a): registry keys for the repeated delays, the literal gate in `test-fast-timer-inventory.cjs`
+      with a shrink-only `timer-literal-baseline.json`. Left: 139 AHK sites (`STALE_TEMP_MS` x5, gesture poll
+      `-100` x6, safety flush `-2000` x3...), ~25 Swift `usleep`, 40 baselined Lua/JS sites.
+- [ ] **PAR-80. `[limits]` section for byte caps.** [CODE] Done (7376321788): `[limits]` with the process
+      output, declaration file and changelog caps, a retyping gate with a shrink-only baseline. Left: the AHK
+      caps, `MAX_TEXT_BYTES` and `MAX_BODY_BYTES` (public module fields).
+- [ ] **PAR-81. Theme tokens and palette codegen.** [CODE] Done: `_shared/ui/theme.css` linked by the
+      shared pages; `_shared/data/native_theme.toml` generating `_shared/lua/native_theme_data.lua` for the macOS
+      and Linux palettes; the dead macOS download-window page removed; hex lint with a shrink-only baseline
+      (`tools/lint/hex-literal-baseline.json`, 53 files). Left: an AHK emitter replacing the typed palette in
+      `hcw_helpers.ahk` (then retire `test-color-presets-parity.cjs`), and moving the baselined literals onto
+      tokens with per-page pixel diffs.
+- [ ] **PAR-82. Hard-coded UI string gate.** [CODE] New `tools/test/test-no-hardcoded-ui-strings.cjs`
+      (TrayTip, MsgBox, alert, title literals fail unless allowlisted; reuse
+      `tools/lint/audit-gui-titles.cjs`), including the Linux `install.sh` echo table. Audit K6, I9.
+- [ ] **PAR-83. Identifiers and hosts in one file.** [CODE] Done for Lua (948ebef074, bb1899206e):
+      `_shared/data/identifiers.json` generating `_shared/lua/identifiers.lua`, typed copies held to a
+      shrink-only baseline. Emitters exist for JS, shell, Python, AHK and Swift; the JS pages, the macOS
+      Lua and Python sites and the launcher constants read them (33600679a4, db7bc54668 [CI: Swift]). Left
+      (`tools/lint/identifier-literal-baseline.json`): the AHK copies; the macOS owned-runtime Swift files,
+      whose signing ids are derived from the launcher id (`.runtime-installer`, `.installed-physical-source`,
+      `remap.core`/`console`/`cli`: declare them in `identifiers.json` first, which regenerates the Windows
+      AHK copy) and whose `OwnedRuntimePublisherIdentity` raw values must stay literals (pin them with a
+      test instead); the Swift test fixtures' app names; the runtime shell scripts
+      (`ensure-ollama-deps.sh`, `_shared/.../ollama_install.sh`, `linux/install.sh`, the generated
+      `managed-python-release.sh`), for which `test-shell-identifiers-sourcing.cjs` accepts only the
+      build scripts' repo-root sourcing form; `Package.swift` (a SwiftPM manifest cannot read sources);
+      the `tools/` build scripts.
 
 ## Backlog (one line each)
 
