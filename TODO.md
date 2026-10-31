@@ -296,7 +296,8 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
     is fetched; a Vertex service-account key (signed JWT) is not taken.
   - [CODE] The listing reader takes `data` (and `models` for Gemini) only: DashScope's native listing and Writer's
     `models[]` would need a per-provider listing shape on the three OS.
-  - [CODE] With about forty providers, the Linux zenity prompt of the screen actions lists every one on a line.
+  - [CODE] (Windows, the PC's) the native `llm_vision` prompt of the screen actions still lists every backend on a
+    line; macOS and Linux pick it in a list, then ask the optional model (noted in the PC hand-off).
   - Inferred, not read: Chutes and Featherless `chat_template_kwargs.enable_thinking` on Qwen, SambaNova
     `enable_thinking: false`, whether Qianfan `ernie-5.1` is hybrid. Watch: Perplexity Sonar chat completions
     (ended 2026-09-27, still answering), `dashscope-intl`, Moonshot K2 retiring by December.
