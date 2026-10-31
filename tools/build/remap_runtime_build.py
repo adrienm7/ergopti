@@ -2829,7 +2829,7 @@ def _validate_owned_record(record, profile):
             and row["schema"] == 1
             and row["status"] == "passed"
             and type(elapsed) in (int, float)
-            and 0 <= elapsed <= 300
+            and 0 <= elapsed <= record["budget_seconds"]
             and math.isfinite(elapsed)
         )
         if special:

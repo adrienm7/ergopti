@@ -668,6 +668,27 @@ class OwnedRecordControls(unittest.TestCase):
         record["budget_seconds"] = SUBJECT.HOSTED_RUNNER_SECONDS
         self.assertIsNone(SUBJECT.validate_owned_record(record))
 
+    def test_phase_elapsed_is_bounded_by_the_record_deadline(self):
+        # Run 41228607079 built core in 966.6 s under the hosted deadline and
+        # was refused by a phase bound that still assumed the 300 s calibration.
+        hosted = SUBJECT.HOSTED_RUNNER_SECONDS
+        for budget, elapsed, admitted in (
+            (hosted, 966.6, True),
+            (hosted, hosted, True),
+            (hosted, hosted + 0.5, False),
+            (300, 300, True),
+            (300, 300.5, False),
+        ):
+            with self.subTest(budget=budget, elapsed=elapsed):
+                record = self.record()
+                record["budget_seconds"] = budget
+                row = next(r for r in record["phases"] if r["phase"] == "core_build")
+                row["elapsed_seconds"] = elapsed
+                if admitted:
+                    self.assertIsNone(SUBJECT.validate_owned_record(record))
+                else:
+                    self.refused(record)
+
     def test_exact_record_keyset_and_schema(self):
         for operation in (
             lambda r: r.update(extra=True),
