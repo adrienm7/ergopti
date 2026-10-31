@@ -121,7 +121,11 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //           12 → 11 (2026-10-31: the ShellRunner GC pin test drops its three
 //                    signature scans; its spawned-handle cases fail when the F7
 //                    signature returns.)
-const BASELINE = 11;
+//           11 → 10 (2026-10-31: the peak-override model test is retired; it
+//                    read engine.lua and modelled the gate in local functions,
+//                    while test_peak_override_needs_sustained_hold drives the
+//                    engine through a 4-frame peak at 120 Hz.)
+const BASELINE = 10;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -185,7 +189,9 @@ const BASELINE = 11;
 //       51 → 48 (2026-10-31: the dedup single-source test drives one answer
 //              through each of the three backends and checks the flag each
 //              hands to ApiCommon.insert_prediction.)
-const READ_BASELINE = 48;
+//       48 → 47 (2026-10-31: the peak-override model test is retired, see
+//              the file count above.)
+const READ_BASELINE = 47;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
