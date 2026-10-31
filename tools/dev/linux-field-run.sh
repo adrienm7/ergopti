@@ -5,15 +5,18 @@
 # MODULE: Linux field run request
 # DESCRIPTION:
 # Asks the running Linux daemon to run its Debug field checks with no window
-# (static/ergopti_plus/linux/infra/field_run.lua, declared by
-# static/ergopti_plus/linux/data/field_run.json): it writes the request into the
-# daemon's field-run folder, waits for the done marker or a refusal, copies the
+# (static/ergopti_plus/linux/infra/field_run.lua, on the shared protocol
+# static/ergopti_plus/_shared/data/field_run_protocol.json and the Linux steps
+# file it names): it writes the request into the folder of the daemon that is
+# ready, waits for the done marker or a refusal, copies the
 # results into the report and prints one mark per step, the macOS collector's
 # marks (✅ pass, ❌ fail, ⏭️ skip, ⌨️ needs_typing, ⚠️ other), then a summary line.
 #
 # FEATURES & RATIONALE:
-# 1. The folder, the file names and the default deadline come from the driver
-#    itself through luajit: one source for the daemon and the collector.
+# 1. The folders, the file names, the every-step word and the default deadline
+#    come from the driver itself through luajit: one source for the daemon and
+#    the collector. The developer folder (the clone's) is tried first, then the
+#    installed one, as the shared declaration says.
 # 2. No daemon ready (no ready.json, or its process is gone) is said and is not
 #    a collector failure: the shell checks and the logs are still collected.
 # 3. The request is staged then renamed, so the daemon never reads half of it.
@@ -21,40 +24,53 @@
 # Sourced only; defines functions and runs nothing.
 # ==============================================================================
 
-# Prints the folder, the request, refused, results and done names and the
-# default deadline, one per line, as the driver resolves them.
+# Prints the developer folder, the installed folder (empty without
+# XDG_RUNTIME_DIR), the ready, request, refused, results and done names, the
+# every-step word, the schema and the default deadline, one per line, as the driver resolves them.
 field_run_layout() {
-	local driver_root="$1/static/ergopti_plus/linux" shared="$1/static/ergopti_plus/_shared/lua"
-	# luajit -e takes no script arguments: the driver root travels in the environment.
-	FIELD_RUN_DRIVER_ROOT="$driver_root" \
-	LUA_PATH="$driver_root/?.lua;$driver_root/?/init.lua;$shared/?.lua;$shared/?/init.lua;;" luajit -e '
+	local driver_root="$1/static/ergopti_plus/linux" shared="$1/static/ergopti_plus/_shared"
+	# luajit -e takes no script arguments: the roots travel in the environment.
+	FIELD_RUN_CLONE_ROOT="$1" FIELD_RUN_DRIVER_ROOT="$driver_root" FIELD_RUN_SHARED_ROOT="$shared" \
+	LUA_PATH="$driver_root/?.lua;$driver_root/?/init.lua;$shared/lua/?.lua;$shared/lua/?/init.lua;;" luajit -e '
 		local FieldRun = require("infra.field_run")
-		local file = assert(io.open(os.getenv("FIELD_RUN_DRIVER_ROOT") .. "/data/field_run.json", "rb"))
-		local spec = FieldRun.validate(require("json").decode(file:read("*a")))
-		file:close()
-		local folder = assert(FieldRun.folder(spec, os.getenv, require("app_dirs").folder_name))
-		print(folder); print(spec.files.ready); print(spec.files.request); print(spec.files.refused)
-		print(spec.files.results); print(spec.files.done); print(spec.deadline_seconds.default)'
+		local spec = FieldRun.load(os.getenv("FIELD_RUN_SHARED_ROOT"), os.getenv("FIELD_RUN_DRIVER_ROOT"))
+		print(FieldRun.folder(spec, os.getenv, os.getenv("FIELD_RUN_CLONE_ROOT")))
+		print(FieldRun.folder(spec, os.getenv, nil) or "")
+		print(spec.files.ready); print(spec.files.request); print(spec.files.refused)
+		print(spec.files.results); print(spec.files.done); print(spec.all_steps); print(spec.schema)
+		print(spec.deadline_seconds.default)'
+}
+
+# Prints the pid a ready file names when that process is alive.
+field_run_ready_pid() {
+	local pid
+	pid="$(sed -n 's/.*"pid":\([0-9][0-9]*\).*/\1/p' "$1" 2>/dev/null)"
+	[ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null && printf '%s\n' "${pid}"
 }
 
 # Runs the field checks of the daemon and copies their results.
 # $1 the clone root, $2 the report folder. Prints the marks and the summary.
 field_linux_run() {
-	local root="$1" out="$2" layout folder ready request refused results done deadline pid id waited
+	local root="$1" out="$2" layout clone installed folder ready request refused results done all schema deadline id waited
 	if ! layout="$(field_run_layout "${root}" 2>&1)"; then
 		printf 'field_run=unresolved\n%s\n' "${layout}"
 		return 1
 	fi
-	{ read -r folder; read -r ready; read -r request; read -r refused; read -r results; read -r done; read -r deadline; } <<< "${layout}"
-	pid="$(sed -n 's/.*"pid":\([0-9][0-9]*\).*/\1/p' "${folder}/${ready}" 2>/dev/null)"
-	if [ -z "${pid}" ] || ! kill -0 "${pid}" 2>/dev/null; then
+	{ read -r clone; read -r installed; read -r ready; read -r request; read -r refused; read -r results; read -r done; read -r all; read -r schema; read -r deadline; } <<< "${layout}"
+	folder=""
+	if field_run_ready_pid "${clone}/${ready}" > /dev/null; then
+		folder="${clone}"
+	elif [ -n "${installed}" ] && field_run_ready_pid "${installed}/${ready}" > /dev/null; then
+		folder="${installed}"
+	fi
+	if [ -z "${folder}" ]; then
 		printf '  ⚠️ field run: no running daemon published its field run session\n'
 		printf 'field_run=no_daemon\n'
 		return 0
 	fi
 	id="fr-$(date +%Y%m%d%H%M%S)-$$"
 	rm -f "${folder}/${refused}"
-	printf '{"schema":1,"request_id":"%s","steps":["all"]}' "${id}" > "${folder}/${request}.tmp-$$"
+	printf '{"schema":%s,"request_id":"%s","steps":["%s"]}' "${schema}" "${id}" "${all}" > "${folder}/${request}.tmp-$$"
 	mv -f "${folder}/${request}.tmp-$$" "${folder}/${request}"
 	# The daemon's own request deadline plus a grace for its last write.
 	waited=0

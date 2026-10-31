@@ -1,0 +1,21 @@
+{
+	"_comment": "Linux field run steps: tools/dev/collect-linux-field-report.sh asks the running daemon to run these Debug field checks with no window, then copies the results. The protocol (file names, verdicts, refusal reasons, identifier rules, folders and the keys of each document) is _shared/data/field_run_protocol.json, read by infra/field_run.lua and the collector; this file holds only what is Linux's: the steps, the request deadline bounds and the name of the configuration guard step. Each step's proves line says what its pass shows.",
+	"deadline_seconds": { "default": 300, "min": 60, "max": 900 },
+	"guard_step": "config_guard",
+	"steps": [
+		{
+			"id": "field_composer",
+			"kind": "field_check",
+			"check": "composer",
+			"deadline_seconds": 120,
+			"proves": "The layout composer installs its check layout in the user XKB tree, the copy matches its record, the installer verifies it and a fresh run removes it."
+		},
+		{
+			"id": "field_network",
+			"kind": "field_check",
+			"check": "network",
+			"deadline_seconds": 90,
+			"proves": "The managed download chain works: proxy settings, PAC download and verdict, route lookup, TLS trust and one transfer, with the route of each Ollama origin."
+		}
+	]
+}
