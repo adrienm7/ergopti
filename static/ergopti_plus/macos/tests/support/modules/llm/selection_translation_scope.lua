@@ -157,6 +157,9 @@ local OWNED = {
 	"modules.llm.local_server_ports",
 	"modules.llm.local_servers",
 	"modules.llm.network_env",
+	-- network_env reads the shared proxy override through these two.
+	"network.proxy_override",
+	"network.route_plan",
 	"modules.llm.ollama_binary",
 	"modules.llm.ollama_endpoint",
 	"modules.llm.ollama_server_command",
