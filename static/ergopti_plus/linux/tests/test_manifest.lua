@@ -51,6 +51,7 @@ return {
 	"tests.unit.infra.config.test_byte_limits",
 	"tests.unit.infra.config.test_shared_manifest_reader",
 	"tests.unit.infra.control.test_driver_control",
+	"tests.unit.infra.control.test_field_run",
 	"tests.unit.infra.control.test_reload_outcome",
 	"tests.unit.infra.control.test_reload_restart",
 	"tests.unit.modules.updater.install.test_production_dispatch_refusal",
