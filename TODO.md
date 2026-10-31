@@ -294,8 +294,6 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
     `menu.llm.api_provider_token_exchange_unavailable`; port the async form POST and token cache of
     `api_token_exchange.lua`.
   - [CODE] A Vertex service-account key (signed JWT) is not taken: only `authorized_user` credentials are exchanged.
-  - [CODE] The listing reader takes `data` (and `models` for Gemini) only: DashScope's native listing and Writer's
-    `models[]` would need a per-provider listing shape on the three OS.
   - [CODE] (Windows, the PC's) the native `llm_vision` prompt of the screen actions still lists every backend on a
     line; macOS and Linux pick it in a list, then ask the optional model (noted in the PC hand-off).
   - Inferred, not read: Chutes and Featherless `chat_template_kwargs.enable_thinking` on Qwen, SambaNova
