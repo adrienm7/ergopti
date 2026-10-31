@@ -262,8 +262,9 @@ Follow [.agents/skills/orchestrate-pass/references/fix-os-pass.md](.agents/skill
 
 Problems seen on the maintainer's Mac on 2026-10-27 and 28 (macOS 26.6.2, arm64; issue
 [#104](https://github.com/adrienm7/ergopti/issues/104) and the `field/mac-2026-10-27` reports). Labels are local to
-this ledger; a label cited elsewhere without an entry here was fixed (its entry is in `git show 7f80d3d141:TODO.md`
-or `git show 1aa287427a:TODO.md`). L16, L17, L18 and L23 moved into "macOS main-thread holds", L25 and L28 into the
+this ledger. A label cited elsewhere without an entry here is closed: its lessons are in
+[macos-hammerspoon memory](docs/memory/macos-hammerspoon.md) and its entry in `git show 7f80d3d141:TODO.md` or
+`git show 1aa287427a:TODO.md`. L16, L17, L18 and L23 moved into "macOS main-thread holds", L25 and L28 into the
 Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
 
 ### Open TODO
