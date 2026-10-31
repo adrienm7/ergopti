@@ -58,6 +58,9 @@ local _load_time = os.time()
 -- The documents of the diagnostics window, loaded once
 local _config = nil
 
+-- The last synchronous collection: its duration, budget and collector costs
+local _last_phase_a = nil
+
 -- The menu state the last opening handed over, for the features section
 local _menu_state = nil
 
@@ -742,29 +745,72 @@ local function level_name()
 	return nil
 end
 
---- The module contract check: every adapter loads and exposes its contract.
---- @return table ok Adapter ids that passed.
---- @return table failed Adapter ids that did not, with the reason.
-local function check_modules()
-	local ok_list, failed = {}, {}
-	for _, spec in ipairs(ADAPTER_SPECS) do
-		local loaded, mod = pcall(require, spec.id)
-		if not loaded then
-			failed[#failed + 1] = spec.id .. " (load failed)"
-			Logger.warn(LOG, "Adapter '%s' could not be loaded: %s.", spec.id, tostring(mod))
-		else
-			local complete = true
-			for _, method in ipairs(spec.contract) do
-				if type(mod[method]) ~= "function" then
-					complete = false
-					Logger.warn(LOG, "Adapter '%s' missing contract method '%s'.", spec.id, method)
-				end
-			end
-			if complete then ok_list[#ok_list + 1] = spec.id
-			else failed[#failed + 1] = spec.id .. " (contract incomplete)" end
+--- One adapter of the module contract check: it loads and exposes its contract.
+--- @param spec table One ADAPTER_SPECS entry.
+--- @param ok_list table Receives the id when it passed.
+--- @param failed table Receives the id and the reason when it did not.
+local function check_adapter(spec, ok_list, failed)
+	local loaded, mod = pcall(require, spec.id)
+	if not loaded then
+		failed[#failed + 1] = spec.id .. " (load failed)"
+		Logger.warn(LOG, "Adapter '%s' could not be loaded: %s.", spec.id, tostring(mod))
+		return
+	end
+	local complete = true
+	for _, method in ipairs(spec.contract) do
+		if type(mod[method]) ~= "function" then
+			complete = false
+			Logger.warn(LOG, "Adapter '%s' missing contract method '%s'.", spec.id, method)
 		end
 	end
-	return ok_list, failed
+	if complete then ok_list[#ok_list + 1] = spec.id
+	else failed[#failed + 1] = spec.id .. " (contract incomplete)" end
+end
+
+--- The facts phase A leaves to the local_state probe, as ordered steps: the
+--- Wi-Fi signal (hs.wifi.interfaceDetails, about 50 ms of CoreWLAN queries on
+--- the Mac) and one module contract check per adapter (requiring an adapter
+--- not loaded yet compiles it: 30 to 65 ms in all). Together they held the
+--- synchronous diagnostics at 90 to 150 ms against its 5 ms budget
+--- (field report 2026-10-31); as steps, the probe runs them in slices that
+--- each fit that budget, between run-loop turns.
+--- @return table steps Functions run in order, each a bounded main-thread read.
+--- @return table sections { network = { wifi_signal }, developer = { modules_ok, modules_failed } }
+function M.local_state_steps()
+	local ok_list, failed = {}, {}
+	local sections = { network = {}, developer = { modules_ok = ok_list, modules_failed = failed } }
+	local steps = {
+		function() sections.network.wifi_signal = H.collect_network().wifi_signal end,
+	}
+	for _, spec in ipairs(ADAPTER_SPECS) do
+		steps[#steps + 1] = function() check_adapter(spec, ok_list, failed) end
+	end
+	return steps, sections
+end
+
+--- Runs the local_state steps at once, for a report collected without a page
+--- (Debug > Report a bug, the field run): after phase A was measured, like
+--- its configuration.
+--- @param snapshot table The phase A snapshot, completed in place.
+local function complete_local_state(snapshot)
+	local started = hs.timer.absoluteTime()
+	local steps, sections = M.local_state_steps()
+	local failures = {}
+	for index, step in ipairs(steps) do
+		local ok, err = pcall(step)
+		if not ok then
+			failures[#failures + 1] = tostring(err):match("^[^\n]*")
+			Logger.error(LOG, "Local state step %d raised: %s.", index, tostring(err))
+		end
+	end
+	for id, values in pairs(sections) do
+		for key, value in pairs(values) do snapshot.sections[id][key] = value end
+	end
+	snapshot.probes.local_state = {
+		state   = #failures == 0 and "ok" or "error",
+		cleanup = "settled",
+		ms      = math.floor((hs.timer.absoluteTime() - started) / 1e6 + 0.5),
+	}
 end
 
 --- The warnings and errors: the logger's session counters, its last error and
@@ -788,18 +834,28 @@ local function collect_issues()
 	}
 end
 
---- The developer section: the module check, the log level and the ring.
+--- The developer section: the log level and the ring; the module check is the
+--- local_state probe's.
 --- @return table
 local function collect_developer()
-	local ok_list, failed = check_modules()
 	return {
-		modules_ok          = ok_list,
-		modules_failed      = failed,
 		modules_disabled    = {},
 		log_level           = level_name(),
 		ring_lines          = #(Logger.ring_buffer_snapshot() or {}),
 		event_tap_telemetry = M.event_tap_telemetry(require("adapters.system_info").runtime_version()).summary,
 	}
+end
+
+--- The last synchronous collection's duration, its budget and each collector's
+--- cost, for the field run, which reports them without a person reading the log.
+--- @return table|nil { ms, budget_ms, collectors = { { name, ms } } }, nil before any.
+function M.last_phase_a()
+	if _last_phase_a == nil then return nil end
+	local collectors = {}
+	for index, entry in ipairs(_last_phase_a.collectors) do
+		collectors[index] = { name = entry.name, ms = entry.ms }
+	end
+	return { ms = _last_phase_a.ms, budget_ms = _last_phase_a.budget_ms, collectors = collectors }
 end
 
 --- Collects the synchronous (phase A) snapshot: memory, Hammerspoon queries
@@ -847,7 +903,8 @@ function M.run(opts)
 		configuration = { items = {} },
 		unavailable = section("platform_coverage", H.collect_unavailable),
 		ai          = section("ai", H.collect_ai),
-		network     = section("network", H.collect_network),
+		-- Filled by the local_state probe with the developer section's module check
+		network     = {},
 		permissions = section("permissions", function() return H.collect_permissions(permission_ids) end),
 		peripherals = section("peripherals", function() return H.collect_peripherals(detailed) end),
 		issues      = section("issues", collect_issues),
@@ -865,6 +922,7 @@ function M.run(opts)
 
 	local elapsed = (hs.timer.absoluteTime() - started) / 1e6
 	sections.developer.phase_a_ms = elapsed
+	_last_phase_a = { ms = elapsed, budget_ms = schema.phase_a_budget_ms, collectors = timings }
 	-- Not a warning: the next snapshot would count it among the session's
 	-- problems. The report's developer section carries the duration.
 	if elapsed > schema.phase_a_budget_ms then
@@ -883,6 +941,7 @@ function M.run(opts)
 		local err = require("healthcheck.configuration").complete(snapshot,
 			H.configuration_context(schema, opts.configuration))
 		if err then Logger.error(LOG, "The configuration could not be collected: %s.", err) end
+		complete_local_state(snapshot)
 	end
 	return snapshot
 end

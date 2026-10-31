@@ -31,6 +31,9 @@
 ---    timer after phase A. It reads only local files, so it also runs without
 ---    the extensive opt-in (local_only), and an answer past its timeout_ms is a
 ---    timeout without sections.
+--- 8. local_state reads the main-thread facts phase A leaves out (the Wi-Fi
+---    signal, the module contract check) in slices of the phase A budget, on
+---    timers after phase A; local, like the configuration.
 --- ==============================================================================
 
 local M = {}
@@ -456,6 +459,54 @@ local function configuration(schema, overrides)
 	end
 end
 
+--- The main-thread facts phase A leaves out (ui.healthcheck.core
+--- local_state_steps: the Wi-Fi signal, the module contract check), run in
+--- slices between run-loop turns: each slice stops once it has held the main
+--- thread for the phase A budget, so opening the window never stalls the
+--- event taps behind them. A raising step costs its own fact and turns the
+--- answer into an error that still carries the others.
+--- @param slice_ms number The phase A budget, the most one slice may hold.
+--- @return function Probe body.
+local function local_state(slice_ms)
+	return function(done, on_cancel)
+		local Timers = require("adapters.timer_scheduler")
+		local yield = require("infra.timings").sec("ui", "healthcheck_probe_yield_ms")
+		local steps, sections = require("ui.healthcheck.core").local_state_steps()
+		local next_step, failures, handle = 1, {}, nil
+		local function slice()
+			handle = nil
+			local started = now_ms()
+			while next_step <= #steps do
+				local ok, err = pcall(steps[next_step])
+				if not ok then
+					failures[#failures + 1] = string.format("step %d: %s", next_step, tostring(err):match("^[^\n]*"))
+				end
+				next_step = next_step + 1
+				if next_step <= #steps and now_ms() - started >= slice_ms then
+					local committed
+					handle, committed = Timers.after(yield, slice)
+					if committed ~= true then
+						done({ state = "error", detail = "the next slice could not be armed" }, sections)
+					end
+					return
+				end
+			end
+			if #failures > 0 then
+				done({ state = "error", detail = table.concat(failures, "; ") }, sections)
+				return
+			end
+			done({ state = "ok" }, sections)
+		end
+		local committed
+		handle, committed = Timers.after(yield, slice)
+		if committed ~= true then
+			done({ state = "error", detail = "the first slice could not be armed" })
+			return
+		end
+		on_cancel(function() if handle then Timers.cancel(handle) end end)
+	end
+end
+
 --- The Bluetooth input devices, after the USB ones phase A listed.
 --- @param usb_items table The snapshot's peripherals items.
 --- @param detailed boolean
@@ -500,6 +551,7 @@ function M.start(schema, snapshot, publish, options)
 	local config = schema.probes
 	local sections = snapshot.sections
 	start_probe(run, "configuration", config.configuration.timeout_ms, configuration(schema, options.overrides))
+	start_probe(run, "local_state", config.local_state.timeout_ms, local_state(schema.phase_a_budget_ms))
 	if options.local_only == true then
 		function run.refresh_cleanup() end
 		function run.has_pending_cleanup() return false end

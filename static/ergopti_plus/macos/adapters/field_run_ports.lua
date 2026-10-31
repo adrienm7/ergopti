@@ -189,6 +189,36 @@ local function run_field_check(step, finish)
 	if not started then finish("fail", { Engine.is_running() and "check_busy" or "check_refused" }) end
 end
 
+-- Collectors named by cost in the diagnostics step's codes.
+M.PHASE_A_COLLECTORS_NAMED = 5
+
+--- The diagnostics step's verdict and codes: the session's issue counts, then
+--- the synchronous collection's duration against its budget and its costliest
+--- collectors, so the field run names the one to move off phase A.
+--- @param issues table The snapshot's issues section.
+--- @param phase_a table|nil ui.healthcheck.core.last_phase_a().
+--- @return string verdict "pass", or "fail" over the budget or without a measure.
+--- @return table codes Closed codes.
+function M.diagnostics_codes(issues, phase_a)
+	local codes = { "warnings_" .. tostring(issues.warn_count or 0), "errors_" .. tostring(issues.err_count or 0) }
+	if type(phase_a) ~= "table" or type(phase_a.ms) ~= "number" or type(phase_a.budget_ms) ~= "number" then
+		codes[#codes + 1] = "fail_phase_a_unmeasured"
+		return "fail", codes
+	end
+	codes[#codes + 1] = "phase_a_ms_" .. tostring(math.floor(phase_a.ms + 0.5))
+	local ranked = {}
+	for index, entry in ipairs(phase_a.collectors or {}) do ranked[index] = entry end
+	table.sort(ranked, function(a, b) return a.ms > b.ms end)
+	for index = 1, math.min(#ranked, M.PHASE_A_COLLECTORS_NAMED) do
+		codes[#codes + 1] = string.format("phase_a_%s_%.1f", ranked[index].name, ranked[index].ms)
+	end
+	if phase_a.ms > phase_a.budget_ms then
+		codes[#codes + 1] = "fail_phase_a_budget"
+		return "fail", codes
+	end
+	return "pass", codes
+end
+
 --- Collects the diagnostics snapshot as the Debug menu's bug report does, and
 --- keeps its share projection.
 local function run_diagnostics(finish)
@@ -197,8 +227,8 @@ local function run_diagnostics(finish)
 	local snapshot = Core.run({ complete_local = true })
 	local issues = type(snapshot.sections) == "table" and snapshot.sections.issues or {}
 	local safe = require("healthcheck.share").snapshot(snapshot, schema)
-	finish("pass", { "warnings_" .. tostring(issues.warn_count or 0), "errors_" .. tostring(issues.err_count or 0) },
-		safe)
+	local verdict, codes = M.diagnostics_codes(issues, Core.last_phase_a())
+	finish(verdict, codes, safe)
 end
 
 
