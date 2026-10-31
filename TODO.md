@@ -1292,8 +1292,6 @@ or under "Decided, do not re-raise".
   tools: OPT), the base utilities on both OS (SYS); macOS `/usr/bin/python3` helpers (PIN on the managed
   Python); and whether the rows become a machine-readable `_shared/data/owned_runtimes.json`. Kept meanwhile:
   every tool as it is used today; a new spawn needs a row (the inventory test).
-- **"Sticky" in French and Latin-script locales.** The sticky-modifier labels keep the English
-  "Sticky", like the `menu.tapholds.sticky_*` strings. Use a French term such as « rémanent »?
 - **Dutch "Rolls".** `category.rolls` and `hs_config.cat_rolls` keep "Rolls" (Dutch "Rollen" means
   "roles"). Another Dutch word?
 - **A hand-written `config.toml` `[script]` row on macOS and Linux.** Windows reads `locale` from
