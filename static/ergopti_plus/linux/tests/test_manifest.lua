@@ -505,6 +505,7 @@ return {
 	"tests.unit.adapters.runtime.test_timer_scheduler_adapter",
 	"tests.unit.adapters.runtime.test_timer_delay_ceiling",
 	"tests.unit.infra.logger.test_timings_reader",
+	"tests.unit.infra.config.test_config_save_failure",
 	"tests.unit.infra.config.test_toml_codec_shared_decode",
 	"tests.unit.infra.config.test_toml_codec_shapes",
 	"tests.unit.ui.menu.structure.test_top_level_order_is_the_manifest",

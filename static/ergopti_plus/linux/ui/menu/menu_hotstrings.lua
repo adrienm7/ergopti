@@ -11,6 +11,7 @@
 
 local M = {}
 
+local SaveFailure = require("config_save_failure")
 local Logger = require("logger.shim")
 local Extensions = require("hotstrings.extensions")
 local PersonalFiles = require("hotstrings.personal_files")
@@ -267,7 +268,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 			if called and committed == true then return true end
 			Logger.error(LOG, "The aggregate hotstrings switch did not acknowledge durable publication.")
-			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 			return false
 		end
 		return ManifestMenu.check_row("hotstring_scope_checkbox", require("config_keys").COMMAND.HOTSTRING_SCOPE_ALL_SECTIONS,
@@ -336,7 +337,7 @@ local function _manifest_hotstring_rows(ctx, config)
 						end
 						Logger.error(LOG, "Hotstring section toggle refused for '%s.%s' (%s).", id, name,
 							called and "owner-not-committed" or "owner-error")
-						show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+						SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 						return false
 					end,
 				}
@@ -355,7 +356,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 			Logger.error(LOG, "Hotstring category scope refused for '%s' (%s).", id,
 				called and "owner-not-committed" or "owner-error")
-			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 			return false
 		end
 		local render_ctx = { commands = {
@@ -530,7 +531,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		if type(setter) == "function" then ok, committed = pcall(setter, ...) end
 		if not ok or committed ~= true then
 			Logger.error(LOG, "The hotstring delay owner refused publication.")
-			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 			return false
 		end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -1043,7 +1044,7 @@ local function _manifest_hotstring_rows(ctx, config)
 								end)
 								if not called or committed ~= true then
 									Logger.error(LOG, "Dynamic hotstring family refused (%s).", called and "owner-not-committed" or "owner-error")
-									show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+									SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 									return false
 								end
 								-- A prefix family is matched by the ORDINARY engine, which
@@ -1072,7 +1073,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				local called, committed = pcall(function() return dyn.set_scope_enabled(enabled, config) end)
 				if not called or committed ~= true then
 					Logger.error(LOG, "Dynamic hotstring scope refused (%s).", called and "owner-not-committed" or "owner-error")
-					show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+					SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 					return false
 				end
 				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -1322,7 +1323,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					end
 					Logger.error(LOG, "Extension hotstring gate selection refused (%s).",
 						called and "owner-not-committed" or "owner-error")
-					show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+					SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 					return false
 				end
 
@@ -1367,7 +1368,7 @@ local function _manifest_hotstring_rows(ctx, config)
 							end
 							Logger.error(LOG, "Extension hotstring section toggle refused for '%s.%s' (%s).", bound.category, bound.section,
 								called and "owner-not-committed" or "owner-error")
-							show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+							SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 							return false
 						end or nil,
 					}
