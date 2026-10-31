@@ -1153,6 +1153,62 @@ const CHECKS = [
 		}
 	},
 	{
+		id: 'autocorrection-family-alone',
+		title:
+			'Each common autocorrection family alone expands its own word from real keys, not the others',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const { samples } = JSON.parse(
+				fs.readFileSync(
+					path.join(
+						live.ROOT,
+						'static/ergopti_plus/_shared/tests/corpus/hotstrings/family_samples.json'
+					),
+					'utf8'
+				)
+			);
+			const common = samples.filter((sample) => sample.family === 'autocorrection');
+			if (common.length < 3) return fail(`only ${common.length} autocorrection samples`);
+			const problems = [];
+			for (const alone of common) {
+				const master = '[category_enabled]\nhotstrings = true\nautocorrection = true\n';
+				const toml = common
+					.map(
+						(sample) =>
+							`[hotstrings.autocorrection.${sample.section}]\nenabled = ${sample === alone}\n`
+					)
+					.join('');
+				const { session } = await bootEnglish(context, `family-${alone.section}`, master + toml);
+				await session.run('pump', ['3000']);
+				for (const sample of common) {
+					await session.run('edit_open');
+					await session.run('hse_reset');
+					session.type([
+						['mode', 'event'],
+						['level', '100'],
+						['gap', '120'],
+						['text', sample.buffer],
+						['key', '{SC039}'],
+						['wait', '900']
+					]);
+					const engine = (await session.run('hse_buffer')).replace(/^buffer=/, '');
+					await session.run('edit_close');
+					const expanded = engine.includes(sample.expected.replacement);
+					if (expanded !== (sample === alone))
+						problems.push(
+							`${alone.section} alone, ${sample.buffer}: the engine holds "${engine}", ${expanded ? 'expanded' : 'not expanded'}`
+						);
+				}
+				const errors = session.loggedErrors();
+				if (errors.length > 0) problems.push(`${alone.section}: the log holds ${errors[0]}`);
+				await session.stop();
+			}
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`${common.length} families each expand their own sample and refuse the others`);
+		}
+	},
+	{
 		id: 'handwritten-delimiters',
 		title: 'Handwritten [[hotstrings.terminators]] through Add, toggle, Delete, save and restart',
 		async run(context) {
