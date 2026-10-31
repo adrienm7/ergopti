@@ -55,6 +55,9 @@ helpers.describe("Karabiner generator publication uses the proven filesystem wri
 			helpers.assert_eq(deploy and deploy.bytes, #fixture.file_writes[1].content,
 				"the last deploy names the bytes it wrote")
 			helpers.assert_true(type(deploy.write_ms) == "number" and deploy.write_ms >= 0)
+			-- (lease-deploy-fork-share) the forks counted inside that write.
+			helpers.assert_true(type(deploy.fork_ms) == "number" and deploy.fork_ms >= 0)
+			helpers.assert_true(type(deploy.forks) == "number" and deploy.forks >= 0)
 			helpers.assert_eq(#fixture.parent_prepare_calls, 1)
 			helpers.assert_eq(fixture.parent_prepare_calls[1], path)
 			helpers.assert_eq(#fixture.file_reads, 1, "publication must merge from one exact post-preparation read")

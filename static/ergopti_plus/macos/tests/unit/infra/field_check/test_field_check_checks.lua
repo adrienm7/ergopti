@@ -134,6 +134,13 @@ helpers.describe("lease check", function()
 		helpers.assert_eq(steps.deploy_write_ms.state, "info")
 		helpers.assert_eq(steps.deploy_write_ms.value, "42")
 		helpers.assert_eq(steps.deploy_kb.value, "743")
+		helpers.assert_eq(steps.deploy_fork_ms.value, "none", "a write without its fork share names none")
+		-- (lease-deploy-fork-share) the part of the write an asynchronous
+		-- publication could take off the main thread is named.
+		local forked = make_ports({ deploy_facts = function()
+			return { bytes = 760832, write_ms = 254.2, fork_ms = 181.6, forks = 1 }
+		end })
+		helpers.assert_eq(run("lease", forked).deploy_fork_ms.value, "182")
 		local quiet = make_ports()
 		helpers.assert_eq(run("lease", quiet).deploy_write_ms.value, "none", "no deploy this session is named")
 	end)
