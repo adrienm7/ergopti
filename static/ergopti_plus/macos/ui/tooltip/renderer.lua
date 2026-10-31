@@ -15,6 +15,7 @@ local hs = hs
 local Logger = require("infra.logger")
 local LOG = "tooltip_renderer"
 local Config = require("ui.tooltip.config")
+local AXResponsiveness = require("adapters.accessibility_permission")
 -- The two pieces of tooltip maths that must not differ between drivers, and
 -- are pinned to the same JSON vectors on both.
 local SharedTint   = require("tooltip.tint")
@@ -258,47 +259,10 @@ function M.apply_tint(requested_tint)
 	})
 end
 
--- The AX error of a read the application did not answer within the
--- process-wide messaging timeout (kAXErrorCannotComplete).
-local AX_UNANSWERED = "Messaging failed"
-
--- How long an application that left a read unanswered is not asked again. Each
--- unanswered read holds the main thread for the whole messaging timeout; the
--- caret cascade made five in one render (2515 ms, field run 2026-10-31).
-local AX_UNANSWERED_COOLDOWN_SEC = 5
-
--- pid -> secondsSinceEpoch until which its windows are not queried
-local _ax_unanswered_until = {}
-
--- Raised inside the AX cascade to stop it at the first unanswered read
+-- Raised inside the AX cascade to stop it at the first unanswered read: each
+-- one holds the main thread for the whole messaging timeout, and the cascade
+-- asked up to seven (2515 ms, field run 2026-10-31)
 local UNANSWERED_SENTINEL = {}
-
---- Returns the frontmost application's pid without an Accessibility query.
---- @return number|nil pid Nil when the workspace does not name one.
-local function frontmost_pid()
-	local ok, pid = pcall(function()
-		local app = hs.application.frontmostApplication()
-		if app == nil or type(app.pid) ~= "function" then return nil end
-		return app:pid()
-	end)
-	return ok and type(pid) == "number" and pid or nil
-end
-
---- Whether the frontmost application can be asked Accessibility questions.
---- This process never can: its own AX server answers on the main thread this
---- query blocks, so each read waits out the whole messaging timeout.
---- @param pid number|nil Frontmost application's pid.
---- @return boolean askable
-local function ax_askable(pid)
-	if pid == nil then return true end
-	local own = hs.processInfo and hs.processInfo.processID or nil
-	if own ~= nil and pid == own then return false end
-	local until_at = _ax_unanswered_until[pid]
-	if until_at == nil then return true end
-	if hs.timer.secondsSinceEpoch() < until_at then return false end
-	_ax_unanswered_until[pid] = nil
-	return true
-end
 
 --- Reads one AX value and stops the cascade at an unanswered read.
 --- @param element userdata|table AX element.
@@ -306,7 +270,7 @@ end
 --- @return any value
 local function ax_read(element, method, ...)
 	local value, err = element[method](element, ...)
-	if value == nil and type(err) == "string" and err:find(AX_UNANSWERED, 1, true) then
+	if value == nil and type(err) == "string" and err:find(AXResponsiveness.UNANSWERED_ERROR, 1, true) then
 		error(UNANSWERED_SENTINEL, 0)
 	end
 	return value
@@ -349,7 +313,7 @@ local function resolve_ax_anchor()
 	end)
 	if not ok then
 		local unanswered = position == UNANSWERED_SENTINEL
-			or (type(position) == "string" and position:find(AX_UNANSWERED, 1, true) ~= nil)
+			or (type(position) == "string" and position:find(AXResponsiveness.UNANSWERED_ERROR, 1, true) ~= nil)
 		return nil, unanswered
 	end
 	return type(position) == "table" and position or nil, false
@@ -360,14 +324,14 @@ end
 --- @return table|nil anchor Table containing x, y, and optionally h and type.
 --- @return table screen_frame Frame of the focused window's screen or the main one.
 function M.resolve_placement()
-	local pid = frontmost_pid()
-	local askable = ax_askable(pid)
+	local pid = AXResponsiveness.frontmost_pid()
+	local askable = AXResponsiveness.is_askable(pid)
 	local anchor, unanswered = nil, false
 	if askable then anchor, unanswered = resolve_ax_anchor() end
 	if unanswered and pid ~= nil then
-		_ax_unanswered_until[pid] = hs.timer.secondsSinceEpoch() + AX_UNANSWERED_COOLDOWN_SEC
+		AXResponsiveness.mark_unanswered(pid)
 		Logger.debug(LOG, "Frontmost application (PID %s) left an Accessibility read unanswered; tooltip placed without it for %d s.",
-			tostring(pid), AX_UNANSWERED_COOLDOWN_SEC)
+			tostring(pid), AXResponsiveness.unanswered_cooldown_sec())
 	end
 
 	-- hs.window.focusedWindow is an Accessibility read of the same application
@@ -395,10 +359,7 @@ function M.resolve_anchor()
 	return (M.resolve_placement())
 end
 
---- Forgets every application that left a read unanswered (tests only).
-function M.reset_ax_unanswered_for_tests()
-	_ax_unanswered_until = {}
-end
+
 
 
 
