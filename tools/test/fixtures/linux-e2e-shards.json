@@ -33,6 +33,7 @@
 			"Install prerequisites for Load the number-row options into a real X server",
 			"Load the number-row options into a real X server",
 			"Restart the daemon through the local reload control",
+			"Run the field checks without a click",
 			"A virtual touchpad, described by the kernel and read back",
 			"A gesture written to uinput comes back as a gesture"
 		],

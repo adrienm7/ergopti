@@ -3022,6 +3022,27 @@ jobs:
           fi
         timeout-minutes: 3
 
+      # The field report's no-click checks between real processes: a host of the
+      # production field run session takes the collector's request and runs the
+      # Debug field checks with no window; the network check's verdict depends on
+      # the runner's network, so every step must answer, not pass.
+      - name: Run the field checks without a click
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          env LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/lua/?.lua;$PWD/../_shared/lua/?/init.lua;;" luajit "$PWD/tests/hardware/run_field_run_live.lua"
+          else
+              exit 1
+          fi
+        timeout-minutes: 6
+
       - name: Install prerequisites for The tray binding names libraries and symbols that exist
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
