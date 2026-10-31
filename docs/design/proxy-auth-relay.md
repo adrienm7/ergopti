@@ -88,8 +88,13 @@ used, so there is no dependency to pin or licence to record.
 The closed set is `_shared/modules/network/proxy_auth_relay.json` `refusals`;
 each names its locale key under `network.relay.*`. The Go constants are pinned
 to it by `contract_test.go`, and the Lua policy (`network/proxy_auth_relay.lua`)
-reads the same file. A relay binary that is not installed is the caller's
-`relay_unavailable`.
+reads the same file. A relay that ran but did not answer by contract (a crash,
+a timeout, a foreign line) is the caller's `relay_unavailable`. A relay binary
+that is not installed is the binding's `not_installed` status, not a refusal:
+the client keeps the proxy as named, as before the relay existed, with one
+WARNING, and the network check reports `relay_not_installed`. This holds only
+until the binary ships in every package; then `not_installed` becomes a
+refusal.
 
 ## Security
 
@@ -114,7 +119,7 @@ reads the same file. A relay binary that is not installed is the caller's
 ## Not covered
 
 - Packaging the binary in each release (Linux packages, the macOS app, the
-  Windows bundle) and its hosted build cells; until then the caller refuses
-  with `relay_unavailable`.
+  Windows bundle) and its hosted build cells; until then the caller warns and
+  keeps the proxy as named (`not_installed` above).
 - Channel bindings, Kerberos delegation, and mutual authentication of the
   proxy: the tunnel carries TLS to the origin, which authenticates the origin.

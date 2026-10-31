@@ -31,7 +31,8 @@
 ---    refuses such downloads, so the failure stays a failure.
 --- 6. A plain http relay the route plan selects is probed for a sign-in the
 ---    daemon cannot give (docs/design/proxy-auth-relay.md): proxy_relay names
----    not_needed, required_<scheme>, or the relay's closed refusal.
+---    not_needed, required_<scheme>, relay_not_installed, or the relay's
+---    closed refusal.
 --- ==============================================================================
 
 local M = {}
@@ -182,7 +183,9 @@ local function record_proxy_relay(report, plan, relay_probe, relay, done)
 		return done()
 	end
 	relay_probe(upstream, function(answer, reason)
-		if answer and answer.status == "required" then
+		if answer and answer.status == ProxyAuthRelay.NOT_INSTALLED then
+			report.step("proxy_relay", STATE.skip, "relay_not_installed")
+		elseif answer and answer.status == "required" then
 			report.step("proxy_relay", STATE.pass, "required_" .. answer.scheme)
 		elseif answer then
 			report.step("proxy_relay", STATE.pass, "not_needed")
