@@ -28,7 +28,7 @@ local function fake(initial_state)
 	package.loaded["platform.remap.runtime_activation"] = nil
 	local Activation = require("platform.remap.runtime_activation")
 	local world = { state = initial_state or "idle", starts = {}, stops = 0, restores = 0, marker = false,
-		restore_result = true, reloads = 0, admit = true }
+		restore_result = true, reloads = 0, admit = true, consent = true }
 	local owner = {
 		status = function() return { state = world.state } end,
 		start = function(options, on_settled)
@@ -55,6 +55,7 @@ local function fake(initial_state)
 			clear = function() world.marker = false; return true end,
 		},
 		reload = function() world.reloads = world.reloads + 1 end,
+		close_other_instances = function() return world.consent end,
 	})
 	return activation, world, Activation
 end
@@ -92,12 +93,16 @@ end)
 -- =================================
 
 helpers.describe("owned runtime activation: Ergopti runs", function()
-	helpers.it("starts Ergopti's runtime, which always closes the user's Karabiner", function()
+	helpers.it("starts Ergopti's runtime with the user's consent to close theirs", function()
 		local activation, world = fake()
 		local admitted = 0
 		helpers.assert_eq(activation.reconcile(true, function() admitted = admitted + 1 end), "start")
 		helpers.assert_eq(world.starts, { { close_other_instances = true } })
 		helpers.assert_eq(admitted, 1)
+		local unticked, unticked_world = fake()
+		unticked_world.consent = false
+		unticked.reconcile(true)
+		helpers.assert_eq(unticked_world.starts, { { close_other_instances = false } })
 	end)
 
 	helpers.it("does not start a second time while the runtime starts or runs", function()

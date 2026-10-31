@@ -1059,6 +1059,27 @@ local function user_karabiner_closed_rows(karabiner)
 	return ManifestMenu.template_rows("tap_hold_user_karabiner_closed_rows", {}) or {}
 end
 
+--- The consent row of Ergopti's own Karabiner runtime (ADR 011): while it is
+--- ticked, Ergopti closes the user's own Karabiner-Elements while it runs and
+--- gives it back when paused or quit. It exists only on a boot that runs the
+--- owned runtime.
+--- @param karabiner table Remap facade.
+--- @param update_menu function|nil Menu refresh callback.
+--- @return table rows Empty unless the owned runtime runs.
+local function close_other_karabiner_rows(karabiner, update_menu)
+	if type(karabiner.owned_runtime_selected) ~= "function" or karabiner.owned_runtime_selected() ~= true
+		or type(karabiner.get_close_other_instances) ~= "function" then return {} end
+	local consent = karabiner.get_close_other_instances() == true
+	return ManifestMenu.template_rows("tap_hold_close_other_karabiner_rows", {
+		[ConfigKeys.COMMAND.TAP_HOLD_CLOSE_OTHER_KARABINER] = function()
+			Logger.info(LOG, "Close other Karabiner instances toggled to %s from the Tap-Holds menu.", tostring(not consent))
+			return commit_menu_setting(karabiner, "Close other Karabiner instances", function()
+				return karabiner.set_close_other_instances(not consent)
+			end, update_menu)
+		end,
+	}, { close_other_karabiner = function() return consent end }) or {}
+end
+
 --- Why Ergopti's own runtime cannot run, for the blocks the user can act on.
 --- Only one VirtualHIDDevice version can be active on a Mac, so a user
 --- Karabiner with another driver version blocks it (ADR 011), and a driver
@@ -1120,6 +1141,7 @@ function M.build(ctx)
 			local rows = legacy_rules_rows(karabiner)
 			for _, row in ipairs(guardian_status_rows(karabiner, tap_holds_on)) do rows[#rows + 1] = row end
 			for _, row in ipairs(owned_runtime_block_rows(karabiner)) do rows[#rows + 1] = row end
+			for _, row in ipairs(close_other_karabiner_rows(karabiner, update_menu)) do rows[#rows + 1] = row end
 			for _, row in ipairs(user_karabiner_closed_rows(karabiner)) do rows[#rows + 1] = row end
 			rows[#rows + 1] = build_delay_item(karabiner, update_menu)
 			rows[#rows + 1] = build_sticky_delay_item(karabiner, update_menu)

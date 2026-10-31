@@ -224,7 +224,8 @@ runtime (pinned with Ahk2Exe 1.1.37.02a2 and SHA-256 in
 - **Revised by the maintainer (2026-10-31), superseding the line above:** the
   rule follows Ergopti running, not the Tap-Hold section. Ergopti running (not
   paused) always uses its own pinned runtime and closes a running user
-  Karabiner; Ergopti paused or quit stops its runtime and restarts the user's
+  Karabiner (under the default-on consent row); Ergopti paused or quit stops
+  its runtime and restarts the user's
   Karabiner only if it closed it, remembered in a persisted marker so a crash
   is recovered. The owned runtime is the only path: the shared-mode merge into
   the user's `karabiner.json` is retired (an owned boot removes the rules an
