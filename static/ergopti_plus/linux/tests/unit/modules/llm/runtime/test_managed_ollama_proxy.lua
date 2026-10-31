@@ -392,6 +392,25 @@ it("(proxy-auth-relay) a refused sign-in refuses the start with the relay's reas
 	end
 end)
 
+it("(proxy-auth-relay) a relay that is not installed keeps the proxy as named, with a warning", function()
+	local Logger = require("logger.shim")
+	local warned = {}
+	local original = Logger.warn
+	Logger.warn = function(_, message) warned[#warned + 1] = message end
+	local ok, failure = pcall(function()
+		local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } },
+			probe_answer = { { status = "not_installed" } } })
+		local result = w:run()
+		eq(result.ok, true)
+		eq(result.relay, nil)
+		eq(result.environment[1], "HTTPS_PROXY=http://proxy.corp.example:3128")
+	end)
+	Logger.warn = original
+	assert(ok, failure)
+	eq(#warned, 1)
+	assert(warned[1]:find("not installed", 1, true), warned[1])
+end)
+
 it("(proxy-auth-relay) a probe that cannot start is the named relay_unavailable", function()
 	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } },
 		probe_error = "proxy-auth-relay-probe-unavailable" })

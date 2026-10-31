@@ -198,7 +198,11 @@ function M.new(deps)
 					return
 				end
 				local result = { ok = true, environment = environment_of(plan, rows), direct_fallback = fallback }
-				if answer.status == "required" then
+				if answer.status == "not_installed" then
+					-- The relay is not packaged yet: the daemon keeps the proxy as
+					-- named, as before the relay existed, and says so.
+					Logger.warn(LOG, "Managed Ollama proxy sign-in relay not installed: a proxy that demands NTLM or Negotiate will refuse the pulls.")
+				elseif answer.status == "required" then
 					Logger.info(LOG, "Managed Ollama proxy demands a %s sign-in: the daemon starts under the local relay.",
 						answer.scheme)
 					result.relay = { upstream = upstream, scheme = answer.scheme }
