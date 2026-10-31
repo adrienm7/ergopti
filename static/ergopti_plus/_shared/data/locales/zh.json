@@ -2371,8 +2371,6 @@
 	"ollama.model_ready": "%s 已就绪！",
 	"ollama.model_repair": "模型似乎已损坏。正在尝试重新下载：%s",
 	"ollama.model_repair_title": "正在修复 Ollama 模型",
-	"ollama.not_detected_body": "请安装 Ollama 后重试。",
-	"ollama.not_detected_title": "未检测到 Ollama",
 	"ollama.service_disconnected": "Ollama 服务停止响应。",
 	"ollama.service_ready": "Ollama 服务就绪 ✅",
 	"ollama.service_stopped": "Ollama 服务已停止。正在启动…",

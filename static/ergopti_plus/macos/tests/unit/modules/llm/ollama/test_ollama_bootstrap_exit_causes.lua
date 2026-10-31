@@ -26,7 +26,7 @@ local function failure_for(code, stdout, key)
 	Fixture.scoped(function()
 		local state = Fixture.new_state()
 		local checker = Fixture.load_ollama_checker(state)
-		helpers.assert_true(checker.install_for_selection(function() end))
+		helpers.assert_true(Fixture.start_verification(state, checker, function() end))
 		state.tasks[1].done(code, stdout or "", "")
 		message = checker.get_failure_message()
 		if key then expected = require("infra.i18n").get(key) end
@@ -63,7 +63,7 @@ local function missing_catalogue_failure(developer)
 		Fixture.scoped(function()
 			local state = Fixture.new_state()
 			local checker = Fixture.load_ollama_checker(state)
-			helpers.assert_true(checker.install_for_selection(function() end))
+			helpers.assert_true(Fixture.start_verification(state, checker, function() end))
 			state.tasks[1].done(78, "", "[OLLAMA-DEPS] stage: runtime_install\nOLLAMA_MANAGED_CATALOGUE_MISSING\n"
 				.. "[OLLAMA-DEPS] ERROR: stage runtime_install ended with exit 78.\n")
 			message = checker.get_failure_message()
@@ -109,7 +109,7 @@ local function signalled_failure(code, streamed)
 			local checker = Fixture.load_ollama_checker(state)
 			-- The suite's locale stub answers keys; keep the substituted value visible.
 			require("infra.i18n").format = function(key, ...) return key .. "(" .. table.concat({ ... }, ",") .. ")" end
-			helpers.assert_true(checker.install_for_selection(function() end))
+			helpers.assert_true(Fixture.start_verification(state, checker, function() end))
 			local task = state.tasks[1]
 			if streamed then helpers.assert_true(task.stream(task, "", streamed)) end
 			task.done(code, "", "")

@@ -1133,14 +1133,6 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 		bootstrap.includes('\napply_system_network\n'),
 		'native curl uv wheel and cached probes retain default activation'
 	);
-	const curlBootstrap = fs.readFileSync(
-		path.join(root, 'static/ergopti_plus/macos/modules/llm/ensure-ollama-deps.sh'),
-		'utf8'
-	);
-	assert.ok(
-		curlBootstrap.includes('\napply_system_network\n'),
-		'native curl installer retains default admission'
-	);
 	const localServer = fs.readFileSync(
 		path.join(root, 'static/ergopti_plus/macos/modules/llm/ollama_server_command.lua'),
 		'utf8'

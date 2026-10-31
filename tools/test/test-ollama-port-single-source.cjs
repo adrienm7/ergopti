@@ -23,11 +23,10 @@
  * of the deferring files, or if one of them stops referencing llm_ollama_port
  * (which would mean the default resolution was silently deleted).
  *
- * The Ollama install script (install/ollama_install.sh) probed and announced a
- * typed 11434 too; it now reads the port from the same defaults.json and is held
- * to the same rule. It stays on the stock key: it is the legacy system installer,
- * which no driver calls. Its PowerShell
- * twin installed a system Ollama and is gone: its absence is checked here.
+ * The legacy system installers (install/ollama_install.sh and its PowerShell
+ * twin) installed a stock Ollama, which Ergopti never uses: both are gone
+ * (owned-runtimes row "Ollama installers (legacy)"), and their absence is
+ * checked here.
  * ==============================================================================
  */
 
@@ -43,18 +42,18 @@ const SSOT_FILE = path.join(ROOT, 'static/ergopti_plus/_shared/modules/llm/defau
 // from a local literal. api_ollama.ahk is a redirect shim; constants live in
 // the init sub-file which is the authoritative gate for this invariant.
 const OWNED_KEY = 'llm_ollama_owned_port';
-const STOCK_KEY = 'llm_ollama_port';
 const FILES = [
 	['static/ergopti_plus/windows/modules/llm/api_ollama/init.ahk', OWNED_KEY],
 	['static/ergopti_plus/windows/ui/menu/menu_llm/_index.ahk', OWNED_KEY],
 	// The Ollama port tool moved from the tray's model list to the selector page.
 	['static/ergopti_plus/windows/ui/model_browser/init.ahk', OWNED_KEY],
-	['static/ergopti_plus/windows/ui/menu/menu_llm/menu_settings.ahk', OWNED_KEY],
-	['static/ergopti_plus/_shared/modules/llm/install/ollama_install.sh', STOCK_KEY]
+	['static/ergopti_plus/windows/ui/menu/menu_llm/menu_settings.ahk', OWNED_KEY]
 ];
 
-const RETIRED_SYSTEM_INSTALLER =
-	'static/ergopti_plus/_shared/modules/llm/install/ollama_install.ps1';
+const RETIRED_SYSTEM_INSTALLERS = [
+	'static/ergopti_plus/_shared/modules/llm/install/ollama_install.ps1',
+	'static/ergopti_plus/_shared/modules/llm/install/ollama_install.sh'
+];
 
 // Line-comment marker per language: AHK uses ";", shell and PowerShell "#".
 const COMMENT_MARKERS = { '.ahk': ';', '.sh': '#', '.ps1': '#' };
@@ -91,11 +90,13 @@ if (!Number.isInteger(ownedSsot) || ownedSsot < 1024 || ownedSsot > 65535 || own
 	);
 	process.exit(1);
 }
-if (fs.existsSync(path.join(ROOT, RETIRED_SYSTEM_INSTALLER))) {
-	console.error(
-		`\x1b[31m[ERROR] ${RETIRED_SYSTEM_INSTALLER} would install a system Ollama; Ergopti owns its own.\x1b[0m`
-	);
-	process.exit(1);
+for (const retired of RETIRED_SYSTEM_INSTALLERS) {
+	if (fs.existsSync(path.join(ROOT, retired))) {
+		console.error(
+			`\x1b[31m[ERROR] ${retired} would install a system Ollama; Ergopti owns its own.\x1b[0m`
+		);
+		process.exit(1);
+	}
 }
 
 const literalRe = new RegExp(`\\b(?:${ssot}|${ownedSsot})\\b`);
