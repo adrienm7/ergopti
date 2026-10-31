@@ -8,9 +8,10 @@ import subprocess
 import sys
 
 ABSENT_JOB_STATUS = 113
-# An ad hoc signed helper (no TeamIdentifier) names its registration reset on
-# a second line; a Developer ID helper prints the status alone.
-READY_REGISTRATIONS = ("ready\n", "ready\ndeveloper_adhoc_reregistered\n")
+# An ad hoc signed helper (no TeamIdentifier) runs the guardian as the per-user
+# legacy agent only and names it on a second line (f57e8123f9 retired the
+# Background Items reset note); a Developer ID helper prints the status alone.
+READY_REGISTRATIONS = ("ready\n", "ready\ndeveloper_adhoc_legacy_only\n")
 
 
 def observe(application, output):

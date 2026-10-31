@@ -105,14 +105,20 @@ class HelperGuardianAcceptanceTests(unittest.TestCase):
         self.assertEqual(receipt["cleanup_errors"], [])
         self.assertFalse(any(call[1] == "bootout" for call in boundary.calls))
 
-    def test_an_ad_hoc_helper_names_its_registration_reset_and_nothing_else(self):
+    def test_an_ad_hoc_helper_names_its_legacy_only_guardian_and_nothing_else(self):
         def configure(stdout):
             return lambda boundary: setattr(boundary, "register_stdout", stdout)
 
-        _, receipt, error = self.run_probe(configure("ready\ndeveloper_adhoc_reregistered\n"))
+        _, receipt, error = self.run_probe(configure("ready\ndeveloper_adhoc_legacy_only\n"))
         self.assertIsNone(error)
         self.assertTrue(receipt["unregistration_verified"])
-        for stdout in ["ready\ndeveloper_adhoc_reset_refused\n", "ready\nready\n", "ready"]:
+        retired = "ready\ndeveloper_adhoc_reregistered\n"
+        for stdout in [
+            retired,
+            "ready\ndeveloper_adhoc_reset_refused\n",
+            "ready\nready\n",
+            "ready",
+        ]:
             with self.subTest(stdout=stdout):
                 _, receipt, error = self.run_probe(configure(stdout))
                 self.assertIn("did not register a ready guardian", error)
