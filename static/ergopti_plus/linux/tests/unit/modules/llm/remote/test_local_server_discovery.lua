@@ -98,6 +98,45 @@ helpers.describe("Linux local server discovery ownership", function()
 			helpers.assert_eq(endpoint.url:sub(1, 26), "http://127.0.0.1:8181/v1/c", "a request follows the scanned port")
 		end)
 	end)
+	-- vLLM shares oMLX's port 8000: both rows probe it when both are looked for,
+	-- and the answer's owned_by names the one row kept (local_servers.json fingerprint)
+	helpers.it("vLLM answering on oMLX's port is one row named vLLM (local-server-fingerprint)", function()
+		isolated(function(servers, _, calls, _, scan)
+			for _, id in ipairs({ "lmstudio", "llamacpp", "jan" }) do scan[id] = { running = false, pids = {} } end
+			scan.vllm = { running = true, pids = { 2 } }
+			helpers.assert_true(servers.rescan(function() return true end, function() end))
+			helpers.assert_eq(#calls, 2)
+			helpers.assert_eq(calls[1].url, "http://127.0.0.1:8000/v1/models")
+			helpers.assert_eq(calls[2].url, "http://127.0.0.1:8000/v1/models")
+			local listing = { ok = true, status = 200,
+				body = '{"object":"list","data":[{"id":"Qwen/Qwen3-8B","object":"model","owned_by":"vllm"}]}' }
+			calls[1].finish(listing)
+			calls[2].finish(listing)
+			helpers.assert_eq(table.concat(servers.detected(), ","), "vllm")
+			helpers.assert_eq(servers.result("omlx").shadowed_by, "vllm")
+			local names = {}
+			for _, view in ipairs(servers.views()) do
+				if view.status == "up" then names[#names + 1] = view.display_name end
+			end
+			helpers.assert_eq(names, { "vLLM" })
+		end)
+	end)
+	helpers.it("an oMLX row whose answer is vLLM's is named vLLM (local-server-fingerprint)", function()
+		isolated(function(servers, _, calls, _, scan)
+			for _, id in ipairs({ "lmstudio", "llamacpp", "jan" }) do scan[id] = { running = false, pids = {} } end
+			helpers.assert_true(servers.rescan(function() return true end, function() end))
+			helpers.assert_eq(#calls, 1)
+			calls[1].finish({ ok = true, status = 200,
+				body = '{"object":"list","data":[{"id":"Qwen/Qwen3-8B","object":"model","owned_by":"vllm"}]}' })
+			helpers.assert_eq(table.concat(servers.detected(), ","), "omlx")
+			helpers.assert_eq(servers.views()[1].display_name, "vLLM")
+			-- Paused: the rows are built from the published verdicts, with no new sweep
+			local rows = require("ui.menu.local_server_rows").rows({ is_enabled = function() return true end,
+				get_backend = function() return "ollama" end, can_configure_local_servers = function() return false end },
+				{}, nil, { is_paused = function() return true end })
+			helpers.assert_true(find(rows, "vLLM 🖥️ — 127.0.0.1:8000") ~= nil, "the menu row names vLLM")
+		end)
+	end)
 	helpers.it("no running server probes nothing and still publishes none (local-server-ports)", function()
 		isolated(function(servers, _, calls, _, scan)
 			for _, id in ipairs({ "omlx", "lmstudio", "llamacpp", "jan" }) do scan[id] = { running = false, pids = {} } end
@@ -329,6 +368,10 @@ helpers.describe("Configured generic loopback discovery (local-configured-affini
 				helpers.assert_eq(calls[1].url, "http://127.0.0.1:8000/v1/models")
 				helpers.assert_eq(calls[1].headers.Authorization, "Bearer inert-token")
 				helpers.assert_nil(calls[2].headers.Authorization, "a configured credential never crosses catalogue origins")
+				-- The entry's address is also vLLM's default address: the entry belongs
+				-- to the address's default row (oMLX) alone, so vLLM is not probed
+				helpers.assert_eq(#calls, 4)
+				helpers.assert_eq(servers.target("vllm").entry_id, nil)
 				calls[1].finish({ ok = true, status = 200, body = '{"object":"list","data":[{"id":"mlx-community/Qwen3-8B-4bit","object":"model","owned_by":"omlx"}]}' })
 				for index = 2, 4 do calls[index].finish({ ok = false, status = 0, body = "" }) end
 				local receipt = servers.capture("omlx")

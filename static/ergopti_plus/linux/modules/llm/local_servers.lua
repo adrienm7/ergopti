@@ -7,6 +7,7 @@ local Catalogue = require("modules.llm.local_server_catalogue")
 local Ports = require("modules.llm.local_server_ports")
 local Discovery = require("llm.local_server_discovery")
 local Auth = require("llm.local_server_auth")
+local Menu = require("llm.local_server_menu")
 local Entries = require("modules.llm.api_entries")
 local Remote = require("modules.llm.api_remote")
 local Http = require("adapters.http_client")
@@ -15,7 +16,7 @@ local Clock = require("infra.monotonic")
 local EventLoop = require("adapters.event_loop")
 local Logger = require("logger.shim")
 local LOG = "llm.local_servers"
-local catalogue_order, catalogue_servers, _, catalogue_discovery = Catalogue.load({})
+local catalogue_order, catalogue_servers, _, catalogue_discovery, _, _, catalogue_identities = Catalogue.load({})
 -- Server id -> the last port scan result (llm.local_server_ports); the callbacks
 -- of the rescans waiting for the running scan, nil when none runs
 local port_scans, scan_waiters = {}, nil
@@ -24,7 +25,7 @@ local requests, pending, view_receipts = {}, {}, setmetatable({}, { __mode = "k"
 local queued = {}
 local closed, view_generation, configuration_generation = false, 0, 0
 local cached_source, source_initialized = nil, false
-local controller = Discovery.new({ order = order, clock = Clock.now_ms,
+local controller = Discovery.new({ order = order, clock = Clock.now_ms, identities = catalogue_identities,
 	max_age = function() return Timings.ms("llm", "local_server_detection_max_age_ms") end,
 	on_publish = function(results, changed)
 		if changed then view_generation = view_generation + 1 end
@@ -33,8 +34,11 @@ local controller = Discovery.new({ order = order, clock = Clock.now_ms,
 			local result = results[id]
 			if result and result.status ~= Discovery.STATUS_DOWN then
 				local scan = port_scans[id]
-				found[#found + 1] = string.format("%s=%s at %s%s", id, result.status, tostring(result.base_url),
-					scan and scan.source and scan.base_url == result.base_url and (" (port from " .. scan.source .. ")") or "")
+				found[#found + 1] = string.format("%s=%s at %s%s%s", id, result.status, tostring(result.base_url),
+					scan and scan.source and scan.base_url == result.base_url and (" (port from " .. scan.source .. ")") or "",
+					result.server and (" (answers as " .. result.server .. ")") or "")
+			elseif result and result.shadowed_by then
+				found[#found + 1] = string.format("%s at %s answers as %s", id, tostring(result.base_url), result.shadowed_by)
 			end
 		end
 		Logger.info(LOG, "Local servers swept: %s.", #found > 0 and table.concat(found, ", ") or "none answers")
@@ -380,7 +384,7 @@ function M.views()
 		if target and server then
 			local scan = catalogue_servers[id] and port_scans[id] or nil
 			local verdict = controller.result(id)
-			local view = { id = id, display_name = server.label, base_url = target.base_url,
+			local view = { id = id, display_name = Menu.label_of(servers, id, verdict), base_url = target.base_url,
 				port = tonumber(target.base_url:match("^%a[%w+.-]*://[^/]-:(%d+)")), port_source = target.port_source }
 			if target.port_source ~= "user" and scan and scan.running == false then
 				view.reason = "not_running"

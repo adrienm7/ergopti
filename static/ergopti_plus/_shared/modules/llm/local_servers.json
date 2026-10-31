@@ -1,5 +1,5 @@
 {
-	"_comment": "Single source of truth for the local servers the AI menu detects: servers the user installed and runs, which answer the OpenAI Chat Completions dialect (GET <base_url>/models, POST <base_url>/chat/completions). The driver never installs or starts them: it lists one only when its models endpoint answers, and sends it the requests of the openai format of api_providers.json, with no key unless the user gives one or the server's own settings file holds one (discovery.config_files key_key, read only for a running loopback server and never logged). A server's id must not be a provider id of api_providers.json. base_url is each project's documented default port on 127.0.0.1, the IPv4 loopback every one of them binds by default; _source names where it was read. The IP literal, as for Ollama and MLX, keeps the probe off the name localhost, which a client may resolve to ::1 first (where these servers do not listen), send through the system proxy, or answer slowly (#99). llama-server (llama.cpp), LocalAI and llamafile all listen on port 8080 by default with the same --port flag, so one probe covers them and the row names them together. No two rows share a default address: a generic entry the user configured at that address would otherwise belong to two servers. A server whose API always needs a key or answers outside the OpenAI dialect (AnythingLLM: a workspace slug as the model) is not listed. A server is probed only while its process runs (discovery.process_names: the executable's file name; discovery.command_lines: a command-line fragment), at the port its command line passes (discovery.port_flags, discovery.address_flags), else the port of its settings file (discovery.config_files: per OS, dir or the folder named in dir_file, file, dotted port_key, optional dotted key_key), else a port its process listens on, and only then at base_url's default port (_shared/lua/llm/local_server_ports.lua). When the process list cannot be read, a server is still probed at the port of its settings file, else at a port a process of its name listens on, else at base_url's default port.",
+	"_comment": "Single source of truth for the local servers the AI menu detects: servers the user installed and runs, which answer the OpenAI Chat Completions dialect (GET <base_url>/models, POST <base_url>/chat/completions). The driver never installs or starts them: it lists one only when its models endpoint answers, and sends it the requests of the openai format of api_providers.json, with no key unless the user gives one or the server's own settings file holds one (discovery.config_files key_key, read only for a running loopback server and never logged). A server's id must not be a provider id of api_providers.json. base_url is each project's documented default port on 127.0.0.1, the IPv4 loopback every one of them binds by default; _source names where it was read. The IP literal, as for Ollama and MLX, keeps the probe off the name localhost, which a client may resolve to ::1 first (where these servers do not listen), send through the system proxy, or answer slowly (#99). llama-server (llama.cpp), LocalAI and llamafile all listen on port 8080 by default with the same --port flag, so one probe covers them and the row names them together. Two rows may share a default address (oMLX and vLLM on 8000, text-generation-webui and TabbyAPI on 5000): their models listings have the same shape, so each row of a shared address declares a fingerprint (model_field: a field of the model objects of GET <base_url>/models, equals: the value that project writes there). When several rows of one address answer there in one sweep, one row is kept (_shared/lua/llm/local_server_discovery.lua): the row the response's fingerprint names, else the first row of that address in server_order (the address's default row: oMLX, text-generation-webui), also kept for a 401 or 403, which carries no listing to read; a row whose response names another row of its address is shown with that row's name. A fingerprint is declared only on a shared address, and a generic entry configured there belongs to the address's default row only (_shared/lua/llm/local_server_auth.lua entry_matches), which then shows the name of the server that answered (_shared/lua/llm/local_server_fingerprint.lua, replayed on _shared/tests/corpus/llm/local_server_fingerprint.json). A server whose API always needs a key or answers outside the OpenAI dialect (AnythingLLM: a workspace slug as the model) is not listed. A server is probed only while its process runs (discovery.process_names: the executable's file name; discovery.command_lines: a command-line fragment), at the port its command line passes (discovery.port_flags, discovery.address_flags), else the port of its settings file (discovery.config_files: per OS, dir or the folder named in dir_file, file, dotted port_key, optional dotted key_key), else a port its process listens on, and only then at base_url's default port (_shared/lua/llm/local_server_ports.lua). When the process list cannot be read, a server is still probed at the port of its settings file, else at a port a process of its name listens on, else at base_url's default port.",
 	"server_order": [
 		"omlx",
 		"lmstudio",
@@ -11,7 +11,9 @@
 		"gpt4all",
 		"lemonade",
 		"docker_model_runner",
-		"exo"
+		"exo",
+		"vllm",
+		"tabbyapi"
 	],
 	"thinking_dialect": {
 		"_comment": "How a local server carries the reasoning controls of the model families of thinking_off.json, merged after request_fields (which turn thinking off for every model) and never over a field already set: a family's effort level travels in chat_template_kwargs, where gpt-oss chat templates read reasoning_effort (llama.cpp server, vLLM, mlx-lm); a template that does not know a key ignores it.",
@@ -28,6 +30,11 @@
 			"base_url": "http://127.0.0.1:8000/v1",
 			"_source": "github.com/jundot/omlx: README ('Any OpenAI-compatible client can connect to http://localhost:8000/v1'), omlx/settings.py (host 127.0.0.1, port 8000), omlx/server.py (GET /v1/models, POST /v1/chat/completions; a key only when one is configured).",
 			"auth": "optional",
+			"fingerprint": {
+				"model_field": "owned_by",
+				"equals": "omlx",
+				"_source": "github.com/jundot/omlx omlx/api/openai_models.py (ModelInfo.owned_by default 'omlx')."
+			},
 			"discovery": {
 				"process_names": ["omlx-server"],
 				"command_lines": ["omlx.cli serve", "omlx serve"],
@@ -105,6 +112,11 @@
 			"base_url": "http://127.0.0.1:5000/v1",
 			"_source": "github.com/oobabooga/textgen modules/shared.py (--api, --api-port default 5000, --api-key default empty) and modules/api/script.py (GET /v1/models, POST /v1/chat/completions).",
 			"auth": "optional",
+			"fingerprint": {
+				"model_field": "owned_by",
+				"equals": "user",
+				"_source": "github.com/oobabooga/textgen modules/api/models.py (model_info_dict: owned_by 'user')."
+			},
 			"discovery": {
 				"command_lines": ["one_click.py", "server.py --api", "text-generation-webui/server.py"],
 				"port_flags": ["--api-port"],
@@ -173,6 +185,38 @@
 				"process_names": ["exo"],
 				"port_flags": ["--api-port"],
 				"_source": "The exo console script (pyproject.toml), usually through uv run exo; --api-port. Its ~/.config/exo folder holds no documented port."
+			}
+		},
+		"vllm": {
+			"label": "vLLM",
+			"base_url": "http://127.0.0.1:8000/v1",
+			"_source": "github.com/vllm-project/vllm vllm/entrypoints/openai/cli_args.py (port default 8000; host default None, every interface, so the loopback answers; api_key default None: a key only with --api-key) and vllm/entrypoints/openai/protocol.py (ModelList of ModelCard for GET /v1/models; POST /v1/chat/completions).",
+			"auth": "optional",
+			"fingerprint": {
+				"model_field": "owned_by",
+				"equals": "vllm",
+				"_source": "github.com/vllm-project/vllm vllm/entrypoints/openai/protocol.py (ModelCard.owned_by default 'vllm')."
+			},
+			"discovery": {
+				"command_lines": ["vllm serve", "vllm.entrypoints.openai.api_server"],
+				"port_flags": ["--port"],
+				"_source": "The vllm console script (vllm serve <model>) and python -m vllm.entrypoints.openai.api_server, both with --port (cli_args.py); a Python console script runs as python, so its command line is matched. Its optional --config file is YAML at no default path."
+			}
+		},
+		"tabbyapi": {
+			"label": "TabbyAPI",
+			"base_url": "http://127.0.0.1:5000/v1",
+			"_source": "github.com/theroyallab/tabbyAPI config_sample.yml (network.host 127.0.0.1, network.port 5000, network.disable_auth false) and endpoints/core/router.py (GET /v1/models behind check_api_key; POST /v1/chat/completions). Its key lives in api_tokens.yml in the install folder, so a default install answers 401 and the menu asks for the key; disable_auth lets it answer without one.",
+			"auth": "optional",
+			"fingerprint": {
+				"model_field": "owned_by",
+				"equals": "tabbyAPI",
+				"_source": "github.com/theroyallab/tabbyAPI endpoints/core/types/model.py (ModelCard.owned_by default 'tabbyAPI')."
+			},
+			"discovery": {
+				"command_lines": ["tabbyapi/start.py", "tabbyapi/main.py"],
+				"port_flags": ["--port"],
+				"_source": "start.sh and start.bat run start.py, which imports main.py and serves in the same process; the command line is matched with the install folder's name, as the repository is cloned. common/args.py makes a flag of every config field, so network.port is --port. Its config.yml is YAML, which this reader does not parse."
 			}
 		}
 	}

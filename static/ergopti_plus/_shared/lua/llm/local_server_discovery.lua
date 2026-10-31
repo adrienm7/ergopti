@@ -11,6 +11,7 @@
 
 local M = {}
 local AuthPolicy = require("llm.local_server_auth")
+local Fingerprint = require("llm.local_server_fingerprint")
 
 M.STATUS_UP = "up"
 M.STATUS_NEEDS_KEY = "needs_key"
@@ -40,22 +41,65 @@ end
 --- @return boolean
 local function verdict_changed(a, b)
 	if a == nil or b == nil then return a ~= b end
-	if a.status ~= b.status or a.base_url ~= b.base_url or #a.models ~= #b.models then return true end
+	if a.status ~= b.status or a.base_url ~= b.base_url or #a.models ~= #b.models
+		or a.server ~= b.server or a.shadowed_by ~= b.shadowed_by then return true end
 	for index, model in ipairs(a.models) do
 		if b.models[index] ~= model then return true end
 	end
 	return false
 end
 
+--- Keeps one row per answering shared address and names the server that
+--- answered (llm.local_server_fingerprint). Among the rows of one address
+--- group that answered at the same address in one sweep, the row the
+--- fingerprint names wins, else the address's default row (the first of the
+--- group in server_order); the others become down with shadowed_by naming the
+--- winner. A winner whose response names another row of its group carries
+--- server = that row, so the menu shows that server's name.
+--- @param order table The sweep's view order.
+--- @param fresh table View id -> verdict; modified in place.
+--- @param identified table View id -> the row its body fingerprinted.
+--- @param identities table|nil Output of llm.local_server_fingerprint.parse.
+local function resolve_shared(order, fresh, identified, identities)
+	if type(identities) ~= "table" then return end
+	local buckets, keys = {}, {}
+	for _, id in ipairs(order) do
+		local identity, verdict = identities[id], fresh[id]
+		if identity and verdict and (verdict.status == M.STATUS_UP or verdict.status == M.STATUS_NEEDS_KEY) then
+			local key = identity.group[1] .. "\n" .. tostring(verdict.base_url)
+			if not buckets[key] then buckets[key], keys[#keys + 1] = {}, key end
+			table.insert(buckets[key], id)
+		end
+	end
+	for _, key in ipairs(keys) do
+		local members, named = buckets[key], nil
+		for _, id in ipairs(members) do
+			if identified[id] then named = identified[id]; break end
+		end
+		local winner = members[1]
+		for _, id in ipairs(members) do if id == named then winner = id end end
+		for _, id in ipairs(members) do
+			if id ~= winner then
+				fresh[id] = { status = M.STATUS_DOWN, base_url = fresh[id].base_url, models = {}, shadowed_by = winner }
+			end
+		end
+		if named and named ~= winner then fresh[winner].server = named end
+	end
+end
+
 --- Creates an independent controller; clock and max_age use the same host units.
 --- No timing literal lives here: drivers pass their shared timings registry.
---- @param options table { order, clock, max_age, on_publish?, on_error? }.
+--- @param options table { order, clock, max_age, on_publish?, on_error?,
+--- identities? }: identities is llm.local_server_fingerprint.parse's output;
+--- without it no row is fingerprinted or merged.
 --- @return table controller
 function M.new(options)
 	assert(type(options) == "table", "local discovery controller options are required")
 	assert(type(options.order) == "table", "local discovery controller order is required")
 	assert(type(options.clock) == "function", "local discovery controller clock is required")
 	assert(type(options.max_age) == "function", "local discovery controller cache age is required")
+	assert(options.identities == nil or type(options.identities) == "table",
+		"local discovery controller identities must be a table")
 	local order = {}
 	for index, id in ipairs(options.order) do order[index] = id end
 	local results, checked_at, generation, active, waiters = {}, nil, 0, false, {}
@@ -125,11 +169,12 @@ function M.new(options)
 		local own_generation = generation
 		active = true
 		if on_done then waiters[#waiters + 1] = on_done end
-		local fresh, pending = {}, #captured
+		local fresh, identified, pending = {}, {}, #captured
 
 		local function finish()
 			if own_generation ~= generation then return end
 			active = false
+			resolve_shared(order, fresh, identified, options.identities)
 			local changed = false
 			for _, id in ipairs(order) do
 				if verdict_changed(results[id], fresh[id]) then changed = true end
@@ -158,6 +203,9 @@ function M.new(options)
 				settled = true
 				local status, models = M.classify(response)
 				fresh[id] = { status = status, base_url = base_url, models = models or {} }
+				if status == M.STATUS_UP then
+					identified[id] = Fingerprint.identify(response.body, id, options.identities)
+				end
 				pending = pending - 1
 				if pending == 0 then finish() end
 			end
