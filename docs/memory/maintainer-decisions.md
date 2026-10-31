@@ -60,3 +60,13 @@ shipped locale code is adopted.
   version resource** go to the PC agent (handoff).
 - **L115 is closed**: the provider error envelope guard did not reproduce
   under WSL LuaJIT (6 of 6 runs pass); reopen only on a new failing run.
+
+## Every owned-runtime row is decided (2026-10-31)
+
+The maintainer accepted every row's proposal of the owned-runtimes inventory.
+The rows live in `_shared/data/owned_runtimes.json` (decision
+PIN/SYS/OPT/DELETE/NA, status done/follow_up); where a proposal named two ways,
+the first is decided and the second kept as `alternative`. WebView2 stays the
+Evergreen system runtime (2026-10-27). Edit the JSON, then run
+`node tools/codegen/codegen-owned-runtimes.cjs`; never hand-edit the generated
+tables of `docs/design/owned-runtimes.md`. Do not re-raise per-row choices.

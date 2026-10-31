@@ -339,6 +339,11 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/macos/_generated/hid_key_identity.lua']
 	},
 	{
+		// Splices the tables between the document's GENERATED markers; the prose stays.
+		script: 'codegen/codegen-owned-runtimes.cjs',
+		outputs: ['docs/design/owned-runtimes.md']
+	},
+	{
 		script: 'codegen/codegen-keystats-queries.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/lua/keystats/queries.lua',
