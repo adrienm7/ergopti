@@ -27,6 +27,9 @@ else
 fi
 NETWORK_RETRY_LIB="$SCRIPT_DIR/network-retry.sh"
 OLLAMA_RELEASE_FILE="$SCRIPT_DIR/ollama-release.sh"
+# The external hosts, generated from _shared/data/identifiers.json into the
+# shared tree the bundle ships beside the driver.
+IDENTIFIERS_FILE="$SCRIPT_DIR/../../../_shared/data/identifiers.sh"
 # System tools stay reachable when the caller hands over a minimal PATH.
 export PATH="$PATH:/usr/bin:/bin:/usr/sbin:/sbin"
 
@@ -83,7 +86,7 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-for dependency_file in "$NETWORK_RETRY_LIB" "$OLLAMA_RELEASE_FILE"; do
+for dependency_file in "$NETWORK_RETRY_LIB" "$OLLAMA_RELEASE_FILE" "$IDENTIFIERS_FILE"; do
 	if [ ! -f "$dependency_file" ]; then
 		log_error "Required bootstrap source is missing at $dependency_file."
 		exit 1
@@ -91,6 +94,7 @@ for dependency_file in "$NETWORK_RETRY_LIB" "$OLLAMA_RELEASE_FILE"; do
 done
 . "$NETWORK_RETRY_LIB"
 . "$OLLAMA_RELEASE_FILE"
+. "$IDENTIFIERS_FILE"
 
 if [ -n "$OLLAMA_RESOLVED_BIN" ]; then
 	if [ ! -x "$OLLAMA_RESOLVED_BIN" ]; then
@@ -124,7 +128,7 @@ apply_system_network
 
 INSTALL_TEMP="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-ollama.XXXXXX")"
 archive_path="$INSTALL_TEMP/ollama-darwin.tgz"
-archive_url="https://github.com/ollama/ollama/releases/download/v$OLLAMA_RELEASE_VERSION/ollama-darwin.tgz"
+archive_url="https://$ERGOPTI_HOST_GITHUB/ollama/ollama/releases/download/v$OLLAMA_RELEASE_VERSION/ollama-darwin.tgz"
 
 # Prints one progress marker from the bytes already written.
 report_download_progress() {

@@ -11,6 +11,10 @@ const SOURCE = sharedRel('modules', 'llm', 'managed_python_release.json');
 const SHELL_OUTPUT = 'static/ergopti_plus/macos/modules/llm/managed-python-release.sh';
 const METADATA_OUTPUT = 'static/ergopti_plus/macos/modules/llm/managed-python-downloads.json';
 const LUA_LOCATOR_OUTPUT = sharedRel('lua', 'core', 'llm', 'managed_python_locator.lua');
+// The GitHub host is declared once; the shell projection expands its generated
+// shell copy, which the macOS bundle ships three folders above modules/llm.
+const IDENTIFIERS = sharedRel('data', 'identifiers.json');
+const SHELL_IDENTIFIERS = '"$(dirname "${BASH_SOURCE[0]}")/../../../_shared/data/identifiers.sh"';
 
 function exactKeys(value, expected) {
 	if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -21,8 +25,15 @@ function exactKeys(value, expected) {
 		throw new TypeError('Managed Python metadata has an unknown or missing field.');
 }
 
-/** Refuse unsupported platforms and unsafe shell values before generating output. */
-function validate(data) {
+/**
+ * Refuse unsupported platforms and unsafe shell values before generating output.
+ * @param {object} data Canonical managed Python metadata.
+ * @param {{hosts: {github: string}}} identifiers Parsed _shared/data/identifiers.json.
+ */
+function validate(data, identifiers) {
+	const github = identifiers?.hosts?.github;
+	if (typeof github !== 'string' || !/^[a-z0-9.-]+$/.test(github))
+		throw new TypeError('Managed Python generation requires the shared GitHub host.');
 	exactKeys(data, ['schema_version', 'uv_release', 'source', 'downloads']);
 	if (
 		data.schema_version !== 1 ||
@@ -85,10 +96,17 @@ function validate(data) {
 		if (
 			key !== `cpython-${version}-darwin-${family}-none` ||
 			entry.url !==
-				`https://github.com/astral-sh/python-build-standalone/releases/download/${entry.build}/cpython-${version}%2B${entry.build}-${family}-apple-darwin-install_only_stripped.tar.gz`
+				`https://${github}/astral-sh/python-build-standalone/releases/download/${entry.build}/cpython-${version}%2B${entry.build}-${family}-apple-darwin-install_only_stripped.tar.gz`
 		)
 			throw new TypeError('Managed Python archive identity refused.');
-		return { key, entry, version, nativeArchitecture: family === 'aarch64' ? 'arm64' : 'x86_64' };
+		return {
+			key,
+			entry,
+			version,
+			// The download path below the host; the shell projection prefixes the host.
+			hostPath: entry.url.slice(`https://${github}`.length),
+			nativeArchitecture: family === 'aarch64' ? 'arm64' : 'x86_64'
+		};
 	});
 	if (
 		selections.some(
@@ -102,16 +120,20 @@ function validate(data) {
 	return selections;
 }
 
-/** Render deterministic projections; the original metadata still owns uv extraction. */
-function render(data) {
-	const selections = validate(data);
+/**
+ * Render deterministic projections; the original metadata still owns uv extraction.
+ * @param {object} data Canonical managed Python metadata.
+ * @param {{hosts: {github: string}}} identifiers Parsed _shared/data/identifiers.json.
+ */
+function render(data, identifiers) {
+	const selections = validate(data, identifiers);
 	const branches = selections
-		.map(({ entry, version, nativeArchitecture }) => {
+		.map(({ entry, version, hostPath, nativeArchitecture }) => {
 			const basename =
 				entry.sha256.slice(0, 9) + '-' + entry.url.split('/').at(-1).replace('%2B', '-');
 			return `\t${nativeArchitecture})
 \t\tMANAGED_PYTHON_REQUEST="cpython-${version}-macos-${entry.arch.family}-none"
-\t\tMANAGED_PYTHON_URL="${entry.url}"
+\t\tMANAGED_PYTHON_URL="https://\${ERGOPTI_HOST_GITHUB}${hostPath}"
 \t\tMANAGED_PYTHON_SHA256="${entry.sha256}"
 \t\tMANAGED_PYTHON_CACHE_BASENAME="${basename}"
 \t\t;;`;
@@ -140,6 +162,7 @@ ${locator}
 # Source: _shared/modules/llm/managed_python_release.json.
 # uv owns hash verification, offline extraction and interpreter publication.
 
+. ${SHELL_IDENTIFIERS} || return 78
 MANAGED_PYTHON_UV_RELEASE="${data.uv_release}"
 case "\${ERGOPTI_NATIVE_ARCH:-$(/usr/bin/uname -m)}" in
 ${branches}
@@ -156,6 +179,7 @@ function generate(root = REPO_ROOT, { check = false } = {}) {
 	if (!path.isAbsolute(root) || typeof check !== 'boolean')
 		throw new TypeError('Managed Python generator options refused.');
 	const data = JSON.parse(fs.readFileSync(path.join(root, SOURCE), 'utf8'));
+	const identifiers = JSON.parse(fs.readFileSync(path.join(root, IDENTIFIERS), 'utf8'));
 	const uv = fs.readFileSync(
 		path.join(root, 'static/ergopti_plus/macos/modules/llm/uv-release.sh'),
 		'utf8'
@@ -163,7 +187,7 @@ function generate(root = REPO_ROOT, { check = false } = {}) {
 	const version = uv.match(/^UV_RELEASE_VERSION="([0-9]+\.[0-9]+\.[0-9]+)"$/m);
 	if (!version || version[1] !== data.uv_release)
 		throw new TypeError('Managed Python metadata does not belong to the installed uv release.');
-	const outputs = render(data);
+	const outputs = render(data, identifiers);
 	for (const [relative, contents] of Object.entries(outputs)) {
 		const target = path.join(root, relative);
 		if (check) {
@@ -192,6 +216,7 @@ if (require.main === module) {
 
 module.exports = {
 	SOURCE,
+	IDENTIFIERS,
 	SHELL_OUTPUT,
 	METADATA_OUTPUT,
 	LUA_LOCATOR_OUTPUT,
