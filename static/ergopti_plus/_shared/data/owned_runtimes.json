@@ -257,15 +257,15 @@
 			"tool": "`/usr/bin/curl`",
 			"programs": ["curl"],
 			"used_for": "MLX discovery and inference, managed bootstrap (`macos/modules/llm/api_mlx_inference.lua:979`, `api_mlx_discovery.lua:925`, `macos/modules/llm/managed_ollama_runtime.py:91`)",
-			"today": "System (macOS ships it)",
+			"today": "System (macOS ships it); checked once at the first transfer, which refuses with a localized reason when it is missing or older than 7.64.1 (`macos/adapters/system_curl.lua`)",
 			"current_class": "SYS",
-			"version_needed": "any shipped with macOS 14+",
+			"version_needed": "7.64.1 or later (the curl of macOS 11, the oldest system the app declares)",
 			"if_missing": "Downloads fail",
 			"pin_possible": "Not needed",
 			"decision": "SYS",
 			"decision_text": "SYS: check once, refuse with a message",
 			"alternative": null,
-			"status": "follow_up"
+			"status": "done"
 		},
 		{
 			"os": "macos",
