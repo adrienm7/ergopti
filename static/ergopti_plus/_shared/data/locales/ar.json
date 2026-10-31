@@ -724,7 +724,6 @@
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "محرك عرض الويب",
 	"webview.runtime_too_old": "إصدار WebView2 Runtime قديم جدًا ({2}): يحتاج Ergopti+ إلى الإصدار {1} أو أحدث. تُفتح نوافذه بشكلها البسيط إلى أن تحدّثه.",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "الطراز",
 	"healthcheck.field.cpu": "المعالج",
 	"healthcheck.field.cpu_cores": "الأنوية المنطقية",

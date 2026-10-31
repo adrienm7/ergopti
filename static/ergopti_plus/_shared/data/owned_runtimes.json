@@ -903,9 +903,9 @@
 		{
 			"os": "linux",
 			"tool": "`kanata --version`, `df`, `ls` in the health check",
-			"programs": ["kanata", "df", "ls"],
+			"programs": ["df", "ls"],
 			"used_for": "Probe line only (`linux/ui/healthcheck/probes.lua:17,270`)",
-			"today": "Not installed; a stale probe",
+			"today": "The kanata probe is removed; `df` reads the logs volume's free space",
 			"current_class": "OPT",
 			"version_needed": "n/a",
 			"if_missing": "A line in the report",
@@ -913,7 +913,7 @@
 			"decision": "DELETE",
 			"decision_text": "Remove the kanata probe",
 			"alternative": null,
-			"status": "follow_up"
+			"status": "done"
 		},
 		{
 			"os": "linux",

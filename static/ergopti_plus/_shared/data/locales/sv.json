@@ -724,7 +724,6 @@
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Webbvymotor",
 	"webview.runtime_too_old": "WebView2 Runtime är för gammal ({2}): Ergopti+ kräver {1} eller senare. Fönstren öppnas i enkel form tills du uppdaterar den.",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "Modell",
 	"healthcheck.field.cpu": "Processor",
 	"healthcheck.field.cpu_cores": "Logiska kärnor",

@@ -719,7 +719,6 @@
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Moteur des fenêtres web",
 	"webview.runtime_too_old": "Le runtime WebView2 est trop ancien ({2}) : Ergopti+ demande la version {1} ou plus récente. Ses fenêtres s’ouvrent sous leur forme simple jusqu’à sa mise à jour.",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "Modèle",
 	"healthcheck.field.cpu": "Processeur",
 	"healthcheck.field.cpu_cores": "Cœurs logiques",

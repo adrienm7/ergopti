@@ -724,7 +724,6 @@
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Рушій веб-подань",
 	"webview.runtime_too_old": "Середовище WebView2 Runtime застаріле ({2}): Ergopti+ потрібна версія {1} або новіша. Вікна відкриваються у простому вигляді, доки ви його не оновите.",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "Модель",
 	"healthcheck.field.cpu": "Процесор",
 	"healthcheck.field.cpu_cores": "Логічні ядра",
