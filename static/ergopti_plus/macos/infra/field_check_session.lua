@@ -31,6 +31,9 @@ local PASS, FAIL, INFO = Report.STATE_PASS, Report.STATE_FAIL, Report.STATE_INFO
 -- leaves far less than this; more means a timer or a watcher spins.
 M.IDLE_WINDOW_SECONDS = 30
 M.IDLE_CPU_PERCENT_MAX = 3
+-- Timer sites of the idle window named as steps, and in the log.
+M.IDLE_TIMERS_REPORTED = 3
+M.IDLE_TIMERS_LOGGED = 8
 -- Slowest boot stages written to the log.
 M.BOOT_STAGES_LOGGED = 3
 
@@ -92,9 +95,34 @@ function M.parse_rss(text)
 	return value and tonumber(value) or nil
 end
 
+--- Names a timer site `<file>:<line>`, the folders dropped so no user path
+--- reaches a report or the log.
+--- @param site any Callback site "path:line" from the callback accounting.
+--- @return string name
+function M.timer_site_name(site)
+	local path, line = tostring(site or ""):match("^(.-%.lua):(%d+)$")
+	if not path then return "unknown" end
+	return (path:match("([^/]+)$") or path) .. ":" .. line
+end
+
+--- One timer site as a step value: `<file>:<line>:<count>:<ms>`.
+--- @param entry table { site, count, ms } from the callback accounting.
+--- @return string token
+function M.timer_site_token(entry)
+	return string.format("%s:%d:%d", M.timer_site_name(entry.site), entry.count or 0,
+		math.floor((entry.ms or 0) + 0.5))
+end
+
 --- The driver's own CPU share and memory over a quiet window.
+--- The window starts from a collected heap: the garbage the field run's earlier
+--- steps left would otherwise be collected inside it and billed to idleness
+--- (2026-10-31: the heap fell by 21 MB in the 30 s window). The timer callbacks
+--- that ran in it are named with their count and time, so a share over the
+--- bound says which owner wakes the app; the rest of the CPU (event taps,
+--- touch frames, Accessibility, task callbacks, other threads) is one figure.
 --- ports: pid(), cpu_ms() (process CPU), now_ms() (monotonic), exec, after,
---- hold_counts(), lua_heap_kb().
+--- hold_counts(), lua_heap_kb(), collect_garbage(), begin_callback_accounting(),
+--- end_callback_accounting().
 function M.idle_cost(ports, report, finish)
 	local pid = tostring(ports.pid())
 	local function rss(callback)
@@ -103,14 +131,35 @@ function M.idle_cost(ports, report, finish)
 		end)
 	end
 	rss(function(rss_start)
+		local collect_started = ports.now_ms()
+		ports.collect_garbage()
+		report.step("idle_pre_collect_ms", INFO, math.floor(ports.now_ms() - collect_started + 0.5))
 		local cpu_start, wall_start = ports.cpu_ms(), ports.now_ms()
 		local holds_start, heap_start = ports.hold_counts(), ports.lua_heap_kb()
+		ports.begin_callback_accounting()
 		ports.after(M.IDLE_WINDOW_SECONDS, function()
+			local timers = ports.end_callback_accounting()
 			local cpu_used, wall = ports.cpu_ms() - cpu_start, ports.now_ms() - wall_start
 			local share = wall > 0 and cpu_used * 100 / wall or 0
 			Logger.evidence(LOG, "Idle window: %.0f ms of CPU over %.0f ms (%.2f %%).", cpu_used, wall, share)
 			report.step("idle_cpu_percent", share <= M.IDLE_CPU_PERCENT_MAX and PASS or FAIL,
 				string.format("%.2f", share))
+			local timer_ms, timer_count = 0, 0
+			for index, entry in ipairs(timers) do
+				timer_ms, timer_count = timer_ms + entry.ms, timer_count + entry.count
+				if index <= M.IDLE_TIMERS_LOGGED then
+					Logger.evidence(LOG, "Idle timer %d: %s ran %d time(s) for %.1f ms.", index,
+						M.timer_site_name(entry.site),
+						entry.count, entry.ms)
+				end
+			end
+			report.step("idle_timer_callbacks", INFO, timer_count)
+			report.step("idle_timer_ms", INFO, math.floor(timer_ms + 0.5))
+			-- What no timer explains: taps, touch frames, Accessibility, threads.
+			report.step("idle_other_cpu_ms", INFO, math.max(0, math.floor(cpu_used - timer_ms + 0.5)))
+			for index = 1, M.IDLE_TIMERS_REPORTED do
+				report.step("idle_timer_" .. index, INFO, timers[index] and M.timer_site_token(timers[index]) or "none")
+			end
 			local holds_end = ports.hold_counts()
 			-- The counters restart at each phase summary: a smaller end is a restart.
 			local holds = (holds_end.over_250ms or 0) - (holds_start.over_250ms or 0)
