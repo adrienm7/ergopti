@@ -431,6 +431,9 @@ local _token_cache = {}
 local _token_inflight = {}
 local _token_cleanup_debt = false
 local _token_cleanup_in_progress = false
+-- Resolver waiters parked on a pending access-token exchange (waiter -> true):
+-- settled with the Keychain waiters when the remote identity changes
+local _access_waiters = {}
 local _availability_pause_cleanup_pending = false
 local _warmup_client_recovery_token = nil
 -- Entries already named for a provider this build no longer has, so each is
@@ -758,6 +761,20 @@ local function settle_token_resolutions(reason, notify_waiters)
 		}
 	end
 
+	-- An exchange waiter owns no native operation: the exchange itself goes on
+	-- and caches its token, so fencing the waiter settles it
+	local access_waiters = {}
+	for waiter in pairs(_access_waiters) do access_waiters[#access_waiters + 1] = waiter end
+	_access_waiters = {}
+	for _, waiter in ipairs(access_waiters) do
+		if waiter.active == true then
+			waiter.active = false
+			if notify_waiters == true then
+				invoke_token_callback(waiter.callback, false, nil, reason)
+			end
+		end
+	end
+
 	local settled = true
 	for _, owned in ipairs(records) do
 		local cache_key = owned.cache_key
@@ -839,6 +856,10 @@ local function invalidate_identity()
 	end
 end
 
+-- Starts the access-token exchange of the active entry once the identity
+-- settles (assigned below, after the resolver it calls)
+local schedule_access_prewarm
+
 --- Replace the full list of configured API entries. Used at load time from
 --- the persisted JSON sidecar and whenever the tray menu adds / removes one.
 --- @param entries table Array of entry tables. Pass {} to clear.
@@ -850,6 +871,7 @@ function M.set_entries(entries)
 		if type(e) == "table" then table.insert(_entries, e) end
 	end
 	Logger.debug(LOG, "API entries set (%d entry/entries).", #_entries)
+	schedule_access_prewarm()
 end
 
 function M.get_entries()
@@ -875,6 +897,7 @@ function M.set_active_entry_id(id)
 	_active_id = id
 	invalidate_identity()
 	Logger.debug(LOG, "Active API entry id: '%s'.", id)
+	schedule_access_prewarm()
 end
 
 function M.get_active_entry_id()
@@ -1011,21 +1034,56 @@ function M.prepare_access(provider_id, key, on_ready)
 end
 
 --- Hands a resolved entry to a resolver callback, its stored key replaced by
---- the access token when its provider exchanges keys; refused, with the
---- exchange started, while no token can be sent.
+--- the access token when its provider exchanges keys. While that exchange is
+--- pending the callback waits for it, owned by the returned lease, so the
+--- first request after start or a key change is sent rather than refused;
+--- a refused exchange in its retry pause answers at once.
 --- @param callback function
 --- @param copy table The entry with its cleartext key.
+--- @return table lease Cancels a wait; already settled otherwise.
 local function deliver_resolved(callback, copy)
 	local provider = M.PROVIDERS[copy.provider]
-	if provider and provider.auth then
-		local token, reason = access_token(copy.provider, copy.token)
-		if not token then
-			Logger.warn(LOG, "API entry '%s' has no access token yet: %s.", tostring(copy.id), reason)
+	if not (provider and provider.auth) then
+		invoke_token_callback(callback, true, copy, nil)
+		return settled_token_lease()
+	end
+	local key = copy.token
+	local token, reason = access_token(copy.provider, key)
+	if token then
+		copy.token = token
+		invoke_token_callback(callback, true, copy, nil)
+		return settled_token_lease()
+	end
+	if access_slot(copy.provider, key).pending ~= true then
+		Logger.warn(LOG, "API entry '%s' has no access token: %s.", tostring(copy.id), reason)
+		invoke_token_callback(callback, false, nil, "access_token_unavailable")
+		return settled_token_lease()
+	end
+	local waiter = { callback = callback, active = true, generation = _identity_generation }
+	_access_waiters[waiter] = true
+	Logger.debug(LOG, "API entry '%s' waits for its access token.", tostring(copy.id))
+	refresh_access(copy.provider, key, function(ok, why)
+		if waiter.active ~= true then return end
+		waiter.active = false
+		_access_waiters[waiter] = nil
+		if waiter.generation ~= _identity_generation then
+			return invoke_token_callback(callback, false, nil, "stale_identity")
+		end
+		local fresh = ok == true and access_slot(copy.provider, key).token or nil
+		if type(fresh) ~= "string" or fresh == "" then
+			Logger.warn(LOG, "API entry '%s' has no access token: %s.", tostring(copy.id), tostring(why))
 			return invoke_token_callback(callback, false, nil, "access_token_unavailable")
 		end
-		copy.token = token
-	end
-	invoke_token_callback(callback, true, copy, nil)
+		copy.token = fresh
+		invoke_token_callback(callback, true, copy, nil)
+	end)
+	return {
+		cancel = function()
+			waiter.active = false
+			_access_waiters[waiter] = nil
+			return true
+		end,
+	}
 end
 
 --- Returns a shallow copy whose token is cleartext, leaving the persisted entry
@@ -1064,24 +1122,23 @@ function M.resolve_active_entry(callback)
 	-- A local server the user gave no key to is sent the one its own settings
 	-- file holds, else none
 	if type(stored) ~= "string" or stored == "" then
-		deliver_resolved(callback, resolved_copy(LocalServers.discovered_key(entry.provider, entry.base_url)))
-		return settled_token_lease()
+		return deliver_resolved(callback, resolved_copy(LocalServers.discovered_key(entry.provider, entry.base_url)))
 	end
 	if not TokenCrypto.is_encrypted(stored) then
-		deliver_resolved(callback, resolved_copy(stored))
-		return settled_token_lease()
+		return deliver_resolved(callback, resolved_copy(stored))
 	end
 
 	local cache_key = tostring(entry.id) .. "\0" .. stored
 	local cached = _token_cache[cache_key]
 	if type(cached) == "string" and cached ~= "" then
-		deliver_resolved(callback, resolved_copy(cached))
-		return settled_token_lease()
+		return deliver_resolved(callback, resolved_copy(cached))
 	end
 
 	local waiter = { callback = callback, active = true, record = nil }
 	local lease = {}
 	lease.cancel = function()
+		-- Past the Keychain read, the lease owns the access-token wait
+		if waiter.access_lease then return waiter.access_lease.cancel() end
 		if waiter.active ~= true then return true end
 		local record = waiter.record
 		if type(record) ~= "table" or record.done == true then
@@ -1154,7 +1211,7 @@ function M.resolve_active_entry(callback)
 		for _, pending_waiter in ipairs(record.waiters) do
 			if pending_waiter.active == true then
 				pending_waiter.active = false
-				if ok then deliver_resolved(pending_waiter.callback, resolved_copy(cleartext))
+				if ok then pending_waiter.access_lease = deliver_resolved(pending_waiter.callback, resolved_copy(cleartext))
 				else invoke_token_callback(pending_waiter.callback, false, nil, reason) end
 			end
 		end
@@ -1180,6 +1237,36 @@ function M.resolve_active_entry(callback)
 		end
 	end
 	return lease
+end
+
+-- Whether an access-token prewarm is already scheduled for the next tick
+local _access_prewarm_scheduled = false
+
+schedule_access_prewarm = function()
+	if _access_prewarm_scheduled then return end
+	local entry = find_active_entry()
+	local provider = entry and M.PROVIDERS[entry.provider]
+	if not (provider and provider.auth) then return end
+	-- On the next tick: the menu sets the entries and the active id in turn,
+	-- and the exchange is for the identity they leave
+	_access_prewarm_scheduled = true
+	local _, committed = TimerScheduler.after(0, function()
+		_access_prewarm_scheduled = false
+		local current = find_active_entry()
+		local current_provider = current and M.PROVIDERS[current.provider]
+		if not (current_provider and current_provider.auth) then return end
+		Logger.debug(LOG, "Starting the access-token exchange of API entry '%s'.", tostring(current.id))
+		M.resolve_active_entry(function(ok, _, reason)
+			if ok ~= true and reason ~= "identity_changed" and reason ~= "stale_identity" then
+				Logger.warn(LOG, "Access-token prewarm of API entry '%s' did not complete: %s.",
+					tostring(current.id), tostring(reason))
+			end
+		end)
+	end)
+	if committed ~= true then
+		_access_prewarm_scheduled = false
+		Logger.warn(LOG, "Access-token prewarm of API entry '%s' could not be scheduled.", tostring(entry.id))
+	end
 end
 
 --- Starts a best-effort asynchronous token resolution after persisted state
