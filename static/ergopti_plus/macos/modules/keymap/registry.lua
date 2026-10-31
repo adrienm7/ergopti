@@ -980,18 +980,39 @@ function M.field_run_candidates()
 		local group = m.group or ""
 		if not groups[group] then groups[group] = true; groups.count = groups.count + 1 end
 	end
+	-- The settings and manifest reads behind a section's state, and a group's
+	-- origin, are answered once per group or section: per mapping they held the
+	-- main thread for 1810 ms over 301 candidates (field run 2026-10-31).
+	local shipped_groups, section_states = {}, {}
+	local function group_shipped(name)
+		local known = shipped_groups[name]
+		if known ~= nil then return known end
+		local group = _state.groups[name]
+		known = group ~= nil and group.enabled == true and group.kind == "toml"
+			and group.personal_source == nil
+			and type(group.path) == "string" and Groups.file_origin(group.path) == "bundled"
+		shipped_groups[name] = known
+		return known
+	end
+	local function section_enabled(group_name, section)
+		local key = group_name .. "\0" .. section
+		local known = section_states[key]
+		if known == nil then
+			known = M.is_section_enabled(group_name, section) == true
+			section_states[key] = known
+		end
+		return known
+	end
 	local candidates = {}
 	for _, m in ipairs(_state.mappings) do
-		local group = m.group and _state.groups[m.group] or nil
-		local shipped = group ~= nil and group.enabled == true and group.kind == "toml"
-			and group.personal_source == nil and m.personal_source == nil
-			and type(group.path) == "string" and Groups.file_origin(group.path) == "bundled"
-		local section_on = m.section == nil or M.is_section_enabled(m.group, m.section)
-		if shipped and section_on and not m.auto and not m.has_magic and not m.is_private
+		-- The cheap per-mapping filters run before any group or section read.
+		if m.group and m.personal_source == nil and not m.auto and not m.has_magic and not m.is_private
 			and m.trigger:match("^[a-z][a-z]+$") and #m.trigger <= 12
 			and trigger_groups[m.trigger].count == 1
 			and m.repl == m.plain_repl and m.plain_repl ~= "" and m.plain_repl ~= m.trigger
-			and not m.plain_repl:find("[%c{}]") and not m.plain_repl:find(_state.magic_key, 1, true) then
+			and not m.plain_repl:find("[%c{}]") and not m.plain_repl:find(_state.magic_key, 1, true)
+			and group_shipped(m.group)
+			and (m.section == nil or section_enabled(m.group, m.section)) then
 			candidates[#candidates + 1] = { trigger = m.trigger, expansion = m.plain_repl }
 		end
 	end
