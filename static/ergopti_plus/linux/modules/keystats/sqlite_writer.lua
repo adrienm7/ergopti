@@ -95,14 +95,12 @@ local unpack_values = table.unpack or unpack
 --- @return boolean
 local function _check_sqlite3()
 	if _available ~= nil then return _available end
-	-- command -v, the shell's own lookup: `which` is a separate package that
-	-- Arch's base image and other minimal systems do not ship, and there the
-	-- probe reported sqlite3 missing and switched metrics to the JSON fallback.
-	local ok = os.execute("command -v sqlite3 >/dev/null 2>&1")
-	_available = (ok == true or ok == 0)
+	-- The private runtime's sqlite3 (infra/owned_programs.lua): every package
+	-- carries it, so its absence is a broken install, not a missing host package.
+	local Owned = require("infra.owned_programs")
+	_available = Owned.available("sqlite3")
 	if not _available then
-		Logger.warn(LOG, "sqlite3 CLI not found — SQLite persistence disabled.")
-		Logger.warn(LOG, "  Install: sudo apt-get install sqlite3")
+		Logger.error(LOG, "sqlite3 (%s) is not available — SQLite persistence disabled.", Owned.path("sqlite3"))
 	end
 	return _available
 end
