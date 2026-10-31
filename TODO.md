@@ -348,8 +348,22 @@ into its item below or into the matching existing item.
       macOS: detection reads every server of the shared list through the shared discovery descriptor
       (`local_servers.lua`, `llm.local_server_ports`), so the added servers need no macOS code; the field
       run's `field_local_servers` fails when the driver cannot use a declared server's descriptor and names
-      each server's answer read-only (branch `fix/macos-overnight-d`). Left: the shared entries themselves
-      (another worker), then one field report on a Mac running some of them [PHYS-M].
+      each server's answer read-only (branch `fix/macos-overnight-d`). Left: one field report on a Mac running
+      some of them [PHYS-M].
+      Shared entries (d6194c5e, ports and names cited from each project's sources in `_source`): SGLang
+      30000, KoboldCpp 5001, text-generation-webui 5000, GPT4All 4891, AMD Lemonade 13305 (its documented
+      port, not 8000; `config.json` in `~/.config/lemonade` or `/var/lib/lemonade`), Docker Model Runner
+      12434 (`/engines/v1`), exo 52415, and llamafile in the llama.cpp / LocalAI row. Linux detection is
+      proved against real stand-in processes, pgrep, ss and a settings file (be4e2b04). Left: (1) vLLM and
+      TabbyAPI share 8000 with oMLX and 5000 with text-generation-webui, so a generic entry configured at
+      that address would belong to two rows: decide between one merged row per port (the oMLX label changes
+      on every OS) and order-aware affinity in `local_server_auth.entry_matches`, then add them; (2)
+      AnythingLLM always needs a key and takes a workspace slug as the model, and Msty documents no port
+      or dialect: both stay out unless that changes; Microsoft Foundry Local (dynamic port, Windows) and
+      `mlx_lm.server` (macOS) belong to the other drivers; (3) Windows: `test_local_server_auth.ahk` (4
+      descriptors) and `test_local_server_panel_view_preparation.ahk` (4 and 5 orders, 4 providers) count
+      the old catalogue and were not run on Linux: run them and make them read the catalogue; (4) the
+      none row now lists eleven labels; (5) [PHYS-L] one run with some of them installed.
 - [ ] **Mac field report 2026-10-30 21:01, functional errors left open (worker `fix/macos-field-errors`).**
       Fixed there: shortcut full rebind on each bounded retry (35cc4a5d), pre-dispatch Ollama pull receipt
       (6f6b752f), one model-list error per outage (6051b50c), MLX server stopped before a repair (fcdb6f27),
@@ -509,7 +523,7 @@ HTTP transport items are done (`linux/adapters/notifier.lua`, `[sections.llm]` l
   Left: [PHYS-L] on a real desktop, add a key with the keyring locked and check the unlock prompt takes the
   keyboard under the grab (`ui/modal.lua`), then restart and check the plaintext migration of an older
   `api_keys.json`. `install.sh` now installs `secret-tool` (apt `libsecret-tools`, dnf `libsecret`, zypper
-  `secret-tool`, pacman, xbps and apk `libsecret`); the deb and rpm still only recommend it.
+  `secret-tool`, pacman, xbps and apk `libsecret`), and the deb, rpm, Arch and Nix packages depend on it (823639a3).
 
 ## Next fix/<os> agent pass (read when the maintainer asks for a new fix/linux, fix/macos or fix/windows)
 
