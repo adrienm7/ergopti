@@ -88,6 +88,8 @@ class PreparationControls(unittest.TestCase):
                 "/usr/bin/xcodebuild",
                 "-configuration",
                 "Release",
+                "-jobs",
+                "2",
                 "-alltargets",
                 "SYMROOT=" + str(self.source / "build"),
                 "ARCHS=arm64 x86_64",
@@ -525,6 +527,8 @@ class PreparationControls(unittest.TestCase):
                     tools["xcodebuild"],
                     "-configuration",
                     "Release",
+                    "-jobs",
+                    "2",
                     "-alltargets",
                     "SYMROOT=" + str(source / recipe / "build"),
                     "ARCHS=arm64 x86_64",
@@ -830,7 +834,7 @@ def concurrent_owned_control_suite():
             self.assertTrue(all(h.drained for h in self.owners))
             self.assertFalse((self.case.owner / "owned-native-build-result.json").exists())
 
-        def test_finish_refusal_drains_pending_cli_without_publication(self):
+        def test_finish_refusal_stops_acquisition_without_publication(self):
             error = self.builder.BASE.NativeBuildError(
                 "phase_failed", "MODELED native finish refusal"
             )
@@ -843,7 +847,8 @@ def concurrent_owned_control_suite():
             with self.assertRaises(self.builder.BASE.NativeBuildError) as caught:
                 self.case.invoke()
             self.assertIs(caught.exception, error)
-            self.assertEqual(self.finishes, ["core_build", "console_build", "cli_build"])
+            self.assertEqual(self.begins, ["core_build", "console_build"])
+            self.assertEqual(self.finishes, ["core_build", "console_build"])
             self.assertTrue(all(h.drained for h in self.owners))
             self.assertFalse((self.case.owner / "owned-native-build-result.json").exists())
 
@@ -872,6 +877,8 @@ def concurrent_owned_control_suite():
                     "/usr/bin/true",
                     "-configuration",
                     "Release",
+                    "-jobs",
+                    "2",
                     "-alltargets",
                     "SYMROOT=" + str(self.case.stage / recipe / "build"),
                     "ARCHS=arm64 x86_64",
@@ -912,14 +919,35 @@ def concurrent_owned_control_suite():
             )
             self.assertTrue(all(h.drained for h in self.owners))
 
-        def test_reverse_ready_completion_keeps_canonical_array_order(self):
+        def test_each_build_finishes_before_the_next_begins(self):
             from unittest.mock import patch
 
-            with patch.object(
-                self.builder, "_PHASE_READY", side_effect=lambda h: h.name == "console_build"
+            # Concurrent universal builds overcommitted a hosted runner for hours,
+            # so readiness never lets a later build start before an earlier ends.
+            events = []
+            old_begin, old_finish = self.begin, self.finish
+
+            def begin(*arguments):
+                events.append(("begin", arguments[0]))
+                return old_begin(*arguments)
+
+            def finish(owner):
+                events.append(("finish", owner.name))
+                return old_finish(owner)
+
+            with (
+                patch.object(self.builder, "_BEGIN_PHASE", side_effect=begin),
+                patch.object(self.builder, "_FINISH_PHASE", side_effect=finish),
             ):
                 row = self.case.invoke()
-            self.assertEqual(self.finishes, ["console_build", "core_build", "cli_build"])
+            self.assertEqual(
+                events,
+                [
+                    (event, label + "_build")
+                    for label in ("core", "console", "cli")
+                    for event in ("begin", "finish")
+                ],
+            )
             self.assertEqual(
                 [r["target"] for r in row["products"]], ["duktape", "core", "console", "cli"]
             )
@@ -948,19 +976,13 @@ def concurrent_owned_control_suite():
                         observed.append(label)
                 return original(path, root)
 
-            with (
-                patch.object(self.builder, "product_snapshot", side_effect=capture),
-                patch.object(
-                    self.builder, "_PHASE_READY", side_effect=lambda h: h.name == "console_build"
-                ),
-            ):
+            with patch.object(self.builder, "product_snapshot", side_effect=capture):
                 self.case.invoke()
-            self.assertEqual(observed[0], "console")
+            self.assertEqual(list(dict.fromkeys(observed)), ["core", "console", "cli"])
             self.assertTrue(all(h.drained for h in self.owners))
 
-        def test_primary_preserves_both_later_drain_refusals(self):
+        def test_primary_preserves_the_later_drain_refusal(self):
             primary = self.builder.BASE.NativeBuildError("phase_failed", "MODELED begin refusal")
-            core = self.builder.BASE.NativeBuildError("phase_failed", "MODELED core drain refusal")
             console = self.builder.BASE.NativeBuildError(
                 "phase_failed", "MODELED console drain refusal"
             )
@@ -970,13 +992,15 @@ def concurrent_owned_control_suite():
                     raise primary
 
             def finish_fault(owner):
-                raise core if owner.name == "core_build" else console
+                if owner.name == "console_build":
+                    raise console
 
             self.begin_fault, self.finish_fault = begin_fault, finish_fault
             with self.assertRaises(self.builder.BASE.NativeBuildError) as caught:
                 self.case.invoke()
             self.assertIs(caught.exception, primary)
-            self.assertEqual(caught.exception._owned_phase_failures, (core, console))
+            self.assertEqual(caught.exception._owned_phase_failures, (console,))
+            self.assertEqual(self.begins, ["core_build", "console_build"])
             self.assertTrue(all(h.drained for h in self.owners))
             self.assertFalse((self.case.owner / "owned-native-build-result.json").exists())
 
