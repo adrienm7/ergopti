@@ -182,16 +182,21 @@ end
 --- supply an openssl pass phrase SOURCE instead — "file:/etc/machine-id" on
 --- Linux, "stdin" where the id comes from a command.
 --- @param pass_spec string An openssl `-pass` source.
+--- @param program string|nil The openssl to run, already a shell word; "openssl"
+---   by default. Linux passes its private runtime's copy (infra/owned_programs.lua).
 --- @return string|nil command, string|nil reason
-function M.derive_key_command(pass_spec)
+function M.derive_key_command(pass_spec, program)
 	if type(pass_spec) ~= "string" or pass_spec == "" then
 		return nil, "pass_spec must be a non-empty openssl -pass source"
+	end
+	if program ~= nil and (type(program) ~= "string" or program == "" or program:find("\0", 1, true)) then
+		return nil, "program must be a non-empty shell word"
 	end
 	if pass_spec:match("^pass:") then
 		return nil, "refusing -pass pass:<secret>; it exposes the key material in the process table"
 	end
 	return table.concat({
-		"openssl enc", "-" .. M.CIPHER,
+		(program or "openssl") .. " enc", "-" .. M.CIPHER,
 		"-pbkdf2", "-iter", tostring(M.KDF_ITERATIONS),
 		"-md", M.KDF_DIGEST,
 		"-S", M.KDF_SALT_HEX,
