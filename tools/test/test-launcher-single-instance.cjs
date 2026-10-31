@@ -36,6 +36,17 @@ const constants = read(
 	'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherConstants.swift'
 );
 const launcher = read('static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift');
+// The Swift constant reads the generated Identifiers enum (PAR-83); resolve it
+// through the one declaration, _shared/data/identifiers.json.
+const { bundle_ids: bundleIds } = JSON.parse(
+	read('static/ergopti_plus/_shared/data/identifiers.json')
+);
+const swiftBundleId = (name) => {
+	const value = constants.match(
+		new RegExp(`^let ${name} = (?:"([^"]+)"|Identifiers\\.BundleIds\\.(\\w+))$`, 'm')
+	);
+	return value?.[1] ?? (value?.[2] ? bundleIds[value[2]] : undefined);
+};
 
 const errors = [];
 
@@ -59,7 +70,7 @@ if (!keyMatch) {
 
 const outerId = build.match(/^BUNDLE_ID="([^"]+)"$/m)?.[1];
 const embeddedId = build.match(/^HAMMERSPOON_BUNDLE_ID="([^"]+)"$/m)?.[1];
-const swiftEmbeddedId = constants.match(/^let kEmbeddedHammerspoonBundleId = "([^"]+)"$/m)?.[1];
+const swiftEmbeddedId = swiftBundleId('kEmbeddedHammerspoonBundleId');
 if (!outerId || !embeddedId || outerId === embeddedId) {
 	errors.push(
 		'the single-instance outer app and its embedded GUI runtime need distinct bundle IDs.'
