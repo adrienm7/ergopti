@@ -295,6 +295,12 @@ local function config_dir()
 	return _default_config_dir or _base_dir or ""
 end
 
+--- Hands the resolved configuration directory to the log redactor, which masks
+--- the names under it at write time; called whenever the resolution can move.
+local function follow_config_dir_in_logs()
+	Logger.follow_config_dir(config_dir())
+end
+
 --- Returns the resolved logs folder (with trailing slash): the LogsDirPath
 --- override, or ~/Library/Logs/ergopti_plus/. Lazy-loads paths.toml like
 --- config_dir(). Without a home folder the logger's early-boot fallback is the
@@ -478,6 +484,7 @@ local function adopt_changed_bootstrap_target()
 		_bootstrap_status = "absent"
 		_bootstrap_snapshot = { status = "absent" }
 	end
+	follow_config_dir_in_logs()
 	return true
 end
 
@@ -647,6 +654,7 @@ function M.init(base_dir)
 	local resolved = config_dir()
 	if resolved == _default_config_dir then ensure_dir(_default_config_dir) end
 	_initialized = true
+	follow_config_dir_in_logs()
 	Logger.success(LOG, "Config paths initialized (base: '%s', config: '%s').", base_dir, resolved)
 	return true
 end
@@ -772,6 +780,7 @@ function M.set_paths(new_config_dir, new_logs_dir)
 		adopt_changed_bootstrap_target()
 		return false, save_err
 	end
+	follow_config_dir_in_logs()
 	if logs_dir() ~= old_logs then
 		Logger.info(LOG, "Logs folder set to '%s'; it takes effect at the next reload.", logs_dir())
 	end

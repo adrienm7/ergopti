@@ -58,6 +58,9 @@ local Json = require("json")
 local ErrorDescription = require("error_description")
 local PhaseStats = require("infra.phase_stats")
 local _redact_message = nil
+-- The configuration directory the user chose, followed for the redactor: its
+-- folder and file names are personal, and the user may move it at runtime.
+local _config_dir = nil
 
 --- Captures canonical privacy rules before bootstrap permits any log output.
 --- The entry point owns the shared path; this constructor does not resolve paths
@@ -83,7 +86,24 @@ function M.initialize_privacy(raw_policy, supplied)
 	assert(type(rules.token_prefixes) == "table" and type(rules.secret_keys) == "table",
 		"logger: canonical privacy inventory invalid")
 	assert(pcall(Redact.apply, "", rules, captured), "logger: canonical privacy rules invalid")
-	_redact_message = function(text) return Redact.apply(text, rules, captured) end
+	_redact_message = function(text)
+		return Redact.apply(text, rules, {
+			home = captured.home, user = captured.user, case_insensitive = captured.case_insensitive,
+			config_dir = _config_dir,
+		})
+	end
+end
+
+--- Follows the configuration directory the redactor masks. The path owner calls
+--- it at initialization and after each committed move, so a line written after
+--- the user changes folders hides the new folder's names, not the old ones.
+--- Independent of privacy admission: it records a value the redactor reads.
+--- @param dir string|nil Absolute directory, or nil/"" while none is resolved.
+function M.follow_config_dir(dir)
+	if dir ~= nil and type(dir) ~= "string" then
+		error("logger: the followed configuration directory must be a path", 2)
+	end
+	_config_dir = (dir ~= nil and dir ~= "") and dir or nil
 end
 
 --- Redacts unformatted free text for the owned log sinks and boot journal.
