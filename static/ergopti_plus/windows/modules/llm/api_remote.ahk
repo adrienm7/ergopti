@@ -1358,10 +1358,19 @@ _LLMRemoteResolveEntry(Entry) {
     if !LLM_API_PROVIDERS.Has(ProviderId)
         return ""
     Provider := LLM_API_PROVIDERS[ProviderId]
+    if Provider.Get("TokenExchange", false) {
+        try LoggerError("LLM.remote", "API entry of provider '{1}' is refused: its key is exchanged for an access token, which the Windows driver does not do yet.", ProviderId)
+        return ""
+    }
     ProvFmt  := Provider["Format"]
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
     if (BaseUrl == "")
         BaseUrl := _LLMRemote_DefaultBaseUrl(ProviderId, Provider)
+    ; A per-account address is filled when the entry is added; its template never leaves
+    if ApiUrlTemplateHasPlaceholder(BaseUrl) {
+        try LoggerError("LLM.remote", "API entry of provider '{1}' has no account address: add it again from the provider list.", ProviderId)
+        return ""
+    }
     if !(BaseUrl is String) || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
         return ""
     Token := _LLMRemoteEntryGet(Entry, "Token", "")
@@ -1471,6 +1480,9 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
         _LLMRemote_CompleteReady(Owner, on_result, false)
         return Owner
     }
+    ; A capability listing asks for its largest page (thinking_off.json page_query)
+    if (Owner.Get("listing_query", "") != "")
+        PingUrl .= (InStr(PingUrl, "?") ? "&" : "?") . Owner["listing_query"]
 
     if !(Port is Map) || Port.Has("managed_settings") {
         _LLMRemote_DispatchManagedReady(Owner, on_result, PingUrl, ProvFmt, Token, Port)
@@ -1865,6 +1877,89 @@ LLM_OllamaThink(Model) {
     return Think
 }
 
+; The capability listings by provider id (model_capabilities.ahk cache)
+global _LLM_RemoteCapabilities := Map()
+
+; The capability check of one provider's model for the resolver.
+; @param {String} ProviderId
+; @param {String} Model
+; @returns {Func|Integer} (Kind, Level, Template) -> Boolean, 0 when the
+;     provider has no listing or the listing says nothing of the model.
+_LLMRemoteCapabilityLacks(ProviderId, Model) {
+    global LLM_THINKING_FAMILIES, _LLM_RemoteCapabilities
+    if !LLM_THINKING_FAMILIES.HasOwnProp("Capability")
+            || !LLM_THINKING_FAMILIES.Capability["providers"].Has(ProviderId)
+        return 0
+    Record := LLM_ModelCapsRecord(LLM_ModelCapsRecords(_LLM_RemoteCapabilities, ProviderId), Model)
+    if !(Record is Map)
+        return 0
+    return _LLMRemoteCapabilityLacksOne.Bind(Record, ProviderId, Model)
+}
+
+_LLMRemoteCapabilityLacksOne(Record, ProviderId, Model, Kind, Level, Template) {
+    Lacking := LLM_ModelCapsLacks(Record, Kind, Level, Template)
+    if Lacking
+        try LoggerDebug("LLM.remote", "Model {1} of provider '{2}' lacks the {3} control (its listing): skipped.",
+            Model, ProviderId, Kind)
+    return Lacking
+}
+
+; Fetches a provider's capability listing when it is missing or stale: from a
+; one-shot timer and with its own auxiliary owner, so the request that asked
+; for it is never delayed. A failed fetch keeps the old listing.
+; @param {Map} Resolved _LLMRemoteResolveEntry's record (provider, address, key).
+; @returns {Boolean} True when a fetch was scheduled.
+_LLMRemoteRefreshCapabilities(Resolved) {
+    global LLM_THINKING_FAMILIES, _LLM_RemoteCapabilities
+    ProviderId := Resolved.Get("Provider", "")
+    if !LLM_THINKING_FAMILIES.HasOwnProp("Capability")
+        return false
+    Config := LLM_THINKING_FAMILIES.Capability
+    if !Config["providers"].Has(ProviderId)
+            || !LLM_ModelCapsNeedsFetch(_LLM_RemoteCapabilities, ProviderId, _LLMRemoteEpochNow(), Config["ttl_sec"])
+        return false
+    Listing := Config["providers"][ProviderId]
+    LLM_ModelCapsBegin(_LLM_RemoteCapabilities, ProviderId)
+    SetTimer(_LLMRemoteFetchCapabilities.Bind(Resolved.Clone(), ProviderId, Listing,
+        Config["page_query"].Get(Listing, "")), -1)
+    return true
+}
+
+_LLMRemoteFetchCapabilities(Resolved, ProviderId, Listing, Query) {
+    LoggerInfo("LLM.remote", "Capability listing of provider {1} requested.", ProviderId)
+    try {
+        Owner := LLM_AuxBegin("api_capabilities:" . ProviderId, Map("backend", "api",
+            "endpoint", Resolved.Get("BaseUrl", ""), "identity", ProviderId))
+        Owner["listing"] := true
+        Owner["listing_query"] := Query
+        LLM_RemoteIsReady_Async(Resolved, _LLMRemoteCapabilitiesDone.Bind(ProviderId, Listing), Owner)
+    } catch as Err {
+        LoggerWarn("LLM.remote", "Capability listing of provider {1} could not be sent ({2}).", ProviderId, Err.Message)
+        LLM_ModelCapsFinish(_LLM_RemoteCapabilities, ProviderId, "", _LLMRemoteEpochNow())
+    }
+}
+
+; Stores the listing answer the readiness poll delivered (false on any failure).
+_LLMRemoteCapabilitiesDone(ProviderId, Listing, Answer) {
+    global _LLM_RemoteCapabilities
+    Records := ""
+    Status := Answer is Map ? Answer.Get("status", 0) : 0
+    if !(Status is Integer) || Status < 200 || Status >= 300 {
+        LoggerWarn("LLM.remote", "Capability listing of provider {1} unavailable (status={2}): kept the old one.",
+            ProviderId, Status)
+    } else {
+        Decoded := 0
+        try Decoded := JsonParse(Answer.Get("body", ""))
+        Records := LLM_ModelCapsParse(Listing, Decoded, &Reason)
+        if (Records is Map)
+            LoggerInfo("LLM.remote", "Capability listing of provider {1}: {2} model(s) described.",
+                ProviderId, Records.Count)
+        else
+            LoggerWarn("LLM.remote", "Capability listing of provider {1} could not be read ({2}).", ProviderId, Reason)
+    }
+    LLM_ModelCapsFinish(_LLM_RemoteCapabilities, ProviderId, Records, _LLMRemoteEpochNow())
+}
+
 ; Turns the model's reasoning off in a request body: its family's control
 ; (thinking_off.json) through the provider's thinking_dialect
 ; (_shared/modules/llm/thinking_off.ahk). A field the body already sets wins.
@@ -1877,7 +1972,9 @@ _LLMRemoteApplyThinkingOff(Resolved, Body, &Added := "") {
     Model := Resolved.Get("Model", "")
     Provider := Resolved.Get("Provider", "")
     Result := LLM_ThinkingOffApply(LLM_THINKING_FAMILIES, Resolved.Get("ThinkingDialect", Map()), Model, Body,
-        _LLMRemoteThinkingRefused().Get(Provider . "|" . Model, ""), &Family, &Kind, &Added)
+        _LLMRemoteThinkingRefused().Get(Provider . "|" . Model, ""), &Family, &Kind, &Added,
+        _LLMRemoteCapabilityLacks(Provider, Model))
+    _LLMRemoteRefreshCapabilities(Resolved)
     if (Added.Length > 0)
         try LoggerDebug("LLM.remote", "Thinking off: family {1} applies to model {2} through provider '{3}' ({4}).",
             Family, Model, Provider, Kind)
@@ -2149,8 +2246,14 @@ _LLMRemote_CatalogDescriptorIsValid(providerId, desc) {
         return false
 
     ; The compatibility row is a user-supplied endpoint/model template. Every
-    ; shipped concrete provider must be immediately usable from the catalogue.
-    if (providerId != "openai_compat" and (Trim(baseUrl) = "" or Trim(defaultModel) = ""))
+    ; shipped concrete provider must be immediately usable from the catalogue,
+    ; except that a per-account address (a template the add-entry form fills)
+    ; leaves the model to the user.
+    Template := ApiUrlTemplateFields(baseUrl)
+    if !Template["valid"]
+        return false
+    if (providerId != "openai_compat" and (Trim(baseUrl) = ""
+            or (Template["fields"].Length = 0 and Trim(defaultModel) = "")))
         return false
     if (baseUrl != "" and !RegExMatch(baseUrl, "i)^https?://[^[:space:]]+$"))
         return false
@@ -2334,6 +2437,10 @@ _LLMRemote_LoadCatalog() {
             continue
         }
         candidateProviders[pid] := Map(
+            ; An auth block exchanges the key for a short-lived access token,
+            ; which this driver does not do yet: such a provider is refused
+            ; by the API form and the request resolver, never sent its key
+            "TokenExchange", desc.Has("auth"),
             "ThinkingDialect", Dialect,
             "Label", desc["label"],
             "BaseUrl", desc["base_url"],

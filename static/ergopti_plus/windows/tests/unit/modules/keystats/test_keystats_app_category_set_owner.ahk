@@ -38,7 +38,7 @@ _KLACSO_Case() {
 			"the fixture cannot replace an active foreign category writer")
 		FSCreateDirectoryExclusiveStrict(Root)
 		Owned := true
-		Original := '{"audit.exe":"productive","other.exe":"neutral"}' . "`n"
+		Original := '{"audit.exe":{"type":"productive","score":0},"other.exe":{"type":"neutral","score":0}}' . "`n"
 		AssertTrue(FSWriteCreateDurable(Path, Original))
 		KLAppCat.categories := Map(), KLAppCat.file_path := ""
 		KLAppCat.dirty := false, KLAppCat.save_fn := FixtureTimer
@@ -64,7 +64,7 @@ _KLACSO_Case() {
 		AssertTrue(KLAppCat.categories == Admitted, "the same admitted map must retain the discovery")
 		AssertTrue(KLAppCat.dirty, "the discovery remains owned by deferred persistence")
 		AssertEqual("unknown", Receipt["discovery"])
-		AssertFalse(JsonParse(FSReadStrict(Path)).Has("during-save.exe"),
+		AssertFalse(JsonParse(FSReadStrict(Path))["apps"].Has("during-save.exe"),
 			"the actual first filesystem image predates the discovery")
 		AssertTrue(KL_AppCat_Save(), "the released writer must permit a real durable retry")
 		AssertFalse(KLAppCat.dirty)

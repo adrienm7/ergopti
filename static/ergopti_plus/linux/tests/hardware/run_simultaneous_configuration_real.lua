@@ -195,11 +195,7 @@ local function run()
 	assert(Files.write(tap_path, '[tap_hold]\nenabled = false\ninherit_defaults = false\n'))
 	assert(Writer.use_ffi_backend() and Reader.use_ffi_backend(), "original native transport is mandatory")
 	assert(node_for(source_name) == nil and node_for(Names.VIRTUAL_KEYBOARD) == nil, "owned virtual names must be absent")
-	local old_name = Names.VIRTUAL_KEYBOARD
-	Names.VIRTUAL_KEYBOARD = source_name
-	local loaded, source_writer = pcall(function() return assert(loadfile("adapters/uinput_writer.lua"))() end)
-	Names.VIRTUAL_KEYBOARD = old_name
-	assert(loaded, source_writer)
+	local source_writer = require("tests.hardware.keyboard_source_writer").load(source_name)
 	source = {writer=source_writer}
 	assert(source.writer.use_ffi_backend() and source.writer.open())
 	source.cap = assert(source.writer.capture_output())

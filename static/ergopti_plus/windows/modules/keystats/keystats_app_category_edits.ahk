@@ -92,9 +92,9 @@ _KL_AppCat_WriteOwned(Owner, Content, Source := unset, FullCurrentFn := 0, Admis
 _KL_AppCat_NativeRoot(ExpectedMetricsRoot) {
 	if !(ExpectedMetricsRoot is String) || ExpectedMetricsRoot == "" || KLAppCat.file_path == ""
 		throw Error("Category editing requires its initialized native metrics store.")
-	SplitPath(KLAppCat.file_path, &Name, &Directory)
+	SplitPath(KLAppCat.file_path, &Name)
 	Root := FSResolveDirectoryPath(ExpectedMetricsRoot)
-	if !(Name == KLAppCatConst.FILE_NAME) || !(Root = FSResolveDirectoryPath(Directory))
+	if !(Name == KLAppCatConst.FILE_NAME) || !(Root = FSResolveDirectoryPath(KLAppCat.metrics_root))
 		throw Error("The category editor does not own this metrics root.")
 	return Root
 }
@@ -141,11 +141,11 @@ KL_AppCat_EditorSnapshot(App, ExpectedMetricsRoot) {
 	if !(Snapshot is Map)
 		return false
 	Key := StrLower(App)
-	Value := Snapshot["store"]["categories"].Get(Key, KLAppCatConst.DEFAULTS.Get(Key, "unknown"))
+	Value := Snapshot["store"]["categories"].Get(Key, _KL_AppCat_NewRecord(_KL_AppCat_ShippedLabel(Key)))
 	Snapshot["app"] := App
 	Snapshot["key"] := Key
 	Snapshot["current_type"] := _KL_AppCat_RecordLabel(Value)
-	Snapshot["current_score"] := Value is Map ? Value["score"] : 0
+	Snapshot["current_score"] := Value["score"]
 	return Snapshot
 }
 
@@ -186,11 +186,11 @@ KL_AppCat_CommitEdit(Snapshot, Category, Score, FullCurrentFn := 0, AdmissionFn 
 			if !Candidate.Has(Key) && _KL_AppCat_IsDiscovery(Key, Value, Owner["model"])
 				Candidate[Key] := Value
 		_KL_AppCat_SetRecord(Candidate, Snapshot["key"], Category, Score)
-		Content := _KL_AppCat_RenderStore(Candidate, Model, true)
+		Content := _KL_AppCat_RenderStore(Candidate, Model)
 		NextModel := _KL_AppCat_DecodeStore(Content, Owner["path"])
 		Canonical := Map()
 		for StoredKey, Value in KLAppCatConst.DEFAULTS
-			Canonical[StoredKey] := Value
+			Canonical[StoredKey] := _KL_AppCat_NewRecord(Value)
 		for StoredKey, Value in NextModel["categories"]
 			Canonical[StoredKey] := Value
 		if !_KL_AppCat_WriteOwned(Owner, Content, Model, FullCurrentFn, AdmissionFn)
@@ -204,7 +204,7 @@ KL_AppCat_CommitEdit(Snapshot, Category, Score, FullCurrentFn := 0, AdmissionFn 
 				if !Owner["snapshot"].Has(StoredKey) && _KL_AppCat_IsDiscovery(StoredKey, Value, NextModel)
 					LateDiscoveries[StoredKey] := Value
 			; Rebuild the same admitted Map from fresh canonical values. Old
-			; records and legacy strings removed externally cannot return later.
+			; records removed externally cannot return later.
 			KLAppCat.categories.Clear()
 			for StoredKey, Value in Canonical
 				KLAppCat.categories[StoredKey] := Value
@@ -227,13 +227,18 @@ KL_AppCat_CommitEdit(Snapshot, Category, Score, FullCurrentFn := 0, AdmissionFn 
 
 /**
  * Reads explicit overrides for actual manifest keys in a detached worker.
- * @param MetricsRoot {String} Actual native projection root; no resident Init needed.
+ * @param StoreRoot {String} Folder of the store; no resident Init needed.
  * @param Apps {Array} Exact application keys emitted by this manifest.
- * @return {Map} Explicit type/score overrides; legacy classifications are omitted.
- * @throws {Error} An unreadable or invalid existing store never becomes an empty map.
+ * @return {Map} Explicit type/score overrides. A store refused for its flat form
+ *   holds no record, so the dashboard keeps rendering from the events.
+ * @throws {Error} An unreadable or damaged store never becomes an empty map.
  */
-KL_AppCat_ProjectAt(MetricsRoot, Apps) {
-	Root := FSResolveDirectoryPath(MetricsRoot)
-	Model := _KL_AppCat_ReadImage(RTrim(Root, "\") . "\" . KLAppCatConst.FILE_NAME)
+KL_AppCat_ProjectAt(StoreRoot, Apps) {
+	Root := FSResolveDirectoryPath(StoreRoot)
+	try Model := _KL_AppCat_ReadImage(RTrim(Root, "\") . "\" . KLAppCatConst.FILE_NAME)
+	catch KLAppCatFlatFormError as Err {
+		try LoggerWarn("KLAppCat", "The dashboard shows no category edit: {1}", Err.Message)
+		return Map()
+	}
 	return _KL_AppCat_ProjectStore(Model, Apps)
 }

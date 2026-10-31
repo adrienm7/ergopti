@@ -7,6 +7,8 @@ Test("Ollama runtime: foreign cancellation receipt cannot grant file cleanup", _
 Test("Ollama runtime: canonical lazy task adopted before start", _ORT_Adoption)
 Test("Ollama runtime: every launch carries the shared serve environment", _ORT_ServeEnvironment)
 Test("Ollama runtime: owner refuses a launch without the shared serve environment", _ORT_ServeEnvironmentRequired)
+Test("Ollama runtime: every launch carries the captured proxy dependencies (owned-ollama-proxy)", _ORT_ProxyCaptures)
+Test("Ollama runtime: owner refuses a launch without its proxy captures (owned-ollama-proxy)", _ORT_ProxyCapturesRequired)
 Test("Ollama runtime: failed start strict physical ACK without callback", _ORT_FailedStart)
 Test("Ollama runtime: nonBoolean termination cannot release leases", _ORT_FalseAck)
 Test("Ollama runtime: retained file retirement debt blocks successors", _ORT_RetirementDebt)
@@ -51,6 +53,7 @@ class _ORT_Fixture {
 			"helper_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 			"environment", "C:\bundled\managed_ollama_environment.json",
 			"environment_sha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+			"proxy", _ORT_Proxy(),
 			"spawn", ObjBindMethod(this, "Spawn"), "read_ready", ObjBindMethod(this, "Read"),
 			"clock", ObjBindMethod(this, "Clock"),
 			"on_retired", ObjBindMethod(this, "Retire"), "on_error", ObjBindMethod(this, "Error")))
@@ -161,13 +164,56 @@ _ORT_ServeEnvironmentRequired() {
 			"helper_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 			"environment", "C:\bundled\managed_ollama_environment.json",
 			"environment_sha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-			"on_retired", (*) => true)
+			"proxy", _ORT_Proxy(), "on_retired", (*) => true)
 		Options.Delete(Name)
 		Refused := false
 		try OllamaRuntimeOwner(Options)
 		catch TypeError
 			Refused := true
 		Assert(Refused, "A launch without the captured serve environment is refused: " . Name)
+	}
+}
+
+; The captured proxy dependencies the launcher looks the daemon's proxy up with.
+_ORT_Proxy() {
+	return Map("VendorDirectory", "C:\bundled\vendor",
+		"VendorSha256", "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+		"ProxyPolicyPath", "C:\bundled\proxy_policy.json",
+		"ProxyPolicySha256", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		"UpdaterDefaultsPath", "C:\bundled\defaults.json",
+		"UpdaterDefaultsSha256", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		"RouteOriginsPath", "C:\bundled\route_origins.json",
+		"RouteOriginsSha256", "0000000000000000000000000000000000000000000000000000000000000000")
+}
+
+; The owned daemon reads only HTTPS_PROXY and NO_PROXY: the launcher looks them
+; up from these captures, so every launch carries them all.
+_ORT_ProxyCaptures() {
+	F := _ORT_Fixture()
+	Assert(F.Run(), "Actual start is admitted.")
+	Args := _ORT_Args(F.Arguments)
+	for Name, Value in _ORT_Proxy()
+		Assert(InStr(Args, "-" . Name . "`n" . Value . "`n"), "The launcher receives " . Name . ".")
+	Assert(F.Owner.Stop(), "Strict physical ACK releases owner.")
+}
+
+_ORT_ProxyCapturesRequired() {
+	for Name in ["", "VendorDirectory", "VendorSha256", "RouteOriginsPath", "RouteOriginsSha256"] {
+		Proxy := _ORT_Proxy()
+		if (Name != "")
+			Proxy.Delete(Name)
+		Options := Map("launcher", "C:\bundled\runtime.ps1", "helper", "C:\bundled\files.ps1",
+			"helper_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			"environment", "C:\bundled\managed_ollama_environment.json",
+			"environment_sha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+			"on_retired", (*) => true)
+		if (Name != "")
+			Options["proxy"] := Proxy
+		Refused := false
+		try OllamaRuntimeOwner(Options)
+		catch TypeError
+			Refused := true
+		Assert(Refused, "A launch without its proxy captures is refused: " . (Name == "" ? "proxy" : Name))
 	}
 }
 

@@ -118,6 +118,8 @@
 			"Install prerequisites for Qualify native managed network runtime",
 			"Qualify native managed network runtime",
 			"Qualify the Go route plan twin",
+			"Install prerequisites for Qualify the installed managed Ollama route plan",
+			"Qualify the installed managed Ollama route plan",
 			"Qualify native retained FD SHA-256",
 			"Install prerequisites for Prepare authenticated managed HTTP validation tools",
 			"Prepare authenticated managed HTTP validation tools",
@@ -353,6 +355,9 @@
 		],
 		"Qualify native managed network runtime": [
 			"Install prerequisites for Qualify native managed network runtime"
+		],
+		"Qualify the installed managed Ollama route plan": [
+			"Install prerequisites for Qualify the installed managed Ollama route plan"
 		],
 		"Qualify native runtime prerequisites": [
 			"Install prerequisites for Qualify native runtime prerequisites"

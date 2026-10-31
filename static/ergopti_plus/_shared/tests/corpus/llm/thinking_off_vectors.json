@@ -1,6 +1,6 @@
 {
 	"description": "Thinking-off resolution, replayed by _shared/lua/llm/thinking_off.lua (macOS and Linux suites) and its AutoHotkey port _shared/modules/llm/thinking_off.ahk (Windows suite) over the shipped _shared/modules/llm/thinking_off.json families and api_providers.json thinking_dialect, so the drivers cannot drift.",
-	"rule": "normalize_vectors: lowercase, last path segment, an Ollama :tag dropped. glob_vectors: a glob matches the whole id, ignoring case, * the only wildcard. merge_vectors: fields deep-merged into body give expected (the body wins at every level); added lists the paths added. resolve_vectors: the model's family (first match on the normalized id) through the provider's dialect (first control kind it carries, $level filled) merged into body gives expected; family is its 1-based index and kind the control applied, both absent when none. refusal_vectors: after resolution, an HTTP 400 whose message names an added key (snake or camel; a generic leaf as parent.leaf) refuses its top-level field, stripped from the body (expected); field absent when nothing is refused. refused_vectors: a refused top-level field is never added. family_parse_vectors and dialect_parse_vectors: accepted whole (valid true) or refused whole. sampling_vectors: whether the model's family accepts only the default sampling (no temperature sent). refusal_store_vectors: a persisted store \"<provider>|<model>\" -> field -> epoch second keeps each valid field refused less than refusal_expiry_days (thinking_off.json) before now and not after it; a key left with none, or without |, is dropped and counted. ollama_think_vectors: the think value of an Ollama chat body: the model family's first control Ollama carries, false for a toggle or an off intent, the level of an effort control whose level is in ollama_think_levels (thinking_off.json), false with no family or no such control.",
+	"rule": "normalize_vectors: lowercase, last path segment, an Ollama :tag dropped. glob_vectors: a glob matches the whole id, ignoring case, * the only wildcard. merge_vectors: fields deep-merged into body give expected (the body wins at every level); added lists the paths added. resolve_vectors: the model's family (first match on the normalized id) through the provider's dialect (first control kind it carries, $level filled) merged into body gives expected; family is its 1-based index and kind the control applied, both absent when none. refusal_vectors: after resolution, an HTTP 400 whose message names an added key (snake or camel; a generic leaf as parent.leaf) refuses its top-level field, stripped from the body (expected); field absent when nothing is refused. refused_vectors: a refused top-level field is never added. family_parse_vectors and dialect_parse_vectors: accepted whole (valid true) or refused whole. sampling_vectors: whether the model's family accepts only the default sampling (no temperature sent). refusal_store_vectors: a persisted store \"<provider>|<model>\" -> field -> epoch second keeps each valid field refused less than refusal_expiry_days (thinking_off.json) before now and not after it; a key left with none, or without |, is dropped and counted. ollama_think_vectors: the think value of an Ollama chat body: the model family's first control Ollama carries, false for a toggle or an off intent, the level of an effort control whose level is in ollama_think_levels (thinking_off.json), false with no family or no such control. A families table also needs capability_listing (model_capabilities.lua parse_config): ttl_hours a positive integer, providers a non-empty object of provider id -> listing dialect, page_query an object of listing dialect -> one name=number query.",
 	"normalize_vectors": [
 		{
 			"model": "GPT-5.1",
@@ -981,7 +981,7 @@
 				"temperature": 0.7
 			},
 			"added": [],
-			"family": 25
+			"family": 26
 		},
 		{
 			"id": "deepseek_deepseek-chat",
@@ -1003,7 +1003,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 30,
+			"family": 36,
 			"kind": "toggle"
 		},
 		{
@@ -1026,7 +1026,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 28,
+			"family": 31,
 			"kind": "toggle"
 		},
 		{
@@ -1049,7 +1049,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 30,
+			"family": 36,
 			"kind": "toggle"
 		},
 		{
@@ -1088,7 +1088,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 27,
+			"family": 30,
 			"kind": "effort"
 		},
 		{
@@ -1151,7 +1151,7 @@
 				"reasoning_effort": "low"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 24,
+			"family": 25,
 			"kind": "effort"
 		},
 		{
@@ -1215,7 +1215,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 27,
+			"family": 30,
 			"kind": "toggle"
 		},
 		{
@@ -1273,7 +1273,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 27,
+			"family": 30,
 			"kind": "effort"
 		},
 		{
@@ -1336,7 +1336,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 24,
+			"family": 25,
 			"kind": "toggle"
 		},
 		{
@@ -1359,7 +1359,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 23,
+			"family": 24,
 			"kind": "toggle"
 		},
 		{
@@ -1403,7 +1403,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 27,
+			"family": 30,
 			"kind": "toggle"
 		},
 		{
@@ -1442,7 +1442,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 27,
+			"family": 30,
 			"kind": "effort"
 		},
 		{
@@ -1484,7 +1484,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 28,
+			"family": 31,
 			"kind": "effort"
 		},
 		{
@@ -1504,7 +1504,7 @@
 				"temperature": 0.7
 			},
 			"added": [],
-			"family": 27
+			"family": 30
 		},
 		{
 			"id": "openai_compat_gpt-5.1",
@@ -1524,6 +1524,1325 @@
 			},
 			"added": [],
 			"family": 7
+		},
+		{
+			"id": "fireworks_accounts_fireworks_models_llama-v3p3-70b-instruct",
+			"provider": "fireworks",
+			"model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+			"body": {
+				"model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "perplexity_sonar",
+			"provider": "perplexity",
+			"model": "sonar",
+			"body": { "model": "sonar", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "sonar", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "perplexity_sonar-pro",
+			"provider": "perplexity",
+			"model": "sonar-pro",
+			"body": { "model": "sonar-pro", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "sonar-pro", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "moonshot_kimi-k3",
+			"provider": "moonshot",
+			"model": "kimi-k3",
+			"body": { "model": "kimi-k3", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "kimi-k3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 25,
+			"kind": "effort"
+		},
+		{
+			"id": "moonshot_kimi-k3.1-pro",
+			"provider": "moonshot",
+			"model": "kimi-k3.1-pro",
+			"body": { "model": "kimi-k3.1-pro", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "kimi-k3.1-pro",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 25,
+			"kind": "effort"
+		},
+		{
+			"id": "dashscope_qwen3.8-flash",
+			"provider": "dashscope",
+			"model": "qwen3.8-flash",
+			"body": { "model": "qwen3.8-flash", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "qwen3.8-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "dashscope_qwen3.8-max",
+			"provider": "dashscope",
+			"model": "qwen3.8-max",
+			"body": { "model": "qwen3.8-max", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "qwen3.8-max",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "zai_glm-4.7",
+			"provider": "zai",
+			"model": "glm-4.7",
+			"body": { "model": "glm-4.7", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "glm-4.7",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["thinking"]],
+			"family": 24,
+			"kind": "toggle"
+		},
+		{
+			"id": "zai_glm-5.3-flash",
+			"provider": "zai",
+			"model": "glm-5.3-flash",
+			"body": { "model": "glm-5.3-flash", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "glm-5.3-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 23,
+			"kind": "effort"
+		},
+		{
+			"id": "zai_glm-5.2",
+			"provider": "zai",
+			"model": "glm-5.2",
+			"body": { "model": "glm-5.2", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "glm-5.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["thinking"]],
+			"family": 24,
+			"kind": "toggle"
+		},
+		{
+			"id": "minimax_MiniMax-M3",
+			"provider": "minimax",
+			"model": "MiniMax-M3",
+			"body": { "model": "MiniMax-M3", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "MiniMax-M3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["thinking"]],
+			"family": 28,
+			"kind": "toggle"
+		},
+		{
+			"id": "minimax_MiniMax-M3.1-Flash",
+			"provider": "minimax",
+			"model": "MiniMax-M3.1-Flash",
+			"body": {
+				"model": "MiniMax-M3.1-Flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "MiniMax-M3.1-Flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 27,
+			"kind": "effort"
+		},
+		{
+			"id": "minimax_MiniMax-M2.7",
+			"provider": "minimax",
+			"model": "MiniMax-M2.7",
+			"body": { "model": "MiniMax-M2.7", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "MiniMax-M2.7",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 26
+		},
+		{
+			"id": "siliconflow_Qwen_Qwen3-8B",
+			"provider": "siliconflow",
+			"model": "Qwen/Qwen3-8B",
+			"body": { "model": "Qwen/Qwen3-8B", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "Qwen/Qwen3-8B",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "siliconflow_deepseek-ai_DeepSeek-V3.2",
+			"provider": "siliconflow",
+			"model": "deepseek-ai/DeepSeek-V3.2",
+			"body": {
+				"model": "deepseek-ai/DeepSeek-V3.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-ai/DeepSeek-V3.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 31,
+			"kind": "toggle"
+		},
+		{
+			"id": "deepinfra_deepseek-ai_DeepSeek-V4-Flash-0731",
+			"provider": "deepinfra",
+			"model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+			"body": {
+				"model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": { "enabled": false }
+			},
+			"added": [["reasoning"]],
+			"family": 31,
+			"kind": "toggle"
+		},
+		{
+			"id": "deepinfra_openai_gpt-oss-120b",
+			"provider": "deepinfra",
+			"model": "openai/gpt-oss-120b",
+			"body": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "sambanova_Meta-Llama-3.3-70B-Instruct",
+			"provider": "sambanova",
+			"model": "Meta-Llama-3.3-70B-Instruct",
+			"body": {
+				"model": "Meta-Llama-3.3-70B-Instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "Meta-Llama-3.3-70B-Instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "sambanova_gpt-oss-120b",
+			"provider": "sambanova",
+			"model": "gpt-oss-120b",
+			"body": { "model": "gpt-oss-120b", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "sambanova_DeepSeek-V3.2",
+			"provider": "sambanova",
+			"model": "DeepSeek-V3.2",
+			"body": { "model": "DeepSeek-V3.2", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "DeepSeek-V3.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 31,
+			"kind": "toggle"
+		},
+		{
+			"id": "huggingface_meta-llama_Llama-3.1-8B-Instruct",
+			"provider": "huggingface",
+			"model": "meta-llama/Llama-3.1-8B-Instruct",
+			"body": {
+				"model": "meta-llama/Llama-3.1-8B-Instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "meta-llama/Llama-3.1-8B-Instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "huggingface_Qwen_Qwen3-32B:cheapest",
+			"provider": "huggingface",
+			"model": "Qwen/Qwen3-32B:cheapest",
+			"body": {
+				"model": "Qwen/Qwen3-32B:cheapest",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "Qwen/Qwen3-32B:cheapest",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 30,
+			"kind": "effort"
+		},
+		{
+			"id": "nvidia_nvidia_nemotron-3.5-lightning-30b-a3b",
+			"provider": "nvidia",
+			"model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+			"body": {
+				"model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 33,
+			"kind": "toggle"
+		},
+		{
+			"id": "nvidia_openai_gpt-oss-20b",
+			"provider": "nvidia",
+			"model": "openai/gpt-oss-20b",
+			"body": {
+				"model": "openai/gpt-oss-20b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-20b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "nvidia_qwen_qwen3-next-80b-a3b-instruct",
+			"provider": "nvidia",
+			"model": "qwen/qwen3-next-80b-a3b-instruct",
+			"body": {
+				"model": "qwen/qwen3-next-80b-a3b-instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen/qwen3-next-80b-a3b-instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "nebius_Qwen_Qwen3-30B-A3B-Instruct-2507",
+			"provider": "nebius",
+			"model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+			"body": {
+				"model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 29
+		},
+		{
+			"id": "nebius_Qwen_Qwen3-32B",
+			"provider": "nebius",
+			"model": "Qwen/Qwen3-32B",
+			"body": { "model": "Qwen/Qwen3-32B", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "Qwen/Qwen3-32B",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 30,
+			"kind": "effort"
+		},
+		{
+			"id": "nebius_openai_gpt-oss-120b",
+			"provider": "nebius",
+			"model": "openai/gpt-oss-120b",
+			"body": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "novita_qwen_qwen3.8-flash",
+			"provider": "novita",
+			"model": "qwen/qwen3.8-flash",
+			"body": {
+				"model": "qwen/qwen3.8-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen/qwen3.8-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "novita_deepseek_deepseek-v4.1-flash-1017",
+			"provider": "novita",
+			"model": "deepseek/deepseek-v4.1-flash-1017",
+			"body": {
+				"model": "deepseek/deepseek-v4.1-flash-1017",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek/deepseek-v4.1-flash-1017",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 31,
+			"kind": "toggle"
+		},
+		{
+			"id": "hyperbolic_glm-5.3-flash",
+			"provider": "hyperbolic",
+			"model": "glm-5.3-flash",
+			"body": { "model": "glm-5.3-flash", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "glm-5.3-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 23
+		},
+		{
+			"id": "scaleway_mistral-small-3.2-24b-instruct-2506",
+			"provider": "scaleway",
+			"model": "mistral-small-3.2-24b-instruct-2506",
+			"body": {
+				"model": "mistral-small-3.2-24b-instruct-2506",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "mistral-small-3.2-24b-instruct-2506",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "scaleway_qwen3.5-397b-a17b",
+			"provider": "scaleway",
+			"model": "qwen3.5-397b-a17b",
+			"body": {
+				"model": "qwen3.5-397b-a17b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen3.5-397b-a17b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 30,
+			"kind": "effort"
+		},
+		{
+			"id": "scaleway_gpt-oss-120b",
+			"provider": "scaleway",
+			"model": "gpt-oss-120b",
+			"body": { "model": "gpt-oss-120b", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "ovhcloud_Mistral-Small-3.2-24B-Instruct-2506",
+			"provider": "ovhcloud",
+			"model": "Mistral-Small-3.2-24B-Instruct-2506",
+			"body": {
+				"model": "Mistral-Small-3.2-24B-Instruct-2506",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "Mistral-Small-3.2-24B-Instruct-2506",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "ovhcloud_gpt-oss-20b",
+			"provider": "ovhcloud",
+			"model": "gpt-oss-20b",
+			"body": { "model": "gpt-oss-20b", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "gpt-oss-20b", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": [],
+			"family": 11
+		},
+		{
+			"id": "upstage_solar-mini4",
+			"provider": "upstage",
+			"model": "solar-mini4",
+			"body": { "model": "solar-mini4", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "solar-mini4", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "upstage_solar-pro4",
+			"provider": "upstage",
+			"model": "solar-pro4",
+			"body": { "model": "solar-pro4", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "solar-pro4", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "ai21_jamba-mini",
+			"provider": "ai21",
+			"model": "jamba-mini",
+			"body": { "model": "jamba-mini", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "jamba-mini", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "venice_llama-3.2-3b",
+			"provider": "venice",
+			"model": "llama-3.2-3b",
+			"body": { "model": "llama-3.2-3b", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "llama-3.2-3b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "venice_qwen3-235b-a22b-thinking-2507",
+			"provider": "venice",
+			"model": "qwen3-235b-a22b-thinking-2507",
+			"body": {
+				"model": "qwen3-235b-a22b-thinking-2507",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen3-235b-a22b-thinking-2507",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 29
+		},
+		{
+			"id": "venice_kimi-k3",
+			"provider": "venice",
+			"model": "kimi-k3",
+			"body": { "model": "kimi-k3", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "kimi-k3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": { "enabled": false }
+			},
+			"added": [["reasoning"]],
+			"family": 25,
+			"kind": "toggle"
+		},
+		{
+			"id": "vercel_openai_gpt-4.1-nano",
+			"provider": "vercel",
+			"model": "openai/gpt-4.1-nano",
+			"body": {
+				"model": "openai/gpt-4.1-nano",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-4.1-nano",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "vercel_openai_gpt-oss-120b",
+			"provider": "vercel",
+			"model": "openai/gpt-oss-120b",
+			"body": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": { "effort": "low" }
+			},
+			"added": [["reasoning"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "vercel_alibaba_qwen3-max",
+			"provider": "vercel",
+			"model": "alibaba/qwen3-max",
+			"body": {
+				"model": "alibaba/qwen3-max",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "alibaba/qwen3-max",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": { "enabled": false }
+			},
+			"added": [["reasoning"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "poe_gpt-4.1-mini",
+			"provider": "poe",
+			"model": "gpt-4.1-mini",
+			"body": { "model": "gpt-4.1-mini", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "gpt-4.1-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "featherless_meta-llama_Meta-Llama-3.1-8B-Instruct",
+			"provider": "featherless",
+			"model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+			"body": {
+				"model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "featherless_Qwen_Qwen3-8B",
+			"provider": "featherless",
+			"model": "Qwen/Qwen3-8B",
+			"body": { "model": "Qwen/Qwen3-8B", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "Qwen/Qwen3-8B",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false, "thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "featherless_deepseek-ai_DeepSeek-V3.2",
+			"provider": "featherless",
+			"model": "deepseek-ai/DeepSeek-V3.2",
+			"body": {
+				"model": "deepseek-ai/DeepSeek-V3.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-ai/DeepSeek-V3.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false, "thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 31,
+			"kind": "toggle"
+		},
+		{
+			"id": "inception_mercury-3",
+			"provider": "inception",
+			"model": "mercury-3",
+			"body": { "model": "mercury-3", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "mercury-3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "instant"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 34,
+			"kind": "effort"
+		},
+		{
+			"id": "inception_mercury-2",
+			"provider": "inception",
+			"model": "mercury-2",
+			"body": { "model": "mercury-2", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "mercury-2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "instant"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 34,
+			"kind": "effort"
+		},
+		{
+			"id": "chutes_Qwen_Qwen3.8-27B-TEE",
+			"provider": "chutes",
+			"model": "Qwen/Qwen3.8-27B-TEE",
+			"body": {
+				"model": "Qwen/Qwen3.8-27B-TEE",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "Qwen/Qwen3.8-27B-TEE",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false, "thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "chutes_moonshotai_Kimi-K3",
+			"provider": "chutes",
+			"model": "moonshotai/Kimi-K3",
+			"body": {
+				"model": "moonshotai/Kimi-K3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "moonshotai/Kimi-K3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false, "thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 25,
+			"kind": "toggle"
+		},
+		{
+			"id": "requesty_openai_gpt-4o-mini",
+			"provider": "requesty",
+			"model": "openai/gpt-4o-mini",
+			"body": {
+				"model": "openai/gpt-4o-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-4o-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "requesty_openai_gpt-oss-120b",
+			"provider": "requesty",
+			"model": "openai/gpt-oss-120b",
+			"body": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "baseten_deepseek-ai_DeepSeek-V4-Flash-0731",
+			"provider": "baseten",
+			"model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+			"body": {
+				"model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 31,
+			"kind": "effort"
+		},
+		{
+			"id": "baseten_zai-org_GLM-5.2",
+			"provider": "baseten",
+			"model": "zai-org/GLM-5.2",
+			"body": { "model": "zai-org/GLM-5.2", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "zai-org/GLM-5.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 24,
+			"kind": "effort"
+		},
+		{
+			"id": "reka_reka-edge-2603",
+			"provider": "reka",
+			"model": "reka-edge-2603",
+			"body": { "model": "reka-edge-2603", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "reka-edge-2603",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "stepfun_step-3.5-flash",
+			"provider": "stepfun",
+			"model": "step-3.5-flash",
+			"body": { "model": "step-3.5-flash", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "step-3.5-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "volcengine_doubao-seed-2-0-mini-260428",
+			"provider": "volcengine",
+			"model": "doubao-seed-2-0-mini-260428",
+			"body": {
+				"model": "doubao-seed-2-0-mini-260428",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "doubao-seed-2-0-mini-260428",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["thinking"]],
+			"family": 35,
+			"kind": "toggle"
+		},
+		{
+			"id": "volcengine_deepseek-v3-2-251201",
+			"provider": "volcengine",
+			"model": "deepseek-v3-2-251201",
+			"body": {
+				"model": "deepseek-v3-2-251201",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-v3-2-251201",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["thinking"]],
+			"family": 36,
+			"kind": "toggle"
+		},
+		{
+			"id": "qianfan_ernie-5.1",
+			"provider": "qianfan",
+			"model": "ernie-5.1",
+			"body": { "model": "ernie-5.1", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "ernie-5.1", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "qianfan_qwen3-32b",
+			"provider": "qianfan",
+			"model": "qwen3-32b",
+			"body": { "model": "qwen3-32b", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "qwen3-32b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["enable_thinking"], ["thinking"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "qianfan_deepseek-v3.2",
+			"provider": "qianfan",
+			"model": "deepseek-v3.2",
+			"body": { "model": "deepseek-v3.2", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "deepseek-v3.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["enable_thinking"], ["thinking"]],
+			"family": 31,
+			"kind": "toggle"
+		},
+		{
+			"id": "spark_lite",
+			"provider": "spark",
+			"model": "lite",
+			"body": { "model": "lite", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "lite", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "baichuan_Baichuan4-Air",
+			"provider": "baichuan",
+			"model": "Baichuan4-Air",
+			"body": { "model": "Baichuan4-Air", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "Baichuan4-Air",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "azure_gpt-5.1",
+			"provider": "azure",
+			"model": "gpt-5.1",
+			"body": { "model": "gpt-5.1", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 7,
+			"kind": "effort"
+		},
+		{
+			"id": "azure_gpt-4.1-mini",
+			"provider": "azure",
+			"model": "gpt-4.1-mini",
+			"body": { "model": "gpt-4.1-mini", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "gpt-4.1-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "bedrock_openai.gpt-oss-20b-1:0",
+			"provider": "bedrock",
+			"model": "openai.gpt-oss-20b-1:0",
+			"body": {
+				"model": "openai.gpt-oss-20b-1:0",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai.gpt-oss-20b-1:0",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 11
+		},
+		{
+			"id": "cloudflare_@cf_meta_llama-3.1-8b-instruct",
+			"provider": "cloudflare",
+			"model": "@cf/meta/llama-3.1-8b-instruct",
+			"body": {
+				"model": "@cf/meta/llama-3.1-8b-instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "@cf/meta/llama-3.1-8b-instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "databricks_system.ai.gpt-oss-120b",
+			"provider": "databricks",
+			"model": "system.ai.gpt-oss-120b",
+			"body": {
+				"model": "system.ai.gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "system.ai.gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "databricks_databricks-gpt-oss-120b",
+			"provider": "databricks",
+			"model": "databricks-gpt-oss-120b",
+			"body": {
+				"model": "databricks-gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "databricks-gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "snowflake_claude-haiku-4-5",
+			"provider": "snowflake",
+			"model": "claude-haiku-4-5",
+			"body": {
+				"model": "claude-haiku-4-5",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "claude-haiku-4-5",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "snowflake_openai-gpt-5.1",
+			"provider": "snowflake",
+			"model": "openai-gpt-5.1",
+			"body": { "model": "openai-gpt-5.1", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "openai-gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "watsonx_ibm_granite-4-h-small",
+			"provider": "watsonx",
+			"model": "ibm/granite-4-h-small",
+			"body": {
+				"model": "ibm/granite-4-h-small",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "ibm/granite-4-h-small",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "watsonx_openai_gpt-oss-120b",
+			"provider": "watsonx",
+			"model": "openai/gpt-oss-120b",
+			"body": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 11
+		},
+		{
+			"id": "vertex_google_gemini-3.5-flash",
+			"provider": "vertex",
+			"model": "google/gemini-3.5-flash",
+			"body": {
+				"model": "google/gemini-3.5-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "google/gemini-3.5-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 16,
+			"kind": "gemini_level"
+		},
+		{
+			"id": "vertex_google_gemini-2.5-flash",
+			"provider": "vertex",
+			"model": "google/gemini-2.5-flash",
+			"body": {
+				"model": "google/gemini-2.5-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "google/gemini-2.5-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 13
 		}
 	],
 	"refusal_vectors": [
@@ -1749,7 +3068,14 @@
 			"table": {
 				"families": ["x"],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -1769,7 +3095,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -1788,7 +3121,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -1808,7 +3148,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -1828,7 +3175,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -1842,7 +3196,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -1856,7 +3217,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -1871,7 +3239,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -1886,7 +3261,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": true
 		},
@@ -1910,7 +3292,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": true
 		},
@@ -1936,7 +3325,14 @@
 						"controls": []
 					}
 				],
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -1963,7 +3359,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": []
+				"ollama_think_levels": [],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -1977,7 +3380,112 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", 1]
+				"ollama_think_levels": ["low", 1],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "no_capability_listing",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low"]
+			},
+			"valid": false
+		},
+		{
+			"id": "capability_ttl_fractional",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low"],
+				"capability_listing": {
+					"ttl_hours": 1.5,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "capability_unknown_listing",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openai"
+					},
+					"page_query": {}
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "capability_no_providers",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {},
+					"page_query": {}
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "capability_bad_page_query",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"gemini": "gemini"
+					},
+					"page_query": {
+						"gemini": "pageSize=all"
+					}
+				}
 			},
 			"valid": false
 		}

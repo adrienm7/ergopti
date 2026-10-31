@@ -181,7 +181,7 @@ function checkLinuxInstallCallers() {
 	expect(
 		same(
 			installs,
-			['ui/menu/menu_builder.lua', 'ui/update_check/bridge.lua', 'ui/changelog/bridge.lua'].sort()
+			['ui/menu/menu_about.lua', 'ui/update_check/bridge.lua', 'ui/changelog/bridge.lua'].sort()
 		),
 		`Linux: an update is downloaded or installed from an unreviewed file: ${installs.join(', ')}`
 	);

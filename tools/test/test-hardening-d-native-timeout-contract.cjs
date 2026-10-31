@@ -22,9 +22,10 @@
  * 1. Values are parsed from source, never copied: the Swift constants, the
  *    Lua constants, and which Lua constant arm_ack_timer uses for which ACK.
  * 2. The Swift side of a pair is derived from the code that spends it. The
- *    guardian registration budget counts the launchctl steps and health waits
- *    in ensureLegacyRemapGuardianRegistered, so an added step raises the
- *    required Lua deadline without anyone updating a comment.
+ *    guardian registration budget counts the launchctl steps and waits in
+ *    ensureLegacyRemapGuardianRegistered and in the ad hoc reset before it, so
+ *    an added step raises the required Lua deadline without anyone updating a
+ *    comment.
  * 3. A pair whose parse finds nothing fails: a renamed constant must not turn
  *    this contract into a silent pass.
  * 4. `--root <dir>` runs the contract against another checkout's copy (used to
@@ -298,9 +299,56 @@ const launchctlTimeout = swiftSeconds(guardian, 'kLegacyLaunchctlTimeoutSeconds'
 					'ensureLegacyRemapGuardianRegistered — the count no longer reads the registration'
 			);
 		}
-		const budget = steps * (launchctlTimeout + grace) + healthWaits * launchctlTimeout;
+		// An ad hoc build first replaces its stale registrations (field run
+		// 2026-10-30): the exact legacy removal's launchctl steps, then the proof
+		// that the previous guardian exited. The modern path's own health wait
+		// precedes the legacy fallback the count above reads.
+		const outcome = swiftFuncBody(guardian, 'remapGuardianRegistrationOutcome');
+		const removal = swiftFuncBody(guardian, 'removeLegacyRemapGuardian');
+		const exited = swiftFuncBody(guardian, 'remapGuardianJobHasExited');
+		const exitWait = swiftFuncBody(guardian, 'waitForRemapGuardianUnregistrationObservation');
+		let resetSteps = NaN;
+		let resetWaits = NaN;
+		if (!outcome || !removal || !exited || !exitWait) {
+			errors.push(
+				`${GUARDIAN_FILE}: the ad hoc registration reset (remapGuardianRegistrationOutcome, ` +
+					'removeLegacyRemapGuardian, remapGuardianJobHasExited) could not be read'
+			);
+		} else if (
+			!outcome.includes('resetAdhocRemapGuardianRegistration(') ||
+			!outcome.includes('removeLegacyRemapGuardian(executablePath:') ||
+			!outcome.includes('remapGuardianJobHasExited(paths)') ||
+			!outcome.includes('waitForLegacyGuardianHealth(')
+		) {
+			errors.push(
+				`${GUARDIAN_FILE}: remapGuardianRegistrationOutcome no longer spends the reset and ` +
+					'health wait this budget counts'
+			);
+		} else {
+			const timeoutDefault = guardian.match(
+				/func waitForRemapGuardianUnregistrationObservation\([\s\S]*?timeout:\s*TimeInterval\s*=\s*(\w+)/
+			);
+			if (!timeoutDefault || timeoutDefault[1] !== 'kLegacyLaunchctlTimeoutSeconds') {
+				errors.push(
+					`${GUARDIAN_FILE}: waitForRemapGuardianUnregistrationObservation no longer waits ` +
+						'kLegacyLaunchctlTimeoutSeconds by default'
+				);
+			}
+			resetSteps = count(removal, 'runner.run(arguments:') + count(exited, 'exitStatus(arguments:');
+			resetWaits = count(exited, 'waitForRemapGuardianUnregistrationObservation(') + 1;
+			if (resetSteps < 3 || resetWaits < 2) {
+				errors.push(
+					`${GUARDIAN_FILE}: found ${resetSteps} reset launchctl step(s) and ${resetWaits} ` +
+						'wait(s) — the count no longer reads the ad hoc reset'
+				);
+			}
+		}
+		const budget =
+			(steps + resetSteps) * (launchctlTimeout + grace) +
+			(healthWaits + resetWaits) * launchctlTimeout;
 		requirePair(
-			`guardian registration (${steps} launchctl steps + ${healthWaits} health waits)`,
+			`guardian registration (${steps} + ${resetSteps} launchctl steps + ` +
+				`${healthWaits} + ${resetWaits} waits)`,
 			'LEASE_GUARDIAN_REGISTRATION_TIMEOUT_SEC',
 			luaSeconds(remapLua, 'LEASE_GUARDIAN_REGISTRATION_TIMEOUT_SEC', REMAP_LUA),
 			'worst-case registration',

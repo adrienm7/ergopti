@@ -62,6 +62,36 @@ on the PC; push the branch and say so, dev integration stays with the coordinato
 Every commit keeps the AHK UTF-8 BOM (repository encoding gate), reseals a touched updater source and
 passes the Windows CI lane (`gh workflow run ci.yml --ref <branch> -f os_lanes=windows`).
 
+### Windows manual checks for the maintainer (batched by the PC agent, 2026-10-31)
+
+Decisions of 2026-10-30: app categories follow macOS and Linux with no migration, the shared TOML writer is the
+reference, the installed-record corpus follows Lua. A `metrics\app_categories.json` is no longer read.
+
+- [ ] Tray > Gestures: one « Infos… » row, no long text row, and it opens the dialog.
+- [ ] Ollama or oMLX on a non-default port with the process scan failing: the server is still found.
+- [ ] Type `axa` then Space fast, 20 times: always `AXA`.
+- [ ] Type `sru` with a personal `sru` -> `SRU` final entry: `SRU`. Type a hotstring containing `{left}`: the caret moves.
+- [ ] With live Ollama, token-by-token predictions display correctly, then enable the row (PAR-12).
+- [ ] System Ollama on 11434, AI on: Ergopti's listens on 11435 and the other one is untouched.
+- [ ] Type `fb` + Space, Enter and ★ with the abbreviation and brand packs, at 1, 2 and 3 arrows, consumed and not.
+- [ ] Type on a real keyboard with the composed layout (Debug > "Test the composed layout").
+- [ ] Block api.github.com and run an update check: the Atom fallback reports the version.
+- [ ] "Create a GitHub issue" signed in: the form opens with no "Whoops" page.
+- [ ] Install a build with 5d6beccf83, update to the next one: the exe restarts, the three scripts are in
+      `%LOCALAPPDATA%\Ergopti\vendor\`, the command line shows `-File` and no `-EncodedCommand`.
+- [ ] `tools\dev\run-windows-dev.ps1` with the exe running: the exe closes, the tray appears, saving an `.ahk` reloads
+      once. `npm run dev:windows` from Git Bash and cmd; double-click `ErgoptiPlus.ahk` with and without the exe.
+- [ ] The ten window-toggle actions, also without WebView2: no orphan WebView2 process.
+- [ ] Win+S targets (browser, mail, Regedit, Settings, web search); Backspace word start in Windows Terminal with
+      Claude Code, Notepad Ctrl+Backspace, browser Ctrl+L, AltGr+Backspace on AZERTY and Kana; native pair popup;
+      Versions Retry button.
+- [ ] Brightness joined source; retired Metrics shortcuts across a three-OS full save and an installed upgrade.
+- [ ] Corporate network: Debug > diagnostics (`github_api`, `proxy_pac`), a model pull behind a PAC, the Windows
+      security warning for the native CA case, and decide whether NTLM relays get an option.
+- [ ] Accounts: SignPath application (`docs/tooling/signpath-foundation-application.md`); update-signing key
+      (`docs/tooling/update-signing.md`), one release with `off`, then `required`; VirusTotal and Defender submissions.
+- [ ] Testers: retry the download behind a block page, and retest number-row, key-combination and priority-100 setups.
+
 ## Mac todo (run by the agent on the Mac)
 
 Check out `dev` (or the branch to test) and run `bash tools/dev/collect-macos-field-report.sh`. It creates
@@ -77,7 +107,8 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    - **oMLX:** oMLX on port 8181 is found in API mode, with no `ps` deadlock.
    - **Composer (L52):** the composer is enabled after a single re-read, and `06_field_composer` passes.
    - **Keystats cache:** it now lives in `~/Library/Caches/ergopti_plus/metrics`. Check the one-time move
-     line from TMPDIR.
+     line from TMPDIR. Automated: `field_storage`'s `keystats_cache_place` passes only when the live cache
+     sits there and no `<TMPDIR>/ergopti_metrics/<device>/db.sqlite` is left.
    - **Gestures:** the menu shows one « Infos… » row that opens the dialog, and `tap_3` recommends left
      click.
    - **Three-finger swipe (L46):** each step of 25 units (4, 29, 54, 79…) gives one more action, and two-finger
@@ -93,11 +124,15 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    boundaries: hosted gates cannot execute Darwin poll/FD behaviour or the hidden `FSEventStreamStart` result.
    `swift test` there needs full Xcode.app, not just the Command Line Tools (`no such module 'XCTest'`
    otherwise); confirmed on a CLT-only checkout 2026-10-29, see
-   [macos-hammerspoon memory](docs/memory/macos-hammerspoon.md).
+   [macos-hammerspoon memory](docs/memory/macos-hammerspoon.md). Needs the maintainer to install Xcode.app once; the field
+   run cannot install it (an App Store download behind an Apple ID).
 5. **Production Hammerspoon profile (from the former root TODO.md).** Collect the `hotpath_profiler`,
    `boot_profiler` and `perf` artifacts on the Mac and measure MLX adoption, WPM `mouseMoved` traffic, Terminal
    identity lookup, keystats app attribution, canvas/AX work and the remaining synchronous shell helpers before
-   optimizing any of them from source reading alone.
+   optimizing any of them from source reading alone. The field run now collects part of it with no person:
+   `field_boot_cost` (boot wall, CPU, slowest stages), `field_idle_cost` (idle CPU share, memory) and
+   `field_slow_lines` (the day's slow HotPath segments by own time, ingest ticks, preferences saves). Left
+   for hands: a working day of typing before the run, so the slow lines have something to measure.
 6. **Field run checks (`field_run/NN_<step>.json`, each step's `proves` line in
    `static/ergopti_plus/macos/data/field_run.json`).** A failing step's codes are `fail_<check step>`; read the
    step's report and log window before the day log. The read-only checks added for the field run alone:
@@ -115,7 +150,9 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      (`immutable=1`, so the ingest never meets a lock; an issue counts when a second scan sees it) (a damage names the
      number of issue lines only); `config.toml`, `config_karabiner.toml`, the personal hotstrings and personal
      info files each parse with the driver's TOML reader, read-only; today's log exists; the logs folder takes a
-     probe file (removed at once); the auto-reload file watcher owner is published (FSEvents accepted it).
+     probe file (removed at once); the auto-reload file watcher owner is published (FSEvents accepted it);
+     the keystats cache is under `~/Library/Caches/ergopti_plus/` with no TMPDIR copy left
+     (`keystats_cache_place`: `caches`, `legacy_left`, `outside_caches`).
    - `field_launcher_roles`: the launcher resolves; `--managed-http-worker` with malformed arguments exits 64
      at once (any other exit or a timeout: the role did not dispatch); the same worker carries one direct GET,
      with the request `native_http.py` sends, to a loopback server the check opens and closes. An exit 64 there
@@ -137,15 +174,59 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    - `key_accounting` (automatic, no person): the app opens its own scratch text field, brings it to the
      front and types `wkjx` there only, checking before each key that the field still has the focus (a lost
      focus stops the sequence with its code; no key reaches another app); the passive tap must see each key
-     once, the field must hold exactly `wkjx`, the previous app must get the focus back. Synthetic keys are
-     posted, tagged, through `adapters/synthetic_input.lua` (keymap and keystats treat them as the driver's
-     output) after Karabiner: the virtual keyboard path and the ledger's double count are `physical_keys_only`.
+     once, the field must hold exactly `wkjx`, the previous app must get the focus back. The keys are
+     selftest keys (`SyntheticInput.emit_selftest_key_stroke`): the keymap decodes them as typing only while
+     the developer runtime's published scratch window has the focus and consumes them anywhere else (one
+     `keymap.selftest_gate` warning per run names why), keystats never counts them, and the typing stops
+     before a key while the keymap taps are off (`keymap_tap_off`). They are posted after Karabiner: the
+     virtual keyboard path and the ledger's double count are `physical_keys_only`.
+   - `hotstring_roundtrip` (automatic, after `key_accounting`): the first shipped, enabled, terminator
+     hotstring with a plain lowercase trigger no other file registers is typed as selftest keys into the
+     scratch field, after a Space and followed by Space; the field must hold exactly the Space and its
+     expansion (plus the Space unless Space is a consumed terminator), and `terminator_to_text_ms` is named.
+     Codes: `keymap_absent`, `no_enabled_trigger`, `space_not_terminator`, `not_expanded`,
+     `mismatch_<n>_bytes`, `typing_incomplete`.
+   - `prediction_tooltip` (automatic): with predictions on and the active model already on this Mac (Ollama
+     listed by a running server, or an MLX model in the cache; nothing is started or downloaded),
+     `le chat dort sur le ` is typed into the scratch field and the prediction tooltip must show within 45 s;
+     `keystroke_to_tooltip_ms` (last key to tooltip) is named. Codes: `llm_disabled`, `no_installed_model`
+     (a remote backend included), `tooltip_not_shown`, `typing_incomplete`.
    - `driver_reload` (last step): the configuration is put back, the run's state goes to `resume.json`, the
      driver reloads through the termination coordinator, and the reloaded driver's field run resumes, naming
      the reload's duration (request to a ready field run, `reload_ms` in the report) and taking a fresh
      configuration snapshot for the guard. A reload refused, or accepted and never started, fails by name.
    - `field_menu_build`: one rebuild of the menu tree, as a state change triggers it, must be accepted by
      AppKit; its duration in ms, the number of top-level rows and the three slowest rows (`id:ms`) are named.
+   - `field_boot_cost` (after `field_composer`): the boot that started the app completed; its wall and CPU
+     totals and its slowest stage are named, the three slowest stages in its log window.
+   - `field_idle_cost`: over 30 quiet seconds the driver's process CPU share must stay at or under 3 %
+     (`idle_cpu_percent`); resident memory and its growth, Lua heap growth and main-thread holds over 250 ms
+     in the window are named.
+   - `field_slow_lines`: one `awk` pass over today's log (a summary only reaches the task's pipe) tallies
+     the HotPath `Slow <segment>: X ms own` lines by segment, and the `Slow ingest tick` and
+     `Slow preferences save` lines; `slow_dominant` names the segment with the most own time (the five
+     largest in the log window), the two others are `count:worst_ms`; `log_lease_bound_failures` and
+     `log_layout_change_before_baseline` fail when a `Lease-bound input startup failed` or a
+     `Layout … detected change before its baseline` line is in the day log (item 38).
+   - `field_fifo_safety`: in a folder of its own under `TMPDIR`, a FIFO (a reader attached first, so a
+     regressed guard cannot freeze the app) is named `named_pipe` by `followed_mode`, `exists` sees it, and
+     both `append` and the atomic `write` refuse it and leave it in place; the folder is removed.
+   - `field_local_servers` (after `field_ai_local`, read-only): every server of
+     `_shared/modules/llm/local_servers.json` must have a discovery descriptor the driver accepts
+     (`servers_catalogue`, else `undescribed_<n>`); one detection sweep, the AI menu's own (process,
+     settings file, listening port, then `GET /models`), names each server as `server_<id>`:
+     `up:<port source>:<models>`, `not_running:<port source>`, `needs_key:...` or `no_answer:...`. A
+     server added to the shared list is reported by the next run with no driver change.
+   - `field_layout_rows` (after `field_idle_cost`): from the Ergo-L file the app ships, a loose layout typing
+     the symbols first is written as `~/Library/Keyboard Layouts/ErgoptiFieldRows-<n>.keylayout` under a new
+     name and id, enabled through the enabled-sources preference, selected, and read back from a fresh
+     process (`rows_build:keys_13` when the launcher's keyboard probe types its thirteen base cells); a second
+     build that also moves the edge keys replaces it live and retires it (`rows_replace`, the design note's
+     M4); then the user's selected source is selected again, every check build is disabled and deleted
+     (`rows_retire`), and the selected id and the `AppleEnabledInputSources` list must be identical to the
+     ones read before (`rows_restore`). `rows_ghosts` counts builds the system keeps listing until logout
+     (M5a). A failure names its code: `requires_logout`, `select_refused`, `readback_mismatch`; the step's log
+     window names each build and the source id the probe read.
 
 ## Maintainer requests of 2026-10-30 (coordinator session; everything here is to be done)
 
@@ -205,36 +286,70 @@ into its item below or into the matching existing item.
       main thread; (4) name the collector behind the healthcheck 100 to 230 ms from its new line, and the
       ignored-window AX probe (500 ms timeout); (5) the one-off holds of `field_run`, `error_dialog`, `keymap/utils`
       timers and `menu_state` (shell.ioreg 146 ms).
-- [ ] **Thinking off for every model on every backend and OS (worker `fix/llm-thinking-off`).** [CODE] The
-      rule depends on the MODEL, not on the provider: model families (normalized model id) declare an intent
-      (off, or the lowest level a model allows) and a control kind; each provider and local server declares
-      the dialect that carries each kind; a 400 naming an injected field is retried once without it, logged
-      and remembered; provider capability listings (OpenRouter `supported_parameters`, Anthropic Models API,
-      Gemini `models.list`) confirm it automatically. Covers predictions, warmups, vision, translation, tone,
-      live mode, the agent and the test prediction, for local servers, Ollama, MLX and every cloud provider.
-      Already done before: local servers (c9ca910659), Ollama predictions, macOS MLX. Gaps found:
-      `_shared/lua/llm/vision.lua` (no format turns thinking off), the Windows Ollama warmup, every cloud
-      model except Cerebras `qwen-3.8-27b`. Also check whether Anthropic requests send `temperature`
-      (Opus 5.5, Sonnet 5.5 and Fable reject non-default sampling with a 400).
-- [ ] **Every known cloud AI provider in `api_providers.json`, on the three OS.** [CODE] Each one with its
-      key handling, model listing, the thinking-off dialect of the item above, localized labels and tests.
-      Verify every endpoint against the provider's official documentation.
-  - OpenAI-compatible with one key: Perplexity, Moonshot (Kimi), Alibaba Qwen (DashScope international),
-    Z.ai (Zhipu GLM), MiniMax, SiliconFlow, DeepInfra, SambaNova, Hugging Face Inference Providers, NVIDIA NIM,
-    Nebius AI Studio, Novita AI, Hyperbolic, Scaleway Generative APIs, OVHcloud AI Endpoints, Upstage (Solar),
-    AI21 (Jamba), Venice.ai, Vercel AI Gateway, GitHub Models, Poe, Featherless, Lambda, Inception Labs
-    (Mercury), Chutes, Requesty, Baseten, Writer (Palmyra), Aleph Alpha, Reka, Liquid AI, StepFun, 01.AI.
-  - Own authentication or per-account address: Azure OpenAI / Microsoft Foundry (deployment URL, `api-key`
-    header, Entra ID), Amazon Bedrock (SigV4 and Bedrock API keys), Google Vertex AI (OAuth service account),
-    Cloudflare Workers AI and AI Gateway (account id), IBM watsonx, Databricks Model Serving, Snowflake Cortex.
-  - Mainly used in China: ByteDance Doubao (Volcengine Ark), Baidu Qianfan (ERNIE), Tencent Hunyuan, iFlytek
-    Spark, Baichuan.
+- [ ] **Thinking off for every model on every backend and OS (workers `fix/llm-thinking-off`,
+      `fix/llm-thinking-off-2`).** [CODE] The rule depends on the MODEL, not on the provider: model families
+      of `thinking_off.json` declare an intent and a control kind, each provider and local server the dialect
+      that carries it; a 400 naming an injected field is retried once without it and remembered. Done on the
+      three OS: cloud providers, local servers, MLX, default-only sampling, the resolved Ollama `think` of
+      every Ollama body (predictions, warmups, test prediction, models manager check, vision and agent: false,
+      or the family's level when Ollama ignores false, gpt-oss `low`; the single-source guard fails a literal),
+      and capability listings (OpenRouter `supported_parameters`, Anthropic Models API `capabilities`, Gemini
+      `models.list` `thinking`): fetched per provider off the request path, cached `ttl_hours`, and a control
+      a listing says a model lacks is skipped before sending. Left: run the Windows suite (AutoHotkey could
+      not run in the cloud container: `model_capabilities.ahk`, the `think` spec of `vision.ahk` and
+      `LLM_OllamaThink` are covered by the shared corpus but unexecuted); the listing cache lives in memory,
+      so a restart fetches it again on its first request.
+- [ ] **Every known cloud AI provider in `api_providers.json`, on the three OS (workers `feat/llm-providers`, `-3`).**
+      [CODE] Done (official documentation read 2026-10-30, each descriptor's `_source`): Perplexity, Moonshot,
+      DashScope, Z.ai, MiniMax, SiliconFlow, DeepInfra, SambaNova, Hugging Face, NVIDIA NIM, Nebius, Novita,
+      Hyperbolic, Scaleway, OVHcloud, Upstage, AI21, Venice, Vercel AI Gateway, Poe, Featherless, Inception,
+      Chutes, Requesty, Baseten, Reka, StepFun, Volcengine Ark, Baidu Qianfan, iFlytek Spark, Baichuan. The three
+      drivers read the catalogue generically (key, requests, `<base>/models` listing), so no driver code changed;
+      labels are brand names read from the catalogue, like the providers before them, so no locale key.
+      `test_api_provider_catalogue.lua` (macOS, Linux) requires a default-model thinking vector and a recorded
+      listing or its reason for every provider; the shared corpora are replayed by the three drivers. Not added:
+      GitHub Models (retired 2026-07-30), Lambda Inference (shut down), 01.AI (API stopped 2026-09-03), Aleph Alpha
+      and Liquid AI (no public hosted API), Writer (its reference documents `POST /v1/chat`, not
+      `/chat/completions`, and lists `{"models": [...]}`), Tencent Hunyuan (moving to TokenHub `hy3`, whose
+      international address is only in third-party sources), BytePlus ModelArk (documentation unreadable).
+      Inferred, not read: Chutes and Featherless honour `chat_template_kwargs.enable_thinking` on Qwen; SambaNova
+      `enable_thinking: false` (only `true` is shown); whether Qianfan `ernie-5.1` is hybrid. Watch: Perplexity
+      ended Sonar chat-completions support on 2026-09-27 (requests still answer, converted to its Agent API);
+      `dashscope-intl` is a legacy shared domain; Moonshot K2 retires by December.
+      Per-account providers (worker `feat/llm-providers-3`): Azure OpenAI / Foundry, Amazon Bedrock, Cloudflare
+      Workers AI, Databricks, Snowflake Cortex are rows whose `base_url` is a template
+      (`_shared/lua/llm/api_url_template.lua`, AHK port, shared corpus): the add-entry form of the three OS asks one
+      value per placeholder (`menu.llm.api_prompt_field.<name>`), stores the filled address and needs a model, since
+      these rows have no default model; an unfilled template is never sent. IBM watsonx.ai (model gateway, IAM token
+      from the API key) and Google Vertex AI (the `authorized_user` credentials file, its refresh token exchanged)
+      declare an `auth` block (`_shared/lua/llm/api_token_exchange.lua`): macOS and Linux exchange the key, cache and
+      refresh the token, pause a minute after a refusal, and the key test waits for it. Left:
+  - [PHYS-W] Run the AHK suite on Windows: `test_llm_api_url_template.ahk`, `test_llm_api_add_account_address.ahk`
+    (the form with a template provider, the access-token refusal) and the rest of `run_all.ahk` were written
+    without an AutoHotkey run.
+  - Windows token exchange: the Windows driver refuses watsonx and Vertex AI with
+    `menu.llm.api_provider_token_exchange_unavailable`; it needs the async form POST and the token cache the Lua
+    drivers have (port of `api_token_exchange.lua`).
+  - The first prediction after start (or after a key change) on an access-token provider is refused while the token
+    is fetched (the boot pre-warm on macOS fetches it early); a Vertex service-account key (signed JWT) is not
+    taken; the IBM gateway lists only the models an administrator configured.
+  - Cloudflare AI Gateway was not added: its `/compat` address is deprecated for Workers AI's own, and a gateway
+    used with the user's provider key needs a second header (`cf-aig-authorization`) the entries cannot hold.
+  - The listing reader takes `data` (and `models` for Gemini) only: DashScope's native listing
+    (`output.models[].model`) and Writer's `models[]` would need a per-provider listing shape on the three OS.
+  - With about forty providers, the Linux zenity prompt of the screen actions lists every one on a line.
 - [ ] **Every known local AI server in `local_servers.json`, on the three OS.** [CODE] Detection by process,
       settings file and port like the existing four, with the thinking-off dialect: vLLM (8000), SGLang
       (30000), KoboldCpp (5001), text-generation-webui (5000), TabbyAPI (5000), GPT4All (4891), AMD Lemonade
       (8000), Docker Model Runner (12434), Microsoft Foundry Local (dynamic port), llamafile (8080, shared with
       llama.cpp and LocalAI), a hand-started `mlx_lm.server` (8080), exo (52415), Msty, AnythingLLM. Ports
       shared by several servers are probed once and named together, as llama.cpp and LocalAI are.
+      Windows (30 Oct): detection is data-driven (`LocalServerPortsDescriptor`, `.exe` names, command-line and config ports, the shared port corpus), so a server added to the JSON needs no AHK code; the new servers themselves are not in the JSON yet on any OS.
+      macOS: detection reads every server of the shared list through the shared discovery descriptor
+      (`local_servers.lua`, `llm.local_server_ports`), so the added servers need no macOS code; the field
+      run's `field_local_servers` fails when the driver cannot use a declared server's descriptor and names
+      each server's answer read-only (branch `fix/macos-overnight-d`). Left: the shared entries themselves
+      (another worker), then one field report on a Mac running some of them [PHYS-M].
 - [ ] **Mac field report 2026-10-30 21:01, functional errors left open (worker `fix/macos-field-errors`).**
       Fixed there: shortcut full rebind on each bounded retry (35cc4a5d), pre-dispatch Ollama pull receipt
       (6f6b752f), one model-list error per outage (6051b50c), MLX server stopped before a repair (fcdb6f27),
@@ -263,6 +378,21 @@ into its item below or into the matching existing item.
 - [ ] **Container note.** `tools/test/test-managed-ollama-protocol.cjs` stops in a cloud container on Git's
       "dubious ownership" when run as a non-root user over a root-owned checkout; give the test its own
       `safe.directory` for its child Git calls instead of relying on the host configuration.
+- [ ] **Remap guardian killed at every developer start (worker `fix/macos-guardian-adhoc`).** [CODE]
+      [PHYS-M] macOS killed an ErgoptiPlus process ~3 s after "Registering the remap guardian" (CODESIGNING 4,
+      Launch Constraint Violation) and the guardian only ran after the 10 s throttle. Done: an ad hoc build
+      removes its exact legacy agent and its Background Items record, proves the old guardian gone, then
+      registers; the register role names it `developer_adhoc_reregistered` (deferred while leases are live or
+      approval is pending, refused when a removal is not proven), the driver logs it and `field_login_items`
+      reports `guardian_registration`. Left [PHYS-M]: the next field run must show that note, no
+      `ErgoptiPlus` codesigning kill in `field_app_health`, and `guardian_state` ready with a `guardian_wait`
+      under 10 s.
+- [ ] **Timed reload lost the app (2026-10-30 21:06).** [CODE] [PHYS-M] Accepted reload, lease revocation
+      requested, an error window, then nothing: no boot, no crash report. Done: every coordinator stage and
+      teardown step writes `reload_breadcrumb.txt` synchronously, the next boot appends `boot` and the macOS
+      collector copies it; the error window stays closed during a reload or quit. `driver_reload` stays
+      disabled (`reload_lost_the_app`). Left [PHYS-M]: reload by hand from the menu until one is lost, run the
+      collector, and fix the stage the trail's last line names; then enable `driver_reload` again.
 
 ## Maintainer: remote branch cleanup (run on your machine; the cloud container's proxy refuses ref deletion and tag pushes)
 
@@ -331,51 +461,43 @@ gesture routes are in `docs/memory/rejected_proposals.md`. Its notifier, LLM man
 HTTP transport items are done (`linux/adapters/notifier.lua`, `[sections.llm]` lists `linux`,
 `linux/modules/llm/api_remote.lua`). Still open on 2026-10-29:
 
-- M3.3: remove `linux/ui/menu/menu_builder.lua` in favour of the shared renderer. [CODE] Every submenu
-  already renders through `_shared/lua/menu/renderer.lua` (`infra/manifest_menu.lua`, 21
-  `ManifestMenu.build` calls), so what is left is splitting the 5 729-line file into per-section modules.
-  Started and reverted on 2026-10-30: the earlier plan here (repoint each reader to the new file) does
-  not hold. The menu gates are single-file data-flow analysers with mutation counterexamples:
-  `checkLinuxDeclaredAboutParent` (`test-menu-manifest.cjs`) needs `_build_about` and `M.build` in one
-  source, `test-menu-parity.cjs` names the file as the native source of ~90 rows, and
-  `fixtures/linux-native-caption-binding-counterexamples.cjs` and
-  `fixtures/hotstring-language-owner-counterexamples.cjs` trace helpers inside it. Moving only the 12 pure
-  dialog helpers and `i18n_safe` to a `menu_common.lua` (module bindings kept per file) turned
-  `test-menu-parity`, `test-menu-manifest`, `test-menu-action-handler-bijection` and
-  `test-hotstring-category-submenu-order` red, against a `dev` baseline where they pass. Measured facts
-  for whoever resumes:
-  - The dependency graph is clean: each top-level definition is reached by one builder or is shared, and
-    no builder assigns a shared local. Shared: the zenity dialogs, `_fill`, `shell_quote`, `succeeded`,
-    `prompt_text`, `assign_parameterized_action`, `open_action_picker`, `slot_binding_rows`,
-    `ask_yes_no`; module bindings (`ManifestMenu`, `Logger`, `COMMAND`...) must stay per file for the
-    gates. Splitting all 14 builders leaves a 438-line root.
-  - `i18n_safe` is a global that tests replace in `_G`: parts must read it at call time, never alias it.
-  - Tests reload the builder after swapping `package.loaded` entries, and walk
-    `build -> _build_<section> -> helper` by upvalue name, so the root must reload its parts when it
-    loads and keep the `_build_<section>` local names.
-  - The header builder shares the root's separator facade checks and belongs with the root.
-  - Decided by the coordinator on 2026-10-30: (a), teach the analysers to follow the module boundary as
-    they follow the macOS `ui/menu/menu_*.lua` modules, with new counterexamples, in their own
-    `tools/test` commits green on dev before any split; then one builder per commit, smallest first.
-  - Measured with the smallest step (Quit alone to `menu_quit.lua`, module bindings required in the
-    file): `test-menu-manifest` (lifecycle rows looked up in `menu_builder.lua`, line ~1917),
-    `test-menu-parity` via `fixtures/linux-native-caption-binding-counterexamples.cjs` ("complete native
-    root ... closed caption cohort") and `test-hotstring-category-submenu-order` via
-    `fixtures/hotstring-language-owner-counterexamples.cjs` turn red: the root analysers embed literal
-    multi-line fragments of the root and expect `["quit"] = _build_quit` to name a local function of the
-    same file. The analyser change is therefore a resolver in `tools/lib` (root binding
-    `local _build_x = require("ui.menu.menu_x").build` to that module's `local function _build_x`,
-    refusing any other wiring) used by `menu-native-root-binding*.cjs`, the caption and language-owner
-    fixtures and the lifecycle check, each with a counterexample placed in the split module.
-  - The root must not write `package.loaded`: with a `package.loaded[name] = nil` reload helper,
-    `test-menu-action-handler-bijection` also turns red (its template binding refuses that wiring).
-    Reloading the parts with the root, which the Lua tests need, must be done another way (a fresh
-    `loadfile` of each part, or the tests reloading the parts themselves).
-- 20 of the 36 gesture slots are physically out of reach on some machines.
+- M3.3: split `linux/ui/menu/menu_builder.lua` into one module per section builder. [CODE] Every
+  submenu already renders through `_shared/lua/menu/renderer.lua` (`infra/manifest_menu.lua`); the
+  split itself landed on 2026-10-30 (branch `fix/linux-menu-split-2`), option (a): the analysers follow
+  the module boundary.
+  - The root binds each builder as `local _build_x = require("ui.menu.menu_x").build` and the shared
+    zenity dialogs and binding helpers name by name from `ui/menu/menu_dialogs.lua`. It keeps the
+    imports, the facade, header and separator checks, the header builder, the pause greying and
+    `M.build` (about 480 lines).
+  - Gates read the root through `tools/lib/linux-menu-parts.cjs`. It admits only that wiring (part
+    modules hold the root's own imports, their `LOG`, local definitions, `M.<field>` exports and
+    `return M`) and recomposes the root the single-source analysers already read. `readSourceFile()`
+    is the by-path reader; directory scans keep reading files raw so a part is never counted twice.
+    `test-linux-menu-parts.cjs` and the caption-binding, language-owner and lifecycle checks carry
+    split-module counterexamples (`tools/test/lib/linux-menu-split.cjs`).
+  - Lua tests: the runner reloads the cached `ui.menu.menu_*` modules whenever the root's file runs
+    (`tests/support/menu_part_reload.lua`; the root never writes `package.loaded`), and text checks
+    read `helpers.read_menu_source()` (root, then each bound part).
+  - A part may import only what the root holds, so the root still carries imports only parts use
+    (`ParentSource`, `Version`...). Hoisting them would need the analysers' import whitelist
+    (`closedModuleExport` in `tools/lib/menu-native-llm-parent-binding.cjs`) to follow the parts too.
+  - Left: renaming or deleting the root itself (`require("ui.menu.menu_builder")` callers, the frozen
+    census oracle's `CURRENT_SOURCE_RETIREMENTS` in `test-native-menu-rows.cjs`, the
+    `linux_evidence.json` paths). The coordinator's plan named this last step; it was not started.
+- 20 of the 36 gesture slots are physically out of reach on some machines. [PHYS-L] The menu greys
+  them; since 30 October the reader start also names every unreachable slot and warns for each bound
+  one (`modules/gestures/slot_report.lua`, a binding written by hand never passes through the menu).
+  Left: a three-finger pad on a real machine.
 - Without a grab, the desktop (GNOME 47+) acts on the same gesture.
-- The 9 two-finger slots fight with scrolling everywhere.
+- The 9 two-finger slots fight with scrolling everywhere. The decoder already refuses a scrolling
+  pair as a swipe (its rule 1) and the reader start now names each bound two-finger slot; the desktop
+  still acts on the same ungrabbed touches, which no code here can stop without the grab.
 - No external process can move, focus or close a window under Wayland.
-- The decoder's event trace is a reconstruction, not a capture.
+- The decoder's event trace is a reconstruction, not a capture. [PHYS-L] Code done 30 October:
+  `tests/support/touchpad_record.lua` reads `libinput record` files, `test_touchpad_record.lua` replays
+  every `linux/tests/fixtures/touchpad_record_*.yml` trace into the decoder, and the uinput round trip
+  replays its own kernel capture through that reader. Left: one recording from a real touchpad
+  (`linux/HARDWARE.md` section 13).
 - Done: the navigation layer's wheel bindings run on Linux (the recommended layer makes it the
   volume, as on Windows and macOS). The hook grabs the mice only while the held layer binds a wheel
   direction and forwards everything else through the virtual device
@@ -452,19 +574,26 @@ runs the branch cleanup below. Each pass left a full handover; read it first:
   2. Done 30 October: on CPython 3.8.20 (uv) both XKB suites pass (42 and 265 tests, 14 skips for
      xkbcli >= 1.13 and the xkbcommon binding, absent here), `generate_xkb_files.py --check` reproduces the
      shipped files and every installer CLI starts; nothing needed a fix.
-- macOS (from its TODO, plus Mac bugs the Linux pass proved):
-  1. `native_python_bootstrap` in `macos/modules/llm/native_python_bootstrap.sh` leaves its uv-wheel and
-     Python-archive temp workspaces behind on SIGTERM. Give it operation-local cleanup; the proof is in the
-     archive.
-  2. `macos/modules/llm/network_env.lua` turns POSIX backslashes into slashes while locating the driver root.
-  3. `ensure-mlx-deps.sh` takes the first awk field of `shasum`, which gives a wrong digest for names that
-     contain a backslash.
-  4. Two native leads are unconfirmed: the `OwnedProgramWorker.runBridge` receipt write refusal and the
-     `InstalledPhysicalSourceBridge` early cancellation. Reproduce both before fixing.
-  5. The macOS optional-callback regression accepts a genuine `error(nil)`, because it checks the payload and
-     not the `pcall` status. This is a test defect, found by the Windows pass.
-  6. The `test_ledger_replay_bounded` CPU budget (20 ms) failed at 71 ms in one full portable run. The cause is
-     unknown, so the test was neither weakened nor blamed.
+- macOS (from its TODO, plus Mac bugs the Linux pass proved): items 1 to 6 done 30 October on
+  `fix/macos-overnight-c`.
+  1. Done: `native_bootstrap_python` owns its workspace; INT/TERM/HUP release it, restore the caller's handlers
+     and re-raise, so the status stays 143 and the caller's EXIT report names the stage
+     (`test_native_python_bootstrap_interrupt.lua`, real bash and a real group SIGTERM in both download stages).
+  2. Done: `network_env.lua`, the MLX download and the webview locale base split on the host separators
+     (`native_path`) and the URL base is percent-encoded (`test_posix_backslash_source_paths.lua`, tree scan).
+  3. Done: the installers share `sha256_file_digest` (`network-retry.sh`), the release stage and the Karabiner
+     checksum parser strip shasum's escape marker (`test_sha256_digest_escaped_names.lua`). Left: the build-time
+     `tools/build/build_macos_app.sh` digests (lines 261, 811) take the first field too; a shared JS test pins the
+     second spelling, so the coordinator owns that change.
+  4. Both leads confirmed in the source and fixed. `OwnedProgramWorker.runBridge` verified a terminal before
+     forwarding it, so an unforwarded receipt exited 0 (`OwnedProgramForwardingTests`, requires exit 70; not run
+     here, the macOS launcher lane runs it). `InstalledPhysicalSourceBridge` short-circuited its nonblocking
+     setup after a refusal, so the first read of a quiet held child blocked before the cancel
+     (`test_native_bridge_transport_setup.lua`; a native reproduction still needs a real installed peer).
+  5. Done: the case asserts the `pcall` status and an empty return; the archived r29 fault probe now fails it.
+  6. Done: the cause was a collection of earlier modules' garbage finishing inside one step (heap 40 MB to
+     15 MB in a 14 ms step, against 0.5 ms of replay work). Each step now runs after a full collection with the
+     collector paused, the 20 ms budget is unchanged, and a new bound caps a step's own allocation at six blocks.
 - CI: the macOS 26 "Run Swift launcher tests" step hit its 10-minute limit twice on 28 October, in main run
   40764020578 and fix/macos run 40765470617. `HomebrewArchiveAcceptanceTests` alone took 289 s, and a real PAC
   trust test was still running at the limit. Move the real-network cases into their own job, or raise the step
@@ -556,6 +685,9 @@ dev.
   `[gestures.sensitivities]` swipe_3 value in `config.toml` (or remove it), then a normal and a
   short deliberate vertical three-finger swipe each switch exactly one tab, a swipe past 29
   units (the logged `sd`) two, and lifting never adds or removes one.
+  Since 30 October the field run proves the capture stamp from the session's own touches, with no
+  manual step: `field_gesture_frames` fails `unstamped:N` on any frame without a stamp, names
+  `gesture_frame_spacing_ms` (about 8), and skips when the trackpad was not touched.
 
 - **L16** [CODE][PHYS-M] Slow ingest tick, `append` phase 466 to 563 ms, peaks 1531 and 1709 ms
   (new.txt 14:25:50 to 16:53:38, 20 lines, still on 228f79f2). The 1.2 to 1.8 s ticks are the
@@ -572,7 +704,7 @@ dev.
   `; append: lock= journal= prepare= publish= write= clear= settle= release= ms; metadata_commands=<n>
 in <ms> ms` (`adapters/metadata_command_stats.lua` counts every metadata fork). Mac confirms: the
   next `Slow ingest tick` line names the stage; if `publish` and `settle` carry it with
-  metadata_commands=8 near the total, the fix is to stop forking for the private journal. The 23:33 run measured a fork: four `mkdir -p` of the keystats start took 161 ms, about 40 ms each, so eight journal forks match the 0.3 to 0.7 s append. Fixed on `tmp/wip-mac-holds-2` (016ef6adc5): the driver-owned journal is published by `FileSystem.write_private_if_unchanged` (same lock, route, staging and compare-before-write, no carried ACL or xattrs); a flush forks nothing (`test_append_retry.lua`: 4 forks before, 0 after). Mac confirms: no `Slow ingest tick` and no `Main-thread hold` line from log_manager.lua during typing.
+  metadata_commands=8 near the total, the fix is to stop forking for the private journal. The 23:33 run measured a fork: four `mkdir -p` of the keystats start took 161 ms, about 40 ms each, so eight journal forks match the 0.3 to 0.7 s append. Fixed on `tmp/wip-mac-holds-2` (016ef6adc5): the driver-owned journal is published by `FileSystem.write_private_if_unchanged` (same lock, route, staging and compare-before-write, no carried ACL or xattrs); a flush forks nothing (`test_append_retry.lua`: 4 forks before, 0 after). Mac confirms: no `Slow ingest tick` and no `Main-thread hold` line from log_manager.lua during typing. Since 30 October the field run's event taps check names `worst_hold_ms` and `worst_hold_site` (file and line).
 - **L17** [CODE][PHYS-M] "Slow preferences save 1.9 to 2.1 s (prepare about 1.25 s, write about
   0.8 s; operations=293)" (new.txt 15:27:35 to 16:48:20, 6 times, also on 228f79f2). It is the
   2.06 s hold of startup_controller.lua:263 (15:28:57, 16:48:20). Next: profile `prepare` for 293
@@ -588,7 +720,7 @@ in <ms> ms` (the forks of the write phase). Not reproduced here: the save writes
   270 ms before `sqlite_writer` initializes, then 917 to 1047 ms between `rotation Initialized` and
   `Aggregate cache recovery continues in 8 ms slices` on the two boots that started a recovery;
   boots without a recovery hold 264 to 874 ms (16:54 to 22:55). Not changed on `tmp/wip-mac-holds`
-  (time box); the slicing remains the fix. Fixed on `tmp/wip-mac-holds-2` (58f82e9fdc) after the 23:33 run (1300 ms: 161 ms of four `mkdir -p` forks, 696 ms of the one-time L19 index build, 392 ms of the synchronous first `ingest_once`, 48 ms of watchers): existing folders are answered from their attributes and the first ingest runs on the first 5 s tick, which flushes the outbox first (`cold_rollover_context_process.lua` asserts no synchronous ingest and no fork; 4 forks before). The index build happens once per cache and is done on this Mac. Mac confirms: `Keystats engine start (deferred)` under 100 ms and no hold from menu_state.lua:531.
+  (time box); the slicing remains the fix. Fixed on `tmp/wip-mac-holds-2` (58f82e9fdc) after the 23:33 run (1300 ms: 161 ms of four `mkdir -p` forks, 696 ms of the one-time L19 index build, 392 ms of the synchronous first `ingest_once`, 48 ms of watchers): existing folders are answered from their attributes and the first ingest runs on the first 5 s tick, which flushes the outbox first (`cold_rollover_context_process.lua` asserts no synchronous ingest and no fork; 4 forks before). The index build happens once per cache and is done on this Mac. Mac confirms: `Keystats engine start (deferred)` under 100 ms and no hold from menu_state.lua:531. Since 30 October the field run's storage check names `keystats_start_ms`.
 - **L23** [CODE] "Ignored-window prewarm incomplete; tracking remains fail-closed" (new.txt
   15:28:28, 16:28:04) and 1 s holds from keymap/utils.lua:1426 and :1455 (14:26:05, 15:34:09).
   Next: log which prewarm stage was incomplete and bound the 1 s probe. Instrumented on
@@ -637,8 +769,10 @@ application|app_name|title|context_watchers|secure_field>, TTL refresh <armed|no
   0, select -50 and the source still disabled): known limitation, not re-fixed.
 - **L32** Partly fixed on tmp/wip-field-run-checklist (cce99afbc7): the shared schema enum lacked
   `missing`, `unavailable` and `not_used`, so the share projection turned a refused Screen Recording
-  grant (and a guardian needing approval) into `unknown`. Still open: Input Monitoring has no
-  non-prompting reader (IOHIDCheckAccess via a native helper), and the resident size breakdown.
+  grant (and a guardian needing approval) into `unknown`. Still open: the resident size breakdown.
+  Input Monitoring: done 30 October in code (`fix/macos-overnight-c-2` 28a6dec3, 10bcfeca), the
+  launcher role `--input-monitoring status` answers from IOHIDCheckAccess (never prompts) and the
+  field run's permissions check reads it; the macOS Build stage must compile and run its XCTest.
   Original entry: issue #104 diagnostics: Input Monitoring, Login Items and Screen Recording read
   `unknown`; memory used 843 MB with 93 MB free. Next: read or label those permissions, and
   measure the 843 MB resident size.
@@ -668,7 +802,8 @@ Linux Ollama lookup still refuse an unusable PAC, so their check keeps failing, 
 what they do; their fallback is the deferred item "PAC unusable: direct fallback". Open on macOS:
 `route_lookup pass:selected`in the 22:31 run carried no fallback marker although the route role
 saw`native_pac_download`; confirm on the Mac whether the HEAD worker's CFNetwork lookup went
-  direct by itself. Mac confirms: off the company network, 03_field_network passes with those
+  direct by itself. Done in code 30 October (49020f18, e45e7572): the worker writes a closed
+  `# native_http_route kind=`marker per attempt and the check reads`route_lookup pass:selected:direct`  (or`:http`), so the next report answers it; the macOS Build stage must compile it. Mac confirms: off the company network, 03_field_network passes with those
   info values.
 - **L43** [PHYS-M] 04_field_toolchain `karabiner_signature fail:exit_1` (19:47 run). Not a
   wrong check: `karabiner_cask info:absent` only means Homebrew did not install it; Karabiner
@@ -710,7 +845,7 @@ check `composer_ready=pass:enabled`; "still reads off after 5 fresh read(s)" mea
 
 Work done on Linux and macOS only; the AHK side is built and run live on the Windows PC.
 
-- [ ] **PRIVACY: private hotstring text reaches AI prompts on Windows.** [CODE] Fixed on macOS (private
+- [x] **PRIVACY: private hotstring text reaches AI prompts on Windows.** [CODE] Fixed on macOS (private
       expansions now hidden from every prompt) and Linux (separate AI context). Read-only look at Windows:
       `_HSE_MirrorCanonicalEffectToLlm` (`hotstring_dispatch.ahk`) and `_HSE_MirrorLiteralEditToLlm`
       (`hotstring_send.ahk`) copy `Effect.InsertedText` into `_LLM_Bridge_Buffer` and the agent buffer, and the
@@ -718,12 +853,12 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       to Ollama or a remote provider. Add `IsPrivate` to those Effects, clear both buffers on a private effect
       and keep appending later typing (as Linux); AHK test: a private expansion then a prediction request
       carries no secret. Do this first on the PC.
-- [ ] **Hosted Windows unit failures.** [CODE] Run 40235626114 (e2aa642f8c) still fails `meta`,
+- [x] **Hosted Windows unit failures.** [CODE] Run 40235626114 (e2aa642f8c) still fails `meta`,
       `config-scope-features`, `core` and `keymap-gestures` (likely the gesture greying, dbc29c5077);
       `hotstrings-shortcuts` passes since the second round of fixes. `test_hotstrings_scope.ahk:520` (expected 0.5, got 1.0) is
       unexplained: print `_HotstringsOverrides["autocorrection"].Sections[family]` after
       `HotstringsOverridesApplyBase()`.
-- [ ] **AI off disarms the AI keys and the agent's manual actions.** [CODE] Done on Linux and macOS
+- [x] **AI off disarms the AI keys and the agent's manual actions.** [CODE] Done on Linux and macOS
       (bc2048765a, 6d96986979). Windows: `AiActionIsAi`/`AiActionBlocked` in `modules/gestures/config.ahk`;
       split `TapHoldTapAction` (`platform/remap/tap_hold_loader.ahk`) so a blocked AI tap returns the native
       tap, configured readers in `menu_taphold.ahk` and `tap_hold_writer.ahk` use the new
@@ -733,15 +868,15 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       `_LLM_Agent_ManualRefusal` passes `LLM_Menu_AiEnabled()`; `requires_ahk = ["ai:on"]` on the two agent
       actions with the codegen token and the picker greying; tests `test_ai_action_gate.ahk`,
       `test_llm_agent.ahk`, `test_llm_agent_requester.ahk`; reseal.
-- [ ] **One app-category file on the three OS (PAR-34).** [CODE] Windows keeps `app_categories.json` in the
+- [x] **One app-category file on the three OS (PAR-34).** [CODE] Windows keeps `app_categories.json` in the
       metrics dir and accepts legacy flat string values the Lua codec refuses, and it preserves unknown
       members the codec drops. Align the location (decision pending), the record shape and the score range,
       and replay `_shared/tests/corpus/metrics/app_category_store_vectors.json` in AHK.
-- [ ] **AI off disarms the agent's automatic mode.** [CODE] Done on Linux and macOS (e284077ba9). Windows:
+- [x] **AI off disarms the agent's automatic mode.** [CODE] Done on Linux and macOS (e284077ba9). Windows:
       the AHK agent runner arms no typing pause and refuses a triage or request in flight while the AI is
       off, cancels the pause at the switch-off and re-arms on the next keystroke; rewrite
       `test_llm_agent_ai_off.ahk` (it feeds the agent with the AI off on purpose) to assert that.
-- [ ] **Release notes in the update-check window (PAR-52).** [CODE] `windows/ui/update_check/init.ahk`:
+- [x] **Release notes in the update-check window (PAR-52).** [CODE] `windows/ui/update_check/init.ahk`:
       seed `state.notes = {body, owner, repo}` in the `available` message (from `UPDATER_LATEST_RELEASE.Body`,
       `UPDATER_GH_OWNER`, `UPDATER_GH_REPO`, as `_Updater_ReleaseNotesSeed`), serve `open_url` in the
       `available` phase through the allowlist behind `_Updater_OpenManualUrl`, add `"open_url", "available"` to
@@ -753,7 +888,7 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       `vendor/ergopti_updater_download.ps1` (`CreateFileW`, `GetFileInformationByHandle`, from bdfa026d16). Check
       whether a bundled type already declaring them could be reused, then lower it back. The same build log notes
       `key_state_polling` dropped to 59: lower its script ceiling from 62 once a Windows build confirms 59.
-- [ ] **Windows counterparts of the 26 October work.** [CODE] The Lua side is on dev: - read `[logger] hotpath_slow_ms` in `hotpath_profiler.ahk`; - drop the dead crash kind (`error_dialog/init.ahk`, `ERROR_REPORT_KINDS`, then the shared `KINDS` and the
+- [x] **Windows counterparts of the 26 October work.** [CODE] The Lua side is on dev: - read `[logger] hotpath_slow_ms` in `hotpath_profiler.ahk`; - drop the dead crash kind (`error_dialog/init.ahk`, `ERROR_REPORT_KINDS`, then the shared `KINDS` and the
       `crash_multi_line_without_recent_issues` vector together); - read the 14-colour palette from `native_theme.toml`; - use `dialog.action_picker.requires_ai` for the greyed AI actions; - port `llm/request_plan` (debounce, batching) with its vectors, accept -1 "never", never hold explicit
       requests, read `llm.trigger.min_request_interval_ms` with a menu row, then delete
       `rate_limit_min_interval_ms` from `inference.json`; - `tap_hold.toml` v0→v1 migration (`_shared/tap_hold/migrations.toml`) in the loader and writer, stop
@@ -764,7 +899,7 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
 
 - [ ] **Versioned `tap_hold.toml` migrator.** [CODE] Linux done (`_shared/tap_hold/migrations.toml`,
       macOS has no tap_hold.toml); in progress: byte-preserving rewrite (agent AE); Windows side on the PC.
-- [ ] **Registry op that re-encodes a value.** [CODE] Windows `config_migrate.ahk` first (PC), then the Lua
+- [x] **Registry op that re-encodes a value.** [CODE] Windows `config_migrate.ahk` first (PC), then the Lua
       engines, then delete the macOS `[llm.profiles] user_profiles` reader import (0146a938c5).
 
 ## Big item 1: Windows corporate networks and trust (items 62, 132)
@@ -811,12 +946,17 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       worker (25411ee080, after v1.0.5). Reproduce on the Mac with these log lines; the only
       workaround is Configuration > Ergopti uses Karabiner > Off. Recovery deploys (28 of 33 on
       2026-10-19) cannot be reduced without fewer lease failures. Leftovers: the starvation
-      hypothesis for silent PONG/READY timeouts (`memory_pressure | tail -1` during lease errors);
-      only the keymap tap skips an event that waited behind the main thread (`adapters/event_clock.lua`),
-      the tap-keys and script-control taps do not yet.
+      hypothesis for silent PONG/READY timeouts: done 30 October (`fix/macos-overnight-c`), every lease
+      failure logs `Memory free when the Karabiner lease failed (<kind>): N%.` once a minute, and the field
+      run's lease check names `lease_failure_kinds` (pong:N, ready:N) and `memory_free_percent`. The late-event
+      gate is in every consuming physical tap already: tap keys (`actions/system.lua`), script control and the
+      modifier injector call `KeyEventHealth.passes_late_event`, with behavioural tests. Mac action: send the
+      field report; a low free percentage next to the PONG/READY kinds confirms starvation.
 - [ ] **Dropped letters on macOS.** [PHYS-M] Unproven. Every consumed and never delivered key is
-      reported ("typed key(s) swallowed", decisions only, never the key). Mac action: Debug > Report
-      a bug right when a letter disappears, then compare with lease failures or Karabiner deploys.
+      reported ("typed key(s) swallowed", decisions only, never the key). Since 30 October the field run's
+      lease check fails `swallowed_keys` on any such key, so the report proves it without a person. Mac
+      action: Debug > Report a bug right when a letter disappears, then compare with lease failures or
+      Karabiner deploys.
 - [ ] **31. HS-274 exact physical key accounting with an owned Karabiner runtime.** [CODE] Work
       packages WP3-WP10 (production consumer, headless producer v2, reproducible runtime, launchd
       ownership, owned configuration, native and real-Mac acceptance, enable and retire); media keys
@@ -907,9 +1047,13 @@ Not started:
       tests). macOS in code (launcher role `--managed-proxy-route`, 06addb2e3f; per-origin route
       plan 1fd254d92e and 749e00c4c8); Swift compiled and tested on the hosted macOS cell. Windows
       is covered by the WinHTTP transport (62). Left: a real-PAC pull on the maintainer's Mac (Debug >
-      Test network), the Ollama blob host inventory check, a `route_plan` step in the network check.
+      Test network). The network check already has its `route_plan` step (shared
+      `field_check_network.lua`); the blob host inventory check is the field-run step
+      `field_ollama_blob_host` since 30 October (`blob_host` fails `unplanned_host` when the registry
+      redirects a blob to a host `route_origins.json` does not plan).
       The daemon start now looks up every inventory origin (it read only the single-origin variable,
       so `pac_probe_client = "ollama"` never resolved at start; fixed with the fallback below).
+      Windows (30 Oct): the launcher looks up both `route_origins.json` "ollama" origins natively and starts the daemon with HTTPS_PROXY/NO_PROXY from the shared route plan (57276199); a relay demanding a Windows login is never exported and the pull refuses with a named reason, the start stays (local models offline). Left: [PHYS-W] a pull behind a PAC; maintainer decision: an option for NTLM relays (a local authenticating forwarder, or none).
 - [ ] **PAC unusable: direct fallback (maintainer decision).** [CODE] [PHYS-M] macOS done on branch
       `tmp/wip-pac-fallback`: when the PAC or WPAD route lookup fails at a stage listed in
       `proxy_policy.json` `pac_unavailable_fallback` (PAC download, evaluation, WPAD discovery, lookup
@@ -926,12 +1070,14 @@ Not started:
       change compiles in the macOS cell. Linux follows it for the Ollama daemon start (fe9199b9, 838af0c0:
       the shared policy's `falls_back_direct` read by `managed_ollama_proxy.lua`): a GIO lookup that
       fails or times out sends that origin direct with a WARNING naming `native_proxy_lookup` or
-      `native_proxy_budget`. Linux left: the pull failure does not yet name both causes
-      (`network.failure.pac_unreachable_direct_failed`; the start result carries `direct_fallback` for it),
-      GIO names no finer stage than the lookup, and the daemon holds one relay, so a PAC list such as
-      `PROXY a; DIRECT` keeps only its first entry; [PHYS-L] a pull on a PAC-only network whose PAC is
+      `native_proxy_budget`; a pull that daemon then fails to fetch shows
+      `network.failure.pac_unreachable_direct_failed` and logs the stage (`pac-direct-fallback-pull`).
+      Linux left: GIO names no finer stage than the lookup, and the daemon holds one relay, so a PAC list such as
+      `PROXY a; DIRECT` keeps only its first entry (following it needs a reachability probe of `a`
+      before the daemon starts, a new network behaviour to decide); [PHYS-L] a pull on a PAC-only network whose PAC is
       unreachable. Deferred: Windows (`ergopti_network_routes.ps1` still refuses with `pac_failed` or
       `wpad_failed`) must follow the same policy.
+      Windows (30 Oct): no longer deferred, `ergopti_network_routes.ps1` `New-ErgoptiPacDirectFallback` goes direct at the policy's stages; [PHYS-W] confirm on a network whose PAC is unreachable.
 - [ ] **AppImage self-contained.** [CODE] `.zsync` and update information are done (10c016e51f,
       6fb83014e3). Built on ubuntu:22.04 (glibc 2.35 floor, no bundled libc or loader, musl refused in words,
       tray closure kept); the build refuses a foreign loader or a staged C library (dce846a0bd). Left: hosted
@@ -980,7 +1126,7 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       image/TTS/audio.
       The AHK suite and parse of this change must run in hosted Windows CI (no AutoHotkey in the cloud
       container).
-- [ ] **Retire the orphaned Windows gesture-notice entries.** [CODE] The gesture status submenu and notice
+- [x] **Retire the orphaned Windows gesture-notice entries.** [CODE] The gesture status submenu and notice
       are gone (dbc29c5077); the `gesture_conflict_dismissed.*` storage entries they wrote stay in user
       state. Remove them in a config migration.
 - [ ] **Review the machine translations of October 25.** [I18N] New keys (gesture recommendation notes,
@@ -990,7 +1136,7 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       base is user-settable everywhere, section delays are stored as `delay_offset` or `delay_unlimited`,
       old absolute values migrate keeping the effective delay, shared vectors `base_delay_vectors.json`.
       Left: run the Windows corpus test on the PC.
-- [ ] **PAR-8. Word delimiters in config leaves on Windows.** [CODE] Done: the consume choice is the
+- [x] **PAR-8. Word delimiters in config leaves on Windows.** [CODE] Done: the consume choice is the
       leaf `[hotstrings.terminator_consume]` on macOS and Linux (76716e7); Windows writes built-in states
       through the live config writer and moves the old override strings at boot (2d734b6); macOS and
       Linux end a word on a user delimiter when deciding a repeat, as Windows does (1748df6: Linux
@@ -1003,6 +1149,7 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       pieces done (28bdd5a5d9, vectors `check_only_vectors.json` and `list_cache_vectors.json`). Windows
       needs the Atom fallback in `core.ahk` plus an AHK feed parser, then a reseal of the sealed updater
       sources (only when `run_all.ahk` has no foreign hunk).
+      Windows (30 Oct): the Atom fallback and its parser are on dev (`core.ahk`, `test_updater_check_only_fallback.ahk`); [PHYS-W] a check with api.github.com blocked.
 - [ ] **PAR-15. Tap-hold thresholds.** [CODE] Done: exact per-key thresholds pinned, one one-shot timeout
       (macOS read 3000 against 2000 ms), Linux holds the key's own side. macOS reads the shared per-key
       thresholds too (8cb8f04); one fallback `default_activation_ms = 200` (macOS was 250). Left: Windows
@@ -1028,7 +1175,7 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       Ctrl-letter switches, role table with per-driver families, manifest slots, both drivers adopt the role
       names, migrated-config binding proof, AHK fixtures pinned to v15, per-slot parameters carried by
       `rename_prefix`. Left: the Windows adoption, macOS `ctrl_g` to `open_url` later.
-- [ ] **PAR-45. Notifications: one behaviour for toggles and refusals.** [CODE] Done on macOS and Linux
+- [x] **PAR-45. Notifications: one behaviour for toggles and refusals.** [CODE] Done on macOS and Linux
       (shared `feature_notice.lua`, Linux quit refusal). Left: Windows `NotifyFeature(label, enabled)` around
       `NotifierSend` at the same call sites, and a Windows quit-refusal path firing `notify.quit_refused`.
 - [ ] **PAR-52. Release notes on macOS and Linux update windows.** [CODE] Done on macOS and Linux
@@ -1038,18 +1185,20 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 ### D. Instrumentation and diagnostics
 
 - [ ] **PAR-53. Bring HotPath-style slow-segment logging to macOS and Linux.** [CODE] Done (shared
-      `hotpath_segments.lua`, always-on Linux spans, one warning per segment per 10 s). Left: nesting
-      attribution (Windows has it), the threshold question.
-- [ ] **PAR-54. PhaseStats and child-process timing.** [CODE] Done on macOS and Linux (`process.<program>`,
+      `hotpath_segments.lua`, always-on Linux spans, one warning per segment per 10 s, and nesting
+      attribution: a segment is judged on its own time and reported with its enclosing segment,
+      `hotpath_nesting_vectors.json` replayed on macOS and Linux). Left: Windows prints the exclusive
+      time but still judges and reports on the wall clock (`_HotPathNestedMs`); the threshold question.
+- [x] **PAR-54. PhaseStats and child-process timing.** [CODE] Done on macOS and Linux (`process.<program>`,
       `toml.parse`, `menu.rebuild`, `boot.stage`, `boot.stage_cpu`). Windows: port `phase_stats_core.lua` with
       the same phases (`boot_profiler.ahk` already measures stages).
-- [ ] **PAR-55. Crash reports: one content, one cap, one notice.** [CODE] Done on macOS and Linux (shared
+- [x] **PAR-55. Crash reports: one content, one cap, one notice.** [CODE] Done on macOS and Linux (shared
       `crash_report.lua`, vectors `diagnostics/crash_report_vectors.json`, 20 newest kept). Left: Windows
       `crash_report_worker.ahk` adopting the same fields, names and cap.
 - [ ] **PAR-56. Log-volume metrics on all three drivers.** [CODE] Done on macOS and Linux (per-level,
       dropped, suppressed and collapsed counts in the shared logger core, on the interval evidence record).
       Left: Windows `_LoggerEmit` counting the same seven figures in the same order.
-- [ ] **PAR-57. Retention read from timings on Windows.** [CODE] `logger.ahk:112` is a literal 14. Read
+- [x] **PAR-57. Retention read from timings on Windows.** [CODE] `logger.ahk:112` is a literal 14. Read
       `Timings` and extend `test-logger-scalars-single-source.cjs`. Audit G5.
 
 ### E. Tests and corpora
@@ -1064,35 +1213,41 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       redirects, document lease; the download-document contract is Linux-only by design). Left: Windows
       consumers of `http/get_redirect_vectors.json`, `native_presentations/original_captions.json`,
       `route_plan_vectors.json`.
-- [ ] **PAR-60. Hotstring `family_samples.json` plus chaining, synthetic-output and erase vectors.** [CODE]
+      Windows (30 Oct): `get_redirect_vectors` (`test_corpus_updater_redirect.ahk`) and `original_captions` (`test_window_title_captions.ahk`) were already replayed; `route_plan_vectors.json` is now replayed by the PowerShell twin `vendor/ergopti_route_plan.ps1` (`test-windows-route-plan.cjs`).
+- [x] **PAR-60. Hotstring `family_samples.json` plus chaining, synthetic-output and erase vectors.** [CODE]
       Done on macOS and Linux (`family_samples.json`, `sequence_vectors.json`, `cascade_vectors.json` in both
       E2E harnesses). Left: a Windows `family_samples` consumer.
-- [ ] **PAR-61. Tap-versus-hold decision corpus.** [CODE] Done on macOS and Linux (`decision_vectors.json`,
+- [x] **PAR-61. Tap-versus-hold decision corpus.** [CODE] Done on macOS and Linux (`decision_vectors.json`,
       23 vectors, shared contract). Left: a Windows consumer through its tap-hold engine.
 - [ ] **PAR-63. Remaining 2026-10-18 test items.** [CODE] Done on Linux and macOS (personal-info editor,
       field masking, native-only number row; model records, downloads, keystats corpus and the toggle gaps
       were already covered). Left: Windows dynamic hotstrings, Windows root runners and the
       `test-driver-tree-parity.cjs:19` exclusion.
-- [ ] **PAR-64. Installed-record and layout corpora on Windows.** [CODE] Windows replays 1 of 4 files.
+- [x] **PAR-64. Installed-record and layout corpora on Windows.** [CODE] Windows replays 1 of 4 files.
       Replay extensions, preservation and updates. Audit L6.
 
 ### F. Centralisation and hexagonal architecture (value order)
 
-- [ ] **PAR-65. Extract the LLM request plan to `_shared/lua/llm/request_plan`.** [CODE] Phase 1 done on macOS
+- [x] **PAR-65. Extract the LLM request plan to `_shared/lua/llm/request_plan`.** [CODE] Phase 1 done on macOS
       and Linux: `debounce.lua` and `batching.lua` with request-transcript vectors (`_shared/tests/corpus/llm/`)
       replayed by both drivers (48be669def, 7442ab5edd, d18f573791; the decisions of October 26 are on
       `work/todo-af`). Left: the Windows twin replaying the vectors, then the HttpClient, TimerScheduler and
       TooltipRenderer ports, the live prompt, the token budget, the info-bar text and the agent flows. Audit R1.
+      Checked 30 October: on macOS and Linux those are done, `_shared/lua/llm/request_plan/` holds `ports`,
+      `token_budget`, `live`, `info_bar` and `agent`, required by both prediction engines, the remote and MLX
+      clients and the agent runner; only the Windows twin is left [PC].
 - [ ] **PAR-67. Shared keystats query catalogue and walker.** [CODE] Reader catalogue, shared walker and
       aggregation vectors done; `meta.rev` shared and a gate refuses SQL spelled by hand in both Lua drivers.
       In progress: write-statement catalogue with typed slots (agent). Windows: adopt it later.
-- [ ] **PAR-68. Hotstring override parser into `_shared` on `toml_codec`.** [CODE] Done on macOS and Linux
+- [x] **PAR-68. Hotstring override parser into `_shared` on `toml_codec`.** [CODE] Done on macOS and Linux
       (shared `hotstrings/overrides.lua`, `override_parse_vectors.json`). macOS now reads a duplicate key or
       header as invalid TOML (was last-wins). Left: Windows `_ParseOverrides` replaying the vectors.
 - [ ] **PAR-71. Finish the route-plan rollout and make `proxy_policy.json` the codegen source.** [CODE] Done on
       macOS and Linux (generated shell and Lua precedence, Linux lookup limits from the policy, drift guard).
       Left, Windows: generated or read AHK copy in `http_client.ahk` (reseal), the route-plan consumer
       replaying `route_plan_vectors.json`, the native lookup limits from the policy.
+      Windows (30 Oct): `http_client.ahk` reads the curl relay names from `proxy_policy.json` (its ratchet entry removed); route plan ported (`vendor/ergopti_route_plan.ps1`). Left: wire it into the owned Ollama daemon start and pull (`ollama-runtime-launch.ps1`, `ollama-model-pull.ps1`; decide what an SSPI-only relay exports), the native lookup limits from the policy; [PHYS-W] a pull behind a PAC.
+      Windows (30 Oct, later): the route plan is wired into the owned daemon start (57276199); the healthcheck PAC limit reads the policy (1255b8b6). Left: [PHYS-W] a pull behind a PAC, and the maintainer's decision on an NTLM/Negotiate relay option (today such a relay is never exported and the pull refuses with `network.failure.proxy_windows_login`).
 - [ ] **PAR-72. Shared registries and catalogues.** [CODE] Done: layout registry store, shortcuts
       catalogue, healthcheck report runner, agent learning store (daee88e48d..e105336d39); gesture
       direction and temperature were already shared with vectors. Left: the registry install/select flows and
@@ -1180,7 +1335,9 @@ Added October 22 (from the agents' reports; details in their commits):
 - [ ] **macOS swallowed-keys check on v1.0.6.** [PHYS-M] The fixes (03a2c2fa4b, d026f3e024,
       a414e83fb7, 19fa9fa872, 89cbcae90b, 9b500a9e8c, c21e920d7e, bb6fcc2cc2) shipped in v1.0.6;
       they need a Mac day of typing with the `key_event_health` counters (`infra/key_event_health.lua`,
-      written to the driver log).
+      written to the driver log). _Hands:_ the day of typing. Once typed, the field run's
+      `diagnostics` step carries the `key_*` counters and `field_event_taps` the late keys of the
+      session, so no reading by hand is left.
 - [ ] **Keystats rename leftovers.** [CODE] The rename is done (180a53e4de, 1 283 files, 579 paths). Left:
       the comment in `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` (a compiled
       script: recompile on a Mac); declare each persisted name once and make tests read it instead
@@ -1200,13 +1357,19 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       Swift on macOS CI, add Go table cases for the new stages; (6) the network check's digest step
       is skipped (HEAD only); (7) PAC fetch/evaluation failures now fall back to a direct connection on
       macOS (item "PAC unusable: direct fallback"): confirm on the Mac.
+      Field run (branch `fix/macos-overnight-d`): (1) is `field_slow_lines` (the segment the day's
+      `Slow <segment>` lines charge most, the slow ingest ticks and preferences saves with their worst
+      duration); (3) is `field_local_servers` (each server's answer and port source); the PAC route of (7)
+      shows in `field_network`'s route steps, but a PAC that fails on purpose needs a PAC the maintainer
+      breaks. (2), (4), (5), (6) are code.
 - [ ] **macOS input follow-ups (swallowed keys).** [CODE] Done: late keys pass through (ed2d9fe65c),
       AXValue read once per burst (34765cde7c), no error window for a lease failure that recovered
       within 60 s (fcf4af85dc), `key_*` counters in the diagnostics (6f2daed2e5). Lease token reuse
       was analysed and refused (ADR 012): a reused token could never reach READY because the
       revocation tombstone is monotone; reuse needs a native acknowledged rearm, decided NOT to
-      build for now. The next Mac log carries `Lease token decision=` and `written in N ms`: if the
-      write is short, keep it; if long, shrink the 743 KB file instead.
+      build for now. The next Mac log carries `Lease token decision=` and `written in N ms`, and since
+      30 October the field run's lease check names `deploy_write_ms` and `deploy_kb`: if the write is
+      short, keep it; if long, shrink the 743 KB file instead.
 - [ ] **Linux correction parity remainders.** [CODE] Done (06bbbe5985): Backspace pops the word, erased
       n-grams get `e`, synthetic output chains. Erased and synthetic vectors in the shared corpus, replayed on
       macOS and Linux (ee2eab6b1e, `keystats/correction_erased_vectors.json`). Left [PC]: the AHK replayer
@@ -1266,10 +1429,15 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       daemon on 11434 left untouched, with regression tests that an installed system Ollama is never
       resolved or started. [PHYS-W] [PHYS-L] confirm with a system Ollama running on 11434: Ergopti's
       listens on 11435 (Linux: enable the AI from the menu on a machine running `ollama serve`).
+      Windows (30 Oct): done in code on dev: owned port from `llm_ollama_owned_port`, 11434 refused (`LLM_Option_TryNormalizeOllamaPort`), a saved 11434 dropped once and logged (`persist.ahk`), only the owned runtime is launched (`test_ollama_owned_only.ahk`). [PHYS-W] still open.
 - [ ] **Ctrl+Caps Lock slot on macOS.** [PHYS-M] The `secondary_capslock` slot binds through its own native
       entry again (ea02cf7000: the generic registrar refuses Caps Lock and the whole shortcut start rolled
       back). The registrar tests say macOS never fires a Caps Lock hotkey: check on a real Mac that Ctrl+Caps
       Lock toggles Caps Lock; if not, report it and drop the slot's recommendation on macOS with a reason.
+      Since 30 October the field run judges it from the session's own keys, with no manual step: when a
+      Ctrl+Caps Lock was typed during the session, `field_capslock_chord` passes `delivered:N` or fails
+      `never_delivered` (the keymap modifier tap counts the physical chord, the slot's native callback
+      counts each delivery); with none typed it skips.
 - [ ] **Layout emulation on macOS and Linux through one generated `.keylayout`, live (maintainer request, 27
       October).** [CODE] Decided by the maintainer: no pre-generated variants. The user picks a layout
       (Ergopti, Bépo, ...), the menu options (number row in direct access or symbols, row switches) and later
@@ -1297,7 +1465,20 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       registry (none exists, so only installed registry layouts and the composition are sources); the row
       switches (`layout.emulate_*_row`) stay Windows-only: they mix Ergopti rows with the OS layout, which has
       no `.keylayout` source on Linux; the onboarding control is 3337d99bc8 on `tmp/wip-todo-af`
-      (compatible, it reads `number_row_live.available()`). macOS (1) to (3) are all left.
+      (compatible, it reads `number_row_live.available()`).
+      **macOS done in code** (branch `fix/macos-overnight-d`, 30 October): (1) the menu rows store the choice and
+      rebuild the layout typing now (an installed registry or composed layout, or the build typing for it) with
+      `layouts/keylayout_rows.lua`, the shared `.keylayout` editor proved against the Linux converter on every
+      vector and registry layout (`test-keylayout-row-options.cjs`; Cmd, Ctrl and Option keep the layout's
+      cells through a copy of the keyMap they shared); (2) `layout_rows_build.lua` writes each build under a new
+      name and id, enables it through the preference route, selects it, accepts it only on a fresh-process
+      read-back of its base cells, then retires the previous build (two failed retirements refuse the next);
+      (3) the global scope's layout participant settles only on that read-back and reverts the rows when the
+      system did not take the layout. Left [PHYS-M]: the next field report's `field_layout_rows` answers M4 to
+      M6 (live select, live replace, exact restore, ghosts until logout); if it fails on `select_refused` or
+      `requires_logout`, the live path needs the in-bundle route of the design note. Choosing an option in the
+      menu on the Mac and typing with it needs hands (the field step drives the same build path, not the menu
+      click). An Ergopti bundle source types digits on both levels, so its rows stay greyed (`digits_on_both`).
 - [ ] **Windows updater -File workers: real update check.** [PHYS] Install a build with 5d6beccf83
       by hand, then update from it to the next release: the exe is replaced and restarts, the
       three scripts are in `%LOCALAPPDATA%\Ergopti\vendor\`, the PowerShell command line shows
@@ -1338,8 +1519,14 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       acquisition (a pre-host native binding with an approved image contract).
 - [ ] **62 (macOS and Linux).** [CODE] Packaged paths resolve every request and redirect natively;
       the environment fallback now resolves each origin of the client inventory and refuses two
-      different relays (1fd254d92e, 749e00c4c8). Left: confirm the Ollama blob host on the Mac,
-      the Go twin `_shared/go/route_plan` in a CI cell, a Linux wrapper test.
+      different relays (1fd254d92e, 749e00c4c8). The Go twin runs in the `network-ai` cell ("Qualify
+      the Go route plan twin"). Linux wrapper test done 30 October:
+      `linux/tests/hardware/run_managed_ollama_route_plan.py` installs the driver as the packages lay
+      it out, takes LUA_PATH from the wrapper's own export line, runs from a foreign directory and
+      answers both origins with a real PAC through glib-pacrunner on a private bus (8 cases, passing
+      in a Linux container; a registry-only stage turns 4 red); CI step "Qualify the installed managed
+      Ollama route plan". Left: confirm the Ollama blob host on the Mac, the first hosted run of the
+      new step.
 - [ ] **CI duration** ([target](docs/memory/workflow-and-verification.md)). Flatpak runtime cache and a
       bounded retry are in (07a601c97e plus the retry commit); confirm on a hosted run (target under
       5 min). Windows Integration still adds 4-5 min on the critical path; the macOS lane (about 58
@@ -1350,37 +1537,55 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       hotstrings, macOS audit-named tests renamed, neutral-installation gate. Left: Windows replay of
       the shared HTTP-redirect, timer-ceiling and key-chord corpora (needs a decision to build those
       policies on Windows), conversion of Windows source assertions to behaviour (audit item 14).
-- [ ] **5.** [CODE] Linux/macOS numeric-owned Script aliases need an explicit snapshot contract. Done: the
-      Linux layout and number-row scope participant composed with the real producers (global scope,
-      preferences, layout manager, installer and an Xvfb server, `run_layout_rows_live.lua` section 5).
 - [ ] **116. Guided third-party validation report.** [PHYS-M] macOS `field_check_toolchain` landed
       (timer, Shortcuts, Homebrew, Karabiner signature); needs a run on a real Mac. Package
-      provenance beyond the signature check is open.
+      provenance beyond the signature check is open. The field run's `field_toolchain` step is that run,
+      with no person: the next field report answers it.
 - [ ] **139. Personal identities in logs.** [CODE] Done: email, URL-credential, foreign-profile
       rules (5ef12e8a2a) and config-directory name masking (20e845692b); opt-in redacted day log
       attachment (1c6f891ed3, item 138). Left: emitter-side pack labels (the TomlLoader SUCCESS line
-      prints the pack label; check the macOS and Linux loaders), write-time masking in the three
+      prints the pack label; check the macOS and Linux loaders: checked 30 October, the macOS registry already
+      masks it, `file_label` and the Lua and TOML start/success lines go through `PrivateLabel.mask`), write-time masking in the three
       loggers, historical logs on disk stay unmasked (the collector masks at export), GitHub field
       editability after a form reload needs a real draft.
 - [ ] **142 gaps.** [CODE] Windows: a Reload click during a pending reload now follows the join rule
       (standing-checks agent); no hash-check requirement identified for the Windows client. Linux:
       the reload restarts the daemon (pending record, see "Config policy remainders").
+      Windows: done (`test_menu_reload_replay.ahk` reload-click-joins).
 - [ ] **13/35.** [CODE] Enrol the complete guardian acceptance collector in main CI.
-- [ ] **93. Linux ordered pairs.** [CODE] XI2 property cookies proven on Xvfb in WSL; the saved Xi
-      packet is retired (libXi as a package dependency declined by the maintainer). Physical input
-      and the XKB/XI2 server-state join need a real kernel and desktop.
-- [ ] **97/98.** [CODE] Native physical-position capture and all-owner collision admission; Linux
-      identity needs the MediaStore device contract. The star setting migration is dropped (no
-      users, no legacy migration).
+- [ ] **93. Linux ordered pairs.** [PHYS-L] XI2 property cookies proven on Xvfb in WSL and again on
+      30 October in an Ubuntu 24.04 container (Xvfb 21.1.12, `run_xi2_property_cookies.py`: created,
+      modified, deleted); the saved Xi packet is retired (libXi as a package dependency declined by
+      the maintainer). Nothing else is provable on Xvfb: it reads no kernel device, so the join of a
+      uinput Writer edge with the server's XKB/XI2 modifier state needs Xorg or a compositor reading
+      real evdev nodes, and physical input needs a real kernel and desktop.
+- [ ] **97/98.** [CODE] Native physical-position capture and all-owner collision admission. The
+      MediaStore device contract now exists (`_shared/lua/keystats/media_identity.lua`: `device` is a
+      decimal u64 string, as macOS fills it), so the Linux identity is no longer blocked on policy;
+      the candidate is the owned descriptor's `st_rdev` from `fstat`, never a path or event-node
+      number. Not added on 30 October because nothing on Linux would read it yet: no Linux producer
+      calls `sqlite_writer.insert_media_events`, and `keyboard_hook.capture_position` hands the editor
+      `native_code` and `mods` only. Decide the consumer first (Linux media-key metrics, or a
+      per-device physical binding), then add the identity with it. The star setting migration is
+      dropped (no users, no legacy migration).
 - [ ] **106.** [PHYS-M] Genuine Apple Shortcuts invocation with bounded cancellation; only the
-      refusal-in-time probe exists (in 116).
-- [ ] **107.** [CODE] macOS forced output, Linux input+XI2+writer join.
+      refusal-in-time probe exists (in 116). _Hands:_ a genuine run needs a shortcut the maintainer
+      owns and names (the `shortcuts` command cannot create or import one without a dialog, and running an
+      arbitrary shortcut of theirs is not read-only); `field_toolchain`'s `shortcuts_list` and
+      `shortcuts_refusal` are what a program can prove.
+- [ ] **107.** [CODE] macOS forced output. Linux is settled by design: the number-row ordering and
+      edge keys are applied by rebuilding the layout (`docs/design/linux-number-row-runtime.md`), so
+      the hook's input+XI2+writer join is deliberately unreachable (nothing passes `numberRowMode`)
+      and is not owed; left for Linux only [PHYS-L] mutter and KWin reloading a `~/.config/xkb`
+      layout (W1 to W4 of that note).
 - [ ] **108.** [CODE] Item 97's collision/source/modifier/output joins.
 - [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible
       Variables/KeyHistory snapshot.
 - [ ] **120 (formerly 46/47/48).** [CODE] Broad Ollama process termination on macOS stays debt (the
       other clauses of 46/47/48 were stale or by design; their context was lost and the maintainer
-      retired them).
+      retired them). Checked 30 October: the macOS driver no longer kills any Ollama broadly; quit and
+      reload retire only the owned daemon (`api_ollama.stop_owned_server`), and the only `pkill -f`
+      sweeps left name the expander, the HTTP helper and `mlx_lm` server. Proposal: close it.
 - [ ] **L115.** [CODE] Provider error envelope guard: not reproducible under WSL LuaJIT (6 of 6
       runs pass); leave it or close it.
 - Optional, not planned: XKB angle-name gaps and raw-input grammar (L118-L120); concurrent JSON
@@ -1456,13 +1661,21 @@ PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, 
 
 - [ ] Cold start: quit Ergopti, wait 10 s, start it; note the `Boot complete in … ms` and `Boot CPU` lines.
       Repeat three times, then once right after a macOS login. Report the three numbers and the slowest
-      `Boot stage` lines.
+      `Boot stage` lines. _Field run:_ `field_boot_cost` reports the boot that started the field run (wall,
+      CPU, slowest stage; the three slowest in its log window). _Hands:_ the three cold starts and the one
+      after a login (a quit ends the field run, a login ends the session).
 - [ ] Reload: Hammerspoon > Reload config three times; same lines. A menu click during the reload is held
-      and replayed; a second Reload click joins the first one (no double reload).
+      and replayed; a second Reload click joins the first one (no double reload). _Field run:_ the
+      `driver_reload` step (the timed reload, owned by another worker) times one reload; three reloads compared
+      line by line come with it. _Hands:_ the menu clicks during a reload.
 - [ ] Idle: 10 minutes without typing, then Activity Monitor CPU and memory of Hammerspoon; the PhaseStats
-      summary in the log should show no recurring work above a few ms per minute.
+      summary in the log should show no recurring work above a few ms per minute. _Field run:_
+      `field_idle_cost` measures the driver's own CPU share over 30 quiet seconds (fails above 3 %) and names
+      its resident memory, heap growth and main-thread holds; nothing here needs a person any more except
+      the 10-minute figure, which the next report's PhaseStats lines give.
 - [ ] Quit during a busy moment (typing, then Quit within a second): the app ends both processes within
       10 s (CI item "Quit did not end both processes within 10 s"); Quit wins over a reload in progress.
+      _Hands:_ a quit ends the field run itself; the CI launch gate times the quit of a packaged app.
 
 #### 2. Typing in real conditions (one working day if possible)
 
@@ -1479,7 +1692,8 @@ PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, 
       terminator (Return, Tab, a letter) is a fail.
 - [ ] Tap-hold: each tap-hold key alone, fast rolls (`one-shot`), holding with another key; the Karabiner JSON
       thresholds equal the shared per-key thresholds (PAR-15: compare `~/.config/karabiner/karabiner.json`
-      with the menu values).
+      with the menu values). _Hands:_ the key presses. The threshold comparison is a program's job, left to
+      the Karabiner input owner.
 - [ ] Ctrl+Caps Lock toggles Caps Lock (new `secondary_capslock` slot binding, ea02cf7000; the tests say
       macOS may never fire a Caps Lock hotkey: report exactly what happens).
 - [ ] Right Option + Return, Delete, Backspace and Escape run their script actions; Backspace word start in
@@ -1502,7 +1716,8 @@ PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, 
       window for each of its three slots.
 - [ ] Menu row order looks as before in every submenu (orders now come from one data file, PAR-76 R18).
 - [ ] « Retirer les anciennes règles » on an upgrade (item 43); Login Items show one Ergopti (item 24,
-      Debug > Show what starts Ergopti at login).
+      Debug > Show what starts Ergopti at login). _Field run:_ `field_login_items` names every login entry
+      and whether it belongs to this copy. _Hands:_ the upgrade.
 
 #### 4. AI predictions
 
@@ -1529,7 +1744,9 @@ probe answered ...`, else `curl -sS -o /dev/null -w '%{http_code}\n' http://127.
       `Field check result:` lines; the new route-plan step shows which route each Ollama origin takes; an
       `http://` company PAC is fetched (Issue #101).
 - [ ] Debug > Test Karabiner lease, Test key accounting (30 s, type during it), Test third-party tools
-      (Shortcuts, Homebrew, timer; item 116), Test owned Karabiner runtime (must stay dormant).
+      (Shortcuts, Homebrew, timer; item 116), Test owned Karabiner runtime (must stay dormant). _Field run:_
+      `field_lease`, `key_accounting` (typed by the app into its own field), `field_toolchain` and
+      `field_owned_runtime` run each of them; nothing here needs a person.
 - [ ] Update check window: release notes pane readable in light and dark, links open the repository
       (PAR-52); a Sparkle update from the previous release installs and relaunches; Homebrew live upgrade.
 - [ ] MLX download behind a proxy (119/130/136); code 74.
@@ -1550,7 +1767,10 @@ probe answered ...`, else `curl -sS -o /dev/null -w '%{http_code}\n' http://127.
 #### 7. Edge cases
 
 - [ ] `pipefail` and `printf %b` under the system bash 3.2 (automated: collector step `system_bash`), the native HTTPS downgrade refusal,
-      `hs.fs.attributes` on a FIFO, the read-only dashboard with a hot journal.
+      `hs.fs.attributes` on a FIFO, the read-only dashboard with a hot journal. _Field run:_
+      `field_fifo_safety` (a FIFO is named without being opened; append and the atomic write refuse it).
+      Left for a program: the HTTPS downgrade (needs an HTTPS origin that redirects to HTTP) and the hot
+      journal.
 - [ ] Recompile `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` from its source in Script
       Editor so its comment follows the keystats rename, and commit it.
 
@@ -1662,7 +1882,8 @@ Standing checks:
       restore/clear; Ctrl+S open target (as on Windows, registry keys answer « Windows only »);
       Backspace word start (Terminal Return, `ab`, three Backspaces, `c★`; TextEdit
       Option+Backspace; Safari Cmd+L).
-- [ ] **Item 38**: no "Lease-bound input startup failed" or spurious "Layout poll detected change";
+- [ ] **Item 38**: no "Lease-bound input startup failed" or spurious "Layout poll detected change"
+      (automated: `field_slow_lines`' `log_lease_bound_failures` and `log_layout_change_before_baseline`);
       Right Option + Return/Delete/Backspace/Escape run script actions; no Python or Rosetta notice;
       MLX behind a proxy; Versions rollback.
 - [ ] **Installed app**: 7 (Cocoa Finish, folder disagreement, native restart), 116 page, 120
@@ -1674,7 +1895,8 @@ Standing checks:
       once), 119/130/136 MLX PAC download, code 74, Homebrew live upgrade.
 - [ ] **Shell and file edge cases**: `pipefail` and `printf %b` under bash 3.2 (automated: collector step
       `system_bash`), the native HTTPS
-      downgrade refusal, `hs.fs.attributes` on a FIFO, the read-only dashboard with a hot journal.
+      downgrade refusal, `hs.fs.attributes` on a FIFO (automated: `field_fifo_safety`), the read-only
+      dashboard with a hot journal.
 
 ### Linux (no machine available)
 
@@ -1699,11 +1921,17 @@ not open software work.
       save and installed upgrade.
 - [ ] **104, 105.** Common autocorrection sections (native Windows/macOS, per-section E2E, package;
       the 140-rule corpus is never regenerated from production); dynamic hotstrings on macOS.
-- [ ] **34, 37, 102, 129.** Native Linux/macOS delimiter transactions; macOS packaging with both
-      extension TOML files; Windows native cases and Fedora/Alpine ShellRunner fixtures; Linux E2E.
-- [ ] **121, 123, 137.** AI Agent submenu composed-menu qualification; native Linux export
-      write/close refusal; provider published before model loading (macOS).
-- [ ] **30.** Linux tests of the physical magic-key notice (407db5fd50).
+- [ ] **34, 37, 102, 129.** Native macOS delimiter transactions; macOS packaging with both
+      extension TOML files; Windows native cases and Fedora/Alpine ShellRunner fixtures. Linux done in
+      the start-up E2E: the tray's toggle and Delete rows, a refused write rolled back and retried, and
+      the next start (`run_e2e.lua`, "the tray's delimiter toggle, Delete and a refused write"; the refusal needs a non-root runner and reports SKIP as root); the
+      built-in date rules typed through the real daemon, `update` never proposing `date` (`dynamic-word-start`).
+- [ ] **121, 123, 137.** AI Agent submenu composed-menu qualification on macOS and Windows; provider
+      published before model loading (macOS). Linux done: the composed tray's agent row is disabled with
+      its reason and runs nothing (`run_e2e.lua`, `agent-disabled-root`); the native export write/close refusal
+      (`tests/hardware/run_diagnostics_save_receipts.py`, real RLIMIT_FSIZE and permission failures)
+      passes 7/7 as a non-root user, and 5/7 fail when the save ignores the write receipt; the Linux E2E
+      job runs it on every run outside a deferred stable-release profile.
 - [ ] **Carbon and daemon-report Swift.** Carbon fixture compilation and both-architecture
       receipts; daemon-report Swift allocation failures on Intel and Apple silicon.
 - [ ] **CodeQL Go.** After the `native_http` Go module is published, re-enable Go and check a fresh
@@ -1762,3 +1990,13 @@ or under "Decided, do not re-raise".
   "Sticky", like the `menu.tapholds.sticky_*` strings. Use a French term such as « rémanent »?
 - **Dutch "Rolls".** `category.rolls` and `hs_config.cat_rolls` keep "Rolls" (Dutch "Rollen" means
   "roles"). Another Dutch word?
+- **A hand-written `config.toml` `[script]` row on macOS and Linux.** Windows reads `locale` from
+  `config.toml` at start. macOS (`hs.settings` `i18n_locale`) and Linux (`storage.json`) read only their
+  native alias store, so a `locale`, `log_level` or `show_error_dialog` typed into `config.toml` is
+  ignored at start; only the Script scope writes both stores (`script_scope_runtime.lua`). Making
+  `config.toml` win at start would switch most users back to French: installs copied
+  `_generated/config_template.toml`, which ships `locale = "fr"`, while the wizard and the language
+  menu persist only the native value. A safe change on both Lua drivers needs (a) every writer (menu,
+  wizard) to write the `config.toml` leaf too, (b) one adoption at the first start of that build that
+  writes the native value in use into `config.toml`, with a marker, and only then (c) the start
+  reading `config.toml`. Kept meanwhile: the native store is the start authority on macOS and Linux.

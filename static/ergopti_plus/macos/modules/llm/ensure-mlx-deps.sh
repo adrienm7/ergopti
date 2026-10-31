@@ -337,7 +337,7 @@ install_pinned_uv() (
 	if ! managed_bootstrap_download "$UV_WHEEL_ARM64_URL" "$wheel" "$UV_WHEEL_ARM64_SHA256" "" resilient >&2; then
 		return 1
 	fi
-	digest="$(shasum -a 256 "$wheel" | awk '{print $1}')"
+	digest="$(sha256_file_digest "$wheel")"
 	if [ "$digest" != "$UV_WHEEL_ARM64_SHA256" ]; then
 		log_error "The uv $UV_RELEASE_VERSION wheel does not match its pinned SHA-256 (got $digest)."
 		return 1
@@ -517,8 +517,8 @@ fi
 # resolution invalidates the environment.
 dependency_fingerprint() {
 	local pyproject_hash lock_hash
-	pyproject_hash="$(shasum -a 256 "$PYPROJECT" | awk '{print $1}')" || return 1
-	lock_hash="$(shasum -a 256 "$UV_LOCK" | awk '{print $1}')" || return 1
+	pyproject_hash="$(sha256_file_digest "$PYPROJECT")" || return 1
+	lock_hash="$(sha256_file_digest "$UV_LOCK")" || return 1
 	printf "%s:%s" "$pyproject_hash" "$lock_hash"
 }
 

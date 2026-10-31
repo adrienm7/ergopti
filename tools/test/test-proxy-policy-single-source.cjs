@@ -30,14 +30,6 @@ const POLICY = 'static/ergopti_plus/_shared/modules/network/proxy_policy.json';
 // generated yet. Remove an entry when its copy is replaced by the JSON.
 const KNOWN_COPIES = new Map([
 	[
-		'static/ergopti_plus/windows/adapters/http_client.ahk',
-		{
-			count: 2,
-			reason:
-				'curl relay inheritance check; the file is pinned by the sealed key-combination cohort inputs'
-		}
-	],
-	[
 		'static/ergopti_plus/macos/adapters/release_stage.sh',
 		{
 			count: 1,

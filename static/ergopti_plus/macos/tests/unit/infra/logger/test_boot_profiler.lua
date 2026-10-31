@@ -299,6 +299,33 @@ helpers.describe("infra.boot_profiler CPU time beside wall time", function()
 		boot.use_cpu_clock(nil)
 		package.loaded["infra.logger"].evidence = nil
 	end)
+
+	helpers.it("keeps the boot CPU and the slowest stages for the field run (field-session-checks)", function()
+		configure_journal()
+		package.loaded["infra.logger"].evidence = function() return true end
+		local cpu = 0
+		boot.use_cpu_clock(function() return cpu end)
+		CLOCK_NS = 90e9
+		boot.begin()
+		for _, stage in ipairs({ { "short", 5e6 }, { "long", 40e6 }, { "middle", 20e6 } }) do
+			boot.stage(stage[1])
+			CLOCK_NS = CLOCK_NS + stage[2]
+			boot.mark(stage[1])
+		end
+		cpu = 70
+		boot.complete()
+		cpu = 500
+		helpers.assert_eq(boot.boot_cpu_ms(), 70, "the boot CPU must not grow after the boot")
+		local slowest = boot.slowest_stages(2)
+		helpers.assert_eq(#slowest, 2)
+		helpers.assert_eq(slowest[1].name, "long")
+		helpers.assert_eq(slowest[2].name, "middle")
+		boot.begin()
+		helpers.assert_nil(boot.boot_cpu_ms(), "a new boot starts without the previous figures")
+		helpers.assert_eq(#boot.slowest_stages(3), 0)
+		boot.use_cpu_clock(nil)
+		package.loaded["infra.logger"].evidence = nil
+	end)
 end)
 
 helpers.describe("infra.boot_profiler sub-stages and require trace", function()

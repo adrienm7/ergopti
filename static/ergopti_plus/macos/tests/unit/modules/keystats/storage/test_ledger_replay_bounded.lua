@@ -65,14 +65,30 @@ local function temp_file(content)
 	return path
 end
 
+-- Allocation one step may make, in read blocks: the block, the carried
+-- buffer and the applied slice. Reading the whole ledger, the L64 defect, is
+-- dozens of blocks for the synthetic ledger and hundreds of MB in the field.
+local STEP_ALLOCATION_BLOCKS = 6
+
 --- Runs a replay to completion, rebuilding the state from its JSON form at
 --- every step like a restart that resumes it.
+---
+--- Each step is measured on its own work. The garbage earlier test modules
+--- left behind is collected before the step, and the collector is paused
+--- during it: in a full suite a cycle over 40 MB of foreign garbage finished
+--- inside one step and was charged to it (14 ms measured in the modules group,
+--- 71 ms in one full single-process run, against about 0.5 ms of replay work).
+--- The step's own share of collection work is bounded instead by its
+--- allocation, measured over the same paused window.
 local function run_replay(path, size, options)
-	local applied, steps, max_cpu_ms, max_step_bytes = {}, 0, 0, 0
+	local applied, steps, max_cpu_ms, max_step_bytes, max_step_kb = {}, 0, 0, 0, 0
 	local json = require("json")
 	local state = LedgerReplay.new_state()
 	while true do
 		local before = state.offset
+		collectgarbage("collect")
+		collectgarbage("stop")
+		local heap_kb = collectgarbage("count")
 		local cpu = os.clock()
 		local status, detail = LedgerReplay.step({
 			path = path, size = size, state = state, cursor = options.cursor,
@@ -81,11 +97,13 @@ local function run_replay(path, size, options)
 			-- that applied a batch, the worst case for the main-thread hold.
 			clock = function() return 1 end, deadline = 0,
 		})
-		steps = steps + 1
 		max_cpu_ms = math.max(max_cpu_ms, (os.clock() - cpu) * 1000)
+		max_step_kb = math.max(max_step_kb, collectgarbage("count") - heap_kb)
+		collectgarbage("restart")
+		steps = steps + 1
 		max_step_bytes = math.max(max_step_bytes, state.offset - before)
 		if status ~= "more" then
-			return status, detail, table.concat(applied), steps, max_cpu_ms, max_step_bytes
+			return status, detail, table.concat(applied), steps, max_cpu_ms, max_step_bytes, max_step_kb
 		end
 		if options.restart_each_step then state = json.decode(json.encode(state)) end
 	end
@@ -109,10 +127,16 @@ helpers.describe("keystats: bounded local ledger replay (L64)", function()
 	end)
 
 	helpers.it("keeps every step to one read block of work", function()
-		local _, _, _, _, max_cpu_ms, max_step_bytes = run_replay(path, #ledger, { cursor = cursor })
+		local _, _, _, _, max_cpu_ms, max_step_bytes, max_step_kb = run_replay(path, #ledger, { cursor = cursor })
 		helpers.assert_true(max_step_bytes <= LedgerReplay.READ_BYTES,
 			"one step applied " .. max_step_bytes .. " bytes, more than one read block")
 		helpers.assert_true(max_cpu_ms < 20, string.format("one step used %.1f ms of CPU (budget 20 ms)", max_cpu_ms))
+		local allocation_limit_kb = STEP_ALLOCATION_BLOCKS * LedgerReplay.READ_BYTES / 1024
+		helpers.assert_true(max_step_kb <= allocation_limit_kb, string.format(
+			"one step allocated %.0f KB, more than %d read blocks (%.0f KB)",
+			max_step_kb, STEP_ALLOCATION_BLOCKS, allocation_limit_kb))
+		helpers.assert_true(#ledger > 4 * STEP_ALLOCATION_BLOCKS * LedgerReplay.READ_BYTES,
+			"the synthetic ledger must dwarf the allocation bound, or a whole-ledger read would pass")
 	end)
 
 	helpers.it("resumes from its persisted state with the same result", function()

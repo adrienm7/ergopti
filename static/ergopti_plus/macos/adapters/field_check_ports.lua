@@ -115,6 +115,17 @@ local function remap_facts()
 	return { enabled = Remap.get_enabled(), phase = phase, guardian = Remap.guardian_state() }
 end
 
+--- The note and status of this lifecycle's guardian registration, read from memory.
+--- @return string|nil note `developer_adhoc_*`, or nil when no reset ran.
+--- @return string|nil status The registration's answer, nil before it settled.
+local function guardian_registration_note()
+	local ok, note, status = pcall(function()
+		return require("platform.remap.lease_controller").guardian_registration_note()
+	end)
+	if not ok then return nil, nil end
+	return note, status
+end
+
 --- Keystats facts, read from memory.
 local function keystats_facts()
 	local Accounting = require("modules.keystats.physical_accounting_mode")
@@ -146,7 +157,8 @@ end
 
 --- Runs the native network helper (one HEAD through the managed transport).
 --- @param callback function fn(exit_code|nil, stdout); nil when it cannot start.
---- @param mode string|nil "--hosts" for one HEAD per declared host.
+--- @param mode string|table|nil "--hosts" for one HEAD per declared host, or
+---   the argument list of another mode ({ "--ollama-blob", model }).
 --- @param timeout_s number|nil Seconds before the helper is terminated.
 local function network_chain(callback, mode, timeout_s)
 	local python = require("adapters.python_interpreter").resolve()
@@ -158,7 +170,7 @@ local function network_chain(callback, mode, timeout_s)
 		return
 	end
 	local args = { "-B", root .. "/modules/llm/managed_network_check.py" }
-	if mode then args[#args + 1] = mode end
+	for _, argument in ipairs(type(mode) == "table" and mode or { mode }) do args[#args + 1] = argument end
 	exec(python, args, timeout_s or 40, callback)
 end
 
@@ -225,6 +237,19 @@ local function login_startup_status(callback)
 	end, environment)
 end
 
+--- Reads the Input Monitoring grant through the launcher's IOHIDCheckAccess
+--- role, which never prompts (ledger L32).
+--- @param callback function fn("granted"|"denied"|"unknown"|nil); nil when unreadable.
+local function input_monitoring_access(callback)
+	local launcher, _, environment = require("platform.remap.lease_helper").resolve()
+	if not launcher then return callback(nil) end
+	exec(launcher, { "--input-monitoring", "status" }, 5, function(code, output)
+		local state = code == 0 and tostring(output):match("^(%a+)%s*$") or nil
+		if state ~= "granted" and state ~= "denied" and state ~= "unknown" then state = nil end
+		callback(state)
+	end, environment)
+end
+
 --- Facts about the pieces of the owned runtime that are not installed yet:
 --- whether the artifact manifest is pinned, whether the installed-source module
 --- can be reached (it is loaded, never acquired), and what a close of the official
@@ -247,19 +272,38 @@ M.exec = exec
 
 --- The ports of the real Mac.
 --- @return table ports
+--- The catalogue's smallest model for a backend, an installed one first; the
+--- field run's AI steps and the blob host check pick the same model.
+--- @param backend string "ollama" or "mlx".
+--- @param installed function|nil fn(model) -> boolean.
+--- @return table|nil model { name, runtime_name, download_gb }
+function M.smallest_model(backend, installed)
+	local path = require("infra.paths").shared_llm_path("models.json")
+	-- Resolved per call: the field run's ports and these share the caller's adapters.
+	local text = path and require("adapters.file_system").read(path) or nil
+	if type(text) ~= "string" then return nil end
+	return require("infra.field_run").smallest_model(require("json").decode(text), backend, installed)
+end
+
 function M.new()
 	local ports = {
 		path_exists = FileSystem.exists,
 		exec = exec,
 		home = function() return os.getenv("HOME") end,
 		remap_facts = remap_facts,
+		guardian_registration_note = guardian_registration_note,
 		keystats_facts = keystats_facts,
 		health_counts = function() return require("infra.key_event_health").counts() end,
+		swallowed_keys = function() return require("infra.keystroke_integrity").drop_count() end,
+		deploy_facts = function() return require("platform.remap.generator").last_deploy() end,
 		count_keys = count_keys,
 		fetch_pac = fetch_pac,
 		network_chain = function(callback) return network_chain(callback) end,
 		-- Five hosts of at most 15 s each, one after the other
 		host_heads = function(callback) return network_chain(callback, "--hosts", 100) end,
+		-- A manifest GET and one blob HEAD of at most 15 s each
+		blob_host = function(model, callback) return network_chain(callback, { "--ollama-blob", model }, 40) end,
+		smallest_ollama_model = function() return M.smallest_model("ollama") end,
 		route_plan = route_plan,
 		timer_probe = timer_probe,
 		after = function(seconds, callback)
@@ -269,6 +313,7 @@ function M.new()
 		owned_readiness = owned_readiness,
 		app_path = app_path,
 		login_startup_status = login_startup_status,
+		input_monitoring_access = input_monitoring_access,
 		composer_env = function() return (require("modules.keymap.composer_check").env()) end,
 	}
 	-- The field run's own checks (infra/field_check_probes.lua) read more facts

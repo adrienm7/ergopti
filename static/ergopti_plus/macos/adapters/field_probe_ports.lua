@@ -82,6 +82,7 @@ local function hold_counts()
 	return {
 		over_250ms = PhaseStats.counter("runtime.timer_hold_over_250ms"),
 		over_1000ms = PhaseStats.counter("runtime.timer_hold_over_1000ms"),
+		worst = require("infra.logger").worst_timer_hold(),
 	}
 end
 
@@ -224,7 +225,15 @@ local function keystats_database()
 	local path = type(manager) == "table" and type(manager.get_sqlite_path) == "function"
 		and manager.get_sqlite_path() or nil
 	if type(path) ~= "string" or path == "" then return { path = nil, present = false } end
-	return { path = path, present = require("adapters.file_system").exists(path) == true }
+	local FileSystem = require("adapters.file_system")
+	-- The cache of earlier versions, <TMPDIR>/ergopti_metrics/<device>/db.sqlite,
+	-- which the log manager adopts once (log_manager._adopt_legacy_cache).
+	local device, tmp = path:match("([^/]+)/db%.sqlite$"), os.getenv("TMPDIR")
+	local legacy = device and type(tmp) == "string" and tmp:sub(1, 1) == "/"
+		and (tmp:gsub("/+$", "") .. "/ergopti_metrics/" .. device .. "/db.sqlite") or nil
+	return { path = path, present = FileSystem.exists(path) == true,
+		expected_root = require("infra.config_paths").metrics_cache_dir(),
+		legacy_present = legacy ~= nil and FileSystem.exists(legacy) == true }
 end
 
 
@@ -339,8 +348,13 @@ local OWNED_CRASH_PROCESSES = {
 	{ "^python", "python" }, { "^karabiner", "karabiner" },
 }
 
--- Bytes of a report read for its closed tokens (the header and the exception).
-local CRASH_READ_BYTES = 65536
+--- Bytes of a report read for its closed tokens (the header and the exception).
+--- Read when a report is opened, not at load: the timing registry resolves the
+--- shared folder through hs.fs, which a port loaded for another probe may lack.
+--- @return number Bytes.
+local function crash_read_bytes()
+	return require("infra.timings").count("limits", "crash_report_head_bytes")
+end
 
 --- The closed tokens of one crash report: its kind (hang or crash), the
 --- exception type, the signal and the termination namespace macOS recorded.
@@ -352,7 +366,7 @@ local function crash_kind(path, name)
 	local tokens = { name:lower():match("%.hang$") and "hang" or (name:lower():match("%.spin$") and "spin" or "crash") }
 	local file = io.open(path, "rb")
 	if file then
-		local text = file:read(CRASH_READ_BYTES) or ""
+		local text = file:read(crash_read_bytes()) or ""
 		file:close()
 		for _, pattern in ipairs({ '"type"%s*:%s*"(EXC_[%u_]+)"', '"signal"%s*:%s*"(SIG%u+)"',
 			'"namespace"%s*:%s*"(%u[%u_]+)"' }) do
@@ -479,6 +493,34 @@ local function ollama_installed_model()
 	return nil
 end
 
+--- Whether predictions can show with a model already on this Mac. Nothing is
+--- started or downloaded: an Ollama server that is not running lists nothing,
+--- and a remote backend never counts as installed.
+--- @param callback function fn({ enabled, backend, installed }).
+local function prediction_readiness(callback)
+	local engine = package.loaded["modules.llm.prediction_engine"]
+	if type(engine) ~= "table" or type(engine.get_llm_enabled) ~= "function" then
+		return callback({ enabled = false, backend = "absent", installed = false })
+	end
+	local _, model = engine.get_llm_runtime_setting("llm_model")
+	local facts = { enabled = engine.get_llm_enabled() == true, backend = require("modules.llm").get_backend(),
+		installed = false }
+	if not facts.enabled or type(model) ~= "string" or model == "" then return callback(facts) end
+	if facts.backend == "ollama" then
+		return ollama_refresh(function(listed)
+			facts.installed = listed and require("modules.llm.api_ollama").local_model_installed(model) == true
+			callback(facts)
+		end)
+	end
+	if facts.backend == "mlx" then
+		local manager = models_manager()
+		local _, display = engine.get_llm_runtime_setting("llm_display_model_name")
+		facts.installed = manager ~= nil and type(manager.mlx_model_installed) == "function"
+			and manager.mlx_model_installed(display) == true
+	end
+	callback(facts)
+end
+
 --- Predicts one token through the driver's own Ollama request path.
 --- @param model string Installed model.
 --- @param text string The check's own text.
@@ -516,11 +558,33 @@ local SCRATCH_SETTLE_SECONDS = 0.6
 local SCRATCH_KEY_GAP_SECONDS = 0.08
 local SCRATCH_READ_SECONDS = 0.4
 local SCRATCH_BOUND_SECONDS = 5
+-- Seconds between two reads of an awaited effect (expanded text, prediction).
+local SCRATCH_POLL_SECONDS = 0.05
 
 -- The scratch page: one text field that takes the focus itself.
 local SCRATCH_HTML = [[<!doctype html><html><body style="margin:12px;font:14px -apple-system">
 <textarea id="field" rows="2" cols="30" autofocus></textarea>
 <script>document.getElementById("field").focus();</script></body></html>]]
+
+--- True while the prediction engine shows predictions, read without starting it.
+--- @return boolean shown
+local function prediction_shown()
+	local engine = package.loaded["modules.llm.prediction_engine"]
+	return type(engine) == "table" and type(engine.is_visible) == "function" and engine.is_visible() == true
+end
+
+--- The shipped hotstrings the hotstring round-trip may type, and how Space
+--- ends one, or nil before the keymap registry is loaded.
+--- @return table|nil facts { candidates = { { trigger, expansion } }, space_terminates, space_consumed }
+local function hotstring_candidates()
+	local registry = package.loaded["modules.keymap.registry"]
+	if type(registry) ~= "table" or type(registry.field_run_candidates) ~= "function" then return nil end
+	return {
+		candidates = registry.field_run_candidates(),
+		space_terminates = registry.is_terminator(" ") == true,
+		space_consumed = registry.terminator_is_consumed(" ") == true,
+	}
+end
 
 --- The menu's timed rebuild, or nil before the menu exists.
 --- @return table|nil outcome
@@ -530,22 +594,53 @@ local function menu_rebuild()
 	return menu.timed_rebuild()
 end
 
---- Types tagged keys into a scratch text field this process opens, and only there:
---- the focus is checked before each key, and the window is closed and the
---- previous application brought back whatever happens.
---- @param keys table Single characters.
---- @param callback function fn({ focused, posted, aborted, text, latency_ms, restored }).
-local function scratch_typing(keys, callback)
+--- True when the keymap taps that decode a selftest key, and consume it
+--- anywhere but the scratch window, are running.
+--- @return boolean running
+local function keymap_taps_enabled()
+	local states = tap_states()
+	if type(states) ~= "table" or states.started ~= true then return false end
+	local enabled = {}
+	for _, entry in ipairs(states.taps or {}) do enabled[entry.name] = entry.state == "enabled" end
+	return enabled.keyDown == true and enabled.loopbackKeyUp == true
+end
+
+--- Types selftest keys into a scratch text field this process opens, and only
+--- there. The keymap decodes them as typing only while that window is the
+--- focused one and consumes them anywhere else (modules/keymap/selftest_gate.lua);
+--- this side also checks the focus and the keymap taps before each key, and
+--- closes the window and brings the previous application back whatever happens.
+--- A key is a single character or a key name such as "space".
+--- @param keys table Keys, typed in order.
+--- @param callback function fn({ focused, posted, aborted, text, latency_ms,
+---        effect_ms, restored }).
+--- @param options table|nil { bound_seconds, wait_seconds, until_text, until_prediction }:
+---        after the last key, the field (until_text) or the prediction tooltip
+---        (until_prediction) is polled for wait_seconds; effect_ms is the time
+---        from the last key to the effect, nil when it never came.
+local function scratch_typing(keys, callback, options)
 	local Timer = require("adapters.timer_scheduler")
 	local OwnWindow = require("adapters.own_window")
+	local Selftest = require("infra.field_run_selftest")
+	options = options or {}
 	local outcome = { focused = false, posted = 0 }
 	local previous = hs.application.frontmostApplication()
-	local view, settled, bound, started = nil, false, nil, nil
+	local view, settled, bound, started, publication = nil, false, nil, nil, nil
 	local function settle(aborted)
 		if settled then return end
 		settled = true
 		if bound then Timer.cancel(bound) end
 		outcome.aborted = outcome.aborted or aborted
+		-- Retracted before the window closes: no selftest key is decoded as
+		-- typing once the scratch field is gone.
+		if publication then
+			local retracted, err = pcall(Selftest.retract, publication)
+			if not retracted then
+				require("infra.logger").error("adapters.field_probe_ports", "The selftest window was not retracted: %s.",
+					tostring(err))
+			end
+			publication = nil
+		end
 		if view then pcall(function() view:delete() end) end
 		if previous then pcall(function() previous:activate() end) end
 		Timer.after(SCRATCH_READ_SECONDS, function()
@@ -555,49 +650,88 @@ local function scratch_typing(keys, callback)
 		end)
 	end
 	--- True while the scratch field's window is the focused one of this process.
+	--- @return boolean focused, string|integer reason_or_window_id
 	local function scratch_has_focus()
 		local front = hs.application.frontmostApplication()
 		if not front or front:pid() ~= hs.processInfo.processID then return false, "not_frontmost" end
 		local focused, own = hs.window.focusedWindow(), OwnWindow.for_webview(view)
 		if not focused or not own or focused:id() ~= own:id() then return false, "window_unfocused" end
-		return true
+		return true, own:id()
 	end
 	local ok, err = pcall(function()
 		local screen = hs.screen.mainScreen():frame()
 		view = hs.webview.new({ x = screen.x + screen.w / 2 - 180, y = screen.y + 80, w = 360, h = 90 },
 			{ developerExtrasEnabled = false })
-		view:windowStyle({ "titled" }):windowTitle("Ergopti field run"):allowTextEntry(true)
-		view:level(hs.drawing.windowLevels.floating):html(SCRATCH_HTML):show()
-		require("ui.ui_builder").force_focus(view, true)
+		-- The shared chrome keeps the normal level: the field is focused before
+		-- each key and the run aborts when it loses the focus, so floating it
+		-- would only leave it above the windows the user opens meanwhile
+		local UiBuilder = require("ui.ui_builder")
+		for _, step in ipairs(UiBuilder.window_chrome_steps(view)) do step.apply() end
+		view:windowTitle("Ergopti field run"):allowTextEntry(true):html(SCRATCH_HTML):show()
+		UiBuilder.force_focus(view, true)
 	end)
 	if not ok then
 		require("infra.logger").error("adapters.field_probe_ports", "The scratch field could not open: %s.", tostring(err))
 		return settle("scratch_refused")
 	end
-	bound = Timer.after(SCRATCH_BOUND_SECONDS, function()
+	bound = Timer.after(options.bound_seconds or SCRATCH_BOUND_SECONDS, function()
 		bound = nil
 		settle("scratch_bound")
 	end)
+	local last_key_at = nil
+	local function read_field(fn) view:evaluateJavaScript('document.getElementById("field").value', fn) end
+	local function done(text)
+		if settled then return end
+		outcome.text = type(text) == "string" and text or nil
+		outcome.latency_ms = (hs.timer.absoluteTime() - started) / 1e6
+		settle(nil)
+	end
+	--- Polls for the awaited effect until it shows or wait_seconds run out.
+	--- @param polls integer Polls left.
+	local function poll(polls)
+		if settled then return end
+		local function observed(effect)
+			if effect then outcome.effect_ms = (hs.timer.absoluteTime() - last_key_at) / 1e6 end
+			if effect or polls <= 1 then return read_field(done) end
+			Timer.after(SCRATCH_POLL_SECONDS, function() poll(polls - 1) end)
+		end
+		if options.until_prediction then return observed(prediction_shown()) end
+		read_field(function(text) observed(text == options.until_text) end)
+	end
+	local function finish_typing()
+		if settled then return end
+		if options.until_text or options.until_prediction then
+			return poll(math.max(1, math.floor((options.wait_seconds or SCRATCH_READ_SECONDS) / SCRATCH_POLL_SECONDS)))
+		end
+		Timer.after(SCRATCH_READ_SECONDS, function()
+			if settled then return end
+			read_field(done)
+		end)
+	end
 	local function type_key(index)
 		if settled then return end
-		if index > #keys then
-			return Timer.after(SCRATCH_READ_SECONDS, function()
-				if settled then return end
-				view:evaluateJavaScript('document.getElementById("field").value', function(text)
-					outcome.text = type(text) == "string" and text or nil
-					outcome.latency_ms = (hs.timer.absoluteTime() - started) / 1e6
-					settle(nil)
-				end)
-			end)
-		end
+		if index > #keys then return finish_typing() end
 		local focused, reason = scratch_has_focus()
 		if not focused then return settle(index == 1 and reason or ("focus_lost_" .. reason)) end
+		-- A selftest key is consumed only by the keymap tap: with it off, the
+		-- key would reach whatever has the focus when it is delivered.
+		if not keymap_taps_enabled() then return settle(index == 1 and "keymap_tap_off" or "keymap_tap_lost") end
+		if publication == nil then
+			local published, generation = pcall(Selftest.publish, reason)
+			if not published then
+				require("infra.logger").error("adapters.field_probe_ports", "The selftest window could not be published: %s.",
+					tostring(generation))
+				return settle("selftest_busy")
+			end
+			publication = generation
+		end
 		outcome.focused = true
 		started = started or hs.timer.absoluteTime()
-		-- Through the one tagged injection owner: the keymap and keystats know
-		-- these keys as the driver's own output, the passive counter still sees them
-		local sent, emitted = pcall(require("adapters.synthetic_input").emit_key_stroke, {}, keys[index], 0)
+		-- The selftest class: the keymap decodes these keys as typing in this
+		-- window only, keystats never counts them, the passive counter sees them
+		local sent, emitted = pcall(require("adapters.synthetic_input").emit_selftest_key_stroke, {}, keys[index])
 		if not sent or emitted ~= true then return settle("injection_refused") end
+		last_key_at = hs.timer.absoluteTime()
 		outcome.posted = index
 		Timer.after(SCRATCH_KEY_GAP_SECONDS, function() type_key(index + 1) end)
 	end
@@ -608,11 +742,99 @@ end
 
 
 
--- ==========================
--- ==========================
--- ======= 9/ Factory =======
--- ==========================
--- ==========================
+-- =====================================
+-- =====================================
+-- ======= 9/ Layout rows builds =======
+-- =====================================
+-- =====================================
+
+-- The shipped layout the check builds from, and its own name and files: Ergo-L
+-- moves cells with the symbols first (Ergopti types digits on both levels).
+local ROWS_SOURCE_ID = "ergol"
+local ROWS_KEYBOARD_NAME = "Ergopti Field Rows"
+local ROWS_FILE_PREFIX = "ErgoptiFieldRows-"
+
+--- The boot that started this app (infra/field_check_session.lua).
+--- @return table { complete_ms, cpu_ms, slowest }
+local function boot_facts()
+	local Boot = require("infra.boot_profiler")
+	return { complete_ms = Boot.boot_complete_ms(), cpu_ms = Boot.boot_cpu_ms(), slowest = Boot.slowest_stages(3) }
+end
+
+--- The file system calls the FIFO check drives, in a folder of its own.
+--- @return table { dir, mode, exists, append, write }
+local function fifo()
+	local FileSystem = require("adapters.file_system")
+	local tmp = (os.getenv("TMPDIR") or "/tmp"):gsub("/+$", "")
+	return {
+		dir = tmp .. "/ergopti-field-fifo-" .. tostring(hs.processInfo.processID),
+		mode = FileSystem.followed_mode,
+		exists = FileSystem.exists,
+		append = FileSystem.append,
+		write = FileSystem.write,
+	}
+end
+
+--- The local server catalogue the driver loaded (infra/field_check_local_servers.lua).
+--- @return table { order, discovery, published }
+local function local_server_catalogue()
+	local LocalServers = require("modules.llm.local_servers")
+	return { order = LocalServers.ORDER, discovery = LocalServers.DISCOVERY,
+		published = LocalServers.config_catalogue_published() }
+end
+
+--- One detection sweep of every local server, as the AI menu runs it; read-only.
+--- @param on_done function fn(views|nil), once.
+local function local_servers_detect(on_done)
+	local Api = require("modules.llm.api_remote")
+	local answered = false
+	local started = Api.detect_local_servers(function()
+		if answered then return end
+		answered = true
+		on_done(Api.local_server_views())
+	end)
+	if started ~= true and not answered then
+		answered = true
+		on_done(nil)
+	end
+end
+
+--- The layout rows check's environment (infra/field_check_layout_rows.lua).
+--- @return table|nil env
+--- @return string|nil error
+local function layout_rows_env()
+	local Build = require("modules.keymap.layout_rows_build")
+	local InputSources = require("modules.keymap.input_sources")
+	local shipped, shipped_err = require("modules.keymap.layout_registry").shipped_layout(ROWS_SOURCE_ID)
+	if not shipped then return nil, shipped_err end
+	local deps = Build.default_deps({
+		file_prefix = ROWS_FILE_PREFIX,
+		record_path = require("infra.config_paths").get_config_dir() .. "layouts/field_rows_builds.json",
+	})
+	if type(deps.keycodes_table) ~= "table" then return nil, "the keycode table is unreadable" end
+	return {
+		source = { id = ROWS_SOURCE_ID, keyboard_name = ROWS_KEYBOARD_NAME, text = shipped.text,
+			convention = shipped.entry.keycode_convention },
+		replace = function(source, rows, on_done) return Build.replace(source, rows, on_done, deps) end,
+		retire_all = function(on_done) return Build.retire_all(on_done, deps) end,
+		exists = deps.exists,
+		sources_state = InputSources.read_sources_state_async,
+		-- A source id is no menu name: the native selector looks it up by id.
+		select_id = function(id, on_done)
+			return InputSources.set_input_source_async(nil, id, function(ok, _, reason) on_done(ok, reason) end)
+		end,
+	}, nil
+end
+
+
+
+
+
+-- ===========================
+-- ===========================
+-- ======= 10/ Factory =======
+-- ===========================
+-- ===========================
 
 -- Test seam: the shell runner exec_input spawns through; nil in production.
 M._shell_runner = nil
@@ -645,6 +867,32 @@ function M.new()
 		ollama_predict = ollama_predict,
 		menu_rebuild = menu_rebuild,
 		scratch_typing = scratch_typing,
+		keystats_start_ms = function()
+			local MenuState = package.loaded["ui.menu.menu_state"]
+			return type(MenuState) == "table" and MenuState.keystats_start_ms() or nil
+		end,
+		gesture_frame_counts = function() return require("infra.gesture_frame_evidence").counts() end,
+		capslock_chord_facts = function()
+			local Shortcuts = require("modules.shortcuts.keyboard_shortcuts")
+			local counts = require("infra.capslock_chord_evidence").counts()
+			return {
+				action = Shortcuts.get_action("secondary_capslock"),
+				bound = Shortcuts.is_slot_bound("secondary_capslock"),
+				presses = counts.presses,
+				deliveries = counts.deliveries,
+			}
+		end,
+		hotstring_candidates = hotstring_candidates,
+		prediction_readiness = prediction_readiness,
+		layout_rows_env = layout_rows_env,
+		local_server_catalogue = local_server_catalogue,
+		local_servers_detect = local_servers_detect,
+		boot_facts = boot_facts,
+		fifo = fifo,
+		today_log_path = function() return require("infra.logger").today_log_path() end,
+		-- Process CPU and a monotonic clock, both in milliseconds
+		cpu_ms = function() return os.clock() * 1000 end,
+		now_ms = function() return hs.timer.absoluteTime() / 1000000 end,
 	}
 end
 

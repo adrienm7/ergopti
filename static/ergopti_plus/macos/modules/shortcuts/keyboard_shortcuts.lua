@@ -27,6 +27,7 @@ local Registrar   = require("adapters.hotkey_registrar")
 local FileSystem  = require("adapters.file_system")
 local Paths       = require("infra.paths")
 local Logger      = require("infra.logger")
+local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
 local OperationReporter = require("diagnostics.operation_reporter")
 local GestActions = nil
 local Codec       = require("toml_codec")
@@ -758,9 +759,11 @@ local function bind_slot(slot_id, action_id)
 	-- The Caps Lock slot keeps the native factory the retired Ctrl+CapsLock
 	-- switch used; the registrar refuses Caps Lock as a key on every other path.
 	local parsed_chord = Chord.parse(chord)
-	local bind = (parsed_chord and parsed_chord.key:lower() == "capslock")
-		and Registrar.bind_capslock_chord or Registrar.bind
+	local is_capslock = parsed_chord ~= nil and parsed_chord.key:lower() == "capslock"
+	local bind = is_capslock and Registrar.bind_capslock_chord or Registrar.bind
 	local ok_bind, handle, refusal = xpcall(bind, debug.traceback, chord, function()
+		-- Whether macOS fires a Caps Lock hotkey at all is the field question.
+		if is_capslock then CapsLockChordEvidence.note_delivery() end
 		if _delivery_enabled ~= true or _lifecycle_paused == true then return false end
 		local current_action = _actions[slot_id] or "none"
 		if current_action == "none" then
@@ -886,6 +889,13 @@ function M.get_configuration_intent()
 	for slot, action in pairs(_explicit_actions) do assignments[slot] = action end
 	for slot in pairs(_physical_assignments) do claims[slot] = true end
 	return assignments, claims
+end
+
+--- Reports whether a slot holds a native binding right now.
+--- @param slot_id string
+--- @return boolean bound
+function M.is_slot_bound(slot_id)
+	return _hotkeys[slot_id] ~= nil
 end
 
 --- Returns the current action id for a given slot.

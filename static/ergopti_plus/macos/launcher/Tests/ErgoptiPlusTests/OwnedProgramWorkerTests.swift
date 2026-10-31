@@ -8,7 +8,9 @@ import Foundation
 import XCTest
 @testable import ErgoptiPlus
 
-private final class OwnedProgramTestSession {
+// Shared with OwnedProgramForwardingTests, whose cases sit outside the exact
+// OwnedProgramWorkerTests method set the CI receipt notice qualifies.
+final class OwnedProgramTestSession {
 	let directory: URL
 	let executable: URL
 	let source: URL
@@ -21,6 +23,7 @@ private final class OwnedProgramTestSession {
 	private(set) var stdout = Data()
 	private(set) var stderr = Data()
 	private var inputClosed = false
+	private var outputClosed = false
 
 	init(executable: URL, payload: URL? = nil, arguments: [String], symlinkSource: Bool = false, sendInitialRequest: Bool = true, prepareFixture: ((URL) throws -> Void)? = nil) throws {
 		self.executable = executable
@@ -70,6 +73,13 @@ private final class OwnedProgramTestSession {
 		try input.fileHandleForWriting.write(contentsOf: Data("{\"version\":1".utf8))
 	}
 
+	// Closes the caller's receipt reader, so the next forwarded receipt is refused.
+	func closeOutput() throws {
+		guard !outputClosed else { return }
+		try output.fileHandleForReading.close()
+		outputClosed = true
+	}
+
 	func closeInput() throws {
 		guard !inputClosed else { return }
 		try input.fileHandleForWriting.close()
@@ -85,7 +95,8 @@ private final class OwnedProgramTestSession {
 	}
 
 	func poll() throws {
-		let bytes = try drain(output.fileHandleForReading)
+		var bytes = Data()
+		if !outputClosed { bytes = try drain(output.fileHandleForReading) }
 		stdout.append(bytes)
 		stderr.append(try drain(error.fileHandleForReading))
 		guard stdout.count <= 128, stderr.isEmpty, decoder.append(bytes) else {

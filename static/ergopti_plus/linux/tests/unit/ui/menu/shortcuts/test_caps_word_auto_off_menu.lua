@@ -15,9 +15,7 @@ local helpers = require("tests.helpers")
 --- @param upvalues table Values the builder closes over.
 --- @return function builder
 local function load_builder(upvalues)
-	local f = assert(io.open(helpers.driver_root() .. "/ui/menu/menu_builder.lua", "rb"))
-	local source = f:read("*a")
-	f:close()
+	local source = helpers.read_menu_source()
 	local start = assert(source:find('\tgroup_builders["caps_word_auto_off"] = function()', 1, true),
 		"the CapsWord group builder is missing")
 	local stop = assert(source:find("\n\tend\n", start, true))

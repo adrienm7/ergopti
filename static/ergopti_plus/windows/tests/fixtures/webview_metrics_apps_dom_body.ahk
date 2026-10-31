@@ -343,7 +343,7 @@ _MAD_VerifyProjection(Category, Score, Count) {
 	_MVSP_Require(KL_AppCat_Reload(), "The actual canonical store reload must admit the durable edit.")
 	_MVSP_Require(KL_AppCat_Get(_MAD.App) == Category, "The public string category must round-trip through the actual file.")
 	Document := JsonParse(FSReadStrict(KLAppCat.file_path))
-	_MVSP_Require(Document["apps"]["legacy-owned.exe"] == "never change"
+	_MVSP_Require(Document["apps"]["legacy-owned.exe"]["type"] == "never change"
 		&& Document["apps"][_MAD.App]["type"] == Category && Document["apps"][_MAD.App]["score"] == Score,
 		"The genuine record must preserve its legacy sibling and exact confirmed values.")
 	Path := KLPF_PrefetchPath("apps", _MAD_Root)
@@ -409,9 +409,9 @@ _MAD_Main() {
 		_MVSP.Gui.Show("w1000 h760")
 		_MAD.App := StrLower(WinGetProcessName("ahk_id " . _MVSP.Gui.Hwnd))
 		_MAD_SeedLedger(_MAD.App)
-		_MVSP_Require(FSWriteCreateDurable(_MAD_Root . "\" . KLAppCatConst.FILE_NAME,
-			'{"legacy-owned.exe":"never change"}'), "The private canonical store seed must be created once.")
-		_MVSP_Require(KL_AppCat_Init(_MAD_Root), "The actual classifier must admit the private store.")
+		_MVSP_Require(FSWriteCreateDurable(KL_AppCat_StoreDir() . "\" . KLAppCatConst.FILE_NAME,
+			'{"legacy-owned.exe":{"type":"never change","score":0}}'), "The private canonical store seed must be created once.")
+		_MVSP_Require(KL_AppCat_Init(KL_AppCat_StoreDir(), _MAD_Root), "The actual classifier must admit the private store.")
 		_MVSP.Phase := "native-controller"
 		SetTimer(_MAD_Deadline, -60000)
 		_MVSP.Profile := WebView_NewProfilePath("ergopti_apps_dom_")

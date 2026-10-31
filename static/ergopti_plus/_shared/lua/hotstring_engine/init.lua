@@ -237,6 +237,7 @@ end
 --- @param start_is_boundary boolean Whether the buffer's start abuts a terminator.
 --- @return string|nil eff Effective replacement, or nil when it does not fire.
 --- @return string|nil typed The buffer tail that matched, for the caller's arithmetic.
+--- @return boolean|nil is_noop True when it matched but would replace text with itself.
 function M.mapping_fires(mapping, buf_cps, body_len, start_is_boundary)
 	if type(mapping) ~= "table" or type(buf_cps) ~= "table" then return nil end
 	local tlen = mapping.tlen
@@ -247,8 +248,8 @@ function M.mapping_fires(mapping, buf_cps, body_len, start_is_boundary)
 	local typed     = table.concat(buf_cps, "", body_len - tlen + 1, body_len)
 	local prev_char = body_len > tlen and buf_cps[body_len - tlen] or nil
 
-	local eff = M.decide(mapping, mapping.replacement, typed, prev_char, start_is_boundary)
-	if not eff then return nil end
+	local eff, is_noop = M.decide(mapping, mapping.replacement, typed, prev_char, start_is_boundary)
+	if not eff then return nil, nil, is_noop end
 	return eff, typed
 end
 
@@ -280,11 +281,38 @@ function M.best_match_at(buf_cps, buckets, body_len, want_auto, start_is_boundar
 	-- calls directly from its own buffer — this loop is only the "which one" half.
 	for _, mapping in ipairs(bucket) do
 		if mapping.auto_expand == want_auto then
-			local eff = M.mapping_fires(mapping, buf_cps, body_len, start_is_boundary)
+			local eff, _, is_noop = M.mapping_fires(mapping, buf_cps, body_len, start_is_boundary)
 			if eff then return mapping, mapping.tlen, eff end
+			-- A final entry that changes nothing still wins: nothing below it fires.
+			if is_noop and mapping.final_result then return nil, mapping.tlen, nil, true end
 		end
 	end
 	return nil
+end
+
+--- Whether a final end-character entry holds an immediate candidate back.
+---
+--- The immediate entry would fire on the last letter, before the end character
+--- that the final entry of strictly higher priority is waiting for, so priority
+--- alone could never reach it. Windows `_HSE_FinalEndOutranks` and macOS
+--- `final_end_outranks` apply the same rule.
+--- @param buf_cps table Array of UTF-8 codepoint strings (the rolling buffer).
+--- @param buckets table Tail-char buckets.
+--- @param body_len number Index the candidates must end at.
+--- @param start_is_boundary boolean Whether the buffer's start abuts a terminator.
+--- @param auto_map table The immediate candidate.
+--- @return boolean
+function M.final_end_outranks(buf_cps, buckets, body_len, start_is_boundary, auto_map)
+	local bucket = buckets[text_utils.trig_lower(buf_cps[body_len])]
+	if not bucket then return false end
+	for _, mapping in ipairs(bucket) do
+		if not mapping.auto_expand and mapping.final_result
+			and mapping.tlen >= auto_map.tlen and mapping.priority > auto_map.priority then
+			local eff, _, is_noop = M.mapping_fires(mapping, buf_cps, body_len, start_is_boundary)
+			if eff or is_noop then return true end
+		end
+	end
+	return false
 end
 
 
@@ -512,6 +540,11 @@ function M.new()
 	-- a codepoint, because the buffer then starts in the middle of the user's text
 	-- and nothing here knows what preceded it.
 	local _start_is_boundary = true
+	-- Whether the previous key completed a final entry that changes nothing. Its
+	-- text stays in the buffer but is claimed: the end character that follows
+	-- must not hand it to a lower entry (a personal `sru` > `sru` against a
+	-- bundled `sru` > `sur`). It lasts one key, so typing on judges afresh.
+	local _final_noop_pending = false
 	-- Whether the buffer's start is also the start of an empty input line, so a
 	-- Backspace that finds the buffer empty deleted nothing and the word start
 	-- stands. Only a reset that names it sets it (a bare Enter in a terminal
@@ -772,14 +805,19 @@ function M.new()
 	--- @return string|nil replacement Effective replacement.
 	--- @return boolean|nil via_end_char Whether the end-char path won.
 	--- @return boolean|nil nbsp_stripped Whether a no-break space preceded the terminator.
-	local function select_match(cps, is_terminator)
+	--- @return boolean|nil final_noop Whether a final immediate entry that changes
+	---   nothing won, which claims its text against the next end character.
+	local function select_match(cps, is_terminator, text_is_claimed)
 		local buf_len = #cps
 		local function best_match(body_len, want_auto)
 			return M.best_match_at(cps, _buckets, body_len, want_auto, _start_is_boundary)
 		end
 
 		-- Path A — auto_expand: fires on the trigger's own last character.
-		local auto_map, auto_len, auto_repl = best_match(buf_len, true)
+		local auto_map, auto_len, auto_repl, auto_final_noop = best_match(buf_len, true)
+		if auto_map and M.final_end_outranks(cps, _buckets, buf_len, _start_is_boundary, auto_map) then
+			auto_map, auto_len, auto_repl = nil, nil, nil
+		end
 
 		-- Path B — end-char: a non-auto trigger fires only when a terminator
 		-- follows it, so the body excludes the character just typed.
@@ -796,7 +834,8 @@ function M.new()
 		-- hotstring. Only the end-char path is affected; a trigger whose own last
 		-- codepoint is ":" still fires on the auto path untouched.
 		local end_map, end_len, end_repl, nbsp_stripped = nil, nil, nil, false
-		if is_terminator then
+		local end_final_noop = false
+		if is_terminator and not text_is_claimed then
 			local typed = cps[buf_len]
 			local body_len = buf_len - 1
 			local eligible = true
@@ -810,10 +849,20 @@ function M.new()
 				end
 			end
 			if eligible then
-				end_map, end_len, end_repl = best_match(body_len, false)
+				local noop_len, noop
+				end_map, noop_len, end_repl, noop = best_match(body_len, false)
+				end_len = noop_len
+				end_final_noop = noop == true
 			end
 			if not end_map then nbsp_stripped = false end
 		end
+
+		-- A final entry that changes nothing is a winner with no edit, by the same
+		-- length rule as the fires below.
+		if auto_final_noop and not (end_map and end_len > auto_len) then
+			return nil, nil, nil, nil, nil, true
+		end
+		if end_final_noop and (not auto_map or end_len > auto_len) then return nil end
 
 		-- Resolve across the two paths by trigger LENGTH, which is what Windows
 		-- does (_HSE_EndCharBeats: a star match yields to a strictly longer
@@ -1010,8 +1059,11 @@ function M.new()
 		-- enough to follow the matcher.
 		Logger.debug(LOG, "on_char: buffer %d codepoint(s).", #_buf_cps)
 
-		local mapping, tlen, replacement, via_end_char, nbsp_stripped =
-			select_match(_buf_cps, options.is_terminator == true)
+		local text_is_claimed = _final_noop_pending
+		_final_noop_pending = false
+		local mapping, tlen, replacement, via_end_char, nbsp_stripped, final_noop =
+			select_match(_buf_cps, options.is_terminator == true, text_is_claimed)
+		_final_noop_pending = final_noop == true
 		if not mapping then return nil end
 
 		-- An end-char match always ERASES the terminator because it sits between
@@ -1096,6 +1148,7 @@ function M.new()
 		-- final_result expansion — so what follows genuinely starts a word.
 		_start_is_boundary = at_boundary ~= false
 		_start_is_line_start = _start_is_boundary and at_line_start == true
+		_final_noop_pending = false
 		Logger.debug(LOG, "Buffer reset.")
 	end
 
@@ -1126,6 +1179,7 @@ function M.new()
 	--- deleted and the word start stands. Windows (HSE_FeedBackspace) and macOS
 	--- (keymap) apply the same rules.
 	function engine:backspace()
+		_final_noop_pending = false
 		if #_buf_cps == 0 then
 			if _start_is_line_start and _start_is_boundary then return end
 			_start_is_boundary = false

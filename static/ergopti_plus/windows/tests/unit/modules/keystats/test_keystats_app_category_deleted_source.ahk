@@ -24,11 +24,11 @@ _KLACDS_Case(Record, Pending) {
 		AssertTrue(Saved.Get("write_owner", 0) is Integer && Saved.Get("write_owner", 0) == 0,
 			"the fixture cannot replace an admitted foreign writer")
 		FSCreateDirectoryExclusiveStrict(Root), Owned := true
-		Deleted := Record ? '{"type":"old historical override","score":-1}' : '"old legacy category"'
+		Deleted := Record ? '{"type":"old historical override","score":-1}' : '{"type":"unknown","score":0}'
 		Original := '{"schema":"ergopti.app_categories","version":1,"apps":{'
-			. '"audit.exe":"productive","removed.exe":' . Deleted . ',"other.exe":"neutral"}}' . "`n"
+			. '"audit.exe":{"type":"productive","score":0},"removed.exe":' . Deleted . ',"other.exe":{"type":"neutral","score":0}}}' . "`n"
 		Fresh := '{"schema":"ergopti.app_categories","version":1,"apps":{'
-			. '"audit.exe":"productive","other.exe":"neutral"}}' . "`n"
+			. '"audit.exe":{"type":"productive","score":0},"other.exe":{"type":"neutral","score":0}}}' . "`n"
 		AssertTrue(FSWriteCreateDurable(Path, Original))
 		KLAppCat.categories := Map(), KLAppCat.file_path := "", KLAppCat.dirty := false
 		KLAppCat.save_fn := Timer
@@ -55,7 +55,7 @@ _KLACDS_Case(Record, Pending) {
 		AssertEqual(Pending, Document["apps"].Has("new-discovery.exe"),
 			"only a real new discovery may survive merging with the fresh canonical image")
 		if Pending
-			AssertEqual("unknown", Document["apps"]["new-discovery.exe"])
+			AssertEqual("unknown", Document["apps"]["new-discovery.exe"]["type"])
 		; Exercise the next real deferred-save obligation before reloading RAM.
 		; Stale entries must not return through this second persistence path.
 		AssertEqual("unknown", KL_AppCat_Get("later-discovery.exe"))
@@ -95,6 +95,6 @@ _KLACDS_Case(Record, Pending) {
 }
 
 Test("App category fresh source: deleted record stays withdrawn (app-category-source-deletion)", _KLACDS_Case.Bind(true, false))
-Test("App category fresh source: deleted legacy stays withdrawn (app-category-source-deletion)", _KLACDS_Case.Bind(false, false))
+Test("App category fresh source: deleted unedited record stays withdrawn (app-category-source-deletion)", _KLACDS_Case.Bind(false, false))
 Test("App category fresh source: new discovery survives deleted record (app-category-source-deletion)", _KLACDS_Case.Bind(true, true))
-Test("App category fresh source: new discovery survives deleted legacy (app-category-source-deletion)", _KLACDS_Case.Bind(false, true))
+Test("App category fresh source: new discovery survives deleted unedited record (app-category-source-deletion)", _KLACDS_Case.Bind(false, true))

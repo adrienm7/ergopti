@@ -2,6 +2,7 @@
 """Receive the production Lua-emitted command with actual Python and guard."""
 
 import os
+import re
 import shutil
 import shlex
 from pathlib import Path
@@ -12,6 +13,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = Path(os.environ.get("ERGOPTI_SOURCE_ROOT", ROOT))
+# Mirrors REFUSAL_PATTERN in macos/adapters/managed_ollama_daemon.lua, the line the driver logs.
+REFUSAL_LINE = re.compile(r"Managed Ollama daemon admission refused: [\w.:=, -]+\.\n")
 
 
 @unittest.skipUnless(os.name == "posix", "Actual foreground POSIX execution required")
@@ -49,7 +52,7 @@ class EmittedServeCommand(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 78)
             self.assertEqual(result.stdout, "")
-            self.assertEqual(result.stderr, "Managed Ollama daemon admission refused.\n")
+            self.assertIsNotNone(REFUSAL_LINE.fullmatch(result.stderr), result.stderr)
             self.assertEqual(list(Path(directory).iterdir()), [])
 
     def test_emitted_isolated_serve_does_not_write_source_payload_caches(self):
@@ -105,7 +108,7 @@ class EmittedServeCommand(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 78)
             self.assertEqual(result.stdout, "")
-            self.assertEqual(result.stderr, "Managed Ollama daemon admission refused.\n")
+            self.assertIsNotNone(REFUSAL_LINE.fullmatch(result.stderr), result.stderr)
             self.assertEqual(list(home.iterdir()), [])
             self.assertEqual(list(copied.rglob("*.pyc")), [])
 

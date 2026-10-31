@@ -691,6 +691,8 @@ _LLM_Deps_State := "ready"
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/remote_formats.ahk
 #Include ..\..\_shared\modules\llm\local_server_auth.ahk
+#Include ..\..\_shared\modules\llm\api_url_template.ahk
+#Include ..\..\_shared\modules\llm\model_capabilities.ahk
 #Include ..\..\_shared\modules\llm\thinking_off.ahk
 #Include ..\..\_shared\modules\llm\local_server_discovery.ahk
 #Include ..\..\_shared\modules\llm\local_server_ports.ahk
@@ -710,6 +712,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/api/test_llm_api_remote_async_registry.ahk
 #Include unit/modules/llm/api/test_llm_api_remote_requests.ahk
 #Include unit/modules/llm/api/test_llm_thinking_off.ahk
+#Include unit/modules/llm/api/test_llm_model_capabilities.ahk
 #Include unit/platform/network/test_managed_curl_owner.ahk
 #Include unit/platform/network/test_managed_curl_empty_header.ahk
 #Include unit/platform/network/test_http_post_replacement_validation.ahk
@@ -743,6 +746,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/api/test_llm_aux_request_ownership.ahk
 #Include unit/modules/llm/api/test_llm_api_test_entry.ahk
 #Include unit/modules/llm/api/test_llm_api_entry_names.ahk
+#Include unit/modules/llm/api/test_llm_api_url_template.ahk
 #Include unit/modules/llm/menu/test_llm_menu_backend_model_labels.ahk
 #Include unit/modules/llm/menu/test_llm_menu_model_hardware.ahk
 #Include unit/modules/llm/menu/test_llm_menu_build_submenu.ahk
@@ -890,6 +894,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/modules/llm/servers/test_local_server_receipt_entry.ahk
 #Include unit/modules/llm/servers/test_local_server_source_operations.ahk
 #Include unit/modules/llm/api/test_llm_api_add_production.ahk
+#Include unit/modules/llm/api/test_llm_api_add_account_address.ahk
 #Include unit/modules/llm/servers/test_local_server_write_admission.ahk
 #Include unit/modules/llm/servers/test_local_server_join.ahk
 #Include unit/modules/llm/servers/test_local_server_scope_cohort.ahk
@@ -1041,6 +1046,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/infra/config/transition/test_config_transition_temporal_custody.ahk
 #Include unit/infra/toml/test_toml_build_updated_content.ahk
 #Include unit/infra/toml/test_toml_writer_admission.ahk
+#Include unit/infra/toml/test_toml_writer_case_twins.ahk
 #Include unit/infra/toml/test_toml_table_array_writer.ahk
 #Include unit/infra/config/persistence/test_config_full_save_generation.ahk
 #Include unit/infra/config/persistence/test_config_full_save_terminal.ahk
@@ -1331,6 +1337,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_no_throw_sentinel_delivery.ahk
 #Include meta/suite/test_retired_callback_exception_delivery.ahk
 #Include meta/suite/test_live_drive_failure_delivery.ahk
+#Include meta/suite/test_live_dialog_button.ahk
+#Include meta/suite/test_live_right_click_menu.ahk
 #Include meta/modules/hotstrings/personal/test_personal_hotstring_node_shape.ahk
 #Include meta/modules/hotstrings/personal/test_personal_hotstring_seed.ahk
 #Include meta/modules/hotstrings/personal/test_personal_hotstring_new_section_seed.ahk
@@ -1913,6 +1921,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/hotstrings/engine/test_hotstring_output_is_final.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_chaining.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_cascade.ahk
+#Include unit/modules/hotstrings/engine/test_hotstring_final_result.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_injection_plan.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_output_tokens.ahk
 #Include meta/modules/hotstrings/catalogue/test_hotstrings_combo_auto_escaping.ahk

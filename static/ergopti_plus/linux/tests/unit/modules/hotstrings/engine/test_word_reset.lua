@@ -411,7 +411,7 @@ helpers.describe("word reset: the daemon wiring", function()
 	end)
 
 	helpers.it("word reset, gives each new switch its menu command and checked state", function()
-		local text = source("ui/menu/menu_builder.lua")
+		local text = helpers.expand_config_keys(helpers.read_menu_source())
 		for _, key in ipairs({ "arrow_resets_word", "shortcut_resets_word", "tap_hold_resets_word" }) do
 			helpers.assert_contains(text, 'params_ctx.commands["' .. key .. '"]')
 			helpers.assert_contains(text, "WordReset.toggle_" .. key .. "()")
@@ -508,7 +508,7 @@ helpers.describe("word reset: the cascade arrow count", function()
 			f:close()
 			return bytes
 		end
-		local text = source("ui/menu/menu_builder.lua")
+		local text = helpers.read_menu_source()
 		helpers.assert_contains(text, "params_ctx.commands[COMMAND.CASCADE_MAX_ARROWS]")
 		helpers.assert_contains(text, "WordReset.set_cascade_max_arrows(arrows)")
 		helpers.assert_contains(text, "params_ctx.state_getters[require(\"config_keys\").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS]")

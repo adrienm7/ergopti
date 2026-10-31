@@ -9,6 +9,7 @@ Test("managed bootstrap: declined start keeps installation without daemon (group
 Test("managed bootstrap: held install consent rejects withdrawn source (groups247-managed)", _G4B_Withdraw)
 Test("managed bootstrap: model pull needs separate consent and fresh tags (groups247-managed)", _G4B_Model)
 Test("managed bootstrap: missing model after pull fails closed (groups247-managed)", _G4B_MissingAfterPull)
+Test("managed bootstrap: a Windows-login relay refuses the pull with its reason (owned-ollama-proxy)", _G4B_PullProxyLogin)
 Test("managed bootstrap: unknown tags cannot enable AI (groups247-managed)", _G4B_UnknownTags)
 Test("managed bootstrap: configured version mismatch cannot enable AI (groups247-managed)", _G4B_Version)
 Test("managed bootstrap: foreign epoch cannot publish readiness (groups247-managed)", _G4B_Epoch)
@@ -144,6 +145,7 @@ class _G4B_Fixture {
 		this.Now := 1000
 		this.UnknownTags := false
 		this.MissingAfterPull := false
+		this.PullExit := 0
 		this.Files := _G4B_Files(this)
 		this.Runtime := _G4B_Runtime(this)
 	}
@@ -184,7 +186,7 @@ class _G4B_Fixture {
 		this.Pulls += 1
 		AssertEqual(Target["origin"], "http://127.0.0.1:23456", "Pull keeps the captured managed origin.")
 		AssertEqual(Model, this.Model, "Pull keeps the consented model.")
-		Done.Call(0)
+		Done.Call(this.PullExit)
 		return true
 	}
 	Close() {
@@ -358,6 +360,31 @@ _G4B_MissingAfterPull() {
 		AssertEqual(F.ReadyCalls, 0)
 		AssertEqual(F.FailedCalls, 1, "A successful pull exit alone cannot claim an installed model.")
 	} finally F.Close()
+}
+
+; A relay that demands a Windows login was kept from the owned daemon: the
+; pull refuses with its own exit code, and the user reads why, not a generic
+; repair failure.
+_G4B_PullProxyLogin() {
+	global LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT, _LLM_Deps_FailureMessage
+	SavedMessage := _LLM_Deps_FailureMessage
+	F := _G4B_Fixture()
+	try {
+		F.Model := "qwen3:0.6b"
+		F.PullExit := LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(F.Pulls, 1)
+		AssertEqual(F.ReadyCalls, 0)
+		AssertEqual(F.FailedCalls, 1, "a refused pull fails the bootstrap")
+		AssertEqual(t("network.failure.proxy_windows_login"), _LLM_Deps_FailureMessage,
+			"the failure names the Windows-login relay")
+		AssertTrue(t("network.failure.proxy_windows_login") != t("ollama.runtime_repair_failed"),
+			"the named reason is not the generic one")
+	} finally {
+		F.Close()
+		_LLM_Deps_FailureMessage := SavedMessage
+	}
 }
 
 _G4B_UnknownTags() {

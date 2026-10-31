@@ -165,6 +165,51 @@ class OperationReceiving(unittest.TestCase):
         self.assertFalse(self.owner.pull("fixture", lambda _: None))
         self.assertTrue(self.owner.pending)
 
+    def test_pinned_ollama_stream_end_is_named_by_its_outcome(self):
+        # Rows in the order Ollama 0.40.4 PullModel and streamResponse send them
+        # (server/images.go, server/routes.go): the last layer's bytes, then the
+        # verification, the manifest, the pruning and success, or one error row
+        # that closes the stream. Field run of 2026-10-30 23:10: a pull exited 1
+        # after its last byte row and nothing named the row that ended it.
+        tail = b'{"status":"pulling cfc7749b96f6","digest":"sha256:cfc7","total":430,"completed":430}\n'
+        cases = (
+            (
+                tail
+                + b'{"status":"verifying sha256 digest"}\n{"status":"writing manifest"}\n'
+                + b'{"status":"removing unused layers"}\n{"status":"success"}\n',
+                True,
+                "success",
+            ),
+            (
+                tail
+                + b'{"status":"verifying sha256 digest"}\n'
+                + b'{"error":"digest mismatch, file must be downloaded again: sha256:cfc7"}\n',
+                False,
+                "error_row",
+            ),
+            (
+                tail + b'{"status":"verifying sha256 digest"}\n',
+                False,
+                "stream_ended_without_success",
+            ),
+        )
+        for progress, expected, outcome in cases:
+            with self.subTest(outcome=outcome):
+                self.setUp()
+                self.admit()
+                self.ports.progress = progress
+                self.assertIs(self.owner.pull("fixture", lambda _: None), expected)
+                self.assertEqual(self.owner.outcome, outcome)
+                self.assertTrue(
+                    self.owner.pending, "the daemon operation still needs its retirement"
+                )
+
+    def test_success_row_counts_even_when_a_status_row_follows_it(self):
+        self.admit()
+        self.ports.progress = b'{"status":"success"}\n{"status":"writing manifest"}\n'
+        self.assertTrue(self.owner.pull("fixture", lambda _: None))
+        self.assertEqual(self.owner.outcome, "success")
+
     def test_oversize_partial_duplicate_bool_and_unknown_progress_keep_debt(self):
         vectors = [
             b'{"status":"success"}',

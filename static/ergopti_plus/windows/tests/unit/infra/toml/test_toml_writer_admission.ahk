@@ -554,9 +554,6 @@ _TBUI_ConfigInlineSpanVectors() {
 		{ Id: 'quoted equals delimiter authority', Source: 'settings = { "a.b" = { "x=y,#}" = 1, future = `'001`' }, a = { b = { "x=y,#}" = 2 } } }`n[future]`nold = "retain" # user data`n',
 			Updates: [{ Section: 'settings."a.b"', Key: 'x=y,#}', Value: 3 }],
 			Expected: 'settings = { "a.b" = { "x=y,#}" = 3, future = `'001`' }, a = { b = { "x=y,#}" = 2 } } }`n[future]`nold = "retain" # user data`n' },
-		{ Id: 'case twins retain actual owners', Source: 'settings={A={enabled=false,keep="upper"}, a={enabled=true,keep="lower"}}`n[future]`nold = "retain" # user data`n',
-			Updates: [{ Section: 'settings.A', Key: 'enabled', Value: TOML_Bool(true) }],
-			Expected: 'settings={A={enabled=true,keep="upper"}, a={enabled=true,keep="lower"}}`n[future]`nold = "retain" # user data`n' },
 		{ Id: 'unknown exact numeric spellings', Source: 'settings = {owned=false, huge=9223372036854775807, tiny=1e-308, hex=0x0010, decimal=1_000.00, quoted="001"}`n[future]`nold = "retain" # user data`n',
 			Updates: [{ Section: 'settings', Key: 'owned', Value: TOML_Bool(true) }],
 			Expected: 'settings = {owned=true, huge=9223372036854775807, tiny=1e-308, hex=0x0010, decimal=1_000.00, quoted="001"}`n[future]`nold = "retain" # user data`n' },
@@ -572,9 +569,6 @@ _TBUI_ConfigInlineSpanVectors() {
 		{ Id: 'dotted inline destination', Source: 'settings = {a.b=1, a.c = 2, "a.b" = 7}`n[future]`nold = "retain" # user data`n',
 			Updates: [{ Section: 'settings.a', Key: 'b', Value: 3 }],
 			Expected: 'settings = {a.b=3, a.c = 2, "a.b" = 7}`n[future]`nold = "retain" # user data`n' },
-		{ Id: 'new dotted descendant', Source: 'settings = {a.b=1, a.c = 2, "a.b" = 7 }`n[future]`nold = "retain" # user data`n',
-			Updates: [{ Section: 'settings.a', Key: 'd', Value: 3 }],
-			Expected: 'settings = {a.b=1, a.c = 2, "a.b" = 7,a.d = 3 }`n[future]`nold = "retain" # user data`n' },
 		{ Id: 'owned deletion retains neighbors', Source: 'settings={first=1,remove=2,last=3}`n[future]`nold = "retain" # user data`n',
 			Updates: [{ Section: 'settings', Key: 'remove', Delete: 1 }],
 			Expected: 'settings={first=1,last=3}`n[future]`nold = "retain" # user data`n' },
@@ -599,9 +593,6 @@ _TBUI_ConfigInlineSpanVectors() {
 		{ Id: 'Unicode literal identity spans', Source: 'settings={"é.😀"={owned=false, future="é😀"}, stable="001"}`n[future]`nold = "retain" # user data`n',
 			Updates: [{ Section: 'settings."é.😀"', Key: 'owned', Value: TOML_Bool(true) }],
 			Expected: 'settings={"é.😀"={owned=true, future="é😀"}, stable="001"}`n[future]`nold = "retain" # user data`n' },
-		{ Id: 'explicit owned child container', Source: 'settings={ owned = {future="release explicitly", value=1}, neighbor="retain" }`n[future]`nold = "retain" # user data`n',
-			Updates: [{ Section: 'settings', Key: 'owned', Value: Map('value', 2) }],
-			Expected: 'settings={ owned = {value = 2}, neighbor="retain" }`n[future]`nold = "retain" # user data`n' },
 		{ Id: 'last dotted descendant deletion', Source: 'settings={a.b=1}`n[future]`nold = "retain" # user data`n',
 			Updates: [{ Section: 'settings.a', Key: 'b', Delete: 1 }],
 			Expected: 'settings={a = {}}`n[future]`nold = "retain" # user data`n' }
@@ -650,6 +641,12 @@ for _TBUI_InlineSpanVector in _TBUI_ConfigInlineSpanVectors()
 
 _TBUI_ConfigInlineSpanRefusalVectors() {
 	return [
+		{ Id: 'new member through a dotted parent', Source: 'settings = {a.b=1, a.c = 2, "a.b" = 7 }`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings.a', Key: 'd', Value: 3 }] },
+		{ Id: 'container over an inline member', Source: 'settings={ owned = {future="release explicitly", value=1}, neighbor="retain" }`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings', Key: 'owned', Value: Map('value', 2) }] },
+		{ Id: 'case twin in an inline owner', Source: 'settings={A={enabled=false,keep="upper"}, a={enabled=true,keep="lower"}}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings.A', Key: 'enabled', Value: TOML_Bool(true) }] },
 		{ Id: 'retained scalar collision', Source: 'settings={blocked=1, future={keep="001"}}`n[future]`nold = "retain" # user data`n',
 			Updates: [{ Section: 'settings.blocked', Key: 'leaf', Value: 2 }] },
 		{ Id: 'retained array collision', Source: 'settings={blocked=[1,2], future={keep="001"}}`n[future]`nold = "retain" # user data`n',

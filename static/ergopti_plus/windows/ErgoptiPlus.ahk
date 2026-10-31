@@ -616,6 +616,8 @@ KLPF_InitializeCleanup()
 #Include modules/llm/parser.ahk
 #Include modules/llm/remote_formats.ahk
 #Include ..\_shared\modules\llm\local_server_auth.ahk
+#Include ..\_shared\modules\llm\api_url_template.ahk
+#Include ..\_shared\modules\llm\model_capabilities.ahk
 #Include ..\_shared\modules\llm\thinking_off.ahk
 #Include ..\_shared\modules\llm\local_server_discovery.ahk
 #Include ..\_shared\modules\llm\local_server_ports.ahk

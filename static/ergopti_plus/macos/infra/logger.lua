@@ -1822,6 +1822,9 @@ local MILLISECONDS_PER_SECOND = 1000
 -- Monotonic nanosecond clock captured at install; nil without hs.timer.
 local _callback_clock = nil
 local _slow_callback_reported_at = {}
+-- The longest hold of the session, with its callback site: the field run names
+-- it (ledger L16, L18, L24) without a person reading the log.
+local _worst_hold = nil
 -- Total nanoseconds spent waiting for a person inside a modal dialog since
 -- install. A callback that opens a dialog is not stalled by the time the user
 -- takes to answer it, so the slow-callback report subtracts this wait.
@@ -1877,6 +1880,13 @@ local function describe_callback_site(fn)
 	return site
 end
 
+--- The session's longest timer-callback hold of 250 ms or more.
+--- @return table|nil hold { ms, site } where site is "path:line", nil before any.
+function M.worst_timer_hold()
+	if _worst_hold == nil then return nil end
+	return { ms = _worst_hold.ms, site = _worst_hold.site }
+end
+
 --- Reports one timer callback that held the main thread past the threshold.
 --- @param fn function The callback that ran.
 --- @param kind string Timer family label.
@@ -1897,6 +1907,7 @@ local function report_slow_timer_callback(fn, kind, started, modal_before, heap_
 	if held_ms < SLOW_TIMER_CALLBACK_COUNT_MS then return end
 	local ok_site, site = pcall(describe_callback_site, fn)
 	site = ok_site and site or "?"
+	if _worst_hold == nil or held_ms > _worst_hold.ms then _worst_hold = { ms = held_ms, site = site } end
 	local previous = _slow_callback_reported_at[site]
 	local now_sec = now / NANOSECONDS_PER_MILLISECOND / MILLISECONDS_PER_SECOND
 	if previous and now_sec - previous < SLOW_TIMER_CALLBACK_REPEAT_SEC then return end

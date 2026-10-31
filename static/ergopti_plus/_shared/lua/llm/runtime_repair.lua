@@ -305,7 +305,7 @@ function M.new(ports, policy)
 			entry.promoted=true
 			budget_owner:finish()
 			request.result={ok=true, installed=entry.installed==true, origin=entry.origin,
-				model_installed=false}
+				model_installed=false, direct_fallback=entry.direct_fallback}
 			entry.stage='done'; complete(); announce_result()
 		end
 		local function start_probe()
@@ -382,6 +382,9 @@ function M.new(ports, policy)
 						if held.delivered and type(answer)=='table' and answer.ok==true
 							and type(answer.environment)=='table' then
 							entry.service_environment=answer.environment
+							-- The lookup stage that sent an origin direct: a later pull
+							-- that fails names both causes (PAC unusable, direct failed).
+							entry.direct_fallback=type(answer.direct_fallback)=='string' and answer.direct_fallback or nil
 							begin_service()
 						else
 							fail('runtime_proxy_unavailable')

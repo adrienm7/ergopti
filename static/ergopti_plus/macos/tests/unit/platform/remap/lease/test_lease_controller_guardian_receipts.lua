@@ -106,4 +106,38 @@ helpers.describe("karabiner guardian unregistration receipts", function()
 			helpers.assert_eq(#ctx.spawns, 0)
 		end)
 	end)
+
+	helpers.it("keeps an ad hoc registration note and refuses unknown or probe notes", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			local answered
+			controller.register_guardian(function(status) answered = status end)
+			ctx.complete(1, 0, "ready\ndeveloper_adhoc_reregistered\n")
+			helpers.assert_eq(answered, "ready")
+			local note, status = controller.guardian_registration_note()
+			helpers.assert_eq(note, "developer_adhoc_reregistered")
+			helpers.assert_eq(status, "ready")
+			helpers.assert_eq(controller.guardian_registration_required(), false)
+
+			for _, stdout in ipairs({ "ready\nunknown_note\n", "ready\ndeveloper_adhoc_reregistered", "ready\nready\n" }) do
+				local refused, failure = load_controller()
+				refused.init()
+				local status, reason = "unset", nil
+				refused.register_guardian(function(observed, detail) status, reason = observed, detail end)
+				failure.complete(1, 0, stdout)
+				helpers.assert_nil(status)
+				helpers.assert_true(type(reason) == "string")
+				helpers.assert_nil(refused.guardian_registration_note())
+				helpers.assert_true(refused.guardian_registration_required())
+			end
+
+			local probed, probe_ctx = load_controller()
+			probed.init()
+			local probe_status = "unset"
+			probed.probe_guardian_status(function(observed) probe_status = observed end)
+			probe_ctx.complete(1, 0, "ready\ndeveloper_adhoc_reregistered\n")
+			helpers.assert_nil(probe_status)
+		end)
+	end)
 end)

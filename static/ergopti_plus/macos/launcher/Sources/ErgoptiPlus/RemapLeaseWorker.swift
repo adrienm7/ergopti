@@ -394,8 +394,8 @@ func runGuardianRegistration(
 	identityReader: (String) -> LeaseExecutableIdentity? = {
 		LeaseExecutableIdentity.capture(at: $0)
 	},
-	register: (String) -> RemapGuardianRegistrationStatus = {
-		remapGuardianRegistrationStatus(executablePath: $0)
+	register: (String) -> RemapGuardianRegistrationOutcome = {
+		remapGuardianRegistrationOutcome(executablePath: $0)
 	},
 	writeResult: (Data) -> Bool = {
 		writeLauncherLogData($0, descriptor: STDOUT_FILENO)
@@ -408,8 +408,8 @@ func runGuardianRegistration(
 		environment: environment,
 		identityReader: identityReader
 	), let executablePath else { return LeaseWorkerExit.invalidArguments.rawValue }
-	let status = register(executablePath)
-	guard let output = (status.rawValue + "\n").data(using: .utf8), writeResult(output)
+	let outcome = register(executablePath)
+	guard let output = outcome.output.data(using: .utf8), writeResult(output)
 	else { return LeaseWorkerExit.innerFailed.rawValue }
 	return LeaseWorkerExit.success.rawValue
 }

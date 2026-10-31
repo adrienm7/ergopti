@@ -860,6 +860,26 @@ function M.composer_remove(on_done, deps)
 	return true
 end
 
+--- The text and index entry of a layout the app ships (the field run's source of
+--- the number-row build), read from the shipped registry the offline install uses.
+--- @param id string Registry id.
+--- @param deps table|nil
+--- @return table|nil shipped { entry, text }
+--- @return string|nil error
+function M.shipped_layout(id, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	local index = bundled_index(resolved)
+	for _, entry in ipairs(type(index) == "table" and index.layouts or {}) do
+		if entry.id == id then
+			local text = type(resolved.bundled_dir) == "string" and resolved.read(resolved.bundled_dir .. entry.file) or nil
+			if type(text) ~= "string" then return nil, "the shipped " .. id .. " layout is unreadable" end
+			return { entry = entry, text = text }, nil
+		end
+	end
+	return nil, "the app ships no " .. tostring(id) .. " layout"
+end
+
 --- Test seam: forgets the catalogue, the operation slot and the shipped index.
 function M._reset()
 	Store.reset()

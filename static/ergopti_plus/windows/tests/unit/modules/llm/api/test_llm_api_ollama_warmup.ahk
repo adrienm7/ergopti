@@ -112,6 +112,10 @@ class _OllamaWarmupPendingRetryTransport {
 		this.SendCalls += 1
 		AssertTrue(InStr(Payload, '"num_predict":1') > 0,
 			"the real warmup must construct its original one-token request")
+		; The warmup loads the model as predictions will use it: reasoning off
+		; (thinking_off.json), or a reasoning model spends the token thinking
+		AssertTrue(RegExMatch(Payload, '"think":(false|"[a-z]+")') > 0,
+			"the warmup must turn the model's thinking off (thinking-off-everywhere)")
 		return true
 	}
 

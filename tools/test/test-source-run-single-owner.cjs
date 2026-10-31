@@ -247,7 +247,7 @@ for (const file of sources('linux', '.lua')) {
 }
 for (const file of [
 	'ui/menu/uninstall.lua',
-	'ui/menu/menu_builder.lua',
+	'ui/menu/menu_about.lua',
 	'ui/changelog/bridge.lua',
 	'ui/update_check/bridge.lua',
 	'modules/keymap/layout_registry.lua'
@@ -259,7 +259,7 @@ for (const file of [
 }
 expect(
 	/installed_build"\]\s*=\s*function\(\)\s*return not Installation\.is_source_run\(\)/.test(
-		code('linux', 'ui/menu/menu_builder.lua', luaComment)
+		code('linux', 'ui/menu/menu_about.lua', luaComment)
 	),
 	'the Linux About menu must answer installed_build from Installation.is_source_run'
 );

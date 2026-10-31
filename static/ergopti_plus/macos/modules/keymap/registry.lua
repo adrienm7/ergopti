@@ -962,6 +962,42 @@ end
 -- =============================
 -- =============================
 
+--- Lists the shipped hotstrings the developer field run may type to prove a
+--- real expansion: enabled, from a bundled file, expanded by a terminator, a
+--- plain lowercase ASCII trigger no other file registers, and a replacement
+--- with no token, no line break and no magic key. Registry order, so the
+--- choice is stable from run to run.
+--- @return table candidates Array of { trigger, expansion }.
+function M.field_run_candidates()
+	if not require_state("field_run_candidates") then return {} end
+	-- The groups registering each folded trigger: the cased variants of one
+	-- entry share its group, another file's entry for it does not.
+	local trigger_groups = {}
+	for _, m in ipairs(_state.mappings) do
+		local folded = text_utils.trig_lower(m.trigger)
+		local groups = trigger_groups[folded]
+		if groups == nil then groups = { count = 0 }; trigger_groups[folded] = groups end
+		local group = m.group or ""
+		if not groups[group] then groups[group] = true; groups.count = groups.count + 1 end
+	end
+	local candidates = {}
+	for _, m in ipairs(_state.mappings) do
+		local group = m.group and _state.groups[m.group] or nil
+		local shipped = group ~= nil and group.enabled == true and group.kind == "toml"
+			and group.personal_source == nil and m.personal_source == nil
+			and type(group.path) == "string" and Groups.file_origin(group.path) == "bundled"
+		local section_on = m.section == nil or M.is_section_enabled(m.group, m.section)
+		if shipped and section_on and not m.auto and not m.has_magic and not m.is_private
+			and m.trigger:match("^[a-z][a-z]+$") and #m.trigger <= 12
+			and trigger_groups[m.trigger].count == 1
+			and m.repl == m.plain_repl and m.plain_repl ~= "" and m.plain_repl ~= m.trigger
+			and not m.plain_repl:find("[%c{}]") and not m.plain_repl:find(_state.magic_key, 1, true) then
+			candidates[#candidates + 1] = { trigger = m.trigger, expansion = m.plain_repl }
+		end
+	end
+	return candidates
+end
+
 --- Injects the shared CoreState from keymap/init.lua.
 --- Must be called exactly once before any other function in this module.
 --- @param core_state table The shared state object.

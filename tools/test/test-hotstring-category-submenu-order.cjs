@@ -19,6 +19,8 @@ require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a
 const fs = require('fs');
 const assert = require('node:assert/strict');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 const { scriptTokens } = require('../lib/script-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -202,7 +204,7 @@ function read(driver, file) {
 		);
 		return null;
 	}
-	return fs.readFileSync(full, 'utf8');
+	return readSourceFile(full);
 }
 
 /**

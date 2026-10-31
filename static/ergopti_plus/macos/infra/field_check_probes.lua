@@ -20,6 +20,8 @@
 ---    one request to a loopback server this check owns.
 --- 6. network_hosts: every external host the drivers declare answers one HEAD
 ---    through the managed transport (route lookup, proxy, TLS), by its key.
+---    ollama_blob_host: the host the Ollama registry sends a model's blob to
+---    is one the route inventory plans, so the daemon's pull takes its route.
 --- 7. app_health: the app's memory and CPU at idle, and the crash reports the
 ---    driver or macOS wrote for it during the last day.
 --- 8. ai_local: the owned Ollama's signature, its server's listing, one token
@@ -28,6 +30,14 @@
 --- 10. typing_selftest: the automatic key accounting. The app types a fixed
 ---    sequence into a scratch field of its own, and only there; the tap must
 ---    see each key once and the field must hold exactly the sequence.
+--- 11. capslock_chord: whether the Ctrl+Caps Lock slot is bound, and whether a
+---    physical Ctrl+Caps Lock press this session ever reached it.
+---    gesture_frames: every touch frame this session carried its capture stamp,
+---    and the mean spacing of the stamps.
+--- 12. hotstring_roundtrip: a shipped hotstring typed into the scratch field
+---    with its terminator must leave exactly its expansion there.
+--- 13. prediction_tooltip: a short neutral text typed into the scratch field
+---    must bring up the prediction tooltip, with a model already installed.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only, like the Debug checks: nothing is granted, prompted, written
@@ -42,13 +52,18 @@
 
 local Identifiers = require("identifiers")
 local Json = require("json")
+local NativePath = require("native_path")
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 
 local M = {}
 
 local STATE = { pass = "pass", fail = "fail", info = "info", skip = "skip" }
 
--- Seconds an external command may run before its step is a timeout.
-local COMMAND_TIMEOUT = 10
+-- Seconds an external command of these probes may run before its step is a
+-- timeout: twice the field checks' own bound, since a strict codesign check
+-- reads every file of a bundle and the Ollama one alone is gigabytes.
+local PROBE_COMMAND_TIMEOUT = 10
 
 local CODESIGN = "/usr/bin/codesign"
 
@@ -120,10 +135,27 @@ end
 --- keeps the grants (an ad hoc signature changes with every build).
 function M.permissions(ports, report, finish)
 	local facts = ports.permission_facts()
+	if facts.input_monitoring ~= nil then
+		return M.permissions_with(ports, report, finish, facts, grant_value(facts.input_monitoring))
+	end
+	-- Hammerspoon cannot ask without prompting: the launcher's IOHIDCheckAccess
+	-- role reads it (ledger L32), and an unreadable answer stays named.
+	ports.input_monitoring_access(function(state)
+		local value = (state == "granted" or state == "denied" or state == "unknown") and state or "not_queryable"
+		M.permissions_with(ports, report, finish, facts, value == "denied" and "missing" or value)
+	end)
+end
+
+--- The permissions steps once the Input Monitoring answer is known.
+--- @param ports table Probe ports.
+--- @param report table Step reporter.
+--- @param finish function Settles the check.
+--- @param facts table permission_facts() answer.
+--- @param input_monitoring string Closed Input Monitoring value.
+function M.permissions_with(ports, report, finish, facts, input_monitoring)
 	report.step("accessibility", facts.accessibility == true and STATE.pass or STATE.fail,
 		grant_value(facts.accessibility))
-	report.step("input_monitoring", STATE.info,
-		facts.input_monitoring == nil and "not_queryable" or grant_value(facts.input_monitoring))
+	report.step("input_monitoring", STATE.info, input_monitoring)
 	report.step("screen_recording", STATE.info, grant_value(facts.screen_recording))
 	report.step("automation", STATE.skip, "not_queryable")
 	local secure = facts.secure_input
@@ -136,7 +168,7 @@ function M.permissions(ports, report, finish)
 		report.step("signing_identity", STATE.skip, "no_bundle")
 		return finish()
 	end
-	ports.exec(CODESIGN, { "--verify", "--strict", "--verbose=2", bundle }, COMMAND_TIMEOUT,
+	ports.exec(CODESIGN, { "--verify", "--strict", "--verbose=2", bundle }, PROBE_COMMAND_TIMEOUT,
 		function(code, output, errors)
 			if code == 0 then
 				report.step("app_signature", STATE.pass, "valid")
@@ -145,7 +177,7 @@ function M.permissions(ports, report, finish)
 				report.step("app_signature", STATE.fail, code == nil and "timeout"
 					or failure_token(code) .. ":" .. (signature_cause(text) or "unclassified"))
 			end
-			ports.exec(CODESIGN, { "-dv", "--verbose=2", bundle }, COMMAND_TIMEOUT,
+			ports.exec(CODESIGN, { "-dv", "--verbose=2", bundle }, PROBE_COMMAND_TIMEOUT,
 				function(describe_code, describe_output, describe_errors)
 					local text = tostring(describe_output or "") .. "\n" .. tostring(describe_errors or "")
 					local identity = M.parse_signing_identity(text)
@@ -188,6 +220,17 @@ local function runloop_lateness(ports, callback)
 	probe()
 end
 
+--- Names a callback site as "<file>:<line>" in the step grammar: the folders
+--- of the path are dropped, so no user path can reach a report.
+--- @param site any Callback site "path:line".
+--- @return string token
+function M.hold_site_token(site)
+	local path, line = tostring(site or ""):match("^(.-)%.lua:(%d+)$")
+	local file = path and NativePath.basename(path)
+	if not file then return "unknown" end
+	return file .. ":" .. line
+end
+
 --- The keymap's event taps and the run loop that feeds them. Each tap the
 --- keymap owns is its own step, so a report names the one macOS disabled; the
 --- watchdog that revives a disabled tap must be running. The run loop answers
@@ -210,6 +253,10 @@ function M.event_taps(ports, report, finish)
 	local holds = ports.hold_counts()
 	report.step("holds_over_250ms", STATE.info, holds.over_250ms or 0)
 	report.step("holds_over_1000ms", STATE.info, holds.over_1000ms or 0)
+	-- The worst hold's site names the owner to fix (ledger L16, L18, L24).
+	local worst = holds.worst
+	report.step("worst_hold_ms", STATE.info, worst and math.floor(worst.ms) or "none")
+	report.step("worst_hold_site", STATE.info, worst and M.hold_site_token(worst.site) or "none")
 	report.step("lua_heap_mb", STATE.info, math.floor((tonumber(ports.lua_heap_kb()) or 0) / 1024))
 	runloop_lateness(ports, function(worst)
 		report.step("runloop_late_ms", worst <= M.RUNLOOP_LATE_MS and STATE.pass or STATE.fail,
@@ -251,7 +298,7 @@ local function count_refusals(ports, executable, prefix, files, callback)
 		local args = {}
 		for _, argument in ipairs(prefix) do args[#args + 1] = argument end
 		args[#args + 1] = files[index]
-		ports.exec(executable, args, COMMAND_TIMEOUT, function(code)
+		ports.exec(executable, args, PROBE_COMMAND_TIMEOUT, function(code)
 			if code == nil then timed_out = timed_out + 1 elseif code ~= 0 then bad = bad + 1 end
 			check(index + 1)
 		end)
@@ -322,7 +369,7 @@ local function check_keylayouts(ports, files, callback)
 			bad, cause = bad + 1, cause or "unreadable"
 			return check(index + 1)
 		end
-		ports.exec_input(XMLLINT, { "--noout", "--nonet", "-" }, M.keylayout_as_xml10(text), COMMAND_TIMEOUT,
+		ports.exec_input(XMLLINT, { "--noout", "--nonet", "-" }, M.keylayout_as_xml10(text), PROBE_COMMAND_TIMEOUT,
 			function(code, _, errors)
 				if code == nil then
 					timed_out = timed_out + 1
@@ -421,6 +468,9 @@ end
 --- takes one probe file that is removed at once; the file watcher owner must be
 --- published, since FSEvents refusing a stream leaves every edit unseen.
 function M.storage(ports, report, finish)
+	-- The deferred keystats start once held the main thread 1.1 to 1.3 s (L18).
+	local start_ms = ports.keystats_start_ms()
+	report.step("keystats_start_ms", STATE.info, start_ms and math.floor(start_ms + 0.5) or "not_started")
 	for _, file in ipairs(ports.config_files()) do
 		local id = "config_" .. file.name
 		if not file.present then
@@ -445,6 +495,15 @@ function M.storage(ports, report, finish)
 	if not database.present then
 		report.step("keystats_db", STATE.skip, "absent")
 		return finish()
+	end
+	-- v1.0.7 moved the cache out of TMPDIR (Mac todo): the live one sits under
+	-- the persistent folder and the adopted one is gone.
+	local root = type(database.expected_root) == "string" and database.expected_root:gsub("/+$", "") .. "/" or nil
+	if root == nil or database.path:sub(1, #root) ~= root then
+		report.step("keystats_cache_place", STATE.fail, "outside_caches")
+	else
+		report.step("keystats_cache_place", database.legacy_present and STATE.fail or STATE.pass,
+			database.legacy_present and "legacy_left" or "caches")
 	end
 	-- immutable=1 takes no lock: the ingest writes in rollback-journal mode, and
 	-- a reader's shared lock made its COMMIT fail with "database is locked"
@@ -481,11 +540,16 @@ function M.storage(ports, report, finish)
 end
 
 --- The URI SQLite opens without any lock, for a file another connection writes.
+--- Each path segment is percent-encoded and the separators kept, so a "?", "#"
+--- or "%" in a directory name cannot end the path or start an escape.
 --- @param path string Absolute database path.
 --- @return string uri
 function M.immutable_uri(path)
-	local escaped = path:gsub("[%%%?#%s]", function(char) return string.format("%%%02X", char:byte()) end)
-	return "file:" .. escaped .. "?immutable=1"
+	local segments = {}
+	for segment in (path .. "/"):gmatch("([^/]*)/") do
+		segments[#segments + 1] = TextUtils.percent_encode(segment)
+	end
+	return "file:" .. table.concat(segments, "/") .. "?immutable=1"
 end
 
 
@@ -554,7 +618,7 @@ function M.launcher_roles(ports, report, finish)
 		return finish()
 	end
 	report.step("launcher_present", STATE.pass, "yes")
-	ports.exec(launcher, { M.HTTP_WORKER_FLAG }, COMMAND_TIMEOUT, function(usage_code)
+	ports.exec(launcher, { M.HTTP_WORKER_FLAG }, PROBE_COMMAND_TIMEOUT, function(usage_code)
 		report.step("http_worker_usage", usage_code == M.USAGE_EXIT and STATE.pass or STATE.fail,
 			usage_code == M.USAGE_EXIT and "usage_refused" or failure_token(usage_code))
 		ports.loopback_server(M.LOOPBACK_PATH, function(server)
@@ -568,7 +632,7 @@ function M.launcher_roles(ports, report, finish)
 			-- What the worker received, for an EX_USAGE that names no guard
 			report.step("http_worker_request", STATE.info, "args_" .. (#args + 1) .. ":bytes_" .. #request)
 			ports.exec_input(launcher, args, request,
-				COMMAND_TIMEOUT, function(code, stdout)
+				PROBE_COMMAND_TIMEOUT, function(code, stdout)
 					local hits = server.hits()
 					server.stop()
 					local status, stage = M.parse_worker_head(stdout)
@@ -615,9 +679,7 @@ end
 --- proxy, TLS trust), by the native helper. Any HTTP answer below 500 proves
 --- the route; a host the helper did not answer for fails by its key.
 function M.network_hosts(ports, report, finish)
-	local keys = {}
-	for key in pairs(Identifiers.hosts) do keys[#keys + 1] = key end
-	table.sort(keys)
+	local keys = TableUtil.sorted_keys(Identifiers.hosts)
 	ports.host_heads(function(code, output)
 		local steps = code == 0 and M.parse_host_lines(output) or {}
 		for _, key in ipairs(keys) do
@@ -626,6 +688,46 @@ function M.network_hosts(ports, report, finish)
 				report.step("host_" .. key, step.state, step.value)
 			else
 				report.step("host_" .. key, STATE.fail, code == nil and "helper_unavailable" or "no_answer")
+			end
+		end
+		finish()
+	end)
+end
+
+--- Reads the helper's blob_manifest and blob_host lines.
+--- @param output any Helper stdout.
+--- @return table steps id → { state, value }
+function M.parse_blob_lines(output)
+	local steps = {}
+	for id, state, value in tostring(output or ""):gmatch("step (blob_[%w_]+) (%a+) (%S+)") do
+		if (id == "blob_manifest" or id == "blob_host") and not steps[id] then
+			steps[id] = { state = state, value = value }
+		end
+	end
+	return steps
+end
+
+--- The Ollama daemon pulls a model's blobs from the host the registry redirects
+--- it to, on the route the inventory (route_origins.json) planned for that
+--- host. The helper reads the smallest catalogue model's manifest and asks for
+--- one blob without following the redirect: a blob host the inventory does not
+--- plan fails, since behind a PAC the daemon would fetch it on the wrong route.
+function M.ollama_blob_host(ports, report, finish)
+	local model = ports.smallest_ollama_model()
+	if not model then
+		report.step("blob_manifest", STATE.skip, "no_catalogue_model")
+		report.step("blob_host", STATE.skip, "no_catalogue_model")
+		finish()
+		return
+	end
+	ports.blob_host(model.runtime_name, function(code, output)
+		local steps = code == 0 and M.parse_blob_lines(output) or {}
+		for _, id in ipairs({ "blob_manifest", "blob_host" }) do
+			local step = steps[id]
+			if step then
+				report.step(id, step.state, step.value)
+			else
+				report.step(id, STATE.fail, code == nil and "helper_unavailable" or "no_answer")
 			end
 		end
 		finish()
@@ -681,7 +783,7 @@ function M.app_health(ports, report, finish)
 		report.step("app_crash_" .. index, STATE.info, owned[index].process .. ":" .. owned[index].kind)
 	end
 	report.step("other_crash_reports_24h", STATE.info, crashes.other or 0)
-	ports.exec(PS, { "-o", "rss=,%cpu=", "-p", tostring(ports.pid()) }, COMMAND_TIMEOUT, function(code, output)
+	ports.exec(PS, { "-o", "rss=,%cpu=", "-p", tostring(ports.pid()) }, PROBE_COMMAND_TIMEOUT, function(code, output)
 		local rss, cpu = M.parse_usage(code == 0 and output or "")
 		if not rss then
 			report.step("app_rss_mb", STATE.fail, failure_token(code))
@@ -744,7 +846,7 @@ function M.ai_local(ports, report, finish)
 		report.step("ollama_binary", STATE.skip, "not_installed")
 		return listing_stage()
 	end
-	ports.exec(CODESIGN, { "--verify", "--strict", "--verbose=2", facts.ollama_path }, COMMAND_TIMEOUT,
+	ports.exec(CODESIGN, { "--verify", "--strict", "--verbose=2", facts.ollama_path }, PROBE_COMMAND_TIMEOUT,
 		function(code, output, errors)
 			if code == 0 then
 				report.step("ollama_binary", STATE.pass, "signature_valid")
@@ -815,10 +917,10 @@ M.SELFTEST_COUNT_SECONDS = 6
 --- user's application, and a lost focus stops the sequence with its code. The
 --- passive counter must see each posted key once and the field must hold the
 --- sequence exactly; the previous application gets the focus back. The keys
---- go through the tagged injection owner, so the keymap and keystats treat
---- them as the driver's own output; they are posted after Karabiner, so the
---- virtual keyboard path and the ledger's double count are only provable with
---- physical keys, as their codes say.
+--- are selftest keys: the keymap decodes them as typing in the scratch window
+--- only and keystats never counts them; they are posted after Karabiner, so
+--- the virtual keyboard path and the ledger's double count are only provable
+--- with physical keys, as their codes say.
 function M.typing_selftest(ports, report, finish)
 	local expected = table.concat(M.SELFTEST_KEYS)
 	local before = ports.keystats_facts()
@@ -852,10 +954,195 @@ function M.typing_selftest(ports, report, finish)
 		report.step("karabiner_path", STATE.skip, "physical_keys_only")
 		report.step("double_count", STATE.skip, "physical_keys_only")
 		report.step("front_restored", typed.restored and STATE.pass or STATE.fail, typed.restored and "yes" or "no")
-		report.step("keystats_effect", STATE.info, "tagged_synthetic_input")
+		report.step("keystats_effect", STATE.info, "selftest_never_counted")
 		finish()
 	end)
 	ports.scratch_typing(M.SELFTEST_KEYS, function(outcome) typed = outcome end)
+end
+
+
+
+
+
+-- =======================================
+-- =======================================
+-- ======= 11/ Ctrl+Caps Lock slot =======
+-- =======================================
+-- =======================================
+
+--- The secondary_capslock slot (Ctrl+Caps Lock) binds through its own native
+--- entry, and the registrar tests say macOS may never fire a Caps Lock hotkey.
+--- No synthetic event can stand in for the physical chord (Caps Lock reaches
+--- the taps as a modifier change, not as a key press), so the check judges the
+--- session's own evidence: once the person pressed the chord, a slot that
+--- never received it fails, which proves the slot cannot work on this Mac.
+function M.capslock_chord(ports, report, finish)
+	local facts = ports.capslock_chord_facts()
+	local action = facts.action or "none"
+	report.step("capslock_slot_action", STATE.info, action)
+	if action == "none" then
+		report.step("capslock_slot_bound", STATE.skip, "unassigned")
+	else
+		report.step("capslock_slot_bound", facts.bound and STATE.pass or STATE.fail, facts.bound and "yes" or "no")
+	end
+	report.step("capslock_chord_presses", STATE.info, facts.presses)
+	if facts.presses == 0 then
+		report.step("capslock_chord_delivered", STATE.skip, "not_pressed")
+	elseif facts.deliveries > 0 then
+		report.step("capslock_chord_delivered", STATE.pass, "delivered:" .. facts.deliveries)
+	elseif action == "none" or not facts.bound then
+		report.step("capslock_chord_delivered", STATE.skip, "slot_inactive")
+	else
+		report.step("capslock_chord_delivered", STATE.fail, "never_delivered")
+	end
+	finish()
+end
+
+--- The gestures engine times touch frames on the trackpad's capture stamp, so a
+--- burst delivered after a main-thread stall keeps its real spacing (ledger
+--- L46). Any frame without a stamp fails; the mean spacing of the stamped ones
+--- (about 8 ms on a built-in trackpad) shows the stamp is in seconds.
+function M.gesture_frames(ports, report, finish)
+	local counts = ports.gesture_frame_counts()
+	if counts.stamped + counts.unstamped == 0 then
+		report.step("gesture_frames_stamped", STATE.skip, "no_touch")
+		report.step("gesture_frame_spacing_ms", STATE.skip, "no_touch")
+		finish()
+		return
+	end
+	report.step("gesture_frames_stamped", counts.unstamped == 0 and STATE.pass or STATE.fail,
+		counts.unstamped == 0 and counts.stamped or ("unstamped:" .. counts.unstamped))
+	local spacing = counts.mean_spacing_ms
+	report.step("gesture_frame_spacing_ms", STATE.info,
+		spacing and string.format("%.1f", spacing) or "single_frame")
+	finish()
+end
+
+
+
+
+
+-- =========================================================
+-- =========================================================
+-- ======= 12/ Typed steps: hotstring and prediction =======
+-- =========================================================
+-- =========================================================
+
+-- Seconds the field is read for the expansion after the terminator, and the
+-- whole typing bound (focus settle, keys, wait and the focus given back).
+M.HOTSTRING_WAIT_SECONDS = 3
+M.HOTSTRING_BOUND_SECONDS = 15
+
+-- The prediction step's own text: common words, no terminator punctuation,
+-- never a person's text. A cold model load can take most of the wait.
+M.TOOLTIP_TEXT = "le chat dort sur le "
+M.PREDICTION_WAIT_SECONDS = 45
+M.PREDICTION_BOUND_SECONDS = 60
+
+--- Splits text into the keys the scratch typing posts, Space by its name.
+--- @param text string ASCII text.
+--- @return table keys
+local function text_keys(text)
+	local keys = {}
+	for char in text:gmatch(".") do keys[#keys + 1] = char == " " and "space" or char end
+	return keys
+end
+
+--- Reports what every typed step shares: the scratch focus, the keys posted
+--- and the focus given back to the previous application.
+--- @param report table Step reporter.
+--- @param typed table The scratch typing outcome.
+--- @param count integer Keys asked for.
+--- @return boolean complete True when every key was posted.
+local function report_typing(report, typed, count)
+	report.step("scratch_focus", typed.focused and STATE.pass or STATE.fail, typed.focused and "focused"
+		or (typed.aborted or "not_focused"))
+	local posted = typed.posted or 0
+	report.step("keys_posted", posted == count and STATE.pass or STATE.fail,
+		posted == count and posted or ("posted_" .. posted .. "_of_" .. count
+			.. (typed.aborted and (":" .. typed.aborted) or "")))
+	return posted == count
+end
+
+--- The real typing path for one hotstring. The first shipped, enabled,
+--- terminator-expanded hotstring the registry lists (a plain lowercase trigger
+--- no other mapping shares) is typed as selftest keys into the scratch field,
+--- after a Space and followed by Space, its terminator. The field must hold
+--- exactly the Space and the expansion, plus the terminator unless Space is a
+--- consumed terminator; the time from the terminator to that text is named.
+--- Each assumption that does not hold fails with its own code: no keymap, no
+--- candidate, Space not a terminator, the trigger typed but not expanded.
+function M.hotstring_roundtrip(ports, report, finish)
+	local facts = ports.hotstring_candidates()
+	if type(facts) ~= "table" then
+		report.step("hotstring_trigger", STATE.fail, "keymap_absent")
+		return finish()
+	end
+	local candidate = (facts.candidates or {})[1]
+	if candidate == nil then
+		report.step("hotstring_trigger", STATE.fail, "no_enabled_trigger")
+		return finish()
+	end
+	if not facts.space_terminates then
+		report.step("hotstring_trigger", STATE.fail, "space_not_terminator")
+		return finish()
+	end
+	report.step("hotstring_trigger", STATE.pass, "candidates_" .. #facts.candidates)
+	report.step("hotstring_trigger_chars", STATE.info, #candidate.trigger)
+	report.step("space_consumed", STATE.info, facts.space_consumed and "yes" or "no")
+	local keys = text_keys(" " .. candidate.trigger .. " ")
+	local expected = " " .. candidate.expansion .. (facts.space_consumed and "" or " ")
+	ports.scratch_typing(keys, function(typed)
+		local complete = report_typing(report, typed, #keys)
+		if typed.text == nil then
+			report.step("hotstring_expanded", STATE.fail, "unreadable")
+		elseif typed.text == expected then
+			report.step("hotstring_expanded", STATE.pass, "exact")
+		elseif typed.text == " " .. candidate.trigger .. " " then
+			report.step("hotstring_expanded", STATE.fail, complete and "not_expanded" or "typing_incomplete")
+		else
+			report.step("hotstring_expanded", STATE.fail, "mismatch_" .. #typed.text .. "_bytes")
+		end
+		if typed.effect_ms then
+			report.step("terminator_to_text_ms", STATE.info, math.floor(typed.effect_ms))
+		end
+		report.step("front_restored", typed.restored and STATE.pass or STATE.fail, typed.restored and "yes" or "no")
+		finish()
+	end, { bound_seconds = M.HOTSTRING_BOUND_SECONDS, wait_seconds = M.HOTSTRING_WAIT_SECONDS, until_text = expected })
+end
+
+--- The real typing path for a prediction. With predictions on and the active
+--- model already installed (nothing is started or downloaded), the step's own
+--- text is typed as selftest keys into the scratch field and the prediction
+--- tooltip must show; the time from the last key to the tooltip is named.
+--- Predictions off, a model that is not on this Mac and a tooltip that never
+--- showed each fail with their own code.
+function M.prediction_tooltip(ports, report, finish)
+	ports.prediction_readiness(function(facts)
+		report.step("prediction_backend", STATE.info, facts.backend or "unknown")
+		if not facts.enabled then
+			report.step("prediction_ready", STATE.fail, "llm_disabled")
+			return finish()
+		end
+		if not facts.installed then
+			report.step("prediction_ready", STATE.fail, "no_installed_model")
+			return finish()
+		end
+		report.step("prediction_ready", STATE.pass, "installed_model")
+		local keys = text_keys(M.TOOLTIP_TEXT)
+		ports.scratch_typing(keys, function(typed)
+			local complete = report_typing(report, typed, #keys)
+			if typed.effect_ms then
+				report.step("prediction_shown", STATE.pass, "shown")
+				report.step("keystroke_to_tooltip_ms", STATE.info, math.floor(typed.effect_ms))
+			else
+				report.step("prediction_shown", STATE.fail, complete and "tooltip_not_shown" or "typing_incomplete")
+			end
+			report.step("front_restored", typed.restored and STATE.pass or STATE.fail, typed.restored and "yes" or "no")
+			finish()
+		end, { bound_seconds = M.PREDICTION_BOUND_SECONDS, wait_seconds = M.PREDICTION_WAIT_SECONDS,
+			until_prediction = true })
+	end)
 end
 
 return M

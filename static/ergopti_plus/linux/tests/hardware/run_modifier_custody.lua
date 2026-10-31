@@ -75,11 +75,7 @@ end
 --- @return table input
 local function create_source(name)
 	assert(node_for(name) == nil, "fixture source already exists")
-	local old_name = Names.VIRTUAL_KEYBOARD
-	Names.VIRTUAL_KEYBOARD = name
-	local loaded, source = pcall(function() return assert(loadfile("adapters/uinput_writer.lua"))() end)
-	Names.VIRTUAL_KEYBOARD = old_name
-	assert(loaded, source)
+	local source = require("tests.hardware.keyboard_source_writer").load(name)
 	local entry = { name = name, writer = source }
 	inputs[#inputs + 1] = entry
 	assert(source.use_ffi_backend(), "source FFI backend")
@@ -178,9 +174,22 @@ local function run()
 		return accepted
 	end
 	local broker = assert(Broker.attach(Writer)); output_broker = broker
-	Hook.start({ intercept = true, requireOutputBroker = true, outputBroker = broker,
-		onEmitRaw = Writer.emit })
-	assert(Hook.isRunning(), "Hook owns both real virtual source grabs")
+	-- The hook logs why it refuses to start and only answers false: keep its
+	-- errors so a hosted failure names the reason (run 41141808375 showed
+	-- this assertion alone).
+	local Shim = require("logger.shim")
+	local shim_error, refusals = Shim.error, {}
+	Shim.error = function(tag, fmt, ...)
+		local formatted, text = pcall(string.format, fmt, ...)
+		refusals[#refusals + 1] = tostring(tag) .. ": " .. (formatted and text or tostring(fmt))
+		return shim_error(tag, fmt, ...)
+	end
+	local started, start_error = pcall(Hook.start, { intercept = true, requireOutputBroker = true,
+		outputBroker = broker, onEmitRaw = Writer.emit })
+	Shim.error = shim_error
+	assert(started, start_error)
+	assert(Hook.isRunning(), "Hook owns both real virtual source grabs; logged: "
+		.. (#refusals > 0 and table.concat(refusals, " | ") or "no error"))
 	check(Reader.is_grabbed("keyboard:" .. a.node) and Reader.is_grabbed("keyboard:" .. b.node),
 		"both original sources hold native EVIOCGRAB")
 
