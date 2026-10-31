@@ -80,6 +80,7 @@ local ProviderConfig = require("llm.provider_config_policy")
 local Json           = require("json")
 local ApiModelListing = require("llm.api_model_listing")
 local UrlTemplate    = require("llm.api_url_template")
+local TokenExchange  = require("llm.api_token_exchange")
 local LOG            = "llm.api_remote"
 -- One probe client per local server, created at its first sweep with the
 -- registry's local_server_probe_timeout_ms and pinned for the life of the
@@ -255,15 +256,24 @@ local function load_api_providers()
 				seen_providers[pid] = true
 				local desc = p_providers[pid]
 				local thinking_dialect, thinking_reason = nil, nil
-				if type(desc) == "table" then thinking_dialect, thinking_reason = ThinkingOff.parse_dialect(desc.thinking_dialect) end
+				local auth, auth_reason = nil, nil
+				if type(desc) == "table" then
+					thinking_dialect, thinking_reason = ThinkingOff.parse_dialect(desc.thinking_dialect)
+					auth, auth_reason = TokenExchange.parse(desc.auth)
+				end
 				if not catalog_descriptor_is_valid(pid, desc) then
 					Logger.warn("llm.api_remote", "api_providers.json: providers.%s has an invalid descriptor — skipped.", tostring(pid))
+				elseif auth_reason then
+					-- Sent as Bearer, the stored key itself would be refused: refuse the provider whole
+					Logger.error("llm.api_remote", "api_providers.json: providers.%s.auth is invalid (%s) — skipped.",
+						tostring(pid), tostring(auth_reason))
 				elseif not thinking_dialect then
 					-- A half-read dialect would let some models think: refuse the provider whole
 					Logger.error("llm.api_remote", "api_providers.json: providers.%s.thinking_dialect is invalid (%s) — skipped.",
 						tostring(pid), tostring(thinking_reason))
 				else
 					out_providers[pid] = {
+						auth          = auth,
 						label         = desc.label,
 						base_url      = desc.base_url,
 						default_model = desc.default_model,
@@ -896,6 +906,127 @@ function M.get_active_entry()
 	return find_active_entry()
 end
 
+-- Access tokens of the providers that exchange the stored key (auth in
+-- api_providers.json), per provider and cleartext key: { token, expires_at,
+-- pending, waiters, failure, retry_at }. In memory only, and never logged.
+local _access = {}
+local _access_client = _http_adapter.new(_http_options)
+-- Seconds before a failed exchange is tried again, so a refused key does
+-- not reach the token service on every keystroke
+local ACCESS_RETRY_SECONDS = 60
+
+--- The access slot of a provider and cleartext key.
+--- @param provider_id string
+--- @param key string
+--- @return table
+local function access_slot(provider_id, key)
+	local id = tostring(provider_id) .. "\0" .. tostring(key)
+	_access[id] = _access[id] or { waiters = {} }
+	return _access[id]
+end
+
+--- Exchanges a cleartext key for an access token, once at a time;
+--- on_done(ok, reason) runs when the exchange settles.
+--- @param provider_id string
+--- @param key string The cleartext stored key.
+--- @param on_done function|nil
+local function refresh_access(provider_id, key, on_done)
+	local provider = M.PROVIDERS[provider_id]
+	local slot = access_slot(provider_id, key)
+	if type(on_done) == "function" then slot.waiters[#slot.waiters + 1] = on_done end
+	if slot.pending then return end
+	local function settle(ok, reason)
+		slot.pending = false
+		local waiters = slot.waiters
+		slot.waiters = {}
+		for _, waiter in ipairs(waiters) do invoke_token_callback(waiter, ok, reason) end
+	end
+	local request, reason = TokenExchange.request(provider.auth, key)
+	if not request then
+		slot.failure, slot.retry_at = reason, TimerScheduler.now() + ACCESS_RETRY_SECONDS
+		Logger.error(LOG, "Access token of provider '%s' cannot be asked: %s.", tostring(provider_id), reason)
+		return settle(false, reason)
+	end
+	slot.pending = true
+	Logger.start(LOG, "Exchanging the key of provider '%s' for an access token…", tostring(provider_id))
+	local dispatched = _access_client.post(request.url, request.headers, request.body, function(r)
+		r = type(r) == "table" and r or {}
+		local raw = type(r.body) == "string" and r.body ~= "" and r.body or r.error_body
+		local decoded_ok, decoded = pcall(JsonCodec.decode, type(raw) == "string" and raw or "")
+		local token, why = TokenExchange.read(provider.auth, r.status, decoded_ok and decoded or nil, TimerScheduler.now())
+		if token then
+			slot.token, slot.expires_at, slot.failure, slot.retry_at = token.token, token.expires_at, nil, nil
+			Logger.success(LOG, "Access token of provider '%s' received (valid %d s).", tostring(provider_id),
+				math.floor(token.expires_at - TimerScheduler.now()))
+			return settle(true, nil)
+		end
+		slot.failure, slot.retry_at = why, TimerScheduler.now() + ACCESS_RETRY_SECONDS
+		Logger.error(LOG, "Access token of provider '%s' refused: %s.", tostring(provider_id), why)
+		return settle(false, why)
+	end)
+	if not dispatched then
+		slot.failure, slot.retry_at = "the token exchange could not be sent", TimerScheduler.now() + ACCESS_RETRY_SECONDS
+		Logger.error(LOG, "Access token of provider '%s' cannot be asked: the request was not sent.", tostring(provider_id))
+		return settle(false, slot.failure)
+	end
+end
+
+--- The access token a provider's requests carry now for a cleartext key,
+--- refreshed in the background when it nears its end.
+--- @param provider_id string
+--- @param key string
+--- @return string|nil token, string|nil reason
+local function access_token(provider_id, key)
+	local provider = M.PROVIDERS[provider_id]
+	local slot = access_slot(provider_id, key)
+	local now = TimerScheduler.now()
+	local usable, refresh = TokenExchange.state(provider.auth, slot.token and slot or nil, now)
+	if refresh and not slot.pending and (slot.retry_at == nil or now >= slot.retry_at) then
+		refresh_access(provider_id, key)
+	end
+	if usable then return slot.token, nil end
+	return nil, slot.failure or "the access token is being fetched: try again in a moment"
+end
+
+--- Fetches the access token of a provider and cleartext key when the
+--- provider exchanges keys, then runs on_ready(ok, reason, token); token is
+--- the key itself for any other provider.
+--- @param provider_id string
+--- @param key string
+--- @param on_ready function
+function M.prepare_access(provider_id, key, on_ready)
+	local provider = M.PROVIDERS[provider_id]
+	if not (provider and provider.auth) then return on_ready(true, nil, key) end
+	local token = access_token(provider_id, key)
+	if token then return on_ready(true, nil, token) end
+	local slot = access_slot(provider_id, key)
+	if not slot.pending and slot.retry_at and TimerScheduler.now() < slot.retry_at then
+		-- A refused exchange waits its pause: the reason answers at once
+		return on_ready(false, slot.failure, nil)
+	end
+	refresh_access(provider_id, key, function(ok, reason)
+		on_ready(ok, reason, ok and access_slot(provider_id, key).token or nil)
+	end)
+end
+
+--- Hands a resolved entry to a resolver callback, its stored key replaced by
+--- the access token when its provider exchanges keys; refused, with the
+--- exchange started, while no token can be sent.
+--- @param callback function
+--- @param copy table The entry with its cleartext key.
+local function deliver_resolved(callback, copy)
+	local provider = M.PROVIDERS[copy.provider]
+	if provider and provider.auth then
+		local token, reason = access_token(copy.provider, copy.token)
+		if not token then
+			Logger.warn(LOG, "API entry '%s' has no access token yet: %s.", tostring(copy.id), reason)
+			return invoke_token_callback(callback, false, nil, "access_token_unavailable")
+		end
+		copy.token = token
+	end
+	invoke_token_callback(callback, true, copy, nil)
+end
+
 --- Returns a shallow copy whose token is cleartext, leaving the persisted entry
 --- object untouched. Concurrent callers for the same exact identity/reference
 --- share one Keychain task. Identity changes complete all waiters as stale and
@@ -932,18 +1063,18 @@ function M.resolve_active_entry(callback)
 	-- A local server the user gave no key to is sent the one its own settings
 	-- file holds, else none
 	if type(stored) ~= "string" or stored == "" then
-		invoke_token_callback(callback, true, resolved_copy(LocalServers.discovered_key(entry.provider, entry.base_url)), nil)
+		deliver_resolved(callback, resolved_copy(LocalServers.discovered_key(entry.provider, entry.base_url)))
 		return settled_token_lease()
 	end
 	if not TokenCrypto.is_encrypted(stored) then
-		invoke_token_callback(callback, true, resolved_copy(stored), nil)
+		deliver_resolved(callback, resolved_copy(stored))
 		return settled_token_lease()
 	end
 
 	local cache_key = tostring(entry.id) .. "\0" .. stored
 	local cached = _token_cache[cache_key]
 	if type(cached) == "string" and cached ~= "" then
-		invoke_token_callback(callback, true, resolved_copy(cached), nil)
+		deliver_resolved(callback, resolved_copy(cached))
 		return settled_token_lease()
 	end
 
@@ -1022,8 +1153,8 @@ function M.resolve_active_entry(callback)
 		for _, pending_waiter in ipairs(record.waiters) do
 			if pending_waiter.active == true then
 				pending_waiter.active = false
-				invoke_token_callback(pending_waiter.callback,
-					ok, ok and resolved_copy(cleartext) or nil, reason)
+				if ok then deliver_resolved(pending_waiter.callback, resolved_copy(cleartext))
+				else invoke_token_callback(pending_waiter.callback, false, nil, reason) end
 			end
 		end
 	end
@@ -2698,7 +2829,15 @@ local function with_provider_key(label, provider_id, use, fail, on_ready)
 			fail("invalid_endpoint")
 			return
 		end
-		on_ready(provider, entry, token, base)
+		-- The stored key is exchanged for the short-lived token the requests carry
+		M.prepare_access(provider_id, token, function(ok, reason, access)
+			if not ok then
+				Logger.error(LOG, "%s request for provider '%s' has no access token: %s.", label, provider_id, tostring(reason))
+				fail("access_token_unavailable")
+				return
+			end
+			on_ready(provider, entry, access, base)
+		end)
 	end
 	if type(stored_token) ~= "string" or stored_token == "" then
 		-- key_missing() let it through: a local server given no key, sent the
@@ -3074,30 +3213,44 @@ function M.test_request(entry, spec, on_ok, on_fail)
 		return fail("invalid probe sampling")
 	end
 	local t0 = TimerScheduler.now()
-	local ok_send, send_err = xpcall(function()
-		post_and_parse_resolved(entry,
-			(type(entry.model) == "string" and entry.model ~= "") and entry.model or nil,
-			spec.system_prompt, spec.user_text, "",
-			spec.temperature, spec.max_tokens, 1, false,
-			-- The probe judges the raw reply: the prediction parser applies the
-			-- menu's minimum word count, which refused the one-word "OK" the probe
-			-- asks for, so every real key failed its test.
-			nil,
-			function(detail)
-				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "request_failed", detail) end
-			end,
-			ApiCommon.new_dedup_stats(),
-			function(raw)
-				local text = type(raw) == "string" and text_utils.trim(raw) or ""
-				if text == "" then
-					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "empty_reply") end
-					return
-				end
-				local ms = math.max(0, math.floor((TimerScheduler.now() - t0) * 1000))
-				if type(on_ok) == "function" then ApiCommon.protected_call(on_ok, "test_request_ok", text, ms) end
-			end)
-	end, debug.traceback)
-	if not ok_send then return fail("dispatch_raised: " .. tostring(send_err)) end
+	--- Sends the probe with the key, or the access token, its requests carry.
+	--- @param probe table The entry, its token ready to send.
+	local function send(probe)
+		local ok_send, send_err = xpcall(function()
+			post_and_parse_resolved(probe,
+				(type(entry.model) == "string" and entry.model ~= "") and entry.model or nil,
+				spec.system_prompt, spec.user_text, "",
+				spec.temperature, spec.max_tokens, 1, false,
+				-- The probe judges the raw reply: the prediction parser applies the
+				-- menu's minimum word count, which refused the one-word "OK" the probe
+				-- asks for, so every real key failed its test.
+				nil,
+				function(detail)
+					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "request_failed", detail) end
+				end,
+				ApiCommon.new_dedup_stats(),
+				function(raw)
+					local text = type(raw) == "string" and text_utils.trim(raw) or ""
+					if text == "" then
+						if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "empty_reply") end
+						return
+					end
+					local ms = math.max(0, math.floor((TimerScheduler.now() - t0) * 1000))
+					if type(on_ok) == "function" then ApiCommon.protected_call(on_ok, "test_request_ok", text, ms) end
+				end)
+		end, debug.traceback)
+		if not ok_send then return fail("dispatch_raised: " .. tostring(send_err)) end
+		return true
+	end
+	if not (provider and provider.auth) then return send(entry) end
+	-- The key test waits for the access token, then probes with it
+	M.prepare_access(entry.provider, entry.token, function(ok, reason, access)
+		if not ok then return fail(reason) end
+		local probe = {}
+		for key, value in pairs(entry) do probe[key] = value end
+		probe.token = access
+		send(probe)
+	end)
 	return true
 end
 
