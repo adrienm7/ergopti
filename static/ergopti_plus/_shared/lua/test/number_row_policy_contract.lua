@@ -270,7 +270,9 @@ function M.run(helpers, corpus_path)
 				return bytes
 			end
 			local registry = assert(Migrate.load_registry(shared .. Migrate.REGISTRY_PATH))
-			helpers.assert_eq(registry.current, 19, "the actual shipped registry includes the dynamic feature-row migration")
+			-- The dynamic feature-row step is v15 -> v16 and the replayed cases expect the
+			-- registry's own current stamp, so a later schema bump must not break this pin.
+			helpers.assert_true(registry.current >= 16, "the actual shipped registry includes the dynamic feature-row migration")
 			local replays = 0
 			for index = 0, 10 do
 				-- A case the Windows-only dynamic-master step changes is split in two: the
