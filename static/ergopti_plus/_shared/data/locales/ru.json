@@ -2881,6 +2881,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Переключить регистр выделения",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus нужно разрешение «Универсальный доступ», чтобы читать клавиатуру. Откройте ErgoptiPlus снова: он сам откроет Системные настройки > Конфиденциальность и безопасность > Универсальный доступ. Включите пункт «Hammerspoon»: это движок ErgoptiPlus. Если он уже выглядит включённым, выключите и включите его снова.",
+	"startup.curl_missing": "Программа curl из Windows ({1}) отсутствует или не читается. Запросы к локальному ИИ отклоняются, пока она не вернётся: восстановите или обновите Windows; Ergopti+ никогда её не заменяет.",
+	"startup.curl_too_old": "У программы curl из Windows ({1}) версия {2}, а Ergopti+ нужна {3} или новее. Запросы к локальному ИИ отклоняются, пока Windows не будет обновлена; Ergopti+ никогда её не заменяет.",
 	"permission_dialog.window_title": "Требуется разрешение",
 	"permission_dialog.open_settings": "Открыть настройки",
 	"permission_dialog.step_add": "Если «Hammerspoon» нет в списке, нажмите +, затем ⌘⇧G, вставьте {1} и нажмите «Открыть».",

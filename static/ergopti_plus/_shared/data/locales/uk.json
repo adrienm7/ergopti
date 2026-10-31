@@ -2881,6 +2881,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Перемикати регістр виділення",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus потрібен дозвіл «Доступність», щоб читати клавіатуру. Відкрийте ErgoptiPlus знову: він сам відкриє Системні параметри > Приватність і безпека > Доступність. Увімкніть пункт «Hammerspoon»: це рушій ErgoptiPlus. Якщо він уже виглядає увімкненим, вимкніть і знову увімкніть його.",
+	"startup.curl_missing": "Програма curl із Windows ({1}) відсутня або не читається. Запити до локального ШІ відхиляються, доки вона не повернеться: відновіть або оновіть Windows; Ergopti+ ніколи її не замінює.",
+	"startup.curl_too_old": "У програми curl із Windows ({1}) версія {2}, а Ergopti+ потрібна {3} або новіша. Запити до локального ШІ відхиляються, доки Windows не буде оновлено; Ergopti+ ніколи її не замінює.",
 	"permission_dialog.window_title": "Потрібен дозвіл",
 	"permission_dialog.open_settings": "Відкрити налаштування",
 	"permission_dialog.step_add": "Якщо «Hammerspoon» немає у списку, натисніть +, потім ⌘⇧G, вставте {1} і натисніть «Відкрити».",

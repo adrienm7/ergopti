@@ -2881,6 +2881,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Växla markeringens versaler/gemener",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus behöver behörigheten Hjälpmedel för att läsa tangentbordet. Öppna ErgoptiPlus igen: det öppnar Systeminställningar > Integritet och säkerhet > Hjälpmedel åt dig. Slå på posten ”Hammerspoon”: det är ErgoptiPlus motor. Om den redan verkar påslagen, slå av och på den igen.",
+	"startup.curl_missing": "Windows curl-program ({1}) saknas eller kan inte läsas. Förfrågningar till lokal AI nekas tills det är tillbaka: reparera eller uppdatera Windows; Ergopti+ ersätter det aldrig.",
+	"startup.curl_too_old": "Windows curl-program ({1}) har version {2}, och Ergopti+ behöver {3} eller senare. Förfrågningar till lokal AI nekas tills Windows är uppdaterat; Ergopti+ ersätter det aldrig.",
 	"permission_dialog.window_title": "Behörighet krävs",
 	"permission_dialog.open_settings": "Öppna inställningar",
 	"permission_dialog.step_add": "Om ”Hammerspoon” saknas i listan klickar du på +, trycker på ⌘⇧G, klistrar in {1} och klickar på Öppna.",
