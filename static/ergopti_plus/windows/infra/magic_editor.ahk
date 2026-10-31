@@ -203,6 +203,10 @@ MagicEditorRecordOrdinaryScan(Scan, Slot, Action, Keycodes := unset) {
 	if State["initialized"]
 		throw Error("An ordinary Win slot requires an unstarted broker.")
 	Canonical := MagicEditorNormalizeScan(Scan, IsSet(Keycodes) ? Keycodes : MagicEditorPhysicalCatalogue())
+	; Two slots can name one key (Win+4 and Win+' on AZERTY); only one can answer.
+	if State["ordinary_physical"].Has(Canonical)
+		LoggerWarn("MagicEditor", "Win slot '{1}' replaces '{2}' on the key {3}: both name the same key.",
+			Slot, State["ordinary_physical"][Canonical]["slot"], Canonical)
 	State["ordinary_physical"][Canonical] := Map("slot", Slot, "action", Action)
 }
 

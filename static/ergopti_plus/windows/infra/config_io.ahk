@@ -2462,6 +2462,32 @@ KeyboardSlotLayoutScan(SlotId) {
 }
 
 /**
+ * The physical key a Win slot binds. A textual Win chord cannot be relied on:
+ * AutoHotkey registers it with RegisterHotKey when the chord is free, and when
+ * Windows holds it (Win+S, Win+E, Win+1, Win+Tab) falls back to its hook, which
+ * reads a key carrying any scan-code hotkey from the scan-code table. The layout
+ * tables give almost every key one, inert or not, so the textual variant never
+ * fired and Windows kept the chord. An exact #SCnnn variant is found in that table.
+ * A key already spelled by its scan (sc029, sc03a) or one the host layout does not
+ * have stays with its chord.
+ * @param {String} SlotId A meta_ slot id.
+ * @returns {String} Canonical "SCnnn", or "" when the chord itself must be bound.
+ */
+KeyboardSlotWinScan(SlotId) {
+		LayoutScan := KeyboardSlotLayoutScan(SlotId)
+		if LayoutScan != ""
+				return LayoutScan
+		Native := SlotRoleNative(SlotId)
+		if !Native.Has("key")
+				return ""
+		Key := SlotRoleChordKey(Native["key"])
+		if RegExMatch(Key, "i)^(?:sc|vk)[0-9a-f]")
+				return ""
+		Code := GetKeySC(Key)
+		return Code > 0 ? Format("SC{:03X}", Code) : ""
+}
+
+/**
  * The canonical chord a slot binds: its key is the physical one where the layout
  * owner decides it (KeyboardSlotLayoutScan).
  * @param {String} SlotId Neutral slot id.
@@ -2478,10 +2504,10 @@ _KeyboardSlotBoundChord(SlotId, Scan) {
 }
 
 /**
- * Registers every configured slot. A Win slot on a key the layout owner decides
- * joins the physical broker, which already holds that Win variant for the remap
- * of the same key; the others take their own hotkey through the registrar, which
- * reports refusal by returning "".
+ * Registers every configured slot. A Win slot binds its physical key
+ * (KeyboardSlotWinScan) and, on a key of the physical registry, joins the broker,
+ * which holds that Win variant for the remap of the same key too; the others take
+ * their own hotkey through the registrar, which reports refusal by returning "".
  * @returns {Integer} The slots bound.
  */
 KeyboardShortcutsBindAll() {
@@ -2495,8 +2521,9 @@ KeyboardShortcutsBindAll() {
 						continue
 				if Action == "none"
 						continue
-				Scan := KeyboardSlotLayoutScan(Slot)
-				if Scan != "" && SubStr(Slot, 1, 5) == "meta_" {
+				IsWinSlot := SubStr(Slot, 1, 5) == "meta_"
+				Scan := IsWinSlot ? KeyboardSlotWinScan(Slot) : KeyboardSlotLayoutScan(Slot)
+				if Scan != "" && IsWinSlot && KeyboardSlotPhysicalScan("meta_" . Scan) != "" {
 						MagicEditorRecordOrdinaryScan(Scan, Slot, Action)
 						Bound++
 						continue
