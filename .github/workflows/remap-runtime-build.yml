@@ -71,7 +71,7 @@ jobs:
         working-directory: ergopti
         run: |
           set -euo pipefail
-          python3 tools/build/remap_runtime_phase_deadline_test.py
+          python3 tools/build/remap_runtime_hosted_build_test.py
           python3 tools/build/remap_runtime_build_test.py
 
       - name: Compile and run each vendor-header test

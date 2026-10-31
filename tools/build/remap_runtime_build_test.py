@@ -1218,4 +1218,4 @@ if __name__ == "__main__":
         "errors=" + str(len(result.errors)),
         "skipped=" + str(len(result.skipped)),
     )
-    raise SystemExit(0 if result.wasSuccessful() and count == 45 and not result.skipped else 1)
+    raise SystemExit(0 if result.wasSuccessful() and count == 49 and not result.skipped else 1)
