@@ -258,9 +258,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       Linux reading the same declaration (53c1766514, CI step "Run the field checks without a click"). Left:
       AutoHotkey never ran the Windows side (step 1 and 2 of "PC Windows todo"); a Linux run on a real desktop.
 - [ ] **Field log analysis.** Done: `tools/dev/field-log-analyse.py` on every collector, the `[budgets]` section and
-      the "Over budget" lines (8d52300169). Left: run `npm run test:hs` and `test:linux` where Lua runs and the AHK
-      suite on the PC; [CODE] the Linux driver measures no reload or menu rebuild and the Windows one no menu
-      rebuild, so those budgets are judged on macOS only.
+      the "Over budget" lines (8d52300169); Linux measures and judges its reload (request to the successor's boot,
+      `infra/reload_timing.lua`) and its menu rebuild (`ui/menu/timed_build.lua`) as macOS does. Left: run
+      `npm run test:hs` and `test:linux` where Lua runs and the AHK suite on the PC; [CODE] (Windows, the PC's) the
+      Windows driver measures no menu rebuild, so that budget is judged on macOS and Linux only.
 - [ ] **macOS main-thread holds (field report `mac-2026-10-30_210120`; ledger L16, L17, L18, L23).** [CODE]
       [PHYS-M] Done: ledger admission with native finds (0b679b0b0d), the personal-row alias check indexed once
       (b5c0c0de37), the dynamic-rule preview guard (c17aa3e5d7), the slowest diagnostics collectors named

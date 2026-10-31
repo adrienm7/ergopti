@@ -3115,6 +3115,8 @@ local function main()
 		device, opts.layout, mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
 	if not privacy_owners.startup_checkpoint() then return end
 	local boot_ms = BootProfiler.complete()
+	-- The Reload this boot completes, if any, from its request in the previous daemon.
+	require("infra.reload_timing").complete()
 	if not privacy_owners.startup_checkpoint() then return end
 	emit_diagnostic_snapshot(boot_ms, opts, ok_i18n and i18n_mod or nil, privacy_owners.startup.snapshot)
 	privacy_owners.startup.snapshot = nil

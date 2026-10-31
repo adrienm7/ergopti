@@ -39,6 +39,8 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "diagnostics"))
 		helpers.assert_true(position(state.events, "layout.publish") < position(state.events, "boot.complete"))
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "hook.pump"))
+		-- (linux-reload-budget) The Reload this boot ends is measured to its completion.
+		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "reload.complete"))
 		helpers.assert_eq(state.pumps, 1)
 		helpers.assert_eq(state.pump_services, true)
 		helpers.assert_eq(state.loop_after_complete, false)
