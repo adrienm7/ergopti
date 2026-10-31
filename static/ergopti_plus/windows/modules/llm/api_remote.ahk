@@ -771,7 +771,7 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
         reservation["proxy_resolution_done"] := false
         DeadlineFn := _LLMRemote_ProxyDeadline.Bind(req_id, reservation, on_fail)
         reservation["proxy_deadline"] := DeadlineFn
-        SetTimer(DeadlineFn, -Max(1, timeout_ms))
+        SetTimer(DeadlineFn, -Max(1, TimerRequireDelayMs(timeout_ms, "LLM remote proxy deadline")))
         ResolveFn := _LLM_CurlArtifactPortFn(Port, "resolve_proxy", SystemProxy_ResolveCurlAsync)
         ContinueFn := _LLMRemote_ContinueProxyDispatch.Bind(req_id, reservation, resolved,
             Url, Payload, on_success, on_fail, timeout_ms, Port)

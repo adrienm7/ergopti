@@ -427,6 +427,7 @@ InstallSendNoOps()
 #Include unit/modules/gestures/test_take_note_async_job.ahk
 #Include unit/adapters/input/test_text_sender_modifiers.ahk
 #Include unit/infra/dispatch/test_timer_scheduler.ahk
+#Include unit/infra/dispatch/test_timer_delay_ceiling.ahk
 #Include unit/ui/menu/test_tray_pause_greys_features.ahk
 #Include unit/infra/dispatch/test_hook_dispatcher.ahk
 #Include unit/adapters/input/test_own_injection_is_not_activity.ahk
