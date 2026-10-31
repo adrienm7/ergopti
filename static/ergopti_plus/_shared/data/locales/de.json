@@ -1406,7 +1406,7 @@
 	"menu.debug.hook_probe": "Reihenfolge der Tastatur-Hooks aufzeichnen",
 	"menu.debug.composer_check": "Zusammengestellte Belegung testen",
 	"platform_reason.action_apple_shortcuts_are_macos": "Nur macOS: Apple-Kurzbefehle gibt es nur unter macOS. Führen Sie anderswo stattdessen einen Befehl oder ein Programm aus.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "Unter Windows leistet „Programm ausführen“ dasselbe: cmd.exe oder powershell.exe mit dem Befehl als Argumenten oder explorer.exe mit der zu öffnenden Datei bzw. dem Ordner.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "Unter Windows leistet „Programm ausführen“ dasselbe: cmd.exe mit dem Befehl als Argumenten oder explorer.exe mit der zu öffnenden Datei bzw. dem Ordner.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Diese Prüfungen messen SendInput von AutoHotkey und seinen Tastatur-Hook, die nur der Windows-Treiber hat.",
 	"input_probe.title": "Eingabeprüfung",
 	"input_probe.confirm": "Diese Prüfung öffnet ein kleines Fenster und tippt etwa {1} Sekunden lang hinein. Tippen oder klicken Sie in der Zwischenzeit nicht woanders. Fortfahren?",
