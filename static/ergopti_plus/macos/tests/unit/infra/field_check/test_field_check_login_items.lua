@@ -369,8 +369,8 @@ helpers.describe("login items: the check", function()
 
 	helpers.it("names the ad hoc guardian registration reset and fails a refused or slow one", function()
 		for _, case in ipairs({
-			{ "developer_adhoc_reregistered", "ready", true },
-			{ "developer_adhoc_reregistered", "unavailable", false },
+			{ "developer_adhoc_legacy_only", "ready", true },
+			{ "developer_adhoc_legacy_only", "unavailable", false },
 			{ "developer_adhoc_reset_deferred", "requires_approval", true },
 			{ "developer_adhoc_reset_refused", "ready", false },
 		}) do

@@ -106,11 +106,11 @@ local GUARDIAN_SETTINGS_FLAG = "--open-remap-guardian-settings"
 local GUARDIAN_STATUS_OUTPUT_MAX_BYTES = 32
 local GUARDIAN_SETTINGS_OUTPUT_MAX_BYTES = 32
 -- A registration may add one note line after its status
--- (RemapGuardianRegistrationNote): what an ad hoc build did to its stale
--- legacy agent and Background Items record before registering.
+-- (RemapGuardianRegistrationNote): what an ad hoc build did with its
+-- Background Items record before running the per-user legacy agent.
 local GUARDIAN_REGISTRATION_OUTPUT_MAX_BYTES = 64
 local GUARDIAN_REGISTRATION_NOTES = {
-	developer_adhoc_reregistered = true,
+	developer_adhoc_legacy_only = true,
 	developer_adhoc_reset_deferred = true,
 	developer_adhoc_reset_refused = true,
 }
