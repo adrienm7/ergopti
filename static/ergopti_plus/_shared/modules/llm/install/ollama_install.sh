@@ -45,12 +45,17 @@ OLLAMA_READY_TIMEOUT_SEC=20
 # The default port is declared once, in _shared/modules/llm/defaults.json
 # (llm_ollama_port, pinned by tools/test/test-ollama-port-single-source.cjs).
 # The readiness probe and the server this script starts both use it.
-LLM_DEFAULTS_FILE="$(cd "$(dirname "$0")/.." && pwd)/defaults.json"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LLM_DEFAULTS_FILE="$SCRIPT_DIR/../defaults.json"
 OLLAMA_PORT="$(sed -n 's/^[[:space:]]*"llm_ollama_port":[[:space:]]*\([0-9][0-9]*\),\{0,1\}[[:space:]]*$/\1/p' "$LLM_DEFAULTS_FILE")"
 if [ -z "$OLLAMA_PORT" ]; then
 	printf "[OLLAMA-DEPS] llm_ollama_port is missing from %s.\n" "$LLM_DEFAULTS_FILE" >&2
 	exit 1
 fi
+
+# The external hosts are declared once, in _shared/data/identifiers.json; the
+# generated shell copy sits in the same _shared tree wherever this script runs.
+. "$SCRIPT_DIR/../../../data/identifiers.sh"
 
 # Server endpoint we probe to determine readiness. `/api/tags` returns 200
 # OK with an empty list on a freshly installed server, so it's a reliable
@@ -125,7 +130,7 @@ if ! command -v ollama >/dev/null 2>&1; then
 			log_error "'curl' introuvable — impossible de télécharger Ollama. Vérifiez l'installation de macOS."
 			exit 1
 		fi
-		if ! curl -fsSL https://ollama.com/install.sh | sh >&2; then
+		if ! curl -fsSL "https://${ERGOPTI_HOST_OLLAMA}/install.sh" | sh >&2; then
 			log_error "Téléchargement / installation d’Ollama impossible. Vérifiez votre réseau (ou un éventuel pare-feu)."
 			exit 1
 		fi

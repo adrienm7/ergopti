@@ -213,6 +213,7 @@ const COLD_SOURCE_PATHS = [
 	'_shared/lua/core/llm/native_pty_receipt.lua',
 	'_shared/modules/network/proxy_policy.json',
 	'_shared/modules/llm/managed_python_release.json',
+	'_shared/data/identifiers.sh',
 	'macos/uv.lock',
 	'macos/pyproject.toml'
 ];

@@ -304,6 +304,7 @@ function coldBootstrapRecord() {
 			'_shared/lua/core/llm/native_pty_receipt.lua',
 			'_shared/modules/network/proxy_policy.json',
 			'_shared/modules/llm/managed_python_release.json',
+			'_shared/data/identifiers.sh',
 			'macos/uv.lock',
 			'macos/pyproject.toml'
 		].map((relative) => [relative, hash('static/ergopti_plus/' + relative)])

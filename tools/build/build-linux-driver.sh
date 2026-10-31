@@ -202,6 +202,8 @@ REQUIRED_FILES=(
 	"_shared/lua/app_dirs.lua"
 	# Application and bundle names, service labels and external hosts.
 	"_shared/lua/identifiers.lua"
+	# Their shell copy: install.sh and the Ollama installer source it.
+	"_shared/data/identifiers.sh"
 	"_shared/lua/keycodes/evdev.lua"
 	"_shared/lua/updater/version.lua"
 	"_shared/lua/updater/release_sources.lua"
