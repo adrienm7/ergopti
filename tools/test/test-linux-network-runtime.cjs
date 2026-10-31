@@ -296,8 +296,9 @@ function portable() {
 	check('original library identities and all historical package requirements survive', () => {
 		assert.deepEqual(generator.KEYS, ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb']);
 		for (const [format, old] of Object.entries({
-			deb: ['luajit (>= 2.1)', 'xclip', 'libnotify-bin', 'curl', 'at-spi2-core'],
-			rpm: ['luajit >= 2.1', 'xclip', 'libnotify', 'curl', 'at-spi2-core'],
+			// LuaJIT and curl come from the private runtime of these two.
+			deb: ['xclip', 'libnotify-bin', 'at-spi2-core'],
+			rpm: ['xclip', 'libnotify', 'at-spi2-core'],
 			arch: ['luajit', 'xclip', 'libnotify', 'curl', 'at-spi2-core'],
 			nix_library_path: ['libayatana-appindicator', 'gtk3', 'glib', 'libxkbcommon', 'at-spi2-core']
 		})) {
