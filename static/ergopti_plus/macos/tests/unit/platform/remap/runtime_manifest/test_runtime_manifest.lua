@@ -81,19 +81,23 @@ end
 -- ==================================
 
 helpers.describe("owned runtime manifest: what ships", function()
-	helpers.it("pins the VirtualHIDDevice and the capture limits but not the unbuilt runtime", function()
+	helpers.it("pins the VirtualHIDDevice and the capture but not the unbuilt runtime", function()
 		local Manifest = load_module()
 		helpers.assert_eq(Manifest.unpinned(shipped()), {
 			"runtime.version", "runtime.file_name", "runtime.source_url", "runtime.sha256", "runtime.size",
-			"capture.requirement",
 		})
+	end)
+
+	helpers.it("pins the capture to the launcher signed by the stable identity", function()
+		helpers.assert_eq(shipped().capture.requirement,
+			'identifier "com.ergoptiplus.app" and certificate leaf = H"759d8aae58886bac8886d834f9eeae52274051bc"')
 	end)
 
 	helpers.it("refuses the shipped manifest with a sentence naming the first missing field", function()
 		local pinned, reason = load_module().pinned(shipped())
 		helpers.assert_nil(pinned)
 		helpers.assert_contains(reason, "runtime.version")
-		helpers.assert_contains(reason, "5 more")
+		helpers.assert_contains(reason, "4 more")
 	end)
 
 	helpers.it("hands the field check the pinned driver version while the runtime is unbuilt", function()

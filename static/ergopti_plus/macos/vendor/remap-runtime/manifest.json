@@ -18,7 +18,7 @@
     "size": 2089117
   },
   "capture": {
-    "requirement": null,
+    "requirement": "identifier \"com.ergoptiplus.app\" and certificate leaf = H\"759d8aae58886bac8886d834f9eeae52274051bc\"",
     "batch_limit": 64,
     "frame_limit": 65536,
     "history_capacity": 4096
