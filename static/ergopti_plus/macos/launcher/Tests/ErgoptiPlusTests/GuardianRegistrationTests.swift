@@ -36,10 +36,10 @@ final class GuardianRegistrationTests: XCTestCase {
 		}
 	}
 
-	/// The ad hoc reset's note follows the status on its own line, which the
+	/// The ad hoc note follows the status on its own line, which the
 	/// driver logs and the field run reports; a Developer ID answer has none.
 	func testRegistrationPrintsTheAdhocNoteAfterTheStatus() {
-		for note in [RemapGuardianRegistrationNote.adhocReregistered, .adhocResetDeferred, .adhocResetRefused] {
+		for note in [RemapGuardianRegistrationNote.adhocLegacyOnly, .adhocResetDeferred, .adhocResetRefused] {
 			var output = Data()
 			let code = runGuardianRegistration(
 				arguments: [executable, kRegisterRemapGuardianFlag],
@@ -51,7 +51,7 @@ final class GuardianRegistrationTests: XCTestCase {
 			XCTAssertEqual(code, 0)
 			XCTAssertEqual(String(data: output, encoding: .utf8), "ready\n" + note.rawValue + "\n")
 		}
-		XCTAssertEqual(RemapGuardianRegistrationNote.adhocReregistered.rawValue, "developer_adhoc_reregistered")
+		XCTAssertEqual(RemapGuardianRegistrationNote.adhocLegacyOnly.rawValue, "developer_adhoc_legacy_only")
 	}
 
 	/// Invalid commands must neither register a service nor publish a status.
