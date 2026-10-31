@@ -723,6 +723,7 @@
 	"healthcheck.field.runtime": "ランタイム",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Web ビューエンジン",
+	"webview.runtime_too_old": "WebView2 ランタイムが古すぎます ({2})。Ergopti+ には {1} 以降が必要です。更新するまで、ウィンドウは簡易表示で開きます。",
 	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "モデル",
 	"healthcheck.field.cpu": "プロセッサ",

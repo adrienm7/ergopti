@@ -723,6 +723,7 @@
 	"healthcheck.field.runtime": "Kørselsmiljø",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Webvisningsmotor",
+	"webview.runtime_too_old": "WebView2 Runtime er for gammel ({2}): Ergopti+ kræver {1} eller nyere. Vinduerne åbner i deres enkle form, indtil du opdaterer den.",
 	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "Model",
 	"healthcheck.field.cpu": "Processor",

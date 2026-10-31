@@ -723,6 +723,7 @@
 	"healthcheck.field.runtime": "סביבת הריצה",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "מנוע תצוגת האינטרנט",
+	"webview.runtime_too_old": "WebView2 Runtime ישן מדי ({2}): Ergopti+ דורש גרסה {1} ומעלה. החלונות ייפתחו בצורתם הפשוטה עד שתעדכן אותו.",
 	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "דגם",
 	"healthcheck.field.cpu": "מעבד",
