@@ -45,6 +45,20 @@ _CTWP_NativeReadCustodyTick(State) {
 
 ; These fixture-only helpers serve the two real acquired-read timer families.
 ; They do not grant production admission or replace the native journal ports.
+; Attempts a padded read gets to span a timer tick. The source only has to outlast
+; the gap between two interrupt checks on some attempt, and every byte of it costs
+; far more in the commit and the rollback than in that read, so a small source with
+; many attempts is both faster and tighter than a large one with few.
+global _CTWP_TEMPORAL_READ_ATTEMPTS := 512
+
+_CTWP_TemporalPaddedSource(Marker) {
+	static PaddingDoublings := 18
+	Padding := "x"
+	loop PaddingDoublings
+		Padding .= Padding
+	return _CTWP_SchemaSource(Marker) . "# " . Padding . "`n"
+}
+
 _CTWP_TemporalDescriptorMatches(Left, Right) {
 	if !(Left is Object) || !(Right is Object)
 		return false
@@ -215,13 +229,7 @@ _CTWP_NativeReadTemporalCustody(Mode) {
 	Dir := _CTWP_NewDir("genuine-native-read-temporal-custody")
 	PathsFile := Dir . "\paths.toml", Path := Dir . "\config.toml"
 	OldSource := _CTWP_SchemaSource("old actual timed recovery source")
-	; 8 MiB keeps the native read across a timer tick (1 MiB sometimes missed it)
-	; at a quarter of the cost of the former 32 MiB source.
-	Padding := "x"
-	loop 23
-		Padding .= Padding
-	NewSource := _CTWP_SchemaSource("new actual timed recovery source") . "# " . Padding . "`n"
-	Padding := ""
+	NewSource := _CTWP_TemporalPaddedSource("new actual timed recovery source")
 	Native := ConfigTransitionProductionPort(), HashCallback := Native["hash"]
 	Digest := CryptoSha256(NewSource), Bundle := false
 	State := {path: Path, pathKey: FileReadActivityKey(Path), port: Native, mode: Mode,
@@ -267,9 +275,9 @@ _CTWP_NativeReadTemporalCustody(Mode) {
 		AssertTrue(ConfigTransitionResultIs(Committed, "committed_new"))
 		WalPath := ConfigTransitionWalPath(PathsFile), BeforeWal := _CTWP_RawHex(WalPath)
 		Facts := false
-		; Eight genuine invocations bound timing variance. A missing acquired-read
-		; timer interval is a failure, never a green skip or modeled observation.
-		loop 8 {
+		; A missing acquired-read timer interval is a failure, never a green skip
+		; or modeled observation.
+		loop _CTWP_TEMPORAL_READ_ATTEMPTS {
 			State.active := true
 			SetTimer(Timer, 1)
 			try Facts := _ConfigTransitionNativeRecoveryImages(PathsFile, Path, Bundle)
@@ -277,8 +285,10 @@ _CTWP_NativeReadTemporalCustody(Mode) {
 				State.active := false
 				SetTimer(Timer, 0)
 			}
-			if State.observed
+			if State.observed {
+				_TestPrint("# acquired-read timer observed on attempt " . A_Index)
 				break
+			}
 		}
 		Restore()
 		AssertEqual("", State.failure, "actual timer observer failure is retained rather than swallowed")
@@ -356,13 +366,7 @@ _CTWP_GuardedReadTemporalCustody(Mode) {
 	Dir := _CTWP_NewDir("genuine-guarded-read-temporal-custody")
 	PathsFile := Dir . "\paths.toml", Path := Dir . "\config.toml"
 	OldSource := _CTWP_SchemaSource("old actual timed recovery source")
-	; 8 MiB keeps the native read across a timer tick (1 MiB sometimes missed it)
-	; at a quarter of the cost of the former 32 MiB source.
-	Padding := "x"
-	loop 23
-		Padding .= Padding
-	NewSource := _CTWP_SchemaSource("new actual timed recovery source") . "# " . Padding . "`n"
-	Padding := ""
+	NewSource := _CTWP_TemporalPaddedSource("new actual timed recovery source")
 	Native := ConfigTransitionProductionPort(), HashCallback := Native["hash"]
 	TargetCallback := false
 	switch Mode {
@@ -419,9 +423,9 @@ _CTWP_GuardedReadTemporalCustody(Mode) {
 		AssertEqual(8, Captured.port.Count, "the actual guarded adapter forwards the complete native callback class")
 		ProbePath := Dir . "\foreign-timer-probe.txt"
 		Facts := false
-		; Eight genuine invocations bound timing variance. A missing acquired-read
-		; timer interval is a failure, never a green skip or modeled observation.
-		loop 8 {
+		; A missing acquired-read timer interval is a failure, never a green skip
+		; or modeled observation.
+		loop _CTWP_TEMPORAL_READ_ATTEMPTS {
 			State.active := true
 			SetTimer(Timer, 1)
 			try Facts := _ConfigTransitionReadSnapshot(Captured.port, Path)
@@ -429,8 +433,10 @@ _CTWP_GuardedReadTemporalCustody(Mode) {
 				State.active := false
 				SetTimer(Timer, 0)
 			}
-			if State.observed
+			if State.observed {
+				_TestPrint("# acquired-read timer observed on attempt " . A_Index)
 				break
+			}
 		}
 		if Mode != "control" {
 			if Mode == "write_create_durable"
