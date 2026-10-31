@@ -211,6 +211,52 @@ helpers.describe("the shipped rule graph deploys (json-shared-tables)", function
 		end
 	end
 
+	-- (owned-revision-config-keys) The owned runtime loads this document with the
+	-- 9312593e configuration reader, the shared one with 16.0.0's. Between them a
+	-- rule's `enabled` moved to the unresolved JSON, `description_notes` became a
+	-- strictly typed array, `available_since` lost its type check, the global
+	-- update and quit keys were renamed or dropped and profiles gained
+	-- `ignore_pointing_device_events_by_default`, and a device's `ignore` default
+	-- is resolved from its identifiers before loading (a keyboard is still not
+	-- ignored and still drives the Caps Lock LED). Keys outside these lists would
+	-- be read differently by the two runtimes, so a new one needs that comparison
+	-- first (tests/support/karabiner_model.lua, OWNED RUNTIME REVISION).
+	helpers.it("(owned-revision-config-keys) emits only keys both runtime revisions read alike", function()
+		local DOCUMENT_KEYS = { profiles = true }
+		local PROFILE_KEYS = { name = true, selected = true, complex_modifications = true,
+			virtual_hid_keyboard = true, devices = true }
+		local DEVICE_KEYS = { identifiers = true, simple_modifications = true }
+		local VIRTUAL_KEYBOARD_KEYS = { country_code = true, keyboard_type_v2 = true }
+		local RULE_KEYS = { description = true, manipulators = true }
+		local function only(keys, value, where)
+			for key in pairs(value) do
+				helpers.assert_true(keys[key] == true, where .. " carries the key " .. tostring(key))
+			end
+		end
+		with_generator(nil, nil, function(env)
+			for _, preset in ipairs({ "default", "recommended" }) do
+				local config, err = build(env, preset, true, true)
+				helpers.assert_not_nil(config, err)
+				only(DOCUMENT_KEYS, config, preset .. " document")
+				for index, profile in ipairs(config.profiles) do
+					only(PROFILE_KEYS, profile, preset .. " profile " .. index)
+					only({ rules = true }, profile.complex_modifications, preset .. " complex_modifications")
+					only(VIRTUAL_KEYBOARD_KEYS, profile.virtual_hid_keyboard, preset .. " virtual_hid_keyboard")
+					for device_index, device in ipairs(profile.devices) do
+						only(DEVICE_KEYS, device, preset .. " device " .. device_index)
+						helpers.assert_eq(device.identifiers, { is_keyboard = true },
+							"a keyboard is the one device whose defaults both revisions resolve alike")
+						helpers.assert_eq(#device.simple_modifications, 0)
+					end
+					helpers.assert_true(#profile.complex_modifications.rules > 0, preset .. " emits rules")
+					for rule_index, rule in ipairs(profile.complex_modifications.rules) do
+						only(RULE_KEYS, rule, preset .. " rule " .. rule_index)
+					end
+				end
+			end
+		end)
+	end)
+
 	helpers.it("merging edits the selected profile only, even when another one is equal (json-shared-tables)", function()
 		with_generator(EXISTING_WITH_TWIN_PROFILES, nil, function(env)
 			local config, err, legacy_rules, legacy_context = build(env, "recommended", true, true)
