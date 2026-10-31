@@ -9,7 +9,12 @@
 ---
 --- The menu tree mirrors the macOS menubar (§9 of the parity plan): its rows,
 --- their order and the separators between them are the manifest's `top_level`,
---- which M.build dispatches through its builder table.
+--- which M.build dispatches through its builder table. Each section builder
+--- lives in its own ui/menu/menu_<section>.lua, bound here as
+--- `require("ui.menu.menu_<section>").build`, and the zenity dialogs they share
+--- in ui/menu/menu_dialogs.lua; this file keeps the header, the facade checks
+--- and the tray assembly. tools/lib/linux-menu-parts.cjs admits only that
+--- wiring for the menu gates.
 ---
 --- Items that depend on features not yet implemented on Linux
 --- are present as labelled stubs that log the action — they don't crash and
@@ -53,14 +58,6 @@ local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
 local LOG = "ui.menu.menu_builder"
 local COMMAND = require("config_keys").COMMAND
 
-
--- Delays are stored in seconds and typed in milliseconds: seconds is what the
--- cascade and the TOMLs speak, milliseconds is what a person means by "wait a
--- bit longer". The conversion happens only at this boundary.
-
--- The category id of the user's own hotstrings — the stem of personal.toml, and
--- the same name the editor bridge writes under. Named here so the default-section
--- picker reads the sections of that pack rather than guessing at a spelling.
 
 -- Single source of the driver version and of the build identity.
 local Version = require("infra.version")
