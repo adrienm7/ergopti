@@ -42,7 +42,10 @@
 ---    active developer folder's python3, and that copy was x86_64 only. The
 ---    migrated Mac keeps those Intel Pythons (and an Intel Homebrew in
 ---    /usr/local); a Python helper started after the boot must pick the arm64 one.
---- 7. init-boot-mlx: the boot ran its MLX port cleanup (lsof, a curl probe of up
+--- 7. init-boot-logger: a boot WARNING used {1} and {2} as placeholders, which
+---    string.format never replaces, so the paths it named never reached the
+---    log. No boot line may keep a {N} placeholder.
+--- 8. init-boot-mlx: the boot ran its MLX port cleanup (lsof, a curl probe of up
 ---    to 1 s, ps) on every boot, the AI off included; it only serves the AI
 ---    warmup. An AI-off boot runs no such shell, and a boot whose AI is on and
 ---    consented in this Mac's preferences runs it once. Only the AI-off boot
@@ -474,6 +477,10 @@ local function judge(output, action, marker)
 	for line in output:gmatch("[^\n]+") do
 		if line:find("%[ERROR%]") or line:find("%[FATAL%]") then
 			problems[#problems + 1] = "logged " .. line:gsub("^%S+ %S+ ", "")
+		elseif line:find("^%d%d%d%d%-") and line:find("{%d+}") then
+			-- init-boot-logger: the logger formats with string.format, so a {1}
+			-- placeholder reaches the file as is and hides its value.
+			problems[#problems + 1] = "logged an unformatted placeholder: " .. line:gsub("^%S+ %S+ ", "")
 		else
 			local kind = line:match("^E2E_([%u_]+) ")
 			if kind == "DIALOG" or kind == "EXIT" or kind == "BUNDLE_WRITE" or kind == "BUNDLE_READ_MISSING"

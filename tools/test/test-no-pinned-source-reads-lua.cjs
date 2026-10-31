@@ -202,7 +202,10 @@ const BASELINE = 8;
 //              scenarios, see the file count above.)
 //       45 → 44 (2026-10-31: the skipped LLM bootstrap moved to the boot
 //              scenarios, see the file count above.)
-const READ_BASELINE = 44;
+//       44 → 42 (2026-10-31: the boot scenarios refuse any boot line that
+//              keeps a {N} placeholder; test_init_boot_logger_format no
+//              longer searches init.lua for one.)
+const READ_BASELINE = 42;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
