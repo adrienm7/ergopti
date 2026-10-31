@@ -657,6 +657,7 @@ return {
 	"tests.unit.modules.llm.remote.test_api_entries_secret_service",
 	"tests.unit.modules.llm.remote.test_local_server_auth_policy",
 	"tests.unit.modules.llm.remote.test_local_server_ports",
+	"tests.unit.modules.llm.remote.test_local_server_detection_native",
 	"tests.unit.modules.llm.prediction.test_prediction_backend",
 	"tests.unit.modules.llm.prediction.test_prediction_control_retirement",
 	"tests.unit.modules.llm.prediction.test_prediction_injection_owner",
