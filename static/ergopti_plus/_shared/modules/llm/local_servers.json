@@ -131,7 +131,7 @@
 			"discovery": {
 				"process_names": ["gpt4all"],
 				"command_lines": ["gpt4all/bin/chat"],
-				"_source": "The Linux executable is the CMake target chat in the installer's gpt4all/bin folder; on macOS gpt4all-chat/CMakeLists.txt sets OUTPUT_NAME gpt4all, so the app runs gpt4all.app/Contents/MacOS/gpt4all. Its port setting lives in a Qt INI file this reader does not parse, so its listening port is read."
+				"_source": "The Linux executable is the CMake target chat in the installer's gpt4all/bin folder; on macOS gpt4all-chat/CMakeLists.txt sets OUTPUT_NAME gpt4all, so the app runs gpt4all.app/Contents/MacOS/gpt4all; on Windows it is chat.exe in gpt4all\\bin, whose process rows the driver reads with forward slashes. Its port setting lives in a Qt INI file this reader does not parse, so its listening port is read."
 			}
 		},
 		"lemonade": {
@@ -144,7 +144,7 @@
 				"port_flags": ["--port"],
 				"config_files": [
 					{
-						"os": ["linux", "macos"],
+						"os": ["linux", "macos", "windows"],
 						"dir": "~/.config/lemonade",
 						"file": "config.json",
 						"port_key": "port"
@@ -162,7 +162,7 @@
 						"port_key": "port"
 					}
 				],
-				"_source": "The server is lemond (data/lemond.service.in; --port in src/cpp/server/cli_parser.cpp), formerly lemonade-server; config.json holds sparse overrides, in ~/.config/lemonade for a standalone lemond or a macOS user install, /Library/Application Support/lemonade/.config for a macOS system install and /var/lib/lemonade for the Linux packaged service (docs/guide/configuration/README.md)."
+				"_source": "The server is lemond (data/lemond.service.in; --port in src/cpp/server/cli_parser.cpp), formerly lemonade-server; config.json holds sparse overrides, in ~/.config/lemonade for a standalone lemond, a macOS user install or Windows (%USERPROFILE%\\.config\\lemonade), /Library/Application Support/lemonade/.config for a macOS system install and /var/lib/lemonade for the Linux packaged service (docs/guide/configuration/README.md)."
 			}
 		},
 		"docker_model_runner": {
