@@ -336,6 +336,76 @@ EOF_ROUTE_PLAN
 	return 0
 }
 
+# Runs "$@" (the stock Ollama daemon) under Ergopti's local sign-in relay when
+# the relay HTTPS_PROXY names answers 407 with NTLM or Negotiate
+# (docs/design/proxy-auth-relay.md); the daemon cannot answer that sign-in
+# itself. Only a plain http relay without credentials is probed: userinfo is
+# Basic, which the daemon sends, and socks or https relays are not signed in.
+# The relay is the one bundled beside the admitted launcher; the probe signs in
+# once, so "required" proves the user's Kerberos ticket before the daemon
+# depends on it. The probe line is read as network/proxy_auth_relay.lua reads it
+# (the shared proxy_auth_relay_probe_vectors.json pins both). A relay that is
+# not bundled, or a refused sign-in, starts the daemon without it, as a failed
+# route lookup does, so the models already on disk keep working; the log names
+# the closed reason and Debug > Test network reports it. Never logs the proxy.
+# Deadlines come from the caller (constants.toml [adapters] proxy_relay_*_ms):
+# ERGOPTI_PROXY_RELAY_DIAL_MS, ERGOPTI_PROXY_RELAY_HANDSHAKE_MS and
+# ERGOPTI_PROXY_RELAY_IDLE_MS; the registry is the first OPAQUE_NETWORK_PAC_PROBE_URLS origin.
+run_with_proxy_sign_in_relay() {
+	local upstream="${HTTPS_PROXY:-}" relay origin authority output status reason
+	local dial="${ERGOPTI_PROXY_RELAY_DIAL_MS:-}" handshake="${ERGOPTI_PROXY_RELAY_HANDSHAKE_MS:-}"
+	local idle="${ERGOPTI_PROXY_RELAY_IDLE_MS:-}"
+	[ "$#" -gt 0 ] || return 2
+	if ! printf '%s' "$upstream" | grep -Eq '^http://[A-Za-z0-9.-]+:[0-9]{1,5}/?$'; then
+		"$@"
+		return
+	fi
+	upstream="${upstream%/}"
+	origin="${OPAQUE_NETWORK_PAC_PROBE_URLS:-${OPAQUE_NETWORK_PAC_PROBE_URL:-}}"
+	origin="${origin%% *}"
+	case "$origin" in https://*) authority="${origin#https://}:443" ;; *) authority="" ;; esac
+	case "$dial:$handshake:$idle" in
+		*[!0-9:]*|:*|*::*|*:) authority="" ;;
+	esac
+	if [ -z "$authority" ] || ! printf '%s' "$authority" | grep -Eq '^[A-Za-z0-9.-]+:443$'; then
+		log_error "The proxy sign-in relay was not probed: its inputs are incomplete (relay_unavailable)."
+		"$@"
+		return
+	fi
+	relay=""
+	if managed_bootstrap_launcher_available; then
+		relay="${ERGOPTI_LAUNCHER_EXECUTABLE%/*}/ergopti-proxy-relay"
+	fi
+	if [ -z "$relay" ] || [ ! -f "$relay" ] || [ ! -x "$relay" ] || [ -L "$relay" ]; then
+		log_info "The proxy sign-in relay is not installed: a proxy that demands NTLM or Negotiate will refuse model downloads (not_installed)."
+		"$@"
+		return
+	fi
+	output="$("$relay" probe --upstream "$upstream" --authority "$authority" \
+		--dial-timeout-ms "$dial" --handshake-timeout-ms "$handshake" 2>/dev/null </dev/null)"
+	status=$?
+	case "$status:$output" in
+		'0:{"schema":1,"status":"not_needed"}')
+			"$@"
+			return
+			;;
+		'0:{"schema":1,"status":"required","scheme":"negotiate"}'|'0:{"schema":1,"status":"required","scheme":"ntlm"}')
+			log_info "The proxy demands a network sign-in: model downloads go through the local relay."
+			"$relay" run --upstream "$upstream" --variable HTTPS_PROXY --variable https_proxy \
+				--dial-timeout-ms "$dial" --handshake-timeout-ms "$handshake" --idle-timeout-ms "$idle" -- "$@"
+			return
+			;;
+		[23]':{"schema":1,"status":"refused","reason":"'*'"}')
+			reason="${output#*\"reason\":\"}"
+			reason="${reason%\"\}}"
+			printf '%s' "$reason" | grep -Eq '^[a-z_]{1,40}$' || reason=relay_unavailable
+			;;
+		*) reason=relay_unavailable ;;
+	esac
+	log_error "The proxy sign-in relay refused (${reason}): the daemon starts without it."
+	"$@"
+}
+
 # Prints the SHA-256 hex digest of one file. shasum marks a line whose name
 # holds a backslash or a newline with a leading backslash before the digest,
 # so the first field alone was "\<digest>" for such a path and never matched.

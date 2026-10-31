@@ -1063,7 +1063,8 @@ window_switch_worker_sleep_ms = 10
 # selected proxy; handshake: a CONNECT with its NTLM/Negotiate legs, and a
 # client's request head; idle: an open tunnel with no byte in either direction;
 # probe: the whole probe child, from start to its JSON line.
-# LX: modules/llm/managed_ollama_proxy.lua. HS: adapters/field_check_ports.lua.
+# LX: infra/proxy_auth_relay.lua. HS: adapters/field_check_ports.lua,
+# modules/llm/ollama_server_command.lua (network-retry.sh run_with_proxy_sign_in_relay).
 proxy_relay_dial_timeout_ms = 10000
 proxy_relay_handshake_timeout_ms = 15000
 proxy_relay_idle_timeout_ms = 300000
