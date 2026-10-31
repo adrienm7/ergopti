@@ -4204,6 +4204,7 @@ local function publish_settings_state(candidate)
 	_state.sticky_timeout_ms = candidate.sticky_timeout_ms
 	_state.simultaneous_threshold_ms = candidate.simultaneous_threshold_ms
 	_state.combo_symmetric = candidate.combo_symmetric
+	_state.close_other_instances = candidate.close_other_instances
 end
 
 --- Persists and then publishes one detached settings candidate.
@@ -5165,6 +5166,42 @@ function M.set_tap_holds_enabled(value)
 		-- The Tap-Hold switch is what runs or stops Ergopti's own runtime.
 		if M._owned.selected() and M._owned.reconcile() ~= true then
 			Logger.error(LOG, "Owned Karabiner runtime could not follow the Tap-Hold switch.")
+		end
+	end
+	return committed
+end
+
+--- Whether this boot runs Ergopti's own Karabiner runtime, for the menu rows
+--- that only exist with it.
+--- @return boolean owned
+function M.owned_runtime_selected()
+	return M._owned.selected()
+end
+
+--- The user's consent to closing their own Karabiner while Tap-Hold is on.
+--- @return boolean consent
+function M.get_close_other_instances()
+	if not require_state("get_close_other_instances") then return false end
+	return _state.close_other_instances == true
+end
+
+--- Sets and persists `[karabiner] close_other_instances`, then applies the
+--- activation rule so a running runtime that waited on the consent starts.
+--- @param value boolean Desired consent.
+--- @return boolean committed
+function M.set_close_other_instances(value)
+	if not require_state("set_close_other_instances") then return false end
+	if type(value) ~= "boolean" then
+		Logger.error(LOG, "set_close_other_instances(): value must be a boolean.")
+		return false
+	end
+	local committed = commit_state_mutation(function(candidate)
+		candidate.close_other_instances = value
+	end)
+	if committed then
+		Logger.info(LOG, "Close other Karabiner instances: %s.", value and "on" or "off")
+		if M._owned.selected() and M._owned.reconcile() ~= true then
+			Logger.error(LOG, "Owned Karabiner runtime could not follow the close option.")
 		end
 	end
 	return committed

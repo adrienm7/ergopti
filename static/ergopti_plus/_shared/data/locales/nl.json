@@ -2073,6 +2073,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inactief: sta ErgoptiPlus toe bij Inloggen",
 	"menu.tapholds.guardian_unavailable": "🔴 Inactief: het achtergrondhulpprogramma van ErgoptiPlus is niet geregistreerd (controleer Inloggen, stop ErgoptiPlus en open het opnieuw)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ Oude ErgoptiPlus-regels blokkeren je instellingen: verwijderen…",
+	"menu.tapholds.close_other_karabiner": "Andere Karabiner sluiten zolang tik-vasthouden aan staat (daarna hersteld)",
 	"menu.tapholds.open_login_items": "Instellingen voor Inloggen openen…",
 	"menu.tapholds.show_login_items_steps": "Stappen tonen om ErgoptiPlus toe te staan…",
 	"menu.tapholds.saved_until_guardian": "💾 Toetsenbordinstellingen bewaard: ze gelden zodra ErgoptiPlus is toegestaan bij Inloggen (klik om de instellingen te openen).",
