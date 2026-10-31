@@ -329,8 +329,8 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       `local_server_auth.entry_matches`; (2) AnythingLLM always needs a key and takes a workspace slug as the model,
       Msty documents no port or dialect: both stay out; Foundry Local (Windows) and `mlx_lm.server` (macOS) belong to
       those drivers; (3) Windows: `test_local_server_auth.ahk` and `test_local_server_panel_view_preparation.ahk`
-      count the four old servers and were not run: run them and read the catalogue; (4) the "none" row lists
-      eleven labels; (5) [PHYS-M] [PHYS-L] one run with some of them installed.
+      count the four old servers and were not run: run them and read the catalogue; (5) [PHYS-M] [PHYS-L] one run
+      with some of them installed.
 - [ ] **Mac field report 2026-10-30 21:01, functional errors left open.** Fixed: shortcut full rebind on each
       retry, pre-dispatch Ollama pull receipt (also for a request refused while read: `--receipt-path`, 2a2dde64),
       one model-list error per outage, MLX server stopped before a repair, both schema versions named, the

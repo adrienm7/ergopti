@@ -3652,6 +3652,7 @@
 	"menu.llm.backend_unknown": "Sconosciuto",
 	"menu.llm.local_servers.header": "Server locali (API compatibile con OpenAI)",
 	"menu.llm.local_servers.none": "Nessun server locale risponde ({1})",
+	"menu.llm.local_servers.none_detected": "Nessun server locale rilevato",
 	"menu.llm.local_servers.searching": "Ricerca dei server locali ({1})…",
 	"menu.llm.local_servers.needs_key": "{1} — chiave API richiesta",
 	"menu.llm.local_servers.no_models": "Nessun modello disponibile",

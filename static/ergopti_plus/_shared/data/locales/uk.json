@@ -3652,6 +3652,7 @@
 	"menu.llm.backend_unknown": "Невідомо",
 	"menu.llm.local_servers.header": "Локальні сервери (API, сумісний з OpenAI)",
 	"menu.llm.local_servers.none": "Жоден локальний сервер не відповідає ({1})",
+	"menu.llm.local_servers.none_detected": "Локальний сервер не виявлено",
 	"menu.llm.local_servers.searching": "Пошук локальних серверів ({1})…",
 	"menu.llm.local_servers.needs_key": "{1} — потрібен ключ API",
 	"menu.llm.local_servers.no_models": "Немає доступних моделей",

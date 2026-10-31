@@ -3652,6 +3652,7 @@
 	"menu.llm.backend_unknown": "未知",
 	"menu.llm.local_servers.header": "本地服务器（OpenAI 兼容 API）",
 	"menu.llm.local_servers.none": "没有本地服务器响应（{1}）",
+	"menu.llm.local_servers.none_detected": "未检测到本地服务器",
 	"menu.llm.local_servers.searching": "正在搜索本地服务器（{1}）…",
 	"menu.llm.local_servers.needs_key": "{1} — 需要 API 密钥",
 	"menu.llm.local_servers.no_models": "没有可用的模型",

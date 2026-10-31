@@ -3652,6 +3652,7 @@
 	"menu.llm.backend_unknown": "不明",
 	"menu.llm.local_servers.header": "ローカルサーバー（OpenAI 互換 API）",
 	"menu.llm.local_servers.none": "応答するローカルサーバーがありません（{1}）",
+	"menu.llm.local_servers.none_detected": "ローカルサーバーが検出されませんでした",
 	"menu.llm.local_servers.searching": "ローカルサーバーを検索中（{1}）…",
 	"menu.llm.local_servers.needs_key": "{1} — API キーが必要です",
 	"menu.llm.local_servers.no_models": "利用できるモデルがありません",

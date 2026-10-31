@@ -3652,6 +3652,7 @@
 	"menu.llm.backend_unknown": "Neznámý",
 	"menu.llm.local_servers.header": "Místní servery (API kompatibilní s OpenAI)",
 	"menu.llm.local_servers.none": "Žádný místní server neodpovídá ({1})",
+	"menu.llm.local_servers.none_detected": "Nebyl zjištěn žádný místní server",
 	"menu.llm.local_servers.searching": "Hledání místních serverů ({1})…",
 	"menu.llm.local_servers.needs_key": "{1} — vyžadován klíč API",
 	"menu.llm.local_servers.no_models": "Žádný model není k dispozici",
