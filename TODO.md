@@ -1618,11 +1618,6 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
 - [ ] **108.** [CODE] Item 97's collision/source/modifier/output joins.
 - [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible
       Variables/KeyHistory snapshot.
-- [ ] **120 (formerly 46/47/48).** [CODE] Broad Ollama process termination on macOS stays debt (the
-      other clauses of 46/47/48 were stale or by design; their context was lost and the maintainer
-      retired them). Checked 30 October: the macOS driver no longer kills any Ollama broadly; quit and
-      reload retire only the owned daemon (`api_ollama.stop_owned_server`), and the only `pkill -f`
-      sweeps left name the expander, the HTTP helper and `mlx_lm` server. Proposal: close it.
 - [ ] **L115.** [CODE] Provider error envelope guard: not reproducible under WSL LuaJIT (6 of 6
       runs pass); leave it or close it.
 - Optional, not planned: XKB angle-name gaps and raw-input grammar (L118-L120); concurrent JSON
