@@ -961,6 +961,7 @@ function M.new()
 		local_servers_detect = local_servers_detect,
 		boot_facts = boot_facts,
 		fifo = fifo,
+		apple_shortcut_action = function() return require("modules.gestures.apple_shortcut_action") end,
 		today_log_path = function() return require("infra.logger").today_log_path() end,
 		-- Process CPU and a monotonic clock, both in milliseconds
 		cpu_ms = function() return os.clock() * 1000 end,

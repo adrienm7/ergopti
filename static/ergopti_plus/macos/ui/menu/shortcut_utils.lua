@@ -320,9 +320,100 @@ function M.ask_vision_parameter(gestures, title, prior)
 	return Vision.compose_parameter(chosen.value, typed, default_model)
 end
 
+--- Asks the user to choose one option of a closed set, the stored one first
+--- (dialog.choose preselects its first choice).
+--- @param title string The prompt's title.
+--- @param question_key string Locale key of the question.
+--- @param options table Array of { value, key } (key: the option's locale key).
+--- @param prior string|nil The stored value.
+--- @return string|nil value Nil when the user cancelled.
+local function choose_option(title, question_key, options, prior)
+	local ordered, labels = {}, {}
+	for _, option in ipairs(options) do
+		if option.value == prior then table.insert(ordered, 1, option) else ordered[#ordered + 1] = option end
+	end
+	for index, option in ipairs(ordered) do labels[index] = i18n.get(option.key) end
+	local picked = dialog.choose(title, i18n.get(question_key), labels, i18n.get("button.cancel"), i18n.get("button.save"))
+	return picked and ordered[picked].value or nil
+end
+
+-- The output choices of run_command and run_apple_shortcut.
+local OUTPUT_OPTIONS = {
+	{ value = "none", key = "dialog.gestures.param_output_none" },
+	{ value = "type", key = "dialog.gestures.param_output_type" },
+	{ value = "copy", key = "dialog.gestures.param_output_copy" },
+}
+
+--- Asks for a run_command value: the command typed, then how it runs and, for
+--- a hidden run, what its output does. An invalid command is returned as typed
+--- so the caller's validator refuses it with the parameter's own error.
+--- @param gestures table The gestures facade (parameter_prompt).
+--- @param action string The action being configured.
+--- @param title string The prompt's title.
+--- @param prior string The stored value.
+--- @return string|nil value Nil when the user cancelled.
+function M.ask_command_parameter(gestures, action, title, prior)
+	local UserActionParameter = require("user_action_parameter")
+	local stored = UserActionParameter.parse("command", prior) or {}
+	local save_btn = i18n.get("button.save")
+	local prompt_ok, button, typed = pcall(dialog.text_prompt, title, gestures.parameter_prompt(action),
+		stored.command or "", save_btn, i18n.get("button.cancel"))
+	if not prompt_ok or button ~= save_btn or type(typed) ~= "string" then return nil end
+	local mode = choose_option(title, "dialog.gestures.param_command_mode", {
+		{ value = "hidden", key = "dialog.gestures.param_command_mode_hidden" },
+		{ value = "terminal", key = "dialog.gestures.param_command_mode_terminal" },
+	}, stored.mode)
+	if not mode then return nil end
+	local output = "none"
+	if mode == "hidden" then
+		output = choose_option(title, "dialog.gestures.param_output", OUTPUT_OPTIONS, stored.output)
+		if not output then return nil end
+	end
+	local fields = { command = typed, mode = mode, output = output }
+	return UserActionParameter.encode("command", fields) or UserActionParameter.spell("command", fields)
+end
+
+--- Asks for a run_apple_shortcut value: one shortcut of the library, then
+--- whether it receives the selection and what its output does.
+--- @param gestures table The gestures facade (parameter_prompt).
+--- @param action string The action being configured.
+--- @param title string The prompt's title.
+--- @param prior string The stored value.
+--- @return string|nil value Nil when the user cancelled or nothing can be listed.
+function M.ask_apple_shortcut_parameter(gestures, action, title, prior)
+	local UserActionParameter = require("user_action_parameter")
+	local stored = UserActionParameter.parse("apple_shortcut", prior) or {}
+	local rows, reason = require("adapters.apple_shortcuts_cli").list_blocking()
+	if not rows or #rows == 0 then
+		Logger.warn(LOG, "The Shortcuts library could not be listed for an editor: %s.", tostring(reason or "empty"))
+		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
+			i18n.get(rows and "dialog.gestures.param_shortcuts_empty" or "user_actions.shortcuts_unavailable"),
+			i18n.get("button.ok"), nil, "warning")
+		return nil
+	end
+	local ordered, labels = {}, {}
+	for _, row in ipairs(rows) do
+		if row.id == stored.id then table.insert(ordered, 1, row) else ordered[#ordered + 1] = row end
+	end
+	for index, row in ipairs(ordered) do labels[index] = row.name end
+	local picked = dialog.choose(title, gestures.parameter_prompt(action), labels,
+		i18n.get("button.cancel"), i18n.get("button.save"))
+	if not picked then return nil end
+	local input = choose_option(title, "dialog.gestures.param_shortcut_input", {
+		{ value = "none", key = "dialog.gestures.param_output_none" },
+		{ value = "selection", key = "dialog.gestures.param_shortcut_input_selection" },
+	}, stored.input)
+	if not input then return nil end
+	local output = choose_option(title, "dialog.gestures.param_output", OUTPUT_OPTIONS, stored.output)
+	if not output then return nil end
+	local fields = { id = ordered[picked].id, name = ordered[picked].name, input = input, output = output }
+	return UserActionParameter.encode("apple_shortcut", fields) or UserActionParameter.spell("apple_shortcut", fields)
+end
+
 --- Asks for one parameter value the way its kind is chosen: an application is
 --- picked in the /Applications chooser, a vision backend in a list, every other
 --- kind is typed.
+--- run_command, open_path and run_apple_shortcut have their own editors.
 --- @param gestures table The gestures facade.
 --- @param action string The action being configured.
 --- @param spec string Its parameter kind.
@@ -335,6 +426,9 @@ function M.ask_parameter_value(gestures, action, spec, title, prior)
 	if spec == "app" then
 		return dialog.choose_application(prompt, title)
 	end
+	if spec == "path" then return dialog.choose_path(prompt, title) end
+	if spec == "command" then return M.ask_command_parameter(gestures, action, title, prior) end
+	if spec == "apple_shortcut" then return M.ask_apple_shortcut_parameter(gestures, action, title, prior) end
 	local save_btn = i18n.get("button.save")
 	local prompt_ok, button, typed = pcall(dialog.text_prompt,
 		title, prompt, prior, save_btn, i18n.get("button.cancel"))

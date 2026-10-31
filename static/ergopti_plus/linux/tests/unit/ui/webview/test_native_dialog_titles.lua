@@ -295,7 +295,9 @@ h.describe("native caption consumer inventory", function()
 	h.it("(linux-native-titles) every production CLI caption remains in the independently bounded owner inventory", function()
 		local expected = {
 			["ui/text_prompt.lua"] = 1,
-			["ui/app_chooser.lua"] = 2,
+			-- The application picker's two captions, and the open_path picker's two,
+			-- composed through window_titles and proven by test_user_actions.
+			["ui/app_chooser.lua"] = 4,
 			["ui/config_dir_picker.lua"] = 2,
 			["ui/gesture_conflicts.lua"] = 1,
 			["modules/gestures/system_actions.lua"] = 2,

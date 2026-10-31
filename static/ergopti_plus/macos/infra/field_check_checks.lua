@@ -899,6 +899,7 @@ M.checks = {
 	fifo_safety = Session.fifo_safety,
 	slow_lines = Session.slow_lines,
 	pac_fallback = PacFallback.pac_fallback,
+	apple_shortcuts = require("infra.field_check_apple_shortcuts").apple_shortcuts,
 }
 
 --- The Debug menu checks the field run does not ask for, each with the

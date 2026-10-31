@@ -303,6 +303,51 @@ function M.choose_application(message, title)
 	return type(path) == "string" and path ~= "" and path or nil
 end
 
+--- The folder the file-or-folder chooser opens on: the user's home.
+local HOME_DIR = os.getenv("HOME") or "/"
+
+--- Builds the native file-or-folder panel of the open_path editor through the
+--- in-process AppleScript port: any file or folder may be chosen, and an alias
+--- resolves to the item it names.
+--- @param message string The panel's unchanged message.
+--- @param title string|nil The translated, brandless parameter title.
+--- @return string script The escaped native panel source.
+function M.path_picker_script(message, title)
+	return text_utils.applescript_format([[
+use framework "AppKit"
+use scripting additions
+set panel to current application's NSOpenPanel's openPanel()
+panel's setTitle:"%s"
+panel's setMessage:"%s"
+panel's setDirectoryURL:(current application's NSURL's fileURLWithPath:"%s")
+panel's setCanChooseFiles:true
+panel's setCanChooseDirectories:true
+panel's setAllowsMultipleSelection:false
+panel's setTreatsFilePackagesAsDirectories:false
+panel's setResolvesAliases:true
+set response to panel's runModal()
+if response is not (current application's NSModalResponseOK) then return missing value
+set chosenURLs to panel's |URLs|()
+if (chosenURLs's |count|()) is 0 then return missing value
+set chosenURL to chosenURLs's firstObject()
+return (chosenURL's |path|()) as text
+]], WindowTitles.compose(title), message, HOME_DIR)
+end
+
+--- Focus-aware file-or-folder chooser for the open_path editor. Modal, like
+--- choose_application, and opened from a menu, never from the keyboard tap.
+--- @param message string The panel's message.
+--- @param title string|nil The translated, brandless parameter title.
+--- @return string|nil path The chosen path, nil when cancelled.
+function M.choose_path(message, title)
+	focus_hammerspoon()
+	local ok, path = Logger.run_modal(hs.osascript.applescript, M.path_picker_script(message, title))
+	if ok ~= true then
+		error("dialog_util.choose_path: the native file-or-folder picker failed", 2)
+	end
+	return type(path) == "string" and path ~= "" and path or nil
+end
+
 --- Focus-aware wrapper around hs.dialog.alert (the non-blocking variant).
 --- Focusing is still useful so the alert renders on top of the user's current
 --- app and its auto-dismiss / button-click behaviour is predictable.

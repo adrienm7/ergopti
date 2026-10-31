@@ -435,6 +435,9 @@ local function _build_shortcuts(ctx)
 					return require("ui.app_chooser").pick(require("adapters.shell_runner"), gestures.get_action_parameter_prompt(action))
 				end
 				local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", gestures.get_action_label(action))
+				if require("ui.user_action_editor").KINDS[spec] then
+					return require("ui.user_action_editor").ask(spec, title, gestures.get_action_parameter_prompt(action), prior)
+				end
 				-- A backend is picked from a list, as on the action picker page.
 				if spec == "llm_vision" then return require("ui.vision_parameter_prompt").ask(title, prior) end
 				return prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)

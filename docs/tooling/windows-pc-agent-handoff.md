@@ -88,6 +88,27 @@ only by static and JS tests. Once it lands on `dev`:
   closed `reason` from `_shared/modules/logger/vocabulary.json` (add it there
   deliberately, then `npm run codegen:contracts`) and put the detail in the
   message.
+- Three new assignable actions are `hs,linux` (`run_command`, `open_path`) and
+  `hs` (`run_apple_shortcut`, macOS only) in `actions.toml`
+  (`feat/actions-command-path-shortcut`). Their Windows half, under
+  AutoHotkey: (1) `run_command` (kind `command`, versioned JSON pinned by
+  `_shared/tests/corpus/action_parameters/user_action_vectors.json`): run the
+  line with `cmd.exe /d /s /c` (or PowerShell, decide and document) hidden,
+  bounded by `[gestures] run_command_timeout_ms` and
+  `[limits] user_action_output_bytes`, exit code logged, first stderr line
+  notified (`user_actions.command_failed_detail`), stdout typed or copied, or
+  in a new console window (`mode = "terminal"`); the command text never in a
+  log line. (2) `open_path` (kind `path`): `ShellExecute` open of the file or
+  folder chosen in a `FileSelect` file/folder picker, a missing path refused
+  with `user_actions.path_missing`; the corpus rule is POSIX (an absolute
+  `/` path), so Windows needs its own drive-letter syntax in
+  `user_action_parameter` and the corpus first. Add `command` and `path` to
+  `GestureValidateActionParameter` / `GestureActionParameterPrompt`
+  (`modules/gestures/config.ahk`), replay the corpus in an AHK test, then add
+  `ahk` to both `platform` lines and regenerate the catalogue. All the locale
+  keys exist in the 21 locales (`sg_actions.run_command`,
+  `dialog.gestures.param_command*`, `dialog.gestures.param_path*`,
+  `user_actions.*`).
 
 - False-green ratchet red on dev since 9aa90d28a5's batch:
   `tools/test/find-false-greens.cjs` reports an unfloored source-scan loop in
