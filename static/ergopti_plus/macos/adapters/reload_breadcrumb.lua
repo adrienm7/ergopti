@@ -39,7 +39,7 @@ M.BOOT = "boot"
 
 -- A boot appends only to a trail at most this long: boots with no reload in
 -- between must not grow it without bound
-M.MAX_BYTES = 8192
+M.TRAIL_MAX_BYTES = 8192
 
 -- Stage names: a closed vocabulary of lower-case words, digits, "_" and "-"
 local STAGE_PATTERN = "^[a-z][a-z0-9_%-]*$"
@@ -119,7 +119,7 @@ function M.record_boot()
 	if not ok or not handle then return false end
 	local size_ok, size = pcall(function() return handle:seek("end") end)
 	pcall(function() handle:close() end)
-	if not size_ok or type(size) ~= "number" or size > M.MAX_BYTES then return false end
+	if not size_ok or type(size) ~= "number" or size > M.TRAIL_MAX_BYTES then return false end
 	return write_line("ab", M.BOOT)
 end
 
