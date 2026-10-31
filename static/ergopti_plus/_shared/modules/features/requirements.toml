@@ -95,7 +95,7 @@ summary = "xdotool, X11 only: pointer, window and screen queries and actions"
 
 [requirements.wmctrl]
 kind = "program"
-summary = "wmctrl, X11 only: workspace switching"
+summary = "wmctrl, X11 only: workspace switching and the window list minimize_all walks"
 
 [requirements.zenity]
 kind = "program"
@@ -223,6 +223,7 @@ content = ['["\x27]xdotool[ "\x27]']
 content = ['["\x27]wmctrl[ "\x27]', 'has_command\("wmctrl"']
 
 [detection.linux.wmctrl.owners]
+"modules/gestures/system_actions.lua" = ["gestures.*"]
 "modules/gestures/workspace_switcher.lua" = ["gestures.*"]
 
 [detection.linux.wmctrl.plumbing]
