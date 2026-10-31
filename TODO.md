@@ -568,8 +568,9 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       VirtualHIDDevice update offer (signed payload supplier), WP8 native acceptance, WP9 real-Mac
       acceptance, WP10 enable and retire (with the menu text for the close option).
       Next: the maintainer's `bash tools/dev/collect-macos-field-report.sh` (`field_owned_runtime`, and on an
-      owned boot `field_owned_activation`: artifact downloaded and verified, inactive with Tap-Hold off, ready
-      with it on, the user's Karabiner closed then given back, the switch restored).
+      owned boot `field_owned_start`: artifact verified, runtime ready, the user's Karabiner closed; then
+      `field_owned_pause`: the controlled pause stops ours and gives theirs back, the resume follows the run
+      and reloads, so the next run's `field_owned_start` proves close-on-resume).
 
 ## Big item 3: Windows input-hook architecture (items 49, 91, 50)
 
@@ -1234,6 +1235,11 @@ not open software work.
   macOS version, read from `HOSTS` in `tools/ci/macos-stage-roles.cjs`.
 - **Windows unit shards are grouped by test category, not by duration.** A new test file with no
   category fails a gate; a minute more of wall time buys a CI whose red job says what broke.
+- **Ergopti's own Karabiner follows Ergopti running, not a menu switch (2026-10-31, ADR 011).** While
+  Ergopti runs and is not paused it always uses its own Karabiner runtime and closes a running user
+  Karabiner-Elements; paused or quit, it stops its runtime and restarts the user's Karabiner only if it
+  closed it (a persisted marker, so a crash or forced quit still restores it). No Tap-Hold or other
+  switch takes part, and the shared-mode merge into the user's `karabiner.json` is retired.
 - **Maintainer workflow**: partial work is delivered into dev after the feasible container or CI
   work, with native or device gaps documented here rather than holding a branch.
 
