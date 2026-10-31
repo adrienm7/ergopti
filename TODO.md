@@ -725,9 +725,10 @@ Added October 22 (from the agents' reports; details in their commits):
       company PAC, direct route when the PAC names none, no retry of a refused route, the lookup's failing step
       named, the lease line cap, the Ollama 412 upgrade request, the diagnostics PAC probe. The field run answers (1)
       (`field_slow_lines`) and (3) (`field_local_servers`); (4) is in "macOS main-thread holds"; (7) is "PAC
-      unusable: direct fallback". Left [CODE]: (2) an explicit proxy override field; (5) rebuild the inverse oracle
-      of `macos_native_http_receiving_facts_test`, compile the Swift on macOS CI, add Go table cases for the new
-      stages; (6) the network check's digest step is skipped (HEAD only).
+      unusable: direct fallback". (5) the receiving-facts inverse oracle passes (100 tests, count fixed in
+      25dd84e4) and the Go transport replays the six PAC/WPAD stages (49e77217); (6) the network check downloads
+      the pinned input and checks its SHA-256 (eae26498). Left [CODE]: (2) an explicit proxy override field; [CI]
+      the macOS lane compiles the Swift and runs the Go cells.
 - [ ] **Developer mode on the three OS (maintainer decision, 27 October).** [CODE] [PHYS-W] [PHYS-M] [PHYS-L] Done:
       macOS `bash tools/dev/run-macos-dev-app.sh`, Linux `bash tools/dev/run-linux-dev.sh`, Windows
       `tools\dev\run-windows-dev.ps1`; inventory in `docs/design/developer-mode.md`. Left: (1) [PHYS-W] the
