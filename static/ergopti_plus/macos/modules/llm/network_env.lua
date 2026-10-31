@@ -78,6 +78,22 @@ local function route_inventory()
 	return inventory, nil
 end
 
+-- The contract of the local sign-in relay (docs/design/proxy-auth-relay.md).
+local RELAY_RELATIVE = "/../_shared/modules/network/proxy_auth_relay.json"
+
+--- The shared sign-in relay policy (network/proxy_auth_relay.lua).
+--- @return table|nil policy
+--- @return string|nil err Why the contract cannot be used.
+function M.proxy_auth_relay()
+	local root = driver_root()
+	if not root then return nil, "the bundled relay contract owner is missing" end
+	local ok, bytes, status = pcall(FileSystem.read_with_status, root .. RELAY_RELATIVE, function() end)
+	if not ok or status ~= "ok" or type(bytes) ~= "string" then return nil, "the relay contract is unreadable" end
+	local decoded, contract = pcall(Json.decode, bytes)
+	if not decoded then return nil, "the relay contract is unreadable" end
+	return require("network.proxy_auth_relay").new(contract)
+end
+
 --- Seconds one origin's route lookup may take (route_origins.json).
 --- @return number|nil seconds
 --- @return string|nil err Why the inventory cannot be used.

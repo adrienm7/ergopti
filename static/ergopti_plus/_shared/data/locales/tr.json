@@ -287,6 +287,7 @@
 	"field_check.step.transfer": "İndirme sunucusuna deneme isteği",
 	"field_check.step.digest": "İndirme bütünlüğü denetimi",
 	"field_check.step.route_plan": "Ollama daemon'unun her indirme kaynağının izlediği yol (doğrudan veya bir aktarıcı üzerinden)",
+	"field_check.step.proxy_relay": "Seçilen proxy'nin istediği oturum açma (yok veya Ergopti'nin yerel aktarıcısı tarafından yanıtlanır)",
 	"launcher.fatal.stage_detail": "Adım: {1}\nNeden: {2}\nAyrıntılar {3} konumuna kaydedildi.",
 	"launcher.fatal.component_detail": "Bileşen: {1}\nNeden: {2}\nAyrıntıların kaydedildiği yer:\n{3}",
 	"menu.llm.deps_download_page_failed": "Ollama indirme sayfası açılamadı.",
