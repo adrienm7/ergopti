@@ -724,7 +724,6 @@
 	"healthcheck.field.runtime": "रनटाइम",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "वेब व्यू इंजन",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "मॉडल",
 	"healthcheck.field.cpu": "प्रोसेसर",
 	"healthcheck.field.cpu_cores": "लॉजिकल कोर",

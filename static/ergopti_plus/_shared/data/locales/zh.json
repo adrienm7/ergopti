@@ -724,7 +724,6 @@
 	"healthcheck.field.runtime": "运行时",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "网页视图引擎",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "型号",
 	"healthcheck.field.cpu": "处理器",
 	"healthcheck.field.cpu_cores": "逻辑核心",

@@ -13,7 +13,7 @@
 --- 1. One collector per section, each isolated: a report exists to be read
 ---    when things are broken, so one collector raising costs its own section,
 ---    never the window. Phase A reads /proc, /sys and daemon memory only.
---- 2. The probes (api.github.com, the AI backend, kanata and df) run as curl
+--- 2. The probes (api.github.com, the AI backend and df) run as curl
 ---    and child processes owned by libuv; their answers are pushed into the
 ---    page only while the page they were started for is still open.
 --- 3. Every page message is validated by healthcheck.actions before anything

@@ -212,12 +212,6 @@
 					"id": "webview",
 					"type": "text",
 					"platforms": ["windows", "linux"]
-				},
-				{
-					"id": "kanata",
-					"type": "text",
-					"platforms": ["linux"],
-					"probe": "system_details"
 				}
 			]
 		},
@@ -943,9 +937,6 @@
 									"kind": "version"
 								},
 								"webview": {
-									"kind": "version"
-								},
-								"kanata": {
 									"kind": "version"
 								},
 								"commit": {
