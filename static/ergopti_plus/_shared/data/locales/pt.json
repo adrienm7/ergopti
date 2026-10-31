@@ -2074,6 +2074,8 @@
 	"menu.tapholds.guardian_unavailable": "🔴 Inativos: o assistente em segundo plano do ErgoptiPlus não está registado (verifique Elementos de início de sessão e depois feche e abra o ErgoptiPlus novamente)",
 	"menu.tapholds.legacy_rules_pending": "⚠️ Regras antigas do ErgoptiPlus bloqueiam as suas definições: removê-las…",
 	"menu.tapholds.close_other_karabiner": "Fechar outros Karabiner enquanto os tap-holds estiverem ativados (restaurados depois)",
+	"menu.tapholds.vhid_incompatible": "⚠️ Tap-holds em pausa: outra versão do driver do Karabiner está instalada e o macOS só ativa uma",
+	"menu.tapholds.vhid_not_active": "⚠️ Tap-holds em pausa: permita o driver de teclado virtual do Karabiner nos Ajustes do Sistema",
 	"menu.tapholds.open_login_items": "Abrir as definições de Elementos de início de sessão…",
 	"menu.tapholds.show_login_items_steps": "Mostrar os passos para permitir o ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 Definições do teclado guardadas: aplicam-se assim que o ErgoptiPlus for permitido em Elementos de início de sessão (clique para abrir as definições).",
