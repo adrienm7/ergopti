@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"description": "Decided policy for every third-party program or runtime the three drivers depend on. docs/design/owned-runtimes.md renders its tables from these rows (tools/codegen/codegen-owned-runtimes.cjs) and tools/test/test-owned-runtimes-inventory.cjs fails when a program the macOS or Linux driver starts is in no row's \"programs\".",
+	"description": "Decided policy for every third-party program or runtime the three drivers depend on. docs/design/owned-runtimes.md renders its tables from these rows (tools/codegen/codegen-owned-runtimes.cjs) and tools/test/test-owned-runtimes-inventory.cjs fails when a program a driver starts is in no row's \"programs\".",
 	"decided_on": "2026-10-31",
 	"decision_classes": {
 		"PIN": {
@@ -1158,7 +1158,7 @@
 		{
 			"os": "windows",
 			"tool": "Ollama",
-			"programs": [],
+			"programs": ["ollama.exe"],
 			"used_for": "Local inference (`windows/modules/llm/ollama_runtime_owner.ahk`, `ollama_managed_bootstrap.ahk`, PowerShell helpers `ollama_managed_files.ps1`, `ollama-runtime-launch.ps1`)",
 			"today": "Managed pinned 0.40.4 (`_shared/modules/llm/ollama_release.json`: 1.47 GB amd64, 210 MB arm64), on its own port `llm_ollama_owned_port` = 11435; 11434 is refused and only the owned runtime is launched",
 			"current_class": "PIN",
@@ -1302,6 +1302,51 @@
 			"pin_possible": "n/a",
 			"decision": "NA",
 			"decision_text": "Not applicable (App Cloner is macOS only)",
+			"alternative": null,
+			"status": "done"
+		},
+		{
+			"os": "windows",
+			"tool": "`explorer.exe`, `notepad.exe`, `regedit.exe`, `wt.exe`",
+			"programs": ["explorer.exe", "notepad.exe", "regedit.exe", "wt.exe"],
+			"used_for": "Open a folder or a file, the Regedit shortcut, a terminal action (`windows/adapters/network_failure_host.ahk`, `windows/modules/shortcuts/win.ahk`, `windows/adapters/system_control.ahk`)",
+			"today": "System; `wt.exe` is the Windows Terminal alias, absent on some systems",
+			"current_class": "SYS",
+			"version_needed": "n/a",
+			"if_missing": "The action reports it; without `wt.exe` the terminal action is unavailable",
+			"pin_possible": "No (OS)",
+			"decision": "SYS",
+			"decision_text": "SYS",
+			"alternative": null,
+			"status": "done"
+		},
+		{
+			"os": "windows",
+			"tool": "`msedge.exe`",
+			"programs": ["msedge.exe"],
+			"used_for": "Metrics page opened in an app window (`windows/modules/keystats/keystats_ui.ahk`)",
+			"today": "System copy, searched in its three install folders",
+			"current_class": "OPT",
+			"version_needed": "any",
+			"if_missing": "The page opens another way or reports it",
+			"pin_possible": "No (a system component)",
+			"decision": "OPT",
+			"decision_text": "OPT",
+			"alternative": null,
+			"status": "done"
+		},
+		{
+			"os": "windows",
+			"tool": "`ergoptiplus.exe`, `ergoptiplus_new.exe`",
+			"programs": ["ergoptiplus.exe", "ergoptiplus_new.exe"],
+			"used_for": "Ergopti's own binary and its staged update (`windows/modules/updater/self_update.ahk`)",
+			"today": "Ergopti's own",
+			"current_class": "NA",
+			"version_needed": "n/a",
+			"if_missing": "n/a",
+			"pin_possible": "Built here",
+			"decision": "NA",
+			"decision_text": "Not applicable (built by this repository)",
 			"alternative": null,
 			"status": "done"
 		}
