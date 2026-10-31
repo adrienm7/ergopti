@@ -779,6 +779,24 @@ model until that launcher applies the plan. Action: add a new
 environment-driven client to `route_origins.json` and plan it; never put a
 managed HTTP download on a plan.
 
+### project-proxy-override-wins-before-the-pac-lookup
+
+The user's proxy override (`_shared/modules/network/proxy_override.json` for
+the storage key and default, `_shared/lua/network/proxy_override.lua` for the
+value grammar) is empty (automatic), `direct`, or one relay `route_plan.lua`
+accepts. `proxy_policy.route` applies it right after loopback, so it wins over
+an exported relay and the PAC/WPAD lookup never runs. Linux hands it to every
+route through `infra/proxy_policy.lua` (managed HTTP gets the existing
+`selected`/`direct` curl selections, the Ollama daemon its `HTTPS_PROXY` or
+`NO_PROXY=*`). macOS exports `ERGOPTI_PROXY_OVERRIDE` at the head of every
+`network_env.lua` prelude and `network-retry.sh` turns it into the explicit
+route before capturing the inherited one; the signed Swift workers resolve
+natively and never read it, so an override selects the environment-driven
+client instead (opaque prelude, no `install_huggingface_transport`). macOS
+`hs.http` requests (update checks) still follow the system settings. Action: a
+new download client on macOS must take its prelude from `network_env.lua`, and
+a new native worker must read the override before claiming it honours it.
+
 ### project-metrics-day-and-correction-semantics
 
 Metrics raw days use the local calendar day and "yesterday" is derived at noon
