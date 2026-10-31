@@ -1684,7 +1684,7 @@
 				["open_metrics_apps", "📊 Statistiky aplikací", "action"],
 				["open_hotstrings_editor", "⌨ Editor hotstring", "action"],
 				["open_paths_editor", "📂 Editor cest", "action"],
-				["open_hotstrings_settings", "⚙ Zpoždění a barvy hotstring", "action"],
+				["open_hotstrings_settings", "⚙ Zpoždění a barvy hotstringů", "action"],
 				["open_layout_manager", "⌨ Rozložení klávesnice", "action"],
 				["open_layer_editor", "🧭 Navigační vrstva", "action"],
 				["open_model_browser", "🤖 Katalog modelů", "action"],
