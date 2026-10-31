@@ -103,7 +103,9 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //           21 → 20 (2026-10-31: the noise filter test answers real requests
 //                    through the prediction pipeline instead of reading
 //                    prediction_engine.lua.)
-const BASELINE = 20;
+//           20 → 19 (2026-10-31: the physical shortcut hook test loads its
+//                    module by name.)
+const BASELINE = 19;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -147,7 +149,9 @@ const BASELINE = 20;
 //       66 → 65 (2026-10-31: the noise filter test answers real requests
 //              through the prediction pipeline instead of reading
 //              prediction_engine.lua.)
-const READ_BASELINE = 65;
+//       65 → 64 (2026-10-31: the physical shortcut hook test loads its module
+//              by name.)
+const READ_BASELINE = 64;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
