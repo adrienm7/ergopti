@@ -440,6 +440,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 	loaded["adapters.one_shot_shift"] = nil
 	-- The console owner captures the native API and must follow the current stub.
 	loaded["ui.console_window"] = nil
+	-- The Accessibility adapter remembers which application left a read
+	-- unanswered and captures hs: each test starts with no cooldown.
+	loaded["adapters.accessibility_permission"] = nil
 
 	-- Drop every cached modules.keymap.registry* sub-module (registry.lua was split
 	-- into registry_groups.lua + registry_index.lua). All three capture `local hs = hs`
