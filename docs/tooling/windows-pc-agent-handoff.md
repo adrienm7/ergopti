@@ -75,6 +75,13 @@ only by static and JS tests. Once it lands on `dev`:
 
 ## Found tonight for the PC agent
 
+- Logger scalar gate red on dev since the PC batch of 2026-10-31 evening:
+  `tools/test/test-logger-scalars-single-source.cjs` reports 3 free-form reason
+  literals in `windows/infra/lifecycle.ahk` against a baseline of 2. Use a
+  closed `reason` from `_shared/modules/logger/vocabulary.json` (add it there
+  deliberately, then `npm run codegen:contracts`) and put the detail in the
+  message.
+
 - False-green ratchet red on dev since 9aa90d28a5's batch:
   `tools/test/find-false-greens.cjs` reports an unfloored source-scan loop in
   `windows/tests/unit/infra/config/scope/test_hotstring_dynamic_menu_scope.ahk:26`
