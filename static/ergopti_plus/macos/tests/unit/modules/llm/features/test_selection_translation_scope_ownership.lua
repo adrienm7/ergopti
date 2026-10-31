@@ -19,6 +19,8 @@ require("llm.api_url_template") -- pure: the remote backend fills per-account ad
 require("llm.api_token_exchange") -- pure: the remote backend reads auth blocks with it
 require("perf_budget") -- pure: the remote backend judges its request time with it
 require("infra.main_thread_hold") -- pure: the logger reads its read-only hold bounds from it
+require("llm.local_server_fingerprint") -- pure: the local server rows identify a server by its models answer
+require("llm.local_server_menu") -- pure: the remote backend names the local server rows with it
 local World = require("tests.support.modules.llm.selection_translation_fixture")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
 local SharedLogger = require("logger")
