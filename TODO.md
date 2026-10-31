@@ -354,9 +354,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       ready with a `guardian_wait` under 10 s.
 - [ ] **Timed reload lost the app (2026-10-30 21:06).** [CODE] [PHYS-M] Done: the reload breadcrumb
       (`reload_breadcrumb.txt`, b12a654d79), the error window kept closed during a reload (02c58f8a94), a controlled
-      reload bounded by its own deadline (c366dd1c5b); `driver_reload` stays disabled. Left: reload by hand from the
-      menu until one is lost, run the collector, fix the stage the trail's last line names, then enable
-      `driver_reload` again.
+      reload bounded by its own deadline (c366dd1c5b). The 2026-10-31 trails ended at `teardown_failed`: the owned
+      Ollama daemon refused the teardown (c0ba1d98bb), a refusing step is now named (8121349ee7), a failed reload
+      teardown reloads natively (e6426e2ec5), and `driver_reload` is enabled again. Left: the next field run shows
+      `driver_reload` pass and `reload.request_to_boot` under its 4000 ms budget.
 
 ## Maintainer: remote branch cleanup (run on your machine; the cloud container's proxy refuses ref deletion and tag pushes)
 
