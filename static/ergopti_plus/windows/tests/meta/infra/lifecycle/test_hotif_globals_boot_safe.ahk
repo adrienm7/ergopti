@@ -223,37 +223,61 @@ _HGBS_PathTo(Fn) {
 ; Function names called in a snippet, minus the language constructs and the
 ; control-flow keywords AHK spells with parentheses.
 _HGBS_CodeOnly(Text) {
+	static Memo := Map()
+	; Keyed by content, so the many repeated bodies and the unmutated driver are
+	; scanned once; a mutant is a different key and gets its own scan.
+	if Memo.Has(Text)
+		return Memo[Text]
+	Original := Text
 	Text := _DriverMaskBlockComments(&Text)
 	Out := ""
 	Quote := ""
+	Len := StrLen(Text)
 	i := 1
-	while (i <= StrLen(Text)) {
-		Ch := SubStr(Text, i, 1)
+	while (i <= Len) {
 		if (Quote != "") {
-			if (Ch == Chr(96)) {
+			; Native search over the quoted run; only delimiters need a decision.
+			Next := RegExMatch(Text, "[" . Chr(96) . Quote . "]", , i)
+			End := Next ? Next - 1 : Len
+			Out .= _HGBS_BlankKeepingLf(SubStr(Text, i, End - i + 1))
+			if !Next
+				break
+			if (SubStr(Text, Next, 1) == Chr(96)) {
 				Out .= "  "
-				i += 2
+				i := Next + 2
 				continue
 			}
-			if (Ch == Quote)
-				Quote := ""
-			Out .= (Ch == "`n") ? "`n" : " "
-		} else if (Ch == Chr(34) or Ch == Chr(39)) {
-			Quote := Ch
+			Quote := ""
 			Out .= " "
-		} else if (Ch == ";") {
-			LineEnd := InStr(Text, "`n", , i)
+			i := Next + 1
+			continue
+		}
+		Next := RegExMatch(Text, "[" . Chr(34) . Chr(39) . Chr(59) . "]", , i)
+		if !Next {
+			Out .= SubStr(Text, i)
+			break
+		}
+		Out .= SubStr(Text, i, Next - i)
+		Ch := SubStr(Text, Next, 1)
+		if (Ch == ";") {
+			LineEnd := InStr(Text, "`n", , Next)
 			if !LineEnd
 				break
 			Out .= "`n"
 			i := LineEnd + 1
 			continue
-		} else {
-			Out .= Ch
 		}
-		i++
+		Quote := Ch
+		Out .= " "
+		i := Next + 1
 	}
+	Memo[Original] := Out
 	return Out
+}
+
+; Blanks a quoted run: only LF survives, so line structure is unchanged.
+_HGBS_BlankKeepingLf(Run) {
+	return RegExReplace(Run, "[^\n]", " ")
 }
 
 _HGBS_CalleesIn(Text) {
@@ -399,6 +423,52 @@ _HGBS_CalleeScannerIgnoresNonCodeAndMethods() {
 	AssertEqual("RealCall", Calls[1])
 }
 
+
+; The character-level definition the native code scanner must keep matching.
+_HGBS_CodeOnlyOracle(Text) {
+	Text := _DriverMaskBlockComments(&Text)
+	Out := "", Quote := "", i := 1
+	while (i <= StrLen(Text)) {
+		Ch := SubStr(Text, i, 1)
+		if (Quote != "") {
+			if (Ch == Chr(96)) {
+				Out .= "  "
+				i += 2
+				continue
+			}
+			if (Ch == Quote)
+				Quote := ""
+			Out .= (Ch == "`n") ? "`n" : " "
+		} else if (Ch == Chr(34) or Ch == Chr(39)) {
+			Quote := Ch
+			Out .= " "
+		} else if (Ch == Chr(59)) {
+			LineEnd := InStr(Text, "`n", , i)
+			if !LineEnd
+				break
+			Out .= "`n"
+			i := LineEnd + 1
+			continue
+		} else {
+			Out .= Ch
+		}
+		i++
+	}
+	return Out
+}
+
+_HGBS_CodeOnlyMatchesItsDefinition() {
+	Q := Chr(34), A := Chr(39), B := Chr(96), C := Chr(59)
+	for Sample in ["", "plain", Q . "x" . Q . " y", A . "it" . Q . "s" . A . "z",
+		Q . "a" . B . Q . "b" . Q . "c", Q . "line`nnext" . Q . "d", Q . "open", Q . "tail" . B,
+		"code " . C . " note`nnext", "code " . C . " last", C . Q . "`nafter", "a`r`n" . Q . "b`r`nc" . Q]
+		AssertEqual(_HGBS_CodeOnlyOracle(Sample), _HGBS_CodeOnly(Sample), "code scanner sample " . A_Index)
+	Entry := _HGBS_EntrySource()
+	Assert(Entry != "", "the differential must cover the actual entry source")
+	Assert(_HGBS_CodeOnlyOracle(Entry) == _HGBS_CodeOnly(Entry), "the native scanner must equal its definition on the entry")
+}
+Test("meta hotif-globals-boot-safe: native code scanner equals its definition (meta-source-memo)",
+	_HGBS_CodeOnlyMatchesItsDefinition)
 
 Test("meta hotif-globals-boot-safe: the pre-pump block still seeds what it promises",
 	_HGBS_SeedsSurviveInThePrePumpBlock)
