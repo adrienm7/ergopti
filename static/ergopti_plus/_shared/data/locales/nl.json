@@ -1406,7 +1406,7 @@
 	"menu.debug.hook_probe": "Volgorde van toetsenbord-hooks vastleggen",
 	"menu.debug.composer_check": "Samengestelde indeling testen",
 	"platform_reason.action_apple_shortcuts_are_macos": "Alleen macOS: Apple Opdrachten bestaan alleen op macOS. Voer elders in plaats daarvan een opdracht of een programma uit.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "Op Windows doet ‘Een programma uitvoeren’ hetzelfde: cmd.exe of powershell.exe met de opdracht als argumenten, of explorer.exe met het te openen bestand of de map.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "Op Windows doet ‘Een programma uitvoeren’ hetzelfde: cmd.exe met de opdracht als argumenten, of explorer.exe met het te openen bestand of de map.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Deze controles meten SendInput van AutoHotkey en de toetsenbordhook, die alleen het Windows-stuurprogramma heeft.",
 	"input_probe.title": "Invoercontrole",
 	"input_probe.confirm": "Deze controle opent een klein venster en typt er ongeveer {1} seconden in. Typ of klik ondertussen nergens anders. Doorgaan?",

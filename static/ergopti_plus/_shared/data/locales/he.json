@@ -1406,7 +1406,7 @@
 	"menu.debug.hook_probe": "תיעוד סדר הוקים של המקלדת",
 	"menu.debug.composer_check": "בדיקת הפריסה המורכבת",
 	"platform_reason.action_apple_shortcuts_are_macos": "macOS בלבד: קיצורי Apple קיימים רק ב־macOS. במערכות אחרות, הריצו במקום זאת פקודה או תוכנה.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "ב־Windows, „הפעלת תוכנה” עושה את אותו הדבר: cmd.exe או powershell.exe עם הפקודה כארגומנטים, או explorer.exe עם הקובץ או התיקייה לפתיחה.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "ב־Windows, „הפעלת תוכנה” עושה את אותו הדבר: cmd.exe עם הפקודה כארגומנטים, או explorer.exe עם הקובץ או התיקייה לפתיחה.",
 	"platform_reason.input_probe_is_autohotkey_specific": "בדיקות אלה מודדות את SendInput של AutoHotkey ואת הוק המקלדת שלו, שיש רק במנהל ההתקן של Windows.",
 	"input_probe.title": "בדיקת קלט",
 	"input_probe.confirm": "הבדיקה פותחת חלון קטן ומקלידה בו כ-{1} שניות. אל תקלידו ואל תלחצו במקום אחר בינתיים. להמשיך?",
