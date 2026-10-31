@@ -1756,6 +1756,8 @@
 	"menu.llm.api_no_entry": "לא הוגדרה נקודת קצה API",
 	"menu.llm.api_prompt_field.account": "מזהה החשבון (החלק שלפני ‎.snowflakecomputing.com):",
 	"menu.llm.api_prompt_field.account_id": "מזהה חשבון:",
+	"menu.llm.api_prompt_field.location": "מיקום (לדוגמה global):",
+	"menu.llm.api_prompt_field.project": "מזהה פרויקט Google Cloud:",
 	"menu.llm.api_prompt_field.region": "אזור (לדוגמה us-east-1):",
 	"menu.llm.api_prompt_field.resource": "שם המשאב (החלק שלפני ‎.openai.azure.com):",
 	"menu.llm.api_prompt_field.workspace": "מארח סביבת העבודה (לדוגמה dbc-1234.cloud.databricks.com):",

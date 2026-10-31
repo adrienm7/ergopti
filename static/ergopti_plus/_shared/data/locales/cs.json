@@ -1756,6 +1756,8 @@
 	"menu.llm.api_no_entry": "Žádný API endpoint není nastaven",
 	"menu.llm.api_prompt_field.account": "Identifikátor účtu (část před .snowflakecomputing.com):",
 	"menu.llm.api_prompt_field.account_id": "ID účtu:",
+	"menu.llm.api_prompt_field.location": "Umístění (například global):",
+	"menu.llm.api_prompt_field.project": "ID projektu Google Cloud:",
 	"menu.llm.api_prompt_field.region": "Oblast (například us-east-1):",
 	"menu.llm.api_prompt_field.resource": "Název prostředku (část před .openai.azure.com):",
 	"menu.llm.api_prompt_field.workspace": "Hostitel pracovního prostoru (například dbc-1234.cloud.databricks.com):",

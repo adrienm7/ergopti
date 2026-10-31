@@ -23,6 +23,7 @@ local SHARED = helpers.driver_root() .. "/../_shared/"
 
 local ThinkingOff = require("llm.thinking_off")
 local UrlTemplate = require("llm.api_url_template")
+local TokenExchange = require("llm.api_token_exchange")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -40,8 +41,9 @@ end
 -- ======= 1/ Catalogue coverage ==============
 -- ============================================
 
---- The shipped thinking dialect kinds an OpenAI-format body can carry.
-local OPENAI_KINDS = { toggle = true, effort = true }
+--- The shipped thinking dialect kinds an OpenAI-format body can carry: Vertex
+--- AI takes the Gemini levels (minimal, low) as reasoning_effort.
+local OPENAI_KINDS = { toggle = true, effort = true, gemini_level = true }
 -- The wire formats whose providers chat and list their models.
 local CHAT_FORMATS = { openai = true, anthropic = true, gemini = true }
 
@@ -97,6 +99,8 @@ helpers.describe("api_providers.json: every concrete provider is usable and cove
 				else
 					helpers.assert_true(type(desc.default_model) == "string" and desc.default_model ~= "", id .. ": default model")
 				end
+				local _, auth_problem = TokenExchange.parse(desc.auth)
+				helpers.assert_nil(auth_problem, id .. ": auth block")
 				local dialect, problem = ThinkingOff.parse_dialect(desc.thinking_dialect)
 				helpers.assert_true(dialect ~= nil, id .. ": " .. tostring(problem))
 				if desc.format == "openai" then

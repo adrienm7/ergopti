@@ -1756,6 +1756,8 @@
 	"menu.llm.api_no_entry": "API не налаштовано",
 	"menu.llm.api_prompt_field.account": "Ідентифікатор облікового запису (частина перед .snowflakecomputing.com):",
 	"menu.llm.api_prompt_field.account_id": "ID облікового запису:",
+	"menu.llm.api_prompt_field.location": "Розташування (наприклад, global):",
+	"menu.llm.api_prompt_field.project": "ID проєкту Google Cloud:",
 	"menu.llm.api_prompt_field.region": "Регіон (наприклад, us-east-1):",
 	"menu.llm.api_prompt_field.resource": "Назва ресурсу (частина перед .openai.azure.com):",
 	"menu.llm.api_prompt_field.workspace": "Хост робочої області (наприклад, dbc-1234.cloud.databricks.com):",

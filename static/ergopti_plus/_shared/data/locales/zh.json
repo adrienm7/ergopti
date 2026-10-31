@@ -1756,6 +1756,8 @@
 	"menu.llm.api_no_entry": "尚未配置 API 端点",
 	"menu.llm.api_prompt_field.account": "账户标识符（.snowflakecomputing.com 之前的部分）：",
 	"menu.llm.api_prompt_field.account_id": "账户 ID：",
+	"menu.llm.api_prompt_field.location": "位置（例如 global）：",
+	"menu.llm.api_prompt_field.project": "Google Cloud 项目 ID：",
 	"menu.llm.api_prompt_field.region": "区域（例如 us-east-1）：",
 	"menu.llm.api_prompt_field.resource": "资源名称（.openai.azure.com 之前的部分）：",
 	"menu.llm.api_prompt_field.workspace": "工作区主机（例如 dbc-1234.cloud.databricks.com）：",
