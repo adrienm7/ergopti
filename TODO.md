@@ -208,9 +208,11 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      AppKit; its duration in ms, the number of top-level rows and the three slowest rows (`id:ms`) are named.
    - `field_boot_cost` (after `field_composer`): the boot that started the app completed; its wall and CPU
      totals and its slowest stage are named, the three slowest stages in its log window.
-   - `field_idle_cost`: over 30 quiet seconds the driver's process CPU share must stay at or under 3 %
-     (`idle_cpu_percent`); resident memory and its growth, Lua heap growth and main-thread holds over 250 ms
-     in the window are named.
+   - `field_idle_cost`: over 30 quiet seconds, started from a collected heap (`idle_pre_collect_ms`), the
+     driver's process CPU share must stay at or under 3 % (`idle_cpu_percent`); the timer callbacks that ran
+     (`idle_timer_1..3` as `file:line:count:ms`, `idle_timer_ms`, and `idle_other_cpu_ms` for the rest),
+     resident memory and its growth, Lua heap growth and main-thread holds over 250 ms in the window are
+     named.
    - `field_slow_lines`: one `awk` pass over today's log (a summary only reaches the task's pipe) tallies
      the HotPath `Slow <segment>: X ms own` lines by segment, and the `Slow ingest tick`,
      `Slow preferences save`, `Slow ignored-window probe` and over-budget diagnostics lines; `slow_dominant`

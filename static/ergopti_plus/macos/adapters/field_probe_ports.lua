@@ -928,6 +928,10 @@ function M.new()
 		today_log_path = function() return require("infra.logger").today_log_path() end,
 		-- Process CPU and a monotonic clock, both in milliseconds
 		cpu_ms = function() return os.clock() * 1000 end,
+		-- The idle window starts from a collected heap and names its timers.
+		collect_garbage = function() collectgarbage("collect") end,
+		begin_callback_accounting = function() require("infra.logger").begin_callback_accounting() end,
+		end_callback_accounting = function() return require("infra.logger").end_callback_accounting() end,
 		now_ms = function() return hs.timer.absoluteTime() / 1000000 end,
 	}
 end
