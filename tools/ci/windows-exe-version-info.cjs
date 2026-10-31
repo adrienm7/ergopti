@@ -20,7 +20,9 @@ const IDENTITY_DIRECTIVES = Object.freeze({
 	SetDescription: 'FileDescription',
 	SetCopyright: 'LegalCopyright',
 	SetOrigFilename: 'OriginalFilename',
-	SetInternalName: 'InternalName'
+	SetInternalName: 'InternalName',
+	// Ahk2Exe has no SetComments: Set writes any property, from a real string table row.
+	'Set Comments,': 'Comments'
 });
 
 /**
