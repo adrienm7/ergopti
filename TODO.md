@@ -301,11 +301,18 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
     (ended 2026-09-27, still answering), `dashscope-intl`, Moonshot K2 retiring by December.
 - [ ] **Every known local AI server in `local_servers.json`, on the three OS.** [CODE] Detection is data-driven on
       the three OS (Windows `LocalServerPortsDescriptor`, macOS `llm.local_server_ports`, field step
-      `field_local_servers`), but the list still holds only oMLX, LM Studio, llama.cpp and Jan. Left: add vLLM (8000),
-      SGLang (30000), KoboldCpp (5001), text-generation-webui (5000), TabbyAPI (5000), GPT4All (4891), AMD Lemonade
-      (8000), Docker Model Runner (12434), Foundry Local (dynamic port), llamafile (8080), `mlx_lm.server` (8080),
-      exo (52415), Msty and AnythingLLM with their thinking-off dialect, shared ports probed once; then one field
-      report on a Mac running some of them [PHYS-M].
+      `field_local_servers`). Added (b459f5b6, each port and name cited from the project's sources in `_source`):
+      SGLang 30000, KoboldCpp 5001, text-generation-webui 5000, GPT4All 4891, AMD Lemonade 13305 (its documented
+      port, not 8000; `config.json` in `~/.config/lemonade` or `/var/lib/lemonade`), Docker Model Runner 12434
+      (`/engines/v1`), exo 52415, and llamafile in the llama.cpp / LocalAI row; Linux detection proved on real
+      stand-in processes, pgrep, ss and a settings file (99121ade). Left: (1) vLLM and TabbyAPI share 8000 with
+      oMLX and 5000 with text-generation-webui, so a generic entry configured there would belong to two rows:
+      choose one merged row per port (the oMLX label changes on every OS) or order-aware affinity in
+      `local_server_auth.entry_matches`; (2) AnythingLLM always needs a key and takes a workspace slug as the model,
+      Msty documents no port or dialect: both stay out; Foundry Local (Windows) and `mlx_lm.server` (macOS) belong to
+      those drivers; (3) Windows: `test_local_server_auth.ahk` and `test_local_server_panel_view_preparation.ahk`
+      count the four old servers and were not run: run them and read the catalogue; (4) the "none" row lists
+      eleven labels; (5) [PHYS-M] [PHYS-L] one run with some of them installed.
 - [ ] **Mac field report 2026-10-30 21:01, functional errors left open.** Fixed: shortcut full rebind on each
       retry, pre-dispatch Ollama pull receipt, one model-list error per outage, MLX server stopped before a repair,
       both schema versions named, the app-health census on an absent folder. Left, one line per family:
@@ -399,7 +406,7 @@ The July Linux driver plan (X11/Wayland hotstring engine, 2026-07-30) is retired
   speed under the hold follows the virtual device's libinput settings).
 - Remote API keys in the desktop secret service (e93a4f7368; `install.sh` installs `secret-tool`). Left [PHYS-L]: add
   a key with the keyring locked and check the unlock prompt takes the keyboard under the grab, then restart and check
-  the plaintext migration of an older `api_keys.json`. The deb and rpm only recommend libsecret.
+  the plaintext migration of an older `api_keys.json`. The deb, rpm, Arch and Nix packages depend on it (939c0f60).
 
 ## Next fix/<os> agent pass (read when the maintainer asks for a new fix/linux, fix/macos or fix/windows)
 
@@ -599,8 +606,12 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       on the PC and on Linux; maintainer decision for Linux: following a PAC list such as `PROXY a; DIRECT` needs a
       reachability probe of `a` before the daemon starts (today only its first entry is kept).
 - [ ] **AppImage self-contained.** [CI] Built on ubuntu:22.04 (glibc 2.35 floor, no bundled libc or loader, foreign
-      loader refused, dce846a0bd). Left: hosted CI evidence of the Build and `install-linux` AppImage rows on the distro
-      matrix.
+      loader refused, dce846a0bd). Both rows reproduced in a container on 31 October (Docker, registry mirror,
+      proxy CA in the image): the build gives the 16 MB image and its `.zsync`; unpacked `--help`, the glibc ceiling
+      (42 ELF files at most GLIBC_2.35) and the library closure pass; the catalogue smoke shows the XEmbed tray, the
+      status window and the menu on buttons 1 and 3 (`/dev/fuse` must be 0666, as on the runners); the 11-image
+      sweep runs on Ubuntu 22.04 to 26.04, Debian 12 and 13, Fedora, openSUSE Leap and Arch, and refuses in words
+      on Debian 11 (glibc 2.31) and Alpine (musl). Left: the hosted run itself.
 - [ ] **Linux X11 window list.** [CI] `getAll()` covered by the Openbox receipts (962a25a973), passing on Xvfb and
       Openbox in a container. Left: the first hosted run; Flatpak: wmctrl is only a documented host program.
 - [ ] **Windows config policy (items 33, 42) and the TOML parse cost.** [CODE] Done: the Windows
