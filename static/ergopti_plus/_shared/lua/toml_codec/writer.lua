@@ -43,6 +43,33 @@ if not _ok_i18n or type(i18n) ~= "table" then
 end
 local LOG    = "toml_writer"
 local ENOENT_ERROR_CODE = 2
+-- A save and its preflight refuse the same row: one notice is enough.
+local CASE_TWIN_NOTICE_GAP_SECONDS = 5
+local case_twin_reporter = nil
+local case_twin_noticed = { setting = nil, at = 0 }
+-- The setting whose case twin refused the batch being prepared.
+local case_twin_setting = nil
+
+local function case_twin_name(section, key)
+	return section == "" and key or section .. "." .. key
+end
+
+--- Tells the user which setting two spellings make unwritable, and the way out.
+--- @param setting string Dotted name of the refused setting.
+local function report_case_twin(setting)
+	if case_twin_reporter == nil then return end
+	local now = os.time()
+	if case_twin_noticed.setting == setting and now - case_twin_noticed.at < CASE_TWIN_NOTICE_GAP_SECONDS then return end
+	case_twin_noticed.setting, case_twin_noticed.at = setting, now
+	-- Literal replacement: a setting name may hold characters gsub would interpret.
+	local message = i18n.get("dialog.config_save.case_twin")
+	local first, last = message:find("{1}", 1, true)
+	if first then message = message:sub(1, first - 1) .. setting .. message:sub(last + 1) end
+	first, last = message:find("{2}", 1, true)
+	if first then message = message:sub(1, first - 1) .. i18n.get("menu.global.clean_unused_keys") .. message:sub(last + 1) end
+	local shown, detail = pcall(case_twin_reporter, message)
+	if not shown then Logger.error(LOG, "The case-twin notice could not be shown: %s.", tostring(detail)) end
+end
 local BasicString = require("toml_codec.basic_string")
 local RecordScanner = require("toml_codec.record_scanner")
 local Bom = require("toml_codec.bom")
@@ -774,7 +801,10 @@ local function inline_scalar_state(document, path, row, shapes, allow_absent)
 			end
 			return nil
 		end
-		if matches ~= 1 then return nil, nil, "ambiguous inline scalar case identity" end
+		if matches ~= 1 then
+			case_twin_setting = case_twin_name(row.section, row.key)
+			return nil, nil, "ambiguous inline scalar case identity"
+		end
 		value = child
 	end
 	local kind, desired = type(value), row.value
@@ -943,7 +973,7 @@ end
 --- @return string|nil detail
 --- @return string|nil content Candidate bytes.
 --- @return table|nil source Exact publication precondition.
-function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
+local function prepare_batch_checked(path, updates, file_adapter, expected_source, on_error)
 	local report = OperationReporter.new(on_error, Logger, LOG)
 	if type(path) ~= "string" or path == "" then
 		report("validation", "error", "batch_write: invalid path.")
@@ -1138,7 +1168,10 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 	for _, header in ipairs(scanned.headers) do
 		if header.segments then
 			local identity = header.section:lower()
-			if lookup[identity] and seen_headers[identity] then return false, "ambiguous batch table identity" end
+			if lookup[identity] and seen_headers[identity] then
+				case_twin_setting = header.section
+				return false, "ambiguous batch table identity"
+			end
 			seen_headers[identity] = true
 			if header.array then
 				for _, row in ipairs(updates) do
@@ -1249,7 +1282,10 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 								end
 							end
 							local identity = u.section:lower() .. "\0" .. u.key:lower()
-							if applied[identity] then return false, "ambiguous batch key identity" end
+							if applied[identity] then
+								case_twin_setting = case_twin_name(u.section, u.key)
+								return false, "ambiguous batch key identity"
+							end
 							applied[identity] = true
 							root_owned[#root_owned + 1] = { path = path, row = u }
 							u.inline_unchanged = not u.delete and same_value(existing, desired)
@@ -1312,12 +1348,18 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 						for key in pairs(parent) do
 							if type(key) == "string" and key:lower() == segment:lower() then matches = matches + 1 end
 						end
-						if matches ~= 1 then return false, "ambiguous section scalar case identity" end
+						if matches ~= 1 then
+							case_twin_setting = KeyPath.render(scalar_path)
+							return false, "ambiguous section scalar case identity"
+						end
 						parent = parent[segment]
 					end
 				end
 				local identity = sl .. "\0" .. kl
-				if applied[identity] then return false, "ambiguous batch key identity" end
+				if applied[identity] then
+					case_twin_setting = KeyPath.render(scalar_path)
+					return false, "ambiguous batch key identity"
+				end
 				applied[identity] = true
 				root_owned[#root_owned + 1] = { path = scalar_path, row = u }
 				local unchanged = not u.delete and same_value(existing, u.value)
@@ -1355,7 +1397,10 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			local sl, kl = section:lower(), key:lower()
 			local u = lookup[sl] and lookup[sl][kl]
 			if u and (not record.quoted or not key:find(".", 1, true) or u.literal_key) then
-				if applied[sl .. "\0" .. kl] then return false, "ambiguous batch key identity" end
+				if applied[sl .. "\0" .. kl] then
+					case_twin_setting = case_twin_name(section, key)
+					return false, "ambiguous batch key identity"
+				end
 				applied[sl .. "\0" .. kl] = true
 				for index = record.first, record.last do removed[index] = true end
 				if not u.delete then
@@ -1503,6 +1548,32 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		}
 	end
 	return true, nil, content, snapshot
+end
+
+--- Prepares one batch and reports a refusal a case twin caused.
+--- @param path string Destination path.
+--- @param updates table Explicit set/delete operations.
+--- @param file_adapter table|nil Classified platform file adapter.
+--- @param expected_source table|nil Exact source precondition.
+--- @param on_error function|nil Receives only fixed failure categories.
+--- @return boolean prepared
+--- @return string|nil detail
+--- @return string|nil content Candidate bytes.
+--- @return table|nil source Exact publication precondition.
+function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
+	case_twin_setting = nil
+	local prepared, detail, content, source = prepare_batch_checked(path, updates, file_adapter, expected_source, on_error)
+	if not prepared and case_twin_setting then report_case_twin(case_twin_setting) end
+	return prepared, detail, content, source
+end
+
+--- Registers how this driver shows a case-twin refusal. Callers only see a false
+--- from their preference owner and show a generic save failure, so the writer is
+--- the one place that still knows the cause.
+--- @param reporter function Receives the localized message.
+function M.set_case_twin_reporter(reporter)
+	if type(reporter) ~= "function" then error("a case-twin reporter must be a function") end
+	case_twin_reporter = reporter
 end
 
 --- Prepares and atomically publishes one explicit set/delete batch.

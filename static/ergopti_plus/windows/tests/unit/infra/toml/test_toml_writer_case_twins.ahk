@@ -27,6 +27,38 @@ _TTWIN_UntouchedTwinStaysWritable() {
 Test("toml writer twins: a twin refuses only the row that changes it (toml-writer-case-twins)",
 	_TTWIN_UntouchedTwinStaysWritable)
 
+; The refusal used to reach the user as "Close any app holding the file", which
+; names the wrong problem and no way out.
+_TTWIN_RefusalNamesTheProblem() {
+	Path := A_Temp . "\ergopti_toml_twin_" . A_TickCount . ".toml"
+	Source := _CMJFixtureCurrentSource("[Script]`nlevel = 1`n[script]`nlevel = 2`n")
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"], "the schema reader admits it")
+		AssertFalse(TOML_ConfigBatchWrite(Path, [{ Section: "script", Key: "level", Value: 3 }]))
+		Seen := []
+		AssertFalse(ConfigReportPersistenceFailure("the setting", (Message, Options) => Seen.Push(Message)))
+		AssertEqual(1, Seen.Length)
+		Expected := StrReplace(StrReplace(t("dialog.config_save.case_twin"), "{1}", "script.level"),
+			"{2}", t("menu.global.clean_unused_keys"))
+		AssertEqual(Expected, Seen[1], "the notice names the setting and the cleanup row")
+		AssertFalse(InStr(Seen[1], "{"), "no placeholder reaches the user")
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "the file is untouched")
+
+		ConfigReportPersistenceFailure("another", (Message, Options) => Seen.Push(Message))
+		AssertEqual(t("dialog.bulk_toggle.save_failed"), Seen[2], "the cause is read once: a later failure is generic")
+		AssertFalse(TOML_ConfigBatchWrite(Path, [{ Section: "script", Key: "level", Value: 3 }]))
+		AssertTrue(TOML_ConfigBatchWrite(Path, [{ Section: "other", Key: "x", Value: 1 }]))
+		ConfigReportPersistenceFailure("a third", (Message, Options) => Seen.Push(Message))
+		AssertEqual(t("dialog.bulk_toggle.save_failed"), Seen[3], "a later write clears an unread cause")
+	} finally {
+		_TOML_InvalidateParseCache(Path)
+		FSDelete(Path)
+	}
+}
+Test("toml writer twins: a refused save tells the user about the twin and the cleanup (toml-writer-case-twins)",
+	_TTWIN_RefusalNamesTheProblem)
+
 _TTWIN_HeaderSpellingIsFollowed() {
 	Result := _TTWIN_Build("[Script]`nlevel = 1`n", [{ Section: "script", Key: "level", Value: 2 }])
 	AssertEqual("[Script]`nlevel = 2`n", Result["content"],

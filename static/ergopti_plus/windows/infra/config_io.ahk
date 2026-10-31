@@ -31,14 +31,19 @@ ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchan
 	} else {
 		try LoggerError("Config", "Could not fully persist {1}.", Context)
 	}
+	CaseTwin := TOML_TakeCaseTwinRefusal()
 	MessageKey := NewerSchema ? "config.read_only.newer_schema"
-		: (StateUnchanged ? "dialog.bulk_toggle.save_failed" : "onboarding.error.write_failed")
+		: (CaseTwin != "" ? "dialog.config_save.case_twin"
+		: (StateUnchanged ? "dialog.bulk_toggle.save_failed" : "onboarding.error.write_failed"))
 	; Failure reporting is a backstop, never a second failure source. Translation,
 	; an injected UI seam, or the native notifier can each throw while the driver
 	; is already handling a refused write. Preserve the false status and the
 	; file-log evidence instead of escaping the menu/timer callback.
 	try {
 		Message := t(MessageKey)
+		if MessageKey == "dialog.config_save.case_twin"
+			Message := StrReplace(StrReplace(Message, "{1}", CaseTwin),
+				"{2}", t("menu.global.clean_unused_keys"))
 		Options := Map("title", t("paths_editor.save_failed_title"), "level", "error")
 		if HasMethod(NotifyFn, "Call")
 			NotifyFn.Call(Message, Options)

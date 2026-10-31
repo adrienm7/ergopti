@@ -339,6 +339,7 @@
 	"dialog.app_picker.stopped_suffix": " (stoppet)",
 	"dialog.app_picker.title": "Programvalg",
 	"dialog.bulk_toggle.save_failed": "Endringen kunne ikke lagres i konfigurasjonsfilen.\nDen er angret. Lukk alle programmer som holder filen åpen, og prøv igjen.",
+	"dialog.config_save.case_twin": "Innstillingen {1} står i konfigurasjonsfilen i to skrivemåter som bare skiller seg med store og små bokstaver, så ErgoptiPlus kan ikke vite hvilken som skal endres.\nEndringen ble ikke lagret. Bruk «{2}» i menyen for å fjerne den overflødige skrivemåten, og prøv igjen.",
 	"dialog.config_folder.hint": "Alle personlige filer (personal_shortcuts.ahk, personal_hotstrings.toml…) blir søkt i denne mappen. La være tom for å bruke standardmappen.",
 	"dialog.config_folder.label": "Sti:",
 	"dialog.config_folder.select_title": "Velg konfigurasjonsmappe",

@@ -849,6 +849,9 @@ local function main()
 	BootProfiler.stage("config")
 	require("toml_codec.writer").set_sparse_defaults(
 		require("infra.config_paths").config("config.toml"), require("infra.manifest_reader"))
+	require("toml_codec.writer").set_case_twin_reporter(function(message)
+		require("adapters.notifier").send(message, { level = "error" })
+	end)
 	-- 8.0) Version config.toml before anything reads or writes it: the gesture
 	-- and shortcut managers below load the migrated file, and a file the wizard
 	-- creates carries this build's version. A file this build cannot version (a
