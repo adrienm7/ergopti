@@ -234,8 +234,9 @@ function generatorHook(source) {
 		!one("import { readFileSync, writeFileSync } from 'fs';") ||
 		!one("import sharedPaths from '../lib/paths.cjs';") ||
 		!one("import startupProjection from '../lib/codegen-startup-tray.cjs';") ||
-		!one('const { shared } = sharedPaths;') ||
-		!one("const MANIFEST_PATH = shared('modules/features/manifest.toml');") ||
+		!one('const { shared, MENU_SOURCE_REL, FEATURES_MANIFEST_REL } = sharedPaths;') ||
+		!one('const MANIFEST_PATH = shared(FEATURES_MANIFEST_REL);') ||
+		!one('const MENU_SOURCE_PATH = shared(MENU_SOURCE_REL);') ||
 		!one("const OUT_PATH = shared('modules/menu/menu_manifest.json');")
 	)
 		return false;
@@ -246,9 +247,9 @@ function generatorHook(source) {
 		return false;
 	const expected = statements(`
     const raw = readFileSync(MANIFEST_PATH, 'utf8');
-    const parsed = parseToml(raw);
+    const parsed = parseToml(readFileSync(MENU_SOURCE_PATH, 'utf8'));
     if (!parsed.menu || typeof parsed.menu !== 'object') {
-      throw new Error('manifest.toml is missing the [menu] tables — cannot emit menu_manifest.json');
+      throw new Error('menu.toml is missing the [menu] tables — cannot emit menu_manifest.json');
     }
     projectChoices(parsed.menu, raw);
     validateGreyedRows(parsed.menu);
@@ -300,6 +301,9 @@ function generatorHook(source) {
 		'sharedPaths',
 		'shared',
 		'MANIFEST_PATH',
+		'MENU_SOURCE_PATH',
+		'MENU_SOURCE_REL',
+		'FEATURES_MANIFEST_REL',
 		'OUT_PATH',
 		'build'
 	]);

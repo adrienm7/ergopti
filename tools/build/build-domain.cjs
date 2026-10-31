@@ -188,7 +188,7 @@ const PIPELINE = [
 		generated: ['static/ergopti_plus/_shared/ui/metrics_typing/_generated/keycode_data.js']
 	},
 	{
-		name: 'build:menu — emit menu_manifest.json from manifest.toml [menu.*]',
+		name: 'build:menu — emit menu_manifest.json from menu.toml [menu.*]',
 		run() {
 			const { ok, stderr } = runNpmScript('build:menu');
 			return { ok, detail: ok ? undefined : stderr };
