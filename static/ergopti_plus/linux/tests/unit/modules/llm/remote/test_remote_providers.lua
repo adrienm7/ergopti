@@ -105,7 +105,8 @@ end
 
 helpers.describe("New providers: listed in catalogue order, each where it can serve", function()
 	local catalogue = read_shared("modules/llm/api_providers.json")
-	local local_ids = { "omlx", "lmstudio", "llamacpp", "jan" }
+	-- Every local server of the shipped catalogue, in its order
+	local local_ids = read_shared("modules/llm/local_servers.json").server_order
 	local expected_order = {}
 	for _, id in ipairs(catalogue.provider_order) do expected_order[#expected_order + 1] = id end
 	for _, id in ipairs(local_ids) do expected_order[#expected_order + 1] = id end
