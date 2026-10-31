@@ -65,6 +65,18 @@ runs it, so a Quit clicked under a held lease reports its refusal after 10 s plu
 its own 12 s deadline. A check that waits for only the deadline sees nothing and
 blames the driver. Read the log with `waitForLog` for both.
 
+### project-live-checks-silent-hang-is-a-blocked-command
+
+A command that gives « no answer » with an idle driver is not a frozen driver:
+the serving thread lies under a thread that waits. A dialog's opener sits in
+`WinWaitClose` over the command, and a native context menu runs its own loop on
+the only thread. Before suspecting the driver, attach AutoHotkey's debugger late
+(post the registered message `AHK_ATTACH_DEBUGGER` with the IP and port to the
+script's hidden window, then `stack_get` over DBGp): a `--keep` trace cannot show
+this, and timing probes inside the timer can hide it. So a dialog is pressed with
+`LiveClickDialogButton`, never `ControlClick`, and the typist cancels the menu of
+a right click.
+
 ### project-live-checks-versions-window-needs-memory
 
 `Changelog_Open` opens its WebView2 form only when `WebView_ShouldUseNativeFallback()`

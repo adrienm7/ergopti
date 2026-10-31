@@ -1335,6 +1335,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_retired_callback_exception_delivery.ahk
 #Include meta/suite/test_live_drive_failure_delivery.ahk
 #Include meta/suite/test_live_dialog_button.ahk
+#Include meta/suite/test_live_right_click_menu.ahk
 #Include meta/modules/hotstrings/personal/test_personal_hotstring_node_shape.ahk
 #Include meta/modules/hotstrings/personal/test_personal_hotstring_seed.ahk
 #Include meta/modules/hotstrings/personal/test_personal_hotstring_new_section_seed.ahk
