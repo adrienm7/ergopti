@@ -1026,7 +1026,7 @@ _TOML_ConfigInlineCanInsert(Raw, Path) {
 ; An inline or a dotted owner is one physical line holding other values: the
 ; shared writer changes a scalar there only for one of its own type, and never a
 ; container, a literal-dot key or a spelling that is not exact.
-_TOML_ConfigAdmitOwnedEdit(Owner, Parts, Existing, Key, Differs, Desired := unset) {
+_TOML_ConfigAdmitOwnedEdit(Owner, Parts, Existing, Key, Differs, Desired := unset, WholeValue := false) {
 	Name := _TOML_ConfigPathName(Parts)
 	Inline := Owner.Path.Length < Parts.Length
 	Holder := Inline ? "An inline table" : "A dotted key"
@@ -1046,8 +1046,13 @@ _TOML_ConfigAdmitOwnedEdit(Owner, Parts, Existing, Key, Differs, Desired := unse
 		return
 	}
 	Held := _TOML_ConfigScalarKind(Existing["value"])
-	if Held == ""
+	if Held == "" {
+		; A batch save refuses this as the shared writer does; only the explicit
+		; cleanup removes one offered value whole, as the Lua cleanup's own cut does.
+		if WholeValue && !IsSet(Desired)
+			return
 		throw ValueError(Holder . " keeps the container at " . Name . " whole")
+	}
 	if !IsSet(Desired)
 		return
 	; Only a root dotted key may change type: it is alone on its line, with no header.
@@ -1066,6 +1071,7 @@ _TOML_ConfigAdmitRow(Document, Records, Physical, Parts, Update) {
 	if Existing["blocked"]
 		return Canonical
 	Deleting := Update.HasOwnProp("Delete") && Update.Delete == 1
+	WholeValue := Deleting && Update.HasOwnProp("WholeValue") && Update.WholeValue == 1
 	if Deleting {
 		; Deleting what this spelling does not name never reaches a sibling in another
 		; spelling: a save deletes every neutral setting, and that sibling is the user's.
@@ -1088,9 +1094,9 @@ _TOML_ConfigAdmitRow(Document, Records, Physical, Parts, Update) {
 			break
 		if Record.Path.Length < Canonical.Length {
 			if Record.Value is Map
-				_TOML_ConfigAdmitOwnedEdit(Record, Canonical, Existing, Update.Key, Resolved["differs"], Desired?)
+				_TOML_ConfigAdmitOwnedEdit(Record, Canonical, Existing, Update.Key, Resolved["differs"], Desired?, WholeValue)
 		} else if Record.Path.Length - _TOML_ConfigPath(Record.NativeSection).Length > 1 {
-			_TOML_ConfigAdmitOwnedEdit(Record, Canonical, Existing, Update.Key, Resolved["differs"], Desired?)
+			_TOML_ConfigAdmitOwnedEdit(Record, Canonical, Existing, Update.Key, Resolved["differs"], Desired?, WholeValue)
 		}
 		return Canonical
 	}
