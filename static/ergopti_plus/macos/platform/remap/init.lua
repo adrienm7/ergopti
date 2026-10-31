@@ -6948,6 +6948,18 @@ function M.init(file_system)
 		if not (env_override and env_override ~= "") then
 			KARABINER_OUT = file_system.expand_path(M._owned.paths.config_file_for(runtime))
 			Logger.info(LOG, "Owned KE config path resolved: '%s'.", KARABINER_OUT)
+			-- Migration from the shared runtime: the rules an earlier build merged
+			-- into the user's own karabiner.json leave it once, byte for byte
+			-- around their own rules; afterwards that file is only read.
+			local user_file = file_system.expand_path(M._owned.paths.config_file_for(M._owned.paths.RUNTIME_SHARED))
+			local migrated_ok, removed, detail, count = pcall(ManagedRuleRemoval.remove_managed_rules, user_file)
+			if not migrated_ok or removed ~= true then
+				Logger.error(LOG, "Shared-runtime rules could not leave the user's karabiner.json: %s.",
+					tostring(migrated_ok and detail or removed))
+			elseif (count or 0) > 0 then
+				Logger.success(LOG, "Migrated to the owned runtime: %d shared-runtime rule(s) left the user's karabiner.json.",
+					count)
+			end
 		end
 	end
 

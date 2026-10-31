@@ -137,6 +137,17 @@ helpers.describe("the remap bridge reaches the owned runtime only after an opt-i
 			"« Ergopti uses Karabiner » follows the rule once settled")
 	end)
 
+	helpers.it("migrates an owned boot by removing only Ergopti's marked rules from the user's file", function()
+		local source = init_source()
+		local owned = source:find('Logger.info(LOG, "Owned KE config path resolved', 1, true)
+		local migration = source:find("pcall(ManagedRuleRemoval.remove_managed_rules, user_file)", owned, true)
+		helpers.assert_true(owned ~= nil and migration ~= nil, "the owned boot runs the marked-rule removal")
+		local user_file = source:find("config_file_for(M._owned.paths.RUNTIME_SHARED)", owned, true)
+		helpers.assert_true(user_file ~= nil and user_file < migration, "on the user's shared-runtime file")
+		local guard = source:find('if not (env_override and env_override ~= "") then', owned - 400, true)
+		helpers.assert_true(guard ~= nil and guard < owned, "never under the test override")
+	end)
+
 	helpers.it("gives a closed Karabiner back on a quit but never on a reload", function()
 		local source = init_source()
 		helpers.assert_true(source:find(
