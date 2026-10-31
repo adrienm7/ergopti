@@ -14,7 +14,7 @@ license=('MIT')
 install=ergopti.install
 backup=('etc/udev/rules.d/99-ergopti-uinput.rules' 'etc/modules-load.d/ergopti-uinput.conf')
 # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
-depends=('luajit' 'xclip' 'libnotify' 'curl' 'libxkbcommon' 'at-spi2-core' 'openssl' 'sqlite' 'xdg-utils' 'polkit' 'kmod' 'systemd' 'shadow' 'util-linux' 'glibc' 'libayatana-appindicator' 'zenity' 'lua51-lgi' 'webkit2gtk-4.1' 'python' 'libxkbcommon-x11' 'libx11' 'glib-networking' 'gsettings-desktop-schemas' 'lua51-luv')
+depends=('luajit' 'xclip' 'libnotify' 'curl' 'libxkbcommon' 'at-spi2-core' 'openssl' 'sqlite' 'xdg-utils' 'polkit' 'kmod' 'systemd' 'shadow' 'util-linux' 'glibc' 'libayatana-appindicator' 'zenity' 'lua51-lgi' 'webkit2gtk-4.1' 'python' 'libsecret' 'libxkbcommon-x11' 'libx11' 'glib-networking' 'gsettings-desktop-schemas' 'lua51-luv')
 # END GENERATED LINUX NATIVE REQUIREMENTS
 optdepends=('lua-luv: async I/O for timers and HTTP'
             'lua-filesystem: faster file discovery'
