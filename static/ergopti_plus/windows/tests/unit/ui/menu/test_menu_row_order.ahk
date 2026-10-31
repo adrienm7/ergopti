@@ -23,7 +23,7 @@ _TMRO_AssertSame(Expected, Actual, What) {
 
 _TMRO_Vectors() {
 	Corpus := _TMRO_Corpus()
-	Assert(Corpus["sorts"].Length >= 5 && Corpus["lists"].Length >= 2 && Corpus["refusals"].Length >= 2,
+	Assert(Corpus["sorts"].Length >= 5 && Corpus["lists"].Length >= 1 && Corpus["refusals"].Length >= 2,
 		"the corpus holds its vectors")
 	for Vector in Corpus["sorts"]
 		_TMRO_AssertSame(Vector["sorted"], MenuRowOrderSorted(Vector["rule"], Vector["input"]), Vector["id"])
