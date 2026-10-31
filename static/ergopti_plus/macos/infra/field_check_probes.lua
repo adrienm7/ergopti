@@ -22,8 +22,9 @@
 ---    through the managed transport (route lookup, proxy, TLS), by its key.
 ---    ollama_blob_host: the host the Ollama registry sends a model's blob to
 ---    is one the route inventory plans, so the daemon's pull takes its route.
---- 7. app_health: the app's memory and CPU at idle, and the crash reports the
----    driver or macOS wrote for it during the last day.
+--- 7. app_health: the app's memory and CPU at idle, where that memory goes
+---    (vmmap's footprint and largest resident regions, the Lua heap), and the
+---    crash reports the driver or macOS wrote for it during the last day.
 --- 8. ai_local: the owned Ollama's signature, its server's listing, one token
 ---    predicted with a model already installed, and the MLX models on disk.
 --- 9. menu_build: one timed rebuild of the menu tree and its slowest rows.
@@ -745,9 +746,20 @@ end
 -- =============================
 
 local PS = "/bin/ps"
+local VMMAP = "/usr/bin/vmmap"
 
 -- Newest app crash reports listed one by one with their kind.
 M.CRASHES_LISTED = 3
+
+-- Largest resident vmmap regions listed one by one (ledger L32).
+M.MEMORY_REGIONS_LISTED = 5
+
+-- Seconds vmmap may take: with the two ps reads (PROBE_COMMAND_TIMEOUT each)
+-- the check stays inside field_app_health's 30 s deadline.
+local VMMAP_TIMEOUT = 8
+
+-- Longest region name kept in a step value, before its ":<MB>".
+local REGION_NAME_MAX = 32
 
 --- Reads `ps -o rss=,%cpu=` output.
 --- @param output any Command output.
@@ -770,6 +782,77 @@ function M.parse_elapsed(output)
 	if #parts < 2 or #parts > 3 or rest:find("::", 1, true) then return nil end
 	local hours = #parts == 3 and parts[1] or 0
 	return ((tonumber(days) or 0) * 24 + hours) * 3600 + parts[#parts - 1] * 60 + parts[#parts]
+end
+
+--- Reads one vmmap size ("256K", "50.2M", "1.1G", "0") as megabytes.
+--- @param text string
+--- @return number|nil megabytes
+local function vmmap_megabytes(text)
+	local number, unit = tostring(text or ""):match("^([%d.]+)([BKMG]?)$")
+	number = tonumber(number)
+	if not number then return nil end
+	local scale = { B = 1 / 1048576, K = 1 / 1024, M = 1, G = 1024 }
+	return number * (scale[unit] or 1 / 1048576)
+end
+
+--- Reads `vmmap --summary` output: the physical footprint, its peak, the
+--- resident total and the region rows of the first table (the malloc zone
+--- table that follows has other columns and is not read).
+--- @param output any Command output.
+--- @return table|nil summary { footprint, peak, total, regions = {{ name, resident }} } in MB.
+function M.parse_vmmap_summary(output)
+	local summary, fences, regions = {}, 0, {}
+	for line in tostring(output or ""):gmatch("[^\n]+") do
+		local footprint = line:match("^Physical footprint:%s+(%S+)")
+		local peak = line:match("^Physical footprint %(peak%):%s+(%S+)")
+		if footprint then summary.footprint = vmmap_megabytes(footprint) end
+		if peak then summary.peak = vmmap_megabytes(peak) end
+		if line:match("^=+%s+=+") then
+			fences = fences + 1
+		elseif fences == 1 then
+			local name, _, resident = line:match("^(.-)%s+([%d.]+[BKMG]?)%s+([%d.]+[BKMG]?)%s")
+			resident = vmmap_megabytes(resident)
+			if name and name ~= "" and resident then regions[#regions + 1] = { name = name, resident = resident } end
+		elseif fences == 2 and not summary.total then
+			local total = line:match("^TOTAL%s+%S+%s+(%S+)")
+			summary.total = vmmap_megabytes(total)
+		end
+	end
+	if not summary.footprint or #regions == 0 then return nil end
+	table.sort(regions, function(a, b)
+		if a.resident ~= b.resident then return a.resident > b.resident end
+		return a.name < b.name
+	end)
+	summary.regions = regions
+	return summary
+end
+
+--- Names where the app's memory goes (ledger L32: 843 MB resident, issue #104,
+--- with nothing saying which part): vmmap's physical footprint, its peak, the
+--- resident total and the largest resident regions, then the Lua heap. All of
+--- it is information; vmmap refused (a hardened runtime without get-task-allow)
+--- or unparsed is a named skip.
+--- @param ports table { exec, pid, lua_heap_kb }.
+--- @param report table The check's report.
+--- @param finish function Called once.
+function M.memory_breakdown(ports, report, finish)
+	ports.exec(VMMAP, { "--summary", tostring(ports.pid()) }, VMMAP_TIMEOUT, function(code, output)
+		local summary = code == 0 and M.parse_vmmap_summary(output) or nil
+		if not summary then
+			report.step("memory_footprint_mb", STATE.skip, code == 0 and "unparsed" or failure_token(code))
+		else
+			report.step("memory_footprint_mb", STATE.info, math.floor(summary.footprint))
+			if summary.peak then report.step("memory_footprint_peak_mb", STATE.info, math.floor(summary.peak)) end
+			if summary.total then report.step("memory_resident_total_mb", STATE.info, math.floor(summary.total)) end
+			for index = 1, math.min(#summary.regions, M.MEMORY_REGIONS_LISTED) do
+				local region = summary.regions[index]
+				local name = region.name:gsub("[^%w_%.%+%-]+", "_"):sub(1, REGION_NAME_MAX)
+				report.step("memory_region_" .. index, STATE.info, name .. ":" .. math.floor(region.resident))
+			end
+		end
+		report.step("lua_heap_mb", STATE.info, string.format("%.1f", ports.lua_heap_kb() / 1024))
+		finish()
+	end)
 end
 
 --- The app's resident memory and CPU share while the field run waits between
@@ -832,7 +915,7 @@ function M.app_health_with_start(ports, report, finish, since)
 			report.step("app_rss_mb", STATE.info, math.floor(rss / 1024))
 			report.step("app_cpu_pct", STATE.info, string.format("%.1f", cpu or 0))
 		end
-		finish()
+		M.memory_breakdown(ports, report, finish)
 	end)
 end
 
