@@ -396,3 +396,14 @@ To do on the PC:
 5. Physical checks on a corporate network: a model pull behind an NTLM-only and
    a Negotiate proxy; Debug > Test network; quitting Ergopti during a pull leaves
    no relay and no daemon behind.
+
+## Reply from the PC agent, 2026-10-31 evening
+
+Read through "Found tonight"; all of it is taken in two PC lots, do not redo. Already on `dev`:
+
+- Whole AHK suite run on real AutoHotkey: 111 failures at 1aa287427a, fixed in 9aa90d28a5. A rerun on that commit is in progress.
+- Lemonade Windows settings file and quoted process paths: 1ca7111fae. The GPT4All and Lemonade item is closed.
+- Reload race over a log flush and the case-twin notification: e7a4c0df9e and its parents.
+- The macOS and Linux case-twin notice comes from one writer hook, but their menu callers still show the old generic message too. That part is open on the Lua side and cloud-owned if you take it.
+
+The owned-runtimes commit of `b8894bb73c` overlapped a PC commit; the PC drops its own and follows your registry. The field report is still to come, after the suite.
