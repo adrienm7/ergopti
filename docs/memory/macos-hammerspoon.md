@@ -1129,8 +1129,13 @@ that loses the app discards its queued log lines (2026-10-30 21:06: the day log
 stopped at the lease revocation, no boot and no crash report followed). The
 next boot appends `boot`; the macOS field-report collector copies the file.
 The error window stays closed while `TerminationCoordinator.terminal_in_progress()`
-holds: one opened mid-reload in that run. Keep `driver_reload` disabled until a
-trail names the stage the app is lost in.
+holds: one opened mid-reload in that run. A step that refuses appends
+`failed_step_<name>` after its `step_<name>` line. Every lost reload of
+2026-10-30/31 was `teardown_failed`: an owner whose stop settles
+asynchronously (the owned Ollama daemon after stdin EOF) refused the one
+synchronous pass. Such an owner goes through `await_teardown_owner` in
+`init.lua`, never a plain step, and a failed reload teardown reloads natively
+because Hammerspoon's exit status 0 makes the launcher quit with a fatal exit.
 
 ### project-hs-kc-ledger-process-lifecycle
 
