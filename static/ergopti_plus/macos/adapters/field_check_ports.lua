@@ -236,13 +236,17 @@ local function relay_probe(upstream, callback)
 	end)
 end
 
---- Measures how late the timer service fires.
+--- Measures how late the timer service fires, and names the long phases that
+--- ran while it waited: what held the run loop when the probe came late.
 --- @param seconds number Delay asked of the timer.
---- @param callback function fn(late_ms) with the lateness in milliseconds.
+--- @param callback function fn(late_ms, phases) with the lateness in
+---   milliseconds and `name=12.3 ms, …` (longest first), or nil when none ran.
 local function timer_probe(seconds, callback)
+	local PhaseStats = require("infra.phase_stats")
 	local started = hs.timer.secondsSinceEpoch()
+	local started_ns = PhaseStats.now()
 	Timer.after(seconds, function()
-		callback((hs.timer.secondsSinceEpoch() - started - seconds) * 1000)
+		callback((hs.timer.secondsSinceEpoch() - started - seconds) * 1000, PhaseStats.recent_since(started_ns))
 	end)
 end
 
