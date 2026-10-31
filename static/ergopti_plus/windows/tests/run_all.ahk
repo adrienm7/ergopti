@@ -983,6 +983,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/platform/remap/keys/test_tap_keys.ahk
 #Include unit/platform/remap/keys/test_ai_action_gate.ahk
 #Include unit/platform/remap/key_combinations/test_key_combinations.ahk
+#Include unit/platform/remap/key_combinations/test_key_combination_chord_policy.ahk
 #Include unit/modules/gestures/test_gesture_cycle_candidates.ahk
 #Include unit/modules/gestures/test_gesture_recommended_actions.ahk
 #Include unit/infra/config/persistence/test_config_persistence_transactions.ahk

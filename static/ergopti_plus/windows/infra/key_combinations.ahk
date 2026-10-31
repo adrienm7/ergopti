@@ -871,3 +871,101 @@ KeyCombinationFireAltGrSuffix(Passthrough, Ports := 0) {
 	return KeyCombinationFire("alt_gr", Ports is Map ? Ports
 		: _KeyCombinationAltGrSuffixPorts(Passthrough))
 }
+
+
+
+
+
+; =============================================
+; =============================================
+; ======= 5/ Simultaneous chord policy ========
+; =============================================
+; =============================================
+
+; The pure third-slot policy that _shared/lua/tap_hold/key_combinations.lua owns
+; on macOS and Linux: which pair a press of two keys within the simultaneous
+; delay selects. _shared/tests/corpus/tap_hold/key_combination_chords.json holds
+; the cases. Constructing it enables no engine: the Windows pairs above decide on
+; the press of the second key and carry no third slot, and buffering, provenance
+; and delivery would stay the host's.
+
+; Refuses chord settings that are not a positive finite delay and an exact
+; boolean. AutoHotkey's booleans are the Integers 0 and 1.
+; @param DelayMs {Number} The simultaneous delay in milliseconds.
+; @param Symmetric {Integer} Whether both orders of a pair select one owner.
+; @returns {Map} Map("simultaneous_threshold_ms", ..., "combo_symmetric", ...).
+KeyCombinationChordSettings(DelayMs, Symmetric) {
+	if !(DelayMs is Number) || !(DelayMs - DelayMs == 0) || DelayMs <= 0
+		throw ValueError("The chord delay must be a positive finite number.", -1, String(DelayMs))
+	if !(Symmetric is Integer) || (Symmetric != 0 && Symmetric != 1)
+		throw ValueError("The chord symmetry must be an exact boolean.", -1, IsObject(Symmetric) ? Type(Symmetric) : Symmetric)
+	return Map("simultaneous_threshold_ms", DelayMs, "combo_symmetric", Symmetric)
+}
+
+; A chord identifier, the shared id grammar. The separator of a direction key is
+; a tab, which no token holds.
+_KeyCombinationChordToken(Value) {
+	return (Value is String) && RegExMatch(Value, "^[a-z][a-z0-9_]*\z")
+}
+
+class KeyCombinationChordPolicy {
+	; @param Pairs {Array} Rows Map("id", ..., "first", ..., "second", ...), in catalogue order.
+	; @param Chords {Map} Pair id -> validated action id; an absent pair is "none".
+	; @param Settings {Map} As KeyCombinationChordSettings returns.
+	__New(Pairs, Chords, Settings) {
+		global KEY_COMBINATION_NONE
+		if !(Pairs is Array) || !(Chords is Map) || !(Settings is Map)
+			throw TypeError("A chord policy requires its declared catalogue, slots and settings.")
+		this.Settings := KeyCombinationChordSettings(
+			Settings["simultaneous_threshold_ms"], Settings["combo_symmetric"])
+		this.Directions := Map()
+		this.Canonical := Map()
+		Identifiers := Map()
+		for Entry in Pairs {
+			if !(Entry is Map) || !_KeyCombinationChordToken(Entry.Get("id", 0))
+				|| !_KeyCombinationChordToken(Entry.Get("first", 0))
+				|| !_KeyCombinationChordToken(Entry.Get("second", 0))
+				|| Entry["first"] == Entry["second"] || Identifiers.Has(Entry["id"])
+				throw ValueError("A chord catalogue requires distinct pairs.")
+			Direction := Entry["first"] . "`t" . Entry["second"]
+			Reverse := Entry["second"] . "`t" . Entry["first"]
+			if this.Directions.Has(Direction)
+				throw ValueError("A chord catalogue holds a duplicate direction.", -1, Entry["id"])
+			Action := Chords.Get(Entry["id"], KEY_COMBINATION_NONE)
+			if !_KeyCombinationChordToken(Action)
+				throw ValueError("A chord action must already be validated.", -1, Entry["id"])
+			Row := Map("id", Entry["id"], "first", Entry["first"], "second", Entry["second"], "action", Action)
+			this.Directions[Direction] := Row
+			Identifiers[Entry["id"]] := Row
+			this.Canonical[Entry["id"]] := this.Directions.Has(Reverse)
+				? this.Canonical[this.Directions[Reverse]["id"]] : Row
+		}
+	}
+
+	; The pair that owns PairId under symmetry, the earlier of its two orders.
+	; @returns {String} A pair id, or "" for an unknown one.
+	CanonicalPair(PairId) {
+		return this.Canonical.Has(PairId) ? this.Canonical[PairId]["id"] : ""
+	}
+
+	; The pair a press of First then Second, ElapsedMs apart, selects.
+	; @returns {Map|Boolean} Map("pair_id", "first", "second", "action", "binding"), or false.
+	Choose(First, Second, ElapsedMs) {
+		global KEY_COMBINATION_NONE, KEY_COMBINATION_BINDING_SCOPE
+		if !(ElapsedMs is Number) || !(ElapsedMs - ElapsedMs == 0) || ElapsedMs < 0
+			|| ElapsedMs > this.Settings["simultaneous_threshold_ms"]
+			return false
+		if !_KeyCombinationChordToken(First) || !_KeyCombinationChordToken(Second)
+			return false
+		Direction := First . "`t" . Second
+		if !this.Directions.Has(Direction)
+			return false
+		Row := this.Directions[Direction]
+		if this.Settings["combo_symmetric"]
+			Row := this.Canonical[Row["id"]]
+		if (Row["action"] == KEY_COMBINATION_NONE)
+			return false
+		return Map("pair_id", Row["id"], "first", First, "second", Second, "action", Row["action"],
+			"binding", GestureBindingId(KEY_COMBINATION_BINDING_SCOPE, Row["id"]))
+	}
+}
