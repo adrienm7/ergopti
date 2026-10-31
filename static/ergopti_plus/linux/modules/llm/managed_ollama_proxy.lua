@@ -34,6 +34,11 @@
 ---    relay, proven by the probe's own sign-in; the stage then names that relay
 ---    so the daemon starts under it. A refused sign-in refuses the start with
 ---    the relay's closed reason instead of a daemon whose pulls would fail.
+--- 7. The user's proxy override (network/proxy_override.lua, which the policy
+---    binding applies) wins over everything above: "direct" bypasses every relay
+---    the daemon would inherit, the sign-in relay included; a relay URL becomes
+---    the daemon's HTTPS_PROXY as given, and is probed like a planned relay, so
+---    an override that demands NTLM or Negotiate still gets the sign-in relay.
 --- ==============================================================================
 
 local M = {}
@@ -94,6 +99,15 @@ local function environment_of(plan, rows)
 	end
 	local merged = current == "" and direct or current .. "," .. direct
 	for _, name in ipairs(M.BYPASS_VARIABLES) do environment[#environment + 1] = name .. "=" .. merged end
+	return environment
+end
+
+--- The daemon rows of a direct proxy override: a bypass of every relay the
+--- daemon would otherwise inherit, the sign-in relay included.
+--- @return table environment
+local function override_direct_environment()
+	local environment = {}
+	for _, name in ipairs(M.BYPASS_VARIABLES) do environment[#environment + 1] = name .. "=*" end
 	return environment
 end
 
@@ -159,11 +173,6 @@ function M.new(deps)
 			finish({ ok = false, error = "proxy_route_invalid" })
 			return operation
 		end
-		if route.mode ~= "system" then
-			Logger.info(LOG, "Managed Ollama proxy lookup skipped: %s route.", route.mode)
-			finish({ ok = true, environment = {} })
-			return operation
-		end
 		local entries = {}
 		-- The first lookup stage that sent an origin direct, for the pull's error.
 		local fallback = nil
@@ -217,6 +226,26 @@ function M.new(deps)
 				return
 			end
 			if step == mine then inner = child end
+		end
+
+		-- Both short-cuts come after probe_relay: an override relay is probed
+		-- like a planned one, so an NTLM or Negotiate proxy still gets the relay.
+		if route.source == "override" then
+			if route.mode == "direct" then
+				Logger.info(LOG, "Managed Ollama proxy lookup skipped: the proxy override names a direct route.")
+				finish({ ok = true, environment = override_direct_environment() })
+				return operation
+			end
+			Logger.info(LOG, "Managed Ollama proxy lookup skipped: the proxy override names a relay.")
+			local plan = { proxy = route.proxy, no_proxy = function() return "" end }
+			local upstream = relay.policy.upstream(route.proxy)
+			if upstream then probe_relay(plan, upstream) else finish({ ok = true, environment = environment_of(plan, rows) }) end
+			return operation
+		end
+		if route.mode ~= "system" then
+			Logger.info(LOG, "Managed Ollama proxy lookup skipped: %s route.", route.mode)
+			finish({ ok = true, environment = {} })
+			return operation
 		end
 
 		--- Settles the plan once every origin has a route.
