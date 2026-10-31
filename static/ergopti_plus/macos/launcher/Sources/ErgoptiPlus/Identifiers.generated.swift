@@ -14,6 +14,13 @@ enum Identifiers {
 		static let launcher = "com.ergoptiplus.app"
 		static let hammerspoon = "com.ergoptiplus.app.hammerspoon"
 	}
+	enum SigningIds {
+		static let runtimeInstaller = "com.ergoptiplus.app.runtime-installer"
+		static let installedPhysicalSource = "com.ergoptiplus.app.installed-physical-source"
+		static let remapCore = "com.ergoptiplus.remap.core"
+		static let remapConsole = "com.ergoptiplus.remap.console"
+		static let remapCli = "com.ergoptiplus.remap.cli"
+	}
 	enum ServiceLabels {
 		static let macosCore = "com.ergoptiplus.runtime.core"
 		static let macosRemapGuardian = "com.ergoptiplus.remap-guardian"
