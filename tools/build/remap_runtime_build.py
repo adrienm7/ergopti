@@ -192,6 +192,84 @@ def _report_identity_change(kind, path, previous, current):
     )
 
 
+MACHO_DIFFERENCE_RANGES = 16
+MACHO_DIFFERENCE_CHUNK = 4096
+
+
+def _differing_ranges(left, right):
+    """Return the first merged byte ranges where two buffers differ, within their common length."""
+    ranges, length = [], min(len(left), len(right))
+    for chunk in range(0, length, MACHO_DIFFERENCE_CHUNK):
+        stop = min(chunk + MACHO_DIFFERENCE_CHUNK, length)
+        if left[chunk:stop] == right[chunk:stop]:
+            continue
+        for offset in range(chunk, stop):
+            if left[offset] != right[offset]:
+                if ranges and ranges[-1][1] == offset:
+                    ranges[-1][1] = offset + 1
+                elif len(ranges) == MACHO_DIFFERENCE_RANGES:
+                    return ranges
+                else:
+                    ranges.append([offset, offset + 1])
+    return ranges
+
+
+def _report_macho_difference(macho, relative, original, signed, error, deadline):
+    """Describe a refused signing transform: the comparator line and each slice's layout.
+
+    Failure-only and best-effort: the comparator shares one code across a
+    dozen checks, and a diagnostic failure never replaces its refusal.
+    """
+    try:
+        frames = traceback.extract_tb(error.__traceback__)[-2:]
+        print(
+            "[owned-build] Mach-O comparison of "
+            + relative
+            + " refused "
+            + str(error.code)
+            + " at "
+            + " <- ".join(
+                "%s:%d (%s)" % (Path(frame.filename).name, frame.lineno, frame.name)
+                for frame in reversed(frames)
+            ),
+            file=sys.stderr,
+            flush=True,
+        )
+        pairs = zip(macho._images(original, deadline), macho._images(signed, deadline))
+        for before, after in pairs:
+            print(
+                "[owned-build]   slice cpu=%#x bytes %d -> %d, commands_end %d -> %d, "
+                "commands %d -> %d, signature %s -> %s, linkedit size %d -> %d vm %d -> %d, "
+                "payload_end %d -> %d, differing ranges %s"
+                % (
+                    before.cpu,
+                    len(before.data),
+                    len(after.data),
+                    before.commands_end,
+                    after.commands_end,
+                    len(before.commands),
+                    len(after.commands),
+                    before.signature,
+                    after.signature,
+                    before.link_size,
+                    after.link_size,
+                    before.link_vm,
+                    after.link_vm,
+                    before.payload_end,
+                    after.payload_end,
+                    _differing_ranges(before.data, after.data),
+                ),
+                file=sys.stderr,
+                flush=True,
+            )
+    except BaseException as failure:
+        print(
+            "[owned-build] Mach-O difference report failed: " + failure.__class__.__name__,
+            file=sys.stderr,
+            flush=True,
+        )
+
+
 def _report_refusal_origin(stage, error):
     """Name the exception type, code and innermost builder line of a refusal.
 
@@ -1622,6 +1700,14 @@ class _SigningSink(_PreparationSink):
                                     held[relative].data, observation.data, deadline
                                 )
                             except self.macho.MachORefusal as error:
+                                _report_macho_difference(
+                                    self.macho,
+                                    relative,
+                                    held[relative].data,
+                                    observation.data,
+                                    error,
+                                    deadline,
+                                )
                                 code = (
                                     "signed_content" if error.code == "content" else "signed_shape"
                                 )

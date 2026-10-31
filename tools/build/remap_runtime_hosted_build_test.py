@@ -21,6 +21,7 @@ import sys
 import tempfile
 import textwrap
 import time
+import types
 import unittest
 from unittest import mock
 
@@ -300,6 +301,62 @@ class SigningTargetControls(unittest.TestCase):
                     if executable
                     else {None},
                 )
+
+
+class MachODifferenceControls(unittest.TestCase):
+    """A refused signing transform reports the comparator line and slice layouts."""
+
+    def test_differing_ranges_merge_and_stop_at_the_common_length(self):
+        left = bytes(10000)
+        right = bytearray(left)
+        right[16:24] = b"\x01" * 8
+        right[5000] = 1
+        self.assertEqual(
+            BUILD._differing_ranges(left, bytes(right) + b"tail"), [[16, 24], [5000, 5001]]
+        )
+        self.assertEqual(BUILD._differing_ranges(left, left), [])
+
+    def test_report_names_comparator_line_and_each_slice(self):
+        slices = [
+            types.SimpleNamespace(
+                cpu=0x0100000C,
+                data=data,
+                commands_end=1000,
+                commands=(1, 2),
+                signature=(992, 4096, 512),
+                link_size=600,
+                link_vm=16384,
+                payload_end=4096,
+            )
+            for data in (bytes(64), bytes(32) + b"\x01" + bytes(31))
+        ]
+        macho = types.SimpleNamespace(_images=lambda image, deadline: [slices[image]])
+
+        def refuse():
+            raise ValueError("modeled")
+
+        try:
+            refuse()
+        except ValueError as error:
+            error.code = "content"
+            caught = error
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            BUILD._report_macho_difference(macho, "Runtime/x", 0, 1, caught, 10**9)
+        text = log.getvalue()
+        self.assertIn("Mach-O comparison of Runtime/x refused content at ", text)
+        self.assertIn("(refuse)", text)
+        self.assertIn("slice cpu=0x100000c bytes 64 -> 64", text)
+        self.assertIn("differing ranges [[32, 33]]", text)
+
+    def test_report_failure_never_raises(self):
+        macho = types.SimpleNamespace(_images=None)
+        error = ValueError("modeled")
+        error.code = "content"
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            BUILD._report_macho_difference(macho, "Runtime/x", b"", b"", error, 10**9)
+        self.assertIn("Mach-O difference report failed: TypeError", log.getvalue())
 
 
 class RefusalOriginControls(unittest.TestCase):
