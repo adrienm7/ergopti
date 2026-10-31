@@ -6,6 +6,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { REPO_ROOT, sharedRel } = require('../lib/paths.cjs');
+const { hosts } = require('../lib/identifiers.cjs');
 
 const SOURCE = sharedRel('modules', 'llm', 'ollama_release.json');
 const MACOS_OUTPUT = 'static/ergopti_plus/macos/modules/llm/ollama-release.sh';
@@ -65,7 +66,7 @@ function assetUrl(data, id) {
 	validate(data);
 	if (typeof id !== 'string' || !Object.hasOwn(ASSET_FILENAMES, id))
 		throw new TypeError('Ollama release asset identity is unavailable.');
-	return `https://github.com/ollama/ollama/releases/download/v${data.version}/${data.assets[id].filename}`;
+	return `https://${hosts.github}/ollama/ollama/releases/download/v${data.version}/${data.assets[id].filename}`;
 }
 
 /** Render deterministic LF output without reading or mutating the working tree. */

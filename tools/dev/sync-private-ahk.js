@@ -1,5 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'module';
+
+const { app } = createRequire(import.meta.url)('../lib/identifiers.cjs');
 
 // Sync the private AHK file to the public repo location.
 // Reads the path from "static/ergopti_plus/windows/.local_ahk_path" (gitignored).
@@ -26,7 +29,7 @@ if (!fs.existsSync(privatePath)) {
 	process.exit(1);
 }
 
-const publicPath = path.join('static', 'ergopti_plus', 'windows', 'ErgoptiPlus.ahk');
+const publicPath = path.join('static', 'ergopti_plus', 'windows', app.ahk);
 
 // Normalize text before inspecting its first line so the private BOM cannot
 // move behind the generated date, and Windows saves cannot introduce CRLF.
