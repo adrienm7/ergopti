@@ -253,13 +253,17 @@ into its item below or into the matching existing item.
       Windows step `collector_checks`, macOS `macos-field-shell-checks.sh`) and the last run of each tray
       check clicked today (runs and failures counted). Left [PHYS-W] [PHYS-L]: one real run of each
       collector; the Windows runtime layer of `test-windows-field-report-contract.cjs` runs only where pwsh
-      is installed. Linux no longer needs a click (branch `fix/linux-input-config-2`): the daemon owns the
-      macOS field run's protocol (`linux/infra/field_run.lua`, `linux/data/field_run.json`, the same file
-      names, verdicts and reasons, pinned against macOS by a test) and runs its composer and network checks
-      headless; `tools/dev/linux-field-run.sh` sends the request from the collector and prints a mark per
-      step (`tests/hardware/run_field_run_live.lua`, CI step "Run the field checks without a click"). The
-      Windows tray checks still need a click (another worker owns that side and the shared declaration;
-      the Linux side moves onto it if its names differ).
+      is installed. Linux no longer needs a click (branch `fix/linux-input-config-3`): the daemon reads the
+      shared protocol `_shared/data/field_run_protocol.json` (file names, verdicts, reasons, identifier
+      and code rules, folders, the keys of each document) and only its steps from
+      `linux/data/field_run_steps.json` (`linux/infra/field_run.lua`), and runs its composer and network
+      checks headless; `tools/dev/linux-field-run.sh` sends the request from the collector, to the clone's
+      folder first, then the installed one, and prints a mark per step
+      (`tests/hardware/run_field_run_live.lua`, CI step "Run the field checks without a click"). The
+      Windows tray checks still need a click (another worker owns that side). Open in the shared
+      declaration: `step_kinds` has no `guard`, the kind macOS and Linux write for `config_guard`, and
+      `documents.refused` lists `request_id`, which both drivers leave out for a request without a valid
+      one.
 - [ ] **Field log analysis.** [CODE] Done: `tools/dev/field-log-analyse.py` (Python 3.8, stdlib) runs at the end
       of every collector on the scrubbed day logs only and writes `analysis.md` and `analysis.json` at the top
       of the report: errors and warnings grouped by module and template with first and last time, an example
