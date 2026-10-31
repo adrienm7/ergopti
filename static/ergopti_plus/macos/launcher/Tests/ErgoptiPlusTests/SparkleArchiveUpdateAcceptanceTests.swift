@@ -10,6 +10,7 @@ import Darwin
 import Foundation
 import Sparkle
 import XCTest
+@testable import ErgoptiPlus
 
 final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 	private enum NativeCommandPhase: String {
@@ -797,7 +798,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let owner: String
 		let name: String
 		var archiveOrigin: String {
-			"https://github.com/" + owner + "/" + name + "/releases/download/v2.0.0/ErgoptiPlus.app.tar.xz"
+			"https://\(Identifiers.Hosts.github)/\(owner)/\(name)/releases/download/v2.0.0/\(Identifiers.App.bundle).tar.xz"
 		}
 	}
 
@@ -1398,8 +1399,8 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		try Data(key.rawRepresentation.base64EncodedString().utf8).write(to: keyFile, options: .withoutOverwriting)
 		try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: keyFile.path)
 		for directory in ["installed", "source", "archives"] { try privateDirectory(root.appendingPathComponent(directory)) }
-		let installed = root.appendingPathComponent("installed/ErgoptiPlus.app")
-		let source = root.appendingPathComponent("source/ErgoptiPlus.app")
+		let installed = root.appendingPathComponent("installed/\(Identifiers.App.bundle)")
+		let source = root.appendingPathComponent("source/\(Identifiers.App.bundle)")
 		for (app, version) in [(installed, "1"), (source, "2")] {
 			try makeBundle(app, compiled: compiled, framework: framework.bundleURL, root: root,
 				nonce: nonce, port: port, publicKey: key.publicKey.rawRepresentation.base64EncodedString(), version: version, identity: identity)
@@ -1412,7 +1413,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			source.path, archives.path], root: root, phase: .archiveBuild)
 		_ = try run("/usr/bin/env", ["node", repository.appendingPathComponent("tools/build/macos-release-publication.cjs").path,
 			"sign", archives.path, signer, keyFile.path], root: root, phase: .archiveSign)
-		let payload = try Data(contentsOf: archives.appendingPathComponent("ErgoptiPlus.app.tar.xz"))
+		let payload = try Data(contentsOf: archives.appendingPathComponent("\(Identifiers.App.bundle).tar.xz"))
 		let fragment = try String(contentsOf: archives.appendingPathComponent("_ErgoptiPlus.app.tar.xz.sig"), encoding: .utf8)
 		let expression = try NSRegularExpression(pattern: #"^sparkle:edSignature="([A-Za-z0-9+/]{86}==)" length="([1-9][0-9]*)"\n$"#)
 		let match = try XCTUnwrap(expression.firstMatch(in: fragment, range: NSRange(fragment.startIndex..., in: fragment)))
@@ -1434,7 +1435,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		XCTAssertFalse(key.publicKey.isValidSignature(wrongSignature, for: payload))
 		let foreignArchives = root.appendingPathComponent("foreign-key-archives")
 		try privateDirectory(foreignArchives)
-		for name in ["ErgoptiPlus.app.tar.xz", "ErgoptiPlus.app.zip"] {
+		for name in ["\(Identifiers.App.bundle).tar.xz", "\(Identifiers.App.bundle).zip"] {
 			try manager.copyItem(at: archives.appendingPathComponent(name), to: foreignArchives.appendingPathComponent(name))
 		}
 		let foreignKeyFile = root.appendingPathComponent("foreign-file-key")
@@ -1446,7 +1447,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let foreignMatch = try XCTUnwrap(expression.firstMatch(in: foreignFragment, range: NSRange(foreignFragment.startIndex..., in: foreignFragment)))
 		let foreignSignature = String(foreignFragment[try XCTUnwrap(Range(foreignMatch.range(at: 1), in: foreignFragment))])
 		let officialForeignSignature = try XCTUnwrap(Data(base64Encoded: foreignSignature))
-		let copiedForeignPayload = try Data(contentsOf: foreignArchives.appendingPathComponent("ErgoptiPlus.app.tar.xz"))
+		let copiedForeignPayload = try Data(contentsOf: foreignArchives.appendingPathComponent("\(Identifiers.App.bundle).tar.xz"))
 		let officialForeignValid = foreignKey.publicKey.isValidSignature(officialForeignSignature, for: payload)
 		let officialInstalledValid = key.publicKey.isValidSignature(officialForeignSignature, for: payload)
 		let foreignPayloadEqual = copiedForeignPayload == payload
