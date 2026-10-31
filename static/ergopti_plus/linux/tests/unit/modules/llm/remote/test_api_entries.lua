@@ -659,3 +659,45 @@ helpers.describe("API entry identity after restart (api-entry-id-restart)", func
 		helpers.assert_eq(observations.active, observations.second)
 	end)
 end)
+
+-- Selecting an entry starts its access-token exchange, so the first request
+-- after a key change finds the token (access-token-lease)
+helpers.describe("API entry selection prewarms the access token (access-token-lease)", function()
+	--- Records every prewarm the store asks of the real remote backend.
+	--- @param body function body(entries, prewarmed)
+	local function with_prewarm_recorder(body)
+		local entries = fresh()
+		local remote = require("modules.llm.api_remote")
+		local original = remote.prewarm_access
+		local prewarmed = {}
+		remote.prewarm_access = function(entry)
+			prewarmed[#prewarmed + 1] = entry and entry.id or false
+			return false
+		end
+		local ok, failure = pcall(body, entries, prewarmed)
+		remote.prewarm_access = original
+		if not ok then error(failure, 0) end
+	end
+
+	helpers.it("adding a selected entry prewarms it, an unselected one does not (access-token-lease)", function()
+		with_prewarm_recorder(function(entries, prewarmed)
+			local first = assert(entries.add({ provider = "cerebras", label = "first", token = "inert-first" }))
+			helpers.assert_eq(prewarmed[1], first.id)
+			assert(entries.add({ provider = "cerebras", label = "second", token = "inert-second" }, false))
+			helpers.assert_eq(#prewarmed, 1, "a kept selection is not prewarmed again")
+		end)
+	end)
+
+	helpers.it("selecting an entry or giving it a model prewarms that entry (access-token-lease)", function()
+		with_prewarm_recorder(function(entries, prewarmed)
+			local first = assert(entries.add({ provider = "cerebras", label = "first", token = "inert-first" }))
+			local second = assert(entries.add({ provider = "cerebras", label = "second", token = "inert-second" }))
+			for index = #prewarmed, 1, -1 do prewarmed[index] = nil end
+			helpers.assert_true(entries.set_active(first.id))
+			helpers.assert_eq(prewarmed[1], first.id)
+			helpers.assert_true(entries.set_model(second.id, "llama-4-scout"))
+			helpers.assert_eq(prewarmed[2], second.id, "set_model selects the entry it changes")
+			helpers.assert_eq(#prewarmed, 2)
+		end)
+	end)
+end)

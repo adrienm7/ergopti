@@ -292,19 +292,4 @@ helpers.describe("Access-token providers: the first request waits for the token 
 			helpers.assert_eq(remote.prewarm_access({ id = "o", provider = "openai", token = "sk", model = "m" }), false)
 		end)
 	end)
-
-	helpers.it("every entry change that selects an entry prewarms its access token (access-token-lease)", function()
-		local fh = assert(io.open(helpers.driver_root() .. "/modules/llm/api_entries.lua", "r"))
-		local src = fh:read("*a")
-		fh:close()
-		local definition = src:find("local function prewarm_active_access", 1, true)
-		helpers.assert_true(definition ~= nil, "the prewarm helper exists")
-		for _, name in ipairs({ "function M.add(", "function M.set_active(", "function M.set_model(" }) do
-			local start = assert(src:find(name, 1, true), name)
-			local finish = assert(src:find("\nend\n", start, true), name)
-			helpers.assert_true(definition < start, name .. " reads the helper declared above it")
-			helpers.assert_true(src:sub(start, finish):find("prewarm_active_access()", 1, true) ~= nil,
-				name .. " starts the exchange of the entry it selects")
-		end
-	end)
 end)
