@@ -13,7 +13,12 @@
  *    clone folder;
  * 3. every driver steps file that exists declares steps the protocol accepts:
  *    unique ids, declared kinds, positive integer deadlines, a check name for
- *    a field check and one sentence of what its pass proves.
+ *    a field check and one sentence of what its pass proves, and a request
+ *    deadline whose default covers every step at its own deadline;
+ * 4. the Windows driver (infra/field_run.ahk, which AutoHotkey cannot run
+ *    here) reads every name from the declarations, has a runner for every
+ *    declared check, writes only declared verdicts and refusal reasons, starts
+ *    in developer source mode only and stops with the driver.
  * ==============================================================================
  */
 
@@ -118,8 +123,60 @@ check('every driver steps file declares steps the protocol accepts', () => {
 				`${label} proves nothing`
 			);
 		}
+		const deadline = read(relative).deadline_seconds;
+		if (deadline && typeof deadline.default === 'number') {
+			const total = steps.reduce((sum, step) => sum + step.deadline_seconds, 0);
+			assert(deadline.min <= deadline.default && deadline.default <= deadline.max, `${os} bounds`);
+			assert(deadline.default >= total, `${os} default ${deadline.default} s < steps ${total} s`);
+		}
 	}
 	assert(found >= 1, 'no driver steps file exists');
+});
+
+check('the Windows driver implements the protocol from the declarations', () => {
+	const WINDOWS = 'static/ergopti_plus/windows/';
+	const source = fs.readFileSync(path.join(ROOT, WINDOWS, 'infra/field_run.ahk'), 'utf8');
+	const code = source
+		.split('\n')
+		.filter((line) => !/^\s*;/.test(line))
+		.join('\n');
+	assert.match(code, /_SharedDir \. "\\data\\field_run_protocol\.json"/);
+	assert.match(code, /Spec\["steps_file"\]\["windows"\]/);
+	assert.match(code, /Spec\["folder"\]\["clone"\]/);
+	// A kind key is read as such ("results" is both a key and its name).
+	for (const [kind, name] of Object.entries(protocol.files))
+		if (name !== kind)
+			assert(!code.includes(`"${name}"`), `field_run.ahk spells the file name ${name} itself`);
+	const runners = code.match(/^FieldRun_Runners\(\) \{\n([\s\S]*?)^\}$/m);
+	assert(runners, 'no FieldRun_Runners');
+	for (const step of read(protocol.steps_file.windows).steps)
+		assert(runners[1].includes(`"${step.check}", `), `no runner for the check ${step.check}`);
+	const verdicts = [
+		...code.matchAll(/(?:Done\.Call\(|this\.Settle\(Token, |Verdict := )"([a-z_]+)"/g),
+		...code.matchAll(/\? "([a-z_]+)" : "([a-z_]+)", (?:\[|Codes)/g)
+	].flatMap((match) => match.slice(1).filter(Boolean));
+	assert(verdicts.length >= 5, `found only ${verdicts.length} verdict literals`);
+	for (const verdict of verdicts)
+		assert(protocol.verdicts.includes(verdict), `undeclared verdict ${verdict}`);
+	const reasons = [
+		...code.matchAll(/this\.Refuse\([^,]+, "([a-z_]+)"\)|Reason := "([a-z_]+)"/g)
+	].flatMap((match) => match.slice(1).filter(Boolean));
+	assert(reasons.length >= 3, `found only ${reasons.length} refusal literals`);
+	for (const reason of reasons)
+		assert(protocol.reasons.includes(reason), `undeclared reason ${reason}`);
+	const main = fs.readFileSync(path.join(ROOT, WINDOWS, 'ErgoptiPlus.ahk'), 'utf8');
+	const devBlock = main.match(
+		/if \(DevSource_Root\(\) != ""\) \{\n([\s\S]*?)\n\t\}\n\} catch as _DevSourceErr/
+	);
+	assert(
+		devBlock && /try FieldRun_Start\(DevSource_Root\(\)\)/.test(devBlock[1]),
+		'developer mode only'
+	);
+	assert.equal(main.split('FieldRun_Start(').length, 2, 'started once');
+	assert.match(main, /^#Include infra\/field_run\.ahk$/m);
+	const lifecycle = fs.readFileSync(path.join(ROOT, WINDOWS, 'infra/lifecycle.ahk'), 'utf8');
+	assert.match(lifecycle, /try FieldRun_Stop\(\)/, 'stopped with the driver');
+	assert.match(code, /TimingsGet\("ui", "field_run_poll_ms"\)/);
 });
 
 console.log(`[OK] field run protocol (${checks} checks).`);
