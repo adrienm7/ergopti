@@ -2522,7 +2522,7 @@ console.log('Cold exact uint64 identity controls: 8 admissions, 60 refusals');
 
 /** Pins a native arm64 full application job after packaging and without publication. */
 function checkColdJob(body) {
-	const role = macRoleBody(body, 'cold-bootstrap-native', 9);
+	const role = macRoleBody(body, 'cold-bootstrap-native', 7);
 	const prerequisites = pipeline.step(role, 'Require actual arm64 cold runtime prerequisites');
 	assert.match(prerequisites, /test -x \/usr\/bin\/sandbox-exec/);
 	assert.match(prerequisites, /test \"\$\(uname -m\)\" = arm64/);
@@ -2545,17 +2545,6 @@ function checkColdJob(body) {
 	assert.match(receive, /python3 tools\/diagnostics\/macos_cold_bootstrap.py/);
 	assert.match(receive, /--app "\$PWD\/build\/macos\/ErgoptiPlus.app"/);
 	assert.match(receive, /record-cold-macos/);
-	const officialUpload = pipeline.step(role, 'Retain official cold Ollama receipt only');
-	assert.equal(
-		pipeline.stepField(officialUpload, 'if'),
-		Mac.condition('cold-bootstrap-native', 'always()')
-	);
-	assert.match(officialUpload, /if-no-files-found: error/);
-	assert.match(officialUpload, /overwrite: true/);
-	assert.match(
-		officialUpload,
-		/path: \$\{\{ runner.temp \}\}\/native-cold-ollama-bootstrap\/receipt.json$/m
-	);
 	const upload = pipeline.step(role, 'Retain native cold bootstrap evidence');
 	assert.equal(
 		pipeline.stepField(upload, 'if'),

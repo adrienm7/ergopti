@@ -741,9 +741,6 @@ Nothing left.
       Fixed on the three OS (4741950f04: Windows forgets a final output at commit, a final entry whose output equals
       the typed text claims it, an immediate correction yields to a waiting final entry of higher priority). Left:
       the manual check line on the PC.
-- [ ] **macOS cold official-Ollama lane.** [CI] since bc09e4584c no product path calls the stock
-      `ollama_deps_checker.install_for_selection()`, so the macOS "official cold Ollama without stock Python" lane only
-      proves the official installer still works cold. Repoint it at the native install or retire it.
 - [ ] **"Create a GitHub issue" button is broken.** [PHYS-W] [PHYS-M] [PHYS-L] Fixed on the three OS (4e63c54c8a:
       4000 bytes, which holds even through the signed-out `/login?return_to=` re-encoding; measured anonymously).
       Left: a click while signed in opens the prefilled form with no "Whoops" page.

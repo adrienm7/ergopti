@@ -515,13 +515,6 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	],
 	[MACOS_BOX, 'package-macos', 'Retain launcher build diagnostics', 'always()'],
 	[MACOS_BOX, 'package-macos', 'Retain application build diagnostics', 'always()'],
-	[
-		MACOS_BOX,
-		'cold-bootstrap-native',
-		'Receive actual official cold Ollama without stock Python',
-		"${{ !cancelled() && steps.cold-app.outcome == 'success' }}"
-	],
-	[MACOS_BOX, 'cold-bootstrap-native', 'Retain official cold Ollama receipt only', 'always()'],
 	[MACOS_BOX, 'cold-bootstrap-native', 'Retain native cold bootstrap evidence', 'always()']
 ].map(macConditionEntry);
 const WINDOWS_FILE_RETENTION = [
@@ -4833,20 +4826,6 @@ for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
 	assert.ok(problems.some((problem) => problem.includes('STEP_CONDITIONS lists ' + key)));
 }
 
-const officialColdHead = '      - name: Receive actual official cold Ollama without stock Python\n';
-for (const condition of [
-	'always()',
-	'${{ !cancelled() }}',
-	"${{ !cancelled() && steps.cold-app.outcome != 'failure' }}"
-]) {
-	mustCatch(
-		'official cold runtime receiver broadened admission ' + condition,
-		MACOS_BOX,
-		macConditionalPrefix(officialColdHead),
-		officialColdHead + `        if: ${condition}\n`,
-		stepProblems
-	);
-}
 // Upload only closed receipts: the owned script corpus contains newline names,
 // and recursively uploading its private fixture tree also exposes unnecessary data.
 const NATIVE_INVENTORY_ARTIFACT = 'Retain native Hammerspoon provider inventory';
