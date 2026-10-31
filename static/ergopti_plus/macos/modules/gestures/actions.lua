@@ -1409,9 +1409,9 @@ sg("display_mirror_toggle", mouse_action("toggle_display_mirror"))
 -- The frontmost window saved to the screenshots folder, under the dispatching
 -- parent's screenshot owner: what the key left of 1 ran before it became a tap key.
 sg("screen_capture_instant", owner_action("modules.shortcuts.actions.system", "capture_frontmost_window"))
--- The URL the Ctrl+G shortcut opens, read from its owner at each run so a
--- changed shortcuts.chatgpt_url applies at once (Windows and Linux had this
--- action; macOS only had the shortcut).
+-- Formerly the fixed Ctrl+G hotkey (schema v20 made it the secondary_g slot).
+-- The URL is read from its owner at each run, so a changed
+-- shortcuts.chatgpt_url applies at once to every binding.
 sg("open_chatgpt", function()
 	local ok_bindings, Bindings = pcall(require, "modules.shortcuts.bindings")
 	if not ok_bindings or type(Bindings) ~= "table" or type(Bindings.get_chatgpt_url) ~= "function" then

@@ -571,8 +571,8 @@ Nothing left.
       Done on macOS and Linux (sixth integration batch): schema v15 `v14_to_v15` migration of the slots and
       Ctrl-letter switches, role table with per-driver families, manifest slots, both drivers adopt the role
       names, migrated-config binding proof, AHK fixtures pinned to v15, per-slot parameters carried by
-      `rename_prefix`. Left: the Windows adoption; macOS `ctrl_g` to its slot is a schema v20 step, Windows PC agent first
-      (the AHK tests that treat 19 as current move to 20; details in `docs/tooling/windows-pc-agent-handoff.md`).
+      `rename_prefix`. macOS Ctrl+G is its `secondary_g` slot since schema v20 (`open_chatgpt` on `hs`, the fixed
+      hotkey retired). Left: the Windows adoption.
 
 ### D. Instrumentation and diagnostics
 
@@ -877,6 +877,10 @@ PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, 
 - [ ] Schema v15 (PAR-41): with a copy of an old `config.toml` that has keyboard shortcut slots with
       parameters (for example a shortcut that opens a URL or types text), start the new build: every slot
       keeps its action and its parameter under its role-named id.
+- [ ] Schema v20 (PAR-41): with a copy of a v19 `config.toml` whose `[shortcuts.keys]` has `ctrl_g = true`,
+      start the new build: Ctrl+G opens the URL set by « Modifier l'URL ChatGPT… » in « Raccourcis ^ Ctrl », the
+      slot shows « Ouvrir ChatGPT (URL définie dans le menu) » and `ctrl_g` is gone from the file; with
+      `ctrl_g = false` the slot is empty and Ctrl+G does nothing.
 - [ ] Old `[llm.profiles] user_profiles`: a config that has them still shows the profiles in the AI menu
       (PAR-40), and the next save writes the new `llm.user_profiles` only.
 - [ ] Clear and Restore per category and global, then restart: unknown keys kept, personal hotstrings kept

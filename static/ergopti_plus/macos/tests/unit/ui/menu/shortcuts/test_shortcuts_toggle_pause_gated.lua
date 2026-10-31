@@ -55,10 +55,10 @@ local function build_paused()
 		decorate_section = function(value) return value end,
 	}
 	package.loaded["ui.menu.menu_utils"] = {}
-	package.loaded["infra.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(_, _, _, _, ctx)
+	package.loaded["infra.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(_, _, _, _, ctx)
 		render_ctx = ctx
 		return {}
-	end }
+	end)
 	package.loaded["ui.menu.shortcut_utils"] = {}
 	package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
 	package.loaded["infra.manifest_reader"] = { default_for = function() return "★" end }
