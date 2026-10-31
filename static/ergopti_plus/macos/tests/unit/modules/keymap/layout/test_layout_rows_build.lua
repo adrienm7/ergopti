@@ -57,6 +57,19 @@ helpers.describe("layout rows build: a live replace with no logout (layout-rows-
 			"the previous build was retired before the new one typed")
 	end)
 
+	helpers.it("probes the build under the identity a fresh process proved (rows-probe-fresh-identity)", function()
+		Build._reset()
+		local _, deps = fake_mac()
+		local probe, seen = deps.probe, nil
+		deps.probe = function(request, done) seen = request; return probe(request, done) end
+		local outcome
+		Build.replace(SOURCE, { order = "symbols", edges = false }, function(ok, result) outcome = { ok, result } end, deps)
+		helpers.assert_eq(outcome[1], true, tostring(outcome[2]))
+		helpers.assert_eq(seen.source_id, "org.unknown.keylayout.Ergo-L 1")
+		helpers.assert_eq(seen.identity, "fresh_process",
+			"Hammerspoon's own view still names the previous source right after the selection")
+	end)
+
 	helpers.it("undoes a build the probe does not see typing its cells", function()
 		Build._reset()
 		local mac, deps = fake_mac({ stale_cells = true })
