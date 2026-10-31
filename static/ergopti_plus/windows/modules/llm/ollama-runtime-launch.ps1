@@ -298,13 +298,37 @@ namespace Ergopti.Ollama {
   [DllImport("kernel32")] static extern IntPtr GetCurrentProcess();
   [DllImport("kernel32",SetLastError=true)] static extern bool IsProcessInJob(IntPtr p, IntPtr job, out bool inside);
   [DllImport("kernel32",SetLastError=true)] static extern bool QueryInformationJobObject(IntPtr job, int kind, byte[] data, uint size, IntPtr length);
+  [DllImport("kernel32",SetLastError=true)] static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+  [DllImport("kernel32",SetLastError=true)] static extern bool CloseHandle(IntPtr handle);
+  [DllImport("kernel32",SetLastError=true,CharSet=CharSet.Unicode)] static extern bool QueryFullProcessImageNameW(IntPtr process, uint flags, System.Text.StringBuilder name, ref uint size);
+  [DllImport("ntdll")] static extern int NtQueryInformationProcess(IntPtr process, int kind, long[] data, int size, IntPtr length);
+  // A console process started without a window still has a conhost.exe, created as
+  // its child and inside its job: it serves the leader and ends with it, so it is no
+  // descendant to wait for. Only this process's own host is excluded, by exact parent.
+  static bool IsOwnConsoleHost(uint pid, uint self) {
+   IntPtr process=OpenProcess(0x1000,false,pid);
+   if(process==IntPtr.Zero) return false;
+   try {
+    var basic=new long[6];
+    if(NtQueryInformationProcess(process,0,basic,48,IntPtr.Zero)!=0 || basic[5]!=self) return false;
+    uint size=1024; var name=new System.Text.StringBuilder(1024);
+    if(!QueryFullProcessImageNameW(process,0,name,ref size)) return false;
+    var system=Environment.GetFolderPath(Environment.SpecialFolder.System);
+    return string.Equals(name.ToString(),System.IO.Path.Combine(system,"conhost.exe"),StringComparison.OrdinalIgnoreCase);
+   } finally { CloseHandle(process); }
+  }
   public static uint ActiveProcesses() {
    bool inside;
    if(!IsProcessInJob(GetCurrentProcess(),IntPtr.Zero,out inside)) throw new Win32Exception(Marshal.GetLastWin32Error());
    if(!inside) throw new InvalidOperationException("Managed runtime has no canonical tree owner.");
-   var data=new byte[48];
-   if(!QueryInformationJobObject(IntPtr.Zero,1,data,48,IntPtr.Zero)) throw new Win32Exception(Marshal.GetLastWin32Error());
-   return BitConverter.ToUInt32(data,40);
+   var data=new byte[8+8*1024];
+   if(!QueryInformationJobObject(IntPtr.Zero,3,data,(uint)data.Length,IntPtr.Zero)) throw new Win32Exception(Marshal.GetLastWin32Error());
+   uint listed=BitConverter.ToUInt32(data,4), self=(uint)System.Diagnostics.Process.GetCurrentProcess().Id, count=0;
+   for(uint index=0;index<listed;index++) {
+    uint member=(uint)BitConverter.ToUInt64(data,(int)(8+index*8));
+    if(member==self || !IsOwnConsoleHost(member,self)) count++;
+   }
+   return count;
   }
  }
 }
