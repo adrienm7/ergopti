@@ -73,7 +73,9 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 			if Row.Section == "script" && Row.Key == "locale"
 				Repeated += 1
 		}
-		Assert(Repeated >= 2, "the actual whole-state producer has intentional repeated runtime-owner rows")
+		; The feature walk and its runtime owner both emit this row; the writer refuses
+		; two rows on one path, so the producer settles them (_ConfigLastRowWins).
+		AssertEqual(1, Repeated, "the actual whole-state producer settles an overruled row to one")
 		if Scenario == "late-neutral"
 			Rows.Push({ Section: "hotstrings.autocorrection.names", Key: "enabled", Delete: 1 })
 		if Scenario == "source" || Scenario == "absent"

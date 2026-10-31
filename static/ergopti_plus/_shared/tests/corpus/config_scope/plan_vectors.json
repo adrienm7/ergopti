@@ -7,7 +7,7 @@
 	},
 	"stored_paths": [
 		"action_parameters.gesture__tap_4__open_url",
-		"action_parameters.keyboard__ctrl_k__open_url",
+		"action_parameters.keyboard__primary_k__open_url",
 		"action_parameters.script__reload__open_url",
 		"action_parameters.tap_key__digit_1__open_url",
 		"action_parameters.tap_hold__caps_lock__open_url"

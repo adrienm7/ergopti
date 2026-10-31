@@ -515,7 +515,7 @@ helpers.describe("Native discovery infrastructure receipts (local-probe-unavaila
 				local catalogue=require("json").decode(assert(io.open(require("infra.paths").shared("modules/llm/local_servers.json"),"rb")):read("*a"))
 				local labels={}
 				for _,id in ipairs(catalogue.server_order) do labels[#labels+1]=catalogue.servers[id].label end
-				local none=require("infra.i18n").get("menu.llm.local_servers.none"):gsub("{1}",(table.concat(labels,", "):gsub("%%","%%%%")))
+				local none=require("infra.i18n").get("menu.llm.local_servers.none_detected")
 				helpers.assert_nil(find(rows,none),"infrastructure refusal cannot become a no-server claim")
 				helpers.assert_eq(servers.cancel(),false,"no flag acknowledges still retained native debt")
 				if failure~="throw" and failure~="unsupported" then

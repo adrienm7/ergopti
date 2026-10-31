@@ -41,6 +41,11 @@ refuses it. `platforms = ["ahk", "hs", "linux"]` restricts a row; with
 `unavailable = "hide"` it is absent elsewhere, with `unavailable = "grey"` and a
 `reason_key` it is drawn greyed with the reason.
 
+What a feature behind a row needs outside the driver (Karabiner on macOS, evdev
+and uinput on Linux, WebView2 on Windows, Ollama…) is the `requires` field of
+its `manifest.toml` entry, not a menu attribute; the generated
+`docs/design/feature-requirements.md` shows it per OS.
+
 ## Editing rules
 
 1. Edit `menu.toml` (features and their defaults stay in

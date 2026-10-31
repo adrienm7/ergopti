@@ -16,8 +16,10 @@ const { trustCheckout } = require('./lib/git-safe-directory.cjs');
 // the checkout (a cloud container cloned as root), git refused it as "dubious
 // ownership" and the gate stopped there: trust this one checkout for the gate's
 // own children, never in the user's Git configuration.
+// Spread into this realm: test-managed-ollama-no-cloud.cjs runs this file in a
+// vm context, where the helper's object has another realm's Object prototype.
 assert.deepEqual(
-	trustCheckout({ GIT_CONFIG_COUNT: '2' }, '/checkout'),
+	{ ...trustCheckout({ GIT_CONFIG_COUNT: '2' }, '/checkout') },
 	{
 		GIT_CONFIG_COUNT: '3',
 		GIT_CONFIG_KEY_2: 'safe.directory',

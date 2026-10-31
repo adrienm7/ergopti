@@ -148,7 +148,11 @@ _LMC_DriverSkipsALackingControl() {
 		AssertFalse(JsonParse(Lacking).Has("reasoning"), "the listing says the model takes no reasoning")
 		Listed := _LLMRemoteApplyThinkingOff(_LTO_Resolved("openrouter", "qwen/qwen3-235b-a22b"),
 			_LLMRemoteBuildPayload("openai", "qwen/qwen3-235b-a22b", "s", "u", 0, 16))
-		AssertContains(Listed, '"reasoning":{"enabled":false}', "a listed control is still sent")
+		; Read the JSON the provider receives: its spacing is not part of the contract.
+		ListedPayload := JsonParse(Listed)
+		AssertTrue(ListedPayload.Has("reasoning") && ListedPayload["reasoning"] is Map
+			&& ListedPayload["reasoning"].Has("enabled") && !ListedPayload["reasoning"]["enabled"],
+			"a listed control is still sent")
 		AssertTrue(_LLM_RemoteCapabilities["openrouter"].Get("pending", false) == false, "a fresh listing is not fetched")
 	} finally {
 		_LLM_RemoteCapabilities := Saved

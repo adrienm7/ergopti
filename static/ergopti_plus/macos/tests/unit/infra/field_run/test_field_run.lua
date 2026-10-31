@@ -380,12 +380,26 @@ helpers.describe("field run: declaration and requests", function()
 end)
 
 helpers.describe("field run: a disabled step", function()
-	helpers.it("skips the shipped driver_reload by name and never asks for a reload", function()
+	-- The reload that lost the app (2026-10-30 21:06, both 2026-10-31 runs) was
+	-- the owned Ollama daemon refusing the teardown; the shipped step runs again.
+	helpers.it("ships driver_reload enabled (reload-teardown-failed)", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local spec = FieldRun.validate(Json.decode(SPEC_TEXT))
+			helpers.assert_true(spec.step_by_id.driver_reload ~= nil)
+			helpers.assert_nil(spec.step_by_id.driver_reload.disabled)
+		end)
+	end)
+
+	helpers.it("skips a disabled step by name and never asks for a reload", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
 			local state = world()
-			local spec = FieldRun.validate(Json.decode(SPEC_TEXT))
-			-- The Mac run of 2026-10-30 21:06 lost the app when this step reloaded.
+			local declaration = Json.decode(SPEC_TEXT)
+			for _, step in ipairs(declaration.steps) do
+				if step.id == "driver_reload" then step.disabled = "reload_lost_the_app" end
+			end
+			local spec = FieldRun.validate(declaration)
 			helpers.assert_eq(spec.step_by_id.driver_reload.disabled, "reload_lost_the_app")
 			local session = FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports })
 			session:start()

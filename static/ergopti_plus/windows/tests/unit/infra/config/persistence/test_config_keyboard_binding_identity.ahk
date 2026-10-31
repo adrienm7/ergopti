@@ -15,8 +15,9 @@ TestConfigKeyboardBindingIdentity_Corpus() {
 	AssertEqual(17, Corpus["vectors"].Length, "independent handwritten keyboard identity vectors")
 	Ids := Corpus["ids"]
 	Catalogue := ConfigBindingIdentityKeyboardCatalogue(Ids)
+	Admitted := Ids[1]
 	Ids[1] := "changed_after_capture"
-	Assert(Catalogue["slots"].Has("primary_k"), "detached publication retains the admitted source value")
+	Assert(Catalogue["slots"].Has(Admitted), "detached publication retains the admitted source value")
 	Assert(!Catalogue["slots"].Has("changed_after_capture"), "source mutation does not rewrite the detached catalogue")
 	for Row in Corpus["vectors"] {
 		AssertEqual(Row["expected"], ConfigBindingIdentityKeyboardStatus(Row["binding"], Catalogue), Row["name"])

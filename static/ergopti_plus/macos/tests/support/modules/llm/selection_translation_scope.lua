@@ -13,6 +13,7 @@ local OWNED = {
 	"_generated.action_catalogue",
 	"_generated.gesture_emit_actions",
 	"_generated.logger_sub_files",
+	"_generated.registry_limits",
 	"actions.assignable",
 	"app_dirs",
 	"app_parameter",

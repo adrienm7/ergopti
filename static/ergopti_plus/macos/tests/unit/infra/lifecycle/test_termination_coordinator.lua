@@ -372,7 +372,7 @@ helpers.describe("controlled termination coordinator", function()
 
 	helpers.it("fails once only after an exact pending teardown refusal (HS-008)", function()
 		local coordinator, calls = load_coordinator({ teardown_deferred = true })
-		helpers.assert_true(coordinator.request_reload("mlx_cleanup_refused"))
+		helpers.assert_true(coordinator.request_exit("mlx_cleanup_refused", 0))
 		calls.lease_callback(true, "stopped")
 
 		helpers.assert_eq(calls.fatal_exits, 0,
@@ -381,13 +381,26 @@ helpers.describe("controlled termination coordinator", function()
 		helpers.assert_true(exact_callback(false, "listener still present") == false)
 		helpers.assert_eq(calls.teardowns, 1)
 		helpers.assert_eq(calls.drains, 0)
-		helpers.assert_eq(calls.reloads, 0)
+		helpers.assert_eq(calls.exits, 0)
 		helpers.assert_eq(calls.fatal_exits, 1)
 		helpers.assert_true(not coordinator.is_pending())
 
 		exact_callback(false, "duplicate refusal")
 		helpers.assert_eq(calls.fatal_exits, 1,
 			"a duplicate refusal cannot invoke the fatal backstop twice")
+
+		-- A reload refused the same way replaces its Lua state natively, once
+		local reload, reload_calls = load_coordinator({ teardown_deferred = true })
+		helpers.assert_true(reload.request_reload("mlx_cleanup_refused"))
+		reload_calls.lease_callback(true, "stopped")
+		local reload_callback = reload_calls.teardown_callback
+		helpers.assert_true(reload_callback(false, "listener still present") == false)
+		helpers.assert_eq(reload_calls.drains, 0)
+		helpers.assert_eq(reload_calls.reloads, 1)
+		helpers.assert_eq(reload_calls.fatal_exits, 0)
+		reload_callback(false, "duplicate refusal")
+		helpers.assert_eq(reload_calls.reloads, 1, "a duplicate refusal cannot reload twice")
+		helpers.assert_true(not reload.is_pending())
 	end)
 
 	helpers.it("retries a pending reload teardown with the latest exit intent (HS-008)", function()
@@ -706,11 +719,9 @@ helpers.describe("controlled termination coordinator", function()
 
 	helpers.it("exits non-zero after a throwing post-fence teardown", function()
 		local teardown_failure, teardown_calls = load_coordinator({ teardown_raises = true })
-		helpers.assert_true(teardown_failure.request_reload("raising_teardown"))
+		helpers.assert_true(teardown_failure.request_exit("raising_teardown", 0))
 		teardown_calls.lease_callback(true, "stopped")
-		helpers.assert_eq(teardown_calls.reloads, 0)
-		helpers.assert_eq(teardown_calls.clears, 1,
-			"a failed teardown must not leave the next real quit marked as reload")
+		helpers.assert_eq(teardown_calls.exits, 0)
 		helpers.assert_eq(teardown_calls.fatal_exits, 1,
 			"post-fence teardown failure cannot return as a live driver")
 		helpers.assert_eq(teardown_calls.fatal_exit_code, 70)
@@ -722,18 +733,51 @@ helpers.describe("controlled termination coordinator", function()
 			teardown_result = false,
 			partial_teardown = true,
 		})
-		helpers.assert_true(false_teardown.request_reload("false_teardown"))
+		helpers.assert_true(false_teardown.request_exit("false_teardown", 0))
 		false_calls.lease_callback(true, "stopped")
 		helpers.assert_true(false_calls.first_owner_stopped,
 			"the causal fixture must prove local teardown already mutated live state")
-		helpers.assert_eq(false_calls.reloads, 0,
+		helpers.assert_eq(false_calls.exits, 0,
 			"an explicit false teardown result must not execute the terminal action")
-		helpers.assert_eq(false_calls.clears, 1)
 		helpers.assert_eq(false_calls.fatal_exits, 1,
 			"an irreversibly partial teardown must invoke the native EOF backstop once")
 		helpers.assert_eq(false_calls.fatal_exit_code, 70)
 		helpers.assert_true(not false_teardown.is_pending(),
 			"the broken environment must never be republished as live")
+	end)
+
+	-- Both reloads of the 2026-10-31 field run failed their local teardown, and
+	-- the fatal exit lost the app: Hammerspoon reports status 0, so the launcher
+	-- quit with it and nothing came back for 57 s and 170 s.
+	helpers.it("reloads natively when a reload's local teardown fails (reload-teardown-failed)", function()
+		for _, options in ipairs({
+			{ teardown_raises = true },
+			{ teardown_result = false, partial_teardown = true },
+		}) do
+			local stages = {}
+			options.record_stage = function(_, stage) stages[#stages + 1] = stage end
+			local coordinator, calls = load_coordinator(options)
+			helpers.assert_true(coordinator.request_reload("watcher"))
+			calls.lease_callback(true, "stopped")
+			helpers.assert_eq(calls.drains, 0, "a failed teardown never reaches the log drain")
+			helpers.assert_eq(calls.finalizers, 0)
+			helpers.assert_eq(calls.reloads, 1, "the failed reload replaces its Lua state natively")
+			helpers.assert_eq(calls.fatal_exits, 0, "a reload must not lose the app")
+			helpers.assert_eq(calls.clears, 0,
+				"the sentinel stays marked so the shutdown callback sees a reload")
+			helpers.assert_true(not coordinator.is_pending())
+			helpers.assert_eq(stages[#stages - 1], "reload_after_failed_teardown")
+			helpers.assert_eq(stages[#stages], "hs_reload_called")
+			calls.lease_callback(true, "duplicate stopped")
+			helpers.assert_eq(calls.reloads, 1)
+			helpers.assert_eq(calls.teardowns, 1)
+		end
+
+		-- A native reload that raises still takes the fatal backstop
+		local raising, raising_calls = load_coordinator({ teardown_raises = true, reload_raises = true })
+		helpers.assert_true(raising.request_reload("watcher"))
+		raising_calls.lease_callback(true, "stopped")
+		helpers.assert_eq(raising_calls.fatal_exits, 1)
 	end)
 
 	helpers.it("exits non-zero when the fenced callback raises before local teardown", function()

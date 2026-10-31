@@ -2371,7 +2371,19 @@ end
 --- @return boolean written
 --- @return string|nil error_message
 function M.write(path, content)
-	local written, detail = write_atomic(path, content, nil)
+	local written, detail = write_atomic(path, content, nil, nil)
+	return written, detail
+end
+
+--- Same as M.write, for a caller that provokes the refusal: on_error receives
+--- the fixed failure category instead of the log. Kept apart so the FileSystem
+--- port keeps its two-argument write.
+--- @param path string Destination path.
+--- @param content string UTF-8 content.
+--- @param on_error function Receives the failure category.
+--- @return boolean written, string|nil detail
+function M.write_reporting(path, content, on_error)
+	local written, detail = write_atomic(path, content, nil, on_error)
 	return written, detail
 end
 
@@ -2437,13 +2449,17 @@ function M.write_if_unchanged_admitted(path, content, expected_source, on_error,
 	return write_atomic(path, content, captured, on_error, admission)
 end
 
---- Appends content to a file, creating it if it does not exist.
+--- Appends content to a file, creating it if it does not exist, for a caller
+--- that provokes the refusal: on_error receives the fixed failure category
+--- instead of the log (M.append is the port's two-argument form).
 --- @param path    string Absolute path to the file.
 --- @param content string UTF-8 content to append.
+--- @param on_error function|nil Receives the failure category; nil logs it.
 --- @return boolean true on success, false on any error.
-function M.append(path, content)
+function M.append_reporting(path, content, on_error)
+	local report = OperationReporter.new(on_error, Logger, LOG)
 	if type(path) ~= "string" or path == "" then
-		Logger.error(LOG, "append(): path must be a non-empty string.")
+		report("append", "error", "append(): path must be a non-empty string.")
 		return false
 	end
 	content = type(content) == "string" and content or ""
@@ -2452,23 +2468,23 @@ function M.append(path, content)
 	-- a FIFO without a reader blocks the main thread, and with a reader the bytes
 	-- leave for another process. The metadata follows a symlink to its target.
 	if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
-		Logger.error(LOG, "append(): destination metadata is unavailable; refusing to open it.")
+		report("append", "error", "append(): destination metadata is unavailable; refusing to open it.")
 		return false
 	end
 	local probe_ok, attributes = pcall(hs.fs.attributes, path)
 	if not probe_ok then
-		Logger.error(LOG, "append(): cannot inspect the destination — %s", tostring(attributes))
+		report("append", "error", "append(): cannot inspect the destination — %s", tostring(attributes))
 		return false
 	end
 	if type(attributes) == "table" and attributes.mode ~= "file" then
-		Logger.error(LOG, "append(): destination is not a regular file (%s).", tostring(attributes.mode))
+		report("append", "error", "append(): destination is not a regular file (%s).", tostring(attributes.mode))
 		return false
 	end
 
 	local ok, result = pcall(function()
 		local fh, err = io.open(path, "a")
 		if not fh then
-			Logger.error(LOG, "append(): cannot open '%s' for appending — %s", path, tostring(err))
+			report("append", "error", "append(): cannot open '%s' for appending — %s", path, tostring(err))
 			return false
 		end
 		local write_ok, written = pcall(function() return fh:write(content) end)
@@ -2477,19 +2493,27 @@ function M.append(path, content)
 		local write_failed = not write_ok or written ~= fh
 		local close_failed = not close_ok or closed ~= true
 		if write_failed then
-			Logger.error(LOG, "append(): native write failed.")
+			report("append", "error", "append(): native write failed.")
 		end
 		if close_failed then
-			Logger.error(LOG, "append(): native close failed.")
+			report("append", "error", "append(): native close failed.")
 		end
 		return not write_failed and not close_failed
 	end)
 
 	if not ok then
-		Logger.error(LOG, "append(): unexpected error on '%s' — %s", path, tostring(result))
+		report("append", "error", "append(): unexpected error on '%s' — %s", path, tostring(result))
 		return false
 	end
 	return result == true
+end
+
+--- Appends content to a file, creating it if it does not exist.
+--- @param path    string Absolute path to the file.
+--- @param content string UTF-8 content to append.
+--- @return boolean true on success, false on any error.
+function M.append(path, content)
+	return M.append_reporting(path, content, nil)
 end
 
 --- Returns true if a file or directory exists at the given path.

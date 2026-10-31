@@ -53,7 +53,11 @@ implemented today.
   (`tools/build/remap_runtime_publish.py`), so an opted-in boot reports
   `artifact_unpinned` today; once pinned, `runtime_artifact_fetch.lua`
   downloads and verifies it into `~/Library/Application Support/ErgoptiPlus/RemapRuntime/`
-  on the first admission and reuses it after. `runtime_activation.lua` is the
+  on the first admission and reuses it after. The artifact is the signed privileged
+  helper `ErgoptiPlus-Runtime-Installer.app` with the runtime products sealed in its
+  `Contents/Resources/OwnedRuntime/` (the `runtime-artifact` job runs
+  `remap_runtime_build.py --package-owned`); the launcher's administrator install
+  stages that helper from `<version>/payload/` once the receipt names the pinned digest. `runtime_activation.lua` is the
   maintainer's rule: while Ergopti runs and is not paused ours runs and closes
   the user's Karabiner, which a notification and a Tap-Holds row say; a pause
   or a quit stops ours and gives theirs back when Ergopti closed it. An owned boot also removes the rules

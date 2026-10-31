@@ -427,41 +427,122 @@ function composeLinuxMenuRoot(sources) {
 			});
 		}
 	}
-	const composed = new Set();
+	// The names the root itself reads or writes: an import only a part holds is
+	// emitted into the composed root, and the root may not read it there.
+	const rootNames = new Set();
+	for (let at = 0; at < t.length; at++)
+		if (t[at].kind === 'identifier' && !['.', ':'].includes(t[at - 1]?.value))
+			rootNames.add(t[at].value);
+	const composed = new Set(),
+		visiting = new Set(),
+		emitted = new Map(),
+		parsed = new Map();
+	const seen = new Set();
 	let result = '',
 		previous = 0;
+	const append = (chunk) => {
+		const tokens = scriptTokens(chunk, '.lua');
+		tokens.forEach((token, at) => {
+			if (token.kind === 'identifier' && !['.', ':'].includes(tokens[at - 1]?.value))
+				seen.add(token.value);
+		});
+		result += chunk;
+	};
+	const readFor = (moduleName) => {
+		const file = partFile(moduleName);
+		if (!file) return { ok: false, reason: moduleName + ' is not a part module' };
+		if (!parsed.has(file)) parsed.set(file, readPart(file, sources[file]));
+		return parsed.get(file);
+	};
+	// Emits one part module: the imports the root does not hold, the part modules
+	// only parts bind, then its definitions. Returns a refusal or null.
+	const emit = (moduleName) => {
+		const file = partFile(moduleName);
+		const part = readFor(moduleName);
+		if (!part.ok) return part;
+		if (visiting.has(moduleName)) return refuse(file + ': part modules bind each other in a cycle');
+		visiting.add(moduleName);
+		for (const { statement, at, end } of part.imports) {
+			if (rootHolds(root, statement)) continue;
+			const names = headerDeclares(part.unit, at);
+			if (!names.length || part.unit.tokens[at].value !== 'local')
+				return refuse(file + ': the root does not hold `' + statement + '`');
+			const owner = names.map((name) => emitted.get(name));
+			if (owner.every((held) => held === statement)) continue;
+			for (const name of names) {
+				if (emitted.has(name))
+					return refuse(
+						file + ': `' + statement + '` declares ' + name + ' another part declares otherwise'
+					);
+				if (rootNames.has(name))
+					return refuse(
+						file + ': the root reads ' + name + ', which only `' + statement + '` declares'
+					);
+				if (seen.has(name))
+					return refuse(file + ': ' + name + ' is read before `' + statement + '` declares it');
+				emitted.set(name, statement);
+			}
+			append(text(part.unit, at, end) + '\n');
+		}
+		for (const binding of part.partBindings) {
+			if (rootHolds(root, binding.text)) {
+				if (!composed.has(binding.module))
+					return refuse(file + ': ' + binding.module + ' must be bound in the root first');
+				continue;
+			}
+			// A part module only parts bind is composed ahead of its first binder.
+			if (!composed.has(binding.module)) {
+				const refused = emit(binding.module);
+				if (refused) return refused;
+				append('\n\n');
+			}
+			const bound = readFor(binding.module);
+			if (bound.exports.get(binding.field) !== binding.name)
+				return refuse(
+					file + ': ' + binding.module + ' does not export ' + binding.field + ' as ' + binding.name
+				);
+			if (rootNames.has(binding.name))
+				return refuse(
+					file + ': the root reads ' + binding.name + ', which only `' + binding.text + '` binds'
+				);
+		}
+		append(part.span);
+		visiting.delete(moduleName);
+		composed.add(moduleName);
+		return null;
+	};
 	for (const block of blocks) {
 		const file = partFile(block.module);
 		if (!file) return refuse(block.module + ' is not a part module');
-		const part = readPart(file, sources[file]);
+		if (composed.has(block.module))
+			return refuse(LINUX_MENU_ROOT + ': ' + block.module + ' is bound after a part composed it');
+		const part = readFor(block.module);
 		if (!part.ok) return part;
 		for (const binding of block.bindings)
 			if (part.exports.get(binding.field) !== binding.name)
 				return refuse(file + ' does not export ' + binding.field + ' as ' + binding.name);
-		for (const { statement } of part.imports)
-			if (!rootHolds(root, statement))
-				return refuse(file + ': the root does not hold `' + statement + '`');
-		for (const binding of part.partBindings) {
-			if (!composed.has(binding.module))
-				return refuse(file + ': ' + binding.module + ' must be bound in the root first');
-			if (!rootHolds(root, binding.text))
-				return refuse(file + ': the root does not hold `' + binding.text + '`');
-		}
-		composed.add(block.module);
-		result += rootSource.slice(previous, t[block.at].start) + part.span;
+		append(rootSource.slice(previous, t[block.at].start));
+		const refused = emit(block.module);
+		if (refused) return refused;
 		previous = t[block.end - 1].end;
 	}
-	result += rootSource.slice(previous);
-	return { ok: true, source: result, parts: blocks.map((block) => partFile(block.module)) };
+	append(rootSource.slice(previous));
+	return { ok: true, source: result, parts: [...composed].map(partFile) };
 }
 
-/** Root plus every part module it binds, read from `<pluginRoot>/linux/ui/menu`. */
+/** Root plus every part module it or a part binds, read from `<pluginRoot>/linux/ui/menu`. */
 function readLinuxMenuSources(pluginRoot) {
 	const read = (file) => fs.readFileSync(path.join(pluginRoot, file), 'utf8');
 	const sources = { [LINUX_MENU_ROOT]: read(LINUX_MENU_ROOT) };
-	for (const token of scriptTokens(sources[LINUX_MENU_ROOT], '.lua')) {
-		const file = token.kind === 'string' ? partFile(token.value) : null;
-		if (file && !Object.hasOwn(sources, file)) sources[file] = read(file);
+	const pending = [LINUX_MENU_ROOT];
+	while (pending.length) {
+		for (const token of scriptTokens(sources[pending.pop()], '.lua')) {
+			const file = token.kind === 'string' ? partFile(token.value) : null;
+			if (file && !Object.hasOwn(sources, file)) {
+				sources[file] = read(file);
+				pending.push(file);
+			}
+		}
 	}
 	return sources;
 }

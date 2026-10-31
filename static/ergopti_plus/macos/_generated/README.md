@@ -7,6 +7,7 @@ Run the corresponding npm script to regenerate.
 | ----------------------- | ------------------------ | --------------------------------------------- |
 | `features_manifest.lua` | `npm run build:manifest` | ✅ Wired — read via `lib/manifest_reader.lua` |
 | `config_template.toml`  | `npm run build:manifest` | ⚠️ **No macOS runtime reader** — generated, schema-validated and shipped inside every `.app`, read by nothing. Only Windows copies a template on first boot (`windows/lib/first_boot.ahk`) |
+| `registry_limits.lua`   | `npm run codegen:registry-constants` | ✅ Wired — the [limits] byte caps of the modules loaded before `infra.timings` (log transport, TOML cache, shell runner) |
 
 There is **no** `terminators.lua` here. The terminator catalogue is generated once,
 shared, at `_shared/lua/keymap/terminators_catalogue.lua`, and this driver reaches it

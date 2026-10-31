@@ -127,7 +127,8 @@ _LAEN_DuplicatesReadApart() {
 }
 Test("api-entry-auto-name: two entries of one provider and model read apart", _LAEN_DuplicatesReadApart)
 
-; The dialog asks four fields and no name: provider, URL, key, model. Scanned
+; The dialog asks no name: provider, URL (or one value per placeholder of a
+; per-account address), key, model. That is five prompt sites. Scanned
 ; comment-stripped so prose cannot satisfy it.
 _LAEN_DialogAsksNoName() {
 	Code := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_PromptApiEntry"))
@@ -145,7 +146,7 @@ _LAEN_DialogAsksNoName() {
 		Asked += 1
 		Pos += 1
 	}
-	AssertEqual(4, Asked, "the dialog has four fields: provider, URL, key and model")
+	AssertEqual(5, Asked, "the dialog prompts provider, per-account address values, URL, key and model")
 	AssertContains(Code, '"Name",     provider_id . "/" . new_model',
 		"the stored name is the automatic one, for the builds that still read it")
 }

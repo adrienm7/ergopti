@@ -8,7 +8,7 @@
 [_meta]
 delay = 0.5
 show_tooltip = false
-description = { fr = "Roulements", en = "Rolls", de = "Läufe", es = "Rodamientos", zh = "连击", ar = "تداول", cs = "Rolování", da = "Rolls", he = "גלגולים", hi = "रोल्स", it = "Rollate", ja = "ロール", ko = "롤", nl = "Rolls", no = "Rolls", pl = "Rolady", pt = "Rolagens", ru = "Перекаты", sv = "Rolls", tr = "Yuvarlamalar", uk = "Перекати" }
+description = { fr = "Roulements", en = "Rolls", de = "Läufe", es = "Rodamientos", zh = "连击", ar = "تداول", cs = "Rolování", da = "Rolls", he = "גלגולים", hi = "रोल्स", it = "Rollate", ja = "ロール", ko = "롤", nl = "Rolbewegingen", no = "Rolls", pl = "Rolady", pt = "Rolagens", ru = "Перекаты", sv = "Rolls", tr = "Yuvarlamalar", uk = "Перекати" }
 sections_order = ["hc", "sx", "cx", "english_negation", "ez", "ct", "-", "close_chevron_tag", "chevron_less", "chevron_greater", "comment_open", "comment_close", "-", "assign", "not_equal", "-", "paren_quote", "bracket_quote", "hashtag_parenthesis", "hashtag_open_bracket", "hashtag_close_bracket", "equal_string", "-", "left_arrow", "assign_arrow_equal_right", "assign_arrow_equal_left", "assign_arrow_minus_right", "assign_arrow_minus_left"]
 
 

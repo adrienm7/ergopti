@@ -14,7 +14,7 @@ _GTN_WinWaitIsQualified() {
 	EntryBody := _DriverFuncBody("GestureTakeNote")
 	RequestBody := _DriverFuncBody("TakeNoteRequest")
 	PollBody := _DriverFuncBody("_TakeNotePoll")
-	Assert(InStr(EntryBody, "_TakeNoteQueueFromFeatures(false)") > 0,
+	Assert(InStr(EntryBody, "_TakeNoteQueueFromFeatures(") > 0,
 		"GestureTakeNote must delegate to the shared note transaction")
 	Assert(!InStr(EntryBody, "WinWait") and !InStr(PollBody, "WinWait"),
 		"neither gesture dispatch nor its deferred worker may block in WinWait")

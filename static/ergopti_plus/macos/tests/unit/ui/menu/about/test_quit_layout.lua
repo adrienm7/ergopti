@@ -183,7 +183,7 @@ helpers.describe("quit layout: the root teardown runs the step first", function(
 		local body = src:sub(body_start, body_start + 6000)
 		local run_at = body:find("quit_layout_step.run(termination_kind, on_teardown_ready)", 1, true)
 		local pending_at = body:find('if layout_state == "pending" then', 1, true)
-		local mlx_at = body:find("_mlx_teardown_settled", 1, true)
+		local mlx_at = body:find("await_teardown_owner(owner, on_teardown_ready)", 1, true)
 		local steps_at = body:find("local steps = {", 1, true)
 		helpers.assert_true(run_at ~= nil, "the teardown must run the quit layout step")
 		helpers.assert_true(pending_at ~= nil and pending_at > run_at, "and return while the switch is pending")

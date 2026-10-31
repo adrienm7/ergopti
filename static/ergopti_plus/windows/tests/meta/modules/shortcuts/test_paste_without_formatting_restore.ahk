@@ -42,7 +42,6 @@ _PWF_ReadSource(FileName) {
 ; ================================================================
 
 _PWF_AssertSnapshot() {
-	Src := _PWF_ReadSource("actions.ahk")
 	Body := _DriverFuncBody("GesturePastePlain")
 	Assert(Body != "", "GesturePastePlain(*) declaration must exist in actions.ahk")
 	Assert(InStr(Body, "CB_SavePlainSnapshot(OwnerToken, &Captured)") > 0,
@@ -51,7 +50,6 @@ _PWF_AssertSnapshot() {
 Test("ctrl: GesturePastePlain snapshots clipboard before coercion (paste-without-formatting-no-restore)", _PWF_AssertSnapshot)
 
 _PWF_AssertDeferredRestore() {
-	Src := _PWF_ReadSource("actions.ahk")
 	Body := _DriverFuncBody("GesturePastePlain")
 	Assert(Body != "", "GesturePastePlain(*) declaration must exist in actions.ahk")
 	Assert(InStr(Body, "SetTimer") > 0,

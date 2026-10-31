@@ -47,6 +47,21 @@ local MINIMAL = [[<?xml version="1.1" encoding="UTF-8"?>
 ]]
 
 helpers.describe("keylayout rows: applying the number-row options to a .keylayout (keylayout-rows)", function()
+	-- 2026-10-31 14:13: Ergo-L's '&' moved to the plain 7 key was written
+	-- `&amp;`, and macOS read that key as typing nothing (readback_mismatch,
+	-- key 26). The shipped layouts write every XML-special character as a
+	-- numeric reference (keylayout-rows-numeric-refs).
+	helpers.it("writes moved XML-special outputs as numeric references (keylayout-rows-numeric-refs)", function()
+		local text = read(REGISTRY_DIR .. "ergol/ergol.keylayout")
+		local result = assert(Rows.apply(text, { order = "symbols", edges = false }, codes("ansi")))
+		helpers.assert_true(result.text:find('<key code="26" output="&#x0026;"/>', 1, true) ~= nil,
+			"the moved '&' must be written the way the shipped layouts write it")
+		helpers.assert_nil(result.text:find("&amp;", 1, true), "no named entity reaches the build")
+		helpers.assert_nil(result.text:find("&quot;", 1, true))
+		local after = assert(Rows.cells(result.text, codes("ansi")))
+		helpers.assert_eq(after.digits[7].plain.Text, "&")
+	end)
+
 	helpers.it("moves Ergo-L's cells and reads them back, Ctrl keeping the layout's digit", function()
 		local text = read(REGISTRY_DIR .. "ergol/ergol.keylayout")
 		local before = assert(Rows.cells(text, codes("ansi")))

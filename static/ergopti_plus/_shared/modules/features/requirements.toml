@@ -1,0 +1,290 @@
+# _shared/modules/features/requirements.toml
+# Closed vocabulary of what a feature can need outside its driver, per OS, and
+# the rules that derive each need from the drivers' code.
+#
+# Every feature of manifest.toml declares `requires = { macos = [...],
+# linux = [...], windows = [...] }` with exactly the OS it is available on, each
+# list naming ids of this file in alphabetical order (an empty list means
+# nothing external). tools/test/test-feature-requirements.cjs derives the same
+# lists from the code and fails in both directions: a feature that reaches a
+# requirement without declaring it, and a declared requirement nothing reaches.
+# docs/design/feature-requirements.md is the generated table
+# (tools/codegen/codegen-feature-requirements.cjs).
+#
+# What is in the vocabulary: a component a feature reaches that the OS does not
+# provide by itself (an application, a runtime, an optional program — the PIN and
+# OPT rows of docs/design/owned-runtimes.md), or a kernel interface the user must
+# open to Ergopti (evdev, uinput). What is not: what the whole driver needs
+# whatever feature is on (Hammerspoon and its Accessibility grant, the
+# AutoHotkey runtime, LuaJIT, GTK and WebKitGTK), the OS's own tools
+# (osascript, PowerShell 5.1, curl: the SYS rows) and the macOS WebKit view.
+# Adding an id needs a [detection.<os>.<id>] rule that finds its uses.
+#
+# Detection rules, per OS:
+#   source = "karabiner_generator"  macOS only. The features come from
+#                     macos/platform/remap/generator.lua: M.REQUIREMENT_STATE_FEATURES
+#                     maps each state field the generator reads to the features it
+#                     feeds, M.REQUIREMENT_FACADE_FEATURES each module calling the
+#                     injected remap facade (`content` below finds them).
+#   content         Regular expressions searched in the source without comments.
+#   file_name       Regular expression on the file name (an owner module named
+#                     for the runtime it drives).
+#   [owners]        Path prefix -> feature selectors. Every hit file matches
+#                     exactly one owner or plumbing prefix, and every prefix
+#                     matches at least one hit.
+#   [plumbing]      Path prefix -> why the file serves no feature: an adapter its
+#                     owners call, the driver's entry point, a menu or a settings
+#                     editor. A feature's requirement is what its behaviour
+#                     reaches, including a window it shows itself (a dashboard, a
+#                     download window, an error window), not the menu that edits
+#                     its settings.
+#
+# Selectors: `a.b` is one feature, `a.b.*` the features directly in section
+# a.b, `a.b.**` every feature under a.b, `!selector` removes a selection. Each
+# selector must select a feature available on that OS.
+
+
+
+# ===============================
+# ===============================
+# ======= 1. Driver trees =======
+# ===============================
+# ===============================
+
+[drivers.macos]
+root = "macos"
+extensions = [".lua"]
+skip = ["tests/", "_generated/", "vendor/", "native/"]
+
+[drivers.linux]
+root = "linux"
+extensions = [".lua"]
+skip = ["tests/", "_generated/", "vendor/", "native/"]
+
+# Read only: the Windows driver is AutoHotkey-native and spawns its runtimes
+# from AHK modules and their PowerShell workers.
+[drivers.windows]
+root = "windows"
+extensions = [".ahk", ".ps1"]
+skip = ["tests/", "_generated/", "vendor/", "native/"]
+
+
+
+# =============================
+# =============================
+# ======= 2. Vocabulary =======
+# =============================
+# =============================
+
+[requirements.karabiner]
+kind = "application"
+summary = "Karabiner-Elements (shared mode) or Ergopti's owned Karabiner runtime, with its VirtualHIDDevice driver"
+
+[requirements.evdev]
+kind = "kernel"
+summary = "Read access to `/dev/input/event*` (the input group), for the exclusive keyboard grab and the touchpad"
+
+[requirements.uinput]
+kind = "kernel"
+summary = "Write access to `/dev/uinput` (the udev rule of `install/setup_permissions.sh`), the output channel of every injected key"
+
+[requirements.xdotool]
+kind = "program"
+summary = "xdotool, X11 only: pointer, window and screen queries and actions"
+
+[requirements.wmctrl]
+kind = "program"
+summary = "wmctrl, X11 only: workspace switching"
+
+[requirements.zenity]
+kind = "program"
+summary = "zenity, or kdialog on KDE: the confirmation dialogs a feature shows itself"
+
+[requirements.ollama]
+kind = "runtime"
+summary = "The Ollama inference server that runs the local models"
+
+[requirements.mlx]
+kind = "runtime"
+summary = "The MLX (mlx-lm) Python environment Ergopti creates for on-device inference on Apple silicon"
+
+[requirements.webview2]
+kind = "runtime"
+summary = "The Microsoft Edge WebView2 Runtime, which renders the windows a feature shows itself"
+
+
+
+# ========================
+# ========================
+# ======= 3. macOS =======
+# ========================
+# ========================
+
+[detection.macos.karabiner]
+source = "karabiner_generator"
+content = ['(?<![\w])_karabiner(\.(?!toml)\w|\[)', '"platform\.remap\.ke_variables"', 'karabiner_kc\.log']
+
+[detection.macos.ollama]
+file_name = 'ollama'
+
+[detection.macos.ollama.owners]
+"adapters/managed_ollama_" = ["llm.**", "!llm.models.mlx"]
+"modules/llm/" = ["llm.**", "!llm.models.mlx"]
+
+[detection.macos.ollama.plumbing]
+"ui/menu/menu_llm/" = "the LLM menu edits the settings; the modules/llm owners run the features"
+
+[detection.macos.mlx]
+file_name = 'mlx'
+
+[detection.macos.mlx.owners]
+"modules/llm/" = ["llm.**", "!llm.models.ollama"]
+
+[detection.macos.mlx.plumbing]
+"ui/menu/menu_llm/" = "the LLM menu edits the settings and offers the MLX repair; the modules/llm owners run the features"
+
+
+
+# ========================
+# ========================
+# ======= 4. Linux =======
+# ========================
+# ========================
+
+[detection.linux.evdev]
+content = [
+	'EVIOCGRAB',
+	'"adapters\.evdev_reader"',
+	'"adapters\.keyboard_hook"',
+	'"modules\.hotstrings\.device_finder"',
+	'"modules\.gestures\.touchpad_finder"',
+]
+
+[detection.linux.evdev.owners]
+# The keyboard grab: every feature that reacts to a typed key runs behind it.
+"modules/hotstrings/device_finder.lua" = [
+	"hotstrings.**",
+	"shortcuts.**",
+	"tap_holds.*",
+	"mod_combos.*",
+	"category_enabled.key_combinations",
+	"llm.**",
+	"metrics.**",
+]
+"modules/hotstrings/injector.lua" = ["hotstrings.**", "llm.**"]
+"modules/shortcuts/manager.lua" = ["shortcuts.**"]
+"platform/remap/tap_hold_manager.lua" = ["tap_holds.*", "mod_combos.*", "shortcuts.key_combination_taps.*", "category_enabled.key_combinations"]
+"modules/keystats/" = ["metrics.**"]
+# The touchpad reader and the gesture actions.
+"modules/gestures/" = ["gestures.**"]
+
+[detection.linux.evdev.plumbing]
+"adapters/" = "the evdev and uinput adapters the owners call"
+"ergopti_hotstrings.lua" = "the daemon entry point that wires the owners"
+"ui/healthcheck/" = "the health check probes the device access"
+"ui/menu/menu_gestures.lua" = "the gestures menu edits the settings"
+"ui/modal.lua" = "releases the grab while a dialog is open, for every feature alike"
+"ui/physical_shortcuts/" = "the shortcut editor captures one key combination to store it"
+
+[detection.linux.uinput]
+content = ['/dev/uinput', 'UI_DEV_CREATE', '"adapters\.uinput_writer"', '"modules\.hotstrings\.injector"']
+
+[detection.linux.uinput.owners]
+"modules/hotstrings/injector.lua" = ["hotstrings.**", "llm.**"]
+"modules/dynamic_hotstrings/" = ["hotstrings.dynamic.*"]
+"modules/shortcuts/manager.lua" = ["shortcuts.**"]
+"platform/remap/tap_hold_manager.lua" = ["tap_holds.*", "mod_combos.*", "shortcuts.key_combination_taps.*", "category_enabled.key_combinations"]
+"modules/gestures/combo_emitter.lua" = ["gestures.*"]
+
+[detection.linux.uinput.plumbing]
+"adapters/" = "the evdev and uinput adapters the owners call"
+"ergopti_hotstrings.lua" = "the daemon entry point that wires the owners"
+"ui/healthcheck/" = "the health check probes the device access"
+
+[detection.linux.xdotool]
+content = ['["\x27]xdotool[ "\x27]']
+
+[detection.linux.xdotool.owners]
+"modules/gestures/" = ["gestures.*"]
+"adapters/window_switch.lua" = ["gestures.*"]
+"ui/tooltip/preview.lua" = [
+	"hotstrings.preview_ai_enabled",
+	"hotstrings.preview_autocorrect_enabled",
+	"hotstrings.preview_colored_tooltips",
+	"hotstrings.preview_star_enabled",
+	"llm.display.*",
+]
+
+[detection.linux.xdotool.plumbing]
+"adapters/window_info.lua" = "the focused-window port answers through libxcb in process; xdotool is only its fallback when libxcb is missing"
+
+[detection.linux.wmctrl]
+content = ['["\x27]wmctrl[ "\x27]', 'has_command\("wmctrl"']
+
+[detection.linux.wmctrl.owners]
+"modules/gestures/workspace_switcher.lua" = ["gestures.*"]
+
+[detection.linux.wmctrl.plumbing]
+"adapters/window_info.lua" = "the window list answers through libxcb in process; wmctrl is only its fallback when libxcb is missing"
+
+[detection.linux.zenity]
+content = ['["\x27](zenity|kdialog)[ "\x27]']
+
+[detection.linux.zenity.owners]
+"modules/gestures/system_actions.lua" = ["gestures.*"]
+"ui/gesture_conflicts.lua" = ["gestures.*"]
+"modules/llm/local_model_offer.lua" = ["llm.enabled"]
+"ui/llm_enable_refusal.lua" = ["llm.enabled"]
+
+[detection.linux.zenity.plumbing]
+"ui/app_chooser.lua" = "a dialog helper of the menus and settings editors"
+"ui/choice_prompt.lua" = "a dialog helper of the menus and settings editors"
+"ui/config_dir_picker.lua" = "the configuration folder picker of the onboarding and the paths editor"
+"ui/field_check/" = "the maintainer field check window"
+"ui/menu/" = "the menu dialogs edit the settings"
+"ui/text_prompt.lua" = "a dialog helper of the menus and settings editors"
+
+[detection.linux.ollama]
+file_name = 'ollama'
+
+[detection.linux.ollama.owners]
+"modules/llm/" = ["llm.**"]
+
+
+
+# ==========================
+# ==========================
+# ======= 5. Windows =======
+# ==========================
+# ==========================
+
+[detection.windows.ollama]
+file_name = 'ollama'
+
+[detection.windows.ollama.owners]
+"adapters/ollama_identity.ahk" = ["llm.**"]
+"modules/llm/" = ["llm.**"]
+
+[detection.windows.webview2]
+content = ['WebView2Loader', 'CreateCoreWebView2']
+
+[detection.windows.webview2.owners]
+"modules/llm/ollama_webview.ahk" = ["llm.**"]
+"modules/keystats/keystats_webview.ahk" = ["metrics.*"]
+"ui/error_dialog/" = ["script.show_error_dialog"]
+
+[detection.windows.webview2.plumbing]
+"infra/webview_" = "the WebView2 host helpers the windows share"
+"modules/updater/" = "application updates are not a manifest feature"
+"ui/action_picker_webview.ahk" = "the action picker edits a binding and keeps its native list as the fallback"
+"ui/changelog/" = "the changelog window is not a manifest feature"
+"ui/healthcheck/" = "the health check window is not a manifest feature"
+"ui/hotstrings_config_window/" = "the hotstring group editor edits the settings"
+"ui/layout_manager/" = "the layout registry window is not a manifest feature"
+"ui/model_browser/" = "the model browser edits the model choice"
+"ui/onboarding/" = "the onboarding wizard is not a manifest feature"
+"ui/paths_editor/" = "the folders editor is not a manifest feature"
+"ui/personal_info_editor/" = "the personal information editor edits the settings"
+"ui/personal_toml_editor_webview.ahk" = "the personal hotstrings editor edits the settings"
+"ui/prompt_editor/" = "the prompt profile editor edits the settings"
+"ui/update_check/" = "the update window is not a manifest feature"

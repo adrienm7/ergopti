@@ -289,7 +289,7 @@ class FieldRunSession {
 		this.Pid := Pid
 		this.Deps := Deps
 		this.Run := 0
-		this.Timer := 0
+		this.PollTimer := 0
 		this.Started := false
 	}
 
@@ -309,8 +309,8 @@ class FieldRunSession {
 			LoggerWarn(FIELD_RUN_TAG, "A stale field run request was left by an earlier session; removed.")
 			FSDelete(this.Path("request"))
 		}
-		this.Timer := ObjBindMethod(this, "Poll")
-		SetTimer(this.Timer, this.Deps["poll_ms"])
+		this.PollTimer := ObjBindMethod(this, "Poll")
+		SetTimer(this.PollTimer, this.Deps["poll_ms"])
 		Ids := []
 		for Step in this.Steps["steps"]
 			Ids.Push(Step["id"])
@@ -321,9 +321,9 @@ class FieldRunSession {
 
 	/** Stops watching; a running run is closed as interrupted. */
 	Stop() {
-		if this.Timer
-			SetTimer(this.Timer, 0)
-		this.Timer := 0
+		if this.PollTimer
+			SetTimer(this.PollTimer, 0)
+		this.PollTimer := 0
 		if IsObject(this.Run)
 			this.Finish(true, "teardown")
 		FSDelete(this.Path("ready"))

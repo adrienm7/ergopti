@@ -56,9 +56,14 @@ on the PC; push the branch and say so, dev integration stays with the coordinato
    `tools/dev/run-windows-dev.ps1` started, and the runtime layer of `test-windows-field-report-contract.cjs`; the
    expected files and refusals are steps 3 to 7 of the handoff's field run section. Push the report.
 3. **Windows code left** (AutoHotkey, so the PC's): the [CODE] parts that name Windows in "Maintainer requests of
-   2026-10-30" (provider token exchange), "Cross-OS parity" (PAR-53, PAR-58, PAR-63, PAR-74, PAR-76 R23, PAR-79,
-   PAR-80, PAR-81, PAR-83), "Wave 2" (config cleanup offers) and the antivirus ceiling of "Windows side to do on the
-   PC" below.
+   2026-10-30" (provider token exchange), "Cross-OS parity" (PAR-53, PAR-58, PAR-63, PAR-74, PAR-76 R23; PAR-79, PAR-81
+   and PAR-83 are in the handoff), "Wave 2" (config cleanup offers) and the antivirus ceiling of "Windows side to do on the
+   PC" below. Two more from the cloud pass of 2026-10-31: (a) `test-windows-bundle-manifest` is red on dev because
+   `infra/config_registry_cache.ahk` `ConfigRegistryCacheCodeIdentity` names `..\_generated\config_migration_ops.ahk`
+   (c95a93ed00), which is never shipped; the read only happens in a source run (`A_IsCompiled` returns first), so
+   either resolve that path in a way the gate does not read as a runtime literal or teach the gate source-only reads;
+   (b) land a408a29790 (`tmp/wip-todo-ah`, "split the four longest AHK unit shards by sub-domain", edits
+   `ci-windows.yml`) and run the Windows lane on it.
 4. **Physical checks:** "Windows manual checks for the maintainer" just below and "Maintainer checks > Windows PC";
    report each line as pass, fail or not run.
 
@@ -263,9 +268,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       AutoHotkey never ran the Windows side (step 1 and 2 of "PC Windows todo"); a Linux run on a real desktop.
 - [ ] **Field log analysis.** Done: `tools/dev/field-log-analyse.py` on every collector, the `[budgets]` section and
       the "Over budget" lines (8d52300169); Linux measures and judges its reload (request to the successor's boot,
-      `infra/reload_timing.lua`) and its menu rebuild (`ui/menu/timed_build.lua`) as macOS does. Left: run
-      `npm run test:hs` and `test:linux` where Lua runs and the AHK suite on the PC; [CODE] (Windows, the PC's) the
-      Windows driver measures no menu rebuild, so that budget is judged on macOS and Linux only.
+      `infra/reload_timing.lua`) and its menu rebuild (`ui/menu/timed_build.lua`) as macOS does; `npm run test:hs` and
+      `test:linux` pass as a non-root user under the pinned Node (2026-10-31). Left: the AHK suite on the PC; [CODE]
+      (Windows, the PC's) the Windows driver measures no menu rebuild, so that budget is judged on macOS and Linux
+      only.
 - [ ] **macOS main-thread holds (field report `mac-2026-10-30_210120`; ledger L16, L17, L18, L23).** [CODE]
       [PHYS-M] Done: ledger admission with native finds (0b679b0b0d), the personal-row alias check indexed once
       (b5c0c0de37), the dynamic-rule preview guard (c17aa3e5d7), the slowest diagnostics collectors named
@@ -275,7 +281,8 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       `cp -p` in one fork (two forks per replacement instead of four: preferences save `write`, keystats append),
       and `field_slow_lines` naming what decides each part below (6c30779ec3). Left, from the next field report
       (no manual action: the field run reports it): (1) the remaining menu rebuilds: `slow_layout_menu_phase` names
-      the `menu_keyboard_layout.*` stage to slice, `slow_hold_phase` the busiest phase of every hold; (2)
+      the `menu_keyboard_layout.*` stage to slice (per-builder phases were reverted on 2026-10-31: they changed the call
+      shapes the menu parity proofs read; time the builders without changing those calls), `slow_hold_phase` the busiest phase of every hold; (2)
       preferences save `sparse` (about 280 ms) and `write` (L17): `slow_preferences_save_stage` and
       `slow_preferences_save_forks` (`count:ms` of the worst save) say whether the remaining fork or a prepare
       stage holds it; (3) keystats append `write` and the ledger read (L16): `slow_ingest_ticks`,
@@ -284,16 +291,6 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       point 4: `slow_ignored_window_probes`, `slow_ignored_window_stage`), bound the named stage; (5) the one-off
       holds of `field_run`, `error_dialog`, `keymap/utils` timers and `menu_state` (shell.ioreg 146 ms):
       `worst_hold_site` and `slow_hold_phase`; L18: `keystats_start_ms` under 100 ms.
-- [ ] **Thinking off for every model on every backend and OS (merged with "Reasoning off in every AI request:
-      verify the open rules").** Done on the three OS: model families of `thinking_off.json` crossed with each
-      provider's dialect, the resolved Ollama `think` per family (98b9a2ad57), persisted and expiring refusals,
-      default-only sampling, and capability listings skipping a control a model lacks (c1c8a9c181). Left: run the
-      Windows suite on the PC (`model_capabilities.ahk`, `vision.ahk` `think`, `LLM_OllamaThink` are unexecuted);
-      verified 2026-10-31: OpenAI `gpt-5-mini`/`gpt-5-nano` matched no family and now take minimal (b8fb1c36),
-      Hermes 4 reasons only when asked and gets no toggle (07ce3db4), Fireworks DeepSeek V3.1 to V4.1 take `none`
-      or false as the family sends, Gemini's thinking table lists no 2.5 Flash image/TTS/audio model, and xAI's
-      reasoning page no longer lists `grok-3-mini` (kept, marked unverified). [CODE] Left to verify: the generic
-      name heuristic (`*qwen3*`, `*deepseek*`, `*-r1*`, `*think*`, `*reasoning*`) and Together/Kimi effort.
 - [ ] **Every known cloud AI provider in `api_providers.json`, on the three OS.** Done: about forty providers
       (official documentation read 2026-10-30, each descriptor's `_source`), the per-account providers whose
       `base_url` is a template (b5d321a4a3, form on the three OS), IBM watsonx.ai and Google Vertex AI with a token
@@ -303,13 +300,7 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
   - [CODE] Windows token exchange (AutoHotkey, the PC's): Windows refuses watsonx and Vertex AI with
     `menu.llm.api_provider_token_exchange_unavailable`; port the async form POST and token cache of
     `api_token_exchange.lua`.
-  - [CODE] The first prediction after start (or a key change) on an access-token provider is refused while the token
-    is fetched (the start prewarm already begins the exchange; a key change does not). Waiting instead needs
-    `resolve_active_entry` to return a lease that owns the pending exchange: today `deliver_resolved` answers
-    synchronously with a settled lease, which its five callers may cancel. A Vertex service-account key (signed
-    JWT) is not taken.
-  - [CODE] The listing reader takes `data` (and `models` for Gemini) only: DashScope's native listing and Writer's
-    `models[]` would need a per-provider listing shape on the three OS.
+  - [CODE] A Vertex service-account key (signed JWT) is not taken: only `authorized_user` credentials are exchanged.
   - [CODE] (Windows, the PC's) the native `llm_vision` prompt of the screen actions still lists every backend on a
     line; macOS and Linux pick it in a list, then ask the optional model (noted in the PC hand-off).
   - Inferred, not read: Chutes and Featherless `chat_template_kwargs.enable_thinking` on Qwen, SambaNova
@@ -329,8 +320,8 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       `local_server_auth.entry_matches`; (2) AnythingLLM always needs a key and takes a workspace slug as the model,
       Msty documents no port or dialect: both stay out; Foundry Local (Windows) and `mlx_lm.server` (macOS) belong to
       those drivers; (3) Windows: `test_local_server_auth.ahk` and `test_local_server_panel_view_preparation.ahk`
-      count the four old servers and were not run: run them and read the catalogue; (4) the "none" row lists
-      eleven labels; (5) [PHYS-M] [PHYS-L] one run with some of them installed.
+      count the four old servers and were not run: run them and read the catalogue; (5) [PHYS-M] [PHYS-L] one run
+      with some of them installed.
 - [ ] **Mac field report 2026-10-30 21:01, functional errors left open.** Fixed: shortcut full rebind on each
       retry, pre-dispatch Ollama pull receipt (also for a request refused while read: `--receipt-path`, 2a2dde64),
       one model-list error per outage, MLX server stopped before a repair, both schema versions named, the
@@ -354,9 +345,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
       ready with a `guardian_wait` under 10 s.
 - [ ] **Timed reload lost the app (2026-10-30 21:06).** [CODE] [PHYS-M] Done: the reload breadcrumb
       (`reload_breadcrumb.txt`, b12a654d79), the error window kept closed during a reload (02c58f8a94), a controlled
-      reload bounded by its own deadline (c366dd1c5b); `driver_reload` stays disabled. Left: reload by hand from the
-      menu until one is lost, run the collector, fix the stage the trail's last line names, then enable
-      `driver_reload` again.
+      reload bounded by its own deadline (c366dd1c5b). The 2026-10-31 trails ended at `teardown_failed`: the owned
+      Ollama daemon refused the teardown (c0ba1d98bb), a refusing step is now named (8121349ee7), a failed reload
+      teardown reloads natively (e6426e2ec5), and `driver_reload` is enabled again. Left: the next field run shows
+      `driver_reload` pass and `reload.request_to_boot` under its 4000 ms budget.
 
 ## Maintainer: remote branch cleanup (run on your machine; the cloud container's proxy refuses ref deletion and tag pushes)
 
@@ -392,14 +384,10 @@ The resulting tags are `archive/fix-macos`, `archive/fix-linux`, `archive/fix-wi
 (`tmp/wip-todo-ag`, `-ag2`, `-ae`, `tmp/wip-field-auto`, `tmp/wip-field-run-checklist` and 358e211a10 are on dev).
 After the cleanup, read them through the `archive/tmp-wip-<name>` tags.
 
-- `tmp/wip-todo-af`: 3337d99bc8 (Linux number-row order onboarding; it reads `number_row_live.available()`) and
-  4fcb4a979a (logger scalar), then `tmp/wip-todo-ag3` d5cf3ba50b (its strings; it conflicts in the 21 locales unless
-  the AF commits come first). 8634b1ff80 is superseded by dfb197a1ea; do not land it.
-- `tmp/wip-todo-ah`: 53b1bc5375 (reset every `hs.*` cache entry between macOS test files) and five CI speed-ups
-  (Ubuntu archive reuse, AHK shard split, one macOS checkout per E2E cell, Intel E2E start, SwiftPM cache trial); run
-  them on `tmp/preflight-dev` before dev.
-- `tmp/wip-ci-fix`: f44fcc1e64, c9b90d11d7, ba13937b8c, 5009ad87b8 (Linux distribution-row CI fixtures): check each
-  against dev first, later fixes may have replaced them.
+- `tmp/wip-todo-ah`: a408a29790 (AHK shard split) only, handed to the PC ("PC Windows todo" step 3); the `hs.*` cache
+  reset and the four Linux and macOS speed-ups landed on 2026-10-31 (`fix/todo-final-p4-ci`). `tmp/wip-ci-fix` is
+  fully on dev under other ids (2fb196a022, 767cf0cb7a, 9c496d384d with the fixture-owned machine id, 9b7abbe580,
+  7feb5a211b, 376b28db82): nothing to land.
 - Reference only: `tmp/wip-issue103` b449da5713 (an old reseal), `tmp/wip-issue104` aec2fb58cb (replaced by
   2be257c9f5), `tmp/wip-fr-uncommitted` 0d7e53b28b (replaced by 708bc6671d), `tmp/wip-todo-ae-par30` 41f72525cf
   (the PAR-30 Linux gate landed as cd824ccf8e).
@@ -409,11 +397,6 @@ After the cleanup, read them through the `archive/tmp-wip-<name>` tags.
 The July Linux driver plan (X11/Wayland hotstring engine, 2026-07-30) is retired; its rejected gesture routes are in
 `docs/memory/rejected_proposals.md` and the ungrabbed-touchpad limits in `docs/memory/linux-web-release.md`.
 
-- M3.3: [CODE] the tray menu is split into one module per section (`ui/menu/menu_*.lua`, 2026-10-30 and 31, gates
-  read the root through `tools/lib/linux-menu-parts.cjs`), and the root took the macOS root's name,
-  `ui/menu/builder.lua` (the frozen census oracle maps the old name through `CURRENT_SOURCE_RENAMES`). Left: a part
-  may import only what the root holds, so hoisting the root's part-only imports needs `closedModuleExport` in
-  `tools/lib/menu-native-llm-parent-binding.cjs` to follow the parts.
 - Gestures [PHYS-L]: the menu greys the slots out of reach and the reader start names them (d627f511fc); recorded
   `libinput record` traces replay into the decoder (1870e62e1a). Left: a three-finger pad on a real machine and one
   recording from a real touchpad (`linux/HARDWARE.md` section 13).
@@ -455,7 +438,11 @@ runs the branch cleanup below. Each pass left a full handover; read it first:
    - Run as a normal user with `USER` and `LOGNAME` set; the JS suite refuses root.
    - Use Node 22.22.2 and Ruff 0.15.8, and PowerShell 7 for the Windows host checks.
    - AutoHotkey under Wine is narrower evidence only; it does not replace Windows CI.
-   - **Host-only reds on the Linux container** (not bugs): JS `test-ahk-tap-follower`, `test-linux-install-sandbox`,
+   - **Host-only reds on the Linux container** (not bugs): Lua `local-server-detection-native` without `ss`
+     (install iproute2); macOS `new commits beyond origin/dev are clean` when the checkout or its worktree admin
+     folder is not owned by the running user (the suite isolates `HOME`, so a global `safe.directory` is not read;
+     the same ownership breaks the JS catalogue and clock-evidence gates' `git` calls); JS `test-ahk-tap-follower`,
+     `test-linux-install-sandbox`,
      `test-linux-runtime-native-registration`, `test-macos-managed-bootstrap-http`, `test-managed-ollama-protocol`,
      `test-managed-remote-retirement` (no pwsh), `test-linux-deb-package-owner` (refuses root),
      `test-drift-guard-covers-every-output` (worktrees only, node_modules symlink). Lua as root: every
@@ -483,10 +470,6 @@ runs the branch cleanup below. Each pass left a full handover; read it first:
      cases failed under Wine, cause unknown.
 - Linux (from its closeout): physical acceptance (evdev/uinput grabs, polkit, autostart, Wayland/X11) still needs a
   real machine.
-- CI: the macOS 26 "Run Swift launcher tests" step hit its 10-minute limit twice on 28 October, in main run
-  40764020578 and fix/macos run 40765470617. `HomebrewArchiveAcceptanceTests` alone took 289 s, and a real PAC
-  trust test was still running at the limit. Move the real-network cases into their own job, or raise the step
-  budget with a measured reason.
 
 ## Mac field session 2026-10-27: problem ledger
 
@@ -583,10 +566,12 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       job (manual dispatch) and the reproducible packager, `capture.requirement` pinned, the first-run
       fetch into `~/Library/Application Support/ErgoptiPlus/RemapRuntime/`, the running/paused/quit rule
       with its consent row and closed-Karabiner notice, the VirtualHIDDevice block rows (no migration out of
-      the user's `karabiner.json`: the maintainer starts from a clean state). Left: a green hosted runtime build and its `runtime.*`
-      pin; [CI] the artifact as the signed `ErgoptiPlus-Runtime-Installer.app` (`--package-owned`) with
-      the staging taking the downloaded helper instead of the bundle's
-      (`OwnedVirtualHIDDaemonReportMainOperation.swift`); the per-OS feature requirements table (needs the
+      the user's `karabiner.json`: the maintainer starts from a clean state). Since 2026-10-31 too: the
+      artifact is the signed `ErgoptiPlus-Runtime-Installer.app` with the products sealed inside
+      (`runtime-artifact` runs `--package-owned`, version `16.3.0-ergopti.2`), and the administrator staging
+      takes the helper of the verified download (`OwnedRuntimeDownloadedHelper.swift`, named refusals, no
+      bundle fallback). Left: [CI] the macOS lane on that Swift and a green hosted runtime build of the new
+      shape, then its `runtime.*` pin; the per-OS feature requirements table (needs the
       generator's inputs mapped to feature paths); the driver-only VirtualHIDDevice update offer; WP8
       native and WP9 real-Mac acceptance; then the `RUNTIME_DEFAULT` flip and the shared-mode deletion.
       Next: the maintainer's `bash tools/dev/collect-macos-field-report.sh` (`field_owned_runtime`, and on an
@@ -622,10 +607,8 @@ Mac todo's Composer (L52) line, L26 into L42, L27 into L43.
       across real processes and on the systemd unit path). Left: [CI] native macOS qualification of the Hotstrings
       category boot publication and of the obsolete-leaf setters; [CODE] (Windows, the PC's) the cleanup still cannot
       offer bare root keys or unknown `[[x]]` generations, and the physical keyboard slot parameters
-      (`keyboard__win_SC03A__x`); [PHYS-L] one daemon restart under a real user manager on a real session, which a
-      Linux `driver_reload` field step (kind `reload` of `_shared/data/field_run_protocol.json`, its duration from
-      `infra/reload_timing.lua`) would prove with no person once [CODE] `infra/field_run.lua`, which runs
-      `field_check` steps only, resumes a run in the successor daemon.
+      (`keyboard__win_SC03A__x`); [PHYS-L] one daemon restart under a real user manager on a real session: the Linux
+      `driver_reload` field step proves it with no person once `collect-linux-field-report.sh` runs there.
 - [ ] **Ollama redirect policy and Go compile (decision 5).** [CI] Code done (cda1e10c5e); the hosted Go cell passed
       on a throwaway branch (run 40021624397). Left: the same cell on the final source before a release.
 - [ ] **Ergopti-started Ollama behind a PAC proxy (merged with PAR-71).** [PHYS-W] [PHYS-M] Linux done (89d22d782c);
@@ -718,27 +701,12 @@ Nothing left.
 
 ### G. Constants, delays, colours, labels (value order)
 
-- [ ] **PAR-79. Replace repeated timer literals with registry keys.** [CODE] Lua and JS done; AHK moved to the
-      registry (e7a548149f). Left: the 36 AHK sites left in `tools/test/timer-literal-baseline.json` (the PC's) and
-      about 37 `usleep` calls in the Swift launcher sources.
-- [ ] **PAR-80. `[limits]` section for byte caps.** [CODE] Done, with the AHK process output caps (daedb449ce) and
-      `MAX_BODY_BYTES` reading `[limits]`. Left: the eight Lua constants of `tools/test/limit-literal-baseline.json`.
-- [ ] **PAR-81. Theme tokens and palette codegen.** [CODE] Done, with the Windows palette from the generated theme
-      (1a53f8ccc5). Left: moving the literals of `tools/lint/hex-literal-baseline.json` (40 files, mostly CSS and
-      TOML) onto tokens with per-page pixel diffs.
-- [ ] **PAR-83. Identifiers and hosts in one file.** [CODE] Done for Lua (948ebef074, bb1899206e):
-      `_shared/data/identifiers.json` generating `_shared/lua/identifiers.lua`, typed copies held to a
-      shrink-only baseline. Emitters exist for JS, shell, Python, AHK and Swift; the JS pages, the macOS
-      Lua and Python sites and the launcher constants read them (33600679a4, db7bc54668 [CI: Swift]). Left
-      (`tools/lint/identifier-literal-baseline.json`): the AHK copies; the macOS owned-runtime Swift files,
-      whose signing ids are derived from the launcher id (`.runtime-installer`, `.installed-physical-source`,
-      `remap.core`/`console`/`cli`: declare them in `identifiers.json` first, which regenerates the Windows
-      AHK copy) and whose `OwnedRuntimePublisherIdentity` raw values must stay literals (pin them with a
-      test instead); the Swift test fixtures' app names; the runtime shell scripts
-      (`ensure-ollama-deps.sh`, `_shared/.../ollama_install.sh`, `linux/install.sh`, the generated
-      `managed-python-release.sh`), for which `test-shell-identifiers-sourcing.cjs` accepts only the
-      build scripts' repo-root sourcing form; `Package.swift` (a SwiftPM manifest cannot read sources);
-      the `tools/` build scripts.
+- [ ] **PAR-79/PAR-83 macOS remainder.** [CODE] [CI: Swift] Once the owned-runtime change now in CI lands: move the
+      nine sleeps of the `OwnedRuntime*` and `OwnedVirtualHIDDaemonReport*` Swift files onto `[launcher]` keys
+      (`tools/test/launcher-sleep-literal-baseline.json`, shrink with `--shrink`), and their identifier copies
+      (`tools/lint/identifier-literal-baseline.json`): declare the derived signing ids in `identifiers.json`
+      first and pin the `OwnedRuntimePublisherIdentity` raw values with a test. The Windows remainder of PAR-79,
+      PAR-81 and PAR-83 is in [the PC handoff](docs/tooling/windows-pc-agent-handoff.md).
 
 ## Backlog (one line each)
 
@@ -825,8 +793,7 @@ Added October 22 (from the agents' reports; details in their commits):
       unreachable (state, action) outputs (a dead key pressed inside a dead state sends its own keysym, while the
       Compose line names the base one) and 6 conflicting sequences (`<infinity> <asciicircum>` and five more), in the
       Python converter and its byte-identical Lua twin alike, so the fix touches both and the shipped Ergopti
-      XCompose; maintainer decision: CC BY-SA 3.0 or GFDL for the vendored copy (bepo.fr dual-licenses it); the
-      onboarding control is 3337d99bc8 on `tmp/wip-todo-af`. The row switches (`layout.emulate_*_row`)
+      XCompose; maintainer decision: CC BY-SA 3.0 or GFDL for the vendored copy (bepo.fr dual-licenses it). The row switches (`layout.emulate_*_row`)
       stay Windows-only: they mix Ergopti rows with the OS layout, which has no `.keylayout` source on macOS or
       Linux; an Ergopti bundle source types digits on both levels, so its rows stay greyed on macOS.
 - [ ] **Linux CI installs packages inside short test steps.** [CI] Every Linux test step now has its own install
@@ -854,8 +821,10 @@ Added October 22 (from the agents' reports; details in their commits):
       shared HTTP-redirect corpus on Windows (c64788227a), macOS audit-named tests renamed, neutral-installation gate,
       many Windows source scans turned into behaviour tests on 2026-10-30; on 2026-10-31 the macOS app launcher
       quoting and clipboard round-trip tests became behaviour tests (macOS pinned-read ratchet 27 -> 24 files, 75
-      -> 70 reads) and Linux got its own pinned-read ratchet (74 files, 136 reads,
-      `tools/test/test-no-pinned-source-reads-linux.cjs`). Left: Windows replay of the timer-ceiling and key-chord
+      -> 70 reads) and Linux got its own pinned-read ratchet (`tools/test/test-no-pinned-source-reads-linux.cjs`);
+      later that day two macOS tests (api_ollama's require-time scheduling and streaming payload removal) and two
+      Linux ones (version stamp, debounce clock) became behaviour tests: macOS 22 files / 67 reads, Linux 72 / 135.
+      Left: Windows replay of the timer-ceiling and key-chord
       corpora (needs a decision to build those policies on Windows), and the rest of the source assertions to
       behaviour (audit item 14), driving both Lua ratchets down.
 - [ ] **116. Guided third-party validation report.** [PHYS-M] `field_toolchain` runs it with no person (timer,
@@ -868,7 +837,6 @@ Added October 22 (from the agents' reports; details in their commits):
       is written (`macos/infra/logger.lua` `redact_message`, `linux/infra/logger_sink.lua`; logs written before it
       stay unmasked on disk and the collector masks them at export). Left: GitHub field editability after a form
       reload needs a real draft.
-- [ ] **13/35.** [CODE] Enrol the complete guardian acceptance collector in main CI.
 - [ ] **93. Linux ordered pairs.** [PHYS-L] XI2 property cookies proven on Xvfb (`run_xi2_property_cookies.py`).
       Nothing else is provable on Xvfb: the join of a uinput Writer edge with the server's XKB/XI2 modifier state
       needs Xorg or a compositor reading real evdev nodes.
@@ -1291,10 +1259,6 @@ or under "Decided, do not re-raise".
   tools: OPT), the base utilities on both OS (SYS); macOS `/usr/bin/python3` helpers (PIN on the managed
   Python); and whether the rows become a machine-readable `_shared/data/owned_runtimes.json`. Kept meanwhile:
   every tool as it is used today; a new spawn needs a row (the inventory test).
-- **"Sticky" in French and Latin-script locales.** The sticky-modifier labels keep the English
-  "Sticky", like the `menu.tapholds.sticky_*` strings. Use a French term such as « rémanent »?
-- **Dutch "Rolls".** `category.rolls` and `hs_config.cat_rolls` keep "Rolls" (Dutch "Rollen" means
-  "roles"). Another Dutch word?
 - **A hand-written `config.toml` `[script]` row on macOS and Linux.** Windows reads `locale` from
   `config.toml` at start. macOS (`hs.settings` `i18n_locale`) and Linux (`storage.json`) read only their
   native alias store, so a `locale`, `log_level` or `show_error_dialog` typed into `config.toml` is

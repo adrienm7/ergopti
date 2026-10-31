@@ -156,10 +156,6 @@
 					"id": "stage-admission"
 				},
 				{
-					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}"
-				},
-				{
 					"name": "Install the E2E interpreter",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}"
 				},
@@ -173,10 +169,6 @@
 					"name": "Retain source-bound e2e-hs qualification receipts",
 					"uses": "actions/upload-artifact@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' && (always()) }}"
-				},
-				{
-					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}"
 				},
 				{
 					"uses": "actions/setup-node@v4",
@@ -259,6 +251,23 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'xctest') }}"
 				},
 				{
+					"name": "Name the Intel XCTest SwiftPM build",
+					"id": "swiftpm-xctest-key",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO == 'xctest') }}",
+					"shell": "bash"
+				},
+				{
+					"name": "Restore the Intel XCTest SwiftPM build",
+					"id": "swiftpm-xctest-cache",
+					"uses": "actions/cache/restore@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO == 'xctest') }}"
+				},
+				{
+					"name": "Report the Intel XCTest SwiftPM build cache",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO == 'xctest') }}",
+					"shell": "bash"
+				},
+				{
 					"name": "Qualify actual SDK accepted-owner and deadline XCTest controls",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'runtime') }}",
 					"timeout-minutes": 10,
@@ -285,6 +294,11 @@
 					"name": "Retain selected number-row Carbon XCTest diagnostics",
 					"uses": "actions/upload-artifact@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'runtime') }}"
+				},
+				{
+					"name": "Save the Intel XCTest SwiftPM build",
+					"uses": "actions/cache/save@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO == 'xctest' && steps.swiftpm-xctest-cache.outputs.cache-hit != 'true') }}"
 				},
 				{
 					"name": "Qualify native input-source and launcher XCTest controls",
@@ -437,10 +451,6 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (always()) }}"
 				},
 				{
-					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
-				},
-				{
 					"uses": "actions/setup-node@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
@@ -485,10 +495,6 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}"
 				},
 				{
-					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
-				},
-				{
 					"uses": "actions/setup-node@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
@@ -505,10 +511,6 @@
 					"name": "Retain exact paired-process native receiving",
 					"uses": "actions/upload-artifact@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}"
-				},
-				{
-					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 				},
 				{
 					"name": "Prepare Node for native policy fixtures and XCTest evidence",
@@ -577,7 +579,7 @@
 					"name": "Run Swift launcher tests on macOS 26",
 					"id": "swift-launcher-tests",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}",
-					"timeout-minutes": 10
+					"timeout-minutes": 15
 				},
 				{
 					"name": "Retain scoped native Brew qualification receipt",
@@ -928,6 +930,11 @@
 				{
 					"name": "Install, launch and judge every scenario of the lot",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
+				},
+				{
+					"name": "Register and retire the installed remap guardian",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (!cancelled()) }}",
+					"timeout-minutes": 5
 				},
 				{
 					"name": "Retain source-bound AppleEvent launch qualification receipt",

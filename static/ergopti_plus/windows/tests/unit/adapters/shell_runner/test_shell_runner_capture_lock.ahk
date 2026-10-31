@@ -443,6 +443,52 @@ _SRCL_SweepRemovesOnlyDeadOwnersFolders() {
 Test("shell runner: the capture sweep removes only exited owners' folders (shell-capture-lock)",
 	_SRCL_SweepRemovesOnlyDeadOwnersFolders)
 
+; A managed HTTP request killed mid-flight leaves its staged members, and
+; transport.json carries the request's headers and body in clear. The sweep must
+; retire them; a folder reached through a junction is not emptied.
+_SRCL_SweepRetiresManagedRequestMembers() {
+	Root := _FSWL_Path() . ".members"
+	Dead := Root . "\" . SR_CAPTURE_DIR_PREFIX . SRCL_DEAD_OWNER_PID . "_1"
+	Held := Root . "\" . SR_CAPTURE_DIR_PREFIX . SRCL_DEAD_OWNER_PID . "_2"
+	Linked := Root . "\" . SR_CAPTURE_DIR_PREFIX . SRCL_DEAD_OWNER_PID . "_3"
+	Foreign := Root . "\foreign"
+	Lock := 0, Log := 0
+	AssertEqual(0, ProcessExist(SRCL_DEAD_OWNER_PID), "the fixture owner PID must name no process")
+	try {
+		for Folder in [Dead, Held] {
+			DirCreate(Folder)
+			for Name in ["request.json", "admission.json", "transport.json"]
+				FileAppend("left behind", Folder . "\" . Name, "UTF-8-RAW")
+		}
+		DirCreate(Foreign)
+		FileAppend("not the adapter's", Foreign . "\keep.txt", "UTF-8-RAW")
+		AssertEqual(0, RunWait(A_ComSpec . ' /c mklink /J "' . Linked . '" "' . Foreign . '"', , "Hide"),
+			"the fixture must own a real junction")
+		Lock := _SRCL_OpenCaptureLikeHandle(Held . "\transport.json", SRCL_GENERIC_READ, SRCL_OPEN_EXISTING)
+		Log := _SRCL_BeginLog()
+		try Sweep := _SR_CaptureSweepStale(Root, 0)
+		finally _SRCL_EndLog(Log)
+		AssertFalse(DirExist(Dead) != "", "every member of an exited request goes with its folder")
+		AssertTrue(FileExist(Held . "\transport.json") != "", "a member another process holds stays")
+		AssertFalse(FileExist(Held . "\request.json") != "", "the members nothing holds still go")
+		AssertEqual(1, Sweep["kept"], "the held folder waits for a later start")
+		AssertTrue(FileExist(Foreign . "\keep.txt") != "", "a junction's target is never emptied")
+		AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Lock, "Int"))
+		Lock := 0
+		AssertEqual(0, _SR_CaptureSweepStale(Root, 0)["kept"], "the released folder goes at the next sweep")
+		AssertFalse(DirExist(Held) != "")
+	} finally {
+		if Lock
+			DllCall("Kernel32\CloseHandle", "Ptr", Lock, "Int")
+		if DirExist(Linked)
+			DllCall("Kernel32\RemoveDirectoryW", "WStr", Linked, "Int")
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("shell runner: the capture sweep retires a killed request's staged members (shell-capture-lock)",
+	_SRCL_SweepRetiresManagedRequestMembers)
+
 
 
 

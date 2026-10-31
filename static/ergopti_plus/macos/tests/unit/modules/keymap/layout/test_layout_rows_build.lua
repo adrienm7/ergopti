@@ -82,6 +82,26 @@ helpers.describe("layout rows build: a live replace with no logout (layout-rows-
 		helpers.assert_nil(mac.enabled["Ergo-L 1"], "the failed build is still enabled")
 	end)
 
+	-- 2026-10-31 14:13:22: the undo selected the previous build, which macOS
+	-- refused (invalid_output, MISS), and the keyboard was left on the failed
+	-- build (rows-undo-falls-back-to-source).
+	helpers.it("selects the source layout when the undo cannot select the previous build (rows-undo-falls-back-to-source)", function()
+		Build._reset()
+		local options = {}
+		local mac, deps = fake_mac(options)
+		local first
+		Build.replace(SOURCE, { order = "symbols", edges = false }, function(...) first = { ... } end, deps)
+		helpers.assert_eq(first[1], true, tostring(first[2]))
+		options.stale_cells = true
+		options.unselectable = { ["Ergo-L 1"] = true }
+		local answer
+		Build.replace(SOURCE, { order = "symbols", edges = true }, function(...) answer = { ... } end, deps)
+		helpers.assert_eq(answer[1], false)
+		helpers.assert_eq(answer[2], Build.FAILURE_READBACK)
+		helpers.assert_eq(mac.selected, "Ergo-L", "the source layout types when the previous build cannot")
+		helpers.assert_nil(mac.enabled["Ergo-L 2"], "the failed build is still enabled")
+	end)
+
 	helpers.it("goes back to the source layout when the choice moves no cell", function()
 		Build._reset()
 		local mac, deps = fake_mac()

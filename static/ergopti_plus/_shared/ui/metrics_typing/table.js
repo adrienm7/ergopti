@@ -1293,7 +1293,7 @@ function render_kc_heatmap(kc_data_arr) {
 		// Tooltip div — absolutely positioned, hidden by default
 		tooltips +=
 			`<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
-			`background:#1a1a2e;border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
+			`background:${ThemeTokens.color('hue-1a1a2e')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
 			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:220px;white-space:nowrap;text-align:left;">` +
 			tip_html +
 			`</div>`;
@@ -1301,10 +1301,10 @@ function render_kc_heatmap(kc_data_arr) {
 
 	container.innerHTML =
 		`<div style="display:inline-block;position:relative;">` +
-		`<div style="font-size:17px;font-weight:bold;color:#1e96ff;margin-bottom:6px;text-align:left;">` +
+		`<div style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-1e96ff')};margin-bottom:6px;text-align:left;">` +
 		`Heatmap de l'utilisation physique des touches</div>` +
 		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
-		`style="background:#12121e;border-radius:10px;display:block;"` +
+		`style="background:${ThemeTokens.color('hue-12121e')};border-radius:10px;display:block;"` +
 		`onmousemove="hm_track_mouse(event)">` +
 		rects +
 		labels +
@@ -1470,7 +1470,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 
 	// Green (cold, 0 SFBs) → red (hot, many SFBs)
 	const heat_color = (count) => {
-		if (count === 0) return '#1e2e1e';
+		if (count === 0) return ThemeTokens.color('hue-1e2e1e');
 		const t = Math.pow(count / max_count, 0.4);
 		if (t < 0.5) {
 			const tt = t * 2;
@@ -1727,7 +1727,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 
 		tooltips +=
 			`<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
-			`background:#1a2e1a;border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
+			`background:${ThemeTokens.color('hue-1a2e1a')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
 			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:280px;white-space:nowrap;text-align:left;">` +
 			`<style scoped>.hm-tooltip hr{margin:4px 0;border-color:${ThemeTokens.color('grey-555')};}</style>` +
 			tip_html +
@@ -1736,10 +1736,10 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 
 	container.innerHTML =
 		`<div style="display:inline-block;position:relative;">` +
-		`<div style="font-size:17px;font-weight:bold;color:#22c55e;margin-bottom:6px;text-align:left;">` +
+		`<div style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-22c55e')};margin-bottom:6px;text-align:left;">` +
 		`Heatmap des SFBs par touche</div>` +
 		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
-		`style="background:#1e1608;border-radius:10px;display:block;"` +
+		`style="background:${ThemeTokens.color('hue-1e1608')};border-radius:10px;display:block;"` +
 		`onmousemove="hm_track_mouse(event)">` +
 		rects +
 		labels +
