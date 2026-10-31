@@ -31,7 +31,7 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // Frozen on 2026-10-31, the day the ratchet started: Linux test files naming a
 // driver source path, and the pinned reads they hold.
 const BASELINE = 74;
-const READ_BASELINE = 136;
+const READ_BASELINE = 137;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];
