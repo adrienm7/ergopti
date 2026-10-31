@@ -6,7 +6,7 @@ import XCTest
 @testable import ErgoptiPlus
 
 final class GuardianRegistrationTests: XCTestCase {
-	private let executable = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+	private let executable = "/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus"
 	private let environment = ["ERGOPTI_LAUNCHER_DEVICE": "11", "ERGOPTI_LAUNCHER_INODE": "22"]
 	private let identity = LeaseExecutableIdentity(device: "11", inode: "22")
 
