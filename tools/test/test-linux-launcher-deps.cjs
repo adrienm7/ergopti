@@ -498,6 +498,9 @@ const nixBinPath =
 if (!/\blibxkbcommon\b/.test(nixBinPath)) {
 	errors.push('the Nix wrapper must expose xkbcli from libxkbcommon through PATH');
 }
+if (!/\blibsecret\b/.test(nixBinPath)) {
+	errors.push('the Nix wrapper must expose secret-tool from libsecret through PATH');
+}
 
 const packageDependencyChecks = [debDepends, rpmRequires, archDepends, nixLibraryPath, nixBinPath];
 if (packageDependencyChecks.some((value) => value == null || value === '' || value.size === 0)) {
@@ -509,9 +512,12 @@ if (packageDependencyChecks.some((value) => value == null || value === '' || val
 // Exercise actual generator outputs, including the metadata read by native packagers.
 // Independent historical floors keep a catalogue edit from quietly dropping old requirements.
 const preservedRequirements = {
-	deb: 'luajit (>= 2.1), xclip, libnotify-bin, curl, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, zenity, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1'.split(
-		', '
-	),
+	deb: [
+		...'luajit (>= 2.1), xclip, libnotify-bin, curl, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, zenity, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1'.split(
+			', '
+		),
+		'libsecret-tools'
+	],
 	rpm: [
 		'luajit >= 2.1',
 		'xclip',
@@ -526,9 +532,12 @@ const preservedRequirements = {
 		'libayatana-appindicator-gtk3',
 		'zenity',
 		'shadow-utils',
-		'util-linux'
+		'util-linux',
+		'libsecret'
 	],
-	arch: ['luajit', 'xclip', 'libnotify', 'curl', 'libxkbcommon', 'at-spi2-core'],
+	// secret-tool: remote API keys are refused without the secret service, so
+	// the packages depend on it as install.sh does, never only recommend it.
+	arch: ['luajit', 'xclip', 'libnotify', 'curl', 'libxkbcommon', 'at-spi2-core', 'libsecret'],
 	nix_library_path: ['libayatana-appindicator', 'gtk3', 'glib', 'libxkbcommon', 'at-spi2-core']
 };
 try {

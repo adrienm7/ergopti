@@ -85,6 +85,8 @@
                   # Metrics must not borrow key derivation, SQLite or directory
                   # creation commands from the user's optional login profile.
                   openssl sqlite coreutils
+                  # secret-tool: remote API keys live in the desktop secret service.
+                  libsecret
                 ])} \
                 --prefix LD_LIBRARY_PATH : ${nixpkgs.lib.makeLibraryPath (with pkgs; [
                   # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
