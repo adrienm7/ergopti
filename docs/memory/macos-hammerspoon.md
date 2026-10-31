@@ -488,12 +488,16 @@ On POSIX Lua, `file:read(0)` returns nil without an error at EOF for an empty
 regular file; a directory returns nil with an error. Test doubles must inspect
 both returns instead of treating nil as proof of a directory.
 
-### project-macos-atomic-write-leaves-a-lock-file
+### project-macos-write-lock-lives-outside-the-destination
 
-`adapters/file_system.lua` writes through a sibling `<path>.ergoptiplus-write-lock-v1`
-that stays after the write (the field run results show one per result file). A
-scratch file in a folder the user owns (a writability probe) must be written and
-removed with plain `io.open`/`os.remove`, or each run leaves that lock file behind.
+`adapters/file_system.lua` takes a stable advisory-lock inode for every
+publication and conditional removal. It cannot unlink that inode after use (a
+waiter would lock the orphan while a newcomer locks a new file), so the lock
+lives in `~/Library/Application Support/ErgoptiPlus/write-locks/` under an
+FNV-1a digest of the canonical destination (`adapters/write_lock_path.lua`).
+Beside its destination it stayed next to every field-run result and inside
+private folders whose exact census then refused retirement (the Ollama pull
+slot of 2026-10-31). Tests find a lock with the fixture's `write_lock_path`.
 The stub `hs.fs.attributes` ignores its second argument: read the attribute table.
 
 ### project-macos-split-module-stub-reload
