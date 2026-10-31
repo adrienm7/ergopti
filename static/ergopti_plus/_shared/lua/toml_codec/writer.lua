@@ -64,7 +64,12 @@ local function report_case_twin(setting)
 	-- Literal replacement: a setting name may hold characters gsub would interpret.
 	local message = i18n.get("dialog.config_save.case_twin")
 	local first, last = message:find("{1}", 1, true)
-	if first then message = message:sub(1, first - 1) .. setting .. message:sub(last + 1) end
+	-- A notice that cannot name the setting leaves the user no way to find it.
+	if not first then
+		Logger.error(LOG, "The case-twin notice has no {1} placeholder for setting '%s'.", setting)
+		return
+	end
+	message = message:sub(1, first - 1) .. setting .. message:sub(last + 1)
 	first, last = message:find("{2}", 1, true)
 	if first then message = message:sub(1, first - 1) .. i18n.get("menu.global.clean_unused_keys") .. message:sub(last + 1) end
 	local shown, detail = pcall(case_twin_reporter, message)
