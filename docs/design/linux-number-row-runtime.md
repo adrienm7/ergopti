@@ -5,17 +5,17 @@
 Status (2026-10-30): applied on Linux by rebuilding the layout. Linux reads
 `layout.direct_access_digits` and `layout.number_row_reorder_edges` from
 `config.toml`, converts the installed `.keylayout` again with them and loads the
-result into the running session, on X11 and on GNOME or KDE Wayland. macOS still
-stores them without applying them. The whole design, for the three OS, is
+result into the running session, on X11 and on GNOME or KDE Wayland. macOS applies
+them the same way since fc5d3a11df: it rebuilds the `.keylayout` and replaces it live. The whole design, for the three OS, is
 `docs/design/layout-option-emulation.md`; this note records the Linux choices.
 
 ## How each driver treats the two settings
 
-| Driver  | Number-row ordering (`direct_access_digits`)                                                                                                                                                                   | Edge keys (`number_row_reorder_edges`) |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| Windows | Applied. The driver emulates the layout, and `#HotIf NumberRowEffectiveMode()` hotkeys retype the ten digit keys (`modules/keymap/layout.ahk`, `layout/digit_row_bindings.ahk`, `layout/number_row_send.ahk`). | Applied with the ordering.             |
-| macOS   | Not applied. The layout is installed as a system input source and the system types the row. The menu row is read-only: `number_row_policy.native_rows` with `platform_reason.number_row_override_unsupported`. | Not applied, same reason.              |
-| Linux   | Applied by the layout itself: the converter (`_shared/lua/layouts/xkb_converter.lua`) swaps the cells while converting, and the session loads the new XKB layout. No key is retyped by the hook.               | Applied with the ordering, same path.  |
+| Driver  | Number-row ordering (`direct_access_digits`)                                                                                                                                                                              | Edge keys (`number_row_reorder_edges`) |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Windows | Applied. The driver emulates the layout, and `#HotIf NumberRowEffectiveMode()` hotkeys retype the ten digit keys (`modules/keymap/layout.ahk`, `layout/digit_row_bindings.ahk`, `layout/number_row_send.ahk`).            | Applied with the ordering.             |
+| macOS   | Applied by the layout itself: `modules/keymap/number_row_live.lua` rebuilds the installed `.keylayout` with the options (`layouts/keylayout_rows.lua`) and replaces it live (`layout_rows_build.lua`). No key is retyped. | Applied with the ordering, same path.  |
+| Linux   | Applied by the layout itself: the converter (`_shared/lua/layouts/xkb_converter.lua`) swaps the cells while converting, and the session loads the new XKB layout. No key is retyped by the hook.                          | Applied with the ordering, same path.  |
 
 ## Why the layout and not the hook
 
