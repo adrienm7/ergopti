@@ -40,7 +40,9 @@
 			"server": "omlx",
 			"os": "macos",
 			"ps": "300 /opt/homebrew/bin/python3 -m omlx.cli serve --base-path /Users/u/.omlx --port 9001",
-			"files": { "/Users/u/.omlx/settings.json": "{\"server\":{\"port\":8181}}" },
+			"files": {
+				"/Users/u/.omlx/settings.json": "{\"server\":{\"port\":8181}}"
+			},
 			"expected": {
 				"running": true,
 				"pids": [300],
@@ -54,15 +56,22 @@
 			"server": "omlx",
 			"os": "macos",
 			"ps": "1 /sbin/launchd\n500 vim /Users/u/notes/omlx-server.txt",
-			"files": { "/Users/u/.omlx/settings.json": "{\"server\":{\"port\":8181}}" },
-			"expected": { "running": false, "pids": [] }
+			"files": {
+				"/Users/u/.omlx/settings.json": "{\"server\":{\"port\":8181}}"
+			},
+			"expected": {
+				"running": false,
+				"pids": []
+			}
 		},
 		{
 			"name": "a settings file without a port falls back to the listening port",
 			"server": "omlx",
 			"os": "macos",
 			"ps": "77996 omlx-server",
-			"files": { "/Users/u/.omlx/settings.json": "{\"server\":{\"host\":\"127.0.0.1\"}}" },
+			"files": {
+				"/Users/u/.omlx/settings.json": "{\"server\":{\"host\":\"127.0.0.1\"}}"
+			},
 			"lsof": "p77996\nf5\nn127.0.0.1:8181\np123\nf4\nn127.0.0.1:8000",
 			"expected": {
 				"running": true,
@@ -76,7 +85,9 @@
 			"server": "omlx",
 			"os": "macos",
 			"ps": "77996 omlx-server",
-			"files": { "/Users/u/.omlx/settings.json": "{not json" },
+			"files": {
+				"/Users/u/.omlx/settings.json": "{not json"
+			},
 			"lsof": "p77996\nf5\nn*:8383",
 			"expected": {
 				"running": true,
@@ -104,7 +115,9 @@
 			"server": "omlx",
 			"os": "linux",
 			"ps": "77996 omlx-server",
-			"files": { "/Users/u/.omlx/settings.json": "{\"server\":{\"port\":8181}}" },
+			"files": {
+				"/Users/u/.omlx/settings.json": "{\"server\":{\"port\":8181}}"
+			},
 			"ss": "LISTEN 0 2048 127.0.0.1:8484 0.0.0.0:* users:((\"python3\",pid=77996,fd=7))",
 			"expected": {
 				"running": true,
@@ -238,6 +251,151 @@
 				"port": 8282,
 				"base_url": "http://127.0.0.1:8282/v1",
 				"api_key": "cli-key"
+			}
+		},
+		{
+			"name": "SGLang launch_server module with --port",
+			"server": "sglang",
+			"os": "linux",
+			"ps": "4200 python3 -m sglang.launch_server --model-path Qwen/Qwen3-4B --port 30123",
+			"files": {},
+			"expected": {
+				"running": true,
+				"source": "cli",
+				"port": 30123,
+				"base_url": "http://127.0.0.1:30123/v1"
+			}
+		},
+		{
+			"name": "SGLang console script serve",
+			"server": "sglang",
+			"os": "linux",
+			"ps": "4201 /home/u/.venv/bin/python3 /home/u/.venv/bin/sglang serve --model-path Qwen/Qwen3-4B",
+			"files": {},
+			"expected": {
+				"running": true,
+				"source": "default",
+				"port": 30000,
+				"base_url": "http://127.0.0.1:30000/v1"
+			}
+		},
+		{
+			"name": "KoboldCpp Linux release binary with --port",
+			"server": "koboldcpp",
+			"os": "linux",
+			"ps": "4300 /home/u/Downloads/koboldcpp-linux-x64 --model q.gguf --port 5123",
+			"files": {},
+			"expected": {
+				"running": true,
+				"source": "cli",
+				"port": 5123,
+				"base_url": "http://127.0.0.1:5123/v1"
+			}
+		},
+		{
+			"name": "text-generation-webui server.py with --api-port",
+			"server": "textgen_webui",
+			"os": "linux",
+			"ps": "4400 /home/u/text-generation-webui/installer_files/env/bin/python server.py --api --api-port 5055",
+			"files": {},
+			"expected": {
+				"running": true,
+				"source": "cli",
+				"port": 5055,
+				"base_url": "http://127.0.0.1:5055/v1"
+			}
+		},
+		{
+			"name": "GPT4All found at the port it listens on",
+			"server": "gpt4all",
+			"os": "linux",
+			"ps": "4600 /home/u/gpt4all/bin/chat",
+			"files": {},
+			"ss": "LISTEN 0 50 127.0.0.1:4892 0.0.0.0:* users:((\"chat\",pid=4600,fd=31))",
+			"expected": {
+				"running": true,
+				"source": "listening",
+				"port": 4892,
+				"base_url": "http://127.0.0.1:4892/v1"
+			}
+		},
+		{
+			"name": "Lemonade lemond reads its user config.json",
+			"server": "lemonade",
+			"os": "linux",
+			"ps": "4700 /usr/bin/lemond",
+			"files": {
+				"/Users/u/.config/lemonade/config.json": "{\"port\":13400,\"host\":\"localhost\"}"
+			},
+			"expected": {
+				"running": true,
+				"source": "config",
+				"port": 13400,
+				"base_url": "http://127.0.0.1:13400/v1"
+			}
+		},
+		{
+			"name": "Lemonade packaged service reads /var/lib/lemonade/config.json",
+			"server": "lemonade",
+			"os": "linux",
+			"ps": "4701 /usr/bin/lemond",
+			"files": {
+				"/var/lib/lemonade/config.json": "{\"port\":13500}"
+			},
+			"expected": {
+				"running": true,
+				"source": "config",
+				"port": 13500,
+				"base_url": "http://127.0.0.1:13500/v1"
+			}
+		},
+		{
+			"name": "Docker Model Runner container entrypoint at its documented port",
+			"server": "docker_model_runner",
+			"os": "linux",
+			"ps": "4800 /app/model-runner",
+			"files": {},
+			"expected": {
+				"running": true,
+				"source": "default",
+				"port": 12434,
+				"base_url": "http://127.0.0.1:12434/engines/v1"
+			}
+		},
+		{
+			"name": "exo with --api-port",
+			"server": "exo",
+			"os": "linux",
+			"ps": "4900 /home/u/exo/.venv/bin/python3 /home/u/exo/.venv/bin/exo --api-port 52499",
+			"files": {},
+			"expected": {
+				"running": true,
+				"source": "cli",
+				"port": 52499,
+				"base_url": "http://127.0.0.1:52499/v1"
+			}
+		},
+		{
+			"name": "a llamafile model on its own port joins the llama.cpp row",
+			"server": "llamacpp",
+			"os": "linux",
+			"ps": "5000 /home/u/models/Qwen3-4B.llamafile --server --port 8090",
+			"files": {},
+			"expected": {
+				"running": true,
+				"source": "cli",
+				"port": 8090,
+				"base_url": "http://127.0.0.1:8090/v1"
+			}
+		},
+		{
+			"name": "a TabbyAPI process does not make text-generation-webui run",
+			"server": "textgen_webui",
+			"os": "linux",
+			"ps": "4500 python3 /home/u/tabbyAPI/start.py --port 5000",
+			"files": {},
+			"expected": {
+				"running": false
 			}
 		}
 	]
