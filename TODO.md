@@ -236,49 +236,8 @@ The July Linux driver plan (X11/Wayland hotstring engine, 2026-07-30) is retired
 
 ## Next fix/<os> agent pass (read when the maintainer asks for a new fix/linux, fix/macos or fix/windows)
 
-The 28 October passes (Codex agents, one per OS) were squashed onto dev as
-`fix(macos|linux|windows): land the fix/<os> audit branch`. Their original histories are kept as tags `archive/fix-<os>` once the maintainer
-runs the branch cleanup below. Each pass left a full handover; read it first:
-
-- macOS: [docs/audits/macos/2026-10-28/](docs/audits/macos/2026-10-28/) (`TODO.md`, `report.md`).
-- Linux: [docs/audits/linux/2026-10-28-closeout/](docs/audits/linux/2026-10-28-closeout/) (`README.md`, "Outstanding
-  TODO").
-- Windows: [docs/audits/windows-2026-10-28/](docs/audits/windows-2026-10-28/) (`README.md` "Remaining findings",
-  `POST_VALIDATION.md` "Resume from a fresh checkout").
-
-**How a pass must run, so no time is lost:**
-
-1. Branch `fix/<os>` from the current `dev`, never from an old fix branch. Keep it linear: rebase onto dev, and
-   never run `git merge dev` into it. The 28 October passes merged dev a dozen times each, so they could not be
-   replayed commit by commit and had to be squashed.
-2. Push every hour and dispatch `gh workflow run ci.yml --ref fix/<os> -f os_lanes=<os>`. A pass is done only
-   when its lane and Common are green.
-   - On 28 October the Windows pass stopped with 3 unit groups red.
-   - The Linux pass stopped with the RPM and AppImage installed-data checks red.
-   - The coordinator had to fix both before the release.
-3. Stay in the OS's own files. Shared tests (`tools/test/*.cjs`) touched by two passes conflicted: the macOS and
-   Linux passes rewrote the same App Cloner, bash-resolution and PAC source tests in different ways. Leave
-   shared files to the coordinator, or announce them first.
-4. Workflows (`.github/workflows/*`) may be edited when a fix needs it; say so in the commit.
-5. Evidence goes into one `docs/audits/<os>/<date>/` folder: a README with the remaining work at the top, then
-   any archives. Keep each archive under 10 MB.
-6. Host notes:
-   - Run as a normal user with `USER` and `LOGNAME` set; the JS suite refuses root.
-   - Use Node 22.22.2 and Ruff 0.15.8, and PowerShell 7 for the Windows host checks.
-   - AutoHotkey under Wine is narrower evidence only; it does not replace Windows CI.
-   - **Host-only reds on the Linux container** (not bugs): Lua `local-server-detection-native` without `ss`
-     (install iproute2); macOS `new commits beyond origin/dev are clean` when the checkout or its worktree admin
-     folder is not owned by the running user (the suite isolates `HOME`, so a global `safe.directory` is not read;
-     the same ownership breaks the JS catalogue and clock-evidence gates' `git` calls); JS `test-ahk-tap-follower`,
-     `test-linux-install-sandbox`,
-     `test-linux-runtime-native-registration`, `test-macos-managed-bootstrap-http`, `test-managed-ollama-protocol`,
-     `test-managed-remote-retirement` (no pwsh), `test-linux-deb-package-owner` (refuses root),
-     `test-drift-guard-covers-every-output` (worktrees only, node_modules symlink). Lua as root: every
-     EACCES/unreadable/denied case, Linux test 102, four `test_sqlite_first_open` native cases; macOS screenshot
-     EACCES, two mlx-repair unreadable neighbour, errors-log refuses denied, the eight `release-arming-physical`
-     cases (refuse root). Confirm with
-     `setpriv --reuid=65534 --regid=65534 --clear-groups` and set `XDG_RUNTIME_DIR`. Run the macOS suite per
-     group: one process slows down progressively here.
+Follow [.agents/skills/orchestrate-pass/references/fix-os-pass.md](.agents/skills/orchestrate-pass/references/fix-os-pass.md)
+(the previous handovers, branch, CI, file-ownership and host rules).
 
 **Left open by the 28 October passes:**
 

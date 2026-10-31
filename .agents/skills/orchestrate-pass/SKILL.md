@@ -76,6 +76,12 @@ issued early re-runs every later call, finished ones included. Resume with the
 script unchanged, and never stop a run to inject a new requirement: follow
 `workflow-change-control`.
 
+## Per-OS fix passes
+
+A `fix/<os>` pass (one agent per OS, landed on dev by the coordinator) follows
+[references/fix-os-pass.md](references/fix-os-pass.md): branch and CI rules,
+file ownership, evidence folder and host notes.
+
 ## When not to do this
 
 A single-file question, a known symbol, a mechanical edit, or anything where you
