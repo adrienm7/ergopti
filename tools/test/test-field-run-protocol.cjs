@@ -18,7 +18,9 @@
  * 4. the Windows driver (infra/field_run.ahk, which AutoHotkey cannot run
  *    here) reads every name from the declarations, has a runner for every
  *    declared check, writes only declared verdicts and refusal reasons, starts
- *    in developer source mode only and stops with the driver.
+ *    in developer source mode only and stops with the driver;
+ * 5. the Linux field run (linux/infra/field_run.lua) has its steps file and
+ *    repeats no protocol key in it: it reads the protocol from this file.
  * ==============================================================================
  */
 
@@ -185,6 +187,13 @@ check('the Windows driver implements the protocol from the declarations', () => 
 	const lifecycle = fs.readFileSync(path.join(ROOT, WINDOWS, 'infra/lifecycle.ahk'), 'utf8');
 	assert.match(lifecycle, /try FieldRun_Stop\(\)/, 'stopped with the driver');
 	assert.match(code, /TimingsGet\("ui", "field_run_poll_ms"\)/);
+});
+
+check('the Linux field run declares its steps and repeats no protocol key', () => {
+	const relative = protocol.steps_file.linux;
+	assert(fs.existsSync(path.join(ROOT, relative)), `${relative} is missing`);
+	for (const key of Object.keys(read(relative)))
+		assert(key === '_comment' || !(key in protocol), `${relative} repeats the protocol key ${key}`);
 });
 
 console.log(`[OK] field run protocol (${checks} checks).`);
