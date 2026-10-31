@@ -604,12 +604,11 @@ Nothing left.
 
 ### G. Constants, delays, colours, labels (value order)
 
-- [ ] **PAR-79/PAR-83 macOS remainder.** [CODE] [CI: Swift] Once the owned-runtime change now in CI lands: move the
-      nine sleeps of the `OwnedRuntime*` and `OwnedVirtualHIDDaemonReport*` Swift files onto `[launcher]` keys
-      (`tools/test/launcher-sleep-literal-baseline.json`, shrink with `--shrink`), and their identifier copies
-      (`tools/lint/identifier-literal-baseline.json`): declare the derived signing ids in `identifiers.json`
-      first and pin the `OwnedRuntimePublisherIdentity` raw values with a test. The Windows remainder of PAR-79,
-      PAR-81 and PAR-83 is in [the PC handoff](docs/tooling/windows-pc-agent-handoff.md).
+- [ ] **PAR-79/PAR-83 macOS remainder.** [CODE] [CI: Swift] Once the `[launcher]` timing registry
+      (`LauncherTimings.generated.swift`, `tools/test/launcher-sleep-literal-baseline.json`) lands on dev: move the
+      seven sleeps of the `OwnedRuntime*` and `OwnedVirtualHIDDaemonReport*` Swift files onto `[launcher]` keys and
+      shrink the baseline with `--shrink`. Their identifier copies are done (`identifiers.json` `signing_ids`). The
+      Windows remainder of PAR-79, PAR-81 and PAR-83 is in [the PC handoff](docs/tooling/windows-pc-agent-handoff.md).
 
 ## Backlog (one line each)
 
