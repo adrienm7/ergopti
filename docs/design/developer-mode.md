@@ -107,7 +107,7 @@ every native helper path, read in `origin/dev` at `bde408f3a6`.
 | Updater, Versions window installs, uninstall                 | differs (by design): a checkout is a source run (`infra/installation.lua`)                                                                             |
 | Layout catalogue                                             | differs (by design): the checkout's registry, as on macOS                                                                                              |
 | Start at login                                               | differs: requires an installed application (the row says so)                                                                                           |
-| `bin/ergopti-hotstrings` from a clone                        | differs: prefers `/usr/lib/ergopti` when a package is installed; the developer runner does not use it                                                  |
+| `bin/ergopti-hotstrings` from a clone                        | works: runs the tree it lives in, even when a package is installed; the developer runner does not use it                                               |
 
 ### Windows
 

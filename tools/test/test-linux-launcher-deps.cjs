@@ -391,10 +391,9 @@ if (
 // =========================================================
 
 // The launcher composes its paths from shell variables, so they are resolved the
-// way the shell resolves them: in order, following the same assignments. Only the
-// repo-checkout branch is verifiable here — the installed branch points at
-// /usr/lib/ergopti, which exists on a user's machine and not in a clone — and it
-// is the branch that wins, because it is assigned last.
+// way the shell resolves them: in order, following the same assignments. The
+// launcher has one root, the tree it lives in (section 2b), so the clone resolves
+// every path it exports.
 const vars = new Map([['SCRIPT_DIR', path.dirname(LAUNCHER)]]);
 
 for (const line of launcherCode.split(/\r?\n/)) {
@@ -443,6 +442,71 @@ for (const name of referenced) {
 				'daemon rebuilds package.path from its own location, so a broken export looks harmless right up ' +
 				'until something relies on it.'
 		);
+	}
+}
+
+// =========================================================
+// =========================================================
+// ======= 2b/ A Clone Run Runs The Clone =======
+// =========================================================
+// =========================================================
+
+// (launcher-runs-its-own-tree) The launcher once preferred /usr/lib/ergopti
+// whenever that directory existed, so a run from a clone on a machine with a
+// package installed ran the package instead. No test can create /usr/lib/ergopti,
+// so the rule is held twice: the code names no other tree, and a copy of the
+// launcher placed in a scratch clone execs that clone's entry file and nothing else.
+if (/\/usr\/lib\/ergopti/.test(launcherCode))
+	errors.push(
+		'the launcher names /usr/lib/ergopti: it must run the tree it lives in, so a clone run never runs an installed package'
+	);
+{
+	const clone = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-launcher-clone-'));
+	try {
+		const driver = path.join(clone, 'ergopti_plus', 'linux');
+		for (const rel of ['bin', 'install', 'stub'])
+			fs.mkdirSync(path.join(driver, rel), { recursive: true });
+		fs.mkdirSync(path.join(clone, 'ergopti_plus', '_shared', 'lua'), { recursive: true });
+		const copied = path.join(driver, 'bin', 'ergopti-hotstrings');
+		fs.copyFileSync(LAUNCHER, copied);
+		fs.chmodSync(copied, 0o755);
+		fs.copyFileSync(
+			path.join(DRIVER, 'install', 'messages.sh'),
+			path.join(driver, 'install', 'messages.sh')
+		);
+		// The sentences it prints come from the generated catalogue beside install/.
+		fs.cpSync(
+			path.join(DRIVER, '_generated', 'shell_messages'),
+			path.join(driver, '_generated', 'shell_messages'),
+			{ recursive: true }
+		);
+		fs.writeFileSync(path.join(driver, 'ergopti_hotstrings.lua'), 'return true\n');
+		for (const name of ['luajit', 'notify-send'])
+			fs.writeFileSync(
+				path.join(driver, 'stub', name),
+				'#!/bin/bash\nprintf \'%s\\n\' "$0" "$@" "LUA_PATH=$LUA_PATH"\n',
+				{ mode: 0o755 }
+			);
+		// Git Bash reads a POSIX PATH; its own tools stay reachable after the stubs.
+		const systemPath = process.platform === 'win32' ? '/usr/bin:/bin' : process.env.PATH || '';
+		const run = spawnSync(bashExecutable(), [bashPath(copied), '--tray'], {
+			encoding: 'utf8',
+			env: { ...process.env, PATH: bashPath(path.join(driver, 'stub')) + ':' + systemPath }
+		});
+		const lines = (run.stdout || '').split('\n');
+		const realDriver = bashPath(fs.realpathSync(driver));
+		if (run.status !== 0 || !lines[0].endsWith('/stub/luajit'))
+			errors.push(
+				`the launcher copied into a clone did not exec its luajit (exit ${run.status}): ${run.stderr}`
+			);
+		else if (lines[1] !== realDriver + '/ergopti_hotstrings.lua' || lines[2] !== '--tray')
+			errors.push(
+				`the launcher copied into a clone ran ${lines[1]} ${lines[2]}, not that clone's entry file`
+			);
+		else if (!lines[3].startsWith(`LUA_PATH=${realDriver}/?.lua;`))
+			errors.push(`the launcher copied into a clone exported ${lines[3]}, not that clone's tree`);
+	} finally {
+		fs.rmSync(clone, { recursive: true, force: true });
 	}
 }
 

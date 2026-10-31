@@ -3,10 +3,12 @@
 #
 # Wrapper shell script for the Ergopti hotstring expansion daemon.
 #
-# Resolves the installation directory (either the real install path
-# /usr/lib/ergopti/ or the repo checkout), configures LUA_PATH so
-# that all driver and shared modules are visible to LuaJIT, then
-# exec-replaces itself with the daemon process.
+# Runs the tree it lives in: bin/ -> linux/ -> ergopti_plus/, so a run from a
+# clone always runs that clone, even when a package is installed. Packages
+# never start through this file: they install their own /usr/bin/ergopti, and
+# the installer its standalone launcher (install/standalone_launcher.sh). It
+# configures LUA_PATH so that all driver and shared modules are visible to
+# LuaJIT, then exec-replaces itself with the daemon process.
 #
 # Usage:
 #   ergopti-hotstrings [--install-deps] [-- <luajit flags>]
@@ -104,17 +106,12 @@ _install_deps() {
 # so the script stays portable; however this is a Linux-only file.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
-# Determine the ergopti installation root.
-# When installed via .deb / AppImage: script lives at /usr/bin/ and libs at
-# /usr/lib/ergopti/.  When run from a repo checkout: script lives in
-# static/ergopti_plus/linux/bin/ and we go two levels up to reach the ergopti_plus root.
-if [ -d "/usr/lib/ergopti" ]; then
-	ERGOPTI_ROOT="/usr/lib/ergopti"
-else
-	# Repo checkout: bin/ → linux/ → ergopti_plus/ → …
-	DRIVERS_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
-	ERGOPTI_ROOT="${DRIVERS_ROOT}"
-fi
+# The tree this script belongs to, never another one found on the machine. It
+# used to prefer /usr/lib/ergopti whenever that directory existed, so a clone
+# run on a machine with a package installed silently ran the package; and as
+# the deb, rpm and Arch packages lay the driver out flat (no linux/ under
+# /usr/lib/ergopti), that run then stopped on a missing driver directory.
+ERGOPTI_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
 
 DRIVER_ROOT="${ERGOPTI_ROOT}/linux"
 # _shared, with the underscore. The tree is static/ergopti_plus/_shared in a
