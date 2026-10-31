@@ -1851,8 +1851,10 @@ function M.new(deps, presets, ram_getter)
 				-- computes the percent, speed and time left from them
 				local done, total = last_pull_bytes(out)
 				local pct = done and (done * 100 / total) or 0
+				-- No print here: the console tee logged every chunk, about one each
+				-- 60 ms (1508 of a 4736-line field log, 2026-10-31); the window shows
+				-- the progress and the end-of-pull line names the last output
 				if last_line ~= "" then update_progress_ui(owner, pct, last_line, done, total) end
-				print("[Ollama Pull] " .. out)
 			end
 			return true
 		end
