@@ -22,6 +22,7 @@
 
 local M = {}
 local Codec = require("toml_codec")
+local ConfigKeys = require("config_keys")
 local KeyPath = require("toml_codec.key_path")
 local Outdated = require("config_outdated")
 local TableUtil = require("table_util")
@@ -71,7 +72,7 @@ end
 --- string to the manifest, but only a shipped locale can be adopted, or the
 --- start would replace a good saved locale with one i18n then refuses.
 local VALUE_RULES = {
-	["script.locale"] = function(value)
+	[ConfigKeys.KEY.SCRIPT_LOCALE] = function(value)
 		if type(value) ~= "string" then return false, "the value is not a string" end
 		for _, row in ipairs(require("_generated.locale_table")) do
 			if row.code == value then return true end
