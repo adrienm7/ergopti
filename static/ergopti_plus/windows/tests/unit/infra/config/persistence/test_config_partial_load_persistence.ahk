@@ -48,16 +48,16 @@ _CPL_FullSavePreservesRejectedPreferenceBody(Invalid, Literal, Logs) {
 	Runtime := _CFGFS_CaptureRuntime()
 	Coordinator := _ConfigFullSaveCoordinator()
 	Path := _CTU_NewPath()
-	Original := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n[shortcuts]`nscreen = " . (Invalid ? Literal : "false")
+	Original := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n[shortcuts]`nwrap_text_if_selected = " . (Invalid ? Literal : "false")
 		. "`n[layout]`nergopti_base = false`n"
 	Target := ManifestBuildFeaturesMap()
-	DefaultScreen := Target["shortcuts"]["screen"]
+	DefaultValue := Target["shortcuts"]["wrap_text_if_selected"]
 	Target["layout"]["ergopti_base"] := true
 	Writes := []
 	Writer := (FilePath, Updates) =>
 		(Writes.Push(Updates), TOML_BatchWrite(FilePath, Updates))
-	Collect := () => [{ Section: "shortcuts", Key: "screen",
-		Value: Target["shortcuts"]["screen"] }]
+	Collect := () => [{ Section: "shortcuts", Key: "wrap_text_if_selected",
+		Value: Target["shortcuts"]["wrap_text_if_selected"] }]
 	try {
 		_CFGFS_Prepare(Path)
 		_ConfigBootRejectedOverrides := 0
@@ -81,7 +81,7 @@ _CPL_FullSavePreservesRejectedPreferenceBody(Invalid, Literal, Logs) {
 			PartialLogged := PartialLogged || InStr(Line, "v2 config only partially applied")
 			SuccessLogged := SuccessLogged || InStr(Line, "v2 config applied (")
 			OutdatedNamed := OutdatedNamed || (InStr(Line, "[WARNING]", true)
-				&& InStr(Line, "outdated configuration value(s)") && InStr(Line, "[shortcuts].screen"))
+				&& InStr(Line, "outdated configuration value(s)") && InStr(Line, "[shortcuts].wrap_text_if_selected"))
 		}
 		AssertEqual(0, Errors, "an outdated value is never an ERROR (config-outdated-windows); "
 			. "captured error namespaces: " . ErrorNamespaces)
@@ -89,7 +89,7 @@ _CPL_FullSavePreservesRejectedPreferenceBody(Invalid, Literal, Logs) {
 		AssertTrue(SuccessLogged, "the load of every other value completes")
 		AssertEqual(Invalid, !!OutdatedNamed, "the outdated value is named in one warning")
 		AssertEqual(0, _ConfigBootRejectedOverrides, "an outdated value never blocks full saves")
-		AssertEqual(Invalid ? DefaultScreen : false, Target["shortcuts"]["screen"])
+		AssertEqual(Invalid ? DefaultValue : false, Target["shortcuts"]["wrap_text_if_selected"])
 		AssertFalse(Target["layout"]["ergopti_base"])
 		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(Writer, (*) => true,
 			true, 0, Collect), "an outdated value must not refuse the full save")
@@ -99,7 +99,7 @@ _CPL_FullSavePreservesRejectedPreferenceBody(Invalid, Literal, Logs) {
 				"the neutral value boot kept must not erase the outdated entry")
 			AssertEqual(Original, FSRead(Path), "the cleanup still finds the outdated entry")
 		} else
-			AssertFalse(TOML_ParseFreshFile(Path)["shortcuts"]["screen"])
+			AssertFalse(TOML_ParseFreshFile(Path)["shortcuts"]["wrap_text_if_selected"])
 	} finally {
 		_ConfigBootRejectedOverrides := OldRejected
 		_ConfigBootOutdatedEntries := OldOutdated
@@ -124,22 +124,22 @@ _CPL_LocalDiagnosticsCannotChangeBootAuthority() {
 	try {
 		_ConfigBootRejectedOverrides := 0
 		_ConfigBootOutdatedEntries := Map()
-		AssertTrue(FSWrite(Path, "[shortcuts]`nscreen = 2`n"))
+		AssertTrue(FSWrite(Path, "[shortcuts]`nwrap_text_if_selected = 2`n"))
 		ConfigSchemaPrepareSource(Path)
 		AssertEqual(0, ApplyConfigToml(ManifestBuildFeaturesMap(), Path, &Rejected, , &Outdated))
 		AssertEqual(0, Rejected, "an outdated value is not a rejected override")
-		AssertTrue(Outdated.Has("shortcuts`nscreen"), "the load reports the outdated entry")
+		AssertTrue(Outdated.Has("shortcuts`nwrap_text_if_selected"), "the load reports the outdated entry")
 		AssertEqual(0, _ConfigBootOutdatedEntries.Count,
 			"a local candidate load must not change boot authority")
 		ApplyBootConfigToml(ManifestBuildFeaturesMap(), Path)
-		AssertTrue(_ConfigBootOutdatedEntries.Has("shortcuts`nscreen"))
+		AssertTrue(_ConfigBootOutdatedEntries.Has("shortcuts`nwrap_text_if_selected"))
 		AssertEqual(0, _ConfigBootRejectedOverrides)
-		AssertTrue(FSWrite(ValidPath, "[shortcuts]`nscreen = false`n[ahk.layout]`nergopti_base = 0`n"))
+		AssertTrue(FSWrite(ValidPath, "[shortcuts]`nwrap_text_if_selected = false`n[ahk.layout]`nergopti_base = 0`n"))
 		ConfigSchemaPrepareSource(ValidPath)
 		AssertEqual(1, ApplyConfigToml(ManifestBuildFeaturesMap(), ValidPath, &Rejected, , &Outdated))
 		AssertEqual(0, Rejected, "each diagnostic starts fresh; obsolete silos do not block migration")
 		AssertEqual(0, Outdated.Count, "each diagnostic starts fresh")
-		AssertTrue(_ConfigBootOutdatedEntries.Has("shortcuts`nscreen"),
+		AssertTrue(_ConfigBootOutdatedEntries.Has("shortcuts`nwrap_text_if_selected"),
 			"a later valid read must not forget what the live tree ignored")
 	} finally {
 		_ConfigBootRejectedOverrides := OldRejected
