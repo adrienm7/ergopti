@@ -97,3 +97,15 @@ address's default row (first in `server_order`), which is also kept on 401/403.
 A generic entry at a shared address belongs to the default row only. A merged
 row per port and order-only affinity were rejected; add a new port collision
 as a new fingerprinted row.
+
+## A clone run reads the published layout registry unless the clone changed it (2026-10-31)
+
+A source run (developer mode or any run from a checkout) reads the published
+layout registry like a release, from its channel's branch with the same cache
+and ETag, unless `git status --porcelain --untracked-files=all` lists changes
+under the clone's `static/layouts/registry` (index.json and the layout files
+count, untracked included); then it shows the clone's folder without HTTP. A
+git failure shows the clone's folder and logs an ERROR: the clone is the code
+being run, and the published registry would hide a local edit. The decision is
+shared (`Catalogue.registry_source` and `registry_changes_args` in
+`_shared/lua/layouts/catalogue.lua`); the Windows port is in the PC handoff.
