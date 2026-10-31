@@ -17,8 +17,15 @@
  * a row sharing its name, start and completion with an earlier attempt is dropped.
  * Steps that never ran carry no times and are skipped, never read as zero.
  *
+ * Inside a run (--step-summary), the jobs not finished yet, the summarizing
+ * one included, carry no completion time and are left out: the release
+ * preflight runs after every lane, so its summary covers the whole run. The
+ * summary is evidence, not a gate: an unreadable API is written into the
+ * summary and raised as a warning annotation, and publication goes on.
+ *
  * USAGE:
  *   node tools/ci/run-timing.cjs <run-id> [--top N]
+ *   node tools/ci/run-timing.cjs --step-summary [--top N]   (in GitHub Actions)
  * Needs an authenticated `gh`. Pages are 30 jobs: a larger page makes the API
  * answer 502 on runs with several hundred jobs.
  * ==============================================================================
@@ -31,6 +38,8 @@ const { execFileSync } = require('node:child_process');
 const REPOSITORY = 'adrienm7/ergopti';
 const PAGE_SIZE = 30;
 const DEFAULT_TOP = 15;
+// The job summary shows more steps: it is read once per run, in a browser.
+const SUMMARY_TOP = 40;
 
 /**
  * Milliseconds between two ISO instants, or null when either is missing.
@@ -144,16 +153,55 @@ function render(summary) {
 }
 
 /**
+ * Escapes a value for one Markdown table cell.
+ * @param {string} text Cell text.
+ * @returns {string}
+ */
+function cell(text) {
+	return String(text).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+}
+
+/**
+ * Renders the summary as the Markdown of a GitHub job summary.
+ * @param {ReturnType<typeof summarize>} summary Timing summary.
+ * @returns {string}
+ */
+function renderMarkdown(summary) {
+	const lines = [
+		'## CI timing',
+		'',
+		`Wall clock of the finished jobs: **${clock(summary.wall_ms)}**`,
+		'',
+		'| Lane | Wall clock | Jobs |',
+		'| --- | --- | --- |'
+	];
+	for (const row of summary.lanes)
+		lines.push(`| ${cell(row.lane)} | ${clock(row.wall_ms)} | ${row.jobs} |`);
+	lines.push('', '| Slowest job | Elapsed | Queued | Conclusion |', '| --- | --- | --- | --- |');
+	for (const row of summary.jobs)
+		lines.push(
+			`| ${cell(row.job)} | ${clock(row.elapsed_ms)} | ${clock(row.queued_ms)} | ${cell(row.conclusion || '-')} |`
+		);
+	lines.push('', '| Slowest step | Job | Elapsed | Conclusion |', '| --- | --- | --- | --- |');
+	for (const row of summary.steps)
+		lines.push(
+			`| ${cell(row.step)} | ${cell(row.job)} | ${clock(row.elapsed_ms)} | ${cell(row.conclusion || '-')} |`
+		);
+	return lines.join('\n') + '\n';
+}
+
+/**
  * Reads every job row of a run through `gh`, page by page.
  * @param {string} runId Numeric run id.
  * @param {(endpoint: string) => object} readApi Returns the parsed API answer.
+ * @param {string} [repository] owner/name.
  * @returns {Array<object>}
  */
-function readJobs(runId, readApi) {
+function readJobs(runId, readApi, repository = REPOSITORY) {
 	const jobs = [];
 	for (let page = 1; ; page++) {
 		const answer = readApi(
-			`repos/${REPOSITORY}/actions/runs/${runId}/jobs?filter=all&per_page=${PAGE_SIZE}&page=${page}`
+			`repos/${repository}/actions/runs/${runId}/jobs?filter=all&per_page=${PAGE_SIZE}&page=${page}`
 		);
 		if (!Array.isArray(answer.jobs)) throw new Error('The jobs answer has no job list.');
 		jobs.push(...answer.jobs);
@@ -161,21 +209,72 @@ function readJobs(runId, readApi) {
 	}
 }
 
-function main(argv = process.argv.slice(2)) {
-	const runId = argv[0];
-	const topAt = argv.indexOf('--top');
-	const top = topAt >= 0 ? Number(argv[topAt + 1]) : DEFAULT_TOP;
-	if (!/^[1-9][0-9]*$/.test(runId || '') || !Number.isSafeInteger(top) || top < 1)
-		throw new Error('usage: run-timing.cjs <run-id> [--top N]');
-	const readApi = (endpoint) =>
-		JSON.parse(
-			execFileSync('gh', ['api', endpoint], {
-				encoding: 'utf8',
-				maxBuffer: 16 * 1024 * 1024,
-				stdio: ['ignore', 'pipe', 'pipe']
-			})
+/**
+ * Reads one GitHub API endpoint through the authenticated `gh`.
+ * @param {string} endpoint API path.
+ * @returns {object}
+ */
+function readGitHubApi(endpoint) {
+	return JSON.parse(
+		execFileSync('gh', ['api', endpoint], {
+			encoding: 'utf8',
+			maxBuffer: 16 * 1024 * 1024,
+			stdio: ['ignore', 'pipe', 'pipe']
+		})
+	);
+}
+
+/**
+ * Writes the timing of the current run into its job summary. A run whose jobs
+ * cannot be read gets the reason in the summary and a warning annotation.
+ * @param {{ env: object, top: number, readApi: Function, append: Function, log: Function }} ports
+ * @returns {boolean} Whether the timing was written.
+ */
+function writeStepSummary({ env, top, readApi, append, log }) {
+	const runId = env.GITHUB_RUN_ID;
+	const repository = env.GITHUB_REPOSITORY;
+	if (typeof env.GITHUB_STEP_SUMMARY !== 'string' || env.GITHUB_STEP_SUMMARY === '')
+		throw new Error(
+			'--step-summary needs GITHUB_STEP_SUMMARY: it runs inside GitHub Actions only.'
 		);
-	process.stdout.write(render(summarize(readJobs(runId, readApi), top)));
+	if (!/^[1-9][0-9]*$/.test(runId || '') || !/^[\w.-]+\/[\w.-]+$/.test(repository || ''))
+		throw new Error('--step-summary needs GITHUB_RUN_ID and GITHUB_REPOSITORY.');
+	let markdown;
+	try {
+		markdown = renderMarkdown(summarize(readJobs(runId, readApi, repository), top));
+	} catch (error) {
+		const reason = String(error.message || error).split('\n')[0];
+		append(
+			env.GITHUB_STEP_SUMMARY,
+			`## CI timing\n\nThe run's job timings could not be read: ${cell(reason)}\n`
+		);
+		log(`::warning title=CI timing::The run's job timings could not be read: ${reason}`);
+		return false;
+	}
+	append(env.GITHUB_STEP_SUMMARY, markdown);
+	return true;
+}
+
+function main(argv = process.argv.slice(2)) {
+	const topAt = argv.indexOf('--top');
+	const summaryMode = argv.includes('--step-summary');
+	const top = topAt >= 0 ? Number(argv[topAt + 1]) : summaryMode ? SUMMARY_TOP : DEFAULT_TOP;
+	if (!Number.isSafeInteger(top) || top < 1)
+		throw new Error('usage: run-timing.cjs <run-id> [--top N]');
+	if (summaryMode) {
+		writeStepSummary({
+			env: process.env,
+			top,
+			readApi: readGitHubApi,
+			append: (file, text) => require('node:fs').appendFileSync(file, text, 'utf8'),
+			log: (line) => console.log(line)
+		});
+		return;
+	}
+	const runId = argv[0];
+	if (!/^[1-9][0-9]*$/.test(runId || ''))
+		throw new Error('usage: run-timing.cjs <run-id> [--top N] | --step-summary [--top N]');
+	process.stdout.write(render(summarize(readJobs(runId, readGitHubApi), top)));
 }
 
 if (require.main === module) {
@@ -186,4 +285,12 @@ if (require.main === module) {
 		process.exitCode = 1;
 	}
 }
-module.exports = { summarize, executedJobs, readJobs, render, clock };
+module.exports = {
+	summarize,
+	executedJobs,
+	readJobs,
+	render,
+	renderMarkdown,
+	writeStepSummary,
+	clock
+};
