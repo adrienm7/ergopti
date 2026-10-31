@@ -29,9 +29,11 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
 const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // Frozen on 2026-10-31, the day the ratchet started: Linux test files naming a
-// driver source path, and the pinned reads they hold.
-const BASELINE = 74;
-const READ_BASELINE = 137;
+// driver source path, and the pinned reads they hold. 74 → 72 files and 137 →
+// 135 reads the same day: the version literal and debounce clock scans became
+// a fresh module load over a stamp and a debounce driven by a controlled clock.
+const BASELINE = 72;
+const READ_BASELINE = 135;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];
