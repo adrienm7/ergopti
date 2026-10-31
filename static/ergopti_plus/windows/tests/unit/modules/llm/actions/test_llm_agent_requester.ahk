@@ -54,9 +54,11 @@ _LAG_SystemListReceiving() {
 			Item := _MR_FindItemById("agent_menu", "agent_system1")
 			AssertTrue(Item is Map, "the genuine Windows declaration is uniquely visible")
 			AssertEqual("list", Item["type"], "central list receiving is the actual production route")
-			Platforms := Item["platforms"]
+			; One declaration for every driver: the row carries no platforms list.
+			AssertFalse(Item.Has("platforms"), "the System list is declared once for every driver")
 			Restore() {
-				Item["platforms"] := Platforms
+				if Item.Has("platforms")
+					Item.Delete("platforms")
 			}
 			try {
 				Built := LLM_Agent_MenuBuild()
@@ -77,7 +79,7 @@ _LAG_SystemListReceiving() {
 				Owned.Push(Repaired)
 				AssertEqual(6, TrayMenuItemCount(Repaired), "repair reopens the same genuine declaration route")
 				AssertEqual(Corpus["locales"]["fr"]["systems"]["system1"]["cerebras"], _CTC_LabelAt(Repaired, 2))
-				AssertTrue(Item["platforms"] == Platforms, "the exact original declaration owner is restored")
+				AssertFalse(Item.Has("platforms"), "the exact original declaration owner is restored")
 				AssertEqual(0, Fx.Commits.Length)
 				AssertEqual(0, Fx.Rebuilds)
 			} catch as Failure {

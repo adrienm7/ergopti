@@ -1077,7 +1077,10 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 			done("", "empty reply")
 			return
 		end
-		Logger.debug(LOG, "Remote completion received (%d chars in %d ms).", #text, Monotonic.now_ms() - started)
+		local elapsed_ms = Monotonic.now_ms() - started
+		Logger.debug(LOG, "Remote completion received (%d chars in %d ms).", #text, elapsed_ms)
+		require("perf_budget").judge(Logger, LOG, "llm.remote", elapsed_ms,
+			function() return Timings.ms("budgets", "llm_remote_request_ms") end)
 		if authorized and not authorized() then return end
 		if type(on_chunk) == "function" then pcall(on_chunk, text) end
 		done(text, nil, usage)

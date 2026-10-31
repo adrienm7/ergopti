@@ -94,10 +94,12 @@ local function load_policy()
 		if type(rows) == "table" then
 			policy, ids = {}, {}
 			for _, row in ipairs(rows) do
-				-- Only the rows this driver renders carry a greying policy: the
-				-- separator and Linux's two inline lists have no submenu to grey.
+				-- Only the settings rows carry a greying policy, and each declares
+				-- it: the separators, the commands and the boundary lists do not.
+				-- Reading the field rather than a row type keeps the policy when a
+				-- row changes type (the model and profile rows became `list`).
 				if type(row) == "table" and type(row.id) == "string"
-					and (row.type == "dynamic" or row.type == "group") and is_for_this_driver(row) then
+					and type(row.disabled_when_off) == "boolean" and is_for_this_driver(row) then
 					policy[row.id] = (row.disabled_when_off == true)
 					ids[#ids + 1] = row.id
 				end

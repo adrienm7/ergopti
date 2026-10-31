@@ -21,6 +21,10 @@
 ---    inside the live session.
 --- 3. Boundary-clean: persistence goes through the Storage adapter and time
 ---    through os.time, so this lib stays free of direct Hammerspoon API calls.
+--- 4. The reload's own duration: the caller records when the reload call ran
+---    (wall clock milliseconds, from its own clock) and the next boot takes it
+---    back once, so it can name and judge the reload against [budgets]
+---    driver_reload_ms.
 --- ==============================================================================
 
 local M = {}
@@ -48,6 +52,9 @@ local SENTINEL_KEY = "reload_in_progress"
 --- quit is never mistaken for a reload.
 local SENTINEL_TTL_SEC = 60
 
+--- Persistent-store key holding the wall clock milliseconds of the reload call.
+local STARTED_KEY = "reload_started_epoch_ms"
+
 
 
 
@@ -63,6 +70,21 @@ local SENTINEL_TTL_SEC = 60
 function M.mark_reload()
 	Storage.set(SENTINEL_KEY, os.time())
 	Logger.debug(LOG, "Reload sentinel set.")
+end
+
+--- Records when the reload call runs, for the next boot to measure it.
+--- @param epoch_ms number Wall clock milliseconds.
+function M.mark_started(epoch_ms)
+	if type(epoch_ms) ~= "number" or epoch_ms <= 0 then error("reload_guard.mark_started: epoch_ms must be positive", 2) end
+	Storage.set(STARTED_KEY, epoch_ms)
+end
+
+--- Takes back, once, the reload call time the previous session recorded.
+--- @return number|nil epoch_ms Nil when this boot follows no recorded reload.
+function M.take_started()
+	local epoch_ms = Storage.get(STARTED_KEY, nil)
+	Storage.delete(STARTED_KEY)
+	return type(epoch_ms) == "number" and epoch_ms or nil
 end
 
 local function clear_sentinel(log_completion)

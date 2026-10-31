@@ -4070,9 +4070,17 @@ description_key = "menu.layout.menubar_icon"
 # codegen tools/build/build-menu-manifest.js emits _shared/modules/menu/
 # menu_manifest.json from these [menu.*] tables, and a drift gate keeps the two
 # in sync. Both drivers read the generated JSON at runtime (unchanged). Item
-# types: toggle / feature / action / dynamic / group / section_header /
-# letter_picker / choice / "---" separator. platforms = ["ahk"|"hs"] gates per
-# driver.
+# types: toggle / feature / action / group / section_header / list / check /
+# command / letter_picker / choice / "---" separator. platforms =
+# ["ahk"|"hs"|"linux"] gates per driver.
+#
+# There is no `dynamic` type any more (retired 2026-10-31). It handed the row id
+# back to platform code, which then decided what to draw there, so a row could be
+# added, renamed or reshaped per OS without this file changing. The six last
+# ones (llm_model, llm_profile, llm_generation, agent_system1, agent_system2,
+# agent_disabled_apps) are `list` rows: the driver supplies the row DATA of the
+# named provider and the shared renderer draws it. The generator refuses a
+# `dynamic` row, and test-menu-manifest fails on one.
 #
 # A `choice` is one enum feature (`path`) drawn as ONE row titled by `i18n`,
 # with one row per value beneath it and the current value ticked. The values are
@@ -4433,14 +4441,15 @@ rows = []
 # macOS and Windows two rows neither has ever drawn, which is precisely the
 # failure this file exists to prevent.
 #
-# The eight `dynamic` rows are what macOS and Windows draw. They lived in a
+# The eight settings rows are what macOS and Windows draw. They lived in a
 # SECOND shared file (_shared/modules/llm/menu_layout.json) with its own reader
 # on each of those two drivers, so one menu had two shared descriptions and
 # neither mentioned the other. That file is retired; its row order, its
-# disabled-when-off policy and its health-dot flag are these rows' fields. They
-# stay `dynamic` because their submenus read Win32 and hs state — see the
-# investigation below, which this change does not overturn: what moves here is
-# the DESCRIPTION of the menu, not its rendering.
+# disabled-when-off policy and its health-dot flag are these rows' fields. The
+# model, profile and Linux generation rows are `list` rows since 2026-10-31: their
+# contents read Win32 and hs state, so each driver supplies that row DATA, and the
+# shared renderer draws it at the declared place — see the investigation below,
+# which this change does not overturn.
 #
 # WHY macOS AND WINDOWS ARE NOT SIMPLY MOVED ONTO IT (investigated 2026-08-06):
 # The macOS LLM menu is 7 578 lines across 21 files, and almost all of it is
@@ -4516,7 +4525,7 @@ type = "---"
 # the model (« 🦙 qwen3:4b », « 🌐 OpenAI/gpt-4o-mini »). The Backend chooser,
 # the model list, the API options and the custom-model option left the menu.
 [[menu.llm_menu]]
-type = "dynamic"
+type = "list"
 id = "llm_model"
 # Static provider status of the local servers, before their panel exists.
 # Inert labels are status text, not section headings or executable commands.
@@ -4532,7 +4541,7 @@ platforms = ["ahk", "hs", "linux"]
 # The model and the prompt rows form one block on every driver: no separator
 # between them (maintainer, 2026-10-29).
 [[menu.llm_menu]]
-type = "dynamic"
+type = "list"
 id = "llm_profile"
 i18n = "menu.profiles.profile_label_prefix"
 disabled_when_off = true
@@ -4566,7 +4575,7 @@ platforms = ["ahk", "hs"]
 reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
 
 [[menu.llm_menu]]
-type = "dynamic"
+type = "list"
 id = "llm_generation"
 platforms = ["linux"]
 reason_key = "platform_reason.llm_lists_are_inline_on_linux"
@@ -4672,7 +4681,10 @@ disabled_reason_key = "menu.about.source_run_reason"
 # and model of System 1 (fast triage) and System 2 (the actions), and the
 # applications the automatic mode ignores. The fixed modes belong to the enum
 # feature and its shared choice renderer. The backend lists and application
-# picker remain dynamic: they depend on stored API entries and native apps.
+# rows are `list` rows: each driver supplies their DATA (stored API entries,
+# native apps) and the shared renderer draws them. Windows keeps its excluded
+# applications as one `command` row opening its native picker dialog, where the
+# Lua drivers list the applications in a submenu.
 # The common Info Bar check keeps the native display providers on either side:
 # macOS retains its leading indent selector; the other drivers supply no leading row.
 # The two automatic prediction triggers share row identity, labels and admission.
@@ -4804,38 +4816,20 @@ disabled_when = ["agent_mode_ready"]
 type = "---"
 
 [[menu.agent_menu]]
-type = "dynamic"
-id = "agent_system1"
-i18n = "menu.agent.system1"
-platforms = ["hs", "linux"]
-unavailable = "hide"
-
-[[menu.agent_menu]]
 type = "list"
 id = "agent_system1"
 i18n = "menu.agent.system1"
-platforms = ["ahk"]
-unavailable = "hide"
-
-[[menu.agent_menu]]
-type = "dynamic"
-id = "agent_system2"
-i18n = "menu.agent.system2"
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.agent_menu]]
 type = "list"
 id = "agent_system2"
 i18n = "menu.agent.system2"
-platforms = ["ahk"]
-unavailable = "hide"
 
 [[menu.agent_menu]]
 type = "---"
 
 [[menu.agent_menu]]
-type = "dynamic"
+type = "list"
 id = "agent_disabled_apps"
 i18n = "menu.agent.disabled_apps"
 platforms = ["hs", "linux"]

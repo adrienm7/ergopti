@@ -235,7 +235,6 @@ local function build_fixture(callback, options)
 			end,
 		}
 		package.loaded["ui.menu.menu_llm.menu_layout"] = {
-			row_ids = function() return { "llm_backend", "llm_model" } end,
 			row_disabled = function() return false end,
 			title_health_dot = function(status)
 				return ({ ready = "🟢", warming = "🟡", unreachable = "🔴" })[status]
@@ -265,18 +264,16 @@ local function build_fixture(callback, options)
 				if slot == "llm_generation_settings" then return native_renderer.render_rows(rows, slot) end
 				return rows
 			end,
-			build = function(key, _, handlers, _, render_ctx, providers)
-				-- Only the health-bearing top-level handlers are observed here.
+			build = function(key, _, _, _, render_ctx, providers)
+				-- Only the health-bearing top-level model row is observed here.
 				-- Generation's declared child retains the old pass-through numeric
 				-- provider; its real check is covered by test_settings_transaction.
 				if key == "llm_generation_menu" then
 					return providers.llm_generation_values()
 				end
 				last_render_ctx = render_ctx
-				local items = {}
-				handlers.llm_backend(items)
-				handlers.llm_model(items)
-				return items
+				-- The model row is list DATA: the shared renderer materialises it.
+				return native_renderer.render_rows(providers.llm_model(), "llm_model")
 			end,
 		}
 		local core = package.loaded["modules.llm"]

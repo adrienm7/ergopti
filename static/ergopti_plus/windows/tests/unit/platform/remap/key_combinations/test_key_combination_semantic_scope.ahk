@@ -68,6 +68,24 @@ _KCT_SemanticScope(Shape, Mode) {
 			AssertEqual(1, MenuRenderer_AppendCommand(Rendered, "key_combinations_group", Id,
 				_SC_KeyCombinationCommands(Fixture.options)))
 			ItemId := DllCall("GetMenuItemID", "ptr", Rendered.Handle, "int", 0, "uint")
+			; Only a [section] line has a twin the writer cannot tell apart: a root dotted
+			; line names its whole exact path. As in the shared Lua writer, deleting the
+			; row is refused and the cleanup, which offers both twins, is the way out.
+			if Shape == "quoted" {
+				Refused := (_MenuDispatchCallbacks[ItemId])()
+				AssertEqual("refused", Refused["status"], "a section twin leaves the deletion without one destination")
+				AssertTrue(FSUtf8ExactMatches(Fixture.path, Fixture.source), "the refused scope leaves the file bytes unchanged")
+				AssertFalse(FileExist(Refused["backup"]), "the refusal precedes the backup")
+				Offered := []
+				for Entry in ConfigUnusedKeysFind(Fixture.path)["keys"] {
+					if Entry["section"] == "action_parameters" && (Entry["key"] == "Combination__space_then_enter__open_url"
+							|| Entry["key"] == "combination__space_then_enter__OPEN_URL")
+						Offered.Push(Entry)
+				}
+				AssertEqual(2, Offered.Length, "the cleanup offers both twins")
+				AssertEqual("removed", ConfigUnusedKeysRemove(Fixture.path, Offered, "20990101-000900")["status"])
+				Fixture.source := FSReadUtf8Exact(Fixture.path)
+			}
 			Receipt := (_MenuDispatchCallbacks[ItemId])()
 			AssertEqual("pending", Receipt["status"], "the real scope writer reaches replacement handoff")
 			AssertEqual(Fixture.source, FSReadUtf8Exact(Receipt["backup"]))
@@ -84,9 +102,15 @@ _KCT_SemanticScope(Shape, Mode) {
 			AssertFalse(Params.Has("combination__left_alt_then_caps_lock__open_url"))
 			AssertFalse(Params.Has("combination__space_then_enter__open_url"))
 			for Key, Value in Map("combination__future_pair__open_url", "foreign-pair",
-				"Combination__space_then_enter__open_url", "foreign-case",
-				"combination__space_then_enter__OPEN_URL", "foreign-action", "keyboard__meta_b__open_url", "foreign-domain")
+				"keyboard__meta_b__open_url", "foreign-domain")
 				AssertEqual(Value, Params[Key], "unowned parameter remains exact: " . Key)
+			for Key, Value in Map("Combination__space_then_enter__open_url", "foreign-case",
+				"combination__space_then_enter__OPEN_URL", "foreign-action") {
+				if Shape == "quoted"
+					AssertFalse(Params.Has(Key), "the cleanup removed this twin: " . Key)
+				else
+					AssertEqual(Value, Params[Key], "a twin of a dotted row remains exact: " . Key)
+			}
 			AssertEqual("keep", Taps["future_pair"])
 			AssertEqual("keep", Holds["future_pair"])
 			AssertEqual("copy", Document["shortcuts"]["keyboard"]["meta_b"])

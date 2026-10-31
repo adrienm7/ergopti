@@ -36,13 +36,14 @@
 # ([logs.windows]: %LOCALAPPDATA%\ergopti_plus\logs).
 #
 # NOT COVERED, AND WHY:
-# - No field run. The AutoHotkey driver has no request protocol like the macOS
-#   developer app's (infra/field_run.lua). Its one-click composer and network
-#   checks run from the tray and show a result a person closes, so running
-#   them would need the user. Each writes one "check=<id> verdict=<...>" line
-#   to the day log: the checks clicked today are in digest_field_checks and get
-#   their mark in the analysis. The checks that need no person run from the
-#   collector itself.
+# - The field run needs a developer driver of this clone already running
+#   (tools/dev/run-windows-dev.ps1): the collector asks it, through the shared
+#   protocol (_shared/data/field_run_protocol.json, infra/field_run.ahk), to
+#   run its steps (windows/data/field_run_steps.json: boot cost, network,
+#   composer) without their windows, and copies the results. It never starts
+#   a driver itself: a second driver beside the maintainer's own spoils both.
+#   Without a ready developer driver the field run is a skip in the analysis;
+#   the tray checks clicked today are still read from the day log.
 # - No services: the driver is a per-user process started from the Startup
 #   folder or the Run key, which the autostart step lists.
 # - No diagnostics export. The Diagnostics collection keeps its own consent and
@@ -326,6 +327,103 @@ function Resolve-ConfigDir {
 	return Join-Path $env:USERPROFILE ('.config\' + $FolderName)
 }
 
+# How long a ready developer driver may take to accept the request (it looks
+# every [ui] field_run_poll_ms), how long the collector waits for done after the
+# request's own deadline, and how often it looks.
+$FieldRunAcceptSeconds = 60
+$FieldRunGraceSeconds = 60
+$FieldRunPollSeconds = 2
+# The results folder of this run's request, copied into the report at the end.
+$script:FieldRunResults = ''
+
+# Asks the developer driver of this clone to run its field run steps, waits for
+# its done marker and writes one "check=<step> verdict=<...>" line per result
+# into field_run_checks.txt, which the analysis marks. A driver that is not
+# ready, a refusal or a timeout is a verdict line too, never a prompt.
+function Invoke-FieldRun {
+	$Protocol = Get-Content -Raw -Encoding UTF8 -LiteralPath (
+		[IO.Path]::Combine($SharedRoot, 'data', 'field_run_protocol.json')) | ConvertFrom-Json
+	$Declared = Get-Content -Raw -Encoding UTF8 -LiteralPath (
+		Join-Path $RepoRoot $Protocol.steps_file.windows) | ConvertFrom-Json
+	$Files = $Protocol.files
+	$Folder = Join-Path $RepoRoot $Protocol.folder.clone
+	$Checks = Join-Path $script:Out 'field_run_checks.txt'
+	$Ready = Join-Path $Folder $Files.ready
+	$DriverPid = 0
+	if (Test-Path -LiteralPath $Ready -PathType Leaf) {
+		try { $DriverPid = [int](Get-Content -Raw -Encoding UTF8 -LiteralPath $Ready | ConvertFrom-Json).pid }
+		catch { $DriverPid = 0 }
+	}
+	if ($DriverPid -le 0 -or -not (Get-Process -Id $DriverPid -ErrorAction SilentlyContinue)) {
+		Log 'No developer driver of this clone is ready (tools/dev/run-windows-dev.ps1 starts one); the field run is skipped.'
+		Write-Text $Checks "check=field_run verdict=skip codes=no_ready_driver`n"
+		return
+	}
+	$RequestId = 'win-' + $Stamp
+	$Deadline = [int]$Declared.deadline_seconds.default
+	$Refused = Join-Path $Folder $Files.refused
+	if (Test-Path -LiteralPath $Refused) { Remove-Item -LiteralPath $Refused -Force }
+	$Request = '{"schema":' + $Protocol.schema + ',"request_id":"' + $RequestId + '","steps":["' +
+		$Protocol.all_steps + '"],"deadline_seconds":' + $Deadline + '}'
+	$Stage = Join-Path $Folder ('.' + $Files.request + '.tmp')
+	Write-Text $Stage "$Request`n"
+	Move-Item -Force -LiteralPath $Stage -Destination (Join-Path $Folder $Files.request)
+	$script:FieldRunResults = Join-Path (Join-Path $Folder $Files.results) $RequestId
+	Log "Developer driver ready (pid $DriverPid); requesting every field run step within $Deadline s."
+	$Seen = @{}
+	$Lines = New-Object System.Collections.Generic.List[string]
+	# Reads the results written since the last look, in step order.
+	$ReadResults = {
+		$Found = @(Get-ChildItem -LiteralPath $script:FieldRunResults -File -ErrorAction SilentlyContinue |
+			Where-Object { $_.Name -match $Protocol.result_file_pattern } | Sort-Object Name)
+		foreach ($File in $Found) {
+			if ($Seen.ContainsKey($File.Name)) { continue }
+			$Result = Get-Content -Raw -Encoding UTF8 -LiteralPath $File.FullName | ConvertFrom-Json
+			$Seen[$File.Name] = $true
+			Log "  field run $($File.BaseName): $($Result.verdict)"
+			$Lines.Add("check=$($Result.step) verdict=$($Result.verdict) codes=$(@($Result.codes) -join ',')")
+		}
+	}
+	$Sent = Get-Date
+	while ($true) {
+		if (Test-Path -LiteralPath $Refused -PathType Leaf) {
+			$Refusal = Get-Content -Raw -Encoding UTF8 -LiteralPath $Refused | ConvertFrom-Json
+			Log "The developer driver refused the field run request: $($Refusal.reason)."
+			$Lines.Add("check=field_run verdict=fail codes=refused_$($Refusal.reason)")
+			break
+		}
+		& $ReadResults
+		if (Test-Path -LiteralPath (Join-Path $script:FieldRunResults $Files.done) -PathType Leaf) {
+			# A result written just before done is read once more.
+			& $ReadResults
+			Log 'Field run done.'
+			break
+		}
+		$Elapsed = ((Get-Date) - $Sent).TotalSeconds
+		$Accepted = Test-Path -LiteralPath (Join-Path $script:FieldRunResults $Files.accepted) -PathType Leaf
+		if (-not $Accepted -and $Elapsed -ge $FieldRunAcceptSeconds) {
+			# Withdrawn, so no run starts after the collector gave up on it.
+			$Pending = Join-Path $Folder $Files.request
+			if (Test-Path -LiteralPath $Pending) { Remove-Item -LiteralPath $Pending -Force }
+			Log "The developer driver did not accept the request within $FieldRunAcceptSeconds s; withdrawn."
+			$Lines.Add('check=field_run verdict=fail codes=not_accepted')
+			break
+		}
+		if ($Elapsed -ge ($Deadline + $FieldRunGraceSeconds)) {
+			Log "No done marker $($Deadline + $FieldRunGraceSeconds) s after the request; keeping the partial results."
+			$Lines.Add('check=field_run verdict=timeout codes=no_done_marker')
+			break
+		}
+		if (-not (Get-Process -Id $DriverPid -ErrorAction SilentlyContinue)) {
+			Log 'The developer driver is gone; keeping the partial results.'
+			$Lines.Add('check=field_run verdict=fail codes=driver_gone')
+			break
+		}
+		Start-Sleep -Seconds $FieldRunPollSeconds
+	}
+	Write-Text $Checks (($Lines -join "`n") + "`n")
+}
+
 # The first Python that really runs: the python3 of a Windows without Python is
 # a Microsoft Store stub that only prints a hint and fails.
 function Find-Python {
@@ -416,6 +514,12 @@ function Complete-Report {
 	} else {
 		Add-Step ('{0,-28} missing' -f 'logs')
 		Write-Text (Join-Path $script:Out 'logs_dir.txt') (Hide-User "$Folder`n")
+	}
+
+	# The field run's results, even after Ctrl-C cut its wait short.
+	if ($script:FieldRunResults -and (Test-Path -LiteralPath $script:FieldRunResults -PathType Container)) {
+		Copy-Item -Recurse -Force -LiteralPath $script:FieldRunResults -Destination (Join-Path $script:Out 'field_run')
+		Add-Step ('{0,-28} copied' -f 'field_run_results')
 	}
 
 	# Which personal triggers share a bundled one, with both sides' flags and no
@@ -597,6 +701,13 @@ try {
 		else { 'check=webview2 verdict=fail codes=missing' }
 		# The verdicts above are the result; a probe's exit code is not the step's.
 		$global:LASTEXITCODE = 0
+	}
+	# Last of the steps: the field run takes minutes, the facts above are kept
+	# if it is interrupted.
+	try { Invoke-FieldRun }
+	catch {
+		Log "The field run could not be run: $($_.Exception.Message)"
+		Add-Step ('{0,-28} failed ({1})' -f 'field_run', $_.Exception.Message)
 	}
 	$Completed = $true
 } finally {
