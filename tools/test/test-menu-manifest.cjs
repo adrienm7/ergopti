@@ -39,6 +39,39 @@ const REPO_ROOT = resolve(__dirname, '..', '..');
 const SHARED = resolve(REPO_ROOT, 'static/ergopti_plus/_shared');
 const MENU_PATH = resolve(SHARED, 'modules/menu/menu_manifest.json');
 const MANIFEST_PATH = resolve(SHARED, 'modules/features/manifest.toml');
+// The hand-edited tray-menu source: the [menu] tables live here, not in MANIFEST_PATH.
+const { MENU_SOURCE_PATH } = require('../lib/menu-source.cjs');
+
+/**
+ * The feature manifest and the menu source as one TOML text, for a compiler
+ * fixture that mutates either. Valid TOML: menu.toml holds only [menu].
+ * @param {string} sharedDir The _shared/ tree to read.
+ * @returns {string} The combined source.
+ */
+function combinedCompilerSource(sharedDir = SHARED) {
+	return (
+		readSourceFile(resolve(sharedDir, 'modules/features/manifest.toml')) +
+		'\n' +
+		readSourceFile(resolve(sharedDir, 'modules/menu/menu.toml'))
+	);
+}
+
+/**
+ * Writes one combined source to a compiler fixture's two inputs. The generator
+ * reads features from manifest.toml and only [menu] from menu.toml, so the same
+ * text in both compiles exactly as the one file the menu lived in until
+ * 2026-10-31.
+ * @param {string} fixtureRoot The fixture repository root.
+ * @param {string} text The combined source.
+ */
+function writeCompilerSources(fixtureRoot, text) {
+	const fs = require('fs');
+	const sharedDir = resolve(fixtureRoot, 'static/ergopti_plus/_shared');
+	for (const rel of ['modules/features/manifest.toml', 'modules/menu/menu.toml']) {
+		fs.mkdirSync(dirname(resolve(sharedDir, rel)), { recursive: true });
+		fs.writeFileSync(resolve(sharedDir, rel), text);
+	}
+}
 const LOCALES_DIR = resolve(SHARED, 'data/locales');
 
 // "linux" is expressible even though no row declares it yet: I2 fixes the
@@ -352,9 +385,9 @@ function checkChoiceProjection() {
 		);
 		fs.mkdirSync(path.dirname(manifest), { recursive: true });
 		fs.mkdirSync(path.dirname(output), { recursive: true });
-		const original = readSourceFile(MANIFEST_PATH);
+		const original = combinedCompilerSource();
 		const execute = (source) => {
-			fs.writeFileSync(manifest, source);
+			writeCompilerSources(fixture, source);
 			return spawnSync(process.execPath, ['tools/build/build-menu-manifest.js'], {
 				cwd: fixture,
 				encoding: 'utf8'
@@ -2795,7 +2828,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/gesture_slot_modes.json'))
 	);
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
-	const declared = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declared = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const expected = corpus.rows.map(({ value, ...row }) => row);
 	assert.deepEqual(
 		corpus.rows.map((row) => row.value),
@@ -3311,7 +3344,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/gesture_slot_controls.json'))
 	);
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
-	const declared = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declared = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	for (const [section, rows] of Object.entries(corpus.sections)) {
 		assert.deepEqual(declared[section], rows, 'handwritten controls source: ' + section);
 		assert.deepEqual(generated[section], rows, 'actual generated controls: ' + section);
@@ -3600,7 +3633,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/gesture_system_refresh.json'))
 	);
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
-	const source = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const source = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	assert.deepEqual(source[corpus.section], corpus.rows, 'independent refresh source declaration');
 	assert.deepEqual(generated[corpus.section], corpus.rows, 'actual generated refresh declaration');
 	assert.deepEqual(corpus.platform_rows, {
@@ -3762,7 +3795,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/gesture_swipe_template.json'))
 	);
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
-	const declared = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declared = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	assert.deepEqual(declared[corpus.section], corpus.rows, 'handwritten complete swipe source');
 	assert.deepEqual(generated[corpus.section], corpus.rows, 'actual generated swipe template');
 	assert.deepEqual(corpus.child_sections, {
@@ -3918,7 +3951,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	const corpus = JSON.parse(
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/gesture_swipe_template.json'))
 	);
-	const records = parseToml(readSourceFile(MANIFEST_PATH)).menu[corpus.section];
+	const records = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu[corpus.section];
 	function assertSwipeRecords(actual) {
 		assert.deepEqual(actual, corpus.rows, 'exact independently handwritten full-slot declaration');
 	}
@@ -4018,7 +4051,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	assert.equal(corpus.version_index, 1);
 	assert.equal(corpus.separator_index, 2);
 	assert.equal(corpus.channel_index, 3);
-	const source = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const source = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	assert.deepEqual(source[corpus.section], corpus.rows);
 	assert.deepEqual(JSON.parse(readSourceFile(MENU_PATH))[corpus.section], corpus.rows);
 	function sequence(tokens, values) {
@@ -4137,7 +4170,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	const expected = JSON.parse(
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/custom_profile_children.json'))
 	);
-	const declared = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declared = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	assert.deepEqual(declared[expected.section], expected.declaration);
 	assert.deepEqual(generated[expected.section], expected.declaration);
@@ -4251,7 +4284,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/linux_numeric_custom_tail.json'))
 	);
 	const section = 'llm_numeric_custom_rows';
-	const declared = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declared = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	function declaration(candidate) {
 		assert.deepEqual(candidate[section], expected.declaration);
@@ -6613,7 +6646,7 @@ console.log(
 			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'
 		);
 		const en = path.join(fixture, 'static/ergopti_plus/_shared/data/locales/en.json');
-		const original = readSourceFile(manifest);
+		const original = combinedCompilerSource(path.join(fixture, 'static/ergopti_plus/_shared'));
 		const addition = corpus.rows
 			.map(
 				(row) =>
@@ -6625,7 +6658,7 @@ console.log(
 			)
 			.join('');
 		const compile = (text) => {
-			fs.writeFileSync(manifest, text);
+			writeCompilerSources(fixture, text);
 			return spawnSync(process.execPath, ['tools/build/build-menu-manifest.js'], {
 				cwd: fixture,
 				encoding: 'utf8'
@@ -7096,7 +7129,7 @@ console.log(
 			fixture,
 			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'
 		);
-		const original = readSourceFile(manifest);
+		const original = combinedCompilerSource(path.join(fixture, 'static/ergopti_plus/_shared'));
 		const compile = (rows, extra = '') => {
 			const addition = rows
 				.map(
@@ -7108,7 +7141,7 @@ console.log(
 						'\n'
 				)
 				.join('');
-			fs.writeFileSync(manifest, original + addition + extra);
+			writeCompilerSources(fixture, original + addition + extra);
 			return spawnSync(process.execPath, ['tools/build/build-menu-manifest.js'], {
 				cwd: fixture,
 				encoding: 'utf8'
@@ -9535,9 +9568,9 @@ console.log(
 				)
 				.join('');
 		// Both genuine outputs require their complete canonical startup source closure.
-		const canonical = readSourceFile(MANIFEST_PATH);
+		const canonical = combinedCompilerSource();
 		const compile = (rows) => {
-			fs.writeFileSync(manifest, canonical + toml(rows));
+			writeCompilerSources(fixture, canonical + toml(rows));
 			return spawnSync(process.execPath, ['tools/build/build-menu-manifest.js'], {
 				cwd: fixture,
 				encoding: 'utf8',
@@ -9814,7 +9847,7 @@ console.log(
 // action submenu frame they once rendered is gone from the declaration.
 {
 	const assert = require('node:assert/strict');
-	const records = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const records = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	for (const name of ['tap_hold_action_picker_frame', 'tap_hold_action_picker_boundary']) {
 		assert.equal(records[name], undefined, 'retired action submenu declaration: ' + name);
@@ -9835,7 +9868,7 @@ console.log(
 	const corpus = JSON.parse(
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/gesture_system_status_captions.json'))
 	);
-	const declaration = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declaration = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	const expected = {
 		gesture_system_status_macos_frame: [
@@ -10036,7 +10069,7 @@ console.log(
 			}
 		]
 	};
-	const records = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const records = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	for (const [name, rows] of Object.entries(declaration)) {
 		assert.deepEqual(records[name], rows, 'independently specified root-badge declaration');
@@ -10253,7 +10286,7 @@ console.log(
 			}
 		]
 	};
-	const canonical = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const canonical = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const projected = JSON.parse(readSourceFile(MENU_PATH));
 	for (const [key, rows] of Object.entries(declaration)) {
 		assert.deepEqual(canonical[key], rows, 'independent finished kind/role/placement declaration');
@@ -10393,7 +10426,7 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
-	const declaration = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declaration = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	const expected = {
 		layout_switching_frame: [
@@ -10597,7 +10630,7 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const { nativeLayoutTemplatePublication } = require('../lib/menu-native-layout-binding.cjs');
-	const declaration = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declaration = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	const native = readSourceFile(
 		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua')
@@ -10706,7 +10739,7 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const { nativeLayoutTemplatePublication } = require('../lib/menu-native-layout-binding.cjs');
-	const declaration = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const declaration = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const source = readSourceFile(
 		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua')
 	);
@@ -10806,7 +10839,7 @@ console.log(
 	const parsedPolicy = parseTomlSource(
 		readSourceFile(resolve(SHARED, 'modules/menu/startup_tray.toml'))
 	);
-	const parsedMenu = parseTomlSource(readSourceFile(MANIFEST_PATH)).menu;
+	const parsedMenu = parseTomlSource(readSourceFile(MENU_SOURCE_PATH)).menu;
 	assert.equal(Object.getPrototypeOf(parsedPolicy), null, 'exercise genuine parser-owned records');
 	assert.equal(
 		startup.render(parsedMenu, parsedPolicy, locales),
@@ -10875,7 +10908,7 @@ console.log(
 	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
 	const { publishesSelectedMenuGroup } = require('../lib/menu-shared-delegation.cjs');
 	const { scriptTokens } = require('../lib/script-source.cjs');
-	const records = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const records = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	const frame = 'llm_profile_parent_frame_ahk';
 	const group = 'llm_profile_parent_ahk';
@@ -11943,7 +11976,7 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
-	const canonical = parseToml(readSourceFile(MANIFEST_PATH)).menu;
+	const canonical = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const row = canonical.top_level.find((item) => item.id === 'hotstrings');
 	assert.equal(row.type, 'group');
 	assert.equal(row.i18n, 'menu.hotstrings.title');
@@ -13155,7 +13188,8 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
-	const recipe = parseToml(readSourceFile(MANIFEST_PATH)).menu.shortcut_extension_construction_ahk;
+	const recipe = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu
+		.shortcut_extension_construction_ahk;
 	assert.deepEqual(recipe, {
 		kind: 'owned_native_menu',
 		platform: 'ahk',
@@ -13290,7 +13324,7 @@ console.log(
 		if (value.type === 'dynamic') found.push(`${where} (${value.id ?? '?'})`);
 		for (const [key, child] of Object.entries(value)) walk(child, `${where}.${key}`);
 	};
-	walk(parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu, 'manifest.toml menu');
+	walk(parseToml(readFileSync(MENU_SOURCE_PATH, 'utf8')).menu, 'menu.toml menu');
 	walk(JSON.parse(readFileSync(MENU_PATH, 'utf8')), 'menu_manifest.json');
 	assert.deepEqual(found, [], 'no menu row may be declared `dynamic`; declare a `list` row');
 	assert.equal(availability.RETIRED_ROW_TYPES.has('dynamic'), true);
@@ -13312,4 +13346,30 @@ console.log(
 	console.log(
 		'[OK] retired `dynamic` rows: none declared, none generated, and the compiler refuses one.'
 	);
+}
+
+// The tray menu is defined in one findable file, _shared/modules/menu/menu.toml.
+// Its tables were interleaved with the feature tables of the feature manifest
+// until 2026-10-31, where a reader looking for a row had 9 500 lines to search;
+// a [menu] table back in that file would split the definition in two again.
+{
+	const assert = require('node:assert/strict');
+	const features = readSourceFile(MANIFEST_PATH);
+	const headers = features
+		.split('\n')
+		.map((line, index) => [index + 1, line])
+		.filter(([, line]) => /^\s*\[\[?\s*menu\s*(?:[.\]])/.test(line));
+	assert.deepEqual(
+		headers,
+		[],
+		'features/manifest.toml declares features only; [menu] tables belong in modules/menu/menu.toml'
+	);
+	assert.equal(Object.hasOwn(parseToml(features), 'menu'), false);
+	const menu = parseToml(readSourceFile(MENU_SOURCE_PATH));
+	assert.deepEqual(Object.keys(menu), ['menu'], 'menu.toml declares the [menu] tables only');
+	// The check itself refuses both header spellings.
+	for (const line of ['[menu]', '[[menu.demo]]', '  [ menu.demo ]'])
+		assert.equal(/^\s*\[\[?\s*menu\s*(?:[.\]])/.test(line), true, line);
+	assert.equal(/^\s*\[\[?\s*menu\s*(?:[.\]])/.test('[menus]'), false);
+	console.log('[OK] the tray menu is declared in menu.toml only, never in the feature manifest.');
 }

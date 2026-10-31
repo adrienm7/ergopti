@@ -456,16 +456,8 @@ for (const [field, value] of [
 }
 assert.equal(unsupportedPhysicalEditor(undefined), false);
 
-const featureSource = fs.readFileSync(
-	path.join(ROOT, SP, '_shared/modules/features/manifest.toml'),
-	'utf8'
-);
-const canonicalMenu = parseToml(
-	featureSource.replace(
-		/^\[\[features\.([^\]]+)\]\]\r?$/gm,
-		(_match, prefix) => `[[entries]]\npath_prefix = "${prefix}"`
-	)
-).menu;
+// The menu rows live in the tray-menu source, beside the generated manifest.
+const canonicalMenu = require('../lib/menu-source.cjs').readMenuTables(parseToml);
 const generatedMenu = JSON.parse(
 	fs.readFileSync(path.join(ROOT, SP, '_shared/modules/menu/menu_manifest.json'), 'utf8')
 );

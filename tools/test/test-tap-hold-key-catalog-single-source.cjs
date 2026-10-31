@@ -346,6 +346,8 @@ const manifest = TOML.parse(
 		(_header, section) => `[[feature_records]]\nsection_path = \"${section}\"`
 	)
 );
+// The menu rows live in the tray-menu source, beside the generated manifest.
+manifest.menu = require('../lib/menu-source.cjs').readMenuTables(TOML.parse);
 const combinations = manifest.menu.shortcuts_menu.find((row) => row.id === 'key_combinations');
 const linuxManager = stripLineComments(
 	read(path.join(SP, 'linux/platform/remap/tap_hold_manager.lua')),
