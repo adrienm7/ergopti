@@ -96,4 +96,14 @@ helpers.describe("gesture emit actions (macOS)", function()
 		end
 	end)
 
+	helpers.it("presses Space from a binding, as on Windows and Linux (action-parity-space)", function()
+		-- space was a Windows and Linux tap-hold value only; macOS had no row,
+		-- so a shared tap-hold layout could not put Space on a key there.
+		local by_id = {}
+		for _, row in ipairs(require("_generated.gesture_emit_actions")) do by_id[row.id] = row end
+		helpers.assert_true(by_id.space ~= nil, "space must be declared for macOS")
+		helpers.assert_eq(by_id.space.key, "space")
+		helpers.assert_eq(#by_id.space.mods, 0, "a bare Space, without Command (that is Spotlight)")
+	end)
+
 end)
