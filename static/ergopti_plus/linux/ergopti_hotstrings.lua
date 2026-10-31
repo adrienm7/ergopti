@@ -252,6 +252,9 @@ local input_capture_gate = nil
 -- The error window: a logged ERROR can open it (the shared policy decides); a
 -- crash is announced by the crash reporter's immediate notification only.
 -- Installed before main() so the boot's own errors count; it opens nothing before the event loop runs.
+-- config.toml's [script] rows (locale, log level, error window) win over the
+-- saved values at start, as on Windows: adopted before any of them is read.
+require("infra.script_scope").adopt_configured()
 local ErrorDialog = RuntimeGuard.optional_require("ui.error_dialog.bridge")
 if ErrorDialog and ErrorDialog.init() then Logger.set_error_observer(ErrorDialog.on_error) end
 
