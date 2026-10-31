@@ -725,7 +725,7 @@ _LMT_ApiSemanticDetachedBuilder() {
 	OldRead := _ConfigBootReadFailed, OldRejected := _ConfigBootRejectedOverrides
 	OldOutdated := _ConfigBootOutdatedEntries
 	Source := '_meta.schema_version = ' . ConfigMigrateCurrentVersion() . '`nllm = {enabled = false, api_entry_id = "api_old", future = "retain"}`n[future]`nold = "retain" # user data`n'
-	Expected := Chr(0xFEFF) . '_meta.schema_version = ' . ConfigMigrateCurrentVersion() . '`nllm = {enabled = true, api_entry_id = "api_new", future = "retain"}`n[future]`nold = "retain" # user data`n'
+	Expected := '_meta.schema_version = ' . ConfigMigrateCurrentVersion() . '`nllm = {enabled = true, api_entry_id = "api_new", future = "retain"}`n[future]`nold = "retain" # user data`n'
 	try {
 		_ConfigBootReadFailed := false
 		_ConfigBootRejectedOverrides := 0
