@@ -1035,97 +1035,96 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertEqual(approvalLegacyCalls, 0)
 	}
 
-	/// An ad hoc build's coexisting legacy agent and Background Items record
-	/// spawned the job under the previous cdhash, which macOS killed (Launch
-	/// Constraint Violation, field run 2026-10-30). Both are removed, in that
-	/// order, and the previous guardian's exit is proven before registering.
-	func testAdhocResetRemovesBothRegistrationsBeforeRegistering() throws {
+	/// An ad hoc build never registers the Background Items job: macOS killed
+	/// its fresh spawn even after a full reset (CODESIGNING 4, Launch
+	/// Constraint Violation, field run 2026-10-31). It runs the legacy agent
+	/// only, after removing a record an earlier build left.
+	func testAdhocBuildNeverRegistersTheBackgroundItemsJob() throws {
 		guard #available(macOS 13.0, *) else { return }
 		for initial in [SMAppService.Status.enabled, .notRegistered, .notFound] {
 			let service = ScriptedModernGuardianService(status: initial)
 			var order: [String] = []
 			var lines: [String] = []
-			let note = resetAdhocRemapGuardianRegistration(
+			let outcome = resolveAdhocRemapGuardianRegistration(
 				service: service,
 				leasesAreEmpty: { order.append("leases"); return true },
-				removeLegacy: {
-					order.append("legacy")
-					XCTAssertEqual(service.unregisterCalls, 0, "the legacy agent goes first")
-					return true
-				},
-				guardianHasExited: {
-					order.append("exit:\(service.unregisterCalls)")
+				guardianHealth: { XCTFail("no lease keeps the record"); return false },
+				guardianHasExited: { order.append("exit:\(service.unregisterCalls)"); return true },
+				ensureLegacy: {
+					order.append("legacy:\(service.status == .enabled)")
 					return true
 				},
 				report: { lines.append($0) }
 			)
-			XCTAssertEqual(note, .adhocReregistered)
+			XCTAssertEqual(outcome, RemapGuardianRegistrationOutcome(status: .ready, note: .adhocLegacyOnly))
+			XCTAssertEqual(service.registerCalls, 0, "an ad hoc build never registers the job: \(lines)")
 			XCTAssertEqual(service.unregisterCalls, initial == .enabled ? 1 : 0)
-			XCTAssertEqual(service.registerCalls, 0, "the reset itself never registers")
-			XCTAssertEqual(order, ["leases", "legacy", "exit:\(initial == .enabled ? 1 : 0)"])
-			XCTAssertEqual(lines.count, 1, "\(lines)")
-			XCTAssertEqual(resolveModernRemapGuardianRegistration(
-				service: service,
-				guardianHealth: { true },
-				legacyInvalidSignatureFallback: { XCTFail("registered"); return false }
-			), .ready)
-			XCTAssertEqual(service.registerCalls, 1, "the fresh registration follows the reset")
+			XCTAssertEqual(order, initial == .enabled
+				? ["leases", "exit:1", "legacy:false"] : ["legacy:false"])
+			XCTAssertTrue(lines.contains { $0.contains("legacy agent is ready") }, "\(lines)")
 		}
+		let unavailable = resolveAdhocRemapGuardianRegistration(
+			service: ScriptedModernGuardianService(status: .notRegistered),
+			leasesAreEmpty: { true },
+			guardianHealth: { false },
+			guardianHasExited: { true },
+			ensureLegacy: { false },
+			report: { _ in }
+		)
+		XCTAssertEqual(unavailable, RemapGuardianRegistrationOutcome(status: .unavailable, note: .adhocLegacyOnly))
 	}
 
-	/// Live leases and a pending approval keep the registration untouched; an
-	/// unproven removal or exit is named and leaves the ordinary registration.
-	func testAdhocResetKeepsLiveLeasesApprovalAndUnprovenRemovals() throws {
+	/// Live leases and a pending approval keep the record; a removal that is
+	/// refused or whose job never exits is named and still runs the legacy agent.
+	func testAdhocBuildKeepsLiveLeasesApprovalAndNamesUnprovenRemovals() throws {
 		guard #available(macOS 13.0, *) else { return }
 		let live = ScriptedModernGuardianService(status: .enabled)
-		XCTAssertEqual(resetAdhocRemapGuardianRegistration(
+		XCTAssertEqual(resolveAdhocRemapGuardianRegistration(
 			service: live,
 			leasesAreEmpty: { false },
-			removeLegacy: { XCTFail("live leases"); return true },
+			guardianHealth: { true },
 			guardianHasExited: { XCTFail("live leases"); return true },
+			ensureLegacy: { XCTFail("a healthy guardian keeps its leases"); return true },
 			report: { _ in }
-		), .adhocResetDeferred)
+		), RemapGuardianRegistrationOutcome(status: .ready, note: .adhocResetDeferred))
 		XCTAssertEqual(live.unregisterCalls, 0)
+		XCTAssertEqual(live.registerCalls, 0)
 
 		let pending = ScriptedModernGuardianService(status: .requiresApproval)
-		XCTAssertEqual(resetAdhocRemapGuardianRegistration(
+		XCTAssertEqual(resolveAdhocRemapGuardianRegistration(
 			service: pending,
 			leasesAreEmpty: { true },
-			removeLegacy: { XCTFail("approval is the user's"); return true },
+			guardianHealth: { true },
 			guardianHasExited: { true },
+			ensureLegacy: { XCTFail("approval is the user's"); return true },
 			report: { _ in }
-		), .adhocResetDeferred)
-		XCTAssertEqual(pending.unregisterCalls, 0)
-
-		let foreignLegacy = ScriptedModernGuardianService(status: .enabled)
-		XCTAssertEqual(resetAdhocRemapGuardianRegistration(
-			service: foreignLegacy,
-			leasesAreEmpty: { true },
-			removeLegacy: { false },
-			guardianHasExited: { XCTFail("refused"); return true },
-			report: { _ in }
-		), .adhocResetRefused)
-		XCTAssertEqual(foreignLegacy.unregisterCalls, 0)
+		), RemapGuardianRegistrationOutcome(status: .requiresApproval, note: .adhocResetDeferred))
+		XCTAssertEqual(pending.unregisterCalls + pending.registerCalls, 0)
 
 		let stuck = ScriptedModernGuardianService(
 			status: .enabled,
 			unregistrationError: NSError(domain: kRemapGuardianServiceErrorDomain, code: 1)
 		)
-		XCTAssertEqual(resetAdhocRemapGuardianRegistration(
+		XCTAssertEqual(resolveAdhocRemapGuardianRegistration(
 			service: stuck,
 			leasesAreEmpty: { true },
-			removeLegacy: { true },
+			guardianHealth: { false },
 			guardianHasExited: { XCTFail("refused"); return true },
+			ensureLegacy: { true },
 			report: { _ in }
-		), .adhocResetRefused)
+		), RemapGuardianRegistrationOutcome(status: .ready, note: .adhocResetRefused))
+		XCTAssertEqual(stuck.registerCalls, 0)
 
-		XCTAssertEqual(resetAdhocRemapGuardianRegistration(
-			service: ScriptedModernGuardianService(status: .enabled),
+		let draining = ScriptedModernGuardianService(status: .enabled)
+		XCTAssertEqual(resolveAdhocRemapGuardianRegistration(
+			service: draining,
 			leasesAreEmpty: { true },
-			removeLegacy: { true },
+			guardianHealth: { false },
 			guardianHasExited: { false },
+			ensureLegacy: { true },
 			report: { _ in }
-		), .adhocResetRefused)
+		), RemapGuardianRegistrationOutcome(status: .ready, note: .adhocResetRefused))
+		XCTAssertEqual(draining.registerCalls, 0)
 	}
 
 	/// Only a signature without a team is ad hoc: Developer ID builds keep
