@@ -60,7 +60,13 @@ const DEAD = [
 // path.join segment form of the canonical override: 'ergopti_plus', 'windows', '.local_ahk_path'.
 const OVERRIDE_JOIN_RE =
 	/['"]ergopti_plus['"]\s*,\s*['"]windows['"]\s*,\s*['"]\.local_ahk_path['"]/;
-const PUBLIC_JOIN_RE = /['"]ergopti_plus['"]\s*,\s*['"]windows['"]\s*,\s*['"]ErgoptiPlus\.ahk['"]/;
+// The entry file name comes from the shared identifiers (app.ahk), never typed again.
+const PUBLIC_JOIN_RE = /['"]ergopti_plus['"]\s*,\s*['"]windows['"]\s*,\s*app\.ahk\s*\)/;
+const IDENTIFIERS_IMPORT_RE =
+	/const \{ app \} = createRequire\(import\.meta\.url\)\('\.\.\/lib\/identifiers\.cjs'\);/;
+const identifiers = JSON.parse(
+	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.json'), 'utf8')
+);
 
 const errors = [];
 
@@ -88,9 +94,14 @@ for (const s of ['sync-private-ahk.js', 'watch-ahk.js', 'install-ahk-watcher.js'
 }
 
 // 3. The sync tool must write the public file to its live location.
-if (!PUBLIC_JOIN_RE.test(read('sync-private-ahk.js'))) {
+if (
+	!PUBLIC_JOIN_RE.test(read('sync-private-ahk.js')) ||
+	!IDENTIFIERS_IMPORT_RE.test(read('sync-private-ahk.js')) ||
+	!fs.existsSync(path.join(ROOT, 'static/ergopti_plus/windows', identifiers.app.ahk))
+) {
 	errors.push(
-		'sync-private-ahk.js: public file must be static/ergopti_plus/windows/ErgoptiPlus.ahk.'
+		`sync-private-ahk.js: public file must be static/ergopti_plus/windows/${identifiers.app.ahk}, ` +
+			'named through app.ahk of tools/lib/identifiers.cjs.'
 	);
 }
 

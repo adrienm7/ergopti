@@ -64,9 +64,6 @@
 		"tools/build/InstalledRuntimePublisher.hpp": {
 			"bundle_id_or_label": 4
 		},
-		"tools/build/build-linux-flatpak.sh": {
-			"host": 2
-		},
 		"tools/build/build-macos-managed-ollama.py": {
 			"host": 6
 		},
@@ -91,14 +88,6 @@
 		"tools/build/core_sdk/source/src/share/remap_runtime_installed_capture.hpp": {
 			"bundle_id_or_label": 7
 		},
-		"tools/build/homebrew-cask.cjs": {
-			"app_file_name": 1,
-			"bundle_id_or_label": 1,
-			"host": 1
-		},
-		"tools/build/macos-release-publication.cjs": {
-			"host": 2
-		},
 		"tools/build/owned-runtime-native/installed_physical_source.mm": {
 			"bundle_id_or_label": 3
 		},
@@ -109,39 +98,7 @@
 		"tools/build/remap_runtime_build.py": {
 			"host": 1
 		},
-		"tools/build/stage-macos-managed-ollama-catalogue.py": {
-			"host": 1
-		},
-		"tools/build/verify-macos-managed-ollama-publication.py": {
-			"app_file_name": 3,
-			"host": 1
-		},
-		"tools/ci/dev-release-qualification.cjs": {
-			"host": 2
-		},
-		"tools/ci/windows-exe-av-surface.cjs": {
-			"app_file_name": 1
-		},
-		"tools/ci/windows-exe-version-info.cjs": {
-			"app_file_name": 1
-		},
-		"tools/ci/windows-stable-signing.cjs": {
-			"app_file_name": 3,
-			"host": 1
-		},
-		"tools/codegen/codegen-ollama-release.cjs": {
-			"host": 1
-		},
-		"tools/dev/bench-ahk-startup.cjs": {
-			"app_file_name": 3
-		},
-		"tools/dev/sync-private-ahk.js": {
-			"app_file_name": 1
-		},
 		"tools/lib/menu-native-startup-binding.cjs": {
-			"app_file_name": 1
-		},
-		"tools/maintainer/windows-live-checks.cjs": {
 			"app_file_name": 1
 		},
 		"tools/rtk/bootstrap.ps1": {

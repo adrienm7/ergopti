@@ -26,6 +26,8 @@ import tempfile
 CONTRACT = "static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json"
 OFFICIAL_RELEASE = "static/ergopti_plus/_shared/modules/llm/ollama_release.json"
 DEFAULTS = "static/ergopti_plus/_shared/modules/updater/defaults.json"
+# The release host is declared once here.
+IDENTIFIERS = "static/ergopti_plus/_shared/data/identifiers.json"
 CHANNELS = "static/ergopti_plus/_shared/modules/updater/channels.json"
 PRODUCER = "tools/build/build-macos-managed-ollama.py"
 SHA256 = re.compile(r"[a-f0-9]{64}\Z")
@@ -602,6 +604,7 @@ def stage(options):
         channel=options.release_channel,
         node=options.node,
     )
+    github = inputs.read_json(source_file(repository, IDENTIFIERS))["hosts"]["github"]
     official = options.official_archive.absolute()
     if (
         ordinary(official).st_size != official_identity["bytes"]
@@ -642,7 +645,9 @@ def stage(options):
             raise ValueError("A duplicate native host asset was refused")
         if options.release:
             asset["url"] = (
-                "https://github.com/"
+                "https://"
+                + github
+                + "/"
                 + plan["repository"]
                 + "/releases/download/"
                 + plan["tag"]
