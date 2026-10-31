@@ -12,6 +12,7 @@
 ; ==============================================================================
 
 #Include ../../infra/phase_stats.ahk
+#Include ../../infra/perf_budget.ahk
 
 
 
@@ -819,8 +820,21 @@ RebuildTrayMenu(PublishAuthorizeFn := 0, WorkerFn := 0,
 	if !Acquired
 		return QueuedOutcome
 	Started := PhaseStats_Now()
-	try return _TrayRootDrain()
-	finally PhaseStats_Stop("menu.rebuild", Started)
+	Published := false
+	try Published := _TrayRootDrain()
+	finally ElapsedMs := PhaseStats_Stop("menu.rebuild", Started)
+	if ((Published is Integer) && Published == 1)
+		_TrayRootReportRebuild(ElapsedMs, DllCall("GetMenuItemCount", "ptr", A_TrayMenu.Handle, "int"))
+	return Published
+}
+
+; The macOS and Linux line of a tray rebuild and its budget, so one pattern of
+; tools/dev/field-log-analyse.py judges every driver. A refused pass rebuilt nothing.
+; @param ElapsedMs {Number} What the rebuild took.
+; @param TopLevelItems {Integer} The rows of the published root.
+_TrayRootReportRebuild(ElapsedMs, TopLevelItems) {
+	LoggerInfo("Menu", "Menu tree rebuilt in {1} ms ({2} top-level item(s)).", Format("{:.1f}", ElapsedMs), TopLevelItems)
+	PerfBudget_Report("Menu", "menu.rebuild", ElapsedMs, TimingsGet("budgets", "menu_rebuild_ms"))
 }
 
 ; Sets the active log level without a restart. Disk and the cached hot-path
