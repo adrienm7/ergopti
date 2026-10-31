@@ -54,10 +54,9 @@ implemented today.
   `artifact_unpinned` today; once pinned, `runtime_artifact_fetch.lua`
   downloads and verifies it into `~/Library/Application Support/ErgoptiPlus/RemapRuntime/`
   on the first admission and reuses it after. `runtime_activation.lua` is the
-  maintainer's rule: Tap-Hold on (« Ergopti uses Karabiner » and the Tap-Holds
-  switch) runs ours and closes the user's Karabiner with the consent, which the
-  Tap-Holds menu offers on an owned boot; Tap-Hold off keeps ours inactive and
-  gives theirs back when Ergopti closed it. An owned boot also removes the rules
+  maintainer's rule: while Ergopti runs and is not paused ours runs and closes
+  the user's Karabiner, which a notification and a Tap-Holds row say; a pause
+  or a quit stops ours and gives theirs back when Ergopti closed it. An owned boot also removes the rules
   an earlier shared-mode build merged into the user's `karabiner.json`. The Swift lease
   worker and guardian accept the owned `ergoptiplus_remap_cli` next to the shared
   tool, and the guardian record names the runtime.

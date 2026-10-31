@@ -969,17 +969,19 @@ product name: `pgrep -f Karabiner-Elements` also matches an installed but idle
 root daemon and would block owned mode forever. A lease record names its
 runtime (`shared` or `owned`), so a guardian never fences an owned token
 through a stock tool that may not exist, which would retry forever.
-The activation rule has one owner, `platform/remap/runtime_activation.lua`:
-« Tap-Hold on » is `integration_enabled` and `tap_holds_enabled` together;
-on starts ours and closes theirs with consent, off stops ours. Theirs is
-restored (`register-core-agents`, the inverse of the quit step) only when the
+The activation rule has one owner, `platform/remap/runtime_activation.lua`
+(maintainer, 2026-10-31): Ergopti running and not paused starts ours, which
+always closes theirs; a pause stops ours. Theirs is restored
+(`register-core-agents`, the inverse of the quit step) only when the
 `closed-other-karabiner` marker records that Ergopti closed it, so a user who
 quit their own Karabiner never sees Ergopti start it; the marker is a file, so
-a boot after a crash with Tap-Hold off still restores it. Teardown restores on
-a quit and never on a reload (`M.revoke` reason `hammerspoon_reload`), which
-would hand the keyboard to theirs between two of ours. Action: route every new
-switch that changes « Tap-Hold on » through `M._owned.reconcile`, and never
-call the closer's `restore` without the marker. The pinned artifact is fetched
+a crash or forced quit is recovered at the next pause or quit. Teardown
+restores on a quit and never on a reload (`M.revoke` reason
+`hammerspoon_reload`). A resume after a pause reloads the driver, because one
+Lua VM cannot start a second capture; the field run therefore defers the
+resume with `FieldRun.after_run`. Action: never tie the owned runtime to a menu
+switch, route pause and resume through `M._owned.reconcile`, and never call the
+closer's `restore` without the marker. The pinned artifact is fetched
 by `platform/remap/runtime_artifact_fetch.lua` into
 `~/Library/Application Support/ErgoptiPlus/RemapRuntime/<version>/` (size, then
 SHA-256, then a closed member list, receipt last); the privileged installer
