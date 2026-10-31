@@ -589,7 +589,7 @@ _LLV_GenerationRoute(Groups, Build) {
 	Bound := _LLV_ExecutableStatement(Groups,
 		'm)^[ \t]*(return) Map\([^)]*"llm_generation_settings", LLM_Menu_BuildGenerationMenu\)', 1)
 	Draw := _LLV_ExecutableStatement(Build,
-		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", DynamicHandlers, _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*"", Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
+		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", Map\(\), _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*ListProviders, Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
 	return Bound && Draw
 }
 
