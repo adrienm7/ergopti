@@ -77,11 +77,10 @@ ERGOPTI_CHANNEL="${ERGOPTI_CHANNEL:-main}"
 # frameworks it hosts (Sparkle's remaining windows) stay English.
 LAUNCHER_LOCALIZATIONS="$(python3 "$REPO_ROOT/tools/build/launcher_localizations.py")"
 
-# Ollama is not bundled either: modules/llm/ollama_binary.lua reuses an
-# installed Ollama.app, Homebrew or PATH copy, and the first selection of the
-# Ollama backend offers to download the pinned official release into
-# Application Support (modules/llm/ensure-ollama-deps.sh). The 79.6 MB binary
-# this build used to copy under Resources/Tools/ weighed 29.4 MB of the zip.
+# Ollama is not bundled either: the first selection of the Ollama backend
+# offers to install Ergopti's own pinned runtime into Application Support
+# (modules/llm/ensure-ollama-native-deps.sh). The 79.6 MB binary this build
+# used to copy under Resources/Tools/ weighed 29.4 MB of the zip.
 
 # Developer source mode: 1 records this clone's root in the launcher Info.plist
 # (key ERGOPTI_DEV_SOURCE_PLIST_KEY), so the launcher points the embedded

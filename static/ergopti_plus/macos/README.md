@@ -78,12 +78,11 @@ feature logic lives in the modules it loads.
 > packages stop importing (a `uv.lock` bump in an update, a partial venv), the
 > model check marks it not installed and the next MLX selection rebuilds it.
 > A backend row switches only after its runtime install succeeds. The first
-> selection of the Ollama backend reuses an installed Ollama
-> (`modules/llm/ollama_binary.lua`: Ollama.app, `~/Applications`, Homebrew,
-> Ergopti's Application Support copy, then `PATH`) or offers to download the
-> release pinned in `modules/llm/ollama-release.sh`.
-> `ui/menu/menu_llm/runtime_install_offer.lua` is the only caller of either
-> checker's `install_for_selection()`. `modules/llm/mlx_deps_checker.lua`
+> selection of the Ollama backend reuses Ergopti's own installed runtime
+> (`modules/llm/ollama_binary.lua`; a user's own Ollama is never used) or offers
+> to install it (`modules/llm/ensure-ollama-native-deps.sh`).
+> `ui/menu/menu_llm/runtime_install_offer.lua` is the only caller of the
+> checkers' install entries. `modules/llm/mlx_deps_checker.lua`
 > resolves its script relative to the Hammerspoon root, so moving these files
 > requires updating their path resolution — the Lua unit suite does not exercise
 > the bash/venv runtime.
