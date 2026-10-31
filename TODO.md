@@ -1037,7 +1037,8 @@ Not started:
       `native_proxy_budget`; a pull that daemon then fails to fetch shows
       `network.failure.pac_unreachable_direct_failed` and logs the stage (`pac-direct-fallback-pull`).
       Linux left: GIO names no finer stage than the lookup, and the daemon holds one relay, so a PAC list such as
-      `PROXY a; DIRECT` keeps only its first entry; [PHYS-L] a pull on a PAC-only network whose PAC is
+      `PROXY a; DIRECT` keeps only its first entry (following it needs a reachability probe of `a`
+      before the daemon starts, a new network behaviour to decide); [PHYS-L] a pull on a PAC-only network whose PAC is
       unreachable. Deferred: Windows (`ergopti_network_routes.ps1` still refuses with `pac_failed` or
       `wpad_failed`) must follow the same policy.
       Windows (30 Oct): no longer deferred, `ergopti_network_routes.ps1` `New-ErgoptiPacDirectFallback` goes direct at the policy's stages; [PHYS-W] confirm on a network whose PAC is unreachable.
