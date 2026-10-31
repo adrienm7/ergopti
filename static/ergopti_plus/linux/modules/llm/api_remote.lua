@@ -479,6 +479,44 @@ function M.prepare_access(entry, on_ready)
 	refresh_access(provider, entry, on_ready)
 end
 
+--- Starts the access-token exchange of an entry whose provider exchanges keys
+--- and holds no usable token, so the first request after a key change finds
+--- it; a fresh token, a pending exchange or a refusal in its pause is left as
+--- it is.
+--- @param entry table|nil
+--- @return boolean started Whether an exchange is now pending.
+function M.prewarm_access(entry)
+	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
+	if not (provider and provider.auth) or type(entry.token) ~= "string" or entry.token == "" then return false end
+	access_token(provider, entry)
+	return access_slot(entry).pending == true
+end
+
+--- Runs send() once an entry's access token is usable: at once for a provider
+--- that exchanges no key or whose token is fresh, else when the exchange
+--- settles, and only while owned() still holds (a retired exchange never
+--- sends). A refused exchange runs refuse(reason).
+--- @param entry table
+--- @param owned function owned() -> boolean
+--- @param send function send() -> boolean dispatched
+--- @param refuse function refuse(reason) -> boolean
+--- @return boolean|nil result send's or refuse's result when settled at once, nil while waiting
+local function with_access(entry, owned, send, refuse)
+	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
+	if not (provider and provider.auth) then return send() end
+	local slot = access_slot(entry)
+	if TokenExchange.state(provider.auth, slot.token and slot or nil, Monotonic.now_sec()) then return send() end
+	local settled, result = false, nil
+	Logger.debug(LOG, "API entry '%s' waits for its access token.", tostring(entry.id))
+	M.prepare_access(entry, function(ok, reason)
+		settled = true
+		if not owned() then return end
+		if ok then result = send() else result = refuse(reason or "the access token could not be fetched") end
+	end)
+	if settled then return result end
+	return nil
+end
+
 --- The address and headers of one request to an entry's provider, per format:
 --- openai (and every OpenAI-compatible provider) base_url/chat/completions with
 --- a Bearer key, anthropic base_url/messages with x-api-key, gemini
@@ -1040,6 +1078,51 @@ local function backboard_send(scope, epoch, prepared, spec, fail, on_answer, aut
 	end, authorized)
 end
 
+--- Builds and sends one chat completion for chat(), inside its exchange.
+--- @param scope table
+--- @param epoch integer
+--- @param done function
+--- @param authorized function|nil
+--- @param fail function
+--- @param refuse function
+--- @param deliver function
+--- @param entry table
+--- @param messages table
+--- @param opts table|nil
+--- @return boolean dispatched
+local function send_chat(scope, epoch, done, authorized, fail, refuse, deliver, entry, messages, opts)
+	local request, reason = M.build_request(entry, messages, opts)
+	if not request then return refuse(reason) end
+	Logger.debug(LOG, "chat() → %s (model=%s)", M.redact_url(request.url), request.model)
+	local options = { owner = scope.owner, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized }
+	local retried = false
+	local function on_result(result)
+		if epoch ~= scope.epoch then return end
+		if authorized and not authorized() then return end
+		if type(result) ~= "table" or result.ok ~= true then
+			-- A refused thinking field: the same request once more without it
+			if not retried and M.thinking_refusal(request.provider, request.model, result, request.added, request.payload) then
+				retried = true
+				local again = Json.encode(request.payload)
+				if type(again) == "string"
+					and (InferenceClient or HttpClient).post(request.url, request.headers, again, on_result, options) == true then
+					return
+				end
+			end
+			fail(failure_detail(result), failure_receipt(result))
+			return
+		end
+		local classified = Classifier.classify(request.format, result.body)
+		deliver(classified.text ~= "" and classified.text or nil, priced(classified.usage, request.model))
+	end
+	local dispatched = (InferenceClient or HttpClient).post(request.url, request.headers, request.body, on_result, options)
+	if dispatched ~= true then
+		done("", "HTTP transport unavailable")
+		return false
+	end
+	return true
+end
+
 --- Sends one completion. Same shape as api_ollama.chat, with the entry in
 --- place of the base URL: on_done(full_text, nil, usage) on success, with the
 --- reported tokens priced from model_prices, or on_done("", err, failure_receipt?),
@@ -1098,37 +1181,16 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		return scope.active ~= nil and scope.active.epoch == epoch
 	end
 
-	local request, reason = M.build_request(entry, messages, opts)
-	if not request then return refuse(reason) end
-	Logger.debug(LOG, "chat() → %s (model=%s)", M.redact_url(request.url), request.model)
-	local options = { owner = scope.owner, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized }
-	local retried = false
-	local function on_result(result)
-		if epoch ~= scope.epoch then return end
-		if authorized and not authorized() then return end
-		if type(result) ~= "table" or result.ok ~= true then
-			-- A refused thinking field: the same request once more without it
-			if not retried and M.thinking_refusal(request.provider, request.model, result, request.added, request.payload) then
-				retried = true
-				local again = Json.encode(request.payload)
-				if type(again) == "string"
-					and (InferenceClient or HttpClient).post(request.url, request.headers, again, on_result, options) == true then
-					return
-				end
-			end
-			fail(failure_detail(result), failure_receipt(result))
-			return
-		end
-		local classified = Classifier.classify(request.format, result.body)
-		deliver(classified.text ~= "" and classified.text or nil, priced(classified.usage, request.model))
+	local function owned()
+		return epoch == scope.epoch and (not authorized or authorized())
 	end
-	local dispatched = (InferenceClient or HttpClient).post(request.url, request.headers, request.body, on_result, options)
-	if dispatched ~= true then
-		done("", "HTTP transport unavailable")
-		return false
-	end
-	return true
+	-- The first request after start or a key change waits for the access token
+	local waited = with_access(entry, owned, function() return send_chat(scope, epoch, done, authorized, fail, refuse,
+		deliver, entry, messages, opts) end, refuse)
+	if waited ~= nil then return waited end
+	return scope.active ~= nil and scope.active.epoch == epoch
 end
+
 
 --- Asks Jev one set of typed questions for the agent's System 1: a decisions
 --- provider receives decisions_body(); a Backboard entry sends a message with
@@ -1270,21 +1332,13 @@ local function listing_endpoint(entry)
 	return url, endpoint.headers, endpoint.format
 end
 
---- Lists the models an entry's provider serves, for the model selector page,
---- through the HTTP adapter with the request timeout. Never logs the address
---- (a gemini key rides in it) nor the key.
---- @param entry table Provider, base URL, token and model.
---- @param on_done function Receives the api_model_listing state:
----   { state = "listed", ids } or { state = "failed", reason }.
+--- Sends the model listing of list_models() once the entry's key can be sent.
+--- @param entry table
+--- @param finish function finish(state)
 --- @return boolean dispatched
-function M.list_models(entry, on_done)
-	if type(on_done) ~= "function" then error("api_remote.list_models requires on_done", 2) end
+local function list_models_now(entry, finish)
 	local url, headers, format = listing_endpoint(entry)
 	local provider_id = type(entry) == "table" and tostring(entry.provider) or "?"
-	local function finish(state)
-		local ok, err = pcall(on_done, state)
-		if not ok then Logger.error(LOG, "Remote model listing callback raised — %s", ErrorDescription.describe(err)) end
-	end
 	if not url then
 		finish({ state = "failed", reason = "unsupported" })
 		return false
@@ -1313,6 +1367,29 @@ function M.list_models(entry, on_done)
 		finish({ state = "failed", reason = "unavailable" })
 		return false
 	end
+	return true
+end
+
+--- Lists the models an entry's provider serves, for the model selector page,
+--- through the HTTP adapter with the request timeout. Never logs the address
+--- (a gemini key rides in it) nor the key.
+--- @param entry table Provider, base URL, token and model.
+--- @param on_done function Receives the api_model_listing state:
+---   { state = "listed", ids } or { state = "failed", reason }.
+--- @return boolean dispatched
+function M.list_models(entry, on_done)
+	if type(on_done) ~= "function" then error("api_remote.list_models requires on_done", 2) end
+	local function finish(state)
+		local ok, err = pcall(on_done, state)
+		if not ok then Logger.error(LOG, "Remote model listing callback raised — %s", ErrorDescription.describe(err)) end
+	end
+	-- An access-token provider lists once its token is fetched
+	local waited = with_access(entry, function() return true end, function() return list_models_now(entry, finish) end,
+		function()
+			finish({ state = "failed", reason = "refused" })
+			return false
+		end)
+	if waited ~= nil then return waited end
 	return true
 end
 
