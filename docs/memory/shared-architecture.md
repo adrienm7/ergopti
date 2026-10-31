@@ -10,6 +10,14 @@
 adapters and runtime orchestration while consuming shared schemas, constants,
 and generated data. Bypassing the shared source creates silent drift.
 
+### project-registry-flows-and-healthcheck-bridges-stay-per-driver
+
+The layout registry store, the shortcuts catalogue, the healthcheck report runner
+and the agent learning store are shared (PAR-72), but the layout install and
+select flows and the healthcheck bridge stay in each driver: each converts the
+layout for its own OS and reaches its own native collectors. Do not move them
+into `_shared`; share only their rules and vectors.
+
 ### project-a-second-vocabulary-fails-silently
 
 Use the same field names at every boundary. Translating a concept into a second
