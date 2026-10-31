@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local FusedMetadataCommand = require("tests.support.fused_metadata_command")
 
 --- Captures explicit native ports before wrapping the fresh transaction host.
 --- @param callback function Receives the transaction adapter factory.
@@ -83,7 +84,7 @@ local function with_fixture(callback, native_overrides)
 				package.loaded["adapters.file_system"] = nil
 				package.loaded["infra.fs_dir"] = nil
 				local adapter = helpers.load_with_stubs("adapters.file_system", {
-					execute = function(command)
+					execute = FusedMetadataCommand.answering(function(command)
 						local arguments = quoted_arguments(command)
 						if command:find("/bin/cp -p ", 1, true) then
 							local source_path = arguments[1]
@@ -116,7 +117,7 @@ local function with_fixture(callback, native_overrides)
 							return "fixture header\n" .. tostring(record and record.acl or ""), true, "exit", 0
 						end
 						return "", true, "exit", 0
-					end,
+					end),
 					fs = {
 						dir = function(parent)
 							local listed_parent = parent

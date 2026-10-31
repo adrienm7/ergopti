@@ -232,9 +232,12 @@ helpers.describe("adapters.file_system: write() is atomic (F-MED-16)", function(
 				end
 				return renamed, rename_err, rename_code
 			end
+			local Commands = require("adapters.metadata_command_stats")
+			local commands_before = Commands.snapshot()
 			local call_ok, write_ok = xpcall(function()
 				return adapter.write(path, "private new bytes")
 			end, debug.traceback)
+			local commands_after = Commands.snapshot()
 			os.rename = original_rename
 			if not call_ok then
 				os.remove(path)
@@ -244,6 +247,11 @@ helpers.describe("adapters.file_system: write() is atomic (F-MED-16)", function(
 			helpers.assert_true(write_ok, "the metadata-preserving atomic replacement must publish")
 			helpers.assert_eq(metadata.copy_calls, 1,
 				"an existing destination must seed exactly one private staging inode")
+			-- (prefs-save-metadata-forks) the source listings and the copy share one
+			-- fork, the staged inode's check is the other: four forks held a Mac
+			-- preferences save 600 to 800 ms (ledger L17).
+			helpers.assert_eq(commands_after - commands_before, 2,
+				"an existing destination must cost two forked metadata commands, not four")
 			helpers.assert_eq(metadata.records[path].ino, 12,
 				"the control must exercise inode replacement rather than an in-place write")
 			helpers.assert_eq(metadata.records[path].permissions, "rw-------")
@@ -342,6 +350,41 @@ helpers.describe("adapters.file_system: write() is atomic (F-MED-16)", function(
 			end
 
 			helpers.assert_eq(write_ok, false, "a user attribute that changed must still fail closed")
+			local live = assert(io.open(path, "r"))
+			helpers.assert_eq(live:read("*a"), "authoritative bytes")
+			live:close()
+			os.remove(path)
+		end)
+	end)
+
+	helpers.it("write() refuses publication when the source ACL changes during the fused copy", function()
+		with_fixture(function(fixture)
+			local path = os.tmpname():gsub("\\", "/")
+			local original = assert(io.open(path, "w"))
+			assert(original:write("authoritative bytes")); assert(original:close())
+			local metadata = {
+				records = {
+					[path] = {
+						permissions = "rw-------", uid = 501, gid = 20, dev = 7, ino = 51,
+						acl = " 0: group:privacy allow read\n", xattrs = {},
+					},
+				},
+				default = { permissions = "rw-r--r--", uid = 501, gid = 20, acl = "", xattrs = {} },
+			}
+			-- Another process widens the source's ACL while cp -p runs: the
+			-- listing after the copy, in the same fork, must see it.
+			metadata.after_copy = function()
+				metadata.records[path].acl = " 0: everyone allow write\n"
+			end
+			local adapter = fixture.make_adapter(nil, nil, nil, nil, nil, nil, nil, metadata)
+			local call_ok, write_ok = xpcall(function()
+				return adapter.write(path, "must not publish")
+			end, debug.traceback)
+			if not call_ok then
+				os.remove(path)
+				error(write_ok, 0)
+			end
+			helpers.assert_eq(write_ok, false, "an ACL changed during the copy must fail closed")
 			local live = assert(io.open(path, "r"))
 			helpers.assert_eq(live:read("*a"), "authoritative bytes")
 			live:close()
