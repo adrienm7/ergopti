@@ -299,7 +299,7 @@ into its item below or into the matching existing item.
       not run in the cloud container: `model_capabilities.ahk`, the `think` spec of `vision.ahk` and
       `LLM_OllamaThink` are covered by the shared corpus but unexecuted); the listing cache lives in memory,
       so a restart fetches it again on its first request.
-- [ ] **Every known cloud AI provider in `api_providers.json`, on the three OS (worker `feat/llm-providers`).**
+- [ ] **Every known cloud AI provider in `api_providers.json`, on the three OS (workers `feat/llm-providers`, `-3`).**
       [CODE] Done (official documentation read 2026-10-30, each descriptor's `_source`): Perplexity, Moonshot,
       DashScope, Z.ai, MiniMax, SiliconFlow, DeepInfra, SambaNova, Hugging Face, NVIDIA NIM, Nebius, Novita,
       Hyperbolic, Scaleway, OVHcloud, Upstage, AI21, Venice, Vercel AI Gateway, Poe, Featherless, Inception,
@@ -315,18 +315,26 @@ into its item below or into the matching existing item.
       Inferred, not read: Chutes and Featherless honour `chat_template_kwargs.enable_thinking` on Qwen; SambaNova
       `enable_thinking: false` (only `true` is shown); whether Qianfan `ernie-5.1` is hybrid. Watch: Perplexity
       ended Sonar chat-completions support on 2026-09-27 (requests still answer, converted to its Agent API);
-      `dashscope-intl` is a legacy shared domain; Moonshot K2 retires by December. Left:
-  - Per-account address (design): an `openai_compat` entry with the account URL and a Bearer key already reaches
-    Azure OpenAI / Foundry v1 (`https://<resource>.openai.azure.com/openai/v1`, the key accepted as Bearer, the
-    model is the deployment name), Amazon Bedrock with a long-term API key (the bedrock-runtime address
-    `/openai/v1` has no `/models`; `bedrock-mantle.<region>.api.aws/v1` lists), Cloudflare Workers AI
-    (`api.cloudflare.com/client/v4/accounts/<id>/ai/v1`, its listing is Cloudflare-shaped at `/ai/models/search`;
-    AI Gateway `/compat` is deprecated in favour of that address), Databricks (`https://<workspace>/serving-endpoints`,
-    PAT) and Snowflake Cortex (`https://<account>.snowflakecomputing.com/api/v2/cortex/v1`, PAT, 15-day default
-    expiry). Shipping them as catalogue rows needs a `base_url` template whose placeholders (resource, region,
-    account, workspace) the add-entry form asks for on the three OS, and no catalogue default model (the
-    validators require one today). Google Vertex AI (OAuth access token, 1 h) and IBM watsonx (API key exchanged
-    for an IAM token; the OpenAI-shaped model gateway is a preview) need a token-refresh auth model first.
+      `dashscope-intl` is a legacy shared domain; Moonshot K2 retires by December.
+      Per-account providers (worker `feat/llm-providers-3`): Azure OpenAI / Foundry, Amazon Bedrock, Cloudflare
+      Workers AI, Databricks, Snowflake Cortex are rows whose `base_url` is a template
+      (`_shared/lua/llm/api_url_template.lua`, AHK port, shared corpus): the add-entry form of the three OS asks one
+      value per placeholder (`menu.llm.api_prompt_field.<name>`), stores the filled address and needs a model, since
+      these rows have no default model; an unfilled template is never sent. IBM watsonx.ai (model gateway, IAM token
+      from the API key) and Google Vertex AI (the `authorized_user` credentials file, its refresh token exchanged)
+      declare an `auth` block (`_shared/lua/llm/api_token_exchange.lua`): macOS and Linux exchange the key, cache and
+      refresh the token, pause a minute after a refusal, and the key test waits for it. Left:
+  - [PHYS-W] Run the AHK suite on Windows: `test_llm_api_url_template.ahk`, `test_llm_api_add_account_address.ahk`
+    (the form with a template provider, the access-token refusal) and the rest of `run_all.ahk` were written
+    without an AutoHotkey run.
+  - Windows token exchange: the Windows driver refuses watsonx and Vertex AI with
+    `menu.llm.api_provider_token_exchange_unavailable`; it needs the async form POST and the token cache the Lua
+    drivers have (port of `api_token_exchange.lua`).
+  - The first prediction after start (or after a key change) on an access-token provider is refused while the token
+    is fetched (the boot pre-warm on macOS fetches it early); a Vertex service-account key (signed JWT) is not
+    taken; the IBM gateway lists only the models an administrator configured.
+  - Cloudflare AI Gateway was not added: its `/compat` address is deprecated for Workers AI's own, and a gateway
+    used with the user's provider key needs a second header (`cf-aig-authorization`) the entries cannot hold.
   - The listing reader takes `data` (and `models` for Gemini) only: DashScope's native listing
     (`output.models[].model`) and Writer's `models[]` would need a per-provider listing shape on the three OS.
   - With about forty providers, the Linux zenity prompt of the screen actions lists every one on a line.
