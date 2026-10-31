@@ -288,6 +288,16 @@ startup_phase_timeout_ms = 30000
 # HS: gestures/actions_aux_owner.lua SHELL_DEADLINE_SEC.
 aux_shell_timeout_ms = 10000
 
+# Longest a hidden run_command child may run before it is stopped and its
+# failure notified (a terminal window is the user's own and is not bounded).
+# HS: gestures/user_actions.lua. LX: modules/gestures/user_actions.lua.
+run_command_timeout_ms = 30000
+
+# Longest one `shortcuts run` of a run_apple_shortcut binding may take before it
+# is stopped (each `shortcuts list` revalidation keeps the owner's own bound).
+# HS: gestures/apple_shortcut_action.lua.
+apple_shortcut_run_timeout_ms = 60000
+
 # Delay between exact termination retries after an auxiliary child times out.
 # HS: gestures/actions_aux_owner.lua SHELL_CLEANUP_RETRY_SEC.
 aux_shell_cleanup_retry_ms = 500
@@ -1145,6 +1155,14 @@ proxy_packet_bytes = 65536
 # one run's result), also the limit the request passes to the launcher.
 # HS: adapters/apple_shortcuts.lua.
 shortcuts_reply_bytes = 65536
+
+# Largest text output a run_command or run_apple_shortcut binding captures
+# (stdout plus stderr, or the shortcut's output file) before the child is
+# stopped and the run refused as too large, so a runaway command can neither
+# exhaust memory nor type for minutes.
+# HS: gestures/user_actions.lua, gestures/apple_shortcut_action.lua.
+# LX: modules/gestures/user_actions.lua.
+user_action_output_bytes = 65536
 
 # Encoded log lines the macOS log transport prepares in one tick, also the
 # longest single line it enqueues. Read before infra.timings exists, through the

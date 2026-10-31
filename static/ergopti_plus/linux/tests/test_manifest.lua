@@ -746,6 +746,7 @@ return {
 	"tests.unit.modules.gestures.actions.test_workspace_switcher",
 	"tests.unit.modules.gestures.actions.test_file_selection_vectors",
 	"tests.unit.modules.gestures.actions.test_open_app_action",
+	"tests.unit.modules.gestures.actions.test_user_actions",
 	"tests.unit.modules.gestures.actions.test_system_actions",
 	"tests.unit.modules.gestures.engine.test_gesture_dispatch",
 	"tests.unit.modules.gestures.programs.test_program_lifecycle",

@@ -134,6 +134,12 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 			gestures.get_action_parameter_prompt(action))
 		if not chosen then Logger.info(LOG, "No application chosen for '%s': %s.", tostring(binding), tostring(why)) end
 		value = chosen
+	elseif require("ui.user_action_editor").KINDS[spec] then
+		-- A command is typed then its options chosen; a path is picked.
+		local label = type(gestures.get_action_label) == "function"
+			and gestures.get_action_label(action) or action
+		value = require("ui.user_action_editor").ask(spec, _fill(i18n_safe("dialog.gestures.param_title"), "{1}", label),
+			gestures.get_action_parameter_prompt(action), prior)
 	else
 		local label = type(gestures.get_action_label) == "function"
 			and gestures.get_action_label(action) or action

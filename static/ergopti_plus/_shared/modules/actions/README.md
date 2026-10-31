@@ -43,7 +43,7 @@ the set of actions it can actually run, in both directions (tests tagged
 handler hidden by its declaration, fails the build.
 
 A parameter kind (`url`, `search_url`, `wrap_pair`, `text`, `key`,
-`shortcut`, `app`) is validated, prompted
+`shortcut`, `app`, `command`, `path`, `apple_shortcut`) is validated, prompted
 for and explained by each driver's gesture module: macOS
 `modules/gestures/actions.lua` (`validate_action_parameter`,
 `parameter_prompt`, `parameter_error`), Linux `modules/gestures/manager.lua`
@@ -64,3 +64,60 @@ pick, which the driver still validates before it stores it. Each host sends
 the page `send_keys.json` and the prompts and refusals above; the other kinds
 keep the driver's own prompt. `tools/test/test-action-picker-parameter-editor.cjs`
 replays the corpus against the page.
+
+## User commands, paths and Apple shortcuts
+
+`run_command`, `open_path` and `run_apple_shortcut` carry the `command`,
+`path` and `apple_shortcut` kinds, decoded by
+`_shared/lua/user_action_parameter.lua` and pinned by
+`_shared/tests/corpus/action_parameters/user_action_vectors.json`. They run in
+`modules/gestures/user_actions.lua` on macOS and Linux and in
+`modules/gestures/apple_shortcut_action.lua` on macOS. Windows is pending
+(`docs/tooling/windows-pc-agent-handoff.md`), so the three declare
+`hs,linux` and `hs`.
+
+- `run_command` runs `/bin/sh -l -c <command>`: a login shell's environment
+  (`/etc/profile` and `~/.profile`; on macOS `/etc/profile` runs
+  `path_helper`). A `PATH` set only in `~/.zprofile`, `~/.zshrc` or
+  `~/.bashrc` is not read: export it in `~/.profile` or use absolute paths.
+  Hidden, it is stopped after `[gestures] run_command_timeout_ms` or once
+  its output passes `[limits] user_action_output_bytes`; a non-zero exit is
+  logged with its code and notified with the first stderr line; its stdout
+  (without the trailing line break) can be typed, up to the `send_text`
+  limit of `send_keys.json`, or copied. In a terminal window (macOS
+  Terminal, Linux `$TERMINAL` when it names a known terminal, else
+  `x-terminal-emulator` and the other terminals of `TERMINALS`) it is the
+  user's own window and is not bounded.
+- `open_path` opens with `open` (macOS) or `xdg-open`, else `gio open`
+  (Linux), and refuses a path that no longer exists with a notice naming it.
+- `run_apple_shortcut` stores a shortcut's identifier and name. Each run
+  lists the library (`shortcuts list --show-identifiers`) and refuses a
+  shortcut that was deleted or renamed by name, then
+  `adapters/apple_shortcuts.lua` revalidates the identifier once more and
+  invokes `shortcuts run <identifier>`, bounded by
+  `[gestures] apple_shortcut_run_timeout_ms`. The selection reaches it as a
+  plain-text file (`--input-path`), its text output is read back from
+  `--output-path`.
+
+### Security notes
+
+- A `run_command` binding runs anything its text says, with the user's
+  rights, as soon as its gesture, key or menu fires: it is exactly as
+  trusted as `config.toml`. Ergopti never writes one on its own; a config
+  file from someone else must be read before it is used.
+- The command text is user configuration and may hold secrets: it never
+  reaches the log, the native task log (macOS `run_private`, payload-free) or
+  an AppleScript source (Terminal receives it as an `osascript` argument of a
+  fixed run handler). Log lines name the action and its exit code only; the
+  first stderr line is shown in the user's own notification, never logged.
+  The diagnostics redaction (`_shared/modules/diagnostics/redaction.json`)
+  therefore never needs to see it. Like any process argument, the command is
+  visible to the user's other processes (`ps`) while it runs.
+- Paths and shortcut names are not logged either: the notices that name
+  them are the user's own.
+- The selection a shortcut receives and the text it returns cross the disk
+  only as `os.tmpname` files (mode 0600) that are removed after the run.
+- Cancelling a shortcut (its deadline, or pausing the action parent) stops
+  the `shortcuts` tool. Shortcuts runs a shortcut in its own service, which
+  may still finish the actions already handed to it: the tool's exit is the
+  only receipt the command line gives.

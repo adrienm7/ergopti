@@ -224,6 +224,11 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    - `field_fifo_safety`: in a folder of its own under `TMPDIR`, a FIFO (a reader attached first, so a
      regressed guard cannot freeze the app) is named `named_pipe` by `followed_mode`, `exists` sees it, and
      both `append` and the atomic `write` refuse it and leave it in place; the folder is removed.
+   - `field_apple_shortcuts` (before `field_owned_pause`): the run_apple_shortcut action lists the
+     Shortcuts library through its own owner and `shortcuts list --show-identifiers` (`shortcuts_listed`,
+     the count), then runs the shortcut named `Ergopti Field Test` end to end (`field_test_run`, the
+     owner's closed category). Without that shortcut `field_test_shortcut` is skipped as `absent`: create it
+     once in Shortcuts as a shortcut that does nothing.
    - `field_local_servers` (after `field_ai_local`, read-only): every server of
      `_shared/modules/llm/local_servers.json` must have a discovery descriptor the driver accepts
      (`servers_catalogue`, else `undescribed_<n>`); one detection sweep, the AI menu's own (process,

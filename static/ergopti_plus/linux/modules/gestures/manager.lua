@@ -49,6 +49,8 @@ local Manifest = require("infra.manifest_reader")
 local ParameterLabel = require("action_parameter_label")
 local ProgramParameter = require("program_parameter")
 local ProgramOwner = require("modules.gestures.program_owner")
+local UserActions = require("modules.gestures.user_actions")
+local UserActionParameter = require("user_action_parameter")
 local WindowSwitch = require("adapters.window_switch")
 local PromptAction = require("llm.prompt_action")
 local Vision = require("llm.vision")
@@ -545,6 +547,26 @@ local SETTINGS_APPLICATIONS = {
 --- the binding that fired it, which parameterized actions read their value by.
 local BUILTIN_HANDLERS = {
 	["run_program"] = function(binding) return M.run_program(binding) end,
+	-- The user's own command line and file or folder: each value is decoded by
+	-- _shared/lua/user_action_parameter and never logged.
+	["run_command"] = function(binding)
+		local fields = UserActionParameter.parse("command", M.get_action_parameter(binding, "run_command"))
+		if not fields then
+			Logger.warn(LOG, "run_command ignored for binding '%s': no valid command is stored.", tostring(binding))
+			return false
+		end
+		-- The shortcuts manager owns the send-input vocabulary (read here, not
+		-- through send_vocabulary(), which is declared below this table)
+		return UserActions.run_command(fields, require("modules.shortcuts.manager").send_vocabulary().text_max_code_points)
+	end,
+	["open_path"] = function(binding)
+		local fields = UserActionParameter.parse("path", M.get_action_parameter(binding, "open_path"))
+		if not fields then
+			Logger.warn(LOG, "open_path ignored for binding '%s': no valid path is stored.", tostring(binding))
+			return false
+		end
+		return UserActions.open_path(fields)
+	end,
 	["alt_tab_monitor"] = function(binding) return M.run_window_switch(binding) end,
 	["open_system_settings"] = function()
 		local Shell = require("adapters.shell_runner")
@@ -1278,6 +1300,8 @@ function M.validate_action_parameter(action_name, value)
 	-- Syntax only: whether the desktop entry exists is gtk-launch's to say.
 	if spec == "app" then return AppParameter.is_valid(value) end
 	if spec == "program" then return ProgramParameter.parse(value, "posix") ~= nil end
+	-- Syntax only: whether the path still exists is checked when it opens.
+	if UserActionParameter.KINDS[spec] then return UserActionParameter.parse(spec, value) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
@@ -1298,6 +1322,7 @@ function M.get_action_parameter_prompt(action_name)
 	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
 	if spec == "app" then return i18n.get("dialog.gestures.param_app") end
 	if spec == "program" then return i18n.get("dialog.gestures.param_program") end
+	if UserActionParameter.KINDS[spec] then return i18n.get(UserActionParameter.PROMPT_KEYS[spec]) end
 	if spec == "wrap_pair" then
 		local Shortcuts = shortcuts_manager()
 		local WrapPair = require("wrap_pair")
@@ -1346,6 +1371,11 @@ function M.get_action_parameter_error(action_name)
 	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
 	if spec == "app" then return i18n.get("dialog.gestures.param_err_app") end
 	if spec == "program" then return i18n.get("dialog.gestures.param_err_program") end
+	if spec == "command" then
+		return fill_placeholder(i18n.get(UserActionParameter.ERROR_KEYS.command),
+			tostring(UserActionParameter.MAX_COMMAND_BYTES))
+	end
+	if UserActionParameter.KINDS[spec] then return i18n.get(UserActionParameter.ERROR_KEYS[spec]) end
 	if SEND_INPUT_KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(send_vocabulary().text_max_code_points))
@@ -1452,13 +1482,16 @@ function M.run_program(binding)
 end
 
 function M.set_program_paused(paused)
-	if _program_owner == nil then return type(paused) == "boolean" end
-	return _program_owner.set_paused(paused)
+	-- The hidden run_command children follow the same pause as user programs
+	local commands_settled = UserActions.set_paused(paused)
+	if _program_owner == nil then return type(paused) == "boolean" and commands_settled end
+	return _program_owner.set_paused(paused) and commands_settled
 end
 
 function M.stop_programs()
-	if _program_owner == nil then return true end
-	return _program_owner.stop()
+	local commands_settled = UserActions.stop()
+	if _program_owner == nil then return commands_settled end
+	return _program_owner.stop() and commands_settled
 end
 
 function M.when_programs_settled(callback)
@@ -1689,7 +1722,7 @@ function M.get_action_display_label(slot)
 	local label = M.get_action_label(action)
 	local value = M.get_action_parameter(slot, action)
 	if M.get_action_parameter_spec(action) == "program" then return label end
-	return ParameterLabel.format(label, value)
+	return ParameterLabel.for_spec(label, M.get_action_parameter_spec(action), value)
 end
 
 --- Returns all gesture actions.
