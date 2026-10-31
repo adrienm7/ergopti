@@ -118,18 +118,25 @@ helpers.describe("keystats SQL literals survive the sqlite3_exec C string (sql-l
 		local Literal = require("sqlite.literal")
 		local escaped = "'" .. Literal.escape(SENTINEL) .. "'"
 		helpers.assert_eq(evaluate_literal(escaped), SENTINEL)
-		-- Each quoting helper's own declaration selects its file (aggregator,
-		-- outbox, reader, writer) without naming a path a move would break.
-		for _, symbol in ipairs({
-			"local function sq(s)",
-			"local function _sq(s)",
-			"local function _q(s)",
-			"local function _sql_str(s)",
-		}) do
-			local source = helpers.read_driver_source(symbol)
-			helpers.assert_true(source ~= nil and source ~= "", symbol .. " must be readable")
-			helpers.assert_true(source:find('gsub("\'", "\'\'")', 1, true) == nil,
-				symbol .. " still quotes SQL by doubling apostrophes only")
+		-- The whole keystats tree, not a list of helper names: a named list went
+		-- stale when a helper was renamed, and never covered the foreign-device
+		-- watermark queries of export.lua that still doubled apostrophes only.
+		local root = helpers.driver_root()
+		local pipe = assert(io.popen("cd '" .. root .. "' && find modules/keystats -name '*.lua' -type f"))
+		local offenders, scanned = {}, 0
+		for relative in pipe:lines() do
+			local file = assert(io.open(root .. relative, "rb"))
+			local source = file:read("*a")
+			file:close()
+			scanned = scanned + 1
+			for line in source:gmatch("[^\n]+") do
+				if not line:match("^%s*%-%-") and line:find('gsub("\'", "\'\'")', 1, true) then
+					offenders[#offenders + 1] = relative .. ": " .. line:gsub("^%s+", "")
+				end
+			end
 		end
+		pipe:close()
+		helpers.assert_true(scanned >= 20, "the scan must reach the keystats tree, saw " .. scanned)
+		helpers.assert_eq(#offenders, 0, "quote SQL text through sqlite.literal:\n" .. table.concat(offenders, "\n"))
 	end)
 end)
