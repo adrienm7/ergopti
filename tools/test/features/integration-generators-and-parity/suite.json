@@ -76,7 +76,7 @@
 		},
 		{
 			"id": "js-config-template-shared",
-			"ordinal": 548,
+			"ordinal": 550,
 			"name": "the one shared config template projects to every driver's template byte for byte and decodes to the same defaults in smol-toml and the Lua codec",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-config-template-shared.cjs"],
