@@ -114,7 +114,9 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //           16 → 15 (2026-10-31: the LLM menu persistence and regression tests
 //                    ask preferences.flat_key_for instead of searching its
 //                    text.)
-const BASELINE = 15;
+//           15 → 13 (2026-10-31: the two watcher tests feed a synthetic source
+//                    path; they named keymap/init.lua only as a sample event.)
+const BASELINE = 13;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -168,7 +170,9 @@ const BASELINE = 15;
 //              case in test_health_probe_generation.)
 //       59 → 57 (2026-10-31: the LLM menu persistence and regression tests ask
 //              preferences.flat_key_for instead of searching its text.)
-const READ_BASELINE = 57;
+//       57 → 55 (2026-10-31: the two watcher tests feed a synthetic source
+//              path; they named keymap/init.lua only as a sample event.)
+const READ_BASELINE = 55;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).

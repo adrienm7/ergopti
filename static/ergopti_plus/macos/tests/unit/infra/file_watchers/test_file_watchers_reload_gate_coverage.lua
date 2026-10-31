@@ -159,7 +159,9 @@ helpers.describe("reload gate: the TOML snapshot cache does not trigger a reload
 	helpers.it("still reloads on a real .lua source change", function()
 		with_watchers({}, function(w)
 
-			w.fire(DRIVER_DIR .. "modules/keymap/init.lua")
+			-- A synthetic source path: the watcher judges the extension and location,
+			-- never whether the named module exists.
+			w.fire(DRIVER_DIR .. "modules/edited_feature/core.lua")
 			w.settle()
 
 			helpers.assert_eq(w.reloads(), 1,
