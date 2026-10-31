@@ -724,7 +724,6 @@
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "网页视图引擎",
 	"webview.runtime_too_old": "WebView2 运行时过旧（{2}）：Ergopti+ 需要 {1} 或更高版本。在更新之前，窗口以简易形式打开。",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "型号",
 	"healthcheck.field.cpu": "处理器",
 	"healthcheck.field.cpu_cores": "逻辑核心",

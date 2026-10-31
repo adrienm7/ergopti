@@ -357,10 +357,6 @@
 			"reason": "file-name-or-token",
 			"locales": "*"
 		},
-		"healthcheck.field.kanata": {
-			"reason": "brand-or-feature-name",
-			"locales": "*"
-		},
 		"healthcheck.field.karabiner": {
 			"reason": "brand-or-feature-name",
 			"locales": "*"

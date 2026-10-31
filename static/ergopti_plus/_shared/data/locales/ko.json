@@ -724,7 +724,6 @@
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "웹 보기 엔진",
 	"webview.runtime_too_old": "WebView2 런타임이 너무 오래되었습니다({2}). Ergopti+에는 {1} 이상이 필요합니다. 업데이트할 때까지 창이 간단한 형태로 열립니다.",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "모델",
 	"healthcheck.field.cpu": "프로세서",
 	"healthcheck.field.cpu_cores": "논리 코어",

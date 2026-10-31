@@ -724,7 +724,6 @@
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Webové zobrazovací jádro",
 	"webview.runtime_too_old": "Modul WebView2 Runtime je příliš starý ({2}): Ergopti+ vyžaduje verzi {1} nebo novější. Jeho okna se otevírají v jednoduché podobě, dokud modul neaktualizujete.",
-	"healthcheck.field.kanata": "kanata",
 	"healthcheck.field.model": "Model",
 	"healthcheck.field.cpu": "Procesor",
 	"healthcheck.field.cpu_cores": "Logická jádra",
