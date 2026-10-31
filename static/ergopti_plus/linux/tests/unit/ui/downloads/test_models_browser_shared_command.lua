@@ -59,10 +59,9 @@ local function with_browser(callback)
 		end
 		root.top_level = selected
 		local facade = {}; for key, value in pairs(native) do facade[key] = value end
-		facade.build = function(_, _, dynamic_handlers)
-			local rows = {}
-			dynamic_handlers.llm_model(rows)
-			return rows
+		facade.build = function(_, _, _, _, _, providers)
+			-- The model row is list DATA: the shared renderer materialises it.
+			return native.render_rows(providers.llm_model(), "llm_model")
 		end
 		package.loaded["infra.manifest_menu"] = facade
 		package.loaded["ui.menu.menu_builder"] = nil

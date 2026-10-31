@@ -819,6 +819,35 @@ helpers.describe("Agent model locale cohort isolation (agent-system-model)", fun
 end)
 
 
+--- Records the row DATA the agent menu's declared `list` providers hand the
+--- shared renderer, by id, without changing what they return.
+--- @param ids table Set of provider ids to observe.
+--- @param observed table Receives id -> array of the row arrays returned.
+--- @return function restore
+local function spy_agent_lists(ids, observed)
+	local renderer = require("infra.manifest_menu")
+	local build = renderer.build
+	renderer.build = function(key, category, handlers, groups, ctx, providers)
+		if key == "agent_menu" and type(providers) == "table" then
+			local wrapped = {}
+			for id, provider in pairs(providers) do
+				wrapped[id] = provider
+				if ids[id] then
+					wrapped[id] = function(...)
+						local rows = provider(...)
+						observed[id] = observed[id] or {}
+						observed[id][#observed[id] + 1] = rows
+						return rows
+					end
+				end
+			end
+			providers = wrapped
+		end
+		return build(key, category, handlers, groups, ctx, providers)
+	end
+	return function() renderer.build = build end
+end
+
 --- Loads captions frozen from prior physical locale bytes, never from new menu output.
 local function disabled_apps_frame_corpus()
 	local path = require("infra.paths").shared("tests/corpus/menus/agent_linux_disabled_apps.json")
@@ -998,25 +1027,25 @@ helpers.describe("Linux Agent complete excluded-applications frame (agent-disabl
 
 	helpers.it("publishes the actual completed parent and native child identities (agent-disabled-apps-frame)", function()
 		with_system_model_locale("en", function()
-			local renderer = require("infra.manifest_menu")
-			local render = renderer.render_rows
-			local captured, count = nil, 0
-			renderer.render_rows = function(rows, id, ...)
-				local native = render(rows, id, ...)
-				if id == "agent_disabled_apps" then captured, count = native[1], count + 1 end
-				return native
-			end
+			local observed = {}
+			local restore = spy_agent_lists({ agent_disabled_apps = true }, observed)
 			local ok, err = pcall(function()
 				with_disabled_apps_frame({ "editor" }, "terminal", {}, function(_, parent)
-					helpers.assert_eq(count, 1, "one genuine completed frame is published")
-					helpers.assert_eq(rawequal(parent, captured), true, "the actual final producer retains its rendered parent")
-					helpers.assert_eq(rawequal(parent.menu, captured.menu), true)
-					helpers.assert_eq(parent.menu[1].fn, captured.menu[1].fn)
-					helpers.assert_eq(parent.menu[3].fn, captured.menu[3].fn)
-					helpers.assert_eq(parent.menu[4].fn, captured.menu[4].fn)
+					local lists = observed.agent_disabled_apps or {}
+					helpers.assert_eq(#lists, 1, "one genuine completed frame is published")
+					helpers.assert_eq(#lists[1], 1, "the frame is one parent row")
+					-- The list provider hands over DATA; the shared renderer draws it.
+					local captured = lists[1][1]
+					helpers.assert_eq(parent.title, captured.label, "the renderer draws the provider's parent row")
+					helpers.assert_type(captured.items, "table")
+					for _, index in ipairs({ 1, 3, 4 }) do
+						helpers.assert_type(captured.items[index].action, "function")
+						helpers.assert_true(rawequal(parent.menu[index].fn, captured.items[index].action),
+							"the original DATA callback is retained by identity")
+					end
 				end)
 			end)
-			renderer.render_rows = render
+			restore()
 			if not ok then error(err, 0) end
 		end)
 	end)
@@ -1153,18 +1182,8 @@ helpers.describe("Linux Agent complete System1/System2 frames (agent-linux-syste
 			local children = root[sections.children]
 			local backend = root[sections.backend][1]
 			local checked = backend.checked_when
-			local render, observed = menu.render_rows, {}
-			menu.render_rows = function(rows, id, ...)
-				local record
-				if id == "agent_system1" or id == "agent_system2" then
-					record = { parent = rows[1], data = rows[1].items }
-					observed[id] = observed[id] or {}
-					observed[id][#observed[id] + 1] = record
-				end
-				local native = render(rows, id, ...)
-				if record then record.native = native[1] end
-				return native
-			end
+			local lists = {}
+			local restore = spy_agent_lists({ agent_system1 = true, agent_system2 = true }, lists)
 			local ok, err = pcall(function()
 				parents[1].i18n, parents[2].i18n = "menu.agent.model", "menu.agent.model"
 				root[sections.children] = { children[3], children[2], children[1] }
@@ -1174,9 +1193,10 @@ helpers.describe("Linux Agent complete System1/System2 frames (agent-linux-syste
 						local parent = agent.menu[index]
 						helpers.assert_eq(parent.title, "Model… (Cerebras)")
 						local id = index == 3 and "agent_system1" or "agent_system2"
-						helpers.assert_eq(#observed[id], 1, "the actual parent crosses its native boundary once")
-						local record = observed[id][1]
-						helpers.assert_true(rawequal(parent, record.native))
+						helpers.assert_eq(#(lists[id] or {}), 1, "the actual parent crosses its native boundary once")
+						helpers.assert_eq(#lists[id][1], 1, "the frame is one parent row")
+						local record = { parent = lists[id][1][1], data = lists[id][1][1].items }
+						helpers.assert_eq(parent.title, record.parent.label, "the renderer draws the provider's parent row")
 						local data = record.data
 						helpers.assert_type(data, "table")
 						-- The original '-' belongs to actual DATA; only final native rendering prunes it.
@@ -1207,7 +1227,7 @@ helpers.describe("Linux Agent complete System1/System2 frames (agent-linux-syste
 					end
 				end)
 			end)
-			menu.render_rows = render
+			restore()
 			parents[1].i18n, parents[2].i18n = labels[1], labels[2]
 			root[sections.children], backend.checked_when = children, checked
 			if not ok then error(err, 0) end
@@ -1249,25 +1269,21 @@ helpers.describe("Linux Agent complete System1/System2 frames (agent-linux-syste
 
 	helpers.it("hands off the actual completed rendered parent exactly once (agent-linux-system-frame)", function()
 		with_system_model_locale("en", function()
-			local menu = require("infra.manifest_menu")
-			local render, observed = menu.render_rows, {}
-			menu.render_rows = function(rows, id, ...)
-				local native = render(rows, id, ...)
-				if id == "agent_system1" or id == "agent_system2" then
-					observed[id] = observed[id] or {}
-					observed[id][#observed[id] + 1] = native[1]
-				end
-				return native
-			end
+			local observed = {}
+			local restore = spy_agent_lists({ agent_system1 = true, agent_system2 = true }, observed)
 			local ok, err = pcall(function()
 				with_agent_system_frames(agent_system_frames_corpus().spec, {}, function(_, agent)
 					for index, id in ipairs({ "agent_system1", "agent_system2" }) do
-						helpers.assert_eq(#observed[id], 1)
-						helpers.assert_true(rawequal(agent.menu[index + 2], observed[id][1]))
+						helpers.assert_eq(#(observed[id] or {}), 1)
+						helpers.assert_eq(#observed[id][1], 1)
+						-- Drawn by the renderer at the declared place, from that one DATA row.
+						local parent = agent.menu[index + 2]
+						helpers.assert_eq(parent.title, observed[id][1][1].label)
+						helpers.assert_type(parent.menu, "table")
 					end
 				end)
 			end)
-			menu.render_rows = render
+			restore()
 			if not ok then error(err, 0) end
 		end)
 	end)

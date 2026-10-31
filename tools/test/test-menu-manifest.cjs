@@ -1116,8 +1116,8 @@ function checkAutoTemperatureControl() {
 	assert.deepEqual(definition[1].disabled_when, ['llm_auto_raise_ready']);
 	assert.equal(
 		root.llm_menu.find((row) => row.id === 'llm_generation').type,
-		'dynamic',
-		'the Linux inline caller delivers the shared child without a private list policy'
+		'list',
+		'the Linux inline caller delivers the shared child as list row DATA'
 	);
 	for (const [file, first, last] of [
 		[
@@ -1128,7 +1128,7 @@ function checkAutoTemperatureControl() {
 		['macos/ui/menu/menu_llm/temperature_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/ui/menu/menu_builder.lua',
-			'dynamic_handlers["llm_generation"] = function',
+			'providers["llm_generation"] = function',
 			"-- The category switch, the submenu's first row"
 		]
 	]) {
@@ -1359,7 +1359,7 @@ function checkAutomaticTriggerControls() {
 		[
 			'linux/ui/menu/menu_builder.lua',
 			'group_builders["llm_trigger"] = function',
-			'dynamic_handlers["llm_profile"] = function'
+			'providers["llm_profile"] = function'
 		]
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', file));
@@ -1584,7 +1584,7 @@ function checkPrivacyTriggerControls() {
 		[
 			'linux/ui/menu/menu_builder.lua',
 			'group_builders["llm_trigger"] = function',
-			'dynamic_handlers["llm_profile"] = function'
+			'providers["llm_profile"] = function'
 		]
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', file));
@@ -2008,7 +2008,7 @@ function profileFrameOwnerSource(source, platform) {
 						['function', 'M', '.', 'new', '(']
 					]
 				: [
-						['dynamic_handlers', '[', 'llm_profile', ']', '=', 'function'],
+						['providers', '[', 'llm_profile', ']', '=', 'function'],
 						['group_builders', '[', 'llm_display', ']', '=', 'function']
 					];
 	function matches(at, values) {
@@ -4280,12 +4280,11 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			['llm_trigger', 'delay_choices'],
 			['llm_generation', 'choices']
 		]) {
-			const registry = owner === 'llm_trigger' ? 'group_builders' : 'dynamic_handlers';
-			const parameters = owner === 'llm_trigger' ? '' : 'target';
-			const begin = source.indexOf(registry + '["' + owner + '"] = function(' + parameters + ')');
+			const registry = owner === 'llm_trigger' ? 'group_builders' : 'providers';
+			const begin = source.indexOf(registry + '["' + owner + '"] = function()');
 			assert(begin >= 0, 'actual numeric provider ' + owner);
 			const rest = source.slice(begin + 1);
-			const end = rest.indexOf('dynamic_handlers[');
+			const end = rest.indexOf('providers[');
 			const body = source.slice(begin, end < 0 ? source.length : begin + 1 + end);
 			const tokens = scriptTokens(body, '.lua').map((t) => t.value);
 			function has(seq) {
@@ -4580,13 +4579,13 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				? '_LLM_Menu_ProfileRows() {'
 				: platform === 'hs'
 					? 'local function build_profile_menu('
-					: 'dynamic_handlers["llm_profile"] = function';
+					: 'providers["llm_profile"] = function';
 		const unrelatedOwner =
 			platform === 'ahk'
 				? '_LLM_Menu_UnrelatedRows() {'
 				: platform === 'hs'
 					? 'local function unrelated_build_profile_menu('
-					: 'dynamic_handlers["unrelated_profile"] = function';
+					: 'providers["unrelated_profile"] = function';
 		const fakeOwner = source.replace(
 			ownerMarker,
 			(platform === 'ahk' ? '; ' : '-- ') + ownerMarker + '\n' + unrelatedOwner
@@ -4604,7 +4603,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		if (platform === 'linux') {
 			const foreignHandler = source.replace(
 				ownerMarker,
-				'local decoy = {dynamic_handlers={}}; decoy.' + ownerMarker
+				'local decoy = {providers={}}; decoy.' + ownerMarker
 			);
 			assert.notEqual(foreignHandler, source);
 			assert.throws(
@@ -5275,7 +5274,11 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		assert.deepEqual(declared[0].platforms, ['ahk', 'hs', 'linux']);
 	}
 	for (const row of menu.llm_menu.filter((row) => ['llm_model', 'llm_profile'].includes(row.id)))
-		assert.equal(row.type, 'dynamic', 'other dynamic child families keep their existing API');
+		assert.equal(
+			row.type,
+			'list',
+			'the model and profile rows are list rows whose providers supply DATA'
+		);
 	for (const id of ['llm_generation_settings']) {
 		const rows = menu.llm_menu.filter((row) => row.id === id);
 		assert.equal(rows.length, 1, 'the complete fixed parent has one genuine identity');
@@ -5413,7 +5416,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 					',',
 					'LLM',
 					',',
-					'handlers',
+					'nil',
 					',',
 					'group_builders'
 				]),
@@ -5441,7 +5444,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 					',',
 					'LLM',
 					',',
-					'dynamic_handlers',
+					'nil',
 					',',
 					'group_builders'
 				]),
@@ -5466,11 +5469,15 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 					',',
 					'LLM',
 					',',
-					'DynamicHandlers',
+					'Map',
+					'(',
+					')',
 					',',
 					'_LLM_Menu_GroupBuilders',
 					'(',
-					')'
+					')',
+					',',
+					'ListProviders'
 				]),
 				'actual outer Windows canonical renderer'
 			);
@@ -12772,23 +12779,15 @@ console.log(
 			]
 		},
 		{ type: '---' },
-		{ type: 'dynamic', id: 'agent_system1', i18n: 'menu.agent.system1' },
-		{ type: 'dynamic', id: 'agent_system2', i18n: 'menu.agent.system2' },
+		// One declaration per System row for every driver since 2026-10-31: the
+		// `dynamic` copy the Lua drivers drew and the `list` copy Windows drew were
+		// the same row declared twice by type alone.
+		{ type: 'list', id: 'agent_system1', i18n: 'menu.agent.system1' },
+		{ type: 'list', id: 'agent_system2', i18n: 'menu.agent.system2' },
 		{ type: '---' }
 	];
-	const receivedPrefix = originalPrefix.flatMap((row) =>
-		row.type === 'dynamic'
-			? [
-					{ ...row, platforms: ['hs', 'linux'], unavailable: 'hide' },
-					{ ...row, type: 'list', platforms: ['ahk'], unavailable: 'hide' }
-				]
-			: [row]
-	);
-	const windowsPrefix = receivedPrefix.filter(
-		(row) => !row.platforms || row.platforms.includes('ahk')
-	);
 	const originalApps = {
-		type: 'dynamic',
+		type: 'list',
 		id: 'agent_disabled_apps',
 		i18n: 'menu.agent.disabled_apps'
 	};
@@ -12804,7 +12803,7 @@ console.log(
 	assert.deepEqual(
 		manifest[apps],
 		[
-			...receivedPrefix,
+			...originalPrefix,
 			{ ...originalApps, platforms: ['hs', 'linux'], unavailable: 'hide' },
 			appsCommand
 		],
@@ -12816,11 +12815,11 @@ console.log(
 				.filter((row) => !row.platforms || row.platforms.includes(platform))
 				.map(({ platforms, unavailable, ...row }) => row),
 			[...originalPrefix, originalApps],
-			platform + ': the original native-visible dynamic menu projection is preserved'
+			platform + ': the original native-visible menu projection is preserved'
 		);
 	assert.deepEqual(
 		manifest[apps].filter((row) => !row.platforms || row.platforms.includes('ahk')),
-		[...windowsPrefix, appsCommand],
+		[...originalPrefix, appsCommand],
 		'Windows receives one final command at the original apps position'
 	);
 	const renderer = readSourceFile(
@@ -13028,26 +13027,16 @@ console.log(
 		);
 		assert.deepEqual(
 			visible,
-			[
-				{
-					type: 'list',
-					id: system,
-					i18n: 'menu.agent.' + system.slice(6),
-					platforms: ['ahk'],
-					unavailable: 'hide'
-				}
-			],
-			'one current Windows list declaration owns ' + system
+			[{ type: 'list', id: system, i18n: 'menu.agent.' + system.slice(6) }],
+			'one current list declaration owns ' + system
 		);
 		for (const platform of ['hs', 'linux'])
 			assert.deepEqual(
-				manifest.agent_menu
-					.filter(
-						(row) => row.id === system && (!row.platforms || row.platforms.includes(platform))
-					)
-					.map(({ platforms, unavailable, ...row }) => row),
-				[{ type: 'dynamic', id: system, i18n: 'menu.agent.' + system.slice(6) }],
-				platform + ': original System dynamic ownership remains exact'
+				manifest.agent_menu.filter(
+					(row) => row.id === system && (!row.platforms || row.platforms.includes(platform))
+				),
+				visible,
+				platform + ': the same single System list declaration is drawn'
 			);
 	}
 	assert.equal(

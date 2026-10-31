@@ -54,7 +54,7 @@ helpers.describe("AI submenu configuration guard (ai-submenus-newer-config-2026-
 		helpers.assert_eq(ran, 1, "the refused click never reaches its action")
 	end)
 
-	--- Builds the AI menu and collects what each declared dynamic row places.
+	--- Builds the AI menu and renders what each declared list row supplies.
 	--- @param newer boolean Whether config.toml is protected by a newer version.
 	--- @param callback function Receives { rows = id -> native rows, calls = fixture calls }.
 	local function with_rows(newer, callback)
@@ -65,21 +65,17 @@ helpers.describe("AI submenu configuration guard (ai-submenus-newer-config-2026-
 				read_only_reason = function() return protected and "newer schema" or nil end,
 				read_only_status = function() return protected and "newer" or nil end,
 			}
-			local handlers
-			-- The fixture declares no dynamic row: declare the profile parent.
-			package.loaded["ui.menu.menu_llm.menu_layout"].row_ids = function()
-				return { "llm_profile" }
-			end
-			package.loaded["infra.manifest_menu"].build = function(_key, _category, built_handlers)
-				handlers = built_handlers
+			local renderer = package.loaded["infra.manifest_menu"]
+			local providers
+			renderer.build = function(_key, _category, _handlers, _groups, _ctx, built_providers)
+				providers = built_providers
 				return {}
 			end
 			calls.handler.build_item()
+			-- The rows are list DATA: the shared renderer materialises them.
 			local placed = {}
-			for id, handler in pairs(handlers) do
-				local items = {}
-				handler(items)
-				placed[id] = items
+			for _, id in ipairs({ "llm_model", "llm_profile" }) do
+				placed[id] = renderer.render_rows(providers[id](), id)
 			end
 			callback({ rows = placed, calls = calls, protect = function(value) protected = value end })
 		end)

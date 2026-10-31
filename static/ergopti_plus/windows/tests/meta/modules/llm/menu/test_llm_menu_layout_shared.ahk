@@ -59,10 +59,11 @@ _LMLS_SharedDir() {
 	return WindowsDir . "\..\_shared"
 }
 
-; The manifest rows this platform renders: the declared ``dynamic`` and ``group`` rows of
-; llm_menu that are visible on "ahk". Linux's two inline `list` rows and the
-; separator between them are not settings rows and are filtered out here exactly
-; as _LLM_MenuLayout_Rows() filters them at runtime.
+; The manifest rows this platform renders: the llm_menu rows visible on "ahk" that
+; declare ``disabled_when_off`` (the model and profile ``list`` rows and the
+; declared ``group`` rows). Separators, commands and boundary lists are not
+; settings rows and are filtered out here exactly as _LLM_MenuLayout_Rows()
+; filters them at runtime.
 _LMLS_ManifestRows(Source := unset) {
 	path := _LMLS_SharedDir() . "\modules\menu\menu_manifest.json"
 	content := IsSet(Source) ? Source : ""
@@ -73,7 +74,7 @@ _LMLS_ManifestRows(Source := unset) {
 	Assert(parsed is Map && parsed.Has("llm_menu"), "menu_manifest.json must have an 'llm_menu' array")
 	Rows := []
 	for _, Entry in parsed["llm_menu"] {
-		if !(Entry is Map) or !Entry.Has("type") or (Entry["type"] != "dynamic" && Entry["type"] != "group")
+		if !(Entry is Map) or !Entry.Has("type") or !Entry.Has("disabled_when_off")
 			continue
 		Visible := true
 		if Entry.Has("platforms") {
@@ -235,7 +236,8 @@ _LMLS_CurrentGroupSourceAndDataControls() {
 	_LMLS_CurrentRowTypesPolicy(_LMLS_ManifestRows())
 }
 
-; The four fixed parents are declared groups; backend/model/profile remain native.
+; The four fixed parents are declared groups; the model and profile rows are
+; declared lists whose native providers supply row DATA.
 _LMLS_CurrentRowTypesPolicy(Rows) {
 	Groups := 0
 	for Row in Rows {
@@ -243,7 +245,7 @@ _LMLS_CurrentRowTypesPolicy(Rows) {
 			|| Row["id"] == "llm_generation_settings" {
 			AssertEqual("group", Row["type"], "fixed LLM parents require shared group ownership")
 			Groups += 1
-		} else AssertEqual("dynamic", Row["type"], "other native dynamic domains retain their existing API")
+		} else AssertEqual("list", Row["type"], "the model and profile rows are list rows whose providers supply DATA")
 	}
 	AssertEqual(4, Groups, "exactly the selected genuine fixed parents have shared group ownership")
 }
@@ -262,10 +264,10 @@ _LMLS_CurrentRowTypeWithdrawalControls() {
 		Mutant := []
 		for Row in Rows
 			Mutant.Push(Row.Clone())
-		Mutant[Index]["type"] := Original["type"] == "group" ? "dynamic" : "group"
+		Mutant[Index]["type"] := Original["type"] == "group" ? "list" : "group"
 		ExpectedMessage := Original["type"] == "group"
-			? "fixed LLM parents require shared group ownership - expected: <group>, actual: <dynamic>"
-			: "other native dynamic domains retain their existing API - expected: <dynamic>, actual: <group>"
+			? "fixed LLM parents require shared group ownership - expected: <group>, actual: <list>"
+			: "the model and profile rows are list rows whose providers supply DATA - expected: <list>, actual: <group>"
 		Refused := false
 		try _LMLS_CurrentRowTypesPolicy(Mutant)
 		catch as PolicyFailure {
@@ -283,7 +285,7 @@ Test("llm-menu-layout-shared: every current declared native route rejects its ty
 ; Pin their complete inventory before withdrawing any genuine current route.
 _LMLS_CurrentInventoryPolicy(Rows) {
 	Canonical := _LMLS_Canonical()
-	Types := ["dynamic", "dynamic", "group", "group", "group", "group"]
+	Types := ["list", "list", "group", "group", "group", "group"]
 	AssertEqual(6, Canonical.Length, "the independently handwritten canonical inventory remains six")
 	AssertEqual(Canonical.Length, Rows.Length, "current LLM inventory row count")
 	for Index, Expected in Canonical {

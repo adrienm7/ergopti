@@ -223,18 +223,20 @@ LLM_Menu_BuildSubmenu() {
 	; happen only after every row has been successfully constructed.
 	try LoggerInfo("LLM", "LLM_Menu_Build: pre-emit staging took {1} ms.", TickElapsed(_tStaged))
 	try LoggerInfo("LLM", "LLM_Menu_Build: emitting {1} settings row(s) from shared spec…", _rows.Length)
-	DynamicHandlers := Map(), GroupDisabled := Map()
+	; The model and profile rows are declared ``list`` rows: their provider
+	; returns row DATA and the renderer draws it at the declared entry.
+	ListProviders := Map(), GroupDisabled := Map()
 	for _i, _row in _rows {
 		RowDisabled := _row["disabled_when_off"] ? _disabled : false
 		if _MR_Get(_row, "type") == "group" {
 			GroupDisabled[_row["id"]] := RowDisabled
 		} else {
-			DynamicHandlers[_row["id"]] := _LLM_Menu_EmitCapturedRow.Bind(
-				StagedHandle, _row["id"], RowDisabled, WarningRows)
+			ListProviders[_row["id"]] := _LLM_Menu_EmitCapturedRow.Bind(
+				StagedHandle, _row["id"], RowDisabled, WarningRows, StagedHandle, "LLM")
 		}
 	}
-	MenuRenderer_Build("llm_menu", "LLM", DynamicHandlers, _LLM_Menu_GroupBuilders(),
-		"", Commands, StateGetters, StagedHandle, GroupDisabled)
+	MenuRenderer_Build("llm_menu", "LLM", Map(), _LLM_Menu_GroupBuilders(),
+		ListProviders, Commands, StateGetters, StagedHandle, GroupDisabled)
 	try LoggerInfo("LLM", "LLM_Menu_Build: settings rows emitted ({1} item(s) so far).", DllCall("GetMenuItemCount", "ptr", StagedHandle.Handle, "int"))
 	} catch as e {
 		try StagedHandle.Delete()
@@ -455,10 +457,11 @@ _LLM_MenuLayout_Rows() {
 		Declared := _MR_GetMenuDef("llm_menu")
 		Filtered := []
 		for _, Entry in Declared {
-			; Separators and Linux's inline lists are not settings rows: this
-			; dispatch emits a native submenu per id, and only the declared
-			; ``dynamic`` and declared ``group`` rows have one.
-			if (Entry is Map && _MR_IsForAhk(Entry) && (_MR_Get(Entry, "type", "") == "dynamic" || _MR_Get(Entry, "type", "") == "group"))
+			; Separators, commands and boundary lists are not settings rows:
+			; only the settings rows declare ``disabled_when_off``. Reading the
+			; field rather than a row type keeps the policy when a row changes
+			; type (the model and profile rows became ``list``).
+			if (Entry is Map && _MR_IsForAhk(Entry) && Entry.Has("disabled_when_off"))
 				Filtered.Push(Entry)
 		}
 		if (Filtered.Length > 0)
@@ -491,7 +494,7 @@ _LLM_MenuLayout_Fallback() {
 }
 
 /**
- * Returns the row DATA of one `dynamic` settings row by its shared-spec id; the
+ * Returns the row DATA of one `list` settings row by its shared-spec id; the
  * renderer draws it into TargetMenu at the declared entry. The declared `group`
  * rows never come here: the renderer draws them from _LLM_Menu_GroupBuilders.
  * The spec (_LLM_MenuLayout_Rows) owns the ORDER and the `disabled` flag; this
