@@ -109,8 +109,7 @@ _LBLM_BackendLifecycleProducersAreOwned() {
 		"the dependency timer must capture its epoch before it is armed")
 	Assert(InStr(CheckBody, "show_ui, captured_epoch)", true, TimerPos) > TimerPos,
 		"the deferred dependency callback must carry the captured epoch, not reread the current one")
-	for Name in ["LLM_Deps_AsyncCheck", "LLM_Deps_DoCheck",
-			"LLM_Deps_RunInstaller", "LLM_Deps_PollServerReady"] {
+	for Name in ["LLM_Deps_AsyncCheck", "LLM_Deps_DoCheck"] {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Name . " must exist for the dependency ownership guard")
 		Assert(InStr(Body, "captured_epoch != _LLM_Deps_Epoch") > 0,

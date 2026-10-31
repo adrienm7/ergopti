@@ -661,10 +661,6 @@ Ergopti_OnSuspendEnter() {
 		; _ResetPrefixBuffer() on resume keeps the preview buffer paired with the engine.
 	if IsSet(HSE_HardReset)
 		_LifecycleRunRequiredStep(Transition, "hotstring-engine", HSE_HardReset)
-	global _LLM_Deps_PollTimer
-	if IsSet(_LLM_Deps_PollTimer)
-		_LifecycleRunRequiredStep(Transition, "llm-dependency-poll",
-			() => SetTimer(_LLM_Deps_PollTimer, 0))
 		; Layout > « Layout on pause / resume »: the keyboard the user types on
 		; while the driver is paused (pause_layout_switch.ahk).
 	if IsSet(PauseLayoutSwitch_Apply)
@@ -704,10 +700,6 @@ Ergopti_OnSuspendResume() {
 						_LifecycleRunRequiredStep(Transition, "prefix-index",
 							HotstringPrefixWatcherRebuildIndex)
 		}
-		global _LLM_Deps_PollTimer, _LLM_Deps_Checking
-		if IsSet(_LLM_Deps_PollTimer) and IsSet(_LLM_Deps_Checking) and _LLM_Deps_Checking
-				_LifecycleRunRequiredStep(Transition, "llm-dependency-poll",
-					() => SetTimer(_LLM_Deps_PollTimer, 3000))
 		; Re-arm the LLM pointer-dismiss watcher stopped in Ergopti_OnSuspendEnter,
 		; but only when the bridge is still active — _LLM_PointerWatch_Start is a
 		; no-op when already armed, so this is safe to call unconditionally on the
