@@ -22,6 +22,12 @@ TouchpadRegistryEnsureBackup(*) {
 	return true
 }
 
+; The reservation timer is retained and cancelled, so its period never elapses.
+TimingsGet(Section, Key) {
+	_GPSE_Require(Section == "gestures" && Key == "worker_result_poll_ms", "Only the worker poll timing is bound.")
+	return 60000
+}
+
 _GPSE_Timer(Callback, Period) {
 	global _GPSE_Timers
 	_GPSE_Timers.Push(Callback)
