@@ -19,7 +19,8 @@ local function with_fixture(callback, native_overrides)
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			local host = helpers.load_with_stubs("hs", native_overrides)
 			local STAGING_LOCK_SUFFIX = ".ergoptiplus-stage-lock"
-			local WRITE_LOCK_SUFFIX = ".ergoptiplus-write-lock-v1"
+			local WriteLockPath = require("adapters.write_lock_path")
+			local WRITE_LOCK_SUFFIX = WriteLockPath.SUFFIX
 			local HOST_ATTRIBUTES = host.fs.attributes
 			local HOST_SYMLINK_ATTRIBUTES = host.fs.symlinkAttributes
 			local HOST_MKDIR = host.fs.mkdir
@@ -209,6 +210,10 @@ local function with_fixture(callback, native_overrides)
 			return callback({
 				STAGING_LOCK_SUFFIX = STAGING_LOCK_SUFFIX,
 				WRITE_LOCK_SUFFIX = WRITE_LOCK_SUFFIX,
+				-- The per-user lock pathname the writer takes for one canonical destination.
+				write_lock_path = function(path)
+					return assert(WriteLockPath.for_canonical(path, os.getenv("HOME")))
+				end,
 				HOST_ATTRIBUTES = HOST_ATTRIBUTES,
 				HOST_SYMLINK_ATTRIBUTES = HOST_SYMLINK_ATTRIBUTES,
 				HOST_MKDIR = HOST_MKDIR,

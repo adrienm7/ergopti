@@ -512,6 +512,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.write_lock_path",
+		contract = { "for_canonical" },
+		-- Every cooperative publication and removal of adapters.file_system.
+		wired    = true,
+	},
+	{
 		id       = "adapters.metadata_command_stats",
 		contract = { "clock", "record", "snapshot" },
 		-- Slow ingest and slow preferences save reports count the metadata forks.

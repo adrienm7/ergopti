@@ -46,7 +46,7 @@ local function with_subject(stage, body, options)
 					and control.refusal and control.locks == control.fail_operation then
 					return { write = function() return nil, "injected write refusal" end, close = function() return handle:close() end }
 				end
-				if not handle or mode ~= "a+" or target ~= source_path .. fixture.WRITE_LOCK_SUFFIX then return handle, detail end
+				if not handle or mode ~= "a+" or target ~= fixture.write_lock_path(source_path) then return handle, detail end
 				local proxy = { raw = handle }
 				function proxy:close()
 					if control.refusal and self.operation == control.fail_operation then return false, "injected close refusal" end
@@ -131,7 +131,7 @@ local function with_subject(stage, body, options)
 			end, debug.traceback)
 			io.open, os.rename = original_open, original_rename
 			for _, handle in ipairs(handles) do pcall(handle.raw.close, handle.raw) end
-			os.remove(path); os.remove(source_path); os.remove(source_path .. fixture.WRITE_LOCK_SUFFIX)
+			os.remove(path); os.remove(source_path); os.remove(fixture.write_lock_path(source_path))
 			if control.foreign_path then os.remove(control.foreign_path) end
 			if not ran then error(problem, 0) end
 		end)
