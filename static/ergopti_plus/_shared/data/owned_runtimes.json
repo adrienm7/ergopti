@@ -224,18 +224,18 @@
 		},
 		{
 			"os": "macos",
-			"tool": "`/usr/bin/python3`",
+			"tool": "App Cloner's Python (formerly `/usr/bin/python3`)",
 			"programs": ["python3"],
-			"used_for": "App Cloner helpers (`macos/apps/App Cloner.app/Contents/Resources/clone_app.sh:552`, `extract_icon.py:17`)",
-			"today": "System shim (needs the Command Line Tools)",
-			"current_class": "HOST",
-			"version_needed": "any 3.x",
-			"if_missing": "A Mac without the tools gets an Xcode install prompt; cloning fails",
-			"pin_possible": "Could reuse the managed Python above",
+			"used_for": "App Cloner helpers and the launchers it writes (`macos/apps/App Cloner.app/Contents/Resources/clone_app.sh`, `ShortcutBuilder.applescript`, `Contents/MacOS/AppCloner`)",
+			"today": "The managed Python above with pinned PyObjC 12.1 (`macos/modules/llm/managed-pyobjc.json`), installed on the user's agreement under the native PTY guardian (`ensure-managed-pyobjc.sh`, `modules/llm/managed_pyobjc.lua`); App Cloner and its clones run its versionless link `app-cloner/python3`",
+			"current_class": "PIN",
+			"version_needed": "CPython 3.11 + pyobjc-core and pyobjc-framework-Cocoa 12.1",
+			"if_missing": "App Cloner refuses to start and names the Apps menu, which installs it; a clone made before the switch keeps /usr/bin/python3 until it is cloned again",
+			"pin_possible": "Yes, done. PyObjC MIT; two universal2 wheels, about 1 MB",
 			"decision": "PIN",
 			"decision_text": "PIN: use the managed Python for these helpers",
 			"alternative": null,
-			"status": "follow_up"
+			"status": "done"
 		},
 		{
 			"os": "macos",
