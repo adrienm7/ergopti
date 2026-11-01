@@ -63,6 +63,44 @@ _KCCE_Press(World, Ports, Key) {
 	return Result
 }
 
+; The three writers of the chords, driven on a file of their own: a held lease makes
+; each one report false with no reload; once free, each persists and reloads once.
+_KCCE_ChordWritersFollowTheirCommit() {
+	_KCCE_With(Map(), false, _KCCE_ChordWritersBody)
+}
+_KCCE_ChordWritersBody(World, Ports) {
+	Path := A_Temp . "\ergopti_kcce_chord_writers_" . DllCall("GetCurrentProcessId", "UInt") . ".toml"
+	if FileExist(Path)
+		FileDelete(Path)
+	FileAppend("", Path, "UTF-8-RAW")
+	Reloads := 0
+	Reload := () => (Reloads += 1, "reloaded")
+	Writers := Map(
+		"combo", () => SetKeyCombinationChord("caps_lock_then_tab", "copy", Path, Reload),
+		"symmetric", () => KeyCombinationChordToggleSymmetric(Path, Reload),
+		"simultaneous_threshold_ms", () => KeyCombinationChordCommitDelay("150", Path, Reload))
+	try {
+		Owner := _ConfigWriteLeaseTryAcquire(Path, "chord-writer-refusal")
+		AssertTrue(Owner is Object, "the test holds the write lease")
+		try {
+			for Needle, Writer in Writers
+				AssertEqual(false, Writer.Call(), Needle . ": a refused commit reports false")
+		} finally _ConfigWriteLeaseRelease(Owner)
+		AssertEqual(0, Reloads, "a refused commit never reloads")
+		AssertEqual("", FileRead(Path, "UTF-8"), "a refused commit writes nothing")
+		AssertEqual(false, KeyCombinationChordCommitDelay("soon", Path, Reload), "a delay that is no number changes nothing")
+		AssertEqual(0, Reloads, "a refused delay never reloads")
+		for Needle, Writer in Writers {
+			Before := Reloads
+			AssertEqual("reloaded", Writer.Call(), Needle . ": a commit answers with its reload")
+			AssertEqual(Before + 1, Reloads, Needle . ": a commit reloads once")
+			Assert(InStr(FileRead(Path, "UTF-8"), Needle), Needle . " reaches the file")
+		}
+	} finally FileDelete(Path)
+}
+Test("key combination chords: the writers report a refused commit and never reload behind it",
+	_KCCE_ChordWritersFollowTheirCommit)
+
 _KCCE_ChordFiresInsideTheDelay() {
 	_KCCE_With(Map("caps_lock_then_tab", "copy"), false, _KCCE_ChordFiresBody)
 }

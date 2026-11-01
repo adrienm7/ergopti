@@ -219,7 +219,11 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; 43-44: the built-in delimiter commit (HotstringsTerminatorBuiltinCommit)
 	; and the legacy delimiter migration (HotstringsTerminatorMigrateStrings)
 	; commit through ConfigCommitUpdates and return false when it refuses.
-	AssertEqual(44, Calls,
+	; 45-47: the chord writers (SetKeyCombinationChord,
+	; KeyCombinationChordToggleSymmetric, KeyCombinationChordCommitDelay) return
+	; false and skip their reload on a refusal, driven for real by
+	; test_key_combination_chord_engine.ahk.
+	AssertEqual(47, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
