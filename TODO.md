@@ -251,6 +251,9 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
   November: App Cloner on the managed Python with pinned PyObjC 12.1 (managed-pyobjc.json, ensure-managed-pyobjc.sh
   under the native PTY guardian, consent offer from the Apps menu, stable link `native-bootstrap/app-cloner/python3`;
   existing clones keep /usr/bin/python3 until re-cloned).
+- **Proxy variables in `network-retry.sh`.** Four hand-typed spellings of the proxy variables now live there (the
+  direct override and the refused sign-in start, 3597ee4f, among them); `test-proxy-policy-single-source` allows 4.
+  Factor one `clear_proxy_environment()` both paths call, then lower the allowance.
 - **Checks left to a program from the Mac session.** Done on 1 November: `field_tap_hold_thresholds` (9901da4d94;
   PAR-15 is confirmed by the next field run's result);
   the HTTPS downgrade refusal is already covered by `ManagedPACSourceTests` and `ManagedBootstrapDownloadTests`.
