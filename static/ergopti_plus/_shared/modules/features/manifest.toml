@@ -2167,7 +2167,7 @@ description_key = "menu.shortcuts.key_combinations"
 [[features.mod_combos]]
 id = "simultaneous_threshold_ms"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = 100
 recommended = 100
 input_altering = false
@@ -2177,7 +2177,7 @@ description_key = "menu.tapholds.simultaneous_dialog_title"
 [[features.mod_combos]]
 id = "symmetric"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = false
 recommended = false
 input_altering = false
