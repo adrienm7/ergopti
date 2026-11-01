@@ -73,7 +73,7 @@ helpers.describe("log_manager — initialization transaction", function()
 				return function()
 					if not yielded and query:find("aggregate_cache_revision", 1, true) then
 						yielded = true
-						return { value = "2" }
+						return { value = "3" }
 					end
 					return nil
 				end
