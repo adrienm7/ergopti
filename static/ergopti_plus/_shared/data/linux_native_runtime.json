@@ -110,7 +110,6 @@
 			"libayatana-appindicator",
 			"lua51-lgi",
 			"webkit2gtk-4.1",
-			"python",
 			"libsecret"
 		],
 		"nix_library_path": [
@@ -233,6 +232,34 @@
 				}
 			},
 			"description": "AppImage copies the actual build-host ELF closure and retains the recipient glibc and certificate trust. Flatpak builds its native modules under /app. Runtime admission proves ABI/schema/backend availability, not desktop/PAC settings or transport delivery."
+		}
+	},
+	"managed_python": {
+		"description": "Ergopti's own Python for the user XKB installer (owned runtimes, PIN): the python-build-standalone build of the shared managed Python release (_shared/modules/llm/managed_python_release.json, same uv release, version and build), downloaded on consent into the private data folder. Each archive is the uv-reviewed install_only_stripped tarball, pinned by SHA-256 and size.",
+		"uv_release": "0.12.21",
+		"version": "3.11.16",
+		"build": "20260929",
+		"archives": {
+			"x86_64-gnu": {
+				"triple": "x86_64-unknown-linux-gnu",
+				"sha256": "f05084f3fbd7a0c7ed762ea6fd2455976a463952bb5c3253fc6cdc777f84728d",
+				"bytes": 30792219
+			},
+			"aarch64-gnu": {
+				"triple": "aarch64-unknown-linux-gnu",
+				"sha256": "0fe7a9925be231f38c7dffc92eb7f5cf47b121661899ffdb9bc77adfdc74ad2f",
+				"bytes": 31101929
+			},
+			"x86_64-musl": {
+				"triple": "x86_64-unknown-linux-musl",
+				"sha256": "88df3ffae0ba380ed54c1f6c08697681ba70612fb44fbe7f2e7d122927c1ae31",
+				"bytes": 29738762
+			},
+			"aarch64-musl": {
+				"triple": "aarch64-unknown-linux-musl",
+				"sha256": "1a38e436fa144149c8d9562ceac8b243c97013058d61903cde591a8216461679",
+				"bytes": 30008097
+			}
 		}
 	},
 	"archive_digest_runtime": {

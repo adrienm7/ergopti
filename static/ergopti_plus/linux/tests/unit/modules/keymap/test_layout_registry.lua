@@ -23,6 +23,8 @@ local CHANNEL = require("modules.updater.manager").installed_channel()
 local INDEX_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/" .. CHANNEL .. "/static/layouts/registry/index.json"
 local ERGOL_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/" .. CHANNEL .. "/static/layouts/registry/ergol/ergol.keylayout"
 local PYTHON_MESSAGE = "translated: layouts.linux_needs_python"
+-- The interpreter the managed Python dependency answers with.
+local MANAGED_PYTHON = "/data/ergopti/runtime/python/cpython-3.11.16+20260929-x86_64-gnu/python/bin/python3"
 local LOCAL_DIR = "/cfg/layouts/"
 local SHIPPED_DIR = "/pkg/linux/static/layouts/registry/"
 local CONVERTER_DATA = "/pkg/linux/xkb_generation/data"
@@ -109,6 +111,12 @@ local function manager(options)
 		delete = function(path) state.files[path] = nil; state.deleted[#state.deleted + 1] = path; return true end,
 		exists = function(path) return state.files[path] ~= nil end,
 		ensure_dir = function() return true end,
+		-- Ergopti's own Python, as modules/keymap/managed_python.lua answers once installed.
+		python = function(callback)
+			state.python_asked = (state.python_asked or 0) + 1
+			if options.python_refusal then callback(false, options.python_refusal, "fixture refusal") return end
+			callback(true, MANAGED_PYTHON)
+		end,
 		run = function(program, args, run_options, callback)
 			state.runs[#state.runs + 1] = { program = program, args = args, timeout_ms = run_options.timeout_ms }
 			callback(assert(table.remove(runs, 1), "unexpected process run"))
@@ -373,6 +381,66 @@ helpers.describe("layout manager (Linux): installing", function()
 			helpers.assert_eq(#state.runs, 1, "nothing runs without an interpreter")
 			helpers.assert_nil(state.files[LOCAL_DIR .. "installed.json"])
 		end
+	end)
+
+	helpers.it("runs the installer on Ergopti's own Python, never the host's python3 (layout-registry-managed-python)", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files(),
+			runs = { OK_RUN, INSTALLED_RUN } })
+		run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(#state.runs >= 1, "the interpreter probe runs")
+		for _, child in ipairs(state.runs) do
+			helpers.assert_eq(child.program, MANAGED_PYTHON, "every Python child runs the managed interpreter")
+		end
+	end)
+
+	helpers.it("asks once before downloading Ergopti's own Python, naming its size (layout-registry-managed-python)", function()
+		local saved = { registry = package.loaded["modules.keymap.layout_registry"],
+			managed = package.loaded["modules.keymap.managed_python"], dialogs = package.loaded["ui.menu.menu_dialogs"],
+			i18n = package.loaded["infra.i18n"] }
+		local asked, answer = {}, nil
+		package.loaded["infra.i18n"] = { get = function(key)
+			return key == "layouts.managed_python_offer" and "Download {1} MB <now>?" or key
+		end }
+		package.loaded["ui.menu.menu_dialogs"] = {
+			plain_markup = function(text) return (text:gsub("<", "&lt;"):gsub(">", "&gt;")) end,
+			ask_yes_no = function(title, text, ok_label, cancel_label)
+				asked[#asked + 1] = { title = title, text = text, ok = ok_label, cancel = cancel_label }
+				return answer
+			end,
+		}
+		package.loaded["modules.keymap.managed_python"] = { ensure = function(deps, done)
+			done(deps.confirm(31 * 1048576 - 1), "fixture")
+		end }
+		package.loaded["modules.keymap.layout_registry"] = nil
+		local ok, err = pcall(function()
+			local python = require("modules.keymap.layout_registry")._managed_python_for_probe()
+			local outcomes = {}
+			-- nil is the question that could not be shown (no display): a decline.
+			for _, reply in ipairs({ { true }, { false }, {} }) do
+				answer = reply[1]
+				python(function(accepted) outcomes[#outcomes + 1] = accepted end)
+			end
+			helpers.assert_eq(outcomes, { true, false, false }, "only Download accepts; Cancel and no answer decline")
+		end)
+		package.loaded["modules.keymap.layout_registry"] = saved.registry
+		package.loaded["modules.keymap.managed_python"] = saved.managed
+		package.loaded["ui.menu.menu_dialogs"] = saved.dialogs
+		package.loaded["infra.i18n"] = saved.i18n
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(asked[1], { title = "layouts.managed_python_title", text = "Download 31 MB &lt;now&gt;?",
+			ok = "menu.llm.btn_download", cancel = "common.cancel" })
+	end)
+
+	helpers.it("reports a declined or failed managed Python and runs nothing (layout-registry-managed-python)", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files(),
+			python_refusal = "python_declined" })
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(result.ok == false)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_PYTHON)
+		helpers.assert_eq(result.user_message, PYTHON_MESSAGE)
+		helpers.assert_contains(result.extra, "python_declined")
+		helpers.assert_eq(#state.runs, 0, "no child runs without Ergopti's Python")
+		helpers.assert_eq(state.python_asked, 1)
 	end)
 
 	helpers.it("tells the user why a pure Xorg session cannot install a layout (layout-registry-convert)", function()
