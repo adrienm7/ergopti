@@ -1776,6 +1776,17 @@ function M.new(deps, presets, ram_getter)
 				-- notice below says so: not an error window on top of it (#101). A
 				-- network report outranks it, as in the notice.
 				local requires_upgrade = network_report == nil and needs_ollama_upgrade(pull_output)
+				-- The worker's closing OUTCOME line only says that a row failed: the
+				-- class of that row and the stage it ended on are the cause (field run
+				-- 2026-11-01 logged "error_row" and nothing else).
+				local managed_error, managed_stage = nil, nil
+				for line in pull_output:gmatch("[^\r\n]+") do
+					managed_error = line:match("^OLLAMA_PULL_ERROR (%S+)") or managed_error
+					managed_stage = line:match("^OLLAMA_PULL_STATUS (%S+)") or managed_stage
+				end
+				if managed_error ~= nil then
+					last_line = string.format("OLLAMA_PULL_ERROR %s after %s", managed_error, tostring(managed_stage))
+				end
 				local pull_cause = last_line ~= "" and last_line:sub(1, 300) or "no output"
 				if requires_upgrade then
 					Logger.warn(LOG, "The Ollama pull of %s was refused: the installed Ollama is too old (code %s): %s.",

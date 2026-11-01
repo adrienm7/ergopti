@@ -460,7 +460,18 @@ ERROR_CLASSES = (
     ("permission denied", "permission_denied"),
     ("context canceled", "cancelled"),
     ("max retries", "max_retries"),
+    # Before "manifest": Ollama prefixes a failed fetch with "pull model manifest".
+    ("deadline exceeded", "timeout"),
+    ("timeout", "timeout"),
+    ("certificate", "certificate"),
+    ("tls", "certificate"),
+    ("no such host", "dns"),
+    ("connection refused", "connection"),
+    ("connection reset", "connection"),
+    ("unexpected eof", "connection"),
+    ("too many requests", "rate_limited"),
     ("manifest", "manifest"),
+    ("file does not exist", "not_found"),
 )
 
 
