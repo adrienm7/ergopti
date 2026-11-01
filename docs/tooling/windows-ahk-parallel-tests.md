@@ -32,8 +32,8 @@ Everything lives in the ignored `.ahk-parallel/` folder (`--run-dir` moves it).
   the workers have ended, in a single process at a time. `--only` selects within
   both phases.
 - **The exclusive class is derived, not listed.** A test file joins it when its
-  code, or a fixture it names, calls one of these resources; quoting one in a
-  string does not count. A file that reaches one only through production code
+  code, or a fixture it names, calls one of these resources or a `CB_` function
+  of the clipboard adapter; quoting one in a string does not count. A file that reaches one only through production code
   says so with a line `; ahk-parallel: session-exclusive <why>`. A fixture using a
   resource must be named by some test file, or carry
   `; ahk-parallel: operator-only <why>` when the suite never launches it:
@@ -43,6 +43,9 @@ Everything lives in the ignored `.ahk-parallel/` folder (`--run-dir` moves it).
   resource. Read a failure as real only once `--rerun-failures` reproduces it
   alone. That run answers for those failures only, in its exit status and its
   summary, and needs `--accept-stale` once HEAD has moved.
+- **The phase is exclusive within one run only.** Another AHK run on the same
+  session, from another checkout or a direct `run_all.ahk`, still shares the
+  clipboard and the focus with it. Run the suite with nothing else testing.
 
 Two mechanisms make the parallelism sound. Workers run under `/force`, the
 interpreter's switch for `#SingleInstance Off`, so they do not replace one

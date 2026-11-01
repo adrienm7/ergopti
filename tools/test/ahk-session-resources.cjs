@@ -32,6 +32,10 @@ const NATIVE_CALL =
 const LANGUAGE_USE =
 	/(?<![\w.])(A_Clipboard\b|ClipboardAll\b|(?:ClipWait|OnClipboardChange|SendInput|SendEvent|SendPlay|SendText|Send|ControlSend|ControlSendText|ControlFocus|WinActivate|WinWaitActive|WinWaitNotActive|BlockInput)(?=\())|\.Focus\(/g;
 
+// adapters/clipboard.ahk: its CB_ functions reach the real clipboard, so naming
+// one counts as a use even though no Win32 name appears in the caller.
+const CLIPBOARD_ADAPTER = /(?<![\w.])CB_\w+(?=\()/g;
+
 // A fake transport's `Send() {` makes every Send( of that file its own.
 const LOCAL_SEND = /^[ \t]*(?:static[ \t]+)?Send\([^)\n]*\)[ \t]*(?:\{|=>)/m;
 
@@ -82,6 +86,7 @@ function sessionUses(source) {
 	for (const match of maskSource(source, false).matchAll(NATIVE_CALL)) found.add(match[1]);
 	const code = maskSource(source, true);
 	for (const match of code.matchAll(LANGUAGE_USE)) found.add(match[1] || '.Focus');
+	for (const match of code.matchAll(CLIPBOARD_ADAPTER)) found.add(match[0]);
 	if (LOCAL_SEND.test(code)) found.delete('Send');
 	return [...found].sort();
 }

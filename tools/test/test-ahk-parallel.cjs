@@ -123,6 +123,7 @@ assert.deepEqual(sessionUses('DllCall("SetForegroundWindow", "Ptr", Hwnd)'), [
 	'SetForegroundWindow'
 ]);
 assert.deepEqual(sessionUses('\tSendInput("x")\n\tEdit.Focus()'), ['.Focus', 'SendInput']);
+assert.deepEqual(sessionUses('CB_OpenClipboardWithin(A_ScriptHwnd)'), ['CB_OpenClipboardWithin']);
 assert.deepEqual(sessionUses('Assert(InStr(Src, "SendInput("))'), []);
 assert.deepEqual(sessionUses('; SendInput("x")\n/* WinActivate(x) */'), []);
 assert.deepEqual(sessionUses('Request.Send(Body)'), []);
