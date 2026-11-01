@@ -212,7 +212,10 @@ const BASELINE = 7;
 //              modules by a declaration unique to each instead of their paths.)
 //       38 → 37 (2026-11-01: the MLX import probe single source, see the file
 //              count above.)
-const READ_BASELINE = 37;
+//       37 → 34 (2026-11-01: dialog_util.alert refuses a call without
+//              hs.dialog.alert's shape; the vscode bridge test no longer scans
+//              three named files that held no alert call.)
+const READ_BASELINE = 34;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
