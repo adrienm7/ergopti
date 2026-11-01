@@ -709,15 +709,28 @@ function validateManualRequester(agent, vision) {
 		capture >= 0 && capture < trigger.indexOf('Enabled := _LLM_Menu.Get('),
 		'Capture original epoch before native/readiness getters.'
 	);
+	// The capture starts in _LLM_Vision_BeginCapture, either at once or once a
+	// token-exchange provider's access token arrived; both paths keep the
+	// trigger's original epoch.
 	assert.match(
 		trigger,
+		/return _LLM_Vision_BeginCapture\(Kind, Parsed, Model, Config, AnswersKey, Target, AuxGeneration\)/
+	);
+	assert.match(trigger, /_LLM_Vision_OnAccess\.Bind\(_LLM_Vision_Generation, AuxGeneration,/);
+	assert.match(
+		bodyOf(vision, '_LLM_Vision_OnAccess'),
+		/if !_LLM_Vision_RenderIsCurrent\(Waiting, AuxGeneration\)/
+	);
+	const begin = bodyOf(vision, '_LLM_Vision_BeginCapture');
+	assert.match(
+		begin,
 		/if !_LLM_Vision_RequestScopeCurrent\(AuxGeneration\)\s+return false\s+_LLM_Vision_Generation \+= 1/
 	);
 	assert.match(
-		trigger,
+		begin,
 		/Requester := _LLM_Vision_RenderIsCurrent\.Bind\(_LLM_Vision_Generation, AuxGeneration\)/
 	);
-	assert.match(trigger, /"requester_current", Requester/);
+	assert.match(begin, /"requester_current", Requester/);
 	const current = bodyOf(vision, '_LLM_Vision_IsCurrent');
 	assert.match(current, /Current := Flow\.Get\("requester_current", 0\)/);
 	assert.match(current, /Result := Current\.Call\(\)/);
