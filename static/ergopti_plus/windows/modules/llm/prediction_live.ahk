@@ -72,7 +72,7 @@ LLM_Live_ConfigRefusal(Decoded) {
 		return "live.json is missing or not JSON"
 	if !(Decoded.Get(ConfigLeaf.DEBOUNCE_MS, "") is Integer) || Decoded[ConfigLeaf.DEBOUNCE_MS] < 0
 		return "live.json debounce_ms is not a non-negative integer"
-	if !(Decoded.Get("min_words", "") is Integer) || Decoded["min_words"] < 0
+	if !(Decoded.Get(ConfigLeaf.MIN_WORDS, "") is Integer) || Decoded[ConfigLeaf.MIN_WORDS] < 0
 		return "live.json min_words is not a non-negative integer"
 	return ""
 }
@@ -99,7 +99,7 @@ LLM_Live_Decide(Config, Receipt, MenuCount, Profile) {
 	if !(Profile is Map)
 		return Map("action", "stop", "cause", "prompt deleted")
 	return Map("action", "request", ConfigLeaf.NUM_PREDICTIONS, Count ? Count : MenuCount,
-		"min_words", Config["min_words"])
+		ConfigLeaf.MIN_WORDS, Config[ConfigLeaf.MIN_WORDS])
 }
 
 

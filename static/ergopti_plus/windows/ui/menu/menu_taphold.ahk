@@ -11,6 +11,8 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -691,8 +693,8 @@ _TH_ScopeCommands(Options := unset) {
 	global _ConfigDir
 	OwnedOptions := IsSet(Options) ? Options : Map("layers_config_dir", _ConfigDir)
 	return Map(
-		"tapholds_toggle", MenuRenderer_CategoryGateCommand("TapHolds"),
+		MenuCommand.TAPHOLDS_TOGGLE, MenuRenderer_CategoryGateCommand("TapHolds"),
 		"scope_restore", (*) => TapHoldScopeApply("recommended", OwnedOptions),
 		"scope_clear", (*) => TapHoldScopeApply("clear", OwnedOptions),
-		"edit_nav_layer", LayerEditor_Open)
+		MenuCommand.EDIT_NAV_LAYER, LayerEditor_Open)
 }

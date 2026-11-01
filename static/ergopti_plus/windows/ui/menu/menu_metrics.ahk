@@ -11,6 +11,8 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -66,8 +68,8 @@ BuildMetricsMenu() {
 		"reset_wpm_position", (*) => WPMWidget_ResetPosition(),
 		"show_typing",     KLUI_ToggleTyping,
 		"show_apps",       KLUI_ToggleApps,
-		"metrics_suspend", (*) => ToggleMetricsCollectionPause(),
-		"metrics_reset_session", (*) => ResetMetricsSession(),
+		MenuCommand.METRICS_SUSPEND, (*) => ToggleMetricsCollectionPause(),
+		MenuCommand.METRICS_RESET_SESSION, (*) => ResetMetricsSession(),
 	)
 		Commands[Id] := Handler
 

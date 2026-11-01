@@ -141,9 +141,9 @@ _LLM_Menu_ProfileRows() {
 	FrameState := Map()
 	PausedFn := (*) => A_IsSuspended
 	return _LLM_Menu_GuardConfigRows(MenuRenderer_TemplateRows("llm_profile_windows_frame", Map(
-		"llm_profile_create", LLM_Menu_PromptCreateProfile,
-		"llm_profile_clone", LLM_Menu_CloneActiveBuiltinProfile,
-		"llm_profile_auto_detect", (*) => _LLM_Menu_ToggleAutoProfile()), Map(
+		MenuCommand.LLM_PROFILE_CREATE, LLM_Menu_PromptCreateProfile,
+		MenuCommand.LLM_PROFILE_CLONE, LLM_Menu_CloneActiveBuiltinProfile,
+		MenuCommand.LLM_PROFILE_AUTO_DETECT, (*) => _LLM_Menu_ToggleAutoProfile()), Map(
 		"llm_profile_custom_present", _LLM_Menu_ProfileCustomPresent.Bind(FrameState),
 		"llm_profile_clone_present", _LLM_Menu_ProfileClonePresent,
 		"llm_profile_auto_detect_checked", () => _LLM_Menu["auto_profile_for_model"],
@@ -231,7 +231,7 @@ _LLM_Menu_PerAppProfileRows() {
 		}
 	}
 	Rows := MenuRenderer_TemplateRows("llm_profile_app_override_frame", Map(
-		"llm_profile_override_active_app", (*) => _LLM_Menu_AddOverrideForActiveApp()),
+		MenuCommand.LLM_PROFILE_OVERRIDE_ACTIVE_APP, (*) => _LLM_Menu_AddOverrideForActiveApp()),
 		Map("llm_profile_overrides_present", () => overrides is Map && overrides.Count > 0),
 		Map("llm_profile_override_rows", () => Rows))
 	if !(Rows is Array)
@@ -636,8 +636,8 @@ _LLM_Menu_CreateProfileReady(PausedFn) {
 _LLM_Menu_CreateProfileRow(OpenFn, PausedFn := 0) {
 	if (PausedFn is Integer) && PausedFn == 0
 		PausedFn := (*) => A_IsSuspended
-	return MenuRenderer_CommandRow("llm_profile_commands", "llm_profile_create",
-		Map("llm_profile_create", OpenFn),
+	return MenuRenderer_CommandRow("llm_profile_commands", MenuCommand.LLM_PROFILE_CREATE,
+		Map(MenuCommand.LLM_PROFILE_CREATE, OpenFn),
 		Map("llm_profile_create_ready", _LLM_Menu_CreateProfileReady.Bind(PausedFn)))
 }
 
@@ -650,8 +650,8 @@ _LLM_Menu_CreateProfileRow(OpenFn, PausedFn := 0) {
 _LLM_Menu_CloneProfileRow(OpenFn, PausedFn := 0) {
 	if (PausedFn is Integer) && PausedFn == 0
 		PausedFn := (*) => A_IsSuspended
-	return MenuRenderer_CommandRow("llm_profile_commands", "llm_profile_clone",
-		Map("llm_profile_clone", OpenFn),
+	return MenuRenderer_CommandRow("llm_profile_commands", MenuCommand.LLM_PROFILE_CLONE,
+		Map(MenuCommand.LLM_PROFILE_CLONE, OpenFn),
 		Map("llm_profile_clone_ready", _LLM_Menu_CreateProfileReady.Bind(PausedFn)))
 }
 

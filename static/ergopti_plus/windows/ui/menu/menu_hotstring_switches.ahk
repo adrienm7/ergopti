@@ -9,6 +9,8 @@
 ; the shared declaration and renderer own category row labels and ordering.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -78,8 +80,8 @@ _HS_CategoryFileRow(TomlPath, OpenFn := 0) {
 ; other side through ``Apply(Bool)``, the scope's batched writer. Every write
 ; rebuilds the tray, so the state captured here is the one the click acts on.
 _HS_AllSectionsRow(AllOn, Apply) {
-	return MenuRenderer_CheckRow("hotstring_scope_checkbox", "hotstring_scope_all_sections",
-		Map("hotstring_scope_all_sections", (*) => Apply(!AllOn)),
+	return MenuRenderer_CheckRow("hotstring_scope_checkbox", MenuCommand.HOTSTRING_SCOPE_ALL_SECTIONS,
+		Map(MenuCommand.HOTSTRING_SCOPE_ALL_SECTIONS, (*) => Apply(!AllOn)),
 		Map("hotstring_scope_all_on", (*) => AllOn ? true : false))
 }
 

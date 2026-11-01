@@ -258,7 +258,7 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 		["auto_profile_for_model", llm["profiles"]["auto_profile_for_model"], ConfigKey.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL],
 		["min_words", llm["generation"]["min_words"], ConfigKey.LLM_GENERATION_MIN_WORDS],
 		["max_words", llm["generation"]["max_words"], ConfigKey.LLM_GENERATION_MAX_WORDS],
-		["ctx_chars", llm["generation"]["context_length"], "llm.generation.context_length"],
+		["ctx_chars", llm["generation"]["context_length"], ConfigKey.LLM_GENERATION_CONTEXT_LENGTH],
 		[ConfigLeaf.DEBOUNCE_MS, llm["trigger"][ConfigLeaf.DEBOUNCE_MS], ConfigKey.LLM_TRIGGER_DEBOUNCE_MS],
 		[ConfigLeaf.MIN_REQUEST_INTERVAL_MS, llm["trigger"][ConfigLeaf.MIN_REQUEST_INTERVAL_MS], ConfigKey.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS],
 		[ConfigLeaf.INSTANT_ON_WORD_END, llm["trigger"][ConfigLeaf.INSTANT_ON_WORD_END], ConfigKey.LLM_TRIGGER_INSTANT_ON_WORD_END],
@@ -281,9 +281,9 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 	TemperatureRaw := llm["generation"]["temperature"]
 	if (TemperatureRaw is Integer) || (TemperatureRaw is Float)
 		_LLM_Menu_PutValidatedPersistedOption(opts, "temperature",
-			Format("{:.2f}", TemperatureRaw + 0), "llm.generation.temperature")
+			Format("{:.2f}", TemperatureRaw + 0), ConfigKey.LLM_GENERATION_TEMPERATURE)
 	else
-		_LLM_Menu_LogInvalidPersistedOption("llm.generation.temperature")
+		_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_GENERATION_TEMPERATURE)
 	for Key in LLM_AGENT_SETTING_KEYS {
 		if llm.Has(Key)
 			_LLM_Menu_PutValidatedPersistedOption(opts, Key, llm[Key], "llm." . Key)

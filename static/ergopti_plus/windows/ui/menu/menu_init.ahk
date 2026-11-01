@@ -595,8 +595,8 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 		; A local version has no installation to update, so it checks for nothing.
 		; The two rows are still drawn, greyed with the reason: left out, nobody
 		; could tell whether the automatic update exists.
-		SourceRow := MenuRenderer_CommandRow("about_source_menu", "about_source_check",
-			Map("about_source_check", (*) => false),
+		SourceRow := MenuRenderer_CommandRow("about_source_menu", MenuCommand.ABOUT_SOURCE_CHECK,
+			Map(MenuCommand.ABOUT_SOURCE_CHECK, (*) => false),
 			Map("about_source_release_ready", () => !IsLocal))
 		if SourceRow is Map
 			Rows.Push(SourceRow)
@@ -618,9 +618,9 @@ _MI_FrequencyPickerRow(SetIntervalFn := 0, IsLocal := Updater_IsLocalSource()) {
 	global UPDATER_CHECK_INTERVAL
 	if !IsObject(SetIntervalFn)
 		SetIntervalFn := Updater_SetCheckInterval
-	return MenuRenderer_ChoiceRow("about_update_frequency_menu", "update_check_interval",
-		Map("update_check_interval", SetIntervalFn),
-		Map("updater.check_interval_seconds", () => UpdateSchedule_SnapInterval(UPDATER_CHECK_INTERVAL).Seconds,
+	return MenuRenderer_ChoiceRow("about_update_frequency_menu", MenuCommand.UPDATE_CHECK_INTERVAL,
+		Map(MenuCommand.UPDATE_CHECK_INTERVAL, SetIntervalFn),
+		Map(ConfigKey.UPDATER_CHECK_INTERVAL_SECONDS, () => UpdateSchedule_SnapInterval(UPDATER_CHECK_INTERVAL).Seconds,
 			"installed_build", () => !IsLocal))
 }
 
@@ -648,20 +648,20 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 	if !HasMethod(LogLevelCommand, "Call")
 		LogLevelCommand := LoggerSetLevel
 	Commands := Map(
-		"window_spy",     WindowSpy,
+		MenuCommand.WINDOW_SPY,     WindowSpy,
 		"list_vars",      ActivateListVars,
 		"key_history",    ActivateKeyHistory,
-		"open_logs",      OpenLogsFolder,
-		"open_today_log", OpenTodayLog,
-		"open_error_log", OpenErrorLog,
+		MenuCommand.OPEN_LOGS,      OpenLogsFolder,
+		MenuCommand.OPEN_TODAY_LOG, OpenTodayLog,
+		MenuCommand.OPEN_ERROR_LOG, OpenErrorLog,
 		"healthcheck",    MenuStartupUiCommand(ShowHealthCheck, MenuStartupDiagnosticsReady),
 		MenuCommand.SEND_PROBE, InputProbe_SendComparisonCommand,
 		MenuCommand.HOOK_PROBE, InputProbe_HookOrderCommand,
 		MenuCommand.COMPOSER_CHECK, ComposerCheck_Command,
 		MenuCommand.FIELD_CHECK_NETWORK, NetworkCheck_Command,
 		MenuCommand.PROXY_OVERRIDE, ProxyOverride_Command,
-		"report_bug",      (*) => HealthCheck_ReportBug(),
-		"suggest_feature", (*) => HealthCheck_SuggestFeature(),
+		MenuCommand.REPORT_BUG,      (*) => HealthCheck_ReportBug(),
+		MenuCommand.SUGGEST_FEATURE, (*) => HealthCheck_SuggestFeature(),
 		"show_error_dialog", (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),
 		"log_level", LogLevelCommand
 	)
@@ -673,7 +673,7 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 ; Keep command registration shared by the real menu and its persistence tests.
 _LAY_ScopeCommands(Options := unset) {
 	Commands := ConfigScopeMenuCommands("keyboard_layout", Map(), IsSet(Options) ? Options : Map())
-	Commands["layout_toggle"] := MenuRenderer_CategoryGateCommand("Layout")
+	Commands[MenuCommand.LAYOUT_TOGGLE] := MenuRenderer_CategoryGateCommand("Layout")
 	Commands["layout_manager"] := LayoutManager_Open
 	return Commands
 }

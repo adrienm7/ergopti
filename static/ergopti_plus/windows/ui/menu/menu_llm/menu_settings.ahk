@@ -91,11 +91,11 @@ LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset, Privac
 	return MenuRenderer_Build("llm_trigger_menu", "LLM", "", "",
 		Map("llm_trigger_leading", (*) => _LLM_Menu_TriggerRows("leading"),
 			"llm_trigger_remaining", (*) => _LLM_Menu_TriggerRows("remaining")),
-		Map("llm_instant_on_word_end", (*) => _LLM_Menu_TriggerReady() && InstantCommand.Call(),
-			"llm_after_hotstring", (*) => _LLM_Menu_TriggerReady() && AfterCommand.Call(),
-			"llm_url_bar_filter", (*) => _LLM_Menu_PrivacyCommand(UrlSource, "disable_url_bars",
+		Map(MenuCommand.LLM_INSTANT_ON_WORD_END, (*) => _LLM_Menu_TriggerReady() && InstantCommand.Call(),
+			MenuCommand.LLM_AFTER_HOTSTRING, (*) => _LLM_Menu_TriggerReady() && AfterCommand.Call(),
+			MenuCommand.LLM_URL_BAR_FILTER, (*) => _LLM_Menu_PrivacyCommand(UrlSource, "disable_url_bars",
 				PrivacyCommands is Map ? PrivacyCommands.Get("disable_url_bars", 0) : 0),
-			"llm_secure_field_filter", (*) => _LLM_Menu_PrivacyCommand(SecureSource, "disable_password_fields",
+			MenuCommand.LLM_SECURE_FIELD_FILTER, (*) => _LLM_Menu_PrivacyCommand(SecureSource, "disable_password_fields",
 				PrivacyCommands is Map ? PrivacyCommands.Get("disable_password_fields", 0) : 0)),
 		Map("llm_instant_on_word_end_enabled", (*) => _LLM_Menu[ConfigLeaf.INSTANT_ON_WORD_END],
 			"llm_after_hotstring_enabled", (*) => _LLM_Menu[ConfigLeaf.AFTER_HOTSTRING],
@@ -179,8 +179,8 @@ _LLM_Menu_TriggerRows(Position := "all") {
 
 	; Debounce — dialog like HS (free numeric input)
 	DebounceRows := MenuRenderer_TemplateRows("llm_trigger_debounce_control",
-		Map("llm_trigger_debounce", (*) => LLM_Menu_PromptDebounce(),
-			"llm_trigger_min_interval", (*) => LLM_Menu_PromptMinRequestInterval()),
+		Map(MenuCommand.LLM_TRIGGER_DEBOUNCE, (*) => LLM_Menu_PromptDebounce(),
+			MenuCommand.LLM_TRIGGER_MIN_INTERVAL, (*) => LLM_Menu_PromptMinRequestInterval()),
 		Map("llm_trigger_debounce_caption", () => _LLM_Menu_DebounceCaption(_LLM_Menu[ConfigLeaf.DEBOUNCE_MS]),
 			"llm_trigger_min_interval_caption", () => _LLM_Menu[ConfigLeaf.MIN_REQUEST_INTERVAL_MS] . " ms"), Map())
 	if !(DebounceRows is Array)
@@ -249,7 +249,7 @@ LLM_Menu_BuildGenerationMenu(AutoCommand := unset, ValuesProvider := unset) {
 		ValuesProvider := (*) => _LLM_Menu_GenerationRows()
 	return MenuRenderer_Build("llm_generation_menu", "LLM", Map(), Map(),
 		Map("llm_generation_values", ValuesProvider),
-		Map("llm_auto_raise_temperature", (*) => _LLM_Menu_AutoRaiseReady() ? AutoCommand.Call() : false),
+		Map(MenuCommand.LLM_AUTO_RAISE_TEMPERATURE, (*) => _LLM_Menu_AutoRaiseReady() ? AutoCommand.Call() : false),
 		Map("llm_auto_raise_enabled", (*) => _LLM_Menu[ConfigLeaf.AUTO_RAISE_TEMP],
 			"llm_auto_raise_ready", (*) => _LLM_Menu_AutoRaiseReady()))
 }
@@ -301,14 +301,14 @@ _LLM_Menu_GenerationRows() {
 	max_display := (max_val == 0) ? t("menu.llm.unlimited") : max_val
 	GenerationCommands := Map(
 		"llm_generation_context", (*) => LLM_Menu_PromptCtxChars(),
-		"llm_generation_context_reset", (*) => _LLM_AssignAndRebuild("ctx_chars", _LLM_DefaultFor("llm_context_length", 500)),
-		"llm_generation_min_words", (*) => LLM_Menu_PromptMinWords(),
-		"llm_generation_min_words_reset", (*) => _LLM_AssignAndRebuild("min_words", _LLM_DefaultFor("llm_min_words", 3)),
-		"llm_generation_max_words", (*) => LLM_Menu_PromptMaxWords(),
-		"llm_generation_max_words_reset", (*) => _LLM_AssignAndRebuild("max_words", _LLM_DefaultFor("llm_max_words", 15)),
+		MenuCommand.LLM_GENERATION_CONTEXT_RESET, (*) => _LLM_AssignAndRebuild("ctx_chars", _LLM_DefaultFor("llm_context_length", 500)),
+		MenuCommand.LLM_GENERATION_MIN_WORDS, (*) => LLM_Menu_PromptMinWords(),
+		MenuCommand.LLM_GENERATION_MIN_WORDS_RESET, (*) => _LLM_AssignAndRebuild("min_words", _LLM_DefaultFor("llm_min_words", 3)),
+		MenuCommand.LLM_GENERATION_MAX_WORDS, (*) => LLM_Menu_PromptMaxWords(),
+		MenuCommand.LLM_GENERATION_MAX_WORDS_RESET, (*) => _LLM_AssignAndRebuild("max_words", _LLM_DefaultFor("llm_max_words", 15)),
 		"llm_generation_temperature", (*) => LLM_Menu_PromptTemperature(),
-		"llm_generation_temperature_reset", (*) => _LLM_AssignAndRebuild("temperature", TempDefault),
-		"llm_reset_on_nav", (*) => LLM_Menu_ToggleBool(ConfigLeaf.RESET_ON_NAV))
+		MenuCommand.LLM_GENERATION_TEMPERATURE_RESET, (*) => _LLM_AssignAndRebuild("temperature", TempDefault),
+		MenuCommand.LLM_RESET_ON_NAV, (*) => LLM_Menu_ToggleBool(ConfigLeaf.RESET_ON_NAV))
 	GenerationGetters := Map(
 		"llm_generation_ready", () => true,
 		"llm_generation_context_caption", () => "" . _LLM_Menu["ctx_chars"],
@@ -396,10 +396,10 @@ LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset, Streami
 		Map("llm_display_leading", (*) => [],
 			"llm_display_remaining", (*) => _LLM_Menu_DisplayRows("remaining"),
 			"llm_display_trailing", (*) => _LLM_Menu_DisplayRows("trailing")),
-		Map("llm_indentation", (Value) => _LLM_Menu_IndentCommand(IndentSource, Value, IndentCommand),
-			"llm_info_bar", (*) => _LLM_Menu_InfoBarCommand(InfoSource, InfoCommand),
+		Map(MenuCommand.LLM_INDENTATION, (Value) => _LLM_Menu_IndentCommand(IndentSource, Value, IndentCommand),
+			MenuCommand.LLM_INFO_BAR, (*) => _LLM_Menu_InfoBarCommand(InfoSource, InfoCommand),
 			"llm_token_streaming", (*) => _LLM_Menu_StreamingCommand(StreamingSource, StreamingCommand),
-			"llm_show_all", (*) =>
+			MenuCommand.LLM_SHOW_ALL, (*) =>
 			_LLM_Menu_ShowAllReady() ? ShowAllCommand.Call() : false),
 		Map(ConfigKey.LLM_DISPLAY_PRED_INDENT, (*) => IndentSource["indentation"],
 			"llm_indentation_ready", (*) => LLM_DisplayIndentReady(IndentSource),
@@ -557,7 +557,7 @@ _LLM_Menu_DisplayRows(Position := "all") {
 	; user keeps the option of bare Backspace / Ctrl+Z to roll back what
 	; was typed.
 	InlineRows := MenuRenderer_TemplateRows("llm_display_inline_control",
-		Map("llm_display_inline", (*) => LLM_Menu_ToggleBool(ConfigLeaf.INLINE_AUTOTYPE)),
+		Map(MenuCommand.LLM_DISPLAY_INLINE, (*) => LLM_Menu_ToggleBool(ConfigLeaf.INLINE_AUTOTYPE)),
 		Map("llm_display_inline_checked", () => _LLM_Menu[ConfigLeaf.INLINE_AUTOTYPE]), Map())
 	if !(InlineRows is Array)
 		return []
