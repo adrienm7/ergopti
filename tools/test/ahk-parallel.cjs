@@ -290,6 +290,21 @@ function killTree(pid) {
 }
 
 /**
+ * Creates a worker's temporary directory under the system's. Several tests need
+ * their fixture outside any repository (a missing .git, the uninstaller's refusal
+ * of a source checkout), so one inside this checkout makes them fail.
+ * @param {number} worker Worker index.
+ * @returns {string} The new directory.
+ */
+function workerTempDir(worker) {
+	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `ergopti-ahk-w${worker}-`));
+	const relative = path.relative(REPO_ROOT, tempDir);
+	if (!relative.startsWith('..') && !path.isAbsolute(relative))
+		throw new Error(`The system temporary directory ${tempDir} is inside the checkout.`);
+	return tempDir;
+}
+
+/**
  * Runs one process over a list of tests and folds its results into the ledger.
  * The first test without a result is the one the process died in; the rest are
  * returned to run again.
@@ -297,8 +312,8 @@ function killTree(pid) {
 function runProcess(context, worker, list) {
 	const { exe, options, ledger, ledgerFile } = context;
 	const workerDir = path.join(options.runDir, `w${worker}`);
-	const tempDir = path.join(workerDir, 'temp');
-	fs.mkdirSync(tempDir, { recursive: true });
+	fs.mkdirSync(workerDir, { recursive: true });
+	const tempDir = workerTempDir(worker);
 	const tap = path.join(workerDir, 'results.tap');
 	const listFile = path.join(workerDir, 'list.txt');
 	fs.writeFileSync(listFile, list.join('\n') + '\n');

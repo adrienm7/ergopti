@@ -35,7 +35,8 @@ Everything lives in the ignored `.ahk-parallel/` folder (`--run-dir` moves it).
 Two mechanisms make the parallelism sound. Workers run under `/force`, the
 interpreter's switch for `#SingleInstance Off`, so they do not replace one
 another and no copy of the runner is needed. Each worker has its own `TEMP`,
-because several tests use fixed names there.
+because several tests use fixed names there, under the system temporary folder
+because several others need a fixture outside any repository.
 
 A test that runs a real configuration transaction spends most of its time in one
 place: every guarded journal effect compares the live migration registry with its
