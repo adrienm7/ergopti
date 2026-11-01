@@ -5490,7 +5490,9 @@ jobs:
           pkgver="$(bash -c 'source "$1"; printf %s "$pkgver"' recipe "$recipe/PKGBUILD")"
           cp "pkg/$LINUX_BUNDLE_ASSET" "$recipe/ergopti-plus-linux-$pkgver.tar.gz"
           chown -R ergopti-builder "$recipe"
-          (cd "$recipe" && sudo -u ergopti-builder makepkg --noconfirm)
+          # A repack builds nothing, so it needs none of its runtime dependencies;
+          # pacman -U below resolves them from the repositories.
+          (cd "$recipe" && sudo -u ergopti-builder makepkg --noconfirm --nodeps)
 
       - name: Install the package with pacman (pkgbuild)
         if: env.INSTALL_KIND == 'pkgbuild'
