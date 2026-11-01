@@ -8,6 +8,8 @@
 ; complete cohort, physical typing or a production backend policy.
 ; ==============================================================================
 
+; ahk-parallel: operator-only launched by hand with its explicit flag, never by the suite
+
 #Requires AutoHotkey v2.0
 #SingleInstance Off
 #Warn All, StdOut
