@@ -176,6 +176,54 @@ _NPL_ScriptChordReadsTheHeldKeys() {
 }
 Test("press ledger: the script chord cleanup reads held keys (item5-script-chord)", _NPL_ScriptChordReadsTheHeldKeys)
 
+; An ordinary press is exactly a KeyWait: its duration, and so every tap-hold, does
+; not change. Only a press the ledger hides is watched there.
+_NPL_WaitOrdinaryPressIsAKeyWait() {
+	Asked := []
+	Ports := Map("key_wait", (Options) => (Asked.Push(Options), true),
+		"tick", () => (Assert(false, "an ordinary press reads no clock"), 0),
+		"sleep", (*) => Assert(false, "an ordinary press polls nothing"))
+	AssertTrue(KS_WaitReleased("SC06E", 0.2, Ports), "no owner")
+	_NPL_WithLedger([], () => KS_WaitReleased("SC06E", 0.2, Ports))
+	AssertEqual(2, Asked.Length)
+	AssertEqual("T" . 0.2, Asked[1], "the same timeout goes to the same KeyWait")
+	AssertEqual("T" . 0.2, Asked[2], "with an owner too")
+}
+Test("press ledger: an ordinary press waits with KeyWait, its duration unchanged (item5-keywait-ordinary)",
+	_NPL_WaitOrdinaryPressIsAKeyWait)
+
+; A release the ledger missed (Ctrl+Alt+Del, UAC): the wait is bounded, and the reset
+; ends it at once. Either way the owner runs on, no press stays held for good.
+_NPL_WaitMissedRelease() {
+	global KS_NATIVE_KEY_HIDDEN
+	Hidden := true, Now := 1000, Sleeps := 0
+	Previous := KS_NativeKeyPressPort()
+	KS_NativeKeyPressPort((Sc) => { flags: Hidden ? KS_NATIVE_KEY_HIDDEN : 0, sequence: 0 })
+	try {
+		Ports := Map("key_wait", (*) => Assert(false, "a hidden press is not AutoHotkey's to wait for"),
+			"tick", () => Now, "sleep", (Ms) => (Now += Ms, Sleeps += 1))
+		AssertFalse(KS_WaitReleased("SC06E", 0.2, Ports), "never released: the timeout ends the wait")
+		AssertEqual(1200, Now, "and at its bound")
+		Hidden := true, Now := 1000
+		ResetPorts := Map("key_wait", (*) => Assert(false, "no KeyWait"), "tick", () => Now,
+			"sleep", (Ms) => (Now += Ms, Hidden := Now < 1030))
+		AssertTrue(KS_WaitReleased("SC06E", 5, ResetPorts), "the ledger's reset releases it")
+		Assert(Now < 1100, "well before the five seconds")
+	} finally KS_NativeKeyPressPort(Previous)
+}
+Test("press ledger: a missed release never stalls a wait (item5-keywait-missed)", _NPL_WaitMissedRelease)
+
+; Every release wait of the driver goes through the one bounded owner.
+_NPL_NoBareKeyWaitLeft() {
+	for _, Rel in ["platform\remap\tab.ahk", "platform\remap\rshift.ahk", "platform\remap\rctrl.ahk",
+			"platform\remap\lshift_lctrl.ahk", "platform\remap\lalt.ahk", "platform\remap\constants.ahk",
+			"infra\nav_layer_helpers.ahk"] {
+		Source := FileRead(A_ScriptDir . "\..\" . Rel, "UTF-8")
+		AssertEqual(0, InStr(Source, "KeyWait(") , Rel . " must wait through KS_WaitReleased")
+	}
+}
+Test("press ledger: every release wait is bounded through KS_WaitReleased (item5-keywait-sites)", _NPL_NoBareKeyWaitLeft)
+
 ; The AltGr guard runs before the order: the fake LCtrl of a standard AltGr
 ; press must never become the pair's first key, whatever its number says.
 _NPL_FakeLCtrlIsNeverTheFirstKey() {

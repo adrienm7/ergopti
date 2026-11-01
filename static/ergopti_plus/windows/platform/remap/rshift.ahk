@@ -55,7 +55,7 @@ _RShiftHandleHold(PhysicalModifierPassthrough) {
 	; Bounded (unlike a bare KeyWait): a lost SC036 key-up can never wedge
 	; this hotkey's tap/hold discrimination forever (hold-keywait-whole-class).
 	TimeBefore := A_TickCount
-	Released := KeyWait("SC036", "T" . TapHoldDuration(TapHold, "right_shift"))
+	Released := KS_WaitReleased("SC036", TapHoldDuration(TapHold, "right_shift"))
 	TimeAfter := A_TickCount
 	ElapsedMs := TickElapsed(TimeBefore, TimeAfter)
 	tap := Released and (ElapsedMs <= TapHoldDuration(TapHold, "right_shift") * 1000)

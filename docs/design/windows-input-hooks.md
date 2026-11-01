@@ -309,6 +309,12 @@ down then has no slot: its release is ignored, its order reads unknown, and Auto
 physical state keeps answering. `ErgoptiNav_GetKeyLedgerHealth` says whether the watch is
 installed and how many switches it saw (`stage=hook_order` in the log).
 
+`KS_WaitReleased` is the one wait for a key's release. An ordinary press is exactly a
+`KeyWait`, so no tap-hold duration changes. A press only the ledger holds (replayed after
+a terminal expansion, where `KeyWait` answered at once and made every press a tap) is
+polled there until the replayed release or a reset, within the same bound. Revert this
+consumer alone with its commit: the others do not depend on it.
+
 `TapHoldUserLCtrlHeld` reads the flag only under AltGr on a standard layout: real means
 the user's Ctrl. A forgotten release cannot turn a later AltGr alone into the user's Ctrl,
 and with no owner running the LCtrl under AltGr stays AltGr's, as before. Physical check:

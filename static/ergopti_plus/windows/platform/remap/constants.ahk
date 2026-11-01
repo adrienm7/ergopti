@@ -371,7 +371,7 @@ TapHoldShouldCancelTap(KeyId, GuardMs := 250) {
 }
 
 _TapHoldModifierWaitRelease(KeyName, TimeoutSec) {
-	return KeyWait(KeyName, "U T" . TimeoutSec)
+	return KS_WaitReleased(KeyName, TimeoutSec)
 }
 
 _TapHoldModifierKeyIsDown(KeyName) {

@@ -141,6 +141,38 @@ KS_RealPressState(KeyName) {
 	return (Press.flags & KS_NATIVE_KEY_REAL_DOWN) ? 1 : 0
 }
 
+; How often a wait for a press only the ledger holds looks at it.
+global KS_WAIT_RELEASED_POLL_MS := 10
+
+; Waits for a key to come up, for a bounded time. AutoHotkey's KeyWait answers at once
+; for a press replayed after a terminal expansion (its physical state never had it),
+; which made every such press a tap. Such a press is watched in the ledger instead,
+; whose release comes with the replay or from a reset (Ctrl+Alt+Del, a desktop switch).
+; Any other press is exactly a KeyWait, so its duration does not change. The bound
+; stands either way: a release nobody sees costs the timeout, never a stuck key.
+; @param KeyName {String} Platform key identifier.
+; @param TimeoutSec {Number} The longest wait, in seconds.
+; @param Ports {Map} Test seams: "key_wait"(Options), "tick"(), "sleep"(Ms).
+; @return {Boolean} True when the key came up, false at the timeout.
+KS_WaitReleased(KeyName, TimeoutSec, Ports := 0) {
+	global KS_NATIVE_KEY_HIDDEN, KS_WAIT_RELEASED_POLL_MS
+	Press := _KS_NativeKeyPress(KeyName)
+	if !(Press && (Press.flags & KS_NATIVE_KEY_HIDDEN)) {
+		if (Ports is Map)
+			return Ports["key_wait"].Call("T" . TimeoutSec)
+		return KeyWait(KeyName, "T" . TimeoutSec)
+	}
+	Tick := (Ports is Map) ? Ports["tick"] : () => A_TickCount
+	Wait := (Ports is Map) ? Ports["sleep"] : Sleep
+	Start := Tick.Call()
+	while KS_IsHeld(KeyName) {
+		if (Tick.Call() - Start >= TimeoutSec * 1000)
+			return false
+		Wait.Call(KS_WAIT_RELEASED_POLL_MS)
+	}
+	return true
+}
+
 ; KS_IsHeld for either Shift: one scan code cannot name both.
 ; @return {Integer} 1 if a Shift is held, 0 otherwise.
 KS_ShiftIsHeld() {
