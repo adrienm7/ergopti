@@ -242,17 +242,16 @@ helpers.describe("Ollama install state on Linux", function()
 	end)
 
 	helpers.it("(linux-ollama-install-state) the page binding greys the Ollama group with that reason", function()
-		local source = assert(io.open(helpers.driver_root() .. "/ui/model_browser/bridge.lua", "r"))
-		local code = source:read("*a"); source:close()
+		-- Each file selected by a declaration unique to it: the model browser
+		-- bridge, the backend rows and the prediction engine.
+		local code = assert(helpers.read_driver_unit("local function load_catalogue("))
 		helpers.assert_true(code:find("_bound.ollama_state(frame.llm)", 1, true) ~= nil, "the payload reads the bound state")
 		helpers.assert_true(code:find('backend_entry("ollama", { available = blocked == nil and ollama_ok, reason_key = blocked or ollama_reason', 1, true) ~= nil,
 			"the Ollama group is greyed with the state's reason")
-		local rows = assert(io.open(helpers.driver_root() .. "/ui/menu/llm_backend_rows.lua", "r"))
-		local bind = rows:read("*a"); rows:close()
+		local bind = assert(helpers.read_driver_unit("local function save_failed("))
 		helpers.assert_true(bind:find('require("modules.llm.ollama_install_state").capture(engine)', 1, true) ~= nil,
 			"the menu binds the real install state")
-		local engine_file = assert(io.open(helpers.driver_root() .. "/modules/llm/prediction_engine.lua", "r"))
-		local engine_code = engine_file:read("*a"); engine_file:close()
+		local engine_code = assert(helpers.read_driver_unit("local function SYSTEM_CLOCK("))
 		helpers.assert_true(engine_code:find('require("modules.llm.ollama_install_state").note_repair(result)', 1, true) ~= nil,
 			"the owned repair records its result")
 	end)
