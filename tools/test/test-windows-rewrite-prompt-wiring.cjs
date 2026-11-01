@@ -414,7 +414,7 @@ for (const name of ['LLM_Engine_OnKeystroke', 'LLM_Engine_StartTimer']) {
 // The request plan owns the delay, so live mode's debounce reaches it here.
 check(
 	bodyFrom(keystrokes, '_LLM_Engine_PlanInput').includes(
-		'"live_debounce_ms", LLM_Engine_LiveIsActive() ? LLM_Live_Config()[ConfigLeaf.DEBOUNCE_MS] : false'
+		'"live_debounce_ms", LLM_Engine_LiveIsActive() ? LLM_Live_Config()["debounce_ms"] : false'
 	),
 	"the request plan must receive live mode's debounce while live mode is on"
 );
@@ -630,7 +630,8 @@ check(
 check(
 	bodyOf(agentAction, '_LLM_Agent_OnPause').includes('_LLM_Agent_Auto["triaged"].Has(Sentence)') &&
 		bodyOf(agentAction, '_LLM_Agent_OnPause').includes('LLM_Engine_LiveIsActive()') &&
-		bodyOf(agentAction, '_LLM_Agent_OnPause').includes('SFD_IsSecureField()'),
+		bodyOf(agentAction, '_LLM_Agent_OnPause').includes('_LLM_Agent_FieldIsSecure()') &&
+		bodyOf(agentAction, '_LLM_Agent_FieldIsSecure').includes('SFD_IsSecureField()'),
 	'the automatic mode must skip a triaged sentence, live mode and secure fields'
 );
 check(
