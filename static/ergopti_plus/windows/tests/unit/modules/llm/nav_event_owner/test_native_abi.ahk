@@ -228,6 +228,28 @@ _LNEO_KeyPressCrossesTheAbiExactly() {
 Test("LLM nav event owner: the press ledger crosses the ABI exactly (todo91-ledger-abi)",
 	_LNEO_KeyPressCrossesTheAbiExactly)
 
+; The session record is written once the owner stopped and unhooked its watch: it
+; must not read that as a watch that failed to arm, a warning on every healthy exit.
+_LNEO_StoppedOwnerDoesNotBlameTheDesktopWatch() {
+	Logged := []
+	LoggerSetTestSink((Line) => Logged.Push(Line))
+	try _LLM_NavEventOwnerLogHookOrder()
+	finally LoggerClearTestSink()
+	for Line in Logged
+		AssertFalse(InStr(Line, "desktop_watch=0"), "a stopped owner warns of no desktop watch: " . Line)
+	Logged := []
+	LoggerSetTestSink((Line) => Logged.Push(Line))
+	try _LLM_NavEventOwnerLogDesktopWatch()
+	finally LoggerClearTestSink()
+	Joined := ""
+	for Line in Logged
+		Joined .= Line . "`n"
+	AssertContains(Joined, "desktop_watch=0", "a running owner without its watch does warn")
+}
+
+Test("LLM nav event owner: a stopped owner reports no missing desktop watch (ledger-desktop-watch)",
+	_LNEO_StoppedOwnerDoesNotBlameTheDesktopWatch)
+
 ; Empty val_modifiers is the shared default: a bare digit N while a prediction
 ; owner is committed must be suppressed (never typed) and target slot N, while
 ; a modified digit or a digit beyond the shown slots stays application input.
