@@ -61,9 +61,14 @@ _LPP_Menu(Enabled := true) {
 }
 
 ; The engine state matching that menu. Streaming and the per-app overrides are
-; off so the scenario is deterministic; the rate floor starts open.
+; off so the scenario is deterministic; the rate floor starts open. The clone is
+; shallow: any LLM_Engine_Init test plants a request plan on the real engine, so
+; a shared plan carried one scenario's send into the 300 ms floor of the next,
+; and an automatic request deferred, in a whole-group run only.
 _LPP_Engine(Base) {
 	Engine := Base.Clone()
+	if Engine.Has("request_plan")
+		Engine.Delete("request_plan")
 	Settings := Map(
 		"enabled", true, "backend", "api",
 		"api_entries", [_LPP_Entry()], "api_entry_id", "remote-a",
@@ -299,6 +304,31 @@ _LPP_RewriteEndToEnd() {
 }
 Test("LLM prompt prediction: a rewrite binding runs end to end with a fake network and keyboard",
 	_LPP_RewriteEndToEnd)
+
+; A scenario's own request never reaches the floor of the real engine or of the
+; next scenario, even when the real engine already carries a plan.
+_LPP_ScenariosKeepTheirOwnFloor() {
+	global LPP_BUFFER, _LLM_Engine
+	SavedEngine := _LLM_Engine
+	Base := SavedEngine.Clone()
+	Outer := LLMRequestPlan(_LLM_Engine_FloorMs)
+	Base["request_plan"] := Outer
+	_LLM_Engine := Base
+	try {
+		loop 2 {
+			_LPP_Run(_LPP_Menu(), LPP_BUFFER, _Body)
+			AssertEqual("", Outer.LastSentMs, "a scenario's send must not move the real engine's floor")
+		}
+	} finally _LLM_Engine := SavedEngine
+	_Body(Calls, Lines) {
+		global _LLM_Engine, LPP_BUFFER
+		AssertEqual("", _LLM_Engine_Plan().LastSentMs, "each scenario's rate floor starts open")
+		LLM_Engine_FirePrediction(LPP_BUFFER)
+		AssertEqual(1, Calls.Length, "the automatic trigger dispatches at once")
+	}
+}
+Test("LLM prompt prediction: a scenario's request stays out of the next one's rate floor",
+	_LPP_ScenariosKeepTheirOwnFloor)
 
 ; Every built-in gets a ready-made action running it with the menu's count.
 _LPP_PresetsRunTheirProfile() {
