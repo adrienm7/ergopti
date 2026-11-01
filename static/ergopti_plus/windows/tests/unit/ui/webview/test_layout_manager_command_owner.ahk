@@ -61,6 +61,8 @@ _LMCT_ChildSource() {
 	Code := SubStr(Code, 1, StrLen(Code) - StrLen(Tail))
 	for Symbol in ["UpdateChannelRegistryData", "UpdateScheduleData"]
 		Code .= "#Include " . _LMCT_GeneratedOwner(Symbol) . "`n"
+	; The updater owner of this graph builds its URLs from the generated hosts.
+	Code .= "#Include " . _DriverDir . "\_generated\identifiers.ahk`n"
 	Seen := Map()
 	for Symbol in ["UpdateChannels_Ids", "UpdateSchedule_Timing", "Updater_IsLocalSource",
 		"ErgoptiLayout_BuiltinVariant", "LayoutCatalogue_WriteInstalled", "LayoutExtension_Problem"] {

@@ -407,7 +407,7 @@ _HCW_ResetAll() {
 ; overrides for a consistent cascade. Personal file TOMLs are patched atomically.
 _HCW_SetAllGrey() {
 	global _HCW_CATEGORY_LIST
-	Grey := "#6e6e73"
+	Grey := _HCW_PaletteHex("gray")
 	Writes := []
 	for _, E in _HCW_CATEGORY_LIST {
 		if E.IsPersonal {

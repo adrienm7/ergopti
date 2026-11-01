@@ -423,7 +423,7 @@ KLWV_Open(which, metrics_dir) {
 			)
 			if KLWV.close_during_open.Get(which, false)
 					KLWV_Hide(which, g)
-			SetTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -1500)
+			SetTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -TimingsGet("keystats", "first_push_delay_ms"))
 			KLWV_ArmRebuildWatch(which, Epoch)
 			KLWV_FitWebView(which)
 			KLWV_OpenTimingMark(which, "navigate", Timing)

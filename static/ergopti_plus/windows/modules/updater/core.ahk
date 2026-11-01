@@ -40,11 +40,11 @@ global UPDATER_UNKNOWN_COMMIT_KEY := "menu.about.commit_unknown"
 ; exists, which callers reported as an unreachable network. Mirrors
 ; update_check.releases_url in _shared/modules/updater/defaults.json (pinned
 ; by tools/test/test-updater-constants-single-source.cjs).
-global UPDATER_RELEASES_API_URL_TEMPLATE := "https://api.github.com/repos/{owner}/{repo}/releases?per_page=100"
+global UPDATER_RELEASES_API_URL_TEMPLATE := "https://" . Identifiers.Hosts.GITHUB_API . "/repos/{owner}/{repo}/releases?per_page=100"
 ; The public releases Atom feed, read when api.github.com gives no list: a
 ; check-only answer, because the feed names no asset and no digest.
-global UPDATER_GITHUB_WEB_ROOT := "https://github.com/"
-global UPDATER_RELEASES_FEED_URL_TEMPLATE := "https://github.com/{owner}/{repo}/releases.atom"
+global UPDATER_GITHUB_WEB_ROOT := "https://" . Identifiers.Hosts.GITHUB . "/"
+global UPDATER_RELEASES_FEED_URL_TEMPLATE := UPDATER_GITHUB_WEB_ROOT . "{owner}/{repo}/releases.atom"
 
 ; Returned instead of a release when the list holds none of the requested
 ; channel: distinct from "" (network or HTTP failure), which callers report
@@ -1431,7 +1431,7 @@ _Updater_ScheduleCheckIntervalMenu(MenuScheduleFn := 0) {
 		return _Updater_ResultSucceeded(
 			MenuScheduleFn.Call(Callback, 50))
 	try {
-		SetTimer(Callback, -50)
+		SetTimer(Callback, -TimingsGet("adapters", "updater_callback_defer_ms"))
 		return true
 	} catch as Err {
 		try LoggerError("Updater", "Could not schedule the check-interval menu rebuild: {1}.", Err.Message)

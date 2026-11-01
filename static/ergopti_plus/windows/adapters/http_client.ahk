@@ -1566,7 +1566,7 @@ _HTTP_ManagedWait(Request) {
 			Request.Abort()
 			return false
 		}
-		Sleep(10)
+		Sleep(TimingsGet("adapters", "http_managed_wait_poll_ms"))
 	}
 	return !Request.Aborted && !A_IsSuspended && Request._Remaining() > 0
 }

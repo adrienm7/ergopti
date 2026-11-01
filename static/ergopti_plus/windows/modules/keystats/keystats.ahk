@@ -305,7 +305,7 @@ KL_WriteAtomic(path, content) {
     ; of the same target — and there are several, on threads that interrupt one
     ; another. KL_SaveState is reached from the ingest timer, from
     ; KL_DayRollover and from KL_Stop (OnExit, which pre-empts a running timer),
-    ; and the ``Sleep 50`` retry below is a yield point that hands control to
+    ; and the ``Sleep(TimingsGet("keystats", "stop_poll_ms"))`` retry below is a yield point that hands control to
     ; exactly those threads. The losing interleaving is:
     ;
     ;   A: FileAppend(tmp) → MoveFileExW fails (AV lock) → Sleep 50 …yields…

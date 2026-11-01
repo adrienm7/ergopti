@@ -697,7 +697,7 @@ _GestureSendTransformedSelection(Text, Transform) {
 		try SyntheticOwner := KL_MarkSynthetic("case-transform")
 		try {
 				SendInstant(Transform.Call(Text))
-				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
+				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -TimingsGet("gestures", "synthetic_clear_ms"))
 		} catch {
 				KL_ClearSynthetic(SyntheticOwner)
 				throw
@@ -1070,7 +1070,7 @@ _GestureIsTerminalForeground() {
 GestureSaveAndReload() {
 		if !_GestureIsTerminalForeground() {
 				TextPressKey("s", ["Ctrl"])
-				Sleep(300)
+				Sleep(TimingsGet("gestures", "action_settle_ms"))
 		}
 		ReloadPreservingSuspend()
 }

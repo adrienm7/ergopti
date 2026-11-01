@@ -271,6 +271,11 @@ terminal_hotstring_key_delay_ms = 20
 # ──────────────────────────────────────────────────────────────────────
 
 [gestures]
+# Windows: how long a gesture's synthetic keys stay marked, the settle after an
+# action's own window change, and the wait before the first auto-configuration.
+synthetic_clear_ms = 300
+action_settle_ms = 300
+auto_configure_delay_ms = 250
 
 # Windows: how often a worker-authored result file is checked after a touchpad
 # restart or gesture registration.
@@ -405,6 +410,9 @@ return_delay_ms = 200
 # ──────────────────────────────────────────────────────────────────────
 
 [keystats]
+# Windows: the poll while keystats stops, and the wait before the page's first data.
+stop_poll_ms = 50
+first_push_delay_ms = 1500
 
 # Background ingest tick — how often buffered events are flushed to disk.
 # AHK: keystats.ahk INGEST_TICK_MS. HS: log_manager.lua INGEST_TICK_SEC.
@@ -624,6 +632,8 @@ one_shot_shift_timeout_ms = 2000
 # ──────────────────────────────────────────────────────────────────────
 
 [hotstrings]
+# Windows: how long a hotstring's synthetic output stays marked as its own.
+synthetic_clear_ms = 60
 
 # A Shift, Alt or AltGr/Option keystroke takes longer finger-path time than a
 # bare letter, and the Ergopti layout is Shift/AltGr-heavy. The expansion delay
@@ -675,6 +685,11 @@ hesitation_cooldown_ms = 10000
 # ──────────────────────────────────────────────────────────────────────
 
 [ui]
+# Windows: the model browser's filter debounce, the onboarding poll while a page
+# loads, and the wait before its gesture step reports done.
+model_browser_filter_debounce_ms = 120
+onboarding_poll_ms = 100
+onboarding_gesture_done_ms = 100
 
 # Linux diagnostics owns an asynchronous desktop launcher until its exit/EOF receipt.
 desktop_open_timeout_ms = 30000
@@ -1051,6 +1066,15 @@ prediction_display_ms = 2000
 # ──────────────────────────────────────────────────────────────────────
 
 [adapters]
+# Windows: the poll of a managed HTTP request an owner waits for.
+http_managed_wait_poll_ms = 10
+# Windows: the delay before a closed WebView profile folder is removed.
+webview_profile_cleanup_ms = 1000
+# Windows: the input probe's gap between sends, and its settle before reading.
+input_probe_step_ms = 10
+input_probe_settle_ms = 40
+# Windows: an updater completion run off the current thread.
+updater_callback_defer_ms = 50
 
 # Windows: minimum age of an abandoned atomic-write stage before it is reaped.
 # AHK: infra/toml/toml_helpers.ahk StaleTempAgeMs (pinned copy).

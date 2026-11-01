@@ -90,6 +90,14 @@ _HCW_InitLocaleStrings() {
 	_HCW_FILE_LEVEL_LABEL := t("hs_config.file_level")
 }
 
+; One colour of the shared palette by its name; a missing name is a broken generator.
+_HCW_PaletteHex(Name) {
+	for Row in NativeThemeHotstringPalette()
+		if Row["Name"] == Name
+			return Row["Hex"]
+	throw ValueError("The hotstring palette holds no colour named " . Name . ".")
+}
+
 ; Build the unified category list:
 ; 1. Common categories (Group: "common")
 ; 2. Personal TOML files discovered from PersonalHotstringsDir (Group: "personal")

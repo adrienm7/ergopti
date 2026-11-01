@@ -655,7 +655,7 @@ _OnbWeb_GestureAutoDone(SessionEpoch, ok) {
 		return
 	}
 	if A_IsSuspended {
-		SetTimer(_OnbWeb_GestureAutoDone.Bind(SessionEpoch, ok), -100)
+		SetTimer(_OnbWeb_GestureAutoDone.Bind(SessionEpoch, ok), -TimingsGet("ui", "onboarding_gesture_done_ms"))
 		return
 	}
 	try LoggerInfo("Onboarding", "Gesture auto-configuration completed (ok={1}).", ok ? "true" : "false")
