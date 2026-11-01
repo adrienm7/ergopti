@@ -109,8 +109,8 @@ Hands needed:
       login item starts a second Hammerspoon, declining the download opens no error window.
 - [ ] Installed app: guardian registration and retirement on both architectures (13/35), VS Code bridge retirement
       (127), 120 provider menu, issue 94 (tap-hold refusal, symbol-wrap clipboard).
-- [ ] Recompile `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` (`osadecompile`, edit the comment
-      for the keystats rename, `osacompile -o`) and commit it.
+- [ ] Run the field report once: its `scpt_recompile` step rebuilds `Encryptor.app/.../main.scpt` from its updated
+      `.applescript` (keystats rename) and commits it on the field branch (710f0a379d); cherry-pick that commit.
 
 ## To confirm on the Windows PC
 
@@ -193,7 +193,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [ ] Developer mode with the package installed: `run-linux-dev.sh` stops the unit, the tray appears, a saved `.lua`
       and the tray's Reload restart the daemon, a second run reports "already running".
 - [ ] Ten window-toggle actions on GNOME Wayland and X11 (a covered page is raised, not closed); release notes pane
-      (PAR-52); tap delay row (zenity/kdialog), group restore and clear, open target, Backspace word start.
+      (PAR-52); tap delay row and every tray dialog in the owned GTK host (ca680655d7), group restore and clear, open target, Backspace word start.
 - [ ] Some `local_servers.json` servers installed: the detection names them.
 
 ## Remaining code work
@@ -232,22 +232,23 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 
 - **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md)). WP3, WP6
   and WP7 are built and dormant behind `[karabiner] runtime = "owned"`. Left: a green hosted runtime build of the
-  installer shape (`fix/remap-runtime-build-hang` is still being fixed), then its `runtime.*` pin; the per-OS feature
-  requirements table (needs the generator's inputs mapped to feature paths); the driver-only VirtualHIDDevice update
-  offer; WP8 native and WP9 real-Mac acceptance; then the `RUNTIME_DEFAULT` flip and the shared-mode deletion.
+  installer shape (`fix/remap-runtime-build-hang` is still being fixed), then its `runtime.*` pin; WP8 native and WP9 real-Mac acceptance; then the
+  `RUNTIME_DEFAULT` flip and the shared-mode deletion. Done on 1 November: the per-OS feature requirements table
+  (`docs/design/feature-requirements.md`) and the driver-only VirtualHIDDevice update offer (3ebab93a17).
 - **Owned runtimes.** The rows in state "to do" of `_shared/data/owned_runtimes.json`
-  (`docs/design/owned-runtimes.md` section 7); the Swift-owned managed daemon under the proxy relay.
-- **Checks left to a program from the Mac session.** The Karabiner JSON tap-hold thresholds equal the shared
-  per-key ones (PAR-15, the Karabiner input owner's); the native HTTPS downgrade refusal (needs an HTTPS origin that
-  redirects to HTTP); the read-only dashboard with a hot journal.
+  (`docs/design/owned-runtimes.md` section 7); the Swift-owned managed daemon under the proxy relay; App Cloner on the
+  managed Python with pinned PyObjC (in progress on `feat/overnight-macos-2`).
+- **Checks left to a program from the Mac session.** Done on 1 November: `field_tap_hold_thresholds` (9901da4d94);
+  the HTTPS downgrade refusal is already covered by `ManagedPACSourceTests` and `ManagedBootstrapDownloadTests`.
 
 ### All drivers
 
-- **Test parity (audit item 14).** macOS: the `init.lua` scans (need a boot harness) and the dedup single-source test
-  (needs the three backends' HTTP fixtures); Linux: the `managed_http` dofile group pinned by
-  `test_managed_http_fixture_import_isolation`.
-- **Provider flags inferred, not read.** Chutes and Featherless `chat_template_kwargs.enable_thinking` on Qwen,
-  SambaNova `enable_thinking: false`, Qianfan `ernie-5.1` hybrid; watch Perplexity Sonar chat completions (ended
+- **Test parity (audit item 14).** Done on 1 November for the `init.lua` gates (boot scenarios), the dedup test,
+  the `managed_http` group and most Linux source invariants (`helpers.read_driver_unit`). Left: whole-tree class scans
+  (legitimate meta tests) and the sliced-source compile tests (archive_output tar feeder).
+- **Provider flags inferred, not read.** Checked against the docs on 1 November (90344262aa): Featherless and
+  Qianfan confirmed; left: SambaNova toggle unverified (its docs answer 403 to automated reads), Chutes Qwen field
+  inferred; watch Perplexity Sonar chat completions (ended
   2026-09-27), `dashscope-intl`, Moonshot K2 retiring by December.
 - **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
@@ -288,6 +289,10 @@ Each closes on a named green hosted or native run, recorded here.
       `testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope`.
 
 ## Maintainer decisions pending
+
+- [ ] Define "the read-only dashboard with a hot journal" (which dashboard opens which database read-only, and
+      which journal is hot: a rollback `-journal` left by an interrupted keystats write, or a WAL?) so a program can
+      check it.
 
 - **PAC list walk on macOS and Windows.** Linux probes a `PROXY a; DIRECT` list before the Ollama start
   (`llm.managed_proxy_probe_timeout_ms`); the decision named Linux only, so macOS
