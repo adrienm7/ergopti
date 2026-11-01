@@ -775,6 +775,8 @@ printf icns > "$out"
 					OWNED_STAT_FAULT: '',
 					REAL_PYTHON: realPython.stdout.trim(),
 					OWNED_STAT_QUERY: toBashPath(statQuery),
+					// clone_app.sh requires the managed Python link and leads PATH with its folder.
+					ERGOPTI_CLONER_PYTHON: `${toBashPath(fakeBin)}/python3`,
 					PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
 				}
 			}
@@ -863,6 +865,8 @@ printf icns > "$out"
 					REAL_PYTHON: realPython.stdout.trim(),
 					OWNED_STAT_QUERY: toBashPath(statQuery),
 					OWNED_TMP_TEMPLATE: `${toBashPath(fixtureRoot)}/rollback-work.XXXXXX`,
+					// clone_app.sh requires the managed Python link and leads PATH with its folder.
+					ERGOPTI_CLONER_PYTHON: `${toBashPath(prefixBin)}/python3`,
 					PATH: `${toBashPath(prefixBin)}:${process.env.PATH || ''}`
 				}
 			}

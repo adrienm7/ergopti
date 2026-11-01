@@ -32,6 +32,9 @@ def run_case(
     spec = importlib.util.spec_from_loader(loader.name, loader)
     subject = importlib.util.module_from_spec(spec)
     loader.exec_module(subject)
+    # The managed Python check has its own test (test-app-cloner-managed-python.cjs);
+    # this probe's fakes stand in for every subprocess, so the check is admitted.
+    subject.cloner_python_refusal = lambda app_root, cloner_python: None
     original = (
         os.open,
         os.fdopen,
