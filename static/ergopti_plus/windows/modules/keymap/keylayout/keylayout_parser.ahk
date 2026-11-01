@@ -200,7 +200,7 @@ Keylayout_ParseCanonical(Text) {
 	ModifierMaps := Map()
 	Sets := Map(), SetOrder := []
 	Actions := Map(), ActionOrder := []
-	Terminators := Map(), TerminatorOrder := []
+	TerminatorOutputs := Map(), TerminatorOrder := []
 	CurModifierMap := "", CurSelect := 0, CurSet := 0, CurKeyMap := 0, CurAction := 0
 	InTerminators := false
 
@@ -310,8 +310,8 @@ Keylayout_ParseCanonical(Text) {
 						CurAction["Whens"][State] := When
 						CurAction["Order"].Push(State)
 					}
-				} else if (InTerminators && Attrs.Has("state") && !Terminators.Has(Attrs["state"])) {
-					Terminators[Attrs["state"]] := Attrs.Get("output", "")
+				} else if (InTerminators && Attrs.Has("state") && !TerminatorOutputs.Has(Attrs["state"])) {
+					TerminatorOutputs[Attrs["state"]] := Attrs.Get("output", "")
 					TerminatorOrder.Push(Attrs["state"])
 				}
 			case "terminators":
@@ -360,7 +360,7 @@ Keylayout_ParseCanonical(Text) {
 		Canonical["actions"].Push(Map("id", Id, "whens", Whens))
 	}
 	for State in TerminatorOrder
-		Canonical["terminators"].Push(Map("state", State, "output", Terminators[State]))
+		Canonical["terminators"].Push(Map("state", State, "output", TerminatorOutputs[State]))
 	return Canonical
 }
 
