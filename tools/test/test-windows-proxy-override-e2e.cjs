@@ -684,6 +684,27 @@ async function main() {
 			}
 		);
 
+		await ahkCheck(
+			'a password clear in the file is sealed once and the next downloads still use it',
+			async () => {
+				const form = forms[forms.length - 1];
+				arm(form);
+				const first = await runOwner(work, { stored: form.value, seal_at_start: true });
+				assert.equal(first.sealed_now, 1, JSON.stringify(first.logs));
+				assert.equal(first.committed.length, 1, 'one write');
+				const [envelope] = first.committed;
+				assert.match(envelope, /^dpapi:/);
+				assert.ok(!envelope.includes(SECRET) && !envelope.includes(BASIC_CREDENTIAL.user));
+				assertTunnel(form, JSON.stringify(first.receipt));
+				arm(form);
+				const next = await runOwner(work, { stored: envelope, seal_at_start: true });
+				assert.equal(next.published, 1);
+				assert.equal(next.sealed_now, 0, 'the migration runs once');
+				assert.deepEqual(next.committed, [], 'and writes nothing more');
+				assertTunnel(form, JSON.stringify(next.receipt));
+			}
+		);
+
 		await check('the daemon is handed the real relay, in its environment only', async () => {
 			reset();
 			const value = `socks5h://${USERINFO}@${hostOf(socksLogin)}`;

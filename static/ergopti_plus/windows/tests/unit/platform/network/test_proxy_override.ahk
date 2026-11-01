@@ -81,6 +81,27 @@ _TPO_WorkerEnvironment() {
 	_TPO_WithPublished("", (*) => _TPO_AssertBlockHolds(PROXY_OVERRIDE_ENVIRONMENT . "=", "automatic hides an inherited value"))
 }
 
+; A relay with credentials is stored as an envelope; everything else stays readable.
+_TPO_Sealed() {
+	Relay := "http://user:tpo-secret@proxy.invalid:3128"
+	Envelope := ProxyOverride_Seal(Relay)
+	Assert(ProxyOverride_IsSealed(Envelope), "an envelope")
+	AssertFalse(InStr(Envelope, "tpo-secret") || InStr(Envelope, "proxy.invalid"), "nothing of the relay is readable")
+	for Value in ["", "direct", "http://proxy.invalid:3128"]
+		AssertEqual(ProxyOverride_Seal(Value), Value, "nothing to protect")
+	_TPO_WithPublished(Envelope, _TPO_AssertOpened.Bind(Relay))
+	; A file copied to another account: the blob does not open and is never automatic.
+	Foreign := SubStr(Envelope, 1, -8) . (SubStr(Envelope, -8, 1) == "A" ? "B" : "A") . SubStr(Envelope, -7)
+	_TPO_WithPublished(Foreign, _TPO_AssertPublishedRefused)
+	_TPO_WithPublished("dpapi:not-base64", _TPO_AssertPublishedRefused)
+}
+
+_TPO_AssertOpened(Relay, Published) {
+	Assert(Published, "the envelope opens")
+	AssertEqual(ProxyOverride_Current()["relay"], Relay)
+	AssertEqual(_ProxyOverrideStored, Relay, "the menu row shows what the user typed")
+}
+
 ; A worker stays in its Job: the private entry is the tree-owned one.
 _TPO_WorkerIsTreeOwned() {
 	AssertContains(_DriverFuncBody("ProxyOverride_SpawnWorker"), "ShellRunner_SpawnTreeOwnedPrivate(")
@@ -271,6 +292,7 @@ Test("proxy override: a relay with credentials stays out of the worker's input f
 Test("proxy override: run_command and Run children never inherit it", _TPO_NoChildInherits)
 Test("proxy override: only a worker's private environment carries it", _TPO_WorkerEnvironment)
 Test("proxy override: a worker stays tree-owned and the value never enters this process", _TPO_WorkerIsTreeOwned)
+Test("proxy override: credentials are sealed with DPAPI and a foreign envelope is refused", _TPO_Sealed)
 Test("proxy override: a refused value is published as a refusal, never as automatic", _TPO_Published)
 Test("proxy override: every adapter route owner honours the override before the system", _TPO_Precedence)
 Test("proxy override: automatic keeps the exported relay, then the system settings", _TPO_Automatic)

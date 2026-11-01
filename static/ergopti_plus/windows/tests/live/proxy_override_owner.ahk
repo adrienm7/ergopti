@@ -36,6 +36,15 @@ LoggerSuccess(*) => 0
 LoggerDebug(*) => 0
 t(Key) => _OwnerTexts[Key]
 
+global ConfigurationFile := ""
+global _OwnerCommitted := []
+; config_io is not part of this fixture's closure: the commit records what reaches the file.
+ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0, PublishFn := 0) {
+	_OwnerCommitted.Push(Updates[1].Value)
+	PublishFn.Call()
+	return true
+}
+
 #Include ..\..\infra\tick_count.ahk
 #Include ..\..\infra\json.ahk
 #Include ..\..\adapters\crypto.ahk
@@ -64,6 +73,11 @@ _OwnerMain(PlanPath) {
 	_VendorDir := Plan["vendor"]
 	_OwnerTexts := JsonParse(FileRead(_SharedDir . "\data\locales\en.json", "UTF-8"))
 	Result := Map("published", ProxyOverride_Publish(Plan["stored"]))
+	; The first start after an edit by hand: the request below then runs on the sealed value.
+	if Plan.Get("seal_at_start", false) {
+		Result["sealed_now"] := ProxyOverride_SealStoredAtStart() ? 1 : 0
+		Result["committed"] := _OwnerCommitted
+	}
 	Settings := Map("auto_detect", false, "pac_url", Plan.Get("pac_url", ""), "proxy", Plan.Get("system_proxy", ""), "bypass", "")
 
 	Http := CurlAsyncRequest()

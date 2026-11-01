@@ -23,9 +23,18 @@
 ;    for an https relay, a socks5 relay or credentials in the address; the Ollama
 ;    daemon reads them from its environment itself. The value holds a password then,
 ;    and logs name the mode.
+; 4. A relay with credentials is stored whole as a DPAPI envelope, the store of the
+;    API keys, so config.toml holds no password; the address goes with it because one
+;    string has no torn state between two keys. A clear value edited by hand is sealed
+;    once, after boot. No plaintext fallback: a seal that fails refuses the save.
+;    macOS and Linux keep this value in their settings store for now: every route
+;    decision there reads it synchronously, while the Keychain answers asynchronously
+;    through the signed launcher and secret-tool hands the keyboard to the desktop.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+
+#Include %A_LineFile%\..\..\modules\llm\api_token_crypto.ahk
 
 ; The variable the route owner reads, as on macOS (network_env.lua)
 global PROXY_OVERRIDE_ENVIRONMENT := "ERGOPTI_PROXY_OVERRIDE"
@@ -40,6 +49,8 @@ global _ProxyOverrideInitialized := false
 global _ProxyOverrideStored := ""
 ; What the next worker receives: the canonical choice, or the refused token
 global _ProxyOverridePublished := ""
+; Whether the value published last came from a DPAPI envelope
+global _ProxyOverrideSealed := false
 
 
 
@@ -143,6 +154,41 @@ ProxyOverride_CarriesCredentials(Relay) {
 	return InStr(Relay, "@") > 0
 }
 
+/**
+ * Whether a stored value is a DPAPI envelope.
+ * @param {Any} Stored The stored value.
+ * @returns {Boolean}
+ */
+ProxyOverride_IsSealed(Stored) {
+	global LLM_API_TOKEN_DPAPI_PREFIX
+	return Stored is String && SubStr(Stored, 1, StrLen(LLM_API_TOKEN_DPAPI_PREFIX)) == LLM_API_TOKEN_DPAPI_PREFIX
+}
+
+/**
+ * The form a canonical value takes in config.toml.
+ * @param {String} Canonical From ProxyOverride_Canonical.
+ * @returns {String|Boolean} The value, its envelope when it holds credentials, or
+ *   false when it cannot be sealed: the caller refuses the save, never writes it clear.
+ */
+ProxyOverride_Seal(Canonical) {
+	if !ProxyOverride_CarriesCredentials(Canonical)
+		return Canonical
+	Envelope := LLM_ApiToken_Encrypt(Canonical)
+	return Envelope is String && Envelope != "" ? Envelope : false
+}
+
+/**
+ * The value a stored form stands for.
+ * @param {Any} Stored The stored value.
+ * @returns {Any} Anything but an envelope unchanged; false for an envelope this
+ *   Windows account cannot open, which the grammar then refuses.
+ */
+ProxyOverride_Unseal(Stored) {
+	if !ProxyOverride_IsSealed(Stored)
+		return Stored
+	Clear := LLM_ApiToken_Decrypt(Stored)
+	return Clear is String && !ProxyOverride_IsSealed(Clear) ? Clear : false
+}
 
 
 
@@ -157,13 +203,15 @@ ProxyOverride_CarriesCredentials(Relay) {
 /**
  * Publishes a stored value to the route owners of this process and to every network
  * worker started next. It stays in this process's memory.
- * @param {Any} Stored The stored value.
+ * @param {Any} Stored The stored value, an envelope included.
  * @returns {Boolean} False when the value is refused.
  */
 ProxyOverride_Publish(Stored) {
-	global PROXY_OVERRIDE_REFUSED_TOKEN, _ProxyOverrideStored, _ProxyOverridePublished
-	_ProxyOverrideStored := Stored is String ? Stored : String(Stored)
-	Choice := ProxyOverride_Parse(Stored)
+	global PROXY_OVERRIDE_REFUSED_TOKEN, _ProxyOverrideStored, _ProxyOverridePublished, _ProxyOverrideSealed
+	_ProxyOverrideSealed := ProxyOverride_IsSealed(Stored)
+	Value := ProxyOverride_Unseal(Stored)
+	_ProxyOverrideStored := Value is String ? Value : Stored is String ? Stored : String(Stored)
+	Choice := ProxyOverride_Parse(Value)
 	Usable := Choice is Map
 	_ProxyOverridePublished := Usable ? ProxyOverride_Canonical(Choice) : PROXY_OVERRIDE_REFUSED_TOKEN
 	return Usable

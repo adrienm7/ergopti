@@ -1472,6 +1472,7 @@ if _LLM_Menu_RuntimeActivated
 _MenuPopulationPublished.Start()
 _DriverBootPhase := "ready"
 SetTimer(ShellRunner_CheckWinPsAtStart, -1)
+SetTimer(ProxyOverride_SealStoredAtStart, -1)
 HTTP_ScheduleCurlCheck(_LLM_Menu.Get("enabled", false))
 HealthCheck_StartWindowControl()
 ; The local reload command is optional: a control that cannot start is

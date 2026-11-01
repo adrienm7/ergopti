@@ -65,10 +65,33 @@ _ProxyOverride_DefaultPorts() {
 
 _ProxyOverride_Store(Value) {
 	global ConfigurationFile
+	Stored := ProxyOverride_Seal(Value)
+	if !(Stored is String)
+		return false
 	Declaration := ProxyOverride_Declaration()
-	Updates := [{ Section: Declaration["section"], Key: Declaration["key"], Value: Value }]
+	Updates := [{ Section: Declaration["section"], Key: Declaration["key"], Value: Stored }]
 	return ConfigCommitUpdates(ConfigurationFile, Updates, "the proxy override", 0, 0,
-		(*) => ProxyOverride_Publish(Value))
+		(*) => ProxyOverride_Publish(Stored))
+}
+
+/**
+ * Moves a password still clear in config.toml into its DPAPI envelope, once: the
+ * stored form then says it is done. Scheduled after the boot is ready, since a
+ * commit replaces the configuration snapshot the boot readers hold.
+ * @returns {Boolean} Whether the value was sealed now.
+ */
+ProxyOverride_SealStoredAtStart(*) {
+	global _ProxyOverrideSealed
+	Choice := ProxyOverride_Current()
+	if !(Choice is Map) || Choice["mode"] != "relay" || _ProxyOverrideSealed
+			|| !ProxyOverride_CarriesCredentials(Choice["relay"])
+		return false
+	if _ProxyOverride_Store(Choice["relay"]) != true {
+		LoggerError("ProxyOverride", "The stored proxy credentials could not be sealed: they stay in the file until the next start.")
+		return false
+	}
+	LoggerInfo("ProxyOverride", "The stored proxy credentials are sealed.")
+	return true
 }
 
 _ProxyOverride_Prompt(Title, Text, Initial) {
