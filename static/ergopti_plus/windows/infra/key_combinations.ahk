@@ -975,12 +975,12 @@ class KeyCombinationChordPolicy {
 			Settings[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS], Settings[MenuCommand.COMBO_SYMMETRIC])
 		this.Directions := Map()
 		this.Canonical := Map()
-		Identifiers := Map()
+		SeenPairs := Map()
 		for Entry in Pairs {
 			if !(Entry is Map) || !_KeyCombinationChordToken(Entry.Get("id", 0))
 				|| !_KeyCombinationChordToken(Entry.Get("first", 0))
 				|| !_KeyCombinationChordToken(Entry.Get("second", 0))
-				|| Entry["first"] == Entry["second"] || Identifiers.Has(Entry["id"])
+				|| Entry["first"] == Entry["second"] || SeenPairs.Has(Entry["id"])
 				throw ValueError("A chord catalogue requires distinct pairs.")
 			Direction := Entry["first"] . "`t" . Entry["second"]
 			Reverse := Entry["second"] . "`t" . Entry["first"]
@@ -991,7 +991,7 @@ class KeyCombinationChordPolicy {
 				throw ValueError("A chord action must already be validated.", -1, Entry["id"])
 			Row := Map("id", Entry["id"], "first", Entry["first"], "second", Entry["second"], "action", Action)
 			this.Directions[Direction] := Row
-			Identifiers[Entry["id"]] := Row
+			SeenPairs[Entry["id"]] := Row
 			this.Canonical[Entry["id"]] := this.Directions.Has(Reverse)
 				? this.Canonical[this.Directions[Reverse]["id"]] : Row
 		}

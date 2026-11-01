@@ -974,12 +974,12 @@ _LifecycleRefuseShutdown(Gate, RequireNativeRetirement := false, ReloadRetry := 
 
 ; Arms the retry of the same user exit after a transient keystats refusal.
 ; Reloads and system exits keep their own owners; one retry is armed at most.
-; @param Reason {String} The refused OnExit reason.
+; @param ExitKind {String} The refused OnExit value, AutoHotkey's and not a log reason.
 ; @param Code {Integer} The refused exit code, reused by the retry.
-_LifecycleArmFlushExitRetry(Reason, Code) {
+_LifecycleArmFlushExitRetry(ExitKind, Code) {
 	global _LifecycleFlushExitRetryArmed, LIFECYCLE_FLUSH_EXIT_POLL_MS
 	global LIFECYCLE_FLUSH_EXIT_BUDGET_MS
-	if _LifecycleFlushExitRetryArmed || !(Reason = "Exit" || Reason = "Menu")
+	if _LifecycleFlushExitRetryArmed || !(ExitKind = "Exit" || ExitKind = "Menu")
 		return
 	_LifecycleFlushExitRetryArmed := true
 	Deadline := A_TickCount + LIFECYCLE_FLUSH_EXIT_BUDGET_MS
