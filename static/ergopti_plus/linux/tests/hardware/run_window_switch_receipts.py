@@ -214,9 +214,13 @@ def main():
         observations = None
         try:
             log = (root / "native.log").open("wb")
+            # Without -noreset the server resets whenever its last client leaves:
+            # each polling xprop below raced Openbox's own connection, and Openbox
+            # lost it with "Failed to open the display" (run 41282668228).
             server = subprocess.Popen(
                 [
                     "Xvfb",
+                    "-noreset",
                     "-displayfd",
                     str(writer),
                     "-screen",
