@@ -264,6 +264,19 @@ LLM_Option_NormalizeApiEntries(Value) {
 	return Out
 }
 
+/**
+ * The key an application is stored and looked up under, the twin of
+ * _shared/lua/llm/app_identity.lua `normalize`.
+ * @param {Any} App The identifier a driver reports, or a user typed.
+ * @returns {String} Lower-cased, trimmed, without ".exe"; "" when unusable.
+ */
+LLM_AppIdentity_Normalize(App) {
+	if !(App is String)
+		return ""
+	Key := RegExReplace(StrLower(Trim(App, " `t`r`n")), "\.exe$", "")
+	return (Key == "" || StrLen(Key) > 256 || RegExMatch(Key, "[\x00-\x1F\x7F]")) ? "" : Key
+}
+
 /** Returns a detached app -> profile-id map or false for any invalid pair. */
 LLM_Option_NormalizeAppProfileOverrides(Value) {
 	global LLM_OPTION_MAX_COLLECTION_ITEMS

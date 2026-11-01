@@ -248,8 +248,8 @@ _LLM_Menu_AddOverrideForActiveApp() {
 	}
 	global _LLM_Menu
 	app := ""
-	try app := StrLower(WinGetProcessName("A"))
-	app := RegExReplace(app, "\.exe$", "")
+	try app := WinGetProcessName("A")
+	app := LLM_AppIdentity_Normalize(app)
 	if (app == "")
 		return false
 	return LLM_Menu_CommitMutation("the active-application profile override",
@@ -579,9 +579,12 @@ _LLM_Menu_DeserializeUserProfiles(Payload) {
 _LLM_Menu_SerializeAppProfileOverrides(Overrides) {
 	if !(Overrides is Map)
 		return false
+	; The declared neutral value (app_profile_overrides_vectors.json "encode").
+	if Overrides.Count == 0
+		return ""
 	Rows := []
 	for AppName, ProfileId in Overrides {
-		if !(AppName is String) || AppName == "" || !(ProfileId is String) || ProfileId == ""
+		if LLM_AppIdentity_Normalize(AppName) !== AppName || !(ProfileId is String) || ProfileId == ""
 			return false
 		Rows.Push('{"app":"' . _LLM_MenuApiJsonEscape(AppName)
 			. '","profile":"' . _LLM_MenuApiJsonEscape(ProfileId) . '"}')
@@ -592,23 +595,10 @@ _LLM_Menu_SerializeAppProfileOverrides(Overrides) {
 _LLM_Menu_DeserializeAppProfileOverrides(Payload) {
 	if !(Payload is String)
 		return false
-	if SubStr(Payload, 1, 3) != "v1:" {
-		; Strict migration reader for the legacy app=profile;... representation.
-		Decoded := Map()
-		for Pair in StrSplit(Payload, ";") {
-			if Pair == ""
-				return false
-			Separator := InStr(Pair, "=", true, -1)
-			if (Separator <= 1 || Separator == StrLen(Pair))
-				return false
-			AppName := SubStr(Pair, 1, Separator - 1)
-			ProfileId := SubStr(Pair, Separator + 1)
-			if Decoded.Has(AppName)
-				return false
-			Decoded[AppName] := ProfileId
-		}
-		return Decoded
-	}
+	if Payload == "" || Payload == "_"
+		return Map()
+	if SubStr(Payload, 1, 3) !== "v1:"
+		return false
 	try Bytes := CryptoBase64Decode(SubStr(Payload, 4))
 	catch
 		return false
@@ -620,9 +610,9 @@ _LLM_Menu_DeserializeAppProfileOverrides(Payload) {
 	Decoded := Map()
 	for Row in Parsed {
 		if !(Row is Map) || !Row.Has("app") || !Row.Has("profile")
-				|| !(Row["app"] is String) || Row["app"] == ""
+				|| LLM_AppIdentity_Normalize(Row["app"]) !== Row["app"]
 				|| !(Row["profile"] is String) || Row["profile"] == ""
-				|| Decoded.Has(Row["app"])
+				|| StrLen(Row["profile"]) > 256 || Decoded.Has(Row["app"])
 			return false
 		Decoded[Row["app"]] := Row["profile"]
 	}

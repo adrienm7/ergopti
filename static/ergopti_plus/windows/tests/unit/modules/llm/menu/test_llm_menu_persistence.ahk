@@ -617,11 +617,8 @@ Test_LLM_Persist_LosslessAppOverrides() {
 	AssertEqual("advanced", Decoded["semi;tool"])
 	AssertEqual("basic", Decoded["eq=tool"])
 	AssertEqual("raw", Decoded["éditeur"])
-	Legacy := _LLM_Menu_DeserializeAppProfileOverrides("eq=tool=advanced")
-	Assert(Legacy is Map, "a recoverable legacy payload must decode")
-	AssertEqual(1, Legacy.Count)
-	AssertEqual("advanced", Legacy["eq=tool"],
-		"legacy migration must split on the last equals sign so a legal app basename survives")
+	; The legacy pairs are refused as on macOS and Linux (no user holds them).
+	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("eq=tool=advanced"))
 	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("dup=raw;dup=basic"))
 	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("broken"))
 	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("good=basic;;late=advanced"),
