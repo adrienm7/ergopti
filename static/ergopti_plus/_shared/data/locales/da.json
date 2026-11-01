@@ -2890,6 +2890,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus skal have tilladelsen Tilgængelighed for at læse tastaturet. Åbn ErgoptiPlus igen: det åbner Systemindstillinger > Anonymitet og sikkerhed > Tilgængelighed for dig. Slå posten „Hammerspoon“ til: det er ErgoptiPlus-motoren. Hvis den allerede ser slået til ud, så slå den fra og til igen.",
 	"startup.curl_missing": "Windows' curl-program ({1}) mangler eller kan ikke læses. Anmodninger til lokal AI afvises, indtil det er tilbage: reparer eller opdater Windows; Ergopti+ erstatter det aldrig.",
+	"startup.curl_title": "Windows-programmet curl",
 	"startup.curl_too_old": "Windows' curl-program ({1}) har version {2}, og Ergopti+ kræver {3} eller nyere. Anmodninger til lokal AI afvises, indtil Windows er opdateret; Ergopti+ erstatter det aldrig.",
 	"permission_dialog.window_title": "Tilladelse påkrævet",
 	"permission_dialog.open_settings": "Åbn indstillinger",

@@ -2890,6 +2890,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus가 키보드를 읽으려면 손쉬운 사용 권한이 필요합니다. ErgoptiPlus를 다시 열면 시스템 설정 > 개인정보 보호 및 보안 > 손쉬운 사용이 자동으로 열립니다. “Hammerspoon” 항목을 켜세요. 이것이 ErgoptiPlus 엔진입니다. 이미 켜져 있는 것처럼 보이면 껐다가 다시 켜세요.",
 	"startup.curl_missing": "Windows의 curl 프로그램({1})이 없거나 읽을 수 없습니다. 복구될 때까지 로컬 AI 요청이 거부됩니다. Windows를 복구하거나 업데이트하십시오. Ergopti+는 이를 대체하지 않습니다.",
+	"startup.curl_title": "Windows curl 프로그램",
 	"startup.curl_too_old": "Windows의 curl 프로그램({1}) 버전은 {2}이며 Ergopti+에는 {3} 이상이 필요합니다. Windows를 업데이트할 때까지 로컬 AI 요청이 거부됩니다. Ergopti+는 이를 대체하지 않습니다.",
 	"permission_dialog.window_title": "권한 필요",
 	"permission_dialog.open_settings": "설정 열기",

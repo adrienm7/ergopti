@@ -2890,6 +2890,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus needs the Accessibility permission to read the keyboard. Open ErgoptiPlus again: it opens System Settings > Privacy & Security > Accessibility for you. Turn on the entry named “Hammerspoon”: it is the ErgoptiPlus engine. If it already looks on, turn it off and on again.",
 	"startup.curl_missing": "The curl program of Windows ({1}) is missing or cannot be read. Requests to the local AI are refused until it is back: repair or update Windows; Ergopti+ never replaces it.",
+	"startup.curl_title": "The curl program of Windows",
 	"startup.curl_too_old": "The curl program of Windows ({1}) has version {2}, and Ergopti+ needs {3} or later. Requests to the local AI are refused until Windows is updated; Ergopti+ never replaces it.",
 	"permission_dialog.window_title": "Permission needed",
 	"permission_dialog.open_settings": "Open Settings",

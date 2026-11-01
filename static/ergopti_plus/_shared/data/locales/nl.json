@@ -2890,6 +2890,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus heeft de toegankelijkheidsmachtiging nodig om het toetsenbord te lezen. Open ErgoptiPlus opnieuw: het opent voor u Systeeminstellingen > Privacy en beveiliging > Toegankelijkheid. Schakel het onderdeel „Hammerspoon” in: dat is de ErgoptiPlus-engine. Lijkt het al ingeschakeld, zet het dan uit en weer aan.",
 	"startup.curl_missing": "Het curl-programma van Windows ({1}) ontbreekt of kan niet worden gelezen. Verzoeken aan de lokale AI worden geweigerd totdat het terug is: herstel of werk Windows bij; Ergopti+ vervangt het nooit.",
+	"startup.curl_title": "Het curl-programma van Windows",
 	"startup.curl_too_old": "Het curl-programma van Windows ({1}) heeft versie {2} en Ergopti+ heeft {3} of nieuwer nodig. Verzoeken aan de lokale AI worden geweigerd totdat Windows is bijgewerkt; Ergopti+ vervangt het nooit.",
 	"permission_dialog.window_title": "Toestemming vereist",
 	"permission_dialog.open_settings": "Instellingen openen",

@@ -2890,6 +2890,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus がキーボードを読み取るには、アクセシビリティの許可が必要です。ErgoptiPlus をもう一度開いてください。システム設定 > プライバシーとセキュリティ > アクセシビリティが自動で開きます。「Hammerspoon」という項目をオンにしてください。これは ErgoptiPlus のエンジンです。すでにオンに見える場合は、一度オフにしてから再びオンにしてください。",
 	"startup.curl_missing": "Windows の curl プログラム（{1}）が見つからないか、読み取れません。元に戻るまで、ローカル AI への要求は拒否されます。Windows を修復またはアップデートしてください。Ergopti+ がこれを置き換えることはありません。",
+	"startup.curl_title": "Windows の curl プログラム",
 	"startup.curl_too_old": "Windows の curl プログラム（{1}）のバージョンは {2} で、Ergopti+ には {3} 以降が必要です。Windows をアップデートするまで、ローカル AI への要求は拒否されます。Ergopti+ がこれを置き換えることはありません。",
 	"permission_dialog.window_title": "許可が必要です",
 	"permission_dialog.open_settings": "設定を開く",
