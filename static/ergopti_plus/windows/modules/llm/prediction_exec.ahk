@@ -81,21 +81,21 @@ _LLM_Engine_NormalizePromptOverride(Override) {
 }
 
 /**
- * Per-call output-token budget for a backend request, given the shared
- * PromptBuilder per-prediction budget and how many predictions THIS call yields
- * (1 for a sequential-variant call, N for a single batch call that returns all
- * N predictions in one response). Mirrors the macOS fetch_batch formula
- * ``max_predict * num_predictions + num_predictions * 5`` so the AHK batch path
- * is no longer under-budgeted (it previously sent the single-prediction cap for
- * an N-prediction response, truncating it).
- * @param {integer} maxTokens     Shared PromptBuilder per-prediction budget.
+ * Per-call output-token budget for a backend request, the twin of
+ * _shared/lua/llm/request_plan/token_budget.lua `for_call`: a call returning one
+ * prediction keeps the base budget; a batch call returning N gets N * (base + 5),
+ * the five being a variant's numbering and separator.
+ * @param {integer} maxTokens     Shared PromptBuilder per-prediction budget (>= 1).
  * @param {integer} predsPerCall  Predictions produced by this one call (>= 1).
  * @returns {integer} The num_predict / max_tokens cap to send.
  */
 _LLM_Engine_CallTokenBudget(maxTokens, predsPerCall) {
 	global LLM_PRED_TOKEN_OVERHEAD
-	n := (predsPerCall is Integer and predsPerCall >= 1) ? predsPerCall : 1
-	return Max(5, maxTokens * n + n * LLM_PRED_TOKEN_OVERHEAD)
+	if !(maxTokens is Integer) || maxTokens < 1
+		throw ValueError("base_tokens must be a whole number from 1")
+	if !(predsPerCall is Integer) || predsPerCall < 1
+		throw ValueError("per_call must be a whole number from 1")
+	return Max(5, predsPerCall == 1 ? maxTokens : predsPerCall * (maxTokens + LLM_PRED_TOKEN_OVERHEAD))
 }
 
 ; Return a detached, fail-closed acceptance-source snapshot. Timer callers pass
@@ -1241,15 +1241,16 @@ _LLM_Engine_ResolveProfileIdForApp(default_id) {
 	; window is focused (lock screen, transient menu); fall back to the
 	; default in that case rather than blowing up the prediction.
 	app := ""
-	try app := StrLower(WIGetFocused()["appId"])
-	if (app == "")
-		return default_id
-	; Drop any trailing ``.exe`` so user-entered overrides ("slack") match
-	; the OS-reported process name ("slack.exe").
-	app := RegExReplace(app, "\.exe$", "")
-	if overrides.Has(app)
-		return overrides[app]
-	return default_id
+	try app := WIGetFocused()["appId"]
+	return LLM_AppProfile_Resolve(overrides, app, default_id)
+}
+
+; The twin of app_profile_overrides.lua `resolve`, so "slack" matches a reported "Slack.EXE".
+LLM_AppProfile_Resolve(Overrides, App, DefaultId) {
+	Key := LLM_AppIdentity_Normalize(App)
+	if Key == "" || !Overrides.Has(Key) || !(Overrides[Key] is String) || Overrides[Key] == ""
+		return DefaultId
+	return Overrides[Key]
 }
 
 ; Look up the active remote API entry from the engine state. Returns the entry
