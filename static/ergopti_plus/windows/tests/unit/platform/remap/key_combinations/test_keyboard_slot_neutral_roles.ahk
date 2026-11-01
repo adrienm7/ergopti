@@ -216,6 +216,53 @@ _KSNR_WinSlotBindsItsPhysicalKey() {
 }
 Test("neutral slots: a Win slot binds its physical key, not a textual chord (win-s-open-target)", _KSNR_WinSlotBindsItsPhysicalKey)
 
+; RemapKey registers Ctrl and Alt of every key it remaps, so a slot on that chord was
+; refused as another producer's on each boot: Ctrl+B never ran microsoft_bold.
+_KSNR_CtrlSlotSharesTheLayoutChord() {
+	global RemappedList, KeyboardShortcutAssignments
+	SavedList := RemappedList
+	HadAssignments := IsSet(KeyboardShortcutAssignments)
+	if HadAssignments
+		SavedAssignments := KeyboardShortcutAssignments
+	Chords := _KeyboardShortcutLayoutChords()
+	Ran := []
+	GESTURE_ACTIONS["ksnr_probe"] := { Fn: (*) => Ran.Push(1), Ai: false, Platforms: ["ahk"] }
+	RemappedList := Map("b", "SC014")
+	KeyboardShortcutAssignments := Map("primary_b", "ksnr_probe")
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		AssertEqual(1, KeyboardShortcutsBindAll(), "the slot counts as bound")
+		AssertEqual("primary_b", Chords.Get("^SC014", ""), "the slot joins the layout's own variant")
+		AssertFalse(HOTKEY_REGISTRAR_SPECS.Has("^SC014"), "no second producer is registered")
+		for Line in Captured
+			AssertFalse(InStr(Line, "[WARNING]"), "a healthy slot warns of nothing: " . Line)
+		AssertTrue(KeyboardShortcutRunLayoutChord("^SC014"), "the press runs the slot")
+		AssertEqual(1, Ran.Length, "and its action, once")
+		KeyboardShortcutAssignments["primary_b"] := "none"
+		AssertFalse(KeyboardShortcutRunLayoutChord("^SC014"), "an emptied slot leaves the chord to the layout")
+		AssertFalse(KeyboardShortcutRunLayoutChord("^SC015"), "another key is the layout's")
+		AssertEqual("", _KeyboardSlotLayoutVariant("primary_shift_v", "SC02F", "Ctrl+Shift+Sc02f"),
+			"a chord the layout does not register takes its own hotkey")
+	} finally {
+		LoggerClearTestSink()
+		Chords.Clear()
+		GESTURE_ACTIONS.Delete("ksnr_probe")
+		RemappedList := SavedList
+		KeyboardShortcutAssignments := HadAssignments ? SavedAssignments : unset
+	}
+}
+Test("neutral slots: a Ctrl slot on a remapped key shares the layout's chord (ctrl-slot-on-layout-chord)", _KSNR_CtrlSlotSharesTheLayoutChord)
+
+_KSNR_LayoutChordsAskTheSlots() {
+	Remap := _DriverFuncBody("RemapKey")
+	for Prefix in ["^", "!"]
+		AssertTrue(InStr(Remap, '_RemapChordEmit.Bind("' . Prefix . '" . StrUpper(ScanCode)') > 0,
+			"RemapKey's " . Prefix . " variant asks the slots first")
+	AssertTrue(InStr(_DriverFuncBody("_RemapChordEmit"), "KeyboardShortcutRunLayoutChord(Variant)") > 0, "at each press")
+}
+Test("neutral slots: the layout's Ctrl and Alt variants ask the slots (ctrl-slot-on-layout-chord)", _KSNR_LayoutChordsAskTheSlots)
+
 ; Boot order: the slots read RemappedList, and the Win broker acquires its keys once.
 _KSNR_SlotsBindBetweenLayoutAndBroker() {
 	Src := _DriverSourceNoComments()

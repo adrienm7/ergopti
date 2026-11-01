@@ -248,6 +248,12 @@ _LockWorkstationEmit(*) {
 		_ResetPrefixBuffer()
 }
 
+; A Ctrl or Alt chord of a remapped key: the keyboard slot set on it, else the layout's.
+_RemapChordEmit(Variant, SendStr, KeyChar, *) {
+	if !KeyboardShortcutRunLayoutChord(Variant)
+		_RemapEmit(SendStr, KeyChar)
+}
+
 RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	global RemappedList
 	static WinCriteria := Map()
@@ -271,14 +277,16 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	; In theory, * and {Blind} should be sufficient, but it isn't the case when we define custom hotkeys in next sections
 	; For example, a new hotkey for ^b leads to ^t giving ^b in QWERTY
 	; The same happens for Win shortcuts, where we can get the shortcut on the QWERTY layer and not emulated Ergopti layer
+	; A keyboard slot on the same chord asks here: it cannot take a variant the
+	; layout owns (KeyboardShortcutsBindAll).
 	Hotkey(
 		"^" ScanCode,
-		_RemapEmit.Bind("^" Character, Character),
+		_RemapChordEmit.Bind("^" . StrUpper(ScanCode), "^" Character, Character),
 		InputLevel
 	)
 	Hotkey(
 		"!" ScanCode,
-		_RemapEmit.Bind("!" Character, Character),
+		_RemapChordEmit.Bind("!" . StrUpper(ScanCode), "!" Character, Character),
 		"I3" ; Needs to be higher to keep the Alt shortcuts
 	)
 	; Win variants share a broker, so the earlier row passthrough cannot win
@@ -843,7 +851,8 @@ if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"] {
 			case "ctrl_save":
 				; InputLevel 3 overrides the Ctrl+source-scan → "^★" binding
 				; that RemapKey installs at InputLevel 2, routing to Ctrl+S instead.
-				Hotkey(_MagicKeyHotkey["hotkey"], (*) => SendFinalResult("^s"), "I3")
+				Hotkey(_MagicKeyHotkey["hotkey"], (*) => KeyboardShortcutRunLayoutChord("^" . StrUpper(ScriptInformation["MagicKeySourceScan"]))
+					|| SendFinalResult("^s"), "I3")
 		}
 	}
 }
