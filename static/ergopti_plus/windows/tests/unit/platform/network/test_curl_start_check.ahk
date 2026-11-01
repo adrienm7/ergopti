@@ -5,7 +5,8 @@
 ; DESCRIPTION:
 ; The owned-runtimes decision (SYS): the driver keeps System32 curl.exe, checks it
 ; at start and names its absence or an unusable version in words, not with each
-; local AI request's bare refusal.
+; local AI request's bare refusal. Only the AI needs it: the check runs at boot when
+; the AI is on and when it gets turned on, and with the AI off no dialog ever opens.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -55,7 +56,23 @@ _CSC_RealFileAndEntry() {
 	AssertTrue(HTTP_CheckCurlAtStart(), "this machine is supported, so no dialog opens")
 	Entry := _DriverSourceConcat()
 	AssertContains(Entry, "SetTimer(HTTP_CheckCurlAtStart, -1)", "a dialog must not freeze the boot")
-	Assert(RegExMatch(Entry, 's)_DriverBootPhase := "ready".*\RHTTP_ScheduleCurlCheck\(\)'),
-		"the entry schedules the check after ready")
+	Assert(RegExMatch(Entry, 's)_DriverBootPhase := "ready".*\RHTTP_ScheduleCurlCheck\(_LLM_Menu\.Get\("enabled", false\)\)'),
+		"the entry schedules the check after ready, following the AI's own state")
 }
 Test("curl-start-check: the file reading and the entry's scheduling", _CSC_RealFileAndEntry)
+
+; AI off: nothing is scheduled, so an unusable curl stays silent. AI on: the check runs
+; and says so. The scheduled callback runs for real over a refused curl.
+_CSC_FollowsTheAi() {
+	Scheduled := []
+	Record := (Check) => Scheduled.Push(Check)
+	AssertFalse(HTTP_ScheduleCurlCheck(false, Record), "the AI off schedules nothing")
+	AssertEqual(0, Scheduled.Length, "the AI off reaches no check, so no dialog")
+	AssertTrue(HTTP_ScheduleCurlCheck(true, Record), "the AI on schedules the check")
+	AssertEqual(1, Scheduled.Length, "one check")
+	Notices := []
+	AssertFalse(Scheduled[1].Call(_CSC_Value.Bind("7.55.1"), _CSC_Record.Bind(Notices)),
+		"what the AI on scheduled is the check itself")
+	AssertEqual(1, Notices.Length, "and it speaks about an unusable curl")
+}
+Test("curl-start-check: the check follows the AI, off shows nothing, on checks", _CSC_FollowsTheAi)

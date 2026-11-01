@@ -149,9 +149,20 @@ HTTP_SystemCurlPath() {
 	return A_WinDir . "\System32\curl.exe"
 }
 
-; Schedules the start check below once the boot is ready.
-HTTP_ScheduleCurlCheck() {
-	SetTimer(HTTP_CheckCurlAtStart, -1)
+; Schedules the check below when the AI is on: the boot once it is ready, and the
+; toggle that turns the AI on. Only the AI's requests need curl, so with the AI off
+; nothing is checked and no dialog opens (maintainer decision).
+; @param AiOn {Boolean} Whether the AI is on.
+; @param ScheduleFn {Func} Test seam taking the check, a one-shot timer by default.
+; @returns {Boolean} True when a check was scheduled.
+HTTP_ScheduleCurlCheck(AiOn, ScheduleFn := 0) {
+	if !AiOn
+		return false
+	if HasMethod(ScheduleFn, "Call")
+		ScheduleFn.Call(HTTP_CheckCurlAtStart)
+	else
+		SetTimer(HTTP_CheckCurlAtStart, -1)
+	return true
 }
 
 ; Says at start, in words, that the local AI requests cannot run, instead of each
