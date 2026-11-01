@@ -2881,6 +2881,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Auswahl in Groß-/Kleinbuchstaben umwandeln",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus benötigt die Bedienungshilfen-Berechtigung, um die Tastatur zu lesen. Öffnen Sie ErgoptiPlus erneut: Es öffnet für Sie Systemeinstellungen > Datenschutz & Sicherheit > Bedienungshilfen. Aktivieren Sie den Eintrag „Hammerspoon“: Das ist die ErgoptiPlus-Engine. Wirkt er bereits aktiviert, schalten Sie ihn aus und wieder ein.",
+	"startup.curl_missing": "Das curl-Programm von Windows ({1}) fehlt oder kann nicht gelesen werden. Anfragen an die lokale KI werden abgelehnt, bis es wieder vorhanden ist: Reparieren oder aktualisieren Sie Windows; Ergopti+ ersetzt es nie.",
+	"startup.curl_too_old": "Das curl-Programm von Windows ({1}) hat Version {2}, Ergopti+ benötigt {3} oder neuer. Anfragen an die lokale KI werden abgelehnt, bis Windows aktualisiert ist; Ergopti+ ersetzt es nie.",
 	"permission_dialog.window_title": "Berechtigung erforderlich",
 	"permission_dialog.open_settings": "Einstellungen öffnen",
 	"permission_dialog.step_add": "Fehlt „Hammerspoon“ in der Liste, klicken Sie auf +, drücken Sie ⌘⇧G, fügen Sie {1} ein und klicken Sie auf „Öffnen“.",

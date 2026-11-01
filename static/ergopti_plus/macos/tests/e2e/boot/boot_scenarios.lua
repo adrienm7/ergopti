@@ -47,8 +47,8 @@
 ---    log. No boot line may keep a {N} placeholder.
 --- 8. init-boot-mlx: the boot ran its MLX port cleanup (lsof, a curl probe of up
 ---    to 1 s, ps) on every boot, the AI off included; it only serves the AI
----    warmup. An AI-off boot runs no such shell, and a boot whose AI is on and
----    consented in this Mac's preferences runs it once. Only the AI-off boot
+---    warmup. An AI-off boot runs no such shell, and a boot whose AI is on,
+---    from config.toml or this Mac's preferences, runs it once. Only the AI-off boot
 ---    skips the LLM backend bootstrap, and logs that it did.
 --- ==============================================================================
 
@@ -178,16 +178,22 @@ local function neutral_defaults(ctx)
 	ctx.world.install_karabiner(ctx.root .. "/machine", ctx.home)
 end
 
---- The neutral defaults with the AI turned on, in config.toml and in the
---- consent this Mac's preferences keep: the boot the MLX port cleanup serves.
+--- The neutral defaults with the AI turned on in config.toml only: no value in
+--- this Mac's preferences, as after a copied or restored configuration.
 --- @param ctx table Scenario context.
-local function ai_consented(ctx)
+local function ai_on_in_config(ctx)
 	neutral_defaults(ctx)
 	local path = ctx.home .. "/.config/ergopti_plus/hammerspoon/config.toml"
 	local toml, replaced = assert(read(path), "config.toml missing"):gsub("\n%[llm%]\nenabled = false\n",
 		"\n[llm]\nenabled = true\n", 1)
 	assert(replaced == 1, "the config template no longer opens [llm] with enabled = false")
 	write_home(ctx.home, ".config/ergopti_plus/hammerspoon/config.toml", toml)
+end
+
+--- The AI turned on in config.toml and in this Mac's preferences.
+--- @param ctx table Scenario context.
+local function ai_consented(ctx)
+	ai_on_in_config(ctx)
 	ctx.settings = { ["ergopti.llm.enabled"] = true }
 end
 
@@ -340,6 +346,10 @@ local function scenarios(repo)
 			ai_enabled = false },
 		{ name = "the AI turned on and consented boots its MLX port cleanup (init-boot-mlx)", setup = ai_consented,
 			steps = { "boot" }, marker = BOOTED_MARKER, ai_enabled = true },
+		-- The cleanup gate read the preferences alone while the AI bootstrap fell
+		-- back to config.toml: this boot started the AI with no cleanup.
+		{ name = "the AI turned on in config.toml alone boots its MLX port cleanup (init-boot-mlx-config)",
+			setup = ai_on_in_config, steps = { "boot" }, marker = BOOTED_MARKER, ai_enabled = true },
 		{ name = "the layout menu selects French through its native fallback (native-layout-selection)",
 			setup = neutral_defaults, steps = { "select_layout_natively" }, marker = BOOTED_MARKER,
 			machine = "native_layout_selection", facts = { layout_set_attempts = "1", layout_native_selections = "1",
@@ -397,9 +407,7 @@ local function scenarios(repo)
 			-- The legacy preference keys of an unstamped release turn the AI off
 			ai_runtime = case.stamped and function(arch) return missing_ai_runtime(case, arch) end or nil,
 		}
-		-- An AI-on release carries no consent in this Mac's preferences, so only
-		-- an AI-off one is judged on the port cleanup.
-		if not (case.stamped and case.enables_ai) then list[#list].ai_enabled = false end
+		list[#list].ai_enabled = case.stamped and case.enables_ai
 	end
 	if #list < 6 then error("boot scenarios: the migration corpus holds fewer than three macOS releases") end
 	local turns_ai_on = false

@@ -102,7 +102,10 @@ const NOT_SUITE_ENTRIES = new Set([
 	'tools/test/browser/layer-editor.playwright.cjs',
 	// Actual Chromium/WebKit rendering runs separately in mandatory Core / js;
 	// test-ci-pipeline-wiring.cjs rejects missing or redirected browser execution.
-	'tools/test/browser/physical-shortcuts.playwright.cjs'
+	'tools/test/browser/physical-shortcuts.playwright.cjs',
+	// A manual launcher that serves the fake corporate network until stdin
+	// closes; test-fake-network.cjs runs the library it starts inside the suite.
+	'tools/test/fake-network.cjs'
 ]);
 
 // Gates the suite runs with no npm alias. Zero since 2026-08-03, when the last

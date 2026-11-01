@@ -2066,6 +2066,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/remap/key_combinations/test_keyboard_shortcut_groups_register_dispatch.ahk
 #Include meta/modules/updater/test_changelog_fetch_async.ahk
 #Include meta/platform/network/test_curl_response_size_bound.ahk
+#Include unit/platform/network/test_curl_start_check.ahk
 #Include meta/platform/network/test_curl_personal_config_disabled.ahk
 #Include meta/modules/updater/test_curl_staging_failure_cleanup.ahk
 #Include meta/modules/updater/test_changelog_webview_bridge.ahk

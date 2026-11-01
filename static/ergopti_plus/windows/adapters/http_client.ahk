@@ -140,6 +140,41 @@ _HTTP_CurlRuntimeLimitSupported(CurlExe, VersionFn := 0) {
 		HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION)
 }
 
+; The system curl the loopback requests start. Ergopti+ keeps it rather than
+; pinning a copy (maintainer decision): the start check below refuses in words.
+; @returns {String} Its absolute path.
+HTTP_SystemCurlPath() {
+	return A_WinDir . "\System32\curl.exe"
+}
+
+; Says at start, in words, that the local AI requests cannot run, instead of each
+; request's bare refusal. The version comes from the file: starting the program
+; would cost a process at every start of the driver. Scheduled after the boot is
+; ready, since a modal dialog freezes the auto-execute thread under it.
+; @param VersionFn {Func} Test seam taking the path, FileGetVersion by default; it
+;        throws for a file missing or without a version.
+; @param NoticeFn {Func} Test seam taking the text, a dialog by default.
+; @returns {Boolean} True when the version is usable.
+HTTP_CheckCurlAtStart(VersionFn := 0, NoticeFn := 0) {
+	global HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION
+	CurlExe := HTTP_SystemCurlPath()
+	if _HTTP_CurlRuntimeLimitSupported(CurlExe, VersionFn)
+		return true
+	Version := ""
+	try Version := IsObject(VersionFn) ? VersionFn.Call(CurlExe) : FileGetVersion(CurlExe)
+	catch as Err
+		LoggerWarn("HttpClient", "Could not read the version of curl: {1}.", Err.Message)
+	LoggerError("HttpClient", "curl {1} or later is required, found '{2}'.",
+		HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION, Version)
+	Text := StrReplace(t(Version == "" ? "startup.curl_missing" : "startup.curl_too_old"), "{1}", CurlExe)
+	Text := StrReplace(StrReplace(Text, "{2}", Version), "{3}", HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION)
+	if HasMethod(NoticeFn, "Call")
+		NoticeFn.Call(Text)
+	else
+		Ui_MsgBox(Text, "curl", "Icon!")
+	return false
+}
+
 
 _HTTP_CurlRemaining(StartTick, TimeoutMs, TickFn := 0) {
 	Now := IsObject(TickFn) ? TickFn.Call() : A_TickCount

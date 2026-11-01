@@ -1310,15 +1310,15 @@
 			"tool": "`curl.exe`",
 			"programs": ["curl.exe"],
 			"used_for": "Ollama HTTP and downloads (`windows/modules/llm/api_ollama/ollama_http.ahk:497,686,910`)",
-			"today": "System component (`System32\\curl.exe`, Windows 10 1803+)",
+			"today": "System component (`System32\\curl.exe`), checked at start with a refusal in words when it is missing or older than 8.4.0 (`windows/adapters/http_client.ahk`)",
 			"current_class": "SYS",
-			"version_needed": "7.55+",
-			"if_missing": "AI requests fail",
-			"pin_possible": "Yes, MIT, ~5 MB",
-			"decision": "PIN",
-			"decision_text": "PIN (its TLS behaviour on a company proxy is already a known cause of failures)",
-			"alternative": "SYS",
-			"status": "follow_up"
+			"version_needed": "8.4.0 or later (the first to enforce `--max-filesize` while receiving)",
+			"if_missing": "Local AI requests are refused",
+			"pin_possible": "Yes, MIT, ~5 MB, declined by the maintainer on 2026-11-01",
+			"decision": "SYS",
+			"decision_text": "SYS: check at start, refuse in words (the maintainer's decision of 2026-11-01: keep the system curl, no pinned copy)",
+			"alternative": null,
+			"status": "done"
 		},
 		{
 			"os": "windows",

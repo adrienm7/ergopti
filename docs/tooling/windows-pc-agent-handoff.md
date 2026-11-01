@@ -133,6 +133,29 @@ readable through `archive/2026-10-31/<branch>`. Then:
   Test infrastructure: the AHK no-pinned-source-reads ratchet (24/174 vs
   23/173). Each lane: `npm run test:js -- --feature <lane>`.
 
+- Windows AHK lanes, run 41254356788 on dev 264b1ad9 (1 November, 00:16
+  UTC), beyond the items already listed in this file (thinking off, the
+  `test_local_server_auth.ahk` affinity 24 -> 28 count, the menu caller child):
+  - llm: `test_llm_api_remote_requests.ahk:24` still expects 4 optional-auth
+    local providers, the catalogue now has 13; `test_llm_model_capabilities.ahk`
+    `:84`, `:103` (an Array has no `Capability`) and `:153`;
+    `test_llm_bridge_apply_expansion.ahk:315` (private-ai-context: the
+    prediction pipeline never reaches its capture-only transport);
+    `test_llm_prompt_prediction.ahk:344` (the rewrite profile's automatic
+    trigger dispatches nothing) and `:1119` (local-prediction-custody: no
+    original transport input published); `test_llm_agent_connectors.ahk:244`
+    (Item has no value).
+  - meta: the OS-call purity ratchet for `windows/ui` is at 126 against a
+    baseline of 125 (`test_ahk_os_purity_ratchet.ahk:131`);
+    `test_discarded_config_is_reported.ahk:122` wants `MenuRenderer_Build` to
+    report a dropped `dynamic` manifest item.
+  - hotstrings-shortcuts: `test_run_program_actions.ahk:359` (exact shutdown
+    and reload leave 1 controlled program or native callback alive).
+  - keystats: eleven metrics publisher-clock and native64 cases throw
+    "Startup working directory does not exist" at `file_system.ahk:395`, and
+    the two metrics rebuild cases get no reader database from the fixture
+    ledger (`test_klr_cache_fixture.ahk:214`).
+
 - Three of your evening commits were adjusted on dev by the coordinator: 738478ff68
   was reverted (the per-builder `timed()` phases of `menu_keyboard_layout.lua` it
   reads were themselves reverted in 153b73cb8c, so the menu parity proof failed);
