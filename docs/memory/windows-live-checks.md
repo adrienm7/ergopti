@@ -98,6 +98,18 @@ reached yet are handed to the next successor by `TakeForReload`. Each metrics
 toggle reloads, so this check chains about five reloads. Action: when it fails
 again, read the phase in the log; do not mask the error in the check.
 
+### project-live-checks-a-vetoed-exitapp-does-not-return
+
+A veto ends the thread that called `ExitApp`; only its `finally` still runs, so
+nothing written after the call answers a refused Quit. `_LifecycleRefuseShutdown`
+arms `_LifecycleAnswerVetoedQuit` instead, and a retry armed by the gate keeps the
+answer owed. Any exit that interrupts a flush or a read goes through
+`_LifecycleArmFlushExitRetry`, which keeps the OnExit reason (a retried logoff is
+no Quit) and leaves an updater exit to the updater's retry, as a plain `ExitApp`
+would skip `FinalExit`. `quit-over-a-log-flush` is the live check. Windows may end
+the process right after a vetoed logoff, so that retry is best effort. Action: a
+new shutdown gate that settles by itself uses this retry and logs no error.
+
 ### project-live-checks-versions-window-needs-memory
 
 `Changelog_Open` opens its WebView2 form only when `WebView_ShouldUseNativeFallback()`

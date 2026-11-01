@@ -74,14 +74,20 @@ global _LifecycleShutdownReason := ""
 ; Exact private AI attempt owned by this noninterruptible OnExit call.
 global _LifecycleAiShutdownAttempt := 0
 ;
-; A user exit refused only because a keystats flush or journal handoff was
-; running is retried once that settles, so one Quit is enough. The poll costs no
+; An exit refused only because it interrupted a keystats or log flush, or a file
+; read, is retried once that settles, so one Quit is enough. The poll costs no
 ; shutdown veto: only the retried ExitApp passes through the gates again.
 global LIFECYCLE_FLUSH_EXIT_POLL_MS := 100
 global LIFECYCLE_FLUSH_EXIT_BUDGET_MS := 10000
 ; A successor prompts after about 2 s of waiting: a reload retry looks often.
 global LIFECYCLE_RELOAD_RETRY_POLL_MS := 20
 global _LifecycleFlushExitRetryArmed := false
+; The budget spans every retry of one exit: a gate that keeps refusing ends in the
+; real refusal, not in a new wait. Zero while no exit is being retried.
+global _LifecycleExitRetryStarted := 0
+; What OnExit reported for the exit being retried: ExitApp reports "Exit", and a
+; retried logoff must not count as the user's Quit.
+global _LifecycleExitRetryReason := ""
 ; The retried reload re-enters OnExit through ExitApp, which reports "Exit": the
 ; successor asks to close once only, and nothing else can raise its reason again.
 global _LifecycleReloadExitRetrying := false
@@ -961,6 +967,8 @@ _LifecycleRefuseShutdown(Gate, RequireNativeRetirement := false, ReloadRetry := 
 			catch as Err
 				try LoggerError("Lifecycle", "Local AI server repair remains owned after shutdown refusal.")
 		}
+		if IsSet(_LifecycleAnswerVetoedQuit)
+			SetTimer(_LifecycleAnswerVetoedQuit, -1)
 		return 1
 	}
 	Released := _LifecycleForceReleaseHeldInput()
@@ -972,41 +980,81 @@ _LifecycleRefuseShutdown(Gate, RequireNativeRetirement := false, ReloadRetry := 
 	return 0
 }
 
-; Arms the retry of the same user exit after a transient keystats refusal.
-; Reloads and system exits keep their own owners; one retry is armed at most.
+; Whether the updater, which keeps a bounded retry of its own, asked for this exit.
+; A plain ExitApp would skip the FinalExit authorization of its swap.
+_LifecycleUpdaterRetriesExit() {
+	global _UpdaterRecoveryExitInvocation
+	return (_Updater_ExitInvocationOwner() is Map) || !!_UpdaterRecoveryExitInvocation
+}
+
+; Arms the retry of the same exit after a refusal that settles by itself: an exit
+; OnExit interrupted a thread for, which can only resume once OnExit returns. This
+; covers the logoff too, though Windows may end the process before the first poll.
+; A reload keeps its own owner (ReloadTerminalHandoffDeferClaim), an exit AutoHotkey
+; raised on an error is not asked twice; one retry is armed at most.
 ; @param ExitKind {String} The refused OnExit value, AutoHotkey's and not a log reason.
 ; @param Code {Integer} The refused exit code, reused by the retry.
-_LifecycleArmFlushExitRetry(ExitKind, Code) {
+; @param SettledFn {Func} Whether the interrupted owner has finished.
+; @param Gate {String} What the exit is waiting for, for the log.
+; @returns {Boolean} True when a retry owns this exit, false for a real refusal.
+_LifecycleArmFlushExitRetry(ExitKind, Code, SettledFn := KL_FlushHandoffSettled, Gate := "keystats flush") {
 	global _LifecycleFlushExitRetryArmed, LIFECYCLE_FLUSH_EXIT_POLL_MS
-	global LIFECYCLE_FLUSH_EXIT_BUDGET_MS
-	if _LifecycleFlushExitRetryArmed || !(ExitKind = "Exit" || ExitKind = "Menu")
-		return
+	global LIFECYCLE_FLUSH_EXIT_BUDGET_MS, _LifecycleExitRetryStarted
+	if _LifecycleFlushExitRetryArmed || _LifecycleUpdaterRetriesExit()
+		return true
+	if !(ExitKind = "Exit" || ExitKind = "Menu" || ExitKind = "Close" || ExitKind = "Single"
+			|| ExitKind = "Logoff" || ExitKind = "Shutdown")
+		return false
+	if !_LifecycleExitRetryStarted
+		_LifecycleExitRetryStarted := A_TickCount
+	else if TickExpired(_LifecycleExitRetryStarted, LIFECYCLE_FLUSH_EXIT_BUDGET_MS) {
+		_LifecycleExitRetryStarted := 0
+		return false
+	}
 	_LifecycleFlushExitRetryArmed := true
-	Deadline := A_TickCount + LIFECYCLE_FLUSH_EXIT_BUDGET_MS
+	Deadline := _LifecycleExitRetryStarted + LIFECYCLE_FLUSH_EXIT_BUDGET_MS
 	; The first poll runs after OnExit returns: ExitApp never re-enters it.
-	try TimerArmOneShotMs(() => KL_AwaitFlushHandoff(_LifecycleRetryExitNow.Bind(Code),
-		_LifecycleAbandonExitRetry, Deadline, LIFECYCLE_FLUSH_EXIT_POLL_MS),
+	try TimerArmOneShotMs(() => KL_AwaitFlushHandoff(_LifecycleRetryExitNow.Bind(Code, ExitKind, Gate),
+		_LifecycleAbandonExitRetry.Bind(Gate), Deadline, LIFECYCLE_FLUSH_EXIT_POLL_MS, TimerArmOneShotMs, 0, SettledFn),
 		LIFECYCLE_FLUSH_EXIT_POLL_MS)
 	catch as Err {
 		_LifecycleFlushExitRetryArmed := false
+		_LifecycleExitRetryStarted := 0
 		try LoggerError("Lifecycle", "Deferred exit retry could not be armed: {1}.", Err.Message)
+		return false
+	}
+	return true
+}
+
+_LifecycleRetryExitNow(Code, ExitKind, Gate, *) {
+	global _LifecycleFlushExitRetryArmed, _LifecycleExitRetryReason, _LifecycleExitRetryStarted
+	_LifecycleFlushExitRetryArmed := false
+	_LifecycleExitRetryReason := ExitKind
+	try LoggerInfo("Lifecycle", "The {1} settled; retrying the deferred exit.", Gate)
+	; A veto ends this thread with ExitApp, and only a finally still runs here.
+	try ExitApp(Code)
+	finally {
+		_LifecycleExitRetryReason := ""
+		if !_LifecycleFlushExitRetryArmed
+			_LifecycleExitRetryStarted := 0
+		QuitRequest_ExitReturned(_LifecycleQuitRetryOwned, NotifyQuitRefused)
 	}
 }
 
-_LifecycleRetryExitNow(Code, *) {
-	global _LifecycleFlushExitRetryArmed
-	_LifecycleFlushExitRetryArmed := false
-	try LoggerInfo("Lifecycle", "Keystats flush settled; retrying the deferred exit.")
-	ExitApp(Code)
+; Answers a Quit after its veto: nothing runs after a vetoed ExitApp in the thread
+; that called it, so the caller cannot do it. A retry armed by the gate keeps the
+; answer owed.
+_LifecycleAnswerVetoedQuit() {
 	QuitRequest_ExitReturned(_LifecycleQuitRetryOwned, NotifyQuitRefused)
 }
 
-_LifecycleAbandonExitRetry(*) {
-	global _LifecycleFlushExitRetryArmed, LIFECYCLE_FLUSH_EXIT_BUDGET_MS
+_LifecycleAbandonExitRetry(Gate, *) {
+	global _LifecycleFlushExitRetryArmed, LIFECYCLE_FLUSH_EXIT_BUDGET_MS, _LifecycleExitRetryStarted
 	_LifecycleFlushExitRetryArmed := false
+	_LifecycleExitRetryStarted := 0
 	try LoggerError("Lifecycle",
-		"Deferred exit abandoned: the keystats flush did not settle within {1} ms.",
-		LIFECYCLE_FLUSH_EXIT_BUDGET_MS)
+		"Deferred exit abandoned: the {1} did not settle within {2} ms.",
+		Gate, LIFECYCLE_FLUSH_EXIT_BUDGET_MS)
 	QuitRequest_RetryAbandoned(NotifyQuitRefused)
 }
 
@@ -1044,10 +1092,13 @@ _LifecycleRetrySupersededExit(Code, Record, *) {
 
 Ergopti_OnShutdown(reason, code) {
 		global _LifecycleShutdownReason, _LifecycleAiShutdownAttempt
-		global _LifecycleReloadExitRetrying
+		global _LifecycleReloadExitRetrying, _LifecycleExitRetryReason
 		if _LifecycleReloadExitRetrying {
 			_LifecycleReloadExitRetrying := false
 			reason := "Reload"
+		} else if _LifecycleExitRetryReason != "" {
+			reason := _LifecycleExitRetryReason
+			_LifecycleExitRetryReason := ""
 		}
 		if IsSet(LLM_Menu_ApiPrivateBeginShutdown)
 			_LifecycleAiShutdownAttempt := LLM_Menu_ApiPrivateBeginShutdown()
@@ -1298,13 +1349,18 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Logger shutdown preflight failed: {1}.", Err.Message)
 		if !LoggerReady {
 			; The evidence says whether the refusal was a flush this exit interrupted,
-			; which ends by itself and retries the same reload, or a sink that really
+			; which ends by itself and retries the same exit, or a sink that really
 			; refused.
 			LoggerRetry := 0
-			if (TerminalHandoff is Map) && LoggerShutdownRefusalSettles(LoggerRefusal) {
+			LoggerSettles := LoggerShutdownRefusalSettles(LoggerRefusal)
+			if (TerminalHandoff is Map) && LoggerSettles {
 				LoggerRetry := _LifecycleReloadRetry(LoggerFlushSettled, code)
 				try LoggerInfo("Lifecycle",
 					"Reload deferred while the log flush it interrupted settles (phase={1}, flush_active={2}, append_owners={3}).",
+					LoggerRefusal["phase"], LoggerRefusal["flush_active"], LoggerRefusal["append_owners"])
+			} else if LoggerSettles && _LifecycleArmFlushExitRetry(reason, code, LoggerFlushSettled, "log flush") {
+				try LoggerInfo("Lifecycle",
+					"Shutdown deferred while the log flush it interrupted settles (phase={1}, flush_active={2}, append_owners={3}).",
 					LoggerRefusal["phase"], LoggerRefusal["flush_active"], LoggerRefusal["append_owners"])
 			} else {
 				try LoggerError("Lifecycle",
@@ -1339,6 +1395,11 @@ Ergopti_OnShutdown(reason, code) {
 		; through _LifecycleRefuseShutdown and withdraws the keystats lease below.
 		if FileReadActivityBusy() {
 			try KL_CancelShutdown()
+			; An interrupted read ends by itself, like an interrupted flush.
+			if !(TerminalHandoff is Map)
+				_LifecycleArmFlushExitRetry(reason, code, () => !FileReadActivityBusy(), "file read")
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
 			return _LifecycleRefuseShutdown("an exact file read still owns native cleanup")
 		}
 		if (SupersededReload is Map) {
@@ -1645,8 +1706,8 @@ _LifecycleQuitSchedule(Ms, Callback) {
 				return false
 		}
 }
-; Whether something already retries a refused exit by itself: the keystats flush,
-; or the retirement of a reload successor that resumes the same exit.
+; Whether something already retries a refused exit by itself: a flush or read this
+; exit interrupted, or the retirement of a reload successor that resumes the same exit.
 _LifecycleQuitRetryOwned() {
 		global _LifecycleFlushExitRetryArmed
 		if _LifecycleFlushExitRetryArmed

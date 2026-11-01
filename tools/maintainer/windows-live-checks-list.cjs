@@ -559,6 +559,26 @@ const CHECKS = [
 		}
 	},
 	{
+		id: 'quit-over-a-log-flush',
+		title: 'One Quit that lands on a log flush exits by itself, with no error window',
+		async run(context) {
+			const { session } = await bootEnglish(context, 'quitflush');
+			await session.run('hold_log_flush');
+			await session.run('click', ['re:Quit$'], 20000, { followReload: true });
+			const started = Date.now();
+			while (session.child.exitCode === null && Date.now() - started < 30000) await live.sleep(100);
+			if (session.child.exitCode !== 0)
+				return fail(`the Quit ended with ${session.child.exitCode}, 0 expected`);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) return fail(`the log holds an error: ${errors[0]}`);
+			if (session.logLines('Shutdown deferred while the log flush').length !== 1)
+				return fail('the Quit did not land on the held flush');
+			if (session.logLines('Quit was refused').length > 0)
+				return fail('the user was told of a refusal');
+			return pass('the Quit was deferred once and exited with no error');
+		}
+	},
+	{
 		id: 'win-s-open-target',
 		title:
 			'Win+S on a selection: a missing path and a bare file name are reported, a folder is opened',
