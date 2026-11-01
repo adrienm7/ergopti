@@ -369,12 +369,12 @@ function receiveWindowsRuntimeHandoff() {
 		stderr,
 		'Owned runtime retains image leases: exact job accounting is unavailable.\n'
 	);
-	assert.equal(stdout.split('\n').filter((line) => line.startsWith('PASS ')).length, 9);
+	assert.equal(stdout.split('\n').filter((line) => line.startsWith('PASS ')).length, 15);
 	assert.doesNotMatch(stdout, /^FAIL /m);
-	assert.match(stdout, /^RESULT passed=9 failed=0\n$/m);
+	assert.match(stdout, /^RESULT passed=15 failed=0\n$/m);
 	// The small private fixture namespace remains a retained receiving artifact.
 	process.stdout.write(stdout);
-	process.stdout.write('WINDOWS-RUNTIME-HANDOFF models=9 native_runtime=false http=false\n');
+	process.stdout.write('WINDOWS-RUNTIME-HANDOFF models=15 native_runtime=false http=false\n');
 }
 function receiveWindowsModelEnvironment() {
 	assert.equal(process.platform, 'win32', 'Model admission requires production Windows PS5.');
