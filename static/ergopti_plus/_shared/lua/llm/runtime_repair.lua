@@ -208,10 +208,10 @@ function M.new(ports, policy)
 			local pending=entry.result_listeners;entry.result_listeners={}
 			for _,callback in ipairs(pending) do notify(callback,request.result) end
 		end
-		fail = function(reason, relay_refusal)
+		fail = function(reason)
 			if entry.promoted then return end
 			if not failing then
-				failing=true; request.result={ok=false,error=reason or 'runtime_refused', relay_refusal=relay_refusal}
+				failing=true; request.result={ok=false,error=reason or 'runtime_refused'}
 				announce_result()
 			end
 			entry.stage='cleanup'; clean()
@@ -305,7 +305,7 @@ function M.new(ports, policy)
 			entry.promoted=true
 			budget_owner:finish()
 			request.result={ok=true, installed=entry.installed==true, origin=entry.origin,
-				model_installed=false, direct_fallback=entry.direct_fallback}
+				model_installed=false, direct_fallback=entry.direct_fallback, relay_refusal=entry.relay_refusal}
 			entry.stage='done'; complete(); announce_result()
 		end
 		local function start_probe()
@@ -388,10 +388,10 @@ function M.new(ports, policy)
 							-- A proxy that demands a sign-in the daemon cannot give: the
 							-- daemon starts under the local relay (proxy-auth-relay.md).
 							entry.relay=type(answer.relay)=='table' and answer.relay or nil
+							-- A refused sign-in: the daemon starts without the proxy for the
+							-- models on disk, and this closed reason refuses only the pull.
+							entry.relay_refusal=type(answer.relay_refusal)=='string' and answer.relay_refusal or nil
 							begin_service()
-						elseif held.delivered and type(answer)=='table' and type(answer.relay_refusal)=='string' then
-							-- The relay's closed reason reaches the page as its own message.
-							fail('runtime_proxy_relay_refused', answer.relay_refusal)
 						else
 							fail('runtime_proxy_unavailable')
 						end

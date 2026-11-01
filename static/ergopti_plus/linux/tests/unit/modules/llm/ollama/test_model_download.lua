@@ -550,6 +550,31 @@ helpers.describe("model download: exact requester retirement continuation", func
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("(proxy-auth-relay) a refused sign-in refuses the pull with the relay's message, and its retry", function()
+		local State = require("modules.llm.ollama_install_state")
+		local ok, err = xpcall(function()
+			State._reset()
+			State.note_repair({ ok = true, origin = "http://127.0.0.1:11434", relay_refusal = "sign_in_rejected" })
+			local Download, transport, window, shown = load_fixture()
+			local finished = nil
+			Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen", function(done) finished = done end)
+			helpers.assert_eq(#transport.starts, 0, "the daemon is never asked to fetch")
+			helpers.assert_eq(window.completions[1][2], false)
+			helpers.assert_eq(window.completions[1][3], require("infra.i18n").get("network.relay.sign_in_rejected"))
+			helpers.assert_eq(finished, false)
+			helpers.assert_eq(Download.is_active(), false)
+			shown().on_retry()
+			helpers.assert_eq(#transport.starts, 0, "a retry reads the same receipt")
+			helpers.assert_eq(window.completions[2][3], window.completions[1][3])
+			State.note_repair({ ok = true, origin = "http://127.0.0.1:11434" })
+			shown().on_retry()
+			helpers.assert_eq(#transport.starts, 1, "a daemon under its proxy pulls")
+		end, debug.traceback)
+		State._reset()
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
 	-- pac-direct-fallback-pull: the managed daemon went direct because its PAC
 	-- route was unusable; a pull it then could not fetch names both causes.
 	local REGISTRY_TIMEOUT = "pull model manifest: Get \"https://registry.ollama.ai/v2/library/qwen/manifests/2b\": "

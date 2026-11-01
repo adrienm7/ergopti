@@ -54,6 +54,9 @@ process.on('exit', () => fs.rmSync(scratch, { recursive: true, force: true }));
 const launcher = path.join(scratch, 'ErgoptiPlus.app', 'Contents', 'MacOS', 'ErgoptiPlus');
 const relay = path.join(path.dirname(launcher), 'ergopti-proxy-relay');
 const calls = path.join(scratch, 'relay-calls');
+const receipt = path.join(scratch, 'caches', 'proxy_relay_refusal');
+/** The closed reason the last start recorded for the pull, or null. */
+const recordedRefusal = () => (fs.existsSync(receipt) ? fs.readFileSync(receipt, 'utf8') : null);
 fs.mkdirSync(path.dirname(launcher), { recursive: true });
 fs.writeFileSync(launcher, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
 
@@ -96,12 +99,17 @@ function run({
 	].join('\n');
 	const env = {
 		PATH: process.env.PATH,
-		ERGOPTI_LAUNCHER_EXECUTABLE: launcher,
+		ERGOPTI_LAUNCHER_EXECUTABLE: launcher.replace(/\\/g, '/'),
 		OPAQUE_NETWORK_PAC_PROBE_URLS: origins,
 		FAKE_PROBE_STDOUT: stdout,
 		FAKE_PROBE_EXIT: String(exit)
 	};
 	if (proxy) env.HTTPS_PROXY = proxy;
+	// The Windows Git Bash reads this as a POSIX path too.
+	env.ERGOPTI_PROXY_RELAY_REFUSAL_FILE = receipt.replace(/\\/g, '/');
+	// A receipt of a previous daemon start must never survive this one.
+	fs.mkdirSync(path.dirname(receipt), { recursive: true });
+	fs.writeFileSync(receipt, 'stale_reason\n');
 	const result = spawnSync(bash, ['-c', script], { env, encoding: 'utf8' });
 	assert.equal(result.error, undefined);
 	return {
@@ -132,6 +140,7 @@ fs.rmSync(relay, { force: true });
 let result = run();
 assert.equal(result.stdout, `CHILD 127.0.0.1:1 ${PROXY}\n`);
 assert.match(result.stderr, /not installed.*\(not_installed\)/);
+assert.equal(recordedRefusal(), null, 'not installed refuses nothing');
 noSecret(result);
 checks++;
 
@@ -156,16 +165,22 @@ for (const vector of VECTORS) {
 			vector.id
 		);
 		assert.equal(result.stdout, 'CHILD 127.0.0.1:1 http://ergopti:token@127.0.0.1:1\n', vector.id);
-	} else {
+		assert.equal(recordedRefusal(), null, vector.id);
+	} else if (vector.result) {
 		assert.equal(result.calls.length, 1, `${vector.id}: no relay run`);
 		assert.equal(result.stdout, `CHILD 127.0.0.1:1 ${PROXY}\n`, vector.id);
-		if (vector.result) assert.equal(result.stderr, '', vector.id);
-		else
-			assert.match(
-				result.stderr,
-				new RegExp(`refused \\(${vector.reason}\\): the daemon starts without it`),
-				vector.id
-			);
+		assert.equal(result.stderr, '', vector.id);
+		assert.equal(recordedRefusal(), null, vector.id);
+	} else {
+		// A refused sign-in: no proxy for the daemon, a receipt for the pull.
+		assert.equal(result.calls.length, 1, `${vector.id}: no relay run`);
+		assert.equal(result.stdout, 'CHILD 127.0.0.1:1 none\n', vector.id);
+		assert.match(
+			result.stderr,
+			new RegExp(`refused \\(${vector.reason}\\): the daemon starts without the proxy`),
+			vector.id
+		);
+		assert.equal(recordedRefusal(), `${vector.reason}\n`, vector.id);
 	}
 	noSecret(result);
 	checks++;
@@ -194,7 +209,8 @@ for (const options of [
 	result = run({ ...options, stdout: '{"schema":1,"status":"required","scheme":"ntlm"}' });
 	assert.deepEqual(result.calls, [], JSON.stringify(options));
 	assert.match(result.stderr, /\(relay_unavailable\)/);
-	assert.equal(result.stdout, `CHILD 127.0.0.1:1 ${PROXY}\n`);
+	assert.equal(result.stdout, 'CHILD 127.0.0.1:1 none\n');
+	assert.equal(recordedRefusal(), 'relay_unavailable\n');
 	checks++;
 }
 

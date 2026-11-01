@@ -206,12 +206,14 @@ helpers.describe("Ollama install state on Linux", function()
 		State._reset()
 	end)
 
-	-- docs/design/proxy-auth-relay.md: a refused proxy sign-in names its own fix.
-	helpers.it("(proxy-auth-relay) a refused proxy sign-in greys Ollama with the relay's message", function()
+	-- docs/design/proxy-auth-relay.md: a refused proxy sign-in leaves the models on
+	-- disk usable, and names its own fix on the pull alone.
+	helpers.it("(proxy-auth-relay) a refused proxy sign-in keeps Ollama usable and refuses the pull with the relay's message", function()
 		local State = helpers.load_module("modules.llm.ollama_install_state")
 		State._reset()
 		local live = ports({ managed = "installed" })
 		live.failure = State.failure
+		local ORIGIN = "http://127.0.0.1:11434"
 		local cases = {
 			sign_in_unavailable = "network.relay.sign_in_unavailable",
 			ntlm_requires_windows = "network.relay.ntlm_requires_windows",
@@ -221,16 +223,21 @@ helpers.describe("Ollama install state on Linux", function()
 			upstream_timeout = "network.relay.failed",
 		}
 		for refusal, key in pairs(cases) do
-			State.note_repair({ ok = false, error = "runtime_proxy_relay_refused", relay_refusal = refusal })
+			State.note_repair({ ok = true, origin = ORIGIN, relay_refusal = refusal })
 			local available, reason = State.capture(llm(), live)
-			helpers.assert_eq(available, false, refusal)
-			helpers.assert_eq(reason, key, refusal)
+			helpers.assert_eq(available, true, refusal)
+			helpers.assert_nil(reason, refusal)
+			helpers.assert_eq(State.pull_refusal_key(ORIGIN), key, refusal)
+			helpers.assert_eq(State.relay_refusal(ORIGIN), refusal)
+			helpers.assert_nil(State.pull_refusal_key("http://127.0.0.1:11500"), "another daemon's pull goes ahead")
 		end
 		State.note_repair({ ok = false, error = "runtime_install_failed" })
 		local _, reason = State.capture(llm(), live)
 		helpers.assert_eq(reason, "model_browser.reason_ollama_missing", "another failure keeps the generic reason")
-		State.note_repair({ ok = true })
+		helpers.assert_true(State.pull_refusal_key(ORIGIN) ~= nil, "a failed repair leaves the earlier daemon and its receipt")
+		State.note_repair({ ok = true, origin = ORIGIN })
 		helpers.assert_eq(State.capture(llm(), live), true)
+		helpers.assert_nil(State.pull_refusal_key(ORIGIN), "a daemon under its proxy pulls again")
 		State._reset()
 	end)
 

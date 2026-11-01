@@ -14,6 +14,8 @@
 --- demands an NTLM or Negotiate sign-in is answered by Ergopti's local relay
 --- (run_with_proxy_sign_in_relay in network-retry.sh,
 --- docs/design/proxy-auth-relay.md), with deadlines from the timings registry.
+--- A refused sign-in starts it without the proxy and leaves a receipt
+--- (modules/llm/proxy_relay_receipt.lua) that refuses the pull.
 --- ==============================================================================
 
 local M = {}
@@ -123,10 +125,12 @@ function M.build(ollama_bin, unified_log_file, port, source_kind, caller_nonce)
 	-- the daemon to start anyway, for the models already on disk.
 	local network, network_err = NetworkEnv.prelude("OLLAMA-SERVER", M.NETWORK_OPTIONS)
 	if not network then return nil, network_err end
+	local refusal_file = require("modules.llm.proxy_relay_receipt").path()
 
 	return table.concat({
 		network,
 		"LOG_DIR=", text_utils.shell_quote(log_dir), "; ",
+		"ERGOPTI_PROXY_RELAY_REFUSAL_FILE=", text_utils.shell_quote(refusal_file or ""), "; ",
 		"ERGOPTI_PROXY_RELAY_DIAL_MS=", string.format("%.0f", Timings.ms("adapters", "proxy_relay_dial_timeout_ms")), "; ",
 		"ERGOPTI_PROXY_RELAY_HANDSHAKE_MS=", string.format("%.0f", Timings.ms("adapters", "proxy_relay_handshake_timeout_ms")), "; ",
 		"ERGOPTI_PROXY_RELAY_IDLE_MS=", string.format("%.0f", Timings.ms("adapters", "proxy_relay_idle_timeout_ms")), "; ",

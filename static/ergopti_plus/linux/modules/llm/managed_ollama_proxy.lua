@@ -36,8 +36,9 @@
 ---    (docs/design/proxy-auth-relay.md): a proxy that demands an NTLM or
 ---    Negotiate sign-in the daemon cannot give is answered by Ergopti's local
 ---    relay, proven by the probe's own sign-in; the stage then names that relay
----    so the daemon starts under it. A refused sign-in refuses the start with
----    the relay's closed reason instead of a daemon whose pulls would fail.
+---    so the daemon starts under it. A refused sign-in starts the daemon without
+---    the proxy, as Windows does: the models on disk keep working, and the result
+---    carries the relay's closed reason, which refuses only the pull.
 --- 7. The user's proxy override (network/proxy_override.lua, which the policy
 ---    binding applies) wins over everything above: "direct" bypasses every relay
 ---    the daemon would inherit, the sign-in relay included; a relay URL becomes
@@ -106,10 +107,10 @@ local function environment_of(plan, rows)
 	return environment
 end
 
---- The daemon rows of a direct proxy override: a bypass of every relay the
---- daemon would otherwise inherit, the sign-in relay included.
+--- The daemon rows of a route without any proxy (a direct override, a refused
+--- sign-in): a bypass of every relay the daemon would otherwise inherit.
 --- @return table environment
-local function override_direct_environment()
+local function bypass_environment()
 	local environment = {}
 	for _, name in ipairs(M.BYPASS_VARIABLES) do environment[#environment + 1] = name .. "=*" end
 	return environment
@@ -188,6 +189,15 @@ function M.new(deps)
 		local fallback = nil
 		local dispatch, choose
 
+		--- Settles a refused sign-in: the daemon starts without the proxy, and the
+		--- closed reason travels with the result to refuse the pull alone.
+		--- @param reason string The relay's closed refusal.
+		local function refuse_sign_in(reason)
+			Logger.error(LOG, "Managed Ollama proxy sign-in relay refused (%s): the daemon starts without the proxy.",
+				tostring(reason))
+			finish({ ok = true, environment = bypass_environment(), relay_refusal = reason, direct_fallback = fallback })
+		end
+
 		--- Asks the selected relay whether it demands a sign-in the daemon cannot
 		--- give, then settles the stage with the relay the daemon starts under.
 		--- @param plan table Settled route plan with a relay.
@@ -211,11 +221,7 @@ function M.new(deps)
 					finish({ ok = false, error = "proxy_cancelled" })
 					return
 				end
-				if not answer then
-					Logger.error(LOG, "Managed Ollama proxy sign-in relay refused: %s", tostring(reason))
-					finish({ ok = false, error = "proxy_relay_refused", relay_refusal = reason })
-					return
-				end
+				if not answer then refuse_sign_in(reason); return end
 				local result = { ok = true, environment = environment_of(plan, rows), direct_fallback = fallback }
 				if answer.status == "not_installed" then
 					-- The relay is not packaged yet: the daemon keeps the proxy as
@@ -232,7 +238,7 @@ function M.new(deps)
 			end)
 			if not child then
 				Logger.error(LOG, "Managed Ollama proxy relay probe not started: %s", tostring(probe_error))
-				finish({ ok = false, error = "proxy_relay_refused", relay_refusal = "relay_unavailable" })
+				refuse_sign_in(require("network.proxy_auth_relay").UNAVAILABLE)
 				return
 			end
 			if step == mine then inner = child end
@@ -243,7 +249,7 @@ function M.new(deps)
 		if route.source == "override" then
 			if route.mode == "direct" then
 				Logger.info(LOG, "Managed Ollama proxy lookup skipped: the proxy override names a direct route.")
-				finish({ ok = true, environment = override_direct_environment() })
+				finish({ ok = true, environment = bypass_environment() })
 				return operation
 			end
 			Logger.info(LOG, "Managed Ollama proxy lookup skipped: the proxy override names a relay.")
