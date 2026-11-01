@@ -56,8 +56,10 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // 30 → 25 files and 75 → 61 reads: the keycode single-source, model
 // selector listing, keystats privacy filter, token prompt setter and pause
 // layout switch invariants select their files by declaration.
-const BASELINE = 25;
-const READ_BASELINE = 61;
+// 25 → 23 files and 61 → 53 reads: the dashboard bridge actions and the
+// keystats SQLite writer schema cases select their files by declaration.
+const BASELINE = 23;
+const READ_BASELINE = 53;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];
