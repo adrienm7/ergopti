@@ -1314,6 +1314,7 @@ global _AhkSubDir := ""
 _LogBootProgress("keystats modules + tests included")
 
 ; ── Meta tests (codebase hygiene, no production includes needed) ──
+#Include meta/suite/test_driver_source_constants.ahk
 #Include meta/suite/test_ahk_brace_balance.ahk
 #Include meta/suite/test_run_all_include_integrity.ahk
 #Include meta/suite/test_runner_only_filter.ahk
