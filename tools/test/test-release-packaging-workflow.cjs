@@ -1633,11 +1633,11 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 	positive.compiled_upgrade = {
 		schema_version: 1,
 		prior_install: {
-			package_sha256: '210d737ab9ebb9a65d54d98aafe05cba78fe961de00e75cce660ce0067b09caf',
-			asset_id: 601771276,
-			version: '0.0.0-dev.155',
-			commit: 'c9e4c64abb6448243252201dffec0c248e2c24ac',
-			bundle_identity: '0.0.0-dev.155',
+			package_sha256: '54be80668a07f160c72bfa9d78d2bb502a0ffa455815a65cc6442f1966a2a7f8',
+			asset_id: 626678404,
+			version: '1.0.0',
+			commit: '5ef675e08d9f75b0902026a21f36782e999b3ac2',
+			bundle_identity: '1.0.0',
 			pid: 20,
 			executable: 'C:\\private\\prior\\ErgoptiPlus.exe',
 			created_utc: '2026-10-07T12:00:00.0000000Z',
@@ -1645,7 +1645,7 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 			tree_closed: true,
 			native_profile_before_edit: {
 				sha256: '4'.repeat(64),
-				schema_version: 6,
+				schema_version: 12,
 				metrics_enabled: false,
 				metrics_shortcut_typing: 'Ctrl+Alt+M',
 				metrics_shortcut_apps: 'Ctrl+Alt+A',
@@ -1659,21 +1659,21 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 				after_sha256: '9'.repeat(64),
 				untouched_before_sha256: '6'.repeat(64),
 				untouched_after_sha256: '6'.repeat(64),
-				profile_schema_version: 6,
+				profile_schema_version: 12,
 				preserved_records: 5,
 				changed: true
 			},
-			saved_profile: { sha256: '9'.repeat(64), preserved_records: 5, schema_version: 6 },
+			saved_profile: { sha256: '9'.repeat(64), preserved_records: 5, schema_version: 12 },
 			extracted_assets: [
 				{
 					path: 'static/ergopti_plus/_shared/core/config_schema/migrations.toml',
-					bytes: 33897,
-					sha256: '39b35d65f2c3e2dc01a2c32f762b56ec8b16aaff55495d86d12529ab298b4bf4'
+					bytes: 39632,
+					sha256: '9dae9fb9a10ae8ea2b8218fd1152b08acc61f8076e1a59895a048806a556fcd6'
 				},
 				{
 					path: 'static/ergopti_plus/_shared/data/locales/en.json',
-					bytes: 209494,
-					sha256: 'eaff8ce0e2bb4d7ec539ad92dc77067b5c740e9eedf4c5e698d7ddad51659e43'
+					bytes: 224077,
+					sha256: '37889fd7fe021c8665c5828824b503f708f6944777d213b46bcfa2efb07f042f'
 				}
 			]
 		},
