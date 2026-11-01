@@ -163,6 +163,18 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		end
 		base_url = assert(UrlTemplate.expand(provider.base_url, values))
 		Logger.info(LOG, "API entry address filled for provider '%s' (%d account field(s)).", provider.id, #fields)
+	elseif provider.optional_address then
+		-- The catalogue's address works; one optional value replaces it
+		local optional = provider.optional_address
+		local value = dialogs.prompt(heading, tr("menu.llm.api_prompt_field." .. optional.field), "")
+		if not value then return end
+		local filled = UrlTemplate.optional_url(optional, TextUtils.trim(value))
+		if not filled then
+			Logger.error(LOG, "API entry address refused: the '%s' value cannot fill it.", optional.field)
+			dialogs.error(tr("menu.llm.api_prompt_field_invalid." .. optional.field), heading)
+			return
+		end
+		base_url = filled
 	-- OpenAI selects the wire schema, not a fixed host. Keep its declared
 	-- default visible while allowing the same custom endpoint as the generic form.
 	elseif provider.base_url == "" or provider.id == "openai" then

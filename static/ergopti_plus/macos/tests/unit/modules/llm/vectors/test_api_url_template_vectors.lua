@@ -83,4 +83,30 @@ helpers.describe("api_url_template replays the shared corpus", function()
 			helpers.assert_eq(Template.has_placeholder(v.url), v.has, v.url)
 		end)
 	end
+
+	for _, v in ipairs(corpus.optional_address.values) do
+		helpers.it("optional address value '" .. v.value .. "'", function()
+			local url = Template.optional_url(corpus.optional_address.block, v.value)
+			if v.refused then helpers.assert_nil(url, "refused") else helpers.assert_eq(url, v.url) end
+		end)
+	end
+
+	for index, v in ipairs(corpus.optional_address.blocks) do
+		helpers.it("optional address block vector " .. index, function()
+			helpers.assert_eq(Template.optional_problem(v.block) == nil, v.valid)
+		end)
+	end
+
+	helpers.it("the catalogue's blocks are usable and every locale names their suffix", function()
+		local catalogue = read_json("modules/llm/api_providers.json")
+		local optional = catalogue.providers.dashscope.optional_address
+		helpers.assert_nil(Template.optional_problem(optional))
+		for _, lang in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no",
+			"pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
+			local locale = read_json("data/locales/" .. lang .. ".json")
+			local text = locale["menu.llm.api_prompt_field_invalid." .. optional.field]
+			helpers.assert_true(type(text) == "string" and text:find(optional.host_suffix, 1, true) ~= nil, lang)
+			helpers.assert_true(type(locale["menu.llm.api_prompt_field." .. optional.field]) == "string", lang)
+		end
+	end)
 end)

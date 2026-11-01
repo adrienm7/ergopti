@@ -6,7 +6,8 @@
 ; The address of a provider whose host or path depends on the user's account:
 ; api_providers.json writes its base_url as a template such as
 ; "https://{resource}.openai.azure.com/openai/v1", the add-entry form asks one
-; value per placeholder, and the filled address becomes the entry's BaseUrl.
+; value per placeholder, and the filled address becomes the entry's BaseUrl. An
+; optional_address block keeps a working address and offers one optional field.
 ; Port of _shared/lua/llm/api_url_template.lua; both replay
 ; _shared/tests/corpus/llm/api_url_template_vectors.json.
 ; ==============================================================================
@@ -99,4 +100,46 @@ ApiUrlTemplateExpand(Template, Values) {
 		Url := StrReplace(Url, "{" . Name . "}", Value)
 	}
 	return Map("url", Url)
+}
+
+/**
+ * Why an optional_address block cannot be used: the catalogue's address works
+ * as it is, and the form offers one optional field that replaces it.
+ * @param {Any} Optional The block, "" when the provider declares none.
+ * @returns {String} The reason, "" for a usable or absent block.
+ */
+ApiUrlTemplateOptionalProblem(Optional) {
+	if (Optional is String) && Optional == ""
+		return ""
+	if !(Optional is Map)
+		return "not an object"
+	Field := Optional.Get("field", 0), Template := Optional.Get("template", 0), Suffix := Optional.Get("host_suffix", 0)
+	if !(Field is String) || !RegExMatch(Field, "^[a-z0-9_]+$")
+		return "no field name"
+	if !(Template is String) || !RegExMatch(Template, "^https://\S+$")
+		return "no https template"
+	Parsed := ApiUrlTemplateFields(Template)
+	if !Parsed["valid"] || Parsed["fields"].Length != 1 || Parsed["fields"][1] != Field
+		return "the template must hold its field once"
+	if !(Suffix is String) || !RegExMatch(Suffix, "^\.[A-Za-z0-9.-]+$") || InStr(Suffix, "..")
+		return "no host suffix"
+	return ""
+}
+
+/**
+ * The address one value of an optional field gives.
+ * @param {Map} Optional A block ApiUrlTemplateOptionalProblem accepted.
+ * @param {String} Value The trimmed value.
+ * @returns {String|Integer} The address, "" to keep the catalogue's, 0 when refused.
+ */
+ApiUrlTemplateOptionalUrl(Optional, Value) {
+	if Value == ""
+		return ""
+	if !ApiUrlTemplateValidValue(Value) || InStr(Value, "..")
+		return 0
+	Suffix := Optional["host_suffix"]
+	; The comparison ignores case, as a host does.
+	if StrLen(Value) <= StrLen(Suffix) || SubStr(Value, -StrLen(Suffix)) != Suffix
+		return 0
+	return ApiUrlTemplateExpand(Optional["template"], Map(Optional["field"], Value))["url"]
 }

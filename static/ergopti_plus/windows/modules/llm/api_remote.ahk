@@ -2580,8 +2580,16 @@ _LLMRemote_LoadCatalog() {
                 continue
             }
         }
+        ; A refused block refuses the provider whole: its form could not ask the field.
+        OptionalAddress := desc.Get("optional_address", "")
+        OptionalProblem := ApiUrlTemplateOptionalProblem(OptionalAddress)
+        if (OptionalProblem != "") {
+            try LoggerError("LLM.remote", "api_providers.json: providers.{1}.optional_address is invalid ({2}) — skipped.", pid, OptionalProblem)
+            continue
+        }
         candidateProviders[pid] := Map(
             "Auth", Auth,
+            "OptionalAddress", OptionalAddress,
             "ThinkingDialect", Dialect,
             "Label", desc["label"],
             "BaseUrl", desc["base_url"],

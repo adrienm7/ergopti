@@ -119,7 +119,8 @@ local function descriptor_is_valid(id, desc)
 		return false
 	end
 	if desc.base_url ~= "" and not desc.base_url:match("^https?://%S+$") then return false end
-	return true
+	-- A refused block refuses the provider whole: its form could not ask the field
+	return UrlTemplate.optional_problem(desc.optional_address) == nil
 end
 
 --- Keeps the scalar, JSON-safe fields of each model's extras.
@@ -203,6 +204,7 @@ function M.parse_catalogue(text)
 				default_model = desc.default_model,
 				format = desc.format,
 				model_extras = normalize_model_extras(desc.model_extras),
+				optional_address = desc.optional_address,
 				thinking_dialect = thinking_dialect,
 			}
 			catalogue.order[#catalogue.order + 1] = id

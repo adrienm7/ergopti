@@ -21,6 +21,11 @@
 ---    value cannot add a scheme, a user, a port, a path or a query.
 --- 4. A template never reaches the network: a request whose address still
 ---    holds a placeholder is refused (M.has_placeholder).
+--- 5. An optional_address block is the opposite case: the catalogue's address
+---    works as it is, and the form offers one optional field that replaces it
+---    (DashScope's workspace-dedicated domains). An empty value keeps the
+---    catalogue's address; a filled one must end with the block's host_suffix,
+---    so the field can only name a host of that provider.
 --- ==============================================================================
 
 local M = {}
@@ -86,6 +91,35 @@ function M.expand(template, values)
 		if not M.valid_value(values[name]) then return nil, name end
 	end
 	return (template:gsub(PLACEHOLDER, function(name) return values[name] end)), nil
+end
+
+--- Why an optional_address block cannot be used.
+--- @param optional any The block, nil when the provider declares none.
+--- @return string|nil reason Nil for a usable or absent block.
+function M.optional_problem(optional)
+	if optional == nil then return nil end
+	if type(optional) ~= "table" then return "not an object" end
+	local field, template, suffix = optional.field, optional.template, optional.host_suffix
+	if type(field) ~= "string" or field:match("^[%l%d_]+$") == nil then return "no field name" end
+	if type(template) ~= "string" or template:match("^https://%S+$") == nil then return "no https template" end
+	local fields, reason = M.fields(template)
+	if reason or #fields ~= 1 or fields[1] ~= field then return "the template must hold its field once" end
+	if type(suffix) ~= "string" or suffix:match("^%.[%w.-]+$") == nil or suffix:find("..", 1, true) then
+		return "no host suffix"
+	end
+	return nil
+end
+
+--- The address one value of an optional field gives.
+--- @param optional table A block optional_problem() accepted.
+--- @param value string The trimmed value.
+--- @return string|nil url The address, "" to keep the catalogue's, nil when refused.
+function M.optional_url(optional, value)
+	if value == "" then return "" end
+	if not M.valid_value(value) or value:find("..", 1, true) then return nil end
+	local suffix = optional.host_suffix
+	if #value <= #suffix or value:sub(-#suffix):lower() ~= suffix:lower() then return nil end
+	return (M.expand(optional.template, { [optional.field] = value }))
 end
 
 return M
