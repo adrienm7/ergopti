@@ -913,42 +913,30 @@ _R7LC_ReplacementSurvivesVerificationFailure() {
 Test("FileSystem copy ownership: verification refusal retains an actual foreign replacement (copy-replaced-stage)", _R7LC_ReplacementSurvivesVerificationFailure)
 
 
-; A refused native rename grants no authority over a replaced restore sidecar.
+; A stage held by handle cannot be moved or replaced, by name, even in-process,
+; and a refused native rename leaves nothing to be confused with a foreign file.
 _R7LC_RestoreMoveRefusalRetainsReplacement() {
 	static GENERIC_READ := 0x80000000, FILE_SHARE_READ := 0x00000001, OPEN_EXISTING := 3
 	static FILE_ATTRIBUTE_NORMAL := 0x00000080
 	Root := A_Temp . "\ergopti_r7_restore_replaced_" . PLC_CurrentProcessId() . "_" . A_TickCount
 	Cfg := Root . "\cfg", Stage := Cfg . "\config.toml.ergopti-restore.tmp", Moved := Root . "\owned-moved.tmp"
-	Mover := FSAtomicMoveReplace
+	Mover := _FSHeldRename
 	AssertFalse(Mover.HasOwnProp("Call"), "a foreign rename observer cannot be detached")
 	Completed := false
-	ForeignBytes := "replacement restore sidecar bytes`n"
-	Observe(Self, ActualSource, ActualDestination) {
+	Observe(Self, StageHandle, Folder, Name) {
 		Mover.DeleteProp("Call")
-		AssertEqual(Stage, ActualSource)
-		AssertEqual(Cfg . "\config.toml", ActualDestination)
-		BeforeFile := FileOpen(Stage, "r")
-		try Before := FSHandleSnapshot(BeforeFile.Handle)
-		finally BeforeFile.Close()
+		AssertEqual("config.toml", Name)
+		Before := FSHandleSnapshot(StageHandle)
 		AssertTrue(Before["ok"], "the verified restore copy must have a native identity")
-		FileMove(Stage, Moved, false)
-		AssertTrue(FSWriteCreateDurable(Stage, ForeignBytes))
-		AfterFile := FileOpen(Stage, "r")
-		try After := FSHandleSnapshot(AfterFile.Handle)
-		finally AfterFile.Close()
-		AssertTrue(After["ok"], "the replacement sidecar must have a native identity")
-		AssertTrue(Before["volume"] == After["volume"] && (Before["index_high"] != After["index_high"] || Before["index_low"] != After["index_low"]),
-			"the pathname must now refer to a genuinely different file")
-		Lock := DllCall("kernel32\CreateFileW", "Str", ActualDestination, "UInt", GENERIC_READ,
+		AssertFalse(FSMove(Stage, Moved), "the held stage cannot move away by name")
+		AssertFalse(FSDelete(Stage), "the held stage cannot be deleted by name")
+		AssertEqual(Before["index_low"], FSHandleSnapshot(StageHandle)["index_low"], "the handle still names the verified file")
+		Lock := DllCall("kernel32\CreateFileW", "Str", Cfg . "\config.toml", "UInt", GENERIC_READ,
 			"UInt", FILE_SHARE_READ, "Ptr", 0, "UInt", OPEN_EXISTING, "UInt", FILE_ATTRIBUTE_NORMAL, "Ptr", 0, "Ptr")
 		AssertTrue(Lock != -1, "the actual destination must have an owned no-delete-share handle")
 		try {
-			Refused := Mover.Call(ActualSource, ActualDestination, &NativeError)
-			AssertFalse(Refused, "the actual native replacement must fail while the destination denies delete sharing")
-			AssertTrue(NativeError is Integer && NativeError != 0, "the actual native refusal must retain a concrete OS error")
-			FileAppend("# restore-native-rename-refusal error=" . NativeError . "`n", "*")
 			Completed := true
-			return Refused
+			return Mover.Call(StageHandle, Folder, Name)
 		} finally DllCall("kernel32\CloseHandle", "Ptr", Lock, "Int")
 	}
 	try {
@@ -964,13 +952,12 @@ _R7LC_RestoreMoveRefusalRetainsReplacement() {
 		Result := ConfigBackup_Restore(Cfg, Backup["id"], Rules, Later)
 		if Mover.HasOwnProp("Call")
 			Mover.DeleteProp("Call")
-		AssertTrue(Completed, "the actual foreign replacement and native sharing refusal must complete")
+		AssertTrue(Completed, "the by-name attempts and the native sharing refusal must complete")
 		AssertFalse(Result["ok"])
 		AssertEqual("write", Result["reason"])
 		AssertEqual("generation = 2`n", FSReadUtf8Exact(Cfg . "\config.toml"))
-		AssertEqual("generation = 1`n", FSReadUtf8Exact(Moved), "the moved original copy must remain independently observable")
-		AssertTrue(FileExist(Stage), "a native rename refusal cannot delete the foreign replacement sidecar")
-		AssertEqual(ForeignBytes, FSReadUtf8Exact(Stage))
+		AssertFalse(FileExist(Moved), "nothing could take the stage out of its folder")
+		AssertFalse(FileExist(Stage), "the refused stage left through its own handle")
 	} finally {
 		if Mover.HasOwnProp("Call")
 			Mover.DeleteProp("Call")

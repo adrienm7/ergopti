@@ -617,6 +617,7 @@ InstallSendNoOps()
 #Include unit/modules/updater/test_asset_signature.ahk
 #Include unit/modules/updater/test_updater_managed_failure.ahk
 #Include unit/modules/updater/test_release_install.ahk
+#Include unit/modules/updater/test_config_restore_custody.ahk
 #Include unit/infra/lifecycle/test_uninstall.ahk
 #Include unit/infra/lifecycle/test_uninstall_source_run.ahk
 #Include unit/infra/lifecycle/test_start_at_login.ahk
