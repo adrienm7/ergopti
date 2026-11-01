@@ -55,6 +55,28 @@ check('the pre-commit hook formats the staged files before the convention lint',
 	assert.ok(format < hook.indexOf('node tools/lint/lint-conventions.js'));
 });
 
+check('the module loads where Prettier cannot be resolved', () => {
+	// The planner requires format.cjs, and the registration gates run the planner
+	// from fixture copies of tools/ that have no node_modules.
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-format-load-'));
+	try {
+		const copy = path.join(fixture, 'tools', 'lint', 'format.cjs');
+		fs.mkdirSync(path.dirname(copy), { recursive: true });
+		fs.copyFileSync(path.join(ROOT, 'tools', 'lint', 'format.cjs'), copy);
+		const env = { ...process.env };
+		delete env.NODE_PATH;
+		const loaded = spawnSync(
+			process.execPath,
+			['-e', `console.log(require(${JSON.stringify(copy)}).RUFF_VERSION)`],
+			{ cwd: fixture, encoding: 'utf8', env }
+		);
+		assert.strictEqual(loaded.status, 0, loaded.stderr);
+		assert.strictEqual(loaded.stdout.trim(), Format.RUFF_VERSION);
+	} finally {
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
+});
+
 /** Pin the genuine reusable Common step, including its unsuppressed exit status. */
 function checkCiFormatting(body) {
 	const step = pipeline.step(body, 'Check formatting');
