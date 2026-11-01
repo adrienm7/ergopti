@@ -26,11 +26,23 @@ Everything lives in the ignored `.ahk-parallel/` folder (`--run-dir` moves it).
   share down to one minute, so the workers finish together.
 - **A process that dies or hangs** past its 30-minute cap marks the test it died
   in as failed; the rest of its chunk goes back to the queue.
-- **Failures.** Parallel neighbours can disturb tests that use the keyboard, the
-  clipboard or a shared native resource. Read a failure as real only once
-  `--rerun-failures` reproduces it alone. That run answers for those failures
-  only, in its exit status and its summary, and needs `--accept-stale` once HEAD
-  has moved.
+- **Two phases.** The clipboard, the foreground window and injected input belong
+  to the Windows session, so no per-worker folder separates two tests that use
+  them. `ahk-session-resources.cjs` finds those test files, and they run after
+  the workers have ended, in a single process at a time. `--only` selects within
+  both phases.
+- **The exclusive class is derived, not listed.** A test file joins it when its
+  code, or a fixture it names, calls one of these resources; quoting one in a
+  string does not count. A file that reaches one only through production code
+  says so with a line `; ahk-parallel: session-exclusive <why>`. A fixture using a
+  resource must be named by some test file, or carry
+  `; ahk-parallel: operator-only <why>` when the suite never launches it:
+  `npm run test:ahk-parallel-tool` fails otherwise, because such a test would run
+  among neighbours unnoticed.
+- **Failures.** A failure in the shared phase may still owe it to a shared native
+  resource. Read a failure as real only once `--rerun-failures` reproduces it
+  alone. That run answers for those failures only, in its exit status and its
+  summary, and needs `--accept-stale` once HEAD has moved.
 
 Two mechanisms make the parallelism sound. Workers run under `/force`, the
 interpreter's switch for `#SingleInstance Off`, so they do not replace one

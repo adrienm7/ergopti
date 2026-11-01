@@ -3,15 +3,26 @@
 
 /** Pins the parallel runner's reading of results: a wrong mapping would mark the wrong test green. */
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const {
 	parseTap,
 	foldResults,
 	takeChunk,
 	guidedChunkSeconds,
+	splitPhases,
 	defaultWorkers,
 	formatReport,
 	parseArguments
 } = require('./ahk-parallel.cjs');
+const {
+	sessionUses,
+	readFixtures,
+	exclusiveReasons,
+	exclusiveTests,
+	unreachedSessionFixtures
+} = require('./ahk-session-resources.cjs');
 
 // --list runs in registry order: an index maps to its RUNNING line, not to the list file.
 const tap = [
@@ -98,5 +109,80 @@ assert.throws(() => parseArguments(['--workers=0']), /positive integer/);
 assert.throws(() => parseArguments(['--fresh', '--rerun-failures']), /forgets/);
 assert.equal(parseArguments(['--only=a=b']).only, 'a=b');
 assert.equal(parseArguments(['--report']).report, 30);
+
+// Whatever is selected, the two phases partition it: exclusive tests never join the workers.
+assert.deepEqual(splitPhases(['a', 'b', 'c'], new Set(['b', 'z'])), {
+	shared: ['a', 'c'],
+	exclusive: ['b']
+});
+
+// Real use counts; a quoted name, a comment, an HTTP request and a fake transport do not.
+assert.deepEqual(sessionUses('A_Clipboard := "x"'), ['A_Clipboard']);
+assert.deepEqual(sessionUses('DllCall("user32\\OpenClipboard", "Ptr", 0)'), ['OpenClipboard']);
+assert.deepEqual(sessionUses('DllCall("SetForegroundWindow", "Ptr", Hwnd)'), [
+	'SetForegroundWindow'
+]);
+assert.deepEqual(sessionUses('\tSendInput("x")\n\tEdit.Focus()'), ['.Focus', 'SendInput']);
+assert.deepEqual(sessionUses('Assert(InStr(Src, "SendInput("))'), []);
+assert.deepEqual(sessionUses('; SendInput("x")\n/* WinActivate(x) */'), []);
+assert.deepEqual(sessionUses('Request.Send(Body)'), []);
+assert.deepEqual(sessionUses('class Fake {\n\tSend(Body) {\n\t}\n}\nSend(1)'), []);
+
+// A fixture counts for the test naming it, through a wrapper too, and a marker adds a file.
+function withTests(files, check) {
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-session-'));
+	try {
+		for (const [file, source] of Object.entries(files)) {
+			fs.mkdirSync(path.dirname(path.join(directory, file)), { recursive: true });
+			fs.writeFileSync(path.join(directory, file), source);
+		}
+		check(directory);
+	} finally {
+		fs.rmSync(directory, { recursive: true, force: true });
+	}
+}
+withTests(
+	{
+		'fixtures/owner_wrapper.ahk': '#Include owner_body.ahk\n',
+		'fixtures/owner_body.ahk': 'A_Clipboard := "x"\n',
+		'fixtures/calm_body.ahk': 'x := 1\n',
+		'fixtures/orphan_body.ahk': 'SendInput("x")\n',
+		'fixtures/manual_body.ahk': '; ahk-parallel: operator-only run by hand\nSendInput("x")\n',
+		'unit/wrapped.ahk': 'Run("owner_wrapper.ahk")\n',
+		'unit/calm.ahk': 'Run("calm_body.ahk")\n',
+		'unit/declared.ahk': '; ahk-parallel: session-exclusive production pastes\n',
+		'unit/bare_marker.ahk': '; ahk-parallel: session-exclusive\n'
+	},
+	(directory) => {
+		const plan = ['wrapped', 'calm', 'declared', 'bare_marker'].map((name) => ({
+			name,
+			file: `unit/${name}.ahk`
+		}));
+		plan.push({ name: 'calm', file: 'unit/declared.ahk' });
+		assert.deepEqual([...exclusiveTests(plan, directory)].sort(), ['calm', 'declared', 'wrapped']);
+		// A session fixture nothing names has a test that would run among neighbours.
+		assert.deepEqual(unreachedSessionFixtures(directory), ['orphan_body']);
+	}
+);
+
+// The gate on the real suite: every session fixture is reached, and each test
+// file that failed among neighbours on 2026-11-01 stays exclusive.
+const TESTS_DIR = path.resolve(__dirname, '../../static/ergopti_plus/windows/tests');
+assert.deepEqual(unreachedSessionFixtures(TESTS_DIR), []);
+const fixtures = readFixtures(TESTS_DIR);
+for (const file of [
+	'unit/adapters/input/test_clipboard_restore_debt_cas.ahk',
+	'unit/adapters/input/test_suppressive_capture_settlement.ahk',
+	'unit/adapters/input/test_plain_native_cas_owner.ahk',
+	'unit/adapters/input/test_clipboardall_external_lock.ahk',
+	'unit/infra/input_probe/test_input_probe_rival_owner.ahk',
+	'unit/infra/input_probe/test_input_probe_entry_owner.ahk',
+	'unit/ui/tooltip/test_tooltip_hostile_native64.ahk',
+	'unit/modules/hotstrings/engine/test_sendinstant_clipboard_owner.ahk',
+	'unit/modules/gestures/test_gesture_plain_clipboard_owner.ahk'
+]) {
+	const source = fs.readFileSync(path.join(TESTS_DIR, file), 'utf8');
+	assert.notDeepEqual(exclusiveReasons(source, fixtures), [], file);
+}
 
 console.log('ahk-parallel: ok');

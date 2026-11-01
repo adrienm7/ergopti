@@ -11,6 +11,11 @@
  * copy of the runner is needed. Each worker also owns a temporary directory:
  * several tests use fixed names under %TEMP%.
  *
+ * Tests that use the clipboard, the focus or injected input cannot be separated
+ * that way, because those belong to the session: ahk-session-resources.cjs finds
+ * them, and they run in a phase of their own, one process at a time, once every
+ * other worker has ended.
+ *
  *   npm run test:ahk-parallel                      run or resume
  *   npm run test:ahk-parallel -- --workers=6 --only="config transition"
  *   npm run test:ahk-parallel -- --fresh           forget the ledger first
@@ -22,6 +27,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
+const { exclusiveTests } = require('./ahk-session-resources.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const TESTS_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/windows/tests');
@@ -153,6 +159,19 @@ function guidedChunkSeconds(names, durations, workers, limits) {
 }
 
 /**
+ * Splits the tests left to run into the phases that never overlap.
+ * @param {string[]} names Tests left to run, in plan order.
+ * @param {Set<string>} exclusive Tests that need the session to themselves.
+ * @returns {{shared: string[], exclusive: string[]}} The two queues.
+ */
+function splitPhases(names, exclusive) {
+	return {
+		shared: names.filter((name) => !exclusive.has(name)),
+		exclusive: names.filter((name) => exclusive.has(name))
+	};
+}
+
+/**
  * Picks the default worker count: half the logical CPUs, fewer when free memory
  * cannot hold them (a worker holds about 350 MB, more while it runs a child).
  * @param {number} cpuCount Logical CPUs.
@@ -277,12 +296,10 @@ function dumpPlan(exe, runDir) {
 		.replace(/^\uFEFF/, '')
 		.split(/\r?\n/)
 		.filter(Boolean);
-	const plan = {};
-	for (const row of rows) {
+	return rows.map((row) => {
 		const [, file, ...name] = row.split('\t');
-		plan[name.join('\t')] = path.relative(TESTS_DIR, file).replace(/\\/g, '/');
-	}
-	return plan;
+		return { name: name.join('\t'), file: path.relative(TESTS_DIR, file).replace(/\\/g, '/') };
+	});
 }
 
 function killTree(pid) {
@@ -348,6 +365,10 @@ function runProcess(context, worker, list) {
 	});
 }
 
+function minutes(ms) {
+	return (ms / 60000).toFixed(1);
+}
+
 function countStatuses(entries) {
 	const values = Object.values(entries);
 	return {
@@ -402,7 +423,8 @@ async function main() {
 		: {};
 	const ledger = prior || { version: LEDGER_VERSION, commit, plan: {}, entries: {} };
 	ledger.commit = commit;
-	ledger.plan = dumpPlan(exe, options.runDir);
+	const planRows = dumpPlan(exe, options.runDir);
+	ledger.plan = Object.fromEntries(planRows.map(({ name, file }) => [name, file]));
 	const context = { exe, options, ledger, ledgerFile };
 	const selected = Object.keys(ledger.plan).filter(
 		(name) => !options.only || name.toLowerCase().includes(options.only.toLowerCase())
@@ -411,7 +433,8 @@ async function main() {
 	// tests have no result, and that says nothing about whether those failures hold.
 	let checked = selected;
 	if (options.rerunFailures) {
-		// Alone and one at a time: what still fails here does not owe it to a neighbour.
+		// Alone and one at a time, which is stricter than the exclusive phase: what
+		// still fails here does not owe it to a neighbour.
 		const failures = selected.filter(
 			(name) => ledger.entries[name] && ledger.entries[name].status === NOT_OK
 		);
@@ -420,15 +443,23 @@ async function main() {
 		for (const name of failures) delete ledger.entries[name];
 		await runQueue(context, failures, 1, (queue) => queue.splice(0, 1));
 	} else {
-		const queue = selected.filter((name) => !ledger.entries[name]);
+		const left = selected.filter((name) => !ledger.entries[name]);
+		const phases = splitPhases(left, exclusiveTests(planRows, TESTS_DIR));
 		console.log(
-			`Plan ${selected.length}, left ${queue.length}, ${options.workers} worker(s), run dir ${options.runDir}.`
+			`Plan ${selected.length}, left ${left.length}: ${phases.shared.length} on ${options.workers} worker(s), then ${phases.exclusive.length} exclusive; run dir ${options.runDir}.`
 		);
-		await runQueue(context, queue, options.workers, (remaining) =>
+		const chunkFor = (workers) => (remaining) =>
 			takeChunk(remaining, durations, {
 				...options,
-				chunkSeconds: guidedChunkSeconds(remaining, durations, options.workers, options)
-			})
+				chunkSeconds: guidedChunkSeconds(remaining, durations, workers, options)
+			});
+		// runQueue returns once its workers have ended, so nothing overlaps this phase.
+		const sharedStarted = Date.now();
+		await runQueue(context, phases.shared, options.workers, chunkFor(options.workers));
+		const exclusiveStarted = Date.now();
+		await runQueue(context, phases.exclusive, 1, chunkFor(1));
+		console.log(
+			`Shared phase ${minutes(exclusiveStarted - sharedStarted)} min, exclusive phase ${minutes(Date.now() - exclusiveStarted)} min.`
 		);
 	}
 	for (const [name, entry] of Object.entries(ledger.entries))
@@ -464,6 +495,7 @@ module.exports = {
 	foldResults,
 	takeChunk,
 	guidedChunkSeconds,
+	splitPhases,
 	defaultWorkers,
 	formatReport,
 	parseArguments
