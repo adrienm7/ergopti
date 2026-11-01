@@ -720,6 +720,29 @@ function M.read_driver_unit(symbol)
 	return matches[1]
 end
 
+--- The module name a driver-relative source path is required by: dots for
+--- slashes, `.lua` dropped, and a package's `init` dropped. Whole-tree scans key
+--- their allowlists by this name, as the code names the module, never by path.
+--- @param rel string Path under the driver root, e.g. "modules/keystats/init.lua".
+--- @return string module_name e.g. "modules.keystats".
+function M.module_name_of(rel)
+	local name = rel:gsub("\\", "/"):gsub("^%./", ""):gsub("%.lua$", ""):gsub("/", ".")
+	return (name:gsub("%.init$", ""))
+end
+
+--- The source of a production module, resolved from its module name through
+--- package.searchpath exactly as require would find it (the Linux helper of the
+--- same name is its twin).
+--- The read goes through SourceFile, so an open, read or close failure raises
+--- naming its phase and path instead of reading as an absent module.
+--- @param module_name string Dotted module name, e.g. "infra.fs_dir".
+--- @return string|nil body, string|nil err Body, or nil plus why the module is not found.
+function M.read_module_source(module_name)
+	local path, missing = package.searchpath(module_name, package.path)
+	if not path then return nil, missing end
+	return SourceFile.read(path)
+end
+
 
 
 

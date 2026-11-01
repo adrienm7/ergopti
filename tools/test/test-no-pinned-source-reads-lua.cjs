@@ -135,7 +135,10 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //            8 → 7 (2026-11-01: the MLX import probe has one source, the
 //                    script; the bootstrap test compares the checker's probe
 //                    with it instead of reading models_manager_mlx.lua.)
-const BASELINE = 7;
+//            7 → 5 (2026-11-01: helpers.module_name_of and
+//                    helpers.read_module_source; the adapter wiring and fs_dir
+//                    guards name their module instead of its path.)
+const BASELINE = 5;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -215,7 +218,11 @@ const BASELINE = 7;
 //       37 → 34 (2026-11-01: dialog_util.alert refuses a call without
 //              hs.dialog.alert's shape; the vscode bridge test no longer scans
 //              three named files that held no alert call.)
-const READ_BASELINE = 34;
+//       34 → 9 (2026-11-01: the whole-tree allowlists of the require-state,
+//              recurring-timer, settings-namespace, raw-task and GC-retention
+//              guards are keyed by module name; the reads left are the driver
+//              root's init.lua, which no module name reaches.)
+const READ_BASELINE = 9;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
