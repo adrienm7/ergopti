@@ -423,7 +423,7 @@ control('one Lua ABI cannot replace original mandatory pair', () =>
 		)
 	)
 );
-assert.equal(count, 51, 'Independent direct C registration extension floor changed');
+assert.equal(count, 52, 'Independent direct C registration extension floor changed');
 console.log(
 	'[OK] Linux updater namespace registration: 8 source controls passed; no native credit.'
 );
@@ -453,7 +453,7 @@ for (const input of closureInputs) {
 		)
 	);
 }
-assert.equal(count, 59, 'Independent native closure dependency floor changed');
+assert.equal(count, 60, 'Independent native closure dependency floor changed');
 console.log(
 	'[OK] Linux updater native closure registration: 8 source controls passed; no native credit.'
 );
