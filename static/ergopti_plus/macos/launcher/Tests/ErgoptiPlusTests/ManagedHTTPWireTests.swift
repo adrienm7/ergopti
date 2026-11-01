@@ -75,7 +75,7 @@ final class ManagedWireFixture {
 		let terminal = try read(timeout: 45)
 		guard terminal["closed"] as? Bool == true else { throw ManagedWireFixtureError.refused }
 		let deadline = ProcessInfo.processInfo.systemUptime + 5
-		while process.isRunning && ProcessInfo.processInfo.systemUptime < deadline { usleep(10_000) }
+		while process.isRunning && ProcessInfo.processInfo.systemUptime < deadline { usleep(LauncherTimings.testPoll.microseconds) }
 		guard !process.isRunning else { throw ManagedWireFixtureError.deadline }
 		process.waitUntilExit()
 		try output.fileHandleForReading.close()

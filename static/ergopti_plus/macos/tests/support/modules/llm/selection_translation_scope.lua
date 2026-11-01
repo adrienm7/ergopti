@@ -74,7 +74,7 @@ local OWNED = {
 	"manifest_reader",
 	"perf_budget",
 	"platform.remap.lease_helper",
-	"program_parameter",
+	"program_parameter", "user_action_parameter",
 	"script_chords",
 	"send_input",
 	"tap_hold.key_combinations",
@@ -158,6 +158,9 @@ local OWNED = {
 	"modules.llm.local_server_ports",
 	"modules.llm.local_servers",
 	"modules.llm.network_env",
+	-- network_env reads the shared proxy override through these two.
+	"network.proxy_override",
+	"network.route_plan",
 	"modules.llm.ollama_binary",
 	"modules.llm.ollama_endpoint",
 	"modules.llm.ollama_server_command",

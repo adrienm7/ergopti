@@ -137,11 +137,24 @@ helpers.describe("file_watchers Personal topology", function()
 				end
 			end)
 		end
-		function state.directory(path)
-			assert(native_luv.fs_mkdir(path, 448)); directories[#directories + 1] = path; return path
-		end
 		local sequence = 0
+		-- The kernel stamps a directory from a coarse clock tick, so an entry changed
+		-- within the tick of the poller's last reading left the mtime unchanged and
+		-- a case failed at random on a fast host. Polling cases measure the reaction
+		-- to a moved timestamp, so each entry change moves its parent's explicitly.
+		local function move_parent_timestamp(path)
+			if backend_name ~= "pump" then return end
+			local parent = assert(path:match("^(.*)/[^/]+$"))
+			sequence = sequence + 1
+			assert(native_luv.fs_utime(parent, 1700000000 + sequence, 1700000000 + sequence))
+		end
+		function state.directory(path)
+			assert(native_luv.fs_mkdir(path, 448)); directories[#directories + 1] = path
+			move_parent_timestamp(path)
+			return path
+		end
 		function state.file(path, content)
+			local created = not files[path]
 			files[path] = true
 			local handle = assert(io.open(path, "w"))
 			local wrote, detail = handle:write(content or '[personal.topology]\ntrigger = "before"\n')
@@ -149,10 +162,13 @@ helpers.describe("file_watchers Personal topology", function()
 			assert(wrote, detail); assert(closed, close_detail)
 			sequence = sequence + 1
 			assert(native_luv.fs_utime(path, 1700000000 + sequence, 1700000000 + sequence))
+			if created then move_parent_timestamp(path) end
+
 			return path
 		end
 		function state.rename(from, to)
 			assert(native_luv.fs_rename(from, to))
+			move_parent_timestamp(from); move_parent_timestamp(to)
 			for index, path in ipairs(directories) do
 				if path == from or path:sub(1, #from + 1) == from .. "/" then directories[index] = to .. path:sub(#from + 1) end
 			end
@@ -162,9 +178,10 @@ helpers.describe("file_watchers Personal topology", function()
 			end
 			for old, new in pairs(moved) do files[old], files[new] = nil, true end
 		end
-		function state.remove_file(path) assert(native_luv.fs_unlink(path)); files[path] = nil end
+		function state.remove_file(path) assert(native_luv.fs_unlink(path)); files[path] = nil; move_parent_timestamp(path) end
 		function state.remove_directory(path)
 			assert(native_luv.fs_rmdir(path))
+			move_parent_timestamp(path)
 			for index, value in ipairs(directories) do if value == path then table.remove(directories, index); break end end
 		end
 		local previous_watch = package.loaded["infra.file_watchers"]

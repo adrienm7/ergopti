@@ -230,6 +230,8 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 				try Data().write(to: log)
 				let result = try run([script.path, app.path, "Log " + mode, "", "", "tint", "", "0", log.path], root: root,
 					environment: ["HOME": home.path, "PATH": bin.path + ":/usr/bin:/bin:/usr/sbin:/sbin", "OWNED_SOURCE": app.path,
+						// clone_app.sh requires the managed Python link; the stub above stands in for it.
+						"ERGOPTI_CLONER_PYTHON": bin.appendingPathComponent("python3").path,
 						"OWNED_LOG": log.path, "OWNED_LOG_FAULT": mode, "OWNED_TEE_RECEIPT": teeReceipt.path,
 						"OWNED_TMP_TEMPLATE": root.appendingPathComponent("workspace.XXXXXX").path])
 				let deadline = DispatchTime.now() + Self.retirementDeadline
@@ -251,7 +253,7 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 						fixtureCanRetire = false
 						throw CocoaError(.executableRuntimeMismatch)
 					}
-					usleep(10_000)
+					usleep(LauncherTimings.testPoll.microseconds)
 				}
 				guard teeRetired else {
 					fixtureCanRetire = false

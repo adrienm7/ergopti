@@ -241,8 +241,8 @@ Test("LLM engine: superseded partial render cannot repaint (ahk026-partial-rende
 ; A5 follow-up — per-call token budget mirrors macOS fetch_batch scaling.
 ; A sequential-variant call yields 1 prediction; a single batch call yields N.
 _LLM_EngineCallTokenBudget_Sequential() {
-	; preds_per_call = 1 -> maxTokens + 1*5
-	AssertEqual(105, _LLM_Engine_CallTokenBudget(100, 1), "sequential call = maxTokens + overhead")
+	; The shared rule (request_plan_token_budget_vectors.json): one prediction keeps the base.
+	AssertEqual(100, _LLM_Engine_CallTokenBudget(100, 1), "sequential call keeps the base budget")
 }
 Test("LLM engine: per-call token budget for a sequential variant", _LLM_EngineCallTokenBudget_Sequential)
 
@@ -253,7 +253,8 @@ _LLM_EngineCallTokenBudget_Batch() {
 Test("LLM engine: per-call token budget scales for a batch call", _LLM_EngineCallTokenBudget_Batch)
 
 _LLM_EngineCallTokenBudget_GuardsInvalidCount() {
-	; A non-positive / non-integer count is treated as a single prediction.
-	AssertEqual(105, _LLM_Engine_CallTokenBudget(100, 0), "zero predictions guarded to one")
+	; A non-positive or fractional count is refused, as the shared plan refuses it.
+	AssertThrows(() => _LLM_Engine_CallTokenBudget(100, 0), "zero predictions are refused")
+	AssertThrows(() => _LLM_Engine_CallTokenBudget(100, 1.5), "a fractional count is refused")
 }
 Test("LLM engine: per-call token budget guards an invalid prediction count", _LLM_EngineCallTokenBudget_GuardsInvalidCount)

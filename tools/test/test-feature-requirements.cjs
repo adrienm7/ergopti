@@ -187,6 +187,14 @@ check('an unlisted file using a requirement fails, and a dead owner fails', () =
 	);
 });
 
+check('the Windows scan leaves out the inventory a packaging run writes', () => {
+	assert.ok(sources.vocabulary.drivers.windows.skip.includes('build/'));
+	assert.deepEqual(
+		Object.keys(sources.files.windows).filter((rel) => rel.startsWith('build/')),
+		[]
+	);
+});
+
 check('a signature that only appears in a comment is no use', () => {
 	const mutated = cloneSources(sources);
 	mutated.files.linux['modules/probe_comment.lua'] =

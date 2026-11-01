@@ -1005,7 +1005,7 @@ helpers.describe("original output observer constructor provenance (controlled po
 					helpers.assert_true(s.writer.close_owned(s.output)); helpers.assert_true(s.writer.open())
 					s.output = assert(capture()); s.writer.capture_output = function() return s.output, factory end
 				else
-					local other = assert(loadfile("adapters/uinput_writer.lua"))()
+					local other = helpers.fresh_module("adapters.uinput_writer")
 					s.writer.capture_output_observer = other.capture_output_observer
 				end
 				s.restore_factory = function() s.writer.capture_output, s.writer.capture_output_observer = capture, factory end

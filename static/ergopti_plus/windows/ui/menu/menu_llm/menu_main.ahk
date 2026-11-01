@@ -194,8 +194,8 @@ LLM_Menu_BuildSubmenu() {
 	_disabled := !_LLM_Menu["enabled"]
 
 	Commands := _LLM_ScopeCommands()
-	Commands["llm_toggle"] := LLM_Menu_OnToggle
-	Commands["llm_test_prediction"] := (*) => LLM_Menu_TestPrediction()
+	Commands[MenuCommand.LLM_TOGGLE] := LLM_Menu_OnToggle
+	Commands[MenuCommand.LLM_TEST_PREDICTION] := (*) => LLM_Menu_TestPrediction()
 	StateGetters := _LLM_Menu_StateGetters()
 	WarningRows := []
 	if (_LLM_Menu["enabled"] and _LLM_Menu["backend"] == "ollama" and !_deps_ready) {
@@ -251,13 +251,15 @@ _LLM_Menu_StateGetters() {
 	return Map("llm_enabled", () => _LLM_Menu["enabled"],
 		"llm_toggle_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
 		"llm_scope_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
-		"config_newer_schema", () => ConfigNewerSchemaReadOnly())
+		"config_newer_schema", () => ConfigNewerSchemaReadOnly(),
+		"config_older_schema", () => ConfigOlderSchemaReadOnly())
 }
 
 /**
  * Names why the AI submenus that write config.toml (servers, API entries,
- * profiles) cannot be used: a configuration saved by a newer version, or any
- * other refusal of the session writer. The switch and the restore row grey
+ * profiles) cannot be used: a configuration saved by a newer version, one too
+ * old to migrate, or any other refusal of the session writer. The switch and
+ * the restore row grey
  * with the same causes through the manifest; these parents are native, so they
  * name the cause here. A pause is not a cause: it greys the rows already.
  * @returns {String} A locale key, or "" when the file accepts writes.
@@ -268,7 +270,9 @@ _LLM_Menu_ConfigBlockReason() {
 		return ""
 	if TOML_WriteRefusal(ConfigurationFile) == ""
 		return ""
-	return ConfigNewerSchemaReadOnly() ? "menu.read_only.newer_schema" : "menu.llm.save_unavailable"
+	if ConfigNewerSchemaReadOnly()
+		return "menu.read_only.newer_schema"
+	return ConfigOlderSchemaReadOnly() ? "menu.read_only.older_schema" : "menu.llm.save_unavailable"
 }
 
 /**
@@ -534,8 +538,8 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, CapturedWarningRows := unset) {
 		; The definitions-only test graph loads no WebView page: the button is
 		; then drawn greyed instead of calling a missing owner.
 		OpenPage := IsSet(LLM_ModelBrowser_Show) ? LLM_ModelBrowser_Show : 0
-		Row := MenuRenderer_CommandRow("llm_model_selector_commands", "llm_model_selector",
-			Map("llm_model_selector", (*) => OpenPage.Call()),
+		Row := MenuRenderer_CommandRow("llm_model_selector_commands", MenuCommand.LLM_MODEL_SELECTOR,
+			Map(MenuCommand.LLM_MODEL_SELECTOR, (*) => OpenPage.Call()),
 			Map("llm_model_selector_caption", (*) => Caption,
 				"llm_model_selector_ready", (*) => !disabled && IsObject(OpenPage)))
 		if !(Row is Map)
@@ -599,7 +603,7 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, CapturedWarningRows := unset) {
 ; menu offers the restore alone: its « Tout effacer » row was retired.
 _LLM_ScopeCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
-	return Map("scope_restore", (*) => _LLM_ApplyScope("recommended", OwnedOptions))
+	return Map(MenuCommand.SCOPE_RESTORE, (*) => _LLM_ApplyScope("recommended", OwnedOptions))
 }
 
 _LLM_ApplyScope(Mode, Options) {

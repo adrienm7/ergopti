@@ -272,6 +272,7 @@ local function admit_client_source(path)
   or normalized:find('/_shared/data/locales/en%.json$')
   or normalized:find('/_shared/modules/network/route_origins%.json$')
   or normalized:find('/_shared/modules/network/proxy_policy%.json$')
+  or normalized:find('/_shared/modules/network/proxy_override%.json$')
   or normalized:find('/_shared/data/http/transport_policy%.json$')
   or normalized:find('/_shared/data/http/header_policy%.json$')
   or normalized:find('/_shared/data/http/redirect_policy%.json$'),
@@ -1575,6 +1576,7 @@ const INSTALL_ROWS = [
 	['smoke-rpm-install', 'rpm', 'fedora:latest'],
 	['smoke-appimage-run', 'appimage', ''],
 	['smoke-tarball-install', 'archive', ''],
+	['smoke-arch-package', 'pkgbuild', 'archlinux:latest'],
 	['smoke-flatpak-run', 'flatpak', '']
 ];
 const INSTALL_PREPARATIONS = {
@@ -1610,7 +1612,11 @@ function assertInstallRows(metadata) {
 	);
 	for (const [id, kind, image] of INSTALL_ROWS) {
 		const row = Object.values(metadata).find((candidate) => candidate.id === id);
-		const expected = { id, kind, container: ['install', 'rpm'].includes(kind) ? image : '' };
+		const expected = {
+			id,
+			kind,
+			container: ['install', 'rpm', 'pkgbuild'].includes(kind) ? image : ''
+		};
 		if (['install', 'first'].includes(kind)) {
 			expected.distro = id.replace(/^(archive-install-|first-install-)/, '');
 			expected.image = image;
@@ -1688,7 +1694,7 @@ function assertInstallMatrix(body, metadata = installationMetadata, producer = i
 		'set -eu',
 		'test -n "$INSTALL_ID"',
 		'case "$INSTALL_KIND" in',
-		'  install|first|deb|rpm|appimage|archive|flatpak) ;;',
+		'  install|first|deb|rpm|appimage|archive|flatpak|pkgbuild) ;;',
 		'  *) exit 1 ;;',
 		'esac'
 	]);
@@ -2074,6 +2080,7 @@ for (const subject of PACKAGE_SUBJECTS) {
 }
 for (const [name, subject] of [
 	['Record mandatory archive smoke evidence (archive)', 'smoke-tarball-install'],
+	['Record mandatory Arch package smoke evidence (pkgbuild)', 'smoke-arch-package'],
 	['Record mandatory Flatpak smoke evidence (flatpak)', 'smoke-flatpak-run']
 ]) {
 	const record = pipeline.step(pipeline.job('install-linux'), name);

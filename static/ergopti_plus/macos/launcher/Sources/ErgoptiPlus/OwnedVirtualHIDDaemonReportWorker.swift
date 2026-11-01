@@ -31,7 +31,7 @@ enum OwnedVirtualHIDDaemonReportWorker {
 		var accepted: OwnedVirtualHIDDaemonReportRequestChannel.Root.Request?
 		while root.current(), OwnedVirtualHIDDaemonReportClock.remains(began), !completion.withdrawn() {
 			if let request = root.receiveRequest() { accepted = request; break }
-			usleep(20_000)
+			usleep(LauncherTimings.vhidReportRequestPoll.microseconds)
 		}
 		guard let request = accepted else { return root.retire() == nil ? 75 : 77 }
 		let stage = OwnedVirtualHIDDaemonReportStageOwner.capture(from: request)
@@ -141,7 +141,7 @@ enum OwnedVirtualHIDDaemonReportWorker {
 				while !self.isStopping() {
 					_ = self.root.receiveRequest()
 					guard !self.request.withdrawn(), self.request.current() else { self.observer.stop(); return }
-					usleep(20_000)
+					usleep(LauncherTimings.vhidReportRequestPoll.microseconds)
 				}
 			}
 		}

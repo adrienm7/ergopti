@@ -47,7 +47,7 @@ _Updater_FindAsset(Json, AssetName, Tag) {
 	Assets := Release["assets"]
 	if !(Assets is Array)
 		return 0
-	ExpectedUrl := "https://github.com/" . UPDATER_GH_OWNER . "/"
+	ExpectedUrl := UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/"
 		. UPDATER_GH_REPO . "/releases/download/" . Tag . "/" . AssetName
 	for AssetIndex, Asset in Assets {
 		if !(Asset is Map)
@@ -1225,6 +1225,7 @@ _Updater_RequestRecoveryHandoffExit(*) {
 		_UpdaterRecoveryExitInvocation := true
 		TimerArmOneShotMs(_Updater_RequestRecoveryHandoffExit,
 			UPDATER_RECOVERY_HANDOFF_RETRY_MS)
+		LifecycleNoteExitRequester("the updater's recovery handoff")
 		ExitApp(0)
 	} finally {
 		_UpdaterRecoveryExitInvocation := false
@@ -2155,7 +2156,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		return false
 	}
 	AssetName := IsSet(BUNDLE_RELEASE_ASSET) and BUNDLE_RELEASE_ASSET != ""
-		? BUNDLE_RELEASE_ASSET : "ErgoptiPlus.exe"
+		? BUNDLE_RELEASE_ASSET : Identifiers.App.EXE
 	Asset := _Updater_FindAsset(Release.RawJson, AssetName, Release.Tag)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
@@ -2442,7 +2443,7 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 			_Updater_BindCurlCaptureTransport(Transport, Capture)
 		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
 			NativeAdopt := IsObject(Capture) ? ObjBindMethod(Capture, "OnNativeAdopt") : 0
-			Worker := ShellRunner_SpawnTreeOwned(
+			Worker := ProxyOverride_SpawnWorker(
 				_Updater_PowerShellPath(), Transport.Args, _OnDone, , NativeAdopt)
 			if IsObject(Capture)
 				Capture.Attach(Worker)
@@ -3705,8 +3706,10 @@ _Updater_RequestExitForIntent(TransactionId) {
 	InvocationPublished := false
 	try {
 		InvocationPublished := _Updater_PublishExitInvocation(TransactionId, Owner)
-		if InvocationPublished
+		if InvocationPublished {
+			LifecycleNoteExitRequester("the updater's swap")
 			ExitApp(0)
+		}
 	} finally {
 		_Updater_ClearExitInvocation(TransactionId, Owner)
 		Critical(PreviousCritical)
@@ -3866,7 +3869,7 @@ _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 	try {
 		DiscardStaging := IsObject(Artifacts) && Artifacts.HasOwnProp("StagingRetirement")
 		_Updater_RetireCurlCaptureArtifacts(Artifacts, DiscardStaging)
-		try SetTimer((*) => _Updater_RebuildMenu(), -50)
+		try SetTimer((*) => _Updater_RebuildMenu(), -TimingsGet("adapters", "updater_callback_defer_ms"))
 	} finally _Updater_ReleaseDownloadRetirement(Retirement)
 	return true
 }

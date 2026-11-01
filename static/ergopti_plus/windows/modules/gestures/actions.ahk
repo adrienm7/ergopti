@@ -18,6 +18,8 @@
 ; Action registry — each action has a label and an execution function
 global GESTURE_ACTIONS := Map(
 		"run_program", { Fn: (BindingId := "") => ProgramActions_Run(BindingId) },
+		"run_command", { Fn: (BindingId := "") => UserActions_RunCommand(BindingId) },
+		"open_path", { Fn: (BindingId := "") => UserActions_OpenPath(BindingId) },
 		"none", {
 				Fn: (*) => 0,
 		},
@@ -115,6 +117,10 @@ global GESTURE_ACTIONS := Map(
 		"lock_screen", {
 				Fn: (*) => DllCall("LockWorkStation"),
 		},
+		; Deferred: Windows blanks the screens for a moment while it applies this.
+		"display_mirror_toggle", {
+				Fn: (*) => _GestureMakeSystemRunner("display_mirror_toggle", GestureDisplayMirrorToggle).Call(),
+		},
 		; --- UI windows ---
 		; Each UI action toggles its window (actions.toml, group "UI"): closed or
 		; hidden opens it, open but in the background raises it, open and focused
@@ -168,10 +174,10 @@ global GESTURE_ACTIONS := Map(
 		"open_logs_folder", {
 				Fn: (*) => OpenLogsFolder(),
 		},
-		"open_today_log", {
+		MenuCommand.OPEN_TODAY_LOG, {
 				Fn: (*) => OpenTodayLog(),
 		},
-		"open_error_log", {
+		MenuCommand.OPEN_ERROR_LOG, {
 				Fn: (*) => OpenErrorLog(),
 		},
 		; --- Script management ---
@@ -192,10 +198,10 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => WindowSpy(),
 		},
 		"open_list_vars", {
-				Fn: (*) => ConsoleWindow_Open("list_vars"),
+				Fn: (*) => ConsoleWindow_Open(MenuCommand.LIST_VARS),
 		},
 		"open_key_history", {
-				Fn: (*) => ConsoleWindow_Open("key_history"),
+				Fn: (*) => ConsoleWindow_Open(MenuCommand.KEY_HISTORY),
 		},
 		; --- Advanced system actions ---
 		"screen_capture_instant", {
@@ -437,10 +443,22 @@ _GestureActionLabel(Name) {
 	Translated := t(Key)
 	; t() returns the raw key when no translation is found — treat that as a miss
 	if (Translated != Key)
-		return Translated
+		; The sticky labels name macOS's keys; every locale keeps those two words.
+		return InStr(Name, "sticky_") == 1
+			? StrReplace(StrReplace(Translated, "Cmd", "Win", true), "Option", "Alt", true) : Translated
 	return Name
 }
 
+
+for _StickyId in ["sticky_ctrl", "sticky_cmd", "sticky_option", "sticky_cmd_shift", "sticky_cmd_option",
+		"sticky_cmd_ctrl", "sticky_option_shift", "sticky_option_ctrl", "sticky_ctrl_shift", "sticky_cmd_option_shift",
+		"sticky_cmd_option_ctrl", "sticky_cmd_shift_ctrl", "sticky_option_shift_ctrl", "sticky_hyper"]
+	GESTURE_ACTIONS[_StickyId] := { Fn: _GestureMakeStickyRunner(_StickyId) }
+
+; The remap layer that owns the capture loads after this module.
+_GestureMakeStickyRunner(ActionId) {
+	return (*) => StickyModifier(ActionId)
+}
 
 ; --- Advanced system action implementations ---
 
@@ -556,7 +574,7 @@ GestureOpenConfiguredURL(BindingId := "") {
 GestureOpenChatGpt() {
 		global Features
 		try {
-				Link := Features["shortcuts"]["chatgpt_url"]
+				Link := Features["shortcuts"][ConfigLeaf.CHATGPT_URL]
 				if (Type(Link) != "String" or Trim(Link) = "")
 						throw Error("the configured ChatGPT link is empty or invalid")
 				Run(Link)
@@ -651,6 +669,45 @@ GestureTeleportMouse() {
 		SpotlightMouseAt(TargetX, TargetY, 3000)
 }
 
+; DISPLAYCONFIG_TOPOLOGY_ID (wingdi.h), the same bits as the SDC_TOPOLOGY_* flags.
+global GESTURE_DISPLAY_TOPOLOGY_INTERNAL := 0x1
+global GESTURE_DISPLAY_TOPOLOGY_CLONE := 0x2
+global GESTURE_DISPLAY_TOPOLOGY_EXTEND := 0x4
+global GESTURE_DISPLAY_TOPOLOGY_EXTERNAL := 0x8
+; What the toggle left, restored on the way back; 0 when it mirrored nothing.
+global _GestureMirrorPriorTopology := 0
+
+; Mirrors the displays, or goes back to what they did before. A mirror this run
+; did not start (Win+P, or a driver restarted since) has no remembered topology
+; and leaves for Extend, the arrangement mirroring is normally left for.
+; @param {Object} Sys The SystemControl it acts through (a double in tests).
+; @returns {Boolean} Whether a topology was applied.
+; @throws {OSError} When Windows refuses to read or apply a topology.
+GestureDisplayMirrorToggle(Sys := 0) {
+		global _GestureMirrorPriorTopology, GESTURE_DISPLAY_TOPOLOGY_INTERNAL, GESTURE_DISPLAY_TOPOLOGY_CLONE
+		global GESTURE_DISPLAY_TOPOLOGY_EXTEND, GESTURE_DISPLAY_TOPOLOGY_EXTERNAL
+		Sys := _GestureSys(Sys)
+		if (Sys.ConnectedDisplayCount() < 2) {
+				LoggerInfo("gestures", "display_mirror_toggle: one display is connected, nothing to mirror.")
+				Sys.Notify(t("shortcuts.no_other_monitor"))
+				return false
+		}
+		Current := Sys.DisplayTopology()
+		if (Current = GESTURE_DISPLAY_TOPOLOGY_CLONE)
+				Target := _GestureMirrorPriorTopology ? _GestureMirrorPriorTopology : GESTURE_DISPLAY_TOPOLOGY_EXTEND
+		else if (Current = GESTURE_DISPLAY_TOPOLOGY_INTERNAL || Current = GESTURE_DISPLAY_TOPOLOGY_EXTEND
+				|| Current = GESTURE_DISPLAY_TOPOLOGY_EXTERNAL)
+				Target := GESTURE_DISPLAY_TOPOLOGY_CLONE
+		else
+				throw ValueError("Windows reports an unknown display topology.", -1, Current)
+		Status := Sys.ApplyDisplayTopology(Target)
+		if (Status != 0)
+				throw OSError(Status, "SetDisplayConfig")
+		_GestureMirrorPriorTopology := (Target = GESTURE_DISPLAY_TOPOLOGY_CLONE) ? Current : 0
+		LoggerInfo("gestures", "display_mirror_toggle: topology {1} replaced {2}.", Target, Current)
+		return true
+}
+
 ; Case action id -> the pure transform it applies to the selection
 ; (infra/text_case.ahk). The registry below and the shared-corpus replay
 ; (tests/unit/modules/shortcuts/test_text_case_vectors.ahk) both read this map, so an id cannot be
@@ -659,10 +716,10 @@ GestureTeleportMouse() {
 GestureCaseTransforms() {
 		static Transforms := Map(
 				"selection_uppercase", TextCaseUpper,
-				"selection_lowercase", TextCaseLower,
+				MenuCommand.SELECTION_LOWERCASE, TextCaseLower,
 				"selection_titlecase", TextCaseTitle,
-				"uppercase_selection", TextCaseToggleUpper,
-				"titlecase_selection", TextCaseToggleTitle,
+				MenuCommand.UPPERCASE_SELECTION, TextCaseToggleUpper,
+				MenuCommand.TITLECASE_SELECTION, TextCaseToggleTitle,
 		)
 		return Transforms
 }
@@ -683,7 +740,7 @@ _GestureSendTransformedSelection(Text, Transform) {
 		try SyntheticOwner := KL_MarkSynthetic("case-transform")
 		try {
 				SendInstant(Transform.Call(Text))
-				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
+				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -TimingsGet("gestures", "synthetic_clear_ms"))
 		} catch {
 				KL_ClearSynthetic(SyntheticOwner)
 				throw
@@ -1056,7 +1113,7 @@ _GestureIsTerminalForeground() {
 GestureSaveAndReload() {
 		if !_GestureIsTerminalForeground() {
 				TextPressKey("s", ["Ctrl"])
-				Sleep(300)
+				Sleep(TimingsGet("gestures", "action_settle_ms"))
 		}
 		ReloadPreservingSuspend()
 }

@@ -91,11 +91,11 @@ LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset, Privac
 	return MenuRenderer_Build("llm_trigger_menu", "LLM", "", "",
 		Map("llm_trigger_leading", (*) => _LLM_Menu_TriggerRows("leading"),
 			"llm_trigger_remaining", (*) => _LLM_Menu_TriggerRows("remaining")),
-		Map("llm_instant_on_word_end", (*) => _LLM_Menu_TriggerReady() && InstantCommand.Call(),
-			"llm_after_hotstring", (*) => _LLM_Menu_TriggerReady() && AfterCommand.Call(),
-			"llm_url_bar_filter", (*) => _LLM_Menu_PrivacyCommand(UrlSource, "disable_url_bars",
+		Map(MenuCommand.LLM_INSTANT_ON_WORD_END, (*) => _LLM_Menu_TriggerReady() && InstantCommand.Call(),
+			MenuCommand.LLM_AFTER_HOTSTRING, (*) => _LLM_Menu_TriggerReady() && AfterCommand.Call(),
+			MenuCommand.LLM_URL_BAR_FILTER, (*) => _LLM_Menu_PrivacyCommand(UrlSource, "disable_url_bars",
 				PrivacyCommands is Map ? PrivacyCommands.Get("disable_url_bars", 0) : 0),
-			"llm_secure_field_filter", (*) => _LLM_Menu_PrivacyCommand(SecureSource, "disable_password_fields",
+			MenuCommand.LLM_SECURE_FIELD_FILTER, (*) => _LLM_Menu_PrivacyCommand(SecureSource, "disable_password_fields",
 				PrivacyCommands is Map ? PrivacyCommands.Get("disable_password_fields", 0) : 0)),
 		Map("llm_instant_on_word_end_enabled", (*) => _LLM_Menu[ConfigLeaf.INSTANT_ON_WORD_END],
 			"llm_after_hotstring_enabled", (*) => _LLM_Menu[ConfigLeaf.AFTER_HOTSTRING],
@@ -134,7 +134,7 @@ _LLM_Menu_PrivacySnapshot(Key) {
 			|| StrCompare(_LLM_Engine["backend"], Snapshot["backend"], true) != 0
 			|| !ManifestValuesEqual(_LLM_Engine[Key], Snapshot["value"])
 		NativeKey := Key == "disable_url_bars" ? ConfigLeaf.URL_BAR_FILTER_ENABLED : ConfigLeaf.SECURE_FILTER_ENABLED
-		for Field, Path in Map("enabled", "llm.enabled", "backend", ConfigKey.LLM_MODELS_SELECTED,
+		for Field, Path in Map("enabled", ConfigKey.LLM_ENABLED, "backend", ConfigKey.LLM_MODELS_SELECTED,
 				"value", "llm.trigger." . NativeKey) {
 			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
 			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Path)
@@ -179,8 +179,8 @@ _LLM_Menu_TriggerRows(Position := "all") {
 
 	; Debounce — dialog like HS (free numeric input)
 	DebounceRows := MenuRenderer_TemplateRows("llm_trigger_debounce_control",
-		Map("llm_trigger_debounce", (*) => LLM_Menu_PromptDebounce(),
-			"llm_trigger_min_interval", (*) => LLM_Menu_PromptMinRequestInterval()),
+		Map(MenuCommand.LLM_TRIGGER_DEBOUNCE, (*) => LLM_Menu_PromptDebounce(),
+			MenuCommand.LLM_TRIGGER_MIN_INTERVAL, (*) => LLM_Menu_PromptMinRequestInterval()),
 		Map("llm_trigger_debounce_caption", () => _LLM_Menu_DebounceCaption(_LLM_Menu[ConfigLeaf.DEBOUNCE_MS]),
 			"llm_trigger_min_interval_caption", () => _LLM_Menu[ConfigLeaf.MIN_REQUEST_INTERVAL_MS] . " ms"), Map())
 	if !(DebounceRows is Array)
@@ -249,7 +249,7 @@ LLM_Menu_BuildGenerationMenu(AutoCommand := unset, ValuesProvider := unset) {
 		ValuesProvider := (*) => _LLM_Menu_GenerationRows()
 	return MenuRenderer_Build("llm_generation_menu", "LLM", Map(), Map(),
 		Map("llm_generation_values", ValuesProvider),
-		Map("llm_auto_raise_temperature", (*) => _LLM_Menu_AutoRaiseReady() ? AutoCommand.Call() : false),
+		Map(MenuCommand.LLM_AUTO_RAISE_TEMPERATURE, (*) => _LLM_Menu_AutoRaiseReady() ? AutoCommand.Call() : false),
 		Map("llm_auto_raise_enabled", (*) => _LLM_Menu[ConfigLeaf.AUTO_RAISE_TEMP],
 			"llm_auto_raise_ready", (*) => _LLM_Menu_AutoRaiseReady()))
 }
@@ -297,30 +297,30 @@ _LLM_Menu_GenerationRows() {
 	MinDefault := _LLM_DefaultFor("llm_min_words", 3)
 	MaxDefault := _LLM_DefaultFor("llm_max_words", 15)
 	TempDefault := Format("{:.2f}", Float(_LLM_DefaultFor("llm_temperature", "0.10")) + 0)
-	max_val := _LLM_Menu["max_words"]
+	max_val := _LLM_Menu[ConfigLeaf.MAX_WORDS]
 	max_display := (max_val == 0) ? t("menu.llm.unlimited") : max_val
 	GenerationCommands := Map(
-		"llm_generation_context", (*) => LLM_Menu_PromptCtxChars(),
-		"llm_generation_context_reset", (*) => _LLM_AssignAndRebuild("ctx_chars", _LLM_DefaultFor("llm_context_length", 500)),
-		"llm_generation_min_words", (*) => LLM_Menu_PromptMinWords(),
-		"llm_generation_min_words_reset", (*) => _LLM_AssignAndRebuild("min_words", _LLM_DefaultFor("llm_min_words", 3)),
-		"llm_generation_max_words", (*) => LLM_Menu_PromptMaxWords(),
-		"llm_generation_max_words_reset", (*) => _LLM_AssignAndRebuild("max_words", _LLM_DefaultFor("llm_max_words", 15)),
-		"llm_generation_temperature", (*) => LLM_Menu_PromptTemperature(),
-		"llm_generation_temperature_reset", (*) => _LLM_AssignAndRebuild("temperature", TempDefault),
-		"llm_reset_on_nav", (*) => LLM_Menu_ToggleBool(ConfigLeaf.RESET_ON_NAV))
+		MenuCommand.LLM_GENERATION_CONTEXT, (*) => LLM_Menu_PromptCtxChars(),
+		MenuCommand.LLM_GENERATION_CONTEXT_RESET, (*) => _LLM_AssignAndRebuild("ctx_chars", _LLM_DefaultFor("llm_context_length", 500)),
+		MenuCommand.LLM_GENERATION_MIN_WORDS, (*) => LLM_Menu_PromptMinWords(),
+		MenuCommand.LLM_GENERATION_MIN_WORDS_RESET, (*) => _LLM_AssignAndRebuild(ConfigLeaf.MIN_WORDS, _LLM_DefaultFor("llm_min_words", 3)),
+		MenuCommand.LLM_GENERATION_MAX_WORDS, (*) => LLM_Menu_PromptMaxWords(),
+		MenuCommand.LLM_GENERATION_MAX_WORDS_RESET, (*) => _LLM_AssignAndRebuild(ConfigLeaf.MAX_WORDS, _LLM_DefaultFor("llm_max_words", 15)),
+		MenuCommand.LLM_GENERATION_TEMPERATURE, (*) => LLM_Menu_PromptTemperature(),
+		MenuCommand.LLM_GENERATION_TEMPERATURE_RESET, (*) => _LLM_AssignAndRebuild("temperature", TempDefault),
+		MenuCommand.LLM_RESET_ON_NAV, (*) => LLM_Menu_ToggleBool(ConfigLeaf.RESET_ON_NAV))
 	GenerationGetters := Map(
 		"llm_generation_ready", () => true,
 		"llm_generation_context_caption", () => "" . _LLM_Menu["ctx_chars"],
 		"llm_generation_context_reset_caption", () => "" . ContextDefault,
 		"llm_generation_context_reset_present", () => _LLM_Menu["ctx_chars"] != ContextDefault,
 		"llm_reset_on_nav_checked", () => _LLM_Menu[ConfigLeaf.RESET_ON_NAV],
-		"llm_generation_min_words_caption", () => "" . _LLM_Menu["min_words"],
+		"llm_generation_min_words_caption", () => "" . _LLM_Menu[ConfigLeaf.MIN_WORDS],
 		"llm_generation_min_words_reset_caption", () => "" . MinDefault,
-		"llm_generation_min_words_reset_present", () => _LLM_Menu["min_words"] != MinDefault,
+		"llm_generation_min_words_reset_present", () => _LLM_Menu[ConfigLeaf.MIN_WORDS] != MinDefault,
 		"llm_generation_max_words_caption", () => "" . max_display,
 		"llm_generation_max_words_reset_caption", () => "" . MaxDefault,
-		"llm_generation_max_words_reset_present", () => _LLM_Menu["max_words"] != MaxDefault,
+		"llm_generation_max_words_reset_present", () => _LLM_Menu[ConfigLeaf.MAX_WORDS] != MaxDefault,
 		"llm_generation_temperature_caption", () => _LLM_Menu["temperature"],
 		"llm_generation_temperature_reset_caption", () => TempDefault,
 		"llm_generation_temperature_reset_present", () => _LLM_Menu["temperature"] != TempDefault)
@@ -396,10 +396,10 @@ LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset, Streami
 		Map("llm_display_leading", (*) => [],
 			"llm_display_remaining", (*) => _LLM_Menu_DisplayRows("remaining"),
 			"llm_display_trailing", (*) => _LLM_Menu_DisplayRows("trailing")),
-		Map("llm_indentation", (Value) => _LLM_Menu_IndentCommand(IndentSource, Value, IndentCommand),
-			"llm_info_bar", (*) => _LLM_Menu_InfoBarCommand(InfoSource, InfoCommand),
-			"llm_token_streaming", (*) => _LLM_Menu_StreamingCommand(StreamingSource, StreamingCommand),
-			"llm_show_all", (*) =>
+		Map(MenuCommand.LLM_INDENTATION, (Value) => _LLM_Menu_IndentCommand(IndentSource, Value, IndentCommand),
+			MenuCommand.LLM_INFO_BAR, (*) => _LLM_Menu_InfoBarCommand(InfoSource, InfoCommand),
+			MenuCommand.LLM_TOKEN_STREAMING, (*) => _LLM_Menu_StreamingCommand(StreamingSource, StreamingCommand),
+			MenuCommand.LLM_SHOW_ALL, (*) =>
 			_LLM_Menu_ShowAllReady() ? ShowAllCommand.Call() : false),
 		Map(ConfigKey.LLM_DISPLAY_PRED_INDENT, (*) => IndentSource["indentation"],
 			"llm_indentation_ready", (*) => LLM_DisplayIndentReady(IndentSource),
@@ -425,7 +425,7 @@ _LLM_Menu_InfoBarSnapshot() {
 	try {
 		Snapshot["source"] := _LLM_Menu_EnableReadSource()
 		Document := TOML_ParseDocumentShared(FSReadUtf8Exact(ConfigurationFile))
-		for Field, Path in Map("enabled", "llm.enabled", "info_bar", ConfigKey.LLM_DISPLAY_SHOW_INFO_BAR,
+		for Field, Path in Map("enabled", ConfigKey.LLM_ENABLED, "info_bar", ConfigKey.LLM_DISPLAY_SHOW_INFO_BAR,
 				"backend", ConfigKey.LLM_MODELS_SELECTED) {
 			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
 			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Path)
@@ -474,7 +474,7 @@ _LLM_Menu_IndentSnapshot() {
 	try {
 		Snapshot["source"] := _LLM_Menu_EnableReadSource()
 		Document := TOML_ParseDocumentShared(FSReadUtf8Exact(ConfigurationFile))
-		for Field, Path in Map("enabled", "llm.enabled", "count", ConfigKey.LLM_PROFILES_NUM_PREDICTIONS,
+		for Field, Path in Map("enabled", ConfigKey.LLM_ENABLED, "count", ConfigKey.LLM_PROFILES_NUM_PREDICTIONS,
 				"indentation", ConfigKey.LLM_DISPLAY_PRED_INDENT, "progressive", ConfigKey.LLM_DISPLAY_STREAMING_MULTI,
 				"backend", ConfigKey.LLM_MODELS_SELECTED) {
 			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
@@ -557,7 +557,7 @@ _LLM_Menu_DisplayRows(Position := "all") {
 	; user keeps the option of bare Backspace / Ctrl+Z to roll back what
 	; was typed.
 	InlineRows := MenuRenderer_TemplateRows("llm_display_inline_control",
-		Map("llm_display_inline", (*) => LLM_Menu_ToggleBool(ConfigLeaf.INLINE_AUTOTYPE)),
+		Map(MenuCommand.LLM_DISPLAY_INLINE, (*) => LLM_Menu_ToggleBool(ConfigLeaf.INLINE_AUTOTYPE)),
 		Map("llm_display_inline_checked", () => _LLM_Menu[ConfigLeaf.INLINE_AUTOTYPE]), Map())
 	if !(InlineRows is Array)
 		return []
@@ -770,8 +770,8 @@ _LLM_AssignAndRebuild(tray_key, value) {
 _LLM_MaybeResetRow(Rows, current, default_val, on_click) {
 	if (current = default_val)
 		return
-	ResetRows := MenuRenderer_TemplateRows("llm_native_numeric_reset",
-		Map("llm_native_numeric_reset", on_click),
+	ResetRows := MenuRenderer_TemplateRows(MenuCommand.LLM_NATIVE_NUMERIC_RESET,
+		Map(MenuCommand.LLM_NATIVE_NUMERIC_RESET, on_click),
 		Map("llm_numeric_reset_caption", () => "" . default_val), Map())
 	if !(ResetRows is Array)
 		throw Error("Declared numeric reset control was refused.")
@@ -845,7 +845,7 @@ LLM_Menu_PromptCtxChars() {
 }
 
 LLM_Menu_PromptMinWords() {
-	LLM_Menu_PromptNumeric("min_words", t("menu.llm.generation_menu_title"),
+	LLM_Menu_PromptNumeric(ConfigLeaf.MIN_WORDS, t("menu.llm.generation_menu_title"),
 		t("menu.llm.min_words_prompt"))
 }
 
@@ -857,13 +857,13 @@ LLM_Menu_PromptMaxWords() {
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
-	ib := Ui_InputBox(t("menu.llm.max_words_prompt"), t("menu.llm.generation_menu_title"), "w400 h120", _LLM_Menu["max_words"])
+	ib := Ui_InputBox(t("menu.llm.max_words_prompt"), t("menu.llm.generation_menu_title"), "w400 h120", _LLM_Menu[ConfigLeaf.MAX_WORDS])
 	if !_LLM_Menu_TryNormalizeIntegerPrompt(ib.Result, ib.Value,
-			"max_words", &val)
+			ConfigLeaf.MAX_WORDS, &val)
 		return
 	return LLM_Menu_CommitMutation("the LLM maximum-word setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"max_words", val), _LLM_Menu_ApplyStandardCommitted)
+			ConfigLeaf.MAX_WORDS, val), _LLM_Menu_ApplyStandardCommitted)
 }
 
 LLM_Menu_PromptTemperature() {
@@ -1030,8 +1030,8 @@ LLM_Menu_TestPrediction(SendFn := 0) {
 ; Sends the sample to the active backend, with the active prompt and settings.
 _LLM_Menu_TestPredictionSend(Sample, OnSuccess, OnFail, Current) {
 	global _LLM_Menu, _LLM_Engine
-	Profile := LLM_FindProfile(_LLM_Menu["profile_id"], _LLM_Menu["user_profiles"])
-	System := LLM_ResolveSystemPrompt(Profile, 1, _LLM_Engine["min_words"], _LLM_Engine["max_words"],
+	Profile := LLM_FindProfile(_LLM_Menu["profile_id"], _LLM_Menu[ConfigLeaf.USER_PROFILES])
+	System := LLM_ResolveSystemPrompt(Profile, 1, _LLM_Engine[ConfigLeaf.MIN_WORDS], _LLM_Engine[ConfigLeaf.MAX_WORDS],
 		_LLM_Engine["language"])
 	Temperature := _LLM_Engine["temperature"] + 0.0
 	if (_LLM_Menu["backend"] == "api") {
@@ -1102,7 +1102,7 @@ LLM_Menu_TriggerPredictionWith(ProfileId, NumPredictions := 0, FireFn := 0, Tran
 	global _LLM_Menu, _LLM_Bridge_Buffer
 	Profile := (TranslationTarget != "") ? ((ProfileId == "translate")
 		? LLM_Translate_PredictionProfile(TranslationTarget) : 0)
-		: LLM_FindProfile(ProfileId, _LLM_Menu["user_profiles"])
+		: LLM_FindProfile(ProfileId, _LLM_Menu[ConfigLeaf.USER_PROFILES])
 	; A rewrite rewrites the current sentence, whatever its length: the engine
 	; receives the whole buffer and extends its capped context to the sentence.
 	; Its "nothing typed" is an empty sentence, not an empty buffer.
@@ -1175,7 +1175,7 @@ LLM_Menu_StartLiveMode(ProfileId, NumPredictions := 0, TranslationTarget := "") 
 	}
 	Profile := (TranslationTarget != "") ? ((ProfileId == "translate")
 		? LLM_Translate_PredictionProfile(TranslationTarget) : 0)
-		: LLM_FindProfile(ProfileId, _LLM_Menu["user_profiles"])
+		: LLM_FindProfile(ProfileId, _LLM_Menu[ConfigLeaf.USER_PROFILES])
 	if !(Profile is Map) {
 		LoggerWarn("LLM", "Live mode refused: the prompt '{1}' no longer exists.", ProfileId)
 		_LLM_Menu_ShowManualPredictionNotice("llm.prompt_prediction.unknown_prompt")

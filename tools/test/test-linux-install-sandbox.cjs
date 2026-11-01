@@ -130,7 +130,8 @@ function runInstaller(scenario) {
 			`for p in "$@"; do touch ${JSON.stringify(bashPath(state))}/"$p"; done\nexit 0`
 	);
 	// Stub desktop capabilities; ownership hashes must come from real coreutils.
-	for (const name of ['notify-send', 'zenity', 'sqlite3', 'xkbcli']) stub(stubs, name, 'exit 0');
+	for (const name of ['notify-send', 'sqlite3', 'secret-tool', 'xkbcli'])
+		stub(stubs, name, 'exit 0');
 	// luajit: library probes answer from the markers, so the desktop backends
 	// are "missing" until the package manager was asked for them.
 	stub(

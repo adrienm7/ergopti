@@ -251,10 +251,14 @@ managed Mac, and keep a field probe of the exact exec shape when changing it.
 ### project-macos-ai-runtimes-install-on-selection
 
 Neither AI runtime ships in the app or downloads at boot, on AI enable with
-another backend, or after an update: only `install_for_selection()` of
-`ollama_deps_checker`/`mlx_deps_checker` grants a download, its sole caller is
+another backend, or after an update: only `install_native_for_selection()` of
+`ollama_deps_checker` (under an issued `ollama_runtime_choice`) and
+`install_for_selection()` of `mlx_deps_checker` install, their sole caller is
 `ui/menu/menu_llm/runtime_install_offer.lua`, and any other check settles
-`missing` without a task. An installed runtime is reused by stat alone
+`missing` without a task. The stock Ollama download and its installers are
+retired (owned-runtimes row "Ollama installers (legacy)"):
+`ensure-ollama-deps.sh` only verifies the resolved runtime and exits 64 when
+none was resolved; never give it a download back. An installed runtime is reused by stat alone
 (Ollama: `ollama_binary.resolve()`; MLX: venv `bin/python` plus
 `.last_sync_hash`), so a new `uv.lock` in an update never re-syncs the venv.
 When the MLX import probe then fails on an installed venv,
@@ -278,10 +282,9 @@ flag, and a failed install comes back with its cause and the repair button
 row instead of carrying the click that opens its fix: hardening-g scans
 notifications as well as dialogs. The Ollama checker still builds its failure
 tail from the completion alone.
-The Ollama installer publishes the whole release archive (CLI plus the
-ggml/MLX libraries it loads from its own folder, as in
-`Ollama.app/Contents/Resources`) into the folder
-`ollama_binary.managed_install_dir()` names; never copy the lone binary. Add a
+The native Ollama installer publishes the whole runtime (CLI plus the
+libraries it loads from its own folder) into
+`ollama_binary.native_managed_install_dir()`; never copy the lone binary. Add a
 new runtime trigger through the router, and extend
 `test_ai_runtime_selection_install_*.lua` (`ai-runtime-*`).
 
@@ -1885,11 +1888,186 @@ flows through `infra/field_run.lua`: a request file in the clone folder that
 `static/ergopti_plus/macos/data/field_run.json` names, one JSON result per
 step, then a done marker. It starts only behind `infra/dev_source.lua`; a
 packaged runtime never loads it. Runtime installs go through
-`runtime_install_offer` (the only grantor), never `install_for_selection()`
-directly, or `ai-runtime-triggers` fails. Add a new Debug field check to the
+`runtime_install_offer` (the only grantor), never the checkers' install
+entries directly, or `ai-runtime-triggers` fails. Add a new Debug field check to the
 declaration too: `test_field_run.lua` and `test-macos-field-run-contract.cjs`
 refuse a check with no step. A step that needs a person is declared with
 `person`/`reason` and reported, never driven with synthetic input.
+
+### project-karabiner-strict-signature-finder-detritus
+
+A `com.apple.FinderInfo` xattr on the Karabiner-Elements bundle root makes
+`codesign --verify --strict` refuse a bundle that Gatekeeper accepts (Notarized
+Developer ID, team G43BCU2T37; maintainer's Mac 2026-10-27, ledger L43).
+`infra/field_check_checks.lua` (`only_finder_detritus`) therefore reports a
+trusted bundle whose only strict failure is that detritus as
+`info strict_only:finder_detritus`, not a failure. Action: treat any other
+strict cause as a real signature failure; do not widen the benign list.
+
+### project-macos-privacy-grants-read-through-the-launcher
+
+Hammerspoon has no Input Monitoring query that cannot prompt, so the grant
+read `unknown` in issue #104 (ledger L32). The field check asks the launcher
+role `--input-monitoring status` (`InputMonitoringAccessWorker.swift`), which
+calls `IOHIDCheckAccess` (reads TCC only) and never `IOHIDRequestAccess` (the
+call that asks). Action: add any further privacy read the same way, through a
+non-prompting native query in a launcher role.
+
+### project-macos-field-run-step-details
+
+Each step's `proves` line in `field_run.json` says what a pass shows; this
+entry keeps only what a reader of a red report needs beyond it. A failing
+step's codes are `fail_<check step>`: read the step's report and log window
+before the day log. The Debug menu's own checks (`field_lease`,
+`field_owned_runtime`, `field_network`, `field_toolchain`, `field_login_items`,
+`field_composer`) are described in their window. Set Debug > Log level > DEBUG
+before the run. The developer app's managed Ollama is built from the repository
+pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
+
+- `field_permissions`: only Accessibility fails; Automation is skipped (it
+  cannot be queried without a prompt); the signing identity (team or ad hoc)
+  says whether a rebuild keeps the grants.
+- `field_event_taps`: the taps are keyDown, loopbackKeyUp, flagsChanged and
+  mouse, named; the probe is the worst of five 100 ms timers (late over
+  250 ms); holds over 250 ms and 1 s are counted.
+- `field_input_sources`: the enabled list is the text-input system's, not the
+  preference; `.keylayout` files go through `xmllint` as XML 1.0 with their C0
+  control references blanked, `Info.plist` files through `plutil -lint`; a
+  failure names the count.
+- `field_storage`: the keystats quick check opens the database `-readonly` and
+  `immutable=1` so the ingest never meets a lock; an issue counts only when a
+  second scan sees it, and damage names the issue line count only. The parsed
+  files are `config.toml`, `config_karabiner.toml`, personal hotstrings and
+  personal info, with the driver's TOML reader. The logs probe file is removed
+  at once. `keystats_cache_place` is `caches`, `legacy_left` or
+  `outside_caches` (cache under `~/Library/Caches/ergopti_plus/metrics`, no
+  `<TMPDIR>/ergopti_metrics/<device>/db.sqlite` left).
+- `field_launcher_roles`: any exit other than 64 to malformed
+  `--managed-http-worker` arguments, or a timeout, means the role did not
+  dispatch; the GET is the one `native_http.py` sends. An exit 64 on the GET
+  (the 2026-10-30 `native_child_status=64`), a refusal stage or `not_reached`
+  names where it broke.
+- `field_network_hosts`: the hosts are the keys of
+  `_shared/data/identifiers.json` (`github`, `github_api` for the update feed,
+  `huggingface`, `ollama`, `ollama_registry`), one HEAD after the other; the
+  registry is probed at `/v2/` because its root answers 503; any answer below
+  500 passes, a failure names the native reason by host key. Nothing is
+  downloaded.
+- `field_ollama_blob_host`: the blob host is the Ollama registry's redirect
+  target; Windows ports the route plan in `vendor/ergopti_route_plan.ps1`.
+- `field_app_health` runs after the AI steps. "Since the app start" is the
+  launcher's `ps` elapsed time (`app_uptime_s`); it reads the driver's
+  `crash_reports` folder and `~/Library/Logs/DiagnosticReports` for
+  ErgoptiPlus and its launcher roles, Hammerspoon, Ollama, Python and
+  Karabiner, failing as `<process>:<count>` with the three newest listed by
+  closed tokens (hang or crash, exception, signal, termination namespace).
+  Earlier starts' reports and other apps' are counted only. The footprint
+  fields are `memory_footprint_mb`, `memory_region_1..5` and `lua_heap_mb`.
+- `field_ai_local` runs after the AI steps and only reads: the owned Ollama
+  binary passes `codesign --verify --strict`; a stopped server skips (never
+  started here); the token is predicted with the smallest catalogue model
+  already installed (none: skip, never a download).
+- `key_accounting` (check `typing_selftest`) types `wkjx` into the app's own
+  scratch field after bringing it to the front, checking focus before each key
+  (a lost focus stops with its code, no key reaches another app). The keys are
+  selftest keys (`SyntheticInput.emit_selftest_key_stroke`): the keymap decodes
+  them as typing only while the developer runtime's published scratch window
+  has the focus and consumes them anywhere else (one `keymap.selftest_gate`
+  warning per run), keystats never counts them, and typing stops before a key
+  while the keymap taps are off (`keymap_tap_off`). They are posted after
+  Karabiner, so the virtual keyboard path and the ledger's double count stay
+  `physical_keys_only`.
+- `hotstring_roundtrip` runs after `key_accounting`: the first shipped, enabled
+  terminator hotstring with a plain lowercase trigger no other file registers,
+  typed after a Space and followed by Space; the field holds the Space and the
+  expansion (plus the Space unless Space is a consumed terminator);
+  `terminator_to_text_ms` is named. Codes: `keymap_absent`,
+  `no_enabled_trigger`, `space_not_terminator`, `not_expanded`,
+  `mismatch_<n>_bytes`, `typing_incomplete`.
+- `prediction_tooltip`: the active model must already be on the Mac (listed
+  by a running Ollama, or an MLX model in the cache; nothing is started or
+  downloaded); it types `le chat dort sur le ` and waits 45 s;
+  `keystroke_to_tooltip_ms` is last key to tooltip. Predictions turned off
+  skip as `llm_disabled` (never turned on). Codes: `no_installed_model` (a
+  remote backend included), `tooltip_not_shown`, `typing_incomplete`.
+- `field_capslock_chord` reports `delivered:N` or `never_delivered`; on
+  `never_delivered`, drop the slot's macOS recommendation with a reason.
+- `field_gesture_frames` proves the capture stamps that L46's three-finger
+  timing uses.
+- `field_owned_start` and `field_owned_pause`: the pause's resume follows the
+  run and reloads, so the next run's `field_owned_start` proves close on
+  resume.
+- `driver_reload` is the last step: the configuration is put back, the run's
+  state goes to `resume.json`, the reload goes through the termination
+  coordinator, and the resumed run takes a fresh configuration snapshot for the
+  guard; `reload_ms` is request to ready field run. A reload refused, or
+  accepted and never started, fails by name.
+- `field_menu_build` rebuilds the tree as a state change does and AppKit must
+  accept it; the slowest rows are `id:ms`, three of them.
+- `field_boot_cost` runs after `field_composer`; the three slowest stages are in
+  its log window.
+- `field_idle_cost`: 30 quiet seconds started from a collected heap
+  (`idle_pre_collect_ms`), bound 3 % (`idle_cpu_percent`); the timer callbacks
+  that ran (`idle_timer_1..3` as `file:line:count:ms`, `idle_timer_ms`,
+  `idle_other_cpu_ms` for the rest) and holds over 250 ms are named.
+- `field_slow_lines`: one `awk` pass over today's log (only a summary reaches
+  the task's pipe) tallies HotPath `Slow <segment>: X ms own` lines and the
+  `Slow ingest tick`, `Slow preferences save`, `Slow ignored-window probe` and
+  over-budget diagnostics lines. `slow_dominant` names the segment with the
+  most own time (the five largest in the log window); the others are
+  `count:worst_ms` with the worst line's largest stage (`slow_*_stage`,
+  `slow_diagnostics_collector`) and metadata forks (`slow_*_forks`,
+  `count:ms`); `slow_hold_phase` and `slow_layout_menu_phase` are `name:ms`.
+  `log_lease_bound_failures` and `log_layout_change_before_baseline` fail on a
+  `Lease-bound input startup failed` or `Layout … detected change before its
+baseline` line (item 38).
+- `field_fifo_safety` works in its own folder under `TMPDIR`, attaches a reader
+  first so a regressed guard cannot freeze the app, checks `followed_mode`
+  gives `named_pipe` and `exists` sees it, and removes the folder.
+- `field_local_servers` runs after `field_ai_local`: a missing descriptor is
+  `undescribed_<n>` (else `servers_catalogue`); the sweep is the AI menu's own
+  (process, settings file, listening port, then `GET /models`) and names each
+  `server_<id>` as `up:<port source>:<models>`, `not_running:<port source>`,
+  `needs_key:...` or `no_answer:...`. A server added to the shared list is
+  reported with no driver change.
+- `field_apple_shortcuts` runs before `field_owned_pause` and lists the
+  Shortcuts library through the run_apple_shortcut owner and
+  `shortcuts list --show-identifiers` (`shortcuts_listed`, the count). It then
+  runs the shortcut named `Ergopti Field Test` end to end (`field_test_run`,
+  the owner's closed category, or `not_started`). Without that shortcut
+  `field_test_shortcut` is skipped as `absent` (`no_listing` when the list
+  failed): create it once in Shortcuts as a shortcut that does nothing.
+- `field_pac_fallback` runs after the AI downloads: one `awk` pass counts the
+  PAC-then-direct lines of every writer (shell admission, Swift spool, Python
+  receiver, Ollama pull). `pac_fallback_counts` is `warnings:worked:failed`,
+  `pac_fallback_stages` the stages; `pac_fallback_outcome` is
+  `no_pac_failure` (information), passes as `direct_worked`, and fails on
+  `no_outcome`, `direct_failed` or `unlisted_stage:<stage>` (outside
+  `proxy_policy.json` `pac_unavailable_fallback`).
+- `field_layout_rows` runs after `field_idle_cost`. From the shipped Ergo-L
+  file it writes `~/Library/Keyboard Layouts/ErgoptiFieldRows-<n>.keylayout`
+  under a new name and id, enables it through the enabled-sources preference,
+  selects it and reads it back from a fresh process (`rows_build:keys_13` when
+  the launcher's keyboard probe types its thirteen base cells); a second build
+  that also moves the edge keys replaces it live (`rows_replace`, design note
+  M4); every check build is then disabled and deleted (`rows_retire`) and the
+  selected id and `AppleEnabledInputSources` must equal the ones read before
+  (`rows_restore`). `rows_ghosts` counts builds listed until logout (M5a).
+  Codes: `requires_logout`, `select_refused`, `readback_mismatch`; the log
+  window names each build and the source id the probe read.
+- `field_tap_hold_thresholds` reads the deployed `karabiner.json` of the
+  selected runtime and checks every managed manipulator with `to_if_alone` on a
+  tap-hold key (`thresholds_checked`, the count): its tap timeout and held-down
+  threshold equal the key's own delay, else the global one (PAR-15).
+  `thresholds_match` fails as `mismatch_<n>:<key id>:<actual>_not_<expected>`;
+  a mismatch with green unit tests means a stale or rewritten deploy.
+- The collector's own `scpt_recompile` step (no app needed) rebuilds every
+  tracked `.scpt` whose `.applescript` decompiles differently
+  (`tools/dev/recompile-applescripts.py`): `scpt_recompiled:<n>`, or
+  `scpt_failed:<path>:<reason>` (`decompile_existing`, `osacompile_exit_<n>`,
+  `decompile_rebuilt`, `roundtrip_mismatch`) with the `.scpt` untouched. The
+  rebuilt files are committed on the field branch apart from the report:
+  cherry-pick that commit to the base, as only a Mac can compile them.
 
 ## Keyboard input sources: read the state from a fresh process
 
@@ -1920,3 +2098,14 @@ goes through the same copy, and tag positions come from `layouts.keylayout`
 (`positions`, `key_positions`): the single-reader gate refuses a second
 scanner. A macOS build of a changed layout always gets a new name and id
 (probe M3); `field_layout_rows` proves the live replace on the Mac.
+
+### project-macos-physical-capture-is-the-owned-runtime
+
+The macOS consumers of physical key positions and media events exist
+(`keystats/media_store` replays through `aggregator/core.media_policy`; the
+shortcut editor reads `physical_capture.position_available`), but their only
+producer is `modules/keystats/physical_capture.lua`, which only the owned
+Karabiner runtime starts (`adapters/runtime_capture_port.lua`, dormant behind
+`[karabiner] runtime = "owned"`; checked 2026-10-31). Action: native position
+capture on macOS is item 31's production capture owner; do not plan it as
+separate work.

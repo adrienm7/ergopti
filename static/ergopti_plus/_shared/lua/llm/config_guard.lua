@@ -24,6 +24,7 @@
 local M = {}
 
 M.NEWER_REASON_KEY = "menu.read_only.newer_schema"
+M.OLDER_REASON_KEY = "menu.read_only.older_schema"
 M.GENERIC_REASON_KEY = "menu.llm.save_unavailable"
 
 -- Guards against a cyclic menu table.
@@ -46,7 +47,9 @@ local MAX_DEPTH = 8
 function M.reason_key(path, migrate)
 	if type(path) ~= "string" or path == "" then return M.GENERIC_REASON_KEY end
 	if migrate.read_only_reason(path) == nil then return nil end
-	if migrate.read_only_status(path) == "newer" then return M.NEWER_REASON_KEY end
+	local status = migrate.read_only_status(path)
+	if status == "newer" then return M.NEWER_REASON_KEY end
+	if status == "unsupported" then return M.OLDER_REASON_KEY end
 	return M.GENERIC_REASON_KEY
 end
 

@@ -216,7 +216,8 @@ check('the field run speaks the shared protocol and never starts a driver', () =
 check('the proxy facts say set or unset, never an address', () => {
 	const winhttp = code.match(/Invoke-Step 'proxy_winhttp' \{\n([\s\S]*?)\n\t\}\n/)[1];
 	assert.match(winhttp, /'WinHTTP: direct' \} else \{ 'WinHTTP: set' \}/);
-	assert.doesNotMatch(winhttp, /\$Text\s*$/m, 'the netsh output itself is never printed');
+	assert.doesNotMatch(winhttp, /netsh/, 'its wording follows the display language');
+	assert.match(winhttp, /'WinHttpSettings'/, 'the answer is the registry flags');
 	const proxy = code.match(/Invoke-Step 'proxy' \{\n([\s\S]*?)\n\t\}\n/)[1];
 	// Only the two switches print their value; the server and the PAC say "set".
 	assert.equal(proxy.split('$Value.Value').length, 2);
@@ -449,6 +450,11 @@ try {
 				new RegExp(`^${dayLog.replace(/\./g, '\\.')}\\s+copied \\(scrubbed\\)$`, 'm')
 			);
 			assert.match(steps, /^hotstring_collisions\s+exit=0$/m);
+			assert.match(steps, /^proxy_winhttp\s+exit=0$/m);
+			assert.match(
+				fs.readFileSync(path.join(folders[0], 'proxy_winhttp.txt'), 'utf8'),
+				/^WinHTTP: (direct|set)\s*$/
+			);
 			assert.match(
 				fs.readFileSync(path.join(folders[0], 'hotstring_collisions.txt'), 'utf8'),
 				/no personal hotstrings file at personal_hotstrings\.toml/,

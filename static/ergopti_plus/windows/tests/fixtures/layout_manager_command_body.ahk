@@ -311,6 +311,8 @@ _LMCS_Main() {
 	Primary := 0, Command := 0, Observed := false, InheritedCritical := A_IsCritical
 	try {
 		_LMCS_Require(!A_IsCompiled && Updater_IsLocalSource(), "The genuine refresh must take its source-mode local branch.")
+		; A clone with a registry change: the catalogue shows its folder, without HTTP.
+		global _LayoutCatalogueRegistryChangesFn := (Callback) => Callback.Call(" M static/layouts/registry/index.json", "")
 		_LMCS.LocalDir := LayoutRegistry_LocalDir(_ConfigDir)
 		DirCreate(_LMCS.LocalDir)
 		Bundled := LayoutRegistry_ReadBundled(_LMCS.Id, LayoutRegistry_BundledDir())

@@ -26,6 +26,11 @@
  *    real comparison — generated catalogue against the set each driver can
  *    run, both ways — lives in each driver's own suite, where the registry
  *    exists; this file checks those three tests are still there.
+ * 5. 93 actions were missing from one or two drivers with nothing to say why
+ *    (AGENTS.md wants every absence explained in the menu's reason text). A
+ *    row that does not claim a driver must now give a localized reason, its
+ *    equivalents must exist there, and the README availability table must be
+ *    the one the generator writes.
  * ==============================================================================
  */
 
@@ -36,6 +41,8 @@ const path = require('path');
 const {
 	generate,
 	generateShared,
+	generateReadme,
+	README_OUTPUT,
 	parseRegistry,
 	OUTPUTS,
 	CHORD_GROUP_KEY,
@@ -108,6 +115,88 @@ rejects(
 	mutate('[sg_actions.lookup]\nplatform = "hs"', '[sg_actions.lookup]\nplatform = "mac"'),
 	/unknown platform "mac"/
 );
+
+// 1b. Every absence says why (action-availability-reasons). 93 rows were
+// missing from one or two drivers with nothing but a TOML comment, or nothing
+// at all, to say why; the picker of that OS dropped them without a word.
+rejects(
+	'missing reason',
+	mutate('reason_linux = "platform_reason.action_lookup_is_macos_dictionary"\n', ''),
+	/not on Linux, so reason_linux must name/
+);
+rejects(
+	'reason on a driver the row claims',
+	mutate(
+		'[sg_actions.lookup]\nplatform = "hs"',
+		'[sg_actions.lookup]\nplatform = "hs"\nreason_hs = "platform_reason.action_not_yet_on_macos"'
+	),
+	/reason_hs or equivalent_hs on an action that claims hs/
+);
+rejects(
+	'reason that is not a platform_reason key',
+	mutate(
+		'reason_linux = "platform_reason.action_lookup_is_macos_dictionary"',
+		'reason_linux = "Linux has no dictionary"'
+	),
+	/reason_linux must name the platform_reason/
+);
+rejects(
+	'equivalent the driver does not offer',
+	mutate('equivalent_hs = ["win_app_prev"]', 'equivalent_hs = ["win_prev"]'),
+	/equivalent_hs "win_prev" is not offered on macOS/
+);
+rejects(
+	'equivalent that is no action',
+	mutate('equivalent_hs = ["win_app_prev"]', 'equivalent_hs = ["ghost_action"]'),
+	/equivalent_hs "ghost_action" is not an action/
+);
+{
+	const english = JSON.parse(fs.readFileSync(path.join(LOCALES, 'en.json'), 'utf8'));
+	const readmePath = path.join(ROOT, README_OUTPUT);
+	const readme = fs.readFileSync(readmePath, 'utf8');
+	const fresh = generateReadme(SOURCE, readme, english).text;
+	check(
+		fresh === readme,
+		`${README_OUTPUT}: the availability table is stale — run npm run codegen:action-catalogue`
+	);
+	check(
+		/\| `lookup` \| [^|]+ \| no, R\d+ \| yes \| no, R\d+ \|/.test(fresh),
+		'the README table must list lookup as macOS-only with a reason for Windows and Linux'
+	);
+	const missing = { ...english };
+	delete missing['platform_reason.action_lookup_is_macos_dictionary'];
+	let refusal = null;
+	try {
+		generateReadme(SOURCE, readme, missing);
+	} catch (err) {
+		refusal = err.message;
+	}
+	check(
+		refusal !== null && /has no English text/.test(refusal),
+		`a reason key missing from en.json must stop generation, got: ${refusal}`
+	);
+	// Every reason resolves in all 21 locales, not only in English.
+	const keys = new Set();
+	for (const family of ['sg_actions', 'ax_actions']) {
+		for (const row of Object.values(parseRegistry(SOURCE)[family])) {
+			for (const driver of ['ahk', 'hs', 'linux']) {
+				if (row[`reason_${driver}`]) keys.add(row[`reason_${driver}`]);
+			}
+		}
+	}
+	check(keys.size >= 20, `only ${keys.size} reason key(s) found — the walk collapsed`);
+	for (const file of fs.readdirSync(LOCALES).filter((f) => f.endsWith('.json'))) {
+		const locale = JSON.parse(fs.readFileSync(path.join(LOCALES, file), 'utf8'));
+		for (const key of keys) {
+			check(
+				typeof locale[key] === 'string' &&
+					locale[key].trim() !== '' &&
+					!locale[key].includes('{H}'),
+				`${file}: reason ${key} is missing, empty or still holds its {H} placeholder`
+			);
+		}
+	}
+}
 rejects(
 	'unknown parameter kind',
 	mutate('parameter = "url"', 'parameter = "uri"'),
@@ -186,11 +275,14 @@ check(
 	ids(models.hs).includes('lookup') && !ids(models.linux).includes('lookup'),
 	'lookup is macOS-only'
 );
-const navKey = HEADER_KEY_PREFIX + 'navigation';
+// The Debug heading holds the AutoHotkey tools and the Hammerspoon console:
+// Linux has neither, so the heading is dropped there. (The Navigation heading
+// used to be the example; nav_back and nav_forward now exist on every OS.)
+const debugKey = HEADER_KEY_PREFIX + 'debug';
 const hasHeading = (m, key) => m.sgItems.some((i) => i.kind === 'heading' && i.key === key);
-check(hasHeading(models.ahk, navKey), 'Windows keeps the Navigation heading over its two rows');
-check(!hasHeading(models.hs, navKey), 'macOS must not show an empty Navigation heading');
-check(!hasHeading(models.linux, navKey), 'Linux must not show an empty Navigation heading');
+check(hasHeading(models.ahk, debugKey), 'Windows keeps the Debug heading over its tools');
+check(hasHeading(models.hs, debugKey), 'macOS keeps the Debug heading over its console');
+check(!hasHeading(models.linux, debugKey), 'Linux must not show an empty Debug heading');
 for (const [platform, m] of Object.entries(models)) {
 	for (let i = 0; i < m.sgItems.length; i++) {
 		const item = m.sgItems[i];

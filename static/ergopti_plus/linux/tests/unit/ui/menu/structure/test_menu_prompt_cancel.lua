@@ -50,7 +50,7 @@ local function with_zenity(read_body, close_status, fn)
 	local real_checked = shell.exec_checked
 	local commands = {}
 	shell.exec_checked = function(command)
-		if not command:find("zenity --entry", 1, true) then return real_checked(command) end
+		if not command:find("dialog_host.lua' --entry", 1, true) then return real_checked(command) end
 		commands[#commands + 1] = command
 		return close_status == 0, read_body, close_status == 0 and nil or "command exited with status " .. close_status
 	end
@@ -107,7 +107,7 @@ local function find_delay_row(mb, manager)
 			if cb and children_of(row) == nil then
 				local commands = with_zenity("", 1, function() pcall(cb) end)
 				for _, cmd in ipairs(commands) do
-					if cmd:find("zenity", 1, true) and cmd:find("--entry", 1, true) then return cb end
+					if cmd:find("dialog_host.lua", 1, true) and cmd:find("--entry", 1, true) then return cb end
 				end
 			end
 		end

@@ -25,11 +25,28 @@ function shellQuote(value) {
 	return `'${String(value).replace(/'/g, `'"'"'`)}'`;
 }
 
+/** The [adapters] proxy relay deadlines of the real timings registry, as a Lua table literal. */
+function luaTimings() {
+	const toml = fs.readFileSync(
+		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'timings', 'constants.toml'),
+		'utf8'
+	);
+	const section = toml.split(/^\[adapters\]$/m)[1].split(/^\[/m)[0];
+	const entries = ['dial', 'handshake', 'idle'].map((name) => {
+		const key = `proxy_relay_${name}_timeout_ms`;
+		const value = new RegExp(`^${key} = (\\d+)$`, 'm').exec(section);
+		assert.ok(value, key);
+		return `["adapters.${key}"] = ${value[1]}`;
+	});
+	return `{ ${entries.join(', ')} }`;
+}
+
 function buildCommand(fakeBinary, logFile) {
 	const moduleRoot = MACOS_ROOT.replace(/\\/g, '/');
 	const sharedRoot = SHARED_LUA_ROOT.replace(/\\/g, '/');
 	const source = [
 		`package.path = ${JSON.stringify(`${moduleRoot}/?.lua;${moduleRoot}/?/init.lua;${sharedRoot}/?.lua;${sharedRoot}/?/init.lua;`)} .. package.path`,
+		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
 		// Hammerspoon always provides hs.fs.attributes, and FileSystem.exists
 		// refuses to classify a path without a metadata probe. Plain Lua has no
 		// stat, so this host stand-in reports the regular files the builder
@@ -44,6 +61,9 @@ function buildCommand(fakeBinary, logFile) {
 		// Native Windows Lua expands module dots with backslashes. Load this
 		// path-sensitive macOS module with its real POSIX filename on every host.
 		`package.loaded["modules.llm.network_env"] = assert(loadfile(${JSON.stringify(`${moduleRoot}/modules/llm/network_env.lua`)}))()`,
+		// The timings owner resolves the shared tree through Hammerspoon paths; the
+		// stand-in serves the real registry values the builder reads (relay deadlines).
+		`package.loaded["infra.timings"] = { ms = function(section, key) return assert((${luaTimings()})[section .. "." .. key], key) end }`,
 		'local Builder = require("modules.llm.ollama_server_command")',
 		`local command, detail = Builder.build(${JSON.stringify(fakeBinary)}, ${JSON.stringify(logFile)}, ${PORT})`,
 		'if not command then io.stderr:write(tostring(detail)); os.exit(2) end',

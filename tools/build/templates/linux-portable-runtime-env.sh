@@ -10,10 +10,14 @@ fi
 ERGOPTI_PACKAGE_PREFIX="$1"
 DRIVER_ROOT="$2"
 SHARED_LUA="$DRIVER_ROOT/_shared/lua"
-export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;"
+# The private prefix's Lua packages (luaposix) after the driver's own modules.
+export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;$ERGOPTI_PACKAGE_PREFIX/share/lua/5.1/?.lua;$ERGOPTI_PACKAGE_PREFIX/share/lua/5.1/?/init.lua;;"
+# The driver runs its owned programs from this prefix only (infra/owned_programs.lua).
+export ERGOPTI_RUNTIME_PREFIX="$ERGOPTI_PACKAGE_PREFIX"
 export LUA_CPATH="$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/?.so${LUA_CPATH:+;$LUA_CPATH};;"
 export PATH="$ERGOPTI_PACKAGE_PREFIX/bin:$PATH"
-export LD_LIBRARY_PATH="$ERGOPTI_PACKAGE_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# No LD_LIBRARY_PATH: every staged file finds lib/ through its own RUNPATH, and
+# this environment reaches every host program the daemon starts.
 export GIO_MODULE_DIR="$ERGOPTI_PACKAGE_PREFIX/lib/gio/modules"
 export GIO_EXTRA_MODULES="$ERGOPTI_PACKAGE_PREFIX/lib/gio/modules"
 export GSETTINGS_SCHEMA_DIR="$ERGOPTI_PACKAGE_PREFIX/share/glib-2.0/schemas"
@@ -22,7 +26,13 @@ export XDG_DATA_DIRS="$ERGOPTI_PACKAGE_PREFIX/share:${XDG_DATA_DIRS:-/usr/local/
 for ERGOPTI_PACKAGE_COMPONENT in \
   "$ERGOPTI_PACKAGE_PREFIX/bin/luajit" \
   "$ERGOPTI_PACKAGE_PREFIX/bin/curl" \
+  "$ERGOPTI_PACKAGE_PREFIX/bin/sqlite3" \
+  "$ERGOPTI_PACKAGE_PREFIX/bin/openssl" \
+  "$ERGOPTI_PACKAGE_PREFIX/bin/zstd" \
   "$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/luv.so" \
+  "$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/lfs.so" \
+  "$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/posix/sys/stat.so" \
+  "$ERGOPTI_PACKAGE_PREFIX/share/lua/5.1/posix/init.lua" \
   "$GIO_MODULE_DIR/libgiolibproxy.so" \
   "$GSETTINGS_SCHEMA_DIR/gschemas.compiled"; do
   if [ ! -f "$ERGOPTI_PACKAGE_COMPONENT" ]; then

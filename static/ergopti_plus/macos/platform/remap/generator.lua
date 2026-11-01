@@ -43,6 +43,8 @@ local NativePath = require("native_path")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
 local TimerScheduler = require("adapters.timer_scheduler")
+local PhaseStats = require("infra.phase_stats")
+local MetadataCommandStats = require("adapters.metadata_command_stats")
 local JsonCodec  = require("adapters.json_codec")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
@@ -3355,10 +3357,13 @@ local _last_deploy = nil
 --- The last karabiner.json publication of this session: the write runs on the
 --- main thread, so its duration decides whether the file must shrink (the
 --- 743 KB file of the swallowed-keys follow-up).
---- @return table|nil facts { bytes, write_ms }, nil before the first deploy.
+--- @return table|nil facts { bytes, write_ms, fork_ms, forks }, nil before the
+---   first deploy: fork_ms is the part of write_ms spent waiting for the
+---   metadata-preserving copy the atomic writer forks.
 function M.last_deploy()
 	if _last_deploy == nil then return nil end
-	return { bytes = _last_deploy.bytes, write_ms = _last_deploy.write_ms }
+	return { bytes = _last_deploy.bytes, write_ms = _last_deploy.write_ms,
+		fork_ms = _last_deploy.fork_ms, forks = _last_deploy.forks }
 end
 
 --- Re-reads, merges, encodes, and publishes the current Karabiner config.
@@ -3394,6 +3399,9 @@ function M.merge_and_deploy_config(
 		return false, detail, 1
 	end
 
+	-- The merge (read, decode, compare), the encode and the write are phases:
+	-- the field run names the one a late run loop or a hold spent its time in.
+	local merge_started = PhaseStats.now()
 	local merge_ok, merged, merge_err, source_snapshot, merge_changed, merge_refusal = pcall(
 		M.merge_into_existing_config,
 		hs_config,
@@ -3401,6 +3409,7 @@ function M.merge_and_deploy_config(
 		legacy_fingerprints,
 		legacy_context
 	)
+	PhaseStats.stop("karabiner.merge", merge_started)
 	if not merge_ok or type(merged) ~= "table" then
 		local detail = "merge failed: " .. tostring(merge_ok and merge_err or merged)
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
@@ -3450,7 +3459,9 @@ function M.merge_and_deploy_config(
 		return skip_identical("the managed rules on disk already match")
 	end
 
+	local encode_started = PhaseStats.now()
 	local encode_ok, content = pcall(hs.json.encode, merged, true)
+	PhaseStats.stop("karabiner.encode", encode_started)
 	if not encode_ok or type(content) ~= "string" then
 		local detail = "JSON encode failed: " .. tostring(content)
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
@@ -3463,6 +3474,7 @@ function M.merge_and_deploy_config(
 	end
 
 	local write_started = TimerScheduler.awake_time()
+	local forks_before, fork_ms_before = MetadataCommandStats.snapshot()
 	local call_ok, deployed, deploy_detail = pcall(
 		M.deploy_string,
 		content,
@@ -3470,6 +3482,8 @@ function M.merge_and_deploy_config(
 		source_snapshot
 	)
 	local write_ms = (TimerScheduler.awake_time() - write_started) * 1000
+	local forks_after, fork_ms_after = MetadataCommandStats.snapshot()
+	PhaseStats.add_ms("karabiner.write", write_ms)
 	if not call_ok or deployed ~= true then
 		local detail = "write failed: " .. tostring(call_ok and deploy_detail or deployed)
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
@@ -3478,11 +3492,14 @@ function M.merge_and_deploy_config(
 
 	-- The write is synchronous on the Hammerspoon main thread: its duration is
 	-- the stall a typist can feel, so the log carries it next to the size.
-	_last_deploy = { bytes = #content, write_ms = write_ms }
+	-- The forks are the part an asynchronous publication could take off the
+	-- main thread; the rest is the in-process write, sync and rename.
+	_last_deploy = { bytes = #content, write_ms = write_ms, fork_ms = fork_ms_after - fork_ms_before,
+		forks = forks_after - forks_before }
 	Logger.info(LOG,
-		"Karabiner deploy decision: deployed (%s; %d bytes; written in %.0f ms; Karabiner reloads every rule).",
+		"Karabiner deploy decision: deployed (%s; %d bytes; written in %.0f ms, %.0f ms of it in %d metadata fork(s); Karabiner reloads every rule).",
 		source_snapshot.status == "absent" and "no karabiner.json yet"
-			or "the managed rules on disk differ", #content, write_ms)
+			or "the managed rules on disk differ", #content, write_ms, _last_deploy.fork_ms, _last_deploy.forks)
 	-- A key held across the reload is the one most likely to lose its key-up.
 	pcall(KeyEventHealth.note_transition, "a karabiner.json reload")
 	return true, deploy_detail or "ok", 1

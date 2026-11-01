@@ -389,6 +389,36 @@
 			}
 		},
 		{
+			"name": "Lemonade on Windows reads the settings file of its documented profile folder",
+			"server": "lemonade",
+			"os": "windows",
+			"ps": "6000 C:/Program Files/Lemonade/lemond.exe",
+			"files": {
+				"/Users/u/.config/lemonade/config.json": "{\"port\":13400}"
+			},
+			"expected": {
+				"running": true,
+				"source": "config",
+				"port": 13400,
+				"base_url": "http://127.0.0.1:13400/v1"
+			}
+		},
+		{
+			"name": "GPT4All's chat.exe on Windows runs under the catalogue's command line fragment",
+			"server": "gpt4all",
+			"os": "windows",
+			"ps": "6100 C:/Users/u/gpt4all/bin/chat.exe\n6101 C:/Program Files/Other/chat.exe",
+			"files": {},
+			"lsof": "p6100\nn127.0.0.1:4892",
+			"expected": {
+				"running": true,
+				"pids": [6100],
+				"source": "listening",
+				"port": 4892,
+				"base_url": "http://127.0.0.1:4892/v1"
+			}
+		},
+		{
 			"name": "a TabbyAPI process does not make text-generation-webui run",
 			"server": "textgen_webui",
 			"os": "linux",
@@ -396,6 +426,34 @@
 			"files": {},
 			"expected": {
 				"running": false
+			}
+		},
+		{
+			"name": "TabbyAPI start.py with --port",
+			"server": "tabbyapi",
+			"os": "linux",
+			"ps": "4500 python3 /home/u/tabbyAPI/start.py --port 5050",
+			"files": {},
+			"expected": {
+				"running": true,
+				"pids": [4500],
+				"source": "cli",
+				"port": 5050,
+				"base_url": "http://127.0.0.1:5050/v1"
+			}
+		},
+		{
+			"name": "vllm serve with --port, and no oMLX process",
+			"server": "vllm",
+			"os": "macos",
+			"ps": "4600 /Users/u/.venv/bin/python3 /Users/u/.venv/bin/vllm serve Qwen/Qwen3-8B --port 8100",
+			"files": {},
+			"expected": {
+				"running": true,
+				"pids": [4600],
+				"source": "cli",
+				"port": 8100,
+				"base_url": "http://127.0.0.1:8100/v1"
 			}
 		}
 	]

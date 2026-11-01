@@ -50,4 +50,6 @@ EXPORTS
 	ErgoptiNav_PendingForToken
 	ErgoptiNav_GetLastOsError
 	ErgoptiNav_GetHookOrderStats
+	ErgoptiNav_QueryKeyPress
+	ErgoptiNav_GetKeyLedgerHealth
 	ErgoptiNav_TestDispatch

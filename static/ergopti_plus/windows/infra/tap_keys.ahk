@@ -25,6 +25,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 #Include %A_LineFile%\..\ai_action_gate.ahk
 
 
@@ -69,7 +70,7 @@ TapKeysReadConfig(Cache) {
 	global TapKeyAssignments, TAP_KEY_ORDER, GESTURE_ACTIONS
 	Assignments := Map()
 	for _, Id in TAP_KEY_ORDER {
-		Value := IniCacheGet(Cache, "shortcuts.tap_keys", Id)
+		Value := IniCacheGet(Cache, ConfigKey.SHORTCUTS_TAP_KEYS, Id)
 		if (Value == "_") {
 			Entry := ManifestFindEntryByPath("shortcuts.tap_keys." . Id)
 			if !(Entry is Map)
@@ -100,7 +101,7 @@ SetTapKeyAction(Id, ActionName) {
 	global TapKeyAssignments, TAP_KEY_SCANCODES
 	if !TAP_KEY_SCANCODES.Has(Id)
 		throw ValueError("Unknown tap key '" . Id . "'.")
-	if !GestureAssignConfiguredAction(&TapKeyAssignments, "tap_key", "shortcuts.tap_keys", Id, ActionName)
+	if !GestureAssignConfiguredAction(&TapKeyAssignments, "tap_key", ConfigKey.SHORTCUTS_TAP_KEYS, Id, ActionName)
 		return false
 	LoggerInfo("TapKeys", "Tap key '{1}' → '{2}'.", Id, ActionName)
 	return ReloadPreservingSuspend()

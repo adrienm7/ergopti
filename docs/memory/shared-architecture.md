@@ -113,7 +113,11 @@ drivers read it generically, so adding one needs no driver code. Two shapes
 carry what a plain key and address cannot: a `base_url` holding `{name}`
 placeholders is an address the add-entry form fills (`api_url_template.lua`,
 AHK port), and an `auth` block makes the requests carry an access token
-exchanged from the key (`api_token_exchange.lua`). Every row needs a
+exchanged from the key (`api_token_exchange.lua`); its optional `assertion`
+block signs an RS256 JWT for a key of the named JSON type (a Google service
+account) with the pure-Lua `_shared/lua/crypto/` signer, which a driver must
+step through `api_token_exchange.drive` over timer ticks: a whole signature
+takes about 0.25 s of Lua 5.4 and would stall the event taps. Every row needs a
 thinking-off vector and a recorded listing or its reason
 (`test_api_provider_catalogue.lua`); read the provider's own documentation for
 each field and name it in the row's `_source`.
@@ -247,7 +251,7 @@ control, the shortcuts manager's text actions) are injected at init through
 A catalogue action with `confirm = true` is asked for by each driver's single
 dispatch choke point, never by the action: macOS `execute_single` (non-blocking
 `modules/gestures/action_confirm.lua`), Windows `GestureInvokeAction` (deferred
-MsgBox), Linux a zenity/kdialog question chained in front of the command of
+MsgBox), Linux a question of the owned dialog host chained in front of the command of
 `modules/gestures/system_actions.lua`. Linux therefore refuses to load a confirm
 action that is not one of those commands. Action: declare `confirm` in the
 catalogue and add the confirm-gate test case; do not add a second prompt inside
@@ -613,9 +617,12 @@ Windows keys a pair `first_then_second` and stores its two slots in
 `config.toml`: `[shortcuts.key_combination_taps]` (a catalogue action) and
 `[shortcuts.key_combination_holds]` (a hold-picker value). Only the pairs that
 ship a recommendation are manifest features; every other pair is an owned key
-of those sections (`TomlConfigForeignOwner`). Windows has no chord slot:
-macOS's needs the first key to wait for the second, which the Windows tap-hold
-owners, taking their hold at key-down, do not do. The group's two lists, one
+of those sections (`TomlConfigForeignOwner`). The chord slot is
+`[mod_combos.config.<pair>] combo` on all three: a key some chord begins waits
+for the second key, so on Windows its hotkey swallows the press and sends it
+again when no chord comes (`infra/key_combinations.ahk` section 6). AltGr is no
+chord member on Windows, nor LCtrl where AltGr adds a fake one: suppressing
+either kills AltGr. Only a key with a chord assigned ever waits. The group's two lists, one
 per hand of the first key, and the separator between them are declared in the
 manifest for both drivers; a provider returns the pairs only. Each pair also
 reads `key_combination_pair_menu`: the shared declaration owns its clear row,
@@ -778,6 +785,35 @@ net/http there reads only the environment: a PAC-only network cannot pull a
 model until that launcher applies the plan. Action: add a new
 environment-driven client to `route_origins.json` and plan it; never put a
 managed HTTP download on a plan.
+
+### project-proxy-override-wins-before-the-pac-lookup
+
+The user's proxy override (`_shared/modules/network/proxy_override.json` for
+the storage key and default, `_shared/lua/network/proxy_override.lua` for the
+value grammar) is empty (automatic), `direct`, or one relay `route_plan.lua`
+accepts. `proxy_policy.route` applies it right after loopback, so it wins over
+an exported relay and the PAC/WPAD lookup never runs. Linux hands it to every
+route through `infra/proxy_policy.lua` (managed HTTP gets the existing
+`selected`/`direct` curl selections, the Ollama daemon its `HTTPS_PROXY` or
+`NO_PROXY=*`). macOS exports `ERGOPTI_PROXY_OVERRIDE` at the head of every
+`network_env.lua` prelude and `network-retry.sh` turns it into the explicit
+route before capturing the inherited one; the signed Swift workers resolve
+natively and never read it, so an override selects the environment-driven
+client instead (opaque prelude, no `install_huggingface_transport`). macOS
+`hs.http` requests (update checks) still follow the system settings. Windows
+keeps the key in `config.toml`, holds the choice in the driver's memory and sets
+`ERGOPTI_PROXY_OVERRIDE` only on the private environment of a network worker
+(`ProxyOverride_SpawnWorker`, `adapters/proxy_override.ahk`), where
+`Resolve-ErgoptiNativeNetworkRoutes` applies it. It never enters the driver's own
+environment: `run_command`, `Run` and opened programs would inherit it. WinHTTP and
+HttpWebRequest reach a plain http relay only, so an https relay, a socks5 relay or
+credentials in the address go through the loopback hop of that file (C# in the
+worker's own process, answering that process only); the owned daemon gets the real
+relay in `HTTPS_PROXY`. Action: a new download client on macOS must take its
+prelude from `network_env.lua`, a new native worker must read the override before
+claiming it honours it, and a new Windows client must route through
+`Resolve-ErgoptiNativeNetworkRoutes` or `SystemProxy_*`, start through
+`ProxyOverride_SpawnWorker`, and join `test-windows-proxy-override-e2e.cjs`.
 
 ### project-metrics-day-and-correction-semantics
 

@@ -189,7 +189,8 @@ local function with_write_receipts(channel, refusal, body)
 	local original_open, original_execute = io.open, os.execute
 	local original_stdout, original_stderr = io.stdout, io.stderr
 	local previous_paths = package.loaded["infra.config_paths"]
-	package.loaded["infra.config_paths"] = { get_logs_dir = function() return dir end }
+	package.loaded["infra.config_paths"] = { get_logs_dir = function() return dir end,
+		get_config_dir = function() return "/home/fixture-user/.config/ergopti" end }
 	os.execute = function() return 0 end
 	io.stdout = { write = function(_, line) state.console[#state.console + 1] = line; return true end,
 		flush = function() return true end }
@@ -303,7 +304,8 @@ local function with_repoint_receipts(case, body)
 	local previous_paths = package.loaded["infra.config_paths"]
 	local logger = { set_sink = function(callback) state.emit = callback end,
 		enable_repeat_collapsing = function() end, disable_repeat_collapsing = function() end }
-	package.loaded["infra.config_paths"] = { get_logs_dir = function() return state.target end }
+	package.loaded["infra.config_paths"] = { get_logs_dir = function() return state.target end,
+		get_config_dir = function() return "/home/fixture-user/.config/ergopti" end }
 	os.execute = function()
 		if state.phase ~= "initial" and case.mode == "mkdir" then return false end
 		return 0
@@ -640,7 +642,8 @@ end)
 
 helpers.describe("logger sink — date rollover", function()
 	helpers.it("both handles are repointed when the date changes", function()
-		local src = read_file(DRIVER_ROOT .. "/infra/logger_sink.lua")
+		-- infra/logger_sink, selected by a declaration unique to it.
+		local src = helpers.read_driver_unit("local function retention_days(")
 		helpers.assert_not_nil(src, "logger_sink.lua must be readable")
 
 		-- open_handles() must assign BOTH handles; a rollover that only repoints
@@ -719,6 +722,7 @@ local function with_private_log_sink(options, body)
 	}
 	package.loaded["infra.config_paths"] = {
 		get_logs_dir = function() return "/home/PrivateUser/logs" end,
+		get_config_dir = function() return "/home/PrivateUser/.config/ergopti" end,
 		account_home = function()
 			state.home_resolutions = state.home_resolutions + 1
 			return options.resolved_home or DirectoryResolver.account_home()

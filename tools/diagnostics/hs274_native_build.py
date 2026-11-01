@@ -12,6 +12,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import signal
 import socket
 import stat
 import ssl
@@ -30,6 +31,15 @@ VIRTUAL_HID = "bdfcb459b2eaca8ccda680a73b0dc898f330f4bb"
 CALIBRATION_SECONDS = 300
 MAX_INPUT_BYTES = 2 * 1024 * 1024
 MAX_LOG_BYTES = 32 * 1024 * 1024
+# A running phase reports progress at this period so a crawling compiler is
+# visible in a CI log; the deadline itself is enforced by killing the child.
+PHASE_PROGRESS_SECONDS = 30
+# Bound the post-kill reap and the process-table read the kill relies on.
+PHASE_REAP_SECONDS = 30
+PROCESS_TABLE_SECONDS = 10
+PROCESS_TREE_ROUNDS = 64
+PROGRESS_LINE_CHARS = 160
+PROGRESS_TAIL_BYTES = 65_536
 XCODEGEN_VERSION = "2.46.0"
 XCODEGEN_ASSET_ID = 478866069
 XCODEGEN_ARCHIVE_BYTES = 4_278_764
@@ -831,6 +841,144 @@ def verify_pins(observed):
     return dict(expected)
 
 
+def _report_phase(name, message):
+    """Stream one phase lifecycle or progress line to the controlling log."""
+    print("[native-phase] " + name + ": " + message, file=sys.stderr, flush=True)
+
+
+def _killed_message(name):
+    return "Native phase exceeded the calibration deadline and was killed: " + name
+
+
+def _last_action(path):
+    """Return the newest unindented output line, which names the current build action."""
+    try:
+        with open(path, "rb") as stream:
+            size = os.fstat(stream.fileno()).st_size
+            stream.seek(max(0, size - PROGRESS_TAIL_BYTES))
+            tail = stream.read(PROGRESS_TAIL_BYTES)
+    except OSError as error:
+        return "output unreadable: " + error.__class__.__name__
+    for line in reversed(tail.decode("utf-8", "replace").splitlines()):
+        if line and not line[0].isspace():
+            return line[:PROGRESS_LINE_CHARS]
+    return ""
+
+
+def _swap_usage():
+    """Return Darwin swap usage, the signal that concurrent compilers overcommit memory."""
+    if sys.platform != "darwin":
+        return ""
+    try:
+        result = subprocess.run(
+            ["sysctl", "-n", "vm.swapusage"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=PROCESS_TABLE_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return ", swap unavailable: " + error.__class__.__name__
+    return ", swap " + result.stdout.decode("ascii", "replace").strip()
+
+
+def _progress_line(started, deadline, output):
+    now = time.monotonic()
+    try:
+        size = os.stat(output).st_size
+    except OSError:
+        size = -1
+    load = os.getloadavg()[0] if hasattr(os, "getloadavg") else float("nan")
+    return "running %.0f s, %.0f s of budget left, load %.2f%s, stdout %d bytes, last: %s" % (
+        now - started,
+        deadline - now,
+        load,
+        _swap_usage(),
+        size,
+        _last_action(output),
+    )
+
+
+def process_tree(root):
+    """Return the root pid and every descendant in one bounded process-table read."""
+    listing = subprocess.run(
+        ["ps", "-A", "-o", "pid=", "-o", "ppid="],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        timeout=PROCESS_TABLE_SECONDS,
+        check=True,
+    )
+    children = {}
+    for row in listing.stdout.decode("ascii", "replace").splitlines():
+        fields = row.split()
+        if len(fields) == 2 and fields[0].isdigit() and fields[1].isdigit():
+            children.setdefault(int(fields[1]), []).append(int(fields[0]))
+    tree, pending = {root}, [root]
+    while pending:
+        for child in children.get(pending.pop(), ()):
+            if child not in tree:
+                tree.add(child)
+                pending.append(child)
+    return tree
+
+
+def _signal(pid, number):
+    try:
+        os.kill(pid, number)
+    except ProcessLookupError:
+        pass
+
+
+def kill_process_tree(process):
+    """Freeze then kill a child and all its descendants, and reap the child.
+
+    The phase child stays in the guardian's inherited group, so the tree is
+    walked instead of signalling a group. Every member is stopped before any is
+    killed: a stopped parent cannot spawn, and a live parent keeps its children
+    attached, so no descendant is reparented away from the walk.
+    """
+    stopped = set()
+    try:
+        for _ in range(PROCESS_TREE_ROUNDS):
+            fresh = process_tree(process.pid) - stopped
+            if not fresh:
+                break
+            for pid in fresh:
+                _signal(pid, signal.SIGSTOP)
+            stopped |= fresh
+    finally:
+        for pid in stopped | {process.pid}:
+            _signal(pid, signal.SIGKILL)
+    return process.wait(timeout=PHASE_REAP_SECONDS)
+
+
+def wait_within_deadline(process, name, deadline, output):
+    """Wait for a phase child until the deadline, reporting progress, then kill it.
+
+    Return (returncode, killed). The calibration deadline is a hard bound: a
+    child still running at the deadline is killed with its whole process tree.
+    """
+    started = time.monotonic()
+    report_at = started + PHASE_PROGRESS_SECONDS
+    while True:
+        now = time.monotonic()
+        if now >= deadline:
+            _report_phase(
+                name,
+                "calibration deadline reached after %.0f s; killing its process tree"
+                % (now - started),
+            )
+            return kill_process_tree(process), True
+        try:
+            return process.wait(timeout=max(0.01, min(deadline, report_at) - now)), False
+        except subprocess.TimeoutExpired:
+            pass
+        if time.monotonic() >= report_at:
+            _report_phase(name, _progress_line(started, deadline, output))
+            report_at += PHASE_PROGRESS_SECONDS
+
+
 def run_phase(name, args, cwd, owner, deadline):
     """Run one foreground child inside the guardian's inherited group and retain evidence."""
     owner, cwd = validate_owner_root(owner), Path(cwd)
@@ -873,9 +1021,11 @@ def run_phase(name, args, cwd, owner, deadline):
             os.close(out)
             raise
         with os.fdopen(out, "wb") as output, os.fdopen(err, "wb") as errors:
-            result = subprocess.run(
+            child = subprocess.Popen(
                 args, cwd=cwd, stdin=subprocess.DEVNULL, stdout=output, stderr=errors
             )
+            _report_phase(name, "started")
+            returncode, killed = wait_within_deadline(child, name, deadline, stdout)
             output.flush()
             errors.flush()
             os.fsync(output.fileno())
@@ -898,19 +1048,23 @@ def run_phase(name, args, cwd, owner, deadline):
         "schema": 1,
         "phase": name,
         "status": "refused"
-        if ended > deadline
-        else ("passed" if result.returncode == 0 else "failed"),
-        "exit_status": result.returncode,
+        if killed or ended > deadline
+        else ("passed" if returncode == 0 else "failed"),
+        "exit_status": returncode,
         "elapsed_seconds": ended - started,
     }
+    if killed:
+        record["refusal"] = "phase_deadline_killed"
     write_json(owner / (name + ".receipt.json"), record)
+    _report_phase(name, record["status"] + " in %.1f s" % record["elapsed_seconds"])
+    require(not killed, "phase_deadline", _killed_message(name))
     require(
         stdout.stat().st_size <= MAX_LOG_BYTES and stderr.stat().st_size <= MAX_LOG_BYTES,
         "phase_log_limit",
         "Native phase output exceeded its retained evidence bound",
     )
     require(
-        result.returncode == 0,
+        returncode == 0,
         "phase_failed",
         "Native phase exited unsuccessfully: " + name,
     )
@@ -943,6 +1097,7 @@ class _ConcurrentPhase:
         self.failure = None
         self.secondary_failures = ()
         self.record = None
+        self.killed = False
 
 
 def _phase_descriptor_identity(info):
@@ -1017,6 +1172,7 @@ def begin_phase(name, args, cwd, owner, deadline, register):
             stderr=operation.streams[1],
         )
         operation.launch_debt = False
+        _report_phase(name, "started")
         return operation
     except BaseException as error:
         operation.failure = (
@@ -1093,8 +1249,16 @@ def finish_phase(operation):
 
     try:
         if operation.process is not None:
-            status = operation.process.wait()
+            status, killed = wait_within_deadline(
+                operation.process,
+                operation.name,
+                operation.deadline,
+                operation.owner / (operation.name + ".stdout"),
+            )
             operation.waited = True
+            if killed:
+                operation.killed = True
+                refuse(NativeBuildError("phase_deadline", _killed_message(operation.name)))
         for index, stream in enumerate(operation.streams):
             stream.flush()
             os.fsync(stream.fileno())
@@ -1147,6 +1311,9 @@ def finish_phase(operation):
             "exit_status": status,
             "elapsed_seconds": ended - operation.started,
         }
+        if operation.killed:
+            record["refusal"] = "phase_deadline_killed"
+    _report_phase(operation.name, record["status"] + " in %.1f s" % record["elapsed_seconds"])
     try:
         write_json(operation.owner / (operation.name + ".receipt.json"), record)
         operation.record = record

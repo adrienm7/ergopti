@@ -80,6 +80,10 @@ const PKGBUILD_REL = 'tools/build/PKGBUILD';
 // The step that unpacks an already stamped bundle and verifies its stamp.
 const UNPACK_TAR = /\btar\s+-xzf\b[^\n]*\s-C\s+build\/linux\b/;
 const UNPACK_VERIFY = 'write_build_stamp.sh verify build/linux/_shared';
+// The script a workflow step runs to pack the installable tarball; it must
+// verify the stamp of the tree it packs before its tar.
+const TARBALL_BUILDER_REL = 'tools/build/build-linux-bundle-archive.sh';
+const TARBALL_BUILDER = /\bbash\s+tools\/build\/build-linux-bundle-archive\.sh\b/;
 
 const COMMIT_ENV = /^ERGOPTI_BUILD_COMMIT:\s*\$\{\{\s*github\.sha\s*\}\}\s*$/;
 const VERSION_ENV = /^ERGOPTI_BUILD_VERSION:\s*\$\{\{\s*inputs\.version\s*\}\}\s*$/;
@@ -202,6 +206,18 @@ function parseJobs(text) {
 // =================================
 
 /**
+ * Tells whether a tarball builder verifies the stamp of the tree it packs
+ * before its first tar command.
+ * @param {string} text The builder script.
+ * @returns {boolean} True when a stamp verify of $BUILD_DIR/_shared precedes the tar.
+ */
+function builderVerifiesBeforeTar(text) {
+	const verify = text.search(/write_build_stamp\.sh"?\s+verify\s+"\$BUILD_DIR\/_shared"/);
+	const tar = text.search(/^\s*tar\s+-czf\b/m);
+	return verify >= 0 && tar > verify;
+}
+
+/**
  * Checks that every package build in a workflow stamps the commit.
  * @param {string} text Workflow YAML.
  * @param {string} rel The workflow's repository-relative path, for messages.
@@ -263,6 +279,15 @@ function checkWorkflow(text, rel) {
 					errors.push(
 						`${where} runs ${packager} before any build-linux-driver.sh in its job — ` +
 							'it would package a tree nobody stamped'
+					);
+				}
+			}
+			if (TARBALL_BUILDER.test(step.run)) {
+				tarballs++;
+				if (!builderVerifiesBeforeTar(read(TARBALL_BUILDER_REL))) {
+					errors.push(
+						`${where} runs ${TARBALL_BUILDER_REL}, which packs a tarball without first ` +
+							'running write_build_stamp.sh verify on the tree it packs'
 					);
 				}
 			}
@@ -447,6 +472,27 @@ for (const box of VERSIONED_BOXES) {
 	}
 }
 
+// The tarball builder's verify must be able to fail: without it, or after
+// the tar, the script is refused.
+{
+	const builder = read(TARBALL_BUILDER_REL);
+	const verifyLine = /^.*write_build_stamp\.sh"?\s+verify\s+"\$BUILD_DIR\/_shared".*\n/m;
+	if (!builderVerifiesBeforeTar(builder)) {
+		errors.push(`${TARBALL_BUILDER_REL} no longer verifies the stamp before its tar`);
+	} else if (builderVerifiesBeforeTar(builder.replace(verifyLine, ''))) {
+		errors.push(
+			`self-check: removing the stamp verify from ${TARBALL_BUILDER_REL} went unnoticed — this guard cannot fail`
+		);
+	} else {
+		const moved = builder.replace(verifyLine, '') + builder.match(verifyLine)[0];
+		if (builderVerifiesBeforeTar(moved)) {
+			errors.push(
+				`self-check: a stamp verify after the tar in ${TARBALL_BUILDER_REL} went unnoticed — this guard cannot fail`
+			);
+		}
+	}
+}
+
 // The unpack-and-verify path must be able to fail too: dropping the verify
 // from every step that unpacks a bundle has to be reported.
 for (const { rel, text } of workflows) {
@@ -486,17 +532,25 @@ for (const [packager, wrappers] of Object.entries(PACKAGER_WRAPPERS)) {
 	}
 }
 
-// The Arch package is built by makepkg, outside the workflow, so the workflow
-// parse above never sees it: it must assemble through the stamping driver
-// builder and verify the tree it installs.
+// The Arch recipe repacks the release tarball, whose tree the stamping driver
+// builder assembled and the tarball builder verified before packing; makepkg
+// runs outside the workflow and without the build scripts, so the recipe
+// checks the stamp's commit entry itself, with the writer's file and key names.
 const pkgbuild = read(PKGBUILD_REL);
-if (!STAMPING_BUILDS['tools/build/build-linux-driver.sh'].test(pkgbuild)) {
-	errors.push(
-		`${PKGBUILD_REL} no longer assembles through build-linux-driver.sh, which writes the stamp`
-	);
+const stampWriter = read(WRITER_REL);
+const stampFile = (stampWriter.match(/^BUILD_STAMP_FILE="([^"]+)"$/m) || [])[1];
+const commitKey = (stampWriter.match(/^BUILD_STAMP_COMMIT_KEY="([^"]+)"$/m) || [])[1];
+if (
+	!stampFile ||
+	!commitKey ||
+	!pkgbuild.includes(
+		`grep -Eq '^${commitKey}=[0-9a-f]{40}$' "$pkgdir/usr/lib/ergopti/_shared/${stampFile}"`
+	)
+) {
+	errors.push(`${PKGBUILD_REL} no longer verifies the build stamp commit in the tree it installs`);
 }
-if (!/write_build_stamp\.sh\s+verify\s+"\$pkgdir\/usr\/lib\/ergopti\/_shared"/.test(pkgbuild)) {
-	errors.push(`${PKGBUILD_REL} no longer verifies the build stamp in the tree it installs`);
+if (!/ergopti-plus-linux\.tar\.gz/.test(pkgbuild)) {
+	errors.push(`${PKGBUILD_REL} no longer repacks the stamped release tarball`);
 }
 
 // One stamp format: what the writer writes is what the Lua drivers read.

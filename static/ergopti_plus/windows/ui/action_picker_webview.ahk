@@ -454,7 +454,7 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 		. _ActPickWeb_Kv("cancelLabel", t("button.cancel")) . ","
 		. _ActPickWeb_Kv("executableSyntax", "windows") . ","
 		. '"commandIsPrimary":false,'
-		. '"sendVocabulary":' . SendInputVocabularyJson() . ","
+		. '"sendVocabulary":' . SendKeysVocabularyJson() . ","
 		. '"parameterStrings":' . _ActPickWeb_ParameterStringsJson() . ","
 		. '"programProviders":' . _ActPickWeb_ProgramPacketJson() . ","
 		. '"programProviderStrings":{'

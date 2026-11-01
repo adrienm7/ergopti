@@ -1,7 +1,8 @@
 # tools/test/test-linux-native-dialog-titles.py
-"""Real public Zenity captions, cancellation and results on an owned X11 display.
+"""Real public captions, cancellation and results of Ergopti's own dialog host
+(static/ergopti_plus/linux/ui/dialog_host.lua) on an owned X11 display.
 
-Requires Node 22, LuaJIT, Zenity, Xvfb and libXtst. Run inside dbus-run-session;
+Requires Node 22, LuaJIT, GTK 3, Xvfb and libXtst. Run inside dbus-run-session;
 optional signed runtime prefixes are supplied through the ordinary environment.
 No missing prerequisite turns this explicit native profile into a green skip.
 """
@@ -117,10 +118,11 @@ root = (
     if len(sys.argv) > 1
     else pathlib.Path(__file__).resolve().parents[2]
 )
-zenity = shutil.which("zenity")
 xvfb = shutil.which("Xvfb")
 lua = shutil.which("luajit")
-assert zenity and xvfb and lua, "native title profile requires actual Zenity, Xvfb and LuaJIT"
+assert xvfb and lua, "native title profile requires actual Xvfb and LuaJIT"
+host = root / "static/ergopti_plus/linux/ui/dialog_host.lua"
+assert host.is_file(), "the owned dialog host must exist"
 r, w = os.pipe()
 server = subprocess.Popen(
     [xvfb, "-displayfd", str(w), "-screen", "0", "1024x768x24", "-nolisten", "tcp"],
@@ -266,6 +268,11 @@ try:
             )
             original["window_title"] = policy
             manifest.write_text(json.dumps(original))
+            # The generator checks every presented caption against the locales.
+            data = policy_root / "static/ergopti_plus/_shared/data"
+            data.mkdir(parents=True)
+            shutil.copy(root / "static/ergopti_plus/_shared/data/locale_order.json", data)
+            shutil.copytree(root / "static/ergopti_plus/_shared/data/locales", data / "locales")
             subprocess.run(
                 [
                     "node",
@@ -316,8 +323,8 @@ try:
                             else "local value=require('ui.config_dir_picker').pick(shell,{default_config_dir=function() return '/tmp' end},{get=function() return 'Select configuration folder' end},'/tmp')\n"
                             if mode == "directory"
                             else "local dialogs\n"
-                            "package.loaded['ui.menu.llm_backend_rows']={rows=function(_,ports) dialogs=ports;return {} end}\n"
-                            "package.loaded['ui.menu.start_at_login']={enabled=function() return false end}\n"
+                            "package.loaded['ui.menu.llm_backend_rows']={bind_page=function(_,options) dialogs=options.dialogs end,caption=function() return 'model button' end}\n"
+                            "package.loaded['ui.menu.start_at_login']={enabled=function() return false end,command_available=function() return false end}\n"
                             "package.loaded['adapters.storage']={get=function(key,default) if key=='locale' then return 'en' end;return default end,set=function() return false end}\n"
                             "require('infra.locale').set_locale('en')\n"
                             "require('ui.menu.builder').build({llm={is_enabled=function() return false end},_version='native-profile',on_quit=function() end})\n"
@@ -364,10 +371,14 @@ try:
                             else expected_prefix + label
                         )
                         assert receipt["title"] == expected_title, receipt
-                        assert (
-                            pathlib.Path("/proc") / str(receipt["pid"]) / "exe"
-                        ).resolve() == pathlib.Path(zenity).resolve(), (
-                            "caption must belong to the actual Zenity executable"
+                        command_line = (
+                            (pathlib.Path("/proc") / str(receipt["pid"]) / "cmdline")
+                            .read_bytes()
+                            .split(b"\0")
+                        )
+                        assert str(host).encode() in command_line, (
+                            "caption must belong to the owned dialog host",
+                            command_line,
                         )
                         dismiss(receipt["hwnd"], accept)
                         out, err = child.communicate(timeout=10)

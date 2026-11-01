@@ -68,7 +68,7 @@ _LMCC_Script(Framework, Receipt) {
 			"_TrayRootRelease", "_TrayRootTryReleaseFailed",
 			"_TrayRootFinishReportableFailure", "_TrayRootFinishOrdinaryFailure",
 			"_TrayRootReportTerminalFailure", "_TrayRootRetireFatal",
-			"_TrayRootFirstPublicationPending", "PerfCount", "_PerfCountersOwner"] {
+			"_TrayRootFirstPublicationPending", "_TrayRootReportRebuild", "PerfCount", "_PerfCountersOwner"] {
 		Body := _DriverFuncBodyOrEmpty(Name)
 		AssertTrue(Body != "", "the actual root composition subject must exist: " Name)
 		Sources .= Body "`n"
@@ -109,6 +109,8 @@ TickElapsed(Args*) => 0
 t(Key, Args*) => Key
 PhaseStats_Now(Args*) => 0
 PhaseStats_Stop(Args*) => 0
+PerfBudget_Report(Args*) => 0
+TimingsGet(Args*) => 0
 BootProfile_Mark(Args*) => 0
 BootProfile_StageBegin(Args*) => 0
 BootProfile_StageEnd(Args*) => 0

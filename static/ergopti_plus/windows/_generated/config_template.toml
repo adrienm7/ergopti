@@ -560,6 +560,14 @@ left_alt_then_caps_lock = "none"
 
 
 
+
+
+[mod_combos]
+simultaneous_threshold_ms = 100
+symmetric = false
+
+
+
 [shortcuts.personal]
 laptop_broken_key = false
 mouse_drag_window = false
@@ -655,3 +663,10 @@ distances_reduction = false
 sfbs_reduction = false
 rolls = false
 magic_key = false
+
+
+
+
+
+[network]
+proxy_override = ""

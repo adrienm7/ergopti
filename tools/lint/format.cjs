@@ -52,7 +52,9 @@ const PRETTIER_EXTENSIONS = new Set([
 	'.yaml'
 ]);
 
-const PRETTIER_BIN = path.join(ROOT, 'node_modules', 'prettier', 'bin', 'prettier.cjs');
+// Resolved, not joined to ROOT: a worktree has no node_modules of its own and
+// reaches the main checkout's through NODE_PATH.
+const PRETTIER_BIN = require.resolve('prettier/bin/prettier.cjs');
 
 function run(command, args, options = {}) {
 	const result = spawnSync(command, args, { cwd: ROOT, stdio: 'inherit', ...options });

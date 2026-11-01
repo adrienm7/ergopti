@@ -69,6 +69,13 @@ function M.usage(format, root)
 			out.completion_tokens = nonnegative_number(usage.output_tokens)
 			out.total_tokens      = out.prompt_tokens + out.completion_tokens
 		end
+	elseif format == Formats.AGENT_FORMAT then
+		local usage = root.usage
+		if type(usage) == "table" then
+			out.prompt_tokens     = nonnegative_number(usage.input_tokens)
+			out.completion_tokens = nonnegative_number(usage.output_tokens)
+			out.total_tokens      = nonnegative_number(usage.total_tokens)
+		end
 	else
 		local usage = root.usage
 		if type(usage) == "table" then
@@ -95,6 +102,7 @@ end
 local function extract_text(format, root)
 	if type(root) ~= "table" then return "" end
 	if format == "backboard" then return Formats.backboard_text(root) or "" end
+	if format == Formats.AGENT_FORMAT then return Formats.agent_text(root) or "" end
 	if format == "anthropic" then
 		local content = root.content
 		if type(content) == "table" then
@@ -145,8 +153,10 @@ function M.classify(format, body)
 	if type(root) ~= "table" or Json.is_null(root) then
 		return { text = "", usage = empty_usage(), valid_json = false }
 	end
+	local failed = format == Formats.AGENT_FORMAT and Formats.agent_failed(root, Json.is_null)
+		or (format ~= Formats.AGENT_FORMAT and Formats.response_has_error(root))
 	return {
-		text = Formats.response_has_error(root) and "" or extract_text(format, root),
+		text = failed and "" or extract_text(format, root),
 		usage = M.usage(format, root),
 		valid_json = true,
 	}

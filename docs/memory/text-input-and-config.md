@@ -14,6 +14,15 @@ ownership difference.
 An expansion is one ordered transaction: deletion, replacement, and canonical
 tail. Provenance filtering, not a timing window, prevents self-observation.
 
+Windows' Enter and Tab are the exception to compensation: they submit a line or
+move the focus, so nothing can be erased after them, and OnKeyDown wipes the word
+before OnChar brings their character. `HotstringEndKeyCompletes` asks the engine
+on the press; only a press that fires is held back (a `#HotIf` hotkey, or
+`TapHoldDispatchTap` for a tap typing them), and the burst erases the trigger
+alone (`event_on_screen` false) with the key as its tail. Every other press stays
+native. The Notepad worker verifies the end character it erases, so that host
+keeps the native key and no expansion. `(hotstring-end-keys)` pins it.
+
 Some terminal/TUI renderers compute rapid repeated deletions from stale state.
 On Windows, schedule the edit after the visible `OnChar` callback returns, expand
 the count into explicit `{BackSpace}` tokens, and send the complete edit through
@@ -201,8 +210,11 @@ key goes out through `SendEscapeLiteral`, and so does a replayed end character,
 where `!` would otherwise press Alt. Linux keeps `injector.inject` text-only and
 plays key outputs through `inject_tokens`, because a prediction holding the
 characters `{Left}` must type them. After a key output each driver forgets its
-buffer and the AI context, and Linux drops its Undo. Windows withholds the preview
-row of a key output; macOS and Linux show its typed text.
+buffer and the AI context, and Linux drops its Undo. Every driver previews a key
+output's typed text; on Windows the decision carries it as `PreviewOutput`, since
+its Replacement is a Send string. Withholding that row hid the time gate too: the
+maintainer's `gcm★` showed nothing, and a magic key pressed while waiting for the
+bubble was refused past the delay (`preview-key-output`).
 
 ### project-hotstring-delay-architecture
 
@@ -399,8 +411,11 @@ moving or retyping a config key ships a registry step in the same commit, with
 a corpus case each named driver replays. Retired keys reported by the explicit
 cleanup remain on disk until that cleanup; boot migrations and ordinary saves
 preserve them (ADR-009's retirement exception). Readers drop the old spelling
-at once. Invalid schema stamps retain strict boot and session-write refusal.
-A writer stamps only a file it creates; an existing file
+at once. Invalid schema stamps retain strict boot and session-write refusal, and so does
+a stamp below the registry's `oldest_version` (v12, what 1.0.0 wrote). A file
+with no stamp is treated as current (maintainer decision 2026-11-01, so a
+hand-written file keeps working): no step runs and the next save stamps it.
+Otherwise a writer stamps only a file it creates; an existing file
 keeps the stamp the boot migration gave it, or its remaining steps are skipped.
 The Windows full save is the one exception: it always writes the current
 version, which is safe only because it runs after the boot migration and never
@@ -427,9 +442,9 @@ that can hold it, since the op set has no section-wide map. Every driver
 parses the whole registry at every boot: measured with the pure-Lua
 `toml_codec` (Lua 5.4), the 17 KB registry took 36 ms and v5_to_v6's 42 ops
 of six pairs doubled it to 77 ms; listing macOS's 200 keyboard-slot keys as
-well would have added about 250 ms. v5_to_v6 therefore covers gesture slots,
-tap keys and script-control keys only, and a keyboard slot naming a retired
-id is reported as outdated. Action: before retiring more stored ids, add a
+well would have added about 250 ms. v5_to_v6 (squashed since) therefore
+covered gesture slots, tap keys and script-control keys only, and a keyboard
+slot naming a retired id is reported as outdated. Action: before retiring more stored ids, add a
 section-wide map op to all three interpreters (with Windows runtime tests)
 rather than enumerating keys.
 
@@ -642,7 +657,7 @@ the layout owns the key: Windows keeps its declared, detected, then shipped
 Ergopti chain, while macOS and Linux remap nothing, because their Ergopti+
 OS layouts already type the magic key on KeyC. Action: add a candidate only
 through the manifest enum and mac_keycodes.json (test-magic-key-source.cjs
-pins both and the v4_to_v5 map); never make a Lua driver remap `auto`, which
+pins both); never make a Lua driver remap `auto`, which
 would take KeyC from every QWERTY user who turned the replace section on. A
 key the user chose is another key of their layout: every driver remaps its
 plain press only. Windows' every-level RemapKey (Shift gives "J"), Ctrl+★ save

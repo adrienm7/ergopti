@@ -315,7 +315,9 @@ helpers.describe("diagnostics configuration is collected by a probe, not by phas
 		under_stub(function()
 			local published, timers = start_local(10)
 			helpers.assert_eq(#published, 0, "nothing is published before the timer fires")
-			helpers.assert_eq(#timers, 2, "the watchdog and the collection timer, no other probe")
+			-- The other local probe, local_state, arms its own watchdog and first
+			-- slice after these two; no probe that needs the opt-in starts
+			helpers.assert_eq(#timers, 4, "two timers per local probe, no other probe")
 			timers[2].fn()
 			helpers.assert_eq(#published, 1)
 			helpers.assert_eq(published[1].id, "configuration")

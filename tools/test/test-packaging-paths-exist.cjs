@@ -40,7 +40,10 @@ const {
 	DEFAULT_OUTPUT,
 	OUTPUT,
 	DRIVER,
-	BUILDER
+	BUILDER,
+	RELAY_OUTPUT,
+	RELAY_GENERATE,
+	RELAY_BUILDER
 } = require('./generated-linux-native-artifacts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -63,6 +66,43 @@ const DESTINATION =
 
 // Paths built at runtime from a variable, or globs — not statically checkable.
 const NOT_STATIC = /[*?$]|\{|\}/;
+
+// A build script's private staging directory ("$STAGE/linux/runtime") is an
+// output it fills, never a source to look up: the bundle archive stages the
+// private runtime there before packing it.
+const STAGED_OUTPUT = /\$\{?STAGE\}?\/$/;
+
+/**
+ * Tells whether the path match starting at `start` writes into the staging
+ * directory rather than naming a source file.
+ * @param {string} line The script line holding the match.
+ * @param {number} start Index of the repository-relative path in the line.
+ * @returns {boolean} True for a staging destination.
+ */
+function isStagedOutput(line, start) {
+	return STAGED_OUTPUT.test(line.slice(0, start));
+}
+
+/**
+ * Lists the source paths one script line names, staging destinations excluded.
+ * @param {string} line The script line.
+ * @returns {string[]} Repository-relative source paths in line order.
+ */
+function sourcePathsOf(line) {
+	return [...line.matchAll(SOURCE_PATH)]
+		.filter((m) => !isStagedOutput(line, m.index + m[0].length - m[1].length))
+		.map((m) => m[1]);
+}
+assert.deepEqual(
+	sourcePathsOf('install -m 644 "$BUILD_DIR/AppDir/env.sh" "$STAGE/linux/network-runtime-env.sh"'),
+	[],
+	'a staging destination is an output, not a source'
+);
+assert.deepEqual(
+	sourcePathsOf('cp -a "$BUILD_DIR/linux/missing.lua" "${STAGE}/linux/missing.lua"'),
+	['linux/missing.lua'],
+	'a source copied into the staging directory is still looked up'
+);
 
 // Package folders the Linux build fills from the keyboard-layout tree rather
 // than from the driver tree: the .keylayout converter and the user XKB
@@ -194,6 +234,23 @@ for (const [file, before, after] of [
 	const sources = { ...generated.sources, [file]: generated.sources[file].replace(before, after) };
 	assert.throws(() => classifyGeneratedNativeArtifacts(sources), /source recipe refused/);
 }
+assert.ok(
+	generated.artifacts.has(RELAY_OUTPUT),
+	'the current bundle must admit the proxy relay recipe'
+);
+for (const [file, before, after] of [
+	[DRIVER, RELAY_GENERATE, 'true'],
+	[DRIVER, '"' + RELAY_OUTPUT + '"', '"linux/bin/missing-relay"'],
+	[RELAY_BUILDER, 'mv -- "$STAGE" "$OUTPUT"', 'cp -- "$STAGE" "$OUTPUT"'],
+	[RELAY_BUILDER, 'CGO_ENABLED=1', 'CGO_ENABLED=0']
+]) {
+	assert.ok(
+		generated.sources[file].includes(before),
+		'mutation must hit an actual relay recipe input'
+	);
+	const sources = { ...generated.sources, [file]: generated.sources[file].replace(before, after) };
+	assert.throws(() => classifyGeneratedNativeArtifacts(sources), /source recipe refused/);
+}
 for (const input of [
 	'static/ergopti_plus/linux/native/archive_output/archive_publication.c',
 	'static/ergopti_plus/linux/native/archive_output/archive_publication.h'
@@ -253,6 +310,7 @@ for (const name of scripts) {
 		for (const m of line.matchAll(SOURCE_PATH)) {
 			const rel = m[1];
 			if (NOT_STATIC.test(rel)) continue;
+			if (isStagedOutput(line, m.index + m[0].length - rel.length)) continue;
 
 			// A source path that is really part of an install destination — e.g.
 			// the "linux" in "$DEB_ROOT/usr/lib/ergopti/linux" — is not ours to
@@ -281,6 +339,17 @@ for (const name of scripts) {
 						'\n'
 					).length -
 						1
+			) {
+				generatedChecked++;
+				continue;
+			}
+			// The proxy sign-in relay is generated too: its one build line and its
+			// mandatory array entry, both admitted with the complete Go recipe.
+			if (
+				name === path.basename(DRIVER) &&
+				rel === RELAY_OUTPUT &&
+				generated.artifacts.has(rel) &&
+				(line.trim() === RELAY_GENERATE || line.trim() === '"' + RELAY_OUTPUT + '"')
 			) {
 				generatedChecked++;
 				continue;

@@ -56,6 +56,9 @@ global _PrefixLastKeyTick := ""
 ; What the last idle reset forgot, with the two generations it published, so
 ; a Backspace right after the pause can still edit that word; 0 when none.
 global _PrefixIdleForgotten := 0
+; The virtual key of the end key an expansion took this press, 0 when none
+; (HotstringEndKeyClaim).
+global _PrefixEndKeyClaim := 0
 
 ; Set when a PRIVATE expansion has written its resolved value into the buffers.
 ; After a star fire the watcher takes the engine's buffer verbatim, so
@@ -225,12 +228,13 @@ global _UIA_WRAP_PAIRS := Map(
 ; Start the InputHook. The auxiliary catalogue is built later for analytics.
 ; Idempotent — calling it twice is a no-op (the second call only logs).
 HotstringPrefixWatcherInit() {
-	global _PrefixInputHook
+	global _PrefixInputHook, _PrefixEndKeyProbe
 	if _PrefixInputHook {
 		LoggerWarn("PrefixWatcher", "Init called twice — ignoring duplicate.")
 		return
 	}
 	LoggerStart("PrefixWatcher", "Initializing prefix watcher…")
+	_PrefixEndKeyProbe := _PrefixClaimEndKey
 
 	; The ~3180-entry analytics catalogue is deferred to the boot tail. Preview is
 	; already complete during that window because it asks the live engine directly.
@@ -1488,8 +1492,8 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 		; is defined in wrap_symbols_config.ahk which is #Include'd before this file.
 		ContextReleased := false
 		if (IsSet(Features) and Features.Has("shortcuts")
-			and Features["shortcuts"].Has("wrap_text_if_selected")
-			and Features["shortcuts"]["wrap_text_if_selected"]
+			and Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED)
+			and Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]
 			and IsSet(_WS_ACTIVE_PAIRS)
 		) {
 			; Snapshot the active-pairs map once so the pair lookup is consistent
@@ -1649,7 +1653,7 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 				; IsRepeat matches have no Category property — pass "repeat_key" explicitly
 				; so the WPM widget knows to stay at the default color.
 				HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
-					? "repeat_key"
+					? MenuCommand.REPEAT_KEY
 					: (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
 				HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
 				; Metrics logging is analytics — enqueue it and return; the heavy
@@ -1741,6 +1745,7 @@ _PrefixRecordMagicOutcome(Char, Outcome) {
 ; tooltip's auto-hide timer for that case.
 _OnPrefixKeyDown(IH, VK, SC) {
 	global _PrefixWatcherSuppressed, HSE_Suppressed, _PrefixFocusedControlToken
+	global _PrefixEndKeyClaim
 	; The prefix watcher is the newest InputHook and normally authorizes Tab
 	; acceptance before HookDispatcher sees the same physical down. Record it
 	; here; the shared key-state owner deduplicates the later dispatcher callback.
@@ -1751,6 +1756,11 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	; private InputHook is fully silent during suspend.
 	if A_IsSuspended
 		return
+	; This press belongs to the expansion it completes (HotstringEndKeyClaim).
+	if (VK == _PrefixEndKeyClaim) {
+		_PrefixEndKeyClaim := 0
+		return
+	}
 	; Synthetic key events are rejected by InputHook I1.  Only an explicit
 	; engine-level suppression (used by standalone/manual callers) blocks a
 	; physical keydown from updating the buffer.
@@ -1839,7 +1849,7 @@ _OnPrefixKeyDown(IH, VK, SC) {
 				and !_PrefixModifierIsDown.Call("RShift") and _PrefixTerminalHostFocused())
 			; An arrow leaves the word open when hotstrings.arrow_resets_word
 			; is off; the prediction still learns that the caret moved.
-			if (!IsArrow or HSE_WordResetFlagCurrent("arrow_resets_word"))
+			if (!IsArrow or HSE_WordResetFlagCurrent(ConfigLeaf.ARROW_RESETS_WORD))
 				_PrefixInvalidateInputContext(FocusToken, KnownBoundary, AtLineStart)
 			else if LoggerIsDebugEnabled()
 				LoggerDebug("PrefixWatcher", "Arrow key: hotstrings.arrow_resets_word is off — the word stays open.")
@@ -1849,6 +1859,102 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	} catch as Err {
 		LoggerError("PrefixWatcher", "OnKeyDown error for VK {1}: {2}.", VK, Err.Message)
 	}
+}
+
+; Enter and Tab act before a watcher could see them: Enter submits a line, Tab
+; moves the focus, and either wipes the buffers in OnKeyDown before OnChar brings
+; their character. So `ko` + Space expanded and `ko` + Enter or Tab never did,
+; although both are catalogue end characters. They must not be treated like Space
+; (typed, then erased): erasing after Enter would edit the next prompt. The driver
+; holds such a key back when, and only when, it completes an expansion; the
+; expansion's tail then types it.
+; @param Char {String} The end character of the key: "`n" or "`t".
+; @returns {Boolean} True when this key press would fire an end-character entry.
+HotstringEndKeyCompletes(Char) {
+	global HSE_Buffer
+	if (A_IsSuspended or !IsSet(HSE_Buffer) or HSE_Buffer == "" or !IsCategoryGated("Hotstrings"))
+		return false
+	; Enter's and Tab's own word reset applies to any key that takes no expansion.
+	Decision := HSE_PreviewNextDecision(HSE_Buffer, Char)
+	if !IsObject(Decision) or Decision.EndChar == ""
+		return false
+	; The Notepad worker verifies the end character it erases, which is not there.
+	; A prediction on screen keeps Tab: it is what the user is accepting.
+	Host := OutputHostResolve(_HSE_OutputHostNeedsTitle)
+	if !Host["Valid"] or OutputHostTakesTextByPaste(Host)
+		return false
+	return !(Char == "`t" and LLM_Tooltip_GetText() != "")
+}
+
+; The hotkey criterion of a physical end key. It also records that the key belongs
+; to the expansion: OnKeyDown must not wipe the word the hotkey is about to read.
+; @param VK {Integer} The virtual key.
+; @param Char {String} The end character of the key.
+; @returns {Boolean} Whether the hotkey takes this press.
+HotstringEndKeyClaim(VK, Char) {
+	global _PrefixEndKeyProbe
+	; A #HotIf runs from the first message pump, long before the engine has state:
+	; it reaches the engine only once the watcher has started and published this.
+	return IsSet(_PrefixEndKeyProbe) ? _PrefixEndKeyProbe.Call(VK, Char) : false
+}
+
+; The live half of HotstringEndKeyClaim, published by the watcher's start.
+_PrefixClaimEndKey(VK, Char) {
+	global _PrefixEndKeyClaim
+	Completes := HotstringEndKeyCompletes(Char)
+	_PrefixEndKeyClaim := Completes ? VK : 0
+	return Completes
+}
+
+; Fires the expansion an end key completes, before the key reaches the application.
+; @param Char {String} The end character of the key.
+; @param GateTick {Integer} When the key went down, 0 for now.
+; @returns {Boolean} True when the expansion owns the key, whose tail types it; on
+;   false the caller sends the key and nothing has changed on screen.
+HotstringCompleteEndKey(Char, GateTick := 0) {
+	global HSE_LastEndChar, _PrefixPrivateResidue
+	PreviousCritical := Critical("On")
+	try {
+		if !HotstringEndKeyCompletes(Char) or !_PrefixEnsureInputContext()
+			return false
+		_PrefixCancelRender()
+		Match := HSE_FeedChar(Char, true)
+		if !IsObject(Match)
+			return false
+		IsPrivate := Match.HasOwnProp("IsPrivate") && Match.IsPrivate
+		Effect := 0
+		Fired := HSE_DispatchMatch(Match, HSE_LastEndChar, &Effect, false, unset, GateTick, false)
+		if (Fired is Map) && Fired.Has("Pending")
+			return true
+		if !Fired
+			return false
+		if IsPrivate
+			_PrefixPrivateResidue := true
+		_PrefixCommitPostFireEffect(Effect)
+		_HSE_QueueFireLog(Match.Trigger, Match.Replacement, "endchar",
+			Match.HasOwnProp("Category") ? Match.Category : "",
+			Match.HasOwnProp("Section") ? Match.Section : "", IsPrivate)
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; The end character of a tap-hold key's tap, "" when it is anything else: a tap
+; types through the driver's own send, which the watcher never sees.
+; @param KeyId {String} Canonical tap-hold key id.
+; @returns {String} "`n", "`t" or "".
+HotstringEndCharOfTap(KeyId) {
+	global GESTURE_ACTIONS, TapHold
+	ActionId := TapHoldTapAction(TapHold, KeyId)
+	if (ActionId == "")
+		ActionId := KeyId
+	if (ActionId != "enter" and ActionId != "tab")
+		return ""
+	if (GESTURE_ACTIONS.Has(ActionId) and GESTURE_ACTIONS[ActionId].HasOwnProp("Mods")
+			and GESTURE_ACTIONS[ActionId].Mods.Length > 0)
+		return ""
+	return ActionId == "enter" ? "`n" : "`t"
 }
 
 ; The trailing word of the ENGINE buffer, using the same boundary set the
@@ -2576,12 +2682,11 @@ _PrefixDecisionDisplayText(Decision) {
 		catch
 			return ""
 	}
-	; Send-key syntax is not literal screen text: showing `""{Left}` as five
-	; printable characters would be another prediction engine. Such mappings may
-	; opt in later with an explicit, engine-owned PreviewOutput snapshot.
+	; A Replacement with keys is a Send string, not screen text. The row shows what
+	; it types, as on macOS and Linux: the decision carries that text in the typed
+	; case. Keys alone type nothing, so they have no row.
 	if !(Decision.HasOwnProp("OnlyText") and Decision.OnlyText) {
-		return (Spec.HasOwnProp("PreviewOutput") and Spec.PreviewOutput is String)
-			? Spec.PreviewOutput : ""
+		return Decision.HasOwnProp("PreviewOutput") ? Decision.PreviewOutput : ""
 	}
 	return (Decision.HasOwnProp("Replacement") and Decision.Replacement is String)
 		? Decision.Replacement : ""
@@ -2749,7 +2854,7 @@ _LookupAndRender(CollectFn := unset, ResolveFn := unset) {
 		if !HSE_PreviewSwitchCurrent(HSE_PreviewFamilySwitch(Decision))
 			continue
 		; The tint is the colour switch's: off, every bubble is neutral.
-		Color := (Cfg.Color != "" && HSE_PreviewSwitchCurrent("preview_colored_tooltips"))
+		Color := (Cfg.Color != "" && HSE_PreviewSwitchCurrent(ConfigLeaf.PREVIEW_COLORED_TOOLTIPS))
 			? Cfg.Color : ""
 		GateDurationMs := Decision.HasOwnProp("GateDurationMs")
 			? Decision.GateDurationMs : 0

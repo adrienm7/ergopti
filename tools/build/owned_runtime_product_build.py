@@ -33,6 +33,8 @@ HELPER_SOURCES = (
     SWIFT + "OwnedRuntimeInstallJournal.swift",
     SWIFT + "OwnedRuntimeServiceLifecycleLock.swift",
     SWIFT + "LauncherConstants.swift",
+    # LauncherConstants takes its bundle ids from the generated enum.
+    SWIFT + "Identifiers.generated.swift",
 )
 VALIDATOR_SOURCES = (
     "tools/build/owned-runtime-installer/BuildValidationMain.swift",
@@ -41,6 +43,7 @@ VALIDATOR_SOURCES = (
     SWIFT + "OwnedRuntimeInstallWorker.swift",
     SWIFT + "OwnedRuntimePublisherIdentity.swift",
     SWIFT + "LauncherConstants.swift",
+    SWIFT + "Identifiers.generated.swift",
 )
 LIFECYCLE_C = LAUNCHER + "CPOSIXCompatibility/OwnedRuntimeLifecycleContract.c"
 LIFECYCLE_HEADER = LAUNCHER + "CPOSIXCompatibility/include/OwnedRuntimeLifecycleContract.h"
@@ -73,6 +76,9 @@ REPORT_SWIFT_SOURCES = tuple(
         "Clock",
         "Reference",
     )
+) + (
+    # The worker's request poll reads its duration from the [launcher] registry.
+    SWIFT + "LauncherTimings.generated.swift",
 )
 REPORT_C_SOURCES = (
     LAUNCHER + "CPOSIXCompatibility/CPOSIXCompatibility.c",
@@ -114,7 +120,7 @@ def report_module_map(repository):
 
 LUA_ARCHIVE_SHA256 = "9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30"
 NATIVE_BACKEND = "tools/diagnostics/hs274_native_build.py"
-NATIVE_BACKEND_SHA256 = "9695174913fec75b4f0ea1b58b1fed70a06f31fc88dcc7b521ca93eb730d9fe6"
+NATIVE_BACKEND_SHA256 = "bebd311d6299529a54f7fc414f1353074ad798ca07ee7494eeb14f2f8fbd9277"
 HAMMERSPOON_COMMIT = "1469832361b4c3687ec7d589c1b4efe4d3b742ee"
 # Actual Hammerspoon1.1.1 vendored source, not a standard-Lua ABI assumption.
 HAMMERSPOON_HEADERS = (
@@ -303,7 +309,9 @@ def compile_commands(repository, work, sdk, lua_headers, *, daemon_report=False)
                 report_objects.append(str(native_report_object))
                 result.append(
                     (
-                        "report_" + stem + "_" + architecture,
+                        # Phase names are lowercase evidence basenames
+                        # (run 41260796161 refused report_CPOSIXCompatibility).
+                        "report_" + stem.lower() + "_" + architecture,
                         [
                             "/usr/bin/xcrun",
                             "clang",
@@ -616,7 +624,7 @@ def compile_native_parts(repository, owner, lua_build_work, deadline, *, daemon_
         module_path = work / "report.modulemap"
         if daemon_report:
             module_bytes = report_module_map(repository)
-            _write_exclusive(module_path, module_bytes, 0o600, deadline)
+            _write_exclusive(module_path, module_bytes, REPORT_MODULE_MAP_MODE, deadline)
             module_descriptor = os.open(module_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
             # Retain the raw FD before fstat; failure still reaches its checked close.
             module_source = HeldSource(
@@ -664,7 +672,7 @@ def compile_native_parts(repository, owner, lua_build_work, deadline, *, daemon_
             )
             backend.run_phase(
                 "production_" + role + "_architectures",
-                ["/usr/bin/lipo", "-verify_arch", "arm64", "x86_64", str(output)],
+                architecture_check_command(output),
                 work,
                 owner,
                 deadline,
@@ -684,6 +692,19 @@ def compile_native_parts(repository, owner, lua_build_work, deadline, *, daemon_
                 held.close()
 
 
+def architecture_check_command(path):
+    """Return the lipo command that requires both slices in one universal output.
+
+    lipo takes its input first: -verify_arch reads every following operand as
+    an architecture, so a trailing path is refused (run 41266118563).
+    """
+    return ["/usr/bin/lipo", str(path), "-verify_arch", *ARCHITECTURES]
+
+
+# The module map is written through the admitted output modes; its private
+# 0700 work directory keeps it unreadable to others. 0o600 was never
+# admitted and refused every daemon-report build (run 41257077872).
+REPORT_MODULE_MAP_MODE = 0o644
 INSTALLER_ID = "com.ergoptiplus.app.runtime-installer"
 MODULE_ID = "com.ergoptiplus.app.installed-physical-source"
 CORE_IDLE_FACTORY_SHA256 = "d30b414066703652ed8d59cf668c0db4f6d8fed0aeebb1f9eb7ac5ed46f6fc22"

@@ -8,6 +8,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -371,7 +372,7 @@ TapHoldShouldCancelTap(KeyId, GuardMs := 250) {
 }
 
 _TapHoldModifierWaitRelease(KeyName, TimeoutSec) {
-	return KeyWait(KeyName, "U T" . TimeoutSec)
+	return KS_WaitReleased(KeyName, TimeoutSec)
 }
 
 _TapHoldModifierKeyIsDown(KeyName) {
@@ -1224,7 +1225,13 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		; the word open, as hotstrings.tap_hold_resets_word says; its keystroke,
 		; if any, is then attributed to the tap-hold (TapHoldOwnsShortcut).
 		if (TapHoldTapIsCommand(KeyId) and IsSet(HS_ApplyEventWordReset))
-			HS_ApplyEventWordReset("tap_hold_resets_word", "tap of " . KeyId)
+			HS_ApplyEventWordReset(ConfigLeaf.TAP_HOLD_RESETS_WORD, "tap of " . KeyId)
+		; A tap that types Enter or Tab goes out through the driver's own send, which
+		; the watcher never sees: it completes a hotstring here, as Space does.
+		EndChar := HotstringEndCharOfTap(KeyId)
+		if (EndChar != "" and HotstringCompleteEndKey(EndChar,
+				TapHoldRollTapIsRunning(KeyId) ? TapHoldRollTapDownTick() : 0))
+			return true
 		PreviousTap := TapHoldTapInDispatch()
 		_TapHoldTapInDispatch := KeyId
 		try TapFn.Call()
@@ -1433,15 +1440,24 @@ TapHoldKanaAltGrHeld() {
 ; AltGr's. Only there: QWERTY's right Alt is a plain Alt and a Kana AltGr is no
 ; RAlt, neither adds a fake LCtrl (KS_AltGrAddsFakeLCtrl), so a physical LCtrl
 ; is always the user's and LCtrl+RAlt then LAlt tapped as Backspace is the
-; Ctrl+Backspace special.
+; Ctrl+Backspace special. The native ledger does tell them apart (raw 0x21D is the
+; alias), so a real LCtrl held with AltGr is the user's whenever an owner runs;
+; with none running, the LCtrl under AltGr stays AltGr's, as AltGr alone needs. The
+; ledger forgets a release missed on the secure desktop, so a stale LCtrl cannot
+; turn a later AltGr alone into the user's Ctrl.
 ; @param KeyIsDownFn {Func} Test seam taking a key name, KS_IsDown by default.
+; @param RealPressFn {Func} Test seam taking a key name, KS_RealPressState by default.
 ; @return {Boolean}
-TapHoldUserLCtrlHeld(KeyIsDownFn := 0) {
+TapHoldUserLCtrlHeld(KeyIsDownFn := 0, RealPressFn := 0) {
 	if !IsObject(KeyIsDownFn)
 		KeyIsDownFn := KS_IsDown
 	if !KeyIsDownFn.Call("SC01D")
 		return false
-	return !KS_AltGrAddsFakeLCtrl() or !KeyIsDownFn.Call("RAlt")
+	if !KS_AltGrAddsFakeLCtrl() or !KeyIsDownFn.Call("RAlt")
+		return true
+	if !IsObject(RealPressFn)
+		RealPressFn := KS_RealPressState
+	return RealPressFn.Call("SC01D") == 1
 }
 
 ; Hand back the synthetic hold the owner of KeyId took for this press, now.

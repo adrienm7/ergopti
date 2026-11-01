@@ -42,8 +42,10 @@ M.LOCAL_BACKEND = "local"
 -- Longest model name a binding may carry
 M.MAX_MODEL_LENGTH = 200
 
+local Formats = require("llm.remote_formats")
+
 -- Request formats build_request() writes
-M.FORMATS = { openai = true, anthropic = true, gemini = true, ollama = true }
+M.FORMATS = { openai = true, anthropic = true, gemini = true, ollama = true, [Formats.AGENT_FORMAT] = true }
 
 -- The user turn that goes with the screenshot of the reading request
 M.READ_USER_TEXT = "Transcribe this screenshot."
@@ -116,7 +118,7 @@ end
 -- =====================================
 
 --- Builds the request body of one vision or text call.
---- @param format string "openai", "anthropic", "gemini" or "ollama".
+--- @param format string "openai", "anthropic", "gemini", "perplexity_agent" (text only) or "ollama".
 --- @param spec table { model, system, text, image (base64 or nil), mime, max_tokens, think }:
 ---     think is required for ollama, false or a level (thinking_off.lua ollama_think).
 --- @return table body The JSON body, without address or credentials.
@@ -129,6 +131,11 @@ function M.build_request(format, spec)
 	local image, mime = spec.image, spec.mime
 	if image ~= nil and (type(image) ~= "string" or image == "" or type(mime) ~= "string") then
 		error("vision.build_request: an image needs base64 data and a mime type")
+	end
+	if format == Formats.AGENT_FORMAT then
+		-- The Agent API takes an image by URL only: a screenshot has none
+		if image then error("vision.build_request: a perplexity_agent request carries no image") end
+		return Formats.agent_body(spec)
 	end
 	if format == "openai" then
 		local content = spec.text

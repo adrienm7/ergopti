@@ -581,6 +581,20 @@ _CMJ_RegistryProofScope() {
 		AssertTrue(AllHold(), "exact repair restores admission")
 		ConfigMigrateBoot(Dirs[1] . "\config.toml", "check_write")
 		AssertFalse(ConfigMigrateRegistryProofOpen(), "check_write closes the proof scope it opened")
+		; A standing proof spares the reads of a transaction, never its next effect.
+		Standing := { registry: 0, shadow: 0 }
+		Before := ConfigMigrateRegistryDeepCompares
+		AssertTrue(ConfigMigrateWithRegistryProof(AllHold, Standing))
+		AssertTrue(ConfigMigrateWithRegistryProof(AllHold, Standing))
+		AssertEqual(1, ConfigMigrateRegistryDeepCompares - Before, "a standing proof serves the next scope")
+		AssertTrue(AllHold(), "a standing proof leaves no memo outside its own scopes")
+		AssertEqual(6, ConfigMigrateRegistryDeepCompares - Before, "guards outside a scope still compare")
+		Registry["current"] := OriginalCurrent + 1
+		Standing.registry := 0, Standing.shadow := 0
+		AssertFalse(ConfigMigrateWithRegistryProof(AllHold, Standing),
+			"emptied before an effect, the standing proof refuses a registry mutated during the reads")
+		AssertEqual(0, Standing.registry, "a refused comparison proves nothing that could stand")
+		Registry["current"] := OriginalCurrent
 	} finally {
 		Registry["current"] := OriginalCurrent
 		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
@@ -595,7 +609,7 @@ _CMJ_BootRegistryWithdrawal(When := "prepared") {
 	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
 	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
 	Registry := ConfigMigrateShippedRegistry(), Step := Registry["steps"][1], Reason := Step["reason"]
-	Source := '[_meta]`nschema_version = ' . Registry["unstamped"] . '`n[hotstrings]`ntrigger_char = "@"`n'
+	Source := '[_meta]`nschema_version = ' . Registry["oldest"] . '`n[hotstrings]`ntrigger_char = "@"`n'
 	NativeWrite := FSWriteDurable, PreviousSink := _LOGGER_TEST_SINK
 	PreviousLevel := LOGGER_MIN_LEVEL
 	Seen := { stage: 0, completed: 0, stage_paths: [], stage_content: "", source_unchanged: false }
@@ -689,10 +703,10 @@ _CMJ_PostBootDirectPublication(Metadata, Refuse) {
 	PreviousPath := HadPath ? ConfigurationFile : ""
 	Coordinator := _ConfigFullSaveCoordinator()
 	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
-	Original := '[_meta]`nschema_version = 19`n[llm]`nmodel = "user-model"`n'
+	Original := '[_meta]`nschema_version = 20`n[llm]`nmodel = "user-model"`n'
 	Successor := Metadata . '`n[llm]`nmodel = "user-model"`n[future]`nkeep = [false, 1, "1"]`n'
 	try {
-		AssertEqual(19, ConfigMigrateCurrentVersion(), "the authored current source owns the actual v19 registry contract")
+		AssertEqual(20, ConfigMigrateCurrentVersion(), "the authored current source owns the actual v20 registry contract")
 		ConfigurationFile := Path
 		AssertTrue(FSWriteDurable(Path, Original))
 		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
@@ -713,7 +727,7 @@ _CMJ_PostBootDirectPublication(Metadata, Refuse) {
 				"exact genuine current source repair restores actual native publication")
 		}
 		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
-		AssertEqual(19, Document["_meta"]["schema_version"], "publication must retain the independent current stamp")
+		AssertEqual(20, Document["_meta"]["schema_version"], "publication must retain the independent current stamp")
 		AssertEqual("changed-model", Document["llm"]["model"])
 		Stages := 0
 		Loop Files, Path . ".*.tmp"
@@ -726,7 +740,7 @@ _CMJ_PostBootDirectPublication(Metadata, Refuse) {
 	}
 }
 Test("config journal: post-boot direct current14 no-op and writer keep genuine admission",
-	_CMJ_PostBootDirectPublication.Bind('[_meta]`nschema_version = 19', false))
+	_CMJ_PostBootDirectPublication.Bind('[_meta]`nschema_version = 20', false))
 Test("config journal: post-boot direct future99 no-op and writer refuse without borrowing boot",
 	_CMJ_PostBootDirectPublication.Bind('[_meta]`nschema_version = 99', true))
 Test("config journal: post-boot direct nonversion no-op and writer refuse without borrowing boot",

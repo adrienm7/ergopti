@@ -135,6 +135,8 @@ _LLM_Menu_ApplyToggleCommitted(Candidate, ShowUi := true) {
 		LLM_Menu_ScheduleBackendLifecycle(ShowUi)
 		; A boot with the AI off left its hotkeys inactive until now.
 		LLM_Menu_ScheduleHotkeysAwaitingEnable()
+		; A boot with the AI off did not check the curl its requests need.
+		HTTP_ScheduleCurlCheck(true)
 	} else {
 		SetTimer(_LLM_Menu_FireHealthProbe, 0)
 		LLM_Menu_BackendLifecycleInvalidate(true)
@@ -472,9 +474,9 @@ _LLM_Menu_SetProfileCandidate(Candidate, Id) {
 	; for the current model is still computed live by the auto-detect
 	; helper, so flipping the toggle back on later re-applies it.
 	recommended := LLM_RecommendProfileForModel(Candidate["model"])
-	if (Candidate["auto_profile_for_model"] and recommended != ""
+	if (Candidate[ConfigLeaf.AUTO_PROFILE_FOR_MODEL] and recommended != ""
 			and Id != recommended) {
-		Candidate["auto_profile_for_model"] := false
+		Candidate[ConfigLeaf.AUTO_PROFILE_FOR_MODEL] := false
 	}
 	Candidate["profile_id"] := Id
 	return true

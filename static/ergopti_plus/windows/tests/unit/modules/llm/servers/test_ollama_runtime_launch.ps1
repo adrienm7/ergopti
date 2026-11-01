@@ -100,9 +100,44 @@ $script:UpdaterDefaultsSha256 = 'f' * 64
 $script:RouteOriginsPath = 'C:\bundled\route_origins.json'
 $script:RouteOriginsSha256 = '0' * 64
 $script:FixtureProxy = $null
+# The real relay contract and route plan module: the decision below reads the
+# probe's answer through them, and only the relay process itself is modeled.
+$script:ProxyRelayContractPath = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $Source) '..\..\..\_shared\modules\network\proxy_auth_relay.json'))
+$script:ProxyRelayContractSha256 = '1' * 64
+$script:ProxyRelayDialMs = 10000
+$script:ProxyRelayHandshakeMs = 15000
+$script:ProxyRelayIdleMs = 300000
+$script:ProxyRelayProbeMs = 30000
+$script:ProxyRelayPath = ''
+$script:ProxyRelaySha256 = ''
+$script:ProbeAnswer = $null
+$script:ProbeCalls = @()
+. ([IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $Source) '..\..\..\windows\vendor\ergopti_route_plan.ps1')))
 function Read-OllamaRuntimeJson([string]$Path, [string]$ExpectedHash) {
 	[Ergopti.Ollama.ManagedNative]::Events.Add('declaration:' + [IO.Path]::GetFileName($Path))
+	if ($Path -ceq $script:ProxyRelayContractPath) { return ([IO.File]::ReadAllText($Path) | ConvertFrom-Json) }
 	return [pscustomobject]@{}
+}
+function Invoke-OllamaRelayProbe([string]$Executable, [string]$Arguments, [int]$TimeoutMs) {
+	$script:ProbeCalls += @{ Executable = $Executable; Arguments = $Arguments; TimeoutMs = $TimeoutMs }
+	return $script:ProbeAnswer
+}
+function Open-OllamaRelayImage([string]$Path, [string]$ExpectedHash) {
+	[Ergopti.Ollama.ManagedNative]::Events.Add('relay-image:' + $ExpectedHash)
+	return [IO.MemoryStream]::new()
+}
+function Get-OllamaRelayServer($Relay, [int]$Port, [string]$Executable) {
+	if ($Relay.Id -ne 5001) { throw 'The relay server is looked up under the exact relay.' }
+	$script:RelayServerImage = $Executable
+	$server = [RuntimeChild]::new()
+	$server.Id = 5002
+	return $server
+}
+function Get-RelayDecision {
+	return Get-OllamaRuntimeRelayDecision 'http://proxy.corp:3128' 'registry.ollama.ai:443' @{
+		started_tick = $script:StartedTick; deadline_ms = $script:DeadlineMs
+		relay = @{ path = $script:ProxyRelayPath; contract = $script:ProxyRelayContractPath; contract_sha256 = $script:ProxyRelayContractSha256
+			dial_ms = $script:ProxyRelayDialMs; handshake_ms = $script:ProxyRelayHandshakeMs; idle_ms = $script:ProxyRelayIdleMs; probe_ms = $script:ProxyRelayProbeMs } }
 }
 function Open-OllamaRuntimeVendor([string]$Directory, [string]$ExpectedHash) {
 	if ($Directory -cne $script:VendorDirectory -or $ExpectedHash -cne $script:VendorSha256) { throw 'The captured vendor inventory changed.' }
@@ -124,6 +159,7 @@ function Start-OllamaRuntimeProcess($Start) {
 	$script:LastStart = $Start
 	[Ergopti.Ollama.RuntimeObservation]::Active = 2
 	$child = [RuntimeChild]::new()
+	if ($Start.FileName -clike '*ergopti-proxy-relay.exe') { $child.Id = 5001 }
 	$global:FixtureRuntimeChild = $child
 	if ($script:Collision) { $child.HasExited = $true; [Ergopti.Ollama.RuntimeObservation]::Active = 1 }
 	return $child
@@ -152,7 +188,8 @@ function Reset-Case([string]$Name) {
 	$global:FixtureRuntimeFiles = @(@{ path = 'runner.dll' })
 	$global:FixtureHttpRefusal = $false
 	$script:Spawns = 0; $script:HttpCalls = 0; $script:Collision = $false; $script:Foreign = $false
-	$script:FixtureProxy = @{ Mode = 'direct'; Tunnel = 'none'; Environment = [ordered]@{} }
+	$script:FixtureProxy = @{ Mode = 'direct'; Tunnel = 'none'; Relay = 'not_applicable'; RelayRun = ''; Environment = [ordered]@{} }
+	$script:ProxyRelayPath = ''; $script:ProxyRelaySha256 = ''; $script:ProbeAnswer = $null; $script:ProbeCalls = @()
 	[Ergopti.Ollama.RuntimeObservation]::Active = 1
 	[Ergopti.Ollama.RuntimeObservation]::Sequence.Clear()
 	[Ergopti.Ollama.ManagedNative]::Events.Clear()
@@ -160,8 +197,11 @@ function Reset-Case([string]$Name) {
 $cases = @(
 	@('a looked-up relay reaches the daemon and the receipt names it', {
 		Reset-Case 'relay'
-		$script:FixtureProxy = @{ Mode = 'relay'; Tunnel = 'open'; Environment = [ordered]@{ HTTPS_PROXY = 'http://relay.corp:3128'; NO_PROXY = 'blobs.example' } }
-		Must ((Invoke-OllamaRuntimeEntry) -eq 0) 'Actual recording child exit must be retained.'
+		$script:FixtureProxy = @{ Mode = 'relay'; Tunnel = 'open'; Relay = 'not_applicable'; RelayRun = ''; Environment = [ordered]@{ HTTPS_PROXY = 'http://relay.corp:3128'; NO_PROXY = 'blobs.example' } }
+		$env:ERGOPTI_PROXY_OVERRIDE = 'http://relay.corp:3128'
+		try { Must ((Invoke-OllamaRuntimeEntry) -eq 0) 'Actual recording child exit must be retained.' }
+		finally { Remove-Item Env:ERGOPTI_PROXY_OVERRIDE }
+		Must (-not $script:LastStart.EnvironmentVariables.ContainsKey('ERGOPTI_PROXY_OVERRIDE')) 'The override stops at the launcher.'
 		Must ($script:LastStart.EnvironmentVariables['HTTPS_PROXY'] -ceq 'http://relay.corp:3128') 'The looked-up relay must reach the daemon.'
 		Must ($script:LastStart.EnvironmentVariables['NO_PROXY'] -ceq 'blobs.example') 'The origins sent direct must bypass the relay.'
 		$receipt = $global:CapturedReadyText | ConvertFrom-Json
@@ -171,11 +211,56 @@ $cases = @(
 	}),
 	@('a relay demanding a Windows login is never exported', {
 		Reset-Case 'login'
-		$script:FixtureProxy = @{ Mode = 'relay'; Tunnel = 'windows_login'; Environment = [ordered]@{} }
+		$script:FixtureProxy = @{ Mode = 'relay'; Tunnel = 'windows_login'; Relay = 'relay_not_installed'; RelayRun = ''; Environment = [ordered]@{} }
 		Must ((Invoke-OllamaRuntimeEntry) -eq 0) 'Local models keep their daemon.'
 		Must (-not $script:LastStart.EnvironmentVariables.ContainsKey('HTTPS_PROXY')) 'A login-only relay must not reach the daemon.'
 		$receipt = $global:CapturedReadyText | ConvertFrom-Json
 		Must ($receipt.proxy_tunnel -ceq 'windows_login') 'The receipt must tell the pull why it is refused.'
+	}),
+	@('no relay installed keeps the named login refusal without a probe', {
+		Reset-Case 'relay-absent'
+		$decision = Get-RelayDecision
+		Must ($decision.Tunnel -ceq 'windows_login' -and $decision.Relay -ceq 'relay_not_installed') 'The login refusal stays named.'
+		Must ($script:ProbeCalls.Count -eq 0) 'An absent relay is not started.'
+	}),
+	@('a required sign-in starts the daemon under the relay', {
+		Reset-Case 'relay-required'
+		$script:ProxyRelayPath = 'C:\bundled\vendor\ergopti-proxy-relay.exe'
+		$script:ProbeAnswer = @{ ExitCode = 0; Stdout = '{"schema":1,"status":"required","scheme":"ntlm"}' + "`n" }
+		$decision = Get-RelayDecision
+		Must ($decision.Tunnel -ceq 'relay' -and $decision.Relay -ceq 'required_ntlm') 'The probe proved the sign-in.'
+		Must ($script:ProbeCalls[0].Arguments -ceq 'probe --upstream http://proxy.corp:3128 --authority registry.ollama.ai:443 --dial-timeout-ms 10000 --handshake-timeout-ms 15000') 'The probe reads its deadlines.'
+		Must ($script:ProbeCalls[0].TimeoutMs -le 30000) 'The probe stays bounded.'
+		Must ($decision.RelayRun -cmatch '^run --upstream http://proxy\.corp:3128 --variable HTTPS_PROXY .*--idle-timeout-ms 300000 --$') 'The run names its upstream and variable.'
+		$script:ProxyRelaySha256 = '2' * 64
+		$script:FixtureProxy = @{ Mode = 'relay'; Tunnel = 'relay'; Relay = 'required_ntlm'; RelayRun = $decision.RelayRun; Environment = [ordered]@{ NO_PROXY = 'blobs.example' } }
+		Must ((Invoke-OllamaRuntimeEntry) -eq 0) 'The relay exit is the runtime exit.'
+		Must ($script:LastStart.FileName -ceq $script:ProxyRelayPath) 'The retained child is the relay.'
+		$image = Join-Path $script:PublishedPath 'ollama.exe'
+		Must ($script:LastStart.Arguments -ceq ($decision.RelayRun + ' "' + $image + '" serve')) 'The relay serves the exact admitted daemon.'
+		Must (-not $script:LastStart.EnvironmentVariables.ContainsKey('HTTPS_PROXY')) 'The relay alone sets the proxy of its child.'
+		Must ($script:LastStart.EnvironmentVariables['NO_PROXY'] -ceq 'blobs.example') 'The origins sent direct stay direct.'
+		Must ($script:RelayServerImage -ceq $image) 'Only the admitted image may be the server.'
+		$receipt = $global:CapturedReadyText | ConvertFrom-Json
+		Must ($receipt.child_pid -eq 5002 -and $receipt.launcher_pid -eq $PID) 'The receipt names the daemon, not the relay.'
+		Must ($receipt.proxy_tunnel -ceq 'relay' -and $receipt.proxy_relay -ceq 'required_ntlm') 'The receipt names the relay decision.'
+		Must ([Ergopti.Ollama.ManagedNative]::Events -contains ('relay-image:' + ('2' * 64))) 'The relay image is verified against its digest.'
+	}),
+	@('a refused sign-in names its reason and exports nothing', {
+		Reset-Case 'relay-refused'
+		$script:ProxyRelayPath = 'C:\bundled\vendor\ergopti-proxy-relay.exe'
+		$script:ProbeAnswer = @{ ExitCode = 3; Stdout = '{"schema":1,"status":"refused","reason":"sign_in_rejected"}' + "`n" }
+		$decision = Get-RelayDecision
+		Must ($decision.Tunnel -ceq 'relay_refused' -and $decision.Relay -ceq 'sign_in_rejected' -and $decision.RelayRun -ceq '') 'The closed reason reaches the receipt.'
+		$script:ProbeAnswer = @{ ExitCode = $null; Stdout = $null }
+		Must ((Get-RelayDecision).Relay -ceq 'relay_unavailable') 'A relay that did not answer is named, never a silent direct start.'
+	}),
+	@('a proxy the relay finds open keeps the proxy as named', {
+		Reset-Case 'relay-open'
+		$script:ProxyRelayPath = 'C:\bundled\vendor\ergopti-proxy-relay.exe'
+		$script:ProbeAnswer = @{ ExitCode = 0; Stdout = '{"schema":1,"status":"not_needed"}' + "`n" }
+		$decision = Get-RelayDecision
+		Must ($decision.Tunnel -ceq 'open' -and $decision.Relay -ceq 'not_needed' -and $decision.RelayRun -ceq '') 'No relay is started.'
 	}),
 	@('actual entry binds prepared borrowed handle, private models, exact receipt', {
 		Reset-Case 'positive'

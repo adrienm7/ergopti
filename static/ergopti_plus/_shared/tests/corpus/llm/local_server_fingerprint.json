@@ -1,0 +1,389 @@
+{
+	"_comment": "Which catalogue row a models listing belongs to when two rows share a default address (_shared/lua/llm/local_server_fingerprint.lua, _shared/lua/llm/local_server_discovery.lua), replayed on the production local_servers.json by the macOS and Linux suites and, on Windows, by the AutoHotkey reader. groups: the rows of each shared address in server_order, the first being the address's default row, and the rows that declare a fingerprint. identify: a body probed for one row -> the row its fingerprint names (null when none decides) and why. sweeps: one sweep's answers -> the rows the menu keeps, each shown with the name of its server; a row merged into another of its address is down with shadowed_by. An unknown or ambiguous listing, and a 401 or 403 (no listing to read), keep the address's default row. A row whose address no other row shares is never fingerprinted. refusals: catalogues whose fingerprints are refused. Expected values are authored, not derived from the code.",
+	"version": 1,
+	"groups": {
+		"omlx": ["omlx", "vllm"],
+		"vllm": ["omlx", "vllm"],
+		"textgen_webui": ["textgen_webui", "tabbyapi"],
+		"tabbyapi": ["textgen_webui", "tabbyapi"]
+	},
+	"fingerprinted": ["omlx", "textgen_webui", "vllm", "tabbyapi"],
+	"identify": [
+		{
+			"name": "a vLLM listing probed as oMLX names vLLM",
+			"server": "omlx",
+			"body": "{\"object\":\"list\",\"data\":[{\"id\":\"Qwen/Qwen3-8B\",\"object\":\"model\",\"created\":1761900000,\"owned_by\":\"vllm\",\"root\":\"Qwen/Qwen3-8B\",\"parent\":null,\"max_model_len\":32768,\"permission\":[]}]}",
+			"expected": "vllm",
+			"reason": "match"
+		},
+		{
+			"name": "an oMLX listing probed as vLLM names oMLX",
+			"server": "vllm",
+			"body": "{\"object\":\"list\",\"data\":[{\"id\":\"Qwen3-8B-4bit\",\"object\":\"model\",\"created\":1761900000,\"owned_by\":\"omlx\"}]}",
+			"expected": "omlx",
+			"reason": "match"
+		},
+		{
+			"name": "a TabbyAPI listing probed as text-generation-webui names TabbyAPI",
+			"server": "textgen_webui",
+			"body": "{\"object\":\"list\",\"data\":[{\"id\":\"Qwen3-8B-exl3\",\"object\":\"model\",\"created\":1761900000,\"owned_by\":\"tabbyAPI\",\"parameters\":null}]}",
+			"expected": "tabbyapi",
+			"reason": "match"
+		},
+		{
+			"name": "a text-generation-webui listing probed as TabbyAPI names text-generation-webui",
+			"server": "tabbyapi",
+			"body": "{\"object\":\"list\",\"data\":[{\"id\":\"Qwen3-8B-Q4_K_M.gguf\",\"object\":\"model\",\"created\":0,\"owned_by\":\"user\"}]}",
+			"expected": "textgen_webui",
+			"reason": "match"
+		},
+		{
+			"name": "the value is compared exactly, case included",
+			"server": "tabbyapi",
+			"body": "{\"object\":\"list\",\"data\":[{\"id\":\"m\",\"object\":\"model\",\"owned_by\":\"TabbyAPI\"}]}",
+			"expected": null,
+			"reason": "unknown"
+		},
+		{
+			"name": "a listing without a model decides nothing",
+			"server": "omlx",
+			"body": "{\"object\":\"list\",\"data\":[]}",
+			"expected": null,
+			"reason": "unknown"
+		},
+		{
+			"name": "a model object without the field decides nothing",
+			"server": "vllm",
+			"body": "{\"object\":\"list\",\"data\":[{\"id\":\"m\",\"object\":\"model\"}]}",
+			"expected": null,
+			"reason": "unknown"
+		},
+		{
+			"name": "the fingerprint of another address does not count",
+			"server": "omlx",
+			"body": "{\"object\":\"list\",\"data\":[{\"id\":\"m\",\"object\":\"model\",\"owned_by\":\"tabbyAPI\"}]}",
+			"expected": null,
+			"reason": "unknown"
+		},
+		{
+			"name": "a listing carrying two fingerprints of one address is ambiguous",
+			"server": "omlx",
+			"body": "{\"object\":\"list\",\"data\":[{\"id\":\"a\",\"owned_by\":\"omlx\"},{\"id\":\"b\",\"owned_by\":\"vllm\"}]}",
+			"expected": null,
+			"reason": "ambiguous"
+		},
+		{
+			"name": "a body that is not a listing decides nothing",
+			"server": "vllm",
+			"body": "<html>not found</html>",
+			"expected": null,
+			"reason": "invalid"
+		},
+		{
+			"name": "a row whose address no other row shares is never fingerprinted",
+			"server": "llamacpp",
+			"body": "{\"object\":\"list\",\"data\":[{\"id\":\"m\",\"object\":\"model\",\"owned_by\":\"vllm\"}]}",
+			"expected": null,
+			"reason": "unshared"
+		}
+	],
+	"sweeps": [
+		{
+			"name": "process list unread: both rows of 8000 probe it and vLLM answers",
+			"targets": [
+				{ "id": "omlx", "base_url": "http://127.0.0.1:8000/v1" },
+				{ "id": "vllm", "base_url": "http://127.0.0.1:8000/v1" }
+			],
+			"answers": {
+				"omlx": {
+					"ok": true,
+					"status": 200,
+					"body": "{\"object\":\"list\",\"data\":[{\"id\":\"Qwen/Qwen3-8B\",\"object\":\"model\",\"owned_by\":\"vllm\"}]}"
+				},
+				"vllm": {
+					"ok": true,
+					"status": 200,
+					"body": "{\"object\":\"list\",\"data\":[{\"id\":\"Qwen/Qwen3-8B\",\"object\":\"model\",\"owned_by\":\"vllm\"}]}"
+				}
+			},
+			"expected": {
+				"detected": ["vllm"],
+				"rows": ["vLLM 🖥️ — 127.0.0.1:8000"],
+				"results": {
+					"omlx": {
+						"status": "down",
+						"base_url": "http://127.0.0.1:8000/v1",
+						"models": [],
+						"shadowed_by": "vllm"
+					},
+					"vllm": {
+						"status": "up",
+						"base_url": "http://127.0.0.1:8000/v1",
+						"models": ["Qwen/Qwen3-8B"]
+					}
+				}
+			}
+		},
+		{
+			"name": "process list unread: both rows of 8000 probe it and oMLX answers",
+			"targets": [
+				{ "id": "omlx", "base_url": "http://127.0.0.1:8000/v1" },
+				{ "id": "vllm", "base_url": "http://127.0.0.1:8000/v1" }
+			],
+			"answers": {
+				"omlx": {
+					"ok": true,
+					"status": 200,
+					"body": "{\"object\":\"list\",\"data\":[{\"id\":\"Qwen3-8B-4bit\",\"object\":\"model\",\"owned_by\":\"omlx\"}]}"
+				},
+				"vllm": {
+					"ok": true,
+					"status": 200,
+					"body": "{\"object\":\"list\",\"data\":[{\"id\":\"Qwen3-8B-4bit\",\"object\":\"model\",\"owned_by\":\"omlx\"}]}"
+				}
+			},
+			"expected": {
+				"detected": ["omlx"],
+				"rows": ["oMLX 🖥️ — 127.0.0.1:8000"],
+				"results": {
+					"omlx": {
+						"status": "up",
+						"base_url": "http://127.0.0.1:8000/v1",
+						"models": ["Qwen3-8B-4bit"]
+					},
+					"vllm": {
+						"status": "down",
+						"base_url": "http://127.0.0.1:8000/v1",
+						"models": [],
+						"shadowed_by": "omlx"
+					}
+				}
+			}
+		},
+		{
+			"name": "a TabbyAPI listing at 5000 keeps the TabbyAPI row",
+			"targets": [
+				{ "id": "textgen_webui", "base_url": "http://127.0.0.1:5000/v1" },
+				{ "id": "tabbyapi", "base_url": "http://127.0.0.1:5000/v1" }
+			],
+			"answers": {
+				"textgen_webui": {
+					"ok": true,
+					"status": 200,
+					"body": "{\"object\":\"list\",\"data\":[{\"id\":\"Qwen3-8B-exl3\",\"object\":\"model\",\"owned_by\":\"tabbyAPI\"}]}"
+				},
+				"tabbyapi": {
+					"ok": true,
+					"status": 200,
+					"body": "{\"object\":\"list\",\"data\":[{\"id\":\"Qwen3-8B-exl3\",\"object\":\"model\",\"owned_by\":\"tabbyAPI\"}]}"
+				}
+			},
+			"expected": {
+				"detected": ["tabbyapi"],
+				"rows": ["TabbyAPI 🖥️ — 127.0.0.1:5000"],
+				"results": {
+					"textgen_webui": {
+						"status": "down",
+						"base_url": "http://127.0.0.1:5000/v1",
+						"models": [],
+						"shadowed_by": "tabbyapi"
+					},
+					"tabbyapi": {
+						"status": "up",
+						"base_url": "http://127.0.0.1:5000/v1",
+						"models": ["Qwen3-8B-exl3"]
+					}
+				}
+			}
+		},
+		{
+			"name": "an unknown listing keeps the address's default row",
+			"targets": [
+				{ "id": "textgen_webui", "base_url": "http://127.0.0.1:5000/v1" },
+				{ "id": "tabbyapi", "base_url": "http://127.0.0.1:5000/v1" }
+			],
+			"answers": {
+				"textgen_webui": {
+					"ok": true,
+					"status": 200,
+					"body": "{\"object\":\"list\",\"data\":[{\"id\":\"m\",\"object\":\"model\",\"owned_by\":\"organization_owner\"}]}"
+				},
+				"tabbyapi": {
+					"ok": true,
+					"status": 200,
+					"body": "{\"object\":\"list\",\"data\":[{\"id\":\"m\",\"object\":\"model\",\"owned_by\":\"organization_owner\"}]}"
+				}
+			},
+			"expected": {
+				"detected": ["textgen_webui"],
+				"rows": ["text-generation-webui 🖥️ — 127.0.0.1:5000"],
+				"results": {
+					"textgen_webui": {
+						"status": "up",
+						"base_url": "http://127.0.0.1:5000/v1",
+						"models": ["m"]
+					},
+					"tabbyapi": {
+						"status": "down",
+						"base_url": "http://127.0.0.1:5000/v1",
+						"models": [],
+						"shadowed_by": "textgen_webui"
+					}
+				}
+			}
+		},
+		{
+			"name": "a key wanted at a shared address keeps the address's default row",
+			"targets": [
+				{ "id": "textgen_webui", "base_url": "http://127.0.0.1:5000/v1" },
+				{ "id": "tabbyapi", "base_url": "http://127.0.0.1:5000/v1" }
+			],
+			"answers": {
+				"textgen_webui": { "ok": false, "status": 401, "body": "{\"detail\":\"Invalid API key\"}" },
+				"tabbyapi": { "ok": false, "status": 401, "body": "{\"detail\":\"Invalid API key\"}" }
+			},
+			"expected": {
+				"detected": ["textgen_webui"],
+				"results": {
+					"textgen_webui": {
+						"status": "needs_key",
+						"base_url": "http://127.0.0.1:5000/v1",
+						"models": []
+					},
+					"tabbyapi": {
+						"status": "down",
+						"base_url": "http://127.0.0.1:5000/v1",
+						"models": [],
+						"shadowed_by": "textgen_webui"
+					}
+				}
+			}
+		},
+		{
+			"name": "a TabbyAPI process alone probes and names its own row, key wanted",
+			"targets": [{ "id": "tabbyapi", "base_url": "http://127.0.0.1:5000/v1" }],
+			"answers": {
+				"tabbyapi": { "ok": false, "status": 401, "body": "{\"detail\":\"Invalid API key\"}" }
+			},
+			"expected": {
+				"detected": ["tabbyapi"],
+				"results": {
+					"tabbyapi": {
+						"status": "needs_key",
+						"base_url": "http://127.0.0.1:5000/v1",
+						"models": []
+					}
+				}
+			}
+		},
+		{
+			"name": "a row probed alone whose answer names the other row of its address shows that name",
+			"targets": [{ "id": "omlx", "base_url": "http://127.0.0.1:8000/v1" }],
+			"answers": {
+				"omlx": {
+					"ok": true,
+					"status": 200,
+					"body": "{\"object\":\"list\",\"data\":[{\"id\":\"Qwen/Qwen3-8B\",\"object\":\"model\",\"owned_by\":\"vllm\"}]}"
+				}
+			},
+			"expected": {
+				"detected": ["omlx"],
+				"rows": ["vLLM 🖥️ — 127.0.0.1:8000"],
+				"results": {
+					"omlx": {
+						"status": "up",
+						"base_url": "http://127.0.0.1:8000/v1",
+						"models": ["Qwen/Qwen3-8B"],
+						"server": "vllm"
+					}
+				}
+			}
+		},
+		{
+			"name": "two rows of one address answering at different ports are both kept",
+			"targets": [
+				{ "id": "omlx", "base_url": "http://127.0.0.1:8000/v1" },
+				{ "id": "vllm", "base_url": "http://127.0.0.1:8100/v1" }
+			],
+			"answers": {
+				"omlx": {
+					"ok": true,
+					"status": 200,
+					"body": "{\"object\":\"list\",\"data\":[{\"id\":\"a\",\"object\":\"model\",\"owned_by\":\"omlx\"}]}"
+				},
+				"vllm": {
+					"ok": true,
+					"status": 200,
+					"body": "{\"object\":\"list\",\"data\":[{\"id\":\"b\",\"object\":\"model\",\"owned_by\":\"vllm\"}]}"
+				}
+			},
+			"expected": {
+				"detected": ["omlx", "vllm"],
+				"rows": ["oMLX 🖥️ — 127.0.0.1:8000", "vLLM 🖥️ — 127.0.0.1:8100"]
+			}
+		},
+		{
+			"name": "a row whose address no other row shares keeps its name",
+			"targets": [{ "id": "llamacpp", "base_url": "http://127.0.0.1:8080/v1" }],
+			"answers": {
+				"llamacpp": {
+					"ok": true,
+					"status": 200,
+					"body": "{\"object\":\"list\",\"data\":[{\"id\":\"m\",\"object\":\"model\",\"owned_by\":\"vllm\"}]}"
+				}
+			},
+			"expected": {
+				"detected": ["llamacpp"],
+				"rows": ["llama.cpp / LocalAI / llamafile 🖥️ — 127.0.0.1:8080"],
+				"results": {
+					"llamacpp": { "status": "up", "base_url": "http://127.0.0.1:8080/v1", "models": ["m"] }
+				}
+			}
+		}
+	],
+	"refusals": [
+		{
+			"name": "a fingerprint on an address no other row shares is refused",
+			"servers": {
+				"a": {
+					"base_url": "http://127.0.0.1:1/v1",
+					"fingerprint": { "model_field": "owned_by", "equals": "a" }
+				},
+				"b": { "base_url": "http://127.0.0.1:2/v1" }
+			},
+			"expected": { "fingerprinted": [], "refused": 1 }
+		},
+		{
+			"name": "two rows of one address with the same fingerprint are both refused",
+			"servers": {
+				"a": {
+					"base_url": "http://127.0.0.1:1/v1",
+					"fingerprint": { "model_field": "owned_by", "equals": "x" }
+				},
+				"b": {
+					"base_url": "http://127.0.0.1:1/v1",
+					"fingerprint": { "model_field": "owned_by", "equals": "x" }
+				}
+			},
+			"expected": { "fingerprinted": [], "refused": 1 }
+		},
+		{
+			"name": "a fingerprint without a field name or a value is refused",
+			"servers": {
+				"a": {
+					"base_url": "http://127.0.0.1:1/v1",
+					"fingerprint": { "model_field": "owned by", "equals": "x" }
+				},
+				"b": {
+					"base_url": "http://127.0.0.1:1/v1",
+					"fingerprint": { "model_field": "owned_by", "equals": "" }
+				},
+				"c": {
+					"base_url": "http://127.0.0.1:1/v1",
+					"fingerprint": { "model_field": "owned_by", "equals": "c" }
+				}
+			},
+			"expected": { "fingerprinted": ["c"], "refused": 2 }
+		}
+	]
+}

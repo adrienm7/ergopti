@@ -66,7 +66,8 @@ skip = ["tests/", "_generated/", "vendor/", "native/"]
 [drivers.windows]
 root = "windows"
 extensions = [".ahk", ".ps1"]
-skip = ["tests/", "_generated/", "vendor/", "native/"]
+# build/ holds the ignored inventory a packaging run writes; it names every asset.
+skip = ["tests/", "_generated/", "vendor/", "native/", "build/"]
 
 
 
@@ -94,11 +95,7 @@ summary = "xdotool, X11 only: pointer, window and screen queries and actions"
 
 [requirements.wmctrl]
 kind = "program"
-summary = "wmctrl, X11 only: workspace switching"
-
-[requirements.zenity]
-kind = "program"
-summary = "zenity, or kdialog on KDE: the confirmation dialogs a feature shows itself"
+summary = "wmctrl, X11 only: workspace switching and the window list minimize_all walks"
 
 [requirements.ollama]
 kind = "runtime"
@@ -222,27 +219,11 @@ content = ['["\x27]xdotool[ "\x27]']
 content = ['["\x27]wmctrl[ "\x27]', 'has_command\("wmctrl"']
 
 [detection.linux.wmctrl.owners]
+"modules/gestures/system_actions.lua" = ["gestures.*"]
 "modules/gestures/workspace_switcher.lua" = ["gestures.*"]
 
 [detection.linux.wmctrl.plumbing]
 "adapters/window_info.lua" = "the window list answers through libxcb in process; wmctrl is only its fallback when libxcb is missing"
-
-[detection.linux.zenity]
-content = ['["\x27](zenity|kdialog)[ "\x27]']
-
-[detection.linux.zenity.owners]
-"modules/gestures/system_actions.lua" = ["gestures.*"]
-"ui/gesture_conflicts.lua" = ["gestures.*"]
-"modules/llm/local_model_offer.lua" = ["llm.enabled"]
-"ui/llm_enable_refusal.lua" = ["llm.enabled"]
-
-[detection.linux.zenity.plumbing]
-"ui/app_chooser.lua" = "a dialog helper of the menus and settings editors"
-"ui/choice_prompt.lua" = "a dialog helper of the menus and settings editors"
-"ui/config_dir_picker.lua" = "the configuration folder picker of the onboarding and the paths editor"
-"ui/field_check/" = "the maintainer field check window"
-"ui/menu/" = "the menu dialogs edit the settings"
-"ui/text_prompt.lua" = "a dialog helper of the menus and settings editors"
 
 [detection.linux.ollama]
 file_name = 'ollama'

@@ -24,6 +24,14 @@ const BUILDER_PATH = path.join(APP_ROOT, 'Contents', 'Resources', 'ShortcutBuild
 const PY_CANDIDATES = ['python3', 'python'];
 const results = [];
 
+// The launcher refuses to start without the managed Python link the Apps menu
+// passes (ERGOPTI_CLONER_PYTHON); these harnesses fake its subprocesses, so an
+// executable named python3 stands in for the link in every child.
+const clonerPythonDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'ergopti-cloner-python-'));
+fs.writeFileSync(path.join(clonerPythonDir, 'python3'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+process.env.ERGOPTI_CLONER_PYTHON = path.join(clonerPythonDir, 'python3');
+process.on('exit', () => fs.rmSync(clonerPythonDir, { recursive: true, force: true }));
+
 function test(name, ok, detail = '') {
 	results.push({ name, ok, detail });
 }
@@ -329,6 +337,10 @@ try:
         staged_launcher = installed / "macos/apps/App Cloner.app/Contents/MacOS/AppCloner"
         staged_launcher.parent.mkdir(parents=True)
         shutil.copyfile(launcher_path, staged_launcher)
+        # The installed payload ships the managed PyObjC manifest the launcher checks.
+        staged_manifest = installed / "macos/modules/llm/managed-pyobjc.json"
+        staged_manifest.parent.mkdir(parents=True)
+        shutil.copyfile(Path(launcher_path).parents[4] / "modules/llm/managed-pyobjc.json", staged_manifest)
         staged_locales = installed / "_shared/data/locales"
         staged_locales.mkdir(parents=True)
         for name in ("en.json", "fr.json"):

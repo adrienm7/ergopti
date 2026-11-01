@@ -602,7 +602,42 @@ end
 local function menu_rebuild()
 	local menu = package.loaded["ui.menu"]
 	if type(menu) ~= "table" or type(menu.timed_rebuild) ~= "function" then return nil end
-	return menu.timed_rebuild()
+	-- The rebuild is synchronous, so each layout phase's total grows by what
+	-- this rebuild spent in it: the slowest names the stage to fix.
+	local PhaseStats = require("infra.phase_stats")
+	local layout = package.loaded["ui.menu.menu_keyboard_layout"]
+	local phases = type(layout) == "table" and type(layout.PHASES) == "table" and layout.PHASES or {}
+	local function totals()
+		local values = {}
+		for _, name in ipairs(phases) do
+			local figures = PhaseStats.figures(name)
+			values[name] = figures and figures.total_ms or 0
+		end
+		return values
+	end
+	local before = totals()
+	local outcome = menu.timed_rebuild()
+	if type(outcome) ~= "table" then return outcome end
+	local after, slowest = totals(), nil
+	for _, name in ipairs(phases) do
+		local spent = after[name] - before[name]
+		-- A phase flush between the two reads restarts the totals.
+		if spent < 0 then spent = after[name] end
+		if spent > 0 and (slowest == nil or spent > slowest.ms) then slowest = { id = name, ms = spent } end
+	end
+	local result = {}
+	for key, value in pairs(outcome) do result[key] = value end
+	result.layout_slowest = slowest
+	return result
+end
+
+--- The AXValueChanged watcher outcomes of this driver boot, or nil before the
+--- context tracker is loaded.
+--- @return table|nil counts { already_watched, failed }
+local function ax_value_watch_counts()
+	local tracker = package.loaded["modules.keystats.context_tracker"]
+	if type(tracker) ~= "table" or type(tracker.ax_value_watch_counts) ~= "function" then return nil end
+	return tracker.ax_value_watch_counts()
 end
 
 --- True when the keymap taps that decode a selftest key, and consume it
@@ -889,6 +924,7 @@ function M.new()
 		read_text = function(path) return require("adapters.file_system").read(path) end,
 		loopback_server = loopback_server,
 		crash_counts = crash_counts,
+		ax_value_watch_counts = ax_value_watch_counts,
 		pid = function() return hs.processInfo.processID end,
 		-- The app started with its launcher, which outlives a driver reload;
 		-- a driver run without one (a bare Hammerspoon) started with itself.
@@ -925,9 +961,14 @@ function M.new()
 		local_servers_detect = local_servers_detect,
 		boot_facts = boot_facts,
 		fifo = fifo,
+		apple_shortcut_action = function() return require("modules.gestures.apple_shortcut_action") end,
 		today_log_path = function() return require("infra.logger").today_log_path() end,
 		-- Process CPU and a monotonic clock, both in milliseconds
 		cpu_ms = function() return os.clock() * 1000 end,
+		-- The idle window starts from a collected heap and names its timers.
+		collect_garbage = function() collectgarbage("collect") end,
+		begin_callback_accounting = function() require("infra.logger").begin_callback_accounting() end,
+		end_callback_accounting = function() return require("infra.logger").end_callback_accounting() end,
 		now_ms = function() return hs.timer.absoluteTime() / 1000000 end,
 	}
 end

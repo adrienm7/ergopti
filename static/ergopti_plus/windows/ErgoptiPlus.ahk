@@ -1,5 +1,6 @@
 ﻿; Last modified on 2026-04-23 at 00:00 (UTC+2)
 #Requires Autohotkey v2.0+
+#Include %A_LineFile%\..\_generated\config_keys.ahk
 ; Version resource of the compiled exe (Ahk2Exe directives, plain comments for
 ; the interpreter): without it the exe carries only the runtime's defaults. The
 ; version comes from BUNDLE_VERSION in infra/bundle.ahk.
@@ -9,6 +10,7 @@
 ;@Ahk2Exe-SetCopyright Copyright (c) 2024 Adrien MOYAUX (MIT License) - https://ergopti.fr
 ;@Ahk2Exe-SetOrigFilename ErgoptiPlus.exe
 ;@Ahk2Exe-SetInternalName ErgoptiPlus
+;@Ahk2Exe-Set Comments, Open-source keyboard companion.
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 ; No process starts with a tray icon: the driver path reveals it once the custom
 ; icon and the safe bootstrap menu are in place, and a detached worker never does.
@@ -183,9 +185,9 @@ BootProfile_Stamp("Single-owner gate completed")
 
 ; Single source of truth for the driver's baseline (non-boosted) process
 ; priority class. Every restore site outside a transient boost — LLM_Menu_Init's
-; defensive reset, LLM_Deps_Fail, LLM_Deps_Cancel, _LLM_Deps_OnPollProbeResult —
+; defensive reset, LLM_Deps_Fail, LLM_Deps_Cancel —
 ; MUST reference this constant instead of a hardcoded "Normal" literal. Before
-; this fix those four sites restored to the OS default "Normal", silently
+; this fix those sites restored to the OS default "Normal", silently
 ; undoing the AboveNormal boot boost below the first time any of them ran
 ; (driver-baseline-priority-reverted-to-normal).
 global DRIVER_BASELINE_PRIORITY_CLASS := "AboveNormal"
@@ -511,6 +513,8 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include infra/program_parameter.ahk
 #Include adapters/program_providers.ahk
 #Include infra/program_actions.ahk
+#Include infra/user_actions.ahk
+#Include infra/sticky_modifiers.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
 ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
 #Include infra/locale.ahk
@@ -620,6 +624,7 @@ KLPF_InitializeCleanup()
 #Include ..\_shared\modules\llm\api_url_template.ahk
 #Include ..\_shared\modules\llm\model_capabilities.ahk
 #Include ..\_shared\modules\llm\thinking_off.ahk
+#Include ..\_shared\modules\llm\local_server_fingerprint.ahk
 #Include ..\_shared\modules\llm\local_server_discovery.ahk
 #Include ..\_shared\modules\llm\local_server_ports.ahk
 #Include ..\_shared\modules\llm\local_server_menu.ahk
@@ -788,6 +793,7 @@ LoggerInit()
 ; window, which waits for the driver to be ready before it shows
 ErrorDialog_Init(_IniCache)
 ManagedNetworkFailureWindows_Init()
+ProxyOverride_Init(_IniCache)
 Updater_ConfigureManagedFailurePresenter(ManagedNetworkFailureWindows_Contract(),
 	_Updater_ShowManagedDownloadFailure, _Updater_RetireManagedDownloadFailure)
 bootScriptName := IsSet(A_ScriptName) ? A_ScriptName : "ErgoptiPlus"
@@ -825,6 +831,7 @@ BootProfile_StageBegin("i18n")
 I18nPreload()
 BootProfile_StageEnd("i18n", "locale " . I18nGetLocale())
 BootProfile_Mark("i18n locale preloaded")
+ConfigNotifyOlderSchemaAtBoot()
 
 ; Load tooltip visual constants from _shared/modules/tooltip/constants.toml so the
 ; runtime values stay in sync with the TOML single source of truth.
@@ -928,6 +935,7 @@ EnsureUserConfigsExist()
 ; Map and every downstream Features["llm"]["enabled"] access throws a
 ; cryptic "Item has no value" error. Fail loudly here instead.
 if !ManifestEnsureLoaded() {
+	try LoggerError("ErgoptiPlus", "Startup aborted: the generated manifest is missing.")
 	Ui_MsgBox(t("startup.manifest_missing"), t("startup.manifest_window_title"), "OK Iconx")
 	ExitApp(1)
 }
@@ -969,9 +977,9 @@ BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, 
 
 ; Safe nested read
 _SpaceAroundSymbolsNode := (Features.Has("hotstrings")
-	and Features["hotstrings"].Has("distances_reduction")
-	and Features["hotstrings"]["distances_reduction"].Has("space_around_symbols"))
-	? Features["hotstrings"]["distances_reduction"]["space_around_symbols"]
+	and Features["hotstrings"].Has(ConfigLeaf.DISTANCES_REDUCTION)
+	and Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION].Has("space_around_symbols"))
+	? Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION]["space_around_symbols"]
 	: Map()
 global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceAroundSymbolsNode["enabled"]) ? " " : ""
 
@@ -1268,10 +1276,10 @@ _MagicKeySource := LayoutRegistry_MagicKeySource(Map(
 	"configured", ScriptInformation["MagicKeySource"],
 	"declared", LayoutRegistry_DeclaredMagicKey(
 		LayoutRegistry_ActiveLayoutExtension(KeylayoutEmulation_SelectedId(),
-			Features["layout"]["ergopti_base"], ERGOPTI_LAYOUT_ID,
+			Features["layout"][ConfigLeaf.ERGOPTI_BASE], ERGOPTI_LAYOUT_ID,
 			() => LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))),
 		_HotstringExtensionPacks, LayoutRegistry_BundledDir()),
-	"emulated", Features["layout"]["ergopti_base"],
+	"emulated", Features["layout"][ConfigLeaf.ERGOPTI_BASE],
 	"keycodes", LayoutRegistry_Keycodes(),
 	"detect", LayoutRegistry_DetectMagicKeyScan.Bind(_LAYOUT_REMAP_HKL, ScriptInformation["MagicKeySourceChar"]),
 	"shipped", LayoutRegistry_ShippedMagicKey))
@@ -1367,6 +1375,7 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/layout_manager/composer.ahk
 #Include ui/layout_manager/composer_check.ahk
 #Include ui/field_check/network_check.ahk
+#Include ui/proxy_override.ahk
 #Include ui/personal_info_editor/init.ahk
 #Include ui/layer_editor/init.ahk
 
@@ -1449,8 +1458,9 @@ HotstringPrefixWatcherInit()
 ; Install the shared low-level keyboard arbiter after the prefix InputHook. Its
 ; terminal capture then runs first in the hook chain and can hold physical edges
 ; while paced terminal output completes. A failed native admission is reported
-; by the adapter and terminal expansions remain fail-open.
-LLM_NavEventOwner_EnsureStarted()
+; by the adapter and terminal expansions remain fail-open. It runs whatever the
+; AI's state: the press ledger serves every user's first-key order.
+KeyboardArbiterEnsureForLedger()
 HotstringPrefixWatcherRebuildIndex()
 BootProfile_StageEnd("prefix watcher")
 BootProfile_Mark("Prefix watcher index complete")
@@ -1464,6 +1474,9 @@ if _LLM_Menu_RuntimeActivated
 	_MenuStartupCommands.NotifyReady()
 _MenuPopulationPublished.Start()
 _DriverBootPhase := "ready"
+SetTimer(ShellRunner_CheckWinPsAtStart, -1)
+SetTimer(ProxyOverride_SealStoredAtStart, -1)
+HTTP_ScheduleCurlCheck(_LLM_Menu.Get("enabled", false))
 HealthCheck_StartWindowControl()
 ; The local reload command is optional: a control that cannot start is
 ; reported and the ready driver keeps running without it.
@@ -1595,8 +1608,8 @@ _Updater_ArmInheritedSwapFailureNotice()
 ; replay the full driver boot, and no provider call happens until an idle-gated
 ; request arrives. Starting it here prevents the first wrap action after a
 ; reload from racing a cold worker process.
-if Features.Has("shortcuts") && Features["shortcuts"].Has("wrap_text_if_selected")
-	&& Features["shortcuts"]["wrap_text_if_selected"]
+if Features.Has("shortcuts") && Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED)
+	&& Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]
 	SetTimer(UIASW_Start, -1)
 
 if _DriverStartupSmokeDir == "" && IsCategoryGated("Hotstrings")

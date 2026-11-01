@@ -252,6 +252,9 @@ local input_capture_gate = nil
 -- The error window: a logged ERROR can open it (the shared policy decides); a
 -- crash is announced by the crash reporter's immediate notification only.
 -- Installed before main() so the boot's own errors count; it opens nothing before the event loop runs.
+-- config.toml's [script] rows (locale, log level, error window) win over the
+-- saved values at start, as on Windows: adopted before any of them is read.
+require("infra.script_scope").adopt_configured()
 local ErrorDialog = RuntimeGuard.optional_require("ui.error_dialog.bridge")
 if ErrorDialog and ErrorDialog.init() then Logger.set_error_observer(ErrorDialog.on_error) end
 
@@ -846,6 +849,9 @@ local function main()
 	BootProfiler.stage("config")
 	require("toml_codec.writer").set_sparse_defaults(
 		require("infra.config_paths").config("config.toml"), require("infra.manifest_reader"))
+	require("toml_codec.writer").set_case_twin_reporter(function(message)
+		require("adapters.notifier").send(message, { level = "error" })
+	end)
 	-- 8.0) Version config.toml before anything reads or writes it: the gesture
 	-- and shortcut managers below load the migrated file, and a file the wizard
 	-- creates carries this build's version. A file this build cannot version (a
@@ -1624,7 +1630,7 @@ local function main()
 	-- output, so this callback is the single place that prevents special keys
 	-- from disappearing and avoids a printable-key double count.
 	local capture_owned_scancodes = {}
-	local function handle_physical(scancode, _key_name, _char, value)
+	local function handle_physical(scancode, _key_name, _char, value, source)
 		if value ~= InputEvent.VALUE_DOWN then return end
 		capture_owned_scancodes[scancode] = nil
 		local allowed = not secure_focus_guard.blocks_text()
@@ -1636,6 +1642,12 @@ local function main()
 			keystats.suppress()
 		else
 			keystats.unsuppress()
+		end
+		-- A media key counts under its semantic identity, with the device its
+		-- owned descriptor reads, never on the numeric heatmap.
+		if keystats.media_id(scancode) then
+			keystats.record_media_press(app_id, scancode, keyboard_hook.source_device_identity(source))
+			return
 		end
 		keystats.record_physical_key(app_id, scancode, math.floor(Monotonic.now_ms()))
 	end
@@ -1717,7 +1729,7 @@ local function main()
 				local info = window_info.getFocused()
 				return { app = info.appId or "", title = info.windowTitle or "" }
 			end or nil,
-			-- llm_agent_command asks for the command in a zenity entry.
+			-- llm_agent_command asks for the command in a native entry.
 			ask_text = function(title, prompt)
 				if opts.dry_run then return nil end
 				return require("ui.text_prompt").ask(title, prompt, "")
@@ -2284,12 +2296,16 @@ local function main()
 			or script_actions.is_paused() or input_capture_gate.blocks_text() then return nil end
 		return hold_token()
 	end
-	local function handle_hold(scancode, held_ms)
+	local function handle_hold(scancode, held_ms, source)
 		if capture_owned_scancodes[scancode] then
 			capture_owned_scancodes[scancode] = nil
 			return
 		end
 		if secure_focus_guard.blocks_text() then return end
+		if keystats.media_id(scancode) then
+			keystats.record_media_release(scancode, keyboard_hook.source_device_identity(source), held_ms)
+			return
+		end
 		keystats.record_hold(_cached_app_id or "Unknown", scancode, held_ms)
 	end
 	local on_hold = input_capture_gate.guard(handle_hold, function(scancode)
@@ -2323,6 +2339,11 @@ local function main()
 	BootProfiler.stage("tray")
 	if opts.tray and tray_menu then
 		Logger.info(LOG, "Tray icon requested — starting.")
+		-- GTK, libayatana-appindicator, lgi and WebKitGTK are the host's (owned
+		-- runtimes, SYS): a missing one is named here rather than leaving an
+		-- invisible daemon or windows that never open.
+		local refusal = require("infra.gui_stack").check_at_start({ i18n = ok_i18n and i18n_mod or nil, notifier = notifier })
+		if refusal then os.exit(refusal) end
 		tray_menu.setIcon({ title = "Ergopti" })
 		if not privacy_owners.startup_checkpoint() then return end
 

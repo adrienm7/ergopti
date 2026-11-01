@@ -22,6 +22,7 @@
 
 'use strict';
 
+require('../lib/config-key-source-view.cjs').install(); // driver source may name a generated constant
 const fs = require('fs');
 const path = require('path');
 const {

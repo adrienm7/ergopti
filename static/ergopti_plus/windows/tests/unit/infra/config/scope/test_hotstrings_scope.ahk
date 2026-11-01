@@ -206,7 +206,7 @@ _HotstringsScopeManifestRows() {
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
-Test("hotstrings-scope: the Hotstrings menu draws both scope rows and runs the owner", _HotstringsScopeManifestRows)
+Test("hotstrings-scope: the Hotstrings menu draws both scope rows and runs the owner", _RRNC_NoDialog.Bind("Hotstrings", _HotstringsScopeManifestRows))
 
 _HotstringsScopeRefusals() {
 	for Scenario in ["backup", "inventory", "external"] {
@@ -479,13 +479,19 @@ _HotstringsScopeDelayVectors() {
 }
 Test("hotstrings-scope: independent delay vectors agree with both Lua drivers", _HotstringsScopeDelayVectors)
 
-_HotstringsScopeMeasuredDelayRoundTrip(SelectedFamily) {
-	OwnedSection := "autocorrection." . SelectedFamily
+; The three measured families share one fixture and one transaction per mode: the
+; journal is the same whichever sections it carries, and it costs far more than
+; the per-family checks. Each family keeps its own assertions.
+_HotstringsScopeMeasuredDelayRoundTrip() {
+	static Families := ["names", "abbreviations", "technical_terms"]
 	global _HotstringsOverrides, _HSResolveCache, _HSResolveGen, HotstringGroupConfig
 	Saved := { overrides: _HotstringsOverrides, cache: _HSResolveCache, generation: _HSResolveGen,
 		groups: HotstringGroupConfig }
 	Fixture := _HotstringsScopeFixture()
-	Fixture.options["sections"] := (Entry) => [{ Name: Entry.IsPersonal ? "words" : SelectedFamily }]
+	FamilySections := []
+	for Family in Families
+		FamilySections.Push({ Name: Family })
+	Fixture.options["sections"] := (Entry) => Entry.IsPersonal ? [{ Name: "words" }] : FamilySections
 	Bundle := 0, Refusal := 0
 	Launch(_Success, Borrowed, Refused) {
 		Bundle := Borrowed
@@ -501,31 +507,37 @@ _HotstringsScopeMeasuredDelayRoundTrip(SelectedFamily) {
 		; generation counter after bumping it, so a stale entry of an earlier suite
 		; can carry the very generation this round trip reaches. Own a fresh memo.
 		_HSResolveCache := Map()
-		AssertEqual(1.0, _HotstringsScopeInheritedDelay("autocorrection", SelectedFamily),
-			"the real corpus makes deletion inherit 1.0 seconds")
-		AssertEqual(0.5, ManifestValueFor("hotstrings." . OwnedSection . ".time_activation_seconds", "recommended"),
-			"the real shared manifest recommends 0.5 seconds")
+		for Family in Families {
+			AssertEqual(1.0, _HotstringsScopeInheritedDelay("autocorrection", Family),
+				"the real corpus makes deletion inherit 1.0 seconds: " . Family)
+			AssertEqual(0.5, ManifestValueFor("hotstrings.autocorrection." . Family . ".time_activation_seconds", "recommended"),
+				"the real shared manifest recommends 0.5 seconds: " . Family)
+		}
 		for Mode in ["recommended", "clear"] {
 			Fixture.options["stamp"] := "measured-delay-" . Mode
 			Receipt := HotstringsScopeApply(Mode, Fixture.options)
 			AssertEqual("pending", Receipt["status"])
 			Overrides := TOML_ParseFreshFile(Fixture.overrides)
-			if Mode == "recommended" {
-				AssertTrue(Overrides[OwnedSection]["delay_offset"] is Float,
-					"the acknowledged offset must retain its TOML numeric type through persistence")
-				AssertEqual(Round(0.5 - HotstringsBaseDelay(), 3), Overrides[OwnedSection]["delay_offset"],
-					"the acknowledged candidate explicitly stores the recommendation as an offset of the base")
-			} else
-				Assert(!Overrides.Has(OwnedSection) || !Overrides[OwnedSection].Has("delay_offset"),
-					"clear removes the recommendation and returns to corpus inheritance")
-			Assert(!Overrides.Has(OwnedSection) || !Overrides[OwnedSection].Has("delay"),
-				"the absolute spelling of earlier builds is never written back")
+			for Family in Families {
+				OwnedSection := "autocorrection." . Family
+				if Mode == "recommended" {
+					AssertTrue(Overrides[OwnedSection]["delay_offset"] is Float,
+						"the acknowledged offset must retain its TOML numeric type through persistence: " . Family)
+					AssertEqual(Round(0.5 - HotstringsBaseDelay(), 3), Overrides[OwnedSection]["delay_offset"],
+						"the acknowledged candidate explicitly stores the recommendation as an offset of the base: " . Family)
+				} else
+					Assert(!Overrides.Has(OwnedSection) || !Overrides[OwnedSection].Has("delay_offset"),
+						"clear removes the recommendation and returns to corpus inheritance: " . Family)
+				Assert(!Overrides.Has(OwnedSection) || !Overrides[OwnedSection].Has("delay"),
+					"the absolute spelling of earlier builds is never written back: " . Family)
+			}
 			_HotstringsOverrides := _ParseOverrides(Fixture.overrides)
 			HotstringsOverridesApplyBase()
 			HotstringsResolveBumpGen()
-			AssertEqual(Mode == "recommended" ? 0.5 : 1.0,
-				HotstringsResolve("autocorrection", SelectedFamily).Delay,
-				"the actual native resolver delivers the requested delay")
+			for Family in Families
+				AssertEqual(Mode == "recommended" ? 0.5 : 1.0,
+					HotstringsResolve("autocorrection", Family).Delay,
+					"the actual native resolver delivers the requested delay: " . Family)
 			AssertEqual("keep", Overrides["autocorrection"]["unknown"])
 			AssertEqual(9, Overrides["foreign"]["delay"])
 			Personal := TOML_ParseFreshFile(Fixture.personal[1])
@@ -550,9 +562,8 @@ _HotstringsScopeMeasuredDelayRoundTrip(SelectedFamily) {
 	}
 	Assert(HotstringGroupConfig == Saved.groups, "the original metadata cache identity is restored")
 }
-for _hsScopeFamily in ["names", "abbreviations", "technical_terms"]
-	Test("hotstrings-scope: recommended delays differ from clear and restore exact stores on refusal — " . _hsScopeFamily,
-		_HotstringsScopeMeasuredDelayRoundTrip.Bind(_hsScopeFamily))
+Test("hotstrings-scope: recommended delays differ from clear and restore exact stores on refusal in every measured family",
+	_HotstringsScopeMeasuredDelayRoundTrip)
 
 
 ; Native phase timing for the unchanged capacity subject. The real test clock

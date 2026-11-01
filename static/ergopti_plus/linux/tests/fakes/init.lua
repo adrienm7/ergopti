@@ -156,6 +156,14 @@ function M.evdev_reader(opts)
 	end
 	function fake.is_open(slot) return fake.open_slots[slot or fake.KEYBOARD] ~= nil end
 	function fake.device_path(slot) return fake.open_slots[slot or fake.KEYBOARD] end
+	-- A scripted descriptor names no device unless the test gives it a number.
+	function fake.device_identity(slot)
+		local path = fake.open_slots[slot or fake.KEYBOARD]
+		if path == nil then return nil, "device is not open" end
+		local numbers = opts.device_numbers or {}
+		if numbers[path] == nil then return nil, "no device-number port" end
+		return numbers[path]
+	end
 	function fake.event_capabilities(slot)
 		slot = slot or fake.KEYBOARD
 		local path, owner = fake.open_slots[slot], opens[slot]
@@ -693,6 +701,7 @@ function M.sqlite_writer(opts)
 	function fake.flush_transport_available() return available end
 	function fake.has_private_file_debt() return false end
 	function fake.open_db(path) fake.path = path ; return available end
+	function fake.ensure_token_encoding() return true end
 	function fake.close_db() fake.path = nil ; return true end
 	function fake.get_db_path() return fake.path end
 	function fake.get_revision() return fake.revision end
@@ -842,6 +851,7 @@ function M.sqlite_writer(opts)
 		fake.media_projections[path][device_id] = copy(batch)
 		fake.revision = fake.revision + 1
 	end
+	function fake.media_available() return media_ready() end
 	function fake.insert_media_events(device_id, events, threshold_ms)
 		if not media_ready() then return false end
 		local previous = media_history[fake.path] and media_history[fake.path][device_id]

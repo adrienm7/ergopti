@@ -883,6 +883,21 @@ _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes) {
 	return Map("status", "error", "kind", "render_failed", "content", "")
 }
 
+; The setting a case twin refused in the latest write, "" otherwise. The writers
+; answer a boolean, so the failure report reads the cause here, once.
+global _TomlCaseTwinRefusal := ""
+
+/**
+ * Answers the setting a case twin refused in the latest write, and forgets it.
+ * @returns {String} The setting's dotted name, or "" for any other outcome.
+ */
+TOML_TakeCaseTwinRefusal() {
+	global _TomlCaseTwinRefusal
+	Setting := _TomlCaseTwinRefusal
+	_TomlCaseTwinRefusal := ""
+	return Setting
+}
+
 TOML_BatchWrite(Path, Updates, ExactSectionPrefixes := [], AdmissionFn := 0) {
 		return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , false, AdmissionFn)
 }
@@ -962,6 +977,8 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		if !(Mode is String) || (Mode != "write" && Mode != "build")
 				throw ValueError("TOML_BatchWrite mode must be 'write' or 'build'")
 		BuildOnly := Mode == "build"
+		global _TomlCaseTwinRefusal
+		_TomlCaseTwinRefusal := ""
 		Refusal := TOML_WriteRefusal(Path)
 		if (Refusal != "") {
 				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': writes to it are refused for this session ({3}). No file was changed.",
@@ -1017,6 +1034,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 			}
 			try Admitted := TOML_BuildConfigDocumentCandidate(SourceBytes, CandidateUpdates, ExactSectionPrefixes)
 			catch as Err {
+				_TomlCaseTwinRefusal := Err.HasOwnProp("CaseTwinSetting") ? Err.CaseTwinSetting : ""
 				try LoggerError("TomlWrite", "Refusing semantic configuration {1} for '{2}': {3}. No file was changed.", Mode, Path, Err.Message)
 				return false
 			}

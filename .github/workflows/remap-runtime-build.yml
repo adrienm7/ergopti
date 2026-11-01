@@ -65,6 +65,15 @@ jobs:
           persist-credentials: false
           path: ergopti
 
+      # The native phase owner kills a child at the calibration deadline by
+      # walking the Darwin process table; these real-child tests prove it here.
+      - name: Run the native phase owner tests
+        working-directory: ergopti
+        run: |
+          set -euo pipefail
+          python3 tools/build/remap_runtime_hosted_build_test.py
+          python3 tools/build/remap_runtime_build_test.py
+
       - name: Compile and run each vendor-header test
         working-directory: ergopti
         run: |
@@ -120,6 +129,13 @@ jobs:
       # first. This app is a build scaffold, never published: it is signed ad
       # hoc (no certificate secret reaches this step) and carries a throwaway
       # Sparkle key; only the helper the next steps package leaves this job.
+      # The scaffold bundles the proxy sign-in relay, built with Go.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ergopti/static/ergopti_plus/_shared/go/native_http/go.mod
+          check-latest: false
+          cache: false
+
       - name: Build the application scaffold the packaging writes into
         working-directory: ergopti
         env:
@@ -175,18 +191,34 @@ jobs:
             echo "RUNTIME_SIGNING_LEAF=$work/leaf.der"
           } >> "$GITHUB_ENV"
 
+      # Spotlight indexes every fresh build product and project file, adding
+      # extended attributes in the background (a ctime-only change seen on a
+      # generated project.pbxproj, run 41227533352) and competing with the
+      # compiler for the runner's three cores.
+      - name: Stop Spotlight indexing on the runner
+        run: |
+          set -euo pipefail
+          sudo mdutil -a -i off
+
+      # The calibration deadline is enforced by the native phase owner: a child
+      # still running at it is killed with its process tree and the build is
+      # refused with phase_deadline, while each phase streams a progress line
+      # every 30 s. A hosted runner cannot fit the 300 s Mac calibration (the
+      # core translation unit alone exceeds two minutes), so this lane selects
+      # the hosted runner deadline (remap_runtime_build.py
+      # HOSTED_RUNNER_SECONDS, 60 min). The step timeout is only a backstop.
       - name: Build, sign and seal the owned runtime in its installer helper
         working-directory: ergopti
+        timeout-minutes: 70
         env:
           ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN: ${{ github.token }}
+          PYTHONUNBUFFERED: '1'
         run: |
           set -euo pipefail
           owner="$RUNNER_TEMP/runtime-owner"
           mkdir -m 700 "$owner"
           echo "RUNTIME_OWNER=$owner" >> "$GITHUB_ENV"
-          # The owned build admits exactly its 300 s calibration budget
-          # (remap_runtime_build.py _compile_owned); any other value is refused.
-          python3 tools/build/remap_runtime_build.py "$PWD" "$owner" --package-owned --budget 300 \
+          python3 tools/build/remap_runtime_build.py "$PWD" "$owner" --package-owned --hosted-runner-budget \
             --signing-identity "$RUNTIME_SIGNING_IDENTITY" \
             --signing-keychain "$RUNTIME_SIGNING_KEYCHAIN" \
             --signing-public-leaf "$RUNTIME_SIGNING_LEAF" \

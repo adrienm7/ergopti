@@ -10,7 +10,7 @@
 --- may decide about it: the F2 « Ergopti uses Karabiner » switch, its removal
 --- command, the hint explaining greyed tap-holds, the removal notice, and the
 --- texts about the user's own Karabiner-Elements that Ergopti closed or whose
---- driver version blocks Ergopti's runtime. The
+--- driver version blocks Ergopti's runtime, with its driver-only update. The
 --- keys are collected from what the tray actually draws: every i18n key the
 --- menu modules pass to i18n.get, and every label key the shared menu
 --- manifest declares for this platform.
@@ -38,8 +38,8 @@ local SWITCH_KEYS = {
 
 -- The texts about the user's own Karabiner-Elements, which Ergopti's own runtime
 -- acts on (ADR 011, the maintainer's rule of 2026-10-31): the consent to close
--- it while Ergopti runs, that it is closed, and that its driver version blocks
--- Ergopti's runtime.
+-- it while Ergopti runs, that it is closed, that its driver version blocks
+-- Ergopti's runtime, and the row offering the driver-only update that changes its driver too.
 -- They must name the product the user installed, or the user cannot tell what
 -- disappeared or what to change.
 local USER_KARABINER_KEYS = {
@@ -47,6 +47,7 @@ local USER_KARABINER_KEYS = {
 	["notify.karabiner.user_closed"] = true,
 	["menu.tapholds.vhid_incompatible"] = true,
 	["menu.tapholds.vhid_not_active"] = true,
+	["menu.tapholds.vhid_update"] = true,
 }
 
 -- The Debug menu's field checks exist so the maintainer can test the remap

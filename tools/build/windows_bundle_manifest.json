@@ -30,7 +30,7 @@
 		{
 			"source": "static/ergopti_plus/windows/vendor",
 			"dest": "vendor",
-			"why": "Native libraries and PowerShell workers resolved through _VendorDir: sqlite3.dll, 64bit/WebView2Loader.dll, ergopti_nav_owner.dll, the uninstall, crash-report, updater staging and swap, and screen-brightness workers, and the bounded PAC worker with its runtime identity receipt and license."
+			"why": "Native libraries and PowerShell workers resolved through _VendorDir: sqlite3.dll, 64bit/WebView2Loader.dll, ergopti_nav_owner.dll, the uninstall, crash-report, updater staging and swap, and screen-brightness workers, the bounded PAC worker with its runtime identity receipt and license, and the proxy sign-in relay with its manifest."
 		},
 		{
 			"source": "static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1",
@@ -109,6 +109,16 @@
 				"static/ergopti_plus/_shared/modules/llm/managed_ollama_release.json"
 			],
 			"why": "The macOS and Linux tray PNGs, shared Python runtime and caches, the macOS MLX Python bootstrap catalogue, the Linux evdev key codes, the HID usages only the macOS codegen reads, and the Linux feature evidence ledger; the Windows tray uses the .ico files and Windows reads key positions from physical_keys.json. The optional native macOS Ollama source and produced asset catalogues are not read by Windows."
+		},
+		{
+			"name": "owned-runtimes-registry",
+			"globs": ["static/ergopti_plus/_shared/data/owned_runtimes.json"],
+			"why": "The decided owned-runtime rows that generate docs/design/owned-runtimes.md and feed the macOS and Linux spawn inventory test; no driver reads it at run time."
+		},
+		{
+			"name": "shared-config-template",
+			"globs": ["static/ergopti_plus/_shared/_generated/config_template.toml"],
+			"why": "The default config of the three drivers written once; npm run build:manifest projects it into each driver's _generated/config_template.toml. No Windows code reads either file at run time."
 		},
 		{
 			"name": "website-logos",
@@ -246,6 +256,14 @@
 		{
 			"source": "static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt",
 			"dest": "vendor/ergopti_network_pac.LICENSE.txt"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti-proxy-relay.exe",
+			"dest": "vendor/ergopti-proxy-relay.exe"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti-proxy-relay.json",
+			"dest": "vendor/ergopti-proxy-relay.json"
 		},
 		{
 			"dest": "vendor/ergopti_nav_owner.manifest.json",

@@ -17,7 +17,8 @@
 --- them — plus one wrapper serving two incompatible call shapes. The assertions
 --- below are on whether the server still starts when the notification throws, not
 --- on the order of two statements, so any restructuring that keeps the guarantee
---- passes.
+--- passes. The wrapper's own shape is refused at the call by dialog_util.alert,
+--- driven in test_dialog_focus_terminal_owner.lua.
 ---
 --- Why it was silent: init.lua's call site is inside a pcall that logs, so the
 --- throw produced one line about the bridge failing and nothing about the server
@@ -171,57 +172,6 @@ helpers.describe("vscode_bridge: setup() isolates the cosmetic step from the ser
 		helpers.assert_eq(result, true, "the positive setup path must return exact success")
 		helpers.assert_eq(started.count, 1,
 			"exactly one server, on the happy path too")
-	end)
-
-end)
-
-
-
-
--- ==================================================================
--- ==================================================================
--- ======= 2/ One wrapper, one argument shape =======================
--- ==================================================================
--- ==================================================================
-
-helpers.describe("dialog_util.alert: every call site agrees on the shape", function()
-
-	helpers.it("no call site passes a number where the wrapper forwards a string", function()
-		-- dialog_util.alert forwards straight to hs.dialog.alert, whose leading
-		-- parameters are coordinates and a callback — never (message, duration).
-		-- One call site used the hs.alert.show shape instead, which is what raised.
-		-- A transient toast belongs on lib.notifications, which every other toast in
-		-- the driver already uses.
-		local src = helpers.read_driver_source("focus_hammerspoon")
-		helpers.assert_true(src ~= nil and src ~= "",
-			"dialog_util must be locatable by 'focus_hammerspoon'")
-
-		-- The corpus for the CALL SITES is the whole driver, not just the wrapper's
-		-- own file: the mismatch is between a definition here and callers elsewhere.
-		local offenders = {}
-		for _, rel in ipairs({
-			"infra/vscode_bridge.lua", "ui/metrics_apps/init.lua", "modules/keystats/init.lua",
-		}) do
-			local fh = io.open(helpers.driver_root() .. rel, "r")
-			if fh then
-				local code = fh:read("*a"):gsub("%-%-[^\n]*", "")
-				fh:close()
-				local n = 0
-				for args in code:gmatch("dialog[_%w]*%.alert%(([^\n]*)") do
-					n = n + 1
-					-- A bare numeric literal as the LAST argument is the hs.alert.show
-					-- duration, i.e. the wrong wrapper for this call.
-					if args:match(",%s*%d+%s*%)") then
-						table.insert(offenders, rel .. " -> " .. args:sub(1, 60))
-					end
-				end
-			end
-		end
-
-		helpers.assert_eq(#offenders, 0,
-			"one wrapper cannot serve two contracts: these pass a duration to a function "
-			.. "that forwards to hs.dialog.alert, so the call raises and takes its caller "
-			.. "down with it: " .. table.concat(offenders, " | "))
 	end)
 
 end)

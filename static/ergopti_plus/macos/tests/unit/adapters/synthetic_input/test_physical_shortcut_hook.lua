@@ -40,7 +40,9 @@ function hs.eventtap.new(_,fn)
  tap={active=false,start=function(self) self.active=true;if settings.start_stop then settings.owner.stop() end;return self end,stop=function(self) if not settings.stop_refused then self.active=false end;return self end,isEnabled=function(self) return self.active end}
  return tap
 end
-local factory=assert(loadfile(helpers.driver_root() .. '/adapters/physical_shortcut_hook.lua'))()
+-- Loaded by module name over the doubles above; the cache is restored below.
+package.loaded['adapters.physical_shortcut_hook']=nil
+local factory=require('adapters.physical_shortcut_hook')
 local function fresh(rows,flags)
  settings=flags or {};tap=nil;callback=nil;source_callback=nil;constructs=0;executed=0;timers={};log={}
  local owner=factory.new(model);settings.owner=owner

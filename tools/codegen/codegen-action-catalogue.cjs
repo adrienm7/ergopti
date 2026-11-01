@@ -29,6 +29,15 @@
  * same file therefore produced three different pickers. Filtering, ordering and
  * validating once, here, leaves each driver a plain data file to load.
  *
+ * WHY EVERY ABSENCE IS EXPLAINED:
+ * AGENTS.md makes every feature cover the three OS, or say why one cannot. A
+ * row that does not claim a driver must therefore carry `reason_<driver>`, a
+ * locale key under platform_reason.*, and may name the actions that do the same
+ * there (`equivalent_<driver>`). The generator refuses a missing reason, a
+ * reason on a driver the row claims, an equivalent the driver does not offer
+ * and a reason key with no English text, then writes the action x OS table of
+ * _shared/modules/actions/README.md from them.
+ *
  * WHY STRICT:
  * Every field, platform token, parameter kind and requirement token is checked.
  * A field this generator does not know would otherwise be dropped on the floor,
@@ -47,6 +56,19 @@ const toml = require('smol-toml');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const CATALOGUE = path.join(SP, '_shared', 'modules', 'actions', 'actions.toml');
+const ENGLISH_LOCALE = path.join(SP, '_shared', 'data', 'locales', 'en.json');
+
+/** The action README whose availability table this generator owns. */
+const README_OUTPUT = 'static/ergopti_plus/_shared/modules/actions/README.md';
+const README_BEGIN =
+	'<!-- BEGIN GENERATED availability: tools/codegen/codegen-action-catalogue.cjs; do not edit -->';
+const README_END = '<!-- END GENERATED availability -->';
+
+/** Locale key prefix of every reason an action gives for a missing driver. */
+const REASON_KEY_PREFIX = 'platform_reason.';
+
+/** Display name of each driver key, in the README table. */
+const DRIVER_NAMES = { ahk: 'Windows', hs: 'macOS', linux: 'Linux' };
 
 /** Driver key -> generated file, relative to the repository root. */
 const OUTPUTS = {
@@ -85,7 +107,10 @@ const PARAMETER_KINDS = new Set([
 	'llm_vision',
 	'llm_language',
 	'app',
-	'program'
+	'program',
+	'command',
+	'path',
+	'apple_shortcut'
 ]);
 
 const SG_FIELDS = new Set([
@@ -101,9 +126,24 @@ const SG_FIELDS = new Set([
 	'is_header',
 	'requires_ahk',
 	'requires_hs',
-	'requires_linux'
+	'requires_linux',
+	'reason_ahk',
+	'reason_hs',
+	'reason_linux',
+	'equivalent_ahk',
+	'equivalent_hs',
+	'equivalent_linux'
 ]);
-const AX_FIELDS = new Set(['platform', 'scalable']);
+const AX_FIELDS = new Set([
+	'platform',
+	'scalable',
+	'reason_ahk',
+	'reason_hs',
+	'reason_linux',
+	'equivalent_ahk',
+	'equivalent_hs',
+	'equivalent_linux'
+]);
 
 /**
  * Requirement tokens each driver can probe. A token with no probe would be a
@@ -131,6 +171,7 @@ function parseRegistry(source) {
 	}
 	validateFamily(data.sg_actions, SG_FIELDS, 'sg_actions');
 	validateFamily(data.ax_actions, AX_FIELDS, 'ax_actions');
+	validateEquivalents(data);
 	validateOrder(data.sg_order.items, data.sg_actions, 'sg_order', true);
 	validateOrder(data.ax_order.items, data.ax_actions, 'ax_order', false);
 	for (const [alias, target] of Object.entries(data.karabiner_aliases || {})) {
@@ -195,6 +236,7 @@ function validateFamily(family, allowed, name) {
 			throw new Error(`${where}: is_header may only be true`);
 		}
 		for (const driver of PLATFORMS) {
+			validateAbsence(row, driver, claimed, where);
 			const tokens = row[`requires_${driver}`];
 			if (tokens === undefined) continue;
 			if (!claimed.includes(driver)) {
@@ -209,6 +251,74 @@ function validateFamily(family, allowed, name) {
 						`${where}: requires_${driver} token "${token}" has no ${driver} probe — ` +
 							'add the probe to the driver before declaring the requirement'
 					);
+				}
+			}
+		}
+	}
+}
+
+/**
+ * Validates the reason and equivalents one row gives for one driver: required
+ * where the row does not claim the driver, refused where it does.
+ * @param {object} row The action row.
+ * @param {string} driver Driver key.
+ * @param {string[]} claimed Drivers the row claims.
+ * @param {string} where Row name for messages.
+ */
+function validateAbsence(row, driver, claimed, where) {
+	const reason = row[`reason_${driver}`];
+	const equivalent = row[`equivalent_${driver}`];
+	if (claimed.includes(driver)) {
+		if (reason !== undefined || equivalent !== undefined) {
+			throw new Error(
+				`${where}: reason_${driver} or equivalent_${driver} on an action that claims ${driver}`
+			);
+		}
+		return;
+	}
+	if (row.is_header === true) return;
+	if (typeof reason !== 'string' || !/^platform_reason\.[a-z0-9_]+$/.test(reason)) {
+		throw new Error(
+			`${where}: not on ${DRIVER_NAMES[driver]}, so reason_${driver} must name the ` +
+				`${REASON_KEY_PREFIX}* locale key that says why (AGENTS.md: every feature covers the three OS)`
+		);
+	}
+	if (equivalent === undefined) return;
+	if (!Array.isArray(equivalent) || equivalent.length === 0) {
+		throw new Error(`${where}: equivalent_${driver} must be a non-empty array of action ids`);
+	}
+	if (
+		equivalent.some((id) => typeof id !== 'string') ||
+		new Set(equivalent).size !== equivalent.length
+	) {
+		throw new Error(`${where}: equivalent_${driver} must list distinct action ids`);
+	}
+}
+
+/**
+ * Checks that every equivalent names a row, of either family, that claims the
+ * driver it is offered for: an equivalent the user cannot bind there is a
+ * dead end.
+ * @param {object} data The decoded registry.
+ */
+function validateEquivalents(data) {
+	const rows = { ...data.ax_actions, ...data.sg_actions };
+	for (const [family, name] of [
+		[data.sg_actions, 'sg_actions'],
+		[data.ax_actions, 'ax_actions']
+	]) {
+		for (const [id, row] of Object.entries(family)) {
+			for (const driver of PLATFORMS) {
+				for (const target of row[`equivalent_${driver}`] || []) {
+					const targetRow = rows[target];
+					if (!targetRow) {
+						throw new Error(`${name}.${id}: equivalent_${driver} "${target}" is not an action`);
+					}
+					if (!platformsOf(targetRow.platform, target).includes(driver)) {
+						throw new Error(
+							`${name}.${id}: equivalent_${driver} "${target}" is not offered on ${DRIVER_NAMES[driver]}`
+						);
+					}
 				}
 			}
 		}
@@ -546,6 +656,129 @@ function renderAhk(model, refresh) {
 const REFRESH = 'npm run codegen:action-catalogue';
 
 /**
+ * Reads one key from a decoded locale, whose keys are flat dotted strings.
+ * @param {object} locale Decoded locale JSON.
+ * @param {string} key Dotted key.
+ * @returns {string|undefined}
+ */
+function localeText(locale, key) {
+	const value = locale[key];
+	return typeof value === 'string' ? value : undefined;
+}
+
+/**
+ * Escapes one Markdown table cell.
+ * @param {string} text Cell text.
+ * @returns {string}
+ */
+function cell(text) {
+	return String(text).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+}
+
+/**
+ * Renders the action x OS availability table and its reason legend.
+ * @param {object} data The validated registry.
+ * @param {object} english Decoded English locale.
+ * @returns {string} The Markdown between the README markers, markers excluded.
+ */
+function renderAvailability(data, english) {
+	const reasons = [];
+	const reasonIndex = new Map();
+	const reasonRef = (key, where) => {
+		if (!reasonIndex.has(key)) {
+			const text = localeText(english, key);
+			if (typeof text !== 'string' || text.trim() === '') {
+				throw new Error(`${where}: reason key "${key}" has no English text in en.json`);
+			}
+			reasons.push({ key, text });
+			reasonIndex.set(key, reasons.length);
+		}
+		return `R${reasonIndex.get(key)}`;
+	};
+	const label = (id, family) => {
+		const text = localeText(english, `sg_actions.${id}`) ?? localeText(english, `ax_actions.${id}`);
+		return text === undefined ? id : text;
+	};
+	const rowsOf = (items, family, name) =>
+		items
+			.filter((item) => family[item] && family[item].is_header !== true)
+			.map((id) => {
+				const row = family[id];
+				const claimed = platformsOf(row.platform, `${name}.${id}`);
+				const cells = PLATFORMS.map((driver) => {
+					if (claimed.includes(driver)) {
+						const req = row[`requires_${driver}`];
+						return req ? `yes (${req.join(', ')})` : 'yes';
+					}
+					const ref = reasonRef(row[`reason_${driver}`], `${name}.${id}`);
+					const eq = row[`equivalent_${driver}`];
+					return eq ? `no, ${ref}; use ${eq.map((e) => '`' + e + '`').join(', ')}` : `no, ${ref}`;
+				});
+				return `| \`${id}\` | ${cell(label(id, family))} | ${cells.map(cell).join(' | ')} |`;
+			});
+	const header = `| Action | Label | ${PLATFORMS.map((d) => DRIVER_NAMES[d]).join(' | ')} |`;
+	const rule = `| --- | --- | ${PLATFORMS.map(() => '---').join(' | ')} |`;
+	const sg = rowsOf(data.sg_order.items, data.sg_actions, 'sg_actions');
+	const ax = rowsOf(data.ax_order.items, data.ax_actions, 'ax_actions');
+	const out = [
+		'',
+		`Generated from \`actions.toml\` by \`${REFRESH}\`; edit the rows there. "yes" lists`,
+		'the requirements the picker checks; "no" points at the reason below and at the',
+		'actions that do the same on that OS. The modifier + key shortcuts',
+		'(`modifier_chords.json`) exist on every OS and are not listed.',
+		'',
+		'### Single actions',
+		'',
+		header,
+		rule,
+		...sg,
+		'',
+		'### Continuous swipes (axis actions)',
+		'',
+		header,
+		rule,
+		...ax,
+		'',
+		'### Reasons',
+		'',
+		'| Ref | Locale key | Reason (English) |',
+		'| --- | --- | --- |',
+		...reasons.map((r, i) => `| R${i + 1} | \`${r.key}\` | ${cell(r.text)} |`),
+		''
+	];
+	return out.join('\n');
+}
+
+/**
+ * Splices the availability table into the README between its markers.
+ * @param {string} readme Current README text.
+ * @param {string} table Text from renderAvailability.
+ * @returns {string}
+ */
+function spliceReadme(readme, table) {
+	const begin = readme.indexOf(README_BEGIN);
+	const end = readme.indexOf(README_END);
+	if (begin < 0 || end < begin) {
+		throw new Error(`${README_OUTPUT} has no GENERATED availability markers`);
+	}
+	return readme.slice(0, begin + README_BEGIN.length) + '\n' + table + '\n' + readme.slice(end);
+}
+
+/**
+ * Generates the README with its availability table.
+ * @param {string} source TOML text.
+ * @param {string} readme Current README text.
+ * @param {object} english Decoded English locale.
+ * @returns {{path: string, text: string}}
+ */
+function generateReadme(source, readme, english) {
+	return {
+		path: README_OUTPUT,
+		text: spliceReadme(readme, renderAvailability(parseRegistry(source), english))
+	};
+}
+
+/**
  * Generates the three driver catalogues from a registry source.
  * @param {string} source TOML text.
  * @returns {Record<string, {path: string, text: string, model: object}>}
@@ -576,6 +809,8 @@ function generateShared(source) {
 module.exports = {
 	generate,
 	generateShared,
+	generateReadme,
+	README_OUTPUT,
 	parseRegistry,
 	buildModel,
 	OUTPUTS,
@@ -588,10 +823,16 @@ module.exports = {
 if (require.main === module) {
 	let generated;
 	let shared;
+	let readme;
 	try {
 		const source = fs.readFileSync(CATALOGUE, 'utf8');
 		generated = generate(source);
 		shared = generateShared(source);
+		readme = generateReadme(
+			source,
+			fs.readFileSync(path.join(ROOT, README_OUTPUT), 'utf8'),
+			JSON.parse(fs.readFileSync(ENGLISH_LOCALE, 'utf8'))
+		);
 	} catch (err) {
 		console.error(`[ERROR] ${err.message}`);
 		process.exit(1);
@@ -607,5 +848,7 @@ if (require.main === module) {
 			`  wrote ${rel} (${model.sgItems.length} picker item(s), ${Object.keys(model.actions).length} action(s))`
 		);
 	}
+	fs.writeFileSync(path.join(ROOT, readme.path), readme.text, 'utf8');
+	console.log(`  wrote ${readme.path}`);
 	console.log('[OK] action catalogues generated.');
 }

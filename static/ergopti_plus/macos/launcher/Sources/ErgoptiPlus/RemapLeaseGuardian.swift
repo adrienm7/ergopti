@@ -60,8 +60,8 @@ private let kGuardianArmedHeader = "ARMED"
 private let kGuardianRecordSuffix = ".lease"
 private let kGuardianAckSuffix = ".armed"
 private let kGuardianArmTimeoutSeconds: TimeInterval = 3
-private let kGuardianArmPollMicroseconds: useconds_t = 10_000
-private let kGuardianSingletonRetryMicroseconds: useconds_t = 10_000
+private let kGuardianArmPollMicroseconds = LauncherTimings.guardianArmPoll.microseconds
+private let kGuardianSingletonRetryMicroseconds = LauncherTimings.guardianSingletonRetry.microseconds
 private let kGuardianMaximumRecordBytes = 256
 let kGuardianMaximumUnacknowledgedRecords = 64
 private let kGuardianSafetyScanSeconds: TimeInterval = 10
@@ -1876,6 +1876,21 @@ func removeLegacyRemapGuardian(
 	return Darwin.unlink(path) == 0
 }
 
+/// True when the job under the guardian label is this app's own per-user
+/// legacy agent: its exact plist bytes for this executable are installed and
+/// launchd holds the label. A record an earlier build left fails the byte check.
+func legacyRemapGuardianIsOwnLoadedAgent(
+	executablePath: String,
+	runner: GuardianLaunchctlRunning = PosixGuardianLaunchctlRunner(),
+	homeDirectory: String = NSHomeDirectory()
+) -> Bool {
+	let path = homeDirectory + "/Library/LaunchAgents/" + kRemapGuardianPlistName
+	guard let data = legacyGuardianPlist(executablePath: executablePath).data(using: .utf8),
+		legacyGuardianPlistMatches(data, path: path)
+	else { return false }
+	return runner.run(arguments: ["print", "gui/\(getuid())/" + kRemapGuardianLabel])
+}
+
 /// Performs one side-effect-free exact health observation.
 func legacyGuardianIsHealthy(_ paths: LeaseGuardianPaths) -> Bool {
 	let singleton = Darwin.open(
@@ -2393,13 +2408,18 @@ func resolveModernRemapGuardianRegistration(
 /// registration); every field launch then came up on the legacy agent. A
 /// record an earlier build left is removed so launchd stops respawning it;
 /// live lease records keep it, since removing a running guardian fences them,
-/// and a pending approval stays the user's decision.
+/// and a pending approval stays the user's decision. Background Items reads
+/// `.enabled` while this app's own legacy agent holds the shared label, so a
+/// repeat registration recognises that agent first and keeps it: removing it
+/// as a stale record was refused and reported `developer_adhoc_reset_refused`
+/// (installed-app CI, 2026-10-31).
 @available(macOS 13.0, *)
 func resolveAdhocRemapGuardianRegistration(
 	service: RemapGuardianModernService,
 	leasesAreEmpty: () -> Bool,
 	guardianHealth: () -> Bool,
 	guardianHasExited: () -> Bool,
+	ownLegacyAgentLoaded: () -> Bool,
 	ensureLegacy: () -> Bool,
 	report: (String) -> Void
 ) -> RemapGuardianRegistrationOutcome {
@@ -2415,6 +2435,12 @@ func resolveAdhocRemapGuardianRegistration(
 		report("ad hoc build: Login Items approval is pending; the registration is not changed")
 		return RemapGuardianRegistrationOutcome(status: .requiresApproval, note: .adhocResetDeferred)
 	case .enabled:
+		// An ad hoc build never registers the job: the label is held by the
+		// legacy agent this build installed, not by a stale record.
+		if ownLegacyAgentLoaded() {
+			report("ad hoc build: the enabled status is this app's own legacy agent; it is kept")
+			return legacyOutcome(.adhocLegacyOnly)
+		}
 		guard leasesAreEmpty() else {
 			report("ad hoc build: lease records are live; the Background Items record is kept")
 			if guardianHealth() {
@@ -2470,8 +2496,25 @@ func currentProcessSigningInformation() -> [String: Any]? {
 	return information as? [String: Any]
 }
 
+/// True for the Background Items states under which the legacy agent's own
+/// health is authoritative; they authorize the same lease activity
+/// (modernGuardianActivationIsAuthorized).
+@available(macOS 13.0, *)
+private func remapGuardianStatusDefersToLegacyHealth(_ status: SMAppService.Status) -> Bool {
+	switch status {
+	case .enabled, .notRegistered, .notFound: return true
+	case .requiresApproval: return false
+	@unknown default: return false
+	}
+}
+
 /// Observes modern authorization without registering, bootstrapping, or
 /// otherwise changing ServiceManagement state. Only exact live health is ready.
+/// The status may move between enabled and not registered while the health is
+/// read: Background Items reads `.enabled` once the legacy agent holds the
+/// shared label, and a readback straight after its bootstrap answered
+/// `unavailable` for a healthy guardian (installed-app CI, 2026-11-01). Such a
+/// move keeps the same authorization; any other change still fails closed.
 @available(macOS 13.0, *)
 func observeModernRemapGuardianRegistration(
 	service: RemapGuardianModernService,
@@ -2487,7 +2530,7 @@ func observeModernRemapGuardianRegistration(
 		let healthy = guardianHealth()
 		let statusAfterHealth = service.status
 		if statusAfterHealth == .requiresApproval { return .requiresApproval }
-		guard statusAfterHealth == statusBeforeHealth else { return .unavailable }
+		guard remapGuardianStatusDefersToLegacyHealth(statusAfterHealth) else { return .unavailable }
 		return healthy ? .ready : .unavailable
 	case .requiresApproval:
 		return .requiresApproval
@@ -2580,6 +2623,7 @@ func remapGuardianRegistrationOutcome(
 					leasesAreEmpty: { remapGuardianLeaseRecordsAreEmpty(paths) },
 					guardianHealth: { legacyGuardianIsHealthy(paths) },
 					guardianHasExited: { remapGuardianJobHasExited(paths) },
+					ownLegacyAgentLoaded: { legacyRemapGuardianIsOwnLoadedAgent(executablePath: executablePath) },
 					ensureLegacy: { ensureLegacyRemapGuardianRegistered(executablePath: executablePath) },
 					report: { LauncherLog.write($0) }
 				)

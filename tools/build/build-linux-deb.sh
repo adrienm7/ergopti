@@ -85,6 +85,12 @@ echo "Package: $PACKAGE_NAME $VERSION ($ARCH)"
 install -D -m 644 "$BUILD_DIR/linux/install/99-ergopti-uinput.rules" "$DEB_ROOT/etc/udev/rules.d/99-ergopti-uinput.rules"
 install -D -m 644 "$BUILD_DIR/linux/install/ergopti-uinput.conf" "$DEB_ROOT/etc/modules-load.d/ergopti-uinput.conf"
 
+# The private runtime the AppImage stages on the oldest supported LTS: LuaJIT,
+# luv, luafilesystem, luaposix, curl, sqlite3, openssl and zstd run from here,
+# never from a host package (owned runtimes, PIN).
+bash "$SCRIPT_DIR/stage-linux-private-runtime.sh" "$BUILD_DIR/AppDir" "$DEB_ROOT/usr/lib/ergopti/runtime" /usr/lib/ergopti
+install -m 644 "$BUILD_DIR/AppDir/usr/lib/ergopti/network-runtime-env.sh" "$DEB_ROOT/usr/lib/ergopti/network-runtime-env.sh"
+
 file_count=$(find "$DEB_ROOT/usr/lib/ergopti" -type f | wc -l)
 echo "  $file_count files copied to /usr/lib/ergopti/"
 
@@ -94,10 +100,11 @@ echo "  $file_count files copied to /usr/lib/ergopti/"
 cat > "$DEB_ROOT/usr/bin/ergopti" << 'WRAPPER_EOF'
 #!/bin/bash
 # ergopti launcher — delegates to the LuaJIT driver.
-# Set LUA_PATH so all driver and shared modules resolve correctly.
+# The package's private runtime decides LUA_PATH, LUA_CPATH and the programs
+# the driver runs (network-runtime-env.sh, shared with the AppImage).
+set -euo pipefail
 DRIVER_ROOT="/usr/lib/ergopti"
-SHARED_LUA="$DRIVER_ROOT/_shared/lua"
-export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;"
+source "$DRIVER_ROOT/network-runtime-env.sh" "$DRIVER_ROOT/runtime" "$DRIVER_ROOT"
 exec bash "$DRIVER_ROOT/install/launch.sh" "$@"
 WRAPPER_EOF
 chmod 755 "$DEB_ROOT/usr/bin/ergopti"
@@ -174,8 +181,8 @@ Package: $PACKAGE_NAME
 Version: $VERSION
 Architecture: $ARCH
 Maintainer: Ergopti Contributors <ergopti@example.com>
-Depends: luajit (>= 2.1), xclip, libnotify-bin, curl, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, zenity, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1, glib-networking, gsettings-desktop-schemas, lua-luv, openssl, sqlite3, xdg-utils, libsecret-tools, libxkbcommon-x11-0, libx11-6, libx11-xcb1, libssl3t64 | libssl3
-Recommends: lua-luv, lua-filesystem, openssl, xdotool, wmctrl, wl-clipboard
+Depends: xclip, libnotify-bin, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1, glib-networking, gsettings-desktop-schemas, xdg-utils, libsecret-tools, libxkbcommon-x11-0, libx11-6, libx11-xcb1
+Recommends: xdotool, wmctrl, wl-clipboard
 Section: utils
 Priority: optional
 Homepage: https://$ERGOPTI_HOST_GITHUB/adrienm7/ergopti

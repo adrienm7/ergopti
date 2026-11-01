@@ -1056,7 +1056,7 @@ function render_repetitions_kpi() {
 	const doublings = [];
 
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		total_count += item.count || 0;
 		// Bigram is a "doubling" when both grapheme clusters are identical
 		if (chars.length === 2 && chars[0] === chars[1]) {
@@ -1270,7 +1270,7 @@ function render_sfb_kpi() {
 	let bigram_total = 0;
 
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		const count = item.count || 0;
 		bigram_total += count;
@@ -1346,7 +1346,7 @@ function render_sfb_kpi() {
 	let sfb_avoided_hs = 0;
 	let bg_hs_total = 0;
 	Object.entries(hs_bg).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		const count = item.count || 0;
 		bg_hs_total += count;
@@ -1590,7 +1590,7 @@ function render_distance_kpi() {
 	const char_to_kc = _build_char_to_kc_map();
 	const kc_bigram = {}; // kc_a → kc_b → count
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		const kc_a = char_to_kc[chars[0].toLowerCase()];
 		const kc_b = char_to_kc[chars[1].toLowerCase()];
@@ -1985,7 +1985,7 @@ function render_ergo_bigram_kpi() {
 		top_roll_out = [];
 
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		const count = item.count || 0;
 		if (count <= 0) return;
@@ -2178,7 +2178,7 @@ function render_ergo_trigram_kpi() {
 		top_bad_redir = [];
 
 	Object.entries(tg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 3) return;
 		const count = item.count || 0;
 		if (count <= 0) return;
@@ -2313,7 +2313,7 @@ function render_errors_kpi() {
 		total_errs = 0;
 	const rows = [];
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		// Skip bigrams whose second char is a control / bracket marker (already
 		// represented by [BS] / [ENTER] etc.) — they're not "user-correctable" pairs.

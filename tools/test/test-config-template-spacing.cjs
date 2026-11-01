@@ -28,11 +28,17 @@ function headerSpacings(text) {
 	return found;
 }
 
-for (const driver of ['windows', 'macos', 'linux']) {
-	const text = fs.readFileSync(
-		paths.shared('..', driver, '_generated', 'config_template.toml'),
-		'utf8'
-	);
+// The shared template every driver template is projected from carries the
+// same spacing, so the projection never has to re-space a block.
+const TEMPLATES = {
+	windows: paths.shared('..', 'windows', '_generated', 'config_template.toml'),
+	macos: paths.shared('..', 'macos', '_generated', 'config_template.toml'),
+	linux: paths.shared('..', 'linux', '_generated', 'config_template.toml'),
+	shared: paths.shared('_generated', 'config_template.toml')
+};
+
+for (const [driver, file] of Object.entries(TEMPLATES)) {
+	const text = fs.readFileSync(file, 'utf8');
 	assert(!text.includes('\r'), `${driver} template must be stored with LF`);
 	const spacings = headerSpacings(text);
 	assert(spacings.length > 20, `${driver} template must expose its real sections`);

@@ -255,16 +255,23 @@ platforms = ["ahk", "hs", "linux"]
 
 # The tray's own appearance, which is not a keyboard feature. macOS alone draws a
 # menubar icon whose variant the user picks.
+# The proxy override of _shared/modules/network/proxy_override.json. macOS and
+# Linux hold it under this same key in their native store; config.toml is the
+# Windows settings store.
+[sections.network]
+description_key = "menu.debug.proxy_override"
+platforms = ["ahk"]
+reason_key = "platform_reason.proxy_override_is_native_settings"
+
 [sections.ui]
 description_key = "menu.ui"
 platforms = ["hs"]
 reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
-# Linux native simultaneous timing and symmetry. Third slots remain neutral.
+# Native simultaneous timing and symmetry. Third slots remain neutral.
 [sections.mod_combos]
 description_key = "menu.shortcuts.key_combinations"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
+platforms = ["ahk", "hs", "linux"]
 
 [sections.shortcuts.key_combination_taps]
 description_key = "menu.shortcuts.key_combinations"
@@ -1378,7 +1385,7 @@ description_key = "menu.hotstrings.personal.test"
 
 [[features.llm]]
 id = "enabled"
-requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput", "zenity"], windows = ["ollama", "webview2"] }
+requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = false
 recommended = false
 input_altering = true
@@ -2164,28 +2171,26 @@ description_key = "menu.shortcuts.key_combinations"
 
 
 
-# Linux declares its own values; no runtime fallback to Mac hs_timeouts.
+# Windows and Linux declare their own values; no runtime fallback to Mac hs_timeouts.
 [[features.mod_combos]]
 id = "simultaneous_threshold_ms"
-platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = 100
 recommended = 100
 input_altering = false
 type = "number"
 description_key = "menu.tapholds.simultaneous_dialog_title"
-reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[features.mod_combos]]
 id = "symmetric"
-platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = false
 recommended = false
 input_altering = false
 type = "boolean"
 description_key = "menu.tapholds.symmetric"
-reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # ====================================
 # ===== 3.5.6 shortcuts.personal =====
@@ -2549,6 +2554,17 @@ recommended = "open_file_manager"
 input_altering = true
 type = "action"
 description_key = "shortcuts.label_ctrl_e"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_g"
+platforms = ["hs"]
+requires = { macos = [] }
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "open_chatgpt"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_g"
 
 [[features.shortcuts.keyboard]]
 id = "secondary_h"
@@ -2937,7 +2953,7 @@ description_key = "menu.caps_word.pointer.other_buttons"
 [[features.gestures]]
 id = "enabled"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"], windows = [] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = false
 recommended = true
 input_altering = true
@@ -2947,7 +2963,7 @@ description_key = "menu.gestures.enabled"
 [[features.gestures]]
 id = "swipe_3_down"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"], windows = [] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "tab_close", hs = "tab_next", linux = "none" }
 input_altering = true
@@ -2957,7 +2973,7 @@ description_key = "menu.gestures.swipe_3_down"
 [[features.gestures]]
 id = "swipe_3_left"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"], windows = [] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "tab_prev", hs = "sel_word_prev", linux = "none" }
 input_altering = true
@@ -2967,7 +2983,7 @@ description_key = "menu.gestures.swipe_3_left"
 [[features.gestures]]
 id = "swipe_3_right"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"], windows = [] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "tab_next", hs = "sel_word_next", linux = "none" }
 input_altering = true
@@ -2977,7 +2993,7 @@ description_key = "menu.gestures.swipe_3_right"
 [[features.gestures]]
 id = "swipe_3_up"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"], windows = [] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "tab_new", hs = "tab_prev", linux = "none" }
 input_altering = true
@@ -2987,7 +3003,7 @@ description_key = "menu.gestures.swipe_3_up"
 [[features.gestures]]
 id = "swipe_4_down"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"], windows = [] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "win_app_prev", hs = "none", linux = "none" }
 input_altering = true
@@ -2997,7 +3013,7 @@ description_key = "menu.gestures.swipe_4_down"
 [[features.gestures]]
 id = "swipe_4_left"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"], windows = [] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "desktop_prev", hs = "none", linux = "none" }
 input_altering = true
@@ -3007,7 +3023,7 @@ description_key = "menu.gestures.swipe_4_left"
 [[features.gestures]]
 id = "swipe_4_right"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"], windows = [] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "desktop_next", hs = "none", linux = "none" }
 input_altering = true
@@ -3017,7 +3033,7 @@ description_key = "menu.gestures.swipe_4_right"
 [[features.gestures]]
 id = "swipe_4_up"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"], windows = [] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "win_app_next", hs = "none", linux = "none" }
 input_altering = true
@@ -3027,7 +3043,7 @@ description_key = "menu.gestures.swipe_4_up"
 [[features.gestures]]
 id = "tap_3"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"], windows = [] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "left_click_toggle", hs = "left_click_toggle", linux = "left_click_toggle" }
 input_altering = true
@@ -3037,7 +3053,7 @@ description_key = "menu.gestures.tap_3"
 [[features.gestures]]
 id = "tap_4"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"], windows = [] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "alt_tab_monitor", hs = "win_app_next", linux = "alt_tab_monitor" }
 input_altering = true
@@ -3048,7 +3064,7 @@ description_key = "menu.gestures.tap_4"
 [[features.gestures]]
 id = "swipe_2_left"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3059,7 +3075,7 @@ description_key = "menu.gestures.swipe_2_left"
 [[features.gestures]]
 id = "swipe_5_up"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3070,7 +3086,7 @@ description_key = "menu.gestures.swipe_5_up"
 [[features.gestures]]
 id = "swipe_5_down"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3081,7 +3097,7 @@ description_key = "menu.gestures.swipe_5_down"
 [[features.gestures]]
 id = "swipe_5_left"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3092,7 +3108,7 @@ description_key = "menu.gestures.swipe_5_left"
 [[features.gestures]]
 id = "swipe_5_right"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3103,7 +3119,7 @@ description_key = "menu.gestures.swipe_5_right"
 [[features.gestures]]
 id = "swipe_2_right"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3114,7 +3130,7 @@ description_key = "menu.gestures.swipe_2_right"
 [[features.gestures]]
 id = "swipe_2_up"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3125,7 +3141,7 @@ description_key = "menu.gestures.swipe_2_up"
 [[features.gestures]]
 id = "swipe_2_down"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3136,7 +3152,7 @@ description_key = "menu.gestures.swipe_2_down"
 [[features.gestures]]
 id = "swipe_2_left_down"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3147,7 +3163,7 @@ description_key = "menu.gestures.swipe_2_left_down"
 [[features.gestures]]
 id = "swipe_2_left_up"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3158,7 +3174,7 @@ description_key = "menu.gestures.swipe_2_left_up"
 [[features.gestures]]
 id = "swipe_2_right_down"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3169,7 +3185,7 @@ description_key = "menu.gestures.swipe_2_right_down"
 [[features.gestures]]
 id = "swipe_2_right_up"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3182,7 +3198,7 @@ description_key = "menu.gestures.swipe_2_right_up"
 [[features.gestures]]
 id = "swipe_3_left_down"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3193,7 +3209,7 @@ description_key = "menu.gestures.swipe_3_left_down"
 [[features.gestures]]
 id = "swipe_3_left_up"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3204,7 +3220,7 @@ description_key = "menu.gestures.swipe_3_left_up"
 [[features.gestures]]
 id = "swipe_3_right_down"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3215,7 +3231,7 @@ description_key = "menu.gestures.swipe_3_right_down"
 [[features.gestures]]
 id = "swipe_3_right_up"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3227,7 +3243,7 @@ description_key = "menu.gestures.swipe_3_right_up"
 [[features.gestures]]
 id = "swipe_3_horiz"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended_per_platform = { hs = "words", linux = "none" }
@@ -3239,7 +3255,7 @@ description_key = "menu.gestures.swipe_3_horiz"
 [[features.gestures]]
 id = "swipe_4_left_down"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3250,7 +3266,7 @@ description_key = "menu.gestures.swipe_4_left_down"
 [[features.gestures]]
 id = "swipe_4_left_up"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3261,7 +3277,7 @@ description_key = "menu.gestures.swipe_4_left_up"
 [[features.gestures]]
 id = "swipe_4_right_down"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3272,7 +3288,7 @@ description_key = "menu.gestures.swipe_4_right_down"
 [[features.gestures]]
 id = "swipe_4_right_up"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3284,7 +3300,7 @@ description_key = "menu.gestures.swipe_4_right_up"
 [[features.gestures]]
 id = "swipe_4_horiz"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended_per_platform = { hs = "spaces", linux = "none" }
@@ -3296,7 +3312,7 @@ description_key = "menu.gestures.swipe_4_horiz"
 [[features.gestures]]
 id = "swipe_5_left_down"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3307,7 +3323,7 @@ description_key = "menu.gestures.swipe_5_left_down"
 [[features.gestures]]
 id = "swipe_5_left_up"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3318,7 +3334,7 @@ description_key = "menu.gestures.swipe_5_left_up"
 [[features.gestures]]
 id = "swipe_5_right_down"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3329,7 +3345,7 @@ description_key = "menu.gestures.swipe_5_right_down"
 [[features.gestures]]
 id = "swipe_5_right_up"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3341,7 +3357,7 @@ description_key = "menu.gestures.swipe_5_right_up"
 [[features.gestures]]
 id = "swipe_5_horiz"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended_per_platform = { hs = "windows", linux = "none" }
@@ -3353,7 +3369,7 @@ description_key = "menu.gestures.swipe_5_horiz"
 [[features.gestures]]
 id = "tap_2"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -3364,7 +3380,7 @@ description_key = "menu.gestures.tap_2"
 [[features.gestures]]
 id = "tap_5"
 platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool", "zenity"] }
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
@@ -4394,6 +4410,16 @@ description_key = "menu.shortcuts.key_combinations"
 # The macOS menubar icon: v1 is the simple glyph, v2 the detailed Ergopti logo.
 # It lived in hs.settings (menubar_logo_variant) with its default written twice
 # in the driver; it is a config.toml setting like every other one now.
+[[features.network]]
+id = "proxy_override"
+platforms = ["ahk"]
+requires = { windows = [] }
+default = ""
+recommended = ""
+input_altering = false
+type = "string"
+description_key = "menu.debug.proxy_override"
+
 [[features.ui]]
 id = "menubar_icon"
 platforms = ["hs"]
@@ -4445,17 +4471,6 @@ recommended = true
 input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_wrap_text"
-platforms = ["hs"]
-requires = { macos = [] }
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_g"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_g"
 platforms = ["hs"]
 requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"

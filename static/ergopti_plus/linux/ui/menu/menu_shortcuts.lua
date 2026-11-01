@@ -10,6 +10,7 @@
 
 local M = {}
 
+local SaveFailure = require("config_save_failure")
 local ParameterLabel = require("action_parameter_label")
 local RowDialect = require("menu.row_dialect")
 local Logger = require("logger.shim")
@@ -22,7 +23,7 @@ if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 local _fill = require("ui.menu.menu_dialogs")._fill
 local prompt_text = require("ui.menu.menu_dialogs").prompt_text
 local show_error = require("ui.menu.menu_dialogs").show_error
-local zenity_plain = require("ui.menu.menu_dialogs").zenity_plain
+local plain_markup = require("ui.menu.menu_dialogs").plain_markup
 local assign_parameterized_action = require("ui.menu.menu_dialogs").assign_parameterized_action
 local open_action_picker = require("ui.menu.menu_dialogs").open_action_picker
 local slot_binding_rows = require("ui.menu.menu_dialogs").slot_binding_rows
@@ -408,7 +409,7 @@ local function _build_shortcuts(ctx)
 			open_picker = open_action_picker, error = show_error,
 			prompt_delay = function(current, declared)
 				return TextPrompt.ask(i18n_safe("menu.tapholds.simultaneous_dialog_title"),
-					zenity_plain(string.format(i18n_safe("menu.tapholds.simultaneous_dialog_prompt"), declared)), tostring(current))
+					plain_markup(string.format(i18n_safe("menu.tapholds.simultaneous_dialog_prompt"), declared)), tostring(current))
 			end,
 			-- A pair's hold opens the shared action picker, titled by its slot
 			-- and the pair, with the hold options the provider lists.
@@ -435,9 +436,12 @@ local function _build_shortcuts(ctx)
 					return require("ui.app_chooser").pick(require("adapters.shell_runner"), gestures.get_action_parameter_prompt(action))
 				end
 				local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", gestures.get_action_label(action))
+				if require("ui.user_action_editor").KINDS[spec] then
+					return require("ui.user_action_editor").ask(spec, title, gestures.get_action_parameter_prompt(action), prior)
+				end
 				-- A backend is picked from a list, as on the action picker page.
 				if spec == "llm_vision" then return require("ui.vision_parameter_prompt").ask(title, prior) end
-				return prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
+				return prompt_text(title, plain_markup(gestures.get_action_parameter_prompt(action)), prior)
 			end,
 		})
 	end
@@ -488,7 +492,7 @@ local function _build_shortcuts(ctx)
 			end
 			if not called or committed ~= true then
 				Logger.error(LOG, "The script chord switch did not acknowledge durable publication.")
-				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+				SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 				return false
 			end
 			require("ui.menu.feature_notice").feature(i18n_safe("notify.script_control"), not current)
@@ -521,7 +525,7 @@ local function _build_shortcuts(ctx)
 		local settings = AutoOff.settings()
 		local function changed(committed)
 			if committed ~= true then
-				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+				SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 				return false
 			end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -627,7 +631,7 @@ local function _build_shortcuts(ctx)
 		end
 		if not called or committed ~= true then
 			Logger.error(LOG, "The shortcuts master did not acknowledge durable publication.")
-			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 			return false
 		end
 		require("ui.menu.feature_notice").feature(i18n_safe("menu.shortcuts.title"), not current)

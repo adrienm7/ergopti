@@ -26,13 +26,13 @@
 			"keyboard_hook_api": { "pattern": "SetWindowsHookEx", "max": 2 },
 			"key_state_polling": {
 				"pattern": "GetAsyncKeyState|GetKeyState|GetKeyboardState",
-				"max": 59
+				"max": 57
 			},
 			"clipboard_listener": {
 				"pattern": "AddClipboardFormatListener|SetClipboardViewer|OnClipboardChange",
 				"max": 3
 			},
-			"send_input_api": { "pattern": "SendInput", "max": 124 },
+			"send_input_api": { "pattern": "SendInput", "max": 122 },
 			"script_host": { "pattern": "WScript|cscript|mshta", "max": 2 },
 			"elevation_wording": {
 				"pattern": "RunAs|requireAdministrator|highestAvailable|\\bUAC\\b",
@@ -59,16 +59,16 @@
 		},
 		"ceilings": {
 			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 1 },
-			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 3 },
+			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 1 },
 			"scriptblock_create": { "pattern": "\\[ScriptBlock\\]::Create", "max": 1 },
 			"inline_csharp_compile": { "pattern": "Add-Type", "max": 18 },
-			"pinvoke_declaration": { "pattern": "DllImport", "max": 54 },
+			"pinvoke_declaration": { "pattern": "DllImport", "max": 51 },
 			"base64_decode": { "pattern": "FromBase64String", "max": 1 },
 			"powershell_mentions": { "pattern": "powershell", "max": 9 },
 			"send_input_api": { "pattern": "SendInput", "max": 127 },
 			"download_api": {
 				"pattern": "URLDownloadToFile|DownloadFile|Invoke-WebRequest|Invoke-RestMethod",
-				"max": 3
+				"max": 0
 			},
 			"script_host": { "pattern": "WScript|cscript|mshta", "max": 1 }
 		}

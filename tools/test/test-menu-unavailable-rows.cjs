@@ -168,6 +168,8 @@ function rowErrors(where, row) {
 }
 
 const errors = [];
+require('../lib/config-key-source-view.cjs').install(); // driver source may name a generated constant
+
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
 const locales = fs
 	.readdirSync(LOCALES)

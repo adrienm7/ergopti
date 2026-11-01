@@ -1336,6 +1336,25 @@ function checkFreshSourceBoot(body) {
 const sourceBoot = pipeline.job('test-ahk');
 const integrationBoot = pipeline.job('integration-ahk');
 checkFreshSourceBoot(integrationBoot);
+
+// pwsh keeps only the last native exit status: an unchecked first test died
+// with a green step, and hid that the AutoHotkey variable had the wrong name.
+{
+	const step = pipeline.step(
+		integrationBoot,
+		'Run the proxy relay end to end through the fake network'
+	);
+	const lines = pipeline.runOf(step);
+	const tests = lines.flatMap((line, index) => (/^\s*node /.test(line) ? [index] : []));
+	assert.equal(tests.length, 3, 'the relay, override and Perplexity tests all run');
+	for (const index of tests)
+		assert.match(lines[index + 1], /if \(\$LASTEXITCODE -ne 0\) \{ exit \$LASTEXITCODE \}/);
+	const overrideSource = fs.readFileSync(
+		path.join(__dirname, 'test-windows-proxy-override-e2e.cjs'),
+		'utf8'
+	);
+	assert.match(overrideSource, /process\.env\.ERGOPTI_AHK_EXE/, 'the name the step exports');
+}
 assert.ok(
 	!pipeline.steps(sourceBoot).some((step) => step.name.includes('fresh Git clone')),
 	'the fresh-clone boot runs once, in the Integration stage'
@@ -2556,7 +2575,12 @@ console.log('Cold exact uint64 identity controls: 8 admissions, 60 refusals');
 
 /** Pins a native arm64 full application job after packaging and without publication. */
 function checkColdJob(body) {
-	const role = macRoleBody(body, 'cold-bootstrap-native', 7);
+	// Eight: the pinned Go floor joined so the application can build its proxy relay.
+	const role = macRoleBody(body, 'cold-bootstrap-native', 8);
+	assert.match(
+		role,
+		/uses: actions\/setup-go@v5\n(?:.*\n)*?\s+go-version-file: static\/ergopti_plus\/_shared\/go\/native_http\/go\.mod/
+	);
 	const prerequisites = pipeline.step(role, 'Require actual arm64 cold runtime prerequisites');
 	assert.match(prerequisites, /test -x \/usr\/bin\/sandbox-exec/);
 	assert.match(prerequisites, /test \"\$\(uname -m\)\" = arm64/);

@@ -116,11 +116,10 @@ io.open = function(path, mode)
 	return real_open(path, mode)
 end
 
--- User-visible error dialogs: zenity/kdialog errors, and notifications raised
+-- User-visible error dialogs: the owned dialog's errors, and notifications raised
 -- at the error level.
 local function watch_command(command)
-	if type(command) == "string" and (command:find("zenity%s+%-%-error") or command:find("kdialog%s+%-%-error")
-		or command:find("kdialog%s+%-%-sorry")) then
+	if type(command) == "string" and command:find("dialog_host%.lua'%s+%-%-error") then
 		record("DIALOG", command:sub(1, 200))
 	end
 end
@@ -187,6 +186,13 @@ if SEED and SEED ~= "" then
 	local source = assert(real_open(SEED, "rb"))
 	local content = source:read("*a")
 	source:close()
+	-- Stamped at the oldest version, so the boot climbs the chain as a release file does.
+	if not content:find("schema_version%s*=") then
+		local registry = assert(real_open(DRIVER .. "/../_shared/core/config_schema/migrations.toml", "rb"))
+		local text = registry:read("*a")
+		registry:close()
+		content = "[_meta]\nschema_version = " .. assert(text:match("\noldest_version = (%d+)")) .. "\n\n" .. content
+	end
 	local fh = assert(real_open(target, "wb"))
 	fh:write(content)
 	fh:close()

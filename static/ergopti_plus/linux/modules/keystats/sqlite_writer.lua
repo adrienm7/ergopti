@@ -46,6 +46,7 @@ local AppCategoryStore = require("keystats.app_category_store")
 local RegularFileReader = require("infra.regular_file_reader")
 local ErrorDescription = require("error_description")
 local Queries = require("keystats.queries")
+local TokenEncoding = require("keystats.token_encoding")
 local PrivateSqlite = nil
 
 -- How many session durations one application-day keeps. Read from the shared
@@ -95,14 +96,12 @@ local unpack_values = table.unpack or unpack
 --- @return boolean
 local function _check_sqlite3()
 	if _available ~= nil then return _available end
-	-- command -v, the shell's own lookup: `which` is a separate package that
-	-- Arch's base image and other minimal systems do not ship, and there the
-	-- probe reported sqlite3 missing and switched metrics to the JSON fallback.
-	local ok = os.execute("command -v sqlite3 >/dev/null 2>&1")
-	_available = (ok == true or ok == 0)
+	-- The private runtime's sqlite3 (infra/owned_programs.lua): every package
+	-- carries it, so its absence is a broken install, not a missing host package.
+	local Owned = require("infra.owned_programs")
+	_available = Owned.available("sqlite3")
 	if not _available then
-		Logger.warn(LOG, "sqlite3 CLI not found — SQLite persistence disabled.")
-		Logger.warn(LOG, "  Install: sudo apt-get install sqlite3")
+		Logger.error(LOG, "sqlite3 (%s) is not available — SQLite persistence disabled.", Owned.path("sqlite3"))
 	end
 	return _available
 end
@@ -363,6 +362,51 @@ function M.flush_transport_available()
 	return require("infra.sqlite_batch_process").is_available() == true
 end
 
+--- Moves a store to the current n-gram token encoding, once. This database is
+--- the only copy of its derived keys: unlike Windows and macOS there is no ledger
+--- replay, so the keys are rewritten in place. VACUUM INTO first leaves a
+--- consistent backup beside it, the update is one transaction that also records
+--- the version. The caller stops using a store this refuses: writing new keys
+--- beside old ones would make a later retry escape them twice.
+--- @return boolean True once the store holds the current encoding.
+function M.ensure_token_encoding()
+	local recorded = _query_scalar("SELECT value FROM meta WHERE key='ngram_token_encoding';")
+	if recorded == tostring(TokenEncoding.VERSION) then return true end
+	local keys = {}
+	for table_name in pairs(TokenEncoding.MIGRATED_FAMILIES) do
+		local output = _query_output("SELECT DISTINCT hex(token) FROM " .. table_name .. " WHERE instr(token,'[')>0;")
+		if output == nil then
+			Logger.error(LOG, "Cannot read the n-gram keys of %s for their migration.", table_name)
+			return false
+		end
+		local family = {}
+		for hex in output:gmatch("[^\n]+") do
+			family[#family + 1] = (hex:gsub("%x%x", function(pair) return string.char(tonumber(pair, 16)) end))
+		end
+		keys[table_name] = family
+	end
+	local statements = TokenEncoding.migration_statements(keys)
+	if #statements > 0 then
+		local backup = _db_path .. TokenEncoding.BACKUP_SUFFIX
+		local fh = io.open(backup, "rb")
+		if fh then
+			fh:close()
+		elseif not _exec("VACUUM INTO '" .. backup:gsub("'", "''") .. "';") then
+			Logger.error(LOG, "Cannot back the metrics store up before migrating its n-gram keys.")
+			return false
+		end
+	end
+	statements[#statements + 1] = string.format(
+		"INSERT OR REPLACE INTO meta (key, value) VALUES ('ngram_token_encoding','%d');", TokenEncoding.VERSION)
+	if not _exec_raw_batch(table.concat(statements, "\n")) then
+		Logger.error(LOG, "The n-gram key migration was refused; the store is unchanged.")
+		return false
+	end
+	Logger.info(LOG, "Metrics store moved to n-gram token encoding %d (%d statement(s)).",
+		TokenEncoding.VERSION, #statements - 1)
+	return true
+end
+
 --- Opens (or creates) the SQLite database at the given path and bootstraps the
 --- canonical schema on first open.
 --- @param db_path string Absolute path to the .sqlite file (e.g. ~/.local/share/ergopti/metrics.sqlite).
@@ -518,6 +562,13 @@ function M.register_device(device_id, device_name, os_name, os_version, host_sig
 	local accepted = _exec(sql)
 	if accepted then Logger.debug(LOG, "Device registered.") end
 	return accepted
+end
+
+--- Whether semantic media entries can be stored now: an open database whose media
+--- schema and five-key catalogue were admitted, with no unresolved media terminal.
+--- @return boolean available
+function M.media_available()
+	return M.is_available() and _media_policy ~= nil and _media_terminal_debt == nil
 end
 
 --- Stores already admitted semantic media entries in one native transaction.
@@ -876,6 +927,26 @@ _raw_sql.system = function(device_id, events, first_id)
 			metadata_json = type(ev.metadata) == "table" and Json.encode(ev.metadata) or nil,
 		})
 	end
+	return table.concat(statements, "\n")
+end
+
+--- Plans admitted semantic media entries as raw events_system rows and their
+--- derived press and hold rows, so the flush that owns the raw source commits
+--- its projections in the same transaction (media never reaches the numeric
+--- heatmap tables).
+--- @param device_id string Persisted collector partition.
+--- @param events table Ordered physical_media_press/release entries.
+--- @param first_id integer First reserved raw-event identifier.
+--- @param threshold_ms integer Shared inclusive tap threshold.
+_raw_sql.media = function(device_id, events, first_id, threshold_ms)
+	assert(_media_policy ~= nil, "Semantic media policy is not admitted")
+	local statements, batch = {}, { media_ngram = {}, media_hold = {} }
+	MediaStore.replay(_media_policy, batch, events, threshold_ms)
+	for index, event in ipairs(events) do
+		statements[#statements + 1] = MediaStore.raw_sql(device_id, first_id + index - 1, event, Json.encode)
+	end
+	for _, row in pairs(batch.media_ngram) do statements[#statements + 1] = MediaStore.press_sql(device_id, row) end
+	for _, row in pairs(batch.media_hold) do statements[#statements + 1] = MediaStore.hold_sql(device_id, row) end
 	return table.concat(statements, "\n")
 end
 
@@ -1568,8 +1639,14 @@ function M.start_flush(device_id, payload)
 	payload.raw.windows = payload.raw.windows or {}
 	payload.raw.sessions = payload.raw.sessions or {}
 	payload.raw.system = payload.raw.system or {}
+	payload.raw.media = payload.raw.media or {}
+	-- Media rows need the admitted policy and the tap threshold their holds are split by.
+	if #payload.raw.media > 0 and (not M.media_available() or type(payload.media_threshold_ms) ~= "number") then
+		return nil
+	end
+	local media_threshold_ms = payload.media_threshold_ms
 	local path, count = _db_path, 0
-	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions", "system" }
+	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions", "system", "media" }
 	for _, name in ipairs(families) do
 		array(payload.raw[name])
 		count = count + #payload.raw[name]
@@ -1600,7 +1677,8 @@ function M.start_flush(device_id, payload)
 		for _, name in ipairs(families) do
 			local rows = payload.raw[name]
 			if #rows > 0 then
-				statements[#statements + 1] = assert(_raw_sql[name](device_id, rows, cursor))
+				statements[#statements + 1] = assert(_raw_sql[name](device_id, rows, cursor,
+					name == "media" and media_threshold_ms or nil))
 				cursor = cursor + #rows
 			end
 		end

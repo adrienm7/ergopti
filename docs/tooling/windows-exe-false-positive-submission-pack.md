@@ -19,30 +19,34 @@ state, every count) to the job summary and to the artifact `ergoptiplus-av-surfa
 
 Measured on a local Ahk2Exe build of `dev` (2026-10-23, 11 624 960 bytes, unsigned):
 
-| Family                                           | Compiled script | Bundled text files                    | Where it comes from                                                                                                          |
-| ------------------------------------------------ | --------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `keylog` wording                                 | 0 (forbidden)   | 0 (forbidden)                         | The keystats rename is complete in shipped text; `KeylogConst` was the last identifier (commit `ae8ed7788e`)                 |
-| `SetWindowsHookEx`                               | 2               | 0 (forbidden)                         | Only `infra/input_probe.ahk`, the Debug input probe; the driver's own hooks are AutoHotkey's                                 |
-| `GetAsyncKeyState`, `GetKeyState` families       | 62              | 0 (forbidden)                         | `adapters/key_state.ahk`, AltGr and shortcut modules: documented modifier reads                                              |
-| Clipboard listener APIs                          | 3               | 0 (forbidden)                         | `modules/keystats/keystats_clipboard.ahk` (paste observer for the opt-in metrics)                                            |
-| `SendInput`                                      | 124             | 127 (locale texts naming the setting) | `infra/send_input_parameter.ahk`, `adapters/text_sender.ahk`, terminal output, hotstring send                                |
-| `URLDownloadToFile` and PowerShell web cmdlets   | 0 (forbidden)   | 3                                     | `ollama_install.ps1` (optional local AI runtime, official source)                                                            |
-| `WScript`, `cscript`, `mshta`                    | 2               | 1                                     | `infra/webview_script.ahk` and `adapters/network_info.ahk` (script-host naming), `ergopti_uninstall.ps1`                     |
-| Registry Run keys                                | 0 (forbidden)   | 0 (forbidden)                         |                                                                                                                              |
-| Elevation words (`*RunAs`, UAC, requireAdmin.)   | 3               | 0 (forbidden)                         | `modules/gestures/config.ahk`, `ui/onboarding/gesture_registration.ahk`: the user-initiated touchpad registry write          |
-| Injection words (`LoadLibrary` and the classics) | 11              | 0 (forbidden)                         | `LoadLibraryW` of gdiplus, sqlite3, UIA and the nav-owner DLL; the remote-thread family is forbidden and absent              |
-| Screen capture (`BitBlt`)                        | 1               | 0 (forbidden)                         | `adapters/screen_capture.ahk`, the in-process screenshot (replaced the former hidden PowerShell `CopyFromScreen`)            |
-| `powershell` mentions                            | 52              | 9                                     | `modules/updater/self_update.ahk`, `adapters/http_client.ahk`, Ollama, crash report, uninstall                               |
-| `ExecutionPolicy Bypass`                         | 16              | 1                                     | Process scope on `-File` launches of bundled workers; the default client policy refuses scripts otherwise                    |
-| `WindowStyle Hidden`                             | 3               | 3                                     | Brightness worker, touchpad registry scripts, Ollama install, updater swap                                                   |
-| `DllImport` and `Add-Type` (bundled workers)     | 0 (forbidden)   | 52 and 18                             | Vendor workers (WinHTTP transport, native proxy, PAC, diagnostics) and the Ollama files; never in the compiled script itself |
+| Family                                           | Compiled script | Bundled text files                    | Where it comes from                                                                                                     |
+| ------------------------------------------------ | --------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `keylog` wording                                 | 0 (forbidden)   | 0 (forbidden)                         | The keystats rename is complete in shipped text; `KeylogConst` was the last identifier (commit `ae8ed7788e`)            |
+| `SetWindowsHookEx`                               | 2               | 0 (forbidden)                         | Only `infra/input_probe.ahk`, the Debug input probe; the driver's own hooks are AutoHotkey's                            |
+| `GetAsyncKeyState`, `GetKeyState` families       | 62              | 0 (forbidden)                         | `adapters/key_state.ahk`, AltGr and shortcut modules: documented modifier reads                                         |
+| Clipboard listener APIs                          | 3               | 0 (forbidden)                         | `modules/keystats/keystats_clipboard.ahk` (paste observer for the opt-in metrics)                                       |
+| `SendInput`                                      | 124             | 127 (locale texts naming the setting) | `infra/send_input_parameter.ahk`, `adapters/text_sender.ahk`, terminal output, hotstring send                           |
+| `URLDownloadToFile` and PowerShell web cmdlets   | 0 (forbidden)   | 3                                     | `ollama_install.ps1` (optional local AI runtime, official source)                                                       |
+| `WScript`, `cscript`, `mshta`                    | 2               | 1                                     | `infra/webview_script.ahk` and `adapters/network_info.ahk` (script-host naming), `ergopti_uninstall.ps1`                |
+| Registry Run keys                                | 0 (forbidden)   | 0 (forbidden)                         |                                                                                                                         |
+| Elevation words (`*RunAs`, UAC, requireAdmin.)   | 3               | 0 (forbidden)                         | `modules/gestures/config.ahk`, `ui/onboarding/gesture_registration.ahk`: the user-initiated touchpad registry write     |
+| Injection words (`LoadLibrary` and the classics) | 11              | 0 (forbidden)                         | `LoadLibraryW` of gdiplus, sqlite3, UIA and the nav-owner DLL; the remote-thread family is forbidden and absent         |
+| Screen capture (`BitBlt`)                        | 1               | 0 (forbidden)                         | `adapters/screen_capture.ahk`, the in-process screenshot (replaced the former hidden PowerShell `CopyFromScreen`)       |
+| `powershell` mentions                            | 52              | 9                                     | `modules/updater/self_update.ahk`, `adapters/http_client.ahk`, Ollama, crash report, uninstall                          |
+| `ExecutionPolicy Bypass`                         | 16              | 1                                     | Process scope on `-File` launches of bundled workers; the default client policy refuses scripts otherwise               |
+| `WindowStyle Hidden`                             | 3               | 3                                     | Brightness worker, touchpad registry scripts, Ollama install, updater swap                                              |
+| `DllImport` and `Add-Type` (bundled workers)     | 0 (forbidden)   | 51 and 18                             | Vendor workers (WinHTTP transport, native proxy, PAC, relay hop, diagnostics) and the Ollama files; never in the script |
 
 Per-file origin of every count: run the command with `--breakdown --sources`. The compiled script
 keeps no file boundaries, so the script side is attributed from the source tree.
 
 Finding for the coordinator: the committed WinHTTP transport (`7c001b2456`) added 19 `DllImport`
-to `vendor/ergopti_winhttp_transport.ps1`; the bundle ceiling `pinvoke_declaration` is therefore 52
-(it was 33), and `ergopti_curl_attempt.ps1` is gone, which lowered `ExecutionPolicy Bypass` to 16/1.
+to `vendor/ergopti_winhttp_transport.ps1`, and `ergopti_curl_attempt.ps1` is gone, which lowered
+`ExecutionPolicy Bypass` to 16/1. The proxy relay hop (`2ddd91881a`) added one `Add-Type` and one
+`DllImport` (`GetExtendedTcpTable`: no managed API names the process behind a loopback peer, and
+the hop must answer its own process only). Retiring `vendor/ergopti_native_proxy.ps1`, which nothing
+had loaded since the PAC worker moved to `ergopti_network_pac.ps1`, paid for both: `pinvoke_declaration`
+is 51 and `inline_csharp_compile` is 18.
 
 ## 2. Honest hygiene already done in this pass, and what is left
 

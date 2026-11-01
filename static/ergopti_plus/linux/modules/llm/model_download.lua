@@ -161,6 +161,17 @@ local function dispatch(request)
 	local attempt = _attempt_serial
 	request.attempt = attempt
 	_active, _retained = request, request
+	-- The daemon started without its proxy after a refused sign-in: it serves the
+	-- models on disk, and a pull is refused here with the relay's own message.
+	local InstallState = require("modules.llm.ollama_install_state")
+	local refusal_key = InstallState.pull_refusal_key(request.base_url)
+	if refusal_key then
+		Logger.error(LOG, "Ollama model pull refused: the proxy sign-in relay refused (%s).",
+			tostring(InstallState.relay_refusal(request.base_url)))
+		request.acquiring = false
+		finish(request, attempt, false, translated(refusal_key))
+		return false
+	end
 	local url = HttpBridge.ollama_endpoint(request.base_url, "pull")
 	local ok_body, body = pcall(Json.encode, { name = request.tag, stream = true })
 	if not url or not ok_body or type(body) ~= "string" then

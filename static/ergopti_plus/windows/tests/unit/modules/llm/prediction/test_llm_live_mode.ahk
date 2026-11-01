@@ -371,6 +371,26 @@ _LLV_MinimumWordsAreLiveOnes() {
 }
 Test("LLM live mode: the minimum word count is live.json's", _LLV_MinimumWordsAreLiveOnes)
 
+; request_plan_live_vectors.json: a deleted prompt stops live mode and asks for
+; nothing. It used to stay on and refuse every later keystroke with a warning.
+_LLV_DeletedPromptStopsLiveMode() {
+	_LLV_Run("bonjour", _Body)
+	_Body(Calls, Lines, Builds) {
+		global _LLM_Menu, _LLM_Engine
+		Profile := Map("id", "user_live_1", "label", "Suite",
+			"system_single", "Continue: {context}", "batch", false)
+		_LLM_Menu["user_profiles"] := [Profile]
+		_LLM_Engine["user_profiles"] := [Profile]
+		AssertTrue(_LLV_Toggle("user_live_1|1"))
+		_LLM_Menu["user_profiles"] := []
+		_LLM_Engine["user_profiles"] := []
+		_LLV_Fire(_LLV_Type(" Marc"))
+		AssertEqual(0, Calls.Length, "a deleted prompt asks for nothing")
+		AssertFalse(LLM_Engine_LiveIsActive(), "and live mode stops")
+	}
+}
+Test("LLM live mode: a deleted prompt stops it", _LLV_DeletedPromptStopsLiveMode)
+
 ; A new keystroke supersedes the live request in flight.
 _LLV_SupersededRequestIsIgnored() {
 	_LLV_Run("on se voit", _Body)

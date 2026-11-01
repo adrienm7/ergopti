@@ -714,6 +714,22 @@
 			"cmd": "node",
 			"args": ["tools/test/test-keylayout-row-options.cjs"],
 			"repro": "npm run test:keylayout-row-options"
+		},
+		{
+			"id": "js-user-action-vectors",
+			"ordinal": 556,
+			"name": "the run_command, open_path and run_apple_shortcut parameter rule is one shared corpus both Lua suites replay",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-user-action-vectors-shared.cjs"],
+			"repro": "npm run test:user-action-vectors-shared"
+		},
+		{
+			"id": "js-keystats-token-encoding",
+			"ordinal": 563,
+			"name": "n-gram keys read the same on the dashboard, and every driver emits the shared marker list",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-keystats-token-encoding.cjs"],
+			"repro": "npm run test:keystats-token-encoding"
 		}
 	]
 }

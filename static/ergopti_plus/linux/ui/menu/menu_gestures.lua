@@ -13,7 +13,7 @@ local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
 local show_info = require("ui.menu.menu_dialogs").show_info
-local zenity_plain = require("ui.menu.menu_dialogs").zenity_plain
+local plain_markup = require("ui.menu.menu_dialogs").plain_markup
 local assign_parameterized_action = require("ui.menu.menu_dialogs").assign_parameterized_action
 local slot_binding_rows = require("ui.menu.menu_dialogs").slot_binding_rows
 
@@ -103,7 +103,7 @@ local function _build_gestures(ctx)
 	-- The recommended-defaults rule and why Linux recommends no swipe, behind
 	-- the menu's « Infos… » row: several sentences do not fit a menu row.
 	gesture_commands[require("config_keys").COMMAND.GESTURE_RECOMMENDED_INFO] = function()
-		show_info(i18n_safe("menu.gestures.notify_title"), zenity_plain(i18n_safe("menu.gestures.recommended_note")
+		show_info(i18n_safe("menu.gestures.notify_title"), plain_markup(i18n_safe("menu.gestures.recommended_note")
 			.. "\n\n" .. i18n_safe("menu.gestures.recommended_reason_linux")))
 		return true
 	end

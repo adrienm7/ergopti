@@ -1,0 +1,4 @@
+{
+	"_comment": "Launcher Swift files whose sleeps still spell a duration literal (tools/test/test-launcher-sleep-registry.cjs). Counts may only go down; lower them with --shrink.",
+	"files": {}
+}

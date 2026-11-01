@@ -205,6 +205,26 @@ function registryVersion(relative) {
 }
 
 /**
+ * The oldest config.toml version the shipped registry still migrates.
+ * @returns {number}
+ */
+function oldestVersion() {
+	const text = fs.readFileSync(
+		path.join(
+			live.ROOT,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'core',
+			'config_schema',
+			'migrations.toml'
+		),
+		'utf8'
+	);
+	return Number(/^oldest_version = (\d+)/m.exec(text)[1]);
+}
+
+/**
  * The HKCU touchpad values, so a check that clicks Restore proves it left them alone.
  * @returns {string}
  */
@@ -537,6 +557,48 @@ const CHECKS = [
 		}
 	},
 	{
+		id: 'reload-over-a-log-flush',
+		title: 'A reload whose close request lands on a log flush keeps its successor and completes',
+		async run(context) {
+			const { session, pid: first } = await bootEnglish(context, 'flush');
+			await session.run('hold_log_flush');
+			await session.run('click', [RELOAD_ROW], 180000, { followReload: true });
+			const settled = await session.quiesce(first);
+			const refused = session.logLines('Reload refused after launch');
+			const errors = session.loggedErrors();
+			if (refused.length > 0) return fail(refused[0]);
+			if (errors.length > 0) return fail(`the log holds an error: ${errors[0]}`);
+			if (!settled.reloaded) return fail('the driver did not reload');
+			if (session.logLines('Reload deferred while the log flush').length !== 1)
+				return fail('the close request did not land on the held flush');
+			const dialogs = await session.run('dialogs');
+			if (dialogs !== 'dialogs=') return fail(`a dialog is on screen: ${dialogs}`);
+			return pass(
+				`the reload was deferred once and completed; one driver: ${driverCount(session) === 1}`
+			);
+		}
+	},
+	{
+		id: 'quit-over-a-log-flush',
+		title: 'One Quit that lands on a log flush exits by itself, with no error window',
+		async run(context) {
+			const { session } = await bootEnglish(context, 'quitflush');
+			await session.run('hold_log_flush');
+			await session.run('click', ['re:Quit$'], 20000, { followReload: true });
+			const started = Date.now();
+			while (session.child.exitCode === null && Date.now() - started < 30000) await live.sleep(100);
+			if (session.child.exitCode !== 0)
+				return fail(`the Quit ended with ${session.child.exitCode}, 0 expected`);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) return fail(`the log holds an error: ${errors[0]}`);
+			if (session.logLines('Shutdown deferred while the log flush').length !== 1)
+				return fail('the Quit did not land on the held flush');
+			if (session.logLines('Quit was refused').length > 0)
+				return fail('the user was told of a refusal');
+			return pass('the Quit was deferred once and exited with no error');
+		}
+	},
+	{
 		id: 'win-s-open-target',
 		title:
 			'Win+S on a selection: a missing path and a bare file name are reported, a folder is opened',
@@ -683,6 +745,40 @@ const CHECKS = [
 			return pass(
 				`all four typed scenarios behave as the rules say (${alone ? 'engine and screen judged' : 'engine judged; the screen is not, another driver shares the desktop'})`
 			);
+		}
+	},
+	{
+		id: 'key-chord-typing',
+		title: 'A key chord assigned on Space: the driver boots it, and harness typing keeps its order',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const { session } = await bootEnglish(
+				context,
+				'chord',
+				'[mod_combos.config.space_then_tab]\ncombo = "copy"\n'
+			);
+			await session.run('pump', ['3000']);
+			if (session.logLines('Key chords read: 1 chord').length === 0)
+				return fail('the driver did not read the chord of the configuration');
+			await session.run('edit_open', ['edit']);
+			// A process cannot make a physical press: this input was not seen reaching the
+			// chord hotkeys, so a chord firing stays on the maintainer's physical list.
+			session.type([
+				['mode', 'event'],
+				['level', '0'],
+				['gap', '5'],
+				['key', '{Blind}{SC010}'],
+				['key', '{Blind}{SC039}'],
+				['key', '{Blind}{SC011}'],
+				['wait', '900']
+			]);
+			const typed = (await session.run('edit_value')).replace(/^value=/, '');
+			await session.run('edit_close');
+			if (!/^. .$/u.test(typed)) return fail(`letter, Space, letter gave "${typed}" on the screen`);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) return fail(`the log holds an error: ${errors[0]}`);
+			return pass(`the chord is read and harness typing keeps its order ("${typed}")`);
 		}
 	},
 	{
@@ -1131,6 +1227,63 @@ const CHECKS = [
 		}
 	},
 	{
+		id: 'autocorrection-family-alone',
+		title:
+			'Each common autocorrection family alone expands its own word from real keys, not the others',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const { samples } = JSON.parse(
+				fs.readFileSync(
+					path.join(
+						live.ROOT,
+						'static/ergopti_plus/_shared/tests/corpus/hotstrings/family_samples.json'
+					),
+					'utf8'
+				)
+			);
+			const common = samples.filter((sample) => sample.family === 'autocorrection');
+			if (common.length < 3) return fail(`only ${common.length} autocorrection samples`);
+			const problems = [];
+			for (const alone of common) {
+				const master = '[category_enabled]\nhotstrings = true\nautocorrection = true\n';
+				const toml = common
+					.map(
+						(sample) =>
+							`[hotstrings.autocorrection.${sample.section}]\nenabled = ${sample === alone}\n`
+					)
+					.join('');
+				const { session } = await bootEnglish(context, `family-${alone.section}`, master + toml);
+				await session.run('pump', ['3000']);
+				for (const sample of common) {
+					await session.run('edit_open');
+					// No hse_reset: it declares the word start unknown, and is_word samples then
+					// refuse. Each typed word follows a boot or the previous word's Space.
+					session.type([
+						['mode', 'event'],
+						['level', '100'],
+						['gap', '120'],
+						['text', sample.buffer],
+						['key', '{SC039}'],
+						['wait', '900']
+					]);
+					const engine = (await session.run('hse_buffer')).replace(/^buffer=/, '');
+					await session.run('edit_close');
+					const expanded = engine.includes(sample.expected.replacement);
+					if (expanded !== (sample === alone))
+						problems.push(
+							`${alone.section} alone, ${sample.buffer}: the engine holds "${engine}", ${expanded ? 'expanded' : 'not expanded'}`
+						);
+				}
+				const errors = session.loggedErrors();
+				if (errors.length > 0) problems.push(`${alone.section}: the log holds ${errors[0]}`);
+				await session.stop();
+			}
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`${common.length} families each expand their own sample and refuse the others`);
+		}
+	},
+	{
 		id: 'handwritten-delimiters',
 		title: 'Handwritten [[hotstrings.terminators]] through Add, toggle, Delete, save and restart',
 		async run(context) {
@@ -1292,6 +1445,37 @@ const CHECKS = [
 		}
 	},
 	{
+		id: 'ai-agent-unavailable-row',
+		title: 'AI agent in the composed tray: one disabled row says why, the AI submenu works',
+		async run(context) {
+			const { session } = await bootEnglish(context, 'agent');
+			const notReady = (await session.run('translate', ['menu.agent.not_ready'])).replace(
+				/^text=/,
+				''
+			);
+			await session.run('tree');
+			const tree = fs.readFileSync(path.join(session.live, 'tree.txt'), 'utf8').split('\n');
+			const agent = tree.filter((line) => /AI agent/.test(line));
+			if (agent.length !== 1) return fail(`the tree holds ${agent.length} AI agent rows`);
+			const [row] = agent;
+			const problems = [];
+			// The manifest declares the unfinished agent once (item 121): a plain root row.
+			if (/^\s|\[\+\]/.test(row)) problems.push(`the row is not a root leaf: ${row}`);
+			if (!row.includes(notReady)) problems.push(`the row does not say "${notReady}": ${row}`);
+			const shown = await session.run('rows', ['AI agent']);
+			if (!/\[disabled\]/.test(shown)) problems.push(`the row is enabled: ${shown}`);
+			// The AI submenu beside it keeps controls a person can use.
+			const usable = (await session.run('rows', ['.', 'Artificial Intelligence']))
+				.split(' | ')
+				.filter((line) => line && !line.includes('[disabled]'));
+			if (usable.length === 0) problems.push('the AI submenu has no enabled row');
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`disabled root row "${notReady}", ${usable.length} AI rows usable`);
+		}
+	},
+	{
 		id: 'test-prediction-ai-off',
 		title: 'AI > Test a prediction, with the AI off: refused, says why, sends nothing',
 		async run(context) {
@@ -1366,12 +1550,14 @@ const CHECKS = [
 	},
 	{
 		id: 'old-config-migration',
-		title: 'An old config.toml climbs the whole registry at boot and keeps its actions',
+		title: 'The oldest supported config.toml climbs the registry at boot and keeps its actions',
 		async run(context) {
 			const version = registryVersion('core/config_schema/migrations.toml');
-			// Spellings a Windows build wrote before each step, unstamped (v2).
+			// Spellings Windows 1.0.0 wrote: the registry's oldest supported version.
 			const old = [
 				'# from an old build',
+				'[_meta]',
+				`schema_version = ${oldestVersion()}`,
 				'[script]',
 				"locale = 'en'",
 				'[category_enabled]',
@@ -1381,11 +1567,6 @@ const CHECKS = [
 				"trigger_shortcut = '^!a'",
 				'[hotstrings]',
 				'cascade_depth = 2',
-				'magic_key_source_scan = "SC029"',
-				'[hotstrings.autocorrection.caps]',
-				'enabled = true',
-				'[layout]',
-				'direct_access_digits = true',
 				'[shortcuts.keyboard]',
 				'ctrl_g = "open_hotstrings_editor"',
 				'win_e = "search_web"',
@@ -1406,9 +1587,6 @@ const CHECKS = [
 				'shortcuts.keyboard.meta_e': '"search_web"',
 				[KEY.HOTSTRINGS_DYNAMIC_ENABLED]: 'false',
 				[KEY.HOTSTRINGS_CASCADE_MAX_ARROWS]: '3',
-				[KEY.LAYOUT_DIRECT_ACCESS_DIGITS]: '"digits"',
-				'hotstrings.autocorrection.names.enabled': 'true',
-				[KEY.HOTSTRINGS_MAGIC_KEY_SOURCE]: '"Backquote"',
 				'llm.trigger_shortcut': '"^!a"'
 			};
 			for (const [key, value] of Object.entries(want))
@@ -1426,6 +1604,29 @@ const CHECKS = [
 				problems.push(`the log holds an error: ${session.loggedErrors()[0]}`);
 			if (problems.length > 0) return fail(problems.join('; '));
 			return pass(`${backups[0]} is exact; v${version}; every action and mapped value kept`);
+		}
+	},
+	{
+		id: 'too-old-config-refused',
+		title: 'A config.toml older than the registry is refused in words and left byte for byte',
+		async run(context) {
+			// What a pre-release left: only a real stamp below the floor is refused.
+			const old = "# from a pre-release\n[_meta]\nschema_version = 11\n[script]\nlocale = 'en'\n";
+			const session = context.newSession('tooold');
+			session.seed('autohotkey/config.toml', old);
+			await session.start();
+			const problems = [];
+			if (!configBytes(session, 'autohotkey/config.toml').equals(Buffer.from(old)))
+				problems.push('the refused file changed');
+			if (backupNames(session, /^config\.pre-v/).length !== 0)
+				problems.push('a migration backup was written');
+			if (!session.logLines('refused (unsupported)').length)
+				problems.push('the refusal is not in the log');
+			await session.restart();
+			if (!configBytes(session, 'autohotkey/config.toml').equals(Buffer.from(old)))
+				problems.push('a second boot changed the file');
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass('refused, exact bytes across two boots, no backup written');
 		}
 	},
 	{

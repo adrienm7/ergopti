@@ -58,6 +58,7 @@
 
 'use strict';
 
+require('../lib/config-key-source-view.cjs').install(); // driver source may name a generated constant
 const fs = require('fs');
 const path = require('path');
 
@@ -413,7 +414,7 @@ for (const name of ['LLM_Engine_OnKeystroke', 'LLM_Engine_StartTimer']) {
 // The request plan owns the delay, so live mode's debounce reaches it here.
 check(
 	bodyFrom(keystrokes, '_LLM_Engine_PlanInput').includes(
-		'"live_debounce_ms", LLM_Engine_LiveIsActive() ? LLM_Live_Config()[ConfigLeaf.DEBOUNCE_MS] : false'
+		'"live_debounce_ms", LLM_Engine_LiveIsActive() ? LLM_Live_Config()["debounce_ms"] : false'
 	),
 	"the request plan must receive live mode's debounce while live mode is on"
 );
@@ -629,7 +630,8 @@ check(
 check(
 	bodyOf(agentAction, '_LLM_Agent_OnPause').includes('_LLM_Agent_Auto["triaged"].Has(Sentence)') &&
 		bodyOf(agentAction, '_LLM_Agent_OnPause').includes('LLM_Engine_LiveIsActive()') &&
-		bodyOf(agentAction, '_LLM_Agent_OnPause').includes('SFD_IsSecureField()'),
+		bodyOf(agentAction, '_LLM_Agent_OnPause').includes('_LLM_Agent_FieldIsSecure()') &&
+		bodyOf(agentAction, '_LLM_Agent_FieldIsSecure').includes('SFD_IsSecureField()'),
 	'the automatic mode must skip a triaged sentence, live mode and secure fields'
 );
 check(
@@ -709,15 +711,28 @@ function validateManualRequester(agent, vision) {
 		capture >= 0 && capture < trigger.indexOf('Enabled := _LLM_Menu.Get('),
 		'Capture original epoch before native/readiness getters.'
 	);
+	// The capture starts in _LLM_Vision_BeginCapture, either at once or once a
+	// token-exchange provider's access token arrived; both paths keep the
+	// trigger's original epoch.
 	assert.match(
 		trigger,
+		/return _LLM_Vision_BeginCapture\(Kind, Parsed, Model, Config, AnswersKey, Target, AuxGeneration\)/
+	);
+	assert.match(trigger, /_LLM_Vision_OnAccess\.Bind\(_LLM_Vision_Generation, AuxGeneration,/);
+	assert.match(
+		bodyOf(vision, '_LLM_Vision_OnAccess'),
+		/if !_LLM_Vision_RenderIsCurrent\(Waiting, AuxGeneration\)/
+	);
+	const begin = bodyOf(vision, '_LLM_Vision_BeginCapture');
+	assert.match(
+		begin,
 		/if !_LLM_Vision_RequestScopeCurrent\(AuxGeneration\)\s+return false\s+_LLM_Vision_Generation \+= 1/
 	);
 	assert.match(
-		trigger,
+		begin,
 		/Requester := _LLM_Vision_RenderIsCurrent\.Bind\(_LLM_Vision_Generation, AuxGeneration\)/
 	);
-	assert.match(trigger, /"requester_current", Requester/);
+	assert.match(begin, /"requester_current", Requester/);
 	const current = bodyOf(vision, '_LLM_Vision_IsCurrent');
 	assert.match(current, /Current := Flow\.Get\("requester_current", 0\)/);
 	assert.match(current, /Result := Current\.Call\(\)/);

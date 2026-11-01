@@ -86,7 +86,24 @@ else
 if (!luaSnapshot.includes(`M.MODULE = "${contract.module}"`))
 	errors.push('the Lua log tag drifted from the contract');
 
-const ahkSnapshot = read('windows/infra/diagnostic_snapshot.ahk');
+// The config-key gate makes AutoHotkey spell a shared name through the generated
+// ConfigLeaf class, so its source is compared with each constant's value in place.
+const configLeafClass = read('windows/_generated/config_keys.ahk').match(
+	/^class ConfigLeaf \{([\s\S]*?)^\}/m
+);
+if (!configLeafClass) errors.push('windows/_generated/config_keys.ahk has no ConfigLeaf class');
+const configLeaves = new Map(
+	[...(configLeafClass?.[1] ?? '').matchAll(/static ([A-Z0-9_]+) := "([a-z0-9_]+)"/g)].map((m) => [
+		m[1],
+		m[2]
+	])
+);
+const resolveConfigLeaves = (source) =>
+	source.replace(/\bConfigLeaf\.([A-Z0-9_]+)/g, (spelled, name) =>
+		configLeaves.has(name) ? `"${configLeaves.get(name)}"` : spelled
+	);
+
+const ahkSnapshot = resolveConfigLeaves(read('windows/infra/diagnostic_snapshot.ahk'));
 const ahkBlock = ahkSnapshot.match(/static Fields := \[([\s\S]*?)\]/);
 if (!ahkBlock)
 	errors.push('windows/infra/diagnostic_snapshot.ahk no longer declares its field list');
@@ -113,7 +130,7 @@ const collectorBodies = {
 	'windows/infra/diagnostic_snapshot.ahk': /DiagSnapshot_Collect\(BootMs\) \{[\s\S]*?\n\}\n/
 };
 for (const [rel, pattern] of Object.entries(collectors)) {
-	const body = read(rel).match(collectorBodies[rel]);
+	const body = resolveConfigLeaves(read(rel)).match(collectorBodies[rel]);
 	if (!body) {
 		errors.push(`${rel}: the collecting function was not found — this scan would check nothing`);
 		continue;

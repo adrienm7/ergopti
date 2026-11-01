@@ -43,6 +43,8 @@ local function scenario(options, body)
 					or path == "/fixture/layouts/ergopti.keylayout"
 			end,
 			translate = function(key) return key end,
+			-- Ergopti's own Python is installed (modules/keymap/managed_python.lua).
+			python = function(callback) callback(true, "/fixture/python3") end,
 			run = function(_, args, _, callback)
 				if args[1] == "-c" then callback({ exit_code = 0, stdout = "", stderr = "" })
 				elseif world.deferred then world.pending = callback

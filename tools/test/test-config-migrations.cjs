@@ -11,9 +11,12 @@
  * expected.toml cannot silently describe behaviour no interpreter has.
  *
  * FEATURES & RATIONALE:
- * 1. Registry shape. current_version and unstamped_version bound a gap-free
- *    chain of steps named v<from>_to_v<to>, each for a non-empty set of known
- *    drivers, each op carrying exactly its declared fields with bare names.
+ * 1. Registry shape. oldest_version (unstamped_version when absent) and
+ *    current_version bound a gap-free chain of steps named v<from>_to_v<to>,
+ *    each for a non-empty set of known drivers, each op carrying exactly its
+ *    declared fields with bare names. A stamp below oldest_version is
+ *    unsupported; a file with no stamp, when unstamped_version is lower, has no
+ *    step left and counts as current.
  * 2. Statically idempotent ops. A map_value whose target is also a source
  *    would change a value again on replay, so its from and to sets must be
  *    disjoint; a move into its own subtree is refused likewise.
@@ -277,10 +280,17 @@ function validateRegistry(doc, where) {
 		);
 		return null;
 	}
+	// Steps below the oldest supported version were squashed away: the chain
+	// starts there, and anything older is refused rather than half migrated.
+	const oldest = registry.oldest_version ?? unstamped;
+	if (!Number.isInteger(oldest) || oldest < unstamped || oldest > current) {
+		fail(where, 'oldest_version must be an integer with unstamped <= oldest <= current');
+		return null;
+	}
 	const unknownRoot = Object.keys(doc).filter((key) => key !== 'registry' && key !== 'steps');
 	if (unknownRoot.length) fail(where, `unknown top-level tables: ${unknownRoot.join(', ')}`);
 	const unknownRegistry = Object.keys(registry).filter(
-		(key) => !['current_version', 'unstamped_version'].includes(key)
+		(key) => !['current_version', 'unstamped_version', 'oldest_version'].includes(key)
 	);
 	if (unknownRegistry.length) fail(where, `unknown [registry] keys: ${unknownRegistry.join(', ')}`);
 
@@ -310,17 +320,17 @@ function validateRegistry(doc, where) {
 		steps.push(step);
 	}
 	steps.sort((left, right) => left.from - right.from);
-	const expectedCount = current - unstamped;
+	const expectedCount = current - oldest;
 	if (steps.length !== expectedCount)
 		fail(
 			where,
-			`expected ${expectedCount} step(s) from v${unstamped} to v${current}, found ${steps.length}`
+			`expected ${expectedCount} step(s) from v${oldest} to v${current}, found ${steps.length}`
 		);
 	steps.forEach((step, index) => {
-		if (step.from !== unstamped + index)
+		if (step.from !== oldest + index)
 			fail(where, `the chain has a gap or overlap at v${step.from}`);
 	});
-	return { current, unstamped, steps };
+	return { current, unstamped, oldest, steps };
 }
 
 // ==========================================
@@ -668,6 +678,8 @@ function applyOp(model, op, context) {
 function migrate(model, registry, driver, context) {
 	const meta = model.get('_meta');
 	let version = registry.unstamped;
+	if (!(meta && meta.has('schema_version')) && registry.unstamped < registry.oldest)
+		return { outcome: 'current' };
 	if (meta && meta.has('schema_version')) {
 		version = meta.get('schema_version');
 		if (typeof version === 'bigint') version = Number(version);
@@ -675,7 +687,7 @@ function migrate(model, registry, driver, context) {
 	}
 	if (version > registry.current) return { outcome: 'newer' };
 	if (version === registry.current) return { outcome: 'current' };
-	if (version < registry.unstamped) return { outcome: 'unsupported' };
+	if (version < registry.oldest) return { outcome: 'unsupported' };
 	const out = cloneModel(model);
 	try {
 		for (const step of registry.steps) {
@@ -734,18 +746,14 @@ for (let mask = 1; mask < 2 ** modifiers.length; mask += 1) {
 }
 const migrationContext = { modifier_chords: modifierChords, assignable_actions: assignableActions };
 
-// Inline tables remain opaque at a closed opcode source or this exact frozen
-// destination-owner fixture. Every unrelated inline record keeps the guard.
+// Inline tables remain opaque at a closed opcode source. Every unrelated inline
+// record keeps the guard.
 function opaqueChordPaths(source, registry, where, report = fail) {
 	const allowed = new Set(
 		registry.steps.flatMap((step) =>
 			step.ops.filter((op) => op.op === 'move_chord_action').map((op) => op.section + '.' + op.key)
 		)
 	);
-	if (
-		/^shipped_common_autocorrection_occupied(?:_non_windows)?\/(input|expected)\.toml$/.test(where)
-	)
-		allowed.add('hotstrings.autocorrection.names');
 	const paths = new Set();
 	let section = '';
 	for (const line of source.split('\n')) {
@@ -766,25 +774,18 @@ function opaqueChordPaths(source, registry, where, report = fail) {
 	return paths;
 }
 
-// Both the namespace and fixture identity fence this exception. These negative
-// controls call the same guard without adding expected failures to the run.
+// This negative control calls the same guard without adding an expected failure
+// to the run.
 {
-	const controls = [
-		[
-			'shipped_common_autocorrection_occupied/input.toml',
-			'[hotstrings.autocorrection]\nforeign = { enabled = false }\n'
-		],
-		['unrelated/input.toml', '[hotstrings.autocorrection]\nnames = { enabled = false }\n']
-	];
-	for (const [where, source] of controls) {
-		const refusals = [];
-		const paths = opaqueChordPaths(source, { steps: [] }, where, (...args) => refusals.push(args));
-		if (refusals.length !== 1 || paths.size !== 0)
-			fail(
-				'opaque namespace negative control',
-				`${where}: unrelated inline ownership must remain refused`
-			);
-	}
+	const refusals = [];
+	const paths = opaqueChordPaths(
+		'[hotstrings.autocorrection]\nnames = { enabled = false }\n',
+		{ steps: [] },
+		'unrelated/input.toml',
+		(...args) => refusals.push(args)
+	);
+	if (refusals.length !== 1 || paths.size !== 0)
+		fail('opaque namespace negative control', 'unrelated inline ownership must remain refused');
 }
 
 const shipped = validateRegistry(readToml(REGISTRY_PATH) || {}, 'migrations.toml');
@@ -1234,5 +1235,5 @@ if (failures.length) {
 	process.exit(1);
 }
 console.log(
-	`Config migration gate: registry v${shipped.unstamped}..v${shipped.current} (${shipped.steps.length} step(s)), ${onDisk.length} corpus case(s), ${replays} driver replay(s), ${rejectedCases.length} rejected registry defect(s) — OK`
+	`Config migration gate: registry v${shipped.oldest}..v${shipped.current} (${shipped.steps.length} step(s)), ${onDisk.length} corpus case(s), ${replays} driver replay(s), ${rejectedCases.length} rejected registry defect(s) — OK`
 );

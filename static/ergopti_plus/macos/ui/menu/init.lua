@@ -1008,7 +1008,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 
 		-- Restore the user-configured ChatGPT URL at boot the same way: without this,
-		-- ctrl_g silently ignores config.toml and always opens the manifest default
+		-- open_chatgpt silently ignores config.toml and always opens the manifest default
 		-- until the user happens to re-save the URL from the menu (shortcuts-ctrl-g-ignores-config).
 		if type(core_mods.shortcuts_mod.set_chatgpt_url) == "function" then
 			pcall(core_mods.shortcuts_mod.set_chatgpt_url, state.chatgpt_url)
@@ -1158,6 +1158,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		set_log_level             = function(level)
 			local L = require("infra.logger")
+			-- config.toml's [script] log_level wins at start: rewrite it first.
+			if not require("infra.script_scope").rewrite_configured(require("config_keys").KEY.SCRIPT_LOG_LEVEL, level) then
+				return false
+			end
 			local ok, committed = pcall(Storage.set, require("config_keys").LEAF.LOG_LEVEL, level)
 			if not ok or committed ~= true then
 				L.warn("menu", "Log level %s was refused by settings; the live level was left unchanged.", level)

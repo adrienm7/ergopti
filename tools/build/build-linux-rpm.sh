@@ -4,34 +4,24 @@
 # Assembles a .rpm package from the build/linux/ driver bundle.
 # Requires Linux; actual .rpm creation also requires rpmbuild.
 #
-# The package publishes its own LuaJIT luv binding in native_modules/: Fedora's
-# lua-luv is built for the generic Lua ABI, not LuaJIT's 5.1 one, and the driver
-# enumerates directories through luv. It is compiled at package build time by
-# build-linux-packaged-luv.sh, here unless --luv-module hands over one already
-# built (the release builds it on the oldest supported LTS, for its glibc).
-# Nothing is downloaded or compiled at installation.
+# The package carries the private runtime prefix the AppImage stages on the
+# oldest supported LTS (tools/build/stage-linux-private-runtime.sh): LuaJIT,
+# luv, luafilesystem, luaposix, curl, sqlite3, openssl and zstd run from
+# there, never from a host package (owned runtimes, PIN). Fedora's lua-luv was
+# built for the generic Lua ABI, not LuaJIT's, so this also replaces the luv
+# binding the package used to compile for itself. Nothing is downloaded or
+# compiled at installation.
 #
 # Usage:
 #   bash tools/build/build-linux-rpm.sh              # full build + .rpm
 #   bash tools/build/build-linux-rpm.sh --skip-rpm   # structure only
-#   ... --luv-module /abs/luv.so                     # publish this already
-#                                                    # built binding instead
 
 set -euo pipefail
 
 SKIP_RPM=false
-LUV_MODULE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-rpm) SKIP_RPM=true; shift ;;
-    --luv-module)
-      if [[ $# -lt 2 || "$2" != /* ]]; then
-        echo "[ERR] --luv-module needs an absolute module path." >&2
-        exit 1
-      fi
-      LUV_MODULE="$2"
-      shift 2
-      ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -118,27 +108,10 @@ install -D -m 644 "$BUILD_DIR/linux/install/ergopti-uinput.conf" "$INSTALL_ROOT/
 
 
 # ----------------------------------------------------------------------
-# 3b. LuaJIT luv binding
+# 3b. Private runtime
 # ----------------------------------------------------------------------
-# build_native_luv.sh loads its result through the build host's LuaJIT and
-# refuses a module without the C entry points the driver calls.
-NATIVE_LUV_STAGE="$RPM_ROOT/native-luv"
-mkdir "$NATIVE_LUV_STAGE"
-if [ -n "$LUV_MODULE" ]; then
-  if [ -L "$LUV_MODULE" ] || [ ! -f "$LUV_MODULE" ]; then
-    echo "[ERR] --luv-module $LUV_MODULE is not a regular file." >&2
-    exit 1
-  fi
-  install -m 755 "$LUV_MODULE" "$NATIVE_LUV_STAGE/luv.so"
-else
-  bash "$SCRIPT_DIR/build-linux-packaged-luv.sh" "$NATIVE_LUV_STAGE"
-fi
-if [ "$(head -c 4 "$NATIVE_LUV_STAGE/luv.so" | od -An -tx1 | tr -d ' \n')" != 7f454c46 ]; then
-  echo "[ERR] The luv binding is not an ELF shared object." >&2
-  exit 1
-fi
-install -D -m 755 "$NATIVE_LUV_STAGE/luv.so" "$INSTALL_ROOT/usr/lib/ergopti/native_modules/luv.so"
-echo "  LuaJIT luv binding: usr/lib/ergopti/native_modules/luv.so"
+bash "$SCRIPT_DIR/stage-linux-private-runtime.sh" "$BUILD_DIR/AppDir" "$INSTALL_ROOT/usr/lib/ergopti/runtime" /usr/lib/ergopti
+install -m 644 "$BUILD_DIR/AppDir/usr/lib/ergopti/network-runtime-env.sh" "$INSTALL_ROOT/usr/lib/ergopti/network-runtime-env.sh"
 
 chmod -R 755 "$INSTALL_ROOT/usr/lib/ergopti"
 echo "  $(find "$INSTALL_ROOT/usr/lib/ergopti" -type f | wc -l) files"
@@ -148,11 +121,11 @@ echo "  $(find "$INSTALL_ROOT/usr/lib/ergopti" -type f | wc -l) files"
 # ----------------------------------------------------------------------
 cat > "$INSTALL_ROOT/usr/bin/ergopti" << 'WRAPPER_EOF'
 #!/bin/bash
+# The package's private runtime decides LUA_PATH, LUA_CPATH and the programs
+# the driver runs (network-runtime-env.sh, shared with the AppImage).
+set -euo pipefail
 DRIVER_ROOT="/usr/lib/ergopti"
-SHARED_LUA="$DRIVER_ROOT/_shared/lua"
-export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;"
-source "$DRIVER_ROOT/install/native_modules_env.sh"
-ergopti_admit_native_modules "$DRIVER_ROOT" required || exit 1
+source "$DRIVER_ROOT/network-runtime-env.sh" "$DRIVER_ROOT/runtime" "$DRIVER_ROOT"
 exec bash "$DRIVER_ROOT/install/launch.sh" "$@"
 WRAPPER_EOF
 chmod 755 "$INSTALL_ROOT/usr/bin/ergopti"
@@ -230,10 +203,8 @@ Source0:        %{name}-%{version}.tar.gz
 BuildArch:      $ARCH
 
 # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
-Requires:       luajit >= 2.1
 Requires:       xclip
 Requires:       libnotify
-Requires:       curl
 Requires:       libxkbcommon
 Requires:       libxkbcommon-utils
 Requires:       at-spi2-core
@@ -241,22 +212,21 @@ Requires:       polkit
 Requires:       kmod
 Requires:       systemd-udev
 Requires:       libayatana-appindicator-gtk3
-Requires:       zenity
 Requires:       shadow-utils
 Requires:       util-linux
-Requires:       openssl
-Requires:       sqlite
 Requires:       xdg-utils
 Requires:       libsecret
 Requires:       libxkbcommon-x11
 Requires:       libX11
 Requires:       libX11-xcb
 # END GENERATED LINUX NATIVE REQUIREMENTS
-Recommends:     lua-filesystem
-Recommends:     openssl
 Recommends:     yad
 Recommends:     xdotool
 Recommends:     wmctrl
+# The private runtime's libraries serve its own programs only: they must not
+# answer another package's dependency, and its programs' needs are met inside it.
+%global __provides_exclude_from ^/usr/lib/ergopti/runtime/.*\$
+%global __requires_exclude_from ^/usr/lib/ergopti/runtime/.*\$
 
 %description
 Ergopti is a cross-platform keyboard optimizer that provides an intelligent

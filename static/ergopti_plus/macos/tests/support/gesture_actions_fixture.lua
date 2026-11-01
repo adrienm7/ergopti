@@ -24,7 +24,7 @@ local OWNERS = {
 	"number_policy",
 	-- The real notifications owner focuses the clicked application through this adapter.
 	"adapters.running_application",
-	"program_parameter",
+	"program_parameter", "user_action_parameter",
 	"actions.assignable",
 	"_generated.action_catalogue",
 	-- The generated catalogue filters the shared data through this owner.
@@ -73,6 +73,8 @@ local OWNERS = {
 	"llm.tone",
 	"llm.translate",
 	"llm.vision",
+	-- The shared vision request reads the API dialects from this pure owner.
+	"llm.remote_formats",
 	"modules.gestures",
 	"modules.gestures.actions",
 	"modules.gestures.native_app_switcher_action",

@@ -319,15 +319,15 @@
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_g",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_g",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "g"
 			},
 			"action": "open_chatgpt",
-			"slot": null,
-			"note": null
+			"slot": "secondary_g",
+			"note": "Was the switch shortcuts.keys.ctrl_g; migrated by schema v20."
 		},
 		{
 			"driver": "macos",

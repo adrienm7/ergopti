@@ -148,6 +148,16 @@ end
 
 
 -- Read canonical data before individual fixtures replace file and environment ports.
+-- The shared TOML writer splices the refused setting into this notice's {1}: a stub
+-- that echoes the key would hide that name, so the baseline carries the real format.
+-- It is read on first use: a suite that re-roots the driver has no locale tree.
+local CASE_TWIN_KEY = "dialog.config_save.case_twin"
+setmetatable(M.I18N_PLACEHOLDER_FORMATS, { __index = function(formats, key)
+	if key ~= CASE_TWIN_KEY then return nil end
+	local english = require("json").decode(SourceFile.read(M.shared("data/locales/en.json")))
+	rawset(formats, key, assert(english[key], "the case-twin notice is localized"))
+	return formats[key]
+end })
 local logger_privacy_policy = SourceFile.read(M.shared("modules/diagnostics/redaction.json"))
 local logger_privacy_owners = setmetatable({}, { __mode = "k" })
 
@@ -710,6 +720,29 @@ function M.read_driver_unit(symbol)
 	return matches[1]
 end
 
+--- The module name a driver-relative source path is required by: dots for
+--- slashes, `.lua` dropped, and a package's `init` dropped. Whole-tree scans key
+--- their allowlists by this name, as the code names the module, never by path.
+--- @param rel string Path under the driver root, e.g. "modules/keystats/init.lua".
+--- @return string module_name e.g. "modules.keystats".
+function M.module_name_of(rel)
+	local name = rel:gsub("\\", "/"):gsub("^%./", ""):gsub("%.lua$", ""):gsub("/", ".")
+	return (name:gsub("%.init$", ""))
+end
+
+--- The source of a production module, resolved from its module name through
+--- package.searchpath exactly as require would find it (the Linux helper of the
+--- same name is its twin).
+--- The read goes through SourceFile, so an open, read or close failure raises
+--- naming its phase and path instead of reading as an absent module.
+--- @param module_name string Dotted module name, e.g. "infra.fs_dir".
+--- @return string|nil body, string|nil err Body, or nil plus why the module is not found.
+function M.read_module_source(module_name)
+	local path, missing = package.searchpath(module_name, package.path)
+	if not path then return nil, missing end
+	return SourceFile.read(path)
+end
+
 
 
 
@@ -867,6 +900,7 @@ function M.make_logger_stub()
 		-- Every dialog_util modal runs through this wrapper; it has no clock here.
 		run_modal = function(fn, ...) return fn(...) end,
 		redact_message = function(text) return text end,
+		follow_config_dir = noop,
 		install_runtime_error_capture = noop,
 		init_log_path = noop,
 		-- The logs-folder resolver every consumer asks; a stub without it would

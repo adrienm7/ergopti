@@ -586,3 +586,38 @@ helpers.describe("evdev_reader: capability query ownership", function()
 		end)
 	end)
 end)
+
+helpers.describe("evdev_reader: device identity (linux-media-key-metrics)", function()
+	helpers.it("names the open descriptor's device number, never its path", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = recorder()
+		local asked = {}
+		backend.device_number = function(fd) asked[#asked + 1] = fd; return 3393 end
+		reader._set_backend(backend)
+		helpers.assert_eq({ reader.device_identity("keyboard:/dev/input/event3") }, { nil, "device is not open" })
+		helpers.assert_true(reader.open("/dev/input/event3", "keyboard:/dev/input/event3"))
+		helpers.assert_eq(reader.device_identity("keyboard:/dev/input/event3"), "3393")
+		helpers.assert_eq(#asked, 1, "the descriptor itself is asked")
+		for _, answer in ipairs({ 0, -1, 1.5, "3393", 2 ^ 53 }) do
+			backend.device_number = function() return answer end
+			helpers.assert_nil(reader.device_identity("keyboard:/dev/input/event3"), tostring(answer))
+		end
+		backend.device_number = function() error("fstat raised") end
+		helpers.assert_nil(reader.device_identity("keyboard:/dev/input/event3"), "a raising fstat names nothing")
+		backend.device_number = nil
+		helpers.assert_eq(select(2, reader.device_identity("keyboard:/dev/input/event3")), "no device-number port")
+	end)
+
+	helpers.it("reads st_rdev of a character device through fstat on the real descriptor", function()
+		local ok_uv, uv = pcall(require, "luv")
+		local ok_ffi = pcall(require, "ffi")
+		if not ok_uv or not ok_ffi then return end
+		local reader = helpers.load_module("adapters.evdev_reader")
+		helpers.assert_true(reader.use_ffi_backend())
+		-- /dev/null is a character device every Linux host has (1:3).
+		helpers.assert_true(reader.open("/dev/null", "probe"))
+		local expected = uv.fs_stat("/dev/null").rdev
+		helpers.assert_eq(reader.device_identity("probe"), string.format("%.0f", expected))
+		helpers.assert_true(reader.close("probe"))
+	end)
+end)

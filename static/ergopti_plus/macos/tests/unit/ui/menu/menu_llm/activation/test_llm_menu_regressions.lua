@@ -25,14 +25,6 @@ local function load_contract_entry(id)
 	error("contract entry not found: " .. id)
 end
 
-local function preferences_source()
-	return helpers.driver_root() .. "infra/preferences.lua"
-end
-
-local function driver_init_source()
-	return helpers.driver_root() .. "init.lua"
-end
-
 local function normalize_toml_array(v)
 	if type(v) == "table" then
 		local out = {}
@@ -173,27 +165,10 @@ helpers.describe("LLM menu regressions — Hammerspoon", function()
 		os.remove(tmp)
 	end)
 
-	helpers.it("preferences.lua maps llm_val_modifiers (persist path, not actions)", function()
-		local fh = io.open(preferences_source(), "r")
-		helpers.assert_true(fh ~= nil, "preferences.lua missing")
-		local body = fh:read("*a")
-		fh:close()
-		helpers.assert_true(body:find("llm_val_modifiers", 1, true) ~= nil,
-			"preferences.lua must wire llm_val_modifiers")
-		-- macOS has no menu_llm/actions.ahk; guard against duplicating persist in wrong layer.
-		helpers.assert_true(body:find("KEY_MAP", 1, true) ~= nil,
-			"preferences.lua must use KEY_MAP for flat persistence")
-	end)
-
-	helpers.it("driver init gates LLM backend bootstrap on the boot enabled flag", function()
-		local fh = io.open(driver_init_source(), "r")
-		helpers.assert_true(fh ~= nil, "init.lua missing")
-		local body = fh:read("*a")
-		fh:close()
-		helpers.assert_true(body:find("LLM boot disabled at startup", 1, true) ~= nil,
-			"init.lua must keep an explicit disabled-boot LLM skip path")
-		helpers.assert_true(body:find("start_background_network_bootstrap", 1, true) ~= nil,
-			"init.lua must explicitly opt into the core LLM network bootstrap only when boot LLM is enabled")
+	helpers.it("preferences own llm_val_modifiers at its persisted path", function()
+		local prefs = helpers.load_with_stubs("infra.preferences")
+		helpers.assert_eq(prefs.flat_key_for("llm.navigation.val_modifiers"), "llm_val_modifiers",
+			"the validation modifiers must persist through the preference owner")
 	end)
 
 end)

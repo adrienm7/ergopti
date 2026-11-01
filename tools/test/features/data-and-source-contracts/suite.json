@@ -597,10 +597,26 @@
 		{
 			"id": "js-owned-runtimes-inventory",
 			"ordinal": 544,
-			"name": "Owned runtimes inventory lists every program the macOS and Linux drivers start, each with a proposal",
+			"name": "Owned runtimes registry lists every program the macOS and Linux drivers start, each with a decision",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-owned-runtimes-inventory.cjs"],
 			"repro": "npm run test:owned-runtimes-inventory"
+		},
+		{
+			"id": "js-owned-runtimes-doc",
+			"ordinal": 549,
+			"name": "Owned runtimes document tables are generated from _shared/data/owned_runtimes.json and in sync",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-owned-runtimes-doc.cjs"],
+			"repro": "npm run test:owned-runtimes-doc"
+		},
+		{
+			"id": "js-launcher-sleep-registry",
+			"ordinal": 551,
+			"name": "every Swift launcher sleep takes its duration from the [launcher] timing registry section",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-launcher-sleep-registry.cjs"],
+			"repro": "npm run test:launcher-sleep-registry"
 		}
 	]
 }

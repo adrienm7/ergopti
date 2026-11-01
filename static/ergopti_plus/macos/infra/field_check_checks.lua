@@ -200,6 +200,9 @@ function M.lease_with_facts(ports, report, finish, remap, waited)
 	local deploy = ports.deploy_facts()
 	report.step("deploy_write_ms", STATE.info, deploy and math.floor(deploy.write_ms + 0.5) or "none")
 	report.step("deploy_kb", STATE.info, deploy and math.floor(deploy.bytes / 1024 + 0.5) or "none")
+	-- The share of the write spent in the atomic writer's forks: what an
+	-- asynchronous publication could take off the main thread.
+	report.step("deploy_fork_ms", STATE.info, deploy and deploy.fork_ms and math.floor(deploy.fork_ms + 0.5) or "none")
 	-- The swallowed-keys item's open decision: a write that is itself a key-delaying
 	-- hold means karabiner.json must shrink; a shorter one is kept as is.
 	if deploy == nil then
@@ -329,6 +332,8 @@ function M.network(ports, report, finish)
 			end)
 		end,
 		route_plan = ports.route_plan,
+		relay_probe = ports.relay_probe,
+		relay = assert(ports.relay_policy(), "the shared relay contract is unreadable"),
 		-- The shared policy, not a platform call: a lookup the PAC fallback covers goes direct.
 		pac_fallback = function(stage)
 			return require("modules.llm.opaque_network_admission").is_pac_fallback_stage(stage)
@@ -894,6 +899,8 @@ M.checks = {
 	fifo_safety = Session.fifo_safety,
 	slow_lines = Session.slow_lines,
 	pac_fallback = PacFallback.pac_fallback,
+	apple_shortcuts = require("infra.field_check_apple_shortcuts").apple_shortcuts,
+	tap_hold_thresholds = require("infra.field_check_tap_hold_thresholds").tap_hold_thresholds,
 }
 
 --- The Debug menu checks the field run does not ask for, each with the

@@ -79,6 +79,8 @@ _NNL_Run() {
 			StartError := DllCall(NativeError, "UInt")
 			FileAppend("START mode=" . Mode . " status=" . StartStatus . " os_error=" . StartError . "`n", "*")
 			_NNL_Require(StartStatus == 0 && StartError == 0, "The real native hook did not start.")
+			_NNL_Require(LLM_NavEventOwner_KeyLedgerHealth()["desktop_watch"] == 1,
+				"The real owner must watch the desktop while it runs (ledger-desktop-watch-real).")
 			_NNL.Starts += 1
 			StopStatus := Mode == "raw" ? DllCall(_NNL.Stop, "Int") : _LLM_NavEventOwnerNativeStop()
 			ExpectedStop := Mode == "raw" ? 0 : 1

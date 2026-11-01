@@ -87,7 +87,6 @@ const GENERATORS = [
 			'static/ergopti_plus/linux/install.sh',
 			'tools/build/build-linux-deb.sh',
 			'tools/build/build-linux-rpm.sh',
-			'tools/build/build-linux-packaged-luv.sh',
 			'tools/build/PKGBUILD',
 			'tools/build/nix/flake.nix',
 			'tools/build/templates/linux-portable-runtime-env.sh'
@@ -111,6 +110,7 @@ const GENERATORS = [
 	{
 		script: 'build/build-features-manifest.js',
 		outputs: [
+			'static/ergopti_plus/_shared/_generated/config_template.toml',
 			'static/ergopti_plus/_shared/lua/features/manifest_data.lua',
 			'static/ergopti_plus/linux/_generated/config_template.toml',
 			'static/ergopti_plus/linux/_generated/features_manifest.lua',
@@ -173,6 +173,14 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-keycode-data-js.cjs',
 		outputs: ['static/ergopti_plus/_shared/ui/metrics_typing/_generated/keycode_data.js']
+	},
+	{
+		script: 'codegen/codegen-keystats-tokens.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/lua/keystats/tokens_data.lua',
+			'static/ergopti_plus/windows/_generated/keystats_tokens.ahk',
+			'static/ergopti_plus/_shared/ui/metrics_typing/_generated/keystats_tokens.js'
+		]
 	},
 	{
 		script: 'codegen/codegen-update-channels.cjs',
@@ -264,7 +272,10 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-registry-constants.cjs',
-		outputs: ['static/ergopti_plus/macos/_generated/registry_limits.lua']
+		outputs: [
+			'static/ergopti_plus/macos/_generated/registry_limits.lua',
+			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherTimings.generated.swift'
+		]
 	},
 	{
 		script: 'codegen/codegen-logger-sub-files.cjs',
@@ -322,9 +333,11 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/linux/_generated/gesture_emit_actions.lua']
 	},
 	{
+		// Also splices the availability table between the README's GENERATED markers.
 		script: 'codegen/codegen-action-catalogue.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/lua/actions/catalogue_data.lua',
+			'static/ergopti_plus/_shared/modules/actions/README.md',
 			'static/ergopti_plus/macos/_generated/action_catalogue.lua',
 			'static/ergopti_plus/linux/_generated/action_catalogue.lua',
 			'static/ergopti_plus/windows/_generated/action_catalogue.ahk'
@@ -337,6 +350,11 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-hid-key-identity-hs.cjs',
 		outputs: ['static/ergopti_plus/macos/_generated/hid_key_identity.lua']
+	},
+	{
+		// Splices the tables between the document's GENERATED markers; the prose stays.
+		script: 'codegen/codegen-owned-runtimes.cjs',
+		outputs: ['docs/design/owned-runtimes.md']
 	},
 	{
 		script: 'codegen/codegen-keystats-queries.cjs',

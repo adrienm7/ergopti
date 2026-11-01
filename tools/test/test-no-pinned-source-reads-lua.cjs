@@ -97,7 +97,48 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //                    scheduling calls of a fresh load; the streaming payload
 //                    declaration-order scan became a completion behaviour case
 //                    in test_api_ollama_stream_retirement.)
-const BASELINE = 22;
+//           22 → 21 (2026-10-31: the llm_bridge choke-point test drives
+//                    apply_prediction through a recording expander instead of
+//                    reading the bridge.)
+//           21 → 20 (2026-10-31: the noise filter test answers real requests
+//                    through the prediction pipeline instead of reading
+//                    prediction_engine.lua.)
+//           20 → 19 (2026-10-31: the physical shortcut hook test loads its
+//                    module by name.)
+//           19 → 18 (2026-10-31: the table-valued scalar test flattens a
+//                    document through preferences instead of reading it.)
+//           18 → 17 (2026-10-31: the M-14 warning test fails real requests on
+//                    three backends instead of comparing source positions.)
+//           17 → 16 (2026-10-31: the menu probe loop guard became a repaint-
+//                    count case in test_health_probe_generation.)
+//           16 → 15 (2026-10-31: the LLM menu persistence and regression tests
+//                    ask preferences.flat_key_for instead of searching its
+//                    text.)
+//           15 → 13 (2026-10-31: the two watcher tests feed a synthetic source
+//                    path; they named keymap/init.lua only as a sample event.)
+//           13 → 12 (2026-10-31: the prompt editor test requires the real
+//                    ui_builder by module name.)
+//           12 → 11 (2026-10-31: the ShellRunner GC pin test drops its three
+//                    signature scans; its spawned-handle cases fail when the F7
+//                    signature returns.)
+//           11 → 10 (2026-10-31: the peak-override model test is retired; it
+//                    read engine.lua and modelled the gate in local functions,
+//                    while test_peak_override_needs_sustained_hold drives the
+//                    engine through a 4-frame peak at 120 Hz.)
+//           10 → 9 (2026-10-31: the MLX boot cleanup gate is judged by the
+//                    installed-application boot scenarios, which count the
+//                    port cleanup shells an AI-off and an AI-on boot start,
+//                    instead of reading init.lua.)
+//            9 → 8 (2026-10-31: the AI-off boot's skipped LLM bootstrap is
+//                    judged by the same boot scenarios instead of a search of
+//                    init.lua in test_llm_menu_regressions.)
+//            8 → 7 (2026-11-01: the MLX import probe has one source, the
+//                    script; the bootstrap test compares the checker's probe
+//                    with it instead of reading models_manager_mlx.lua.)
+//            7 → 5 (2026-11-01: helpers.module_name_of and
+//                    helpers.read_module_source; the adapter wiring and fs_dir
+//                    guards name their module instead of its path.)
+const BASELINE = 5;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -135,7 +176,53 @@ const BASELINE = 22;
 //              splitting it in two let the fixer take the driver half.)
 //       75 → 70 (2026-10-31: the three files of the file baseline's 27 → 24.)
 //       70 → 67 (2026-10-31: the two files of the file baseline's 24 → 22.)
-const READ_BASELINE = 67;
+//       67 → 66 (2026-10-31: the llm_bridge choke-point test drives
+//              apply_prediction through a recording expander instead of reading
+//              the bridge.)
+//       66 → 65 (2026-10-31: the noise filter test answers real requests
+//              through the prediction pipeline instead of reading
+//              prediction_engine.lua.)
+//       65 → 64 (2026-10-31: the physical shortcut hook test loads its module
+//              by name.)
+//       64 → 63 (2026-10-31: the table-valued scalar test flattens a document
+//              through preferences instead of reading it.)
+//       63 → 61 (2026-10-31: the M-14 warning test fails real requests on three
+//              backends instead of comparing source positions.)
+//       61 → 59 (2026-10-31: the menu probe loop guard became a repaint-count
+//              case in test_health_probe_generation.)
+//       59 → 57 (2026-10-31: the LLM menu persistence and regression tests ask
+//              preferences.flat_key_for instead of searching its text.)
+//       57 → 55 (2026-10-31: the two watcher tests feed a synthetic source
+//              path; they named keymap/init.lua only as a sample event.)
+//       55 → 54 (2026-10-31: the prompt editor test requires the real
+//              ui_builder by module name.)
+//       54 → 51 (2026-10-31: the ShellRunner GC pin test drops its three
+//              signature scans; its spawned-handle cases fail when the F7
+//              signature returns.)
+//       51 → 48 (2026-10-31: the dedup single-source test drives one answer
+//              through each of the three backends and checks the flag each
+//              hands to ApiCommon.insert_prediction.)
+//       48 → 47 (2026-10-31: the peak-override model test is retired, see
+//              the file count above.)
+//       47 → 45 (2026-10-31: the MLX boot cleanup gate moved to the boot
+//              scenarios, see the file count above.)
+//       45 → 44 (2026-10-31: the skipped LLM bootstrap moved to the boot
+//              scenarios, see the file count above.)
+//       44 → 42 (2026-10-31: the boot scenarios refuse any boot line that
+//              keeps a {N} placeholder; test_init_boot_logger_format no
+//              longer searches init.lua for one.)
+//       42 → 38 (2026-11-01: the keystats pause-guard test selects its two
+//              modules by a declaration unique to each instead of their paths.)
+//       38 → 37 (2026-11-01: the MLX import probe single source, see the file
+//              count above.)
+//       37 → 34 (2026-11-01: dialog_util.alert refuses a call without
+//              hs.dialog.alert's shape; the vscode bridge test no longer scans
+//              three named files that held no alert call.)
+//       34 → 9 (2026-11-01: the whole-tree allowlists of the require-state,
+//              recurring-timer, settings-namespace, raw-task and GC-retention
+//              guards are keyed by module name; the reads left are the driver
+//              root's init.lua, which no module name reaches.)
+const READ_BASELINE = 9;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).

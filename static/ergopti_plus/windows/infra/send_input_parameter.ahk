@@ -44,7 +44,7 @@ global _SEND_INPUT_VOCABULARY_JSON := ""
 ; a broken install, not an empty vocabulary: every send_* binding would refuse
 ; its value with no explanation.
 ; @returns {Map}
-SendInputVocabulary() {
+SendKeysVocabulary() {
 	global _SEND_INPUT_VOCABULARY, _SEND_INPUT_VOCABULARY_JSON, _SharedDir
 	if (_SEND_INPUT_VOCABULARY is Map)
 		return _SEND_INPUT_VOCABULARY
@@ -67,9 +67,9 @@ SendInputVocabulary() {
 ; The vocabulary as the JSON text of the shared file, for the action picker's
 ; editor, which validates with the same rules in the page.
 ; @returns {String}
-SendInputVocabularyJson() {
+SendKeysVocabularyJson() {
 	global _SEND_INPUT_VOCABULARY_JSON
-	SendInputVocabulary()
+	SendKeysVocabulary()
 	return _SEND_INPUT_VOCABULARY_JSON
 }
 
@@ -132,7 +132,7 @@ SendInputDescribeKeys() {
 	Names := []
 	RunFirst := ""
 	RunLast := ""
-	for _, Entry in SendInputVocabulary()["keys"] {
+	for _, Entry in SendKeysVocabulary()["keys"] {
 		if RegExMatch(Entry["id"], "^f\d+$") {
 			if (RunFirst = "")
 				RunFirst := Entry["id"]
@@ -166,7 +166,7 @@ SendInputParseText(Value) {
 	if !(Value is String)
 		return ""
 	Points := _SendInputCodePoints(Value)
-	if (Points.Length == 0 || Points.Length > SendInputVocabulary()["text_max_code_points"])
+	if (Points.Length == 0 || Points.Length > SendKeysVocabulary()["text_max_code_points"])
 		return ""
 	for _, Point in Points {
 		if _SendInputIsControl(Point)
@@ -187,7 +187,7 @@ SendInputParseKey(Value, LowerLetter := false) {
 	Wanted := Trim(Value, SEND_INPUT_TRIM)
 	if (Wanted == "")
 		return ""
-	Entry := _SendInputFindEntry(SendInputVocabulary()["keys"], _SendInputAsciiLower(Wanted))
+	Entry := _SendInputFindEntry(SendKeysVocabulary()["keys"], _SendInputAsciiLower(Wanted))
 	if (Entry is Map)
 		return Map("named", Entry["id"], "canonical", Entry["id"])
 	Points := _SendInputCodePoints(Wanted)
@@ -217,7 +217,7 @@ SendInputParseShortcut(Value) {
 	}
 	if (ModTokens.Length == 0)
 		return ""
-	Vocabulary := SendInputVocabulary()
+	Vocabulary := SendKeysVocabulary()
 	Held := Map()
 	for _, Token in ModTokens {
 		Entry := _SendInputFindEntry(Vocabulary["modifiers"],
@@ -252,7 +252,7 @@ _SendInputReadOutputGroup(Inner, &Text, &Entry, &Count) {
 	Text := ""
 	Entry := ""
 	Count := 1
-	Vocabulary := SendInputVocabulary()
+	Vocabulary := SendKeysVocabulary()
 	if RegExMatch(Inner, "^[Uu]\+([0-9A-Fa-f]+)$", &Hex) {
 		if (StrLen(Hex[1]) > 6)
 			return false
@@ -287,7 +287,7 @@ _SendInputReadOutputGroup(Inner, &Text, &Entry, &Count) {
 SendInputParseOutput(Value) {
 	if !(Value is String)
 		throw TypeError("A hotstring output must be a string.")
-	Vocabulary := SendInputVocabulary()
+	Vocabulary := SendKeysVocabulary()
 	if !Vocabulary.Has("output_key_max_repeat")
 		throw Error("The send-input vocabulary has no output_key_max_repeat.")
 	Tokens := []
@@ -395,7 +395,7 @@ SendInputParse(Kind, Value) {
 _SendInputAhkKey(Parsed) {
 	if Parsed.Has("char")
 		return Parsed["char"]
-	return _SendInputFindEntry(SendInputVocabulary()["keys"], Parsed["named"])["ahk"]
+	return _SendInputFindEntry(SendKeysVocabulary()["keys"], Parsed["named"])["ahk"]
 }
 
 ; Types or presses a parsed value through the driver's synthetic-input choke
@@ -419,7 +419,7 @@ SendInputEmit(Kind, Parsed) {
 	Names := []
 	Seen := Map()
 	for _, Id in Parsed["mods"] {
-		Name := _SendInputFindEntry(SendInputVocabulary()["modifiers"], Id)["ahk"]
+		Name := _SendInputFindEntry(SendKeysVocabulary()["modifiers"], Id)["ahk"]
 		if !Seen.Has(Name) {
 			Seen[Name] := true
 			Names.Push(Name)

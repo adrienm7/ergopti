@@ -208,6 +208,7 @@ function Get-ErgoptiOwnedProxyEnvironment {
 		[Parameter(Mandatory = $true)][scriptblock]$ReadEnvironment)
 	if ($Origins.Count -eq 0) { return @{ Ok = $false; Reason = $script:ErgoptiRoutePlanEmpty } }
 	$Entries = New-Object System.Collections.ArrayList
+	$OverrideDirect = $false
 	foreach ($Origin in $Origins) {
 		$Answer = & $Resolve $Origin
 		if ($null -eq $Answer -or $Answer.Ok -ne $true -or @($Answer.Routes).Count -eq 0) {
@@ -218,17 +219,24 @@ function Get-ErgoptiOwnedProxyEnvironment {
 		if ($script:ErgoptiOwnedInheritedSources -ccontains $First.Source) {
 			return @{ Ok = $true; Mode = 'inherit'; Proxy = ''; Environment = [ordered]@{} }
 		}
+		if ($First.Source -ceq 'override' -and $First.Kind -ceq 'direct') { $OverrideDirect = $true }
 		if ($First.Kind -ceq 'direct') { $Route = 'direct' }
 		elseif ($First.Kind -ceq 'proxy' -and $First.Endpoint -is [string]) {
-			# Relays are normalized absolute URIs ("http://host:port/"); the plan takes host:port
-			$Route = $First.Endpoint -replace '/$', ''
+			# Relays are normalized absolute URIs ("http://host:port/"); the plan takes host:port.
+			# An override names its real relay: the daemon reads https, socks and credentials
+			# from its environment itself, and a loopback hop would die with this process.
+			$Route = $(if ($First -is [hashtable] -and $First.ContainsKey('Relay')) { $First.Relay } else { $First.Endpoint -replace '/$', '' })
 		} else { return @{ Ok = $false; Reason = $script:ErgoptiRoutePlanInvalid } }
 		[void]$Entries.Add(@{ origin = $Origin; route = $Route })
 	}
 	$Plan = New-ErgoptiRoutePlan @($Entries)
 	if (-not $Plan.Ok) { return @{ Ok = $false; Reason = $Plan.Reason } }
 	$Environment = [ordered]@{}
-	if ($Plan.Proxy -ceq 'direct') { return @{ Ok = $true; Mode = 'direct'; Proxy = ''; Environment = $Environment } }
+	if ($Plan.Proxy -ceq 'direct') {
+		# A direct override also beats a relay the daemon would inherit from the user.
+		if ($OverrideDirect) { $Environment[$script:ErgoptiOwnedBypassVariable] = '*' }
+		return @{ Ok = $true; Mode = 'direct'; Proxy = ''; Environment = $Environment }
+	}
 	$Environment[$script:ErgoptiOwnedProxyVariable] = $Plan.Proxy
 	if ($Plan.NoProxy -cne '') {
 		# The user's own bypass entries are kept ahead of the origins sent direct
@@ -283,4 +291,68 @@ function Test-ErgoptiRelayTunnel {
 		}
 		return 'credentials'
 	} finally { $Client.Close() }
+}
+
+# The local sign-in relay's command line and answers, the twin of the shared
+# network/proxy_auth_relay.lua (docs/design/proxy-auth-relay.md): pure policy, with
+# reasons and statuses that never carry a URL, host, header or token.
+
+# The upstream the relay may sign in to, '' when it does not apply: only a plain
+# http relay without credentials can be signed in to.
+function New-ErgoptiRelayUpstream {
+	param([AllowNull()]$Proxy)
+	if ($Proxy -isnot [string] -or $Proxy -cnotmatch '^http://([A-Za-z0-9.\-]+):([0-9]{1,5})/?\z') { return '' }
+	$RelayHost = $Matches[1].ToLowerInvariant()
+	$RelayPort = [int]$Matches[2]
+	if ($RelayHost.Length -gt 253 -or $RelayHost.Contains('..') -or $RelayPort -lt 1 -or $RelayPort -gt 65535) { return '' }
+	return 'http://' + $RelayHost + ':' + $RelayPort
+}
+
+function New-ErgoptiRelayProbeArguments {
+	param([Parameter(Mandatory = $true)][string]$Upstream, [Parameter(Mandatory = $true)][string]$Authority,
+		[Parameter(Mandatory = $true)][ValidateRange(1, 2147483647)][int]$DialMs,
+		[Parameter(Mandatory = $true)][ValidateRange(1, 2147483647)][int]$HandshakeMs)
+	if ((New-ErgoptiRelayUpstream $Upstream) -cne $Upstream -or $Authority -cnotmatch '^[A-Za-z0-9.\-]+:[0-9]+\z') {
+		throw 'The relay probe requires a plain upstream and authority.'
+	}
+	return "probe --upstream $Upstream --authority $Authority --dial-timeout-ms $DialMs --handshake-timeout-ms $HandshakeMs"
+}
+
+# The relay's arguments up to and including the "--" before its child.
+function New-ErgoptiRelayRunPrefix {
+	param([Parameter(Mandatory = $true)][string]$Upstream, [Parameter(Mandatory = $true)][string]$Variable,
+		[Parameter(Mandatory = $true)][ValidateRange(1, 2147483647)][int]$DialMs,
+		[Parameter(Mandatory = $true)][ValidateRange(1, 2147483647)][int]$HandshakeMs,
+		[Parameter(Mandatory = $true)][ValidateRange(1, 2147483647)][int]$IdleMs)
+	if ((New-ErgoptiRelayUpstream $Upstream) -cne $Upstream -or $Variable -cnotmatch '^[A-Za-z_][A-Za-z0-9_]*\z') {
+		throw 'The relay run requires a plain upstream and variable.'
+	}
+	return "run --upstream $Upstream --variable $Variable --dial-timeout-ms $DialMs --handshake-timeout-ms $HandshakeMs --idle-timeout-ms $IdleMs --"
+}
+
+# Reads a finished probe against the decoded proxy_auth_relay.json. Anything
+# else, or an exit that does not match its line, is 'relay_unavailable', never a
+# silent direct start. Returns @{ Status; Scheme } or @{ Status = 'refused'; Reason }.
+function Read-ErgoptiRelayProbe {
+	param([AllowNull()]$ExitCode, [AllowNull()]$Stdout, [Parameter(Mandatory = $true)]$Contract)
+	$Unavailable = @{ Status = 'refused'; Reason = 'relay_unavailable' }
+	if ($ExitCode -isnot [int] -or $Stdout -isnot [string]) { return $Unavailable }
+	$Exits = $Contract.exit_codes
+	if ($Stdout -cmatch '^\{"schema":1,"status":"not_needed"\}\r?\n?\z') {
+		if ($ExitCode -ne $Exits.ok) { return $Unavailable }
+		return @{ Status = 'not_needed' }
+	}
+	if ($Stdout -cmatch '^\{"schema":1,"status":"required","scheme":"([a-z]+)"\}\r?\n?\z') {
+		$Scheme = $Matches[1]
+		if ($ExitCode -ne $Exits.ok -or @($Contract.schemes) -cnotcontains $Scheme) { return $Unavailable }
+		return @{ Status = 'required'; Scheme = $Scheme }
+	}
+	if ($Stdout -cmatch '^\{"schema":1,"status":"refused","reason":"([a-z_]+)"\}\r?\n?\z') {
+		$Reason = $Matches[1]
+		$Known = @($Contract.refusals.PSObject.Properties | ForEach-Object { $_.Name })
+		if (($ExitCode -ne $Exits.refused -and $ExitCode -ne $Exits.invalid_arguments) -or
+			$Known -cnotcontains $Reason -or $Reason -ceq 'relay_unavailable') { return $Unavailable }
+		return @{ Status = 'refused'; Reason = $Reason }
+	}
+	return $Unavailable
 }

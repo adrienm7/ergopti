@@ -49,9 +49,19 @@ try {
 			'utf8'
 		)
 	).github;
+	// LuaJIT is built from the commit the runtime catalogue pins (owned runtimes
+	// PIN), never from a moving branch.
+	const pinned = JSON.parse(
+		fs.readFileSync(
+			path.join(ROOT, 'static/ergopti_plus/_shared/data/linux_native_runtime.json'),
+			'utf8'
+		)
+	).network_runtime.portable.flatpak_sources.luajit;
 	const luajit = manifest.modules.find((module) => module.name === 'luajit');
 	assert.equal(luajit?.sources?.[0]?.url, `https://${github}/LuaJIT/LuaJIT.git`);
-	assert.equal(luajit.sources[0].branch, 'v2.1');
+	assert.equal(luajit.sources[0].url, pinned.url);
+	assert.equal(luajit.sources[0].commit, pinned.commit);
+	assert.equal(luajit.sources[0].branch, undefined, 'a branch would move under the pin');
 	const metainfo = fs.readFileSync(path.join(payload, `share/metainfo/${id}.metainfo.xml`), 'utf8');
 	assert.equal(
 		metainfo.match(/<url type="homepage">([^<]+)<\/url>/)?.[1],

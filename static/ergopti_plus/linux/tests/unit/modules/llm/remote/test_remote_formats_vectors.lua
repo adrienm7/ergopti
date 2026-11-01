@@ -112,6 +112,16 @@ helpers.describe("remote formats replay the shared corpus", function()
 			assert_shape(answers and { answers = answers, where = where } or nil, v.expected, v.id)
 		end)
 	end
+	for _, v in ipairs(corpus.agent_body) do
+		helpers.it("agent body '" .. v.id .. "'", function()
+			assert_shape(Formats.agent_body(v.spec), v.expected, v.id)
+		end)
+	end
+	for _, v in ipairs(corpus.agent_answer) do
+		helpers.it("agent answer '" .. v.id .. "'", function()
+			helpers.assert_eq(require("llm.remote_response_classifier").classify("perplexity_agent", v.body).text, v.text)
+		end)
+	end
 	for _, v in ipairs(corpus.decisions_body) do
 		helpers.it("decisions body '" .. v.id .. "'", function()
 			assert_shape(Formats.decisions_body(v.model, v.state, Agent.jev_questions(agent)), v.expected, v.id)

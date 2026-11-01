@@ -56,6 +56,9 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Python suites: verify-change's xkb-python gate and linux-layout.yml run
 	// them; the JS suite stays free of a Python dependency.
 	'tools/test/run-xkb-python-tests.cjs',
+	// The resumable parallel AHK suite runner needs AutoHotkey on Windows; the PC
+	// agent and the Windows CI lane run it, its own tool test is in the suite.
+	'tools/test/ahk-parallel.cjs',
 	// Native X11/XKB qualification requires its own display and headers;
 	// verify-change and the Linux CI lane own that separate native gate.
 	'tools/test/run-linux-xkb-source.cjs',
@@ -81,6 +84,9 @@ const NOT_SUITE_ENTRIES = new Set([
 	// and verify-change run it, and the suite runs its vacuity gate
 	// (test-go-route-plan-gate.cjs) instead.
 	'tools/test/run-go-route-plan.cjs',
+	// The Go relay needs Go with cgo; the Linux network-ai CI shard and
+	// verify-change run it, and the suite runs test-go-proxy-relay-gate.cjs.
+	'tools/test/run-go-proxy-relay.cjs',
 	// Actual staged package/kernel admission is mandatory in its planner and CI lane.
 	'tools/test/run-linux-portable-network-native.cjs',
 	// Retained descriptor hashing has its own mandatory actual Linux qualification.
@@ -96,7 +102,10 @@ const NOT_SUITE_ENTRIES = new Set([
 	'tools/test/browser/layer-editor.playwright.cjs',
 	// Actual Chromium/WebKit rendering runs separately in mandatory Core / js;
 	// test-ci-pipeline-wiring.cjs rejects missing or redirected browser execution.
-	'tools/test/browser/physical-shortcuts.playwright.cjs'
+	'tools/test/browser/physical-shortcuts.playwright.cjs',
+	// A manual launcher that serves the fake corporate network until stdin
+	// closes; test-fake-network.cjs runs the library it starts inside the suite.
+	'tools/test/fake-network.cjs'
 ]);
 
 // Gates the suite runs with no npm alias. Zero since 2026-08-03, when the last

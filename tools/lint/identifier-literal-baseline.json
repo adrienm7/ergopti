@@ -4,62 +4,14 @@
 		"static/ergopti_plus/macos/launcher/Package.swift": {
 			"host": 1
 		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeBootstrapStageOwner.swift": {
-			"bundle_id_or_label": 2
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeFirstInstallOwner.swift": {
-			"bundle_id_or_label": 2
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallJournal.swift": {
-			"bundle_id_or_label": 1
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallOwner.swift": {
-			"bundle_id_or_label": 8
-		},
 		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimePublisherIdentity.swift": {
 			"bundle_id_or_label": 4
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeServiceLifecycleLock.swift": {
-			"bundle_id_or_label": 1
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift": {
-			"bundle_id_or_label": 1
-		},
-		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/GuardianRegistrationTests.swift": {
-			"app_file_name": 1
-		},
-		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/GuardianUnregistrationTests.swift": {
-			"app_file_name": 1
-		},
-		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LauncherEnvironmentTests.swift": {
-			"bundle_id_or_label": 6
 		},
 		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeCoreProvisionOwnerTests.swift": {
 			"bundle_id_or_label": 8
 		},
-		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ReleaseArchiveStagingTests.swift": {
-			"app_file_name": 12
-		},
-		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift": {
-			"app_file_name": 10
-		},
-		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift": {
-			"host": 1,
-			"app_file_name": 7
-		},
-		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/UninstallWorkerTests.swift": {
-			"app_file_name": 2,
-			"bundle_id_or_label": 3
-		},
 		"static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1": {
 			"host": 1
-		},
-		"static/ergopti_plus/windows/modules/updater/core.ahk": {
-			"host": 3
-		},
-		"static/ergopti_plus/windows/modules/updater/self_update.ahk": {
-			"host": 1,
-			"app_file_name": 1
 		},
 		"tools/build/InstalledRuntimePublisher.hpp": {
 			"bundle_id_or_label": 4

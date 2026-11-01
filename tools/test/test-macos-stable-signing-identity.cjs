@@ -179,6 +179,7 @@ assemble_native_runtime() {
 	mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Frameworks/Sparkle.framework"
 	: > "$APP_PATH/Contents/MacOS/ErgoptiPlus"
 	: > "$APP_PATH/Contents/MacOS/SystemSwitcherState"
+	: > "$APP_PATH/Contents/MacOS/ergopti-proxy-relay"
 	: > "$APP_PATH/Contents/MacOS/ErgoptiAutomationQuery"
 }
 assemble_app() {

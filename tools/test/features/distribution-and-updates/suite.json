@@ -609,6 +609,30 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-run-protocol.cjs"],
 			"repro": "npm run test:field-run-protocol"
+		},
+		{
+			"id": "js-managed-pyobjc",
+			"ordinal": 558,
+			"name": "the App Cloner's PyObjC wheels are pinned, verified, installed offline into the managed Python and imported",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-managed-pyobjc.cjs"],
+			"repro": "node tools/test/test-managed-pyobjc.cjs"
+		},
+		{
+			"id": "js-app-cloner-managed-python",
+			"ordinal": 559,
+			"name": "App Cloner refuses to start without the managed Python, never executes /usr/bin/python3, and its clones exec the versionless link",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-app-cloner-managed-python.cjs"],
+			"repro": "node tools/test/test-app-cloner-managed-python.cjs"
+		},
+		{
+			"id": "js-windows-builder-boundaries",
+			"ordinal": 561,
+			"name": "Windows native builders enter literal paths and refuse a mistyped manifest schema",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-builder-boundaries.cjs"],
+			"repro": "node tools/test/test-windows-builder-boundaries.cjs"
 		}
 	]
 }

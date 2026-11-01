@@ -624,6 +624,7 @@ const RULES = [
 				'static/ergopti_plus/linux/modules/updater/manager.lua',
 				'static/ergopti_plus/linux/modules/updater/archive_transfer.lua',
 				'static/ergopti_plus/linux/infra/archive_output.lua',
+				'static/ergopti_plus/linux/infra/archive_tar_feeder.lua',
 				'static/ergopti_plus/linux/infra/fd_sha256.lua',
 				'static/ergopti_plus/linux/modules/shortcuts/script_actions.lua',
 				'static/ergopti_plus/linux/infra/http_output_target.lua',
@@ -663,6 +664,7 @@ const RULES = [
 				'static/ergopti_plus/linux/modules/updater/archive_transfer.lua',
 				'static/ergopti_plus/linux/modules/updater/installer.lua',
 				'static/ergopti_plus/linux/infra/archive_output.lua',
+				'static/ergopti_plus/linux/infra/archive_tar_feeder.lua',
 				'static/ergopti_plus/linux/infra/fd_sha256.lua',
 				'static/ergopti_plus/linux/infra/http_output_target.lua',
 				'static/ergopti_plus/linux/adapters/curl_http_client.lua',
@@ -752,6 +754,7 @@ const RULES = [
 				'static/ergopti_plus/linux/infra/managed_http_deadline.lua',
 				'static/ergopti_plus/linux/infra/native_timer.lua',
 				'static/ergopti_plus/linux/infra/archive_output.lua',
+				'static/ergopti_plus/linux/infra/archive_tar_feeder.lua',
 				'static/ergopti_plus/linux/infra/http_output_target.lua',
 				'static/ergopti_plus/linux/infra/curl_identity.lua',
 				'static/ergopti_plus/linux/infra/proxy_policy.lua',
@@ -807,6 +810,73 @@ const RULES = [
 			].includes(f)
 	},
 	{
+		gate: 'go-proxy-relay',
+		why: 'the local NTLM/Negotiate relay (docs/design/proxy-auth-relay.md) is proven only under go test',
+		match: (f) =>
+			f.startsWith('static/ergopti_plus/_shared/go/native_http/proxyrelay/') ||
+			f.startsWith('static/ergopti_plus/_shared/go/native_http/cmd/ergopti-proxy-relay/') ||
+			[
+				'static/ergopti_plus/_shared/modules/network/proxy_auth_relay.json',
+				'static/ergopti_plus/_shared/tests/corpus/network/proxy_auth_relay_probe_vectors.json',
+				'tools/test/run-go-proxy-relay.cjs'
+			].includes(f)
+	},
+	{
+		gate: 'windows-proxy-relay-e2e',
+		why: 'only the real launcher, relay and SSPI through the fake network show a managed start and pull work on Windows',
+		match: (f) =>
+			f.startsWith('static/ergopti_plus/_shared/go/native_http/proxyrelay/') ||
+			f.startsWith('static/ergopti_plus/_shared/go/native_http/cmd/ergopti-proxy-relay/') ||
+			f.startsWith('tools/test/fixtures/ollama-stub/') ||
+			[
+				'static/ergopti_plus/_shared/modules/network/proxy_auth_relay.json',
+				'static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1',
+				'static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1',
+				'static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1',
+				'static/ergopti_plus/windows/modules/llm/ollama_runtime_owner.ahk',
+				'static/ergopti_plus/windows/tests/live/managed_relay_owner.ahk',
+				'static/ergopti_plus/windows/vendor/ergopti_network_routes.ps1',
+				'static/ergopti_plus/windows/vendor/ergopti_route_plan.ps1',
+				'static/ergopti_plus/windows/vendor/ergopti-proxy-relay.exe',
+				'static/ergopti_plus/windows/vendor/ergopti-proxy-relay.json',
+				'tools/test/lib/fake-network.cjs',
+				'tools/test/lib/windows-job-host.ps1',
+				'tools/test/lib/windows-owned-runtime.cjs',
+				'tools/test/test-windows-proxy-relay-e2e.cjs'
+			].includes(f)
+	},
+	{
+		gate: 'windows-proxy-override-e2e',
+		why: 'only the real adapter, managed worker and staging worker through the fake network show every download honours the override',
+		match: (f) =>
+			[
+				'static/ergopti_plus/_shared/modules/network/proxy_override.json',
+				'static/ergopti_plus/windows/adapters/http_client.ahk',
+				'static/ergopti_plus/windows/adapters/proxy_override.ahk',
+				'static/ergopti_plus/windows/tests/live/proxy_override_owner.ahk',
+				'static/ergopti_plus/windows/ui/proxy_override.ahk',
+				'static/ergopti_plus/windows/vendor/ergopti_managed_http_worker.ps1',
+				'static/ergopti_plus/windows/vendor/ergopti_network_routes.ps1',
+				'static/ergopti_plus/windows/vendor/ergopti_updater_staging.ps1',
+				'tools/test/lib/fake-network.cjs',
+				'tools/test/test-windows-proxy-override-e2e.cjs'
+			].includes(f)
+	},
+	{
+		gate: 'perplexity-agent-e2e',
+		why: 'only the real transport against the fake Agent API shows the drivers speak its documented shape',
+		match: (f) =>
+			[
+				'static/ergopti_plus/_shared/lua/llm/remote_formats.lua',
+				'static/ergopti_plus/_shared/lua/llm/remote_response_classifier.lua',
+				'static/ergopti_plus/windows/modules/llm/remote_formats.ahk',
+				'static/ergopti_plus/windows/tests/live/perplexity_agent_owner.ahk',
+				'tools/test/fixtures/perplexity-agent-client.lua',
+				'tools/test/lib/fake-network.cjs',
+				'tools/test/test-perplexity-agent-e2e.cjs'
+			].includes(f)
+	},
+	{
 		gate: 'linux-network-runtime',
 		why: 'managed networking requires actual LuaJIT luv, GIO modules, compiled schemas and installed helper paths',
 		match: (f) =>
@@ -838,6 +908,7 @@ const RULES = [
 				'static/ergopti_plus/linux/tests/hardware/run_fd_sha256_native.lua',
 				'static/ergopti_plus/linux/infra/fd_sha256.lua',
 				'static/ergopti_plus/linux/infra/archive_output.lua',
+				'static/ergopti_plus/linux/infra/archive_tar_feeder.lua',
 				'static/ergopti_plus/linux/infra/managed_http_deadline.lua',
 				'static/ergopti_plus/linux/infra/native_timer.lua',
 				'static/ergopti_plus/linux/infra/monotonic.lua',
@@ -970,6 +1041,10 @@ const GATE_COMMANDS = {
 	'linux-http-stream': { npm: 'test:linux:http-stream' },
 	'linux-network-runtime': { npm: 'test:linux:network-runtime' },
 	'go-route-plan': { npm: 'test:go-route-plan' },
+	'go-proxy-relay': { npm: 'test:go-proxy-relay' },
+	'windows-proxy-relay-e2e': { npm: 'test:windows-proxy-relay-e2e', platform: 'win32' },
+	'windows-proxy-override-e2e': { npm: 'test:windows-proxy-override-e2e', platform: 'win32' },
+	'perplexity-agent-e2e': { npm: 'test:perplexity-agent-e2e', platform: 'win32' },
 	'linux-nix-native': { npm: 'test:linux:nix-native', platform: 'linux' },
 	'linux-updater-temp-native': { npm: 'test:linux:updater-temp-native', platform: 'linux' },
 	'linux-updater-archive-native': { npm: 'test:linux:updater-archive-native', platform: 'linux' },

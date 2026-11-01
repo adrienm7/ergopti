@@ -1987,6 +1987,10 @@ local function create_menu(deps)
 													local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
 													return require("config_migrate").read_only_status(path) == "newer"
 												end,
+												config_older_schema = function()
+													local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
+													return require("config_migrate").read_only_status(path) == "unsupported"
+												end,
 										},
 								}
 								main_menu = ManifestMenu.build("llm_menu", "LLM", nil, group_builders, render_ctx, list_providers) or {}

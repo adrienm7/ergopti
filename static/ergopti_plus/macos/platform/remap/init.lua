@@ -5172,6 +5172,31 @@ function M.owned_runtime_status()
 	return { state = status.state, reason = status.reason }
 end
 
+--- The driver version the owned runtime needs, for the update offer of an
+--- incompatible VirtualHIDDevice.
+--- @return string|nil version Nil when the manifest pins none.
+function M.owned_virtual_hid_version()
+	return require("adapters.runtime_owner_ports").virtual_hid_version()
+end
+
+--- Replaces an incompatible VirtualHIDDevice with the pinned driver after the
+--- user confirmed it. The caller reloads after telling the user, so the next
+--- owner admits the new driver or names the System Settings approval macOS
+--- may still wait for (ui/virtual_hid_update.lua).
+--- @param on_done function fn(ok, reason|nil, explanation|nil) called once.
+--- @return boolean started False when no incompatible driver blocks the owned runtime.
+function M.update_virtual_hid_driver(on_done)
+	assert(type(on_done) == "function", "update_virtual_hid_driver(): a completion callback is required")
+	local status = M.owned_runtime_status()
+	if not M._owned.selected() or type(status) ~= "table"
+		or status.reason ~= require("platform.remap.runtime_vhid").REASON_INCOMPATIBLE then
+		Logger.error(LOG, "VirtualHIDDevice update refused: no incompatible driver blocks the owned runtime.")
+		return false
+	end
+	require("adapters.runtime_owner_ports").update_virtual_hid(on_done)
+	return true
+end
+
 --- Whether Ergopti closed the user's own Karabiner-Elements and has not given
 --- it back yet, for the menu row that says so.
 --- @return boolean closed
@@ -6294,10 +6319,15 @@ function M.regenerate(
 	-- Cheap enough to do unconditionally: load_available_actions memoises the
 	-- built list, so this walks the logical_char entries and mutates their key
 	-- codes in place rather than rebuilding 673 action tables.
+	-- Each stage is a phase: a late run loop or a hold names the stage that cost
+	-- (2026-10-31: 360 ms for a layout-settle regeneration that changed nothing).
+	local Phases = require("infra.phase_stats")
+	local stage_started = Phases.now()
 	if M.AVAILABLE_ACTIONS then
 		local layout_ok = resolve_current_layout_actions("Karabiner regeneration layout-action resolution")
 		if not layout_ok then return fail("layout-resolution-failed") end
 	end
+	Phases.stop("karabiner.layout_actions", stage_started)
 	context.built_layout_serial = _layout_event_serial
 	context.built_after_tis_settle = _layout_settled_serial >= context.built_layout_serial
 
@@ -6311,6 +6341,7 @@ function M.regenerate(
 
 	-- The navigation layer is data: layers.toml is read again for every
 	-- regeneration, so an edited file applies with the next one.
+	stage_started = Phases.now()
 	local ok_nav, nav_layer, nav_observation = pcall(NavLayer.load)
 	if not ok_nav then
 		Logger.error(LOG, "The navigation layer could not be read: %s.", tostring(nav_layer))
@@ -6330,6 +6361,8 @@ function M.regenerate(
 		_state.script_chords = chords
 	end
 
+	Phases.stop("karabiner.inputs", stage_started)
+	stage_started = Phases.now()
 	local ok_build, result, build_err, legacy_rules, legacy_context = pcall(
 		Generator.build_karabiner_json,
 		_state,
@@ -6345,8 +6378,10 @@ function M.regenerate(
 		return fail("generation-failed")
 	end
 
+	Phases.stop("karabiner.build", stage_started)
 	-- Counted before the call: a failed deploy may still have written.
 	_deploy_serial = _deploy_serial + 1
+	stage_started = Phases.now()
 	local deploy_ok, deployed, deploy_detail, _, deploy_refusal = xpcall(function()
 		if M._owned.selected() then
 			return Generator.deploy_owned_config(result, KARABINER_OUT)
@@ -6358,6 +6393,7 @@ function M.regenerate(
 			legacy_context
 		)
 	end, debug.traceback)
+	Phases.stop("karabiner.deploy", stage_started)
 	if not deploy_ok or deployed ~= true then
 		local deploy_failure = deploy_ok and deploy_detail or deployed
 		Logger.error(LOG, "Karabiner deploy failed → '%s': %s.",

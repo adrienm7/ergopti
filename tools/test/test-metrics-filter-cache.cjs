@@ -172,6 +172,8 @@ function typingFixture() {
 	});
 	context.window = context;
 	installHostCapabilities(context);
+	vm.runInContext(read('metrics_typing/_generated/keystats_tokens.js'), context);
+	vm.runInContext(read('metrics_typing/key_tokens.js'), context);
 	vm.runInContext(read('metrics_typing/data.js'), context);
 	context.get_source_mode_flags = () => modes;
 	context.get_local_date_string = () => today;
@@ -3629,18 +3631,14 @@ for (const host of ['windows', 'macos', 'linux']) {
 					vm.runInContext(`app_state.current_tab = ${JSON.stringify(vector.tab)}`, page.context);
 					page.context.render_current_tab();
 					page.timers.at(-1)();
-					// Flat bracket strings have an independent, reported token-boundary ambiguity.
-					// Pin their projection policy without claiming the current tokenizer can render them.
-					if (vector.id !== 'literal-bracket') {
-						const rows = vm.runInContext('app_state.rendered_list', page.context);
-						assert.equal(rows.length, 1);
-						assert.equal(
-							rows[0].acc,
-							vector.accuracy,
-							'case folding retains the original native correction policy'
-						);
-						assert.equal(rows[0].count, vector.c);
-					}
+					const rows = vm.runInContext('app_state.rendered_list', page.context);
+					assert.equal(rows.length, 1);
+					assert.equal(
+						rows[0].acc,
+						vector.accuracy,
+						'case folding retains the original native correction policy'
+					);
+					assert.equal(rows[0].count, vector.c);
 					const key = sensitive ? vector.token : vector.token.toLowerCase();
 					const item = vm.runInContext(
 						`app_state.data[${JSON.stringify(vector.tab)}][${JSON.stringify(key)}]`,

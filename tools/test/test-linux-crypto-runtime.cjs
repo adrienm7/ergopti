@@ -43,27 +43,34 @@ check('original identities/providers retained and Nix OpenSSL appears once', () 
 		1
 	);
 });
-check('Debian depends on one alternative expression and preserves old requirements', () => {
+// The .deb and the .rpm carry the AppImage's private runtime prefix, whose
+// libcrypto, openssl and sqlite3 answer instead of a host package
+// (tools/build/stage-linux-private-runtime.sh).
+check('Debian takes libcrypto from its private runtime and preserves old requirements', () => {
 	const required = generator.requirements(data, 'deb');
-	assert.equal(required.filter((x) => x === 'libssl3t64 | libssl3').length, 1);
-	assert.equal(required.includes('libssl3t64'), false);
-	assert.equal(required.includes('libssl3'), false);
-	for (const old of ['luajit (>= 2.1)', 'curl', 'at-spi2-core']) assert.ok(required.includes(old));
+	for (const host of ['libssl3t64 | libssl3', 'libssl3t64', 'libssl3'])
+		assert.equal(required.includes(host), false, `deb must not depend on the host ${host}`);
+	for (const old of ['at-spi2-core', 'libxkbcommon0']) assert.ok(required.includes(old));
 });
+// The Arch recipe repacks the release tarball, which carries the same private
+// runtime as the .deb and the .rpm.
 for (const [format, sqlite] of [
 	['deb', 'sqlite3'],
 	['rpm', 'sqlite'],
 	['arch', 'sqlite']
 ])
-	check('metrics CLI providers are mandatory for ' + format + ' (metrics-cli-required)', () => {
-		const required = generator.requirements(data, format);
-		for (const provider of ['openssl', sqlite])
-			assert.equal(
-				required.filter((name) => name === provider).length,
-				1,
-				`${format} must provide ${provider} even when optional dependencies are disabled`
-			);
-	});
+	check(
+		'metrics CLI providers come from the private runtime for ' + format + ' (metrics-cli-required)',
+		() => {
+			const required = generator.requirements(data, format);
+			for (const provider of ['openssl', sqlite])
+				assert.equal(
+					required.includes(provider),
+					false,
+					`${format} must run its private runtime's ${provider}, not a host package`
+				);
+		}
+	);
 check(
 	'source installation admits the OpenSSL executable separately from libcrypto (metrics-cli-required)',
 	() => {

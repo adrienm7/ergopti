@@ -181,7 +181,8 @@ _TQA_DriverWiring() {
 	Activate := _DriverFuncBody("ActivateExitApp")
 	Assert(Activate != "", "the tray's Quit exists")
 	Assert(InStr(Activate, "QuitRequest_Run(") > 0, "the tray's Quit goes through the admission")
-	Assert(InStr(Activate, '"exit", () => ExitApp()') > 0, "ExitApp runs only as the admission's exit port")
+	Assert(RegExMatch(Activate, '"exit", \(\) => \(LifecycleNoteExitRequester\([^\r\n]+\), ExitApp\(\)\)') > 0,
+		"ExitApp runs only as the admission's exit port, which says who asked")
 	Facts := _DriverFuncBody("_LifecycleQuitFacts")
 	for Owner in ["MenuCommandConfigBusy()", "ReloadTerminalHandoffPending()", "_LifecycleQuitRetryOwned()",
 			"HSE_TerminalTransactionPending()", "_ConfigFullSaveHasPending()"]
@@ -284,3 +285,142 @@ _TQA_ScopeRowsNotify() {
 	Assert(InStr(Rows, "_HS_DelimRecordRowClick(") > 0, "a user delimiter row notifies")
 }
 Test("feature notices: the language, personal, dynamic and word-expander rows notify (PAR-45)", _TQA_ScopeRowsNotify)
+
+; ============================================================
+; ============================================================
+; ======= An exit that interrupted a flush or a read =========
+; ============================================================
+; ============================================================
+
+_TQA_ExitHarnessDone(State, Code, Output, Errors) {
+	State["code"] := Code
+	State["errors"] := Errors
+	State["done"] := true
+}
+
+; Runs the real Ergopti_OnShutdown in a child, under a real OnExit and ExitApp.
+; @param Scenario {String} A scenario of tests/support/exit_over_flush_harness.ahk.
+; @returns {String} The child's receipt.
+_TQA_ExitOverFlush(Scenario) {
+	global LIFECYCLE_FLUSH_EXIT_POLL_MS
+	Root := A_Temp . "\exit_over_flush_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the child has a private directory")
+	DirCreate(Root)
+	CanRetire := true
+	try {
+		Source := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
+		for Name in ["Ergopti_OnShutdown", "_LifecycleRefuseShutdown", "LifecycleShutdownVetoHonored",
+				"_LifecycleArmFlushExitRetry", "_LifecycleUpdaterRetriesExit", "_LifecycleRetryExitNow",
+				"_LifecycleAbandonExitRetry", "_LifecycleReloadRetry", "_LifecycleRetrySupersededExit", "_LifecycleAnswerVetoedQuit",
+				"ActivateExitApp", "_LifecycleQuitFacts", "_LifecycleQuitSchedule", "_LifecycleQuitRetryOwned",
+				"LifecycleNoteExitRequester", "_LifecycleExitRequesterText", "_LifecycleLogExitRequest",
+				"KL_AwaitFlushHandoff", "KL_FlushHandoffSettled", "LoggerShutdownRefusalSettles"] {
+			Body := _DriverFuncBody(Name)
+			Assert(Body != "", "the production function is extracted: " . Name)
+			Source .= Body . "`n"
+		}
+		Driver := _DriverSourceNoComments()
+		for Name in ["LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS", "LIFECYCLE_FLUSH_EXIT_POLL_MS", "LIFECYCLE_FLUSH_EXIT_BUDGET_MS",
+				"LIFECYCLE_RELOAD_RETRY_POLL_MS", "LIFECYCLE_USER_QUIT_DEADLINE_MS", "LIFECYCLE_USER_QUIT_POLL_MS"] {
+			Assert(RegExMatch(Driver, "m)^global " . Name . " := [^`r`n]+", &Declared), "the real " . Name)
+			Source .= Declared[0] . "`n"
+		}
+		for Line in ['_LifecycleShutdownVetoAttempts := 0', '_LifecycleShutdownReason := ""',
+				'_LifecycleAiShutdownAttempt := 0', '_LifecycleReloadExitRetrying := false',
+				'_LifecycleExitRetryReason := ""', '_LifecycleExitRetryStarted := 0', '_LifecycleExitRequester := ""',
+				'_LifecycleFlushExitRetryArmed := false', '_UpdaterRecoveryExitInvocation := 0',
+				'_EOF_State := Map()', '_EOF_Scenario := ""', '_EOF_Held := false', '_EOF_ReadBusy := false',
+				'_EOF_ReceiptPath := ""']
+			Source .= "global " . Line . "`n"
+		Source .= "#Include " . _DriverDir . "\infra\quit_admission.ahk`n"
+		Source .= "#Include " . A_ScriptDir . "\support\exit_over_flush_harness.ahk`n"
+		Harness := Root . "\exit.ahk"
+		Receipt := Root . "\receipt.txt"
+		FileAppend(Source, Harness, "UTF-8")
+		State := Map("done", false)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Harness, Scenario, Receipt],
+			_TQA_ExitHarnessDone.Bind(State))
+		try {
+			AssertEqual(1, Handle.start(), "the child starts")
+			Started := A_TickCount
+			while !State["done"] && TickElapsed(Started) < 8000 {
+				_SR_TreePoll()
+				Sleep(10)
+			}
+			AssertTrue(State["done"], "the child ends within its bound")
+			AssertEqual("", State["errors"], "the child raised nothing")
+		} finally {
+			Retired := Handle.terminate()
+			CanRetire := (Retired is Integer) && Retired == 1
+		}
+		AssertTrue(FileExist(Receipt) != "", "the child wrote its receipt")
+		return FileRead(Receipt, "UTF-8") . " code=" . State["code"]
+	} finally {
+		if CanRetire
+			DirDelete(Root, true)
+	}
+}
+
+_TQA_QuitOverLogFlush() {
+	Receipt := _TQA_ExitOverFlush("quit")
+	AssertContains(Receipt, "exited=1 reason=Exit vetoes=1 armed=0 errors=0 notices=0",
+		"one Quit is enough and tells nobody of a flush it interrupted")
+	AssertContains(Receipt, "quit_layout=1", "the retried Quit is still the user's quit")
+	AssertContains(Receipt, "Shutdown deferred while the log flush it interrupted settles", "the deferral is logged")
+}
+Test("quit: a Quit that interrupted a log flush retries itself, with no error (quit-over-log-flush)",
+	_TQA_QuitOverLogFlush)
+
+; A silent quit on 2026-11-01 left a clean teardown and nothing saying what asked for it.
+_TQA_EveryExitSaysWhoAsked() {
+	Quit := _TQA_ExitOverFlush("quit")
+	AssertContains(Quit, "Exit requested: reason=Exit code=0 by=the user's Quit (tray or script_quit)",
+		"the first attempt names the user's Quit, before any gate could refuse it")
+	AssertContains(Quit, "Exit requested: reason=Exit code=0 by=the retry of an exit deferred by the log flush",
+		"its retry names itself")
+	AssertContains(Quit, "Exit accepted: reason=Exit code=0", "the accepted exit is closed by its own line")
+	AssertContains(_TQA_ExitOverFlush("updater"), "by=an ExitApp that named no requester",
+		"an ExitApp nobody noted says so")
+	AssertContains(_TQA_ExitOverFlush("logoff"), "reason=Logoff code=5 by=the Windows session ending",
+		"the reason names an asker outside the driver")
+}
+Test("quit: every exit logs its reason and who asked (exit-reason-2026-11-01)", _TQA_EveryExitSaysWhoAsked)
+
+_TQA_LogoffOverLogFlush() {
+	Receipt := _TQA_ExitOverFlush("logoff")
+	AssertContains(Receipt, "exited=1 reason=Logoff vetoes=1 armed=0 errors=0 notices=0",
+		"a logoff is retried as a logoff, with no error window on the way out")
+	AssertContains(Receipt, "quit_layout=0", "a logoff never takes the user's quit layout")
+	AssertContains(Receipt, "code=5", "the retry keeps the exit code")
+}
+Test("quit: a logoff that interrupted a log flush stays a logoff (quit-over-log-flush)", _TQA_LogoffOverLogFlush)
+
+_TQA_ReadOverQuit() {
+	AssertContains(_TQA_ExitOverFlush("read"), "exited=1 reason=Exit vetoes=1 armed=0 errors=0 notices=0",
+		"an interrupted file read settles like a flush")
+}
+Test("quit: a Quit that interrupted a file read retries itself (quit-over-log-flush)", _TQA_ReadOverQuit)
+
+_TQA_SinkStillRefuses() {
+	Receipt := _TQA_ExitOverFlush("sink")
+	AssertContains(Receipt, "exited=0", "a log that refuses a write still refuses the exit")
+	AssertContains(Receipt, "armed=0 errors=1 notices=1", "and it is told, with nothing left armed")
+	AssertContains(Receipt, "error=Shutdown refused because diagnostic records are not durable yet")
+}
+Test("quit: a log that truly refused still refuses the Quit (quit-over-log-flush)", _TQA_SinkStillRefuses)
+
+_TQA_SpentBudgetRefuses() {
+	Receipt := _TQA_ExitOverFlush("budget")
+	AssertContains(Receipt, "exited=0 reason=Exit vetoes=1 armed=0 errors=1 notices=1",
+		"a flush that never settles spends the budget and is told once")
+	AssertContains(Receipt, "error=Deferred exit abandoned: the {1} did not settle within {2} ms.")
+}
+Test("quit: a flush that outlives the budget refuses the Quit (quit-over-log-flush)", _TQA_SpentBudgetRefuses)
+
+_TQA_UpdaterKeepsItsRetry() {
+	Receipt := _TQA_ExitOverFlush("updater")
+	AssertContains(Receipt, "exited=0 reason=Exit vetoes=1 armed=0 errors=0 notices=0 updater=1",
+		"an update restart keeps its own retry: a plain ExitApp would skip FinalExit")
+}
+Test("quit: an update restart over a log flush keeps the updater's retry (quit-over-log-flush)",
+	_TQA_UpdaterKeepsItsRetry)

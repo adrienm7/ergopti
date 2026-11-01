@@ -1,5 +1,5 @@
 {
-	"description": "Hand-checked .keylayout fixtures and the canonical form (schema 1, documented in _shared/lua/layouts/keylayout.lua) every parser must produce from them. 'error' fixtures must be refused. Replayed by the macOS and Linux Lua suites and by the Python converter tests; the web composer and the AutoHotkey parser replay it when they adopt the form. Real layouts: composed.canonical.json (the composer corpus layout) and, for every registry layout, tools/test/test-keylayout-canonical-parity.cjs.",
+	"description": "Hand-checked .keylayout fixtures and the canonical form (schema 1, documented in _shared/lua/layouts/keylayout.lua) every parser must produce from them. 'error' fixtures must be refused, a malformed tag of an element the readers walk included. Replayed by the macOS and Linux Lua suites, the Python converter tests and the AutoHotkey suite; the web composer replays it when it adopts the form. Real layouts: composed.canonical.json (the composer corpus layout) and, for every registry layout, tools/test/test-keylayout-canonical-parity.cjs.",
 	"vectors": [
 		{
 			"name": "everything: modifiers, bases, duplicates, entities, comments",
@@ -214,6 +214,54 @@
 		{
 			"name": "unknown modifier token",
 			"keylayout": "<?xml version=\"1.1\" encoding=\"UTF-8\"?>\n<!DOCTYPE keyboard SYSTEM \"file://localhost/System/Library/DTDs/KeyboardLayout.dtd\">\n<keyboard name=\"Mini\"><layouts><layout first=\"0\" last=\"0\" mapSet=\"s\" modifiers=\"m\"/></layouts><modifierMap id=\"m\" defaultIndex=\"0\"><keyMapSelect mapIndex=\"1\"><modifier keys=\"hyper\"/></keyMapSelect></modifierMap><keyMapSet id=\"s\"><keyMap index=\"0\"><key code=\"0\" output=\"x\"/></keyMap></keyMapSet></keyboard>\n",
+			"error": true
+		},
+		{
+			"name": "single-quoted attributes, a double quote inside one",
+			"keylayout": "<?xml version=\"1.1\" encoding=\"UTF-8\"?>\n<!DOCTYPE keyboard SYSTEM \"file://localhost/System/Library/DTDs/KeyboardLayout.dtd\">\n<keyboard name='Mini&apos;s'><layouts><layout first=\"0\" last=\"0\" mapSet=\"s\" modifiers=\"m\"/></layouts><modifierMap id=\"m\" defaultIndex=\"0\"><keyMapSelect mapIndex=\"1\"><modifier keys=\"shift\"/></keyMapSelect></modifierMap><keyMapSet id=\"s\"><keyMap index=\"0\"><key code='0' output='\"x\"'/><key code=\"1\" output='y'/></keyMap></keyMapSet></keyboard>\n",
+			"canonical": {
+				"schema": 1,
+				"name": "Mini's",
+				"map_set": "s",
+				"default_index": 0,
+				"selects": [
+					{
+						"index": 1,
+						"modifiers": [
+							{
+								"required": ["shift"],
+								"optional": []
+							}
+						]
+					}
+				],
+				"key_map_sets": [
+					{
+						"id": "s",
+						"key_maps": [
+							{
+								"index": 0,
+								"keys": [
+									{
+										"code": 0,
+										"output": "\"x\""
+									},
+									{
+										"code": 1,
+										"output": "y"
+									}
+								]
+							}
+						]
+					}
+				],
+				"actions": [],
+				"terminators": []
+			}
+		},
+		{
+			"name": "a key tag the grammar cannot read is refused, not skipped",
+			"keylayout": "<?xml version=\"1.1\" encoding=\"UTF-8\"?>\n<!DOCTYPE keyboard SYSTEM \"file://localhost/System/Library/DTDs/KeyboardLayout.dtd\">\n<keyboard name=\"Mini\"><layouts><layout first=\"0\" last=\"0\" mapSet=\"s\" modifiers=\"m\"/></layouts><modifierMap id=\"m\" defaultIndex=\"0\"><keyMapSelect mapIndex=\"1\"><modifier keys=\"shift\"/></keyMapSelect></modifierMap><keyMapSet id=\"s\"><keyMap index=\"0\"><key code=\"0\" output=\"x\"/><key code=1 output=\"z\"/></keyMap></keyMapSet></keyboard>\n",
 			"error": true
 		}
 	]

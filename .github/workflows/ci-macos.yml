@@ -748,7 +748,7 @@ jobs:
           grep -Fq "Test Suite 'ManagedOllamaAPIWorkerTests' passed" "$transcript"
           grep -Fq 'Executed 12 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'ManagedPTYWorkerTests' passed" "$transcript"
-          grep -Fq 'Executed 15 tests, with 0 failures' "$transcript"
+          grep -Fq 'Executed 17 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'ManagedImageAliasTests' passed" "$transcript"
           grep -Fq 'Executed 4 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'OwnedSuspendedImageTests' passed" "$transcript"
@@ -757,7 +757,7 @@ jobs:
           grep -Fq 'Executed 2 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'ManagedNetworkBootstrapTests' passed" "$transcript"
           test "$(grep -Fc 'Executed 7 tests, with 0 failures' "$transcript")" -eq 1
-          grep -Fq 'Executed 54 tests, with 0 failures' "$transcript"
+          grep -Fq 'Executed 56 tests, with 0 failures' "$transcript"
           # Independent logging cohort; historical52 above supplies no seven-case credit.
           log_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-xctest.log"
           log_source="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-source.json"
@@ -3060,6 +3060,15 @@ jobs:
         with:
           python-version: '3.13'
 
+      # The application bundles the proxy sign-in relay, built with Go; the
+      # module's go.mod names the floor, the runner never downloads a module.
+      - uses: actions/setup-go@v5
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}
+        with:
+          go-version-file: static/ergopti_plus/_shared/go/native_http/go.mod
+          check-latest: false
+          cache: false
+
       - name: Require actual arm64 cold runtime prerequisites on macOS 26
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}
         id: lot-cold-prerequisites
@@ -3140,6 +3149,15 @@ jobs:
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
         with:
           python-version: '3.13'
+
+      # The application bundles the proxy sign-in relay, built with Go; the
+      # module's go.mod names the floor, the runner never downloads a module.
+      - uses: actions/setup-go@v5
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
+        with:
+          go-version-file: static/ergopti_plus/_shared/go/native_http/go.mod
+          check-latest: false
+          cache: false
 
       - name: Require actual arm64 cold runtime prerequisites
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}

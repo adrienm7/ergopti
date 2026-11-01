@@ -74,7 +74,7 @@ if ($Receipt.schema_version -ne 1 -or $Receipt.source_fingerprint -cnotmatch '^[
 $Common = @('/nologo', '/Brepro', '/std:c11', '/O2', '/MT', '/guard:cf', '/D_CRT_SECURE_NO_WARNINGS', '/D_WIN32_WINNT=0x0602', ('/I' + $Prepared), ('/I' + $SharedSource), ('/I' + $NativeSource))
 $Strict = @('/W4', '/WX', '/wd5105')
 $Link = @('/link', '/Brepro', '/MACHINE:X64', '/DYNAMICBASE', '/HIGHENTROPYVA', '/NXCOMPAT', '/guard:cf', 'ws2_32.lib', 'iphlpapi.lib')
-Push-Location $BuildRoot
+Push-Location -LiteralPath $BuildRoot
 try {
 	Invoke-PacBuildCommand 'cl.exe' ($Common + @('/W0', '/c', (Join-Path $Prepared 'duktape.c'), '/Foduktape.obj'))
 	Invoke-PacBuildCommand 'cl.exe' ($Common + $Strict + @('/c', (Join-Path $SharedSource 'pac_runtime.c'), '/Fopac_runtime.obj'))

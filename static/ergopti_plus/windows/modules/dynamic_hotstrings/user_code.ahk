@@ -360,7 +360,7 @@ UserHotstringsOnChar(BufferValue) {
 	Rule := _UserHotstringsOwner.Find(LogicalBuffer)
 	if !(Rule is Map)
 		return false
-	Delay := Features["hotstrings"]["dynamic"][ConfigLeaf.USER_CODE]["time_activation_seconds"]
+	Delay := Features["hotstrings"]["dynamic"][ConfigLeaf.USER_CODE][ConfigLeaf.TIME_ACTIVATION_SECONDS]
 	Trigger := Rule["suffix"] . MagicKey
 	Spec := {Replacement: Rule["preview"], Trigger: Trigger, Length: StrLen(Trigger),
 		TimeActivationSeconds: Delay, PrevCharKey: _TextPenultimateCodepoint(Trigger), OnlyText: true}
@@ -576,7 +576,7 @@ UserHotstringsPreviewSpec(BufferBefore, Completion) {
 	Trigger := Rule["suffix"] . Completion
 	return {Replacement: Rule["preview"], Trigger: Trigger, Length: StrLen(Trigger),
 		OnlyText: true, IsPrivate: true, Category: "dynamichotstrings",
-		TimeActivationSeconds: Features["hotstrings"]["dynamic"][ConfigLeaf.USER_CODE]["time_activation_seconds"],
+		TimeActivationSeconds: Features["hotstrings"]["dynamic"][ConfigLeaf.USER_CODE][ConfigLeaf.TIME_ACTIVATION_SECONDS],
 		PrevCharKey: _TextPenultimateCodepoint(Trigger), UserCodeGeneration: _UserHotstringsOwner.generation,
 		TransientKind: ConfigLeaf.USER_CODE}
 }

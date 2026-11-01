@@ -19,6 +19,7 @@
 
 local M = {}
 
+local SaveFailure = require("config_save_failure")
 local llm_mod       = require("modules.llm")
 local i18n          = require("infra.i18n")
 local Logger        = require("infra.logger")
@@ -104,8 +105,9 @@ end
 
 local function notify_persistence_failure(label)
 	Logger.error(LOG, "%s was rejected; runtime state was restored.", tostring(label))
-	pcall_log("notify(api persistence failure)", notifications.notify,
-		i18n.get("common.error_title"), i18n.get("dialog.bulk_toggle.save_failed"), "error")
+	pcall_log("notify(api persistence failure)", SaveFailure.present, i18n.get, function(message)
+		notifications.notify(i18n.get("common.error_title"), message, "error")
+	end)
 end
 
 --- The automatic name of every entry, by id: <provider>/<model>, with the
@@ -546,6 +548,23 @@ function M.build(ctx)
 						end
 						base_url = assert(UrlTemplate.expand(p.base_url, values))
 						Logger.info(LOG, "API entry address filled for provider '%s' (%d account field(s)).", pid, #fields)
+					elseif p.optional_address then
+						-- The catalogue's address works; one optional value replaces it
+						local optional = p.optional_address
+						local field_label = i18n.get("menu.llm.api_prompt_field." .. optional.field)
+						local value_ok, value = prompt_field(
+							string.format("API %s — %s", p.label, field_label), "", field_label)
+						if not value_ok then return false end
+						local filled = UrlTemplate.optional_url(optional, value)
+						if not filled then
+							Logger.error(LOG, "API entry address refused: the '%s' value cannot fill it.", optional.field)
+							pcall_log("notify(api account field refusal)", notifications.notify,
+								i18n.get("common.error_title"),
+								i18n.get("menu.llm.api_prompt_field_invalid." .. optional.field),
+								"error")
+							return false
+						end
+						base_url = filled ~= "" and filled or p.base_url
 					else
 						local base_url_ok
 						base_url_ok, base_url = prompt_field(

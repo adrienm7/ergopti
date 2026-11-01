@@ -35,6 +35,7 @@ _HTIP_Check(IsDown) {
 		; CPU load. Production thresholds are restored after the isolated sample.
 		_HOTPATH_SLOW_MS_BY_SEGMENT := Map(Label, -1)
 		_LOGGER_WARN_ENABLED := true
+		_HotPathResetForTest()
 		LoggerSetTestSink((Line) => Lines.Push(Line))
 		if IsDown
 			HookDispatcher._OnKeyDown(0, 0x41, 0x1E)

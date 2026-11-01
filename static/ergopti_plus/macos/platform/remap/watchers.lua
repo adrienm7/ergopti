@@ -37,6 +37,7 @@ local Timings        = require("infra.timings")
 local Keycodes       = require("infra.keycodes")
 local ShellRunner    = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
+local SystemInfo     = require("adapters.system_info")
 local KeyState       = require("adapters.key_state")
 local MouseControl   = require("adapters.mouse_control")
 local Registrar      = require("adapters.hotkey_registrar")
@@ -96,6 +97,14 @@ local _notification_before_baseline = false
 -- Poll interval for the HIToolbox fallback watcher.
 -- Shared cross-driver value ([ui] layout_poll_ms).
 local LAYOUT_POLL_SEC = Timings.sec("ui", "layout_poll_ms")
+-- Longest gap between two fallback reads while no input event reached the
+-- system: a switch the notification missed and no person made (an app that
+-- selects its document's source) is still seen within it.
+local LAYOUT_IDLE_POLL_SEC = Timings.sec("ui", "layout_idle_poll_ms")
+-- Poll ticks since the last read the fallback poll started.
+local _layout_ticks_since_read = 0
+-- The HID idle time was unreadable once: the poll reads on every tick, said once.
+local _layout_idle_unreadable_reported = false
 
 -- Holds the fallback poll timer so it can be cancelled on stop.
 local _layout_poll_timer = nil
@@ -846,6 +855,29 @@ local function read_layout_async(callback)
 	return true
 end
 
+--- Whether this fallback poll tick must read HIToolbox. A switch the
+--- notification missed comes from a key, a click or the menu: while no input
+--- event reached the system since the last read, nothing a person did can have
+--- moved the layout, so the tick spawns nothing. Each `defaults` read is a child
+--- process of the app, and one every 2 s for the whole session was the steady
+--- idle cost the field run measured (150 per 5 minutes on 2026-10-31). A read
+--- still runs every LAYOUT_IDLE_POLL_SEC for a switch no person made.
+--- @return boolean due
+local function layout_poll_due()
+	_layout_ticks_since_read = _layout_ticks_since_read + 1
+	local since_read_sec = _layout_ticks_since_read * LAYOUT_POLL_SEC
+	if since_read_sec >= LAYOUT_IDLE_POLL_SEC then return true end
+	local idle_sec = SystemInfo.input_idle_seconds()
+	if type(idle_sec) ~= "number" then
+		if not _layout_idle_unreadable_reported then
+			_layout_idle_unreadable_reported = true
+			Logger.warn(LOG, "The HID idle time is unreadable; the layout poll reads HIToolbox on every tick.")
+		end
+		return true
+	end
+	return idle_sec < since_read_sec
+end
+
 --- Fires the on_change callback with proper debouncing, updating both layout
 --- names. A change seen only in the localised form leaves the HIToolbox
 --- baseline to the next read, which adopts it without reporting it again.
@@ -1183,6 +1215,8 @@ function M.start_input_source_watcher(on_change)
 	local poll_ok, poll_or_err = pcall(hs.timer.new, LAYOUT_POLL_SEC, function()
 		if _layout_poll_committed ~= true
 			or _layout_poll_timer ~= poll_candidate then return end
+		if not layout_poll_due() then return end
+		_layout_ticks_since_read = 0
 		Logger.pcall(LOG, run_layout_refresh, "poll")
 	end)
 	local poll_type = type(poll_or_err)
@@ -1229,7 +1263,8 @@ function M.start_input_source_watcher(on_change)
 		end
 	end
 
-	Logger.done(LOG, "Input source watcher registered (poll every %.0fs).", LAYOUT_POLL_SEC)
+	Logger.done(LOG, "Input source watcher registered (poll every %.0fs after input, every %.0fs without).",
+		LAYOUT_POLL_SEC, LAYOUT_IDLE_POLL_SEC)
 	return true
 end
 

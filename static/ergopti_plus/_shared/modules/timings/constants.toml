@@ -105,6 +105,11 @@ dependency_bootstrap_timeout_ms = 1800000
 # LX: modules/llm/runtime_factory.lua managed proxy lookup.
 managed_proxy_lookup_timeout_ms = 30000
 
+# Longest TCP connect to a relay a PAC names before another entry ("PROXY a;
+# DIRECT"): an unreachable relay sends the managed Ollama server to the next
+# entry, as a browser does. LX: modules/llm/managed_ollama_proxy.lua.
+managed_proxy_probe_timeout_ms = 1000
+
 # HTTP polling interval when the remote driver polls a streaming response.
 # AHK: api_remote.ahk LLM_REMOTE_POLL_MS / api_ollama.ahk LLM_OLLAMA_POLL_MS.
 poll_interval_ms = 50
@@ -266,6 +271,11 @@ terminal_hotstring_key_delay_ms = 20
 # ──────────────────────────────────────────────────────────────────────
 
 [gestures]
+# Windows: how long a gesture's synthetic keys stay marked, the settle after an
+# action's own window change, and the wait before the first auto-configuration.
+synthetic_clear_ms = 300
+action_settle_ms = 300
+auto_configure_delay_ms = 250
 
 # Windows: how often a worker-authored result file is checked after a touchpad
 # restart or gesture registration.
@@ -287,6 +297,16 @@ startup_phase_timeout_ms = 30000
 # Hard deadline for one interactive gesture-owned open/AppleScript child.
 # HS: gestures/actions_aux_owner.lua SHELL_DEADLINE_SEC.
 aux_shell_timeout_ms = 10000
+
+# Longest a hidden run_command child may run before it is stopped and its
+# failure notified (a terminal window is the user's own and is not bounded).
+# HS: gestures/user_actions.lua. LX: modules/gestures/user_actions.lua.
+run_command_timeout_ms = 30000
+
+# Longest one `shortcuts run` of a run_apple_shortcut binding may take before it
+# is stopped (each `shortcuts list` revalidation keeps the owner's own bound).
+# HS: gestures/apple_shortcut_action.lua.
+apple_shortcut_run_timeout_ms = 60000
 
 # Delay between exact termination retries after an auxiliary child times out.
 # HS: gestures/actions_aux_owner.lua SHELL_CLEANUP_RETRY_SEC.
@@ -390,6 +410,9 @@ return_delay_ms = 200
 # ──────────────────────────────────────────────────────────────────────
 
 [keystats]
+# Windows: the poll while keystats stops, and the wait before the page's first data.
+stop_poll_ms = 50
+first_push_delay_ms = 1500
 
 # Background ingest tick — how often buffered events are flushed to disk.
 # AHK: keystats.ahk INGEST_TICK_MS. HS: log_manager.lua INGEST_TICK_SEC.
@@ -609,6 +632,8 @@ one_shot_shift_timeout_ms = 2000
 # ──────────────────────────────────────────────────────────────────────
 
 [hotstrings]
+# Windows: how long a hotstring's synthetic output stays marked as its own.
+synthetic_clear_ms = 60
 
 # A Shift, Alt or AltGr/Option keystroke takes longer finger-path time than a
 # bare letter, and the Ergopti layout is Shift/AltGr-heavy. The expansion delay
@@ -660,6 +685,11 @@ hesitation_cooldown_ms = 10000
 # ──────────────────────────────────────────────────────────────────────
 
 [ui]
+# Windows: the model browser's filter debounce, the onboarding poll while a page
+# loads, and the wait before its gesture step reports done.
+model_browser_filter_debounce_ms = 120
+onboarding_poll_ms = 100
+onboarding_gesture_done_ms = 100
 
 # Linux diagnostics owns an asynchronous desktop launcher until its exit/EOF receipt.
 desktop_open_timeout_ms = 30000
@@ -743,6 +773,11 @@ capsword_check_interval_ms = 100
 # Layout poll interval (periodic layout drift detection).
 # HS: karabiner/watchers.lua LAYOUT_POLL_SEC.
 layout_poll_ms = 2000
+
+# Layout poll interval while no input event reached the system since the last
+# read: a switch no person made is still seen within it.
+# HS: karabiner/watchers.lua LAYOUT_IDLE_POLL_SEC.
+layout_idle_poll_ms = 30000
 
 # UI-restore poll interval (window position persistence).
 # HS: lib/ui_restore.lua POLL_INTERVAL_SEC.
@@ -1031,6 +1066,15 @@ prediction_display_ms = 2000
 # ──────────────────────────────────────────────────────────────────────
 
 [adapters]
+# Windows: the poll of a managed HTTP request an owner waits for.
+http_managed_wait_poll_ms = 10
+# Windows: the delay before a closed WebView profile folder is removed.
+webview_profile_cleanup_ms = 1000
+# Windows: the input probe's gap between sends, and its settle before reading.
+input_probe_step_ms = 10
+input_probe_settle_ms = 40
+# Windows: an updater completion run off the current thread.
+updater_callback_defer_ms = 50
 
 # Windows: minimum age of an abandoned atomic-write stage before it is reaped.
 # AHK: infra/toml/toml_helpers.ahk StaleTempAgeMs (pinned copy).
@@ -1049,9 +1093,26 @@ default_timeout_ms = 30000
 # ignored-window probe, the tooltip anchor and the context capture).
 unresponsive_ax_backoff_ms = 30000
 
+# Linux: deadline of the one download of Ergopti's own Python (about 30 MB,
+# _shared/data/linux_native_runtime.json managed_python) and of its unpacking.
+# LX: modules/keymap/layout_registry.lua (managed_python.lua).
+managed_python_download_timeout_ms = 600000
+
 # Linux: how long the window switch worker sleeps between two polls of its queue.
 # LX: platform/window_switch_worker.lua.
 window_switch_worker_sleep_ms = 10
+
+# Local authenticating proxy relay (docs/design/proxy-auth-relay.md). The caller
+# passes each value on the relay's command line. dial: one TCP connect to the
+# selected proxy; handshake: a CONNECT with its NTLM/Negotiate legs, and a
+# client's request head; idle: an open tunnel with no byte in either direction;
+# probe: the whole probe child, from start to its JSON line.
+# LX: infra/proxy_auth_relay.lua. HS: adapters/field_check_ports.lua,
+# modules/llm/ollama_server_command.lua (network-retry.sh run_with_proxy_sign_in_relay).
+proxy_relay_dial_timeout_ms = 10000
+proxy_relay_handshake_timeout_ms = 15000
+proxy_relay_idle_timeout_ms = 300000
+proxy_relay_probe_timeout_ms = 30000
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -1070,6 +1131,10 @@ window_switch_worker_sleep_ms = 10
 # (every Linux process owner takes it from there; pinned to this key).
 # AHK: adapters/crash_report_worker.ahk and adapters/http_client.ahk, pinned copies.
 process_output_bytes = 65536
+
+# Bytes of one /proc/<pid>/cmdline the Linux local-server scan reads: ports and
+# server names sit well inside it. LX: modules/llm/local_server_ports.lua.
+proc_cmdline_bytes = 65536
 
 # Largest managed-Ollama environment declaration file the Linux driver reads.
 # LX: modules/llm/managed_ollama_environment.lua.
@@ -1135,6 +1200,14 @@ proxy_packet_bytes = 65536
 # HS: adapters/apple_shortcuts.lua.
 shortcuts_reply_bytes = 65536
 
+# Largest text output a run_command or run_apple_shortcut binding captures
+# (stdout plus stderr, or the shortcut's output file) before the child is
+# stopped and the run refused as too large, so a runaway command can neither
+# exhaust memory nor type for minutes.
+# HS: gestures/user_actions.lua, gestures/apple_shortcut_action.lua.
+# LX: modules/gestures/user_actions.lua.
+user_action_output_bytes = 65536
+
 # Encoded log lines the macOS log transport prepares in one tick, also the
 # longest single line it enqueues. Read before infra.timings exists, through the
 # generated macos/_generated/registry_limits.lua. HS: adapters/log_transport.lua.
@@ -1149,3 +1222,90 @@ shell_captured_output_bytes = 4194304
 # bytes. Read through macos/_generated/registry_limits.lua.
 # HS: adapters/toml_cache.lua.
 toml_source_chunk_bytes = 65536
+
+[launcher]
+
+# Every sleep and poll interval of the Swift launcher (macos/launcher), its
+# fixtures and its tests. The launcher cannot parse this file, so
+# tools/codegen/codegen-registry-constants.cjs projects the section onto
+# LauncherTimings.generated.swift; tools/test/test-launcher-sleep-registry.cjs
+# refuses a literal sleep duration and a key no Swift file reads. macOS only:
+# Windows and Linux have no native launcher.
+
+# Retry of a contended launcher.log or logger datagram file lock, inside its
+# 250 ms lock budget. Swift: main.swift LauncherLog, LoggerDatagramWorker.swift.
+file_lock_retry_ms = 1
+
+# Pause between tries of the sole-launcher lock while an update relaunch hands
+# it over (50 tries). Swift: main.swift, LauncherInstanceOwnership.swift.
+instance_lock_retry_ms = 100
+
+# Poll of the remap lease guardian while it arms, and of its singleton lock.
+# Swift: RemapLeaseGuardian.swift.
+guardian_arm_poll_ms = 10
+guardian_singleton_retry_ms = 10
+
+# Poll of a lease worker child, and the grace a terminated child gets before
+# it is killed. Swift: RemapLeaseWorker.swift; their sum is held under the
+# private command budget by macos/tests/meta/architecture/test_native_lease_budget_parity.lua.
+lease_child_poll_ms = 50
+process_termination_grace_ms = 50
+
+# Back-off between Karabiner fence transport retries, the last one repeated.
+# Swift: RemapLeaseWorker.swift kFenceRetryDelays.
+fence_retry_first_ms = 50
+fence_retry_second_ms = 100
+fence_retry_third_ms = 250
+fence_retry_last_ms = 1000
+
+# Poll of the stopped automation query guardian, and of the automation
+# permission while Shortcuts Events launches. Swift: OwnedAutomationQueryWorker.swift.
+automation_guardian_poll_ms = 20
+automation_permission_poll_ms = 50
+
+# Poll of the uninstall lease record until the fenced worker retires it.
+# Swift: UninstallWorker.swift.
+uninstall_lease_poll_ms = 10
+
+# The owned remap runtime's installer and owners: the poll of a signalled
+# launchctl child until it is reaped, of the core service's launchd
+# registration after provisioning (inside its 10 s deadline), and of the user
+# console program's native receipt. Swift: OwnedRuntimeCoreLaunchctl.swift,
+# OwnedRuntimeCoreProvisionOwner.swift, OwnedRuntimeUserConsoleOwner.swift.
+owned_runtime_child_reap_poll_ms = 10
+owned_runtime_core_service_poll_ms = 10
+owned_runtime_console_poll_ms = 25
+
+# The VirtualHIDDevice daemon report: the poll of its signed query program,
+# of the Main CLI request's owner, and of the request channel by the worker
+# and its withdrawal watcher. Swift: OwnedVirtualHIDDaemonReportMainOperation.swift,
+# OwnedVirtualHIDDaemonReportWorker.swift.
+vhid_report_query_poll_ms = 10
+vhid_report_main_poll_ms = 20
+vhid_report_request_poll_ms = 20
+
+# Test fixtures compiled into the launcher: the automation query fixture's
+# hold, the owned program fixture's poll, and the managed Ollama listener's
+# reap poll and its progress and stall chunk pauses.
+# Swift: OwnedAutomationQueryWorker.swift, OwnedProgramNativeFixture.swift,
+# ManagedOllamaListenerFixture.swift.
+automation_fixture_wait_ms = 30000
+program_fixture_poll_ms = 1
+ollama_fixture_reap_poll_ms = 10
+ollama_fixture_progress_part_ms = 400
+ollama_fixture_stall_part_ms = 1500
+
+# The launcher tests' polls (a fast one for local pipes and files, the usual
+# one for child processes, a lease record poll and a native census poll) and
+# their settle waits: the guardian kept alive after it owns its singleton, the
+# retired guardian's record, the lease writer's line interval, a late native
+# relaunch and a slow proxy settings read. Swift: Tests/ErgoptiPlusTests.
+test_fast_poll_ms = 1
+test_poll_ms = 10
+test_record_poll_ms = 5
+test_census_poll_ms = 100
+test_guardian_settle_ms = 350
+test_guardian_retire_settle_ms = 100
+test_lease_line_interval_ms = 50
+test_late_relaunch_settle_ms = 250
+test_slow_settings_read_ms = 20

@@ -62,6 +62,10 @@ local LOG = "platform.tray.appindicator"
 -- hardware, communications or system services.
 local CATEGORY_APPLICATION_STATUS = 0
 
+-- The component names a refusal shows, the same words in every language.
+M.GTK_COMPONENT = "GTK 3"
+M.INDICATOR_COMPONENT = "libayatana-appindicator3"
+
 -- AppIndicatorStatus. PASSIVE is what hides an item from the panel.
 local STATUS_PASSIVE = 0
 local STATUS_ACTIVE = 1
@@ -95,6 +99,9 @@ local PACKAGE_HINTS = {
 
 -- nil until probed, false when this machine cannot host an indicator.
 local _lib = nil
+-- The library the binding could not load, named as the start check reports
+-- it (infra/gui_stack.lua); nil when every library loaded.
+local _missing = nil
 
 -- The live indicator, its current menu, and every callback keeping GTK alive.
 local _indicator = nil
@@ -213,8 +220,8 @@ local function bind()
 	local gobject = load_any(ffi, CANDIDATE_LIBS.gobject)
 	local indicator = load_any(ffi, CANDIDATE_LIBS.indicator)
 	if not gtk or not gobject or not indicator then
-		Logger.error(LOG, "Tray unavailable — %s is missing. Try: %s",
-			(not indicator) and "libayatana-appindicator3" or "GTK 3", package_hint())
+		_missing = (not indicator) and M.INDICATOR_COMPONENT or M.GTK_COMPONENT
+		Logger.error(LOG, "Tray unavailable — %s is missing. Try: %s", _missing, package_hint())
 		return nil
 	end
 
@@ -244,6 +251,15 @@ end
 --- @return boolean
 function M.is_available()
 	return bind() ~= nil
+end
+
+--- The system library the tray cannot load, for the start check's refusal.
+--- nil when the libraries loaded, even if no display then accepted GTK: that
+--- is a session without a desktop, not a missing package.
+--- @return string|nil M.GTK_COMPONENT or M.INDICATOR_COMPONENT.
+function M.missing_component()
+	bind()
+	return _missing
 end
 
 

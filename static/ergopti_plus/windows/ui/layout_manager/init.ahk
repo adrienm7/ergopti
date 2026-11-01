@@ -92,7 +92,7 @@ LayoutManager_ActiveId(FeaturesSource := unset) {
 	if (Selected != "")
 		return Selected
 	Layout := FeaturesSource.Has("layout") ? FeaturesSource["layout"] : Map()
-	if !(Layout.Get("ergopti_base", false) = true)
+	if !(Layout.Get(ConfigLeaf.ERGOPTI_BASE, false) = true)
 		return ""
 	return ErgoptiLayout_BuiltinVariant(FeaturesSource)
 }

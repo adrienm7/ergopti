@@ -203,8 +203,8 @@ class DaemonReportBuildControls(unittest.TestCase):
         )
 
     def test_default_source_rosters_are_exact_and_report_is_additive(self):
-        self.assertEqual(len(product.HELPER_SOURCES), 9)
-        self.assertEqual(len(product.VALIDATOR_SOURCES), 6)
+        self.assertEqual(len(product.HELPER_SOURCES), 10)
+        self.assertEqual(len(product.VALIDATOR_SOURCES), 7)
         self.assertEqual(product.product_source_paths(), product.SOURCE_PATHS)
         expected = tuple(
             product.SWIFT + "OwnedVirtualHIDDaemonReport" + name + ".swift"
@@ -217,7 +217,7 @@ class DaemonReportBuildControls(unittest.TestCase):
                 "Clock",
                 "Reference",
             )
-        )
+        ) + (product.SWIFT + "LauncherTimings.generated.swift",)
         self.assertEqual(product.REPORT_SWIFT_SOURCES, expected)
         selected = product.product_source_paths(daemon_report=True)
         self.assertEqual(len(selected), len(set(selected)))
@@ -236,13 +236,16 @@ class DaemonReportBuildControls(unittest.TestCase):
                 "installer",
                 "validator",
                 "module",
-                "report_CPOSIXCompatibility",
-                "report_OwnedProgramCompatibility",
-                "report_OwnedVHDReportSocketIdentity",
+                "report_cposixcompatibility",
+                "report_ownedprogramcompatibility",
+                "report_ownedvhdreportsocketidentity",
             )
         }
         expected.update(("installer_universal", "validator_universal", "module_universal"))
         self.assertEqual(set(commands), expected)
+        # Every name becomes a native phase; the backend admits only this shape.
+        for name in commands:
+            self.assertRegex("production_" + name, r"^[a-z][a-z0-9_]{0,63}$")
         for arch in ("arm64", "x86_64"):
             installer = commands["installer_" + arch]
             for stem in (
@@ -317,6 +320,60 @@ class DaemonReportBuildControls(unittest.TestCase):
                 )
             ),
         )
+
+
+class SwiftRosterClosureControls(unittest.TestCase):
+    """Each Swift roster declares the generated identifiers it references."""
+
+    REPOSITORY = Path(__file__).resolve().parents[2]
+
+    def test_rosters_using_identifiers_compile_their_declaration(self):
+        # Run 41263664973: LauncherConstants used Identifiers without its file.
+        for name, roster in (
+            ("helper", product.HELPER_SOURCES + product.REPORT_SWIFT_SOURCES),
+            ("validator", product.VALIDATOR_SOURCES),
+        ):
+            with self.subTest(roster=name):
+                texts = {
+                    relative: (self.REPOSITORY / relative).read_text(encoding="utf-8")
+                    for relative in roster
+                    if relative.endswith(".swift")
+                }
+                users = [path for path, text in texts.items() if "Identifiers." in text]
+                declarations = [path for path, text in texts.items() if "enum Identifiers" in text]
+                self.assertTrue(users, "the roster no longer references Identifiers")
+                self.assertEqual(len(declarations), 1, users)
+
+
+class ArchitectureCheckControls(unittest.TestCase):
+    """lipo receives the universal output before the -verify_arch list."""
+
+    def test_input_precedes_the_architecture_list(self):
+        self.assertEqual(
+            product.architecture_check_command(Path("/work/installer")),
+            ["/usr/bin/lipo", "/work/installer", "-verify_arch", "arm64", "x86_64"],
+        )
+
+
+class ModuleMapWriteControls(unittest.TestCase):
+    """The daemon-report module map is written with an admitted output mode."""
+
+    def test_module_map_mode_is_admitted_by_the_exclusive_writer(self):
+        # Run 41257077872 refused "output leaf bytes or mode refused" at 0o600.
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "report.modulemap"
+            product._write_exclusive(
+                path, b"module Report {}\n", product.REPORT_MODULE_MAP_MODE, time.monotonic() + 30
+            )
+            self.assertEqual(path.read_bytes(), b"module Report {}\n")
+            self.assertEqual(path.stat().st_mode & 0o777, product.REPORT_MODULE_MAP_MODE)
+
+    def test_private_mode_is_not_an_admitted_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(product.ProductBuildRefusal):
+                product._write_exclusive(
+                    Path(temporary) / "leaf", b"x", 0o600, time.monotonic() + 30
+                )
 
 
 if __name__ == "__main__":

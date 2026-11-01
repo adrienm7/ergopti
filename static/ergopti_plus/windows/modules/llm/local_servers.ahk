@@ -68,10 +68,14 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		this.Sweeps := Map()
 		this.RescanBusy := false
 		this.QueuedRescan := 0
-		this.Controller := LocalServerDiscoveryController(Map("order", this.Order,
+		ControllerOptions := Map("order", this.Order,
 			"clock", Options["clock"], "max_age", Options["max_age"],
 			"on_publish", ObjBindMethod(this, "_Published"),
-			"on_error", ObjBindMethod(this, "_DiscoveryError")))
+			"on_error", ObjBindMethod(this, "_DiscoveryError"))
+		; Without identities no row is fingerprinted or merged, as the sweep's own unit tests run.
+		if Options.Has("identities")
+			ControllerOptions["identities"] := Options["identities"]
+		this.Controller := LocalServerDiscoveryController(ControllerOptions)
 	}
 
 	/** @returns {Map|Integer} Captured configured target; no secret enters shared state. */
@@ -262,10 +266,10 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 			if !(Server is Map) || !(Target is Map)
 				continue
 			Scan := this.PortScans.Get(Id, 0)
-			View := Map("id", Id, "display_name", Server["label"], "base_url", Target["base_url"],
+			Verdict := this.Result(Id)
+			View := Map("id", Id, "display_name", LocalServerMenuLabelOf(this.Servers, Id, Verdict), "base_url", Target["base_url"],
 				"port", RegExMatch(Target["base_url"], "^\w[\w+.-]*://[^/]*?:(\d+)", &Port) ? Integer(Port[1]) : 0,
 				"port_source", Target["port_source"], "models", 0, "status", "", "reason", "")
-			Verdict := this.Result(Id)
 			if Target["port_source"] != "user" && (Scan is Map) && !Scan["running"]
 				View["reason"] := "not_running"
 			else if !(Verdict is Map)

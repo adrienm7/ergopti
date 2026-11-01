@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Remote API Formats Beyond Chat Completions — Shared Lua Implementation
 --- DESCRIPTION:
---- The request and answer shapes of the two provider formats of
+--- The request and answer shapes of the provider formats of
 --- _shared/modules/llm/api_providers.json that are not an OpenAI, Anthropic or
 --- Gemini chat call:
 --- - "backboard": Backboard's assistant/thread API (app.backboard.io). One
@@ -14,6 +14,8 @@
 --- - "decisions": TypeSafe's System One protocol (/v1/systemone, also served by
 ---   OpenRouter at /api/alpha/decisions): typed questions in, answers with
 ---   probabilities out. Jev, the model it serves, is not a chat model.
+--- - "perplexity_agent": Perplexity's Agent API (POST <base>/agent): `input` and
+---   `instructions` in, a typed `output` array out.
 ---
 --- Also classify own root error fields in decoded chat responses, including
 --- explicit null and false; nested and inherited metadata remain independent.
@@ -29,6 +31,11 @@
 ---    the first real request instead of passing silently.
 --- 3. Credentials never enter a body: the drivers put the key in the header
 ---    named by the provider's format.
+--- 4. The Agent API's shapes come from docs.perplexity.ai (api-reference/agent-post,
+---    agent-api/output-control, read 2026-11-01). No key was available: they run
+---    against a local fake only. Its answer is an OpenAI Responses object, which
+---    may carry a null `error` beside a good answer, so the generic error rule
+---    does not apply to it, and a tool's item may stand before the message.
 ---
 --- The AutoHotkey port is windows/modules/llm/remote_formats.ahk. Both are
 --- pinned by _shared/tests/corpus/llm/remote_formats_vectors.json.
@@ -173,9 +180,68 @@ end
 
 
 
+-- =======================================
+-- =======================================
+-- ======= 3/ Perplexity Agent API =======
+-- =======================================
+-- =======================================
+
+-- The format name of api_providers.json
+M.AGENT_FORMAT = "perplexity_agent"
+
+-- The request path below the base_url
+M.AGENT_PATH = "/agent"
+
+--- Returns the body of an Agent API request. No tool is declared: a prediction
+--- asks for text, not for a web search.
+--- @param spec table { model, system, text, max_tokens, temperature? }
+--- @return table body
+function M.agent_body(spec)
+	local body = { model = spec.model, input = spec.text, max_output_tokens = spec.max_tokens, stream = false }
+	if type(spec.system) == "string" and spec.system ~= "" then body.instructions = spec.system end
+	if spec.temperature ~= nil then body.temperature = spec.temperature end
+	return body
+end
+
+--- Reads the answer text of a decoded Agent API answer: every output_text of
+--- every message item, in order. Tool and reasoning items are skipped.
+--- @param response table
+--- @return string|nil text Nil when the answer holds no output array.
+function M.agent_text(response)
+	local output = type(response) == "table" and response.output or nil
+	if type(output) ~= "table" then return nil end
+	local parts = {}
+	for _, item in ipairs(output) do
+		if type(item) == "table" and item.type == "message" and type(item.content) == "table" then
+			for _, part in ipairs(item.content) do
+				if type(part) == "table" and part.type == "output_text" and type(part.text) == "string" then
+					parts[#parts + 1] = part.text
+				end
+			end
+		end
+	end
+	return table.concat(parts)
+end
+
+--- Whether a decoded Agent API answer is a failure: a non-null error field or a
+--- failed status.
+--- @param response any
+--- @param is_null function Tells the decoder's JSON null.
+--- @return boolean
+function M.agent_failed(response, is_null)
+	if type(response) ~= "table" then return false end
+	local failure = rawget(response, "error")
+	if failure ~= nil and not is_null(failure) then return true end
+	return response.status == "failed"
+end
+
+
+
+
+
 -- =========================================
 -- =========================================
--- ======= 3/ Response error fields ========
+-- ======= 4/ Response error fields ========
 -- =========================================
 -- =========================================
 

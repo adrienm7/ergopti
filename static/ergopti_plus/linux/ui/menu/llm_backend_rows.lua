@@ -12,7 +12,7 @@
 --- FEATURES & RATIONALE:
 --- 1. The tray builds no list (maintainer, 2026-10-27): the page offers the
 ---    entries, the providers and the local servers, and runs these actions.
---- 2. Adding an API asks for the key in a hidden zenity entry, stores it in the
+--- 2. Adding an API asks for the key in a hidden native entry, stores it in the
 ---    private entries file, selects it, then tests it at once so a wrong key is
 ---    reported while the user is still looking, with the provider's own reason.
 --- 3. Dialogs are handed in by the menu builder, so this module never opens a
@@ -27,6 +27,7 @@
 --- ==============================================================================
 
 local M = {}
+local SaveFailure = require("config_save_failure")
 local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
@@ -67,7 +68,7 @@ local function save_failed(dialogs, entries, title)
 	if called and type(refusal) == "string" then
 		dialogs.error(fill(tr("menu.llm.api_key_no_secret_store"), { refusal }), title)
 	else
-		dialogs.error(tr("dialog.bulk_toggle.save_failed"), title)
+		SaveFailure.present(tr, function(message) dialogs.error(message, title) end)
 	end
 end
 
@@ -162,6 +163,18 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		end
 		base_url = assert(UrlTemplate.expand(provider.base_url, values))
 		Logger.info(LOG, "API entry address filled for provider '%s' (%d account field(s)).", provider.id, #fields)
+	elseif provider.optional_address then
+		-- The catalogue's address works; one optional value replaces it
+		local optional = provider.optional_address
+		local value = dialogs.prompt(heading, tr("menu.llm.api_prompt_field." .. optional.field), "")
+		if not value then return end
+		local filled = UrlTemplate.optional_url(optional, TextUtils.trim(value))
+		if not filled then
+			Logger.error(LOG, "API entry address refused: the '%s' value cannot fill it.", optional.field)
+			dialogs.error(tr("menu.llm.api_prompt_field_invalid." .. optional.field), heading)
+			return
+		end
+		base_url = filled
 	-- OpenAI selects the wire schema, not a fixed host. Keep its declared
 	-- default visible while allowing the same custom endpoint as the generic form.
 	elseif provider.base_url == "" or provider.id == "openai" then
@@ -191,12 +204,12 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		local begin = llm.begin_api_selection
 		current, finish = llm.api_selection_is_current, llm.finish_api_selection
 		if type(begin) ~= "function" or type(current) ~= "function" or type(finish) ~= "function" then
-			dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+			SaveFailure.present(tr, function(message) dialogs.error(message, heading) end)
 			return false
 		end
 		local captured, receipt = pcall(begin)
 		if not captured or type(receipt) ~= "table" then
-			dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+			SaveFailure.present(tr, function(message) dialogs.error(message, heading) end)
 			return false
 		end
 		ticket = receipt
@@ -217,7 +230,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	if chat then
 		local retired, ack = pcall(finish, ticket, called and type(entry) == "table", called and settled == true)
 		if not retired or ack ~= true then
-			dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+			SaveFailure.present(tr, function(message) dialogs.error(message, heading) end)
 			return false
 		end
 	end
@@ -452,7 +465,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 					typed = type(typed) == "string" and TextUtils.trim(typed) or ""
 					if typed == "" then return false end
 					if llm.set_backend("api") ~= true then
-						dialogs.error(tr("dialog.bulk_toggle.save_failed"), tr("common.error_title"))
+						SaveFailure.present(tr, function(message) dialogs.error(message, tr("common.error_title")) end)
 						return false
 					end
 					if entries.set_model(entry.id, typed) ~= true then

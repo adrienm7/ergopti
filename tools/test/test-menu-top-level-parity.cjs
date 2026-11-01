@@ -61,6 +61,7 @@
 const fs = require('fs');
 const path = require('path');
 // The Linux tray root is read with its split section modules folded back in.
+require('../lib/config-key-source-view.cjs').install(); // driver source may name a generated constant
 const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');

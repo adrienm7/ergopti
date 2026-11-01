@@ -325,7 +325,9 @@ a worker that ended at the same second.
 The same rule applies to `tests/run_all.ahk`: concurrent `--only` invocations
 from the same checkout replace the earlier runner through `#SingleInstance
 Force`. Its predecessor can exit0 with an unfinished test plan. Serialize these
-invocations and require a complete manifest before accepting a zero exit.
+invocations and require a complete manifest before accepting a zero exit, or run
+them under the interpreter's `/force` switch, as
+[the parallel runner](../tooling/windows-ahk-parallel-tests.md) does.
 
 ### project-ahk-getmenustate-counts-rows-in-the-high-byte
 
@@ -672,6 +674,17 @@ other AutoHotkey hooks, through their mutex. Action: never let correctness
 depend on the order of the AutoHotkey hook and a native hook; give each
 decision to one hook outright.
 
+### project-ahk-llm-fixtures-leak-through-reloads-and-clones
+
+Two shapes turned LLM tests red only in a whole-group run. `_LLMRemote_LoadCatalog`
+publishes every catalogue global, including empty thinking families and local
+identities when a fixture root lacks their files, so a test that reloads it must
+use `_RemoteCatalog_SnapshotPublished` and `_RemoteCatalog_RestorePublished`,
+which read the published names from the loaders. And `_LLM_Engine.Clone()` is
+shallow: `request_plan` is shared with the real engine once any `LLM_Engine_Init`
+test has planted it, so a fixture that sends must delete that key from its clone,
+or one scenario's send holds the next automatic request behind the rate floor.
+
 ### project-llm-ollama-is-only-the-owned-runtime
 
 The Windows engine talks only to the daemon `OllamaManagedBootstrap` started
@@ -701,8 +714,29 @@ the hook falls back to the Tab key's other owners when its criterion refuses
 native cycle routes on extended scan code zero
 (`LLM_NAV_EVENT_OWNER_PARKED_CYCLE_ROUTES`), so no hook order cycles twice or
 never (`test_llm_nav_cycle_windows.ahk`, `test-windows-llm-nav-cycle.cjs`).
-Action: when the DLL is next rebuilt, drop the cycle routes from its contract
-together with the parked table.
+Action: when the plan shape is next changed, drop the cycle routes from the DLL's
+contract together with the parked table.
+
+### project-native-press-ledger-is-the-held-state-ahk-cannot-see
+
+A press the native owner captured, consumed or replayed never moves AutoHotkey's
+physical state. `KS_IsHeld` adds exactly those presses (`key_press_ledger.h`,
+`ErgoptiNav_QueryKeyPress`), and `KS_PressSequence` gives the press order, 0 when
+the ledger did not see the press. Query right Alt by 0x138, never `GetKeySC("RAlt")`:
+a layout mapping it to Kana gives that VK no scan code. RawInput is no alternative:
+a key a low-level hook swallows raises no `WM_INPUT` (measured with injected input).
+Action: a consumer that must treat a replayed edge as physical reads `KS_IsHeld`;
+the DLL is published only through `-UpdateTracked` on the pinned toolset
+(`docs/tooling/windows-native-dll.md`).
+
+### project-native-export-lookup-is-not-for-the-keystroke-path
+
+`_LLM_NavEventOwnerNativeExport` re-proves the whole issued image on every call: about
+280 us, against 3.4 us for the native call behind it. Through the ledger this put
+that cost in `IsRealAltGrPress`, so in every AltGr `#HotIf`. Action: code reached from
+a key press or a criterion takes the address once at the owner's start and passes it,
+as the press ledger port does. Measure a new read with a QPC loop inside a booted
+isolated driver: the `[HotPath]` lines do not see `#HotIf` criteria.
 
 ### project-nav-owner-start-registers-before-its-epoch
 
@@ -1009,7 +1043,8 @@ combination that holds AltGr (Shift+AltGr...) on such a layout, its owner
 pressing only the other members; a left_ctrl hold
 that took the fake LCtrl is handed back when the RAlt arrives
 (`TapHoldAltGrTakesItsLCtrl`); "LCtrl physically held" means
-`TapHoldUserLCtrlHeld()`. Only `KS_AltGrAddsFakeLCtrl()` layouts (not Kana,
+`TapHoldUserLCtrlHeld()`, which asks the native ledger's real flag under AltGr
+(no owner: AltGr's). Only `KS_AltGrAddsFakeLCtrl()` layouts (not Kana,
 and the boot probe found an AltGr level) have the fake LCtrl: on QWERTY and
 Kana a physical LCtrl held with RAlt or SC138 is the user's Ctrl, so never read
 "RAlt down" as "the Ctrl is AltGr's" without that predicate. Where right Alt
@@ -1380,3 +1415,29 @@ letter means the key that types it under the Ergopti emulation
 because a Win slot on such a key joins the physical broker, which acquires its
 keys once. Moving the binding earlier silently returns every emulated letter to the
 host layout's key; keep the order pinned by `test_keyboard_slot_neutral_roles.ahk`.
+
+### project-job-accounting-counts-the-console-host
+
+A console process started with `CREATE_NO_WINDOW` still gets a `conhost.exe`, created
+as its child and inside its job, so `ActiveProcesses` of a ShellRunner tree-owned
+PowerShell starts at 2. A "sole member of my job" check must enumerate the job
+(class 3, not the accounting count) and exclude only its own host, by exact parent and
+System32 image. Model tests that stub the observation class cannot see this: only a
+real job can (`npm run test:windows-proxy-relay-e2e`).
+
+### project-delete-lease-excludes-a-second-lease
+
+A handle opened with DELETE access and without `FILE_SHARE_DELETE` (every managed
+lease: `OpenDirectory(path, true)`, `Open-OllamaReadFile path true`) makes a second
+open of the same file fail with a sharing violation, unless that open asks for no DELETE
+and shares DELETE. A worker beside the running launcher, such as the pull worker,
+therefore observes (`OpenObservedDirectory`, `OpenObservedFile`) and never leases.
+
+### project-netonly-gives-sspi-a-known-identity
+
+`CreateProcessWithLogonW` with `LOGON_NETCREDENTIALS_ONLY` starts a process whose local
+identity stays the user's and whose outbound SSPI identity is any domain, user and
+password given, unverified, with no administrator right. A fake server can then check a
+real NTLMv2 proof against a known password (`tools/test/lib/windows-job-host.ps1`). Its
+command line is limited to 1024 characters, and SSPI's Negotiate without a domain sends
+raw NTLM and refuses an answer wrapped in SPNEGO (`SEC_E_INVALID_TOKEN`).

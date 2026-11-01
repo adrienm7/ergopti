@@ -75,8 +75,8 @@ _ScopeShortcutsCase(Mode, FromManifest := false) {
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
-Test("config-scope-shortcuts: restore owns registered preferences and recovers refusal", _ScopeShortcutsCase.Bind("recommended"))
-Test("config-scope-shortcuts: clear owns registered preferences and recovers refusal", _ScopeShortcutsCase.Bind("clear"))
+Test("config-scope-shortcuts: restore owns registered preferences and recovers refusal", _RRNC_NoDialog.Bind("Shortcuts", _ScopeShortcutsCase.Bind("recommended")))
+Test("config-scope-shortcuts: clear owns registered preferences and recovers refusal", _RRNC_NoDialog.Bind("Shortcuts", _ScopeShortcutsCase.Bind("clear")))
 
 _ScopeShortcutsUnavailableInventory() {
 	global _PersonalShortcutsRegistry

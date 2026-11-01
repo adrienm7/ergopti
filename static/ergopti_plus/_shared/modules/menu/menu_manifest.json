@@ -448,6 +448,10 @@
 				{
 					"when": "config_newer_schema",
 					"reason_key": "menu.read_only.newer_schema"
+				},
+				{
+					"when": "config_older_schema",
+					"reason_key": "menu.read_only.older_schema"
 				}
 			],
 			"category": "LLM"
@@ -464,6 +468,10 @@
 				{
 					"when": "config_newer_schema",
 					"reason_key": "menu.read_only.newer_schema"
+				},
+				{
+					"when": "config_older_schema",
+					"reason_key": "menu.read_only.older_schema"
 				}
 			]
 		},
@@ -1262,6 +1270,11 @@
 		},
 		{
 			"type": "command",
+			"id": "proxy_override",
+			"i18n": "menu.debug.proxy_override"
+		},
+		{
+			"type": "command",
 			"id": "composer_check",
 			"i18n": "menu.debug.composer_check"
 		},
@@ -1600,6 +1613,17 @@
 			"unavailable": "hide"
 		}
 	],
+	"tap_hold_vhid_update_rows": [
+		{
+			"type": "command",
+			"id": "tap_hold_vhid_update",
+			"i18n": "menu.tapholds.vhid_update",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"tap_hold_vhid_not_active_rows": [
 		{
 			"type": "label",
@@ -1828,19 +1852,19 @@
 				"combo_symmetric"
 			],
 			"platforms": [
+				"ahk",
 				"hs",
 				"linux"
-			],
-			"reason_key": "platform_reason.remap_engine_is_per_driver"
+			]
 		},
 		{
 			"type": "list",
 			"id": "combo_timings",
 			"platforms": [
+				"ahk",
 				"hs",
 				"linux"
-			],
-			"reason_key": "platform_reason.remap_engine_is_per_driver"
+			]
 		},
 		{
 			"type": "command",

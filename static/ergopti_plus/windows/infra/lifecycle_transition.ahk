@@ -16,11 +16,11 @@ global LIFECYCLE_REQUIRED_OWNERS := Map(
 		"keystats-prefetch-range", "uia-selection-worker",
 		"keystats-text-migration", "keep-awake", "gesture-left-hold",
 		"gesture-right-hold", "caps-word", "hotstring-engine", "user-hotstrings",
-		"llm-dependency-poll", "keyboard-layout"
+		"keyboard-layout"
 	],
 	"resume", [
 		"user-programs", "navigation-event", "hotstring-prefix-watcher", "prefix-buffer",
-		"prefix-index", "llm-dependency-poll", "llm-pointer-watch",
+		"prefix-index", "llm-pointer-watch",
 		"metrics-focus-refresh", "keystats-webview", "webview-readiness",
 		"keystats-text-migration", "llm-menu", "updater",
 		"uia-selection-worker", "keyboard-layout"

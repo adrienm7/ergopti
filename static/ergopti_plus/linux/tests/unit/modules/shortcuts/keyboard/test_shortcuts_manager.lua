@@ -8,7 +8,7 @@
 
 local helpers = require("tests.helpers")
 
-helpers.describe("modules/shortcuts/manager.lua", function()
+helpers.describe("modules.shortcuts.manager", function()
 
   -- ==========================================================================
   -- 1. Module structural
@@ -242,10 +242,8 @@ helpers.describe("modules/shortcuts/manager.lua", function()
   end)
 
   helpers.it("routes desktop interaction through portable adapters", function()
-	local path = helpers.driver_root() .. "/modules/shortcuts/manager.lua"
-	local file = assert(io.open(path, "r"))
-	local source = file:read("*a")
-	file:close()
+	-- modules/shortcuts/manager, selected by a declaration unique to it.
+	local source = assert(helpers.read_driver_unit("local function capture_text_destination("))
 	for _, forbidden in ipairs({ "xdotool", "xclip", "io.popen", "os.execute" }) do
 		helpers.assert_true(source:find(forbidden, 1, true) == nil,
 			"the shortcuts manager must not bypass adapters with " .. forbidden)
@@ -437,7 +435,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 					end
 					modal.run = function(callback) releases = releases + 1; return callback() end
 					os.execute = function(command)
-						if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+						if command:find("dialog_host.lua", 1, true) then notices[#notices + 1] = command; return 0 end
 						return execute(command)
 					end
 					local called, receipt = pcall(action)

@@ -286,6 +286,7 @@ local function run_isolated(options, assertions)
 			["infra.i18n"] = {
 				set_locale_injector = function() end,
 				init = function() return true end,
+				adopt_saved_locale = function() return false end,
 				get = function(key) return tostring(key) end,
 			},
 			["infra.locale"] = {
@@ -299,6 +300,8 @@ local function run_isolated(options, assertions)
 			["infra.reload_guard"] = ReloadGuard,
 			["infra.emergency_exit"] = { request = function() return true end },
 			["infra.startup_transaction"] = {},
+			-- The boot lets config.toml's [script] rows win once the path resolves.
+			["infra.script_scope"] = { adopt_configured = function() return {} end },
 			["infra.config_paths"] = {
 				init = function() return true end,
 				get_config_dir = function() return "/virtual/config" end,

@@ -97,8 +97,8 @@ HS_SyntheticPayloadKind(Payload) {
 ; @returns {String} The leaf under [hotstrings].
 HS_ShortcutWordResetKey() {
 	if (IsSet(TapHoldOwnsShortcut) and TapHoldOwnsShortcut())
-		return "tap_hold_resets_word"
-	return "shortcut_resets_word"
+		return ConfigLeaf.TAP_HOLD_RESETS_WORD
+	return ConfigLeaf.SHORTCUT_RESETS_WORD
 }
 
 ; Starts a new word for an event one of the word-reset settings governs, when
@@ -190,7 +190,7 @@ HS_CommitSyntheticEffect(Payload, SendFailed := false) {
 	; what it did to the text is unknown.
 	if !SendFailed {
 		Kind := HS_SyntheticPayloadKind(Payload)
-		Setting := (Kind == "arrow") ? "arrow_resets_word"
+		Setting := (Kind == "arrow") ? ConfigLeaf.ARROW_RESETS_WORD
 			: (Kind == "shortcut") ? HS_ShortcutWordResetKey() : ""
 		if (Setting != "" and !HSE_WordResetFlagCurrent(Setting)) {
 			IncompleteContext := IsSet(_PrefixHasIncompleteFragment) && _PrefixHasIncompleteFragment()

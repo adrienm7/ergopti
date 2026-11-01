@@ -2,6 +2,7 @@
 
 --- Renders shared ordered slots through the actual native picker and publisher.
 --- Same-device chord choices retain the original source and publication owner.
+local SaveFailure = require("config_save_failure")
 local Shared = require("tap_hold.key_combinations")
 local HoldOptions = require("tap_hold.hold_options")
 local KeyCatalog = require("tap_hold.key_catalog")
@@ -29,7 +30,7 @@ function M.build(ctx,ui)
 		and type(pairs.get_chord)=="function" and type(pairs.chord_settings)=="function"
 		and type(pairs.chord_pair)=="function"
 	local function feedback(accepted)
-		if accepted~=true then ui.error(t("dialog.bulk_toggle.save_failed"),t("common.error_title")) end
+		if accepted~=true then SaveFailure.present(t, function(message) ui.error(message, t("common.error_title")) end) end
 		if accepted==true and type(ctx.on_menu_changed)=="function" then ctx.on_menu_changed() end
 		return accepted==true
 	end

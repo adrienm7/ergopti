@@ -91,8 +91,9 @@ function Invoke-OllamaManagedModelPull {
 		if ([Ergopti.Ollama.RuntimeObservation]::ActiveProcesses() -ne 1) { throw 'The model worker requires its sole canonical job.' }
 		$root = Open-OllamaManagedRoot $request.root $false
 		if ($root.identity -cne $request.root_identity) { throw 'The originating model root changed.' }
-		$handle = [Ergopti.Ollama.ManagedNative]::OpenDirectory($request.path, $true)
-		$stage = Open-OllamaPreparedStage $root $request.ticket $request.identity $request.manifest $false $request.path $handle
+		# The running launcher holds this version's DELETE leases: observe, never lease.
+		$handle = [Ergopti.Ollama.ManagedNative]::OpenObservedDirectory($request.path)
+		$stage = Open-OllamaPreparedStage $root $request.ticket $request.identity $request.manifest $false $request.path $handle $true
 		$ready = Open-OllamaReadFile ([IO.Path]::Combine($root.path, '.runtime-' + $request.runtime + '.json'))
 		if ([Ergopti.Ollama.ManagedNative]::Identity($ready.SafeFileHandle.DangerousGetHandle()) -cne $request.ready_identity -or
 			(Get-OllamaStreamHash $ready) -cne $request.ready_image) { throw 'The exact runtime readiness image changed.' }
@@ -106,6 +107,13 @@ function Invoke-OllamaManagedModelPull {
 		# cannot answer it: the pull would fail later on an unnamed error.
 		if ($receipt.proxy_tunnel -ceq 'windows_login') {
 			[Console]::Error.WriteLine('Managed model pull refused: proxy_windows_login')
+			return (Get-OllamaPullProxyLoginExitCode)
+		}
+		# The sign-in relay refused at the daemon's start: its closed reason names
+		# the message the AHK owner shows.
+		if ($receipt.proxy_tunnel -ceq 'relay_refused') {
+			if ($receipt.proxy_relay -cnotmatch '^[a-z_]+\z') { throw 'The receipt names no closed relay refusal.' }
+			[Console]::Error.WriteLine('Managed model pull refused: proxy_relay ' + $receipt.proxy_relay)
 			return (Get-OllamaPullProxyLoginExitCode)
 		}
 		$server = [Diagnostics.Process]::GetProcessById($receipt.child_pid)

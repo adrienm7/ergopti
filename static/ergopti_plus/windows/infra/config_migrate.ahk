@@ -173,14 +173,14 @@ _ConfigMigrateValidateOp(Op, Where) {
 }
 
 ; Validates parsed registry sections and returns Map("current", "unstamped",
-; "steps") with the steps in execution order, each a Map of "from", "to",
+; "oldest", "steps") with the steps in execution order, each a Map of "from", "to",
 ; "drivers" (a set), "reason" and "ops". Throws on the first defect.
 ConfigMigrateValidateRegistry(Sections) {
 	if !(Sections is Map) || !Sections.Has("registry")
 		throw Error("the registry has no [registry] table")
 	Head := Sections["registry"]
 	for Field in Head {
-		if !(Field == "current_version" || Field == "unstamped_version")
+		if !(Field == "current_version" || Field == "unstamped_version" || Field == "oldest_version")
 			throw Error("[registry] has an unknown key '" . Field . "'")
 	}
 	Current := Head.Get("current_version", "")
@@ -188,8 +188,14 @@ ConfigMigrateValidateRegistry(Sections) {
 	if !_ConfigMigrateIsVersion(Current) || !_ConfigMigrateIsVersion(Unstamped)
 			|| Unstamped > Current
 		throw Error("current_version and unstamped_version must be integers with 1 <= unstamped <= current")
+	; Steps below the oldest supported version were squashed away: the chain
+	; starts there, and anything older is refused rather than half migrated.
+	Oldest := Head.Get("oldest_version", Unstamped)
+	if !_ConfigMigrateIsVersion(Oldest) || Oldest < Unstamped || Oldest > Current
+		throw Error("oldest_version must be an integer with unstamped <= oldest <= current")
 	Current := Integer(Current)
 	Unstamped := Integer(Unstamped)
+	Oldest := Integer(Oldest)
 	Steps := []
 	for Name, Step in Sections {
 		if (Name == "registry")
@@ -233,11 +239,11 @@ ConfigMigrateValidateRegistry(Sections) {
 		Steps.Push(Map("from", From, "to", From + 1, "drivers", DriverSet,
 			"reason", Reason, "ops", Ops))
 	}
-	if (Steps.Length != Current - Unstamped)
-		throw Error("the steps do not chain v" . Unstamped . " to v" . Current)
+	if (Steps.Length != Current - Oldest)
+		throw Error("the steps do not chain v" . Oldest . " to v" . Current)
 	Ordered := []
 	loop Steps.Length {
-		Wanted := Unstamped + A_Index - 1
+		Wanted := Oldest + A_Index - 1
 		Found := 0
 		for Step in Steps {
 			if (Step["from"] == Wanted) {
@@ -249,7 +255,7 @@ ConfigMigrateValidateRegistry(Sections) {
 			throw Error("the chain has a gap at v" . Wanted)
 		Ordered.Push(Found)
 	}
-	return Map("current", Current, "unstamped", Unstamped, "steps", Ordered)
+	return Map("current", Current, "unstamped", Unstamped, "oldest", Oldest, "steps", Ordered)
 }
 
 ; Reads and validates a registry file. Throws on any defect.
@@ -647,7 +653,8 @@ _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 
 ; Reads a model's version against a registry: "current", "migrate", "newer",
 ; "invalid" or "unsupported". Version receives the file's version (the
-; unstamped version when the file carries none).
+; unstamped version when the file carries none, the current one when the chain
+; no longer reaches it).
 ConfigMigrateClassify(Model, Registry, &Version) {
 	Version := Registry["unstamped"]
 	if Model.Has("_meta") && Model["_meta"].Has("schema_version") {
@@ -655,12 +662,17 @@ ConfigMigrateClassify(Model, Registry, &Version) {
 		if !_ConfigMigrateIsVersion(Version)
 			return "invalid"
 		Version := Integer(Version)
+	} else if (Registry["unstamped"] < Registry["oldest"]) {
+		; The steps a file with no stamp would need are gone: it is hand-written or
+		; very old, so it runs as it is and the next full save stamps it.
+		Version := Registry["current"]
+		return "current"
 	}
 	if (Version > Registry["current"])
 		return "newer"
 	if (Version == Registry["current"])
 		return "current"
-	if (Version < Registry["unstamped"])
+	if (Version < Registry["oldest"])
 		return "unsupported"
 	return "migrate"
 }
@@ -1001,7 +1013,8 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 			case "invalid":
 				return Refuse("invalid", "[_meta] schema_version is not a positive integer")
 			case "unsupported":
-				return Refuse("unsupported", "no migration path from schema v" . Version)
+				return Refuse("unsupported", "no migration path from schema v" . Version
+					. ": the oldest this build migrates is v" . Registry["oldest"])
 		}
 
 		ConfigMigrateClassify(Before, Registry, &LegacyVersion)
@@ -1069,17 +1082,100 @@ ConfigMigrateRegistryProofOpen() {
 ; memo or mutate state between two checks, and it is dropped when the outermost
 ; scope ends. Callers close the proof with one fresh check (RegistryLive with
 ; Fresh) after the scope, so a mutation made while Body ran is still refused.
-ConfigMigrateWithRegistryProof(Body) {
+; A Standing proof carries the memo from one scope to the next of one transaction,
+; across native work that changes nothing; its owner empties it before any durable
+; effect, which therefore always compares again.
+; @param {Func} Body The checks to run.
+; @param {Object} Standing Optional { registry, shadow } kept by the caller.
+ConfigMigrateWithRegistryProof(Body, Standing := 0) {
 	global ConfigMigrateRegistryProof
 	PreviousCritical := Critical("On")
+	if IsObject(Standing) && !ConfigMigrateRegistryProof.depth
+		ConfigMigrateRegistryProof.registry := Standing.registry, ConfigMigrateRegistryProof.shadow := Standing.shadow
 	ConfigMigrateRegistryProof.depth += 1
 	try return Body.Call()
 	finally {
 		ConfigMigrateRegistryProof.depth -= 1
-		if !ConfigMigrateRegistryProof.depth
+		if !ConfigMigrateRegistryProof.depth {
+			if IsObject(Standing)
+				Standing.registry := ConfigMigrateRegistryProof.registry, Standing.shadow := ConfigMigrateRegistryProof.shadow
 			ConfigMigrateRegistryProof.registry := 0, ConfigMigrateRegistryProof.shadow := 0
+		}
 		Critical(PreviousCritical)
 	}
+}
+
+; Whether two registries are the same closed model, node for node: plain Maps with
+; the same case rule and exactly the same keys, dense plain Arrays, exact TOML_Bool
+; values, strings compared with case and numbers by value. Every liveness check
+; visits each of the registry's nodes, so this walk avoids what costs a call per
+; node: strings are compared in their parent's loop, and one Get replaces Has plus
+; an index. test_config_migrate_same_registry.ahk holds it to the plain definition.
+; NativeLive binds this owner: a replaced comparison refuses every liveness check.
+ConfigMigrateSameRegistry(Left, Right) {
+	static MapBase := Map.Prototype, ArrayBase := Array.Prototype, Absent := {}
+	if !IsObject(Left) {
+		if Left is String
+			return (Right is String) && Left == Right
+		return (Right is Integer || Right is Float) && Left = Right
+	}
+	Base := ObjGetBase(Left)
+	if Base == MapBase {
+		if !IsObject(Right) || ObjGetBase(Right) != MapBase || ObjOwnPropCount(Left) || ObjOwnPropCount(Right)
+				|| Left.Count != Right.Count || Left.CaseSense != Right.CaseSense
+			return false
+		ExactRight := Right
+		if Right.CaseSense != "On" {
+			ExactRight := Map()
+			ExactRight.CaseSense := "On"
+			for Key, Value in Right
+				ExactRight[Key] := Value
+		}
+		for Key, Value in Left {
+			Other := ExactRight.Get(Key, Absent)
+			if Value is String {
+				if !(Other is String) || Value !== Other
+					return false
+			} else if !ConfigMigrateSameRegistry(Value, Other)
+				return false
+		}
+		return true
+	}
+	if Base == ArrayBase {
+		if !IsObject(Right) || ObjGetBase(Right) != ArrayBase || ObjOwnPropCount(Left) || ObjOwnPropCount(Right)
+				|| Left.Length != Right.Length
+			return false
+		loop Left.Length {
+			; A missing cell reads as Absent, which no value equals: Absent is
+			; neither a string nor a plain container, on either side.
+			Value := Left.Get(A_Index, Absent), Other := Right.Get(A_Index, Absent)
+			if Value is String {
+				if !(Other is String) || Value !== Other
+					return false
+			} else if !ConfigMigrateSameRegistry(Value, Other)
+				return false
+		}
+		return true
+	}
+	if Left is TOML_Bool {
+		if !IsObject(Right) || Base != TOML_Bool.Prototype || ObjGetBase(Right) != TOML_Bool.Prototype
+			return false
+		for Value in [Left, Right] {
+			Count := 0
+			for Name in ObjOwnProps(Value) {
+				if Name != "Value"
+					return false
+				Descriptor := Object.Prototype.GetOwnPropDesc.Call(Value, Name)
+				if !Descriptor.HasOwnProp("Value") || !(Descriptor.Value is Integer)
+					return false
+				Count += 1
+			}
+			if Count != 1
+				return false
+		}
+		return Left.Value == Right.Value
+	}
+	return false
 }
 
 ; One private issuer owns both read-only preparation and actual boot completion.
@@ -1092,7 +1188,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		registry_path: ConfigMigrateRegistryPath, registry: ConfigMigrateShippedRegistry,
 		decode: TOML_ParseDocument, classify: _ConfigMigrateClassifyDocument,
 		migrate: ConfigMigrateRun, key: FileReadActivityKey,
-		clone: ManifestCloneValue, same: ConfigMigrateSameValue,
+		clone: ManifestCloneValue, same: ConfigMigrateSameValue, same_registry: ConfigMigrateSameRegistry,
 		terminal_owns: _ConfigWriteTerminalOwnsExact, variant_refusal: _ConfigMigrateVariantBootRefusal,
 		move: FSConfigAtomicMoveReplace, generic_move: FSAtomicMoveReplace, noop: FSNativeAcknowledge, settlement_port: ConfigTransitionProductionPort, settlement_inspect: ConfigTransitionInspect, settlement_result: ConfigTransitionResultIs, settlement_matches: FSUtf8ExactMatches, settlement_debt: _ConfigPublicationHasRecoveryDebt, settlement_refusal: TOML_WriteRefusal, settlement_bounds: _ConfigTransitionPresenceHashIsValid, config_write: TOML_ConfigBatchWrite, generic_write: TOML_BatchWrite, recovery_images: _ConfigTransitionNativeRecoveryImages
 	}
@@ -1112,6 +1208,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			&& Native.settlement_bounds == _ConfigTransitionPresenceHashIsValid
 			&& Native.migrate == ConfigMigrateRun && Native.key == FileReadActivityKey
 			&& Native.clone == ManifestCloneValue && Native.same == ConfigMigrateSameValue
+			&& Native.same_registry == ConfigMigrateSameRegistry
 			&& Native.terminal_owns == _ConfigWriteTerminalOwnsExact
 			&& Native.variant_refusal == _ConfigMigrateVariantBootRefusal
 			&& Native.move == FSConfigAtomicMoveReplace && Native.generic_move == FSAtomicMoveReplace && Native.noop == FSNativeAcknowledge
@@ -1120,67 +1217,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 	}
 
 	PlainContainer(Value, Prototype) {
-		; ObjOwnPropCount avoids an enumerator per node: SameRegistry visits
-		; every node of the registry on each liveness check (~27 % faster).
 		return IsObject(Value) && ObjGetBase(Value) == Prototype && !ObjOwnPropCount(Value)
-	}
-
-	SameRegistry(Left, Right) {
-		; NativeLive still binds the canonical scalar owner before comparison.
-		if Left is String
-			return (Right is String) && Left == Right
-		if Left is Integer || Left is Float
-			return (Right is Integer || Right is Float) && Left = Right
-		if Left is Map {
-			if !PlainContainer(Left, Map.Prototype) || !PlainContainer(Right, Map.Prototype)
-					|| Left.Count != Right.Count || Left.CaseSense != Right.CaseSense
-				return false
-			ExactRight := Right
-			if Right.CaseSense != "On" {
-				ExactRight := Map()
-				ExactRight.CaseSense := "On"
-				for Key, Value in Right
-					ExactRight[Key] := Value
-			}
-			for Key, Value in Left {
-				if !ExactRight.Has(Key) || !SameRegistry(Value, ExactRight[Key])
-					return false
-			}
-			return true
-		}
-		if Left is Array {
-			if !PlainContainer(Left, Array.Prototype) || !PlainContainer(Right, Array.Prototype)
-					|| Left.Length != Right.Length
-				return false
-			loop Left.Length {
-				if !Left.Has(A_Index) || !Right.Has(A_Index)
-						|| !SameRegistry(Left[A_Index], Right[A_Index])
-					return false
-			}
-			return true
-		}
-		if Left is TOML_Bool {
-			if !IsObject(Right) || ObjGetBase(Left) != TOML_Bool.Prototype
-					|| ObjGetBase(Right) != TOML_Bool.Prototype
-				return false
-			for Value in [Left, Right] {
-				Count := 0
-				for Name in ObjOwnProps(Value) {
-					if Name != "Value"
-						return false
-					Descriptor := Object.Prototype.GetOwnPropDesc.Call(Value, Name)
-					if !Descriptor.HasOwnProp("Value") || !(Descriptor.Value is Integer)
-						return false
-					Count += 1
-				}
-				if Count != 1
-					return false
-			}
-			return Left.Value == Right.Value
-		}
-		if IsObject(Left) || IsObject(Right)
-			return false
-		return Native.same.Call(Left, Right)
 	}
 
 	RegistryLive(Row, Fresh := false) {
@@ -1202,7 +1239,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 				return true
 			ConfigMigrateRegistryDeepCompares += 1
 			CompareStarted := PerfStage_Begin()
-			Same := SameRegistry(CurrentRegistry, Row.registry_shadow)
+			Same := ConfigMigrateSameRegistry(CurrentRegistry, Row.registry_shadow)
 			PerfStage_End("ConfigMigrate.registry_deep_compare", CompareStarted)
 			if !Same
 				return false
@@ -1443,11 +1480,11 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			FreshRegistry := Native.load_registry.Call(Native.registry_path.Call())
 			PerfStage_End("ConfigMigrate.row_load_registry", StageTicks)
 			StageTicks := PerfStage_Begin()
-			if !SameRegistry(FreshRegistry, Row.registry)
+			if !ConfigMigrateSameRegistry(FreshRegistry, Row.registry)
 				throw Error("The default registry differs from its native source")
 			; Rows built from the same registry source share one private shadow,
 			; so a proof scope compares the live registry with it only once.
-			if !(SharedShadow is Map) || !SameRegistry(FreshRegistry, SharedShadow)
+			if !(SharedShadow is Map) || !ConfigMigrateSameRegistry(FreshRegistry, SharedShadow)
 				SharedShadow := Native.clone.Call(FreshRegistry)
 			PerfStage_End("ConfigMigrate.row_compare_and_shadow", StageTicks)
 			Row.registry_shadow := SharedShadow
@@ -1729,6 +1766,14 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			return false
 		if ClassifyImage({ present: 1, source: Candidate }, Row) != "current"
 			return false
+		; Only an existing file may stay unstamped: a file this build creates is stamped.
+		if !Image.present {
+			try CandidateDocument := Native.decode.Call(Candidate)
+			catch
+				return false
+			if !CandidateDocument.Has("_meta") || !CandidateDocument["_meta"].Has("schema_version")
+				return false
+		}
 	}
 	ExpectedWriteSource := Image.source
 	ExpectedWritePresent := Image.present
@@ -1913,7 +1958,7 @@ _ConfigMigrateVariantBootRefusal(Result, FilePath) {
 			return ""
 		Document := TOML_ParseDocument(Source)
 		Legacy := _TOML_DocumentLookup(Document, ["layout", "ergopti_plus"])
-		Variant := _TOML_DocumentLookup(Document, ["layout", "ergopti_variant"])
+		Variant := _TOML_DocumentLookup(Document, ["layout", ConfigLeaf.ERGOPTI_VARIANT])
 	} catch {
 		return ""
 	}
@@ -1926,14 +1971,14 @@ _ConfigMigrateVariantBootRefusal(Result, FilePath) {
 		return Prefix . " current variant ownership is not a recognized exact choice"
 	if Result.Get("read_only", false)
 		return Prefix . " the joint source remains refused by its migration owner"
-	for Field in ["ergopti_base", "ergopti_alt_gr", "emulated_layout"] {
+	for Field in [ConfigLeaf.ERGOPTI_BASE, ConfigLeaf.ERGOPTI_ALT_GR, ConfigLeaf.EMULATED_LAYOUT] {
 		Read := _TOML_DocumentLookup(Document, ["layout", Field])
 		if Read["blocked"]
 			return Prefix . " an independent intent participant has an occupied namespace"
 		if !Read["found"]
 			continue
 		Value := Read["value"]
-		if Field == "emulated_layout" {
+		if Field == ConfigLeaf.EMULATED_LAYOUT {
 			if !(Value is String) || (Value != "" && !RegExMatch(Value, "^[a-z][a-z0-9_]*$"))
 				return Prefix . " the registry source intent is malformed"
 		} else if !(Value is TOML_Bool) || !(Value.Value is Integer) || (Value.Value != 0 && Value.Value != 1)

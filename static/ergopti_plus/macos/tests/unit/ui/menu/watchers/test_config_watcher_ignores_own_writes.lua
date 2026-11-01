@@ -101,7 +101,9 @@ helpers.describe("config watcher: the driver's own cache writes arm no reload", 
 		with_watcher(function(cb, armed)
 
 			local before = armed()
-			cb({ BASE_DIR .. "/modules/keymap/init.lua" })
+			-- A synthetic source path: the watcher judges the extension and location,
+			-- never whether the named module exists.
+			cb({ BASE_DIR .. "/modules/edited_feature/core.lua" })
 
 			helpers.assert_true(armed() > before,
 				"an edit to a real source file must still arm a reload")

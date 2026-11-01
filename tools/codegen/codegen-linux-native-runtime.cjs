@@ -128,17 +128,21 @@ function validate(data) {
 	const sources = portable.flatpak_sources;
 	if (
 		!sources ||
-		Object.keys(sources).join(',') !== 'luv,schemas,krb5,curl,duktape,libproxy,glib_networking'
+		Object.keys(sources).join(',') !==
+			'luv,schemas,krb5,curl,duktape,libproxy,glib_networking,luafilesystem,luaposix,sqlite,zstd,openssl,luajit'
 	)
 		throw new TypeError('Incomplete portable native source inventory.');
 	for (const [name, source] of Object.entries(sources)) {
+		// SQLite publishes its amalgamation only on its own site; every other
+		// source is a GitHub repository or release asset.
+		const host = name === 'sqlite' ? 'www\\.sqlite\\.org' : 'github\\.com';
 		if (
-			!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_./-]+$/.test(source.url) ||
+			!new RegExp(`^https://${host}/[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+$`).test(source.url) ||
 			source.url.includes('..')
 		)
 			throw new TypeError('Invalid portable native source identity.');
 		if (
-			name === 'duktape'
+			ARCHIVE_SOURCES.has(name)
 				? !/^[a-f0-9]{64}$/.test(source.sha256)
 				: !/^[a-f0-9]{40}$/.test(source.commit)
 		)
@@ -154,9 +158,14 @@ function requirements(data, format) {
 	const native = manager
 		? KEYS.map((key) => data.libraries[key].packages[manager])
 		: KEYS.map((key) => data.libraries[key].nix_package);
-	const network = manager ? data.network_runtime.providers[manager] || [] : [];
-	const digest =
-		format === 'deb'
+	// The .deb, the .rpm and the Arch repack of the release tarball carry the
+	// AppImage's private runtime prefix (tools/build/stage-linux-private-runtime.sh):
+	// LuaJIT, luv, curl and libcrypto come from there, never from a host package.
+	const privateRuntime = PRIVATE_RUNTIME_FORMATS.has(format);
+	const network = manager && !privateRuntime ? data.network_runtime.providers[manager] || [] : [];
+	const digest = privateRuntime
+		? []
+		: format === 'deb'
 			? [data.archive_digest_runtime.deb_dependency_alternatives.join(' | ')]
 			: format === 'nix_library_path'
 				? [data.archive_digest_runtime.nix_package]
@@ -165,6 +174,12 @@ function requirements(data, format) {
 }
 
 /** Native Flatpak recipes use pinned canonical sources, never the build host ABI. */
+/** The package formats that ship the private runtime prefix instead of host packages. */
+const PRIVATE_RUNTIME_FORMATS = new Set(['deb', 'rpm', 'arch']);
+
+/** Sources pinned as a release archive by SHA-256; the others are Git commits. */
+const ARCHIVE_SOURCES = new Set(['duktape', 'sqlite', 'zstd', 'openssl']);
+
 function flatpakModules(data) {
 	validate(data);
 	const sources = data.network_runtime.portable.flatpak_sources;
@@ -257,6 +272,58 @@ function flatpakModules(data) {
 				'-Dinstalled_tests=false'
 			],
 			source: 'glib_networking'
+		},
+		// The programs and Lua modules the driver runs from its own prefix only
+		// (linux/infra/owned_programs.lua), the ones the other formats stage
+		// from the oldest supported LTS. The command-line programs link their
+		// library statically, so no second libcrypto or libsqlite3 shadows the
+		// runtime's own in /app/lib.
+		{
+			name: 'owned-luafilesystem',
+			buildsystem: 'simple',
+			'build-commands': [
+				'gcc -O2 -shared -fPIC -I/app/include/luajit-2.1 src/lfs.c -o lfs.so',
+				'install -Dm755 lfs.so /app/lib/lua/5.1/lfs.so'
+			],
+			source: 'luafilesystem'
+		},
+		{
+			name: 'owned-luaposix',
+			buildsystem: 'simple',
+			'build-commands': [
+				'/app/bin/luajit build-aux/luke LUA_INCDIR=/app/include/luajit-2.1',
+				'/app/bin/luajit build-aux/luke install INST_LIBDIR=/app/lib/lua/5.1 INST_LUADIR=/app/share/lua/5.1'
+			],
+			'post-install': [
+				'test -f /app/lib/lua/5.1/posix/sys/stat.so',
+				'test -f /app/share/lua/5.1/posix/init.lua'
+			],
+			source: 'luaposix'
+		},
+		{
+			name: 'owned-sqlite3',
+			buildsystem: 'simple',
+			'build-commands': [
+				'gcc -O2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION shell.c sqlite3.c -o sqlite3 -lm',
+				'install -Dm755 sqlite3 /app/bin/sqlite3'
+			],
+			source: 'sqlite'
+		},
+		{
+			name: 'owned-zstd',
+			buildsystem: 'simple',
+			'build-commands': ['make -C programs zstd', 'install -Dm755 programs/zstd /app/bin/zstd'],
+			source: 'zstd'
+		},
+		{
+			name: 'owned-openssl',
+			buildsystem: 'simple',
+			'build-commands': [
+				'./Configure no-shared no-tests --prefix=/app/lib/ergopti-openssl --openssldir=/app/lib/ergopti-openssl',
+				'make build_programs',
+				'install -Dm755 apps/openssl /app/bin/openssl'
+			],
+			source: 'openssl'
 		}
 	];
 	return modules
@@ -268,10 +335,9 @@ function flatpakModules(data) {
 			// Meson's SDK default can be lib64; the installed environment admits lib.
 			if (recipe.buildsystem === 'meson') recipe['config-opts'].unshift('--libdir=lib');
 			const input = sources[source];
-			const pinned =
-				source === 'duktape'
-					? { type: 'archive', url: input.url, sha256: input.sha256 }
-					: { type: 'git', url: input.url, commit: input.commit };
+			const pinned = ARCHIVE_SOURCES.has(source)
+				? { type: 'archive', url: input.url, sha256: input.sha256 }
+				: { type: 'git', url: input.url, commit: input.commit };
 			// HTTP content encoding must not change bytes before digest verification.
 			// The archive unpacker still owns decompression after authentication.
 			if (pinned.type === 'archive') pinned['disable-http-decompression'] = true;
@@ -292,6 +358,54 @@ function projectRegion(source, label, body) {
 }
 
 /** Render complete output files; exported so tests exercise the real production projection. */
+/** The four Linux archives of Ergopti's own Python, by native architecture and C library. */
+const MANAGED_PYTHON_ARCHIVES = {
+	'x86_64-gnu': 'x86_64-unknown-linux-gnu',
+	'aarch64-gnu': 'aarch64-unknown-linux-gnu',
+	'x86_64-musl': 'x86_64-unknown-linux-musl',
+	'aarch64-musl': 'aarch64-unknown-linux-musl'
+};
+
+/**
+ * Validates the managed Python pin against the shared managed Python release
+ * (one uv release, version and build for every OS) and projects it for Lua.
+ * @param {object} data The runtime catalogue.
+ * @param {function} read Repository file reader.
+ * @param {string} githubPrefix https://<GitHub host>/
+ * @returns {string} The Lua table entry.
+ */
+function managedPythonProjection(data, read, githubPrefix) {
+	const pin = data.managed_python;
+	const release = JSON.parse(
+		read('static/ergopti_plus/_shared/modules/llm/managed_python_release.json')
+	);
+	const shared = Object.values(release.downloads)[0];
+	if (
+		!pin ||
+		Object.keys(pin).sort().join(',') !== 'archives,build,description,uv_release,version' ||
+		pin.uv_release !== release.uv_release ||
+		pin.version !== `${shared.major}.${shared.minor}.${shared.patch}` ||
+		pin.build !== shared.build ||
+		Object.keys(pin.archives || {}).join(',') !== Object.keys(MANAGED_PYTHON_ARCHIVES).join(',')
+	)
+		throw new TypeError(
+			'The Linux managed Python pin must name the shared managed Python release.'
+		);
+	const rows = Object.entries(pin.archives).map(([key, archive]) => {
+		if (
+			Object.keys(archive).sort().join(',') !== 'bytes,sha256,triple' ||
+			archive.triple !== MANAGED_PYTHON_ARCHIVES[key] ||
+			!/^[a-f0-9]{64}$/.test(archive.sha256) ||
+			!Number.isSafeInteger(archive.bytes) ||
+			archive.bytes <= 0
+		)
+			throw new TypeError(`Invalid Linux managed Python archive ${key}.`);
+		const url = `${githubPrefix}astral-sh/python-build-standalone/releases/download/${pin.build}/cpython-${pin.version}%2B${pin.build}-${archive.triple}-install_only_stripped.tar.gz`;
+		return `\t\t\t[${JSON.stringify(key)}] = { url = ${JSON.stringify(url)}, sha256 = ${JSON.stringify(archive.sha256)}, bytes = ${archive.bytes} },`;
+	});
+	return `\tmanaged_python = {\n\t\tversion = ${JSON.stringify(pin.version)},\n\t\tbuild = ${JSON.stringify(pin.build)},\n\t\tarchives = {\n${rows.join('\n')}\n\t\t},\n\t},\n`;
+}
+
 function render(data, read) {
 	validate(data);
 	const result = {};
@@ -391,8 +505,9 @@ function render(data, read) {
 		'ARCHIVE_DIGEST_SONAME=' + JSON.stringify(data.archive_digest_runtime.soname)
 	);
 	const nativeNetwork = `\tnetwork_runtime = {\n\t\tlibraries = {\n${NETWORK_KEYS.map((key) => `\t\t\t${key} = ${JSON.stringify(data.network_runtime.libraries[key])},`).join('\n')}\n\t\t},\n\t\tproxy_schema = ${JSON.stringify(data.network_runtime.proxy_schema)},\n\t},\n`;
+	const managedPython = managedPythonProjection(data, read, githubPrefix);
 	result[LUA_OUTPUT] =
-		`--- _generated/native_runtime.lua\n\n--- Generated by tools/codegen/codegen-linux-native-runtime.cjs; do not edit.\n--- Source: _shared/data/linux_native_runtime.json.\nreturn {\n${KEYS.map((key) => `\t${key} = ${JSON.stringify(data.libraries[key].soname)},`).join('\n')}\n${nativeNetwork}\tarchive_digest_runtime = {\n\t\tschema_version = 1,\n\t\tsoname = ${JSON.stringify(data.archive_digest_runtime.soname)},\n\t},\n}\n`;
+		`--- _generated/native_runtime.lua\n\n--- Generated by tools/codegen/codegen-linux-native-runtime.cjs; do not edit.\n--- Source: _shared/data/linux_native_runtime.json.\nreturn {\n${KEYS.map((key) => `\t${key} = ${JSON.stringify(data.libraries[key].soname)},`).join('\n')}\n${nativeNetwork}\tarchive_digest_runtime = {\n\t\tschema_version = 1,\n\t\tsoname = ${JSON.stringify(data.archive_digest_runtime.soname)},\n\t},\n${managedPython}}\n`;
 	for (const [file, format] of [
 		['tools/build/build-linux-deb.sh', 'deb'],
 		['tools/build/build-linux-rpm.sh', 'rpm'],
@@ -417,12 +532,6 @@ function render(data, read) {
 			result[file] = projectRegion(read(file), 'LINUX NATIVE REQUIREMENTS', body);
 		}
 	}
-	const packagedLuv = 'tools/build/build-linux-packaged-luv.sh';
-	result[packagedLuv] = projectRegion(
-		read(packagedLuv),
-		'LINUX PACKAGED LUV SOURCE',
-		packagedLuvRecipe
-	);
 	return result;
 }
 

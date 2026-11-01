@@ -23,8 +23,8 @@ global _HS_GrandTotalReadOwner := 0
 _HS_ScopeCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
 	return Map(
-		"scope_restore", (*) => HotstringsScopeApply("recommended", OwnedOptions),
-		"scope_clear", (*) => HotstringsScopeApply("clear", OwnedOptions))
+		MenuCommand.SCOPE_RESTORE, (*) => HotstringsScopeApply("recommended", OwnedOptions),
+		MenuCommand.SCOPE_CLEAR, (*) => HotstringsScopeApply("clear", OwnedOptions))
 }
 
 ; Compute the grand total count used in the tray menu title label.
@@ -195,8 +195,8 @@ _HS_DelaysColorsRows(OpenConfigFn := OpenHotstringsConfigWindow) {
 	if !(Captions is Map)
 		return []
 	Providers := Map(
-		"parameter_delay_config", (*) => [MenuRenderer_CommandRow("hotstrings_delays_menu", "hotstrings_config_window",
-			Map("hotstrings_config_window", (*) => OpenConfigFn.Call()), Map("hotstrings_config_ready", (*) => true))],
+		"parameter_delay_config", (*) => [MenuRenderer_CommandRow("hotstrings_delays_menu", MenuCommand.HOTSTRINGS_CONFIG_WINDOW,
+			Map(MenuCommand.HOTSTRINGS_CONFIG_WINDOW, (*) => OpenConfigFn.Call()), Map("hotstrings_config_ready", (*) => true))],
 		"parameter_delay_default", (*) => [Map("label", _HS_DefaultDelayLabel(Captions["default"]), "action", (*) => _HS_PromptDefaultDelay())],
 		"parameter_delay_magic_key", (*) => [Map("label", _HS_CategoryDelayLabel("magickey", Captions[ConfigLeaf.MAGIC_KEY]),
 			"action", (*) => _HS_PromptCategoryDelay("magickey", "menu.hotstrings.delay_magic_key"))],
@@ -231,8 +231,8 @@ _HS_PreviewBubbleRows(Toggle := ToggleHotstringsPreviewSwitch) {
 		Commands[Key] := ((SwitchKey, *) => Toggle.Call(SwitchKey)).Bind(Key)
 		Getters["hotstrings." . Key] := ((SwitchKey, *) => HSE_PreviewSwitchCurrent(SwitchKey)).Bind(Key)
 	}
-	Magic := MenuRenderer_CheckRow("preview_magic_control", "preview_star_enabled", Commands, Getters)
-	Colored := MenuRenderer_CheckRow("preview_colored_control", "preview_colored_tooltips", Commands, Getters)
+	Magic := MenuRenderer_CheckRow("preview_magic_control", ConfigLeaf.PREVIEW_STAR_ENABLED, Commands, Getters)
+	Colored := MenuRenderer_CheckRow("preview_colored_control", ConfigLeaf.PREVIEW_COLORED_TOOLTIPS, Commands, Getters)
 	if !(Magic is Map) || !(Colored is Map)
 		return []
 	Presence := []
@@ -454,14 +454,14 @@ _HS_WordExpanderRows(Commands := unset) {
 				"items", [Map("label", Record.Label, "checked", Record.Enabled,
 					"action", ((Captured, Enabled, Label) => (*) => _HS_DelimRecordRowClick(Captured, !Enabled, Label))(
 						Admission, Record.Enabled, Record.Label)),
-					MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_delete",
-					Map("word_expander_delete", ((Captured) => (*) => _HS_DelimRemoveRecord(Captured))(Admission)),
+					MenuRenderer_CommandRow("word_expander_custom_menu", MenuCommand.WORD_EXPANDER_DELETE,
+					Map(MenuCommand.WORD_EXPANDER_DELETE, ((Captured) => (*) => _HS_DelimRemoveRecord(Captured))(Admission)),
 					Map("word_expanders_ready", (*) => !A_IsSuspended))]))
 		}
 	}
 
-	Rows.Push(MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_add",
-		Map("word_expander_add", (*) => _HS_DelimAddCustom()),
+	Rows.Push(MenuRenderer_CommandRow("word_expander_custom_menu", MenuCommand.WORD_EXPANDER_ADD,
+		Map(MenuCommand.WORD_EXPANDER_ADD, (*) => _HS_DelimAddCustom()),
 		Map("word_expanders_ready", (*) => !A_IsSuspended)))
 
 	Entries := MenuRenderer_TemplateRows("hotstrings_word_expander_frame", Map(), Map(),
@@ -472,9 +472,9 @@ _HS_WordExpanderRows(Commands := unset) {
 
 	if !IsSet(Commands) {
 		Commands := Map(
-			"word_expanders_enable_all", (*) => _HS_DelimSetAll(true),
-			"word_expanders_disable_all", (*) => _HS_DelimSetAll(false),
-			"word_expanders_restore", (*) => _HS_DelimReset())
+			MenuCommand.WORD_EXPANDERS_ENABLE_ALL, (*) => _HS_DelimSetAll(true),
+			MenuCommand.WORD_EXPANDERS_DISABLE_ALL, (*) => _HS_DelimSetAll(false),
+			MenuCommand.WORD_EXPANDERS_RESTORE, (*) => _HS_DelimReset())
 	}
 	Ready := (*) => !A_IsSuspended
 	GuardedCommands := Map()
@@ -949,8 +949,8 @@ _HS_PersonalEditorReady(PausedFn) {
 _HS_PersonalEditorRow(OpenFn, PausedFn := 0) {
 	if !IsObject(PausedFn)
 		PausedFn := (*) => A_IsSuspended
-	return MenuRenderer_CommandRow("personal_hotstring_commands", "personal_hotstring_open_editor",
-		Map("personal_hotstring_open_editor", OpenFn),
+	return MenuRenderer_CommandRow("personal_hotstring_commands", MenuCommand.PERSONAL_HOTSTRING_OPEN_EDITOR,
+		Map(MenuCommand.PERSONAL_HOTSTRING_OPEN_EDITOR, OpenFn),
 		Map("personal_hotstring_editor_ready", _HS_PersonalEditorReady.Bind(PausedFn)))
 }
 
@@ -996,7 +996,7 @@ _HS_PersonalRows(Options := unset) {
 		}
 		if HasDefaultChoices {
 			; Admit the actual record source before allocating callback-owned menus.
-			DefaultChoiceDefinition := _MR_FindItemById("hotstring_personal_default_choice", "personal_default_section")
+			DefaultChoiceDefinition := _MR_FindItemById("hotstring_personal_default_choice", MenuCommand.PERSONAL_DEFAULT_SECTION)
 			if !(DefaultChoiceDefinition is Map) || _MR_Get(DefaultChoiceDefinition, "type") != "check"
 				return []
 		}
@@ -1013,15 +1013,15 @@ _HS_PersonalRows(Options := unset) {
 			if !TomlData["sections"].Has(SecName)
 				continue
 			SecLabel := DisambiguatedLabels[SecName]
-			DefaultChoice := MenuRenderer_CheckRow("hotstring_personal_default_choice", "personal_default_section",
-				Map("personal_default_section", _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels)),
+			DefaultChoice := MenuRenderer_CheckRow("hotstring_personal_default_choice", MenuCommand.PERSONAL_DEFAULT_SECTION,
+				Map(MenuCommand.PERSONAL_DEFAULT_SECTION, _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels)),
 				Map("personal_default_section_label", ((Label) => (*) => Label)(SecLabel),
 					"personal_default_section_selected", ((Selected) => (*) => Selected)(CurDefaultSec == SecName)))
 			if !(DefaultChoice is Map)
 				return []
 			DefaultRows.Push(DefaultChoice)
 		}
-		DefaultCommands := Map("personal_default_none", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels))
+		DefaultCommands := Map(MenuCommand.PERSONAL_DEFAULT_NONE, (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels))
 		DefaultGetters := Map("personal_default_unset", (*) => CurDefaultSec == "", "personal_default_boundary", (*) => true)
 		DefaultProviders := Map("personal_default_choices", (*) => DefaultRows)
 		DefaultFrame := MenuRenderer_TemplateRows("hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders)
@@ -1039,12 +1039,12 @@ _HS_PersonalRows(Options := unset) {
 			return []
 		DefaultParent := [DefaultCaption]
 		Controls := MenuRenderer_TemplateRows("hotstring_personal_controls_frame",
-			Map("hotstring_file_open", _MakeOpenFileFn(PersonalPath),
-				"personal_close_on_add", (*) => _TogglePersonalCloseOnAdd(PersonalMenu)),
+			Map(MenuCommand.HOTSTRING_FILE_OPEN, _MakeOpenFileFn(PersonalPath),
+				MenuCommand.PERSONAL_CLOSE_ON_ADD, (*) => _TogglePersonalCloseOnAdd(PersonalMenu)),
 			Map("hotstring_file_ready", (*) => true, "personal_open_present", (*) => true,
 				"personal_controls_head_boundary", (*) => true, "personal_controls_tail_boundary", (*) => false,
 				"personal_preferences_present", (*) => true, "personal_controls_ready", (*) => true,
-				"personal_close_on_add", (*) => _EditorCloseOnAddEnabled()),
+				MenuCommand.PERSONAL_CLOSE_ON_ADD, (*) => _EditorCloseOnAddEnabled()),
 			Map("personal_editor", (*) => EditorRow is Map ? [EditorRow] : [],
 				"personal_default_parent", (*) => DefaultParent, "personal_legacy_before", (*) => [], "personal_legacy_after", (*) => []))
 		if !(Controls is Array)
@@ -1185,7 +1185,7 @@ _HS_TomlFileRow(TF) {
 		for _, ES in TF.sections
 			SectionRows.Push(Map("label", ES["description"] . " (" . FmtCount(ES["count"]) . ")"))
 	}
-	Commands := Map("hotstring_file_open", _MakeOpenFileFn(TF.path))
+	Commands := Map(MenuCommand.HOTSTRING_FILE_OPEN, _MakeOpenFileFn(TF.path))
 	Getters := Map("hotstring_file_ready", (*) => true, "personal_file_open_present", (*) => true,
 		"personal_file_boundary", (*) => Owner is PersonalFileAdoptedOwner)
 	Providers := Map("personal_file_controls", (*) => ControlRows, "personal_file_sections", (*) => SectionRows)
@@ -1227,17 +1227,17 @@ _HS_PersonalFileControlRows(Owner, Section, Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
 	Resolved := Owner.Resolve(Section)
 	Commands := Map(
-		"personal_file_enabled", (*) => Owner.Commit(Section, "enabled", !Owner.Selected(Section), OwnedOptions),
-		"personal_file_delay", (*) => _HS_PromptPersonalFileField(Owner, Section, "delay"),
-		"personal_file_priority", (*) => _HS_PromptPersonalFileField(Owner, Section, "priority"),
-		"personal_file_color", (*) => _HS_PromptPersonalFileField(Owner, Section, "color"),
-		"personal_file_tooltip", (*) => Owner.Commit(Section, "show_tooltip", !Owner.Resolve(Section).ShowTooltip, OwnedOptions))
+		MenuCommand.PERSONAL_FILE_ENABLED, (*) => Owner.Commit(Section, "enabled", !Owner.Selected(Section), OwnedOptions),
+		MenuCommand.PERSONAL_FILE_DELAY, (*) => _HS_PromptPersonalFileField(Owner, Section, "delay"),
+		MenuCommand.PERSONAL_FILE_PRIORITY, (*) => _HS_PromptPersonalFileField(Owner, Section, "priority"),
+		MenuCommand.PERSONAL_FILE_COLOR, (*) => _HS_PromptPersonalFileField(Owner, Section, "color"),
+		MenuCommand.PERSONAL_FILE_TOOLTIP, (*) => Owner.Commit(Section, "show_tooltip", !Owner.Resolve(Section).ShowTooltip, OwnedOptions))
 	Getters := Map(
 		"personal_file_owner_ready", (*) => PersonalFileControls.IsCurrent(Owner),
-		"personal_file_enabled", (*) => Owner.Selected(Section),
-		"personal_file_tooltip", (*) => Owner.Resolve(Section).ShowTooltip)
-	Values := Map("personal_file_delay", Round(Resolved.Delay * 1000),
-		"personal_file_priority", Resolved.Priority, "personal_file_color", Resolved.Color)
+		MenuCommand.PERSONAL_FILE_ENABLED, (*) => Owner.Selected(Section),
+		MenuCommand.PERSONAL_FILE_TOOLTIP, (*) => Owner.Resolve(Section).ShowTooltip)
+	Values := Map(MenuCommand.PERSONAL_FILE_DELAY, Round(Resolved.Delay * 1000),
+		MenuCommand.PERSONAL_FILE_PRIORITY, Resolved.Priority, MenuCommand.PERSONAL_FILE_COLOR, Resolved.Color)
 	Rows := [], Definition := _MR_GetMenuDef("personal_file_controls")
 	if !(Definition is Array)
 		return Rows
@@ -1250,9 +1250,9 @@ _HS_PersonalFileControlRows(Owner, Section, Options := unset) {
 			continue
 		if Values.Has(Id)
 			Row["label"] .= " : " . Values[Id]
-		Field := Id == "personal_file_tooltip" ? "show_tooltip"
-			: (Id == "personal_file_delay" ? "delay" : (Id == "personal_file_priority" ? "priority"
-				: (Id == "personal_file_color" ? "color" : "")))
+		Field := Id == MenuCommand.PERSONAL_FILE_TOOLTIP ? "show_tooltip"
+			: (Id == MenuCommand.PERSONAL_FILE_DELAY ? "delay" : (Id == MenuCommand.PERSONAL_FILE_PRIORITY ? "priority"
+				: (Id == MenuCommand.PERSONAL_FILE_COLOR ? "color" : "")))
 		if Field != "" && !Owner.MetadataAvailable(Section, Field) {
 			Row["disabled"] := true
 			Row["label"] .= " — " . t("menu.hotstrings.personal_metadata_unavailable")
@@ -1264,7 +1264,7 @@ _HS_PersonalFileControlRows(Owner, Section, Options := unset) {
 
 ; Refused native source inventories retain a declared translated reason and no action.
 _HS_PersonalUnavailableRow(Kind, Prefix := "") {
-	Id := Kind == "directory" ? "personal_directory_unavailable" : "personal_file_unavailable"
+	Id := Kind == "directory" ? MenuCommand.PERSONAL_DIRECTORY_UNAVAILABLE : MenuCommand.PERSONAL_FILE_UNAVAILABLE
 	Getter := Kind == "directory" ? "personal_directory_ready" : "personal_file_owner_ready"
 	Row := MenuRenderer_CommandRow(Id, Id,
 		Map(Id, (*) => false), Map(Getter, (*) => false))
@@ -1566,10 +1566,10 @@ _HS_ExtensionRows(Options := unset) {
 ; current whole groups and bound leaves again when a retained row is clicked.
 _HS_ExtensionScopeCommandRows(ExtensionId, Options) {
 	Commands := Map(
-		"hotstring_category_enable_all", (*) => HotstringsExtensionScopeApply(ExtensionId, true, Options),
-		"hotstring_category_disable_all", (*) => HotstringsExtensionScopeApply(ExtensionId, false, Options))
+		MenuCommand.HOTSTRING_CATEGORY_ENABLE_ALL, (*) => HotstringsExtensionScopeApply(ExtensionId, true, Options),
+		MenuCommand.HOTSTRING_CATEGORY_DISABLE_ALL, (*) => HotstringsExtensionScopeApply(ExtensionId, false, Options))
 	Rows := []
-	for Id in ["hotstring_category_enable_all", "hotstring_category_disable_all"] {
+	for Id in [MenuCommand.HOTSTRING_CATEGORY_ENABLE_ALL, MenuCommand.HOTSTRING_CATEGORY_DISABLE_ALL] {
 		Row := MenuRenderer_CommandRow("hotstring_category_menu", Id, Commands)
 		if Row is Map {
 			Row["disabled"] := A_IsSuspended
@@ -1584,9 +1584,9 @@ _HS_ExtensionScopeCommandRows(ExtensionId, Options) {
 ; failed to load), and the repair stays one click away: creating the example
 ; loads it at once, and opening a source that does not exist is greyed.
 _HS_ProgrammableHotstringRows() {
-	Commands := Map("open_user_hotstring_source", UserHotstringsOpenSource,
-		"reload_user_hotstring_source", UserHotstringsReload,
-		"create_user_hotstring_example", UserHotstringsRepairWithExample)
+	Commands := Map(MenuCommand.OPEN_USER_HOTSTRING_SOURCE, UserHotstringsOpenSource,
+		MenuCommand.RELOAD_USER_HOTSTRING_SOURCE, UserHotstringsReload,
+		MenuCommand.CREATE_USER_HOTSTRING_EXAMPLE, UserHotstringsRepairWithExample)
 	Problem := UserHotstringsProblem()
 	Rows := []
 	for Declaration in _MR_GetMenuDef("programmable_hotstrings") {
@@ -1599,7 +1599,7 @@ _HS_ProgrammableHotstringRows() {
 			Row := MenuRowWithLabel(Declaration["path"], Label, "DynamicHotstrings")
 		} else if Declaration.Get("type", "") == "command" {
 			Row := MenuRenderer_CommandRow("programmable_hotstrings", Declaration["id"], Commands)
-			if (Row is Map and Problem == "missing" and Declaration["id"] == "open_user_hotstring_source")
+			if (Row is Map and Problem == "missing" and Declaration["id"] == MenuCommand.OPEN_USER_HOTSTRING_SOURCE)
 				Row["disabled"] := true
 		} else {
 			continue

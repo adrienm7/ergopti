@@ -1607,17 +1607,38 @@
 		{
 			"id": "perplexity_sonar",
 			"provider": "perplexity",
-			"model": "sonar",
-			"body": { "model": "sonar", "max_tokens": 16, "stream": false, "temperature": 0.7 },
-			"expected": { "model": "sonar", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"model": "perplexity/sonar",
+			"body": {
+				"model": "perplexity/sonar",
+				"max_output_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "perplexity/sonar",
+				"max_output_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
 			"added": []
 		},
 		{
-			"id": "perplexity_sonar-pro",
+			"id": "perplexity_kimi-k3",
 			"provider": "perplexity",
-			"model": "sonar-pro",
-			"body": { "model": "sonar-pro", "max_tokens": 16, "stream": false, "temperature": 0.7 },
-			"expected": { "model": "sonar-pro", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"model": "perplexity/kimi-k3",
+			"family": 25,
+			"body": {
+				"model": "perplexity/kimi-k3",
+				"max_output_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "perplexity/kimi-k3",
+				"max_output_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
 			"added": []
 		},
 		{

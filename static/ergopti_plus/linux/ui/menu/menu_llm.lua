@@ -10,6 +10,7 @@
 
 local M = {}
 
+local SaveFailure = require("config_save_failure")
 local Logger = require("logger.shim")
 local TextPrompt = require("ui.text_prompt")
 local PrivacyPolicy = require("llm.trigger_policy")
@@ -23,7 +24,7 @@ local succeeded = require("ui.menu.menu_dialogs").succeeded
 local prompt_text = require("ui.menu.menu_dialogs").prompt_text
 local show_error = require("ui.menu.menu_dialogs").show_error
 local show_info = require("ui.menu.menu_dialogs").show_info
-local zenity_plain = require("ui.menu.menu_dialogs").zenity_plain
+local plain_markup = require("ui.menu.menu_dialogs").plain_markup
 local ask_yes_no = require("ui.menu.menu_dialogs").ask_yes_no
 
 local LOG = "ui.menu.menu_llm"
@@ -65,7 +66,7 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 		Logger.error(LOG, "Numeric setting '%s' refused: its opening configuration is no longer current.", name)
 		local okay, notifier = pcall(require, "adapters.notifier")
 		if okay and type(notifier.send) == "function" then
-			pcall(notifier.send, i18n_safe("dialog.bulk_toggle.save_failed"), { level = "error" })
+			pcall(SaveFailure.present, i18n_safe, function(message) notifier.send(message, { level = "error" }) end)
 		end
 		return false
 	end
@@ -268,7 +269,7 @@ local function _build_llm(ctx)
 				set = function(list) return ready() and TriggerSettings.set_disabled_apps(list) end,
 				current = type(llm.get_agent_last_app) == "function" and llm.get_agent_last_app or function() return nil end,
 				prompt = function(title, text, initial, hidden, choices)
-					return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
+					return TextPrompt.ask(title, plain_markup(text), initial, hidden, choices)
 				end,
 				title = exclusion_title,
 				changed = function()
@@ -668,7 +669,7 @@ local function _build_llm(ctx)
 						local called, committed = pcall(set, option)
 						if not called or committed ~= true then
 							Logger.error(LOG, "Prediction modifier choice was not durably acknowledged.")
-							show_error(i18n_safe("dialog.bulk_toggle.save_failed"))
+							SaveFailure.present(i18n_safe, show_error)
 							return false
 						end
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -723,7 +724,7 @@ local function _build_llm(ctx)
 		error = show_error,
 		info = show_info,
 		confirm = function(title, text)
-			return ask_yes_no(title, zenity_plain(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
+			return ask_yes_no(title, plain_markup(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
 		end,
 	}
 	--- Tells the user how a model removal ended: it runs after the page acted.
@@ -755,7 +756,7 @@ local function _build_llm(ctx)
 			return false
 		end
 		local confirmed = ask_yes_no(i18n_safe("menu.llm.delete_model_title"),
-			zenity_plain(string.format(i18n_safe("menu.llm.delete_model_body"), model)),
+			plain_markup(string.format(i18n_safe("menu.llm.delete_model_body"), model)),
 			i18n_safe("button.delete"), i18n_safe("button.cancel"))
 		if confirmed ~= true then return false end
 		return llm.delete_model(model, function(succeeded, tag, reason)
@@ -965,6 +966,10 @@ local function _build_llm(ctx)
 	local function newer_schema()
 		return require("config_migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "newer"
 	end
+	-- So does one too old for this build to migrate.
+	local function older_schema()
+		return require("config_migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "unsupported"
+	end
 	-- The restore alone: the AI menu's clear row was retired.
 	llm_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
 		-- A retained row rechecks what greyed it when it was built.
@@ -992,6 +997,7 @@ local function _build_llm(ctx)
 	llm_ctx.state_getters["llm_toggle_ready"] = toggle_ready
 	llm_ctx.state_getters["llm_scope_ready"] = scope_ready
 	llm_ctx.state_getters["config_newer_schema"] = newer_schema
+	llm_ctx.state_getters["config_older_schema"] = older_schema
 
 	local rendered = ManifestMenu
 		and ManifestMenu.build("llm_menu", "LLM", nil, group_builders, llm_ctx, providers)

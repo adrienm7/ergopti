@@ -405,8 +405,14 @@ function reportFolder(paths) {
 				assert(spec.verdicts.includes(verdict), `verdict ${verdict} is not declared`);
 			for (const step of spec.steps.filter((item) => item.person))
 				assert(spec.verdicts.includes(step.person), `${step.id} names an undeclared verdict`);
-			// The maintainer reads what each step proves in the declaration and in TODO.md
-			const todo = fs.readFileSync(path.join(ROOT, 'TODO.md'), 'utf8');
+			// The maintainer reads what each step proves in the declaration, and its
+			// codes and reading notes in the macOS memory's field run entry.
+			const memory = fs.readFileSync(path.join(ROOT, 'docs/memory/macos-hammerspoon.md'), 'utf8');
+			const stepDetails = memory.slice(
+				memory.indexOf('### project-macos-field-run-step-details'),
+				memory.indexOf('\n## ', memory.indexOf('### project-macos-field-run-step-details'))
+			);
+			assert(stepDetails.length > 0, 'the macOS memory has no field run step details entry');
 			for (const step of spec.steps) {
 				assert(
 					typeof step.proves === 'string' && /^[A-Z].{20,240}\.$/.test(step.proves),
@@ -416,7 +422,7 @@ function reportFolder(paths) {
 					assert.fail(`${step.id} runs the undeclared check ${step.check}`);
 			}
 			// The Debug menu's own checks are described in their window; the
-			// field run's own probes are listed in TODO.md's Mac todo.
+			// field run's own probes are listed in the memory entry.
 			const debugMenuSteps = new Set([
 				'field_lease',
 				'field_owned_runtime',
@@ -428,8 +434,8 @@ function reportFolder(paths) {
 			for (const step of spec.steps.filter((item) => item.kind === 'field_check'))
 				if (!debugMenuSteps.has(step.id) && !step.person)
 					assert(
-						todo.includes(`\`${step.id}\``),
-						`TODO.md's Mac todo does not describe ${step.id}`
+						stepDetails.includes(`\`${step.id}\``),
+						`the macOS field run memory entry does not describe ${step.id}`
 					);
 			for (const id of [
 				'diagnostics',
@@ -621,6 +627,78 @@ function reportFolder(paths) {
 				'no path, other image or other report'
 			);
 		});
+
+		await check(
+			'the collector recompiles a stale compiled AppleScript and only a stale one',
+			() => {
+				assert.match(
+					collector,
+					/^step scpt_recompile python3 "\$\{REPO_ROOT\}\/tools\/dev\/recompile-applescripts\.py" "\$\{REPO_ROOT\}"$/m
+				);
+				assert.match(collector, /git add -u -- '\*\.scpt'/);
+				const repo = fs.mkdtempSync(path.join(scratch, 'scpt-'));
+				const bin = fs.mkdtempSync(path.join(scratch, 'scpt-bin-'));
+				// osacompile writes a marker then the source; osadecompile prints the
+				// source back with its own indentation and CR line ends, as the real
+				// tool reformats; MANGLE makes the rebuilt script decompile wrong.
+				shim(bin, 'osacompile', '[ "$1" = -o ] || exit 64\n{ echo COMPILED; cat "$3"; } > "$2"');
+				shim(
+					bin,
+					'osadecompile',
+					'head -1 "$1" | grep -qx COMPILED || exit 1\ntail -n +2 "$1" | sed -e "s/^ */\t/" | tr "\\n" "\\r" | sed -e "s/kept/${MANGLE:-kept}/"'
+				);
+				const folder = path.join(repo, 'Stale App.app');
+				fs.mkdirSync(folder);
+				fs.writeFileSync(
+					path.join(folder, 'main.applescript'),
+					'on run\n  -- keystats\n  return "kept"\nend run\n'
+				);
+				fs.writeFileSync(
+					path.join(folder, 'main.scpt'),
+					'COMPILED\non run\n  -- metrics\n  return "kept"\nend run\n'
+				);
+				fs.writeFileSync(path.join(repo, 'fresh.applescript'), 'say "hi"\n');
+				fs.writeFileSync(path.join(repo, 'fresh.scpt'), 'COMPILED\n    say "hi"\n\n');
+				fs.writeFileSync(path.join(repo, 'lonely.applescript'), 'beep\n');
+				git(repo, 'init', '-q');
+				git(repo, 'add', '.');
+				const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+				const tool = path.join(ROOT, 'tools/dev/recompile-applescripts.py');
+				const mangled = spawnSync('python3', [tool, repo], {
+					encoding: 'utf8',
+					env: { ...env, MANGLE: 'changed' }
+				});
+				assert.equal(mangled.status, 1, mangled.stdout + mangled.stderr);
+				assert.match(
+					mangled.stdout,
+					/^scpt_failed:Stale App\.app\/main\.scpt:roundtrip_mismatch$/m
+				);
+				assert.match(mangled.stdout, /^scpt_recompiled:0$/m);
+				assert.match(
+					fs.readFileSync(path.join(folder, 'main.scpt'), 'utf8'),
+					/metrics/,
+					'a rebuild that does not decompile to its source never replaces the script'
+				);
+				const result = spawnSync('python3', [tool, repo], { encoding: 'utf8', env });
+				assert.equal(result.status, 0, result.stdout + result.stderr);
+				assert.match(result.stdout, /^recompiled Stale App\.app\/main\.scpt$/m);
+				assert.match(result.stdout, /^up_to_date fresh\.scpt$/m);
+				assert.match(result.stdout, /^scpt_recompiled:1$/m);
+				assert.doesNotMatch(
+					result.stdout,
+					/lonely/,
+					'a source without a compiled script is not compiled'
+				);
+				assert.match(fs.readFileSync(path.join(folder, 'main.scpt'), 'utf8'), /keystats/);
+				assert.deepEqual(
+					fs.readdirSync(folder).sort(),
+					['main.applescript', 'main.scpt'],
+					'no temporary file left'
+				);
+				const again = spawnSync('python3', [tool, repo], { encoding: 'utf8', env });
+				assert.match(again.stdout, /^scpt_recompiled:0$/m);
+			}
+		);
 
 		await check(
 			'the input-source probe answers every question it declares, without the v4 defects',

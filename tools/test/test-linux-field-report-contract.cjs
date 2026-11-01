@@ -189,7 +189,7 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 	shim(bin, 'localectl', `echo "VC Keymap: fr in ${home}/keymaps for fixtureuser"`);
 	const marker = path.join(base, 'hanging');
 	shim(bin, 'ss', hang ? `: > "${marker}"\nsleep 30` : 'echo "LISTEN 127.0.0.1:11434 ollama"');
-	for (const name of ['systemctl', 'pgrep', 'gsettings', 'setxkbmap', 'zenity'])
+	for (const name of ['systemctl', 'pgrep', 'gsettings', 'setxkbmap'])
 		shim(bin, name, `echo "${name} fixture"`);
 	return { base, clone, origin, bin, home, env, logs, marker };
 }
@@ -287,7 +287,17 @@ function read(folder, name) {
 			() => {
 				assert.match(collector, /^\. "\$REPO_ROOT\/tools\/dev\/linux-field-run\.sh"$/m);
 				assert.match(collector, /^field_linux_run "\$\{REPO_ROOT\}" "\$\{out\}"/m);
+				// The composer check needs Ergopti's Python: the collector installs it
+				// first, running it being the consent, said in one line before the download.
+				const ensure = collector.search(/^field_linux_ensure_python "\$\{REPO_ROOT\}"/m);
+				assert.ok(ensure >= 0, "the collector installs Ergopti's Python");
+				assert.ok(
+					ensure < collector.search(/^field_linux_run /m),
+					'Python is installed before the field run asks the daemon'
+				);
 				const runner = fs.readFileSync(path.join(ROOT, FIELD_RUN), 'utf8');
+				assert.match(runner, /layout_registry"\)\.install_python\(/);
+				assert.match(runner, /running this collector is the consent/);
 				assert.match(runner, /require\("infra\.field_run"\)/);
 				assert.match(runner, /FieldRun\.load\(/);
 				assert.doesNotMatch(
@@ -328,7 +338,8 @@ function read(folder, name) {
 					'toolchain',
 					'input_access',
 					'units',
-					'listeners'
+					'listeners',
+					'field_python'
 				])
 					assert.match(steps, new RegExp(`^${name}\\s+exit=\\d+$`, 'm'));
 				const dayLog = `${LOG_FILES.main}${today()}${LOG_FILES.extension}`;

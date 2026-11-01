@@ -16,8 +16,9 @@
 ; 2. A Reload Is Abandoned: OnExit already supersedes a pending reload, so the
 ;    decision only records it; no click is held for the reload's end.
 ; 3. One More Refusal Than The Lua Drivers: OnExit's gates can still veto the
-;    admitted exit, which returns from ExitApp. A veto followed by no retry owner
-;    is told with the same notice, because Quit otherwise did nothing visible.
+;    admitted exit, which ends the thread that called ExitApp, so the lifecycle
+;    answers from the veto itself. A veto followed by no retry owner is told with
+;    the same notice, because Quit otherwise did nothing visible.
 ; 4. Bounded Vetoes Untouched: a deferral burns no veto of the shutdown budget,
 ;    because ExitApp is not called until the writer has finished.
 ; ==============================================================================
@@ -160,7 +161,8 @@ QuitRequest_Run(Ports) {
 	return State == "waiting" || Started
 }
 
-; Starts the exit of an admitted Quit. An OnExit veto returns here.
+; Starts the exit of an admitted Quit. An OnExit veto ends this thread in ExitApp:
+; the port's return covers an exit that ran no OnExit, the lifecycle the veto.
 _QuitRequest_Start(Ports, Decision) {
 	global _QuitRequestWaiting, _QuitRequestExitOwed
 	_QuitRequestWaiting := false
@@ -181,8 +183,8 @@ _QuitRequest_Refuse(Ports, Decision) {
 	Ports["notify"].Call()
 }
 
-; An ExitApp of the user's Quit returned: OnExit vetoed it. Something that retries
-; the same exit keeps the owed answer; otherwise the user is told.
+; OnExit vetoed the user's Quit. Something that retries the same exit keeps the owed
+; answer; otherwise the user is told.
 ; @param RetryOwnedFn {Func} Whether a retry of this exit is armed.
 ; @param NotifyFn {Func} Tells the user of the refusal.
 ; @returns {Boolean} Whether the exit is still on its way.

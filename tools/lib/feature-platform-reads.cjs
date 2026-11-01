@@ -36,7 +36,10 @@ function entryPlatforms(manifest, entry) {
 	return PLATFORMS;
 }
 
-/** Drops full-line comments of Lua, AutoHotkey and JavaScript. */
+/**
+ * Drops full-line comments of Lua, AutoHotkey and JavaScript, and module names:
+ * require("network.proxy_override") is a file, not the key of the same spelling.
+ */
 function codeLines(source) {
 	return source
 		.split('\n')
@@ -44,7 +47,8 @@ function codeLines(source) {
 			const trimmed = line.trimStart();
 			return !trimmed.startsWith('--') && !trimmed.startsWith(';') && !trimmed.startsWith('//');
 		})
-		.join('\n');
+		.join('\n')
+		.replace(/\brequire\(\s*["'][^"'\n]*["']\s*\)/g, 'require()');
 }
 
 /** @param {string} text Literal text. @returns {string} Regular-expression source. */

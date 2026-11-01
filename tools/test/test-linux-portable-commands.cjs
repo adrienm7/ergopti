@@ -394,7 +394,6 @@ const PROGRAMS = {
 	// Declared runtime dependencies (packages and install.sh).
 	xclip: declaredByDeb('xclip', 'clipboard on X11', DRIVER_HOST),
 	'notify-send': declaredByInstaller('notify-send', 'desktop notifications'),
-	zenity: declaredByInstaller('zenity', 'dialogs'),
 	sqlite3: why(
 		'declared dependency: install.sh _check_or_install sqlite3, and every driver and test launch probes it first; the Ubuntu jobs install it',
 		ALL,
@@ -439,8 +438,8 @@ const PROGRAMS = {
 		DRIVER_HOST,
 		{ proof: { file: CI_LINUX, token: 'pulseaudio-utils', scopes: HOST }, probed: DRIVER }
 	),
-	kdialog: optionalTool('KDE dialogs'),
-	amixer: optionalTool('ALSA volume metric'),
+	wpctl: optionalTool('PipeWire mute metric, read when pactl does not answer'),
+	amixer: optionalTool('ALSA mute metric when neither PulseAudio nor PipeWire answers'),
 	nmcli: optionalTool('network metric'),
 	iwgetid: optionalTool('Wi-Fi metric'),
 	'gnome-extensions': optionalTool('AppIndicator extension on GNOME'),
@@ -497,6 +496,14 @@ const PROGRAMS = {
 	),
 	// The driver reads /proc instead; the hardware lanes probe procps first.
 	ps: optionalTool('procps process listing of the hardware lanes', HOST),
+	ss: why(
+		`iproute2 listening sockets of the local-server detection test; installed by CI: ${DISTRO_PREP}`,
+		TEST,
+		{
+			proof: { file: DISTRO_PREP, token: '\\biproute2?(-ss)? curl ;;' },
+			probed: true
+		}
+	),
 	node: why('reads the version for install.sh and falls back to "dev"', DRIVER_HOST, {
 		proof: { file: INSTALLER, token: '\\|\\| echo "dev"' }
 	}),

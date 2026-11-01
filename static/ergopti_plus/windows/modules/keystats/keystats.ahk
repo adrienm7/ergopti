@@ -99,6 +99,7 @@ class Keystats {
     static today_log_offset := 0
     static today_log_date   := ""
     static rollover_pending := 0
+    static data_sql_receipt := 0
     ; Ownership latch for the multi-batch midnight transaction. It prevents
     ; an ingest timer from starting a second rollover while the first one is
     ; still draining/rotating yesterday's durable JSONL file.
@@ -305,7 +306,7 @@ KL_WriteAtomic(path, content) {
     ; of the same target — and there are several, on threads that interrupt one
     ; another. KL_SaveState is reached from the ingest timer, from
     ; KL_DayRollover and from KL_Stop (OnExit, which pre-empts a running timer),
-    ; and the ``Sleep 50`` retry below is a yield point that hands control to
+    ; and the ``Sleep(TimingsGet("keystats", "stop_poll_ms"))`` retry below is a yield point that hands control to
     ; exactly those threads. The losing interleaving is:
     ;
     ;   A: FileAppend(tmp) → MoveFileExW fails (AV lock) → Sleep 50 …yields…
@@ -992,16 +993,7 @@ KL_MidnightCheck() {
 
 KL_BootstrapDataSql() {
     if FileExist(Keystats.data_sql_path) {
-		try {
-			Probe := FileOpen(Keystats.data_sql_path, "a", "UTF-8")
-			if !IsObject(Probe)
-				throw Error("append handle unavailable")
-			Probe.Close()
-			return true
-		} catch as Err {
-			try LoggerError("Keystats", "data.sql is not writable: {1}.", Err.Message)
-			return false
-		}
+		return KL_AdmitExistingDataSql()
 	}
     header := "-- ergopti metrics — device " . Keystats.device_id
         .  " — schema_version " . KeystatsConst.SCHEMA_VERSION . "`n"

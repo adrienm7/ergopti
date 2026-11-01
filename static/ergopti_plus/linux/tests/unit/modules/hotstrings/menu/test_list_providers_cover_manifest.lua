@@ -779,9 +779,8 @@ end
 --- Every list id the menu builder registers a provider for.
 --- @return table Set of ids.
 local function registered_providers(omitted_delegate)
-	local handle = assert(io.open(helpers.driver_root() .. "/ui/menu/builder.lua", "r"))
-	local source = helpers.expand_config_keys(handle:read("*a"))
-	handle:close()
+	-- ui/menu/builder, selected by a declaration unique to it.
+	local source = helpers.expand_config_keys(assert(helpers.read_driver_unit("local function separator_facade_current(")))
 	-- Providers may be owned by a directly required native menu module. Scan
 	-- those actual delegates, rather than every source file in the tree.
 	local sources, visited = { source }, { ["ui.menu.builder"] = true }

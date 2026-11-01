@@ -681,9 +681,9 @@ def external_glibc(name):
 def recipient_base(name):
     # The tray and the windows load the recipient's GTK stack into the daemon,
     # and that stack links the recipient's GLib and C++ runtime. A bundled copy
-    # older than the recipient's shadows it through LD_LIBRARY_PATH: a host
-    # library built against GLib 2.80 then misses g_once_init_enter_pointer and
-    # the tray never loads. The build host is the oldest supported LTS, so the
+    # older than the recipient's shadows it inside the daemon: a host library
+    # built against GLib 2.80 then misses g_once_init_enter_pointer and the
+    # tray never loads. The build host is the oldest supported LTS, so the
     # recipient's copies are never older than the ones the modules were built
     # against; neither they nor their own dependencies are staged (see
     # recipient_dependencies).
@@ -715,6 +715,14 @@ TRAY_LIBRARIES = frozenset(
         "libdbusmenu-gtk3.so.4",
     }
 )
+
+
+# Libraries of one owned program, kept out of the lib/ the others search. The
+# build host's readline 8.1 once shadowed the recipient's through the prefix's
+# environment: bash 5.3 died on Arch with "undefined symbol:
+# rl_trim_arg_from_keyseq" before the daemon started. Only sqlite3 links it.
+SQLITE3_LIBRARY_DIRECTORY = "lib/sqlite3"
+SQLITE3_ONLY_LIBRARIES = frozenset({"libreadline.so.8"})
 
 
 def tray_sources():
@@ -772,8 +780,43 @@ def copy_elf_closure(seeds, library_directory, owners):
         for name, dependency in dependency_paths(run(["ldd", str(source)])):
             if external_glibc(name) or name in recipient:
                 continue
-            copy_unique(dependency, library_directory / name, owners)
+            directory = (
+                library_directory.parent / SQLITE3_LIBRARY_DIRECTORY
+                if name in SQLITE3_ONLY_LIBRARIES
+                else library_directory
+            )
+            copy_unique(dependency, directory / name, owners)
             pending.append(dependency)
+
+
+def private_runpath(destination, library_directory):
+    """Name lib/ from one staged file, wherever the prefix is installed."""
+    relative = os.path.relpath(library_directory, destination.parent)
+    return "$ORIGIN" if relative == "." else "$ORIGIN/" + relative
+
+
+def set_private_runpaths(prefix, owners):
+    """Let every staged program and library find the prefix's lib/ by itself.
+
+    The prefix's libraries used to reach everything through LD_LIBRARY_PATH,
+    every host program the daemon starts included: the build host's readline
+    killed bash 5.3 on Arch that way, and its libssl, libcurl and libtinfo stood
+    in front of the host's for ssh, git and a browser opened by xdg-open. A
+    RUNPATH applies to its own file only, so each one carries it, and it is
+    also what a ffi.load by name searches from LuaJIT.
+    """
+    library_directory = prefix / "lib"
+    staged = sorted(
+        destination
+        for destination in owners
+        if destination.parent == prefix / "bin"
+        or re.search(r"\.so(\.|$)", destination.name) is not None
+    )
+    for destination in staged:
+        search = private_runpath(destination, library_directory)
+        if destination == prefix / "bin/sqlite3":
+            search = "$ORIGIN/../" + SQLITE3_LIBRARY_DIRECTORY + ":" + search
+        run(["patchelf", "--set-rpath", search, str(destination)])
 
 
 def explicit_digest_sources(catalogue):
@@ -803,6 +846,60 @@ def explicit_digest_sources(catalogue):
     return sources
 
 
+# The programs the private prefix carries, run by the driver from there only
+# (linux/infra/owned_programs.lua). luajit runs the daemon, curl every HTTP
+# request, sqlite3 the keystats writer, openssl the keystats key derivation and
+# zstd unpacks the Ollama archive. The owned-runtimes registry decides each PIN.
+OWNED_PROGRAMS = ("luajit", "curl", "sqlite3", "openssl", "zstd")
+
+
+def lua_search(luajit, name, path):
+    """Ask the build host's LuaJIT where it loads one module from.
+
+    The spelling LuaJIT found, not its target: Debian links each luaposix C
+    module to a versioned library in the multiarch directory, and walking the
+    target's parent stages that whole directory.
+    """
+    found = Path(
+        run([luajit, "-e", f'io.write(assert(package.searchpath("{name}", package.{path})))'])
+    )
+    if not found.is_absolute():
+        raise RuntimeRefused("Native Lua module location refused.")
+    regular_source(found)
+    return found
+
+
+def stage_lua_modules(luajit, prefix, owners):
+    """Stage luv, lfs and luaposix as the build host's LuaJIT loads them.
+
+    luaposix is a Lua package (share/lua/5.1/posix) over C modules
+    (lib/lua/5.1/posix), both copied whole: its init requires its parts
+    lazily, so a partial copy fails only on the first signal or stat.
+    """
+    run([luajit, "-e", 'local uv=require("luv"); assert(type(uv.spawn)=="function")'])
+    run([luajit, "-e", 'local l=require("lfs"); assert(type(l.attributes)=="function")'])
+    run([luajit, "-e", 'local s=require("posix.sys.stat"); assert(type(s.stat)=="function")'])
+    sources = []
+    for name in ("luv", "lfs"):
+        source = regular_source(lua_search(luajit, name, "cpath"))
+        copy_unique(source, prefix / "lib/lua/5.1" / f"{name}.so", owners)
+        sources.append(source)
+    trees = (
+        (lua_search(luajit, "posix.ctype", "cpath").parent, prefix / "lib/lua/5.1/posix", "*.so"),
+        (lua_search(luajit, "posix", "path").parent, prefix / "share/lua/5.1/posix", "*.lua"),
+    )
+    for root, destination, pattern in trees:
+        found = sorted(root.rglob(pattern))
+        if not found:
+            raise RuntimeRefused("Native luaposix tree absent from the build host.")
+        for entry in found:
+            source = regular_source(entry)
+            copy_unique(source, destination / entry.relative_to(root), owners)
+            if pattern == "*.so":
+                sources.append(source)
+    return sources
+
+
 def stage(appdir, catalogue, template):
     global _STAGE_DEADLINE
     _STAGE_DEADLINE = time.monotonic() + 180
@@ -817,22 +914,13 @@ def stage(appdir, catalogue, template):
         policy = catalogue_data["network_runtime"]["portable"]
         owners = {}
         binaries = []
-        for name in ["luajit", "curl"]:
+        for name in OWNED_PROGRAMS:
             source = shutil.which(name)
             if source is None:
                 raise RuntimeRefused("Required native packaging executable absent.")
             copy_unique(source, prefix / "bin" / name, owners)
             binaries.append(source)
-        luv_path = run(
-            [
-                binaries[0],
-                "-e",
-                'local p=assert(package.searchpath("luv",package.cpath)); '
-                'local uv=require("luv"); assert(type(uv.spawn)=="function"); io.write(p)',
-            ]
-        )
-        luv_source = regular_source(luv_path)
-        copy_unique(luv_source, prefix / "lib/lua/5.1/luv.so", owners)
+        lua_modules = stage_lua_modules(binaries[0], prefix, owners)
         # pkg-config reports the actual build host's GIO module location; no
         # distribution-specific /usr/lib spelling is inferred.
         module_directory = Path(run(["pkg-config", "--variable=giomoduledir", "gio-2.0"]).strip())
@@ -856,10 +944,15 @@ def stage(appdir, catalogue, template):
             copy_unique(
                 source, prefix / "lib" / catalogue_data["archive_digest_runtime"]["soname"], owners
             )
-        copy_elf_closure([*binaries, luv_source, *modules, *digest_sources], prefix / "lib", owners)
+        copy_elf_closure(
+            [*binaries, *lua_modules, *modules, *digest_sources], prefix / "lib", owners
+        )
         # Not through the closure walk: it would stage GTK with them.
         for name, source in sorted(tray_sources().items()):
             copy_unique(source, prefix / "lib" / name, owners)
+        # inspect_installed() runs every owned program under the launch
+        # environment, which names no library directory.
+        set_private_runpaths(prefix, owners)
         # The oldest supported LTS ships libproxy 0.4, whose optional plugins
         # (GNOME settings, PAC runners) load from an absolute build-host path
         # and so are absent from the image. Its built-in environment, sysconfig
@@ -901,6 +994,19 @@ def inspect_installed(prefix, driver):
         "selection_scope": "native-selection",
     }:
         raise RuntimeRefused("Installed native packaging admission refused.")
+    run(
+        [
+            bash_executable(),
+            "-c",
+            'set -euo pipefail; source "$1" "$2" "$3"; '
+            '"$2/bin/luajit" -e \'require("lfs"); require("posix"); require("posix.sys.stat"); require("luv")\'; '
+            '"$2/bin/sqlite3" -version; "$2/bin/openssl" version; "$2/bin/zstd" --version',
+            "ergopti-owned-programs",
+            str(driver / "network-runtime-env.sh"),
+            str(prefix),
+            str(driver),
+        ]
+    )
     curl_version = run(
         [
             bash_executable(),

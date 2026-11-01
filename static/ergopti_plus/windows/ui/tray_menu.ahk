@@ -94,8 +94,8 @@ global _LegacyTopCategoryMap := Map(
 	"SFBsReduction",      ConfigKey.HOTSTRINGS_SFBS_REDUCTION,
 	"Rolls",              ConfigKey.HOTSTRINGS_ROLLS,
 	"MagicKey",           ConfigKey.HOTSTRINGS_MAGIC_KEY,
-	"DynamicHotstrings",  "hotstrings.dynamic",
-	"Personal",           "hotstrings.personal",
+	"DynamicHotstrings",  ConfigKey.HOTSTRINGS_DYNAMIC,
+	"Personal",           ConfigKey.HOTSTRINGS_PERSONAL,
 )
 
 ; Native aliases and render order are both derived from the shared child rows.

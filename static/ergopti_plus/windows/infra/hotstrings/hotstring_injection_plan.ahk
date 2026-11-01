@@ -13,9 +13,10 @@
 ; 1. Pure: no global state, no clock, no I/O. Map keys are the Lua field names,
 ;    so one vector reads the same on the three drivers.
 ; 2. AutoHotkey has no nil: an absent tail is "" and an absent replay is 0.
-; 3. event_on_screen is always true on Windows: a watcher observes the completing
-;    key after the application got it, so it is erased with the trigger. This is
-;    the one driver-dependent input of the plan.
+; 3. event_on_screen is true for a key the watcher observes after the application
+;    got it, so it is erased with the trigger. It is false for Enter and Tab, which
+;    the driver holds back: they submit or move focus, so no later edit could undo
+;    them. This is the one driver-dependent input of the plan.
 ; 4. The plan's `replay` tells how a terminator travels where key events and the
 ;    text pipeline do not order themselves. Windows sends one atomic burst, whose
 ;    {Text} mode turns Enter and Tab into their keys, so it never needs them apart.

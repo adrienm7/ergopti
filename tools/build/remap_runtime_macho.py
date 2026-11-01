@@ -35,6 +35,8 @@ _COMMANDS = {
     0xE,
 }
 _LINK_DATA = {0x26, 0x29, 0x80000033, 0x80000034}
+# Fat slice alignments as powers of two: the x86_64 and arm64 page sizes.
+_PAGE_ALIGNMENTS = {12, 14}
 
 
 class MachORefusal(ValueError):
@@ -95,7 +97,10 @@ def _signature(data, offset, size, signed, deadline):
     _require(12 <= length <= size and count <= 32, "bounds")
     table_end = 12 + count * 8
     _extent(0, table_end, length)
-    _require(size - length <= 15, "signature")
+    # The linker writes a tight signature. codesign reserves its estimated
+    # size and zero-fills the rest (92960 bytes reserved on x86_64, run
+    # 41247532775), so only the zero fill below bounds its slack.
+    _require(signed or size - length <= 15, "signature")
     _zero(data, offset + length, offset + size, deadline)
     slots, ranges = {}, []
     known = {0, 2, 5, 7, 0x10000} | set(range(0x1000, 0x1006))
@@ -267,10 +272,28 @@ def _images(image, deadline):
     return tuple(result)
 
 
+def _linkedit_vm_admitted(cpu, original_vm, size, vm):
+    """Admit a signed __LINKEDIT vmsize: kept, or its size rounded to a page.
+
+    codesign rounds to 16 KiB on x86_64 as well (size 5304272 -> vm 5308416,
+    run 41247532775), so x86_64 admits either page size; arm64 only 16 KiB.
+    """
+    pages = (4096, 16384) if cpu == 0x01000007 else (16384,)
+    return any(vm == (size + page - 1) // page * page for page in pages) or (
+        vm == original_vm and original_vm >= size
+    )
+
+
 def _compare(original, signed, deadline):
+    _require((original.cpu, original.subtype) == (signed.cpu, signed.subtype), "content")
+    # codesign rewrites the universal container and may re-align a slice to
+    # either page size (run 41245238523: lipo and codesign disagreed on one
+    # slice). Alignment only places a slice; _images proves each offset honours
+    # it and the slice bytes are compared below, so only a page alignment, or
+    # an unchanged thin image, is admitted.
     _require(
-        (original.cpu, original.subtype, original.alignment)
-        == (signed.cpu, signed.subtype, signed.alignment),
+        (original.alignment is None and signed.alignment is None)
+        or (original.alignment in _PAGE_ALIGNMENTS and signed.alignment in _PAGE_ALIGNMENTS),
         "content",
     )
     _require(signed.signature is not None, "signature")
@@ -291,11 +314,8 @@ def _compare(original, signed, deadline):
             exclusions.extend([(position + 32, position + 40), (position + 48, position + 56)])
         else:
             _equal(original.data, signed.data, position, position + size, deadline)
-    page = 4096 if original.cpu == 0x01000007 else 16384
-    rounded = (signed.link_size + page - 1) // page * page
     _require(
-        signed.link_vm == rounded
-        or (signed.link_vm == original.link_vm and original.link_vm >= signed.link_size),
+        _linkedit_vm_admitted(original.cpu, original.link_vm, signed.link_size, signed.link_vm),
         "shape",
     )
     _require(0 <= signed.payload_end - original.payload_end <= 15, "shape")

@@ -601,6 +601,17 @@ async function main() {
 	assert(lines.some((line) => line.includes('native CI remains unexecuted')));
 	assert(lines.some((line) => line.includes('deferred native validation remains unexecuted')));
 	assert(!lines.some((line) => line === 'verify-change: every required gate passed.'));
+	// A server that resets when its last client leaves lets each polling xprop
+	// race Openbox's first connection; Openbox loses and exits (run 41282668228).
+	assert(
+		/"Xvfb",\s+"-noreset",/.test(
+			fs.readFileSync(
+				path.join(ROOT, 'static/ergopti_plus/linux/tests/hardware/run_window_switch_receipts.py'),
+				'utf8'
+			)
+		),
+		'the owned X server survives its polling clients'
+	);
 	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-window-registration-'));
 	let mutations = 0;
 	try {

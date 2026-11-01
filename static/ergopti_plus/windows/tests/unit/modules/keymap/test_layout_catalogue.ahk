@@ -210,7 +210,58 @@ Test("layout catalogue: a refresh caches the index with its ETag and sends it ba
 	_LCT_RefreshCase)
 
 Test("layout catalogue: a source checkout refreshes locally without HTTP or cache writes (layout-catalogue-local)",
-	_LCT_LocalRefreshCase)
+	_LCT_WithRegistryChanges.Bind(" M static/layouts/registry/index.json", "", _LCT_LocalRefreshCase))
+Test("layout catalogue: a git that cannot answer shows the clone's folder and says so",
+	_LCT_WithRegistryChanges.Bind("", "git status exited with 128", _LCT_GitFailureCase))
+Test("layout catalogue: an unmodified clone makes the release's one index request",
+	_LCT_WithRegistryChanges.Bind("", "", _LCT_UnmodifiedCloneCase))
+Test("layout catalogue: a source run's git check is the shared argv over the real clone",
+	_LCT_RealGitCase)
+
+; Runs a body with the source run's git check answering Changes and GitError.
+_LCT_WithRegistryChanges(Changes, GitError, Body) {
+	global _LayoutCatalogueRegistryChangesFn
+	_LayoutCatalogueRegistryChangesFn := (Callback) => Callback.Call(Changes, GitError)
+	try
+		Body.Call()
+	finally
+		_LayoutCatalogueRegistryChangesFn := 0
+}
+
+_LCT_GitFailureCase() {
+	Dir := _LCT_TempDir()
+	try {
+		Log := [], Outcomes := []
+		LayoutCatalogue_Refresh(Dir, (Outcome) => Outcomes.Push(Outcome), _LCT_Transport(Map(), Log), _LCT_Index(), true)
+		AssertEqual(0, Log.Length, "a failed git issues no request")
+		AssertEqual("bundled", Outcomes[1]["source"])
+	} finally DirDelete(Dir, true)
+}
+
+_LCT_UnmodifiedCloneCase() {
+	Dir := _LCT_TempDir()
+	try {
+		Log := [], Outcomes := []
+		LayoutCatalogue_Refresh(Dir, (Outcome) => Outcomes.Push(Outcome),
+			_LCT_Transport(_LCT_Served(_LCT_LayoutText("ergol")), Log), 0, true)
+		AssertEqual(1, Log.Length, "one index request, as a release makes")
+		AssertEqual(LayoutRegistry_RawUrl("index.json"), Log[1]["url"])
+		AssertEqual("network", Outcomes[1]["source"])
+		AssertEqual('"e1"', _LCT_Read(Dir . "index.etag"), "the same cache and ETag")
+	} finally DirDelete(Dir, true)
+}
+
+; The real child: it answers for this very checkout, whatever its state, once and async.
+_LCT_RealGitCase() {
+	Answers := []
+	_LayoutCatalogueRegistryChanges((Changes, GitError) => Answers.Push(Map("changes", Changes, "error", GitError)))
+	Deadline := A_TickCount + 30000
+	while Answers.Length == 0 && A_TickCount < Deadline
+		Sleep(10)
+	AssertEqual(1, Answers.Length, "git answered exactly once")
+	AssertEqual("", Answers[1]["error"], "git runs on this checkout")
+	Assert(Answers[1]["changes"] is String, "the listing is text")
+}
 
 _LCT_LocalRefreshCase() {
 	Dir := _LCT_TempDir()
@@ -219,7 +270,7 @@ _LCT_LocalRefreshCase() {
 		_LCT_WriteRaw(Dir . "index.json", Cache)
 		for Bundled in [_LCT_Index(), 0] {
 			Log := [], Outcomes := []
-			LayoutCatalogue_Refresh(Dir, (Outcome) => Outcomes.Push(Outcome), _LCT_Transport(Map(), Log), Bundled)
+			LayoutCatalogue_Refresh(Dir, (Outcome) => Outcomes.Push(Outcome), _LCT_Transport(Map(), Log), Bundled, true)
 			AssertEqual(1, Outcomes.Length, "local refresh completes once")
 			AssertEqual(0, Log.Length, "unpublished checkout data must not trigger a remote request")
 			AssertEqual(Cache, _LCT_Read(Dir . "index.json"), "local refresh preserves remote cache")

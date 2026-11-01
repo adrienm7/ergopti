@@ -11,7 +11,7 @@
 		{ "contains": "editor-early-show-owner", "expected_count": 6 },
 		{ "contains": "layout-refresh-owner", "expected_count": 4 },
 		{ "contains": "action-picker-native-engine", "expected_count": 1 },
-		{ "contains": "keylogger-fire-publication-owner", "expected_count": 3 },
+		{ "contains": "keystats-fire-publication-owner", "expected_count": 3 },
 		{ "contains": "keepawake-timer-owner", "expected_count": 2 },
 		{ "contains": "keepawake-suspend-owner", "expected_count": 3 },
 		{ "contains": "personal-editor-window-retirement", "expected_count": 2 }

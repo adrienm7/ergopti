@@ -133,6 +133,23 @@ LLM_Vision_BackendChoicesText() {
 }
 
 /**
+ * The binding value of a picked backend and a typed model, as
+ * _shared/lua/llm/vision.lua compose_parameter: an empty model keeps the backend's
+ * default, and a backend with no default yields "<backend>|", which validation
+ * refuses so the user is told a model is required.
+ * @param {String} Backend The picked backend id.
+ * @param {String} Typed The typed model, trimmed here.
+ * @param {String} DefaultModel The backend's default model, "" for none.
+ * @returns {String}
+ */
+LLM_Vision_ComposeParameter(Backend, Typed, DefaultModel) {
+	Model := Trim(Typed)
+	if (Model != "")
+		return Backend . "|" . Model
+	return (DefaultModel != "") ? Backend : Backend . "|"
+}
+
+/**
  * Runs one screen reading. The capture and the requests are asynchronous; this
  * call applies the refusals, supersedes any flow in progress and starts the
  * capture.
@@ -182,6 +199,42 @@ LLM_Vision_Trigger(Kind, Value, AnswersKey := "answers") {
 		_LLM_Menu_ShowManualPredictionNotice("llm.vision.read_failed")
 		return false
 	}
+	; A provider exchanging its key (watsonx, Vertex AI) has no credential until
+	; its access token arrives: the action waits for it and captures afterwards,
+	; so nothing is captured for a request that is then refused (prepare_target)
+	if Target.Has("resolved") && _LLMRemote_NeedsAccess(Target["resolved"]) {
+		if !_LLM_Vision_RequestScopeCurrent(AuxGeneration)
+			return false
+		_LLM_Vision_Generation += 1
+		LoggerInfo("LLM", "Screen reading waits for the access token of '{1}'.", Parsed["backend"])
+		_LLMRemote_WithAccess(Target["resolved"], _LLM_Vision_OnAccess.Bind(_LLM_Vision_Generation, AuxGeneration,
+			Kind, Parsed, Model, Config, AnswersKey, Target))
+		return true
+	}
+	return _LLM_Vision_BeginCapture(Kind, Parsed, Model, Config, AnswersKey, Target, AuxGeneration)
+}
+
+; The access token a screen reading waited for settled.
+; @param {Integer} Waiting The generation the wait took; a newer one drops it.
+; @param {Integer} AuxGeneration The original lifecycle.
+_LLM_Vision_OnAccess(Waiting, AuxGeneration, Kind, Parsed, Model, Config, AnswersKey, Target, Ok, Failure) {
+	if !_LLM_Vision_RenderIsCurrent(Waiting, AuxGeneration) {
+		LoggerInfo("LLM", "Screen reading's access token arrived after the action was dropped.")
+		return
+	}
+	if !Ok {
+		LoggerWarn("LLM", "Screen reading refused: the access token of '{1}' could not be fetched ({2}).",
+			Parsed["backend"], _LLM_Vision_FailureReason(Failure))
+		_LLM_Menu_ShowManualPredictionNotice("llm.vision.read_failed")
+		return
+	}
+	_LLM_Vision_BeginCapture(Kind, Parsed, Model, Config, AnswersKey, Target, AuxGeneration)
+}
+
+; Takes a generation and starts the capture of a flow whose target is ready.
+; @returns {Boolean} True when the capture started.
+_LLM_Vision_BeginCapture(Kind, Parsed, Model, Config, AnswersKey, Target, AuxGeneration) {
+	global _LLM_Vision_Generation, _LLM_Vision_CaptureFn
 	; The screen would leave an app the user excluded from the AI
 	if _LLM_Engine_ShouldSuppressForDisabledApps() {
 		LoggerInfo("LLM", "Screen reading refused: the focused app is excluded from the AI.")
@@ -441,6 +494,12 @@ _LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine := true, CurrentF
 		_LLM_Vision_CancelEngine()
 	if !_LLM_Vision_CallbackCurrent(CurrentFn)
 		return false
+	; The AI agent reaches a token-exchange provider through here as well
+	if Target.Has("resolved") && _LLMRemote_NeedsAccess(Target["resolved"]) {
+		_LLMRemote_WithAccess(Target["resolved"], _LLM_Vision_SendOnAccess.Bind(Target, Body, OnSuccess, OnFail,
+			CancelEngine, CurrentFn))
+		return
+	}
 	if Target.Has("resolved") {
 		; The model family's thinking control (and a local server's request fields)
 		Body := _LLMRemoteCompleteBody(Target["resolved"], Body, &Added)
@@ -456,6 +515,17 @@ _LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine := true, CurrentF
 	Transport := HasMethod(_LLM_Vision_OllamaTransport, "Call")
 		? _LLM_Vision_OllamaTransport : LLM_OllamaChat_Async
 	Transport.Call(Body, OnSuccess, OnFail, CurrentFn)
+}
+
+; Sends a body whose target had to wait for its access token.
+_LLM_Vision_SendOnAccess(Target, Body, OnSuccess, OnFail, CancelEngine, CurrentFn, Ok, Failure) {
+	if !_LLM_Vision_CallbackCurrent(CurrentFn)
+		return
+	if !Ok {
+		OnFail.Call(_LLMRemote_AccessFailInfo(Failure))
+		return
+	}
+	_LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine, CurrentFn)
 }
 
 ; This production facade and the injected image transport share one ABI.

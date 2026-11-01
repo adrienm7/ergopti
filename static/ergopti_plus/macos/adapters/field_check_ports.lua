@@ -115,6 +115,36 @@ local function remap_facts()
 	return { enabled = Remap.get_enabled(), phase = phase, guardian = Remap.guardian_state() }
 end
 
+--- The deployed Karabiner configuration and the tap-hold delays the shared
+--- model asks for, for infra/field_check_tap_hold_thresholds.lua.
+--- @return table facts { enabled, config, reason, expected, tag }.
+local function tap_hold_threshold_facts()
+	local Remap = require("platform.remap")
+	local KePaths = require("platform.remap.ke_paths")
+	local facts = { enabled = Remap.get_enabled() == true, expected = {},
+		tag = require("platform.remap.lease_contract").MANAGED_TAG_LABEL }
+	local global = Remap.get_tap_hold_timeout()
+	for _, key in ipairs(Remap.TAP_HOLD_KEYS or {}) do
+		local key_code = type(key.from) == "table" and key.from.key_code
+		if type(key_code) == "string" then
+			local own = Remap.get_tap_timeout(key.id)
+			facts.expected[key_code] = { id = key.id, ms = (own and own > 0) and own or global }
+		end
+	end
+	local text = FileSystem.read(FileSystem.expand_path(KePaths.config_file_for(KePaths.selected_runtime())))
+	if type(text) ~= "string" then
+		facts.reason = "unreadable"
+		return facts
+	end
+	local decoded = require("adapters.json_codec").decode(text)
+	if type(decoded) ~= "table" then
+		facts.reason = "not_json"
+		return facts
+	end
+	facts.config = decoded
+	return facts
+end
+
 --- The note and status of this lifecycle's guardian registration, read from memory.
 --- @return string|nil note `developer_adhoc_*`, or nil when no reset ran.
 --- @return string|nil status The registration's answer, nil before it settled.
@@ -203,13 +233,50 @@ local function route_plan(callback)
 	dispatch(1)
 end
 
---- Measures how late the timer service fires.
+--- The installed relay beside the launcher in the application bundle; nil in a
+--- source checkout, or a bundle built before the relay shipped.
+--- @return string|nil path
+local function relay_executable()
+	local launcher = require("platform.remap.lease_helper").resolve()
+	if not launcher then return nil end
+	local path = NativePath.dirname(launcher) .. "/" .. require("network.proxy_auth_relay").EXECUTABLE_NAME
+	return FileSystem.exists(path) and path or nil
+end
+
+--- Probes the relay the route plan selected for the registry, as the daemon's
+--- start would (docs/design/proxy-auth-relay.md). The answer is the shared
+--- policy's: not needed, required with its scheme, or a closed refusal.
+--- @param upstream string Plain http relay (policy.upstream()).
+--- @param callback function fn(answer|nil, reason|nil).
+local function relay_probe(upstream, callback)
+	local NetworkEnv = require("modules.llm.network_env")
+	local policy = NetworkEnv.proxy_auth_relay()
+	local origins = NetworkEnv.route_origins("ollama")
+	if not policy or not origins then return callback(nil, "relay_unavailable") end
+	local executable = relay_executable()
+	if not executable then return callback({ status = require("network.proxy_auth_relay").NOT_INSTALLED }) end
+	local Timings = require("infra.timings")
+	local args = policy.probe_args(upstream, policy.authority(origins[1]), {
+		dial_ms = Timings.ms("adapters", "proxy_relay_dial_timeout_ms"),
+		handshake_ms = Timings.ms("adapters", "proxy_relay_handshake_timeout_ms"),
+	})
+	if not args then return callback(nil, "relay_unavailable") end
+	exec(executable, args, Timings.sec("adapters", "proxy_relay_probe_timeout_ms"), function(code, output)
+		callback(policy.read_probe(code, output))
+	end)
+end
+
+--- Measures how late the timer service fires, and names the long phases that
+--- ran while it waited: what held the run loop when the probe came late.
 --- @param seconds number Delay asked of the timer.
---- @param callback function fn(late_ms) with the lateness in milliseconds.
+--- @param callback function fn(late_ms, phases) with the lateness in
+---   milliseconds and `name=12.3 ms, …` (longest first), or nil when none ran.
 local function timer_probe(seconds, callback)
+	local PhaseStats = require("infra.phase_stats")
 	local started = hs.timer.secondsSinceEpoch()
+	local started_ns = PhaseStats.now()
 	Timer.after(seconds, function()
-		callback((hs.timer.secondsSinceEpoch() - started - seconds) * 1000)
+		callback((hs.timer.secondsSinceEpoch() - started - seconds) * 1000, PhaseStats.recent_since(started_ns))
 	end)
 end
 
@@ -322,6 +389,7 @@ function M.new()
 		exec = exec,
 		home = function() return os.getenv("HOME") end,
 		remap_facts = remap_facts,
+		tap_hold_threshold_facts = tap_hold_threshold_facts,
 		guardian_registration_note = guardian_registration_note,
 		keystats_facts = keystats_facts,
 		health_counts = function() return require("infra.key_event_health").counts() end,
@@ -336,6 +404,8 @@ function M.new()
 		blob_host = function(model, callback) return network_chain(callback, { "--ollama-blob", model }, 40) end,
 		smallest_ollama_model = function() return M.smallest_model("ollama") end,
 		route_plan = route_plan,
+		relay_probe = relay_probe,
+		relay_policy = function() return require("modules.llm.network_env").proxy_auth_relay() end,
 		timer_probe = timer_probe,
 		after = function(seconds, callback)
 			local _, committed = Timer.after(seconds, callback)

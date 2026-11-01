@@ -34,6 +34,7 @@ local Timer           = require("adapters.timer_scheduler")
 local EventProvenance = require("adapters.event_provenance")
 local Shared          = require("keymap.magic_key_source")
 local ManifestMenu    = require("infra.manifest_menu")
+local PhaseStats      = require("infra.phase_stats")
 local Source          = require("modules.keymap.magic_key_source")
 local Geometry        = require("adapters.keyboard_geometry")
 
@@ -294,8 +295,11 @@ end
 --- @param ctx table { state, save_prefs, keymap, update_menu, paused }
 --- @return table rows
 function M.rows(ctx)
+	local started = PhaseStats.now()
 	local resolver = Source.resolver()
-	return Shared.menu_rows(resolver, {
+	-- One geometry for the whole build: nothing changes it between two rows.
+	local owners = Source.candidates_by_code(nil)
+	local rows = Shared.menu_rows(resolver, {
 		manifest = ManifestMenu,
 		t = i18n.get,
 		current = Source.get(),
@@ -303,12 +307,14 @@ function M.rows(ctx)
 		key_text = function(code)
 			local native = resolver.native(code)
 			-- Without an originating model, a swapped glyph could name its neighbor.
-			if Source.code_for(native, nil) ~= code then return nil end
+			if native == nil or owners[native] ~= code then return nil end
 			return key_text(native)
 		end,
 		choose = function(value) M.choose(ctx, value) end,
 		capture = ctx.paused ~= true and function() M.capture(ctx) end or nil,
 	})
+	PhaseStats.stop("menu_keyboard_layout.magic_key", started)
+	return rows
 end
 
 return M

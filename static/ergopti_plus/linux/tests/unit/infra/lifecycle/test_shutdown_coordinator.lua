@@ -1156,7 +1156,7 @@ helpers.describe("native signal owner", function()
 			if options.missing then error("explicit missing native dependency") end
 			return uv
 		end }, { __index = _G })
-		local path = helpers.driver_root() .. "/infra/signal_handlers.lua"
+		local path = assert(package.searchpath("infra.signal_handlers", package.path))
 		local chunk = assert(loadfile(path))
 		if setfenv then setfenv(chunk, env) else chunk = assert(loadfile(path, "t", env)) end
 		local owner = chunk()
@@ -1531,6 +1531,8 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 			modules[name] = {}
 		end
 		modules["infra.session_lock"] = { protect = function() return true end }
+		-- Main lets config.toml's [script] rows win before the error window starts.
+		modules["infra.script_scope"] = { adopt_configured = function() return {} end }
 		-- Main writes a pre-sink fatal record only when startup is refused.
 		modules["infra.bootstrap_log"] = { append = function(reason) error("isolated Main must not refuse startup: " .. tostring(reason)) end }
 		modules["compat.utf8"] = { install = function() return false end }

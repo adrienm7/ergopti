@@ -33,6 +33,9 @@ local M = {}
 --- Identity of the check in its evidence record; the Windows record carries the same.
 M.CHECK_ID = "composer"
 
+--- The not-run code when the host's install prerequisite is missing.
+M.PREREQUISITE_MISSING = "python_not_installed"
+
 local PASS, FAIL, INFO, SKIP = Report.STATE_PASS, Report.STATE_FAIL, Report.STATE_INFO, Report.STATE_SKIP
 
 --- Runs the check.
@@ -42,7 +45,9 @@ local PASS, FAIL, INFO, SKIP = Report.STATE_PASS, Report.STATE_FAIL, Report.STAT
 ---   keylayout } | nil, err, exists(path), read_copy() -> text | nil, sha256(text,
 ---   callback), host_ready(installed_info, entry) -> state, value (or
 ---   host_ready_async(installed_info, entry, ready(state, value))), log(level,
----   message, ...).
+---   message, ...), and optionally prerequisite_code / prerequisite_name: the
+---   registry failure code of a missing install prerequisite, which skips the
+---   check instead of failing it.
 --- @param env table
 --- @param report table From field_check_report.new_report.
 --- @param finish function Called once when the report is complete.
@@ -169,8 +174,21 @@ function M.run(env, report, finish)
 	local answered = false
 	local dispatched, dispatch_err = pcall(env.registry.composer_save,
 		{ declaration = fixture.declaration, keylayout = fixture.keylayout, use = false },
-		function(ok, code, _detail, _used, info)
+		function(ok, code, detail, _used, info)
 			answered = true
+			-- A missing interpreter the host installs on consent (Linux: Ergopti's
+			-- own Python) is not the composer's failure: the check did not run.
+			if not ok and env.prerequisite_code ~= nil and code == env.prerequisite_code then
+				env.log("warn", "The check composition needs %s, which is not installed (%s).",
+					env.prerequisite_name, tostring(detail))
+				-- The reason travels as the host's own closed code (Linux: the
+				-- managed Python failure, such as python_download_failed).
+				local reason = type(detail) == "string" and detail:match("^([%l_]+):") or nil
+				step("composer_install", SKIP, reason or M.PREREQUISITE_MISSING)
+				report.not_run(M.PREREQUISITE_MISSING)
+				cleanup()
+				return
+			end
 			if not ok then
 				env.log("error", "The check composition was not installed (%s).", tostring(code))
 				step("composer_install", FAIL, code or "failed")

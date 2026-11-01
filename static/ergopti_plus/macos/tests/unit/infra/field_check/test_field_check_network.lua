@@ -43,6 +43,12 @@ local function run(world)
 				{ origin = "https://blob.ollama.example", route = "direct" },
 			} })
 		end,
+		relay_probe = function(upstream, callback)
+			seen[#seen + 1] = upstream
+			local answer = world.relay_answer or { { status = "not_needed" } }
+			callback(answer[1], answer[2])
+		end,
+		relay_policy = function() return require("modules.llm.network_env").proxy_auth_relay() end,
 	}
 	local result
 	helpers.with_stub_scope(MODULES, function()
@@ -172,6 +178,34 @@ helpers.describe("network check", function()
 		helpers.assert_true(result.passed)
 		local all_direct = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK })
 		helpers.assert_eq(all_direct.route_plan.value, "registry:direct+blob:direct")
+	end)
+
+	-- docs/design/proxy-auth-relay.md: the step names what the daemon's start does.
+	helpers.it("(proxy-auth-relay) names the sign-in the selected relay demands", function()
+		local relay = "http://proxy.corp.example:3128"
+		local plan = { entries = {
+			{ origin = "https://registry.ollama.ai", route = relay },
+			{ origin = "https://blob.ollama.example", route = relay },
+		} }
+		local steps, result, seen = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK, plan = plan,
+			relay_answer = { { status = "required", scheme = "negotiate" } } })
+		helpers.assert_eq(steps.proxy_relay.state, "pass")
+		helpers.assert_eq(steps.proxy_relay.value, "required_negotiate")
+		helpers.assert_eq(seen[#seen], relay)
+		helpers.assert_true(result.passed)
+		local refused, refused_result = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK, plan = plan,
+			relay_answer = { nil, "sign_in_unavailable" } })
+		helpers.assert_eq(refused.proxy_relay.state, "fail")
+		helpers.assert_eq(refused.proxy_relay.value, "sign_in_unavailable")
+		helpers.assert_true(not refused_result.passed)
+		local missing, missing_result = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK, plan = plan,
+			relay_answer = { { status = "not_installed" } } })
+		helpers.assert_eq(missing.proxy_relay.state, "skip")
+		helpers.assert_eq(missing.proxy_relay.value, "relay_not_installed")
+		helpers.assert_true(missing_result.passed, "a build without the relay does not fail the check")
+		local direct = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK })
+		helpers.assert_eq(direct.proxy_relay.state, "skip")
+		helpers.assert_eq(direct.proxy_relay.value, "direct")
 	end)
 
 	helpers.it("fails the route plan with the reason that would stop the daemon", function()

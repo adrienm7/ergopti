@@ -46,6 +46,7 @@ const inputs = [
 	'static/ergopti_plus/linux/modules/updater/manager.lua',
 	'static/ergopti_plus/linux/modules/updater/archive_transfer.lua',
 	'static/ergopti_plus/linux/infra/archive_output.lua',
+	'static/ergopti_plus/linux/infra/archive_tar_feeder.lua',
 	'static/ergopti_plus/linux/infra/fd_sha256.lua',
 	'static/ergopti_plus/linux/modules/shortcuts/script_actions.lua',
 	'static/ergopti_plus/linux/native/archive_output/archive_publication.c',
@@ -300,9 +301,9 @@ control('compiler prerequisite omission refused', () =>
 		)
 	)
 );
-assert.equal(count, 43, 'Independent temporary updater registration floor changed');
+assert.equal(count, 44, 'Independent temporary updater registration floor changed');
 console.log(
-	'[OK] Linux updater temporary registration: 43 source controls passed; no native credit.'
+	'[OK] Linux updater temporary registration: 44 source controls passed; no native credit.'
 );
 
 // Additional independent mandatory direct-C subject; original 43 controls stay intact.
@@ -422,7 +423,7 @@ control('one Lua ABI cannot replace original mandatory pair', () =>
 		)
 	)
 );
-assert.equal(count, 51, 'Independent direct C registration extension floor changed');
+assert.equal(count, 52, 'Independent direct C registration extension floor changed');
 console.log(
 	'[OK] Linux updater namespace registration: 8 source controls passed; no native credit.'
 );
@@ -452,7 +453,7 @@ for (const input of closureInputs) {
 		)
 	);
 }
-assert.equal(count, 59, 'Independent native closure dependency floor changed');
+assert.equal(count, 60, 'Independent native closure dependency floor changed');
 console.log(
 	'[OK] Linux updater native closure registration: 8 source controls passed; no native credit.'
 );

@@ -240,8 +240,19 @@ check(
 const remove = bodyOf(runner, '_SR_CaptureRemove');
 check(
 	/DeleteFileW[\s\S]*RemoveDirectoryW/.test(remove) &&
-		(runner.match(/"Kernel32\\(?:DeleteFileW|RemoveDirectoryW)"/g) || []).length === 2,
-	'the DeleteFileW and RemoveDirectoryW calls of the adapter must live in _SR_CaptureRemove only'
+		(runner.match(/"Kernel32\\(?:DeleteFileW|RemoveDirectoryW)"/g) || []).length === 3,
+	'the DeleteFileW and RemoveDirectoryW calls of the adapter must live in _SR_CaptureRemove, plus the one member delete of the stale sweep'
+);
+// An exited owner's staged request files hold headers and bodies in clear: the
+// sweep deletes them just before the owned removal, which still reports a refusal.
+const sweepMembers = bodyOf(runner, '_SR_CaptureSweepMembers');
+const sweepStale = bodyOf(runner, '_SR_CaptureSweepStale');
+check(
+	(sweepMembers.match(/"Kernel32\\DeleteFileW"/g) || []).length === 1 &&
+		!sweepMembers.includes('RemoveDirectoryW') &&
+		(runner.match(/(?<!^)_SR_CaptureSweepMembers\(/gm) || []).length === 1 &&
+		/_SR_CaptureSweepMembers\([\s\S]*?refusal := _SR_CaptureRemove\(capture\)/.test(sweepStale),
+	'only the stale sweep deletes capture members, and its owned removal still follows and reports'
 );
 check(
 	remove.includes('return delete_error') &&

@@ -154,6 +154,16 @@ rule, so the token has to be in the rule text and every new token is a new file
 lease failures do. Recovery deploys instead wait for a typing pause and log one
 INFO "Karabiner deploy decision" line each.
 
+## Reusing a bundled type for the updater's custody P/Invokes
+
+Do not lower the exe bundle's DllImport ceiling by sharing `CreateFileW` and
+`GetFileInformationByHandle` between `vendor/ergopti_updater_download.ps1` and
+`modules/llm/ollama_managed_files.ps1`, the only other declaration. Each stage is
+a separate `-File` process that compiles its own `Add-Type`; a shared type would
+make the updater stage load an Ollama script (or a third file) and change its
+sealed sources for two declarations. Reconsider if the stages ever share a
+compiled module.
+
 ## Differential updates at current release sizes
 
 The maintainer withdrew differential update packages on 2026-10-04. Reported

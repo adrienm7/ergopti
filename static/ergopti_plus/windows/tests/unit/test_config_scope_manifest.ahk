@@ -313,7 +313,7 @@ _ScopeGestureMenuOwnsParameters() {
 	}
 }
 Test("config-scope: the gesture menu's restore owns the master, its clear keeps it, and both own only its action parameters",
-	_ScopeGestureMenuOwnsParameters)
+	_RRNC_NoDialog.Bind("Gestures", _ScopeGestureMenuOwnsParameters))
 
 _ScopeOwnerRetainsRollbackDebt() {
 	global _ConfigTransitionRetainedBarrier

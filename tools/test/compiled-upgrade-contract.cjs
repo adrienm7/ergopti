@@ -25,7 +25,11 @@ function inspectNativePriorProfile(file, schemaVersion) {
 	const bytes = fs.readFileSync(file);
 	const source = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
 	const model = parse(source.replace(/^\uFEFF/, ''));
-	assert.equal(schemaVersion, 6, 'Installed prior registry is not the pinned schema');
+	assert.equal(
+		schemaVersion,
+		prior.config_schema_version,
+		'Installed prior registry is not the pinned schema'
+	);
 	assert.equal(model._meta?.schema_version, schemaVersion, 'Native prior profile schema differs');
 	// The prior release's sparse writer deletes a value equal to its manifest
 	// default (false), so a boot save it sometimes finishes before the smoke

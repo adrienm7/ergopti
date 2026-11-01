@@ -207,18 +207,29 @@ M.RUNLOOP_LATE_MS = 250
 
 --- Takes the run-loop probes one after the other.
 --- @param ports table Check ports (timer_probe).
---- @param callback function fn(max_late_ms).
+--- @param callback function fn(max_late_ms, phases) with the phases that ran
+---   while the latest probe waited, nil when none ran.
 local function runloop_lateness(ports, callback)
-	local worst, taken = 0, 0
+	local worst, worst_phases, taken = 0, nil, 0
 	local function probe()
-		ports.timer_probe(M.RUNLOOP_PROBE_SECONDS, function(late_ms)
+		ports.timer_probe(M.RUNLOOP_PROBE_SECONDS, function(late_ms, phases)
 			taken = taken + 1
-			worst = math.max(worst, tonumber(late_ms) or 0)
-			if taken >= M.RUNLOOP_PROBES then return callback(worst) end
+			local late = tonumber(late_ms) or 0
+			if taken == 1 or late > worst then worst, worst_phases = late, phases end
+			if taken >= M.RUNLOOP_PROBES then return callback(worst, worst_phases) end
 			probe()
 		end)
 	end
 	probe()
+end
+
+--- The longest phase of a `name=12.3 ms, …` list as a step value `name:12`.
+--- @param phases any PhaseStats.recent_since text, longest first.
+--- @return string token `none` when no phase ran.
+function M.phase_token(phases)
+	local name, ms = tostring(phases or ""):match("^([%w_%.]+)=(%d+)")
+	if not name then return "none" end
+	return name .. ":" .. ms
 end
 
 --- Names a callback site as "<file>:<line>" in the step grammar: the folders
@@ -259,9 +270,12 @@ function M.event_taps(ports, report, finish)
 	report.step("worst_hold_ms", STATE.info, worst and math.floor(worst.ms) or "none")
 	report.step("worst_hold_site", STATE.info, worst and M.hold_site_token(worst.site) or "none")
 	report.step("lua_heap_mb", STATE.info, math.floor((tonumber(ports.lua_heap_kb()) or 0) / 1024))
-	runloop_lateness(ports, function(worst)
+	runloop_lateness(ports, function(worst, phases)
 		report.step("runloop_late_ms", worst <= M.RUNLOOP_LATE_MS and STATE.pass or STATE.fail,
 			math.max(0, math.floor(worst)))
+		-- The source of a late run loop is the phase that held it (2026-10-31:
+		-- 352 ms late with nothing in the report to say why).
+		report.step("runloop_late_phase", STATE.info, M.phase_token(phases))
 		finish()
 	end)
 end
@@ -904,6 +918,17 @@ function M.app_health_with_start(ports, report, finish, since)
 	end
 	report.step("app_crash_reports_earlier_24h", STATE.info, by_process(crashes.earlier or {}))
 	report.step("other_crash_reports_24h", STATE.info, crashes.other or 0)
+	-- This driver boot's AXValueChanged watcher errors: a daily log mixes in
+	-- processes booted on older code (the 2026-10-31 17:37:20 "already
+	-- registered" ERROR ran the pre-fix file until the 17:37:37 reload).
+	local watches = ports.ax_value_watch_counts()
+	if type(watches) ~= "table" then
+		report.step("ax_value_watch_errors_since_boot", STATE.skip, "not_loaded")
+	else
+		report.step("ax_value_watch_errors_since_boot", (watches.failed or 0) == 0 and STATE.pass or STATE.fail,
+			watches.failed or 0)
+		report.step("ax_value_watch_already_watched", STATE.info, watches.already_watched or 0)
+	end
 	ports.exec(PS, { "-o", "rss=,%cpu=", "-p", tostring(ports.pid()) }, PROBE_COMMAND_TIMEOUT, function(code, output)
 		local rss, cpu = M.parse_usage(code == 0 and output or "")
 		if not rss then
@@ -1012,6 +1037,12 @@ function M.menu_build(ports, report, finish)
 				tostring(entry.id) .. ":" .. string.format("%.1f", tonumber(entry.ms) or 0))
 		end
 	end
+	-- The keyboard-layout row was the slowest one in the 2026-10-31 field
+	-- run: its costliest stage of this rebuild is the one to slice next.
+	local layout = outcome.layout_slowest
+	report.step("menu_layout_slowest", STATE.info, type(layout) == "table"
+		and tostring(layout.id):gsub("^menu_keyboard_layout%.", "") .. ":" .. string.format("%.1f", tonumber(layout.ms) or 0)
+		or "none")
 	finish()
 end
 

@@ -70,7 +70,14 @@ end }
 package.loaded["modules.llm.network_env"] = { prelude = function() network_calls = network_calls + 1; return "STATIC-PRELUDE; " end }
 package.loaded["modules.llm.managed_native_python"] = { resolve = function() return python end }
 package.loaded["adapters.python_interpreter"] = { resolve = function() return python end }
-package.loaded["app_dirs"] = { files = { unified_prefix = "ErgoptiPlus_", extension = ".log" } }
+-- The real app_dirs names the daily log. The real timing registry reads the
+-- production _shared/ tree, which the hs.fs double cannot walk to, and logs its
+-- own load: bind it under a silent logger before the command module needs it.
+package.loaded["infra.paths"] = { shared = function(relative)
+	return production .. "/static/ergopti_plus/_shared/" .. relative
+end }
+package.loaded["infra.logger"] = setmetatable({}, { __index = function() return function() end end })
+require("infra.timings")
 package.loaded["adapters.managed_ollama_hint"] = { get = function(directory)
 	local raw = files[receipt_path]
 	if not raw or #raw > 1048576 then return nil end
@@ -89,7 +96,7 @@ local ActualBuilder = require("modules.llm.ollama_server_command")
 -- original cases and independent expectations remain unchanged.
 local Builder = { build = function(executable, log, port)
 	return ActualBuilder.build(executable, log, port,
-		executable == native and Binary.SOURCE_NATIVE_MANAGED or Binary.SOURCE_PATH)
+		executable == native and Binary.SOURCE_NATIVE_MANAGED or "path")
 end }
 case(function()
 	local path, err, source = Binary.resolve()
@@ -105,14 +112,13 @@ end)
 case(function()
 	files[receipt_path] = Json.encode(copy(receipt)); files[receipt_path] = files[receipt_path]:gsub(rd, string.rep("f", 64))
 	-- A foreign receipt never falls back to the user's own Ollama (issue #104):
-	-- the app is only named for a log, and the stock composition is reached
-	-- through an explicit non-native source.
+	-- the resolver does not even name it (owned-runtimes row "Ollama"), and the
+	-- stock composition is reached only through an explicit non-native source.
 	local path, err, source = Binary.resolve()
 	check(path, nil); check(err, "Ergopti's own Ollama runtime is not installed"); check(source, nil)
-	local user_path, user_source = Binary.find_user_installation()
-	check(user_path, "/Applications/Ollama.app/Contents/Resources/ollama"); check(user_source, Binary.SOURCE_APP)
-	local command = assert(ActualBuilder.build(user_path, "/private/logs/ErgoptiPlus_2099-01-01.log", 45678,
-		Binary.SOURCE_APP))
+	check(Binary.find_user_installation, nil); check(Binary.candidates, nil)
+	local user_path = "/Applications/Ollama.app/Contents/Resources/ollama"
+	local command = assert(ActualBuilder.build(user_path, "/private/logs/ErgoptiPlus_2099-01-01.log", 45678, "app"))
 	check(command:find("STATIC-PRELUDE", 1, true) ~= nil, true)
 	check(command:find("while IFS= read -r LINE", 1, true) ~= nil, true)
 	check(command:find("%Y-%m-%d", 1, true) ~= nil, true)
@@ -145,10 +151,10 @@ case(function()
 end)
 case(function()
 	local external = "/opt/independent/ollama-native-http/ollama"
-	local command, reason = ActualBuilder.build(external, "/private/logs/today.log", 11434, Binary.SOURCE_PATH)
+	local command, reason = ActualBuilder.build(external, "/private/logs/today.log", 11434, "path")
 	check(reason, nil); check(command:find("while IFS= read -r LINE", 1, true) ~= nil, true)
 	check(command:find(external, 1, true) ~= nil, true)
-	local canonical_path_only = assert(ActualBuilder.build(native, "/private/logs/today.log", 11434, Binary.SOURCE_PATH))
+	local canonical_path_only = assert(ActualBuilder.build(native, "/private/logs/today.log", 11434, "path"))
 	check(canonical_path_only:find("while IFS= read -r LINE", 1, true) ~= nil, true)
 	local absent_kind = assert(ActualBuilder.build(native, "/private/logs/today.log", 11434))
 	check(absent_kind:find("while IFS= read -r LINE", 1, true) ~= nil, true)

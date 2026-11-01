@@ -7,7 +7,7 @@
 --- and the AutoHotkey port replay too: the binding values through the gesture
 --- validator, the model each resolves to, every request body and the answer
 --- reading. Then pins what the binding editors receive for the llm_vision
---- kind: the zenity prompt listing the backends, its refusal, and the picker
+--- kind: the native prompt listing the backends, its refusal, and the picker
 --- page's payload (backend choices with their default models, labels).
 ---
 --- ROOT CAUSE ENCODED:
@@ -23,7 +23,7 @@ local json = require("json")
 local SHARED = helpers.driver_root() .. "/../_shared/"
 local ACTIONS = { "llm_screen_region", "llm_screen_full", "llm_screen_error" }
 -- The provider formats whose requests carry no image
-local NO_IMAGE_FORMATS = { backboard = true, decisions = true }
+local NO_IMAGE_FORMATS = { backboard = true, decisions = true, perplexity_agent = true }
 
 --- @param relative string Path under _shared/.
 --- @return table decoded
@@ -152,7 +152,7 @@ helpers.describe("llm_vision parameter: what the binding editors show", function
 		helpers.assert_true(#excluded >= 3, "backboard and the two Jev providers: " .. table.concat(excluded, ","))
 	end)
 
-	helpers.it("the zenity prompt lists local first, then every provider in catalogue order", function()
+	helpers.it("the native prompt lists local first, then every provider in catalogue order", function()
 		local prompt = Gestures.get_action_parameter_prompt("llm_screen_region")
 		helpers.assert_true(prompt:find("{1}", 1, true) == nil, "the placeholder is filled")
 		local expected = { "local \226\128\148 " .. i18n.get("llm.vision.local_backend") }

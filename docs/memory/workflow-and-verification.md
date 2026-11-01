@@ -71,6 +71,49 @@ updater source requires resealing
 `tools/ci/windows-updater-original-diagnostic-cohort-inputs.json` with
 `tools/ci/seal-windows-updater-original-source.cjs`.
 
+### project-hook-failure-from-a-foreign-dirty-file
+
+When a pre-commit hook fails because of another agent's uncommitted file,
+wait until that file is committed, or commit through a private index
+(`GIT_INDEX_FILE` seeded from `HEAD`, only the owned paths added) with the
+hooks still running, then move the branch with a compare-and-swap
+`git update-ref <ref> <new> <old>`. Never use `--no-verify`: it skips the gates
+for the owned paths too. Quality over speed: never weaken a test to land.
+
+### project-pre-commit-formatters-and-reseal
+
+Run the pinned ruff 0.15.8 and Prettier on the changed files before every
+commit. After touching a sealed Windows updater source, reseal with
+`node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`.
+
+### project-todo-checklist-conventions
+
+The root `TODO.md` is the only checklist: open work only, with no separate
+handoff file (an agent writes what is left into the item itself). A finished
+item is removed and its lessons go to `docs/memory`; its history stays in Git
+(`git log --follow -p -- TODO.md`; the long form before the 2026-10-31 shrink
+is `git show 2a0083cb11:TODO.md`, before the 2026-10-31 pass
+`git show 1aa287427a:TODO.md`, before the 2026-10-30 pass
+`git show 7f80d3d141:TODO.md`). Its sections are one line per hardware check
+per machine (naming the field-run step or hand action and the commits it
+confirms), "Remaining code work", "CI acceptance" and "Maintainer decisions
+pending"; it is meant to be deleted once the field reports close the checks.
+Item numbers are stable and never reused. Tags:
+**[CODE]** software to write or adopt; **[CI]** only a hosted or native CI run
+qualifies it; **[PHYS-W]**, **[PHYS-M]**, **[PHYS-L]** needs a real Windows PC,
+Mac or Linux machine. Open questions sit in TODO's "Maintainer decisions
+pending", each naming the default kept meanwhile; an answer moves into the
+item or into [maintainer decisions](maintainer-decisions.md).
+
+### project-physical-qualification-stays-open
+
+Unless an item says otherwise, native macOS and Linux qualification and every
+physical-device acceptance stay OPEN and their qualification flags false:
+portable tests, containers and software-supplied events are never physical
+evidence. The maintainer has a Windows PC (physical tests on request) and a
+work Mac (reproduce on CI first, then ask for at most one short command); there
+is no Linux machine.
+
 ### project-preserve-external-runtimes-during-tests
 
 Tests and probes never kill an external Ollama server, the personal locator or
@@ -371,6 +414,26 @@ exit; the gate now records an unanswered Quit and which process outlived it.
 Vendor-header C++ tests of the owned runtime compile only in
 `remap-runtime-build.yml`, against Karabiner-Elements at the revision of
 `remap_runtime_patch.py`.
+
+### project-linux-container-host-only-reds
+
+These reds on the Linux container are host limits, not bugs. Lua
+`local-server-detection-native` needs `ss` (install iproute2). macOS
+`new commits beyond origin/dev are clean` fails when the checkout or its
+worktree admin folder is not owned by the running user: the suite isolates
+`HOME`, so a global `safe.directory` is not read, and the same ownership breaks
+the JS catalogue and clock-evidence gates' `git` calls. JS
+`test-ahk-tap-follower`, `test-linux-install-sandbox`,
+`test-linux-runtime-native-registration`, `test-macos-managed-bootstrap-http`,
+`test-managed-ollama-protocol`, `test-managed-remote-retirement` (no pwsh),
+`test-linux-deb-package-owner` (refuses root) and
+`test-drift-guard-covers-every-output` (worktrees only, node_modules symlink).
+As root, Lua fails every EACCES, unreadable or denied case, Linux test 102,
+four `test_sqlite_first_open` native cases, the macOS screenshot EACCES, the two
+mlx-repair unreadable neighbour cases, errors-log refuses denied, and the eight
+`release-arming-physical` cases (they refuse root). Confirm a red with
+`setpriv --reuid=65534 --regid=65534 --clear-groups` and `XDG_RUNTIME_DIR`
+set. Run the macOS suite per group: one process slows down progressively there.
 
 ### project-js-gate-host-limits-on-windows
 

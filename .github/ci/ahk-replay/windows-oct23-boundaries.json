@@ -26,7 +26,7 @@
 			"expected_count": 6
 		},
 		{
-			"contains": "keylogger-fire-publication-owner",
+			"contains": "keystats-fire-publication-owner",
 			"expected_count": 3
 		}
 	]

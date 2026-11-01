@@ -95,6 +95,33 @@ try {
 			Refuse { New-OllamaModelStart 'C:\captured\ollama.exe' 'C:\captured\models' 18148 $model $environment }
 		}
 	}
+	# The launcher holds the version with DELETE access and shares no DELETE for the
+	# daemon's life: seen live, the worker's own lease open refused every pull.
+	Case 'the pull worker observes the version the running launcher leases' {
+		$root = Join-Path ([IO.Path]::GetTempPath()) ('ergopti-pull-lease-' + [Guid]::NewGuid().ToString('N'))
+		[IO.Directory]::CreateDirectory($root) | Out-Null
+		$file = Join-Path $root 'ollama.exe'
+		[IO.File]::WriteAllText($file, 'image')
+		$lease = [Ergopti.Ollama.ManagedNative]::OpenDirectory($root, $true)
+		$fileLease = [Ergopti.Ollama.ManagedNative]::OpenRegularFile($file, $true)
+		try {
+			Refuse { [Ergopti.Ollama.ManagedNative]::OpenDirectory($root, $true) }
+			Refuse { [Ergopti.Ollama.ManagedNative]::OpenRegularFile($file, $true) }
+			$seen = [Ergopti.Ollama.ManagedNative]::OpenObservedDirectory($root)
+			$read = [Ergopti.Ollama.ManagedNative]::OpenObservedFile($file)
+			try {
+				Assert-Model ([Ergopti.Ollama.ManagedNative]::Identity($seen) -ceq [Ergopti.Ollama.ManagedNative]::Identity($lease)) 'The observer sees the leased version.'
+				Assert-Model ($read.Length -eq 5) 'The observer reads the leased image.'
+			} finally {
+				$read.Dispose()
+				Assert-Model ([Ergopti.Ollama.ManagedNative]::CloseHandle($seen)) 'The observer closes.'
+			}
+		} finally {
+			$fileLease.Dispose()
+			Assert-Model ([Ergopti.Ollama.ManagedNative]::CloseHandle($lease)) 'The lease closes.'
+			[IO.Directory]::Delete($root, $true)
+		}
+	}
 	$listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
 	$listener.Start()
 	$port = $listener.LocalEndpoint.Port

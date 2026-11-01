@@ -25,7 +25,7 @@ local function with_window(module_name, scenario)
 			"infra.text_utils", "text_utils", "compat.utf8", "layouts.manager_bridge",
 
 			"adapters.apple_shortcuts", "adapters.apple_shortcuts_native", "adapters.shell_runner", "adapters.task_environment",
-			"diagnostics.runtime_log", "platform.remap.lease_helper", "program_parameter",
+			"diagnostics.runtime_log", "platform.remap.lease_helper", "program_parameter", "user_action_parameter",
 			"brightness_actions", "brightness_actions_data", "config_migrate", "diagnostics.operation_reporter",
 			"infra.fs_dir", "keycodes", "lfs", "module_source_directory", "module_source_identity", "modules.keymap.layout",
 			"toml_codec.basic_string", "toml_codec.bom", "toml_codec.key_path", "toml_codec.leaf_rows",

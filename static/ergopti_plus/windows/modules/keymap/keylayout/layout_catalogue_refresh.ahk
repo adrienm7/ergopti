@@ -12,6 +12,10 @@
 
 global _LayoutCatalogueRefreshes := Map()
 global _LayoutCatalogueRefreshSequence := 0
+; Replaces the git check of a source run: Fn(Callback(Changes, GitError)). Tests only.
+global _LayoutCatalogueRegistryChangesFn := 0
+; The largest listing a source run reads: only "is it empty" matters.
+global LAYOUT_CATALOGUE_GIT_MAX_OUTPUT_BYTES := 65536
 
 ; Only RAM admission is atomic; path resolution, transport and publication stay
 ; outside Critical. Existing-directory resolution also unifies long/short names.
@@ -73,25 +77,65 @@ _LayoutCatalogueNotifyRefresh(Callbacks, Outcome) {
  * @param {Map} Transport - See LayoutRegistry_Request; injectable for tests.
  * @param Bundled - Index shipped with the driver (0 for none); read from the
  *   shipped registry folder when omitted.
- * @param {Boolean} LocalSource - Use the checkout registry; defaults to the updater's source mode.
+ * @param {Boolean} LocalSource - A run from a clone: it reads the published registry like a
+ *   release unless the clone's registry folder differs from HEAD (maintainer decision of
+ *   2026-10-31, docs/design/developer-mode.md); defaults to the updater's source mode.
  */
 LayoutCatalogue_Refresh(LocalDir, OnDone, Transport := 0, Bundled := unset, LocalSource := unset) {
-	global LAYOUT_REGISTRY_PARTIAL_SUFFIX, LAYOUT_REGISTRY_USER_AGENT
-	global LAYOUT_CATALOGUE_SOURCE_BUNDLED, LAYOUT_CATALOGUE_SOURCE_NONE, LAYOUT_CATALOGUE_ERROR_INVALID_INDEX
-	Settings := LayoutRegistry_Settings()
 	if !IsSet(Bundled)
 		Bundled := LayoutCatalogue_BundledIndex()
 	if !IsSet(LocalSource)
 		LocalSource := Updater_IsLocalSource()
 	if LocalSource {
-		LoggerStart("LayoutCatalogue", "Refreshing the layout catalogue…")
-		Problem := LayoutCatalogue_IndexProblem(Bundled)
-		_LayoutCatalogueFinishRefresh(Map("index", Problem == "" ? Bundled : 0,
-			"source", Problem == "" ? LAYOUT_CATALOGUE_SOURCE_BUNDLED : LAYOUT_CATALOGUE_SOURCE_NONE,
-			"store", false, "etag", "", "error", Problem == "" ? 0
-				: Map("code", LAYOUT_CATALOGUE_ERROR_INVALID_INDEX, "detail", Problem)), OnDone)
+		_LayoutCatalogueRegistryChanges(_LayoutCatalogueOnRegistryChanges.Bind(LocalDir, OnDone, Transport, Bundled))
 		return
 	}
+	_LayoutCatalogueRefreshPublished(LocalDir, OnDone, Transport, Bundled)
+}
+
+; Lists the clone's changes to its registry folder without blocking the keyboard
+; thread: the argv of Catalogue.registry_changes_args. Calls Callback(Changes, GitError).
+_LayoutCatalogueRegistryChanges(Callback) {
+	global _LayoutCatalogueRegistryChangesFn, LAYOUT_CATALOGUE_GIT_MAX_OUTPUT_BYTES
+	if IsObject(_LayoutCatalogueRegistryChangesFn)
+		return _LayoutCatalogueRegistryChangesFn.Call(Callback)
+	Git := ShellRunner_FindOnPath("git.exe")
+
+	if Git == ""
+		return Callback.Call("", "git is not on the PATH")
+	OnDone := (ExitCode, Stdout, Stderr) => Callback.Call(Stdout, ExitCode == 0 ? "" : "git status exited with " . ExitCode)
+	Args := ["--no-optional-locks", "-C", RTrim(LayoutRegistry_BundledDir(), "\"),
+		"status", "--porcelain", "--untracked-files=all", "--", "."]
+	Started := false
+	try {
+		Task := ShellRunner_SpawnTreeOwned(Git, Args, OnDone, , , LAYOUT_CATALOGUE_GIT_MAX_OUTPUT_BYTES)
+		Started := Task.start()
+	} catch as Err
+		return Callback.Call("", "git status could not start: " . Err.Message)
+	if !Started
+		Callback.Call("", "git status could not start")
+}
+
+; Catalogue.registry_source: an unmodified clone reads the published registry; a
+; changed one, or a git that cannot answer, shows the clone's folder without HTTP.
+_LayoutCatalogueOnRegistryChanges(LocalDir, OnDone, Transport, Bundled, Changes, GitError) {
+	global LAYOUT_CATALOGUE_SOURCE_BUNDLED, LAYOUT_CATALOGUE_SOURCE_NONE, LAYOUT_CATALOGUE_ERROR_INVALID_INDEX
+	if GitError != ""
+		LoggerError("LayoutCatalogue", "The clone's registry changes could not be listed, so its folder is shown: {1}.", GitError)
+	else if Trim(Changes, " `t`r`n") == ""
+		return _LayoutCatalogueRefreshPublished(LocalDir, OnDone, Transport, Bundled)
+	LoggerStart("LayoutCatalogue", "Refreshing the layout catalogue…")
+	Problem := LayoutCatalogue_IndexProblem(Bundled)
+	_LayoutCatalogueFinishRefresh(Map("index", Problem == "" ? Bundled : 0,
+		"source", Problem == "" ? LAYOUT_CATALOGUE_SOURCE_BUNDLED : LAYOUT_CATALOGUE_SOURCE_NONE,
+		"store", false, "etag", "", "error", Problem == "" ? 0
+			: Map("code", LAYOUT_CATALOGUE_ERROR_INVALID_INDEX, "detail", Problem)), OnDone)
+}
+
+; The release's conditional request for the published index, cache and ETag included.
+_LayoutCatalogueRefreshPublished(LocalDir, OnDone, Transport, Bundled) {
+	global LAYOUT_REGISTRY_PARTIAL_SUFFIX, LAYOUT_REGISTRY_USER_AGENT
+	Settings := LayoutRegistry_Settings()
 	try {
 		if !DirExist(LocalDir)
 			DirCreate(LocalDir)

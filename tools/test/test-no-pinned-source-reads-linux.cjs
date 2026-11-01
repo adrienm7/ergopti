@@ -32,8 +32,48 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // driver source path, and the pinned reads they hold. 74 → 72 files and 137 →
 // 135 reads the same day: the version literal and debounce clock scans became
 // a fresh module load over a stamp and a debounce driven by a controlled clock.
-const BASELINE = 72;
-const READ_BASELINE = 135;
+// 72 → 65 files and 135 → 122 reads: eight tests load their module by name
+// through helpers.fresh_module instead of dofile or loadfile on its path.
+// 65 → 61 files and 122 → 116 reads: six describe labels named their module
+// by path; they name it by module now.
+// 61 → 61 files and 116 → 111 reads: the input_reader half of the keycode
+// single-source test loads the reader over a shared-table double instead of
+// reading its source.
+// 61 → 55 files and 111 → 100 reads: the managed_http fixture group loads
+// http_client, system_proxy, managed_http_deadline and the shared proxy
+// policy by module name, and its import-isolation test fails the import
+// through package.preload instead of matching dofile paths.
+// 55 → 51 files and 100 → 96 reads: four managed-network tests load
+// managed_http, managed_http_deadline, http_client and the shared proxy
+// policy by module name instead of dofile on their paths.
+// 51 → 43 files and 96 → 88 reads: helpers.read_driver_unit(symbol), the
+// twin of the macOS helper, selects a production file by a declaration unique
+// to it; eight source invariants use it instead of the file's path.
+// 43 → 30 files and 88 → 75 reads: thirteen more source invariants select
+// their file through helpers.read_driver_unit (shortcuts manager, keystats
+// reader and writer, injector, webview manager, keyboard layout and hook,
+// logger sink, expansion delay, prediction engine, menu builder).
+// 30 → 25 files and 75 → 61 reads: the keycode single-source, model
+// selector listing, keystats privacy filter, token prompt setter and pause
+// layout switch invariants select their files by declaration.
+// 25 → 23 files and 61 → 53 reads: the dashboard bridge actions and the
+// keystats SQLite writer schema cases select their files by declaration.
+// 23 → 19 files and 53 → 47 reads: the CapsWord auto-off, word reset and
+// loader delegation tests select their files by declaration, the timed TOML
+// reader's delegation is checked by a recording shared reader, and the signal
+// handler test resolves its chunk from the module name.
+// 19 → 13 files and 47 → 41 reads: the archive_output tar feeder tests (the
+// sliced-source compiles) and the webview manager loadfile resolve their file
+// with package.searchpath from the module name; the dynamic hotstrings
+// manager, tap-hold lifecycle and clipboard preparation reads select theirs by
+// declaration.
+// 13 → 8 files and 41 → 18 reads: helpers.read_module_source(name) resolves a
+// module through package.searchpath; the spawn-args sites, the http_client
+// and api_ollama pair, the sqlite_command callers, the CapsWord pointer map,
+// the native dialog title inventory and the webview app names list modules
+// by name instead of by path.
+const BASELINE = 8;
+const READ_BASELINE = 18;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];

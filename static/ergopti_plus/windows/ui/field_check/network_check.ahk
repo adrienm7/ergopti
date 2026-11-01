@@ -84,11 +84,14 @@ class NetworkCheckRun {
  * Names the kinds of proxy configured.
  * @param {Map} Config - From SystemProxy_ReadIEConfig: auto_detect, pac_url, proxy.
  * @param {Func} EnvFn - Reads an environment variable.
- * @returns {string} Tokens joined by "+" (env, pac, discovery, fixed), or "none".
+ * @returns {string} Tokens joined by "+" (override, env, pac, discovery, fixed), or "none".
  */
 NetworkCheck_ProxyKinds(Config, EnvFn := EnvGet) {
 	global NETWORK_CHECK_ENV_PROXY_NAMES
 	Kinds := []
+	Override := ProxyOverride_Current()
+	if !(Override is Map) || Override["mode"] != "automatic"
+		Kinds.Push("override")
 	for Name in NETWORK_CHECK_ENV_PROXY_NAMES {
 		if EnvFn.Call(Name) != "" {
 			Kinds.Push("env")
@@ -193,6 +196,7 @@ NetworkCheck_FailureToken(Result) {
 _NetworkCheck_DefaultDeps() {
 	return Map(
 		"settings", _NetworkCheck_ReadSettings,
+		"override_routes", NetworkCheck_OverrideRoutes,
 		"fetch_pac", _NetworkCheck_FetchPac,
 		"feed_url", () => _CLW_SourceUrl("feed"),
 		"route", (Url, Callback) => SystemProxy_ResolveCurlAsync(Url, Callback),
@@ -239,6 +243,14 @@ _NetworkCheck_Settings(Run) {
 	} catch {
 		ComposerCheck_Step(Run.Report, "proxy_settings", "fail", "unreadable")
 	}
+	; Under an override no transfer consults the PAC, and a relay override means
+	; nothing leaves this machine another way: the probe would test an unused
+	; route and bypass the one the user chose.
+	if PacUrl != "" && Run.Deps["override_routes"].Call() {
+		ComposerCheck_Step(Run.Report, "pac_download", "skip", "override")
+		ComposerCheck_Step(Run.Report, "pac_script", "skip", "override")
+		return _NetworkCheck_Route(Run)
+	}
 	if PacUrl == "" {
 		ComposerCheck_Step(Run.Report, "pac_download", "skip", "no_pac")
 		ComposerCheck_Step(Run.Report, "pac_script", "skip", "no_pac")
@@ -279,10 +291,12 @@ _NetworkCheck_OnRoute(Run, Url, Route) {
 		return
 	if Route.Get("ok", false) {
 		Sources := Map("system_direct", "selected_direct", "system_static", "selected_proxy",
-			"environment", "selected_environment", "loopback", "selected_direct")
+			"environment", "selected_environment", "loopback", "selected_direct",
+			"override", Route.Get("proxy", "") == "" ? "selected_direct" : "selected_proxy")
 		ComposerCheck_Step(Run.Report, "route_lookup", "pass", Sources.Get(Route.Get("source", ""), "selected"))
 	} else {
-		ComposerCheck_Step(Run.Report, "route_lookup", "fail", "native_refused")
+		ComposerCheck_Step(Run.Report, "route_lookup", "fail",
+			Route.Get("source", "") == "override_refused" ? "override_refused" : "native_refused")
 	}
 	_NetworkCheck_Transfer(Run, Url)
 }
@@ -344,13 +358,23 @@ _NetworkCheck_ReadSettings() {
 	return Map("kinds", NetworkCheck_ProxyKinds(Config), "pac_url", Config["pac_url"])
 }
 
-; Downloads the PAC directly, as the managed download does. Calls
-; Callback(Status, Bytes) once; Status is 0 and Bytes "" when the request fails.
-_NetworkCheck_FetchPac(Url, Callback) {
+; Whether the user's override, valid or refused, decides the route of a transfer.
+NetworkCheck_OverrideRoutes() {
+	Override := ProxyOverride_Current()
+	return !(Override is Map) || Override["mode"] != "automatic"
+}
+
+; Downloads the PAC directly, as the managed download does (proxy_policy.json
+; native_pac.source_acquisition.route). Calls Callback(Status, Bytes) once; Status
+; is 0 and Bytes "" when the request fails.
+_NetworkCheck_FetchPac(Url, Callback, CreateFn := HTTPCreateWinHttpRequest) {
 	global NETWORK_CHECK_PAC_TIMEOUT_MS, NETWORK_CHECK_POLL_MS
+	static HTTPREQUEST_PROXYSETTING_DIRECT := 1
 	Whr := ""
 	try {
-		Whr := HTTPCreateWinHttpRequest()
+		Whr := CreateFn.Call()
+		; The object's own default is the machine's WinHTTP proxy, which is not direct.
+		Whr.SetProxy(HTTPREQUEST_PROXYSETTING_DIRECT)
 		Whr.SetTimeouts(5000, 5000, NETWORK_CHECK_PAC_TIMEOUT_MS, NETWORK_CHECK_PAC_TIMEOUT_MS)
 		Whr.Open("GET", Url, true)
 		Whr.Send()

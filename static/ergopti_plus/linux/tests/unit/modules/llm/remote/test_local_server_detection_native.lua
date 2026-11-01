@@ -7,7 +7,7 @@
 --- real server shows (python -m sglang.launch_server, the KoboldCpp
 --- release binary, a .llamafile, lemond, /app/model-runner, ...), each serving
 --- the OpenAI models endpoint on a loopback port. The production Linux scan
---- (modules/llm/local_server_ports.lua: real pgrep, real ss, a real settings
+--- (modules/llm/local_server_ports.lua: real /proc, real ss, a real settings
 --- file) must find each one at the port its command line, settings file or
 --- listening socket gives, and report every other server stopped.
 --- ==============================================================================
@@ -58,6 +58,9 @@ local LAUNCHES = {
 	{ server = "exo", script = "venv/bin/exo", args = { "--api-port", "47808" }, port = 47808, source = "cli" },
 	{ server = "llamacpp", script = "models/Qwen3-4B.llamafile", args = { "--server", "--port", "47809" },
 		port = 47809, source = "cli" },
+	{ server = "vllm", script = "venv/bin/vllm", args = { "serve", "Qwen/Qwen3-4B", "--port", "47810" },
+		port = 47810, source = "cli" },
+	{ server = "tabbyapi", script = "tabbyAPI/start.py", args = { "--port", "47811" }, port = 47811, source = "cli" },
 }
 
 --- Writes a file, creating its folders.
@@ -95,6 +98,11 @@ end
 
 helpers.describe("Local server detection against real processes (local-server-detection-native)", function()
 	helpers.it("(local-server-detection-native) the real Linux scan finds every catalogue launch at its port", function()
+		-- The driver reads processes from /proc and listening sockets with ss
+		-- only (busybox has no ss): without it every row without a port in its
+		-- command line or settings file would read at its catalogue default
+		local status = os.execute("command -v ss >/dev/null 2>&1")
+		assert(status == 0 or status == true, "ss is required to scan local servers")
 		local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-local-servers-XXXXXX"))
 		local home = root .. "/home"
 		local processes, started = {}, {}

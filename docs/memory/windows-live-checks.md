@@ -40,6 +40,16 @@ and its keystats ledger recorded the test keys. Judge such a check from the
 private driver's own state (`HSE_Buffer`, its log), and leave CapsWord, which
 writes the real CapsLock state, to a desktop with no other driver.
 
+### project-live-checks-hse-reset-makes-the-word-start-unknown
+
+`hse_reset` calls `HSE_HardReset`, which no driver path calls and which leaves
+`HSE_StartIsWordBoundary` false, so a word-start trigger typed next refuses. The
+idle reset hides this from the second word of a session on (the pause before its
+first key restores a known start), but not from the first: the driver has no
+previous keystroke to measure. A check about word-start triggers therefore skips
+`hse_reset`: only a scenario that needs the unknown start (Backspace word start)
+uses it. A refusal measured after it proves nothing.
+
 ### project-live-checks-send-restores-capslock
 
 A `Send` that is not `{Blind}` lifts CapsLock around its keys and restores it
@@ -77,15 +87,28 @@ this, and timing probes inside the timer can hide it. So a dialog is pressed wit
 `LiveClickDialogButton`, never `ControlClick`, and the typist cancels the menu of
 a right click.
 
-### project-live-checks-menu-click-replay-fails-on-a-real-race
+### project-live-checks-menu-click-replay-exercises-two-close-races
 
-`menu-click-replay` fails intermittently, alone as well as in a run (4 of 6 alone
-on 2026-10-31), and its verdict is right: the successor's close request runs OnExit
-on top of a log flush it interrupted, `LoggerPrepareShutdown` refuses
-(`phase=repair, flush_active=1, append_owners=1`), and the reload is handed back
-with an error. The owner under OnExit can only resume once OnExit returns, so
-waiting inside it cannot work. Action: the fix is a retry of the same reload that
-keeps the successor, not a looser check; do not mask the error in the check.
+The successor's close request can run OnExit on top of any thread. Over a log or
+keystats flush, the owner under OnExit can only resume once OnExit returns, so
+waiting inside it cannot work: `ReloadTerminalHandoffDeferClaim` puts the reload
+back to pending and retries the same exit once the owner settled, keeping the
+successor, which asks only once. Over `MenuStartupCommands.Drain`, the rows not
+reached yet are handed to the next successor by `TakeForReload`. Each metrics
+toggle reloads, so this check chains about five reloads. Action: when it fails
+again, read the phase in the log; do not mask the error in the check.
+
+### project-live-checks-a-vetoed-exitapp-does-not-return
+
+A veto ends the thread that called `ExitApp`; only its `finally` still runs, so
+nothing written after the call answers a refused Quit. `_LifecycleRefuseShutdown`
+arms `_LifecycleAnswerVetoedQuit` instead, and a retry armed by the gate keeps the
+answer owed. Any exit that interrupts a flush or a read goes through
+`_LifecycleArmFlushExitRetry`, which keeps the OnExit reason (a retried logoff is
+no Quit) and leaves an updater exit to the updater's retry, as a plain `ExitApp`
+would skip `FinalExit`. `quit-over-a-log-flush` is the live check. Windows may end
+the process right after a vetoed logoff, so that retry is best effort. Action: a
+new shutdown gate that settles by itself uses this retry and logs no error.
 
 ### project-live-checks-versions-window-needs-memory
 

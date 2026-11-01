@@ -1455,6 +1455,15 @@ function M.new(deps, presets, ram_getter)
 			if foreign_daemon then
 				network, network_err = NetworkEnv.prelude("OLLAMA-PULL")
 			else
+				-- The daemon Ergopti started runs without its proxy after a refused
+				-- sign-in: the models on disk work, and only the pull is refused.
+				local refusal_key, refusal = require("modules.llm.proxy_relay_receipt").pull_refusal()
+				if refusal_key then
+					Logger.error(LOG, "The Ollama model pull is refused: the proxy sign-in relay refused (%s).", refusal)
+					pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get(refusal_key), "error")
+					settle_cancel("proxy_relay_refused")
+					return false
+				end
 				-- The daemon Ergopti started reads only HTTPS_PROXY: a company PAC is
 				-- resolved for the registry by the launcher instead of refusing the pull.
 				network, network_err = NetworkEnv.opaque_prelude("OLLAMA-PULL",
@@ -2191,8 +2200,13 @@ function M.new(deps, presets, ram_getter)
 			end
 			return false
 		end
-		pcall(hs.urlevent.openURL, OllamaBinary.DOWNLOAD_PAGE_URL)
-		pcall(notifications.notify, i18n.get("ollama.not_detected_title"), i18n.get("ollama.not_detected_body"), "warning")
+		-- Only Ergopti's own runtime is ever used: the notice carries the click
+		-- that offers its install, never the stock Ollama download page
+		-- (owned-runtimes row "Ollama", PIN).
+		local ok, err = pcall(function()
+			return require("ui.menu.menu_llm.runtime_install_offer").notify_if_missing("ollama")
+		end)
+		if not ok then Logger.error(LOG, "The missing Ollama runtime notice raised: %s.", tostring(err)) end
 		return false
 	end
 

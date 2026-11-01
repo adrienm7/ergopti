@@ -5,9 +5,9 @@
  * MODULE: Spawned Tools
  * DESCRIPTION:
  * Derives, from the driver sources themselves, the external programs the macOS
- * and Linux drivers start: docs/design/owned-runtimes.md must list each one
- * with a proposal (own and pin it, or take the system copy with a version check
- * and a clear refusal), and a spawn added without a row fails the inventory
+ * and Linux drivers start: _shared/data/owned_runtimes.json must list each one
+ * in a row with a decision (own and pin it, or take the system copy with a
+ * version check and a clear refusal), and a spawn added without a row fails the inventory
  * test instead of joining the product unnoticed.
  *
  * FEATURES & RATIONALE:
@@ -29,6 +29,10 @@
  * 4. Shell builtins and keywords are not programs; SQL and awk programs are
  *    not shell text. Swift sources are read for rule 1 only (`Process` takes an
  *    absolute URL); tests, vendored code and generated files are not read.
+ * 5. On Windows (AutoHotkey and PowerShell, the vendored workers included, since
+ *    the driver starts them) a program is a `<name>.exe` token outside a comment,
+ *    a name table row or an `ahk_exe` criterion, or the first word of a literal
+ *    command given to Run or RunWait.
  * ==============================================================================
  */
 
@@ -40,7 +44,8 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const DRIVERS = Object.freeze({
 	linux: 'static/ergopti_plus/linux',
-	macos: 'static/ergopti_plus/macos'
+	macos: 'static/ergopti_plus/macos',
+	windows: 'static/ergopti_plus/windows'
 });
 // Folders that hold tests, vendored libraries or generated data, not driver code.
 const SKIPPED_FOLDERS = new Set([
@@ -143,8 +148,9 @@ function sourceFiles(driver) {
 		for (const entry of fs.readdirSync(path.join(ROOT, relative), { withFileTypes: true })) {
 			const child = `${relative}/${entry.name}`;
 			if (entry.isDirectory()) {
-				if (!SKIPPED_FOLDERS.has(entry.name)) walk(child);
-			} else if (/\.(lua|swift)$/.test(entry.name)) {
+				if (!SKIPPED_FOLDERS.has(entry.name) || (driver === 'windows' && entry.name === 'vendor'))
+					walk(child);
+			} else if ((driver === 'windows' ? /\.(?:ahk|ps1)$/ : /\.(?:lua|swift)$/).test(entry.name)) {
 				found.push(child);
 			}
 		}
@@ -295,6 +301,7 @@ function literalPrograms({ value, before, after }, functions = new Set()) {
  */
 function programsOf(relative) {
 	const text = fs.readFileSync(path.join(ROOT, relative), 'utf8');
+	if (/\.(?:ahk|ps1)$/.test(relative)) return windowsPrograms(text);
 	const programs = new Set();
 	if (relative.endsWith('.swift')) {
 		for (const match of text.matchAll(/"([^"\n]+)"/g)) {
@@ -316,6 +323,51 @@ function programsOf(relative) {
 }
 
 /**
+ * Derives the programs one Windows source line starts. A row of a name table
+ * (a per-app category, a password manager, a terminal) only compares window
+ * owners and an `ahk_exe` criterion reads one: neither starts anything.
+ * @param {string} line AutoHotkey or PowerShell source, comment removed.
+ * @returns {string[]}
+ */
+function windowsLinePrograms(line) {
+	if (/^\s*(?:"[^"]*"\s*,?\s*(?:(?:true|false)\s*,?\s*)?)+\)?$/i.test(line)) return [];
+	const programs = [];
+	const code = line.replace(/ahk_exe\s+[^"']*/gi, ' ').replace(/==\s*"[^"]*"/g, ' ');
+	for (const match of code.matchAll(/(?:^|[\s"'\\/(])([A-Za-z][A-Za-z0-9_-]*)\.exe\b/gi))
+		programs.push(match[1].toLowerCase());
+	// A command written without its extension: Run("explorer ..."), RunWait('reg ...').
+	for (const match of code.matchAll(
+		/\b(?:Run|RunWait)\(\s*["']([A-Za-z][A-Za-z0-9_-]*)(?:[\s"'])/g
+	))
+		programs.push(match[1].toLowerCase());
+	return programs;
+}
+
+/**
+ * Derives the programs one Windows source file starts.
+ * @param {string} text AutoHotkey or PowerShell source.
+ * @returns {Set<string>}
+ */
+function windowsPrograms(text) {
+	const programs = new Set();
+	let block = false;
+	for (const raw of text.split('\n')) {
+		const line = raw.trim();
+		if (block) {
+			if (line.includes('*/') || line.includes('#>')) block = false;
+			continue;
+		}
+		if (line.startsWith('/*') || line.startsWith('<#')) {
+			block = !(line.includes('*/') || line.includes('#>'));
+			continue;
+		}
+		if (/^[;#]/.test(line)) continue;
+		for (const name of windowsLinePrograms(raw.replace(/\s;\s.*$/, ''))) programs.add(name);
+	}
+	return programs;
+}
+
+/**
  * Derives every program a driver starts, with the files that start it.
  * @param {string} driver Key of DRIVERS.
  * @returns {Map<string, string[]>} Program name to repository-relative files.
@@ -331,4 +383,11 @@ function spawnedTools(driver) {
 	return tools;
 }
 
-module.exports = { DRIVERS, luaLiterals, shellPrograms, literalPrograms, spawnedTools };
+module.exports = {
+	DRIVERS,
+	luaLiterals,
+	shellPrograms,
+	literalPrograms,
+	windowsPrograms,
+	spawnedTools
+};

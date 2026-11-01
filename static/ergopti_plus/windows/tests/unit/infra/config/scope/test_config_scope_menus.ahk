@@ -77,12 +77,12 @@ _ScopeMenuCommandsCase(Scope, Factory, MenuKey, Modes := ["recommended", "clear"
 	}
 }
 Test("config-scope-menu: layout commands publish only their scope and recover refusal",
-	_ScopeMenuCommandsCase.Bind("keyboard_layout", "_LAY_ScopeCommands", "layout_menu"))
+	_RRNC_NoDialog.Bind("Layout", _ScopeMenuCommandsCase.Bind("keyboard_layout", "_LAY_ScopeCommands", "layout_menu")))
 Test("config-scope-menu: LLM commands preserve credentials and recover refusal",
-	_ScopeMenuCommandsCase.Bind("llm", "_LLM_ScopeCommands", "llm_menu", ["recommended"]))
+	_RRNC_NoDialog.Bind("AI", _ScopeMenuCommandsCase.Bind("llm", "_LLM_ScopeCommands", "llm_menu", ["recommended"])))
 ; The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
 Test("config-scope-menu: metrics restore preserves consent, recovers refusal, and has no clear",
-	_ScopeMenuCommandsCase.Bind("metrics", "_MET_ScopeCommands", "metrics_menu", ["recommended"]))
+	_RRNC_NoDialog.Bind("Metrics", _ScopeMenuCommandsCase.Bind("metrics", "_MET_ScopeCommands", "metrics_menu", ["recommended"])))
 
 _ScopeMenuAbsentConsent() {
 	for Factory in ["_LLM_ScopeCommands", "_MET_ScopeCommands"] {

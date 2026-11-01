@@ -35,7 +35,7 @@ global _LLM_Live := Map("active", false, "profile_id", "", ConfigLeaf.NUM_PREDIC
 
 /**
  * Returns the decoded, validated live.json, read on first use.
- * @returns {Map} Map("debounce_ms", Ms, "min_words", Words).
+ * @returns {Map} Map("debounce_ms", Ms, ConfigLeaf.MIN_WORDS, Words).
  */
 LLM_Live_Config() {
 	global _SharedDir
@@ -46,7 +46,7 @@ LLM_Live_Config() {
 	Candidate := JsonParse(FSReadStrict(Path))
 	_LLM_Live_ValidateConfig(Candidate, Path)
 	Config := Map(ConfigLeaf.DEBOUNCE_MS, Candidate[ConfigLeaf.DEBOUNCE_MS],
-		"min_words", Candidate["min_words"])
+		ConfigLeaf.MIN_WORDS, Candidate[ConfigLeaf.MIN_WORDS])
 	return Config
 }
 
@@ -54,14 +54,52 @@ LLM_Live_Config() {
 ; @param {Map} Candidate The decoded file.
 ; @param {String} Path Its path, for the error.
 _LLM_Live_ValidateConfig(Candidate, Path) {
-	if !(Candidate is Map)
-		throw ValueError(Path . ": the root must be an object.")
+	Reason := LLM_Live_ConfigRefusal(Candidate)
+	if Reason != ""
+		throw ValueError(Path . ": " . Reason . ".")
 	; The same bounds as the menu's debounce: the timer period rule is shared
-	if !(Candidate.Get(ConfigLeaf.DEBOUNCE_MS, "") is Integer) || Candidate[ConfigLeaf.DEBOUNCE_MS] < 0
-			|| !LLM_Option_TryNormalize(ConfigLeaf.DEBOUNCE_MS, Candidate[ConfigLeaf.DEBOUNCE_MS], &Normalized)
+	if !LLM_Option_TryNormalize(ConfigLeaf.DEBOUNCE_MS, Candidate[ConfigLeaf.DEBOUNCE_MS], &Normalized)
 		throw ValueError(Path . ": debounce_ms must be an integer the debounce setting accepts.")
-	if !(Candidate.Get("min_words", "") is Integer) || Candidate["min_words"] < 0
-		throw ValueError(Path . ": min_words must be a non-negative integer.")
+}
+
+/**
+ * Why a decoded live.json is unusable: request_plan/live.lua `config`.
+ * @param {Any} Decoded The decoded file.
+ * @returns {String} The reason, "" when the file is usable.
+ */
+LLM_Live_ConfigRefusal(Decoded) {
+	if !(Decoded is Map)
+		return "live.json is missing or not JSON"
+	if !(Decoded.Get(ConfigLeaf.DEBOUNCE_MS, "") is Integer) || Decoded[ConfigLeaf.DEBOUNCE_MS] < 0
+		return "live.json debounce_ms is not a non-negative integer"
+	if !(Decoded.Get(ConfigLeaf.MIN_WORDS, "") is Integer) || Decoded[ConfigLeaf.MIN_WORDS] < 0
+		return "live.json min_words is not a non-negative integer"
+	return ""
+}
+
+/**
+ * What one live keystroke asks for: request_plan/live.lua `decide`. A deleted
+ * prompt stops live mode: live typing never falls back to another prompt.
+ * @param {Map} Config The validated live.json.
+ * @param {Map} Receipt The prompt live mode started with: profile_id, and a
+ *     num_predictions of its own when it has one.
+ * @param {Integer} MenuCount The menu's prediction count.
+ * @param {Map|Integer} Profile The prompt found now, 0 when it no longer exists.
+ * @returns {Map} action "request" with num_predictions and min_words, or action
+ *     "stop" with its cause.
+ */
+LLM_Live_Decide(Config, Receipt, MenuCount, Profile) {
+	if !(Receipt.Get("profile_id", "") is String) || Receipt.Get("profile_id", "") == ""
+		throw ValueError("receipt needs a profile_id")
+	if !(MenuCount is Integer) || MenuCount < 1
+		throw ValueError("menu_count must be a whole number from 1")
+	Count := Receipt.Get(ConfigLeaf.NUM_PREDICTIONS, 0)
+	if !(Count is Integer) || (Receipt.Has(ConfigLeaf.NUM_PREDICTIONS) && Count < 1)
+		throw ValueError("receipt num_predictions must be a whole number from 1")
+	if !(Profile is Map)
+		return Map("action", "stop", "cause", "prompt deleted")
+	return Map("action", "request", ConfigLeaf.NUM_PREDICTIONS, Count ? Count : MenuCount,
+		ConfigLeaf.MIN_WORDS, Config[ConfigLeaf.MIN_WORDS])
 }
 
 
@@ -137,7 +175,7 @@ LLM_Engine_LiveStart(ProfileId, NumPredictions := 0, TranslationTarget := "") {
 	LoggerInfo("LLM", "Live mode {1} with '{2}' ({3} prediction(s), {4} ms debounce, {5} minimum word(s)).",
 		WasActive ? "moved" : "on", Checked["profile_id"],
 		Checked[ConfigLeaf.NUM_PREDICTIONS] > 0 ? Checked[ConfigLeaf.NUM_PREDICTIONS] : "the menu's",
-		Config[ConfigLeaf.DEBOUNCE_MS], Config["min_words"])
+		Config[ConfigLeaf.DEBOUNCE_MS], Config[ConfigLeaf.MIN_WORDS])
 }
 
 /**

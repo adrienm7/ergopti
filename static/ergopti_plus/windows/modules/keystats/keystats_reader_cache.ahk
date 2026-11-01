@@ -53,7 +53,12 @@
 ; Version 13 keeps trigger input credits within their source day.
 ; Version 14 preserves literal synthetic-source labels across walker flushes.
 ; Version 15 qualifies batch framing through the forward SQLite lexer index.
-global KLR_CACHE_FORMAT_VERSION := "15"
+; Version 16 rebuilds every n-gram key from data.sql in token encoding 2.
+global KLR_CACHE_FORMAT_VERSION := "16"
+; The last image in the old keys is kept once, renamed, not discarded: the
+; ledgers stay the source, and this keeps what the dashboard showed until now.
+global KLR_PRE_ENCODING_FORMAT_VERSION := "15"
+global KLR_PRE_ENCODING_BACKUP_SUFFIX := ".pre-ngram-encoding-2.bak"
 
 ; Republishing the image copies every page of it — 650 MB on the store this was
 ; built against. An open dashboard refreshes every few seconds, so saving each
@@ -197,6 +202,7 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 	; the try block silently failed and left every later worker re-reading and
 	; re-rejecting the same dead image.
 	rejected := false
+	Version := ""
 	; An image whose only defect is a leftover main-schema payload table is
 	; upgraded rather than rebuilt: every rollup in it is still exact, while a
 	; cold rebuild of a large store costs tens of minutes of blank dashboard.
@@ -293,7 +299,8 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 		if rejected {
 			if BeforeDiscard
 				BeforeDiscard.Call()
-			KLR_CacheDiscard(md, logPath, Observed)
+			if Version != KLR_PRE_ENCODING_FORMAT_VERSION || !_KLR_CacheKeepPreEncodingImage(Path, logPath, Observed)
+				KLR_CacheDiscard(md, logPath, Observed)
 		}
 	}
 
@@ -311,6 +318,23 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 	KLR_PrefetchDebug(logPath, "KLR cache attached with " . Offsets.Count
 		. " ledger(s), readonly=" . KLRCache.readonly . " in " . (A_TickCount - AttachTick) . "ms.")
 	return 1
+}
+
+; Moves the last image of the old token encoding aside, create-only, so a second
+; run keeps the first backup. A peer that published in between kept its image.
+; @param Path {String} The cache path.
+; @param logPath {String} Diagnostic sink shared with the rest of the reader.
+; @param Observed {Map} Identity of the rejected file captured before opening it.
+; @returns {Boolean} Whether the rejected image left the cache path.
+_KLR_CacheKeepPreEncodingImage(Path, logPath, Observed) {
+	if !KLR_LedgerSnapshotIsSame(Observed, KLR_LedgerSnapshot(Path))
+		return false
+	if !FSAtomicMoveCreate(Path, Path . KLR_PRE_ENCODING_BACKUP_SUFFIX)
+		return false
+	KLR_PrefetchDebug(logPath, "KLR cache kept as the pre-encoding backup")
+	try LoggerInfo("KLReader", "Metrics image kept as {1} before the n-gram keys are rebuilt.",
+		Path . KLR_PRE_ENCODING_BACKUP_SUFFIX)
+	return true
 }
 
 ; The file an upgrade read still holds the clear payload it was upgraded from.
@@ -394,7 +418,7 @@ _KLR_CacheStageIsOwned(Path) {
 		if Rows.Length != 4
 			return false
 		Version := _KLR_CacheMetaValue(Db, "format_version")
-		return Version = "3" || Version = "4" || Version = "5" || Version = "6" || Version = "7" || Version = "8" || Version = "9" || Version = "10" || Version = "11" || Version = "12" || Version = "13" || Version = "14" || Version = KLR_CACHE_FORMAT_VERSION
+		return Version = "3" || Version = "4" || Version = "5" || Version = "6" || Version = "7" || Version = "8" || Version = "9" || Version = "10" || Version = "11" || Version = "12" || Version = "13" || Version = "14" || Version = KLR_PRE_ENCODING_FORMAT_VERSION || Version = KLR_CACHE_FORMAT_VERSION
 	} finally SQLite_Close(Db)
 }
 

@@ -5,6 +5,88 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Restore holds its stage by handle (2026-11-01)
+
+The audit's "restore staging substitution" is fixed on Windows, after two rejected
+designs: a raw copy lost streams and metadata, and a pinned `CopyFileW` still wrote
+through a replaced ancestor. `FSCopyReplaceAtomic` resolves one pathname, the anchor
+folder. Every folder below opens relative to its parent without delete sharing, the
+stage opens relative to its folder sharing nothing, `BackupRead`/`BackupWrite` copy
+what `CopyFileW` copied (content, named streams, extended attributes) by handle, and
+the rename goes through the stage's handle into the folder handle. No native helper
+is needed: ntdll and kernel32 cover it. `test_config_restore_custody.ahk` runs a
+separate process against it and, as a control, against the old pipeline.
+
+macOS and Linux have the same hole and cannot close it: POSIX renames by name and
+denies a same-user process nothing. The shared `owner.restore` reads each file back
+and reports a substituted one as a failure, naming the pre-restore backup. A foreign
+file can still reach the destination there, but never as a success.
+
+## N-gram keys are token encoding 2 (2026-11-01)
+
+A key is a run of markers from `_shared/data/keystats_tokens.json`, the escape `[[`
+for a typed `[`, and single characters, so `[BS]` no longer reads as both a Backspace
+and four typed characters. The long spellings won (`[PAGEUP]`, `[PAGEDOWN]`,
+`[DELETE]`); `[PGUP]`, `[PGDN]` and `[DEL]` stay aliases because raw events keep them.
+Change the JSON, run `tools/codegen/codegen-keystats-tokens.cjs`, and replay
+`token_encoding_vectors.json`.
+
+Stored data moves once, and raw events are never rewritten. Windows (cache format 16)
+and macOS (aggregate revision 3) rebuild every key from the raw events, which were
+never ambiguous, keeping the old image as `*.pre-ngram-encoding-2.bak`. Linux has no
+replay, so `ensure_token_encoding` writes a `VACUUM INTO` backup, then rewrites its keys
+and records the version in one transaction. Its keys are read with the family's token
+count; a key with two readings of that length takes the earliest marker, so such a
+row can be wrong on Linux only.
+
+## The Windows proxy override takes every relay of the grammar (2026-11-01)
+
+https relays, socks5 relays and credentials in the address are accepted on Windows
+instead of refused. Each PowerShell channel (managed worker, updater staging,
+artifact engine, Ollama archive) hops through a loopback listener in its own
+process; the daemon reads the real relay from `HTTPS_PROXY`. The system curl
+serves loopback requests only, so no override reaches it. A credential lives in
+a DPAPI envelope in config.toml (the whole relay, sealed once at start when found
+clear) and in the private environment of a network worker, never in the driver's
+own environment, a log, command line, receipt or request file;
+`test-windows-proxy-override-e2e.cjs` proves each form. macOS and Linux keep the
+relay in clear in their settings store: their route decisions read it synchronously,
+the Keychain answers asynchronously through the signed launcher, and secret-tool
+hands the keyboard to the desktop. Moving it means caching the secret at start
+there, and the macOS prelude still writes the relay into shell text.
+
+## Perplexity speaks the Agent API (2026-11-01)
+
+Perplexity left Sonar chat completions for the Agent API on the three drivers:
+format `perplexity_agent`, `POST <base_url>/agent`, base
+`https://api.perplexity.ai/v1`, default model `perplexity/sonar`. Its image input
+takes a URL, so it serves every text use and no screenshot. `GET /v1/models`
+declares no authentication, so the save-time ping proves the address, not the key;
+the Test action sends a real request. The shapes come from the docs and were only
+run against the fake of `tools/test/lib/fake-network.cjs`: no key existed for a
+live call. No retirement date is recorded, none being confirmed by Perplexity.
+
+## DashScope keeps `dashscope-intl`, a workspace domain is optional (2026-11-01)
+
+The default address stays the shared `dashscope-intl.aliyuncs.com`. Alibaba calls
+it legacy but available and recommends workspace-dedicated domains, so the
+provider's `optional_address` block in `api_providers.json` adds one optional
+field to the add-entry form on the three drivers. Empty keeps the catalogue's
+address; a value must end with `.maas.aliyuncs.com`. Such a domain takes only a
+key of its workspace. `llm/api_url_template` (Lua, AHK port) owns the rule and
+`api_url_template_vectors.json` pins it.
+
+## Windows keeps the system curl (2026-11-01)
+
+The Windows driver runs `System32\curl.exe` and does not pin its own copy, the
+SYS class of the owned-runtimes registry. `HTTP_CheckCurlAtStart`
+(`windows/adapters/http_client.ahk`) names its absence or a version below
+`HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION` in words. Do not propose a pinned curl again
+unless that check stops being enough.
+
+The dialog belongs to the AI (2026-11-01): `HTTP_ScheduleCurlCheck` runs at boot
+when the AI is on and when it gets turned on, and with the AI off nothing opens.
+
 ## French sticky modifiers are « rémanents » (2026-10-31)
 
 The French sticky-modifier labels say « rémanent »: `📌 Maj rémanente`,
@@ -30,3 +112,159 @@ lists no server; the names stay in the local servers panel and the "other
 address" submenu. The row of a running sweep (`searching`) keeps the list. The
 shared `_shared/lua/llm/local_server_menu.lua` owns the rule; the Windows twin
 follows through the PC handoff.
+
+## config.toml `[script]` wins at start on macOS and Linux, without migration (2026-10-31)
+
+A `config.toml` `[script]` row (`locale`, `log_level`, `show_error_dialog`) wins
+over the native store (hs.settings, storage.json) at start, as on Windows:
+`_shared/lua/script_config_authority.lua` writes it into the native alias
+(`infra/script_scope.lua` `adopt_configured`) before the error window, the log
+level and i18n read it, and every menu or wizard change rewrites the row first
+when the file holds one (`rewrite_configured`). There is no migration or
+adoption marker (sole user, clean state): a file without the row leaves the
+native value in force, and nothing is copied between the stores. Only a
+shipped locale code is adopted.
+
+## Decisions without code of 2026-10-31
+
+- **Published release notes** that carry agent session lines are rewritten
+  once by the coordinator; `build_changelog.py` already strips them from new
+  notes.
+- **The `WH_KEYBOARD_LL` probe** (`windows/.../input_probe.ahk`) stays in the
+  release exe, flagged or not by a corporate proxy.
+- **Windows builds the timer-delay ceiling and key-chord policies** that macOS
+  and Linux replay (`_shared/tests/corpus/timer/delay_ceiling_vectors.json`,
+  `_shared/tests/corpus/tap_hold/key_combination_chords.json`); the work is in
+  the PC handoff.
+- **`dev` history is kept as it is**: the October 22 commits whose message
+  belongs to another change are not rewritten.
+- **Item 109 (branded debug GUI) and a real `Comments` field in the exe's
+  version resource** go to the PC agent (handoff).
+- **L115 is closed**: the provider error envelope guard did not reproduce
+  under WSL LuaJIT (6 of 6 runs pass); reopen only on a new failing run.
+
+## Every owned-runtime row is decided (2026-10-31)
+
+The maintainer accepted every row's proposal of the owned-runtimes inventory.
+The rows live in `_shared/data/owned_runtimes.json` (decision
+PIN/SYS/OPT/DELETE/NA, status done/follow_up); where a proposal named two ways,
+the first is decided and the second kept as `alternative`. WebView2 stays the
+Evergreen system runtime (2026-10-27). Edit the JSON, then run
+`node tools/codegen/codegen-owned-runtimes.cjs`; never hand-edit the generated
+tables of `docs/design/owned-runtimes.md`. Do not re-raise per-row choices.
+
+## One shared config template for the three drivers (2026-10-31, PAR-73)
+
+The default `config.toml` of the three drivers is generated once, in
+`_shared/_generated/config_template.toml`: a shared key appears once, a
+driver-only key or a default the drivers disagree on is written
+`platform.<driver>.<key>`, and each driver's table order is
+`[platform.<driver>] sections`. The `{windows,macos,linux}/_generated/config_template.toml`
+files stay committed as byte-exact projections
+(`tools/lib/config-template-projection.cjs`, proved by
+`test-config-template-shared.cjs`) because the .deb/.rpm, the macOS .app and
+the AHK smoke test ship or seed them. No driver reads a template at run time:
+the effective defaults come from the features manifest. Change them only
+through `npm run build:manifest`.
+
+## Shared local-server ports are told apart by response fingerprint (2026-10-31)
+
+vLLM shares 8000 with oMLX and TabbyAPI 5000 with text-generation-webui. Each
+row of a shared default address declares `fingerprint { model_field, equals }`
+in `_shared/modules/llm/local_servers.json`, matched against the `owned_by` of
+`GET /v1/models` (`vllm`, `tabbyAPI`, `omlx`, `user`).
+`_shared/lua/llm/local_server_fingerprint.lua` and the shared discovery
+controller keep one row per answering address: the fingerprinted row, else the
+address's default row (first in `server_order`), which is also kept on 401/403.
+A generic entry at a shared address belongs to the default row only. A merged
+row per port and order-only affinity were rejected; add a new port collision
+as a new fingerprinted row.
+
+## A clone run reads the published layout registry unless the clone changed it (2026-10-31)
+
+A source run (developer mode or any run from a checkout) reads the published
+layout registry like a release, from its channel's branch with the same cache
+and ETag, unless `git status --porcelain --untracked-files=all` lists changes
+under the clone's `static/layouts/registry` (index.json and the layout files
+count, untracked included); then it shows the clone's folder without HTTP. A
+git failure shows the clone's folder and logs an ERROR: the clone is the code
+being run, and the published registry would hide a local edit. The decision is
+shared (`Catalogue.registry_source` and `registry_changes_args` in
+`_shared/lua/layouts/catalogue.lua`); the Windows port is in the PC handoff.
+
+## Decisions moved out of TODO by its 2026-10-31 shrink
+
+- **Every web-view page has a toggle action (2026-10-27).** Ten actions of the
+  shared catalogue (`_shared/modules/actions/actions.toml`, group "UI"):
+  `open_metrics_typing`, `open_metrics_apps`, `open_hotstrings_editor`,
+  `open_paths_editor`, `open_hotstrings_settings`, `open_layout_manager`,
+  `open_layer_editor`, `open_model_browser`, `open_changelog`,
+  `open_healthcheck`. Closed or hidden: open and focus; covered by another
+  window: bring to front, never close; frontmost: close through the page's own
+  close. Owners: macOS `ui/window_toggle.lua`, Linux `ui/webview_manager.lua`
+  `toggle()`, Windows `GestureToggleOrFocusUI`. Not toggles, on purpose:
+  onboarding (a shortcut would abandon a half-finished setup), the download
+  window (owned by a running download), the release notes (a pane) and the
+  contextual dialogs. A model-browser rework keeps macOS `ui/model_browser`
+  `window()`/`close()` and the `set_opener("model_browser", …)` line of
+  `menu_llm/models_selector.lua`.
+- **Windows app categories follow macOS and Linux with no migration
+  (2026-10-30).** The shared TOML writer is the reference, the installed-record
+  corpus follows Lua, and `metrics\app_categories.json` is no longer read.
+- **Cloud providers not added (2026-10-30)**, reasons in their commits: GitHub
+  Models, Lambda, 01.AI, Aleph Alpha, Liquid AI, Writer, Tencent Hunyuan,
+  BytePlus ModelArk, Cloudflare AI Gateway.
+- **Local servers left out of `local_servers.json`**: AnythingLLM always needs a
+  key and takes a workspace slug as the model; Msty documents no port or
+  dialect. Foundry Local (Windows) and `mlx_lm.server` (macOS) belong to those
+  drivers, not to the shared list.
+- **The layout row switches stay Windows-only.** `layout.emulate_*_row` mixes
+  Ergopti rows with the OS layout, which has no `.keylayout` source on macOS or
+  Linux; an Ergopti bundle source types digits on both levels, so its rows stay
+  greyed on macOS. The number-row options work everywhere by rebuilding the one
+  generated `.keylayout` (`docs/design/layout-option-emulation.md`).
+- **Forced number-row output is not owed by a hook (item 107).** macOS and Linux
+  apply the number-row ordering and edge keys by rebuilding the layout, so the
+  Linux hook's input+XI2+writer join is deliberately unreachable
+  (`docs/design/linux-number-row-runtime.md`).
+
+## Earlier decisions (moved from TODO, 2026-10-31)
+
+- **Delta updates (item 22)**: withdrawn by the maintainer; full signed downloads stay below 20 MB.
+  Full signed, checksummed downloads keep one install and rollback path, without delta-base
+  selection, patch rebuild or extra fallbacks. Reconsider only if release size or measured
+  repeated-download cost grows.
+- **Report a bug has no review screen**: the report is reviewable on GitHub (October 21).
+- **Not defects after native review**: L48, L83 and the release-notes CR handling on Windows; L30,
+  L85, L88 and L18 on macOS.
+- **Configuration file style (October 20)**: `config.toml` keeps the 5/3 blank-line style everywhere
+  (templates and the Windows writer); `windows/_generated/config_template.toml` changes only
+  through `npm run build:manifest`; the release list and its ETag persist across restarts.
+- **Credentialed redirects** are not followed, by design (L42).
+- **Unsigned stable Windows releases** are authorised until SignPath signing is integrated (item
+  132).
+- **The AHK suite watchdog** is not raised to make a run finish; shard the suite instead.
+- **Obsolete configuration scalars** are preserved until explicit cleanup; ordinary saves refuse a
+  colliding subtree (ADR-009).
+- **Unicode general categories and graphemes** are out of scope for the metrics character classes
+  (L137); there is no Lua 5.4 AT-SPI backend, the FFI needs LuaJIT (L67).
+- **A stored layout or number-row choice is never rewritten** by a layout change: where it cannot
+  apply it stays ticked, greyed and suffixed « — non appliqué », and applies again by itself.
+- **Moving the Karabiner lease token out of the rule text** is impossible: Karabiner compares
+  variables only to fixed values. Fewer recovery deploys need fewer lease failures first.
+- **Do not deduplicate the macOS Swift launcher XCTest classes between E2E and Build.** The managed
+  native E2E cells run the SDK, logger and daily-log cohorts on macOS 15 (Apple silicon and Intel);
+  Build's full Swift run repeats them on macOS 26 (`macos-latest`). Skipping them in Build saves
+  about 42 s of 364 s of test time (measured 2026-10-20, run 39388400901) and nothing on the
+  critical path, and drops their only macOS 26 coverage. Job, lot and step names state each cell's
+  macOS version, read from `HOSTS` in `tools/ci/macos-stage-roles.cjs`.
+- **Windows unit shards are grouped by test category, not by duration.** A new test file with no
+  category fails a gate; a minute more of wall time buys a CI whose red job says what broke.
+- **Ergopti's own Karabiner follows Ergopti running, not a menu switch (2026-10-31, ADR 011).** While
+  Ergopti runs and is not paused it always uses its own Karabiner runtime and closes a running user
+  Karabiner-Elements; paused or quit, it stops its runtime and restarts the user's Karabiner only if it
+  closed it (a persisted marker, so a crash or forced quit still restores it). No Tap-Hold or other
+  feature switch takes part; the default-on consent row « close other Karabiner apps while Ergopti is
+  running » stays. The shared-mode merge into the user's `karabiner.json` is retired.
+- **Maintainer workflow**: partial work is delivered into dev after the feasible container or CI
+  work, with native or device gaps documented here rather than holding a branch.

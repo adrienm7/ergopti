@@ -508,6 +508,32 @@ helpers.describe("LLM health probe ownership", function()
 		end)
 	end)
 
+	helpers.it("repaints only when a probe changes the health status (probe loop, 2026-06-19)", function()
+		-- Each build fires a probe. When the probe's completion repainted the menu
+		-- unconditionally, the repaint built the menu, which probed again: about
+		-- ten to twenty rebuilds a second with live HTTP. A completion that leaves
+		-- the status as it was must therefore repaint nothing.
+		with_fixture(function(fixture)
+			fixture.handler.build_item()
+			helpers.assert_eq(#fixture.probes, 1, "opening the menu must probe once")
+			local updates_before = fixture.updates()
+			fixture.probes[1].completion(200)
+			helpers.assert_eq(fixture.updates(), updates_before + 1,
+				"a probe that turns the status from unknown to reachable must repaint once")
+
+			fixture.handler.build_item()
+			helpers.assert_eq(#fixture.probes, 2, "the repainted menu probes again")
+			fixture.probes[2].completion(200)
+			helpers.assert_eq(fixture.updates(), updates_before + 1,
+				"a probe that confirms the same status must not repaint, or build and probe loop")
+
+			fixture.handler.build_item()
+			fixture.probes[3].completion(0)
+			helpers.assert_eq(fixture.updates(), updates_before + 2,
+				"a probe that finds the server gone must repaint")
+		end)
+	end)
+
 	helpers.it("reports shutdown settled only from the exact stop callback (HS-008)", function()
 		for _, mode in ipairs({ "false", "throw" }) do
 			with_fixture(function(fixture)

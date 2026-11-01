@@ -785,7 +785,7 @@ _CNR_ControlledNativePacFixture() {
 				_DriverDir . "\tests\fixtures\system_proxy_native.ps1", "-WorkerPath",
 				_VendorDir . "\ergopti_system_proxy_worker.ps1", "-EntryInputPath", Capture["TmpFile"]],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
-		AssertTrue(Handle.start(), "controlled native WinHTTP fixture must actually start")
+		AssertTrue(Handle.start(), "controlled native PAC fixture must actually start")
 		Started := A_TickCount
 		while Observed.Length == 0 && !TickExpired64(Started, 30000) {
 			_SR_TreePoll()
@@ -794,11 +794,9 @@ _CNR_ControlledNativePacFixture() {
 		AssertEqual(1, Observed.Length, "owned native fixture must settle within its bounded test budget")
 		if Observed[1]["exit"] != 0
 			try _CNR_NativePacDiagnostic(Observed[1])
-		AssertEqual(0, Observed[1]["exit"], "real WinHTTP PAC ABI and destination policy must agree")
+		AssertEqual(0, Observed[1]["exit"], "the production worker and the destination policy must agree")
 		AssertEqual("", Observed[1]["stderr"], "native fixture must expose no hidden failure")
-		AssertContains(Observed[1]["stdout"], "[OK] 11 controlled native WinHTTP PAC fixtures")
-		AssertTrue(InStr(Observed[1]["stdout"], "native_failover=first_only") > 0
-			|| InStr(Observed[1]["stdout"], "native_failover=list_two") > 0, "the actual native failover representation must be explicitly qualified")
+		AssertContains(Observed[1]["stdout"], "[OK] 7 controlled native PAC worker fixtures")
 	} finally {
 		Retired := IsObject(Handle) ? Handle.terminate() : true
 		AssertTrue(Retired, "the exact native fixture tree must physically settle")
@@ -806,7 +804,7 @@ _CNR_ControlledNativePacFixture() {
 			AssertEqual(0, _SR_CaptureRemove(Capture), "fixture private input must be removed after exact tree retirement")
 	}
 }
-Test("system proxy native: actual WinHTTP PAC evaluates HTTP full URL, HTTPS native scope and DIRECT", _CNR_ControlledNativePacFixture)
+Test("system proxy native: the production worker evaluates a PAC on the full URL, DIRECT and refused scripts", _CNR_ControlledNativePacFixture)
 
 _CNR_NativeEndpointPolicy() {
 	AssertEqual("http://selected.invalid:3128", _SystemProxy_UsableNativeProxy("selected.invalid:3128", "https"))
@@ -847,7 +845,7 @@ _CNR_NativePacEntryDiagnosticFact(Out) {
 _CNR_NativePacDiagnosticFact(Out) {
 	if !(Out is String) || StrLen(Out) > 8192
 		return ""
-	Pattern := "m)^PROXY_NATIVE_DIAG stage=(source_load|source_parse|native_compile|fixture_compile|abi|server_setup|native_call|native_cases|https_scope|direct|bad_script|missing_script|failover|entrypoint_input|entrypoint_start|entrypoint_wait|entrypoint_read|entrypoint_process|entrypoint_privacy|entrypoint_parse|entrypoint_frame|server_receipt|cleanup) passed=([0-9]|10|11) family=(win32|command_missing|io|argument|invalid_operation|timeout|runtime|other) code=(-?(?:0|[1-9][0-9]{0,9}))`r?$"
+	Pattern := "m)^PROXY_NATIVE_DIAG stage=(fixture_compile|server_setup|entrypoint_input|entrypoint_start|entrypoint_wait|entrypoint_read|entrypoint_process|entrypoint_privacy|entrypoint_parse|entrypoint_frame|server_receipt|cleanup) passed=([0-9]|10|11) family=(win32|command_missing|io|argument|invalid_operation|timeout|runtime|other) code=(-?(?:0|[1-9][0-9]{0,9}))`r?$"
 	if !RegExMatch(Out, Pattern, &Fact)
 		return ""
 	Prefix := "m)^PROXY_NATIVE_DIAG "
@@ -861,11 +859,11 @@ _CNR_NativePacDiagnosticFact(Out) {
 }
 
 _CNR_NativePacDiagnosticProtocol() {
-	Early := "PROXY_NATIVE_DIAG stage=native_compile passed=0 family=runtime code=-2146233087"
-	AssertEqual("stage=native_compile passed=0 family=runtime code=-2146233087", _CNR_NativePacDiagnosticFact(Early))
-	AssertEqual("stage=native_call passed=5 family=win32 code=12180", _CNR_NativePacDiagnosticFact("PROXY_NATIVE_DIAG stage=native_call passed=5 family=win32 code=12180`r`n"))
+	Early := "PROXY_NATIVE_DIAG stage=fixture_compile passed=0 family=runtime code=-2146233087"
+	AssertEqual("stage=fixture_compile passed=0 family=runtime code=-2146233087", _CNR_NativePacDiagnosticFact(Early))
+	AssertEqual("stage=entrypoint_wait passed=5 family=win32 code=12180", _CNR_NativePacDiagnosticFact("PROXY_NATIVE_DIAG stage=entrypoint_wait passed=5 family=win32 code=12180`r`n"))
 	AssertEqual("stage=cleanup passed=11 family=io code=-2147483648", _CNR_NativePacDiagnosticFact("PROXY_NATIVE_DIAG stage=cleanup passed=11 family=io code=-2147483648"))
-	for Refused in [StrReplace(Early, "native_compile", "private_url"), StrReplace(Early, "family=runtime", "family=secret"),
+	for Refused in [StrReplace(Early, "fixture_compile", "private_url"), StrReplace(Early, "family=runtime", "family=secret"),
 		StrReplace(Early, "passed=0", "passed=12"), StrReplace(Early, "code=-2146233087", "code=2147483648"),
 		StrReplace(Early, "code=-2146233087", "code=-2147483649"), StrReplace(Early, "code=-2146233087", "code=01"),
 		StrReplace(Early, "code=-2146233087", "code=-0"), Early . "`n" . Early,

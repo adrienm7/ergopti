@@ -316,7 +316,8 @@ _RPA_ExactNativeShutdownEnvelope(Scenario := "program") {
 				"_ReloadPreservingSuspendNonCritical", "ProgramActions_Stop", "_ProgramActions_Retire",
 				"_ProgramActions_EnsurePoll", "_ProgramActions_StopPoll", "ProgramActions_Poll",
 				"_ProgramActions_Admitted", "_ProgramActions_BindingAction",
-				"TimerSetCallback", "_TimerAdapterSetNative"] {
+				"TimerSetCallback", "_TimerAdapterFitsNative", "TimerDelayWithinCeiling",
+				"_TimerAdapterSetNative"] {
 			Body := _DriverFuncBody(Name)
 			Assert(Body != "", "the exact production owner is extracted: " . Name)
 			Source .= Body . "`n"
@@ -327,6 +328,8 @@ _RPA_ExactNativeShutdownEnvelope(Scenario := "program") {
 		Source .= Budget[0] . "`n"
 		Source .= 'global _LifecycleShutdownVetoAttempts := 0' . "`n"
 		Source .= 'global _LifecycleShutdownReason := ""' . "`n"
+		Source .= 'global _LifecycleReloadExitRetrying := false' . "`n"
+		Source .= 'global _LifecycleExitRetryReason := ""' . "`n"
 		Source .= 'global _UserProgramEntries := Map()' . "`n"
 		Source .= 'global _UserProgramGeneration := 0' . "`n"
 		Source .= 'global _UserProgramPaused := false' . "`n"
@@ -338,6 +341,7 @@ _RPA_ExactNativeShutdownEnvelope(Scenario := "program") {
 		Source .= 'global ScriptShortcutAssignments := Map()' . "`n"
 		Source .= 'global TapKeyAssignments := Map()' . "`n"
 		Source .= "global TIMER_ADAPTER_MAX_INTERVAL_MS := " . TIMER_ADAPTER_MAX_INTERVAL_MS . "`n"
+		Source .= "global TIMER_MAX_DELAY_MS := " . TIMER_MAX_DELAY_MS . "`n"
 		Source .= 'global _RPA_EnvelopeTimings := Map("aux_shell_cleanup_retry_ms", '
 			. TimingsGet("gestures", "aux_shell_cleanup_retry_ms") . ', "aux_shell_timeout_ms", '
 			. TimingsGet("gestures", "aux_shell_timeout_ms") . ")`n"

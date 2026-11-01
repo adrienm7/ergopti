@@ -53,8 +53,9 @@ M.sections = {
 	["shortcuts.caps_word.pointer"] = { description_key = "menu.caps_word.pointer_header", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["category_enabled"] = { description_key = "menu.category_enabled", platforms = { "ahk" }, subsections = {  } },
 	["layout"] = { description_key = "menu.layout", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
+	["network"] = { description_key = "menu.debug.proxy_override", platforms = { "ahk" }, subsections = {  } },
 	["ui"] = { description_key = "menu.ui", platforms = { "hs" }, subsections = {  } },
-	["mod_combos"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "hs", "linux" }, subsections = {  } },
+	["mod_combos"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["gestures"] = { description_key = "menu.gestures", platforms = { "ahk", "hs", "linux" }, subsections = { "modes", "sensitivities" } },
 	["gestures.modes"] = { description_key = "menu.gestures.modes", platforms = { "hs" }, subsections = {  } },
 	["gestures.sensitivities"] = { description_key = "menu.gestures.sensitivities", platforms = { "hs" }, subsections = {  } },
@@ -533,10 +534,10 @@ M.features = {
 		path = "shortcuts.key_combination_taps.left_alt_then_caps_lock", id = "left_alt_then_caps_lock", section = "shortcuts.key_combination_taps", default = "none", type = "action", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = "caps_word", input_altering = true,
 	},
 	{
-		path = "mod_combos.simultaneous_threshold_ms", id = "simultaneous_threshold_ms", section = "mod_combos", default = 100, type = "number", description_key = "menu.tapholds.simultaneous_dialog_title", platforms = { "hs", "linux" }, recommended = 100, input_altering = false, reason_key = "platform_reason.remap_engine_is_per_driver",
+		path = "mod_combos.simultaneous_threshold_ms", id = "simultaneous_threshold_ms", section = "mod_combos", default = 100, type = "number", description_key = "menu.tapholds.simultaneous_dialog_title", platforms = { "ahk", "hs", "linux" }, recommended = 100, input_altering = false,
 	},
 	{
-		path = "mod_combos.symmetric", id = "symmetric", section = "mod_combos", default = false, type = "boolean", description_key = "menu.tapholds.symmetric", platforms = { "hs", "linux" }, recommended = false, input_altering = false, reason_key = "platform_reason.remap_engine_is_per_driver",
+		path = "mod_combos.symmetric", id = "symmetric", section = "mod_combos", default = false, type = "boolean", description_key = "menu.tapholds.symmetric", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
 		path = "shortcuts.personal.laptop_broken_key", section = "shortcuts.personal", platforms = { "ahk" },
@@ -630,6 +631,9 @@ M.features = {
 	},
 	{
 		path = "shortcuts.keyboard.secondary_e", id = "secondary_e", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_e", platforms = { "hs" }, recommended = "open_file_manager", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_g", id = "secondary_g", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_g", platforms = { "hs" }, recommended = "open_chatgpt", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.keyboard.secondary_h", id = "secondary_h", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_h", platforms = { "hs" }, recommended = "screenshot_region_clipboard", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
@@ -1097,6 +1101,9 @@ M.features = {
 		path = "category_enabled.key_combinations", id = "key_combinations", section = "category_enabled", default = true, type = "boolean", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = true, input_altering = false, reason_key = "platform_reason.key_combinations_are_karabiner_settings_on_macos",
 	},
 	{
+		path = "network.proxy_override", section = "network", platforms = { "ahk" },
+	},
+	{
 		path = "ui.menubar_icon", id = "menubar_icon", section = "ui", default = "v1", type = "enum", description_key = "menu.layout.menubar_icon", platforms = { "hs" }, recommended = "v1", input_altering = false, enum_values = { "v1", "v2" },
 	},
 	{
@@ -1104,9 +1111,6 @@ M.features = {
 	},
 	{
 		path = "shortcuts.keys.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_g", id = "ctrl_g", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_g", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.keys.cmd_star", id = "cmd_star", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_cmd_star", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",

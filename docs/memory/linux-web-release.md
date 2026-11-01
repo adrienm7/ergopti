@@ -294,6 +294,14 @@ predicate, and describe foreign error objects with `ErrorDescription`, never
 separately; a signal is a failure (SIGTERM is status 143), and ESRCH on a
 process group means already gone.
 
+### project-linux-a-corrupt-store-moves-aside-without-replacing
+
+A malformed JSON store is set aside through `infra/corrupt_aside.lua`
+(`<path>.corrupt`, then `.corrupt.1`, ...) with the no-replace move, never with
+`os.rename`, which replaces an older set-aside or the one another process makes
+at the same instant. `api_entries.lua` used `os.rename` until 2026-10-31;
+`agent_learning.lua` and the storage adapter already refused to replace.
+
 ### project-linux-idle-loop-costs
 
 An active libuv idle handle makes the loop poll with a zero timeout, so the
@@ -424,7 +432,9 @@ OwnedProcess and `uv.spawn` calls, Python `subprocess`, every shell script) and
 checks each program against one list, `PROGRAMS`, by scope (driver, test, host).
 Action: read `/proc` or `/sys` instead of running a program (the process
 snapshot of `adapters/process_lifecycle.lua` reads `/proc/<pid>/stat` rather
-than forking `ps`); when one is needed, add it to `PROGRAMS` with a proof the
+than forking `ps`, and the local-server scan reads `/proc/<pid>/cmdline`
+because Alpine's busybox `pgrep`, first on PATH even with procps-ng installed,
+has no `-a` or `-i`); when one is needed, add it to `PROGRAMS` with a proof the
 gate checks for every scope it is used in: a file token (installed by the prep
 script or a CI job, declared in the package recipes and `install.sh`, or `sh`,
 which both container entry points run in every bare image), each bound to the
@@ -600,10 +610,16 @@ callback; keep this live step green for any hook, injector or tray change.
 ### project-linux-tray-dialogs-and-windows-cross-the-grab-and-json
 
 Two boundaries silently broke every tray UI on Linux while unit tests stayed
-green. (1) A zenity/kdialog dialog runs inside a menu callback and blocks the
-event loop that forwards the grabbed keyboard, so nothing could be typed into
-it: every blocking dialog must go through `ui/modal.lua`
-(`keyboard_hook.while_released`). (2) The webview manager decoded page
+green. (1) A native dialog runs inside a menu callback and blocks the event
+loop that forwards the grabbed keyboard, so nothing could be typed into it:
+every blocking dialog must go through `ui/modal.lua`
+(`keyboard_hook.while_released`). The dialog is Ergopti's own GTK 3 child
+process (`ui/dialog_host.lua`, LuaJIT FFI, started by `ui/native_dialog.lua`
+with the daemon's interpreter), never zenity or kdialog: its command line is
+the zenity subset the sites wrote, exit 0 accepted, 1 cancelled, 69 no display
+or no GTK 3 (never read as a No). It stays a separate process so the modal
+release keeps owning the keyboard; `tools/test/test-linux-native-dialog-titles.py`
+drives it live on Xvfb. (2) The webview manager decoded page
 messages and encoded replies through `dkjson`, which is never installed: all
 page objects arrived as nil. It uses the shared `json` codec now; bridge tests
 that pass Lua tables to `route_message` cannot catch this, so
@@ -627,20 +643,21 @@ live in `~/.config/ergopti_plus/api_keys.json`, mode 0600, outside the
 possibly-synced config folder. Action: keep both live steps green for any
 change to the injector, the engine, the parser or the HTTP client.
 
-### project-ergopti-xcompose-chained-dead-keys-are-unreachable
+### project-xcompose-sequences-name-the-keysym-the-key-sends
 
-The committed Ergopti XCompose files name a dead key pressed inside a dead-key
-state after the character its action is named after (`<dead_circumflex>
-<diaeresis> : "/"`), but that key types `dead_diaeresis`, so the sequence can
-never be typed on Linux; `^ ^` only works through the `include "%L"` system
-table. The generic converter reproduces this on purpose (the Ergopti golden
-test pins those files byte for byte), and
-`xkb_generation/tests/test_keystroke_vectors.py` skips the two shared vectors
-by id. The converter reports such outputs in `Conversion.unreachable`;
-`test_registry_conversion.py` pins Ergopti's three and requires none for every
-other registry layout, so a new layout hitting the limit fails there. Action:
-fixing it is a deliberate regeneration of the Ergopti XKB files, golden files
-included, not a converter tweak.
+Inside a dead-key state a key sends what it sends from the neutral state: a
+dead key its dead keysym, any other key the keysym of what it types. Both
+converters (`keylayout_to_xkb.py` and its Lua twin `layouts/xkb_converter.lua`,
+`state_keysyms`) end each Compose sequence with those keysyms. Naming the
+character the action is called after instead (the historical rule) made Ergopti's
+`^ ^` and `^ ¨` untypable and gave Bépo's chained dead keys 62 untypable outputs
+and 6 conflicting sequences (a plain `^` and the circumflex dead key sharing
+`<asciicircum>`). The base keysym stays first when a key sends it, so every other
+line of the shipped Ergopti files is unchanged; the Ergopti+ magic key
+(`base_level_only`) still names its action's letter inside a dead state.
+Action: pin a new dead-key shape with a vector in
+`_shared/tests/corpus/keylayout/xkb_conversion_vectors.json` (both converters
+replay it) and keep `test_registry_conversion.py`'s written-keysym check green.
 
 ## Release artifacts
 
@@ -676,8 +693,15 @@ every package carries) in an `ubuntu:22.04` container, and
 C++ runtime and libgcc are left to the recipient: the tray loads the host GTK
 into the daemon, and an older bundled GLib shadowing it through
 `LD_LIBRARY_PATH` breaks every host library built against GLib >= 2.80. The
-bundled lib directory still reaches child processes through `LD_LIBRARY_PATH`.
-The asset is `ErgoptiPlus-x86_64.AppImage` (the catalogue rejects "linux" in
+launch environment reaches every host program the daemon starts, so it names no
+library directory: `LD_LIBRARY_PATH` put the staged libssl, libcurl, libtinfo and
+readline in front of the host's (readline 8.1 killed bash 5.3 on Arch,
+`undefined symbol: rl_trim_arg_from_keyseq`, before the daemon started). Every
+staged program and library carries its own `$ORIGIN` RUNPATH instead
+(`set_private_runpaths`, patchelf, on every host that runs the stager), which a
+`ffi.load` by soname from LuaJIT searches too. A RUNPATH is not transitive, so a
+file staged after that pass finds nothing. A library only one owned program
+needs goes in `SQLITE3_ONLY_LIBRARIES`' `lib/sqlite3`. The asset is `ErgoptiPlus-x86_64.AppImage` (the catalogue rejects "linux" in
 the name); installed AppImages never self-update, so a rename breaks no updater.
 Action: keep the build in that container until the catalogue's LTS moves, then
 raise `GLIBC_CEILING` and the image together.
@@ -726,6 +750,38 @@ Action: read the catalogue's
 full log (`gh run view <id> --repo AppImage/appimage.github.io --log`) before
 trusting its "first error", which is only the first stderr line.
 
+### project-linux-xkb-installer-runs-on-ergopti-python
+
+The user XKB installer (`ergopti/linux/xkb_installation/user_layout_installer.py`)
+runs on Ergopti's own Python, never the host's python3 (maintainer decision, 1
+November): the python-build-standalone build of the shared managed Python
+release, pinned by SHA-256 and size per machine and C library in
+`_shared/data/linux_native_runtime.json` `managed_python` (the codegen refuses a
+version, build or uv release that differs from
+`_shared/modules/llm/managed_python_release.json`). `modules/keymap/managed_python.lua`
+asks once (owned dialog), downloads through the managed HTTP client, checks size
+and digest, unpacks into `<root>.staging` and renames it into the versioned
+folder under `ConfigPaths.data()/runtime/python/`, so a versioned folder only ever
+holds a verified interpreter. A declined or failed download reports
+`python_missing` with the reason. Action: a new Python consumer asks the layout
+registry's `python` dependency; a probe that is not about Python injects it
+(`run_layout_rows_live.lua`) instead of opening the consent dialog;
+`tests/hardware/run_managed_python_live.lua` is the network proof.
+
+### project-arch-recipe-repacks-the-release-tarball
+
+`tools/build/PKGBUILD` is a template, not a from-source recipe (maintainer
+decision, 1 November): it repacks the release tarball, which already carries
+the private runtime in `linux/runtime`, pinned by the tarball's SHA-256.
+`tools/build/render-arch-pkgbuild.cjs` fills the version (from the tarball's
+build stamp, hyphen dropped so a prerelease sorts first in pacman), the tag and
+the checksum; the Linux Build job renders it beside the tarball, Release
+attaches `PKGBUILD` and `ergopti.install`, and the `smoke-arch-package` row
+builds it with `makepkg` on Arch and installs it with pacman, which also proves
+the declared dependency names. The tarball carries no build scripts, so the
+recipe checks the stamp's commit line itself. Action: never build the pinned
+sources in makepkg; a runtime change reaches Arch through the tarball.
+
 ### project-the-drift-guard-crashes-on-this-windows-box
 
 When a cross-platform drift tool fails on Windows path/process semantics, use
@@ -765,16 +821,20 @@ The Ollama daemon Ergopti starts cannot evaluate a PAC, so a pull behind a
 PAC-only network failed. `modules/llm/managed_ollama_proxy.lua` runs a stage in
 the shared runtime repair before the daemon starts: the shared proxy policy
 routes the registry URL, and only a `system` route calls the owned GIO lookup
-(`adapters/system_proxy.lua`); the first selection becomes `HTTPS_PROXY` of the
-daemon. A proxy the user exported wins and is never overridden; DIRECT and a
+(`adapters/system_proxy.lua`); the first usable selection becomes `HTTPS_PROXY`
+of the daemon. A proxy the user exported wins over the PAC (the proxy override
+wins over both); DIRECT and a
 machine without a desktop proxy add nothing. A GIO lookup that fails or times
 out (an unusable PAC: GIO names no finer step) sends that origin direct with one
 WARNING naming `native_proxy_lookup` or `native_proxy_budget`, stages the shared
 policy's `falls_back_direct` admits from `pac_unavailable_fallback`; a failure of
 Ergopti's own helper child still refuses the start (`runtime_proxy_unavailable`).
-Ollama has no failover, so only the first
-selection is used, and a PAC that sends blob hosts elsewhere than the registry
-is not followed.
+Ollama has no failover, so the PAC list is walked before the start like a
+browser does: a relay followed by another entry is kept only when a TCP connect
+completes within `llm.managed_proxy_probe_timeout_ms` (1 s,
+`adapters/tcp_probe.lua`), else the next entry is tried; the last entry is kept
+unprobed. Action: give any new environment-driven client the same walk rather
+than its first PAC entry.
 
 ### project-linux-ollama-runs-on-the-owned-port-only
 

@@ -151,6 +151,10 @@ default-branch: stable
 runtime: org.freedesktop.Platform
 runtime-version: '24.08'
 sdk: org.freedesktop.Sdk
+# The proxy sign-in relay (docs/design/proxy-auth-relay.md) is Go: it is built
+# with the SDK's own toolchain, like every other ELF in /app.
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.golang
 
 command: ergopti
 
@@ -190,9 +194,8 @@ cleanup:
 
 modules:
   # org.freedesktop.Platform does not ship LuaJIT, and the daemon is a LuaJIT
-  # program — so it is built here rather than assumed. Upstream's v2.1 branch is
-  # the maintained line; a release build should pin `commit:` instead of
-  # `branch:` so the bundle is reproducible.
+  # program — so it is built here rather than assumed, from the v2.1 commit
+  # pinned in linux_native_runtime.json (owned runtimes: LuaJIT is PIN).
   - name: luajit
     buildsystem: simple
     build-commands:
@@ -205,12 +208,12 @@ modules:
     sources:
       - type: git
 MANIFEST_EOF
-# Only the host expands: the rest of the manifest stays a quoted here-document.
-printf '        url: %s\n' "https://$ERGOPTI_HOST_GITHUB/LuaJIT/LuaJIT.git" >> "$MANIFEST_FILE"
-cat >> "$MANIFEST_FILE" << 'MANIFEST_EOF'
-        branch: v2.1
-
-MANIFEST_EOF
+# The pinned source is read from the runtime catalogue, the one place the other
+# owned modules are pinned too.
+node - "$PROJECT_ROOT/static/ergopti_plus/_shared/data/linux_native_runtime.json" >> "$MANIFEST_FILE" << 'LUAJIT_SOURCE_EOF'
+const source = require(process.argv[2]).network_runtime.portable.flatpak_sources.luajit;
+process.stdout.write(`        url: ${source.url}\n        commit: ${source.commit}\n\n`);
+LUAJIT_SOURCE_EOF
 # Additional native modules come from the canonical runtime generator, using
 # exact upstream commits/distribution hashes. Do not maintain a second recipe.
 node - "$PROJECT_ROOT" >> "$MANIFEST_FILE" << 'NETWORK_MODULES_EOF'
@@ -236,6 +239,10 @@ cat >> "$MANIFEST_FILE" << 'MANIFEST_EOF'
       - bash tools/build/build-linux-native-output.sh --source-directory "$PWD/lib/ergopti/native/archive_output" --output-directory "$PWD/native-output"
       - cp -r lib/ergopti/. /app/lib/ergopti/
       - install -Dm755 native-output/libergopti_archive_publication.so /app/lib/ergopti/bin/libergopti_archive_publication.so
+      # The relay from the shipped Go sources, offline (standard library only),
+      # with the SDK's compiler for its cgo GSS-API half.
+      - bash -c 'set -euo pipefail; source /usr/lib/sdk/golang/enable.sh; export GOCACHE="$PWD/.gocache" GOPATH="$PWD/.gopath"; bash tools/build/build-proxy-relay.sh --source-directory "$PWD/lib/ergopti/_shared/go/native_http" --output "$PWD/native-output/ergopti-proxy-relay"'
+      - install -Dm755 native-output/ergopti-proxy-relay /app/lib/ergopti/bin/ergopti-proxy-relay
       - install -Dm755 bin/ergopti /app/bin/ergopti
       - install -Dm644 lib/ergopti/network-runtime-env.sh /app/lib/ergopti/network-runtime-env.sh
       - install -Dm644 share/applications/org.ergopti.Ergopti.desktop /app/share/applications/org.ergopti.Ergopti.desktop
@@ -273,9 +280,10 @@ echo "Staging driver payload..."
 cp -r "$BUILD_DIR/linux/." "$PAYLOAD_DIR/lib/ergopti/"
 # This SDK module receives sources and the canonical compiler owner only.
 # A host-built ELF must not enter /app before the SDK-built artifact replaces it.
-rm -f -- "$PAYLOAD_DIR/lib/ergopti/bin/libergopti_archive_publication.so"
+rm -f -- "$PAYLOAD_DIR/lib/ergopti/bin/libergopti_archive_publication.so" "$PAYLOAD_DIR/lib/ergopti/bin/ergopti-proxy-relay"
 mkdir -p "$PAYLOAD_DIR/tools/build"
 install -m 755 "$SCRIPT_DIR/build-linux-native-output.sh" "$PAYLOAD_DIR/tools/build/build-linux-native-output.sh"
+install -m 755 "$SCRIPT_DIR/build-proxy-relay.sh" "$PAYLOAD_DIR/tools/build/build-proxy-relay.sh"
 
 # The whole shared tree, not just _shared/lua: the keycode tables, hotstring
 # packs, locales and the defaults the resolver fails fast on live in

@@ -71,7 +71,7 @@ _LShiftHandleHold(PhysicalModifierPassthrough) {
 	; UAC prompt, Suspend toggled mid-press) can never wedge this hotkey's
 	; tap/hold discrimination forever (hold-keywait-whole-class).
 	TimeBefore := A_TickCount
-	Released := KeyWait("SC02A", "T" . DurationSec)
+	Released := KS_WaitReleased("SC02A", DurationSec)
 	TimeAfter := A_TickCount
 	ElapsedMs := TickElapsed(TimeBefore, TimeAfter)
 	GuardMs := DurationSec * 1000
@@ -156,7 +156,7 @@ _LCtrlHandleTapOnly() {
 	; Bounded (unlike a bare KeyWait): a lost SC01D key-up can never wedge
 	; this hotkey's tap/hold discrimination forever (hold-keywait-whole-class).
 	TimeBefore := A_TickCount
-	Released := KeyWait("SC01D", "T" . DurationSec)
+	Released := KS_WaitReleased("SC01D", DurationSec)
 	TimeAfter := A_TickCount
 	ElapsedMs := TickElapsed(TimeBefore, TimeAfter)
 	TapHoldRecordLCtrlPress()

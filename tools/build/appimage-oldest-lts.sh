@@ -11,8 +11,8 @@
 # file need at most its glibc; check-elf-glibc-ceiling.cjs proves it on the
 # packaged tree. The container also rebuilds the driver's native archive backend
 # in build/linux, so the .deb, .rpm and tarball made from the bundle afterwards
-# load on it too, and builds the .rpm's LuaJIT luv binding in
-# build/linux/packaged-luv.
+# load on it too. The private runtime the AppImage stages there is the one the
+# .deb and the .rpm carry (stage-linux-private-runtime.sh).
 #
 # Usage:
 #   bash tools/build/appimage-oldest-lts.sh build
@@ -53,12 +53,38 @@ apt_install() {
 # ----------------------------------------------------------------------
 # Inside the container: the build
 # ----------------------------------------------------------------------
+# Builds luaposix from the source the runtime manifest pins (the Flatpak's own,
+# network_runtime.portable.flatpak_sources.luaposix) into a private prefix and
+# points LuaJIT at it. This release's lua-posix 33.4 is one monolithic posix.so
+# over liblua5.1-posix, and the private runtime carries the split posix/*.so
+# layout every package and the launch check share (stage-linux-network-runtime.py).
+build_owned_luaposix() {
+	local prefix="/opt/ergopti-luaposix" work url commit
+	{ read -r url; read -r commit; } < <(python3 -c '
+import json, sys
+source = json.load(open(sys.argv[1]))["network_runtime"]["portable"]["flatpak_sources"]["luaposix"]
+print(source["url"]); print(source["commit"])' static/ergopti_plus/_shared/data/linux_native_runtime.json)
+	work="$(mktemp -d)"
+	git -c advice.detachedHead=false clone -q "$url" "$work/luaposix"
+	git -C "$work/luaposix" -c advice.detachedHead=false checkout -q "$commit"
+	[ "$(git -C "$work/luaposix" rev-parse HEAD)" = "$commit" ] || { echo "luaposix pin not checked out" >&2; exit 1; }
+	(cd "$work/luaposix" && luajit build-aux/luke LUA_INCDIR=/usr/include/luajit-2.1 \
+		&& luajit build-aux/luke install INST_LIBDIR="$prefix/lib/lua/5.1" INST_LUADIR="$prefix/share/lua/5.1")
+	test -f "$prefix/lib/lua/5.1/posix/sys/stat.so"
+	test -f "$prefix/share/lua/5.1/posix/init.lua"
+	export LUA_PATH="$prefix/share/lua/5.1/?.lua;$prefix/share/lua/5.1/?/init.lua;;"
+	export LUA_CPATH="$prefix/lib/lua/5.1/?.so;;"
+}
+
 container_build() {
-	# cmake, make, git and the LuaJIT headers build the .rpm's luv binding below.
-	apt_install bash ca-certificates curl binutils file gcc libc6-dev pkg-config python3 \
-		cmake make git libluajit-5.1-dev \
-		luajit lua-luv libssl-dev libglib2.0-dev libglib2.0-bin glib-networking \
+	# The programs and Lua modules of the private runtime every package carries
+	# are this release's packages (stage-linux-network-runtime.py), except
+	# luaposix, built from its pin (build_owned_luaposix).
+	apt_install bash ca-certificates curl binutils file gcc libc6-dev patchelf pkg-config python3 git \
+		luajit libluajit-5.1-dev lua-luv lua-filesystem sqlite3 openssl zstd \
+		libssl-dev libglib2.0-dev libglib2.0-bin glib-networking \
 		dconf-gsettings-backend gsettings-desktop-schemas libayatana-appindicator3-1
+	build_owned_luaposix
 	# The runner's Node, mounted read-only: the release's own is too old for the
 	# build scripts, and Node itself ships nothing into the image.
 	export PATH="/opt/node/bin:$PATH"
@@ -70,16 +96,6 @@ container_build() {
 	rm -f "$BUILD_ROOT/linux/bin/$backend"
 	bash tools/build/build-linux-native-output.sh
 
-	# The .rpm publishes its own LuaJIT luv binding; built here, it needs at most
-	# this release's glibc as well. build-linux-rpm.sh takes it with --luv-module.
-	local luv_stage
-	luv_stage="$(mktemp -d)"
-	bash tools/build/build-linux-packaged-luv.sh "$luv_stage"
-	rm -rf "$BUILD_ROOT/packaged-luv"
-	install -D -m 755 "$luv_stage/luv.so" "$BUILD_ROOT/packaged-luv/luv.so"
-	node tools/build/check-elf-glibc-ceiling.cjs "$BUILD_ROOT/packaged-luv/luv.so"
-
-	# appimagetool ships as an AppImage and a container has no FUSE: unpack it.
 	local tools
 	tools="$(mktemp -d)"
 	curl -fsSL --retry 3 --retry-delay 5 -o "$tools/appimagetool" \

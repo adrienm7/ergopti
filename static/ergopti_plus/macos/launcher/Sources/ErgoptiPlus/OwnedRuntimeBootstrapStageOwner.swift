@@ -17,7 +17,7 @@ final class OwnedRuntimeBootstrapStageOwner {
 	/// The scope is the executing signed helper's own fixed UUID bootstrap copy, never an installed app/profile.
 	static func acquire(afterPublication publication: OwnedRuntimeFirstInstallOwner) -> OwnedRuntimeBootstrapStageOwner? {
 		guard publication.authorizesBootstrapStageRetirement(), getuid() == 0, geteuid() == 0,
-			Bundle.main.bundleIdentifier == "com.ergoptiplus.app.runtime-installer",
+			Bundle.main.bundleIdentifier == Identifiers.SigningIds.runtimeInstaller,
 			Bundle.main.bundleURL.lastPathComponent == "Helper.app" else { return nil }
 		let stage = Bundle.main.bundleURL.deletingLastPathComponent()
 		guard stage.deletingLastPathComponent().standardizedFileURL == parentURL,
@@ -37,7 +37,7 @@ final class OwnedRuntimeBootstrapStageOwner {
 	}
 	func retire() -> Bool {
 		guard getpid() == creator, getuid() == 0, geteuid() == 0,
-			Bundle.main.bundleIdentifier == "com.ergoptiplus.app.runtime-installer" else { return false }
+			Bundle.main.bundleIdentifier == Identifiers.SigningIds.runtimeInstaller else { return false }
 		// After the first owned unlink, the helper's own signature/resource paths intentionally cease to exist.
 		// The original native owner/EX lock and immutable held-vnode plan remain in this same process until exit.
 		return plan.retire()

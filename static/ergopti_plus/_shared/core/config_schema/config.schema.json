@@ -39,6 +39,12 @@
 				}
 			}
 		},
+		"network": {
+			"description": "The proxy override of modules/network/proxy_override.json: empty, direct, or one relay URL. Its value grammar is validated by the driver.",
+			"type": "object",
+			"additionalProperties": false,
+			"properties": { "proxy_override": { "type": "string" } }
+		},
 		"category_enabled": { "$ref": "#/$defs/category_enabled" },
 		"ui": { "$ref": "#/$defs/ui" }
 	},

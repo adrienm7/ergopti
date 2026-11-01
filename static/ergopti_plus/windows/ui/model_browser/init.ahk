@@ -138,7 +138,7 @@ _LLM_ModelBrowser_Build() {
 	g.FilterDebounce := () => _LLM_ModelBrowser_RefreshRows(g.ListView, filter_edit.Value)
 	filter_edit.OnEvent("Change", (*) => (
 		SetTimer(g.FilterDebounce, 0),
-		SetTimer(g.FilterDebounce, -120)
+		SetTimer(g.FilterDebounce, -TimingsGet("ui", "model_browser_filter_debounce_ms"))
 	))
 
 	; ListView — columns mirror the metadata extracted in

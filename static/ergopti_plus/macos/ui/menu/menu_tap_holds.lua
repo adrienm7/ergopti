@@ -1099,7 +1099,25 @@ local function owned_runtime_block_rows(karabiner)
 	if not ok or type(status) ~= "table" or status.state ~= "unavailable" then return {} end
 	local rows = VHID_BLOCK_ROWS[status.reason]
 	if not rows then return {} end
-	return rows() or {}
+	rows = rows() or {}
+	if status.reason == require("platform.remap.runtime_vhid").REASON_INCOMPATIBLE
+		and type(karabiner.update_virtual_hid_driver) == "function" then
+		-- ADR 011's driver-only update: the row opens a confirmation, never the update itself.
+		for _, row in ipairs(ManifestMenu.template_rows("tap_hold_vhid_update_rows", {
+			[ConfigKeys.COMMAND.TAP_HOLD_VHID_UPDATE] = function()
+				Logger.info(LOG, "Showing the VirtualHIDDevice driver update from the Tap-Holds menu.")
+				local shown_ok, shown = xpcall(function()
+					return require("ui.virtual_hid_update").open(karabiner)
+				end, debug.traceback)
+				if not shown_ok then
+					Logger.error(LOG, "The VirtualHIDDevice driver update could not be shown: %s.", tostring(shown))
+					return false
+				end
+				return shown == true
+			end,
+		}) or {}) do rows[#rows + 1] = row end
+	end
+	return rows
 end
 
 --- Builds the Tap-holds row and its submenu.

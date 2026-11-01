@@ -255,6 +255,27 @@ const containerBuildBody = container.slice(
 	container.indexOf('container_build() {'),
 	container.indexOf('container_smoke() {')
 );
+// The prefix's libraries once reached every host program through LD_LIBRARY_PATH:
+// the build host's readline there killed bash 5.3 on Arch before the daemon
+// started. Each staged file now carries a RUNPATH the build container must be
+// able to write, and sqlite3 alone reaches the readline directory.
+assert.match(stager, /SQLITE3_ONLY_LIBRARIES = frozenset\(\{"libreadline\.so\.8"\}\)/);
+assert.match(
+	stager,
+	/search = "\$ORIGIN\/\.\.\/" \+ SQLITE3_LIBRARY_DIRECTORY \+ ":" \+ search/,
+	'sqlite3 alone reaches its library directory'
+);
+assert.ok(/\bpatchelf\b/.test(containerBuildBody), 'the build container carries patchelf');
+assert.doesNotMatch(
+	read('tools/build/templates/linux-portable-runtime-env.sh').replace(/^\s*#.*$/gm, ''),
+	/LD_LIBRARY_PATH/,
+	'the launch environment reaches host programs and names no library directory'
+);
+assert.doesNotMatch(
+	read('static/ergopti_plus/linux/install.sh'),
+	/LD_LIBRARY_PATH/,
+	'the installer has no library path of its own to keep from apt, dnf or pkexec'
+);
 const containerSmokeBody = container.slice(
 	container.indexOf('container_smoke() {'),
 	container.indexOf('user_smoke() {')
@@ -268,6 +289,33 @@ assert.ok(
 	'the smoke host lacks libayatana, as the catalogue does'
 );
 assert.ok(containerSmokeBody.includes('libgtk-3-0 stalonetray x11-utils'));
+// Ubuntu 22.04's lua-posix 33.4 is one monolithic posix.so, which the stager's
+// split-layout check refuses ("Native network packaging refused."): the build
+// container compiles luaposix from the manifest's pin and installs no lua-posix.
+assert.ok(
+	!/apt_install[^\n]*(\\\n[^\n]*)*\blua-posix\b/.test(containerBuildBody),
+	"the build host's monolithic lua-posix is never staged"
+);
+assert.ok(
+	containerBuildBody.includes('\tbuild_owned_luaposix\n'),
+	'the build compiles the pinned luaposix'
+);
+const ownedLuaposix = container.slice(
+	container.indexOf('build_owned_luaposix() {'),
+	container.indexOf('container_build() {')
+);
+assert.match(
+	ownedLuaposix,
+	/\["flatpak_sources"\]\["luaposix"\]/,
+	"the pin is the runtime manifest's"
+);
+assert.match(
+	ownedLuaposix,
+	/rev-parse HEAD\)" = "\$commit"/,
+	'the checked-out commit is the pinned one'
+);
+assert.match(ownedLuaposix, /test -f "\$prefix\/lib\/lua\/5\.1\/posix\/sys\/stat\.so"/);
+assert.match(ownedLuaposix, /export LUA_CPATH="\$prefix\/lib\/lua\/5\.1\/\?\.so;;"/);
 assert.ok(
 	container.includes(
 		'env -u DBUS_SESSION_BUS_ADDRESS xvfb-run -a bash "$SELF" xembed-in-display "$appimage"'
@@ -309,8 +357,10 @@ const packageJob = workflow.slice(
 const containerBuild = packageJob.indexOf('run: bash tools/build/appimage-oldest-lts.sh build\n');
 assert.ok(containerBuild > packageJob.indexOf('run: bash tools/build/build-linux-driver.sh\n'));
 assert.ok(
-	containerBuild < packageJob.indexOf('tar -czf "build/linux/$LINUX_BUNDLE_ASSET"') &&
-		containerBuild < packageJob.indexOf('bash tools/build/build-linux-deb.sh'),
+	containerBuild <
+		packageJob.indexOf(
+			'run: bash tools/build/build-linux-bundle-archive.sh "$LINUX_BUNDLE_ASSET"'
+		) && containerBuild < packageJob.indexOf('bash tools/build/build-linux-deb.sh'),
 	'every package is made from the bundle after its native backend is rebuilt'
 );
 assert.ok(
@@ -342,7 +392,13 @@ if (process.platform === 'linux') {
 		for (const name of [
 			'bin/luajit',
 			'bin/curl',
+			'bin/sqlite3',
+			'bin/openssl',
+			'bin/zstd',
 			'lib/lua/5.1/luv.so',
+			'lib/lua/5.1/lfs.so',
+			'lib/lua/5.1/posix/sys/stat.so',
+			'share/lua/5.1/posix/init.lua',
 			'lib/gio/modules/libgiolibproxy.so',
 			'share/glib-2.0/schemas/gschemas.compiled'
 		]) {

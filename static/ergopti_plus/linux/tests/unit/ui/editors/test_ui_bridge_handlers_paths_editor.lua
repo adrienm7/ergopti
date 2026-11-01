@@ -599,7 +599,9 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 		local captured = { storage_attempts = 0, writes = 0, hidden = 0, restarts = 0, errors = {} }
 		local observed = nil
 		local ok, err = xpcall(function()
-			package.loaded["infra.config_paths"] = { config_home = function() return root end }
+			-- config() is where the locale owner rewrites a held [script] locale.
+			package.loaded["infra.config_paths"] = { config_home = function() return root end,
+				config = function(name) return root .. "/config/" .. name end }
 			package.loaded["infra.locale"] = nil
 			package.loaded["adapters.storage"] = nil
 			package.loaded["infra.i18n"] = nil

@@ -165,10 +165,10 @@
 		{
 			"id": "js-0312",
 			"ordinal": 325,
-			"name": "Ollama bootstrap bounds and authenticates network acquisition",
+			"name": "The stock Ollama installer is retired; only Ergopti's runtime is verified",
 			"cmd": "node",
-			"args": ["tools/test/test-ollama-bootstrap-network-hardening.cjs"],
-			"repro": "npm run test:ollama-bootstrap-network-hardening"
+			"args": ["tools/test/test-ollama-stock-installer-retired.cjs"],
+			"repro": "npm run test:ollama-stock-installer-retired"
 		},
 		{
 			"id": "js-0313",
@@ -465,6 +465,65 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-route-plan.cjs"],
 			"repro": "node tools/test/test-windows-route-plan.cjs"
+		},
+		{
+			"id": "go-proxy-relay-gate",
+			"ordinal": 548,
+			"name": "Go proxy sign-in relay gate cannot pass vacuously (missing toolchain, no test files, skipped test)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-go-proxy-relay-gate.cjs"],
+			"repro": "node tools/test/test-go-proxy-relay-gate.cjs"
+		},
+		{
+			"id": "macos-proxy-relay-shell",
+			"ordinal": 552,
+			"name": "macOS Ollama daemon starts under the proxy sign-in relay when the proxy demands NTLM or Negotiate",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-proxy-relay-shell.cjs"],
+			"repro": "node tools/test/test-macos-proxy-relay-shell.cjs"
+		},
+		{
+			"id": "fake-network-controls",
+			"ordinal": 553,
+			"name": "The fake corporate network refuses a wrong NTLM password and ends each proxy mode as it claims",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-fake-network.cjs"],
+			"repro": "node tools/test/test-fake-network.cjs"
+		},
+		{
+			"id": "windows-proxy-relay-bundle",
+			"ordinal": 554,
+			"name": "The bundled Windows proxy relay is the one its sources and manifest name",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-proxy-relay-bundle.cjs"],
+			"repro": "node tools/test/test-windows-proxy-relay-bundle.cjs"
+		},
+		{
+			"id": "windows-proxy-relay-e2e",
+			"ordinal": 555,
+			"name": "Windows proxy relay end to end: real relay, launcher and SSPI through the fake network",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-proxy-relay-e2e.cjs"],
+			"repro": "node tools/test/test-windows-proxy-relay-e2e.cjs",
+			"platforms": ["win32"]
+		},
+		{
+			"id": "windows-proxy-override-e2e",
+			"ordinal": 560,
+			"name": "Windows proxy override end to end: the real adapter and workers through the fake network",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-proxy-override-e2e.cjs"],
+			"repro": "node tools/test/test-windows-proxy-override-e2e.cjs",
+			"platforms": ["win32"]
+		},
+		{
+			"id": "perplexity-agent-e2e",
+			"ordinal": 562,
+			"name": "Perplexity Agent API end to end: the real transport and the shared Lua through the fake network",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-perplexity-agent-e2e.cjs"],
+			"repro": "node tools/test/test-perplexity-agent-e2e.cjs",
+			"platforms": ["win32"]
 		}
 	]
 }

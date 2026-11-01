@@ -177,7 +177,7 @@ LLM_Agent_Backend(Key, &Reason := "") {
 		return ""
 	}
 	Fmt := LLM_RemoteProviderFormat(Parsed["backend"])
-	if (Key == "agent_system2" && Fmt != "" && !LLM_RemoteFormatServes(Fmt, "chat")) {
+	if (Key == ConfigLeaf.AGENT_SYSTEM2 && Fmt != "" && !LLM_RemoteFormatServes(Fmt, "chat")) {
 		Reason := "'" . Parsed["backend"] . "' answers typed questions only, it cannot write actions"
 		return ""
 	}
@@ -201,7 +201,7 @@ LLM_Agent_Backend(Key, &Reason := "") {
  */
 LLM_Agent_BackendChoices(Key) {
 	global LLM_VISION_LOCAL_BACKEND, LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER
-	if (Key != ConfigLeaf.AGENT_SYSTEM1 && Key != "agent_system2")
+	if (Key != ConfigLeaf.AGENT_SYSTEM1 && Key != ConfigLeaf.AGENT_SYSTEM2)
 		throw ValueError("LLM_Agent_BackendChoices: unknown system " . String(Key) . ".")
 	Choices := [Map("value", LLM_VISION_LOCAL_BACKEND, "label", t("llm.vision.local_backend"))]
 	for ProviderId in LLM_API_PROVIDER_ORDER {
@@ -262,13 +262,13 @@ LLM_Agent_RefreshTray() {
  * @returns {Boolean} True when the mode changed.
  */
 LLM_Agent_SetMode(Mode) {
-	if !LLM_Option_TryNormalize("agent_mode", Mode, &Normalized)
+	if !LLM_Option_TryNormalize(ConfigLeaf.AGENT_MODE, Mode, &Normalized)
 		throw ValueError("LLM_Agent_SetMode: unknown mode " . String(Mode) . ".")
 	if (Normalized == "auto" && !_LLM_Agent_AutoIsPossible())
 		return false
-	if (LLM_Agent_Setting("agent_mode") == Normalized)
+	if (LLM_Agent_Setting(ConfigLeaf.AGENT_MODE) == Normalized)
 		return false
-	if !LLM_Agent_CommitSetting("agent_mode", Normalized)
+	if !LLM_Agent_CommitSetting(ConfigLeaf.AGENT_MODE, Normalized)
 		return false
 	LoggerInfo("LLM", "AI agent mode set to '{1}'.", Normalized)
 	if (Normalized != "auto")
@@ -282,7 +282,7 @@ LLM_Agent_SetMode(Mode) {
  * @returns {Boolean} True when the mode changed.
  */
 LLM_Agent_ToggleAuto() {
-	TurnOn := LLM_Agent_Setting("agent_mode") != "auto"
+	TurnOn := LLM_Agent_Setting(ConfigLeaf.AGENT_MODE) != "auto"
 	if !LLM_Agent_SetMode(TurnOn ? "auto" : "action")
 		return false
 	_LLM_Menu_ShowManualPredictionNotice(TurnOn ? "llm.agent.auto_on" : "llm.agent.auto_off")
@@ -305,7 +305,7 @@ _LLM_Agent_ApplyCommitted(Key, Previous, Candidate) {
 	global _LLM_Agent_Generation, _LLM_Agent_System1Revision
 	; Durable source/mode withdrawals retire every held requester, including ABA.
 	; A no-op or a refused transaction never revokes an accepted request.
-	if (Key == "agent_system2" || Key == "agent_mode") && Candidate[Key] != Previous
+	if (Key == ConfigLeaf.AGENT_SYSTEM2 || Key == ConfigLeaf.AGENT_MODE) && Candidate[Key] != Previous
 		_LLM_Agent_Generation += 1
 	if Key == ConfigLeaf.AGENT_SYSTEM1 && Candidate[Key] != Previous
 		_LLM_Agent_System1Revision += 1
@@ -321,7 +321,7 @@ _LLM_Agent_AutoIsPossible() {
 		_LLM_Menu_ShowManualPredictionNotice("llm.agent.no_system1")
 		return false
 	}
-	if !(LLM_Agent_Backend("agent_system2", &Reason) is Map) {
+	if !(LLM_Agent_Backend(ConfigLeaf.AGENT_SYSTEM2, &Reason) is Map) {
 		LoggerInfo("LLM", "AI agent automatic mode refused: System 2 is not usable ({1}).", Reason)
 		_LLM_Menu_ShowManualPredictionNotice("llm.agent.no_system2")
 		return false
@@ -396,23 +396,31 @@ _LLM_Agent_ManualRefusal() {
 		_LLM_Menu_ShowManualPredictionRefusal(Refusal, 0)
 		return ""
 	}
-	if (LLM_Agent_Setting("agent_mode") == "off") {
+	if (LLM_Agent_Setting(ConfigLeaf.AGENT_MODE) == "off") {
 		LoggerInfo("LLM", "AI agent refused: its mode is off.")
 		_LLM_Menu_ShowManualPredictionNotice("llm.agent.off_notice")
 		return ""
 	}
-	Backend := LLM_Agent_Backend("agent_system2", &Reason)
+	Backend := LLM_Agent_Backend(ConfigLeaf.AGENT_SYSTEM2, &Reason)
 	if !(Backend is Map) {
 		LoggerInfo("LLM", "AI agent refused: System 2 is not usable ({1}).", Reason)
 		_LLM_Menu_ShowManualPredictionNotice("llm.agent.no_system2")
 		return ""
 	}
-	; The text would leave an app the user excluded from the AI
-	if _LLM_Engine_ShouldSuppressForDisabledApps() {
-		LoggerInfo("LLM", "AI agent refused: the focused app is excluded from the AI.")
+	; The text would leave a secure field, or an app the user excluded from the AI
+	if _LLM_Agent_FieldIsSecure() || _LLM_Engine_ShouldSuppressForDisabledApps() {
+		LoggerInfo("LLM", "AI agent refused: the focused field or app is excluded from the AI.")
 		return ""
 	}
 	return Backend
+}
+
+; @returns {Boolean} True in a secure field, and when that cannot be told.
+_LLM_Agent_FieldIsSecure() {
+	global _LLM_Agent_SecureFieldFn
+	Secure := true
+	try Secure := HasMethod(_LLM_Agent_SecureFieldFn, "Call") ? _LLM_Agent_SecureFieldFn.Call() : SFD_IsSecureField()
+	return Secure ? true : false
 }
 
 ; The selection arrived: hand it to System 2, or say that nothing is selected.
@@ -771,7 +779,7 @@ _LLM_Agent_TimeZone() {
 LLM_Agent_WatchesTyping() {
 	if A_IsSuspended || !LLM_Menu_AiEnabled()
 		return false
-	return LLM_Agent_Setting("agent_mode") == "auto"
+	return LLM_Agent_Setting(ConfigLeaf.AGENT_MODE) == "auto"
 }
 
 /**
@@ -792,7 +800,7 @@ LLM_Agent_OnTyping(Buffer, PublishGuard := unset) {
 		return false
 	}
 	_LLM_Agent_SettleOffer(false)
-	Automatic := LLM_Agent_Setting("agent_mode") == "auto"
+	Automatic := LLM_Agent_Setting(ConfigLeaf.AGENT_MODE) == "auto"
 	; Configuration may be cold; resolve it before mutating the pause owner.
 	PauseMs := Automatic ? LLM_Agent_Config()["system1"]["pause_ms"] : 0
 	PreviousCritical := Critical("On")
@@ -925,20 +933,20 @@ _LLM_Agent_OnSystem1Fail(OnTriage, Current, Failure := "") {
 
 ; The typing paused: triage the current sentence when everything allows it.
 _LLM_Agent_OnPause(Generation, Buffer) {
-	global _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Agent_SecureFieldFn, _LLM_Agent_System1Revision
+	global _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Agent_System1Revision
 	Revision := _LLM_Agent_System1Revision
 	Current := _LLM_Agent_TriageIsCurrent.Bind(Generation, Revision)
 	_LLM_Agent_Auto["timer"] := 0
 	if (Generation != _LLM_Agent_Generation) || A_IsSuspended || !LLM_Menu_AiEnabled()
 		return false
-	if (LLM_Agent_Setting("agent_mode") != "auto")
+	if (LLM_Agent_Setting(ConfigLeaf.AGENT_MODE) != "auto")
 		return false
 	if LLM_Engine_LiveIsActive() || _LLM_Agent_SurfaceIsHeld() || _LLM_Engine_HotstringTooltipShown() {
 		LoggerDebug("LLM", "AI agent: no triage, live mode or another tooltip holds the surface.")
 		return false
 	}
 	System1 := LLM_Agent_Backend(ConfigLeaf.AGENT_SYSTEM1, &Reason)
-	System2 := LLM_Agent_Backend("agent_system2", &Reason)
+	System2 := LLM_Agent_Backend(ConfigLeaf.AGENT_SYSTEM2, &Reason)
 	if !(System1 is Map) || !(System2 is Map) {
 		LoggerDebug("LLM", "AI agent: no triage, a system is not usable ({1}).", Reason)
 		return false
@@ -951,9 +959,7 @@ _LLM_Agent_OnPause(Generation, Buffer) {
 		LoggerDebug("LLM", "AI agent: no triage, this sentence was already triaged.")
 		return false
 	}
-	Secure := true
-	try Secure := HasMethod(_LLM_Agent_SecureFieldFn, "Call") ? _LLM_Agent_SecureFieldFn.Call() : SFD_IsSecureField()
-	if Secure {
+	if _LLM_Agent_FieldIsSecure() {
 		LoggerInfo("LLM", "AI agent: no triage in a secure field.")
 		return false
 	}
@@ -1003,7 +1009,7 @@ _LLM_Agent_OnTriage(Flow, Triage) {
 
 ; @returns {Boolean} True when App is in the automatic mode's excluded apps.
 _LLM_Agent_AppIsExcluded(App) {
-	Apps := LLM_Agent_Setting("agent_disabled_apps")
+	Apps := LLM_Agent_Setting(ConfigLeaf.AGENT_DISABLED_APPS)
 	; The engine's matcher: case-insensitive, with or without ".exe"
 	return (Apps is Array) && Apps.Length > 0 && _LLM_Engine_AppIsExcluded(App, Apps)
 }

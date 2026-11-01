@@ -88,6 +88,8 @@ class PreparationControls(unittest.TestCase):
                 "/usr/bin/xcodebuild",
                 "-configuration",
                 "Release",
+                "-jobs",
+                "2",
                 "-alltargets",
                 "SYMROOT=" + str(self.source / "build"),
                 "ARCHS=arm64 x86_64",
@@ -96,6 +98,7 @@ class PreparationControls(unittest.TestCase):
                 "CODE_SIGNING_REQUIRED=NO",
                 "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
                 "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+                "LD_RUNPATH_SEARCH_PATHS=",
             ],
         )
 
@@ -328,6 +331,30 @@ class PreparationControls(unittest.TestCase):
                 lambda: SUBJECT.preflight(Path(__file__).resolve().parents[2], self.root, value),
             )
 
+    def test_owned_compilation_admits_only_its_two_named_deadlines(self):
+        self.assertEqual(SUBJECT.OWNED_BUDGETS, (300, SUBJECT.HOSTED_RUNNER_SECONDS))
+        hosted = SUBJECT.HOSTED_RUNNER_SECONDS
+        for value in [True, 301, hosted - 1, hosted + 1, 300.0, float(hosted), 0]:
+            self.refusal(
+                "invalid_budget",
+                lambda: SUBJECT.compile_owned(
+                    Path(__file__).resolve().parents[2], self.root, value
+                ),
+            )
+
+    def test_hosted_runner_flag_selects_its_deadline(self):
+        seen = []
+        with mock.patch.object(
+            SUBJECT, "compile_owned", side_effect=lambda r, o, s, u: seen.append(s) or {}
+        ):
+            try:
+                SUBJECT.main(
+                    [str(self.root), str(self.root), "--compile-owned", "--hosted-runner-budget"]
+                )
+            except BaseException:
+                pass
+        self.assertEqual(seen, [SUBJECT.HOSTED_RUNNER_SECONDS])
+
     def test_baseline_stdout_exact_actual_19_phases(self):
         stdout = "PASS unsigned pinned Core-Service and CLI compilation; native capture and installation unexecuted\n"
         stdout += "".join("PHASE " + name + " seconds=0.125\n" for name in BASELINE_PHASES)
@@ -360,7 +387,10 @@ class PreparationControls(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stdout, "")
         self.assertEqual(
-            result.stderr, "Owned runtime compilation refused: dependency_unreleased\n"
+            result.stderr,
+            "Owned runtime compilation refused: dependency_unreleased\n"
+            "Owned runtime refusal detail: "
+            "Complete pristine source inputs are absent from dependency-only preparation\n",
         )
         receipt = json.loads((self.root / "owned-build-refusal.json").read_text())
         self.assertEqual(
@@ -525,6 +555,8 @@ class PreparationControls(unittest.TestCase):
                     tools["xcodebuild"],
                     "-configuration",
                     "Release",
+                    "-jobs",
+                    "2",
                     "-alltargets",
                     "SYMROOT=" + str(source / recipe / "build"),
                     "ARCHS=arm64 x86_64",
@@ -533,6 +565,7 @@ class PreparationControls(unittest.TestCase):
                     "CODE_SIGNING_REQUIRED=NO",
                     "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
                     "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+                    "LD_RUNPATH_SEARCH_PATHS=",
                 ]
                 if label == "core":
                     expected_command.append("ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO")
@@ -632,12 +665,40 @@ class OwnedRecordControls(unittest.TestCase):
                 record = self.record(fresh)
                 self.assertIsNone(SUBJECT.validate_owned_record(record))
 
+    def test_hosted_runner_deadline_record_is_admitted(self):
+        record = self.record()
+        record["budget_seconds"] = SUBJECT.HOSTED_RUNNER_SECONDS
+        self.assertIsNone(SUBJECT.validate_owned_record(record))
+
+    def test_phase_elapsed_is_bounded_by_the_record_deadline(self):
+        # Run 41228607079 built core in 966.6 s under the hosted deadline and
+        # was refused by a phase bound that still assumed the 300 s calibration.
+        hosted = SUBJECT.HOSTED_RUNNER_SECONDS
+        for budget, elapsed, admitted in (
+            (hosted, 966.6, True),
+            (hosted, hosted, True),
+            (hosted, hosted + 0.5, False),
+            (300, 300, True),
+            (300, 300.5, False),
+        ):
+            with self.subTest(budget=budget, elapsed=elapsed):
+                record = self.record()
+                record["budget_seconds"] = budget
+                row = next(r for r in record["phases"] if r["phase"] == "core_build")
+                row["elapsed_seconds"] = elapsed
+                if admitted:
+                    self.assertIsNone(SUBJECT.validate_owned_record(record))
+                else:
+                    self.refused(record)
+
     def test_exact_record_keyset_and_schema(self):
         for operation in (
             lambda r: r.update(extra=True),
             lambda r: r.pop("pins"),
             lambda r: r.update(schema=True),
             lambda r: r.update(budget_seconds=300.0),
+            lambda r: r.update(budget_seconds=301),
+            lambda r: r.update(budget_seconds=float(SUBJECT.HOSTED_RUNNER_SECONDS)),
         ):
             record = self.record()
             operation(record)
@@ -830,7 +891,7 @@ def concurrent_owned_control_suite():
             self.assertTrue(all(h.drained for h in self.owners))
             self.assertFalse((self.case.owner / "owned-native-build-result.json").exists())
 
-        def test_finish_refusal_drains_pending_cli_without_publication(self):
+        def test_finish_refusal_stops_acquisition_without_publication(self):
             error = self.builder.BASE.NativeBuildError(
                 "phase_failed", "MODELED native finish refusal"
             )
@@ -843,7 +904,8 @@ def concurrent_owned_control_suite():
             with self.assertRaises(self.builder.BASE.NativeBuildError) as caught:
                 self.case.invoke()
             self.assertIs(caught.exception, error)
-            self.assertEqual(self.finishes, ["core_build", "console_build", "cli_build"])
+            self.assertEqual(self.begins, ["core_build", "console_build"])
+            self.assertEqual(self.finishes, ["core_build", "console_build"])
             self.assertTrue(all(h.drained for h in self.owners))
             self.assertFalse((self.case.owner / "owned-native-build-result.json").exists())
 
@@ -872,6 +934,8 @@ def concurrent_owned_control_suite():
                     "/usr/bin/true",
                     "-configuration",
                     "Release",
+                    "-jobs",
+                    "2",
                     "-alltargets",
                     "SYMROOT=" + str(self.case.stage / recipe / "build"),
                     "ARCHS=arm64 x86_64",
@@ -880,6 +944,7 @@ def concurrent_owned_control_suite():
                     "CODE_SIGNING_REQUIRED=NO",
                     "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
                     "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+                    "LD_RUNPATH_SEARCH_PATHS=",
                 ]
                 if label == "core":
                     expected.append("ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO")
@@ -912,14 +977,35 @@ def concurrent_owned_control_suite():
             )
             self.assertTrue(all(h.drained for h in self.owners))
 
-        def test_reverse_ready_completion_keeps_canonical_array_order(self):
+        def test_each_build_finishes_before_the_next_begins(self):
             from unittest.mock import patch
 
-            with patch.object(
-                self.builder, "_PHASE_READY", side_effect=lambda h: h.name == "console_build"
+            # Concurrent universal builds overcommitted a hosted runner for hours,
+            # so readiness never lets a later build start before an earlier ends.
+            events = []
+            old_begin, old_finish = self.begin, self.finish
+
+            def begin(*arguments):
+                events.append(("begin", arguments[0]))
+                return old_begin(*arguments)
+
+            def finish(owner):
+                events.append(("finish", owner.name))
+                return old_finish(owner)
+
+            with (
+                patch.object(self.builder, "_BEGIN_PHASE", side_effect=begin),
+                patch.object(self.builder, "_FINISH_PHASE", side_effect=finish),
             ):
                 row = self.case.invoke()
-            self.assertEqual(self.finishes, ["console_build", "core_build", "cli_build"])
+            self.assertEqual(
+                events,
+                [
+                    (event, label + "_build")
+                    for label in ("core", "console", "cli")
+                    for event in ("begin", "finish")
+                ],
+            )
             self.assertEqual(
                 [r["target"] for r in row["products"]], ["duktape", "core", "console", "cli"]
             )
@@ -948,19 +1034,13 @@ def concurrent_owned_control_suite():
                         observed.append(label)
                 return original(path, root)
 
-            with (
-                patch.object(self.builder, "product_snapshot", side_effect=capture),
-                patch.object(
-                    self.builder, "_PHASE_READY", side_effect=lambda h: h.name == "console_build"
-                ),
-            ):
+            with patch.object(self.builder, "product_snapshot", side_effect=capture):
                 self.case.invoke()
-            self.assertEqual(observed[0], "console")
+            self.assertEqual(list(dict.fromkeys(observed)), ["core", "console", "cli"])
             self.assertTrue(all(h.drained for h in self.owners))
 
-        def test_primary_preserves_both_later_drain_refusals(self):
+        def test_primary_preserves_the_later_drain_refusal(self):
             primary = self.builder.BASE.NativeBuildError("phase_failed", "MODELED begin refusal")
-            core = self.builder.BASE.NativeBuildError("phase_failed", "MODELED core drain refusal")
             console = self.builder.BASE.NativeBuildError(
                 "phase_failed", "MODELED console drain refusal"
             )
@@ -970,13 +1050,15 @@ def concurrent_owned_control_suite():
                     raise primary
 
             def finish_fault(owner):
-                raise core if owner.name == "core_build" else console
+                if owner.name == "console_build":
+                    raise console
 
             self.begin_fault, self.finish_fault = begin_fault, finish_fault
             with self.assertRaises(self.builder.BASE.NativeBuildError) as caught:
                 self.case.invoke()
             self.assertIs(caught.exception, primary)
-            self.assertEqual(caught.exception._owned_phase_failures, (core, console))
+            self.assertEqual(caught.exception._owned_phase_failures, (console,))
+            self.assertEqual(self.begins, ["core_build", "console_build"])
             self.assertTrue(all(h.drained for h in self.owners))
             self.assertFalse((self.case.owner / "owned-native-build-result.json").exists())
 
@@ -1139,4 +1221,4 @@ if __name__ == "__main__":
         "errors=" + str(len(result.errors)),
         "skipped=" + str(len(result.skipped)),
     )
-    raise SystemExit(0 if result.wasSuccessful() and count == 45 and not result.skipped else 1)
+    raise SystemExit(0 if result.wasSuccessful() and count == 49 and not result.skipped else 1)

@@ -16,7 +16,7 @@ import signal
 import sys
 import time
 
-SOURCE_SHA = "dbada7b080b92f0a6d6613db0cd7102e02d3131ef162bc519f4e5cf1d46a1a57"
+SOURCE_SHA = "a21d2bb6a6f6a99b33d701b19b0a36a8e03af3c371bf1d9b92c4304507a02241"
 _source_path = Path(__file__).resolve().with_name("operational_core_source.py")
 _source_info = _source_path.lstat()
 _source_bytes = _source_path.read_bytes()
@@ -481,6 +481,8 @@ def receive(repository, owner):
             "ErgoptiPlus-Remap-Core-Observer.xcodeproj",
             "-configuration",
             "Release",
+            "-jobs",
+            str(build.XCODEBUILD_JOBS),
             "SYMROOT=" + str(project / "build"),
             "ARCHS=arm64 x86_64",
             "ONLY_ACTIVE_ARCH=NO",
@@ -488,6 +490,7 @@ def receive(repository, owner):
             "CODE_SIGNING_REQUIRED=NO",
             "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
             "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+            "LD_RUNPATH_SEARCH_PATHS=",
             "ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO",
         ]
         for name, target, relative in (

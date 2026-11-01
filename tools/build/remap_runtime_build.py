@@ -17,10 +17,11 @@ import shutil
 import stat
 import sys
 import time
+import traceback
 import uuid
 
 BASE_PATH = Path(__file__).resolve().parents[1] / "diagnostics/hs274_native_build.py"
-BASE_SHA256 = "9695174913fec75b4f0ea1b58b1fed70a06f31fc88dcc7b521ca93eb730d9fe6"
+BASE_SHA256 = "bebd311d6299529a54f7fc414f1353074ad798ca07ee7494eeb14f2f8fbd9277"
 PROVIDER_SHA256 = "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a"
 
 
@@ -83,6 +84,16 @@ BASELINE_PHASES = (
     "cli_build",
 )
 PRODUCT_MAX_BYTES = 128 * 1024 * 1024
+# One universal build compiles each heavy C++23 translation unit once per
+# architecture; two concurrent compiler jobs keep a 3-core 7 GB hosted runner
+# out of swap, where an unbounded build crawled for hours.
+XCODEBUILD_JOBS = 2
+# The 300 s calibration deadline fits a maintainer Mac. On a hosted 3-core
+# runner the universal core build alone takes 1090 s (run 41224698238), so
+# the hosted lane selects this one other admitted deadline; it still bounds
+# the whole owned build with a hard kill.
+HOSTED_RUNNER_SECONDS = 3600
+OWNED_BUDGETS = (BASE.CALIBRATION_SECONDS, HOSTED_RUNNER_SECONDS)
 # The complete canonical factory already bounds its actual tracked leaves at 8 MiB.
 SOURCE_TREE_MAX_BYTES = 8 * 1024 * 1024
 
@@ -127,6 +138,182 @@ def _identity(info):
         info.st_size,
         info.st_mtime_ns,
         info.st_ctime_ns,
+    )
+
+
+_IDENTITY_AXES = ("dev", "ino", "uid", "mode", "nlink", "size", "mtime", "ctime")
+# A held file stays current when its bytes and every identity field but ctime
+# are unchanged. macOS changes the ctime of untouched files in the background
+# (an extended attribute added to a generated project.pbxproj between two
+# phases, run 41227533352); the inode, size, mtime and bytes still pin the
+# exact incarnation, so a ctime-only change is not a replaced or edited input.
+_CTIME_AXIS = _IDENTITY_AXES.index("ctime")
+
+
+def _held_identity(identity):
+    return identity[:_CTIME_AXIS] + identity[_CTIME_AXIS + 1 :]
+
+
+def _held_current(previous, current):
+    """Compare two captures of one held file, tolerating only a ctime change."""
+    return (
+        current.path == previous.path
+        and current.data == previous.data
+        and _held_identity(current.identity) == _held_identity(previous.identity)
+    )
+
+
+def _report_identity_change(kind, path, previous, current):
+    """Name a changed retained file and its changed fields on the build log.
+
+    The boundary journal is capped and full before the native builds start, so
+    a currentness refusal otherwise reaches the log as a bare code. Only the
+    relative path and field names are printed; the refusal itself is unchanged.
+    """
+    if current is None:
+        axes = ("unavailable",)
+    else:
+        axes = tuple(
+            name for name, old, new in zip(_IDENTITY_AXES, previous[0], current[0]) if old != new
+        )
+        if previous[1] != current[1]:
+            axes += ("data",)
+    tolerated = axes == ("ctime",)
+    print(
+        "[owned-build] "
+        + kind
+        + (" ctime changed, bytes and incarnation unchanged: " if tolerated else " changed: ")
+        + str(path)
+        + " ("
+        + ",".join(axes)
+        + ")",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
+MACHO_DIFFERENCE_RANGES = 16
+MACHO_DIFFERENCE_CHUNK = 4096
+
+
+def _differing_ranges(left, right):
+    """Return the first merged byte ranges where two buffers differ, within their common length."""
+    ranges, length = [], min(len(left), len(right))
+    for chunk in range(0, length, MACHO_DIFFERENCE_CHUNK):
+        stop = min(chunk + MACHO_DIFFERENCE_CHUNK, length)
+        if left[chunk:stop] == right[chunk:stop]:
+            continue
+        for offset in range(chunk, stop):
+            if left[offset] != right[offset]:
+                if ranges and ranges[-1][1] == offset:
+                    ranges[-1][1] = offset + 1
+                elif len(ranges) == MACHO_DIFFERENCE_RANGES:
+                    return ranges
+                else:
+                    ranges.append([offset, offset + 1])
+    return ranges
+
+
+def _report_macho_difference(macho, relative, original, signed, error, deadline):
+    """Describe a refused signing transform: the comparator line and each slice's layout.
+
+    Failure-only and best-effort: the comparator shares one code across a
+    dozen checks, and a diagnostic failure never replaces its refusal.
+    """
+    try:
+        frames = traceback.extract_tb(error.__traceback__)[-2:]
+        print(
+            "[owned-build] Mach-O comparison of "
+            + relative
+            + " refused "
+            + str(error.code)
+            + " at "
+            + " <- ".join(
+                "%s:%d (%s)" % (Path(frame.filename).name, frame.lineno, frame.name)
+                for frame in reversed(frames)
+            ),
+            file=sys.stderr,
+            flush=True,
+        )
+        pairs = zip(macho._images(original, deadline), macho._images(signed, deadline))
+        for before, after in pairs:
+            print(
+                "[owned-build]   slice cpu=%#x bytes %d -> %d, commands_end %d -> %d, "
+                "commands %d -> %d, signature %s -> %s, linkedit size %d -> %d vm %d -> %d, "
+                "payload_end %d -> %d, differing ranges %s"
+                % (
+                    before.cpu,
+                    len(before.data),
+                    len(after.data),
+                    before.commands_end,
+                    after.commands_end,
+                    len(before.commands),
+                    len(after.commands),
+                    before.signature,
+                    after.signature,
+                    before.link_size,
+                    after.link_size,
+                    before.link_vm,
+                    after.link_vm,
+                    before.payload_end,
+                    after.payload_end,
+                    _differing_ranges(before.data, after.data),
+                ),
+                file=sys.stderr,
+                flush=True,
+            )
+    except BaseException as failure:
+        print(
+            "[owned-build] Mach-O difference report failed: " + failure.__class__.__name__,
+            file=sys.stderr,
+            flush=True,
+        )
+
+
+# The production builder executes its own copies of the native backend under
+# these fixed module names, so their NativeBuildError classes are distinct
+# from BASE's; run 41260796161 let one escape as a traceback.
+PRODUCTION_BACKEND_MODULES = ("fixed_owned_product_native_backend", "fixed_live_product_backend")
+
+
+def _production_backend_errors():
+    """Return the NativeBuildError classes of the loaded production backend copies."""
+    return tuple(
+        sys.modules[name].NativeBuildError
+        for name in PRODUCTION_BACKEND_MODULES
+        if name in sys.modules
+    )
+
+
+def _report_refusal_origin(stage, error):
+    """Name a refusal's type, code, innermost builder line, deeper origin and message.
+
+    Signing and packaging map every refusal, and any OSError, to one closed
+    code, and many checks share it; the source line and the fixed refusal
+    message tell them apart on the log.
+    """
+    trace = traceback.extract_tb(error.__traceback__)
+    frames = [frame for frame in trace if Path(frame.filename).name == Path(__file__).name]
+    where = "line %d (%s)" % (frames[-1].lineno, frames[-1].name) if frames else "unknown line"
+    if trace and (not frames or trace[-1] is not frames[-1]):
+        where += " via %s:%d (%s)" % (
+            Path(trace[-1].filename).name,
+            trace[-1].lineno,
+            trace[-1].name,
+        )
+    message = str(error)
+    print(
+        "[owned-build] "
+        + stage
+        + " refused by "
+        + error.__class__.__name__
+        + " "
+        + str(getattr(error, "code", ""))
+        + " at "
+        + where
+        + (": " + message if message else ""),
+        file=sys.stderr,
+        flush=True,
     )
 
 
@@ -677,7 +864,14 @@ def current_inputs(snapshot, deadline, *, maximum=BASE.MAX_INPUT_BYTES):
         for previous in snapshot.files:
             check_deadline(deadline)
             current = _ordinary(snapshot.root / previous.path, snapshot.root, maximum)
-            _REQUIRE(current == previous, "source_identity", "Retained source changed")
+            if current != previous:
+                _report_identity_change(
+                    "retained source",
+                    previous.path,
+                    (previous.identity, previous.data),
+                    (current.identity, current.data),
+                )
+            _REQUIRE(_held_current(previous, current), "source_identity", "Retained source changed")
             check_deadline(deadline)
 
 
@@ -740,6 +934,8 @@ def build_command(executable, project):
         executable,
         "-configuration",
         "Release",
+        "-jobs",
+        str(XCODEBUILD_JOBS),
         "-alltargets",
         "SYMROOT=" + str(Path(project) / "build"),
         "ARCHS=arm64 x86_64",
@@ -748,6 +944,10 @@ def build_command(executable, project):
         "CODE_SIGNING_REQUIRED=NO",
         "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
         "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+        # The products embed no framework, and the installer's load-path
+        # closure admits no @executable_path rpath (run 41268303524), so
+        # Xcode's default ../Frameworks runpath is cleared.
+        "LD_RUNPATH_SEARCH_PATHS=",
     ]
 
 
@@ -785,14 +985,27 @@ def current_product(snapshot, root):
     try:
         with _observe_span("products"):
             current = product_snapshot(Path(root) / snapshot.path, root)
+            if current != snapshot and _held_current(snapshot, current):
+                _report_identity_change(
+                    "retained product",
+                    snapshot.path,
+                    (snapshot.identity, snapshot.data),
+                    (current.identity, current.data),
+                )
             _REQUIRE(
-                current == snapshot,
+                _held_current(snapshot, current),
                 "source_identity",
                 "Native product changed across a foreign phase",
             )
     except BASE.NativeBuildError as error:
         if _product_refusal_cut(error) == "held_product_changed":
             _observe_product_difference(snapshot, current)
+            _report_identity_change(
+                "retained product",
+                snapshot.path,
+                (snapshot.identity, snapshot.data),
+                None if current is None else (current.identity, current.data),
+            )
         raise
 
 
@@ -1052,7 +1265,7 @@ class _PreparationSink:
 
 
 MACHO_RELATIVE = "tools/build/remap_runtime_macho.py"
-MACHO_SHA256 = "238fc52ca61326fe05b708954a0d9e84ebecc0f45b5088c06278a3b3ba1eb14b"
+MACHO_SHA256 = "2a695acf4c239d0746357a531cef542f9be0db4315f0b8fbaeaac0e98b013122"
 _SIGNED_PRODUCTS = (
     ("Runtime/ErgoptiPlus-Remap-Core.app", "com.ergoptiplus.remap.core", "ErgoptiPlus-Remap-Core"),
     (
@@ -1062,6 +1275,55 @@ _SIGNED_PRODUCTS = (
     ),
     ("Runtime/bin/ergoptiplus_remap_cli", "com.ergoptiplus.remap.cli", None),
 )
+
+
+def leaf_extraction_command(prefix, architecture, target):
+    """Return the codesign command writing a slice's certificates as prefix0, prefix1, ...
+
+    codesign takes the optional prefix only attached with "="; given as its
+    own argument it is read as a second target (run 41249928898: "No such
+    file or directory").
+    """
+    return [
+        "/usr/bin/codesign",
+        "--display",
+        "--extract-certificates=" + str(prefix),
+        "--architecture",
+        architecture,
+        str(target),
+    ]
+
+
+def _signing_targets(destination, executable):
+    """Return each signing level's (path, resource seal it may write).
+
+    A bundled product signs its main executable, then its bundle. codesign
+    given a bundle's main executable signs the enclosing bundle and writes its
+    resource seal too (run 41239491355), so both levels may write exactly that
+    one CodeResources; a bare executable writes none.
+    """
+    if not executable:
+        return ((destination, None),)
+    resources = destination + "/Contents/_CodeSignature/CodeResources"
+    return (
+        (destination + "/Contents/MacOS/" + executable, resources),
+        (destination, resources),
+    )
+
+
+def signing_identity_listed(text, identity):
+    """Return whether find-identity lists the pinned SHA-1 exactly once.
+
+    The stable identity is self-signed, so find-identity always suffixes it
+    with "(CSSMERR_TP_NOT_TRUSTED)" (run 41232985096); codesign signs with it
+    regardless, and the designated requirement pins the certificate leaf, not
+    system trust. Any other status, such as an expired or revoked
+    certificate, is still refused.
+    """
+    matches = re.findall(
+        r'(?m)^\s*\d+\) ([A-Fa-f0-9]{40}) "[^\n]*"(?: \(CSSMERR_TP_NOT_TRUSTED\))?\s*$', text
+    )
+    return sum(value.upper() == identity for value in matches) == 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -1377,13 +1639,20 @@ class _SigningSink(_PreparationSink):
                                 )
                                 path = directory / entry.name
                                 relative = str(path.relative_to(signed))
-                                require(
+                                known = (
                                     relative in fixed_directories
                                     or relative in signature_directories
                                     or relative in held
-                                    or relative in signature_files,
-                                    "signed_inventory",
+                                    or relative in signature_files
                                 )
+                                if not known:
+                                    print(
+                                        "[owned-build] signed tree gained an unowned entry: "
+                                        + relative,
+                                        file=sys.stderr,
+                                        flush=True,
+                                    )
+                                require(known, "signed_inventory")
                                 info = path.lstat()
                                 require(
                                     info.st_uid == os.getuid()
@@ -1440,12 +1709,30 @@ class _SigningSink(_PreparationSink):
                     allowed_directories = set(previous_directories) | fixed_directories
                     if target_resources is not None:
                         allowed_directories.add(str(PurePosixPath(target_resources).parent))
+                    if set(actual_directories) != allowed_directories:
+                        print(
+                            "[owned-build] signed tree directories differ: extra "
+                            + ",".join(sorted(set(actual_directories) - allowed_directories))
+                            + " missing "
+                            + ",".join(sorted(allowed_directories - set(actual_directories))),
+                            file=sys.stderr,
+                            flush=True,
+                        )
                     require(set(actual_directories) == allowed_directories, "signed_inventory")
                     for relative, stamp in previous_directories.items():
                         require(actual_directories[relative] == stamp, "signed_inventory")
                     allowed_files = set(previous_files) | set(held)
                     if target_resources is not None:
                         allowed_files.add(target_resources)
+                    if set(actual_files) != allowed_files:
+                        print(
+                            "[owned-build] signed tree files differ: extra "
+                            + ",".join(sorted(set(actual_files) - allowed_files))
+                            + " missing "
+                            + ",".join(sorted(allowed_files - set(actual_files))),
+                            file=sys.stderr,
+                            flush=True,
+                        )
                     require(set(actual_files) == allowed_files, "signed_inventory")
                     for relative, observation in actual_files.items():
                         tick(deadline)
@@ -1455,6 +1742,14 @@ class _SigningSink(_PreparationSink):
                                     held[relative].data, observation.data, deadline
                                 )
                             except self.macho.MachORefusal as error:
+                                _report_macho_difference(
+                                    self.macho,
+                                    relative,
+                                    held[relative].data,
+                                    observation.data,
+                                    error,
+                                    deadline,
+                                )
                                 code = (
                                     "signed_content" if error.code == "content" else "signed_shape"
                                 )
@@ -1479,7 +1774,15 @@ class _SigningSink(_PreparationSink):
                                 "signed_content",
                             )
                             if relative in previous_files:
-                                require(observation == previous_files[relative], "signed_inventory")
+                                prior = previous_files[relative]
+                                if observation != prior:
+                                    _report_identity_change(
+                                        "signed file",
+                                        relative,
+                                        (prior.identity, prior.data),
+                                        (observation.identity, observation.data),
+                                    )
+                                require(observation == prior, "signed_inventory")
                     previous_files, previous_directories = actual_files, actual_directories
 
                 def work_current():
@@ -1555,31 +1858,18 @@ class _SigningSink(_PreparationSink):
                     identity_text = (identity_stdout + identity_stderr).decode("utf-8", "strict")
                 except UnicodeError as error:
                     raise self.module.ArtifactRefusal("signing_credentials") from error
-                matches = re.findall(
-                    r"(?m)^\s*\d+\) ([A-Fa-f0-9]{40}) \"[^\n]*\"\s*$", identity_text
-                )
-                require(
-                    sum(value.upper() == identity for value in matches) == 1, "signing_credentials"
-                )
+                require(signing_identity_listed(identity_text, identity), "signing_credentials")
                 for index, (destination, identifier, executable) in enumerate(_SIGNED_PRODUCTS):
                     primary = (
                         destination + "/Contents/MacOS/" + executable if executable else destination
                     )
-                    targets = (
-                        ((primary, False), (destination, True))
-                        if executable
-                        else ((primary, False),)
-                    )
                     requirement = (
                         'identifier "' + identifier + '" and certificate leaf = H"' + identity + '"'
                     )
-                    for level, (relative, bundle) in enumerate(targets):
+                    for level, (relative, resources) in enumerate(
+                        _signing_targets(destination, executable)
+                    ):
                         target = str(signed / relative)
-                        resources = (
-                            destination + "/Contents/_CodeSignature/CodeResources"
-                            if bundle
-                            else None
-                        )
                         label = "signing_" + str(index) + "_" + str(level)
                         phase(
                             label + "_sign",
@@ -1650,15 +1940,7 @@ class _SigningSink(_PreparationSink):
                             require(not os.path.lexists(work / (prefix + "0")), "signed_collision")
                             phase(
                                 label + "_" + architecture + "_leaf",
-                                [
-                                    "/usr/bin/codesign",
-                                    "--display",
-                                    "--extract-certificates",
-                                    str(work / prefix),
-                                    "--architecture",
-                                    architecture,
-                                    target,
-                                ],
+                                leaf_extraction_command(work / prefix, architecture, target),
                                 certificate=prefix + "0",
                             )
                 boundary()
@@ -1709,6 +1991,7 @@ class _SigningSink(_PreparationSink):
                         self._distribution_claim = None
             current()
         except (BASE.NativeBuildError, self.module.ArtifactRefusal, OSError) as error:
+            _report_refusal_origin("signing", error)
             code = getattr(error, "code", "signed_inventory")
             if code == "phase_deadline":
                 code = "deadline"
@@ -1721,7 +2004,7 @@ class _SigningSink(_PreparationSink):
 
 
 PRODUCTION_RELATIVE = "tools/build/owned_runtime_product_build.py"
-PRODUCTION_SHA256 = "df7ca3937d5ea724914671669ffde015140f9abc0ffff87e6ac7daa5f0cf2fa0"
+PRODUCTION_SHA256 = "7c2adad3a5a0cb59b83098a6ce1ba6d34aff4f43d85d70e9df4e326d41a26340"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1905,7 +2188,9 @@ class _ProductionSink(_SigningSink):
             BASE.NativeBuildError,
             self.production_module.ProductBuildRefusal,
             OSError,
+            *_production_backend_errors(),
         ) as error:
+            _report_refusal_origin("packaging", error)
             self.packaged = ProductionFailure(
                 getattr(error, "code", "production_packaging"),
                 resource_failure=(
@@ -2291,8 +2576,12 @@ def _compile_owned_product_images(
         for previous, root in retained:
             current_product(previous, root)
         for path, identity in tool_inputs:
+            observed = _identity(path.stat())
+            if observed != identity:
+                _report_identity_change("native tool", path, (identity, b""), (observed, b""))
             _REQUIRE(
-                path.resolve(strict=True) == path and _identity(path.stat()) == identity,
+                path.resolve(strict=True) == path
+                and _held_identity(observed) == _held_identity(identity),
                 "source_identity",
                 "Native tool image changed across actual compilation",
             )
@@ -2446,6 +2735,10 @@ def _compile_owned_product_images(
                 if not registered:
                     _finish_dispatch_span(token, error)
                 raise
+            # Builds run one at a time: three concurrent universal xcodebuilds
+            # overcommit a hosted runner's memory and never reach the deadline
+            # check. The retained owner still drains through the finally below.
+            complete(owners[-1], observations=True)
         for entry in owners:
             complete(entry, observations=True)
         current()
@@ -2602,7 +2895,7 @@ def _validate_owned_record(record, profile):
         and record["status"] == "passed"
         and record["qualification"] == "unsigned_actual_owned_four_target_compilation"
         and type(record["budget_seconds"]) is int
-        and record["budget_seconds"] == 300
+        and record["budget_seconds"] in OWNED_BUDGETS
     )
     if profile is _CURRENT_OWNED_RECORD_PROFILE:
         require(
@@ -2716,7 +3009,7 @@ def _validate_owned_record(record, profile):
             and row["schema"] == 1
             and row["status"] == "passed"
             and type(elapsed) in (int, float)
-            and 0 <= elapsed <= 300
+            and 0 <= elapsed <= record["budget_seconds"]
             and math.isfinite(elapsed)
         )
         if special:
@@ -3217,9 +3510,9 @@ def _compile_owned(
     authenticates.
     """
     _REQUIRE(
-        type(seconds) is int and seconds == 300,
+        type(seconds) is int and seconds in OWNED_BUDGETS,
         "invalid_budget",
-        "Owned calibration requires 300 seconds",
+        "Owned compilation requires the 300 s calibration or the hosted runner deadline",
     )
     owner = _OWNER(owner)
     owner_identity = _directory_identity(owner.lstat()) if prepare else None
@@ -3792,7 +4085,12 @@ def main(arguments=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("repository", type=Path)
     parser.add_argument("owner", type=Path)
-    parser.add_argument("--budget", type=int, default=300)
+    parser.add_argument("--budget", type=int, default=BASE.CALIBRATION_SECONDS)
+    parser.add_argument(
+        "--hosted-runner-budget",
+        action="store_true",
+        help="compile with the hosted runner deadline instead of the calibration",
+    )
     parser.add_argument("--preflight", action="store_true")
     parser.add_argument("--ready", action="store_true")
     parser.add_argument("--compile-owned", action="store_true")
@@ -3808,6 +4106,8 @@ def main(arguments=None):
     parser.add_argument("--upstream", type=Path)
     parser.add_argument("--observe-products", type=Path)
     options = parser.parse_args(arguments)
+    if options.hosted_runner_budget:
+        options.budget = HOSTED_RUNNER_SECONDS
     try:
         selected = (
             int(options.preflight)
@@ -3871,7 +4171,16 @@ def main(arguments=None):
                 or type(result.signing) is SigningFailure
                 or type(result.packaging) is ProductionFailure
             ):
-                print("Protected runtime packaging refused", file=sys.stderr)
+                codes = [
+                    stage + "=" + outcome.code
+                    for stage, outcome in (
+                        ("preparation", result.preparation),
+                        ("signing", result.signing),
+                        ("packaging", result.packaging),
+                    )
+                    if type(outcome) in (PreparationFailure, SigningFailure, ProductionFailure)
+                ]
+                print("Protected runtime packaging refused: " + ", ".join(codes), file=sys.stderr)
                 return 2
             print("PASS native validated packaged products; installation and capture unqualified")
             return 0
@@ -3996,6 +4305,7 @@ def main(arguments=None):
             )
         else:
             print("Owned runtime compilation refused: " + error.code, file=sys.stderr)
+        print("Owned runtime refusal detail: " + str(error), file=sys.stderr)
         return 1
 
 

@@ -4,35 +4,40 @@
  * ==============================================================================
  * MODULE: Owned Runtimes Inventory Tests
  * DESCRIPTION:
- * Keeps docs/design/owned-runtimes.md complete for the macOS and Linux drivers:
- * every external program the driver code starts, as derived from the code by
- * tools/test/lib/spawned-tools.cjs, has a row in that driver's table with a
- * proposal, so a new spawn cannot join the product without a decision.
+ * Keeps the owned runtimes registry (_shared/data/owned_runtimes.json, which
+ * docs/design/owned-runtimes.md renders) complete for the three drivers: every
+ * external program the driver code starts, as derived from the code by
+ * tools/test/lib/spawned-tools.cjs, is in the `programs` of one of that
+ * driver's rows, each of which carries a decision, so a new spawn cannot join
+ * the product without one.
  *
  * FEATURES & RATIONALE:
  * 1. The extractor itself is pinned on small sources: it must find a program
  *    in each spawn shape the drivers use and nothing in a log line, an SQL
  *    statement, a phase name or a shell function.
- * 2. The macOS table (section 3) and the Linux table (section 4) name every
- *    derived program in their Tool column, in backticks or as the row's name.
- * 3. Every row ends with a proposal of the document's vocabulary.
+ * 2. The registry's rows name every program derived for their driver in their
+ *    `programs` list. Rows are read from the JSON, not parsed from Markdown.
+ *    A Windows name compares without its `.exe` and without case.
+ * 3. The registry load rejects a row whose decision is outside its closed
+ *    vocabulary (tools/lib/owned-runtimes.cjs).
  * ==============================================================================
  */
 
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 const Spawned = require('./lib/spawned-tools.cjs');
+const Registry = require('../lib/owned-runtimes.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
-const DOC = 'docs/design/owned-runtimes.md';
-const SECTIONS = Object.freeze({ macos: '3. macOS', linux: '4. Linux' });
-// The proposal cell of a row starts with one of these.
-const PROPOSALS = /^(?:PIN|SYS|OPT|Delete|Remove|Not applicable)/;
-// A row for something the driver does not use carries no proposal.
-const NOT_USED = /^Not used/;
+const DATA = path.relative(ROOT, Registry.DATA_PATH);
+// The Windows driver starts few programs: most of its work is in-process. A
+// floor catches an extractor that stopped reading its sources.
+const MINIMUM_PROGRAMS = Object.freeze({ macos: 21, linux: 21, windows: 10 });
+const DRIVERS = Object.freeze(Object.keys(MINIMUM_PROGRAMS));
+// The words a row's `today` ends with when only a source checkout uses the host.
+const DEV_ONLY_MARKER = 'dev-only: source checkout uses host packages';
 
 let failures = 0;
 let checks = 0;
@@ -71,36 +76,18 @@ function programsIn(source) {
 }
 
 /**
- * Reads the rows of a driver's table.
- * @param {string} driver Key of SECTIONS.
- * @returns {{ names: Set<string>, rows: string[][] }}
+ * Names every program a driver's registry rows cover.
+ * @param {object} registry Loaded registry.
+ * @param {string} driver One of DRIVERS.
+ * @returns {Set<string>}
  */
-function tableOf(driver) {
-	const text = fs.readFileSync(path.join(ROOT, DOC), 'utf8');
-	const section = text.split(/\n## /).find((part) => part.startsWith(SECTIONS[driver]));
-	assert(section, `${DOC} has no section "${SECTIONS[driver]}"`);
-	const rows = section
-		.split('\n')
-		.filter(
-			(line) => line.startsWith('| ') && !/^\|\s*-/.test(line) && !/^\|\s*Tool\s*\|/.test(line)
-		)
-		.map((line) =>
-			line
-				.split('|')
-				.slice(1, -1)
-				.map((cell) => cell.trim())
-		);
-	assert(rows.length > 0, `the ${driver} table has no row`);
-	const names = new Set();
-	for (const [tool] of rows) {
-		// A row named in words ("curl", "openssl CLI") names its program too.
-		for (const word of tool.replace(/`[^`]*`/g, ' ').split(/[\s,()]+/))
-			if (word) names.add(word.toLowerCase());
-		for (const match of tool.matchAll(/`([^`]+)`/g)) {
-			for (const word of match[1].split(/[\s,]+/)) names.add(word.replace(/.*\//, ''));
-		}
-	}
-	return { names, rows };
+function programsOf(registry, driver) {
+	const rows = registry.rows.filter((row) => row.os === driver);
+	assert(rows.length > 0, `${DATA} has no ${driver} row`);
+	const names = rows.flatMap((row) => row.programs);
+	return new Set(
+		driver === 'windows' ? names.map((name) => name.replace(/\.exe$/i, '').toLowerCase()) : names
+	);
 }
 
 check('the extractor finds each spawn shape the drivers use', () => {
@@ -152,11 +139,41 @@ check('the extractor ignores logs, SQL, phases, comments and shell functions', (
 	assert.deepEqual(programsIn(source), []);
 });
 
-for (const driver of Object.keys(SECTIONS)) {
-	check(`the ${driver} table lists every program the ${driver} driver starts`, () => {
+check('the Windows extractor finds what starts and ignores names that only compare', () => {
+	const source = [
+		'; Run("commented-out.exe")',
+		"Run('notepad.exe \"' . Path . '\"')",
+		'Exe := A_WinDir . "\\System32\\curl.exe"',
+		'Run("explorer " . Folder)',
+		"RunWait('reg query HKCU')",
+		'"slack.exe",   "communication",',
+		'"zoom.exe", "teams.exe",',
+		'"KeePass.exe", true,',
+		'if WinActive("ahk_exe EXCEL.EXE") {',
+		'if (ProcName == "Code.exe") {',
+		"$Start = Join-Path $Root 'ollama.exe'",
+		'"i)\\.recovery\\.exe$", ".republish.exe")'
+	].join('\n');
+	assert.deepEqual([...Spawned.windowsPrograms(source)].sort(), [
+		'curl',
+		'explorer',
+		'notepad',
+		'ollama',
+		'reg'
+	]);
+});
+
+// A malformed registry or an undecided row fails here, before any check.
+const registry = Registry.load();
+
+for (const driver of DRIVERS) {
+	check(`the ${driver} rows list every program the ${driver} driver starts`, () => {
 		const derived = Spawned.spawnedTools(driver);
-		assert(derived.size > 20, `the extractor found only ${derived.size} ${driver} programs`);
-		const { names } = tableOf(driver);
+		assert(
+			derived.size >= MINIMUM_PROGRAMS[driver],
+			`the extractor found only ${derived.size} ${driver} programs`
+		);
+		const names = programsOf(registry, driver);
 		const missing = [...derived.keys()]
 			.filter((name) => !names.has(name))
 			.sort()
@@ -164,20 +181,37 @@ for (const driver of Object.keys(SECTIONS)) {
 		assert.deepEqual(
 			missing,
 			[],
-			`add a row with a proposal to ${DOC} section ${SECTIONS[driver]} for:\n` + missing.join('\n')
+			`add each program to the "programs" of a ${driver} row of ${DATA}, with its decision, ` +
+				'then run node tools/codegen/codegen-owned-runtimes.cjs:\n' +
+				missing.join('\n')
 		);
 	});
-
-	check(`every ${driver} row ends with a proposal`, () => {
-		for (const row of tableOf(driver).rows) {
-			const proposal = row[row.length - 1];
-			assert(
-				PROPOSALS.test(proposal) || NOT_USED.test(row[1]),
-				`row "${row[0]}" has no proposal: ${proposal}`
-			);
-		}
-	});
 }
+
+check('the registry load refuses a row without a decided class', () => {
+	const undecided = structuredClone(registry);
+	undecided.rows[0].decision = 'PROPOSAL';
+	assert.throws(() => Registry.validate(undecided), /unknown decision/);
+});
+
+// Ruling of 1 November: an install from a source checkout is a developer path,
+// so a Linux row whose only host use is that install is done, says so with the
+// dev-only marker, and is pinned; it does not stay open for it.
+check('a Linux row is not left open for a source-checkout install alone', () => {
+	const linux = registry.rows.filter((row) => row.os === 'linux');
+	const devOnly = linux.filter((row) => row.today.includes(DEV_ONLY_MARKER));
+	assert(devOnly.length >= 7, `expected the private-runtime rows to carry "${DEV_ONLY_MARKER}"`);
+	for (const row of devOnly) {
+		assert.equal(row.status, 'done', `${row.tool} is dev-only on the host and must be done`);
+		assert.equal(row.current_class, 'PIN', `${row.tool} ships pinned and must be classed PIN`);
+	}
+	for (const row of linux.filter((entry) => entry.status !== 'done'))
+		assert.doesNotMatch(
+			row.today,
+			/source checkout/,
+			`${row.tool} stays open only for a source-checkout install`
+		);
+});
 
 if (failures > 0) {
 	console.error(`[FAIL] owned runtimes inventory: ${failures} of ${checks} checks failed.`);

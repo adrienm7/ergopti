@@ -14,6 +14,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const { requiredComponents, stageAppDir } = require('./lib/linux-private-runtime-fixture.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-rpm-publish-'));
@@ -90,33 +91,23 @@ if (path.basename(process.argv[1]) === 'rpm') {
 		ERGOPTI_RPM_TEST_DIAGNOSTIC: '1'
 	};
 	const producer = path.join(ROOT, 'tools/build/build-linux-rpm.sh');
-	// The genuine binding is compiled and loaded by the CI package build; the
-	// packager itself only carries an ELF into native_modules/.
-	const luvModule = path.join(scratch, 'luv.so');
-	const luvBytes = Buffer.concat([Buffer.from([0x7f, 0x45, 0x4c, 0x46]), Buffer.from('luv')]);
-	fs.writeFileSync(luvModule, luvBytes);
-	const notElf = path.join(scratch, 'not-elf.so');
-	fs.writeFileSync(notElf, 'not a shared object');
-	const aliasModule = path.join(scratch, 'alias.so');
-	fs.symlinkSync(luvModule, aliasModule);
-	for (const [label, args, pattern] of [
-		['non-ELF module', ['--luv-module', notElf], /not an ELF shared object/],
-		['symlinked module', ['--luv-module', aliasModule], /is not a regular file/],
-		['relative module', ['--luv-module', 'luv.so'], /needs an absolute module path/],
-		['missing module path', ['--luv-module'], /needs an absolute module path/]
-	]) {
-		const refused = bash(producer, args, modelEnv);
-		assert.notEqual(refused.status, 0, `${label} must refuse packaging`);
-		assert.match(refused.stderr, pattern, label);
-	}
-	const direct = success(bash(producer, ['--luv-module', luvModule], modelEnv));
-	// ROOT CAUSE ENCODED: the .rpm shipped no LuaJIT luv binding and its wrapper
-	// set LUA_PATH only, so i18n.list_locales() refused on Fedora (CI run
-	// 40766890057). Replay the actual wrapper, minus its exec, on the staged tree.
+	// The genuine runtime is staged and admitted on the oldest supported LTS by
+	// the AppImage stager; the packager only carries that prefix.
+	const unstaged = bash(producer, [], modelEnv);
+	assert.notEqual(unstaged.status, 0, 'a package without the staged private runtime must refuse');
+	assert.match(unstaged.stderr, /No staged private runtime/);
+	fs.rmSync(path.join(BUILD, 'rpm'), { recursive: true, force: true });
+	stageAppDir(BUILD);
+	const direct = success(bash(producer, [], modelEnv));
+	// ROOT CAUSE ENCODED: the .rpm took LuaJIT, curl, openssl and sqlite3 from
+	// Fedora and compiled only its own luv, so the host decided what ran (owned
+	// runtimes, PIN). Replay the actual wrapper, minus its exec, on the staged tree.
 	const payload = path.join(BUILD, `rpm/BUILD/ergopti-${expected.version}`);
 	const driverRoot = path.join(payload, 'usr/lib/ergopti');
-	const stagedModule = path.join(driverRoot, 'native_modules/luv.so');
-	assert.deepEqual(fs.readFileSync(stagedModule), luvBytes, 'the package carries the binding');
+	const runtime = path.join(driverRoot, 'runtime');
+	for (const component of requiredComponents())
+		assert.ok(fs.existsSync(path.join(runtime, component)), `the package carries ${component}`);
+	assert.ok(!fs.existsSync(path.join(driverRoot, 'native_modules')), 'no second luv binding');
 	const wrapper = fs.readFileSync(path.join(payload, 'usr/bin/ergopti'), 'utf8').split('\n');
 	assert.match(wrapper.at(-2), /^exec bash "\$DRIVER_ROOT\/install\/launch\.sh" "\$@"$/);
 	const environment = wrapper
@@ -124,21 +115,27 @@ if (path.basename(process.argv[1]) === 'rpm') {
 		.join('\n')
 		.replace('DRIVER_ROOT="/usr/lib/ergopti"', 'DRIVER_ROOT="$ERGOPTI_TEST_DRIVER_ROOT"');
 	const replay = () =>
-		spawnSync(bashExecutable(), ['-c', environment + '\nprintf %s "$LUA_CPATH"'], {
-			env: { ...env, ERGOPTI_TEST_DRIVER_ROOT: driverRoot, LUA_CPATH: '' },
-			encoding: 'utf8'
-		});
+		spawnSync(
+			bashExecutable(),
+			['-c', environment + '\nprintf "%s\\n%s" "$LUA_CPATH" "$ERGOPTI_RUNTIME_PREFIX"'],
+			{
+				env: {
+					...env,
+					ERGOPTI_TEST_DRIVER_ROOT: driverRoot,
+					LUA_CPATH: '',
+					CURL_CA_BUNDLE: 'owned explicit trust, no TLS request'
+				},
+				encoding: 'utf8'
+			}
+		);
 	const admitted = success(replay());
-	assert.equal(admitted.stdout, `${path.join(driverRoot, 'native_modules')}/?.so;;;`);
-	fs.rmSync(stagedModule);
+	assert.equal(admitted.stdout, `${path.join(runtime, 'lib/lua/5.1')}/?.so;;\n${runtime}`);
+	fs.rmSync(path.join(runtime, 'bin/sqlite3'));
 	const missing = replay();
-	assert.notEqual(missing.status, 0, 'a package without its binding must refuse to start');
-	assert.match(missing.stderr, /native_modules\/luv\.so is not a published native module/);
-	fs.symlinkSync(luvModule, stagedModule);
-	assert.notEqual(replay().status, 0, 'a symlinked binding must refuse to start');
-	fs.rmSync(stagedModule);
-	fs.writeFileSync(stagedModule, luvBytes, { mode: 0o755 });
-	console.log('PASS rpm-wrapper-admits-its-published-luajit-luv-binding');
+	assert.notEqual(missing.status, 0, 'a package missing a runtime program must refuse to start');
+	assert.match(missing.stderr, /Required installed native package component unavailable/);
+	fs.writeFileSync(path.join(runtime, 'bin/sqlite3'), 'fixture', { mode: 0o755 });
+	console.log('PASS rpm-wrapper-admits-its-private-runtime');
 	const selected = direct.stdout.match(/^Package: (.+\.rpm)$/m)?.[1];
 	assert.ok(selected, 'actual producer must report its selected runtime package');
 	assert.equal(
@@ -164,7 +161,7 @@ if (path.basename(process.argv[1]) === 'rpm') {
 		'all raw/debug native outputs must remain retained'
 	);
 	const mainBytes = fs.readFileSync(selected);
-	const staged = success(bash(producer, ['--skip-rpm', '--luv-module', luvModule], modelEnv));
+	const staged = success(bash(producer, ['--skip-rpm'], modelEnv));
 	assert.deepEqual(
 		fs.readFileSync(path.join(BUILD, 'rpm/publish-linux-rpm.cjs')),
 		fs.readFileSync(path.join(ROOT, 'tools/build/publish-linux-rpm.cjs')),

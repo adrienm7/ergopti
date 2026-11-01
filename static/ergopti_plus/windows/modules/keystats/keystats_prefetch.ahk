@@ -1454,8 +1454,8 @@ KLPF_KeycodeLayout() {
 
 		ergopti_active := IsSet(Features)
 		&& Features.Has("layout")
-		&& Features["layout"].Has("ergopti_base")
-		&& Features["layout"]["ergopti_base"] = true
+		&& Features["layout"].Has(ConfigLeaf.ERGOPTI_BASE)
+		&& Features["layout"][ConfigLeaf.ERGOPTI_BASE] = true
 		if ergopti_active {
 				for sc, ch in ErgoptiBaseLabels()
 						out[String(sc)] := ch

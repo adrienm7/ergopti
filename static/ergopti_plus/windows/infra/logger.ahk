@@ -32,6 +32,8 @@
 ;    changing arguments, into its first occurrence plus one timed summary.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -388,6 +390,20 @@ LoggerUserNamePlaceholder() {
 	return Config["rules"]["config_name_placeholder"]
 }
 
+/**
+ * Masks a name the user chose for a log line, the twin of the Lua drivers'
+ * diagnostics/private_label.lua. The redactor masks such a name only as a path
+ * component under the configuration directory: a bare name, or a file elsewhere,
+ * needs the placeholder at the point of emission.
+ * @param Name {String} The name or path; only its type is checked, never its content.
+ * @returns {String} Always the policy's placeholder.
+ */
+LoggerMaskUserName(Name) {
+	if !(Name is String)
+		throw TypeError("The user-chosen name to mask must be a string.")
+	return LoggerUserNamePlaceholder()
+}
+
 /** Returns zero only before the shared source exists; invalid admission throws. */
 _LoggerPrivacyAdmitted() {
 	global _SharedDir
@@ -541,7 +557,7 @@ LoggerInit() {
 						try {
 								Content := FSReadStrict(ConfigurationFile)
 								Cache := ConfigTomlDecodeSnapshot(Content).Cache
-								Value := IniCacheGet(Cache, "script", "log_level", LOGGER_DEFAULT_LEVEL)
+								Value := IniCacheGet(Cache, "script", ConfigLeaf.LOG_LEVEL, LOGGER_DEFAULT_LEVEL)
 						}
 				}
 		}
@@ -868,6 +884,26 @@ LoggerPrepareShutdown(&Refusal := 0, FlushFn := 0) {
 		return false
 	}
 	return true
+}
+
+; True once no thread holds a flush, an append or a repair: the only state a
+; shutdown refusal can be waiting for without a sink having refused anything.
+; @returns {Boolean} False while an interrupted owner still has to resume.
+LoggerFlushSettled() {
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_APPEND_OWNERS, _LOGGER_APPEND_DEBT_REPAIRS
+	PreviousCritical := Critical("On")
+	try return !_LOGGER_FLUSH_ACTIVE && _LOGGER_APPEND_OWNERS.Count == 0
+		&& _LOGGER_APPEND_DEBT_REPAIRS.Count == 0
+	finally Critical(PreviousCritical)
+}
+
+; An owner under OnExit can only resume once OnExit returns, so such a refusal
+; ends by itself. A sink that refused holds no owner and is a real refusal.
+; @param Refusal {Map|Integer} The evidence LoggerPrepareShutdown returned.
+; @returns {Boolean} True when the refusal names an interrupted owner.
+LoggerShutdownRefusalSettles(Refusal) {
+	return (Refusal is Map) && (Refusal["flush_active"] || Refusal["append_owners"] > 0
+		|| Refusal["append_repairs"] > 0)
 }
 
 ; Sample existing ownership and queue counts at the refusing caller's boundary.

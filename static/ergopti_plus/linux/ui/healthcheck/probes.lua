@@ -14,7 +14,8 @@
 --- 1. github_api asks api.github.com for its rate limit, the host every update
 ---    check talks to; the endpoint does not count against that limit.
 --- 2. ai_health asks the local Ollama for its version when the AI is on.
---- 3. system_details runs `kanata --version` and `df -Pk` on the logs folder.
+--- 3. system_details runs `df -Pk` on the logs folder. kanata left the driver
+---    on 2026-09-24, so its version probe is gone with it.
 --- 4. cpu_load reads /proc/stat and /proc/self/stat twice, sample_ms apart on
 ---    a libuv timer, for the machine's load and the daemon's share of it.
 --- 5. Without libuv there is no asynchronous child, no HTTP client and no
@@ -234,7 +235,7 @@ local function ai_health(config, state, run)
 	end
 end
 
---- The kanata version and the logs volume's free space.
+--- The logs volume's free space.
 --- @param config table { timeout_ms }
 --- @param logs_dir string|nil
 --- @param run table
@@ -246,42 +247,26 @@ local function system_details(config, logs_dir, run)
 			done({ state = "unsupported" })
 			return
 		end
-		local sections = { versions = {}, system = {} }
-		local pending, failures = 0, {}
-		local function step(detail)
-			if detail then failures[#failures + 1] = detail end
-			pending = pending - 1
-			if pending > 0 then return end
-			if #failures > 0 then
-				done({ state = "error", detail = table.concat(failures, "; ") }, sections)
-			else
-				done({ state = "ok" }, sections)
+		local sections = { system = {} }
+		if not logs_dir then
+			done({ state = "ok" }, sections)
+			return
+		end
+		local handle, err = Shell.run_async("df", { "-Pk", logs_dir }, { timeout_ms = config.timeout_ms }, function(result)
+			if not result.ok then
+				done({ state = "error", detail = "df: " .. tostring(result.error) }, sections)
+				return
 			end
-		end
-		local function run_command(executable, args, on_output)
-			pending = pending + 1
-			local handle, err = Shell.run_async(executable, args, { timeout_ms = config.timeout_ms }, function(result)
-				if result.ok then
-					on_output(result.stdout)
-					step(nil)
-				else
-					step(executable .. ": " .. tostring(result.error))
-				end
-			end)
-			if not handle then step(executable .. ": " .. tostring(err)) return end
-			run.cancellers[#run.cancellers + 1] = function() handle.cancel() end
-		end
-		run_command("kanata", { "--version" }, function(stdout)
-			local version = stdout:match("(%d+%.%d+[%w%.%-]*)")
-			sections.versions.kanata = version and ("kanata " .. version) or nil
+			-- Second line: filesystem, 1024-blocks, used, available, ...
+			local available = result.stdout:match("\n%S+%s+%d+%s+%d+%s+(%d+)")
+			sections.system.disk_free = available and tonumber(available) * 1024 or nil
+			done({ state = "ok" }, sections)
 		end)
-		if logs_dir then
-			run_command("df", { "-Pk", logs_dir }, function(stdout)
-				-- Second line: filesystem, 1024-blocks, used, available, ...
-				local available = stdout:match("\n%S+%s+%d+%s+%d+%s+(%d+)")
-				sections.system.disk_free = available and tonumber(available) * 1024 or nil
-			end)
+		if not handle then
+			done({ state = "error", detail = "df: " .. tostring(err) }, sections)
+			return
 		end
+		run.cancellers[#run.cancellers + 1] = function() handle.cancel() end
 	end
 end
 

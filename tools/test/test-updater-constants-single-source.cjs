@@ -28,6 +28,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const identifiers = require('../lib/identifiers.cjs');
 const { expandIdentifiers } = require('../lib/shell-identifiers.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -214,34 +215,71 @@ for (const [label, source] of [
 	}
 }
 
+// identifiers.json's lower-case keys, spelled as the generated Identifiers.Hosts class.
+const HOSTS = Object.fromEntries(
+	Object.entries(identifiers.hosts).map(([key, host]) => [key.toUpperCase(), host])
+);
+
+/**
+ * The value of a core.ahk string global: its "literal" operands, joined with
+ * Identifiers.Hosts.NAME (identifiers.json owns the hosts) and earlier globals.
+ * @param {string} source AutoHotkey source text.
+ * @param {string} name Global's name.
+ * @returns {string|null} The value, or null when an operand has another shape.
+ */
+function ahkStringGlobal(source, name) {
+	const declaration = source.match(new RegExp(`^global ${name} := (.+)$`, 'm'));
+	if (!declaration) return null;
+	let value = '';
+	for (const operand of declaration[1].split(/\s+\.\s+/)) {
+		const literal = operand.match(/^"([^"]*)"$/);
+		const host = operand.match(/^Identifiers\.Hosts\.([A-Z_]+)$/);
+		const inner = /^[A-Z][A-Z0-9_]*$/.test(operand) ? ahkStringGlobal(source, operand) : null;
+		if (literal) value += literal[1];
+		else if (host && HOSTS[host[1]]) value += HOSTS[host[1]];
+		else if (inner !== null) value += inner;
+		else return null;
+	}
+	return value;
+}
+
+// The resolver must be able to refuse, or both URL checks below prove nothing.
+for (const [line, want] of [
+	['global P := "https://" . Identifiers.Hosts.GITHUB . "/x"', `https://${HOSTS.GITHUB}/x`],
+	['global P := "https://" . Identifiers.Hosts.MISSING . "/x"', null],
+	['global P := "https://" . SomeCall() . "/x"', null]
+]) {
+	if (ahkStringGlobal(line, 'P') !== want) fail(`ahkStringGlobal misread: ${line}`);
+}
+
 // Every update channel reads one release list (never /releases/latest, which
 // answers 404 while a channel has no release). AHK cannot read JSON at include
-// time, so its template literal is pinned here.
+// time, so its template is pinned here, hosts resolved through their owner.
 const checkUrl = defaults.update_check && defaults.update_check.releases_url;
-const ahkFeedUrlM = ahkSrc.match(/UPDATER_RELEASES_FEED_URL_TEMPLATE\s*:=\s*"([^"]+)"/);
-if (!ahkFeedUrlM) {
-	fail('core.ahk: could not find UPDATER_RELEASES_FEED_URL_TEMPLATE');
-} else if (ahkFeedUrlM[1] !== defaults.release_sources.atom_feed_url) {
+const ahkFeedUrl = ahkStringGlobal(ahkSrc, 'UPDATER_RELEASES_FEED_URL_TEMPLATE');
+if (ahkFeedUrl === null) {
+	fail('core.ahk: could not resolve UPDATER_RELEASES_FEED_URL_TEMPLATE');
+} else if (ahkFeedUrl !== defaults.release_sources.atom_feed_url) {
 	fail(
-		`core.ahk UPDATER_RELEASES_FEED_URL_TEMPLATE="${ahkFeedUrlM[1]}" does not match defaults.json release_sources.atom_feed_url`
+		`core.ahk UPDATER_RELEASES_FEED_URL_TEMPLATE="${ahkFeedUrl}" does not match defaults.json release_sources.atom_feed_url`
 	);
 } else {
 	pass(
 		'core.ahk UPDATER_RELEASES_FEED_URL_TEMPLATE matches defaults.json release_sources.atom_feed_url'
 	);
 }
-const ahkCheckUrlM = ahkSrc.match(/UPDATER_RELEASES_API_URL_TEMPLATE\s*:=\s*"([^"]+)"/);
+const ahkCheckUrl = ahkStringGlobal(ahkSrc, 'UPDATER_RELEASES_API_URL_TEMPLATE');
 if (
 	typeof checkUrl !== 'string' ||
 	!checkUrl.includes('{owner}/{repo}') ||
 	checkUrl.includes('/releases/latest')
 ) {
 	fail('defaults.json update_check.releases_url must be an {owner}/{repo} release-list template');
-} else if (!ahkCheckUrlM) {
-	fail('core.ahk: could not find UPDATER_RELEASES_API_URL_TEMPLATE');
-} else if (ahkCheckUrlM[1] !== checkUrl) {
+} else if (ahkCheckUrl === null) {
+	fail('core.ahk: could not resolve UPDATER_RELEASES_API_URL_TEMPLATE');
+} else if (ahkCheckUrl !== checkUrl) {
 	fail(
-		`core.ahk UPDATER_RELEASES_API_URL_TEMPLATE="${ahkCheckUrlM[1]}" does not match defaults.json update_check.releases_url="${checkUrl}"`
+		`core.ahk UPDATER_RELEASES_API_URL_TEMPLATE="${ahkCheckUrl}" does not match defaults.json update_check.releases_url="${checkUrl}"`
 	);
 } else {
 	pass(
@@ -251,7 +289,11 @@ if (
 const ahkApiLatest = ahkSrc
 	.split('\n')
 	.filter((line) => !/^\s*;/.test(line))
-	.filter((line) => line.includes('api.github.com') && line.includes('/releases/latest'));
+	.filter(
+		(line) =>
+			(line.includes(HOSTS.GITHUB_API) || line.includes('Identifiers.Hosts.GITHUB_API')) &&
+			line.includes('/releases/latest')
+	);
 if (ahkApiLatest.length > 0) {
 	fail(
 		"core.ahk still requests the API's /releases/latest, which answers 404 while a channel has no release"
@@ -410,14 +452,6 @@ for (const drv of LUA_DRIVERS) {
 // declaration is itself checked for staleness — an exemption nobody uses is how
 // an allow-list quietly becomes blanket permission.
 const THIRD_PARTY_SOURCES = new Map([
-	[
-		'LuaJIT/LuaJIT',
-		'build-linux-flatpak.sh: the Flatpak runtime ships no LuaJIT, so the manifest builds it from upstream'
-	],
-	[
-		'luvit/luv',
-		'build-linux-packaged-luv.sh: the .rpm builds its LuaJIT luv binding from the pinned upstream recipe'
-	],
 	[
 		'pqrs-org/Karabiner-Elements',
 		'remap_runtime_build.py: the owned runtime authenticates and builds the pinned Karabiner-Elements upstream source'

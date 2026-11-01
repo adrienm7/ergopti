@@ -209,7 +209,10 @@ _LLM_ThinkingOffFieldsValid(Text) {
  */
 LLM_ThinkingOffNormalize(Model) {
 	Parts := StrSplit(StrLower(String(Model)), "/")
-	return StrSplit(Parts[Parts.Length], ":")[1]
+	; StrSplit gives no element for an empty string: no model selected yet, or a
+	; model id ending in a slash, matches nothing rather than failing the request.
+	Tag := Parts.Length ? StrSplit(Parts[Parts.Length], ":") : []
+	return Tag.Length ? Tag[1] : ""
 }
 
 /**

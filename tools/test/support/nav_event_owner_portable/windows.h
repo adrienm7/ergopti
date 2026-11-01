@@ -37,6 +37,8 @@ typedef void *LPVOID;
 typedef void *HANDLE;
 typedef void *HWND;
 typedef void *HHOOK;
+typedef void *HWINEVENTHOOK;
+typedef int32_t LONG;
 typedef void *HINSTANCE;
 typedef struct RECT { int32_t left, top, right, bottom; } RECT;
 typedef struct GUITHREADINFO {
@@ -111,6 +113,8 @@ typedef struct MSG {
 #define VK_UP 0x26u
 #define VK_DOWN 0x28u
 #define VK_LWIN 0x5Bu
+#define VK_DELETE 0x2Eu
+#define WINEVENT_OUTOFCONTEXT 0x0000u
 #define VK_RWIN 0x5Cu
 #define VK_LSHIFT 0xA0u
 #define VK_RSHIFT 0xA1u
@@ -171,6 +175,8 @@ _Noreturn intptr_t ErgoptiPortable_Unsupported(const char *operation, ...);
 #define SetWindowsHookExW(...) ((HHOOK)ErgoptiPortable_Unsupported("SetWindowsHookExW", __VA_ARGS__))
 #define UnhookWindowsHookEx(...) ErgoptiPortable_Unsupported("UnhookWindowsHookEx", __VA_ARGS__)
 #define CallNextHookEx(...) ErgoptiPortable_Unsupported("CallNextHookEx", __VA_ARGS__)
+#define SetWinEventHook(...) ((HWINEVENTHOOK)ErgoptiPortable_Unsupported("SetWinEventHook", __VA_ARGS__))
+#define UnhookWinEvent(...) ErgoptiPortable_Unsupported("UnhookWinEvent", __VA_ARGS__)
 #define SendInput(...) ErgoptiPortable_Unsupported("SendInput", __VA_ARGS__)
 #define PostMessageW(...) ErgoptiPortable_Unsupported("PostMessageW", __VA_ARGS__)
 #define PeekMessageW(...) ErgoptiPortable_Unsupported("PeekMessageW", __VA_ARGS__)

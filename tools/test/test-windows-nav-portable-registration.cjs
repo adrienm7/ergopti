@@ -35,6 +35,9 @@ const EXPECTED = [
 	'menu mask survives multiple Win holds',
 	'stop drain balances consumed holds',
 	'terminal capture replays exact physical edges',
+	'press ledger keeps a captured press held until its replayed up (todo91-ledger-replay)',
+	'press ledger orders presses and tells the fake LCtrl from the real one (todo91-ledger-provenance)',
+	'press ledger lets go of keys whose release it cannot see (item3-missed-release)',
 	'terminal route snapshots retain exact suffix (todo49-route-fifo)',
 	'terminal output preview is authenticated and guarded (todo49-output-preview)',
 	'terminal output custody settles exact FIFO head (todo49-output-custody)',
@@ -61,9 +64,9 @@ const EXPECTED = [
 
 /** Requires the complete authored census, including the explicitly native-only case. */
 function checkCensus(names) {
-	assert.equal(EXPECTED.length, 45);
+	assert.equal(EXPECTED.length, 48);
 	assert.deepEqual(names, EXPECTED, 'A native registration was lost, added or reordered.');
-	assert.equal(names.filter((name) => name !== 'native editor receiver matrix').length, 44);
+	assert.equal(names.filter((name) => name !== 'native editor receiver matrix').length, 47);
 }
 
 /** Creates an independent source fixture with the parser's documented table shape. */
@@ -98,6 +101,6 @@ assert.throws(
 	/registration/
 );
 console.log(
-	'Portable navigation registration: 45 authored cases and 6 negative selection controls passed.'
+	'Portable navigation registration: 47 authored cases and 6 negative selection controls passed.'
 );
 console.log('Source selection only; no C execution or Windows native qualification.');

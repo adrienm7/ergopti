@@ -81,7 +81,8 @@ Test("config journal owned settlement: preboot remains readonly until genuine bo
 
 _CMJ_OwnedColdLegacyRecovery() {
 	Fixture := _ScopeOwnerFixture(), Path := Fixture.directory . "\cold.toml", Locator := Fixture.options["locator"], Bundle := 0
-	Legacy := '[llm]`nenabled = true`n', NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n')
+	Legacy := '[_meta]`nschema_version = ' . ConfigMigrateShippedRegistry()["oldest"] . '`n[llm]`nenabled = true`n'
+	NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n')
 	try {
 		Assert(FSWriteDurable(Path, Legacy))
 		Port := ConfigTransitionProductionPort()

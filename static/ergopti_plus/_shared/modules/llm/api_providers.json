@@ -1,5 +1,5 @@
 {
-	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver. `format` is openai, anthropic, gemini, backboard (Backboard's assistant/thread API, key in X-API-Key, models written <llm_provider>/<model_name>) or decisions (TypeSafe's System One protocol: typed questions in, answers with probabilities out; base_url is the full endpoint and the key goes in Authorization: Bearer). A decisions provider serves Jev, which is not a chat model: it is offered only as the agent's System 1. The request shapes of backboard and decisions live in _shared/lua/llm/remote_formats.lua. `thinking_dialect` (optional) says how the provider carries each reasoning control kind of _shared/modules/llm/thinking_off.json: kind -> body fields deep-merged into the request (a field the body already sets wins), the string $level replaced by the model family's level. A kind the provider does not list is never sent (openai_compat lists none: it may point at a strict endpoint). Sources: platform.claude.com build-with-claude/thinking and effort, developers.openai.com guides/reasoning, ai.google.dev thinking, docs.x.ai reasoning, docs.mistral.ai reasoning, api-docs.deepseek.com thinking_mode, docs.cohere.com compatibility-api, inference-docs.cerebras.ai reasoning, openrouter.ai reasoning-tokens, console.groq.com reasoning, docs.together.ai reasoning-models-guide, docs.fireworks.ai post-chatcompletions (checked 2026-10-30). Every provider after fireworks names the official pages its address, key, listing, default model and dialect were read from in its _source (checked 2026-10-30). A base_url holding {name} placeholders is a per-account address (_shared/lua/llm/api_url_template.lua): the add-entry form asks one value per placeholder (menu.llm.api_prompt_field.<name>) and stores the filled address in the entry; such a provider has no default_model, its model being the user's deployment or chosen model. An auth block (_shared/lua/llm/api_token_exchange.lua) says the requests carry a short-lived access token exchanged from the stored key, never the key: macOS and Linux exchange and refresh it, the Windows driver refuses such a provider with its reason until it does.",
+	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver. `format` is openai, anthropic, gemini, perplexity_agent (Perplexity's Agent API: POST <base_url>/agent with input and instructions, a typed output array back, Bearer key, text only), backboard (Backboard's assistant/thread API, key in X-API-Key, models written <llm_provider>/<model_name>) or decisions (TypeSafe's System One protocol: typed questions in, answers with probabilities out; base_url is the full endpoint and the key goes in Authorization: Bearer). A decisions provider serves Jev, which is not a chat model: it is offered only as the agent's System 1. The request shapes of perplexity_agent, backboard and decisions live in _shared/lua/llm/remote_formats.lua. `thinking_dialect` (optional) says how the provider carries each reasoning control kind of _shared/modules/llm/thinking_off.json: kind -> body fields deep-merged into the request (a field the body already sets wins), the string $level replaced by the model family's level. A kind the provider does not list is never sent (openai_compat lists none: it may point at a strict endpoint). Sources: platform.claude.com build-with-claude/thinking and effort, developers.openai.com guides/reasoning, ai.google.dev thinking, docs.x.ai reasoning, docs.mistral.ai reasoning, api-docs.deepseek.com thinking_mode, docs.cohere.com compatibility-api, inference-docs.cerebras.ai reasoning, openrouter.ai reasoning-tokens, console.groq.com reasoning, docs.together.ai reasoning-models-guide, docs.fireworks.ai post-chatcompletions (checked 2026-10-30). Every provider after fireworks names the official pages its address, key, listing, default model and dialect were read from in its _source (checked 2026-10-30). A base_url holding {name} placeholders is a per-account address (_shared/lua/llm/api_url_template.lua): the add-entry form asks one value per placeholder (menu.llm.api_prompt_field.<name>) and stores the filled address in the entry; such a provider has no default_model, its model being the user's deployment or chosen model. An optional_address block (field, template, host_suffix) is the opposite: base_url works as it is, and the add-entry form asks one optional value (menu.llm.api_prompt_field.<field>, refusal menu.llm.api_prompt_field_invalid.<field>) that replaces it when filled; the value must end with host_suffix. An auth block (_shared/lua/llm/api_token_exchange.lua) says the requests carry a short-lived access token exchanged from the stored key, never the key: macOS and Linux exchange and refresh it, the Windows driver refuses such a provider with its reason until it does.",
 	"provider_order": [
 		"openai",
 		"anthropic",
@@ -157,10 +157,10 @@
 		},
 		"perplexity": {
 			"label": "Perplexity",
-			"base_url": "https://api.perplexity.ai",
-			"default_model": "sonar",
-			"format": "openai",
-			"_source": "https://docs.perplexity.ai/docs/legacy/sonar/openai-compatibility, https://docs.perplexity.ai/docs/legacy/sonar/models (sonar does not reason; no thinking control documented)"
+			"base_url": "https://api.perplexity.ai/v1",
+			"default_model": "perplexity/sonar",
+			"format": "perplexity_agent",
+			"_source": "https://docs.perplexity.ai/docs/agent-api/quickstart, https://docs.perplexity.ai/api-reference/agent-post, https://docs.perplexity.ai/docs/agent-api/models, https://docs.perplexity.ai/api-reference/models-get, https://docs.perplexity.ai/docs/agent-api/migrate-from-sonar/how-to (read 2026-11-01; POST /v1/agent, GET /v1/models lists the ids and declares no authentication; input_image takes a URL of at most 2048 characters, so no screenshot; a reasoning control exists but its per-model behaviour is undocumented, so no dialect). Never called live: no key was available."
 		},
 		"moonshot": {
 			"label": "Moonshot AI (Kimi)",
@@ -175,11 +175,16 @@
 			"base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
 			"default_model": "qwen3.8-flash",
 			"format": "openai",
+			"optional_address": {
+				"field": "workspace_domain",
+				"template": "https://{workspace_domain}/compatible-mode/v1",
+				"host_suffix": ".maas.aliyuncs.com"
+			},
 			"thinking_dialect": {
 				"toggle": { "enable_thinking": false },
 				"effort": { "reasoning_effort": "$level" }
 			},
-			"_source": "https://www.alibabacloud.com/help/en/model-studio/deep-thinking, https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope (Singapore shared domain)"
+			"_source": "https://www.alibabacloud.com/help/en/model-studio/deep-thinking, https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope (Singapore shared domain), https://www.alibabacloud.com/help/en/model-studio/base-url (read 2026-11-01: the shared DashScope domain is legacy but available, migrating to a workspace-dedicated domain {WorkspaceId}.{region}.maas.aliyuncs.com is recommended, such a domain takes only a key of its workspace)"
 		},
 		"zai": {
 			"label": "Z.ai (GLM)",
@@ -231,7 +236,7 @@
 				"toggle": { "chat_template_kwargs": { "enable_thinking": false } },
 				"effort": { "reasoning_effort": "$level" }
 			},
-			"_source": "https://docs.sambanova.ai/docs/api-reference/chat-completions/create-chat-based-completion, https://docs.sambanova.ai/docs/en/features/text-generation (reasoning_effort low/medium/high for gpt-oss)"
+			"_source": "https://docs.sambanova.ai/docs/api-reference/chat-completions/create-chat-based-completion, https://docs.sambanova.ai/docs/en/features/text-generation (reasoning_effort low/medium/high for gpt-oss; read 2026-11-01: chat_template_kwargs enable_thinking is the documented switch for DeepSeek-V3.2 and Gemma 4 31B, off by default, shown only as true, so false is the same key's other value)"
 		},
 		"huggingface": {
 			"label": "Hugging Face",
@@ -342,7 +347,7 @@
 			"thinking_dialect": {
 				"toggle": { "chat_template_kwargs": { "enable_thinking": false, "thinking": false } }
 			},
-			"_source": "https://featherless.ai/docs/chat-template-kwargs (enable_thinking for Qwen-style templates, thinking for DeepSeek and Kimi; a template ignores the other key), https://featherless.ai/docs/api-overview-and-common-options"
+			"_source": "https://featherless.ai/docs/chat-template-kwargs (read 2026-11-01: enable_thinking false disables Qwen3, Qwen3.5/3.6 and GLM 4.7/5/5.1, thinking false disables Kimi K2.5/K2.6, DeepSeek V3.1/V3.2/V4 default to off; enable_thinking, thinking and do_reasoning are synonyms and a disagreeing false wins; DeepSeek R1, Kimi-K2-Thinking, MiniMax-M2, gpt-oss and Step-3.5 cannot be turned off), https://featherless.ai/docs/api-overview-and-common-options"
 		},
 		"inception": {
 			"label": "Inception (Mercury)",
@@ -360,7 +365,7 @@
 			"thinking_dialect": {
 				"toggle": { "chat_template_kwargs": { "enable_thinking": false, "thinking": false } }
 			},
-			"_source": "https://chutes.ai/llms.txt, https://chutes.ai/llms-full.txt (chat_template_kwargs thinking false for Kimi; enable_thinking is the key of the Qwen templates it serves)"
+			"_source": "https://chutes.ai/llms.txt, https://chutes.ai/docs/models/chutes-moonshotai-kimi-k2-6-tee (read 2026-11-01: chat_template_kwargs thinking false is Kimi K2.6 Instant mode), https://chutes.ai/docs/models/chutes-qwen-qwen3-32b-tee (names the enable_thinking template switch and /no_think without a body example: enable_thinking stays inferred from the Qwen template, and a refusal is dropped and remembered); no DeepSeek switch is documented"
 		},
 		"requesty": {
 			"label": "Requesty",
@@ -412,7 +417,7 @@
 				"toggle": { "enable_thinking": false, "thinking": { "type": "disabled" } },
 				"effort": { "reasoning_effort": "$level" }
 			},
-			"_source": "https://cloud.baidu.com/doc/qianfan-api/s/3m9b5lqft, https://cloud.baidu.com/doc/qianfan-api/s/3m7of64lb, https://cloud.baidu.com/doc/qianfan-docs/s/Wm95lyynv (enable_thinking for ERNIE and Qwen3, thinking.type for DeepSeek, Kimi and GLM: a field a model refuses is dropped once and remembered)"
+			"_source": "https://cloud.baidu.com/doc/qianfan-api/s/3m9b5lqft, https://cloud.baidu.com/doc/qianfan-api/s/3m7of64lb, https://cloud.baidu.com/doc/qianfan-docs/s/Wm95lyynv (read 2026-11-01: enable_thinking, default false, for qwen3-32b/14b/8b, the ERNIE 4.5 VL models and ernie-5.0-thinking-preview, default true there; thinking.type, default disabled, for deepseek-v4/v3.2, kimi-k2.5 and glm-5 to 5.2, glm-5.3 cannot disable; ernie-5.1 is listed only for thinking_budget, so no family turns it off and nothing is sent for it; a field a model refuses is dropped once and remembered)"
 		},
 		"spark": {
 			"label": "iFlytek Spark",
@@ -503,9 +508,21 @@
 				"token_field": "access_token",
 				"expires_field": "expires_in",
 				"default_expires_seconds": 3600,
-				"refresh_margin_seconds": 300
+				"refresh_margin_seconds": 300,
+				"assertion": {
+					"key_type": "service_account",
+					"body": {
+						"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+						"assertion": "{assertion}"
+					},
+					"issuer_field": "client_email",
+					"private_key_field": "private_key",
+					"key_id_field": "private_key_id",
+					"scope": "https://www.googleapis.com/auth/cloud-platform",
+					"lifetime_seconds": 3600
+				}
 			},
-			"_source": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/start/openai (OpenAI-compatible endpoint, Google Cloud access tokens only, reasoning_effort minimal, low, medium, high), https://docs.cloud.google.com/vertex-ai/generative-ai/docs/migrate/openai/auth-and-credentials, https://developers.google.com/identity/protocols/oauth2/web-server#offline (the key is the authorized_user credentials file gcloud auth application-default login writes; a service-account key, which needs a signed JWT, is not taken)"
+			"_source": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/start/openai (OpenAI-compatible endpoint, Google Cloud access tokens only, reasoning_effort minimal, low, medium, high), https://docs.cloud.google.com/vertex-ai/generative-ai/docs/migrate/openai/auth-and-credentials, https://developers.google.com/identity/protocols/oauth2/web-server#offline (an authorized_user credentials file, which gcloud auth application-default login writes, is refreshed), https://developers.google.com/identity/protocols/oauth2/service-account#httprest (a service-account key file is exchanged for a JWT signed RS256 with its private_key: iss client_email, kid private_key_id, scope, aud the token address, exp at most an hour after iat)"
 		},
 		"backboard": {
 			"label": "Backboard",

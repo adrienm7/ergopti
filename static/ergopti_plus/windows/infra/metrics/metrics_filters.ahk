@@ -79,7 +79,7 @@ class MetricsFilters {
 ; the failure this function exists to make impossible to have unnoticed.
 MetricsFiltersApplyManifestDefaults() {
 		Pairs := Map(
-			"private_browsing", "metrics.private_filter_enabled",
+			"private_browsing", ConfigKey.METRICS_PRIVATE_FILTER_ENABLED,
 			"secure_field",     ConfigKey.METRICS_SECURE_FILTER_ENABLED,
 			"system_auth",      ConfigKey.METRICS_SYSTEM_AUTH_FILTER_ENABLED,
 			"encrypt",          ConfigKey.METRICS_ENCRYPT
@@ -130,7 +130,7 @@ MF_SaveBuiltToIni(Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
 
 _MF_FilterConfigKey(Prop) {
 	static Keys := Map(
-		"private_browsing", "private_filter_enabled",
+		"private_browsing", ConfigLeaf.PRIVATE_FILTER_ENABLED,
 		"secure_field",     ConfigLeaf.SECURE_FILTER_ENABLED,
 		"system_auth",      ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED
 	)

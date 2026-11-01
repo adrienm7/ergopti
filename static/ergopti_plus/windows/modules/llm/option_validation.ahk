@@ -37,7 +37,7 @@ global LLM_PROFILE_BATCH_PARAMS_B    := 4.0   ; ≥ 4B → batch_advanced
 global LLM_PROFILE_LIVE_TRANSLATIONS := ["translate_en", "translate_ja"]
 ; The AI agent's settings (llm.agent_* of the features manifest): the AI menu's
 ; state carries and persists them like its own options.
-global LLM_AGENT_SETTING_KEYS := [ConfigLeaf.AGENT_SYSTEM1, "agent_system2", "agent_mode", "agent_disabled_apps"]
+global LLM_AGENT_SETTING_KEYS := [ConfigLeaf.AGENT_SYSTEM1, ConfigLeaf.AGENT_SYSTEM2, ConfigLeaf.AGENT_MODE, ConfigLeaf.AGENT_DISABLED_APPS]
 ; The agent's modes, in menu order: every agent action refuses, the actions
 ; only, the actions and the detection while typing.
 global LLM_AGENT_MODES := ["off", "action", "auto"]
@@ -264,6 +264,19 @@ LLM_Option_NormalizeApiEntries(Value) {
 	return Out
 }
 
+/**
+ * The key an application is stored and looked up under, the twin of
+ * _shared/lua/llm/app_identity.lua `normalize`.
+ * @param {Any} App The identifier a driver reports, or a user typed.
+ * @returns {String} Lower-cased, trimmed, without ".exe"; "" when unusable.
+ */
+LLM_AppIdentity_Normalize(App) {
+	if !(App is String)
+		return ""
+	Key := RegExReplace(StrLower(Trim(App, " `t`r`n")), "\.exe$", "")
+	return (Key == "" || StrLen(Key) > 256 || RegExMatch(Key, "[\x00-\x1F\x7F]")) ? "" : Key
+}
+
 /** Returns a detached app -> profile-id map or false for any invalid pair. */
 LLM_Option_NormalizeAppProfileOverrides(Value) {
 	global LLM_OPTION_MAX_COLLECTION_ITEMS
@@ -356,20 +369,20 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 	static StringKeys := Map(
 		"model", true, "profile_id", true, "language", true,
 		"backend", true, "api_entry_id", true,
-		ConfigLeaf.AGENT_SYSTEM1, true, "agent_system2", true)
+		ConfigLeaf.AGENT_SYSTEM1, true, ConfigLeaf.AGENT_SYSTEM2, true)
 	; These are semantic consumer bounds, not merely storage types. Keep every
 	; public integer in this one table so boot restore, menu persistence, runtime
 	; publication and interactive setters cannot disagree. max_words=0 is the
 	; documented unlimited sentinel; the finite ceiling bounds token arithmetic.
 	static IntegerRanges := Map(
 		"n_predictions", [1, 10],
-		"min_words", [1, 20],
-		"max_words", [0, 10000],
+		ConfigLeaf.MIN_WORDS, [1, 20],
+		ConfigLeaf.MAX_WORDS, [0, 10000],
 		ConfigLeaf.DEBOUNCE_MS, [50, 10000],
 		ConfigLeaf.MIN_REQUEST_INTERVAL_MS, [0, 10000],
 		"ctx_chars", [50, 10000])
 	static BooleanKeys := Map(
-		"enabled", true, "auto_profile_for_model", true,
+		"enabled", true, ConfigLeaf.AUTO_PROFILE_FOR_MODEL, true,
 		ConfigLeaf.INSTANT_ON_WORD_END, true, ConfigLeaf.AFTER_HOTSTRING, true,
 		ConfigLeaf.RESET_ON_NAV, true, "disable_url_bars", true,
 		"disable_password_fields", true, ConfigLeaf.SHOW_INFO_BAR, true,
@@ -428,11 +441,11 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		Normalized := Value == 1
 		return true
 	}
-	if (Key == ConfigLeaf.DISABLED_APPS || Key == "agent_disabled_apps") {
+	if (Key == ConfigLeaf.DISABLED_APPS || Key == ConfigLeaf.AGENT_DISABLED_APPS) {
 		Normalized := LLM_Option_NormalizeStringArray(Value, true)
 		return Normalized is Array
 	}
-	if (Key == "agent_mode") {
+	if (Key == ConfigLeaf.AGENT_MODE) {
 		for Mode in LLM_AGENT_MODES {
 			if (Value is String) && Value == Mode {
 				Normalized := Value
@@ -441,7 +454,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		}
 		return false
 	}
-	if (Key == "user_profiles") {
+	if (Key == ConfigLeaf.USER_PROFILES) {
 		Normalized := LLM_Option_NormalizeUserProfiles(Value)
 		return Normalized is Array
 	}

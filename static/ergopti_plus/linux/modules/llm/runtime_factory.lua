@@ -32,6 +32,10 @@ function M.new(engine, profiles)
 	if not proxy_policy then return nil, proxy_reason end
 	local origins, origins_reason = require("infra.route_origins").client("ollama")
 	if not origins then return nil, origins_reason end
+	-- A proxy that demands an NTLM/Negotiate sign-in is answered by the local relay.
+	local Relay = require("infra.proxy_auth_relay")
+	local relay_policy, relay_reason = Relay.load()
+	if not relay_policy then return nil, relay_reason end
 	local source = require("modules.llm.runtime_source").new({
 		preferences = require("infra.llm_preferences"), profiles = profiles,
 		writer = require("toml_codec.writer"), manifest = require("infra.manifest_reader"),
@@ -51,7 +55,11 @@ function M.new(engine, profiles)
 		http = require("adapters.http_client"), owned_timer = timer, timings = Timings,
 		serve_environment = serve_environment,
 		network = { policy = proxy_policy, lookup = require("adapters.system_proxy").lookup_owned,
-			timeout_ms = Timings.ms("llm", "managed_proxy_lookup_timeout_ms"), origins = origins },
+			timeout_ms = Timings.ms("llm", "managed_proxy_lookup_timeout_ms"), origins = origins,
+			relay = { policy = relay_policy, probe = Relay.probe, executable = Relay.executable,
+				timings = Relay.timings, timeout_ms = Relay.timings().probe_ms },
+			probe = require("adapters.tcp_probe").probe, relay_address = require("adapters.tcp_probe").relay_address,
+			probe_timeout_ms = Timings.ms("llm", "managed_proxy_probe_timeout_ms") },
 		environment = function()
 			local values = native.os_environ()
 			if type(values) ~= "table" then return nil end

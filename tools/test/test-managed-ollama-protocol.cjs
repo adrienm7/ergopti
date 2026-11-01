@@ -369,12 +369,12 @@ function receiveWindowsRuntimeHandoff() {
 		stderr,
 		'Owned runtime retains image leases: exact job accounting is unavailable.\n'
 	);
-	assert.equal(stdout.split('\n').filter((line) => line.startsWith('PASS ')).length, 9);
+	assert.equal(stdout.split('\n').filter((line) => line.startsWith('PASS ')).length, 15);
 	assert.doesNotMatch(stdout, /^FAIL /m);
-	assert.match(stdout, /^RESULT passed=9 failed=0\n$/m);
+	assert.match(stdout, /^RESULT passed=15 failed=0\n$/m);
 	// The small private fixture namespace remains a retained receiving artifact.
 	process.stdout.write(stdout);
-	process.stdout.write('WINDOWS-RUNTIME-HANDOFF models=9 native_runtime=false http=false\n');
+	process.stdout.write('WINDOWS-RUNTIME-HANDOFF models=15 native_runtime=false http=false\n');
 }
 function receiveWindowsModelEnvironment() {
 	assert.equal(process.platform, 'win32', 'Model admission requires production Windows PS5.');
@@ -386,7 +386,7 @@ function receiveWindowsModelEnvironment() {
 	if (moduleKey) delete env[moduleKey];
 	env.PSModulePath = path.join(psHome, 'Modules');
 	for (const [script, count] of [
-		['test_ollama_model_pull.ps1', 8],
+		['test_ollama_model_pull.ps1', 10],
 		['test_ollama_model_environment.ps1', 3]
 	]) {
 		const result = spawnSync(
@@ -410,8 +410,8 @@ function receiveWindowsModelEnvironment() {
 		assert.equal(result.stderr, '');
 		assert.equal(stdout.split('\n').filter((line) => line.startsWith('PASS ')).length, count);
 		assert.doesNotMatch(stdout, /^FAIL /m);
-		if (count === 8)
-			assert.match(stdout, /^Managed model import acceptance: 8 passed, 0 failed\.$/m);
+		if (count === 10)
+			assert.match(stdout, /^Managed model import acceptance: 10 passed, 0 failed\.$/m);
 		else assert.match(stdout, /^RESULT passed=3 failed=0 builder_only=false$/m);
 	}
 	process.stdout.write('WINDOWS-MODEL-ENVIRONMENT controls=11 native_children=true ollama=false\n');
@@ -490,7 +490,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/test/managed_ollama_go_evidence_test.py', 47]);
 	cases.push(['tools/test/managed_ollama_signal_pid_publication_test.py', 2]);
 	// The developer app's managed Ollama build; injected ports, no network.
-	cases.push(['tools/test/macos_dev_ollama_catalogue_test.py', 13]);
+	cases.push(['tools/test/macos_dev_ollama_catalogue_test.py', 18]);
 } else {
 	process.stdout.write(
 		'SKIP actual POSIX process peers on Windows; Apple SDK receiving is separate.\n'

@@ -60,10 +60,10 @@ LLM_Menu_BuildOpts() {
 	return Map(
 		"model",                   _LLM_Menu["model"],
 		"profile_id",              _LLM_Menu["profile_id"],
-		"user_profiles",           _LLM_Menu["user_profiles"],
+		ConfigLeaf.USER_PROFILES,           _LLM_Menu[ConfigLeaf.USER_PROFILES],
 		"n_predictions",           _LLM_Menu["n_predictions"],
-		"min_words",               _LLM_Menu["min_words"],
-		"max_words",               _LLM_Menu["max_words"],
+		ConfigLeaf.MIN_WORDS,               _LLM_Menu[ConfigLeaf.MIN_WORDS],
+		ConfigLeaf.MAX_WORDS,               _LLM_Menu[ConfigLeaf.MAX_WORDS],
 		"language",                I18nGetLocale(),
 		ConfigLeaf.DEBOUNCE_MS,             _LLM_Menu[ConfigLeaf.DEBOUNCE_MS],
 		ConfigLeaf.MIN_REQUEST_INTERVAL_MS, _LLM_Menu[ConfigLeaf.MIN_REQUEST_INTERVAL_MS],

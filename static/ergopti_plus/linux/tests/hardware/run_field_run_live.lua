@@ -93,6 +93,8 @@ setenv("XDG_RUNTIME_DIR", scratch .. "/run")
 setenv("XDG_CONFIG_HOME", scratch .. "/config")
 setenv("HOME", scratch .. "/home")
 setenv("ERGOPTI_XKB_USER_HOME", scratch .. "/home")
+setenv("XDG_DATA_HOME", scratch .. "/data")
+
 
 local host = io.popen("luajit " .. quote(SCRIPT) .. " daemon >" .. quote(scratch .. "/daemon.log")
 	.. " 2>&1 & echo $!", "r")
@@ -110,7 +112,10 @@ if not check(read(ready) ~= nil, "the daemon host publishes its field run sessio
 	os.exit(1)
 end
 
+-- As the collector does: it installs Ergopti's Python first (running it is the
+-- consent), so the composer check reaches the installer without a click.
 local handle = io.popen("bash -c " .. quote(". " .. quote(ROOT .. "/tools/dev/linux-field-run.sh")
+	.. " && field_linux_ensure_python " .. quote(ROOT)
 	.. " && field_linux_run " .. quote(ROOT) .. " " .. quote(scratch .. "/report")) .. " 2>&1", "r")
 local output = handle:read("*a")
 handle:close()
@@ -121,6 +126,8 @@ for index, step in ipairs({ "field_composer", "field_network", "driver_reload", 
 	check(read(string.format("%s/report/field_run/%02d_%s.json", scratch, index, step)) ~= nil,
 		"and copies its result file")
 end
+check(output:match("running this collector is the consent") ~= nil, "the collector states its consent before the download")
+check(output:match("field_python=installed") ~= nil, "the collector installs Ergopti's Python")
 check(output:match("field run field_composer: pass") ~= nil, "the composer check passes headless")
 check(output:match("field run driver_reload: pass %(reloaded%)") ~= nil,
 	"the host restarts and the successor resumes the run")
@@ -133,7 +140,7 @@ check(output:match("field run config_guard: pass") ~= nil, "no step changed conf
 check(output:match("Field run summary: ") ~= nil and not output:match("interrupted"), "the run closed with a summary")
 check(output:match("field_run=fr%-") ~= nil, "the collector names the request it ran")
 local log = read(scratch .. "/daemon.log") or ""
-check(not log:find("zenity", 1, true), "no window was asked for")
+check(not log:find("dialog_host.lua", 1, true), "no window was asked for")
 
 os.execute("kill " .. host_pid .. " " .. tostring(successor_pid or "") .. " 2>/dev/null")
 for _ = 1, 100 do

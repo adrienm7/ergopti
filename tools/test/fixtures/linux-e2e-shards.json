@@ -51,6 +51,9 @@
 			"The tray binding names libraries and symbols that exist",
 			"Install prerequisites for The tray icon registers with a StatusNotifier host",
 			"The tray icon registers with a StatusNotifier host",
+			"Install prerequisites for The owned dialog host shows its captions and answers on a real display",
+			"The owned dialog host shows its captions and answers on a real display",
+			"Ergopti's own Python downloads, verifies and runs",
 			"Install prerequisites for The secure-field probe on a real accessibility bus",
 			"The secure-field probe on a real accessibility bus",
 			"Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options",
@@ -124,6 +127,7 @@
 			"Install prerequisites for Qualify native managed network runtime",
 			"Qualify native managed network runtime",
 			"Qualify the Go route plan twin",
+			"Qualify the Go proxy sign-in relay",
 			"Install prerequisites for Qualify the installed managed Ollama route plan",
 			"Qualify the installed managed Ollama route plan",
 			"Qualify native retained FD SHA-256",
@@ -350,6 +354,9 @@
 		],
 		"The tray icon registers with a StatusNotifier host": [
 			"Install prerequisites for The tray icon registers with a StatusNotifier host"
+		],
+		"The owned dialog host shows its captions and answers on a real display": [
+			"Install prerequisites for The owned dialog host shows its captions and answers on a real display"
 		],
 		"The secure-field probe on a real accessibility bus": [
 			"Install prerequisites for The secure-field probe on a real accessibility bus"

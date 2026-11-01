@@ -693,6 +693,7 @@ const STEP_CONDITIONS = [
 	[COMMON_BOX, 'common-integration', 'Retain captured JS integration failure output', 'always()'],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native runtime prerequisites', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify the Go route plan twin', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Qualify the Go proxy sign-in relay', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native retained FD SHA-256', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Prepare authenticated managed HTTP validation tools', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native managed HTTP public and retained output', NOT_CANCELLED],
@@ -850,6 +851,15 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'test-ahk', 'Test native compiled startup admission', "matrix.module == 'meta'"],
 	[WINDOWS_BOX, 'integration-ahk', 'Receive managed Ollama file component', WINDOWS_NATIVE_LOT],
 	[WINDOWS_BOX, 'integration-ahk', 'Run native desktop AHK cohorts', WINDOWS_NATIVE_LOT],
+	// The proxy relay runs end to end once, in the native lot, with its Go pin.
+	[WINDOWS_BOX, 'integration-ahk', 'Read the pinned Go toolchain', WINDOWS_NATIVE_LOT],
+	[WINDOWS_BOX, 'integration-ahk', 'Install the pinned Go toolchain', WINDOWS_NATIVE_LOT],
+	[
+		WINDOWS_BOX,
+		'integration-ahk',
+		'Run the proxy relay end to end through the fake network',
+		WINDOWS_NATIVE_LOT
+	],
 	[
 		WINDOWS_BOX,
 		'integration-ahk',
@@ -1092,7 +1102,7 @@ const STEP_CONDITIONS = [
 	[
 		LINUX_BOX,
 		'install-linux',
-		'Install LuaJIT for the archive launcher (archive)',
+		'Install the GLib stack for the archive launcher (archive)',
 		"env.INSTALL_KIND == 'archive'"
 	],
 	[
@@ -1124,6 +1134,54 @@ const STEP_CONDITIONS = [
 		'install-linux',
 		'Upload mandatory archive smoke evidence (archive)',
 		"env.INSTALL_KIND == 'archive'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Tools the job itself needs (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Download the packages built above (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Build the release recipe with makepkg (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Install the package with pacman (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Launch what the package installed (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'The installed shared data tree resolves and opens (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Record mandatory Arch package smoke evidence (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Upload mandatory Arch package smoke evidence (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
 	],
 	[
 		LINUX_BOX,
@@ -1676,7 +1734,7 @@ function lotTransport(source, rel) {
 				assert.deepEqual(receiving.steps[0], {
 					name: 'Require a declared installation lot',
 					shell: 'sh',
-					run: 'set -eu\ntest -n "$INSTALL_ID"\ncase "$INSTALL_KIND" in\n  install|first|deb|rpm|appimage|archive|flatpak) ;;\n  *) exit 1 ;;\nesac\n'
+					run: 'set -eu\ntest -n "$INSTALL_ID"\ncase "$INSTALL_KIND" in\n  install|first|deb|rpm|appimage|archive|flatpak|pkgbuild) ;;\n  *) exit 1 ;;\nesac\n'
 				});
 				assert.equal(preceding.steps.at(-1).id, id, 'Plan only after mandatory packaging evidence');
 			}
