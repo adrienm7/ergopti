@@ -670,6 +670,14 @@ To do on the PC, after the Windows token exchange itself (the TODO's
    exchange lands, the native `llm_vision` request must wait for the token the
    same way instead of refusing while it is fetched.
 
+Done on Windows on 1 November (`modules/llm/api_token_exchange.ahk`,
+`modules/llm/rs256_signer.ahk`), with two departures from the steps above, both
+forced by the corpus. The DER is read by the signer itself: the blob of
+`CNG_RSA_PRIVATE_KEY_BLOB` holds no `dp`, `dq` or `qinv`, and the decoder cannot
+tell the refusals apart. CNG also recomputes those values, so a wrong `dq` would
+sign correctly on Windows while macOS and Linux refuse the file: the signer checks
+them with a small limb division before it signs.
+
 ## Actions Windows can gain (31 October)
 
 Branch `feat/action-parity` ported catalogue actions to macOS and Linux and gave
