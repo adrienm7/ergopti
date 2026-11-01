@@ -12,6 +12,7 @@ npm run test:ahk-parallel -- --only="config transition"    # a subset of the pla
 npm run test:ahk-parallel -- --fresh                       # forget the ledger first
 npm run test:ahk-parallel -- --rerun-failures              # each failure alone, one at a time
 npm run test:ahk-parallel -- --report=40                   # slowest tests and files, runs nothing
+npm run test:ahk-parallel -- --wait=60                     # queue behind another runner, 180 min without a number
 ```
 
 Everything lives in the ignored `.ahk-parallel/` folder (`--run-dir` moves it).
@@ -43,9 +44,12 @@ Everything lives in the ignored `.ahk-parallel/` folder (`--run-dir` moves it).
   resource. Read a failure as real only once `--rerun-failures` reproduces it
   alone. That run answers for those failures only, in its exit status and its
   summary, and needs `--accept-stale` once HEAD has moved.
-- **The phase is exclusive within one run only.** Another AHK run on the same
-  session, from another checkout or a direct `run_all.ahk`, still shares the
-  clipboard and the focus with it. Run the suite with nothing else testing.
+- **One runner per machine.** A runner holds the named pipe
+  `\\.\pipe\ergopti-ahk-parallel` for its whole life, in every checkout, and a
+  second one refuses at once and names the holder, or queues with `--wait`. The
+  kernel frees the name when the holder dies, so there is no lock to clear.
+  `--report` runs nothing and needs no lock. A direct `run_all.ahk` does not take
+  the lock and still shares the clipboard and the focus: run nothing else then.
 
 Two mechanisms make the parallelism sound. Workers run under `/force`, the
 interpreter's switch for `#SingleInstance Off`, so they do not replace one
