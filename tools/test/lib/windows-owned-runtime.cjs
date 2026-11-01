@@ -76,12 +76,18 @@ function runPowerShellFile(script, argumentsList, timeout = 60000) {
 	);
 }
 
-/** The calling environment without any proxy or Ollama variable. */
+/**
+ * The calling environment without any proxy or Ollama variable. PSModulePath is
+ * replaced too: a caller under PowerShell 7 exports its own module folders, and
+ * Windows PowerShell then fails to load Microsoft.PowerShell.Security (Get-Acl)
+ * from them.
+ */
 function scrubbedEnvironment(extra = {}) {
 	const environment = {};
 	for (const [name, value] of Object.entries(process.env))
-		if (!AMBIENT_PROXY_NAMES.test(name)) environment[name] = value;
-	return { ...environment, ...extra };
+		if (!AMBIENT_PROXY_NAMES.test(name) && !/^psmodulepath$/i.test(name)) environment[name] = value;
+	const PSModulePath = path.join(path.dirname(POWERSHELL), 'Modules');
+	return { ...environment, PSModulePath, ...extra };
 }
 
 /** The last JSON line a managed file action printed. */
