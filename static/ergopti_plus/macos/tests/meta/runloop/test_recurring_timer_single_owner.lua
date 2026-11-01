@@ -28,13 +28,14 @@ local PRODUCTION_SOURCE_FLOOR = 200
 -- Existing explicit native timer owners remain migration debt. Pinning the full
 -- set keeps the guard useful today: a new sibling or a reintroduced ui_restore
 -- poller fails instead of hiding behind one already-approved file.
+-- Keyed by module name (helpers.module_name_of), never by path.
 local RAW_TIMER_NEW_OWNERS = {
-	["adapters/timer_scheduler.lua"] = "canonical native timer owner",
-	["infra/launcher_guard.lua"] = "runs before TimerScheduler and publishes before start",
-	["modules/keystats/init.lua"] = "legacy keystats runtime transaction pending migration",
-	["modules/keystats/log_manager.lua"] = "legacy ingest owner pending migration",
-	["modules/keymap/init.lua"] = "legacy tap-watchdog owner pending migration",
-	["platform/remap/watchers.lua"] = "legacy layout-poll owner pending migration",
+	["adapters.timer_scheduler"] = "canonical native timer owner",
+	["infra.launcher_guard"] = "runs before TimerScheduler and publishes before start",
+	["modules.keystats"] = "legacy keystats runtime transaction pending migration",
+	["modules.keystats.log_manager"] = "legacy ingest owner pending migration",
+	["modules.keymap"] = "legacy tap-watchdog owner pending migration",
+	["platform.remap.watchers"] = "legacy layout-poll owner pending migration",
 }
 
 --- Lists production Lua files recursively without relying on LuaFileSystem.
@@ -199,7 +200,7 @@ helpers.describe("recurring native timer single owner", function()
 				local relative = normalized:match("/macos/(.+)$")
 				helpers.assert_true(relative ~= nil,
 					"raw timer owner must resolve relative to the macOS driver: " .. normalized)
-				found[relative] = true
+				found[helpers.module_name_of(relative)] = true
 			end
 		end
 

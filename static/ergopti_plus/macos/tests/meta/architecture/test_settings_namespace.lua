@@ -13,9 +13,10 @@ local CommandLines = require("tests.support.command_lines")
 
 local DRIVER_ROOT = helpers.driver_root()
 local PRODUCTION_SOURCE_FLOOR = 200
+-- Keyed by module name (helpers.module_name_of), never by path.
 local RAW_SETTINGS_OWNERS = {
-	["adapters/log_transport.lua"] = true,
-	["adapters/storage.lua"] = true,
+	["adapters.log_transport"] = true,
+	["adapters.storage"] = true,
 }
 
 --- Lists production Lua files recursively without LuaFileSystem.
@@ -129,7 +130,7 @@ helpers.describe("Hammerspoon settings namespace", function()
 				local relative = path:match("/macos/(.+)$")
 				helpers.assert_not_nil(relative,
 					"settings owner must resolve relative to the macOS driver")
-				found[relative] = true
+				found[helpers.module_name_of(relative)] = true
 			end
 		end
 		for path in pairs(found) do
