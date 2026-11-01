@@ -271,17 +271,22 @@ def _report_macho_difference(macho, relative, original, signed, error, deadline)
 
 
 def _report_refusal_origin(stage, error):
-    """Name the exception type, code and innermost builder line of a refusal.
+    """Name a refusal's type, code, innermost builder line, deeper origin and message.
 
-    Signing maps every refusal, and any OSError, to one closed code, and a
-    dozen checks share that code; the source line tells them apart on the log.
+    Signing and packaging map every refusal, and any OSError, to one closed
+    code, and many checks share it; the source line and the fixed refusal
+    message tell them apart on the log.
     """
-    frames = [
-        frame
-        for frame in traceback.extract_tb(error.__traceback__)
-        if Path(frame.filename).name == Path(__file__).name
-    ]
+    trace = traceback.extract_tb(error.__traceback__)
+    frames = [frame for frame in trace if Path(frame.filename).name == Path(__file__).name]
     where = "line %d (%s)" % (frames[-1].lineno, frames[-1].name) if frames else "unknown line"
+    if trace and (not frames or trace[-1] is not frames[-1]):
+        where += " via %s:%d (%s)" % (
+            Path(trace[-1].filename).name,
+            trace[-1].lineno,
+            trace[-1].name,
+        )
+    message = str(error)
     print(
         "[owned-build] "
         + stage
@@ -290,7 +295,8 @@ def _report_refusal_origin(stage, error):
         + " "
         + str(getattr(error, "code", ""))
         + " at "
-        + where,
+        + where
+        + (": " + message if message else ""),
         file=sys.stderr,
         flush=True,
     )
@@ -2164,6 +2170,7 @@ class _ProductionSink(_SigningSink):
             self.production_module.ProductBuildRefusal,
             OSError,
         ) as error:
+            _report_refusal_origin("packaging", error)
             self.packaged = ProductionFailure(
                 getattr(error, "code", "production_packaging"),
                 resource_failure=(
