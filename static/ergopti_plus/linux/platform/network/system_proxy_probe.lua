@@ -181,7 +181,9 @@ local function curl_capabilities()
 		close(stderr)
 	end
 	-- The private runtime's curl, the one every request runs (infra/owned_programs.lua).
-	process, pid = uv.spawn(require("infra.owned_programs").path("curl"), {
+	-- resolve(), not path(): stdout is this helper's receipt, and path() logs the
+	-- source-run mode through a shim whose fallback prints to stdout here.
+	process, pid = uv.spawn(require("infra.owned_programs").resolve("curl"), {
 		args = { "--disable", "--version" }, stdio = { nil, stdout, stderr },
 	}, function(exit_code, signal)
 		exited, code = true, signal == 0 and exit_code or -1
