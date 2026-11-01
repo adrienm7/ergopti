@@ -122,25 +122,31 @@ Test("Windows API requests: an unfilled per-account address is refused", _LAAA_U
 ; =========================================
 ; =========================================
 
-; macOS and Linux exchange the key of a provider declaring an auth block
-; (test_api_access_token.lua); the Windows driver refuses it with a reason.
+; A provider declaring an auth block is added like any other per-account provider;
+; its key is exchanged for an access token (test_llm_api_token_exchange.ahk), and
+; the stored key itself is never sent. A pasted credentials file fits one line.
 _LAAA_TokenExchange() {
 	global LLM_API_PROVIDERS, _LLM_Menu
 	Form := _WAA_Form("openai")
 	try {
 		Providers := LLM_Menu_DeepClone(LLM_API_PROVIDERS)
-		Providers["ibm_fixture"] := Map("Label", "IBM fixture", "BaseUrl", "https://us-south.ml.cloud.ibm.com/ml/gateway/v1",
-			"DefaultModel", "", "Format", "openai", "ModelExtras", Map(), "ThinkingDialect", Map(), "TokenExchange", true)
+		Providers["vertex_fixture"] := LLM_Menu_DeepClone(LLM_API_PROVIDERS["vertex"])
+		Providers["vertex_fixture"]["BaseUrl"] := "https://{region}.fixture.invalid/v1"
 		LLM_API_PROVIDERS := Providers
-		Form.Answers := ["ibm_fixture", "unused", "unused", "unused"]
-		AssertFalse(Form.Run(), "the form refuses the provider")
-		AssertEqual(1, Form.Inputs.Length, "nothing is asked after the provider")
-		AssertEqual(1, Form.Notices.Length)
-		AssertEqual(t("menu.llm.api_provider_token_exchange_unavailable"), Form.Notices[1])
-		Form.AssertNoSave()
-		AssertEqual("", _LLMRemoteResolveEntry(Map("Provider", "ibm_fixture",
-			"BaseUrl", "https://us-south.ml.cloud.ibm.com/ml/gateway/v1", "Token", "ibm-api-key", "Model", "m")),
-			"the stored key is never sent as Bearer")
+		Form.Answers := ["vertex_fixture", "us-south", '{`r`n"type": "authorized_user",`n"client_id": "id"`n}', "m"]
+		AssertTrue(Form.Run(), "the form saves the provider")
+		AssertEqual(4, Form.Inputs.Length, "provider, account field, key and model")
+		AssertEqual(0, Form.Notices.Length, "no refusal")
+		Saved := _LLM_Menu["api_entries"][3]
+		AssertEqual("https://us-south.fixture.invalid/v1", Saved["BaseUrl"])
+		AssertEqual('{"type": "authorized_user","client_id": "id"}', Saved["Token"], "the key file on one line")
+		AssertEqual(1, Form.Ready.Length, "the save validates the key")
+		Resolved := _LLMRemoteResolveEntry(Saved)
+		AssertTrue(Resolved is Map, "the entry is usable")
+		AssertEqual("", Resolved["Token"], "the stored key is never sent as Bearer")
 	} finally Form.Restore()
 }
-Test("Windows API Add: an access-token provider is refused with its reason", _LAAA_TokenExchange)
+Test("Windows API Add: an access-token provider is saved with its key on one line", _LAAA_TokenExchange)
+
+#Include test_llm_rs256_signer.ahk
+#Include test_llm_api_token_exchange.ahk

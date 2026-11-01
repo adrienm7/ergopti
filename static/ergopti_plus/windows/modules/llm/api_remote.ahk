@@ -195,6 +195,14 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
     Retry["send"] := (Body, Fail) => _LLMRemoteRetryOf(req_id, LLM_RemotePostBody_Async(resolved, Url, Body,
         OriginalSuccess, Fail, timeout_ms, Kind, 0, CurrentFn))
 
+    ; A key exchanged for an access token waits for it, reservation held: the
+    ; first request never reaches the provider without one
+    if resolved.Has("StoredKey") && _LLMRemote_NeedsAccess(resolved) {
+        _LLMRemote_WithAccess(resolved, _LLMRemote_ResumeAfterAccess.Bind(req_id, reservation, on_fail,
+            _LLMRemote_DispatchCurl.Bind(req_id, resolved, Url, Payload, on_success, on_fail, timeout_ms, 0, reservation)))
+        return req_id
+    }
+
     ; The managed worker (WinHTTP in its own process) is the only production
     ; transport: the WinHTTP COM object would put DNS/connect/Send back on the
     ; cooperative AHK thread.
@@ -313,6 +321,7 @@ LLM_RemoteTopLevelKeys(Response) {
 }
 
 #Include api_remote_backboard_exchange.ahk
+#Include api_token_exchange.ahk
 
 /**
  * Sends one Backboard message and hands its decoded answer on. The first
@@ -1358,10 +1367,6 @@ _LLMRemoteResolveEntry(Entry) {
     if !LLM_API_PROVIDERS.Has(ProviderId)
         return ""
     Provider := LLM_API_PROVIDERS[ProviderId]
-    if Provider.Get("TokenExchange", false) {
-        try LoggerError("LLM.remote", "API entry of provider '{1}' is refused: its key is exchanged for an access token, which the Windows driver does not do yet.", ProviderId)
-        return ""
-    }
     ProvFmt  := Provider["Format"]
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
     if (BaseUrl == "")
@@ -1373,7 +1378,7 @@ _LLMRemoteResolveEntry(Entry) {
     }
     if !(BaseUrl is String) || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
         return ""
-    Token := _LLMRemoteEntryGet(Entry, "Token", "")
+    Token := _LLMRemoteStoredKey(Entry)
     if !LocalServerAuthEntryTokenAllowed(ProviderId, Token, BaseUrl, LLM_LOCAL_API_SERVERS)
         return ""
     Model := _LLMRemoteEntryGet(Entry, "Model", Provider["DefaultModel"])
@@ -1386,8 +1391,82 @@ _LLMRemoteResolveEntry(Entry) {
     ModelExtras := Provider.Has("ModelExtras") ? Provider["ModelExtras"] : Map()
     Extras := (ModelExtras is Map && ModelExtras.Has(Model)) ? ModelExtras[Model] : Map()
     RequestFields := Provider.Has("RequestFields") ? Provider["RequestFields"] : Map()
-    return Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model,
+    Resolved := Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model,
         "Extras", Extras, "RequestFields", RequestFields, "ThinkingDialect", Provider.Get("ThinkingDialect", Map()))
+    ; The stored key never travels as a credential: Token holds the access token
+    ; once it is usable, and stays empty until _LLMRemote_WithAccess has it
+    if Provider.Get("Auth", "") is Map {
+        Resolved["StoredKey"] := Token
+        Resolved["Token"] := ""
+    }
+    return Resolved
+}
+
+; The key an entry record stores: a resolved record of a token-exchange provider
+; keeps it apart from the access token its Token field carries.
+_LLMRemoteStoredKey(Entry) {
+    return (Entry is Map && Entry.Has("StoredKey")) ? Entry["StoredKey"] : _LLMRemoteEntryGet(Entry, "Token", "")
+}
+
+/**
+ * Tells whether a resolved record must wait for its access token. A usable one is
+ * written to its Token field, so the record is ready to send when this says no.
+ * @param {Map} Resolved _LLMRemoteResolveEntry's record.
+ * @returns {Boolean}
+ */
+_LLMRemote_NeedsAccess(Resolved) {
+    global LLM_API_PROVIDERS
+    if !Resolved.Has("StoredKey")
+        return false
+    ProviderId := Resolved["Provider"]
+    Token := LLM_TokenExchange_Current(ProviderId, LLM_API_PROVIDERS[ProviderId]["Auth"], Resolved["StoredKey"])
+    Resolved["Token"] := Token
+    return Token == ""
+}
+
+/**
+ * Runs OnReady once a resolved record carries its access token: at once for a
+ * provider sending its key as is or a fresh token, else when the exchange settles.
+ * @param {Map} Resolved _LLMRemoteResolveEntry's record.
+ * @param {Func} OnReady OnReady(Ok, Failure); see LLM_TokenExchange_Prepare.
+ */
+_LLMRemote_WithAccess(Resolved, OnReady) {
+    global LLM_API_PROVIDERS
+    if !_LLMRemote_NeedsAccess(Resolved) {
+        OnReady.Call(true, 0)
+        return
+    }
+    ProviderId := Resolved["Provider"]
+    LLM_TokenExchange_Prepare(ProviderId, LLM_API_PROVIDERS[ProviderId]["Auth"], Resolved["StoredKey"],
+        _LLMRemote_OnAccess.Bind(Resolved, OnReady))
+}
+
+_LLMRemote_OnAccess(Resolved, OnReady, Ok, Failure) {
+    if Ok
+        _LLMRemote_NeedsAccess(Resolved)
+    OnReady.Call(Ok, Failure)
+}
+
+; The failure every waiting request reports for a refused exchange. Its reason
+; stays in the log: the menu's Test action words it through the locale.
+_LLMRemote_AccessFailInfo(Failure) {
+    Report := Failure is Map ? Failure.Get("network_report", 0) : 0
+    return _LLMRemote_FailInfo("token_exchange", Failure is Map ? Failure.Get("status", 0) : 0, "", Report)
+}
+
+; A reserved request resumes once its access token settled, unless it was
+; cancelled, trimmed or retired meanwhile.
+_LLMRemote_ResumeAfterAccess(req_id, reservation, on_fail, Dispatch, Ok, Failure) {
+    if !_LLMRemote_RequestAdmitted(req_id, reservation) {
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return
+    }
+    if !Ok {
+        if _LLMRemote_DeleteOwned(req_id, reservation, true)
+            _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_AccessFailInfo(Failure))
+        return
+    }
+    Dispatch.Call()
 }
 
 ; Per-phase timeout (ms) for the readiness ping. Same value the sync path
@@ -1455,7 +1534,7 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
     if (BaseUrl == "")
         BaseUrl := _LLMRemote_DefaultBaseUrl(ProviderId, Provider)
-    Token    := _LLMRemoteEntryGet(Entry, "Token", "")
+    Token    := _LLMRemoteStoredKey(Entry)
     if !_LLMRemote_ConfigScalarIsSafe(BaseUrl) || BaseUrl == ""
             || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
             || !LocalServerAuthEntryTokenAllowed(ProviderId, Token, BaseUrl, LLM_LOCAL_API_SERVERS)
@@ -1470,6 +1549,35 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
         -Owner["network_timeout_ms"])
     Owner["local_server"] := LocalServerAuthEntryTokenAllowed(ProviderId, "", BaseUrl, LLM_LOCAL_API_SERVERS)
     ProvFmt := Provider["Format"]
+    if Provider.Get("Auth", "") is Map {
+        LLM_TokenExchange_Prepare(ProviderId, Provider["Auth"], Token, _LLMRemote_ReadyOnAccess.Bind(
+            Owner, on_result, ProviderId, Provider["Auth"], Token, BaseUrl, ProvFmt, Port))
+        return Owner
+    }
+    return _LLMRemote_ReadySend(Owner, on_result, BaseUrl, ProvFmt, Token, Port)
+}
+
+; The token service's verdict is what a save validates: an access token proves the
+; key, and no provider of this kind promises a model list to every account. Only a
+; listing goes on, with the token. A key the service refused reads as HTTP 401.
+_LLMRemote_ReadyOnAccess(Owner, on_result, ProviderId, Auth, Key, BaseUrl, ProvFmt, Port, Ok, Failure) {
+    if !_LLMRemote_ReadyOwnerIsCurrent(Owner)
+        return
+    if !Ok {
+        Owner["http_status"] := Failure.Get("key_refused", false) ? 401 : Failure.Get("status", 0)
+        _LLMRemote_CompleteReady(Owner, on_result, false)
+        return
+    }
+    if !Owner.Get("listing", false) {
+        _LLMRemote_CompleteReady(Owner, on_result, true)
+        return
+    }
+    _LLMRemote_ReadySend(Owner, on_result, BaseUrl, ProvFmt, LLM_TokenExchange_Current(ProviderId, Auth, Key), Port)
+}
+
+; Sends the readiness probe of an entry whose credential is known.
+; @returns {Map} Owner.
+_LLMRemote_ReadySend(Owner, on_result, BaseUrl, ProvFmt, Token, Port) {
     PingUrl := ""
     if (ProvFmt == "openai" or ProvFmt == "anthropic") {
         PingUrl := RTrim(BaseUrl, "/") . "/models"
@@ -2436,11 +2544,22 @@ _LLMRemote_LoadCatalog() {
                 pid, ThinkingErr.Message)
             continue
         }
+        ; An auth block exchanges the key for a short-lived access token. A refused
+        ; block refuses the provider whole: its key would go out as a Bearer. The
+        ; address of a gemini-format request holds the credential and is written
+        ; before the token arrives, so no such provider can exchange its key.
+        Auth := ""
+        if desc.Has("auth") {
+            Auth := LLM_TokenExchange_Parse(desc["auth"], &AuthReason)
+            if (AuthReason == "" && desc["format"] == "gemini")
+                AuthReason := "a gemini-format provider cannot exchange its key"
+            if (AuthReason != "") {
+                try LoggerError("LLM.remote", "api_providers.json: providers.{1}.auth is invalid ({2}) — skipped.", pid, AuthReason)
+                continue
+            }
+        }
         candidateProviders[pid] := Map(
-            ; An auth block exchanges the key for a short-lived access token,
-            ; which this driver does not do yet: such a provider is refused
-            ; by the API form and the request resolver, never sent its key
-            "TokenExchange", desc.Has("auth"),
+            "Auth", Auth,
             "ThinkingDialect", Dialect,
             "Label", desc["label"],
             "BaseUrl", desc["base_url"],

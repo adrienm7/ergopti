@@ -281,16 +281,6 @@ _LLM_Menu_PromptApiEntry(EditId, Port := 0) {
 			LLM_API_PROVIDERS, &provider_id, NotifyFn)
 		return false
 	provider := LLM_API_PROVIDERS[provider_id]
-	if provider.Get("TokenExchange", false) {
-		; macOS and Linux exchange such a key for an access token; this driver does not yet
-		LoggerWarn("LLM.menu", "API entry refused: provider '{1}' needs an access-token exchange.", provider_id)
-		Body := t("menu.llm.api_provider_token_exchange_unavailable"), Title := t("common.error_title")
-		if HasMethod(NotifyFn, "Call")
-			NotifyFn.Call(Body, Title)
-		else
-			Ui_MsgBox(Body, Title, "Icon!")
-		return false
-	}
 
 	; Step 2 — base URL (prefilled with the provider default). A new entry of a
 	; per-account provider asks one value per placeholder of its address instead.
@@ -344,6 +334,9 @@ _LLM_Menu_PromptApiEntry(EditId, Port := 0) {
 		return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
 			"the originating private configuration changed during a prompt")
 	new_token := ib.Value   ; do NOT Trim — leading/trailing chars are part of the secret
+	; Vertex AI's key is a credentials file, pasted with its line breaks
+	if provider.Get("Auth", "") is Map
+		new_token := LLM_TokenExchange_NormalizeKey(new_token)
 
 	; Step 4 — model.
 	def_model := existing != "" ? _LLM_MenuApiEntryGet(existing, "Model", "") : provider["DefaultModel"]
@@ -998,6 +991,8 @@ _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info := "") {
 	NetworkKey := Info is Map ? ManagedNetworkFailureWindows_MessageKey(Info.Get("network_report", 0)) : ""
 	if NetworkKey != ""
 		Body .= "`n" . t(NetworkKey)
+	if Info is Map && Info.Get("reason", "") == "token_exchange"
+		Body .= "`n" . t("menu.llm.api_token_exchange_failed")
 	ServerLine := _LLM_Menu_ApiTestServerLine(Info)
 	if (ServerLine != "")
 		Body .= "`n" . ServerLine
