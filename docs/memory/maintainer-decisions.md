@@ -12,9 +12,14 @@ instead of refused. Each PowerShell channel (managed worker, updater staging,
 artifact engine, Ollama archive) hops through a loopback listener in its own
 process; the daemon reads the real relay from `HTTPS_PROXY`. The system curl
 serves loopback requests only, so no override reaches it. A credential lives in
-config.toml and in the private environment of a network worker, never in the
-driver's own environment, a log, command line, receipt or request file;
-`test-windows-proxy-override-e2e.cjs` proves each form.
+a DPAPI envelope in config.toml (the whole relay, sealed once at start when found
+clear) and in the private environment of a network worker, never in the driver's
+own environment, a log, command line, receipt or request file;
+`test-windows-proxy-override-e2e.cjs` proves each form. macOS and Linux keep the
+relay in clear in their settings store: their route decisions read it synchronously,
+the Keychain answers asynchronously through the signed launcher, and secret-tool
+hands the keyboard to the desktop. Moving it means caching the secret at start
+there, and the macOS prelude still writes the relay into shell text.
 
 ## Perplexity speaks the Agent API (2026-11-01)
 
