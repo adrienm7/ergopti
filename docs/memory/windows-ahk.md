@@ -674,6 +674,17 @@ other AutoHotkey hooks, through their mutex. Action: never let correctness
 depend on the order of the AutoHotkey hook and a native hook; give each
 decision to one hook outright.
 
+### project-ahk-llm-fixtures-leak-through-reloads-and-clones
+
+Two shapes turned LLM tests red only in a whole-group run. `_LLMRemote_LoadCatalog`
+publishes every catalogue global, including empty thinking families and local
+identities when a fixture root lacks their files, so a test that reloads it must
+use `_RemoteCatalog_SnapshotPublished` and `_RemoteCatalog_RestorePublished`,
+which read the published names from the loaders. And `_LLM_Engine.Clone()` is
+shallow: `request_plan` is shared with the real engine once any `LLM_Engine_Init`
+test has planted it, so a fixture that sends must delete that key from its clone,
+or one scenario's send holds the next automatic request behind the rate floor.
+
 ### project-llm-ollama-is-only-the-owned-runtime
 
 The Windows engine talks only to the daemon `OllamaManagedBootstrap` started
