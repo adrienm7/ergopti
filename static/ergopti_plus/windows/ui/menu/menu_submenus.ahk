@@ -222,7 +222,7 @@ _BuildDynamicHotstringsSubmenu(Options := unset) {
 			continue
 		}
 		V2Id := _LegacyDynamicHotstringsKeyMap[V1Id]
-		if V2Id == "user_code" {
+		if V2Id == ConfigLeaf.USER_CODE {
 			for UserRow in _HS_ProgrammableHotstringRows()
 				Rows.Push(UserRow)
 			continue

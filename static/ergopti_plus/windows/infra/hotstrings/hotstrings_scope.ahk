@@ -206,7 +206,7 @@ _HotstringsScopeChoiceOperations(Choices, ExtensionGroups := unset) {
 			Entries.Push(Map("path", _LegacyTopCategoryMap[Id] . "." . Choice["section"],
 				"value", Choice["enabled"]))
 		} else {
-			Rows.Push(_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Id), Choice["enabled"]))
+			Rows.Push(_ConfigSparseOperation(ConfigLeaf.CATEGORY_ENABLED, _CategoryEnabledKey(Id), Choice["enabled"]))
 		}
 	}
 	if _ConfigStageFeatureEntries(Candidate, Entries, Rows) != Entries.Length

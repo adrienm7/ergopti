@@ -55,7 +55,7 @@ global UPDATER_NO_CHANNEL_RELEASE := "[]"
 ; the presets are the shared ones (_shared/modules/updater/defaults.json, read
 ; through modules/updater/schedule.ahk); a saved value outside them snaps to
 ; the nearest preset. Honoured by ``Updater_StartBackgroundChecks``.
-global UPDATER_INI_INTERVAL_KEY    := "check_interval_seconds"
+global UPDATER_INI_INTERVAL_KEY    := ConfigLeaf.CHECK_INTERVAL_SECONDS
 global UPDATER_DEFAULT_INTERVAL    := UpdateSchedule_Timing()["default_check_interval_sec"]
 global UPDATER_CHECK_INTERVAL      := UPDATER_DEFAULT_INTERVAL
 

@@ -1059,7 +1059,7 @@ HSE_IdleResetsWord(LastTick, NowTick, IdleSeconds) {
 HSE_IdleResetSecondsCurrent() {
 		global HSE_IdleResetSeconds
 		return HSE_IdleResetSeconds == ""
-				? ManifestDefaultFor("hotstrings.idle_reset_seconds")
+				? ManifestDefaultFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS)
 				: HSE_IdleResetSeconds
 }
 
@@ -1069,7 +1069,7 @@ HSE_IdleResetSecondsCurrent() {
 HSE_ClickResetsWordCurrent() {
 		global HSE_ClickResetsWord
 		Value := HSE_ClickResetsWord == ""
-				? ManifestDefaultFor("hotstrings.click_resets_word")
+				? ManifestDefaultFor(ConfigKey.HOTSTRINGS_CLICK_RESETS_WORD)
 				: HSE_ClickResetsWord
 		return Value ? true : false
 }
@@ -1082,9 +1082,9 @@ HSE_ClickResetsWordCurrent() {
 HSE_WordResetFlagCurrent(Key) {
 		global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
 		switch Key {
-				case "arrow_resets_word": Value := HSE_ArrowResetsWord
-				case "shortcut_resets_word": Value := HSE_ShortcutResetsWord
-				case "tap_hold_resets_word": Value := HSE_TapHoldResetsWord
+				case ConfigLeaf.ARROW_RESETS_WORD: Value := HSE_ArrowResetsWord
+				case ConfigLeaf.SHORTCUT_RESETS_WORD: Value := HSE_ShortcutResetsWord
+				case ConfigLeaf.TAP_HOLD_RESETS_WORD: Value := HSE_TapHoldResetsWord
 				default: throw ValueError("Unknown word-reset setting: " . Key)
 		}
 		if (Value == "")

@@ -1937,7 +1937,7 @@ _ConfigMigrateVariantBootRefusal(Result, FilePath) {
 			return ""
 		Document := TOML_ParseDocument(Source)
 		Legacy := _TOML_DocumentLookup(Document, ["layout", "ergopti_plus"])
-		Variant := _TOML_DocumentLookup(Document, ["layout", "ergopti_variant"])
+		Variant := _TOML_DocumentLookup(Document, ["layout", ConfigLeaf.ERGOPTI_VARIANT])
 	} catch {
 		return ""
 	}
@@ -1950,14 +1950,14 @@ _ConfigMigrateVariantBootRefusal(Result, FilePath) {
 		return Prefix . " current variant ownership is not a recognized exact choice"
 	if Result.Get("read_only", false)
 		return Prefix . " the joint source remains refused by its migration owner"
-	for Field in ["ergopti_base", "ergopti_alt_gr", "emulated_layout"] {
+	for Field in [ConfigLeaf.ERGOPTI_BASE, ConfigLeaf.ERGOPTI_ALT_GR, ConfigLeaf.EMULATED_LAYOUT] {
 		Read := _TOML_DocumentLookup(Document, ["layout", Field])
 		if Read["blocked"]
 			return Prefix . " an independent intent participant has an occupied namespace"
 		if !Read["found"]
 			continue
 		Value := Read["value"]
-		if Field == "emulated_layout" {
+		if Field == ConfigLeaf.EMULATED_LAYOUT {
 			if !(Value is String) || (Value != "" && !RegExMatch(Value, "^[a-z][a-z0-9_]*$"))
 				return Prefix . " the registry source intent is malformed"
 		} else if !(Value is TOML_Bool) || !(Value.Value is Integer) || (Value.Value != 0 && Value.Value != 1)

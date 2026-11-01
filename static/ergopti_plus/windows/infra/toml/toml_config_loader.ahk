@@ -332,7 +332,7 @@ TomlConfigForeignOwner(SectionPath, Key) {
 	; Admit exactly the slots the keyboard input owner binds (its published
 	; domain); a broad section exemption would hide misspellings such as meta_cc
 	; forever, and a narrower rule would offer a live physical slot for removal.
-	if (SectionPath == "shortcuts.keyboard" && KeyboardSlotIsCatalogued(Key))
+	if (SectionPath == ConfigKey.SHORTCUTS_KEYBOARD && KeyboardSlotIsCatalogued(Key))
 		return "ConfigIO"
 	; The key-combination slots are keyed by an ordered pair of tap-hold keys,
 	; « first_then_second » (infra/key_combinations.ahk); the manifest declares

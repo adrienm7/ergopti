@@ -271,7 +271,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; The AI preview switch (hotstrings.preview_ai_enabled) governs the automatic
 	; typing-triggered bubble on every driver. A request the user asked for by
 	; name (a prompt action, live mode) carries an Override and is not a preview.
-	if !(Override is Map) && !HSE_PreviewSwitchCurrent("preview_ai_enabled") {
+	if !(Override is Map) && !HSE_PreviewSwitchCurrent(ConfigLeaf.PREVIEW_AI_ENABLED) {
 		try LoggerDebug("LLM", "Automatic prediction skipped: the AI preview switch is off.")
 		return
 	}
@@ -375,11 +375,11 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		? Override[ConfigLeaf.NUM_PREDICTIONS] : _LLM_Engine["n_predictions"]
 	; Live mode shows what is typed from the first word: its own floor replaces
 	; the menu's minimum word count for the prompt and the parser alike.
-	request_min_words := IsLive ? LLM_Live_Config()["min_words"] : _LLM_Engine["min_words"]
+	request_min_words := IsLive ? LLM_Live_Config()[ConfigLeaf.MIN_WORDS] : _LLM_Engine[ConfigLeaf.MIN_WORDS]
 	pb := PromptBuilder()
 	pb_cfg := Map(
-		"max_words",            _LLM_Engine["max_words"],
-		"min_words",            request_min_words,
+		ConfigLeaf.MAX_WORDS,            _LLM_Engine[ConfigLeaf.MAX_WORDS],
+		ConfigLeaf.MIN_WORDS,            request_min_words,
 		ConfigLeaf.NUM_PREDICTIONS,      request_n_predictions,
 		"temperature",          _LLM_Engine["temperature"] + 0.0,
 		ConfigLeaf.AUTO_RAISE_TEMP,      _LLM_Engine[ConfigLeaf.AUTO_RAISE_TEMP],
@@ -568,7 +568,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		profile,
 		n_predictions,
 		request_min_words,
-		_LLM_Engine["max_words"],
+		_LLM_Engine[ConfigLeaf.MAX_WORDS],
 		_LLM_Engine["language"]
 	)
 	is_batch_profile := (profile is Map and profile.Has("batch") and profile["batch"] == true)
@@ -638,8 +638,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		state := Map(
 			"ctx",           ctx,
 			"ctx_tail",      tail,
-			"min_words",     request_min_words,
-			"max_words",     _LLM_Engine["max_words"],
+			ConfigLeaf.MIN_WORDS,     request_min_words,
+			ConfigLeaf.MAX_WORDS,     _LLM_Engine[ConfigLeaf.MAX_WORDS],
 			"is_batch",      true,
 			"request_id",    this_request_id,
 			"semantic_signature", request_semantic_signature,
@@ -670,8 +670,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	state := Map(
 		"ctx",               ctx,
 		"ctx_tail",          tail,
-		"min_words",         request_min_words,
-		"max_words",         _LLM_Engine["max_words"],
+		ConfigLeaf.MIN_WORDS,         request_min_words,
+		ConfigLeaf.MAX_WORDS,         _LLM_Engine[ConfigLeaf.MAX_WORDS],
 		"is_batch",          is_batch_profile,
 		"request_id",        this_request_id,
 		"semantic_signature", request_semantic_signature,
@@ -1271,8 +1271,8 @@ _LLM_Engine_ParseSlots(raw, state) {
 		raw,
 		state["ctx"],
 		state.Has("ctx_tail") ? state["ctx_tail"] : state["ctx"],
-		state.Has("min_words") ? state["min_words"] : 1,
-		state.Has("max_words") ? state["max_words"] : 15,
+		state.Has(ConfigLeaf.MIN_WORDS) ? state[ConfigLeaf.MIN_WORDS] : 1,
+		state.Has(ConfigLeaf.MAX_WORDS) ? state[ConfigLeaf.MAX_WORDS] : 15,
 		is_batch,
 		state["requested"],
 		&dedup_ref,

@@ -348,7 +348,7 @@ ParseConfigTomlFile(Path) {
 ; loader. Language gate augmentation stays with the feature loader owner.
 TomlConfigStaticForeignOwnershipRegistry() {
 	static Registry := Map(
-		"category_enabled", Map(
+		ConfigLeaf.CATEGORY_ENABLED, Map(
 			"autocorrection", "FeatureState",
 			ConfigLeaf.DISTANCES_REDUCTION, "FeatureState",
 			ConfigLeaf.MAGIC_KEY, "FeatureState",

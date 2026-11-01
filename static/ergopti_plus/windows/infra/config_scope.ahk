@@ -252,7 +252,7 @@ ConfigFullSnapshotCaptureObsoleteSource(Source) {
 		Meta := Snapshot.Document["_meta"]
 		if !(Meta is Map)
 			throw TypeError("The full configuration schema metadata is not a table.")
-		if Meta.Has("schema_version") {
+		if Meta.Has(ConfigLeaf.SCHEMA_VERSION) {
 			Outcome := ConfigMigrateClassify(Snapshot.Document, ConfigMigrateShippedRegistry(), &Version)
 			if Outcome != "current"
 				throw Error("The full configuration schema stamp is not current: " . Outcome)

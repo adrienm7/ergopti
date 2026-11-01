@@ -42,7 +42,7 @@ CountDynamicSection(SectionName) {
 
 		Count := 0
 		switch SectionName {
-				case "DateFr", "DateLongFr", "Date", "date_fr", ConfigLeaf.DATE_LONG_FR, "date":
+				case "DateFr", "DateLongFr", "Date", ConfigLeaf.DATE_FR, ConfigLeaf.DATE_LONG_FR, "date":
 						Count := 1
 				case "PhonePrefixes", ConfigLeaf.PHONE_PREFIXES:
 						N := 0
@@ -155,7 +155,7 @@ _ParseExtTomlSections(FilePath) {
 				Trimmed := Trim(A_LoopField, " `t")
 				if RegExMatch(Trimmed, "^\[+([^\[\]]+)\]+$", &SecM) {
 						CurSec := StrLower(Trim(SecM[1]))
-						if (CurSec == "_meta" or CurSec == "_meta.sections") {
+						if (CurSec == ConfigLeaf._META or CurSec == "_meta.sections") {
 								CurSec := ""
 						} else if !SectionCounts.Has(CurSec) {
 								SectionCounts[CurSec] := 0

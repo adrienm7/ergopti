@@ -41,7 +41,7 @@ global ED_HOST_ACCESS_ALLOW := 1
 
 ; The Debug menu setting, as the features manifest declares it
 global ED_SETTING_SECTION := "script"
-global ED_SETTING_KEY     := "show_error_dialog"
+global ED_SETTING_KEY     := ConfigLeaf.SHOW_ERROR_DIALOG
 
 ; How often a window decided during boot checks again whether the driver is ready
 global ED_BOOT_RETRY_MS := 500

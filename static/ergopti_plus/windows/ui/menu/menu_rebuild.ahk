@@ -852,7 +852,7 @@ LoggerSetLevel(Level, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 		try LoggerWarn("Menu", "LoggerSetLevel: unknown level '{1}' — ignoring.", Level)
 		return false
 	}
-	Updates := [{ Section: "script", Key: "log_level", Value: Level }]
+	Updates := [{ Section: "script", Key: ConfigLeaf.LOG_LEVEL, Value: Level }]
 	Persisted := ConfigCommitUpdates(ConfigurationFile, Updates,
 		"the runtime log level", WriterFn, NotifyFn,
 		_LoggerSetLevelPublish.Bind(Level))

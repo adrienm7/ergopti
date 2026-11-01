@@ -21,7 +21,7 @@ ConfigGlobalScopeApply(Mode, Options := unset) {
 		throw TypeError("Global scope options must be an owner map.")
 	Owners := Map("action_parameter_domain", ConfigScopeActionParameterDomain)
 	Plan := ManifestScopePlan("global", Mode, [], Owners)
-	if Plan.presets.Length != 1 || Plan.presets[1].scope != "tap_holds"
+	if Plan.presets.Length != 1 || Plan.presets[1].scope != ConfigLeaf.TAP_HOLDS
 			|| Plan.presets[1].preset != "tap_hold" || Plan.presets[1].mode != Mode
 		throw Error("The global scope declares an unsupported separate-file owner.")
 	if !_HCW_FlushNumericWrite(false)

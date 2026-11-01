@@ -3141,7 +3141,7 @@ _LLM_NavEventOwnerTerminalRouteSource() {
 	Caps := GetKeyState("CapsLock", "T") ? 1 : 0
 	if !IsSet(KLE_Model) || !(KLE_Model is Map)
 		return Map("active", false, "caps", Caps)
-	return Map("active", KeylayoutEmulation_LayerIsActive("ergopti_base") ? 1 : 0,
+	return Map("active", KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) ? 1 : 0,
 		"caps", Caps, "model", KLE_Model, "layout_name", KLE_Id,
 		"keys", KLE_KeyCodes.Clone(), "composition_state", KLE_State,
 		"capture", KeylayoutEmulation_CaptureReplayRoute,
