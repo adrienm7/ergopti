@@ -31,9 +31,7 @@ driver folder minus `\static\ergopti_plus\windows`. `DevSource_DeriveRoot`
 accepts it only when that root holds a `.git` folder (a clone) or `.git` file
 (a linked worktree) and `static\ergopti_plus\_shared\data\identifiers.json`.
 The run then takes the same path: `%APPDATA%\Ergopti\paths.toml`, the watcher,
-and the updater, uninstall and remote layout catalogue off with their reasons
-(the remote catalogue is pending on Windows: see
-[Layout catalogue in a source run](#layout-catalogue-in-a-source-run)).
+and the updater and uninstall off with their reasons.
 The startup line names the origin: "Developer source mode; the driver runs from
 … (clone root from the script location)", or "(clone root from the developer
 variable)" under the PowerShell script.
@@ -123,7 +121,7 @@ every native helper path, read in `origin/dev` at `bde408f3a6`.
 | Worker processes (metrics projection, UIA probe, keystats prefetch)                                                          | works: started with `A_AhkPath` and the script, the source-mode form of the same command                                                                                                                               |
 | Reload successor                                                                                                             | works: `LifecycleLaunchSuccessor` relaunches the interpreter with the script; the developer variable is inherited, or the root is derived again                                                                        |
 | Updater, release installs, uninstall, changelog installs                                                                     | differs (by design): `Updater_IsLocalSource()`                                                                                                                                                                         |
-| Layout catalogue                                                                                                             | differs (pending the Windows owner): always the checkout's registry; the macOS and Linux rule is not ported yet                                                                                                        |
+| Layout catalogue                                                                                                             | works like the release, with the same exception as on macOS                                                                                                                                                            |
 | Start at login                                                                                                               | changed: registers the interpreter and the clone's script, and that login start derives the root from the script location, so it is a developer run too, as the maintainer decided on 27 October ([PHYS-W] to confirm) |
 | Registry cache identity                                                                                                      | differs (harmless): hashes the parser sources instead of the exe                                                                                                                                                       |
 
@@ -140,7 +138,7 @@ is the one listed and installed. Untracked files count as changes.
 The check is `git status --porcelain --untracked-files=all` on that folder
 (`Catalogue.registry_changes_args`, `_shared/lua/layouts/catalogue.lua`),
 started asynchronously by each driver (`ShellRunner.run` on macOS,
-`ProcessRunner.run` on Linux) so the keyboard loop never waits; the shared
+`ProcessRunner.run` on Linux, `ShellRunner_SpawnTreeOwned` on Windows) so the keyboard loop never waits; the shared
 store (`_shared/lua/layouts/registry_store.lua`) applies
 `Catalogue.registry_source`. When git is missing or fails, the catalogue shows
 the clone's folder and logs an ERROR naming the git failure: the clone is the
