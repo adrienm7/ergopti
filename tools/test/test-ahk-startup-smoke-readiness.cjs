@@ -18,6 +18,12 @@ const SLOTS = [
 	'script_altgr_escape'
 ];
 
+/** Strips the stamp the real runner seeds: an unstamped file would skip every migration. */
+function withoutOldestStamp(text) {
+	assert.match(text, /^\[_meta\]\nschema_version = \d+\n\n/, 'the runner stamps seeded configs');
+	return text.replace(/^\[_meta\]\nschema_version = \d+\n\n/, '');
+}
+
 /** Runs the complete real JS admission flow; no AHK or native process is started. */
 async function observe(source, root, scenario) {
 	const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-startup-admission-'));
@@ -96,7 +102,7 @@ async function observe(source, root, scenario) {
 								const file = path.join(probe, 'config/autohotkey/config.toml');
 								const original = fs.readFileSync(file, 'utf8');
 								assert.equal(
-									original,
+									withoutOldestStamp(original),
 									'# retained legacy dashboard bindings\n[metrics]\n' +
 										'metrics_shortcut_typing = "Ctrl+Alt+M" # retained typing\n' +
 										'metrics_shortcut_apps = { future = { keep = 9 }, enabled = false } # retained apps\n',
@@ -123,7 +129,7 @@ async function observe(source, root, scenario) {
 								const file = path.join(probe, 'config/autohotkey/config.toml');
 								if (configTypesCalls === 1)
 									assert.equal(
-										fs.readFileSync(file, 'utf8'),
+										withoutOldestStamp(fs.readFileSync(file, 'utf8')),
 										"[script]\nlocale = 'en'\nlog_level = 'DEBUG'\n" +
 											'[personal_editor]\ndefault_section = "001"\n'
 									);
@@ -206,6 +212,9 @@ async function observe(source, root, scenario) {
 								if (scenario !== 'ai-resume-missing')
 									resume += '[INFO] AI hotkeys deferred by the pause are active.\n';
 							}
+							// A refused file's session names its cause; the smoke requires it.
+							if (options.env.ERGOPTI_STARTUP_SMOKE_EXPECT_READ_ONLY === '1')
+								resume += '[WARN] config.toml is too old for this build to migrate.\n';
 							fs.writeFileSync(
 								path.join(logs, 'ErgoptiPlus_20261004.log'),
 								warm && scenario === 'logged-error'
@@ -246,10 +255,12 @@ async function observe(source, root, scenario) {
 									{ flag: 'wx' }
 								);
 							const wrapperSource = fs.readFileSync(args[1], 'utf8');
+							// The wrapper gates the save on this variable: a refused file's
+							// read-only session must publish none.
 							const integrated =
-								/_StartupSmokeReceipts\(\*\)\s*\{\s*_StartupSmokeFullSaveReceipt\(\)/.test(
+								/_StartupSmokeReceipts\(\*\)\s*\{\s*if EnvGet\("ERGOPTI_STARTUP_SMOKE_EXPECT_READ_ONLY"\) != "1"\s*_StartupSmokeFullSaveReceipt\(\)/.test(
 									wrapperSource
-								);
+								) && options.env.ERGOPTI_STARTUP_SMOKE_EXPECT_READ_ONLY !== '1';
 							const fullSave = {
 								schema_version: 1,
 								nonce: options.env.ERGOPTI_STARTUP_SMOKE_NONCE,
