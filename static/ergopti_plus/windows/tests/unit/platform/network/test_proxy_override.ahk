@@ -98,7 +98,28 @@ _TPO_Precedence() {
 	_TPO_WithPublished("not a proxy", (*) => _TPO_AssertRefused(Url))
 }
 
+; The same answers network_proxy_policy.py gives from proxy_policy.json.
+_TPO_LoopbackRanges() {
+	for Url in ["http://127.0.0.1/", "http://127.255.0.9:8080/", "http://127.1.2.3/x", "http://localhost/",
+			"http://LOCALHOST:1/", "http://printer.localhost/", "http://[::1]:11435/", "http://[0:0:0:0:0:0:0:1]/",
+			"http://[0::1]/"]
+		Assert(SystemProxy_IsLoopbackUrl(Url), "loopback: " . Url)
+	for Url in ["http://128.0.0.1/", "http://126.255.255.255/", "http://127.0.0.256/", "http://127.000.0.1/",
+			"http://127.1/", "http://localhost.evil.invalid/", "http://notlocalhost/", "http://.localhost/",
+			"http://[::2]/", "http://[1::1]/", "http://[::]/", "https://registry.invalid/"]
+		Assert(!SystemProxy_IsLoopbackUrl(Url), "not loopback: " . Url)
+}
+
+_TPO_AssertLoopbackRoute() {
+	; The whole range stays direct under a relay, and through the curl route too.
+	for LocalUrl in ["http://127.9.9.9:8080/", "http://app.localhost/"] {
+		AssertEqual(SystemProxy_ForUrl(LocalUrl, _TPO_NoSystem), "")
+		AssertEqual(_TPO_CurlRoute(LocalUrl)["source"], "loopback")
+	}
+}
+
 _TPO_AssertRelay(Url) {
+	_TPO_AssertLoopbackRoute()
 	Route := _TPO_CurlRoute(Url)
 	AssertEqual(Route["proxy"], "http://proxy.corp.invalid:3128")
 	AssertEqual(Route["source"], "override")
@@ -192,4 +213,5 @@ Test("proxy override: a relay with credentials stays out of the worker's input f
 Test("proxy override: a refused value is published as a refusal, never as automatic", _TPO_Published)
 Test("proxy override: every adapter route owner honours the override before the system", _TPO_Precedence)
 Test("proxy override: automatic keeps the exported relay, then the system settings", _TPO_Automatic)
+Test("proxy override: loopback is the policy's ranges, not three names", _TPO_LoopbackRanges)
 Test("proxy override: the menu row validates, stores and says what happened", _TPO_MenuRow)
