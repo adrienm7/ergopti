@@ -176,7 +176,7 @@ HTTP_CheckCurlAtStart(VersionFn := 0, NoticeFn := 0) {
 	if HasMethod(NoticeFn, "Call")
 		NoticeFn.Call(Text)
 	else
-		Ui_MsgBox(Text, "curl", "Icon!")
+		Ui_MsgBox(Text, t("startup.curl_title"), "Icon!")
 	return false
 }
 

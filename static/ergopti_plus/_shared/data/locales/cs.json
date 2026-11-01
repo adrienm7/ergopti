@@ -2890,6 +2890,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus potřebuje oprávnění Zpřístupnění, aby mohl číst klávesnici. Otevřete ErgoptiPlus znovu: otevře za vás Nastavení systému > Soukromí a zabezpečení > Zpřístupnění. Zapněte položku „Hammerspoon“: je to jádro ErgoptiPlus. Pokud už vypadá zapnutá, vypněte ji a znovu zapněte.",
 	"startup.curl_missing": "Program curl systému Windows ({1}) chybí nebo jej nelze přečíst. Požadavky na místní AI jsou odmítnuty, dokud nebude obnoven: opravte nebo aktualizujte Windows; Ergopti+ jej nikdy nenahrazuje.",
+	"startup.curl_title": "Program curl ve Windows",
 	"startup.curl_too_old": "Program curl systému Windows ({1}) má verzi {2} a Ergopti+ potřebuje {3} nebo novější. Požadavky na místní AI jsou odmítnuty, dokud nebude Windows aktualizován; Ergopti+ jej nikdy nenahrazuje.",
 	"permission_dialog.window_title": "Vyžadováno oprávnění",
 	"permission_dialog.open_settings": "Otevřít nastavení",

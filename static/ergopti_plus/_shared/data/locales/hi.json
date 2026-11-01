@@ -2890,6 +2890,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "कीबोर्ड पढ़ने के लिए ErgoptiPlus को एक्सेसिबिलिटी अनुमति चाहिए। ErgoptiPlus फिर से खोलें: यह आपके लिए सिस्टम सेटिंग्ज़ > गोपनीयता और सुरक्षा > एक्सेसिबिलिटी खोलता है। “Hammerspoon” नाम की प्रविष्टि चालू करें: यह ErgoptiPlus का इंजन है। अगर यह पहले से चालू दिखे, तो इसे बंद करके फिर चालू करें।",
 	"startup.curl_missing": "Windows का curl प्रोग्राम ({1}) मौजूद नहीं है या पढ़ा नहीं जा सकता। उसके वापस आने तक स्थानीय AI के अनुरोध अस्वीकार किए जाते हैं: Windows की मरम्मत करें या उसे अपडेट करें; Ergopti+ इसे कभी नहीं बदलता।",
+	"startup.curl_title": "Windows का curl प्रोग्राम",
 	"startup.curl_too_old": "Windows के curl प्रोग्राम ({1}) का संस्करण {2} है, और Ergopti+ को {3} या उसके बाद का संस्करण चाहिए। Windows अपडेट होने तक स्थानीय AI के अनुरोध अस्वीकार किए जाते हैं; Ergopti+ इसे कभी नहीं बदलता।",
 	"permission_dialog.window_title": "अनुमति आवश्यक है",
 	"permission_dialog.open_settings": "सेटिंग्स खोलें",

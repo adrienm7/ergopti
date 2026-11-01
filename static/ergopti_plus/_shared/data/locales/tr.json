@@ -2890,6 +2890,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus’ın klavyeyi okumak için Erişilebilirlik iznine ihtiyacı var. ErgoptiPlus’ı yeniden açın: sizin için Sistem Ayarları > Gizlilik ve Güvenlik > Erişilebilirlik’i açar. “Hammerspoon” adlı girişi açın: bu, ErgoptiPlus motorudur. Zaten açık görünüyorsa kapatıp yeniden açın.",
 	"startup.curl_missing": "Windows'un curl programı ({1}) eksik veya okunamıyor. Geri gelene kadar yerel yapay zekâ istekleri reddedilir: Windows'u onarın veya güncelleyin; Ergopti+ onu asla değiştirmez.",
+	"startup.curl_title": "Windows curl programı",
 	"startup.curl_too_old": "Windows'un curl programı ({1}) {2} sürümünde ve Ergopti+ {3} veya daha yenisine ihtiyaç duyuyor. Windows güncellenene kadar yerel yapay zekâ istekleri reddedilir; Ergopti+ onu asla değiştirmez.",
 	"permission_dialog.window_title": "İzin gerekli",
 	"permission_dialog.open_settings": "Ayarları Aç",

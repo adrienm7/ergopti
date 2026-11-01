@@ -2890,6 +2890,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus זקוק להרשאת נגישות כדי לקרוא את המקלדת. פתחו שוב את ErgoptiPlus: הוא יפתח עבורכם את הגדרות המערכת > פרטיות ואבטחה > נגישות. הפעילו את הפריט בשם „Hammerspoon”: זהו המנוע של ErgoptiPlus. אם הוא כבר נראה מופעל, כבו והפעילו אותו מחדש.",
 	"startup.curl_missing": "‏תוכנית curl של Windows ‏({1}) חסרה או שאי אפשר לקרוא אותה. בקשות לבינה המלאכותית המקומית נדחות עד שתחזור: תקנו או עדכנו את Windows; Ergopti+ לעולם אינו מחליף אותה.",
+	"startup.curl_title": "תוכנית curl של Windows",
 	"startup.curl_too_old": "‏לתוכנית curl של Windows ‏({1}) יש גרסה {2}, ו-Ergopti+ זקוק לגרסה {3} ומעלה. בקשות לבינה המלאכותית המקומית נדחות עד ש-Windows יעודכן; Ergopti+ לעולם אינו מחליף אותה.",
 	"permission_dialog.window_title": "נדרשת הרשאה",
 	"permission_dialog.open_settings": "פתח הגדרות",

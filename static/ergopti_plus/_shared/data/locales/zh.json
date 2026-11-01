@@ -2890,6 +2890,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus 需要“辅助功能”权限才能读取键盘。请重新打开 ErgoptiPlus：它会为你打开“系统设置 > 隐私与安全性 > 辅助功能”。打开名为“Hammerspoon”的项目：它是 ErgoptiPlus 的引擎。如果它看起来已经打开，请先关闭再重新打开。",
 	"startup.curl_missing": "Windows 的 curl 程序（{1}）缺失或无法读取。在其恢复之前，对本地 AI 的请求都会被拒绝：请修复或更新 Windows；Ergopti+ 从不替换它。",
+	"startup.curl_title": "Windows 的 curl 程序",
 	"startup.curl_too_old": "Windows 的 curl 程序（{1}）版本为 {2}，而 Ergopti+ 需要 {3} 或更高版本。在 Windows 更新之前，对本地 AI 的请求都会被拒绝；Ergopti+ 从不替换它。",
 	"permission_dialog.window_title": "需要权限",
 	"permission_dialog.open_settings": "打开设置",
