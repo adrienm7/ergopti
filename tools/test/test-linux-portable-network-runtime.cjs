@@ -884,10 +884,41 @@ print('PASS recipient GLib closure: 2 libraries staged, 9 left to the recipient.
 	console.log('Recipient GLib closure control: 1 passed; 0 skipped.');
 }
 
-// Command-contract witness: the prefix's lib/ reaches every host program through
-// LD_LIBRARY_PATH, so the build host's readline shadowed the recipient's and
-// bash 5.3 died on Arch with "undefined symbol: rl_trim_arg_from_keyseq" before
-// the daemon started. Only sqlite3 may reach it, through lib/sqlite3.
+// Command-contract witness: LD_LIBRARY_PATH put the prefix's libraries in front of
+// every host program's, so each staged file finds lib/ by its own RUNPATH, at any
+// depth, and scripts, data and the driver tree are left alone.
+if (process.platform === 'linux') {
+	const runpaths = spawnSync(
+		'python3',
+		[
+			'-B',
+			'-c',
+			`
+import importlib.util,pathlib,sys
+spec=importlib.util.spec_from_file_location('owned_stager',sys.argv[1]);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+prefix=pathlib.PurePosixPath('/prefix')
+calls={}
+def controlled_run(arguments,**options):
+ assert arguments[:2]==['patchelf','--set-rpath'] and len(arguments)==4,'Only patchelf is observed'
+ calls[arguments[3]]=arguments[2]
+m.run=controlled_run
+owners=[prefix/p for p in ['bin/curl','bin/sqlite3','lib/libssl.so.3','lib/sqlite3/libreadline.so.8','lib/lua/5.1/luv.so','lib/lua/5.1/posix/sys/stat.so','lib/gio/modules/libgiolibproxy.so','lib/gio/modules/giomodule.cache','lib/ergopti/network-runtime-env.sh','share/glib-2.0/schemas/gschemas.compiled','share/lua/5.1/posix/init.lua']]
+m.set_private_runpaths(prefix,dict.fromkeys(owners))
+assert calls=={'/prefix/bin/curl':'$ORIGIN/../lib','/prefix/bin/sqlite3':'$ORIGIN/../lib/sqlite3:$ORIGIN/../lib','/prefix/lib/libssl.so.3':'$ORIGIN','/prefix/lib/sqlite3/libreadline.so.8':'$ORIGIN/..','/prefix/lib/lua/5.1/luv.so':'$ORIGIN/../..','/prefix/lib/lua/5.1/posix/sys/stat.so':'$ORIGIN/../../../..','/prefix/lib/gio/modules/libgiolibproxy.so':'$ORIGIN/../..'},calls
+print('PASS private runpaths: every staged ELF, at its depth.')
+`,
+			path.join(root, 'tools/build/stage-linux-network-runtime.py')
+		],
+		{ cwd: '/', encoding: 'utf8', env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' } }
+	);
+	assert.equal(runpaths.status, 0, runpaths.stderr);
+	assert.equal(runpaths.stdout, 'PASS private runpaths: every staged ELF, at its depth.\n');
+	console.log('Private runpath control: 1 passed; 0 skipped.');
+}
+
+// Command-contract witness: readline in lib/ shadowed the recipient's and bash 5.3
+// died on Arch with "undefined symbol: rl_trim_arg_from_keyseq" before the daemon
+// started. Only sqlite3 may reach it, through lib/sqlite3.
 if (process.platform === 'linux') {
 	const readlineClosure = spawnSync(
 		'python3',

@@ -681,9 +681,9 @@ def external_glibc(name):
 def recipient_base(name):
     # The tray and the windows load the recipient's GTK stack into the daemon,
     # and that stack links the recipient's GLib and C++ runtime. A bundled copy
-    # older than the recipient's shadows it through LD_LIBRARY_PATH: a host
-    # library built against GLib 2.80 then misses g_once_init_enter_pointer and
-    # the tray never loads. The build host is the oldest supported LTS, so the
+    # older than the recipient's shadows it inside the daemon: a host library
+    # built against GLib 2.80 then misses g_once_init_enter_pointer and the
+    # tray never loads. The build host is the oldest supported LTS, so the
     # recipient's copies are never older than the ones the modules were built
     # against; neither they nor their own dependencies are staged (see
     # recipient_dependencies).
@@ -717,12 +717,10 @@ TRAY_LIBRARIES = frozenset(
 )
 
 
-# Libraries of one owned program that LD_LIBRARY_PATH must not expose. The
-# launchers and the daemon run the recipient's bash through the prefix's
-# environment, and the build host's readline 8.1 shadowed the recipient's:
-# bash 5.3 then died on Arch with "undefined symbol: rl_trim_arg_from_keyseq"
-# before the daemon started. Only sqlite3 links it, so it stays beside the
-# prefix's lib/ and sqlite3 alone reaches it through its RUNPATH.
+# Libraries of one owned program, kept out of the lib/ the others search. The
+# build host's readline 8.1 once shadowed the recipient's through the prefix's
+# environment: bash 5.3 died on Arch with "undefined symbol:
+# rl_trim_arg_from_keyseq" before the daemon started. Only sqlite3 links it.
 SQLITE3_LIBRARY_DIRECTORY = "lib/sqlite3"
 SQLITE3_ONLY_LIBRARIES = frozenset({"libreadline.so.8"})
 
@@ -789,6 +787,36 @@ def copy_elf_closure(seeds, library_directory, owners):
             )
             copy_unique(dependency, directory / name, owners)
             pending.append(dependency)
+
+
+def private_runpath(destination, library_directory):
+    """Name lib/ from one staged file, wherever the prefix is installed."""
+    relative = os.path.relpath(library_directory, destination.parent)
+    return "$ORIGIN" if relative == "." else "$ORIGIN/" + relative
+
+
+def set_private_runpaths(prefix, owners):
+    """Let every staged program and library find the prefix's lib/ by itself.
+
+    The prefix's libraries used to reach everything through LD_LIBRARY_PATH,
+    every host program the daemon starts included: the build host's readline
+    killed bash 5.3 on Arch that way, and its libssl, libcurl and libtinfo stood
+    in front of the host's for ssh, git and a browser opened by xdg-open. A
+    RUNPATH applies to its own file only, so each one carries it, and it is
+    also what a ffi.load by name searches from LuaJIT.
+    """
+    library_directory = prefix / "lib"
+    staged = sorted(
+        destination
+        for destination in owners
+        if destination.parent == prefix / "bin"
+        or re.search(r"\.so(\.|$)", destination.name) is not None
+    )
+    for destination in staged:
+        search = private_runpath(destination, library_directory)
+        if destination == prefix / "bin/sqlite3":
+            search = "$ORIGIN/../" + SQLITE3_LIBRARY_DIRECTORY + ":" + search
+        run(["patchelf", "--set-rpath", search, str(destination)])
 
 
 def explicit_digest_sources(catalogue):
@@ -919,18 +947,12 @@ def stage(appdir, catalogue, template):
         copy_elf_closure(
             [*binaries, *lua_modules, *modules, *digest_sources], prefix / "lib", owners
         )
-        # inspect_installed() runs sqlite3 -version, which fails without this.
-        run(
-            [
-                "patchelf",
-                "--set-rpath",
-                "$ORIGIN/../" + SQLITE3_LIBRARY_DIRECTORY,
-                str(prefix / "bin/sqlite3"),
-            ]
-        )
         # Not through the closure walk: it would stage GTK with them.
         for name, source in sorted(tray_sources().items()):
             copy_unique(source, prefix / "lib" / name, owners)
+        # inspect_installed() runs every owned program under the launch
+        # environment, which names no library directory.
+        set_private_runpaths(prefix, owners)
         # The oldest supported LTS ships libproxy 0.4, whose optional plugins
         # (GNOME settings, PAC runners) load from an absolute build-host path
         # and so are absent from the image. Its built-in environment, sysconfig

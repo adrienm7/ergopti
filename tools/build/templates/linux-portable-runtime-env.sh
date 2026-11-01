@@ -16,7 +16,8 @@ export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$S
 export ERGOPTI_RUNTIME_PREFIX="$ERGOPTI_PACKAGE_PREFIX"
 export LUA_CPATH="$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/?.so${LUA_CPATH:+;$LUA_CPATH};;"
 export PATH="$ERGOPTI_PACKAGE_PREFIX/bin:$PATH"
-export LD_LIBRARY_PATH="$ERGOPTI_PACKAGE_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# No LD_LIBRARY_PATH: every staged file finds lib/ through its own RUNPATH, and
+# this environment reaches every host program the daemon starts.
 export GIO_MODULE_DIR="$ERGOPTI_PACKAGE_PREFIX/lib/gio/modules"
 export GIO_EXTRA_MODULES="$ERGOPTI_PACKAGE_PREFIX/lib/gio/modules"
 export GSETTINGS_SCHEMA_DIR="$ERGOPTI_PACKAGE_PREFIX/share/glib-2.0/schemas"

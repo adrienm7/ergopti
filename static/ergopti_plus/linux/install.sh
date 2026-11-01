@@ -72,17 +72,8 @@ source "${SRC_DRIVER}/install/messages.sh"
 # the copy of the driver tree installs the runtime with it. A checkout has
 # none and keeps the host packages (a source install, logged by the daemon).
 if [ -e "${SRC_DRIVER}/runtime" ] || [ -L "${SRC_DRIVER}/runtime" ]; then
-	_host_library_path="${LD_LIBRARY_PATH-}"
-	_host_library_path_set="${LD_LIBRARY_PATH+set}"
 	# shellcheck source=/dev/null
 	source "${SRC_DRIVER}/network-runtime-env.sh" "${SRC_DRIVER}/runtime" "${SRC_DRIVER}" || exit 1
-	# The runtime's libraries reach its own programs only: apt, dnf or pkexec
-	# must keep the host's, whatever version the runtime carries.
-	_runtime_library_path="$LD_LIBRARY_PATH"
-	if [ -n "$_host_library_path_set" ]; then export LD_LIBRARY_PATH="$_host_library_path"; else unset LD_LIBRARY_PATH; fi
-	for _runtime_program in luajit curl sqlite3 openssl zstd; do
-		eval "${_runtime_program}() { LD_LIBRARY_PATH=\"\$_runtime_library_path\" \"\$ERGOPTI_RUNTIME_PREFIX/bin/${_runtime_program}\" \"\$@\"; }"
-	done
 fi
 
 # Prints a section title between its bars.
