@@ -251,7 +251,7 @@ _LTE_Refusal() {
 		LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, _LTE_Key(), (Ok, Failure) => Results.Push(Failure))
 		_LTE_Pump()
 		_LTE_Answer(Posts[1], "", 400)
-		AssertEqual("the token exchange answered HTTP 400", Results[1]["reason"])
+		AssertEqual("the token exchange answered HTTP 400", Results[1]["refusal"])
 		AssertTrue(Results[1]["key_refused"], "a 4xx is the key's fault")
 		LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, _LTE_Key(), (Ok, Failure) => Results.Push(Failure))
 		AssertEqual(2, Results.Length, "during the pause the refusal answers at once")
@@ -290,7 +290,7 @@ _LTE_BadKeyFile() {
 		LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, "not-json", (Ok, Failure) => Results.Push(Failure))
 		_LTE_Pump()
 		AssertEqual(0, Posts.Length, "nothing is posted for a key that cannot fill the form")
-		AssertEqual("the key holds no client_id field", Results[1]["reason"])
+		AssertEqual("the key holds no client_id field", Results[1]["refusal"])
 		AssertTrue(Results[1]["key_refused"])
 		AssertFalse(_LLM_TokenExchange_Slot(LTE_PROVIDER, "not-json")["pending"], "the slot never stays pending")
 	}

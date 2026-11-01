@@ -297,7 +297,7 @@ _UserCommandStart(BindingId, Line, Output) {
 		LoggerWarn("UserActions", "The command of binding '{1}' is still running: no second one was started.", BindingId)
 		return false
 	}
-	Stem := A_Temp . "\ergopti_user_command_" . DllCall("GetCurrentProcessId", "UInt") . "_" . ++_UserCommandCounter
+	Stem := A_Temp . "\ergopti_user_command_" . ProcessExist() . "_" . ++_UserCommandCounter
 	Entry := Map("binding", BindingId, "output", Output, "out", Stem . ".out", "err", Stem . ".err",
 		"started", A_TickCount, "stop_cause", "", "finished", false)
 	_UserCommandEntries[BindingId] := Entry
@@ -375,7 +375,7 @@ _UserCommandReportStopped(Entry) {
 ; Reads a capture as strict UTF-8.
 ; @returns {String|Boolean} The text, "" for no file or no byte, false when it is not UTF-8.
 _UserCommandRead(Path) {
-	try Bytes := FileRead(Path, "RAW")
+	try Bytes := FSReadBytesStrict(Path)
 	catch
 		return ""
 	if (Bytes.Size == 0)
@@ -486,7 +486,8 @@ _UserCommandFinish(Entry) {
 	if Entry.Has("poll")
 		TimerSetCallback(Entry["poll"], 0)
 	for Path in [Entry["out"], Entry["err"]]
-		try FileDelete(Path)
+		if !FSDelete(Path)
+			LoggerWarn("UserActions", "A capture of a run_command binding could not be deleted.")
 }
 
 ; Stops every running command, as the program actions stop at a pause or a reload.
