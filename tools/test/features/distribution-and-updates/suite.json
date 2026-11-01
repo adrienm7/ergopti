@@ -609,6 +609,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-run-protocol.cjs"],
 			"repro": "npm run test:field-run-protocol"
+		},
+		{
+			"id": "js-managed-pyobjc",
+			"ordinal": 558,
+			"name": "the App Cloner's PyObjC wheels are pinned, verified, installed offline into the managed Python and imported",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-managed-pyobjc.cjs"],
+			"repro": "node tools/test/test-managed-pyobjc.cjs"
 		}
 	]
 }
