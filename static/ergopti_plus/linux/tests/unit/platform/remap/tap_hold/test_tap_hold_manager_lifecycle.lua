@@ -672,7 +672,8 @@ helpers.describe("OneShot daemon Manager bootstrap", function()
 		local keystats_at = assert(daemon:find('require("modules.keystats.keystats")', 1, true))
 		local hook_at = assert(daemon:find('require("adapters.keyboard_hook")', 1, true))
 		helpers.assert_true(keystats_at < hook_at, "actual daemon loads keystats before its Hook import")
-		file = assert(io.open("modules/keystats/keystats.lua", "r")); local source = file:read("*a"); file:close()
+		-- modules/keystats/keystats, selected by a declaration unique to it.
+		local source = assert(helpers.read_driver_unit("local function new_live_tracker("))
 		helpers.assert_true(source:find('require("platform.remap.tap_hold_manager")', 1, true) ~= nil,
 			"actual keystats constructs Manager before daemon Hook setup")
 		local options = {}
