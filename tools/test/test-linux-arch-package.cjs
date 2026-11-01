@@ -554,6 +554,22 @@ try {
 				`the host dialog program ${name} must not be required`
 			);
 	});
+	// The recipe only repacks the tarball, so makepkg needs none of its runtime
+	// dependencies; pacman -U resolves them from the repositories, which also
+	// proves every declared name exists. Without --nodeps makepkg refused before
+	// building ("Could not resolve all dependencies.", run 41278576846).
+	check('the CI install row builds the repack without its runtime dependencies', () => {
+		const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci-linux.yml'), 'utf8');
+		const build = workflow.slice(
+			workflow.indexOf('- name: Build the release recipe with makepkg (pkgbuild)'),
+			workflow.indexOf('- name: Install the package with pacman (pkgbuild)')
+		);
+		assert.match(build, /sudo -u ergopti-builder makepkg --noconfirm --nodeps\)/);
+		const install = workflow.slice(
+			workflow.indexOf('- name: Install the package with pacman (pkgbuild)')
+		);
+		assert.match(install.slice(0, 600), /pacman -U --noconfirm "\$\{packages\[0\]\}"/);
+	});
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });
 }
