@@ -63,7 +63,14 @@ function frontend(host = 'macos') {
 			messageHandlers: { metrics_typing_bridge: { postMessage: (req) => requests.push(req) } }
 		};
 	}
-	for (const file of ['_generated/keycode_data.js', 'state.js', 'data.js', 'filters.js']) {
+	for (const file of [
+		'_generated/keycode_data.js',
+		'_generated/keystats_tokens.js',
+		'key_tokens.js',
+		'state.js',
+		'data.js',
+		'filters.js'
+	]) {
 		vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context);
 	}
 	const state = vm.runInContext('app_state', context);

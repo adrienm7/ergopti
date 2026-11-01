@@ -172,6 +172,8 @@ function typingFixture() {
 	});
 	context.window = context;
 	installHostCapabilities(context);
+	vm.runInContext(read('metrics_typing/_generated/keystats_tokens.js'), context);
+	vm.runInContext(read('metrics_typing/key_tokens.js'), context);
 	vm.runInContext(read('metrics_typing/data.js'), context);
 	context.get_source_mode_flags = () => modes;
 	context.get_local_date_string = () => today;
