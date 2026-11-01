@@ -322,6 +322,8 @@ end
 --- @param result table field_check_report result { check, steps, passed }.
 --- @return string verdict, table codes, table report
 function M.step_outcome(result)
+	-- A check whose prerequisite was missing proves nothing: a skip with its code.
+	if type(result) == "table" and type(result.not_run) == "string" then return "skip", { result.not_run }, result end
 	local codes = {}
 	for _, item in ipairs(type(result) == "table" and type(result.steps) == "table" and result.steps or {}) do
 		if item.state == Report.STATE_FAIL then codes[#codes + 1] = "fail_" .. tostring(item.id) end

@@ -938,6 +938,8 @@ require("test.composer_check_contract")(helpers, Json, {
 		return count
 	end,
 	ready_step = "composer_ready=pass:verified",
+	-- The installer runs on Ergopti's own Python: without it the check skips.
+	prerequisite_code = "python_missing",
 	-- The installer is not run again for a composition that already exists.
 	existing_ready_step = "composer_ready=info:not_reprobed",
 	-- The installer installs the layout but could not verify it.
