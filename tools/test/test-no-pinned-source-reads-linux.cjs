@@ -46,8 +46,11 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // 55 → 51 files and 100 → 96 reads: four managed-network tests load
 // managed_http, managed_http_deadline, http_client and the shared proxy
 // policy by module name instead of dofile on their paths.
-const BASELINE = 51;
-const READ_BASELINE = 96;
+// 51 → 43 files and 96 → 88 reads: helpers.read_driver_unit(symbol), the
+// twin of the macOS helper, selects a production file by a declaration unique
+// to it; eight source invariants use it instead of the file's path.
+const BASELINE = 43;
+const READ_BASELINE = 88;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];

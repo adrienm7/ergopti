@@ -402,8 +402,8 @@ helpers.describe("menu rebuild: actual Main and tray boundaries", function()
 			if name == "infra.perf_counters" then return require(name) end
 			error("unexpected tray dependency: " .. name)
 		end }, { __index = _G })
-		local file = assert(io.open(helpers.driver_root() .. "/adapters/tray_menu.lua", "rb"))
-		local source = file:read("*a"); file:close()
+		-- adapters/tray_menu, selected by a declaration unique to it.
+		local source = assert(helpers.read_driver_unit("local function resolve_icon("))
 		local tray = compile(source, environment)()
 		helpers.assert_eq(tray.setMenu({}), true)
 		accepted = false

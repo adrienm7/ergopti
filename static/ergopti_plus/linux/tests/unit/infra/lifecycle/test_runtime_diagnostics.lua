@@ -154,9 +154,8 @@ describe("Runtime log: previously swallowed failures now log", function()
 	end)
 
 	it("reports an update notifier that raised", function()
-		local fh = assert(io.open(helpers.driver_root() .. "/modules/updater/manager.lua", "r"))
-		local updater = fh:read("*a")
-		fh:close()
+		-- modules/updater/manager, selected by a declaration unique to it.
+		local updater = assert(helpers.read_driver_unit("local function resolve_defaults_path("))
 		assert_true(updater:find("Update-available handler raised", 1, true) ~= nil)
 		assert_eq(nil, updater:find("\t\t\t\t\tpcall(on_available, release)\n", 1, true))
 	end)
