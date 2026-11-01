@@ -208,6 +208,8 @@ function mediaFixture() {
 		'dom_utils.js',
 		'host_bridge.js',
 		'metrics_typing/_generated/keycode_data.js',
+		'metrics_typing/_generated/keystats_tokens.js',
+		'metrics_typing/key_tokens.js',
 		'metrics_typing/state.js',
 		'metrics_typing/format.js',
 		'metrics_typing/filters.js',
