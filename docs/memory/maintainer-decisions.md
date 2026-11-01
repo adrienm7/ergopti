@@ -9,9 +9,12 @@ named constraint changes; a change of mind comes from the maintainer.
 
 The Windows driver runs `System32\curl.exe` and does not pin its own copy, the
 SYS class of the owned-runtimes registry. `HTTP_CheckCurlAtStart`
-(`windows/adapters/http_client.ahk`) checks it once the boot is ready and names
-its absence or a version below `HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION` in words.
-Do not propose a pinned curl again unless that check stops being enough.
+(`windows/adapters/http_client.ahk`) names its absence or a version below
+`HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION` in words. Do not propose a pinned curl again
+unless that check stops being enough.
+
+The dialog belongs to the AI (2026-11-01): `HTTP_ScheduleCurlCheck` runs at boot
+when the AI is on and when it gets turned on, and with the AI off nothing opens.
 
 ## French sticky modifiers are « rémanents » (2026-10-31)
 
