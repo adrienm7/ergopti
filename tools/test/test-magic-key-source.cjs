@@ -20,9 +20,7 @@
  * 2. Resolution. Every candidate has a Windows scan code, a macOS keycode and
  *    an evdev code in physical_keys.json, and the Windows scan code equals the
  *    one mac_keycodes.json gives the emulation.
- * 3. Migration. The v4_to_v5 step maps both spellings of every candidate's
- *    scan code to its code, then renames the key, for Windows files only.
- * 4. Last resort. The shipped Ergopti extension declares a candidate, whose
+ * 3. Last resort. The shipped Ergopti extension declares a candidate, whose
  *    scan code is SC02E: the former Windows default is unchanged.
  * ==============================================================================
  */
@@ -80,55 +78,7 @@ for (const code of expected) {
 	assert.strictEqual(record.ahk, scanOf.get(code), `${code}: the two scan-code tables agree`);
 }
 
-// 3. Migration.
-const registry = TOML.parse(fs.readFileSync(shared('core/config_schema/migrations.toml'), 'utf8'));
-const step = registry.steps.v4_to_v5;
-assert.ok(step, 'config schema v5 carries the physical magic-key step');
-assert.deepStrictEqual(step.drivers, ['ahk'], 'only Windows files carry the retired scan code');
-const maps = step.ops.filter((op) => op.op === 'map_value');
-const renames = step.ops.filter((op) => op.op === 'rename');
-assert.strictEqual(step.ops.at(-1), renames[0], 'the rename runs after every value is mapped');
-assert.deepStrictEqual(
-	tomlOwnData(renames),
-	[{ op: 'rename', section: 'hotstrings', key: RETIRED_KEY, to_key: 'magic_key_source' }],
-	'the retired key becomes the shared one'
-);
-const mapped = new Map();
-for (const op of maps) {
-	assert.strictEqual(op.section, 'hotstrings');
-	assert.strictEqual(op.key, RETIRED_KEY, 'every value map reads the retired key');
-	for (const pair of op.map) {
-		assert.ok(!mapped.has(pair.from), `${pair.from} is mapped once`);
-		mapped.set(pair.from, pair.to);
-	}
-}
-// The Windows reader matched ^SC[0-9A-F]{3}$ without regard to case, so every
-// letter-case spelling of a candidate's scan code was a working key: "Sc024" and
-// "SC02e" as much as "SC024" and "sc024".
-const caseSpellings = (text) =>
-	[...text].reduce(
-		(spellings, ch) => {
-			const forms = [...new Set([ch.toUpperCase(), ch.toLowerCase()])];
-			return spellings.flatMap((prefix) => forms.map((form) => prefix + form));
-		},
-		['']
-	);
-assert.deepStrictEqual(
-	caseSpellings('SC02E').length,
-	8,
-	'S, C and the hex letter each take two cases'
-);
-const wanted = new Map();
-for (const code of expected) {
-	for (const spelling of caseSpellings(scanOf.get(code))) wanted.set(spelling, code);
-}
-assert.deepStrictEqual(
-	[...mapped.entries()].sort(),
-	[...wanted.entries()].sort(),
-	'every letter case the Windows reader accepted maps every candidate scan code to its code'
-);
-
-// 4. Last resort.
+// 3. Last resort.
 const ergopti = TOML.parse(
 	fs.readFileSync(
 		path.join(REPO_ROOT, 'static', 'layouts', 'registry', 'ergopti', 'manifest.toml'),
@@ -148,8 +98,8 @@ assert.strictEqual(
 );
 
 console.log(
-	`PASS: ${expected.length} physical magic-key candidates pinned to the key tables, ` +
-		`${mapped.size} migrated scan-code spellings and the shipped Ergopti declaration (${declared}).`
+	`PASS: ${expected.length} physical magic-key candidates pinned to the key tables ` +
+		`and the shipped Ergopti declaration (${declared}).`
 );
 
 // Configured tap ownership is independent of temporary feature gates. The

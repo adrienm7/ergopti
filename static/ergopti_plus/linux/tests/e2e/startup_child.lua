@@ -186,6 +186,13 @@ if SEED and SEED ~= "" then
 	local source = assert(real_open(SEED, "rb"))
 	local content = source:read("*a")
 	source:close()
+	-- Stamped at the oldest version: a file with no version is refused as too old.
+	if not content:find("schema_version%s*=") then
+		local registry = assert(real_open(DRIVER .. "/../_shared/core/config_schema/migrations.toml", "rb"))
+		local text = registry:read("*a")
+		registry:close()
+		content = "[_meta]\nschema_version = " .. assert(text:match("\noldest_version = (%d+)")) .. "\n\n" .. content
+	end
 	local fh = assert(real_open(target, "wb"))
 	fh:write(content)
 	fh:close()

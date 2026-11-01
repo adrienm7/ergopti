@@ -20,8 +20,8 @@
  *   3. No driver source keeps the state key, its getter/setter or the row's
  *      command, comments included: a comment naming the setting describes
  *      code that no longer exists.
- *   4. The historical retirement step remains registered without mutation:
- *      existing gestures.space_wrap data survives until explicit cleanup.
+ *   4. No migration step deletes gestures.space_wrap: existing data survives
+ *      until explicit cleanup.
  *
  * Every scan asserts it read something first: an empty scan would pass this
  * gate while checking nothing.
@@ -136,19 +136,18 @@ for (const file of localeFiles) {
 // ==================================================
 
 const migrations = TOML.parse(fs.readFileSync(MIGRATIONS, 'utf8'));
-const retirement = migrations.steps && migrations.steps.v2_to_v3;
-if (
-	!retirement ||
-	retirement.from !== 2 ||
-	retirement.to !== 3 ||
-	!Array.isArray(retirement.drivers) ||
-	retirement.drivers.length !== 1 ||
-	retirement.drivers[0] !== 'hs' ||
-	!Array.isArray(retirement.ops) ||
-	retirement.ops.length !== 0
-) {
+const deletions = Object.values(migrations.steps || {})
+	.flatMap((step) => step.ops)
+	.filter(
+		(op) =>
+			op.op === 'delete' &&
+			op.section === 'gestures' &&
+			(op.key === undefined || op.key === 'space_wrap')
+	);
+if (Object.keys(migrations.steps || {}).length === 0) errors.push('migrations.toml holds no step.');
+if (deletions.length > 0) {
 	errors.push(
-		'migrations.toml must retain the v2→v3 macOS retirement step without operations: existing data belongs to explicit cleanup.'
+		'migrations.toml must not delete gestures.space_wrap: existing data belongs to explicit cleanup.'
 	);
 }
 

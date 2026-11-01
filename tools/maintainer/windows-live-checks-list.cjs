@@ -28,7 +28,8 @@ const live = require('./windows-live-checks.cjs');
 const pass = (detail) => ({ state: 'PASS', detail });
 const fail = (detail) => ({ state: 'FAIL', detail });
 const notExecuted = (detail) => ({ state: 'NOT EXECUTED', detail });
-const ENGLISH = "[script]\nlocale = 'en'\n";
+// Stamped: a file with no schema version is older than the registry's floor.
+const ENGLISH = `[_meta]\nschema_version = ${registryVersion('core/config_schema/migrations.toml')}\n[script]\nlocale = 'en'\n`;
 const RELOAD_ROW = 're:Reload$';
 const SUSPEND_ROW = 're:Suspend$';
 
@@ -202,6 +203,26 @@ function registryVersion(relative) {
 		'utf8'
 	);
 	return Number(/^current_version = (\d+)/m.exec(text)[1]);
+}
+
+/**
+ * The oldest config.toml version the shipped registry still migrates.
+ * @returns {number}
+ */
+function oldestVersion() {
+	const text = fs.readFileSync(
+		path.join(
+			live.ROOT,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'core',
+			'config_schema',
+			'migrations.toml'
+		),
+		'utf8'
+	);
+	return Number(/^oldest_version = (\d+)/m.exec(text)[1]);
 }
 
 /**
@@ -1530,12 +1551,14 @@ const CHECKS = [
 	},
 	{
 		id: 'old-config-migration',
-		title: 'An old config.toml climbs the whole registry at boot and keeps its actions',
+		title: 'The oldest supported config.toml climbs the registry at boot and keeps its actions',
 		async run(context) {
 			const version = registryVersion('core/config_schema/migrations.toml');
-			// Spellings a Windows build wrote before each step, unstamped (v2).
+			// Spellings Windows 1.0.0 wrote: the registry's oldest supported version.
 			const old = [
 				'# from an old build',
+				'[_meta]',
+				`schema_version = ${oldestVersion()}`,
 				'[script]',
 				"locale = 'en'",
 				'[category_enabled]',
@@ -1545,11 +1568,6 @@ const CHECKS = [
 				"trigger_shortcut = '^!a'",
 				'[hotstrings]',
 				'cascade_depth = 2',
-				'magic_key_source_scan = "SC029"',
-				'[hotstrings.autocorrection.caps]',
-				'enabled = true',
-				'[layout]',
-				'direct_access_digits = true',
 				'[shortcuts.keyboard]',
 				'ctrl_g = "open_hotstrings_editor"',
 				'win_e = "search_web"',
@@ -1570,9 +1588,6 @@ const CHECKS = [
 				'shortcuts.keyboard.meta_e': '"search_web"',
 				[KEY.HOTSTRINGS_DYNAMIC_ENABLED]: 'false',
 				[KEY.HOTSTRINGS_CASCADE_MAX_ARROWS]: '3',
-				[KEY.LAYOUT_DIRECT_ACCESS_DIGITS]: '"digits"',
-				'hotstrings.autocorrection.names.enabled': 'true',
-				[KEY.HOTSTRINGS_MAGIC_KEY_SOURCE]: '"Backquote"',
 				'llm.trigger_shortcut': '"^!a"'
 			};
 			for (const [key, value] of Object.entries(want))
@@ -1590,6 +1605,30 @@ const CHECKS = [
 				problems.push(`the log holds an error: ${session.loggedErrors()[0]}`);
 			if (problems.length > 0) return fail(problems.join('; '));
 			return pass(`${backups[0]} is exact; v${version}; every action and mapped value kept`);
+		}
+	},
+	{
+		id: 'too-old-config-refused',
+		title: 'A config.toml older than the registry is refused in words and left byte for byte',
+		async run(context) {
+			// No stamp: what a build before versioning left.
+			const old =
+				"# from a very old build\n[script]\nlocale = 'en'\n[gestures]\nspace_wrap = true\n";
+			const session = context.newSession('tooold');
+			session.seed('autohotkey/config.toml', old);
+			await session.start();
+			const problems = [];
+			if (!configBytes(session, 'autohotkey/config.toml').equals(Buffer.from(old)))
+				problems.push('the refused file changed');
+			if (backupNames(session, /^config\.pre-v/).length !== 0)
+				problems.push('a migration backup was written');
+			if (!session.logLines('refused (unsupported)').length)
+				problems.push('the refusal is not in the log');
+			await session.restart();
+			if (!configBytes(session, 'autohotkey/config.toml').equals(Buffer.from(old)))
+				problems.push('a second boot changed the file');
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass('refused, exact bytes across two boots, no backup written');
 		}
 	},
 	{

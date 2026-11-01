@@ -173,8 +173,13 @@ end
 --- Karabiner-Elements is set up.
 --- @param ctx table Scenario context.
 local function neutral_defaults(ctx)
+	-- Stamped at the oldest version: a file with no version is refused as too old.
+	local registry = assert(read(ctx.repo .. "/static/ergopti_plus/_shared/core/config_schema/migrations.toml"),
+		"migration registry missing")
+	local version = assert(registry:match("\noldest_version = (%d+)"), "registry has no oldest version")
 	write_home(ctx.home, ".config/ergopti_plus/hammerspoon/config.toml",
-		assert(read(ctx.driver .. "/_generated/config_template.toml"), "config template missing"))
+		"[_meta]\nschema_version = " .. version .. "\n\n"
+		.. assert(read(ctx.driver .. "/_generated/config_template.toml"), "config template missing"))
 	ctx.world.install_karabiner(ctx.root .. "/machine", ctx.home)
 end
 
