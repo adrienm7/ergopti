@@ -31,7 +31,9 @@ local function with_managed(options, callback)
 	package.loaded["adapters.managed_ollama_pull"] = nil
 	local raw, removed, handle, adapter, cleanup_hook, reentry_result = "", false, nil, nil, nil, nil
 	package.loaded["adapters.file_system"] = {
-		exists = function() return true end,
+		-- No refused proxy sign-in left its receipt: the pull these cases own
+		-- goes ahead (modules/llm/proxy_relay_receipt.lua).
+		exists = function(path) return not path:find("proxy_relay_refusal", 1, true) end,
 		read_with_status = function(path)
 			if path:find("proxy_policy.json", 1, true) then return '{"max_proxy_bytes":4096}', "ok" end
 			if path:find("network-retry.sh", 1, true) then
