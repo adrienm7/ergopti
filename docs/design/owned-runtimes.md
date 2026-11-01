@@ -62,10 +62,10 @@ and its decision.
 
 | Table rows (a row can group several OS tools)  | macOS | Linux | Windows | Total |
 | ---------------------------------------------- | ----- | ----- | ------- | ----- |
-| Rows inventoried                               | 28    | 42    | 17      | 87    |
+| Rows inventoried                               | 28    | 42    | 18      | 88    |
 | PIN (own pinned copy), done                    | 8     | 9     | 6       | 23    |
 | PIN (own pinned copy), to do                   | 3     | 0     | 0       | 3     |
-| SYS (system tool: check, refuse clearly), done | 13    | 10    | 7       | 30    |
+| SYS (system tool: check, refuse clearly), done | 13    | 10    | 8       | 31    |
 | OPT (optional feature), done                   | 3     | 20    | 1       | 24    |
 | Delete or remove (legacy path), done           | 1     | 1     | 1       | 3     |
 | Not applicable, done                           | 0     | 2     | 2       | 4     |
@@ -255,6 +255,7 @@ runtime (pinned with Ahk2Exe 1.1.37.02a2 and SHA-256 in
 | `explorer.exe`, `notepad.exe`, `regedit.exe`, `wt.exe`              | Open a folder or a file, the Regedit shortcut, a terminal action (`windows/adapters/network_failure_host.ahk`, `windows/modules/shortcuts/win.ahk`, `windows/adapters/system_control.ahk`)                                                                                                        | System; `wt.exe` is the Windows Terminal alias, absent on some systems                                                                                                                                   | SYS         | n/a                                                                    | The action reports it; without `wt.exe` the terminal action is unavailable | No (OS)                                                                 | SYS                                                                                                                                                             | done  |
 | `msedge.exe`                                                        | Metrics page opened in an app window (`windows/modules/keystats/keystats_ui.ahk`)                                                                                                                                                                                                                 | System copy, searched in its three install folders                                                                                                                                                       | OPT         | any                                                                    | The page opens another way or reports it                                   | No (a system component)                                                 | OPT                                                                                                                                                             | done  |
 | `ergoptiplus.exe`, `ergoptiplus_new.exe`, `ergopti-proxy-relay.exe` | Ergopti's own binary, its staged update and its sign-in proxy relay (`windows/modules/updater/self_update.ahk`, `windows/modules/llm/ollama_managed_bootstrap.ahk`)                                                                                                                               | Ergopti's own                                                                                                                                                                                            | NA          | n/a                                                                    | n/a                                                                        | Built here                                                              | Not applicable (built by this repository)                                                                                                                       | done  |
+| `git`                                                               | Developer run only: is the clone's layout registry modified? (`windows/modules/keymap/keylayout/layout_catalogue_refresh.ahk`)                                                                                                                                                                    | System (Git for Windows)                                                                                                                                                                                 | SYS         | any                                                                    | The developer run uses the clone's registry and logs an ERROR              | No (developer tool)                                                     | SYS (developer runs only)                                                                                                                                       | done  |
 
 <!-- END GENERATED windows -->
 
@@ -312,7 +313,8 @@ runtime (pinned with Ahk2Exe 1.1.37.02a2 and SHA-256 in
 ### 6.3 Python and MLX (macOS)
 
 Already owned: pinned CPython, pinned uv, locked `uv.lock`, own `.venv`, own
-port. The one hole is `/usr/bin/python3` for the App Cloner (risk 6).
+port. The App Cloner moved to the managed Python on 1 November (risk 6); a clone
+made earlier keeps `/usr/bin/python3` until it is cloned again.
 
 ### 6.4 Linux packaging
 
