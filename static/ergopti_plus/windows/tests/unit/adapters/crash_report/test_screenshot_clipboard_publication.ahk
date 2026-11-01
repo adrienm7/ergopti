@@ -67,6 +67,13 @@ _GSCP_Case(Mode, Configure := 0) {
 		if HasMethod(Configure, "Call")
 			Configure.Call(Record)
 		GestureDirectCaptureWorkerDone(1, 1, Job, 0, "", "")
+		; A clipboard viewer reacting to the write above can hold the native lock, so
+		; rollback owes its first attempt to CB_RetryRestoreDebt, as a real timer would.
+		DebtStarted := A_TickCount
+		while CBClipboardOwner.restore_debt is Map && TickElapsed(DebtStarted) < 2000 {
+			CB_RetryRestoreDebt()
+			Sleep(10)
+		}
 		Receipt := Record.Get("receipt", Map())
 		Diagnostic := " / mode=" . Mode . " receipt=" . Receipt.Get("sequence", 0)
 			. " afterPublish=" . Record.Get("sequence_after_publish", 0)
