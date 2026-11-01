@@ -117,8 +117,8 @@ _DCIR_MenuDropsAreReported() {
 	Body := _DriverFuncBody("MenuRenderer_Build")
 	Assert(Body != "", "MenuRenderer_Build() must exist")
 
-	for Kind in ["action", "dynamic"] {
-		Marker := "No handler for " . Kind . " item"
+	; A list row replaced the retired dynamic one; a stale dynamic row is an unknown type.
+	for Kind, Marker in Map("action", "No handler for action item", "list", "No provider for list item", "unknown", "Unknown item type") {
 		Assert(InStr(Body, Marker) > 0,
 			"MenuRenderer_Build must report a dropped '" . Kind . "' item — manifest/handler drift otherwise removes menu entries silently, while the unknown-item-type branch beside it has always logged")
 	}
