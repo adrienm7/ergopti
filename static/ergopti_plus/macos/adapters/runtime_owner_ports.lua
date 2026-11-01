@@ -24,6 +24,9 @@
 --- 6. Fetched Into Ergopti's Folder: the first admission downloads and verifies
 ---    the pinned artifact through platform/remap/runtime_artifact_fetch.lua,
 ---    then every later one reuses that copy without the network.
+--- 7. Driver-Only Update On Request: the pinned VirtualHIDDevice replaces an
+---    incompatible one only through platform/remap/runtime_vhid_update.lua,
+---    which the Tap-Holds row starts after the user's confirmation.
 --- ==============================================================================
 
 local M = {}
@@ -92,6 +95,24 @@ function M.fetch_artifact(callback)
 		expand = FileSystem.expand_path,
 	})
 	fetcher.ensure(manifest.runtime, callback)
+end
+
+local vhid_updater
+
+--- Replaces the installed VirtualHIDDevice with the pinned driver, once the
+--- user confirmed it (platform/remap/runtime_vhid_update.lua).
+--- @param callback function fn(ok, reason|nil, explanation|nil).
+function M.update_virtual_hid(callback)
+	local Update = require("platform.remap.runtime_vhid_update")
+	local manifest = load_manifest()
+	if not manifest then
+		return callback(false, Update.REASON.UNPINNED, "the runtime manifest could not be read")
+	end
+	vhid_updater = vhid_updater or Update.new({
+		exec = FieldCheckPorts.exec,
+		expand = FileSystem.expand_path,
+	})
+	vhid_updater.update(manifest.virtual_hid_device, callback)
 end
 
 --- The persisted record that Ergopti closed the user's own Karabiner.
