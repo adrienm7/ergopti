@@ -57,14 +57,16 @@ _RemoteCatalog_PublishedGlobals() {
 				Declared[Name] := true
 			Position := Line.Pos + Line.Len
 		}
-		Seen := Map(), Position := 1
+		Seen := Map(), Position := 1, Published := 0
 		while RegExMatch(Body, "m)^\s*(?:try\s+)?(\w+)\s*:=", &Line, Position) {
 			if Declared.Has(Line[1]) && !Seen.Has(Line[1]) {
 				Seen[Line[1]] := true
 				Names.Push(Line[1])
+				Published += 1
 			}
 			Position := Line.Pos + Line.Len
 		}
+		AssertTrue(Published > 0, "the scan must find what the owner publishes: " . Loader)
 	}
 	return Names
 }
