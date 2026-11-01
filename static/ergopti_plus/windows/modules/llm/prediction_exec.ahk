@@ -98,6 +98,37 @@ _LLM_Engine_CallTokenBudget(maxTokens, predsPerCall) {
 	return Max(5, predsPerCall == 1 ? maxTokens : predsPerCall * (maxTokens + LLM_PRED_TOKEN_OVERHEAD))
 }
 
+/**
+ * Output token limit of a retried call: token_budget.lua `for_retry`.
+ * @param {integer} callTokens   The failed call's budget (>= 1).
+ * @param {integer} extraTokens  The retry policy's extra tokens (>= 0).
+ * @returns {integer} The num_predict / max_tokens cap of the retry.
+ */
+_LLM_Engine_RetryTokenBudget(callTokens, extraTokens) {
+	if !(callTokens is Integer) || callTokens < 1
+		throw ValueError("call_tokens must be a whole number from 1")
+	if !(extraTokens is Integer) || extraTokens < 0
+		throw ValueError("extra_tokens must be a whole number from 0")
+	return callTokens + extraTokens
+}
+
+/**
+ * Arms the next attempt as a retry of the one that yielded nothing, with the
+ * shared policy's extra room and temperature: a first answer cut short needs
+ * room to finish, and repeating the same call would repeat its failure. The
+ * attempt count stays the budget of inference.json, max_multiplier attempts per
+ * requested prediction.
+ * @param {Map} state The per-request state carried by the callback.
+ */
+_LLM_Engine_ArmRetry(state) {
+	if !state.Has("sent_tokens")
+		return
+	Policy := LLM_ApiCommon_GetRetryPolicy()
+	state["retry_call"] := Map(
+		"tokens", _LLM_Engine_RetryTokenBudget(state["sent_tokens"], Policy[3]),
+		"temp", Min(_LLM_Common_Cfg("diversity_temperature", "max_temperature"), state["sent_temp"] + Policy[2]))
+}
+
 ; Return a detached, fail-closed acceptance-source snapshot. Timer callers pass
 ; the source captured with the keystroke that armed them; direct/manual callers
 ; omit it and capture the currently focused control at dispatch time.
@@ -609,8 +640,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		log_model := model_tag
 		provider_id := (entry is Map) ? entry.Get("Provider", "") : (entry.HasOwnProp("Provider") ? entry.Provider : "")
 		remote_transport := _LLM_Engine_ResolveRemoteTransport()
-		dispatch_fn := (temp, on_succ, on_fail) =>
-			remote_transport.Call(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, call_tokens, "", 0, request_current)
+		dispatch_fn := (temp, on_succ, on_fail, tokens := 0) =>
+			remote_transport.Call(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, tokens || call_tokens, "", 0, request_current)
 	} else {
 		model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
 		log_model := model_tag
@@ -622,8 +653,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		stop_seqs := (profile is Map and profile.Has("stop_sequences") and profile["stop_sequences"] is Array)
 			? profile["stop_sequences"] : ""
 		is_batch := (profile is Map and profile.Has("batch") and profile["batch"] == true)
-		dispatch_fn := (temp, on_succ, on_fail) =>
-			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs, call_tokens, is_batch, tail, "", request_current)
+		dispatch_fn := (temp, on_succ, on_fail, tokens := 0) =>
+			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs, tokens || call_tokens, is_batch, tail, "", request_current)
 		dispatch_stream_fn := (temp, on_partial, on_succ, on_fail) =>
 			LLM_OllamaGenerate_Streaming(model_tag, system_prompt, ctx, temp, on_partial, on_succ, on_fail, stop_seqs, call_tokens, is_batch, tail)
 	}
@@ -689,6 +720,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		"rewrite_edits",     Map(),
 		"dispatch_fn",       dispatch_fn,
 		"dispatch_stream_fn",dispatch_stream_fn,
+		"call_tokens",       call_tokens,
 		"streaming",         streaming_enabled,
 		"show_all_at_once",  _LLM_Engine.Has("show_all_at_once") and _LLM_Engine["show_all_at_once"],
 		; Wallclock at request start so the keystats event can include the
@@ -897,6 +929,12 @@ _LLM_Engine_DispatchVariant(state) {
 	variant_idx := state["attempt_index"]
 	state["attempt_index"] := variant_idx + 1
 	temp := LLM_ApiCommon_GetDiversityTemp(state["base_temp"], variant_idx)
+	Retry := state.Has("retry_call") ? state.Delete("retry_call") : 0
+	if Retry
+		temp := Retry["temp"]
+	state["sent_temp"] := temp
+	if state.Has("call_tokens")
+		state["sent_tokens"] := Retry ? Retry["tokens"] : state["call_tokens"]
 
 	; Reveal animation once earlier variants already filled a slot — keep the
 	; violet loading tooltip while the in-flight variant is still empty
@@ -932,8 +970,9 @@ _LLM_Engine_DispatchVariant(state) {
 	; Streaming path: when enabled and the backend exposes a streaming
 	; dispatcher, on_partial fires per token so the tooltip updates the
 	; in-flight slot live. on_success closes the slot with the final
-	; text just like the non-streaming path.
-	if (state["streaming"] and state["dispatch_stream_fn"] != "") {
+	; text just like the non-streaming path. A retry never streams: it would
+	; overwrite the growing preview, and only the plain path takes its budget.
+	if (!Retry and state["streaming"] and state["dispatch_stream_fn"] != "") {
 		this_slot_idx := state["slots"].Length + 1
 		stream_fn := state["dispatch_stream_fn"]
 		; ``(text, meta := "")`` signature matches both backends. The remote
@@ -950,6 +989,15 @@ _LLM_Engine_DispatchVariant(state) {
 	; Same signature as the streaming branch — forward ``meta`` so the
 	; finalize step can record token usage / cost. Without ``meta`` here
 	; the API path silently zeroed those metrics in the keystats event.
+	if Retry {
+		try LoggerDebug("LLM", "Variant {1}/{2} retries with {3} tokens at temperature {4}.",
+			variant_idx, state["max_attempts"], Retry["tokens"], Format("{:.2f}", temp))
+		dispatch_fn.Call(temp,
+			(text, meta := "") => _LLM_Engine_OnVariantSuccess(state_ref, text, meta),
+			(failure := "") => _LLM_Engine_OnVariantFail(state_ref, failure),
+			Retry["tokens"])
+		return
+	}
 	dispatch_fn.Call(temp,
 		(text, meta := "") => _LLM_Engine_OnVariantSuccess(state_ref, text, meta),
 		(failure := "") => _LLM_Engine_OnVariantFail(state_ref, failure))
@@ -1019,7 +1067,8 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 			state["dedup_stats"]["duplicates"] += 1
 		else
 			state["dedup_stats"]["kept"] += 1
-	}
+	} else
+		_LLM_Engine_ArmRetry(state)
 	; Paint the current accumulated slots so the user sees the new
 	; prediction land immediately, even if more variants are still in
 	; flight. Active = the first un-filled slot OR the last filled when
@@ -1056,9 +1105,8 @@ _LLM_Engine_OnVariantFail(state, failure := "") {
 		state["attempt_index"] - 1, state["max_attempts"], state["model"], Reason)
 	; The variant didn't yield a usable result. ``attempt_index`` already
 	; advanced for the next attempt; the retry budget (max_attempts) caps
-	; how often we keep trying. No special retry-temperature step here —
-	; the diversity step bumps the temperature on the next variant anyway,
-	; which is the same end effect.
+	; how often we keep trying.
+	_LLM_Engine_ArmRetry(state)
 	_LLM_Engine_DispatchVariant(state)
 }
 
