@@ -132,6 +132,20 @@ try {
 } catch { $failed = $true }
 if (-not $failed -or $script:recycled.Count -ne 0) { throw 'A replacement executable was removed' }
 [IO.File]::WriteAllText($target, 'original')
+# The 28 October audit's proof: the unregister step moves the image away and
+# installs a foreign file, and the recycle then selects that replacement.
+$moved = "$target.moved"
+$swap = {
+ param($Path)
+ try { [IO.File]::Move($Path, $moved) } catch { return }
+ [IO.File]::WriteAllText($Path, 'foreign replacement')
+}
+$scriptRecycledText = $null
+$readRecycle = { param($Path) $script:scriptRecycledText = [IO.File]::ReadAllText($Path) }
+if (-not (Invoke-ErgoptiRemoval $target $hash { $true } { $true } $readRecycle $swap)) { throw 'Pinned removal refused' }
+if ($script:scriptRecycledText -ne 'original' -or (Test-Path -LiteralPath $moved)) {
+ throw 'The unregister step could swap the confirmed image before its recycle'
+}
 if (-not (Invoke-ErgoptiRemoval $target $hash { $true } { $true } $recycle)) { throw 'Confirmed removal refused' }
 if ($script:recycled.Count -ne 1 -or $script:recycled[0] -ne $target) { throw 'Removal authority exceeded its exact target' }
 $checkout = Join-Path (Split-Path $target) '.git'
