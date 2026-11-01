@@ -314,8 +314,8 @@ _DriverGeneratedConstants() {
 	Table := Map()
 	Owner := ""
 	loop parse, Text, "`n", "`r" {
-		if RegExMatch(A_LoopField, "^class (\w+) \{", &Class)
-			Owner := Class[1]
+		if RegExMatch(A_LoopField, "^class (\w+) \{", &Header)
+			Owner := Header[1]
 		else if RegExMatch(A_LoopField, '^\s*static (\w+) := "([^"]*)"', &Entry)
 			Table[Owner . "." . Entry[1]] := Entry[2]
 	}
