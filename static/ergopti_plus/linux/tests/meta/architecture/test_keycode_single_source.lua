@@ -21,6 +21,12 @@
 
 local helpers = require("tests.helpers")
 
+--- The keyboard hook's source, selected by a declaration unique to it.
+--- @return string
+local function keyboard_hook_source()
+	return assert(helpers.read_driver_unit("local function hold_owner("))
+end
+
 
 
 
@@ -33,28 +39,19 @@ local helpers = require("tests.helpers")
 
 helpers.describe("keycode single-source: keyboard_hook has no hardcoded layout tables", function()
 	helpers.it("source contains no _KEYCODE_MAP variable", function()
-		local fh = io.open(helpers.driver_root() .. "/adapters/keyboard_hook.lua", "r")
-		helpers.assert_true(fh ~= nil, "should open keyboard_hook.lua")
-		local src = fh:read("*a")
-		fh:close()
+		local src = keyboard_hook_source()
 		helpers.assert_true(src:find("_KEYCODE_MAP", 1, true) == nil,
 			"_KEYCODE_MAP must be removed — it was a triplicated copy of evdev.json")
 	end)
 
 	helpers.it("source contains no _build_keycode_map function", function()
-		local fh = io.open(helpers.driver_root() .. "/adapters/keyboard_hook.lua", "r")
-		helpers.assert_true(fh ~= nil, "should open keyboard_hook.lua")
-		local src = fh:read("*a")
-		fh:close()
+		local src = keyboard_hook_source()
 		helpers.assert_true(src:find("_build_keycode_map", 1, true) == nil,
 			"_build_keycode_map must be removed — dead code that duplicated evdev.json")
 	end)
 
 	helpers.it("source contains no inline layout table literal", function()
-		local fh = io.open(helpers.driver_root() .. "/adapters/keyboard_hook.lua", "r")
-		helpers.assert_true(fh ~= nil, "should open keyboard_hook.lua")
-		local src = fh:read("*a")
-		fh:close()
+		local src = keyboard_hook_source()
 		-- The old code had numeric-keyed table entries with string char values
 		-- that only a hardcoded layout map would produce
 		helpers.assert_true(src:find('[30]="a"', 1, true) == nil,
@@ -66,18 +63,13 @@ helpers.describe("keycode single-source: keyboard_hook has no hardcoded layout t
 	end)
 
 	helpers.it("the pure-Lua hook harness delegates to input_reader.resolve_char", function()
-		local fh = io.open(helpers.driver_root() .. "/adapters/keyboard_hook.lua", "r")
-		helpers.assert_true(fh ~= nil, "should open keyboard_hook.lua")
-		local src = fh:read("*a")
-		fh:close()
+		local src = keyboard_hook_source()
 		helpers.assert_true(src:find("ir.resolve_char", 1, true) ~= nil,
 			"the Windows test harness needs one deterministic resolver without FFI")
 	end)
 
 	helpers.it("production capture delegates every event to live XKB state", function()
-		local fh = assert(io.open(helpers.driver_root() .. "/adapters/keyboard_hook.lua", "r"))
-		local src = fh:read("*a")
-		fh:close()
+		local src = keyboard_hook_source()
 		helpers.assert_true(src:find('require("adapters.xkb_capture")', 1, true) ~= nil,
 			"production capture must bind the stateful XKB adapter")
 		local role_at = src:find("_modifier_role(ev.code)", 1, true)
@@ -96,9 +88,8 @@ helpers.describe("keycode single-source: keyboard_hook has no hardcoded layout t
 	end)
 
 	helpers.it("capture and injection consume the same server keymap dump", function()
-		local fh = assert(io.open(helpers.driver_root() .. "/adapters/keyboard_layout.lua", "r"))
-		local src = fh:read("*a")
-		fh:close()
+		-- adapters/keyboard_layout, selected by a declaration unique to it.
+		local src = assert(helpers.read_driver_unit("local function copy_step("))
 		helpers.assert_true(src:find("XkbCapture.load(text)", 1, true) ~= nil,
 			"one dumped keymap must initialise capture before building the inverse injection table")
 	end)
