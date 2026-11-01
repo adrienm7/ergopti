@@ -23,7 +23,7 @@ local json = require("json")
 local SHARED = helpers.driver_root() .. "/../_shared/"
 local ACTIONS = { "llm_screen_region", "llm_screen_full", "llm_screen_error" }
 -- The provider formats whose requests carry no image
-local NO_IMAGE_FORMATS = { backboard = true, decisions = true }
+local NO_IMAGE_FORMATS = { backboard = true, decisions = true, perplexity_agent = true }
 
 --- @param relative string Path under _shared/.
 --- @return table decoded
