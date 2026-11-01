@@ -3616,6 +3616,7 @@ _LLM_NavEventOwnerNativeStart(Hwnd, WakeMessage) {
 	KS_NativeKeyPressPort(LLM_NavEventOwner_KeyPress)
 	if !LLM_NavEventOwner_RefreshTerminalRoutes()
 		throw Error("Terminal route metadata registration was not admitted at startup.")
+	_LLM_NavEventOwnerLogDesktopWatch()
 	return 1
 }
 
@@ -3672,7 +3673,8 @@ LLM_NavEventOwner_KeyPress(Sc) {
 }
 
 ; How the ledger is kept honest: a release no hook sees must not leave a key held.
-; @returns {Map} desktop_watch (installed) and resets (desktop switches seen).
+; @returns {Map} desktop_watch (installed, so 0 once stopped) and resets (desktop
+;   switches seen by the last session).
 LLM_NavEventOwner_KeyLedgerHealth() {
 	Watching := 0, Resets := 0
 	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_GetKeyLedgerHealth"),
@@ -3691,6 +3693,18 @@ LLM_NavEventOwner_HookHealth() {
 	return LLM_NavEventOwner_HookOrderStats()
 }
 
+; Reports the desktop watch while the owner runs: a stopped owner has unhooked it,
+; so its health can only be read before the stop.
+_LLM_NavEventOwnerLogDesktopWatch() {
+	try {
+		if LLM_NavEventOwner_KeyLedgerHealth()["desktop_watch"]
+			LoggerDebug("KeyboardArbiter", "stage=key_ledger desktop_watch=1.")
+		else
+			LoggerWarn("KeyboardArbiter", "stage=key_ledger desktop_watch=0: a release missed on UAC or the lock screen can stay held.")
+	} catch as Failure
+		LoggerWarn("KeyboardArbiter", "stage=key_ledger outcome=unreadable detail={1}.", Failure.Message)
+}
+
 ; One counters-only record per native session: no key identity, no text.
 _LLM_NavEventOwnerLogHookOrder() {
 	try {
@@ -3699,13 +3713,9 @@ _LLM_NavEventOwnerLogHookOrder() {
 		try LoggerWarn("KeyboardArbiter", "stage=hook_order outcome=unreadable detail={1}.", Failure.Message)
 		return
 	}
-	try {
-		Ledger := LLM_NavEventOwner_KeyLedgerHealth()
-		if Ledger["desktop_watch"]
-			LoggerDebug("KeyboardArbiter", "stage=key_ledger desktop_watch=1 resets={1}.", Ledger["resets"])
-		else
-			LoggerWarn("KeyboardArbiter", "stage=key_ledger desktop_watch=0 resets={1}: a release missed on UAC or the lock screen can stay held.", Ledger["resets"])
-	} catch as Failure
+	; The reset count outlives the stop; the watch itself does not.
+	try LoggerDebug("KeyboardArbiter", "stage=key_ledger resets={1}.", LLM_NavEventOwner_KeyLedgerHealth()["resets"])
+	catch as Failure
 		LoggerWarn("KeyboardArbiter", "stage=key_ledger outcome=unreadable detail={1}.", Failure.Message)
 	try LoggerDebug("KeyboardArbiter",
 		"stage=hook_order keys={1} injected_armed={2} reinstalls={3} failures={4} last_error={5} hires={6}.",
