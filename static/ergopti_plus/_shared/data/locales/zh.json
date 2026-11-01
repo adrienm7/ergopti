@@ -1401,7 +1401,6 @@
 	"proxy_override.saved_automatic": "下载重新遵循系统网络设置。",
 	"proxy_override.saved_direct": "下载现在不经任何代理直接连接。",
 	"proxy_override.saved_relay": "下载现在经过此代理。",
-	"proxy_override.windows_plain_http_only": "在 Windows 上，下载只能通过地址中不含用户名或密码的普通 http 代理；代理使用您的 Windows 会话登录。请提供类似 http://proxy.example.com:3128 的地址。",
 	"menu.debug.field_check_toolchain": "测试第三方工具（快捷指令、Homebrew、计时器）",
 	"menu.debug.field_check_login_items": "显示登录时启动 Ergopti 的项目",
 	"menu.debug.key_history": "按键历史",

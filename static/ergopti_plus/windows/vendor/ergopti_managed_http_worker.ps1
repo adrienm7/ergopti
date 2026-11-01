@@ -52,7 +52,9 @@ try {
         param([Uri]$Destination)
         if ($InputValue.fixed_proxy -is [string]) {
             $Endpoint = $InputValue.fixed_proxy
-            if ($Endpoint -ne '') { $Endpoint = Get-ErgoptiHttpRelay $Endpoint $Policy }
+            # A relay with credentials stays in the environment, never in this input file.
+            if ($Endpoint -ceq 'override') { $Endpoint = [Environment]::GetEnvironmentVariable('ERGOPTI_PROXY_OVERRIDE', 'Process') }
+            if ($Endpoint -ne '') { $Endpoint = Resolve-ErgoptiRelayEndpoint $Endpoint $Policy }
             $Selection = @{ Ok = $true; MaxRoutes = $Policy.max_selections; MaxRedirects = $Policy.redirects.max_hops;
                 Routes = @(@{ Kind = $(if ($Endpoint -eq '') { 'direct' } else { 'proxy' }); Endpoint = $Endpoint;
                     Authentication = $(if ($Endpoint -eq '') { 'none' } else { 'current_user_proxy_only' }) }) }

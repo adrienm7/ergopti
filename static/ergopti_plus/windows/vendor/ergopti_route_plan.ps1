@@ -222,8 +222,10 @@ function Get-ErgoptiOwnedProxyEnvironment {
 		if ($First.Source -ceq 'override' -and $First.Kind -ceq 'direct') { $OverrideDirect = $true }
 		if ($First.Kind -ceq 'direct') { $Route = 'direct' }
 		elseif ($First.Kind -ceq 'proxy' -and $First.Endpoint -is [string]) {
-			# Relays are normalized absolute URIs ("http://host:port/"); the plan takes host:port
-			$Route = $First.Endpoint -replace '/$', ''
+			# Relays are normalized absolute URIs ("http://host:port/"); the plan takes host:port.
+			# An override names its real relay: the daemon reads https, socks and credentials
+			# from its environment itself, and a loopback hop would die with this process.
+			$Route = $(if ($First -is [hashtable] -and $First.ContainsKey('Relay')) { $First.Relay } else { $First.Endpoint -replace '/$', '' })
 		} else { return @{ Ok = $false; Reason = $script:ErgoptiRoutePlanInvalid } }
 		[void]$Entries.Add(@{ origin = $Origin; route = $Route })
 	}

@@ -7,7 +7,9 @@
  * Runs the real clients of the Windows proxy override (Issue #101 point 2) through
  * the fake corporate network and asserts on what the network saw: the relay named
  * by the override is asked for the tunnel, a decoy relay and a decoy PAC are never
- * contacted, and a refused value reaches nothing and is said in words.
+ * contacted, and a refused value reaches nothing and is said in words. An https
+ * relay, a socks5 relay and credentials in the address go through the owned
+ * loopback hop, and no credential reaches a log, a command line or a receipt.
  *
  * FEATURES & RATIONALE:
  * 1. http_client: the real adapter and its real managed worker, under AutoHotkey
@@ -16,7 +18,9 @@
  *    shape, downloads through the real route owner.
  * 3. The Ollama launcher, the daemon and the sign-in relay are proven by the
  *    override cases of test-windows-proxy-relay-e2e.cjs, whose profile they need.
- * 4. It cannot silently skip: a missing AutoHotkey prints a "NOT EXECUTED" row, and
+ *    This test proves what the daemon is handed for the extended forms.
+ * 4. A system curl never carries an override: it serves loopback requests only.
+ * 5. It cannot silently skip: a missing AutoHotkey prints a "NOT EXECUTED" row, and
  *    --required, which the Windows CI step passes, turns it into a failure.
  *
  * USAGE:
@@ -29,14 +33,18 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
+const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync, spawn } = require('node:child_process');
 const {
+	BASIC_CREDENTIAL,
 	pacScript,
+	selfSignedCertificate,
 	startFakePacServer,
 	startFakeProxy,
-	startFakeRegistry
+	startFakeRegistry,
+	startFakeSocks5Proxy
 } = require('./lib/fake-network.cjs');
 const { NOT_EXECUTED_MARKER } = require('./validate-ahk-suite-manifest.cjs');
 
@@ -58,7 +66,14 @@ const ONLY = (process.argv.find((value) => value.startsWith('--only=')) || '').s
 const TARGET_HOST = 'proxy-override-target.invalid';
 const TARGET = `https://${TARGET_HOST}/feed`;
 const AUTHORITY = `${TARGET_HOST}:443`;
+// A numeric destination: a socks5 client resolves names itself, and this one has none.
+const NUMERIC_TARGET = 'https://192.0.2.1/feed';
+const NUMERIC_AUTHORITY = '192.0.2.1:443';
 const REFUSED = 'proxy.corp.invalid:3128';
+const SECRET = BASIC_CREDENTIAL.password;
+const USERINFO = `${BASIC_CREDENTIAL.user}:${encodeURIComponent(SECRET)}`;
+const PIN_VARIABLE = 'ERGOPTI_TEST_RELAY_PIN_SHA256';
+const COMMAND_SAMPLE_MS = 400;
 const WORKER_TIMEOUT_MS = 90000;
 const LOCALE = JSON.parse(fs.readFileSync(path.join(SHARED, 'data/locales/en.json'), 'utf8'));
 
@@ -89,6 +104,42 @@ async function check(name, body) {
 }
 
 const tunnels = (proxy) => proxy.events.filter((event) => event.outcome === 'tunnel');
+
+/** Every process command line of the machine, read as a child so the fakes keep running. */
+function commandLines() {
+	return run(
+		POWERSHELL,
+		[
+			'-NoLogo',
+			'-NoProfile',
+			'-NonInteractive',
+			'-Command',
+			'Get-CimInstance Win32_Process | ForEach-Object { $_.CommandLine }'
+		],
+		process.env
+	).then((done) => done.stdout);
+}
+
+/** Runs a body while sampling the command lines; fails if the secret shows in one. */
+async function withoutCredentialOnAnyCommandLine(body) {
+	let running = true;
+	let sampled = 0;
+	const sampler = (async () => {
+		while (running) {
+			const lines = await commandLines();
+			sampled += 1;
+			assert.ok(!lines.includes(SECRET), 'a command line carries the credential');
+			await new Promise((resolve) => setTimeout(resolve, COMMAND_SAMPLE_MS));
+		}
+	})();
+	try {
+		return await body();
+	} finally {
+		running = false;
+		await sampler;
+		assert.ok(sampled > 0, 'the command lines were read');
+	}
+}
 
 /** Runs a child without blocking the event loop the fake network lives on. */
 function run(command, args, environment) {
@@ -136,12 +187,12 @@ async function runOwner(work, plan, extra = {}) {
 }
 
 /** Runs the real updater staging worker in its production shape. */
-async function runStaging(work, override, extra = {}) {
+async function runStaging(work, override, extra = {}, url = TARGET) {
 	const prefix = `ERGOPTI_UPDATER_${process.pid}_${Date.now()}_1`;
 	const swapSource = path.join(work, 'swap-source.ps1');
 	fs.writeFileSync(swapSource, '# swap\n');
 	const inputs = {
-		URL: TARGET,
+		URL: url,
 		DIGEST: 'a'.repeat(64),
 		NEW_EXE: path.join(work, 'staged', 'new.exe'),
 		SWAP_PATH: path.join(work, 'staged', 'swap.ps1'),
@@ -183,10 +234,75 @@ async function main() {
 	const relay = await startFakeProxy({ mode: 'open', upstream: { port: registry.port } });
 	const decoy = await startFakeProxy({ mode: 'open', upstream: { port: registry.port } });
 	const pac = await startFakePacServer({ script: pacScript(`PROXY 127.0.0.1:${decoy.port}`) });
+	const upstream = { port: registry.port };
+	const secureRelay = await startFakeProxy({
+		mode: 'open',
+		upstream,
+		identity: selfSignedCertificate('fake-relay.invalid', 'ecdsa')
+	});
+	const socksRelay = await startFakeSocks5Proxy({ upstream });
+	const socksLogin = await startFakeSocks5Proxy({
+		upstream,
+		credential: { user: BASIC_CREDENTIAL.user, password: SECRET }
+	});
+	const pinned = { [PIN_VARIABLE]: secureRelay.sha256 };
+	const hostOf = (fake) => fake.url.replace(/^[a-z0-9]+:\/\//, '');
+	const forms = [
+		{
+			name: 'an https relay',
+			fake: secureRelay,
+			value: secureRelay.url,
+			mode: 'open',
+			extra: pinned
+		},
+		{
+			name: 'an https relay with credentials',
+			fake: secureRelay,
+			value: `https://${USERINFO}@${hostOf(secureRelay)}`,
+			mode: 'basic',
+			extra: pinned
+		},
+		{
+			name: 'an http relay with credentials',
+			fake: relay,
+			value: `http://${USERINFO}@${hostOf(relay)}`,
+			mode: 'basic'
+		},
+		{ name: 'a socks5h relay', fake: socksRelay, value: `socks5h://${hostOf(socksRelay)}` },
+		{
+			name: 'a socks5 relay',
+			fake: socksRelay,
+			value: `socks5://${hostOf(socksRelay)}`,
+			numeric: true
+		},
+		{
+			name: 'a socks5h relay with credentials',
+			fake: socksLogin,
+			value: `socks5h://${USERINFO}@${hostOf(socksLogin)}`
+		}
+	];
 	const reset = () => {
 		relay.setMode('open');
 		decoy.setMode('open');
+		secureRelay.setMode('open');
+		secureRelay.events.length = 0;
+		socksRelay.events.length = 0;
+		socksLogin.events.length = 0;
 		pac.requests.length = 0;
+	};
+	const arm = (form) => {
+		reset();
+		if (form.mode) form.fake.setMode(form.mode);
+	};
+	const assertTunnel = (form, detail) => {
+		assert.deepEqual(
+			tunnels(form.fake)
+				.map((event) => event.authority)
+				.slice(0, 1),
+			[form.numeric ? NUMERIC_AUTHORITY : AUTHORITY],
+			detail
+		);
+		assert.equal(decoy.events.length, 0, 'the decoy relay saw nothing');
 	};
 	const hasAhk = fs.existsSync(AUTOHOTKEY);
 	const ahkCheck = hasAhk
@@ -298,15 +414,28 @@ async function main() {
 			}
 		);
 
+		await ahkCheck('menu row: a bad value is refused in words and never stored', async () => {
+			reset();
+			const typed = [REFUSED, 'ftp://proxy.invalid:21', 'http://proxy.invalid:3128/path'];
+			const { rows } = await runOwner(work, {
+				stored: '',
+				url: 'http://127.0.0.1:9/',
+				typed
+			});
+			rows.forEach((row) => {
+				assert.equal(row.saved, 0, row.typed);
+				assert.deepEqual(row.stored, [], row.typed);
+				assert.deepEqual(row.shown, [`error: ${LOCALE['proxy_override.invalid']}`], row.typed);
+			});
+		});
+
 		await ahkCheck(
-			'menu row: a bad value and a relay Windows cannot use are refused in words and never stored',
+			'menu row: https, socks and credentials are stored, and no log carries a credential',
 			async () => {
 				reset();
 				const typed = [
-					REFUSED,
-					'ftp://proxy.invalid:21',
 					'socks5://127.0.0.1:1080',
-					'http://user:secret@proxy.invalid:3128',
+					`http://user:${SECRET}@proxy.invalid:3128`,
 					'https://proxy.invalid:443'
 				];
 				const { rows, logs } = await runOwner(work, {
@@ -314,21 +443,33 @@ async function main() {
 					url: 'http://127.0.0.1:9/',
 					typed
 				});
-				const refusals = [
-					LOCALE['proxy_override.invalid'],
-					LOCALE['proxy_override.invalid'],
-					LOCALE['proxy_override.windows_plain_http_only'],
-					LOCALE['proxy_override.windows_plain_http_only'],
-					LOCALE['proxy_override.windows_plain_http_only']
-				];
-				rows.forEach((row, index) => {
-					assert.equal(row.saved, 0, row.typed);
-					assert.deepEqual(row.stored, [], row.typed);
-					assert.deepEqual(row.shown, [`error: ${refusals[index]}`], row.typed);
+				rows.forEach((row) => {
+					assert.equal(row.saved, 1, row.typed);
+					assert.deepEqual(row.stored, [row.typed]);
+					assert.deepEqual(row.shown, [`info: ${LOCALE['proxy_override.saved_relay']}`]);
 				});
-				assert.ok(!JSON.stringify(logs).includes('secret'), 'no log carries the typed credential');
+				assert.ok(!JSON.stringify(logs).includes(SECRET), 'no log carries the typed credential');
 			}
 		);
+
+		for (const form of forms) {
+			await ahkCheck(`http_client: ${form.name} carries the request`, async () => {
+				arm(form);
+				const url = form.numeric ? NUMERIC_TARGET : TARGET;
+				const result = await withoutCredentialOnAnyCommandLine(() =>
+					runOwner(work, { stored: form.value, url, ...company }, { ...exported, ...form.extra })
+				);
+				assert.equal(result.published, 1);
+				assertTunnel(form, JSON.stringify(result.receipt));
+				assert.equal(pac.requests.length, 0, 'the PAC was never fetched');
+				assert.equal(result.curl_route.source, 'override');
+				assert.ok(
+					!JSON.stringify(result.receipt).includes(SECRET),
+					'the receipt holds no credential'
+				);
+				assert.ok(!JSON.stringify(result.logs).includes(SECRET), 'no log holds the credential');
+			});
+		}
 
 		await ahkCheck(
 			'menu row: valid values are stored in canonical form and said in words',
@@ -367,6 +508,113 @@ async function main() {
 				assert.equal(decoy.events.length, 0, 'the decoy relay saw nothing');
 			}
 		);
+
+		for (const form of forms) {
+			await check(`updater staging worker: ${form.name} carries the download`, async () => {
+				arm(form);
+				const done = await withoutCredentialOnAnyCommandLine(() =>
+					runStaging(
+						work,
+						form.value,
+						{ ...exported, ...form.extra },
+						form.numeric ? NUMERIC_TARGET : TARGET
+					)
+				);
+				assert.equal(done.code, 1, 'the untrusted fake certificate ends the download');
+				assertTunnel(form, done.stdout);
+				assert.ok(!(done.stdout + done.stderr).includes(SECRET), 'no output holds the credential');
+			});
+		}
+
+		await check(
+			'updater staging worker: a wrong relay password reaches no origin and leaks nothing',
+			async () => {
+				reset();
+				const wrong = `socks5h://${BASIC_CREDENTIAL.user}:not-${encodeURIComponent(SECRET)}@${hostOf(socksLogin)}`;
+				const done = await runStaging(work, wrong, exported);
+				assert.equal(done.code, 1);
+				assert.deepEqual(tunnels(socksLogin), [], done.stdout);
+				assert.ok(
+					socksLogin.events.some((event) => event.outcome === 'rejected'),
+					done.stdout
+				);
+				assert.ok(!(done.stdout + done.stderr).includes(SECRET), 'no output holds the credential');
+			}
+		);
+
+		await check('the loopback hop refuses every process but its own', async () => {
+			reset();
+			const script = path.join(work, 'hop-owner.ps1');
+			fs.writeFileSync(
+				script,
+				[
+					`. '${path.join(VENDOR, 'ergopti_network_routes.ps1')}'`,
+					`$Policy = Get-ErgoptiNetworkPolicy '${path.join(SHARED, 'modules/network/proxy_policy.json')}'`,
+					`[Console]::Out.WriteLine((Resolve-ErgoptiRelayEndpoint '${`socks5h://${USERINFO}@${hostOf(socksLogin)}`}' $Policy))`,
+					'[Console]::Out.Flush()',
+					'[Console]::In.ReadLine() | Out-Null'
+				].join('\n')
+			);
+			const child = spawn(
+				POWERSHELL,
+				['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script],
+				{ env: cleanEnvironment({}), windowsHide: true }
+			);
+			try {
+				const port = await new Promise((resolve, reject) => {
+					let output = '';
+					child.on('error', reject);
+					child.stdout.on('data', (chunk) => {
+						output += chunk;
+						const found = output.match(/127\.0\.0\.1:(\d+)/);
+						if (found) resolve(Number(found[1]));
+					});
+					setTimeout(
+						() => reject(new Error(`the hop did not start: ${output}`)),
+						WORKER_TIMEOUT_MS
+					);
+				});
+				const answer = await new Promise((resolve, reject) => {
+					let received = '';
+					const socket = net.connect(port, '127.0.0.1', () =>
+						socket.write(`CONNECT ${AUTHORITY} HTTP/1.1\r\nHost: ${AUTHORITY}\r\n\r\n`)
+					);
+					socket.on('data', (chunk) => (received += chunk));
+					socket.on('error', () => resolve(received));
+					socket.on('close', () => resolve(received));
+					setTimeout(() => reject(new Error('the hop kept a foreign connection open')), 15000);
+				});
+				assert.equal(answer, '', 'nothing is answered to another process');
+				assert.equal(socksLogin.events.length, 0, 'the relay never heard of it');
+			} finally {
+				child.kill();
+			}
+		});
+
+		await check('the daemon is handed the real relay, in its environment only', async () => {
+			reset();
+			const value = `socks5h://${USERINFO}@${hostOf(socksLogin)}`;
+			const script = path.join(work, 'daemon.ps1');
+			fs.writeFileSync(
+				script,
+				[
+					`. '${path.join(VENDOR, 'ergopti_route_plan.ps1')}'`,
+					`. '${path.join(VENDOR, 'ergopti_network_routes.ps1')}'`,
+					`$Policy = '${path.join(SHARED, 'modules/network/proxy_policy.json')}'`,
+					`$Defaults = '${path.join(SHARED, 'modules/updater/defaults.json')}'`,
+					'$Resolve = { param($Origin) Resolve-ErgoptiNativeNetworkRoutes $Origin 30000 $null $null $Policy $Defaults }',
+					"$Read = { param($Name) [Environment]::GetEnvironmentVariable($Name, 'Process') }",
+					"$Plan = Get-ErgoptiOwnedProxyEnvironment -Origins @('https://registry.ollama.ai') -Resolve $Resolve -ReadEnvironment $Read",
+					"[Console]::Out.Write($Plan.Environment['HTTPS_PROXY'])"
+				].join('\n')
+			);
+			const done = await run(
+				POWERSHELL,
+				['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script],
+				cleanEnvironment({ ERGOPTI_PROXY_OVERRIDE: value })
+			);
+			assert.equal(done.stdout.trim(), value, done.stderr);
+		});
 
 		await check(
 			'updater staging worker: a direct override never reaches the exported relay',
@@ -438,6 +686,48 @@ async function main() {
 			}
 		);
 
+		await check(
+			'signed artifact engine: a socks5h relay with credentials carries the download',
+			async () => {
+				const form = forms[forms.length - 1];
+				arm(form);
+				const script = path.join(work, 'artifact-hop.ps1');
+				fs.writeFileSync(
+					script,
+					[
+						`. '${path.join(VENDOR, 'ergopti_updater_download.ps1')}'`,
+						`. '${path.join(VENDOR, 'ergopti_network_routes.ps1')}'`,
+						`$PolicyFile = '${path.join(SHARED, 'modules/network/proxy_policy.json')}'`,
+						`$DefaultsFile = '${path.join(SHARED, 'modules/updater/defaults.json')}'`,
+						"$State = @{ Stage = 'proxy_resolve'; Reason = 'download'; Receipt = @{}; CleanupDebt = @() }",
+						'$Resolver = { param($Destination, $Budget) Resolve-ErgoptiNativeNetworkRoutes $Destination $Budget $null $null $PolicyFile $DefaultsFile }',
+						'$Tick = [ErgoptiUpdaterMonotonicClock]::GetTickCount64()',
+						`try { Invoke-ErgoptiUpdaterArtifactDownload ([Uri]'${TARGET}') '${path.join(work, 'artifact-hop', 'out.bin')}' 5000 $State $Resolver 45000 $Tick 1024 $PolicyFile $DefaultsFile } catch { exit 1 }`
+					].join('\n')
+				);
+				const done = await run(
+					POWERSHELL,
+					[
+						'-NoLogo',
+						'-NoProfile',
+						'-NonInteractive',
+						'-ExecutionPolicy',
+						'Bypass',
+						'-File',
+						script
+					],
+					cleanEnvironment({ ERGOPTI_PROXY_OVERRIDE: form.value, ...exported })
+				);
+				assert.equal(
+					done.code,
+					1,
+					`the untrusted fake certificate ends the download: ${done.stderr}`
+				);
+				assertTunnel(form, done.stderr);
+				assert.ok(!(done.stdout + done.stderr).includes(SECRET), 'no output holds the credential');
+			}
+		);
+
 		await check('without the variable the staging worker keeps the exported relay', async () => {
 			reset();
 			const done = await runStaging(work, null, exported);
@@ -452,7 +742,11 @@ async function main() {
 			assert.equal(relay.events.length, 0);
 		});
 	} finally {
-		await Promise.all([relay.close(), decoy.close(), pac.close(), registry.close()]);
+		await Promise.all(
+			[relay, decoy, pac, registry, secureRelay, socksRelay, socksLogin].map((owner) =>
+				owner.close()
+			)
+		);
 		fs.rmSync(work, { recursive: true, force: true });
 	}
 	console.log(`1..${total}`);

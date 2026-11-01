@@ -6,8 +6,9 @@
  * DESCRIPTION:
  * Loopback stand-ins for what a company network puts between a client and a
  * model registry: an HTTP CONNECT proxy (open, Basic, NTLM, Negotiate, refusing,
- * slow, dropping), a PAC/WPAD file server, an Ollama-like registry over TLS and a
- * Perplexity-like Agent API.
+ * slow, dropping), over plain TCP or TLS, a SOCKS5 proxy (open or username), a
+ * PAC/WPAD file server, an Ollama-like registry over TLS and a Perplexity-like
+ * Agent API.
  *
  * FEATURES & RATIONALE:
  * 1. Every listener binds 127.0.0.1 on an ephemeral port, so there is no firewall
@@ -299,13 +300,16 @@ function answer(status, reason, headers = []) {
  * @param {{host?: string, port: number}} [options.upstream] Where a tunnel goes.
  * @param {number} [options.slowMs] How long the slow modes hold their answer.
  * @param {object} [options.credential] The NTLM identity to verify.
- * @returns {Promise<object>} { port, url, events, setMode, close }.
+ * @param {object} [options.identity] selfSignedCertificate(): serves TLS, an https relay.
+ * @returns {Promise<object>} { port, url, events, setMode, close }; with an
+ *     identity also sha256, the digest a client pins.
  */
 async function startFakeProxy({
 	mode = 'open',
 	upstream = null,
 	slowMs = DEFAULT_SLOW_MS,
-	credential = TEST_CREDENTIAL
+	credential = TEST_CREDENTIAL,
+	identity = null
 } = {}) {
 	const state = { mode };
 	const events = [];
@@ -478,7 +482,7 @@ async function startFakeProxy({
 		}
 	};
 
-	const server = net.createServer((socket) => {
+	const onConnection = (socket) => {
 		sockets.add(socket);
 		let buffered = Buffer.alloc(0);
 		socket.on('close', () => sockets.delete(socket));
@@ -497,7 +501,10 @@ async function startFakeProxy({
 				if (socket.destroyed || socket.listenerCount('data') === 0) return;
 			}
 		});
-	});
+	};
+	const server = identity
+		? tls.createServer({ key: identity.key, cert: identity.cert }, onConnection)
+		: net.createServer(onConnection);
 	await new Promise((resolve, reject) => {
 		server.once('error', reject);
 		server.listen(0, LOOPBACK, resolve);
@@ -505,7 +512,8 @@ async function startFakeProxy({
 	const { port } = server.address();
 	return {
 		port,
-		url: `http://${LOOPBACK}:${port}`,
+		url: `${identity ? 'https' : 'http'}://${LOOPBACK}:${port}`,
+		...(identity ? { sha256: identity.sha256 } : {}),
 		events,
 		setMode(next) {
 			assertMode(next);
@@ -522,6 +530,112 @@ function closeServer(server, sockets, timers = new Set()) {
 	timers.clear();
 	for (const socket of sockets) socket.destroy();
 	return new Promise((resolve) => server.close(() => resolve()));
+}
+
+/**
+ * Starts a SOCKS5 relay (RFC 1928, username method of RFC 1929). As with the
+ * CONNECT proxy, a tunnel only ever reaches the loopback upstream.
+ * @param {object} options
+ * @param {{port: number}} options.upstream Where a tunnel goes.
+ * @param {{user: string, password: string}} [options.credential] Demands this login.
+ * @returns {Promise<object>} { port, url, events, close }.
+ */
+async function startFakeSocks5Proxy({ upstream, credential = null }) {
+	const events = [];
+	const sockets = new Set();
+	const server = net.createServer((socket) => {
+		sockets.add(socket);
+		socket.on('close', () => sockets.delete(socket));
+		socket.on('error', () => {});
+		let buffered = Buffer.alloc(0);
+		let step = 'greeting';
+		const take = (count) => {
+			if (buffered.length < count) return null;
+			const head = buffered.subarray(0, count);
+			buffered = buffered.subarray(count);
+			return head;
+		};
+		const greeting = () => {
+			if (buffered.length < 2 || buffered.length < 2 + buffered[1]) return false;
+			const methods = [...take(2 + buffered[1]).subarray(2)];
+			const method = credential ? 2 : 0;
+			if (!methods.includes(method)) {
+				events.push({ type: 'connect', outcome: 'no_method' });
+				socket.end(Buffer.from([5, 0xff]));
+				return false;
+			}
+			socket.write(Buffer.from([5, method]));
+			step = credential ? 'login' : 'request';
+			return true;
+		};
+		const login = () => {
+			if (buffered.length < 2) return false;
+			const nameLength = buffered[1];
+			if (buffered.length < 3 + nameLength) return false;
+			const secretLength = buffered[2 + nameLength];
+			if (buffered.length < 3 + nameLength + secretLength) return false;
+			const frame = take(3 + nameLength + secretLength);
+			const user = frame.subarray(2, 2 + nameLength).toString('utf8');
+			const password = frame.subarray(3 + nameLength).toString('utf8');
+			const accepted = user === credential.user && password === credential.password;
+			events.push({ type: 'sign_in', outcome: accepted ? 'credential_verified' : 'rejected' });
+			if (!accepted) {
+				socket.end(Buffer.from([1, 1]));
+				return false;
+			}
+			socket.write(Buffer.from([1, 0]));
+			step = 'request';
+			return true;
+		};
+		const request = () => {
+			if (buffered.length < 5) return false;
+			const type = buffered[3];
+			const addressLength = type === 1 ? 4 : type === 4 ? 16 : 1 + buffered[4];
+			if (buffered.length < 4 + addressLength + 2) return false;
+			const frame = take(4 + addressLength + 2);
+			const address = frame.subarray(4, 4 + addressLength);
+			const host =
+				type === 1
+					? [...address].join('.')
+					: type === 4
+						? address.toString('hex')
+						: address.subarray(1).toString('utf8');
+			const port = frame.readUInt16BE(4 + addressLength);
+			events.push({ type: 'connect', authority: `${host}:${port}`, outcome: 'tunnel', atyp: type });
+			socket.removeAllListeners('data');
+			socket.pause();
+			socket.write(Buffer.from([5, 0, 0, 1, 127, 0, 0, 1, 0, 0]));
+			const target = net.connect(upstream.port, LOOPBACK, () => {
+				if (buffered.length) target.write(buffered);
+				socket.pipe(target);
+				target.pipe(socket);
+			});
+			sockets.add(target);
+			target.on('close', () => {
+				sockets.delete(target);
+				socket.destroy();
+			});
+			target.on('error', () => socket.destroy());
+			socket.on('close', () => target.destroy());
+			return false;
+		};
+		const steps = { greeting, login, request };
+		socket.on('data', (chunk) => {
+			buffered = Buffer.concat([buffered, chunk]);
+			while (steps[step]());
+		});
+	});
+	await new Promise((resolve, reject) => {
+		server.once('error', reject);
+		server.listen(0, LOOPBACK, resolve);
+	});
+	const { port } = server.address();
+	return {
+		port,
+		url: `socks5://${LOOPBACK}:${port}`,
+		events,
+		close: () => closeServer(server, sockets)
+	};
 }
 
 // ========================================
@@ -589,11 +703,19 @@ function pacScript(route) {
  * write X.509. Clients pin its digest: no CA store is touched, and a client that
  * accepted another certificate would prove the tunnel is not end to end.
  * @param {string} commonName The subject and issuer.
+ * @param {'ed25519'|'ecdsa'} [algorithm] ecdsa (P-256) for a Windows TLS client:
+ *     Schannel refuses an Ed25519 certificate.
  * @returns {{key: string, cert: string, sha256: string}} PEM values and the DER digest.
  */
-function selfSignedCertificate(commonName) {
-	const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
-	const ed25519 = der(0x30, der(0x06, Buffer.from('2b6570', 'hex')));
+function selfSignedCertificate(commonName, algorithm = 'ed25519') {
+	const { publicKey, privateKey } =
+		algorithm === 'ecdsa'
+			? crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
+			: crypto.generateKeyPairSync('ed25519');
+	const signing = der(
+		0x30,
+		der(0x06, Buffer.from(algorithm === 'ecdsa' ? '2a8648ce3d040302' : '2b6570', 'hex'))
+	);
 	const name = der(
 		0x30,
 		der(
@@ -608,14 +730,14 @@ function selfSignedCertificate(commonName) {
 		0x30,
 		der(0xa0, der(0x02, Buffer.from([2]))),
 		der(0x02, Buffer.from([1])),
-		ed25519,
+		signing,
 		name,
 		der(0x30, time(new Date(now - 3600000)), time(new Date(now + 86400000))),
 		name,
 		publicKey.export({ format: 'der', type: 'spki' })
 	);
-	const signature = crypto.sign(null, tbs, privateKey);
-	const certificate = der(0x30, tbs, ed25519, der(0x03, Buffer.from([0]), signature));
+	const signature = crypto.sign(algorithm === 'ecdsa' ? 'sha256' : null, tbs, privateKey);
+	const certificate = der(0x30, tbs, signing, der(0x03, Buffer.from([0]), signature));
 	const pem = certificate.toString('base64').replace(/(.{64})(?=.)/g, '$1\n');
 	return {
 		key: privateKey.export({ format: 'pem', type: 'pkcs8' }),
@@ -829,5 +951,6 @@ module.exports = {
 	startFakePacServer,
 	startFakeProxy,
 	startFakeRegistry,
+	startFakeSocks5Proxy,
 	verifyNtlmV2
 };

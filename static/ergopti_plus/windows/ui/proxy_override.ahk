@@ -37,11 +37,6 @@ ProxyOverride_Edit(Ports) {
 		Ports["error"].Call(Title, t("proxy_override.invalid"))
 		return false
 	}
-	if !ProxyOverride_WindowsCanRoute(Choice) {
-		LoggerWarn("ProxyOverride", "Proxy override refused: the Windows download stack reaches a plain http relay only.")
-		Ports["error"].Call(Title, t("proxy_override.windows_plain_http_only"))
-		return false
-	}
 	if Ports["set"].Call(ProxyOverride_Canonical(Choice)) != true {
 		LoggerError("ProxyOverride", "Proxy override not saved: the settings store refused the write.")
 		Ports["error"].Call(Title, t("proxy_override.not_saved"))

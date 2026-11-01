@@ -17,10 +17,11 @@
 ;    applies it in one place; no channel can forget it.
 ; 2. Fail fast: a stored value that is not valid is published as a token the route
 ;    owner refuses, never read as automatic, and the user is told in words.
-; 3. WinHTTP, the Windows download stack, reaches a plain http relay only, without
-;    SOCKS, TLS to the relay or credentials in its address; it signs in with the
-;    Windows session instead. Such a relay is valid for the shared grammar and
-;    refused here, in words: the macOS and Linux clients can use it, this one cannot.
+; 3. Every relay of the shared grammar is usable. WinHTTP and HttpWebRequest reach a
+;    plain http relay only, so vendor/ergopti_network_routes.ps1 runs a loopback hop
+;    for an https relay, a socks5 relay or credentials in the address; the Ollama
+;    daemon reads them from its environment itself. The value holds a password then:
+;    it stays in the settings file and this process variable, and logs name the mode.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -131,12 +132,12 @@ ProxyOverride_Canonical(Choice) {
 }
 
 /**
- * Whether the Windows download stack can use a parsed choice (rationale 3).
- * @param {Map} Choice From ProxyOverride_Parse.
+ * Whether a relay address holds a credential, so it must stay out of any file.
+ * @param {String} Relay The relay.
  * @returns {Boolean}
  */
-ProxyOverride_WindowsCanRoute(Choice) {
-	return Choice["mode"] != "relay" || RegExMatch(Choice["relay"], "^http://[^@/]+$") != 0
+ProxyOverride_CarriesCredentials(Relay) {
+	return InStr(Relay, "@") > 0
 }
 
 
@@ -158,7 +159,7 @@ ProxyOverride_Publish(Stored) {
 	global PROXY_OVERRIDE_ENVIRONMENT, PROXY_OVERRIDE_REFUSED_TOKEN, _ProxyOverrideStored
 	_ProxyOverrideStored := Stored is String ? Stored : String(Stored)
 	Choice := ProxyOverride_Parse(Stored)
-	Usable := Choice is Map && ProxyOverride_WindowsCanRoute(Choice)
+	Usable := Choice is Map
 	EnvSet(PROXY_OVERRIDE_ENVIRONMENT, Usable ? ProxyOverride_Canonical(Choice) : PROXY_OVERRIDE_REFUSED_TOKEN)
 	return Usable
 }
@@ -172,8 +173,7 @@ ProxyOverride_Current() {
 	Published := EnvGet(PROXY_OVERRIDE_ENVIRONMENT)
 	if Published == ""
 		return Map("mode", "automatic")
-	Choice := ProxyOverride_Parse(Published)
-	return Choice is Map && ProxyOverride_WindowsCanRoute(Choice) ? Choice : 0
+	return ProxyOverride_Parse(Published)
 }
 
 /**

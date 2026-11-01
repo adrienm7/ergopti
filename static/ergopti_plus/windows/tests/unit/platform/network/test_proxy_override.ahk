@@ -35,13 +35,28 @@ _TPO_Parse() {
 		AssertEqual(ProxyOverride_Parse(Value), 0, "refused: " . String(Value))
 }
 
+; Every relay of the shared grammar is published as it is, for the route owner's hop.
 _TPO_WindowsReach() {
-	for Relay in ["http://proxy.corp.invalid:3128", "http://[::1]:3128"]
-		Assert(ProxyOverride_WindowsCanRoute(ProxyOverride_Parse(Relay)), Relay)
-	for Relay in ["https://proxy.corp.invalid:443", "socks5h://127.0.0.1:1080", "http://user:p%40ss@proxy.corp.invalid:8080"]
-		Assert(!ProxyOverride_WindowsCanRoute(ProxyOverride_Parse(Relay)), Relay)
-	Assert(ProxyOverride_WindowsCanRoute(ProxyOverride_Parse("")), "automatic")
-	Assert(ProxyOverride_WindowsCanRoute(ProxyOverride_Parse("direct")), "direct")
+	for Relay in ["http://proxy.corp.invalid:3128", "http://[::1]:3128", "https://proxy.corp.invalid:443",
+			"socks5h://127.0.0.1:1080", "http://user:p%40ss@proxy.corp.invalid:8080"]
+		_TPO_WithPublished(Relay, _TPO_AssertPublishedRelay.Bind(Relay))
+}
+
+_TPO_AssertPublishedRelay(Relay, Published) {
+	Assert(Published, Relay)
+	AssertEqual(EnvGet(PROXY_OVERRIDE_ENVIRONMENT), Relay)
+	AssertEqual(ProxyOverride_Current()["relay"], Relay)
+}
+
+; A relay with credentials reaches the worker through the environment, not its file.
+_TPO_NoCredentialInTheInputFile() {
+	Assert(ProxyOverride_CarriesCredentials("socks5://user:secret@proxy.invalid:1080"), "userinfo")
+	Assert(!ProxyOverride_CarriesCredentials("socks5://proxy.invalid:1080"), "no userinfo")
+	Http := CurlAsyncRequest()
+	Http.SetProxy("https://user:secret@proxy.invalid:443")
+	AssertEqual(Http.Proxy, "https://user:secret@proxy.invalid:443", "the request accepts every override relay")
+	AssertContains(_DriverSourceConcat(), 'ProxyOverride_CarriesCredentials(this.Proxy) ? "override" : this.Proxy',
+		"the input file holds a token")
 }
 
 _TPO_AssertPublishedRefused(Published) {
@@ -52,7 +67,7 @@ _TPO_AssertPublishedRefused(Published) {
 
 _TPO_Published() {
 	; A value the driver cannot use is published as the refused token, never as automatic.
-	for Stored in ["proxy.corp.invalid:3128", "socks5://127.0.0.1:1080", 3128]
+	for Stored in ["proxy.corp.invalid:3128", "ftp://proxy.invalid:21", 3128]
 		_TPO_WithPublished(Stored, _TPO_AssertPublishedRefused)
 	_TPO_WithPublished(" DIRECT ", (Published) => (
 		Assert(Published, "direct"),
@@ -156,9 +171,12 @@ _TPO_MenuRow() {
 	Assert(!Row["saved"] && Row["writes"].Length == 0, "an invalid value is never written")
 	AssertEqual(Row["shown"][1], "error:" . t("proxy_override.invalid"))
 
-	Row := _TPO_Row("", "socks5://127.0.0.1:1080")
-	Assert(!Row["saved"] && Row["writes"].Length == 0, "a relay WinHTTP cannot reach is never written")
-	AssertEqual(Row["shown"][1], "error:" . t("proxy_override.windows_plain_http_only"))
+	for Relay in ["socks5://127.0.0.1:1080", "https://proxy.corp.invalid:443", "http://user:secret@proxy.corp.invalid:8080"] {
+		Row := _TPO_Row("", Relay)
+		Assert(Row["saved"], Relay . " is saved")
+		AssertEqual(Row["writes"][1], Relay)
+		AssertEqual(Row["shown"][1], "info:" . t("proxy_override.saved_relay"))
+	}
 
 	Row := _TPO_Row("direct", false)
 	Assert(!Row["saved"] && Row["writes"].Length == 0 && Row["shown"].Length == 0, "a cancel changes nothing")
@@ -169,7 +187,8 @@ _TPO_MenuRow() {
 }
 
 Test("proxy override: the shared grammar replayed", _TPO_Parse)
-Test("proxy override: WinHTTP reaches a plain http relay only", _TPO_WindowsReach)
+Test("proxy override: every relay of the grammar is published for the route owner", _TPO_WindowsReach)
+Test("proxy override: a relay with credentials stays out of the worker's input file", _TPO_NoCredentialInTheInputFile)
 Test("proxy override: a refused value is published as a refusal, never as automatic", _TPO_Published)
 Test("proxy override: every adapter route owner honours the override before the system", _TPO_Precedence)
 Test("proxy override: automatic keeps the exported relay, then the system settings", _TPO_Automatic)
