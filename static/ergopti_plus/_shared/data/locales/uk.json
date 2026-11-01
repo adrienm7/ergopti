@@ -1147,7 +1147,7 @@
 	"linux_shell.uninstall.invalid_path": "Неприпустимий шлях володіння.",
 	"linux_shell.uninstall.manifest_missing": "Відсутній маніфест володіння встановлення.",
 	"linux_shell.uninstall.missing_prefix_value": "Не вказано значення --prefix.",
-	"linux_shell.uninstall.no_dialog_tool": "Немає ні інструмента діалогів (zenity, kdialog), ні notify-send.",
+	"linux_shell.uninstall.no_dialog_tool": "Немає ні інструмента діалогів, ні notify-send.",
 	"linux_shell.uninstall.no_package_owner": "Системне встановлення не має перевіреного пакета-власника.",
 	"linux_shell.uninstall.notification_failed": "Не вдалося показати сповіщення про збій видалення.",
 	"linux_shell.uninstall.owned_file_replaced": "Власний файл замінено посиланням або файлом іншого типу.",

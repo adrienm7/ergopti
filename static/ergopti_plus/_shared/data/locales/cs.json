@@ -1147,7 +1147,7 @@
 	"linux_shell.uninstall.invalid_path": "Neplatná cesta vlastnictví.",
 	"linux_shell.uninstall.manifest_missing": "Chybí manifest vlastnictví instalace.",
 	"linux_shell.uninstall.missing_prefix_value": "Chybí hodnota --prefix.",
-	"linux_shell.uninstall.no_dialog_tool": "Není k dispozici žádný dialogový nástroj (zenity, kdialog) ani notify-send.",
+	"linux_shell.uninstall.no_dialog_tool": "Není k dispozici žádný dialogový nástroj ani notify-send.",
 	"linux_shell.uninstall.no_package_owner": "Systémová instalace nemá ověřený vlastnický balíček.",
 	"linux_shell.uninstall.notification_failed": "Oznámení o neúspěšné odinstalaci nelze zobrazit.",
 	"linux_shell.uninstall.owned_file_replaced": "Vlastněný soubor byl nahrazen odkazem nebo jiným typem souboru.",

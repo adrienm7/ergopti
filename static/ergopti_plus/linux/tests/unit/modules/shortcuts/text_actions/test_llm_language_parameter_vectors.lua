@@ -7,7 +7,7 @@
 --- suite and the AutoHotkey port replay too: the binding values through the
 --- gesture validator, the target language each resolves to, the prompt, the
 --- user turn and the answer reading. Then pins what the binding editors receive
---- for the llm_language kind: the zenity prompt listing the languages, its
+--- for the llm_language kind: the native prompt listing the languages, its
 --- refusal, and the picker page's payload (the choices, "ui" first, and the
 --- label).
 ---

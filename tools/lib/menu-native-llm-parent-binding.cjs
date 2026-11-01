@@ -616,7 +616,7 @@ const LINUX_UNINSTALL_CAPTION_LOCALS = {
 const LINUX_UNINSTALL_CAPTION_FACADE_SOURCE =
 	'local function uninstall_caption_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil\n\t\tand rawget(package, "loaded") == separator_modules\n\t\tand rawget(separator_modules, "infra.manifest_menu") == ManifestMenu\n\t\tand type(uninstall_caption_factory) == "function" and rawget(ManifestMenu, "command_caption_receiver") == uninstall_caption_factory\n\t\tand type(uninstall_caption_i18n) == "table" and getmetatable(uninstall_caption_i18n) == nil\n\t\tand rawget(separator_modules, "infra.i18n") == uninstall_caption_i18n\n\t\tand type(uninstall_caption_get) == "function" and rawget(uninstall_caption_i18n, "get") == uninstall_caption_get\nend';
 const LINUX_UNINSTALL_CAPTION_COMMAND_SOURCE =
-	'local function _uninstall_command(ctx)\n\tlocal receive, current\n\tif uninstall_caption_facade_current() then receive, current = uninstall_caption_factory("about_menu", "uninstall") end\n\treturn function()\n\t\tif not uninstall_caption_facade_current() or type(receive) ~= "function" or type(current) ~= "function" or not current() then return false end\n\t\tlocal run = require("ui.menu.uninstall").run\n\t\tlocal title = receive()\n\t\tif title == nil or not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal confirmation = i18n_safe("dialog.uninstall.confirm")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal failure = i18n_safe("dialog.uninstall.failed")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal missing_program = i18n_safe("dialog.uninstall.missing_program")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal options = {\n\t\t\ttitle = title,\n\t\t\tconfirmation = confirmation,\n\t\t\tfailure = failure,\n\t\t\tmissing_program = missing_program,\n\t\t\tconfirm = function(title, text)\n\t\t\t\treturn ask_yes_no(title, zenity_plain(text),\n\t\t\t\t\ti18n_safe("button.remove"), i18n_safe("button.cancel"))\n\t\t\tend,\n\t\t\tfail = function(text) show_error(zenity_plain(text), i18n_safe("menu.global.uninstall")) end,\n\t\t\tquit = function()\n\t\t\t\tif type(ctx.on_quit) ~= "function" then\n\t\t\t\t\tLogger.error(LOG, "Uninstall: ctx.on_quit is absent — the daemon cannot quit.")\n\t\t\t\t\treturn\n\t\t\t\tend\n\t\t\t\tctx.on_quit()\n\t\t\tend,\n\t\t}\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\trun(options)\n\tend\nend';
+	'local function _uninstall_command(ctx)\n\tlocal receive, current\n\tif uninstall_caption_facade_current() then receive, current = uninstall_caption_factory("about_menu", "uninstall") end\n\treturn function()\n\t\tif not uninstall_caption_facade_current() or type(receive) ~= "function" or type(current) ~= "function" or not current() then return false end\n\t\tlocal run = require("ui.menu.uninstall").run\n\t\tlocal title = receive()\n\t\tif title == nil or not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal confirmation = i18n_safe("dialog.uninstall.confirm")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal failure = i18n_safe("dialog.uninstall.failed")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal missing_program = i18n_safe("dialog.uninstall.missing_program")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal options = {\n\t\t\ttitle = title,\n\t\t\tconfirmation = confirmation,\n\t\t\tfailure = failure,\n\t\t\tmissing_program = missing_program,\n\t\t\tconfirm = function(title, text)\n\t\t\t\treturn ask_yes_no(title, plain_markup(text),\n\t\t\t\t\ti18n_safe("button.remove"), i18n_safe("button.cancel"))\n\t\t\tend,\n\t\t\tfail = function(text) show_error(plain_markup(text), i18n_safe("menu.global.uninstall")) end,\n\t\t\tquit = function()\n\t\t\t\tif type(ctx.on_quit) ~= "function" then\n\t\t\t\t\tLogger.error(LOG, "Uninstall: ctx.on_quit is absent — the daemon cannot quit.")\n\t\t\t\t\treturn\n\t\t\t\tend\n\t\t\t\tctx.on_quit()\n\t\t\tend,\n\t\t}\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\trun(options)\n\tend\nend';
 
 const LINUX_UNINSTALL_CAPTION_ABOUT_SOURCE =
 	// config-key-literal-ok: quotes the driver source this gate pins
@@ -698,6 +698,7 @@ function closedModuleExport(unit, lex, rootPositions) {
 		PreviewSettings: 'modules.hotstrings.preview_settings',
 		RepeatKey: 'modules.hotstrings.repeat_key',
 		Modal: 'ui.modal',
+		NativeDialog: 'ui.native_dialog',
 		TextPrompt: 'ui.text_prompt',
 		PrivacyPolicy: 'llm.trigger_policy',
 		LlmBackendRows: 'ui.menu.llm_backend_rows',
@@ -2001,7 +2002,7 @@ function closedPublicationCalls(unit, role, builder) {
 						require: 1,
 						build: 1,
 						ask: 1,
-						zenity_plain: 2,
+						plain_markup: 2,
 						show_error: 1
 					}
 				: null;
@@ -2471,7 +2472,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 			!closedNativeControl(producer, 'agent') ||
 			!terminal(
 				caller,
-				'return require("ui.menu.agent_rows").build(ctx, { prompt = function(title, text, initial, hidden, choices) return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices) end, error = function(text) show_error(zenity_plain(text)) end, })'
+				'return require("ui.menu.agent_rows").build(ctx, { prompt = function(title, text, initial, hidden, choices) return TextPrompt.ask(title, plain_markup(text), initial, hidden, choices) end, error = function(text) show_error(plain_markup(text)) end, })'
 			) ||
 			!one(producer, 'local ManifestMenu = require("infra.manifest_menu")') ||
 			!one(producer, 'local NativeParent = require("ui.menu.ai_parent")') ||

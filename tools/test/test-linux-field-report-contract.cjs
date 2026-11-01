@@ -189,7 +189,7 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 	shim(bin, 'localectl', `echo "VC Keymap: fr in ${home}/keymaps for fixtureuser"`);
 	const marker = path.join(base, 'hanging');
 	shim(bin, 'ss', hang ? `: > "${marker}"\nsleep 30` : 'echo "LISTEN 127.0.0.1:11434 ollama"');
-	for (const name of ['systemctl', 'pgrep', 'gsettings', 'setxkbmap', 'zenity'])
+	for (const name of ['systemctl', 'pgrep', 'gsettings', 'setxkbmap'])
 		shim(bin, name, `echo "${name} fixture"`);
 	return { base, clone, origin, bin, home, env, logs, marker };
 }

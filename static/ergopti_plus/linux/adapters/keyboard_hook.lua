@@ -4161,7 +4161,7 @@ function M.emergency_stop(reason)
 	_armed_input, _live_input_context = nil, nil
 end
 
---- Runs a blocking modal (a zenity dialog) with the keyboard handed back to
+--- Runs a blocking modal (a native dialog) with the keyboard handed back to
 --- the desktop, then takes it again.
 ---
 --- The daemon forwards every grabbed key from its event loop, and a dialog run

@@ -16,7 +16,7 @@ local TextPrompt = require("ui.text_prompt")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local zenity_plain = require("ui.menu.menu_dialogs").zenity_plain
+local plain_markup = require("ui.menu.menu_dialogs").plain_markup
 
 local LOG = "ui.menu.menu_metrics"
 
@@ -324,7 +324,7 @@ local function _manifest_metrics_rows(ctx, k)
 					set = k.set_disabled_apps,
 					current = k.last_app,
 					prompt = function(title, text, initial, hidden, choices)
-						return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
+						return TextPrompt.ask(title, plain_markup(text), initial, hidden, choices)
 					end,
 					title = prompt_title,
 					changed = function()

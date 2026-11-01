@@ -212,7 +212,6 @@ Requires:       polkit
 Requires:       kmod
 Requires:       systemd-udev
 Requires:       libayatana-appindicator-gtk3
-Requires:       zenity
 Requires:       shadow-utils
 Requires:       util-linux
 Requires:       xdg-utils

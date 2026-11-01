@@ -1147,7 +1147,7 @@
 	"linux_shell.uninstall.invalid_path": "Ogiltig ägarskapssökväg.",
 	"linux_shell.uninstall.manifest_missing": "Installationens ägarskapsmanifest saknas.",
 	"linux_shell.uninstall.missing_prefix_value": "Värde för --prefix saknas.",
-	"linux_shell.uninstall.no_dialog_tool": "Varken ett dialogverktyg (zenity, kdialog) eller notify-send är tillgängligt.",
+	"linux_shell.uninstall.no_dialog_tool": "Varken ett dialogverktyg eller notify-send är tillgängligt.",
 	"linux_shell.uninstall.no_package_owner": "Systeminstallationen har ingen verifierad paketägare.",
 	"linux_shell.uninstall.notification_failed": "Aviseringen om den misslyckade avinstallationen kunde inte visas.",
 	"linux_shell.uninstall.owned_file_replaced": "En ägd fil ersattes av en länk eller en annan filtyp.",

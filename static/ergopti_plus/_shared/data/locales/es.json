@@ -1147,7 +1147,7 @@
 	"linux_shell.uninstall.invalid_path": "Ruta de propiedad no válida.",
 	"linux_shell.uninstall.manifest_missing": "Falta el manifiesto de propiedad de la instalación.",
 	"linux_shell.uninstall.missing_prefix_value": "Falta el valor de --prefix.",
-	"linux_shell.uninstall.no_dialog_tool": "No hay ninguna herramienta de diálogo (zenity, kdialog) ni notify-send disponible.",
+	"linux_shell.uninstall.no_dialog_tool": "No hay ninguna herramienta de diálogo ni notify-send disponible.",
 	"linux_shell.uninstall.no_package_owner": "La instalación del sistema no tiene un paquete propietario verificado.",
 	"linux_shell.uninstall.notification_failed": "No se pudo mostrar la notificación del fallo de la desinstalación.",
 	"linux_shell.uninstall.owned_file_replaced": "Un archivo propio fue sustituido por un enlace u otro tipo de archivo.",

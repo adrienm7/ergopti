@@ -16,7 +16,7 @@
 ---    privacy-safe result as the log line (field_check_report.lua).
 --- 3. One run at a time per check: a second click while a check is pending only
 ---    says so.
---- 4. The dialog is a zenity question whose two buttons are « Copy report » and
+--- 4. The dialog is a native question whose two buttons are « Copy report » and
 ---    « Close »; it opens through ui.modal, which hands the keyboard back to the
 ---    desktop while it is open. Every collaborator is injectable.
 --- 5. The logger is resolved at call time, so a suite can replace it per case.
@@ -44,7 +44,7 @@ local function native(spec)
 		notify = function(message) return require("adapters.application_notifier").send(message, { level = "info" }) end,
 		--- Shows the report; returns true when the user asked to copy it.
 		dialog = function(title, text, copy_label, close_label)
-			local command = "zenity --question --no-markup --title=" .. Shell.quote(require("window_titles").compose(title))
+			local command = require("ui.native_dialog").command() .. " --question --no-markup --title=" .. Shell.quote(require("window_titles").compose(title))
 				.. " --text=" .. Shell.quote(text)
 				.. " --ok-label=" .. Shell.quote(copy_label)
 				.. " --cancel-label=" .. Shell.quote(close_label)

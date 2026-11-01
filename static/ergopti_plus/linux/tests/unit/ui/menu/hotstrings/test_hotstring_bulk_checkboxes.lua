@@ -248,7 +248,7 @@ local function with_bulk_error_receipts(body)
 		return first, second, third
 	end
 	os.execute = function(command)
-		if type(command) == "string" and command:match("^zenity %-%-error") then
+		if type(command) == "string" and command:match("dialog_host%.lua' %-%-error") then
 			notices[#notices + 1] = { command = command, keyboard_released = inside }
 			return 0
 		end

@@ -803,17 +803,17 @@
 		{
 			"os": "linux",
 			"tool": "`zenity`, `kdialog`",
-			"programs": ["zenity", "kdialog"],
-			"used_for": "Confirmation dialogs (`linux/modules/gestures/system_actions.lua:114-118`, `linux/modules/llm/local_model_offer.lua:48-53`)",
-			"today": "Host (`zenity` is a package requirement)",
-			"current_class": "OPT",
+			"programs": [],
+			"used_for": "Confirmation, entry, list and file dialogs (`linux/modules/gestures/system_actions.lua`, `linux/ui/text_prompt.lua`, `linux/ui/choice_prompt.lua`, `linux/ui/app_chooser.lua`)",
+			"today": "Ergopti's own GTK 3 dialog (`linux/ui/dialog_host.lua`, through the LuaJIT FFI as the tray binds GTK), run by the daemon's interpreter (`linux/ui/native_dialog.lua`); zenity and kdialog are neither started nor package requirements",
+			"current_class": "NA",
 			"version_needed": "any",
-			"if_missing": "No dialog: the action refuses rather than asking",
+			"if_missing": "GTK 3 is the tray's own host library; without a display the dialog exits 69 and the action refuses rather than asking",
 			"pin_possible": "zenity is LGPL, GTK-dependent",
 			"decision": "OPT",
 			"decision_text": "OPT; drive our own GTK window instead",
 			"alternative": null,
-			"status": "follow_up"
+			"status": "done"
 		},
 		{
 			"os": "linux",

@@ -1147,7 +1147,7 @@
 	"linux_shell.uninstall.invalid_path": "अमान्य स्वामित्व पथ।",
 	"linux_shell.uninstall.manifest_missing": "इंस्टॉलेशन स्वामित्व मैनिफ़ेस्ट अनुपलब्ध है।",
 	"linux_shell.uninstall.missing_prefix_value": "--prefix का मान अनुपलब्ध है।",
-	"linux_shell.uninstall.no_dialog_tool": "कोई डायलॉग टूल (zenity, kdialog) या notify-send उपलब्ध नहीं है।",
+	"linux_shell.uninstall.no_dialog_tool": "कोई डायलॉग टूल या notify-send उपलब्ध नहीं है।",
 	"linux_shell.uninstall.no_package_owner": "सिस्टम इंस्टॉलेशन का कोई सत्यापित पैकेज स्वामी नहीं है।",
 	"linux_shell.uninstall.notification_failed": "अनइंस्टॉल विफलता की सूचना प्रदर्शित नहीं की जा सकी।",
 	"linux_shell.uninstall.owned_file_replaced": "स्वामित्व वाली फ़ाइल को किसी लिंक या अन्य फ़ाइल प्रकार से बदल दिया गया।",

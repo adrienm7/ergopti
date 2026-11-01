@@ -1712,7 +1712,7 @@ helpers.describe("Gestures Infos row opens the explanation in a dialog", functio
 		rawset(_G, "i18n_safe", real_i18n_safe)
 		helpers.assert_true(ok, tostring(err))
 		helpers.assert_eq(#commands, 1, "one click opens one dialog")
-		helpers.assert_true(commands[1]:find("zenity --info", 1, true) == 1, "the existing info dialog: " .. commands[1])
+		helpers.assert_true(commands[1]:find("dialog_host.lua' --info", 1, true) ~= nil, "the existing info dialog: " .. commands[1])
 		-- shell_quote closes and reopens the quotes around an apostrophe.
 		local unquoted = commands[1]:gsub("'\\''", "'")
 		for _, expected in ipairs({ note, reason, i18n.get("menu.gestures.notify_title") }) do

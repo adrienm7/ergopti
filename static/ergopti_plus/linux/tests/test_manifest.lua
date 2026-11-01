@@ -777,6 +777,7 @@ return {
 	"tests.unit.ui.menu.about.test_about_menu_uninstall",
 	"tests.unit.ui.menu.about.test_about_menu_version_row",
 	"tests.unit.ui.webview.test_app_chooser",
+	"tests.unit.ui.webview.test_dialog_host",
 	"tests.unit.ui.webview.test_native_dialog_titles",
 	"tests.unit.ui.webview.test_every_app_window_title",
 	"tests.unit.ui.webview.test_text_prompt_exit_status",

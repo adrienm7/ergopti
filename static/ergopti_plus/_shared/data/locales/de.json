@@ -1147,7 +1147,7 @@
 	"linux_shell.uninstall.invalid_path": "Ungültiger Eigentumspfad.",
 	"linux_shell.uninstall.manifest_missing": "Das Eigentumsmanifest der Installation fehlt.",
 	"linux_shell.uninstall.missing_prefix_value": "Wert für --prefix fehlt.",
-	"linux_shell.uninstall.no_dialog_tool": "Weder ein Dialogwerkzeug (zenity, kdialog) noch notify-send ist verfügbar.",
+	"linux_shell.uninstall.no_dialog_tool": "Weder ein Dialogwerkzeug noch notify-send ist verfügbar.",
 	"linux_shell.uninstall.no_package_owner": "Die Systeminstallation hat keinen bestätigten Paketeigentümer.",
 	"linux_shell.uninstall.notification_failed": "Die Benachrichtigung über den fehlgeschlagenen Deinstallationsvorgang konnte nicht angezeigt werden.",
 	"linux_shell.uninstall.owned_file_replaced": "Eine zur Installation gehörende Datei wurde durch eine Verknüpfung oder einen anderen Dateityp ersetzt.",

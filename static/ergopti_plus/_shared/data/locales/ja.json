@@ -1147,7 +1147,7 @@
 	"linux_shell.uninstall.invalid_path": "所有権のパスが無効です。",
 	"linux_shell.uninstall.manifest_missing": "インストールの所有権マニフェストがありません。",
 	"linux_shell.uninstall.missing_prefix_value": "--prefix の値がありません。",
-	"linux_shell.uninstall.no_dialog_tool": "ダイアログツール (zenity、kdialog) も notify-send も利用できません。",
+	"linux_shell.uninstall.no_dialog_tool": "ダイアログツールも notify-send も利用できません。",
 	"linux_shell.uninstall.no_package_owner": "システムのインストールには検証済みの所有パッケージがありません。",
 	"linux_shell.uninstall.notification_failed": "アンインストール失敗の通知を表示できませんでした。",
 	"linux_shell.uninstall.owned_file_replaced": "所有するファイルがリンクまたは別の種類のファイルに置き換えられました。",

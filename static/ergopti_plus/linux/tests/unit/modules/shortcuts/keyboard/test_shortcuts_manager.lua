@@ -437,7 +437,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 					end
 					modal.run = function(callback) releases = releases + 1; return callback() end
 					os.execute = function(command)
-						if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+						if command:find("dialog_host.lua", 1, true) then notices[#notices + 1] = command; return 0 end
 						return execute(command)
 					end
 					local called, receipt = pcall(action)

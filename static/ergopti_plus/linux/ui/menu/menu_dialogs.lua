@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Linux Menu Dialogs
 --- DESCRIPTION:
---- The zenity dialogs, prompts and binding helpers the tray's section builders
---- share: placeholder filling, shell quoting, exit-status normalisation, text
+--- The native dialogs (Ergopti's own, ui/native_dialog.lua), prompts and
+--- binding helpers the tray's section builders share: placeholder filling, shell quoting, exit-status normalisation, text
 --- prompts, error and information messages, the yes/no question, and the action
 --- picker and slot-binding rows.
 --- ==============================================================================
@@ -14,6 +14,7 @@ local M = {}
 local WindowTitles = require("window_titles")
 local Logger = require("logger.shim")
 local Modal = require("ui.modal")
+local NativeDialog = require("ui.native_dialog")
 local TextPrompt = require("ui.text_prompt")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
@@ -45,7 +46,7 @@ end
 --- return a NUMBER, 0 for success. From Lua 5.2 the same success reads as
 --- `true`. A bare `if not status` is therefore never true on LuaJIT — not
 --- even for a failure — so Cancel and "binary absent" both read as success.
---- Every zenity site below goes through this helper.
+--- Every dialog site below goes through this helper.
 --- @param status any
 --- @return boolean
 local function succeeded(status)
@@ -72,12 +73,12 @@ end
 --- @param message string Already-localised text.
 --- @param title string|nil Already-localised window title.
 local function show_error(message, title)
-	local command = "zenity --error"
+	local command = NativeDialog.command() .. " --error"
 		.. " --title=" .. shell_quote(WindowTitles.compose(title == nil and i18n_safe("common.error_title") or title))
 		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
 	if not succeeded(Modal.run(function() return os.execute(command) end)) then
-		-- Zenity absent: the refusal still has to reach someone, and a silent
-		-- rejection reads as a menu row that does nothing when clicked.
+		-- No dialog could open: the refusal still has to reach someone, and a
+		-- silent rejection reads as a menu row that does nothing when clicked.
 		Logger.error(LOG, "%s", tostring(message))
 	end
 end
@@ -86,20 +87,20 @@ end
 --- @param title string Already-localised window title.
 --- @param message string Already-localised text.
 local function show_info(title, message)
-	local command = "zenity --info --title=" .. shell_quote(WindowTitles.compose(title))
+	local command = NativeDialog.command() .. " --info --title=" .. shell_quote(WindowTitles.compose(title))
 		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
 	if not succeeded(Modal.run(function() return os.execute(command) end)) then
-		-- Zenity absent: the outcome is still recorded where a user can find it.
+		-- No dialog could open: the outcome is still recorded where a user can find it.
 		Logger.info(LOG, "%s", tostring(message))
 	end
 end
 
---- Escapes text for zenity's --text, which is Pango markup: a config value
+--- Escapes text for a dialog's --text, which is Pango markup: a config value
 --- holding "<" or "&" would otherwise blank the dialog.
 --- @param text string
 --- @return string
-local function zenity_plain(text)
-	return (tostring(text):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
+local function plain_markup(text)
+	return NativeDialog.plain_markup(text)
 end
 
 --- Prompts and persists the parameter required by one action before binding it.
@@ -150,7 +151,7 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		else
 			-- The prompt belongs to the parameter kind (the gestures manager owns it).
 			-- Escaped: a wrap-pair sample such as <…> would be read as Pango markup.
-			value = prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
+			value = prompt_text(title, plain_markup(gestures.get_action_parameter_prompt(action)), prior)
 		end
 	end
 	if value == nil or (spec == "llm_language" and value == "") then return false end
@@ -159,7 +160,7 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 	then
 		Logger.warn(LOG, "Invalid parameter for binding '%s' action '%s'.",
 			tostring(binding), tostring(action))
-		show_error(zenity_plain(gestures.get_action_parameter_error(action)))
+		show_error(plain_markup(gestures.get_action_parameter_error(action)))
 		return false
 	end
 	-- A rejected assignment cannot leave its parameter durably changed.
@@ -244,24 +245,19 @@ end
 --- @param cancel_label string Already-translated.
 --- @return boolean|nil
 local function ask_yes_no(title, text, ok_label, cancel_label, default_cancel)
-	-- os.execute returns a number on LuaJIT (5.1) and true on 5.2+: the
-	-- module-level succeeded() above normalises both spellings.
-	local command = "zenity --question --title=" .. shell_quote(WindowTitles.compose(title))
+	local command = NativeDialog.command() .. " --question --title=" .. shell_quote(WindowTitles.compose(title))
 		.. " --text=" .. shell_quote(text)
 		.. " --ok-label=" .. shell_quote(ok_label)
 		.. " --cancel-label=" .. shell_quote(cancel_label)
 		.. (default_cancel and " --default-cancel" or "")
 		.. " 2>/dev/null"
-
-	-- Probed rather than assumed, because the exit code alone cannot distinguish
-	-- "the user pressed Cancel" from "no such binary" — both are non-zero, and
-	-- treating the second as a No would silently record a choice nobody made.
-	if not succeeded(os.execute("command -v zenity >/dev/null 2>&1")) then
-		Logger.error(LOG, "Zenity is unavailable: cannot ask '%s'.", tostring(title))
-		return nil
-	end
-	-- zenity exits 0 for the OK button and 1 for cancel.
-	return succeeded(Modal.run(function() return os.execute(command) end))
+	-- The dialog exits 0 for OK and 1 for Cancel; any other end (no display,
+	-- no GTK 3) is nobody answering, which must not be recorded as a No.
+	local status, how, code = Modal.run(function() return os.execute(command) end)
+	if succeeded(status) then return true end
+	if NativeDialog.exit_code(status, how, code) == NativeDialog.EXIT_CANCELLED then return false end
+	Logger.error(LOG, "No dialog could ask '%s' (status %s).", tostring(title), tostring(code or status))
+	return nil
 end
 
 M._fill = _fill
@@ -270,7 +266,7 @@ M.succeeded = succeeded
 M.prompt_text = prompt_text
 M.show_error = show_error
 M.show_info = show_info
-M.zenity_plain = zenity_plain
+M.plain_markup = plain_markup
 M.assign_parameterized_action = assign_parameterized_action
 M.open_action_picker = open_action_picker
 M.slot_binding_rows = slot_binding_rows
