@@ -133,7 +133,7 @@ _LSA_AffinityCorpus() {
 	global _SharedDir, LLM_LOCAL_API_SERVERS
 	LLM_Defaults_Load()
 	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\llm\local_server_affinity.json"))
-	AssertEqual(24, Corpus["affinity_cases"].Length, "the independent endpoint affinity inventory must be complete")
+	AssertEqual(28, Corpus["affinity_cases"].Length, "the independent endpoint affinity inventory must be complete")
 	for Vector in Corpus["affinity_cases"]
 		AssertEqual(Vector["matches"], LocalServerAuthEntryMatches(Vector["provider"], Vector["base_url"], Vector["server"], LLM_LOCAL_API_SERVERS), Vector["name"])
 	AssertEqual(13, Corpus["entry_auth_cases"].Length, "the contextual authentication inventory must remain independent")
