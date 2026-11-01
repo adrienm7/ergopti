@@ -5,6 +5,40 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Restore holds its stage by handle (2026-11-01)
+
+The audit's "restore staging substitution" is fixed on Windows, after two rejected
+designs: a raw copy lost streams and metadata, and a pinned `CopyFileW` still wrote
+through a replaced ancestor. `FSCopyReplaceAtomic` resolves one pathname, the anchor
+folder. Every folder below opens relative to its parent without delete sharing, the
+stage opens relative to its folder sharing nothing, `BackupRead`/`BackupWrite` copy
+what `CopyFileW` copied (content, named streams, extended attributes) by handle, and
+the rename goes through the stage's handle into the folder handle. No native helper
+is needed: ntdll and kernel32 cover it. `test_config_restore_custody.ahk` runs a
+separate process against it and, as a control, against the old pipeline.
+
+macOS and Linux have the same hole and cannot close it: POSIX renames by name and
+denies a same-user process nothing. The shared `owner.restore` reads each file back
+and reports a substituted one as a failure, naming the pre-restore backup. A foreign
+file can still reach the destination there, but never as a success.
+
+## N-gram keys are token encoding 2 (2026-11-01)
+
+A key is a run of markers from `_shared/data/keystats_tokens.json`, the escape `[[`
+for a typed `[`, and single characters, so `[BS]` no longer reads as both a Backspace
+and four typed characters. The long spellings won (`[PAGEUP]`, `[PAGEDOWN]`,
+`[DELETE]`); `[PGUP]`, `[PGDN]` and `[DEL]` stay aliases because raw events keep them.
+Change the JSON, run `tools/codegen/codegen-keystats-tokens.cjs`, and replay
+`token_encoding_vectors.json`.
+
+Stored data moves once, and raw events are never rewritten. Windows (cache format 16)
+and macOS (aggregate revision 3) rebuild every key from the raw events, which were
+never ambiguous, keeping the old image as `*.pre-ngram-encoding-2.bak`. Linux has no
+replay, so `ensure_token_encoding` writes a `VACUUM INTO` backup, then rewrites its keys
+and records the version in one transaction. Its keys are read with the family's token
+count; a key with two readings of that length takes the earliest marker, so such a
+row can be wrong on Linux only.
+
 ## The Windows proxy override takes every relay of the grammar (2026-11-01)
 
 https relays, socks5 relays and credentials in the address are accepted on Windows
