@@ -141,9 +141,13 @@ handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
   build ever wrote, so shared-mode generator output and boot stay identical.
 - An incompatible VirtualHIDDevice (only one version can be active system-wide)
   blocks owned mode in an explicit named unavailable state with an explanation.
-  The decided policy offers a driver-only update requiring explicit confirmation.
-  Detection, product wiring and authenticated signed DriverKit payload suppliers
-  remain unfinished, as do native validation and real-Mac acceptance.
+  The decided policy offers a driver-only update requiring explicit confirmation:
+  detection is `platform/remap/runtime_vhid.lua`, the Tap-Holds row and its
+  confirmation are wired, and the payload is the manifest's pinned pqrs package,
+  whose digest and Developer ID Installer team are checked again by the
+  administrator shell before `/usr/sbin/installer`
+  (`platform/remap/runtime_vhid_update.lua`). Native validation and real-Mac
+  acceptance remain unfinished.
 - Counts are exact only inside an admitted capture. Before approval, during
   stream loss or with the option off while another Karabiner holds the
   keyboards, the gaps are recorded explicitly and never reconstructed.

@@ -5172,6 +5172,31 @@ function M.owned_runtime_status()
 	return { state = status.state, reason = status.reason }
 end
 
+--- The driver version the owned runtime needs, for the update offer of an
+--- incompatible VirtualHIDDevice.
+--- @return string|nil version Nil when the manifest pins none.
+function M.owned_virtual_hid_version()
+	return require("adapters.runtime_owner_ports").virtual_hid_version()
+end
+
+--- Replaces an incompatible VirtualHIDDevice with the pinned driver after the
+--- user confirmed it. The caller reloads after telling the user, so the next
+--- owner admits the new driver or names the System Settings approval macOS
+--- may still wait for (ui/virtual_hid_update.lua).
+--- @param on_done function fn(ok, reason|nil, explanation|nil) called once.
+--- @return boolean started False when no incompatible driver blocks the owned runtime.
+function M.update_virtual_hid_driver(on_done)
+	assert(type(on_done) == "function", "update_virtual_hid_driver(): a completion callback is required")
+	local status = M.owned_runtime_status()
+	if not M._owned.selected() or type(status) ~= "table"
+		or status.reason ~= require("platform.remap.runtime_vhid").REASON_INCOMPATIBLE then
+		Logger.error(LOG, "VirtualHIDDevice update refused: no incompatible driver blocks the owned runtime.")
+		return false
+	end
+	require("adapters.runtime_owner_ports").update_virtual_hid(on_done)
+	return true
+end
+
 --- Whether Ergopti closed the user's own Karabiner-Elements and has not given
 --- it back yet, for the menu row that says so.
 --- @return boolean closed
