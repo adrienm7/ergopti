@@ -11,7 +11,7 @@
 --- their order and the separators between them are the manifest's `top_level`,
 --- which M.build dispatches through its builder table. Each section builder
 --- lives in its own ui/menu/menu_<section>.lua, bound here as
---- `require("ui.menu.menu_<section>").build`, and each part binds the zenity
+--- `require("ui.menu.menu_<section>").build`, and each part binds the native
 --- dialogs it uses from ui/menu/menu_dialogs.lua and holds its own imports;
 --- this file keeps the header, the facade checks and the tray assembly. tools/lib/linux-menu-parts.cjs admits only that
 --- wiring for the menu gates.

@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Choice Prompt Dialog (Linux)
 --- DESCRIPTION:
---- Asks the user to pick one value among labelled choices in a native list
---- (zenity --list, else kdialog --menu), so a closed set is chosen instead of
+--- Asks the user to pick one value among labelled choices in Ergopti's own
+--- list dialog (ui/native_dialog.lua), so a closed set is chosen instead of
 --- typed from a list printed in the prompt.
 ---
 --- FEATURES & RATIONALE:
@@ -15,8 +15,8 @@
 ---    keeping it is one Enter.
 --- 3. Through ui/modal.lua, like every dialog the tray opens: the grabbed
 ---    keyboard is handed to the desktop while the list is open.
---- 4. Cancel is not a choice: a dismissed or failed dialog returns nil, and a
----    desktop with neither zenity nor kdialog is logged as an error.
+--- 4. Cancel is not a choice: a dismissed dialog returns nil, and a dialog that
+---    could not open is logged as an error.
 --- ==============================================================================
 
 local M = {}
@@ -24,6 +24,7 @@ local M = {}
 local Errors = require("adapter_errors")
 local Logger = require("logger.shim")
 local Modal = require("ui.modal")
+local NativeDialog = require("ui.native_dialog")
 local Shell = require("adapters.shell_runner")
 local WindowTitles = require("window_titles")
 
@@ -42,27 +43,20 @@ local function ordered(choices, current)
 	return first
 end
 
---- The native command that lists the choices, or nil when no dialog tool is installed.
+--- The native command that lists the choices.
 --- @param title string Window title.
 --- @param text string The question, shown as plain text.
 --- @param choices table Ordered choices.
---- @return string|nil command
+--- @return string command
 function M.command(title, text, choices)
 	local rows = {}
 	for _, choice in ipairs(choices) do
 		rows[#rows + 1] = Shell.quote(choice.value) .. " " .. Shell.quote(choice.label)
 	end
-	if Shell.has_command("zenity") then
-		-- The first column holds the value: hidden, and the one printed.
-		return "zenity --list --no-markup --hide-header --title=" .. Shell.quote(WindowTitles.compose(title))
-			.. " --text=" .. Shell.quote(text) .. " --column='' --column='' --hide-column=1 --print-column=1 "
-			.. table.concat(rows, " ") .. " 2>/dev/null"
-	end
-	if Shell.has_command("kdialog") then
-		return "kdialog --title " .. Shell.quote(WindowTitles.compose(title)) .. " --menu " .. Shell.quote(text) .. " "
-			.. table.concat(rows, " ") .. " 2>/dev/null"
-	end
-	return nil
+	-- The first column holds the value: hidden, and the one printed.
+	return NativeDialog.command() .. " --list --no-markup --hide-header --title=" .. Shell.quote(WindowTitles.compose(title))
+		.. " --text=" .. Shell.quote(text) .. " --column='' --column='' --hide-column=1 --print-column=1 "
+		.. table.concat(rows, " ") .. " 2>/dev/null"
 end
 
 --- Asks the user to pick one of the choices.
@@ -75,10 +69,6 @@ function M.pick(title, text, choices, current)
 	assert(type(choices) == "table" and #choices > 0, "a choice prompt needs at least one choice")
 	local list = ordered(choices, current)
 	local command = M.command(title, text, list)
-	if not command then
-		Logger.error(LOG, "Neither zenity nor kdialog is installed: '%s' cannot be chosen.", tostring(title))
-		return nil
-	end
 	local ok, answer, message, reason, status = Modal.run(function() return Shell.exec_checked(command) end)
 	if ok ~= true then
 		if not (reason == Errors.COMMAND_EXITED_NONZERO and status == 1) then

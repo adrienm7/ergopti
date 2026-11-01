@@ -24,7 +24,7 @@ local succeeded = require("ui.menu.menu_dialogs").succeeded
 local prompt_text = require("ui.menu.menu_dialogs").prompt_text
 local show_error = require("ui.menu.menu_dialogs").show_error
 local show_info = require("ui.menu.menu_dialogs").show_info
-local zenity_plain = require("ui.menu.menu_dialogs").zenity_plain
+local plain_markup = require("ui.menu.menu_dialogs").plain_markup
 local ask_yes_no = require("ui.menu.menu_dialogs").ask_yes_no
 
 local LOG = "ui.menu.menu_llm"
@@ -269,7 +269,7 @@ local function _build_llm(ctx)
 				set = function(list) return ready() and TriggerSettings.set_disabled_apps(list) end,
 				current = type(llm.get_agent_last_app) == "function" and llm.get_agent_last_app or function() return nil end,
 				prompt = function(title, text, initial, hidden, choices)
-					return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
+					return TextPrompt.ask(title, plain_markup(text), initial, hidden, choices)
 				end,
 				title = exclusion_title,
 				changed = function()
@@ -724,7 +724,7 @@ local function _build_llm(ctx)
 		error = show_error,
 		info = show_info,
 		confirm = function(title, text)
-			return ask_yes_no(title, zenity_plain(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
+			return ask_yes_no(title, plain_markup(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
 		end,
 	}
 	--- Tells the user how a model removal ended: it runs after the page acted.
@@ -756,7 +756,7 @@ local function _build_llm(ctx)
 			return false
 		end
 		local confirmed = ask_yes_no(i18n_safe("menu.llm.delete_model_title"),
-			zenity_plain(string.format(i18n_safe("menu.llm.delete_model_body"), model)),
+			plain_markup(string.format(i18n_safe("menu.llm.delete_model_body"), model)),
 			i18n_safe("button.delete"), i18n_safe("button.cancel"))
 		if confirmed ~= true then return false end
 		return llm.delete_model(model, function(succeeded, tag, reason)

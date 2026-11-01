@@ -1152,7 +1152,7 @@
 	"linux_shell.uninstall.invalid_path": "Ugyldig ejerskabssti.",
 	"linux_shell.uninstall.manifest_missing": "Installationens ejerskabsmanifest mangler.",
 	"linux_shell.uninstall.missing_prefix_value": "Værdi for --prefix mangler.",
-	"linux_shell.uninstall.no_dialog_tool": "Intet dialogværktøj (zenity, kdialog) eller notify-send er tilgængeligt.",
+	"linux_shell.uninstall.no_dialog_tool": "Intet dialogværktøj eller notify-send er tilgængeligt.",
 	"linux_shell.uninstall.no_package_owner": "Systeminstallationen har ingen bekræftet pakkeejer.",
 	"linux_shell.uninstall.notification_failed": "Meddelelsen om den mislykkede afinstallation kunne ikke vises.",
 	"linux_shell.uninstall.owned_file_replaced": "En ejet fil blev erstattet af et link eller en anden filtype.",

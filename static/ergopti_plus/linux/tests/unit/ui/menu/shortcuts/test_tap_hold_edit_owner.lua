@@ -41,7 +41,7 @@ local function with_editor(body, options)
 			assert(opts.presentation_id == "tap_hold_action"); s.confirm = confirm; return true
 		end }
 		os.execute = function(command)
-			if command:find("zenity --error", 1, true) then s.notices = s.notices + 1; return 1 end
+			if command:find("dialog_host.lua' --error", 1, true) then s.notices = s.notices + 1; return 1 end
 			return execute(command)
 		end
 		local I18n = require("infra.i18n"); I18n.init()

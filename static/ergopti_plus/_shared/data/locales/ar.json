@@ -1152,7 +1152,7 @@
 	"linux_shell.uninstall.invalid_path": "مسار ملكية غير صالح.",
 	"linux_shell.uninstall.manifest_missing": "بيان ملكية التثبيت مفقود.",
 	"linux_shell.uninstall.missing_prefix_value": "قيمة --prefix مفقودة.",
-	"linux_shell.uninstall.no_dialog_tool": "لا تتوفر أداة حوار (zenity أو kdialog) ولا notify-send.",
+	"linux_shell.uninstall.no_dialog_tool": "لا تتوفر أداة حوار ولا notify-send.",
 	"linux_shell.uninstall.no_package_owner": "لا يوجد لتثبيت النظام مالك حزمة موثَّق.",
 	"linux_shell.uninstall.notification_failed": "تعذّر عرض إشعار فشل إلغاء التثبيت.",
 	"linux_shell.uninstall.owned_file_replaced": "استُبدل ملف مملوك برابط أو بنوع ملف آخر.",

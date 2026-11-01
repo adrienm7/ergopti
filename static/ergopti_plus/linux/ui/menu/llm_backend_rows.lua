@@ -12,7 +12,7 @@
 --- FEATURES & RATIONALE:
 --- 1. The tray builds no list (maintainer, 2026-10-27): the page offers the
 ---    entries, the providers and the local servers, and runs these actions.
---- 2. Adding an API asks for the key in a hidden zenity entry, stores it in the
+--- 2. Adding an API asks for the key in a hidden native entry, stores it in the
 ---    private entries file, selects it, then tests it at once so a wrong key is
 ---    reported while the user is still looking, with the provider's own reason.
 --- 3. Dialogs are handed in by the menu builder, so this module never opens a

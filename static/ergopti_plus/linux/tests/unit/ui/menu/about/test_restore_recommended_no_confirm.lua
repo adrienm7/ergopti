@@ -28,7 +28,7 @@ local function with_zenity_answering_no(body)
 	local previous_modal = package.loaded["ui.modal"]
 	package.loaded["ui.modal"] = { run = function(callback) return callback() end }
 	os.execute = function(command)
-		if command:find("zenity", 1, true) then
+		if command:find("dialog_host.lua", 1, true) then
 			asked[#asked + 1] = command
 			return 1
 		end

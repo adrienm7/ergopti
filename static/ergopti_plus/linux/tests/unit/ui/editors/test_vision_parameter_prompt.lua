@@ -73,14 +73,10 @@ helpers.describe("screen action vision parameter (linux-vision-choice-list)", fu
 	end)
 
 	helpers.it("(linux-vision-choice-list) the native list holds one row per backend, the value hidden", function()
-		local Shell = require("adapters.shell_runner")
-		local held = Shell.has_command
-		Shell.has_command = function(name) return name == "zenity" end
 		local ChoicePrompt = helpers.load_module("ui.choice_prompt")
 		local ok, command = pcall(ChoicePrompt.command, "Title", "Vision provider", choices())
-		Shell.has_command = held
 		helpers.assert_true(ok, tostring(command))
-		helpers.assert_contains(command, "zenity --list --no-markup")
+		helpers.assert_contains(command, require("ui.native_dialog").command() .. " --list --no-markup")
 		helpers.assert_contains(command, "--hide-column=1 --print-column=1")
 		helpers.assert_contains(command, "'openai' 'OpenAI'")
 		helpers.assert_contains(command, "'custom' 'Custom'")

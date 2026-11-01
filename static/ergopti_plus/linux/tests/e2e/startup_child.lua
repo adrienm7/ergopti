@@ -116,11 +116,10 @@ io.open = function(path, mode)
 	return real_open(path, mode)
 end
 
--- User-visible error dialogs: zenity/kdialog errors, and notifications raised
+-- User-visible error dialogs: the owned dialog's errors, and notifications raised
 -- at the error level.
 local function watch_command(command)
-	if type(command) == "string" and (command:find("zenity%s+%-%-error") or command:find("kdialog%s+%-%-error")
-		or command:find("kdialog%s+%-%-sorry")) then
+	if type(command) == "string" and command:find("dialog_host%.lua'%s+%-%-error") then
 		record("DIALOG", command:sub(1, 200))
 	end
 end

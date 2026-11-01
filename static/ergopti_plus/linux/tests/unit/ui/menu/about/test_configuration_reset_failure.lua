@@ -24,7 +24,7 @@ local function with_zenity(body)
 	local previous_modal = package.loaded["ui.modal"]
 	package.loaded["ui.modal"] = { run = function(callback) return callback() end }
 	os.execute = function(command)
-		if command:find("zenity", 1, true) then
+		if command:find("dialog_host.lua", 1, true) then
 			shown[#shown + 1] = command
 			return 0
 		end
@@ -102,7 +102,7 @@ helpers.describe("Configuration restore and clear failure reason (Linux)", funct
 					failed = case.failed, reverted = case.reverted, detail = "refused" }
 				local shown = click(row_key, false, report)
 				helpers.assert_eq(#shown, 1, "one error dialog")
-				helpers.assert_true(shown[1]:find("zenity --error", 1, true) == 1, shown[1])
+				helpers.assert_true(shown[1]:find("dialog_host.lua' --error", 1, true) ~= nil, shown[1])
 				local title, message = ResetFailure.message(report, i18n.get)
 				helpers.assert_eq(zenity_text(shown[1]), message)
 				helpers.assert_true(shown[1]:find(title, 1, true) ~= nil, "the reset failure title")

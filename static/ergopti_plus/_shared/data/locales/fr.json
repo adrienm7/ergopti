@@ -1147,7 +1147,7 @@
 	"linux_shell.uninstall.invalid_path": "Chemin de propriété invalide.",
 	"linux_shell.uninstall.manifest_missing": "Le manifeste de propriété de l’installation est manquant.",
 	"linux_shell.uninstall.missing_prefix_value": "Valeur de --prefix manquante.",
-	"linux_shell.uninstall.no_dialog_tool": "Aucun outil de dialogue (zenity, kdialog) ni notify-send n’est disponible.",
+	"linux_shell.uninstall.no_dialog_tool": "Aucun outil de dialogue ni notify-send n’est disponible.",
 	"linux_shell.uninstall.no_package_owner": "L’installation système n’a pas de paquet propriétaire vérifié.",
 	"linux_shell.uninstall.notification_failed": "La notification d’échec de la désinstallation n’a pas pu être affichée.",
 	"linux_shell.uninstall.owned_file_replaced": "Un fichier possédé a été remplacé par un lien ou un autre type de fichier.",

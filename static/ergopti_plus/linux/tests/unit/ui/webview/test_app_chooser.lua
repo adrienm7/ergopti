@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Application chooser for open_app (Linux)
 --- DESCRIPTION:
---- The dialog an open_app binding is configured with: zenity (or kdialog) over
---- the system's desktop entries, answered with the desktop-file id gtk-launch
+--- The dialog an open_app binding is configured with: Ergopti's own file dialog
+--- over the system's desktop entries, answered with the desktop-file id gtk-launch
 --- takes, and nothing when the user cancels or picks something else.
 ---
 --- ROOT CAUSE ENCODED:
@@ -16,13 +16,11 @@
 local helpers = require("tests.helpers")
 
 --- A shell double that acknowledges only a supplied answer and records commands.
---- @param tools table binary -> boolean
 --- @param answer string|nil What the dialog prints.
 --- @return table shell, table commands
-local function fake_shell(tools, answer)
+local function fake_shell(answer)
 	local commands = {}
 	local shell = {
-		has_command = function(binary) return tools[binary] == true end,
 		quote = function(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end,
 		exec_checked = function(command)
 			commands[#commands + 1] = command
@@ -35,32 +33,21 @@ end
 helpers.describe("open_app application chooser (Linux)", function()
 	local Chooser = helpers.load_module("ui.app_chooser")
 
-	helpers.it("zenity lists the desktop entries and the choice becomes its desktop id", function()
-		local shell, commands = fake_shell({ zenity = true }, "/usr/share/applications/org.gnome.Nautilus.desktop")
+	helpers.it("the owned dialog lists the desktop entries and the choice becomes its desktop id", function()
+		local shell, commands = fake_shell("/usr/share/applications/org.gnome.Nautilus.desktop")
 		local id, err = Chooser.pick(shell, "Open an application")
 		helpers.assert_eq(err, nil)
 		helpers.assert_eq(id, "org.gnome.Nautilus")
-		helpers.assert_eq(commands[1], "zenity --file-selection --title='ErgoptiPlus — Open an application'"
+		helpers.assert_eq(commands[1], require("ui.native_dialog").command()
+			.. " --file-selection --title='ErgoptiPlus — Open an application'"
 			.. " --filename='/usr/share/applications/' --file-filter='*.desktop' 2>/dev/null")
 	end)
 
-	helpers.it("kdialog is the fallback", function()
-		local shell, commands = fake_shell({ kdialog = true }, "/usr/share/applications/firefox.desktop")
-		helpers.assert_eq((Chooser.pick(shell, "T")), "firefox")
-		helpers.assert_eq(commands[1], "kdialog --getopenfilename '/usr/share/applications/' '*.desktop'"
-			.. " --title 'ErgoptiPlus — T' 2>/dev/null")
-	end)
-
-	helpers.it("a cancelled dialog, another file or no dialog tool chooses nothing", function()
-		local shell = fake_shell({ zenity = true }, nil)
+	helpers.it("a cancelled dialog or another file chooses nothing", function()
+		local shell = fake_shell(nil)
 		helpers.assert_eq((Chooser.pick(shell, "T")), nil)
-		shell = fake_shell({ zenity = true }, "/home/ana/notes.txt")
+		shell = fake_shell("/home/ana/notes.txt")
 		helpers.assert_eq((Chooser.pick(shell, "T")), nil)
-		local none, commands = fake_shell({}, "/usr/share/applications/firefox.desktop")
-		local id, err = Chooser.pick(none, "T")
-		helpers.assert_eq(id, nil)
-		helpers.assert_true(type(err) == "string" and err ~= "", "no dialog tool is named as the reason")
-		helpers.assert_eq(#commands, 0)
 	end)
 
 	helpers.it("desktop_id strips only a real .desktop suffix", function()
@@ -114,7 +101,7 @@ helpers.describe("application chooser preserves installed desktop ids", function
 				local expected = row[5] ~= false and row[5] or nil
 				local Chooser = require("ui.app_chooser")
 				helpers.assert_eq(Chooser.desktop_id(row[4]), expected)
-				local shell = fake_shell({ zenity = true }, row[4] .. "\n")
+				local shell = fake_shell(row[4] .. "\n")
 				local selected, reason = Chooser.pick(shell, "Applications")
 				helpers.assert_eq(selected, expected)
 				if expected == nil then helpers.assert_true(type(reason) == "string" and reason ~= "") end
@@ -125,16 +112,15 @@ end)
 
 
 --- Exercises a real dialog child and shell status without requiring a desktop prompt.
---- @param tool string Selected native dialog tool.
 --- @param status number Actual child exit status.
 --- @param output string Actual child stdout.
 --- @return string receipt
-local function native_dialog_receipt(tool, status, output)
+local function native_dialog_receipt(status, output)
 	local Shell = require("adapters.shell_runner")
 	local made, directory = Shell.exec_checked("mktemp -d")
 	assert(made)
 	directory = directory:gsub("[\r\n]+$", "")
-	local executable, worker = directory .. "/" .. tool, directory .. "/worker.lua"
+	local executable, worker = directory .. "/dialog", directory .. "/worker.lua"
 	local function write(path, content)
 		local file = assert(io.open(path, "wb"))
 		assert(file:write(content) and file:close())
@@ -146,8 +132,9 @@ local function native_dialog_receipt(tool, status, output)
 			.. "package.loaded['logger.shim']={error=function()end,warn=function()end,debug=function()end}\n"
 			.. "local calls=0;package.loaded['ui.modal']={run=function(fn)calls=calls+1;return fn()end}\n"
 			.. "local S=require('adapters.shell_runner')\n"
-			.. "local shell={quote=S.quote,exec_line=S.exec_line,exec_checked=S.exec_checked,"
-			.. "has_command=function(name)return name==" .. string.format("%q", tool) .. "end}\n"
+			.. "local shell={quote=S.quote,exec_line=S.exec_line,exec_checked=S.exec_checked}\n"
+			-- The private executable stands in for the owned dialog host.
+			.. "package.loaded['ui.native_dialog']={command=function()return S.quote(" .. string.format("%q", executable) .. ")end}\n"
 			.. "local id=require('ui.app_chooser').pick(shell,'Applications')\n"
 			.. "io.write(id==nil and 'refused' or 'accepted|'..id);io.write('|modal:'..calls)\n")
 		local executed, result, reason = Shell.exec_checked("env PATH="
@@ -164,23 +151,23 @@ local function native_dialog_receipt(tool, status, output)
 end
 
 helpers.describe("application chooser requires native confirmation", function()
-	for _, tool in ipairs({ "zenity", "kdialog" }) do
+	do local tool = "owned dialog"
 		for _, status in ipairs({ 1, 7 }) do
 			helpers.it("(linux-app-chooser-status) " .. tool .. " exit " .. status .. " rejects partial selection", function()
-				helpers.assert_eq(native_dialog_receipt(tool, status, "/usr/share/applications/firefox.desktop\n"),
+				helpers.assert_eq(native_dialog_receipt(status, "/usr/share/applications/firefox.desktop\n"),
 					"refused|modal:1")
 			end)
 		end
 		helpers.it("(linux-app-chooser-status) " .. tool .. " successful choice preserves the exact native id", function()
-			helpers.assert_eq(native_dialog_receipt(tool, 0, "/usr/share/applications/org.gnome.Nautilus.desktop\n"),
+			helpers.assert_eq(native_dialog_receipt(0, "/usr/share/applications/org.gnome.Nautilus.desktop\n"),
 				"accepted|org.gnome.Nautilus|modal:1")
 		end)
 		helpers.it("(linux-app-chooser-status) " .. tool .. " refuses a line break inside the full record", function()
-			helpers.assert_eq(native_dialog_receipt(tool, 0, "/usr/share/applications/org.gnome.Nautilus.desktop\nignored\n"),
+			helpers.assert_eq(native_dialog_receipt(0, "/usr/share/applications/org.gnome.Nautilus.desktop\nignored\n"),
 				"refused|modal:1")
 		end)
 		helpers.it("(linux-app-chooser-status) " .. tool .. " confirmed empty output is not an application", function()
-			helpers.assert_eq(native_dialog_receipt(tool, 0, ""), "refused|modal:1")
+			helpers.assert_eq(native_dialog_receipt(0, ""), "refused|modal:1")
 		end)
 	end
 end)
