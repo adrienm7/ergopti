@@ -669,7 +669,7 @@ def compile_native_parts(repository, owner, lua_build_work, deadline, *, daemon_
             )
             backend.run_phase(
                 "production_" + role + "_architectures",
-                ["/usr/bin/lipo", "-verify_arch", "arm64", "x86_64", str(output)],
+                architecture_check_command(output),
                 work,
                 owner,
                 deadline,
@@ -687,6 +687,15 @@ def compile_native_parts(repository, owner, lua_build_work, deadline, *, daemon_
         finally:
             for held in sources:
                 held.close()
+
+
+def architecture_check_command(path):
+    """Return the lipo command that requires both slices in one universal output.
+
+    lipo takes its input first: -verify_arch reads every following operand as
+    an architecture, so a trailing path is refused (run 41266118563).
+    """
+    return ["/usr/bin/lipo", str(path), "-verify_arch", *ARCHITECTURES]
 
 
 # The module map is written through the admitted output modes; its private
