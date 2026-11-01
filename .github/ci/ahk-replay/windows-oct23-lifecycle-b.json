@@ -30,7 +30,7 @@
 			"expected_count": 2
 		},
 		{
-			"contains": "keylogger-fire-publication-owner",
+			"contains": "keystats-fire-publication-owner",
 			"expected_count": 3
 		}
 	]

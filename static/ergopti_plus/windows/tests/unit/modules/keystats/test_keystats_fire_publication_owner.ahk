@@ -1,4 +1,4 @@
-﻿; tests/unit/modules/keylogger/test_keylogger_fire_publication_owner.ahk
+﻿; tests/unit/modules/keystats/test_keystats_fire_publication_owner.ahk
 
 ; ==============================================================================
 ; MODULE: Deferred Fire Publication Lifecycle Tests
@@ -63,7 +63,7 @@ _KFPO_ChildSource() {
 	AssertTrue(RegExMatch(FileRead(GateOwner, "UTF-8"), "ms)^class KLCollection \{.*?^\}", &GateClass) > 0,
 		"The child must use the actual capture gate class KLCollection")
 	Source .= GateClass[0] . "`n" . _DriverFuncBody("KL_CaptureHeld") . "`n"
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\keylogger_fire_publication_owner_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\keystats_fire_publication_owner_body.ahk`n"
 }
 
 _KFPO_Complete(State, Code, Output, ErrorText) {
@@ -128,11 +128,11 @@ _KFPO_Case(Mode) {
 	AssertEqual(1, AtDeadline.Calls)
 	AssertEqual("", AtDeadline.ErrorText, AtDeadline.Output)
 	AssertEqual(0, AtDeadline.Code, AtDeadline.Output)
-	AssertContains(AtDeadline.Output, "PASS keylogger-fire-owner " . Mode)
+	AssertContains(AtDeadline.Output, "PASS keystats-fire-owner " . Mode)
 	if IsObject(ExportFailure)
 		throw ExportFailure
 }
 
 for _KFPO_Mode in ["current", "paused", "resumed"]
-	Test("Keylogger fire publication: " . _KFPO_Mode . " retains its lifecycle owner (keylogger-fire-publication-owner)",
+	Test("Keystats fire publication: " . _KFPO_Mode . " retains its lifecycle owner (keystats-fire-publication-owner)",
 		_KFPO_Case.Bind(_KFPO_Mode))
