@@ -162,7 +162,9 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "clear_clipboard" })
 	Items.Push({ Kind: "action", Id: "center_mouse" })
 	Items.Push({ Kind: "action", Id: "open_app" })
+	Items.Push({ Kind: "action", Id: "open_path" })
 	Items.Push({ Kind: "action", Id: "run_program" })
+	Items.Push({ Kind: "action", Id: "run_command" })
 	Items.Push({ Kind: "action", Id: "quit_frontmost_app" })
 	Items.Push({ Kind: "action", Id: "force_quit_frontmost" })
 	Items.Push({ Kind: "action", Id: "empty_trash" })
@@ -328,6 +330,7 @@ GestureActionCatalogueData() {
 	Actions["open_metrics_apps"] := { Family: "sg", LabelKey: "sg_actions.open_metrics_apps", Parameter: "", Confirm: false }
 	Actions["open_metrics_typing"] := { Family: "sg", LabelKey: "sg_actions.open_metrics_typing", Parameter: "", Confirm: false }
 	Actions["open_model_browser"] := { Family: "sg", LabelKey: "sg_actions.open_model_browser", Parameter: "", Confirm: false }
+	Actions["open_path"] := { Family: "sg", LabelKey: "sg_actions.open_path", Parameter: "path", Confirm: false }
 	Actions["open_paths_editor"] := { Family: "sg", LabelKey: "sg_actions.open_paths_editor", Parameter: "", Confirm: false }
 	Actions["open_personal_hotstrings"] := { Family: "sg", LabelKey: "sg_actions.open_personal_hotstrings", Parameter: "", Confirm: false }
 	Actions["open_personal_info"] := { Family: "sg", LabelKey: "sg_actions.open_personal_info", Parameter: "", Confirm: false }
@@ -346,6 +349,7 @@ GestureActionCatalogueData() {
 	Actions["quit_frontmost_app"] := { Family: "sg", LabelKey: "sg_actions.quit_frontmost_app", Parameter: "", Confirm: false }
 	Actions["redo"] := { Family: "sg", LabelKey: "sg_actions.redo", Parameter: "", Confirm: false }
 	Actions["right_click_toggle"] := { Family: "sg", LabelKey: "sg_actions.right_click_toggle", Parameter: "", Confirm: false }
+	Actions["run_command"] := { Family: "sg", LabelKey: "sg_actions.run_command", Parameter: "command", Confirm: false }
 	Actions["run_program"] := { Family: "sg", LabelKey: "sg_actions.run_program", Parameter: "program", Confirm: false }
 	Actions["screen_capture"] := { Family: "sg", LabelKey: "sg_actions.screen_capture", Parameter: "", Confirm: false }
 	Actions["screen_capture_instant"] := { Family: "sg", LabelKey: "sg_actions.screen_capture_instant", Parameter: "", Confirm: false }

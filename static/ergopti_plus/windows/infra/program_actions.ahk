@@ -263,6 +263,8 @@ ProgramActions_Stop(Pause := false) {
 	_UserProgramGeneration += 1
 	_UserProgramPaused := Pause == true
 	Receipt := !IsObject(_UserProgramAcquiring)
+	if IsSet(UserActions_StopCommands) && !UserActions_StopCommands()
+		Receipt := false
 	for _, Entry in _UserProgramEntries.Clone()
 		if !_ProgramActions_Retire(Entry)
 			Receipt := false

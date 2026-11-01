@@ -975,21 +975,17 @@ parameter = "program"
 # Terminal, Linux the session's terminal). Bounded by
 # [gestures] run_command_timeout_ms and [limits] run_command_output_bytes. The
 # command text is user configuration and never logged (see README, security).
-# Windows is pending: docs/tooling/windows-pc-agent-handoff.md.
-platform = "hs,linux"
+# Windows runs it through cmd.exe /d /s /c, or a new console (windows/infra/user_actions.ahk).
+platform = "all"
 parameter = "command"
-reason_ahk = "platform_reason.action_windows_runs_shell_through_run_program"
-equivalent_ahk = ["run_program"]
 
 [sg_actions.open_path]
 # A file or folder opened with its default application (macOS `open`, Linux
-# xdg-open, else gio open), chosen in the native file/folder picker. A path
-# that no longer exists is refused with a named notice. Windows is pending:
-# docs/tooling/windows-pc-agent-handoff.md.
-platform = "hs,linux"
+# xdg-open, else gio open; Windows ShellExecute), chosen in the native file/folder picker. A path
+# that no longer exists is refused with a named notice. Windows opens it through
+# ShellExecute and spells it with a drive letter or a UNC share.
+platform = "all"
 parameter = "path"
-reason_ahk = "platform_reason.action_windows_runs_shell_through_run_program"
-equivalent_ahk = ["run_program"]
 
 [sg_actions.run_apple_shortcut]
 # One shortcut of the user's Shortcuts library, picked from `shortcuts list`
