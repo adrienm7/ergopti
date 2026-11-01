@@ -17,6 +17,7 @@
 
 local VALUES = {
 	process_output_bytes = 65536,
+	proc_cmdline_bytes = 65536,
 	declaration_file_bytes = 65536,
 	changelog_source_bytes = 4194304,
 	journal_recovery_turn_bytes = 65536,

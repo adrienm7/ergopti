@@ -43,7 +43,7 @@ local LOG = "llm.local_server_ports"
 -- A settings file larger than this is not a server's port setting
 local MAX_SETTINGS_BYTES = 1048576
 -- Bytes of a command line read: ports and names sit well inside this
-local MAX_CMDLINE_BYTES = 65536
+local MAX_CMDLINE_BYTES = Timings.count("limits", "proc_cmdline_bytes")
 -- Pids read per slice before the walk yields to the loop
 local PIDS_PER_SLICE = 128
 
