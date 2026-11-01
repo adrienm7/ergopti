@@ -246,8 +246,9 @@ class UbuntuArchiveControls(unittest.TestCase):
     def test_actual_source_bytes_and_package_selection_survive_both_scoped_operations(self):
         calls, roots = [], []
 
-        def execute(argv, *, check):
+        def execute(argv, *, check, timeout):
             self.assertTrue(check)
+            self.assertEqual(timeout, owner.APT_COMMAND_TIMEOUT_SECONDS)
             source = next(
                 value.split("=", 1)[1]
                 for value in argv
@@ -324,7 +325,7 @@ class UbuntuArchiveControls(unittest.TestCase):
         calls, roots = [], []
         failure = subprocess.CalledProcessError(100, ["apt-get", "update"])
 
-        def execute(argv, *, check):
+        def execute(argv, *, check, timeout):
             calls.append(argv)
             source = next(
                 value.split("=", 1)[1]
@@ -344,7 +345,7 @@ class UbuntuArchiveControls(unittest.TestCase):
         calls = []
         failure = subprocess.CalledProcessError(101, ["apt-get", "install"])
 
-        def execute(argv, *, check):
+        def execute(argv, *, check, timeout):
             calls.append(argv)
             if "install" in argv:
                 raise failure
@@ -400,7 +401,7 @@ class PinnedUbuntuAuthorityControls(unittest.TestCase):
         )
         calls, roots = [], []
 
-        def execute(argv, *, check):
+        def execute(argv, *, check, timeout):
             self.assertTrue(check)
             source = next(
                 value.split("=", 1)[1]
@@ -722,7 +723,7 @@ class ActiveOriginAndCleanupControls(unittest.TestCase):
         self.assertEqual([role for role, _ in model.opens], ["source"])
         calls, roots = [], []
 
-        def execute(argv, *, check):
+        def execute(argv, *, check, timeout):
             self.assertTrue(check)
             source = next(
                 value.split("=", 1)[1]
@@ -786,7 +787,7 @@ class ActiveOriginAndCleanupControls(unittest.TestCase):
             def write(self, text):
                 raise report_error
 
-        def execute(argv, *, check):
+        def execute(argv, *, check, timeout):
             self.assertTrue(check)
             raise primary
 
@@ -1011,7 +1012,7 @@ class ArchiveCacheControls(unittest.TestCase):
                     target.write_bytes(raw)
             seen = {}
 
-            def execute(argv, *, check):
+            def execute(argv, *, check, timeout):
                 if "install" in argv:
                     archives = (
                         Path(next(v.split("=", 1)[1] for v in argv if v.startswith("Dir::Cache=")))
@@ -1023,6 +1024,7 @@ class ArchiveCacheControls(unittest.TestCase):
                             (archives / name).write_bytes(self.GOOD)
 
             def capture(argv, **kwargs):
+                self.assertEqual(kwargs["timeout"], owner.APT_COMMAND_TIMEOUT_SECONDS)
                 if argv[0] == "/usr/bin/apt-cache":
                     selectors = argv[argv.index("show") + 1 :]
                     seen["selectors"] = selectors
