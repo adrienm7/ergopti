@@ -152,20 +152,29 @@ for (const kind of ['command', 'path', 'apple_shortcut'])
 // Each Lua suite replays the corpus, and each replay is wired into its runner.
 const CONSUMERS = {
 	hs: 'macos/tests/unit/modules/gestures/actions/test_user_actions.lua',
-	linux: 'linux/tests/unit/modules/gestures/actions/test_user_actions.lua'
+	linux: 'linux/tests/unit/modules/gestures/actions/test_user_actions.lua',
+	ahk: 'windows/tests/unit/modules/gestures/test_user_actions.ahk'
 };
-for (const file of Object.values(CONSUMERS)) {
+for (const [platform, file] of Object.entries(CONSUMERS)) {
 	const abs = path.join(SP, file);
 	const source = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '';
+	const corpusPath =
+		platform === 'ahk'
+			? 'tests\\corpus\\action_parameters\\user_action_vectors.json'
+			: 'tests/corpus/action_parameters/user_action_vectors.json';
+	check(source.includes(corpusPath), `${file} must read the shared user-action corpus`);
 	check(
-		source.includes('tests/corpus/action_parameters/user_action_vectors.json'),
-		`${file} must read the shared user-action corpus`
-	);
-	check(
-		source.includes('validate_action_parameter'),
+		source.includes(
+			platform === 'ahk' ? 'GestureValidateActionParameter' : 'validate_action_parameter'
+		),
 		`${file} must replay it through the gesture validator`
 	);
 }
+const ahkRunner = fs.readFileSync(path.join(SP, 'windows', 'tests', 'run_all.ahk'), 'utf8');
+check(
+	ahkRunner.includes('unit/modules/gestures/test_user_actions.ahk'),
+	'the AHK runner must include test_user_actions.ahk'
+);
 const linuxManifest = fs.readFileSync(path.join(SP, 'linux', 'tests', 'test_manifest.lua'), 'utf8');
 check(
 	linuxManifest.includes('"tests.unit.modules.gestures.actions.test_user_actions"'),
