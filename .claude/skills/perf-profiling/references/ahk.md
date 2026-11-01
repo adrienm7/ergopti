@@ -14,9 +14,10 @@ map before interpreting missing lines or comparing counts. The log population
 is censored at each segment's threshold, so it cannot provide an all-keystroke
 median or p99 without a denominator.
 
-Nested lines can describe the same stall. Current lines may include
-`[excl X ms, nested Y ms]`; use that attribution and never sum a parent with its
-contained segments. Exclude the errors-only mirror when aggregating the main
+A slow line is judged on own time: `X ms own, Y ms total, parent P`. Sum own
+time, never totals: a parent's total contains its children. A slow child no
+longer makes a line for its parent, and repeats within ten seconds are counted
+in the next line's "similar" figure, not printed. Exclude the errors-only mirror when aggregating the main
 log, or warnings are counted twice.
 
 `static/ergopti_plus/windows/infra/boot_profiler.ahk` measures startup with

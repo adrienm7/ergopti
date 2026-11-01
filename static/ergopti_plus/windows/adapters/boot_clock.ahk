@@ -37,8 +37,12 @@ BootClockCpuMs() {
 
 /** Returns the raw performance-counter ticks; 0 when the OS refuses. */
 PerfClockTicks() {
+	; Resolved once: this runs twice per hot-path segment, and DllCall searches the
+	; loaded system libraries for a name on every call.
+	static Address := DllCall("GetProcAddress", "Ptr",
+		DllCall("GetModuleHandle", "Str", "kernel32", "Ptr"), "AStr", "QueryPerformanceCounter", "Ptr")
 	Counter := 0
-	DllCall("QueryPerformanceCounter", "Int64*", &Counter)
+	DllCall(Address, "Int64*", &Counter)
 	return Counter
 }
 
