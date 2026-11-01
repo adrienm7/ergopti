@@ -1,0 +1,15 @@
+2026-11-01 22:10:34:828 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-01 22:11:56:839 [INFO] [karabiner.lease] Stopping Karabiner lease b268f3d7ea21474f9a37b40cdd438be6 (watcher).
+2026-11-01 22:11:57:346 [DEBUG] [karabiner] ↑ "Retaining %s Karabiner regeneration behind a fresh native guardian proof." repeated 1 more time between 2026-11-01 22:10:35:777 and 2026-11-01 22:10:35:777 (last: Retaining public Karabiner regeneration behind a fresh native guardian proof.).
+2026-11-01 22:11:57:372 [INFO] [karabiner.lease] Karabiner lease watchdog b268f3d7ea21474f9a37b40cdd438be6 stopped (exit 0); STOPPED acknowledged.
+2026-11-01 22:11:59:055 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-01 22:11:59:057 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-01 22:11:59:104 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-11-01 22:11:58:673 and 2026-11-01 22:11:58:963 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-11-01 22:11:59:356 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-01 22:11:59:356 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-11-01 22:11:59:416 [INFO] [karabiner.lease] Remap guardian registration answered 'ready' (developer_adhoc_legacy_only).
+2026-11-01 22:11:59:428 [INFO] [karabiner.lease] Lease token decision=fresh reason=first-generation unaccounted_writers=0 ledger_size=498
+2026-11-01 22:11:59:428 [DEBUG] [karabiner.lease] Prepared Karabiner lease generation d5ef6e8541f64e90af4eb3d007f27773.
+2026-11-01 22:11:59:744 [START] [karabiner.lease] Starting Karabiner lease watchdog d5ef6e8541f64e90af4eb3d007f27773…
+2026-11-01 22:11:59:747 [SUCCESS] [karabiner.lease] Karabiner lease watchdog d5ef6e8541f64e90af4eb3d007f27773 launched; awaiting READY.
+2026-11-01 22:12:00:065 [INFO] [karabiner.lease] Karabiner lease d5ef6e8541f64e90af4eb3d007f27773 activated paused by watchdog READY.

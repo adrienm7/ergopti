@@ -1,0 +1,81 @@
+2026-11-01 22:11:57:328 [DEBUG] [menu_llm.mlx] MLX shutdown: no server owned this session; listener proof skipped.
+2026-11-01 22:11:57:328 [INFO] [menu_llm.models] MLX server stopped safely.
+2026-11-01 22:11:57:328 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-11-01 22:11:57:329 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 6).
+2026-11-01 22:11:57:329 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 7, in-flight warmup invalidated.
+2026-11-01 22:11:57:351 [DEBUG] [menu_llm] Helper sweep 'expander' dispatched.
+2026-11-01 22:11:57:360 [DEBUG] [menu_llm] ↑ "Invalidated LLM health status." repeated 1 more time between 2026-11-01 22:11:57:348 and 2026-11-01 22:11:57:348.
+2026-11-01 22:11:57:360 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 1 more time between 2026-11-01 22:11:57:349 and 2026-11-01 22:11:57:349 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 8).).
+2026-11-01 22:11:57:360 [DEBUG] [llm.api_ollama] ↑ "stop_warmup() — gen bumped to %d, in-flight warmup invalidated." repeated 1 more time between 2026-11-01 22:11:57:349 and 2026-11-01 22:11:57:349 (last: stop_warmup() — gen bumped to 9, in-flight warmup invalidated.).
+2026-11-01 22:11:57:360 [DEBUG] [menu_llm] ↑ "Helper sweep '%s' dispatched." repeated 1 more time between 2026-11-01 22:11:57:354 and 2026-11-01 22:11:57:354 (last: Helper sweep 'http-server' dispatched.).
+2026-11-01 22:11:59:072 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-11-01 22:11:59:072 [DEBUG] [llm.core] Backend: mlx.
+2026-11-01 22:11:59:102 [DEBUG] [keymap.llm_bridge] Star preview: on.
+2026-11-01 22:11:59:103 [DEBUG] [keymap.llm_bridge] Autocorrect preview: on.
+2026-11-01 22:11:59:103 [DEBUG] [keymap.llm_bridge] Colored tooltips: on.
+2026-11-01 22:11:59:103 [DEBUG] [llm.core] User profiles: 0 custom profile(s).
+2026-11-01 22:11:59:103 [DEBUG] [llm.core] set_active_profile: runtime LLM disabled — skipping warmup for 'batch_advanced'.
+2026-11-01 22:11:59:103 [DEBUG] [llm.core] Streaming: on.
+2026-11-01 22:11:59:103 [INFO] [llm.prediction_engine] Model set: 'Qwen3.5-2B' (backend: mlx).
+2026-11-01 22:11:59:103 [DEBUG] [llm.core] Runtime LLM gate: disabled.
+2026-11-01 22:11:59:103 [INFO] [llm.prediction_engine] LLM disabled.
+2026-11-01 22:11:59:103 [DEBUG] [llm.prediction_engine] Ollama daemon recovery superseded: prediction runtime disabled.
+2026-11-01 22:11:59:103 [DEBUG] [llm.warmup_controller] Warmup retry chain cancelled (gen bumped to 1).
+2026-11-01 22:11:59:103 [DEBUG] [llm.api_mlx] stop_warmup() — gen bumped to 1, self-retry chain stopped.
+2026-11-01 22:11:59:104 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 4, in-flight warmup invalidated.
+2026-11-01 22:11:59:104 [DEBUG] [llm.api_remote] Remote warmup stopped (generation 1).
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] AI preview: on.
+2026-11-01 22:11:59:104 [DEBUG] [keymap.llm_bridge] LLM chain after hotstring: on.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Auto temperature raise: on.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Inactivity timer delay updated: 0.500s.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Request interval updated: 0.300s.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Backend label: 'MLX 🚀'.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Model display name: 'Qwen3.5-2B'.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Context window: 500 chars.
+2026-11-01 22:11:59:104 [DEBUG] [keymap.llm_bridge] LLM context reset on nav: yes.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Temperature: 0.1.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Max words: 15 (0 = unlimited).
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Min words: 3.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Prediction count: 3.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Sequential mode: off.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Streaming: on.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Streaming multi: on.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Navigation modifiers: [].
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Info bar: visible.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Validation modifiers: [].
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Prediction indent: 0.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Excluded apps: 0 configured.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Application profile overrides: 0 configured.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] URL bar filter: off.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Secure field filter: on.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Instant on word end: on.
+2026-11-01 22:11:59:104 [DEBUG] [llm.agent_runner] System 1: ''.
+2026-11-01 22:11:59:104 [DEBUG] [llm.agent_runner] System 2: ''.
+2026-11-01 22:11:59:104 [DEBUG] [llm.agent_runner] Agent mode: 'off'.
+2026-11-01 22:11:59:104 [DEBUG] [llm.agent_runner] Agent excluded applications: 0.
+2026-11-01 22:11:59:132 [DEBUG] [llm.core] ↑ "Backend: %s." repeated 1 more time between 2026-11-01 22:11:59:103 and 2026-11-01 22:11:59:103 (last: Backend: mlx.).
+2026-11-01 22:11:59:133 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 2 more times between 2026-11-01 22:11:59:103 and 2026-11-01 22:11:59:103 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 3).).
+2026-11-01 22:11:59:156 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-11-01 22:11:59:156 [DEBUG] [llm.core] Backend: mlx.
+2026-11-01 22:11:59:156 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-11-01 22:11:59:206 [DONE] [menu_llm.models] Loaded models catalogue (18 providers) from ~/perso/ergopti/static/ergopti_plus/_shared/modules/llm/models.json.
+2026-11-01 22:11:59:206 [DEBUG] [llm.core] ↑ "Streaming: %s." repeated 1 more time between 2026-11-01 22:11:59:104 and 2026-11-01 22:11:59:104 (last: Streaming: on.).
+2026-11-01 22:11:59:223 [DEBUG] [llm.prediction_engine] Prediction count: 3.
+2026-11-01 22:11:59:223 [DEBUG] [llm.prediction_engine] Max words: 15 (0 = unlimited).
+2026-11-01 22:11:59:223 [DEBUG] [llm.prediction_engine] Min words: 3.
+2026-11-01 22:11:59:223 [DEBUG] [llm.core] Streaming: on.
+2026-11-01 22:11:59:223 [DEBUG] [llm.prediction_engine] Streaming: on.
+2026-11-01 22:11:59:223 [DEBUG] [llm.prediction_engine] Streaming multi: on.
+2026-11-01 22:11:59:223 [DEBUG] [llm.core] User profiles: 0 custom profile(s).
+2026-11-01 22:11:59:223 [DEBUG] [llm.core] set_active_profile: runtime LLM disabled — skipping warmup for 'batch_advanced'.
+2026-11-01 22:11:59:223 [DEBUG] [menu_llm] Resolving model name on startup: 'Qwen3.5-2B' -> 'Qwen3.5-2B-4bit'.
+2026-11-01 22:11:59:224 [DEBUG] [llm.prediction_engine] Model display name: 'Qwen3.5-2B'.
+2026-11-01 22:11:59:224 [DEBUG] [menu_llm] Model power on startup: 2.
+2026-11-01 22:11:59:229 [DEBUG] [llm.local_model_offer] Local model installer registered.
+2026-11-01 22:11:59:231 [DEBUG] [llm.agent_runner] Agent mode persister registered.
+2026-11-01 22:11:59:371 [DEBUG] [llm.api_remote] API entries set (1 entry/entries).
+2026-11-01 22:11:59:371 [DEBUG] [llm.api_remote] Active API entry id: 'local-omlx'.
+2026-11-01 22:11:59:371 [DEBUG] [llm.api_remote] Pre-warmed Keychain token for active API entry 'local-omlx'.
+2026-11-01 22:12:02:670 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-11-01 22:12:02:670 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-11-01 22:12:02:683 [DEBUG] [menu_llm] Building prediction count menu…

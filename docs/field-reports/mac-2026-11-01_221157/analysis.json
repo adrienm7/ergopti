@@ -1,0 +1,995 @@
+{
+ "continuations": 0,
+ "counters": {
+  "counter:runtime.timer_hold_over_1000ms": 1
+ },
+ "error_keys": [
+  "ERROR|keystats.log_manager|Cannot keep the metrics cache before its rebuild: cannot VACUUM - SQL statements in progress.",
+  "WARNING|keystats.log_manager|Slow ingest tick <*> ms (drain=<*> foreign=<*> outbox=<*> read=<*> build=<*> apply=<*> commit=<*> append=<*> notify=<*> ms; append: lock=<*> journal=<*> prepare=<*> publish=<*> write=<*> clear=<*> settle=<*> release=<*> ms; metadata_commands=<*> in <*> ms; entries=<*> statements=<*>).",
+  "WARNING|runtime|An hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB.",
+  "WARNING|keymap.utils|Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> ms).",
+  "WARNING|file_watchers|Git operation in '<*>' still owns the reload fence after <*> checks; reload remains pending.",
+  "WARNING|menu_watchers|Git operation still owns the reload fence after <*> checks on '<*>'; reload remains pending.",
+  "WARNING|menu|Over budget: menu.rebuild took <*> ms (budget <*> ms).",
+  "WARNING|runtime|An hs.timer.new callback (...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: menu.rebuild=<*> ms, menu_item.shortcuts=<*> ms, menu_item.keyboard_layout=<*> ms, menu_keyboard_layout.rows=<*> ms, menu_item.gestures=<*> ms. Lua heap <*>-><*> MB."
+ ],
+ "errors": [
+  {
+   "count": 1,
+   "example": "2026-11-01 22:11:59:811 [ERROR] [keystats.log_manager] Cannot keep the metrics cache before its rebuild: cannot VACUUM - SQL statements in progress.",
+   "first": "2026-11-01 22:11:59:811",
+   "key": "ERROR|keystats.log_manager|Cannot keep the metrics cache before its rebuild: cannot VACUUM - SQL statements in progress.",
+   "last": "2026-11-01 22:11:59:811",
+   "level": "ERROR",
+   "module": "keystats.log_manager",
+   "new": true,
+   "perf": false,
+   "template": "Cannot keep the metrics cache before its rebuild: cannot VACUUM - SQL statements in progress."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-01 20:27:03:569 [WARNING] [keystats.log_manager] Slow ingest tick 1047 ms (drain=0 foreign=0 outbox=83 read=21 build=0 apply=119 commit=24 append=797 notify=0 ms; append: lock=1 journal=19 prepare=0 publish=324 write=16 clear=42 settle=391 release=0 ms; metadata_commands=0 in 0 ms; entries=…",
+   "first": "2026-11-01 20:27:03:569",
+   "key": "WARNING|keystats.log_manager|Slow ingest tick <*> ms (drain=<*> foreign=<*> outbox=<*> read=<*> build=<*> apply=<*> commit=<*> append=<*> notify=<*> ms; append: lock=<*> journal=<*> prepare=<*> publish=<*> write=<*> clear=<*> settle=<*> release=<*> ms; metadata_commands=<*> in <*> ms; entries=<*> statements=<*>).",
+   "last": "2026-11-01 20:27:03:569",
+   "level": "WARNING",
+   "module": "keystats.log_manager",
+   "new": true,
+   "perf": true,
+   "template": "Slow ingest tick <*> ms (drain=<*> foreign=<*> outbox=<*> read=<*> build=<*> apply=<*> commit=<*> append=<*> notify=<*> ms; append: lock=<*> journal=<*> prepare=<*> publish=<*> write=<*> clear=<*> settle=<*> release=<*> ms; metadata_commands=<*> in <*> ms; entries=<*> statements=<*>)."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-01 20:27:03:569 [WARNING] [runtime] An hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:2123) held the main thread for 1047 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 52->53 MB.",
+   "first": "2026-11-01 20:27:03:569",
+   "key": "WARNING|runtime|An hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB.",
+   "last": "2026-11-01 20:27:03:569",
+   "level": "WARNING",
+   "module": "runtime",
+   "new": true,
+   "perf": true,
+   "template": "An hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-01 22:10:33:858 [WARNING] [keymap.utils] Slow ignored-window probe 502 ms (watchers=0 focused_window=502 ms).",
+   "first": "2026-11-01 22:10:33:858",
+   "key": "WARNING|keymap.utils|Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> ms).",
+   "last": "2026-11-01 22:10:33:858",
+   "level": "WARNING",
+   "module": "keymap.utils",
+   "new": false,
+   "perf": false,
+   "template": "Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> ms)."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-01 22:11:53:001 [WARNING] [file_watchers] Git operation in '~/perso/ergopti/static/ergopti_plus/macos/' still owns the reload fence after 120 checks; reload remains pending.",
+   "first": "2026-11-01 22:11:53:001",
+   "key": "WARNING|file_watchers|Git operation in '<*>' still owns the reload fence after <*> checks; reload remains pending.",
+   "last": "2026-11-01 22:11:53:001",
+   "level": "WARNING",
+   "module": "file_watchers",
+   "new": true,
+   "perf": false,
+   "template": "Git operation in '<*>' still owns the reload fence after <*> checks; reload remains pending."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-01 22:11:53:003 [WARNING] [menu_watchers] Git operation still owns the reload fence after 120 checks on '~/perso/ergopti/static/ergopti_plus/macos/'; reload remains pending.",
+   "first": "2026-11-01 22:11:53:003",
+   "key": "WARNING|menu_watchers|Git operation still owns the reload fence after <*> checks on '<*>'; reload remains pending.",
+   "last": "2026-11-01 22:11:53:003",
+   "level": "WARNING",
+   "module": "menu_watchers",
+   "new": true,
+   "perf": false,
+   "template": "Git operation still owns the reload fence after <*> checks on '<*>'; reload remains pending."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-01 22:12:02:774 [WARNING] [menu] Over budget: menu.rebuild took 1371 ms (budget 250 ms).",
+   "first": "2026-11-01 22:12:02:774",
+   "key": "WARNING|menu|Over budget: menu.rebuild took <*> ms (budget <*> ms).",
+   "last": "2026-11-01 22:12:02:774",
+   "level": "WARNING",
+   "module": "menu",
+   "new": false,
+   "perf": true,
+   "template": "Over budget: menu.rebuild took <*> ms (budget <*> ms)."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-01 22:12:02:781 [WARNING] [runtime] An hs.timer.new callback (...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:1801) held the main thread for 1537 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: menu.rebuild=1371.2 ms, menu_i…",
+   "first": "2026-11-01 22:12:02:781",
+   "key": "WARNING|runtime|An hs.timer.new callback (...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: menu.rebuild=<*> ms, menu_item.shortcuts=<*> ms, menu_item.keyboard_layout=<*> ms, menu_keyboard_layout.rows=<*> ms, menu_item.gestures=<*> ms. Lua heap <*>-><*> MB.",
+   "last": "2026-11-01 22:12:02:781",
+   "level": "WARNING",
+   "module": "runtime",
+   "new": true,
+   "perf": true,
+   "template": "An hs.timer.new callback (...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: menu.rebuild=<*> ms, menu_item.shortcuts=<*> ms, menu_item.keyboard_layout=<*> ms, menu_keyboard_layout.rows=<*> ms, menu_item.gestures=<*> ms. Lua heap <*>-><*> MB."
+  }
+ ],
+ "field_checks": {
+  "counts": {
+   "info": 1,
+   "pass": 1
+  },
+  "items": [
+   {
+    "id": "privacy_pane_urls",
+    "source": "privacy_pane_urls",
+    "verdict": "info"
+   },
+   {
+    "id": "system_bash",
+    "source": "system_bash",
+    "verdict": "pass"
+   }
+  ]
+ },
+ "lifecycle": {
+  "reload": {
+   "count": 1,
+   "events": [
+    {
+     "line": "2026-11-01 22:11:56:839 [INFO] [infra.termination_coordinator] Controlled reload requested (reason: watcher).",
+     "time": "2026-11-01 22:11:56:839"
+    }
+   ],
+   "first": "2026-11-01 22:11:56:839",
+   "last": "2026-11-01 22:11:56:839"
+  },
+  "sleep_wake": {
+   "count": 1,
+   "events": [
+    {
+     "line": "2026-11-01 22:10:33:349 [INFO] [gestures] Wake-from-sleep detected (event=0) — recycling watchers",
+     "time": "2026-11-01 22:10:33:349"
+    }
+   ],
+   "first": "2026-11-01 22:10:33:349",
+   "last": "2026-11-01 22:10:33:349"
+  },
+  "start": {
+   "count": 1,
+   "events": [
+    {
+     "line": "===== 2026-11-01 22:11:58:018 — ErgoptiPlus session opened =====",
+     "time": "2026-11-01 22:11:58:018"
+    }
+   ],
+   "first": "2026-11-01 22:11:58:018",
+   "last": "2026-11-01 22:11:58:018"
+  },
+  "stop": {
+   "count": 1,
+   "events": [
+    {
+     "line": "2026-11-01 22:11:57:327 [INFO] [init] Hammerspoon local teardown started (reload).",
+     "time": "2026-11-01 22:11:57:327"
+    }
+   ],
+   "first": "2026-11-01 22:11:57:327",
+   "last": "2026-11-01 22:11:57:327"
+  }
+ },
+ "lines": 994,
+ "logs": [
+  "ErgoptiPlus_2026-11-01.log"
+ ],
+ "performance": [
+  {
+   "budget": {
+    "inclusive": true,
+    "source": "static/ergopti_plus/macos/infra/main_thread_hold.lua",
+    "value": 250.0
+   },
+   "count": 4,
+   "kind": "occurrences",
+   "max": 1537.0,
+   "mean": 844.75,
+   "metric": "main_thread.hold",
+   "over": 4,
+   "p50": 502.0,
+   "p95": 1537.0,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": "...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:1801",
+     "time": "2026-11-01 22:12:02:781",
+     "value": 1537.0
+    },
+    {
+     "context": "...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:2123",
+     "time": "2026-11-01 20:27:03:569",
+     "value": 1047.0
+    },
+    {
+     "context": "...gopti/static/ergopti_plus/macos/modules/keymap/utils.lua:1567",
+     "time": "2026-11-01 22:10:33:858",
+     "value": 502.0
+    },
+    {
+     "context": "...ergopti/static/ergopti_plus/macos/ui/menu/menu_state.lua:541",
+     "time": "2026-11-01 22:12:00:046",
+     "value": 293.0
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 250.0
+   },
+   "count": 1,
+   "kind": "occurrences",
+   "max": 1371.2,
+   "mean": 1371.2,
+   "metric": "menu.rebuild",
+   "over": 1,
+   "p50": 1371.2,
+   "p95": 1371.2,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:12:02:773",
+     "value": 1371.2
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": true,
+    "source": "static/ergopti_plus/macos/modules/keystats/ingest_trace.lua",
+    "value": 500.0
+   },
+   "count": 1,
+   "kind": "occurrences",
+   "max": 1047.0,
+   "mean": 1047.0,
+   "metric": "keystats.ingest",
+   "over": 1,
+   "p50": 1047.0,
+   "p95": 1047.0,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 20:27:03:569",
+     "value": 1047.0
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "stated in the log line",
+    "value": 5.0
+   },
+   "count": 1,
+   "kind": "occurrences",
+   "max": 26.4,
+   "mean": 26.4,
+   "metric": "healthcheck.sync",
+   "over": 1,
+   "p50": 26.4,
+   "p95": 26.4,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:12:00:499",
+     "value": 26.4
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 2500.0
+   },
+   "count": 1,
+   "kind": "occurrences",
+   "max": 1722.0,
+   "mean": 1722.0,
+   "metric": "boot.total",
+   "over": 0,
+   "p50": 1722.0,
+   "p95": 1722.0,
+   "verdict": "within",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:59:263",
+     "value": 1722.0
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 4000.0
+   },
+   "count": 1,
+   "kind": "occurrences",
+   "max": 2423.9999999990687,
+   "mean": 2423.9999999990687,
+   "metric": "reload.request_to_boot",
+   "over": 0,
+   "p50": 2423.9999999990687,
+   "p95": 2423.9999999990687,
+   "verdict": "within",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:56:839",
+     "value": 2423.9999999990687
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 4000.0
+   },
+   "count": 1,
+   "kind": "occurrences",
+   "max": 1944.0,
+   "mean": 1944.0,
+   "metric": "reload.total",
+   "over": 0,
+   "p50": 1944.0,
+   "p95": 1944.0,
+   "verdict": "within",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:59:263",
+     "value": 1944.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 1267.0,
+   "mean": 1267.0,
+   "metric": "boot.cpu",
+   "over": 0,
+   "p50": 1267.0,
+   "p95": 1267.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:59:263",
+     "value": 1267.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 390.0,
+   "mean": 390.0,
+   "metric": "boot.stage:Config-dependent module requires",
+   "over": 0,
+   "p50": 390.0,
+   "p95": 390.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:424",
+     "value": 390.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 207.3,
+   "mean": 207.3,
+   "metric": "boot.stage:Hotstring groups registered (personal + dynamic + common)",
+   "over": 0,
+   "p50": 207.3,
+   "p95": 207.3,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:925",
+     "value": 207.3
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 191.0,
+   "mean": 191.0,
+   "metric": "boot.stage:UI: menu.start (menubar + state sync + engines + LLM handler)",
+   "over": 0,
+   "p50": 191.0,
+   "p95": 191.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:59:250",
+     "value": 191.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 129.3,
+   "mean": 129.3,
+   "metric": "boot.stage:Config schema migration",
+   "over": 0,
+   "p50": 129.3,
+   "p95": 129.3,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:554",
+     "value": 129.3
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 109.5,
+   "mean": 109.5,
+   "metric": "boot.stage:Shortcuts pre-start",
+   "over": 0,
+   "p50": 109.5,
+   "p95": 109.5,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:672",
+     "value": 109.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 95.8,
+   "mean": 95.8,
+   "metric": "boot.stage:UI: karabiner.init",
+   "over": 0,
+   "p50": 95.8,
+   "p95": 95.8,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:59:058",
+     "value": 95.8
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 30.9,
+   "mean": 30.9,
+   "metric": "boot.stage:Keymap engine started",
+   "over": 0,
+   "p50": 30.9,
+   "p95": 30.9,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:962",
+     "value": 30.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 30.2,
+   "mean": 30.2,
+   "metric": "boot.stage:TOML discovery + ordering",
+   "over": 0,
+   "p50": 30.2,
+   "p95": 30.2,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:718",
+     "value": 30.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 13.8,
+   "mean": 13.8,
+   "metric": "boot.stage:MLX server cleanup started asynchronously",
+   "over": 0,
+   "p50": 13.8,
+   "p95": 13.8,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:687",
+     "value": 13.8
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 9.2,
+   "mean": 9.2,
+   "metric": "boot.stage:File watchers armed",
+   "over": 0,
+   "p50": 9.2,
+   "p95": 9.2,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:59:260",
+     "value": 9.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 7.3,
+   "mean": 7.3,
+   "metric": "boot.stage:Path: native asynchronous logger transport committed",
+   "over": 0,
+   "p50": 7.3,
+   "p95": 7.3,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:027",
+     "value": 7.3
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 6.9,
+   "mean": 6.9,
+   "metric": "boot.stage:First-launch guard (onboarding check)",
+   "over": 0,
+   "p50": 6.9,
+   "p95": 6.9,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:561",
+     "value": 6.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 5.4,
+   "mean": 5.4,
+   "metric": "boot.stage:Final mapping sort + tail-index rebuild",
+   "over": 0,
+   "p50": 5.4,
+   "p95": 5.4,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:931",
+     "value": 5.4
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 2.8,
+   "mean": 2.8,
+   "metric": "boot.stage:Factory-reset recovery reconciled",
+   "over": 0,
+   "p50": 2.8,
+   "p95": 2.8,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:031",
+     "value": 2.8
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 2.7,
+   "mean": 2.7,
+   "metric": "boot.stage:TOML hotstring cache wired",
+   "over": 0,
+   "p50": 2.7,
+   "p95": 2.7,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:034",
+     "value": 2.7
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 2.6,
+   "mean": 2.6,
+   "metric": "boot.stage:Boot complete (post-init deferrals scheduled)",
+   "over": 0,
+   "p50": 2.6,
+   "p95": 2.6,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:59:262",
+     "value": 2.6
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 2.0,
+   "mean": 2.0,
+   "metric": "boot.stage:Path: log file open (retention purge deferred)",
+   "over": 0,
+   "p50": 2.0,
+   "p95": 2.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:019",
+     "value": 2.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 0.7,
+   "mean": 0.7,
+   "metric": "boot.stage:Accessibility permission",
+   "over": 0,
+   "p50": 0.7,
+   "p95": 0.7,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:562",
+     "value": 0.7
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 0.5,
+   "mean": 0.5,
+   "metric": "boot.stage:Script control engine started (panic-button eventtap)",
+   "over": 0,
+   "p50": 0.5,
+   "p95": 0.5,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:673",
+     "value": 0.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 0.5,
+   "mean": 0.5,
+   "metric": "boot.stage:LLM backend bootstrap",
+   "over": 0,
+   "p50": 0.5,
+   "p95": 0.5,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:687",
+     "value": 0.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 0.4,
+   "mean": 0.4,
+   "metric": "boot.stage:Path: runtime error capture installed",
+   "over": 0,
+   "p50": 0.4,
+   "p95": 0.4,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:58:028",
+     "value": 0.4
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 0.2,
+   "mean": 0.2,
+   "metric": "boot.stage:UI: menu ready",
+   "over": 0,
+   "p50": 0.2,
+   "p95": 0.2,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:11:59:250",
+     "value": 0.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 1111.3,
+   "mean": 1111.3,
+   "metric": "menu.submenu:shortcuts",
+   "over": 0,
+   "p50": 1111.3,
+   "p95": 1111.3,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:12:02:773",
+     "value": 1111.3
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 72.1,
+   "mean": 72.1,
+   "metric": "menu.submenu:keyboard_layout",
+   "over": 0,
+   "p50": 72.1,
+   "p95": 72.1,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:12:02:773",
+     "value": 72.1
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 58.9,
+   "mean": 58.9,
+   "metric": "menu.submenu:gestures",
+   "over": 0,
+   "p50": 58.9,
+   "p95": 58.9,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:12:02:773",
+     "value": 58.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 34.7,
+   "mean": 34.7,
+   "metric": "menu.submenu:llm",
+   "over": 0,
+   "p50": 34.7,
+   "p95": 34.7,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:12:02:773",
+     "value": 34.7
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 32.9,
+   "mean": 32.9,
+   "metric": "menu.submenu:hotstrings",
+   "over": 0,
+   "p50": 32.9,
+   "p95": 32.9,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:12:02:773",
+     "value": 32.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 0.3,
+   "mean": 0.3,
+   "metric": "menu.app_exclusions",
+   "over": 0,
+   "p50": 0.3,
+   "p95": 0.3,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-01 22:12:02:670",
+     "value": 0.3
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 2850,
+   "kind": "summaries",
+   "max": 1457.64,
+   "mean": 22.38376140350877,
+   "metric": "phase:process.defaults",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-01 20:43:32:407",
+     "value": 1457.64
+    }
+   ]
+  }
+ ],
+ "previous": "mac-2026-10-31_173736",
+ "records": 992,
+ "schema": 1,
+ "span": {
+  "first": "2026-11-01 00:07:31:218",
+  "last": "2026-11-01 22:12:03:645"
+ },
+ "top_fixes": [
+  {
+   "count": 4,
+   "detail": "max 1537 ms at 2026-11-01 22:12:02:781",
+   "kind": "slow",
+   "score": 12,
+   "what": "main_thread.hold over its 250 ms budget"
+  },
+  {
+   "count": 1,
+   "detail": "2026-11-01 22:11:59:811 [ERROR] [keystats.log_manager] Cannot keep the metrics cache before its rebuild: cannot VACUUM - SQL statements in progress.",
+   "kind": "error",
+   "score": 5,
+   "what": "[keystats.log_manager] Cannot keep the metrics cache before its rebuild: cannot VACUUM - SQL statements in progress."
+  },
+  {
+   "count": 1,
+   "detail": "max 26.4 ms at 2026-11-01 22:12:00:499",
+   "kind": "slow",
+   "score": 3,
+   "what": "healthcheck.sync over its 5 ms budget"
+  },
+  {
+   "count": 1,
+   "detail": "max 1047 ms at 2026-11-01 20:27:03:569",
+   "kind": "slow",
+   "score": 3,
+   "what": "keystats.ingest over its 500 ms budget"
+  },
+  {
+   "count": 1,
+   "detail": "max 1371 ms at 2026-11-01 22:12:02:773",
+   "kind": "slow",
+   "score": 3,
+   "what": "menu.rebuild over its 250 ms budget"
+  },
+  {
+   "count": 1,
+   "detail": "2026-11-01 22:11:53:001 [WARNING] [file_watchers] Git operation in '~/perso/ergopti/static/ergopti_plus/macos/' still owns the reload fence after 120 checks; reload remains pending.",
+   "kind": "warning",
+   "score": 1,
+   "what": "[file_watchers] Git operation in '<*>' still owns the reload fence after <*> checks; reload remains pending."
+  },
+  {
+   "count": 1,
+   "detail": "2026-11-01 22:10:33:858 [WARNING] [keymap.utils] Slow ignored-window probe 502 ms (watchers=0 focused_window=502 ms).",
+   "kind": "warning",
+   "score": 1,
+   "what": "[keymap.utils] Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> ms)."
+  },
+  {
+   "count": 1,
+   "detail": "2026-11-01 22:11:53:003 [WARNING] [menu_watchers] Git operation still owns the reload fence after 120 checks on '~/perso/ergopti/static/ergopti_plus/macos/'; reload remains pending.",
+   "kind": "warning",
+   "score": 1,
+   "what": "[menu_watchers] Git operation still owns the reload fence after <*> checks on '<*>'; reload remains pending."
+  }
+ ]
+}

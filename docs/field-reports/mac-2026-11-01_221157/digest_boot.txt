@@ -1,0 +1,28 @@
+2026-11-01 20:27:03:569 [WARNING] [runtime] An hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:2123) held the main thread for 1047 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 52->53 MB.
+2026-11-01 22:11:58:019 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 2.0 ms (+2.6 ms, total 478.8 ms, cpu 0.9 ms).
+2026-11-01 22:11:58:027 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 7.3 ms (+8.1 ms, total 486.9 ms, cpu 3.7 ms).
+2026-11-01 22:11:58:028 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.4 ms (+0.8 ms, total 487.7 ms, cpu 0.1 ms).
+2026-11-01 22:11:58:031 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 2.8 ms (+3.0 ms, total 490.7 ms, cpu 1.6 ms).
+2026-11-01 22:11:58:034 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 2.7 ms (+3.0 ms, total 493.7 ms, cpu 1.7 ms).
+2026-11-01 22:11:58:424 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 390.0 ms (+390.3 ms, total 884.0 ms, cpu 288.0 ms).
+2026-11-01 22:11:58:554 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 129.3 ms (+129.7 ms, total 1013.7 ms, cpu 38.0 ms).
+2026-11-01 22:11:58:561 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 6.9 ms (+7.3 ms, total 1021.0 ms, cpu 5.7 ms).
+2026-11-01 22:11:58:562 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 0.7 ms (+1.0 ms, total 1022.0 ms, cpu 0.6 ms).
+2026-11-01 22:11:58:672 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 109.5 ms (+109.7 ms, total 1131.6 ms, cpu 44.0 ms).
+2026-11-01 22:11:58:673 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 0.5 ms (+0.8 ms, total 1132.4 ms, cpu 0.3 ms).
+2026-11-01 22:11:58:687 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 13.8 ms (+14.0 ms, total 1146.4 ms, cpu 12.6 ms).
+2026-11-01 22:11:58:687 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 0.5 ms (+0.8 ms, total 1147.2 ms, cpu 0.4 ms).
+2026-11-01 22:11:58:718 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 30.2 ms (+30.3 ms, total 1177.5 ms, cpu 23.2 ms).
+2026-11-01 22:11:58:925 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 207.3 ms (+207.6 ms, total 1385.1 ms, cpu 195.4 ms).
+2026-11-01 22:11:58:931 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 5.4 ms (+5.7 ms, total 1390.8 ms, cpu 5.3 ms).
+2026-11-01 22:11:58:962 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 30.9 ms (+31.1 ms, total 1421.9 ms, cpu 25.3 ms).
+2026-11-01 22:11:59:058 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 95.8 ms (+96.1 ms, total 1518.0 ms, cpu 87.7 ms).
+2026-11-01 22:11:59:250 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 191.0 ms (+191.3 ms, total 1709.3 ms, cpu 169.6 ms).
+2026-11-01 22:11:59:250 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.2 ms (+0.5 ms, total 1709.8 ms, cpu 0.1 ms).
+2026-11-01 22:11:59:260 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 9.2 ms (+9.4 ms, total 1719.2 ms, cpu 7.1 ms).
+2026-11-01 22:11:59:260 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-01 22:11:59:262 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 2.6 ms (+2.9 ms, total 1722.2 ms, cpu 2.5 ms).
+2026-11-01 22:11:59:263 [SUCCESS] [BootProfile] Boot complete in 1722 ms.
+2026-11-01 22:11:59:263 [INFO] [BootProfile] Boot CPU: 1267 ms of process CPU over 1722 ms of boot.
+2026-11-01 22:11:59:355 [INFO] [init] Boot complete — triggering Karabiner async deploy…
+2026-11-01 22:12:02:781 [WARNING] [runtime] An hs.timer.new callback (...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:1801) held the main thread for 1537 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: menu.rebuild=1371.2 ms, menu_item.shortcuts=1111.3 ms, menu_item.keyboard_layout=72.1 ms, menu_keyboard_layout.rows=69.3 ms, menu_item.gestures=58.9 ms. Lua heap 381->524 MB.

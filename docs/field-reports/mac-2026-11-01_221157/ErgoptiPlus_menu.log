@@ -1,0 +1,70 @@
+2026-11-01 22:10:50:203 [DEBUG] [menu_watchers] File change detected (4 distinct in burst) — settle armed.
+2026-11-01 22:10:50:704 [DEBUG] [menu_watchers] Reload held (filesystem settling) on '~/perso/ergopti/static/ergopti_plus/macos/'.
+2026-11-01 22:10:53:210 [DEBUG] [menu_watchers] Reload held (git operation in progress) on '~/perso/ergopti/static/ergopti_plus/macos/' (1/120).
+2026-11-01 22:11:53:003 [WARNING] [menu_watchers] Git operation still owns the reload fence after 120 checks on '~/perso/ergopti/static/ergopti_plus/macos/'; reload remains pending.
+2026-11-01 22:11:57:328 [DEBUG] [menu_llm.mlx] MLX shutdown: no server owned this session; listener proof skipped.
+2026-11-01 22:11:57:328 [INFO] [menu_llm.models] MLX server stopped safely.
+2026-11-01 22:11:57:328 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-11-01 22:11:57:351 [DEBUG] [menu_llm] Helper sweep 'expander' dispatched.
+2026-11-01 22:11:57:359 [DEBUG] [menu] Menubar watchers stopped.
+2026-11-01 22:11:57:360 [DEBUG] [menu_watchers] ↑ "File change detected (%d distinct in burst) — settle armed." repeated 15 more times between 2026-11-01 22:11:53:353 and 2026-11-01 22:11:53:822 (last: File change detected (213 distinct in burst) — settle armed.).
+2026-11-01 22:11:57:360 [DEBUG] [menu_watchers] ↑ "Reload held (filesystem settling) on '%s'." repeated 8 more times between 2026-11-01 22:10:51:704 and 2026-11-01 22:11:56:323 (last: Reload held (filesystem settling) on '~/perso/ergopti/static/ergopti_plus/macos/'.).
+2026-11-01 22:11:57:360 [DEBUG] [menu_watchers] ↑ "Reload held (git operation in progress) on '%s' (%d/%d)." repeated 118 more times between 2026-11-01 22:10:53:712 and 2026-11-01 22:11:52:499 (last: Reload held (git operation in progress) on '~/perso/ergopti/static/ergopti_plus/macos/' (119/120).).
+2026-11-01 22:11:57:360 [DEBUG] [menu_llm] ↑ "Invalidated LLM health status." repeated 1 more time between 2026-11-01 22:11:57:348 and 2026-11-01 22:11:57:348.
+2026-11-01 22:11:57:360 [DEBUG] [menu_llm] ↑ "Helper sweep '%s' dispatched." repeated 1 more time between 2026-11-01 22:11:57:354 and 2026-11-01 22:11:57:354 (last: Helper sweep 'http-server' dispatched.).
+2026-11-01 22:11:58:167 [DEBUG] [menu] Module "gestures menu" loaded successfully (ui.menu.menu_gestures).
+2026-11-01 22:11:58:179 [DEBUG] [menu] Module "shortcuts menu" loaded successfully (ui.menu.menu_shortcuts).
+2026-11-01 22:11:58:199 [DEBUG] [menu] Module "keyboard layout menu" loaded successfully (ui.menu.menu_keyboard_layout).
+2026-11-01 22:11:58:226 [DEBUG] [menu] Module "hotstrings menu" loaded successfully (ui.menu.menu_hotstrings).
+2026-11-01 22:11:58:378 [DEBUG] [menu] Module "AI menu" loaded successfully (ui.menu.menu_llm).
+2026-11-01 22:11:58:383 [DEBUG] [menu] Module "metrics menu" loaded successfully (ui.menu.menu_metrics).
+2026-11-01 22:11:58:387 [DEBUG] [menu] Module "tap-holds menu" loaded successfully (ui.menu.menu_tap_holds).
+2026-11-01 22:11:58:390 [DEBUG] [menu] Module "apps menu" loaded successfully (ui.menu.menu_apps).
+2026-11-01 22:11:58:406 [DEBUG] [menu] Module "about/update menu" loaded successfully (ui.menu.menu_about).
+2026-11-01 22:11:58:407 [DEBUG] [menu] Module "AI engine" loaded successfully (modules.llm).
+2026-11-01 22:11:58:407 [DEBUG] [menu] Module "metrics engine" loaded successfully (modules.keystats).
+2026-11-01 22:11:58:407 [DEBUG] [menu] Module "shortcuts engine" loaded successfully (modules.shortcuts).
+2026-11-01 22:11:58:407 [DEBUG] [menu] Module "dynamic hotstrings engine" loaded successfully (modules.dynamic_hotstrings).
+2026-11-01 22:11:58:408 [DEBUG] [menu] Module "CapsWord auto-off settings" loaded successfully (infra.capsword_auto_off).
+2026-11-01 22:11:59:059 [START] [menu_paths] Initializing paths editor…
+2026-11-01 22:11:59:059 [SUCCESS] [menu_paths] Paths editor initialized.
+2026-11-01 22:11:59:064 [INFO] [menu] Menubar created successfully.
+2026-11-01 22:11:59:064 [DEBUG] [menu] Module "gestures core" loaded successfully (modules.gestures).
+2026-11-01 22:11:59:110 [INFO] [menu_state] Keymap engine start: 0.1 ms.
+2026-11-01 22:11:59:139 [INFO] [menu_state] Hotstring group sync: 12 enable / 0 disable in 0.0 ms.
+2026-11-01 22:11:59:156 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-11-01 22:11:59:206 [DONE] [menu_llm.models] Loaded models catalogue (18 providers) from ~/perso/ergopti/static/ergopti_plus/_shared/modules/llm/models.json.
+2026-11-01 22:11:59:223 [DEBUG] [menu_llm] Resolving model name on startup: 'Qwen3.5-2B' -> 'Qwen3.5-2B-4bit'.
+2026-11-01 22:11:59:224 [DEBUG] [menu_llm] Model power on startup: 2.
+2026-11-01 22:11:59:231 [INFO] [menu] LLM handler created successfully.
+2026-11-01 22:11:59:246 [DEBUG] [menu] Pathwatcher boot suppression active for 5 s.
+2026-11-01 22:11:59:248 [DEBUG] [menu_watchers] Config pathwatcher started on '~/perso/ergopti/static/ergopti_plus/macos/'.
+2026-11-01 22:11:59:250 [DEBUG] [menu_watchers] Theme change watcher started.
+2026-11-01 22:12:00:046 [INFO] [menu_state] Keystats engine start (deferred): 293.0 ms.
+2026-11-01 22:12:00:500 [DEBUG] [ui_builder] Building injected HTML assets…
+2026-11-01 22:12:00:523 [INFO] [ui_builder] Injected HTML assets built and memoised (360163 bytes).
+2026-11-01 22:12:00:525 [DEBUG] [ui_builder] Geometry for 'error_dialog': 560x460.
+2026-11-01 22:12:00:545 [DEBUG] [ui_builder] Forcing window focus and teleporting to active space…
+2026-11-01 22:12:00:554 [INFO] [ui_builder] Window presentation requested (attempt 1).
+2026-11-01 22:12:01:335 [TRACE] [menu_apps] Scanning bundled app directory…
+2026-11-01 22:12:01:363 [DONE] [menu_apps] Found 2 bundled app(s).
+2026-11-01 22:12:01:376 [DEBUG] [builder] Top level loaded from manifest (20 item(s)).
+2026-11-01 22:12:01:376 [DEBUG] [builder] Component 'tap_holds.build' added successfully.
+2026-11-01 22:12:02:488 [DEBUG] [builder] Component 'shortcuts.build' added successfully.
+2026-11-01 22:12:02:547 [DEBUG] [builder] Component 'gestures.build' added successfully.
+2026-11-01 22:12:02:619 [DEBUG] [builder] Component 'keyboard_layout.build' added successfully.
+2026-11-01 22:12:02:619 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-01 22:12:02:644 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-01 22:12:02:670 [DEBUG] [app_picker] Building application exclusion menu…
+2026-11-01 22:12:02:670 [INFO] [app_picker] Application exclusion menu built successfully (0 excluded app(s), 0.3 ms).
+2026-11-01 22:12:02:670 [DEBUG] [builder] Component 'keystats.build' added successfully.
+2026-11-01 22:12:02:670 [DEBUG] [builder] Building AI component…
+2026-11-01 22:12:02:670 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-11-01 22:12:02:670 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-11-01 22:12:02:683 [DEBUG] [menu_llm] Building prediction count menu…
+2026-11-01 22:12:02:705 [DEBUG] [builder] AI component added successfully.
+2026-11-01 22:12:02:705 [TRACE] [menu_apps] Building applications submenu…
+2026-11-01 22:12:02:705 [DONE] [menu_apps] Applications submenu built (2 item(s)).
+2026-11-01 22:12:02:705 [DEBUG] [builder] Component 'apps.build' added successfully.
+2026-11-01 22:12:02:773 [INFO] [menu] Menu tree rebuilt in 1371.2 ms (22 top-level item(s)). Slowest: shortcuts=1111.3 ms, keyboard_layout=72.1 ms, gestures=58.9 ms, llm=34.7 ms, hotstrings=32.9 ms.
+2026-11-01 22:12:02:774 [WARNING] [menu] Over budget: menu.rebuild took 1371 ms (budget 250 ms).

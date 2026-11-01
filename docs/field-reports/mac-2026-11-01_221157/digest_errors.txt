@@ -1,0 +1,8 @@
+2026-11-01 20:27:03:569 [WARNING] [keystats.log_manager] Slow ingest tick 1047 ms (drain=0 foreign=0 outbox=83 read=21 build=0 apply=119 commit=24 append=797 notify=0 ms; append: lock=1 journal=19 prepare=0 publish=324 write=16 clear=42 settle=391 release=0 ms; metadata_commands=0 in 0 ms; entries=1 statements=1).
+2026-11-01 20:27:03:569 [WARNING] [runtime] An hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:2123) held the main thread for 1047 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 52->53 MB.
+2026-11-01 22:10:33:858 [WARNING] [keymap.utils] Slow ignored-window probe 502 ms (watchers=0 focused_window=502 ms).
+2026-11-01 22:11:53:001 [WARNING] [file_watchers] Git operation in '~/perso/ergopti/static/ergopti_plus/macos/' still owns the reload fence after 120 checks; reload remains pending.
+2026-11-01 22:11:53:003 [WARNING] [menu_watchers] Git operation still owns the reload fence after 120 checks on '~/perso/ergopti/static/ergopti_plus/macos/'; reload remains pending.
+2026-11-01 22:11:59:811 [ERROR] [keystats.log_manager] Cannot keep the metrics cache before its rebuild: cannot VACUUM - SQL statements in progress.
+2026-11-01 22:12:02:774 [WARNING] [menu] Over budget: menu.rebuild took 1371 ms (budget 250 ms).
+2026-11-01 22:12:02:781 [WARNING] [runtime] An hs.timer.new callback (...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:1801) held the main thread for 1537 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: menu.rebuild=1371.2 ms, menu_item.shortcuts=1111.3 ms, menu_item.keyboard_layout=72.1 ms, menu_keyboard_layout.rows=69.3 ms, menu_item.gestures=58.9 ms. Lua heap 381->524 MB.

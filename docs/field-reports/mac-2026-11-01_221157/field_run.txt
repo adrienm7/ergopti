@@ -1,0 +1,6 @@
+[field-report] Building and opening the developer app (static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedProgramForwardingTests.swift is newer than the build; a few minutes)...
+[macos-dev-app] Stopping the running ErgoptiPlus (pids: 2383 2388 66306 66322 66389)...
+[macos-dev-app] No ErgoptiPlus process is left.
+[macos-build] Single-architecture launcher (arm64 only): this local app runs on arm64 Macs and is never released.
+[macos-build] ERROR: missing required command: go
+[field-report] The developer app could not be built.

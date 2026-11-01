@@ -1,0 +1,994 @@
+2026-11-01 00:07:31:218 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-10-31 23:51:52:312 and 2026-10-31 23:51:52:312 (last: Process 'defaults' exited (status=0, 12 ms, 29 similar run(s) since the last line).).
+2026-11-01 00:07:32:490 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=17.56 max=215.33 total=2633.8 ms.
+2026-11-01 00:07:32:492 [INFO] [phase_stats] Memory snapshot: lua=39853 KB. Log volume over 300 s: debug=7 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=2.
+2026-11-01 00:07:33:195 [START] [keystats.watchers] Midnight rotation: archiving 2026-10-31…
+2026-11-01 00:07:33:216 [SUCCESS] [keystats.watchers] Midnight rotation complete — now tracking 2026-11-01.
+2026-11-01 00:08:35:252 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 46 ms, 29 similar run(s) since the last line).
+2026-11-01 00:08:38:565 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=3.2%, memory=40G).
+2026-11-01 00:08:43:087 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 140.
+2026-11-01 00:26:25:824 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 17 ms, 30 similar run(s) since the last line).
+2026-11-01 00:42:53:518 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 38 ms, 30 similar run(s) since the last line).
+2026-11-01 00:52:53:833 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 00:52:42:434 and 2026-11-01 00:52:42:434 (last: Process 'defaults' exited (status=0, 11 ms, 30 similar run(s) since the last line).).
+2026-11-01 01:09:09:951 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 13 ms, 30 similar run(s) since the last line).
+2026-11-01 01:09:24:124 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=17.94 max=273.90 total=2691.1 ms.
+2026-11-01 01:09:24:127 [INFO] [phase_stats] Memory snapshot: lua=48916 KB. Log volume over 300 s: debug=7 info=4 warn=0 error=0 dropped=0 suppressed=0 collapsed=1.
+2026-11-01 01:25:35:457 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 16 ms, 29 similar run(s) since the last line).
+2026-11-01 01:41:05:850 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=19.9%, memory=40G).
+2026-11-01 01:41:10:319 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 280.
+2026-11-01 01:57:27:946 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 10 ms, 30 similar run(s) since the last line).
+2026-11-01 02:13:53:520 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 14 ms, 29 similar run(s) since the last line).
+2026-11-01 02:30:21:082 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 11 ms, 30 similar run(s) since the last line).
+2026-11-01 03:02:12:250 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 18 ms, 29 similar run(s) since the last line).
+2026-11-01 03:02:22:415 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=23.52 max=431.19 total=3527.7 ms.
+2026-11-01 03:02:22:417 [INFO] [phase_stats] Memory snapshot: lua=57582 KB. Log volume over 300 s: debug=7 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=0.
+2026-11-01 03:06:13:719 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=7.6%, memory=41G).
+2026-11-01 03:06:18:257 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 420.
+2026-11-01 03:14:26:050 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 03:06:04:384 and 2026-11-01 03:06:04:384 (last: Process 'defaults' exited (status=0, 15 ms, 30 similar run(s) since the last line).).
+2026-11-01 03:14:59:195 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 54 ms, 29 similar run(s) since the last line).
+2026-11-01 03:46:52:326 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 50 ms, 30 similar run(s) since the last line).
+2026-11-01 04:03:33:964 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 17 ms, 30 similar run(s) since the last line).
+2026-11-01 04:20:01:551 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 10 ms, 30 similar run(s) since the last line).
+2026-11-01 04:20:03:743 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=22.48 max=495.53 total=3371.7 ms.
+2026-11-01 04:20:03:747 [INFO] [phase_stats] Memory snapshot: lua=33329 KB. Log volume over 300 s: debug=7 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=1.
+2026-11-01 04:36:29:063 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 9 ms, 30 similar run(s) since the last line).
+2026-11-01 04:36:30:498 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=7.2%, memory=40G).
+2026-11-01 04:36:34:935 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 560.
+2026-11-01 04:58:25:119 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 12 ms, 29 similar run(s) since the last line).
+2026-11-01 05:16:49:299 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 05:01:15:348 and 2026-11-01 05:01:15:348 (last: Process 'defaults' exited (status=0, 22 ms, 30 similar run(s) since the last line).).
+2026-11-01 05:18:57:540 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 10 ms, 30 similar run(s) since the last line).
+2026-11-01 05:35:18:699 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=24.18 max=521.33 total=3627.2 ms.
+2026-11-01 05:35:18:701 [INFO] [phase_stats] Memory snapshot: lua=42002 KB. Log volume over 300 s: debug=6 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=1.
+2026-11-01 05:35:22:534 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 16 ms, 29 similar run(s) since the last line).
+2026-11-01 05:51:50:279 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 10 ms, 30 similar run(s) since the last line).
+2026-11-01 05:51:55:626 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=6.5%, memory=40G).
+2026-11-01 06:07:14:654 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 700.
+2026-11-01 06:11:13:365 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 124 ms, 30 similar run(s) since the last line).
+2026-11-01 06:27:40:944 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 15 ms, 30 similar run(s) since the last line).
+2026-11-01 06:43:07:068 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 06:30:46:906 and 2026-11-01 06:30:46:906 (last: Process 'defaults' exited (status=0, 10 ms, 30 similar run(s) since the last line).).
+2026-11-01 06:46:05:668 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=149 mean=22.81 max=644.35 total=3398.8 ms.
+2026-11-01 06:46:05:669 [INFO] [phase_stats] Memory snapshot: lua=50684 KB. Log volume over 300 s: debug=7 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=1.
+2026-11-01 06:46:17:484 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 20 ms, 29 similar run(s) since the last line).
+2026-11-01 07:02:45:040 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 45 ms, 30 similar run(s) since the last line).
+2026-11-01 07:02:52:335 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=2.8%, memory=40G).
+2026-11-01 07:02:56:876 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 840.
+2026-11-01 07:21:56:284 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 159 ms, 30 similar run(s) since the last line).
+2026-11-01 07:40:55:144 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 07:25:35:727 and 2026-11-01 07:25:35:727 (last: Process 'defaults' exited (status=0, 11 ms, 30 similar run(s) since the last line).).
+2026-11-01 07:44:09:380 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 15 ms, 29 similar run(s) since the last line).
+2026-11-01 07:44:51:531 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=151 mean=21.53 max=351.89 total=3250.7 ms.
+2026-11-01 07:44:51:534 [INFO] [phase_stats] Memory snapshot: lua=59381 KB. Log volume over 300 s: debug=7 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=1.
+2026-11-01 08:02:27:478 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 07:46:41:025 and 2026-11-01 07:46:41:025 (last: Process 'defaults' exited (status=0, 16 ms, 30 similar run(s) since the last line).).
+2026-11-01 08:03:06:578 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 14 ms, 29 similar run(s) since the last line).
+2026-11-01 08:03:07:912 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=2.0%, memory=40G).
+2026-11-01 08:03:12:434 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 966.
+2026-11-01 08:21:20:135 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 14 ms, 30 similar run(s) since the last line).
+2026-11-01 08:37:45:828 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 14 ms, 29 similar run(s) since the last line).
+2026-11-01 08:46:08:054 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=22.04 max=522.49 total=3306.2 ms.
+2026-11-01 08:46:08:057 [INFO] [phase_stats] Memory snapshot: lua=34686 KB. Log volume over 300 s: debug=6 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=2.
+2026-11-01 09:02:59:962 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 2 more times between 2026-11-01 08:40:36:966 and 2026-11-01 08:46:29:887 (last: Process 'defaults' exited (status=0, 18 ms, 29 similar run(s) since the last line).).
+2026-11-01 09:03:01:084 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 37 ms, 29 similar run(s) since the last line).
+2026-11-01 09:03:10:420 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=9.7%, memory=40G).
+2026-11-01 09:03:14:934 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 1106.
+2026-11-01 09:22:58:965 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 09:07:02:376 and 2026-11-01 09:07:02:376 (last: Process 'defaults' exited (status=0, 12 ms, 30 similar run(s) since the last line).).
+2026-11-01 09:23:17:378 [DEBUG] [keystats.watchers] Battery: 99.0% (Battery Power, charging=false).
+2026-11-01 09:23:19:917 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 1248.
+2026-11-01 09:23:30:053 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 12 ms, 30 similar run(s) since the last line).
+2026-11-01 09:42:35:830 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 09:27:07:215 and 2026-11-01 09:27:07:215 (last: Process 'defaults' exited (status=0, 15 ms, 29 similar run(s) since the last line).).
+2026-11-01 09:43:07:112 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=20.65 max=495.03 total=3097.6 ms.
+2026-11-01 09:43:07:113 [INFO] [phase_stats] Memory snapshot: lua=43759 KB. Log volume over 300 s: debug=9 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=3.
+2026-11-01 09:45:37:329 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 12 ms, 30 similar run(s) since the last line).
+2026-11-01 10:02:03:040 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 14 ms, 29 similar run(s) since the last line).
+2026-11-01 10:02:06:364 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=6.4%, memory=41G).
+2026-11-01 10:02:10:897 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 1388.
+2026-11-01 10:25:09:846 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 10:09:37:928 and 2026-11-01 10:09:37:928 (last: Process 'defaults' exited (status=0, 11 ms, 30 similar run(s) since the last line).).
+2026-11-01 10:41:30:475 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 14 ms, 30 similar run(s) since the last line).
+2026-11-01 11:02:38:836 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 10:47:05:320 and 2026-11-01 10:47:05:320 (last: Process 'defaults' exited (status=0, 16 ms, 29 similar run(s) since the last line).).
+2026-11-01 11:02:59:117 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=25.86 max=704.42 total=3878.3 ms.
+2026-11-01 11:02:59:118 [INFO] [phase_stats] Memory snapshot: lua=52458 KB. Log volume over 300 s: debug=7 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=2.
+2026-11-01 11:18:56:510 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 17 ms, 29 similar run(s) since the last line).
+2026-11-01 11:27:43:517 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=2.2%, memory=41G).
+2026-11-01 11:27:48:066 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 1528.
+2026-11-01 11:29:51:424 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 11:27:44:203 and 2026-11-01 11:27:44:203 (last: Process 'defaults' exited (status=0, 17 ms, 29 similar run(s) since the last line).).
+2026-11-01 11:30:24:552 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 39 ms, 30 similar run(s) since the last line).
+2026-11-01 11:49:32:789 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 75 ms, 30 similar run(s) since the last line).
+2026-11-01 12:06:00:304 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 12 ms, 30 similar run(s) since the last line).
+2026-11-01 12:21:47:413 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=22.29 max=341.02 total=3343.7 ms.
+2026-11-01 12:21:47:415 [INFO] [phase_stats] Memory snapshot: lua=61147 KB. Log volume over 300 s: debug=7 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=1.
+2026-11-01 12:37:52:790 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 20 ms, 30 similar run(s) since the last line).
+2026-11-01 12:39:55:650 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=2.4%, memory=41G).
+2026-11-01 12:40:00:189 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 1668.
+2026-11-01 12:47:52:952 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 12:39:56:327 and 2026-11-01 12:39:56:327 (last: Process 'defaults' exited (status=0, 16 ms, 30 similar run(s) since the last line).).
+2026-11-01 12:47:57:547 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 9 ms, 30 similar run(s) since the last line).
+2026-11-01 13:06:19:664 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 12:50:50:559 and 2026-11-01 12:50:50:559 (last: Process 'defaults' exited (status=0, 14 ms, 29 similar run(s) since the last line).).
+2026-11-01 13:22:41:954 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 18 ms, 29 similar run(s) since the last line).
+2026-11-01 13:22:58:122 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=18.72 max=428.82 total=2808.4 ms.
+2026-11-01 13:22:58:124 [INFO] [phase_stats] Memory snapshot: lua=36383 KB. Log volume over 300 s: debug=7 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=2.
+2026-11-01 13:40:48:951 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 15 ms, 30 similar run(s) since the last line).
+2026-11-01 13:48:52:077 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=2.2%, memory=41G).
+2026-11-01 13:48:56:617 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 1794.
+2026-11-01 13:50:49:253 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 13:48:48:760 and 2026-11-01 13:48:48:760 (last: Process 'defaults' exited (status=0, 17 ms, 30 similar run(s) since the last line).).
+2026-11-01 13:51:00:351 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 13 ms, 30 similar run(s) since the last line).
+2026-11-01 14:22:39:772 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 44 ms, 29 similar run(s) since the last line).
+2026-11-01 14:25:42:360 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=20.77 max=647.85 total=3115.8 ms.
+2026-11-01 14:25:42:362 [INFO] [phase_stats] Memory snapshot: lua=45061 KB. Log volume over 300 s: debug=6 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=2.
+2026-11-01 14:41:34:659 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 14:25:34:191 and 2026-11-01 14:25:34:191 (last: Process 'defaults' exited (status=0, 16 ms, 30 similar run(s) since the last line).).
+2026-11-01 14:42:01:130 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 15 ms, 30 similar run(s) since the last line).
+2026-11-01 14:50:04:640 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=2.9%, memory=41G).
+2026-11-01 14:50:09:177 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 1934.
+2026-11-01 15:05:40:792 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 14:50:09:302 and 2026-11-01 14:50:09:302 (last: Process 'defaults' exited (status=0, 9 ms, 30 similar run(s) since the last line).).
+2026-11-01 15:05:42:318 [DEBUG] [keystats.watchers] Battery: 98.0% (Battery Power, charging=false).
+2026-11-01 15:05:44:752 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 2076.
+2026-11-01 15:22:00:443 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 13 ms, 29 similar run(s) since the last line).
+2026-11-01 15:40:50:388 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 15:25:03:887 and 2026-11-01 15:25:03:887 (last: Process 'defaults' exited (status=0, 19 ms, 29 similar run(s) since the last line).).
+2026-11-01 15:50:28:624 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 203 ms, 29 similar run(s) since the last line).
+2026-11-01 15:50:32:580 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=22.04 max=353.72 total=3306.0 ms.
+2026-11-01 15:50:32:582 [INFO] [phase_stats] Memory snapshot: lua=54150 KB. Log volume over 300 s: debug=10 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=2.
+2026-11-01 16:06:56:230 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 30 ms, 30 similar run(s) since the last line).
+2026-11-01 16:10:39:781 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=8.3%, memory=41G).
+2026-11-01 16:10:44:175 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 2216.
+2026-11-01 16:26:19:684 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 16:10:38:294 and 2026-11-01 16:10:38:294 (last: Process 'defaults' exited (status=0, 10 ms, 30 similar run(s) since the last line).).
+2026-11-01 16:27:03:288 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 12 ms, 29 similar run(s) since the last line).
+2026-11-01 16:43:53:112 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 15 ms, 29 similar run(s) since the last line).
+2026-11-01 16:51:56:097 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=22.45 max=438.22 total=3367.7 ms.
+2026-11-01 16:51:56:098 [INFO] [phase_stats] Memory snapshot: lua=62820 KB. Log volume over 300 s: debug=6 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=1.
+2026-11-01 16:54:51:231 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 16:51:57:929 and 2026-11-01 16:51:57:929 (last: Process 'defaults' exited (status=0, 17 ms, 30 similar run(s) since the last line).).
+2026-11-01 16:55:36:275 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 12 ms, 30 similar run(s) since the last line).
+2026-11-01 17:14:58:740 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 13 ms, 29 similar run(s) since the last line).
+2026-11-01 17:15:06:052 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=2.1%, memory=42G).
+2026-11-01 17:15:10:622 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 2356.
+2026-11-01 17:31:42:689 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 7 ms, 30 similar run(s) since the last line).
+2026-11-01 17:46:26:311 [DEBUG] [keystats.watchers] Battery: 97.0% (Battery Power, charging=false).
+2026-11-01 17:46:28:321 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 2498.
+2026-11-01 17:46:53:483 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 30 ms, 29 similar run(s) since the last line).
+2026-11-01 17:53:09:583 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=23.06 max=683.02 total=3458.3 ms.
+2026-11-01 17:53:09:585 [INFO] [phase_stats] Memory snapshot: lua=38463 KB. Log volume over 300 s: debug=9 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=1.
+2026-11-01 18:11:25:878 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 17:55:31:428 and 2026-11-01 17:55:31:428 (last: Process 'defaults' exited (status=0, 36 ms, 30 similar run(s) since the last line).).
+2026-11-01 18:11:59:005 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 42 ms, 30 similar run(s) since the last line).
+2026-11-01 18:30:48:076 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 24 ms, 30 similar run(s) since the last line).
+2026-11-01 18:30:48:104 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=23.4%, memory=41G).
+2026-11-01 18:30:51:939 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 2638.
+2026-11-01 18:47:17:059 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 11 ms, 30 similar run(s) since the last line).
+2026-11-01 19:10:17:715 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 18:54:09:824 and 2026-11-01 18:54:09:824 (last: Process 'defaults' exited (status=0, 18 ms, 29 similar run(s) since the last line).).
+2026-11-01 19:10:26:451 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=20.31 max=528.45 total=3046.7 ms.
+2026-11-01 19:10:26:453 [INFO] [phase_stats] Memory snapshot: lua=47166 KB. Log volume over 300 s: debug=7 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=2.
+2026-11-01 19:11:07:140 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 8 ms, 30 similar run(s) since the last line).
+2026-11-01 19:27:44:974 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 13 ms, 29 similar run(s) since the last line).
+2026-11-01 19:54:34:207 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 9 ms, 30 similar run(s) since the last line).
+2026-11-01 19:54:37:930 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=8.6%, memory=40G).
+2026-11-01 19:54:42:074 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 2778.
+2026-11-01 20:10:59:729 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 8 ms, 29 similar run(s) since the last line).
+2026-11-01 20:26:59:332 [DEBUG] [keystats.watchers] Battery: 96.0% (Battery Power, charging=false).
+2026-11-01 20:27:02:142 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 1458 ms, 17 similar run(s) since the last line).
+2026-11-01 20:27:03:568 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 2920.
+2026-11-01 20:27:03:569 [WARNING] [keystats.log_manager] Slow ingest tick 1047 ms (drain=0 foreign=0 outbox=83 read=21 build=0 apply=119 commit=24 append=797 notify=0 ms; append: lock=1 journal=19 prepare=0 publish=324 write=16 clear=42 settle=391 release=0 ms; metadata_commands=0 in 0 ms; entries=1 statements=1).
+2026-11-01 20:27:03:569 [WARNING] [runtime] An hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:2123) held the main thread for 1047 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 52->53 MB.
+2026-11-01 20:43:28:237 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 14 ms, 30 similar run(s) since the last line).
+2026-11-01 20:43:32:407 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=27.65 max=1457.64 total=4148.2 ms.
+2026-11-01 20:43:32:407 [INFO] [phase_stats] Phase summary [runtime] over 300 s: #timer_hold_over_1000ms=1.
+2026-11-01 20:43:32:409 [INFO] [phase_stats] Memory snapshot: lua=56291 KB. Log volume over 300 s: debug=10 info=3 warn=2 error=0 dropped=0 suppressed=0 collapsed=0.
+2026-11-01 20:55:30:890 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 20:46:27:414 and 2026-11-01 20:46:27:414 (last: Process 'defaults' exited (status=0, 18 ms, 29 similar run(s) since the last line).).
+2026-11-01 20:55:31:300 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 364 ms, 29 similar run(s) since the last line).
+2026-11-01 20:56:07:098 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=14.3%, memory=40G).
+2026-11-01 20:56:10:813 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 3060.
+2026-11-01 21:11:58:657 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 23 ms, 30 similar run(s) since the last line).
+2026-11-01 21:28:26:227 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 18 ms, 30 similar run(s) since the last line).
+2026-11-01 21:46:13:004 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=29.44 max=559.61 total=4415.7 ms.
+2026-11-01 21:46:13:005 [INFO] [phase_stats] Memory snapshot: lua=64980 KB. Log volume over 300 s: debug=6 info=2 warn=0 error=0 dropped=0 suppressed=0 collapsed=1.
+2026-11-01 21:46:14:828 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 9 ms, 30 similar run(s) since the last line).
+2026-11-01 21:56:47:513 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 18 ms, 29 similar run(s) since the last line).
+2026-11-01 22:10:31:439 [TRACE] [keystats.context_tracker] Attaching accessibility observer to PID 449…
+2026-11-01 22:10:31:440 [DONE] [keystats.context_tracker] Accessibility observer attached to PID 449.
+2026-11-01 22:10:32:842 [DEBUG] [adapters.secure_field_detector] AX secure-field classification incomplete (role_read=false, subrole_read=false); suppressing input.
+2026-11-01 22:10:32:842 [DEBUG] [keystats.context_tracker] Secure text field detected — buffer cleared, logging suppressed.
+2026-11-01 22:10:33:349 [DEBUG] [keystats.context_tracker] Replacement AXValueChanged watcher setup skipped: the element cannot be watched (Messaging failed).
+2026-11-01 22:10:33:349 [INFO] [gestures] Wake-from-sleep detected (event=0) — recycling watchers
+2026-11-01 22:10:33:349 [INFO] [gestures] recycle_watchers: BEGIN (watchers_before=1, first_frame=true, reattach=true)
+2026-11-01 22:10:33:351 [INFO] [gestures]   recycle_watchers: found 1 device(s) to attach
+2026-11-01 22:10:33:351 [DEBUG] [gestures]     device #1: id=504403158265495662
+2026-11-01 22:10:33:351 [INFO] [gestures] create_watcher: ENTRY deviceID=504403158265495662
+2026-11-01 22:10:33:354 [INFO] [gestures] create_watcher: device introspection — id=504403158265495662, builtin=true, alive=false, running=false, MTHID=true, driverReady=true, productName=Apple Internal Keyboard / Trackpad
+2026-11-01 22:10:33:354 [INFO] [gestures] create_watcher: ATTACHED device=504403158265495662, running=true, alive=false
+2026-11-01 22:10:33:355 [INFO] [gestures] recycle_watchers: END (watchers_after=1, stopped=1, settled=true)
+2026-11-01 22:10:33:858 [WARNING] [keymap.utils] Slow ignored-window probe 502 ms (watchers=0 focused_window=502 ms).
+2026-11-01 22:10:33:858 [INFO] [runtime] Main-thread hold of 502 ms in an hs.timer.new callback (...gopti/static/ergopti_plus/macos/modules/keymap/utils.lua:1567). Lua heap 33->33 MB.
+2026-11-01 22:10:34:825 [DEBUG] [keystats.log_manager] Ingest cycle: 3 entry(ies), offset now 3340.
+2026-11-01 22:10:34:828 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-01 22:10:34:838 [DEBUG] [keystats.context_tracker] Replacement AXValueChanged watcher setup: the element is already watched by this observer.
+2026-11-01 22:10:34:839 [DEBUG] [keystats.context_tracker] Focus moved away from secure field — logging resumed.
+2026-11-01 22:10:34:889 [DEBUG] [adapters.shell_runner] Process 'ErgoptiPlus' exited (status=0, 58 ms, 4 similar run(s) since the last line).
+2026-11-01 22:10:34:890 [START] [karabiner] Regenerating Karabiner config…
+2026-11-01 22:10:34:950 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-01 22:10:34:956 [START] [karabiner.nav_layer] Loading the navigation layer from '~/perso/config/ergopti_plus/'…
+2026-11-01 22:10:34:964 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 22:10:34:970 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-01 22:10:34:986 [DEBUG] [karabiner] Action 'layer': prepended F20 sentinel to nav-layer activation.
+2026-11-01 22:10:34:986 [INFO] [karabiner] Prepended F20 sentinel to 2 nav-layer-activating action(s).
+2026-11-01 22:10:34:987 [INFO] [karabiner] Inserted the F19 exit sentinel into 2 nav-layer-deactivating event list(s).
+2026-11-01 22:10:34:995 [DEBUG] [karabiner] Combo 'lcmd_rcmd': tap=none, hold=none, combo=opt_backspace (non_canonical=false).
+2026-11-01 22:10:34:995 [DEBUG] [karabiner]   → rule: Cmd gauche + Cmd droit: ⌫ ⌥+Backspace [chord]
+2026-11-01 22:10:35:022 [DEBUG] [karabiner] Building config: tap/hold=200 ms, simultaneous=100 ms, symmetric=false, 31 rule(s).
+2026-11-01 22:10:35:191 [DEBUG] [karabiner] Merged 31 managed rule(s) with 29 validated non-owning legacy hint(s) into selected profile 1 without changing personal settings.
+2026-11-01 22:10:35:192 [INFO] [karabiner] Karabiner deploy decision: skipped-identical (the managed rules on disk already match; no reload).
+2026-11-01 22:10:35:192 [SUCCESS] [karabiner] Karabiner config regenerated: 6 combo(s) + 14 tap/hold key(s) deployed.
+2026-11-01 22:10:35:192 [INFO] [keystats.kc_bridge] Managed output kc set rebuilt: 13 unique kc(s) claimed.
+2026-11-01 22:10:35:192 [SUCCESS] [karabiner] Ergopti Karabiner lease activated after local input preparation.
+2026-11-01 22:10:35:200 [START] [shortcuts.keyboard_shortcuts] Stopping keyboard shortcuts…
+2026-11-01 22:10:35:203 [DEBUG] [adapters.hotkey_registrar] Released Ctrl+U (hotkey#62).
+2026-11-01 22:10:35:203 [SUCCESS] [shortcuts.keyboard_shortcuts] Keyboard shortcuts stopped.
+2026-11-01 22:10:35:203 [TRACE] [shortcuts.bindings] Rebinding shortcuts hotkeys…
+2026-11-01 22:10:35:204 [DEBUG] [shortcuts.bindings] Hotkey 'cmd_star' unbound.
+2026-11-01 22:10:35:204 [START] [shortcuts.bindings] Starting shortcuts bindings…
+2026-11-01 22:10:35:209 [START] [karabiner.nav_layer] Loading the navigation layer from '~/perso/config/ergopti_plus/'…
+2026-11-01 22:10:35:217 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 22:10:35:217 [DEBUG] [shortcuts.bindings] Hotkey 'cmd_star' bound.
+2026-11-01 22:10:35:229 [SUCCESS] [shortcuts.bindings] Shortcuts bindings started (5 hotkey(s), 0 waiting for a retry).
+2026-11-01 22:10:35:229 [DONE] [shortcuts.bindings] Shortcuts hotkeys rebound.
+2026-11-01 22:10:35:229 [START] [shortcuts.keyboard_shortcuts] Starting keyboard shortcuts…
+2026-11-01 22:10:35:242 [DEBUG] [adapters.hotkey_registrar] Bound Ctrl+U → hotkey#81.
+2026-11-01 22:10:35:242 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ U → uppercase_selection.
+2026-11-01 22:10:35:242 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ Caps Lock → toggle_capslock.
+2026-11-01 22:10:35:242 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ X → pick_color.
+2026-11-01 22:10:35:242 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ O → surround_parens.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ . → open_emoji_picker.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ P → display_mirror_toggle.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ D → open_downloads.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ H → screenshot_region_clipboard.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ I → open_system_settings.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ W → titlecase_selection.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ ' → spotlight_mouse.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ⌘ ⇧ V → paste_plain.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ L → lock_screen.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ E → open_file_manager.
+2026-11-01 22:10:35:243 [DEBUG] [adapters.hotkey_registrar] Ctrl+Space enabled=false.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ Space → llm_generate_prediction.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ M → activity_simulation.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ S → copy_selected_path.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ T → teleport_mouse.
+2026-11-01 22:10:35:243 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ A → select_line.
+2026-11-01 22:10:35:243 [SUCCESS] [shortcuts.keyboard_shortcuts] Keyboard shortcuts started (19 active binding(s), 0 waiting for a retry).
+2026-11-01 22:10:35:243 [INFO] [karabiner] Shortcuts rebound for layout 'current'.
+2026-11-01 22:10:35:244 [DEBUG] [keystats.context_tracker] App switch: 'loginwindow' → 'iTerm2' (1889 ms).
+2026-11-01 22:10:35:245 [TRACE] [keystats.context_tracker] Stopping previous accessibility observer…
+2026-11-01 22:10:35:245 [DONE] [keystats.context_tracker] Previous accessibility observer stopped.
+2026-11-01 22:10:35:245 [TRACE] [keystats.context_tracker] Attaching accessibility observer to PID 1521…
+2026-11-01 22:10:35:249 [DONE] [keystats.context_tracker] Accessibility observer attached to PID 1521.
+2026-11-01 22:10:35:275 [DEBUG] [menu.keyboard_layout] Active layouts refreshed asynchronously: 4.
+2026-11-01 22:10:35:718 [DEBUG] [gestures] Touch session started on device=504403158265495662 (frame 1, touches=1).
+2026-11-01 22:10:35:837 [START] [karabiner] Regenerating Karabiner config…
+2026-11-01 22:10:35:852 [START] [karabiner.nav_layer] Loading the navigation layer from '~/perso/config/ergopti_plus/'…
+2026-11-01 22:10:35:859 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 22:10:36:069 [SUCCESS] [karabiner] Karabiner config regenerated: 6 combo(s) + 14 tap/hold key(s) deployed.
+2026-11-01 22:10:36:069 [SUCCESS] [karabiner] Ergopti Karabiner lease activated after local input preparation.
+2026-11-01 22:10:36:076 [START] [shortcuts.keyboard_shortcuts] Stopping keyboard shortcuts…
+2026-11-01 22:10:36:082 [SUCCESS] [shortcuts.keyboard_shortcuts] Keyboard shortcuts stopped.
+2026-11-01 22:10:36:082 [TRACE] [shortcuts.bindings] Rebinding shortcuts hotkeys…
+2026-11-01 22:10:36:082 [START] [shortcuts.bindings] Starting shortcuts bindings…
+2026-11-01 22:10:36:087 [START] [karabiner.nav_layer] Loading the navigation layer from '~/perso/config/ergopti_plus/'…
+2026-11-01 22:10:36:095 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 22:10:36:097 [SUCCESS] [shortcuts.bindings] Shortcuts bindings started (5 hotkey(s), 0 waiting for a retry).
+2026-11-01 22:10:36:097 [DONE] [shortcuts.bindings] Shortcuts hotkeys rebound.
+2026-11-01 22:10:36:097 [START] [shortcuts.keyboard_shortcuts] Starting keyboard shortcuts…
+2026-11-01 22:10:36:098 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ U → uppercase_selection.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ Caps Lock → toggle_capslock.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ X → pick_color.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ O → surround_parens.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ . → open_emoji_picker.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ P → display_mirror_toggle.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ D → open_downloads.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ H → screenshot_region_clipboard.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ I → open_system_settings.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ W → titlecase_selection.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ ' → spotlight_mouse.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ⌘ ⇧ V → paste_plain.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ L → lock_screen.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ E → open_file_manager.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ Space → llm_generate_prediction.
+2026-11-01 22:10:36:099 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ M → activity_simulation.
+2026-11-01 22:10:36:100 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ S → copy_selected_path.
+2026-11-01 22:10:36:100 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ T → teleport_mouse.
+2026-11-01 22:10:36:100 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ A → select_line.
+2026-11-01 22:10:36:100 [SUCCESS] [shortcuts.keyboard_shortcuts] Keyboard shortcuts started (19 active binding(s), 0 waiting for a retry).
+2026-11-01 22:10:36:956 [INFO] [gestures.engine] GESTURE START: fingers=2 pos=(-22.7,22.5) ts=48689.220
+2026-11-01 22:10:36:980 [INFO] [gestures.engine] LOCKED DIR=vert (dx=-0.20 dy=3.46 maxFingers=2)
+2026-11-01 22:10:37:086 [INFO] [gestures.engine] process_frame: n=0 → fingers lifted, calling commitGesture (was active)
+2026-11-01 22:10:37:086 [INFO] [gestures.engine] commitGesture ENTRY: enabled=true maxFingers=2 startPos=(-22.7,22.5) endPos=(-16.0,54.1) lockedDir=vert liveAxisSign=nil stepsCommitted=0 elapsed=0.128s
+2026-11-01 22:10:37:086 [DEBUG] [gestures.engine] commitGesture: dx=6.76 dy=31.60 total_delta=38.36 TAP_MAX_DELTA=8.00 TAP_MAX_SEC=0.70 had_live_fire=false
+2026-11-01 22:10:37:086 [DEBUG] [gestures.engine] commitGesture: computeDir → vert (lockedDir=vert)
+2026-11-01 22:10:37:086 [DEBUG] [gestures.engine] commitGesture: slotForDir(2, vert, 6.76, 31.60) → swipe_2_down
+2026-11-01 22:10:37:086 [DEBUG] [gestures.engine] commitGesture: slot=swipe_2_down action=none — skip
+2026-11-01 22:10:38:139 [DEBUG] [shortcuts.actions.system] wrap key="" alt=false match=false sel=false => passthrough
+2026-11-01 22:10:38:140 [DEBUG] [keymap] Typing context invalidated after a focus transition.
+2026-11-01 22:10:38:166 [DEBUG] [keystats.context_tracker] Native autocorrect detected in 'Unknown' — flushing buffer.
+2026-11-01 22:10:38:579 [INFO] [notifications] Notification dispatched (success): ✅ Karabiner prêt — Le moteur Karabiner est prêt..
+2026-11-01 22:10:38:579 [INFO] [karabiner] Karabiner ready notification sent.
+2026-11-01 22:10:50:203 [DEBUG] [file_watchers] Lua file change detected: ~/perso/ergopti/static/ergopti_plus/macos/tests/meta/boot/test_init_mlx_cleanup_gated.lua (+3 more)
+2026-11-01 22:10:50:203 [DEBUG] [menu_watchers] File change detected (4 distinct in burst) — settle armed.
+2026-11-01 22:10:50:704 [DEBUG] [file_watchers] Reload held (filesystem settling) on '~/perso/ergopti/static/ergopti_plus/macos/'.
+2026-11-01 22:10:50:704 [DEBUG] [menu_watchers] Reload held (filesystem settling) on '~/perso/ergopti/static/ergopti_plus/macos/'.
+2026-11-01 22:10:51:299 [DEBUG] [logger] ↑ 1 identical line suppressed
+2026-11-01 22:10:51:299 [DEBUG] [keystats.watchers] Battery: 95.0% (Battery Power, charging=false).
+2026-11-01 22:10:53:207 [DEBUG] [adapters.file_system] read(): '~/perso/ergopti/static/ergopti_plus/macos/.git' is absent.
+2026-11-01 22:10:53:208 [DEBUG] [file_watchers] Reload held (git operation in progress in ~/perso/ergopti/static/ergopti_plus/macos/) on '~/perso/ergopti/static/ergopti_plus/macos/' (1/120).
+2026-11-01 22:10:53:210 [DEBUG] [menu_watchers] Reload held (git operation in progress) on '~/perso/ergopti/static/ergopti_plus/macos/' (1/120).
+2026-11-01 22:11:39:243 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=10.3%, memory=40G).
+2026-11-01 22:11:53:001 [WARNING] [file_watchers] Git operation in '~/perso/ergopti/static/ergopti_plus/macos/' still owns the reload fence after 120 checks; reload remains pending.
+2026-11-01 22:11:53:003 [WARNING] [menu_watchers] Git operation still owns the reload fence after 120 checks on '~/perso/ergopti/static/ergopti_plus/macos/'; reload remains pending.
+2026-11-01 22:11:56:839 [INFO] [infra.termination_coordinator] Controlled reload requested (reason: watcher).
+2026-11-01 22:11:56:839 [START] [karabiner] Revoking the exact Ergopti Karabiner lease…
+2026-11-01 22:11:56:839 [INFO] [karabiner.lease] Stopping Karabiner lease b268f3d7ea21474f9a37b40cdd438be6 (watcher).
+2026-11-01 22:11:56:839 [SUCCESS] [karabiner] Ergopti Karabiner lease revocation requested; stock Karabiner left untouched.
+2026-11-01 22:11:56:845 [INFO] [file_watchers] Source change reload requested (275 file(s): action_parameter_label.lua, action_parameter_label_contract.lua, actions.lua, actions_aux_owner.lua, ai_runtime_selection_install_fixture.lua, +270 more).
+2026-11-01 22:11:57:317 [DEBUG] [karabiner] Trackpad CapsWord resources stopped with the Ergopti lease.
+2026-11-01 22:11:57:318 [INFO] [infra.termination_coordinator] Exact Karabiner lease fenced; completing controlled reload.
+2026-11-01 22:11:57:322 [DEBUG] [reload_guard] Reload sentinel set.
+2026-11-01 22:11:57:327 [INFO] [init] Hammerspoon local teardown started (reload).
+2026-11-01 22:11:57:328 [DEBUG] [menu_llm.mlx] MLX shutdown: no server owned this session; listener proof skipped.
+2026-11-01 22:11:57:328 [INFO] [menu_llm.models] MLX server stopped safely.
+2026-11-01 22:11:57:328 [INFO] [gestures] ↑ "Wake-from-sleep detected (event=%d) — recycling watchers" repeated 1 more time between 2026-11-01 22:10:35:264 and 2026-11-01 22:10:35:264 (last: Wake-from-sleep detected (event=11) — recycling watchers).
+2026-11-01 22:11:57:328 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-11-01 22:11:57:329 [INFO] [gestures] ↑ "recycle_watchers: BEGIN (watchers_before=%d, first_frame=%s, reattach=%s)" repeated 1 more time between 2026-11-01 22:10:35:271 and 2026-11-01 22:10:35:271 (last: recycle_watchers: BEGIN (watchers_before=1, first_frame=true, reattach=true)).
+2026-11-01 22:11:57:329 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 6).
+2026-11-01 22:11:57:329 [INFO] [gestures] ↑ "  recycle_watchers: found %d device(s) to attach" repeated 1 more time between 2026-11-01 22:10:35:273 and 2026-11-01 22:10:35:273 (last:   recycle_watchers: found 1 device(s) to attach).
+2026-11-01 22:11:57:329 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 7, in-flight warmup invalidated.
+2026-11-01 22:11:57:331 [START] [karabiner] Stopping Karabiner bridge…
+2026-11-01 22:11:57:331 [TRACE] [karabiner] Stopping input source watcher…
+2026-11-01 22:11:57:331 [DONE] [karabiner] Input source watcher stopped.
+2026-11-01 22:11:57:331 [SUCCESS] [karabiner] Karabiner bridge stopped.
+2026-11-01 22:11:57:331 [START] [keymap] Stopping keymap engine…
+2026-11-01 22:11:57:332 [DEBUG] [gestures] ↑ "    device #%d: id=%s" repeated 1 more time between 2026-11-01 22:10:35:273 and 2026-11-01 22:10:35:273 (last:     device #1: id=504403158265495662).
+2026-11-01 22:11:57:332 [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+2026-11-01 22:11:57:333 [START] [diagnostics.hid_mailbox] Stopping HID diagnostic pump…
+2026-11-01 22:11:57:333 [SUCCESS] [diagnostics.hid_mailbox] HID diagnostic pump stopped.
+2026-11-01 22:11:57:333 [SUCCESS] [keymap] Keymap engine stopped.
+2026-11-01 22:11:57:334 [START] [gestures] Stopping gestures module…
+2026-11-01 22:11:57:337 [INFO] [gestures] ↑ "create_watcher: ENTRY deviceID=%s" repeated 1 more time between 2026-11-01 22:10:35:273 and 2026-11-01 22:10:35:273 (last: create_watcher: ENTRY deviceID=504403158265495662).
+2026-11-01 22:11:57:337 [DEBUG] [gestures.click] Forcefully releasing all held clicks…
+2026-11-01 22:11:57:338 [INFO] [gestures] ↑ "create_watcher: device introspection — id=%s, builtin=%s, alive=%s, running=%s, MTHID=%s, driverReady=%s, productName=%s" repeated 1 more time between 2026-11-01 22:10:35:275 and 2026-11-01 22:10:35:275 (last: create_watcher: device introspection — id=504403158265495662, builtin=true, alive=false, running=false, MTHID=true, driverReady=true, productName=Apple Internal Keyboard / Trackpad).
+2026-11-01 22:11:57:338 [INFO] [gestures] recycle_watchers: BEGIN (watchers_before=1, first_frame=true, reattach=false)
+2026-11-01 22:11:57:339 [DONE] [gestures.engine] Gestures engine stopped.
+2026-11-01 22:11:57:339 [SUCCESS] [gestures] Gestures module stopped.
+2026-11-01 22:11:57:344 [START] [shortcuts.bindings] Stopping shortcuts bindings…
+2026-11-01 22:11:57:344 [SUCCESS] [shortcuts.bindings] Shortcuts bindings stopped.
+2026-11-01 22:11:57:344 [START] [shortcuts.script_control] Stopping script control…
+2026-11-01 22:11:57:344 [SUCCESS] [shortcuts.script_control] Script control stopped.
+2026-11-01 22:11:57:344 [START] [shortcuts.keyboard_shortcuts] Stopping keyboard shortcuts…
+2026-11-01 22:11:57:345 [SUCCESS] [shortcuts.keyboard_shortcuts] Keyboard shortcuts stopped.
+2026-11-01 22:11:57:345 [INFO] [gestures] ↑ "create_watcher: ATTACHED device=%s, running=true, alive=%s" repeated 1 more time between 2026-11-01 22:10:35:275 and 2026-11-01 22:10:35:275 (last: create_watcher: ATTACHED device=504403158265495662, running=true, alive=false).
+2026-11-01 22:11:57:345 [INFO] [gestures.conflicts] System gesture settings read cancelled during shutdown.
+2026-11-01 22:11:57:346 [START] [adapters.process_lifecycle] Stopping process lifecycle watchers…
+2026-11-01 22:11:57:346 [SUCCESS] [adapters.process_lifecycle] Process lifecycle watchers stopped.
+2026-11-01 22:11:57:346 [DEBUG] [keystats.watchers] Stopping hardware watcher transaction…
+2026-11-01 22:11:57:346 [DEBUG] [karabiner] ↑ "Retaining %s Karabiner regeneration behind a fresh native guardian proof." repeated 1 more time between 2026-11-01 22:10:35:777 and 2026-11-01 22:10:35:777 (last: Retaining public Karabiner regeneration behind a fresh native guardian proof.).
+2026-11-01 22:11:57:346 [DEBUG] [keystats.watchers] Hardware watcher transaction stopped.
+2026-11-01 22:11:57:348 [DEBUG] [karabiner] ↑ "Resolved %d logical-char action(s) to key codes." repeated 1 more time between 2026-11-01 22:10:35:847 and 2026-11-01 22:10:35:847 (last: Resolved 548 logical-char action(s) to key codes.).
+2026-11-01 22:11:57:348 [DEBUG] [keystats.log_manager] Log manager stopped
+2026-11-01 22:11:57:348 [DONE] [keystats.kc_bridge] KE physical-kc bridge stopped.
+2026-11-01 22:11:57:351 [INFO] [karabiner] ↑ "User config loaded (Ergopti uses Karabiner: %s)." repeated 1 more time between 2026-11-01 22:10:35:861 and 2026-11-01 22:10:35:861 (last: User config loaded (Ergopti uses Karabiner: true).).
+2026-11-01 22:11:57:351 [DEBUG] [menu_llm] Helper sweep 'expander' dispatched.
+2026-11-01 22:11:57:358 [DEBUG] [karabiner] ↑ "Action '%s': prepended F20 sentinel to nav-layer activation." repeated 3 more times between 2026-11-01 22:10:34:986 and 2026-11-01 22:10:35:879 (last: Action 'layer_on': prepended F20 sentinel to nav-layer activation.).
+2026-11-01 22:11:57:358 [INFO] [driver_control] Local reload control retired.
+2026-11-01 22:11:57:359 [INFO] [karabiner] ↑ "Prepended F20 sentinel to %d nav-layer-activating action(s)." repeated 1 more time between 2026-11-01 22:10:35:879 and 2026-11-01 22:10:35:879 (last: Prepended F20 sentinel to 2 nav-layer-activating action(s).).
+2026-11-01 22:11:57:359 [INFO] [field_run] Developer field run watcher retired.
+2026-11-01 22:11:57:359 [INFO] [karabiner] ↑ "Inserted the F19 exit sentinel into %d nav-layer-deactivating event list(s)." repeated 1 more time between 2026-11-01 22:10:35:880 and 2026-11-01 22:10:35:880 (last: Inserted the F19 exit sentinel into 2 nav-layer-deactivating event list(s).).
+2026-11-01 22:11:57:359 [DEBUG] [menu] Menubar watchers stopped.
+2026-11-01 22:11:57:359 [DEBUG] [karabiner] ↑ "Combo '%s': tap=%s, hold=%s, combo=%s (non_canonical=%s)." repeated 11 more times between 2026-11-01 22:10:34:995 and 2026-11-01 22:10:35:885 (last: Combo 'rcmd_lcmd': tap=opt_backspace, hold=option_shift, combo=opt_backspace (non_canonical=true).).
+2026-11-01 22:11:57:359 [INFO] [init] Hammerspoon local owners stopped; draining acknowledged diagnostics.
+2026-11-01 22:11:57:360 [DEBUG] [adapters.secure_field_detector] ↑ "AX secure-field classification incomplete (role_read=%s, subrole_read=%s); suppressing input." repeated 20 more times between 2026-11-01 22:10:34:807 and 2026-11-01 22:11:53:717 (last: AX secure-field classification incomplete (role_read=true, subrole_read=false); suppressing input.).
+2026-11-01 22:11:57:360 [INFO] [gestures] ↑ "recycle_watchers: END (watchers_after=%d, stopped=%d, settled=%s)" repeated 2 more times between 2026-11-01 22:10:35:275 and 2026-11-01 22:11:57:339 (last: recycle_watchers: END (watchers_after=0, stopped=1, settled=true)).
+2026-11-01 22:11:57:360 [DEBUG] [keystats.log_manager] ↑ "Ingest cycle: %d entry(ies), offset now %d." repeated 6 more times between 2026-11-01 22:10:38:751 and 2026-11-01 22:11:53:821 (last: Ingest cycle: 2 entry(ies), offset now 4907.).
+2026-11-01 22:11:57:360 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 1 more time between 2026-11-01 22:11:01:874 and 2026-11-01 22:11:01:874 (last: Process 'defaults' exited (status=0, 11 ms, 30 similar run(s) since the last line).).
+2026-11-01 22:11:57:360 [DEBUG] [karabiner] ↑ "  → rule: %s" repeated 11 more times between 2026-11-01 22:10:34:995 and 2026-11-01 22:10:35:885 (last:   → rule: Cmd droit + Cmd gauche (right_command→left_command): ⌫ ⌥+Backspace (tap) / ⌥⇧ — Option+Shift (hold) [var-based]).
+2026-11-01 22:11:57:360 [DEBUG] [karabiner] ↑ "Building config: tap/hold=%d ms, simultaneous=%d ms, symmetric=%s, %d rule(s)." repeated 1 more time between 2026-11-01 22:10:35:909 and 2026-11-01 22:10:35:909 (last: Building config: tap/hold=200 ms, simultaneous=100 ms, symmetric=false, 31 rule(s).).
+2026-11-01 22:11:57:360 [DEBUG] [karabiner] ↑ "Merged %d managed rule(s) with %d validated non-owning legacy hint(s) into selected profile %d without changing personal settings." repeated 1 more time between 2026-11-01 22:10:36:068 and 2026-11-01 22:10:36:068 (last: Merged 31 managed rule(s) with 29 validated non-owning legacy hint(s) into selected profile 1 without changing personal settings.).
+2026-11-01 22:11:57:360 [INFO] [karabiner] ↑ "Karabiner deploy decision: skipped-identical (%s; no reload)." repeated 1 more time between 2026-11-01 22:10:36:069 and 2026-11-01 22:10:36:069 (last: Karabiner deploy decision: skipped-identical (the managed rules on disk already match; no reload).).
+2026-11-01 22:11:57:360 [INFO] [keystats.kc_bridge] ↑ "Managed output kc set rebuilt: %d unique kc(s) claimed." repeated 1 more time between 2026-11-01 22:10:36:069 and 2026-11-01 22:10:36:069 (last: Managed output kc set rebuilt: 13 unique kc(s) claimed.).
+2026-11-01 22:11:57:360 [DEBUG] [adapters.hotkey_registrar] ↑ "Released %s (%s)." repeated 60 more times between 2026-11-01 22:10:35:203 and 2026-11-01 22:11:57:345 (last: Released Ctrl+E (hotkey#113).).
+2026-11-01 22:11:57:360 [DEBUG] [shortcuts.bindings] ↑ "Hotkey '%s' unbound." repeated 14 more times between 2026-11-01 22:10:35:204 and 2026-11-01 22:11:57:344 (last: Hotkey 'layer_wheel' unbound.).
+2026-11-01 22:11:57:360 [DEBUG] [shortcuts.bindings] ↑ "Hotkey '%s' bound." repeated 9 more times between 2026-11-01 22:10:35:218 and 2026-11-01 22:10:36:097 (last: Hotkey 'layer_wheel' bound.).
+2026-11-01 22:11:57:360 [DEBUG] [adapters.hotkey_registrar] ↑ "Bound %s → %s." repeated 37 more times between 2026-11-01 22:10:35:242 and 2026-11-01 22:10:36:100 (last: Bound Ctrl+A → hotkey#118.).
+2026-11-01 22:11:57:360 [DEBUG] [adapters.hotkey_registrar] ↑ "%s enabled=%s." repeated 1 more time between 2026-11-01 22:10:36:099 and 2026-11-01 22:10:36:099 (last: Ctrl+Space enabled=false.).
+2026-11-01 22:11:57:360 [INFO] [karabiner] ↑ "Shortcuts rebound for layout '%s'." repeated 1 more time between 2026-11-01 22:10:36:100 and 2026-11-01 22:10:36:100 (last: Shortcuts rebound for layout 'current'.).
+2026-11-01 22:11:57:360 [DEBUG] [gestures] ↑ "Touch session started on device=%s (frame %d, touches=%d)." repeated 4 more times between 2026-11-01 22:10:36:385 and 2026-11-01 22:10:51:877 (last: Touch session started on device=504403158265495662 (frame 298, touches=1).).
+2026-11-01 22:11:57:360 [DEBUG] [keystats.context_tracker] ↑ "Native autocorrect detected in '%s' — flushing buffer." repeated 9 more times between 2026-11-01 22:10:38:662 and 2026-11-01 22:11:56:059 (last: Native autocorrect detected in 'Unknown' — flushing buffer.).
+2026-11-01 22:11:57:360 [INFO] [notifications] ↑ "Notification dispatched (%s): %s — %s." repeated 2 more times between 2026-11-01 22:11:56:836 and 2026-11-01 22:11:56:848 (last: Notification dispatched (info): ℹ️ Rechargement — Script modifié — rechargement….).
+2026-11-01 22:11:57:360 [DEBUG] [file_watchers] ↑ "Lua file change detected: %s (+%d more)" repeated 19 more times between 2026-11-01 22:11:53:354 and 2026-11-01 22:11:53:822 (last: Lua file change detected: ~/perso/ergopti/static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua (+25 more)).
+2026-11-01 22:11:57:360 [DEBUG] [menu_watchers] ↑ "File change detected (%d distinct in burst) — settle armed." repeated 15 more times between 2026-11-01 22:11:53:353 and 2026-11-01 22:11:53:822 (last: File change detected (213 distinct in burst) — settle armed.).
+2026-11-01 22:11:57:360 [DEBUG] [file_watchers] ↑ "Reload held (filesystem settling) on '%s'." repeated 9 more times between 2026-11-01 22:10:51:204 and 2026-11-01 22:11:56:323 (last: Reload held (filesystem settling) on '~/perso/ergopti/static/ergopti_plus/macos/'.).
+2026-11-01 22:11:57:360 [DEBUG] [menu_watchers] ↑ "Reload held (filesystem settling) on '%s'." repeated 8 more times between 2026-11-01 22:10:51:704 and 2026-11-01 22:11:56:323 (last: Reload held (filesystem settling) on '~/perso/ergopti/static/ergopti_plus/macos/'.).
+2026-11-01 22:11:57:360 [DEBUG] [keystats.watchers] ↑ "Battery: %s%% (%s, charging=%s)." repeated 1 more time between 2026-11-01 22:11:51:068 and 2026-11-01 22:11:51:068 (last: Battery: 95.0% (Battery Power, charging=false).).
+2026-11-01 22:11:57:360 [DEBUG] [adapters.file_system] ↑ "read(): '%s' is absent." repeated 733 more times between 2026-11-01 22:10:53:207 and 2026-11-01 22:11:56:843 (last: read(): '~/perso/config/ergopti_plus/.git' is absent.).
+2026-11-01 22:11:57:360 [DEBUG] [file_watchers] ↑ "Reload held (git operation in progress in %s) on '%s' (%d/%d)." repeated 118 more times between 2026-11-01 22:10:53:710 and 2026-11-01 22:11:52:498 (last: Reload held (git operation in progress in ~/perso/ergopti/static/ergopti_plus/macos/) on '~/perso/ergopti/static/ergopti_plus/macos/' (119/120).).
+2026-11-01 22:11:57:360 [DEBUG] [menu_watchers] ↑ "Reload held (git operation in progress) on '%s' (%d/%d)." repeated 118 more times between 2026-11-01 22:10:53:712 and 2026-11-01 22:11:52:499 (last: Reload held (git operation in progress) on '~/perso/ergopti/static/ergopti_plus/macos/' (119/120).).
+2026-11-01 22:11:57:360 [DEBUG] [karabiner] ↑ "Trackpad CapsWord resources stopped with the Ergopti lease." repeated 1 more time between 2026-11-01 22:11:57:331 and 2026-11-01 22:11:57:331.
+2026-11-01 22:11:57:360 [DEBUG] [menu_llm] ↑ "Invalidated LLM health status." repeated 1 more time between 2026-11-01 22:11:57:348 and 2026-11-01 22:11:57:348.
+2026-11-01 22:11:57:360 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 1 more time between 2026-11-01 22:11:57:349 and 2026-11-01 22:11:57:349 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 8).).
+2026-11-01 22:11:57:360 [DEBUG] [llm.api_ollama] ↑ "stop_warmup() — gen bumped to %d, in-flight warmup invalidated." repeated 1 more time between 2026-11-01 22:11:57:349 and 2026-11-01 22:11:57:349 (last: stop_warmup() — gen bumped to 9, in-flight warmup invalidated.).
+2026-11-01 22:11:57:360 [DEBUG] [gestures.click] ↑ "Forcefully releasing all held clicks…" repeated 1 more time between 2026-11-01 22:11:57:343 and 2026-11-01 22:11:57:343.
+2026-11-01 22:11:57:360 [DEBUG] [menu_llm] ↑ "Helper sweep '%s' dispatched." repeated 1 more time between 2026-11-01 22:11:57:354 and 2026-11-01 22:11:57:354 (last: Helper sweep 'http-server' dispatched.).
+2026-11-01 22:11:57:372 [DEBUG] [adapters.shell_runner] Process 'ErgoptiPlus' exited (status=0, 7378708 ms, 1 similar run(s) since the last line).
+2026-11-01 22:11:57:372 [INFO] [karabiner.lease] Karabiner lease watchdog b268f3d7ea21474f9a37b40cdd438be6 stopped (exit 0); STOPPED acknowledged.
+
+===== 2026-11-01 22:11:58:018 — ErgoptiPlus session opened =====
+2026-11-01 22:11:58:018 [INFO] [init] Log folder chosen: ~/perso/ergopti/ergopti_plus/ (directory; usable: true).
+2026-11-01 22:11:58:019 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 2.0 ms (+2.6 ms, total 478.8 ms, cpu 0.9 ms).
+2026-11-01 22:11:58:020 [START] [BootProfile] Boot stage started: Path: native asynchronous logger transport committed.
+2026-11-01 22:11:58:027 [INFO] [init] Native logger handshake committed: the launcher worker owns ~/perso/ergopti/ergopti_plus/.
+2026-11-01 22:11:58:027 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 7.3 ms (+8.1 ms, total 486.9 ms, cpu 3.7 ms).
+2026-11-01 22:11:58:028 [INFO] [BootProfile] Boot stage requires: Path: native asynchronous logger transport committed loaded 3 module(s) in 2.3 ms (own time).
+2026-11-01 22:11:58:028 [START] [BootProfile] Boot stage started: Path: runtime error capture installed.
+2026-11-01 22:11:58:028 [INFO] [logger] Runtime error capture installed (hs.timer guards with slow-callback reports, shell timing + console tee).
+2026-11-01 22:11:58:028 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.4 ms (+0.8 ms, total 487.7 ms, cpu 0.1 ms).
+2026-11-01 22:11:58:028 [START] [BootProfile] Boot stage started: Factory-reset recovery reconciled.
+2026-11-01 22:11:58:031 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 2.8 ms (+3.0 ms, total 490.7 ms, cpu 1.6 ms).
+2026-11-01 22:11:58:031 [INFO] [BootProfile] Boot stage requires: Factory-reset recovery reconciled loaded 1 module(s) in 1.8 ms (own time).
+2026-11-01 22:11:58:031 [START] [BootProfile] Boot stage started: TOML hotstring cache wired.
+2026-11-01 22:11:58:033 [START] [adapters.toml_cache] Initializing TOML hotstring cache…
+2026-11-01 22:11:58:034 [SUCCESS] [adapters.toml_cache] TOML hotstring cache ready at '~/Library/Caches/ergopti_plus/toml_hotstrings'.
+2026-11-01 22:11:58:034 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 2.7 ms (+3.0 ms, total 493.7 ms, cpu 1.7 ms).
+2026-11-01 22:11:58:034 [INFO] [BootProfile] Boot stage requires: TOML hotstring cache wired loaded 1 module(s) in 1.5 ms (own time).
+2026-11-01 22:11:58:034 [START] [BootProfile] Boot stage started: Config-dependent module requires.
+2026-11-01 22:11:58:038 [START] [infra.launcher_guard] Initializing Swift launcher liveness guard…
+2026-11-01 22:11:58:038 [SUCCESS] [infra.launcher_guard] Swift launcher liveness guard armed for PID 66306.
+2026-11-01 22:11:58:039 [INFO] [adapters.keyboard_geometry] Loading native keyboard geometry.
+2026-11-01 22:11:58:049 [INFO] [adapters.keyboard_geometry] Native keyboard geometry loaded: 199 ranges.
+2026-11-01 22:11:58:055 [DEBUG] [adapters.toml_cache] Snapshot hit for '~/perso/ergopti/static/ergopti_plus/_shared/tap_hold/defaults.toml'.
+2026-11-01 22:11:58:078 [CONSOLE] [console] -- Loading extension: keycodes
+2026-11-01 22:11:58:097 [INFO] [adapters.keyboard_geometry] Virtual keyboard form source registered.
+2026-11-01 22:11:58:167 [DEBUG] [menu] Module "gestures menu" loaded successfully (ui.menu.menu_gestures).
+2026-11-01 22:11:58:179 [DEBUG] [menu] Module "shortcuts menu" loaded successfully (ui.menu.menu_shortcuts).
+2026-11-01 22:11:58:199 [DEBUG] [menu] Module "keyboard layout menu" loaded successfully (ui.menu.menu_keyboard_layout).
+2026-11-01 22:11:58:226 [DEBUG] [menu] Module "hotstrings menu" loaded successfully (ui.menu.menu_hotstrings).
+2026-11-01 22:11:58:377 [DEBUG] [backend_detector] Auto-default = mlx (arm64, macOS major=26).
+2026-11-01 22:11:58:378 [DEBUG] [menu] Module "AI menu" loaded successfully (ui.menu.menu_llm).
+2026-11-01 22:11:58:383 [DEBUG] [menu] Module "metrics menu" loaded successfully (ui.menu.menu_metrics).
+2026-11-01 22:11:58:387 [DEBUG] [menu] Module "tap-holds menu" loaded successfully (ui.menu.menu_tap_holds).
+2026-11-01 22:11:58:390 [DEBUG] [menu] Module "apps menu" loaded successfully (ui.menu.menu_apps).
+2026-11-01 22:11:58:406 [DEBUG] [menu] Module "about/update menu" loaded successfully (ui.menu.menu_about).
+2026-11-01 22:11:58:407 [DEBUG] [menu] Module "AI engine" loaded successfully (modules.llm).
+2026-11-01 22:11:58:407 [DEBUG] [menu] Module "metrics engine" loaded successfully (modules.keystats).
+2026-11-01 22:11:58:407 [DEBUG] [menu] Module "shortcuts engine" loaded successfully (modules.shortcuts).
+2026-11-01 22:11:58:407 [DEBUG] [menu] Module "dynamic hotstrings engine" loaded successfully (modules.dynamic_hotstrings).
+2026-11-01 22:11:58:408 [DEBUG] [menu] Module "CapsWord auto-off settings" loaded successfully (infra.capsword_auto_off).
+2026-11-01 22:11:58:424 [SUCCESS] [infra.termination_coordinator] Controlled termination coordinator initialized.
+2026-11-01 22:11:58:424 [START] [error_dialog] Initialising the error window…
+2026-11-01 22:11:58:424 [SUCCESS] [error_dialog] Error window ready (enabled).
+2026-11-01 22:11:58:424 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 390.0 ms (+390.3 ms, total 884.0 ms, cpu 288.0 ms).
+2026-11-01 22:11:58:425 [INFO] [BootProfile] Boot stage requires: Config-dependent module requires loaded 160 module(s) in 374.9 ms (own time); slowest: ui.menu.menu_llm=57.1 ms, platform.remap=8.1 ms, platform.remap.defaults=7.6 ms, ui.menu=7.2 ms, ui.changelog=6.8 ms, ui.menu.menu_hotstrings_custom=6.3 ms, ui.menu.menu_hotstrings=6.2 ms, platform.remap.generator=5.5 ms.
+2026-11-01 22:11:58:425 [START] [BootProfile] Boot stage started: Config schema migration.
+2026-11-01 22:11:58:429 [START] [config_migrate] Checking the config schema version of '<config>/hammerspoon/config.toml' (hs driver)…
+2026-11-01 22:11:58:554 [SUCCESS] [config_migrate] Migrated '<config>/hammerspoon/config.toml' from schema v19 to v20; backup at '<config>/hammerspoon/<name>'.
+2026-11-01 22:11:58:554 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 129.3 ms (+129.7 ms, total 1013.7 ms, cpu 38.0 ms).
+2026-11-01 22:11:58:554 [INFO] [BootProfile] Boot stage requires: Config schema migration loaded 2 module(s) in 4.9 ms (own time); slowest: config_unused_keys=3.3 ms.
+2026-11-01 22:11:58:554 [START] [BootProfile] Boot stage started: First-launch guard (onboarding check).
+2026-11-01 22:11:58:561 [INFO] [init] config.toml is present at <config>/hammerspoon/config.toml: the full boot continues.
+2026-11-01 22:11:58:561 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 6.9 ms (+7.3 ms, total 1021.0 ms, cpu 5.7 ms).
+2026-11-01 22:11:58:562 [INFO] [BootProfile] Boot stage requires: First-launch guard (onboarding check) loaded 2 module(s) in 6.4 ms (own time); slowest: ui.onboarding=4.9 ms.
+2026-11-01 22:11:58:562 [START] [BootProfile] Boot stage started: Accessibility permission.
+2026-11-01 22:11:58:562 [INFO] [init] Accessibility permission is granted; arming input owners.
+2026-11-01 22:11:58:562 [CONSOLE] [console] -- Loading extension: window
+2026-11-01 22:11:58:562 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 0.7 ms (+1.0 ms, total 1022.0 ms, cpu 0.6 ms).
+2026-11-01 22:11:58:562 [START] [BootProfile] Boot stage started: Shortcuts pre-start.
+2026-11-01 22:11:58:563 [DEBUG] [init] Starting shortcuts module…
+2026-11-01 22:11:58:569 [DEBUG] [gestures.click] Forcefully releasing all held clicks…
+2026-11-01 22:11:58:571 [START] [shortcuts.bindings] Starting shortcuts bindings…
+2026-11-01 22:11:58:573 [INFO] [shortcuts.tap_keys] Tap keys loaded.
+2026-11-01 22:11:58:579 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 22:11:58:655 [CONSOLE] [console] -- Loading extension: task
+2026-11-01 22:11:58:658 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 22:11:58:659 [DEBUG] [shortcuts.bindings] Hotkey 'layer_wheel' bound.
+2026-11-01 22:11:58:659 [SUCCESS] [shortcuts.bindings] Shortcuts bindings started (2 hotkey(s), 0 waiting for a retry).
+2026-11-01 22:11:58:659 [START] [shortcuts.keyboard_shortcuts] Starting keyboard shortcuts…
+2026-11-01 22:11:58:663 [CONSOLE] [console] -- Loading extension: hotkey
+2026-11-01 22:11:58:670 [DEBUG] [adapters.hotkey_registrar] Bound Ctrl+T → hotkey#1.
+2026-11-01 22:11:58:670 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ T → teleport_mouse.
+2026-11-01 22:11:58:671 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ . → open_emoji_picker.
+2026-11-01 22:11:58:671 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ L → lock_screen.
+2026-11-01 22:11:58:671 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ U → uppercase_selection.
+2026-11-01 22:11:58:671 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ E → open_file_manager.
+2026-11-01 22:11:58:671 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ G → open_chatgpt.
+2026-11-01 22:11:58:671 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ M → activity_simulation.
+2026-11-01 22:11:58:671 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ ' → spotlight_mouse.
+2026-11-01 22:11:58:671 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ X → pick_color.
+2026-11-01 22:11:58:671 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ A → select_line.
+2026-11-01 22:11:58:671 [DONE] [shortcuts.keyboard_shortcuts] Bound ⌘ ⇧ V → paste_plain.
+2026-11-01 22:11:58:671 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ O → surround_parens.
+2026-11-01 22:11:58:671 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ P → display_mirror_toggle.
+2026-11-01 22:11:58:671 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ Caps Lock → toggle_capslock.
+2026-11-01 22:11:58:672 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ S → copy_selected_path.
+2026-11-01 22:11:58:672 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ W → titlecase_selection.
+2026-11-01 22:11:58:672 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ H → screenshot_region_clipboard.
+2026-11-01 22:11:58:672 [DEBUG] [adapters.hotkey_registrar] Ctrl+Space enabled=false.
+2026-11-01 22:11:58:672 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ Space → llm_generate_prediction.
+2026-11-01 22:11:58:672 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ I → open_system_settings.
+2026-11-01 22:11:58:672 [DONE] [shortcuts.keyboard_shortcuts] Bound ^ D → open_downloads.
+2026-11-01 22:11:58:672 [SUCCESS] [shortcuts.keyboard_shortcuts] Keyboard shortcuts started (20 active binding(s), 0 waiting for a retry).
+2026-11-01 22:11:58:672 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 109.5 ms (+109.7 ms, total 1131.6 ms, cpu 44.0 ms).
+2026-11-01 22:11:58:672 [INFO] [BootProfile] Boot stage requires: Shortcuts pre-start loaded 20 module(s) in 26.9 ms (own time); slowest: modules.keymap.layout_registry=3.2 ms.
+2026-11-01 22:11:58:672 [START] [BootProfile] Boot stage started: Script control engine started (panic-button eventtap).
+2026-11-01 22:11:58:672 [DEBUG] [init] Starting script control engine…
+2026-11-01 22:11:58:672 [START] [shortcuts.script_control] Starting script control…
+2026-11-01 22:11:58:673 [SUCCESS] [shortcuts.script_control] Script control started.
+2026-11-01 22:11:58:673 [INFO] [init] Main modules initialized successfully.
+2026-11-01 22:11:58:673 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 0.5 ms (+0.8 ms, total 1132.4 ms, cpu 0.3 ms).
+2026-11-01 22:11:58:673 [START] [BootProfile] Boot stage started: MLX server cleanup started asynchronously.
+2026-11-01 22:11:58:673 [DEBUG] [shortcuts.script_control] Pause owner registered: mlx_dependency_bootstrap.
+2026-11-01 22:11:58:683 [START] [config_overrides] Applying user overrides from '<config>/hammerspoon/config.toml'…
+2026-11-01 22:11:58:683 [SUCCESS] [config_overrides] User overrides applied (0 value(s)).
+2026-11-01 22:11:58:687 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 13.8 ms (+14.0 ms, total 1146.4 ms, cpu 12.6 ms).
+2026-11-01 22:11:58:687 [INFO] [BootProfile] Boot stage requires: MLX server cleanup started asynchronously loaded 2 module(s) in 9.0 ms (own time); slowest: infra.config_overrides=8.0 ms.
+2026-11-01 22:11:58:687 [START] [BootProfile] Boot stage started: LLM backend bootstrap.
+2026-11-01 22:11:58:687 [INFO] [init] LLM boot disabled at startup — skipping backend bootstrap.
+2026-11-01 22:11:58:687 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 0.5 ms (+0.8 ms, total 1147.2 ms, cpu 0.4 ms).
+2026-11-01 22:11:58:688 [START] [BootProfile] Boot stage started: TOML discovery + ordering.
+2026-11-01 22:11:58:690 [INFO] [init] No shared hotstring groups in '<config>/' — using bundled directory '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/'.
+2026-11-01 22:11:58:692 [START] [extension_packs] Discovering extension packs…
+2026-11-01 22:11:58:704 [SUCCESS] [extension_packs] Discovered 2 extension(s): 2 hotstring pack(s), 6 bound geometry file(s).
+2026-11-01 22:11:58:705 [START] [hotstrings_config] Initializing…
+2026-11-01 22:11:58:710 [SUCCESS] [hotstrings_config] Initialized (override file: '<config>/hotstrings_config.toml').
+2026-11-01 22:11:58:717 [DEBUG] [hotstrings_config_window] Personal dir configured: '<config>/hotstrings/'.
+2026-11-01 22:11:58:717 [DEBUG] [hotstrings_config_window] Extensions dir configured: '~/perso/ergopti/static/ergopti_plus/macos/../extensions'.
+2026-11-01 22:11:58:717 [DEBUG] [keymap.registry] update_trigger_char: key unchanged ('★') — skipping rename.
+2026-11-01 22:11:58:717 [DEBUG] [keymap] Trigger char: '★'.
+2026-11-01 22:11:58:718 [DEBUG] [keymap.registry] Sort deferred.
+2026-11-01 22:11:58:718 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 30.2 ms (+30.3 ms, total 1177.5 ms, cpu 23.2 ms).
+2026-11-01 22:11:58:718 [INFO] [BootProfile] Boot stage requires: TOML discovery + ordering loaded 4 module(s) in 10.4 ms (own time); slowest: ui.hotstrings_config_window=5.4 ms.
+2026-11-01 22:11:58:718 [START] [BootProfile] Boot stage started: Hotstring groups registered (personal + dynamic + common).
+2026-11-01 22:11:58:722 [START] [keymap.registry] Loading TOML mapping file '<name>'…
+2026-11-01 22:11:58:732 [SUCCESS] [keymap.registry] TOML mapping file #1 (user, '<name>') loaded (517 mapping(s); 517 total).
+2026-11-01 22:11:58:733 [DEBUG] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / personal hotstrings took 15.4 ms.
+2026-11-01 22:11:58:734 [START] [keymap.registry] Loading TOML mapping file '<name>'…
+2026-11-01 22:11:58:736 [DEBUG] [keymap.registry] Section '<name>/greetings' skipped (disabled in hs.settings).
+2026-11-01 22:11:58:736 [INFO] [keymap.registry] TOML mapping file #2 (bundled, '<name>') registered no mapping: its 2 section(s) are disabled.
+2026-11-01 22:11:58:737 [START] [keymap.registry] Loading TOML mapping file '<name>'…
+2026-11-01 22:11:58:739 [DEBUG] [extension_packs] Registered 2 extension hotstring pack(s).
+2026-11-01 22:11:58:739 [DEBUG] [init] Starting dynamic hotstrings module…
+2026-11-01 22:11:58:739 [DEBUG] [dynamic_hotstrings] Starting the personal info tracker…
+2026-11-01 22:11:58:739 [DEBUG] [personal_info] Starting personal info tracker…
+2026-11-01 22:11:58:739 [DEBUG] [personal_info] Loading personal info from '<config>/personal_info.toml'…
+2026-11-01 22:11:58:739 [INFO] [personal_info] Personal info configuration loaded successfully.
+2026-11-01 22:11:58:739 [INFO] [personal_info] Personal info tracker started successfully.
+2026-11-01 22:11:58:739 [DEBUG] [dynamic_hotstrings] Injecting personal data into the rules engine…
+2026-11-01 22:11:58:739 [DEBUG] [dynamic_hotstrings.rules] Personal data received before keymap wiring; prefix registration deferred to M.start().
+2026-11-01 22:11:58:739 [DEBUG] [dynamic_hotstrings] Starting the dynamic rules engine…
+2026-11-01 22:11:58:739 [DEBUG] [dynamic_hotstrings.rules] Starting dynamic rules engine…
+2026-11-01 22:11:58:739 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+2026-11-01 22:11:58:739 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-01 22:11:58:818 [DEBUG] [keymap.registry] Lua group '<name>' registered.
+2026-11-01 22:11:58:818 [DEBUG] [dynamic_hotstrings.rules] Registering prefix-based dynamic hotstrings…
+2026-11-01 22:11:58:818 [INFO] [dynamic_hotstrings.rules] Prefix-based dynamic hotstrings registered.
+2026-11-01 22:11:58:818 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+2026-11-01 22:11:58:818 [INFO] [dynamic_hotstrings.rules] Dynamic rules engine started successfully.
+2026-11-01 22:11:58:818 [INFO] [dynamic_hotstrings] The dynamic hotstrings core initialized successfully.
+2026-11-01 22:11:58:818 [DEBUG] [personal_info] Disabling personal info tracking…
+2026-11-01 22:11:58:818 [INFO] [personal_info] Personal info tracking disabled.
+2026-11-01 22:11:58:818 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / dynamic hotstrings took 79.5 ms.
+2026-11-01 22:11:58:818 [DEBUG] [init] Loading common TOML hotstring files…
+2026-11-01 22:11:58:820 [DEBUG] [init] Loading TOML file: autocorrection…
+2026-11-01 22:11:58:821 [START] [keymap.registry] Loading TOML mapping file '<name>'…
+2026-11-01 22:11:58:825 [SUCCESS] [keymap.registry] TOML mapping file #5 (bundled, '<name>') loaded (146 mapping(s); 679 total).
+2026-11-01 22:11:58:825 [DEBUG] [init] Loading TOML file: magickey…
+2026-11-01 22:11:58:826 [START] [keymap.registry] Loading TOML mapping file '<name>'…
+2026-11-01 22:11:58:847 [SUCCESS] [keymap.registry] TOML mapping file #6 (bundled, '<name>') loaded (1344 mapping(s); 2023 total).
+2026-11-01 22:11:58:847 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / common hotstring files took 29.2 ms.
+2026-11-01 22:11:58:847 [INFO] [init] Common hotstring load: 2 file(s), slowest 'magickey' 22.2 ms.
+2026-11-01 22:11:58:848 [DEBUG] [init] Loading language TOML file: french_autocorrection…
+2026-11-01 22:11:58:850 [START] [keymap.registry] Loading TOML mapping file '<name>'…
+2026-11-01 22:11:58:859 [SUCCESS] [keymap.registry] TOML mapping file #7 (bundled, '<name>') loaded (978 mapping(s); 3001 total).
+2026-11-01 22:11:58:859 [DEBUG] [init] Loading language TOML file: french_magickey…
+2026-11-01 22:11:58:863 [START] [keymap.registry] Loading TOML mapping file '<name>'…
+2026-11-01 22:11:58:877 [SUCCESS] [keymap.registry] TOML mapping file #8 (bundled, '<name>') loaded (1830 mapping(s); 4831 total).
+2026-11-01 22:11:58:877 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / language hotstring files took 30.0 ms.
+2026-11-01 22:11:58:888 [START] [keymap.registry] Loading TOML mapping file '<name>'…
+2026-11-01 22:11:58:895 [SUCCESS] [keymap.registry] TOML mapping file #9 (bundled, '<name>') loaded (251 mapping(s); 5082 total).
+2026-11-01 22:11:58:902 [START] [keymap.registry] Loading TOML mapping file '<name>'…
+2026-11-01 22:11:58:904 [SUCCESS] [keymap.registry] TOML mapping file #10 (bundled, '<name>') loaded (27 mapping(s); 5109 total).
+2026-11-01 22:11:58:911 [START] [keymap.registry] Loading TOML mapping file '<name>'…
+2026-11-01 22:11:58:914 [SUCCESS] [keymap.registry] TOML mapping file #11 (bundled, '<name>') loaded (40 mapping(s); 5149 total).
+2026-11-01 22:11:58:921 [START] [keymap.registry] Loading TOML mapping file '<name>'…
+2026-11-01 22:11:58:924 [SUCCESS] [keymap.registry] TOML mapping file #12 (bundled, '<name>') loaded (229 mapping(s); 5378 total).
+2026-11-01 22:11:58:925 [SUCCESS] [infra.hotstring_choice_catalogue] Hotstring choice catalogue published.
+2026-11-01 22:11:58:925 [INFO] [init] Loaded 2 TOML hotstring file(s) and 2 language file(s) in 106.8ms.
+2026-11-01 22:11:58:925 [INFO] [init] TOML snapshot cache: 14 hit(s), 0 miss(es), 0 write(s) (enabled=true).
+2026-11-01 22:11:58:925 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / choice catalogue and cache stats took 47.9 ms.
+2026-11-01 22:11:58:925 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 207.3 ms (+207.6 ms, total 1385.1 ms, cpu 195.4 ms).
+2026-11-01 22:11:58:926 [INFO] [BootProfile] Boot stage requires: Hotstring groups registered (personal + dynamic + common) loaded 2 module(s) in 5.1 ms (own time); slowest: infra.personal_hotstrings=3.4 ms.
+2026-11-01 22:11:58:926 [START] [BootProfile] Boot stage started: Final mapping sort + tail-index rebuild.
+2026-11-01 22:11:58:926 [TRACE] [keymap.registry] Sorting 5378 mapping(s)…
+2026-11-01 22:11:58:931 [DONE] [keymap.registry] Mappings sorted.
+2026-11-01 22:11:58:931 [DEBUG] [keymap.registry] Sort flushed.
+2026-11-01 22:11:58:931 [INFO] [init] Final mapping sort completed in 5.2ms.
+2026-11-01 22:11:58:931 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 5.4 ms (+5.7 ms, total 1390.8 ms, cpu 5.3 ms).
+2026-11-01 22:11:58:931 [START] [BootProfile] Boot stage started: Keymap engine started.
+2026-11-01 22:11:58:953 [START] [keymap.utils] Preparing ignored-window watchers before key capture…
+2026-11-01 22:11:58:953 [DEBUG] [keymap.utils] Ignored-window cache: application watcher started.
+2026-11-01 22:11:58:954 [CONSOLE] [console] -- Loading extension: uielement
+2026-11-01 22:11:58:955 [CONSOLE] [console] -- Loading extension: axuielement
+2026-11-01 22:11:58:961 [DEBUG] [adapters.secure_field_detector] AX secure-field classification incomplete (role_read=true, subrole_read=false); suppressing input.
+2026-11-01 22:11:58:961 [SUCCESS] [keymap.utils] Ignored-window watchers ready (8.4 ms).
+2026-11-01 22:11:58:961 [START] [keymap] Starting keymap engine…
+2026-11-01 22:11:58:961 [START] [diagnostics.hid_mailbox] Starting HID diagnostic pump…
+2026-11-01 22:11:58:961 [SUCCESS] [diagnostics.hid_mailbox] HID diagnostic pump started.
+2026-11-01 22:11:58:961 [INFO] [keymap] Perf sampling auto-enabled (DEBUG log level active).
+2026-11-01 22:11:58:962 [SUCCESS] [keymap] Keymap engine started.
+2026-11-01 22:11:58:962 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 30.9 ms (+31.1 ms, total 1421.9 ms, cpu 25.3 ms).
+2026-11-01 22:11:58:962 [INFO] [BootProfile] Boot stage requires: Keymap engine started loaded 7 module(s) in 13.4 ms (own time); slowest: hs.axuielement=3.6 ms, unicode_case.data=3.4 ms.
+2026-11-01 22:11:58:963 [START] [BootProfile] Boot stage started: UI: karabiner.init.
+2026-11-01 22:11:58:963 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-01 22:11:58:963 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-01 22:11:58:964 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-01 22:11:58:964 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-01 22:11:59:003 [DEBUG] [locale] Locale 'en' loaded (4015 key(s)).
+2026-11-01 22:11:59:003 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-01 22:11:59:019 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-01 22:11:59:019 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-01 22:11:59:019 [INFO] [karabiner] init phase 'load_available_actions': 54.9 ms.
+2026-11-01 22:11:59:020 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-01 22:11:59:053 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-01 22:11:59:053 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-01 22:11:59:053 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-01 22:11:59:055 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-01 22:11:59:055 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-01 22:11:59:057 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-01 22:11:59:057 [DEBUG] [shortcuts.bindings] ↑ "Hotkey '%s' bound." repeated 1 more time between 2026-11-01 22:11:58:659 and 2026-11-01 22:11:58:659 (last: Hotkey 'tap_keys' bound.).
+2026-11-01 22:11:59:057 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-01 22:11:59:057 [TRACE] [karabiner] Registering input source watcher…
+2026-11-01 22:11:59:057 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-01 22:11:59:057 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-01 22:11:59:058 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 6 combo(s) active).
+2026-11-01 22:11:59:058 [DEBUG] [adapters.hotkey_registrar] ↑ "Bound %s → %s." repeated 19 more times between 2026-11-01 22:11:58:671 and 2026-11-01 22:11:58:672 (last: Bound Ctrl+D → hotkey#20.).
+2026-11-01 22:11:59:058 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-01 22:11:59:058 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-01 22:11:59:058 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 95.8 ms (+96.1 ms, total 1518.0 ms, cpu 87.7 ms).
+2026-11-01 22:11:59:059 [INFO] [BootProfile] Boot stage requires: UI: karabiner.init loaded 2 module(s) in 1.1 ms (own time).
+2026-11-01 22:11:59:059 [START] [BootProfile] Boot stage started: UI: menu.start (menubar + state sync + engines + LLM handler).
+2026-11-01 22:11:59:059 [DEBUG] [init] Starting user interface components…
+2026-11-01 22:11:59:059 [START] [menu_paths] Initializing paths editor…
+2026-11-01 22:11:59:059 [SUCCESS] [menu_paths] Paths editor initialized.
+2026-11-01 22:11:59:059 [CONSOLE] [console] -- Loading extension: menubar
+2026-11-01 22:11:59:064 [DEBUG] [shortcuts.script_control] ↑ "Pause owner registered: %s." repeated 1 more time between 2026-11-01 22:11:58:673 and 2026-11-01 22:11:58:673 (last: Pause owner registered: ollama_dependency_bootstrap.).
+2026-11-01 22:11:59:064 [INFO] [menu] Menubar created successfully.
+2026-11-01 22:11:59:064 [DEBUG] [menu] Module "gestures core" loaded successfully (modules.gestures).
+2026-11-01 22:11:59:064 [CONSOLE] [console] -- Loading extension: image
+2026-11-01 22:11:59:072 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-11-01 22:11:59:072 [DEBUG] [llm.core] Backend: mlx.
+2026-11-01 22:11:59:092 [DEBUG] [keymap] Base delay: 0.750s.
+2026-11-01 22:11:59:093 [DEBUG] [keymap] Delay 'autocorrection': 1.000s.
+2026-11-01 22:11:59:098 [DEBUG] [gestures] Gesture action 'tap_3' → 'left_click_toggle'.
+2026-11-01 22:11:59:098 [START] [gestures.conflicts] Reading system gesture settings asynchronously…
+2026-11-01 22:11:59:102 [DEBUG] [keymap.registry] Magic-key repeat engine: on.
+2026-11-01 22:11:59:102 [DEBUG] [keymap.registry] ↑ "Section '%s/%s' skipped (disabled in hs.settings)." repeated 3 more times between 2026-11-01 22:11:58:736 and 2026-11-01 22:11:58:738 (last: Section '<name>/math' skipped (disabled in hs.settings).).
+2026-11-01 22:11:59:102 [DEBUG] [keymap] Idle reset: 3s.
+2026-11-01 22:11:59:102 [INFO] [keymap.registry] ↑ "TOML mapping file %s registered no mapping: its %d section(s) are disabled." repeated 1 more time between 2026-11-01 22:11:58:739 and 2026-11-01 22:11:58:739 (last: TOML mapping file #3 (bundled, '<name>') registered no mapping: its 2 section(s) are disabled.).
+2026-11-01 22:11:59:102 [DEBUG] [keymap] Cascade arrows: 3.
+2026-11-01 22:11:59:102 [DEBUG] [keymap] Click starts a new word: true.
+2026-11-01 22:11:59:102 [DEBUG] [BootProfile] ↑ "Boot sub-stage: %s / %s took %.1f ms." repeated 1 more time between 2026-11-01 22:11:58:739 and 2026-11-01 22:11:58:739 (last: Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / extension packs took 5.3 ms.).
+2026-11-01 22:11:59:102 [DEBUG] [keymap] Arrow starts a new word: true.
+2026-11-01 22:11:59:102 [DEBUG] [keymap] Shortcut starts a new word: true.
+2026-11-01 22:11:59:102 [DEBUG] [keymap.llm_bridge] Star preview: on.
+2026-11-01 22:11:59:103 [DEBUG] [keymap.llm_bridge] Autocorrect preview: on.
+2026-11-01 22:11:59:103 [INFO] [tooltip_config] Colorization explicitly set to: true.
+2026-11-01 22:11:59:103 [DEBUG] [keymap.llm_bridge] Colored tooltips: on.
+2026-11-01 22:11:59:103 [DEBUG] [keymap.registry] update_trigger_char: key unchanged ('★') — skipping rename.
+2026-11-01 22:11:59:103 [DEBUG] [keymap] Trigger char: '★'.
+2026-11-01 22:11:59:103 [INFO] [keymap.magic_key_source] Physical magic key: auto.
+2026-11-01 22:11:59:103 [DEBUG] [llm.core] User profiles: 0 custom profile(s).
+2026-11-01 22:11:59:103 [DEBUG] [llm.core] set_active_profile: runtime LLM disabled — skipping warmup for 'batch_advanced'.
+2026-11-01 22:11:59:103 [DEBUG] [dynamic_hotstrings.shared] ↑ "Rule registered: suffix='%s' section='%s'." repeated 2 more times between 2026-11-01 22:11:58:739 and 2026-11-01 22:11:58:739 (last: Rule registered: suffix='date' section='datelongfr'.).
+2026-11-01 22:11:59:103 [DEBUG] [llm.core] Streaming: on.
+2026-11-01 22:11:59:103 [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+2026-11-01 22:11:59:103 [INFO] [llm.prediction_engine] Model set: 'Qwen3.5-2B' (backend: mlx).
+2026-11-01 22:11:59:103 [DEBUG] [llm.core] Runtime LLM gate: disabled.
+2026-11-01 22:11:59:103 [INFO] [llm.prediction_engine] LLM disabled.
+2026-11-01 22:11:59:103 [DEBUG] [llm.prediction_engine] Ollama daemon recovery superseded: prediction runtime disabled.
+2026-11-01 22:11:59:103 [DEBUG] [llm.warmup_controller] Warmup retry chain cancelled (gen bumped to 1).
+2026-11-01 22:11:59:103 [DEBUG] [llm.api_mlx] stop_warmup() — gen bumped to 1, self-retry chain stopped.
+2026-11-01 22:11:59:104 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 4, in-flight warmup invalidated.
+2026-11-01 22:11:59:104 [DEBUG] [llm.api_remote] Remote warmup stopped (generation 1).
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] AI preview: on.
+2026-11-01 22:11:59:104 [DEBUG] [keymap.llm_bridge] LLM chain after hotstring: on.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Auto temperature raise: on.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Inactivity timer delay updated: 0.500s.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Request interval updated: 0.300s.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Backend label: 'MLX 🚀'.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Model display name: 'Qwen3.5-2B'.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Context window: 500 chars.
+2026-11-01 22:11:59:104 [DEBUG] [keymap.llm_bridge] LLM context reset on nav: yes.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Temperature: 0.1.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Max words: 15 (0 = unlimited).
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Min words: 3.
+2026-11-01 22:11:59:104 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-11-01 22:11:58:673 and 2026-11-01 22:11:58:963 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Prediction count: 3.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Sequential mode: off.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Streaming: on.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Streaming multi: on.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Navigation modifiers: [].
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Info bar: visible.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Validation modifiers: [].
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Prediction indent: 0.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Excluded apps: 0 configured.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Application profile overrides: 0 configured.
+2026-11-01 22:11:59:104 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-01 22:11:59:053 and 2026-11-01 22:11:59:053 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] URL bar filter: off.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Secure field filter: on.
+2026-11-01 22:11:59:104 [DEBUG] [llm.prediction_engine] Instant on word end: on.
+2026-11-01 22:11:59:104 [DEBUG] [llm.agent_runner] System 1: ''.
+2026-11-01 22:11:59:104 [DEBUG] [llm.agent_runner] System 2: ''.
+2026-11-01 22:11:59:104 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-01 22:11:59:020 and 2026-11-01 22:11:59:057 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-01 22:11:59:104 [DEBUG] [llm.agent_runner] Agent mode: 'off'.
+2026-11-01 22:11:59:104 [DEBUG] [llm.agent_runner] Agent excluded applications: 0.
+2026-11-01 22:11:59:105 [DEBUG] [dynamic_hotstrings.rules] Trigger char: '★'.
+2026-11-01 22:11:59:105 [DEBUG] [personal_info] Trigger char: ★.
+2026-11-01 22:11:59:105 [DEBUG] [adapters.hotkey_registrar] Bound Ctrl+★ → hotkey#21.
+2026-11-01 22:11:59:105 [DEBUG] [keystats.text_cipher] At-rest encryption: false.
+2026-11-01 22:11:59:110 [DEBUG] [keystats] Options updated (at-rest encryption: false).
+2026-11-01 22:11:59:110 [DEBUG] [adapters.toml_cache] ↑ "Snapshot hit for '%s'." repeated 20 more times between 2026-11-01 22:11:58:724 and 2026-11-01 22:11:59:098 (last: Snapshot hit for '~/perso/ergopti/static/ergopti_plus/_shared/../../../static/layouts/registry/ergopti/hotstrings/sfbsreduction.toml'.).
+2026-11-01 22:11:59:110 [DEBUG] [keystats] Disabled apps updated (0 entry(ies)).
+2026-11-01 22:11:59:110 [DEBUG] [keymap] ↑ "Delay '%s': %.3fs." repeated 6 more times between 2026-11-01 22:11:59:093 and 2026-11-01 22:11:59:098 (last: Delay 'sfbsreduction': 0.500s.).
+2026-11-01 22:11:59:110 [DEBUG] [keystats] Private window filter: on.
+2026-11-01 22:11:59:110 [DEBUG] [gestures] ↑ "Gesture action '%s' → '%s'." repeated 8 more times between 2026-11-01 22:11:59:098 and 2026-11-01 22:11:59:098 (last: Gesture action 'swipe_4_horiz' → 'spaces'.).
+2026-11-01 22:11:59:110 [DEBUG] [keystats] Secure field filter: on.
+2026-11-01 22:11:59:110 [DEBUG] [keystats] System auth filter: on.
+2026-11-01 22:11:59:110 [INFO] [menu_state] Keymap engine start: 0.1 ms.
+2026-11-01 22:11:59:112 [DEBUG] [gestures.click] Forcefully releasing all held clicks…
+2026-11-01 22:11:59:112 [INFO] [gestures] recycle_watchers: BEGIN (watchers_before=0, first_frame=false, reattach=false)
+2026-11-01 22:11:59:112 [INFO] [gestures] recycle_watchers: END (watchers_after=0, stopped=0, settled=true)
+2026-11-01 22:11:59:112 [DONE] [gestures.engine] Gestures engine stopped.
+2026-11-01 22:11:59:112 [START] [gestures] Starting gestures module…
+2026-11-01 22:11:59:112 [INFO] [gestures] ============== GESTURES STARTUP DIAGNOSTIC ==============
+2026-11-01 22:11:59:112 [INFO] [gestures] Hammerspoon timestamp: 1793567519.112
+2026-11-01 22:11:59:112 [INFO] [gestures] touchdevice module available: true
+2026-11-01 22:11:59:115 [START] [gestures.engine] Initializing gestures engine dependencies…
+2026-11-01 22:11:59:117 [SUCCESS] [gestures.engine] Gestures engine dependencies initialized.
+2026-11-01 22:11:59:117 [INFO] [gestures] touchdevice top-level keys (8): __refTable, absoluteTime, available, default, devices, forDeviceID, forcetouch, watcher
+2026-11-01 22:11:59:118 [INFO] [gestures] touchdevice.devices() returned 1 device(s) at startup
+2026-11-01 22:11:59:118 [INFO] [gestures]   pre-init device #1: id=504403158265495662
+2026-11-01 22:11:59:118 [INFO] [gestures] STEP 1/4: pre-warming Hammerspoon dependencies…
+2026-11-01 22:11:59:118 [DEBUG] [gestures] Pre-warming gesture dependencies…
+2026-11-01 22:11:59:132 [DEBUG] [llm.core] ↑ "Backend: %s." repeated 1 more time between 2026-11-01 22:11:59:103 and 2026-11-01 22:11:59:103 (last: Backend: mlx.).
+2026-11-01 22:11:59:132 [INFO] [gestures] STEP 2/4: configuring gesture primer eventtap…
+2026-11-01 22:11:59:132 [DEBUG] [gestures]   primer event type 'beginGesture' is unavailable in this Hammerspoon version (skipped).
+2026-11-01 22:11:59:132 [INFO] [gestures]   primer subscribing to 7 types: gesture, scrollWheel, swipe, magnify, rotate, directTouch, smartMagnify
+2026-11-01 22:11:59:133 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 2 more times between 2026-11-01 22:11:59:103 and 2026-11-01 22:11:59:103 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 3).).
+2026-11-01 22:11:59:133 [INFO] [gestures]   primer eventtap committed
+2026-11-01 22:11:59:133 [INFO] [gestures] STEP 3/4: kickstart HID + first watcher recycle…
+2026-11-01 22:11:59:133 [INFO] [gestures]   recycle_watchers: found 1 device(s) to attach
+2026-11-01 22:11:59:133 [DEBUG] [gestures]     device #1: id=504403158265495662
+2026-11-01 22:11:59:133 [INFO] [gestures] create_watcher: ENTRY deviceID=504403158265495662
+2026-11-01 22:11:59:135 [DEBUG] [tooltip_llm] ↑ "mark_chain_complete: no chain in progress — ignoring." repeated 1 more time between 2026-11-01 22:11:59:103 and 2026-11-01 22:11:59:103.
+2026-11-01 22:11:59:135 [INFO] [gestures] create_watcher: device introspection — id=504403158265495662, builtin=true, alive=false, running=false, MTHID=true, driverReady=true, productName=Apple Internal Keyboard / Trackpad
+2026-11-01 22:11:59:135 [INFO] [gestures] create_watcher: ATTACHED device=504403158265495662, running=true, alive=false
+2026-11-01 22:11:59:135 [INFO] [gestures] STEP 4/5: starting first-frame watcher…
+2026-11-01 22:11:59:135 [INFO] [gestures] ENTER startup phase — single safety probe scheduled at +5.0s, watching for first frame
+2026-11-01 22:11:59:135 [DEBUG] [gestures] Gesture startup probe recurring timer committed.
+2026-11-01 22:11:59:135 [INFO] [gestures] STEP 5/5: arming wake-from-sleep watcher…
+2026-11-01 22:11:59:136 [INFO] [gestures]   wake-from-sleep watcher committed
+2026-11-01 22:11:59:136 [SUCCESS] [gestures] ============== gestures module startup COMPLETE — primer events so far: 0 ==============
+2026-11-01 22:11:59:139 [DEBUG] [shortcuts.keyboard_shortcuts] M.start() called again after menu-state synchronization; bindings already active.
+2026-11-01 22:11:59:139 [DEBUG] [shortcuts.script_control] Script chord slot 'script_altgr_escape' → 'script_quit'.
+2026-11-01 22:11:59:139 [DEBUG] [shortcuts.script_control] Script chords switched on.
+2026-11-01 22:11:59:139 [DEBUG] [shortcuts.bindings] chatgpt_url updated: https://chat.openai.com.
+2026-11-01 22:11:59:139 [DEBUG] [capsword] CapsWord auto-off: delay=10s, delimiters=[space,nbsp,nnbsp,tab,enter,comma,semicolon,period], pointer=[gesture,pointer_motion,left_click,right_click,middle_click,other_buttons].
+2026-11-01 22:11:59:139 [DEBUG] [personal_info] Disabling personal info tracking…
+2026-11-01 22:11:59:139 [INFO] [personal_info] Personal info tracking disabled.
+2026-11-01 22:11:59:139 [INFO] [menu_state] Hotstring group sync: 12 enable / 0 disable in 0.0 ms.
+2026-11-01 22:11:59:143 [DEBUG] [shortcuts.bindings] Hotkey 'wrap_text_if_selected' enabled.
+2026-11-01 22:11:59:156 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-11-01 22:11:59:156 [DEBUG] [llm.core] Backend: mlx.
+2026-11-01 22:11:59:156 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-11-01 22:11:59:206 [DONE] [menu_llm.models] Loaded models catalogue (18 providers) from ~/perso/ergopti/static/ergopti_plus/_shared/modules/llm/models.json.
+2026-11-01 22:11:59:206 [DEBUG] [llm.core] ↑ "Streaming: %s." repeated 1 more time between 2026-11-01 22:11:59:104 and 2026-11-01 22:11:59:104 (last: Streaming: on.).
+2026-11-01 22:11:59:206 [DEBUG] [shortcuts.script_control] Pause owner registered: ollama_model_maintenance.
+2026-11-01 22:11:59:223 [DEBUG] [llm.prediction_engine] Prediction count: 3.
+2026-11-01 22:11:59:223 [DEBUG] [llm.prediction_engine] Max words: 15 (0 = unlimited).
+2026-11-01 22:11:59:223 [DEBUG] [llm.prediction_engine] Min words: 3.
+2026-11-01 22:11:59:223 [DEBUG] [llm.core] Streaming: on.
+2026-11-01 22:11:59:223 [DEBUG] [llm.prediction_engine] Streaming: on.
+2026-11-01 22:11:59:223 [DEBUG] [llm.prediction_engine] Streaming multi: on.
+2026-11-01 22:11:59:223 [DEBUG] [llm.core] User profiles: 0 custom profile(s).
+2026-11-01 22:11:59:223 [DEBUG] [llm.core] set_active_profile: runtime LLM disabled — skipping warmup for 'batch_advanced'.
+2026-11-01 22:11:59:223 [DEBUG] [menu_llm] Resolving model name on startup: 'Qwen3.5-2B' -> 'Qwen3.5-2B-4bit'.
+2026-11-01 22:11:59:224 [DEBUG] [llm.prediction_engine] Model display name: 'Qwen3.5-2B'.
+2026-11-01 22:11:59:224 [DEBUG] [menu_llm] Model power on startup: 2.
+2026-11-01 22:11:59:229 [DEBUG] [llm.local_model_offer] Local model installer registered.
+2026-11-01 22:11:59:230 [DEBUG] [window_toggle] Opener registered for page 'model_browser'.
+2026-11-01 22:11:59:231 [DEBUG] [llm.agent_runner] Agent mode persister registered.
+2026-11-01 22:11:59:231 [INFO] [menu] LLM handler created successfully.
+2026-11-01 22:11:59:231 [INFO] [startup_ctrl] ═══════════════ Starting menu_llm ═══════════════
+2026-11-01 22:11:59:231 [INFO] [startup_ctrl] Restored AI menu state activated with the AI off: its hotkeys and probes wait for the switch-on.
+2026-11-01 22:11:59:231 [DEBUG] [shortcuts.script_control] Pause-change callback registered.
+2026-11-01 22:11:59:231 [DEBUG] [shortcuts.script_control] Extras table registered (7 handler(s)).
+2026-11-01 22:11:59:231 [DEBUG] [shortcuts.bindings] wrap_pairs_getter updated.
+2026-11-01 22:11:59:246 [SUCCESS] [personal_shortcuts] Loaded personal_shortcuts.lua.
+2026-11-01 22:11:59:246 [DEBUG] [menu] Pathwatcher boot suppression active for 5 s.
+2026-11-01 22:11:59:248 [DEBUG] [menu_watchers] Config pathwatcher started on '~/perso/ergopti/static/ergopti_plus/macos/'.
+2026-11-01 22:11:59:248 [CONSOLE] [console] -- Loading extension: distributednotifications
+2026-11-01 22:11:59:250 [DEBUG] [menu_watchers] Theme change watcher started.
+2026-11-01 22:11:59:250 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 191.0 ms (+191.3 ms, total 1709.3 ms, cpu 169.6 ms).
+2026-11-01 22:11:59:250 [INFO] [BootProfile] Boot stage requires: UI: menu.start (menubar + state sync + engines + LLM handler) loaded 31 module(s) in 60.2 ms (own time); slowest: ui.menu.menu_llm.models_manager_mlx_download=6.1 ms, hs.spaces=5.7 ms, ui.menu.menu_llm.models_manager_mlx_server=5.0 ms, ui.menu.menu_llm.models_manager_mlx_hf=4.8 ms, modules.shortcuts.magic_editor=4.2 ms.
+2026-11-01 22:11:59:250 [START] [BootProfile] Boot stage started: UI: menu ready.
+2026-11-01 22:11:59:250 [DEBUG] [keystats.text_cipher] ↑ "At-rest encryption: %s." repeated 1 more time between 2026-11-01 22:11:59:110 and 2026-11-01 22:11:59:110 (last: At-rest encryption: false.).
+2026-11-01 22:11:59:250 [INFO] [init] User interface initialized successfully.
+2026-11-01 22:11:59:250 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.2 ms (+0.5 ms, total 1709.8 ms, cpu 0.1 ms).
+2026-11-01 22:11:59:250 [START] [BootProfile] Boot stage started: File watchers armed.
+2026-11-01 22:11:59:259 [DEBUG] [file_watchers] Configuring file watchers for auto-reloading…
+2026-11-01 22:11:59:260 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 9.2 ms (+9.4 ms, total 1719.2 ms, cpu 7.1 ms).
+2026-11-01 22:11:59:260 [INFO] [BootProfile] Boot stage requires: File watchers armed loaded 1 module(s) in 4.7 ms (own time); slowest: infra.file_watchers=4.7 ms.
+2026-11-01 22:11:59:260 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-01 22:11:59:262 [DEBUG] [keymap.pending_layout_activation] Pending layout activation initialized.
+2026-11-01 22:11:59:262 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 2.6 ms (+2.9 ms, total 1722.2 ms, cpu 2.5 ms).
+2026-11-01 22:11:59:263 [SUCCESS] [BootProfile] Boot complete in 1722 ms.
+2026-11-01 22:11:59:263 [INFO] [BootProfile] Boot CPU: 1267 ms of process CPU over 1722 ms of boot.
+2026-11-01 22:11:59:263 [INFO] [init] Reload completed in 1944 ms (reload call to boot complete).
+2026-11-01 22:11:59:265 [START] [phase_stats] Starting the phase summary timer (every 300 s)…
+2026-11-01 22:11:59:265 [DONE] [phase_stats] Phase summary timer armed.
+2026-11-01 22:11:59:265 [INFO] [init] ════════════════════════════════════════════════════════════
+2026-11-01 22:11:59:265 [INFO] [init] ✅ Hammerspoon boot SUCCESSFUL.
+2026-11-01 22:11:59:269 [START] [driver_control] Starting the local reload control…
+2026-11-01 22:11:59:307 [DEBUG] [adapters.shell_runner] Process 'mkdir' exited (status=0, 36 ms, 0 similar run(s) since the last line).
+2026-11-01 22:11:59:311 [SUCCESS] [driver_control] Local reload control ready.
+2026-11-01 22:11:59:315 [START] [field_run] Starting the developer field run watcher…
+2026-11-01 22:11:59:355 [SUCCESS] [field_run] Developer field run watcher ready.
+2026-11-01 22:11:59:355 [INFO] [init] Boot complete — triggering Karabiner async deploy…
+2026-11-01 22:11:59:356 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-01 22:11:59:356 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-11-01 22:11:59:359 [CONSOLE] [console] -- Done.
+2026-11-01 22:11:59:371 [DEBUG] [llm.api_remote] API entries set (1 entry/entries).
+2026-11-01 22:11:59:371 [DEBUG] [gestures] ↑ "  primer event type '%s' is unavailable in this Hammerspoon version (skipped)." repeated 1 more time between 2026-11-01 22:11:59:132 and 2026-11-01 22:11:59:132 (last:   primer event type 'endGesture' is unavailable in this Hammerspoon version (skipped).).
+2026-11-01 22:11:59:371 [DEBUG] [llm.api_remote] Active API entry id: 'local-omlx'.
+2026-11-01 22:11:59:371 [DEBUG] [llm.api_remote] Pre-warmed Keychain token for active API entry 'local-omlx'.
+2026-11-01 22:11:59:377 [DEBUG] [menu.keyboard_layout] Active layouts refreshed asynchronously: 4.
+2026-11-01 22:11:59:416 [INFO] [karabiner.lease] Remap guardian registration answered 'ready' (developer_adhoc_legacy_only).
+2026-11-01 22:11:59:416 [START] [karabiner] Regenerating Karabiner config…
+2026-11-01 22:11:59:425 [INFO] [gestures] ↑ "recycle_watchers: BEGIN (watchers_before=%d, first_frame=%s, reattach=%s)" repeated 1 more time between 2026-11-01 22:11:59:133 and 2026-11-01 22:11:59:133 (last: recycle_watchers: BEGIN (watchers_before=0, first_frame=false, reattach=true)).
+2026-11-01 22:11:59:425 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-01 22:11:59:428 [INFO] [karabiner.lease] Lease token decision=fresh reason=first-generation unaccounted_writers=0 ledger_size=498
+2026-11-01 22:11:59:428 [DEBUG] [karabiner] Trackpad CapsWord resources stopped with the Ergopti lease.
+2026-11-01 22:11:59:428 [DEBUG] [karabiner.lease] Prepared Karabiner lease generation d5ef6e8541f64e90af4eb3d007f27773.
+2026-11-01 22:11:59:432 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 22:11:59:438 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 22:11:59:441 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-01 22:11:59:456 [DEBUG] [karabiner] Action 'layer': prepended F20 sentinel to nav-layer activation.
+2026-11-01 22:11:59:456 [INFO] [karabiner] Prepended F20 sentinel to 2 nav-layer-activating action(s).
+2026-11-01 22:11:59:457 [INFO] [gestures] ↑ "recycle_watchers: END (watchers_after=%d, stopped=%d, settled=%s)" repeated 1 more time between 2026-11-01 22:11:59:135 and 2026-11-01 22:11:59:135 (last: recycle_watchers: END (watchers_after=1, stopped=0, settled=true)).
+2026-11-01 22:11:59:457 [INFO] [karabiner] Inserted the F19 exit sentinel into 2 nav-layer-deactivating event list(s).
+2026-11-01 22:11:59:462 [DEBUG] [karabiner] Combo 'lcmd_rcmd': tap=none, hold=none, combo=opt_backspace (non_canonical=false).
+2026-11-01 22:11:59:462 [DEBUG] [karabiner]   → rule: Cmd gauche + Cmd droit: ⌫ ⌥+Backspace [chord]
+2026-11-01 22:11:59:483 [DEBUG] [karabiner] Building config: tap/hold=200 ms, simultaneous=100 ms, symmetric=false, 31 rule(s).
+2026-11-01 22:11:59:635 [DEBUG] [karabiner] Merged 31 managed rule(s) with 29 validated non-owning legacy hint(s) into selected profile 1 without changing personal settings.
+2026-11-01 22:11:59:655 [TRACE] [karabiner] Deploy: writing 743375 byte(s) → '~/perso/config/macOS/.config/karabiner/karabiner.json'…
+2026-11-01 22:11:59:744 [DONE] [karabiner] Deploy S1 (direct write) succeeded: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-01 22:11:59:744 [INFO] [karabiner] Karabiner deploy decision: deployed (the managed rules on disk differ; 743375 bytes; written in 89 ms, 84 ms of it in 2 metadata fork(s); Karabiner reloads every rule).
+2026-11-01 22:11:59:744 [SUCCESS] [karabiner] Karabiner config regenerated: 6 combo(s) + 14 tap/hold key(s) deployed.
+2026-11-01 22:11:59:744 [START] [karabiner.lease] Starting Karabiner lease watchdog d5ef6e8541f64e90af4eb3d007f27773…
+2026-11-01 22:11:59:747 [SUCCESS] [karabiner.lease] Karabiner lease watchdog d5ef6e8541f64e90af4eb3d007f27773 launched; awaiting READY.
+2026-11-01 22:11:59:753 [START] [keystats] Starting keystats engine…
+2026-11-01 22:11:59:753 [DEBUG] [gestures.click] ↑ "Forcefully releasing all held clicks…" repeated 2 more times between 2026-11-01 22:11:59:113 and 2026-11-01 22:11:59:137.
+2026-11-01 22:11:59:753 [DEBUG] [keystats] Keymap module cached for shift-side detection.
+2026-11-01 22:11:59:753 [START] [keystats.log_manager] Initializing log manager…
+2026-11-01 22:11:59:805 [START] [keystats.sqlite_writer] Initializing…
+2026-11-01 22:11:59:805 [SUCCESS] [keystats.sqlite_writer] Initialized.
+2026-11-01 22:11:59:805 [START] [keystats.aggregator] Initializing…
+2026-11-01 22:11:59:805 [SUCCESS] [keystats.aggregator] Initialized.
+2026-11-01 22:11:59:805 [START] [keystats.export] Initializing…
+2026-11-01 22:11:59:805 [SUCCESS] [keystats.export] Initialized.
+2026-11-01 22:11:59:811 [START] [keystats.rotation] Initializing…
+2026-11-01 22:11:59:811 [SUCCESS] [keystats.rotation] Initialized (offset=4907).
+2026-11-01 22:11:59:811 [ERROR] [keystats.log_manager] Cannot keep the metrics cache before its rebuild: cannot VACUUM - SQL statements in progress.
+2026-11-01 22:11:59:999 [INFO] [keystats.log_manager] Aggregate cache recovery continues in 8 ms slices; ingest waits for it.
+2026-11-01 22:11:59:999 [SUCCESS] [keystats.log_manager] Log manager initialized.
+2026-11-01 22:11:59:999 [START] [keystats.context_tracker] Initializing context tracker…
+2026-11-01 22:11:59:999 [SUCCESS] [keystats.context_tracker] Context tracker initialized.
+2026-11-01 22:11:59:999 [START] [keystats.watchers] Initializing keystats watchers…
+2026-11-01 22:11:59:999 [SUCCESS] [keystats.watchers] Keystats watchers initialized.
+2026-11-01 22:11:59:999 [START] [adapters.process_lifecycle] Starting process lifecycle watchers…
+2026-11-01 22:11:59:999 [SUCCESS] [adapters.process_lifecycle] Process lifecycle watchers started.
+2026-11-01 22:11:59:999 [DEBUG] [keystats.kc_bridge] LogManager injected into KcBridge.
+2026-11-01 22:11:59:999 [CONSOLE] [console] -- Loading extension: caffeinate
+2026-11-01 22:12:00:004 [DEBUG] [keystats.watchers] Starting hardware watcher transaction…
+2026-11-01 22:12:00:004 [CONSOLE] [console] -- Loading extension: audiodevice
+2026-11-01 22:12:00:008 [CONSOLE] [console] -- Loading extension: wifi
+2026-11-01 22:12:00:036 [CONSOLE] [console] -- Loading extension: battery
+2026-11-01 22:12:00:045 [CONSOLE] [console] -- Loading extension: spaces
+2026-11-01 22:12:00:045 [DEBUG] [keystats.watchers] Hardware watcher transaction committed.
+2026-11-01 22:12:00:046 [SUCCESS] [keystats] Keystats engine started.
+2026-11-01 22:12:00:046 [DEBUG] [shortcuts.bindings] ↑ "Hotkey '%s' enabled." repeated 1 more time between 2026-11-01 22:11:59:143 and 2026-11-01 22:11:59:143 (last: Hotkey 'cmd_star' enabled.).
+2026-11-01 22:12:00:046 [INFO] [menu_state] Keystats engine start (deferred): 293.0 ms.
+2026-11-01 22:12:00:046 [INFO] [runtime] Main-thread hold of 293 ms in an hs.timer.new callback (...ergopti/static/ergopti_plus/macos/ui/menu/menu_state.lua:541). Phases inside the hold: shell.ioreg=48.1 ms. Lua heap 38->340 MB.
+2026-11-01 22:12:00:063 [DEBUG] [adapters.secure_field_detector] AX secure-field classification incomplete (role_read=true, subrole_read=false); suppressing input.
+2026-11-01 22:12:00:063 [TRACE] [keystats.context_tracker] Attaching accessibility observer to PID 1521…
+2026-11-01 22:12:00:065 [DONE] [keystats.context_tracker] Accessibility observer attached to PID 1521.
+2026-11-01 22:12:00:065 [INFO] [karabiner.lease] Karabiner lease d5ef6e8541f64e90af4eb3d007f27773 activated paused by watchdog READY.
+2026-11-01 22:12:00:067 [SUCCESS] [karabiner] Trackpad CapsWord watcher started.
+2026-11-01 22:12:00:067 [SUCCESS] [karabiner] Bare-touch CapsWord hook registered on gestures engine.
+2026-11-01 22:12:00:068 [TRACE] [karabiner] Registering cycle-windows hotkey (f17)…
+2026-11-01 22:12:00:068 [DEBUG] [adapters.hotkey_registrar] Bound F17 → hotkey#22.
+2026-11-01 22:12:00:068 [DONE] [karabiner] cycle-windows hotkey registered.
+2026-11-01 22:12:00:068 [TRACE] [karabiner] Registering Alt+Tab windows hotkey (shift+f17)…
+2026-11-01 22:12:00:068 [DONE] [karabiner] Alt+Tab windows hotkey registered.
+2026-11-01 22:12:00:068 [TRACE] [karabiner] Registering per-screen window hotkey (ctrl+f17)…
+2026-11-01 22:12:00:068 [DONE] [karabiner] per-screen window hotkey registered.
+2026-11-01 22:12:00:068 [TRACE] [karabiner] Registering Alt+Tab apps hotkey (alt+f17)…
+2026-11-01 22:12:00:068 [DONE] [karabiner] Alt+Tab apps hotkey registered.
+2026-11-01 22:12:00:068 [DEBUG] [karabiner] Lease-owned F17 hotkeys bound atomically before activation.
+2026-11-01 22:12:00:068 [INFO] [keystats.kc_bridge] Managed output kc set rebuilt: 13 unique kc(s) claimed.
+2026-11-01 22:12:00:217 [SUCCESS] [karabiner] Ergopti Karabiner lease activated after local input preparation.
+2026-11-01 22:12:00:437 [START] [error_dialog] Opening the error window…
+2026-11-01 22:12:00:473 [START] [healthcheck] Collecting the diagnostics…
+2026-11-01 22:12:00:485 [CONSOLE] [console] -- Loading extension: screen
+2026-11-01 22:12:00:487 [CONSOLE] [console] -- Loading extension: hid
+2026-11-01 22:12:00:496 [CONSOLE] [console] -- Loading extension: usb
+2026-11-01 22:12:00:499 [INFO] [healthcheck] The synchronous diagnostics took 26.4 ms, over the 5 ms budget; slowest: versions=10.9 ms, permissions=5.2 ms, input=3.1 ms.
+2026-11-01 22:12:00:499 [SUCCESS] [healthcheck] Diagnostics collected in 26.4 ms.
+2026-11-01 22:12:00:500 [DEBUG] [ui_builder] Building injected HTML assets…
+2026-11-01 22:12:00:523 [INFO] [ui_builder] Injected HTML assets built and memoised (360163 bytes).
+2026-11-01 22:12:00:525 [DEBUG] [ui_builder] Geometry for 'error_dialog': 560x460.
+2026-11-01 22:12:00:525 [CONSOLE] [console] -- Loading extension: webview
+2026-11-01 22:12:00:536 [CONSOLE] [console] -- Loading extension: drawing
+2026-11-01 22:12:00:545 [DEBUG] [ui_builder] Forcing window focus and teleporting to active space…
+2026-11-01 22:12:00:554 [INFO] [ui_builder] Window presentation requested (attempt 1).
+2026-11-01 22:12:00:554 [SUCCESS] [error_dialog] Error window opened.
+2026-11-01 22:12:00:555 [DEBUG] [keystats.context_tracker] App switch: 'iTerm2' → 'Hammerspoon' (492 ms).
+2026-11-01 22:12:00:555 [TRACE] [keystats.context_tracker] Stopping previous accessibility observer…
+2026-11-01 22:12:00:555 [DONE] [keystats.context_tracker] Previous accessibility observer stopped.
+2026-11-01 22:12:00:555 [TRACE] [keystats.context_tracker] Attaching accessibility observer to PID 66322…
+2026-11-01 22:12:00:555 [DONE] [keystats.context_tracker] Accessibility observer attached to PID 66322.
+2026-11-01 22:12:01:155 [DEBUG] [karabiner.onboarding] Health check: ke=true grabber_bin=true grabber_run=true sysext=true all_ok=true.
+2026-11-01 22:12:01:155 [INFO] [karabiner.onboarding] Onboarding: KE stack fully operational — wizard not needed.
+2026-11-01 22:12:01:312 [DEBUG] [shortcuts.script_control] ↑ "Pause owner registered: %s." repeated 4 more times between 2026-11-01 22:11:59:223 and 2026-11-01 22:11:59:224 (last: Pause owner registered: llm_startup.).
+2026-11-01 22:12:01:312 [DEBUG] [menu.keyboard_layout] Bundle probe — dir=~/Library/Keyboard Layouts/ name=Ergopti_v2.2.2.bundle plist_exists=true.
+2026-11-01 22:12:01:335 [TRACE] [menu_apps] Scanning bundled app directory…
+2026-11-01 22:12:01:363 [DONE] [menu_apps] Found 2 bundled app(s).
+2026-11-01 22:12:01:364 [DEBUG] [menu.tap_holds] Picker trees rebuilt (binding fingerprint changed).
+2026-11-01 22:12:01:376 [DEBUG] [builder] Top level loaded from manifest (20 item(s)).
+2026-11-01 22:12:01:376 [DEBUG] [menu.tap_holds] Picker trees served from cache.
+2026-11-01 22:12:01:376 [DEBUG] [logger] ↑ 1 identical line suppressed
+2026-11-01 22:12:01:376 [DEBUG] [builder] Component 'tap_holds.build' added successfully.
+2026-11-01 22:12:01:383 [START] [menu.tap_keys] Watching input-source changes for the tap-key names…
+2026-11-01 22:12:01:383 [SUCCESS] [menu.tap_keys] Watching input-source changes for the tap-key names.
+2026-11-01 22:12:02:488 [DEBUG] [builder] Component 'shortcuts.build' added successfully.
+2026-11-01 22:12:02:490 [INFO] [gestures.conflicts] Native macOS gesture 'tap_3_conflict' is enabled and overlaps slot tap_3.
+2026-11-01 22:12:02:547 [DEBUG] [shortcuts.script_control] ↑ "Script chord slot '%s' → '%s'." repeated 7 more times between 2026-11-01 22:11:59:139 and 2026-11-01 22:11:59:231 (last: Script chord slot 'script_altgr_backspace' → 'script_reload'.).
+2026-11-01 22:12:02:547 [DEBUG] [builder] Component 'gestures.build' added successfully.
+2026-11-01 22:12:02:548 [DEBUG] [shortcuts.script_control] ↑ "Script chords switched %s." repeated 1 more time between 2026-11-01 22:11:59:231 and 2026-11-01 22:11:59:231 (last: Script chords switched on.).
+2026-11-01 22:12:02:548 [DEBUG] [menu.keyboard_layout] Install probe — latest=Ergopti_v2.2.2.bundle, user_best=Ergopti_v2.2.2.bundle, system_best=Ergopti_v2.2.2.bundle, latest_installed=true.
+2026-11-01 22:12:02:549 [DEBUG] [shortcuts.bindings] ↑ "chatgpt_url updated: %s." repeated 1 more time between 2026-11-01 22:11:59:231 and 2026-11-01 22:11:59:231 (last: chatgpt_url updated: https://chat.openai.com.).
+2026-11-01 22:12:02:549 [DEBUG] [menu.keyboard_layout] Active layout state — stable=2/4 legacy=0 installed=2.2.2 latest_installed=true.
+2026-11-01 22:12:02:580 [DEBUG] [window_toggle] ↑ "Opener registered for page '%s'." repeated 3 more times between 2026-11-01 22:11:59:235 and 2026-11-01 22:11:59:235 (last: Opener registered for page 'healthcheck'.).
+2026-11-01 22:12:02:580 [DEBUG] [menu.keyboard_layout] Number-row rows greyed: no_source_layout.
+2026-11-01 22:12:02:619 [DEBUG] [builder] Component 'keyboard_layout.build' added successfully.
+2026-11-01 22:12:02:619 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-01 22:12:02:620 [DEBUG] [hotstring_counter] Counted: common=2813 ergopti=194 personal=264 ext=0.
+2026-11-01 22:12:02:644 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-01 22:12:02:658 [DEBUG] [wpm_menubar] WPM menubar source colors set to true.
+2026-11-01 22:12:02:663 [DEBUG] [wpm_widget] resolve_shared_constants_path('modules/wpm_widget/constants.toml'): resolved via Paths.shared.
+2026-11-01 22:12:02:670 [DEBUG] [app_picker] Building application exclusion menu…
+2026-11-01 22:12:02:670 [INFO] [app_picker] Application exclusion menu built successfully (0 excluded app(s), 0.3 ms).
+2026-11-01 22:12:02:670 [INFO] [init] ↑ "════════════════════════════════════════════════════════════" repeated 1 more time between 2026-11-01 22:11:59:265 and 2026-11-01 22:11:59:265.
+2026-11-01 22:12:02:670 [DEBUG] [builder] Component 'keystats.build' added successfully.
+2026-11-01 22:12:02:670 [DEBUG] [builder] Building AI component…
+2026-11-01 22:12:02:670 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-11-01 22:12:02:670 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-11-01 22:12:02:683 [DEBUG] [menu_llm] Building prediction count menu…
+2026-11-01 22:12:02:705 [DEBUG] [builder] AI component added successfully.
+2026-11-01 22:12:02:705 [TRACE] [menu_apps] Building applications submenu…
+2026-11-01 22:12:02:705 [DONE] [menu_apps] Applications submenu built (2 item(s)).
+2026-11-01 22:12:02:705 [DEBUG] [builder] Component 'apps.build' added successfully.
+2026-11-01 22:12:02:712 [INFO] [updater] Build identity: local build from source, commit a089d3682 (source git).
+2026-11-01 22:12:02:743 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 2 more times between 2026-11-01 22:11:59:377 and 2026-11-01 22:11:59:377 (last: Process 'ErgoptiPlus' exited (status=0, 135 ms, 0 similar run(s) since the last line).).
+2026-11-01 22:12:02:743 [DEBUG] [canvas_badge] Canvas badge built (canvas_w=200 pill_w=74 paused=false).
+2026-11-01 22:12:02:773 [DEBUG] [shortcuts.script_control] ↑ "Extras table registered (%d handler(s))." repeated 3 more times between 2026-11-01 22:11:59:231 and 2026-11-01 22:11:59:377 (last: Extras table registered (26 handler(s)).).
+2026-11-01 22:12:02:773 [INFO] [menu] Menu tree rebuilt in 1371.2 ms (22 top-level item(s)). Slowest: shortcuts=1111.3 ms, keyboard_layout=72.1 ms, gestures=58.9 ms, llm=34.7 ms, hotstrings=32.9 ms.
+2026-11-01 22:12:02:774 [WARNING] [menu] Over budget: menu.rebuild took 1371 ms (budget 250 ms).
+2026-11-01 22:12:02:781 [INFO] [Diagnostics] Diagnostic snapshot (driver=macos version=local commit=a089d3682 os=macOS os_version="Version 26.6.2 (Build 25G83)" arch=arm64 runtime="Hammerspoon 1.1.1" elevated=false locale=fr keyboard_layout=com.apple.keyboardlayout.ergopti.plus monitors=1 dpi=2x display=quartz config_dir=<config>/ logs_dir=~/perso/ergopti/ergopti_plus/ log_level=DEBUG features_enabled=39/59 boot_ms=1722).
+2026-11-01 22:12:02:781 [WARNING] [runtime] An hs.timer.new callback (...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:1801) held the main thread for 1537 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: menu.rebuild=1371.2 ms, menu_item.shortcuts=1111.3 ms, menu_item.keyboard_layout=72.1 ms, menu_keyboard_layout.rows=69.3 ms, menu_item.gestures=58.9 ms. Lua heap 381->524 MB.
+2026-11-01 22:12:02:782 [DEBUG] [adapters.shell_runner] Process 'defaults' exited (status=0, 1448 ms, 0 similar run(s) since the last line).
+2026-11-01 22:12:02:783 [DEBUG] [karabiner] ↑ "Action '%s': prepended F20 sentinel to nav-layer activation." repeated 1 more time between 2026-11-01 22:11:59:456 and 2026-11-01 22:11:59:456 (last: Action 'layer_on': prepended F20 sentinel to nav-layer activation.).
+2026-11-01 22:12:02:783 [DEBUG] [menu.keyboard_layout] Active layouts refreshed asynchronously: 4.
+2026-11-01 22:12:02:804 [INFO] [notifications] Notification dispatched (success): ✅ Karabiner prêt — Le moteur Karabiner est prêt..
+2026-11-01 22:12:02:804 [INFO] [karabiner] Karabiner ready notification sent.
+2026-11-01 22:12:03:265 [SUCCESS] [gestures] FIRST RAW TOUCH FRAME received! device=504403158265495662, frame#=1, touches=1, first_pos=(9.7,41.5).
+2026-11-01 22:12:03:265 [DEBUG] [karabiner] ↑ "Combo '%s': tap=%s, hold=%s, combo=%s (non_canonical=%s)." repeated 5 more times between 2026-11-01 22:11:59:462 and 2026-11-01 22:11:59:462 (last: Combo 'rcmd_lcmd': tap=opt_backspace, hold=option_shift, combo=opt_backspace (non_canonical=true).).
+2026-11-01 22:12:03:265 [DEBUG] [gestures] Touch session started on device=504403158265495662 (frame 1, touches=1).
+2026-11-01 22:12:03:645 [SUCCESS] [gestures] Startup phase EXIT — first frame received after 4.51s.
+2026-11-01 22:12:03:645 [DEBUG] [karabiner] ↑ "  → rule: %s" repeated 5 more times between 2026-11-01 22:11:59:462 and 2026-11-01 22:11:59:462 (last:   → rule: Cmd droit + Cmd gauche (right_command→left_command): ⌫ ⌥+Backspace (tap) / ⌥⇧ — Option+Shift (hold) [var-based]).
+2026-11-01 22:12:03:645 [INFO] [gestures] ENTER slow health-check loop (cadence=30s)
+2026-11-01 22:12:03:645 [DEBUG] [gestures] Gesture health check recurring timer committed.

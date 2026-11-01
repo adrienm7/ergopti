@@ -1,0 +1,7 @@
+[field-report]   ⚠️ check privacy_pane_urls: info
+[field-report]   ✅ check system_bash: pass
+[field-report] Check verdicts summary: ✅ 1 pass, ❌ 0 fail, ⏭️ 0 skip, ⌨️ 0 needs_typing, ⚠️ 1 other.
+[field-report] Log analysis: 1 error group(s), 7 warning group(s), 4 measure(s) over budget; see analysis.md.
+[field-report]   fix first #1: main_thread.hold over its 250 ms budget (slow x4)
+[field-report]   fix first #2: [keystats.log_manager] Cannot keep the metrics cache before its rebuild: cannot VACUUM - SQL statements in progress. (error x1)
+[field-report]   fix first #3: healthcheck.sync over its 5 ms budget (slow x1)
