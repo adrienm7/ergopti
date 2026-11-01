@@ -189,7 +189,8 @@ global _TH_TapNoneI18n := "tap_hold.tap.none"
 ; Return the ordered key-definition array.
 TapHoldKeyDefs() {
 	global _TH_KeyDefs
-	return _TH_KeyDefs
+	; A parse-time #HotIf reaches this before the table's include has run.
+	return IsSet(_TH_KeyDefs) ? _TH_KeyDefs : Map()
 }
 
 ; Return the key definitions of one hand ("left" or "right"), in order.
