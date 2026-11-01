@@ -335,7 +335,8 @@ _KeyCombinationKeyPressSequence(KeyId) {
 ; order of presses: with a key the native ledger did not number (no owner
 ; running, or a press behind AutoHotkey's hook), the catalogue order decides.
 ; @param Second {String} Tap-hold key id of the key being pressed.
-; @param IsDownFn {Func} Test seam taking a key id, the physical keys by default.
+; @param IsDownFn {Func} Test seam taking a key id, the held keys by default: a first
+;        key replayed after a terminal expansion is held only in the ledger.
 ; @param PressSequenceFn {Func} Test seam taking a key id, the ledger by default.
 ; @returns {String}
 KeyCombinationHeldFirstKey(Second, IsDownFn := 0, PressSequenceFn := 0) {
@@ -343,7 +344,7 @@ KeyCombinationHeldFirstKey(Second, IsDownFn := 0, PressSequenceFn := 0) {
 	if !IsSet(_KeyCombinationFirstKeys) || !_KeyCombinationFirstKeys.Has(Second)
 		return ""
 	if !IsObject(IsDownFn)
-		IsDownFn := _KeyCombinationKeyIsDown
+		IsDownFn := _KeyCombinationKeyIsHeld
 	if !IsObject(PressSequenceFn)
 		PressSequenceFn := _KeyCombinationKeyPressSequence
 	Held := []
@@ -390,6 +391,7 @@ KeyCombinationOwns(Second, IsDownFn := 0) {
 		|| !IsSet(_KeyCombinationPressAssignments) || !IsSet(KeyCombinationTaps)
 		|| !IsSet(KeyCombinationHolds)
 		return false
+	FirstKeyFn := IsDownFn
 	if !IsObject(IsDownFn)
 		IsDownFn := _KeyCombinationKeyIsDown
 	if IsDownFn.Call(Second)
@@ -403,7 +405,7 @@ KeyCombinationOwns(Second, IsDownFn := 0) {
 		_KeyCombinationPressAssignments.Delete(Second)
 	if !KeyCombinationsAreOn()
 		return false
-	First := KeyCombinationHeldFirstKey(Second, IsDownFn)
+	First := KeyCombinationHeldFirstKey(Second, FirstKeyFn)
 	if (First == "")
 		return false
 	PairId := KeyCombinationPairId(First, Second)
