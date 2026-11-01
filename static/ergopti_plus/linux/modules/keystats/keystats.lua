@@ -42,6 +42,7 @@ local PrivateWindow = require("keystats.private_window")
 -- per-app rings below never drift from the collector's global ring cap.
 local SharedMetrics    = require("keystats.metrics")
 local Utils            = require("keystats.utils")
+local TokenEncoding    = require("keystats.token_encoding")
 local WPM_RING_CAPACITY = SharedMetrics.DEFAULT_WPM_RING_CAPACITY
 local MAX_TYPING_INTERVAL_MS = Timings.ms("keystats", "max_keystroke_delay_ms")
 -- The WPM readouts' live speed and last source, the same tracker macOS reads.
@@ -660,7 +661,7 @@ function M.init(opts)
 	_device_id = "linux-" .. hostname
 
 	-- Open the SQLite database (bootstraps schema on first run).
-	if SqliteWriter and SqliteWriter.open_db(_sqlite_path) then
+	if SqliteWriter and SqliteWriter.open_db(_sqlite_path) and SqliteWriter.ensure_token_encoding() then
 		SqliteWriter.register_device(_device_id, hostname, "linux", "", hostname)
 		if SqliteReader then migrate_legacy_categories() end
 		-- A live walk owns the record; only a fresh process reads back what the
@@ -853,7 +854,10 @@ record_app_key = function(app_id, ch, timestamp_ms, clock)
 			app.titles[_current_title] = app.titles[_current_title] or new_title_row()
 			app.titles[_current_title].c = app.titles[_current_title].c + 1
 		end
-		if type(ch) == "string" and ch ~= "" then app.ngrams[ch] = (app.ngrams[ch] or 0) + 1 end
+		if type(ch) == "string" and ch ~= "" then
+			local token = TokenEncoding.event_token(ch)
+			app.ngrams[token] = (app.ngrams[token] or 0) + 1
+		end
 	end
 	live.wpm_ring[#live.wpm_ring + 1] = timestamp_ms
 	while #live.wpm_ring > WPM_RING_CAPACITY do table.remove(live.wpm_ring, 1) end
@@ -978,9 +982,10 @@ ensure_pending = function(app_id, clock)
 end
 
 local function add_synthetic_ngram(app, char, source)
-	app.ngrams[char] = (app.ngrams[char] or 0) + 1
-	app.ngram_sources[char] = app.ngram_sources[char] or {}
-	app.ngram_sources[char][source] = (app.ngram_sources[char][source] or 0) + 1
+	local token = TokenEncoding.event_token(char)
+	app.ngrams[token] = (app.ngrams[token] or 0) + 1
+	app.ngram_sources[token] = app.ngram_sources[token] or {}
+	app.ngram_sources[token][source] = (app.ngram_sources[token][source] or 0) + 1
 end
 
 --- What actually gets persisted for one synthetic character.

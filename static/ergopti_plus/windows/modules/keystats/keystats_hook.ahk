@@ -98,11 +98,11 @@ global KLHOOK_SPECIAL := Map(
 		0x26, "[UP]",
 		0x27, "[RIGHT]",
 		0x28, "[DOWN]",
-		0x2E, "[DEL]",
+		0x2E, "[DELETE]",
 		0x24, "[HOME]",
 		0x23, "[END]",
-		0x21, "[PGUP]",
-		0x22, "[PGDN]"
+		0x21, "[PAGEUP]",
+		0x22, "[PAGEDOWN]"
 )
 
 
