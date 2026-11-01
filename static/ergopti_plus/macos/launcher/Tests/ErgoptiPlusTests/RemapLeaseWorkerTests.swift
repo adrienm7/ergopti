@@ -1273,6 +1273,37 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertEqual(service.registerCalls, 0)
 	}
 
+	/// Installed-app CI, 2026-11-01: the readback straight after an ad hoc
+	/// legacy bootstrap saw Background Items move from not registered to
+	/// enabled while it read the guardian's health, and answered unavailable
+	/// for a healthy guardian. A move between the states that defer to legacy
+	/// health keeps ready; a move to approval or an unhealthy guardian does not.
+	func testModernGuardianObservationKeepsReadyAcrossALegacyLabelStatusMove() {
+		guard #available(macOS 13.0, *) else { return }
+		for (before, after) in [
+			(SMAppService.Status.notRegistered, SMAppService.Status.enabled),
+			(SMAppService.Status.notFound, SMAppService.Status.enabled),
+			(SMAppService.Status.enabled, SMAppService.Status.notRegistered),
+		] {
+			let service = ScriptedModernGuardianService(status: before)
+			XCTAssertEqual(observeModernRemapGuardianRegistration(
+				service: service,
+				guardianHealth: { service.status = after; return true }
+			), .ready, "\(before) -> \(after)")
+			let unhealthy = ScriptedModernGuardianService(status: before)
+			XCTAssertEqual(observeModernRemapGuardianRegistration(
+				service: unhealthy,
+				guardianHealth: { unhealthy.status = after; return false }
+			), .unavailable)
+			XCTAssertEqual(service.registerCalls + service.unregisterCalls, 0)
+		}
+		let approval = ScriptedModernGuardianService(status: .notRegistered)
+		XCTAssertEqual(observeModernRemapGuardianRegistration(
+			service: approval,
+			guardianHealth: { approval.status = .requiresApproval; return true }
+		), .requiresApproval)
+	}
+
 	/// Current approval state is checked independently of legacy guardian health.
 	func testModernGuardianActivationAuthorizationFailsClosed() {
 		guard #available(macOS 13.0, *) else { return }
