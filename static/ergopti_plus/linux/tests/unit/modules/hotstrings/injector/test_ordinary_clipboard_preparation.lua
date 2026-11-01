@@ -108,8 +108,8 @@ local function fixture(options, callback)
 			end
 			if kind ~= "none" then Broker.detach(writer); assert(Broker.attach(writer)) end
 		end
-		local file = assert(io.open("adapters/keyboard_hook.lua", "rb"))
-		local hook_source = file:read("*a"); file:close()
+		-- adapters/keyboard_hook, selected by a declaration unique to it.
+		local hook_source = assert(helpers.read_driver_unit("local function hold_owner("))
 		local first = assert(hook_source:find("function M.emergency_stop(reason)", 1, true))
 		local last = assert(hook_source:find("\n--- Runs a blocking modal", first, true))
 		local hook_body = hook_source:sub(first, last - 1)

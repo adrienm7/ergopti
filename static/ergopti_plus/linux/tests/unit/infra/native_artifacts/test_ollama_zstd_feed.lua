@@ -12,7 +12,8 @@ local helpers = require("tests.helpers")
 
 local function receive(mode)
 	local actual_uv = require("luv")
-	local path = require("infra.paths").driver_root() .. "/infra/archive_output.lua"
+	-- The production module, resolved from its name: the feeder is compiled from its own text.
+	local path = assert(package.searchpath("infra.archive_output", package.path))
 	local file = assert(io.open(path, "rb"))
 	local source = assert(file:read("*a")); assert(file:close())
 	local first = assert(source:find("local retained_tar_operations =", 1, true))
