@@ -29,8 +29,6 @@ local describe    = helpers.describe
 local it          = helpers.it
 local assert_true = helpers.assert_true
 
-local DRIVER_ROOT = helpers.driver_root()
-local LOADER_PATH = DRIVER_ROOT .. "/modules/hotstrings/loader.lua"
 
 
 
@@ -42,15 +40,8 @@ local LOADER_PATH = DRIVER_ROOT .. "/modules/hotstrings/loader.lua"
 -- =========================================
 -- =========================================
 
-local function read_file(path)
-	local fh = io.open(path, "r")
-	if not fh then return "" end
-	local s = fh:read("*a")
-	fh:close()
-	return s
-end
-
-local loader_src = read_file(LOADER_PATH)
+-- modules/hotstrings/loader, selected by a declaration unique to it.
+local loader_src = assert(helpers.read_driver_unit("local function tiers("))
 
 describe("Linux TOML loader delegation to toml_codec.reader", function()
 
@@ -76,11 +67,21 @@ describe("Linux TOML loader delegation to toml_codec.reader", function()
 				or loader_src:find('require%("infra%.toml%.reader"%)', 1, false) ~= nil,
 			"loader.lua must delegate to toml_codec.reader — no local parser fork allowed."
 		)
-		local wrapper = io.open(helpers.driver_root() .. "/infra/toml/reader.lua", "rb")
-		local wrapper_src = wrapper and wrapper:read("*a") or ""
-		if wrapper then wrapper:close() end
-		assert_true(wrapper_src:find('require%("toml_codec%.reader"%)', 1, false) ~= nil,
-			"the timed wrapper must delegate to toml_codec.reader")
+		-- The timed wrapper hands every parse to the shared reader: a recording
+		-- shared reader receives the call and its answer comes back unchanged.
+		local saved_shared, saved_wrapper = package.loaded["toml_codec.reader"], package.loaded["infra.toml.reader"]
+		local seen = {}
+		package.loaded["toml_codec.reader"] = { parse = function(path)
+			seen[#seen + 1] = path
+			return { from_shared = true }, true
+		end }
+		package.loaded["infra.toml.reader"] = nil
+		local ok, document, committed = pcall(function() return require("infra.toml.reader").parse("/fixture.toml") end)
+		package.loaded["toml_codec.reader"], package.loaded["infra.toml.reader"] = saved_shared, saved_wrapper
+		assert_true(ok, tostring(document))
+		helpers.assert_eq(seen, { "/fixture.toml" }, "the timed wrapper must delegate to toml_codec.reader")
+		helpers.assert_eq(document, { from_shared = true })
+		helpers.assert_eq(committed, true)
 	end)
 
 	it("loader.lua does not define parse_toml_file (no parallel parser)", function()
