@@ -1551,7 +1551,7 @@ _KLE_CanonicalSourceOwner(Request, Args*) {
 		Keylayout_KeyEntry, Keylayout_Resolve, Keylayout_IsPrintable, Keylayout_Step,
 		Map.Call, Map.Prototype.Clone, Array.Prototype.Clone,
 		Func.Prototype.Call, Func.Prototype.Bind, Critical,
-		_KLE_BuildNormalReplayGraph, _KLE_BuildReplayGraphOwned]
+		_KLE_BuildNormalReplayGraph, _KLE_BuildReplayGraphOwned, Keylayout_ParseCanonical]
 	static NativeCall := Func.Prototype.Call, NativeBind := Func.Prototype.Bind, NativeCritical := Critical
 
 	FunctionsCurrent() {
@@ -1563,7 +1563,7 @@ _KLE_CanonicalSourceOwner(Request, Args*) {
 			Keylayout_KeyEntry, Keylayout_Resolve, Keylayout_IsPrintable, Keylayout_Step,
 			Map.Call, Map.Prototype.Clone, Array.Prototype.Clone,
 			Func.Prototype.Call, Func.Prototype.Bind, Critical,
-			_KLE_BuildNormalReplayGraph, _KLE_BuildReplayGraphOwned]
+			_KLE_BuildNormalReplayGraph, _KLE_BuildReplayGraphOwned, Keylayout_ParseCanonical]
 		for Index, Original in OriginalOwners
 			if !(Original is Func) || Original != Owners[Index]
 					|| Object.Prototype.HasOwnProp.Call(Original, "Call")
