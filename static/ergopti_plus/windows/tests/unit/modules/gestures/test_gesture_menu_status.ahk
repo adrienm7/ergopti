@@ -57,6 +57,17 @@ _GTB_Owner() {
 	return Owner
 }
 
+; The finger groups belong to macOS: a Windows handler for one is the drift the
+; renderer logs at every boot, for a row this driver can never draw.
+_GTB_NoHandlerForFilteredFingerGroups() {
+	Build := _DriverFuncBody("BuildGesturesMenu")
+	Assert(Build != "", "the gestures menu builder is found")
+	for Id in ["gesture_slots_2", "gesture_slots_3", "gesture_slots_4", "gesture_slots_5"]
+		AssertEqual(0, InStr(Build, Id), Id . " has no Windows handler")
+}
+Test("gestures menu: no handler for a row the platform filter drops (gesture-slots-drift)",
+	_GTB_NoHandlerForFilteredFingerGroups)
+
 _GTB_AssertSlotRows(Rows, ExpectedLength, TapPosition) {
 	Assert(Rows is Array)
 	AssertEqual(ExpectedLength, Rows.Length)

@@ -24,12 +24,6 @@
  */
 BuildGesturesMenu(Options := unset) {
 	ScopeOptions := IsSet(Options) ? Options : Map()
-	DynHandlers := Map(
-		"gesture_slots_2",    (M, C) => _GES_Slots2(M, C),
-		"gesture_slots_3",    (M, C) => _GES_Slots3(M, C),
-		"gesture_slots_4",    (M, C) => _GES_Slots4(M, C),
-		"gesture_slots_5",    (M, C) => _GES_Slots5(M, C),
-	)
 	; The scope's restore and clear are `command` rows of the first group since
 	; 2026-09-30 (switch, restore, clear, separator): the renderer builds each row
 	; and its label from the declaration, and this driver registers only what the
@@ -51,7 +45,7 @@ BuildGesturesMenu(Options := unset) {
 	; There is no status provider: the slot rows below carry the availability
 	; themselves, and « Infos… » explains it in a dialog.
 	ListProviders := Map("gesture_slots_ahk", (*) => _GES_SlotRows())
-	Built := MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", ListProviders, Commands, Getters)
+	Built := MenuRenderer_Build("gestures_menu", "Gestures", Map(), "", ListProviders, Commands, Getters)
 	if Built is Menu
 		GestureSystemWatchMenu(Built)
 	return Built
@@ -123,20 +117,6 @@ _GES_SlotRows(ReadFn := 0) {
 				(Id) => SetGestureSlotAction(_s, Id), false, GestureBindingId("gesture", _s)))(Slot, SlotLabel)))
 	}
 	return Rows
-}
-
-; Dynamic handlers for HS finger groups (unused on AHK — manifest filters them out).
-_GES_Slots2(M, _Cat) {
-	return
-}
-_GES_Slots3(M, _Cat) {
-	return
-}
-_GES_Slots4(M, _Cat) {
-	return
-}
-_GES_Slots5(M, _Cat) {
-	return
 }
 
 ; Applies a new action to a gesture slot and reloads.
