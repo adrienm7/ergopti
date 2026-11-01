@@ -705,7 +705,7 @@ KeyCombinationScopedOperations(Mode, Path) {
 		}
 	}
 	; The chord slots are never declared: restoring the preset or clearing empties them.
-	Table := _TOML_DocumentLookup(Stored, ["mod_combos", "config"])
+	Table := _TOML_DocumentLookup(Stored, [ConfigLeaf.MOD_COMBOS, "config"])
 	for PairId in (Table.Get("value", 0) is Map ? Table["value"] : Map()) {
 		if (KeyCombinationParsePair(PairId) is Map)
 			Plan.operations.Push({ Section: "mod_combos.config." . PairId, Key: "combo", Delete: 1 })
@@ -1100,16 +1100,16 @@ _KeyCombinationChordPorts() {
 KeyCombinationChordsReadConfig(Cache) {
 	global KeyCombinationChords, KeyCombinationChordConfig, _KeyCombinationChordPolicy, _KeyCombinationChordFirsts
 	global KEY_COMBINATION_NONE, GESTURE_ACTIONS, KEY_COMBINATION_CHORD_REFUSED_ACTIONS
-	Stored := (Cache is Map) && Cache.Has("mod_combos") ? Cache["mod_combos"] : Map()
-	Delay := Stored.Get("simultaneous_threshold_ms", ManifestDefaultFor("mod_combos.simultaneous_threshold_ms"))
-	Symmetric := Stored.Get("symmetric", ManifestDefaultFor("mod_combos.symmetric"))
+	Stored := (Cache is Map) && Cache.Has(ConfigLeaf.MOD_COMBOS) ? Cache[ConfigLeaf.MOD_COMBOS] : Map()
+	Delay := Stored.Get(ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS, ManifestDefaultFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS))
+	Symmetric := Stored.Get("symmetric", ManifestDefaultFor(ConfigKey.MOD_COMBOS_SYMMETRIC))
 	Enabled := Stored.Get("enabled", true)
 	try KeyCombinationChordConfig := KeyCombinationChordSettings(
 		IsNumber(Delay) ? Delay + 0 : Delay, Symmetric ? 1 : 0)
 	catch as Err {
 		LoggerWarn("KeyCombinations", "[mod_combos] is refused ({1}): the declared delay and symmetry apply.", Err.Message)
 		KeyCombinationChordConfig := KeyCombinationChordSettings(
-			ManifestDefaultFor("mod_combos.simultaneous_threshold_ms"), ManifestDefaultFor("mod_combos.symmetric") ? 1 : 0)
+			ManifestDefaultFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS), ManifestDefaultFor(ConfigKey.MOD_COMBOS_SYMMETRIC) ? 1 : 0)
 	}
 	Chords := Map()
 	if (Cache is Map) {
@@ -1150,7 +1150,7 @@ KeyCombinationChordsReadConfig(Cache) {
 		}
 	}
 	LoggerInfo("KeyCombinations", "Key chords read: {1} chord(s), {2} ms, symmetric={3}.", Chords.Count,
-		KeyCombinationChordConfig["simultaneous_threshold_ms"], KeyCombinationChordConfig["combo_symmetric"])
+		KeyCombinationChordConfig[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS], KeyCombinationChordConfig[MenuCommand.COMBO_SYMMETRIC])
 }
 
 ; Whether a key can be part of a chord on the layout in force (point 5).
@@ -1362,7 +1362,7 @@ KeyCombinationChordTick(Ports := 0) {
 	if (_KeyCombinationChordWaiting != "") {
 		Elapsed := TickElapsed(_KeyCombinationChordWaitAt, Ports["tick"].Call())
 		; AltGr passes untouched (point 5): the wait ends as soon as it is seen.
-		if (A_IsSuspended || Elapsed > KeyCombinationChordConfig["simultaneous_threshold_ms"]
+		if (A_IsSuspended || Elapsed > KeyCombinationChordConfig[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS]
 				|| !IsHeld.Call(_KeyCombinationChordWaiting) || KS_IsDown("SC138"))
 			_KeyCombinationChordFlush(Ports)
 	}
@@ -1382,7 +1382,11 @@ _KeyCombinationChordArmPoll(Armed) {
 	global _KeyCombinationChordTimerFn, KEY_COMBINATION_CHORD_POLL_MS
 	if !IsObject(_KeyCombinationChordTimerFn)
 		_KeyCombinationChordTimerFn := KeyCombinationChordTick
-	SetTimer(_KeyCombinationChordTimerFn, Armed ? KEY_COMBINATION_CHORD_POLL_MS : 0)
+	if !Armed {
+		SetTimer(_KeyCombinationChordTimerFn, 0)
+		return
+	}
+	SetTimer(_KeyCombinationChordTimerFn, KEY_COMBINATION_CHORD_POLL_MS)
 }
 
 ; Assigns a chord to a pair and persists it, then reloads. Under symmetry the pair's
@@ -1417,7 +1421,7 @@ SetKeyCombinationChord(PairId, ActionName, Path := "", ReloadFn := 0) {
 KeyCombinationChordOwnerPair(PairId) {
 	global KeyCombinationChordConfig
 	Pair := KeyCombinationParsePair(PairId)
-	if !(Pair is Map) || !IsObject(KeyCombinationChordConfig) || !KeyCombinationChordConfig["combo_symmetric"]
+	if !(Pair is Map) || !IsObject(KeyCombinationChordConfig) || !KeyCombinationChordConfig[MenuCommand.COMBO_SYMMETRIC]
 		return PairId
 	for _, Id in KeyCombinationKeyIds() {
 		if (Id == Pair["first"])
@@ -1453,7 +1457,7 @@ _KeyCombinationChordLabel(PairId) {
 ; @returns {Boolean} False when nothing was committed.
 KeyCombinationChordToggleSymmetric(Path := "", ReloadFn := 0) {
 	global KeyCombinationChordConfig, ConfigurationFile
-	Rows := [ManifestSparseOperation("mod_combos.symmetric", !KeyCombinationChordConfig["combo_symmetric"])]
+	Rows := [ManifestSparseOperation(ConfigKey.MOD_COMBOS_SYMMETRIC, !KeyCombinationChordConfig[MenuCommand.COMBO_SYMMETRIC])]
 	if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, Rows, "the symmetry of the key chords")
 		return false
 	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
@@ -1463,7 +1467,7 @@ KeyCombinationChordToggleSymmetric(Path := "", ReloadFn := 0) {
 ; @returns {Array} One row.
 KeyCombinationChordTimingRows() {
 	global KeyCombinationChordConfig
-	Delay := KeyCombinationChordConfig["simultaneous_threshold_ms"]
+	Delay := KeyCombinationChordConfig[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS]
 	Row := Map("action", (*) => KeyCombinationChordPromptDelay())
 	Row["label"] := StrReplace(t("menu.tapholds.simultaneous_title"), "%s", Delay . " ms")
 	return [Row]
@@ -1473,9 +1477,9 @@ KeyCombinationChordTimingRows() {
 ; @returns {Boolean} False when nothing was committed.
 KeyCombinationChordPromptDelay() {
 	global KeyCombinationChordConfig, ConfigurationFile
-	Default := ManifestDefaultFor("mod_combos.simultaneous_threshold_ms")
+	Default := ManifestDefaultFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 	Box := Ui_InputBox(StrReplace(t("menu.tapholds.simultaneous_dialog_prompt"), "%d", Default),
-		t("menu.tapholds.simultaneous_dialog_title"), "w420 h220", KeyCombinationChordConfig["simultaneous_threshold_ms"])
+		t("menu.tapholds.simultaneous_dialog_title"), "w420 h220", KeyCombinationChordConfig[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS])
 	if (Box.Result != "OK")
 		return false
 	return KeyCombinationChordCommitDelay(Trim(Box.Value))
@@ -1493,7 +1497,7 @@ KeyCombinationChordCommitDelay(Text, Path := "", ReloadFn := 0) {
 		LoggerWarn("KeyCombinations", "The chord delay '{1}' is no positive number: nothing changes.", Text)
 		return false
 	}
-	Rows := [ManifestSparseOperation("mod_combos.simultaneous_threshold_ms", Text + 0)]
+	Rows := [ManifestSparseOperation(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, Text + 0)]
 	if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, Rows, "the delay of the key chords")
 		return false
 	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
