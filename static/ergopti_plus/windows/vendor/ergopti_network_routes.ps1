@@ -536,8 +536,9 @@ function Resolve-ErgoptiNativeNetworkRoutes {
             return @{ Ok = $true; MaxRoutes = $Policy.max_selections; MaxRedirects = $Policy.redirects.max_hops; Routes = @(@{ Kind = 'direct'; Endpoint = ''; Source = 'loopback'; Authentication = 'none' }) }
         }
         if ($null -eq $ReadEnvironment) { $ReadEnvironment = { param($Name) [Environment]::GetEnvironmentVariable($Name, 'Process') } }
-        # The user's proxy override (adapters/proxy_override.ahk) is inherited from the
-        # driver. It wins over an exported relay and the PAC or WPAD lookup never runs.
+        # The user's proxy override: the driver sets it on this worker's own environment
+        # (adapters/proxy_override.ahk). It wins over an exported relay and the PAC or
+        # WPAD lookup never runs.
         $Override = & $ReadEnvironment 'ERGOPTI_PROXY_OVERRIDE'
         if ($Override -is [string] -and $Override -ne '') {
             if ($Override -ceq 'direct') {

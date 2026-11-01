@@ -147,7 +147,7 @@ function assertNativePullFailureScope(source) {
 	assert.ok(native.indexOf('MenuOperation :=') < native.indexOf('Owner := Map('));
 	assert.match(
 		native,
-		/Factory := HasMethod\(SpawnFn, "Call"\) \? SpawnFn : ShellRunner_SpawnTreeOwned/
+		/Factory := HasMethod\(SpawnFn, "Call"\) \? SpawnFn : ProxyOverride_SpawnWorker/
 	);
 	assert.match(native, /Task := Factory\.Call\(A_WinDir/);
 	assert.match(native, /Owner\["task"\] := Task/);

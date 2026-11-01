@@ -2442,7 +2442,7 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 			_Updater_BindCurlCaptureTransport(Transport, Capture)
 		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
 			NativeAdopt := IsObject(Capture) ? ObjBindMethod(Capture, "OnNativeAdopt") : 0
-			Worker := ShellRunner_SpawnTreeOwned(
+			Worker := ProxyOverride_SpawnWorker(
 				_Updater_PowerShellPath(), Transport.Args, _OnDone, , NativeAdopt)
 			if IsObject(Capture)
 				Capture.Attach(Worker)

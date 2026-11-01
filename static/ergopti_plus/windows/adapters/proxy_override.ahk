@@ -10,23 +10,24 @@
 ; config.toml, the Windows settings store.
 ;
 ; FEATURES & RATIONALE:
-; 1. One process variable carries the choice to every channel. All Windows
-;    download clients are children of the driver (the managed HTTP worker, the
-;    updater staging worker, the Ollama archive download, the runtime launcher and
-;    its sign-in relay), so each inherits it and vendor/ergopti_network_routes.ps1
-;    applies it in one place; no channel can forget it.
+; 1. One variable carries the choice to every channel, and only to them. It is set
+;    on the private environment of each network worker at spawn (ProxyOverride_
+;    SpawnWorker: the managed HTTP worker, the updater staging worker, the Ollama
+;    bridges and the runtime launcher) and vendor/ergopti_network_routes.ps1 applies
+;    it in one place. It never enters this process's own environment: run_command,
+;    Run and any program the user opens would inherit it, password included.
 ; 2. Fail fast: a stored value that is not valid is published as a token the route
 ;    owner refuses, never read as automatic, and the user is told in words.
 ; 3. Every relay of the shared grammar is usable. WinHTTP and HttpWebRequest reach a
 ;    plain http relay only, so vendor/ergopti_network_routes.ps1 runs a loopback hop
 ;    for an https relay, a socks5 relay or credentials in the address; the Ollama
-;    daemon reads them from its environment itself. The value holds a password then:
-;    it stays in the settings file and this process variable, and logs name the mode.
+;    daemon reads them from its environment itself. The value holds a password then,
+;    and logs name the mode.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-; The process variable the route owner reads, as on macOS (network_env.lua)
+; The variable the route owner reads, as on macOS (network_env.lua)
 global PROXY_OVERRIDE_ENVIRONMENT := "ERGOPTI_PROXY_OVERRIDE"
 ; Published for a stored value that cannot be used; no route owner accepts it
 global PROXY_OVERRIDE_REFUSED_TOKEN := "invalid"
@@ -37,6 +38,8 @@ global _ProxyOverrideDeclaration := 0
 global _ProxyOverrideInitialized := false
 ; The stored text, shown back in the menu row even when it is refused
 global _ProxyOverrideStored := ""
+; What the next worker receives: the canonical choice, or the refused token
+global _ProxyOverridePublished := ""
 
 
 
@@ -144,6 +147,7 @@ ProxyOverride_CarriesCredentials(Relay) {
 
 
 
+
 ; =======================================
 ; =======================================
 ; ======= 2/ The published choice =======
@@ -151,16 +155,17 @@ ProxyOverride_CarriesCredentials(Relay) {
 ; =======================================
 
 /**
- * Publishes a stored value to this process and every child it starts next.
+ * Publishes a stored value to the route owners of this process and to every network
+ * worker started next. It stays in this process's memory.
  * @param {Any} Stored The stored value.
  * @returns {Boolean} False when the value is refused.
  */
 ProxyOverride_Publish(Stored) {
-	global PROXY_OVERRIDE_ENVIRONMENT, PROXY_OVERRIDE_REFUSED_TOKEN, _ProxyOverrideStored
+	global PROXY_OVERRIDE_REFUSED_TOKEN, _ProxyOverrideStored, _ProxyOverridePublished
 	_ProxyOverrideStored := Stored is String ? Stored : String(Stored)
 	Choice := ProxyOverride_Parse(Stored)
 	Usable := Choice is Map
-	EnvSet(PROXY_OVERRIDE_ENVIRONMENT, Usable ? ProxyOverride_Canonical(Choice) : PROXY_OVERRIDE_REFUSED_TOKEN)
+	_ProxyOverridePublished := Usable ? ProxyOverride_Canonical(Choice) : PROXY_OVERRIDE_REFUSED_TOKEN
 	return Usable
 }
 
@@ -169,11 +174,32 @@ ProxyOverride_Publish(Stored) {
  * @returns {Map|Integer} As ProxyOverride_Parse; 0 when the stored value is refused.
  */
 ProxyOverride_Current() {
-	global PROXY_OVERRIDE_ENVIRONMENT
-	Published := EnvGet(PROXY_OVERRIDE_ENVIRONMENT)
-	if Published == ""
+	global _ProxyOverridePublished
+	if _ProxyOverridePublished == ""
 		return Map("mode", "automatic")
-	return ProxyOverride_Parse(Published)
+	return ProxyOverride_Parse(_ProxyOverridePublished)
+}
+
+/**
+ * The private environment of one network worker: this process's, with the choice in
+ * force and the native module path. An empty override still overwrites a value
+ * something exported for the driver, which is not the user's choice in this driver.
+ * @returns {Buffer} A Unicode environment block.
+ */
+ProxyOverride_WorkerEnvironment() {
+	global PROXY_OVERRIDE_ENVIRONMENT, _ProxyOverridePublished
+	return ShellRunner_BuildEnvironment(Map(PROXY_OVERRIDE_ENVIRONMENT, _ProxyOverridePublished,
+		"PSModulePath", ShellRunner_WinPsModulePath()))
+}
+
+/**
+ * ShellRunner_SpawnTreeOwned for a worker that downloads: the only way the override
+ * leaves this process. Same arguments, same task.
+ */
+ProxyOverride_SpawnWorker(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?,
+		MaxOutputBytes := 0, CaptureOutput := true, PrivateDiagnostics := false) {
+	return ShellRunner_SpawnTreeOwnedPrivate(ProxyOverride_WorkerEnvironment(), Executable, Args, OnDone?,
+		OnChunk?, BeforeNativeAdoptFn?, MaxOutputBytes, CaptureOutput, PrivateDiagnostics)
 }
 
 /**
@@ -183,10 +209,12 @@ ProxyOverride_Current() {
  * @returns {Boolean} False when the stored value is refused.
  */
 ProxyOverride_Init(Cache) {
-	global _ProxyOverrideInitialized
+	global _ProxyOverrideInitialized, PROXY_OVERRIDE_ENVIRONMENT
 	if _ProxyOverrideInitialized
 		throw Error("The proxy override was initialized twice.")
 	_ProxyOverrideInitialized := true
+	; A value something exported for this driver must not reach what it starts.
+	EnvSet(PROXY_OVERRIDE_ENVIRONMENT)
 	Declaration := ProxyOverride_Declaration()
 	if !ConfigTomlTryReadBootValue(Cache, Declaration["section"], Declaration["key"], &Stored)
 		Stored := IniCacheGet(Cache, Declaration["section"], Declaration["key"])

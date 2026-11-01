@@ -801,17 +801,19 @@ route before capturing the inherited one; the signed Swift workers resolve
 natively and never read it, so an override selects the environment-driven
 client instead (opaque prelude, no `install_huggingface_transport`). macOS
 `hs.http` requests (update checks) still follow the system settings. Windows
-keeps the key in `config.toml` and publishes it at boot in the process variable
-`ERGOPTI_PROXY_OVERRIDE` (`adapters/proxy_override.ahk`), which every worker
-inherits and `Resolve-ErgoptiNativeNetworkRoutes` applies. WinHTTP and
+keeps the key in `config.toml`, holds the choice in the driver's memory and sets
+`ERGOPTI_PROXY_OVERRIDE` only on the private environment of a network worker
+(`ProxyOverride_SpawnWorker`, `adapters/proxy_override.ahk`), where
+`Resolve-ErgoptiNativeNetworkRoutes` applies it. It never enters the driver's own
+environment: `run_command`, `Run` and opened programs would inherit it. WinHTTP and
 HttpWebRequest reach a plain http relay only, so an https relay, a socks5 relay or
 credentials in the address go through the loopback hop of that file (C# in the
 worker's own process, answering that process only); the owned daemon gets the real
 relay in `HTTPS_PROXY`. Action: a new download client on macOS must take its
 prelude from `network_env.lua`, a new native worker must read the override before
 claiming it honours it, and a new Windows client must route through
-`Resolve-ErgoptiNativeNetworkRoutes` or `SystemProxy_*` and join
-`test-windows-proxy-override-e2e.cjs`.
+`Resolve-ErgoptiNativeNetworkRoutes` or `SystemProxy_*`, start through
+`ProxyOverride_SpawnWorker`, and join `test-windows-proxy-override-e2e.cjs`.
 
 ### project-metrics-day-and-correction-semantics
 

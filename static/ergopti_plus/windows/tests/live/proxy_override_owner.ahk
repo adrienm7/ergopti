@@ -94,12 +94,34 @@ _OwnerMain(PlanPath) {
 	for Typed in Plan.Get("typed", [])
 		Rows.Push(_OwnerRow(Typed))
 	Result["rows"] := Rows
+	if Plan.Get("children", false)
+		_OwnerChildren(Plan, Result)
 	Result["logs"] := _OwnerLogs
 
 	File := FileOpen(Plan["result"], "w", "UTF-8-RAW")
 	File.Write(_OwnerJson(Result))
 	File.Close()
 	ExitApp(0)
+}
+
+; What the driver, a network worker and a program started with Run each see.
+_OwnerChildren(Plan, Result) {
+	Result["driver_environment"] := EnvGet(PROXY_OVERRIDE_ENVIRONMENT)
+	Script := "[Console]::Out.Write((Get-Acl -LiteralPath $env:SystemRoot -ErrorAction Stop).GetType().Name"
+		. " + '|' + $env:ERGOPTI_PROXY_OVERRIDE + '|' + $env:PSModulePath)"
+	Answer := 0
+	Task := ProxyOverride_SpawnWorker(ShellRunner_WinPsPath(), ShellRunner_WinPsArgs("-Command", Script),
+		(Code, Stdout, *) => (Answer := Map("code", Code, "stdout", Stdout)))
+	if !Task.start()
+		throw Error("The worker probe did not start.")
+	Deadline := A_TickCount + 30000
+	while !IsObject(Answer) && A_TickCount < Deadline
+		Sleep(20)
+	Result["worker"] := IsObject(Answer) ? Answer : Map("code", -1, "stdout", "")
+	Path := Plan["result"] . ".set"
+	RunWait('"' . A_ComSpec . '" /d /c set > "' . Path . '"', , "Hide")
+	Result["run_child"] := FileRead(Path)
+	FileDelete(Path)
 }
 
 _OwnerCurlRoute(Url, Reader) {
