@@ -376,6 +376,7 @@ two disagree in either direction.
 | `category_enabled.shortcuts`                                  | n/a             | n/a                                    | —                    |
 | `category_enabled.tap_holds`                                  | n/a             | n/a                                    | —                    |
 | `category_enabled.key_combinations`                           | n/a             | `evdev`, `uinput`                      | —                    |
+| `network.proxy_override`                                      | n/a             | n/a                                    | —                    |
 | `ui.menubar_icon`                                             | —               | n/a                                    | n/a                  |
 | `tap_holds.enabled`                                           | `karabiner`     | `evdev`, `uinput`                      | n/a                  |
 | `shortcuts.keys.wrap_text_if_selected`                        | —               | n/a                                    | n/a                  |
