@@ -729,6 +729,15 @@ Action: a consumer that must treat a replayed edge as physical reads `KS_IsHeld`
 the DLL is published only through `-UpdateTracked` on the pinned toolset
 (`docs/tooling/windows-native-dll.md`).
 
+### project-native-export-lookup-is-not-for-the-keystroke-path
+
+`_LLM_NavEventOwnerNativeExport` re-proves the whole issued image on every call: about
+280 us, against 3.4 us for the native call behind it. Through the ledger this put
+that cost in `IsRealAltGrPress`, so in every AltGr `#HotIf`. Action: code reached from
+a key press or a criterion takes the address once at the owner's start and passes it,
+as the press ledger port does. Measure a new read with a QPC loop inside a booted
+isolated driver: the `[HotPath]` lines do not see `#HotIf` criteria.
+
 ### project-nav-owner-start-registers-before-its-epoch
 
 `LLM_NavEventOwner_EnsureStarted` publishes a new
