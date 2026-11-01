@@ -329,6 +329,7 @@ _RPA_ExactNativeShutdownEnvelope(Scenario := "program") {
 		Source .= 'global _LifecycleShutdownVetoAttempts := 0' . "`n"
 		Source .= 'global _LifecycleShutdownReason := ""' . "`n"
 		Source .= 'global _LifecycleReloadExitRetrying := false' . "`n"
+		Source .= 'global _LifecycleExitRetryReason := ""' . "`n"
 		Source .= 'global _UserProgramEntries := Map()' . "`n"
 		Source .= 'global _UserProgramGeneration := 0' . "`n"
 		Source .= 'global _UserProgramPaused := false' . "`n"
