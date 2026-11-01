@@ -191,6 +191,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "open_emoji_picker" })
 	Items.Push({ Kind: "action", Id: "take_note" })
 	Items.Push({ Kind: "action", Id: "activity_simulation" })
+	Items.Push({ Kind: "action", Id: "display_mirror_toggle" })
 	Items.Push({ Kind: "action", Id: "search_web" })
 	Items.Push({ Kind: "action", Id: "copy_selected_path" })
 	Items.Push({ Kind: "action", Id: "teleport_mouse" })
@@ -278,6 +279,7 @@ GestureActionCatalogueData() {
 	Actions["desktop_next_wrap"] := { Family: "sg", LabelKey: "sg_actions.desktop_next_wrap", Parameter: "", Confirm: false }
 	Actions["desktop_prev"] := { Family: "sg", LabelKey: "sg_actions.desktop_prev", Parameter: "", Confirm: false }
 	Actions["desktop_prev_wrap"] := { Family: "sg", LabelKey: "sg_actions.desktop_prev_wrap", Parameter: "", Confirm: false }
+	Actions["display_mirror_toggle"] := { Family: "sg", LabelKey: "sg_actions.display_mirror_toggle", Parameter: "", Confirm: false }
 	Actions["doc_end"] := { Family: "sg", LabelKey: "sg_actions.doc_end", Parameter: "", Confirm: false }
 	Actions["doc_start"] := { Family: "sg", LabelKey: "sg_actions.doc_start", Parameter: "", Confirm: false }
 	Actions["eject_all_disks"] := { Family: "sg", LabelKey: "sg_actions.eject_all_disks", Parameter: "", Confirm: false }

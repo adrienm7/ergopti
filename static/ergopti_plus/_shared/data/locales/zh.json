@@ -4008,7 +4008,7 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Linux 上没有：桌面数量属于各桌面环境自己的设置（GNOME 自动增减，KDE 和 Xfce 保持固定数量），而 Wayland 不给任何应用更改它的请求。",
 	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Linux 上没有：每个 Linux 桌面都用自己的防休眠功能保持会话唤醒（KDE 和 Xfce 的演示模式，GNOME 的 Caffeine 扩展）；请在那里开启。",
 	"platform_reason.action_key_is_its_own_binding_here": "在此系统上不是单独的一行：对应的操作会发送相同的按键。",
-	"platform_reason.action_mirroring_is_the_systems_projection_menu": "仅 macOS 提供开关：Windows 在 Win+P 投影菜单中选择“复制”，GNOME 和 KDE 在各自的 Super+P 显示器切换器中选择；请把该键绑定为按键组合。",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Linux 上没有开关：GNOME 和 KDE 在各自的 Super+P 显示器切换器中选择“复制”；请把该键绑定为按键组合。",
 	"platform_reason.action_sticky_keys_are_the_systems": "此系统的辅助功能设置中有粘滞键，可让每个修饰键只作用一次；请在那里开启。",
 	"platform_reason.action_take_note_uses_notepad": "仅限 Windows：此操作在每个 Windows 都自带的记事本中打开当天的笔记文件。macOS 有自己的快速备忘录（Fn+Q），而 Linux 没有所有桌面都自带的编辑器。",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "在 macOS 上，实况文本可以读取任何截图或图片中的文字：用对应的操作截一张图，然后选择其中的文字。"

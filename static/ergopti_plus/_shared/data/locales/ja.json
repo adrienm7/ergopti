@@ -4008,7 +4008,7 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Linux にはありません：デスクトップの数は各デスクトップ環境の設定に属し（GNOME は自動で増減し、KDE と Xfce は固定数を保ちます）、Wayland はどのアプリにもそれを変える要求を与えません。",
 	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Linux にはありません：各 Linux デスクトップは独自のアイドル抑止（KDE と Xfce のプレゼンテーションモード、GNOME の Caffeine 拡張）でセッションを起動したままにします。そちらで有効にしてください。",
 	"platform_reason.action_key_is_its_own_binding_here": "このシステムでは独立した行ではありません：同等の操作が同じキーを送ります。",
-	"platform_reason.action_mirroring_is_the_systems_projection_menu": "切り替えは macOS のみ：Windows は Win+P の投影メニューで「複製」を選び、GNOME と KDE は独自の Super+P ディスプレイ切り替えで選びます。そのキーをキーの組み合わせとして割り当ててください。",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Linux には切り替えがありません：GNOME と KDE は独自の Super+P ディスプレイ切り替えで「複製」を選びます。そのキーをキーの組み合わせとして割り当ててください。",
 	"platform_reason.action_sticky_keys_are_the_systems": "このシステムのアクセシビリティ設定には固定キー機能があり、各修飾キーを 1 回だけ有効にします。そちらで有効にしてください。",
 	"platform_reason.action_take_note_uses_notepad": "Windows のみ：この操作は、すべての Windows に付属するメモ帳でその日のメモファイルを開きます。macOS には独自のクイックメモ（Fn+Q）があり、Linux にはすべてのデスクトップに付属するエディターがありません。",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "macOS では、テキスト認識表示があらゆるスクリーンショットや画像の文字を読み取ります：同等の操作で撮影し、その文字を選択してください。"

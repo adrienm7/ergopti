@@ -315,7 +315,7 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `open_emoji_picker` | 😀 Emoji picker | yes | yes | yes |
 | `take_note` | 📝 Take a note | yes | no, R22 | no, R22 |
 | `activity_simulation` | 🖱 Simulate activity (anti-sleep) | yes | yes | no, R23 |
-| `display_mirror_toggle` | 🖥 Mirror displays (on/off) | no, R24 | yes | no, R24 |
+| `display_mirror_toggle` | 🖥 Mirror displays (on/off) | yes | yes | no, R24 |
 | `search_web` | 🔍 Web search [configurable] | yes | yes | yes (tool:xclip, tool:xdg-open) |
 | `copy_selected_path` | 📋 Copy the path, or open / search the selection | yes | yes | yes (tool:xclip, tool:xdg-open) |
 | `teleport_mouse` | 🖱 Teleport mouse | yes | yes | no, R15 |
@@ -421,7 +421,7 @@ actions that do the same on that OS. The modifier + key shortcuts
 | R21 | `platform_reason.action_text_recognition_is_live_text_on_macos` | On macOS, Live Text reads the text of any capture or image: take one with the equivalent action, then select its text. |
 | R22 | `platform_reason.action_take_note_uses_notepad` | Windows only: this opens the day's notes file in Notepad, the editor every Windows ships. macOS has its own Quick Note (Fn+Q), and Linux has no editor every desktop ships. |
 | R23 | `platform_reason.action_keep_awake_is_the_desktops_inhibitor` | Not on Linux: each Linux desktop keeps a session awake through its own idle inhibitor (the presentation mode of KDE and Xfce, a Caffeine extension on GNOME); turn it on there. |
-| R24 | `platform_reason.action_mirroring_is_the_systems_projection_menu` | macOS only as a toggle: Windows chooses Duplicate in its Win+P projection menu, and GNOME and KDE in their own Super+P display switcher; bind that key as a keystroke. |
+| R24 | `platform_reason.action_mirroring_is_the_systems_projection_menu` | No toggle on Linux: GNOME and KDE choose Duplicate in their own Super+P display switcher; bind that key as a keystroke. |
 | R25 | `platform_reason.action_screen_overlay_is_not_on_linux` | Not on Linux: drawing over every window needs an overlay surface that Wayland compositors give no application. |
 | R26 | `platform_reason.action_office_bold_key_is_windows` | Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”. |
 | R27 | `platform_reason.action_sticky_keys_are_the_systems` | This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there. |
