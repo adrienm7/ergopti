@@ -73,7 +73,7 @@ _SC_Getters() {
 _SC_KeyCombinationsSubmenu(Options := unset) {
 	Commands := _SC_KeyCombinationCommands(IsSet(Options) ? Options : Map())
 	Getters := Map("key_combinations_enabled", () => IsCategoryGated("KeyCombinations"),
-		MenuCommand.COMBO_SYMMETRIC, () => KeyCombinationChordConfig[MenuCommand.COMBO_SYMMETRIC] ? true : false)
+		MenuCommand.COMBO_SYMMETRIC, () => KeyCombinationChordCurrentSettings()[MenuCommand.COMBO_SYMMETRIC] ? true : false)
 	ListProviders := Map(
 		"combo_timings", KeyCombinationChordTimingRows,
 		"key_combination_rows_left", () => KeyCombinationRows("left"),

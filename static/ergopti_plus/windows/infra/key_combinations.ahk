@@ -1094,6 +1094,19 @@ _KeyCombinationChordPorts() {
 	return Ports
 }
 
+_KeyCombinationChordDeclaredSettings() {
+	return KeyCombinationChordSettings(ManifestDefaultFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS),
+		ManifestDefaultFor(ConfigKey.MOD_COMBOS_SYMMETRIC) ? 1 : 0)
+}
+
+; The delay and symmetry the menu shows: what the boot read, else the manifest's
+; declared values, since a menu can be built by a caller that loaded no config.
+; @returns {Map} KeyCombinationChordSettings's shape.
+KeyCombinationChordCurrentSettings() {
+	global KeyCombinationChordConfig
+	return IsObject(KeyCombinationChordConfig) ? KeyCombinationChordConfig : _KeyCombinationChordDeclaredSettings()
+}
+
 ; Reads the third slots with the other two: an action is admitted as on Linux, and
 ; the delay and symmetry fall to the manifest's declared values when absent.
 ; @param Cache {Map} The parsed config.
@@ -1108,8 +1121,7 @@ KeyCombinationChordsReadConfig(Cache) {
 		IsNumber(Delay) ? Delay + 0 : Delay, Symmetric ? 1 : 0)
 	catch as Err {
 		LoggerWarn("KeyCombinations", "[mod_combos] is refused ({1}): the declared delay and symmetry apply.", Err.Message)
-		KeyCombinationChordConfig := KeyCombinationChordSettings(
-			ManifestDefaultFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS), ManifestDefaultFor(ConfigKey.MOD_COMBOS_SYMMETRIC) ? 1 : 0)
+		KeyCombinationChordConfig := _KeyCombinationChordDeclaredSettings()
 	}
 	Chords := Map()
 	if (Cache is Map) {
@@ -1456,8 +1468,8 @@ _KeyCombinationChordLabel(PairId) {
 ; @param ReloadFn {Func} Replaces the reload in tests.
 ; @returns {Boolean} False when nothing was committed.
 KeyCombinationChordToggleSymmetric(Path := "", ReloadFn := 0) {
-	global KeyCombinationChordConfig, ConfigurationFile
-	Rows := [ManifestSparseOperation(ConfigKey.MOD_COMBOS_SYMMETRIC, !KeyCombinationChordConfig[MenuCommand.COMBO_SYMMETRIC])]
+	global ConfigurationFile
+	Rows := [ManifestSparseOperation(ConfigKey.MOD_COMBOS_SYMMETRIC, !KeyCombinationChordCurrentSettings()[MenuCommand.COMBO_SYMMETRIC])]
 	if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, Rows, "the symmetry of the key chords")
 		return false
 	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
@@ -1466,8 +1478,7 @@ KeyCombinationChordToggleSymmetric(Path := "", ReloadFn := 0) {
 ; The list provider of the manifest's "combo_timings" entry: the delay of the chords.
 ; @returns {Array} One row.
 KeyCombinationChordTimingRows() {
-	global KeyCombinationChordConfig
-	Delay := KeyCombinationChordConfig[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS]
+	Delay := KeyCombinationChordCurrentSettings()[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS]
 	Row := Map("action", (*) => KeyCombinationChordPromptDelay())
 	Row["label"] := StrReplace(t("menu.tapholds.simultaneous_title"), "%s", Delay . " ms")
 	return [Row]
@@ -1476,10 +1487,10 @@ KeyCombinationChordTimingRows() {
 ; Asks for the delay of the chords and persists a positive number, then reloads.
 ; @returns {Boolean} False when nothing was committed.
 KeyCombinationChordPromptDelay() {
-	global KeyCombinationChordConfig, ConfigurationFile
+	global ConfigurationFile
 	Default := ManifestDefaultFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 	Box := Ui_InputBox(StrReplace(t("menu.tapholds.simultaneous_dialog_prompt"), "%d", Default),
-		t("menu.tapholds.simultaneous_dialog_title"), "w420 h220", KeyCombinationChordConfig[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS])
+		t("menu.tapholds.simultaneous_dialog_title"), "w420 h220", KeyCombinationChordCurrentSettings()[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS])
 	if (Box.Result != "OK")
 		return false
 	return KeyCombinationChordCommitDelay(Trim(Box.Value))
