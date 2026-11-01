@@ -317,6 +317,9 @@ step crash_dumps sh -c 'command -v coredumpctl >/dev/null || { echo "no coredump
 # The checks that need no person (tools/dev/linux-field-shell-checks.sh).
 step collector_checks field_linux_checks "${REPO_ROOT}"
 # The daemon's Debug field checks, run with no window (tools/dev/linux-field-run.sh).
+# The composer check needs Ergopti's Python; running the collector is the consent.
+field_linux_ensure_python "${REPO_ROOT}" 2>&1 | tee "${out}/field_python.txt" | sed 's/^/[field-report] /'
+printf '%-28s exit=%s\n' "field_python" "${PIPESTATUS[0]}" >> "${steps}"
 log "Field run: asking the daemon to run its field checks…"
 field_linux_run "${REPO_ROOT}" "${out}" 2>&1 | tee "${out}/field_run.txt" | sed 's/^/[field-report] /'
 printf '%-28s exit=%s\n' "field_run" "${PIPESTATUS[0]}" >> "${steps}"

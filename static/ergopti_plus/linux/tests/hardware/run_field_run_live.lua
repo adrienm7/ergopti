@@ -95,23 +95,6 @@ setenv("HOME", scratch .. "/home")
 setenv("ERGOPTI_XKB_USER_HOME", scratch .. "/home")
 setenv("XDG_DATA_HOME", scratch .. "/data")
 
--- The composer check installs a layout through Ergopti's own Python, which a
--- first install downloads after a consent question nobody answers here (the
--- download has its own live probe, run_managed_python_live.lua). The private
--- data folder gets that interpreter's slot, pointing at this runner's python3,
--- as run_layout_rows_live.lua stubs it, so the check reaches the installer.
-local ManagedPython = require("modules.keymap.managed_python")
-local probe = { pin = require("_generated.native_runtime").managed_python,
-	data_dir = require("infra.config_paths").data(),
-	machine = function() return uv.os_uname().machine end,
-	exists = function(path) return uv.fs_stat(path) ~= nil end }
-local slot = ManagedPython.platform(probe)
-assert(slot and probe.pin.archives[slot], "no Ergopti Python build for this runner")
-local runner_python = io.popen("command -v python3"):read("*l")
-assert(runner_python and runner_python:sub(1, 1) == "/", "the field run needs this runner's python3")
-local interpreter = ManagedPython.root(probe, slot) .. "/" .. ManagedPython.INTERPRETER
-assert(os.execute("mkdir -p " .. quote(interpreter:match("^(.*)/[^/]+$")) .. " && ln -s "
-	.. quote(runner_python) .. " " .. quote(interpreter)) == 0, "the managed Python slot is provisioned")
 
 local host = io.popen("luajit " .. quote(SCRIPT) .. " daemon >" .. quote(scratch .. "/daemon.log")
 	.. " 2>&1 & echo $!", "r")
@@ -129,7 +112,10 @@ if not check(read(ready) ~= nil, "the daemon host publishes its field run sessio
 	os.exit(1)
 end
 
+-- As the collector does: it installs Ergopti's Python first (running it is the
+-- consent), so the composer check reaches the installer without a click.
 local handle = io.popen("bash -c " .. quote(". " .. quote(ROOT .. "/tools/dev/linux-field-run.sh")
+	.. " && field_linux_ensure_python " .. quote(ROOT)
 	.. " && field_linux_run " .. quote(ROOT) .. " " .. quote(scratch .. "/report")) .. " 2>&1", "r")
 local output = handle:read("*a")
 handle:close()
@@ -140,6 +126,8 @@ for index, step in ipairs({ "field_composer", "field_network", "driver_reload", 
 	check(read(string.format("%s/report/field_run/%02d_%s.json", scratch, index, step)) ~= nil,
 		"and copies its result file")
 end
+check(output:match("running this collector is the consent") ~= nil, "the collector states its consent before the download")
+check(output:match("field_python=installed") ~= nil, "the collector installs Ergopti's Python")
 check(output:match("field run field_composer: pass") ~= nil, "the composer check passes headless")
 check(output:match("field run driver_reload: pass %(reloaded%)") ~= nil,
 	"the host restarts and the successor resumes the run")

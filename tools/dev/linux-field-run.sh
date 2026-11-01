@@ -48,6 +48,27 @@ field_run_ready_pid() {
 	[ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null && printf '%s\n' "${pid}"
 }
 
+# Installs Ergopti's Python before the field run, so the composer check runs
+# without a click: the maintainer who runs the collector gave the consent, said
+# in one line before the download. A failure is printed and the composer check
+# then reports SKIP python_not_installed with its reason.
+# $1 the clone root. Prints field_python=installed or field_python=<code>.
+field_linux_ensure_python() {
+	local driver_root="$1/static/ergopti_plus/linux" shared="$1/static/ergopti_plus/_shared"
+	LUA_PATH="$driver_root/?.lua;$driver_root/?/init.lua;$shared/lua/?.lua;$shared/lua/?/init.lua;;" luajit -e '
+		local uv = require("luv")
+		local Pins = require("_generated.native_runtime").managed_python
+		local outcome
+		require("modules.keymap.layout_registry").install_python(function(bytes)
+			io.write(string.format("  ⬇️ Installing Ergopti'"'"'s Python %s (%d MB) for the composer check: "
+				.. "running this collector is the consent.\n", Pins.version, math.ceil(bytes / 1048576)))
+			io.flush()
+			return true
+		end, function(ok, value) outcome = { ok, value } end)
+		while not outcome and uv.loop_alive() do uv.run("once") end
+		print("field_python=" .. (outcome and outcome[1] and "installed" or tostring(outcome and outcome[2] or "unsettled")))'
+}
+
 # Runs the field checks of the daemon and copies their results.
 # $1 the clone root, $2 the report folder. Prints the marks and the summary.
 field_linux_run() {
