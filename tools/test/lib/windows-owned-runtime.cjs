@@ -146,10 +146,12 @@ function prepareVendor(directory) {
 /**
  * Creates the profile: root, published stub version and private vendor copy.
  * @param {object} options
- * @param {string} options.stubExecutable The built stub daemon.
+ * @param {string} [options.stubExecutable] The built stub daemon.
+ * @param {string} [options.releaseDirectory] A real release folder, published in its
+ *     place through the same admission.
  * @returns {object} The profile, with launch(), pull() and dispose().
  */
-function createProfile({ stubExecutable }) {
+function createProfile({ stubExecutable, releaseDirectory }) {
 	const local = process.env.LOCALAPPDATA;
 	const managedRoot = path.join(
 		local,
@@ -162,8 +164,11 @@ function createProfile({ stubExecutable }) {
 	};
 	try {
 		const release = path.join(work, 'release');
-		fs.mkdirSync(release);
-		fs.copyFileSync(stubExecutable, path.join(release, 'ollama.exe'));
+		if (releaseDirectory) fs.cpSync(releaseDirectory, release, { recursive: true });
+		else {
+			fs.mkdirSync(release);
+			fs.copyFileSync(stubExecutable, path.join(release, 'ollama.exe'));
+		}
 		const archive = path.join(work, 'ollama-windows-amd64.zip');
 		zipDirectory(release, archive);
 		const catalogue = path.join(work, 'catalogue.json');

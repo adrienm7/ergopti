@@ -21,6 +21,9 @@
  *    Windows CI step passes, turns any such row into a failure.
  * 3. Real network is out of reach: a CONNECT only reaches the loopback registry
  *    and the stub refuses any dial outside loopback (see its header).
+ * 4. The official ollama.exe runs the same way when tools/test/fetch-real-ollama.cjs
+ *    has fetched it: an optional mode (lib/windows-real-ollama.cjs) that --required
+ *    does not demand.
  *
  * USAGE:
  *   npm run test:windows-proxy-relay-e2e [-- --required] [-- --only=<substring>]
@@ -43,6 +46,7 @@ const {
 } = require('./lib/fake-network.cjs');
 const { NOT_EXECUTED_MARKER } = require('./validate-ahk-suite-manifest.cjs');
 const runtime = require('./lib/windows-owned-runtime.cjs');
+const { runRealDaemonCases } = require('./lib/windows-real-ollama.cjs');
 
 const { ROOT, VENDOR } = runtime;
 const REQUIRED = process.argv.includes('--required');
@@ -77,12 +81,15 @@ const SLOW_MS = 7000;
 let total = 0;
 let failed = 0;
 let notExecuted = 0;
+// The real daemon's row: --required never demands a 1.4 GB download from CI.
+let optionalNotExecuted = 0;
 
 function report(name, state, detail = '') {
 	total++;
 	if (state === 'ok') console.log(`ok ${total} - ${name}`);
-	else if (state === 'skip') {
+	else if (state === 'skip' || state === 'optional') {
 		notExecuted++;
+		if (state === 'optional') optionalNotExecuted++;
 		console.log(`ok ${total} - ${name}${NOT_EXECUTED_MARKER}${detail}`);
 	} else {
 		failed++;
@@ -983,6 +990,16 @@ async function main() {
 		const ownerName = 'regression c378cbe402: the real owner admits the real launcher receipt';
 		if (!fs.existsSync(ahk)) report(ownerName, 'skip', `AutoHotkey v2 is not at ${ahk}`);
 		else await check(ownerName, () => runOwnerRegression(context, ahk));
+
+		await runRealDaemonCases({
+			check,
+			signedIn,
+			skip: (name, reason) => report(name, 'optional', reason),
+			relay: { relayPath, relaySha256, timings: TIMINGS },
+			netOnly: { good: GOOD_NETONLY, wrong: WRONG_NETONLY },
+			tlsRegistry: registry,
+			forbiddenPortRows
+		});
 	} finally {
 		await registry.close();
 		profile.dispose();
@@ -997,11 +1014,11 @@ function finish() {
 	console.log(
 		`# ${passed} passed, ${failed} failed${notExecuted ? `, ${notExecuted} not executed` : ''}.`
 	);
-	if (REQUIRED && notExecuted > 0) {
+	if (REQUIRED && notExecuted > optionalNotExecuted) {
 		console.log('# --required: a case that did not run is a failure here.');
 		process.exitCode = 1;
 	} else if (failed > 0) process.exitCode = 1;
-	else if (notExecuted > 0)
+	else if (notExecuted > optionalNotExecuted)
 		console.log('SKIP (not executed): see the rows above; hosted CI runs them with --required');
 }
 

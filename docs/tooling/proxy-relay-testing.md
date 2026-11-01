@@ -63,6 +63,36 @@ CI passes `--required`, which fails on one.
 
 What it does not prove: a real domain controller or Kerberos (without a domain, SSPI's
 Negotiate falls back to raw NTLM), a TLS-inspecting proxy, the WPAD discovery itself
-(the PAC is named, never discovered), a corporate policy that blocks NTLM, and the real
-`ollama.exe`, whose registry certificate check cannot be pointed at a test certificate
-without installing a root.
+(the PAC is named, never discovered) and a corporate policy that blocks NTLM.
+
+## The real daemon
+
+`node tools/test/fetch-real-ollama.cjs` downloads the official Windows release of the
+pin (`ollama_release.json`), refuses any other SHA-256 and unpacks `ollama.exe` and its
+CPU libraries (67 MB; the GPU libraries are what makes the archive 1.4 GB) into
+`%LOCALAPPDATA%\Programs\ergopti-ollama-e2e-<version>`. The same end-to-end test then
+adds its `real daemon` rows; `--only="real daemon"` runs those alone, in about two
+minutes. Without the folder one row prints `NOT EXECUTED`, which `--required` does not
+count: CI stays independent of the network.
+
+The rows publish the release through the real archive path and start it under the real
+launcher, with a generated GGUF of 27 KB (`tools/test/lib/tiny-gguf.cjs`) that loads and
+really infers: a pull, a digest mismatch failing twice then healing, a refused relay
+with the daemon still answering, quit during a pull with the real CLI, and the socks and
+https overrides. The daemon's home is the profile, so a user's `.ollama` stays untouched.
+
+Two limits come from the daemon, not from the test:
+
+- Go on Windows checks TLS only against the system store, and the test installs no
+  root. Through HTTPS_PROXY, the relay and the socks override the rows therefore stop at
+  the daemon's refusal of the test certificate, after showing its own ClientHello
+  reached the registry. The complete pulls use Ollama's documented insecure registry,
+  over plain http through HTTP_PROXY, by the API or by `ollama pull --insecure`. So no
+  complete pull has gone through the relay, which accepts CONNECT only, and the real
+  pull worker has only run to that refusal.
+- **Ollama 0.40.4 fetches blob bytes outside the proxy.** The manifest and the first
+  blob request honour the proxy, but after the 307 `transfer.checkedClient` has no
+  `Proxy`, so the storage URL is resolved and dialed directly. On a network whose only
+  way out is the proxy, a managed pull gets its manifest and then fails. Ollama fixed
+  this in 0.40.6 (#19065). The row `blob bytes are fetched outside the proxy` pins the
+  behaviour and fails the day the pin moves past it; retire it then.
