@@ -10,6 +10,10 @@
 
 #Requires AutoHotkey v2.0
 
+; A save made 1,665 comparisons at 18 ms each, 30 s of the driver's only thread,
+; until reading its journal back stopped comparing (llm-api-save-registry-compares).
+global _WAPO_MAX_REGISTRY_COMPARES_PER_SAVE := 400
+
 _WAPO_Mutate(State, Candidate) {
 	if State.Mode == "delete"
 		return _LLM_Menu_RemoveApiEntryCandidate(Candidate, State.SavedEntry["Id"])
@@ -97,20 +101,12 @@ _WAPO_Resolve(State, Url, Callback) {
 }
 
 _WAPO_Ready(State, Entry, Callback, Owner) {
-	global LLM_REMOTE_READY_PING_DEADLINE_MS
 	State.ReadyCalls += 1
 	AssertTrue(Owner == State.OriginalOwner, "Readiness must receive the owner captured before the offer.")
 	AssertTrue(HasMethod(Callback, "Call"), "The actual validation handler must be bound for dispatch.")
 	Port := Map("resolve_proxy", _WAPO_Resolve.Bind(State),
 		"create_http", _WAA_ReadyCreate.Bind(State.Http, 200, '{"data":[]}'))
-	; The real second commit runs non-critical inside the proxy step and can outlast
-	; the readiness budget on a loaded machine: that timer's own refusal is another
-	; path, and this scenario is about the ownership the commit retires.
-	Budget := LLM_REMOTE_READY_PING_DEADLINE_MS
-	if State.Mode == "late-transport"
-		LLM_REMOTE_READY_PING_DEADLINE_MS := 0x7fffffff
-	try LLM_RemoteIsReady_Async(Entry, _WAPO_Result.Bind(State), Owner, Port)
-	finally LLM_REMOTE_READY_PING_DEADLINE_MS := Budget
+	LLM_RemoteIsReady_Async(Entry, _WAPO_Result.Bind(State), Owner, Port)
 }
 
 _WAPO_Result(State, Value) {
@@ -123,7 +119,7 @@ _WAPO_ActualSaveOffer(Mode) {
 
 _WAPO_ActualSaveOfferBody(Mode) {
 	global _LLM_Menu, _LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners
-	global _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	global _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter, ConfigMigrateRegistryDeepCompares
 	Saved := { Generation: _LLM_AuxGeneration, Counter: _LLM_AuxOwnerCounter,
 		Owners: _LLM_AuxOwners, Debt: _LLM_AuxCleanupDebt, DebtCounter: _LLM_AuxCleanupDebtCounter,
 		Suspended: A_IsSuspended }
@@ -142,7 +138,13 @@ _WAPO_ActualSaveOfferBody(Mode) {
 		Form.Port["ask_test"] := _WAPO_Ask.Bind(State)
 		Form.Port["test_entry"] := _WAPO_Test.Bind(State)
 		Form.Port["ready"] := _WAPO_Ready.Bind(State)
+		ComparesBefore := ConfigMigrateRegistryDeepCompares
 		AssertTrue(Form.Run(), "Optional stale post-save work cannot undo an acknowledged native save.")
+		if !(Mode == "replace" || Mode == "delete" || Mode == "after-test-replace" || Mode == "late-transport") {
+			Compares := ConfigMigrateRegistryDeepCompares - ComparesBefore
+			AssertTrue(Compares > 0 && Compares <= _WAPO_MAX_REGISTRY_COMPARES_PER_SAVE,
+				"One API save must compare the registry at its durable effects, not at every journal read: " . Compares)
+		}
 		AssertEqual(4, Form.Inputs.Length)
 		AssertEqual(1, State.AskCalls, "The actual four-step form must reach its post-save offer.")
 		Retired := Mode == "replace" || Mode == "delete" || Mode == "off-on" || Mode == "after-test-replace"
