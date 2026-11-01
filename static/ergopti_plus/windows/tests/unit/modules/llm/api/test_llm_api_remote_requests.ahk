@@ -41,9 +41,83 @@ _RemoteCatalog_LoadedFromShared() {
 Test("api_providers.json: catalogue loaded at module init", _RemoteCatalog_LoadedFromShared)
 
 
+; Every global the catalogue load publishes, read from the loader and the family
+; loader it calls: a global added there is restored here without a second list.
+; A fixture root holds no thinking_off.json and no local_servers.json, so a reload
+; publishes empty families and identities; leaving them behind turned every later
+; thinking-off and fingerprint test red, in a whole-group run only.
+_RemoteCatalog_PublishedGlobals() {
+	Names := []
+	for Loader in ["_LLMRemote_LoadCatalog", "_LLMRemote_LoadThinkingFamilies"] {
+		Body := _StripFullLineComments(_DriverFuncBody(Loader))
+		AssertTrue(Body != "", "the catalogue owner must resolve: " . Loader)
+		Declared := Map(), Position := 1
+		while RegExMatch(Body, "m)^\s*global\s+(.+)$", &Line, Position) {
+			for Name in StrSplit(Line[1], ",", " `t`r")
+				Declared[Name] := true
+			Position := Line.Pos + Line.Len
+		}
+		Seen := Map(), Position := 1
+		while RegExMatch(Body, "m)^\s*(?:try\s+)?(\w+)\s*:=", &Line, Position) {
+			if Declared.Has(Line[1]) && !Seen.Has(Line[1]) {
+				Seen[Line[1]] := true
+				Names.Push(Line[1])
+			}
+			Position := Line.Pos + Line.Len
+		}
+	}
+	return Names
+}
+
+_RemoteCatalog_SnapshotPublished() {
+	global
+	local Snapshot := Map(), Name
+	for Name in _RemoteCatalog_PublishedGlobals()
+		Snapshot[Name] := %Name%
+	return Snapshot
+}
+
+_RemoteCatalog_RestorePublished(Snapshot) {
+	global
+	local Name, Value
+	for Name, Value in Snapshot
+		%Name% := Value
+	for Name, Value in Snapshot
+		AssertEqual(ObjPtr(Value), ObjPtr(%Name%), "the reload fixture restores the exact published " . Name)
+}
+
+_RemoteCatalog_PublishedCensus() {
+	Names := Map()
+	for Name in _RemoteCatalog_PublishedGlobals()
+		Names[Name] := true
+	for Name in ["LLM_API_PROVIDERS", "LLM_API_PROVIDER_ORDER", "LLM_LOCAL_API_SERVERS", "LLM_LOCAL_SERVER_DISCOVERY",
+			"LLM_LOCAL_SERVER_IDENTITIES", "LLM_THINKING_FAMILIES", "LLM_REMOTE_MODEL_PRICES",
+			"LLM_REMOTE_TEST_REQUEST", "LLM_REMOTE_DECISIONS_TEST"]
+		AssertTrue(Names.Has(Name), "the census of published catalogue globals must find " . Name)
+	AssertFalse(Names.Has("_SharedDir"), "a global the loader only reads is not a publication")
+}
+Test("api_providers.json: the reload fixture knows every global the load publishes", _RemoteCatalog_PublishedCensus)
+
+; Reloading the catalogue from a fixture is only sound through this pair; a test
+; that reloads without it leaves the fixture's catalogue to every later test.
+_RemoteCatalog_ReloadsAreRestored() {
+	Reloaders := 0
+	loop files A_ScriptDir . "\unit\*.ahk", "R" {
+		Source := _StripFullLineComments(FileRead(A_LoopFileFullPath, "UTF-8"))
+		if !InStr(Source, "_LLMRemote_LoadCatalog(")
+			continue
+		Reloaders += 1
+		AssertTrue(InStr(Source, "_RemoteCatalog_SnapshotPublished(") && InStr(Source, "_RemoteCatalog_RestorePublished("),
+			A_LoopFileName . " reloads the catalogue without restoring what the load publishes")
+	}
+	AssertTrue(Reloaders >= 1, "the scan must find the fixture that reloads the catalogue")
+}
+Test("api_providers.json: a test that reloads the catalogue restores all it publishes", _RemoteCatalog_ReloadsAreRestored)
+
 _RemoteCatalog_InvalidScalarsNeverPublish() {
-	global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, LLM_REMOTE_TEST_REQUEST, _SharedDir
-	global LLM_REMOTE_DECISIONS_TEST, LLM_LOCAL_API_SERVERS
+	global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, _SharedDir
+	global LLM_LOCAL_API_SERVERS
+	Published := _RemoteCatalog_SnapshotPublished()
 	oldLocalServers := LLM_LOCAL_API_SERVERS
 	oldLocalServerState := []
 	for ProviderId, Descriptor in oldLocalServers {
@@ -52,11 +126,6 @@ _RemoteCatalog_InvalidScalarsNeverPublish() {
 			Fields[Key] := Value
 		oldLocalServerState.Push(Map("id", ProviderId, "descriptor", Descriptor, "fields", Fields))
 	}
-	oldDecisionsTest := LLM_REMOTE_DECISIONS_TEST
-	oldProviders := LLM_API_PROVIDERS
-	oldOrder := LLM_API_PROVIDER_ORDER
-	oldPrices := LLM_REMOTE_MODEL_PRICES
-	oldTestRequest := LLM_REMOTE_TEST_REQUEST
 	oldSharedDir := _SharedDir
 	testRoot := A_Temp . "\ergopti-ahk013-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount
 	fixture := FileRead(A_ScriptDir . "\..\..\_shared\tests\corpus\api_provider_catalog_validation.json", "UTF-8")
@@ -89,12 +158,7 @@ _RemoteCatalog_InvalidScalarsNeverPublish() {
 		AssertEqual(0.0, _LLMRemoteEstimateCost("string_price", 1000000, 1000000))
 	} finally {
 		_SharedDir := oldSharedDir
-		LLM_API_PROVIDERS := oldProviders
-		LLM_API_PROVIDER_ORDER := oldOrder
-		LLM_REMOTE_MODEL_PRICES := oldPrices
-		LLM_REMOTE_TEST_REQUEST := oldTestRequest
-		LLM_REMOTE_DECISIONS_TEST := oldDecisionsTest
-		LLM_LOCAL_API_SERVERS := oldLocalServers
+		_RemoteCatalog_RestorePublished(Published)
 		try DirDelete(testRoot, true)
 	}
 	AssertEqual(ObjPtr(oldLocalServers), ObjPtr(LLM_LOCAL_API_SERVERS),
