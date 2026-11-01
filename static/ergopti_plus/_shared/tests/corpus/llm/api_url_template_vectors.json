@@ -79,5 +79,64 @@
 		{ "url": "https://{resource}.openai.azure.com/openai/v1", "has": true },
 		{ "url": "https://contoso.openai.azure.com/openai/v1", "has": false },
 		{ "url": "", "has": false }
-	]
+	],
+	"optional_address": {
+		"block": {
+			"field": "workspace_domain",
+			"template": "https://{workspace_domain}/compatible-mode/v1",
+			"host_suffix": ".maas.aliyuncs.com"
+		},
+		"values": [
+			{ "value": "", "url": "" },
+			{
+				"value": "ws-1234.ap-southeast-1.maas.aliyuncs.com",
+				"url": "https://ws-1234.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
+			},
+			{
+				"value": "trial.cn-beijing.maas.aliyuncs.com",
+				"url": "https://trial.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+			},
+			{
+				"value": "WS-1234.ap-southeast-1.MAAS.aliyuncs.com",
+				"url": "https://WS-1234.ap-southeast-1.MAAS.aliyuncs.com/compatible-mode/v1"
+			},
+			{ "value": "maas.aliyuncs.com", "refused": true },
+			{ "value": ".maas.aliyuncs.com", "refused": true },
+			{ "value": "evilmaas.aliyuncs.com", "refused": true },
+			{ "value": "ws.maas.aliyuncs.com.evil.example", "refused": true },
+			{ "value": "ws..maas.aliyuncs.com", "refused": true },
+			{ "value": "https://ws.maas.aliyuncs.com", "refused": true },
+			{ "value": "ws.maas.aliyuncs.com/x", "refused": true },
+			{ "value": "user@ws.maas.aliyuncs.com", "refused": true },
+			{ "value": "ws.maas.aliyuncs.com:443", "refused": true }
+		],
+		"blocks": [
+			{
+				"block": { "field": "f", "template": "https://{f}/v1", "host_suffix": ".example.com" },
+				"valid": true
+			},
+			{ "block": "text", "valid": false },
+			{
+				"block": { "field": "F", "template": "https://{F}/v1", "host_suffix": ".example.com" },
+				"valid": false
+			},
+			{
+				"block": { "field": "f", "template": "http://{f}/v1", "host_suffix": ".example.com" },
+				"valid": false
+			},
+			{
+				"block": { "field": "f", "template": "https://{g}/v1", "host_suffix": ".example.com" },
+				"valid": false
+			},
+			{
+				"block": { "field": "f", "template": "https://{f}/{g}", "host_suffix": ".example.com" },
+				"valid": false
+			},
+			{
+				"block": { "field": "f", "template": "https://{f}/v1", "host_suffix": "example.com" },
+				"valid": false
+			},
+			{ "block": { "field": "f", "template": "https://{f}/v1" }, "valid": false }
+		]
+	}
 }

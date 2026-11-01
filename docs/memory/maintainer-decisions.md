@@ -5,6 +5,16 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## DashScope keeps `dashscope-intl`, a workspace domain is optional (2026-11-01)
+
+The default address stays the shared `dashscope-intl.aliyuncs.com`. Alibaba calls
+it legacy but available and recommends workspace-dedicated domains, so the
+provider's `optional_address` block in `api_providers.json` adds one optional
+field to the add-entry form on the three drivers. Empty keeps the catalogue's
+address; a value must end with `.maas.aliyuncs.com`. Such a domain takes only a
+key of its workspace. `llm/api_url_template` (Lua, AHK port) owns the rule and
+`api_url_template_vectors.json` pins it.
+
 ## Windows keeps the system curl (2026-11-01)
 
 The Windows driver runs `System32\curl.exe` and does not pin its own copy, the

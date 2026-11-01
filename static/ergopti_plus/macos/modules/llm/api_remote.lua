@@ -119,6 +119,8 @@ local function catalog_descriptor_is_valid(provider_id, desc)
 	end
 	if desc.label:match("^%s*$") then return false end
 	if not CATALOG_FORMATS[desc.format] then return false end
+	-- A refused block refuses the provider whole: its form could not ask the field
+	if UrlTemplate.optional_problem(desc.optional_address) then return false end
 	-- A per-account address (a template the add-entry form fills) leaves the model to the user
 	local fields, malformed = UrlTemplate.fields(desc.base_url)
 	if malformed then return false end
@@ -281,6 +283,7 @@ local function load_api_providers()
 						default_model = desc.default_model,
 						format        = desc.format,
 						model_extras  = normalize_model_extras(desc.model_extras),
+						optional_address = desc.optional_address,
 						thinking_dialect = thinking_dialect,
 					}
 					out_order[#out_order + 1] = pid

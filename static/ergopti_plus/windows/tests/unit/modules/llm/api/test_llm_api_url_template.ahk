@@ -74,3 +74,38 @@ _LAUT_Expand() {
 		AssertEqual(Vector["has"] ? true : false, ApiUrlTemplateHasPlaceholder(Vector["url"]), Vector["url"])
 }
 Test("API URL template: the filled address and the refusal of a bad value", _LAUT_Expand)
+
+_LAUT_Optional() {
+	Section := _LAUT_Corpus()["optional_address"]
+	Assert(Section["values"].Length >= 10, "the optional address vectors must not be empty")
+	for Vector in Section["values"] {
+		Url := ApiUrlTemplateOptionalUrl(Section["block"], Vector["value"])
+		if Vector.Has("refused")
+			AssertTrue(Url is Integer && Url == 0, Vector["value"] . " is refused")
+		else
+			AssertEqual(Vector["url"], Url, Vector["value"])
+	}
+	for Index, Vector in Section["blocks"]
+		AssertEqual(Vector["valid"] ? true : false, ApiUrlTemplateOptionalProblem(Vector["block"]) == "",
+			"block vector " . Index)
+	AssertEqual("", ApiUrlTemplateOptionalProblem(""), "no block at all is fine")
+}
+Test("API URL template: the optional field keeps or replaces the address", _LAUT_Optional)
+
+; The catalogue's block must parse, and every locale must name its real suffix.
+_LAUT_OptionalLocales() {
+	global _SharedDir, LLM_API_PROVIDERS
+	Optional := LLM_API_PROVIDERS["dashscope"]["OptionalAddress"]
+	AssertTrue(Optional is Map, "DashScope offers the workspace domain")
+	Count := 0
+	Loop Files _SharedDir . "\data\locales\*.json" {
+		Count += 1
+		Locale := JsonParse(FileRead(A_LoopFileFullPath, "UTF-8"))
+		AssertContains(Locale["menu.llm.api_prompt_field_invalid." . Optional["field"]], Optional["host_suffix"],
+			A_LoopFileName . " names the suffix the check enforces")
+		AssertContains(Locale["menu.llm.api_prompt_field." . Optional["field"]], "maas.aliyuncs.com",
+			A_LoopFileName . " shows a real example")
+	}
+	AssertEqual(21, Count, "every locale")
+}
+Test("API URL template: every locale names the suffix of the optional field", _LAUT_OptionalLocales)

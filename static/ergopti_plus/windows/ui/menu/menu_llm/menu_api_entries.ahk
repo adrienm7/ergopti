@@ -309,6 +309,29 @@ _LLM_Menu_PromptApiEntry(EditId, Port := 0) {
 		new_url := ApiUrlTemplateExpand(provider["BaseUrl"], Values)["url"]
 		LoggerInfo("LLM.menu", "API entry address filled for provider '{1}' ({2} account field(s)).",
 			provider_id, Template["fields"].Length)
+	} else if (existing == "" && provider.Get("OptionalAddress", "") is Map) {
+		; The catalogue's address works; one optional value replaces it.
+		Optional := provider["OptionalAddress"]
+		ib := InputFn.Call(t("menu.llm.api_prompt_field." . Optional["field"]), t("menu.llm.api_window_title"),
+			"w520 h130", "")
+		if (ib.Result != "OK")
+			return false
+		if !Owner.Current(Receipt)
+			return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+				"the originating private configuration changed during a prompt")
+		Filled := ApiUrlTemplateOptionalUrl(Optional, Trim(ib.Value))
+		if !(Filled is String) {
+			LoggerError("LLM.menu", "API entry address refused: the '{1}' value cannot fill it.", Optional["field"])
+			Body := t("menu.llm.api_prompt_field_invalid." . Optional["field"]), Title := t("common.error_title")
+			if HasMethod(NotifyFn, "Call")
+				NotifyFn.Call(Body, Title)
+			else
+				Ui_MsgBox(Body, Title, "Icon!")
+			return false
+		}
+		new_url := Filled == "" ? provider["BaseUrl"] : Filled
+		LoggerInfo("LLM.menu", "API entry address for provider '{1}': {2}.", provider_id,
+			Filled == "" ? "the catalogue's" : "the optional field's")
 	} else {
 		def_url := existing != "" ? _LLM_MenuApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
 		ib := InputFn.Call(t("menu.llm.api_prompt_url"), t("menu.llm.api_window_title"),

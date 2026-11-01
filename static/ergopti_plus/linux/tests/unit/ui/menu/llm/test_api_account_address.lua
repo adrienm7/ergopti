@@ -91,6 +91,60 @@ end)
 
 
 
+local QWEN = { id = "dashscope", label = "Alibaba Qwen", base_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+	default_model = "qwen3.8-flash", format = "openai", optional_address = { field = "workspace_domain",
+		template = "https://{workspace_domain}/compatible-mode/v1", host_suffix = ".maas.aliyuncs.com" } }
+
+--- Adds the DashScope row to the scripted remote of the fixture.
+local function with_qwen()
+	local remote = package.loaded["modules.llm.api_remote"]
+	local providers, provider = remote.providers, remote.provider
+	remote.providers = function()
+		local list = providers()
+		list[#list + 1] = QWEN
+		return list
+	end
+	remote.provider = function(id) return id == "dashscope" and QWEN or provider(id) end
+end
+
+helpers.describe("Optional workspace domain: the form keeps or replaces the address", function()
+	helpers.it("a filled domain becomes the entry's address", function()
+		local build, state, restore = setup("api")
+		with_qwen()
+		state.answers = { " ws-1.ap-southeast-1.maas.aliyuncs.com ", "key", "" }
+		find(build(), "➕ Alibaba Qwen").action()
+		restore()
+		helpers.assert_eq(state.prompts[1].text, require("infra.i18n").get("menu.llm.api_prompt_field.workspace_domain"))
+		helpers.assert_eq(state.prompts[1].initial, "")
+		helpers.assert_eq(state.entries[1].base_url, "https://ws-1.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1")
+	end)
+
+	helpers.it("an empty domain keeps the catalogue's address", function()
+		local build, state, restore = setup("api")
+		with_qwen()
+		state.answers = { "  ", "key", "" }
+		find(build(), "➕ Alibaba Qwen").action()
+		restore()
+		helpers.assert_eq(#state.entries, 1)
+		helpers.assert_eq(state.entries[1].base_url, "", "the catalogue's own address is used")
+	end)
+
+	helpers.it("another host is refused in words and saves nothing", function()
+		local build, state, restore = setup("api")
+		with_qwen()
+		state.answers = { "evil.example", "key", "" }
+		find(build(), "➕ Alibaba Qwen").action()
+		restore()
+		helpers.assert_eq(#state.prompts, 1)
+		helpers.assert_contains(state.errors[1], require("infra.i18n").get("menu.llm.api_prompt_field_invalid.workspace_domain"))
+		helpers.assert_eq(#state.entries, 0)
+	end)
+end)
+
+
+
+
+
 -- =========================================
 -- =========================================
 -- ======= 2/ Catalogue and requests =======
@@ -100,7 +154,8 @@ end)
 helpers.describe("Per-account address: the catalogue row and its requests", function()
 	local function catalogue(desc)
 		local Remote = helpers.load_module("modules.llm.api_remote")
-		return Remote.parse_catalogue(Json.encode({ provider_order = { "azure" }, providers = { azure = desc },
+		local id = desc.id or "azure"
+		return Remote.parse_catalogue(Json.encode({ provider_order = { id }, providers = { [id] = desc },
 			model_prices = {} })), Remote
 	end
 
@@ -116,6 +171,14 @@ helpers.describe("Per-account address: the catalogue row and its requests", func
 		helpers.assert_eq(#catalogue(fixed).order, 0, "a fixed address without a default model")
 		fixed.base_url = "https://{Resource}.example.com/v1"
 		helpers.assert_eq(#catalogue(fixed).order, 0, "a brace outside a {name} placeholder")
+	end)
+
+	helpers.it("a malformed optional_address refuses the provider whole", function()
+		local broken = {}
+		for key, value in pairs(QWEN) do broken[key] = value end
+		broken.optional_address = { field = "workspace_domain", template = "https://x/v1", host_suffix = ".maas.aliyuncs.com" }
+		helpers.assert_eq(#catalogue(broken).order, 0)
+		helpers.assert_eq(catalogue(QWEN).order[1], "dashscope")
 	end)
 
 	helpers.it("an entry without its filled address is refused before anything is sent", function()

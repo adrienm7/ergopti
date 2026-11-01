@@ -195,6 +195,41 @@ helpers.describe("API panel per-account address", function()
 		helpers.assert_eq(got.validation_calls, 0)
 	end)
 
+	local QWEN = {
+		label = "Alibaba Qwen",
+		base_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+		default_model = "qwen3.8-flash",
+		optional_address = {
+			field = "workspace_domain",
+			template = "https://{workspace_domain}/compatible-mode/v1",
+			host_suffix = ".maas.aliyuncs.com",
+		},
+	}
+
+	helpers.it("the optional workspace domain replaces the address", function()
+		local values = { "ws-1.ap-southeast-1.maas.aliyuncs.com", "key", "qwen3.8-flash" }
+		local got = run_add_fixture(QWEN, function(index) return "button.ok", values[index] end)
+		helpers.assert_eq(got.prompt_calls, 3, "domain, key, model: no URL prompt")
+		helpers.assert_eq(got.prompt_texts[1].hint, "menu.llm.api_prompt_field.workspace_domain")
+		helpers.assert_eq(got.prompt_texts[1].default, "")
+		helpers.assert_eq(got.staged_entry.base_url, "https://ws-1.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1")
+	end)
+
+	helpers.it("an empty workspace domain keeps the catalogue's address", function()
+		local values = { "", "key", "qwen3.8-flash" }
+		local got = run_add_fixture(QWEN, function(index) return "button.ok", values[index] end)
+		helpers.assert_eq(got.prompt_calls, 3)
+		helpers.assert_eq(got.staged_entry.base_url, "", "the entry uses the catalogue's own address")
+	end)
+
+	helpers.it("a workspace domain of another host is refused in words", function()
+		local values = { "evil.example", "key", "qwen3.8-flash" }
+		local got = run_add_fixture(QWEN, function(index) return "button.ok", values[index] end)
+		helpers.assert_eq(got.prompt_calls, 1)
+		helpers.assert_eq(got.notified[1], "menu.llm.api_prompt_field_invalid.workspace_domain")
+		helpers.assert_eq(#got.entries, 0)
+	end)
+
 	helpers.it("refuses an empty model, since none defaults", function()
 		local values = { "contoso", "azure-key", "" }
 		local got = run_add_fixture(AZURE, function(index) return "button.ok", values[index] end)
