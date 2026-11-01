@@ -527,7 +527,14 @@ class CurlAsyncRequest {
 				return this.Abort()
 			; Reserve once before filesystem calls can pump this timer again. Only
 			; a capability receipt from this exact live Job admits secret staging.
-			this.ManagedPayloadPublished := true
+			; A second poll may have interrupted the reads above and published
+			; already, leaving no image: staging again would refuse a live request.
+			PreviousCritical := Critical("On")
+			try {
+				if this.ManagedPayloadPublished
+					return
+				this.ManagedPayloadPublished := true
+			} finally Critical(PreviousCritical)
 			PayloadImage := this.ManagedTransportImage
 			StagedPath := Directory . "transport.pending"
 			if !FSWrite(StagedPath, PayloadImage)
