@@ -119,6 +119,21 @@ function M.read_driver_unit(symbol)
 	return matches[1]
 end
 
+--- The source of a production module, resolved from its module name through
+--- package.searchpath exactly as require would find it, so a test listing
+--- several modules names them as the code does, never by a driver path.
+--- @param module_name string Dotted module name, e.g. "adapters.http_client".
+--- @return string|nil body, string|nil err Body, or nil plus why.
+function M.read_module_source(module_name)
+	local path, missing = package.searchpath(module_name, package.path)
+	if not path then return nil, missing end
+	local handle, open_error = io.open(path, "rb")
+	if not handle then return nil, open_error end
+	local body = handle:read("*a")
+	handle:close()
+	return body
+end
+
 --- Returns the tray root's source followed by every section module it binds.
 --- ui/menu/builder.lua binds each section builder from its own
 --- ui/menu/menu_<section>.lua; a test that looks for a builder's code by text
