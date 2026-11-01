@@ -80,9 +80,9 @@ _LLRBK_CheckBoundedAndReleaseGated(RelPath, Scancode) {
 	Src := _LLRBK_ReadSource(RelPath)
 	Assert(Src != "", RelPath . " must be readable")
 
-	CallNeedle := 'KeyWait("' . Scancode . '", "T"'
+	CallNeedle := 'KS_WaitReleased("' . Scancode . '", '
 	Assert(InStr(Src, CallNeedle) > 0,
-		RelPath . " must call KeyWait(" . Chr(34) . Scancode . Chr(34) . ", " . Chr(34) . "T" . Chr(34) . " . TapHoldDuration(...)) -- a bare unbounded KeyWait can never time out on a lost key-up")
+		RelPath . " must call KS_WaitReleased(" . Chr(34) . Scancode . Chr(34) . ", <timeout>) -- a bare unbounded KeyWait can never time out on a lost key-up")
 
 	Window := _LLRBK_WindowAround(Src, CallNeedle)
 	Assert(InStr(Window, "Released and") > 0,

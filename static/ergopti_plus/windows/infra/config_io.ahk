@@ -2098,7 +2098,7 @@ ResetScriptComboKeys(SuffixSC, ReleaseFn := 0) {
 		global _ALTGR_KANA_FIXUP
 		if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
 				return
-		KeyWait(SuffixSC, "T2")
+		KS_WaitReleased(SuffixSC, 2)
 		if KS_IsHeld(SuffixSC)
 				return
 		_ScriptComboClearAltGr(KS_AltGrKeyName(), A_SendLevel,

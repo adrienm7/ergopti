@@ -34,7 +34,7 @@ _AKTE_AltGrOwnsKanaTap() {
     Owner := _DriverFuncBody("_AltGrHandleHold")
     StrReplace(Owner, '"alt_gr", "SC138"', , , &Waits)
     AssertEqual(2, Waits, "both AltGr owners (modifier and layer) must wait for the physical SC138 key on every layout")
-    Assert(!InStr(Src, 'KeyWait("RAlt"'), "no AltGr owner may wait for RAlt, a plain Alt on a Kana layout")
+    Assert(!InStr(Src, 'KeyWait("RAlt"') && !InStr(Src, 'KS_WaitReleased("RAlt"'), "no AltGr owner may wait for RAlt, a plain Alt on a Kana layout")
     Assert(InStr(Owner, 'TapHoldPriorKeyIsSelf("alt_gr")') > 0,
         "the AltGr tap must require its own physical prior key before dispatch")
     Assert(!InStr(Src, '_ALTGR_KANA_FIXUP && GetKeyState("SC138", "P")'),
