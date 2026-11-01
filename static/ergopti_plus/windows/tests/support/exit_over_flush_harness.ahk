@@ -33,7 +33,7 @@ LoggerError(Module, Template, Args*) {
 }
 LoggerInfo(Module, Template, Args*) {
 	global _EOF_State
-	_EOF_State["infos"] := _EOF_State.Get("infos", "") . Template . "|"
+	_EOF_State["infos"] := _EOF_State.Get("infos", "") . Format(Template, Args*) . "|"
 	return true
 }
 LoggerWarn(*) {

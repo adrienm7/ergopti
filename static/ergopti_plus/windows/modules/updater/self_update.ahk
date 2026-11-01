@@ -1225,6 +1225,7 @@ _Updater_RequestRecoveryHandoffExit(*) {
 		_UpdaterRecoveryExitInvocation := true
 		TimerArmOneShotMs(_Updater_RequestRecoveryHandoffExit,
 			UPDATER_RECOVERY_HANDOFF_RETRY_MS)
+		LifecycleNoteExitRequester("the updater's recovery handoff")
 		ExitApp(0)
 	} finally {
 		_UpdaterRecoveryExitInvocation := false
@@ -3705,8 +3706,10 @@ _Updater_RequestExitForIntent(TransactionId) {
 	InvocationPublished := false
 	try {
 		InvocationPublished := _Updater_PublishExitInvocation(TransactionId, Owner)
-		if InvocationPublished
+		if InvocationPublished {
+			LifecycleNoteExitRequester("the updater's swap")
 			ExitApp(0)
+		}
 	} finally {
 		_Updater_ClearExitInvocation(TransactionId, Owner)
 		Critical(PreviousCritical)

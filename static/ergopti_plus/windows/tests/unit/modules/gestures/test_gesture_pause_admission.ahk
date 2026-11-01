@@ -109,13 +109,13 @@ _GPO_Source(Owners) {
 	QuitOwner := _DriverProductionFileForSymbol("ActivateExitApp")
 	AssertTrue(QuitOwner != "", "the Quit route owner must resolve")
 	QuitLifecycle := FSReadStrict(QuitOwner)
-	for Name in ["_LifecycleFlushExitRetryArmed", "LIFECYCLE_USER_QUIT_DEADLINE_MS", "LIFECYCLE_USER_QUIT_POLL_MS"] {
+	for Name in ["_LifecycleFlushExitRetryArmed", "_LifecycleExitRequester", "LIFECYCLE_USER_QUIT_DEADLINE_MS", "LIFECYCLE_USER_QUIT_POLL_MS"] {
 		Found := RegExMatch(QuitLifecycle, "m)^global " . Name . "[ \t]*:=[^`r`n]+", &Declaration)
 		AssertTrue(Found != 0, "the Quit route must use its genuine global initializer: " . Name)
 		Source .= Declaration[0] . "`n"
 	}
-	for Symbol in ["GestureDispatch", "GestureReleaseOwnedCarrierModifiers", "ActivateExitApp", "_LifecycleQuitFacts",
-			"_LifecycleQuitSchedule", "_LifecycleQuitRetryOwned", "NotifyQuitRefused"] {
+	for Symbol in ["GestureDispatch", "GestureReleaseOwnedCarrierModifiers", "ActivateExitApp", "LifecycleNoteExitRequester",
+			"_LifecycleQuitFacts", "_LifecycleQuitSchedule", "_LifecycleQuitRetryOwned", "NotifyQuitRefused"] {
 		Body := _DriverFuncBody(Symbol)
 		Path := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Body != "" && Path != "", "the actual route body must resolve: " . Symbol)

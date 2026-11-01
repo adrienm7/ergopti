@@ -181,7 +181,8 @@ _TQA_DriverWiring() {
 	Activate := _DriverFuncBody("ActivateExitApp")
 	Assert(Activate != "", "the tray's Quit exists")
 	Assert(InStr(Activate, "QuitRequest_Run(") > 0, "the tray's Quit goes through the admission")
-	Assert(InStr(Activate, '"exit", () => ExitApp()') > 0, "ExitApp runs only as the admission's exit port")
+	Assert(RegExMatch(Activate, '"exit", \(\) => \(LifecycleNoteExitRequester\([^\r\n]+\), ExitApp\(\)\)') > 0,
+		"ExitApp runs only as the admission's exit port, which says who asked")
 	Facts := _DriverFuncBody("_LifecycleQuitFacts")
 	for Owner in ["MenuCommandConfigBusy()", "ReloadTerminalHandoffPending()", "_LifecycleQuitRetryOwned()",
 			"HSE_TerminalTransactionPending()", "_ConfigFullSaveHasPending()"]
@@ -312,6 +313,7 @@ _TQA_ExitOverFlush(Scenario) {
 				"_LifecycleArmFlushExitRetry", "_LifecycleUpdaterRetriesExit", "_LifecycleRetryExitNow",
 				"_LifecycleAbandonExitRetry", "_LifecycleReloadRetry", "_LifecycleRetrySupersededExit", "_LifecycleAnswerVetoedQuit",
 				"ActivateExitApp", "_LifecycleQuitFacts", "_LifecycleQuitSchedule", "_LifecycleQuitRetryOwned",
+				"LifecycleNoteExitRequester", "_LifecycleExitRequesterText", "_LifecycleLogExitRequest",
 				"KL_AwaitFlushHandoff", "KL_FlushHandoffSettled", "LoggerShutdownRefusalSettles"] {
 			Body := _DriverFuncBody(Name)
 			Assert(Body != "", "the production function is extracted: " . Name)
@@ -325,7 +327,7 @@ _TQA_ExitOverFlush(Scenario) {
 		}
 		for Line in ['_LifecycleShutdownVetoAttempts := 0', '_LifecycleShutdownReason := ""',
 				'_LifecycleAiShutdownAttempt := 0', '_LifecycleReloadExitRetrying := false',
-				'_LifecycleExitRetryReason := ""', '_LifecycleExitRetryStarted := 0',
+				'_LifecycleExitRetryReason := ""', '_LifecycleExitRetryStarted := 0', '_LifecycleExitRequester := ""',
 				'_LifecycleFlushExitRetryArmed := false', '_UpdaterRecoveryExitInvocation := 0',
 				'_EOF_State := Map()', '_EOF_Scenario := ""', '_EOF_Held := false', '_EOF_ReadBusy := false',
 				'_EOF_ReceiptPath := ""']
@@ -368,6 +370,21 @@ _TQA_QuitOverLogFlush() {
 }
 Test("quit: a Quit that interrupted a log flush retries itself, with no error (quit-over-log-flush)",
 	_TQA_QuitOverLogFlush)
+
+; A silent quit on 2026-11-01 left a clean teardown and nothing saying what asked for it.
+_TQA_EveryExitSaysWhoAsked() {
+	Quit := _TQA_ExitOverFlush("quit")
+	AssertContains(Quit, "Exit requested: reason=Exit code=0 by=the user's Quit (tray or script_quit)",
+		"the first attempt names the user's Quit, before any gate could refuse it")
+	AssertContains(Quit, "Exit requested: reason=Exit code=0 by=the retry of an exit deferred by the log flush",
+		"its retry names itself")
+	AssertContains(Quit, "Exit accepted: reason=Exit code=0", "the accepted exit is closed by its own line")
+	AssertContains(_TQA_ExitOverFlush("updater"), "by=an ExitApp that named no requester",
+		"an ExitApp nobody noted says so")
+	AssertContains(_TQA_ExitOverFlush("logoff"), "reason=Logoff code=5 by=the Windows session ending",
+		"the reason names an asker outside the driver")
+}
+Test("quit: every exit logs its reason and who asked (exit-reason-2026-11-01)", _TQA_EveryExitSaysWhoAsked)
 
 _TQA_LogoffOverLogFlush() {
 	Receipt := _TQA_ExitOverFlush("logoff")
