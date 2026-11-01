@@ -38,10 +38,19 @@ local environment_rows = {}
 for key, value in pairs(uv.os_environ()) do environment_rows[#environment_rows + 1] = key .. "=" .. value end
 table.sort(environment_rows)
 
+-- The relay and the PAC list walk come from the same owners the runtime factory
+-- (modules/llm/runtime_factory.lua) gives the shipped stage.
+local Relay = require("infra.proxy_auth_relay")
+local relay_policy = assert(Relay.load())
+local TcpProbe = require("adapters.tcp_probe")
 local port = Proxy.new({
 	policy = policy, lookup = lookup, owner = "ollama-runtime-proxy",
 	timeout_ms = 5000, origins = origins,
 	environment = function() return environment_rows end,
+	relay = { policy = relay_policy, probe = Relay.probe, executable = Relay.executable,
+		timings = Relay.timings, timeout_ms = Relay.timings().probe_ms },
+	probe = TcpProbe.probe, relay_address = TcpProbe.relay_address,
+	probe_timeout_ms = require("infra.timings").ms("llm", "managed_proxy_probe_timeout_ms"),
 })
 local deadline = uv.now() + 8000
 local budget = { remaining_ms = function() uv.update_time(); return deadline - uv.now() end }
