@@ -211,6 +211,15 @@ _LTO_OllamaThinkVectors() {
 Test("LLM thinking off: the Ollama think value replays the shared corpus (thinking-off-everywhere)",
 	_LTO_OllamaThinkVectors)
 
+; An empty model reached this from a prediction with none selected and failed it.
+_LTO_NormalizeHasNoEmptySegment() {
+	AssertEqual("", LLM_ThinkingOffNormalize(""))
+	AssertEqual("", LLM_ThinkingOffNormalize("vendor/"))
+	AssertEqual("qwen3", LLM_ThinkingOffNormalize("Vendor/Qwen3:4b"))
+}
+Test("LLM thinking off: an empty model id normalizes to nothing (thinking-off-everywhere)",
+	_LTO_NormalizeHasNoEmptySegment)
+
 _LTO_ParseVectors() {
 	Checked := 0
 	for Vector in _LTO_Vectors("family_parse_vectors") {
