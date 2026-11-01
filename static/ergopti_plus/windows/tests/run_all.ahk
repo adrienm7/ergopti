@@ -2275,6 +2275,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/infra/dispatch/test_hotpath_breakdown_reentry.ahk
 #Include unit/infra/dispatch/test_hook_timing_input_privacy.ahk
 #Include unit/infra/dispatch/test_hotpath_per_segment_threshold.ahk
+#Include unit/infra/dispatch/test_hotpath_nesting_vectors.ahk
 #Include unit/modules/keystats/test_keystats_today_fh_flush.ahk
 #Include unit/modules/llm/prediction/test_llm_cache_hit_logs_suggested.ahk
 #Include unit/modules/llm/api/test_llm_keep_alive_from_shared_defaults.ahk

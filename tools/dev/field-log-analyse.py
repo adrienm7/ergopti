@@ -146,18 +146,11 @@ PATTERNS = (
         re.compile(r"^LLM_Menu_Build: pre-emit staging took (?P<ms>\d+) ms"),
         "ms",
     ),
-    # Hot path: macOS and Linux write own and total time, Windows the wall clock.
+    # Hot path: the three drivers write own and total time.
     (
         "hotpath:",
         re.compile(
             r"^Slow (?P<name>[\w.]+): (?P<ms>\d+(?:\.\d+)?) ms own, \d+(?:\.\d+)? ms total, parent \S+ \(\d+ similar since the last line\)\.$"
-        ),
-        "ms",
-    ),
-    (
-        "hotpath:",
-        re.compile(
-            r"^Slow (?P<name>[\w.]+): (?P<ms>\d+(?:\.\d+)?) ms(?: \[excl [\d.]+ ms, nested [\d.]+ ms\])? \(.*\)\.$"
         ),
         "ms",
     ),

@@ -70,6 +70,7 @@ _HPT_Reset() {
 _HPT_ReportAndCapture(Label, ElapsedMs) {
 	global LOGGER_RING_BUFFER
 	_HPT_Reset()
+	_HotPathResetForTest()
 	Freq := 0
 	DllCall("QueryPerformanceFrequency", "Int64*", &Freq)
 	Now := HotPath_Now()

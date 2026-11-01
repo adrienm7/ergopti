@@ -604,8 +604,8 @@
 		{
 			"driver": "windows",
 			"source": "static/ergopti_plus/windows/infra/hotpath_profiler.ahk",
-			"template": "Slow {1}: {2} ms{3} ({4}).",
-			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow HSE.Dispatch: 7.25 ms [excl 3.1 ms, nested 4.15 ms] (trigger matched).",
+			"template": "Slow {1}: {2:.2f} ms own, {3:.2f} ms total, parent {4} ({5} similar since the last line).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow HSE.Dispatch: 7.25 ms own, 11.40 ms total, parent OnChar (0 similar since the last line).",
 			"expect": {
 				"measures": [
 					{
@@ -621,8 +621,8 @@
 		{
 			"driver": "windows",
 			"source": "static/ergopti_plus/windows/infra/hotpath_profiler.ahk",
-			"template": "Slow {1}: {2} ms{3} ({4}).",
-			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow UIA.SelectionPoll: 61.2 ms (poll).",
+			"template": "Slow {1}: {2:.2f} ms own, {3:.2f} ms total, parent {4} ({5} similar since the last line).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow UIA.SelectionPoll: 61.20 ms own, 61.20 ms total, parent none (0 similar since the last line).",
 			"expect": {
 				"measures": [
 					{
@@ -637,8 +637,8 @@
 		{
 			"driver": "windows",
 			"source": "static/ergopti_plus/windows/infra/hotpath_profiler.ahk",
-			"template": "Slow {1}: {2} ms{3} ({4}).",
-			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow Tooltip.Present: 12.5 ms (layered).",
+			"template": "Slow {1}: {2:.2f} ms own, {3:.2f} ms total, parent {4} ({5} similar since the last line).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow Tooltip.Present: 12.50 ms own, 12.50 ms total, parent none (0 similar since the last line).",
 			"expect": {
 				"measures": [
 					{
