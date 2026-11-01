@@ -237,6 +237,9 @@ printf icon > "$5"
             }
         )
     )
+    # clone_app.sh requires the managed Python link and leads PATH with its
+    # folder; this wrapper of the probe's own interpreter stands in for it.
+    executable(binary / "python3", "#!/bin/sh\nexec " + shlex.quote(sys.executable) + ' "$@"\n')
     buddy = binary / "PlistBuddy"
     executable(
         buddy,
@@ -254,6 +257,7 @@ printf '%s\\n' Source
         OWNED_EPOCH=str(int(time.time())),
         OWNED_DATE_TEXT="owned frozen clock",
         OWNED_UUID_FAULT="",
+        ERGOPTI_CLONER_PYTHON=str(binary / "python3"),
     )
     return copies, env, buddy
 
@@ -268,7 +272,7 @@ def clone_program(source, buddy, full_prefix):
     program = program.replace("/usr/libexec/PlistBuddy", shlex.quote(str(buddy)))
     if not full_prefix:
         return program + "\nexit 0\n"
-    info_start = 'safe_name_xml="$(/usr/bin/python3 "$QUOTE_HELPER" xml "$safe_name")"'
+    info_start = 'safe_name_xml="$(python3 "$QUOTE_HELPER" xml "$safe_name")"'
     if source.count(info_start) != 1:
         raise ValueError("Actual Info.plist writer must have one owner")
     info = source[source.index(info_start) :].split("\nPLIST\n", 1)[0] + "\nPLIST\n"
