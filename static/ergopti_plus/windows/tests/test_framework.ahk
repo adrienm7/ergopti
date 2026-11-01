@@ -307,13 +307,48 @@ _DriverProductionSourceCensus(Root := unset) {
 	return { Root: Root, Paths: Paths }
 }
 
+; The generated constants a source test reads through: "ConfigLeaf.MAX_WORDS" -> "max_words".
+_DriverGeneratedConstants() {
+	SplitPath(A_ScriptDir, , &Root)
+	Text := FileRead(Root . "\_generated\config_keys.ahk", "UTF-8")
+	Table := Map()
+	Owner := ""
+	loop parse, Text, "`n", "`r" {
+		if RegExMatch(A_LoopField, "^class (\w+) \{", &Class)
+			Owner := Class[1]
+		else if RegExMatch(A_LoopField, '^\s*static (\w+) := "([^"]*)"', &Entry)
+			Table[Owner . "." . Entry[1]] := Entry[2]
+	}
+	if (Table.Count == 0)
+		throw Error("_DriverGeneratedConstants: _generated\config_keys.ahk declares no constant.")
+	return Table
+}
+
+; A pin on a literal must survive that literal moving to its generated constant,
+; as tools/lib/config-key-tokens.cjs does for the Node gates: each reference reads
+; as the quoted string it stands for. A name the table does not hold stays, so a
+; misspelt constant still fails its pin, and one inside a string stays as written.
+_DriverResolveConstants(Src) {
+	static Table := _DriverGeneratedConstants()
+	Out := ""
+	Position := 1
+	while RegExMatch(Src, "\b(?:ConfigKey|ConfigLeaf|MenuCommand)\.[A-Z][A-Z0-9_]*\b", &Found, Position) {
+		Before := SubStr(Src, Found.Pos - 1, 1)
+		Quoted := Found.Pos > 1 && (Before == '"' || Before == "'")
+		Out .= SubStr(Src, Position, Found.Pos - Position)
+			. (Table.Has(Found[0]) && !Quoted ? '"' . Table[Found[0]] . '"' : Found[0])
+		Position := Found.Pos + Found.Len
+	}
+	return Out . SubStr(Src, Position)
+}
+
 _DriverSourceConcat() {
 	static cache := ""
 	if (cache != "")
 		return cache
 	Combined := ""
 	for Path in _DriverProductionSourceCensus().Paths
-		Combined .= "`n" . FileRead(Path, "UTF-8")
+		Combined .= "`n" . _DriverResolveConstants(FileRead(Path, "UTF-8"))
 	cache := Combined
 	return cache
 }
@@ -656,7 +691,7 @@ _DriverDirConcat(RelDir) {
 	Dir := Root . "\" . StrReplace(RelDir, "/", "\")
 	Combined := ""
 	Loop Files, Dir . "\*.ahk", "FR"
-		Combined .= "`n" . FileRead(A_LoopFileFullPath, "UTF-8")
+		Combined .= "`n" . _DriverResolveConstants(FileRead(A_LoopFileFullPath, "UTF-8"))
 	if (Combined == "")
 		throw Error("_DriverDirConcat: '" . RelDir . "' holds no readable .ahk file — the directory was renamed, moved or emptied. Update the test's directory name; do not let it scan nothing.")
 	return Combined
@@ -684,7 +719,7 @@ _DriverFileSource(FileName) {
 		throw Error("_DriverFileSource: no production file is named '" . FileName . "': it was renamed or deleted. Update the test.")
 	if (ByName[FileName] == "")
 		throw Error("_DriverFileSource: several production files are named '" . FileName . "'. Read it by a symbol it defines instead.")
-	return FileRead(ByName[FileName], "UTF-8")
+	return _DriverResolveConstants(FileRead(ByName[FileName], "UTF-8"))
 }
 
 ; Export a callable reference for fragment tests. AHK's isolated #Warn pass
