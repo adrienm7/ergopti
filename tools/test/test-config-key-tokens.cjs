@@ -15,7 +15,27 @@
 
 const assert = require('node:assert/strict');
 const { scriptTokens } = require('../lib/script-source.cjs');
-const { collapseConfigKeys, expandConfigKeys } = require('../lib/config-key-tokens.cjs');
+const {
+	collapseConfigKeys,
+	expandConfigKeys,
+	expandAhkConfigKeys
+} = require('../lib/config-key-tokens.cjs');
+
+// AutoHotkey: the generated class reads as its literal; a name it does not hold, a
+// reference inside a string and one inside a comment stay exactly as written.
+assert.equal(
+	expandAhkConfigKeys('x := Map(ConfigLeaf.MAX_WORDS, ConfigKey.LLM_ENABLED)'),
+	'x := Map("max_words", "llm.enabled")'
+);
+for (const untouched of [
+	'x := ConfigLeaf.NOT_A_LEAF',
+	'x := "ConfigLeaf.MAX_WORDS"',
+	"x := 'ConfigLeaf.MAX_WORDS'",
+	'x := 1 ; ConfigLeaf.MAX_WORDS',
+	'; ConfigLeaf.MAX_WORDS',
+	'x := "a`"ConfigLeaf.MAX_WORDS"'
+])
+	assert.equal(expandAhkConfigKeys(untouched), untouched);
 
 /** The string values and identifier values of a Lua snippet, in order. */
 function shape(source) {

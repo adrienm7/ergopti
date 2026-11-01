@@ -184,4 +184,24 @@ function expandConfigKeys(source) {
 	return out + source.slice(at);
 }
 
-module.exports = { resolve, collapseConfigKeys, expandConfigKeys };
+const AHK_CLASSES = { ConfigKey: 'KEY', ConfigLeaf: 'LEAF', MenuCommand: 'COMMAND' };
+
+/**
+ * The AutoHotkey twin of expandConfigKeys: `ConfigLeaf.MAX_WORDS` reads `"max_words"`.
+ * AutoHotkey has one spelling, the generated class's name, so no alias needs resolving,
+ * and an AutoHotkey string cannot be told from code by a regular expression alone, so
+ * the scan steps over strings and line comments to leave their text as it is.
+ * @param {string} source AutoHotkey source text.
+ * @returns {string} Source in which each resolvable reference reads as its quoted string.
+ */
+function expandAhkConfigKeys(source) {
+	const token =
+		/"(?:[^"`\n]|`.)*"|'(?:[^'`\n]|`.)*'|(^|\s);[^\n]*|\b(ConfigKey|ConfigLeaf|MenuCommand)\.([A-Z][A-Z0-9_]*)\b/gm;
+	return source.replace(token, (match, _comment, owner, name) => {
+		if (!owner) return match;
+		const value = resolve(AHK_CLASSES[owner], name);
+		return value === undefined ? match : JSON.stringify(value);
+	});
+}
+
+module.exports = { resolve, collapseConfigKeys, expandConfigKeys, expandAhkConfigKeys };
