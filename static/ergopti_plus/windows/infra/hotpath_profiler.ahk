@@ -333,7 +333,7 @@ class HotPathNesting {
 class HotPathSlowGate {
 	; The window of LOG_WINDOW_MS in _shared/lua/hotpath_segments.lua, which
 	; AutoHotkey cannot load; test_hotpath_nesting_vectors.ahk compares the two.
-	static LOG_WINDOW_MS := 10000
+	static SLOW_LINE_WINDOW_MS := 10000
 
 	__New() {
 		this.Reset()
@@ -351,7 +351,7 @@ class HotPathSlowGate {
 	 * @returns {Integer} The occurrences withheld since the last line, -1 to withhold this one.
 	 */
 	Admit(Name, NowMs) {
-		if (this.LastLogged.Has(Name) && NowMs - this.LastLogged[Name] < HotPathSlowGate.LOG_WINDOW_MS) {
+		if (this.LastLogged.Has(Name) && NowMs - this.LastLogged[Name] < HotPathSlowGate.SLOW_LINE_WINDOW_MS) {
 			this.Withheld[Name] := this.Withheld.Get(Name, 0) + 1
 			return -1
 		}
