@@ -127,9 +127,10 @@ _LAEN_DuplicatesReadApart() {
 }
 Test("api-entry-auto-name: two entries of one provider and model read apart", _LAEN_DuplicatesReadApart)
 
-; The dialog asks no name: provider, URL (or one value per placeholder of a
-; per-account address), key, model. That is five prompt sites. Scanned
-; comment-stripped so prose cannot satisfy it.
+; The dialog asks no name: provider, then one address branch (a value per
+; placeholder of a per-account address, one optional value such as DashScope's
+; workspace domain, or the URL), key, model. That is six prompt sites, four of
+; them on any one path. Scanned comment-stripped so prose cannot satisfy it.
 _LAEN_DialogAsksNoName() {
 	Code := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_PromptApiEntry"))
 	Assert(Code != "", "_LLM_Menu_PromptApiEntry must remain source-visible")
@@ -146,7 +147,7 @@ _LAEN_DialogAsksNoName() {
 		Asked += 1
 		Pos += 1
 	}
-	AssertEqual(5, Asked, "the dialog prompts provider, per-account address values, URL, key and model")
+	AssertEqual(6, Asked, "the dialog prompts provider, per-account address values, the optional address value, URL, key and model")
 	AssertContains(Code, '"Name",     provider_id . "/" . new_model',
 		"the stored name is the automatic one, for the builds that still read it")
 }
