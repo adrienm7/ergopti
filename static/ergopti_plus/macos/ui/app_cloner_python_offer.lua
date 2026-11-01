@@ -28,6 +28,19 @@ local LOG = "app_cloner_python_offer"
 --- The environment variable App Cloner reads its interpreter from.
 M.ENV = "ERGOPTI_CLONER_PYTHON"
 
+-- The system folders that follow the managed Python's on App Cloner's PATH:
+-- its launcher starts as `/usr/bin/env python3`, which must find the managed
+-- link first, and its scripts call the system tools by name.
+local SYSTEM_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
+
+--- The launch environment that runs App Cloner on the managed Python.
+--- @param link string The versionless managed Python link.
+--- @return table environment `KEY=VALUE` entries.
+function M.environment(link)
+	assert(type(link) == "string" and link:match("^/.+/python3$"), "the managed Python link must be an absolute python3")
+	return { M.ENV .. "=" .. link, "PATH=" .. link:match("^(.+)/python3$") .. ":" .. SYSTEM_PATH }
+end
+
 --- Shows a failed install on the timer scheduler, then calls next.
 --- @param reason string Stable refusal reason.
 --- @param next_step function Continuation.
@@ -49,7 +62,7 @@ end
 function M.open(owner, launch)
 	assert(type(owner) == "table" and type(launch) == "function", "app_cloner_python_offer.open needs an owner and a launch")
 	if owner.ready() then
-		return launch({ M.ENV .. "=" .. owner.link() })
+		return launch(M.environment(owner.link()))
 	end
 	local install = i18n.get("apps.cloner.python_offer.install")
 	local clicked = require("infra.dialog_util").block_alert(i18n.get("apps.cloner.python_offer.title"),
@@ -61,7 +74,7 @@ function M.open(owner, launch)
 	Logger.info(LOG, "Managed PyObjC install accepted for App Cloner.")
 	require("infra.notifications").notify(i18n.get("apps.cloner.python_offer.installing"), nil, "info")
 	owner.install(function(ok, value)
-		if ok then return launch({ M.ENV .. "=" .. value }) end
+		if ok then return launch(M.environment(value)) end
 		report_failure(value, function() launch({}) end)
 	end)
 end

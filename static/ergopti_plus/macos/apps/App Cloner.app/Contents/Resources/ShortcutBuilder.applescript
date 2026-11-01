@@ -712,8 +712,12 @@ on applyTintToImageView(srcImage, tintColor, appPath, imgView)
 	-- separators (e.g. "0,8" on French systems) breaking the Python argument.
 	set alphaInt to round (a * 10000) rounding to nearest
 
-	-- Run Python helper; capture stdout+stderr into the central log.
-	set pyCmd to "/usr/bin/python3 " & quoted form of helperPath & " " & quoted form of tmpSrc & " " & quoted form of tmpDst & " " & quoted form of hexColor & " " & tintMode & " " & alphaInt
+	-- Run Python helper; capture stdout+stderr into the central log. The
+	-- interpreter is Ergopti's managed Python, whose versionless link the
+	-- AppCloner launcher passes in ERGOPTI_CLONER_PYTHON (do shell script
+	-- resets PATH, so the variable names it; /usr/bin/python3 needs Apple's
+	-- developer tools).
+	set pyCmd to quoted form of (system attribute "ERGOPTI_CLONER_PYTHON") & " " & quoted form of helperPath & " " & quoted form of tmpSrc & " " & quoted form of tmpDst & " " & quoted form of hexColor & " " & tintMode & " " & alphaInt
 	my logmsg("[tint] running: " & pyCmd)
 	try
 		set logPath to my app_log_path()

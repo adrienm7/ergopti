@@ -617,6 +617,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-managed-pyobjc.cjs"],
 			"repro": "node tools/test/test-managed-pyobjc.cjs"
+		},
+		{
+			"id": "js-app-cloner-managed-python",
+			"ordinal": 559,
+			"name": "App Cloner refuses to start without the managed Python, never executes /usr/bin/python3, and its clones exec the versionless link",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-app-cloner-managed-python.cjs"],
+			"repro": "node tools/test/test-app-cloner-managed-python.cjs"
 		}
 	]
 }
