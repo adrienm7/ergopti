@@ -465,9 +465,8 @@ helpers.describe("modules.gestures.manager", function()
   end)
 
   helpers.it("does not hardcode the slot arrays (they come from the generated catalogue)", function()
-    local fh = io.open(helpers.driver_root() .. "/modules/gestures/manager.lua", "r")
-    helpers.assert_true(fh ~= nil, "manager source must be readable")
-    local src = fh:read("*a"); fh:close()
+    -- modules/gestures/manager, selected by a declaration unique to it.
+    local src = assert(helpers.read_driver_unit("local function emitter_authority_current("))
     helpers.assert_true(src:find('require, "_generated.action_catalogue"', 1, true) ~= nil,
       "manager must load the generated action catalogue")
     helpers.assert_true(src:find("M.SINGLE_SLOTS = copy_list(Catalogue.slots.single)", 1, true) ~= nil,

@@ -14,8 +14,8 @@ for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 local function run_registered()
 -- Executes the actual candidate's narrow lexical claim functions, without a
 -- daemon, mocked copies of those guards, or native filesystem/process calls.
-local fh = assert(io.open(helpers.driver_root() .. "/modules/llm/prediction_engine.lua", "r"))
-local source=assert(fh:read('*a'));assert(fh:close())
+-- modules/llm/prediction_engine, selected by a declaration unique to it.
+local source = assert(helpers.read_driver_unit("local function SYSTEM_CLOCK("))
 local begin=source:find('\tfunction engine.admit_write',1,true) or source:find('\tfunction engine.publish_enabled',1,true)
 local finish=source:find('\tlocal ok, owner, reason = pcall',assert(begin),true)
 assert(finish,'actual lexical claim boundary must be present')

@@ -128,9 +128,8 @@ helpers.describe("keyboard_hook: lock state is seeded at acquisition", function(
 
 	helpers.it("runs after both kinds of acquisition", function()
 		-- start() and the hotplug re-acquire each reset the capture state.
-		local fh = assert(io.open(helpers.driver_root() .. "/adapters/keyboard_hook.lua", "r"))
-		local source = fh:read("*a")
-		fh:close()
+		-- adapters/keyboard_hook, selected by a declaration unique to it.
+		local source = assert(helpers.read_driver_unit("local function hold_owner("))
 		local _, calls = source:gsub("= _locks%.seed%(_devices%[1%]%)", "")
 		helpers.assert_eq(calls, 2, "seeded after start() and after the watchdog re-acquire")
 	end)
