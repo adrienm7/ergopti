@@ -725,7 +725,7 @@
 		},
 		{
 			"id": "js-keystats-token-encoding",
-			"ordinal": 566,
+			"ordinal": 563,
 			"name": "n-gram keys read the same on the dashboard, and every driver emits the shared marker list",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-keystats-token-encoding.cjs"],
