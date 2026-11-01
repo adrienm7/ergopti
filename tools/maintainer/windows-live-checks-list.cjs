@@ -708,6 +708,40 @@ const CHECKS = [
 		}
 	},
 	{
+		id: 'key-chord-typing',
+		title: 'A key chord assigned on Space: the driver boots it, and harness typing keeps its order',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const { session } = await bootEnglish(
+				context,
+				'chord',
+				'[mod_combos.config.space_then_tab]\ncombo = "copy"\n'
+			);
+			await session.run('pump', ['3000']);
+			if (session.logLines('Key chords read: 1 chord').length === 0)
+				return fail('the driver did not read the chord of the configuration');
+			await session.run('edit_open', ['edit']);
+			// A process cannot make a physical press: this input was not seen reaching the
+			// chord hotkeys, so a chord firing stays on the maintainer's physical list.
+			session.type([
+				['mode', 'event'],
+				['level', '0'],
+				['gap', '5'],
+				['key', '{Blind}{SC010}'],
+				['key', '{Blind}{SC039}'],
+				['key', '{Blind}{SC011}'],
+				['wait', '900']
+			]);
+			const typed = (await session.run('edit_value')).replace(/^value=/, '');
+			await session.run('edit_close');
+			if (!/^. .$/u.test(typed)) return fail(`letter, Space, letter gave "${typed}" on the screen`);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) return fail(`the log holds an error: ${errors[0]}`);
+			return pass(`the chord is read and harness typing keeps its order ("${typed}")`);
+		}
+	},
+	{
 		id: 'number-row-inert-choice',
 		title: 'Number row: a choice that has no effect is shown ticked, greyed and suffixed',
 		async run(context) {

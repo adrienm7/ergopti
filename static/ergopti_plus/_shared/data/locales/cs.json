@@ -2041,6 +2041,7 @@
 	"menu.shortcuts.group_accented": "Zkratky na é è ê à (při přímém psaní)",
 	"menu.shortcuts.key_combinations": "Kombinace kláves",
 	"menu.shortcuts.key_combinations_chord": "Akord (současně) → %s",
+	"menu.shortcuts.key_combinations_chord_no_altgr": "Akord není k dispozici: AltGr musí zůstat okamžitý",
 	"menu.shortcuts.key_combinations_chord_title_prefix": "Akord (současně) — ",
 	"menu.shortcuts.key_combinations_enable": "Povolit kombinace kláves",
 	"menu.shortcuts.key_combinations_hold_hold": "Držet 1 + držet 2 → %s",

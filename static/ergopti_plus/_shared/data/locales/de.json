@@ -2041,6 +2041,7 @@
 	"menu.shortcuts.group_accented": "Tastenkürzel auf é è ê à (bei direkter Eingabe)",
 	"menu.shortcuts.key_combinations": "Tastenkombinationen",
 	"menu.shortcuts.key_combinations_chord": "Akkord (gleichzeitig) → %s",
+	"menu.shortcuts.key_combinations_chord_no_altgr": "Akkord nicht verfügbar: AltGr muss sofort wirken",
 	"menu.shortcuts.key_combinations_chord_title_prefix": "Akkord (gleichzeitig) — ",
 	"menu.shortcuts.key_combinations_enable": "Tastenkombinationen aktivieren",
 	"menu.shortcuts.key_combinations_hold_hold": "1 halten + 2 halten → %s",

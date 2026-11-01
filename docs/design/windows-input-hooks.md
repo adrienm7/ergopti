@@ -246,7 +246,8 @@ None of this can be done from AutoHotkey, which cannot read `dwExtraInfo`:
    (`IsRealAltGrPress`), the KLE Shift read and the tap-hold roll. See "Native press
    ledger".
 2. Done for the source and for first-key order, with AltGr hook provenance exposed
-   but not consumed. Simultaneous input stays off on Windows.
+   but not consumed. Simultaneous input is built on it (`infra/key_combinations.ahk`
+   section 6, `mod_combos`), in AutoHotkey: the hook decides nothing for a chord.
 3. Open: event-specific capture, source pin, authenticated event stream, non-hook
    handler conversion and chained or repeat semantics.
 4. Open: removing the parked cycle routes, which only the DLL's `NavPlanIsValid`

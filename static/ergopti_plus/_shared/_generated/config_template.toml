@@ -941,6 +941,7 @@ sections = [
 	"shortcuts.e_circ",
 	"shortcuts.e_grave",
 	"shortcuts.key_combination_taps",
+	"mod_combos",
 	"shortcuts.personal",
 	"shortcuts.script_control",
 	"shortcuts.keyboard",

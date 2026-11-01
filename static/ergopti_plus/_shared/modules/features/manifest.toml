@@ -260,11 +260,10 @@ description_key = "menu.ui"
 platforms = ["hs"]
 reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
-# Linux native simultaneous timing and symmetry. Third slots remain neutral.
+# Native simultaneous timing and symmetry. Third slots remain neutral.
 [sections.mod_combos]
 description_key = "menu.shortcuts.key_combinations"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
+platforms = ["ahk", "hs", "linux"]
 
 [sections.shortcuts.key_combination_taps]
 description_key = "menu.shortcuts.key_combinations"
@@ -2164,28 +2163,26 @@ description_key = "menu.shortcuts.key_combinations"
 
 
 
-# Linux declares its own values; no runtime fallback to Mac hs_timeouts.
+# Windows and Linux declare their own values; no runtime fallback to Mac hs_timeouts.
 [[features.mod_combos]]
 id = "simultaneous_threshold_ms"
-platforms = ["hs", "linux"]
+platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"] }
 default = 100
 recommended = 100
 input_altering = false
 type = "number"
 description_key = "menu.tapholds.simultaneous_dialog_title"
-reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[features.mod_combos]]
 id = "symmetric"
-platforms = ["hs", "linux"]
+platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"] }
 default = false
 recommended = false
 input_altering = false
 type = "boolean"
 description_key = "menu.tapholds.symmetric"
-reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # ====================================
 # ===== 3.5.6 shortcuts.personal =====

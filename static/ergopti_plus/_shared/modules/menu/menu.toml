@@ -1577,21 +1577,19 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 type = "---"
 platforms = ["ahk", "hs", "linux"]
 
-# macOS and Linux: owned chords' symmetry, their activation delay, and the
-# bulk copy of every pair's tap slot into its chord slot.
+# Every OS: owned chords' symmetry and their activation delay. macOS and Linux
+# also offer the bulk copy of every pair's tap slot into its chord slot.
 [[menu.key_combinations_group]]
 type = "check"
 id = "combo_symmetric"
 i18n = "menu.tapholds.symmetric"
 checked_when = ["combo_symmetric"]
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.key_combinations_group]]
 type = "list"
 id = "combo_timings"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.key_combinations_group]]
 type = "command"
@@ -1605,9 +1603,8 @@ type = "---"
 
 # One row per ordered pair of tap-hold keys: the key held first, then the key
 # struck under it, so LAlt then CapsLock is not CapsLock then LAlt. Each pair
-# has its slots: « Maintenir 1 + taper 2 → » and « Maintenir 1 + maintenir
-# 2 → » on both, and on macOS/Linux « Accord (simultané) → », which Windows does
-# not have yet (it needs the first key of a chord to wait for the second).
+# has its slots: « Maintenir 1 + taper 2 → », « Maintenir 1 + maintenir 2 → »
+# and « Accord (simultané) → », the key of a chord waiting for its second key.
 #
 # Two lists, by the hand of the key held first as [tap_hold.catalog] assigns it
 # (Space is a left-hand key), with the separator between them declared here:

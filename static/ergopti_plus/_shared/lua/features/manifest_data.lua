@@ -54,7 +54,7 @@ M.sections = {
 	["category_enabled"] = { description_key = "menu.category_enabled", platforms = { "ahk" }, subsections = {  } },
 	["layout"] = { description_key = "menu.layout", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["ui"] = { description_key = "menu.ui", platforms = { "hs" }, subsections = {  } },
-	["mod_combos"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "hs", "linux" }, subsections = {  } },
+	["mod_combos"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["gestures"] = { description_key = "menu.gestures", platforms = { "ahk", "hs", "linux" }, subsections = { "modes", "sensitivities" } },
 	["gestures.modes"] = { description_key = "menu.gestures.modes", platforms = { "hs" }, subsections = {  } },
 	["gestures.sensitivities"] = { description_key = "menu.gestures.sensitivities", platforms = { "hs" }, subsections = {  } },
@@ -533,10 +533,10 @@ M.features = {
 		path = "shortcuts.key_combination_taps.left_alt_then_caps_lock", id = "left_alt_then_caps_lock", section = "shortcuts.key_combination_taps", default = "none", type = "action", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = "caps_word", input_altering = true,
 	},
 	{
-		path = "mod_combos.simultaneous_threshold_ms", id = "simultaneous_threshold_ms", section = "mod_combos", default = 100, type = "number", description_key = "menu.tapholds.simultaneous_dialog_title", platforms = { "hs", "linux" }, recommended = 100, input_altering = false, reason_key = "platform_reason.remap_engine_is_per_driver",
+		path = "mod_combos.simultaneous_threshold_ms", id = "simultaneous_threshold_ms", section = "mod_combos", default = 100, type = "number", description_key = "menu.tapholds.simultaneous_dialog_title", platforms = { "ahk", "hs", "linux" }, recommended = 100, input_altering = false,
 	},
 	{
-		path = "mod_combos.symmetric", id = "symmetric", section = "mod_combos", default = false, type = "boolean", description_key = "menu.tapholds.symmetric", platforms = { "hs", "linux" }, recommended = false, input_altering = false, reason_key = "platform_reason.remap_engine_is_per_driver",
+		path = "mod_combos.symmetric", id = "symmetric", section = "mod_combos", default = false, type = "boolean", description_key = "menu.tapholds.symmetric", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
 		path = "shortcuts.personal.laptop_broken_key", section = "shortcuts.personal", platforms = { "ahk" },

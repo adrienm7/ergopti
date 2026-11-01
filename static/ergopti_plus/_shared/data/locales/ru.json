@@ -2041,6 +2041,7 @@
 	"menu.shortcuts.group_accented": "Сочетания на é è ê à (при прямом вводе)",
 	"menu.shortcuts.key_combinations": "Сочетания клавиш",
 	"menu.shortcuts.key_combinations_chord": "Аккорд (одновременно) → %s",
+	"menu.shortcuts.key_combinations_chord_no_altgr": "Аккорд недоступен: AltGr должен срабатывать сразу",
 	"menu.shortcuts.key_combinations_chord_title_prefix": "Аккорд (одновременно) — ",
 	"menu.shortcuts.key_combinations_enable": "Включить сочетания клавиш",
 	"menu.shortcuts.key_combinations_hold_hold": "Удерживать 1 + удерживать 2 → %s",

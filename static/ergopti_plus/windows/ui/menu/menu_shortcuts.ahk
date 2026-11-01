@@ -72,8 +72,10 @@ _SC_Getters() {
 ; key listing the pairs it begins, all declared by key_combinations_group.
 _SC_KeyCombinationsSubmenu(Options := unset) {
 	Commands := _SC_KeyCombinationCommands(IsSet(Options) ? Options : Map())
-	Getters := Map("key_combinations_enabled", () => IsCategoryGated("KeyCombinations"))
+	Getters := Map("key_combinations_enabled", () => IsCategoryGated("KeyCombinations"),
+		"combo_symmetric", () => KeyCombinationChordConfig["combo_symmetric"] ? true : false)
 	ListProviders := Map(
+		"combo_timings", KeyCombinationChordTimingRows,
 		"key_combination_rows_left", () => KeyCombinationRows("left"),
 		"key_combination_rows_right", () => KeyCombinationRows("right"))
 	return MenuRenderer_Build("key_combinations_group", "Shortcuts", "", "", ListProviders, Commands, Getters)
@@ -84,6 +86,7 @@ _SC_KeyCombinationCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
 	return Map(
 		"key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"),
+		"combo_symmetric", (*) => KeyCombinationChordToggleSymmetric(),
 		"scope_restore", (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
 		"scope_clear", (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
 }
