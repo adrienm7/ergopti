@@ -121,10 +121,12 @@ h.describe("owned dialog resolver (owned-dialog-host)", function()
 			quote = function(value) return "<" .. value .. ">" end,
 		})
 		h.assert_eq(command, "</opt/ergopti/runtime/bin/luajit> </usr/lib/ergopti/ui/dialog_host.lua>")
+		-- The real resolution names an existing host file under the driver root
 		local real = NativeDialog.command()
-		h.assert_true(real:find(h.driver_root() .. "/ui/dialog_host.lua", 1, true) ~= nil, real)
-		local host = io.open(h.driver_root() .. "/" .. NativeDialog.HOST, "rb")
-		h.assert_true(host ~= nil, "the resolved host exists")
+		local resolved = real:match("'([^']+)'$") or real:match("(%S+)$")
+		h.assert_true(resolved:sub(1, #h.driver_root() + 1) == h.driver_root() .. "/", real)
+		local host = io.open(resolved, "rb")
+		h.assert_true(host ~= nil, "the resolved host exists: " .. resolved)
 		host:close()
 	end)
 
