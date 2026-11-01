@@ -79,9 +79,9 @@ Test("hotpath nesting: the depth cap sweeps instead of raising (PAR-53)", _HPNV_
 _HPNV_GateMatchesTheLuaWindow() {
 	Lua := FileRead(_SharedDir . "\lua\hotpath_segments.lua", "UTF-8")
 	Assert(RegExMatch(Lua, "M\.LOG_WINDOW_MS = (\d+)", &Match), "the Lua window must stay declared")
-	AssertEqual(Match[1] + 0, HotPathSlowGate.WINDOW_MS, "one window on the three drivers")
+	AssertEqual(Match[1] + 0, HotPathSlowGate.LOG_WINDOW_MS, "one window on the three drivers")
 	Gate := HotPathSlowGate()
-	Window := HotPathSlowGate.WINDOW_MS
+	Window := HotPathSlowGate.LOG_WINDOW_MS
 	AssertEqual(0, Gate.Admit("a", 100), "the first occurrence is always admitted")
 	AssertEqual(-1, Gate.Admit("a", 100 + Window - 1), "inside the window it is withheld")
 	AssertEqual(0, Gate.Admit("b", 200), "each segment has its own window")
