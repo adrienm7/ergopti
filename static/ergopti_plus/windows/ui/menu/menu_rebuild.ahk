@@ -824,7 +824,7 @@ RebuildTrayMenu(PublishAuthorizeFn := 0, WorkerFn := 0,
 	try Published := _TrayRootDrain()
 	finally ElapsedMs := PhaseStats_Stop("menu.rebuild", Started)
 	if ((Published is Integer) && Published == 1)
-		_TrayRootReportRebuild(ElapsedMs, DllCall("GetMenuItemCount", "ptr", A_TrayMenu.Handle, "int"))
+		_TrayRootReportRebuild(ElapsedMs, TrayMenuItemCount(A_TrayMenu))
 	return Published
 }
 
