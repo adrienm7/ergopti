@@ -98,6 +98,7 @@ class PreparationControls(unittest.TestCase):
                 "CODE_SIGNING_REQUIRED=NO",
                 "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
                 "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+                "LD_RUNPATH_SEARCH_PATHS=",
             ],
         )
 
@@ -564,6 +565,7 @@ class PreparationControls(unittest.TestCase):
                     "CODE_SIGNING_REQUIRED=NO",
                     "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
                     "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+                    "LD_RUNPATH_SEARCH_PATHS=",
                 ]
                 if label == "core":
                     expected_command.append("ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO")
@@ -942,6 +944,7 @@ def concurrent_owned_control_suite():
                     "CODE_SIGNING_REQUIRED=NO",
                     "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
                     "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+                    "LD_RUNPATH_SEARCH_PATHS=",
                 ]
                 if label == "core":
                     expected.append("ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO")
