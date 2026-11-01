@@ -19,11 +19,12 @@ _RemoteCatalog_LoadedFromShared() {
 	AssertTrue(LLM_API_PROVIDERS.Has("openai_compat"))
 	; Preserve the complete cloud prefix and independently name the new local suffix.
 	Shipped := JsonParse(FileRead(_SharedDir . "\modules\llm\api_providers.json", "UTF-8"))
-	LocalIds := ["omlx", "lmstudio", "llamacpp", "jan"]
 	ShippedLocal := JsonParse(FileRead(_SharedDir . "\modules\llm\local_servers.json", "UTF-8"))
-	AssertEqual(4, ShippedLocal["server_order"].Length,
-		"the optional-auth catalogue declares exactly the four independently named local providers")
-	AssertEqual(Shipped["provider_order"].Length + 4, LLM_API_PROVIDER_ORDER.Length,
+	LocalIds := ShippedLocal["server_order"]
+	; The first four stay independently named: the catalogue only grows behind them.
+	for Index, ProviderId in ["omlx", "lmstudio", "llamacpp", "jan"]
+		AssertEqual(ProviderId, LocalIds[Index], "the optional-auth catalogue keeps its first local providers")
+	AssertEqual(Shipped["provider_order"].Length + LocalIds.Length, LLM_API_PROVIDER_ORDER.Length,
 		"every shipped cloud and local provider publishes, the Backboard and decisions formats included")
 	for Index, ProviderId in Shipped["provider_order"]
 		AssertEqual(ProviderId, LLM_API_PROVIDER_ORDER[Index], "the catalogue keeps provider_order")
