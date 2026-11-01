@@ -79,6 +79,7 @@ Test("user actions: a label shows a path's name and never a command (user-action
 _UA_Script() {
 	AssertEqual("cd src & git pull", UserActionCommandLine("cd src`n`tgit pull`n"), "the lines of a script run in turn")
 	AssertEqual("echo a", UserActionCommandLine("  echo a  "), "one line stays one line")
+	AssertEqual(3, UserActionCodePoints("é`n🚀"), "a surrogate pair counts once, a line break too")
 	AssertEqual("", UserActionFirstLine("", 10), "no line")
 	AssertEqual("first", UserActionFirstLine("`r`n  `r`nfirst`r`nsecond", 10), "the first non-blank line")
 	AssertEqual("éé…", UserActionFirstLine("ééééé", 4), "a long line is cut within its byte bound")

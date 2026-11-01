@@ -441,6 +441,11 @@ _UserCommandReport(Entry, ExitCode) {
 		_UserCommandDeliver(_UserCommandRead(Entry["out"]), Entry["output"])
 }
 
+; The characters of a text as the typing limit counts them: a surrogate pair is one.
+UserActionCodePoints(Text) {
+	return StrLen(RegExReplace(Text, "s).", "x"))
+}
+
 ; @param {String|Boolean} Text The captured stdout, false when it is not UTF-8.
 ; @param {String} Output "type" or "copy".
 ; @returns {Boolean} True when it was delivered.
@@ -462,7 +467,7 @@ _UserCommandDeliver(Text, Output) {
 		return Written ? true : false
 	}
 	MaxTyped := SendKeysVocabulary()["text_max_code_points"]
-	if (_SendInputCodePoints(Value).Length > MaxTyped) {
+	if (UserActionCodePoints(Value) > MaxTyped) {
 		LoggerWarn("UserActions", "A run_command binding printed more than the {1} characters typed.", MaxTyped)
 		_UserActionNotify("user_actions.output_too_long_to_type", MaxTyped)
 		return false
