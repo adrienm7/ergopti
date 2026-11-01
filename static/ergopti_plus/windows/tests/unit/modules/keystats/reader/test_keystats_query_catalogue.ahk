@@ -235,10 +235,11 @@ _KLQCat_TypingAndLlmRows() {
 				"no_battery", 1, "wpm", 61.25, "no_layout", 1, "text", "it's"))
 		AssertTrue(SQLite_Exec(db, KL_BuildInsertLlm(Map("timestamp", "2026-10-01 10:00:00.000", "prediction", "x'y",
 			"count", 3, "est_cost_usd", 0.00125), 2, "suggested")), "the LLM row must be accepted")
-		_KLQCat_AssertOneRow(db, "SELECT app, kind, prediction, predictions_json, all_predictions_json, count, "
+		_KLQCat_AssertOneRow(db, "SELECT app, kind, prediction, predictions_json IS NULL AS no_predictions, "
+			. "all_predictions_json IS NULL AS no_all_predictions, count, "
 			. "deletes IS NULL AS no_deletes, est_cost_usd FROM events_llm",
-			Map("app", "Unknown", "kind", "suggested", "prediction", "x'y", "predictions_json", "{}",
-				"all_predictions_json", "{}", "count", 3, "no_deletes", 1, "est_cost_usd", 0.00125))
+			Map("app", "Unknown", "kind", "suggested", "prediction", "x'y", "no_predictions", 1,
+				"no_all_predictions", 1, "count", 3, "no_deletes", 1, "est_cost_usd", 0.00125))
 	} finally {
 		SQLite_Close(db)
 	}

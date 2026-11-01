@@ -1662,6 +1662,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/corpus/test_corpus_menu_numbered_caption.ahk
 #Include meta/corpus/test_corpus_llm_small_families.ahk
 #Include meta/corpus/test_corpus_llm_request_plan.ahk
+#Include meta/corpus/test_corpus_terminators_and_llm_rows.ahk
 #Include meta/corpus/test_corpus_tap_hold_labels.ahk
 #Include meta/corpus/test_corpus_toml_hotstring_reader.ahk
 #Include meta/corpus/test_corpus_toml_leaf_rows.ahk
