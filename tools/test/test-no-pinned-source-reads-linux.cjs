@@ -49,8 +49,12 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // 51 → 43 files and 96 → 88 reads: helpers.read_driver_unit(symbol), the
 // twin of the macOS helper, selects a production file by a declaration unique
 // to it; eight source invariants use it instead of the file's path.
-const BASELINE = 43;
-const READ_BASELINE = 88;
+// 43 → 30 files and 88 → 75 reads: thirteen more source invariants select
+// their file through helpers.read_driver_unit (shortcuts manager, keystats
+// reader and writer, injector, webview manager, keyboard layout and hook,
+// logger sink, expansion delay, prediction engine, menu builder).
+const BASELINE = 30;
+const READ_BASELINE = 75;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];
