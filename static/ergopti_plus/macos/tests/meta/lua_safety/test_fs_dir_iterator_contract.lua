@@ -192,7 +192,7 @@ helpers.describe("infra/fs_dir: hs.fs.dir iteration is pcall-protected (init-fsd
 		-- is enforced in exactly one place. A pcall'd closure that contains the
 		-- hs.fs.dir loop is the shape that both catches the throw AND preserves the
 		-- state object. `.` spans newlines in Lua patterns, so this matches across lines.
-		local code = strip_comments(read_file(DRIVER_ROOT .. "infra/fs_dir.lua"))
+		local code = strip_comments(assert(helpers.read_module_source("infra.fs_dir")))
 		helpers.assert_true(
 			code:match("pcall%s*%(%s*function.-hs%.fs%.dir") ~= nil,
 			"infra/fs_dir.entries must iterate hs.fs.dir inside a pcall'd closure so an "

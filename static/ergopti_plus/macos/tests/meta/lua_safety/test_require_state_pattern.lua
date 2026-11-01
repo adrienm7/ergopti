@@ -23,26 +23,27 @@ local DRIVER_ROOT = helpers.driver_root()
 -- Pre-existing violations present at the time this check was tightened.
 -- DO NOT add new entries — fix the module instead.
 -- TODO: refactor all entries below to add a require_state guard (section 5.8).
+-- Keyed by module name (helpers.module_name_of), as the code requires each one.
 local KNOWN_VIOLATIONS = {
-	["modules/dynamic_hotstrings/personal_info.lua"] = true,
-	["modules/gestures/actions.lua"]                 = true,
-	["modules/gestures/engine.lua"]                  = true,
-	["modules/keystats/init.lua"]                   = true,
-	["modules/keystats/rotation.lua"]               = true,
+	["modules.dynamic_hotstrings.personal_info"] = true,
+	["modules.gestures.actions"]                 = true,
+	["modules.gestures.engine"]                  = true,
+	["modules.keystats"]                   = true,
+	["modules.keystats.rotation"]               = true,
 
 	-- Pause invariant is enforced at call sites (script_control + eventtap guards), not always inside every module's require_state.
 	-- See test_script_control.lua and gestures engine for explicit pause regression tests.
 
 	-- Additional for max coverage: personal, karabiner, llm api, gestures actions must not bypass pause
-	["modules/dynamic_hotstrings/personal_info.lua"] = true,
-	["platform/remap/init.lua"] = true,
-	["modules/llm/api_common.lua"] = true,
-	["modules/gestures/actions.lua"] = true,
+	["modules.dynamic_hotstrings.personal_info"] = true,
+	["platform.remap"] = true,
+	["modules.llm.api_common"] = true,
+	["modules.gestures.actions"] = true,
 
 	-- Encore plus: more modules for full pause coverage
-	["modules/llm/prediction_engine.lua"] = true,
-	["modules/metrics/aggregator.lua"] = true,
-	["ui/menu/builder.lua"] = true,
+	["modules.llm.prediction_engine"] = true,
+	["modules.metrics.aggregator"] = true,
+	["ui.menu.builder"] = true,
 }
 
 local function list_lua_files(dir)
@@ -77,7 +78,7 @@ helpers.describe("meta: require_state pattern", function()
 		if stateful and not body:find("require_state", 1, true) then
 			-- Relative path used as the allowlist key (forward-slash normalised)
 			local rel = abs:sub(#DRIVER_ROOT + 1)
-			if KNOWN_VIOLATIONS[rel] then
+			if KNOWN_VIOLATIONS[helpers.module_name_of(rel)] then
 				known_count = known_count + 1
 				print(string.format("  KNOWN: %s — pending fix (see allowlist TODO)", rel))
 			else
