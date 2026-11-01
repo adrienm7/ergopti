@@ -1504,6 +1504,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		this.Bundle := 0
 		this.BoundReceipt := 0
 		this.Writing := false
+		this.RegistryProof := { registry: 0, shadow: 0 }
 	}
 
 	/** Returns native ports without exporting private snapshots through the receipt. */
@@ -1525,8 +1526,15 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		finally Critical(PreviousCritical)
 	}
 
+	; A local server sweep revalidates its source hundreds of times, and each admission
+	; compared the whole migration registry (18 ms, 1,500 times in one join). Outside a
+	; transaction nothing this admission protects can be written, so the proof stands;
+	; with a bundle bound every admission compares, as does the transaction's own port.
 	_AdmitNonCritical() {
-		if A_IsSuspended || !ConfigFullStateCanPersist()
+		if A_IsSuspended
+			return false
+		Standing := (this.Bundle is Object) ? 0 : this.RegistryProof
+		if !ConfigMigrateWithRegistryProof(ConfigFullStateCanPersist, Standing)
 			return false
 		return this._AdmitContextNonCritical()
 	}
