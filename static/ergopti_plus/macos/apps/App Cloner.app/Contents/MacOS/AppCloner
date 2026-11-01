@@ -32,6 +32,7 @@ def load_error_ui(locale_code, locales_dir):
         "apps.cloner.error_unknown",
         "common.ok",
         "apps.cloner.diagnostic_log_path",
+        "apps.cloner.python_missing",
     )
     for key in keys:
         value = catalog.get(key)
@@ -143,6 +144,45 @@ def resolve_locales_dir(app_root: str) -> str:
         return candidate
     return ""
 
+# Seconds the managed Python's import check may take.
+IMPORT_CHECK_TIMEOUT_SECONDS = 60
+
+
+def cloner_python_refusal(app_root, cloner_python):
+    """Return why the managed Python cannot run App Cloner, or None.
+
+    The interpreter is the versionless link Ergopti's Apps menu passes after
+    installing the pinned PyObjC (modules/llm/ensure-managed-pyobjc.sh); the
+    modules it must import are that installer's own import check.
+    """
+    if not cloner_python.startswith("/") or os.path.basename(cloner_python) != "python3":
+        return "no managed Python link (open App Cloner from the Ergopti menu)"
+    if not os.access(cloner_python, os.X_OK):
+        return "the managed Python link does not resolve to an interpreter"
+    manifest_path = os.path.join(
+        os.path.dirname(os.path.dirname(app_root)), "modules", "llm", "managed-pyobjc.json"
+    )
+    try:
+        with open(manifest_path, encoding="utf-8") as manifest_file:
+            modules = json.load(manifest_file)["import_check"]
+    except (OSError, ValueError, KeyError) as error:
+        return f"the managed PyObjC manifest is unreadable: {error}"
+    if not isinstance(modules, list) or not modules or not all(isinstance(m, str) for m in modules):
+        return "the managed PyObjC manifest names no import check"
+    try:
+        result = subprocess.run(
+            [cloner_python, "-I", "-c", "import " + ", ".join(modules)],
+            capture_output=True,
+            text=True,
+            timeout=IMPORT_CHECK_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return f"the managed Python did not run: {error}"
+    if result.returncode != 0:
+        return "the managed Python lacks PyObjC: " + (result.stderr.strip().splitlines() or ["no detail"])[-1]
+    return None
+
+
 def main():
     os.umask(0o077)
     script_path = os.path.realpath(__file__)
@@ -187,6 +227,22 @@ def main():
             ], capture_output=True, env=env)
         finally:
             raise error
+
+    # Everything App Cloner runs needs the managed Python: refuse in words
+    # before any helper starts, rather than fail inside a clone.
+    cloner_python = os.environ.get("ERGOPTI_CLONER_PYTHON", "").strip()
+    refusal = cloner_python_refusal(app_root, cloner_python)
+    if refusal is not None:
+        record_log(f"[AppCloner] managed Python refusal={refusal}\n")
+        refusal_text = ui["apps.cloner.python_missing"] + "\n\n" + refusal
+        if log_path:
+            refusal_text += "\n\n" + ui["apps.cloner.diagnostic_log_path"].replace("{1}", log_path)
+        subprocess.run([
+            "osascript", "-e", ERROR_DIALOG_SCRIPT, "--", refusal_text,
+            ui["apps.cloner.startup_error_title"], ui["common.ok"],
+        ], capture_output=True)
+        sys.exit(1)
+    env["ERGOPTI_CLONER_PYTHON"] = cloner_python
 
     record_log(
         f"[AppCloner] app_root={app_root}\n"

@@ -68,7 +68,8 @@ helpers.describe("App Cloner Python offer", function()
 		local Offer, world = load("unused")
 		local launched
 		Offer.open(owner(true, {}), function(environment) launched = environment end)
-		helpers.assert_eq(launched, { "ERGOPTI_CLONER_PYTHON=" .. LINK })
+		helpers.assert_eq(launched, { "ERGOPTI_CLONER_PYTHON=" .. LINK,
+			"PATH=/Users/test/Library/Application Support/Ergopti/native-bootstrap/app-cloner:/usr/bin:/bin:/usr/sbin:/sbin" })
 		helpers.assert_eq(#world.alerts, 0, "nothing is asked when it is installed")
 		restore()
 	end)
@@ -91,7 +92,8 @@ helpers.describe("App Cloner Python offer", function()
 		Offer.open(double, function(environment) launched = environment end)
 		helpers.assert_eq(calls.installs, 1)
 		helpers.assert_eq(world.notices, 1, "the install is announced")
-		helpers.assert_eq(launched, { "ERGOPTI_CLONER_PYTHON=" .. LINK })
+		helpers.assert_eq(launched, { "ERGOPTI_CLONER_PYTHON=" .. LINK,
+			"PATH=/Users/test/Library/Application Support/Ergopti/native-bootstrap/app-cloner:/usr/bin:/bin:/usr/sbin:/sbin" })
 		restore()
 	end)
 
