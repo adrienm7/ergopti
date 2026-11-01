@@ -13,13 +13,6 @@
 		"static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1": {
 			"host": 1
 		},
-		"static/ergopti_plus/windows/modules/updater/core.ahk": {
-			"host": 3
-		},
-		"static/ergopti_plus/windows/modules/updater/self_update.ahk": {
-			"host": 1,
-			"app_file_name": 1
-		},
 		"tools/build/InstalledRuntimePublisher.hpp": {
 			"bundle_id_or_label": 4
 		},

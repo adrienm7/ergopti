@@ -273,14 +273,14 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 				; clipboard path which is slower than the direct event injection.
 				if IsSet(PrefixWatcherSuppress) {
 						if Fired
-								SetTimer((*) => PrefixWatcherSuppress(false), -60)
+								SetTimer((*) => PrefixWatcherSuppress(false), -TimingsGet("hotstrings", "synthetic_clear_ms"))
 						else
 								PrefixWatcherSuppress(false)
 				}
 				; Release the synthetic flag on the same flush window — clearing it
 				; inline would let trailing replacement keystrokes look manual.
 				if Fired
-						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -60)
+						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -TimingsGet("hotstrings", "synthetic_clear_ms"))
 				else
 						KL_ClearSynthetic(SyntheticOwner)
 		}

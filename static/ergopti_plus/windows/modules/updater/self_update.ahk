@@ -47,7 +47,7 @@ _Updater_FindAsset(Json, AssetName, Tag) {
 	Assets := Release["assets"]
 	if !(Assets is Array)
 		return 0
-	ExpectedUrl := "https://github.com/" . UPDATER_GH_OWNER . "/"
+	ExpectedUrl := UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/"
 		. UPDATER_GH_REPO . "/releases/download/" . Tag . "/" . AssetName
 	for AssetIndex, Asset in Assets {
 		if !(Asset is Map)
@@ -2155,7 +2155,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		return false
 	}
 	AssetName := IsSet(BUNDLE_RELEASE_ASSET) and BUNDLE_RELEASE_ASSET != ""
-		? BUNDLE_RELEASE_ASSET : "ErgoptiPlus.exe"
+		? BUNDLE_RELEASE_ASSET : Identifiers.App.EXE
 	Asset := _Updater_FindAsset(Release.RawJson, AssetName, Release.Tag)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
@@ -3866,7 +3866,7 @@ _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 	try {
 		DiscardStaging := IsObject(Artifacts) && Artifacts.HasOwnProp("StagingRetirement")
 		_Updater_RetireCurlCaptureArtifacts(Artifacts, DiscardStaging)
-		try SetTimer((*) => _Updater_RebuildMenu(), -50)
+		try SetTimer((*) => _Updater_RebuildMenu(), -TimingsGet("adapters", "updater_callback_defer_ms"))
 	} finally _Updater_ReleaseDownloadRetirement(Retirement)
 	return true
 }

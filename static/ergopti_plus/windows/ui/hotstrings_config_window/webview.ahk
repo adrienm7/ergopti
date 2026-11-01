@@ -70,7 +70,7 @@ global HCWWEB_HEIGHT := 660
 
 ; Grey applied by the "set all grey" bulk action — kept in sync with the native
 ; _HCW_SetAllGrey and the macOS host.
-global HCWWEB_GREY := "#6e6e73"
+global HCWWEB_GREY := _HCW_PaletteHex("gray")
 
 ; Returns true when the WebView2 runtime binding + loader DLL are present.
 _HCWWeb_Available() {

@@ -1167,7 +1167,7 @@ GestureOpenTouchpadSettings() {
 ; so a failure here is visible in the log.
 _DeferredGestureAutoConfigure(*) {
 		if A_IsSuspended {
-				SetTimer(_DeferredGestureAutoConfigure, -250)
+				SetTimer(_DeferredGestureAutoConfigure, -TimingsGet("gestures", "auto_configure_delay_ms"))
 				return
 		}
 		LoggerStart("gestures", "Running deferred touchpad auto-configuration…")
