@@ -1985,7 +1985,7 @@ class _SigningSink(_PreparationSink):
 
 
 PRODUCTION_RELATIVE = "tools/build/owned_runtime_product_build.py"
-PRODUCTION_SHA256 = "02667d7563253a02f8710385e9729a081642a7654a81b1efb0fb3bd725863afa"
+PRODUCTION_SHA256 = "a96a9e733fe310bd01bd219e1ab13c9f7757a733865ced680523343e5450573f"
 
 
 @dataclass(frozen=True, slots=True)
