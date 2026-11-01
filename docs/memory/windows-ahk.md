@@ -1023,7 +1023,8 @@ combination that holds AltGr (Shift+AltGr...) on such a layout, its owner
 pressing only the other members; a left_ctrl hold
 that took the fake LCtrl is handed back when the RAlt arrives
 (`TapHoldAltGrTakesItsLCtrl`); "LCtrl physically held" means
-`TapHoldUserLCtrlHeld()`. Only `KS_AltGrAddsFakeLCtrl()` layouts (not Kana,
+`TapHoldUserLCtrlHeld()`, which asks the native ledger's real flag under AltGr
+(no owner: AltGr's). Only `KS_AltGrAddsFakeLCtrl()` layouts (not Kana,
 and the boot probe found an AltGr level) have the fake LCtrl: on QWERTY and
 Kana a physical LCtrl held with RAlt or SC138 is the user's Ctrl, so never read
 "RAlt down" as "the Ctrl is AltGr's" without that predicate. Where right Alt

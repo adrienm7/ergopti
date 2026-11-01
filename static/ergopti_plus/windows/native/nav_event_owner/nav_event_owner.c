@@ -142,6 +142,9 @@ typedef struct NavState {
 	DWORD hook_failure_error;
 	/* Keys held now, read by ErgoptiNav_QueryKeyPress; see key_press_ledger.h. */
 	ErgoptiLedger key_ledger;
+	/* Lets the ledger go when the input desktop changes (UAC, lock, Ctrl+Alt+Del). */
+	HWINEVENTHOOK desktop_watch;
+	uint64_t key_ledger_resets;
 	HWND wake_window;
 	UINT wake_message;
 	DWORD last_os_error;
@@ -2444,6 +2447,27 @@ static void NavLedgerObserveAfterLocked(
 
 
 
+/** EVENT_SYSTEM_DESKTOPSWITCH: named here, the SDK guards it behind a newer WINVER. */
+#define NAV_EVENT_DESKTOP_SWITCH 0x0020u
+
+/**
+ * Forgets the keys held: no hook sees a release on another desktop, and a stale
+ * press would read as held for good. Runs on this hook's own pumping thread.
+ */
+static void CALLBACK NavDesktopSwitchProc(
+	HWINEVENTHOOK watch, DWORD event, HWND window, LONG object, LONG child,
+	DWORD thread, DWORD time)
+{
+	(void)watch; (void)event; (void)window; (void)object; (void)child;
+	(void)thread; (void)time;
+	EnterCriticalSection(&g_nav_state.lock);
+	ErgoptiLedger_ReleaseAll(&g_nav_state.key_ledger);
+	++g_nav_state.key_ledger_resets;
+	LeaveCriticalSection(&g_nav_state.lock);
+}
+
+
+
 /** Records actual native hook entries only inside an explicitly owned fixture. */
 static LRESULT CALLBACK NavLowLevelKeyboardProc(
 	int code, WPARAM message, LPARAM data_pointer)
@@ -2614,6 +2638,7 @@ static DWORD WINAPI NavHookThreadMain(LPVOID parameter)
 	DWORD exit_os_error = 0;
 	int32_t exit_status = ERGOPTI_NAV_STATUS_OK;
 	bool stop_requested = false;
+	HWINEVENTHOOK desktop_watch;
 
 	(void)parameter;
 	EnterCriticalSection(&g_nav_state.lock);
@@ -2660,9 +2685,16 @@ static DWORD WINAPI NavHookThreadMain(LPVOID parameter)
 			os_error = GetLastError();
 	}
 	initial_modifiers = NavReadModifierState();
+	/* No watch is no failure: Ctrl+Alt+Del is still seen, and the health says so. */
+	desktop_watch = hook != NULL
+		? SetWinEventHook(NAV_EVENT_DESKTOP_SWITCH, NAV_EVENT_DESKTOP_SWITCH, NULL,
+			NavDesktopSwitchProc, 0, 0, WINEVENT_OUTOFCONTEXT)
+		: NULL;
 
 	EnterCriticalSection(&g_nav_state.lock);
 	g_nav_state.thread_id = GetCurrentThreadId();
+	g_nav_state.desktop_watch = desktop_watch;
+	g_nav_state.key_ledger_resets = 0;
 	g_nav_state.hook = hook;
 	g_nav_state.reassert_timer = hook != NULL ? reassert_timer : NULL;
 	g_nav_state.reassert_stage = NAV_HOOK_REASSERT_IDLE;
@@ -2752,8 +2784,12 @@ static DWORD WINAPI NavHookThreadMain(LPVOID parameter)
 	hook = g_nav_state.hook;
 	g_nav_state.reassert_timer = NULL;
 	g_nav_state.reassert_stage = NAV_HOOK_REASSERT_IDLE;
+	desktop_watch = g_nav_state.desktop_watch;
+	g_nav_state.desktop_watch = NULL;
 	LeaveCriticalSection(&g_nav_state.lock);
 	(void)CloseHandle(reassert_timer);
+	if (desktop_watch != NULL)
+		(void)UnhookWinEvent(desktop_watch);
 	if (!UnhookWindowsHookEx(hook)) {
 		if (exit_os_error == 0)
 			exit_os_error = GetLastError();
@@ -4705,7 +4741,31 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_QueryKeyPress(
 
 
 
+/** Implements ErgoptiNav_GetKeyLedgerHealth. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetKeyLedgerHealth(
+	uint32_t *out_desktop_watch,
+	uint64_t *out_resets)
+{
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (out_desktop_watch == NULL || out_resets == NULL)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	EnterCriticalSection(&g_nav_state.lock);
+	*out_desktop_watch = g_nav_state.desktop_watch != NULL ? 1u : 0u;
+	*out_resets = g_nav_state.key_ledger_resets;
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
 #if defined(ERGOPTI_NAV_TESTING)
+/** Implements the hook-free seam of the desktop switch. */
+void ERGOPTI_NAV_CALL ErgoptiNav_TestDesktopSwitch(void)
+{
+	NavDesktopSwitchProc(NULL, NAV_EVENT_DESKTOP_SWITCH, NULL, 0, 0, 0, 0);
+}
+
 /** Implements the hook-free press ledger reset seam. */
 void ERGOPTI_NAV_CALL ErgoptiNav_TestResetKeyLedger(void)
 {

@@ -220,6 +220,9 @@ _LNEO_KeyPressCrossesTheAbiExactly() {
 	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_QueryKeyPress"),
 		"UShort", 0x200, "Ptr", Wrong, "Int")
 	AssertEqual(1, Status, "a scan code beyond the extended range must be refused")
+	Health := LLM_NavEventOwner_KeyLedgerHealth()
+	AssertEqual(0, Health["desktop_watch"], "a stopped owner watches no desktop")
+	AssertTrue(Health["resets"] >= 0, "the reset count crosses the ABI")
 }
 
 Test("LLM nav event owner: the press ledger crosses the ABI exactly (todo91-ledger-abi)",

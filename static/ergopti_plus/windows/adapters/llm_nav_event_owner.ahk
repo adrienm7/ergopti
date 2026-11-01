@@ -3671,6 +3671,16 @@ LLM_NavEventOwner_KeyPress(Sc) {
 	return { flags: NumGet(Press, 4, "UInt"), sequence: NumGet(Press, 8, "UInt64") }
 }
 
+; How the ledger is kept honest: a release no hook sees must not leave a key held.
+; @returns {Map} desktop_watch (installed) and resets (desktop switches seen).
+LLM_NavEventOwner_KeyLedgerHealth() {
+	Watching := 0, Resets := 0
+	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_GetKeyLedgerHealth"),
+		"UInt*", &Watching, "Int64*", &Resets, "Int")
+	_LLM_NavEventOwnerNativeRequireOk(Status, "Navigation owner key ledger health")
+	return Map("desktop_watch", Watching, "resets", Resets)
+}
+
 ; The same counters for the diagnostic snapshot, read only when the native owner
 ; is already loaded: the snapshot must never load the DLL as a side effect.
 ; @returns {Map|Integer} The HookOrderStats map, or 0 when the owner is not loaded.
@@ -3689,6 +3699,14 @@ _LLM_NavEventOwnerLogHookOrder() {
 		try LoggerWarn("KeyboardArbiter", "stage=hook_order outcome=unreadable detail={1}.", Failure.Message)
 		return
 	}
+	try {
+		Ledger := LLM_NavEventOwner_KeyLedgerHealth()
+		if Ledger["desktop_watch"]
+			LoggerDebug("KeyboardArbiter", "stage=key_ledger desktop_watch=1 resets={1}.", Ledger["resets"])
+		else
+			LoggerWarn("KeyboardArbiter", "stage=key_ledger desktop_watch=0 resets={1}: a release missed on UAC or the lock screen can stay held.", Ledger["resets"])
+	} catch as Failure
+		LoggerWarn("KeyboardArbiter", "stage=key_ledger outcome=unreadable detail={1}.", Failure.Message)
 	try LoggerDebug("KeyboardArbiter",
 		"stage=hook_order keys={1} injected_armed={2} reinstalls={3} failures={4} last_error={5} hires={6}.",
 		Counts["keys_seen"], Counts["injected_armed"], Counts["reinstalls"],
@@ -4953,7 +4971,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 		"ErgoptiNav_AbortOwnerSwap", "ErgoptiNav_ClaimOwner", "ErgoptiNav_GetOwner", "ErgoptiNav_PollReceipt",
 		"ErgoptiNav_BeginProfileSwap", "ErgoptiNav_CommitProfileSwap", "ErgoptiNav_AbortProfileSwap",
 		"ErgoptiNav_ProfilePendingMask", "ErgoptiNav_CompleteReceipt", "ErgoptiNav_PendingForToken",
-		"ErgoptiNav_GetLastOsError", "ErgoptiNav_GetHookOrderStats", "ErgoptiNav_QueryKeyPress", "ErgoptiNav_TestDispatch"]
+		"ErgoptiNav_GetLastOsError", "ErgoptiNav_GetHookOrderStats", "ErgoptiNav_QueryKeyPress", "ErgoptiNav_GetKeyLedgerHealth", "ErgoptiNav_TestDispatch"]
 	Exports := Map()
 	try {
 		for Name in Names {

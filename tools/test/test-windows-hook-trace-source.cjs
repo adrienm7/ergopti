@@ -57,7 +57,11 @@ const DIAGNOSTIC = [
 ];
 
 const SERIALIZATION = ['ErgoptiNav_SerializeTerminalOutputAttempt'];
-const HOOK_ORDER = ['ErgoptiNav_GetHookOrderStats', 'ErgoptiNav_QueryKeyPress'];
+const HOOK_ORDER = [
+	'ErgoptiNav_GetHookOrderStats',
+	'ErgoptiNav_QueryKeyPress',
+	'ErgoptiNav_GetKeyLedgerHealth'
+];
 const OWNED_CAPTURE = [
 	'ErgoptiNav_BeginTerminalCaptureOwned',
 	'ErgoptiNav_GetTerminalCaptureOwned',
