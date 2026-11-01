@@ -1,0 +1,17 @@
+# _shared/tests/corpus/config_migration_registries/oldest_below_unstamped.toml
+#
+# oldest_version is below unstamped_version.
+
+[registry]
+current_version = 3
+unstamped_version = 2
+oldest_version = 1
+
+[steps.v2_to_v3]
+from = 2
+to = 3
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: one delete."
+ops = [
+	{ op = "delete", section = "gestures", key = "space_wrap" },
+]

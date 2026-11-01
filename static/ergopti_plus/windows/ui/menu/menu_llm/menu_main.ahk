@@ -251,13 +251,15 @@ _LLM_Menu_StateGetters() {
 	return Map("llm_enabled", () => _LLM_Menu["enabled"],
 		"llm_toggle_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
 		"llm_scope_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
-		"config_newer_schema", () => ConfigNewerSchemaReadOnly())
+		"config_newer_schema", () => ConfigNewerSchemaReadOnly(),
+		"config_older_schema", () => ConfigOlderSchemaReadOnly())
 }
 
 /**
  * Names why the AI submenus that write config.toml (servers, API entries,
- * profiles) cannot be used: a configuration saved by a newer version, or any
- * other refusal of the session writer. The switch and the restore row grey
+ * profiles) cannot be used: a configuration saved by a newer version, one too
+ * old to migrate, or any other refusal of the session writer. The switch and
+ * the restore row grey
  * with the same causes through the manifest; these parents are native, so they
  * name the cause here. A pause is not a cause: it greys the rows already.
  * @returns {String} A locale key, or "" when the file accepts writes.
@@ -268,7 +270,9 @@ _LLM_Menu_ConfigBlockReason() {
 		return ""
 	if TOML_WriteRefusal(ConfigurationFile) == ""
 		return ""
-	return ConfigNewerSchemaReadOnly() ? "menu.read_only.newer_schema" : "menu.llm.save_unavailable"
+	if ConfigNewerSchemaReadOnly()
+		return "menu.read_only.newer_schema"
+	return ConfigOlderSchemaReadOnly() ? "menu.read_only.older_schema" : "menu.llm.save_unavailable"
 }
 
 /**

@@ -831,6 +831,7 @@ BootProfile_StageBegin("i18n")
 I18nPreload()
 BootProfile_StageEnd("i18n", "locale " . I18nGetLocale())
 BootProfile_Mark("i18n locale preloaded")
+ConfigNotifyOlderSchemaAtBoot()
 
 ; Load tooltip visual constants from _shared/modules/tooltip/constants.toml so the
 ; runtime values stay in sync with the TOML single source of truth.

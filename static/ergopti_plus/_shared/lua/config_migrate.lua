@@ -151,7 +151,7 @@ M.DRIVERS = { ahk = true, hs = true, linux = true }
 
 -- The only keys of [registry] and of a [steps.*] table. Anything else is a
 -- defect every interpreter rejects: the shared registry-defect corpus pins it.
-local REGISTRY_FIELDS = { current_version = true, unstamped_version = true }
+local REGISTRY_FIELDS = { current_version = true, unstamped_version = true, oldest_version = true }
 local STEP_FIELDS = { from = true, to = true, drivers = true, reason = true, ops = true }
 
 --- Fields of each op of the closed set.
@@ -494,7 +494,7 @@ end
 
 --- Validates a decoded registry and returns it in execution order.
 --- @param decoded table Decoded migrations.toml.
---- @return table|nil registry `{ current, unstamped, steps = { { from, to, drivers, reason, ops } } }`.
+--- @return table|nil registry `{ current, unstamped, oldest, steps = { { from, to, drivers, reason, ops } } }`.
 --- @return string|nil detail
 function M.validate_registry(decoded)
 	if type(decoded) ~= "table" or type(decoded.registry) ~= "table" then
@@ -517,6 +517,13 @@ function M.validate_registry(decoded)
 	local unstamped = decoded.registry.unstamped_version
 	if not is_version(current) or not is_version(unstamped) or unstamped > current then
 		return nil, "current_version and unstamped_version must be integers with 1 <= unstamped <= current"
+	end
+	-- Steps below the oldest supported version were squashed away: the chain
+	-- starts there, and anything older is refused rather than half migrated.
+	local oldest = decoded.registry.oldest_version
+	if oldest == nil then oldest = unstamped end
+	if not is_version(oldest) or oldest < unstamped or oldest > current then
+		return nil, "oldest_version must be an integer with unstamped <= oldest <= current"
 	end
 	local steps = {}
 	for name, step in pairs(decoded.steps or {}) do
@@ -550,15 +557,16 @@ function M.validate_registry(decoded)
 		steps[#steps + 1] = { from = step.from, to = step.to, drivers = drivers, reason = step.reason, ops = step.ops }
 	end
 	table.sort(steps, function(left, right) return left.from < right.from end)
-	if #steps ~= current - unstamped then
-		return nil, "the steps do not chain v" .. version_text(unstamped) .. " to v" .. version_text(current)
+	if #steps ~= current - oldest then
+		return nil, "the steps do not chain v" .. version_text(oldest) .. " to v" .. version_text(current)
 	end
 	for index, step in ipairs(steps) do
-		if step.from ~= unstamped + index - 1 then
+		if step.from ~= oldest + index - 1 then
 			return nil, "the chain has a gap at v" .. version_text(step.from)
 		end
 	end
-	local registry = { current = as_integer(current), unstamped = as_integer(unstamped), steps = steps }
+	local registry = { current = as_integer(current), unstamped = as_integer(unstamped),
+		oldest = as_integer(oldest), steps = steps }
 	validated_registries[registry] = detached(registry)
 	return registry
 end
@@ -1012,7 +1020,7 @@ function M.classify(model, registry)
 	end
 	if version > registry.current then return "newer", version end
 	if version == registry.current then return "current", version end
-	if version < registry.unstamped then return "unsupported", version end
+	if version < registry.oldest then return "unsupported", version end
 	return "migrate", version
 end
 
@@ -1322,16 +1330,19 @@ end
 -- The locale key of the notice a newer file earns, shared with the Windows
 -- driver's refused-save notification (config_io.ahk).
 M.NEWER_SCHEMA_NOTICE_KEY = "config.read_only.newer_schema"
+-- The one a file older than the registry's oldest supported version earns.
+M.OLDER_SCHEMA_NOTICE_KEY = "config.read_only.older_schema"
 
 --- Names the notice a boot result asks the driver to show once: a file saved
---- by a newer build is preserved and read-only, and the user must update and
---- reload before changing settings. Other refusals keep their log diagnostics.
+--- by a newer build, or one too old to migrate, is preserved and read-only, and
+--- the user must act before changing settings. Other refusals keep their log
+--- diagnostics.
 --- @param result table|nil The table M.boot or M.run returned.
 --- @return string|nil key The locale key, or nil when no notice is due.
 function M.read_only_notice_key(result)
-	if type(result) == "table" and result.status == "newer" and result.read_only == true then
-		return M.NEWER_SCHEMA_NOTICE_KEY
-	end
+	if type(result) ~= "table" or result.read_only ~= true then return nil end
+	if result.status == "newer" then return M.NEWER_SCHEMA_NOTICE_KEY end
+	if result.status == "unsupported" then return M.OLDER_SCHEMA_NOTICE_KEY end
 	return nil
 end
 
@@ -1519,7 +1530,8 @@ function M.run(opts)
 		return refuse("invalid", "[_meta] schema_version is not a positive integer")
 	end
 	if plan.outcome == "unsupported" then
-		return refuse("unsupported", "no migration path from schema v" .. version_text(plan.version))
+		return refuse("unsupported", "no migration path from schema v" .. version_text(plan.version)
+			.. ": the oldest this build migrates is v" .. version_text(registry.oldest))
 	end
 	if plan.outcome ~= "migrated" then return refuse("failed", plan.detail) end
 

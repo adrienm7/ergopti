@@ -609,7 +609,7 @@ _CMJ_BootRegistryWithdrawal(When := "prepared") {
 	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
 	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
 	Registry := ConfigMigrateShippedRegistry(), Step := Registry["steps"][1], Reason := Step["reason"]
-	Source := '[_meta]`nschema_version = ' . Registry["unstamped"] . '`n[hotstrings]`ntrigger_char = "@"`n'
+	Source := '[_meta]`nschema_version = ' . Registry["oldest"] . '`n[hotstrings]`ntrigger_char = "@"`n'
 	NativeWrite := FSWriteDurable, PreviousSink := _LOGGER_TEST_SINK
 	PreviousLevel := LOGGER_MIN_LEVEL
 	Seen := { stage: 0, completed: 0, stage_paths: [], stage_content: "", source_unchanged: false }

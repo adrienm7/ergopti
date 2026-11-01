@@ -11,9 +11,11 @@
  * expected.toml cannot silently describe behaviour no interpreter has.
  *
  * FEATURES & RATIONALE:
- * 1. Registry shape. current_version and unstamped_version bound a gap-free
- *    chain of steps named v<from>_to_v<to>, each for a non-empty set of known
- *    drivers, each op carrying exactly its declared fields with bare names.
+ * 1. Registry shape. oldest_version (unstamped_version when absent) and
+ *    current_version bound a gap-free chain of steps named v<from>_to_v<to>,
+ *    each for a non-empty set of known drivers, each op carrying exactly its
+ *    declared fields with bare names. A file below oldest_version, a file
+ *    without a stamp included when unstamped_version is lower, is unsupported.
  * 2. Statically idempotent ops. A map_value whose target is also a source
  *    would change a value again on replay, so its from and to sets must be
  *    disjoint; a move into its own subtree is refused likewise.
@@ -277,10 +279,17 @@ function validateRegistry(doc, where) {
 		);
 		return null;
 	}
+	// Steps below the oldest supported version were squashed away: the chain
+	// starts there, and anything older is refused rather than half migrated.
+	const oldest = registry.oldest_version ?? unstamped;
+	if (!Number.isInteger(oldest) || oldest < unstamped || oldest > current) {
+		fail(where, 'oldest_version must be an integer with unstamped <= oldest <= current');
+		return null;
+	}
 	const unknownRoot = Object.keys(doc).filter((key) => key !== 'registry' && key !== 'steps');
 	if (unknownRoot.length) fail(where, `unknown top-level tables: ${unknownRoot.join(', ')}`);
 	const unknownRegistry = Object.keys(registry).filter(
-		(key) => !['current_version', 'unstamped_version'].includes(key)
+		(key) => !['current_version', 'unstamped_version', 'oldest_version'].includes(key)
 	);
 	if (unknownRegistry.length) fail(where, `unknown [registry] keys: ${unknownRegistry.join(', ')}`);
 
@@ -310,17 +319,17 @@ function validateRegistry(doc, where) {
 		steps.push(step);
 	}
 	steps.sort((left, right) => left.from - right.from);
-	const expectedCount = current - unstamped;
+	const expectedCount = current - oldest;
 	if (steps.length !== expectedCount)
 		fail(
 			where,
-			`expected ${expectedCount} step(s) from v${unstamped} to v${current}, found ${steps.length}`
+			`expected ${expectedCount} step(s) from v${oldest} to v${current}, found ${steps.length}`
 		);
 	steps.forEach((step, index) => {
-		if (step.from !== unstamped + index)
+		if (step.from !== oldest + index)
 			fail(where, `the chain has a gap or overlap at v${step.from}`);
 	});
-	return { current, unstamped, steps };
+	return { current, unstamped, oldest, steps };
 }
 
 // ==========================================
@@ -675,7 +684,7 @@ function migrate(model, registry, driver, context) {
 	}
 	if (version > registry.current) return { outcome: 'newer' };
 	if (version === registry.current) return { outcome: 'current' };
-	if (version < registry.unstamped) return { outcome: 'unsupported' };
+	if (version < registry.oldest) return { outcome: 'unsupported' };
 	const out = cloneModel(model);
 	try {
 		for (const step of registry.steps) {

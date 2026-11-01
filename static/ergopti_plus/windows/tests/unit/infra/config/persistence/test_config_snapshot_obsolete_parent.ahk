@@ -148,7 +148,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 			Registry := ConfigMigrateShippedRegistry()
 			Stamp := Scenario == "stamp-invalid" ? '"invalid"'
 				: Scenario == "stamp-newer" ? String(Registry["current"] + 1)
-				: Scenario == "stamp-older" ? String(Registry["unstamped"])
+				: Scenario == "stamp-older" ? String(Registry["oldest"])
 				: Scenario == "stamp-boolean" ? "true"
 				: Scenario == "stamp-fractional" ? String(Registry["current"] + 0.5) : ""
 			ChangedSource := Scenario == "stamp-parent"

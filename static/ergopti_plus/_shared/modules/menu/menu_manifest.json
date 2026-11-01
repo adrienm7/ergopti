@@ -448,6 +448,10 @@
 				{
 					"when": "config_newer_schema",
 					"reason_key": "menu.read_only.newer_schema"
+				},
+				{
+					"when": "config_older_schema",
+					"reason_key": "menu.read_only.older_schema"
 				}
 			],
 			"category": "LLM"
@@ -464,6 +468,10 @@
 				{
 					"when": "config_newer_schema",
 					"reason_key": "menu.read_only.newer_schema"
+				},
+				{
+					"when": "config_older_schema",
+					"reason_key": "menu.read_only.older_schema"
 				}
 			]
 		},
