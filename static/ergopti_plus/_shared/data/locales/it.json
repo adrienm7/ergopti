@@ -1411,7 +1411,7 @@
 	"menu.debug.hook_probe": "Registra l'ordine degli hook della tastiera",
 	"menu.debug.composer_check": "Prova il layout composto",
 	"platform_reason.action_apple_shortcuts_are_macos": "Solo macOS: i Comandi rapidi di Apple esistono solo su macOS. Altrove, esegui invece un comando o un programma.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "Su Windows, «Esegui un programma» fa lo stesso: cmd.exe o powershell.exe con il comando come argomenti, oppure explorer.exe con il file o la cartella da aprire.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "Su Windows, «Esegui un programma» fa lo stesso: cmd.exe con il comando come argomenti, oppure explorer.exe con il file o la cartella da aprire.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Questi controlli misurano SendInput di AutoHotkey e il suo hook della tastiera, che ha solo il driver Windows.",
 	"input_probe.title": "Controllo dell'input",
 	"input_probe.confirm": "Questo controllo apre una piccola finestra e vi digita per circa {1} secondi. Nel frattempo non digitare né fare clic altrove. Continuare?",

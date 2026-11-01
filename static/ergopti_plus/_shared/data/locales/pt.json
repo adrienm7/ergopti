@@ -1411,7 +1411,7 @@
 	"menu.debug.hook_probe": "Registrar a ordem dos hooks do teclado",
 	"menu.debug.composer_check": "Testar o layout composto",
 	"platform_reason.action_apple_shortcuts_are_macos": "Apenas macOS: os Atalhos da Apple só existem no macOS. Noutros sistemas, execute antes um comando ou um programa.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "No Windows, «Executar um programa» faz o mesmo: cmd.exe ou powershell.exe com o comando como argumentos, ou explorer.exe com o ficheiro ou a pasta a abrir.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "No Windows, «Executar um programa» faz o mesmo: cmd.exe com o comando como argumentos, ou explorer.exe com o ficheiro ou a pasta a abrir.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Estas verificações medem o SendInput do AutoHotkey e o seu hook de teclado, que só o driver do Windows tem.",
 	"input_probe.title": "Verificação de entrada",
 	"input_probe.confirm": "Esta verificação abre uma janela pequena e escreve nela durante cerca de {1} segundos. Não digite nem clique noutro local entretanto. Continuar?",

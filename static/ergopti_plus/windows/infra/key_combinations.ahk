@@ -313,26 +313,58 @@ KeyCombinationFireHotkey(HotkeyName := unset) {
 	return Second == "" ? "" : KeyCombinationFire(Second)
 }
 
-; The first key of the pair a press of Second completes: the first catalogue
-; key physically down that Second has a slot under, or "".
+; The press number the native ledger holds for a tap-hold key, 0 when unknown.
+; @param KeyId {String} Canonical tap-hold key id.
+; @returns {Integer}
+_KeyCombinationKeyPressSequence(KeyId) {
+	global _KeyCombinationScanNames
+	if !IsSet(_KeyCombinationScanNames) || !_KeyCombinationScanNames.Has(KeyId)
+		return 0
+	return KS_PressSequence(_KeyCombinationScanNames[KeyId])
+}
+
+; The first key of the pair a press of Second completes: among the keys down
+; that Second has a slot under, the one pressed first. Held alone then joined by
+; another, it stays the first whatever the catalogue order. AutoHotkey keeps no
+; order of presses: with a key the native ledger did not number (no owner
+; running, or a press behind AutoHotkey's hook), the catalogue order decides.
 ; @param Second {String} Tap-hold key id of the key being pressed.
 ; @param IsDownFn {Func} Test seam taking a key id, the physical keys by default.
+; @param PressSequenceFn {Func} Test seam taking a key id, the ledger by default.
 ; @returns {String}
-KeyCombinationHeldFirstKey(Second, IsDownFn := 0) {
+KeyCombinationHeldFirstKey(Second, IsDownFn := 0, PressSequenceFn := 0) {
 	global _KeyCombinationFirstKeys
 	if !IsSet(_KeyCombinationFirstKeys) || !_KeyCombinationFirstKeys.Has(Second)
 		return ""
 	if !IsObject(IsDownFn)
 		IsDownFn := _KeyCombinationKeyIsDown
+	if !IsObject(PressSequenceFn)
+		PressSequenceFn := _KeyCombinationKeyPressSequence
+	Held := []
 	for _, First in _KeyCombinationFirstKeys[Second] {
 		; On a standard AltGr layout every AltGr press begins with a fake LCtrl,
 		; which reads as LCtrl held first: that pair cannot be told from AltGr.
 		if (First == "left_ctrl" && Second == "alt_gr" && KS_AltGrAddsFakeLCtrl())
 			continue
 		if IsDownFn.Call(First)
-			return First
+			Held.Push(First)
 	}
-	return ""
+	if !Held.Length
+		return ""
+	Earliest := Held[1]
+	if Held.Length == 1
+		return Earliest
+	EarliestSequence := PressSequenceFn.Call(Earliest)
+	for _, First in Held {
+		Sequence := PressSequenceFn.Call(First)
+		if !Sequence || !EarliestSequence
+			return Held[1]
+		if Sequence < EarliestSequence {
+			Earliest := First
+			EarliestSequence := Sequence
+		}
+	}
+	return Earliest
 }
 
 ; The #HotIf of the pair hotkeys of key Second. On a press, whether a first key

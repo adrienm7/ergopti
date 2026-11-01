@@ -1411,7 +1411,7 @@
 	"menu.debug.hook_probe": "Optag rækkefølgen af tastaturhooks",
 	"menu.debug.composer_check": "Test den sammensatte layout",
 	"platform_reason.action_apple_shortcuts_are_macos": "Kun macOS: Apple Genveje findes kun på macOS. Kør i stedet en kommando eller et program andre steder.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "På Windows gør »Kør et program« det samme: cmd.exe eller powershell.exe med kommandoen som argumenter, eller explorer.exe med filen eller mappen, der skal åbnes.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "På Windows gør »Kør et program« det samme: cmd.exe med kommandoen som argumenter, eller explorer.exe med filen eller mappen, der skal åbnes.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Disse kontroller måler AutoHotkeys SendInput og dens tastaturhook, som kun Windows-driveren har.",
 	"input_probe.title": "Inputkontrol",
 	"input_probe.confirm": "Kontrollen åbner et lille vindue og skriver i det i omkring {1} sekunder. Skriv eller klik ikke andre steder imens. Fortsæt?",

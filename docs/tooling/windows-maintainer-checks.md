@@ -1,6 +1,6 @@
 # Windows maintainer checks
 
-The "Maintainer checks > Windows PC" lists of `TODO.md` ask for
+The "To confirm on the Windows PC" lines of `TODO.md` ask for
 things only a real driver shows: a tray row clicked, a dialog opened, a window
 titled, a reload followed. `tools/maintainer/windows-live-checks.cjs` runs the
 ones that can be automated against a real `ErgoptiPlus.ahk` booted from the
@@ -135,3 +135,59 @@ the typed-keys ledger).
    running, run it. By hand: the trigger LAlt then CapsLock; the eight default
    delimiters, each pointer kind and the delay end it; the next word is lower
    case.
+
+## Standing checks
+
+The installed-driver checks the maintainer repeats before a release. `TODO.md`
+names each by its number; report each as pass, fail or not run.
+
+1. **Seven-page wizard** (item 7): fresh, existing and moved folder; every page, Cancel, Finish then
+   restart, rerun; No against recommended choices; WebView rendering and persistence; the layout
+   step's controls never reload the UI.
+2. **Clear and Restore** (item 5): per category and global, then restart; unknown and outdated keys
+   preserved; personal hotstrings unchanged by Restore; exact backups; an external write refused.
+3. **Number row and key combinations**: on AZERTY, US QWERTY and Ergopti, each ordering and
+   edge-key choice, each row emulation switch, an inert choice ticked, greyed and suffixed « — non
+   appliqué », the ² key; a pair assignment saved and reloaded.
+4. **Installed build**: install, start, Diagnostics cold and reopened (UIA/render probes, cold
+   WebView), Quit during a keystats flush, File/Exit and Windows shutdown with exit code 0;
+   uninstall greyed on a source run. Item 101: capture the watcher/debt state if `watchers=0`
+   recurs.
+5. **Item 51 matrix**: arrows and both Shift+Tab over a multi-slot prediction move the marker once
+   and wrap (also after reload, with `nav_modifiers = ctrl`, with a tap-hold Tab); footer "⇧G + Tab
+   ou ↑/←"; bubbles and delayed expansions with emulation off and on; no "eeee"; one clipboard-log
+   row per Ctrl+V; AltGr+Entrée/Suppr/Retour arrière/Échap script actions; AI menu; « Revenir à
+   cette version » keeps a backup.
+6. **Items 19, 49, 50**: tooltips near screen edges on Windows 10 and 11 at several DPI scales; hook
+   order around a SendInput rehook; the send-mode measurement.
+7. **Hotstrings** (items 34, 37, 102, 104, 105, 129), in the installed driver: delays 0.5 s
+   recommended and cleared back to 1.0 s; handwritten delimiters and `[[hotstrings.terminators]]`
+   through Add, Delete, toggle, save and restart; with no Ergopti layout installed the shipped pack,
+   the 24 suffix rules and magic-key repeat appear once; personal files (duplicates, unreadable,
+   junctions, depth 16) and their delay, priority, colour and tooltip edits; each common
+   autocorrection family alone (34/95/11 rules); `run_all.ahk --only "programmable hotstrings"`
+   and the compiled probe `tools/test/run-compiled-user-hotstrings.ps1`; `update` never proposes
+   `date`. Full list: `49c62d77a1:docs/handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md`.
+8. **Layout switching** (item 38): AZERTY with emulation to native Ergopti and back keeps AltGr
+   usable without a reload, also on an AZERTY-style AltGr (LCtrl+RAlt) and a Kana layout.
+9. **Touchpad registry** (item 13): values restored after OFF and removal; kept after a refusal.
+10. **Managed network** (item 62), behind a company proxy: WinINet settings, PAC order and
+    failover, WPAD absence, the eight remote CA cases, Negotiate and NTLM proxy challenges, then the
+    installed updater (download, swap, rollback). The twelve detailed steps stay in Git
+    (`49c62d77a1:docs/handovers/2026-10-04-group6-windows/README.md`).
+11. **CapsWord auto-off**: delays, the eight default delimiters, each pointer kind, the LAlt then
+    CapsLock trigger.
+12. **AI off (#97)**: no local server sweep, no AI hotkeys, a refused AI hotkey leaves the driver
+    running. Item 143: time the AI toggle behind an unfinished startup (3.05 s on the smoke).
+13. **Prediction chord (item 112)**: in Notepad each slot's modifier+digit inserts that prediction
+    and its correction form; the shortcut column is right-aligned and muted.
+14. **Item 114**: observe the resident process during a prediction-key (1-5) or AltGr+Enter stall
+    and collect the Notepad stale-admission diagnostics before changing anything.
+15. **Items 30, 46-48, 54/81, 63, 73, 88, 96-98, 107, 108, 125, 138**: physical magic key under
+    emulation; a real local model (chat, download, consent, pause/resume/shutdown, HTTPS behind the
+    system proxy); installed menus (captions, unavailable reasons, state after restart);
+    brightness up/down and refusal without a backlight; physical-key labels after a locale change;
+    prediction tooltip typography; emulation picker precedence and dead-state output; chosen
+    physical positions and arbitrary outputs including dead keys; number-row and magic-key
+    shortcut delivery; free-text translation dialog; diagnostic export copy, write, reveal and
+    browser.

@@ -1411,7 +1411,7 @@
 	"menu.debug.hook_probe": "Zapisz kolejność hooków klawiatury",
 	"menu.debug.composer_check": "Przetestuj złożony układ",
 	"platform_reason.action_apple_shortcuts_are_macos": "Tylko macOS: Skróty Apple istnieją wyłącznie w macOS. W innych systemach uruchom zamiast tego polecenie lub program.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "W Windows „Uruchom program” robi to samo: cmd.exe lub powershell.exe z poleceniem jako argumentami albo explorer.exe z plikiem lub folderem do otwarcia.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "W Windows „Uruchom program” robi to samo: cmd.exe z poleceniem jako argumentami albo explorer.exe z plikiem lub folderem do otwarcia.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Te testy mierzą SendInput z AutoHotkey i jego hook klawiatury, które ma tylko sterownik Windows.",
 	"input_probe.title": "Test wprowadzania",
 	"input_probe.confirm": "Ten test otwiera małe okno i wpisuje do niego tekst przez około {1} s. W tym czasie nie pisz ani nie klikaj gdzie indziej. Kontynuować?",

@@ -91,13 +91,18 @@ commit. After touching a sealed Windows updater source, reseal with
 The root `TODO.md` is the only checklist: open work only, with no separate
 handoff file (an agent writes what is left into the item itself). A finished
 item is removed and its lessons go to `docs/memory`; its history stays in Git
-(`git log --follow -p -- TODO.md`; the file before the 2026-10-31 pass is
+(`git log --follow -p -- TODO.md`; the long form before the 2026-10-31 shrink
+is `git show 2a0083cb11:TODO.md`, before the 2026-10-31 pass
 `git show 1aa287427a:TODO.md`, before the 2026-10-30 pass
-`git show 7f80d3d141:TODO.md`). Item numbers are stable and never reused. Tags:
+`git show 7f80d3d141:TODO.md`). Its sections are one line per hardware check
+per machine (naming the field-run step or hand action and the commits it
+confirms), "Remaining code work", "CI acceptance" and "Maintainer decisions
+pending"; it is meant to be deleted once the field reports close the checks.
+Item numbers are stable and never reused. Tags:
 **[CODE]** software to write or adopt; **[CI]** only a hosted or native CI run
 qualifies it; **[PHYS-W]**, **[PHYS-M]**, **[PHYS-L]** needs a real Windows PC,
-Mac or Linux machine. Open questions sit in TODO's "Questions for the
-maintainer", each naming the default kept meanwhile; an answer moves into the
+Mac or Linux machine. Open questions sit in TODO's "Maintainer decisions
+pending", each naming the default kept meanwhile; an answer moves into the
 item or into [maintainer decisions](maintainer-decisions.md).
 
 ### project-physical-qualification-stays-open

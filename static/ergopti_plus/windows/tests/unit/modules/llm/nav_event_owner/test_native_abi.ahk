@@ -202,6 +202,29 @@ _LNEO_HookOrderStatsCrossTheAbiExactly() {
 Test("LLM nav event owner: hook-order stats cross the ABI exactly (todo49-hook-order)",
 	_LNEO_HookOrderStatsCrossTheAbiExactly)
 
+; The press ledger crosses the ABI as one 24-byte struct, and the driver reads it
+; from #HotIf criteria (todo91-ledger-abi). No owner runs here: it holds nothing.
+_LNEO_KeyPressCrossesTheAbiExactly() {
+	for _, Sc in [0x138, 0x02A, 0x01D] {
+		Press := LLM_NavEventOwner_KeyPress(Sc)
+		AssertEqual(0, Press.flags, "a stopped owner holds no key")
+		AssertEqual(0, Press.sequence, "a stopped owner numbers no press")
+	}
+	Wrong := Buffer(24, 0xA5)
+	NumPut("UInt", 16, Wrong, 0)
+	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_QueryKeyPress"),
+		"UShort", 0x138, "Ptr", Wrong, "Int")
+	AssertEqual(1, Status, "a mismatched struct size must be refused as invalid")
+	AssertEqual(0xA5A5A5A5, NumGet(Wrong, 4, "UInt"), "a refused call must not write the key")
+	NumPut("UInt", 24, Wrong, 0)
+	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_QueryKeyPress"),
+		"UShort", 0x200, "Ptr", Wrong, "Int")
+	AssertEqual(1, Status, "a scan code beyond the extended range must be refused")
+}
+
+Test("LLM nav event owner: the press ledger crosses the ABI exactly (todo91-ledger-abi)",
+	_LNEO_KeyPressCrossesTheAbiExactly)
+
 ; Empty val_modifiers is the shared default: a bare digit N while a prediction
 ; owner is committed must be suppressed (never typed) and target slot N, while
 ; a modified digit or a digit beyond the shown slots stays application input.

@@ -2030,6 +2030,13 @@ baseline` line (item 38).
   `server_<id>` as `up:<port source>:<models>`, `not_running:<port source>`,
   `needs_key:...` or `no_answer:...`. A server added to the shared list is
   reported with no driver change.
+- `field_apple_shortcuts` runs before `field_owned_pause` and lists the
+  Shortcuts library through the run_apple_shortcut owner and
+  `shortcuts list --show-identifiers` (`shortcuts_listed`, the count). It then
+  runs the shortcut named `Ergopti Field Test` end to end (`field_test_run`,
+  the owner's closed category, or `not_started`). Without that shortcut
+  `field_test_shortcut` is skipped as `absent` (`no_listing` when the list
+  failed): create it once in Shortcuts as a shortcut that does nothing.
 - `field_pac_fallback` runs after the AI downloads: one `awk` pass counts the
   PAC-then-direct lines of every writer (shell admission, Swift spool, Python
   receiver, Ollama pull). `pac_fallback_counts` is `warnings:worked:failed`,
@@ -2090,3 +2097,14 @@ goes through the same copy, and tag positions come from `layouts.keylayout`
 (`positions`, `key_positions`): the single-reader gate refuses a second
 scanner. A macOS build of a changed layout always gets a new name and id
 (probe M3); `field_layout_rows` proves the live replace on the Mac.
+
+### project-macos-physical-capture-is-the-owned-runtime
+
+The macOS consumers of physical key positions and media events exist
+(`keystats/media_store` replays through `aggregator/core.media_policy`; the
+shortcut editor reads `physical_capture.position_available`), but their only
+producer is `modules/keystats/physical_capture.lua`, which only the owned
+Karabiner runtime starts (`adapters/runtime_capture_port.lua`, dormant behind
+`[karabiner] runtime = "owned"`; checked 2026-10-31). Action: native position
+capture on macOS is item 31's production capture owner; do not plan it as
+separate work.

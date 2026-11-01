@@ -80,6 +80,10 @@ const PKGBUILD_REL = 'tools/build/PKGBUILD';
 // The step that unpacks an already stamped bundle and verifies its stamp.
 const UNPACK_TAR = /\btar\s+-xzf\b[^\n]*\s-C\s+build\/linux\b/;
 const UNPACK_VERIFY = 'write_build_stamp.sh verify build/linux/_shared';
+// The script a workflow step runs to pack the installable tarball; it must
+// verify the stamp of the tree it packs before its tar.
+const TARBALL_BUILDER_REL = 'tools/build/build-linux-bundle-archive.sh';
+const TARBALL_BUILDER = /\bbash\s+tools\/build\/build-linux-bundle-archive\.sh\b/;
 
 const COMMIT_ENV = /^ERGOPTI_BUILD_COMMIT:\s*\$\{\{\s*github\.sha\s*\}\}\s*$/;
 const VERSION_ENV = /^ERGOPTI_BUILD_VERSION:\s*\$\{\{\s*inputs\.version\s*\}\}\s*$/;
@@ -202,6 +206,18 @@ function parseJobs(text) {
 // =================================
 
 /**
+ * Tells whether a tarball builder verifies the stamp of the tree it packs
+ * before its first tar command.
+ * @param {string} text The builder script.
+ * @returns {boolean} True when a stamp verify of $BUILD_DIR/_shared precedes the tar.
+ */
+function builderVerifiesBeforeTar(text) {
+	const verify = text.search(/write_build_stamp\.sh"?\s+verify\s+"\$BUILD_DIR\/_shared"/);
+	const tar = text.search(/^\s*tar\s+-czf\b/m);
+	return verify >= 0 && tar > verify;
+}
+
+/**
  * Checks that every package build in a workflow stamps the commit.
  * @param {string} text Workflow YAML.
  * @param {string} rel The workflow's repository-relative path, for messages.
@@ -263,6 +279,15 @@ function checkWorkflow(text, rel) {
 					errors.push(
 						`${where} runs ${packager} before any build-linux-driver.sh in its job — ` +
 							'it would package a tree nobody stamped'
+					);
+				}
+			}
+			if (TARBALL_BUILDER.test(step.run)) {
+				tarballs++;
+				if (!builderVerifiesBeforeTar(read(TARBALL_BUILDER_REL))) {
+					errors.push(
+						`${where} runs ${TARBALL_BUILDER_REL}, which packs a tarball without first ` +
+							'running write_build_stamp.sh verify on the tree it packs'
 					);
 				}
 			}
@@ -444,6 +469,27 @@ for (const box of VERSIONED_BOXES) {
 		errors.push(
 			`self-check: dropping the plan's version from the ${box} caller went unnoticed — this guard cannot fail`
 		);
+	}
+}
+
+// The tarball builder's verify must be able to fail: without it, or after
+// the tar, the script is refused.
+{
+	const builder = read(TARBALL_BUILDER_REL);
+	const verifyLine = /^.*write_build_stamp\.sh"?\s+verify\s+"\$BUILD_DIR\/_shared".*\n/m;
+	if (!builderVerifiesBeforeTar(builder)) {
+		errors.push(`${TARBALL_BUILDER_REL} no longer verifies the stamp before its tar`);
+	} else if (builderVerifiesBeforeTar(builder.replace(verifyLine, ''))) {
+		errors.push(
+			`self-check: removing the stamp verify from ${TARBALL_BUILDER_REL} went unnoticed — this guard cannot fail`
+		);
+	} else {
+		const moved = builder.replace(verifyLine, '') + builder.match(verifyLine)[0];
+		if (builderVerifiesBeforeTar(moved)) {
+			errors.push(
+				`self-check: a stamp verify after the tar in ${TARBALL_BUILDER_REL} went unnoticed — this guard cannot fail`
+			);
+		}
 	}
 }
 
