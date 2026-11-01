@@ -623,6 +623,16 @@ _LLMRemote_DispatchWinHttp(req_id, resolved, Url, Payload, on_success, on_fail,
             _LLMRemote_DeleteOwned(req_id, reservation)
             return true
         }
+        Route := _SystemProxy_OverrideRoute(Url)
+        if Route is Map {
+            if !Route["ok"]
+                return _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+            ; WinHttpRequest SetProxy: 1 is direct, 2 names a server without its scheme.
+            if Route["proxy"] == ""
+                http.SetProxy(1)
+            else
+                http.SetProxy(2, RegExReplace(Route["proxy"], "i)^https?://"))
+        }
         http.Open("POST", Url, true)
         http.SetTimeouts(LLM_REMOTE_CONNECT_TIMEOUT_MS, LLM_REMOTE_CONNECT_TIMEOUT_MS,
             LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS)
