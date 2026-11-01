@@ -1069,15 +1069,25 @@ ConfigMigrateRegistryProofOpen() {
 ; memo or mutate state between two checks, and it is dropped when the outermost
 ; scope ends. Callers close the proof with one fresh check (RegistryLive with
 ; Fresh) after the scope, so a mutation made while Body ran is still refused.
-ConfigMigrateWithRegistryProof(Body) {
+; A Standing proof carries the memo from one scope to the next of one transaction,
+; across native work that changes nothing; its owner empties it before any durable
+; effect, which therefore always compares again.
+; @param {Func} Body The checks to run.
+; @param {Object} Standing Optional { registry, shadow } kept by the caller.
+ConfigMigrateWithRegistryProof(Body, Standing := 0) {
 	global ConfigMigrateRegistryProof
 	PreviousCritical := Critical("On")
+	if IsObject(Standing) && !ConfigMigrateRegistryProof.depth
+		ConfigMigrateRegistryProof.registry := Standing.registry, ConfigMigrateRegistryProof.shadow := Standing.shadow
 	ConfigMigrateRegistryProof.depth += 1
 	try return Body.Call()
 	finally {
 		ConfigMigrateRegistryProof.depth -= 1
-		if !ConfigMigrateRegistryProof.depth
+		if !ConfigMigrateRegistryProof.depth {
+			if IsObject(Standing)
+				Standing.registry := ConfigMigrateRegistryProof.registry, Standing.shadow := ConfigMigrateRegistryProof.shadow
 			ConfigMigrateRegistryProof.registry := 0, ConfigMigrateRegistryProof.shadow := 0
+		}
 		Critical(PreviousCritical)
 	}
 }

@@ -581,6 +581,20 @@ _CMJ_RegistryProofScope() {
 		AssertTrue(AllHold(), "exact repair restores admission")
 		ConfigMigrateBoot(Dirs[1] . "\config.toml", "check_write")
 		AssertFalse(ConfigMigrateRegistryProofOpen(), "check_write closes the proof scope it opened")
+		; A standing proof spares the reads of a transaction, never its next effect.
+		Standing := { registry: 0, shadow: 0 }
+		Before := ConfigMigrateRegistryDeepCompares
+		AssertTrue(ConfigMigrateWithRegistryProof(AllHold, Standing))
+		AssertTrue(ConfigMigrateWithRegistryProof(AllHold, Standing))
+		AssertEqual(1, ConfigMigrateRegistryDeepCompares - Before, "a standing proof serves the next scope")
+		AssertTrue(AllHold(), "a standing proof leaves no memo outside its own scopes")
+		AssertEqual(6, ConfigMigrateRegistryDeepCompares - Before, "guards outside a scope still compare")
+		Registry["current"] := OriginalCurrent + 1
+		Standing.registry := 0, Standing.shadow := 0
+		AssertFalse(ConfigMigrateWithRegistryProof(AllHold, Standing),
+			"emptied before an effect, the standing proof refuses a registry mutated during the reads")
+		AssertEqual(0, Standing.registry, "a refused comparison proves nothing that could stand")
+		Registry["current"] := OriginalCurrent
 	} finally {
 		Registry["current"] := OriginalCurrent
 		ConfigurationFile := IsSet(OldPath) ? OldPath : unset

@@ -37,11 +37,11 @@ interpreter's switch for `#SingleInstance Off`, so they do not replace one
 another and no copy of the runner is needed. Each worker has its own `TEMP`,
 because several tests use fixed names there.
 
-A test that runs a real configuration transaction spends nearly all its time in
-one place: every guarded journal callback compares the live migration registry
-with its private copy four times, about 20 ms each, and a one-file commit plus
-rollback makes about 1,300 of those comparisons. Fewer transactions per test is
-what makes such a test faster; the comparison visits every node on purpose.
+A test that runs a real configuration transaction spends most of its time in one
+place: every guarded journal effect compares the live migration registry with its
+private copy, about 20 ms each, and a one-file commit makes about 200 of those
+comparisons. Fewer transactions per test is what makes such a test faster; the
+comparison visits every node on purpose.
 
 Tests that reach the real `%APPDATA%` still do, and an `APPDATA` override does
 not move them, so metrics written by a test can land in the live data of a
