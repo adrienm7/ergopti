@@ -1149,6 +1149,7 @@ global _AhkSubDir := ""
 #Include ../modules/keystats/keystats_sql.ahk
 #Include unit/modules/keystats/test_keystats_ingest_encryption_retry.ahk
 #Include unit/modules/keystats/test_keystats_rollover_recovery.ahk
+#Include unit/modules/keystats/test_keystats_torn_ledger_tail.ahk
 ; keystats_hotstring_log.ahk holds KL_LogHotstring — the one persisted row that
 ; can carry the user's personal data. It was split out of keystats.ahk (which
 ; installs OS hooks at load and can never be included here) precisely so this

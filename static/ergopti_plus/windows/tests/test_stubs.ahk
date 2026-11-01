@@ -925,6 +925,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 
 class Keystats {
     static rollover_pending := 0
+    static data_sql_receipt := 0
     static synth_active := 0
     static synth_type   := "none"
     static synth_owners := []
