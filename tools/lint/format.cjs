@@ -52,9 +52,15 @@ const PRETTIER_EXTENSIONS = new Set([
 	'.yaml'
 ]);
 
-// Resolved, not joined to ROOT: a worktree has no node_modules of its own and
-// reaches the main checkout's through NODE_PATH.
-const PRETTIER_BIN = require.resolve('prettier/bin/prettier.cjs');
+/**
+ * Resolved, not joined to ROOT: a worktree has no node_modules of its own and
+ * reaches the main checkout's through NODE_PATH. Resolved on use, not on load:
+ * the verification planner imports this module's tables from fixture copies of
+ * the tools that have no node_modules at all, and never runs Prettier there.
+ */
+function prettierBin() {
+	return require.resolve('prettier/bin/prettier.cjs');
+}
 
 function run(command, args, options = {}) {
 	const result = spawnSync(command, args, { cwd: ROOT, stdio: 'inherit', ...options });
@@ -91,7 +97,7 @@ function requireRuff() {
 }
 
 function prettier(args) {
-	return run(process.execPath, [PRETTIER_BIN, ...args]);
+	return run(process.execPath, [prettierBin(), ...args]);
 }
 
 // Prettier formats one file at a time. The whole-tree check took most of the
@@ -193,6 +199,7 @@ async function prettierTree(mode) {
 	const workers = Math.max(1, Math.min(MAX_PRETTIER_WORKERS, os.availableParallelism()));
 	const groups = prettierGroups(workers);
 	if (groups.length === 0) throw new Error('found no path for Prettier to check');
+	const bin = prettierBin();
 	const results = await Promise.all(
 		groups.map(
 			(units) =>
@@ -200,7 +207,7 @@ async function prettierTree(mode) {
 					const child = spawn(
 						process.execPath,
 						[
-							PRETTIER_BIN,
+							bin,
 							mode,
 							'--log-level',
 							'warn',
