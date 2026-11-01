@@ -537,6 +537,7 @@ class MenuCommand {
 	static TAP_HOLD_LOGIN_ITEMS_OPEN := "tap_hold_login_items_open"
 	static TAP_HOLD_LOGIN_ITEMS_STEPS := "tap_hold_login_items_steps"
 	static TAP_HOLD_RESETS_WORD := "tap_hold_resets_word"
+	static TAP_HOLD_VHID_UPDATE := "tap_hold_vhid_update"
 	static TITLECASE_SELECTION := "titlecase_selection"
 	static UNINSTALL := "uninstall"
 	static UPDATE_CHANNEL := "update_channel"

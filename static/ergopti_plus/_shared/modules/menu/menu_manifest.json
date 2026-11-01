@@ -1610,6 +1610,17 @@
 			"unavailable": "hide"
 		}
 	],
+	"tap_hold_vhid_update_rows": [
+		{
+			"type": "command",
+			"id": "tap_hold_vhid_update",
+			"i18n": "menu.tapholds.vhid_update",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"tap_hold_vhid_not_active_rows": [
 		{
 			"type": "label",

@@ -63,7 +63,14 @@ implemented today.
   or a quit stops ours and gives theirs back when Ergopti closed it. An owned boot also removes the rules
   an earlier shared-mode build merged into the user's `karabiner.json`. The Swift lease
   worker and guardian accept the owned `ergoptiplus_remap_cli` next to the shared
-  tool, and the guardian record names the runtime.
+  tool, and the guardian record names the runtime. When another
+  VirtualHIDDevice version blocks the runtime (`virtual_hid_incompatible`), a
+  Tap-Holds row offers the driver-only update: after an explicit confirmation
+  (`ui/virtual_hid_update.lua`), `runtime_vhid_update.lua` downloads the
+  manifest's pinned pqrs package, checks its size and digest, then one
+  administrator shell checks the digest and pqrs' installer signature again on
+  a root-owned copy before `/usr/sbin/installer`, and pqrs' manager asks macOS
+  to activate it; the driver reloads after the report.
 
 ## « Ergopti uses Karabiner »
 

@@ -141,4 +141,35 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 			helpers.assert_nil(find(rows, "menu.tapholds.vhid_not_active"))
 		end
 	end)
+
+	helpers.it("offers the driver-only update under an incompatible driver and only there", function()
+		local UPDATE = "menu.tapholds.vhid_update"
+		local opened = {}
+		package.loaded["ui.virtual_hid_update"] = {
+			open = function(remap) opened[#opened + 1] = remap; return true end,
+		}
+		local function rows_for(status, with_facade)
+			local extra = { owned_runtime_status = function() return status end }
+			if with_facade then extra.update_virtual_hid_driver = function() return true end end
+			return tap_hold_rows(true, extra)
+		end
+		local function find(rows, title)
+			for index, row in ipairs(rows) do if row.title == title then return row, index end end
+			return nil
+		end
+		local blocked = rows_for({ state = "unavailable", reason = "virtual_hid_incompatible" }, true)
+		local row, at = find(blocked, UPDATE)
+		helpers.assert_true(row ~= nil, "the update offer must follow the incompatible-driver explanation")
+		local _, explanation_at = find(blocked, "menu.tapholds.vhid_incompatible")
+		helpers.assert_eq(at, explanation_at + 1)
+		helpers.assert_true(type(row.fn) == "function", "the offer must be clickable")
+		helpers.assert_eq(#opened, 0, "drawing the row must not open the confirmation")
+		row.fn()
+		helpers.assert_eq(#opened, 1, "the row opens the confirmation")
+		helpers.assert_nil(find(rows_for({ state = "unavailable", reason = "virtual_hid_not_active" }, true), UPDATE))
+		helpers.assert_nil(find(rows_for({ state = "ready" }, true), UPDATE))
+		helpers.assert_nil(find(rows_for({ state = "unavailable", reason = "virtual_hid_incompatible" }, false), UPDATE),
+			"no offer without the facade that performs it")
+		package.loaded["ui.virtual_hid_update"] = nil
+	end)
 end)

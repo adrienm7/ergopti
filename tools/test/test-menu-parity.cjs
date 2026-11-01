@@ -700,6 +700,12 @@ const OPENS_SUBMENU = {
 			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
 		},
 		{
+			menu: 'tap_hold_vhid_update_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
 			menu: 'tap_hold_vhid_not_active_rows',
 			platforms: ['hs'],
 			kind: 'compose',
