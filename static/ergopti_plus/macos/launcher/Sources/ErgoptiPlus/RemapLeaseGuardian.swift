@@ -2470,8 +2470,25 @@ func currentProcessSigningInformation() -> [String: Any]? {
 	return information as? [String: Any]
 }
 
+/// True for the Background Items states under which the legacy agent's own
+/// health is authoritative; they authorize the same lease activity
+/// (modernGuardianActivationIsAuthorized).
+@available(macOS 13.0, *)
+private func remapGuardianStatusDefersToLegacyHealth(_ status: SMAppService.Status) -> Bool {
+	switch status {
+	case .enabled, .notRegistered, .notFound: return true
+	case .requiresApproval: return false
+	@unknown default: return false
+	}
+}
+
 /// Observes modern authorization without registering, bootstrapping, or
 /// otherwise changing ServiceManagement state. Only exact live health is ready.
+/// The status may move between enabled and not registered while the health is
+/// read: Background Items reads `.enabled` once the legacy agent holds the
+/// shared label, and a readback straight after its bootstrap answered
+/// `unavailable` for a healthy guardian (installed-app CI, 2026-11-01). Such a
+/// move keeps the same authorization; any other change still fails closed.
 @available(macOS 13.0, *)
 func observeModernRemapGuardianRegistration(
 	service: RemapGuardianModernService,
@@ -2487,7 +2504,7 @@ func observeModernRemapGuardianRegistration(
 		let healthy = guardianHealth()
 		let statusAfterHealth = service.status
 		if statusAfterHealth == .requiresApproval { return .requiresApproval }
-		guard statusAfterHealth == statusBeforeHealth else { return .unavailable }
+		guard remapGuardianStatusDefersToLegacyHealth(statusAfterHealth) else { return .unavailable }
 		return healthy ? .ready : .unavailable
 	case .requiresApproval:
 		return .requiresApproval
