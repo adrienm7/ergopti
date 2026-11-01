@@ -1217,7 +1217,8 @@ const CHECKS = [
 				await session.run('pump', ['3000']);
 				for (const sample of common) {
 					await session.run('edit_open');
-					await session.run('hse_reset');
+					// No hse_reset: it declares the word start unknown, and is_word samples then
+					// refuse. Each typed word follows a boot or the previous word's Space.
 					session.type([
 						['mode', 'event'],
 						['level', '100'],

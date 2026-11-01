@@ -40,6 +40,16 @@ and its keystats ledger recorded the test keys. Judge such a check from the
 private driver's own state (`HSE_Buffer`, its log), and leave CapsWord, which
 writes the real CapsLock state, to a desktop with no other driver.
 
+### project-live-checks-hse-reset-makes-the-word-start-unknown
+
+`hse_reset` calls `HSE_HardReset`, which no driver path calls and which leaves
+`HSE_StartIsWordBoundary` false, so a word-start trigger typed next refuses. The
+idle reset hides this from the second word of a session on (the pause before its
+first key restores a known start), but not from the first: the driver has no
+previous keystroke to measure. A check about word-start triggers therefore skips
+`hse_reset`: only a scenario that needs the unknown start (Backspace word start)
+uses it. A refusal measured after it proves nothing.
+
 ### project-live-checks-send-restores-capslock
 
 A `Send` that is not `{Blind}` lifts CapsLock around its keys and restores it
