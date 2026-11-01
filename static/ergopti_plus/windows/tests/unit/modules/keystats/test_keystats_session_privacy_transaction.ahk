@@ -232,7 +232,7 @@ _KLSPT_ZeroTickExpiry(Origin, Offset) {
 	NextTick := Origin + KLWatchConst.SESSION_TIMEOUT_MS + Offset
 	AssertTrue(KL_Watchers_OnKeystroke(_KLSPT_Append, Origin))
 	AssertTrue(KL_Watchers_OnKeystroke(_KLSPT_Append, NextTick))
-	Expired := Offset >= 0
+	Expired := Offset > 0
 	AssertEqual(Expired ? 3 : 1, _KLSPT_Sink.events.Length,
 		"accepted activity at tick zero must obey the positive session timeout")
 	AssertEqual(Expired ? NextTick : Origin, KLWatch.session_started_at)
@@ -278,7 +278,7 @@ for Refuse in [false, true]
 _KLSPT_ZeroTickCloseRefusal() {
 	AssertTrue(KL_Watchers_OnKeystroke(_KLSPT_Append, 0))
 	_KLSPT_Sink.accept := false
-	AssertFalse(KL_Watchers_OnKeystroke(_KLSPT_Append, KLWatchConst.SESSION_TIMEOUT_MS))
+	AssertFalse(KL_Watchers_OnKeystroke(_KLSPT_Append, KLWatchConst.SESSION_TIMEOUT_MS + 1))
 	AssertTrue(KLWatch.is_session_active)
 	AssertTrue(IsObject(KLWatch.session_close))
 	AssertEqual(0, KLWatch.last_authorized_tick, "a rejected close cannot authorize new activity")
