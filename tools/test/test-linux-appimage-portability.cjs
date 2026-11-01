@@ -255,6 +255,16 @@ const containerBuildBody = container.slice(
 	container.indexOf('container_build() {'),
 	container.indexOf('container_smoke() {')
 );
+// lib/ reaches the recipient's bash through LD_LIBRARY_PATH: the build host's
+// readline there killed bash 5.3 on Arch before the daemon started. sqlite3
+// alone reaches it, by a RUNPATH the build container must be able to write.
+assert.match(stager, /SQLITE3_ONLY_LIBRARIES = frozenset\(\{"libreadline\.so\.8"\}\)/);
+assert.match(
+	stager,
+	/"patchelf",\s+"--set-rpath",\s+"\$ORIGIN\/\.\.\/" \+ SQLITE3_LIBRARY_DIRECTORY/,
+	'sqlite3 alone reaches its library directory'
+);
+assert.ok(/\bpatchelf\b/.test(containerBuildBody), 'the build container carries patchelf');
 const containerSmokeBody = container.slice(
 	container.indexOf('container_smoke() {'),
 	container.indexOf('user_smoke() {')
