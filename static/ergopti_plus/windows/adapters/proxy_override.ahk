@@ -1,0 +1,203 @@
+﻿; adapters/proxy_override.ahk
+
+; ==============================================================================
+; MODULE: Proxy Override Setting (Windows)
+; DESCRIPTION:
+; The user's proxy override (Issue #101 point 2): automatic (the system settings,
+; a company PAC included), direct, or one relay every download uses. The twin of
+; _shared/lua/network/proxy_override.lua over the canonical declaration
+; _shared/modules/network/proxy_override.json, stored under the same key in
+; config.toml, the Windows settings store.
+;
+; FEATURES & RATIONALE:
+; 1. One process variable carries the choice to every channel. All Windows
+;    download clients are children of the driver (the managed HTTP worker, the
+;    updater staging worker, the Ollama archive download, the runtime launcher and
+;    its sign-in relay), so each inherits it and vendor/ergopti_network_routes.ps1
+;    applies it in one place; no channel can forget it.
+; 2. Fail fast: a stored value that is not valid is published as a token the route
+;    owner refuses, never read as automatic, and the user is told in words.
+; 3. WinHTTP, the Windows download stack, reaches a plain http relay only, without
+;    SOCKS, TLS to the relay or credentials in its address; it signs in with the
+;    Windows session instead. Such a relay is valid for the shared grammar and
+;    refused here, in words: the macOS and Linux clients can use it, this one cannot.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+; The process variable the route owner reads, as on macOS (network_env.lua)
+global PROXY_OVERRIDE_ENVIRONMENT := "ERGOPTI_PROXY_OVERRIDE"
+; Published for a stored value that cannot be used; no route owner accepts it
+global PROXY_OVERRIDE_REFUSED_TOKEN := "invalid"
+; The relay schemes of network/route_plan.lua
+global PROXY_OVERRIDE_RELAY_SCHEMES := Map("http", true, "https", true, "socks5", true, "socks5h", true)
+
+global _ProxyOverrideDeclaration := 0
+global _ProxyOverrideInitialized := false
+; The stored text, shown back in the menu row even when it is refused
+global _ProxyOverrideStored := ""
+
+
+
+
+
+; ====================================
+; ====================================
+; ======= 1/ The value grammar =======
+; ====================================
+; ====================================
+
+/**
+ * Reads the canonical declaration once.
+ * @returns {Map} storage_key, section, key, default, direct.
+ */
+ProxyOverride_Declaration() {
+	global _ProxyOverrideDeclaration, _SharedDir
+	if _ProxyOverrideDeclaration is Map
+		return _ProxyOverrideDeclaration
+	Data := JsonParse(FileRead(_SharedDir . "\modules\network\proxy_override.json", "UTF-8"))
+	if !(Data is Map) || Data.Get("schema_version", 0) != 1 || Data.Get("default", 0) !== ""
+			|| !(Data.Get("storage_key", 0) is String) || !(Data.Get("direct", 0) is String)
+			|| !RegExMatch(Data["storage_key"], "^([a-z][a-z_]*)\.([a-z][a-z_]*)$", &Parts)
+			|| !RegExMatch(Data["direct"], "^[a-z]+$")
+		throw ValueError("The proxy override declaration is invalid.")
+	_ProxyOverrideDeclaration := Map("storage_key", Data["storage_key"], "section", Parts[1], "key", Parts[2],
+		"default", Data["default"], "direct", Data["direct"])
+	return _ProxyOverrideDeclaration
+}
+
+/**
+ * Whether a value is one relay an environment-driven client can export: the twin
+ * of route_plan.lua valid_route and of Test-ErgoptiRoutePlanRoute.
+ * @param {String} Value The candidate.
+ * @returns {Boolean}
+ */
+ProxyOverride_IsValidRelay(Value) {
+	global PROXY_OVERRIDE_RELAY_SCHEMES
+	if !(Value is String) || !RegExMatch(Value, "^([a-z][a-z0-9]*)://(.+)$", &Url)
+		return false
+	if !PROXY_OVERRIDE_RELAY_SCHEMES.Has(Url[1])
+		return false
+	Address := Url[2]
+	if RegExMatch(Address, "^([^@]*)@(.*)$", &Parts) {
+		; A userinfo keeps only RFC 3986 characters.
+		if Parts[1] == "" || RegExMatch(Parts[1], "[^A-Za-z0-9._~%!$&()*+,;=:\-]")
+			return false
+		Address := Parts[2]
+	}
+	if !RegExMatch(Address, "^([^/\s@]+):([0-9]+)$", &HostPort) || StrLen(HostPort[2]) > 5
+		return false
+	Port := Integer(HostPort[2])
+	if Port < 1 || Port > 65535
+		return false
+	if SubStr(HostPort[1], 1, 1) == "["
+		return RegExMatch(HostPort[1], "^\[[0-9A-Fa-f:]+\]$") != 0
+	return !RegExMatch(HostPort[1], "[^A-Za-z0-9._\-]")
+}
+
+/**
+ * Classifies a stored or typed value.
+ * @param {Any} Value Anything but a string is refused.
+ * @returns {Map|Integer} mode "automatic", "direct" or "relay" with its relay; 0 when refused.
+ */
+ProxyOverride_Parse(Value) {
+	Direct := ProxyOverride_Declaration()["direct"]
+	if !(Value is String)
+		return 0
+	Value := Trim(Value, " `t`r`n")
+	if Value == ""
+		return Map("mode", "automatic")
+	if StrLower(Value) == Direct
+		return Map("mode", "direct")
+	if !ProxyOverride_IsValidRelay(Value)
+		return 0
+	return Map("mode", "relay", "relay", Value)
+}
+
+/**
+ * The form a valid value is stored under.
+ * @param {Map} Choice From ProxyOverride_Parse.
+ * @returns {String}
+ */
+ProxyOverride_Canonical(Choice) {
+	Declaration := ProxyOverride_Declaration()
+	switch Choice["mode"] {
+		case "automatic":
+			return Declaration["default"]
+		case "direct":
+			return Declaration["direct"]
+	}
+	return Choice["relay"]
+}
+
+/**
+ * Whether the Windows download stack can use a parsed choice (rationale 3).
+ * @param {Map} Choice From ProxyOverride_Parse.
+ * @returns {Boolean}
+ */
+ProxyOverride_WindowsCanRoute(Choice) {
+	return Choice["mode"] != "relay" || RegExMatch(Choice["relay"], "^http://[^@/]+$") != 0
+}
+
+
+
+
+
+; =======================================
+; =======================================
+; ======= 2/ The published choice =======
+; =======================================
+; =======================================
+
+/**
+ * Publishes a stored value to this process and every child it starts next.
+ * @param {Any} Stored The stored value.
+ * @returns {Boolean} False when the value is refused.
+ */
+ProxyOverride_Publish(Stored) {
+	global PROXY_OVERRIDE_ENVIRONMENT, PROXY_OVERRIDE_REFUSED_TOKEN, _ProxyOverrideStored
+	_ProxyOverrideStored := Stored is String ? Stored : String(Stored)
+	Choice := ProxyOverride_Parse(Stored)
+	Usable := Choice is Map && ProxyOverride_WindowsCanRoute(Choice)
+	EnvSet(PROXY_OVERRIDE_ENVIRONMENT, Usable ? ProxyOverride_Canonical(Choice) : PROXY_OVERRIDE_REFUSED_TOKEN)
+	return Usable
+}
+
+/**
+ * The choice in force now.
+ * @returns {Map|Integer} As ProxyOverride_Parse; 0 when the stored value is refused.
+ */
+ProxyOverride_Current() {
+	global PROXY_OVERRIDE_ENVIRONMENT
+	Published := EnvGet(PROXY_OVERRIDE_ENVIRONMENT)
+	if Published == ""
+		return Map("mode", "automatic")
+	Choice := ProxyOverride_Parse(Published)
+	return Choice is Map && ProxyOverride_WindowsCanRoute(Choice) ? Choice : 0
+}
+
+/**
+ * Root boot owner: publishes the stored value before anything can download. Logs
+ * name the mode only: a relay address may be private.
+ * @param {Map} Cache The boot configuration cache.
+ * @returns {Boolean} False when the stored value is refused.
+ */
+ProxyOverride_Init(Cache) {
+	global _ProxyOverrideInitialized
+	if _ProxyOverrideInitialized
+		throw Error("The proxy override was initialized twice.")
+	_ProxyOverrideInitialized := true
+	Declaration := ProxyOverride_Declaration()
+	if !ConfigTomlTryReadBootValue(Cache, Declaration["section"], Declaration["key"], &Stored)
+		Stored := IniCacheGet(Cache, Declaration["section"], Declaration["key"])
+	if Stored == "_"
+		Stored := Declaration["default"]
+	if ProxyOverride_Publish(Stored) {
+		LoggerInfo("ProxyOverride", "Proxy override in force: {1}.", ProxyOverride_Current()["mode"])
+		return true
+	}
+	LoggerError("ProxyOverride", "The stored proxy override is refused: every download refuses until it is corrected.")
+	; Told at start, not at the first failed download; off this thread, as the UI needs the pump.
+	SetTimer(ProxyOverride_SayStoredRefused, -1)
+	return false
+}

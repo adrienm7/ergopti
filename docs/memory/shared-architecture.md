@@ -800,9 +800,16 @@ route through `infra/proxy_policy.lua` (managed HTTP gets the existing
 route before capturing the inherited one; the signed Swift workers resolve
 natively and never read it, so an override selects the environment-driven
 client instead (opaque prelude, no `install_huggingface_transport`). macOS
-`hs.http` requests (update checks) still follow the system settings. Action: a
-new download client on macOS must take its prelude from `network_env.lua`, and
-a new native worker must read the override before claiming it honours it.
+`hs.http` requests (update checks) still follow the system settings. Windows
+keeps the key in `config.toml` and publishes it at boot in the process variable
+`ERGOPTI_PROXY_OVERRIDE` (`adapters/proxy_override.ahk`), which every worker
+inherits and `Resolve-ErgoptiNativeNetworkRoutes` applies; WinHTTP reaches a plain
+http relay only, so https, socks and credentials in the address are refused in
+words at the menu row. Action: a new download client on macOS must take its
+prelude from `network_env.lua`, a new native worker must read the override before
+claiming it honours it, and a new Windows client must route through
+`Resolve-ErgoptiNativeNetworkRoutes` or `SystemProxy_*` and join
+`test-windows-proxy-override-e2e.cjs`.
 
 ### project-metrics-day-and-correction-semantics
 

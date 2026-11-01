@@ -182,6 +182,7 @@
 		"test:fake-network": "node ./tools/test/test-fake-network.cjs",
 		"test:windows-proxy-relay-bundle": "node ./tools/test/test-windows-proxy-relay-bundle.cjs",
 		"test:windows-proxy-relay-e2e": "node ./tools/test/test-windows-proxy-relay-e2e.cjs",
+		"test:windows-proxy-override-e2e": "node ./tools/test/test-windows-proxy-override-e2e.cjs",
 		"build:windows-proxy-relay": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/build/build_windows_proxy_relay.ps1 -Publish",
 		"test:macos-bundle-payload": "node ./tools/test/test-macos-bundle-payload.cjs",
 		"test:macos-keyboard-layout-bundle": "node ./tools/test/test-macos-keyboard-layout-bundle.cjs",

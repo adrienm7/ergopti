@@ -223,7 +223,8 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; KeyCombinationChordToggleSymmetric, KeyCombinationChordCommitDelay) return
 	; false and skip their reload on a refusal, driven for real by
 	; test_key_combination_chord_engine.ahk.
-	AssertEqual(47, Calls,
+	; 48: _ProxyOverride_Store returns the commit's answer to the menu row, which says so.
+	AssertEqual(48, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",

@@ -212,7 +212,8 @@ async function runScenario(context, scenario) {
 		ERGOPTI_STUB_REGISTRY_SHA256: registry.sha256,
 		ERGOPTI_STUB_MODE: 'plain',
 		ERGOPTI_E2E_WININET_PROXY: pac ? '' : (scenario.proxyAddress ?? `127.0.0.1:${proxy.port}`),
-		ERGOPTI_E2E_WININET_PAC: pac ? pac.url : ''
+		ERGOPTI_E2E_WININET_PAC: pac ? pac.url : '',
+		ERGOPTI_PROXY_OVERRIDE: scenario.override === 'relay' ? proxy.url : (scenario.override ?? '')
 	};
 	const run = await runtime.launch(profile, {
 		relayPath: scenario.noRelay ? '' : relayPath,
@@ -237,6 +238,8 @@ async function runScenario(context, scenario) {
 		assert.equal(serve.pid, receipt.child_pid, 'the receipt names the daemon');
 		assert.equal(serve.proxy, scenario.expect.daemonProxy, 'what the daemon reads as HTTPS_PROXY');
 		assert.equal(serve.no_cloud, '1', 'the shared serve environment reached the daemon');
+		if (scenario.expect.noProxy !== undefined)
+			assert.equal(serve.no_proxy, scenario.expect.noProxy, 'what the daemon reads as NO_PROXY');
 		if (scenario.expect.tunnel === 'relay') {
 			assert.notEqual(
 				serve.ppid,
@@ -282,7 +285,9 @@ async function runScenario(context, scenario) {
 		}
 		if (scenario.expect.noTunnel)
 			assert.equal(outcomes(proxy, 'tunnel').length, 0, 'no tunnel opened');
-		if (pac) assert.ok(pac.requests.includes('/proxy.pac'), 'the PAC was read');
+		if (pac && scenario.override)
+			assert.equal(pac.requests.length, 0, 'an override never reads the PAC');
+		else if (pac) assert.ok(pac.requests.includes('/proxy.pac'), 'the PAC was read');
 		assert.equal(
 			forbiddenPortRows(pids),
 			'',
@@ -305,7 +310,7 @@ async function runScenario(context, scenario) {
 /** One launcher run expected to refuse before any receipt. */
 async function runRefusal(
 	context,
-	{ port, relayPath, relaySha256, netOnly, stubMode, retained = false }
+	{ port, relayPath, relaySha256, netOnly, stubMode, retained = false, override = '' }
 ) {
 	const { profile, registry } = context;
 	const proxy = await startFakeProxy({ mode: 'ntlm', upstream: { port: registry.port } });
@@ -321,7 +326,8 @@ async function runRefusal(
 			ERGOPTI_STUB_REGISTRY_SHA256: registry.sha256,
 			ERGOPTI_STUB_MODE: stubMode ?? 'plain',
 			ERGOPTI_E2E_WININET_PROXY: `127.0.0.1:${proxy.port}`,
-			ERGOPTI_E2E_WININET_PAC: ''
+			ERGOPTI_E2E_WININET_PAC: '',
+			ERGOPTI_PROXY_OVERRIDE: override
 		}
 	});
 	try {
@@ -699,6 +705,71 @@ async function main() {
 				}
 			],
 			[
+				'proxy override: the named relay wins over the system proxy, the pull goes through it',
+				{
+					mode: 'open',
+					override: 'relay',
+					// A dead system proxy: only the override can make this pull work.
+					proxyAddress: '127.0.0.1:1',
+					expect: {
+						mode: 'relay',
+						tunnel: 'open',
+						relay: 'not_applicable',
+						daemonProxy: 'named_proxy',
+						pullExit: 0
+					}
+				}
+			],
+			[
+				'proxy override: the named relay wins over a company PAC, which is never read',
+				{
+					mode: 'open',
+					override: 'relay',
+					pac: true,
+					pacRoute: 'PROXY 127.0.0.1:1',
+					expect: {
+						mode: 'relay',
+						tunnel: 'open',
+						relay: 'not_applicable',
+						daemonProxy: 'named_proxy',
+						pullExit: 0
+					}
+				}
+			],
+			[
+				'proxy override: an NTLM relay it names goes through the sign-in relay',
+				{
+					mode: 'ntlm_logon',
+					override: 'relay',
+					proxyAddress: '127.0.0.1:1',
+					expect: {
+						mode: 'relay',
+						tunnel: 'relay',
+						relay: 'required_ntlm',
+						daemonProxy: 'sign_in_relay',
+						pullExit: 0,
+						signIn: 'shape_accepted'
+					}
+				}
+			],
+			[
+				'proxy override: direct keeps the daemon off the system proxy and off an inherited relay',
+				{
+					mode: 'open',
+					override: 'direct',
+					expect: {
+						mode: 'direct',
+						tunnel: 'none',
+						relay: 'not_applicable',
+						daemonProxy: 'none',
+						noProxy: '*',
+						pullExit: 1,
+						pullStderr: /refuses a direct registry connection/,
+						noTunnel: true
+					}
+				}
+			],
+			[
 				'the real user signs in (shape only): daemon under the relay, pull works',
 				{
 					mode: 'ntlm_logon',
@@ -837,6 +908,17 @@ async function main() {
 		];
 		for (const [name, scenario] of signed)
 			await signedIn(`launcher, ${name}`, () => runScenario(context, scenario));
+
+		await check('proxy override: a refused value starts nothing and contacts nobody', async () => {
+			const refused = await runRefusal(context, {
+				relayPath,
+				relaySha256,
+				netOnly: null,
+				override: 'invalid'
+			});
+			assert.equal(refused.events.length, 0, 'no daemon ran');
+			assert.equal(refused.proxy.length, 0, 'the system proxy was not contacted');
+		});
 
 		await check(
 			"relay image: a digest other than the manifest's refuses before anything starts",

@@ -719,6 +719,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/api/test_llm_shared_vectors.ahk
 #Include unit/modules/llm/api/test_llm_model_capabilities.ahk
 #Include unit/platform/network/test_managed_curl_owner.ahk
+#Include unit/platform/network/test_proxy_override.ahk
 #Include unit/platform/network/test_managed_curl_empty_header.ahk
 #Include unit/platform/network/test_http_post_replacement_validation.ahk
 #Include unit/platform/network/test_managed_curl_callers.ahk
@@ -812,6 +813,7 @@ _LLM_Deps_State := "ready"
 #Include ../ui/layout_manager/composer.ahk
 #Include ../ui/layout_manager/composer_check.ahk
 #Include ../ui/field_check/network_check.ahk
+#Include ../ui/proxy_override.ahk
 #Include ../ui/menu/menu_layout.ahk
 #Include unit/modules/keymap/test_layout_manager_host.ahk
 #Include unit/modules/keymap/test_layout_composer_host.ahk

@@ -700,6 +700,7 @@ jobs:
           if (-not $ahk) { throw "AutoHotkey64.exe not found." }
           $env:ERGOPTI_AHK_EXE = $ahk
           node tools/test/test-windows-proxy-relay-e2e.cjs --required
+          node tools/test/test-windows-proxy-override-e2e.cjs --required
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # The receipt and evidence owners stay adjacent and run even on failure.

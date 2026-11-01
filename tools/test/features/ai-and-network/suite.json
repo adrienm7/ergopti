@@ -506,6 +506,15 @@
 			"args": ["tools/test/test-windows-proxy-relay-e2e.cjs"],
 			"repro": "node tools/test/test-windows-proxy-relay-e2e.cjs",
 			"platforms": ["win32"]
+		},
+		{
+			"id": "windows-proxy-override-e2e",
+			"ordinal": 558,
+			"name": "Windows proxy override end to end: the real adapter and workers through the fake network",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-proxy-override-e2e.cjs"],
+			"repro": "node tools/test/test-windows-proxy-override-e2e.cjs",
+			"platforms": ["win32"]
 		}
 	]
 }

@@ -249,6 +249,19 @@ function Resolve-ErgoptiNativeNetworkRoutes {
             return @{ Ok = $true; MaxRoutes = $Policy.max_selections; MaxRedirects = $Policy.redirects.max_hops; Routes = @(@{ Kind = 'direct'; Endpoint = ''; Source = 'loopback'; Authentication = 'none' }) }
         }
         if ($null -eq $ReadEnvironment) { $ReadEnvironment = { param($Name) [Environment]::GetEnvironmentVariable($Name, 'Process') } }
+        # The user's proxy override (adapters/proxy_override.ahk) is inherited from the
+        # driver. It wins over an exported relay and the PAC or WPAD lookup never runs.
+        $Override = & $ReadEnvironment 'ERGOPTI_PROXY_OVERRIDE'
+        if ($Override -is [string] -and $Override -ne '') {
+            if ($Override -ceq 'direct') {
+                return @{ Ok = $true; MaxRoutes = $Policy.max_selections; MaxRedirects = $Policy.redirects.max_hops; Routes = @(@{ Kind = 'direct'; Endpoint = ''; Source = 'override'; Authentication = 'none' }) }
+            }
+            # WinHTTP reaches a plain http relay only; anything else, the refused token
+            # included, refuses the download and is never read as automatic.
+            if ($Override -cnotmatch '^http://[^@/\s]+:[0-9]+\z') { return New-ErgoptiRouteRefusal 'dotnet' 'invalid_configuration' 0 $true }
+            return @{ Ok = $true; MaxRoutes = $Policy.max_selections; MaxRedirects = $Policy.redirects.max_hops; Routes = @(@{ Kind = 'proxy';
+                Endpoint = (Get-ErgoptiHttpRelay $Override $Policy); Source = 'override'; Authentication = 'current_user_proxy_only' }) }
+        }
         foreach ($Name in $Policy.environment_precedence.($Destination.Scheme)) {
             $Value = & $ReadEnvironment $Name
             if ($null -ne $Value -and $Value -isnot [string]) { return New-ErgoptiRouteRefusal 'dotnet' 'invalid_configuration' }

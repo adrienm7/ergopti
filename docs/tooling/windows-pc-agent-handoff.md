@@ -507,6 +507,11 @@ ready (3 step(s)).` and `build/field-run/ready.json` names the driver's pid.
 
 ## Proxy override field: the Windows half (Issue #101 point 2, 31 October)
 
+Done on Windows on 1 November (`adapters/proxy_override.ahk`,
+`ui/proxy_override.ahk`, `npm run test:windows-proxy-override-e2e`); the text below
+is the history. Windows stores the key in config.toml and refuses a relay WinHTTP
+cannot reach (https, socks, credentials in the address), in words.
+
 macOS and Linux now have Debug > "Proxy for downloads…": empty (automatic, the
 default), `direct`, or one relay URL such as `http://proxy.example.com:3128`
 (http, https, socks5, socks5h, with a port). Its storage key and default are

@@ -792,6 +792,7 @@ LoggerInit()
 ; window, which waits for the driver to be ready before it shows
 ErrorDialog_Init(_IniCache)
 ManagedNetworkFailureWindows_Init()
+ProxyOverride_Init(_IniCache)
 Updater_ConfigureManagedFailurePresenter(ManagedNetworkFailureWindows_Contract(),
 	_Updater_ShowManagedDownloadFailure, _Updater_RetireManagedDownloadFailure)
 bootScriptName := IsSet(A_ScriptName) ? A_ScriptName : "ErgoptiPlus"
@@ -1371,6 +1372,7 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/layout_manager/composer.ahk
 #Include ui/layout_manager/composer_check.ahk
 #Include ui/field_check/network_check.ahk
+#Include ui/proxy_override.ahk
 #Include ui/personal_info_editor/init.ahk
 #Include ui/layer_editor/init.ahk
 

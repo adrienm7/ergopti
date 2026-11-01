@@ -84,11 +84,14 @@ class NetworkCheckRun {
  * Names the kinds of proxy configured.
  * @param {Map} Config - From SystemProxy_ReadIEConfig: auto_detect, pac_url, proxy.
  * @param {Func} EnvFn - Reads an environment variable.
- * @returns {string} Tokens joined by "+" (env, pac, discovery, fixed), or "none".
+ * @returns {string} Tokens joined by "+" (override, env, pac, discovery, fixed), or "none".
  */
 NetworkCheck_ProxyKinds(Config, EnvFn := EnvGet) {
 	global NETWORK_CHECK_ENV_PROXY_NAMES
 	Kinds := []
+	Override := ProxyOverride_Current()
+	if !(Override is Map) || Override["mode"] != "automatic"
+		Kinds.Push("override")
 	for Name in NETWORK_CHECK_ENV_PROXY_NAMES {
 		if EnvFn.Call(Name) != "" {
 			Kinds.Push("env")
@@ -279,10 +282,12 @@ _NetworkCheck_OnRoute(Run, Url, Route) {
 		return
 	if Route.Get("ok", false) {
 		Sources := Map("system_direct", "selected_direct", "system_static", "selected_proxy",
-			"environment", "selected_environment", "loopback", "selected_direct")
+			"environment", "selected_environment", "loopback", "selected_direct",
+			"override", Route.Get("proxy", "") == "" ? "selected_direct" : "selected_proxy")
 		ComposerCheck_Step(Run.Report, "route_lookup", "pass", Sources.Get(Route.Get("source", ""), "selected"))
 	} else {
-		ComposerCheck_Step(Run.Report, "route_lookup", "fail", "native_refused")
+		ComposerCheck_Step(Run.Report, "route_lookup", "fail",
+			Route.Get("source", "") == "override_refused" ? "override_refused" : "native_refused")
 	}
 	_NetworkCheck_Transfer(Run, Url)
 }

@@ -1,5 +1,7 @@
 ﻿; adapters/http_client.ahk
 
+#Include %A_LineFile%\..\proxy_override.ahk
+
 ; ==============================================================================
 ; MODULE: HttpClient Adapter (AutoHotkey)
 ; DESCRIPTION:
@@ -1016,6 +1018,12 @@ SystemProxy_ForUrl(Url, ReaderFn := 0, SpawnFn := 0) {
 	; WinINet proxies only govern http(s); any other scheme connects as given.
 	if !(Url is String) || !RegExMatch(Url, "i)^https?://")
 		return ""
+	Override := _SystemProxy_OverrideRoute(Url)
+	if Override is Map {
+		if !Override["ok"]
+			throw ValueError("The stored proxy override is refused.")
+		return Override["proxy"]
+	}
 	Config := _SystemProxy_Config(ReaderFn)
 	_SystemProxy_RefreshCache(Config)
 	Selection := SystemProxy_SelectStatic(Config, Url)
@@ -1040,6 +1048,11 @@ SystemProxy_ResolveAsync(Urls, Callback, ReaderFn := 0, SpawnFn := 0, Strict := 
 	if Strict && !(Budget is Map)
 		Budget := Map("start", A_TickCount)
 	global _SYSTEM_PROXY_PAC_CACHE, _SYSTEM_PROXY_PAC_PENDING
+	OverrideAnswer := _SystemProxy_OverrideAnswer(Urls)
+	if OverrideAnswer is Map {
+		Callback.Call(OverrideAnswer)
+		return true
+	}
 	Config := _SystemProxy_Config(ReaderFn, Strict)
 	ConfigIdentity := _SystemProxy_RefreshCache(Config)
 	Result := Map("_proxy_resolved", true, "_proxy_receipts", Map(), "_proxy_config_identity", ConfigIdentity)
@@ -1350,6 +1363,40 @@ _SystemProxy_CleanupInput(PacRun) {
 	return false
 }
 
+; The override's route for one URL, 0 when it leaves the choice to the system.
+; A loopback destination stays direct whatever the override, as in the shared policy.
+_SystemProxy_OverrideRoute(Url) {
+	Choice := ProxyOverride_Current()
+	if !(Choice is Map)
+		return Map("ok", false, "proxy", "")
+	if Choice["mode"] == "automatic"
+		return 0
+	if SystemProxy_IsLoopbackUrl(Url)
+		return Map("ok", true, "proxy", "")
+	return Map("ok", true, "proxy", Choice["mode"] == "relay" ? Choice["relay"] : "")
+}
+
+; Whether a URL names this machine, by the shared policy's loopback rows.
+SystemProxy_IsLoopbackUrl(Url) {
+	Host := _SystemProxy_UrlParts(Url)["host"]
+	return Host == "localhost" || Host == "127.0.0.1" || Host == "::1" || Host == "[::1]"
+}
+
+; The answer of SystemProxy_ResolveAsync under an override, 0 when automatic.
+_SystemProxy_OverrideAnswer(Urls) {
+	Answer := Map("_proxy_resolved", true, "_proxy_receipts", Map(), "_proxy_config_identity", "override")
+	for Url in Urls {
+		Route := _SystemProxy_OverrideRoute(Url)
+		if !(Route is Map)
+			return 0
+		Answer[Url] := Route["proxy"]
+		Answer["_proxy_receipts"][Url] := Map("source", Route["ok"] ? "override" : "override_refused", "native_error", 0)
+		if !Route["ok"]
+			Answer["_proxy_resolved"] := false
+	}
+	return Answer
+}
+
 ; Explicit environment relay configuration wins over GUI settings, as curl's
 ; inherited environment does. Empty system DIRECT remains an explicit answer.
 SystemProxy_ResolveCurlAsync(Url, Callback, ReaderFn := 0, SpawnFn := 0, EnvFn := EnvGet) {
@@ -1357,6 +1404,14 @@ SystemProxy_ResolveCurlAsync(Url, Callback, ReaderFn := 0, SpawnFn := 0, EnvFn :
 	Host := Parts["host"]
 	if Host == "localhost" || Host == "127.0.0.1" || Host == "::1" {
 		Callback.Call(Map("ok", true, "inherit", false, "proxy", "", "source", "loopback", "native_error", 0))
+		return true
+	}
+	; The user's override is the most explicit choice: it wins over an exported
+	; relay and the PAC lookup never runs (proxy_policy.lua policy.route).
+	Override := _SystemProxy_OverrideRoute(Url)
+	if Override is Map {
+		Callback.Call(Map("ok", Override["ok"], "inherit", false, "proxy", Override["proxy"],
+			"source", Override["ok"] ? "override" : "override_refused", "native_error", 0))
 		return true
 	}
 	; Mirror curl's destination-specific environment precedence. Windows

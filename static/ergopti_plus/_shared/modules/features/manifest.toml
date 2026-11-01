@@ -255,6 +255,14 @@ platforms = ["ahk", "hs", "linux"]
 
 # The tray's own appearance, which is not a keyboard feature. macOS alone draws a
 # menubar icon whose variant the user picks.
+# The proxy override of _shared/modules/network/proxy_override.json. macOS and
+# Linux hold it under this same key in their native store; config.toml is the
+# Windows settings store.
+[sections.network]
+description_key = "menu.debug.proxy_override"
+platforms = ["ahk"]
+reason_key = "platform_reason.proxy_override_is_native_settings"
+
 [sections.ui]
 description_key = "menu.ui"
 platforms = ["hs"]
@@ -4402,6 +4410,16 @@ description_key = "menu.shortcuts.key_combinations"
 # The macOS menubar icon: v1 is the simple glyph, v2 the detailed Ergopti logo.
 # It lived in hs.settings (menubar_logo_variant) with its default written twice
 # in the driver; it is a config.toml setting like every other one now.
+[[features.network]]
+id = "proxy_override"
+platforms = ["ahk"]
+requires = { windows = [] }
+default = ""
+recommended = ""
+input_altering = false
+type = "string"
+description_key = "menu.debug.proxy_override"
+
 [[features.ui]]
 id = "menubar_icon"
 platforms = ["hs"]
