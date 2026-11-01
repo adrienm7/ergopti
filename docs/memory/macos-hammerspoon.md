@@ -2048,6 +2048,11 @@ baseline` line (item 38).
   (`rows_restore`). `rows_ghosts` counts builds listed until logout (M5a).
   Codes: `requires_logout`, `select_refused`, `readback_mismatch`; the log
   window names each build and the source id the probe read.
+- `field_apple_shortcuts` runs before `field_owned_pause`: `shortcuts_listed`
+  is the library count through the action's own owner, `field_test_run` the
+  owner's closed category for the shortcut `Ergopti Field Test`; without that
+  shortcut `field_test_shortcut` is skipped as `absent` (create it once as a
+  shortcut that does nothing).
 
 ## Keyboard input sources: read the state from a fresh process
 
