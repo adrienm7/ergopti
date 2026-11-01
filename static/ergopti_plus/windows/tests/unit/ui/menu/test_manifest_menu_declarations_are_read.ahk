@@ -63,9 +63,9 @@ Test("manifest_menu: key_combinations_group lists the pairs through its provider
 	; driver supplies (KeyCombinationRows): a leftover feature row would draw a
 	; submenu of toggles that no hotkey reads.
 	AssertEqual(
-		"key_combination_rows_left,key_combination_rows_right",
+		"combo_timings,key_combination_rows_left,key_combination_rows_right",
 		_MM_AhkRowIds("key_combinations_group", "list"),
-		"the key-combinations submenu lists its pairs through exactly these providers, one per hand"
+		"the key-combinations submenu lists the chord delay, then its pairs through exactly these providers, one per hand"
 	),
 	AssertEqual(
 		"",
