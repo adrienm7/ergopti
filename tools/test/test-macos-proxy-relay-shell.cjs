@@ -214,6 +214,51 @@ for (const options of [
 	checks++;
 }
 
+/**
+ * Lists what a child sees of the proxy environment after one way of clearing it.
+ * @param {string} body Shell lines run after sourcing the script.
+ * @param {NodeJS.ProcessEnv} extra Environment of the sourcing shell.
+ * @returns {string[]}
+ */
+function proxyEnvironmentAfter(body, extra = {}) {
+	const script = ['set -u', `log_info() { :; }`, `log_error() { :; }`, `. '${SCRIPT}'`, body].join(
+		'\n'
+	);
+	const inherited = { PATH: process.env.PATH, ...extra };
+	for (const name of ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY'])
+		inherited[name] = PROXY;
+	inherited.all_proxy = PROXY;
+	inherited.ALL_PROXY = PROXY;
+	const result = spawnSync(bash, ['-c', script], { env: inherited, encoding: 'utf8' });
+	assert.equal(result.status, 0, result.stderr);
+	return result.stdout
+		.split('\n')
+		.filter((line) => /^[A-Za-z]+_(proxy|PROXY)=/.test(line))
+		.sort();
+}
+
+// The direct override and a refused sign-in leave the same environment: no relay
+// variable at all, set or empty, and every host excluded.
+const NO_RELAY = ['NO_PROXY=*', 'no_proxy=*'];
+assert.deepEqual(
+	proxyEnvironmentAfter(`/usr/bin/env`, { ERGOPTI_PROXY_OVERRIDE: 'direct' }),
+	NO_RELAY
+);
+checks++;
+assert.deepEqual(
+	proxyEnvironmentAfter(`start_without_proxy_after_refusal relay_unavailable '' /usr/bin/env`),
+	NO_RELAY
+);
+checks++;
+// The refused start clears its child only: the sourcing shell keeps its route.
+assert.deepEqual(
+	proxyEnvironmentAfter(
+		`start_without_proxy_after_refusal relay_unavailable '' /usr/bin/env >/dev/null\n/usr/bin/env`
+	).filter((line) => line.startsWith('HTTPS_PROXY=')),
+	[`HTTPS_PROXY=${PROXY}`]
+);
+checks++;
+
 console.log(
 	`[OK] macOS daemon start under the proxy sign-in relay: ${checks} checks, shell and Lua read the same probe vectors.`
 );

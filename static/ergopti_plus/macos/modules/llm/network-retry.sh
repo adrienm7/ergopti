@@ -27,13 +27,21 @@ OPAQUE_NETWORK_REFUSAL_EXIT_CODE=78
 # settings. Empty means automatic: nothing below changes. A set override is
 # exported so an installer script sourcing this file again sees the same one.
 OPAQUE_NETWORK_ROUTE_OVERRIDE=""
+
+# Leaves no relay for this shell's children: every relay variable goes and every
+# host is excluded, so nothing inherited applies. The direct override and a
+# refused sign-in both need exactly this; the names are the shared policy's.
+clear_proxy_environment() {
+	unset http_proxy HTTP_PROXY https_proxy HTTPS_PROXY all_proxy ALL_PROXY
+	export NO_PROXY="*" no_proxy="*"
+}
+
 case "${ERGOPTI_PROXY_OVERRIDE:-}" in
 	"") ;;
 	direct)
 		OPAQUE_NETWORK_ROUTE_OVERRIDE=direct
 		export ERGOPTI_PROXY_OVERRIDE
-		unset http_proxy HTTP_PROXY https_proxy HTTPS_PROXY all_proxy ALL_PROXY
-		export NO_PROXY="*" no_proxy="*"
+		clear_proxy_environment
 		;;
 	http://*|https://*|socks5://*|socks5h://*)
 		OPAQUE_NETWORK_ROUTE_OVERRIDE=relay
@@ -439,7 +447,7 @@ run_with_proxy_sign_in_relay() {
 }
 
 # Records a closed refusal for the pull, then runs the daemon with no proxy at
-# all: empty relay variables and a full bypass, so nothing it inherited applies.
+# all. The subshell keeps the caller's own route for whatever it does next.
 start_without_proxy_after_refusal() {
 	local reason="$1" receipt="$2"
 	shift 2
@@ -448,7 +456,10 @@ start_without_proxy_after_refusal() {
 			log_error "The proxy sign-in refusal could not be recorded for the model pull (${reason})."
 		fi
 	fi
-	HTTPS_PROXY= https_proxy= HTTP_PROXY= http_proxy= ALL_PROXY= all_proxy= NO_PROXY='*' no_proxy='*' "$@"
+	(
+		clear_proxy_environment
+		exec "$@"
+	)
 }
 
 # Prints the SHA-256 hex digest of one file. shasum marks a line whose name
