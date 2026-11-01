@@ -16,7 +16,9 @@ function validateMap(metadata, coverage) {
 		assert.match(lot, /^[A-Za-z0-9.][A-Za-z0-9 .:()-]*$/);
 		assert.ok(cell && typeof cell === 'object' && !Array.isArray(cell));
 		assert.ok(
-			['install', 'first', 'deb', 'rpm', 'appimage', 'archive', 'flatpak'].includes(cell.kind)
+			['install', 'first', 'deb', 'rpm', 'appimage', 'archive', 'pkgbuild', 'flatpak'].includes(
+				cell.kind
+			)
 		);
 		const fields = ['id', 'kind', 'container'];
 		if (cell.kind === 'install' || cell.kind === 'first') fields.push('distro', 'image');

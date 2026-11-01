@@ -2,9 +2,13 @@
 
 /**
  * MODULE: Arch Package Runtime Staging Regression
- * Executes the actual recipe and native bundle builder in a private pkgdir.
- * Installed entry points then run with relocated filesystem roots and recorded
- * system-command boundaries; no package-manager transaction or root is used.
+ * The recipe repacks the release tarball. The test assembles that tarball's
+ * tree from the real driver builder (linux/, _shared/, bin/, install.sh) plus
+ * a private runtime prefix that stands in for the one the oldest-LTS container
+ * stages, with the real network-runtime-env.sh, then executes the actual
+ * package() into a private pkgdir. Installed entry points run with relocated
+ * filesystem roots and recorded system-command boundaries; no package-manager
+ * transaction or root is used.
  */
 'use strict';
 
@@ -37,17 +41,84 @@ try {
 	const stubs = path.join(scratch, 'stubs');
 	const calls = path.join(scratch, 'calls');
 	for (const directory of [srcdir, pkgdir, stubs]) fs.mkdirSync(directory);
-	fs.symlinkSync(ROOT, path.join(srcdir, 'ergopti'), 'dir');
-	// The recipe builds the bundle below $srcdir/ergopti, which is the real checkout here: the test
-	// owns the build directory instead, so packaging tests that run at once never share build/linux.
+	// The release tarball's tree: the real driver bundle the CI tarball step packs.
 	const build = path.join(scratch, 'build');
+	const assembled = spawnSync(
+		bashExecutable(),
+		[path.join(ROOT, 'tools/build/build-linux-driver.sh'), '--skip-smoke'],
+		{
+			cwd: ROOT,
+			env: { ...process.env, ERGOPTI_LINUX_BUILD_DIR: build },
+			encoding: 'utf8',
+			timeout: 300000
+		}
+	);
+	assert.equal(
+		assembled.status,
+		0,
+		assembled.stderr || assembled.stdout || assembled.error?.message
+	);
+	const interpreter = spawnSync(bashExecutable(), ['-c', 'command -v luajit'], {
+		encoding: 'utf8'
+	});
+	assert.equal(interpreter.status, 0, interpreter.stderr);
+	const realLua = interpreter.stdout.trim();
+	assert.ok(path.isAbsolute(realLua), 'a real LuaJIT interpreter must be available');
+	// The private runtime prefix the tarball carries in linux/runtime, standing
+	// in for the oldest-LTS staging: its LuaJIT is the recorded interpreter
+	// boundary, its Lua C modules are this host's own, and the parts only the
+	// environment checks for exist. The environment is the real shared template.
+	const prefix = path.join(build, 'linux/runtime');
+	const record = 'printf "%s %s\\n" "${0##*/}" "$*" >> "$ARCH_CALLS"';
+	const writeExecutable = (file, body) => {
+		fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(file, `#!/bin/bash\n${body}\n`, { mode: 0o755 });
+	};
+	writeExecutable(
+		path.join(prefix, 'bin/luajit'),
+		`${record}\nif [ -n "\${ARCH_PACKAGE_PROBE:-}" ]; then exec "$ARCH_REAL_LUA" -e "$ARCH_PACKAGE_PROBE"; fi\nexec "$ARCH_REAL_LUA" "$@"`
+	);
+	for (const program of ['curl', 'sqlite3', 'openssl', 'zstd'])
+		writeExecutable(path.join(prefix, 'bin', program), `${record}\nexit 0`);
+	const hostModule = (name, field) =>
+		spawnSync(
+			realLua,
+			['-e', `io.write(package.searchpath(${JSON.stringify(name)}, package.${field}) or "")`],
+			{
+				encoding: 'utf8'
+			}
+		).stdout;
+	for (const [name, field, relative] of [
+		['luv', 'cpath', 'lib/lua/5.1/luv.so'],
+		['lfs', 'cpath', 'lib/lua/5.1/lfs.so'],
+		['posix.sys.stat', 'cpath', 'lib/lua/5.1/posix/sys/stat.so'],
+		['posix', 'path', 'share/lua/5.1/posix/init.lua']
+	]) {
+		const target = path.join(prefix, relative);
+		fs.mkdirSync(path.dirname(target), { recursive: true });
+		const found = hostModule(name, field);
+		if (found) fs.copyFileSync(found, target);
+		else fs.writeFileSync(target, '');
+	}
+	for (const relative of [
+		'lib/gio/modules/libgiolibproxy.so',
+		'share/glib-2.0/schemas/gschemas.compiled'
+	]) {
+		fs.mkdirSync(path.dirname(path.join(prefix, relative)), { recursive: true });
+		fs.writeFileSync(path.join(prefix, relative), '');
+	}
+	fs.copyFileSync(
+		path.join(ROOT, 'tools/build/templates/linux-portable-runtime-env.sh'),
+		path.join(build, 'linux/network-runtime-env.sh')
+	);
 	const staged = spawnSync(bashExecutable(), ['-s', '--', recipe, srcdir, pkgdir, scratch], {
-		env: { ...process.env, ERGOPTI_LINUX_BUILD_DIR: build },
+		env: { ...process.env, ERGOPTI_ARCH_BUNDLE_DIR: build },
 		input:
-			'set -euo pipefail\nCARCH="$(uname -m)"\nsource "$1"\nsrcdir="$2"\npkgdir="$3"\n' +
+			'set -euo pipefail\nsource "$1"\nsrcdir="$2"\npkgdir="$3"\n' +
 			'printf "%s\\0" "${depends[@]}" > "$4/dependencies"\n' +
 			'printf "%s" "${install:-}" > "$4/hook-name"\n' +
-			'printf "%s\\0" "${arch[@]}" > "$4/architectures"\npackage\n',
+			'printf "%s\\0" "${arch[@]}" > "$4/architectures"\n' +
+			'printf "%s\\0" "${source[@]}" > "$4/sources"\npackage\n',
 		encoding: 'utf8',
 		timeout: 120000
 	});
@@ -59,36 +130,44 @@ try {
 		Buffer.from([127, 69, 76, 70]),
 		'actual native backend must ship'
 	);
-	check('arch-package-architecture-matches-its-actual-native-payload', () => {
-		// ELF e_ident[EI_DATA] selects the byte order of e_machine.
-		assert.ok(native[5] === 1 || native[5] === 2, 'native ELF must name its byte order');
-		const machine = native[5] === 1 ? native.readUInt16LE(18) : native.readUInt16BE(18);
-		const architectures = { 62: 'x86_64', 183: 'aarch64' };
-		assert.ok(architectures[machine], `unqualified native ELF architecture: ${machine}`);
+	check('arch-package-architecture-is-the-private-runtime-architecture', () => {
+		// The release tarball's private runtime and native backend are x86_64 ELF,
+		// staged in the oldest-LTS container: the recipe declares exactly that.
 		const declared = fs
 			.readFileSync(path.join(scratch, 'architectures'), 'utf8')
 			.split('\0')
 			.filter(Boolean);
-		assert.equal(
-			declared.includes('any'),
-			false,
-			'a compiled shared library cannot be an architecture-independent package'
+		assert.deepEqual(declared, ['x86_64']);
+		assert.ok(native[5] === 1 || native[5] === 2, 'native ELF must name its byte order');
+	});
+	check('arch-package-repacks-the-release-tarball', () => {
+		const sources = fs
+			.readFileSync(path.join(scratch, 'sources'), 'utf8')
+			.split('\0')
+			.filter(Boolean);
+		assert.equal(sources.length, 1, 'the recipe has one source: the release tarball');
+		assert.match(
+			sources[0],
+			/^ergopti-plus-linux-__PKGVER__\.tar\.gz::https:\/\/github\.com\/adrienm7\/ergopti\/releases\/download\/__TAG__\/ergopti-plus-linux\.tar\.gz$/
 		);
-		assert.ok(
-			declared.includes(architectures[machine]),
-			'the recipe must declare the staged ELF architecture'
+		for (const relative of ['runtime/bin/luajit', 'network-runtime-env.sh'])
+			assert.ok(fs.existsSync(path.join(library, relative)), `the package must ship ${relative}`);
+		assert.equal(fs.existsSync(path.join(library, 'tests')), false, 'tests are not installed');
+	});
+	check('arch-recipe-renders-from-the-tarball-identity', () => {
+		const renderer = require('../build/render-arch-pkgbuild.cjs');
+		const template = fs.readFileSync(recipe, 'utf8');
+		const rendered = renderer.render(template, { version: '1.2.3', sha256: 'a'.repeat(64) });
+		assert.match(rendered, /^pkgver=1\.2\.3$/m);
+		assert.match(rendered, /\/releases\/download\/v1\.2\.3\/ergopti-plus-linux\.tar\.gz"\)$/m);
+		assert.match(rendered, new RegExp(`^sha256sums=\\('${'a'.repeat(64)}'\\)$`, 'm'));
+		assert.match(
+			renderer.render(template, { version: '0.0.0-dev.7', sha256: 'b'.repeat(64) }),
+			/^pkgver=0\.0\.0dev\.7$/m,
+			'a prerelease sorts before its stable core in pacman and keeps no hyphen'
 		);
-		const missing = spawnSync(
-			bashExecutable(),
-			['-c', 'CARCH=; source "$1"', 'arch-metadata', recipe],
-			{ encoding: 'utf8', timeout: 15000 }
-		);
-		assert.ifError(missing.error);
-		assert.ok(
-			Number.isInteger(missing.status) && missing.status > 0,
-			'unknown build architecture must fail before package staging'
-		);
-		assert.match(missing.stderr, /CARCH/);
+		assert.throws(() => renderer.render(template, { version: 'nightly', sha256: 'a'.repeat(64) }));
+		assert.throws(() => renderer.render(template, { version: '1.2.3', sha256: 'SKIP' }));
 	});
 	check('arch-desktop-icon-ships-the-real-canonical-png-at-its-native-size', () => {
 		const themes = path.join(pkgdir, 'usr/share/icons/hicolor');
@@ -109,27 +188,16 @@ try {
 			'hicolor size metadata must match the PNG dimensions'
 		);
 	});
-	const record = 'printf "%s %s\\n" "${0##*/}" "$*" >> "$ARCH_CALLS"';
 	const stub = (name, body) =>
 		fs.writeFileSync(path.join(stubs, name), `#!/bin/bash\n${record}\n${body}\n`, { mode: 0o755 });
 	stub('systemctl', 'exit 0');
 	stub('pkexec', 'exit 126');
 	stub('id', 'if [ "$1" = -u ]; then echo 1000; else echo "users input uinput"; fi');
-	const interpreter = spawnSync(bashExecutable(), ['-c', 'command -v luajit'], {
-		encoding: 'utf8'
-	});
-	assert.equal(interpreter.status, 0, interpreter.stderr);
-	const realLua = interpreter.stdout.trim();
-	assert.ok(path.isAbsolute(realLua), 'a real LuaJIT interpreter must be available');
 	const flock = spawnSync(bashExecutable(), ['-c', 'command -v flock'], { encoding: 'utf8' });
 	assert.equal(flock.status, 0, flock.stderr);
 	const realFlock = flock.stdout.trim();
 	assert.ok(path.isAbsolute(realFlock), 'the actual session-lock owner must be available');
 	stub('flock', 'exec "$ARCH_REAL_FLOCK" "$@"');
-	stub(
-		'luajit',
-		'if [ -n "${ARCH_PACKAGE_PROBE:-}" ]; then exec "$ARCH_REAL_LUA" -e "$ARCH_PACKAGE_PROBE"; fi\nexec "$ARCH_REAL_LUA" "$@"'
-	);
 	const wrapper = path.join(scratch, 'installed-ergopti');
 	fs.writeFileSync(
 		wrapper,
@@ -158,6 +226,20 @@ try {
 	// the real launcher must acquire the resources that an actual daemon needs.
 	const launchDaemon = (...args) =>
 		launchWithEnvironment({ ARCH_PACKAGE_PROBE: 'print("ARCH_DAEMON_ENTRY")' }, ...args);
+	check('arch-wrapper-refuses-without-its-private-runtime', () => {
+		// A missing part of the private prefix is refused by the shared
+		// environment before anything runs: never a fall back to host programs.
+		const curl = path.join(library, 'runtime/bin/curl');
+		fs.renameSync(curl, `${curl}.private-test`);
+		try {
+			const result = launch('--help');
+			assert.notEqual(result.status, 0, 'the wrapper must refuse an incomplete private runtime');
+			assert.match(result.stderr, /Required installed native package component unavailable/);
+			assert.doesNotMatch(fs.readFileSync(calls, 'utf8'), /^luajit /m);
+		} finally {
+			fs.renameSync(`${curl}.private-test`, curl);
+		}
+	});
 	check('arch-desktop-entry-reaches-the-session-owner', () => {
 		const desktop = fs.readFileSync(
 			path.join(pkgdir, 'usr/share/applications/ergopti.desktop'),
@@ -452,6 +534,18 @@ try {
 		]) {
 			assert.ok(dependencies.includes(name), `missing runtime package: ${name}`);
 		}
+		// The private runtime in the tarball runs the daemon and its programs:
+		// a host package for any of them would let the host decide what runs.
+		for (const name of [
+			'luajit',
+			'lua51-luv',
+			'curl',
+			'openssl',
+			'sqlite',
+			'zstd',
+			'glib-networking'
+		])
+			assert.ok(!dependencies.includes(name), `the host ${name} must not be required`);
 		// Every dialog is Ergopti's own GTK window (linux/ui/dialog_host.lua).
 		for (const name of ['zenity', 'kdialog'])
 			assert.ok(

@@ -125,6 +125,11 @@
 		"kind": "archive",
 		"container": ""
 	},
+	"Arch package": {
+		"id": "smoke-arch-package",
+		"kind": "pkgbuild",
+		"container": "archlinux:latest"
+	},
 	"Flatpak package": {
 		"id": "smoke-flatpak-run",
 		"kind": "flatpak",

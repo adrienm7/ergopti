@@ -96,14 +96,10 @@
 			"libsecret"
 		],
 		"arch": [
-			"luajit",
 			"xclip",
 			"libnotify",
-			"curl",
 			"libxkbcommon",
 			"at-spi2-core",
-			"openssl",
-			"sqlite",
 			"xdg-utils",
 			"polkit",
 			"kmod",
