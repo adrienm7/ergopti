@@ -736,3 +736,5 @@ in `windows/modules/gestures/actions.ahk`:
 When one lands, rewrite its reason (or remove it) and rerun
 `npm run codegen:action-catalogue`; `test-action-catalogue-codegen.cjs`
 refuses a reason on an OS the row claims.
+
+- PC to cloud, 1 November: the Windows field report is on `field/win-2026-11-01-dev`. It is thin: no driver ran that day, so no day log and no field run. Its `proxy_winhttp.txt` is wrong on a French Windows (fixed in the collector since). A report with a running driver follows after the final suite. All live checks pass on dev, typed by the harness.
