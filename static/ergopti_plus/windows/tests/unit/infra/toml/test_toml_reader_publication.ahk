@@ -45,10 +45,10 @@ class _TCRP_Fixture {
 			if this.Mode != "live" {
 				AssertEqual(1, FSWriteDurable(this.Path, _TCRP_Image(3000, false)))
 				this.Winner := ParseTomlFile(this.Path)
-				AssertEqual(3000, IniCacheGet(this.Winner, "keylogger", "think_pause_ms"),
+				AssertEqual(3000, IniCacheGet(this.Winner, "keystats", "think_pause_ms"),
 					"the actual newer parse must admit the repaired source")
 				if this.Mode == "commit" {
-					Receipt := TOML_Write(4000, this.Path, "keylogger", "think_pause_ms")
+					Receipt := TOML_Write(4000, this.Path, "keystats", "think_pause_ms")
 					AssertTrue(Receipt is Integer && Receipt == 1,
 						"the public writer must acknowledge a real durable rewrite")
 					AssertFalse(_ParseTomlCache.Has(this.Path),
@@ -71,19 +71,19 @@ class _TCRP_Fixture {
 			throw this.Failure
 		AssertEqual(1, this.LogCalls)
 		AssertEqual(1, this.TimerCalls)
-		AssertEqual(2000, IniCacheGet(Older, "keylogger", "think_pause_ms"),
+		AssertEqual(2000, IniCacheGet(Older, "keystats", "think_pause_ms"),
 			"the old detached result still belongs to its own source image")
 		; The genuine consumer resolves the same relative constants path. The
 		; original parser fails on the stale effective timing before any proposed
 		; generation or helper can manufacture a missing-implementation failure.
 		TimingsLoadShared(this.Root)
 		Expected := this.Mode == "live" ? 2000 : this.Mode == "commit" ? 4000 : 3000
-		AssertEqual(Expected, TimingsGet("keylogger", "think_pause_ms"),
+		AssertEqual(Expected, TimingsGet("keystats", "think_pause_ms"),
 			"a returning old parse cannot replace the timing admitted by a newer reader or writer")
 		Current := ParseTomlFile(this.Path)
 		if this.Mode == "read"
 			AssertTrue(Current == this.Winner, "the exact newer cache object must survive")
-		AssertEqual(Expected, IniCacheGet(Current, "keylogger", "think_pause_ms"))
+		AssertEqual(Expected, IniCacheGet(Current, "keystats", "think_pause_ms"))
 		_TCRP_Bytes(this.Bytes, FSReadBytesStrict(this.Path))
 		AssertFalse(FileReadActivityBusy(this.Path))
 		AssertFalse(ConfigWriteLeaseBusy())
@@ -99,7 +99,7 @@ class _TCRP_Fixture {
 }
 
 _TCRP_Image(Value, Broken) {
-	return "[keylogger]`nthink_pause_ms = " . Value . "`n"
+	return "[keystats]`nthink_pause_ms = " . Value . "`n"
 		. (Broken ? "unfinished = [`n" : "")
 }
 

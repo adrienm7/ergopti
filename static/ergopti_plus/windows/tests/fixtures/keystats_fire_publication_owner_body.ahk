@@ -1,4 +1,4 @@
-﻿; tests/fixtures/keylogger_fire_publication_owner_body.ahk
+﻿; tests/fixtures/keystats_fire_publication_owner_body.ahk
 
 ; ==============================================================================
 ; MODULE: Deferred Fire Publication Owner Child
@@ -107,7 +107,7 @@ _KFPO_Queue(Trigger, Replacement) {
 
 _KFPO_Observe(Stage) {
 	global _KFPO, _HSE_FireLogQueue, _PrefixDeferredGeneration
-	FileAppend("RECEIPT keylogger-fire-owner stage=" . Stage . " mode=" . _KFPO.Mode
+	FileAppend("RECEIPT keystats-fire-owner stage=" . Stage . " mode=" . _KFPO.Mode
 		. " rows=" . Keystats._pending_entries.Length . " fires=" . _HSE_FireLogQueue.Length
 		. " old_generation=" . _KFPO.OldGeneration . " generation=" . _PrefixDeferredGeneration
 		. " timer_calls=" . _KFPO.TimerCalls . " clock_calls=" . _KFPO.TimeCalls
@@ -219,7 +219,7 @@ _KFPO_Main() {
 		}
 		ExitApp(1)
 	}
-	FileAppend("PASS keylogger-fire-owner " . _KFPO.Mode . "`n", "*", "UTF-8")
+	FileAppend("PASS keystats-fire-owner " . _KFPO.Mode . "`n", "*", "UTF-8")
 	ExitApp(0)
 }
 
