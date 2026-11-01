@@ -15,7 +15,7 @@ local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
 local show_error = require("ui.menu.menu_dialogs").show_error
-local zenity_plain = require("ui.menu.menu_dialogs").zenity_plain
+local plain_markup = require("ui.menu.menu_dialogs").plain_markup
 
 local LOG = "ui.menu.menu_agent"
 
@@ -29,9 +29,9 @@ local function _build_agent(ctx)
 	end
 	return require("ui.menu.agent_rows").build(ctx, {
 		prompt = function(title, text, initial, hidden, choices)
-			return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
+			return TextPrompt.ask(title, plain_markup(text), initial, hidden, choices)
 		end,
-		error = function(text) show_error(zenity_plain(text)) end,
+		error = function(text) show_error(plain_markup(text)) end,
 	})
 end
 

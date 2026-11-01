@@ -180,7 +180,7 @@ helpers.describe("Linux gesture scope transaction", function()
 				local restore, clear = submenu[2], submenu[3]
 				helpers.assert_true(type(restore.fn) == "function" and type(clear.fn) == "function")
 				os.execute = function(command)
-					if command:find("zenity", 1, true) then questions = questions + 1 end
+					if command:find("dialog_host.lua", 1, true) then questions = questions + 1 end
 					return 0
 				end
 				-- A pause refuses the owner's publication; the file stays whole.

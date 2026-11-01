@@ -42,7 +42,7 @@ local function with_profile(body)
 			local execute, confirmations = os.execute, 0
 			os.execute = function(command)
 				if command == "command -v zenity >/dev/null 2>&1" then return 0 end
-				if command:match("^zenity %-%-question ") then
+				if command:match("dialog_host%.lua' %-%-question ") then
 					confirmations = confirmations + 1
 					if during_confirmation then during_confirmation() end
 					return 0

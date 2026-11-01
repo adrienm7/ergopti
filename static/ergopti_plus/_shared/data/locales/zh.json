@@ -1152,7 +1152,7 @@
 	"linux_shell.uninstall.invalid_path": "所有权路径无效。",
 	"linux_shell.uninstall.manifest_missing": "缺少安装所有权清单。",
 	"linux_shell.uninstall.missing_prefix_value": "缺少 --prefix 的值。",
-	"linux_shell.uninstall.no_dialog_tool": "没有可用的对话框工具（zenity、kdialog）或 notify-send。",
+	"linux_shell.uninstall.no_dialog_tool": "没有可用的对话框工具或 notify-send。",
 	"linux_shell.uninstall.no_package_owner": "系统安装没有经过验证的所属软件包。",
 	"linux_shell.uninstall.notification_failed": "无法显示卸载失败通知。",
 	"linux_shell.uninstall.owned_file_replaced": "所拥有的文件已被替换为链接或其他类型的文件。",

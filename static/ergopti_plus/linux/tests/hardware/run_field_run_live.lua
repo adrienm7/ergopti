@@ -133,7 +133,7 @@ check(output:match("field run config_guard: pass") ~= nil, "no step changed conf
 check(output:match("Field run summary: ") ~= nil and not output:match("interrupted"), "the run closed with a summary")
 check(output:match("field_run=fr%-") ~= nil, "the collector names the request it ran")
 local log = read(scratch .. "/daemon.log") or ""
-check(not log:find("zenity", 1, true), "no window was asked for")
+check(not log:find("dialog_host.lua", 1, true), "no window was asked for")
 
 os.execute("kill " .. host_pid .. " " .. tostring(successor_pid or "") .. " 2>/dev/null")
 for _ = 1, 100 do

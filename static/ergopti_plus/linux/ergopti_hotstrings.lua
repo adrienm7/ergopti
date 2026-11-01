@@ -1729,7 +1729,7 @@ local function main()
 				local info = window_info.getFocused()
 				return { app = info.appId or "", title = info.windowTitle or "" }
 			end or nil,
-			-- llm_agent_command asks for the command in a zenity entry.
+			-- llm_agent_command asks for the command in a native entry.
 			ask_text = function(title, prompt)
 				if opts.dry_run then return nil end
 				return require("ui.text_prompt").ask(title, prompt, "")

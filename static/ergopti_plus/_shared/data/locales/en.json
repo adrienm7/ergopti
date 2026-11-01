@@ -1147,7 +1147,7 @@
 	"linux_shell.uninstall.invalid_path": "Invalid ownership path.",
 	"linux_shell.uninstall.manifest_missing": "Installation ownership manifest is missing.",
 	"linux_shell.uninstall.missing_prefix_value": "Missing --prefix value.",
-	"linux_shell.uninstall.no_dialog_tool": "No dialog tool (zenity, kdialog) or notify-send is available.",
+	"linux_shell.uninstall.no_dialog_tool": "No dialog tool or notify-send is available.",
 	"linux_shell.uninstall.no_package_owner": "The system installation has no verified package owner.",
 	"linux_shell.uninstall.notification_failed": "The uninstall failure notification could not be displayed.",
 	"linux_shell.uninstall.owned_file_replaced": "Owned file was replaced by a link or another file type.",

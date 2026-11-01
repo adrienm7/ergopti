@@ -26,7 +26,7 @@ local uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget
 local _fill = require("ui.menu.menu_dialogs")._fill
 local shell_quote = require("ui.menu.menu_dialogs").shell_quote
 local show_error = require("ui.menu.menu_dialogs").show_error
-local zenity_plain = require("ui.menu.menu_dialogs").zenity_plain
+local plain_markup = require("ui.menu.menu_dialogs").plain_markup
 local ask_yes_no = require("ui.menu.menu_dialogs").ask_yes_no
 
 local LOG = "ui.menu.menu_about"
@@ -247,10 +247,10 @@ local function _uninstall_command(ctx)
 			failure = failure,
 			missing_program = missing_program,
 			confirm = function(title, text)
-				return ask_yes_no(title, zenity_plain(text),
+				return ask_yes_no(title, plain_markup(text),
 					i18n_safe("button.remove"), i18n_safe("button.cancel"))
 			end,
-			fail = function(text) show_error(zenity_plain(text), i18n_safe("menu.global.uninstall")) end,
+			fail = function(text) show_error(plain_markup(text), i18n_safe("menu.global.uninstall")) end,
 			quit = function()
 				if type(ctx.on_quit) ~= "function" then
 					Logger.error(LOG, "Uninstall: ctx.on_quit is absent — the daemon cannot quit.")

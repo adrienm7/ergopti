@@ -25,12 +25,8 @@ local I18n = require("infra.i18n")
 local TextPrompt = require("ui.text_prompt")
 local Vision = require("llm.vision")
 
---- Escapes text for zenity's --text, which is Pango markup.
---- @param text string
---- @return string
-local function markup_plain(text)
-	return (tostring(text):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
-end
+-- Escapes text for a dialog's --text, which is Pango markup.
+local markup_plain = require("ui.native_dialog").plain_markup
 
 --- Asks for the vision parameter of one binding.
 --- @param title string Window title (the action being configured).

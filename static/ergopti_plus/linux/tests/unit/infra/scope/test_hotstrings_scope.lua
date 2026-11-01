@@ -403,7 +403,7 @@ helpers.describe("hotstrings scope: refusals", function()
 					-- The real hotstrings_menu declaration: the rows are the manifest's.
 					root.top_level = declared_parent(top, "hotstrings")
 					os.execute = function(command)
-						if command:find("zenity", 1, true) then
+						if command:find("dialog_host.lua", 1, true) then
 							questions = questions + 1
 							return 0
 						end
@@ -443,7 +443,7 @@ helpers.describe("hotstrings scope: refusals", function()
 			local passed, err = pcall(function()
 				os.execute = function(command)
 					if command:find("command -v zenity", 1, true) then return 0 end
-					if command:find("zenity --question", 1, true) then return 0 end
+					if command:find("dialog_host.lua' --question", 1, true) then return 0 end
 					return execute(command)
 				end
 				local i18n = require("infra.i18n")

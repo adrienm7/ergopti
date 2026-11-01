@@ -248,15 +248,14 @@ helpers.describe("the user action editors store one canonical value (Linux)", fu
 		helpers.assert_eq(require("user_action_parameter").parse("command", value), nil)
 	end)
 
-	helpers.it("a file or folder is picked with zenity or kdialog (user-actions)", function()
+	helpers.it("a file or folder is picked with the owned dialog (user-actions)", function()
 		local shell = { quote = require("text_utils").shell_quote }
-		shell.has_command = function(binary) return binary == "kdialog" end
 		local Chooser = helpers.load_module("ui.app_chooser")
+		local dialog = require("ui.native_dialog").command()
 		helpers.assert_eq(Chooser.path_picker_command(shell, "T", true, "/home/me/"),
-			"kdialog --getexistingdirectory '/home/me/' --title 'T' 2>/dev/null")
-		shell.has_command = function(binary) return binary == "zenity" end
+			dialog .. " --file-selection --directory --title='T' --filename='/home/me/' 2>/dev/null")
 		helpers.assert_eq(Chooser.path_picker_command(shell, "T", false, "/home/me/"),
-			"zenity --file-selection --title='T' --filename='/home/me/' 2>/dev/null")
+			dialog .. " --file-selection --title='T' --filename='/home/me/' 2>/dev/null")
 		local ran
 		shell.exec_checked = function(command) ran = command; return "/home/me/Docs\n" end
 		local value = Editor.ask_path("Title", "Prompt", nil, {

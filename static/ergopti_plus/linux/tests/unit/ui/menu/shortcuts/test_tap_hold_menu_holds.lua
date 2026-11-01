@@ -49,7 +49,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 			local asked = {}
 			local execute = os.execute
 			os.execute = function(command)
-				if command:find("zenity", 1, true) then
+				if command:find("dialog_host.lua", 1, true) then
 					asked[#asked + 1] = command
 					return 1
 				end
@@ -143,7 +143,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 				elseif receipt == "nil" then writer.set_hold = function() return nil end
 				elseif receipt == "throw" then writer.set_hold = function() error("controlled write failure") end end
 				os.execute = function(command)
-					if command:find("zenity", 1, true) then return 1 end
+					if command:find("dialog_host.lua", 1, true) then return 1 end
 					return execute(command)
 				end
 				local caps = find(key_rows(section), i18n.get("tap_hold.group.caps_lock"))
@@ -431,7 +431,7 @@ helpers.describe("declared native command reaches the actual Linux writer", func
 				is_tap_action = function() return true end,
 				canonical_hold = function() return nil end })
 			os.execute = function(command)
-				if command:find("zenity --error", 1, true) then notices = notices + 1; return 1 end
+				if command:find("dialog_host.lua' --error", 1, true) then notices = notices + 1; return 1 end
 				return previous_execute(command)
 			end
 			local items = helpers.load_module("ui.menu.builder").build({
@@ -733,7 +733,7 @@ helpers.describe("declared complete per-key delay tail", function()
 				return answer
 			end
 			os.execute = function(command)
-				if command:find("zenity --error", 1, true) then notices = notices + 1; return 1 end
+				if command:find("dialog_host.lua' --error", 1, true) then notices = notices + 1; return 1 end
 				return previous_execute(command)
 			end
 			local items = helpers.load_module("ui.menu.builder").build({ _version = "test",

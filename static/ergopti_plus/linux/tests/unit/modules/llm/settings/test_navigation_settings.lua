@@ -137,7 +137,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 				}))
 				package.loaded["infra.manifest_menu"] = native_menu
 				os.execute = function(command)
-					if command:find("zenity --error", 1, true) then notices = notices + 1; return true end
+					if command:find("dialog_host.lua' --error", 1, true) then notices = notices + 1; return true end
 					if command:find("start_at_login.sh", 1, true) then return false end
 					return previous_execute(command)
 				end

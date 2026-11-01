@@ -446,13 +446,18 @@ try {
 			'util-linux',
 			'glibc',
 			'libayatana-appindicator',
-			'zenity',
 			'lua51-lgi',
 			'webkit2gtk-4.1',
 			'python'
 		]) {
 			assert.ok(dependencies.includes(name), `missing runtime package: ${name}`);
 		}
+		// Every dialog is Ergopti's own GTK window (linux/ui/dialog_host.lua).
+		for (const name of ['zenity', 'kdialog'])
+			assert.ok(
+				!dependencies.includes(name),
+				`the host dialog program ${name} must not be required`
+			);
 	});
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });

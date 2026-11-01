@@ -249,15 +249,15 @@ local function observe_add_command(mode)
 			return corpus.target.char
 		end }
 		os.execute = function(command)
-			if command == "command -v zenity >/dev/null 2>&1" then
-				return mode == "consume_unavailable" and 1 or 0
-			end
-			if command:find("zenity --question", 1, true) == 1 then
+			if command:find("dialog_host.lua' --question", 1, true) ~= nil then
 				observed.questions = observed.questions + 1
+				-- The owned dialog's « no display or no GTK 3 », as LuaJIT's
+				-- os.execute reports exit 69.
+				if mode == "consume_unavailable" then return 69 * 256 end
 				if mode == "pause_after_consume" then context.paused = true end
 				return mode == "consume_no" and 1 or 0
 			end
-			if command:find("zenity --error", 1, true) == 1 then
+			if command:find("dialog_host.lua' --error", 1, true) ~= nil then
 				observed.errors = observed.errors + 1
 				return 0
 			end

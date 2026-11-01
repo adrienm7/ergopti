@@ -272,7 +272,7 @@ helpers.describe("Linux terminal LLM scope", function()
 				root.llm_menu = {{ type = "command", id = "scope_restore", i18n = key }}
 				root.top_level = {{ id = "llm" }}
 				os.execute = function(command)
-					if command:find("zenity --question", 1, true) then
+					if command:find("dialog_host.lua' --question", 1, true) then
 						questions = questions + 1
 						helpers.assert_contains(command, require("infra.i18n").get("menu.llm.title"))
 						return 0

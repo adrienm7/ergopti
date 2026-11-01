@@ -60,22 +60,23 @@ try {
 		});
 	assert.notEqual(run('--yes').status, 0, 'an unrelated wrapper must prevent removal');
 	assert.ok(fs.existsSync(library), 'refusal preserves the installation');
-	// The failure dialog falls back from zenity to kdialog, then to stderr and
-	// notify-send, so a KDE host without zenity still reports the failure.
-	const kdialogLog = path.join(sandbox, 'kdialog.log');
+	// The failure is shown in Ergopti's own dialog host, run by the source
+	// install's LuaJIT here (no private runtime beside the script); when that
+	// dialog cannot open, stderr and notify-send still report the failure.
+	const dialogHostLog = path.join(sandbox, 'dialog-host.log');
 	const notifyLog = path.join(sandbox, 'notify.log');
 	fs.writeFileSync(
-		path.join(stubs, 'kdialog'),
-		`#!/bin/bash\nprintf '%s|' "$@" > "${bashPath(kdialogLog)}"\n`,
+		path.join(stubs, 'luajit'),
+		`#!/bin/bash\nprintf '%s|' "$@" > "${bashPath(dialogHostLog)}"\n`,
 		{ mode: 0o755 }
 	);
 	assert.notEqual(run('--yes', '--gui', 'Title', 'Body', 'Missing {1}').status, 0);
 	assert.match(
-		fs.readFileSync(kdialogLog, 'utf8'),
-		/--error\|Body\|/,
-		'kdialog must show the failure'
+		fs.readFileSync(dialogHostLog, 'utf8'),
+		/\/ui\/dialog_host\.lua\|--error\|--no-markup\|--title=Title\|--text=Body\|/,
+		'the owned dialog host must show the failure'
 	);
-	fs.unlinkSync(path.join(stubs, 'kdialog'));
+	fs.writeFileSync(path.join(stubs, 'luajit'), '#!/bin/bash\nexit 69\n', { mode: 0o755 });
 	fs.writeFileSync(
 		path.join(stubs, 'notify-send'),
 		`#!/bin/bash\nprintf '%s|' "$@" > "${bashPath(notifyLog)}"\n`,
@@ -89,6 +90,7 @@ try {
 		'notify-send is the last resort'
 	);
 	fs.unlinkSync(path.join(stubs, 'notify-send'));
+	fs.unlinkSync(path.join(stubs, 'luajit'));
 	fs.writeFileSync(
 		wrapper,
 		`#!/bin/bash\nDRIVER_ROOT="${bashPath(library)}/linux"\nexec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"\n`
@@ -330,9 +332,14 @@ try {
 		`#!/bin/bash\necho 'ergopti: ${bashPath(packaged)}/uninstall.sh'\n`,
 		{ mode: 0o755 }
 	);
+	// A package carries its private runtime: its LuaJIT runs the dialog host,
+	// never one found on PATH (the bare PATH here has none).
 	const dialogLog = path.join(sandbox, 'missing-dialog.log');
+	fs.mkdirSync(path.join(packaged, 'runtime/bin'), { recursive: true });
+	fs.mkdirSync(path.join(packaged, 'ui'), { recursive: true });
+	fs.writeFileSync(path.join(packaged, 'ui/dialog_host.lua'), '-- placeholder\n');
 	fs.writeFileSync(
-		path.join(bare, 'zenity'),
+		path.join(packaged, 'runtime/bin/luajit'),
 		`#!/bin/bash\nprintf '%s|' "$@" > "${bashPath(dialogLog)}"\n`,
 		{ mode: 0o755 }
 	);

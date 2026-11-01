@@ -31,7 +31,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 			local ok, err = pcall(function()
 				TextPrompt.ask = function() return "375.5" end
 				os.execute = function(command)
-					if command:find("zenity --error", 1, true) then notices = notices + 1; return 1 end
+					if command:find("dialog_host.lua' --error", 1, true) then notices = notices + 1; return 1 end
 					return original_execute(command)
 				end
 				package.loaded[WRITER].set_threshold = function(key, seconds)
@@ -63,7 +63,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 			local ok, err = pcall(function()
 				TextPrompt.ask = function() return value end
 				os.execute = function(command)
-					if command:find("zenity --error", 1, true) then return 1 end
+					if command:find("dialog_host.lua' --error", 1, true) then return 1 end
 					return original_execute(command)
 				end
 				local key = assert(find(key_rows(section), require("infra.i18n").get("tap_hold.group.left_shift")))

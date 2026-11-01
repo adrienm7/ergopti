@@ -147,8 +147,8 @@ helpers.describe("hotstrings submenu: the personal-hotstring editor", function()
 	---
 	--- Rows are matched by their translated LABEL and only the matched row's `fn`
 	--- is run. Walking the tree and firing every callback to see what each does
-	--- would also fire the magic-key prompt, which shells out to zenity — on a
-	--- machine that has zenity and a display, the suite would stop at a dialog.
+	--- would also fire the magic-key prompt, which opens the owned dialog — on a
+	--- machine that has GTK 3 and a display, the suite would stop at a dialog.
 	--- @return table Set of app names, and the label lookup used.
 	local function apps_opened_by_labels(labels)
 		local asked = {}

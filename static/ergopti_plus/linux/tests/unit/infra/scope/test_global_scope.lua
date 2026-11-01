@@ -218,7 +218,7 @@ helpers.describe("Linux global scope: the Configuration row", function()
 			helpers.assert_not_nil(row, "the Configuration restore row")
 			os.execute = function(command)
 				if command:find("command -v zenity", 1, true) then return 0 end
-				if command:find("zenity --question", 1, true) then asked[#asked + 1] = command; return 1 end
+				if command:find("dialog_host.lua' --question", 1, true) then asked[#asked + 1] = command; return 1 end
 				return execute(command)
 			end
 			row.fn()
@@ -237,7 +237,7 @@ helpers.describe("Linux global scope: the Configuration row", function()
 			local row = restore_row({ _version = "test", on_quit = function() end,
 				is_paused = function() return true end }, calls)
 			os.execute = function(command)
-				if command:find("zenity", 1, true) then asked = asked + 1; return 0 end
+				if command:find("dialog_host.lua", 1, true) then asked = asked + 1; return 0 end
 				return execute(command)
 			end
 			row.fn()
@@ -309,7 +309,7 @@ helpers.describe("Linux global scope: the Configuration clear", function()
 			local execute, asked = os.execute, 0
 			local ran, raised = pcall(function()
 				os.execute = function(command)
-					if command:find("zenity", 1, true) then asked = asked + 1; return 1 end
+					if command:find("dialog_host.lua", 1, true) then asked = asked + 1; return 1 end
 					return execute(command)
 				end
 				local i18n = require("infra.i18n")
