@@ -43,8 +43,11 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // http_client, system_proxy, managed_http_deadline and the shared proxy
 // policy by module name, and its import-isolation test fails the import
 // through package.preload instead of matching dofile paths.
-const BASELINE = 55;
-const READ_BASELINE = 100;
+// 55 → 51 files and 100 → 96 reads: four managed-network tests load
+// managed_http, managed_http_deadline, http_client and the shared proxy
+// policy by module name instead of dofile on their paths.
+const BASELINE = 51;
+const READ_BASELINE = 96;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];

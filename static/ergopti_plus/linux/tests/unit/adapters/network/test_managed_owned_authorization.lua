@@ -13,7 +13,6 @@
 local helpers = require("tests.helpers")
 local Paths = require("infra.paths")
 local Json = require("json")
-local driver = helpers.driver_root()
 local Policy = dofile(assert(Paths.shared("lua/network/proxy_policy.lua")))
 local file = assert(io.open(assert(Paths.shared("modules/network/proxy_policy.json")), "rb"))
 local policy = assert(Policy.new(Json.decode(assert(file:read("*a")))))
@@ -132,7 +131,7 @@ local function with_client(config, exercise)
 			return state.time
 		end }
 		package.loaded["infra.managed_http_deadline"] = { start = timer }
-		client = dofile(driver .. "/adapters/http_client.lua")
+		client = helpers.fresh_module("adapters.http_client")
 		exercise(client, state)
 	end, debug.traceback)
 	-- Exact test-native ports are restored even when import/construction fails.
