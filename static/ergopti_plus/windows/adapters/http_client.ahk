@@ -1449,13 +1449,13 @@ _SystemProxy_IsLoopbackHost(Host) {
 _SystemProxy_Ipv4Number(Text) {
 	if !RegExMatch(Text, "^(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})$", &M)
 		return -1
-	Number := 0
+	Packed := 0
 	loop 4 {
 		if Integer(M[A_Index]) > 255
 			return -1
-		Number := (Number << 8) | Integer(M[A_Index])
+		Packed := (Packed << 8) | Integer(M[A_Index])
 	}
-	return Number
+	return Packed
 }
 
 ; One spelling for an IPv6 address (eight colon-separated numbers), "" when it is not one.
