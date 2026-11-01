@@ -107,25 +107,29 @@ end
 local PAUSE_GATED_ENTRY_POINTS = {
 	{
 		label  = "keystats/init.lua handle_key",
-		file   = "modules/keystats/init.lua",
+		-- modules/keystats/init.lua, selected by a declaration unique to it
+		source = "local function ensure_browser_window_watchers",
 		decl   = "local function handle_key",
 		writer = "leftMouseDown",
 	},
 	{
 		label  = "context_tracker update_private_status (logs window TITLES)",
-		file   = "modules/keystats/context_tracker.lua",
+		-- modules/keystats/context_tracker.lua, selected by a declaration unique to it
+		source = "function M.update_private_status()",
 		decl   = "function M.update_private_status()",
 		writer = "_log_manager.append_log",
 	},
 	{
 		label  = "context_tracker app_watcher_cb (logs app switches)",
-		file   = "modules/keystats/context_tracker.lua",
+		-- modules/keystats/context_tracker.lua, selected by a declaration unique to it
+		source = "function M.update_private_status()",
 		decl   = "function M.app_watcher_cb(",
 		writer = "_log_manager.log_app_switch",
 	},
 	{
 		label  = "context_tracker handle_ax_value_changed (logs sys_autocorrect)",
-		file   = "modules/keystats/context_tracker.lua",
+		-- modules/keystats/context_tracker.lua, selected by a declaration unique to it
+		source = "function M.update_private_status()",
 		decl   = "local function handle_ax_value_changed(",
 		writer = "_log_manager.flush_buffer",
 	},
@@ -134,9 +138,9 @@ local PAUSE_GATED_ENTRY_POINTS = {
 helpers.describe("keystats: EVERY watcher-driven writer is pause-gated (project-suspend-pause-invariant)", function()
 	for _, spec in ipairs(PAUSE_GATED_ENTRY_POINTS) do
 		helpers.it(spec.label .. " — pause guard precedes its first write", function()
-			local src   = read_source(spec.file)
+			local src   = read_source(spec.source)
 			local slice = function_slice(src, spec.decl)
-			helpers.assert_true(slice ~= nil, spec.decl .. " must be locatable in " .. spec.file)
+			helpers.assert_true(slice ~= nil, spec.decl .. " must be locatable beside " .. spec.source)
 
 			-- Matches both `is_paused()` and `_is_paused()`.
 			local guard  = slice:find("is_paused()", 1, true)
