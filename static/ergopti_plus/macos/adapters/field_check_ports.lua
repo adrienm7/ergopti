@@ -115,6 +115,36 @@ local function remap_facts()
 	return { enabled = Remap.get_enabled(), phase = phase, guardian = Remap.guardian_state() }
 end
 
+--- The deployed Karabiner configuration and the tap-hold delays the shared
+--- model asks for, for infra/field_check_tap_hold_thresholds.lua.
+--- @return table facts { enabled, config, reason, expected, tag }.
+local function tap_hold_threshold_facts()
+	local Remap = require("platform.remap")
+	local KePaths = require("platform.remap.ke_paths")
+	local facts = { enabled = Remap.get_enabled() == true, expected = {},
+		tag = require("platform.remap.lease_contract").MANAGED_TAG_LABEL }
+	local global = Remap.get_tap_hold_timeout()
+	for _, key in ipairs(Remap.TAP_HOLD_KEYS or {}) do
+		local key_code = type(key.from) == "table" and key.from.key_code
+		if type(key_code) == "string" then
+			local own = Remap.get_tap_timeout(key.id)
+			facts.expected[key_code] = { id = key.id, ms = (own and own > 0) and own or global }
+		end
+	end
+	local text = FileSystem.read(FileSystem.expand_path(KePaths.config_file_for(KePaths.selected_runtime())))
+	if type(text) ~= "string" then
+		facts.reason = "unreadable"
+		return facts
+	end
+	local decoded = require("adapters.json_codec").decode(text)
+	if type(decoded) ~= "table" then
+		facts.reason = "not_json"
+		return facts
+	end
+	facts.config = decoded
+	return facts
+end
+
 --- The note and status of this lifecycle's guardian registration, read from memory.
 --- @return string|nil note `developer_adhoc_*`, or nil when no reset ran.
 --- @return string|nil status The registration's answer, nil before it settled.
@@ -359,6 +389,7 @@ function M.new()
 		exec = exec,
 		home = function() return os.getenv("HOME") end,
 		remap_facts = remap_facts,
+		tap_hold_threshold_facts = tap_hold_threshold_facts,
 		guardian_registration_note = guardian_registration_note,
 		keystats_facts = keystats_facts,
 		health_counts = function() return require("infra.key_event_health").counts() end,
