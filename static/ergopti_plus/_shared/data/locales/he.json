@@ -4008,7 +4008,7 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "לא ב-Linux: מספר שולחנות העבודה שייך להגדרות של כל סביבת שולחן עבודה (GNOME מוסיף ומסיר אותם בעצמו, KDE ו-Xfce שומרים מספר קבוע), ו-Wayland אינו נותן לשום יישום בקשה לשנות אותו.",
 	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "לא ב-Linux: כל שולחן עבודה של Linux שומר על ההפעלה ערה בעזרת חוסם ההמתנה שלו (מצב המצגת של KDE ו-Xfce, הרחבת Caffeine ב-GNOME); הפעילו אותו שם.",
 	"platform_reason.action_key_is_its_own_binding_here": "אין זו שורה נפרדת במערכת זו: הפעולה המקבילה שולחת את אותו מקש.",
-	"platform_reason.action_mirroring_is_the_systems_projection_menu": "מתג רק ב-macOS: ‏Windows בוחר שכפול בתפריט ההקרנה Win+P, ו-GNOME ו-KDE במחליף המסכים שלהם Super+P; הקצו את המקש הזה כצירוף מקשים.",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "אין מתג ב-Linux: ‏GNOME ו-KDE בוחרים שכפול במחליף המסכים שלהם Super+P; הקצו את המקש הזה כצירוף מקשים.",
 	"platform_reason.action_sticky_keys_are_the_systems": "למערכת זו יש מקשים דביקים בהגדרות הנגישות, שהופכים כל מקש שינוי לחד-פעמי; הפעילו אותם שם.",
 	"platform_reason.action_take_note_uses_notepad": "Windows בלבד: פעולה זו פותחת את קובץ הפתקים של היום ב-Notepad, העורך שמגיע עם כל Windows. ל-macOS יש פתק מהיר משלו (Fn+Q), ול-Linux אין עורך שמגיע עם כל שולחנות העבודה.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "ב-macOS, טקסט חי קורא את הטקסט של כל צילום מסך או תמונה: צלמו אחד עם הפעולה המקבילה ואז בחרו את הטקסט שלו."

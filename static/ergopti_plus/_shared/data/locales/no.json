@@ -4008,7 +4008,7 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Ikke på Linux: antallet skrivebord hører til innstillingene i hvert skrivebordsmiljø (GNOME legger dem til og fjerner dem selv, KDE og Xfce har et fast antall), og Wayland gir ingen app en forespørsel om å endre det.",
 	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Ikke på Linux: hvert Linux-skrivebord holder en økt våken med sin egen hvilesperre (presentasjonsmodusen i KDE og Xfce, en Caffeine-utvidelse i GNOME); slå den på der.",
 	"platform_reason.action_key_is_its_own_binding_here": "Ikke en egen rad på dette systemet: den tilsvarende handlingen sender den samme tasten.",
-	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Bare macOS som bryter: Windows velger Dupliser i projeksjonsmenyen Win+P, og GNOME og KDE i sin egen skjermvelger Super+P; tilordne den tasten som tastekombinasjon.",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Ingen bryter på Linux: GNOME og KDE velger Dupliser i sin egen skjermvelger Super+P; tilordne den tasten som tastekombinasjon.",
 	"platform_reason.action_sticky_keys_are_the_systems": "Dette systemet har Trege taster i tilgjengelighetsinnstillingene, som får hver modifikator til å gjelde én tast; slå dem på der.",
 	"platform_reason.action_take_note_uses_notepad": "Bare Windows: denne handlingen åpner dagens notatfil i Notisblokk, redigeringsprogrammet som følger med hver Windows. macOS har sitt eget Hurtignotat (Fn+Q), og Linux har ikke noe redigeringsprogram som følger med alle skrivebord.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "På macOS leser Livetekst teksten i ethvert skjermbilde eller bilde: ta et med den tilsvarende handlingen, og merk så teksten."

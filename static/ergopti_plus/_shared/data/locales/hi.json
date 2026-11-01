@@ -4008,7 +4008,7 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Linux पर नहीं: डेस्कटॉप की संख्या हर डेस्कटॉप की अपनी सेटिंग्स का हिस्सा है (GNOME उन्हें ख़ुद जोड़ता-हटाता है, KDE और Xfce एक तय संख्या रखते हैं), और Wayland किसी ऐप को इसे बदलने का अनुरोध नहीं देता।",
 	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Linux पर नहीं: हर Linux डेस्कटॉप अपने निष्क्रियता अवरोधक से सत्र को जगाए रखता है (KDE और Xfce का प्रस्तुति मोड, GNOME पर Caffeine एक्सटेंशन); उसे वहीं चालू करें।",
 	"platform_reason.action_key_is_its_own_binding_here": "इस सिस्टम पर यह अलग पंक्ति नहीं है: समकक्ष क्रिया वही कुंजी भेजती है।",
-	"platform_reason.action_mirroring_is_the_systems_projection_menu": "टॉगल केवल macOS पर: Windows अपने Win+P प्रोजेक्शन मेनू में Duplicate चुनता है, और GNOME व KDE अपने Super+P डिस्प्ले स्विचर में; उस कुंजी को कुंजी संयोजन के रूप में बाँधें।",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Linux पर कोई टॉगल नहीं: GNOME और KDE अपने Super+P डिस्प्ले स्विचर में Duplicate चुनते हैं; उस कुंजी को कुंजी संयोजन के रूप में बाँधें।",
 	"platform_reason.action_sticky_keys_are_the_systems": "इस सिस्टम की सुलभता सेटिंग्स में Sticky Keys हैं, जो हर मॉडिफ़ायर को एक बार के लिए लागू करती हैं; उन्हें वहीं चालू करें।",
 	"platform_reason.action_take_note_uses_notepad": "केवल Windows: यह क्रिया दिन की नोट्स फ़ाइल Notepad में खोलती है, जो हर Windows के साथ आता है। macOS का अपना Quick Note (Fn+Q) है, और Linux में ऐसा कोई संपादक नहीं जो हर डेस्कटॉप के साथ आए।",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "macOS पर Live Text किसी भी कैप्चर या चित्र का टेक्स्ट पढ़ लेता है: समकक्ष क्रिया से एक कैप्चर लें, फिर उसका टेक्स्ट चुनें।"

@@ -1265,12 +1265,11 @@ platform = "ahk,hs"
 reason_linux = "platform_reason.action_keep_awake_is_the_desktops_inhibitor"
 
 [sg_actions.display_mirror_toggle]
-# macOS mirrors through the CoreGraphics display-configuration API. Windows and
-# Linux are not implemented, not impossible: neither has one call that toggles
-# mirroring, so the current topology has to be read first (QueryDisplayConfig
-# on Windows; xrandr or kscreen-doctor, depending on the session, on Linux).
-platform = "hs"
-reason_ahk = "platform_reason.action_mirroring_is_the_systems_projection_menu"
+# macOS mirrors through the CoreGraphics display-configuration API, Windows
+# through QueryDisplayConfig and SetDisplayConfig. Linux is not implemented, not
+# impossible: no one call toggles mirroring, so the current layout has to be read
+# first (xrandr or kscreen-doctor, depending on the session).
+platform = "ahk,hs"
 reason_linux = "platform_reason.action_mirroring_is_the_systems_projection_menu"
 
 [sg_actions.surround_parens]

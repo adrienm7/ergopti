@@ -4008,7 +4008,7 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Не в Linux: кількість робочих столів належить до налаштувань кожного середовища (GNOME сам їх додає й прибирає, KDE і Xfce тримають сталу кількість), а Wayland не дає жодному застосунку запиту, щоб її змінити.",
 	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Не в Linux: кожне середовище Linux не дає сеансу заснути власним блокувальником бездіяльності (режимом презентації в KDE і Xfce, розширенням Caffeine у GNOME); увімкніть його там.",
 	"platform_reason.action_key_is_its_own_binding_here": "У цій системі це не окремий рядок: рівноцінна дія надсилає ту саму клавішу.",
-	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Перемикач лише в macOS: Windows вибирає «Дублювати» в меню проєкції Win+P, а GNOME і KDE — у власному перемикачі екранів Super+P; призначте цю клавішу як сполучення клавіш.",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "У Linux перемикача немає: GNOME і KDE вибирають «Дублювати» у власному перемикачі екранів Super+P; призначте цю клавішу як сполучення клавіш.",
 	"platform_reason.action_sticky_keys_are_the_systems": "Ця система має залипання клавіш у налаштуваннях спеціальних можливостей: кожен модифікатор діє на одну клавішу; увімкніть його там.",
 	"platform_reason.action_take_note_uses_notepad": "Лише Windows: ця дія відкриває файл нотаток дня в Блокноті — редакторі, що є в кожній Windows. macOS має власну «Швидку нотатку» (Fn+Q), а Linux не має редактора, що був би в усіх середовищах.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "У macOS функція «Живий текст» читає текст будь-якого знімка чи зображення: зробіть знімок рівноцінною дією, а потім виділіть його текст."

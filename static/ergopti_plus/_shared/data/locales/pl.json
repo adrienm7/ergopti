@@ -4008,7 +4008,7 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Nie w Linuksie: liczba pulpitów należy do ustawień każdego środowiska (GNOME sam je dodaje i usuwa, KDE i Xfce trzymają stałą liczbę), a Wayland nie daje żadnej aplikacji żądania, by ją zmienić.",
 	"platform_reason.action_keep_awake_is_the_desktops_inhibitor": "Nie w Linuksie: każde środowisko Linux utrzymuje sesję w gotowości własną blokadą bezczynności (trybem prezentacji w KDE i Xfce, rozszerzeniem Caffeine w GNOME); włącz ją tam.",
 	"platform_reason.action_key_is_its_own_binding_here": "Nie jest to osobny wiersz w tym systemie: równoważna akcja wysyła ten sam klawisz.",
-	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Przełącznik tylko w macOS: Windows wybiera Duplikuj w menu projekcji Win+P, a GNOME i KDE we własnym przełączniku ekranów Super+P; przypisz ten klawisz jako kombinację klawiszy.",
+	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Brak przełącznika w Linuksie: GNOME i KDE wybierają Duplikuj we własnym przełączniku ekranów Super+P; przypisz ten klawisz jako kombinację klawiszy.",
 	"platform_reason.action_sticky_keys_are_the_systems": "Ten system ma Klawisze trwałe w ustawieniach ułatwień dostępu, dzięki którym każdy modyfikator działa na jeden klawisz; włącz je tam.",
 	"platform_reason.action_take_note_uses_notepad": "Tylko Windows: ta akcja otwiera plik notatek z danego dnia w Notatniku, edytorze dołączonym do każdego Windows. macOS ma własną Szybką notatkę (Fn+Q), a Linux nie ma edytora dołączonego do każdego środowiska.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "W macOS funkcja Tekst na żywo odczytuje tekst każdego zrzutu lub obrazu: zrób zrzut równoważną akcją, a potem zaznacz jego tekst."

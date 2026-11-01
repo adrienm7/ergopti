@@ -136,6 +136,12 @@ the typed-keys ledger).
    running, run it. By hand: the trigger LAlt then CapsLock; the eight default
    delimiters, each pointer kind and the delay end it; the next word is lower
    case.
+8. **Mirror displays, two screens.** The suite never changes the screens. Bind
+   `display_mirror_toggle`, start from Extend: one press mirrors, a second brings
+   Extend back with the same arrangement. Again from PC screen only and from Second
+   screen only: the second press returns to that one. Mirror by Win+P, then press:
+   Extend. With one screen, a notice says no other monitor is detected and nothing
+   flickers. Bring back the `display_mirror_toggle` lines.
 
 ## Standing checks
 

@@ -744,8 +744,6 @@ in `windows/modules/gestures/actions.ahk`:
 - `app_window_previous`: Alt+Escape, which Windows answers as Linux does.
 - `sticky_ctrl` and the other 13 sticky combinations: the one-shot logic of
   `one_shot_shift`, for the other modifiers.
-- `display_mirror_toggle`: today its reason points at the Win+P menu; a
-  toggle needs QueryDisplayConfig/SetDisplayConfig.
 
 When one lands, rewrite its reason (or remove it) and rerun
 `npm run codegen:action-catalogue`; `test-action-catalogue-codegen.cjs`

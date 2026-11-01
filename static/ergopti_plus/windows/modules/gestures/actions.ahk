@@ -117,6 +117,10 @@ global GESTURE_ACTIONS := Map(
 		"lock_screen", {
 				Fn: (*) => DllCall("LockWorkStation"),
 		},
+		; Deferred: Windows blanks the screens for a moment while it applies this.
+		"display_mirror_toggle", {
+				Fn: (*) => _GestureMakeSystemRunner("display_mirror_toggle", GestureDisplayMirrorToggle).Call(),
+		},
 		; --- UI windows ---
 		; Each UI action toggles its window (actions.toml, group "UI"): closed or
 		; hidden opens it, open but in the background raises it, open and focused
@@ -663,6 +667,45 @@ GestureTeleportMouse() {
 		TargetY := Target.Top + (Target.Bottom - Target.Top) // 2
 		MCSetPos(TargetX, TargetY)
 		SpotlightMouseAt(TargetX, TargetY, 3000)
+}
+
+; DISPLAYCONFIG_TOPOLOGY_ID (wingdi.h), the same bits as the SDC_TOPOLOGY_* flags.
+global GESTURE_DISPLAY_TOPOLOGY_INTERNAL := 0x1
+global GESTURE_DISPLAY_TOPOLOGY_CLONE := 0x2
+global GESTURE_DISPLAY_TOPOLOGY_EXTEND := 0x4
+global GESTURE_DISPLAY_TOPOLOGY_EXTERNAL := 0x8
+; What the toggle left, restored on the way back; 0 when it mirrored nothing.
+global _GestureMirrorPriorTopology := 0
+
+; Mirrors the displays, or goes back to what they did before. A mirror this run
+; did not start (Win+P, or a driver restarted since) has no remembered topology
+; and leaves for Extend, the arrangement mirroring is normally left for.
+; @param {Object} Sys The SystemControl it acts through (a double in tests).
+; @returns {Boolean} Whether a topology was applied.
+; @throws {OSError} When Windows refuses to read or apply a topology.
+GestureDisplayMirrorToggle(Sys := 0) {
+		global _GestureMirrorPriorTopology, GESTURE_DISPLAY_TOPOLOGY_INTERNAL, GESTURE_DISPLAY_TOPOLOGY_CLONE
+		global GESTURE_DISPLAY_TOPOLOGY_EXTEND, GESTURE_DISPLAY_TOPOLOGY_EXTERNAL
+		Sys := _GestureSys(Sys)
+		if (Sys.ConnectedDisplayCount() < 2) {
+				LoggerInfo("gestures", "display_mirror_toggle: one display is connected, nothing to mirror.")
+				Sys.Notify(t("shortcuts.no_other_monitor"))
+				return false
+		}
+		Current := Sys.DisplayTopology()
+		if (Current = GESTURE_DISPLAY_TOPOLOGY_CLONE)
+				Target := _GestureMirrorPriorTopology ? _GestureMirrorPriorTopology : GESTURE_DISPLAY_TOPOLOGY_EXTEND
+		else if (Current = GESTURE_DISPLAY_TOPOLOGY_INTERNAL || Current = GESTURE_DISPLAY_TOPOLOGY_EXTEND
+				|| Current = GESTURE_DISPLAY_TOPOLOGY_EXTERNAL)
+				Target := GESTURE_DISPLAY_TOPOLOGY_CLONE
+		else
+				throw ValueError("Windows reports an unknown display topology.", -1, Current)
+		Status := Sys.ApplyDisplayTopology(Target)
+		if (Status != 0)
+				throw OSError(Status, "SetDisplayConfig")
+		_GestureMirrorPriorTopology := (Target = GESTURE_DISPLAY_TOPOLOGY_CLONE) ? Current : 0
+		LoggerInfo("gestures", "display_mirror_toggle: topology {1} replaced {2}.", Target, Current)
+		return true
 }
 
 ; Case action id -> the pure transform it applies to the selection
