@@ -218,6 +218,31 @@ local function resolve_bootstrap_script_path()
 	return Paths.find_from_configdir("modules/llm/ensure-mlx-deps.sh", 12)
 end
 
+-- The import statement ensure-mlx-deps.sh runs, read once from the script.
+local _import_probe = nil
+
+--- Returns the import statement ensure-mlx-deps.sh runs on a venv before it
+--- publishes or reuses it. The script is its one source: the PTY guardian
+--- verifies that script's digest before running it, so it cannot source a
+--- second file, and the menu's probe of a published venv reads the statement
+--- here instead of keeping a copy that could drift from it.
+--- @return string probe Python statements: `import a; import b; …`.
+function M.import_probe()
+	if _import_probe then return _import_probe end
+	local path = resolve_bootstrap_script_path()
+	assert(path, "mlx_deps_checker.import_probe: ensure-mlx-deps.sh cannot be resolved")
+	local handle = assert(io.open(path, "rb"))
+	local source = handle:read("*a")
+	handle:close()
+	local probe = type(source) == "string" and source:match('\nMLX_IMPORT_PROBE="([^"]+)"') or nil
+	-- The menu embeds it in a single-quoted shell argument: modules, dots,
+	-- spaces and semicolons only.
+	assert(probe and probe:match("^import [%w_%.; ]+$") and not probe:find("'", 1, true),
+		"mlx_deps_checker.import_probe: ensure-mlx-deps.sh declares no usable MLX_IMPORT_PROBE")
+	_import_probe = probe
+	return probe
+end
+
 --- Names the virtualenv ensure-mlx-deps.sh publishes: the launcher's
 --- read-only bundle redirects it to Application Support, a checkout keeps it
 --- beside the driver. Mirrors the script's own ERGOPTI_CONFIG_DIR rule.
