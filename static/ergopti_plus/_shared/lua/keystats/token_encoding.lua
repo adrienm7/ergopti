@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local Data = require("keystats.tokens_data")
+local TableUtil = require("table_util")
 
 local M = {}
 
@@ -143,11 +144,8 @@ function M.migration_statements(keys)
 	local function literal(text)
 		return "CAST(X'" .. text:gsub(".", function(c) return string.format("%02X", c:byte()) end) .. "' AS TEXT)"
 	end
-	local names = {}
-	for table_name in pairs(keys) do names[#names + 1] = table_name end
-	table.sort(names)
 	local statements = {}
-	for _, table_name in ipairs(names) do
+	for _, table_name in ipairs(TableUtil.sorted_keys(keys)) do
 		local count = assert(M.MIGRATED_FAMILIES[table_name], "unknown n-gram family")
 		local family = keys[table_name]
 		table.sort(family)
