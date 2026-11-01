@@ -171,9 +171,10 @@ KL_LlmAccountingFields() {
     return Fields
 }
 
-; A missing predictions list stores the '{}' this driver has always stored.
-KL_JsonOrEmptyObject(Value) {
-    return (Value = "") ? "{}" : KL_JsonEncode(Value)
+; A missing predictions list stores NULL, as llm_events_vectors.json says: the
+; dashboard tells an event without a list from one with an empty list.
+KL_JsonOrEmpty(Value) {
+    return (Value = "") ? "" : KL_JsonEncode(Value)
 }
 
 KL_BuildInsertLlm(e, id, kind) {
@@ -183,8 +184,8 @@ KL_BuildInsertLlm(e, id, kind) {
     KL_SlotNullableText(Slots, "context", KL_GetMap(e, "context", ""))
     KL_SlotNullableText(Slots, "prediction", KL_GetMap(e, "prediction", ""))
     KL_SlotNullableText(Slots, "deleted_text", KL_GetMap(e, "deleted_text", ""))
-    Slots["predictions_json"] := KL_JsonOrEmptyObject(KL_GetMap(e, "predictions", ""))
-    Slots["all_predictions_json"] := KL_JsonOrEmptyObject(KL_GetMap(e, "all_predictions", ""))
+    KL_SlotNullableText(Slots, "predictions_json", KL_JsonOrEmpty(KL_GetMap(e, "predictions", "")))
+    KL_SlotNullableText(Slots, "all_predictions_json", KL_JsonOrEmpty(KL_GetMap(e, "all_predictions", "")))
     for Name in ["chosen_index", "deletes", "net_saved_chars", "count"]
         KL_SlotNullableNumber(Slots, Name, KL_GetMap(e, Name, ""))
     for Field in KL_LlmAccountingFields()
