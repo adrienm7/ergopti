@@ -319,5 +319,26 @@ class DaemonReportBuildControls(unittest.TestCase):
         )
 
 
+class ModuleMapWriteControls(unittest.TestCase):
+    """The daemon-report module map is written with an admitted output mode."""
+
+    def test_module_map_mode_is_admitted_by_the_exclusive_writer(self):
+        # Run 41257077872 refused "output leaf bytes or mode refused" at 0o600.
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "report.modulemap"
+            product._write_exclusive(
+                path, b"module Report {}\n", product.REPORT_MODULE_MAP_MODE, time.monotonic() + 30
+            )
+            self.assertEqual(path.read_bytes(), b"module Report {}\n")
+            self.assertEqual(path.stat().st_mode & 0o777, product.REPORT_MODULE_MAP_MODE)
+
+    def test_private_mode_is_not_an_admitted_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(product.ProductBuildRefusal):
+                product._write_exclusive(
+                    Path(temporary) / "leaf", b"x", 0o600, time.monotonic() + 30
+                )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

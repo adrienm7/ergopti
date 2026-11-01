@@ -616,7 +616,7 @@ def compile_native_parts(repository, owner, lua_build_work, deadline, *, daemon_
         module_path = work / "report.modulemap"
         if daemon_report:
             module_bytes = report_module_map(repository)
-            _write_exclusive(module_path, module_bytes, 0o600, deadline)
+            _write_exclusive(module_path, module_bytes, REPORT_MODULE_MAP_MODE, deadline)
             module_descriptor = os.open(module_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
             # Retain the raw FD before fstat; failure still reaches its checked close.
             module_source = HeldSource(
@@ -684,6 +684,10 @@ def compile_native_parts(repository, owner, lua_build_work, deadline, *, daemon_
                 held.close()
 
 
+# The module map is written through the admitted output modes; its private
+# 0700 work directory keeps it unreadable to others. 0o600 was never
+# admitted and refused every daemon-report build (run 41257077872).
+REPORT_MODULE_MAP_MODE = 0o644
 INSTALLER_ID = "com.ergoptiplus.app.runtime-installer"
 MODULE_ID = "com.ergoptiplus.app.installed-physical-source"
 CORE_IDLE_FACTORY_SHA256 = "d30b414066703652ed8d59cf668c0db4f6d8fed0aeebb1f9eb7ac5ed46f6fc22"
