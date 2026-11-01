@@ -488,7 +488,7 @@ class CurlAsyncRequest {
 		SpawnFn := this._DispatchPortFn("spawn")
 		Handle := IsObject(SpawnFn)
 			? SpawnFn.Call(Executable, Args, ObjBindMethod(this, "_OnManagedDone"), 0, 0, 8192)
-			: ShellRunner_SpawnTreeOwned(Executable, Args, ObjBindMethod(this, "_OnManagedDone"), 0, 0, 8192)
+			: ProxyOverride_SpawnWorker(Executable, Args, ObjBindMethod(this, "_OnManagedDone"), 0, 0, 8192)
 		this.Handle := Handle
 		if !this._ManagedIsLive() {
 			this.Completed := false

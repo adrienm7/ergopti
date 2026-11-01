@@ -473,7 +473,7 @@ class OllamaRuntimeOwner {
 	}
 
 	_NativeSpawn(Executable, Arguments, OnDone, Adopt) {
-		Factory := this.Options.Get("factory", ShellRunner_SpawnTreeOwned)
+		Factory := this.Options.Get("factory", ProxyOverride_SpawnWorker)
 		Task := Factory.Call(Executable, Arguments, OnDone, , , 0, false, true)
 		Adopt.Call(Task)
 		return Task

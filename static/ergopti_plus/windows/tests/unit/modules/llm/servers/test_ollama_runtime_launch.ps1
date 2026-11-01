@@ -198,7 +198,10 @@ $cases = @(
 	@('a looked-up relay reaches the daemon and the receipt names it', {
 		Reset-Case 'relay'
 		$script:FixtureProxy = @{ Mode = 'relay'; Tunnel = 'open'; Relay = 'not_applicable'; RelayRun = ''; Environment = [ordered]@{ HTTPS_PROXY = 'http://relay.corp:3128'; NO_PROXY = 'blobs.example' } }
-		Must ((Invoke-OllamaRuntimeEntry) -eq 0) 'Actual recording child exit must be retained.'
+		$env:ERGOPTI_PROXY_OVERRIDE = 'http://relay.corp:3128'
+		try { Must ((Invoke-OllamaRuntimeEntry) -eq 0) 'Actual recording child exit must be retained.' }
+		finally { Remove-Item Env:ERGOPTI_PROXY_OVERRIDE }
+		Must (-not $script:LastStart.EnvironmentVariables.ContainsKey('ERGOPTI_PROXY_OVERRIDE')) 'The override stops at the launcher.'
 		Must ($script:LastStart.EnvironmentVariables['HTTPS_PROXY'] -ceq 'http://relay.corp:3128') 'The looked-up relay must reach the daemon.'
 		Must ($script:LastStart.EnvironmentVariables['NO_PROXY'] -ceq 'blobs.example') 'The origins sent direct must bypass the relay.'
 		$receipt = $global:CapturedReadyText | ConvertFrom-Json

@@ -925,7 +925,7 @@ class OllamaManagedBootstrap {
 		this.PullTask := Owner
 		Accepted := false
 		try {
-			Factory := HasMethod(SpawnFn, "Call") ? SpawnFn : ShellRunner_SpawnTreeOwned
+			Factory := HasMethod(SpawnFn, "Call") ? SpawnFn : ProxyOverride_SpawnWorker
 			Task := Factory.Call(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
 				Args, ObjBindMethod(this, "_Pulled", Owner), , , LLM_OLLAMA_PULL_CAPTURE_BYTES, true, true)
 			Owner["task"] := Task

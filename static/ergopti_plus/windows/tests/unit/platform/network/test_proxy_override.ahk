@@ -8,13 +8,13 @@
 ; workers through the fake network are tools/test/test-windows-proxy-override-e2e.cjs.
 ; ==============================================================================
 
-; Runs a body with one published value and always leaves the process variable clean.
+; Runs a body with one published value and always leaves the driver on automatic.
 _TPO_WithPublished(Stored, Body) {
 	Published := ProxyOverride_Publish(Stored)
 	try
 		Body.Call(Published)
 	finally
-		EnvSet(PROXY_OVERRIDE_ENVIRONMENT, "")
+		ProxyOverride_Publish("")
 }
 
 _TPO_Parse() {
@@ -44,11 +44,69 @@ _TPO_WindowsReach() {
 
 _TPO_AssertPublishedRelay(Relay, Published) {
 	Assert(Published, Relay)
-	AssertEqual(EnvGet(PROXY_OVERRIDE_ENVIRONMENT), Relay)
+	AssertEqual(_ProxyOverridePublished, Relay)
+	AssertEqual(EnvGet(PROXY_OVERRIDE_ENVIRONMENT), "", "the driver's own environment stays out of it")
 	AssertEqual(ProxyOverride_Current()["relay"], Relay)
 }
 
-; A relay with credentials reaches the worker through the environment, not its file.
+; What run_command and Run see while a relay with a password is in force: nothing.
+_TPO_ChildrenSeeNothing(Relay, *) {
+	AssertEqual(EnvGet(PROXY_OVERRIDE_ENVIRONMENT), "", "the driver's own environment")
+	Name := PROXY_OVERRIDE_ENVIRONMENT
+	Command := _UA_Run("if defined " . Name . " (echo inherited) else (echo absent)", "copy")
+	AssertTrue(Command["started"] && Command["finished"], "the run_command child ran")
+	AssertContains(Command["copied"][1], "absent", "a run_command child does not inherit it")
+	Path := A_Temp . "\ergopti_test_proxy_child_" . ProcessExist() . ".txt"
+	try {
+		AssertEqual(0, RunWait('"' . A_ComSpec . '" /d /c set > "' . Path . '"', , "Hide"), "the Run child ran")
+		Seen := FileRead(Path)
+		AssertTrue(InStr(Seen, "COMSPEC=") > 0, "the child printed its environment")
+		AssertFalse(InStr(Seen, Name), "a Run child does not inherit it")
+		AssertFalse(InStr(Seen, "tpo-secret"), "nor the password")
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+
+_TPO_NoChildInherits() {
+	Relay := "http://user:tpo-secret@proxy.invalid:3128"
+	_TPO_WithPublished(Relay, _TPO_ChildrenSeeNothing.Bind(Relay))
+}
+
+; Only the worker's own environment block carries the choice.
+_TPO_WorkerEnvironment() {
+	Relay := "http://user:tpo-secret@proxy.invalid:3128"
+	_TPO_WithPublished(Relay, _TPO_AssertWorkerBlock.Bind(Relay))
+	_TPO_WithPublished("", (*) => _TPO_AssertBlockHolds(PROXY_OVERRIDE_ENVIRONMENT . "=", "automatic hides an inherited value"))
+}
+
+; A worker stays in its Job: the private entry is the tree-owned one.
+_TPO_WorkerIsTreeOwned() {
+	AssertContains(_DriverFuncBody("ProxyOverride_SpawnWorker"), "ShellRunner_SpawnTreeOwnedPrivate(")
+	AssertContains(_DriverFuncBody("ShellRunner_SpawnTreeOwnedPrivate"), "_SR_NewTreeOwnedTask(")
+	for Name in ["OllamaInstallFiles_Spawn", "_Updater_StartStagingWorker"]
+		AssertContains(_DriverFuncBody(Name), "ProxyOverride_SpawnWorker", Name)
+	AssertFalse(InStr(_DriverSourceConcat(), 'EnvSet(PROXY_OVERRIDE_ENVIRONMENT,'), "the value never enters this process")
+}
+
+_TPO_AssertWorkerBlock(Relay, *) {
+	_TPO_AssertBlockHolds(PROXY_OVERRIDE_ENVIRONMENT . "=" . Relay, "the worker receives the relay")
+	_TPO_AssertBlockHolds("PSModulePath=" . ShellRunner_WinPsModulePath(), "and the native module path")
+}
+
+_TPO_AssertBlockHolds(Row, Reason) {
+	Block := ProxyOverride_WorkerEnvironment()
+	At := Block.Ptr
+	while (Entry := StrGet(At, "UTF-16")) != "" {
+		if (Entry == Row)
+			return
+		At += (StrLen(Entry) + 1) * 2
+	}
+	Assert(false, Reason)
+}
+
+; A relay with credentials reaches the worker through its environment, not its file.
 _TPO_NoCredentialInTheInputFile() {
 	Assert(ProxyOverride_CarriesCredentials("socks5://user:secret@proxy.invalid:1080"), "userinfo")
 	Assert(!ProxyOverride_CarriesCredentials("socks5://proxy.invalid:1080"), "no userinfo")
@@ -61,7 +119,7 @@ _TPO_NoCredentialInTheInputFile() {
 
 _TPO_AssertPublishedRefused(Published) {
 	Assert(!Published, "the stored value is refused")
-	AssertEqual(EnvGet(PROXY_OVERRIDE_ENVIRONMENT), PROXY_OVERRIDE_REFUSED_TOKEN)
+	AssertEqual(_ProxyOverridePublished, PROXY_OVERRIDE_REFUSED_TOKEN)
 	AssertEqual(ProxyOverride_Current(), 0)
 }
 
@@ -71,11 +129,11 @@ _TPO_Published() {
 		_TPO_WithPublished(Stored, _TPO_AssertPublishedRefused)
 	_TPO_WithPublished(" DIRECT ", (Published) => (
 		Assert(Published, "direct"),
-		AssertEqual(EnvGet(PROXY_OVERRIDE_ENVIRONMENT), "direct"),
+		AssertEqual(_ProxyOverridePublished, "direct"),
 		AssertEqual(ProxyOverride_Current()["mode"], "direct")))
 	_TPO_WithPublished("", (Published) => (
 		Assert(Published, "automatic"),
-		AssertEqual(EnvGet(PROXY_OVERRIDE_ENVIRONMENT), ""),
+		AssertEqual(_ProxyOverridePublished, ""),
 		AssertEqual(ProxyOverride_Current()["mode"], "automatic")))
 }
 
@@ -210,6 +268,9 @@ _TPO_MenuRow() {
 Test("proxy override: the shared grammar replayed", _TPO_Parse)
 Test("proxy override: every relay of the grammar is published for the route owner", _TPO_WindowsReach)
 Test("proxy override: a relay with credentials stays out of the worker's input file", _TPO_NoCredentialInTheInputFile)
+Test("proxy override: run_command and Run children never inherit it", _TPO_NoChildInherits)
+Test("proxy override: only a worker's private environment carries it", _TPO_WorkerEnvironment)
+Test("proxy override: a worker stays tree-owned and the value never enters this process", _TPO_WorkerIsTreeOwned)
 Test("proxy override: a refused value is published as a refusal, never as automatic", _TPO_Published)
 Test("proxy override: every adapter route owner honours the override before the system", _TPO_Precedence)
 Test("proxy override: automatic keeps the exported relay, then the system settings", _TPO_Automatic)

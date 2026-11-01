@@ -42,7 +42,7 @@ _G5UD_CheckDownloadPollGuards() {
 		"Pause must cancel synchronously and confirm exact native cleanup")
 	StartBody := _DriverFuncBody("_Updater_StartStagingWorker")
 	Assert(StartBody != "", "_Updater_StartStagingWorker must exist in updater.ahk")
-	Assert(InStr(StartBody, "ShellRunner_SpawnTreeOwned") > 0
+	Assert(InStr(StartBody, "ProxyOverride_SpawnWorker") > 0
 		&& !RegExMatch(StartBody, "\bShellRunner_Spawn\("),
 		"updater staging must use the Job-owned process-tree runner; PID-only cancellation can leave PowerShell alive after Suspend (Garantie G5)")
 }

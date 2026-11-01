@@ -650,6 +650,40 @@ async function main() {
 			}
 		});
 
+		await ahkCheck(
+			'only the network worker sees the override: not the driver, not a Run child, in no command line',
+			async () => {
+				arm(forms[forms.length - 1]);
+				const value = forms[forms.length - 1].value;
+				const result = await withoutCredentialOnAnyCommandLine(() =>
+					runOwner(
+						work,
+						{ stored: value, url: 'http://127.0.0.1:9/', children: true },
+						{ PSModulePath: 'C:\\foreign\\pwsh\\Modules' }
+					)
+				);
+				assert.equal(result.driver_environment, '', "the driver's environment stays out of it");
+				assert.equal(result.worker.code, 0, result.worker.stdout);
+				const [acl, seen, modules] = result.worker.stdout.split('|');
+				assert.equal(acl, 'DirectorySecurity', 'Get-Acl answers in the worker');
+				assert.equal(seen, value, 'the worker gets the relay');
+				assert.ok(!modules.includes('foreign'), 'the inherited module path is gone');
+				// Windows PowerShell itself adds its machine folder in front.
+				assert.ok(
+					modules
+						.toLowerCase()
+						.endsWith(path.join(path.dirname(POWERSHELL), 'Modules').toLowerCase()),
+					modules
+				);
+				assert.ok(/^comspec=/im.test(result.run_child), 'the Run child printed its environment');
+				assert.ok(
+					!/ergopti_proxy_override/i.test(result.run_child),
+					'a Run child has no such variable'
+				);
+				assert.ok(!result.run_child.includes(SECRET), 'a Run child never sees the password');
+			}
+		);
+
 		await check('the daemon is handed the real relay, in its environment only', async () => {
 			reset();
 			const value = `socks5h://${USERINFO}@${hostOf(socksLogin)}`;

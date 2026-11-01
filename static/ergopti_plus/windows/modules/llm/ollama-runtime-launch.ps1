@@ -274,6 +274,8 @@ function New-OllamaRuntimeStart([string]$Executable, [int]$Port, [string]$Models
 	$start = [Diagnostics.ProcessStartInfo]::new($Executable)
 	$start.UseShellExecute = $false
 	$start.Arguments = 'serve'
+	# The override is for Ergopti's own workers: the daemon gets its route in HTTPS_PROXY.
+	$start.EnvironmentVariables.Remove('ERGOPTI_PROXY_OVERRIDE')
 	$start.EnvironmentVariables['OLLAMA_HOST'] = '127.0.0.1:' + $Port
 	$start.EnvironmentVariables['OLLAMA_MODELS'] = $ModelsPath
 	foreach ($name in $ServeEnvironment.Keys) { $start.EnvironmentVariables[$name] = $ServeEnvironment[$name] }

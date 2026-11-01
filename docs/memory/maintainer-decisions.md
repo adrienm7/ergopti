@@ -12,8 +12,9 @@ instead of refused. Each PowerShell channel (managed worker, updater staging,
 artifact engine, Ollama archive) hops through a loopback listener in its own
 process; the daemon reads the real relay from `HTTPS_PROXY`. The system curl
 serves loopback requests only, so no override reaches it. A credential lives in
-config.toml and in `ERGOPTI_PROXY_OVERRIDE`, never in a log, command line, receipt
-or request file; `test-windows-proxy-override-e2e.cjs` proves each form.
+config.toml and in the private environment of a network worker, never in the
+driver's own environment, a log, command line, receipt or request file;
+`test-windows-proxy-override-e2e.cjs` proves each form.
 
 ## Perplexity speaks the Agent API (2026-11-01)
 
