@@ -46,6 +46,30 @@ _NPL_HeldReadsTheHiddenPressOnly() {
 Test("press ledger: KS_IsHeld adds only the press AutoHotkey cannot see (todo91-ledger-held)",
 	_NPL_HeldReadsTheHiddenPressOnly)
 
+; The owner starts for everyone: no AI gate stands before it, and a hook that cannot
+; install or read leaves the keyboard working, on the catalogue order (item4).
+_NPL_OwnerRunsForEveryoneAndFailsSoft() {
+	Source := FileRead(A_ScriptDir . "\..\ErgoptiPlus.ahk", "UTF-8")
+	Assert(RegExMatch(Source, "m)^KeyboardArbiterEnsureForLedger\(\)$"), "the boot starts it at top level, under no condition")
+	AssertTrue(KeyboardArbiterEnsureForLedger(() => true))
+	AssertFalse(KeyboardArbiterEnsureForLedger(() => false), "a refused start is reported, not raised")
+	AssertFalse(KeyboardArbiterEnsureForLedger(_NPL_Raises), "a raising start is reported, not raised")
+	Previous := KS_NativeKeyPressPort()
+	KS_NativeKeyPressPort(_NPL_Raises)
+	try {
+		AssertEqual(0, KS_IsHeld("SC06E"), "a failing ledger: only the physical state answers")
+		AssertEqual(0, KS_PressSequence("SC06E"), "and the order reads unknown")
+		AssertEqual(-1 == KS_RealPressState("SC06E") ? 1 : 0, 1, "and the real flag reads unknown")
+	} finally KS_NativeKeyPressPort(Previous)
+	AssertEqual("caps_lock", _NPL_FirstOf(["caps_lock", "tab"], Map("caps_lock", 0, "tab", 0)),
+		"no numbers: the catalogue decides")
+}
+_NPL_Raises(*) {
+	throw Error("no hook")
+}
+Test("press ledger: the owner runs for everyone and a failure falls back to the catalogue (item4-always-on)",
+	_NPL_OwnerRunsForEveryoneAndFailsSoft)
+
 _NPL_ShiftIsEitherShift() {
 	AssertEqual(0, KS_ShiftIsHeld(), "no owner and no key: no Shift")
 	for _, Sc in [0x02A, 0x036]
