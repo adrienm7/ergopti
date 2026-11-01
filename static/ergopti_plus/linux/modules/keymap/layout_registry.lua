@@ -66,8 +66,6 @@ local REQUEST_OWNER = "layout_registry"
 -- ================================
 -- ================================
 
--- Interpreter of the user installer, looked up in PATH like the installers do.
-local PYTHON = "python3"
 -- The git a clone run asks for its registry changes, resolved through PATH.
 local GIT = "git"
 
@@ -178,6 +176,14 @@ local function scoped_deps(source)
 		scoped.run = function(program, args, options, callback)
 			if not current(epoch) then return false end
 			return source.run(program, args, options, function(...)
+				if current(epoch) then return callback(...) end
+			end)
+		end
+	end
+	if type(source.python) == "function" then
+		scoped.python = function(callback)
+			if not current(epoch) then return false end
+			return source.python(function(...)
 				if current(epoch) then return callback(...) end
 			end)
 		end
@@ -321,6 +327,58 @@ local function file_sha256(dir, timeout_ms)
 	end
 end
 
+--- Asks before the one download of Ergopti's own Python, through the menu's
+--- yes/no question (the owned dialog, under the modal keyboard release).
+--- @param bytes number The archive's size.
+--- @return boolean accepted
+local function confirm_python_download(bytes)
+	local Dialogs = require("ui.menu.menu_dialogs")
+	local megabytes = string.format("%d", math.ceil(bytes / 1048576))
+	local text = I18n.get("layouts.managed_python_offer"):gsub("{1}", function() return megabytes end)
+	return Dialogs.ask_yes_no(I18n.get("layouts.managed_python_title"), Dialogs.plain_markup(text),
+		I18n.get("menu.llm.btn_download"), I18n.get("common.cancel")) == true
+end
+
+--- Ergopti's own Python: the installed interpreter, or one downloaded on
+--- consent (modules/keymap/managed_python.lua, pinned in the runtime manifest).
+--- @param confirm function|nil The consent; the owned dialog by default.
+--- @return function python(callback) -> callback(ok, interpreter_or_code, detail)
+local function managed_python(confirm)
+	local timeout_ms = require("infra.timings").ms("adapters", "managed_python_download_timeout_ms")
+	local native = require("luv")
+	local deps = {
+		pin = require("_generated.native_runtime").managed_python,
+		data_dir = ConfigPaths.data(),
+		machine = function() return native.os_uname().machine end,
+		exists = FileSystem.exists,
+		confirm = confirm or confirm_python_download,
+		download = function(url, path, bytes, callback)
+			return HttpClient.download(url, {}, path, { timeout_ms = timeout_ms, max_download_bytes = bytes,
+				owner = REQUEST_OWNER, https_only = true }, callback)
+		end,
+		size = function(path)
+			local stat = native.fs_stat(path)
+			return stat and stat.type == "file" and stat.size or nil
+		end,
+		sha256 = function(path, callback)
+			FileDigest.sha256(path, { timeout_ms = timeout_ms, owner = REQUEST_OWNER }, callback)
+		end,
+		unpack = function(archive, into, callback)
+			if not ShellRunner.has_command("tar") then callback(false, "tar is not installed") return end
+			ProcessRunner.run("tar", { "-xzf", archive, "-C", into, "--no-same-owner" }, { timeout_ms = timeout_ms },
+				function(result) callback(result.exit_code == 0 and result.error == nil, result.error or result.stderr) end)
+		end,
+		ensure_dir = ensure_dir,
+		remove_tree = function(path, callback)
+			ProcessRunner.run("rm", { "-rf", "--", path }, { timeout_ms = timeout_ms },
+				function(result) callback(result.exit_code == 0 and result.error == nil) end)
+		end,
+		delete = FileSystem.delete,
+		rename = os.rename,
+	}
+	return function(callback) require("modules.keymap.managed_python").ensure(deps, callback) end
+end
+
 --- The production collaborators.
 --- @param settings table Result of M.settings().
 --- @return table
@@ -389,6 +447,7 @@ local function default_deps(settings)
 		exists = FileSystem.exists,
 		ensure_dir = ensure_dir,
 		run = ProcessRunner.run,
+		python = managed_python(),
 		local_dir = local_dir,
 		bundled_dir = M.bundled_dir(driver_root, settings, FileSystem.exists),
 		converter_data = M.converter_data_path(driver_root, FileSystem.exists),
@@ -396,6 +455,16 @@ local function default_deps(settings)
 		keycodes = Paths.shared("modules/layouts/mac_keycodes.json"),
 		translate = I18n.get,
 	}
+end
+
+--- The production managed Python for probes only: the live hardware probe
+--- (tests/hardware/run_managed_python_live.lua) injects its consent; nil keeps
+--- the owned consent dialog (the native caption inventory).
+--- @param confirm function|nil confirm(bytes) -> boolean
+--- @return function python(callback)
+function M._managed_python_for_probe(confirm)
+	assert(confirm == nil or type(confirm) == "function", "a probe consent is a function")
+	return managed_python(confirm)
 end
 
 --- Resolves the collaborators, the production ones by default.
@@ -453,23 +522,31 @@ local function version_probe_args()
 	}
 end
 
---- Runs a Python helper after checking the interpreter.
+--- Runs a Python helper on Ergopti's own interpreter (deps.python: installed,
+--- or downloaded on consent, modules/keymap/managed_python.lua) after checking
+--- that it runs: the host's python3 is never used.
 --- on_done(ok, result_or_code, detail) is called exactly once.
 --- @param deps table
 --- @param args table Argument vector after the interpreter.
 --- @param on_done function
 local function run_python(deps, args, on_done)
-	deps.run(PYTHON, version_probe_args(), { timeout_ms = CHILD_TIMEOUT_MS }, function(probe)
-		if probe.not_found or probe.exit_code == PYTHON_TOO_OLD_EXIT then
-			on_done(false, M.FAILURE_PYTHON, "python3 3.8 or newer is required")
+	deps.python(function(available, interpreter, reason)
+		if not available then
+			on_done(false, M.FAILURE_PYTHON, tostring(interpreter) .. ": " .. tostring(reason))
 			return
 		end
-		if probe.error then
-			on_done(false, M.FAILURE_PYTHON, "python3 does not run: " .. tostring(probe.error))
-			return
-		end
-		deps.run(PYTHON, args, { timeout_ms = CHILD_TIMEOUT_MS }, function(result)
-			on_done(true, result, nil)
+		deps.run(interpreter, version_probe_args(), { timeout_ms = CHILD_TIMEOUT_MS }, function(probe)
+			if probe.not_found or probe.exit_code == PYTHON_TOO_OLD_EXIT then
+				on_done(false, M.FAILURE_PYTHON, interpreter .. " is not Python 3.8 or newer")
+				return
+			end
+			if probe.error then
+				on_done(false, M.FAILURE_PYTHON, interpreter .. " does not run: " .. tostring(probe.error))
+				return
+			end
+			deps.run(interpreter, args, { timeout_ms = CHILD_TIMEOUT_MS }, function(result)
+				on_done(true, result, nil)
+			end)
 		end)
 	end)
 end

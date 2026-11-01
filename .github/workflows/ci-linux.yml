@@ -3213,6 +3213,33 @@ jobs:
           fi
         timeout-minutes: 10
 
+      # The user XKB installer runs on Ergopti's own Python, downloaded once on
+      # consent. The live probe drives the production path (managed HTTP
+      # download of the pinned python-build-standalone archive, size and SHA-256
+      # checks, unpack, publication by rename) in a private data folder, runs the
+      # published interpreter, and checks a second request downloads nothing.
+      # LuaJIT and luv come from the owned dialog host's prerequisites above.
+      - name: Ergopti's own Python downloads, verifies and runs
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          scratch="$(mktemp -d /tmp/ergopti-managed-python-XXXXXX)"
+          XDG_DATA_HOME="$scratch/data" XDG_CONFIG_HOME="$scratch/config" XDG_STATE_HOME="$scratch/state" \
+              LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' \
+              luajit tests/hardware/run_managed_python_live.lua
+          rm -rf -- "$scratch"
+          else
+              exit 1
+          fi
+        timeout-minutes: 15
+
       - name: Install prerequisites for The secure-field probe on a real accessibility bus
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         run: |

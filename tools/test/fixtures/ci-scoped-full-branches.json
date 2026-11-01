@@ -1031,6 +1031,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Ergopti's own Python downloads, verifies and runs",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Install prerequisites for The secure-field probe on a real accessibility bus",
 			"protocol": 9
 		},
