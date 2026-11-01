@@ -185,6 +185,10 @@ helpers.describe("HS-099 Remote URL contract", function()
 					.. "/models/gemini:generateContent?key=plain-token")
 			end
 
+			configure(api, "https://fixture.invalid/v1", "gemini", "perplexity_agent")
+			helpers.assert_eq(dispatch_batch(api, "gemini"), 0)
+			helpers.assert_eq(posts[#posts], "https://fixture.invalid/v1/agent", "the Agent API's endpoint")
+
 			local rendered = table.concat(logs, "\n")
 			helpers.assert_eq(refusal_logs, expected_refusals,
 				"every invalid endpoint must produce one actionable diagnostic")

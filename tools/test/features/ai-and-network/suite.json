@@ -515,6 +515,15 @@
 			"args": ["tools/test/test-windows-proxy-override-e2e.cjs"],
 			"repro": "node tools/test/test-windows-proxy-override-e2e.cjs",
 			"platforms": ["win32"]
+		},
+		{
+			"id": "perplexity-agent-e2e",
+			"ordinal": 565,
+			"name": "Perplexity Agent API end to end: the real transport and the shared Lua through the fake network",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-perplexity-agent-e2e.cjs"],
+			"repro": "node tools/test/test-perplexity-agent-e2e.cjs",
+			"platforms": ["win32"]
 		}
 	]
 }

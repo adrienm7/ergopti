@@ -6,7 +6,8 @@
  * DESCRIPTION:
  * Loopback stand-ins for what a company network puts between a client and a
  * model registry: an HTTP CONNECT proxy (open, Basic, NTLM, Negotiate, refusing,
- * slow, dropping), a PAC/WPAD file server and an Ollama-like registry over TLS.
+ * slow, dropping), a PAC/WPAD file server, an Ollama-like registry over TLS and a
+ * Perplexity-like Agent API.
  *
  * FEATURES & RATIONALE:
  * 1. Every listener binds 127.0.0.1 on an ephemeral port, so there is no firewall
@@ -706,6 +707,113 @@ async function startFakeRegistry({ mode = 'ok' } = {}) {
 	};
 }
 
+// ======================================
+// ======= 5/ The Agent API =============
+// ======================================
+
+/** The documented answer: a tool item stands before the message. */
+function agentAnswer(model) {
+	return {
+		id: 'resp_fake',
+		object: 'response',
+		model,
+		status: 'completed',
+		error: null,
+		output: [
+			{ type: 'search_results', queries: [], results: [] },
+			{
+				type: 'message',
+				role: 'assistant',
+				status: 'completed',
+				content: [{ type: 'output_text', text: 'OK', annotations: [] }]
+			}
+		],
+		usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12, cost: { total_cost: 0 } }
+	};
+}
+
+/**
+ * Starts the fake Agent API: POST /v1/agent and GET /v1/models, with the refusals
+ * of docs.perplexity.ai read on 2026-11-01. A key is compared and never recorded.
+ * @param {object} options
+ * @param {string} options.key The expected Bearer key.
+ * @returns {Promise<object>} { port, baseUrl, events, close }.
+ */
+async function startFakeAgentApi({ key }) {
+	const events = [];
+	const sockets = new Set();
+	const send = (response, status, value) => {
+		response.writeHead(status, { 'Content-Type': 'application/json' });
+		response.end(JSON.stringify(value));
+	};
+	const refuse = (response, status, message) => {
+		events.push({ type: 'refused', status, message });
+		send(response, status, { error: { message, type: 'invalid_request' } });
+	};
+	const server = http.createServer((request, response) => {
+		if (request.method === 'GET' && request.url === '/v1/models') {
+			send(response, 200, {
+				object: 'list',
+				data: ['perplexity/sonar', 'perplexity/kimi-k3'].map((id) => ({
+					id,
+					object: 'model',
+					created: 0,
+					owned_by: 'perplexity'
+				}))
+			});
+			return;
+		}
+		if (request.method !== 'POST' || request.url !== '/v1/agent') {
+			refuse(response, 404, 'not found');
+			return;
+		}
+		const chunks = [];
+		request.on('data', (chunk) => chunks.push(chunk));
+		request.on('end', () => {
+			if (request.headers.authorization !== `Bearer ${key}`) {
+				refuse(response, 401, 'invalid api key');
+				return;
+			}
+			let body;
+			try {
+				body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+			} catch {
+				refuse(response, 400, 'body is not JSON');
+				return;
+			}
+			if (typeof body.model !== 'string' || body.input === undefined) {
+				refuse(response, 400, 'input and a model are required');
+				return;
+			}
+			if ('messages' in body || 'max_tokens' in body) {
+				refuse(response, 400, 'chat completion fields are not accepted');
+				return;
+			}
+			if (!Number.isInteger(body.max_output_tokens) || body.max_output_tokens < 1) {
+				refuse(response, 400, 'max_output_tokens is required');
+				return;
+			}
+			events.push({ type: 'agent', body });
+			send(response, 200, agentAnswer(body.model));
+		});
+	});
+	server.on('connection', (socket) => {
+		sockets.add(socket);
+		socket.on('close', () => sockets.delete(socket));
+	});
+	await new Promise((resolve, reject) => {
+		server.once('error', reject);
+		server.listen(0, LOOPBACK, resolve);
+	});
+	const { port } = server.address();
+	return {
+		port,
+		baseUrl: `http://${LOOPBACK}:${port}/v1`,
+		events,
+		close: () => closeServer(server, sockets)
+	};
+}
+
 module.exports = {
 	BASIC_CREDENTIAL,
 	LOOPBACK,
@@ -717,6 +825,7 @@ module.exports = {
 	ntlmType2,
 	pacScript,
 	selfSignedCertificate,
+	startFakeAgentApi,
 	startFakePacServer,
 	startFakeProxy,
 	startFakeRegistry,

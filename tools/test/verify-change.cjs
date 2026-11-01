@@ -863,6 +863,20 @@ const RULES = [
 			].includes(f)
 	},
 	{
+		gate: 'perplexity-agent-e2e',
+		why: 'only the real transport against the fake Agent API shows the drivers speak its documented shape',
+		match: (f) =>
+			[
+				'static/ergopti_plus/_shared/lua/llm/remote_formats.lua',
+				'static/ergopti_plus/_shared/lua/llm/remote_response_classifier.lua',
+				'static/ergopti_plus/windows/modules/llm/remote_formats.ahk',
+				'static/ergopti_plus/windows/tests/live/perplexity_agent_owner.ahk',
+				'tools/test/fixtures/perplexity-agent-client.lua',
+				'tools/test/lib/fake-network.cjs',
+				'tools/test/test-perplexity-agent-e2e.cjs'
+			].includes(f)
+	},
+	{
 		gate: 'linux-network-runtime',
 		why: 'managed networking requires actual LuaJIT luv, GIO modules, compiled schemas and installed helper paths',
 		match: (f) =>
@@ -1030,6 +1044,7 @@ const GATE_COMMANDS = {
 	'go-proxy-relay': { npm: 'test:go-proxy-relay' },
 	'windows-proxy-relay-e2e': { npm: 'test:windows-proxy-relay-e2e', platform: 'win32' },
 	'windows-proxy-override-e2e': { npm: 'test:windows-proxy-override-e2e', platform: 'win32' },
+	'perplexity-agent-e2e': { npm: 'test:perplexity-agent-e2e', platform: 'win32' },
 	'linux-nix-native': { npm: 'test:linux:nix-native', platform: 'linux' },
 	'linux-updater-temp-native': { npm: 'test:linux:updater-temp-native', platform: 'linux' },
 	'linux-updater-archive-native': { npm: 'test:linux:updater-archive-native', platform: 'linux' },

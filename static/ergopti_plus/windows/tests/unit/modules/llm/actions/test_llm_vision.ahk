@@ -311,7 +311,8 @@ _LVS_ParameterKind() {
 		AssertEqual(LLM_API_PROVIDERS[ProviderId]["Label"], Choices[Index + 1]["label"], ProviderId . " label")
 	}
 	for Choice in Choices
-		AssertFalse(Choice["value"] == "backboard" || LLM_RemoteProviderFormat(Choice["value"]) == "decisions",
+		AssertFalse(Choice["value"] == "backboard" || Choice["value"] == "perplexity"
+			|| LLM_RemoteProviderFormat(Choice["value"]) == "decisions",
 			Choice["value"] . " is no vision backend")
 	AssertFalse(InStr(GestureActionParameterPrompt("llm_screen_region"), "typesafe"),
 		"the prompt does not list a decisions provider")

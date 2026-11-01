@@ -110,7 +110,8 @@ if not ok_kl then keystats = nil end
 --- empty-catalogue equivalents on any failure so that a corrupted JSON file
 --- never aborts the full keymap-engine require chain.
 -- The request formats a provider may declare
-local CATALOG_FORMATS = { openai = true, anthropic = true, gemini = true, backboard = true, decisions = true }
+local CATALOG_FORMATS = { openai = true, anthropic = true, gemini = true, perplexity_agent = true,
+	backboard = true, decisions = true }
 
 local function catalog_descriptor_is_valid(provider_id, desc)
 	if type(desc) ~= "table" then return false end
@@ -1501,6 +1502,7 @@ local function build_url(base, format, model, token)
 		local enc = _http_adapter.encodeForQuery(token)
 		return base .. "/models/" .. segment .. ":generateContent?key=" .. enc, nil
 	end
+	if format == Formats.AGENT_FORMAT then return base .. Formats.AGENT_PATH, nil end
 	-- OpenAI / OpenAI-compatible
 	return base .. "/chat/completions", nil
 end
@@ -1624,6 +1626,10 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 			contents          = { { role = "user", parts = { { text = user_prompt or "" } } } },
 			generationConfig  = { temperature = temperature, maxOutputTokens = max_tokens },
 		}
+	end
+	if format == Formats.AGENT_FORMAT then
+		return Formats.agent_body({ model = model, system = system_prompt, text = user_prompt or "",
+			max_tokens = max_tokens, temperature = temperature })
 	end
 	-- OpenAI Chat Completions
 	local payload = {

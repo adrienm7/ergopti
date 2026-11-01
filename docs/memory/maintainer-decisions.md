@@ -5,6 +5,17 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Perplexity speaks the Agent API (2026-11-01)
+
+Perplexity left Sonar chat completions for the Agent API on the three drivers:
+format `perplexity_agent`, `POST <base_url>/agent`, base
+`https://api.perplexity.ai/v1`, default model `perplexity/sonar`. Its image input
+takes a URL, so it serves every text use and no screenshot. `GET /v1/models`
+declares no authentication, so the save-time ping proves the address, not the key;
+the Test action sends a real request. The shapes come from the docs and were only
+run against the fake of `tools/test/lib/fake-network.cjs`: no key existed for a
+live call. No retirement date is recorded, none being confirmed by Perplexity.
+
 ## DashScope keeps `dashscope-intl`, a workspace domain is optional (2026-11-01)
 
 The default address stays the shared `dashscope-intl.aliyuncs.com`. Alibaba calls

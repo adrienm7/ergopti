@@ -54,13 +54,16 @@ global LLM_API_PROVIDER_ORDER := []
 
 ; The formats a catalogue provider may declare, each with what it serves:
 ; "chat" (text in, text out), "images" (a chat that also reads a screenshot).
-; "backboard" chats through Backboard's assistant/thread API and
+; "perplexity_agent" chats through Perplexity's Agent API, whose image input
+; takes a URL only, so no screenshot. "backboard" chats through Backboard's
+; assistant/thread API and
 ; "decisions" answers typed questions only (TypeSafe's Jev): see
 ; modules/llm/remote_formats.ahk for their shapes.
 global LLM_REMOTE_CATALOG_FORMATS := Map(
     "openai",    Map("chat", true,  "images", true),
     "anthropic", Map("chat", true,  "images", true),
     "gemini",    Map("chat", true,  "images", true),
+    "perplexity_agent", Map("chat", true, "images", false),
     "backboard", Map("chat", true,  "images", false),
     "decisions", Map("chat", false, "images", false))
 
@@ -304,7 +307,7 @@ LLM_RemoteProviderFormat(ProviderId) {
  */
 LLM_RemoteHasReadyPing(ProviderId) {
     Fmt := LLM_RemoteProviderFormat(ProviderId)
-    return Fmt == "openai" || Fmt == "anthropic" || Fmt == "gemini"
+    return Fmt == "openai" || Fmt == "anthropic" || Fmt == "gemini" || Fmt == LLM_AGENT_FORMAT
 }
 
 /**
@@ -1280,9 +1283,9 @@ _LLMRemoteExtractUsageRoot(format, root, model) {
         return out
     usage := root[usageKey]
     promptKey := format == "gemini" ? "promptTokenCount"
-        : (format == "anthropic" ? "input_tokens" : "prompt_tokens")
+        : ((format == "anthropic" || format == LLM_AGENT_FORMAT) ? "input_tokens" : "prompt_tokens")
     completionKey := format == "gemini" ? "candidatesTokenCount"
-        : (format == "anthropic" ? "output_tokens" : "completion_tokens")
+        : ((format == "anthropic" || format == LLM_AGENT_FORMAT) ? "output_tokens" : "completion_tokens")
     totalKey := format == "gemini" ? "totalTokenCount" : "total_tokens"
     if usage.Has(promptKey) and usage[promptKey] is Number and usage[promptKey] >= 0
         out["prompt_tokens"] := Integer(usage[promptKey])
@@ -1601,7 +1604,7 @@ _LLMRemote_ReadyOnAccess(Owner, on_result, ProviderId, Auth, Key, BaseUrl, ProvF
 ; @returns {Map} Owner.
 _LLMRemote_ReadySend(Owner, on_result, BaseUrl, ProvFmt, Token, Port) {
     PingUrl := ""
-    if (ProvFmt == "openai" or ProvFmt == "anthropic") {
+    if (ProvFmt == "openai" or ProvFmt == "anthropic" or ProvFmt == LLM_AGENT_FORMAT) {
         PingUrl := RTrim(BaseUrl, "/") . "/models"
     } else if (ProvFmt == "gemini") {
         PingUrl := RTrim(BaseUrl, "/") . "/models?key=" . Token
@@ -1824,6 +1827,8 @@ _LLMRemoteBuildUrl(BaseUrl, Fmt, Token, Model) {
     if (Fmt == "anthropic") {
         return Trimmed . "/messages"
     }
+    if (Fmt == LLM_AGENT_FORMAT)
+        return Trimmed . LLM_AGENT_PATH
     if (Fmt == "decisions") {
         ; A decisions provider's base_url is its full endpoint.
         return BaseUrl
@@ -1918,6 +1923,8 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
         return Format('{"systemInstruction":{"parts":[{"text":"{1}"}]},"contents":[{"role":"user","parts":[{"text":"{2}"}]}],"generationConfig":{"temperature":{3},"maxOutputTokens":{4}}}',
             SysEsc, UserEsc, Temp, MaxTok)
     }
+    if (Fmt == LLM_AGENT_FORMAT)
+        return LLM_RemoteFormats_AgentBody(Model, SystemPrompt, UserText, MaxTok, Temp)
     ; OpenAI Chat Completions shape — covers OpenAI itself plus every
     ; OpenAI-compatible endpoint (Groq, OpenRouter, LM Studio, vLLM, …).
     ; Catalogue extras render generically from data: no per-model literal may
@@ -2273,6 +2280,13 @@ _LLMRemoteParseResponse(Format, Body) {
 }
 
 _LLMRemoteParseStructuredRootState(Format, Root) {
+    if (Format == LLM_AGENT_FORMAT) {
+        if LLM_RemoteFormats_AgentFailed(Root)
+            return Map("recognized", true, "text", "", "reason", "provider_error")
+        if !LLM_RemoteFormats_AgentText(Root, &AgentText)
+            return Map("recognized", false, "text", "", "reason", "unsupported_shape")
+        return Map("recognized", true, "text", AgentText, "reason", "canonical_empty")
+    }
     if Root.Has("error")
         return Map("recognized", true, "text", "", "reason", "provider_error")
     if (Format == "anthropic") {
@@ -2327,6 +2341,9 @@ _LLMRemoteParseStructuredRootState(Format, Root) {
 ; Compatibility extraction is intentionally limited to syntactically valid
 ; JSON maps without a canonical response container or provider-error envelope.
 _LLMRemoteParseResponseRegex(Format, Body) {
+    ; An Agent API answer without its output array holds no answer anywhere.
+    if (Format == LLM_AGENT_FORMAT)
+        return ""
     if (Format == "anthropic") {
         ; { "content": [ { "type": "text", "text": "..." } ], ... }
         if RegExMatch(Body, 'm)"text"\s*:\s*"((?:[^"\\]|\\.)*)"', &m)
@@ -2720,7 +2737,7 @@ global LLM_API_LISTING_MAX_ENTRIES := 16
  * @returns {Boolean}
  */
 LLM_ApiListingSupported(Fmt) {
-    return Fmt == "openai" || Fmt == "anthropic" || Fmt == "gemini"
+    return Fmt == "openai" || Fmt == "anthropic" || Fmt == "gemini" || Fmt == LLM_AGENT_FORMAT
 }
 
 /**
