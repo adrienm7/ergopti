@@ -1334,8 +1334,12 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				: _HSE_PrepareDispatchDecision(
 						Spec, HSE_Buffer, EndChar, HSE_TypoNbspStripped, , GateTick)
 		HotPath_LogIfSlow("HSE.Preflight", PreflightStarted, "")
-		if !IsObject(Prepared)
+		; A refusal changes nothing on screen, and the caller only knows it happened.
+		; These counts name the gate behind each one, with no text of the input.
+		if !IsObject(Prepared) {
+				HotPath_RecordLatency("HSE.Refused.preflight", 0, 5)
 				return false
+		}
 		IsConform := Prepared.IsConform
 		Replacement := Prepared.Replacement
 		OnlyText := Prepared.OnlyText
@@ -1353,8 +1357,10 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		HostStarted := HotPath_Now()
 		OutputHost := OutputHostResolve(_HSE_OutputHostNeedsTitle)
 		HotPath_LogIfSlow("HSE.OutputHost", HostStarted, "raw=false")
-		if !OutputHost["Valid"]
+		if !OutputHost["Valid"] {
+			HotPath_RecordLatency("HSE.Refused.output_host", 0, 5)
 			return false
+		}
 
 		Fired := false
 		DeferredOwner := 0
@@ -1495,8 +1501,10 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						} finally {
 								Critical(_AtCrit)
 						}
-						if !Fired
+						if !Fired {
+								HotPath_RecordLatency("HSE.Refused.terminal_admission", 0, 5)
 								return false
+						}
 						; Admission is not output success. The timer owner revalidates,
 						; emits, commits all canonical state, records metrics, and releases
 						; suppression only after its sender returns a true verdict.
