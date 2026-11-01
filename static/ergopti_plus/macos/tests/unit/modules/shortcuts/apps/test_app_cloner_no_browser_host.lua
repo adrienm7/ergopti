@@ -32,7 +32,7 @@ local BROWSER_SPELLINGS = { "PWA_BROWSER", "pwa_browser", "browser_app_path", "-
 helpers.describe("App Cloner web clones", function()
 	helpers.it("never look for or start a browser (app-cloner-no-browser)", function()
 		local script = read(RESOURCES .. "clone_app.sh")
-		helpers.assert_true(script:find("exec /usr/bin/python3 \"$BUNDLE_RES/pwa_launcher.py\"", 1, true) ~= nil,
+		helpers.assert_true(script:find("exec \"$CLONE_PYTHON\" \"$BUNDLE_RES/pwa_launcher.py\"", 1, true) ~= nil,
 			"the PWA clone is the WKWebView launcher")
 		for _, relative in ipairs({ "clone_app.sh", "ShortcutBuilder.applescript" }) do
 			local text = read(RESOURCES .. relative)
