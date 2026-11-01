@@ -743,18 +743,14 @@ for (let mask = 1; mask < 2 ** modifiers.length; mask += 1) {
 }
 const migrationContext = { modifier_chords: modifierChords, assignable_actions: assignableActions };
 
-// Inline tables remain opaque at a closed opcode source or this exact frozen
-// destination-owner fixture. Every unrelated inline record keeps the guard.
+// Inline tables remain opaque at a closed opcode source. Every unrelated inline
+// record keeps the guard.
 function opaqueChordPaths(source, registry, where, report = fail) {
 	const allowed = new Set(
 		registry.steps.flatMap((step) =>
 			step.ops.filter((op) => op.op === 'move_chord_action').map((op) => op.section + '.' + op.key)
 		)
 	);
-	if (
-		/^shipped_common_autocorrection_occupied(?:_non_windows)?\/(input|expected)\.toml$/.test(where)
-	)
-		allowed.add('hotstrings.autocorrection.names');
 	const paths = new Set();
 	let section = '';
 	for (const line of source.split('\n')) {
@@ -775,25 +771,18 @@ function opaqueChordPaths(source, registry, where, report = fail) {
 	return paths;
 }
 
-// Both the namespace and fixture identity fence this exception. These negative
-// controls call the same guard without adding expected failures to the run.
+// This negative control calls the same guard without adding an expected failure
+// to the run.
 {
-	const controls = [
-		[
-			'shipped_common_autocorrection_occupied/input.toml',
-			'[hotstrings.autocorrection]\nforeign = { enabled = false }\n'
-		],
-		['unrelated/input.toml', '[hotstrings.autocorrection]\nnames = { enabled = false }\n']
-	];
-	for (const [where, source] of controls) {
-		const refusals = [];
-		const paths = opaqueChordPaths(source, { steps: [] }, where, (...args) => refusals.push(args));
-		if (refusals.length !== 1 || paths.size !== 0)
-			fail(
-				'opaque namespace negative control',
-				`${where}: unrelated inline ownership must remain refused`
-			);
-	}
+	const refusals = [];
+	const paths = opaqueChordPaths(
+		'[hotstrings.autocorrection]\nnames = { enabled = false }\n',
+		{ steps: [] },
+		'unrelated/input.toml',
+		(...args) => refusals.push(args)
+	);
+	if (refusals.length !== 1 || paths.size !== 0)
+		fail('opaque namespace negative control', 'unrelated inline ownership must remain refused');
 }
 
 const shipped = validateRegistry(readToml(REGISTRY_PATH) || {}, 'migrations.toml');
@@ -1243,5 +1232,5 @@ if (failures.length) {
 	process.exit(1);
 }
 console.log(
-	`Config migration gate: registry v${shipped.unstamped}..v${shipped.current} (${shipped.steps.length} step(s)), ${onDisk.length} corpus case(s), ${replays} driver replay(s), ${rejectedCases.length} rejected registry defect(s) — OK`
+	`Config migration gate: registry v${shipped.oldest}..v${shipped.current} (${shipped.steps.length} step(s)), ${onDisk.length} corpus case(s), ${replays} driver replay(s), ${rejectedCases.length} rejected registry defect(s) — OK`
 );

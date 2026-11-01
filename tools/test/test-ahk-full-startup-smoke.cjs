@@ -13,8 +13,9 @@
  * 1. hardening-a-startup-zero-error: a boot that reaches ready may still have
  *    logged an ERROR, which opens the error window for the user. Every boot's
  *    logs must hold no ERROR or FATAL line and no suppressed error window.
- * 2. User states: a fresh folder, the neutral defaults the wizard writes, and
- *    config.toml files older releases wrote (the shared migration corpus).
+ * 2. User states: a fresh folder, the neutral defaults the wizard writes,
+ *    config.toml files older releases wrote (the shared migration corpus), and
+ *    one too old to migrate: its boot reaches ready, says so and writes nothing.
  * 3. CI runs it in the Windows unit job with ERGOPTI_AHK_EXE set, which turns
  *    a missing interpreter into a failure instead of a skip.
  * 4. script-chords-switch-2026-09-30: after ready, every script chord of
@@ -62,6 +63,32 @@ for (const name of fs.readdirSync(CORPUS).sort()) {
 		SEEDED_CONFIGS[`older-release-${name}`] = path.join(CORPUS, name, 'input.toml');
 	}
 }
+// A file with no schema version predates the registry's oldest supported one, so
+// every authored fixture climbs from there, as a file of 1.0.0 would.
+const OLDEST_SCHEMA_VERSION = parseToml(
+	fs.readFileSync(
+		path.join(WINDOWS, '..', '_shared', 'core', 'config_schema', 'migrations.toml'),
+		'utf8'
+	)
+).registry.oldest_version;
+
+/**
+ * Writes a seeded config.toml, stamped unless the text carries its own version.
+ * @param {string} file Destination.
+ * @param {string} toml Fixture text.
+ */
+function writeSeededConfig(file, toml) {
+	const stamped = /^schema_version\s*=/m.test(toml)
+		? toml
+		: `[_meta]\nschema_version = ${OLDEST_SCHEMA_VERSION}\n\n${toml}`;
+	fs.writeFileSync(file, stamped);
+}
+
+// A config.toml from before versioning, seeded byte for byte: the one boot that
+// must log its refusal, keep every byte and write no backup.
+const TOO_OLD_FIXTURE = 'too-old-config';
+const TOO_OLD_SOURCE = '# from a build before versioning\n[gestures]\nspace_wrap = false\n';
+
 // config.toml files that change the script chords, and the slots each leaves
 // running (every other fixture runs all four: they start with their preset).
 const SCRIPT_CHORD_SLOTS = [
@@ -493,7 +520,7 @@ async function main() {
 			'\uFEFF#Requires AutoHotkey v2.0+\n_DriverStartupSmokeInspect := _StartupSmokeReceipts\n_DriverStartupSmokeInspectShell := _StartupSmokeShellReceipt\n_DriverStartupSmokeInspectAdmission := _StartupSmokeAdmissionReceipt\n_DriverStartupSmokeInspectBootstrap := _StartupSmokeEarlyClick\n#Include ErgoptiPlus.ahk\n' +
 				'_StartupSmokeEarlyClick(*) {\n\tglobal _TrayStartupClick\n\t_TrayStartupClick.PopupFn := (*) => SetTimer(_StartupSmokePumpReceipt, -1)\n\tPostMessage(0x404, 0, 0x205, , A_ScriptHwnd)\n}\n' +
 				'_StartupSmokePumpReceipt(*) {\n\tglobal _TrayStartupClick, _DriverReady\n\tif !_TrayStartupClick.Pending || (IsSet(_DriverReady) && _DriverReady) || _TrayStartupClick.MenuLoopOpen\n\t\tthrow Error("the retained probe must leave bootstrap and timers running")\n\tFileAppend("pumped", EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\startup-pump.txt", "UTF-8")\n}\n' +
-				'_StartupSmokeReceipts(*) {\n\t_StartupSmokeFullSaveReceipt()\n\t_StartupSmokeConfigTypesReceipt()\n\t_ScriptChordSmokeReceipt()\n\t_LayoutExtensionSmokeReceipt()\n}\n' +
+				'_StartupSmokeReceipts(*) {\n\tif EnvGet("ERGOPTI_STARTUP_SMOKE_EXPECT_READ_ONLY") != "1"\n\t\t_StartupSmokeFullSaveReceipt()\n\t_StartupSmokeConfigTypesReceipt()\n\t_ScriptChordSmokeReceipt()\n\t_LayoutExtensionSmokeReceipt()\n}\n' +
 				'_StartupSmokeShellReceipt(*) {\n\tglobal _TrayFeatureHeadLabels, _TrayRootBootDetailsPending, _TrayStartupClick, _DriverReady, _DriverMenuReady, _MenuStartupCommands\n\tif _DriverReady || !_DriverMenuReady || _TrayRootBootDetailsPending || _TrayFeatureHeadLabels.Length < 4\n\t\tthrow Error("the complete configured root must be published before input readiness")\n\tif _TrayStartupClick.RequestCount != 1\n\t\tthrow Error("the early native context request was lost")\n\tglobal _StartupSmokeSelections\n\tSelections := []\n\t_StartupSmokeSelections := Selections\n\tMenuCommandRun((*) => Selections.Push(1), [])\n\tif Selections.Length || _MenuStartupCommands.Pending.Length != 1\n\t\tthrow Error("an early feature command bypassed startup admission")\n\tRows := Map()\n\tloop TrayMenuItemCount(A_TrayMenu) {\n\t\tText := Buffer(2048, 0)\n\t\tDllCall("GetMenuStringW", "ptr", A_TrayMenu.Handle, "uint", A_Index - 1, "ptr", Text, "int", 1024, "uint", 0x400)\n\t\tRows[StrGet(Text, "UTF-16")] := DllCall("GetMenuState", "ptr", A_TrayMenu.Handle, "uint", A_Index - 1, "uint", 0x400, "uint")\n\t}\n\tif Rows.Has(t("common.loading")) || Rows.Has(t("menu.global.starting"))\n\t\tthrow Error("the usable root still advertises driver startup")\n\tfor Key in ["menu.global.suspend", "menu.global.reload", "menu.global.quit"] {\n\t\tLabel := t(Key)\n\t\tif !Rows.Has(Label) || (Rows[Label] & 3) || (Rows[Label] & 0x10)\n\t\t\tthrow Error("the configured root has no enabled command for " . Key)\n\t}\n\tFileAppend("ready", EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\tray-shell.txt", "UTF-8")\n}\n' +
 				'_StartupSmokeAdmissionReceipt(*) {\n\tglobal _StartupSmokeSelections\n\tExpected := EnvGet("ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED") == "1" ? 0 : 1\n\tStarted := A_TickCount\n\tif Expected\n\t\twhile !_StartupSmokeSelections.Length && !TickExpired(Started, 1000)\n\t\t\tSleep(10)\n\telse\n\t\tSleep(50)\n\tif _StartupSmokeSelections.Length != Expected\n\t\tthrow Error("retained startup selection did not obey restored pause or execute exactly once")\n}\n' +
 				'_StartupSmokeFullSaveReceipt() {\n\tglobal DriverPid\n\t_StartupSmokeRequireFullSaveAcknowledged()\n\tSaveState := _ConfigFullSaveCoordinator()\n\tPreviousCritical := Critical("On")\n\ttry {\n\t\tRequested := SaveState.requested_generation\n\t\tCommitted := SaveState.committed_generation\n\t\tSettled := SaveState.settled_generation\n\t\tPending := _ConfigFullSaveHasPending()\n\t} finally Critical(PreviousCritical)\n\tNonce := EnvGet("ERGOPTI_STARTUP_SMOKE_NONCE")\n\tif !RegExMatch(Nonce, "^[0-9a-f]{32}$")\n\t\tthrow ValueError("Invalid startup full-save nonce.")\n\tReceipt := \'{"schema_version":1,"nonce":\' . JsonStringLiteral(Nonce)\n\t\t. \',"pid":\' . DriverPid . \',"requested":\' . Requested\n\t\t. \',"committed":\' . Committed . \',"settled":\' . Settled\n\t\t. \',"pending":\' . (Pending ? "true" : "false") . \'}\' . "`n"\n\tif !FSWriteCreateDurable(EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\full-save.json", Receipt)\n\t\tthrow Error("The startup full-save receipt could not be created durably.")\n}\n' +
@@ -536,6 +563,7 @@ async function main() {
 			'extension-enabled',
 			'extension-master-off',
 			'retired-metrics-config',
+			TOO_OLD_FIXTURE,
 			CONFIG_TYPES_FIXTURE,
 			REALISTIC_HOTSTRINGS_FIXTURE,
 			...Object.keys(CHORD_CONFIGS),
@@ -547,18 +575,18 @@ async function main() {
 			if (fixture === CONFIG_TYPES_FIXTURE) {
 				const config = path.join(configRoot, 'config', 'autohotkey');
 				fs.mkdirSync(config, { recursive: true });
-				fs.writeFileSync(path.join(config, 'config.toml'), CONFIG_TYPES_SOURCE);
+				writeSeededConfig(path.join(config, 'config.toml'), CONFIG_TYPES_SOURCE);
 			}
 			if (fixture === 'retired-metrics-config') {
 				const config = path.join(configRoot, 'config', 'autohotkey');
 				fs.mkdirSync(config, { recursive: true });
-				fs.writeFileSync(path.join(config, 'config.toml'), RETIRED_METRICS_SOURCE);
+				writeSeededConfig(path.join(config, 'config.toml'), RETIRED_METRICS_SOURCE);
 			}
 			if (fixture === REALISTIC_HOTSTRINGS_FIXTURE) {
 				const config = path.join(configRoot, 'config');
 				fs.mkdirSync(path.join(config, 'autohotkey'), { recursive: true });
 				fs.mkdirSync(path.join(config, 'hotstrings'), { recursive: true });
-				fs.writeFileSync(
+				writeSeededConfig(
 					path.join(config, 'autohotkey', 'config.toml'),
 					REALISTIC_HOTSTRINGS_CONFIG
 				);
@@ -578,17 +606,25 @@ async function main() {
 				// the hotkeys its pause deferred are activated on resume.
 				const config = path.join(configRoot, 'config', 'autohotkey');
 				fs.mkdirSync(config, { recursive: true });
-				fs.writeFileSync(path.join(config, 'config.toml'), SUSPEND_MARKER_CONFIG);
+				writeSeededConfig(path.join(config, 'config.toml'), SUSPEND_MARKER_CONFIG);
 			}
 			if (SEEDED_CONFIGS[fixture]) {
 				const config = path.join(configRoot, 'config', 'autohotkey');
 				fs.mkdirSync(config, { recursive: true });
-				fs.copyFileSync(SEEDED_CONFIGS[fixture], path.join(config, 'config.toml'));
+				writeSeededConfig(
+					path.join(config, 'config.toml'),
+					fs.readFileSync(SEEDED_CONFIGS[fixture], 'utf8')
+				);
 			}
 			if (CHORD_CONFIGS[fixture]) {
 				const config = path.join(configRoot, 'config', 'autohotkey');
 				fs.mkdirSync(config, { recursive: true });
-				fs.writeFileSync(path.join(config, 'config.toml'), CHORD_CONFIGS[fixture].toml);
+				writeSeededConfig(path.join(config, 'config.toml'), CHORD_CONFIGS[fixture].toml);
+			}
+			if (fixture === TOO_OLD_FIXTURE) {
+				const config = path.join(configRoot, 'config', 'autohotkey');
+				fs.mkdirSync(config, { recursive: true });
+				fs.writeFileSync(path.join(config, 'config.toml'), TOO_OLD_SOURCE);
 			}
 			const extensionFixture = fixture.startsWith('extension-');
 			const selected = fixture !== 'extension-neutral';
@@ -603,7 +639,7 @@ async function main() {
 				);
 				const config = path.join(configRoot, 'config', 'autohotkey');
 				fs.mkdirSync(config, { recursive: true });
-				fs.writeFileSync(
+				writeSeededConfig(
 					path.join(config, 'config.toml'),
 					'[category_enabled]\nhotstrings = ' +
 						effective +
@@ -628,7 +664,9 @@ async function main() {
 					ERGOPTI_STARTUP_SMOKE_DIR: configRoot,
 					ERGOPTI_STARTUP_SMOKE_NONCE: nonce,
 					ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED: markerBearing ? '1' : '',
-					ERGOPTI_STARTUP_SMOKE_EXPECT_CONFIG_TYPES: fixture === CONFIG_TYPES_FIXTURE ? '1' : ''
+					ERGOPTI_STARTUP_SMOKE_EXPECT_CONFIG_TYPES: fixture === CONFIG_TYPES_FIXTURE ? '1' : '',
+					// A refused file's session accepts no full save, by design.
+					ERGOPTI_STARTUP_SMOKE_EXPECT_READ_ONLY: fixture === TOO_OLD_FIXTURE ? '1' : ''
 				}
 			});
 			stage = `${fixture}/cold-verdict`;
@@ -650,7 +688,11 @@ async function main() {
 			}
 			const readiness = startupReceiptProblem(configRoot, result.pid, nonce, ahk);
 			if (readiness) return fail(fixture + ': ' + readiness);
-			const fullSave = fullSaveReceiptProblem(configRoot, result.pid, nonce);
+			const fullSave =
+				fixture === TOO_OLD_FIXTURE
+					? fs.existsSync(path.join(configRoot, 'full-save.json')) &&
+						'the read-only session published a full save'
+					: fullSaveReceiptProblem(configRoot, result.pid, nonce);
 			if (fullSave) return fail(fixture + ': ' + fullSave);
 			if (fixture === CONFIG_TYPES_FIXTURE) {
 				const types = configTypesProblem(configRoot, result.pid, nonce);
@@ -699,8 +741,30 @@ async function main() {
 			if (markerBearing && fs.existsSync(marker)) {
 				return fail(`${fixture}: startup reached ready without consuming the suspend marker.`);
 			}
-			const logged = failOnLoggedErrors(fixture, configRoot);
-			if (logged !== null) return logged;
+			if (fixture === TOO_OLD_FIXTURE) {
+				const config = path.join(configRoot, 'config', 'autohotkey');
+				// The refused session may only report that its saves were refused.
+				const foreign = loggedErrors(configRoot).filter(
+					(line) =>
+						!/Refusing full-state persistence|identical line|error window for 'ConfigIO'/.test(line)
+				);
+				if (foreign.length > 0) return fail(`${fixture}: ${foreign[0]}`);
+				const logs = path.join(configRoot, 'ergopti_plus', 'logs');
+				const text = fs
+					.readdirSync(logs)
+					.filter((name) => name.endsWith('.log'))
+					.map((name) => fs.readFileSync(path.join(logs, name), 'utf8'))
+					.join('');
+				if (!text.includes('is too old for this build to migrate'))
+					return fail(`${fixture}: the session did not name its cause`);
+				if (fs.readFileSync(path.join(config, 'config.toml'), 'utf8') !== TOO_OLD_SOURCE)
+					return fail(`${fixture}: the refused file changed`);
+				if (fs.readdirSync(config).some((name) => /^config\.pre-v/.test(name)))
+					return fail(`${fixture}: a migration backup was written`);
+			} else {
+				const logged = failOnLoggedErrors(fixture, configRoot);
+				if (logged !== null) return logged;
+			}
 			// Every boot renders the Hotstrings menu at least twice: the staged
 			// first render and the full one after registration. Both stay a menu
 			// build, not a stall of the only input thread.

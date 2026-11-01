@@ -10,12 +10,8 @@
  *   1. In every locale, no two actions a driver offers share a label.
  *   2. Every switching action's label says what it switches (an application
  *      or a window) and where (this screen, every screen, the active app...).
- *   3. The ids macOS stopped offering are migrated: config migration step
- *      v5_to_v6 maps each one to the action that does the same thing, in every
- *      key of config.toml it lists, and those keys are the whole enumerable
- *      action slot space of macOS (gesture slots, tap keys, script control),
- *      each named as it was at v6: a later rename step leads back to it, and
- *      a key macOS gained after v6 (INTRODUCED_AFTER_V6) held no retired id.
+ *   3. The ids macOS stopped offering stay gone, each with its twin on offer,
+ *      and the remap keys keep reading as that twin.
  * In-memory mutations prove each check can fail.
  * ==============================================================================
  */
@@ -29,10 +25,6 @@ const toml = require('smol-toml');
 const SP = path.resolve(__dirname, '../../static/ergopti_plus');
 const read = (file) => fs.readFileSync(path.join(SP, file), 'utf8').replace(/^﻿/, '');
 const PLATFORMS = ['ahk', 'hs', 'linux'];
-
-// Action keys macOS gained after config schema v6, so no v5 id can be in them:
-// the Delete script chord came with the shared chords of v6_to_v7.
-const INTRODUCED_AFTER_V6 = new Set(['shortcuts.script_control.script_altgr_delete']);
 
 // What each switching action switches and where, in the English label.
 const SWITCHING = {
@@ -50,7 +42,7 @@ const SWITCHING = {
 	app_switcher: /\bSystem Alt\+Tab\b/
 };
 
-// The ids macOS stopped offering, and the action each one became.
+// The ids macOS stopped offering, and the action that replaced each one.
 const MERGED = {
 	app_switcher: 'app_previous',
 	alt_tab_apps: 'app_previous',
@@ -69,8 +61,8 @@ function platformsOf(platform) {
 }
 
 /**
- * Checks labels, switching descriptions and the migration.
- * @param {object} input Parsed catalogue, locales, manifest keys and registry.
+ * Checks labels, switching descriptions and the retired ids.
+ * @param {object} input Parsed catalogue and locales.
  * @returns {{errors: string[], checks: number}} Violations and check count.
  */
 function validate(input) {
@@ -112,7 +104,7 @@ function validate(input) {
 		);
 	}
 
-	// 3. The migration of what macOS stopped offering.
+	// 3. What macOS stopped offering.
 	const hs = new Set(offered('hs'));
 	const aliases = input.catalogue.karabiner_aliases || {};
 	for (const [from, to] of Object.entries(MERGED)) {
@@ -125,50 +117,9 @@ function validate(input) {
 	for (const alias of ['cmd_tab', 'alt_tab_apps_list']) {
 		check(aliases[alias] === 'app_previous', `alias: ${alias} must read as app_previous`);
 	}
-	const step = (input.registry.steps || {}).v5_to_v6;
-	check(step !== undefined, 'migration: step v5_to_v6 is missing');
-	if (!step) return { errors, checks };
-	check(JSON.stringify(step.drivers) === '["hs"]', 'migration: v5_to_v6 is macOS only');
-	const listed = new Set();
-	for (const op of step.ops || []) {
-		listed.add(`${op.section}.${op.key}`);
-		const map = Object.fromEntries((op.map || []).map((pair) => [pair.from, pair.to]));
-		check(
-			op.op === 'map_value' && JSON.stringify(map) === JSON.stringify(MERGED),
-			`migration: ${op.section}.${op.key} must map every merged id to its twin`
-		);
-	}
-	// A later rename step gives a v6 key its current name: follow it back.
-	const renamedFrom = new Map();
-	for (const later of Object.values(input.registry.steps || {})) {
-		if (later.from < 6) continue;
-		for (const op of later.ops || []) {
-			if (op.op !== 'rename') continue;
-			renamedFrom.set(
-				`${op.to_section || op.section}.${op.to_key || op.key}`,
-				`${op.section}.${op.key}`
-			);
-		}
-	}
-	const keysAtV6 = input.actionKeys
-		.filter((key) => !INTRODUCED_AFTER_V6.has(key))
-		.map((key) => renamedFrom.get(key) || key);
-	for (const key of keysAtV6) {
-		check(listed.has(key), `migration: ${key} holds an action id and is not migrated`);
-	}
-	check(
-		listed.size === keysAtV6.length,
-		`migration: ${listed.size} key(s) listed for ${keysAtV6.length} action key(s)`
-	);
 	return { errors, checks };
 }
 
-const manifest = toml.parse(
-	read('_shared/modules/features/manifest.toml').replace(
-		/^\[\[features\.([^\]]+)\]\]\r?$/gm,
-		(_match, prefix) => `[[entries]]\npath_prefix = "${prefix}"`
-	)
-);
 const catalogue = toml.parse(read('_shared/modules/actions/actions.toml'));
 const locales = {};
 for (const file of fs.readdirSync(path.join(SP, '_shared/data/locales'))) {
@@ -176,22 +127,9 @@ for (const file of fs.readdirSync(path.join(SP, '_shared/data/locales'))) {
 		locales[file.slice(0, -5)] = JSON.parse(read(`_shared/data/locales/${file}`));
 	}
 }
-const actionKeys = [
-	...catalogue.slots.single.map((slot) => `gestures.${slot}`),
-	...(manifest.entries || [])
-		.filter(
-			(entry) =>
-				['shortcuts.tap_keys', 'shortcuts.script_control'].includes(entry.path_prefix) &&
-				entry.type === 'action' &&
-				(entry.platforms || []).includes('hs')
-		)
-		.map((entry) => `${entry.path_prefix}.${entry.id}`)
-];
 const input = {
 	catalogue,
-	locales,
-	actionKeys,
-	registry: toml.parse(read('_shared/core/config_schema/migrations.toml'))
+	locales
 };
 
 const result = validate(input);
@@ -219,21 +157,6 @@ const mutations = [
 		'alias: the remap key alt_tab_apps',
 		(copy) => {
 			delete copy.catalogue.karabiner_aliases.alt_tab_apps;
-		}
-	],
-	[
-		'migration: gestures.tap_3 holds',
-		(copy) => {
-			copy.registry.steps.v5_to_v6.ops = copy.registry.steps.v5_to_v6.ops.filter(
-				(op) => op.key !== 'tap_3'
-			);
-		}
-	],
-	[
-		'migration: shortcuts.tap_keys.number_row_left must map',
-		(copy) => {
-			const op = copy.registry.steps.v5_to_v6.ops.find((entry) => entry.key === 'number_row_left');
-			op.map = op.map.slice(1);
 		}
 	]
 ];
@@ -263,5 +186,5 @@ if (result.errors.length > 0 || undetected > 0) {
 }
 console.log(
 	`\x1b[32m[OK] app-switch-labels: ${result.checks} check(s) and ${mutations.length} ` +
-		'mutation(s) hold one explicit action per switch and the migration of the rest.\x1b[0m'
+		'mutation(s) hold one explicit action per switch.\x1b[0m'
 );

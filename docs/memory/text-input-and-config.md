@@ -399,7 +399,9 @@ moving or retyping a config key ships a registry step in the same commit, with
 a corpus case each named driver replays. Retired keys reported by the explicit
 cleanup remain on disk until that cleanup; boot migrations and ordinary saves
 preserve them (ADR-009's retirement exception). Readers drop the old spelling
-at once. Invalid schema stamps retain strict boot and session-write refusal.
+at once. Invalid schema stamps retain strict boot and session-write refusal, and so does
+a file below the registry's `oldest_version` (v12, what 1.0.0 wrote), a file
+with no stamp included: every seeded test or fixture config must carry a stamp.
 A writer stamps only a file it creates; an existing file
 keeps the stamp the boot migration gave it, or its remaining steps are skipped.
 The Windows full save is the one exception: it always writes the current
@@ -427,9 +429,9 @@ that can hold it, since the op set has no section-wide map. Every driver
 parses the whole registry at every boot: measured with the pure-Lua
 `toml_codec` (Lua 5.4), the 17 KB registry took 36 ms and v5_to_v6's 42 ops
 of six pairs doubled it to 77 ms; listing macOS's 200 keyboard-slot keys as
-well would have added about 250 ms. v5_to_v6 therefore covers gesture slots,
-tap keys and script-control keys only, and a keyboard slot naming a retired
-id is reported as outdated. Action: before retiring more stored ids, add a
+well would have added about 250 ms. v5_to_v6 (squashed since) therefore
+covered gesture slots, tap keys and script-control keys only, and a keyboard
+slot naming a retired id is reported as outdated. Action: before retiring more stored ids, add a
 section-wide map op to all three interpreters (with Windows runtime tests)
 rather than enumerating keys.
 
@@ -642,7 +644,7 @@ the layout owns the key: Windows keeps its declared, detected, then shipped
 Ergopti chain, while macOS and Linux remap nothing, because their Ergopti+
 OS layouts already type the magic key on KeyC. Action: add a candidate only
 through the manifest enum and mac_keycodes.json (test-magic-key-source.cjs
-pins both and the v4_to_v5 map); never make a Lua driver remap `auto`, which
+pins both); never make a Lua driver remap `auto`, which
 would take KeyC from every QWERTY user who turned the replace section on. A
 key the user chose is another key of their layout: every driver remaps its
 plain press only. Windows' every-level RemapKey (Shift gives "J"), Ctrl+★ save

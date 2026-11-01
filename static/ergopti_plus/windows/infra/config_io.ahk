@@ -84,6 +84,9 @@ ConfigOlderSchemaReadOnly() {
 ConfigNotifyOlderSchemaAtBoot(NotifyFn := 0) {
 	if !ConfigOlderSchemaReadOnly()
 		return false
+	; The migration's own ERROR can fall out of the pre-logger ring on a busy boot.
+	try LoggerWarn("Config", "The startup configuration is too old for this build to migrate: "
+		. "it is left untouched and this session is read-only.")
 	try {
 		Message := t("config.read_only.older_schema")
 		Options := Map("title", t("paths_editor.save_failed_title"), "level", "warning")

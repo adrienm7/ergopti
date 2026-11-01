@@ -372,7 +372,7 @@ _CMG_SquashedRegistry() {
 	return ConfigMigrateValidateRegistry(_ConfigMigrateParse(
 		"[registry]`ncurrent_version = 3`nunstamped_version = 1`noldest_version = 2`n`n"
 		. '[steps.v2_to_v3]`nfrom = 2`nto = 3`ndrivers = ["ahk"]`nreason = "r"`n'
-		. 'ops = [{ op = "delete", section = "gestures", key = "space_wrap" }]`n',
+		. 'ops = [{ op = "delete", section = "gestures", key = "old_toggle" }]`n',
 		"the squashed test registry"))
 }
 
@@ -395,17 +395,17 @@ _CMG_OlderFileIsRefusedInWords(Older) {
 }
 Test("config migrate: a stamp below the oldest version is refused and left byte for byte "
 	. "(config-migrate-older-refused)", _CMG_OlderFileIsRefusedInWords.Bind(
-	"[_meta]`nschema_version = 1`n`n[gestures]`nspace_wrap = false`n"))
+	"[_meta]`nschema_version = 1`n`n[gestures]`nold_toggle = false`n"))
 Test("config migrate: a file with no stamp is refused and left byte for byte "
 	. "(config-migrate-older-refused)", _CMG_OlderFileIsRefusedInWords.Bind(
-	"# from a build before versioning`n[gestures]`nspace_wrap = false`n"))
+	"# from a build before versioning`n[gestures]`nold_toggle = false`n"))
 
 _CMG_OldestVersionStillMigrates() {
 	global _CMG_STAMP
 	Dir := _CMG_NewDir()
 	try {
 		Path := Dir . "\config.toml"
-		AssertTrue(FSWriteDurable(Path, "[_meta]`nschema_version = 2`n`n[gestures]`nspace_wrap = false`n"))
+		AssertTrue(FSWriteDurable(Path, "[_meta]`nschema_version = 2`n`n[gestures]`nold_toggle = false`n"))
 		Result := ConfigMigrateRun(Path, _CMG_SquashedRegistry(), _CMG_STAMP)
 		AssertEqual("migrated", Result["status"])
 		AssertEqual(2, Result["from"])
