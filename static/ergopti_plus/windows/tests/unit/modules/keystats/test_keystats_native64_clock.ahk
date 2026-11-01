@@ -70,7 +70,7 @@ _KLSCR_Native64Key(Origin, LongGap, Offset) {
 	_KL_Watchers_CommitSessionStart(Origin - 1000)
 	KLWatch.last_authorized_tick := Origin
 	AssertTrue(KL_Watchers_OnKeystroke(0, Origin + Gap))
-	Expired := LongGap || Offset >= 0
+	Expired := LongGap || Offset > 0
 	AssertEqual(Expired ? 2 : 0, _Stub_AppendLogRows.Length,
 		"a long native silence cannot leave the old session active")
 	if Expired {
@@ -99,17 +99,17 @@ _KLSCR_Native64Idle(LongGap, Threshold, Offset) {
 	KLHook.last_tick := Origin
 	_KL_Watchers_CommitSessionStart(Origin - 1000)
 	KL_Watchers_IdleTick(Origin + Gap)
-	Expired := LongGap || Gap >= KLWatchConst.SESSION_TIMEOUT_MS
-	Started := Expired || Gap >= KLWatchConst.MICRO_IDLE_TIMEOUT_MS
+	Expired := LongGap || Gap > KLWatchConst.SESSION_TIMEOUT_MS
+	Started := Expired || Gap > KLWatchConst.MICRO_IDLE_TIMEOUT_MS
 	AssertEqual(Expired ? 3 : Started ? 1 : 0, _Stub_AppendLogRows.Length,
 		"the periodic owner must classify the full physical silence")
 	if Started {
 		AssertEqual("idle_start", _Stub_AppendLogRows[1]["type"])
-		AssertEqual(Origin, KLWatch.idle_started_at)
+		AssertEqual(Origin + KLWatchConst.MICRO_IDLE_TIMEOUT_MS, KLWatch.idle_started_at)
 	}
 	if Expired {
 		AssertEqual("idle_end", _Stub_AppendLogRows[2]["type"])
-		AssertEqual(Gap, _Stub_AppendLogRows[2]["duration_ms"])
+		AssertEqual(Gap - KLWatchConst.MICRO_IDLE_TIMEOUT_MS, _Stub_AppendLogRows[2]["duration_ms"])
 		AssertEqual("session_end", _Stub_AppendLogRows[3]["type"])
 		AssertEqual(1000, _Stub_AppendLogRows[3]["duration_ms"])
 		AssertFalse(KLWatch.is_session_active)
@@ -396,7 +396,7 @@ _KLSCR_Native64PrivacyBody(Code) {
 _KLSCR_Native64SourceOrder(Body, Periodic) {
 	AssertTrue(Body != "", "the watcher timing owner must be readable")
 	Body := _DriverMaskNonCode(&Body)
-	Authority := Periodic ? "KLHook\.last_tick" : "KLWatch\.last_authorized_tick"
+	Authority := Periodic ? "Max\(KLHook\.last_tick,\h*KLWatch\.last_authorized_tick\)" : "KLWatch\.last_authorized_tick"
 	Capture := _KLSCR_Native64SourceMatch(Body,
 		"im)^\h*(\w+)\h*:=\h*" . Authority . "\h*$", "the actual origin must be captured")
 	Clock := _KLSCR_Native64SourceMatch(Body,
@@ -433,7 +433,7 @@ _KLSCR_Native64SourceOrder(Body, Periodic) {
 		AssertEqual(0, RegExMatch(SubStr(Body, Clock.Pos), "i)KLHook\.last_tick"),
 			"publication cannot retarget a new physical origin after sampling")
 		_KLSCR_Native64SourceMatch(Body,
-			"im)^\h*_KL_Watchers_CommitIdleStart\.Bind\(" . Capture[1] . "\)\h*,\h*,\h*$",
+			"im)^\h*_KL_Watchers_CommitIdleStart\.Bind\(" . Capture[1] . "\h*\+\h*KLWatchConst\.MICRO_IDLE_TIMEOUT_MS\)\h*,\h*,\h*$",
 			"idle publication must use the same captured origin")
 		_KLSCR_Native64SourceMatch(Body,
 			"im)^\h*return\h+_KL_Watchers_CloseSession\(" . Capture[1] . ",\h*" . Clock[1] . "\)\h*$",
@@ -463,7 +463,7 @@ _KLSCR_Native64OrderMutations(Periodic) {
 	Body := _DriverFuncBody(Periodic ? "KL_Watchers_IdleTick" : "KL_Watchers_OnKeystroke")
 	_KLSCR_Native64SourceOrder(Body, Periodic)
 	Code := _DriverMaskNonCode(&Body)
-	Authority := Periodic ? "KLHook\.last_tick" : "KLWatch\.last_authorized_tick"
+	Authority := Periodic ? "Max\(KLHook\.last_tick,\h*KLWatch\.last_authorized_tick\)" : "KLWatch\.last_authorized_tick"
 	Capture := _KLSCR_Native64SourceMatch(Code,
 		"im)^\h*(\w+)\h*:=\h*" . Authority . "\h*$", "the capture mutation owner must exist")
 	ClockAssignment := _KLSCR_Native64SourceMatch(Code,
