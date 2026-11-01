@@ -27,6 +27,7 @@ class _TakeNoteFakeOps {
 	static errors := []
 	static windows := []
 	static last_pattern := ""
+	static last_waited := ""
 	static last_file_name := ""
 	static last_target := 0
 	static last_send := ""
@@ -171,8 +172,9 @@ class _TakeNoteFakeOps {
 		return true
 	}
 
-	static WarnTimeout(Pattern) {
+	static WarnTimeout(Pattern, Waited) {
 		_TakeNoteFakeOps.last_pattern := Pattern
+		_TakeNoteFakeOps.last_waited := Waited
 		_TakeNoteFakeOps.warning_count += 1
 	}
 
@@ -389,3 +391,25 @@ _TNAJ_WrapSafeTimeoutCancelsBeforeLaunch() {
 }
 Test("take note async: fake clock expiry across rollover cancels before launch (takenote-async-job)",
 	_TNAJ_WrapSafeTimeoutCancelsBeforeLaunch)
+
+; Three field warnings said « did not appear or take focus »: two causes with two cures.
+_TNAJ_TimeoutNamesWhatItWaitedFor() {
+	global TAKE_NOTE_LAUNCH_TIMEOUT_MS
+	_TNAJ_Reset()
+	TakeNoteRequest(false, "C:\Notes", true, _TakeNoteFakeOps)
+	_TakeNoteFakeOps.RunNext()
+	_TakeNoteFakeOps.now_tick += TAKE_NOTE_LAUNCH_TIMEOUT_MS
+	_TakeNoteFakeOps.RunNext()
+	AssertEqual("window", _TakeNoteFakeOps.last_waited, "no window ever appeared")
+
+	_TNAJ_Reset()
+	TakeNoteRequest(false, "C:\Notes", true, _TakeNoteFakeOps)
+	_TakeNoteFakeOps.window_exists := true
+	_TakeNoteFakeOps.focus_after_activate := false
+	_TakeNoteFakeOps.RunNext()
+	_TakeNoteFakeOps.now_tick += TAKE_NOTE_LAUNCH_TIMEOUT_MS
+	_TakeNoteFakeOps.RunNext()
+	AssertEqual("focus", _TakeNoteFakeOps.last_waited, "the window appeared and never took focus")
+}
+Test("take note async: the deadline warning says what it waited for (takenote-timeout-cause)",
+	_TNAJ_TimeoutNamesWhatItWaitedFor)

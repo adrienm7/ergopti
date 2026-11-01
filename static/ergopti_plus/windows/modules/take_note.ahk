@@ -99,8 +99,10 @@ class _TakeNoteNative {
 		return true
 	}
 
-	static WarnTimeout(Pattern) {
-		LoggerWarn("TakeNote", "Notepad window '{1}' did not appear or take focus before the bounded launch deadline.", Pattern)
+	; @param Pattern {String} The awaited window.
+	; @param Waited {String} What the job last lacked: "window" or "focus".
+	static WarnTimeout(Pattern, Waited) {
+		LoggerWarn("TakeNote", "Notepad window '{1}' missed the bounded launch deadline: it was waiting for {2}.", Pattern, Waited)
 	}
 
 	static ReportError(Message) {
@@ -191,6 +193,7 @@ _TakeNoteQueueFinalize(FilePath, FileName, WinPattern,
 			"pattern", WinPattern,
 			"append_on_launch", AppendNewlineOnLaunch,
 			"append_newline", false,
+			"waited", "window",
 			"started_tick", Ops.NowTick(),
 			"timeout_ms", TAKE_NOTE_LAUNCH_TIMEOUT_MS,
 			"timer", TimerFn,
@@ -223,7 +226,7 @@ _TakeNoteFinish(JobId) {
 
 
 _TakeNoteExpire(JobId, Job) {
-	try Job["ops"].WarnTimeout(Job["pattern"])
+	try Job["ops"].WarnTimeout(Job["pattern"], Job["waited"])
 	_TakeNoteFinish(JobId)
 }
 
@@ -298,6 +301,7 @@ _TakeNotePoll(JobId) {
 			_TakeNoteReschedule(JobId, Job)
 			return
 		}
+		Job["waited"] := "focus"
 		Activated := Ops.Activate(WindowHwnd)
 		if _TakeNoteAbortIfUnavailable(JobId, Job)
 			return
