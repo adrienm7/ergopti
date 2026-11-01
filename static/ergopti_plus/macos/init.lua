@@ -1548,20 +1548,33 @@ if mlx_deps_checker.configure_pause_owner(shortcuts) ~= true
 	error("dependency bootstrap pause-owner registration did not commit")
 end
 
--- Fast-path LLM check: only admitted native opt-in permits the MLX cleanup
--- (lsof + curl), whose warmup retry consumer is also gated on LLM being enabled.
--- Absent or obsolete settings stay untouched and skip this early cleanup.
--- This is a deliberately separate, quick gate; the full
--- boot_llm_enabled computation (including the saved-prefs / DEFAULT_STATE
--- fallback) runs later in Section 3. Named distinctly so the two never shadow
--- each other and the intent of each is unambiguous.
 -- Overrides applied FIRST. config.toml's [script] layer writes into hs.settings,
--- and the native llm.enabled consent read below sits beside it: the two readers
--- of one setting must not sit on opposite sides of the layer that populates it.
+-- and the llm.enabled read below sits beside it: the two readers of one
+-- setting must not sit on opposite sides of the layer that populates it.
 local config_overrides = require("infra.config_overrides")
 config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
-local mlx_cleanup_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED) == true
+-- The boot's one answer to "is the AI on": the native value, else config.toml,
+-- else the shipped default. The MLX port cleanup (lsof + curl) only serves the
+-- AI warmup, so it reads this same value. It used to read the native value
+-- alone: a config.toml that turned the AI on, with no native value yet, started
+-- the AI bootstrap and skipped the cleanup.
+local Preferences = require("infra.preferences")
+local ok_core_llm, core_llm = pcall(require, "modules.llm")
+local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
+local boot_llm_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED)
+if boot_llm_enabled == nil then
+	if type(boot_saved_prefs.llm_enabled) == "boolean" then
+		boot_llm_enabled = boot_saved_prefs.llm_enabled
+	elseif ok_core_llm and type(core_llm) == "table"
+		and type(core_llm.DEFAULT_STATE) == "table" then
+		boot_llm_enabled = (core_llm.DEFAULT_STATE.llm_enabled == true)
+	else
+		boot_llm_enabled = false
+	end
+end
+
+local mlx_cleanup_enabled = boot_llm_enabled == true
 local mlx_cleanup_settled = not mlx_cleanup_enabled
 local pending_llm_bootstrap = nil
 
@@ -1627,8 +1640,8 @@ Boot.stage("LLM backend bootstrap")
 -- edit by hand (log_level). The [features] layer was retired: each declared
 -- feature has one canonical leaf, and a leftover [features] table is reported by
 -- the unused-key scan. All overrides live in the driver-specific config.
--- (config_overrides.apply already ran in Section 2, before the MLX cleanup gate
--- that reads a value it can write.)
+-- (config_overrides.apply already ran in Section 2, before the AI setting the
+-- MLX cleanup gate and the LLM bootstrap both read.)
 
 -- Re-apply the log level AFTER overrides. Logger.set_level already ran at boot
 -- (above), BEFORE config_overrides — so a [script] log_level override
@@ -1640,21 +1653,6 @@ do
 	local valid_levels = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
 	if type(lvl) == "string" and valid_levels[lvl:upper()] then
 		Logger.set_level(lvl:upper())
-	end
-end
-
-local Preferences = require("infra.preferences")
-local ok_core_llm, core_llm = pcall(require, "modules.llm")
-local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
-local boot_llm_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED)
-if boot_llm_enabled == nil then
-	if type(boot_saved_prefs.llm_enabled) == "boolean" then
-		boot_llm_enabled = boot_saved_prefs.llm_enabled
-	elseif ok_core_llm and type(core_llm) == "table"
-		and type(core_llm.DEFAULT_STATE) == "table" then
-		boot_llm_enabled = (core_llm.DEFAULT_STATE.llm_enabled == true)
-	else
-		boot_llm_enabled = false
 	end
 end
 
