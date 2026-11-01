@@ -242,7 +242,10 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 
 - **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md)). WP3, WP6
   and WP7 are built and dormant behind `[karabiner] runtime = "owned"`. Left: a green hosted runtime build of the
-  installer shape (`fix/remap-runtime-build-hang` is still being fixed), then its `runtime.*` pin; WP8 native and WP9 real-Mac acceptance; then the
+  installer shape is done (dev run 41276215019, artifact `owned-remap-runtime`): the maintainer publishes
+  `ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.2.tar.gz` (sha256 `ad1541f8…de8e`, 12176523 bytes) under the tag
+  `remap-runtime-v16.3.0-ergopti.2`, then runs `python3 tools/build/remap_runtime_publish.py apply runtime-pin.json`
+  to write the `runtime.*` pin; WP8 native and WP9 real-Mac acceptance; then the
   `RUNTIME_DEFAULT` flip and the shared-mode deletion. Done on 1 November: the per-OS feature requirements table
   (`docs/design/feature-requirements.md`) and the driver-only VirtualHIDDevice update offer (3ebab93a17).
 - **Owned runtimes.** The rows in state "to do" of `_shared/data/owned_runtimes.json` are all item 31 (shared
