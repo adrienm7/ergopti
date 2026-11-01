@@ -11,6 +11,8 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -96,7 +98,7 @@ _SC_KeyCombinationCommands(Options := unset) {
 ; one per pointer kind of [shortcuts.caps_word.pointer]. Every row stores
 ; through CapsWordAutoOffStore, which the next activation reads; no reload.
 _SC_CapsWordAutoOffSubmenu() {
-	Commands := Map("caps_word_idle_timeout",
+	Commands := Map(MenuCommand.CAPS_WORD_IDLE_TIMEOUT,
 		(Seconds, *) => CapsWordAutoOffStore("shortcuts.caps_word.idle_timeout_seconds", Seconds))
 	Getters := Map("shortcuts.caps_word.idle_timeout_seconds",
 		() => CapsWordAutoOffValues()["idle_timeout_seconds"])
@@ -198,7 +200,7 @@ _SC_ScriptControlSubmenu(Options := unset) {
 _SC_ScriptControlCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
 	return Map(
-		"script_control_toggle", (*) => SetScriptShortcutChordsOn(!ScriptShortcutChordsAreOn(),
+		MenuCommand.SCRIPT_CONTROL_TOGGLE, (*) => SetScriptShortcutChordsOn(!ScriptShortcutChordsAreOn(),
 			OwnedOptions.Get("path", ""), OwnedOptions.Get("toggle_reload", 0)),
 		"scope_restore", (*) => ScriptShortcutsApplyScope("recommended", OwnedOptions),
 		"scope_clear", (*) => ScriptShortcutsApplyScope("clear", OwnedOptions))
@@ -321,9 +323,9 @@ _WS_BuildSymbolRows() {
 	global _WS_BUILTIN_GROUPS, _WS_Custom
 	Getters := Map("wrap_symbols_ready", (*) => true)
 	Rows := MenuRenderer_TemplateRows("wrap_symbols_global_controls", Map(
-		"wrap_symbols_enable_all", (*) => _WS_MenuSetAll(true),
-		"wrap_symbols_disable_all", (*) => _WS_MenuSetAll(false),
-		"wrap_symbols_restore", (*) => _WS_MenuReset()), Getters, Map())
+		MenuCommand.WRAP_SYMBOLS_ENABLE_ALL, (*) => _WS_MenuSetAll(true),
+		MenuCommand.WRAP_SYMBOLS_DISABLE_ALL, (*) => _WS_MenuSetAll(false),
+		MenuCommand.WRAP_SYMBOLS_RESTORE, (*) => _WS_MenuReset()), Getters, Map())
 	if !(Rows is Array)
 		return []
 
@@ -337,8 +339,8 @@ _WS_BuildSymbolRows() {
 			GroupLefts.Push(Pair["left"])
 		}
 		GroupRows := MenuRenderer_TemplateRows("wrap_symbols_group_controls", Map(
-			"wrap_symbols_enable_group", _WS_ControlSetGroup.Bind(GroupLefts, true),
-			"wrap_symbols_disable_group", _WS_ControlSetGroup.Bind(GroupLefts, false)), Getters, Map())
+			MenuCommand.WRAP_SYMBOLS_ENABLE_GROUP, _WS_ControlSetGroup.Bind(GroupLefts, true),
+			MenuCommand.WRAP_SYMBOLS_DISABLE_GROUP, _WS_ControlSetGroup.Bind(GroupLefts, false)), Getters, Map())
 		if !(GroupRows is Array)
 			return []
 
@@ -372,7 +374,7 @@ _WS_BuildSymbolRows() {
 			R := Pair["right"]
 			Lbl := ((L != R) ? (L . " … " . R) : L) . " — " . t("menu.shortcuts.wrap_symbols_custom_label")
 			CustomControls := MenuRenderer_TemplateRows("wrap_symbols_custom_controls", Map(
-				"wrap_symbols_delete_custom", _WS_ControlRemoveCustom.Bind(Idx)), Getters, Map())
+				MenuCommand.WRAP_SYMBOLS_DELETE_CUSTOM, _WS_ControlRemoveCustom.Bind(Idx)), Getters, Map())
 			if !(CustomControls is Array)
 				return []
 			Rows.Push(Map("label", Lbl, "checked", true, "items", CustomControls))
@@ -505,7 +507,7 @@ _WS_MenuAddCustom() {
 _SC_ScopeCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
 	return Map(
-		"shortcuts_toggle", MenuRenderer_CategoryGateCommand("Shortcuts"),
+		MenuCommand.SHORTCUTS_TOGGLE, MenuRenderer_CategoryGateCommand("Shortcuts"),
 		"edit_shortcuts", OpenPersonalShortcuts,
 		"scope_restore", (*) => _SC_ApplyScope("recommended", OwnedOptions),
 		"scope_clear", (*) => _SC_ApplyScope("clear", OwnedOptions))
