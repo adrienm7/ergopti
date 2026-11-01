@@ -81,7 +81,7 @@ local function build_mlx_requirements_manager(task_records, start_records)
 	install_common_stubs()
 	package.loaded["infra.fs_dir"] = {entries = function() return {} end}
 	package.loaded["modules.llm.api_mlx"] = {get_port = function() return 8080 end}
-	package.loaded["modules.llm.mlx_deps_checker"] = {}
+	package.loaded["modules.llm.mlx_deps_checker"] = { import_probe = require("tests.support.modules.llm.mlx_import_probe").read }
 	package.loaded["ui.menu.menu_llm.models_manager_mlx_hf"] = {
 		install = function(ctx)
 			ctx.obj.get_mlx_repo = function(name) return "fixture/" .. tostring(name) end
