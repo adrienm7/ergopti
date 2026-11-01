@@ -2053,6 +2053,13 @@ baseline` line (item 38).
   owner's closed category for the shortcut `Ergopti Field Test`; without that
   shortcut `field_test_shortcut` is skipped as `absent` (create it once as a
   shortcut that does nothing).
+- The collector's own `scpt_recompile` step (no app needed) rebuilds every
+  tracked `.scpt` whose `.applescript` decompiles differently
+  (`tools/dev/recompile-applescripts.py`): `scpt_recompiled:<n>`, or
+  `scpt_failed:<path>:<reason>` (`decompile_existing`, `osacompile_exit_<n>`,
+  `decompile_rebuilt`, `roundtrip_mismatch`) with the `.scpt` untouched. The
+  rebuilt files are committed on the field branch apart from the report:
+  cherry-pick that commit to the base, as only a Mac can compile them.
 
 ## Keyboard input sources: read the state from a fresh process
 
