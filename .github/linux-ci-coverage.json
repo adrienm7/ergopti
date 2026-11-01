@@ -145,6 +145,7 @@
 				"smoke-rpm-install": 1,
 				"smoke-appimage-run": 1,
 				"smoke-tarball-install": 1,
+				"smoke-arch-package": 1,
 				"smoke-flatpak-run": 1
 			}
 		}

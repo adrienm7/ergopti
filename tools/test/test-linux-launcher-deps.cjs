@@ -603,14 +603,16 @@ const preservedRequirements = {
 	],
 	// secret-tool: remote API keys are refused without the secret service, so
 	// the packages depend on it as install.sh does, never only recommend it.
-	arch: ['luajit', 'xclip', 'libnotify', 'curl', 'libxkbcommon', 'at-spi2-core', 'libsecret'],
+	arch: ['xclip', 'libnotify', 'libxkbcommon', 'at-spi2-core', 'libsecret'],
 	nix_library_path: ['libayatana-appindicator', 'gtk3', 'glib', 'libxkbcommon', 'at-spi2-core']
 };
-// The .deb and the .rpm carry the AppImage's private runtime (owned runtimes,
+// The .deb, the .rpm and the Arch repack carry the AppImage's private runtime (owned runtimes,
 // PIN): a host package for any of these would let the host decide what runs.
 const privateRuntimePackages = {
 	deb: ['luajit (>= 2.1)', 'curl', 'lua-luv', 'openssl', 'sqlite3', 'libssl3t64 | libssl3'],
-	rpm: ['luajit >= 2.1', 'curl', 'openssl', 'sqlite']
+	rpm: ['luajit >= 2.1', 'curl', 'openssl', 'sqlite'],
+	// The Arch recipe repacks the release tarball, which carries the same prefix.
+	arch: ['luajit', 'lua51-luv', 'curl', 'openssl', 'sqlite', 'glib-networking']
 };
 try {
 	const data = JSON.parse(fs.readFileSync(path.join(ROOT, nativeRuntimeGenerator.SOURCE), 'utf8'));

@@ -1138,6 +1138,54 @@ const STEP_CONDITIONS = [
 	[
 		LINUX_BOX,
 		'install-linux',
+		'Tools the job itself needs (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Download the packages built above (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Build the release recipe with makepkg (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Install the package with pacman (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Launch what the package installed (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'The installed shared data tree resolves and opens (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Record mandatory Arch package smoke evidence (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Upload mandatory Arch package smoke evidence (pkgbuild)',
+		"env.INSTALL_KIND == 'pkgbuild'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
 		'Download the Flatpak built above (flatpak)',
 		"env.INSTALL_KIND == 'flatpak'"
 	],
@@ -1686,7 +1734,7 @@ function lotTransport(source, rel) {
 				assert.deepEqual(receiving.steps[0], {
 					name: 'Require a declared installation lot',
 					shell: 'sh',
-					run: 'set -eu\ntest -n "$INSTALL_ID"\ncase "$INSTALL_KIND" in\n  install|first|deb|rpm|appimage|archive|flatpak) ;;\n  *) exit 1 ;;\nesac\n'
+					run: 'set -eu\ntest -n "$INSTALL_ID"\ncase "$INSTALL_KIND" in\n  install|first|deb|rpm|appimage|archive|flatpak|pkgbuild) ;;\n  *) exit 1 ;;\nesac\n'
 				});
 				assert.equal(preceding.steps.at(-1).id, id, 'Plan only after mandatory packaging evidence');
 			}

@@ -158,9 +158,9 @@ function requirements(data, format) {
 	const native = manager
 		? KEYS.map((key) => data.libraries[key].packages[manager])
 		: KEYS.map((key) => data.libraries[key].nix_package);
-	// The .deb and the .rpm carry the AppImage's private runtime prefix
-	// (tools/build/stage-linux-private-runtime.sh): LuaJIT, luv, curl and
-	// libcrypto come from there, never from a host package.
+	// The .deb, the .rpm and the Arch repack of the release tarball carry the
+	// AppImage's private runtime prefix (tools/build/stage-linux-private-runtime.sh):
+	// LuaJIT, luv, curl and libcrypto come from there, never from a host package.
 	const privateRuntime = PRIVATE_RUNTIME_FORMATS.has(format);
 	const network = manager && !privateRuntime ? data.network_runtime.providers[manager] || [] : [];
 	const digest = privateRuntime
@@ -175,7 +175,7 @@ function requirements(data, format) {
 
 /** Native Flatpak recipes use pinned canonical sources, never the build host ABI. */
 /** The package formats that ship the private runtime prefix instead of host packages. */
-const PRIVATE_RUNTIME_FORMATS = new Set(['deb', 'rpm']);
+const PRIVATE_RUNTIME_FORMATS = new Set(['deb', 'rpm', 'arch']);
 
 /** Sources pinned as a release archive by SHA-256; the others are Git commits. */
 const ARCHIVE_SOURCES = new Set(['duktape', 'sqlite', 'zstd', 'openssl']);

@@ -52,9 +52,12 @@ check('Debian takes libcrypto from its private runtime and preserves old require
 		assert.equal(required.includes(host), false, `deb must not depend on the host ${host}`);
 	for (const old of ['at-spi2-core', 'libxkbcommon0']) assert.ok(required.includes(old));
 });
+// The Arch recipe repacks the release tarball, which carries the same private
+// runtime as the .deb and the .rpm.
 for (const [format, sqlite] of [
 	['deb', 'sqlite3'],
-	['rpm', 'sqlite']
+	['rpm', 'sqlite'],
+	['arch', 'sqlite']
 ])
 	check(
 		'metrics CLI providers come from the private runtime for ' + format + ' (metrics-cli-required)',
@@ -68,15 +71,6 @@ for (const [format, sqlite] of [
 				);
 		}
 	);
-check('metrics CLI providers are mandatory for arch (metrics-cli-required)', () => {
-	const required = generator.requirements(data, 'arch');
-	for (const provider of ['openssl', 'sqlite'])
-		assert.equal(
-			required.filter((name) => name === provider).length,
-			1,
-			`arch must provide ${provider} even when optional dependencies are disabled`
-		);
-});
 check(
 	'source installation admits the OpenSSL executable separately from libcrypto (metrics-cli-required)',
 	() => {

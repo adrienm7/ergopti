@@ -532,17 +532,25 @@ for (const [packager, wrappers] of Object.entries(PACKAGER_WRAPPERS)) {
 	}
 }
 
-// The Arch package is built by makepkg, outside the workflow, so the workflow
-// parse above never sees it: it must assemble through the stamping driver
-// builder and verify the tree it installs.
+// The Arch recipe repacks the release tarball, whose tree the stamping driver
+// builder assembled and the tarball builder verified before packing; makepkg
+// runs outside the workflow and without the build scripts, so the recipe
+// checks the stamp's commit entry itself, with the writer's file and key names.
 const pkgbuild = read(PKGBUILD_REL);
-if (!STAMPING_BUILDS['tools/build/build-linux-driver.sh'].test(pkgbuild)) {
-	errors.push(
-		`${PKGBUILD_REL} no longer assembles through build-linux-driver.sh, which writes the stamp`
-	);
+const stampWriter = read(WRITER_REL);
+const stampFile = (stampWriter.match(/^BUILD_STAMP_FILE="([^"]+)"$/m) || [])[1];
+const commitKey = (stampWriter.match(/^BUILD_STAMP_COMMIT_KEY="([^"]+)"$/m) || [])[1];
+if (
+	!stampFile ||
+	!commitKey ||
+	!pkgbuild.includes(
+		`grep -Eq '^${commitKey}=[0-9a-f]{40}$' "$pkgdir/usr/lib/ergopti/_shared/${stampFile}"`
+	)
+) {
+	errors.push(`${PKGBUILD_REL} no longer verifies the build stamp commit in the tree it installs`);
 }
-if (!/write_build_stamp\.sh\s+verify\s+"\$pkgdir\/usr\/lib\/ergopti\/_shared"/.test(pkgbuild)) {
-	errors.push(`${PKGBUILD_REL} no longer verifies the build stamp in the tree it installs`);
+if (!/ergopti-plus-linux\.tar\.gz/.test(pkgbuild)) {
+	errors.push(`${PKGBUILD_REL} no longer repacks the stamped release tarball`);
 }
 
 // One stamp format: what the writer writes is what the Lua drivers read.
