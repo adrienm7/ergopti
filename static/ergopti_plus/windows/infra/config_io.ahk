@@ -2512,8 +2512,10 @@ _KeyboardSlotBoundChord(SlotId, Scan) {
 /**
  * Registers every configured slot. A Win slot binds its physical key
  * (KeyboardSlotWinScan) and, on a key of the physical registry, joins the broker,
- * which holds that Win variant for the remap of the same key too; the others take
- * their own hotkey through the registrar, which reports refusal by returning "".
+ * which holds that Win variant for the remap of the same key too. A Ctrl or Alt slot
+ * on a remapped key shares the layout's own variant, which asks at each press; the
+ * others take their own hotkey through the registrar, which reports refusal by
+ * returning "".
  * @returns {Integer} The slots bound.
  */
 KeyboardShortcutsBindAll() {
@@ -2543,6 +2545,13 @@ KeyboardShortcutsBindAll() {
 						LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — chord not resolvable.", Slot)
 						continue
 				}
+				Variant := _KeyboardSlotLayoutVariant(Slot, Scan, Chord)
+				if Variant != "" {
+						_KeyboardShortcutLayoutChords()[Variant] := Slot
+						LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' shares the layout's {3}.", Slot, Action, Variant)
+						Bound++
+						continue
+				}
 				Handle := HotkeyRegistrarBind(Chord, ((_s) => (*) => RunKeyboardShortcutAction(_s))(Slot))
 				if Handle == "" {
 						LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}' ({2}).", Slot, Chord)
@@ -2555,6 +2564,45 @@ KeyboardShortcutsBindAll() {
 		}
 		LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", Bound)
 		return Bound
+}
+
+; The slots set on a Ctrl or Alt variant the layout owns, by native spec. A function,
+; not a global: the boot binds the slots before this file's include.
+; @returns {Map}
+_KeyboardShortcutLayoutChords() {
+		static Chords := Map()
+		return Chords
+}
+
+; The native variant of a slot's chord when RemapKey already registered it: the
+; registrar would refuse it as another producer's, and the slot would never fire.
+; @param Slot {String} The slot.
+; @param Scan {String} Its layout scan, "" when the host layout answers.
+; @param Chord {String} Its bound chord.
+; @returns {String} "^SCnnn" or "!SCnnn", or "" when the slot takes its own hotkey.
+_KeyboardSlotLayoutVariant(Slot, Scan, Chord) {
+		global RemappedList
+		if Scan == "" || !RemappedList.Has(SlotRoleChordKey(SlotRoleNative(Slot)["key"]))
+				return ""
+		Parsed := ChordParse(Chord)
+		Spec := HotkeyRegistrarNativeSpec(Parsed["mods"], Parsed["key"])
+		return RegExMatch(Spec, "^[\^!]SC[0-9A-F]{3}$") ? Spec : ""
+}
+
+; Runs the slot set on a layout variant. An unassigned slot and an AI action held
+; back leave the chord to the layout, as a released native hotkey would.
+; @param Variant {String} The native spec.
+; @returns {Boolean} True when a slot took the press.
+KeyboardShortcutRunLayoutChord(Variant) {
+		global KeyboardShortcutAssignments
+		Slot := _KeyboardShortcutLayoutChords().Get(Variant, "")
+		if Slot == ""
+				return false
+		Action := KeyboardShortcutAssignments.Get(Slot, "none")
+		if Action == "none" || AiActionBlocked(Action)
+				return false
+		RunKeyboardShortcutAction(Slot)
+		return true
 }
 
 RunKeyboardShortcutAction(SlotId) {
