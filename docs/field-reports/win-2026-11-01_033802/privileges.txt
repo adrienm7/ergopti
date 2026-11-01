@@ -1,0 +1,3 @@
+collector elevated: False
+EnableLUA: 1
+ConsentPromptBehavior<user>: 5

@@ -1,0 +1,6 @@
+
+FreePhysicalMemory     : 2364300
+TotalVisibleMemorySize : 7274124
+FreeVirtualMemory      : 8565508
+LastBootUpTime         : 24/10/2026 14:01:01
+

@@ -1,0 +1,12 @@
+fa4b237c7c
+PowerShell 7.6.9 Core
+Microsoft Windows NT 10.0.26100.0
+
+Caption                : Microsoft Windows 11 Famille
+Version                : 10.0.26100
+BuildNumber            : 26100
+OSArchitecture         : 64 bits
+OSLanguage             : 1036
+TotalVisibleMemorySize : 7274124
+
+processors: 8
