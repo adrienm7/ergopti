@@ -40,9 +40,9 @@ const KNOWN_COPIES = new Map([
 	[
 		'static/ergopti_plus/macos/modules/llm/network-retry.sh',
 		{
-			count: 4,
+			count: 3,
 			reason:
-				'POSIX shell parameter expansion, relay presence check, the direct proxy override clearing every relay variable and the daemon start after a refused sign-in emptying them all, before any JSON reader is available; the first two patched in place by codegen-proxy-precedence.cjs'
+				'POSIX shell parameter expansion, relay presence check and clear_proxy_environment, which the direct proxy override and the daemon start after a refused sign-in share, before any JSON reader is available; the first two patched in place by codegen-proxy-precedence.cjs'
 		}
 	]
 ]);
