@@ -1877,6 +1877,7 @@ function closedLlmContext(caller) {
 			: 'llm_ctx.state_getters["llm_toggle_ready"] = function() return type(llm.toggle) == "function" and ctx.paused ~= true end',
 		'llm_ctx.state_getters["llm_scope_ready"] = scope_ready',
 		'llm_ctx.state_getters["config_newer_schema"] = newer_schema',
+		'llm_ctx.state_getters["config_older_schema"] = older_schema',
 		'llm_ctx[key] = value',
 		'ManifestMenu.build("llm_menu", "LLM", nil, group_builders, llm_ctx, providers)'
 	];
