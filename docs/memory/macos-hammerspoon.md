@@ -1375,6 +1375,22 @@ are both owned; partial success must not lose the user's clipboard.
 A non-throwing file-write refusal retains the exact detached snapshot and FIFO
 head for retry. Do not acknowledge data before append commits.
 
+### project-hs-keystats-recovery-paces-and-resumes
+
+A full aggregate rebuild (a new `AGGREGATE_CACHE_REVISION`, a fresh cache) costs
+minutes of main-thread Lua on a months-old ledger. At 8 ms slices with a 10 ms
+pause it took 45 % of a core on battery, and every reload threw the work away:
+the field run of 2026-11-01 interrupted it after 10315 slices and started over
+(ledger read, 60 s scan, clear). `_recovery_pause_sec` now scales the pause to
+0.5 % of a core on battery (`adapters/power_source.lua`) and keeps full speed on
+the mains. `aggregate_recovery_progress` in meta commits in the same
+transaction as the rows it counts, so a start resumes after the last flushed
+(ts, id) and skips the scan, the clear and the foreign import, which ingest then
+rebuilds by partition. Action: a new walker stage needs a rank, a `reached` call
+and an `after_resume_point` clause; a walker state outside the n-gram context is
+lost on resume. A lock-free reader takes `hold_recovery`: commits raced both
+scans of `field_storage` into 101 false issues on a sound cache.
+
 ### project-macos-absence-needs-lstat-proof
 
 `io.open` returning ENOENT does not prove a path is absent: dangling symlinks and
@@ -1939,7 +1955,8 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
   failure names the count.
 - `field_storage`: the keystats quick check opens the database `-readonly` and
   `immutable=1` so the ingest never meets a lock; an issue counts only when a
-  second scan sees it, and damage names the issue line count only. The parsed
+  second scan sees it, and damage names the issue line count only; a running
+  cache rebuild is held for the scans (`keystats_writes=rebuild_held`). The parsed
   files are `config.toml`, `config_karabiner.toml`, personal hotstrings and
   personal info, with the driver's TOML reader. The logs probe file is removed
   at once. `keystats_cache_place` is `caches`, `legacy_left` or
