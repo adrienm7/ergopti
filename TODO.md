@@ -113,6 +113,12 @@ Hands needed:
       login item starts a second Hammerspoon, declining the download opens no error window.
 - [ ] Installed app: guardian registration and retirement on both architectures (13/35), VS Code bridge retirement
       (127), 120 provider menu, issue 94 (tap-hold refusal, symbol-wrap clipboard).
+- [ ] App Cloner (81b3cda6a8): on a Mac without the Command Line Tools, Apps > App Cloner offers the install and
+      "Install" finishes with no Xcode prompt; clone one app and one PWA, both launch; the PWA launcher shows
+      `exec "$CLONE_PYTHON"` on the versionless link; double-clicking App Cloner in Finder shows the localized refusal.
+- [ ] VirtualHIDDevice offer (3ebab93a17): on a Mac whose active driver is older than 8.5.0, Tap-holds > update row,
+      admin prompt, installer, forceActivate; the report names the new version and the remap reloads; cancelling the
+      prompt reports `cancelled` and changes nothing.
 - [ ] Run the field report once: its `scpt_recompile` step rebuilds `Encryptor.app/.../main.scpt` from its updated
       `.applescript` (keystats rename) and commits it on the field branch (710f0a379d); cherry-pick that commit.
 
@@ -239,10 +245,14 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
   installer shape (`fix/remap-runtime-build-hang` is still being fixed), then its `runtime.*` pin; WP8 native and WP9 real-Mac acceptance; then the
   `RUNTIME_DEFAULT` flip and the shared-mode deletion. Done on 1 November: the per-OS feature requirements table
   (`docs/design/feature-requirements.md`) and the driver-only VirtualHIDDevice update offer (3ebab93a17).
-- **Owned runtimes.** The rows in state "to do" of `_shared/data/owned_runtimes.json`
-  (`docs/design/owned-runtimes.md` section 7); the Swift-owned managed daemon under the proxy relay; App Cloner on the
-  managed Python with pinned PyObjC (in progress on `feat/overnight-macos-2`).
-- **Checks left to a program from the Mac session.** Done on 1 November: `field_tap_hold_thresholds` (9901da4d94);
+- **Owned runtimes.** The rows in state "to do" of `_shared/data/owned_runtimes.json` are all item 31 (shared
+  Karabiner app, owned runtime, VirtualHIDDevice). The Swift-owned managed daemon under the proxy relay needs a short
+  design note first (who launches the relay, how its refusal receipt reaches the Swift owner; Swift and Go). Done on 1
+  November: App Cloner on the managed Python with pinned PyObjC 12.1 (managed-pyobjc.json, ensure-managed-pyobjc.sh
+  under the native PTY guardian, consent offer from the Apps menu, stable link `native-bootstrap/app-cloner/python3`;
+  existing clones keep /usr/bin/python3 until re-cloned).
+- **Checks left to a program from the Mac session.** Done on 1 November: `field_tap_hold_thresholds` (9901da4d94;
+  PAR-15 is confirmed by the next field run's result);
   the HTTPS downgrade refusal is already covered by `ManagedPACSourceTests` and `ManagedBootstrapDownloadTests`.
 
 ### All drivers
