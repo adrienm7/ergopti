@@ -298,8 +298,10 @@ enum ManagedPTYWorker {
 	private static let controlDescriptor: Int32 = 3
 	private static let pollMilliseconds: Int32 = 20
 	/// The only installers the guardian runs, relative to the driver folder;
-	/// ensure-ollama-deps.sh is the verifier of an already resolved runtime.
-	static let admittedSourceNames = ["ensure-mlx-deps.sh", "ensure-ollama-native-deps.sh", "ensure-ollama-deps.sh"]
+	/// ensure-ollama-deps.sh is the verifier of an already resolved runtime, and
+	/// ensure-managed-pyobjc.sh installs App Cloner's pinned PyObjC into the managed Python.
+	static let admittedSourceNames = ["ensure-mlx-deps.sh", "ensure-ollama-native-deps.sh", "ensure-ollama-deps.sh",
+		"ensure-managed-pyobjc.sh"]
 
 	/// Absolute installer paths the guardian admits for one Lua source. They live
 	/// in the folder the embedded runtime reads its Lua from: the signed payload
