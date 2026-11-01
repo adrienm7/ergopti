@@ -223,9 +223,8 @@ helpers.describe("sqlite_writer", function()
     end)
 
 	it("persists generated-output sources and physical scancodes independently", function()
-		local path = helpers.driver_root() .. "/modules/keystats/sqlite_writer.lua"
-		local fh = assert(io.open(path, "r"))
-		local src = fh:read("*a"); fh:close()
+		-- modules/keystats/sqlite_writer, selected by a declaration unique to it.
+		local src = assert(helpers.read_driver_unit("local function _check_sqlite3("))
 		with_ngram_sql(function(writer, statements)
 			helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
 				x = { c = 14, td = 7, cd = 2, e = 1,
@@ -261,17 +260,15 @@ helpers.describe("sqlite_writer", function()
 	end)
 
     it("preserves complete dotted application identifiers during flush", function()
-      local path = helpers.driver_root() .. "/modules/keystats/keystats.lua"
-      local fh = assert(io.open(path, "r"))
-      local src = fh:read("*a"); fh:close()
+      -- modules/keystats/keystats, selected by a declaration unique to it.
+      local src = assert(helpers.read_driver_unit("local function new_live_tracker("))
       helpers.assert_true(src:find("local app_name = dashboard_app_name(app_id)", 1, true) ~= nil,
         "SQLite aggregation must use the same full app ID as the dashboard")
     end)
 
     it("uses persistent IDs and non-destructive inserts for raw events", function()
-      local path = helpers.driver_root() .. "/modules/keystats/sqlite_writer.lua"
-      local fh = assert(io.open(path, "r"))
-      local src = fh:read("*a"); fh:close()
+      -- modules/keystats/sqlite_writer, selected by a declaration unique to it.
+      local src = assert(helpers.read_driver_unit("local function _check_sqlite3("))
       helpers.assert_true(src:find("linux_next_event_id", 1, true) ~= nil,
         "a restart-safe SQLite event sequence is required")
       helpers.assert_true(src:find('"events.typing"', 1, true) ~= nil,
@@ -372,9 +369,8 @@ helpers.describe("sqlite_writer", function()
     end)
 
     it("migrates the former device OS constraint to include Linux", function()
-      local path = helpers.driver_root() .. "/modules/keystats/sqlite_writer.lua"
-      local fh = assert(io.open(path, "r"))
-      local src = fh:read("*a"); fh:close()
+      -- modules/keystats/sqlite_writer, selected by a declaration unique to it.
+      local src = assert(helpers.read_driver_unit("local function _check_sqlite3("))
       helpers.assert_true(src:find("_ensure_linux_device_schema", 1, true) ~= nil)
       helpers.assert_true(src:find("'darwin','windows','linux'", 1, true) ~= nil)
     end)
