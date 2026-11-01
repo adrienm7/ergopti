@@ -62,8 +62,13 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // loader delegation tests select their files by declaration, the timed TOML
 // reader's delegation is checked by a recording shared reader, and the signal
 // handler test resolves its chunk from the module name.
-const BASELINE = 19;
-const READ_BASELINE = 47;
+// 19 → 13 files and 47 → 41 reads: the archive_output tar feeder tests (the
+// sliced-source compiles) and the webview manager loadfile resolve their file
+// with package.searchpath from the module name; the dynamic hotstrings
+// manager, tap-hold lifecycle and clipboard preparation reads select theirs by
+// declaration.
+const BASELINE = 13;
+const READ_BASELINE = 41;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];

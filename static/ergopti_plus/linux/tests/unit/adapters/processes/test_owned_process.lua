@@ -428,8 +428,8 @@ end)
 -- handle is a fixture-owned pipe, independently closed on every exit path.
 local function feeder_options(mode, cap)
  local actual_uv = require("luv")
- local paths = require("infra.paths")
- local file = assert(io.open(paths.driver_root() .. "/infra/archive_output.lua", "rb"))
+ -- The production module, resolved from its name: the feeder is compiled from its own text.
+ local file = assert(io.open(assert(package.searchpath("infra.archive_output", package.path)), "rb"))
  local source = assert(file:read("*a")); assert(file:close())
  local first = assert(source:find("local retained_tar_operations =", 1, true))
  local last = assert(source:find("--- Constructs only the fixed native registry;", first, true))
