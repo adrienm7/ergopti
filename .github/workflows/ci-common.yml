@@ -47,6 +47,8 @@ jobs:
   shared-validation:
     name: 'Unit tests'
     runs-on: ubuntu-latest
+    # A lot takes 1 to 5 minutes; a hang fails here instead of after six hours.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.common_plan).matrix }}
@@ -77,6 +79,7 @@ jobs:
         run: node tools/ci/js-feature-matrix.cjs select unit
 
       - name: Install native validation tools
+        timeout-minutes: 10
         run: |
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 lua-luv libxml2-utils
 
@@ -148,6 +151,7 @@ jobs:
     name: 'Integration tests'
     needs: [shared-validation]
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.common_plan).integration_matrix }}
@@ -178,6 +182,7 @@ jobs:
         run: node tools/ci/js-feature-matrix.cjs select integration
 
       - name: Install native integration tools
+        timeout-minutes: 10
         run: |
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 lua-luv libxml2-utils luajit sqlite3
 
