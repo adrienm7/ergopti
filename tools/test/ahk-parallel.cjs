@@ -29,7 +29,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawn, spawnSync } = require('node:child_process');
+const { execFile, spawn, spawnSync } = require('node:child_process');
 const { exclusiveTests } = require('./ahk-session-resources.cjs');
 const { acquireMachineLock } = require('./ahk-machine-lock.cjs');
 
@@ -282,21 +282,25 @@ function headCommit() {
 	return result.stdout.trim();
 }
 
-// The dry run also proves that the whole suite parses before workers start.
-function dumpPlan(exe, runDir) {
+// The dry run also proves that the whole suite parses before workers start. It
+// runs asynchronously so the machine lock can name its holder meanwhile.
+async function dumpPlan(exe, runDir) {
 	const planFile = path.join(runDir, 'plan.tsv');
 	fs.rmSync(planFile, { force: true });
-	const result = spawnSync(
-		exe,
-		['/force', '/ErrorStdOut', 'run_all.ahk', '--dry-run', `--dump-plan=${planFile}`],
-		{
-			cwd: TESTS_DIR,
-			env: { ...process.env, ERGOPTI_AHK_RESULTS_FILE: path.join(runDir, 'plan.tap') },
-			encoding: 'utf8',
-			maxBuffer: 1 << 28,
-			timeout: DEFAULTS.planTimeoutMs
-		}
-	);
+	const result = await new Promise((resolve) => {
+		execFile(
+			exe,
+			['/force', '/ErrorStdOut', 'run_all.ahk', '--dry-run', `--dump-plan=${planFile}`],
+			{
+				cwd: TESTS_DIR,
+				env: { ...process.env, ERGOPTI_AHK_RESULTS_FILE: path.join(runDir, 'plan.tap') },
+				encoding: 'utf8',
+				maxBuffer: 1 << 28,
+				timeout: DEFAULTS.planTimeoutMs
+			},
+			(error, _stdout, stderr) => resolve({ status: error ? error.code : 0, stderr })
+		);
+	});
 	if (!fs.existsSync(planFile))
 		throw new Error(
 			`The suite produced no plan (exit ${result.status}): ${String(result.stderr).slice(0, 2000)}`
@@ -444,7 +448,7 @@ async function main() {
 		: {};
 	const ledger = prior || { version: LEDGER_VERSION, commit, plan: {}, entries: {} };
 	ledger.commit = commit;
-	const planRows = dumpPlan(exe, options.runDir);
+	const planRows = await dumpPlan(exe, options.runDir);
 	ledger.plan = Object.fromEntries(planRows.map(({ name, file }) => [name, file]));
 	const context = { exe, options, ledger, ledgerFile };
 	const selected = Object.keys(ledger.plan).filter(
