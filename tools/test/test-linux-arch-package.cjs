@@ -554,6 +554,23 @@ try {
 				`the host dialog program ${name} must not be required`
 			);
 	});
+	check('ci-arch-smoke-builds-without-host-depends-then-pacman-resolves-them', () => {
+		// The release smoke builds in a bare archlinux container: makepkg must not
+		// demand the runtime depends of a package it only builds, and pacman -U
+		// must install them from the repositories, as a user's install does.
+		const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci-linux.yml'), 'utf8');
+		const step = (name) => {
+			const start = workflow.indexOf(`- name: ${name}`);
+			assert.ok(start >= 0, `missing workflow step: ${name}`);
+			const next = workflow.indexOf('\n      - name: ', start + 1);
+			return workflow.slice(start, next < 0 ? undefined : next);
+		};
+		const build = step('Build the release recipe with makepkg (pkgbuild)');
+		assert.match(build, /sudo -u ergopti-builder makepkg --noconfirm --nodeps\b/);
+		assert.doesNotMatch(build, /--syncdeps|\s-s\b/);
+		const install = step('Install the package with pacman (pkgbuild)');
+		assert.match(install, /pacman -U --noconfirm "\$\{packages\[0\]\}"/);
+	});
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });
 }
