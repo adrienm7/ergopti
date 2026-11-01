@@ -132,7 +132,10 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //            9 → 8 (2026-10-31: the AI-off boot's skipped LLM bootstrap is
 //                    judged by the same boot scenarios instead of a search of
 //                    init.lua in test_llm_menu_regressions.)
-const BASELINE = 8;
+//            8 → 7 (2026-11-01: the MLX import probe has one source, the
+//                    script; the bootstrap test compares the checker's probe
+//                    with it instead of reading models_manager_mlx.lua.)
+const BASELINE = 7;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -207,7 +210,9 @@ const BASELINE = 8;
 //              longer searches init.lua for one.)
 //       42 → 38 (2026-11-01: the keystats pause-guard test selects its two
 //              modules by a declaration unique to each instead of their paths.)
-const READ_BASELINE = 38;
+//       38 → 37 (2026-11-01: the MLX import probe single source, see the file
+//              count above.)
+const READ_BASELINE = 37;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
