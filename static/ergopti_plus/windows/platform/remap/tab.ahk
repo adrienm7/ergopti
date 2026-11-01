@@ -194,6 +194,18 @@ SC00F:: {
 }
 #HotIf
 
+; With no tap-hold the key stays native, except for the press that completes a
+; hotstring: the expansion must land before the key moves the focus. A visible
+; prediction takes precedence over the expansion (HotstringEndKeyCompletes).
+#HotIf TapHoldTapAction(TapHold, "tab") == "" and TapHoldHoldModifier(TapHold, "tab") == "" and TapHoldHoldLayer(TapHold, "tab") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld() and HotstringEndKeyClaim(0x09, "`t")
+SC00F:: {
+	if _TabAcceptVisiblePrediction()
+		return
+	if !HotstringCompleteEndKey("`t")
+		TapHoldEmitKeyTap("Tab")
+}
+#HotIf
+
 
 
 

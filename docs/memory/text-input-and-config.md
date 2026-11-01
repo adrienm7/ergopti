@@ -14,6 +14,15 @@ ownership difference.
 An expansion is one ordered transaction: deletion, replacement, and canonical
 tail. Provenance filtering, not a timing window, prevents self-observation.
 
+Windows' Enter and Tab are the exception to compensation: they submit a line or
+move the focus, so nothing can be erased after them, and OnKeyDown wipes the word
+before OnChar brings their character. `HotstringEndKeyCompletes` asks the engine
+on the press; only a press that fires is held back (a `#HotIf` hotkey, or
+`TapHoldDispatchTap` for a tap typing them), and the burst erases the trigger
+alone (`event_on_screen` false) with the key as its tail. Every other press stays
+native. The Notepad worker verifies the end character it erases, so that host
+keeps the native key and no expansion. `(hotstring-end-keys)` pins it.
+
 Some terminal/TUI renderers compute rapid repeated deletions from stale state.
 On Windows, schedule the edit after the visible `OnChar` callback returns, expand
 the count into explicit `{BackSpace}` tokens, and send the complete edit through

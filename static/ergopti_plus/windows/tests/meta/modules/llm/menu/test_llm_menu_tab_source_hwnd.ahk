@@ -401,8 +401,8 @@ _TLTSH_EveryPhysicalTabTapHoldAcceptsFirst() {
 			"physical Tab handler #" . Handlers . " must accept a visible prediction before any tap-hold logic")
 		Pos += StrLen(Match[0])
 	}
-	AssertEqual(5, Handlers,
-		"the four tap-hold variants of SC00F (alt_tab_monitor, hold-modifier, hold-layer, tap-only) and the no-tap-hold acceptance variant must all be covered")
+	AssertEqual(6, Handlers,
+		"the four tap-hold variants of SC00F (alt_tab_monitor, hold-modifier, hold-layer, tap-only), the hotstring end key and the no-tap-hold acceptance variant must all be covered")
 }
 
 Test("LLM accept meta: physical Tab tap-holds accept a visible prediction on press (llm-tab-taphold-accept)",

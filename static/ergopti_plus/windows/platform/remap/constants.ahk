@@ -1226,6 +1226,12 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		; if any, is then attributed to the tap-hold (TapHoldOwnsShortcut).
 		if (TapHoldTapIsCommand(KeyId) and IsSet(HS_ApplyEventWordReset))
 			HS_ApplyEventWordReset(ConfigLeaf.TAP_HOLD_RESETS_WORD, "tap of " . KeyId)
+		; A tap that types Enter or Tab goes out through the driver's own send, which
+		; the watcher never sees: it completes a hotstring here, as Space does.
+		EndChar := HotstringEndCharOfTap(KeyId)
+		if (EndChar != "" and HotstringCompleteEndKey(EndChar,
+				TapHoldRollTapIsRunning(KeyId) ? TapHoldRollTapDownTick() : 0))
+			return true
 		PreviousTap := TapHoldTapInDispatch()
 		_TapHoldTapInDispatch := KeyId
 		try TapFn.Call()

@@ -34,10 +34,18 @@ _AHK04M_Count(Haystack, Needle) {
 _AHK04M_AllDispatchCallersConsumeTheVerdict() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "driver source must be readable for the AHK-04 class guard")
-	; One definition plus four user-reachable callers. A new caller raises the
+	; One definition plus five user-reachable callers. A new caller raises the
 	; count and must join these exact state/publication verdict checks.
-	AssertEqual(5, _AHK04M_Count(Src, "HSE_DispatchMatch("),
+	AssertEqual(6, _AHK04M_Count(Src, "HSE_DispatchMatch("),
 		"every HSE_DispatchMatch caller must join the send-transaction guard")
+	EndKey := _DriverFuncBody("HotstringCompleteEndKey")
+	EndKeyDispatch := InStr(EndKey, "Fired := HSE_DispatchMatch(Match, HSE_LastEndChar, &Effect")
+	EndKeyPending := InStr(EndKey, 'return true', true, EndKeyDispatch)
+	EndKeyRefusal := InStr(EndKey, "if !Fired", true, EndKeyPending)
+	EndKeyCommit := InStr(EndKey, "_PrefixCommitPostFireEffect(Effect)", true, EndKeyRefusal)
+	Assert(EndKeyDispatch > 0 && EndKeyPending > EndKeyDispatch && EndKeyRefusal > EndKeyPending
+		&& EndKeyCommit > EndKeyRefusal,
+		"an end key must transfer deferred ownership or consume the verdict before publishing the effect")
 
 	; ActivateHotstrings' verdict is driven in test_activate_hotstrings_commits_synchronously.ahk.
 	OnChar := _DriverFuncBody("_OnPrefixChar")
