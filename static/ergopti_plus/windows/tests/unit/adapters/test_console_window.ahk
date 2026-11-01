@@ -206,9 +206,15 @@ _ConsoleCapture_AdapterPath(Owner := "", ProductionRoot := "") {
 	while RegExMatch(OwnerCode, "im)^[ \t]*#Include[ \t]+([^\r\n]+)$", &Registration, Position) {
 		Position := Registration.Pos + Registration.Len
 		Relative := Trim(Registration[1])
+		; A_LineFile is the owner itself, so this one spelling stays relative to it.
+		if SubStr(Relative, 1, 16) == "%A_LineFile%\..\"
+			Relative := SubStr(Relative, 17)
 		if Relative == "" || RegExMatch(Relative, '[<>"*%:]')
 			throw Error("The console owner requires an explicit authored include registration.")
 		Path := _ConsoleCapture_Canonical(OwnerDir . "\" . Relative)
+		; The generated constants are not authored source, so they own no adapter.
+		if InStr(Path, ProductionRoot . "_generated\", false) == 1
+			continue
 		if InStr(Path, ProductionRoot, false) != 1 || !_DriverIsProductionSource(Path)
 			throw Error("The console adapter include must remain inside authored production source.")
 		if !RegExMatch(Path, "i)\.ahk$") || !FileExist(Path) || InStr(FileExist(Path), "D")
@@ -288,10 +294,20 @@ _ConsoleCapture_SourceControls(Root) {
 	FileAppend('#Include relocated.ahk`n', Owner, "UTF-8")
 	AssertEqual(_ConsoleCapture_Canonical(Scope . "\relocated.ahk"), _ConsoleCapture_AdapterPath(Owner, Scope),
 		"moving the class and its authored registration keeps the native owner resolvable")
-	for Mode in ["data-decoy", "nested-decoy", "duplicate", "outside", "unknown", "missing"] {
+	FileDelete(Owner)
+	FileAppend('#Include %A_LineFile%\..\relocated.ahk`n', Owner, "UTF-8")
+	AssertEqual(_ConsoleCapture_Canonical(Scope . "\relocated.ahk"), _ConsoleCapture_AdapterPath(Owner, Scope),
+		"the owner-relative A_LineFile spelling resolves from the owner")
+	DirCreate(Scope . "\_generated")
+	FileAppend('class ConsoleWindowNative {`n}`n', Scope . "\_generated\constants.ahk", "UTF-8")
+	FileAppend('#Include %A_LineFile%\..\_generated\constants.ahk`n', Owner, "UTF-8")
+	AssertEqual(_ConsoleCapture_Canonical(Scope . "\relocated.ahk"), _ConsoleCapture_AdapterPath(Owner, Scope),
+		"a generated include beside the adapter cannot hold the adapter")
+	for Mode in ["data-decoy", "nested-decoy", "duplicate", "outside", "outside-line-file", "unknown", "script-variable", "missing"] {
 		FileDelete(Owner)
 		FileDelete(Scope . "\relocated.ahk")
-		Registration := Mode == "outside" ? "..\foreign.ahk" : Mode == "unknown" ? "<foreign>" : "relocated.ahk"
+		Registration := Mode == "outside" ? "..\foreign.ahk" : Mode == "outside-line-file" ? "%A_LineFile%\..\..\foreign.ahk"
+			: Mode == "unknown" ? "<foreign>" : Mode == "script-variable" ? "%A_ScriptDir%\relocated.ahk" : "relocated.ahk"
 		FileAppend('#Include ' . Registration . '`n', Owner, "UTF-8")
 		Source := Mode == "data-decoy" ? '/*`nclass ConsoleWindowNative {`n}`n*/`nValue := "class ConsoleWindowNative {"`n'
 			: Mode == "nested-decoy" ? 'class Container {`nclass ConsoleWindowNative {`n}`n}`n'
