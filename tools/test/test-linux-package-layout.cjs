@@ -553,11 +553,12 @@ for (const line of pkgbuildSrc.split('\n')) {
 	}
 }
 
-// The bundle location must default to the builder's own output directory.
-if (!pkgbuildSrc.includes('local bundle="${ERGOPTI_LINUX_BUILD_DIR:-build/linux}"')) {
+// The recipe repacks the release tarball makepkg extracts into $srcdir; a
+// test names the directory holding that tree instead.
+if (!pkgbuildSrc.includes('local bundle="${ERGOPTI_ARCH_BUNDLE_DIR:-$srcdir}"')) {
 	errors.push(
-		`${PKGBUILD}: the bundle directory must default to build/linux and honor ` +
-			`ERGOPTI_LINUX_BUILD_DIR, the directory build-linux-driver.sh writes to.`
+		`${PKGBUILD}: the bundle directory must default to $srcdir, where makepkg extracts ` +
+			`the release tarball, and honor ERGOPTI_ARCH_BUNDLE_DIR.`
 	);
 }
 
@@ -580,8 +581,14 @@ if (!/cp -r \"\$bundle\/_shared\/\.\"\s/.test(pkgbuildSrc)) {
 	);
 }
 
-// The wrapper needs LUA_PATH or the daemon dies on its first require.
-if (!/export LUA_PATH=/.test(pkgbuildSrc)) {
+// The wrapper needs LUA_PATH or the daemon dies on its first require: the
+// recipe either exports it or sources the private runtime environment that
+// owns it (the same template as the AppImage, the .deb and the .rpm).
+const pkgbuildViaRuntime =
+	pkgbuildSrc.includes(
+		'source "$DRIVER_ROOT/network-runtime-env.sh" "$DRIVER_ROOT/runtime" "$DRIVER_ROOT"'
+	) && read('tools/build/templates/linux-portable-runtime-env.sh').includes('export LUA_PATH=');
+if (!/export LUA_PATH=/.test(pkgbuildSrc) && !pkgbuildViaRuntime) {
 	errors.push(
 		`${PKGBUILD}: the wrapper must export LUA_PATH — without it the daemon cannot ` +
 			`resolve a single require and exits before it logs anything useful.`

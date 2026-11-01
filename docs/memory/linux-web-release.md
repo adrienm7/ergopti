@@ -743,6 +743,20 @@ Action: read the catalogue's
 full log (`gh run view <id> --repo AppImage/appimage.github.io --log`) before
 trusting its "first error", which is only the first stderr line.
 
+### project-arch-recipe-repacks-the-release-tarball
+
+`tools/build/PKGBUILD` is a template, not a from-source recipe (maintainer
+decision, 1 November): it repacks the release tarball, which already carries
+the private runtime in `linux/runtime`, pinned by the tarball's SHA-256.
+`tools/build/render-arch-pkgbuild.cjs` fills the version (from the tarball's
+build stamp, hyphen dropped so a prerelease sorts first in pacman), the tag and
+the checksum; the Linux Build job renders it beside the tarball, Release
+attaches `PKGBUILD` and `ergopti.install`, and the `smoke-arch-package` row
+builds it with `makepkg` on Arch and installs it with pacman, which also proves
+the declared dependency names. The tarball carries no build scripts, so the
+recipe checks the stamp's commit line itself. Action: never build the pinned
+sources in makepkg; a runtime change reaches Arch through the tarball.
+
 ### project-the-drift-guard-crashes-on-this-windows-box
 
 When a cross-platform drift tool fails on Windows path/process semantics, use

@@ -4571,6 +4571,12 @@ jobs:
         # linux/, so install.sh runs the same pinned programs as every package.
         run: bash tools/build/build-linux-bundle-archive.sh "$LINUX_BUNDLE_ASSET"
 
+      # The Arch recipe the release attaches: a repack of the tarball above,
+      # pinned by its SHA-256 and named after its stamped version.
+      - name: Render the Arch recipe for the installable bundle
+        shell: bash
+        run: node tools/build/render-arch-pkgbuild.cjs "build/linux/$LINUX_BUNDLE_ASSET" build/linux
+
       - name: Sign the update asset (detached signature)
         # PAR-30: the updaters verify <asset>.sig against the key in
         # _shared/modules/updater/asset_signing.json. release-sign owns the
@@ -4788,6 +4794,8 @@ jobs:
             build/linux/${{ env.LINUX_BUNDLE_ASSET }}
             build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sha256
             build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sig
+            build/linux/PKGBUILD
+            build/linux/ergopti.install
             build/linux/ErgoptiPlus-linux-amd64.deb
             build/linux/ErgoptiPlus-linux-x86_64.rpm
             build/linux/ErgoptiPlus-x86_64.AppImage
@@ -4874,7 +4882,7 @@ jobs:
           set -eu
           test -n "$INSTALL_ID"
           case "$INSTALL_KIND" in
-            install|first|deb|rpm|appimage|archive|flatpak) ;;
+            install|first|deb|rpm|appimage|archive|flatpak|pkgbuild) ;;
             *) exit 1 ;;
           esac
 
@@ -4890,6 +4898,14 @@ jobs:
         # one. git is for actions/checkout, findutils for the `find` below.
         shell: bash
         run: dnf install -y git findutils
+
+      - name: Tools the job itself needs (pkgbuild)
+        if: env.INSTALL_KIND == 'pkgbuild'
+        # makepkg and fakeroot (base-devel), git for actions/checkout, sudo to
+        # build as an ordinary user, Node for the evidence record. Deliberately
+        # NOT luajit: the package carries its own private runtime.
+        shell: bash
+        run: pacman -Syu --noconfirm --needed base-devel git sudo nodejs
 
       - uses: actions/checkout@v4
 
@@ -5418,6 +5434,81 @@ jobs:
           name: linux-ci-evidence-smoke-tarball-install
           retention-days: 7
           path: ${{ runner.temp }}/linux-ci-evidence/smoke-tarball-install.json
+          if-no-files-found: error
+
+      # The Arch recipe the release attaches, built by makepkg and installed by
+      # pacman the way a user would: the rendered PKGBUILD and hook the build job
+      # uploaded, over the very tarball it repacks, placed under the recipe's
+      # local source name so makepkg checks its SHA-256 and downloads nothing.
+      # pacman resolves every declared dependency from the Arch repositories.
+      - name: Download the packages built above (pkgbuild)
+        if: env.INSTALL_KIND == 'pkgbuild'
+        uses: actions/download-artifact@v4
+        with:
+          name: assets-linux
+          path: pkg
+
+      - name: Build the release recipe with makepkg (pkgbuild)
+        if: env.INSTALL_KIND == 'pkgbuild'
+        shell: bash
+        env:
+          LINUX_BUNDLE_ASSET: ${{ inputs.linux_bundle }}
+        run: |
+          set -euo pipefail
+          useradd -m ergopti-builder
+          recipe="$RUNNER_TEMP/arch-recipe"
+          install -d "$recipe"
+          cp pkg/PKGBUILD pkg/ergopti.install "$recipe/"
+          pkgver="$(bash -c 'source "$1"; printf %s "$pkgver"' recipe "$recipe/PKGBUILD")"
+          cp "pkg/$LINUX_BUNDLE_ASSET" "$recipe/ergopti-plus-linux-$pkgver.tar.gz"
+          chown -R ergopti-builder "$recipe"
+          (cd "$recipe" && sudo -u ergopti-builder makepkg --noconfirm)
+
+      - name: Install the package with pacman (pkgbuild)
+        if: env.INSTALL_KIND == 'pkgbuild'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          packages=("$RUNNER_TEMP"/arch-recipe/ergopti-[0-9]*.pkg.tar.zst)
+          [ "${#packages[@]}" -eq 1 ] || { echo "::error::makepkg built ${#packages[@]} ergopti package(s), expected one."; exit 1; }
+          pacman -U --noconfirm "${packages[0]}"
+
+      - name: Launch what the package installed (pkgbuild)
+        if: env.INSTALL_KIND == 'pkgbuild'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ergopti --help
+
+      - name: The installed shared data tree resolves and opens (pkgbuild)
+        if: env.INSTALL_KIND == 'pkgbuild'
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=/usr/lib/ergopti
+          source "$root/network-runtime-env.sh" "$root/runtime" "$root"
+          "$ERGOPTI_RUNTIME_PREFIX/bin/luajit" static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+              "$root/_shared"
+
+      - name: Record mandatory Arch package smoke evidence (pkgbuild)
+        if: env.INSTALL_KIND == 'pkgbuild'
+        shell: bash
+        run: |
+          node tools/test/linux-ci-evidence.cjs record \
+              --job install-linux --output "$RUNNER_TEMP/linux-ci-evidence/smoke-arch-package.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro arch \
+              --session installed-package --interpreter "$(bash -c 'source "$1/network-runtime-env.sh" "$1/runtime" "$1" 2>/dev/null && exec "$1/runtime/bin/luajit" -v' installed /usr/lib/ergopti 2>&1 | head -1)" \
+              --subject smoke-arch-package=1
+
+      - name: Upload mandatory Arch package smoke evidence (pkgbuild)
+        if: env.INSTALL_KIND == 'pkgbuild'
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: linux-ci-evidence-smoke-arch-package
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/smoke-arch-package.json
           if-no-files-found: error
 
       # The Flatpak the build job produced, installed the way a user would. The

@@ -218,7 +218,9 @@ jobs:
               ErgoptiPlus-x86_64.AppImage.zsync \
               ErgoptiPlus-linux-x86_64.flatpak \
               "$LINUX_BUNDLE_ASSET" \
-              "$LINUX_BUNDLE_ASSET.sha256"; do
+              "$LINUX_BUNDLE_ASSET.sha256" \
+              PKGBUILD \
+              ergopti.install; do
               if [ ! -s "release-assets/$asset" ]; then
                   echo "::error::release-assets/$asset is missing or empty: the lane that builds it did not upload it as an assets-* artifact."
                   missing=$((missing + 1))
@@ -632,7 +634,7 @@ jobs:
           **Which file for your distribution:**
           - Debian, Ubuntu, Mint, Pop!_OS, elementary → \`ErgoptiPlus-linux-amd64.deb\`
           - Fedora, RHEL, CentOS, openSUSE, Mageia → \`ErgoptiPlus-linux-x86_64.rpm\`
-          - Arch, Manjaro, EndeavourOS → build it from \`tools/build/PKGBUILD\` in the repository; no Arch package is attached to this release
+          - Arch, Manjaro, EndeavourOS → download \`PKGBUILD\` and \`ergopti.install\` from this release into one folder, then run \`makepkg -si\` there: it repacks \`$LINUX_BUNDLE_ASSET\`, pinned by its SHA-256
           - Flatpak → \`ErgoptiPlus-linux-x86_64.flatpak\`, installed with \`flatpak install --bundle\`. It requests \`--device=all\`, which is the only permission that reaches \`/dev/input\` and \`/dev/uinput\`; the sandbox still cannot grant access your user does not have on the host, so the udev rule in step 2 is required either way
           - Any other distribution, an immutable one, or no root access → \`ErgoptiPlus-x86_64.AppImage\` or \`$LINUX_BUNDLE_ASSET\`
 
