@@ -1358,6 +1358,13 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 		MaxOutputBytes, CaptureOutput, PrivateDiagnostics)
 }
 
+; The absolute path of an executable on the search path, "" when there is none.
+ShellRunner_FindOnPath(Name) {
+	Found := Buffer(2 * 32768)
+	return DllCall("Kernel32\SearchPathW", "Ptr", 0, "Str", Name, "Ptr", 0, "UInt", 32768, "Ptr", Found, "Ptr", 0, "UInt")
+		? StrGet(Found, "UTF-16") : ""
+}
+
 /**
  * Owns a trusted complete command line with a private Unicode environment.
  * Unlike the argv entry, this preserves shell syntax already composed by its
