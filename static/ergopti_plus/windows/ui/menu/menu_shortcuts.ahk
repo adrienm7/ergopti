@@ -73,7 +73,7 @@ _SC_Getters() {
 _SC_KeyCombinationsSubmenu(Options := unset) {
 	Commands := _SC_KeyCombinationCommands(IsSet(Options) ? Options : Map())
 	Getters := Map("key_combinations_enabled", () => IsCategoryGated("KeyCombinations"),
-		"combo_symmetric", () => KeyCombinationChordConfig["combo_symmetric"] ? true : false)
+		MenuCommand.COMBO_SYMMETRIC, () => KeyCombinationChordConfig[MenuCommand.COMBO_SYMMETRIC] ? true : false)
 	ListProviders := Map(
 		"combo_timings", KeyCombinationChordTimingRows,
 		"key_combination_rows_left", () => KeyCombinationRows("left"),
@@ -86,7 +86,7 @@ _SC_KeyCombinationCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
 	return Map(
 		"key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"),
-		"combo_symmetric", (*) => KeyCombinationChordToggleSymmetric(),
+		MenuCommand.COMBO_SYMMETRIC, (*) => KeyCombinationChordToggleSymmetric(),
 		"scope_restore", (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
 		"scope_clear", (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
 }
