@@ -299,7 +299,7 @@ _UserCommandStart(BindingId, Line, Output) {
 	}
 	Stem := A_Temp . "\ergopti_user_command_" . DllCall("GetCurrentProcessId", "UInt") . "_" . ++_UserCommandCounter
 	Entry := Map("binding", BindingId, "output", Output, "out", Stem . ".out", "err", Stem . ".err",
-		"started", A_TickCount, "reason", "", "finished", false)
+		"started", A_TickCount, "stop_cause", "", "finished", false)
 	_UserCommandEntries[BindingId] := Entry
 	LoggerStart("UserActions", "Running the command of a run_command binding…")
 	try {
@@ -328,13 +328,13 @@ _UserCommandStart(BindingId, Line, Output) {
 _UserCommandPoll(Entry, *) {
 	if Entry["finished"]
 		return
-	if (Entry["reason"] == "") {
+	if (Entry["stop_cause"] == "") {
 		if (A_TickCount - Entry["started"] >= TimingsGet("gestures", "run_command_timeout_ms"))
-			Entry["reason"] := "timeout"
+			Entry["stop_cause"] := "timeout"
 		else if _UserCommandOutputOverflows(Entry)
-			Entry["reason"] := "overflow"
+			Entry["stop_cause"] := "overflow"
 	}
-	if (Entry["reason"] != "") {
+	if (Entry["stop_cause"] != "") {
 		; terminate() retires the completion callback, so its receipt finishes here.
 		try Receipt := Entry["handle"].terminate()
 		catch
@@ -361,11 +361,11 @@ _UserCommandOutputOverflows(Entry) {
 }
 
 _UserCommandReportStopped(Entry) {
-	if (Entry["reason"] == "timeout") {
+	if (Entry["stop_cause"] == "timeout") {
 		Seconds := Round(TimingsGet("gestures", "run_command_timeout_ms") / 1000)
 		LoggerError("UserActions", "The command of a run_command binding was stopped after {1} seconds.", Seconds)
 		_UserActionNotify("user_actions.command_timeout", Seconds)
-	} else if (Entry["reason"] == "overflow") {
+	} else if (Entry["stop_cause"] == "overflow") {
 		Limit := TimingsGet("limits", "user_action_output_bytes")
 		LoggerError("UserActions", "The command of a run_command binding printed more than {1} bytes and was stopped.", Limit)
 		_UserActionNotify("user_actions.command_output_too_large", Limit)
@@ -412,7 +412,7 @@ _UserCommandDone(Entry, ExitCode := unset, *) {
 	if Entry["finished"]
 		return true
 	try {
-		if (Entry["reason"] != "")
+		if (Entry["stop_cause"] != "")
 			_UserCommandReportStopped(Entry)
 		else
 			_UserCommandReport(Entry, ExitCode)
@@ -423,7 +423,7 @@ _UserCommandDone(Entry, ExitCode := unset, *) {
 _UserCommandReport(Entry, ExitCode) {
 	global USER_ACTION_NOTICE_LINE_BYTES
 	if _UserCommandOutputOverflows(Entry) {
-		Entry["reason"] := "overflow"
+		Entry["stop_cause"] := "overflow"
 		_UserCommandReportStopped(Entry)
 		return
 	}
