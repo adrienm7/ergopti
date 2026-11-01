@@ -53,7 +53,7 @@ _CSC_RealFileAndEntry() {
 	Assert(RegExMatch(FileGetVersion(HTTP_SystemCurlPath()), "^\d+\.\d+\.\d+"),
 		"this Windows reports its curl version from the file")
 	AssertTrue(HTTP_CheckCurlAtStart(), "this machine is supported, so no dialog opens")
-	Entry := FileRead(A_ScriptDir . "\..\ErgoptiPlus.ahk", "UTF-8")
+	Entry := _DriverSourceConcat()
 	AssertContains(Entry, "SetTimer(HTTP_CheckCurlAtStart, -1)", "the entry runs the check after ready")
 	Assert(InStr(Entry, "SetTimer(HTTP_CheckCurlAtStart") > InStr(Entry, '_DriverBootPhase := "ready"'),
 		"a dialog must not freeze the boot")

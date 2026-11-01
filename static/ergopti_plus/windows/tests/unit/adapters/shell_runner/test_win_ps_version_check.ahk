@@ -41,7 +41,7 @@ _WPSV_RealReadingAndEntry() {
 	Version := ShellRunner_WinPsVersion()
 	Assert(RegExMatch(Version, "^\d+\.\d+"), "this Windows reports its PowerShell, got '" . Version . "'")
 	AssertTrue(ShellRunner_CheckWinPsAtStart(), "this machine is supported, so no dialog opens")
-	Entry := FileRead(A_ScriptDir . "\..\ErgoptiPlus.ahk", "UTF-8")
+	Entry := _DriverSourceConcat()
 	AssertContains(Entry, "SetTimer(ShellRunner_CheckWinPsAtStart, -1)", "the entry runs the check after ready")
 	Assert(InStr(Entry, "SetTimer(ShellRunner_CheckWinPsAtStart") > InStr(Entry, '_DriverBootPhase := "ready"'),
 		"a dialog must not freeze the boot")
