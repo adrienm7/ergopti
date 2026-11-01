@@ -1505,17 +1505,18 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		this.BoundReceipt := 0
 		this.Writing := false
 		this.RegistryProof := { registry: 0, shadow: 0 }
+		this.SweepAdmission := false
 	}
 
 	/** Returns native ports without exporting private snapshots through the receipt. */
 	Ports() {
 		return Map("capture_source", ObjBindMethod(this, "Capture"),
-			"source_current", ObjBindMethod(this, "Current"),
+			"source_current", ObjBindMethod(this, "SweepCurrent"),
 			"entry", ObjBindMethod(this, "Entry"),
 			"entry_bound", ObjBindMethod(this, "EntryBound"),
 			"entries_bound", ObjBindMethod(this, "EntriesBound"),
 			"views_bound", ObjBindMethod(this, "ViewsBound"),
-			"admit", ObjBindMethod(this, "Admit"),
+			"admit", ObjBindMethod(this, "SweepAdmit"),
 			"apply", ObjBindMethod(this, "Apply"))
 	}
 
@@ -1526,17 +1527,38 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		finally Critical(PreviousCritical)
 	}
 
-	; A local server sweep revalidates its source hundreds of times, and each admission
-	; compared the whole migration registry (18 ms, 1,500 times in one join). Outside a
-	; transaction nothing this admission protects can be written, so the proof stands;
-	; with a bundle bound every admission compares, as does the transaction's own port.
+	; Every source operation compares the whole migration registry, so a changed
+	; registry never mints currentness, and that comparison arms the proof below.
+	; Only the local server sweep's own ports (SweepAdmit, SweepCurrent), which
+	; revalidate hundreds of times (18 ms, 1,500 times in one join) and can write
+	; nothing, reuse the proof; each sweep's Capture compares again, and so does a
+	; bound bundle's admission and the transaction's own port.
 	_AdmitNonCritical() {
 		if A_IsSuspended
 			return false
-		Standing := (this.Bundle is Object) ? 0 : this.RegistryProof
+		Standing := this.RegistryProof
+		if !this.SweepAdmission || (this.Bundle is Object)
+			Standing.registry := 0, Standing.shadow := 0
 		if !ConfigMigrateWithRegistryProof(ConfigFullStateCanPersist, Standing)
 			return false
 		return this._AdmitContextNonCritical()
+	}
+
+	/** Admit for a local server sweep: reuses the proof of its last full comparison. */
+	SweepAdmit() {
+		return this._WithSweepAdmission(ObjBindMethod(this, "Admit"))
+	}
+
+	/** Current for a local server sweep: reuses the proof of its last full comparison. */
+	SweepCurrent(Receipt) {
+		return this._WithSweepAdmission(ObjBindMethod(this, "Current", Receipt))
+	}
+
+	_WithSweepAdmission(Operation) {
+		Previous := this.SweepAdmission
+		this.SweepAdmission := true
+		try return Operation.Call()
+		finally this.SweepAdmission := Previous
 	}
 
 	; This context fence grants no schema or source permission by itself.

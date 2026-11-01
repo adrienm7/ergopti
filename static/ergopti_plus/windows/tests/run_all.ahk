@@ -899,6 +899,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/modules/llm/servers/test_local_server_publication_rollback.ahk
 #Include unit/modules/llm/servers/test_local_server_receipt_entry.ahk
 #Include unit/modules/llm/servers/test_local_server_source_operations.ahk
+#Include unit/modules/llm/servers/test_local_server_sweep_admission.ahk
 #Include unit/modules/llm/api/test_llm_api_add_production.ahk
 #Include unit/modules/llm/api/test_llm_api_add_account_address.ahk
 #Include unit/modules/llm/servers/test_local_server_write_admission.ahk
