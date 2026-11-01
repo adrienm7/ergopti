@@ -1346,7 +1346,7 @@ checkFreshSourceBoot(integrationBoot);
 	);
 	const lines = pipeline.runOf(step);
 	const tests = lines.flatMap((line, index) => (/^\s*node /.test(line) ? [index] : []));
-	assert.equal(tests.length, 2, 'the relay and override tests both run');
+	assert.equal(tests.length, 3, 'the relay, override and Perplexity tests all run');
 	for (const index of tests)
 		assert.match(lines[index + 1], /if \(\$LASTEXITCODE -ne 0\) \{ exit \$LASTEXITCODE \}/);
 	const overrideSource = fs.readFileSync(
