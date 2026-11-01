@@ -309,6 +309,13 @@ def package_arguments(arguments):
     return list(arguments)
 
 
+# Wall-clock deadline of each apt-get or apt-cache call. Acquire::http::Timeout
+# bounds one stalled read only, and a Common "Install native validation tools"
+# step once hung for more than 95 minutes, so a call that outlives this is
+# killed and fails the step instead of holding the runner for its six hours.
+APT_COMMAND_TIMEOUT_SECONDS = 600
+
+
 def command_prefix(directory):
     """Use the same isolated indexes and signature policy for both operations."""
     options = {
@@ -503,7 +510,7 @@ def acquire(
         directory.chmod(0o555)
         require_owned(directory.lstat(), "private-namespace", directory=True)
         prefix = command_prefix(directory)
-        execute(prefix + ["update"], check=True)
+        execute(prefix + ["update"], check=True, timeout=APT_COMMAND_TIMEOUT_SECONDS)
         plan = []
         if deb_cache is not None:
             restored, used = deb_cache_directories(deb_cache)
@@ -512,6 +519,7 @@ def acquire(
                 check=True,
                 capture_output=True,
                 text=True,
+                timeout=APT_COMMAND_TIMEOUT_SECONDS,
             ).stdout
             plan = planned_archives(listing)
             digests = {}
@@ -522,13 +530,14 @@ def acquire(
                         check=True,
                         capture_output=True,
                         text=True,
+                        timeout=APT_COMMAND_TIMEOUT_SECONDS,
                     ).stdout,
                     plan,
                 )
             archives = directory / "cache" / "archives"
             (archives / "partial").mkdir(mode=0o755, parents=True)
             import_cached_archives(plan, digests, restored, archives)
-        execute(prefix + ["install", *arguments], check=True)
+        execute(prefix + ["install", *arguments], check=True, timeout=APT_COMMAND_TIMEOUT_SECONDS)
         if deb_cache is not None:
             export_used_archives(plan, archives, used)
     except BaseException as error:
@@ -572,3 +581,6 @@ if __name__ == "__main__":
         main(sys.argv[1:])
     except subprocess.CalledProcessError as failure:
         sys.exit(failure.returncode or 1)
+    except subprocess.TimeoutExpired as failure:
+        print(f"APT command exceeded {failure.timeout} s and was stopped", file=sys.stderr)
+        sys.exit(1)
