@@ -205,7 +205,9 @@ const BASELINE = 8;
 //       44 → 42 (2026-10-31: the boot scenarios refuse any boot line that
 //              keeps a {N} placeholder; test_init_boot_logger_format no
 //              longer searches init.lua for one.)
-const READ_BASELINE = 42;
+//       42 → 38 (2026-11-01: the keystats pause-guard test selects its two
+//              modules by a declaration unique to each instead of their paths.)
+const READ_BASELINE = 38;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
