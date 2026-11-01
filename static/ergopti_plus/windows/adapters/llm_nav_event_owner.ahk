@@ -3613,7 +3613,11 @@ _LLM_NavEventOwnerNativeStart(Hwnd, WakeMessage) {
 		}
 		throw StartError
 	}
-	KS_NativeKeyPressPort(LLM_NavEventOwner_KeyPress)
+	; The ledger is read from #HotIf criteria on the keystroke path, and resolving an
+	; export re-proves the whole issued image (about 280 us). Resolve it once here:
+	; the module is process-resident, so the address outlives every owner restart.
+	KeyPressExport := _LLM_NavEventOwnerNativeExport("ErgoptiNav_QueryKeyPress")
+	KS_NativeKeyPressPort((Sc) => LLM_NavEventOwner_KeyPress(Sc, KeyPressExport))
 	if !LLM_NavEventOwner_RefreshTerminalRoutes()
 		throw Error("Terminal route metadata registration was not admitted at startup.")
 	_LLM_NavEventOwnerLogDesktopWatch()
@@ -3662,11 +3666,13 @@ LLM_NavEventOwner_HookOrderStats() {
 ; Reads one key of the native press ledger, which is empty while the owner is
 ; stopped. This runs inside #HotIf criteria, so the buffer is not reallocated.
 ; @param Sc {Integer} Scan code, 0x100 set for an extended key.
+; @param Export {Integer} The resolved query, which a keystroke-path caller passes;
+;     0 resolves it now.
 ; @returns {Object} flags (ERGOPTI_NAV_KEY_* bits) and sequence (press number).
-LLM_NavEventOwner_KeyPress(Sc) {
+LLM_NavEventOwner_KeyPress(Sc, Export := 0) {
 	static Press := Buffer(24, 0)
 	NumPut("UInt", 24, Press, 0)
-	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_QueryKeyPress"),
+	Status := DllCall(Export ? Export : _LLM_NavEventOwnerNativeExport("ErgoptiNav_QueryKeyPress"),
 		"UShort", Sc, "Ptr", Press, "Int")
 	_LLM_NavEventOwnerNativeRequireOk(Status, "Navigation owner key press query")
 	return { flags: NumGet(Press, 4, "UInt"), sequence: NumGet(Press, 8, "UInt64") }

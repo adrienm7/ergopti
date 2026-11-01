@@ -243,3 +243,15 @@ _NPL_FakeLCtrlIsNeverTheFirstKey() {
 }
 Test("press ledger: the fake LCtrl stays out of the first-key choice (todo91-first-key-altgr)",
 	_NPL_FakeLCtrlIsNeverTheFirstKey)
+
+; #HotIf criteria read the ledger on the keystroke path. Resolving an export proves
+; every issued address again, which made one read cost 48 GetKeyState calls.
+_NPL_KeystrokeReadResolvesNoExport(*) {
+	Source := FileRead(A_ScriptDir . "\..\adapters\llm_nav_event_owner.ahk", "UTF-8")
+	Assert(InStr(Source, "KS_NativeKeyPressPort(LLM_NavEventOwner_KeyPress)") == 0,
+		"the port must not resolve the export at every read")
+	Assert(RegExMatch(Source, "KS_NativeKeyPressPort\(\(Sc\) => LLM_NavEventOwner_KeyPress\(Sc, \w+\)\)") > 0,
+		"the port must carry the export resolved once at the owner's start")
+}
+Test("press ledger: a keystroke read resolves no export (ledger-read-cost-2026-11-01)",
+	_NPL_KeystrokeReadResolvesNoExport)
