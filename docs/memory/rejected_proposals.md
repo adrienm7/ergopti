@@ -161,8 +161,7 @@ Do not lower the exe bundle's DllImport ceiling by sharing `CreateFileW` and
 `modules/llm/ollama_managed_files.ps1`, the only other declaration. Each stage is
 a separate `-File` process that compiles its own `Add-Type`; a shared type would
 make the updater stage load an Ollama script (or a third file) and change its
-sealed sources for two declarations. The ceiling stays at 54, the count measured
-on 2026-11-01 with the pinned compiler. Reconsider if the stages ever share a
+sealed sources for two declarations. Reconsider if the stages ever share a
 compiled module.
 
 ## Differential updates at current release sizes
