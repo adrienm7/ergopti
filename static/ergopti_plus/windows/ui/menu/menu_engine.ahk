@@ -347,9 +347,9 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
 		switch V2Path {
 			case ConfigKey.HOTSTRINGS_DYNAMIC_DATE_FR:
 				Label := StrReplace(Label, "{date}", FormatTime(, "dd/MM/yyyy"))
-			case "hotstrings.dynamic.date_long_fr":
+			case ConfigKey.HOTSTRINGS_DYNAMIC_DATE_LONG_FR:
 				Label := StrReplace(Label, "{date}", _DateLongFr())
-			case "hotstrings.dynamic.date":
+			case ConfigKey.HOTSTRINGS_DYNAMIC_DATE:
 				Label := StrReplace(Label, "{date}", FormatTime(, "yyyy_MM_dd"))
 		}
 	}

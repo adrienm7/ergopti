@@ -35,7 +35,7 @@ global _LLM_Live := Map("active", false, "profile_id", "", ConfigLeaf.NUM_PREDIC
 
 /**
  * Returns the decoded, validated live.json, read on first use.
- * @returns {Map} Map("debounce_ms", Ms, "min_words", Words).
+ * @returns {Map} Map("debounce_ms", Ms, ConfigLeaf.MIN_WORDS, Words).
  */
 LLM_Live_Config() {
 	global _SharedDir
@@ -46,7 +46,7 @@ LLM_Live_Config() {
 	Candidate := JsonParse(FSReadStrict(Path))
 	_LLM_Live_ValidateConfig(Candidate, Path)
 	Config := Map(ConfigLeaf.DEBOUNCE_MS, Candidate[ConfigLeaf.DEBOUNCE_MS],
-		"min_words", Candidate["min_words"])
+		ConfigLeaf.MIN_WORDS, Candidate[ConfigLeaf.MIN_WORDS])
 	return Config
 }
 
@@ -175,7 +175,7 @@ LLM_Engine_LiveStart(ProfileId, NumPredictions := 0, TranslationTarget := "") {
 	LoggerInfo("LLM", "Live mode {1} with '{2}' ({3} prediction(s), {4} ms debounce, {5} minimum word(s)).",
 		WasActive ? "moved" : "on", Checked["profile_id"],
 		Checked[ConfigLeaf.NUM_PREDICTIONS] > 0 ? Checked[ConfigLeaf.NUM_PREDICTIONS] : "the menu's",
-		Config[ConfigLeaf.DEBOUNCE_MS], Config["min_words"])
+		Config[ConfigLeaf.DEBOUNCE_MS], Config[ConfigLeaf.MIN_WORDS])
 }
 
 /**

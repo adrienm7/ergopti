@@ -1,5 +1,6 @@
 ﻿; Last modified on 2026-04-23 at 00:00 (UTC+2)
 #Requires Autohotkey v2.0+
+#Include %A_LineFile%\..\_generated\config_keys.ahk
 ; Version resource of the compiled exe (Ahk2Exe directives, plain comments for
 ; the interpreter): without it the exe carries only the runtime's defaults. The
 ; version comes from BUNDLE_VERSION in infra/bundle.ahk.
@@ -974,9 +975,9 @@ BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, 
 
 ; Safe nested read
 _SpaceAroundSymbolsNode := (Features.Has("hotstrings")
-	and Features["hotstrings"].Has("distances_reduction")
-	and Features["hotstrings"]["distances_reduction"].Has("space_around_symbols"))
-	? Features["hotstrings"]["distances_reduction"]["space_around_symbols"]
+	and Features["hotstrings"].Has(ConfigLeaf.DISTANCES_REDUCTION)
+	and Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION].Has("space_around_symbols"))
+	? Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION]["space_around_symbols"]
 	: Map()
 global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceAroundSymbolsNode["enabled"]) ? " " : ""
 
@@ -1273,10 +1274,10 @@ _MagicKeySource := LayoutRegistry_MagicKeySource(Map(
 	"configured", ScriptInformation["MagicKeySource"],
 	"declared", LayoutRegistry_DeclaredMagicKey(
 		LayoutRegistry_ActiveLayoutExtension(KeylayoutEmulation_SelectedId(),
-			Features["layout"]["ergopti_base"], ERGOPTI_LAYOUT_ID,
+			Features["layout"][ConfigLeaf.ERGOPTI_BASE], ERGOPTI_LAYOUT_ID,
 			() => LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))),
 		_HotstringExtensionPacks, LayoutRegistry_BundledDir()),
-	"emulated", Features["layout"]["ergopti_base"],
+	"emulated", Features["layout"][ConfigLeaf.ERGOPTI_BASE],
 	"keycodes", LayoutRegistry_Keycodes(),
 	"detect", LayoutRegistry_DetectMagicKeyScan.Bind(_LAYOUT_REMAP_HKL, ScriptInformation["MagicKeySourceChar"]),
 	"shipped", LayoutRegistry_ShippedMagicKey))
@@ -1605,8 +1606,8 @@ _Updater_ArmInheritedSwapFailureNotice()
 ; replay the full driver boot, and no provider call happens until an idle-gated
 ; request arrives. Starting it here prevents the first wrap action after a
 ; reload from racing a cold worker process.
-if Features.Has("shortcuts") && Features["shortcuts"].Has("wrap_text_if_selected")
-	&& Features["shortcuts"]["wrap_text_if_selected"]
+if Features.Has("shortcuts") && Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED)
+	&& Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]
 	SetTimer(UIASW_Start, -1)
 
 if _DriverStartupSmokeDir == "" && IsCategoryGated("Hotstrings")

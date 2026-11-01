@@ -72,14 +72,14 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 		throw TypeError("LLM saved options must be a Map.")
 	static _str_keys := ["model", "profile_id", "temperature",
 		ConfigLeaf.NAV_MODIFIERS, ConfigLeaf.VAL_MODIFIERS, "backend",
-		"api_entry_id", ConfigLeaf.AGENT_SYSTEM1, "agent_system2", "agent_mode"]
-	static _num_keys := ["n_predictions", "min_words", "max_words", ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
+		"api_entry_id", ConfigLeaf.AGENT_SYSTEM1, ConfigLeaf.AGENT_SYSTEM2, ConfigLeaf.AGENT_MODE]
+	static _num_keys := ["n_predictions", ConfigLeaf.MIN_WORDS, ConfigLeaf.MAX_WORDS, ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
 		"ctx_chars", ConfigLeaf.PRED_INDENT, "ollama_port"]
 	static _bool_keys := ["enabled", ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING,
 		ConfigLeaf.RESET_ON_NAV, "disable_url_bars", "disable_password_fields",
 		ConfigLeaf.SHOW_INFO_BAR, "streaming", "show_all_at_once", ConfigLeaf.AUTO_RAISE_TEMP,
-		"auto_profile_for_model", ConfigLeaf.ONBOARDING_SEEN, ConfigLeaf.INLINE_AUTOTYPE]
-	static _arr_keys := ["user_profiles", ConfigLeaf.DISABLED_APPS, "agent_disabled_apps"]
+		ConfigLeaf.AUTO_PROFILE_FOR_MODEL, ConfigLeaf.ONBOARDING_SEEN, ConfigLeaf.INLINE_AUTOTYPE]
+	static _arr_keys := [ConfigLeaf.USER_PROFILES, ConfigLeaf.DISABLED_APPS, ConfigLeaf.AGENT_DISABLED_APPS]
 	for key in _str_keys {
 		if !saved_opts.Has(key)
 			continue

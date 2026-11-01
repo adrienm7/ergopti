@@ -329,10 +329,13 @@ _DriverGeneratedConstants() {
 ; as the quoted string it stands for. A name the table does not hold stays, so a
 ; misspelt constant still fails its pin, and one inside a string stays as written.
 _DriverResolveConstants(Src) {
-	static Table := _DriverGeneratedConstants()
+	; Read on the first reference: a fixture tree of its own holds no generated file.
+	static Table := 0
 	Out := ""
 	Position := 1
 	while RegExMatch(Src, "\b(?:ConfigKey|ConfigLeaf|MenuCommand)\.[A-Z][A-Z0-9_]*\b", &Found, Position) {
+		if !IsObject(Table)
+			Table := _DriverGeneratedConstants()
 		Before := SubStr(Src, Found.Pos - 1, 1)
 		Quoted := Found.Pos > 1 && (Before == '"' || Before == "'")
 		Out .= SubStr(Src, Position, Found.Pos - Position)

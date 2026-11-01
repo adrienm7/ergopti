@@ -29,6 +29,7 @@
 
 
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include ../../adapters/native_number.ahk
 
 ; ===========================
@@ -1360,7 +1361,7 @@ TapHoldScopeApply(Mode, Options := unset) {
 	Defaults := CandidateOptions.Get("tap_hold_defaults", _SharedDir . "\tap_hold\defaults.toml")
 	CandidateOptions["preset_owner"] := TapHoldScopeOwner(Path, Defaults, Mode,
 		CandidateOptions.Get("layers_config_dir", ""))
-	return ConfigScopeApply("tap_holds", Mode,
+	return ConfigScopeApply(ConfigLeaf.TAP_HOLDS, Mode,
 		Map("parameters", ConfigScopeActionParameterPaths), CandidateOptions)
 }
 

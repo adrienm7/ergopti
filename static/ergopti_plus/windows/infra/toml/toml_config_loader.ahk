@@ -126,7 +126,7 @@ TomlConfigForeignOwnershipRegistry() {
 	; seeds at boot. These are owned settings, never unused configuration keys.
 	for _, Pack in HotstringsLanguageCategories() {
 		for _, Category in Pack["categories"]
-			Registry["category_enabled"][Category["v2"]] := "FeatureState"
+			Registry[ConfigLeaf.CATEGORY_ENABLED][Category["v2"]] := "FeatureState"
 	}
 	return Registry
 }
@@ -549,7 +549,7 @@ TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 		Entry := false
 		if Key == "enabled"
 			return "boolean"
-		if Key == "time_activation_seconds"
+		if Key == ConfigLeaf.TIME_ACTIVATION_SECONDS
 			return "non-negative number"
 		return ""
 	}
@@ -560,7 +560,7 @@ TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 		if (InStr(CurrentSection, "hotstrings.personal.") == 1) {
 			if (Key == "enabled")
 				ExpectedType := "boolean"
-			else if (Key == "time_activation_seconds")
+			else if (Key == ConfigLeaf.TIME_ACTIVATION_SECONDS)
 				ExpectedType := "non-negative number"
 			else
 				return ""
@@ -574,7 +574,7 @@ TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 				return ""
 			if Key == "enabled"
 				ExpectedType := "boolean"
-			else if Key == "time_activation_seconds"
+			else if Key == ConfigLeaf.TIME_ACTIVATION_SECONDS
 				ExpectedType := "non-negative number"
 			else if (Key == ConfigLeaf.PATTERN_MAX_LENGTH
 					&& CurrentSection
@@ -630,7 +630,7 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 			if ((IsSet(RawValue) && LiteralKind != "number")
 					|| !(Value is Integer || Value is Float) || Value < 0)
 				return false
-			if (Key == "time_activation_seconds")
+			if (Key == ConfigLeaf.TIME_ACTIVATION_SECONDS)
 				return TickTryDurationMsFromSeconds(Value, &DurationMs)
 			return true
 		case "integer from 1 through 16":

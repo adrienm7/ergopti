@@ -474,7 +474,7 @@ _UIA_SelectionPollTick() {
     ; When the wrap feature is off, skip the COM round-trip entirely so non-users
     ; never pay the per-tick cost or the large-selection keyboard-thread stall
     ; risk (uia-poll-bypasses-suspend).
-    if (!Features.Has("shortcuts") || !Features["shortcuts"].Has("wrap_text_if_selected") || !Features["shortcuts"]["wrap_text_if_selected"]) {
+    if (!Features.Has("shortcuts") || !Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED) || !Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]) {
 		_UIA_SelectionCache := 0
         return
     }
@@ -608,8 +608,8 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 	; path, but it returns an empty Map when the manifest fails to load, and a
 	; raw read here would throw on the keystroke thread.
 	WrapEnabled := Features.Has("shortcuts")
-		and Features["shortcuts"].Has("wrap_text_if_selected")
-		and Features["shortcuts"]["wrap_text_if_selected"]
+		and Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED)
+		and Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]
 	if (WrapEnabled and WrapSymbols_IsEnabled(LeftSymbol)) {
 		; Critical is RELEASED across the selection probe and the clipboard
 		; round-trip, then restored.
@@ -778,7 +778,7 @@ try {
 ; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards.
 ; The character mapping comes from modules/keymap/layout/layout_ergopti.ahk (read from the
 ; .keylayout) so the keystats heatmap reads the same source of truth without drifting.
-if Features["layout"]["ergopti_base"] {
+if Features["layout"][ConfigLeaf.ERGOPTI_BASE] {
 	; A row switched off types what the OS layout types there: its keys pass
 	; through, through variants created before every built-in layer below.
 	RegisterLayoutRowPassthrough()
@@ -1051,18 +1051,18 @@ _RegisterRollsAltGrHotkeys()
 ; script's own hook while it sends, so the paste it typed was never observed.
 ; These static contexts precede the dynamic row passthrough: each must stand
 ; down itself when its row belongs to the OS, including modified zoom chords.
-#HotIf IsSet(Features) and Features["layout"]["ergopti_base"] and LayoutRowIsEmulatedHotkey(A_ThisHotkey)
+#HotIf IsSet(Features) and Features["layout"][ConfigLeaf.ERGOPTI_BASE] and LayoutRowIsEmulatedHotkey(A_ThisHotkey)
 ^SC02F:: _RemapEmit("^v", "v")
 
 ; The first eligible context wins: leave the general zoom to non-Office hosts
 ; so the Wheel variants below can handle Word, Excel and the other Office apps.
-#HotIf IsSet(Features) and Features["layout"]["ergopti_base"] and LayoutRowIsEmulatedHotkey(A_ThisHotkey) and !MicrosoftApps()
+#HotIf IsSet(Features) and Features["layout"][ConfigLeaf.ERGOPTI_BASE] and LayoutRowIsEmulatedHotkey(A_ThisHotkey) and !MicrosoftApps()
 *^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
 *^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
 #HotIf
 
 ; In Microsoft apps like Word or Excel, we can't use Numpad + to zoom
-#HotIf IsSet(Features) and Features["layout"]["ergopti_base"] and LayoutRowIsEmulatedHotkey(A_ThisHotkey) and MicrosoftApps()
+#HotIf IsSet(Features) and Features["layout"][ConfigLeaf.ERGOPTI_BASE] and LayoutRowIsEmulatedHotkey(A_ThisHotkey) and MicrosoftApps()
 *^SC00C:: SendFinalResult("^{WheelDown}") ; Zoom out with (Shift +) Ctrl + %
 *^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with (Shift +) Ctrl + $
 #HotIf

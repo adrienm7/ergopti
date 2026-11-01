@@ -250,7 +250,7 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 	if NumberRowEffectiveMode() == "digits" {
 		if Numeric >= 0x02 && Numeric <= 0x0B
 			return { Count: 1, Text: Numeric == 0x0B ? "0" : String(Numeric - 1) }
-	} else if !KeylayoutEmulation_LayerIsActive("ergopti_base") {
+	} else if !KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) {
 		; « Symbols first » on the native or built-in row (NumberRowSymbolsFirstText).
 		Swapped := NumberRowSymbolsFirstText(Numeric, false, NumberRowForegroundLayout(), false)
 		if Swapped != ""
@@ -268,7 +268,7 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 		return { Count: Step["Next"] != "" && Step["Next"] != KEYLAYOUT_NEUTRAL_STATE ? -1 : StrLen(Step["Output"]),
 			Text: Step["Output"] }
 	}
-	if Features["layout"]["ergopti_base"] && LayoutRowIsEmulated(Scan) {
+	if Features["layout"][ConfigLeaf.ERGOPTI_BASE] && LayoutRowIsEmulated(Scan) {
 		; The built-in emulation types its own number row (RegisterBuiltinNumberRow).
 		Row := NumberRowEmulatedBase(StrUpper(Scan))
 		if Row != ""
@@ -305,14 +305,14 @@ _MagicEditorCurrentSource(Generation, Keycodes, Hkl) {
 /** Resolves only present ordinary Win settings against one exact native source. */
 _MagicEditorExplicitClaim(Source, Hkl) {
 	global _IniCache, KeyboardShortcutAssignments
-	if !(Source is Map) || !IsSet(_IniCache) || !_IniCache.Has("shortcuts.keyboard")
+	if !(Source is Map) || !IsSet(_IniCache) || !_IniCache.Has(ConfigKey.SHORTCUTS_KEYBOARD)
 		return 0
 	Resolver := HotkeyRegistrarNativeKeyResolverSnapshot(Map("get_layout", (*) => Hkl))
 	if !HasMethod(Resolver, "Call")
 		throw Error("The ordinary Win source identity could not be resolved.")
 	SourceVk := KS_ScancodeToVk(Source["native_code"], Hkl)
 	Selected := 0, Slots := []
-	for Slot in _IniCache["shortcuts.keyboard"] {
+	for Slot in _IniCache[ConfigKey.SHORTCUTS_KEYBOARD] {
 		if SubStr(Slot, 1, 5) != "meta_" || !KeyboardShortcutAssignments.Has(Slot)
 			continue
 		Chord := ChordParse(_KeyboardSlotChord(Slot))
@@ -341,8 +341,8 @@ _MagicEditorSourceSignature() {
 	return ScriptInformation["MagicKey"] . "|" . ScriptInformation["MagicKeySourceScan"]
 		. "|" . ScriptInformation["MagicKeySourceChosen"] . "|" . ScriptInformation["MagicKeySourceOverridesEmulation"]
 		. "|" . Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"]
-		. "|" . Layout["ergopti_base"] . "|" . Layout[ConfigLeaf.DIRECT_ACCESS_DIGITS]
-		. "|" . Layout["emulated_layout"] . "|" . KLE_Id
+		. "|" . Layout[ConfigLeaf.ERGOPTI_BASE] . "|" . Layout[ConfigLeaf.DIRECT_ACCESS_DIGITS]
+		. "|" . Layout[ConfigLeaf.EMULATED_LAYOUT] . "|" . KLE_Id
 }
 
 /** Rejects source changes and an actual tap-hold owner before stale delivery. */

@@ -31,6 +31,8 @@
 ; part of the same compilation unit before ``RegisterAltGrLayer`` is called.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -378,7 +380,7 @@ RegisterAltGrLayer(HotkeyFn := Hotkey, HotIfFn := HotIf, DispatchFn := AltGrShif
         ; Note: ergopti_base is intentionally NOT required here — superscripts,
         ; subscripts and the € sign are layout-independent and must work even when
         ; the Ergopti keyboard emulation is off.
-        HotIfFn.Call((Name := "", *) => Features["layout"]["ergopti_alt_gr"] and RealAltGrFn.Call()
+        HotIfFn.Call((Name := "", *) => Features["layout"][ConfigLeaf.ERGOPTI_ALT_GR] and RealAltGrFn.Call()
             and LayoutRowIsEmulatedHotkey(Name))
         for SC in ALTGR_NUMBER_ROW {
             HotkeyFn.Call("SC138 & " . SC, DispatchFn.Bind(SC, ALTGR_NUMBER_ROW), "I2")
@@ -386,14 +388,14 @@ RegisterAltGrLayer(HotkeyFn := Hotkey, HotIfFn := HotIf, DispatchFn := AltGrShif
         ; A real Ctrl+Alt chord, never the AltGr key: under the AltGr gate above
         ; these needed the physical AltGr, which a Ctrl+Alt chord never holds,
         ; so they were dead on standard layouts and QWERTY.
-        HotIfFn.Call((Name := "", *) => Features["layout"]["ergopti_alt_gr"] and IsCtrlAltNotAltGr()
+        HotIfFn.Call((Name := "", *) => Features["layout"][ConfigLeaf.ERGOPTI_ALT_GR] and IsCtrlAltNotAltGr()
             and LayoutRowIsEmulatedHotkey(Name))
         for SC, Combo in CTRL_ALT_NUMPAD {
             HotkeyFn.Call("^!" . SC, CtrlAltDispatch.Bind(Combo), "I2")
         }
 
         ; --- ErgoptiAltGr base rows (registered last, highest precedence) ---
-        HotIfFn.Call((Name := "", *) => Features["layout"]["ergopti_alt_gr"] and RealAltGrFn.Call()
+        HotIfFn.Call((Name := "", *) => Features["layout"][ConfigLeaf.ERGOPTI_ALT_GR] and RealAltGrFn.Call()
             and LayoutRowIsEmulatedHotkey(Name))
         for SC in ALTGR_BASE_ROWS {
             HotkeyFn.Call("SC138 & " . SC, DispatchFn.Bind(SC, ALTGR_BASE_ROWS), "I2")

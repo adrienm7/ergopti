@@ -32,6 +32,8 @@
 ;    changing arguments, into its first occurrence plus one timed summary.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -555,7 +557,7 @@ LoggerInit() {
 						try {
 								Content := FSReadStrict(ConfigurationFile)
 								Cache := ConfigTomlDecodeSnapshot(Content).Cache
-								Value := IniCacheGet(Cache, "script", "log_level", LOGGER_DEFAULT_LEVEL)
+								Value := IniCacheGet(Cache, "script", ConfigLeaf.LOG_LEVEL, LOGGER_DEFAULT_LEVEL)
 						}
 				}
 		}

@@ -14,6 +14,7 @@
 #Include config_write_lease.ahk
 #Include config_unused_keys.ahk
 #Include %A_LineFile%\..\slot_roles.ahk
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 
 ; Reports one user-visible error for a configuration mutation that did not
 ; reach disk. The TOML writer already logs its low-level failure; this adds the
@@ -1032,7 +1033,7 @@ _ConfigSeedPersonalHotstring(FeaturesTarget, SectionName) {
 		Path := "hotstrings.personal." . SectionName
 		FeaturesTarget["hotstrings"]["personal"][SectionName] := Map(
 			"enabled", ManifestDefaultFor(Path . ".enabled"),
-			"time_activation_seconds", ManifestDefaultFor(Path . ".time_activation_seconds"))
+			ConfigLeaf.TIME_ACTIVATION_SECONDS, ManifestDefaultFor(Path . ".time_activation_seconds"))
 	}
 	return true
 }
@@ -1143,7 +1144,7 @@ _ConfigBuildCategoryIntentPlan(Category, Bool) {
 				throw Error("Unknown hotstring category state: " . Category)
 			RuntimePatches.Push({ target: Features["hotstrings"], key: Root, value: Projected["hotstrings"][Root] })
 	}
-	Updates := [_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Category), Bool)]
+	Updates := [_ConfigSparseOperation(ConfigLeaf.CATEGORY_ENABLED, _CategoryEnabledKey(Category), Bool)]
 	return { updates: Updates, publish: _ConfigPublishDesiredState.Bind(Desired,
 		RuntimePatches, CandidateCategories, CandidateTapHold) }
 }
@@ -1377,7 +1378,7 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 			CandidateCategories := CategoryEnabled.Clone()
 			CandidateCategories[Gate] := Bool
 			FlippedGate := Gate
-			Updates.Push(_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Gate), Bool))
+			Updates.Push(_ConfigSparseOperation(ConfigLeaf.CATEGORY_ENABLED, _CategoryEnabledKey(Gate), Bool))
 		}
 	}
 	Projected := _HSDeepCloneMap(Desired)
@@ -1466,8 +1467,8 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 				; state that only existed in the failed serialization candidate.
 				FeatureSnapshot := _HSDeepCloneMap(MasterGateDesiredFeatures(FeatureState))
 				; The dedicated category owner below is authoritative for master gates.
-				if FeatureSnapshot.Has("category_enabled")
-						FeatureSnapshot.Delete("category_enabled")
+				if FeatureSnapshot.Has(ConfigLeaf.CATEGORY_ENABLED)
+						FeatureSnapshot.Delete(ConfigLeaf.CATEGORY_ENABLED)
 				if IsSet(_LLM_Menu_SyncToFeatures)
 						&& MenuReady && (MenuState is Map)
 						&& !_LLM_Menu_SyncToFeatures(FeatureSnapshot, MenuState)
@@ -1477,15 +1478,15 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 				Updates.Push({ Section: ConfigLeaf._META, Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
 		}
 		Updates.Push({ Section: "script", Key: "locale", Value: I18nGetLocale() })
-		Updates.Push({ Section: "script", Key: "log_level", Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })
-		Updates.Push({ Section: "hotstrings", Key: "trigger_char", Value: ScriptInformation["MagicKey"] })
+		Updates.Push({ Section: "script", Key: ConfigLeaf.LOG_LEVEL, Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })
+		Updates.Push({ Section: "hotstrings", Key: ConfigLeaf.TRIGGER_CHAR, Value: ScriptInformation["MagicKey"] })
 		if IsSet(ScriptShortcutAssignments) {
 				for Slot, Action in ScriptShortcutAssignments
-						Updates.Push({ Section: "shortcuts.script_control", Key: Slot, Value: Action })
+						Updates.Push({ Section: ConfigKey.SHORTCUTS_SCRIPT_CONTROL, Key: Slot, Value: Action })
 		}
 		if IsSet(KeyboardShortcutAssignments)
 				CollectKeyboardShortcutUpdates(Updates, KeyboardShortcutAssignments,
-						_IniCache.Get("shortcuts.keyboard", Map()), KEYBOARD_SHORTCUT_DEFAULTS)
+						_IniCache.Get(ConfigKey.SHORTCUTS_KEYBOARD, Map()), KEYBOARD_SHORTCUT_DEFAULTS)
 		if IsSet(GestureAssignments) {
 				for Slot, Action in GestureAssignments
 						Updates.Push({ Section: "gestures", Key: Slot, Value: Action })
@@ -1494,11 +1495,11 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		for proc, _ in MetricsFilters.disabled_apps
 				apps.Push(proc)
 		Updates.Push({ Section: "metrics", Key: "enabled", Value: TOML_Bool(MetricsShortcuts.enabled) })
-		Updates.Push({ Section: "metrics", Key: "private_filter_enabled", Value: TOML_Bool(MetricsFilters.private_browsing) })
-		Updates.Push({ Section: "metrics", Key: "secure_filter_enabled", Value: TOML_Bool(MetricsFilters.secure_field) })
-		Updates.Push({ Section: "metrics", Key: "system_auth_filter_enabled", Value: TOML_Bool(MetricsFilters.system_auth) })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.PRIVATE_FILTER_ENABLED, Value: TOML_Bool(MetricsFilters.private_browsing) })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.SECURE_FILTER_ENABLED, Value: TOML_Bool(MetricsFilters.secure_field) })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED, Value: TOML_Bool(MetricsFilters.system_auth) })
 		Updates.Push({ Section: "metrics", Key: "encrypt", Value: TOML_Bool(MetricsFilters.encrypt) })
-		Updates.Push({ Section: "metrics", Key: "disabled_apps", Value: apps })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.DISABLED_APPS, Value: apps })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: WPMWidget.use_colors })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH, Value: WPMWidget.show_graph })
@@ -1511,23 +1512,23 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		; over the user's saved values. Skipping is safe: TOML_BatchWrite preserves keys
 		; it does not re-collect, so the on-disk values survive until the menu has loaded.
 		if (MenuReady && (MenuState is Map)) {
-				if !MenuState.Has("onboarding_seen")
-						|| !LLM_Option_TryNormalize("onboarding_seen",
-							MenuState["onboarding_seen"], &OnboardingSeen)
+				if !MenuState.Has(ConfigLeaf.ONBOARDING_SEEN)
+						|| !LLM_Option_TryNormalize(ConfigLeaf.ONBOARDING_SEEN,
+							MenuState[ConfigLeaf.ONBOARDING_SEEN], &OnboardingSeen)
 					throw Error("LLM onboarding state could not be serialized into the full-save candidate")
-				Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: OnboardingSeen })
+				Updates.Push({ Section: "llm", Key: ConfigLeaf.ONBOARDING_SEEN, Value: OnboardingSeen })
 				_AppOverridesPayload := _LLM_Menu_SerializeAppProfileOverrides(
-						MenuState["app_profile_overrides"])
+						MenuState[ConfigLeaf.APP_PROFILE_OVERRIDES])
 				if !(_AppOverridesPayload is String)
 						throw Error("Could not serialize LLM app-profile overrides")
-				Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesPayload })
+				Updates.Push({ Section: "llm", Key: ConfigLeaf.APP_PROFILE_OVERRIDES, Value: _AppOverridesPayload })
 				if IsSet(_LLM_Menu_AppendPersistedUpdates)
 						&& !_LLM_Menu_AppendPersistedUpdates(Updates, MenuState)
 					throw Error("LLM menu persistence fields could not be serialized into the full-save candidate")
 		}
 		if IsSet(CategoryEnabled) {
 				for _CatName, _CatBool in CategoryEnabled
-						Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(_CatName), Value: TOML_Bool(_CatBool) })
+						Updates.Push({ Section: ConfigLeaf.CATEGORY_ENABLED, Key: _CategoryEnabledKey(_CatName), Value: TOML_Bool(_CatBool) })
 		}
 		if IsSet(UPDATER_CHECK_INTERVAL)
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL })
@@ -2058,11 +2059,11 @@ ReadScriptShortcutsConfig() {
 		; Authored preferences retain the canonical manifest/source-kind decision;
 		; detached runtime candidates keep their strict Boolean contract.
 		if !ConfigTomlTryReadBootValue(_IniCache, ConfigKey.SHORTCUTS_SCRIPT_CONTROL, "chords_enabled", &Raw)
-				Raw := IniCacheGet(_IniCache, "shortcuts.script_control", "chords_enabled")
+				Raw := IniCacheGet(_IniCache, ConfigKey.SHORTCUTS_SCRIPT_CONTROL, "chords_enabled")
 		if (Raw != "_")
 				ScriptShortcutChordsOn := _FeatureStateValidateBoolean(Raw, "shortcuts.script_control.chords_enabled")
 		for Slot in SCRIPT_SHORTCUT_SLOTS {
-				Value := IniCacheGet(_IniCache, "shortcuts.script_control", Slot)
+				Value := IniCacheGet(_IniCache, ConfigKey.SHORTCUTS_SCRIPT_CONTROL, Slot)
 				if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
 						ScriptShortcutAssignments[Slot] := Value
 				else if (Value != "_")
@@ -2195,7 +2196,7 @@ RunScriptShortcutAction(Slot) {
 SetScriptShortcutAction(Slot, ActionName) {
 		global ScriptShortcutAssignments
 		if !GestureAssignConfiguredAction(&ScriptShortcutAssignments,
-				"script", "shortcuts.script_control", Slot, ActionName)
+				"script", ConfigKey.SHORTCUTS_SCRIPT_CONTROL, Slot, ActionName)
 				return false
 		return ReloadPreservingSuspend()
 }
@@ -2337,7 +2338,7 @@ KeyboardSlotPhysicalScan(Slot) {
 ; The exact ordinary slot ids, or 0 while the manifest is unavailable: without
 ; its slots the set is incomplete and must judge nothing.
 _KeyboardSlotOrdinarySet() {
-		Manifest := ManifestFeaturesForSection("shortcuts.keyboard")
+		Manifest := ManifestFeaturesForSection(ConfigKey.SHORTCUTS_KEYBOARD)
 		if !(Manifest is Array) || Manifest.Length == 0
 				return 0
 		Slots := Map()
@@ -2400,7 +2401,7 @@ CollectKeyboardShortcutUpdates(Updates, Assignments, Stored, Defaults) {
 	for Slot, Action in Assignments {
 		if Action == "none" && Defaults.Get(Slot, "none") == "none" && !Stored.Has(Slot)
 			continue
-		Updates.Push({ Section: "shortcuts.keyboard", Key: Slot, Value: Action })
+		Updates.Push({ Section: ConfigKey.SHORTCUTS_KEYBOARD, Key: Slot, Value: Action })
 	}
 }
 
@@ -2421,8 +2422,8 @@ ReadKeyboardShortcutsConfig() {
 		SlotsToRead := Map()
 		for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS
 				SlotsToRead[Slot] := true
-		if IsSet(_IniCache) and _IniCache.Has("shortcuts.keyboard") {
-				for Slot, _ in _IniCache["shortcuts.keyboard"]
+		if IsSet(_IniCache) and _IniCache.Has(ConfigKey.SHORTCUTS_KEYBOARD) {
+				for Slot, _ in _IniCache[ConfigKey.SHORTCUTS_KEYBOARD]
 						SlotsToRead[Slot] := true
 		}
 
@@ -2435,7 +2436,7 @@ ReadKeyboardShortcutsConfig() {
 						try LoggerInfo("Shortcuts", "Keyboard slot '{1}' is not a slot of this build; it is left for the configuration cleanup.", Slot)
 						continue
 				}
-				Value := IniCacheGet(_IniCache, "shortcuts.keyboard", Slot)
+				Value := IniCacheGet(_IniCache, ConfigKey.SHORTCUTS_KEYBOARD, Slot)
 				if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
 						KeyboardShortcutAssignments[Slot] := Value
 				else if (Value != "_")
@@ -2665,7 +2666,7 @@ KeyboardShortcutsFollowAiSwitch(SetEnabledFn := 0) {
 SetKeyboardShortcutAction(SlotId, ActionName) {
 		global KeyboardShortcutAssignments
 		if !GestureAssignConfiguredAction(&KeyboardShortcutAssignments,
-				"keyboard", "shortcuts.keyboard", SlotId, ActionName)
+				"keyboard", ConfigKey.SHORTCUTS_KEYBOARD, SlotId, ActionName)
 				return false
 		MagicEditorConfigurationChanged()
 		return ReloadPreservingSuspend()
@@ -2734,8 +2735,8 @@ KeyboardSlotRows() {
 				; The group opens with its restore and clear, declared by
 				; keyboard_group_scope_controls like on the two other drivers.
 				Items := MenuRenderer_TemplateRows("keyboard_group_scope_controls", Map(
-						"scope_restore", _KeyboardSlotGroupScopeCommand.Bind(Prefix, "recommended"),
-						"scope_clear", _KeyboardSlotGroupScopeCommand.Bind(Prefix, "clear")),
+						MenuCommand.SCOPE_RESTORE, _KeyboardSlotGroupScopeCommand.Bind(Prefix, "recommended"),
+						MenuCommand.SCOPE_CLEAR, _KeyboardSlotGroupScopeCommand.Bind(Prefix, "clear")),
 						Map("keyboard_group_ready", (*) => true), Map())
 				if !(Items is Array) || Items.Length != 3
 						throw Error("The keyboard group scope rows are not declared.")
@@ -2778,7 +2779,7 @@ KeyboardSlotGroupOf(Slot) {
 ; Whether one configuration row belongs to a modifier group: its slot, or an
 ; action parameter of the binding that slot dispatches under.
 _KeyboardSlotGroupOwnsRow(Prefix, Row) {
-		if Row.Section == "shortcuts.keyboard"
+		if Row.Section == ConfigKey.SHORTCUTS_KEYBOARD
 				return KeyboardSlotGroupOf(Row.Key) == Prefix
 		BindingPrefix := GestureBindingId("keyboard", "")
 		if Row.Section != "action_parameters" || SubStr(Row.Key, 1, StrLen(BindingPrefix)) != BindingPrefix
@@ -2849,11 +2850,11 @@ ConfigIOShortcutScopeOperations(ScopeId, Mode) {
 		throw Error("Keyboard shortcut inventory is unavailable.")
 	Rows := []
 	for Slot in KeyboardShortcutAssignments {
-		if TomlConfigForeignOwner("shortcuts.keyboard", Slot) != "ConfigIO"
+		if TomlConfigForeignOwner(ConfigKey.SHORTCUTS_KEYBOARD, Slot) != "ConfigIO"
 			continue
 		if ManifestFindEntryByPath("shortcuts.keyboard." . Slot)
 			continue
-		Rows.Push({ Section: "shortcuts.keyboard", Key: Slot, Delete: true })
+		Rows.Push({ Section: ConfigKey.SHORTCUTS_KEYBOARD, Key: Slot, Delete: true })
 	}
 	for Row in KeyCombinationScopeRows()
 		Rows.Push(Row)

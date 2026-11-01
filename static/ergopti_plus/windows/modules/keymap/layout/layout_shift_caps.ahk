@@ -162,7 +162,7 @@ RegisterShiftLayer() {
 	; reset leaks it into every later Hotkey() call in the driver — silently
 	; gating unrelated layers behind this condition.
 	try {
-		HotIf((*) => Features["layout"]["ergopti_base"])
+		HotIf((*) => Features["layout"][ConfigLeaf.ERGOPTI_BASE])
 		for SC in SHIFTED_LETTERS {
 			if _SHIFT_DIGIT_SCS.Has(SC)
 				continue ; the digit row, registered below
@@ -175,7 +175,7 @@ RegisterShiftLayer() {
 		}
 		; The digit row stands down where the swap owns it, decided per press on
 		; the foreground window's layout, so no layout switch needs a reload.
-		HotIf((*) => Features["layout"]["ergopti_base"]
+		HotIf((*) => Features["layout"][ConfigLeaf.ERGOPTI_BASE]
 			and !DigitRowIsSwapped(GetForegroundKeyboardLayout()))
 		for SC in _SHIFT_DIGIT_SCS
 			Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS, true), "I2")
@@ -245,7 +245,7 @@ NumberRowEmulatedBase(Sc) {
 	; A number row switched off is the OS layout's.
 	if !ERGOPTI_NUMBER_ROW.Has(Sc) || !LayoutRowIsEmulated(Sc)
 		return ""
-	if KeylayoutEmulation_LayerIsActive("ergopti_base") {
+	if KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) {
 		if !KLE_KeyCodes.Has(Sc)
 			return ""
 		Level := Keylayout_Resolve(KLE_Model, KLE_LevelIndex[_KLE_ComboKey(false, false, false)], KLE_KeyCodes[Sc])
@@ -345,7 +345,7 @@ NumberRowRegistryOwnsRow() {
 }
 
 _NumberRowRegistryOwnsRowRead(&Owned) {
-	Owned := LayoutRowsPolicyNumberRowSource(KeylayoutEmulation_LayerIsActive("ergopti_base"), LayoutRowSwitches()) == "emulated"
+	Owned := LayoutRowsPolicyNumberRowSource(KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE), LayoutRowSwitches()) == "emulated"
 }
 
 ; A number-row criterion that throws once the driver is ready is a bug, not the
@@ -366,7 +366,7 @@ BuiltinNumberRowIsActive() {
 	; Indexed, not Get: the number-row policy reads its stored choice once
 	; through Get, and the producer fixtures count exactly that read.
 	return IsSet(Features) && Features is Map && Features.Has("layout") && Features["layout"] is Map
-		&& Features["layout"].Has("ergopti_base") && Features["layout"]["ergopti_base"] == true
+		&& Features["layout"].Has(ConfigLeaf.ERGOPTI_BASE) && Features["layout"][ConfigLeaf.ERGOPTI_BASE] == true
 }
 
 RegisterCapsLockLayer() {
@@ -393,7 +393,7 @@ RegisterCapsLockLayer() {
 		Hotkey(ScriptInformation["MagicKeySourceScan"], ((*) => SendNewResult(ScriptInformation["MagicKey"])), "I2")
 
 		; --- Letters and symbols (registered last, highest precedence) ---
-		HotIf((*) => GetCapsLockCondition() and Features["layout"]["ergopti_base"])
+		HotIf((*) => GetCapsLockCondition() and Features["layout"][ConfigLeaf.ERGOPTI_BASE])
 		for SC in SHIFTED_LETTERS {
 			if _SHIFT_DIGIT_SCS.Has(SC)
 				continue ; the digit row, registered below
@@ -407,7 +407,7 @@ RegisterCapsLockLayer() {
 		; direct_access_digits hotkeys with an ergopti_base variant, silently
 		; regressing the auto-advance-skips-a-field fix for OTP/device-login
 		; digit boxes.
-		HotIf((*) => GetCapsLockCondition() and Features["layout"]["ergopti_base"]
+		HotIf((*) => GetCapsLockCondition() and Features["layout"][ConfigLeaf.ERGOPTI_BASE]
 			and !DigitRowIsSwapped(GetForegroundKeyboardLayout()))
 		for SC in _SHIFT_DIGIT_SCS
 			Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS, true), "I2")
@@ -596,7 +596,7 @@ NumberRowSymbolsLevel(Sc, Caps) {
 	global KLE_Id, Features
 	Refused := Map("supported", false, "shift", false)
 	if !IsSet(Features) || !(Features is Map) || !IsSet(KLE_Id) || !(KLE_Id is String)
-			|| !((Caps is Integer) && (Caps == true || Caps == false)) || !KeylayoutEmulation_LayerIsActive("ergopti_base")
+			|| !((Caps is Integer) && (Caps == true || Caps == false)) || !KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE)
 			|| Sc < 0x02 || Sc > 0x0B
 			|| StrCompare(KLE_Id, KeylayoutEmulation_SelectedId(MasterGateDesiredFeatures(Features)), true) != 0
 		return Refused
