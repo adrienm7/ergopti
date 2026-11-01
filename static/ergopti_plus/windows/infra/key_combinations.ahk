@@ -1195,6 +1195,7 @@ _KeyCombinationKeyIsHeld(KeyId) {
 KeyCombinationChordOwns(KeyId, Ports := 0) {
 	global _KeyCombinationChordFirsts, _KeyCombinationChordTaken, _KeyCombinationChordBusy, _KeyCombinationChordReplaying
 	if !IsSet(_KeyCombinationChordBusy) || !IsSet(_KeyCombinationChordFirsts) || !IsSet(_KeyCombinationChordTaken)
+			|| !IsSet(_KeyCombinationChordReplaying)
 		return false
 	if (_KeyCombinationChordReplaying == KeyId)
 		return false
