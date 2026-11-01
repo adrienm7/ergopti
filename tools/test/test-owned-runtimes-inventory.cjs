@@ -36,6 +36,8 @@ const DATA = path.relative(ROOT, Registry.DATA_PATH);
 // floor catches an extractor that stopped reading its sources.
 const MINIMUM_PROGRAMS = Object.freeze({ macos: 21, linux: 21, windows: 10 });
 const DRIVERS = Object.freeze(Object.keys(MINIMUM_PROGRAMS));
+// The words a row's `today` ends with when only a source checkout uses the host.
+const DEV_ONLY_MARKER = 'dev-only: source checkout uses host packages';
 
 let failures = 0;
 let checks = 0;
@@ -190,6 +192,25 @@ check('the registry load refuses a row without a decided class', () => {
 	const undecided = structuredClone(registry);
 	undecided.rows[0].decision = 'PROPOSAL';
 	assert.throws(() => Registry.validate(undecided), /unknown decision/);
+});
+
+// Ruling of 1 November: an install from a source checkout is a developer path,
+// so a Linux row whose only host use is that install is done, says so with the
+// dev-only marker, and is pinned; it does not stay open for it.
+check('a Linux row is not left open for a source-checkout install alone', () => {
+	const linux = registry.rows.filter((row) => row.os === 'linux');
+	const devOnly = linux.filter((row) => row.today.includes(DEV_ONLY_MARKER));
+	assert(devOnly.length >= 7, `expected the private-runtime rows to carry "${DEV_ONLY_MARKER}"`);
+	for (const row of devOnly) {
+		assert.equal(row.status, 'done', `${row.tool} is dev-only on the host and must be done`);
+		assert.equal(row.current_class, 'PIN', `${row.tool} ships pinned and must be classed PIN`);
+	}
+	for (const row of linux.filter((entry) => entry.status !== 'done'))
+		assert.doesNotMatch(
+			row.today,
+			/source checkout/,
+			`${row.tool} stays open only for a source-checkout install`
+		);
 });
 
 if (failures > 0) {
