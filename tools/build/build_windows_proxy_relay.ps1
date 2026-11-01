@@ -57,7 +57,7 @@ try {
 
 New-Item -ItemType Directory -Force -Path $BuildRoot | Out-Null
 $Executable = Join-Path $BuildRoot 'ergopti-proxy-relay.exe'
-Push-Location $Module
+Push-Location -LiteralPath $Module
 try {
 	& $Go build -trimpath -buildvcs=false '-ldflags=-s -w -buildid=' -o $Executable ./cmd/ergopti-proxy-relay
 	if ($LASTEXITCODE -ne 0) { throw 'The relay build failed.' }

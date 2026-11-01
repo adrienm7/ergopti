@@ -625,6 +625,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-app-cloner-managed-python.cjs"],
 			"repro": "node tools/test/test-app-cloner-managed-python.cjs"
+		},
+		{
+			"id": "js-windows-builder-boundaries",
+			"ordinal": 561,
+			"name": "Windows native builders enter literal paths and refuse a mistyped manifest schema",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-builder-boundaries.cjs"],
+			"repro": "node tools/test/test-windows-builder-boundaries.cjs"
 		}
 	]
 }

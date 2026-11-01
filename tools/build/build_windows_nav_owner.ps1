@@ -626,7 +626,8 @@ function Assert-TrackedManifest {
 			throw "The tracked provenance manifest is missing '$propertyName'."
 		}
 	}
-	if ($manifest.schema_version -ne $SchemaVersion) {
+	# -ne coerces, so a JSON string "1" would pass for the integer 1.
+	if ($manifest.schema_version -isnot [int] -or $manifest.schema_version -ne $SchemaVersion) {
 		throw "The tracked provenance manifest schema changed: expected $SchemaVersion, found $($manifest.schema_version)."
 	}
 	if ([string]$manifest.artifact_path -cne $ArtifactPath) {
@@ -793,7 +794,7 @@ if ($UpdateTracked) {
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 New-Item -ItemType Directory -Force -Path $vendorDir | Out-Null
 
-Push-Location $buildDir
+Push-Location -LiteralPath $buildDir
 try {
 	$outputTestArguments = $commonCompilerFlags + @(
 		$replaySourcePath,
