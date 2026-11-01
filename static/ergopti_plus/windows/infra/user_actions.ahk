@@ -451,13 +451,13 @@ UserActionCodePoints(Text) {
 ; @returns {Boolean} True when it was delivered.
 _UserCommandDeliver(Text, Output) {
 	if !(Text is String) {
-		LoggerError("UserActions", "A run_command binding printed text that is not UTF-8: nothing to {1}.", Output)
+		LoggerError("UserActions", "A run_command binding printed text that is not UTF-8: nothing to deliver.")
 		_UserActionNotify("user_actions.output_not_text")
 		return false
 	}
 	Value := RTrim(StrReplace(Text, "`r`n", "`n"), "`r`n")
 	if (Value == "") {
-		LoggerWarn("UserActions", "A run_command binding printed no text to {1}.", Output)
+		LoggerWarn("UserActions", "A run_command binding printed no text to deliver.")
 		return false
 	}
 	if (Output == "copy") {
