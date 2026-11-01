@@ -1069,6 +1069,11 @@ default_timeout_ms = 30000
 # ignored-window probe, the tooltip anchor and the context capture).
 unresponsive_ax_backoff_ms = 30000
 
+# Linux: deadline of the one download of Ergopti's own Python (about 30 MB,
+# _shared/data/linux_native_runtime.json managed_python) and of its unpacking.
+# LX: modules/keymap/layout_registry.lua (managed_python.lua).
+managed_python_download_timeout_ms = 600000
+
 # Linux: how long the window switch worker sleeps between two polls of its queue.
 # LX: platform/window_switch_worker.lua.
 window_switch_worker_sleep_ms = 10
