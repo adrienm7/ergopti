@@ -140,6 +140,42 @@ _NPL_FirstKeyFollowsThePresses() {
 Test("press ledger: the first key is the one pressed first (todo91-first-key-order)",
 	_NPL_FirstKeyFollowsThePresses)
 
+; A first key replayed after a terminal expansion reads as up physically: the pair
+; must still see it held. Its own second key keeps the press reading, or a replayed
+; press would read as its own auto-repeat and start no pair.
+_NPL_ReplayedFirstKeyStartsThePair() {
+	global _KeyCombinationFirstKeys, _KeyCombinationScanNames, _KeyCombinationTaken, _KeyCombinationHandled, _KeyCombinationPressAssignments
+	global KeyCombinationTaps, KeyCombinationHolds, CategoryEnabled
+	Saved := [_KeyCombinationFirstKeys, _KeyCombinationScanNames, _KeyCombinationTaken, _KeyCombinationHandled,
+		_KeyCombinationPressAssignments, KeyCombinationTaps, KeyCombinationHolds, CategoryEnabled]
+	_KeyCombinationFirstKeys := Map("space", ["tab"])
+	_KeyCombinationScanNames := Map("tab", "SC06E", "space", "SC06F")
+	_KeyCombinationTaken := Map(), _KeyCombinationHandled := Map(), _KeyCombinationPressAssignments := Map()
+	KeyCombinationTaps := Map("tab_then_space", "copy"), KeyCombinationHolds := Map()
+	CategoryEnabled := Map("KeyCombinations", true)
+	try {
+		AssertFalse(KeyCombinationOwns("space"), "no first key held: no pair")
+		_NPL_WithLedger([0x06E], () => AssertTrue(KeyCombinationOwns("space"), "a replayed first key takes the pair"))
+		_KeyCombinationTaken := Map()
+		_NPL_WithLedger([0x06F, 0x06E], () => AssertTrue(KeyCombinationOwns("space"),
+			"a replayed second key is a new press, not a repeat"))
+	} finally {
+		_KeyCombinationFirstKeys := Saved[1], _KeyCombinationScanNames := Saved[2], _KeyCombinationTaken := Saved[3]
+		_KeyCombinationHandled := Saved[4], _KeyCombinationPressAssignments := Saved[5]
+		KeyCombinationTaps := Saved[6], KeyCombinationHolds := Saved[7], CategoryEnabled := Saved[8]
+	}
+}
+Test("press ledger: a replayed first key starts its pair (item5-first-key)", _NPL_ReplayedFirstKeyStartsThePair)
+
+; The script chord's cleanup must not lift an AltGr or a suffix held through a replay.
+_NPL_ScriptChordReadsTheHeldKeys() {
+	Body := _DriverFuncBody("ResetScriptComboKeys")
+	AssertTrue(InStr(Body, "KS_IsHeld(SuffixSC)") > 0, "a replayed suffix is not up")
+	AssertFalse(InStr(Body, 'GetKeyState(SuffixSC, "P")') > 0, "the physical read alone misses a replayed press")
+	AssertTrue(InStr(_DriverFuncBody("_ScriptComboClearAltGr"), "KS_IsHeld(Name)") > 0, "nor a replayed AltGr")
+}
+Test("press ledger: the script chord cleanup reads held keys (item5-script-chord)", _NPL_ScriptChordReadsTheHeldKeys)
+
 ; The AltGr guard runs before the order: the fake LCtrl of a standard AltGr
 ; press must never become the pair's first key, whatever its number says.
 _NPL_FakeLCtrlIsNeverTheFirstKey() {

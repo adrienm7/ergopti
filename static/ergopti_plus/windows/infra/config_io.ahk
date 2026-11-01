@@ -2099,7 +2099,7 @@ ResetScriptComboKeys(SuffixSC, ReleaseFn := 0) {
 		if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
 				return
 		KeyWait(SuffixSC, "T2")
-		if GetKeyState(SuffixSC, "P")
+		if KS_IsHeld(SuffixSC)
 				return
 		_ScriptComboClearAltGr(KS_AltGrKeyName(), A_SendLevel,
 				HasMethod(ReleaseFn, "Call") ? ReleaseFn : _ScriptComboReleaseThroughHook, false)
@@ -2113,7 +2113,8 @@ ResetScriptComboKeys(SuffixSC, ReleaseFn := 0) {
 ; hotkey's SendLevel, kept for the Up sent from a timer thread.
 _ScriptComboClearAltGr(Name, Level, ReleaseFn, Waited) {
 		global _TapHoldKeyIsDown, _ScriptComboArmFn, SCRIPT_COMBO_ALTGR_RELEASE_POLL_MS
-		if _TapHoldKeyIsDown.Call(Name, "P") {
+		; A press replayed after a terminal expansion is held in the ledger alone.
+		if (_TapHoldKeyIsDown.Call(Name, "P") || KS_IsHeld(Name)) {
 				_ScriptComboArmFn.Call(_ScriptComboClearAltGr.Bind(Name, Level, ReleaseFn, true),
 						SCRIPT_COMBO_ALTGR_RELEASE_POLL_MS)
 				return
