@@ -345,6 +345,16 @@ class SwiftRosterClosureControls(unittest.TestCase):
                 self.assertEqual(len(declarations), 1, users)
 
 
+class ArchitectureCheckControls(unittest.TestCase):
+    """lipo receives the universal output before the -verify_arch list."""
+
+    def test_input_precedes_the_architecture_list(self):
+        self.assertEqual(
+            product.architecture_check_command(Path("/work/installer")),
+            ["/usr/bin/lipo", "/work/installer", "-verify_arch", "arm64", "x86_64"],
+        )
+
+
 class ModuleMapWriteControls(unittest.TestCase):
     """The daemon-report module map is written with an admitted output mode."""
 
