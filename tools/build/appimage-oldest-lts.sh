@@ -53,13 +53,38 @@ apt_install() {
 # ----------------------------------------------------------------------
 # Inside the container: the build
 # ----------------------------------------------------------------------
+# Builds luaposix from the source the runtime manifest pins (the Flatpak's own,
+# network_runtime.portable.flatpak_sources.luaposix) into a private prefix and
+# points LuaJIT at it. This release's lua-posix 33.4 is one monolithic posix.so
+# over liblua5.1-posix, and the private runtime carries the split posix/*.so
+# layout every package and the launch check share (stage-linux-network-runtime.py).
+build_owned_luaposix() {
+	local prefix="/opt/ergopti-luaposix" work url commit
+	{ read -r url; read -r commit; } < <(python3 -c '
+import json, sys
+source = json.load(open(sys.argv[1]))["network_runtime"]["portable"]["flatpak_sources"]["luaposix"]
+print(source["url"]); print(source["commit"])' static/ergopti_plus/_shared/data/linux_native_runtime.json)
+	work="$(mktemp -d)"
+	git -c advice.detachedHead=false clone -q "$url" "$work/luaposix"
+	git -C "$work/luaposix" -c advice.detachedHead=false checkout -q "$commit"
+	[ "$(git -C "$work/luaposix" rev-parse HEAD)" = "$commit" ] || { echo "luaposix pin not checked out" >&2; exit 1; }
+	(cd "$work/luaposix" && luajit build-aux/luke LUA_INCDIR=/usr/include/luajit-2.1 \
+		&& luajit build-aux/luke install INST_LIBDIR="$prefix/lib/lua/5.1" INST_LUADIR="$prefix/share/lua/5.1")
+	test -f "$prefix/lib/lua/5.1/posix/sys/stat.so"
+	test -f "$prefix/share/lua/5.1/posix/init.lua"
+	export LUA_PATH="$prefix/share/lua/5.1/?.lua;$prefix/share/lua/5.1/?/init.lua;;"
+	export LUA_CPATH="$prefix/lib/lua/5.1/?.so;;"
+}
+
 container_build() {
 	# The programs and Lua modules of the private runtime every package carries
-	# are this release's packages (stage-linux-network-runtime.py).
-	apt_install bash ca-certificates curl binutils file gcc libc6-dev pkg-config python3 \
-		luajit lua-luv lua-filesystem lua-posix sqlite3 openssl zstd \
+	# are this release's packages (stage-linux-network-runtime.py), except
+	# luaposix, built from its pin (build_owned_luaposix).
+	apt_install bash ca-certificates curl binutils file gcc libc6-dev pkg-config python3 git \
+		luajit libluajit-5.1-dev lua-luv lua-filesystem sqlite3 openssl zstd \
 		libssl-dev libglib2.0-dev libglib2.0-bin glib-networking \
 		dconf-gsettings-backend gsettings-desktop-schemas libayatana-appindicator3-1
+	build_owned_luaposix
 	# The runner's Node, mounted read-only: the release's own is too old for the
 	# build scripts, and Node itself ships nothing into the image.
 	export PATH="/opt/node/bin:$PATH"

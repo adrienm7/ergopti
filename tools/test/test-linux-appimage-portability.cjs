@@ -268,6 +268,33 @@ assert.ok(
 	'the smoke host lacks libayatana, as the catalogue does'
 );
 assert.ok(containerSmokeBody.includes('libgtk-3-0 stalonetray x11-utils'));
+// Ubuntu 22.04's lua-posix 33.4 is one monolithic posix.so, which the stager's
+// split-layout check refuses ("Native network packaging refused."): the build
+// container compiles luaposix from the manifest's pin and installs no lua-posix.
+assert.ok(
+	!/apt_install[^\n]*(\\\n[^\n]*)*\blua-posix\b/.test(containerBuildBody),
+	"the build host's monolithic lua-posix is never staged"
+);
+assert.ok(
+	containerBuildBody.includes('\tbuild_owned_luaposix\n'),
+	'the build compiles the pinned luaposix'
+);
+const ownedLuaposix = container.slice(
+	container.indexOf('build_owned_luaposix() {'),
+	container.indexOf('container_build() {')
+);
+assert.match(
+	ownedLuaposix,
+	/\["flatpak_sources"\]\["luaposix"\]/,
+	"the pin is the runtime manifest's"
+);
+assert.match(
+	ownedLuaposix,
+	/rev-parse HEAD\)" = "\$commit"/,
+	'the checked-out commit is the pinned one'
+);
+assert.match(ownedLuaposix, /test -f "\$prefix\/lib\/lua\/5\.1\/posix\/sys\/stat\.so"/);
+assert.match(ownedLuaposix, /export LUA_CPATH="\$prefix\/lib\/lua\/5\.1\/\?\.so;;"/);
 assert.ok(
 	container.includes(
 		'env -u DBUS_SESSION_BUS_ADDRESS xvfb-run -a bash "$SELF" xembed-in-display "$appimage"'
