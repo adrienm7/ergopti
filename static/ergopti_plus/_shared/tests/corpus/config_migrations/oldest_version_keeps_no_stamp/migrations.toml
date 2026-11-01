@@ -1,4 +1,4 @@
-# _shared/tests/corpus/config_migrations/oldest_version_refuses_no_stamp/migrations.toml
+# _shared/tests/corpus/config_migrations/oldest_version_keeps_no_stamp/migrations.toml
 
 [registry]
 current_version = 3

@@ -173,7 +173,7 @@ end
 --- Karabiner-Elements is set up.
 --- @param ctx table Scenario context.
 local function neutral_defaults(ctx)
-	-- Stamped at the oldest version: a file with no version is refused as too old.
+	-- Stamped at the oldest version, so the boot climbs the chain as a release file does.
 	local registry = assert(read(ctx.repo .. "/static/ergopti_plus/_shared/core/config_schema/migrations.toml"),
 		"migration registry missing")
 	local version = assert(registry:match("\noldest_version = (%d+)"), "registry has no oldest version")

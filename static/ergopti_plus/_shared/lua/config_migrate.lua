@@ -217,13 +217,23 @@ local function destination_key(path)
 	return (spelling:sub(1, 1) == "/" and "/" or "") .. table.concat(parts, "/"), ambiguous
 end
 
-local function current_schema(source, version)
+--- Whether a source is at the destination's schema. Once the chain was squashed,
+--- a file with no stamp has no step left and counts as current (see M.classify).
+--- @param source table { status, content }.
+--- @param version number The registry's current version.
+--- @param stampless_current boolean|nil Whether a file with no stamp is current.
+--- @return boolean
+local function current_schema(source, version, stampless_current)
 	if type(source) ~= "table" then return false end
 	if source.status == "absent" then return true end
 	if source.status ~= "ok" or type(source.content) ~= "string" then return false end
 	local called, document, shapes = pcall(canonical_decode, source.content)
 	if not called or type(document) ~= "table" or type(shapes) ~= "table" then return false end
 	local meta = document._meta
+	if stampless_current == true and (meta == nil
+		or type(meta) == "table" and shapes.arrays[meta] ~= true and meta.schema_version == nil) then
+		return true
+	end
 	return type(meta) == "table" and shapes.arrays[meta] ~= true
 		and is_version(meta.schema_version) and meta.schema_version == version
 end
@@ -265,17 +275,19 @@ local function capture_admission(path, source, candidate, operation, adapter)
 		migration.consumed = true
 		return function()
 			return destination_live(record) and rawequal(record.publication, migration)
-				and migration.consumed and current_schema({ status = "ok", content = candidate }, record.current)
+				and migration.consumed and current_schema({ status = "ok", content = candidate }, record.current, record.stampless_current)
 		end, snapshot
 	end
-	if record.phase ~= "ready" or not current_schema(snapshot, record.current)
-		or candidate ~= nil and not current_schema({ status = "ok", content = candidate }, record.current) then
+	-- Only an existing file may stay unstamped: a file this build creates is stamped.
+	local stampless_candidate = record.stampless_current and snapshot.status ~= "absent"
+	if record.phase ~= "ready" or not current_schema(snapshot, record.current, record.stampless_current)
+		or candidate ~= nil and not current_schema({ status = "ok", content = candidate }, record.current, stampless_candidate) then
 		return false
 	end
 	return function()
 		return destination_live(record) and record.phase == "ready"
-			and current_schema(snapshot, record.current)
-			and (candidate == nil or current_schema({ status = "ok", content = candidate }, record.current))
+			and current_schema(snapshot, record.current, record.stampless_current)
+			and (candidate == nil or current_schema({ status = "ok", content = candidate }, record.current, stampless_candidate))
 	end, snapshot
 end
 
@@ -301,7 +313,7 @@ local function read_admitted(path, adapter)
 	if record.phase ~= "ready" then return false end
 	return function(content, status)
 		return destination_live(record) and record.phase == "ready"
-			and current_schema({ status = status, content = content }, record.current)
+			and current_schema({ status = status, content = content }, record.current, record.stampless_current)
 	end
 end
 
@@ -1017,6 +1029,10 @@ function M.classify(model, registry)
 	if entry ~= nil then
 		version = entry.value
 		if not is_version(version) then return "invalid", version end
+	elseif registry.unstamped < registry.oldest then
+		-- The steps a file with no stamp would need are gone: it is hand-written or
+		-- very old, so it runs as it is and the next save stamps it.
+		return "current", registry.current
 	end
 	if version > registry.current then return "newer", version end
 	if version == registry.current then return "current", version end
@@ -1425,6 +1441,7 @@ function M.run(opts)
 	if opts.context_error ~= nil then return refuse("failed", opts.context_error) end
 	result.to = registry.current
 	record.current = registry.current
+	record.stampless_current = registry.unstamped < registry.oldest
 	if not destination_live(record) then return refuse("failed", "config admission owner changed during boot") end
 
 	local adapter = opts.file_adapter
@@ -1449,7 +1466,7 @@ function M.run(opts)
 		-- native destination was admitted by this constructor.
 		if native_default then
 			local content, current_status = default_read(path)
-			if not current_schema({ status = current_status, content = content }, registry.current) then
+			if not current_schema({ status = current_status, content = content }, registry.current, record.stampless_current) then
 				return refuse("failed", "fresh native source is not current before runtime admission")
 			end
 			record.phase = "ready"
@@ -1508,7 +1525,7 @@ function M.run(opts)
 	end
 	-- The strict canonical document, not the flat migration operation model,
 	-- owns current-schema admission for inline/dotted/quoted metadata.
-	if current_schema({ status = "ok", content = source }, registry.current) then
+	if current_schema({ status = "ok", content = source }, registry.current, record.stampless_current) then
 		plan = { outcome = "current", version = registry.current, candidate = source }
 	elseif plan.outcome == "current" then
 		return refuse("invalid", "canonical schema metadata is not current")

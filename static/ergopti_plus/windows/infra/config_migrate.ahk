@@ -653,7 +653,8 @@ _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 
 ; Reads a model's version against a registry: "current", "migrate", "newer",
 ; "invalid" or "unsupported". Version receives the file's version (the
-; unstamped version when the file carries none).
+; unstamped version when the file carries none, the current one when the chain
+; no longer reaches it).
 ConfigMigrateClassify(Model, Registry, &Version) {
 	Version := Registry["unstamped"]
 	if Model.Has("_meta") && Model["_meta"].Has("schema_version") {
@@ -661,6 +662,11 @@ ConfigMigrateClassify(Model, Registry, &Version) {
 		if !_ConfigMigrateIsVersion(Version)
 			return "invalid"
 		Version := Integer(Version)
+	} else if (Registry["unstamped"] < Registry["oldest"]) {
+		; The steps a file with no stamp would need are gone: it is hand-written or
+		; very old, so it runs as it is and the next full save stamps it.
+		Version := Registry["current"]
+		return "current"
 	}
 	if (Version > Registry["current"])
 		return "newer"
@@ -1760,6 +1766,14 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			return false
 		if ClassifyImage({ present: 1, source: Candidate }, Row) != "current"
 			return false
+		; Only an existing file may stay unstamped: a file this build creates is stamped.
+		if !Image.present {
+			try CandidateDocument := Native.decode.Call(Candidate)
+			catch
+				return false
+			if !CandidateDocument.Has("_meta") || !CandidateDocument["_meta"].Has("schema_version")
+				return false
+		}
 	}
 	ExpectedWriteSource := Image.source
 	ExpectedWritePresent := Image.present

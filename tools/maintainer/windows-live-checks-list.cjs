@@ -28,8 +28,7 @@ const live = require('./windows-live-checks.cjs');
 const pass = (detail) => ({ state: 'PASS', detail });
 const fail = (detail) => ({ state: 'FAIL', detail });
 const notExecuted = (detail) => ({ state: 'NOT EXECUTED', detail });
-// Stamped: a file with no schema version is older than the registry's floor.
-const ENGLISH = `[_meta]\nschema_version = ${registryVersion('core/config_schema/migrations.toml')}\n[script]\nlocale = 'en'\n`;
+const ENGLISH = "[script]\nlocale = 'en'\n";
 const RELOAD_ROW = 're:Reload$';
 const SUSPEND_ROW = 're:Suspend$';
 
@@ -1611,9 +1610,8 @@ const CHECKS = [
 		id: 'too-old-config-refused',
 		title: 'A config.toml older than the registry is refused in words and left byte for byte',
 		async run(context) {
-			// No stamp: what a build before versioning left.
-			const old =
-				"# from a very old build\n[script]\nlocale = 'en'\n[gestures]\nspace_wrap = true\n";
+			// What a pre-release left: only a real stamp below the floor is refused.
+			const old = "# from a pre-release\n[_meta]\nschema_version = 11\n[script]\nlocale = 'en'\n";
 			const session = context.newSession('tooold');
 			session.seed('autohotkey/config.toml', old);
 			await session.start();

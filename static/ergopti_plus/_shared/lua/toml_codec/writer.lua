@@ -173,10 +173,10 @@ local read_batch_source
 -- file this build does not understand.
 local _refused_writes = {}
 
--- Rows a writer adds when it creates a path from absence. The config migration
--- registers the schema stamp here, so a config.toml this build creates carries
--- this build's version and a later boot never mistakes it for an unstamped,
--- older file.
+-- Rows a writer adds when it creates a path from absence, or to an existing file
+-- that lacks them. The config migration registers the schema stamp here, so a
+-- config.toml this build creates carries this build's version and a file with
+-- no stamp gets one at its next save.
 local _create_rows = {}
 local _sparse_defaults = {}
 
@@ -1145,24 +1145,25 @@ local function prepare_batch_checked(path, updates, file_adapter, expected_sourc
 		or type(source_shapes.numbers) ~= "table" then
 		return false, "the existing destination is not valid TOML"
 	end
-	if read_status == "absent" then
-		source = ""
-		local seeds = {}
-		for _, seed in ipairs(_create_rows[refusal_key(path)] or {}) do
-			local segments = KeyPath.parse(seed.section, true)
-			if not segments then return false, "invalid creation seed section" end
-			local row = { section = KeyPath.render(segments), segments = segments, key = seed.key, value = seed.value }
-			local sl, kl = row.section:lower(), row.key:lower()
-			if not (lookup[sl] and lookup[sl][kl]) then
-				if not lookup[sl] then lookup[sl] = {} end
-				lookup[sl][kl] = row
-				seeds[#seeds + 1] = row
-			end
+	if read_status == "absent" then source = "" end
+	local seeds = {}
+	for _, seed in ipairs(_create_rows[refusal_key(path)] or {}) do
+		local segments = KeyPath.parse(seed.section, true)
+		if not segments then return false, "invalid creation seed section" end
+		local row = { section = KeyPath.render(segments), segments = segments, key = seed.key, value = seed.value }
+		local sl, kl = row.section:lower(), row.key:lower()
+		local held = decoded
+		for _, segment in ipairs(segments) do held = type(held) == "table" and held[segment] or nil end
+		local present = read_status ~= "absent" and held ~= nil and (type(held) ~= "table" or held[seed.key] ~= nil)
+		if not present and not (lookup[sl] and lookup[sl][kl]) then
+			if not lookup[sl] then lookup[sl] = {} end
+			lookup[sl][kl] = row
+			seeds[#seeds + 1] = row
 		end
-		if #seeds > 0 then
-			for _, u in ipairs(updates) do seeds[#seeds + 1] = u end
-			updates = seeds
-		end
+	end
+	if #seeds > 0 then
+		for _, u in ipairs(updates) do seeds[#seeds + 1] = u end
+		updates = seeds
 	end
 	-- Finite scalar publication must retain the requested native numeric value.
 	-- Reuse the optional codec; authentic source literals retain precedence and

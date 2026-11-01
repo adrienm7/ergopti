@@ -366,8 +366,7 @@ _CMG_NewerFileIsLoggedAndReadOnly() {
 Test("config migrate: a newer config logs its refusal and refuses candidate rendering "
 	. "(config-migrate-newer-read-only)", _CMG_NewerFileIsLoggedAndReadOnly)
 
-; The chain was squashed to v2: v1, and a file with no stamp at all (which this
-; registry reads as v1), have no path left.
+; The chain was squashed to v2: v1 has no path left.
 _CMG_SquashedRegistry() {
 	return ConfigMigrateValidateRegistry(_ConfigMigrateParse(
 		"[registry]`ncurrent_version = 3`nunstamped_version = 1`noldest_version = 2`n`n"
@@ -396,9 +395,24 @@ _CMG_OlderFileIsRefusedInWords(Older) {
 Test("config migrate: a stamp below the oldest version is refused and left byte for byte "
 	. "(config-migrate-older-refused)", _CMG_OlderFileIsRefusedInWords.Bind(
 	"[_meta]`nschema_version = 1`n`n[gestures]`nold_toggle = false`n"))
-Test("config migrate: a file with no stamp is refused and left byte for byte "
-	. "(config-migrate-older-refused)", _CMG_OlderFileIsRefusedInWords.Bind(
-	"# from a build before versioning`n[gestures]`nold_toggle = false`n"))
+
+_CMG_NoStampIsCurrent() {
+	global _CMG_STAMP
+	Dir := _CMG_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		Handwritten := "# by hand`n[gestures]`nold_toggle = false`n"
+		AssertTrue(FSWriteDurable(Path, Handwritten))
+		Result := ConfigMigrateRun(Path, _CMG_SquashedRegistry(), _CMG_STAMP)
+		AssertEqual("current", Result["status"])
+		AssertEqual(0, Result["read_only"])
+		Assert(FSUtf8ExactMatches(Path, Handwritten), "no step ran and nothing was written")
+		AssertFalse(FileExist(ConfigMigrateBackupPath(Path, 3, _CMG_STAMP)), "nothing is backed up")
+		AssertEqual("", TOML_WriteRefusal(Path), "the session can save it")
+	} finally DirDelete(Dir, true)
+}
+Test("config migrate: a file with no stamp is current once the chain was squashed "
+	. "(config-migrate-no-stamp-current)", _CMG_NoStampIsCurrent)
 
 _CMG_OldestVersionStillMigrates() {
 	global _CMG_STAMP
