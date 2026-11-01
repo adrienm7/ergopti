@@ -80,7 +80,7 @@ container_build() {
 	# The programs and Lua modules of the private runtime every package carries
 	# are this release's packages (stage-linux-network-runtime.py), except
 	# luaposix, built from its pin (build_owned_luaposix).
-	apt_install bash ca-certificates curl binutils file gcc libc6-dev pkg-config python3 git \
+	apt_install bash ca-certificates curl binutils file gcc libc6-dev patchelf pkg-config python3 git \
 		luajit libluajit-5.1-dev lua-luv lua-filesystem sqlite3 openssl zstd \
 		libssl-dev libglib2.0-dev libglib2.0-bin glib-networking \
 		dconf-gsettings-backend gsettings-desktop-schemas libayatana-appindicator3-1
