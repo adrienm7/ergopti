@@ -3992,7 +3992,8 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends \
-            luajit lua-luv curl binutils pkg-config libglib2.0-dev \
+            luajit lua-luv lua-filesystem lua-posix curl sqlite3 openssl zstd \
+            binutils pkg-config libglib2.0-dev \
             glib-networking dconf-gsettings-backend gsettings-desktop-schemas \
             libayatana-appindicator3-1
           else
