@@ -121,13 +121,13 @@ _LocalServerFingerprintSorted(Texts) {
  * @param {Any} Body The raw models response body.
  * @param {String} Id The row that was probed.
  * @param {Map} Identities The "identities" of LocalServerFingerprintParse.
- * @returns {Map} "server": the fingerprinted row, "" when none decides; "reason":
+ * @returns {Map} "server": the fingerprinted row, "" when none decides; "decision":
  * "match", "unshared", "invalid", "unknown" or "ambiguous".
  */
 LocalServerFingerprintIdentify(Body, Id, Identities) {
 	Identity := (Identities is Map) ? Identities.Get(Id, 0) : 0
 	if !(Identity is Map)
-		return Map("server", "", "reason", "unshared")
+		return Map("server", "", "decision","unshared")
 	Root := 0
 	if Body is String {
 		try Root := JsonParse(Body)
@@ -135,7 +135,7 @@ LocalServerFingerprintIdentify(Body, Id, Identities) {
 			Root := 0
 	}
 	if !(Root is Map) || !(Root.Get("data", 0) is Array)
-		return Map("server", "", "reason", "invalid")
+		return Map("server", "", "decision","invalid")
 	Found := ""
 	for Candidate in Identity["group"] {
 		Row := Identities.Get(Candidate, 0)
@@ -153,8 +153,8 @@ LocalServerFingerprintIdentify(Body, Id, Identities) {
 		if !Matched
 			continue
 		if Found != ""
-			return Map("server", "", "reason", "ambiguous")
+			return Map("server", "", "decision","ambiguous")
 		Found := Candidate
 	}
-	return Found == "" ? Map("server", "", "reason", "unknown") : Map("server", Found, "reason", "match")
+	return Found == "" ? Map("server", "", "decision","unknown") : Map("server", Found, "decision","match")
 }
