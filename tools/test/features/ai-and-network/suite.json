@@ -509,7 +509,7 @@
 		},
 		{
 			"id": "windows-proxy-override-e2e",
-			"ordinal": 558,
+			"ordinal": 560,
 			"name": "Windows proxy override end to end: the real adapter and workers through the fake network",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-proxy-override-e2e.cjs"],
