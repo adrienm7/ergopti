@@ -3175,6 +3175,44 @@ jobs:
           fi
         timeout-minutes: 4
 
+      - name: Install prerequisites for The owned dialog host shows its captions and answers on a real display
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv libgtk-3-0 libxtst6 dbus xvfb
+          else
+              exit 1
+          fi
+        timeout-minutes: 20
+
+      # Every tray dialog is Ergopti's own GTK window (linux/ui/dialog_host.lua),
+      # never the host's zenity or kdialog. The live profile runs the real public
+      # consumers (text prompt, application and folder choosers, the menu's error
+      # dialog) under five caption policies, reads each mapped window's caption
+      # and process, answers it with a real key or a close request, and checks the
+      # value, the cancellation and the keyboard hand-back each consumer reports.
+      - name: The owned dialog host shows its captions and answers on a real display
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          dbus-run-session -- python3 tools/test/test-linux-native-dialog-titles.py
+          else
+              exit 1
+          fi
+        timeout-minutes: 10
+
       - name: Install prerequisites for The secure-field probe on a real accessibility bus
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         run: |
