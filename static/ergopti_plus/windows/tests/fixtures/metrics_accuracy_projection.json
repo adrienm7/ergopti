@@ -67,7 +67,7 @@
 			"id": "literal-bracket",
 			"tab": "pg",
 			"table": "ngram_pentagrams",
-			"token": "[bs]a",
+			"token": "[[bs]a",
 			"events": ["[", "b", "s", "]", "a", "[BS]"],
 			"c": 1,
 			"e": 1,
