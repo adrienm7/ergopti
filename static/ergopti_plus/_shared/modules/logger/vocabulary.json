@@ -145,6 +145,7 @@
 		"noop_final",
 		"not-initialized",
 		"not_initialized",
+		"not_json",
 		"not_running",
 		"not_swept",
 		"observer_failed",
