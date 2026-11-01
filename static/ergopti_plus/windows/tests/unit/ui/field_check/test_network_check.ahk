@@ -187,6 +187,45 @@ _TNC_NoPac() {
 Test("NetworkCheck: a missing PAC skips both PAC steps (network-check)", _TNC_NoPac)
 
 
+; Under an override the PAC decides nothing, and a relay override forbids any other
+; route: the probe stays silent even though the system names a PAC.
+_TNC_OverrideSkipsPac() {
+	Fetched := 0
+	Report := _TNC_Run(_TNC_Deps(Map("override_routes", () => true,
+		"fetch_pac", (Url, Callback) => (Fetched += 1, Callback.Call(200, "")))))
+	Steps := _TNC_ByIdentity(Report)
+	AssertEqual(0, Fetched, "no request may leave outside the chosen route")
+	AssertEqual("skip", Steps["pac_download"]["state"])
+	AssertEqual("override", Steps["pac_download"]["value"])
+	AssertEqual("override", Steps["pac_script"]["value"])
+	AssertEqual("selected_proxy", Steps["route_lookup"]["value"], "the check goes on with the route")
+	Fetched := 0
+	_TNC_Run(_TNC_Deps(Map("override_routes", () => false,
+		"fetch_pac", (Url, Callback) => (Fetched += 1, Callback.Call(0, "")))))
+	AssertEqual(1, Fetched, "automatic still probes the PAC")
+}
+
+Test("NetworkCheck: an override leaves the PAC alone (network-check)", _TNC_OverrideSkipsPac)
+
+
+; The object's default is the machine's WinHTTP proxy; the policy's route is direct.
+_TNC_PacFetchIsDirect() {
+	Calls := []
+	Request := {}
+	Request.DefineProp("SetProxy", { Call: (Self, Setting) => Calls.Push("proxy:" . Setting) })
+	Request.DefineProp("SetTimeouts", { Call: (Self, *) => Calls.Push("timeouts") })
+	Request.DefineProp("Open", { Call: (Self, Verb, Url, Async) => Calls.Push("open") })
+	Request.DefineProp("Send", { Call: (Self) => (Calls.Push("send"), 0) })
+	Request.DefineProp("WaitForResponse", { Call: (Self, Timeout) => false })
+	Request.DefineProp("Abort", { Call: (Self) => 0 })
+	_NetworkCheck_FetchPac("https://pac.invalid/proxy.pac", (*) => 0, () => Request)
+	AssertEqual("proxy:1", Calls[1], "the route is set before the request opens")
+	AssertEqual("open", Calls[3])
+}
+
+Test("NetworkCheck: the PAC download is direct (network-check)", _TNC_PacFetchIsDirect)
+
+
 _TNC_PacFailures() {
 	Down := _TNC_Run(_TNC_Deps(Map("fetch_pac", (Url, Callback) => Callback.Call(404, ""))))
 	Steps := _TNC_ByIdentity(Down)
