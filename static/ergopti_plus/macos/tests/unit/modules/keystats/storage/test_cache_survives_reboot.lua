@@ -62,7 +62,7 @@ local function start(root, prepare)
 			local rows = {}
 			if sql:find("key='today_log_offset'", 1, true) then rows = { { value = tostring(SAVED_OFFSET) } }
 			elseif sql:find("key='today_log_date'", 1, true) then rows = { { value = "2026-10-28" } }
-			elseif sql:find("key='aggregate_cache_revision'", 1, true) then rows = { { value = "2" } }
+			elseif sql:find("key='aggregate_cache_revision'", 1, true) then rows = { { value = "3" } }
 			elseif sql:find("key='ngram_ctx_json'", 1, true) then rows = { { value = "{}" } } end
 			local index = 0
 			return function() index = index + 1; return rows[index] end

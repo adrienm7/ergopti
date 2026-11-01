@@ -321,7 +321,7 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 										backtrack.RemoveAt(1)
 								p6 := p5, p5 := p4, p4 := p3, p3 := p2, p2 := p1, p1 := "[BS]"
 						} else {
-								k_c  := char
+								k_c  := KLW_EventToken(char)
 								k_bg := (p1 != "") ? p1 . k_c : ""
 								k_tg := (p2 != "") ? p2 . p1 . k_c : ""
 								k_qg := (p3 != "") ? p3 . p2 . p1 . k_c : ""

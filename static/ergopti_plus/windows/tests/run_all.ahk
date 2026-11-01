@@ -1185,6 +1185,7 @@ global _AhkSubDir := ""
 ; against the recording KL_AppendLog stub rather than a copy of its row.
 #Include unit/modules/keystats/ergonomics/test_near_miss_row_privacy.ahk
 #Include unit/modules/keystats/test_keystats_walker.ahk
+#Include unit/modules/keystats/test_keystats_token_encoding.ahk
 #Include unit/modules/keystats/ergonomics/test_walker_json_flush_merge.ahk
 #Include unit/modules/keystats/ergonomics/test_walker_histogram_partitions.ahk
 #Include unit/modules/keystats/test_keystats_sql.ahk

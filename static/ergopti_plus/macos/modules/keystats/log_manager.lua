@@ -1017,7 +1017,11 @@ end
 
 local DATA_SQL_OUTBOX_KEY = "local_data_sql_outbox"
 local REPLAY_FLUSH_EVENT_COUNT = 500
-local AGGREGATE_CACHE_REVISION = "2"
+-- Revision 3 rebuilds every n-gram key from the raw events in token encoding 2
+-- (keystats_tokens.json); the previous cache is kept beside the live one first.
+local AGGREGATE_CACHE_REVISION = "3"
+local PRE_ENCODING_REVISION = "2"
+local PRE_ENCODING_BACKUP_SUFFIX = ".pre-ngram-encoding-2.bak"
 -- Every table written by aggregator/sql.lua.  Replaying a device's canonical
 -- raw rows is additive, so its old derived partition must be cleared first.
 local DERIVED_DEVICE_TABLES = {
@@ -1601,6 +1605,20 @@ local function _aggregate_cache_revision(db)
 		return tostring(row.value or "0")
 	end
 	return "0"
+end
+
+--- Copies the cache of the old token encoding aside before its keys are rebuilt.
+--- The ledgers stay the source, so a refused copy is reported, not fatal; a copy
+--- that already exists is the older one and stays.
+---@param db userdata
+local function _keep_pre_encoding_cache(db)
+	local backup = _paths.sqlite_path .. PRE_ENCODING_BACKUP_SUFFIX
+	if fs.attributes(backup) ~= nil then return end
+	if db:exec("VACUUM INTO " .. _sq(backup) .. ";") ~= sqlite3.OK then
+		Logger.error(LOG, "Cannot keep the metrics cache before its rebuild: %s.", tostring(db:errmsg()))
+		return
+	end
+	Logger.info(LOG, "Metrics cache kept as %s before the n-gram keys are rebuilt.", backup)
 end
 
 --- Mark a fully rebuilt derived cache and make every dashboard snapshot stale.
@@ -2453,7 +2471,12 @@ local function _init(core_state)
 		end
 		-- Last: the live context above must not land in the middle of its walk.
 		-- It ran synchronously here and held the event taps for 22 s (issue #104).
-		if recovery_due then _start_aggregate_recovery(db, replay_state) end
+		if recovery_due then
+			if not cache_was_fresh and _aggregate_cache_revision(db) == PRE_ENCODING_REVISION then
+				_keep_pre_encoding_cache(db)
+			end
+			_start_aggregate_recovery(db, replay_state)
+		end
 	end
 
 	-- Rotation is normally initialised inside the SQLite branch above, which is

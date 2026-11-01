@@ -175,6 +175,14 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/ui/metrics_typing/_generated/keycode_data.js']
 	},
 	{
+		script: 'codegen/codegen-keystats-tokens.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/lua/keystats/tokens_data.lua',
+			'static/ergopti_plus/windows/_generated/keystats_tokens.ahk',
+			'static/ergopti_plus/_shared/ui/metrics_typing/_generated/keystats_tokens.js'
+		]
+	},
+	{
 		script: 'codegen/codegen-update-channels.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/ui/_generated/update_channel_registry.js',

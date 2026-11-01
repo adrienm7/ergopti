@@ -46,6 +46,7 @@ local AppCategoryStore = require("keystats.app_category_store")
 local RegularFileReader = require("infra.regular_file_reader")
 local ErrorDescription = require("error_description")
 local Queries = require("keystats.queries")
+local TokenEncoding = require("keystats.token_encoding")
 local PrivateSqlite = nil
 
 -- How many session durations one application-day keeps. Read from the shared
@@ -359,6 +360,51 @@ function M.has_private_file_debt() return PrivateSqlite ~= nil and PrivateSqlite
 --- @return boolean
 function M.flush_transport_available()
 	return require("infra.sqlite_batch_process").is_available() == true
+end
+
+--- Moves a store to the current n-gram token encoding, once. This database is
+--- the only copy of its derived keys: unlike Windows and macOS there is no ledger
+--- replay, so the keys are rewritten in place. VACUUM INTO first leaves a
+--- consistent backup beside it, the update is one transaction that also records
+--- the version. The caller stops using a store this refuses: writing new keys
+--- beside old ones would make a later retry escape them twice.
+--- @return boolean True once the store holds the current encoding.
+function M.ensure_token_encoding()
+	local recorded = _query_scalar("SELECT value FROM meta WHERE key='ngram_token_encoding';")
+	if recorded == tostring(TokenEncoding.VERSION) then return true end
+	local keys = {}
+	for table_name in pairs(TokenEncoding.MIGRATED_FAMILIES) do
+		local output = _query_output("SELECT DISTINCT hex(token) FROM " .. table_name .. " WHERE instr(token,'[')>0;")
+		if output == nil then
+			Logger.error(LOG, "Cannot read the n-gram keys of %s for their migration.", table_name)
+			return false
+		end
+		local family = {}
+		for hex in output:gmatch("[^\n]+") do
+			family[#family + 1] = (hex:gsub("%x%x", function(pair) return string.char(tonumber(pair, 16)) end))
+		end
+		keys[table_name] = family
+	end
+	local statements = TokenEncoding.migration_statements(keys)
+	if #statements > 0 then
+		local backup = _db_path .. TokenEncoding.BACKUP_SUFFIX
+		local fh = io.open(backup, "rb")
+		if fh then
+			fh:close()
+		elseif not _exec("VACUUM INTO '" .. backup:gsub("'", "''") .. "';") then
+			Logger.error(LOG, "Cannot back the metrics store up before migrating its n-gram keys.")
+			return false
+		end
+	end
+	statements[#statements + 1] = string.format(
+		"INSERT OR REPLACE INTO meta (key, value) VALUES ('ngram_token_encoding','%d');", TokenEncoding.VERSION)
+	if not _exec_raw_batch(table.concat(statements, "\n")) then
+		Logger.error(LOG, "The n-gram key migration was refused; the store is unchanged.")
+		return false
+	end
+	Logger.info(LOG, "Metrics store moved to n-gram token encoding %d (%d statement(s)).",
+		TokenEncoding.VERSION, #statements - 1)
+	return true
 end
 
 --- Opens (or creates) the SQLite database at the given path and bootstraps the
