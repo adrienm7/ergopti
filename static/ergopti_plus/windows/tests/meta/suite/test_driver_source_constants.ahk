@@ -25,17 +25,20 @@ _DSC_LeavesTheRest() {
 }
 Test("source helpers: a misspelt or quoted constant stays as written (par-74)", _DSC_LeavesTheRest)
 
-; The whole census must resolve, or a pin could read a reference no table holds.
+; Every reference in the raw census must resolve, or a pin could read a name no
+; table holds. The helpers' own text has none left, so this reads the files.
 _DSC_NoUnknownReference() {
-	Source := _DriverSourceConcat()
-	AssertTrue(InStr(Source, '"max_words"') > 0, "the census reads the literal")
-	Unknown := []
-	Position := 1
 	Pattern := "(?<![" . Chr(34) . "'\w])\b(?:ConfigKey|ConfigLeaf|MenuCommand)\.[A-Z][A-Z0-9_]*\b"
-	while RegExMatch(Source, Pattern, &Found, Position) {
-		Unknown.Push(Found[0])
-		Position := Found.Pos + Found.Len
+	Seen := 0
+	for Path in _DriverProductionSourceCensus().Paths {
+		Source := FileRead(Path, "UTF-8")
+		Position := 1
+		while RegExMatch(Source, Pattern, &Found, Position) {
+			Seen += 1
+			AssertTrue(_DriverResolveConstants(Found[0]) != Found[0], Found[0] . " is no generated constant")
+			Position := Found.Pos + Found.Len
+		}
 	}
-	AssertEqual("", Unknown.Length ? Unknown[1] : "", "every reference names a generated constant")
+	AssertTrue(Seen > 500, "the census must hold the constants' references, read " . Seen)
 }
 Test("source helpers: every constant in the census is generated (par-74)", _DSC_NoUnknownReference)
