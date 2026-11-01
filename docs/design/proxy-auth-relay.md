@@ -107,24 +107,28 @@ package, the macOS application and the Windows bundle ship the relay;
 
 ## Callers
 
+A refused sign-in means the same on all three (maintainer decision, 2026-11-01): the
+managed daemon starts without the proxy, so the models on disk keep working; a receipt
+names the closed reason; only the pull is refused, with that reason's message.
+
 - Linux: `modules/llm/managed_ollama_proxy.lua` probes the selected relay for
   the registry authority once the route plan settles, and on `required` the
-  daemon is started under `run`.
+  daemon is started under `run`. On a refusal the repair result carries
+  `relay_refusal` and `ollama_install_state` holds it for that daemon's origin;
+  `model_download` refuses there, and on its retry.
 - macOS: the stock daemon start (`modules/llm/ollama_server_command.lua`) runs
   `ollama serve` through `run_with_proxy_sign_in_relay` (`network-retry.sh`),
   which probes the relay the system settings named and, on `required`, starts
-  the daemon under `run`. A refused sign-in is logged by its closed reason and
-  the daemon starts without the relay, as a failed route lookup already does
-  there, so the models on disk keep working; Linux refuses the start instead,
-  because its repair reports the reason on the model page. The Debug network
-  check reports the same probe (`proxy_relay`). The Swift-owned managed daemon
-  (`managed_ollama_serve.py`) does not use the relay yet.
+  the daemon under `run`. The receipt is a file each start removes first
+  (`modules/llm/proxy_relay_receipt.lua`), read by the pull of a daemon Ergopti
+  started; the user's own Ollama has its own network settings and is not refused.
+  The Debug network check reports the same probe (`proxy_relay`). The Swift-owned
+  managed daemon (`managed_ollama_serve.py`) does not use the relay yet, so it has
+  no refusal to record.
 - Windows: `ollama-runtime-launch.ps1` runs the same probe where the tunnel probe
   answers `windows_login`, and on `required` starts the daemon under `run`, the
   listener admitted only as the child of that exact relay from the admitted image.
-  A refused sign-in keeps the daemon without the proxy and refuses only the pull,
-  by the closed reason in the receipt (`proxy_relay`). Whether Linux should converge
-  on this is an open maintainer decision; the live evidence is in
+  The receipt is the runtime's (`proxy_relay`); the live evidence is in
   [proxy-relay-testing.md](../tooling/proxy-relay-testing.md).
 
 ## Packaging

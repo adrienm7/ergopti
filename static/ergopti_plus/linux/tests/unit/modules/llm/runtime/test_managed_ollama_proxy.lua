@@ -396,14 +396,18 @@ it("(proxy-auth-relay) a proxy that demands Negotiate starts the daemon under th
 	eq(result.environment[1], "HTTPS_PROXY=http://proxy.corp.example:3128")
 end)
 
-it("(proxy-auth-relay) a refused sign-in refuses the start with the relay's reason", function()
+it("(proxy-auth-relay) a refused sign-in starts without the proxy and carries the relay's reason", function()
 	for _, reason in ipairs({ "sign_in_unavailable", "ntlm_requires_windows", "sign_in_rejected", "relay_unavailable" }) do
 		local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } },
 			probe_answer = { nil, reason } })
 		local result = w:run()
-		eq(result.ok, false)
-		eq(result.error, "proxy_relay_refused")
+		eq(result.ok, true)
+		eq(result.relay, nil)
 		eq(result.relay_refusal, reason)
+		-- No relay row, and a bypass of any relay the daemon would inherit.
+		eq(#result.environment, 2)
+		eq(result.environment[1], "NO_PROXY=*")
+		eq(result.environment[2], "no_proxy=*")
 	end
 end)
 
@@ -430,7 +434,8 @@ it("(proxy-auth-relay) a probe that cannot start is the named relay_unavailable"
 	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } },
 		probe_error = "proxy-auth-relay-probe-unavailable" })
 	local result = w:run()
-	eq(result.ok, false)
+	eq(result.ok, true)
+	eq(result.environment[1], "NO_PROXY=*")
 	eq(result.relay_refusal, "relay_unavailable")
 end)
 

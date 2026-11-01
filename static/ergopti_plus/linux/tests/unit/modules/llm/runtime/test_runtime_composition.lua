@@ -155,6 +155,17 @@ test('(proxy-auth-relay) a proxy that demands a sign-in starts the daemon under 
 		..' --dial-timeout-ms 11 --handshake-timeout-ms 12 --idle-timeout-ms 13 -- /managed/ollama serve')
 	eq(w.service.opts.timeout_ms,false)
 end)
+test('(proxy-auth-relay) a refused sign-in bypasses a relay the daemon would inherit, keeping its loopback bind',function()
+	local w=fixture({network=network('/opt/ergopti/bin/ergopti-proxy-relay')})
+	w.env={'PATH=/usr/bin','HTTPS_PROXY=http://mine:1','NO_PROXY=intranet'}
+	w.options.environment={'NO_PROXY=*','no_proxy=*'}
+	w.controller.ports.start_service('/managed/ollama',{'serve'},w.options,function()end)
+	eq(w.service.binary,'/managed/ollama')
+	local rows={}
+	for _,entry in ipairs(w.service.opts.env)do rows[entry]=true end
+	eq(rows['NO_PROXY=*'],true);eq(rows['no_proxy=*'],true);eq(rows['NO_PROXY=intranet'],nil)
+	eq(rows['OLLAMA_HOST='..w.options.host],true)
+end)
 test('(proxy-auth-relay) a relay that is not installed refuses the start by name',function()
 	local w=fixture({network=network(nil)})
 	w.options.relay={upstream='http://proxy.corp.example:3128',scheme='ntlm'}

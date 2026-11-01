@@ -373,17 +373,21 @@ EOF_ROUTE_PLAN
 # once, so "required" proves the user's Kerberos ticket before the daemon
 # depends on it. The probe line is read as network/proxy_auth_relay.lua reads it
 # (the shared proxy_auth_relay_probe_vectors.json pins both). A relay that is
-# not bundled, or a refused sign-in, starts the daemon without it, as a failed
-# route lookup does, so the models already on disk keep working; the log names
-# the closed reason and Debug > Test network reports it. Never logs the proxy.
+# not bundled starts the daemon under the proxy as named. A refused sign-in
+# starts the daemon without the proxy, as Windows and Linux do, so the models
+# already on disk keep working: the closed reason goes to the log and to
+# ERGOPTI_PROXY_RELAY_REFUSAL_FILE, which refuses the pull with its message
+# (modules/llm/proxy_relay_receipt.lua). Never logs the proxy.
 # Deadlines come from the caller (constants.toml [adapters] proxy_relay_*_ms):
 # ERGOPTI_PROXY_RELAY_DIAL_MS, ERGOPTI_PROXY_RELAY_HANDSHAKE_MS and
 # ERGOPTI_PROXY_RELAY_IDLE_MS; the registry is the first OPAQUE_NETWORK_PAC_PROBE_URLS origin.
 run_with_proxy_sign_in_relay() {
 	local upstream="${HTTPS_PROXY:-}" relay origin authority output status reason
 	local dial="${ERGOPTI_PROXY_RELAY_DIAL_MS:-}" handshake="${ERGOPTI_PROXY_RELAY_HANDSHAKE_MS:-}"
-	local idle="${ERGOPTI_PROXY_RELAY_IDLE_MS:-}"
+	local idle="${ERGOPTI_PROXY_RELAY_IDLE_MS:-}" receipt="${ERGOPTI_PROXY_RELAY_REFUSAL_FILE:-}"
 	[ "$#" -gt 0 ] || return 2
+	# A receipt names the daemon of its own start, never a later one.
+	[ -z "$receipt" ] || rm -f "$receipt"
 	if ! printf '%s' "$upstream" | grep -Eq '^http://[A-Za-z0-9.-]+:[0-9]{1,5}/?$'; then
 		"$@"
 		return
@@ -397,7 +401,7 @@ run_with_proxy_sign_in_relay() {
 	esac
 	if [ -z "$authority" ] || ! printf '%s' "$authority" | grep -Eq '^[A-Za-z0-9.-]+:443$'; then
 		log_error "The proxy sign-in relay was not probed: its inputs are incomplete (relay_unavailable)."
-		"$@"
+		start_without_proxy_after_refusal relay_unavailable "$receipt" "$@"
 		return
 	fi
 	relay=""
@@ -430,8 +434,21 @@ run_with_proxy_sign_in_relay() {
 			;;
 		*) reason=relay_unavailable ;;
 	esac
-	log_error "The proxy sign-in relay refused (${reason}): the daemon starts without it."
-	"$@"
+	log_error "The proxy sign-in relay refused (${reason}): the daemon starts without the proxy."
+	start_without_proxy_after_refusal "$reason" "$receipt" "$@"
+}
+
+# Records a closed refusal for the pull, then runs the daemon with no proxy at
+# all: empty relay variables and a full bypass, so nothing it inherited applies.
+start_without_proxy_after_refusal() {
+	local reason="$1" receipt="$2"
+	shift 2
+	if [ -n "$receipt" ]; then
+		if ! mkdir -p "${receipt%/*}" || ! printf '%s\n' "$reason" > "$receipt"; then
+			log_error "The proxy sign-in refusal could not be recorded for the model pull (${reason})."
+		fi
+	fi
+	HTTPS_PROXY= https_proxy= HTTP_PROXY= http_proxy= ALL_PROXY= all_proxy= NO_PROXY='*' no_proxy='*' "$@"
 }
 
 # Prints the SHA-256 hex digest of one file. shasum marks a line whose name

@@ -332,6 +332,30 @@ helpers.describe("HS-010 Ollama download shared slot", function()
 		end)
 	end)
 
+	-- docs/design/proxy-auth-relay.md: the daemon Ergopti started runs without its
+	-- proxy after a refused sign-in, so the pull is refused with the relay's message.
+	helpers.it("(proxy-auth-relay) a refused sign-in refuses the pull of Ergopti's daemon only", function()
+		local saved = package.loaded["modules.llm.proxy_relay_receipt"]
+		package.loaded["modules.llm.proxy_relay_receipt"] = {
+			pull_refusal = function() return "network.relay.sign_in_rejected", "sign_in_rejected" end,
+		}
+		local ok, err = pcall(function()
+			with_fixture({}, function(f)
+				helpers.assert_eq(start_pull(f), false)
+				helpers.assert_eq(#f.pulls, 0, "no pull child is started")
+				helpers.assert_eq(f.notification_records[1][2], "network.relay.sign_in_rejected")
+			end)
+			with_fixture({ binary_source = "app", network_env = {
+				prelude = function() return "local_settings; " end,
+			} }, function(f)
+				helpers.assert_true(start_pull(f))
+				helpers.assert_eq(#f.pulls, 1, "the user's own daemon has its own network settings")
+			end)
+		end)
+		package.loaded["modules.llm.proxy_relay_receipt"] = saved
+		if not ok then error(err, 0) end
+	end)
+
 	-- Issue #100: a Mac with a PAC proxy setting never got its model, because the
 	-- admission refused the pull before asking the user's own Ollama.app to
 	-- fetch. That daemon is not Ergopti's child: it downloads with its own
