@@ -884,6 +884,43 @@ print('PASS recipient GLib closure: 2 libraries staged, 9 left to the recipient.
 	console.log('Recipient GLib closure control: 1 passed; 0 skipped.');
 }
 
+// Command-contract witness: the prefix's lib/ reaches every host program through
+// LD_LIBRARY_PATH, so the build host's readline shadowed the recipient's and
+// bash 5.3 died on Arch with "undefined symbol: rl_trim_arg_from_keyseq" before
+// the daemon started. Only sqlite3 may reach it, through lib/sqlite3.
+if (process.platform === 'linux') {
+	const readlineClosure = spawnSync(
+		'python3',
+		[
+			'-B',
+			'-c',
+			`
+import importlib.util,pathlib,sys,tempfile
+spec=importlib.util.spec_from_file_location('owned_stager',sys.argv[1]);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+with tempfile.TemporaryDirectory(prefix='ergopti-readline-closure-') as temporary:
+ root=pathlib.Path(temporary)
+ for name in ['sqlite3','libreadline.so.8','libtinfo.so.6','libc.so.6']:(root/name).write_bytes(b'ldd fixture only, never loaded')
+ listings={'sqlite3':['libreadline.so.8','libtinfo.so.6','libc.so.6'],'libreadline.so.8':['libtinfo.so.6','libc.so.6']}
+ line=lambda name:'\\t'+name+' => '+str(root/name)+' (0x00007f0000000000)'
+ def controlled_run(arguments,**options):
+  assert arguments[0]=='ldd' and len(arguments)==2,'Only ldd is observed'
+  return '\\n'.join(map(line,listings.get(pathlib.Path(arguments[1]).name,['libc.so.6'])))+'\\n'
+ copies=[]
+ prefix=pathlib.PurePosixPath('/prefix')
+ m.run=controlled_run;m.copy_unique=lambda source,destination,owners:copies.append(str(destination))
+ m.copy_elf_closure([root/'sqlite3'],prefix/'lib',{})
+ assert sorted(set(copies))==['/prefix/lib/libtinfo.so.6','/prefix/lib/sqlite3/libreadline.so.8'],sorted(set(copies))
+print('PASS readline closure: reachable by sqlite3 alone.')
+`,
+			path.join(root, 'tools/build/stage-linux-network-runtime.py')
+		],
+		{ cwd: '/', encoding: 'utf8', env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' } }
+	);
+	assert.equal(readlineClosure.status, 0, readlineClosure.stderr);
+	assert.equal(readlineClosure.stdout, 'PASS readline closure: reachable by sqlite3 alone.\n');
+	console.log('Readline closure control: 1 passed; 0 skipped.');
+}
+
 // Real filesystem controls for private evidence, independent of native runtime
 // success. Sample private bytes are never logged or uploaded by this harness.
 if (process.platform === 'linux') {
