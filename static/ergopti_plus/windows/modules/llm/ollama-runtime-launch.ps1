@@ -171,7 +171,8 @@ function Get-OllamaRuntimeProxy($Vendor, $Request) {
 	$tunnel = 'none'; $relay = 'not_applicable'; $relayRun = ''
 	if ($proxy.Mode -ceq 'relay') {
 		$tunnel = 'unprobed'
-		if ($proxy.Proxy -cmatch '^http://') {
+		# Credentials in the address need no probe: only a Windows login stops the daemon.
+		if ($proxy.Proxy -cmatch '^http://[^@]+$') {
 			$registry = ([Uri](@($origins.clients.ollama)[0])).Host + ':443'
 			$tunnel = Test-ErgoptiRelayTunnel -Relay $proxy.Proxy -Target $registry `
 				-TimeoutMs ([Math]::Max(1, [Math]::Min(5000, (Get-OllamaRuntimeRemaining $Request))))

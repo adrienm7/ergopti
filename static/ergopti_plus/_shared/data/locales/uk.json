@@ -1401,7 +1401,6 @@
 	"proxy_override.saved_automatic": "Завантаження знову використовують мережеві налаштування системи.",
 	"proxy_override.saved_direct": "Завантаження тепер підключаються без проксі.",
 	"proxy_override.saved_relay": "Завантаження тепер ідуть через цей проксі.",
-	"proxy_override.windows_plain_http_only": "У Windows завантаження можуть проходити лише через звичайний http-проксі без імені та пароля в адресі; проксі виконує вхід за допомогою вашого сеансу Windows. Вкажіть адресу на зразок http://proxy.example.com:3128.",
 	"menu.debug.field_check_toolchain": "Перевірити сторонні інструменти (Команди, Homebrew, таймер)",
 	"menu.debug.field_check_login_items": "Показати, що запускає Ergopti під час входу",
 	"menu.debug.key_history": "Історія клавіш",

@@ -803,9 +803,11 @@ client instead (opaque prelude, no `install_huggingface_transport`). macOS
 `hs.http` requests (update checks) still follow the system settings. Windows
 keeps the key in `config.toml` and publishes it at boot in the process variable
 `ERGOPTI_PROXY_OVERRIDE` (`adapters/proxy_override.ahk`), which every worker
-inherits and `Resolve-ErgoptiNativeNetworkRoutes` applies; WinHTTP reaches a plain
-http relay only, so https, socks and credentials in the address are refused in
-words at the menu row. Action: a new download client on macOS must take its
+inherits and `Resolve-ErgoptiNativeNetworkRoutes` applies. WinHTTP and
+HttpWebRequest reach a plain http relay only, so an https relay, a socks5 relay or
+credentials in the address go through the loopback hop of that file (C# in the
+worker's own process, answering that process only); the owned daemon gets the real
+relay in `HTTPS_PROXY`. Action: a new download client on macOS must take its
 prelude from `network_env.lua`, a new native worker must read the override before
 claiming it honours it, and a new Windows client must route through
 `Resolve-ErgoptiNativeNetworkRoutes` or `SystemProxy_*` and join

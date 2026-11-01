@@ -395,7 +395,7 @@ class CurlAsyncRequest {
 	; Routes the request through an explicit proxy URL ("" = direct). Proxy
 	; authentication uses the signed-in Windows account (SSPI), like a browser.
 	SetProxy(Proxy) {
-		if !(Proxy is String) || (Proxy != "" && !SystemProxy_IsValidProxyUrl(Proxy))
+		if !(Proxy is String) || (Proxy != "" && !SystemProxy_IsValidProxyUrl(Proxy) && !ProxyOverride_IsValidRelay(Proxy))
 			throw ValueError("HTTP proxy must be an http, https or socks URL.")
 		this.Proxy := Proxy
 		this.ProxySelected := true
@@ -454,7 +454,7 @@ class CurlAsyncRequest {
 		Input .= ',"connect_timeout_ms":' . this.ConnectTimeoutMs
 		Input .= ',"revocation_best_effort":' . (this.RevocationBestEffort ? "true" : "false")
 		if !this.ManagedRouting && this.ProxySelected
-			Input .= ',"fixed_proxy":' . JsonStringLiteral(this.Proxy)
+			Input .= ',"fixed_proxy":' . JsonStringLiteral(ProxyOverride_CarriesCredentials(this.Proxy) ? "override" : this.Proxy)
 		if IsObject(this.ManagedSettingsReader) {
 			Settings := this.ManagedSettingsReader.Call()
 			if !(Settings is Map)

@@ -5,6 +5,16 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The Windows proxy override takes every relay of the grammar (2026-11-01)
+
+https relays, socks5 relays and credentials in the address are accepted on Windows
+instead of refused. Each PowerShell channel (managed worker, updater staging,
+artifact engine, Ollama archive) hops through a loopback listener in its own
+process; the daemon reads the real relay from `HTTPS_PROXY`. The system curl
+serves loopback requests only, so no override reaches it. A credential lives in
+config.toml and in `ERGOPTI_PROXY_OVERRIDE`, never in a log, command line, receipt
+or request file; `test-windows-proxy-override-e2e.cjs` proves each form.
+
 ## Perplexity speaks the Agent API (2026-11-01)
 
 Perplexity left Sonar chat completions for the Agent API on the three drivers:

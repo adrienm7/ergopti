@@ -1396,7 +1396,6 @@
 	"proxy_override.saved_automatic": "Downloads follow the system network settings again.",
 	"proxy_override.saved_direct": "Downloads now connect without any proxy.",
 	"proxy_override.saved_relay": "Downloads now go through this proxy.",
-	"proxy_override.windows_plain_http_only": "On Windows, downloads can only go through a plain http proxy with no name or password in its address; the proxy signs you in with your Windows session. Give an address such as http://proxy.example.com:3128.",
 	"menu.debug.field_check_toolchain": "Test third-party tools (Shortcuts, Homebrew, timer)",
 	"menu.debug.field_check_login_items": "Show what starts Ergopti at login",
 	"menu.debug.key_history": "Key history",

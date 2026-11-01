@@ -1401,7 +1401,6 @@
 	"proxy_override.saved_automatic": "डाउनलोड फिर से सिस्टम की नेटवर्क सेटिंग का पालन करते हैं।",
 	"proxy_override.saved_direct": "डाउनलोड अब बिना किसी प्रॉक्सी के जुड़ते हैं।",
 	"proxy_override.saved_relay": "डाउनलोड अब इस प्रॉक्सी से होकर जाते हैं।",
-	"proxy_override.windows_plain_http_only": "Windows पर डाउनलोड केवल ऐसे सादे http प्रॉक्सी से हो सकते हैं जिसके पते में नाम या पासवर्ड न हो; प्रॉक्सी आपके Windows सत्र से आपको साइन इन करता है। http://proxy.example.com:3128 जैसा पता दें।",
 	"menu.debug.field_check_toolchain": "तृतीय-पक्ष उपकरण जाँचें (शॉर्टकट, Homebrew, टाइमर)",
 	"menu.debug.field_check_login_items": "दिखाएँ कि लॉगिन पर Ergopti को क्या शुरू करता है",
 	"menu.debug.key_history": "कुंजी इतिहास",
