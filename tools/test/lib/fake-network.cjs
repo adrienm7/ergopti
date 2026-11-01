@@ -298,6 +298,8 @@ function answer(status, reason, headers = []) {
  * @param {object} [options]
  * @param {string} [options.mode] One of PROXY_MODES.
  * @param {{host?: string, port: number}} [options.upstream] Where a tunnel goes.
+ * @param {{port: number}} [options.plainUpstream] Where open mode forwards a plain
+ *     http request; without it such a request is refused with a 405.
  * @param {number} [options.slowMs] How long the slow modes hold their answer.
  * @param {object} [options.credential] The NTLM identity to verify.
  * @param {object} [options.identity] selfSignedCertificate(): serves TLS, an https relay.
@@ -307,6 +309,7 @@ function answer(status, reason, headers = []) {
 async function startFakeProxy({
 	mode = 'open',
 	upstream = null,
+	plainUpstream = null,
 	slowMs = DEFAULT_SLOW_MS,
 	credential = TEST_CREDENTIAL,
 	identity = null
@@ -343,6 +346,33 @@ async function startFakeProxy({
 		});
 		target.on('error', () => socket.destroy());
 		socket.on('close', () => target.destroy());
+	};
+
+	// A plain http request in absolute form, the shape an HTTP proxy sees: forwarded
+	// to the loopback upstream, whatever host it names, marked as having come this way.
+	const forwardPlain = (socket, request) => {
+		events.push({ type: 'forward', url: request.target, outcome: 'forwarded' });
+		const target = new URL(request.target);
+		const upstreamRequest = http.request(
+			{
+				host: LOOPBACK,
+				port: plainUpstream.port,
+				method: request.method,
+				path: `${target.pathname}${target.search}`,
+				headers: { ...request.headers, 'x-fake-proxy': 'forwarded', connection: 'close' }
+			},
+			(reply) => {
+				const head = Object.entries(reply.headers)
+					.filter(([name]) => name !== 'connection' && name !== 'transfer-encoding')
+					.map(([name, value]) => `${name}: ${value}`);
+				socket.write(
+					`HTTP/1.1 ${reply.statusCode} ${reply.statusMessage}\r\n${[...head, 'Connection: close'].join('\r\n')}\r\n\r\n`
+				);
+				reply.pipe(socket);
+			}
+		);
+		upstreamRequest.on('error', () => socket.destroy());
+		upstreamRequest.end();
 	};
 
 	const signInStep = (socket, request, authority, scheme, leftover) => {
@@ -409,6 +439,10 @@ async function startFakeProxy({
 	const handleRequest = (socket, request, leftover) => {
 		const authority = request.target;
 		const current = state.mode;
+		if (request.method !== 'CONNECT' && plainUpstream && current === 'open') {
+			forwardPlain(socket, request);
+			return;
+		}
 		if (request.method !== 'CONNECT') {
 			events.push({ type: 'request', method: request.method, outcome: 'refused' });
 			socket.end(answer(405, 'Method Not Allowed', ['Connection: close']));
@@ -752,7 +786,7 @@ function selfSignedCertificate(commonName, algorithm = 'ed25519') {
  * hash to the manifest's digest, as in the macOS field run of 2026-10-31.
  * @param {object} [options]
  * @param {'ok'|'digest_mismatch'} [options.mode] The blob behaviour.
- * @returns {Promise<object>} { port, sha256, requests, setMode, close }.
+ * @returns {Promise<object>} { port, sha256, requests, serverNames, setMode, close }.
  */
 async function startFakeRegistry({ mode = 'ok' } = {}) {
 	const state = { mode };
@@ -776,7 +810,18 @@ async function startFakeRegistry({ mode = 'ok' } = {}) {
 			])
 		);
 	};
-	const server = tls.createServer({ key: identity.key, cert: identity.cert }, (socket) => {
+	const serverNames = [];
+	const options = {
+		key: identity.key,
+		cert: identity.cert,
+		// Reached before the client judges the certificate, so a client that goes on to
+		// refuse it still shows who it meant to talk to.
+		SNICallback: (name, done) => {
+			serverNames.push(name);
+			done(null, null);
+		}
+	};
+	const server = tls.createServer(options, (socket) => {
 		sockets.add(socket);
 		socket.on('close', () => sockets.delete(socket));
 		socket.on('error', () => {});
@@ -821,6 +866,95 @@ async function startFakeRegistry({ mode = 'ok' } = {}) {
 	return {
 		port: server.address().port,
 		sha256: identity.sha256,
+		requests,
+		serverNames,
+		setMode(next) {
+			state.mode = next;
+		},
+		close: () => closeServer(server, sockets)
+	};
+}
+
+/**
+ * Starts a registry the real daemon can pull from without TLS (`insecure`): the
+ * protocol as the real one speaks it, a manifest, HEAD for a blob's size, and a
+ * 307 from the blob to a storage URL on another host name, which is what the
+ * daemon's downloader demands before it takes the bytes.
+ * @param {object} options
+ * @param {{mediaType: string, bytes: Buffer}} options.config The config blob.
+ * @param {{mediaType: string, bytes: Buffer}[]} options.layers The layers.
+ * @param {'ok'|'digest_mismatch'|'stall'} [options.mode] The storage behaviour:
+ *     stall answers half a blob and then holds the connection.
+ * @returns {Promise<object>} { port, manifestDigest, requests, setMode, close };
+ *     a request row is { method, path, proxied, range }.
+ */
+async function startFakeOllamaRegistry({ config, layers, mode = 'ok' }) {
+	const state = { mode };
+	const requests = [];
+	const sockets = new Set();
+	const describe = ({ mediaType, bytes }) => ({
+		mediaType,
+		digest: `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`,
+		size: bytes.length
+	});
+	const blobs = new Map([config, ...layers].map((blob) => [describe(blob).digest, blob.bytes]));
+	const manifest = JSON.stringify({
+		schemaVersion: 2,
+		mediaType: 'application/vnd.docker.distribution.manifest.v2+json',
+		config: describe(config),
+		layers: layers.map(describe)
+	});
+	const server = http.createServer((request, response) => {
+		const url = request.url;
+		requests.push({
+			method: request.method,
+			path: url,
+			proxied: request.headers['x-fake-proxy'] === 'forwarded',
+			range: request.headers.range ?? ''
+		});
+		const storage = /^\/storage\/(sha256:[0-9a-f]{64})$/.exec(url);
+		const blob = /^\/v2\/library\/[^/]+\/blobs\/(sha256:[0-9a-f]{64})$/.exec(url);
+		if (/^\/v2\/library\/[^/]+\/manifests\/[^/]+$/.test(url)) {
+			response.writeHead(200, {
+				'Content-Type': 'application/vnd.docker.distribution.manifest.v2+json',
+				'Content-Length': Buffer.byteLength(manifest)
+			});
+			response.end(request.method === 'HEAD' ? undefined : manifest);
+		} else if (blob && blobs.has(blob[1]) && request.method === 'HEAD') {
+			response.writeHead(200, { 'Content-Length': blobs.get(blob[1]).length });
+			response.end();
+		} else if (blob && blobs.has(blob[1])) {
+			// Another host name for one server: the daemon stops following at that hop.
+			response.writeHead(307, {
+				Location: `http://${LOOPBACK}:${server.address().port}/storage/${blob[1]}`,
+				'Content-Length': 0
+			});
+			response.end();
+		} else if (storage && blobs.has(storage[1])) {
+			const bytes = Buffer.from(blobs.get(storage[1]));
+			if (state.mode === 'stall') {
+				response.writeHead(200, { 'Content-Length': bytes.length });
+				response.write(bytes.subarray(0, bytes.length >> 1));
+				return;
+			}
+			if (state.mode === 'digest_mismatch') bytes[0] ^= 0xff;
+			response.writeHead(200, { 'Content-Length': bytes.length });
+			response.end(bytes);
+		} else {
+			response.writeHead(404);
+			response.end();
+		}
+	});
+	server.on('connection', (socket) => {
+		sockets.add(socket);
+		socket.on('close', () => sockets.delete(socket));
+	});
+	await new Promise((resolve, reject) => {
+		server.once('error', reject);
+		server.listen(0, LOOPBACK, resolve);
+	});
+	return {
+		port: server.address().port,
 		requests,
 		setMode(next) {
 			state.mode = next;
@@ -948,6 +1082,7 @@ module.exports = {
 	pacScript,
 	selfSignedCertificate,
 	startFakeAgentApi,
+	startFakeOllamaRegistry,
 	startFakePacServer,
 	startFakeProxy,
 	startFakeRegistry,

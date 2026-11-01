@@ -28,11 +28,13 @@ const {
 	ntlmClientType3,
 	ntlmType2,
 	pacScript,
+	startFakeOllamaRegistry,
 	startFakePacServer,
 	startFakeProxy,
 	startFakeRegistry,
 	verifyNtlmV2
 } = require('./lib/fake-network.cjs');
+const { buildTinyGguf } = require('./lib/tiny-gguf.cjs');
 
 const STEP_TIMEOUT_MS = 5000;
 
@@ -266,6 +268,68 @@ async function testRegistry() {
 	}
 }
 
+/** A GET the way a client behind an HTTP proxy sends it, in absolute form. */
+function plainProxyGet(port, target) {
+	return new Promise((resolve, reject) => {
+		http
+			.get(
+				{ host: '127.0.0.1', port, path: target, headers: { host: 'registry.ollama.ai' } },
+				(reply) => {
+					const chunks = [];
+					reply.on('data', (chunk) => chunks.push(chunk));
+					reply.on('end', () =>
+						resolve({
+							status: reply.statusCode,
+							location: reply.headers.location,
+							body: Buffer.concat(chunks)
+						})
+					);
+				}
+			)
+			.on('error', reject);
+	});
+}
+
+async function testOllamaRegistry() {
+	const layer = { mediaType: 'application/vnd.ollama.image.model', bytes: buildTinyGguf() };
+	assert.deepEqual(layer.bytes, buildTinyGguf(), 'the model is the same bytes on every run');
+	assert.equal(layer.bytes.subarray(0, 4).toString('latin1'), 'GGUF');
+	assert.notDeepEqual(layer.bytes, buildTinyGguf('other'), 'another name is another blob');
+	const config = { mediaType: 'application/json', bytes: Buffer.from('{}') };
+	const registry = await startFakeOllamaRegistry({ config, layers: [layer] });
+	const proxy = await startFakeProxy({ mode: 'open', plainUpstream: { port: registry.port } });
+	const base = 'http://registry.ollama.ai/v2/library/tiny';
+	try {
+		const manifest = JSON.parse(
+			(await plainProxyGet(proxy.port, `${base}/manifests/latest`)).body.toString('utf8')
+		);
+		const { digest } = manifest.layers[0];
+		const redirect = await plainProxyGet(proxy.port, `${base}/blobs/${digest}`);
+		assert.equal(redirect.status, 307, 'the daemon demands a storage URL');
+		const storage = new URL(redirect.location);
+		const stored = await plainProxyGet(storage.port, storage.pathname);
+		assert.equal(`sha256:${crypto.createHash('sha256').update(stored.body).digest('hex')}`, digest);
+		registry.setMode('digest_mismatch');
+		const broken = await plainProxyGet(storage.port, storage.pathname);
+		assert.notEqual(
+			`sha256:${crypto.createHash('sha256').update(broken.body).digest('hex')}`,
+			digest
+		);
+		assert.equal(broken.body.length, stored.body.length, 'a mismatch keeps the size');
+		assert.deepEqual(
+			registry.requests.map((row) => row.proxied),
+			[true, true, false, false],
+			'the registry tells what came through the proxy'
+		);
+		proxy.setMode('refusing');
+		const refused = await plainProxyGet(proxy.port, `${base}/manifests/latest`);
+		assert.equal(refused.status, 405, 'only open mode forwards');
+	} finally {
+		await proxy.close();
+		await registry.close();
+	}
+}
+
 async function testPac() {
 	const pac = await startFakePacServer({ script: pacScript('PROXY 127.0.0.1:3128') });
 	const read = (url) =>
@@ -296,6 +360,7 @@ async function main() {
 	await testNtlm();
 	await testModes();
 	await testRegistry();
+	await testOllamaRegistry();
 	await testPac();
 	console.log(
 		`[OK] Fake network: ${PROXY_MODES.length} proxy modes, NTLMv2 verification, registry and PAC checked.`
