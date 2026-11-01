@@ -2007,6 +2007,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/platform/remap/key_combinations/test_script_chords_follow_their_slot.ahk
 #Include unit/platform/remap/altgr/test_altgr_layer_shift_from_hold.ahk
 #Include unit/platform/remap/key_combinations/test_ctrl_alt_numpad_gate.ahk
+#Include unit/platform/remap/key_combinations/test_native_press_ledger_consumers.ahk
 #Include unit/platform/remap/keys/test_user_lctrl_held.ahk
 #Include unit/platform/remap/altgr/test_altgr_takes_its_lctrl.ahk
 #Include unit/platform/remap/altgr/test_altgr_lctrl_not_typed.ahk

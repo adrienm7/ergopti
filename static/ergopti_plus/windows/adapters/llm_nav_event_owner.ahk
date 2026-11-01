@@ -3613,6 +3613,7 @@ _LLM_NavEventOwnerNativeStart(Hwnd, WakeMessage) {
 		}
 		throw StartError
 	}
+	KS_NativeKeyPressPort(LLM_NavEventOwner_KeyPress)
 	if !LLM_NavEventOwner_RefreshTerminalRoutes()
 		throw Error("Terminal route metadata registration was not admitted at startup.")
 	return 1
@@ -3655,6 +3656,19 @@ LLM_NavEventOwner_HookOrderStats() {
 		"keys_seen", NumGet(Stats, 8, "UInt64"), "injected_armed", NumGet(Stats, 16, "UInt64"),
 		"reinstalls", NumGet(Stats, 24, "UInt64"), "reinstall_failures", NumGet(Stats, 32, "UInt64"),
 		"last_failure_error", NumGet(Stats, 40, "UInt"))
+}
+
+; Reads one key of the native press ledger, which is empty while the owner is
+; stopped. This runs inside #HotIf criteria, so the buffer is not reallocated.
+; @param Sc {Integer} Scan code, 0x100 set for an extended key.
+; @returns {Object} flags (ERGOPTI_NAV_KEY_* bits) and sequence (press number).
+LLM_NavEventOwner_KeyPress(Sc) {
+	static Press := Buffer(24, 0)
+	NumPut("UInt", 24, Press, 0)
+	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_QueryKeyPress"),
+		"UShort", Sc, "Ptr", Press, "Int")
+	_LLM_NavEventOwnerNativeRequireOk(Status, "Navigation owner key press query")
+	return { flags: NumGet(Press, 4, "UInt"), sequence: NumGet(Press, 8, "UInt64") }
 }
 
 ; The same counters for the diagnostic snapshot, read only when the native owner
@@ -4939,7 +4953,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 		"ErgoptiNav_AbortOwnerSwap", "ErgoptiNav_ClaimOwner", "ErgoptiNav_GetOwner", "ErgoptiNav_PollReceipt",
 		"ErgoptiNav_BeginProfileSwap", "ErgoptiNav_CommitProfileSwap", "ErgoptiNav_AbortProfileSwap",
 		"ErgoptiNav_ProfilePendingMask", "ErgoptiNav_CompleteReceipt", "ErgoptiNav_PendingForToken",
-		"ErgoptiNav_GetLastOsError", "ErgoptiNav_GetHookOrderStats", "ErgoptiNav_TestDispatch"]
+		"ErgoptiNav_GetLastOsError", "ErgoptiNav_GetHookOrderStats", "ErgoptiNav_QueryKeyPress", "ErgoptiNav_TestDispatch"]
 	Exports := Map()
 	try {
 		for Name in Names {

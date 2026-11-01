@@ -1411,7 +1411,7 @@
 	"menu.debug.hook_probe": "Ta opp rekkefølgen på tastaturhooks",
 	"menu.debug.composer_check": "Test det sammensatte oppsettet",
 	"platform_reason.action_apple_shortcuts_are_macos": "Bare macOS: Apple Snarveier finnes bare på macOS. Kjør i stedet en kommando eller et program andre steder.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "På Windows gjør «Kjør et program» det samme: cmd.exe eller powershell.exe med kommandoen som argumenter, eller explorer.exe med filen eller mappen som skal åpnes.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "På Windows gjør «Kjør et program» det samme: cmd.exe med kommandoen som argumenter, eller explorer.exe med filen eller mappen som skal åpnes.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Disse kontrollene måler AutoHotkeys SendInput og tastaturhooken, som bare Windows-driveren har.",
 	"input_probe.title": "Inndatakontroll",
 	"input_probe.confirm": "Kontrollen åpner et lite vindu og skriver i det i omtrent {1} sekunder. Ikke skriv eller klikk andre steder imens. Fortsette?",

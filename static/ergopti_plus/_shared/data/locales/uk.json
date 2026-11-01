@@ -1411,7 +1411,7 @@
 	"menu.debug.hook_probe": "Записати порядок клавіатурних хуків",
 	"menu.debug.composer_check": "Перевірити складену розкладку",
 	"platform_reason.action_apple_shortcuts_are_macos": "Лише macOS: Швидкі команди Apple існують лише в macOS. В інших системах натомість запустіть команду або програму.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "У Windows те саме робить «Запустити програму»: cmd.exe або powershell.exe з командою як аргументами чи explorer.exe з файлом або текою, які треба відкрити.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "У Windows те саме робить «Запустити програму»: cmd.exe з командою як аргументами чи explorer.exe з файлом або текою, які треба відкрити.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Ці перевірки вимірюють SendInput з AutoHotkey і його клавіатурний хук, які є лише в драйвері Windows.",
 	"input_probe.title": "Перевірка введення",
 	"input_probe.confirm": "Ця перевірка відкриває невелике вікно й близько {1} с вводить у нього текст. Поки вона триває, нічого не вводьте й не клацайте деінде. Продовжити?",

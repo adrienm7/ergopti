@@ -1411,7 +1411,7 @@
 	"menu.debug.hook_probe": "تسجيل ترتيب خطافات لوحة المفاتيح",
 	"menu.debug.composer_check": "اختبار التخطيط المركّب",
 	"platform_reason.action_apple_shortcuts_are_macos": "macOS فقط: اختصارات Apple موجودة على macOS فقط. في الأنظمة الأخرى، شغّل أمرًا أو برنامجًا بدلًا من ذلك.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "على Windows، يقوم «تشغيل برنامج» بالشيء نفسه: cmd.exe أو powershell.exe مع الأمر كوسائط، أو explorer.exe مع الملف أو المجلد المراد فتحه.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "على Windows، يقوم «تشغيل برنامج» بالشيء نفسه: cmd.exe مع الأمر كوسائط، أو explorer.exe مع الملف أو المجلد المراد فتحه.",
 	"platform_reason.input_probe_is_autohotkey_specific": "تقيس هذه الفحوص SendInput في AutoHotkey وخطاف لوحة المفاتيح الخاص به، وهما موجودان في برنامج تشغيل Windows فقط.",
 	"input_probe.title": "فحص الإدخال",
 	"input_probe.confirm": "يفتح هذا الفحص نافذة صغيرة ويكتب فيها لمدة {1} ثوانٍ تقريبًا. لا تكتب ولا تنقر في مكان آخر خلال ذلك. هل تريد المتابعة؟",

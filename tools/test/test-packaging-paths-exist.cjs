@@ -67,6 +67,43 @@ const DESTINATION =
 // Paths built at runtime from a variable, or globs — not statically checkable.
 const NOT_STATIC = /[*?$]|\{|\}/;
 
+// A build script's private staging directory ("$STAGE/linux/runtime") is an
+// output it fills, never a source to look up: the bundle archive stages the
+// private runtime there before packing it.
+const STAGED_OUTPUT = /\$\{?STAGE\}?\/$/;
+
+/**
+ * Tells whether the path match starting at `start` writes into the staging
+ * directory rather than naming a source file.
+ * @param {string} line The script line holding the match.
+ * @param {number} start Index of the repository-relative path in the line.
+ * @returns {boolean} True for a staging destination.
+ */
+function isStagedOutput(line, start) {
+	return STAGED_OUTPUT.test(line.slice(0, start));
+}
+
+/**
+ * Lists the source paths one script line names, staging destinations excluded.
+ * @param {string} line The script line.
+ * @returns {string[]} Repository-relative source paths in line order.
+ */
+function sourcePathsOf(line) {
+	return [...line.matchAll(SOURCE_PATH)]
+		.filter((m) => !isStagedOutput(line, m.index + m[0].length - m[1].length))
+		.map((m) => m[1]);
+}
+assert.deepEqual(
+	sourcePathsOf('install -m 644 "$BUILD_DIR/AppDir/env.sh" "$STAGE/linux/network-runtime-env.sh"'),
+	[],
+	'a staging destination is an output, not a source'
+);
+assert.deepEqual(
+	sourcePathsOf('cp -a "$BUILD_DIR/linux/missing.lua" "${STAGE}/linux/missing.lua"'),
+	['linux/missing.lua'],
+	'a source copied into the staging directory is still looked up'
+);
+
 // Package folders the Linux build fills from the keyboard-layout tree rather
 // than from the driver tree: the .keylayout converter and the user XKB
 // installer land in the driver as linux/xkb_generation/ and
@@ -273,6 +310,7 @@ for (const name of scripts) {
 		for (const m of line.matchAll(SOURCE_PATH)) {
 			const rel = m[1];
 			if (NOT_STATIC.test(rel)) continue;
+			if (isStagedOutput(line, m.index + m[0].length - rel.length)) continue;
 
 			// A source path that is really part of an install destination — e.g.
 			// the "linux" in "$DEB_ROOT/usr/lib/ergopti/linux" — is not ours to

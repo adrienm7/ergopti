@@ -115,11 +115,23 @@ readable through `archive/2026-10-31/<branch>`. Then:
 
 - Tell the coordinator through this file (a line under this section) how
   many branches were deleted and how many archive tags were pushed.
+- Done by the PC agent on 2026-10-31: 262 branches deleted, 222 archive tags pushed. Seven branches with a commit under two hours old were kept: `fix/dev-js-reds-3`, `integrate/linux-proof-1`, `-2`, `-3`, `integrate/overnight-linux-1`, `integrate/overnight-macos-1`, `integrate/swift-proof-14`. Delete them yourself or tell the PC agent when they are finished.
 - Remove the "Run the archive-then-delete script" box from TODO.md's
   "Maintainer: remote branch cleanup" section and point
   `docs/tooling/remote-branch-cleanup.md` at the new tag prefix.
 
 ## Found tonight for the PC agent
+
+- Shared CI lanes, 31 October night: every red left on dev is in a Windows
+  file. Data and source contracts: repo-url-single-source
+  (`ErgoptiPlus.ahk:12`), config-key-literals (`key_combinations.ahk`, 7
+  literals vs 1), ahk-local-same-as-global (`key_combinations.ahk:923`,
+  `KeyCombinationChordPolicy.__New` declares `local Identifiers` over the
+  global). Diagnostics and metrics: fast-timer-inventory (`lifecycle.ahk` now
+  has 1 literal delay against a baseline of 2: shrink the baseline) and
+  logger-scalars-single-source (`lifecycle.ahk`, 3 free-form reasons vs 2).
+  Test infrastructure: the AHK no-pinned-source-reads ratchet (24/174 vs
+  23/173). Each lane: `npm run test:js -- --feature <lane>`.
 
 - Three of your evening commits were adjusted on dev by the coordinator: 738478ff68
   was reverted (the per-builder `timed()` phases of `menu_keyboard_layout.lua` it

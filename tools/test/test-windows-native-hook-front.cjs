@@ -11,7 +11,10 @@
  *   1. the foreign hook first makes the owner blind to a key it swallows,
  *   2. one AutoHotkey-stamped Send burst makes the owner reinstall itself
  *      twice (the first pass and the settle pass) with no failure, and
- *   3. afterwards the owner sees the key first, before the foreign hook.
+ *   3. afterwards the owner sees the key first, before the foreign hook, and
+ *   4. a replayed right Alt (the key both the standard and the Kana AltGr ask
+ *      about) and a replayed Shift are not physical for AutoHotkey while the
+ *      owner's press ledger holds them until their release.
  * It sends F23 and F24 through the real input stream, so it needs an
  * interactive Windows desktop with AutoHotkey 2.0.26 x64; it is skipped on
  * every other OS (the owner is Windows-only) and never edits any file.
@@ -85,6 +88,14 @@ function checkPhases(phases) {
 		'The foreign hook must still receive the key from the owner.'
 	);
 	assert.equal(ownerFirst.failures, 0);
+	for (const phaseName of ['ledger_altgr', 'ledger_shift']) {
+		const ledger = phases.get(phaseName);
+		assert(ledger, `The probe must report ${phaseName}.`);
+		assert.equal(ledger.physical_while_held, 0, 'AutoHotkey must not read a replay as physical.');
+		assert.equal(ledger.hidden_while_held, 1, 'The ledger must hold a replayed press.');
+		assert(ledger.sequence_while_held > 0, 'The ledger must number a replayed press.');
+		assert.equal(ledger.flags_after, 0, 'The replayed release must end the hold.');
+	}
 	const stop = phases.get('stop');
 	assert(stop && stop.status === 0, 'The owner must stop cleanly.');
 }
@@ -97,6 +108,26 @@ function checkNegativeControls() {
 		['foreign_first', { phase: 'foreign_first', native_keys_delta: 0, foreign_seen: 1 }],
 		['burst', { phase: 'burst', armed_delta: 2, reinstalls_delta: 2, failures: 0, error: 0 }],
 		['owner_first', { phase: 'owner_first', native_keys_delta: 2, foreign_seen: 2, failures: 0 }],
+		[
+			'ledger_altgr',
+			{
+				phase: 'ledger_altgr',
+				hidden_while_held: 1,
+				sequence_while_held: 1,
+				physical_while_held: 0,
+				flags_after: 0
+			}
+		],
+		[
+			'ledger_shift',
+			{
+				phase: 'ledger_shift',
+				hidden_while_held: 1,
+				sequence_while_held: 2,
+				physical_while_held: 0,
+				flags_after: 0
+			}
+		],
 		['stop', { phase: 'stop', status: 0 }]
 	]);
 	checkPhases(good);
@@ -109,6 +140,11 @@ function checkNegativeControls() {
 	assert.throws(() => checkPhases(mutate('burst', 'reinstalls_delta', 1)), /settle reinstall/);
 	assert.throws(() => checkPhases(mutate('owner_first', 'native_keys_delta', 0)), /see both edges/);
 	assert.throws(() => checkPhases(mutate('burst', 'failures', 1)), /No reinstall may fail/);
+	assert.throws(
+		() => checkPhases(mutate('ledger_altgr', 'hidden_while_held', 0)),
+		/hold a replayed press/
+	);
+	assert.throws(() => checkPhases(mutate('ledger_shift', 'flags_after', 3)), /end the hold/);
 }
 
 checkNegativeControls();

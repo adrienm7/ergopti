@@ -21,6 +21,7 @@
 #include "nav_event_owner.h"
 #include "editor_replace.h"
 #include "hook_trace.h"
+#include "key_press_ledger.h"
 
 /* A genuine Windows build pins the pure x64/ARM64 wire shape to its own SDK. */
 _Static_assert(sizeof(INPUT) == sizeof(ErgoptiOutput_Win32Input), "SDK INPUT size changed.");
@@ -139,6 +140,8 @@ typedef struct NavState {
 	uint64_t hook_reinstalls;
 	uint64_t hook_reinstall_failures;
 	DWORD hook_failure_error;
+	/* Keys held now, read by ErgoptiNav_QueryKeyPress; see key_press_ledger.h. */
+	ErgoptiLedger key_ledger;
 	HWND wake_window;
 	UINT wake_message;
 	DWORD last_os_error;
@@ -2385,6 +2388,62 @@ static void NavArmHookReassertLocked(NavState *state)
 
 
 
+/**
+ * Feeds the press ledger with one raw hook tuple before its delivery.
+ *
+ * @param state Locked state owning the ledger.
+ * @param message Low-level keyboard message.
+ * @param event The untouched hook tuple: the scan bits above the byte are the
+ *        only mark of a system-generated key such as the fake LCtrl of AltGr.
+ * @param out_physical Receives whether the edge is a hardware one.
+ */
+static void NavLedgerObserveBeforeLocked(
+	NavState *state,
+	WPARAM message,
+	const KBDLLHOOKSTRUCT *event,
+	bool *out_physical)
+{
+	const bool injected = (event->flags & LLKHF_INJECTED) != 0;
+	const ErgoptiLedger_Origin origin = ErgoptiLedger_Classify(
+		event->scanCode,
+		injected,
+		(event->flags & LLKHF_LOWER_IL_INJECTED) != 0,
+		(uint64_t)event->dwExtraInfo == ERGOPTI_NAV_TERMINAL_REPLAY_MARKER);
+	*out_physical = origin == ERGOPTI_LEDGER_ORIGIN_PHYSICAL;
+	ErgoptiLedger_ObserveBefore(
+		&state->key_ledger,
+		(uint16_t)((event->scanCode & 0xFFu)
+			| ((event->flags & LLKHF_EXTENDED) != 0 ? 0x100u : 0u)),
+		message == WM_KEYUP || message == WM_SYSKEYUP,
+		origin);
+}
+
+
+
+/**
+ * Tells the press ledger what the owner did with a hardware edge.
+ *
+ * @param state Locked state owning the ledger.
+ * @param message Low-level keyboard message.
+ * @param event The untouched hook tuple.
+ * @param disposition What the owner did.
+ */
+static void NavLedgerObserveAfterLocked(
+	NavState *state,
+	WPARAM message,
+	const KBDLLHOOKSTRUCT *event,
+	ErgoptiLedger_Disposition disposition)
+{
+	ErgoptiLedger_ObserveAfter(
+		&state->key_ledger,
+		(uint16_t)((event->scanCode & 0xFFu)
+			| ((event->flags & LLKHF_EXTENDED) != 0 ? 0x100u : 0u)),
+		message == WM_KEYUP || message == WM_SYSKEYUP,
+		disposition);
+}
+
+
+
 /** Records actual native hook entries only inside an explicitly owned fixture. */
 static LRESULT CALLBACK NavLowLevelKeyboardProc(
 	int code, WPARAM message, LPARAM data_pointer)
@@ -2396,10 +2455,16 @@ static LRESULT CALLBACK NavLowLevelKeyboardProc(
 	uint64_t owner = 0, token = 0, generation = 0, capture_before = 0;
 	uint32_t decision = ERGOPTI_TRACE_PASS;
 	bool tracing = false;
+	bool physical = false;
 	LRESULT result;
 	if (code == HC_ACTION && data_pointer != 0) {
 		EnterCriticalSection(&g_nav_state.lock);
 		++g_nav_state.hook_keys_seen;
+		NavLedgerObserveBeforeLocked(
+			&g_nav_state,
+			message,
+			(const KBDLLHOOKSTRUCT *)data_pointer,
+			&physical);
 		if (NavHookReassertWanted(
 				((const KBDLLHOOKSTRUCT *)data_pointer)->flags,
 				(uint64_t)((const KBDLLHOOKSTRUCT *)data_pointer)->dwExtraInfo))
@@ -2443,6 +2508,17 @@ static LRESULT CALLBACK NavLowLevelKeyboardProc(
 		}
 	}
 	result = NavLowLevelKeyboardProcCore(code, message, data_pointer, &decision);
+	if (physical) {
+		EnterCriticalSection(&g_nav_state.lock);
+		NavLedgerObserveAfterLocked(
+			&g_nav_state,
+			message,
+			(const KBDLLHOOKSTRUCT *)data_pointer,
+			decision == ERGOPTI_TRACE_CAPTURE ? ERGOPTI_LEDGER_CAPTURED
+				: decision == ERGOPTI_TRACE_NAV_SUPPRESS ? ERGOPTI_LEDGER_CONSUMED
+				: ERGOPTI_LEDGER_PASSED);
+		LeaveCriticalSection(&g_nav_state.lock);
+	}
 	if (tracing) {
 		EnterCriticalSection(&g_nav_state.lock);
 		observed.decision = decision;
@@ -2596,6 +2672,7 @@ static DWORD WINAPI NavHookThreadMain(LPVOID parameter)
 	g_nav_state.hook_reinstalls = 0;
 	g_nav_state.hook_reinstall_failures = 0;
 	g_nav_state.hook_failure_error = 0;
+	ErgoptiLedger_Reset(&g_nav_state.key_ledger);
 	g_nav_state.running = hook != NULL;
 	NavApplyInitialModifierSnapshotLocked(
 		&g_nav_state, initial_modifiers);
@@ -2689,6 +2766,7 @@ static DWORD WINAPI NavHookThreadMain(LPVOID parameter)
 	g_nav_state.hook = NULL;
 	g_nav_state.running = 0;
 	g_nav_state.thread_id = 0;
+	ErgoptiLedger_Reset(&g_nav_state.key_ledger);
 	LeaveCriticalSection(&g_nav_state.lock);
 	return 0;
 }
@@ -4603,7 +4681,39 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetHookOrderStats(
 
 
 
+/** Implements ErgoptiNav_QueryKeyPress. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_QueryKeyPress(
+	uint16_t sc,
+	ErgoptiNav_KeyPress *out_press)
+{
+	uint64_t sequence = 0;
+	uint32_t flags;
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (out_press == NULL || out_press->struct_size != ERGOPTI_NAV_KEY_PRESS_SIZE
+			|| sc > 0x1FFu)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	EnterCriticalSection(&g_nav_state.lock);
+	flags = ErgoptiLedger_Query(
+		&g_nav_state.key_ledger, sc, NavHasTerminalDebtLocked(&g_nav_state), &sequence);
+	out_press->flags = flags;
+	out_press->press_sequence = sequence;
+	out_press->overflowed = g_nav_state.key_ledger.overflowed;
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
 #if defined(ERGOPTI_NAV_TESTING)
+/** Implements the hook-free press ledger reset seam. */
+void ERGOPTI_NAV_CALL ErgoptiNav_TestResetKeyLedger(void)
+{
+	EnterCriticalSection(&g_nav_state.lock);
+	ErgoptiLedger_Reset(&g_nav_state.key_ledger);
+	LeaveCriticalSection(&g_nav_state.lock);
+}
+
 /** Implements the hook-free reassertion rule seam. */
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookReassertWanted(
 	uint32_t flags,
@@ -4821,6 +4931,7 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookFlow(
 	bool mask_required = false;
 	bool emit_menu_mask = false;
 	DWORD mask_error = ERROR_SUCCESS;
+	bool physical = false;
 	if (!NavEnsureInitialized())
 		return ERGOPTI_NAV_STATUS_OS_ERROR;
 	if (event == NULL || out_result == NULL
@@ -4841,7 +4952,8 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookFlow(
 	*out_pass_called = 0;
 	*out_mask_before_pass = 0;
 	native_event.vkCode = event->vk;
-	native_event.scanCode = event->sc & 0xFFu;
+	/* Keep the system-generated scan bit, as the real hook tuple does. */
+	native_event.scanCode = event->sc & 0x2FFu;
 	if ((event->sc & 0x100u) != 0)
 		native_event.flags |= LLKHF_EXTENDED;
 	if (event->injected == ERGOPTI_NAV_INJECTION_STANDARD)
@@ -4853,8 +4965,12 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookFlow(
 
 	EnterCriticalSection(&g_nav_state.lock);
 	native_event.time = g_nav_test_hook_time;
+	NavLedgerObserveBeforeLocked(&g_nav_state, message, &native_event, &physical);
 	if (NavCaptureTerminalEventLocked(
 			&g_nav_state, message, &native_event)) {
+		if (physical)
+			NavLedgerObserveAfterLocked(
+				&g_nav_state, message, &native_event, ERGOPTI_LEDGER_CAPTURED);
 		memset(out_result, 0, sizeof(*out_result));
 		out_result->disposition = ERGOPTI_NAV_DISPOSITION_SUPPRESS;
 		LeaveCriticalSection(&g_nav_state.lock);
@@ -4907,6 +5023,11 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookFlow(
 		if (out_result->disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS)
 			NavArmMenuGuardLocked(&g_nav_state);
 	}
+	if (physical)
+		NavLedgerObserveAfterLocked(
+			&g_nav_state, message, &native_event,
+			out_result->disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS
+				? ERGOPTI_LEDGER_CONSUMED : ERGOPTI_LEDGER_PASSED);
 	LeaveCriticalSection(&g_nav_state.lock);
 	(void)NavDeliverHookDecision(
 		out_result,

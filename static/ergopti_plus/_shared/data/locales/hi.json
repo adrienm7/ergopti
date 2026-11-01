@@ -1411,7 +1411,7 @@
 	"menu.debug.hook_probe": "कीबोर्ड हुक का क्रम दर्ज करें",
 	"menu.debug.composer_check": "बनाए गए लेआउट का परीक्षण करें",
 	"platform_reason.action_apple_shortcuts_are_macos": "केवल macOS: Apple शॉर्टकट केवल macOS पर मौजूद हैं। अन्य सिस्टम पर इसके बजाय कोई कमांड या प्रोग्राम चलाएँ।",
-	"platform_reason.action_windows_runs_shell_through_run_program": "Windows पर “प्रोग्राम चलाएँ” यही करता है: कमांड को आर्ग्युमेंट के रूप में लेकर cmd.exe या powershell.exe, या खोलने वाली फ़ाइल या फ़ोल्डर के साथ explorer.exe।",
+	"platform_reason.action_windows_runs_shell_through_run_program": "Windows पर “प्रोग्राम चलाएँ” यही करता है: कमांड को आर्ग्युमेंट के रूप में लेकर cmd.exe, या खोलने वाली फ़ाइल या फ़ोल्डर के साथ explorer.exe।",
 	"platform_reason.input_probe_is_autohotkey_specific": "ये जाँचें AutoHotkey के SendInput और उसके कीबोर्ड हुक को मापती हैं, जो केवल Windows ड्राइवर में हैं।",
 	"input_probe.title": "इनपुट जाँच",
 	"input_probe.confirm": "यह जाँच एक छोटी विंडो खोलकर लगभग {1} सेकंड उसमें टाइप करती है। इस बीच कहीं और न टाइप करें और न क्लिक करें। जारी रखें?",

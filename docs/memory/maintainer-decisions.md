@@ -110,6 +110,42 @@ being run, and the published registry would hide a local edit. The decision is
 shared (`Catalogue.registry_source` and `registry_changes_args` in
 `_shared/lua/layouts/catalogue.lua`); the Windows port is in the PC handoff.
 
+## Decisions moved out of TODO by its 2026-10-31 shrink
+
+- **Every web-view page has a toggle action (2026-10-27).** Ten actions of the
+  shared catalogue (`_shared/modules/actions/actions.toml`, group "UI"):
+  `open_metrics_typing`, `open_metrics_apps`, `open_hotstrings_editor`,
+  `open_paths_editor`, `open_hotstrings_settings`, `open_layout_manager`,
+  `open_layer_editor`, `open_model_browser`, `open_changelog`,
+  `open_healthcheck`. Closed or hidden: open and focus; covered by another
+  window: bring to front, never close; frontmost: close through the page's own
+  close. Owners: macOS `ui/window_toggle.lua`, Linux `ui/webview_manager.lua`
+  `toggle()`, Windows `GestureToggleOrFocusUI`. Not toggles, on purpose:
+  onboarding (a shortcut would abandon a half-finished setup), the download
+  window (owned by a running download), the release notes (a pane) and the
+  contextual dialogs. A model-browser rework keeps macOS `ui/model_browser`
+  `window()`/`close()` and the `set_opener("model_browser", …)` line of
+  `menu_llm/models_selector.lua`.
+- **Windows app categories follow macOS and Linux with no migration
+  (2026-10-30).** The shared TOML writer is the reference, the installed-record
+  corpus follows Lua, and `metrics\app_categories.json` is no longer read.
+- **Cloud providers not added (2026-10-30)**, reasons in their commits: GitHub
+  Models, Lambda, 01.AI, Aleph Alpha, Liquid AI, Writer, Tencent Hunyuan,
+  BytePlus ModelArk, Cloudflare AI Gateway.
+- **Local servers left out of `local_servers.json`**: AnythingLLM always needs a
+  key and takes a workspace slug as the model; Msty documents no port or
+  dialect. Foundry Local (Windows) and `mlx_lm.server` (macOS) belong to those
+  drivers, not to the shared list.
+- **The layout row switches stay Windows-only.** `layout.emulate_*_row` mixes
+  Ergopti rows with the OS layout, which has no `.keylayout` source on macOS or
+  Linux; an Ergopti bundle source types digits on both levels, so its rows stay
+  greyed on macOS. The number-row options work everywhere by rebuilding the one
+  generated `.keylayout` (`docs/design/layout-option-emulation.md`).
+- **Forced number-row output is not owed by a hook (item 107).** macOS and Linux
+  apply the number-row ordering and edge keys by rebuilding the layout, so the
+  Linux hook's input+XI2+writer join is deliberately unreachable
+  (`docs/design/linux-number-row-runtime.md`).
+
 ## Earlier decisions (moved from TODO, 2026-10-31)
 
 - **Delta updates (item 22)**: withdrawn by the maintainer; full signed downloads stay below 20 MB.

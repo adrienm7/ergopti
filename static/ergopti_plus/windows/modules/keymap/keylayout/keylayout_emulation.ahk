@@ -786,7 +786,7 @@ _KLE_OnKey(Sc, Shift, *) {
 }
 
 _KLE_OnAltGr(Sc, *) {
-	_KLE_Emit(Sc, GetKeyState("Shift", "P"), true)
+	_KLE_Emit(Sc, KS_ShiftIsHeld(), true)
 }
 
 _KLE_OnShortcut(Sc, Mods, *) {

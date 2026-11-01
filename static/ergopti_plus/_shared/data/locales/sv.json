@@ -1411,7 +1411,7 @@
 	"menu.debug.hook_probe": "Spela in ordningen på tangentbordshookar",
 	"menu.debug.composer_check": "Testa den sammansatta layouten",
 	"platform_reason.action_apple_shortcuts_are_macos": "Endast macOS: Apple Genvägar finns bara på macOS. Kör i stället ett kommando eller ett program på andra system.",
-	"platform_reason.action_windows_runs_shell_through_run_program": "På Windows gör ”Kör ett program” samma sak: cmd.exe eller powershell.exe med kommandot som argument, eller explorer.exe med filen eller mappen som ska öppnas.",
+	"platform_reason.action_windows_runs_shell_through_run_program": "På Windows gör ”Kör ett program” samma sak: cmd.exe med kommandot som argument, eller explorer.exe med filen eller mappen som ska öppnas.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Dessa kontroller mäter AutoHotkeys SendInput och dess tangentbordshook, som bara Windows-drivrutinen har.",
 	"input_probe.title": "Inmatningskontroll",
 	"input_probe.confirm": "Kontrollen öppnar ett litet fönster och skriver i det i ungefär {1} sekunder. Skriv eller klicka inte någon annanstans under tiden. Fortsätta?",
