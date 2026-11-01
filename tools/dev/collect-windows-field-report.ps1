@@ -617,10 +617,16 @@ try {
 		Get-MpComputerStatus -ErrorAction Stop |
 			Format-List AMRunningMode, AntivirusEnabled, RealTimeProtectionEnabled, AntivirusSignatureVersion
 	}
-	# WinHTTP (the system services' proxy): direct or set, never its address.
+	# WinHTTP (the system services' proxy): direct or set, never its address. Read
+	# from the registry: netsh words its answer in the display language, and a French
+	# Windows read as "set". An absent value is the default, direct; the flags are
+	# the DWORD at offset 8, where only bit 0 means direct.
 	Invoke-Step 'proxy_winhttp' {
-		$Text = (& netsh winhttp show proxy) -join "`n"
-		if ($Text -match '(?i)direct access') { 'WinHTTP: direct' } else { 'WinHTTP: set' }
+		$Key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\Connections'
+		$Settings = Get-ItemProperty -LiteralPath $Key -Name 'WinHttpSettings' -ErrorAction SilentlyContinue
+		$Bytes = if ($Settings) { $Settings.WinHttpSettings } else { $null }
+		if ($Bytes -and $Bytes.Length -lt 12) { throw 'WinHttpSettings is too short to hold its flags.' }
+		if (-not $Bytes -or -not ([BitConverter]::ToUInt32($Bytes, 8) -band 0xFFFFFFFE)) { 'WinHTTP: direct' } else { 'WinHTTP: set' }
 	}
 	Invoke-Step 'runtimes' {
 		foreach ($Name in 'python', 'py', 'node', 'curl', 'ollama') {
