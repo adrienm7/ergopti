@@ -716,6 +716,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/api/test_llm_api_remote_async_registry.ahk
 #Include unit/modules/llm/api/test_llm_api_remote_requests.ahk
 #Include unit/modules/llm/api/test_llm_thinking_off.ahk
+#Include unit/modules/llm/api/test_llm_shared_vectors.ahk
 #Include unit/modules/llm/api/test_llm_model_capabilities.ahk
 #Include unit/platform/network/test_managed_curl_owner.ahk
 #Include unit/platform/network/test_managed_curl_empty_header.ahk
