@@ -653,17 +653,17 @@
 		{
 			"os": "linux",
 			"tool": "python3 ≥ 3.8",
-			"programs": ["python3"],
+			"programs": [],
 			"used_for": "Installs XKB layouts (`linux/modules/keymap/layout_registry.lua:70-73,439-443`; the Arch list names `python`)",
-			"today": "Host",
-			"current_class": "HOST",
+			"today": "Ergopti's own python-build-standalone build of the shared managed Python release (3.11.16, pinned by SHA-256 and size in `_shared/data/linux_native_runtime.json` managed_python), downloaded once on consent into the data folder (`linux/modules/keymap/managed_python.lua`); the host python3 is never run",
+			"current_class": "PIN",
 			"version_needed": "3.8",
-			"if_missing": "Layout install refuses with `python_missing`",
+			"if_missing": "A declined or failed download: the layout install refuses with `python_missing` and says how to retry",
 			"pin_possible": "Yes (python-build-standalone, as macOS)",
 			"decision": "PIN",
 			"decision_text": "PIN the macOS managed Python build",
 			"alternative": "port the installer to Lua",
-			"status": "follow_up"
+			"status": "done"
 		},
 		{
 			"os": "linux",

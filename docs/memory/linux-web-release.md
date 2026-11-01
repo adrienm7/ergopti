@@ -743,6 +743,24 @@ Action: read the catalogue's
 full log (`gh run view <id> --repo AppImage/appimage.github.io --log`) before
 trusting its "first error", which is only the first stderr line.
 
+### project-linux-xkb-installer-runs-on-ergopti-python
+
+The user XKB installer (`ergopti/linux/xkb_installation/user_layout_installer.py`)
+runs on Ergopti's own Python, never the host's python3 (maintainer decision, 1
+November): the python-build-standalone build of the shared managed Python
+release, pinned by SHA-256 and size per machine and C library in
+`_shared/data/linux_native_runtime.json` `managed_python` (the codegen refuses a
+version, build or uv release that differs from
+`_shared/modules/llm/managed_python_release.json`). `modules/keymap/managed_python.lua`
+asks once (owned dialog), downloads through the managed HTTP client, checks size
+and digest, unpacks into `<root>.staging` and renames it into the versioned
+folder under `ConfigPaths.data()/runtime/python/`, so a versioned folder only ever
+holds a verified interpreter. A declined or failed download reports
+`python_missing` with the reason. Action: a new Python consumer asks the layout
+registry's `python` dependency; a probe that is not about Python injects it
+(`run_layout_rows_live.lua`) instead of opening the consent dialog;
+`tests/hardware/run_managed_python_live.lua` is the network proof.
+
 ### project-arch-recipe-repacks-the-release-tarball
 
 `tools/build/PKGBUILD` is a template, not a from-source recipe (maintainer
