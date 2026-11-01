@@ -717,6 +717,16 @@ TRAY_LIBRARIES = frozenset(
 )
 
 
+# Libraries of one owned program that LD_LIBRARY_PATH must not expose. The
+# launchers and the daemon run the recipient's bash through the prefix's
+# environment, and the build host's readline 8.1 shadowed the recipient's:
+# bash 5.3 then died on Arch with "undefined symbol: rl_trim_arg_from_keyseq"
+# before the daemon started. Only sqlite3 links it, so it stays beside the
+# prefix's lib/ and sqlite3 alone reaches it through its RUNPATH.
+SQLITE3_LIBRARY_DIRECTORY = "lib/sqlite3"
+SQLITE3_ONLY_LIBRARIES = frozenset({"libreadline.so.8"})
+
+
 def tray_sources():
     """Resolve the tray libraries from the build host's own dynamic linker."""
     listing = run(["ldconfig", "-p"], env={**os.environ, "LC_ALL": "C"})
@@ -772,7 +782,12 @@ def copy_elf_closure(seeds, library_directory, owners):
         for name, dependency in dependency_paths(run(["ldd", str(source)])):
             if external_glibc(name) or name in recipient:
                 continue
-            copy_unique(dependency, library_directory / name, owners)
+            directory = (
+                library_directory.parent / SQLITE3_LIBRARY_DIRECTORY
+                if name in SQLITE3_ONLY_LIBRARIES
+                else library_directory
+            )
+            copy_unique(dependency, directory / name, owners)
             pending.append(dependency)
 
 
@@ -903,6 +918,15 @@ def stage(appdir, catalogue, template):
             )
         copy_elf_closure(
             [*binaries, *lua_modules, *modules, *digest_sources], prefix / "lib", owners
+        )
+        # inspect_installed() runs sqlite3 -version, which fails without this.
+        run(
+            [
+                "patchelf",
+                "--set-rpath",
+                "$ORIGIN/../" + SQLITE3_LIBRARY_DIRECTORY,
+                str(prefix / "bin/sqlite3"),
+            ]
         )
         # Not through the closure walk: it would stage GTK with them.
         for name, source in sorted(tray_sources().items()):
