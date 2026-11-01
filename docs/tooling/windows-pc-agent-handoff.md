@@ -133,6 +133,12 @@ readable through `archive/2026-10-31/<branch>`. Then:
   Test infrastructure: the AHK no-pinned-source-reads ratchet (24/174 vs
   23/173). Each lane: `npm run test:js -- --feature <lane>`.
 
+- Logger scalar gate on dev a9198f7f: the Vertex AI files landed with
+  free-form reasons, `windows/modules/llm/api_token_exchange.ahk` (22, baseline 0) and `windows/modules/llm/rs256_signer.ahk` (19, baseline 0) in
+  `tools/test/test-logger-scalars-single-source.cjs`. Use closed `reason`
+  values from `_shared/modules/logger/vocabulary.json` (add any missing one
+  there, then `npm run codegen:contracts`) and move the detail to the message.
+
 - Windows AHK lanes, run 41254356788 on dev 264b1ad9 (1 November, 00:16
   UTC), beyond the items already listed in this file (thinking off, the
   `test_local_server_auth.ahk` affinity 24 -> 28 count, the menu caller child):
