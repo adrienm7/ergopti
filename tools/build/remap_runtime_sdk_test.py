@@ -432,8 +432,8 @@ class SDKRouteControls(unittest.TestCase):
             with self.subTest(sdk=sdk):
                 self.report_package_route(sdk=sdk, refuse_source=True)
 
-    QUEUE_BUILD_SHA = "c08681707edf728d3923e514d824c851852f3f8c7dbc92a0b2a4f5d416eeec1a"
-    PREVIOUS_BUILD_SHA = "2c71ce846adf7b9b7081cd84e9e330234ae4a1195b7816257d6f1a61ea77ca56"
+    QUEUE_BUILD_SHA = "38ad920619f61a1fb253306b6b8ffd983065090c51b8578b997ae0171c6fca21"
+    PREVIOUS_BUILD_SHA = "6a5ff73ddd6ebb4b92d0e1d97d3bace56d43af0963267b35f076b4860d21ab91"
 
     def protected_source_fixture(self, root):
         repository = Path(__file__).resolve().parents[2]

@@ -270,6 +270,21 @@ def _report_macho_difference(macho, relative, original, signed, error, deadline)
         )
 
 
+# The production builder executes its own copies of the native backend under
+# these fixed module names, so their NativeBuildError classes are distinct
+# from BASE's; run 41260796161 let one escape as a traceback.
+PRODUCTION_BACKEND_MODULES = ("fixed_owned_product_native_backend", "fixed_live_product_backend")
+
+
+def _production_backend_errors():
+    """Return the NativeBuildError classes of the loaded production backend copies."""
+    return tuple(
+        sys.modules[name].NativeBuildError
+        for name in PRODUCTION_BACKEND_MODULES
+        if name in sys.modules
+    )
+
+
 def _report_refusal_origin(stage, error):
     """Name a refusal's type, code, innermost builder line, deeper origin and message.
 
@@ -1985,7 +2000,7 @@ class _SigningSink(_PreparationSink):
 
 
 PRODUCTION_RELATIVE = "tools/build/owned_runtime_product_build.py"
-PRODUCTION_SHA256 = "a96a9e733fe310bd01bd219e1ab13c9f7757a733865ced680523343e5450573f"
+PRODUCTION_SHA256 = "583de48f023d9f808eb5406c4c1851e7649d8e98df5e213daa2e3ede89b3ec74"
 
 
 @dataclass(frozen=True, slots=True)
@@ -2169,6 +2184,7 @@ class _ProductionSink(_SigningSink):
             BASE.NativeBuildError,
             self.production_module.ProductBuildRefusal,
             OSError,
+            *_production_backend_errors(),
         ) as error:
             _report_refusal_origin("packaging", error)
             self.packaged = ProductionFailure(

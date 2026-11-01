@@ -303,7 +303,9 @@ def compile_commands(repository, work, sdk, lua_headers, *, daemon_report=False)
                 report_objects.append(str(native_report_object))
                 result.append(
                     (
-                        "report_" + stem + "_" + architecture,
+                        # Phase names are lowercase evidence basenames
+                        # (run 41260796161 refused report_CPOSIXCompatibility).
+                        "report_" + stem.lower() + "_" + architecture,
                         [
                             "/usr/bin/xcrun",
                             "clang",

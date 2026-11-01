@@ -517,6 +517,29 @@ class LeafExtractionControls(unittest.TestCase):
         )
 
 
+class ProductionBackendErrorControls(unittest.TestCase):
+    """A production backend copy's refusal is caught as a named refusal."""
+
+    def test_loaded_backend_copies_contribute_their_error_class(self):
+        names = BUILD.PRODUCTION_BACKEND_MODULES
+        source = Path(__file__).resolve().parents[1] / "diagnostics/hs274_native_build.py"
+        copies = {}
+        for name in names:
+            spec = importlib.util.spec_from_file_location(name, source)
+            copies[name] = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(copies[name])
+        with mock.patch.dict(sys.modules, copies):
+            errors = BUILD._production_backend_errors()
+        self.assertEqual(errors, tuple(copies[name].NativeBuildError for name in names))
+        self.assertNotIn(BASE.NativeBuildError, errors)
+
+    def test_no_loaded_copy_contributes_nothing(self):
+        with mock.patch.dict(sys.modules):
+            for name in BUILD.PRODUCTION_BACKEND_MODULES:
+                sys.modules.pop(name, None)
+            self.assertEqual(BUILD._production_backend_errors(), ())
+
+
 class RefusalOriginControls(unittest.TestCase):
     """Signing collapses a dozen checks into one code; the report names the line."""
 
