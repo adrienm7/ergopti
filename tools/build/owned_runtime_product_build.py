@@ -33,6 +33,7 @@ HELPER_SOURCES = (
     SWIFT + "OwnedRuntimeInstallJournal.swift",
     SWIFT + "OwnedRuntimeServiceLifecycleLock.swift",
     SWIFT + "LauncherConstants.swift",
+    # LauncherConstants takes its bundle ids from the generated enum.
     SWIFT + "Identifiers.generated.swift",
 )
 VALIDATOR_SOURCES = (
