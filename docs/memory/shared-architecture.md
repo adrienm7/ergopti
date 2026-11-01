@@ -617,9 +617,12 @@ Windows keys a pair `first_then_second` and stores its two slots in
 `config.toml`: `[shortcuts.key_combination_taps]` (a catalogue action) and
 `[shortcuts.key_combination_holds]` (a hold-picker value). Only the pairs that
 ship a recommendation are manifest features; every other pair is an owned key
-of those sections (`TomlConfigForeignOwner`). Windows has no chord slot:
-macOS's needs the first key to wait for the second, which the Windows tap-hold
-owners, taking their hold at key-down, do not do. The group's two lists, one
+of those sections (`TomlConfigForeignOwner`). The chord slot is
+`[mod_combos.config.<pair>] combo` on all three: a key some chord begins waits
+for the second key, so on Windows its hotkey swallows the press and sends it
+again when no chord comes (`infra/key_combinations.ahk` section 6). AltGr is no
+chord member on Windows, nor LCtrl where AltGr adds a fake one: suppressing
+either kills AltGr. Only a key with a chord assigned ever waits. The group's two lists, one
 per hand of the first key, and the separator between them are declared in the
 manifest for both drivers; a provider returns the pairs only. Each pair also
 reads `key_combination_pair_menu`: the shared declaration owns its clear row,

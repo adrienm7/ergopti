@@ -2041,6 +2041,7 @@
 	"menu.shortcuts.group_accented": "Scorciatoie su é è ê à (se digitate direttamente)",
 	"menu.shortcuts.key_combinations": "Combinazioni di tasti",
 	"menu.shortcuts.key_combinations_chord": "Accordo (simultaneo) → %s",
+	"menu.shortcuts.key_combinations_chord_no_altgr": "Accordo non disponibile: AltGr deve agire subito",
 	"menu.shortcuts.key_combinations_chord_title_prefix": "Accordo (simultaneo) — ",
 	"menu.shortcuts.key_combinations_enable": "Abilita le combinazioni di tasti",
 	"menu.shortcuts.key_combinations_hold_hold": "Tieni 1 + tieni 2 → %s",

@@ -2041,6 +2041,7 @@
 	"menu.shortcuts.group_accented": "é è ê à पर शॉर्टकट (सीधे टाइप होने पर)",
 	"menu.shortcuts.key_combinations": "कुंजी संयोजन",
 	"menu.shortcuts.key_combinations_chord": "कॉर्ड (एक साथ) → %s",
+	"menu.shortcuts.key_combinations_chord_no_altgr": "कॉर्ड उपलब्ध नहीं: AltGr को तुरंत काम करना चाहिए",
 	"menu.shortcuts.key_combinations_chord_title_prefix": "कॉर्ड (एक साथ) — ",
 	"menu.shortcuts.key_combinations_enable": "कुंजी संयोजन सक्षम करें",
 	"menu.shortcuts.key_combinations_hold_hold": "1 दबाए रखें + 2 दबाए रखें → %s",

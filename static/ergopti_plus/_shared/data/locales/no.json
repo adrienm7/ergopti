@@ -2041,6 +2041,7 @@
 	"menu.shortcuts.group_accented": "Snarveier på é è ê à (når de skrives direkte)",
 	"menu.shortcuts.key_combinations": "Tastekombinasjoner",
 	"menu.shortcuts.key_combinations_chord": "Akkord (samtidig) → %s",
+	"menu.shortcuts.key_combinations_chord_no_altgr": "Akkord er ikke tilgjengelig: AltGr må virke med en gang",
 	"menu.shortcuts.key_combinations_chord_title_prefix": "Akkord (samtidig) — ",
 	"menu.shortcuts.key_combinations_enable": "Aktiver tastekombinasjoner",
 	"menu.shortcuts.key_combinations_hold_hold": "Hold 1 nede + hold 2 nede → %s",

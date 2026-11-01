@@ -188,8 +188,8 @@ two disagree in either direction.
 | `shortcuts.key_combination_taps.alt_gr_then_left_alt`         | n/a             | `evdev`, `uinput`                                | —                    |
 | `shortcuts.key_combination_taps.alt_gr_then_caps_lock`        | n/a             | `evdev`, `uinput`                                | —                    |
 | `shortcuts.key_combination_taps.left_alt_then_caps_lock`      | n/a             | `evdev`, `uinput`                                | —                    |
-| `mod_combos.simultaneous_threshold_ms`                        | `karabiner`     | `evdev`, `uinput`                                | n/a                  |
-| `mod_combos.symmetric`                                        | `karabiner`     | `evdev`, `uinput`                                | n/a                  |
+| `mod_combos.simultaneous_threshold_ms`                        | `karabiner`     | `evdev`, `uinput`                                | —                    |
+| `mod_combos.symmetric`                                        | `karabiner`     | `evdev`, `uinput`                                | —                    |
 | `shortcuts.personal.laptop_broken_key`                        | n/a             | n/a                                              | —                    |
 | `shortcuts.personal.mouse_drag_window`                        | n/a             | n/a                                              | —                    |
 | `shortcuts.personal.mouse_tab_switching`                      | n/a             | n/a                                              | —                    |

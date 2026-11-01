@@ -6,7 +6,8 @@
 ; Replays _shared/tests/corpus/tap_hold/key_combination_chords.json against
 ; KeyCombinationChordPolicy, as _shared/lua/test/key_combination_chords_contract.lua
 ; does on macOS and Linux, with the same catalogue and the same refusals.
-; The contract's plan_chord_copy has no Windows owner: Windows stores no third slot.
+; The contract's plan_chord_copy has no Windows owner: the bulk copy is not offered.
+; The engine that uses this policy is test_key_combination_chord_engine.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

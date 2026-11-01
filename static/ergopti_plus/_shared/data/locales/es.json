@@ -2041,6 +2041,7 @@
 	"menu.shortcuts.group_accented": "Atajos en é è ê à (con acceso directo)",
 	"menu.shortcuts.key_combinations": "Combinaciones de teclas",
 	"menu.shortcuts.key_combinations_chord": "Acorde (simultáneo) → %s",
+	"menu.shortcuts.key_combinations_chord_no_altgr": "Acorde no disponible: AltGr debe actuar al instante",
 	"menu.shortcuts.key_combinations_chord_title_prefix": "Acorde (simultáneo) — ",
 	"menu.shortcuts.key_combinations_enable": "Activar las combinaciones de teclas",
 	"menu.shortcuts.key_combinations_hold_hold": "Mantener 1 + mantener 2 → %s",

@@ -599,9 +599,10 @@ _KCT_MenuListsEveryOrderedPair() {
 		AssertTrue(Groups["left_alt"]["checked"], "a first key with a pair is ticked")
 		AssertFalse(Groups["caps_lock"]["checked"])
 		; The menu a pair opens is the manifest's: its clear row, a separator,
-		; then the two slots this provider supplies.
+		; then the three slots this provider supplies.
 		Slots := KeyCombinationSlotRows("left_alt_then_caps_lock", "LAlt + CapsLock")
-		AssertEqual(2, Slots.Length, "a pair has a tap slot and a hold slot")
+		AssertEqual(3, Slots.Length, "a pair has a tap slot, a hold slot and a chord slot")
+		Assert(HasMethod(Slots[3].Get("action", 0), "Call"), "the chord slot opens the action picker")
 		Assert(HasMethod(Slots[1]["action"], "Call"), "the tap slot opens the action picker")
 		Assert(InStr(Slots[1]["label"], GestureActionDisplayLabel("caps_word")) > 0, "and names its action")
 		Assert(!Slots[2].Has("items") && HasMethod(Slots[2].Get("action", 0), "Call"),
@@ -612,8 +613,8 @@ _KCT_MenuListsEveryOrderedPair() {
 		AssertEqual(1, Shown.Length, "the pair's menu is built from the manifest and handed over to be shown")
 		AssertTrue(_KeyCombinationPairMenu == Shown[1],
 			"the shown pair menu stays referenced after the call returns, so its click still finds its item")
-		try AssertEqual(4, DllCall("GetMenuItemCount", "ptr", Shown[1].Handle, "int"),
-			"the clear row, the separator, the tap slot and the hold slot")
+		try AssertEqual(5, DllCall("GetMenuItemCount", "ptr", Shown[1].Handle, "int"),
+			"the clear row, the separator, and the tap, hold and chord slots")
 		finally Shown[1].Delete()
 		Opened := []
 		Capture(Title, Current, OnConfirm, ShowNative, BindingId, Slot) {

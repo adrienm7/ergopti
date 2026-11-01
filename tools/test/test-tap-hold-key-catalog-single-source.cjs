@@ -567,12 +567,16 @@ function simultaneousLinuxAdmission(
 	);
 	return (
 		rows.length === 3 &&
-		rows.every((item) => item.platforms?.join(',') === 'hs,linux') &&
-		delay?.platforms?.join(',') === 'hs,linux' &&
+		rows.every(
+			(item) =>
+				item.platforms?.join(',') ===
+				(item.id === 'copy_tap_to_combo' ? 'hs,linux' : 'ahk,hs,linux')
+		) &&
+		delay?.platforms?.join(',') === 'ahk,hs,linux' &&
 		delay.type === 'number' &&
 		delay.default === 100 &&
 		delay.recommended === 100 &&
-		symmetric?.platforms?.join(',') === 'hs,linux' &&
+		symmetric?.platforms?.join(',') === 'ahk,hs,linux' &&
 		symmetric.type === 'boolean' &&
 		symmetric.default === false &&
 		symmetric.recommended === false &&

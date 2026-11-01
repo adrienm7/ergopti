@@ -2041,6 +2041,7 @@
 	"menu.shortcuts.group_accented": "é è ê à 快捷键（可直接输入时）",
 	"menu.shortcuts.key_combinations": "组合键",
 	"menu.shortcuts.key_combinations_chord": "和弦（同时按下）→ %s",
+	"menu.shortcuts.key_combinations_chord_no_altgr": "和弦不可用：AltGr 必须立即生效",
 	"menu.shortcuts.key_combinations_chord_title_prefix": "和弦（同时按下） — ",
 	"menu.shortcuts.key_combinations_enable": "启用组合键",
 	"menu.shortcuts.key_combinations_hold_hold": "按住 1 + 按住 2 → %s",

@@ -341,6 +341,10 @@ TomlConfigForeignOwner(SectionPath, Key) {
 	if ((SectionPath == "shortcuts.key_combination_taps" || SectionPath == "shortcuts.key_combination_holds")
 			&& RegExMatch(Key, "^(?:" . TomlConfigKeyCombinationKeys() . ")_then_(?:" . TomlConfigKeyCombinationKeys() . ")$"))
 		return "KeyCombinations"
+	; The chord slot of a pair lives in its own table, as macOS and Linux keep it.
+	if (Key == "combo" && RegExMatch(SectionPath, "^mod_combos\.config\.(?:" . TomlConfigKeyCombinationKeys()
+			. ")_then_(?:" . TomlConfigKeyCombinationKeys() . ")$"))
+		return "KeyCombinations"
 	return ""
 }
 
