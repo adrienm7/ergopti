@@ -133,6 +133,15 @@ readable through `archive/2026-10-31/<branch>`. Then:
   Test infrastructure: the AHK no-pinned-source-reads ratchet (24/174 vs
   23/173). Each lane: `npm run test:js -- --feature <lane>`.
 
+- Dev 3852b250 (1 November, 02:30 UTC), from the latest PC pushes:
+  `tools/test/test-config-key-literals.cjs` now counts 18 hand-typed config
+  keys in `windows/infra/key_combinations.ahk` (0 allowed) and 25 in
+  `windows/ui/menu/menu_shortcuts.ahk` (22 allowed): use the generated
+  `ConfigKey`/`ConfigLeaf` constants. `tools/test/test-duplicate-constant-names.cjs`:
+  `WINDOW_MS` gained a copy in `windows/infra/hotpath_profiler.ahk`, and its
+  copies (`shell_runner.ahk`, `hotpath_profiler.ahk`, `wpm_display.ahk`) now
+  hold different values; give each concept its own name or one home.
+
 - Run 41261068581 on dev a149b129 (1 November, 01:40 UTC), new since the
   entries below: `tools/test/test-no-hardcoded-ui-strings.cjs` refuses the
   literal "curl" passed to `Ui_MsgBox` in `windows/adapters/http_client.ahk`
