@@ -693,13 +693,15 @@ every package carries) in an `ubuntu:22.04` container, and
 C++ runtime and libgcc are left to the recipient: the tray loads the host GTK
 into the daemon, and an older bundled GLib shadowing it through
 `LD_LIBRARY_PATH` breaks every host library built against GLib >= 2.80. The
-bundled lib directory still reaches child processes through `LD_LIBRARY_PATH`,
-the recipient's `bash` included: a staged library that a host program also links
-replaces the host's. The build host's readline 8.1 killed bash 5.3 on Arch before
-the daemon started (`undefined symbol: rl_trim_arg_from_keyseq`), so a library
-only one owned program needs goes in `SQLITE3_ONLY_LIBRARIES`' `lib/sqlite3`,
-reached by that program's RUNPATH (patchelf, on every host that runs the stager).
-The asset is `ErgoptiPlus-x86_64.AppImage` (the catalogue rejects "linux" in
+launch environment reaches every host program the daemon starts, so it names no
+library directory: `LD_LIBRARY_PATH` put the staged libssl, libcurl, libtinfo and
+readline in front of the host's (readline 8.1 killed bash 5.3 on Arch,
+`undefined symbol: rl_trim_arg_from_keyseq`, before the daemon started). Every
+staged program and library carries its own `$ORIGIN` RUNPATH instead
+(`set_private_runpaths`, patchelf, on every host that runs the stager), which a
+`ffi.load` by soname from LuaJIT searches too. A RUNPATH is not transitive, so a
+file staged after that pass finds nothing. A library only one owned program
+needs goes in `SQLITE3_ONLY_LIBRARIES`' `lib/sqlite3`. The asset is `ErgoptiPlus-x86_64.AppImage` (the catalogue rejects "linux" in
 the name); installed AppImages never self-update, so a rename breaks no updater.
 Action: keep the build in that container until the catalogue's LTS moves, then
 raise `GLIBC_CEILING` and the image together.

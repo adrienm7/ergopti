@@ -255,16 +255,27 @@ const containerBuildBody = container.slice(
 	container.indexOf('container_build() {'),
 	container.indexOf('container_smoke() {')
 );
-// lib/ reaches the recipient's bash through LD_LIBRARY_PATH: the build host's
-// readline there killed bash 5.3 on Arch before the daemon started. sqlite3
-// alone reaches it, by a RUNPATH the build container must be able to write.
+// The prefix's libraries once reached every host program through LD_LIBRARY_PATH:
+// the build host's readline there killed bash 5.3 on Arch before the daemon
+// started. Each staged file now carries a RUNPATH the build container must be
+// able to write, and sqlite3 alone reaches the readline directory.
 assert.match(stager, /SQLITE3_ONLY_LIBRARIES = frozenset\(\{"libreadline\.so\.8"\}\)/);
 assert.match(
 	stager,
-	/"patchelf",\s+"--set-rpath",\s+"\$ORIGIN\/\.\.\/" \+ SQLITE3_LIBRARY_DIRECTORY/,
+	/search = "\$ORIGIN\/\.\.\/" \+ SQLITE3_LIBRARY_DIRECTORY \+ ":" \+ search/,
 	'sqlite3 alone reaches its library directory'
 );
 assert.ok(/\bpatchelf\b/.test(containerBuildBody), 'the build container carries patchelf');
+assert.doesNotMatch(
+	read('tools/build/templates/linux-portable-runtime-env.sh').replace(/^\s*#.*$/gm, ''),
+	/LD_LIBRARY_PATH/,
+	'the launch environment reaches host programs and names no library directory'
+);
+assert.doesNotMatch(
+	read('static/ergopti_plus/linux/install.sh'),
+	/LD_LIBRARY_PATH/,
+	'the installer has no library path of its own to keep from apt, dnf or pkexec'
+);
 const containerSmokeBody = container.slice(
 	container.indexOf('container_smoke() {'),
 	container.indexOf('user_smoke() {')
