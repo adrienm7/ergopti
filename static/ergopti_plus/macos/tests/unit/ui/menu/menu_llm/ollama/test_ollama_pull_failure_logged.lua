@@ -54,6 +54,20 @@ helpers.describe("Ollama pull failure logging", function()
 		end)
 	end)
 
+	-- Field run 2026-11-01: the log kept "OLLAMA_PULL_OUTCOME error_row", the
+	-- worker's closing summary, and lost the class printed just before it.
+	helpers.it("logs the error class and the stage of a managed pull, not its closing outcome (ollama-pull-class-logged)", function()
+		with_fixture({}, function(f)
+			helpers.assert_true(f.manager.pull_model("granite4:350m-h", "granite4:350m-h",
+				function() return true end, function() return true end,
+				{ is_current = function() return true end }))
+			f.pulls[1].on_done(1, "OLLAMA_PULL_STATUS verifying_digest\nOLLAMA_PULL_STATUS writing_manifest\n"
+				.. "OLLAMA_PULL_ERROR manifest\nOLLAMA_PULL_OUTCOME error_row\n", "")
+			local errors = joined_errors(f)
+			helpers.assert_true(errors:find("OLLAMA_PULL_ERROR manifest after writing_manifest", 1, true) ~= nil, errors)
+		end)
+	end)
+
 	helpers.it("logs the exit code and the last printed line of a pull failing after 100%", function()
 		with_fixture({}, function(f)
 			helpers.assert_true(f.manager.pull_model("model-A", "model-A",
