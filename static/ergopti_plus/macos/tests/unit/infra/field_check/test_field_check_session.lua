@@ -36,6 +36,7 @@ local function idle_ports(cpu_used_ms)
 		collect_garbage = function() end,
 		begin_callback_accounting = function() end,
 		end_callback_accounting = function() return {} end,
+		keystats_recovering = function() return false end,
 	}
 end
 
@@ -52,6 +53,16 @@ helpers.describe("field check session: costs and edge cases a program can answer
 		local spinning = Report.new_report("idle_cost")
 		Session.idle_cost(idle_ports(Session.IDLE_WINDOW_SECONDS * 1000 * 0.2), spinning, function() end)
 		helpers.assert_eq(steps_of(spinning).idle_cpu_percent.state, Report.STATE_FAIL)
+	end)
+
+	helpers.it("names a running keystats rebuild without excusing the share (idle-keystats-recovery)", function()
+		local ports = idle_ports(Session.IDLE_WINDOW_SECONDS * 1000 * 0.2)
+		ports.keystats_recovering = function() return true end
+		local report = Report.new_report("idle_cost")
+		Session.idle_cost(ports, report, function() end)
+		local steps = steps_of(report)
+		helpers.assert_eq(steps.idle_keystats_recovery.value, "running")
+		helpers.assert_eq(steps.idle_cpu_percent.state, Report.STATE_FAIL)
 	end)
 
 	helpers.it("(idle-window-wakers) starts from a collected heap and names the timers that ran", function()

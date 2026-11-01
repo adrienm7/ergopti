@@ -145,6 +145,8 @@ function M.idle_cost(ports, report, finish)
 			Logger.evidence(LOG, "Idle window: %.0f ms of CPU over %.0f ms (%.2f %%).", cpu_used, wall, share)
 			report.step("idle_cpu_percent", share <= M.IDLE_CPU_PERCENT_MAX and PASS or FAIL,
 				string.format("%.2f", share))
+			-- Names the one legitimate owner of a bad figure; the verdict stands.
+			report.step("idle_keystats_recovery", INFO, ports.keystats_recovering() and "running" or "none")
 			local timer_ms, timer_count = 0, 0
 			for index, entry in ipairs(timers) do
 				timer_ms, timer_count = timer_ms + entry.ms, timer_count + entry.count
