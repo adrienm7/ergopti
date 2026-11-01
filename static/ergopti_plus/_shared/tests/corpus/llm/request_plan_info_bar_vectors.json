@@ -3,7 +3,7 @@
 	"drivers": {
 		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
 		"linux": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
-		"windows": "Not ported yet: the AutoHotkey tooltip builds its own info line; it must use the same order (model, backend, short prompt name) and the em dash cut of the label, and replay every vector."
+		"windows": "Replays every vector through LLM_InfoBar_Parts (tests/meta/corpus/test_corpus_llm_request_plan.ahk). The tooltip passes require_model and joins with an em dash, as macOS does."
 	},
 	"differences": {
 		"separator": "macOS joins with an em dash, Linux with a middle dot. Deliberate: each matches its tooltip's typography and existing screenshots; the pieces and their order are shared.",
