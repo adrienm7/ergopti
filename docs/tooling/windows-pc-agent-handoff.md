@@ -133,6 +133,15 @@ readable through `archive/2026-10-31/<branch>`. Then:
   Test infrastructure: the AHK no-pinned-source-reads ratchet (24/174 vs
   23/173). Each lane: `npm run test:js -- --feature <lane>`.
 
+- Run 41261068581 on dev a149b129 (1 November, 01:40 UTC), new since the
+  entries below: `tools/test/test-no-hardcoded-ui-strings.cjs` refuses the
+  literal "curl" passed to `Ui_MsgBox` in `windows/adapters/http_client.ahk`
+  (route it through the i18n catalogue); the Windows core lane fails
+  `test_network_dispatch_nonblocking.ahk:498` ("LLM_RemoteIsReady_Async must
+  construct the tree-owned curl transport"); the AHK pinned-read ratchet is
+  now at 25 files and 175 paths against 23/173; `LocalSameAsGlobal` moved to
+  `key_combinations.ahk:956`.
+
 - Logger scalar gate on dev a9198f7f: the Vertex AI files landed with
   free-form reasons, `windows/modules/llm/api_token_exchange.ahk` (22, baseline 0) and `windows/modules/llm/rs256_signer.ahk` (19, baseline 0) in
   `tools/test/test-logger-scalars-single-source.cjs`. Use closed `reason`
