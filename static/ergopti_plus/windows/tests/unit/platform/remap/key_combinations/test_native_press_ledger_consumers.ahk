@@ -247,7 +247,7 @@ Test("press ledger: the fake LCtrl stays out of the first-key choice (todo91-fir
 ; #HotIf criteria read the ledger on the keystroke path. Resolving an export proves
 ; every issued address again, which made one read cost 48 GetKeyState calls.
 _NPL_KeystrokeReadResolvesNoExport(*) {
-	Source := FileRead(A_ScriptDir . "\..\adapters\llm_nav_event_owner.ahk", "UTF-8")
+	Source := _DriverFileSource("llm_nav_event_owner.ahk")
 	Assert(InStr(Source, "KS_NativeKeyPressPort(LLM_NavEventOwner_KeyPress)") == 0,
 		"the port must not resolve the export at every read")
 	Assert(RegExMatch(Source, "KS_NativeKeyPressPort\(\(Sc\) => LLM_NavEventOwner_KeyPress\(Sc, \w+\)\)") > 0,
