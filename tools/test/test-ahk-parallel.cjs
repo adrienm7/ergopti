@@ -186,4 +186,60 @@ for (const file of [
 	assert.notDeepEqual(exclusiveReasons(source, fixtures), [], file);
 }
 
-console.log('ahk-parallel: ok');
+// The machine lock: a second runner is refused with the holder's name, a waiter
+// gets in when the holder leaves, and a killed holder leaves nothing behind.
+const { spawn } = require('node:child_process');
+const { acquireMachineLock } = require('./ahk-machine-lock.cjs');
+
+async function lockControls() {
+	const name = `ergopti-ahk-parallel-selftest-${process.pid}`;
+	const holder = { pid: 1, checkout: 'D:/one', commit: 'abc', started: 'now', only: 'filter' };
+	const held = await acquireMachineLock(holder, { name });
+	await assert.rejects(
+		acquireMachineLock({ pid: 2 }, { name }),
+		/holds this machine: PID 1 in D:\/one at abc, since now, --only="filter"/
+	);
+	await assert.rejects(
+		acquireMachineLock({ pid: 2 }, { name, waitMinutes: 0.0001, pollMs: 5, log: () => {} }),
+		/Gave up after/
+	);
+	const log = [];
+	const waiter = acquireMachineLock(
+		{ pid: 2 },
+		{ name, waitMinutes: 1, pollMs: 20, log: (line) => log.push(line) }
+	);
+	await new Promise((resolve) => setTimeout(resolve, 100));
+	await new Promise((resolve) => held.close(resolve));
+	const next = await waiter;
+	assert.match(log[0], /Waiting for the machine lock, held by PID 1/);
+	await new Promise((resolve) => next.close(resolve));
+
+	// Only a real process death proves the kernel frees the name. Unix sockets leave
+	// their file behind, and the runner itself is Windows only.
+	if (process.platform === 'win32') {
+		const script = `require(${JSON.stringify(require.resolve('./ahk-machine-lock.cjs'))}).acquireMachineLock({pid:process.pid},{name:${JSON.stringify(name)}}).then(()=>console.log('held'))`;
+		const child = spawn(process.execPath, ['-e', script], {
+			stdio: ['ignore', 'pipe', 'inherit']
+		});
+		await new Promise((resolve) => child.stdout.once('data', resolve));
+		await assert.rejects(acquireMachineLock({ pid: 2 }, { name }), /holds this machine/);
+		const ended = new Promise((resolve) => child.once('close', resolve));
+		child.kill('SIGKILL');
+		await ended;
+		const reclaimed = await acquireMachineLock({ pid: 2 }, { name });
+		await new Promise((resolve) => reclaimed.close(resolve));
+	}
+}
+
+assert.equal(parseArguments(['--wait=5']).waitMinutes, 5);
+assert.equal(parseArguments(['--wait']).waitMinutes, 180);
+assert.equal(parseArguments([]).waitMinutes, 0);
+assert.throws(() => parseArguments(['--wait=soon']), /--wait/);
+
+lockControls().then(
+	() => console.log('ahk-parallel: ok'),
+	(error) => {
+		console.error(error);
+		process.exit(1);
+	}
+);

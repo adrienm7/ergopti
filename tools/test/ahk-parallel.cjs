@@ -21,6 +21,9 @@
  *   npm run test:ahk-parallel -- --fresh           forget the ledger first
  *   npm run test:ahk-parallel -- --rerun-failures  each failure alone, one at a time
  *   npm run test:ahk-parallel -- --report=40       slowest tests of the ledger
+ *   npm run test:ahk-parallel -- --wait=60         queue behind another runner
+ *
+ * One runner holds the machine at a time, across checkouts (ahk-machine-lock.cjs).
  */
 
 const fs = require('node:fs');
@@ -28,6 +31,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
 const { exclusiveTests } = require('./ahk-session-resources.cjs');
+const { acquireMachineLock } = require('./ahk-machine-lock.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const TESTS_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/windows/tests');
@@ -50,6 +54,7 @@ const DEFAULTS = Object.freeze({
 	processCapMinutes: 30,
 	maxEmptyProcesses: 8,
 	reportRows: 30,
+	lockWaitMinutes: 180,
 	planTimeoutMs: 300000
 });
 
@@ -236,6 +241,7 @@ function parseArguments(argv) {
 		rerunFailures: false,
 		report: 0,
 		acceptStale: false,
+		waitMinutes: 0,
 		...DEFAULTS
 	};
 	for (const argument of argv) {
@@ -247,6 +253,8 @@ function parseArguments(argv) {
 		else if (flag === '--fresh') options.fresh = true;
 		else if (flag === '--accept-stale') options.acceptStale = true;
 		else if (flag === '--rerun-failures') options.rerunFailures = true;
+		else if (flag === '--wait')
+			options.waitMinutes = value === undefined ? DEFAULTS.lockWaitMinutes : Number(value);
 		else if (flag === '--report')
 			options.report = value === undefined ? DEFAULTS.reportRows : Number(value);
 		else throw new Error(`Unknown option: ${argument}`);
@@ -255,6 +263,8 @@ function parseArguments(argv) {
 		if (!Number.isInteger(options[name]) || options[name] < 1)
 			throw new Error(`--${name} needs a positive integer.`);
 	}
+	if (!Number.isFinite(options.waitMinutes) || options.waitMinutes < 0)
+		throw new Error('--wait needs a number of minutes.');
 	if (options.fresh && options.rerunFailures)
 		throw new Error('--fresh forgets the failures --rerun-failures would rerun.');
 	return options;
@@ -407,8 +417,19 @@ async function main() {
 		throw new Error(
 			'The AHK suite needs native Windows; macOS and Linux run their own Lua suites.'
 		);
-	fs.mkdirSync(options.runDir, { recursive: true });
 	const commit = headCommit();
+	// Held before the dry run: the plan is an AHK process too. The lock ends with this process.
+	await acquireMachineLock(
+		{
+			pid: process.pid,
+			checkout: REPO_ROOT,
+			commit,
+			started: new Date().toISOString(),
+			only: options.only
+		},
+		{ waitMinutes: options.waitMinutes }
+	);
+	fs.mkdirSync(options.runDir, { recursive: true });
 	const prior = options.fresh ? null : readLedger(ledgerFile);
 	if (prior && prior.commit !== commit && !options.acceptStale) {
 		throw new Error(
