@@ -4,7 +4,8 @@
 # managed Python, for the App Cloner helpers and the launchers it writes. Each
 # wheel is downloaded with its pinned size and SHA-256 before uv installs it
 # offline, without dependencies; the import check then proves the closed set.
-# Prints `PYOBJC_READY<TAB><interpreter>` on success; any refusal exits non-zero
+# Prints `PYOBJC_READY<TAB><stable link>` on success (app-cloner/python3, a
+# versionless link to the managed interpreter); any refusal exits non-zero
 # with the stage named on stderr. Never touches /usr/bin/python3.
 
 set -eu
@@ -91,4 +92,17 @@ bootstrap_stage import_check
 for module in sys.argv[1:]:
     importlib.import_module(module)' "${modules[@]}"
 
-printf 'PYOBJC_READY\t%s\n' "$interpreter"
+bootstrap_stage stable_link
+# The launchers App Cloner writes exec this versionless link, so a clone keeps
+# working when a later managed Python replaces the versioned interpreter: the
+# next run of this installer points the link at the new one. It is replaced
+# atomically and only ever names an interpreter under the private prefix.
+case "$interpreter" in "$ROOT/python/"*) ;; *) exit 78 ;; esac
+link_dir="$ROOT/app-cloner"
+mkdir -p "$link_dir"
+[ ! -L "$link_dir" ] && [ -d "$link_dir" ] || exit 78
+ln -s "$interpreter" "$link_dir/.python3.$$"
+mv -f "$link_dir/.python3.$$" "$link_dir/python3"
+[ "$(readlink "$link_dir/python3")" = "$interpreter" ] || exit 78
+
+printf 'PYOBJC_READY\t%s\n' "$link_dir/python3"

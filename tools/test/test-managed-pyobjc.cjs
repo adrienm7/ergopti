@@ -137,7 +137,9 @@ function fixture({
 			'native_bootstrap_python() {',
 			'\tmkdir -p "$1/bin"',
 			`\tcp "${path.join(dir, 'fake-uv')}" "$1/bin/uv"`,
-			`\texport ERGOPTI_BOOTSTRAP_PYTHON="${INTERPRETER}"`,
+			'\tmkdir -p "$1/python/bin"',
+			`\tln -sf "${INTERPRETER}" "$1/python/bin/python3"`,
+			'\texport ERGOPTI_BOOTSTRAP_PYTHON="$1/python/bin/python3"',
 			'}',
 			''
 		].join('\n')
@@ -183,7 +185,11 @@ check('verified wheels are installed offline without dependencies, then imported
 	const fix = fixture();
 	const result = run(fix);
 	assert.equal(result.status, 0, result.stderr);
-	assert.equal(result.stdout, `PYOBJC_READY\t${INTERPRETER}\n`);
+	const prefix = path.join(fix.home, 'Library/Application Support/Ergopti/native-bootstrap');
+	const managed = path.join(prefix, 'python/bin/python3');
+	const link = path.join(prefix, 'app-cloner/python3');
+	assert.equal(result.stdout, `PYOBJC_READY\t${link}\n`, 'the stable link is what clones exec');
+	assert.equal(fs.readlinkSync(link), managed, 'the link names the managed interpreter');
 	const args = fs.readFileSync(fix.log, 'utf8').trim().split('\n');
 	assert.deepEqual(args.slice(0, 2), ['pip', 'install']);
 	for (const flag of [
@@ -194,7 +200,7 @@ check('verified wheels are installed offline without dependencies, then imported
 		'--no-config'
 	])
 		assert(args.includes(flag), `uv runs with ${flag}`);
-	assert.equal(args[args.indexOf('--python') + 1], INTERPRETER);
+	assert.equal(args[args.indexOf('--python') + 1], managed);
 	assert.deepEqual(
 		args.filter((arg) => arg.endsWith('.whl')).map((arg) => path.basename(arg)),
 		fix.wheels.map((wheel) => wheel.file_name)
@@ -203,6 +209,27 @@ check('verified wheels are installed offline without dependencies, then imported
 		fs.readdirSync(fix.dir).filter((name) => name.startsWith('ergopti-pyobjc.')),
 		[],
 		'the download folder is removed'
+	);
+});
+
+check('a later run points the stable link at the interpreter it installed into', () => {
+	const fix = fixture();
+	const prefix = path.join(fix.home, 'Library/Application Support/Ergopti/native-bootstrap');
+	fs.mkdirSync(path.join(prefix, 'app-cloner'), { recursive: true });
+	fs.symlinkSync(
+		'/nonexistent/cpython-3.11.15/bin/python3.11',
+		path.join(prefix, 'app-cloner/python3')
+	);
+	const result = run(fix);
+	assert.equal(result.status, 0, result.stderr);
+	assert.equal(
+		fs.readlinkSync(path.join(prefix, 'app-cloner/python3')),
+		path.join(prefix, 'python/bin/python3')
+	);
+	assert.deepEqual(
+		fs.readdirSync(path.join(prefix, 'app-cloner')),
+		['python3'],
+		'no temporary link is left'
 	);
 });
 
