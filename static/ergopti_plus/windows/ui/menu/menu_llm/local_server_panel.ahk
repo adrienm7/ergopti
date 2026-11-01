@@ -139,7 +139,7 @@ LLM_Menu_LocalServersPrepareShutdown() {
 
 class LLM_LocalServerPanel {
 	__New(Options := unset) {
-		global LLM_LOCAL_API_SERVERS, LLM_API_PROVIDER_ORDER, LLM_LOCAL_SERVER_DISCOVERY
+		global LLM_LOCAL_API_SERVERS, LLM_API_PROVIDER_ORDER, LLM_LOCAL_SERVER_DISCOVERY, LLM_LOCAL_SERVER_IDENTITIES
 		if !(LLM_LOCAL_API_SERVERS is Map) || LLM_LOCAL_API_SERVERS.Count == 0
 				|| !(LLM_API_PROVIDER_ORDER is Array)
 			throw Error("The local AI server catalogue is unavailable.")
@@ -196,6 +196,7 @@ class LLM_LocalServerPanel {
 		; probe; its configured or listening port before the catalogue default)
 		Ports["scan_ports"] := ObjBindMethod(this.Options.Get("port_scan", LocalServerPortScan()), "Scan")
 		Ports["discovery"] := LLM_LOCAL_SERVER_DISCOVERY
+		Ports["identities"] := LLM_LOCAL_SERVER_IDENTITIES
 		if !(this.Models is LocalServerModelsOwner)
 			throw TypeError("Local server panel requires the owned native models transport.")
 		this.Native := this.Options.Get("native_owner", 0)
@@ -563,11 +564,11 @@ class LLM_LocalServerPanel {
 		Verdict := this.Native.Result(Id)
 		if !(Verdict is Map) || !this._ReportCurrent(Stamp)
 			return false
-		Server := this.Servers[Id]
+		Label := LocalServerMenuLabelOf(this.Servers, Id, Verdict)
 		if Verdict["status"] == "up"
 			Body := this._Format("llm.local_servers.found_body", Verdict["models"].Length)
 		else if Verdict["status"] == "needs_key"
-			Body := this._Format("menu.llm.local_servers.needs_key", Server["label"])
+			Body := this._Format("menu.llm.local_servers.needs_key", Label)
 		else
 			Body := this._Format("menu.llm.local_servers.none", LocalServerMenuHost(Verdict["base_url"]))
 		if !(Body is String)
@@ -582,11 +583,11 @@ class LLM_LocalServerPanel {
 			; Production publication is the bounded native effect. Observer ports
 			; run outside Critical and only observe current-at-claim authority.
 			if !this.Options.Has("notify") {
-				TrayTip(Body, Server["label"], Icon)
+				TrayTip(Body, Label, Icon)
 				return true
 			}
 		} finally Critical(ClaimCritical)
-		this.Options["notify"].Call(Body, Server["label"], Icon)
+		this.Options["notify"].Call(Body, Label, Icon)
 		return true
 	}
 
