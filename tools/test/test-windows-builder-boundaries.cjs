@@ -38,8 +38,16 @@ const navOwner = fs.readFileSync(path.join(BUILD_DIR, 'build_windows_nav_owner.p
 const schemaGuard = navOwner.match(/^\s*if \((.*schema_version.*)\) \{$/m);
 assert.ok(schemaGuard, 'the provenance schema guard must exist');
 
-if (process.platform === 'win32') {
-	const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-builder-boundary-'));
+// Windows PowerShell 5.1 parses a JSON integer as [int] and PowerShell 7, which
+// the hosted runners use, as [long]: the guard runs on both, and the explicit
+// [long] case reproduces the runners' parse on a host that only has 5.1. The
+// host toolchain gate guarantees pwsh off Windows.
+const POWERSHELL_HOSTS = process.platform === 'win32' ? ['powershell.exe', 'pwsh'] : ['pwsh'];
+
+{
+	const scratch = fs.realpathSync(
+		fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-builder-boundary-'))
+	);
 	try {
 		const bracketed = path.join(scratch, 'check[1]out');
 		fs.mkdirSync(bracketed);
@@ -52,21 +60,40 @@ $buildDir = '${quoted}'
 Push-Location -LiteralPath $buildDir
 try { if ((Get-Location).ProviderPath -cne $buildDir) { throw 'Wrong directory' } } finally { Pop-Location }
 $SchemaVersion = 1
-foreach ($case in @(@{ Json = '{"schema_version":1}'; Refused = $false }, @{ Json = '{"schema_version":"1"}'; Refused = $true })) {
- $manifest = $case.Json | ConvertFrom-Json
+$cases = @(
+ @{ Manifest = '{"schema_version":1}' | ConvertFrom-Json; Refused = $false },
+ @{ Manifest = [pscustomobject]@{ schema_version = [int]1 }; Refused = $false },
+ @{ Manifest = [pscustomobject]@{ schema_version = [long]1 }; Refused = $false },
+ @{ Manifest = '{"schema_version":"1"}' | ConvertFrom-Json; Refused = $true },
+ @{ Manifest = '{"schema_version":2}' | ConvertFrom-Json; Refused = $true },
+ @{ Manifest = '{"schema_version":1.0}' | ConvertFrom-Json; Refused = $true }
+)
+foreach ($case in $cases) {
+ $manifest = $case.Manifest
  $refused = [bool](${schemaGuard[1]})
- if ($refused -ne $case.Refused) { throw "Schema guard disagrees on $($case.Json)" }
+ if ($refused -ne $case.Refused) { throw "Schema guard disagrees on $($manifest | ConvertTo-Json -Compress)" }
 }
 Write-Output '[OK] literal builder paths and strict schema kind'
 `
 		);
-		const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', script], {
-			encoding: 'utf8',
-			timeout: 30000,
-			windowsHide: true
-		});
-		assert.equal(result.status, 0, result.stderr || result.error?.message || result.stdout);
-		assert.match(result.stdout, /\[OK\]/);
+		let ran = 0;
+		for (const host of POWERSHELL_HOSTS) {
+			const result = spawnSync(host, ['-NoProfile', '-NonInteractive', '-File', script], {
+				encoding: 'utf8',
+				timeout: 30000,
+				windowsHide: true
+			});
+			if (host === 'pwsh' && process.platform === 'win32' && result.error?.code === 'ENOENT')
+				continue;
+			ran += 1;
+			assert.equal(
+				result.status,
+				0,
+				`${host}: ${result.stderr || result.error?.message || result.stdout}`
+			);
+			assert.match(result.stdout, /\[OK\]/);
+		}
+		assert.ok(ran >= 1, 'the schema guard must run on at least one PowerShell host');
 	} finally {
 		fs.rmSync(scratch, { recursive: true, force: true });
 	}
