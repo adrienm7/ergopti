@@ -1,0 +1,6 @@
+# _shared/tests/corpus/config_migrations/oldest_version_keeps_no_stamp/case.toml
+
+[case]
+description = "A file with no stamp has no step left once unstamped_version is below oldest_version: it counts as current, untouched."
+drivers = ["ahk", "hs", "linux"]
+outcome = "current"

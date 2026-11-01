@@ -403,19 +403,17 @@ local function register_boot(h, driver)
 			end)
 		end)
 
-		-- The chain was squashed to v2: v1, and a file with no stamp at all (which
-		-- this registry reads as v1), have no path left.
+		-- The chain was squashed to v2: v1 has no path left.
+		local squashed = table.concat({
+			"[registry]", "current_version = 3", "unstamped_version = 1", "oldest_version = 2", "",
+			"[steps.v2_to_v3]", "from = 2", "to = 3", "drivers = [\"ahk\", \"hs\", \"linux\"]",
+			"reason = \"Contract: delete.\"",
+			"ops = [{ op = \"delete\", section = \"gestures\", key = \"space_wrap\" }]", "",
+		}, "\n")
 		for label, older in pairs({
 			["a stamp below the oldest version"] = "[_meta]\nschema_version = 1\n\n[gestures]\nspace_wrap = false\n",
-			["a file with no stamp"] = "# from a build before versioning\n[gestures]\nspace_wrap = false\n",
 		}) do
 			h.it("refuses " .. label .. " in words and leaves it byte for byte", function()
-				local squashed = table.concat({
-					"[registry]", "current_version = 3", "unstamped_version = 1", "oldest_version = 2", "",
-					"[steps.v2_to_v3]", "from = 2", "to = 3", "drivers = [\"ahk\", \"hs\", \"linux\"]",
-					"reason = \"Contract: delete.\"",
-					"ops = [{ op = \"delete\", section = \"gestures\", key = \"space_wrap\" }]", "",
-				}, "\n")
 				with_config(older, function(path)
 					local logger, lines = recording_logger()
 					local result = Engine.run({ path = path, driver = driver,
@@ -438,13 +436,34 @@ local function register_boot(h, driver)
 			end)
 		end
 
+		h.it("treats a file with no stamp as current: no step, no backup, no refusal", function()
+			local handwritten = "# by hand\n[gestures]\nspace_wrap = false\n"
+			with_config(handwritten, function(path)
+				local result = Engine.run({ path = path, driver = driver,
+					registry = registry_from(squashed), stamp = STAMP, logger = (recording_logger()) })
+				h.assert_eq(result.status, "current", tostring(result.detail))
+				h.assert_eq(result.read_only, false)
+				h.assert_eq(read_bytes(path), handwritten, "no step ran and nothing was written")
+				h.assert_nil(read_bytes(Engine.backup_path(path, 3, STAMP)), "nothing is backed up")
+				h.assert_nil(Engine.read_only_notice_key(result), "a working file earns no notice")
+				h.assert_true(TomlWriter.batch_write(path, { { section = "gestures", key = "enabled", value = true } }),
+					"the session can save it")
+				local saved = read_bytes(path)
+				h.assert_true(saved:find("schema_version = 3", 1, true) ~= nil, "the next save stamps it: " .. saved)
+				h.assert_true(saved:find("# by hand", 1, true) ~= nil and saved:find("space_wrap = false", 1, true) ~= nil,
+					"and keeps every other byte: " .. saved)
+			end)
+		end)
+
+		h.it("still refuses a stamped old file while no stamp is current", function()
+			local plan = Engine.plan("[_meta]\nschema_version = 1\n", registry_from(squashed), driver)
+			h.assert_eq(plan.outcome, "unsupported")
+			h.assert_eq(Engine.plan("[gestures]\nenabled = true\n", registry_from(squashed), driver).outcome, "current")
+			h.assert_eq(Engine.plan("[gestures]\nenabled = true\n", registry_from(SCENARIO_REGISTRY), driver).outcome,
+				"migrated", "an unsquashed chain still climbs from no stamp")
+		end)
+
 		h.it("still migrates a file stamped at the oldest version", function()
-			local squashed = table.concat({
-				"[registry]", "current_version = 3", "unstamped_version = 1", "oldest_version = 2", "",
-				"[steps.v2_to_v3]", "from = 2", "to = 3", "drivers = [\"ahk\", \"hs\", \"linux\"]",
-				"reason = \"Contract: delete.\"",
-				"ops = [{ op = \"delete\", section = \"gestures\", key = \"space_wrap\" }]", "",
-			}, "\n")
 			with_config("[_meta]\nschema_version = 2\n\n[gestures]\nspace_wrap = false\n", function(path)
 				local result = Engine.run({ path = path, driver = driver,
 					registry = registry_from(squashed), stamp = STAMP, logger = (recording_logger()) })

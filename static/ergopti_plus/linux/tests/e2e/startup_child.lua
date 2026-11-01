@@ -186,7 +186,7 @@ if SEED and SEED ~= "" then
 	local source = assert(real_open(SEED, "rb"))
 	local content = source:read("*a")
 	source:close()
-	-- Stamped at the oldest version: a file with no version is refused as too old.
+	-- Stamped at the oldest version, so the boot climbs the chain as a release file does.
 	if not content:find("schema_version%s*=") then
 		local registry = assert(real_open(DRIVER .. "/../_shared/core/config_schema/migrations.toml", "rb"))
 		local text = registry:read("*a")

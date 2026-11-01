@@ -48,11 +48,12 @@ At boot, before anything applies or saves the file, each driver classifies it:
   replace the file in one atomic publication that refuses if the file changed
   since it was read;
 - **current**: nothing is written;
-- **below `oldest_version`**: the file is never written, the session is
-  read-only, one ERROR is logged and a notice names the way out (run 1.0.8 once,
-  or move the file aside). The chain starts at `oldest_version`; a file with no
-  stamp reads as `unstamped_version`, below it, so a file older than versioning
-  is refused rather than half migrated;
+- **stamped below `oldest_version`**: the file is never written, the session
+  is read-only, one ERROR is logged and a notice names the way out (run 1.0.8
+  once, or move the file aside). The chain starts at `oldest_version`;
+- **no stamp, once `unstamped_version` is below `oldest_version`**: treated as
+  current, as a hand-written file must keep working. No step runs, no backup is
+  written, the next save stamps it and unknown keys go to the explicit cleanup;
 - **newer**, **invalid** stamp, unreadable or unparsable file, or any failure
   of the above: the file is never written. Every later write to it is refused
   for the session and one ERROR is logged.

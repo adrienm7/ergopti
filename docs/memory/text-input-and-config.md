@@ -400,9 +400,10 @@ a corpus case each named driver replays. Retired keys reported by the explicit
 cleanup remain on disk until that cleanup; boot migrations and ordinary saves
 preserve them (ADR-009's retirement exception). Readers drop the old spelling
 at once. Invalid schema stamps retain strict boot and session-write refusal, and so does
-a file below the registry's `oldest_version` (v12, what 1.0.0 wrote), a file
-with no stamp included: every seeded test or fixture config must carry a stamp.
-A writer stamps only a file it creates; an existing file
+a stamp below the registry's `oldest_version` (v12, what 1.0.0 wrote). A file
+with no stamp is treated as current (maintainer decision 2026-11-01, so a
+hand-written file keeps working): no step runs and the next save stamps it.
+Otherwise a writer stamps only a file it creates; an existing file
 keeps the stamp the boot migration gave it, or its remaining steps are skipped.
 The Windows full save is the one exception: it always writes the current
 version, which is safe only because it runs after the boot migration and never

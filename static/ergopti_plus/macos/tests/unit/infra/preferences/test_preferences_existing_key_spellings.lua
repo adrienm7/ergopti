@@ -45,10 +45,7 @@ end
 local function save_after(source, change)
 	return helpers.with_fresh_modules({ "infra.preferences", "adapters.file_system" }, function()
 		local modules = core_modules()
-		-- A file with no version is refused as too old: the seeds are current ones.
-		local registry = assert(Migrate.load_registry(helpers.shared(Migrate.REGISTRY_PATH)))
-		local disk = source:find("schema_version", 1, true) and source
-			or ("[_meta]\nschema_version = " .. registry.current .. "\n\n" .. source)
+		local disk = source
 		package.loaded["adapters.file_system"] = {
 			read_with_status = function() return disk, "ok" end,
 			write = function() error("the save must keep its source precondition") end,

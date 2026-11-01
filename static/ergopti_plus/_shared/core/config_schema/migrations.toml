@@ -11,7 +11,7 @@
 #   - older file  -> byte-exact backup ``<name>.pre-v<N>-<stamp>.toml``, every
 #                    step from the file's version to ``current_version`` in
 #                    order, stamp last, one atomic publish;
-#   - below ``oldest_version`` (a file with no stamp too, as it reads as v2)
+#   - stamped below ``oldest_version``
 #                 -> the file is never written and the session is read-only
 #                    (ERROR logged, notice shown). v2 to v11 were written by
 #                    pre-releases only and their steps were squashed away on
@@ -20,6 +20,9 @@
 #                    climbs from any older file. Raising it past a schema a
 #                    public release wrote needs a maintainer's decision, and the
 #                    bridge named in ``config.read_only.older_schema``;
+#   - no stamp, once ``unstamped_version`` is below ``oldest_version``
+#                 -> treated as current: no step runs, no backup, and the next
+#                    save stamps it. Unknown keys go to the explicit cleanup;
 #   - current     -> nothing is written;
 #   - newer file  -> the file is never written and the session is read-only
 #                    (ERROR logged), so a downgrade cannot destroy settings a

@@ -14,8 +14,9 @@
  * 1. Registry shape. oldest_version (unstamped_version when absent) and
  *    current_version bound a gap-free chain of steps named v<from>_to_v<to>,
  *    each for a non-empty set of known drivers, each op carrying exactly its
- *    declared fields with bare names. A file below oldest_version, a file
- *    without a stamp included when unstamped_version is lower, is unsupported.
+ *    declared fields with bare names. A stamp below oldest_version is
+ *    unsupported; a file with no stamp, when unstamped_version is lower, has no
+ *    step left and counts as current.
  * 2. Statically idempotent ops. A map_value whose target is also a source
  *    would change a value again on replay, so its from and to sets must be
  *    disjoint; a move into its own subtree is refused likewise.
@@ -677,6 +678,8 @@ function applyOp(model, op, context) {
 function migrate(model, registry, driver, context) {
 	const meta = model.get('_meta');
 	let version = registry.unstamped;
+	if (!(meta && meta.has('schema_version')) && registry.unstamped < registry.oldest)
+		return { outcome: 'current' };
 	if (meta && meta.has('schema_version')) {
 		version = meta.get('schema_version');
 		if (typeof version === 'bigint') version = Number(version);
