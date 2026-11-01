@@ -12,14 +12,7 @@ local helpers = require("tests.helpers")
 
 local function receive(mode)
 	local actual_uv = require("luv")
-	-- The production module, resolved from its name: the feeder is compiled from its own text.
-	local path = assert(package.searchpath("infra.archive_output", package.path))
-	local file = assert(io.open(path, "rb"))
-	local source = assert(file:read("*a")); assert(file:close())
-	local first = assert(source:find("local retained_tar_operations =", 1, true))
-	local last = assert(source:find("--- Constructs only the fixed native registry;", first, true))
-	local compile = loadstring or _G.load
-	local construct = assert(compile(source:sub(first, last - 1) .. "\nreturn new_private_tar_feeder\n", "@actual-ollama-zstd-feeder"))()
+	local construct = require("infra.archive_tar_feeder").new
 	local names = { "luv", "infra.managed_http_deadline", "adapters.owned_process" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local pipe, captured, reads = nil, nil, 0

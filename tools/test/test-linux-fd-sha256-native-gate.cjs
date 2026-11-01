@@ -238,6 +238,7 @@ for (const source of [
 	'static/ergopti_plus/linux/tests/hardware/run_fd_sha256_native.lua',
 	'static/ergopti_plus/linux/infra/fd_sha256.lua',
 	'static/ergopti_plus/linux/infra/archive_output.lua',
+	'static/ergopti_plus/linux/infra/archive_tar_feeder.lua',
 	'static/ergopti_plus/linux/infra/managed_http_deadline.lua',
 	'static/ergopti_plus/linux/infra/native_timer.lua',
 	'static/ergopti_plus/linux/infra/monotonic.lua',
