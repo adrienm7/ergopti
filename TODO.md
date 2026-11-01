@@ -24,9 +24,11 @@ Field run, no person needed (read the next report):
 - [ ] Test models: one complete Ollama and MLX test-model download on a connection that does not count (e8ff7479e1).
 - [ ] Timed reload: `driver_reload` passes and `reload.request_to_boot` is under 4000 ms (b12a654d79, 02c58f8a94,
       c366dd1c5b, c0ba1d98bb, 8121349ee7, e6426e2ec5).
-- [ ] Remap guardian: `field_login_items` `developer_adhoc_reregistered`, no `ErgoptiPlus` codesigning kill in
-      `field_app_health`, `guardian_state` ready with `guardian_wait` under 10 s (2be257c9f5; the repeat-registration
-      fix is in CI).
+- [ ] Remap guardian: `field_login_items` `developer_adhoc_reregistered` on a Mac that holds an earlier build's
+      Background Items record, no `ErgoptiPlus` codesigning kill in `field_app_health`, `guardian_state` ready with
+      `guardian_wait` under 10 s, and the same on an Intel Mac (2be257c9f5). Hosted CI proves the ad hoc installed-app
+      path on Apple silicon: registration, repeat registration (62eb698420), readback (34888894dd) and retirement pass
+      in all five Install-and-launch rows (run 41257389239).
 - [ ] Main-thread holds (ledger L16, L17, L18, L23; 0b679b0b0d, b5c0c0de37, c17aa3e5d7, 71a8b87f65, 236ea82e52,
       933707a1ae, 016ef6adc5, 58f82e9fdc, 6c30779ec3): menu rebuild (`field_menu_build` `menu_layout_slowest`,
       `slow_hold_phase`), preferences save (`slow_preferences_save_stage`, `_forks`), keystats append and ledger read
@@ -83,8 +85,10 @@ Hands needed:
 - [ ] Event taps refused, personal hotstring reload rolled back, MLX POST routes 404 after a repair, screenshot
       without an image: read the named step or `accessibility_trusted` on the next occurrence.
 - [ ] Native ownership contracts with Xcode.app: the launcher XCTest suite, the FSEvents start refusal
-      (`macos/infra/file_watchers.lua`), POSIX filesystem capability and ServiceManagement boundaries (hosted CI is
-      green on Launcher XCTest, Build and Native XCTest for the owned-runtimes Swift).
+      (`macos/infra/file_watchers.lua`), POSIX filesystem capability and ServiceManagement boundaries (hosted CI, run
+      41257389239: Launcher XCTest on macOS 26, Native XCTest on macOS 15 Intel, Build and all five Install-and-launch
+      rows green for the owned-runtimes Swift and the guardian fixes; a local `swift test` run on full Xcode.app
+      remains).
 - [ ] Schema v15 and v20 (PAR-41): an old `config.toml` with parameterised slots keeps every action under its role
       id; a v19 file with `ctrl_g = true` opens the ChatGPT URL on Ctrl+G and loses `ctrl_g`, `false` leaves the
       slot empty; old `[llm.profiles] user_profiles` still show (PAR-40).
@@ -263,10 +267,11 @@ Each closes on a named green hosted or native run, recorded here.
       (962a25a973), AppImage Build and `install-linux` rows (dce846a0bd), the Linux per-step installs (17e80f2882),
       "Qualify the installed managed Ollama route plan" (c0a50b5e41), the Linux private runtime in every package,
       and the run-timing summary (`run-timing.cjs --step-summary`; Flatpak under 5 min).
-- [ ] **macOS lane.** The remap guardian repeat-registration fix; L32 and L42 Swift in the Build stage; the Issue #101
+- [ ] **macOS lane.** L32 and L42 Swift in the Build stage; the Issue #101
       Swift and Go cells; native qualification of the Hotstrings category boot publication and the obsolete-leaf
-      setters; item 31's lane once its runtime build is green. Already green: Launcher XCTest, Build and Native
-      XCTest on the owned-runtimes Swift.
+      setters; item 31's lane once its runtime build is green. Already green (run 41257389239): Launcher XCTest,
+      Native XCTest (Intel), Build and all five Install-and-launch rows, guardian fixes included; macOS Unit,
+      Integration and every E2E cell on run 41261068581.
 - [ ] **Ollama Go cell** (cda1e10c5e) on the final source before a release (passed on run 40021624397).
 - [ ] **36.** macOS Package job: Sparkle install/refusal/retry/relaunch, both Brew positives, full-policy denial, Brew
       archive scenarios; Linux Flatpak/AppImage installation and PAC/session/TLS delivery.
