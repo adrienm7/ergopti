@@ -33,7 +33,9 @@ local function lua_files(root)
 	local command = windows and string.format('cmd /c dir /b /s /a-d "%s"', (root:gsub("/", "\\")))
 		or string.format("find '%s' -type f", root)
 	local files = {}
-	for _, raw in ipairs(CommandLines.read(command)) do
+	local inventory = CommandLines.read(command)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, raw in ipairs(inventory) do
 		local path = raw:gsub("\\", "/")
 		if path:find("%.lua$") and not path:find("/tests/", 1, true) then files[#files + 1] = path end
 	end
