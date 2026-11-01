@@ -631,10 +631,8 @@ helpers.describe("sqlite_writer — encryption is not optional once enabled", fu
 	end
 
 	local function writer_code()
-		local fh = io.open(helpers.driver_root() .. "/modules/keystats/sqlite_writer.lua", "r")
-		helpers.assert_not_nil(fh, "sqlite_writer.lua is missing")
-		local src = fh:read("*a")
-		fh:close()
+		-- modules/keystats/sqlite_writer, selected by a declaration unique to it.
+		local src = assert(helpers.read_driver_unit("local function _check_sqlite3("))
 		return strip_comment_lines(src)
 	end
 

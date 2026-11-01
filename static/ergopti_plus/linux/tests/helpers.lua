@@ -75,6 +75,50 @@ function M.driver_root()
 	return (tests_dir:match("^(.*)[/\\\\]tests$") or tests_dir):gsub("\\\\", "/")
 end
 
+-- Production sources, read once per process: the tree is never mutated by a test.
+local _production_sources = nil
+
+--- Loads (once) every production Lua file under the driver root, tests/ excluded.
+--- @return table bodies
+local function production_sources()
+	if _production_sources then return _production_sources end
+	local paths, detail = require("test.runner_discovery").files(M.driver_root(), function(name)
+		return name:match("%.lua$") ~= nil
+	end, { tests = true })
+	assert(paths, detail)
+	local bodies = {}
+	for _, path in ipairs(paths) do
+		local handle = assert(io.open(path, "rb"))
+		bodies[#bodies + 1] = assert(handle:read("*a"))
+		assert(handle:close())
+	end
+	-- An empty inventory is no evidence: left uncached, the caller's floor refuses it.
+	if #bodies > 0 then _production_sources = bodies end
+	return bodies
+end
+
+--- The ONE production file containing `symbol` (the Linux twin of the macOS
+--- helper of the same name). A source invariant names a declaration unique to
+--- its file, never the file's path, so the module can move or split without
+--- turning the invariant into a path error.
+--- @param symbol string A string unique to the file being asked for.
+--- @return string|nil body, string|nil err Body, or nil plus why.
+function M.read_driver_unit(symbol)
+	if type(symbol) ~= "string" or symbol == "" then
+		return nil, "read_driver_unit() needs a symbol to look for"
+	end
+	local matches = {}
+	for _, body in ipairs(production_sources()) do
+		if body:find(symbol, 1, true) then matches[#matches + 1] = body end
+	end
+	if #matches == 0 then return nil, string.format("no production file contains %q", symbol) end
+	if #matches > 1 then
+		return nil, string.format("%d production files contain %q; name a symbol unique to one file",
+			#matches, symbol)
+	end
+	return matches[1]
+end
+
 --- Returns the tray root's source followed by every section module it binds.
 --- ui/menu/builder.lua binds each section builder from its own
 --- ui/menu/menu_<section>.lua; a test that looks for a builder's code by text
