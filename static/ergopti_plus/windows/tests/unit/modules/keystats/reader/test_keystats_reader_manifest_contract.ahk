@@ -729,7 +729,15 @@ Test("Semantic media history: production additive schema", _KLRMedia_ProductionS
 _KLRMedia_SeededProjection() {
 	Db := _KLRMedia_OpenFixture()
 	try {
-		Ids := ["media.play_pause", "media.next_track", "media.previous_track", "media.brightness_up", "media.brightness_down"]
+		; Windows captures no media key: it reads the rows macOS and Linux synced. Its one
+		; share of keystats/media_identity_vectors.json is the identities the reader
+		; publishes; the HID, system and evdev columns have no owner here.
+		global _SharedDir
+		Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\keystats\media_identity_vectors.json", "UTF-8"))
+		Ids := []
+		for Vector in Corpus["positive"]
+			Ids.Push(Vector["id"])
+		AssertEqual(5, Ids.Length, "the shared media identities changed")
 		for Id in Ids {
 			AssertTrue(SQLite_Exec(Db, "INSERT INTO ngram_media_keys VALUES ('a','2025-05-01','editor.exe'," . SQLite_Q(Id) . ",2),"
 				. "('b','2025-05-01','editor.exe'," . SQLite_Q(Id) . ",3);"
