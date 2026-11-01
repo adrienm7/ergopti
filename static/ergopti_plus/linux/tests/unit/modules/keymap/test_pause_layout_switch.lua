@@ -121,10 +121,9 @@ helpers.describe("pause layout switch", function()
 		helpers.assert_true(source:find("on_quit       = privacy_owners.tray_quit,", 1, true) ~= nil)
 		helpers.assert_true(source:find("apply_pause_layout = function() require", 1, true) ~= nil,
 			"the tray quit switches the layout")
-		local request = io.open(helpers.driver_root() .. "/infra/quit_request.lua", "rb")
-		helpers.assert_true(request ~= nil, "the tray quit handler is found")
-		local handler = request:read("*a")
-		request:close()
+		-- infra/quit_request, selected by a declaration unique to it.
+		local handler = helpers.read_driver_unit('local LOG = "infra.quit_request"')
+		helpers.assert_true(handler ~= nil, "the tray quit handler is found")
 		local switched = handler:find("ports.apply_pause_layout()", 1, true)
 		local requested = handler:find('ports.shutdown.request("tray quit")', 1, true)
 		helpers.assert_true(switched ~= nil and requested ~= nil and switched < requested,

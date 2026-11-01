@@ -53,8 +53,11 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // their file through helpers.read_driver_unit (shortcuts manager, keystats
 // reader and writer, injector, webview manager, keyboard layout and hook,
 // logger sink, expansion delay, prediction engine, menu builder).
-const BASELINE = 30;
-const READ_BASELINE = 75;
+// 30 → 25 files and 75 → 61 reads: the keycode single-source, model
+// selector listing, keystats privacy filter, token prompt setter and pause
+// layout switch invariants select their files by declaration.
+const BASELINE = 25;
+const READ_BASELINE = 61;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];
