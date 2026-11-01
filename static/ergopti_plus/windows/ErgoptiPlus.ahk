@@ -1450,8 +1450,9 @@ HotstringPrefixWatcherInit()
 ; Install the shared low-level keyboard arbiter after the prefix InputHook. Its
 ; terminal capture then runs first in the hook chain and can hold physical edges
 ; while paced terminal output completes. A failed native admission is reported
-; by the adapter and terminal expansions remain fail-open.
-LLM_NavEventOwner_EnsureStarted()
+; by the adapter and terminal expansions remain fail-open. It runs whatever the
+; AI's state: the press ledger serves every user's first-key order.
+KeyboardArbiterEnsureForLedger()
 HotstringPrefixWatcherRebuildIndex()
 BootProfile_StageEnd("prefix watcher")
 BootProfile_Mark("Prefix watcher index complete")

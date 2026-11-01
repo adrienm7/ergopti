@@ -85,7 +85,33 @@ _KS_NativeKeyPress(KeyName) {
 	; standard AltGr check names that key: the ledger holds it by its own code.
 	global KS_SC_RIGHT_ALT
 	Sc := KeyName = "RAlt" ? KS_SC_RIGHT_ALT : GetKeySC(KeyName)
-	return (Sc > 0 && Sc <= 0x1FF) ? Query.Call(Sc) : 0
+	if !(Sc > 0 && Sc <= 0x1FF)
+		return 0
+	; This runs in #HotIf criteria: a ledger that fails must never take a key with it.
+	; Without it the physical state answers and the catalogue decides the order.
+	try return Query.Call(Sc)
+	catch as Err {
+		static Reported := false
+		if !Reported {
+			Reported := true
+			try LoggerError("KeyState", "The press ledger cannot be read ({1}): keys read as AutoHotkey sees them.", Err.Message)
+		}
+		return 0
+	}
+}
+
+; Starts the owner of the press ledger, whatever the AI's state. A hook that cannot
+; install is no broken keyboard: first keys fall back to the catalogue order.
+; @param StartFn {Func} Test seam, LLM_NavEventOwner_EnsureStarted by default.
+; @return {Boolean} Whether the owner runs.
+KeyboardArbiterEnsureForLedger(StartFn := 0) {
+	Started := false
+	try Started := HasMethod(StartFn, "Call") ? StartFn.Call() : LLM_NavEventOwner_EnsureStarted()
+	catch as Err
+		LoggerError("KeyboardArbiter", "stage=ledger_start outcome=raised detail={1}.", Err.Message)
+	if !Started
+		LoggerWarn("KeyboardArbiter", "stage=ledger_start outcome=not_started: first keys follow the catalogue order.")
+	return Started ? true : false
 }
 
 ; Returns 1 when the key is held for the user: physically down for AutoHotkey,

@@ -293,6 +293,14 @@ AutoHotkey, so with no owner running, or no capture, nothing changes:
 
 The other rows of the terminal capture table are not switched.
 
+**The owner runs for everyone** (maintainer decision, 2026-11-01): the boot starts it
+whatever the AI's state, and a resume starts it for a driver booted paused, under the
+same suspend and shutdown rules. A hook that cannot install, or a ledger that cannot be
+read, is one log line: the physical state answers and the catalogue decides the order.
+Measured on this PC (one injected F23, three thousand pairs, other hooks running):
+about 750 us an event with the hook, against 470 to 520 without, nearly all of it the
+system's call into a low-level hook; reading one key is about 3.4 us.
+
 **A release no hook sees.** Ctrl+Alt+Del, UAC and the lock screen take the keyboard to
 another desktop, and a hook sees none of the releases there. The ledger lets go of every
 key on a physical Delete with Ctrl and Alt down (AltGr counts), and on each

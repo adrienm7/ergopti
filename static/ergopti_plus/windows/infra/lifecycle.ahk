@@ -405,7 +405,12 @@ _SuspendHandoffBeforeToggle() {
 _LifecycleSetNavEventOwnerSuspended(Suspended) {
 	if !IsSet(LLM_NavEventOwner_QuiesceForLifecycle)
 		return true
-	return LLM_NavEventOwner_QuiesceForLifecycle(Suspended)
+	Quiesced := LLM_NavEventOwner_QuiesceForLifecycle(Suspended)
+	; A driver booted paused (a reload that kept the pause) has no owner yet. The press
+	; ledger runs for everyone, so a resume starts it; a refusal costs only the order.
+	if (Quiesced && !Suspended)
+		KeyboardArbiterEnsureForLedger()
+	return Quiesced
 }
 
 ToggleSuspend(*) {
