@@ -16,7 +16,7 @@ import signal
 import sys
 import time
 
-SOURCE_SHA = "cb1ca1e12b1e34afbe3cbb3d355860598c8c3df3704d38cac18d95e5617d66fe"
+SOURCE_SHA = "22fc728f15ea8658920c9015a49e0bb455adbd7f0fb0f074af3c69d44a2612c0"
 _source_path = Path(__file__).resolve().with_name("operational_core_source.py")
 _source_info = _source_path.lstat()
 _source_bytes = _source_path.read_bytes()
@@ -490,6 +490,7 @@ def receive(repository, owner):
             "CODE_SIGNING_REQUIRED=NO",
             "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
             "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+            "LD_RUNPATH_SEARCH_PATHS=",
             "ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO",
         ]
         for name, target, relative in (
