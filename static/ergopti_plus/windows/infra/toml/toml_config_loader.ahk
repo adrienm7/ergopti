@@ -303,7 +303,7 @@ TomlConfigReportRetiredGestureParameter(FilePath, Key) {
 ; Action parameters use the binding grammar written by the gesture, shortcut
 ; and tap-hold owners. Only actions declaring a parameter can consume a value.
 ; A binding its owner publishes is owned by that publication, not by spelling:
-; a physical keyboard slot keeps its scan-code case (win_SC03A), which the
+; a physical keyboard slot keeps its scan-code case (meta_SC03A), which the
 ; lowercase grammar alone would offer for deletion. An unpublished domain keeps
 ; the lowercase grammar.
 TomlConfigActionParameterIsOwned(Key) {
