@@ -1309,6 +1309,26 @@ _LLMRemoteExtractUsage(format, body, model) {
 ; Per-model USD price table (per 1M tokens) — loaded from api_providers.json.
 global LLM_REMOTE_MODEL_PRICES := Map()
 
+; Keeps the price rows whose in and out are valid; another row is logged and skipped.
+; @param {Map} prices The catalogue's model_prices.
+; @returns {Map} Model -> Map of "in" and "out".
+_LLMRemoteAdmitPrices(prices) {
+    admitted := Map()
+    for model, row in prices {
+        validModel := Type(model) = "String" and model != ""
+        validRow := row is Map and row.Has("in") and row.Has("out")
+        if validRow
+            validRow := _LLMRemote_CatalogPriceIsValid(row["in"])
+                and _LLMRemote_CatalogPriceIsValid(row["out"])
+        if (!validModel or !validRow) {
+            try LoggerWarn("LLM.remote", "api_providers.json: invalid price row '{1}' skipped.", model)
+            continue
+        }
+        admitted[model] := Map("in", row["in"], "out", row["out"])
+    }
+    return admitted
+}
+
 _LLMRemoteEstimateCost(model, in_tokens, out_tokens) {
     global LLM_REMOTE_MODEL_PRICES
     if (model == "" or !LLM_REMOTE_MODEL_PRICES.Has(model))
@@ -2616,19 +2636,7 @@ _LLMRemote_LoadCatalog() {
     LLM_LOCAL_API_SERVERS := LocalCatalogue["servers"]
     LLM_LOCAL_SERVER_DISCOVERY := LocalDiscovery
 
-    candidatePrices := Map()
-    for model, row in prices {
-        validModel := Type(model) = "String" and model != ""
-        validRow := row is Map and row.Has("in") and row.Has("out")
-        if validRow
-            validRow := _LLMRemote_CatalogPriceIsValid(row["in"])
-                and _LLMRemote_CatalogPriceIsValid(row["out"])
-        if (!validModel or !validRow) {
-            try LoggerWarn("LLM.remote", "api_providers.json: invalid price row '{1}' skipped.", model)
-            continue
-        }
-        candidatePrices[model] := Map("in", row["in"], "out", row["out"])
-    }
+    candidatePrices := _LLMRemoteAdmitPrices(prices)
 
     ; The probe section degrades soft, unlike the provider catalogue above:
     ; a missing or malformed test_request must disable only the Test-API
