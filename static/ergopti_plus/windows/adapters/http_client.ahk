@@ -79,6 +79,7 @@ global _SYSTEM_PROXY_PAC_CONFIG := ""
 ; The proxy variables curl reads per destination scheme, from proxy_policy.json
 ; environment_precedence on first use (0 = not read yet).
 global _SYSTEM_PROXY_ENV_PRECEDENCE := 0
+global _SYSTEM_PROXY_LOOPBACK := 0
 
 
 
@@ -1389,8 +1390,98 @@ _SystemProxy_OverrideRoute(Url) {
 
 ; Whether a URL names this machine, by the shared policy's loopback rows.
 SystemProxy_IsLoopbackUrl(Url) {
-	Host := _SystemProxy_UrlParts(Url)["host"]
-	return Host == "localhost" || Host == "127.0.0.1" || Host == "::1" || Host == "[::1]"
+	return _SystemProxy_IsLoopbackHost(_SystemProxy_UrlParts(Url)["host"])
+}
+
+; proxy_policy.json loopback, the rule network_proxy_policy.py and the Lua policy apply.
+_SystemProxy_LoopbackPolicy() {
+	global _SYSTEM_PROXY_LOOPBACK, _SharedDir
+	if !(_SYSTEM_PROXY_LOOPBACK is Map) {
+		Policy := JsonParse(FSReadStrict(_SharedDir . "\modules\network\proxy_policy.json")).Get("loopback", 0)
+		if !(Policy is Map)
+			throw ValueError("proxy_policy.json holds no loopback rows.")
+		Networks := []
+		for Cidr in Policy["ipv4_cidrs"] {
+			Parts := StrSplit(Cidr, "/")
+			Address := _SystemProxy_Ipv4Number(Parts[1])
+			if Parts.Length != 2 || Address < 0 || !IsInteger(Parts[2]) || Integer(Parts[2]) > 32
+				throw ValueError("proxy_policy.json holds an invalid IPv4 loopback range.")
+			Networks.Push([Address, (0xFFFFFFFF << (32 - Integer(Parts[2]))) & 0xFFFFFFFF])
+		}
+		Addresses := []
+		for Address in Policy["ipv6_addresses"] {
+			Groups := _SystemProxy_Ipv6Key(Address)
+			if Groups == ""
+				throw ValueError("proxy_policy.json holds an invalid IPv6 loopback address.")
+			Addresses.Push(Groups)
+		}
+		_SYSTEM_PROXY_LOOPBACK := Map("hosts", Policy["dns_hosts"], "suffixes", Policy["dns_suffixes"],
+			"ipv4", Networks, "ipv6", Addresses)
+	}
+	return _SYSTEM_PROXY_LOOPBACK
+}
+
+_SystemProxy_IsLoopbackHost(Host) {
+	Policy := _SystemProxy_LoopbackPolicy()
+	for Name in Policy["hosts"]
+		if Host == Name
+			return true
+	for Suffix in Policy["suffixes"]
+		if StrLen(Host) > StrLen(Suffix) && SubStr(Host, -StrLen(Suffix)) == Suffix
+			return true
+	Address := _SystemProxy_Ipv4Number(Host)
+	if Address >= 0 {
+		for Network in Policy["ipv4"]
+			if (Address & Network[2]) == Network[1]
+				return true
+		return false
+	}
+	Groups := _SystemProxy_Ipv6Key(Host)
+	if Groups != ""
+		for Loopback in Policy["ipv6"]
+			if Groups == Loopback
+				return true
+	return false
+}
+
+; Dotted decimal to a number, -1 for anything else. A leading zero is refused, as
+; Python's ipaddress does: resolvers read it as octal.
+_SystemProxy_Ipv4Number(Text) {
+	if !RegExMatch(Text, "^(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})$", &M)
+		return -1
+	Number := 0
+	loop 4 {
+		if Integer(M[A_Index]) > 255
+			return -1
+		Number := (Number << 8) | Integer(M[A_Index])
+	}
+	return Number
+}
+
+; One spelling for an IPv6 address (eight colon-separated numbers), "" when it is not one.
+_SystemProxy_Ipv6Key(Text) {
+	if !RegExMatch(Text, "^[0-9A-Fa-f:]{2,39}$") || InStr(Text, ":::") || StrSplit(Text, "::").Length > 2
+		return ""
+	Sides := StrSplit(Text, "::")
+	Head := Sides[1] == "" ? [] : StrSplit(Sides[1], ":")
+	Tail := Sides.Length == 1 || Sides[2] == "" ? [] : StrSplit(Sides[2], ":")
+	Missing := 8 - Head.Length - Tail.Length
+	if (Sides.Length == 1 ? Missing != 0 : Missing < 1)
+		return ""
+	Key := ""
+	for Side in [Head, 0, Tail] {
+		if !IsObject(Side) {
+			loop Sides.Length == 1 ? 0 : Missing
+				Key .= "0:"
+			continue
+		}
+		for Group in Side {
+			if !RegExMatch(Group, "^[0-9A-Fa-f]{1,4}$")
+				return ""
+			Key .= Integer("0x" . Group) . ":"
+		}
+	}
+	return Key
 }
 
 ; The answer of SystemProxy_ResolveAsync under an override, 0 when automatic.
@@ -1412,8 +1503,7 @@ _SystemProxy_OverrideAnswer(Urls) {
 ; inherited environment does. Empty system DIRECT remains an explicit answer.
 SystemProxy_ResolveCurlAsync(Url, Callback, ReaderFn := 0, SpawnFn := 0, EnvFn := EnvGet) {
 	Parts := _SystemProxy_UrlParts(Url)
-	Host := Parts["host"]
-	if Host == "localhost" || Host == "127.0.0.1" || Host == "::1" {
+	if _SystemProxy_IsLoopbackHost(Parts["host"]) {
 		Callback.Call(Map("ok", true, "inherit", false, "proxy", "", "source", "loopback", "native_error", 0))
 		return true
 	}
