@@ -97,12 +97,20 @@ _WAPO_Resolve(State, Url, Callback) {
 }
 
 _WAPO_Ready(State, Entry, Callback, Owner) {
+	global LLM_REMOTE_READY_PING_DEADLINE_MS
 	State.ReadyCalls += 1
 	AssertTrue(Owner == State.OriginalOwner, "Readiness must receive the owner captured before the offer.")
 	AssertTrue(HasMethod(Callback, "Call"), "The actual validation handler must be bound for dispatch.")
 	Port := Map("resolve_proxy", _WAPO_Resolve.Bind(State),
 		"create_http", _WAA_ReadyCreate.Bind(State.Http, 200, '{"data":[]}'))
-	LLM_RemoteIsReady_Async(Entry, _WAPO_Result.Bind(State), Owner, Port)
+	; The real second commit runs non-critical inside the proxy step and can outlast
+	; the readiness budget on a loaded machine: that timer's own refusal is another
+	; path, and this scenario is about the ownership the commit retires.
+	Budget := LLM_REMOTE_READY_PING_DEADLINE_MS
+	if State.Mode == "late-transport"
+		LLM_REMOTE_READY_PING_DEADLINE_MS := 0x7fffffff
+	try LLM_RemoteIsReady_Async(Entry, _WAPO_Result.Bind(State), Owner, Port)
+	finally LLM_REMOTE_READY_PING_DEADLINE_MS := Budget
 }
 
 _WAPO_Result(State, Value) {
