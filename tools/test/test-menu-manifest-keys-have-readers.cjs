@@ -789,6 +789,12 @@ for (const withdrawn of [
 	}
 	if (probe('linux', 'p = { sec = "probe", key = "hs_only" }') !== 1)
 		errors.push('the probe missed a macOS-style preference row read by another driver');
+	// A module named like a key is a file: network_env.lua requires
+	// "network.proxy_override" and reads the key through its declaration.
+	if (probe('linux', 'local M = require("probe.hs_only")') !== 0)
+		errors.push('the probe flagged a module name as a read');
+	if (probe('linux', 'local M = require("probe.hs_only")\nv = get("probe.hs_only")') !== 1)
+		errors.push('a module of the same name hid a read');
 }
 
 // ==========================
