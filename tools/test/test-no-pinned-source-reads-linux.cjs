@@ -58,8 +58,12 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // layout switch invariants select their files by declaration.
 // 25 → 23 files and 61 → 53 reads: the dashboard bridge actions and the
 // keystats SQLite writer schema cases select their files by declaration.
-const BASELINE = 23;
-const READ_BASELINE = 53;
+// 23 → 19 files and 53 → 47 reads: the CapsWord auto-off, word reset and
+// loader delegation tests select their files by declaration, the timed TOML
+// reader's delegation is checked by a recording shared reader, and the signal
+// handler test resolves its chunk from the module name.
+const BASELINE = 19;
+const READ_BASELINE = 47;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];

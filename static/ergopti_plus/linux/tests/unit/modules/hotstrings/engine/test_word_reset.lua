@@ -421,7 +421,8 @@ helpers.describe("word reset: the daemon wiring", function()
 	end)
 
 	helpers.it("word reset, lets the Hotstrings scope adopt and restore both leaves", function()
-		local text = source("infra/hotstrings_scope.lua")
+		-- infra/hotstrings_scope, selected by a declaration unique to it.
+		local text = helpers.expand_config_keys(assert(helpers.read_driver_unit('local LOG = "infra.hotstrings_scope"')))
 		helpers.assert_contains(text, "WordReset.adopt_configuration(decoded)")
 		helpers.assert_contains(text, "WordReset.restore_configuration(snapshot.word_reset)")
 		helpers.assert_contains(text, 'word_reset = require("modules.hotstrings.word_reset")')
