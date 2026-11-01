@@ -275,3 +275,37 @@ TestPreviewAgree_KeyOnlyOutputHasNoRow() {
 }
 Test("preview: an output of keys alone has no row (preview-key-output)",
 	TestPreviewAgree_KeyOnlyOutputHasNoRow)
+
+; The other half of the incident: past the delay the bubble retires and the magic
+; key changes nothing. That refusal left no trace of which gate took it.
+TestPreviewAgree_ExpiredGateIsCountedAtDispatch() {
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_LastEndChar, LastSentCharacterKeyTime
+	MK := ScriptInformation["MagicKey"]
+	Saved := IsSet(LastSentCharacterKeyTime) ? LastSentCharacterKeyTime : Map()
+	Series := _HotPathStatisticsOwner().Stats.Series
+	if Series.Has("HSE.Refused.preflight")
+		Series.Delete("HSE.Refused.preflight")
+	try {
+		HSE_RegistryClear()
+		HSE_RegisterFromTomlFlags(true, "*", "gcm" . MK, 'git commit -m "{Left}"',
+			Map("Category", "test", "Section", "code", "FinalResult", true, "TimeActivationSeconds", 0.75))
+		HSE_Buffer := "gcm"
+		HSE_StartIsWordBoundary := true
+		LastSentCharacterKeyTime := Map("m", A_TickCount)
+		AssertEqual(1, _PrefixCollectCandidates().Length, "inside the delay the bubble offers the entry")
+
+		LastSentCharacterKeyTime := Map("m", A_TickCount - 5000)
+		AssertEqual(0, _PrefixCollectCandidates().Length, "past the delay the bubble is gone")
+		Match := HSE_FeedChar(MK, true)
+		Assert(IsObject(Match), "the matcher still finds the entry: only the gate refuses it")
+		Effect := 0
+		AssertFalse(HSE_DispatchMatch(Match, HSE_LastEndChar, &Effect), "the gate refuses the fire")
+		Assert(Series.Has("HSE.Refused.preflight"), "the refusal names its gate in the statistics")
+	} finally {
+		LastSentCharacterKeyTime := Saved
+		HSE_RegistryClear()
+		HSE_HardReset()
+	}
+}
+Test("preview: a key output past its delay is refused and counted (preview-key-output)",
+	TestPreviewAgree_ExpiredGateIsCountedAtDispatch)
