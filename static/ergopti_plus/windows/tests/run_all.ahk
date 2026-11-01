@@ -552,6 +552,8 @@ InstallSendNoOps()
 #Include unit/ui/wpm/test_wpm_config_types.ahk
 #Include ../ui/wpm/wpm_gdiplus_ownership.ahk
 #Include ../ui/wpm/wpm_widget.ahk
+#Include ../ui/wpm/wpm_category_color.ahk
+#Include unit/ui/wpm/test_wpm_color_resolution.ahk
 #Include unit/ui/wpm/test_wpm_gdiplus_ownership.ahk
 #Include unit/ui/wpm/test_wpm_drag_admission.ahk
 #Include unit/ui/wpm/test_wpm_region_target.ahk
@@ -2076,7 +2078,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/context/test_sensors_warmup_distinct_callback.ahk
 #Include meta/modules/keystats/context/test_kltopo_seen_hwnds_cap.ahk
 #Include meta/platform/remap/layers/test_remapped_list_unconditional.ahk
-#Include meta/ui/wpm/test_wpm_widget_color_cache.ahk
 #Include meta/modules/gestures/test_screenshot_async_run.ahk
 #Include meta/platform/remap/keys/test_space_hold_empty_guard.ahk
 #Include meta/modules/llm/navigation/test_profile_hotkey_stable_pred.ahk
