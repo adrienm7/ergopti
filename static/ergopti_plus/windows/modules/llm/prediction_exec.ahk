@@ -439,6 +439,13 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		if !(profile is Map) {
 			try LoggerWarn("LLM", "Prompt prediction dropped: the prompt '{1}' no longer exists.",
 				effective_profile_id)
+			if IsLive {
+				Receipt := Map("profile_id", effective_profile_id)
+				if Override[ConfigLeaf.NUM_PREDICTIONS] > 0
+					Receipt[ConfigLeaf.NUM_PREDICTIONS] := Override[ConfigLeaf.NUM_PREDICTIONS]
+				Decision := LLM_Live_Decide(LLM_Live_Config(), Receipt, _LLM_Engine["n_predictions"], profile)
+				LLM_Engine_LiveStop(Decision["cause"])
+			}
 			return
 		}
 	} else {
@@ -1678,17 +1685,41 @@ _LLM_Engine_TrimProfileLabel(label) {
 	return RegExReplace(clean, "\s*—\s*$", "")
 }
 
+/**
+ * Pieces of the info bar in display order: request_plan/info_bar.lua `parts`.
+ * @param {Map} Spec model, backend, profile_label, position (index, count), require_model.
+ * @returns {Array|Integer} The strings, or 0 when nothing is to be shown.
+ */
+LLM_InfoBar_Parts(Spec) {
+	Model := Spec.Get("model", "")
+	if Spec.Get("require_model", false) && Model == ""
+		return 0
+	Parts := []
+	if Model != ""
+		Parts.Push(Model)
+	if Spec.Get("backend", "") != ""
+		Parts.Push(Spec["backend"])
+	Short := _LLM_Engine_TrimProfileLabel(Spec.Get("profile_label", ""))
+	if Short != ""
+		Parts.Push(Short)
+	if Spec.Has("position") {
+		Position := Spec["position"]
+		if !(Position is Map) || !IsNumber(Position.Get("index", "")) || Position.Get("index", "") is String
+				|| !IsNumber(Position.Get("count", "")) || Position.Get("count", "") is String
+			throw ValueError("position must be { index, count } numbers")
+		if Position["count"] > 1
+			Parts.Push(Position["index"] . "/" . Position["count"])
+	}
+	return Parts.Length ? Parts : 0
+}
+
 _LLM_Engine_BuildInfoBarText(modelName, backend := "", profileName := "") {
-	if (modelName = "")
+	Parts := LLM_InfoBar_Parts(Map("model", modelName, "backend", backend,
+		"profile_label", profileName, "require_model", true))
+	if !(Parts is Array)
 		return ""
-	pieces := [modelName]
-	if (backend != "")
-		pieces.Push(backend)
-	shortProfile := _LLM_Engine_TrimProfileLabel(profileName)
-	if (shortProfile != "")
-		pieces.Push(shortProfile)
 	out := ""
-	for i, p in pieces
+	for i, p in Parts
 		out .= (i = 1) ? p : " — " . p
 	return out
 }
