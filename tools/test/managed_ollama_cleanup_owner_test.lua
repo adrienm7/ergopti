@@ -24,7 +24,9 @@ local function with_owned(options, run)
 	local refused, rmdir_refused, refuse_path, retry_mode, retry_path, removal_calls = false, false, nil, nil, nil, {}
 	local function write(path, raw) assert(files[path]); files[path].raw = raw end
 	package.loaded["adapters.file_system"] = {
-		exists = function() return true end,
+		-- No refused proxy sign-in left its receipt: the pull these cases own goes
+		-- ahead (modules/llm/proxy_relay_receipt.lua).
+		exists = function(path) return not path:find("proxy_relay_refusal", 1, true) end,
 		create_secure_temp_file = function()
 			sequence = sequence + 1
 			local path = "/private/cleanup-vector-" .. sequence
