@@ -884,7 +884,7 @@ function personalConstructorAuthority(unit) {
 		throw Error('Actual constructor bootstrap must precede renderer declarations');
 	const initializer = reader(unit.tokens.slice(0, entry.index));
 	initializer.take(
-		'#Include menu_population.ahk\nif !_MR_FrameNativeConstructorCurrent(Menu) throw Error('
+		'#Include %A_LineFile%\\..\\..\\_generated\\config_keys.ahk\n#Include menu_population.ahk\nif !_MR_FrameNativeConstructorCurrent(Menu) throw Error('
 	);
 	initializer.refusal();
 	initializer.take(')');
