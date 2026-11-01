@@ -572,7 +572,8 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 		-- hook and handed to the character callback; tap-hold and layer outputs
 		-- are dispatched again through the same path; injected text is reported
 		-- by the injector (test_injector_output_observer).
-		local hook = source("adapters/keyboard_hook.lua")
+		-- adapters/keyboard_hook, selected by a declaration unique to it.
+		local hook = assert(helpers.read_driver_unit("local function hold_owner("))
 		helpers.assert_contains(hook, '_call_callback("character callback", _on_char, char, ev.code)')
 		helpers.assert_contains(hook, '_call_callback("text-control callback", _on_char, text_char, ev.code)')
 		helpers.assert_contains(hook, "\t\t\t\t_dispatch_event(emitted_event, emitted_source)\n")
@@ -596,7 +597,8 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 	end)
 
 	helpers.it("caps word auto-off, the hook hands every pointer press and EV_REL report to the callback", function()
-		local hook = source("adapters/keyboard_hook.lua")
+		-- adapters/keyboard_hook, selected by a declaration unique to it.
+		local hook = assert(helpers.read_driver_unit("local function hold_owner("))
 		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value)')
 		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value)')
 		helpers.assert_contains(hook, "_on_pointer_event = options.onPointerEvent")
