@@ -2055,6 +2055,12 @@ baseline` line (item 38).
   (`rows_restore`). `rows_ghosts` counts builds listed until logout (M5a).
   Codes: `requires_logout`, `select_refused`, `readback_mismatch`; the log
   window names each build and the source id the probe read.
+- `field_tap_hold_thresholds` reads the deployed `karabiner.json` of the
+  selected runtime and checks every managed manipulator with `to_if_alone` on a
+  tap-hold key (`thresholds_checked`, the count): its tap timeout and held-down
+  threshold equal the key's own delay, else the global one (PAR-15).
+  `thresholds_match` fails as `mismatch_<n>:<key id>:<actual>_not_<expected>`;
+  a mismatch with green unit tests means a stale or rewritten deploy.
 - The collector's own `scpt_recompile` step (no app needed) rebuilds every
   tracked `.scpt` whose `.applescript` decompiles differently
   (`tools/dev/recompile-applescripts.py`): `scpt_recompiled:<n>`, or
