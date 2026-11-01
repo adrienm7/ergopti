@@ -176,14 +176,16 @@ KL_DayRollover(Token := 0) {
 	                break
 	        }
 
-	        try FileAppend(
-	            "`n-- === day rollover " . old_date . " -> " . new_date . " ===`n",
-	            Keystats.data_sql_path, "UTF-8")
+	        ; The marker joins the acknowledged ledger through the same receipt, so
+	        ; the tail repair of the next boot cannot read it as an interrupted write.
+	        try KL_AppendDataSqlDurable(Keystats.data_sql_path,
+	            "`n-- === day rollover " . old_date . " -> " . new_date . " ===`n")
 	        catch as err {
 	            try LoggerError("Keystats", "Cannot write day rollover marker: {1}.",
 					err.Message)
 	            return Map("ok", false, "reason", "marker_failed")
 	        }
+	        Keystats.data_sql_receipt := KL_DataSqlAckReceipt(Keystats.data_sql_path)
 
 	        if !_KL_RolloverPrepare(Scope.Token, new_date)
 	            return Map("ok", false, "reason", "state_failed")

@@ -99,6 +99,7 @@ class Keystats {
     static today_log_offset := 0
     static today_log_date   := ""
     static rollover_pending := 0
+    static data_sql_receipt := 0
     ; Ownership latch for the multi-batch midnight transaction. It prevents
     ; an ingest timer from starting a second rollover while the first one is
     ; still draining/rotating yesterday's durable JSONL file.
@@ -992,16 +993,7 @@ KL_MidnightCheck() {
 
 KL_BootstrapDataSql() {
     if FileExist(Keystats.data_sql_path) {
-		try {
-			Probe := FileOpen(Keystats.data_sql_path, "a", "UTF-8")
-			if !IsObject(Probe)
-				throw Error("append handle unavailable")
-			Probe.Close()
-			return true
-		} catch as Err {
-			try LoggerError("Keystats", "data.sql is not writable: {1}.", Err.Message)
-			return false
-		}
+		return KL_AdmitExistingDataSql()
 	}
     header := "-- ergopti metrics — device " . Keystats.device_id
         .  " — schema_version " . KeystatsConst.SCHEMA_VERSION . "`n"
