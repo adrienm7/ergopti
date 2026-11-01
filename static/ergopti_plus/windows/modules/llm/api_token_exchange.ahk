@@ -20,7 +20,8 @@
 ;    worker, polled like any other remote request.
 ; 4. The key file's own token_uri is never followed: the assertion goes to the
 ;    catalogue's token_url only, so a key cannot send its assertion elsewhere.
-; 5. No key, assertion or token reaches a log or a reason. Tokens live in memory.
+; 5. No key, assertion or token reaches a log or a refusal. Tokens live in memory.
+;    A refusal is the corpus's sentence, shared by every driver, not a closed log reason.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -73,19 +74,19 @@ _LLM_TokenExchange_IsWhole(Value) {
 
 ; Reads a form body block.
 ; @param {Any} Raw The block.
-; @param {String} Where Its name in the reasons.
+; @param {String} Where Its name in the refusals.
 ; @param {Boolean} Signed Whether {assertion} is the placeholder it must hold.
-; @param {VarRef} Reason Why it is refused.
+; @param {VarRef} Refusal Why it is refused.
 ; @returns {Boolean}
-_LLM_TokenExchange_BodyIsValid(Raw, Where, Signed, &Reason) {
+_LLM_TokenExchange_BodyIsValid(Raw, Where, Signed, &Refusal) {
 	if !(Raw is Map) || Raw.Count == 0 {
-		Reason := Where . " must be a non-empty object"
+		Refusal := Where . " must be a non-empty object"
 		return false
 	}
 	UsesKey := false
 	for Name, Value in Raw {
 		if !_LLM_TokenExchange_IsField(Name) || !(Value is String) {
-			Reason := Where . " fields must be names holding strings"
+			Refusal := Where . " fields must be names holding strings"
 			return false
 		}
 		At := 1
@@ -95,7 +96,7 @@ _LLM_TokenExchange_BodyIsValid(Raw, Where, Signed, &Reason) {
 				: (Placeholder == "key" || (SubStr(Placeholder, 1, 4) == "key."
 					&& _LLM_TokenExchange_IsField(SubStr(Placeholder, 5))))
 			if !Known {
-				Reason := Where . "." . Name . " holds an unknown placeholder {" . Placeholder . "}"
+				Refusal := Where . "." . Name . " holds an unknown placeholder {" . Placeholder . "}"
 				return false
 			}
 			UsesKey := true
@@ -103,44 +104,44 @@ _LLM_TokenExchange_BodyIsValid(Raw, Where, Signed, &Reason) {
 		}
 	}
 	if !UsesKey {
-		Reason := Where . (Signed ? " never reads the assertion" : " never reads the key")
+		Refusal := Where . (Signed ? " never reads the assertion" : " never reads the key")
 		return false
 	}
 	return true
 }
 
 ; @returns {Boolean} Whether the signed-assertion block holds.
-_LLM_TokenExchange_AssertionIsValid(Raw, &Reason) {
+_LLM_TokenExchange_AssertionIsValid(Raw, &Refusal) {
 	global LLM_TOKEN_EXCHANGE_MIN_EXPIRES_SECONDS, LLM_TOKEN_EXCHANGE_MAX_ASSERTION_SECONDS, LLM_TOKEN_EXCHANGE_HTTPS
 	if !(Raw is Map) {
-		Reason := "auth.assertion must be an object"
+		Refusal := "auth.assertion must be an object"
 		return false
 	}
 	if !_LLM_TokenExchange_IsField(Raw.Get("key_type", 0)) {
-		Reason := "auth.assertion.key_type must be a key type name"
+		Refusal := "auth.assertion.key_type must be a key type name"
 		return false
 	}
-	if !_LLM_TokenExchange_BodyIsValid(Raw.Get("body", 0), "auth.assertion.body", true, &Reason)
+	if !_LLM_TokenExchange_BodyIsValid(Raw.Get("body", 0), "auth.assertion.body", true, &Refusal)
 		return false
 	for Field in ["issuer_field", "private_key_field"] {
 		if !_LLM_TokenExchange_IsField(Raw.Get(Field, 0)) {
-			Reason := "auth.assertion." . Field . " must be a field name"
+			Refusal := "auth.assertion." . Field . " must be a field name"
 			return false
 		}
 	}
 	if Raw.Has("key_id_field") && !_LLM_TokenExchange_IsField(Raw["key_id_field"]) {
-		Reason := "auth.assertion.key_id_field must be a field name"
+		Refusal := "auth.assertion.key_id_field must be a field name"
 		return false
 	}
 	Scope := Raw.Get("scope", 0)
 	if !(Scope is String) || !RegExMatch(Scope, LLM_TOKEN_EXCHANGE_HTTPS) {
-		Reason := "auth.assertion.scope must be an https scope"
+		Refusal := "auth.assertion.scope must be an https scope"
 		return false
 	}
 	Lifetime := Raw.Get("lifetime_seconds", 0)
 	if !_LLM_TokenExchange_IsWhole(Lifetime) || Lifetime < LLM_TOKEN_EXCHANGE_MIN_EXPIRES_SECONDS
 			|| Lifetime > LLM_TOKEN_EXCHANGE_MAX_ASSERTION_SECONDS {
-		Reason := "auth.assertion.lifetime_seconds must be a whole number of seconds in bounds"
+		Refusal := "auth.assertion.lifetime_seconds must be a whole number of seconds in bounds"
 		return false
 	}
 	return true
@@ -149,44 +150,44 @@ _LLM_TokenExchange_AssertionIsValid(Raw, &Reason) {
 /**
  * Reads a provider's auth block (api_providers.json).
  * @param {Any} Raw providers.<id>.auth.
- * @param {VarRef} Reason Receives why it is refused, "" when valid.
+ * @param {VarRef} Refusal Receives why it is refused, "" when valid.
  * @returns {Map|String} The block, "" when refused.
  */
-LLM_TokenExchange_Parse(Raw, &Reason := "") {
+LLM_TokenExchange_Parse(Raw, &Refusal := "") {
 	global LLM_TOKEN_EXCHANGE_MIN_EXPIRES_SECONDS, LLM_TOKEN_EXCHANGE_MAX_EXPIRES_SECONDS, LLM_TOKEN_EXCHANGE_HTTPS
-	Reason := ""
+	Refusal := ""
 	if !(Raw is Map) {
-		Reason := "auth must be an object"
+		Refusal := "auth must be an object"
 		return ""
 	}
 	if (Raw.Get("kind", "") != "token_exchange") {
-		Reason := "auth.kind must be token_exchange"
+		Refusal := "auth.kind must be token_exchange"
 		return ""
 	}
 	TokenUrl := Raw.Get("token_url", 0)
 	if !(TokenUrl is String) || !RegExMatch(TokenUrl, LLM_TOKEN_EXCHANGE_HTTPS) {
-		Reason := "auth.token_url must be an https address"
+		Refusal := "auth.token_url must be an https address"
 		return ""
 	}
-	if !_LLM_TokenExchange_BodyIsValid(Raw.Get("body", 0), "auth.body", false, &Reason)
+	if !_LLM_TokenExchange_BodyIsValid(Raw.Get("body", 0), "auth.body", false, &Refusal)
 		return ""
 	for Field in ["token_field", "expires_field"] {
 		if !_LLM_TokenExchange_IsField(Raw.Get(Field, 0)) {
-			Reason := "auth." . Field . " must be a field name"
+			Refusal := "auth." . Field . " must be a field name"
 			return ""
 		}
 	}
 	Default := Raw.Get("default_expires_seconds", 0), Margin := Raw.Get("refresh_margin_seconds", -1)
 	if !_LLM_TokenExchange_IsWhole(Default) || Default < LLM_TOKEN_EXCHANGE_MIN_EXPIRES_SECONDS
 			|| Default > LLM_TOKEN_EXCHANGE_MAX_EXPIRES_SECONDS {
-		Reason := "auth.default_expires_seconds must be a whole number of seconds in bounds"
+		Refusal := "auth.default_expires_seconds must be a whole number of seconds in bounds"
 		return ""
 	}
 	if !_LLM_TokenExchange_IsWhole(Margin) || Margin < 0 || Margin * 2 >= Default {
-		Reason := "auth.refresh_margin_seconds must be a whole number below half the default lifetime"
+		Refusal := "auth.refresh_margin_seconds must be a whole number below half the default lifetime"
 		return ""
 	}
-	if Raw.Has("assertion") && !_LLM_TokenExchange_AssertionIsValid(Raw["assertion"], &Reason)
+	if Raw.Has("assertion") && !_LLM_TokenExchange_AssertionIsValid(Raw["assertion"], &Refusal)
 		return ""
 	return Raw
 }
@@ -262,17 +263,17 @@ _LLM_TokenExchange_Quote(Text) {
 
 ; The signed form of a service-account key: header and claims in a fixed order, so
 ; the same key and time always give the same bytes (assertion_input in the Lua).
-; @returns {Map|String} The request, "" with Reason set.
-_LLM_TokenExchange_SignedRequest(Auth, Fields, UnixNow, &Reason) {
+; @returns {Map|String} The request, "" with Refusal set.
+_LLM_TokenExchange_SignedRequest(Auth, Fields, UnixNow, &Refusal) {
 	Spec := Auth["assertion"]
 	Pem := _LLM_TokenExchange_KeyString(Fields, Spec["private_key_field"])
 	if (Pem == "") {
-		Reason := "the key holds no " . Spec["private_key_field"] . " field"
+		Refusal := "the key holds no " . Spec["private_key_field"] . " field"
 		return ""
 	}
 	Issuer := _LLM_TokenExchange_KeyString(Fields, Spec["issuer_field"])
 	if (Issuer == "") {
-		Reason := "the key holds no " . Spec["issuer_field"] . " field"
+		Refusal := "the key holds no " . Spec["issuer_field"] . " field"
 		return ""
 	}
 	Header := '{"alg":"RS256","typ":"JWT"'
@@ -285,7 +286,7 @@ _LLM_TokenExchange_SignedRequest(Auth, Fields, UnixNow, &Reason) {
 		. ',"exp":' . (UnixNow + Integer(Spec["lifetime_seconds"])) . "}"
 	Input := _LLM_TokenExchange_Base64Url(CryptoBase64EncodeUtf8(Header)) . "."
 		. _LLM_TokenExchange_Base64Url(CryptoBase64EncodeUtf8(Claims))
-	Signature := LLM_Rs256_Sign(Pem, Input, &Reason)
+	Signature := LLM_Rs256_Sign(Pem, Input, &Refusal)
 	if !(Signature is Buffer)
 		return ""
 	Jwt := Input . "." . _LLM_TokenExchange_Base64Url(CryptoBase64Encode(Signature))
@@ -297,25 +298,25 @@ _LLM_TokenExchange_SignedRequest(Auth, Fields, UnixNow, &Reason) {
  * @param {Map} Auth LLM_TokenExchange_Parse's block.
  * @param {Any} Key The stored key.
  * @param {Integer} UnixNow The wall-clock time, whole seconds since 1970 (a JWT's iat).
- * @param {VarRef} Reason Receives why the key cannot fill the form; never the key.
+ * @param {VarRef} Refusal Receives why the key cannot fill the form; never the key.
  * @returns {Map|String} Map("url", "headers", "body"), "" when refused.
  */
-LLM_TokenExchange_Request(Auth, Key, UnixNow, &Reason := "") {
+LLM_TokenExchange_Request(Auth, Key, UnixNow, &Refusal := "") {
 	if !(Auth is Map)
 		throw TypeError("LLM_TokenExchange_Request requires a parsed auth block.")
 	if !(UnixNow is Integer) || UnixNow < 0
 		throw ValueError("LLM_TokenExchange_Request requires the wall-clock time in whole seconds.")
-	Reason := ""
+	Refusal := ""
 	if !(Key is String) || (Key == "") {
-		Reason := "the key is empty"
+		Refusal := "the key is empty"
 		return ""
 	}
 	Fields := _LLM_TokenExchange_KeyFields(Key)
 	if Auth.Has("assertion") && (Fields is Map) && Fields.Get("type", "") == Auth["assertion"]["key_type"]
-		return _LLM_TokenExchange_SignedRequest(Auth, Fields, UnixNow, &Reason)
+		return _LLM_TokenExchange_SignedRequest(Auth, Fields, UnixNow, &Refusal)
 	Form := _LLM_TokenExchange_EncodeForm(Auth["body"], _LLM_TokenExchange_FillKey.Bind(Key, Fields), &Missing)
 	if (Missing != "") {
-		Reason := "the key holds no " . SubStr(Missing, 5) . " field"
+		Refusal := "the key holds no " . SubStr(Missing, 5) . " field"
 		return ""
 	}
 	return _LLM_TokenExchange_FormRequest(Auth, Form)
@@ -331,23 +332,23 @@ _LLM_TokenExchange_FillKey(Key, Fields, Placeholder) {
  * @param {Any} Status The HTTP status.
  * @param {Any} Decoded The decoded JSON body.
  * @param {Number} Now The current time, in seconds.
- * @param {VarRef} Reason Receives why the answer is refused; never its content.
+ * @param {VarRef} Refusal Receives why the answer is refused; never its content.
  * @returns {Map|String} Map("token", "expires_at"), "" when refused.
  */
-LLM_TokenExchange_Read(Auth, Status, Decoded, Now, &Reason := "") {
+LLM_TokenExchange_Read(Auth, Status, Decoded, Now, &Refusal := "") {
 	global LLM_TOKEN_EXCHANGE_MIN_EXPIRES_SECONDS, LLM_TOKEN_EXCHANGE_MAX_EXPIRES_SECONDS
-	Reason := ""
+	Refusal := ""
 	if (Status != 200) {
-		Reason := "the token exchange answered HTTP " . String(Status)
+		Refusal := "the token exchange answered HTTP " . String(Status)
 		return ""
 	}
 	if !(Decoded is Map) {
-		Reason := "the token exchange answered no JSON object"
+		Refusal := "the token exchange answered no JSON object"
 		return ""
 	}
 	Token := Decoded.Get(Auth["token_field"], "")
 	if !(Token is String) || (Token == "") || RegExMatch(Token, "[[:cntrl:]\s]") {
-		Reason := "the token exchange answered no " . Auth["token_field"]
+		Refusal := "the token exchange answered no " . Auth["token_field"]
 		return ""
 	}
 	Lifetime := Decoded.Get(Auth["expires_field"], "")
@@ -434,7 +435,7 @@ LLM_TokenExchange_Current(ProviderId, Auth, Key) {
  * @param {Map} Auth Its parsed block.
  * @param {String} Key The stored key.
  * @param {Func} OnReady OnReady(Ok, Failure); Failure is 0 or
- *     Map("reason", "status", "key_refused"[, "network_report"]).
+ *     Map("refusal", "status", "key_refused"[, "network_report"]).
  */
 LLM_TokenExchange_Prepare(ProviderId, Auth, Key, OnReady) {
 	if !HasMethod(OnReady, "Call")
@@ -463,18 +464,18 @@ _LLM_TokenExchange_Begin(Slot, ProviderId, Auth, Key) {
 	global _LLM_TokenExchange_PostFn
 	if A_IsSuspended {
 		LoggerInfo("LLM.remote", "Access token of provider '{1}' not asked: the driver is paused.", ProviderId)
-		_LLM_TokenExchange_Settle(Slot, Map("reason", "the driver is paused", "status", 0, "key_refused", false), false)
+		_LLM_TokenExchange_Settle(Slot, Map("refusal", "the driver is paused", "status", 0, "key_refused", false), false)
 		return
 	}
-	try Request := LLM_TokenExchange_Request(Auth, Key, _LLMRemoteEpochNow(), &Reason)
+	try Request := LLM_TokenExchange_Request(Auth, Key, _LLMRemoteEpochNow(), &Refusal)
 	catch as Err {
 		; A fault in the signer settles the slot as refused, so it never stays
 		; pending; Err names a native call, it holds no key material
-		Request := "", Reason := "the assertion signer failed: " . Err.Message
+		Request := "", Refusal := "the assertion signer failed: " . Err.Message
 	}
 	if !(Request is Map) {
-		LoggerError("LLM.remote", "Access token of provider '{1}' cannot be asked: {2}.", ProviderId, Reason)
-		_LLM_TokenExchange_Settle(Slot, Map("reason", Reason, "status", 0, "key_refused", true))
+		LoggerError("LLM.remote", "Access token of provider '{1}' cannot be asked: {2}.", ProviderId, Refusal)
+		_LLM_TokenExchange_Settle(Slot, Map("refusal", Refusal, "status", 0, "key_refused", true))
 		return
 	}
 	LoggerStart("LLM.remote", "Exchanging the key of provider '{1}' for an access token…", ProviderId)
@@ -487,7 +488,7 @@ _LLM_TokenExchange_Begin(Slot, ProviderId, Auth, Key) {
 	} catch as Err {
 		LoggerError("LLM.remote", "Access token of provider '{1}' refused: the request was not sent ({2}).",
 			ProviderId, Err.Message)
-		_LLM_TokenExchange_Settle(Slot, Map("reason", "the token exchange could not be sent", "status", 0, "key_refused", false))
+		_LLM_TokenExchange_Settle(Slot, Map("refusal", "the token exchange could not be sent", "status", 0, "key_refused", false))
 	}
 }
 
@@ -500,7 +501,7 @@ _LLM_TokenExchange_OnAnswer(Slot, ProviderId, Auth, Answer) {
 	catch
 		Decoded := 0
 	Now := _LLM_TokenExchange_Now()
-	Token := LLM_TokenExchange_Read(Auth, Status, Decoded, Now, &Reason)
+	Token := LLM_TokenExchange_Read(Auth, Status, Decoded, Now, &Refusal)
 	if (Token is Map) {
 		Slot["token"] := Token["token"], Slot["expires_at"] := Token["expires_at"]
 		for Stale in ["retry_at", "failure"] {
@@ -512,8 +513,8 @@ _LLM_TokenExchange_OnAnswer(Slot, ProviderId, Auth, Answer) {
 		_LLM_TokenExchange_Settle(Slot, 0)
 		return
 	}
-	LoggerError("LLM.remote", "Access token of provider '{1}' refused: {2}.", ProviderId, Reason)
-	Failure := Map("reason", Reason, "status", Status, "key_refused", Status >= 400 && Status < 500)
+	LoggerError("LLM.remote", "Access token of provider '{1}' refused: {2}.", ProviderId, Refusal)
+	Failure := Map("refusal", Refusal, "status", Status, "key_refused", Status >= 400 && Status < 500)
 	if Answer.Has("network_report")
 		Failure["network_report"] := Answer["network_report"]
 	_LLM_TokenExchange_Settle(Slot, Failure)

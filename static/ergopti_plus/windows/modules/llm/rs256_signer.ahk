@@ -6,7 +6,7 @@
 ; Signs bytes with RSASSA-PKCS1-v1_5 and SHA-256 (JWT RS256) under an unencrypted
 ; PEM private key, PKCS#8 or PKCS#1: the Windows twin of the pure-Lua
 ; _shared/lua/crypto/rsa_pkcs1.lua, replaying the same corpus and refusing with
-; the same reasons (_shared/tests/corpus/crypto/rs256_vectors.json).
+; the same refusals (_shared/tests/corpus/crypto/rs256_vectors.json).
 ;
 ; FEATURES & RATIONALE:
 ; 1. CNG signs a 2048-bit key in about 2 ms, so nothing is sliced over timer ticks
@@ -17,7 +17,7 @@
 ; 3. CNG recomputes the CRT values from the primes, so a wrong dq still signs
 ;    correctly here. The other drivers would produce a bad signature from such a
 ;    file, so it is refused here too: the same key behaves alike on every OS.
-; 4. No key material reaches a reason. Every buffer and limb array holding it is
+; 4. No key material reaches a refusal. Every buffer and limb array holding it is
 ;    zeroed before return; the PEM text itself is the caller's immutable string.
 ; ==============================================================================
 
@@ -46,10 +46,8 @@ global LLM_RS256_DER_OCTET_STRING := 0x04
 global LLM_RS256_DER_OID := 0x06
 global LLM_RS256_DER_SEQUENCE := 0x30
 
-; BCRYPT_RSAFULLPRIVATE_MAGIC, its blob type and BCRYPT_PAD_PKCS1
+; BCRYPT_RSAFULLPRIVATE_MAGIC
 global LLM_RS256_FULL_PRIVATE_MAGIC := 0x33415352
-global LLM_RS256_FULL_PRIVATE_BLOB := "RSAFULLPRIVATEBLOB"
-global LLM_RS256_PAD_PKCS1 := 2
 
 global LLM_RS256_VALUES_DISAGREE := "the private key values disagree: the signature does not verify"
 
@@ -66,23 +64,23 @@ global LLM_RS256_VALUES_DISAGREE := "the private key values disagree: the signat
  * The RSASSA-PKCS1-v1_5 SHA-256 signature of a text.
  * @param {String} Pem PKCS#8 (PRIVATE KEY) or PKCS#1 (RSA PRIVATE KEY) PEM block.
  * @param {String} Message The signed text, as UTF-8 without a NUL.
- * @param {VarRef} Reason Receives why it is refused, "" when signed; never the key.
+ * @param {VarRef} Refusal Receives why it is refused, "" when signed; never the key.
  * @returns {Buffer|String} The signature, as long as the modulus; "" when refused.
  */
-LLM_Rs256_Sign(Pem, Message, &Reason := "") {
-	Reason := ""
-	Der := _LLM_Rs256_PemToDer(Pem, &Reason, &Label)
+LLM_Rs256_Sign(Pem, Message, &Refusal := "") {
+	Refusal := ""
+	Der := _LLM_Rs256_PemToDer(Pem, &Refusal, &Label)
 	if !(Der is Buffer)
 		return ""
 	Values := 0
 	try {
-		Values := _LLM_Rs256_ReadValues(Der, Label, &Reason)
+		Values := _LLM_Rs256_ReadValues(Der, Label, &Refusal)
 		if !(Values is Map)
 			return ""
-		Reason := _LLM_Rs256_CheckValues(Values)
-		if (Reason != "")
+		Refusal := _LLM_Rs256_CheckValues(Values)
+		if (Refusal != "")
 			return ""
-		return _LLM_Rs256_SignNative(Values, Message, &Reason)
+		return _LLM_Rs256_SignNative(Values, Message, &Refusal)
 	} finally {
 		_LLM_Rs256_Zero(Der)
 		if Values is Map
@@ -96,19 +94,7 @@ LLM_Rs256_Sign(Pem, Message, &Reason := "") {
  * @returns {Buffer} 32 bytes.
  */
 LLM_Rs256_Sha256(Data) {
-	HashAlg := 0
-	try {
-		if DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &HashAlg, "WStr", "SHA256", "Ptr", 0, "UInt", 0, "UInt")
-			throw Error("no SHA-256 provider")
-		Digest := Buffer(32)
-		if DllCall("bcrypt\BCryptHash", "Ptr", HashAlg, "Ptr", 0, "UInt", 0, "Ptr", Data.Ptr, "UInt", Data.Size,
-				"Ptr", Digest, "UInt", Digest.Size, "UInt")
-			throw Error("hash refused")
-		return Digest
-	} finally {
-		if HashAlg
-			DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", HashAlg, "UInt", 0, "UInt")
-	}
+	return CryptoSha256Digest(Data)
 }
 
 
@@ -120,44 +106,40 @@ LLM_Rs256_Sha256(Data) {
 ; ===============================
 ; ===============================
 
-; The DER of a PEM block, refused with rsa_pkcs1.lua's reasons.
+; The DER of a PEM block, refused with rsa_pkcs1.lua's refusals.
 ; @param {String} Pem The PEM text.
-; @param {VarRef} Reason Why it is refused.
+; @param {VarRef} Refusal Why it is refused.
 ; @param {VarRef} Label The block's label.
 ; @returns {Buffer|String} The DER, "" when refused.
-_LLM_Rs256_PemToDer(Pem, &Reason, &Label) {
+_LLM_Rs256_PemToDer(Pem, &Refusal, &Label) {
 	global LLM_RS256_LABEL_PKCS8, LLM_RS256_LABEL_PKCS1
 	Label := ""
 	if !(Pem is String) || (Pem == "") {
-		Reason := "the private key is empty"
+		Refusal := "the private key is empty"
 		return ""
 	}
 	if !RegExMatch(Pem, "s)^\s*-----BEGIN ([A-Z ]+)-----(.*?)-----END ([A-Z ]+)-----\s*$", &Block) {
-		Reason := "the private key is no PEM block"
+		Refusal := "the private key is no PEM block"
 		return ""
 	}
 	Label := Block[1]
 	if (Label !== LLM_RS256_LABEL_PKCS8 && Label !== LLM_RS256_LABEL_PKCS1) {
-		Reason := "the private key is a " . Label . ", not an unencrypted RSA key"
+		Refusal := "the private key is a " . Label . ", not an unencrypted RSA key"
 		return ""
 	}
 	if (Block[3] !== Label) {
-		Reason := "the private key PEM labels differ"
+		Refusal := "the private key PEM labels differ"
 		return ""
 	}
 	; CryptStringToBinary skips what is no Base64, so a bad body is refused here
 	Body := RegExReplace(Block[2], "\s")
 	if (StrLen(Body) == 0 || Mod(StrLen(Body), 4) != 0 || !RegExMatch(Body, "^[A-Za-z0-9+/]+={0,2}$")) {
-		Reason := "the private key is no Base64"
+		Refusal := "the private key is no Base64"
 		return ""
 	}
-	Size := 0
-	DllCall("Crypt32\CryptStringToBinaryW", "WStr", Body, "UInt", StrLen(Body), "UInt", 1,
-		"Ptr", 0, "UInt*", &Size, "Ptr", 0, "Ptr", 0)
-	Der := Buffer(Max(Size, 1), 0)
-	if (Size == 0 || !DllCall("Crypt32\CryptStringToBinaryW", "WStr", Body, "UInt", StrLen(Body), "UInt", 1,
-			"Ptr", Der, "UInt*", &Size, "Ptr", 0, "Ptr", 0)) {
-		Reason := "the private key is no Base64"
+	Der := CryptoBase64Decode(Body)
+	if (Der.Size == 0) {
+		Refusal := "the private key is no Base64"
 		return ""
 	}
 	return Der
@@ -212,35 +194,35 @@ _LLM_Rs256_DerHex(Der, Element) {
 
 ; Reads the RSA values of a key, PKCS#8 unwrapped first.
 ; @returns {Map|String} The values (_LLM_Rs256_ReadPkcs1), "" when refused.
-_LLM_Rs256_ReadValues(Der, Label, &Reason) {
+_LLM_Rs256_ReadValues(Der, Label, &Refusal) {
 	global LLM_RS256_LABEL_PKCS1, LLM_RS256_RSA_OID, LLM_RS256_DER_INTEGER, LLM_RS256_DER_OCTET_STRING
 	global LLM_RS256_DER_OID, LLM_RS256_DER_SEQUENCE
 	Outer := _LLM_Rs256_DerElement(Der, 0, Der.Size)
 	if !(Outer is Map) || Outer["tag"] != LLM_RS256_DER_SEQUENCE || Outer["next"] != Der.Size {
-		Reason := "the private key is no DER sequence"
+		Refusal := "the private key is no DER sequence"
 		return ""
 	}
 	if (Label == LLM_RS256_LABEL_PKCS1)
-		return _LLM_Rs256_ReadPkcs1(Der, 0, Der.Size, &Reason)
+		return _LLM_Rs256_ReadPkcs1(Der, 0, Der.Size, &Refusal)
 	; PrivateKeyInfo: version, AlgorithmIdentifier, OCTET STRING privateKey
 	Items := _LLM_Rs256_DerChildren(Der, Outer["at"], Outer["next"])
 	if !(Items is Array) || Items.Length < 3 || Items[1]["tag"] != LLM_RS256_DER_INTEGER
 			|| _LLM_Rs256_DerHex(Der, Items[1]) != "00" {
-		Reason := "the private key is no PKCS#8 key"
+		Refusal := "the private key is no PKCS#8 key"
 		return ""
 	}
 	Algorithm := Items[2]["tag"] == LLM_RS256_DER_SEQUENCE
 		? _LLM_Rs256_DerChildren(Der, Items[2]["at"], Items[2]["next"]) : ""
 	if !(Algorithm is Array) || Algorithm.Length < 1 || Algorithm[1]["tag"] != LLM_RS256_DER_OID
 			|| _LLM_Rs256_DerHex(Der, Algorithm[1]) != LLM_RS256_RSA_OID {
-		Reason := "the private key is no RSA key"
+		Refusal := "the private key is no RSA key"
 		return ""
 	}
 	if (Items[3]["tag"] != LLM_RS256_DER_OCTET_STRING) {
-		Reason := "the private key is no PKCS#8 key"
+		Refusal := "the private key is no PKCS#8 key"
 		return ""
 	}
-	return _LLM_Rs256_ReadPkcs1(Der, Items[3]["at"], Items[3]["next"], &Reason)
+	return _LLM_Rs256_ReadPkcs1(Der, Items[3]["at"], Items[3]["next"], &Refusal)
 }
 
 ; Reads a PKCS#1 RSAPrivateKey.
@@ -249,26 +231,26 @@ _LLM_Rs256_ReadValues(Der, Label, &Reason) {
 ; @param {Integer} End Offset after it.
 ; @returns {Map|String} "n", "e", "d", "p", "q", "dp", "dq", "qinv" as limb arrays,
 ;     "bits" the modulus size; "" when refused.
-_LLM_Rs256_ReadPkcs1(Der, At, End, &Reason) {
+_LLM_Rs256_ReadPkcs1(Der, At, End, &Refusal) {
 	global LLM_RS256_DER_SEQUENCE, LLM_RS256_DER_INTEGER, LLM_RS256_MIN_MODULUS_BITS, LLM_RS256_MAX_MODULUS_BITS
 	Outer := _LLM_Rs256_DerElement(Der, At, End)
 	if !(Outer is Map) || Outer["tag"] != LLM_RS256_DER_SEQUENCE || Outer["next"] != End {
-		Reason := "the private key is no DER sequence"
+		Refusal := "the private key is no DER sequence"
 		return ""
 	}
 	Items := _LLM_Rs256_DerChildren(Der, Outer["at"], Outer["next"])
 	if !(Items is Array) || Items.Length != 9 {
-		Reason := "the private key is no two-prime RSA key"
+		Refusal := "the private key is no two-prime RSA key"
 		return ""
 	}
 	for Item in Items {
 		if (Item["tag"] != LLM_RS256_DER_INTEGER) {
-			Reason := "the private key holds a field that is no integer"
+			Refusal := "the private key holds a field that is no integer"
 			return ""
 		}
 	}
 	if (_LLM_Rs256_DerHex(Der, Items[1]) != "00") {
-		Reason := "the private key has an unknown version"
+		Refusal := "the private key has an unknown version"
 		return ""
 	}
 	Values := Map()
@@ -276,7 +258,7 @@ _LLM_Rs256_ReadPkcs1(Der, At, End, &Reason) {
 		Item := Items[Index + 1]
 		if (Item["size"] > 0 && NumGet(Der, Item["at"], "UChar") >= 128) {
 			_LLM_Rs256_WipeValues(Values)
-			Reason := "the private key holds a negative integer"
+			Refusal := "the private key holds a negative integer"
 			return ""
 		}
 		Values[Name] := _LLM_Rs256_LimbsOf(Der, Item["at"], Item["size"])
@@ -284,14 +266,14 @@ _LLM_Rs256_ReadPkcs1(Der, At, End, &Reason) {
 	Bits := _LLM_Rs256_BitLength(Values["n"])
 	if (Bits < LLM_RS256_MIN_MODULUS_BITS || Bits > LLM_RS256_MAX_MODULUS_BITS) {
 		_LLM_Rs256_WipeValues(Values)
-		Reason := "the private key modulus is not between 2048 and 4096 bits"
+		Refusal := "the private key modulus is not between 2048 and 4096 bits"
 		return ""
 	}
 	Values["bits"] := Bits
 	P := Values["p"], Q := Values["q"], N := Values["n"]
 	if (P.Length == 0 || Q.Length == 0 || !(P[1] & 1) || !(Q[1] & 1) || !(N[1] & 1)) {
 		_LLM_Rs256_WipeValues(Values)
-		Reason := "the private key primes are invalid"
+		Refusal := "the private key primes are invalid"
 		return ""
 	}
 	Product := _LLM_Rs256_Multiply(P, Q)
@@ -299,7 +281,7 @@ _LLM_Rs256_ReadPkcs1(Der, At, End, &Reason) {
 	_LLM_Rs256_WipeLimbs(Product)
 	if !Same {
 		_LLM_Rs256_WipeValues(Values)
-		Reason := "the private key primes do not multiply to its modulus"
+		Refusal := "the private key primes do not multiply to its modulus"
 		return ""
 	}
 	return Values
@@ -534,47 +516,21 @@ _LLM_Rs256_FullBlob(Values) {
 }
 
 ; Signs through CNG and opens the signature again, as rsa_pkcs1.lua does.
-; @returns {Buffer|String} The signature, "" with Reason set.
-_LLM_Rs256_SignNative(Values, Message, &Reason) {
-	global LLM_RS256_FULL_PRIVATE_BLOB, LLM_RS256_PAD_PKCS1, LLM_RS256_VALUES_DISAGREE
-	KeyAlg := 0, Key := 0
+; @returns {Buffer|String} The signature, "" with Refusal set.
+_LLM_Rs256_SignNative(Values, Message, &Refusal) {
+	global LLM_RS256_VALUES_DISAGREE
 	Blob := _LLM_Rs256_FullBlob(Values)
 	try {
-		if DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &KeyAlg, "WStr", "RSA", "Ptr", 0, "UInt", 0, "UInt") {
-			Reason := "the system has no RSA provider"
-			return ""
-		}
-		if DllCall("bcrypt\BCryptImportKeyPair", "Ptr", KeyAlg, "Ptr", 0, "WStr", LLM_RS256_FULL_PRIVATE_BLOB,
-				"Ptr*", &Key, "Ptr", Blob, "UInt", Blob.Size, "UInt", 0, "UInt") {
-			Reason := LLM_RS256_VALUES_DISAGREE
-			return ""
-		}
 		Data := Buffer(StrPut(Message, "UTF-8") - 1)
 		if (Data.Size > 0)
 			StrPut(Message, Data, Data.Size, "UTF-8")
-		Digest := LLM_Rs256_Sha256(Data)
-		; BCRYPT_PKCS1_PADDING_INFO names the digest the padding wraps
-		AlgName := Buffer(StrPut("SHA256", "UTF-16"), 0)
-		StrPut("SHA256", AlgName, "UTF-16")
-		Padding := Buffer(A_PtrSize, 0)
-		NumPut("Ptr", AlgName.Ptr, Padding, 0)
-		Signature := Buffer(_LLM_Rs256_ByteLength(Values["n"]), 0)
-		Written := 0
-		if DllCall("bcrypt\BCryptSignHash", "Ptr", Key, "Ptr", Padding, "Ptr", Digest, "UInt", Digest.Size,
-				"Ptr", Signature, "UInt", Signature.Size, "UInt*", &Written, "UInt", LLM_RS256_PAD_PKCS1, "UInt")
-				|| Written != Signature.Size
-				|| DllCall("bcrypt\BCryptVerifySignature", "Ptr", Key, "Ptr", Padding, "Ptr", Digest, "UInt", Digest.Size,
-					"Ptr", Signature, "UInt", Signature.Size, "UInt", LLM_RS256_PAD_PKCS1, "UInt") {
-			Reason := LLM_RS256_VALUES_DISAGREE
-			return ""
-		}
-		return Signature
+		Signature := CryptoRsaPkcs1SignSha256(Blob, LLM_Rs256_Sha256(Data), _LLM_Rs256_ByteLength(Values["n"]))
+		if Signature is Buffer
+			return Signature
+		Refusal := (Signature == CRYPTO_RSA_NO_PROVIDER) ? "the system has no RSA provider" : LLM_RS256_VALUES_DISAGREE
+		return ""
 	} finally {
 		_LLM_Rs256_Zero(Blob)
-		if Key
-			DllCall("bcrypt\BCryptDestroyKey", "Ptr", Key, "UInt")
-		if KeyAlg
-			DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", KeyAlg, "UInt", 0, "UInt")
 	}
 }
 
@@ -589,8 +545,7 @@ _LLM_Rs256_SignNative(Values, Message, &Reason) {
 
 ; RtlZeroMemory as a call the compiler of this script cannot drop.
 _LLM_Rs256_Zero(Bytes) {
-	if (Bytes.Size > 0)
-		DllCall("Kernel32\RtlZeroMemory", "Ptr", Bytes.Ptr, "UPtr", Bytes.Size)
+	CryptoWipe(Bytes)
 }
 
 _LLM_Rs256_WipeLimbs(Limbs) {
