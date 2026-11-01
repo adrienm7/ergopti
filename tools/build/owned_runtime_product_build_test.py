@@ -236,13 +236,16 @@ class DaemonReportBuildControls(unittest.TestCase):
                 "installer",
                 "validator",
                 "module",
-                "report_CPOSIXCompatibility",
-                "report_OwnedProgramCompatibility",
-                "report_OwnedVHDReportSocketIdentity",
+                "report_cposixcompatibility",
+                "report_ownedprogramcompatibility",
+                "report_ownedvhdreportsocketidentity",
             )
         }
         expected.update(("installer_universal", "validator_universal", "module_universal"))
         self.assertEqual(set(commands), expected)
+        # Every name becomes a native phase; the backend admits only this shape.
+        for name in commands:
+            self.assertRegex("production_" + name, r"^[a-z][a-z0-9_]{0,63}$")
         for arch in ("arm64", "x86_64"):
             installer = commands["installer_" + arch]
             for stem in (
