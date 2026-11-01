@@ -14,9 +14,7 @@
 ;    was budgeted five tokens more than on macOS and Linux, an invalid count was
 ;    silently read as one, the empty map wrote "v1:W10=" and not the neutral value,
 ;    unnormalised application keys were admitted and legacy pairs were read.
-; 2. A retry row of the token corpus has no Windows owner: this driver sends no
-;    retry with more tokens. The rows are counted, and named in the report.
-; 3. A native separator owns no submenu, so the corpus row where one does is not
+; 2. A native separator owns no submenu, so the corpus row where one does is not
 ;    representable here; it is named and skipped, never replayed as something else.
 ; ==============================================================================
 
@@ -74,20 +72,26 @@ _CTSF_TokenBudget() {
 	AssertEqual(8, Vectors.Length, "the token budget vectors changed")
 	Replayed := 0
 	for Vector in Vectors {
-		if Vector.Has("retry")
-			continue
 		Replayed += 1
+		Budget := _CTSF_TokenBudgetOf.Bind(Vector)
 		if Vector.Has("expect_error") {
 			Message := ""
-			try _LLM_Engine_CallTokenBudget(Vector["base_tokens"], Vector["per_call"])
+			try Budget.Call()
 			catch as Err
 				Message := Err.Message
 			AssertContains(Message, Vector["expect_error"], Vector["id"])
 		} else {
-			AssertEqual(Vector["expect"], _LLM_Engine_CallTokenBudget(Vector["base_tokens"], Vector["per_call"]), Vector["id"])
+			AssertEqual(Vector["expect"], Budget.Call(), Vector["id"])
 		}
 	}
-	AssertEqual(5, Replayed, "the corpus rows with a Windows owner")
+	AssertEqual(8, Replayed, "every corpus row has a Windows owner")
+}
+
+_CTSF_TokenBudgetOf(Vector) {
+	if !Vector.Has("retry")
+		return _LLM_Engine_CallTokenBudget(Vector["base_tokens"], Vector["per_call"])
+	Retry := Vector["retry"]
+	return _LLM_Engine_RetryTokenBudget(Retry["call_tokens"], Retry["extra_tokens"])
 }
 
 ; Builds one real popup from corpus rows. A plain string is a row named after itself.
