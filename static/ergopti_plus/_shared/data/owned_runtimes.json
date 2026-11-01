@@ -1424,6 +1424,21 @@
 			"decision_text": "Not applicable (built by this repository)",
 			"alternative": null,
 			"status": "done"
+		},
+		{
+			"os": "windows",
+			"tool": "`git`",
+			"programs": ["git"],
+			"used_for": "Developer run only: is the clone's layout registry modified? (`windows/modules/keymap/keylayout/layout_catalogue_refresh.ahk`)",
+			"today": "System (Git for Windows)",
+			"current_class": "SYS",
+			"version_needed": "any",
+			"if_missing": "The developer run uses the clone's registry and logs an ERROR",
+			"pin_possible": "No (developer tool)",
+			"decision": "SYS",
+			"decision_text": "SYS (developer runs only)",
+			"alternative": null,
+			"status": "done"
 		}
 	]
 }
