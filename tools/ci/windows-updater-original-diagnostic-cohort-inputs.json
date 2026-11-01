@@ -54,12 +54,12 @@
 		"static/ergopti_plus/windows/modules/updater.ahk": "0e61410a2a31e254028625461a1537b6beed763963a323de43155af602302b58",
 		"static/ergopti_plus/windows/modules/updater/changelog.ahk": "047e274588b1620e30825844066e84ae88b33a7d50f52534702dbf6a1278877e",
 		"static/ergopti_plus/windows/modules/updater/channels.ahk": "d65f0823227bca1f86d102542629bd369c8a28de064036680e49c754961c8961",
-		"static/ergopti_plus/windows/modules/updater/config_backup.ahk": "b3faf2e54cf7a358ff55bf606f868be467bd2a8fcd479801c9eae19704f793d1",
+		"static/ergopti_plus/windows/modules/updater/config_backup.ahk": "2d496a7b47bc63f0d7f9e6bd7335769c50b695e183b0e591d7a3306352c41797",
 		"static/ergopti_plus/windows/modules/updater/core.ahk": "dce7abc1b3c21ae11ea9ea104018a3cf789bc3fadafff726f62e80dca8608038",
 		"static/ergopti_plus/windows/modules/updater/release_install.ahk": "964dcfd4d411d94ac916434eaed44c557ba69c1b3a5c3e90b73b51acf033779e",
 		"static/ergopti_plus/windows/modules/updater/schedule.ahk": "546a68c7f6524297d2309847dba6ee43f21ae5f7aaf88c1776df56062272de40",
 		"static/ergopti_plus/windows/modules/updater/self_update.ahk": "9d9afa1c67276976d44658ec5b9d3a5f00a556a560c8c3ba5f89cec26798fa45",
-		"static/ergopti_plus/windows/tests/run_all.ahk": "bfd64b121ca011229f8f1510d679ed5e84ffb361a71a0d5bcbe6743be97bc616",
+		"static/ergopti_plus/windows/tests/run_all.ahk": "9733c6090a3d294fa8a4f3c35ac285e1a9042f118811a52cac98d0a97853ff96",
 		"static/ergopti_plus/windows/tests/test_framework.ahk": "a64b6e2ed758d98c59eef1ab6e620864efbde2c551fd72cb95a6dbde520a5655",
 		"static/ergopti_plus/windows/tests/unit/test_config_scope_manifest.ahk": "a8982781a6dc734f80f2fa98ffbd78f4b06741b6cad7b282f7abe8bac7d43e02",
 		"static/ergopti_plus/windows/tests/unit/test_updater.ahk": "01662ae4e36fbcd5981dc19363d241b068d1dbb70999e8fac03852b69fedbf4d",
@@ -70,7 +70,7 @@
 	"diagnostic_only": true,
 	"private_cost_fixture_admitted": false,
 	"role": "candidate",
-	"source_pin_base": "a7dbfacd25a0e131c11a3a63611f8a02e277f288",
+	"source_pin_base": "ddd8735e9fbdfd0f6fff9da8e14bde0f91641286",
 	"runtime_qualification": "UNRUN",
 	"source_authority": "Pins are data; actual HEAD/Git object/API/artifact receiving remains independently required."
 }
