@@ -247,7 +247,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 						if scenario == "publication refusal" then controls.refuse = path end
 						package.loaded["adapters.file_system"] = controls.files
 						os.execute = function(command)
-							if command:find("zenity", 1, true) then
+							if command:find("dialog_host.lua", 1, true) then
 								questions = questions + 1
 								return 0
 							end

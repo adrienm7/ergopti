@@ -295,7 +295,7 @@ trap on_interrupt INT TERM HUP
 
 step versions sh -c 'git rev-parse --short HEAD; uname -srmo; grep -E "^(NAME|VERSION_ID|ID|ID_LIKE)=" /etc/os-release; nproc; grep -E "^(MemTotal|MemAvailable):" /proc/meminfo'
 step session sh -c 'printf "XDG_SESSION_TYPE=%s\nXDG_CURRENT_DESKTOP=%s\nDESKTOP_SESSION=%s\nWAYLAND_DISPLAY=%s\nDISPLAY=%s\nLANG=%s\n" "${XDG_SESSION_TYPE:-}" "${XDG_CURRENT_DESKTOP:-}" "${DESKTOP_SESSION:-}" "${WAYLAND_DISPLAY:-}" "${DISPLAY:-}" "${LANG:-}"'
-step toolchain sh -c 'luajit -v; luajit -e "require(\"luv\"); print(\"luv ok\")"; for t in ydotool ydotoold zenity notify-send xdg-open cc; do printf "%s: %s\n" "$t" "$(command -v "$t" || echo missing)"; done; zenity --version'
+step toolchain sh -c 'luajit -v; luajit -e "require(\"luv\"); print(\"luv ok\")"; luajit -e "require(\"ffi\").load(\"libgtk-3.so.0\"); print(\"gtk3 ok (owned dialog host)\")"; for t in ydotool ydotoold notify-send xdg-open cc; do printf "%s: %s\n" "$t" "$(command -v "$t" || echo missing)"; done'
 step keyboard_layout sh -c 'localectl status; command -v setxkbmap >/dev/null && setxkbmap -query; command -v gsettings >/dev/null && gsettings get org.gnome.desktop.input-sources sources; true'
 # Input access: the groups, uinput and the evdev nodes the daemon must open.
 step input_access sh -c 'id -nG; ls -l /dev/uinput; n=0; r=0; for d in /dev/input/event*; do n=$((n + 1)); [ -r "$d" ] && r=$((r + 1)); done; echo "evdev nodes: $n, readable: $r"; ls /etc/udev/rules.d 2>/dev/null | grep -i ergopti || true'

@@ -582,7 +582,7 @@ if (packageDependencyChecks.some((value) => value == null || value === '' || val
 // Independent historical floors keep a catalogue edit from quietly dropping old requirements.
 const preservedRequirements = {
 	deb: [
-		...'xclip, libnotify-bin, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, zenity, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1'.split(
+		...'xclip, libnotify-bin, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1'.split(
 			', '
 		),
 		'libsecret-tools'
@@ -597,7 +597,6 @@ const preservedRequirements = {
 		'kmod',
 		'systemd-udev',
 		'libayatana-appindicator-gtk3',
-		'zenity',
 		'shadow-utils',
 		'util-linux',
 		'libsecret'
@@ -635,6 +634,11 @@ try {
 		for (const owned of privateRuntimePackages[format] || [])
 			if (actual.includes(owned))
 				errors.push(`${format} depends on the host ${owned} instead of its private runtime`);
+		// Every dialog is Ergopti's own GTK window (linux/ui/dialog_host.lua):
+		// no package may pull the host's dialog programs back in.
+		for (const dialog of ['zenity', 'kdialog'])
+			if (actual.includes(dialog))
+				errors.push(`${format} depends on the host ${dialog} instead of the owned dialog host`);
 		if (actual.some((pkg) => /xvfb|x11-xkb-utils|(?:^|-)dev(?:el)?$|xkbcomp|setxkbmap/i.test(pkg)))
 			errors.push(`${format} leaked validation or development packages into end-user requirements`);
 	}

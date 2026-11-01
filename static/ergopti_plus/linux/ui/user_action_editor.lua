@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Asks the tray's native dialogs for the parameter of run_command (the
 --- command typed, then how it runs and what its output does) and of open_path
---- (a file or folder chosen in a zenity or kdialog picker). Every binding
+--- (a file or folder chosen in Ergopti's own picker). Every binding
 --- editor of the driver (the shortcuts menu, the menu dialogs and the physical
 --- shortcuts window) calls ask() for these kinds.
 ---
@@ -32,12 +32,8 @@ local LOG = "ui.user_action_editor"
 --- The kinds this module edits.
 M.KINDS = { command = true, path = true }
 
---- Escapes text for zenity's --text, which is Pango markup.
---- @param text string
---- @return string
-local function markup_plain(text)
-	return (tostring(text):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
-end
+-- Escapes text for a dialog's --text, which is Pango markup.
+local markup_plain = require("ui.native_dialog").plain_markup
 
 --- The choices of a closed option set, labelled through the locale.
 --- @param options table Array of { value, key }.

@@ -6,7 +6,7 @@
 --- Runs every system action through the real gesture executor with a recording
 --- shell and asserts the exact command it backgrounds; empty_trash and
 --- force_quit_frontmost, the ones the catalogue asks to confirm here, are
---- chained behind zenity or kdialog and run nothing when neither can ask;
+--- chained behind Ergopti's own dialog and run nothing when it cannot ask;
 --- make_executable_selection reads the file manager's text/uri-list and chmods
 --- exactly the paths it names.
 ---
@@ -156,12 +156,14 @@ helpers.describe("Linux system actions", function()
 		helpers.assert_eq(confirmed, { "empty_trash", "force_quit_frontmost" })
 	end)
 
-	-- The window and its process are read before the question: once zenity's
-	-- own window is gone, the one the window manager focuses may be another
+	-- The window and its process are read before the question: once the
+	-- dialog's own window is gone, the one the window manager focuses may be another
 	-- application's, and a window closed meanwhile has no process to resolve.
+	-- The owned dialog host's command words (ui/native_dialog.lua).
+	local DIALOG = require("ui.native_dialog").command()
 	local FORCE_QUIT_KILL = '[ "$(xdotool getwindowpid "$win" 2>/dev/null)" = "$pid" ] && kill -KILL "$pid"'
 
-	helpers.it("force_quit_frontmost kills only behind zenity's question, window read first (force-quit-confirm)",
+	helpers.it("force_quit_frontmost kills only behind the owned question, window read first (force-quit-confirm)",
 		function()
 			with_recorded_shell(function(commands)
 				Gestures.execute_action("force_quit_frontmost", "tap_3")
@@ -172,43 +174,15 @@ helpers.describe("Linux system actions", function()
 					.. ' && case "$kind" in *_NET_WM_WINDOW_TYPE_DESKTOP*|*_NET_WM_WINDOW_TYPE_DOCK*) false;; esac'
 					.. ' && pid=$(xdotool getwindowpid "$win" 2>/dev/null)'
 					.. ' && [ "$pid" -gt 1 ] && [ "$pid" != "$PPID" ]'
-					.. " && zenity --question --no-markup --default-cancel "
+					.. " && " .. DIALOG .. " --question --no-markup --default-cancel "
 				helpers.assert_eq(run[1]:sub(1, #head), head,
 					"the active window is read, then the question comes, with Cancel focused: " .. run[1])
 				local chained = " && { " .. FORCE_QUIT_KILL .. "; }; } 2>/dev/null &"
 				helpers.assert_eq(run[1]:sub(-#chained), chained, "the kill runs only on Continue")
 				helpers.assert_eq(select(2, run[1]:gsub("getactivewindow", "")), 1,
 					"the window is never read again after the question")
-			end, function(command)
-				if command:find("command -v", 1, true) then return command:find("zenity", 1, true) ~= nil end
-				return true
 			end)
 		end)
-
-	helpers.it("force_quit_frontmost kills only behind kdialog's No, Cancel as default (force-quit-confirm)", function()
-		with_recorded_shell(function(commands)
-			Gestures.execute_action("force_quit_frontmost", "tap_3")
-			local run = launched(commands)
-			helpers.assert_eq(#run, 1)
-			helpers.assert_true(run[1]:find("^{ win=%$%(xdotool getactivewindow 2>/dev/null%) && .*"
-				.. '%[ "%$pid" != "%$PPID" %] && { kdialog ') ~= nil, run[1])
-			local chained = "; [ $? -eq 1 ]; } && { " .. FORCE_QUIT_KILL .. "; }; } 2>/dev/null &"
-			helpers.assert_eq(run[1]:sub(-#chained), chained)
-		end, function(command)
-			if command:find("command -v", 1, true) then return command:find("kdialog", 1, true) ~= nil end
-			return true
-		end)
-	end)
-
-	helpers.it("force_quit_frontmost kills nothing when no dialog can ask (force-quit-confirm)", function()
-		with_recorded_shell(function(commands)
-			Gestures.execute_action("force_quit_frontmost", "tap_3")
-			helpers.assert_eq(#launched(commands), 0)
-		end, function(command)
-			if command:find("command -v", 1, true) then return false end
-			return true
-		end)
-	end)
 
 	-- Executed, not only spelled: a real shell runs the confirmed command with
 	-- stub tools whose active window changes once the question was asked.
@@ -216,9 +190,10 @@ helpers.describe("Linux system actions", function()
 		.. " (force-quit-confirm)",
 		function()
 			local SystemActions = require("modules.gestures.system_actions")
-			local command = SystemActions.command_for("force_quit_frontmost", "Force quit", true,
-				function(binary) return binary == "zenity" end)
+			local command = SystemActions.command_for("force_quit_frontmost", "Force quit", true)
 			helpers.assert_true(type(command) == "string", "a confirmed command is built")
+			local at = command:find(DIALOG, 1, true)
+			helpers.assert_true(at ~= nil, "the owned dialog asks: " .. command)
 			local dir = os.tmpname()
 			os.remove(dir)
 			helpers.assert_true(os.execute("mkdir -p '" .. dir .. "/bin'") ~= nil)
@@ -236,8 +211,12 @@ helpers.describe("Linux system actions", function()
 				.. ' else echo 111; fi;; getwindowpid) [ -f "' .. dir .. '/closed" ] && exit 1;'
 				.. ' echo "$(( $2 * 100 ))";; esac')
 			stub("xprop", "echo '_NET_WM_WINDOW_TYPE(ATOM) = _NET_WM_WINDOW_TYPE_NORMAL'")
-			stub("zenity", 'touch "' .. dir .. '/asked"; answer=$(cat "' .. dir .. '/answer");'
+			-- The private executable stands in for the owned dialog host; exit 69
+			-- is the host's « no display or no GTK 3 ».
+			stub("dialog", 'touch "' .. dir .. '/asked"; answer=$(cat "' .. dir .. '/answer");'
+				.. ' [ "$answer" = unavailable ] && exit 69;'
 				.. ' [ "$answer" = closed ] && touch "' .. dir .. '/closed"; [ "$answer" != cancel ]')
+			command = command:sub(1, at - 1) .. "'" .. dir .. "/bin/dialog'" .. command:sub(at + #DIALOG)
 			-- kill is a shell builtin: a function shadows it with a recorder.
 			write(dir .. "/run.sh", "kill() { echo \"$@\" >> '" .. dir .. "/killed'; }\n" .. command .. "\n")
 			local function run(answer)
@@ -255,47 +234,24 @@ helpers.describe("Linux system actions", function()
 			local cancelled = run("cancel")
 			local continued = run("continue")
 			local closed = run("closed")
+			local unavailable = run("unavailable")
 			os.execute("rm -rf '" .. dir .. "'")
 			helpers.assert_eq(cancelled, nil, "Cancel kills nothing")
 			helpers.assert_eq(continued, "-KILL 11100\n", "Continue kills the window active before the question")
 			helpers.assert_eq(closed, nil, "a window closed during the question leaves its old process id alone")
+			helpers.assert_eq(unavailable, nil, "a dialog that cannot open kills nothing")
 		end)
 
-	helpers.it("empty_trash runs only behind zenity's question, Cancel as default (system-actions)", function()
+	helpers.it("empty_trash runs only behind the owned question, Cancel as default (system-actions)", function()
 		with_recorded_shell(function(commands)
 			Gestures.execute_action("empty_trash", "tap_3")
 			local run = launched(commands)
 			helpers.assert_eq(#run, 1)
-			helpers.assert_true(run[1]:find("^zenity %-%-question %-%-no%-markup %-%-default%-cancel ") ~= nil,
+			local head = DIALOG .. " --question --no-markup --default-cancel "
+			helpers.assert_true(run[1]:sub(1, #head) == head,
 				"the question comes first, with Cancel focused: " .. run[1])
 			local chained = " && { gio trash --empty; } 2>/dev/null &"
 			helpers.assert_eq(run[1]:sub(-#chained), chained, "the trash is emptied only on Continue")
-		end, function(command)
-			if command:find("command -v", 1, true) then return command:find("zenity", 1, true) ~= nil end
-			return true
-		end)
-	end)
-
-	-- kdialog's --warningcontinuecancel focuses Continue, so a stray Return
-	-- emptied the trash: its default button must be the one that cancels.
-	helpers.it("empty_trash falls back to kdialog's question, Cancel as default (system-actions)", function()
-		local Quote = require("adapters.shell_runner").quote
-		local i18n = require("infra.i18n")
-		with_recorded_shell(function(commands)
-			Gestures.execute_action("empty_trash", "tap_3")
-			local run = launched(commands)
-			helpers.assert_eq(#run, 1)
-			helpers.assert_true(run[1]:find("^{ kdialog %-%-title ") ~= nil, run[1])
-			helpers.assert_true(run[1]:find(" --warningyesno ", 1, true) ~= nil, run[1])
-			helpers.assert_true(run[1]:find(" --yes-label " .. Quote(i18n.get("button.cancel"))
-				.. " --no-label " .. Quote(i18n.get("dialog.confirm_action.confirm")) .. "; ", 1, true) ~= nil,
-				"the default Yes button cancels, No continues: " .. run[1])
-			local chained = "; [ $? -eq 1 ]; } && { gio trash --empty; } 2>/dev/null &"
-			helpers.assert_eq(run[1]:sub(-#chained), chained,
-				"only No (exit 1) empties the trash, and the whole question is backgrounded")
-		end, function(command)
-			if command:find("command -v", 1, true) then return command:find("kdialog", 1, true) ~= nil end
-			return true
 		end)
 	end)
 
@@ -310,16 +266,6 @@ helpers.describe("Linux system actions", function()
 				if command:find("command -v", 1, true) then probed[#probed + 1] = command end
 			end
 			helpers.assert_eq(#probed, 3, "dunstctl, makoctl and swaync-client are each looked for")
-		end, function(command)
-			if command:find("command -v", 1, true) then return false end
-			return true
-		end)
-	end)
-
-	helpers.it("empty_trash runs nothing when no dialog can ask (system-actions)", function()
-		with_recorded_shell(function(commands)
-			Gestures.execute_action("empty_trash", "tap_3")
-			helpers.assert_eq(#launched(commands), 0)
 		end, function(command)
 			if command:find("command -v", 1, true) then return false end
 			return true

@@ -98,7 +98,7 @@ for (const statement of [
 	);
 assert.ok(
 	whole.indexOf('local WindowTitles = require("window_titles")') <
-		whole.indexOf('local function zenity_plain('),
+		whole.indexOf('local function plain_markup('),
 	'a part-only import precedes the definitions that read it'
 );
 const partOnly = (file, before, after) => ({

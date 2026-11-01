@@ -1147,7 +1147,7 @@
 	"linux_shell.uninstall.invalid_path": "Ongeldig eigendomspad.",
 	"linux_shell.uninstall.manifest_missing": "Het eigendomsmanifest van de installatie ontbreekt.",
 	"linux_shell.uninstall.missing_prefix_value": "Waarde voor --prefix ontbreekt.",
-	"linux_shell.uninstall.no_dialog_tool": "Er is geen dialoogprogramma (zenity, kdialog) of notify-send beschikbaar.",
+	"linux_shell.uninstall.no_dialog_tool": "Er is geen dialoogprogramma of notify-send beschikbaar.",
 	"linux_shell.uninstall.no_package_owner": "De systeeminstallatie heeft geen geverifieerd eigenaarspakket.",
 	"linux_shell.uninstall.notification_failed": "De melding over de mislukte verwijdering kon niet worden weergegeven.",
 	"linux_shell.uninstall.owned_file_replaced": "Een bestand van de installatie is vervangen door een koppeling of een ander bestandstype.",

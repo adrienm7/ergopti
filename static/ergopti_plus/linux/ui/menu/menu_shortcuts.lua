@@ -23,7 +23,7 @@ if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 local _fill = require("ui.menu.menu_dialogs")._fill
 local prompt_text = require("ui.menu.menu_dialogs").prompt_text
 local show_error = require("ui.menu.menu_dialogs").show_error
-local zenity_plain = require("ui.menu.menu_dialogs").zenity_plain
+local plain_markup = require("ui.menu.menu_dialogs").plain_markup
 local assign_parameterized_action = require("ui.menu.menu_dialogs").assign_parameterized_action
 local open_action_picker = require("ui.menu.menu_dialogs").open_action_picker
 local slot_binding_rows = require("ui.menu.menu_dialogs").slot_binding_rows
@@ -409,7 +409,7 @@ local function _build_shortcuts(ctx)
 			open_picker = open_action_picker, error = show_error,
 			prompt_delay = function(current, declared)
 				return TextPrompt.ask(i18n_safe("menu.tapholds.simultaneous_dialog_title"),
-					zenity_plain(string.format(i18n_safe("menu.tapholds.simultaneous_dialog_prompt"), declared)), tostring(current))
+					plain_markup(string.format(i18n_safe("menu.tapholds.simultaneous_dialog_prompt"), declared)), tostring(current))
 			end,
 			-- A pair's hold opens the shared action picker, titled by its slot
 			-- and the pair, with the hold options the provider lists.
@@ -441,7 +441,7 @@ local function _build_shortcuts(ctx)
 				end
 				-- A backend is picked from a list, as on the action picker page.
 				if spec == "llm_vision" then return require("ui.vision_parameter_prompt").ask(title, prior) end
-				return prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
+				return prompt_text(title, plain_markup(gestures.get_action_parameter_prompt(action)), prior)
 			end,
 		})
 	end

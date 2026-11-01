@@ -1147,7 +1147,7 @@
 	"linux_shell.uninstall.invalid_path": "Geçersiz sahiplik yolu.",
 	"linux_shell.uninstall.manifest_missing": "Kurulum sahiplik bildirimi eksik.",
 	"linux_shell.uninstall.missing_prefix_value": "--prefix değeri eksik.",
-	"linux_shell.uninstall.no_dialog_tool": "Hiçbir iletişim kutusu aracı (zenity, kdialog) veya notify-send yok.",
+	"linux_shell.uninstall.no_dialog_tool": "Hiçbir iletişim kutusu aracı veya notify-send yok.",
 	"linux_shell.uninstall.no_package_owner": "Sistem kurulumunun doğrulanmış bir paket sahibi yok.",
 	"linux_shell.uninstall.notification_failed": "Kaldırma hatası bildirimi görüntülenemedi.",
 	"linux_shell.uninstall.owned_file_replaced": "Sahipli bir dosya bir bağlantıyla veya başka bir dosya türüyle değiştirildi.",

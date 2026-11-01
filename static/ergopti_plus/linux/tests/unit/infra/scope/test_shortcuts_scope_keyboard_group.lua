@@ -93,7 +93,7 @@ helpers.describe("Linux keyboard group scope", function()
 				root.top_level = declared_parent(top, "shortcuts")
 				os.execute = function(command)
 					if command:find("command -v zenity", 1, true) then return 0 end
-					if command:find("zenity --question", 1, true) then questions = questions + 1; return 1 end
+					if command:find("dialog_host.lua' --question", 1, true) then questions = questions + 1; return 1 end
 					return execute(command)
 				end
 				local i18n = require("infra.i18n")

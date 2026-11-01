@@ -181,7 +181,7 @@ Package: $PACKAGE_NAME
 Version: $VERSION
 Architecture: $ARCH
 Maintainer: Ergopti Contributors <ergopti@example.com>
-Depends: xclip, libnotify-bin, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, zenity, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1, glib-networking, gsettings-desktop-schemas, xdg-utils, libsecret-tools, libxkbcommon-x11-0, libx11-6, libx11-xcb1
+Depends: xclip, libnotify-bin, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1, glib-networking, gsettings-desktop-schemas, xdg-utils, libsecret-tools, libxkbcommon-x11-0, libx11-6, libx11-xcb1
 Recommends: xdotool, wmctrl, wl-clipboard
 Section: utils
 Priority: optional

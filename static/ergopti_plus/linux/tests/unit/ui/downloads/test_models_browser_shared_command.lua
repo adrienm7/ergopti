@@ -164,7 +164,7 @@ local function scripted_notices()
 	return notices, function() package.loaded["adapters.application_notifier"] = previous end
 end
 
---- Answers zenity's question with the given exit, recording the commands it ran.
+--- Answers the native question with the given exit, recording the commands it ran.
 --- @param answer boolean True presses Delete, false presses Cancel.
 --- @return table commands, function restore
 local function scripted_question(answer)
@@ -172,8 +172,8 @@ local function scripted_question(answer)
 	local commands = {}
 	os.execute = function(command)
 		commands[#commands + 1] = command
-		if command:find("command -v zenity", 1, true) then return true end
-		return answer
+		-- The dialog exits 0 for Delete and 1 for Cancel.
+		return answer and 0 or 1
 	end
 	return commands, function() os.execute = previous end
 end

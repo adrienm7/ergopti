@@ -1147,7 +1147,7 @@
 	"linux_shell.uninstall.invalid_path": "Недопустимый путь владения.",
 	"linux_shell.uninstall.manifest_missing": "Отсутствует манифест владения установки.",
 	"linux_shell.uninstall.missing_prefix_value": "Не указано значение --prefix.",
-	"linux_shell.uninstall.no_dialog_tool": "Нет ни инструмента диалогов (zenity, kdialog), ни notify-send.",
+	"linux_shell.uninstall.no_dialog_tool": "Нет ни инструмента диалогов, ни notify-send.",
 	"linux_shell.uninstall.no_package_owner": "У системной установки нет проверенного пакета-владельца.",
 	"linux_shell.uninstall.notification_failed": "Не удалось показать уведомление о сбое удаления.",
 	"linux_shell.uninstall.owned_file_replaced": "Собственный файл заменён ссылкой или файлом другого типа.",
