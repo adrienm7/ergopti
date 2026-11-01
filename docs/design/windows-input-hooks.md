@@ -290,9 +290,20 @@ AutoHotkey, so with no owner running, or no capture, nothing changes:
   has no number (no owner running, or pressed while AutoHotkey's hook ran first and
   swallowed it) the order is unknown and the catalogue decides, as before.
 
-The other rows of the terminal capture table are not switched, and neither is
-`TapHoldUserLCtrlHeld`, which could use the alias flag: a Ctrl+Alt+Del leaves a release
-no hook sees, and a stale real LCtrl would turn AltGr alone into the user's Ctrl.
+The other rows of the terminal capture table are not switched.
+
+**A release no hook sees.** Ctrl+Alt+Del, UAC and the lock screen take the keyboard to
+another desktop, and a hook sees none of the releases there. The ledger lets go of every
+key on a physical Delete with Ctrl and Alt down (AltGr counts), and on each
+`EVENT_SYSTEM_DESKTOPSWITCH` from a WinEvent watch on the hook thread. A key really still
+down then has no slot: its release is ignored, its order reads unknown, and AutoHotkey's
+physical state keeps answering. `ErgoptiNav_GetKeyLedgerHealth` says whether the watch is
+installed and how many switches it saw (`stage=hook_order` in the log).
+
+`TapHoldUserLCtrlHeld` reads the flag only under AltGr on a standard layout: real means
+the user's Ctrl. A forgotten release cannot turn a later AltGr alone into the user's Ctrl,
+and with no owner running the LCtrl under AltGr stays AltGr's, as before. Physical check:
+that AltGr's fake LCtrl really arrives as raw 0x21D on the keyboard (see Left below).
 
 The physical terminal capture list above stays open: it says what a user sees
 during a capture, a separate question from the order.

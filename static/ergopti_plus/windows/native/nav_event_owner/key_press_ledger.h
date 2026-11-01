@@ -80,6 +80,19 @@ static inline void ErgoptiLedger_Reset(ErgoptiLedger *ledger)
 }
 
 /**
+ * Lets go of every key held, keeping the press numbers increasing: the releases
+ * were missed (the secure desktop takes the keyboard, and no hook sees what
+ * happens there). A key really still down has its release ignored later, and
+ * AutoHotkey's physical state keeps answering for it meanwhile.
+ *
+ * @param ledger Ledger to clear.
+ */
+static inline void ErgoptiLedger_ReleaseAll(ErgoptiLedger *ledger)
+{
+	memset(ledger->slots, 0, sizeof(ledger->slots));
+}
+
+/**
  * Classifies one raw hook tuple.
  *
  * @param raw_scan KBDLLHOOKSTRUCT scanCode, unmasked.
@@ -133,6 +146,26 @@ static inline ErgoptiLedger_Slot *ErgoptiLedger_Open(ErgoptiLedger *ledger, uint
 	return NULL;
 }
 
+/** Whether a key is really or by its system alias down, without changing it. */
+static inline bool ErgoptiLedger_IsDownAny(ErgoptiLedger *ledger, uint16_t sc)
+{
+	const ErgoptiLedger_Slot *slot = ErgoptiLedger_Find(ledger, sc);
+	return slot != NULL
+		&& (slot->state & (ERGOPTI_LEDGER_REAL_DOWN | ERGOPTI_LEDGER_SYSTEM_DOWN)) != 0;
+}
+
+/**
+ * Whether a Delete going down now completes Ctrl+Alt+Del. The system answers it
+ * with the secure desktop, so no hook sees the releases of the keys held. AltGr
+ * counts: its fake LCtrl and its right Alt are that Ctrl and that Alt.
+ */
+static inline bool ErgoptiLedger_IsSecureAttention(ErgoptiLedger *ledger, uint16_t sc)
+{
+	return (sc == 0x53u || sc == 0x153u)
+		&& (ErgoptiLedger_IsDownAny(ledger, 0x1Du) || ErgoptiLedger_IsDownAny(ledger, 0x11Du))
+		&& (ErgoptiLedger_IsDownAny(ledger, 0x38u) || ErgoptiLedger_IsDownAny(ledger, 0x138u));
+}
+
 /** Numbers a new press; a Down on a key already down is its auto-repeat. */
 static inline void ErgoptiLedger_MarkDown(ErgoptiLedger *ledger, ErgoptiLedger_Slot *slot)
 {
@@ -171,6 +204,10 @@ static inline void ErgoptiLedger_ObserveBefore(
 			slot->state = (uint8_t)(slot->state & ERGOPTI_LEDGER_SYSTEM_DOWN);
 		else if ((slot->state & ERGOPTI_LEDGER_HIDDEN) == 0)
 			slot->state = (uint8_t)(slot->state & ERGOPTI_LEDGER_SYSTEM_DOWN);
+		return;
+	}
+	if (origin == ERGOPTI_LEDGER_ORIGIN_PHYSICAL && ErgoptiLedger_IsSecureAttention(ledger, sc)) {
+		ErgoptiLedger_ReleaseAll(ledger);
 		return;
 	}
 	slot = ErgoptiLedger_Open(ledger, sc);

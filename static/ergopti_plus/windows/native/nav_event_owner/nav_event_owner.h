@@ -754,6 +754,18 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_QueryKeyPress(
 	ErgoptiNav_KeyPress *out_press);
 
 /**
+ * Reads how the ledger is kept honest: a release no hook sees (UAC, lock,
+ * Ctrl+Alt+Del) must not leave a key held.
+ *
+ * @param out_desktop_watch Receives 1 while the desktop switch watch is installed.
+ * @param out_resets Receives how many desktop switches let the ledger go.
+ * @return An ErgoptiNav_Status value.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetKeyLedgerHealth(
+	uint32_t *out_desktop_watch,
+	uint64_t *out_resets);
+
+/**
  * Dispatches an event through the exact production state machine without a hook.
  *
  * This seam performs the same plan match, injection arbitration, owner commit,
@@ -840,6 +852,9 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookReassertWanted(
 
 /** Empties the press ledger between hook-free test cases. */
 void ERGOPTI_NAV_CALL ErgoptiNav_TestResetKeyLedger(void);
+
+/** Hook-free seam: what the desktop switch watch does on an event. */
+void ERGOPTI_NAV_CALL ErgoptiNav_TestDesktopSwitch(void);
 
 /** Arms the same drain latch used by Stop without creating a hook thread. */
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestBeginDrain(void);

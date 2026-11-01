@@ -26,7 +26,8 @@
 
 
 
-; ERGOPTI_NAV_KEY_HIDDEN of native/nav_event_owner/nav_event_owner.h.
+; ERGOPTI_NAV_KEY_REAL_DOWN and ERGOPTI_NAV_KEY_HIDDEN of native/nav_event_owner/nav_event_owner.h.
+global KS_NATIVE_KEY_REAL_DOWN := 0x01
 global KS_NATIVE_KEY_HIDDEN := 0x02
 ; The key's scan code on every layout, including those that map it to Kana.
 global KS_SC_RIGHT_ALT := 0x138
@@ -98,6 +99,20 @@ KS_IsHeld(KeyName) {
 		return 1
 	Press := _KS_NativeKeyPress(KeyName)
 	return (Press && (Press.flags & KS_NATIVE_KEY_HIDDEN)) ? 1 : 0
+}
+
+; Whether the ledger holds the real key behind a shared scan code, as opposed to
+; a system alias of it (the fake LCtrl of AltGr, which AutoHotkey's physical state
+; cannot tell from the real one). A missed release is forgotten by the ledger on
+; Ctrl+Alt+Del and on every desktop switch, so it cannot stay real here.
+; @param KeyName {String} Platform key identifier.
+; @return {Integer} 1 real, 0 not real, -1 unknown: no owner is running.
+KS_RealPressState(KeyName) {
+	global KS_NATIVE_KEY_REAL_DOWN
+	Press := _KS_NativeKeyPress(KeyName)
+	if !IsObject(Press)
+		return -1
+	return (Press.flags & KS_NATIVE_KEY_REAL_DOWN) ? 1 : 0
 }
 
 ; KS_IsHeld for either Shift: one scan code cannot name both.
