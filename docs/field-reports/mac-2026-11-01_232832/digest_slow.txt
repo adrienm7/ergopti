@@ -1,0 +1,8 @@
+2026-11-01 20:27:03:569 [WARNING] [keystats.log_manager] Slow ingest tick 1047 ms (drain=0 foreign=0 outbox=83 read=21 build=0 apply=119 commit=24 append=797 notify=0 ms; append: lock=1 journal=19 prepare=0 publish=324 write=16 clear=42 settle=391 release=0 ms; metadata_commands=0 in 0 ms; entries=1 statements=1).
+2026-11-01 22:10:33:858 [WARNING] [keymap.utils] Slow ignored-window probe 502 ms (watchers=0 focused_window=502 ms).
+2026-11-01 22:10:33:858 [INFO] [runtime] Main-thread hold of 502 ms in an hs.timer.new callback (...gopti/static/ergopti_plus/macos/modules/keymap/utils.lua:1567). Lua heap 33->33 MB.
+2026-11-01 22:12:00:046 [INFO] [runtime] Main-thread hold of 293 ms in an hs.timer.new callback (...ergopti/static/ergopti_plus/macos/ui/menu/menu_state.lua:541). Phases inside the hold: shell.ioreg=48.1 ms. Lua heap 38->340 MB.
+2026-11-01 23:32:27:791 [INFO] [runtime] Main-thread hold of 263 ms in an hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:1844). Lua heap 624->638 MB.
+2026-11-01 23:33:28:160 [INFO] [runtime] Main-thread hold of 311 ms in an hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:1844). Lua heap 65->44 MB.
+2026-11-01 23:34:28:163 [INFO] [runtime] Main-thread hold of 391 ms in an hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:1844). Lua heap 63->47 MB.
+2026-11-01 23:38:00:542 [INFO] [runtime] Main-thread hold of 303 ms in an hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:1844). Lua heap 55->43 MB.

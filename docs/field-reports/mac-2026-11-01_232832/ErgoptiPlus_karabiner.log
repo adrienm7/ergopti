@@ -1,0 +1,328 @@
+2026-11-01 22:10:34:828 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-01 22:10:34:890 [START] [karabiner] Regenerating Karabiner config…
+2026-11-01 22:10:34:950 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-01 22:10:34:956 [START] [karabiner.nav_layer] Loading the navigation layer from '~/perso/config/ergopti_plus/'…
+2026-11-01 22:10:34:964 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 22:10:34:970 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-01 22:10:34:986 [DEBUG] [karabiner] Action 'layer': prepended F20 sentinel to nav-layer activation.
+2026-11-01 22:10:34:986 [INFO] [karabiner] Prepended F20 sentinel to 2 nav-layer-activating action(s).
+2026-11-01 22:10:34:987 [INFO] [karabiner] Inserted the F19 exit sentinel into 2 nav-layer-deactivating event list(s).
+2026-11-01 22:10:34:995 [DEBUG] [karabiner] Combo 'lcmd_rcmd': tap=none, hold=none, combo=opt_backspace (non_canonical=false).
+2026-11-01 22:10:34:995 [DEBUG] [karabiner]   → rule: Cmd gauche + Cmd droit: ⌫ ⌥+Backspace [chord]
+2026-11-01 22:10:35:022 [DEBUG] [karabiner] Building config: tap/hold=200 ms, simultaneous=100 ms, symmetric=false, 31 rule(s).
+2026-11-01 22:10:35:191 [DEBUG] [karabiner] Merged 31 managed rule(s) with 29 validated non-owning legacy hint(s) into selected profile 1 without changing personal settings.
+2026-11-01 22:10:35:192 [INFO] [karabiner] Karabiner deploy decision: skipped-identical (the managed rules on disk already match; no reload).
+2026-11-01 22:10:35:192 [SUCCESS] [karabiner] Karabiner config regenerated: 6 combo(s) + 14 tap/hold key(s) deployed.
+2026-11-01 22:10:35:192 [SUCCESS] [karabiner] Ergopti Karabiner lease activated after local input preparation.
+2026-11-01 22:10:35:209 [START] [karabiner.nav_layer] Loading the navigation layer from '~/perso/config/ergopti_plus/'…
+2026-11-01 22:10:35:217 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 22:10:35:243 [INFO] [karabiner] Shortcuts rebound for layout 'current'.
+2026-11-01 22:10:35:837 [START] [karabiner] Regenerating Karabiner config…
+2026-11-01 22:10:35:852 [START] [karabiner.nav_layer] Loading the navigation layer from '~/perso/config/ergopti_plus/'…
+2026-11-01 22:10:35:859 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 22:10:36:069 [SUCCESS] [karabiner] Karabiner config regenerated: 6 combo(s) + 14 tap/hold key(s) deployed.
+2026-11-01 22:10:36:069 [SUCCESS] [karabiner] Ergopti Karabiner lease activated after local input preparation.
+2026-11-01 22:10:36:087 [START] [karabiner.nav_layer] Loading the navigation layer from '~/perso/config/ergopti_plus/'…
+2026-11-01 22:10:36:095 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 22:10:38:579 [INFO] [karabiner] Karabiner ready notification sent.
+2026-11-01 22:11:56:839 [START] [karabiner] Revoking the exact Ergopti Karabiner lease…
+2026-11-01 22:11:56:839 [INFO] [karabiner.lease] Stopping Karabiner lease b268f3d7ea21474f9a37b40cdd438be6 (watcher).
+2026-11-01 22:11:56:839 [SUCCESS] [karabiner] Ergopti Karabiner lease revocation requested; stock Karabiner left untouched.
+2026-11-01 22:11:57:317 [DEBUG] [karabiner] Trackpad CapsWord resources stopped with the Ergopti lease.
+2026-11-01 22:11:57:331 [START] [karabiner] Stopping Karabiner bridge…
+2026-11-01 22:11:57:331 [TRACE] [karabiner] Stopping input source watcher…
+2026-11-01 22:11:57:331 [DONE] [karabiner] Input source watcher stopped.
+2026-11-01 22:11:57:331 [SUCCESS] [karabiner] Karabiner bridge stopped.
+2026-11-01 22:11:57:346 [DEBUG] [karabiner] ↑ "Retaining %s Karabiner regeneration behind a fresh native guardian proof." repeated 1 more time between 2026-11-01 22:10:35:777 and 2026-11-01 22:10:35:777 (last: Retaining public Karabiner regeneration behind a fresh native guardian proof.).
+2026-11-01 22:11:57:348 [DEBUG] [karabiner] ↑ "Resolved %d logical-char action(s) to key codes." repeated 1 more time between 2026-11-01 22:10:35:847 and 2026-11-01 22:10:35:847 (last: Resolved 548 logical-char action(s) to key codes.).
+2026-11-01 22:11:57:351 [INFO] [karabiner] ↑ "User config loaded (Ergopti uses Karabiner: %s)." repeated 1 more time between 2026-11-01 22:10:35:861 and 2026-11-01 22:10:35:861 (last: User config loaded (Ergopti uses Karabiner: true).).
+2026-11-01 22:11:57:358 [DEBUG] [karabiner] ↑ "Action '%s': prepended F20 sentinel to nav-layer activation." repeated 3 more times between 2026-11-01 22:10:34:986 and 2026-11-01 22:10:35:879 (last: Action 'layer_on': prepended F20 sentinel to nav-layer activation.).
+2026-11-01 22:11:57:359 [INFO] [karabiner] ↑ "Prepended F20 sentinel to %d nav-layer-activating action(s)." repeated 1 more time between 2026-11-01 22:10:35:879 and 2026-11-01 22:10:35:879 (last: Prepended F20 sentinel to 2 nav-layer-activating action(s).).
+2026-11-01 22:11:57:359 [INFO] [karabiner] ↑ "Inserted the F19 exit sentinel into %d nav-layer-deactivating event list(s)." repeated 1 more time between 2026-11-01 22:10:35:880 and 2026-11-01 22:10:35:880 (last: Inserted the F19 exit sentinel into 2 nav-layer-deactivating event list(s).).
+2026-11-01 22:11:57:359 [DEBUG] [karabiner] ↑ "Combo '%s': tap=%s, hold=%s, combo=%s (non_canonical=%s)." repeated 11 more times between 2026-11-01 22:10:34:995 and 2026-11-01 22:10:35:885 (last: Combo 'rcmd_lcmd': tap=opt_backspace, hold=option_shift, combo=opt_backspace (non_canonical=true).).
+2026-11-01 22:11:57:360 [DEBUG] [karabiner] ↑ "  → rule: %s" repeated 11 more times between 2026-11-01 22:10:34:995 and 2026-11-01 22:10:35:885 (last:   → rule: Cmd droit + Cmd gauche (right_command→left_command): ⌫ ⌥+Backspace (tap) / ⌥⇧ — Option+Shift (hold) [var-based]).
+2026-11-01 22:11:57:360 [DEBUG] [karabiner] ↑ "Building config: tap/hold=%d ms, simultaneous=%d ms, symmetric=%s, %d rule(s)." repeated 1 more time between 2026-11-01 22:10:35:909 and 2026-11-01 22:10:35:909 (last: Building config: tap/hold=200 ms, simultaneous=100 ms, symmetric=false, 31 rule(s).).
+2026-11-01 22:11:57:360 [DEBUG] [karabiner] ↑ "Merged %d managed rule(s) with %d validated non-owning legacy hint(s) into selected profile %d without changing personal settings." repeated 1 more time between 2026-11-01 22:10:36:068 and 2026-11-01 22:10:36:068 (last: Merged 31 managed rule(s) with 29 validated non-owning legacy hint(s) into selected profile 1 without changing personal settings.).
+2026-11-01 22:11:57:360 [INFO] [karabiner] ↑ "Karabiner deploy decision: skipped-identical (%s; no reload)." repeated 1 more time between 2026-11-01 22:10:36:069 and 2026-11-01 22:10:36:069 (last: Karabiner deploy decision: skipped-identical (the managed rules on disk already match; no reload).).
+2026-11-01 22:11:57:360 [INFO] [karabiner] ↑ "Shortcuts rebound for layout '%s'." repeated 1 more time between 2026-11-01 22:10:36:100 and 2026-11-01 22:10:36:100 (last: Shortcuts rebound for layout 'current'.).
+2026-11-01 22:11:57:360 [DEBUG] [karabiner] ↑ "Trackpad CapsWord resources stopped with the Ergopti lease." repeated 1 more time between 2026-11-01 22:11:57:331 and 2026-11-01 22:11:57:331.
+2026-11-01 22:11:57:372 [INFO] [karabiner.lease] Karabiner lease watchdog b268f3d7ea21474f9a37b40cdd438be6 stopped (exit 0); STOPPED acknowledged.
+2026-11-01 22:11:58:579 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 22:11:58:658 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 22:11:58:963 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-01 22:11:58:963 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-01 22:11:58:964 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-01 22:11:58:964 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-01 22:11:59:003 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-01 22:11:59:019 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-01 22:11:59:019 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-01 22:11:59:019 [INFO] [karabiner] init phase 'load_available_actions': 54.9 ms.
+2026-11-01 22:11:59:020 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-01 22:11:59:053 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-01 22:11:59:053 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-01 22:11:59:053 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-01 22:11:59:055 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-01 22:11:59:055 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-01 22:11:59:057 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-01 22:11:59:057 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-01 22:11:59:057 [TRACE] [karabiner] Registering input source watcher…
+2026-11-01 22:11:59:057 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-01 22:11:59:057 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-01 22:11:59:058 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 6 combo(s) active).
+2026-11-01 22:11:59:058 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-01 22:11:59:058 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-01 22:11:59:104 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-01 22:11:59:053 and 2026-11-01 22:11:59:053 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-01 22:11:59:104 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-01 22:11:59:020 and 2026-11-01 22:11:59:057 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-01 22:11:59:356 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-01 22:11:59:356 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-11-01 22:11:59:416 [INFO] [karabiner.lease] Remap guardian registration answered 'ready' (developer_adhoc_legacy_only).
+2026-11-01 22:11:59:416 [START] [karabiner] Regenerating Karabiner config…
+2026-11-01 22:11:59:425 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-01 22:11:59:428 [INFO] [karabiner.lease] Lease token decision=fresh reason=first-generation unaccounted_writers=0 ledger_size=498
+2026-11-01 22:11:59:428 [DEBUG] [karabiner] Trackpad CapsWord resources stopped with the Ergopti lease.
+2026-11-01 22:11:59:428 [DEBUG] [karabiner.lease] Prepared Karabiner lease generation d5ef6e8541f64e90af4eb3d007f27773.
+2026-11-01 22:11:59:432 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 22:11:59:438 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 22:11:59:441 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-01 22:11:59:456 [DEBUG] [karabiner] Action 'layer': prepended F20 sentinel to nav-layer activation.
+2026-11-01 22:11:59:456 [INFO] [karabiner] Prepended F20 sentinel to 2 nav-layer-activating action(s).
+2026-11-01 22:11:59:457 [INFO] [karabiner] Inserted the F19 exit sentinel into 2 nav-layer-deactivating event list(s).
+2026-11-01 22:11:59:462 [DEBUG] [karabiner] Combo 'lcmd_rcmd': tap=none, hold=none, combo=opt_backspace (non_canonical=false).
+2026-11-01 22:11:59:462 [DEBUG] [karabiner]   → rule: Cmd gauche + Cmd droit: ⌫ ⌥+Backspace [chord]
+2026-11-01 22:11:59:483 [DEBUG] [karabiner] Building config: tap/hold=200 ms, simultaneous=100 ms, symmetric=false, 31 rule(s).
+2026-11-01 22:11:59:635 [DEBUG] [karabiner] Merged 31 managed rule(s) with 29 validated non-owning legacy hint(s) into selected profile 1 without changing personal settings.
+2026-11-01 22:11:59:655 [TRACE] [karabiner] Deploy: writing 743375 byte(s) → '~/perso/config/macOS/.config/karabiner/karabiner.json'…
+2026-11-01 22:11:59:744 [DONE] [karabiner] Deploy S1 (direct write) succeeded: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-01 22:11:59:744 [INFO] [karabiner] Karabiner deploy decision: deployed (the managed rules on disk differ; 743375 bytes; written in 89 ms, 84 ms of it in 2 metadata fork(s); Karabiner reloads every rule).
+2026-11-01 22:11:59:744 [SUCCESS] [karabiner] Karabiner config regenerated: 6 combo(s) + 14 tap/hold key(s) deployed.
+2026-11-01 22:11:59:744 [START] [karabiner.lease] Starting Karabiner lease watchdog d5ef6e8541f64e90af4eb3d007f27773…
+2026-11-01 22:11:59:747 [SUCCESS] [karabiner.lease] Karabiner lease watchdog d5ef6e8541f64e90af4eb3d007f27773 launched; awaiting READY.
+2026-11-01 22:12:00:065 [INFO] [karabiner.lease] Karabiner lease d5ef6e8541f64e90af4eb3d007f27773 activated paused by watchdog READY.
+2026-11-01 22:12:00:067 [SUCCESS] [karabiner] Trackpad CapsWord watcher started.
+2026-11-01 22:12:00:067 [SUCCESS] [karabiner] Bare-touch CapsWord hook registered on gestures engine.
+2026-11-01 22:12:00:068 [TRACE] [karabiner] Registering cycle-windows hotkey (f17)…
+2026-11-01 22:12:00:068 [DONE] [karabiner] cycle-windows hotkey registered.
+2026-11-01 22:12:00:068 [TRACE] [karabiner] Registering Alt+Tab windows hotkey (shift+f17)…
+2026-11-01 22:12:00:068 [DONE] [karabiner] Alt+Tab windows hotkey registered.
+2026-11-01 22:12:00:068 [TRACE] [karabiner] Registering per-screen window hotkey (ctrl+f17)…
+2026-11-01 22:12:00:068 [DONE] [karabiner] per-screen window hotkey registered.
+2026-11-01 22:12:00:068 [TRACE] [karabiner] Registering Alt+Tab apps hotkey (alt+f17)…
+2026-11-01 22:12:00:068 [DONE] [karabiner] Alt+Tab apps hotkey registered.
+2026-11-01 22:12:00:068 [DEBUG] [karabiner] Lease-owned F17 hotkeys bound atomically before activation.
+2026-11-01 22:12:00:217 [SUCCESS] [karabiner] Ergopti Karabiner lease activated after local input preparation.
+2026-11-01 22:12:01:155 [DEBUG] [karabiner.onboarding] Health check: ke=true grabber_bin=true grabber_run=true sysext=true all_ok=true.
+2026-11-01 22:12:01:155 [INFO] [karabiner.onboarding] Onboarding: KE stack fully operational — wizard not needed.
+2026-11-01 22:12:02:783 [DEBUG] [karabiner] ↑ "Action '%s': prepended F20 sentinel to nav-layer activation." repeated 1 more time between 2026-11-01 22:11:59:456 and 2026-11-01 22:11:59:456 (last: Action 'layer_on': prepended F20 sentinel to nav-layer activation.).
+2026-11-01 22:12:02:804 [INFO] [karabiner] Karabiner ready notification sent.
+2026-11-01 22:12:03:265 [DEBUG] [karabiner] ↑ "Combo '%s': tap=%s, hold=%s, combo=%s (non_canonical=%s)." repeated 5 more times between 2026-11-01 22:11:59:462 and 2026-11-01 22:11:59:462 (last: Combo 'rcmd_lcmd': tap=opt_backspace, hold=option_shift, combo=opt_backspace (non_canonical=true).).
+2026-11-01 22:12:03:645 [DEBUG] [karabiner] ↑ "  → rule: %s" repeated 5 more times between 2026-11-01 22:11:59:462 and 2026-11-01 22:11:59:462 (last:   → rule: Cmd droit + Cmd gauche (right_command→left_command): ⌫ ⌥+Backspace (tap) / ⌥⇧ — Option+Shift (hold) [var-based]).
+2026-11-01 23:29:25:412 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 23:29:25:535 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 23:29:25:858 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-01 23:29:25:859 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-01 23:29:25:859 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-01 23:29:25:859 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-01 23:29:25:892 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-01 23:29:25:899 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-01 23:29:25:899 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-01 23:29:25:899 [INFO] [karabiner] init phase 'load_available_actions': 40.6 ms.
+2026-11-01 23:29:25:900 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-01 23:29:25:926 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-01 23:29:25:926 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-01 23:29:25:927 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-01 23:29:25:928 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-01 23:29:25:928 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-01 23:29:25:929 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-01 23:29:25:929 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-01 23:29:25:929 [TRACE] [karabiner] Registering input source watcher…
+2026-11-01 23:29:25:929 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-01 23:29:25:929 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-01 23:29:25:932 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 6 combo(s) active).
+2026-11-01 23:29:25:932 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-01 23:29:25:932 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-01 23:29:25:983 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-01 23:29:25:926 and 2026-11-01 23:29:25:927 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-01 23:29:25:983 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-01 23:29:25:900 and 2026-11-01 23:29:25:929 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-01 23:29:26:267 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-01 23:29:26:267 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-11-01 23:29:28:461 [DEBUG] [karabiner.onboarding] Health check: ke=true grabber_bin=true grabber_run=true sysext=true all_ok=true.
+2026-11-01 23:29:28:461 [INFO] [karabiner.onboarding] Onboarding: KE stack fully operational — wizard not needed.
+2026-11-01 23:29:30:019 [INFO] [karabiner.lease] Remap guardian registration answered 'ready' (developer_adhoc_legacy_only).
+2026-11-01 23:29:30:019 [START] [karabiner] Regenerating Karabiner config…
+2026-11-01 23:29:30:027 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-01 23:29:30:030 [INFO] [karabiner.lease] Lease token decision=fresh reason=first-generation unaccounted_writers=0 ledger_size=499
+2026-11-01 23:29:30:030 [DEBUG] [karabiner] Trackpad CapsWord resources stopped with the Ergopti lease.
+2026-11-01 23:29:30:030 [DEBUG] [karabiner.lease] Prepared Karabiner lease generation 364327f471694e56a6da269786b1475f.
+2026-11-01 23:29:30:034 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 23:29:30:042 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 23:29:30:045 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-01 23:29:30:059 [DEBUG] [karabiner] Action 'layer': prepended F20 sentinel to nav-layer activation.
+2026-11-01 23:29:30:059 [INFO] [karabiner] Prepended F20 sentinel to 2 nav-layer-activating action(s).
+2026-11-01 23:29:30:059 [INFO] [karabiner] Inserted the F19 exit sentinel into 2 nav-layer-deactivating event list(s).
+2026-11-01 23:29:30:064 [DEBUG] [karabiner] Combo 'lcmd_rcmd': tap=none, hold=none, combo=opt_backspace (non_canonical=false).
+2026-11-01 23:29:30:064 [DEBUG] [karabiner]   → rule: Cmd gauche + Cmd droit: ⌫ ⌥+Backspace [chord]
+2026-11-01 23:29:30:084 [DEBUG] [karabiner] Building config: tap/hold=200 ms, simultaneous=100 ms, symmetric=false, 31 rule(s).
+2026-11-01 23:29:30:229 [DEBUG] [karabiner] Merged 31 managed rule(s) with 29 validated non-owning legacy hint(s) into selected profile 1 without changing personal settings.
+2026-11-01 23:29:30:249 [TRACE] [karabiner] Deploy: writing 743375 byte(s) → '~/perso/config/macOS/.config/karabiner/karabiner.json'…
+2026-11-01 23:29:30:339 [DONE] [karabiner] Deploy S1 (direct write) succeeded: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-01 23:29:30:339 [INFO] [karabiner] Karabiner deploy decision: deployed (the managed rules on disk differ; 743375 bytes; written in 90 ms, 83 ms of it in 2 metadata fork(s); Karabiner reloads every rule).
+2026-11-01 23:29:30:340 [SUCCESS] [karabiner] Karabiner config regenerated: 6 combo(s) + 14 tap/hold key(s) deployed.
+2026-11-01 23:29:30:340 [START] [karabiner.lease] Starting Karabiner lease watchdog 364327f471694e56a6da269786b1475f…
+2026-11-01 23:29:30:343 [SUCCESS] [karabiner.lease] Karabiner lease watchdog 364327f471694e56a6da269786b1475f launched; awaiting READY.
+2026-11-01 23:29:30:526 [INFO] [karabiner.lease] Karabiner lease 364327f471694e56a6da269786b1475f activated paused by watchdog READY.
+2026-11-01 23:29:30:527 [SUCCESS] [karabiner] Trackpad CapsWord watcher started.
+2026-11-01 23:29:30:527 [SUCCESS] [karabiner] Bare-touch CapsWord hook registered on gestures engine.
+2026-11-01 23:29:30:527 [TRACE] [karabiner] Registering cycle-windows hotkey (f17)…
+2026-11-01 23:29:30:527 [DONE] [karabiner] cycle-windows hotkey registered.
+2026-11-01 23:29:30:527 [TRACE] [karabiner] Registering Alt+Tab windows hotkey (shift+f17)…
+2026-11-01 23:29:30:527 [DONE] [karabiner] Alt+Tab windows hotkey registered.
+2026-11-01 23:29:30:527 [TRACE] [karabiner] Registering per-screen window hotkey (ctrl+f17)…
+2026-11-01 23:29:30:527 [DONE] [karabiner] per-screen window hotkey registered.
+2026-11-01 23:29:30:527 [TRACE] [karabiner] Registering Alt+Tab apps hotkey (alt+f17)…
+2026-11-01 23:29:30:527 [DONE] [karabiner] Alt+Tab apps hotkey registered.
+2026-11-01 23:29:30:527 [DEBUG] [karabiner] Lease-owned F17 hotkeys bound atomically before activation.
+2026-11-01 23:29:30:662 [SUCCESS] [karabiner] Ergopti Karabiner lease activated after local input preparation.
+2026-11-01 23:29:33:175 [INFO] [karabiner] Karabiner ready notification sent.
+2026-11-01 23:29:55:948 [DEBUG] [karabiner] Layout baseline adopted from HIToolbox: 'Ergopti_v2_2_2_plus'.
+2026-11-01 23:30:27:130 [DEBUG] [karabiner] Input source notification received — debouncing (250ms)…
+2026-11-01 23:30:27:144 [INFO] [karabiner] Layout notification detected change: 'Ergopti_v2_2_2_plus' → 'Ergopti Field Rows 6'.
+2026-11-01 23:30:27:485 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti Field Rows 6'…
+2026-11-01 23:30:27:986 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-01 23:30:28:042 [START] [karabiner] Regenerating Karabiner config…
+2026-11-01 23:30:28:093 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 23:30:28:102 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 23:30:28:296 [INFO] [karabiner] Karabiner deploy decision: skipped-identical (the managed rules on disk already match; no reload).
+2026-11-01 23:30:28:296 [SUCCESS] [karabiner] Karabiner config regenerated: 6 combo(s) + 14 tap/hold key(s) deployed.
+2026-11-01 23:30:28:296 [SUCCESS] [karabiner] Ergopti Karabiner lease activated after local input preparation.
+2026-11-01 23:30:28:309 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 23:30:28:316 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 23:30:28:319 [INFO] [karabiner] Shortcuts rebound for layout 'Ergopti Field Rows 6'.
+2026-11-01 23:30:28:852 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti Field Rows 7'…
+2026-11-01 23:30:29:191 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-01 23:30:29:745 [START] [karabiner] Regenerating Karabiner config…
+2026-11-01 23:30:29:806 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 23:30:29:813 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 23:30:30:002 [SUCCESS] [karabiner] Karabiner config regenerated: 6 combo(s) + 14 tap/hold key(s) deployed.
+2026-11-01 23:30:30:002 [SUCCESS] [karabiner] Ergopti Karabiner lease activated after local input preparation.
+2026-11-01 23:30:30:014 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 23:30:30:021 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 23:30:43:595 [DEBUG] [karabiner] ↑ "Trackpad CapsWord resources stopped with the Ergopti lease." repeated 2 more times between 2026-11-01 23:29:30:340 and 2026-11-01 23:29:30:526.
+2026-11-01 23:30:46:288 [DEBUG] [karabiner] ↑ "Input source notification received — debouncing (%.0fms)…" repeated 2 more times between 2026-11-01 23:30:28:525 and 2026-11-01 23:30:28:926 (last: Input source notification received — debouncing (250ms)…).
+2026-11-01 23:30:46:305 [INFO] [karabiner] ↑ "Layout %s detected change: '%s' → '%s'." repeated 2 more times between 2026-11-01 23:30:28:548 and 2026-11-01 23:30:28:940 (last: Layout notification detected change: 'Ergopti Field Rows 7' → 'Ergopti_v2_2_2_plus'.).
+2026-11-01 23:30:46:345 [DEBUG] [karabiner] ↑ "Retaining %s Karabiner regeneration behind a fresh native guardian proof." repeated 1 more time between 2026-11-01 23:30:29:692 and 2026-11-01 23:30:29:692 (last: Retaining public Karabiner regeneration behind a fresh native guardian proof.).
+2026-11-01 23:30:46:416 [DEBUG] [karabiner] ↑ "Resolved %d logical-char action(s) to key codes." repeated 2 more times between 2026-11-01 23:30:28:088 and 2026-11-01 23:30:29:801 (last: Resolved 548 logical-char action(s) to key codes.).
+2026-11-01 23:30:46:565 [INFO] [karabiner] ↑ "User config loaded (Ergopti uses Karabiner: %s)." repeated 2 more times between 2026-11-01 23:30:28:104 and 2026-11-01 23:30:29:816 (last: User config loaded (Ergopti uses Karabiner: true).).
+2026-11-01 23:30:46:623 [DEBUG] [karabiner] ↑ "Action '%s': prepended F20 sentinel to nav-layer activation." repeated 5 more times between 2026-11-01 23:29:30:059 and 2026-11-01 23:30:29:830 (last: Action 'layer_on': prepended F20 sentinel to nav-layer activation.).
+2026-11-01 23:30:46:691 [INFO] [karabiner] ↑ "Prepended F20 sentinel to %d nav-layer-activating action(s)." repeated 2 more times between 2026-11-01 23:30:28:119 and 2026-11-01 23:30:29:830 (last: Prepended F20 sentinel to 2 nav-layer-activating action(s).).
+2026-11-01 23:30:46:791 [INFO] [karabiner] ↑ "Inserted the F19 exit sentinel into %d nav-layer-deactivating event list(s)." repeated 2 more times between 2026-11-01 23:30:28:119 and 2026-11-01 23:30:29:830 (last: Inserted the F19 exit sentinel into 2 nav-layer-deactivating event list(s).).
+2026-11-01 23:30:46:820 [DEBUG] [karabiner] ↑ "Combo '%s': tap=%s, hold=%s, combo=%s (non_canonical=%s)." repeated 17 more times between 2026-11-01 23:29:30:064 and 2026-11-01 23:30:29:835 (last: Combo 'rcmd_lcmd': tap=opt_backspace, hold=option_shift, combo=opt_backspace (non_canonical=true).).
+2026-11-01 23:30:46:820 [DEBUG] [karabiner] ↑ "  → rule: %s" repeated 17 more times between 2026-11-01 23:29:30:064 and 2026-11-01 23:30:29:835 (last:   → rule: Cmd droit + Cmd gauche (right_command→left_command): ⌫ ⌥+Backspace (tap) / ⌥⇧ — Option+Shift (hold) [var-based]).
+2026-11-01 23:30:46:826 [DEBUG] [karabiner] ↑ "Building config: tap/hold=%d ms, simultaneous=%d ms, symmetric=%s, %d rule(s)." repeated 2 more times between 2026-11-01 23:30:28:145 and 2026-11-01 23:30:29:854 (last: Building config: tap/hold=200 ms, simultaneous=100 ms, symmetric=false, 31 rule(s).).
+2026-11-01 23:30:46:848 [DEBUG] [karabiner] ↑ "Merged %d managed rule(s) with %d validated non-owning legacy hint(s) into selected profile %d without changing personal settings." repeated 2 more times between 2026-11-01 23:30:28:295 and 2026-11-01 23:30:30:001 (last: Merged 31 managed rule(s) with 29 validated non-owning legacy hint(s) into selected profile 1 without changing personal settings.).
+2026-11-01 23:30:46:874 [INFO] [karabiner] ↑ "Karabiner deploy decision: skipped-identical (%s; no reload)." repeated 1 more time between 2026-11-01 23:30:30:001 and 2026-11-01 23:30:30:001 (last: Karabiner deploy decision: skipped-identical (the managed rules on disk already match; no reload).).
+2026-11-01 23:31:58:138 [INFO] [karabiner] ↑ "Shortcuts rebound for layout '%s'." repeated 1 more time between 2026-11-01 23:30:30:025 and 2026-11-01 23:30:30:025 (last: Shortcuts rebound for layout 'Ergopti_v2_2_2_plus'.).
+2026-11-01 23:34:26:540 [INFO] [phase_stats] Phase summary [karabiner] over 300 s: deploy n=3 mean=184.60 max=255.41 total=553.8 ms | merge n=3 mean=146.85 max=149.53 total=440.5 ms | layout_actions n=3 mean=36.58 max=56.38 total=109.7 ms | write n=1 mean=90.16 max=90.16 total=90.2 ms | inputs n=3 mean=27.57 max=29.06 total=82.7 ms | build n=3 mean=26.83 max=27.99 total=80.5 ms | encode n=1 mean=19.87 max=19.87 total=19.9 ms.
+2026-11-01 23:34:36:165 [INFO] [karabiner] ↑ "Karabiner ready notification sent." repeated 1 more time between 2026-11-01 23:30:32:519 and 2026-11-01 23:30:32:519.
+2026-11-01 23:34:54:953 [START] [karabiner] Revoking the exact Ergopti Karabiner lease…
+2026-11-01 23:34:54:953 [INFO] [karabiner.lease] Stopping Karabiner lease 364327f471694e56a6da269786b1475f (field_run_timed_reload).
+2026-11-01 23:34:54:953 [SUCCESS] [karabiner] Ergopti Karabiner lease revocation requested; stock Karabiner left untouched.
+2026-11-01 23:34:55:559 [DEBUG] [karabiner] Trackpad CapsWord resources stopped with the Ergopti lease.
+2026-11-01 23:34:55:560 [INFO] [karabiner.lease] Karabiner lease watchdog 364327f471694e56a6da269786b1475f stopped (exit 0); STOPPED acknowledged.
+2026-11-01 23:34:55:667 [START] [karabiner] Stopping Karabiner bridge…
+2026-11-01 23:34:55:667 [TRACE] [karabiner] Stopping input source watcher…
+2026-11-01 23:34:55:667 [DONE] [karabiner] Input source watcher stopped.
+2026-11-01 23:34:55:667 [SUCCESS] [karabiner] Karabiner bridge stopped.
+2026-11-01 23:34:55:713 [DEBUG] [karabiner] ↑ "Trackpad CapsWord resources stopped with the Ergopti lease." repeated 1 more time between 2026-11-01 23:34:55:667 and 2026-11-01 23:34:55:667.
+2026-11-01 23:34:56:927 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 23:34:57:068 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 23:34:57:435 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-01 23:34:57:435 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-01 23:34:57:435 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-01 23:34:57:435 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-01 23:34:57:475 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-01 23:34:57:482 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-01 23:34:57:482 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-01 23:34:57:482 [INFO] [karabiner] init phase 'load_available_actions': 46.9 ms.
+2026-11-01 23:34:57:483 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-01 23:34:57:511 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-01 23:34:57:511 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-01 23:34:57:511 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-01 23:34:57:512 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-01 23:34:57:512 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-01 23:34:57:514 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-01 23:34:57:514 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-01 23:34:57:514 [TRACE] [karabiner] Registering input source watcher…
+2026-11-01 23:34:57:514 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-01 23:34:57:514 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-01 23:34:57:515 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 6 combo(s) active).
+2026-11-01 23:34:57:515 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-01 23:34:57:515 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-01 23:34:57:558 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-01 23:34:57:511 and 2026-11-01 23:34:57:511 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-01 23:34:57:558 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-01 23:34:57:483 and 2026-11-01 23:34:57:514 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-01 23:34:57:843 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-01 23:34:57:843 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-11-01 23:34:57:917 [INFO] [karabiner.lease] Remap guardian registration answered 'ready' (developer_adhoc_legacy_only).
+2026-11-01 23:34:57:917 [START] [karabiner] Regenerating Karabiner config…
+2026-11-01 23:34:57:926 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-01 23:34:57:929 [INFO] [karabiner.lease] Lease token decision=fresh reason=first-generation unaccounted_writers=0 ledger_size=500
+2026-11-01 23:34:57:929 [DEBUG] [karabiner] Trackpad CapsWord resources stopped with the Ergopti lease.
+2026-11-01 23:34:57:929 [DEBUG] [karabiner.lease] Prepared Karabiner lease generation 28a3141cbd9b4c49ab790ef0ad996fd9.
+2026-11-01 23:34:57:933 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 23:34:57:940 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 23:34:57:942 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-01 23:34:57:956 [DEBUG] [karabiner] Action 'layer': prepended F20 sentinel to nav-layer activation.
+2026-11-01 23:34:57:956 [INFO] [karabiner] Prepended F20 sentinel to 2 nav-layer-activating action(s).
+2026-11-01 23:34:57:957 [INFO] [karabiner] Inserted the F19 exit sentinel into 2 nav-layer-deactivating event list(s).
+2026-11-01 23:34:57:961 [DEBUG] [karabiner] Combo 'lcmd_rcmd': tap=none, hold=none, combo=opt_backspace (non_canonical=false).
+2026-11-01 23:34:57:961 [DEBUG] [karabiner]   → rule: Cmd gauche + Cmd droit: ⌫ ⌥+Backspace [chord]
+2026-11-01 23:34:57:982 [DEBUG] [karabiner] Building config: tap/hold=200 ms, simultaneous=100 ms, symmetric=false, 31 rule(s).
+2026-11-01 23:34:58:124 [DEBUG] [karabiner] Merged 31 managed rule(s) with 29 validated non-owning legacy hint(s) into selected profile 1 without changing personal settings.
+2026-11-01 23:34:58:147 [TRACE] [karabiner] Deploy: writing 743375 byte(s) → '~/perso/config/macOS/.config/karabiner/karabiner.json'…
+2026-11-01 23:34:58:310 [DONE] [karabiner] Deploy S1 (direct write) succeeded: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-01 23:34:58:310 [INFO] [karabiner] Karabiner deploy decision: deployed (the managed rules on disk differ; 743375 bytes; written in 163 ms, 158 ms of it in 2 metadata fork(s); Karabiner reloads every rule).
+2026-11-01 23:34:58:310 [SUCCESS] [karabiner] Karabiner config regenerated: 6 combo(s) + 14 tap/hold key(s) deployed.
+2026-11-01 23:34:58:310 [START] [karabiner.lease] Starting Karabiner lease watchdog 28a3141cbd9b4c49ab790ef0ad996fd9…
+2026-11-01 23:34:58:314 [SUCCESS] [karabiner.lease] Karabiner lease watchdog 28a3141cbd9b4c49ab790ef0ad996fd9 launched; awaiting READY.
+2026-11-01 23:34:58:544 [INFO] [karabiner.lease] Karabiner lease 28a3141cbd9b4c49ab790ef0ad996fd9 activated paused by watchdog READY.
+2026-11-01 23:34:58:545 [SUCCESS] [karabiner] Trackpad CapsWord watcher started.
+2026-11-01 23:34:58:545 [SUCCESS] [karabiner] Bare-touch CapsWord hook registered on gestures engine.
+2026-11-01 23:34:58:545 [TRACE] [karabiner] Registering cycle-windows hotkey (f17)…
+2026-11-01 23:34:58:545 [DONE] [karabiner] cycle-windows hotkey registered.
+2026-11-01 23:34:58:545 [TRACE] [karabiner] Registering Alt+Tab windows hotkey (shift+f17)…
+2026-11-01 23:34:58:545 [DONE] [karabiner] Alt+Tab windows hotkey registered.
+2026-11-01 23:34:58:545 [TRACE] [karabiner] Registering per-screen window hotkey (ctrl+f17)…
+2026-11-01 23:34:58:545 [DONE] [karabiner] per-screen window hotkey registered.
+2026-11-01 23:34:58:545 [TRACE] [karabiner] Registering Alt+Tab apps hotkey (alt+f17)…
+2026-11-01 23:34:58:545 [DONE] [karabiner] Alt+Tab apps hotkey registered.
+2026-11-01 23:34:58:545 [DEBUG] [karabiner] Lease-owned F17 hotkeys bound atomically before activation.
+2026-11-01 23:34:58:700 [SUCCESS] [karabiner] Ergopti Karabiner lease activated after local input preparation.
+2026-11-01 23:34:59:733 [DEBUG] [karabiner.onboarding] Health check: ke=true grabber_bin=true grabber_run=true sysext=true all_ok=true.
+2026-11-01 23:34:59:733 [INFO] [karabiner.onboarding] Onboarding: KE stack fully operational — wizard not needed.
+2026-11-01 23:35:01:238 [INFO] [karabiner] Karabiner ready notification sent.
+2026-11-01 23:35:01:527 [DEBUG] [karabiner] ↑ "Action '%s': prepended F20 sentinel to nav-layer activation." repeated 1 more time between 2026-11-01 23:34:57:956 and 2026-11-01 23:34:57:956 (last: Action 'layer_on': prepended F20 sentinel to nav-layer activation.).
+2026-11-01 23:35:01:527 [DEBUG] [karabiner] Layout baseline adopted from HIToolbox: 'Ergopti_v2_2_2_plus'.
+2026-11-01 23:35:14:128 [DEBUG] [karabiner] ↑ "Combo '%s': tap=%s, hold=%s, combo=%s (non_canonical=%s)." repeated 5 more times between 2026-11-01 23:34:57:961 and 2026-11-01 23:34:57:961 (last: Combo 'rcmd_lcmd': tap=opt_backspace, hold=option_shift, combo=opt_backspace (non_canonical=true).).
+2026-11-01 23:35:26:311 [DEBUG] [karabiner] ↑ "  → rule: %s" repeated 5 more times between 2026-11-01 23:34:57:961 and 2026-11-01 23:34:57:961 (last:   → rule: Cmd droit + Cmd gauche (right_command→left_command): ⌫ ⌥+Backspace (tap) / ⌥⇧ — Option+Shift (hold) [var-based]).
+2026-11-01 23:35:48:635 [DEBUG] [karabiner] Input source notification received — debouncing (250ms)…
+2026-11-01 23:38:21:665 [INFO] [karabiner] Layout notification detected change: 'Ergopti_v2_2_2_plus' → 'French'.
+2026-11-01 23:38:23:229 [DEBUG] [karabiner] ↑ "Trackpad CapsWord resources stopped with the Ergopti lease." repeated 2 more times between 2026-11-01 23:34:58:310 and 2026-11-01 23:34:58:544.
+2026-11-01 23:38:23:476 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'French'…
+2026-11-01 23:38:24:957 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-01 23:38:25:736 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-01 23:38:26:097 [START] [karabiner] Regenerating Karabiner config…
+2026-11-01 23:38:26:143 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-01 23:38:26:148 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 23:38:26:155 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 23:38:26:158 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-01 23:38:26:175 [DEBUG] [karabiner] Action 'layer': prepended F20 sentinel to nav-layer activation.
+2026-11-01 23:38:26:175 [INFO] [karabiner] Prepended F20 sentinel to 2 nav-layer-activating action(s).
+2026-11-01 23:38:26:176 [INFO] [karabiner] Inserted the F19 exit sentinel into 2 nav-layer-deactivating event list(s).
+2026-11-01 23:38:26:181 [DEBUG] [karabiner] Combo 'lcmd_rcmd': tap=none, hold=none, combo=opt_backspace (non_canonical=false).
+2026-11-01 23:38:26:181 [DEBUG] [karabiner]   → rule: Cmd gauche + Cmd droit: ⌫ ⌥+Backspace [chord]
+2026-11-01 23:38:26:207 [DEBUG] [karabiner] Building config: tap/hold=200 ms, simultaneous=100 ms, symmetric=false, 31 rule(s).
+2026-11-01 23:38:26:376 [DEBUG] [karabiner] Merged 31 managed rule(s) with 29 validated non-owning legacy hint(s) into selected profile 1 without changing personal settings.
+2026-11-01 23:38:26:377 [INFO] [karabiner] Karabiner deploy decision: skipped-identical (the managed rules on disk already match; no reload).
+2026-11-01 23:38:26:377 [SUCCESS] [karabiner] Karabiner config regenerated: 6 combo(s) + 14 tap/hold key(s) deployed.
+2026-11-01 23:38:26:377 [SUCCESS] [karabiner] Ergopti Karabiner lease activated after local input preparation.
+2026-11-01 23:38:26:390 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-01 23:38:26:396 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-01 23:38:26:400 [INFO] [karabiner] Shortcuts rebound for layout 'Ergopti_v2_2_2_plus'.
