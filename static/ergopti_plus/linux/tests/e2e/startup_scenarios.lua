@@ -70,11 +70,13 @@ local CORPUS = "/../_shared/tests/corpus/config_migrations"
 
 -- The errors one refused word-delimiter write logs, as module and message
 -- start: the writer's, the owner's, then the menu's rollback. Only the
--- delimiters_edit step may log them, each exactly once.
+-- delimiters_edit step may log them, each exactly once. The log masks the
+-- configuration folder with the redaction rules' config_placeholder, and the
+-- rollback is logged by the hotstrings menu that applies it.
 local REFUSAL_ERRORS = {
-	{ "toml_writer", "batch_write: publication to '~/.config/ergopti/config.toml' failed" },
+	{ "toml_writer", "batch_write: publication to '<config>/config.toml' failed" },
 	{ "hotstrings.terminator_settings", "Word-delimiter settings were not persisted: " },
-	{ "ui.menu.builder", "Word-delimiter change was rolled back because persistence failed." },
+	{ "ui.menu.menu_hotstrings", "Word-delimiter change was rolled back because persistence failed." },
 }
 
 --- The REFUSAL_ERRORS entry an error line is, if any.
