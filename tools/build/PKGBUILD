@@ -24,7 +24,7 @@ install=ergopti.install
 options=('!strip' '!debug')
 backup=('etc/udev/rules.d/99-ergopti-uinput.rules' 'etc/modules-load.d/ergopti-uinput.conf')
 # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
-depends=('xclip' 'libnotify' 'libxkbcommon' 'at-spi2-core' 'xdg-utils' 'polkit' 'kmod' 'systemd' 'shadow' 'util-linux' 'glibc' 'libayatana-appindicator' 'lua51-lgi' 'webkit2gtk-4.1' 'python' 'libsecret' 'libxkbcommon-x11' 'libx11')
+depends=('xclip' 'libnotify' 'libxkbcommon' 'at-spi2-core' 'xdg-utils' 'polkit' 'kmod' 'systemd' 'shadow' 'util-linux' 'glibc' 'libayatana-appindicator' 'lua51-lgi' 'webkit2gtk-4.1' 'libsecret' 'libxkbcommon-x11' 'libx11')
 # END GENERATED LINUX NATIVE REQUIREMENTS
 optdepends=('xdotool: focused-window identity on X11'
             'wmctrl: window list of the excluded-applications picker on X11'

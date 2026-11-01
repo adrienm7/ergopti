@@ -115,6 +115,11 @@ setenv("ERGOPTI_XKB_USER_HOME", _scratch .. "/home")
 setenv("ERGOPTI_XKB_USER_ROOT", nil)
 setenv("XDG_CURRENT_DESKTOP", nil)
 
+-- The number rows are what this probe proves, not Ergopti's own Python: its
+-- download on consent has its own live probe (run_managed_python_live.lua), so
+-- the installer runs here on the runner's interpreter instead of asking.
+local runner_python = (capture("command -v python3 2>/dev/null"):gsub("%s+$", ""))
+package.loaded["modules.keymap.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
 local Registry = require("modules.keymap.layout_registry")
 
 

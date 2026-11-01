@@ -53,6 +53,7 @@
 			"The tray icon registers with a StatusNotifier host",
 			"Install prerequisites for The owned dialog host shows its captions and answers on a real display",
 			"The owned dialog host shows its captions and answers on a real display",
+			"Ergopti's own Python downloads, verifies and runs",
 			"Install prerequisites for The secure-field probe on a real accessibility bus",
 			"The secure-field probe on a real accessibility bus",
 			"Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options",
