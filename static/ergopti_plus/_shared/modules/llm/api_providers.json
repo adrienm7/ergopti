@@ -231,7 +231,7 @@
 				"toggle": { "chat_template_kwargs": { "enable_thinking": false } },
 				"effort": { "reasoning_effort": "$level" }
 			},
-			"_source": "https://docs.sambanova.ai/docs/api-reference/chat-completions/create-chat-based-completion, https://docs.sambanova.ai/docs/en/features/text-generation (reasoning_effort low/medium/high for gpt-oss)"
+			"_source": "https://docs.sambanova.ai/docs/api-reference/chat-completions/create-chat-based-completion, https://docs.sambanova.ai/docs/en/features/text-generation (reasoning_effort low/medium/high for gpt-oss; chat_template_kwargs enable_thinking is inferred: both pages answered HTTP 403 to an automated read on 2026-11-01)"
 		},
 		"huggingface": {
 			"label": "Hugging Face",
@@ -342,7 +342,7 @@
 			"thinking_dialect": {
 				"toggle": { "chat_template_kwargs": { "enable_thinking": false, "thinking": false } }
 			},
-			"_source": "https://featherless.ai/docs/chat-template-kwargs (enable_thinking for Qwen-style templates, thinking for DeepSeek and Kimi; a template ignores the other key), https://featherless.ai/docs/api-overview-and-common-options"
+			"_source": "https://featherless.ai/docs/chat-template-kwargs (read 2026-11-01: enable_thinking false disables Qwen3, Qwen3.5/3.6 and GLM 4.7/5/5.1, thinking false disables Kimi K2.5/K2.6, DeepSeek V3.1/V3.2/V4 default to off; enable_thinking, thinking and do_reasoning are synonyms and a disagreeing false wins; DeepSeek R1, Kimi-K2-Thinking, MiniMax-M2, gpt-oss and Step-3.5 cannot be turned off), https://featherless.ai/docs/api-overview-and-common-options"
 		},
 		"inception": {
 			"label": "Inception (Mercury)",
@@ -360,7 +360,7 @@
 			"thinking_dialect": {
 				"toggle": { "chat_template_kwargs": { "enable_thinking": false, "thinking": false } }
 			},
-			"_source": "https://chutes.ai/llms.txt, https://chutes.ai/llms-full.txt (chat_template_kwargs thinking false for Kimi; enable_thinking is the key of the Qwen templates it serves)"
+			"_source": "https://chutes.ai/llms.txt, https://chutes.ai/docs/models/chutes-moonshotai-kimi-k2-6-tee (read 2026-11-01: chat_template_kwargs thinking false is Kimi K2.6 Instant mode), https://chutes.ai/docs/models/chutes-qwen-qwen3-32b-tee (names the enable_thinking template switch and /no_think without a body example: enable_thinking stays inferred from the Qwen template, and a refusal is dropped and remembered); no DeepSeek switch is documented"
 		},
 		"requesty": {
 			"label": "Requesty",
@@ -412,7 +412,7 @@
 				"toggle": { "enable_thinking": false, "thinking": { "type": "disabled" } },
 				"effort": { "reasoning_effort": "$level" }
 			},
-			"_source": "https://cloud.baidu.com/doc/qianfan-api/s/3m9b5lqft, https://cloud.baidu.com/doc/qianfan-api/s/3m7of64lb, https://cloud.baidu.com/doc/qianfan-docs/s/Wm95lyynv (enable_thinking for ERNIE and Qwen3, thinking.type for DeepSeek, Kimi and GLM: a field a model refuses is dropped once and remembered)"
+			"_source": "https://cloud.baidu.com/doc/qianfan-api/s/3m9b5lqft, https://cloud.baidu.com/doc/qianfan-api/s/3m7of64lb, https://cloud.baidu.com/doc/qianfan-docs/s/Wm95lyynv (read 2026-11-01: enable_thinking, default false, for qwen3-32b/14b/8b, the ERNIE 4.5 VL models and ernie-5.0-thinking-preview, default true there; thinking.type, default disabled, for deepseek-v4/v3.2, kimi-k2.5 and glm-5 to 5.2, glm-5.3 cannot disable; ernie-5.1 is listed only for thinking_budget, so no family turns it off and nothing is sent for it; a field a model refuses is dropped once and remembered)"
 		},
 		"spark": {
 			"label": "iFlytek Spark",
