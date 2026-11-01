@@ -45,7 +45,7 @@ const DRIVER = path.join(ROOT, 'static/ergopti_plus/windows');
 const SHARED = path.join(ROOT, 'static/ergopti_plus/_shared');
 const VENDOR = path.join(DRIVER, 'vendor');
 const OWNER = path.join(DRIVER, 'tests/live/proxy_override_owner.ahk');
-const AUTOHOTKEY = process.env.AUTOHOTKEY_EXE || 'C:/Program Files/AutoHotkey/v2/AutoHotkey64.exe';
+const AUTOHOTKEY = process.env.ERGOPTI_AHK_EXE || 'C:/Program Files/AutoHotkey/v2/AutoHotkey64.exe';
 const POWERSHELL = path.join(
 	process.env.WINDIR || 'C:/Windows',
 	'System32/WindowsPowerShell/v1.0/powershell.exe'

@@ -1336,6 +1336,25 @@ function checkFreshSourceBoot(body) {
 const sourceBoot = pipeline.job('test-ahk');
 const integrationBoot = pipeline.job('integration-ahk');
 checkFreshSourceBoot(integrationBoot);
+
+// pwsh keeps only the last native exit status: an unchecked first test died
+// with a green step, and hid that the AutoHotkey variable had the wrong name.
+{
+	const step = pipeline.step(
+		integrationBoot,
+		'Run the proxy relay end to end through the fake network'
+	);
+	const lines = pipeline.runOf(step);
+	const tests = lines.flatMap((line, index) => (/^\s*node /.test(line) ? [index] : []));
+	assert.equal(tests.length, 2, 'the relay and override tests both run');
+	for (const index of tests)
+		assert.match(lines[index + 1], /if \(\$LASTEXITCODE -ne 0\) \{ exit \$LASTEXITCODE \}/);
+	const overrideSource = fs.readFileSync(
+		path.join(__dirname, 'test-windows-proxy-override-e2e.cjs'),
+		'utf8'
+	);
+	assert.match(overrideSource, /process\.env\.ERGOPTI_AHK_EXE/, 'the name the step exports');
+}
 assert.ok(
 	!pipeline.steps(sourceBoot).some((step) => step.name.includes('fresh Git clone')),
 	'the fresh-clone boot runs once, in the Integration stage'
