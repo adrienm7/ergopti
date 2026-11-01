@@ -88,7 +88,7 @@ _LBLM_BackendLifecycleProducersAreOwned() {
 		Assert(InStr(Body, "LLM_AuxBindResources(Owner") > 0,
 			Transport . " must bind its process and finalizer to the owner receipt")
 	}
-	RemoteBody := _DriverFuncBody("LLM_RemoteIsReady_Async")
+	RemoteBody := _DriverFuncBody("_LLMRemote_ReadySend")
 	Assert(InStr(RemoteBody, "LLM_AuxBindResources(Owner") > 0,
 		"remote validation must bind its exact WinHTTP abort resource")
 	ApiTransactionBody := _DriverFuncBody("_LLM_Menu_CommitApiEntriesMutationNonCritical")
