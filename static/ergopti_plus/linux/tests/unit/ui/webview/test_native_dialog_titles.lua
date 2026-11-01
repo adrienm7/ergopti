@@ -279,21 +279,21 @@ end)
 h.describe("native caption consumer inventory", function()
 	h.it("(linux-native-titles) every production CLI caption remains in the independently bounded owner inventory", function()
 		local expected = {
-			["ui/text_prompt.lua"] = 1,
+			["ui.text_prompt"] = 1,
 			-- The application picker's two captions, and the open_path picker's two,
 			-- composed through window_titles and proven by test_user_actions.
-			["ui/app_chooser.lua"] = 2,
-			["ui/config_dir_picker.lua"] = 1,
-			["ui/gesture_conflicts.lua"] = 1,
-			["modules/gestures/system_actions.lua"] = 1,
-			["ui/menu/menu_dialogs.lua"] = 3,
-			["modules/llm/local_model_offer.lua"] = 1,
+			["ui.app_chooser"] = 2,
+			["ui.config_dir_picker"] = 1,
+			["ui.gesture_conflicts"] = 1,
+			["modules.gestures.system_actions"] = 1,
+			["ui.menu.menu_dialogs"] = 3,
+			["modules.llm.local_model_offer"] = 1,
 			-- The enable refusal tests prove the policy-owned native caption and modal receipts.
-			["ui/llm_enable_refusal.lua"] = 1,
+			["ui.llm_enable_refusal"] = 1,
 			-- The one-click check runner owns the caption of every check report.
-			["ui/field_check/window.lua"] = 1,
+			["ui.field_check.window"] = 1,
 			-- The list prompt's caption is proven by the choice prompt case.
-			["ui/choice_prompt.lua"] = 1,
+			["ui.choice_prompt"] = 1,
 		}
 		local observed = {}
 		local root = h.driver_root()
@@ -307,7 +307,8 @@ h.describe("native caption consumer inventory", function()
 		h.assert_eq(paths:sub(-1), "\0", "production discovery finishes every exact pathname record")
 		for path in paths:gmatch("([^%z]+)%z") do
 			h.assert_eq(path:sub(1, #root + 1), root .. "/", "discovered source belongs to the exact driver root")
-			local child = path:sub(#root + 2)
+			-- Keyed by module name, as the code requires it, not by path.
+			local child = path:sub(#root + 2):gsub("%.lua$", ""):gsub("/", ".")
 			local file = assert(io.open(path, "rb"))
 			local source = assert(file:read("*a")); assert(file:close())
 			local _, count = source:gsub("%-%-title", "")

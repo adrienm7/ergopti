@@ -67,8 +67,13 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // with package.searchpath from the module name; the dynamic hotstrings
 // manager, tap-hold lifecycle and clipboard preparation reads select theirs by
 // declaration.
-const BASELINE = 13;
-const READ_BASELINE = 41;
+// 13 → 8 files and 41 → 18 reads: helpers.read_module_source(name) resolves a
+// module through package.searchpath; the spawn-args sites, the http_client
+// and api_ollama pair, the sqlite_command callers, the CapsWord pointer map,
+// the native dialog title inventory and the webview app names list modules
+// by name instead of by path.
+const BASELINE = 8;
+const READ_BASELINE = 18;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];

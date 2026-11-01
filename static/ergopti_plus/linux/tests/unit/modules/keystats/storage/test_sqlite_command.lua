@@ -83,9 +83,9 @@ end
 
 --- Returns the comment-free source of a driver file, failing loudly when the
 --- file is missing so a rename cannot make the guards below vacuous.
-local function code_of(rel_path)
-	local src = read_source(rel_path)
-	helpers.assert_not_nil(src, "missing source file: " .. rel_path)
+local function code_of(module_name)
+	local src = helpers.read_module_source(module_name)
+	helpers.assert_not_nil(src, "missing source module: " .. module_name)
 	return strip_comment_lines(src)
 end
 
@@ -421,8 +421,8 @@ end)
 
 helpers.describe("keystats SQLite paths stage nothing on disk", function()
 	local CALLERS = {
-		"modules/keystats/sqlite_writer.lua",
-		"modules/keystats/sqlite_reader.lua",
+		"modules.keystats.sqlite_writer",
+		"modules.keystats.sqlite_reader",
 	}
 
 	helpers.it("never reserves a temp name", function()
