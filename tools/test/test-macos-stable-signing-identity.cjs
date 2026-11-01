@@ -101,6 +101,7 @@ function shellFunction(source, name) {
 function replay(source, options) {
 	const signing = sliceBetween(source, '======= 8/ Codesign + zip', '======= 9/ Entrypoint');
 	const entry = shellFunction(source, options.entry === 'main' ? 'main' : 'build_native_helper');
+	const relayCompiler = shellFunction(source, 'resolve_relay_go');
 	// main() admits the developer source switch first; replay the real check.
 	const devSource = [
 		shellFunction(source, 'check_dev_source_configuration'),
@@ -171,6 +172,7 @@ ERGOPTI_DEV_SOURCE=0
 ERGOPTI_LAUNCHER_ARCHS=universal
 ${devSource}
 ${signing}
+${relayCompiler}
 ${entry}
 clean_build_dir() { :; }
 download_hammerspoon() { record download; }

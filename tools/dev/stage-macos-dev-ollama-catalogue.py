@@ -24,10 +24,9 @@ repository's own pins, and depends on no published Ergopti release:
 - the Go toolchain must report the contract's go_version: the local `go` when
   it is that version, otherwise the exact toolchain Go downloads itself, which
   it verifies against the Go checksum database (refused when that database is
-  disabled or bypassed). A Mac without any `go` gets the official archive of
-  that version, admitted only when its SHA-256 and size equal the ones
-  tools/dev/macos-dev-go.json pins, unpacked under build/macos-dev-go; nothing
-  is installed system-wide.
+  disabled or bypassed). A Mac without any `go` gets the private copy of
+  tools/dev/macos_dev_go.py, which the developer app's proxy relay shares;
+  nothing is installed system-wide.
 
 The catalogue is generated in unpublished mode: CI alone attaches a release
 URL, so it names none, and the archive stays in the clone under
@@ -39,7 +38,6 @@ instead of running a binary built for other sources.
 """
 
 import argparse
-import hashlib
 import importlib.util
 import json
 import os
@@ -67,21 +65,20 @@ HOSTS = {"arm64": "macos-arm64", "x86_64": "macos-amd64"}
 # checksum database; any of them refuses the toolchain instead of trusting HTTPS.
 CHECKSUM_BYPASS = ("GONOSUMDB", "GOINSECURE", "GOPRIVATE")
 CHECKSUM_DATABASE = "sum.golang.org"
-DOWNLOAD_TIMEOUT_SECONDS = 1800
-GO_ARCHIVES = "tools/dev/macos-dev-go.json"
-GO_STATE = "build/macos-dev-go"
 
 
-class StageRefusal(Exception):
-    """One pinned input or produced output that fails its admission."""
+def load_dev_go():
+    specification = importlib.util.spec_from_file_location(
+        "ergopti_macos_dev_go", Path(__file__).with_name("macos_dev_go.py")
+    )
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
 
 
-def sha256_file(path):
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        while chunk := stream.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
+DEV_GO = load_dev_go()
+StageRefusal = DEV_GO.GoRefusal
+sha256_file = DEV_GO.sha256_file
 
 
 def read_json(path):
@@ -197,25 +194,7 @@ class HostPorts:
         return platform.machine()
 
     def download(self, url, destination):
-        run(
-            [
-                "/usr/bin/curl",
-                "--fail",
-                "--show-error",
-                "--location",
-                "--proto",
-                "=https",
-                "--proto-redir",
-                "=https",
-                "--retry",
-                "3",
-                "--max-time",
-                str(DOWNLOAD_TIMEOUT_SECONDS),
-                "--output",
-                str(destination),
-                url,
-            ]
-        )
+        DEV_GO.download(url, destination)
 
     def source_head(self, source):
         """Return the checkout's HEAD when it is clean, else None."""
@@ -264,44 +243,8 @@ class HostPorts:
         return executable
 
     def bootstrap_go(self, version):
-        """Unpack the pinned official Go archive under build/ and return its go."""
-        pins = read_json(self.root / GO_ARCHIVES)
-        if pins["version"] != version:
-            raise StageRefusal(
-                "%s pins %s but the contract builds with %s: copy the %s darwin archive"
-                " digests and sizes into it" % (GO_ARCHIVES, pins["version"], version, version)
-            )
-        archive = pins["archives"].get(self.machine())
-        if archive is None:
-            raise StageRefusal("%s pins no Go archive for %s" % (GO_ARCHIVES, self.machine()))
-        home = self.root / GO_STATE / version
-        go = home / "go" / "bin" / "go"
-        if regular_file(go):
-            return str(go)
-        home.parent.mkdir(parents=True, exist_ok=True)
-        work = Path(tempfile.mkdtemp(prefix="go-", dir=home.parent))
-        try:
-            download = work / archive["filename"]
-            print("[dev-ollama-catalogue] No go on PATH: installing %s for this clone..." % version)
-            self.download(pins["url"].format(filename=archive["filename"]), download)
-            if (
-                download.stat().st_size != archive["size"]
-                or sha256_file(download) != archive["sha256"]
-            ):
-                raise StageRefusal(
-                    "the downloaded %s differs from its pin in %s"
-                    % (archive["filename"], GO_ARCHIVES)
-                )
-            unpacked = work / "unpacked"
-            with tarfile.open(download) as bundle:
-                bundle.extractall(unpacked, filter="data")
-            if not regular_file(unpacked / "go" / "bin" / "go"):
-                raise StageRefusal("%s holds no go/bin/go" % archive["filename"])
-            shutil.rmtree(home, ignore_errors=True)
-            os.replace(unpacked, home)
-        finally:
-            shutil.rmtree(work, ignore_errors=True)
-        return str(go)
+        """Return the private go of tools/dev/macos_dev_go.py, downloaded once."""
+        return DEV_GO.bootstrap(self.root, version, self.machine(), self.download)
 
     def produce(self, root, source, official, go, output):
         run(

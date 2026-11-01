@@ -176,7 +176,11 @@ one Go pin (`managed_ollama_runtime.json` `go_version`) or the module's
 - macOS: `build_macos_app.sh` builds an arm64 and an x86_64 slice with each
   architecture's clang, joins them with `lipo` into
   `Contents/MacOS/ergopti-proxy-relay` and signs it as nested code before the
-  launcher, in the full application and the Git-checkout helper.
+  launcher, in the full application and the Git-checkout helper. A developer app
+  needs no installed Go: `tools/dev/macos_dev_go.py` hands it the pin, downloaded
+  by digest into `build/macos-dev-go`. When that fails the build says so and the
+  developer app goes without the relay, which then reports `not_installed`; a
+  release build still requires it.
 
 ## Not covered
 

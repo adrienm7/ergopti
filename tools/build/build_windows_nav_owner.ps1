@@ -626,8 +626,9 @@ function Assert-TrackedManifest {
 			throw "The tracked provenance manifest is missing '$propertyName'."
 		}
 	}
-	# -ne coerces, so a JSON string "1" would pass for the integer 1.
-	if ($manifest.schema_version -isnot [int] -or $manifest.schema_version -ne $SchemaVersion) {
+	# -ne coerces, so a JSON string "1" would pass for the integer 1. ConvertFrom-Json
+	# yields [int] on Windows PowerShell 5.1 and [long] on the PowerShell 7 of the runners.
+	if (($manifest.schema_version -isnot [int] -and $manifest.schema_version -isnot [long]) -or $manifest.schema_version -ne $SchemaVersion) {
 		throw "The tracked provenance manifest schema changed: expected $SchemaVersion, found $($manifest.schema_version)."
 	}
 	if ([string]$manifest.artifact_path -cne $ArtifactPath) {
