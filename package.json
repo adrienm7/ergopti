@@ -171,6 +171,7 @@
 		"test:linux-dev-script": "node ./tools/test/test-linux-dev-script.cjs",
 		"test:windows-dev-script": "node ./tools/test/test-windows-dev-script.cjs",
 		"test:windows-control-cli": "node ./tools/test/test-windows-control-cli.cjs",
+		"test:windows-builder-boundaries": "node ./tools/test/test-windows-builder-boundaries.cjs",
 		"test:macos-field-run-contract": "node ./tools/test/test-macos-field-run-contract.cjs",
 		"test:linux-field-report-contract": "node ./tools/test/test-linux-field-report-contract.cjs",
 		"test:field-log-scrub": "node ./tools/test/test-field-log-scrub.cjs",
