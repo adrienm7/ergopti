@@ -25,6 +25,9 @@ ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchan
 	NewerSchema := ConfigNewerSchemaReadOnly()
 	if NewerSchema
 		Detail := "the startup configuration uses a newer schema; update ErgoptiPlus and reload before changing settings"
+	OlderSchema := ConfigOlderSchemaReadOnly()
+	if OlderSchema
+		Detail := "the startup configuration is too old for this build to migrate; it was left untouched"
 	if (Detail != "") {
 		try LoggerError("Config", "Could not persist {1}: {2}.", Context, Detail)
 	} else if StateUnchanged {
@@ -34,6 +37,7 @@ ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchan
 	}
 	CaseTwin := TOML_TakeCaseTwinRefusal()
 	MessageKey := NewerSchema ? "config.read_only.newer_schema"
+		: OlderSchema ? "config.read_only.older_schema"
 		: (CaseTwin != "" ? "dialog.config_save.case_twin"
 		: (StateUnchanged ? "dialog.bulk_toggle.save_failed" : "onboarding.error.write_failed"))
 	; Failure reporting is a backstop, never a second failure source. Translation,
@@ -63,6 +67,35 @@ ConfigNewerSchemaReadOnly() {
 	global ConfigurationFile
 	return IsSet(ConfigurationFile) && (ConfigurationFile is String)
 		&& ConfigSchemaReadOnlyStatus(ConfigurationFile) == "newer"
+}
+
+; True when the startup configuration predates the registry's oldest supported
+; version: the boot migration refused it, the file stays byte for byte, and the
+; same notice and greyed rows name this cause.
+ConfigOlderSchemaReadOnly() {
+	global ConfigurationFile
+	return IsSet(ConfigurationFile) && (ConfigurationFile is String)
+		&& ConfigSchemaReadOnlyStatus(ConfigurationFile) == "unsupported"
+}
+
+; Tells the user once at boot why nothing they change will stick, as macOS and
+; Linux do from read_only_notice_key: the refusal's ERROR line is for the logs.
+; NotifyFn is injectable so a test can read the words without a real TrayTip.
+ConfigNotifyOlderSchemaAtBoot(NotifyFn := 0) {
+	if !ConfigOlderSchemaReadOnly()
+		return false
+	try {
+		Message := t("config.read_only.older_schema")
+		Options := Map("title", t("paths_editor.save_failed_title"), "level", "warning")
+		if HasMethod(NotifyFn, "Call")
+			NotifyFn.Call(Message, Options)
+		else
+			NotifierSend(Message, Options)
+	} catch as Err {
+		try LoggerError("Config", "Could not present the older-configuration notice: {1}.", Err.Message)
+		return false
+	}
+	return true
 }
 
 ; SaveFullConfig has three explicit outcomes. Callers must compare against the

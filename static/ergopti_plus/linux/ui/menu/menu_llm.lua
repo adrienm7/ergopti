@@ -966,6 +966,10 @@ local function _build_llm(ctx)
 	local function newer_schema()
 		return require("config_migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "newer"
 	end
+	-- So does one too old for this build to migrate.
+	local function older_schema()
+		return require("config_migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "unsupported"
+	end
 	-- The restore alone: the AI menu's clear row was retired.
 	llm_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
 		-- A retained row rechecks what greyed it when it was built.
@@ -993,6 +997,7 @@ local function _build_llm(ctx)
 	llm_ctx.state_getters["llm_toggle_ready"] = toggle_ready
 	llm_ctx.state_getters["llm_scope_ready"] = scope_ready
 	llm_ctx.state_getters["config_newer_schema"] = newer_schema
+	llm_ctx.state_getters["config_older_schema"] = older_schema
 
 	local rendered = ManifestMenu
 		and ManifestMenu.build("llm_menu", "LLM", nil, group_builders, llm_ctx, providers)

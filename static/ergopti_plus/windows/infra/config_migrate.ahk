@@ -173,14 +173,14 @@ _ConfigMigrateValidateOp(Op, Where) {
 }
 
 ; Validates parsed registry sections and returns Map("current", "unstamped",
-; "steps") with the steps in execution order, each a Map of "from", "to",
+; "oldest", "steps") with the steps in execution order, each a Map of "from", "to",
 ; "drivers" (a set), "reason" and "ops". Throws on the first defect.
 ConfigMigrateValidateRegistry(Sections) {
 	if !(Sections is Map) || !Sections.Has("registry")
 		throw Error("the registry has no [registry] table")
 	Head := Sections["registry"]
 	for Field in Head {
-		if !(Field == "current_version" || Field == "unstamped_version")
+		if !(Field == "current_version" || Field == "unstamped_version" || Field == "oldest_version")
 			throw Error("[registry] has an unknown key '" . Field . "'")
 	}
 	Current := Head.Get("current_version", "")
@@ -188,8 +188,14 @@ ConfigMigrateValidateRegistry(Sections) {
 	if !_ConfigMigrateIsVersion(Current) || !_ConfigMigrateIsVersion(Unstamped)
 			|| Unstamped > Current
 		throw Error("current_version and unstamped_version must be integers with 1 <= unstamped <= current")
+	; Steps below the oldest supported version were squashed away: the chain
+	; starts there, and anything older is refused rather than half migrated.
+	Oldest := Head.Get("oldest_version", Unstamped)
+	if !_ConfigMigrateIsVersion(Oldest) || Oldest < Unstamped || Oldest > Current
+		throw Error("oldest_version must be an integer with unstamped <= oldest <= current")
 	Current := Integer(Current)
 	Unstamped := Integer(Unstamped)
+	Oldest := Integer(Oldest)
 	Steps := []
 	for Name, Step in Sections {
 		if (Name == "registry")
@@ -233,11 +239,11 @@ ConfigMigrateValidateRegistry(Sections) {
 		Steps.Push(Map("from", From, "to", From + 1, "drivers", DriverSet,
 			"reason", Reason, "ops", Ops))
 	}
-	if (Steps.Length != Current - Unstamped)
-		throw Error("the steps do not chain v" . Unstamped . " to v" . Current)
+	if (Steps.Length != Current - Oldest)
+		throw Error("the steps do not chain v" . Oldest . " to v" . Current)
 	Ordered := []
 	loop Steps.Length {
-		Wanted := Unstamped + A_Index - 1
+		Wanted := Oldest + A_Index - 1
 		Found := 0
 		for Step in Steps {
 			if (Step["from"] == Wanted) {
@@ -249,7 +255,7 @@ ConfigMigrateValidateRegistry(Sections) {
 			throw Error("the chain has a gap at v" . Wanted)
 		Ordered.Push(Found)
 	}
-	return Map("current", Current, "unstamped", Unstamped, "steps", Ordered)
+	return Map("current", Current, "unstamped", Unstamped, "oldest", Oldest, "steps", Ordered)
 }
 
 ; Reads and validates a registry file. Throws on any defect.
@@ -660,7 +666,7 @@ ConfigMigrateClassify(Model, Registry, &Version) {
 		return "newer"
 	if (Version == Registry["current"])
 		return "current"
-	if (Version < Registry["unstamped"])
+	if (Version < Registry["oldest"])
 		return "unsupported"
 	return "migrate"
 }
@@ -1001,7 +1007,8 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 			case "invalid":
 				return Refuse("invalid", "[_meta] schema_version is not a positive integer")
 			case "unsupported":
-				return Refuse("unsupported", "no migration path from schema v" . Version)
+				return Refuse("unsupported", "no migration path from schema v" . Version
+					. ": the oldest this build migrates is v" . Registry["oldest"])
 		}
 
 		ConfigMigrateClassify(Before, Registry, &LegacyVersion)

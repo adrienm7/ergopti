@@ -1,0 +1,6 @@
+# _shared/tests/corpus/config_migrations/oldest_version_refuses_no_stamp/case.toml
+
+[case]
+description = "A file with no stamp reads as unstamped_version, below oldest_version, so it is refused rather than half migrated."
+drivers = ["ahk", "hs", "linux"]
+outcome = "unsupported"
