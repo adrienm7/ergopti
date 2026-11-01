@@ -49,8 +49,7 @@ Test("press ledger: KS_IsHeld adds only the press AutoHotkey cannot see (todo91-
 ; The owner starts for everyone: no AI gate stands before it, and a hook that cannot
 ; install or read leaves the keyboard working, on the catalogue order (item4).
 _NPL_OwnerRunsForEveryoneAndFailsSoft() {
-	Source := FileRead(A_ScriptDir . "\..\ErgoptiPlus.ahk", "UTF-8")
-	Assert(RegExMatch(Source, "m)^KeyboardArbiterEnsureForLedger\(\)$"), "the boot starts it at top level, under no condition")
+	Assert(RegExMatch(_DriverSourceNoComments(), "m)^KeyboardArbiterEnsureForLedger\(\)$"), "the boot starts it at top level, under no condition")
 	AssertTrue(KeyboardArbiterEnsureForLedger(() => true))
 	AssertFalse(KeyboardArbiterEnsureForLedger(() => false), "a refused start is reported, not raised")
 	AssertFalse(KeyboardArbiterEnsureForLedger(_NPL_Raises), "a raising start is reported, not raised")
@@ -215,12 +214,14 @@ Test("press ledger: a missed release never stalls a wait (item5-keywait-missed)"
 
 ; Every release wait of the driver goes through the one bounded owner.
 _NPL_NoBareKeyWaitLeft() {
-	for _, Rel in ["platform\remap\tab.ahk", "platform\remap\rshift.ahk", "platform\remap\rctrl.ahk",
-			"platform\remap\lshift_lctrl.ahk", "platform\remap\lalt.ahk", "platform\remap\constants.ahk",
-			"infra\nav_layer_helpers.ahk"] {
-		Source := FileRead(A_ScriptDir . "\..\" . Rel, "UTF-8")
-		AssertEqual(0, InStr(Source, "KeyWait(") , Rel . " must wait through KS_WaitReleased")
+	Source := _DriverSourceNoComments()
+	Count := 0, Pos := 1
+	while (Pos := InStr(Source, "KeyWait(", true, Pos)) {
+		Count += 1
+		Pos += 1
 	}
+	AssertEqual(1, Count, "the whole driver must wait through KS_WaitReleased, the one native KeyWait")
+	Assert(InStr(_DriverFuncBody("KS_WaitReleased"), "KeyWait("), "the one native KeyWait belongs to the bounded owner")
 }
 Test("press ledger: every release wait is bounded through KS_WaitReleased (item5-keywait-sites)", _NPL_NoBareKeyWaitLeft)
 
