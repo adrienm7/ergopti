@@ -37,10 +37,10 @@ local text_utils = require("infra.text_utils")
 
 local LOG = "remap.runtime_vhid_update"
 
---- Seconds the download may take.
-M.DOWNLOAD_TIMEOUT_SEC = 600
---- Seconds a local step may take.
-M.STEP_TIMEOUT_SEC = 60
+-- The download and step bounds are the artifact fetcher's: both fetch one
+-- pinned file from the network and run short local steps on it.
+local Fetch = require("platform.remap.runtime_artifact_fetch")
+
 --- Seconds the administrator prompt and the installer may take together.
 M.INSTALL_TIMEOUT_SEC = 900
 
@@ -235,28 +235,28 @@ function M.new(ports)
 		local package = home .. "/" .. pin.file_name
 		local partial = home .. "/." .. pin.file_name .. ".partial"
 		Logger.start(LOG, "Updating the VirtualHIDDevice driver to %s on the user's request…", pin.version)
-		step("/bin/rm", { "-f", partial, package }, M.STEP_TIMEOUT_SEC, REASON.STORE,
+		step("/bin/rm", { "-f", partial, package }, Fetch.STEP_TIMEOUT_SEC, REASON.STORE,
 			"the driver folder could not be cleared", function()
-		step("/bin/mkdir", { "-p", home }, M.STEP_TIMEOUT_SEC, REASON.STORE,
+		step("/bin/mkdir", { "-p", home }, Fetch.STEP_TIMEOUT_SEC, REASON.STORE,
 			"the driver folder could not be created", function()
 		step("/usr/bin/curl", { "-L", "--fail", "--silent", "--show-error", "--proto", "=https",
 			"--max-filesize", tostring(pin.size), "--output", partial, pin.source_url },
-			M.DOWNLOAD_TIMEOUT_SEC, REASON.DOWNLOAD, "the driver could not be downloaded from " .. pin.source_url,
+			Fetch.DOWNLOAD_TIMEOUT_SEC, REASON.DOWNLOAD, "the driver could not be downloaded from " .. pin.source_url,
 			function()
-		step("/usr/bin/stat", { "-f", "%z", partial }, M.STEP_TIMEOUT_SEC, REASON.SIZE,
+		step("/usr/bin/stat", { "-f", "%z", partial }, Fetch.STEP_TIMEOUT_SEC, REASON.SIZE,
 			"the download size could not be read", function(size)
 			if tonumber(size:match("%d+")) ~= pin.size then
 				return settle(false, REASON.SIZE, "the download has " .. tostring(size:match("%d+"))
 					.. " bytes, the pin says " .. tostring(pin.size))
 			end
-		step("/usr/bin/shasum", { "-a", "256", partial }, M.STEP_TIMEOUT_SEC, REASON.DIGEST,
+		step("/usr/bin/shasum", { "-a", "256", partial }, Fetch.STEP_TIMEOUT_SEC, REASON.DIGEST,
 			"the download digest could not be computed", function(digest)
 			local actual = digest:match("^\\?(%x+)")
 			if actual == nil or actual:lower() ~= pin.sha256 then
 				return settle(false, REASON.DIGEST, "the download digest " .. tostring(actual)
 					.. " is not the pinned " .. pin.sha256)
 			end
-		step("/bin/mv", { partial, package }, M.STEP_TIMEOUT_SEC, REASON.STORE,
+		step("/bin/mv", { partial, package }, Fetch.STEP_TIMEOUT_SEC, REASON.STORE,
 			"the verified driver could not be kept", function()
 		ports.exec("/usr/bin/osascript", M.install_args(package, pin), M.INSTALL_TIMEOUT_SEC,
 			function(code, _, stderr)
@@ -264,7 +264,7 @@ function M.new(ports)
 				return settle(false, M.install_reason(stderr),
 					"the privileged install did not complete (" .. failure("/usr/bin/osascript", code, stderr) .. ")")
 			end
-		step(M.MANAGER, { "forceActivate" }, M.STEP_TIMEOUT_SEC, REASON.ACTIVATE,
+		step(M.MANAGER, { "forceActivate" }, Fetch.STEP_TIMEOUT_SEC, REASON.ACTIVATE,
 			"macOS was not asked to activate the new driver", function()
 			settle(true)
 		end) end) end) end) end) end) end) end)
