@@ -492,6 +492,21 @@ final class ManagedPTYWorkerTests: XCTestCase {
 		XCTAssertTrue(admitted.contains("\(clone)/modules/llm/ensure-ollama-native-deps.sh"))
 	}
 
+	/// App Cloner's PyObjC installer runs under the guardian like the AI installers
+	/// (owned_runtimes.json, the macOS /usr/bin/python3 row); every admitted name
+	/// is a shipped installer, so the list cannot admit a script nobody wrote.
+	func testEveryAdmittedInstallerShipsAndThePyObjCInstallerIsAdmitted() {
+		var repository = URL(fileURLWithPath: #filePath)
+		for _ in 0..<7 { repository.deleteLastPathComponent() }
+		let folder = repository.appendingPathComponent("static/ergopti_plus/macos/modules/llm")
+		XCTAssertTrue(ManagedPTYWorker.admittedSourceNames.contains("ensure-managed-pyobjc.sh"))
+		XCTAssertEqual(Set(ManagedPTYWorker.admittedSourceNames).count, ManagedPTYWorker.admittedSourceNames.count)
+		for name in ManagedPTYWorker.admittedSourceNames {
+			XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appendingPathComponent(name).path),
+				"\(name) is admitted but not shipped")
+		}
+	}
+
 	func testPackagedAppAdmitsOnlyItsPayloadAndARefusalAdmitsNothing() {
 		let payload = "/Applications/\(Identifiers.App.bundle)/Contents/Resources/static/ergopti_plus/macos"
 		let admitted = ManagedPTYWorker.admittedSources(for: .packaged(configDir: payload))
