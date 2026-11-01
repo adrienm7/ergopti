@@ -124,12 +124,37 @@ names the closed reason; only the pull is refused, with that reason's message.
   started; the user's own Ollama has its own network settings and is not refused.
   The Debug network check reports the same probe (`proxy_relay`). The Swift-owned
   managed daemon (`managed_ollama_serve.py`) does not use the relay yet, so it has
-  no refusal to record.
+  no refusal to record; see "macOS managed daemon" below.
 - Windows: `ollama-runtime-launch.ps1` runs the same probe where the tunnel probe
   answers `windows_login`, and on `required` starts the daemon under `run`, the
   listener admitted only as the child of that exact relay from the admitted image.
   The receipt is the runtime's (`proxy_relay`); the live evidence is in
   [proxy-relay-testing.md](../tooling/proxy-relay-testing.md).
+
+## macOS managed daemon (design, not built)
+
+`run` makes the relay the daemon's parent, which the managed path cannot accept:
+`SuspendedImageOwner` starts the exact verified image itself, suspended, and retires
+that one child. So the relay is the daemon's sibling, under the same owner.
+
+- **Who launches it.** The Swift worker behind `SuspendedImageOwner`, before it
+  resumes the daemon, so one owner ends both and a quit leaves neither behind. Python
+  stays out of the process tree; it only decides, as below.
+- **Go.** A new `listen` command beside `run`: bind `127.0.0.1:0`, print one JSON line
+  with the port and the per-run token, serve until stdin reaches EOF. The EOF is how
+  the relay dies with its owner, and `run` stays as it is for the other callers.
+- **Probe.** `managed_ollama_serve.py` asks the same `probe` once it has captured the
+  route and before it writes the bootstrap snapshot. `not_needed` changes nothing.
+  `required` marks the snapshot, and the worker replaces the relay route with the
+  local one from `listen`, never logging the token.
+- **Refusal.** Lua passes the path of `proxy_relay_receipt` to the serve owner as an
+  argument. A refused probe writes the closed reason there and captures a snapshot
+  with no relay, the same outcome as `start_without_proxy_after_refusal`. A refusal of
+  `listen` comes back to Python in the worker's result and ends in the same receipt,
+  so the pull reads one file whichever owner started the daemon.
+
+The relay inherits the launcher's bundle admission (`managed_bootstrap_launcher_available`
+for the shell path); the Swift side must resolve it beside the admitted launcher too.
 
 ## Packaging
 
