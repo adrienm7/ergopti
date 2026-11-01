@@ -84,7 +84,11 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; _ComposerCheckBusy — a re-entrancy flag, not injected state. It starts false
 	; at its declaration, ComposerCheck_Run sets it for the one running check and
 	; that check's terminal step clears it; there is no init for a guard to wait on.
-	"ui/layout_manager/composer_check.ahk", true
+	"ui/layout_manager/composer_check.ahk", true,
+	; _ProxyOverrideDeclaration is a lazy cache of a shipped file and _ProxyOverrideStored
+	; is written with the published value; a reader before boot sees "automatic", the
+	; unset process variable, by design. There is no injected state for a guard to wait on.
+	"adapters/proxy_override.ahk", true
 )
 
 ; Captured 2026-07-21 after excluding UPPER_SNAKE constants from the state

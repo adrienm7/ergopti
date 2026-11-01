@@ -659,6 +659,7 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 		MenuCommand.HOOK_PROBE, InputProbe_HookOrderCommand,
 		MenuCommand.COMPOSER_CHECK, ComposerCheck_Command,
 		MenuCommand.FIELD_CHECK_NETWORK, NetworkCheck_Command,
+		MenuCommand.PROXY_OVERRIDE, ProxyOverride_Command,
 		"report_bug",      (*) => HealthCheck_ReportBug(),
 		"suggest_feature", (*) => HealthCheck_SuggestFeature(),
 		"show_error_dialog", (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),

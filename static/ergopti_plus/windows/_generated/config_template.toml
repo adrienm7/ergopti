@@ -663,3 +663,10 @@ distances_reduction = false
 sfbs_reduction = false
 rolls = false
 magic_key = false
+
+
+
+
+
+[network]
+proxy_override = ""

@@ -208,6 +208,7 @@ function Get-ErgoptiOwnedProxyEnvironment {
 		[Parameter(Mandatory = $true)][scriptblock]$ReadEnvironment)
 	if ($Origins.Count -eq 0) { return @{ Ok = $false; Reason = $script:ErgoptiRoutePlanEmpty } }
 	$Entries = New-Object System.Collections.ArrayList
+	$OverrideDirect = $false
 	foreach ($Origin in $Origins) {
 		$Answer = & $Resolve $Origin
 		if ($null -eq $Answer -or $Answer.Ok -ne $true -or @($Answer.Routes).Count -eq 0) {
@@ -218,6 +219,7 @@ function Get-ErgoptiOwnedProxyEnvironment {
 		if ($script:ErgoptiOwnedInheritedSources -ccontains $First.Source) {
 			return @{ Ok = $true; Mode = 'inherit'; Proxy = ''; Environment = [ordered]@{} }
 		}
+		if ($First.Source -ceq 'override' -and $First.Kind -ceq 'direct') { $OverrideDirect = $true }
 		if ($First.Kind -ceq 'direct') { $Route = 'direct' }
 		elseif ($First.Kind -ceq 'proxy' -and $First.Endpoint -is [string]) {
 			# Relays are normalized absolute URIs ("http://host:port/"); the plan takes host:port
@@ -228,7 +230,11 @@ function Get-ErgoptiOwnedProxyEnvironment {
 	$Plan = New-ErgoptiRoutePlan @($Entries)
 	if (-not $Plan.Ok) { return @{ Ok = $false; Reason = $Plan.Reason } }
 	$Environment = [ordered]@{}
-	if ($Plan.Proxy -ceq 'direct') { return @{ Ok = $true; Mode = 'direct'; Proxy = ''; Environment = $Environment } }
+	if ($Plan.Proxy -ceq 'direct') {
+		# A direct override also beats a relay the daemon would inherit from the user.
+		if ($OverrideDirect) { $Environment[$script:ErgoptiOwnedBypassVariable] = '*' }
+		return @{ Ok = $true; Mode = 'direct'; Proxy = ''; Environment = $Environment }
+	}
 	$Environment[$script:ErgoptiOwnedProxyVariable] = $Plan.Proxy
 	if ($Plan.NoProxy -cne '') {
 		# The user's own bypass entries are kept ahead of the origins sent direct

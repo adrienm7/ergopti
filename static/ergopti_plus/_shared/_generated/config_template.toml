@@ -832,6 +832,13 @@ platform.ahk.magic_key = false
 
 
 
+[network]
+proxy_override = ""
+
+
+
+
+
 [ui]
 menubar_icon = "v1"
 
@@ -951,6 +958,7 @@ sections = [
 	"gestures",
 	"layout",
 	"category_enabled",
+	"network",
 ]
 
 
