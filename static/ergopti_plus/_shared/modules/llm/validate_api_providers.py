@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 CATALOG = Path(__file__).with_name("api_providers.json")
-ALLOWED_FORMATS = {"openai", "anthropic", "gemini"}
+ALLOWED_FORMATS = {"openai", "anthropic", "gemini", "perplexity_agent", "backboard", "decisions"}
 REQUIRED_PROVIDER_KEYS = {"label", "base_url", "default_model", "format"}
 REQUIRED_PRICE_KEYS = {"in", "out"}
 

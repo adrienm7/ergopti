@@ -46,7 +46,8 @@ global LLM_VISION_LOCAL_BACKEND := "local"
 global LLM_VISION_MAX_MODEL_LENGTH := 200
 
 ; Request formats LLM_Vision_BuildRequest writes
-global LLM_VISION_FORMATS := Map("openai", true, "anthropic", true, "gemini", true, "ollama", true)
+global LLM_VISION_FORMATS := Map("openai", true, "anthropic", true, "gemini", true, "ollama", true,
+	"perplexity_agent", true)
 
 ; The user turn that goes with the screenshot of the reading request
 global LLM_VISION_READ_USER_TEXT := "Transcribe this screenshot."
@@ -172,6 +173,12 @@ LLM_Vision_BuildRequest(Fmt, Spec) {
 	System := JsonStringLiteral(Spec["system"])
 	Text := JsonStringLiteral(Spec["text"])
 	Tokens := String(MaxTokens)
+	if (Fmt == LLM_AGENT_FORMAT) {
+		; The Agent API takes an image by URL only: a screenshot has none
+		if HasImage
+			throw ValueError("LLM_Vision_BuildRequest: a perplexity_agent request carries no image.")
+		return LLM_RemoteFormats_AgentBody(Spec["model"], Spec["system"], Spec["text"], MaxTokens)
+	}
 	if (Fmt == "openai") {
 		Content := Text
 		if HasImage

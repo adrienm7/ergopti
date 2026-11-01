@@ -4,14 +4,16 @@
 ; MODULE: Remote API Formats Beyond Chat Completions (AHK)
 ; DESCRIPTION:
 ; AutoHotkey port of _shared/lua/llm/remote_formats.lua: the request and answer
-; shapes of the two provider formats of _shared/modules/llm/api_providers.json
-; that are not an OpenAI, Anthropic or Gemini chat call.
+; shapes of the provider formats of _shared/modules/llm/api_providers.json that
+; are not an OpenAI, Anthropic or Gemini chat call.
 ; - "backboard": Backboard's assistant/thread API. One assistant is created
 ;   once per key; each request is a message on a new thread naming its
 ;   provider and model ("<llm_provider>/<model_name>"), and the answer comes
 ;   back in `content`.
 ; - "decisions": TypeSafe's System One protocol: typed questions in, answers
 ;   with probabilities out. Jev, the model it serves, is not a chat model.
+; - "perplexity_agent": Perplexity's Agent API (POST <base>/agent): input and
+;   instructions in, a typed output array out.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Every function is pure: it builds a request as a Map (url, body) or reads
@@ -50,6 +52,10 @@ global LLM_BACKBOARD_ASSISTANT_NAME := "Ergopti+"
 
 ; Header carrying a decisions key
 global LLM_DECISIONS_KEY_HEADER := "Authorization"
+
+; The Agent API's format name in api_providers.json and its request path
+global LLM_AGENT_FORMAT := "perplexity_agent"
+global LLM_AGENT_PATH := "/agent"
 
 ; Stands for JSON false in a body Map; LLM_RemoteFormats_Encode writes false
 global LLM_REMOTE_JSON_FALSE := Object()
@@ -267,4 +273,69 @@ LLM_RemoteFormats_Encode(Value) {
 ; The Lua type(x) == "table" of a decoded value: an object or an array.
 _LLM_RemoteFormats_IsTable(Value) {
 	return (Value is Map) || (Value is Array)
+}
+
+
+
+
+
+; ====================================
+; ====================================
+; ======= Perplexity Agent API =======
+; ====================================
+; ====================================
+
+/**
+ * Returns the JSON body of an Agent API request. No tool is declared: a
+ * prediction asks for text, not for a web search.
+ * @param {String} Model The model id.
+ * @param {String} System The instructions; "" leaves them out.
+ * @param {String} Text The input.
+ * @param {Integer} MaxTokens The output budget.
+ * @param {String} Temperature Its JSON number, "" leaves it out.
+ * @returns {String}
+ */
+LLM_RemoteFormats_AgentBody(Model, System, Text, MaxTokens, Temperature := "") {
+	Body := '{"model":' . JsonStringLiteral(Model)
+	if (System != "")
+		Body .= ',"instructions":' . JsonStringLiteral(System)
+	Body .= ',"input":' . JsonStringLiteral(Text) . ',"max_output_tokens":' . MaxTokens
+	if (Temperature != "")
+		Body .= ',"temperature":' . Temperature
+	return Body . ',"stream":false}'
+}
+
+/**
+ * Reads the answer text of a decoded Agent API answer: every output_text of
+ * every message item, in order. Tool and reasoning items are skipped.
+ * @param {Map} Response The decoded answer.
+ * @param {VarRef} Text Receives the text.
+ * @returns {Boolean} False when the answer holds no output array.
+ */
+LLM_RemoteFormats_AgentText(Response, &Text) {
+	Text := ""
+	if !(Response is Map) || !Response.Has("output") || !(Response["output"] is Array)
+		return false
+	for Item in Response["output"] {
+		if !(Item is Map) || Item.Get("type", "") != "message" || !(Item.Get("content", "") is Array)
+			continue
+		for Part in Item["content"] {
+			if (Part is Map) && Part.Get("type", "") == "output_text" && (Part.Get("text", 0) is String)
+				Text .= Part["text"]
+		}
+	}
+	return true
+}
+
+/**
+ * Tells whether a decoded Agent API answer is a failure: a non-null error field
+ * or a failed status. A good answer may carry a null error.
+ * @param {Map} Response The decoded answer.
+ * @returns {Boolean}
+ */
+LLM_RemoteFormats_AgentFailed(Response) {
+	global JSON_NULL
+	if Response.Has("error") && !(IsObject(Response["error"]) && Response["error"] == JSON_NULL)
+		return true
+	return Response.Get("status", "") == "failed"
 }

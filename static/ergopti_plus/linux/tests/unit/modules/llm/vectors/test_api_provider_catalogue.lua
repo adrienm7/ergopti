@@ -45,7 +45,7 @@ end
 --- AI takes the Gemini levels (minimal, low) as reasoning_effort.
 local OPENAI_KINDS = { toggle = true, effort = true, gemini_level = true }
 -- The wire formats whose providers chat and list their models.
-local CHAT_FORMATS = { openai = true, anthropic = true, gemini = true }
+local CHAT_FORMATS = { openai = true, anthropic = true, gemini = true, perplexity_agent = true }
 
 --- Whether a list of strings holds a value.
 local function holds(list, value)

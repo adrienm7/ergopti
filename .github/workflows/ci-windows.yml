@@ -703,6 +703,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node tools/test/test-windows-proxy-override-e2e.cjs --required
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node tools/test/test-perplexity-agent-e2e.cjs --required
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # The receipt and evidence owners stay adjacent and run even on failure.
       - name: Run native desktop AHK cohorts
