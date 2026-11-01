@@ -253,6 +253,18 @@ step karabiner sh -c '"/Library/Application Support/org.pqrs/Karabiner-Elements/
 # reasons so a failed signature check names its cause.
 step karabiner_signature sh -c 'codesign --verify --deep --strict --verbose=4 /Applications/Karabiner-Elements.app; echo "codesign exit=$?"; spctl -a -vv /Applications/Karabiner-Elements.app; echo "spctl exit=$?"'
 step memory sh -c 'memory_pressure | tail -1; vm_stat | head -5'
+# Only a Mac compiles AppleScript, so a .applescript edited elsewhere leaves
+# its .scpt stale (the Encryptor comment of the keystats rename). The rebuilt
+# files are committed on the field branch, apart from the report, so the push
+# carries them and the next run starts from a clean tree; cherry-pick that
+# commit to the base.
+step scpt_recompile python3 "${REPO_ROOT}/tools/dev/recompile-applescripts.py" "${REPO_ROOT}"
+if ! git -C "${REPO_ROOT}" diff --quiet -- '*.scpt'; then
+	(cd "${REPO_ROOT}" && git add -u -- '*.scpt' \
+		&& git commit -q -m "chore(macos): recompile the AppleScript sources the field run found stale" -- '*.scpt') \
+		&& log "Recompiled AppleScript committed on ${branch}; cherry-pick that commit to ${base}." \
+		|| log "WARNING: the recompiled AppleScript could not be committed; see ${out}/scpt_recompile.txt."
+fi
 # The process names of _shared/modules/llm/local_servers.json (discovery) too,
 # so a report shows which local API server runs
 step processes sh -c 'pgrep -ilf "ErgoptiPlus|Hammerspoon|karabiner|ollama|omlx|llama-server|local-ai|LM Studio|llmster|Jan" || true'
