@@ -529,8 +529,7 @@ try {
 			'glibc',
 			'libayatana-appindicator',
 			'lua51-lgi',
-			'webkit2gtk-4.1',
-			'python'
+			'webkit2gtk-4.1'
 		]) {
 			assert.ok(dependencies.includes(name), `missing runtime package: ${name}`);
 		}
@@ -543,7 +542,9 @@ try {
 			'openssl',
 			'sqlite',
 			'zstd',
-			'glib-networking'
+			'glib-networking',
+			// The XKB installer runs on Ergopti's own Python, downloaded on consent.
+			'python'
 		])
 			assert.ok(!dependencies.includes(name), `the host ${name} must not be required`);
 		// Every dialog is Ergopti's own GTK window (linux/ui/dialog_host.lua).
