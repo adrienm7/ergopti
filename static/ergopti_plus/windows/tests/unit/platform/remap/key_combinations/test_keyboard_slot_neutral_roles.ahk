@@ -266,7 +266,7 @@ Test("neutral slots: the layout's Ctrl and Alt variants ask the slots (ctrl-slot
 ; Boot order: the slots read RemappedList, and the Win broker acquires its keys once.
 _KSNR_SlotsBindBetweenLayoutAndBroker() {
 	Src := _DriverSourceNoComments()
-	Layout := InStr(Src, "#Include modules/keymap/layout.ahk")
+	Layout := RegExMatch(Src, "m)^#Include\s.*\blayout\.ahk$")
 	Bind := InStr(Src, "KeyboardShortcutsBindAll()" . "`n")
 	Broker := InStr(Src, "MagicEditorStart()" . "`n")
 	AssertTrue(Layout > 0 && Bind > Layout, "the slots bind once the layout tables exist")
