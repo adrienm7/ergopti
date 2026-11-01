@@ -1256,13 +1256,16 @@ _HSE_ExpansionStripUnits(TriggerUnits, EndChar, NbspStripped) {
 ; @param NbspStripped {Boolean} Whether a no-break space preceded it.
 ; @param ForceConsumeEndChar {Boolean} The caller swallows the end character.
 ; @param CascadePlan {Object|String} The net edit of _HSE_PlanCascade, or "".
+; @param EndCharOnScreen {Boolean} Whether the application already holds the end
+;   character. A watched key does; an end key the driver holds back does not.
 ; @returns {Map} The plan of HSE_PlanBuild.
-_HSE_ExpansionPlan(Spec, Replacement, EndChar, NbspStripped, ForceConsumeEndChar, CascadePlan) {
+_HSE_ExpansionPlan(Spec, Replacement, EndChar, NbspStripped, ForceConsumeEndChar, CascadePlan,
+		EndCharOnScreen := true) {
 		Path := _HSE_ExpansionPath(EndChar)
 		Consume := _HSE_EndCharConsumed(EndChar, ForceConsumeEndChar)
 		TriggerLen := _TextCodepointLength(Spec.Trigger)
 		Request := Map("path", Path, "trigger_len", TriggerLen,
-				"event_len", _TextCodepointLength(EndChar), "event_on_screen", true,
+				"event_len", _TextCodepointLength(EndChar), "event_on_screen", EndCharOnScreen ? 1 : 0,
 				"nbsp_stripped", NbspStripped, "replacement", Replacement,
 				"terminator", EndChar, "consume_terminator", Consume,
 				"final_result", Spec.HasOwnProp("FinalResult") and Spec.FinalResult)
@@ -1283,8 +1286,11 @@ _HSE_ExpansionPlan(Spec, Replacement, EndChar, NbspStripped, ForceConsumeEndChar
 ;   at; 0 means now. A completion typed later than the user pressed its end
 ;   character (a tap-hold Space is typed when it comes up) passes the press tick,
 ;   so the time the key stayed down is not held against the typist.
+; @param EndCharOnScreen {Boolean} False for an end key the driver holds back: the
+;   expansion erases only the trigger and its tail types the key.
 HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
-		ForceConsumeEndChar := false, NativeSendFn := unset, GateNowTick := 0) {
+		ForceConsumeEndChar := false, NativeSendFn := unset, GateNowTick := 0,
+		EndCharOnScreen := true) {
 		global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped, HSE_Buffer
 		global _HSE_TerminalOwnerSerial, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
 		global _PrefixInputContextGeneration, _PrefixDeferredGeneration
@@ -1404,7 +1410,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				; The plan counts the NNBSP/NBSP that was stripped before matching when
 				; the end-char is a typographic punctuation (``:`` / `` ; ``).
 				Plan := _HSE_ExpansionPlan(Spec, Replacement, EndChar, HSE_TypoNbspStripped,
-						ForceConsumeEndChar, CascadePlan)
+						ForceConsumeEndChar, CascadePlan, EndCharOnScreen)
 				Replacement := Plan["text"]
 				EraseUnits := _HSE_ExpansionStripUnits(Spec.Length + CascadeUnits, EndChar, HSE_TypoNbspStripped)
 				BSCount := Plan["erase"]

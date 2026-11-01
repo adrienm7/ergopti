@@ -309,3 +309,114 @@ TestPreviewAgree_ExpiredGateIsCountedAtDispatch() {
 }
 Test("preview: a key output past its delay is refused and counted (preview-key-output)",
 	TestPreviewAgree_ExpiredGateIsCountedAtDispatch)
+
+
+
+
+
+; =======================================
+; =======================================
+; ======= 3/ Enter And Tab Expand =======
+; =======================================
+; =======================================
+
+; The live incident: `ko` + Space gave `KO`, `ko` + Enter and `ko` + Tab stayed
+; `ko`. OnKeyDown wiped both buffers for those two keys before OnChar brought
+; their character, so the end character found an empty buffer. They are held back
+; instead: nothing can be erased after Enter submitted a line, so the burst erases
+; the trigger alone and its tail types the key.
+; @param Char {String} The end character of the key.
+; @param Typed {String} The typed engine buffer.
+; @return {Object} Fired, Burst (the recorded send) and Buffer.
+_EndKey_Complete(Char, Typed) {
+	global HSE_Buffer, HSE_StartIsWordBoundary, _Stub_RecordedSends
+	global _PrefixFocusedControlToken, _SendHook
+	HSE_RegistryClear()
+	HSE_RegisterFromTomlFlags(true, "", "ko", "KO",
+		Map("Category", "test", "Section", "endkey"))
+	HSE_Buffer := Typed
+	HSE_StartIsWordBoundary := true
+	_PrefixFocusedControlToken := WIGetFocusedControlToken()
+	_Stub_RecordedSends := []
+	SavedSendHook := _SendHook
+	_SendHook := _HOOK_RecordSend
+	; The foreground window of the run must not choose the delivery route.
+	OutputHostResolverPrimeForTest("endkey-test.exe")
+	try {
+		Fired := HotstringCompleteEndKey(Char)
+		Burst := _Stub_RecordedSends.Length > 0 ? _Stub_RecordedSends[1].args[1] : ""
+		return { Fired: Fired, Burst: Burst, Buffer: HSE_Buffer }
+	} finally {
+		_SendHook := SavedSendHook
+		HSE_RegistryClear()
+		HSE_HardReset()
+	}
+}
+
+TestEndKey_EnterAndTabExpand() {
+	for _, Char in ["`n", "`t"] {
+		Result := _EndKey_Complete(Char, "ko")
+		AssertTrue(Result.Fired, "the end key completes the entry")
+		AssertEqual("{BackSpace 2}{Text}KO" . Char, Result.Burst,
+			"only the trigger is on screen, and the tail types the key held back")
+	}
+}
+Test("end key: Enter and Tab expand and land after the text (hotstring-end-keys)",
+	TestEndKey_EnterAndTabExpand)
+
+TestEndKey_NoEntryKeepsTheNativeKey() {
+	AssertFalse(_EndKey_Complete("`n", "kx").Fired, "no entry: the caller sends the key")
+	AssertEqual("", _EndKey_Complete("`n", "kx").Burst, "and nothing was typed")
+	AssertFalse(_EndKey_Complete("`n", "KO").Fired,
+		"a case-sensitive entry leaves an already capitalised KO to the native key")
+	AssertFalse(_EndKey_Complete("`t", "").Fired, "an empty word has nothing to complete")
+}
+Test("end key: a key that completes nothing stays native (hotstring-end-keys)",
+	TestEndKey_NoEntryKeepsTheNativeKey)
+
+; The press that the hotkey took must not be wiped by the watcher that sees it.
+TestEndKey_ClaimShieldsTheWord() {
+	global HSE_Buffer, HSE_StartIsWordBoundary, _PrefixEndKeyClaim, _PrefixEndKeyProbe
+	try {
+		AssertFalse(HotstringEndKeyClaim(0x0D, "`n"),
+			"before the watcher publishes its probe, a #HotIf of the boot pump stays out")
+		_PrefixEndKeyProbe := _PrefixClaimEndKey
+		HSE_RegistryClear()
+		HSE_RegisterFromTomlFlags(true, "", "ko", "KO",
+			Map("Category", "test", "Section", "endkey"))
+		HSE_Buffer := "ko"
+		HSE_StartIsWordBoundary := true
+		AssertTrue(HotstringEndKeyClaim(0x0D, "`n"), "the hotkey takes the press")
+		_OnPrefixKeyDown(0, 0x0D, 0x1C)
+		AssertEqual("ko", HSE_Buffer, "the claimed press leaves the word to the expansion")
+		AssertEqual(0, _PrefixEndKeyClaim, "the claim covers one press")
+		_OnPrefixKeyDown(0, 0x0D, 0x1C)
+		AssertEqual("", HSE_Buffer, "any other Enter still ends the word")
+	} finally {
+		_PrefixEndKeyClaim := 0
+		HSE_RegistryClear()
+		HSE_HardReset()
+	}
+}
+Test("end key: a claimed press keeps the word and only that press (hotstring-end-keys)",
+	TestEndKey_ClaimShieldsTheWord)
+
+; On the maintainer's setup Tab is AltGr's tap and Enter CapsLock's: both go out
+; through the driver's send, so the watcher never meets them.
+TestEndKey_TapResolvesItsEndChar() {
+	global TapHold
+	Saved := TapHold
+	try {
+		TapHold := Map("keys", Map(
+			"alt_gr", Map("tap_action", "tab"), "caps_lock", Map("tap_action", "enter"),
+			"left_alt", Map("tap_action", "backspace"), "enter", Map()))
+		AssertEqual("`t", HotstringEndCharOfTap("alt_gr"), "AltGr's Tab tap is an end key")
+		AssertEqual("`n", HotstringEndCharOfTap("caps_lock"), "CapsLock's Enter tap is an end key")
+		AssertEqual("", HotstringEndCharOfTap("left_alt"), "a Backspace tap is not")
+		AssertEqual("`n", HotstringEndCharOfTap("enter"), "the native tap of the Enter key is")
+	} finally {
+		TapHold := Saved
+	}
+}
+Test("end key: a tap that types Enter or Tab is an end key (hotstring-end-keys)",
+	TestEndKey_TapResolvesItsEndChar)
