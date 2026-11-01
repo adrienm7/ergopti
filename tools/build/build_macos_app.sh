@@ -20,7 +20,8 @@
 # REQUIREMENTS (runtime on the build host):
 #  - macOS 13+ (build script runs on macos-latest GitHub runner)
 #  - Xcode command-line tools (swift, codesign, iconutil, sips, plutil)
-#  - curl, unzip, zip, git, node, go (the proxy sign-in relay; CI installs the repository pin)
+#  - curl, unzip, zip, git, node, go (the proxy sign-in relay; CI installs the
+#    repository pin, a developer app needs none: see resolve_relay_go)
 #
 # RATIONALE:
 #  - The script is idempotent: every run wipes build/macos so the output is a
@@ -164,6 +165,28 @@ fail() { printf '[macos-build] ERROR: %s\n' "$*" >&2; exit 1; }
 
 require_cmd() {
 	command -v "$1" >/dev/null 2>&1 || fail "missing required command: $1"
+}
+
+# The Go that compiles the proxy sign-in relay. A release takes the pin CI puts
+# on PATH and requires it. A developer app runs on a Mac nobody installs Go on,
+# so it asks tools/dev/macos_dev_go.py for the pinned private copy. The relay
+# only serves a proxy that demands NTLM or Negotiate and the driver already
+# reports its absence (not_installed), so a developer app without a reachable
+# download says so and is built without it.
+RELAY_GO=""
+RELAY_SKIPPED=0
+resolve_relay_go() {
+	if [ "$ERGOPTI_DEV_SOURCE" != 1 ]; then
+		require_cmd go
+		return
+	fi
+	if RELAY_GO="$(python3 "$REPO_ROOT/tools/dev/macos_dev_go.py")"; then
+		log "Proxy sign-in relay compiler: $RELAY_GO"
+		return
+	fi
+	RELAY_GO=""
+	RELAY_SKIPPED=1
+	log "WARNING: no Go toolchain (reason above): this developer app has no proxy sign-in relay, so a proxy that demands NTLM or Negotiate will refuse model downloads. The next build tries again."
 }
 
 # Strip Sparkle's self-update from a bundle the launcher's updater does not
@@ -380,17 +403,20 @@ assemble_native_runtime() {
 	# universal binary beside the launcher, where field_check_ports.lua and
 	# network-retry.sh resolve it. Its cgo half opens GSS.framework with dlopen,
 	# so each slice is compiled with the clang of its own architecture.
-	local relay_build="$BUILD_DIR/proxy-relay"
-	mkdir -p "$relay_build"
-	local relay_arch
-	for relay_arch in arm64 amd64; do
-		local clang_arch="$relay_arch"
-		[ "$relay_arch" = amd64 ] && clang_arch=x86_64
-		bash "$REPO_ROOT/tools/build/build-proxy-relay.sh" --goarch "$relay_arch" \
-			--cc "xcrun clang -arch $clang_arch -mmacosx-version-min=12.0" --output "$relay_build/$relay_arch"
-	done
-	lipo -create "$relay_build/arm64" "$relay_build/amd64" \
-		-output "$APP_PATH/Contents/MacOS/ergopti-proxy-relay"
+	if [ "${RELAY_SKIPPED:-0}" != 1 ]; then
+		local relay_build="$BUILD_DIR/proxy-relay"
+		mkdir -p "$relay_build"
+		local relay_arch
+		for relay_arch in arm64 amd64; do
+			local clang_arch="$relay_arch"
+			[ "$relay_arch" = amd64 ] && clang_arch=x86_64
+			bash "$REPO_ROOT/tools/build/build-proxy-relay.sh" --goarch "$relay_arch" \
+				--cc "xcrun clang -arch $clang_arch -mmacosx-version-min=12.0" --output "$relay_build/$relay_arch" \
+				${RELAY_GO:+--go "$RELAY_GO"}
+		done
+		lipo -create "$relay_build/arm64" "$relay_build/amd64" \
+			-output "$APP_PATH/Contents/MacOS/ergopti-proxy-relay"
+	fi
 	local remap_guardian_plist="$LAUNCHER_DIR/${ERGOPTI_SERVICE_LABEL_MACOS_REMAP_GUARDIAN}.plist"
 	[ -f "$remap_guardian_plist" ] || fail "Remap guardian LaunchAgent plist missing."
 	cp "$remap_guardian_plist" \
@@ -824,9 +850,11 @@ codesign_native_runtime() {
 	local switcher="$APP_PATH/Contents/MacOS/SystemSwitcherState"
 	[ -f "$switcher" ] || fail "Native switcher state helper is missing."
 	sign_code --identifier "$BUNDLE_ID.system-switcher-state" "$switcher"
-	local relay="$APP_PATH/Contents/MacOS/ergopti-proxy-relay"
-	[ -f "$relay" ] || fail "Proxy sign-in relay is missing."
-	sign_code --identifier "$BUNDLE_ID.proxy-relay" "$relay"
+	if [ "${RELAY_SKIPPED:-0}" != 1 ]; then
+		local relay="$APP_PATH/Contents/MacOS/ergopti-proxy-relay"
+		[ -f "$relay" ] || fail "Proxy sign-in relay is missing."
+		sign_code --identifier "$BUNDLE_ID.proxy-relay" "$relay"
+	fi
 	mkdir -p "$APP_PATH/Contents/Resources"
 	sha256_file_digest "$switcher" > "$APP_PATH/Contents/Resources/system-switcher-state.sha256"
 
@@ -936,9 +964,10 @@ main() {
 	[[ $# -eq 0 ]] || fail "Expected no arguments or --native-helper-only."
 	check_dev_source_configuration
 	select_launcher_archs
-	for cmd in curl unzip zip ditto tar swift xcrun awk lipo codesign iconutil sips plutil shasum git node go; do
+	for cmd in curl unzip zip ditto tar swift xcrun awk lipo codesign iconutil sips plutil shasum git node; do
 		require_cmd "$cmd"
 	done
+	resolve_relay_go
 	check_signing_configuration
 
 	clean_build_dir

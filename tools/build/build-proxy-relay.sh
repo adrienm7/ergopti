@@ -13,12 +13,14 @@
 #
 # Usage:
 #   bash tools/build/build-proxy-relay.sh --output FILE [--goarch amd64|arm64]
-#        [--source-directory DIR] [--cc COMPILER]
+#        [--source-directory DIR] [--cc COMPILER] [--go EXECUTABLE]
 #
 # --source-directory is the native_http module (a package staging that carries
 # the sources elsewhere, the Flatpak SDK build). --goarch and --cc cross-build
-# one macOS slice for lipo. The output path must not exist: an occupied
-# destination is refused, and the binary is moved in only after its smoke run.
+# one macOS slice for lipo. --go names an absolute toolchain instead of the go on
+# PATH: the macOS developer app's private copy (tools/dev/macos_dev_go.py). The
+# output path must not exist: an occupied destination is refused, and the binary
+# is moved in only after its smoke run.
 
 set -euo pipefail
 
@@ -28,6 +30,7 @@ SOURCE_DIR="${REPO_ROOT}/static/ergopti_plus/_shared/go/native_http"
 OUTPUT=""
 GOARCH_TARGET=""
 COMPILER=""
+GO_EXECUTABLE=""
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -35,6 +38,7 @@ while [[ $# -gt 0 ]]; do
 		--goarch) [[ $# -ge 2 ]] || exit 2; GOARCH_TARGET="$2"; shift 2 ;;
 		--source-directory) [[ $# -ge 2 ]] || exit 2; SOURCE_DIR="$2"; shift 2 ;;
 		--cc) [[ $# -ge 2 ]] || exit 2; COMPILER="$2"; shift 2 ;;
+		--go) [[ $# -ge 2 ]] || exit 2; GO_EXECUTABLE="$2"; shift 2 ;;
 		*) echo "[ERR] Unknown proxy relay build option: $1" >&2; exit 2 ;;
 	esac
 done
@@ -47,6 +51,11 @@ case "$GOARCH_TARGET" in
 esac
 [[ -f "${SOURCE_DIR}/go.mod" && -f "${SOURCE_DIR}/cmd/ergopti-proxy-relay/main.go" ]] \
 	|| { echo "[ERR] Proxy relay sources missing under $SOURCE_DIR" >&2; exit 1; }
+if [[ -n "$GO_EXECUTABLE" ]]; then
+	[[ "$GO_EXECUTABLE" == /* && -x "$GO_EXECUTABLE" ]] \
+		|| { echo "[ERR] --go must be an absolute executable: $GO_EXECUTABLE" >&2; exit 2; }
+	PATH="${GO_EXECUTABLE%/*}:$PATH"
+fi
 command -v go >/dev/null || { echo "[ERR] Go toolchain unavailable: the proxy relay cannot be built" >&2; exit 1; }
 
 export GOTOOLCHAIN=local GOPROXY=off GOFLAGS=-mod=readonly GOWORK=off CGO_ENABLED=1
