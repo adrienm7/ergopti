@@ -935,6 +935,7 @@ EnsureUserConfigsExist()
 ; Map and every downstream Features["llm"]["enabled"] access throws a
 ; cryptic "Item has no value" error. Fail loudly here instead.
 if !ManifestEnsureLoaded() {
+	try LoggerError("ErgoptiPlus", "Startup aborted: the generated manifest is missing.")
 	Ui_MsgBox(t("startup.manifest_missing"), t("startup.manifest_window_title"), "OK Iconx")
 	ExitApp(1)
 }

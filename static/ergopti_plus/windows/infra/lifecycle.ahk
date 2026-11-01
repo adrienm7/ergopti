@@ -92,6 +92,9 @@ global _LifecycleExitRetryReason := ""
 ; The retried reload re-enters OnExit through ExitApp, which reports "Exit": the
 ; successor asks to close once only, and nothing else can raise its reason again.
 global _LifecycleReloadExitRetrying := false
+; Who asked for the next exit, noted just before ExitApp: OnExit reports "Exit" for
+; every ExitApp alike, and a quit with no asker logged cannot be diagnosed.
+global _LifecycleExitRequester := ""
 ;
 ; How long a Quit waits for a running writer: [ui] user_quit_deadline_ms of
 ; _shared/modules/timings/constants.toml, pinned by test_quit_admission.ahk. The
@@ -1032,6 +1035,7 @@ _LifecycleRetryExitNow(Code, ExitKind, Gate, *) {
 	_LifecycleFlushExitRetryArmed := false
 	_LifecycleExitRetryReason := ExitKind
 	try LoggerInfo("Lifecycle", "The {1} settled; retrying the deferred exit.", Gate)
+	LifecycleNoteExitRequester("the retry of an exit deferred by the " . Gate)
 	; A veto ends this thread with ExitApp, and only a finally still runs here.
 	try ExitApp(Code)
 	finally {
@@ -1087,8 +1091,45 @@ _LifecycleRetrySupersededExit(Code, Record, *) {
 	if ReloadTerminalHandoffPending() != Record || Record["state"] != "abandon_ready"
 			|| !Record["stop_acknowledged"]
 		return false
+	LifecycleNoteExitRequester("the retry of an exit that superseded a reload")
 	ExitApp(Code)
 	QuitRequest_ExitReturned(_LifecycleQuitRetryOwned, NotifyQuitRefused)
+}
+
+; Notes who asks for the exit about to start; read and cleared by the next OnExit.
+; @param Who {String} The asker, for the log.
+LifecycleNoteExitRequester(Who) {
+	global _LifecycleExitRequester
+	_LifecycleExitRequester := Who
+}
+
+; Who asked for an exit: the noted asker, or what OnExit's reason itself tells.
+; @param Reason {String} The OnExit reason.
+; @param Noted {String} The asker noted before ExitApp, "" for none.
+; @returns {String} The asker, for the log.
+_LifecycleExitRequesterText(Reason, Noted) {
+	static ByReason := Map("Close", "a WM_CLOSE from outside the driver's own quit paths",
+		"Single", "a new instance of this script", "Menu", "AutoHotkey's own tray command",
+		"Reload", "a reload", "Error", "an unhandled error",
+		"Logoff", "the Windows session ending", "Shutdown", "the Windows session ending")
+	if Noted != ""
+		return Noted
+	return ByReason.Get(Reason, "an ExitApp that named no requester")
+}
+
+; Logs one exit request before any gate can refuse it: a refused exit and an accepted
+; one both have to say why they started. The hotkey and window tell a keyboard cause
+; from a foreign one; no typed key and no window title is logged.
+; @param Reason {String} The OnExit reason.
+; @param Code {Integer} The exit code.
+_LifecycleLogExitRequest(Reason, Code) {
+	global _LifecycleExitRequester
+	Requester := _LifecycleExitRequesterText(Reason, _LifecycleExitRequester)
+	_LifecycleExitRequester := ""
+	ActiveExe := ""
+	try ActiveExe := WinGetProcessName("A")
+	LoggerInfo("Lifecycle", "Exit requested: reason={1} code={2} by={3}; last hotkey '{4}' {5} ms ago, active app '{6}'.",
+		Reason, Code, Requester, A_ThisHotkey, A_TimeSinceThisHotkey, ActiveExe)
 }
 
 Ergopti_OnShutdown(reason, code) {
@@ -1101,6 +1142,9 @@ Ergopti_OnShutdown(reason, code) {
 			reason := _LifecycleExitRetryReason
 			_LifecycleExitRetryReason := ""
 		}
+		try _LifecycleLogExitRequest(reason, code)
+		catch as Err
+			try LoggerError("Lifecycle", "The exit request could not be logged: {1}.", Err.Message)
 		if IsSet(LLM_Menu_ApiPrivateBeginShutdown)
 			_LifecycleAiShutdownAttempt := LLM_Menu_ApiPrivateBeginShutdown()
 		_LifecycleShutdownReason := reason
@@ -1443,6 +1487,7 @@ Ergopti_OnShutdown(reason, code) {
 			return _LifecycleRefuseShutdown("the recovery handoff failed before terminal teardown")
 		}
 		ShutdownTerminal := true
+		try LoggerInfo("Lifecycle", "Exit accepted: reason={1} code={2}; no gate refused it.", reason, code)
 		try UninstallCommit(reason)
 		catch as Err
 			try LoggerError("Lifecycle", "Removal authorization failed during terminal shutdown: {1}.", Err.Message)
@@ -1684,7 +1729,7 @@ ActivateExitApp(*) {
 				"timeout", LIFECYCLE_USER_QUIT_DEADLINE_MS,
 				"poll", LIFECYCLE_USER_QUIT_POLL_MS,
 				"warn", (Text) => LoggerWarn("Lifecycle", "{1}", Text),
-				"exit", () => ExitApp(),
+				"exit", () => (LifecycleNoteExitRequester("the user's Quit (tray or script_quit)"), ExitApp()),
 				"retry_owned", _LifecycleQuitRetryOwned,
 				"notify", NotifyQuitRefused))
 }
