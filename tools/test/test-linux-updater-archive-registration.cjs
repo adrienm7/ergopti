@@ -52,6 +52,7 @@ const sources = {
 		'static/ergopti_plus/linux/modules/updater/installer.lua',
 		'static/ergopti_plus/linux/modules/updater/archive_transfer.lua',
 		'static/ergopti_plus/linux/infra/archive_output.lua',
+		'static/ergopti_plus/linux/infra/archive_tar_feeder.lua',
 		'static/ergopti_plus/linux/infra/fd_sha256.lua',
 		'static/ergopti_plus/linux/native/archive_output/archive_publication.c',
 		'static/ergopti_plus/linux/native/archive_output/archive_publication.h',
