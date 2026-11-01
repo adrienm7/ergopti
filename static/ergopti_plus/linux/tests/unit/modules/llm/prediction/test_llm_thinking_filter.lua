@@ -29,8 +29,6 @@
 
 local helpers = require("tests.helpers")
 
-local DRIVER_ROOT = helpers.driver_root()
-
 --- Feeds a whole response through a fresh filter in the given chunk sizes.
 --- @param text string Full model response.
 --- @param chunks table Array of strings whose concatenation is `text`.
@@ -48,15 +46,6 @@ local function split_every(s, n)
 	local parts = {}
 	for i = 1, #s, n do parts[#parts + 1] = s:sub(i, i + n - 1) end
 	return parts
-end
-
---- Reads a file or returns nil.
-local function read_file(path)
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local c = fh:read("*a")
-	fh:close()
-	return c
 end
 
 --- Drops fully-commented Lua lines so a commented-out call cannot satisfy a scan.
@@ -154,7 +143,8 @@ end)
 -- =========================================================
 
 helpers.describe("llm thinking filter — engine wiring", function()
-	local raw = read_file(DRIVER_ROOT .. "/modules/llm/prediction_engine.lua")
+	-- modules/llm/prediction_engine, selected by a declaration unique to it.
+	local raw = helpers.read_driver_unit("local function SYSTEM_CLOCK(")
 	local src = raw and strip_comment_lines(raw) or nil
 
 	helpers.it("the engine source is readable", function()

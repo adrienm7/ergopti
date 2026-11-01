@@ -642,7 +642,8 @@ end)
 
 helpers.describe("logger sink — date rollover", function()
 	helpers.it("both handles are repointed when the date changes", function()
-		local src = read_file(DRIVER_ROOT .. "/infra/logger_sink.lua")
+		-- infra/logger_sink, selected by a declaration unique to it.
+		local src = helpers.read_driver_unit("local function retention_days(")
 		helpers.assert_not_nil(src, "logger_sink.lua must be readable")
 
 		-- open_handles() must assign BOTH handles; a rollover that only repoints
