@@ -191,6 +191,9 @@ exec "$OWNED_PYTHON" "$@"
 """,
     )
     environment["OWNED_PYTHON"] = sys.executable
+    # clone_app.sh requires the managed Python link and leads PATH with its
+    # folder; the stub above stands in for it.
+    environment["ERGOPTI_CLONER_PYTHON"] = str(binary / "python3")
     # FIFO admission proves the controlled reader has closed fd0 before metadata returns.
     # The second FIFO acknowledges closure without polling an unbounded marker loop.
     if mode.startswith("deadpipe"):
