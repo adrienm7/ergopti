@@ -467,6 +467,17 @@ function M._managed_python_for_probe(confirm)
 	return managed_python(confirm)
 end
 
+--- Installs Ergopti's Python ahead of a layout install, for the field report
+--- collector (tools/dev/linux-field-run.sh): the maintainer who runs it gave the
+--- consent, which the collector states in one line from confirm(bytes) before
+--- the download. An installed interpreter answers without calling confirm.
+--- @param confirm function confirm(bytes) -> boolean
+--- @param on_done function on_done(ok, interpreter_or_code, detail)
+function M.install_python(confirm, on_done)
+	assert(type(confirm) == "function" and type(on_done) == "function", "install_python needs a consent and a callback")
+	managed_python(confirm)(on_done)
+end
+
 --- Resolves the collaborators, the production ones by default.
 --- @param deps table|nil
 --- @return table|nil deps

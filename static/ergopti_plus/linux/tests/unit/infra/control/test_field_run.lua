@@ -235,6 +235,17 @@ helpers.describe("Linux field run (linux-field-run)", function()
 		helpers.assert_eq({ result.verdict, result.codes }, { "skip", { "check_busy" } })
 	end)
 
+	helpers.it("records a check whose prerequisite was missing as a skip with its code", function()
+		-- The composer check without Ergopti's Python did not run: never a pass.
+		local not_run = { check = "composer", passed = true, not_run = "python_not_installed",
+			steps = { { id = "composer_install", state = "skip", value = "python_download_failed" } } }
+		local _, w = started({ checks = { composer = not_run } })
+		w.request('{"schema":1,"request_id":"p","steps":["field_composer"]}')
+		local result = w.json("results/p/01_field_composer.json")
+		helpers.assert_eq({ result.verdict, result.codes }, { "skip", { "python_not_installed" } })
+		helpers.assert_eq(result.report.steps[1].value, "python_download_failed", "the reason travels with the skip")
+	end)
+
 	helpers.it("fails the guard when a step changed config.toml", function()
 		local session, w = started()
 		w.ports.run_check = function(_, on_result)
