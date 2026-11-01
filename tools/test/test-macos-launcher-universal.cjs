@@ -267,6 +267,99 @@ assemble_native_runtime "$1/ErgoptiPlus"
 	}
 }
 
+// The Mac of field report 2026-11-01 had no go: the developer build must resolve
+// its own, a release must still require the pin CI installs, and only a developer
+// app may go without the relay.
+const resolver = build.match(/^RELAY_GO=""\nRELAY_SKIPPED=0\nresolve_relay_go\(\) \{[\s\S]*?^\}/m);
+if (!resolver) {
+	errors.push('resolve_relay_go() is missing.');
+} else {
+	const resolveWith = (devSource, python) =>
+		spawnSync(
+			bashExecutable(),
+			[
+				'-c',
+				`
+set -euo pipefail
+REPO_ROOT=/fixture
+ERGOPTI_DEV_SOURCE=${devSource}
+log() { printf '%s\\n' "$*"; }
+fail() { printf 'FAIL:%s\\n' "$*"; exit 1; }
+require_cmd() { printf 'required:%s\\n' "$1"; }
+python3() { ${python}; }
+${resolver[0]}
+resolve_relay_go
+printf 'go=%s skipped=%s\\n' "$RELAY_GO" "$RELAY_SKIPPED"
+`
+			],
+			{ encoding: 'utf8', timeout: 10000 }
+		);
+	const pinned = resolveWith(1, 'printf /private/go');
+	if (pinned.status !== 0 || !pinned.stdout.includes('go=/private/go skipped=0'))
+		errors.push(`(relay-go-private) ${pinned.stdout}${pinned.stderr}`);
+	const missing = resolveWith(1, 'return 1');
+	if (missing.status !== 0 || !/WARNING: no Go toolchain[\s\S]*go= skipped=1/.test(missing.stdout))
+		errors.push(`(relay-go-unavailable) ${missing.stdout}${missing.stderr}`);
+	const release = resolveWith(0, 'return 99');
+	if (release.status !== 0 || !/required:go\ngo= skipped=0/.test(release.stdout))
+		errors.push(`(relay-go-release) ${release.stdout}${release.stderr}`);
+}
+if (!/main\(\) \{[\s\S]*\n\tresolve_relay_go\n/.test(build))
+	errors.push('The app build must resolve the relay compiler.');
+if (/iconutil sips plutil shasum git node go;/.test(build))
+	errors.push('The app build requires a go on PATH again.');
+for (const [slug, gate] of [
+	['relay-build', /if \[ "\$\{RELAY_SKIPPED:-0\}" != 1 \]; then\n\t\tlocal relay_build=/],
+	['relay-sign', /if \[ "\$\{RELAY_SKIPPED:-0\}" != 1 \]; then\n\t\tlocal relay="\$APP_PATH/]
+])
+	if (!gate.test(build))
+		errors.push(`(${slug}) the relay step must follow the resolver's verdict.`);
+
+// The real relay builder with a toolchain that is on no PATH. The stand-in answers
+// what the builder asks and writes the slice; cgo and the smoke run stay its own.
+{
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti relay go-'));
+	try {
+		const bin = path.join(fixture, 'private go/bin');
+		fs.mkdirSync(bin, { recursive: true });
+		const go = path.join(bin, 'go');
+		fs.writeFileSync(
+			go,
+			`#!/bin/sh
+case "$1 $2" in
+	"env GOOS") echo darwin ;;
+	"env GOARCH") echo arm64 ;;
+	"env CGO_ENABLED") echo 1 ;;
+	"env GOVERSION") echo go-fixture ;;
+	build*)
+		printf '#!/bin/sh\\necho relay_refused invalid_arguments >&2\\nexit 2\\n' > "$6"
+		chmod 755 "$6" ;;
+esac
+`,
+			{ mode: 0o755 }
+		);
+		const relay = (arguments_) =>
+			spawnSync(
+				bashExecutable(),
+				[bashPath(path.join(ROOT, 'tools/build/build-proxy-relay.sh')), ...arguments_],
+				{ encoding: 'utf8', timeout: 20000 }
+			);
+		const output = `${bashPath(fixture)}/relay`;
+		const built = relay(['--go', bashPath(go), '--output', output]);
+		if (
+			built.status !== 0 ||
+			!built.stdout.includes('go-fixture') ||
+			!fs.existsSync(path.join(fixture, 'relay'))
+		)
+			errors.push(`(relay-go-option) ${built.stdout}${built.stderr}`);
+		const relative = relay(['--go', 'bin/go', '--output', `${output}-relative`]);
+		if (relative.status !== 2 || !relative.stderr.includes('--go must be an absolute executable'))
+			errors.push(`(relay-go-relative) ${relative.stdout}${relative.stderr}`);
+	} finally {
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] macOS launcher architecture or framework assembly failed:\x1b[0m');
 	for (const e of errors) console.error('  - ' + e);

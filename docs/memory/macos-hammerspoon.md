@@ -220,6 +220,9 @@ producer and catalogue generator on the Mac from the clone's own pins: the
 official archive admitted by its `ollama_release.json` SHA-256 and size, the
 upstream source at the contract's `source_commit`, and the contract's
 `go_version` (a downloaded toolchain only through the Go checksum database).
+A Mac without Go uses `tools/dev/macos_dev_go.py`, the digest-pinned private copy
+in `build/macos-dev-go` that the developer build's proxy relay shares; it must
+keep running on the Xcode tools' Python 3.9, so it may not need tarfile filters.
 The catalogue is `unpublished-ci` with no URL; the installer then admits the
 archive kept in `build/macos-dev-ollama/` against its pinned digest. Copying a
 published catalogue instead failed for every unreleased version (field run

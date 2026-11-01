@@ -507,6 +507,62 @@ class PinnedGoTests(unittest.TestCase):
             with self.assertRaises(self.stager.StageRefusal):
                 self.host_without_go(data).pinned_go("go1.26.8")
 
+    def resolve_for_the_relay(self, on_path, served=None):
+        """Runs the relay's resolver; a download is an error unless bytes are served."""
+        contract = self.root / CONTRACT
+        contract.parent.mkdir(parents=True, exist_ok=True)
+        contract.write_text(json.dumps({"go_version": "go1.26.8"}))
+        fetched = []
+
+        def fetch(url, destination):
+            fetched.append(url)
+            if served is None:
+                raise subprocess.CalledProcessError(6, ["curl"])
+            Path(destination).write_bytes(served)
+
+        with mock.patch.object(self.stager.DEV_GO.shutil, "which", return_value=on_path):
+            return self.stager.DEV_GO.resolve(self.root, "arm64", fetch), fetched
+
+    def test_the_relay_gets_the_private_copy_on_a_mac_without_go(self):
+        data = self.go_archive("go1.26.8")
+        go, fetched = self.resolve_for_the_relay(None, data)
+        self.assertEqual(go, str(self.root / "build/macos-dev-go/go1.26.8/go/bin/go"))
+        self.assertEqual(len(fetched), 1)
+        self.assertEqual(self.resolve_for_the_relay(None)[0], go)
+
+    def test_the_relay_uses_a_go_of_the_pin_on_path(self):
+        self.go_archive("go1.26.8")
+        go = self.go("go1.26.8", {})
+        self.assertEqual(self.resolve_for_the_relay(go), (go, []))
+
+    def test_the_relay_replaces_a_go_of_another_version(self):
+        data = self.go_archive("go1.26.8")
+        go, fetched = self.resolve_for_the_relay(self.go("go1.25.0", {}), data)
+        self.assertEqual(go, str(self.root / "build/macos-dev-go/go1.26.8/go/bin/go"))
+        self.assertEqual(len(fetched), 1)
+
+    def test_an_impossible_download_is_a_named_exit(self):
+        self.go_archive("go1.26.8")
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.resolve_for_the_relay(None)
+        self.assertEqual(list((self.root / "build/macos-dev-go").iterdir()), [])
+        dev_go = self.stager.DEV_GO
+        message = io.StringIO()
+        refusal = dev_go.GoRefusal("no route to the archive")
+        with mock.patch.object(dev_go, "resolve", side_effect=refusal):
+            with contextlib.redirect_stderr(message):
+                self.assertEqual(dev_go.main(), 1)
+        self.assertIn("no route to the archive", message.getvalue())
+
+    def test_the_python_of_the_xcode_tools_unpacks_the_archive(self):
+        data = self.go_archive("go1.26.8")
+        filter_function = getattr(tarfile, "data_filter", None)
+        if filter_function is not None:
+            del tarfile.data_filter
+            self.addCleanup(setattr, tarfile, "data_filter", filter_function)
+        go, _ = self.resolve_for_the_relay(None, data)
+        self.assertTrue(Path(go).is_file())
+
 
 if __name__ == "__main__":
     unittest.main()
