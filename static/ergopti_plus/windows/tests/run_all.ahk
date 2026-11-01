@@ -697,6 +697,7 @@ _LLM_Deps_State := "ready"
 #Include ..\..\_shared\modules\llm\api_url_template.ahk
 #Include ..\..\_shared\modules\llm\model_capabilities.ahk
 #Include ..\..\_shared\modules\llm\thinking_off.ahk
+#Include ..\..\_shared\modules\llm\local_server_fingerprint.ahk
 #Include ..\..\_shared\modules\llm\local_server_discovery.ahk
 #Include ..\..\_shared\modules\llm\local_server_ports.ahk
 #Include ../../_shared/modules/llm/local_server_menu.ahk
@@ -727,6 +728,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/servers/test_local_server_menu.ahk
 #Include unit/modules/llm/servers/test_local_servers.ahk
 #Include unit/modules/llm/servers/test_local_server_ports.ahk
+#Include unit/modules/llm/servers/test_local_server_fingerprint.ahk
 #Include unit/modules/llm/servers/test_local_server_queue_timer.ahk
 #Include unit/modules/llm/servers/test_llm_crash_orphan_cleanup.ahk
 #Include unit/modules/llm/servers/test_llm_temp_artifact_terminal_ownership.ahk

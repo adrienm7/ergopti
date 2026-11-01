@@ -227,20 +227,23 @@ Test("local server ports: a Windows scan without a process list still reads the 
 ; =====================================
 
 class _LSP_OwnerFixture extends _LSO_Fixture {
-	__New() {
+	__New(Identities := 0) {
 		super.__New(true)
 		this.Scans := []
 		this.ScanResults := Map()
 		Descriptor := Map("process_names", ["fixture-server"], "command_lines", [], "port_flags", [],
 			"address_flags", [], "config_files", [])
-		this.Native := LocalServersOwner(Map("order", this.Order, "servers", this.Servers,
+		Options := Map("order", this.Order, "servers", this.Servers,
 			"models_owner", this.Transport, "poll_ms", 20,
 			"clock", ObjBindMethod(this, "Clock"), "max_age", (*) => 1000,
 			"entry", ObjBindMethod(this, "Entry"), "capture_source", ObjBindMethod(this, "CaptureSource"),
 			"source_current", ObjBindMethod(this, "SourceCurrent"), "admit", ObjBindMethod(this, "Admission"),
 			"apply", ObjBindMethod(this, "Persist"), "timer", ObjBindMethod(this, "QueueTimer"),
 			"on_publish", ObjBindMethod(this, "Publish"), "on_error", ObjBindMethod(this, "NativeError"),
-			"scan_ports", ObjBindMethod(this, "Scan"), "discovery", Map("lmstudio", Descriptor, "llamacpp", Descriptor)))
+			"scan_ports", ObjBindMethod(this, "Scan"), "discovery", Map("lmstudio", Descriptor, "llamacpp", Descriptor))
+		if Identities is Map
+			Options["identities"] := Identities
+		this.Native := LocalServersOwner(Options)
 	}
 
 	Scan(Entries, OnDone) {

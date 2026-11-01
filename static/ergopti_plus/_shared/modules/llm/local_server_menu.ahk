@@ -28,6 +28,22 @@ LocalServerMenuHost(BaseUrl) {
 }
 
 /**
+ * The name of the server a verdict answered for: the row's own label, or the label
+ * of the row of the same address its response fingerprinted, so vLLM on oMLX's port
+ * is named vLLM.
+ * @param {Map} Servers View id -> Map with "label".
+ * @param {String} Id The row.
+ * @param {Any} Verdict Its published verdict.
+ * @returns {String} The label.
+ */
+LocalServerMenuLabelOf(Servers, Id, Verdict) {
+	Named := (Verdict is Map) ? Verdict.Get("server", "") : ""
+	if (Named is String) && Named != "" && (Servers.Get(Named, 0) is Map)
+		return Servers[Named]["label"]
+	return Servers[Id]["label"]
+}
+
+/**
  * @param {Map} Options Catalogue, cached verdicts, translations and action ports.
  * @returns {Array} Rows equivalent to shared llm/local_server_menu.lua.
  */
@@ -45,7 +61,7 @@ LocalServerMenuRows(Options) {
 		Rows.Push(Map("label", Tr.Call("healthcheck.status.failed"), "disabled", true))
 	for Id in Options["detected"] {
 		Verdict := Result.Call(Id)
-		Label := Options["servers"][Id]["label"] . " 🖥️ — " . LocalServerMenuHost(Verdict["base_url"])
+		Label := LocalServerMenuLabelOf(Options["servers"], Id, Verdict) . " 🖥️ — " . LocalServerMenuHost(Verdict["base_url"])
 		if Verdict["status"] == "needs_key"
 			Label := Fmt.Call("menu.llm.local_servers.needs_key", Label)
 		Active := Options["active"]

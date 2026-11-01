@@ -46,6 +46,8 @@ global LLM_LOCAL_API_SERVERS := Map()
 ; Server id -> validated discovery descriptor of local_servers.json; a server
 ; without one is never probed (local_server_ports.ahk)
 global LLM_LOCAL_SERVER_DISCOVERY := Map()
+; Server id -> its address group and fingerprint (LocalServerFingerprintParse).
+global LLM_LOCAL_SERVER_IDENTITIES := Map()
 ; Server id -> where the last port scan found it (LocalServersOwner publishes it)
 global LLM_LOCAL_SERVER_SCANS := Map()
 global LLM_API_PROVIDER_ORDER := []
@@ -2490,7 +2492,7 @@ _LLMRemote_CatalogDecisionsTestIsValid(Section) {
 
 _LLMRemote_LoadCatalog() {
     global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, LLM_REMOTE_TEST_REQUEST, _SharedDir
-    global LLM_LOCAL_API_SERVERS, LLM_LOCAL_SERVER_DISCOVERY
+    global LLM_LOCAL_API_SERVERS, LLM_LOCAL_SERVER_DISCOVERY, LLM_LOCAL_SERVER_IDENTITIES
     global LLM_REMOTE_DECISIONS_TEST
     path := _SharedDir . "\modules\llm\api_providers.json"
     if !FileExist(path)
@@ -2597,6 +2599,11 @@ _LLMRemote_LoadCatalog() {
         else
             try LoggerError("LLM.remote", "local_servers.json: {1}; that server is never probed.", Verdict["problem"])
     }
+    ; A refused fingerprint leaves its row to its address's default row
+    LocalFingerprints := LocalServerFingerprintParse(LocalRoot, LocalCatalogue["order"])
+    for Reason in LocalFingerprints["errors"]
+        try LoggerError("LLM.remote", "local_servers.json: {1}; that row is not fingerprinted.", Reason)
+    LLM_LOCAL_SERVER_IDENTITIES := LocalFingerprints["identities"]
     for Id in LocalCatalogue["order"] {
         Desc := LocalCatalogue["servers"][Id]
         candidateProviders[Id] := Map("Label", Desc["label"], "BaseUrl", Desc["base_url"],
