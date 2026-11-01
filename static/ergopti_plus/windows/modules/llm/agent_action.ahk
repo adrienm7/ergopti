@@ -407,12 +407,20 @@ _LLM_Agent_ManualRefusal() {
 		_LLM_Menu_ShowManualPredictionNotice("llm.agent.no_system2")
 		return ""
 	}
-	; The text would leave an app the user excluded from the AI
-	if _LLM_Engine_ShouldSuppressForDisabledApps() {
-		LoggerInfo("LLM", "AI agent refused: the focused app is excluded from the AI.")
+	; The text would leave a secure field, or an app the user excluded from the AI
+	if _LLM_Agent_FieldIsSecure() || _LLM_Engine_ShouldSuppressForDisabledApps() {
+		LoggerInfo("LLM", "AI agent refused: the focused field or app is excluded from the AI.")
 		return ""
 	}
 	return Backend
+}
+
+; @returns {Boolean} True in a secure field, and when that cannot be told.
+_LLM_Agent_FieldIsSecure() {
+	global _LLM_Agent_SecureFieldFn
+	Secure := true
+	try Secure := HasMethod(_LLM_Agent_SecureFieldFn, "Call") ? _LLM_Agent_SecureFieldFn.Call() : SFD_IsSecureField()
+	return Secure ? true : false
 }
 
 ; The selection arrived: hand it to System 2, or say that nothing is selected.
@@ -925,7 +933,7 @@ _LLM_Agent_OnSystem1Fail(OnTriage, Current, Failure := "") {
 
 ; The typing paused: triage the current sentence when everything allows it.
 _LLM_Agent_OnPause(Generation, Buffer) {
-	global _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Agent_SecureFieldFn, _LLM_Agent_System1Revision
+	global _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Agent_System1Revision
 	Revision := _LLM_Agent_System1Revision
 	Current := _LLM_Agent_TriageIsCurrent.Bind(Generation, Revision)
 	_LLM_Agent_Auto["timer"] := 0
@@ -951,9 +959,7 @@ _LLM_Agent_OnPause(Generation, Buffer) {
 		LoggerDebug("LLM", "AI agent: no triage, this sentence was already triaged.")
 		return false
 	}
-	Secure := true
-	try Secure := HasMethod(_LLM_Agent_SecureFieldFn, "Call") ? _LLM_Agent_SecureFieldFn.Call() : SFD_IsSecureField()
-	if Secure {
+	if _LLM_Agent_FieldIsSecure() {
 		LoggerInfo("LLM", "AI agent: no triage in a secure field.")
 		return false
 	}
