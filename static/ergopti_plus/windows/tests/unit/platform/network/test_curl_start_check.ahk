@@ -54,8 +54,8 @@ _CSC_RealFileAndEntry() {
 		"this Windows reports its curl version from the file")
 	AssertTrue(HTTP_CheckCurlAtStart(), "this machine is supported, so no dialog opens")
 	Entry := _DriverSourceConcat()
-	AssertContains(Entry, "SetTimer(HTTP_CheckCurlAtStart, -1)", "the entry runs the check after ready")
-	Assert(InStr(Entry, "SetTimer(HTTP_CheckCurlAtStart") > InStr(Entry, '_DriverBootPhase := "ready"'),
-		"a dialog must not freeze the boot")
+	AssertContains(Entry, "SetTimer(HTTP_CheckCurlAtStart, -1)", "a dialog must not freeze the boot")
+	Assert(RegExMatch(Entry, 's)_DriverBootPhase := "ready".*\RHTTP_ScheduleCurlCheck\(\)'),
+		"the entry schedules the check after ready")
 }
 Test("curl-start-check: the file reading and the entry's scheduling", _CSC_RealFileAndEntry)

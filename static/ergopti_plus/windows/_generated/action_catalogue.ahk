@@ -23,6 +23,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "left_click_toggle" })
 	Items.Push({ Kind: "action", Id: "right_click_toggle" })
 	Items.Push({ Kind: "action", Id: "app_switcher" })
+	Items.Push({ Kind: "action", Id: "app_window_previous" })
 	Items.Push({ Kind: "action", Id: "alt_tab_windows" })
 	Items.Push({ Kind: "action", Id: "alt_tab_monitor" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.edition" })
@@ -87,6 +88,10 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "para_next" })
 	Items.Push({ Kind: "action", Id: "doc_start" })
 	Items.Push({ Kind: "action", Id: "doc_end" })
+	Items.Push({ Kind: "action", Id: "home" })
+	Items.Push({ Kind: "action", Id: "end" })
+	Items.Push({ Kind: "action", Id: "page_up" })
+	Items.Push({ Kind: "action", Id: "page_down" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.selection" })
 	Items.Push({ Kind: "action", Id: "sel_up" })
 	Items.Push({ Kind: "action", Id: "sel_down" })
@@ -199,6 +204,20 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "ctrl_delete" })
 	Items.Push({ Kind: "action", Id: "space" })
 	Items.Push({ Kind: "action", Id: "caps_lock" })
+	Items.Push({ Kind: "action", Id: "sticky_ctrl" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd" })
+	Items.Push({ Kind: "action", Id: "sticky_option" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd_shift" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd_option" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd_ctrl" })
+	Items.Push({ Kind: "action", Id: "sticky_option_shift" })
+	Items.Push({ Kind: "action", Id: "sticky_option_ctrl" })
+	Items.Push({ Kind: "action", Id: "sticky_ctrl_shift" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd_option_shift" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd_option_ctrl" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd_shift_ctrl" })
+	Items.Push({ Kind: "action", Id: "sticky_option_shift_ctrl" })
+	Items.Push({ Kind: "action", Id: "sticky_hyper" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.grp_app" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.ui" })
 	Items.Push({ Kind: "action", Id: "open_metrics_typing" })
@@ -234,6 +253,7 @@ GestureActionCatalogueData() {
 	Actions["alt_tab_monitor"] := { Family: "sg", LabelKey: "sg_actions.alt_tab_monitor", Parameter: "", Confirm: false }
 	Actions["alt_tab_windows"] := { Family: "sg", LabelKey: "sg_actions.alt_tab_windows", Parameter: "", Confirm: false }
 	Actions["app_switcher"] := { Family: "sg", LabelKey: "sg_actions.app_switcher", Parameter: "", Confirm: false }
+	Actions["app_window_previous"] := { Family: "sg", LabelKey: "sg_actions.app_window_previous", Parameter: "", Confirm: false }
 	Actions["arrow_down"] := { Family: "sg", LabelKey: "sg_actions.arrow_down", Parameter: "", Confirm: false }
 	Actions["arrow_left"] := { Family: "sg", LabelKey: "sg_actions.arrow_left", Parameter: "", Confirm: false }
 	Actions["arrow_right"] := { Family: "sg", LabelKey: "sg_actions.arrow_right", Parameter: "", Confirm: false }
@@ -262,11 +282,13 @@ GestureActionCatalogueData() {
 	Actions["doc_start"] := { Family: "sg", LabelKey: "sg_actions.doc_start", Parameter: "", Confirm: false }
 	Actions["eject_all_disks"] := { Family: "sg", LabelKey: "sg_actions.eject_all_disks", Parameter: "", Confirm: false }
 	Actions["empty_trash"] := { Family: "sg", LabelKey: "sg_actions.empty_trash", Parameter: "", Confirm: true }
+	Actions["end"] := { Family: "sg", LabelKey: "sg_actions.end", Parameter: "", Confirm: false }
 	Actions["enter"] := { Family: "sg", LabelKey: "sg_actions.enter", Parameter: "", Confirm: false }
 	Actions["escape"] := { Family: "sg", LabelKey: "sg_actions.escape", Parameter: "", Confirm: false }
 	Actions["find"] := { Family: "sg", LabelKey: "sg_actions.find", Parameter: "", Confirm: false }
 	Actions["force_quit_frontmost"] := { Family: "sg", LabelKey: "sg_actions.force_quit_frontmost", Parameter: "", Confirm: true }
 	Actions["fullscreen"] := { Family: "sg", LabelKey: "sg_actions.fullscreen", Parameter: "", Confirm: false }
+	Actions["home"] := { Family: "sg", LabelKey: "sg_actions.home", Parameter: "", Confirm: false }
 	Actions["left_click_toggle"] := { Family: "sg", LabelKey: "sg_actions.left_click_toggle", Parameter: "", Confirm: false }
 	Actions["line_down"] := { Family: "sg", LabelKey: "sg_actions.line_down", Parameter: "", Confirm: false }
 	Actions["line_end"] := { Family: "sg", LabelKey: "sg_actions.line_end", Parameter: "", Confirm: false }
@@ -341,6 +363,8 @@ GestureActionCatalogueData() {
 	Actions["open_today_log"] := { Family: "sg", LabelKey: "sg_actions.open_today_log", Parameter: "", Confirm: false }
 	Actions["open_url"] := { Family: "sg", LabelKey: "sg_actions.open_url", Parameter: "url", Confirm: false }
 	Actions["open_window_spy"] := { Family: "sg", LabelKey: "sg_actions.open_window_spy", Parameter: "", Confirm: false }
+	Actions["page_down"] := { Family: "sg", LabelKey: "sg_actions.page_down", Parameter: "", Confirm: false }
+	Actions["page_up"] := { Family: "sg", LabelKey: "sg_actions.page_up", Parameter: "", Confirm: false }
 	Actions["para_next"] := { Family: "sg", LabelKey: "sg_actions.para_next", Parameter: "", Confirm: false }
 	Actions["para_prev"] := { Family: "sg", LabelKey: "sg_actions.para_prev", Parameter: "", Confirm: false }
 	Actions["paste"] := { Family: "sg", LabelKey: "sg_actions.paste", Parameter: "", Confirm: false }
@@ -386,6 +410,20 @@ GestureActionCatalogueData() {
 	Actions["snap_right"] := { Family: "sg", LabelKey: "sg_actions.snap_right", Parameter: "", Confirm: false }
 	Actions["space"] := { Family: "sg", LabelKey: "sg_actions.space", Parameter: "", Confirm: false }
 	Actions["spotlight_mouse"] := { Family: "sg", LabelKey: "sg_actions.spotlight_mouse", Parameter: "", Confirm: false }
+	Actions["sticky_cmd"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd", Parameter: "", Confirm: false }
+	Actions["sticky_cmd_ctrl"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_ctrl", Parameter: "", Confirm: false }
+	Actions["sticky_cmd_option"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_option", Parameter: "", Confirm: false }
+	Actions["sticky_cmd_option_ctrl"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_option_ctrl", Parameter: "", Confirm: false }
+	Actions["sticky_cmd_option_shift"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_option_shift", Parameter: "", Confirm: false }
+	Actions["sticky_cmd_shift"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_shift", Parameter: "", Confirm: false }
+	Actions["sticky_cmd_shift_ctrl"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_shift_ctrl", Parameter: "", Confirm: false }
+	Actions["sticky_ctrl"] := { Family: "sg", LabelKey: "sg_actions.sticky_ctrl", Parameter: "", Confirm: false }
+	Actions["sticky_ctrl_shift"] := { Family: "sg", LabelKey: "sg_actions.sticky_ctrl_shift", Parameter: "", Confirm: false }
+	Actions["sticky_hyper"] := { Family: "sg", LabelKey: "sg_actions.sticky_hyper", Parameter: "", Confirm: false }
+	Actions["sticky_option"] := { Family: "sg", LabelKey: "sg_actions.sticky_option", Parameter: "", Confirm: false }
+	Actions["sticky_option_ctrl"] := { Family: "sg", LabelKey: "sg_actions.sticky_option_ctrl", Parameter: "", Confirm: false }
+	Actions["sticky_option_shift"] := { Family: "sg", LabelKey: "sg_actions.sticky_option_shift", Parameter: "", Confirm: false }
+	Actions["sticky_option_shift_ctrl"] := { Family: "sg", LabelKey: "sg_actions.sticky_option_shift_ctrl", Parameter: "", Confirm: false }
 	Actions["surround_parens"] := { Family: "sg", LabelKey: "sg_actions.surround_parens", Parameter: "", Confirm: false }
 	Actions["tab"] := { Family: "sg", LabelKey: "sg_actions.tab", Parameter: "", Confirm: false }
 	Actions["tab_close"] := { Family: "sg", LabelKey: "sg_actions.tab_close", Parameter: "", Confirm: false }

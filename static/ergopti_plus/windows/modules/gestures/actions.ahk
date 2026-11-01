@@ -439,10 +439,22 @@ _GestureActionLabel(Name) {
 	Translated := t(Key)
 	; t() returns the raw key when no translation is found — treat that as a miss
 	if (Translated != Key)
-		return Translated
+		; The sticky labels name macOS's keys; every locale keeps those two words.
+		return InStr(Name, "sticky_") == 1
+			? StrReplace(StrReplace(Translated, "Cmd", "Win", true), "Option", "Alt", true) : Translated
 	return Name
 }
 
+
+for _StickyId in ["sticky_ctrl", "sticky_cmd", "sticky_option", "sticky_cmd_shift", "sticky_cmd_option",
+		"sticky_cmd_ctrl", "sticky_option_shift", "sticky_option_ctrl", "sticky_ctrl_shift", "sticky_cmd_option_shift",
+		"sticky_cmd_option_ctrl", "sticky_cmd_shift_ctrl", "sticky_option_shift_ctrl", "sticky_hyper"]
+	GESTURE_ACTIONS[_StickyId] := { Fn: _GestureMakeStickyRunner(_StickyId) }
+
+; The remap layer that owns the capture loads after this module.
+_GestureMakeStickyRunner(ActionId) {
+	return (*) => StickyModifier(ActionId)
+}
 
 ; --- Advanced system action implementations ---
 

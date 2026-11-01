@@ -326,6 +326,7 @@ TestQualificationRegisterParser(JsonParse)
 #Include ../ui/action_picker_webview.ahk
 #Include ../infra/program_actions.ahk
 #Include ../infra/user_actions.ahk
+#Include ../infra/sticky_modifiers.ahk
 #Include ../../_shared/modules/network/failure.ahk
 #Include ../adapters/network_failure_host.ahk
 #Include ../ui/download_window/session.ahk
@@ -2307,6 +2308,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/llm/servers/test_ollama_managed_model_offer.ahk
 #Include unit/modules/shortcuts/test_run_program_actions.ahk
 #Include unit/modules/gestures/test_user_actions.ahk
+#Include unit/modules/gestures/test_sticky_and_navigation_actions.ahk
 #Include unit/modules/shortcuts/test_run_program_actions_custody.ahk
 #Include unit/modules/shortcuts/test_program_providers.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_launch_cleanup.ahk
