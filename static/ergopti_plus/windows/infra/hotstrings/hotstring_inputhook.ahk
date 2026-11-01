@@ -2576,12 +2576,11 @@ _PrefixDecisionDisplayText(Decision) {
 		catch
 			return ""
 	}
-	; Send-key syntax is not literal screen text: showing `""{Left}` as five
-	; printable characters would be another prediction engine. Such mappings may
-	; opt in later with an explicit, engine-owned PreviewOutput snapshot.
+	; A Replacement with keys is a Send string, not screen text. The row shows what
+	; it types, as on macOS and Linux: the decision carries that text in the typed
+	; case. Keys alone type nothing, so they have no row.
 	if !(Decision.HasOwnProp("OnlyText") and Decision.OnlyText) {
-		return (Spec.HasOwnProp("PreviewOutput") and Spec.PreviewOutput is String)
-			? Spec.PreviewOutput : ""
+		return Decision.HasOwnProp("PreviewOutput") ? Decision.PreviewOutput : ""
 	}
 	return (Decision.HasOwnProp("Replacement") and Decision.Replacement is String)
 		? Decision.Replacement : ""

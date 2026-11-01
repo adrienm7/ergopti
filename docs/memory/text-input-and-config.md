@@ -201,8 +201,11 @@ key goes out through `SendEscapeLiteral`, and so does a replayed end character,
 where `!` would otherwise press Alt. Linux keeps `injector.inject` text-only and
 plays key outputs through `inject_tokens`, because a prediction holding the
 characters `{Left}` must type them. After a key output each driver forgets its
-buffer and the AI context, and Linux drops its Undo. Windows withholds the preview
-row of a key output; macOS and Linux show its typed text.
+buffer and the AI context, and Linux drops its Undo. Every driver previews a key
+output's typed text; on Windows the decision carries it as `PreviewOutput`, since
+its Replacement is a Send string. Withholding that row hid the time gate too: the
+maintainer's `gcm★` showed nothing, and a magic key pressed while waiting for the
+bubble was refused past the delay (`preview-key-output`).
 
 ### project-hotstring-delay-architecture
 
