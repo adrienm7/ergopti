@@ -221,33 +221,25 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 
 ### Windows (the PC agent's)
 
-- **Reds on dev.** `lifecycle.ahk` logger scalars and fast timers; `key_combinations.ahk` config keys and
-  `LocalSameAsGlobal`; the repository URL of `ErgoptiPlus.ahk`; `test-windows-bundle-manifest`, because
-  `infra/config_registry_cache.ahk` `ConfigRegistryCacheCodeIdentity` names the never-shipped
-  `..\_generated\config_migration_ops.ahk` (c95a93ed00) in a source-only read: resolve the path so the gate does not
-  read it as a runtime literal, or teach the gate source-only reads. Then land a408a29790 (`tmp/wip-todo-ah`, the
-  four longest AHK unit shards split) and run the Windows lane on it.
-- **LLM.** The watsonx and Vertex AI token exchange (port the async form POST and token cache of
-  `api_token_exchange.lua`; Vertex RS256 signer); the `llm_vision` backend picked in a list, then the optional model;
-  `test_local_server_auth.ahk` and `test_local_server_panel_view_preparation.ahk` still count the four old servers.
-- **Parity.** PAR-41 adoption of the role-named slots; PAR-53 judging on exclusive time (`_HotPathNestedMs`); PAR-58
-  the remaining `menu_*` families and the 61 disagreeing batch-writer vectors; PAR-63 dynamic-hotstring behaviour
-  tests and the runners moved to `tests/runners/`; PAR-74 the 639 literals of
-  `tools/lint/config-key-literal-baseline.json`; PAR-76 R23 (`keylayout_parser.ahk` on the canonical form); PAR-79,
-  81, 83 and the rest listed in the handoff; menu rebuild timing (judged on macOS and Linux only today).
-- **Config cleanup.** Offer bare root keys, unknown `[[x]]` generations and the physical keyboard slot parameters
-  (`keyboard__win_SC03A__x`).
-- **Privacy (139).** The AHK logger's privacy context has no `config_dir`; mask the configuration folder at write time
-  as macOS and Linux do.
-- **Runtimes.** The proxy relay for the owned daemon; the code-derived owned-runtimes check for the Windows driver.
-- **Antivirus ceiling.** d7d98e133b raised the DllImport ceiling of `tools/ci/windows-exe-av-surface.json` from 52 to
-  54 for `CreateFileW` and `GetFileInformationByHandle`; reuse a bundled declaration and lower it back.
+State on 2026-11-01. Whole AHK suite at d85a24eb53: 17277/17288 in parallel, the other 11 (clipboard and focus contention
+between workers) green alone. All live checks pass, typed by the harness.
+
+- **LLM.** `retry_extra_tokens` has no Windows owner, so the corpus retry rows are not replayed there. Real IBM and Google
+  token services were never tried.
+- **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
+  keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left, the rest of the menu files need
+  `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
+  before the registry loads. PAR-83: the host in `ollama_managed_files.ps1`. Moving `tests/run_*.ahk` to
+  `tests/runners/` is not worth it (455 `A_ScriptDir` uses, 1,908 includes).
+- **Tests.** Source assertions left to convert to behaviour; `--reverse` on the `llm` group has 3 order-dependent reds.
+- **Proxy override.** `_NetworkCheck_FetchPac` and the COM WinHttp use of `api_remote.ahk:603` are not checked against the
+  override; `SystemProxy_IsLoopbackUrl` knows only named loopback hosts.
+- **Field report.** `field/win-2026-11-01-dev` ran with no driver; run it again with one.
 - **Signing follow-ups.** Delete `.github/ci/stable_windows_signing_exception.json` once SignPath is configured; flip
-  update enforcement to `required` after the `off` release.
+  update enforcement to `required` after the `off` release. The relay exe and the vendor binaries are unsigned.
 - **Older findings.** The seven "Remaining findings" of
-  [the 2026-10-28 Windows audit](docs/audits/windows-2026-10-28/README.md); item 91 single-hook/RawInput source (needs
-  a genuine MSVC DLL and manifest pair); item 36 updater production coupling (the first trusted PowerShell host
-  acquisition); the Windows tests' keystats spellings.
+  [the 2026-10-28 Windows audit](docs/audits/windows-2026-10-28/README.md); item 36 updater production coupling (the
+  first trusted PowerShell host acquisition); a408a29790 (the four longest AHK unit shards split) was never landed.
 
 ### macOS
 
@@ -312,12 +304,10 @@ Each closes on a named green hosted or native run, recorded here.
 - [ ] **Carbon and daemon-report Swift.** Carbon fixture compilation and both-architecture receipts; daemon-report
       allocation failures on Intel and Apple silicon.
 - [ ] **CodeQL Go.** After the `native_http` Go module is published, re-enable Go and check a non-empty analysis.
-- [ ] **Native Windows TLS fixture.** Seven `native_tls` cases fail since Git 2.56 moved the SDK to ucrt64; the trust
-      install stays at `before_add`. Cause not proved.
-- [x] **Full Windows AHK suite.** Never completed green locally (about 90 min single-threaded); shard it, never raise
-      Done on 2026-11-01 at d85a24eb53 with `npm run test:ahk-parallel`: 17277/17288 in parallel, the 11 others (clipboard
-      and focus contention between workers) green alone.
-      `_SUITE_MAX_TIMEOUT_MS`.
+- [ ] **Native Windows TLS fixture.** `X509Store.Add` on the CurrentUser root store blocks on the Windows security
+      warning (`docs/memory/windows-ahk.md`), so these cases need a click; hosted lanes pass in LocalMachine scope.
+- [x] **Full Windows AHK suite.** Done on 2026-11-01 at d85a24eb53 with `npm run test:ahk-parallel`: 17277/17288 in
+      parallel, the 11 others (clipboard and focus contention between workers) green alone.
 - [ ] **Intermittent fixtures.** Close each after it stays green: Linux window switch, cffi-lua clone, desktop-webview
       AI focus, Windows `config` group, macOS Go `TestIdleDeadlinePhysicallyRetiresPeer`, macOS Swift
       `testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope`.
