@@ -851,6 +851,15 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'test-ahk', 'Test native compiled startup admission', "matrix.module == 'meta'"],
 	[WINDOWS_BOX, 'integration-ahk', 'Receive managed Ollama file component', WINDOWS_NATIVE_LOT],
 	[WINDOWS_BOX, 'integration-ahk', 'Run native desktop AHK cohorts', WINDOWS_NATIVE_LOT],
+	// The proxy relay runs end to end once, in the native lot, with its Go pin.
+	[WINDOWS_BOX, 'integration-ahk', 'Read the pinned Go toolchain', WINDOWS_NATIVE_LOT],
+	[WINDOWS_BOX, 'integration-ahk', 'Install the pinned Go toolchain', WINDOWS_NATIVE_LOT],
+	[
+		WINDOWS_BOX,
+		'integration-ahk',
+		'Run the proxy relay end to end through the fake network',
+		WINDOWS_NATIVE_LOT
+	],
 	[
 		WINDOWS_BOX,
 		'integration-ahk',
