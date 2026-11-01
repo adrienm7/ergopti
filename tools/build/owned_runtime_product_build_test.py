@@ -203,8 +203,8 @@ class DaemonReportBuildControls(unittest.TestCase):
         )
 
     def test_default_source_rosters_are_exact_and_report_is_additive(self):
-        self.assertEqual(len(product.HELPER_SOURCES), 9)
-        self.assertEqual(len(product.VALIDATOR_SOURCES), 6)
+        self.assertEqual(len(product.HELPER_SOURCES), 10)
+        self.assertEqual(len(product.VALIDATOR_SOURCES), 7)
         self.assertEqual(product.product_source_paths(), product.SOURCE_PATHS)
         expected = tuple(
             product.SWIFT + "OwnedVirtualHIDDaemonReport" + name + ".swift"
@@ -320,6 +320,29 @@ class DaemonReportBuildControls(unittest.TestCase):
                 )
             ),
         )
+
+
+class SwiftRosterClosureControls(unittest.TestCase):
+    """Each Swift roster declares the generated identifiers it references."""
+
+    REPOSITORY = Path(__file__).resolve().parents[2]
+
+    def test_rosters_using_identifiers_compile_their_declaration(self):
+        # Run 41263664973: LauncherConstants used Identifiers without its file.
+        for name, roster in (
+            ("helper", product.HELPER_SOURCES + product.REPORT_SWIFT_SOURCES),
+            ("validator", product.VALIDATOR_SOURCES),
+        ):
+            with self.subTest(roster=name):
+                texts = {
+                    relative: (self.REPOSITORY / relative).read_text(encoding="utf-8")
+                    for relative in roster
+                    if relative.endswith(".swift")
+                }
+                users = [path for path, text in texts.items() if "Identifiers." in text]
+                declarations = [path for path, text in texts.items() if "enum Identifiers" in text]
+                self.assertTrue(users, "the roster no longer references Identifiers")
+                self.assertEqual(len(declarations), 1, users)
 
 
 class ModuleMapWriteControls(unittest.TestCase):
