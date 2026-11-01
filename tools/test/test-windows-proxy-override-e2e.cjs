@@ -72,7 +72,10 @@ const NUMERIC_AUTHORITY = '192.0.2.1:443';
 const REFUSED = 'proxy.corp.invalid:3128';
 const SECRET = BASIC_CREDENTIAL.password;
 const USERINFO = `${BASIC_CREDENTIAL.user}:${encodeURIComponent(SECRET)}`;
-const PIN_VARIABLE = 'ERGOPTI_TEST_RELAY_PIN_SHA256';
+// The hop's shipped TLS line, the one place the test's copy of vendor/ differs from it.
+const SHIPPED_RELAY_TLS = 'new SslStream(stream, false);';
+// The name production once read; the shipped hop must stay deaf to it.
+const RETIRED_PIN_VARIABLE = 'ERGOPTI_TEST_RELAY_PIN_SHA256';
 const COMMAND_SAMPLE_MS = 400;
 const WORKER_TIMEOUT_MS = 90000;
 const LOCALE = JSON.parse(fs.readFileSync(path.join(SHARED, 'data/locales/en.json'), 'utf8'));
@@ -186,8 +189,35 @@ async function runOwner(work, plan, extra = {}) {
 	return JSON.parse(fs.readFileSync(resultPath, 'utf8'));
 }
 
+/**
+ * A copy of vendor/ whose hop trusts one self-signed relay. The seam exists only in
+ * this test's temporary folder: the workers load it because the harness names this
+ * folder as their vendor directory, and no shipped input can reach the same trust.
+ * @param {string} work The test's temporary folder.
+ * @param {string} sha256 The relay certificate's lowercase hexadecimal digest.
+ * @returns {string} The copy's path.
+ */
+function trustingVendor(work, sha256) {
+	const copy = path.join(work, 'trusting-vendor');
+	fs.cpSync(VENDOR, copy, { recursive: true });
+	const routes = path.join(copy, 'ergopti_network_routes.ps1');
+	const source = fs.readFileSync(routes, 'utf8');
+	assert.equal(
+		source.split(SHIPPED_RELAY_TLS).length,
+		2,
+		'the shipped TLS line is where the test patches it'
+	);
+	const digest =
+		'BitConverter.ToString(System.Security.Cryptography.SHA256.Create().ComputeHash(certificate.GetRawCertData()))';
+	const trusting =
+		'new SslStream(stream, false, (sender, certificate, chain, errors) => ' +
+		`${digest}.Replace("-", "").ToLowerInvariant() == "${sha256}");`;
+	fs.writeFileSync(routes, source.replace(SHIPPED_RELAY_TLS, trusting));
+	return copy;
+}
+
 /** Runs the real updater staging worker in its production shape. */
-async function runStaging(work, override, extra = {}, url = TARGET) {
+async function runStaging(work, override, extra = {}, url = TARGET, vendor = VENDOR) {
 	const prefix = `ERGOPTI_UPDATER_${process.pid}_${Date.now()}_1`;
 	const swapSource = path.join(work, 'swap-source.ps1');
 	fs.writeFileSync(swapSource, '# swap\n');
@@ -200,7 +230,7 @@ async function runStaging(work, override, extra = {}, url = TARGET) {
 		CURRENT: path.join(work, 'current.exe'),
 		MINIMUM: '1',
 		TIMEOUT: '5000',
-		DOWNLOAD_MODULE: path.join(VENDOR, 'ergopti_updater_download.ps1'),
+		DOWNLOAD_MODULE: path.join(vendor, 'ergopti_updater_download.ps1'),
 		DEADLINE: '45000',
 		STARTED_TICK: String((os.uptime() * 1000) | 0),
 		PROXY_POLICY: path.join(SHARED, 'modules/network/proxy_policy.json'),
@@ -220,7 +250,7 @@ async function runStaging(work, override, extra = {}, url = TARGET) {
 			'-ExecutionPolicy',
 			'Bypass',
 			'-File',
-			path.join(VENDOR, 'ergopti_updater_staging.ps1'),
+			path.join(vendor, 'ergopti_updater_staging.ps1'),
 			'-TransportPrefix',
 			prefix
 		],
@@ -245,7 +275,7 @@ async function main() {
 		upstream,
 		credential: { user: BASIC_CREDENTIAL.user, password: SECRET }
 	});
-	const pinned = { [PIN_VARIABLE]: secureRelay.sha256 };
+	const trusting = trustingVendor(work, secureRelay.sha256);
 	const hostOf = (fake) => fake.url.replace(/^[a-z0-9]+:\/\//, '');
 	const forms = [
 		{
@@ -253,14 +283,14 @@ async function main() {
 			fake: secureRelay,
 			value: secureRelay.url,
 			mode: 'open',
-			extra: pinned
+			vendor: trusting
 		},
 		{
 			name: 'an https relay with credentials',
 			fake: secureRelay,
 			value: `https://${USERINFO}@${hostOf(secureRelay)}`,
 			mode: 'basic',
-			extra: pinned
+			vendor: trusting
 		},
 		{
 			name: 'an http relay with credentials',
@@ -457,7 +487,16 @@ async function main() {
 				arm(form);
 				const url = form.numeric ? NUMERIC_TARGET : TARGET;
 				const result = await withoutCredentialOnAnyCommandLine(() =>
-					runOwner(work, { stored: form.value, url, ...company }, { ...exported, ...form.extra })
+					runOwner(
+						work,
+						{
+							stored: form.value,
+							url,
+							...company,
+							...(form.vendor ? { vendor: form.vendor } : {})
+						},
+						exported
+					)
 				);
 				assert.equal(result.published, 1);
 				assertTunnel(form, JSON.stringify(result.receipt));
@@ -516,8 +555,9 @@ async function main() {
 					runStaging(
 						work,
 						form.value,
-						{ ...exported, ...form.extra },
-						form.numeric ? NUMERIC_TARGET : TARGET
+						exported,
+						form.numeric ? NUMERIC_TARGET : TARGET,
+						form.vendor || VENDOR
 					)
 				);
 				assert.equal(done.code, 1, 'the untrusted fake certificate ends the download');
@@ -525,6 +565,25 @@ async function main() {
 				assert.ok(!(done.stdout + done.stderr).includes(SECRET), 'no output holds the credential');
 			});
 		}
+
+		await check(
+			'updater staging worker: the shipped hop refuses a self-signed relay, whatever the environment says',
+			async () => {
+				arm(forms[0]);
+				const done = await runStaging(work, secureRelay.url, {
+					...exported,
+					[RETIRED_PIN_VARIABLE]: secureRelay.sha256
+				});
+				assert.equal(done.code, 1);
+				assert.deepEqual(tunnels(secureRelay), [], done.stdout);
+				assert.equal(decoy.events.length, 0, 'the decoy relay saw nothing');
+			}
+		);
+
+		await check('the shipped sources name no test pin', async () => {
+			const source = fs.readFileSync(path.join(VENDOR, 'ergopti_network_routes.ps1'), 'utf8');
+			assert.ok(!source.includes(RETIRED_PIN_VARIABLE), 'production reads no test variable');
+		});
 
 		await check(
 			'updater staging worker: a wrong relay password reaches no origin and leaks nothing',

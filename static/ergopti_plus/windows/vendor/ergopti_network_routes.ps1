@@ -152,8 +152,9 @@ function Get-ErgoptiHttpRelay {
 #    credentialed relay must not become an open door for the machine.
 # 3. Credentials stay in this process's memory. No exception text, receipt or
 #    argument carries them; a refusal is one closed status line.
-# 4. Name the variable below only from a test: it pins a self-signed relay.
-$script:ErgoptiRelayHopPinVariable = 'ERGOPTI_TEST_RELAY_PIN_SHA256'
+# 4. An https relay is checked like any TLS peer, by the Windows trust store, and
+#    nothing in this file can widen that: a test's self-signed relay is trusted by
+#    a patched copy of this file in the test's own folder, never by a shipped input.
 $script:ErgoptiRelayHopTimeoutMs = 10000
 $script:ErgoptiRelayHops = @{}
 $script:ErgoptiRelayHopSource = @'
@@ -165,8 +166,6 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Authentication;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 
@@ -180,15 +179,15 @@ public sealed class ErgoptiRelayHop {
     private const string NotAllowed = "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
     private const string Established = "HTTP/1.1 200 Connection established\r\n\r\n";
 
-    private readonly string scheme, relayHost, user, password, pin;
+    private readonly string scheme, relayHost, user, password;
     private readonly int relayPort, timeoutMs;
     private TcpListener listener;
 
     public int Port { get; private set; }
 
-    public ErgoptiRelayHop(string scheme, string relayHost, int relayPort, string user, string password, string pin, int timeoutMs) {
+    public ErgoptiRelayHop(string scheme, string relayHost, int relayPort, string user, string password, int timeoutMs) {
         this.scheme = scheme; this.relayHost = relayHost; this.relayPort = relayPort;
-        this.user = user; this.password = password; this.pin = pin; this.timeoutMs = timeoutMs;
+        this.user = user; this.password = password; this.timeoutMs = timeoutMs;
     }
 
     public void Start() {
@@ -252,15 +251,6 @@ public sealed class ErgoptiRelayHop {
                 return head.ToString();
         }
         return null;
-    }
-
-    private bool AcceptRelayCertificate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors errors) {
-        if (errors == SslPolicyErrors.None) return true;
-        if (pin.Length == 0 || certificate == null) return false;
-        using (SHA256 hash = SHA256.Create()) {
-            string actual = BitConverter.ToString(hash.ComputeHash(certificate.GetRawCertData())).Replace("-", "").ToLowerInvariant();
-            return string.Equals(actual, pin, StringComparison.Ordinal);
-        }
     }
 
     private static void SplitAuthority(string authority, out string host, out int port) {
@@ -343,7 +333,7 @@ public sealed class ErgoptiRelayHop {
         relay.SendTimeout = timeoutMs;
         Stream stream = relay.GetStream();
         if (scheme == "https") {
-            SslStream secure = new SslStream(stream, false, AcceptRelayCertificate);
+            SslStream secure = new SslStream(stream, false);
             secure.AuthenticateAsClient(relayHost, null, SslProtocols.Tls12, false);
             stream = secure;
         }
@@ -432,9 +422,8 @@ function Resolve-ErgoptiRelayEndpoint {
     if ($Parts.Scheme -ceq 'http' -and $null -eq $Parts.User) { return (Get-ErgoptiHttpRelay $Relay $Policy) }
     if (-not $script:ErgoptiRelayHops.ContainsKey($Relay)) {
         if (-not ('ErgoptiRelayHop' -as [type])) { Add-Type -TypeDefinition $script:ErgoptiRelayHopSource -ErrorAction Stop }
-        $Pin = [Environment]::GetEnvironmentVariable($script:ErgoptiRelayHopPinVariable, 'Process')
         $Hop = [ErgoptiRelayHop]::new($Parts.Scheme, $Parts.Host, $Parts.Port, $Parts.User, $Parts.Password,
-            $(if ($null -eq $Pin) { '' } else { $Pin }), $script:ErgoptiRelayHopTimeoutMs)
+            $script:ErgoptiRelayHopTimeoutMs)
         $Hop.Start()
         $script:ErgoptiRelayHops[$Relay] = $Hop
     }
