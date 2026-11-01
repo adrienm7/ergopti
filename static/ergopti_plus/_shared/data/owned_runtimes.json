@@ -550,7 +550,7 @@
 			"tool": "luafilesystem, luaposix",
 			"programs": [],
 			"used_for": "`stat`, signals (`linux/vendor/README.md`)",
-			"today": "Pinned private runtime in the AppImage, .deb, .rpm, release tarball and the Arch recipe that repacks it (`tools/build/PKGBUILD`) (staged on the oldest supported LTS, `tools/build/stage-linux-private-runtime.sh`) and the Flatpak (pinned sources), run from there only (`linux/infra/owned_programs.lua`); dev-only: source checkout uses host packages",
+			"today": "Pinned private runtime in the AppImage, .deb, .rpm, release tarball and the Arch recipe that repacks it (`tools/build/PKGBUILD`) (staged on the oldest supported LTS, `tools/build/stage-linux-private-runtime.sh`; luaposix compiled there from the commit `_shared/data/linux_native_runtime.json` pins, `tools/build/appimage-oldest-lts.sh`, as that release ships it as one monolithic module) and the Flatpak (pinned sources), run from there only (`linux/infra/owned_programs.lua`); dev-only: source checkout uses host packages",
 			"current_class": "PIN",
 			"version_needed": "1.8 / 36",
 			"if_missing": "Daemon degrades or fails",
