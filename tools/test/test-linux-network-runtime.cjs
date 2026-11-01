@@ -300,14 +300,29 @@ function portable() {
 	check('original library identities and all historical package requirements survive', () => {
 		assert.deepEqual(generator.KEYS, ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb']);
 		for (const [format, old] of Object.entries({
-			// LuaJIT and curl come from the private runtime of these two.
+			// LuaJIT and curl come from the private runtime of these three.
 			deb: ['xclip', 'libnotify-bin', 'at-spi2-core'],
 			rpm: ['xclip', 'libnotify', 'at-spi2-core'],
-			arch: ['luajit', 'xclip', 'libnotify', 'curl', 'at-spi2-core'],
+			arch: ['xclip', 'libnotify', 'at-spi2-core'],
 			nix_library_path: ['libayatana-appindicator', 'gtk3', 'glib', 'libxkbcommon', 'at-spi2-core']
 		})) {
 			for (const requirement of old)
 				assert.ok(generator.requirements(source, format).includes(requirement));
+		}
+	});
+	// The Arch recipe repacks the release tarball (tools/build/PKGBUILD), so it
+	// ships the same private runtime as the .deb and the .rpm; a format that lost
+	// it would name the host's LuaJIT, curl or luv package again.
+	check('private-runtime packages name no host LuaJIT, curl or luv', () => {
+		for (const [format, manager] of [
+			['deb', 'apt'],
+			['rpm', 'dnf'],
+			['arch', 'pacman']
+		]) {
+			const required = generator.requirements(source, format);
+			const host = ['luajit', 'curl', ...(source.network_runtime.providers[manager] || [])];
+			for (const name of host.filter((entry) => /lua|curl/.test(entry)))
+				assert.equal(required.includes(name), false, `${format} must not require the host ${name}`);
 		}
 	});
 	check('independent provider inventory rejects fabricated Void and unsupported providers', () => {
