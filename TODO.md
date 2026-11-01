@@ -180,6 +180,17 @@ Account and tester actions (maintainer, from the PC):
 - [ ] Testers: Netskope tester's download retry, T1-T4 ([matrix](docs/tooling/windows-exe-flagged-by-proxy.md));
       number-row, key-combination (c89d74eb) and priority-100 (cf29c35e5f) testers with their exact setup.
 - [ ] `/retest` on AppImage/appimage.github.io#10422 from PowerShell, then read the bot's screenshot (98d41e630b).
+- [ ] Key chords, first: assign a « Chord (simultaneous) » slot and check that it fires and that both orders follow the
+      symmetry setting (the harness never reached the wait path); then rolling text with a chord on Space, AltGr alone
+      and real LCtrl+AltGr on AZERTY, SC138 and AltGr characters on Kana, and a tap-hold key held during an expansion.
+- [ ] Win+S, Win+E, Win+H and Ctrl+B on a real keyboard (Ctrl+B now runs `microsoft_bold`).
+- [ ] Hold LCtrl through Ctrl+Alt+Del or UAC, come back, press AltGr: it stays AltGr. Confirm raw 0x21D in the log for an
+      AltGr press: it unblocks the `left_ctrl` + `alt_gr` pair and the terminal recipe alias.
+- [ ] Sticky keys, `run_command` in a console, `open_path` through both pickers, the vision backend list, and a real
+      vLLM on port 8000.
+- [ ] Decide: squash the old steps of `migrations.toml` (recommended, it would cut most remaining config test time) and
+      whether a registry change seen only at the sweep's next capture is acceptable.
+- [ ] Review the machine translations of 1 November (curl, proxy, token exchange, WebView2, chord and case-twin keys).
 
 ## To confirm on Linux
 
@@ -303,7 +314,9 @@ Each closes on a named green hosted or native run, recorded here.
 - [ ] **CodeQL Go.** After the `native_http` Go module is published, re-enable Go and check a non-empty analysis.
 - [ ] **Native Windows TLS fixture.** Seven `native_tls` cases fail since Git 2.56 moved the SDK to ucrt64; the trust
       install stays at `before_add`. Cause not proved.
-- [ ] **Full Windows AHK suite.** Never completed green locally (about 90 min single-threaded); shard it, never raise
+- [x] **Full Windows AHK suite.** Never completed green locally (about 90 min single-threaded); shard it, never raise
+      Done on 2026-11-01 at d85a24eb53 with `npm run test:ahk-parallel`: 17277/17288 in parallel, the 11 others (clipboard
+      and focus contention between workers) green alone.
       `_SUITE_MAX_TIMEOUT_MS`.
 - [ ] **Intermittent fixtures.** Close each after it stays green: Linux window switch, cffi-lua clone, desktop-webview
       AI focus, Windows `config` group, macOS Go `TestIdleDeadlinePhysicallyRetiresPeer`, macOS Swift
