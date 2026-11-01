@@ -919,6 +919,14 @@ function M.new()
 		log_facts = log_facts,
 		watcher_owners = watcher_owners,
 		keystats_database = keystats_database,
+		hold_keystats_writes = function(seconds)
+			local manager = package.loaded["modules.keystats.log_manager"]
+			return type(manager) == "table" and manager.hold_recovery(seconds) == true
+		end,
+		keystats_recovering = function()
+			local manager = package.loaded["modules.keystats.log_manager"]
+			return type(manager) == "table" and manager.is_recovering() == true
+		end,
 		launcher = launcher,
 		exec_input = exec_input,
 		read_text = function(path) return require("adapters.file_system").read(path) end,

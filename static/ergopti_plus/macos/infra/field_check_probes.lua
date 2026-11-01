@@ -530,6 +530,18 @@ function M.storage(ports, report, finish)
 			callback(code, (tostring(output or ""):gsub("%s+$", "")))
 		end)
 	end
+	-- A cache rebuild commits many times a second: both scans of 2026-11-01 raced
+	-- it and reported 101 lines on a sound file. It waits while the file is read,
+	-- so the verdict stays a real one.
+	local hold_seconds = 2 * SQLITE_TIMEOUT + M.SQLITE_RECHECK_SECONDS
+	if ports.hold_keystats_writes(hold_seconds) then
+		local finish_check = finish
+		finish = function()
+			ports.hold_keystats_writes(0)
+			finish_check()
+		end
+		report.step("keystats_writes", STATE.info, "rebuild_held")
+	end
 	quick_check(function(code, answer)
 		if code == 0 and answer == "ok" then
 			report.step("keystats_db", STATE.pass, "quick_check_ok")
