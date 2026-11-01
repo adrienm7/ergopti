@@ -39,11 +39,8 @@ local helpers = require("tests.helpers")
 --- Reads the injector's source for the structural assertions below.
 --- @return string
 local function injector_source()
-	local path = helpers.driver_root() .. "/modules/hotstrings/injector.lua"
-	local fh = assert(io.open(path, "r"), "cannot open modules/hotstrings/injector.lua")
-	local src = fh:read("*a")
-	fh:close()
-	return src
+	-- modules/hotstrings/injector, selected by a declaration unique to it.
+	return assert(helpers.read_driver_unit("local function retire_clipboard("))
 end
 
 --- Reads the daemon source through the file seam this pre-existing meta-test

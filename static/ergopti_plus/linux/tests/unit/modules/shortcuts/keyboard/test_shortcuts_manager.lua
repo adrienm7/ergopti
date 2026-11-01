@@ -242,10 +242,8 @@ helpers.describe("modules.shortcuts.manager", function()
   end)
 
   helpers.it("routes desktop interaction through portable adapters", function()
-	local path = helpers.driver_root() .. "/modules/shortcuts/manager.lua"
-	local file = assert(io.open(path, "r"))
-	local source = file:read("*a")
-	file:close()
+	-- modules/shortcuts/manager, selected by a declaration unique to it.
+	local source = assert(helpers.read_driver_unit("local function capture_text_destination("))
 	for _, forbidden in ipairs({ "xdotool", "xclip", "io.popen", "os.execute" }) do
 		helpers.assert_true(source:find(forbidden, 1, true) == nil,
 			"the shortcuts manager must not bypass adapters with " .. forbidden)
