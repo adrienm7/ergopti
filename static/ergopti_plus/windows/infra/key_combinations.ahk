@@ -31,6 +31,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 #Include %A_LineFile%\..\ai_action_gate.ahk
 
 
@@ -783,7 +784,7 @@ _KeyCombinationPairMenuOpener(PairId, PairLabel) {
 ; @param PairLabel {String} « First + Second », the title of its action picker.
 ; @param ShowFn {Func} Test seam taking the built menu; shown by default.
 KeyCombinationShowPairMenu(PairId, PairLabel, ShowFn := 0) {
-	Commands := Map("key_combination_clear", (*) => ClearKeyCombination(PairId))
+	Commands := Map(MenuCommand.KEY_COMBINATION_CLEAR, (*) => ClearKeyCombination(PairId))
 	ListProviders := Map("key_combination_slots", () => KeyCombinationSlotRows(PairId, PairLabel))
 	global KEY_COMBINATION_NONE
 	Getters := Map("key_combination_pair_assigned", () => KeyCombinationTapOf(PairId) != KEY_COMBINATION_NONE
@@ -931,7 +932,7 @@ KeyCombinationChordSettings(DelayMs, Symmetric) {
 		throw ValueError("The chord delay must be a positive finite number.", -1, String(DelayMs))
 	if !(Symmetric is Integer) || (Symmetric != 0 && Symmetric != 1)
 		throw ValueError("The chord symmetry must be an exact boolean.", -1, IsObject(Symmetric) ? Type(Symmetric) : Symmetric)
-	return Map("simultaneous_threshold_ms", DelayMs, "combo_symmetric", Symmetric)
+	return Map(ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS, DelayMs, MenuCommand.COMBO_SYMMETRIC, Symmetric)
 }
 
 ; A chord identifier, the shared id grammar. The separator of a direction key is
@@ -949,7 +950,7 @@ class KeyCombinationChordPolicy {
 		if !(Pairs is Array) || !(Chords is Map) || !(Settings is Map)
 			throw TypeError("A chord policy requires its declared catalogue, slots and settings.")
 		this.Settings := KeyCombinationChordSettings(
-			Settings["simultaneous_threshold_ms"], Settings["combo_symmetric"])
+			Settings[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS], Settings[MenuCommand.COMBO_SYMMETRIC])
 		this.Directions := Map()
 		this.Canonical := Map()
 		Identifiers := Map()
@@ -985,7 +986,7 @@ class KeyCombinationChordPolicy {
 	Choose(First, Second, ElapsedMs) {
 		global KEY_COMBINATION_NONE, KEY_COMBINATION_BINDING_SCOPE
 		if !(ElapsedMs is Number) || !(ElapsedMs - ElapsedMs == 0) || ElapsedMs < 0
-			|| ElapsedMs > this.Settings["simultaneous_threshold_ms"]
+			|| ElapsedMs > this.Settings[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS]
 			return false
 		if !_KeyCombinationChordToken(First) || !_KeyCombinationChordToken(Second)
 			return false
@@ -993,7 +994,7 @@ class KeyCombinationChordPolicy {
 		if !this.Directions.Has(Direction)
 			return false
 		Row := this.Directions[Direction]
-		if this.Settings["combo_symmetric"]
+		if this.Settings[MenuCommand.COMBO_SYMMETRIC]
 			Row := this.Canonical[Row["id"]]
 		if (Row["action"] == KEY_COMBINATION_NONE)
 			return false

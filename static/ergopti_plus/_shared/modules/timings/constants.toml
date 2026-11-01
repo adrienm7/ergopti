@@ -1103,6 +1103,10 @@ proxy_relay_probe_timeout_ms = 30000
 # AHK: adapters/crash_report_worker.ahk and adapters/http_client.ahk, pinned copies.
 process_output_bytes = 65536
 
+# Bytes of one /proc/<pid>/cmdline the Linux local-server scan reads: ports and
+# server names sit well inside it. LX: modules/llm/local_server_ports.lua.
+proc_cmdline_bytes = 65536
+
 # Largest managed-Ollama environment declaration file the Linux driver reads.
 # LX: modules/llm/managed_ollama_environment.lua.
 declaration_file_bytes = 65536

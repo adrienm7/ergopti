@@ -2881,6 +2881,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = تبديل التحديد بين الأحرف الكبيرة والصغيرة",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "يحتاج ErgoptiPlus إلى إذن تسهيلات الاستخدام لقراءة لوحة المفاتيح. افتح ErgoptiPlus مرة أخرى: سيفتح لك إعدادات النظام > الخصوصية والأمن > تسهيلات الاستخدام. فعّل العنصر المسمى «Hammerspoon»: إنه محرك ErgoptiPlus. إذا بدا مفعّلًا بالفعل، فأوقفه ثم فعّله من جديد.",
+	"startup.curl_missing": "برنامج curl في Windows ‏({1}) مفقود أو تتعذّر قراءته. تُرفض طلبات الذكاء الاصطناعي المحلي إلى أن يعود: أصلح Windows أو حدّثه؛ لا يستبدله Ergopti+ أبدًا.",
+	"startup.curl_too_old": "برنامج curl في Windows ‏({1}) بالإصدار {2}، ويحتاج Ergopti+ إلى الإصدار {3} أو أحدث. تُرفض طلبات الذكاء الاصطناعي المحلي إلى أن يُحدَّث Windows؛ لا يستبدله Ergopti+ أبدًا.",
 	"permission_dialog.window_title": "الإذن مطلوب",
 	"permission_dialog.open_settings": "فتح الإعدادات",
 	"permission_dialog.step_add": "إذا لم يكن «Hammerspoon» في القائمة، فانقر على +، واضغط ⌘⇧G، والصق {1}، ثم انقر على فتح.",
