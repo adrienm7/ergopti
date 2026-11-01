@@ -546,6 +546,7 @@ module.exports = Object.freeze({
 		TAP_HOLD_LOGIN_ITEMS_OPEN: "tap_hold_login_items_open",
 		TAP_HOLD_LOGIN_ITEMS_STEPS: "tap_hold_login_items_steps",
 		TAP_HOLD_RESETS_WORD: "tap_hold_resets_word",
+		TAP_HOLD_VHID_UPDATE: "tap_hold_vhid_update",
 		TITLECASE_SELECTION: "titlecase_selection",
 		UNINSTALL: "uninstall",
 		UPDATE_CHANNEL: "update_channel",

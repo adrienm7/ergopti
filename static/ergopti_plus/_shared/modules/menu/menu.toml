@@ -1429,6 +1429,15 @@ i18n = "menu.tapholds.vhid_incompatible"
 platforms = ["hs"]
 unavailable = "hide"
 
+# The driver-only update ADR 011 offers for an incompatible driver: it opens a
+# confirmation that says the user's own Karabiner changes driver too.
+[[menu.tap_hold_vhid_update_rows]]
+type = "command"
+id = "tap_hold_vhid_update"
+i18n = "menu.tapholds.vhid_update"
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.tap_hold_vhid_not_active_rows]]
 type = "label"
 id = "tap_hold_vhid_not_active"
