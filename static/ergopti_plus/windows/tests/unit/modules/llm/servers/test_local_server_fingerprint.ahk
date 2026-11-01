@@ -78,7 +78,7 @@ _LSF_IdentifyVector(Vector) {
 	Identities := LocalServerFingerprintParse(Root, LocalServerAuthCatalogue(Root, Map())["order"])["identities"]
 	Verdict := LocalServerFingerprintIdentify(Vector["body"], Vector["server"], Identities)
 	AssertEqual(_LSF_Expected(Vector["expected"]), Verdict["server"])
-	AssertEqual(Vector["reason"], Verdict["reason"])
+	AssertEqual(Vector["reason"], Verdict["decision"])
 }
 
 _LSF_RefusalVector(Vector) {
