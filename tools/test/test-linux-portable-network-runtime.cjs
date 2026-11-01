@@ -1185,6 +1185,7 @@ if (process.argv.includes('--native')) {
 	}
 	// Refusal preserves the owned package for diagnosis. No successful receipt
 	// is inferred from host ABI tests, static source guards or staging alone.
+	if (staged.status !== 0) process.stderr.write(staged.stderr || '');
 	assert.equal(staged.status, 0, 'Actual AppDir runtime staging refused; owned fixture retained');
 	assert.equal(producerReceipt.ok, true, 'Native staging private receipt publication refused');
 	assert.equal(
