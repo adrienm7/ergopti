@@ -73,6 +73,8 @@ local OWNERS = {
 	"llm.tone",
 	"llm.translate",
 	"llm.vision",
+	-- The shared vision request reads the API dialects from this pure owner.
+	"llm.remote_formats",
 	"modules.gestures",
 	"modules.gestures.actions",
 	"modules.gestures.native_app_switcher_action",
