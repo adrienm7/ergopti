@@ -157,8 +157,9 @@ _LMC_DriverSkipsALackingControl() {
 	} finally {
 		_LLM_RemoteCapabilities := Saved
 	}
-	Ready := _DriverFuncBody("LLM_RemoteIsReady_Async")
-	AssertTrue(Ready != "", "LLM_RemoteIsReady_Async must exist")
+	; The probe's address is built where it is sent, once any access token is known.
+	Ready := _DriverFuncBody("_LLMRemote_ReadySend")
+	AssertTrue(Ready != "", "_LLMRemote_ReadySend must exist")
 	AssertTrue(InStr(Ready, 'Owner["listing_query"]') > 0, "the listing asks for its largest page")
 	Refresh := _DriverFuncBody("_LLMRemoteRefreshCapabilities")
 	AssertTrue(Refresh != "" && InStr(Refresh, "SetTimer(") > 0, "the fetch waits for a one-shot timer")
