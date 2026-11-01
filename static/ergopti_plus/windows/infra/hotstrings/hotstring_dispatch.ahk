@@ -1196,6 +1196,7 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 
 		IsConform := Spec.HasOwnProp("CaseConform") and Spec.CaseConform
 		Replacement := ResolvedBase
+		PreviewOutput := Spec.HasOwnProp("PreviewOutput") ? Spec.PreviewOutput : ""
 		if IsConform {
 				CompletionStripLen := StrLen(EndChar) + (TypoNbspStripped ? 1 : 0)
 				TriggerStart := StrLen(BufferAfterCompletion)
@@ -1208,12 +1209,16 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 						(Spec.HasOwnProp("ConformOneChar") and Spec.ConformOneChar), &DoFire)
 				if !DoFire
 						return ""
+				if PreviewOutput != ""
+						PreviewOutput := _HSE_ConformReplacement(PreviewOutput, TypedTrigger, Spec.Trigger,
+								(Spec.HasOwnProp("ConformOneChar") and Spec.ConformOneChar), &DoFire)
 		}
 
 		return {
 				Spec: Spec,
 				ResolvedBase: ResolvedBase,
 				Replacement: Replacement,
+				PreviewOutput: PreviewOutput,
 				OnlyText: Spec.HasOwnProp("OnlyText") ? Spec.OnlyText : true,
 				IsConform: IsConform,
 				GateOriginTick: GateOriginTick,

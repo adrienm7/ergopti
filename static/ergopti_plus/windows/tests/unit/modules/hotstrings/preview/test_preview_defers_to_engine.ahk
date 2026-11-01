@@ -189,3 +189,89 @@ TestPreviewAgree_NoOpCandidateLosesToCanonicalFallback() {
 }
 Test("preview: a no-op candidate cannot stand in for the withheld repeat winner",
 	TestPreviewAgree_NoOpCandidateLosesToCanonicalFallback)
+
+
+
+
+
+; ===============================================
+; ===============================================
+; ======= 2/ An Output That Presses A Key =======
+; ===============================================
+; ===============================================
+
+; The live incident: `gcm★` > `git commit -m "{Left}"` fired, and sent its Left
+; arrow, yet the driver logged « No prefix match » for the three typed letters of
+; every attempt while `gm★` next to it showed its bubble. Dropping the row hid the
+; 0.75 s gate too: waiting for a bubble that could not come ran the gate out, and
+; the magic key was then refused with no trace on screen.
+; @param CaseSensitive {Boolean} The TOML is_case_sensitive flag.
+; @param Trigger {String} The trigger, magic key included.
+; @param Output {String} The output as the TOML holds it.
+; @param Buf {String} The typed engine buffer.
+; @return {Object} The row of the registered trigger, or "".
+_PreviewAgree_KeyOutputRow(CaseSensitive, Trigger, Output, Buf) {
+	global HSE_Buffer, HSE_StartIsWordBoundary
+	HSE_RegistryClear()
+	HSE_RegisterFromTomlFlags(CaseSensitive, "*", Trigger, Output,
+		Map("Category", "test", "Section", "code", "FinalResult", true))
+	HSE_Buffer := Buf
+	HSE_StartIsWordBoundary := true
+	Rows := _PrefixCollectCandidates()
+	return Rows.Length > 0 ? Rows[Rows.Length] : ""
+}
+
+TestPreviewAgree_KeyOutputShowsItsText() {
+	MK := ScriptInformation["MagicKey"]
+	try {
+		Row := _PreviewAgree_KeyOutputRow(true, "gcm" . MK, 'git commit -m "{Left}"', "gcm")
+		Assert(IsObject(Row),
+			"an output that presses a key must keep its bubble: it fires, so the preview must offer it")
+		AssertEqual('git commit -m ""', Row.Output,
+			"the bubble shows what the output types, never the key token")
+		AssertEqual(false, Row.FireDecision.OnlyText,
+			"the decision still sends the key: only the display text is plain")
+		AssertEqual('git commit -m "{Left}"', Row.FireDecision.Replacement,
+			"the frozen payload keeps its key")
+	} finally {
+		HSE_RegistryClear()
+		HSE_HardReset()
+	}
+}
+Test("preview: an output with a key shows its typed text (preview-key-output)",
+	TestPreviewAgree_KeyOutputShowsItsText)
+
+; The two case families reach the Spec through different factories, and the
+; typed casing must reach the bubble as it reaches the output.
+TestPreviewAgree_KeyOutputFollowsTheTypedCase() {
+	MK := ScriptInformation["MagicKey"]
+	try {
+		Row := _PreviewAgree_KeyOutputRow(false, "ab" . MK, "xy(){Left}", "AB")
+		Assert(IsObject(Row), "the conform family must keep its bubble")
+		AssertEqual("XY()", Row.Output, "a capitalised typing capitalises the bubble")
+		Row := _PreviewAgree_KeyOutputRow(false, "ab" . MK, "xy(){Left}", "Ab")
+		AssertEqual("Xy()", Row.Output, "a title-cased typing title-cases the bubble")
+		Row := _PreviewAgree_KeyOutputRow(false, "ab," . MK, "xy(){Left}", "ab,")
+		Assert(IsObject(Row), "the explicit-variant family must keep its bubble")
+		AssertEqual("xy()", Row.Output, "the explicit-variant family carries the text too")
+	} finally {
+		HSE_RegistryClear()
+		HSE_HardReset()
+	}
+}
+Test("preview: a key output's bubble follows the typed case (preview-key-output)",
+	TestPreviewAgree_KeyOutputFollowsTheTypedCase)
+
+; Nothing to show: a row with an empty text would be a blank bubble.
+TestPreviewAgree_KeyOnlyOutputHasNoRow() {
+	MK := ScriptInformation["MagicKey"]
+	try {
+		AssertEqual("", _PreviewAgree_KeyOutputRow(true, "zz" . MK, "{Left 2}", "zz"),
+			"an output that only presses keys types no text to preview")
+	} finally {
+		HSE_RegistryClear()
+		HSE_HardReset()
+	}
+}
+Test("preview: an output of keys alone has no row (preview-key-output)",
+	TestPreviewAgree_KeyOnlyOutputHasNoRow)
