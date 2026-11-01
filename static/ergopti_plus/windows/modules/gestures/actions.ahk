@@ -18,6 +18,8 @@
 ; Action registry — each action has a label and an execution function
 global GESTURE_ACTIONS := Map(
 		"run_program", { Fn: (BindingId := "") => ProgramActions_Run(BindingId) },
+		"run_command", { Fn: (BindingId := "") => UserActions_RunCommand(BindingId) },
+		"open_path", { Fn: (BindingId := "") => UserActions_OpenPath(BindingId) },
 		"none", {
 				Fn: (*) => 0,
 		},
