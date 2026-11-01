@@ -177,7 +177,7 @@ _THRD_KeyRowsPolicy(Owners) {
 		. '"tap_hold_key_tap"\s*,\s*_TH_MakeTapPickerFn\(\s*KeyId\s*,\s*KeyLabel\s*,\s*TapLbl\s*\)\s*,\s*'
 		. '"tap_hold_key_hold_action"\s*,\s*_TH_MakeHoldPickerFn\(\s*KeyId\s*,\s*KeyLabel\s*\)\s*,\s*'
 		. '"tap_hold_key_delay"\s*,\s*_TH_MakeDelayPickerFn\(\s*KeyId\s*\)\s*,\s*'
-		. 'MenuCommand\.TAP_HOLD_KEY_DELAY_USE_GLOBAL\s*,\s*_TH_MakeDelayResetFn\(\s*KeyId\s*\)\s*\)\s*,\s*'
+		. '"tap_hold_key_delay_use_global"\s*,\s*_TH_MakeDelayResetFn\(\s*KeyId\s*\)\s*\)\s*,\s*'
 		. 'Map\(\s*"tap_hold_key_configured"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*IsConfigured\s*\)\s*,'
 		. '\s*"tap_hold_key_tap_caption"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*TapLbl\s*\)\s*,'
 		. '\s*"tap_hold_key_hold_caption"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*HoldLbl\s*\)\s*,'

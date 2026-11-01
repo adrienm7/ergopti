@@ -134,7 +134,7 @@ _DynHS_RegisterAll() {
 	; not a secret and the user's IBAN is.
 	_DynOpts := Map("FinalResult", True, "TimeActivationSeconds", _DynamicHotstringDelay(),
 		"Category", "dynamichotstrings")
-	if Features["hotstrings"]["dynamic"]["date_fr"]["enabled"] {
+	if Features["hotstrings"]["dynamic"][ConfigLeaf.DATE_FR]["enabled"] {
 		CreateHotstring("*?", "@dt" . MK, _DateShortFr, _DynOpts)
 	}
 	if Features["hotstrings"]["dynamic"][ConfigLeaf.DATE_LONG_FR]["enabled"] {

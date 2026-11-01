@@ -8,6 +8,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 #Include ../adapters/console_window.ahk
 
 ; Reads the shared native-window geometry; missing or invalid data is an error.
@@ -30,7 +31,7 @@ ConsoleWindow_ReadRatios() {
 ; @returns {Boolean} True only after every requested native operation succeeded.
 ConsoleWindow_Open(Kind, Native := ConsoleWindowNative) {
 	try {
-		if (Kind != "list_vars" && Kind != "key_history")
+		if (Kind != MenuCommand.LIST_VARS && Kind != MenuCommand.KEY_HISTORY)
 			throw ValueError("Unknown console view '" . Kind . "'.")
 		Ratios := ConsoleWindow_ReadRatios()
 		if Native.Open(Kind) != true

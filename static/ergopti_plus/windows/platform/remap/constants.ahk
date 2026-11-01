@@ -8,6 +8,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -1224,7 +1225,7 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		; the word open, as hotstrings.tap_hold_resets_word says; its keystroke,
 		; if any, is then attributed to the tap-hold (TapHoldOwnsShortcut).
 		if (TapHoldTapIsCommand(KeyId) and IsSet(HS_ApplyEventWordReset))
-			HS_ApplyEventWordReset("tap_hold_resets_word", "tap of " . KeyId)
+			HS_ApplyEventWordReset(ConfigLeaf.TAP_HOLD_RESETS_WORD, "tap of " . KeyId)
 		PreviousTap := TapHoldTapInDispatch()
 		_TapHoldTapInDispatch := KeyId
 		try TapFn.Call()

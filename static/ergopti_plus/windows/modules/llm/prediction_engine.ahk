@@ -39,10 +39,10 @@ global _LLM_Engine := Map(
 	"enabled",                    false,
 	"model",                      "",
 	"profile_id",                 "basic",
-	"user_profiles",              [],
+	ConfigLeaf.USER_PROFILES,              [],
 	"n_predictions",              3,
-	"min_words",                  3,
-	"max_words",                  15,
+	ConfigLeaf.MIN_WORDS,                  3,
+	ConfigLeaf.MAX_WORDS,                  15,
 	ConfigLeaf.DEBOUNCE_MS,                500,
 	ConfigLeaf.MIN_REQUEST_INTERVAL_MS,    300,
 	"ctx_chars",                  500,
@@ -102,10 +102,10 @@ global LLM_ENGINE_SEMANTIC_CONFIG_KEYS := [
 	"ollama_port",
 	"model",
 	"profile_id",
-	"user_profiles",
+	ConfigLeaf.USER_PROFILES,
 	"n_predictions",
-	"min_words",
-	"max_words",
+	ConfigLeaf.MIN_WORDS,
+	ConfigLeaf.MAX_WORDS,
 	"ctx_chars",
 	"language",
 	"temperature",
@@ -171,7 +171,7 @@ LLM_Engine_ApplySharedDefaults() {
 	if !IsSet(LLM_Defaults)
 		return
 
-	static _num := ["n_predictions", "min_words", "max_words", ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS, "ctx_chars", ConfigLeaf.PRED_INDENT]
+	static _num := ["n_predictions", ConfigLeaf.MIN_WORDS, ConfigLeaf.MAX_WORDS, ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS, "ctx_chars", ConfigLeaf.PRED_INDENT]
 	static _bool := [ConfigLeaf.SHOW_INFO_BAR, "streaming", "show_all_at_once", ConfigLeaf.INSTANT_ON_WORD_END,
 		ConfigLeaf.AFTER_HOTSTRING, ConfigLeaf.RESET_ON_NAV, ConfigLeaf.AUTO_RAISE_TEMP, "disable_url_bars", "disable_password_fields"]
 	static _str := ["profile_id", "model", ConfigLeaf.VAL_MODIFIERS, ConfigLeaf.NAV_MODIFIERS, "temperature"]
@@ -181,8 +181,8 @@ LLM_Engine_ApplySharedDefaults() {
 		"llm_active_profile",       "profile_id",
 		"llm_model",                "model",
 		"llm_num_predictions",      "n_predictions",
-		"llm_min_words",            "min_words",
-		"llm_max_words",            "max_words",
+		"llm_min_words",            ConfigLeaf.MIN_WORDS,
+		"llm_max_words",            ConfigLeaf.MAX_WORDS,
 		"llm_debounce_ms",          ConfigLeaf.DEBOUNCE_MS,
 		"llm_min_request_interval_ms", ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
 		"llm_context_length",       "ctx_chars",
@@ -191,9 +191,9 @@ LLM_Engine_ApplySharedDefaults() {
 		"llm_show_info_bar",        ConfigLeaf.SHOW_INFO_BAR,
 		"llm_streaming",            "streaming",
 		"llm_streaming_multi",      "show_all_at_once",
-		"llm_instant_on_word_end",  ConfigLeaf.INSTANT_ON_WORD_END,
-		"llm_after_hotstring",      ConfigLeaf.AFTER_HOTSTRING,
-		"llm_reset_on_nav",         ConfigLeaf.RESET_ON_NAV,
+		MenuCommand.LLM_INSTANT_ON_WORD_END,  ConfigLeaf.INSTANT_ON_WORD_END,
+		MenuCommand.LLM_AFTER_HOTSTRING,      ConfigLeaf.AFTER_HOTSTRING,
+		MenuCommand.LLM_RESET_ON_NAV,         ConfigLeaf.RESET_ON_NAV,
 		"llm_auto_raise_temp",      ConfigLeaf.AUTO_RAISE_TEMP,
 		"llm_disable_url_bars",     "disable_url_bars",
 		"llm_disable_password_fields", "disable_password_fields",
@@ -385,7 +385,7 @@ _LLM_Engine_RequestSemanticSignature(EffectiveProfileId, EffectiveProfile := uns
 	Profile := IsSet(EffectiveProfile)
 		? EffectiveProfile
 		: LLM_GetActiveProfile(EffectiveProfileId,
-			_LLM_Engine.Get("user_profiles", []))
+			_LLM_Engine.Get(ConfigLeaf.USER_PROFILES, []))
 	Signature := _LLM_Engine_FrameSignaturePart(Base)
 		. _LLM_Engine_FrameSignaturePart(_LLM_Engine_EncodeSemanticValue(EffectiveProfileId))
 		. _LLM_Engine_FrameSignaturePart(_LLM_Engine_EncodeSemanticValue(Profile))
@@ -433,12 +433,12 @@ LLM_Engine_Init(opts) {
 	if !(opts is Map)
 		throw TypeError("LLM_Engine_Init options must be a Map.")
 	static _optionKeys := ["model", "profile_id", "backend", "n_predictions",
-		"min_words", "max_words", ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS, "ctx_chars", "language",
+		ConfigLeaf.MIN_WORDS, ConfigLeaf.MAX_WORDS, ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS, "ctx_chars", "language",
 		"temperature", ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING, ConfigLeaf.RESET_ON_NAV,
 		"disable_url_bars", "disable_password_fields", ConfigLeaf.SHOW_INFO_BAR,
 		"streaming", "show_all_at_once", ConfigLeaf.PRED_INDENT, ConfigLeaf.AUTO_RAISE_TEMP,
 		ConfigLeaf.NAV_MODIFIERS, ConfigLeaf.VAL_MODIFIERS, ConfigLeaf.INLINE_AUTOTYPE, "api_entry_id",
-		"ollama_port", "user_profiles", ConfigLeaf.DISABLED_APPS, "api_entries",
+		"ollama_port", ConfigLeaf.USER_PROFILES, ConfigLeaf.DISABLED_APPS, "api_entries",
 		ConfigLeaf.APP_PROFILE_OVERRIDES]
 	ValidatedOpts := Map()
 	for Key in _optionKeys {
@@ -452,7 +452,7 @@ LLM_Engine_Init(opts) {
 	try {
 		_LLM_Engine["enabled"] := true
 
-		static _keys := ["model", "profile_id", "backend", "n_predictions", "min_words", "max_words",
+		static _keys := ["model", "profile_id", "backend", "n_predictions", ConfigLeaf.MIN_WORDS, ConfigLeaf.MAX_WORDS,
 			ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS, "ctx_chars", "language", "temperature",
 			ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING, ConfigLeaf.RESET_ON_NAV,
 			"disable_url_bars", "disable_password_fields",
@@ -478,7 +478,7 @@ LLM_Engine_Init(opts) {
 			_LLM_Engine["language"] := _I18nLocale
 
 		; Arrays require explicit type validation before replacing live state.
-		for Key in ["user_profiles", ConfigLeaf.DISABLED_APPS, "api_entries",
+		for Key in [ConfigLeaf.USER_PROFILES, ConfigLeaf.DISABLED_APPS, "api_entries",
 			ConfigLeaf.APP_PROFILE_OVERRIDES]
 			if ValidatedOpts.Has(Key)
 				_LLM_Engine[Key] := ValidatedOpts[Key]

@@ -19,6 +19,7 @@
 ;    include "ahk" are silently skipped.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 #Include menu_population.ahk
 
 ; Capture only built-in metadata at include, before DATA/user callbacks can run.
@@ -1802,7 +1803,7 @@ _MR_RenderToggle(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 	Id := _MR_Get(Item, "id"), CmdId := _MR_Get(Item, "command")
 	if CmdId == ""
 		CmdId := Id
-	if Row.Has("action") && ManifestKey == "llm_menu" && Id == "llm_toggle" && CmdId == "llm_toggle"
+	if Row.Has("action") && ManifestKey == "llm_menu" && Id == MenuCommand.LLM_TOGGLE && CmdId == MenuCommand.LLM_TOGGLE
 		Row["action"] := MenuStartupRepeatableToggleCommand(Id, Row["action"])
 	return _MR_RenderRows(ResultMenu, [Row], Id, 1)
 }

@@ -55,7 +55,7 @@ _BuildShortcutsSubmenu() {
 	GroupBuilders := Map(
 		"key_combinations",   () => _SC_KeyCombinationsSubmenu(),
 		"caps_word_auto_off", () => _SC_CapsWordAutoOffSubmenu(),
-		"script_control",     () => _SC_ScriptControlSubmenu())
+		ConfigLeaf.SCRIPT_CONTROL,     () => _SC_ScriptControlSubmenu())
 
 	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, GroupBuilders, ListProviders, Commands, Getters, , , DeclaredFrames)
 }
@@ -87,10 +87,10 @@ _SC_KeyCombinationsSubmenu(Options := unset) {
 _SC_KeyCombinationCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
 	return Map(
-		"key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"),
+		MenuCommand.KEY_COMBINATIONS_TOGGLE, MenuRenderer_CategoryGateCommand("KeyCombinations"),
 		MenuCommand.COMBO_SYMMETRIC, (*) => KeyCombinationChordToggleSymmetric(),
-		"scope_restore", (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
-		"scope_clear", (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
+		MenuCommand.SCOPE_RESTORE, (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
+		MenuCommand.SCOPE_CLEAR, (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
 }
 
 ; « CapsWord : désactivation automatique », declared by caps_word_auto_off_group:
@@ -99,9 +99,9 @@ _SC_KeyCombinationCommands(Options := unset) {
 ; through CapsWordAutoOffStore, which the next activation reads; no reload.
 _SC_CapsWordAutoOffSubmenu() {
 	Commands := Map(MenuCommand.CAPS_WORD_IDLE_TIMEOUT,
-		(Seconds, *) => CapsWordAutoOffStore("shortcuts.caps_word.idle_timeout_seconds", Seconds))
-	Getters := Map("shortcuts.caps_word.idle_timeout_seconds",
-		() => CapsWordAutoOffValues()["idle_timeout_seconds"])
+		(Seconds, *) => CapsWordAutoOffStore(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS, Seconds))
+	Getters := Map(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS,
+		() => CapsWordAutoOffValues()[ConfigLeaf.IDLE_TIMEOUT_SECONDS])
 	ListProviders := Map(
 		"caps_word_terminators", () => _SC_CapsWordTerminatorRows(),
 		"caps_word_pointer_kinds", () => _SC_CapsWordPointerRows())
@@ -202,8 +202,8 @@ _SC_ScriptControlCommands(Options := unset) {
 	return Map(
 		MenuCommand.SCRIPT_CONTROL_TOGGLE, (*) => SetScriptShortcutChordsOn(!ScriptShortcutChordsAreOn(),
 			OwnedOptions.Get("path", ""), OwnedOptions.Get("toggle_reload", 0)),
-		"scope_restore", (*) => ScriptShortcutsApplyScope("recommended", OwnedOptions),
-		"scope_clear", (*) => ScriptShortcutsApplyScope("clear", OwnedOptions))
+		MenuCommand.SCOPE_RESTORE, (*) => ScriptShortcutsApplyScope("recommended", OwnedOptions),
+		MenuCommand.SCOPE_CLEAR, (*) => ScriptShortcutsApplyScope("clear", OwnedOptions))
 }
 
 ; Dynamic handler: extensions shortcuts submenus.
@@ -383,7 +383,7 @@ _WS_BuildSymbolRows() {
 
 	; ── Add custom ───────────────────────────────────────────────────────────
 	AddControls := MenuRenderer_TemplateRows("wrap_symbols_add_controls", Map(
-		"wrap_symbols_add_custom", (*) => _WS_MenuAddCustom()), Getters, Map())
+		MenuCommand.WRAP_SYMBOLS_ADD_CUSTOM, (*) => _WS_MenuAddCustom()), Getters, Map())
 	if !(AddControls is Array)
 		return []
 	for _, Row in AddControls
@@ -508,9 +508,9 @@ _SC_ScopeCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
 	return Map(
 		MenuCommand.SHORTCUTS_TOGGLE, MenuRenderer_CategoryGateCommand("Shortcuts"),
-		"edit_shortcuts", OpenPersonalShortcuts,
-		"scope_restore", (*) => _SC_ApplyScope("recommended", OwnedOptions),
-		"scope_clear", (*) => _SC_ApplyScope("clear", OwnedOptions))
+		MenuCommand.EDIT_SHORTCUTS, OpenPersonalShortcuts,
+		MenuCommand.SCOPE_RESTORE, (*) => _SC_ApplyScope("recommended", OwnedOptions),
+		MenuCommand.SCOPE_CLEAR, (*) => _SC_ApplyScope("clear", OwnedOptions))
 }
 
 _SC_ApplyScope(Mode, Options) {

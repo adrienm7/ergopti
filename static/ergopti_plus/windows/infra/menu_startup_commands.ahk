@@ -9,6 +9,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 
 global _MenuStartupCommands := false
 
@@ -57,7 +58,7 @@ MenuStartupDiagnosticsReady() {
 /** Explicitly declares the one toggle whose unchanged early presentation joins repeated clicks. */
 class MenuStartupRepeatableToggleCommand {
 	__New(Id, Callback) {
-		if !(Id is String) || !(Id == "llm_toggle") || !HasMethod(Callback, "Call")
+		if !(Id is String) || !(Id == MenuCommand.LLM_TOGGLE) || !HasMethod(Callback, "Call")
 			throw TypeError("Repeatable startup selection requires the declared AI toggle")
 		this.Id := Id
 		this.Callback := Callback
@@ -155,7 +156,7 @@ class MenuStartupCommands {
 				Identity.Desired := Registration.Desired
 			RepeatCallback := Callback is MenuStartupRepeatableToggleCommand ? Callback.Callback : 0
 			RepeatId := Callback is MenuStartupRepeatableToggleCommand ? Callback.Id : ""
-			if RepeatId == "llm_toggle" && IsObject(Identity)
+			if RepeatId == MenuCommand.LLM_TOGGLE && IsObject(Identity)
 					&& (Identity.ItemId is Integer) && Identity.ItemId > 0
 					&& (Identity.Token is Integer) && Identity.Token > 0 {
 				for Entry in this.Pending {

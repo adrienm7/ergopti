@@ -71,8 +71,8 @@ _HS_CategoryFileRow(TomlPath, OpenFn := 0) {
 		OpenFn := _MakeOpenFileFn(TomlPath)
 	if !HasMethod(OpenFn, "Call")
 		return false
-	return MenuRenderer_CommandRow("hotstring_file_commands", "hotstring_file_open",
-		Map("hotstring_file_open", OpenFn),
+	return MenuRenderer_CommandRow("hotstring_file_commands", MenuCommand.HOTSTRING_FILE_OPEN,
+		Map(MenuCommand.HOTSTRING_FILE_OPEN, OpenFn),
 		Map("hotstring_file_ready", (*) => FileExist(TomlPath) != ""))
 }
 
@@ -118,8 +118,8 @@ _HS_CategorySelectionApply(Targets, Enabled) {
  */
 _HS_CategoryMenu(V1Cat, TomlPath, Sections, Apply := _HS_CategorySelectionApply, TargetMenu := unset) {
 	Commands := Map(
-		"hotstring_category_enable_all", (*) => Apply([V1Cat], true),
-		"hotstring_category_disable_all", (*) => Apply([V1Cat], false))
+		MenuCommand.HOTSTRING_CATEGORY_ENABLE_ALL, (*) => Apply([V1Cat], true),
+		MenuCommand.HOTSTRING_CATEGORY_DISABLE_ALL, (*) => Apply([V1Cat], false))
 	Providers := Map(
 		"hotstring_category_file", (*) => FileExist(TomlPath)
 			? [_HS_CategoryFileRow(TomlPath)] : [],

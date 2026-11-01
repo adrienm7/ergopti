@@ -16,6 +16,7 @@
 #Include reload_successor.ahk
 #Include reload_deferral.ahk
 #Include lifecycle_transition.ahk
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 
 ActivateEdit(*) {
 		Edit()
@@ -762,8 +763,8 @@ Ergopti_OnSuspendResume() {
 		; source entry again after the transition so the first selection-wrap after
 		; resume cannot race a cold worker; UIASW_Start remains feature/suspend safe.
 		if IsSet(Features) and Features.Has("shortcuts")
-			and Features["shortcuts"].Has("wrap_text_if_selected")
-			and Features["shortcuts"]["wrap_text_if_selected"]
+			and Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED)
+			and Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]
 			_LifecycleRunRequiredStep(Transition, "uia-selection-worker",
 				() => SetTimer(UIASW_Start, -1))
 		if IsSet(PauseLayoutSwitch_Apply)

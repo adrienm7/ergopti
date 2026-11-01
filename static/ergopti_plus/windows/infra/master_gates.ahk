@@ -217,7 +217,7 @@ LayoutSupersededFeatures() {
 LayoutSupersededReason(ManifestEntry, FeaturesSource := unset) {
 		; These switches choose registry layers too; only Ergopti-specific
 		; overlays become unavailable when another source is selected.
-		if ManifestEntry["section"] == "layout" && ManifestEntry["id"] != "ergopti_variant"
+		if ManifestEntry["section"] == "layout" && ManifestEntry["id"] != ConfigLeaf.ERGOPTI_VARIANT
 				return ""
 		Reason := ManifestEntry.Get("superseded_reason_key", "")
 		if (Reason == "")
@@ -250,10 +250,10 @@ _MG_SupersedeForEmulatedLayout(FeaturesTarget, Entries := unset) {
 						Node := Node[Part]
 				}
 				Id := Entry["id"]
-				if Entry["section"] == "layout" && Id == "ergopti_variant" && (Node is Map) && Node.Get(Id, "ergopti") == "ergopti"
+				if Entry["section"] == "layout" && Id == ConfigLeaf.ERGOPTI_VARIANT && (Node is Map) && Node.Get(Id, "ergopti") == "ergopti"
 						continue
 				if (Node is Map) and Node.Has(Id) and Node[Id] {
-						Node[Id] := Entry["section"] == "layout" && Id == "ergopti_variant" ? "ergopti" : false
+						Node[Id] := Entry["section"] == "layout" && Id == ConfigLeaf.ERGOPTI_VARIANT ? "ergopti" : false
 						Count += 1
 				}
 		}

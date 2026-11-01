@@ -143,7 +143,7 @@ _MI_TopLevelBuilders() {
 		"agent",           _MI_StageAgent,
 		"metrics",         _MI_StageMetrics,
 		"shortcuts",       _MI_StageShortcuts,
-		"tap_holds",       _MI_StageTapHolds,
+		ConfigLeaf.TAP_HOLDS,       _MI_StageTapHolds,
 		"gestures",        _MI_StageGestures,
 		"configuration",   _MI_StageConfiguration,
 		"language",        _MI_StageLanguage,
@@ -218,7 +218,7 @@ _MI_StageLayout() {
 		"custom_layouts",         (*) => _LAY_CustomLayoutRows(),
 		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
 		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),
-		"magic_key_source",       (*) => MagicKeySourceMenuRows(),
+		ConfigLeaf.MAGIC_KEY_SOURCE,       (*) => MagicKeySourceMenuRows(),
 		"layout_switching",       (*) => PauseLayoutSwitch_MenuRows(),
 	)
 	; The accented-letter group stays enabled without the Ergopti emulation: the
@@ -251,26 +251,26 @@ _MI_StageHotstrings() {
 	; and this driver supplies only the toggle and the state behind the tick. It
 	; was three copies of one checkbox before that, one per driver.
 	_HotParamCommands := Map(
-		"repeat_key", ToggleRepeatKeyEnabled,
+		MenuCommand.REPEAT_KEY, ToggleRepeatKeyEnabled,
 		; The word-reset rows: the idle choice is called with the chosen seconds,
 		; its free entry and the click checkbox with the native menu arguments,
 		; which the seams of these commands must never receive.
-		"idle_reset", (Seconds) => SetHotstringsIdleResetSeconds(Seconds),
+		MenuCommand.IDLE_RESET, (Seconds) => SetHotstringsIdleResetSeconds(Seconds),
 		"idle_reset_custom", (*) => PromptHotstringsIdleResetSeconds(),
 		MenuCommand.CASCADE_MAX_ARROWS, (Arrows) => SetHotstringsCascadeMaxArrows(Arrows),
-		"click_resets_word", (*) => ToggleHotstringsClickResetsWord(),
-		"arrow_resets_word", (*) => ToggleHotstringsWordResetFlag("arrow_resets_word"),
-		"shortcut_resets_word", (*) => ToggleHotstringsWordResetFlag("shortcut_resets_word"),
-		"tap_hold_resets_word", (*) => ToggleHotstringsWordResetFlag("tap_hold_resets_word"),
+		ConfigLeaf.CLICK_RESETS_WORD, (*) => ToggleHotstringsClickResetsWord(),
+		ConfigLeaf.ARROW_RESETS_WORD, (*) => ToggleHotstringsWordResetFlag(ConfigLeaf.ARROW_RESETS_WORD),
+		ConfigLeaf.SHORTCUT_RESETS_WORD, (*) => ToggleHotstringsWordResetFlag(ConfigLeaf.SHORTCUT_RESETS_WORD),
+		ConfigLeaf.TAP_HOLD_RESETS_WORD, (*) => ToggleHotstringsWordResetFlag(ConfigLeaf.TAP_HOLD_RESETS_WORD),
 	)
 	_HotParamGetters := Map(
-		"hotstrings_repeat_enabled", () => ReadFeatureStateV2("hotstrings.repeat_key_enabled").Get("enabled", false),
-		"hotstrings.idle_reset_seconds", () => HSE_IdleResetSecondsCurrent(),
+		"hotstrings_repeat_enabled", () => ReadFeatureStateV2(ConfigKey.HOTSTRINGS_REPEAT_KEY_ENABLED).Get("enabled", false),
+		ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS, () => HSE_IdleResetSecondsCurrent(),
 		ConfigKey.HOTSTRINGS_CASCADE_MAX_ARROWS, () => HSE_CascadeMaxArrowsCurrent(),
 		"hotstrings_click_resets_word", () => HSE_ClickResetsWordCurrent(),
-		"hotstrings_arrow_resets_word", () => HSE_WordResetFlagCurrent("arrow_resets_word"),
-		"hotstrings_shortcut_resets_word", () => HSE_WordResetFlagCurrent("shortcut_resets_word"),
-		"hotstrings_tap_hold_resets_word", () => HSE_WordResetFlagCurrent("tap_hold_resets_word"),
+		"hotstrings_arrow_resets_word", () => HSE_WordResetFlagCurrent(ConfigLeaf.ARROW_RESETS_WORD),
+		"hotstrings_shortcut_resets_word", () => HSE_WordResetFlagCurrent(ConfigLeaf.SHORTCUT_RESETS_WORD),
+		"hotstrings_tap_hold_resets_word", () => HSE_WordResetFlagCurrent(ConfigLeaf.TAP_HOLD_RESETS_WORD),
 	)
 
 	; word_expanders left _HotDynHandlers: its manifest row is `type = "list"`
@@ -299,7 +299,7 @@ _MI_StageHotstrings() {
 	; provider, so the rows reach the same scope owner as its unit tests. There
 	; is no whole-tree « all sections » row: each submenu owns its bulk rows.
 	_HotCommands := _HS_ScopeCommands()
-	_HotCommands["hotstrings_toggle"] := MenuRenderer_CategoryGateCommand("Hotstrings")
+	_HotCommands[MenuCommand.HOTSTRINGS_TOGGLE] := MenuRenderer_CategoryGateCommand("Hotstrings")
 	_HotGetters := Map(
 		"hotstrings_enabled", () => IsCategoryGated("Hotstrings"),
 	)
@@ -351,7 +351,7 @@ _MI_StagePrebuiltLlm(Submenu) {
 _MI_StageAgent() {
 	AgentTitle := t("menu.agent.title")
 	TrayMenuStage_AddFeature(AgentTitle, LLM_Agent_MenuBuild())
-	if (LLM_Agent_Setting("agent_mode") != "off")
+	if (LLM_Agent_Setting(ConfigLeaf.AGENT_MODE) != "off")
 		TrayMenuStage_Check(AgentTitle)
 	BootProfile_Mark("MENU/initMenu: agent menu")
 }
@@ -390,7 +390,7 @@ _MI_StageShortcuts() {
 
 
 _MI_StageTapHolds() {
-	Receiver := MenuRenderer_GroupReceiver("top_level", "tap_holds")
+	Receiver := MenuRenderer_GroupReceiver("top_level", ConfigLeaf.TAP_HOLDS)
 	if !Receiver
 		throw Error("The declared tap_holds feature parent was refused before native construction.")
 	global SubMenus
@@ -515,10 +515,10 @@ _MI_StageDebug() {
 _MI_BuildConfigurationMenu() {
 	Commands := _MI_GlobalScopeCommands()
 	for Id, Callback in Map(
-		"clean_unused_keys",   ShowUnusedConfigKeysCleanup,
-		"config_folder",       FilePathsEditor,
-		"setup_wizard",        Onboarding_ShowFromMenu,
-		"restore_touchpad_gestures", TouchpadRegistryRestoreFromMenu
+		MenuCommand.CLEAN_UNUSED_KEYS,   ShowUnusedConfigKeysCleanup,
+		MenuCommand.CONFIG_FOLDER,       FilePathsEditor,
+		MenuCommand.SETUP_WIZARD,        Onboarding_ShowFromMenu,
+		MenuCommand.RESTORE_TOUCHPAD_GESTURES, TouchpadRegistryRestoreFromMenu
 	)
 		Commands[Id] := Callback
 	return MenuRenderer_Build("configuration_menu", "Configuration", "", "", "", Commands)
@@ -542,9 +542,9 @@ _MI_BuildAboutMenu(StartupCommand := 0, StartupState := 0) {
 	; nowhere — on all three drivers at once.
 	Providers := Map("about_updates", (*) => _MI_AboutUpdateRows())
 	Commands := Map(
-		"about_changelog",     Updater_ShowChangelog,
-		"about_releases_page", Updater_OpenReleasesPage,
-		"start_at_login",      StartupCommand,
+		MenuCommand.ABOUT_CHANGELOG,     Updater_ShowChangelog,
+		MenuCommand.ABOUT_RELEASES_PAGE, Updater_OpenReleasesPage,
+		MenuCommand.START_AT_LOGIN,      StartupCommand,
 		"uninstall",           ShowUninstallErgopti
 	)
 	; A local version run from source has nothing to uninstall: the row stays,
@@ -631,9 +631,9 @@ _MI_FrequencyPickerRow(SetIntervalFn := 0, IsLocal := Updater_IsLocalSource()) {
 ; follows.
 _MI_ChannelPickerRow(SetChannelFn, IsLocal := Updater_IsLocalSource()) {
 	global UPDATER_CHANNEL
-	return MenuRenderer_ChoiceRow("about_update_channel_menu", "update_channel",
-		Map("update_channel", (Id) => SetChannelFn.Call(Id)),
-		Map("updater.channel", () => UPDATER_CHANNEL, "installed_build", () => !IsLocal))
+	return MenuRenderer_ChoiceRow("about_update_channel_menu", MenuCommand.UPDATE_CHANNEL,
+		Map(MenuCommand.UPDATE_CHANNEL, (Id) => SetChannelFn.Call(Id)),
+		Map(ConfigKey.UPDATER_CHANNEL, () => UPDATER_CHANNEL, "installed_build", () => !IsLocal))
 }
 
 
@@ -649,8 +649,8 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 		LogLevelCommand := LoggerSetLevel
 	Commands := Map(
 		MenuCommand.WINDOW_SPY,     WindowSpy,
-		"list_vars",      ActivateListVars,
-		"key_history",    ActivateKeyHistory,
+		MenuCommand.LIST_VARS,      ActivateListVars,
+		MenuCommand.KEY_HISTORY,    ActivateKeyHistory,
 		MenuCommand.OPEN_LOGS,      OpenLogsFolder,
 		MenuCommand.OPEN_TODAY_LOG, OpenTodayLog,
 		MenuCommand.OPEN_ERROR_LOG, OpenErrorLog,
@@ -662,11 +662,11 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 		MenuCommand.PROXY_OVERRIDE, ProxyOverride_Command,
 		MenuCommand.REPORT_BUG,      (*) => HealthCheck_ReportBug(),
 		MenuCommand.SUGGEST_FEATURE, (*) => HealthCheck_SuggestFeature(),
-		"show_error_dialog", (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),
-		"log_level", LogLevelCommand
+		ConfigLeaf.SHOW_ERROR_DIALOG, (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),
+		ConfigLeaf.LOG_LEVEL, LogLevelCommand
 	)
 	StateGetters := Map("error_dialog_enabled", ErrorDialog_IsEnabled,
-		"script.log_level", (*) => LOGGER_MIN_LEVEL)
+		ConfigKey.SCRIPT_LOG_LEVEL, (*) => LOGGER_MIN_LEVEL)
 	return MenuRenderer_Build("debug_menu", "Debug", "", "", Map(), Commands, StateGetters)
 }
 
@@ -674,7 +674,7 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 _LAY_ScopeCommands(Options := unset) {
 	Commands := ConfigScopeMenuCommands("keyboard_layout", Map(), IsSet(Options) ? Options : Map())
 	Commands[MenuCommand.LAYOUT_TOGGLE] := MenuRenderer_CategoryGateCommand("Layout")
-	Commands["layout_manager"] := LayoutManager_Open
+	Commands[MenuCommand.LAYOUT_MANAGER] := LayoutManager_Open
 	return Commands
 }
 
@@ -689,6 +689,6 @@ _MI_GlobalScopeCommands(Options := unset) {
 	global _ConfigDir
 	Selected := IsSet(Options) ? Options : Map("layers_config_dir", _ConfigDir)
 	return Map(
-		"scope_restore", (*) => ConfigGlobalScopeApply("recommended", Selected),
-		"scope_clear", (*) => ConfigGlobalScopeApply("clear", Selected))
+		MenuCommand.SCOPE_RESTORE, (*) => ConfigGlobalScopeApply("recommended", Selected),
+		MenuCommand.SCOPE_CLEAR, (*) => ConfigGlobalScopeApply("clear", Selected))
 }

@@ -87,7 +87,7 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 		return false
 	Validated := Map()
 	for Key in ["enabled", "model", "backend", "profile_id", "n_predictions",
-		"auto_profile_for_model", "temperature", "min_words", "max_words",
+		ConfigLeaf.AUTO_PROFILE_FOR_MODEL, "temperature", ConfigLeaf.MIN_WORDS, ConfigLeaf.MAX_WORDS,
 		"ctx_chars", ConfigLeaf.AUTO_RAISE_TEMP, ConfigLeaf.RESET_ON_NAV, ConfigLeaf.SHOW_INFO_BAR,
 		"streaming", "show_all_at_once", ConfigLeaf.PRED_INDENT, ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
 		ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING, ConfigLeaf.INLINE_AUTOTYPE,
@@ -126,11 +126,11 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 	llm["models"]["selected"]                 := Validated["backend"]
 	llm["profiles"]["active"]                 := Validated["profile_id"]
 	llm["profiles"][ConfigLeaf.NUM_PREDICTIONS]        := Validated["n_predictions"]
-	llm["profiles"]["auto_profile_for_model"] := Validated["auto_profile_for_model"]
+	llm["profiles"][ConfigLeaf.AUTO_PROFILE_FOR_MODEL] := Validated[ConfigLeaf.AUTO_PROFILE_FOR_MODEL]
 	llm["generation"]["temperature"]          := Float(Validated["temperature"])
-	llm["generation"]["min_words"]            := Validated["min_words"]
-	llm["generation"]["max_words"]            := Validated["max_words"]
-	llm["generation"]["context_length"]       := Validated["ctx_chars"]
+	llm["generation"][ConfigLeaf.MIN_WORDS]            := Validated[ConfigLeaf.MIN_WORDS]
+	llm["generation"][ConfigLeaf.MAX_WORDS]            := Validated[ConfigLeaf.MAX_WORDS]
+	llm["generation"][ConfigLeaf.CONTEXT_LENGTH]       := Validated["ctx_chars"]
 	llm["generation"][ConfigLeaf.AUTO_RAISE_TEMP]      := Validated[ConfigLeaf.AUTO_RAISE_TEMP]
 	llm["generation"][ConfigLeaf.RESET_ON_NAV]         := Validated[ConfigLeaf.RESET_ON_NAV]
 	llm["display"][ConfigLeaf.SHOW_INFO_BAR]           := Validated[ConfigLeaf.SHOW_INFO_BAR]
@@ -160,7 +160,7 @@ _LLM_Menu_AppendPersistedUpdates(Updates, MenuState := 0) {
 			&& !LLM_Option_TryNormalize("api_entry_id",
 				MenuState["api_entry_id"], &ApiEntryId)
 		return false
-	if !MenuState.Has("user_profiles")
+	if !MenuState.Has(ConfigLeaf.USER_PROFILES)
 		return false
 	NavModifiersText := false
 	if !MenuState.Has(ConfigLeaf.NAV_MODIFIERS)
@@ -173,8 +173,8 @@ _LLM_Menu_AppendPersistedUpdates(Updates, MenuState := 0) {
 	Apps := MenuState.Has(ConfigLeaf.DISABLED_APPS) ? MenuState[ConfigLeaf.DISABLED_APPS] : []
 	if !LLM_Option_TryNormalize(ConfigLeaf.DISABLED_APPS, Apps, &Apps)
 		return false
-	if !LLM_Option_TryNormalize("user_profiles",
-			MenuState["user_profiles"], &Profiles)
+	if !LLM_Option_TryNormalize(ConfigLeaf.USER_PROFILES,
+			MenuState[ConfigLeaf.USER_PROFILES], &Profiles)
 		return false
 	ProfilesPayload := _LLM_Menu_SerializeUserProfiles(Profiles)
 	if !(ProfilesPayload is String)
@@ -191,7 +191,7 @@ _LLM_Menu_AppendPersistedUpdates(Updates, MenuState := 0) {
 		Updates.Push({ Section: "llm", Key: "ollama_port", Value: OllamaPort })
 	if MenuState.Has("api_entry_id")
 		Updates.Push({ Section: "llm", Key: "api_entry_id", Value: ApiEntryId })
-	Updates.Push({ Section: "llm", Key: "user_profiles", Value: ProfilesPayload })
+	Updates.Push({ Section: "llm", Key: ConfigLeaf.USER_PROFILES, Value: ProfilesPayload })
 	Updates.Push({ Section: ConfigKey.LLM_NAVIGATION, Key: ConfigLeaf.NAV_MODIFIERS,
 		Value: NavModifiers })
 	Updates.Push({ Section: ConfigKey.LLM_TRIGGER, Key: ConfigLeaf.DISABLED_APPS, Value: Apps })
@@ -250,15 +250,15 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 		return opts
 	llm := Features["llm"]
 	for Entry in [
-		["enabled", llm["enabled"], "llm.enabled"],
+		["enabled", llm["enabled"], ConfigKey.LLM_ENABLED],
 		["model", llm["models"]["ollama"], ConfigKey.LLM_MODELS_OLLAMA],
 		["backend", llm["models"]["selected"], ConfigKey.LLM_MODELS_SELECTED],
 		["profile_id", llm["profiles"]["active"], ConfigKey.LLM_PROFILES_ACTIVE],
 		["n_predictions", llm["profiles"][ConfigLeaf.NUM_PREDICTIONS], ConfigKey.LLM_PROFILES_NUM_PREDICTIONS],
-		["auto_profile_for_model", llm["profiles"]["auto_profile_for_model"], ConfigKey.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL],
-		["min_words", llm["generation"]["min_words"], ConfigKey.LLM_GENERATION_MIN_WORDS],
-		["max_words", llm["generation"]["max_words"], ConfigKey.LLM_GENERATION_MAX_WORDS],
-		["ctx_chars", llm["generation"]["context_length"], ConfigKey.LLM_GENERATION_CONTEXT_LENGTH],
+		[ConfigLeaf.AUTO_PROFILE_FOR_MODEL, llm["profiles"][ConfigLeaf.AUTO_PROFILE_FOR_MODEL], ConfigKey.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL],
+		[ConfigLeaf.MIN_WORDS, llm["generation"][ConfigLeaf.MIN_WORDS], ConfigKey.LLM_GENERATION_MIN_WORDS],
+		[ConfigLeaf.MAX_WORDS, llm["generation"][ConfigLeaf.MAX_WORDS], ConfigKey.LLM_GENERATION_MAX_WORDS],
+		["ctx_chars", llm["generation"][ConfigLeaf.CONTEXT_LENGTH], ConfigKey.LLM_GENERATION_CONTEXT_LENGTH],
 		[ConfigLeaf.DEBOUNCE_MS, llm["trigger"][ConfigLeaf.DEBOUNCE_MS], ConfigKey.LLM_TRIGGER_DEBOUNCE_MS],
 		[ConfigLeaf.MIN_REQUEST_INTERVAL_MS, llm["trigger"][ConfigLeaf.MIN_REQUEST_INTERVAL_MS], ConfigKey.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS],
 		[ConfigLeaf.INSTANT_ON_WORD_END, llm["trigger"][ConfigLeaf.INSTANT_ON_WORD_END], ConfigKey.LLM_TRIGGER_INSTANT_ON_WORD_END],
@@ -312,13 +312,13 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 			_LLM_Menu_PutValidatedPersistedOption(
 				opts, "api_entry_id", raw, "llm.api_entry_id")
 		}
-		raw := IniCacheGet(Cache, "llm", "user_profiles")
+		raw := IniCacheGet(Cache, "llm", ConfigLeaf.USER_PROFILES)
 		if !((raw is String) && raw == "_") {
 			Profiles := (raw is String)
 				? _LLM_Menu_DeserializeUserProfiles(raw) : false
 			if (Profiles is Array)
 				_LLM_Menu_PutValidatedPersistedOption(
-					opts, "user_profiles", Profiles, ConfigKey.LLM_USER_PROFILES)
+					opts, ConfigLeaf.USER_PROFILES, Profiles, ConfigKey.LLM_USER_PROFILES)
 			else
 				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_USER_PROFILES)
 		}

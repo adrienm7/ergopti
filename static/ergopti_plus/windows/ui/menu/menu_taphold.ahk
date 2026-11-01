@@ -102,10 +102,10 @@ _TH_KeyRows(Hand) {
 			? Round(TapHoldDuration(Desired, KeyId) * 1000) . " ms"
 			: StrReplace(t("menu.tapholds.key_tap_delay_inherited"), "%s", GlobalCaption)
 		KeyRows := MenuRenderer_TemplateRows("tap_hold_key_rows",
-			Map("tap_hold_key_native", _TH_MakeDisableFn(KeyId),
-				"tap_hold_key_tap", _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl),
-				"tap_hold_key_hold_action", _TH_MakeHoldPickerFn(KeyId, KeyLabel),
-				"tap_hold_key_delay", _TH_MakeDelayPickerFn(KeyId),
+			Map(MenuCommand.TAP_HOLD_KEY_NATIVE, _TH_MakeDisableFn(KeyId),
+				MenuCommand.TAP_HOLD_KEY_TAP, _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl),
+				MenuCommand.TAP_HOLD_KEY_HOLD_ACTION, _TH_MakeHoldPickerFn(KeyId, KeyLabel),
+				MenuCommand.TAP_HOLD_KEY_DELAY, _TH_MakeDelayPickerFn(KeyId),
 				MenuCommand.TAP_HOLD_KEY_DELAY_USE_GLOBAL, _TH_MakeDelayResetFn(KeyId)),
 			Map("tap_hold_key_configured", ((Value) => Value).Bind(IsConfigured),
 				"tap_hold_key_tap_caption", ((Value) => Value).Bind(TapLbl),
@@ -694,7 +694,7 @@ _TH_ScopeCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map("layers_config_dir", _ConfigDir)
 	return Map(
 		MenuCommand.TAPHOLDS_TOGGLE, MenuRenderer_CategoryGateCommand("TapHolds"),
-		"scope_restore", (*) => TapHoldScopeApply("recommended", OwnedOptions),
-		"scope_clear", (*) => TapHoldScopeApply("clear", OwnedOptions),
+		MenuCommand.SCOPE_RESTORE, (*) => TapHoldScopeApply("recommended", OwnedOptions),
+		MenuCommand.SCOPE_CLEAR, (*) => TapHoldScopeApply("clear", OwnedOptions),
 		MenuCommand.EDIT_NAV_LAYER, LayerEditor_Open)
 }

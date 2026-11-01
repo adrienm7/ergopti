@@ -130,7 +130,7 @@ MF_SaveBuiltToIni(Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
 
 _MF_FilterConfigKey(Prop) {
 	static Keys := Map(
-		"private_browsing", "private_filter_enabled",
+		"private_browsing", ConfigLeaf.PRIVATE_FILTER_ENABLED,
 		"secure_field",     ConfigLeaf.SECURE_FILTER_ENABLED,
 		"system_auth",      ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED
 	)

@@ -174,10 +174,10 @@ global GESTURE_ACTIONS := Map(
 		"open_logs_folder", {
 				Fn: (*) => OpenLogsFolder(),
 		},
-		"open_today_log", {
+		MenuCommand.OPEN_TODAY_LOG, {
 				Fn: (*) => OpenTodayLog(),
 		},
-		"open_error_log", {
+		MenuCommand.OPEN_ERROR_LOG, {
 				Fn: (*) => OpenErrorLog(),
 		},
 		; --- Script management ---
@@ -198,10 +198,10 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => WindowSpy(),
 		},
 		"open_list_vars", {
-				Fn: (*) => ConsoleWindow_Open("list_vars"),
+				Fn: (*) => ConsoleWindow_Open(MenuCommand.LIST_VARS),
 		},
 		"open_key_history", {
-				Fn: (*) => ConsoleWindow_Open("key_history"),
+				Fn: (*) => ConsoleWindow_Open(MenuCommand.KEY_HISTORY),
 		},
 		; --- Advanced system actions ---
 		"screen_capture_instant", {
@@ -574,7 +574,7 @@ GestureOpenConfiguredURL(BindingId := "") {
 GestureOpenChatGpt() {
 		global Features
 		try {
-				Link := Features["shortcuts"]["chatgpt_url"]
+				Link := Features["shortcuts"][ConfigLeaf.CHATGPT_URL]
 				if (Type(Link) != "String" or Trim(Link) = "")
 						throw Error("the configured ChatGPT link is empty or invalid")
 				Run(Link)
@@ -716,10 +716,10 @@ GestureDisplayMirrorToggle(Sys := 0) {
 GestureCaseTransforms() {
 		static Transforms := Map(
 				"selection_uppercase", TextCaseUpper,
-				"selection_lowercase", TextCaseLower,
+				MenuCommand.SELECTION_LOWERCASE, TextCaseLower,
 				"selection_titlecase", TextCaseTitle,
-				"uppercase_selection", TextCaseToggleUpper,
-				"titlecase_selection", TextCaseToggleTitle,
+				MenuCommand.UPPERCASE_SELECTION, TextCaseToggleUpper,
+				MenuCommand.TITLECASE_SELECTION, TextCaseToggleTitle,
 		)
 		return Transforms
 }

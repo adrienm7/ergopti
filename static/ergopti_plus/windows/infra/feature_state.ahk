@@ -26,7 +26,7 @@ global _FeatureStateConfigDir := IsSet(_ConfigDir) ? _ConfigDir : ""
 global _FeatureStateAhkSubDir := IsSet(_AhkSubDir) ? _AhkSubDir : ""
 
 global ScriptInformation := Map(
-		"MagicKey", _FeatureStateRequireManifestDefault("hotstrings.trigger_char"),
+		"MagicKey", _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_TRIGGER_CHAR),
 		; The physical key remapped to ★, as the shared [hotstrings]
 		; magic_key_source names it on every driver: a KeyboardEvent.code, or the
 		; manifest default "auto" that leaves the key to the layout.
@@ -134,7 +134,7 @@ for _FeatureStateIndex, _FeatureStateSlot in SCRIPT_SHORTCUT_SLOTS {
 ; Each slot id is a neutral chord id (e.g. "meta_a", "primary_b").
 ; Defaults below mirror the legacy hard-coded shortcuts so a fresh install
 ; behaves identically to before while giving the user full control via the menu.
-global KEYBOARD_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection("shortcuts.keyboard")
+global KEYBOARD_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection(ConfigKey.SHORTCUTS_KEYBOARD)
 global KeyboardShortcutAssignments := Map()
 
 ; ParseTomlFile / IniCacheGet / ResolveConfigPath are defined in
@@ -190,7 +190,7 @@ global CATEGORY_FOLLOWS_HOTSTRINGS_MASTER := Map(
 ReadCategoryEnabled(Cache) {
 		global CategoryEnabled
 		for Category, _Default in CategoryEnabled {
-				Raw := _FeatureStateIniGet(Cache, "category_enabled", _FeatureStateCategoryKey(Category))
+				Raw := _FeatureStateIniGet(Cache, ConfigLeaf.CATEGORY_ENABLED, _FeatureStateCategoryKey(Category))
 				if (Raw == "_") {
 						continue
 				}
@@ -217,7 +217,7 @@ IsCategoryGated(Category) {
 
 ReadScriptConfig(Cache) {
 		; MagicKey lives in [hotstrings] trigger_char in the v2 TOML.
-		Raw := _FeatureStateIniGet(Cache, "hotstrings", "trigger_char")
+		Raw := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.TRIGGER_CHAR)
 		if Raw != "_"
 				ScriptInformation["MagicKey"] := _FeatureStateValidateTriggerChar(Raw)
 		; Source key for the J→★ remap, named by its KeyboardEvent.code so the one
@@ -225,7 +225,7 @@ ReadScriptConfig(Cache) {
 		; no candidate is outdated configuration: the loader reports it and the
 		; cleanup offers it, so it reads as the automatic key here, never as a
 		; boot failure.
-		RawSource := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source")
+		RawSource := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.MAGIC_KEY_SOURCE)
 		ScriptInformation["MagicKeySource"] := _FeatureStateMagicKeySource(RawSource)
 		ScriptInformation["MagicKeySourceChosen"] := ScriptInformation["MagicKeySource"]
 			!== _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
@@ -247,27 +247,27 @@ ReadScriptConfig(Cache) {
 		RawRepeat := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.REPEAT_KEY_ENABLED)
 		if RawRepeat != "_"
 				HSE_RepeatEnabled := _FeatureStateValidateBoolean(
-					RawRepeat, "hotstrings.repeat_key_enabled")
+					RawRepeat, ConfigKey.HOTSTRINGS_REPEAT_KEY_ENABLED)
 		else
-				HSE_RepeatEnabled := ManifestDefaultFor("hotstrings.repeat_key_enabled")
+				HSE_RepeatEnabled := ManifestDefaultFor(ConfigKey.HOTSTRINGS_REPEAT_KEY_ENABLED)
 		; When the engine forgets the current word: after a pause, after a click.
 		global HSE_IdleResetSeconds, HSE_ClickResetsWord
 		HSE_IdleResetSeconds := _FeatureStateIdleResetSeconds(
-			_FeatureStateIniGet(Cache, "hotstrings", "idle_reset_seconds"))
+			_FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.IDLE_RESET_SECONDS))
 		global HSE_CascadeMaxArrows
 		HSE_CascadeMaxArrows := _FeatureStateCascadeMaxArrows(
 			_FeatureStateIniGet(Cache, ConfigKey.HOTSTRINGS, ConfigLeaf.CASCADE_MAX_ARROWS))
-		RawClick := _FeatureStateIniGet(Cache, "hotstrings", "click_resets_word")
+		RawClick := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.CLICK_RESETS_WORD)
 		if RawClick != "_"
 				HSE_ClickResetsWord := _FeatureStateValidateBoolean(
-					RawClick, "hotstrings.click_resets_word")
+					RawClick, ConfigKey.HOTSTRINGS_CLICK_RESETS_WORD)
 		else
-				HSE_ClickResetsWord := ManifestDefaultFor("hotstrings.click_resets_word")
+				HSE_ClickResetsWord := ManifestDefaultFor(ConfigKey.HOTSTRINGS_CLICK_RESETS_WORD)
 		; ...and after an arrow key, a shortcut, a tap-hold key's own output.
 		global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
-		HSE_ArrowResetsWord := _FeatureStateWordResetFlag(Cache, "arrow_resets_word")
-		HSE_ShortcutResetsWord := _FeatureStateWordResetFlag(Cache, "shortcut_resets_word")
-		HSE_TapHoldResetsWord := _FeatureStateWordResetFlag(Cache, "tap_hold_resets_word")
+		HSE_ArrowResetsWord := _FeatureStateWordResetFlag(Cache, ConfigLeaf.ARROW_RESETS_WORD)
+		HSE_ShortcutResetsWord := _FeatureStateWordResetFlag(Cache, ConfigLeaf.SHORTCUT_RESETS_WORD)
+		HSE_TapHoldResetsWord := _FeatureStateWordResetFlag(Cache, ConfigLeaf.TAP_HOLD_RESETS_WORD)
 		; The preview-bubble switches: the stored value, or the manifest default.
 		global HSE_PreviewSwitches
 		HSE_PreviewSwitches := Map()
@@ -302,7 +302,7 @@ _FeatureStateValidateBoolean(Value, Path) {
 ; @param Raw {Any} The raw TOML value, "_" when absent.
 ; @returns {Number} Seconds; 0 disables the idle reset.
 _FeatureStateIdleResetSeconds(Raw) {
-	Default := ManifestDefaultFor("hotstrings.idle_reset_seconds")
+	Default := ManifestDefaultFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS)
 	if Raw == "_"
 		return Default
 	; HSE_ValidIdleResetSeconds's rule, restated because this reader also boots
@@ -378,7 +378,7 @@ _FeatureStateValidateCodePoint(Value, Path) {
 
 _FeatureStateValidateTriggerChar(Value) {
 	; Keep the runtime boundary aligned with config.schema.json.
-	return _FeatureStateValidateCodePoint(Value, "hotstrings.trigger_char")
+	return _FeatureStateValidateCodePoint(Value, ConfigKey.HOTSTRINGS_TRIGGER_CHAR)
 }
 
 ; IniCacheGet belongs to the configuration-loader boundary.  It is included

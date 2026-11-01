@@ -243,9 +243,9 @@ KeylayoutEmulation_SelectedId(FeaturesSource := unset) {
 			return ""
 		FeaturesSource := Features
 	}
-	if !FeaturesSource.Has("layout") || !FeaturesSource["layout"].Has("emulated_layout")
+	if !FeaturesSource.Has("layout") || !FeaturesSource["layout"].Has(ConfigLeaf.EMULATED_LAYOUT)
 		return ""
-	Id := FeaturesSource["layout"]["emulated_layout"]
+	Id := FeaturesSource["layout"][ConfigLeaf.EMULATED_LAYOUT]
 	return (Id is String) ? Id : ""
 }
 
@@ -285,7 +285,7 @@ _KLE_BaseCriterion(Sc, Shift, ForegroundFn := 0, *) {
 	if !Shift && _KLE_MagicKeyOwnsKey(Sc)
 		return false
 	; A row switched off is the OS layout's (LayoutRowIsEmulated).
-	return KeylayoutEmulation_LayerIsActive("ergopti_base") && LayoutRowIsEmulated(Sc)
+	return KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) && LayoutRowIsEmulated(Sc)
 		&& !_KLE_DigitsOwnKey(Sc, Shift, ForegroundFn)
 }
 
@@ -332,7 +332,7 @@ _KLE_DigitsOwnKey(Sc, Shift, ForegroundFn := 0) {
  */
 KeylayoutEmulation_NumberRowLevels(Sc, Caps) {
 	global KLE_Model, KLE_KeyCodes, KLE_LevelIndex
-	if !KeylayoutEmulation_LayerIsActive("ergopti_base")
+	if !KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE)
 		return 0
 	Name := Format("SC{:03X}", Sc)
 	; A number row switched off is the OS layout's, so is its ordering.
@@ -345,7 +345,7 @@ KeylayoutEmulation_NumberRowLevels(Sc, Caps) {
 }
 
 _KLE_ShortcutCriterion(HotkeyName := "", *) {
-	return KeylayoutEmulation_LayerIsActive("ergopti_base") && LayoutRowIsEmulatedHotkey(HotkeyName)
+	return KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) && LayoutRowIsEmulatedHotkey(HotkeyName)
 }
 
 
@@ -769,7 +769,7 @@ _KLE_OnKey(Sc, Shift, *) {
 			return
 		}
 	}
-	if KeylayoutEmulation_LayerIsActive("ergopti_base") && !_KLE_DigitsOwnKey(Sc, Shift) {
+	if KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) && !_KLE_DigitsOwnKey(Sc, Shift) {
 		_KLE_Emit(Sc, Shift, false)
 		return
 	}
@@ -808,7 +808,7 @@ _KLE_OnShortcut(Sc, Mods, *) {
 }
 
 _KLE_AltGrCriterion(HotkeyName := "", *) {
-	return KeylayoutEmulation_LayerIsActive("ergopti_alt_gr") && IsRealAltGrPress()
+	return KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_ALT_GR) && IsRealAltGrPress()
 		&& LayoutRowIsEmulatedHotkey(HotkeyName)
 }
 

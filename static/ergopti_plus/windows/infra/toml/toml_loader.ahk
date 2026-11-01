@@ -443,8 +443,8 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 				if FeatureConfig.Has("enabled") {
 						_V1Compat.Enabled := FeatureConfig["enabled"]
 				}
-				if FeatureConfig.Has("time_activation_seconds") {
-						_V1Compat.TimeActivationSeconds := FeatureConfig["time_activation_seconds"]
+				if FeatureConfig.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS) {
+						_V1Compat.TimeActivationSeconds := FeatureConfig[ConfigLeaf.TIME_ACTIVATION_SECONDS]
 				}
 				if FeatureConfig.Has(ConfigLeaf.PATTERN_MAX_LENGTH) {
 						_V1Compat.PatternMaxLength := FeatureConfig[ConfigLeaf.PATTERN_MAX_LENGTH]

@@ -27,6 +27,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -188,8 +189,8 @@ _LLM_Tone_Dispatch(Generation, Plan, Focus) {
 		return false
 	}
 	Source := Plan["source"]
-	SystemPrompt := LLM_ResolveSystemPrompt(Profile, 1, _LLM_Engine["min_words"],
-		_LLM_Engine["max_words"], _LLM_Engine["language"])
+	SystemPrompt := LLM_ResolveSystemPrompt(Profile, 1, _LLM_Engine[ConfigLeaf.MIN_WORDS],
+		_LLM_Engine[ConfigLeaf.MAX_WORDS], _LLM_Engine["language"])
 	MaxTokens := LLM_Rewrite_MaxTokens(Source)
 	Temperature := _LLM_Engine["temperature"] + 0.0
 	OnSuccess := _LLM_Tone_OnAnswer.Bind(Generation, Plan, Focus)

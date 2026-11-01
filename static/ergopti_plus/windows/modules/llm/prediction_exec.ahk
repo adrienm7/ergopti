@@ -435,7 +435,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		profile := Override.Has("translation_target")
 			? LLM_Translate_PredictionProfile(Override["translation_target"])
 			: LLM_FindProfile(effective_profile_id,
-				_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+				_LLM_Engine.Has(ConfigLeaf.USER_PROFILES) ? _LLM_Engine[ConfigLeaf.USER_PROFILES] : [])
 		if !(profile is Map) {
 			try LoggerWarn("LLM", "Prompt prediction dropped: the prompt '{1}' no longer exists.",
 				effective_profile_id)
@@ -451,7 +451,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	} else {
 		effective_profile_id := _LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"])
 		profile := LLM_GetActiveProfile(effective_profile_id,
-			_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+			_LLM_Engine.Has(ConfigLeaf.USER_PROFILES) ? _LLM_Engine[ConfigLeaf.USER_PROFILES] : [])
 	}
 	request_semantic_signature := _LLM_Engine_RequestSemanticSignature(
 		effective_profile_id, profile,
@@ -751,7 +751,7 @@ _LLM_Engine_ApplyTooltipDisplayOpts(slotCount := 1) {
 			prof := Override.Has("translation_target")
 				? LLM_Translate_PredictionProfile(Override["translation_target"])
 				: LLM_FindProfile(Override["profile_id"],
-					_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+					_LLM_Engine.Has(ConfigLeaf.USER_PROFILES) ? _LLM_Engine[ConfigLeaf.USER_PROFILES] : [])
 			; A built-in record carries no label of its own; the menu's names it,
 			; so the user sees which of their prompts answered.
 			if (prof is Map and prof.Has("label"))
@@ -761,7 +761,7 @@ _LLM_Engine_ApplyTooltipDisplayOpts(slotCount := 1) {
 		} else {
 			prof := LLM_GetActiveProfile(
 				_LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"]),
-				_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+				_LLM_Engine.Has(ConfigLeaf.USER_PROFILES) ? _LLM_Engine[ConfigLeaf.USER_PROFILES] : [])
 			if (prof is Map and prof.Has("label"))
 				profile_label := prof["label"]
 		}

@@ -115,10 +115,10 @@ global _LLM_Menu := Map(
 	"ollama_port",                0,
 	"model",                      "",
 	"profile_id",                 "basic",
-	"user_profiles",              [],
+	ConfigLeaf.USER_PROFILES,              [],
 	"n_predictions",              3,
-	"min_words",                  3,
-	"max_words",                  15,
+	ConfigLeaf.MIN_WORDS,                  3,
+	ConfigLeaf.MAX_WORDS,                  15,
 	ConfigLeaf.DEBOUNCE_MS,                500,
 	ConfigLeaf.MIN_REQUEST_INTERVAL_MS,    300,
 	"ctx_chars",                  500,
@@ -157,7 +157,7 @@ global _LLM_Menu := Map(
 	; models.json. Mirrors the HS get_recommended_profile_info heuristic so
 	; the user does not have to manually re-pick a profile every time they
 	; try a different model size. Toggleable via the profile submenu.
-	"auto_profile_for_model",     true,
+	ConfigLeaf.AUTO_PROFILE_FOR_MODEL,     true,
 	; Onboarding flag — flipped to true the first time the user enables
 	; the LLM feature so the welcome TrayTip never fires twice. MUST be
 	; declared here (not only added at first-flip) because SaveFullConfig
@@ -201,8 +201,8 @@ LLM_Menu_ApplySharedDefaults() {
 		"llm_model",                   "model",
 		"llm_backend",                 "backend",
 		"llm_num_predictions",         "n_predictions",
-		"llm_min_words",               "min_words",
-		"llm_max_words",               "max_words",
+		"llm_min_words",               ConfigLeaf.MIN_WORDS,
+		"llm_max_words",               ConfigLeaf.MAX_WORDS,
 		"llm_debounce_ms",             ConfigLeaf.DEBOUNCE_MS,
 		"llm_min_request_interval_ms", ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
 		"llm_context_length",          "ctx_chars",
