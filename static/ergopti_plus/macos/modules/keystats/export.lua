@@ -244,10 +244,11 @@ end
 function M.get_db_rev()
 	local db = _get_db and _get_db()
 	if not db then return 0 end
+	local rev = 0
 	for r in db:nrows(Queries.render("meta.rev", "native")) do
-		return tonumber(r.value) or 0
+		rev = tonumber(r.value) or 0
 	end
-	return 0
+	return rev
 end
 
 

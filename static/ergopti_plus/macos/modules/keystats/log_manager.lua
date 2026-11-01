@@ -1124,14 +1124,16 @@ local LEDGER_REPLAY_PROGRESS_BYTES = 32 * 1024 * 1024
 ---@param db userdata
 ---@return table|nil state
 local function _read_ledger_replay_state(db)
+	local stored = nil
 	for row in db:nrows("SELECT value FROM meta WHERE key=" .. _sq(LEDGER_REPLAY_KEY)) do
-		local ok, decoded = pcall(json.decode, row.value or "")
-		if ok and LedgerReplay.is_state(decoded) then return decoded end
-		-- An unreadable state restarts the replay: batches are idempotent.
-		Logger.warn(LOG, "Local ledger replay state is unreadable; the replay restarts at byte 0.")
-		return LedgerReplay.new_state()
+		stored = row.value or ""
 	end
-	return nil
+	if stored == nil then return nil end
+	local ok, decoded = pcall(json.decode, stored)
+	if ok and LedgerReplay.is_state(decoded) then return decoded end
+	-- An unreadable state restarts the replay: batches are idempotent.
+	Logger.warn(LOG, "Local ledger replay state is unreadable; the replay restarts at byte 0.")
+	return LedgerReplay.new_state()
 end
 
 --- Persists the replay state; the cache row is the resume point of the next start.
@@ -1331,10 +1333,11 @@ end
 --- This value must never be appended to data.sql itself: it is a cursor-local
 --- recovery record, not data to replay into a different device cache.
 local function _get_local_outbox(db)
+	local outbox = ""
 	for row in db:nrows("SELECT value FROM meta WHERE key=" .. _sq(DATA_SQL_OUTBOX_KEY)) do
-		return type(row.value) == "string" and row.value or ""
+		outbox = type(row.value) == "string" and row.value or ""
 	end
-	return ""
+	return outbox
 end
 
 --- Yields the running aggregate recovery once its slice has spent its budget.
@@ -1357,10 +1360,11 @@ local function _outbox_covers_typing(db, device_id, after_id)
 	local facts = Export._typing_rollover_boundaries(outbox, _sq(device_id), true, _has_trailing_rollover)
 	if not facts or facts.unreadable or facts.has_markers then return false end
 	local condition = after_id ~= nil and (" AND id>" .. tostring(after_id)) or ""
+	local covered = true
 	for row in db:nrows("SELECT id FROM events_typing WHERE device_id=" .. _sq(device_id) .. condition) do
-		if not facts.ids[tonumber(row.id)] then return false end
+		if not facts.ids[tonumber(row.id)] then covered = false end
 	end
-	return true
+	return covered
 end
 
 --- Read boundaries before any derived DELETE; cache-only rows need exact authority.
@@ -1601,15 +1605,18 @@ end
 ---@param db userdata
 ---@return string
 local function _aggregate_cache_revision(db)
+	local revision = "0"
 	for row in db:nrows("SELECT value FROM meta WHERE key='aggregate_cache_revision'") do
-		return tostring(row.value or "0")
+		revision = tostring(row.value or "0")
 	end
-	return "0"
+	return revision
 end
 
 --- Copies the cache of the old token encoding aside before its keys are rebuilt.
 --- The ledgers stay the source, so a refused copy is reported, not fatal; a copy
---- that already exists is the older one and stays.
+--- that already exists is the older one and stays. SQLite refuses VACUUM while
+--- any statement of this connection is running, so every row loop that ran
+--- before it must drain its statement (tests/meta/lua_safety/test_sqlite_row_loops_drain.lua).
 ---@param db userdata
 local function _keep_pre_encoding_cache(db)
 	local backup = _paths.sqlite_path .. PRE_ENCODING_BACKUP_SUFFIX
