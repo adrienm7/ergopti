@@ -55,6 +55,11 @@ local function make_ports()
 		watcher_owners = function() return world.owners end,
 		keystats_database = function() return world.database end,
 		keystats_start_ms = function() return world.keystats_start_ms end,
+		hold_keystats_writes = function(seconds)
+			world.holds = world.holds or {}
+			world.holds[#world.holds + 1] = seconds
+			return world.rebuilding == true
+		end,
 	}
 	return ports, world
 end
@@ -136,6 +141,28 @@ helpers.describe("storage probe", function()
 		world.scans = { { 0, "row 1 missing from index x\n" }, { 0, "row 1 missing from index x\n" } }
 		steps = run(ports)
 		helpers.assert_eq(steps.keystats_db.value, "issues_1")
+	end)
+
+	-- Field run 2026-11-01: a rebuild committed through both scans, which reported
+	-- 101 lines on a sound cache.
+	helpers.it("scans a cache under rebuild with its writes held, and releases them (storage-rebuild-held)", function()
+		local ports, world = make_ports()
+		world.rebuilding = true
+		local steps, result = run(ports)
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.keystats_writes.value, "rebuild_held")
+		helpers.assert_true(world.holds[1] > 0, "the writes are held before the scan")
+		helpers.assert_eq(world.holds[#world.holds], 0, "the hold ends with the check")
+	end)
+
+	helpers.it("still fails real damage while a rebuild is held (storage-rebuild-held)", function()
+		local ports, world = make_ports()
+		world.rebuilding = true
+		world.sqlite = { 0, "*** in database main ***\nPage 12: btreeInitPage() returns error code 11\n" }
+		local steps, result = run(ports)
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(steps.keystats_db.value, "issues_2")
+		helpers.assert_eq(world.holds[#world.holds], 0)
 	end)
 
 	helpers.it("escapes the database path in the immutable URI", function()
