@@ -531,7 +531,8 @@ class RefusalOriginControls(unittest.TestCase):
         self.assertRegex(
             log.getvalue(),
             r"^\[owned-build\] signing refused by NativeBuildError phase_deadline "
-            r"at line \d+ \(check_deadline\)\n$",
+            r"at line \d+ \(check_deadline\) via hs274_native_build\.py:\d+ \(require\): "
+            r"The single calibration deadline expired or is invalid\n$",
         )
 
     def test_error_without_builder_frame_is_reported_as_unknown(self):
@@ -539,7 +540,28 @@ class RefusalOriginControls(unittest.TestCase):
         with contextlib.redirect_stderr(log):
             BUILD._report_refusal_origin("signing", OSError("modeled"))
         self.assertEqual(
-            log.getvalue(), "[owned-build] signing refused by OSError  at unknown line\n"
+            log.getvalue(), "[owned-build] signing refused by OSError  at unknown line: modeled\n"
+        )
+
+    def test_refusal_from_a_deeper_module_names_its_line_and_reason(self):
+        # Run 41253143907: packaging refused with only "production_packaging".
+        spec = importlib.util.spec_from_file_location(
+            "owned_runtime_product_build_origin_subject",
+            Path(__file__).with_name("owned_runtime_product_build.py"),
+        )
+        production = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(production)
+        try:
+            production.require(False, "Lua archive pin changed")
+        except production.ProductBuildRefusal as error:
+            caught = error
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            BUILD._report_refusal_origin("packaging", caught)
+        self.assertRegex(
+            log.getvalue(),
+            r"^\[owned-build\] packaging refused by ProductBuildRefusal  at unknown line "
+            r"via owned_runtime_product_build\.py:\d+ \(require\): Lua archive pin changed\n$",
         )
 
 
