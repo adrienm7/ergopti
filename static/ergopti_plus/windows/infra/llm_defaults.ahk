@@ -179,7 +179,7 @@ LLM_Defaults_Load() {
 
 	; Booleans (all present in defaults.json)
 	for key in ["llm_enabled", "llm_show_info_bar", "llm_streaming", "llm_streaming_multi",
-		"llm_instant_on_word_end", "llm_after_hotstring", "llm_reset_on_nav",
+		MenuCommand.LLM_INSTANT_ON_WORD_END, MenuCommand.LLM_AFTER_HOTSTRING, MenuCommand.LLM_RESET_ON_NAV,
 		"llm_auto_raise_temp", "llm_disable_url_bars", "llm_disable_password_fields"] {
 		if !_LLMD_HasKey(raw, key)
 			missing.Push(key)

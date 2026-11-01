@@ -409,7 +409,7 @@ _HealthCheck_Developer() {
 		"modules_disabled", [],
 		"ring_lines",       LoggerRingBufferSnapshot().Length)
 	if IsSet(LOGGER_MIN_LEVEL)
-		Developer["log_level"] := String(LOGGER_MIN_LEVEL)
+		Developer[ConfigLeaf.LOG_LEVEL] := String(LOGGER_MIN_LEVEL)
 	return Developer
 }
 

@@ -1488,8 +1488,8 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 		; is defined in wrap_symbols_config.ahk which is #Include'd before this file.
 		ContextReleased := false
 		if (IsSet(Features) and Features.Has("shortcuts")
-			and Features["shortcuts"].Has("wrap_text_if_selected")
-			and Features["shortcuts"]["wrap_text_if_selected"]
+			and Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED)
+			and Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]
 			and IsSet(_WS_ACTIVE_PAIRS)
 		) {
 			; Snapshot the active-pairs map once so the pair lookup is consistent
@@ -1649,7 +1649,7 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 				; IsRepeat matches have no Category property — pass "repeat_key" explicitly
 				; so the WPM widget knows to stay at the default color.
 				HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
-					? "repeat_key"
+					? MenuCommand.REPEAT_KEY
 					: (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
 				HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
 				; Metrics logging is analytics — enqueue it and return; the heavy
@@ -1839,7 +1839,7 @@ _OnPrefixKeyDown(IH, VK, SC) {
 				and !_PrefixModifierIsDown.Call("RShift") and _PrefixTerminalHostFocused())
 			; An arrow leaves the word open when hotstrings.arrow_resets_word
 			; is off; the prediction still learns that the caret moved.
-			if (!IsArrow or HSE_WordResetFlagCurrent("arrow_resets_word"))
+			if (!IsArrow or HSE_WordResetFlagCurrent(ConfigLeaf.ARROW_RESETS_WORD))
 				_PrefixInvalidateInputContext(FocusToken, KnownBoundary, AtLineStart)
 			else if LoggerIsDebugEnabled()
 				LoggerDebug("PrefixWatcher", "Arrow key: hotstrings.arrow_resets_word is off — the word stays open.")
@@ -2749,7 +2749,7 @@ _LookupAndRender(CollectFn := unset, ResolveFn := unset) {
 		if !HSE_PreviewSwitchCurrent(HSE_PreviewFamilySwitch(Decision))
 			continue
 		; The tint is the colour switch's: off, every bubble is neutral.
-		Color := (Cfg.Color != "" && HSE_PreviewSwitchCurrent("preview_colored_tooltips"))
+		Color := (Cfg.Color != "" && HSE_PreviewSwitchCurrent(ConfigLeaf.PREVIEW_COLORED_TOOLTIPS))
 			? Cfg.Color : ""
 		GateDurationMs := Decision.HasOwnProp("GateDurationMs")
 			? Decision.GateDurationMs : 0

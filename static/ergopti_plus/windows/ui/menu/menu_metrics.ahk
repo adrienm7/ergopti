@@ -124,6 +124,6 @@ _MET_ExcludeAppsRows(Getters) {
 ; The Configuration clear still composes the metrics settings.
 _MET_ScopeCommands(Options := unset) {
 	Commands := ConfigScopeMenuCommands("metrics", Map(), IsSet(Options) ? Options : Map())
-	Commands.Delete("scope_clear")
+	Commands.Delete(MenuCommand.SCOPE_CLEAR)
 	return Commands
 }

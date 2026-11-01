@@ -1274,7 +1274,7 @@ _HS_SelectionAppliesLive(Paths, FlippedGate := "") {
 		return false
 	for Path in Paths {
 		Parts := StrSplit(Path, ".")
-		if Parts.Length != 3 || Parts[1] != "hotstrings" || Path == "hotstrings.dynamic.user_code"
+		if Parts.Length != 3 || Parts[1] != "hotstrings" || Path == ConfigKey.HOTSTRINGS_DYNAMIC_USER_CODE
 			return false
 		if Parts[2] == "personal"
 			continue
@@ -1327,8 +1327,8 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 			; Discover the canonical families inside the admitted lease, independent
 			; of a menu preview or the mixed legacy tray map. There is no extra gate.
 			; The programmable hotstrings keep their own start/cancel owner.
-			for Entry in ManifestFeaturesForSection("hotstrings.dynamic")
-				if Entry["path"] != "hotstrings.dynamic.user_code"
+			for Entry in ManifestFeaturesForSection(ConfigKey.HOTSTRINGS_DYNAMIC)
+				if Entry["path"] != ConfigKey.HOTSTRINGS_DYNAMIC_USER_CODE
 					Entries.Push(Map("path", Entry["path"], "value", Bool))
 		case "language":
 			; Each category's own sections, as its submenu draws them.
@@ -1428,12 +1428,12 @@ _CategoryEnabledKey(Category) {
 				case "Layout":     return "layout"
 				case "Shortcuts":  return "shortcuts"
 				case "Hotstrings": return "hotstrings"
-				case "TapHolds":   return "tap_holds"
+				case "TapHolds":   return ConfigLeaf.TAP_HOLDS
 				case "KeyCombinations": return "key_combinations"
 				; Hotstring sub-category gates — snake_case to match the v2 schema.
-				case "DistancesReduction": return "distances_reduction"
-				case "SFBsReduction":      return "sfbs_reduction"
-				case "MagicKey":           return "magic_key"
+				case "DistancesReduction": return ConfigLeaf.DISTANCES_REDUCTION
+				case "SFBsReduction":      return ConfigLeaf.SFBS_REDUCTION
+				case "MagicKey":           return ConfigLeaf.MAGIC_KEY
 		}
 		; Language-pack gates are keyed by their group id ("french_autocorrection");
 		; the table is filled when the boot seeds those gates.
@@ -1474,7 +1474,7 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 						throw Error("LLM menu state could not be reconciled into the full-save candidate")
 				_CollectFeatureUpdates(Updates, "", FeatureSnapshot)
 				; The version the boot migration reads (infra/config_migrate.ahk).
-				Updates.Push({ Section: "_meta", Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
+				Updates.Push({ Section: ConfigLeaf._META, Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
 		}
 		Updates.Push({ Section: "script", Key: "locale", Value: I18nGetLocale() })
 		Updates.Push({ Section: "script", Key: "log_level", Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })

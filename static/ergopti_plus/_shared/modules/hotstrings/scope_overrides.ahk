@@ -40,9 +40,9 @@ HotstringsScopeDelayRecommendations(Mode, Features, Groups, Inherited) {
 				continue
 			Entry := _HotstringsScopeSectionFeature(Features, Id, Section)
 			if !(Entry is Map) || !(Entry.Get("recommended", 0) is Map)
-					|| !Entry["recommended"].Has("time_activation_seconds")
+					|| !Entry["recommended"].Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
 				continue
-			Seconds := Entry["recommended"]["time_activation_seconds"]
+			Seconds := Entry["recommended"][ConfigLeaf.TIME_ACTIVATION_SECONDS]
 			if !(Seconds is Integer || Seconds is Float) || Seconds < 0
 				throw TypeError("The manifest's recommended hotstring delay is invalid.")
 			Baseline := Inherited.Call(Id, Section)

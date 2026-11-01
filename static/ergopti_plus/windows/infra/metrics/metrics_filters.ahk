@@ -79,7 +79,7 @@ class MetricsFilters {
 ; the failure this function exists to make impossible to have unnoticed.
 MetricsFiltersApplyManifestDefaults() {
 		Pairs := Map(
-			"private_browsing", "metrics.private_filter_enabled",
+			"private_browsing", ConfigKey.METRICS_PRIVATE_FILTER_ENABLED,
 			"secure_field",     ConfigKey.METRICS_SECURE_FILTER_ENABLED,
 			"system_auth",      ConfigKey.METRICS_SYSTEM_AUTH_FILTER_ENABLED,
 			"encrypt",          ConfigKey.METRICS_ENCRYPT

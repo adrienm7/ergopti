@@ -56,7 +56,7 @@ _LAY_CustomLayoutRows(FeaturesSource := unset, Enabled := unset, Index := unset)
 _LAY_LayoutFeatureBaseRows() {
 	Rows := []
 	for _, LayoutEntry in ManifestFeaturesForSection("layout") {
-		if (LayoutEntry["id"] == "ergopti_base") {
+		if (LayoutEntry["id"] == ConfigLeaf.ERGOPTI_BASE) {
 			Row := MenuRowFromManifest(LayoutEntry, "Layout")
 			if (Row != "") {
 				Rows.Push(Row)
@@ -73,8 +73,8 @@ _LAY_LayoutFeatureBaseRows() {
 ; magic-key replace option it depends on. emulated_layout names a registry
 ; layout: a choice, not a switch, so no toggle row lists it.
 _LAY_LayoutFeatureAltGrRows() {
-	static STANDALONE_IDS := Map("ergopti_base", true, ConfigLeaf.CTRL_MAGIC_SAVE, true,
-		ConfigLeaf.DIRECT_ACCESS_DIGITS, true, "emulated_layout", true, "ergopti_variant", true,
+	static STANDALONE_IDS := Map(ConfigLeaf.ERGOPTI_BASE, true, ConfigLeaf.CTRL_MAGIC_SAVE, true,
+		ConfigLeaf.DIRECT_ACCESS_DIGITS, true, ConfigLeaf.EMULATED_LAYOUT, true, ConfigLeaf.ERGOPTI_VARIANT, true,
 		ConfigLeaf.NUMBER_ROW_REORDER_EDGES, true, ConfigLeaf.EMULATE_NUMBER_ROW, true, ConfigLeaf.EMULATE_TOP_ROW, true,
 		ConfigLeaf.EMULATE_HOME_ROW, true, ConfigLeaf.EMULATE_BOTTOM_ROW, true)
 	Rows := []
@@ -101,7 +101,7 @@ _LAY_NumberRowRuntime() {
 		Caps := GetKeyState("CapsLock", "T")
 		Hkl := NumberRowForegroundLayout()
 		return Map("owner", IsSet(Features) ? Features : 0,
-			"source", IsSet(KLE_Model) && IsObject(KLE_Model) && KeylayoutEmulation_LayerIsActive("ergopti_base") ? KLE_Model : Hkl,
+			"source", IsSet(KLE_Model) && IsObject(KLE_Model) && KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) ? KLE_Model : Hkl,
 			"native_owner", IsSet(_LayoutPollRetry) ? _LayoutPollRetry : 0,
 			"generation", MagicEditorState()["configuration_generation"],
 			"lifecycle", IsSet(_TrayRootLifecycleEpoch) ? _TrayRootLifecycleEpoch : -1,
@@ -130,8 +130,8 @@ _LAY_NumberRowSnapshot() {
 		Document := TOML_ParseDocumentShared(Content)
 		Desired := MasterGateDesiredFeatures(Features)
 		for Path, Expected in Map(ConfigKey.LAYOUT_DIRECT_ACCESS_DIGITS, Snapshot["mode"],
-			ConfigKey.LAYOUT_EMULATED_LAYOUT, Desired["layout"].Get("emulated_layout", ""),
-			ConfigKey.LAYOUT_ERGOPTI_BASE, Desired["layout"].Get("ergopti_base", false),
+			ConfigKey.LAYOUT_EMULATED_LAYOUT, Desired["layout"].Get(ConfigLeaf.EMULATED_LAYOUT, ""),
+			ConfigKey.LAYOUT_ERGOPTI_BASE, Desired["layout"].Get(ConfigLeaf.ERGOPTI_BASE, false),
 			"category_enabled.layout", Snapshot["master"]) {
 			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
 			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Path)
@@ -200,8 +200,8 @@ _LAY_NumberRowWrite(Expected, Value, WriterFn, Path, Updates) {
 /** Supplies only shared choice DATA; each retained callback owns its source. */
 _LAY_NumberRowRows(WriterFn := 0, RefreshFn := 0, NotifyFn := 0) {
 	Expected := _LAY_NumberRowSnapshot()
-	Row := MenuRenderer_ChoiceRow("number_row_policy_rows", "number_row_mode",
-		Map("number_row_mode", _LAY_NumberRowChoose.Bind(Expected, WriterFn, RefreshFn, NotifyFn)),
+	Row := MenuRenderer_ChoiceRow("number_row_policy_rows", MenuCommand.NUMBER_ROW_MODE,
+		Map(MenuCommand.NUMBER_ROW_MODE, _LAY_NumberRowChoose.Bind(Expected, WriterFn, RefreshFn, NotifyFn)),
 		Map(ConfigKey.LAYOUT_DIRECT_ACCESS_DIGITS, (*) => Expected["mode"]))
 	if !(Row is Map) || !Row.Has("items") || !(Row["items"] is Array)
 		return []
@@ -260,7 +260,7 @@ _LAY_NumberRowRows(WriterFn := 0, RefreshFn := 0, NotifyFn := 0) {
 ; @param {Func} RefreshFn Rebuilds the menu; the tray rebuild when 0.
 ; @returns {Map|String} The row, or "" for a malformed declaration.
 _LAY_NumberRowEdgesRow(Declaration, Expected, RefreshFn := 0) {
-	if !(Declaration is Map) || Declaration.Get("type", "") != "check" || Declaration.Get("id", "") != "number_row_edges"
+	if !(Declaration is Map) || Declaration.Get("type", "") != "check" || Declaration.Get("id", "") != MenuCommand.NUMBER_ROW_EDGES
 			|| Declaration.Get("path", "") != ConfigKey.LAYOUT_NUMBER_ROW_REORDER_EDGES || Declaration.Get("i18n", "") == ""
 		return ""
 	State := NumberRowEdgesState(Expected.Get("hkl", NumberRowForegroundLayout()), Expected.Get("caps", false))

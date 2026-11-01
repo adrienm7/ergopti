@@ -178,7 +178,7 @@ _LLM_Tone_Dispatch(Generation, Plan, Focus) {
 	if !_LLM_Tone_OutputCurrent(Generation, Focus, AuxGeneration, PhysicalGeneration)
 		return false
 	ProfileId := Plan["profile_id"]
-	Profile := LLM_FindProfile(ProfileId, _LLM_Engine.Get("user_profiles", []))
+	Profile := LLM_FindProfile(ProfileId, _LLM_Engine.Get(ConfigLeaf.USER_PROFILES, []))
 	if !(Profile is Map) {
 		LoggerError("LLM", "Tone step dropped: the built-in prompt '{1}' is missing.", ProfileId)
 		return false

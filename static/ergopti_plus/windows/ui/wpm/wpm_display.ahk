@@ -97,7 +97,7 @@ class WPMWidgetConst {
     static STORE_X            := ""
     static STORE_Y            := ""
     ; Config key names written to config.toml under [metrics].
-    static CFG_VISIBLE        := "wpm_widget_visible"
+    static CFG_VISIBLE        := ConfigLeaf.WPM_WIDGET_VISIBLE
     static CFG_COLORS         := ConfigLeaf.WPM_WIDGET_COLORS
     static CFG_GRAPH          := ConfigLeaf.WPM_WIDGET_GRAPH
     ; Ring buffer capacity for recent keystrokes.
