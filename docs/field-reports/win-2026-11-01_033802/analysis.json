@@ -1,0 +1,52 @@
+{
+	"continuations": 0,
+	"counters": {},
+	"error_keys": [],
+	"errors": [],
+	"field_checks": {
+		"counts": {
+			"fail": 1,
+			"pass": 3,
+			"skip": 1
+		},
+		"items": [
+			{
+				"id": "autohotkey",
+				"source": "collector_checks",
+				"verdict": "pass"
+			},
+			{
+				"id": "driver_running",
+				"source": "collector_checks",
+				"verdict": "fail"
+			},
+			{
+				"id": "python",
+				"source": "collector_checks",
+				"verdict": "pass"
+			},
+			{
+				"id": "webview2",
+				"source": "collector_checks",
+				"verdict": "pass"
+			},
+			{
+				"id": "field_run",
+				"source": "field_run_checks",
+				"verdict": "skip"
+			}
+		]
+	},
+	"lifecycle": {},
+	"lines": 0,
+	"logs": [],
+	"performance": [],
+	"previous": null,
+	"records": 0,
+	"schema": 1,
+	"span": {
+		"first": null,
+		"last": null
+	},
+	"top_fixes": []
+}

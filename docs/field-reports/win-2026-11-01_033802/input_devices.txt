@@ -1,0 +1,6 @@
+
+FriendlyName             Status
+------------             ------
+Clavier standard PS/2    OK
+Périphérique clavier PIH OK
+
