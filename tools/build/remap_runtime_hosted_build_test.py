@@ -164,6 +164,12 @@ class PhaseDeadlineControls(unittest.TestCase):
         command = BUILD.build_command("/usr/bin/xcodebuild", self.owner)
         self.assertEqual(command[command.index("-jobs") + 1], "2")
 
+    def test_build_command_clears_the_default_runpath(self):
+        # Run 41268303524: every product carried @executable_path/../Frameworks,
+        # which the installer validator's load-path closure refuses.
+        command = BUILD.build_command("/usr/bin/xcodebuild", self.owner)
+        self.assertEqual(command.count("LD_RUNPATH_SEARCH_PATHS="), 1)
+
 
 class IdentityChangeReportControls(unittest.TestCase):
     """A currentness refusal names the changed retained file and its fields."""

@@ -944,6 +944,10 @@ def build_command(executable, project):
         "CODE_SIGNING_REQUIRED=NO",
         "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
         "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+        # The products embed no framework, and the installer's load-path
+        # closure admits no @executable_path rpath (run 41268303524), so
+        # Xcode's default ../Frameworks runpath is cleared.
+        "LD_RUNPATH_SEARCH_PATHS=",
     ]
 
 
