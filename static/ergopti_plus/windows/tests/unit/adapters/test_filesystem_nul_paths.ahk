@@ -97,7 +97,9 @@ _FSNUL_EveryEntryRefuses() {
 			["FSAtomicMoveReplace", FSAtomicMoveReplace.Bind(Source, Nul), false],
 			["FSAtomicMoveCreate", FSAtomicMoveCreate.Bind(Source, AbsentNul), 0],
 			["FSCopyCreateVerified", FSCopyCreateVerified.Bind(Nul, Root . "\created.txt"), false],
-			["FSCopyReplaceAtomic", FSCopyReplaceAtomic.Bind(Source, Nul), false],
+			["FSCopyReplaceAtomic source", FSCopyReplaceAtomic.Bind(Nul, Root, "created.txt"), false],
+			["FSCopyReplaceAtomic anchor", FSCopyReplaceAtomic.Bind(Source, RootNul, "created.txt"), false],
+			["FSCopyReplaceAtomic destination", FSCopyReplaceAtomic.Bind(Source, Root, "prefix.txt" . Chr(0) . ".suffix"), false],
 			["FSSameBytes", FSSameBytes.Bind(Nul, Root . "\prefix.txt"), false],
 			["FSReadStrict", FSReadStrict.Bind(Nul), "<thrown>"],
 			["FSReadBytesStrict", FSReadBytesStrict.Bind(Nul), "<thrown>"],
@@ -119,7 +121,7 @@ _FSNUL_EveryEntryRefuses() {
 			catch as Err
 				Failures.Push(Err.Message)
 		}
-		AssertEqual(34, Refused.Count, "every path-taking FileSystem adapter entry must be exercised")
+		AssertEqual(36, Refused.Count, "every path-taking FileSystem adapter entry must be exercised")
 		Report := ""
 		for Message in Failures
 			Report .= (Report == "" ? "" : " | ") . Message
