@@ -189,7 +189,6 @@ local DECLARATIONS = [[
 	void       gtk_window_set_title(GtkWidget *window, const char *title);
 	void       gtk_window_set_default_size(GtkWidget *window, int width, int height);
 	void       gtk_window_set_position(GtkWidget *window, int position);
-	void       gtk_window_set_keep_above(GtkWidget *window, gboolean setting);
 	void       gtk_container_add(GtkWidget *container, GtkWidget *widget);
 	void       gtk_container_set_border_width(GtkWidget *container, unsigned int width);
 	void       gtk_box_pack_start(GtkWidget *box, GtkWidget *child, gboolean expand, gboolean fill, unsigned int padding);
@@ -272,15 +271,15 @@ local function label(lib, given, stock)
 	return lib.ffi.string(lib.glib.g_dgettext("gtk30", stock))
 end
 
---- Sets the window title and centres it above other windows.
+--- Sets the window title and centres it.
 --- @param lib table
 --- @param window userdata
 --- @param request table
 local function frame(lib, window, request)
 	lib.gtk.gtk_window_set_title(window, request.options.title or "")
 	lib.gtk.gtk_window_set_position(window, GTK_WIN_POS_CENTER)
-	-- The tray opened it: it must not appear behind the window the user is in.
-	lib.gtk.gtk_window_set_keep_above(window, 1)
+	-- Focused when it opens (gtk_dialog_run presents it), never kept on top:
+	-- tools/test/test-ui-focus-fix.cjs holds every window to that rule.
 	if request.options.width or request.options.height then
 		lib.gtk.gtk_window_set_default_size(window, request.options.width or -1, request.options.height or -1)
 	end
