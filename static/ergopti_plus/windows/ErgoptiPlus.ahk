@@ -513,6 +513,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include adapters/program_providers.ahk
 #Include infra/program_actions.ahk
 #Include infra/user_actions.ahk
+#Include infra/sticky_modifiers.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
 ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
 #Include infra/locale.ahk
@@ -1468,7 +1469,7 @@ if _LLM_Menu_RuntimeActivated
 _MenuPopulationPublished.Start()
 _DriverBootPhase := "ready"
 SetTimer(ShellRunner_CheckWinPsAtStart, -1)
-SetTimer(HTTP_CheckCurlAtStart, -1)
+HTTP_ScheduleCurlCheck()
 HealthCheck_StartWindowControl()
 ; The local reload command is optional: a control that cannot start is
 ; reported and the ready driver keeps running without it.

@@ -147,6 +147,11 @@ HTTP_SystemCurlPath() {
 	return A_WinDir . "\System32\curl.exe"
 }
 
+; Schedules the start check below once the boot is ready.
+HTTP_ScheduleCurlCheck() {
+	SetTimer(HTTP_CheckCurlAtStart, -1)
+}
+
 ; Says at start, in words, that the local AI requests cannot run, instead of each
 ; request's bare refusal. The version comes from the file: starting the program
 ; would cost a process at every start of the driver. Scheduled after the boot is
