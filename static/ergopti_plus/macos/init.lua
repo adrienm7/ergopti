@@ -68,6 +68,10 @@ do
 	end
 end
 
+-- Before the first module load: every later `require`, lazy ones included, then
+-- skips Hammerspoon's wrapper, which costs 300 us per call on the main thread.
+local direct_require_installed = require("infra.direct_require").install(_G)
+
 
 
 
@@ -108,6 +112,9 @@ do
 	end
 end
 local Storage            = require("adapters.storage")
+if not direct_require_installed then
+	Logger.warn("init", "Hammerspoon exposes no rawrequire: each require keeps costing about 300 us on the main thread.")
+end
 
 -- Instance admission comes before every settings write, timer, watcher and
 -- path resolution: a process that may not run the driver must leave no trace
