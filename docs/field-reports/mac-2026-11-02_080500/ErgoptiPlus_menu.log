@@ -1,0 +1,231 @@
+2026-11-02 08:04:58:721 [DEBUG] [menu_watchers] File change detected (13 distinct in burst) — settle armed.
+2026-11-02 08:04:59:221 [DEBUG] [menu_watchers] Reload held (filesystem settling) on '~/perso/ergopti/static/ergopti_plus/macos/'.
+2026-11-02 08:05:01:742 [INFO] [menu_global_actions] Global external writer 'Watcher reload' deferred: a reload or quit is in progress.
+2026-11-02 08:05:01:743 [INFO] [menu_watchers] Menu reload request deferred: a reload or quit is in progress.
+2026-11-02 08:05:02:222 [DEBUG] [menu_llm.mlx] MLX shutdown: no server owned this session; listener proof skipped.
+2026-11-02 08:05:02:222 [INFO] [menu_llm.models] MLX server stopped safely.
+2026-11-02 08:05:02:222 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-11-02 08:05:02:265 [DEBUG] [menu_llm] Helper sweep 'expander' dispatched.
+2026-11-02 08:05:02:274 [DEBUG] [menu] Menubar watchers stopped.
+2026-11-02 08:05:02:274 [DEBUG] [menu_watchers] ↑ "Reload held (filesystem settling) on '%s'." repeated 2 more times between 2026-11-02 08:05:00:722 and 2026-11-02 08:05:01:223 (last: Reload held (filesystem settling) on '~/perso/ergopti/static/ergopti_plus/macos/'.).
+2026-11-02 08:05:02:274 [DEBUG] [menu_llm] ↑ "Invalidated LLM health status." repeated 1 more time between 2026-11-02 08:05:02:260 and 2026-11-02 08:05:02:260.
+2026-11-02 08:05:02:274 [DEBUG] [menu_llm] ↑ "Helper sweep '%s' dispatched." repeated 1 more time between 2026-11-02 08:05:02:269 and 2026-11-02 08:05:02:269 (last: Helper sweep 'http-server' dispatched.).
+2026-11-02 08:05:03:104 [DEBUG] [menu] Module "gestures menu" loaded successfully (ui.menu.menu_gestures).
+2026-11-02 08:05:03:117 [DEBUG] [menu] Module "shortcuts menu" loaded successfully (ui.menu.menu_shortcuts).
+2026-11-02 08:05:03:138 [DEBUG] [menu] Module "keyboard layout menu" loaded successfully (ui.menu.menu_keyboard_layout).
+2026-11-02 08:05:03:162 [DEBUG] [menu] Module "hotstrings menu" loaded successfully (ui.menu.menu_hotstrings).
+2026-11-02 08:05:03:300 [DEBUG] [menu] Module "AI menu" loaded successfully (ui.menu.menu_llm).
+2026-11-02 08:05:03:304 [DEBUG] [menu] Module "metrics menu" loaded successfully (ui.menu.menu_metrics).
+2026-11-02 08:05:03:308 [DEBUG] [menu] Module "tap-holds menu" loaded successfully (ui.menu.menu_tap_holds).
+2026-11-02 08:05:03:311 [DEBUG] [menu] Module "apps menu" loaded successfully (ui.menu.menu_apps).
+2026-11-02 08:05:03:330 [DEBUG] [menu] Module "about/update menu" loaded successfully (ui.menu.menu_about).
+2026-11-02 08:05:03:331 [DEBUG] [menu] Module "AI engine" loaded successfully (modules.llm).
+2026-11-02 08:05:03:331 [DEBUG] [menu] Module "metrics engine" loaded successfully (modules.keystats).
+2026-11-02 08:05:03:331 [DEBUG] [menu] Module "shortcuts engine" loaded successfully (modules.shortcuts).
+2026-11-02 08:05:03:331 [DEBUG] [menu] Module "dynamic hotstrings engine" loaded successfully (modules.dynamic_hotstrings).
+2026-11-02 08:05:03:332 [DEBUG] [menu] Module "CapsWord auto-off settings" loaded successfully (infra.capsword_auto_off).
+2026-11-02 08:05:03:878 [START] [menu_paths] Initializing paths editor…
+2026-11-02 08:05:03:878 [SUCCESS] [menu_paths] Paths editor initialized.
+2026-11-02 08:05:03:883 [INFO] [menu] Menubar created successfully.
+2026-11-02 08:05:03:883 [DEBUG] [menu] Module "gestures core" loaded successfully (modules.gestures).
+2026-11-02 08:05:03:927 [INFO] [menu_state] Keymap engine start: 0.2 ms.
+2026-11-02 08:05:03:951 [INFO] [menu_state] Hotstring group sync: 12 enable / 0 disable in 0.0 ms.
+2026-11-02 08:05:03:966 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-11-02 08:05:04:010 [DONE] [menu_llm.models] Loaded models catalogue (18 providers) from ~/perso/ergopti/static/ergopti_plus/_shared/modules/llm/models.json.
+2026-11-02 08:05:04:034 [DEBUG] [menu_llm] Resolving model name on startup: 'Qwen3.5-2B' -> 'Qwen3.5-2B-4bit'.
+2026-11-02 08:05:04:035 [DEBUG] [menu_llm] Model power on startup: 2.
+2026-11-02 08:05:04:041 [INFO] [menu] LLM handler created successfully.
+2026-11-02 08:05:04:058 [DEBUG] [menu] Pathwatcher boot suppression active for 5 s.
+2026-11-02 08:05:04:061 [DEBUG] [menu_watchers] Config pathwatcher started on '~/perso/ergopti/static/ergopti_plus/macos/'.
+2026-11-02 08:05:04:063 [DEBUG] [menu_watchers] Theme change watcher started.
+2026-11-02 08:05:04:679 [INFO] [menu_state] Keystats engine start (deferred): 87.8 ms.
+2026-11-02 08:05:27:228 [DEBUG] [menu] Module "gestures menu" loaded successfully (ui.menu.menu_gestures).
+2026-11-02 08:05:27:239 [DEBUG] [menu] Module "shortcuts menu" loaded successfully (ui.menu.menu_shortcuts).
+2026-11-02 08:05:27:255 [DEBUG] [menu] Module "keyboard layout menu" loaded successfully (ui.menu.menu_keyboard_layout).
+2026-11-02 08:05:27:276 [DEBUG] [menu] Module "hotstrings menu" loaded successfully (ui.menu.menu_hotstrings).
+2026-11-02 08:05:27:422 [DEBUG] [menu] Module "AI menu" loaded successfully (ui.menu.menu_llm).
+2026-11-02 08:05:27:426 [DEBUG] [menu] Module "metrics menu" loaded successfully (ui.menu.menu_metrics).
+2026-11-02 08:05:27:431 [DEBUG] [menu] Module "tap-holds menu" loaded successfully (ui.menu.menu_tap_holds).
+2026-11-02 08:05:27:434 [DEBUG] [menu] Module "apps menu" loaded successfully (ui.menu.menu_apps).
+2026-11-02 08:05:27:449 [DEBUG] [menu] Module "about/update menu" loaded successfully (ui.menu.menu_about).
+2026-11-02 08:05:27:449 [DEBUG] [menu] Module "AI engine" loaded successfully (modules.llm).
+2026-11-02 08:05:27:450 [DEBUG] [menu] Module "metrics engine" loaded successfully (modules.keystats).
+2026-11-02 08:05:27:450 [DEBUG] [menu] Module "shortcuts engine" loaded successfully (modules.shortcuts).
+2026-11-02 08:05:27:450 [DEBUG] [menu] Module "dynamic hotstrings engine" loaded successfully (modules.dynamic_hotstrings).
+2026-11-02 08:05:27:451 [DEBUG] [menu] Module "CapsWord auto-off settings" loaded successfully (infra.capsword_auto_off).
+2026-11-02 08:05:28:056 [START] [menu_paths] Initializing paths editor…
+2026-11-02 08:05:28:056 [SUCCESS] [menu_paths] Paths editor initialized.
+2026-11-02 08:05:28:063 [INFO] [menu] Menubar created successfully.
+2026-11-02 08:05:28:063 [DEBUG] [menu] Module "gestures core" loaded successfully (modules.gestures).
+2026-11-02 08:05:28:106 [INFO] [menu_state] Keymap engine start: 0.2 ms.
+2026-11-02 08:05:28:135 [INFO] [menu_state] Hotstring group sync: 12 enable / 0 disable in 0.0 ms.
+2026-11-02 08:05:28:147 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-11-02 08:05:28:190 [DONE] [menu_llm.models] Loaded models catalogue (18 providers) from ~/perso/ergopti/static/ergopti_plus/_shared/modules/llm/models.json.
+2026-11-02 08:05:28:212 [DEBUG] [menu_llm] Resolving model name on startup: 'Qwen3.5-2B' -> 'Qwen3.5-2B-4bit'.
+2026-11-02 08:05:28:212 [DEBUG] [menu_llm] Model power on startup: 2.
+2026-11-02 08:05:28:219 [INFO] [menu] LLM handler created successfully.
+2026-11-02 08:05:28:235 [DEBUG] [menu] Pathwatcher boot suppression active for 5 s.
+2026-11-02 08:05:28:237 [DEBUG] [menu_watchers] Config pathwatcher started on '~/perso/ergopti/static/ergopti_plus/macos/'.
+2026-11-02 08:05:28:241 [DEBUG] [menu_watchers] Theme change watcher started.
+2026-11-02 08:05:28:792 [INFO] [menu_state] Keystats engine start (deferred): 186.1 ms.
+2026-11-02 08:05:30:463 [TRACE] [menu_apps] Scanning bundled app directory…
+2026-11-02 08:05:30:525 [DONE] [menu_apps] Found 2 bundled app(s).
+2026-11-02 08:05:30:550 [DEBUG] [builder] Top level loaded from manifest (20 item(s)).
+2026-11-02 08:05:30:551 [DEBUG] [builder] Component 'tap_holds.build' added successfully.
+2026-11-02 08:05:31:557 [DEBUG] [builder] Component 'shortcuts.build' added successfully.
+2026-11-02 08:05:31:603 [DEBUG] [builder] Component 'gestures.build' added successfully.
+2026-11-02 08:05:31:666 [DEBUG] [builder] Component 'keyboard_layout.build' added successfully.
+2026-11-02 08:05:31:667 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-02 08:05:31:685 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-02 08:05:31:706 [DEBUG] [app_picker] Building application exclusion menu…
+2026-11-02 08:05:31:721 [INFO] [app_picker] Application exclusion menu built successfully (0 excluded app(s), 15.5 ms).
+2026-11-02 08:05:31:722 [DEBUG] [builder] Component 'keystats.build' added successfully.
+2026-11-02 08:05:31:722 [DEBUG] [builder] Building AI component…
+2026-11-02 08:05:31:722 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-11-02 08:05:31:722 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-11-02 08:05:31:735 [DEBUG] [menu_llm] Building prediction count menu…
+2026-11-02 08:05:31:753 [DEBUG] [builder] AI component added successfully.
+2026-11-02 08:05:31:753 [TRACE] [menu_apps] Building applications submenu…
+2026-11-02 08:05:31:753 [DONE] [menu_apps] Applications submenu built (2 item(s)).
+2026-11-02 08:05:31:753 [DEBUG] [builder] Component 'apps.build' added successfully.
+2026-11-02 08:05:31:820 [INFO] [menu] Menu tree rebuilt in 1247.4 ms (22 top-level item(s)). Slowest: shortcuts=1006.0 ms, keyboard_layout=63.5 ms, gestures=45.8 ms, llm=31.0 ms, metrics=29.2 ms.
+2026-11-02 08:05:31:820 [WARNING] [menu] Over budget: menu.rebuild took 1247 ms (budget 250 ms).
+2026-11-02 08:06:37:519 [DEBUG] [ui_builder] Forcing window focus and teleporting to active space…
+2026-11-02 08:06:37:534 [INFO] [ui_builder] Window presentation requested (attempt 1).
+2026-11-02 08:06:38:151 [DEBUG] [app_picker] ↑ "Building application exclusion menu…" repeated 1 more time between 2026-11-02 08:05:31:734 and 2026-11-02 08:05:31:734.
+2026-11-02 08:06:38:245 [INFO] [app_picker] ↑ "Application exclusion menu built successfully (%d excluded app(s), %.1f ms)." repeated 1 more time between 2026-11-02 08:05:31:735 and 2026-11-02 08:05:31:735 (last: Application exclusion menu built successfully (0 excluded app(s), 0.3 ms).).
+2026-11-02 08:06:45:652 [DEBUG] [builder] Component 'tap_holds.build' added successfully.
+2026-11-02 08:06:46:713 [DEBUG] [builder] Component 'shortcuts.build' added successfully.
+2026-11-02 08:06:46:762 [DEBUG] [builder] Component 'gestures.build' added successfully.
+2026-11-02 08:06:46:879 [DEBUG] [builder] Component 'keyboard_layout.build' added successfully.
+2026-11-02 08:06:46:880 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-02 08:06:46:900 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-02 08:06:46:913 [DEBUG] [app_picker] Building application exclusion menu…
+2026-11-02 08:06:46:914 [INFO] [app_picker] Application exclusion menu built successfully (0 excluded app(s), 1.2 ms).
+2026-11-02 08:06:46:914 [DEBUG] [builder] Component 'keystats.build' added successfully.
+2026-11-02 08:06:46:914 [DEBUG] [builder] Building AI component…
+2026-11-02 08:06:46:915 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-11-02 08:06:46:915 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-11-02 08:06:46:926 [DEBUG] [menu_llm] Building prediction count menu…
+2026-11-02 08:06:46:944 [DEBUG] [builder] AI component added successfully.
+2026-11-02 08:06:46:944 [TRACE] [menu_apps] Building applications submenu…
+2026-11-02 08:06:46:944 [DONE] [menu_apps] Applications submenu built (2 item(s)).
+2026-11-02 08:06:46:944 [DEBUG] [builder] Component 'apps.build' added successfully.
+2026-11-02 08:06:46:991 [INFO] [menu] Menu tree rebuilt in 1313.7 ms (22 top-level item(s)). Slowest: shortcuts=1060.6 ms, keyboard_layout=117.2 ms, gestures=49.5 ms, llm=29.3 ms, hotstrings=27.9 ms.
+2026-11-02 08:06:46:992 [WARNING] [menu] Over budget: menu.rebuild took 1314 ms (budget 250 ms).
+2026-11-02 08:06:47:246 [INFO] [menu_llm.runtime_offer] Installing Ergopti's own Ollama 0.40.4: the install button was the user's choice.
+2026-11-02 08:06:47:423 [START] [download_window] Showing progress UI (kind=ollama_install, mode=bootstrap).
+2026-11-02 08:06:47:427 [DEBUG] [ui_builder] Geometry for 'download_window': 460x380.
+2026-11-02 08:06:47:427 [DEBUG] [ui_builder] Creating webview window 'Installation du moteur IA (Ollama)'…
+2026-11-02 08:06:47:432 [DEBUG] [ui_builder] Building injected HTML assets…
+2026-11-02 08:06:47:454 [INFO] [ui_builder] Injected HTML assets built and memoised (377669 bytes).
+2026-11-02 08:06:47:476 [INFO] [ui_builder] Webview 'Installation du moteur IA (Ollama)' opened in 49 ms.
+2026-11-02 08:06:47:477 [SUCCESS] [download_window] Progress UI shown (title="Installation du moteur IA (Ollama)", reusing=false).
+2026-11-02 08:06:47:555 [DEBUG] [download_window] Discarding unowned operation bridge callback (session=1).
+2026-11-02 08:06:47:583 [DEBUG] [download_window] Window ready; flushing 4 commands (session=1).
+2026-11-02 08:06:47:583 [INFO] [ui_builder] Webview 'Installation du moteur IA (Ollama)' page loaded in 155 ms.
+2026-11-02 08:07:00:311 [DEBUG] [download_window] Step: Somme de contrôle vérifiée. Installation d’Ollama…
+2026-11-02 08:07:07:939 [START] [download_window] Showing progress UI (kind=ollama_model, mode=download).
+2026-11-02 08:07:07:939 [SUCCESS] [download_window] Progress UI shown (title="Téléchargement du modèle Ollama", reusing=true).
+2026-11-02 08:09:29:740 [ERROR] [menu_llm.ollama] The Ollama pull of granite4:350m-h failed (code 1): OLLAMA_PULL_ERROR digest_mismatch after verifying_digest.
+2026-11-02 08:09:29:740 [WARNING] [menu_llm.ollama] The Ollama pull of granite4:350m-h failed its digest check; Ollama removed the layer, so it is pulled once more.
+2026-11-02 08:09:29:792 [START] [download_window] Showing progress UI (kind=ollama_model, mode=download).
+2026-11-02 08:09:29:792 [SUCCESS] [download_window] Progress UI shown (title="Téléchargement du modèle Ollama", reusing=true).
+2026-11-02 08:10:28:261 [INFO] [phase_stats] Phase summary [menu] over 300 s: rebuild n=2 mean=1280.55 max=1313.67 total=2561.1 ms.
+2026-11-02 08:10:28:262 [INFO] [phase_stats] Phase summary [menu_item] over 300 s: shortcuts n=2 mean=1033.32 max=1060.61 total=2066.6 ms | keyboard_layout n=2 mean=90.32 max=117.19 total=180.6 ms | gestures n=2 mean=47.70 max=49.55 total=95.4 ms | llm n=2 mean=30.17 max=31.01 total=60.3 ms | hotstrings n=2 mean=26.87 max=27.93 total=53.7 ms | metrics n=2 mean=17.93 max=29.18 total=35.9 ms | about n=2 mean=12.10 max=18.64 total=24.2 ms | debug n=2 mean=6.03 max=8.91 total=12.1 ms | configuration n=2 mean=2.60 max=3.30 total=5.2 ms | tap_holds n=2 mean=1.14 max=1.17 total=2.3 ms | apps n=2 mean=0.15 max=0.15 total=0.3 ms | language n=2 mean=0.04 max=0.04 total=0.1 ms | reload n=2 mean=0.01 max=0.01 total=0.0 ms | quit n=2 mean=0.01 max=0.01 total=0.0 ms.
+2026-11-02 08:10:28:263 [INFO] [phase_stats] Phase summary [menu_keyboard_layout] over 300 s: rows n=2 mean=59.88 max=61.92 total=119.8 ms | magic_key n=2 mean=35.36 max=37.81 total=70.7 ms | sources n=2 mean=29.20 max=57.94 total=58.4 ms | number_row n=2 mean=9.63 max=10.66 total=19.3 ms | bundles n=2 mean=0.78 max=0.92 total=1.6 ms | variants n=2 mean=0.19 max=0.21 total=0.4 ms.
+2026-11-02 08:11:48:435 [DEBUG] [menu_llm.mlx] Scanning MLX installed models cache…
+2026-11-02 08:11:48:438 [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-2B
+2026-11-02 08:11:48:441 [DEBUG] [menu_llm.mlx] MLX installed models scan complete: 2 model(s).
+2026-11-02 08:11:48:502 [START] [download_window] Showing progress UI (kind=mlx_model, mode=download).
+2026-11-02 08:11:48:502 [SUCCESS] [download_window] Progress UI shown (title="Téléchargement du modèle MLX", reusing=true).
+2026-11-02 08:11:52:724 [INFO] [menu_llm.mlx] Ensuring MLX server for model Qwen3.5-2B…
+2026-11-02 08:11:52:818 [INFO] [menu_llm.mlx] Starting MLX server process for model Qwen3.5-2B — output prefixed [MLX-SERVER] in ~/perso/ergopti/ergopti_plus/ErgoptiPlus_2026-11-02.log
+2026-11-02 08:11:52:823 [DEBUG] [menu_llm.mlx] MLX server bash_cmd: export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; export HF_HUB_DISABLE_XET=1; export HF_HUB_OFFLINE=1; export TRANSFORMERS_OFFLINE=1; export PYTHONUNBUFFERED=1; PYTHON_BIN="~/Library/Application Support/Ergopti/mlx-venv/bin/python"; if [ ! -x "$PYTHON_BIN" ]; then echo "[MLX] ❌ venv introuvable : $PYTHON_BIN"; exit 1; fi; echo "[MLX] Python utilisé: $PYTHON_BIN"; MLX_PID_FILE=/tmp/mlx_server.pid; MLX_PGID_FILE=/tmp/mlx_server.pgid; if [ -f "$MLX_PGID_FILE" ]; then OLD_PGID=$(cat "$MLX_PGID_FILE" 2>/dev/null | tr -d '[:space:]'); echo "[MLX] Skipping PGID-kill of $OLD_PGID — PID-based kill is safer on macOS."; rm -f "$MLX_PGID_FILE"; fi; if [ -f "$MLX_PID_FILE" ]; then OLD_PID=$(cat "$MLX_PID_FILE" 2>/dev/null | tr -d '[:space:]'); if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then OLD_COMM=$(ps -o ucomm= -p "$OLD_PID" 2>/dev/null | tr -d '[:space:]'); OLD_ARGS=$(ps -o args= -p "$OLD_PID" 2>/dev/null); if echo "$OLD_COMM" | grep -qi python && echo "$OLD_ARGS" | grep -q mlx_lm; then echo "[MLX] Killing previous server PID $OLD_PID (verified python+mlx_lm)…"; kill -9 "$OLD_PID" 2>/dev/null || true; else echo "[MLX] ⚠️  PID $OLD_PID is alive but not a python+mlx_lm process (comm='$OLD_COMM') — refusing to kill (PID was recycled, likely Hammerspoon)."; fi; else echo "[MLX] PID file stale (PID $OLD_PID not running)."; fi; rm -f "$MLX_PID_FILE"; fi; PGREP_PIDS=$(ps -axo pid=,ucomm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}' || true); if [ -n "$PGREP_PIDS" ]; then echo "[MLX] mlx_lm process(es) still alive (PIDs: $PGREP_PIDS) — killing…"; echo "$PGREP_PIDS" | xargs kill -9 2>/dev/null || true; sleep 1; fi; sleep 3; LSOF_ATTEMPTS=0; while true; do STALE_PIDS=$(lsof -ti TCP:3460 2>/dev/null || true); if [ -z "$STALE_PIDS" ]; then echo "[MLX] Port 3460 free — starting server."; break; fi; LSOF_ATTEMPTS=$((LSOF_ATTEMPTS + 1)); echo "[MLX] Port 3460 still occupied attempt $LSOF_ATTEMPTS (PIDs: $STALE_PIDS) — killing…"; echo "$STALE_PIDS" | xargs kill -9 2>/dev/null || true; if [ "$LSOF_ATTEMPTS" -ge 10 ]; then echo "[MLX] ❌ Port 3460 still occupied after 10 attempts — giving up."; exit 1; fi; sleep 0.5; done; MLX_FIFO=$(mktemp -u /tmp/mlx_out.XXXXXX); mkfifo "$MLX_FIFO"; MLX_PID=''; MLX_PGID=''; MLX_STOP_PENDING=0; MLX_CLEANED=0; OWN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d '[:space:]'); PARENT_PGID=$(ps -o pgid= -p $PPID 2>/dev/null | tr -d '[:space:]'); cleanup_mlx_child() { if [ "$MLX_CLEANED" -eq 1 ]; then return 0; fi; MLX_CLEANED=1; trap '' TERM INT HUP; if [ -n "$MLX_PID" ] && kill -0 "$MLX_PID" 2>/dev/null; then KILL_TARGET="$MLX_PID"; if [ -n "$MLX_PGID" ] && [ "$MLX_PGID" != "$OWN_PGID" ] && [ "$MLX_PGID" != "$PARENT_PGID" ]; then KILL_TARGET="-$MLX_PGID"; fi; kill -TERM -- "$KILL_TARGET" 2>/dev/null || true; STOP_ATTEMPTS=0; while kill -0 -- "$KILL_TARGET" 2>/dev/null && [ "$STOP_ATTEMPTS" -lt 20 ]; do STOP_ATTEMPTS=$((STOP_ATTEMPTS + 1)); sleep 0.1; done; if kill -0 -- "$KILL_TARGET" 2>/dev/null; then kill -KILL -- "$KILL_TARGET" 2>/dev/null || true; fi; wait "$MLX_PID" 2>/dev/null || true; fi; rm -f "$MLX_FIFO"; }; trap 'MLX_STOP_PENDING=1' TERM INT HUP; set -m; REPO_ID="mlx-community/Qwen3.5-2B-4bit"; CACHE_NAME="models--$(echo "$REPO_ID" | sed 's|/|--|g')"; CACHE_ROOT="$HOME/.cache/huggingface/hub/$CACHE_NAME"; SNAPSHOT_DIR=$(ls -dt "$CACHE_ROOT/snapshots/"*/ 2>/dev/null | head -1); if [ -n "$SNAPSHOT_DIR" ] && [ -d "$SNAPSHOT_DIR" ]; then MODEL_ARG="${SNAPSHOT_DIR%/}"; echo "[MLX] Using local snapshot path: $MODEL_ARG"; printf '%s\n' "$MODEL_ARG" > '<config>/hammerspoon/mlx_active_model.txt'; REVISION=$(basename "$MODEL_ARG"); mkdir -p "$CACHE_ROOT/refs"; if [ ! -f "$CACHE_ROOT/refs/main" ]; then echo "$REVISION" > "$CACHE_ROOT/refs/main"; echo "[MLX] Wrote refs/main = $REVISION (was missing — required by HF offline mode)."; fi; else MODEL_ARG="$REPO_ID"; echo "[MLX] No local snapshot found for $REPO_ID — falling back to repo id."; printf '%s\n' "$REPO_ID" > '<config>/hammerspoon/mlx_active_model.txt'; fi; "$PYTHON_BIN" -m mlx_lm server --model "$MODEL_ARG" --port 3460 --decode-concurrency 1 --prompt-concurrency 1 > "$MLX_FIFO" 2>&1 & MLX_PID=$!; trap 'cleanup_mlx_child' EXIT; trap 'cleanup_mlx_child; exit 15' TERM INT HUP; if [ "$MLX_STOP_PENDING" -eq 1 ]; then cleanup_mlx_child; exit 15; fi; set +m; MLX_PGID=$(ps -o pgid= -p $MLX_PID 2>/dev/null | tr -d ' ' || echo ''); echo "[MLX] Server started with PID $MLX_PID PGID $MLX_PGID."; echo "$MLX_PID" > "$MLX_PID_FILE"; if [ -n "$MLX_PGID" ] && [ "$MLX_PGID" != "$OWN_PGID" ] && [ "$MLX_PGID" != "$PARENT_PGID" ]; then echo "$MLX_PGID" > "$MLX_PGID_FILE"; echo "[MLX] Persisted PGID $MLX_PGID (isolated from Hammerspoon group $PARENT_PGID)."; else echo "[MLX] ⚠️  set -m did not isolate python (MLX_PGID=$MLX_PGID, own=$OWN_PGID, parent=$PARENT_PGID) — NOT persisting PGID. Will rely on PID-only kill on next switch."; rm -f "$MLX_PGID_FILE"; fi; while IFS= read -r LINE; do OUT="$(date +%H:%M:%S) [MLX-SERVER] $LINE"; printf '%s\n' "$OUT"; printf '%s\n' "$OUT" >> ~/perso/ergopti/ergopti_plus/ErgoptiPlus_2026-11-02.log; done < "$MLX_FIFO"; wait "$MLX_PID"; MLX_STATUS=$?; rm -f "$MLX_FIFO"; exit "$MLX_STATUS"
+2026-11-02 08:11:52:825 [INFO] [menu_llm.mlx] MLX server task started for model ‘Qwen3.5-2B’.
+2026-11-02 08:11:52:854 [DEBUG] [menu_llm.mlx] MLX server stream chunk (94 bytes).
+2026-11-02 08:11:52:854 [DEBUG] [menu_llm.mlx] MLX server: [MLX] Python utilisé: ~/Library/Application Support/Ergopti/mlx-venv/bin/python
+2026-11-02 08:11:56:724 [INFO] [ui_builder] Webview 'Installation du moteur IA (Ollama)' closed after 309.3 s open.
+2026-11-02 08:11:57:895 [DEBUG] [menu_llm.mlx] MLX server stop signal accepted; awaiting exact task completion.
+2026-11-02 08:11:57:902 [INFO] [menu_llm.mlx] MLX server process exited with code 15.
+2026-11-02 08:11:57:905 [DEBUG] [menu_llm.mlx] MLX listener shutdown kill dispatched on port 3460.
+2026-11-02 08:11:57:905 [INFO] [menu_llm.models] MLX server stopped safely.
+2026-11-02 08:11:57:905 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-11-02 08:12:02:394 [DEBUG] [app_picker] ↑ "Building application exclusion menu…" repeated 1 more time between 2026-11-02 08:06:46:926 and 2026-11-02 08:06:46:926.
+2026-11-02 08:12:03:708 [INFO] [app_picker] ↑ "Application exclusion menu built successfully (%d excluded app(s), %.1f ms)." repeated 1 more time between 2026-11-02 08:06:46:926 and 2026-11-02 08:06:46:926 (last: Application exclusion menu built successfully (0 excluded app(s), 0.2 ms).).
+2026-11-02 08:12:06:218 [DEBUG] [menu_llm.mlx] MLX shutdown: no server owned this session; listener proof skipped.
+2026-11-02 08:12:06:289 [DEBUG] [download_window] ↑ "Step: %s" repeated 2 more times between 2026-11-02 08:07:00:340 and 2026-11-02 08:07:06:888 (last: Step: Serveur Ollama prêt.).
+2026-11-02 08:12:06:299 [DEBUG] [ui_builder] ↑ "Building injected HTML assets…" repeated 1 more time between 2026-11-02 08:09:30:017 and 2026-11-02 08:09:30:017.
+2026-11-02 08:12:06:302 [INFO] [ui_builder] ↑ "Injected HTML assets built and memoised (%d bytes)." repeated 1 more time between 2026-11-02 08:09:30:036 and 2026-11-02 08:09:30:036 (last: Injected HTML assets built and memoised (360163 bytes).).
+2026-11-02 08:12:06:303 [DEBUG] [ui_builder] ↑ "Geometry for '%s': %dx%d." repeated 1 more time between 2026-11-02 08:09:30:036 and 2026-11-02 08:09:30:036 (last: Geometry for 'error_dialog': 560x460.).
+2026-11-02 08:12:06:304 [DEBUG] [ui_builder] ↑ "Forcing window focus and teleporting to active space…" repeated 3 more times between 2026-11-02 08:06:43:521 and 2026-11-02 08:09:30:044.
+2026-11-02 08:12:06:304 [INFO] [ui_builder] ↑ "Window presentation requested (attempt %d)." repeated 3 more times between 2026-11-02 08:06:43:536 and 2026-11-02 08:09:30:057 (last: Window presentation requested (attempt 1).).
+2026-11-02 08:12:06:309 [DEBUG] [menu_llm] Helper sweep 'expander' dispatched.
+2026-11-02 08:12:06:318 [ERROR] [menu_llm.ollama] ↑ "The Ollama pull of granite4:350m-h failed (code 1): OLLAMA_PULL_ERROR digest_mismatch after verifying_digest." repeated 1 more time between 2026-11-02 08:11:48:416 and 2026-11-02 08:11:48:416.
+2026-11-02 08:12:06:319 [DEBUG] [menu] Menubar watchers stopped.
+2026-11-02 08:12:06:320 [DEBUG] [menu_llm.mlx] ↑ "Scanning MLX installed models cache…" repeated 1 more time between 2026-11-02 08:11:57:947 and 2026-11-02 08:11:57:947.
+2026-11-02 08:12:06:320 [DEBUG] [menu_llm.mlx] ↑ "MLX model detected in cache: %s" repeated 3 more times between 2026-11-02 08:11:48:439 and 2026-11-02 08:11:57:947 (last: MLX model detected in cache: Qwen3.5-4B).
+2026-11-02 08:12:06:320 [DEBUG] [menu_llm.mlx] ↑ "MLX installed models scan complete: %d model(s)." repeated 1 more time between 2026-11-02 08:11:57:948 and 2026-11-02 08:11:57:948 (last: MLX installed models scan complete: 2 model(s).).
+2026-11-02 08:12:06:320 [DEBUG] [menu_llm.mlx] ↑ "MLX server stream chunk (%d bytes)." repeated 9 more times between 2026-11-02 08:11:52:881 and 2026-11-02 08:11:57:895 (last: MLX server stream chunk (99 bytes).).
+2026-11-02 08:12:06:320 [DEBUG] [menu_llm.mlx] ↑ "MLX server: %s" repeated 9 more times between 2026-11-02 08:11:52:881 and 2026-11-02 08:11:57:895 (last: MLX server: 08:11:57 [MLX-SERVER] 2026-11-02 08:11:57,889 - INFO - Starting httpd at 127.0.0.1 on port 3460...).
+2026-11-02 08:12:06:320 [INFO] [menu_llm.models] ↑ "MLX server stopped safely." repeated 1 more time between 2026-11-02 08:12:06:218 and 2026-11-02 08:12:06:218.
+2026-11-02 08:12:06:320 [DEBUG] [menu_llm] ↑ "Invalidated LLM health status." repeated 2 more times between 2026-11-02 08:12:06:218 and 2026-11-02 08:12:06:305.
+2026-11-02 08:12:06:320 [DEBUG] [menu_llm] ↑ "Helper sweep '%s' dispatched." repeated 1 more time between 2026-11-02 08:12:06:313 and 2026-11-02 08:12:06:313 (last: Helper sweep 'http-server' dispatched.).
+2026-11-02 08:12:07:154 [DEBUG] [menu] Module "gestures menu" loaded successfully (ui.menu.menu_gestures).
+2026-11-02 08:12:07:164 [DEBUG] [menu] Module "shortcuts menu" loaded successfully (ui.menu.menu_shortcuts).
+2026-11-02 08:12:07:190 [DEBUG] [menu] Module "keyboard layout menu" loaded successfully (ui.menu.menu_keyboard_layout).
+2026-11-02 08:12:07:220 [DEBUG] [menu] Module "hotstrings menu" loaded successfully (ui.menu.menu_hotstrings).
+2026-11-02 08:12:07:537 [DEBUG] [menu] Module "AI menu" loaded successfully (ui.menu.menu_llm).
+2026-11-02 08:12:07:542 [DEBUG] [menu] Module "metrics menu" loaded successfully (ui.menu.menu_metrics).
+2026-11-02 08:12:07:596 [DEBUG] [menu] Module "tap-holds menu" loaded successfully (ui.menu.menu_tap_holds).
+2026-11-02 08:12:07:601 [DEBUG] [menu] Module "apps menu" loaded successfully (ui.menu.menu_apps).
+2026-11-02 08:12:07:626 [DEBUG] [menu] Module "about/update menu" loaded successfully (ui.menu.menu_about).
+2026-11-02 08:12:07:626 [DEBUG] [menu] Module "AI engine" loaded successfully (modules.llm).
+2026-11-02 08:12:07:626 [DEBUG] [menu] Module "metrics engine" loaded successfully (modules.keystats).
+2026-11-02 08:12:07:627 [DEBUG] [menu] Module "shortcuts engine" loaded successfully (modules.shortcuts).
+2026-11-02 08:12:07:627 [DEBUG] [menu] Module "dynamic hotstrings engine" loaded successfully (modules.dynamic_hotstrings).
+2026-11-02 08:12:07:627 [DEBUG] [menu] Module "CapsWord auto-off settings" loaded successfully (infra.capsword_auto_off).
+2026-11-02 08:12:08:298 [START] [menu_paths] Initializing paths editor…
+2026-11-02 08:12:08:298 [SUCCESS] [menu_paths] Paths editor initialized.
+2026-11-02 08:12:08:303 [INFO] [menu] Menubar created successfully.
+2026-11-02 08:12:08:303 [DEBUG] [menu] Module "gestures core" loaded successfully (modules.gestures).
+2026-11-02 08:12:08:349 [INFO] [menu_state] Keymap engine start: 3.5 ms.
+2026-11-02 08:12:08:376 [INFO] [menu_state] Hotstring group sync: 12 enable / 0 disable in 0.0 ms.
+2026-11-02 08:12:08:396 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-11-02 08:12:08:440 [DONE] [menu_llm.models] Loaded models catalogue (18 providers) from ~/perso/ergopti/static/ergopti_plus/_shared/modules/llm/models.json.
+2026-11-02 08:12:08:464 [DEBUG] [menu_llm] Resolving model name on startup: 'Qwen3.5-2B' -> 'Qwen3.5-2B-4bit'.
+2026-11-02 08:12:08:464 [DEBUG] [menu_llm] Model power on startup: 2.
+2026-11-02 08:12:08:471 [INFO] [menu] LLM handler created successfully.
+2026-11-02 08:12:08:488 [DEBUG] [menu] Pathwatcher boot suppression active for 5 s.
+2026-11-02 08:12:08:489 [DEBUG] [menu_watchers] Config pathwatcher started on '~/perso/ergopti/static/ergopti_plus/macos/'.
+2026-11-02 08:12:08:491 [DEBUG] [menu_watchers] Theme change watcher started.
+2026-11-02 08:12:09:221 [INFO] [menu_state] Keystats engine start (deferred): 96.6 ms.
+2026-11-02 08:12:10:601 [TRACE] [menu_apps] Scanning bundled app directory…
+2026-11-02 08:12:10:648 [DONE] [menu_apps] Found 2 bundled app(s).
+2026-11-02 08:12:10:665 [DEBUG] [builder] Top level loaded from manifest (20 item(s)).
+2026-11-02 08:12:10:666 [DEBUG] [builder] Component 'tap_holds.build' added successfully.
+2026-11-02 08:12:11:645 [DEBUG] [builder] Component 'shortcuts.build' added successfully.
+2026-11-02 08:12:11:697 [DEBUG] [builder] Component 'gestures.build' added successfully.
+2026-11-02 08:12:11:753 [DEBUG] [builder] Component 'keyboard_layout.build' added successfully.
+2026-11-02 08:12:11:754 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-02 08:12:11:772 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-02 08:12:11:794 [DEBUG] [app_picker] Building application exclusion menu…
+2026-11-02 08:12:11:794 [INFO] [app_picker] Application exclusion menu built successfully (0 excluded app(s), 0.2 ms).
+2026-11-02 08:12:11:794 [DEBUG] [builder] Component 'keystats.build' added successfully.
+2026-11-02 08:12:11:794 [DEBUG] [builder] Building AI component…
+2026-11-02 08:12:11:794 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-11-02 08:12:11:794 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-11-02 08:12:11:805 [DEBUG] [menu_llm] Building prediction count menu…
+2026-11-02 08:12:11:821 [DEBUG] [builder] AI component added successfully.
+2026-11-02 08:12:11:821 [TRACE] [menu_apps] Building applications submenu…
+2026-11-02 08:12:11:821 [DONE] [menu_apps] Applications submenu built (2 item(s)).
+2026-11-02 08:12:11:822 [DEBUG] [builder] Component 'apps.build' added successfully.
+2026-11-02 08:12:11:885 [INFO] [menu] Menu tree rebuilt in 1197.7 ms (22 top-level item(s)). Slowest: shortcuts=978.8 ms, keyboard_layout=56.5 ms, gestures=51.5 ms, llm=26.9 ms, hotstrings=25.3 ms.
+2026-11-02 08:12:11:886 [WARNING] [menu] Over budget: menu.rebuild took 1198 ms (budget 250 ms).
+2026-11-02 08:15:35:224 [DEBUG] [menu] Menu refresh requested by menu/menu_tap_keys.lua:144.
+2026-11-02 08:15:36:667 [TRACE] [menu_apps] Building applications submenu…
+2026-11-02 08:15:36:667 [DONE] [menu_apps] Applications submenu built (2 item(s)).
+2026-11-02 08:15:36:713 [WARNING] [menu] Over budget: menu.rebuild took 1453 ms (budget 250 ms).
+2026-11-02 08:15:38:064 [TRACE] [menu_apps] Building applications submenu…
+2026-11-02 08:15:38:064 [DONE] [menu_apps] Applications submenu built (2 item(s)).
+2026-11-02 08:15:38:109 [WARNING] [menu] Over budget: menu.rebuild took 1302 ms (budget 250 ms).

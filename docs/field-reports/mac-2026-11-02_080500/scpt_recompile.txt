@@ -1,0 +1,2 @@
+scpt_failed:static/ergopti_plus/macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt:roundtrip_mismatch
+scpt_recompiled:0

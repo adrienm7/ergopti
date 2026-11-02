@@ -1,0 +1,36 @@
+2026-11-02 00:11:36:461 [WARNING] [keystats.log_manager] day_rollover: ingest stalled at offset 4907 — preserving today.log.
+2026-11-02 00:11:36:461 [WARNING] [keystats.log_manager] day_rollover: today.log not fully drained — file preserved, rotation skipped.
+2026-11-02 00:11:36:461 [WARNING] [keystats.watchers] Midnight rotation stalled — will retry on next maintenance tick.
+2026-11-02 00:27:47:981 [WARNING] [keystats.log_manager] ↑ "day_rollover: ingest stalled at offset 4907 — preserving today.log." repeated 9 more times between 2026-11-02 00:11:41:309 and 2026-11-02 00:12:21:209.
+2026-11-02 00:27:47:981 [WARNING] [keystats.log_manager] ↑ "day_rollover: today.log not fully drained — file preserved, rotation skipped." repeated 9 more times between 2026-11-02 00:11:41:309 and 2026-11-02 00:12:21:209.
+2026-11-02 00:27:47:981 [WARNING] [keystats.watchers] ↑ "Midnight rotation stalled — will retry on next maintenance tick." repeated 9 more times between 2026-11-02 00:11:41:309 and 2026-11-02 00:12:21:209.
+2026-11-02 00:27:51:134 [WARNING] [keystats.log_manager] day_rollover: ingest stalled at offset 4907 — preserving today.log.
+2026-11-02 00:27:51:134 [WARNING] [keystats.log_manager] day_rollover: today.log not fully drained — file preserved, rotation skipped.
+2026-11-02 00:27:51:134 [WARNING] [keystats.watchers] Midnight rotation stalled — will retry on next maintenance tick.
+2026-11-02 00:43:59:859 [WARNING] [keystats.log_manager] ↑ "day_rollover: ingest stalled at offset 4907 — preserving today.log." repeated 8 more times between 2026-11-02 00:27:56:180 and 2026-11-02 00:28:31:130.
+2026-11-02 00:43:59:859 [WARNING] [keystats.log_manager] ↑ "day_rollover: today.log not fully drained — file preserved, rotation skipped." repeated 8 more times between 2026-11-02 00:27:56:180 and 2026-11-02 00:28:31:130.
+2026-11-02 00:43:59:859 [WARNING] [keystats.watchers] ↑ "Midnight rotation stalled — will retry on next maintenance tick." repeated 8 more times between 2026-11-02 00:27:56:180 and 2026-11-02 00:28:31:130.
+2026-11-02 00:44:01:081 [WARNING] [keystats.log_manager] day_rollover: ingest stalled at offset 4907 — preserving today.log.
+2026-11-02 00:44:01:081 [WARNING] [keystats.log_manager] day_rollover: today.log not fully drained — file preserved, rotation skipped.
+2026-11-02 00:44:01:081 [WARNING] [keystats.watchers] Midnight rotation stalled — will retry on next maintenance tick.
+2026-11-02 01:00:12:507 [WARNING] [keystats.log_manager] ↑ "day_rollover: ingest stalled at offset 4907 — preserving today.log." repeated 4 more times between 2026-11-02 00:44:06:087 and 2026-11-02 00:44:21:076.
+2026-11-02 01:00:12:507 [WARNING] [keystats.log_manager] ↑ "day_rollover: today.log not fully drained — file preserved, rotation skipped." repeated 4 more times between 2026-11-02 00:44:06:087 and 2026-11-02 00:44:21:076.
+2026-11-02 01:00:12:507 [WARNING] [keystats.watchers] ↑ "Midnight rotation stalled — will retry on next maintenance tick." repeated 4 more times between 2026-11-02 00:44:06:087 and 2026-11-02 00:44:21:076.
+2026-11-02 08:04:47:494 [WARNING] [runtime] An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:364) held the main thread for 1382 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 48->48 MB.
+2026-11-02 08:05:31:820 [WARNING] [menu] Over budget: menu.rebuild took 1247 ms (budget 250 ms).
+2026-11-02 08:05:31:827 [WARNING] [runtime] An hs.timer.new callback (...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:1801) held the main thread for 1540 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: menu.rebuild=1247.4 ms, menu_item.shortcuts=1006.0 ms, menu_item.keyboard_layout=63.5 ms, menu_keyboard_layout.rows=61.9 ms, shell.find=49.0 ms. Lua heap 30->43 MB.
+2026-11-02 08:05:32:126 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-11-02 08:06:44:245 [WARNING] [HotPath] Slow preview.rebuild: 6.29 ms own, 6.29 ms total, parent keydown (0 similar since the last line).
+2026-11-02 08:06:46:992 [WARNING] [menu] Over budget: menu.rebuild took 1314 ms (budget 250 ms).
+2026-11-02 08:06:46:996 [WARNING] [runtime] An hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/field_run.lua:610) held the main thread for 1357 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: menu.rebuild=1313.7 ms, menu_item.shortcuts=1060.6 ms, menu_item.keyboard_layout=117.2 ms, menu_keyboard_layout.sources=57.9 ms, menu_keyboard_layout.rows=57.8 ms. Lua heap 40->58 MB.
+2026-11-02 08:09:29:740 [ERROR] [menu_llm.ollama] The Ollama pull of granite4:350m-h failed (code 1): OLLAMA_PULL_ERROR digest_mismatch after verifying_digest.
+2026-11-02 08:09:29:740 [WARNING] [menu_llm.ollama] The Ollama pull of granite4:350m-h failed its digest check; Ollama removed the layer, so it is pulled once more.
+2026-11-02 08:12:06:289 [WARNING] [managed_ollama_daemon] Managed Ollama daemon exited (status=78): Managed Ollama daemon admission refused: cancelled.
+2026-11-02 08:12:06:318 [ERROR] [menu_llm.ollama] ↑ "The Ollama pull of granite4:350m-h failed (code 1): OLLAMA_PULL_ERROR digest_mismatch after verifying_digest." repeated 1 more time between 2026-11-02 08:11:48:416 and 2026-11-02 08:11:48:416.
+2026-11-02 08:12:08:221 [WARNING] [keymap.utils] Ignored-window prewarm incomplete (probe stage focused_window, TTL refresh armed); tracking remains fail-closed.
+2026-11-02 08:12:08:221 [WARNING] [keymap] Ignored-window watcher preparation incomplete; tracking remains fail-closed: false.
+2026-11-02 08:12:11:886 [WARNING] [menu] Over budget: menu.rebuild took 1198 ms (budget 250 ms).
+2026-11-02 08:12:11:893 [WARNING] [runtime] An hs.timer.new callback (...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:1801) held the main thread for 1410 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: menu.rebuild=1197.7 ms, menu_item.shortcuts=978.8 ms, menu_item.keyboard_layout=56.5 ms, menu_keyboard_layout.rows=54.8 ms, menu_item.gestures=51.5 ms. Lua heap 28->48 MB.
+2026-11-02 08:15:36:713 [WARNING] [menu] Over budget: menu.rebuild took 1453 ms (budget 250 ms).
+2026-11-02 08:15:36:713 [WARNING] [runtime] An hs.timer.doAfter callback (...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:1746) held the main thread for 1488 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: menu.rebuild=1453.2 ms, menu_item.shortcuts=1119.6 ms, menu_item.keyboard_layout=195.8 ms, menu_keyboard_layout.rows=109.0 ms, menu_keyboard_layout.sources=85.2 ms. Lua heap 36->53 MB.
+2026-11-02 08:15:38:109 [WARNING] [menu] Over budget: menu.rebuild took 1302 ms (budget 250 ms).

@@ -1,0 +1,3 @@
+2026-11-02 00:12:01:195 [INFO] [runtime] Main-thread hold of 609 ms in an hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:1844). Lua heap 60->40 MB.
+2026-11-02 00:43:59:859 [INFO] [runtime] Main-thread hold of 267 ms in an hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:1844). Lua heap 44->44 MB.
+2026-11-02 08:06:44:245 [WARNING] [HotPath] Slow preview.rebuild: 6.29 ms own, 6.29 ms total, parent keydown (0 similar since the last line).

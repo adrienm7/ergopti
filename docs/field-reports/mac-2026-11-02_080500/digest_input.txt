@@ -1,0 +1,44 @@
+2026-11-02 08:04:47:997 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-02 08:05:01:740 [INFO] [karabiner.lease] Stopping Karabiner lease 28a3141cbd9b4c49ab790ef0ad996fd9 (hammerspoon_reload).
+2026-11-02 08:05:02:274 [DEBUG] [karabiner] ↑ "Retaining %s Karabiner regeneration behind a fresh native guardian proof." repeated 1 more time between 2026-11-02 08:04:50:482 and 2026-11-02 08:04:50:482 (last: Retaining public Karabiner regeneration behind a fresh native guardian proof.).
+2026-11-02 08:05:02:277 [INFO] [karabiner.lease] Karabiner lease watchdog 28a3141cbd9b4c49ab790ef0ad996fd9 stopped (exit 0); STOPPED acknowledged.
+2026-11-02 08:05:03:873 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-02 08:05:03:875 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-02 08:05:03:921 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-11-02 08:05:03:518 and 2026-11-02 08:05:03:798 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-11-02 08:05:04:157 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-02 08:05:04:157 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-11-02 08:05:04:237 [INFO] [karabiner.lease] Remap guardian registration answered 'ready' (developer_adhoc_legacy_only).
+2026-11-02 08:05:04:250 [INFO] [karabiner.lease] Lease token decision=fresh reason=first-generation unaccounted_writers=0 ledger_size=501
+2026-11-02 08:05:04:250 [DEBUG] [karabiner.lease] Prepared Karabiner lease generation 2a04f34d34304a8c9ca04c597226cdcd.
+2026-11-02 08:05:04:585 [START] [karabiner.lease] Starting Karabiner lease watchdog 2a04f34d34304a8c9ca04c597226cdcd…
+2026-11-02 08:05:04:588 [SUCCESS] [karabiner.lease] Karabiner lease watchdog 2a04f34d34304a8c9ca04c597226cdcd launched; awaiting READY.
+2026-11-02 08:05:04:793 [INFO] [karabiner.lease] Karabiner lease 2a04f34d34304a8c9ca04c597226cdcd activated paused by watchdog READY.
+2026-11-02 08:05:28:050 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-02 08:05:28:052 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-02 08:05:28:100 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-11-02 08:05:27:665 and 2026-11-02 08:05:27:983 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-11-02 08:05:28:373 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-02 08:05:28:373 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-11-02 08:05:28:792 [INFO] [karabiner.lease] Remap guardian registration answered 'ready' (developer_adhoc_legacy_only).
+2026-11-02 08:05:28:805 [INFO] [karabiner.lease] Lease token decision=fresh reason=first-generation unaccounted_writers=0 ledger_size=502
+2026-11-02 08:05:28:805 [DEBUG] [karabiner.lease] Prepared Karabiner lease generation 26304b64b77041ce8375560578497e4b.
+2026-11-02 08:05:29:134 [START] [karabiner.lease] Starting Karabiner lease watchdog 26304b64b77041ce8375560578497e4b…
+2026-11-02 08:05:29:137 [SUCCESS] [karabiner.lease] Karabiner lease watchdog 26304b64b77041ce8375560578497e4b launched; awaiting READY.
+2026-11-02 08:05:29:348 [INFO] [karabiner.lease] Karabiner lease 26304b64b77041ce8375560578497e4b activated paused by watchdog READY.
+2026-11-02 08:05:31:985 [INFO] [field_check] Field check result: check=lease verdict=pass steps=15 cli_present=pass:yes integration_enabled=info:yes lease_phase=pass:active guardian_state=pass:ready config_present=info:yes lease_failures=pass:0 key_losses=pass:0 swallowed_keys=pass:0 lease_failure_kinds=info:none deploy_write_ms=info:109 deploy_kb=info:726 deploy_fork_ms=info:95 deploy_write_verdict=pass:keep cli_version=pass:16.0.0 memory_free_percent=info:89
+2026-11-02 08:05:56:068 [INFO] [field_check] Field check result: check=login_items verdict=pass steps=7 this_copy_known=info:yes guardian_registration=info:developer_adhoc_legacy_only:ready main_app_login_item=info:enabled btm_state=info:timeout agents_this_copy=info:1 agents_other_copy=info:0 agent_item_1=info:com.ergoptiplus.remap-guardian:this:unk
+2026-11-02 08:06:29:588 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-02 08:06:46:996 [DEBUG] [karabiner] ↑ "Retaining %s Karabiner regeneration behind a fresh native guardian proof." repeated 1 more time between 2026-11-02 08:06:31:457 and 2026-11-02 08:06:31:457 (last: Retaining public Karabiner regeneration behind a fresh native guardian proof.).
+2026-11-02 08:12:05:724 [INFO] [karabiner.lease] Stopping Karabiner lease 26304b64b77041ce8375560578497e4b (field_run_timed_reload).
+2026-11-02 08:12:06:272 [INFO] [karabiner.lease] Karabiner lease watchdog 26304b64b77041ce8375560578497e4b stopped (exit 0); STOPPED acknowledged.
+2026-11-02 08:12:08:294 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-02 08:12:08:296 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-02 08:12:08:339 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-11-02 08:12:07:907 and 2026-11-02 08:12:08:222 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-11-02 08:12:08:618 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-11-02 08:12:08:618 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-11-02 08:12:08:694 [INFO] [karabiner.lease] Remap guardian registration answered 'ready' (developer_adhoc_legacy_only).
+2026-11-02 08:12:08:706 [INFO] [karabiner.lease] Lease token decision=fresh reason=first-generation unaccounted_writers=0 ledger_size=503
+2026-11-02 08:12:08:706 [DEBUG] [karabiner.lease] Prepared Karabiner lease generation e0ada7eee50946c1b3169ac770047c49.
+2026-11-02 08:12:09:113 [START] [karabiner.lease] Starting Karabiner lease watchdog e0ada7eee50946c1b3169ac770047c49…
+2026-11-02 08:12:09:117 [SUCCESS] [karabiner.lease] Karabiner lease watchdog e0ada7eee50946c1b3169ac770047c49 launched; awaiting READY.
+2026-11-02 08:12:09:342 [INFO] [karabiner.lease] Karabiner lease e0ada7eee50946c1b3169ac770047c49 activated paused by watchdog READY.
+2026-11-02 08:15:38:618 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
