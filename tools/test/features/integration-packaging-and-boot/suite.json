@@ -151,6 +151,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-linux-distro-native-prerequisites.cjs"],
 			"repro": "npm run test:linux-distro-native-prerequisites"
+		},
+		{
+			"id": "ahk-tray-rows-read-as-text",
+			"ordinal": 565,
+			"name": "the real Windows tray shows no raw id, key or placeholder in French and English",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-tray-rows-read-as-text.cjs"],
+			"repro": "npm run test:ahk-tray-rows-read-as-text"
 		}
 	]
 }
