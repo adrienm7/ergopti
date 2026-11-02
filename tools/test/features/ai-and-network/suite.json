@@ -524,6 +524,14 @@
 			"args": ["tools/test/test-perplexity-agent-e2e.cjs"],
 			"repro": "node tools/test/test-perplexity-agent-e2e.cjs",
 			"platforms": ["win32"]
+		},
+		{
+			"id": "js-model-browser-host-actions",
+			"ordinal": 566,
+			"name": "every model selector page action has a handler on macOS, Linux and Windows",
+			"cmd": "node",
+			"args": ["tools/test/test-model-browser-host-actions.cjs"],
+			"repro": "npm run test:model-browser-host-actions"
 		}
 	]
 }
