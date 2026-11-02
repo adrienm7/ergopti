@@ -202,6 +202,17 @@ BootProfile_TotalBootMs() {
 	return (Uptime >= 0) ? Uptime : TickElapsed(_BOOT_PROFILE_START, A_TickCount)
 }
 
+; The boot total frozen when the boot ended: TotalBootMs keeps growing with the
+; process, so a check run later must read this one. -1 until the boot ended.
+; @param {Integer} Completed The total to record, or -1 to only read it.
+; @returns {Integer}
+BootProfile_CompletedBootMs(Completed := -1) {
+	static Recorded := -1
+	if Completed >= 0
+		Recorded := Completed
+	return Recorded
+}
+
 ; Durations of the closed stages in completion order, for the boot summary.
 ; A function static for the same include-order reason as the registry above.
 ; @returns {Array} Entries { Name, Ms }.

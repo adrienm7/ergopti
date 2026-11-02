@@ -1501,7 +1501,7 @@ try {
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
-_BootTotalMs := BootProfile_TotalBootMs()
+_BootTotalMs := BootProfile_CompletedBootMs(BootProfile_TotalBootMs())
 _BootOpenStages := BootProfile_OpenStageNames()
 if (_BootOpenStages != "")
 	LoggerWarn("BootProfile", "Boot completed with unclosed stage(s): {1}.", _BootOpenStages)
