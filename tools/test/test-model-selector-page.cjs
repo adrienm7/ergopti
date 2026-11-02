@@ -354,13 +354,29 @@ toggleOf(page, 'mlx').onkeydown(keyEvent(' '));
 assert.equal(toggleOf(page, 'mlx').getAttribute('aria-expanded'), 'false');
 toggleOf(page, 'mlx').onkeydown(keyEvent('a'));
 assert.equal(toggleOf(page, 'mlx').getAttribute('aria-expanded'), 'false');
-// The header's empty space toggles; a click inside its tools does not.
-const apiCell = groupHead(page, 'api').children[0];
-apiCell.onclick({ target: apiCell.children[1] });
+// model-selector-whole-header: the whole header toggles, its lower lines
+// included (a click there used to do nothing); a real control keeps its click.
+// The selector is the page's own, read against a browser's closest().
+const controlClick = { closest: (selector) => (selector.includes('button') ? {} : null) };
+const headCell = (id) => groupHead(page, id).children[0];
+assert.equal(typeof headCell('api').onclick, 'function');
+headCell('api').onclick({ target: controlClick });
+assert.equal(
+	toggleOf(page, 'api').getAttribute('aria-expanded'),
+	'false',
+	'a control keeps its click'
+);
+headCell('api').onclick({ target: headCell('api').children[1] });
+assert.equal(toggleOf(page, 'api').getAttribute('aria-expanded'), 'true', 'the tools line toggles');
+headCell('api').onclick({ target: headCell('api').children[2] });
+assert.equal(toggleOf(page, 'api').getAttribute('aria-expanded'), 'false', 'the add line toggles');
+headCell('api').onclick({ target: headCell('api') });
+assert.equal(toggleOf(page, 'api').getAttribute('aria-expanded'), 'true', 'its padding toggles');
+// The toggle stops its click: reaching the cell too would toggle it twice.
+let stopped = 0;
+toggleOf(page, 'api').onclick({ stopPropagation: () => (stopped += 1) });
+assert.equal(stopped, 1, 'a click on the toggle does not reach the cell');
 assert.equal(toggleOf(page, 'api').getAttribute('aria-expanded'), 'false');
-apiCell.onclick({ target: apiCell });
-assert.equal(toggleOf(page, 'api').getAttribute('aria-expanded'), 'true');
-toggleOf(page, 'api').onclick();
 // The open groups survive a new payload while the page lives.
 page.context.injectModels(payload);
 assert.equal(toggleOf(page, 'ollama').getAttribute('aria-expanded'), 'true');
@@ -435,10 +451,6 @@ assert.equal(
 	'one group per backend with rows'
 );
 assert.ok(groups[0].includes(`${brands.ollama.emoji} ${brands.ollama.brand}`));
-assert.ok(
-	groups[1].includes(en['model_browser.reason_mlx_intel']),
-	'the unavailable backend says why'
-);
 
 // Unavailable backend: greyed, no use button, the select path refuses it.
 assert.ok(rows['Mlx-Installed'].className.includes('unavailable'));
@@ -534,8 +546,14 @@ page.byId['btn-disable'].dispatch('click');
 assert.deepEqual(page.messages.splice(0), [], 'a hidden capability cannot be invoked');
 
 // Group tools: a driver action, the add-a-model field and the provider list.
+// model-selector-two-lines: install, port and status on one line, adding on the other.
 const toolsOf = (id) => groupHead(page, id).children[0].children[1];
+const addOf = (id) => groupHead(page, id).children[0].children[2];
 const ollamaTools = toolsOf('ollama').children;
+assert.equal(toolsOf('ollama').className, 'group-tools');
+assert.equal(addOf('ollama').className, 'group-add');
+assert.equal(toolsOf('mlx').children[1].className, 'reason', 'the status stands on the tools line');
+assert.equal(toolsOf('mlx').children[1].textContent, en['model_browser.reason_mlx_intel']);
 const installText = (id) => en['model_browser.install_runtime'].replace('%s', brands[id].brand);
 // model-selector-install-button: an installed runtime greys its install button
 // with the reason, and a click on it reaches nothing.
@@ -558,7 +576,7 @@ const mlxInstall = toolsOf('mlx').children[0];
 assert.equal(mlxInstall.textContent, installText('mlx'));
 assert.equal(mlxInstall.disabled, true);
 assert.equal(mlxInstall.title, en['model_browser.reason_mlx_intel']);
-const [, input, addButton, addError] = ollamaTools;
+const [input, addButton, addError] = addOf('ollama').children;
 input.value = 'Qwen3 4b';
 addButton.onclick();
 assert.deepEqual(
@@ -575,10 +593,11 @@ assert.deepEqual(page.messages.splice(0), [
 ]);
 assert.deepEqual(
 	toolsOf('mlx').children.map((el) => el.className),
-	['act install'],
+	['act install', 'reason'],
 	'an unavailable backend offers only its greyed install, no add field'
 );
-const [select, providerButton] = toolsOf('api').children;
+assert.equal(addOf('mlx').children.length, 0);
+const [select, providerButton] = addOf('api').children;
 select.value = 'groq';
 providerButton.onclick();
 assert.deepEqual(page.messages.splice(0), [
