@@ -108,7 +108,7 @@ local function ollama_install(frame, blocked, ollama_ok)
 	if install_step == "running" then return { state = "running" } end
 	if ollama_ok then return { state = "installed" } end
 	if install_step == "ai_on" then return { state = "unsupported", reason_key = "model_browser.reason_install_ai_on" } end
-	return { state = "available" }
+	return { state = "available", failed_key = frame.install_refused }
 end
 
 local function build_payload(frame)
@@ -308,6 +308,8 @@ function M.on_message(payload, state, context)
 	local blocked = require("ui.menu.llm_config_guard").reason()
 	if blocked ~= nil and payload.action ~= "open_url" then
 		Logger.warn(LOG, "Model selector action '%s' refused: %s.", tostring(payload.action), blocked)
+		-- The page drew an install click as running: only a payload undoes it.
+		push_payload(frame)
 		return { accepted = false }
 	end
 	local backend = type(payload.backend) == "string" and payload.backend or "ollama"
@@ -332,14 +334,19 @@ function M.on_message(payload, state, context)
 		local install = ollama_install(frame, nil, ollama_ok)
 		if not install or install.state ~= "available" then
 			Logger.warn(LOG, "Refused installing Ollama from the page: it is not offered now.")
+			push_payload(frame)
 			return { accepted = false }
 		end
 		Logger.info(LOG, "Installing Ollama from the model selector page through the AI enable.")
+		frame.install_refused = nil
 		local accepted = _bound.install_ollama(frame.llm, function()
 			changed()
 			M.reproject_current()
 		end) == true
-		if not accepted then Logger.error(LOG, "The Ollama install from the model selector page was not started.") end
+		if not accepted then
+			frame.install_refused = "model_browser.install_not_started"
+			Logger.error(LOG, "The Ollama install from the model selector page was not started.")
+		end
 		push_payload(frame)
 		return { accepted = accepted }
 	end
