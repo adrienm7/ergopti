@@ -190,10 +190,27 @@ AHK v2's `Func` is a class, not the v1 string resolver: `Func("Callback")`
 raises `ValueError: Invalid base`. Return a local wrapper's `.Bind()` when the
 real callback is outside an isolated test include graph.
 
-The default-config boots only reach the staged first tray render, which skips
-most user data. A full render's cost and any module reached by it must be
-proved with the smoke's `realistic-hotstrings` fixture (several 35 KB personal
-files, programmable hotstrings on), which bounds every logged Hotstrings render.
+A boot builds no heavy submenu: the smoke opens every submenu of every fixture
+through `MenuPopulation_OnInitPopup`, so an error in any row still fails it. A
+full render's cost must be proved with the smoke's `realistic-hotstrings` fixture
+(several 35 KB personal files, programmable hotstrings on), which bounds the
+logged `Deferred submenu 'hotstrings_menu'` build and fails if none was logged.
+
+### project-ahk-menu-submenus-build-at-first-open
+
+Layout, Hotstrings, each hotstring category, Shortcuts and Tap-holds are published
+with one disabled placeholder row and built in `WM_INITMENUPOPUP`, before paint,
+from the state of that moment (`MenuDeferred_*`, infra/menu_population.ahk). The
+placeholder keeps the row a parent: a declared group with an empty child is not
+drawn. Boots and full rebuilds share this path, so a toggle redraws only the
+submenu opened next. Deferred children live in one global map because `SubMenus`
+outlives a refused publication and reaches the tray through the updater's bare
+`initMenu`. A log line a test reads must be `Format`ted first: the logger folds
+repeats of one template, and the Hotstrings line vanished behind the category
+builds. AI, Gestures and About stay eager: AI owns a persistent handle and
+hotkeys, and `BuildGesturesMenu` registers a menu watcher. A real popup can be
+driven from a test through `WM_ENTERIDLE` (test_menu_deferred_children.ahk): keys
+posted before `Show` are not consumed, and a bounded idle count must end the menu.
 
 ### project-ahk-menu-render-reads-admitted-snapshots
 
