@@ -517,6 +517,7 @@ return {
 	"tests.unit.infra.config.test_toml_codec_shared_decode",
 	"tests.unit.infra.config.test_toml_codec_shapes",
 	"tests.unit.ui.menu.structure.test_top_level_order_is_the_manifest",
+	"tests.unit.ui.menu.structure.test_tray_rows_read_as_text",
 	"tests.unit.ui.editors.test_ui_bridge_handlers_webview_manager",
 	"tests.unit.ui.editors.test_ui_bridge_handlers_healthcheck_bridge",
 	"tests.unit.ui.editors.test_ui_bridge_handlers_onboarding",
