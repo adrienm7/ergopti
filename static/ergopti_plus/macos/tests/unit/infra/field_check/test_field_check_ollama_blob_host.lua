@@ -54,6 +54,19 @@ helpers.describe("Ollama blob host probe (ollama-blob-host)", function()
 		helpers.assert_eq(steps.blob_host.value, "planned")
 	end)
 
+	helpers.it("(ollama-blob-range) reports whether the network honours a range, and never hides a failure", function()
+		local ports, world = make_ports()
+		world.output = "step blob_manifest pass http_200\nstep blob_host pass planned\nstep blob_range info ignored\n"
+		local steps, result = run(ports)
+		helpers.assert_true(result.passed, "the daemon copes with an ignored range")
+		helpers.assert_eq(steps.blob_range.state, "info")
+		helpers.assert_eq(steps.blob_range.value, "ignored")
+		world.output = "step blob_manifest pass http_200\nstep blob_host pass planned\nstep blob_range fail wrong_range\n"
+		local failed, failed_result = run(ports)
+		helpers.assert_true(not failed_result.passed, "a range served at another offset fails")
+		helpers.assert_eq(failed.blob_range.value, "wrong_range")
+	end)
+
 	helpers.it("fails an unplanned blob host and a missing answer", function()
 		local ports, world = make_ports()
 		world.output = "step blob_manifest pass http_200\nstep blob_host fail unplanned_host\n"

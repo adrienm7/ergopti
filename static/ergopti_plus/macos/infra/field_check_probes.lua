@@ -727,7 +727,7 @@ end
 function M.parse_blob_lines(output)
 	local steps = {}
 	for id, state, value in tostring(output or ""):gmatch("step (blob_[%w_]+) (%a+) (%S+)") do
-		if (id == "blob_manifest" or id == "blob_host") and not steps[id] then
+		if (id == "blob_manifest" or id == "blob_host" or id == "blob_range") and not steps[id] then
 			steps[id] = { state = state, value = value }
 		end
 	end
@@ -757,6 +757,9 @@ function M.ollama_blob_host(ports, report, finish)
 				report.step(id, STATE.fail, code == nil and "helper_unavailable" or "no_answer")
 			end
 		end
+		-- Whether this network honours the Range requests a pull's parts use: a
+		-- relay ignoring it is the suspect of the digest mismatches of 2026-11-02.
+		if steps.blob_range then report.step("blob_range", steps.blob_range.state, steps.blob_range.value) end
 		finish()
 	end)
 end
