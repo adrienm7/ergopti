@@ -110,7 +110,7 @@ try {
     $bundleRoot = Join-Path $localAppData 'Ergopti/bundle'
     $marker = Join-Path $bundleRoot '.bundle-version'
     $priorMarker = [IO.File]::ReadAllText($marker).Trim([char[]]" `t`r`n")
-    if ($priorMarker -cne $contract.version) { throw 'The genuine prior runtime was not installed.' }
+    if ($priorMarker -cne ($contract.version + "`n" + $contract.commit)) { throw 'The genuine prior runtime was not installed.' }
     $assets = @()
     foreach ($asset in $contract.extracted_assets) {
         $file = Join-Path $bundleRoot $asset.path
