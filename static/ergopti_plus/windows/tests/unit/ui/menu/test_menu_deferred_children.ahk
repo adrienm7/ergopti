@@ -136,6 +136,21 @@ _MDC_NoOwnerBuildsAtOnce() {
 }
 Test("menu deferred: only a population build defers", () => _MDC_Run(_MDC_NoOwnerBuildsAtOnce))
 
+; A rebuild once replayed the boot snapshot only to discard it, and that read
+; refuses as soon as a save has changed config.toml: the rebuild failed. Once the
+; options are restored, no rebuild may read the snapshot at all.
+_MDC_RebuildNeverReplaysTheBootSnapshot() {
+	Body := _DriverFuncBody("_MI_StageLlm")
+	Guard := InStr(Body, "if !_LLM_Menu_Loaded {")
+	Read := InStr(Body, "LLM_Menu_BuildSavedOpts(_IniCache)")
+	Close := InStr(Body, "}", , Read)
+	Init := InStr(Body, "LLM_Menu_Init(_LlmSavedOpts")
+	AssertTrue(Guard > 0 && Read > Guard && Close > Read && Init > Close,
+		"only the build that restores the options reads the boot snapshot")
+}
+Test("menu rebuild: restored AI options never read the boot snapshot again (stale-boot-snapshot-replayed-by-rebuild)",
+	_MDC_RebuildNeverReplaysTheBootSnapshot)
+
 ; The handler ran from a real WM_INITMENUPOPUP inside TrackPopupMenu, with the
 ; submenu already attached: deleting its placeholder there must not lose the
 ; handle or the rows. No timer runs in that loop, but WM_ENTERIDLE is sent from

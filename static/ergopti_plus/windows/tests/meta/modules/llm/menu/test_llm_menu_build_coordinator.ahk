@@ -346,7 +346,7 @@ _LMPC_ProjectionScript(Framework, Receipt, ReadBody := _DriverFuncBodyOrEmpty) {
 global _LMPC_State := 0
 global _LLM_Menu := Map("enabled", false)
 global _LLM_Menu_Handle := 0, _LLM_Menu_InTray := true
-global _DriverInputInitPending := false, _IniCache := Map()
+global _DriverInputInitPending := false, _IniCache := Map(), _LLM_Menu_Loaded := false
 global _TrayMenuStage := false
 global _TrayTitleCache := Map(), _FmtCountCache := Map(), _I18nSortedLocalesCache := false
 LoggerInfo(Args*) => 0
