@@ -110,6 +110,8 @@ const MANAGED_PUBLICATION_SOURCES = [
 	'static/ergopti_plus/_shared/modules/llm/ollama_release.json',
 	'static/ergopti_plus/_shared/python/managed_ollama_runtime.py',
 	'static/ergopti_plus/_shared/go/native_http/transport.go',
+	'static/ergopti_plus/_shared/go/native_http/range_response.go',
+	'static/ergopti_plus/_shared/go/native_http/range_response_test.go',
 	'static/ergopti_plus/_shared/go/native_http/worker_darwin.go',
 	'static/ergopti_plus/_shared/go/native_http/worker_other.go',
 	'static/ergopti_plus/_shared/go/native_http/admission.go',
