@@ -1,0 +1,505 @@
+2026-11-02 08:05:02:222 [INFO] [init] Hammerspoon local teardown started (reload).
+2026-11-02 08:05:02:274 [INFO] [init] Hammerspoon local owners stopped; draining acknowledged diagnostics.
+2026-11-02 08:05:02:946 [INFO] [init] Log folder chosen: ~/perso/ergopti/ergopti_plus/ (directory; usable: true).
+2026-11-02 08:05:02:946 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 1.6 ms (+2.4 ms, total 486.3 ms, cpu 1.0 ms).
+2026-11-02 08:05:02:947 [START] [BootProfile] Boot stage started: Path: native asynchronous logger transport committed.
+2026-11-02 08:05:02:954 [INFO] [init] Native logger handshake committed: the launcher worker owns ~/perso/ergopti/ergopti_plus/.
+2026-11-02 08:05:02:955 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 7.7 ms (+8.5 ms, total 494.8 ms, cpu 4.3 ms).
+2026-11-02 08:05:02:955 [INFO] [BootProfile] Boot stage requires: Path: native asynchronous logger transport committed loaded 3 module(s) in 2.1 ms (own time).
+2026-11-02 08:05:02:955 [START] [BootProfile] Boot stage started: Path: runtime error capture installed.
+2026-11-02 08:05:02:955 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.4 ms, total 495.2 ms, cpu 0.1 ms).
+2026-11-02 08:05:02:957 [START] [BootProfile] Boot stage started: Factory-reset recovery reconciled.
+2026-11-02 08:05:02:963 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 5.2 ms (+7.2 ms, total 502.5 ms, cpu 1.6 ms).
+2026-11-02 08:05:02:963 [INFO] [BootProfile] Boot stage requires: Factory-reset recovery reconciled loaded 1 module(s) in 1.6 ms (own time).
+2026-11-02 08:05:02:963 [START] [BootProfile] Boot stage started: TOML hotstring cache wired.
+2026-11-02 08:05:02:965 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 2.2 ms (+2.5 ms, total 504.9 ms, cpu 1.7 ms).
+2026-11-02 08:05:02:966 [INFO] [BootProfile] Boot stage requires: TOML hotstring cache wired loaded 1 module(s) in 1.5 ms (own time).
+2026-11-02 08:05:02:966 [START] [BootProfile] Boot stage started: Config-dependent module requires.
+2026-11-02 08:05:03:351 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 385.7 ms (+386.3 ms, total 891.2 ms, cpu 282.5 ms).
+2026-11-02 08:05:03:352 [INFO] [BootProfile] Boot stage requires: Config-dependent module requires loaded 160 module(s) in 371.8 ms (own time); slowest: ui.menu.menu_llm=38.4 ms, platform.remap=8.7 ms, ui.changelog=8.0 ms, platform.remap.defaults=7.7 ms, ui.menu=7.2 ms, ui.menu.menu_hotstrings_custom=6.6 ms, modules.llm.ollama_deps_checker=6.2 ms, platform.remap.generator=5.9 ms.
+2026-11-02 08:05:03:352 [START] [BootProfile] Boot stage started: Config schema migration.
+2026-11-02 08:05:03:358 [START] [config_migrate] Checking the config schema version of '<config>/hammerspoon/config.toml' (hs driver)…
+2026-11-02 08:05:03:388 [SUCCESS] [config_migrate] '<config>/hammerspoon/config.toml' is at schema v20; nothing to migrate.
+2026-11-02 08:05:03:389 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 37.2 ms (+37.5 ms, total 928.7 ms, cpu 30.3 ms).
+2026-11-02 08:05:03:389 [INFO] [BootProfile] Boot stage requires: Config schema migration loaded 2 module(s) in 4.9 ms (own time); slowest: config_unused_keys=3.3 ms.
+2026-11-02 08:05:03:389 [START] [BootProfile] Boot stage started: First-launch guard (onboarding check).
+2026-11-02 08:05:03:395 [INFO] [init] config.toml is present at <config>/hammerspoon/config.toml: the full boot continues.
+2026-11-02 08:05:03:395 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 6.0 ms (+6.2 ms, total 935.0 ms, cpu 5.2 ms).
+2026-11-02 08:05:03:395 [INFO] [BootProfile] Boot stage requires: First-launch guard (onboarding check) loaded 2 module(s) in 5.5 ms (own time); slowest: ui.onboarding=4.0 ms.
+2026-11-02 08:05:03:395 [START] [BootProfile] Boot stage started: Accessibility permission.
+2026-11-02 08:05:03:396 [INFO] [init] Accessibility permission is granted; arming input owners.
+2026-11-02 08:05:03:396 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 0.7 ms (+0.9 ms, total 935.9 ms, cpu 0.7 ms).
+2026-11-02 08:05:03:396 [START] [BootProfile] Boot stage started: Shortcuts pre-start.
+2026-11-02 08:05:03:396 [DEBUG] [init] Starting shortcuts module…
+2026-11-02 08:05:03:517 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 120.7 ms (+120.9 ms, total 1056.8 ms, cpu 40.3 ms).
+2026-11-02 08:05:03:517 [INFO] [BootProfile] Boot stage requires: Shortcuts pre-start loaded 20 module(s) in 25.3 ms (own time); slowest: modules.keymap.layout_registry=3.2 ms.
+2026-11-02 08:05:03:517 [START] [BootProfile] Boot stage started: Script control engine started (panic-button eventtap).
+2026-11-02 08:05:03:517 [DEBUG] [init] Starting script control engine…
+2026-11-02 08:05:03:518 [INFO] [init] Main modules initialized successfully.
+2026-11-02 08:05:03:518 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 0.6 ms (+0.9 ms, total 1057.7 ms, cpu 0.3 ms).
+2026-11-02 08:05:03:518 [START] [BootProfile] Boot stage started: MLX server cleanup started asynchronously.
+2026-11-02 08:05:03:523 [START] [config_overrides] Applying user overrides from '<config>/hammerspoon/config.toml'…
+2026-11-02 08:05:03:523 [SUCCESS] [config_overrides] User overrides applied (0 value(s)).
+2026-11-02 08:05:03:526 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 8.2 ms (+8.4 ms, total 1066.1 ms, cpu 7.0 ms).
+2026-11-02 08:05:03:526 [INFO] [BootProfile] Boot stage requires: MLX server cleanup started asynchronously loaded 2 module(s) in 3.7 ms (own time).
+2026-11-02 08:05:03:526 [START] [BootProfile] Boot stage started: LLM backend bootstrap.
+2026-11-02 08:05:03:527 [INFO] [init] LLM boot disabled at startup — skipping backend bootstrap.
+2026-11-02 08:05:03:527 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 0.5 ms (+0.7 ms, total 1066.8 ms, cpu 0.4 ms).
+2026-11-02 08:05:03:527 [START] [BootProfile] Boot stage started: TOML discovery + ordering.
+2026-11-02 08:05:03:534 [INFO] [init] No shared hotstring groups in '<config>/' — using bundled directory '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/'.
+2026-11-02 08:05:03:560 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 33.4 ms (+33.5 ms, total 1100.3 ms, cpu 26.4 ms).
+2026-11-02 08:05:03:561 [INFO] [BootProfile] Boot stage requires: TOML discovery + ordering loaded 4 module(s) in 12.9 ms (own time); slowest: ui.hotstrings_config_window=5.5 ms, hotstrings.catalogue_files=4.0 ms.
+2026-11-02 08:05:03:561 [START] [BootProfile] Boot stage started: Hotstring groups registered (personal + dynamic + common).
+2026-11-02 08:05:03:575 [DEBUG] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / personal hotstrings took 14.6 ms.
+2026-11-02 08:05:03:582 [DEBUG] [init] Starting dynamic hotstrings module…
+2026-11-02 08:05:03:657 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / dynamic hotstrings took 75.4 ms.
+2026-11-02 08:05:03:657 [DEBUG] [init] Loading common TOML hotstring files…
+2026-11-02 08:05:03:658 [DEBUG] [init] Loading TOML file: autocorrection…
+2026-11-02 08:05:03:663 [DEBUG] [init] Loading TOML file: magickey…
+2026-11-02 08:05:03:684 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / common hotstring files took 26.6 ms.
+2026-11-02 08:05:03:684 [INFO] [init] Common hotstring load: 2 file(s), slowest 'magickey' 20.6 ms.
+2026-11-02 08:05:03:684 [DEBUG] [init] Loading language TOML file: french_autocorrection…
+2026-11-02 08:05:03:695 [DEBUG] [init] Loading language TOML file: french_magickey…
+2026-11-02 08:05:03:713 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / language hotstring files took 29.0 ms.
+2026-11-02 08:05:03:758 [INFO] [init] Loaded 2 TOML hotstring file(s) and 2 language file(s) in 100.7ms.
+2026-11-02 08:05:03:758 [INFO] [init] TOML snapshot cache: 14 hit(s), 0 miss(es), 0 write(s) (enabled=true).
+2026-11-02 08:05:03:758 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / choice catalogue and cache stats took 45.4 ms.
+2026-11-02 08:05:03:758 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 197.5 ms (+197.8 ms, total 1298.0 ms, cpu 182.7 ms).
+2026-11-02 08:05:03:758 [INFO] [BootProfile] Boot stage requires: Hotstring groups registered (personal + dynamic + common) loaded 2 module(s) in 4.1 ms (own time); slowest: infra.personal_hotstrings=3.1 ms.
+2026-11-02 08:05:03:758 [START] [BootProfile] Boot stage started: Final mapping sort + tail-index rebuild.
+2026-11-02 08:05:03:764 [INFO] [init] Final mapping sort completed in 5.1ms.
+2026-11-02 08:05:03:764 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 5.3 ms (+5.6 ms, total 1303.7 ms, cpu 5.2 ms).
+2026-11-02 08:05:03:764 [START] [BootProfile] Boot stage started: Keymap engine started.
+2026-11-02 08:05:03:797 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 33.0 ms (+33.4 ms, total 1337.1 ms, cpu 29.1 ms).
+2026-11-02 08:05:03:797 [INFO] [BootProfile] Boot stage requires: Keymap engine started loaded 7 module(s) in 17.7 ms (own time); slowest: unicode_case.data=9.0 ms, hs.axuielement=3.2 ms.
+2026-11-02 08:05:03:797 [START] [BootProfile] Boot stage started: UI: karabiner.init.
+2026-11-02 08:05:03:877 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 79.1 ms (+79.4 ms, total 1416.4 ms, cpu 73.8 ms).
+2026-11-02 08:05:03:877 [INFO] [BootProfile] Boot stage requires: UI: karabiner.init loaded 2 module(s) in 1.2 ms (own time).
+2026-11-02 08:05:03:877 [START] [BootProfile] Boot stage started: UI: menu.start (menubar + state sync + engines + LLM handler).
+2026-11-02 08:05:03:877 [DEBUG] [init] Starting user interface components…
+2026-11-02 08:05:03:878 [START] [menu_paths] Initializing paths editor…
+2026-11-02 08:05:03:878 [SUCCESS] [menu_paths] Paths editor initialized.
+2026-11-02 08:05:03:919 [DEBUG] [BootProfile] ↑ "Boot sub-stage: %s / %s took %.1f ms." repeated 1 more time between 2026-11-02 08:05:03:582 and 2026-11-02 08:05:03:582 (last: Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / extension packs took 6.4 ms.).
+2026-11-02 08:05:03:921 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-11-02 08:05:03:518 and 2026-11-02 08:05:03:798 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-11-02 08:05:04:063 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 186.2 ms (+186.5 ms, total 1603.0 ms, cpu 162.9 ms).
+2026-11-02 08:05:04:063 [INFO] [BootProfile] Boot stage requires: UI: menu.start (menubar + state sync + engines + LLM handler) loaded 31 module(s) in 63.3 ms (own time); slowest: ui.menu.menu_llm.models_manager_mlx_download=13.1 ms, hs.spaces=5.1 ms, ui.menu.menu_llm.models_manager_mlx_server=4.7 ms, ui.menu.menu_llm.models_manager_mlx_hf=4.2 ms, modules.shortcuts.magic_editor=3.5 ms.
+2026-11-02 08:05:04:063 [START] [BootProfile] Boot stage started: UI: menu ready.
+2026-11-02 08:05:04:064 [INFO] [init] User interface initialized successfully.
+2026-11-02 08:05:04:064 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.4 ms (+0.8 ms, total 1603.8 ms, cpu 0.1 ms).
+2026-11-02 08:05:04:065 [START] [BootProfile] Boot stage started: File watchers armed.
+2026-11-02 08:05:04:074 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 9.3 ms (+10.1 ms, total 1613.8 ms, cpu 6.5 ms).
+2026-11-02 08:05:04:074 [INFO] [BootProfile] Boot stage requires: File watchers armed loaded 1 module(s) in 4.7 ms (own time); slowest: infra.file_watchers=4.7 ms.
+2026-11-02 08:05:04:074 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-02 08:05:04:077 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 2.6 ms (+2.8 ms, total 1616.7 ms, cpu 2.3 ms).
+2026-11-02 08:05:04:077 [SUCCESS] [BootProfile] Boot complete in 1617 ms.
+2026-11-02 08:05:04:077 [INFO] [BootProfile] Boot CPU: 1228 ms of process CPU over 1617 ms of boot.
+2026-11-02 08:05:04:077 [INFO] [init] Reload completed in 1860 ms (reload call to boot complete).
+2026-11-02 08:05:04:079 [INFO] [init] ════════════════════════════════════════════════════════════
+2026-11-02 08:05:04:079 [INFO] [init] ✅ Hammerspoon boot SUCCESSFUL.
+2026-11-02 08:05:04:157 [INFO] [init] Boot complete — triggering Karabiner async deploy…
+2026-11-02 08:05:27:060 [INFO] [init] Log folder chosen: ~/perso/ergopti/ergopti_plus/ (directory; usable: true).
+2026-11-02 08:05:27:063 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 3.8 ms (+4.5 ms, total 439.4 ms, cpu 0.8 ms).
+2026-11-02 08:05:27:063 [START] [BootProfile] Boot stage started: Path: native asynchronous logger transport committed.
+2026-11-02 08:05:27:075 [INFO] [init] Native logger handshake committed: the launcher worker owns ~/perso/ergopti/ergopti_plus/.
+2026-11-02 08:05:27:075 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 12.0 ms (+12.5 ms, total 451.9 ms, cpu 8.0 ms).
+2026-11-02 08:05:27:076 [INFO] [BootProfile] Boot stage requires: Path: native asynchronous logger transport committed loaded 3 module(s) in 5.4 ms (own time).
+2026-11-02 08:05:27:076 [START] [BootProfile] Boot stage started: Path: runtime error capture installed.
+2026-11-02 08:05:27:076 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.5 ms, total 452.4 ms, cpu 0.1 ms).
+2026-11-02 08:05:27:076 [START] [BootProfile] Boot stage started: Factory-reset recovery reconciled.
+2026-11-02 08:05:27:079 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 3.4 ms (+3.7 ms, total 456.0 ms, cpu 1.5 ms).
+2026-11-02 08:05:27:080 [INFO] [BootProfile] Boot stage requires: Factory-reset recovery reconciled loaded 1 module(s) in 1.3 ms (own time).
+2026-11-02 08:05:27:080 [START] [BootProfile] Boot stage started: TOML hotstring cache wired.
+2026-11-02 08:05:27:083 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 3.0 ms (+3.8 ms, total 459.8 ms, cpu 1.6 ms).
+2026-11-02 08:05:27:085 [INFO] [BootProfile] Boot stage requires: TOML hotstring cache wired loaded 1 module(s) in 1.3 ms (own time).
+2026-11-02 08:05:27:085 [START] [BootProfile] Boot stage started: Config-dependent module requires.
+2026-11-02 08:05:27:467 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 381.1 ms (+383.3 ms, total 843.1 ms, cpu 259.0 ms).
+2026-11-02 08:05:27:467 [INFO] [BootProfile] Boot stage requires: Config-dependent module requires loaded 160 module(s) in 367.7 ms (own time); slowest: ui.menu.menu_llm=69.9 ms, platform.remap=17.6 ms, platform.remap.defaults=13.0 ms, tap_hold.key_catalog=7.7 ms, ui.menu=6.7 ms, ui.changelog=6.6 ms, modules.keymap.layout=5.8 ms, modules.llm.ollama_deps_checker=5.4 ms.
+2026-11-02 08:05:27:467 [START] [BootProfile] Boot stage started: Config schema migration.
+2026-11-02 08:05:27:471 [START] [config_migrate] Checking the config schema version of '<config>/hammerspoon/config.toml' (hs driver)…
+2026-11-02 08:05:27:499 [SUCCESS] [config_migrate] '<config>/hammerspoon/config.toml' is at schema v20; nothing to migrate.
+2026-11-02 08:05:27:500 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 32.9 ms (+33.3 ms, total 876.3 ms, cpu 31.5 ms).
+2026-11-02 08:05:27:500 [INFO] [BootProfile] Boot stage requires: Config schema migration loaded 2 module(s) in 5.1 ms (own time); slowest: config_unused_keys=3.4 ms.
+2026-11-02 08:05:27:500 [START] [BootProfile] Boot stage started: First-launch guard (onboarding check).
+2026-11-02 08:05:27:506 [INFO] [init] config.toml is present at <config>/hammerspoon/config.toml: the full boot continues.
+2026-11-02 08:05:27:506 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 6.1 ms (+6.4 ms, total 882.8 ms, cpu 5.5 ms).
+2026-11-02 08:05:27:506 [INFO] [BootProfile] Boot stage requires: First-launch guard (onboarding check) loaded 2 module(s) in 5.6 ms (own time); slowest: ui.onboarding=4.3 ms.
+2026-11-02 08:05:27:506 [START] [BootProfile] Boot stage started: Accessibility permission.
+2026-11-02 08:05:27:514 [INFO] [init] Accessibility permission is granted; arming input owners.
+2026-11-02 08:05:27:514 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 7.9 ms (+8.1 ms, total 890.9 ms, cpu 0.7 ms).
+2026-11-02 08:05:27:515 [START] [BootProfile] Boot stage started: Shortcuts pre-start.
+2026-11-02 08:05:27:515 [DEBUG] [init] Starting shortcuts module…
+2026-11-02 08:05:27:661 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 146.1 ms (+146.5 ms, total 1037.4 ms, cpu 49.1 ms).
+2026-11-02 08:05:27:661 [INFO] [BootProfile] Boot stage requires: Shortcuts pre-start loaded 20 module(s) in 28.9 ms (own time); slowest: modules.keymap.layout_registry=3.2 ms.
+2026-11-02 08:05:27:661 [START] [BootProfile] Boot stage started: Script control engine started (panic-button eventtap).
+2026-11-02 08:05:27:661 [DEBUG] [init] Starting script control engine…
+2026-11-02 08:05:27:665 [INFO] [init] Main modules initialized successfully.
+2026-11-02 08:05:27:666 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 4.5 ms (+4.7 ms, total 1042.1 ms, cpu 0.4 ms).
+2026-11-02 08:05:27:667 [START] [BootProfile] Boot stage started: MLX server cleanup started asynchronously.
+2026-11-02 08:05:27:673 [START] [config_overrides] Applying user overrides from '<config>/hammerspoon/config.toml'…
+2026-11-02 08:05:27:673 [SUCCESS] [config_overrides] User overrides applied (0 value(s)).
+2026-11-02 08:05:27:677 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 10.0 ms (+11.6 ms, total 1053.7 ms, cpu 8.0 ms).
+2026-11-02 08:05:27:677 [INFO] [BootProfile] Boot stage requires: MLX server cleanup started asynchronously loaded 2 module(s) in 4.8 ms (own time).
+2026-11-02 08:05:27:677 [START] [BootProfile] Boot stage started: LLM backend bootstrap.
+2026-11-02 08:05:27:679 [INFO] [init] LLM boot disabled at startup — skipping backend bootstrap.
+2026-11-02 08:05:27:679 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 1.3 ms (+1.5 ms, total 1055.3 ms, cpu 0.4 ms).
+2026-11-02 08:05:27:679 [START] [BootProfile] Boot stage started: TOML discovery + ordering.
+2026-11-02 08:05:27:683 [INFO] [init] No shared hotstring groups in '<config>/' — using bundled directory '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/'.
+2026-11-02 08:05:27:714 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 35.1 ms (+35.6 ms, total 1090.8 ms, cpu 27.5 ms).
+2026-11-02 08:05:27:715 [INFO] [BootProfile] Boot stage requires: TOML discovery + ordering loaded 4 module(s) in 11.1 ms (own time); slowest: ui.hotstrings_config_window=4.7 ms.
+2026-11-02 08:05:27:715 [START] [BootProfile] Boot stage started: Hotstring groups registered (personal + dynamic + common).
+2026-11-02 08:05:27:733 [DEBUG] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / personal hotstrings took 18.6 ms.
+2026-11-02 08:05:27:743 [DEBUG] [init] Starting dynamic hotstrings module…
+2026-11-02 08:05:27:822 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / dynamic hotstrings took 78.7 ms.
+2026-11-02 08:05:27:822 [DEBUG] [init] Loading common TOML hotstring files…
+2026-11-02 08:05:27:825 [DEBUG] [init] Loading TOML file: autocorrection…
+2026-11-02 08:05:27:829 [DEBUG] [init] Loading TOML file: magickey…
+2026-11-02 08:05:27:848 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / common hotstring files took 25.8 ms.
+2026-11-02 08:05:27:848 [INFO] [init] Common hotstring load: 2 file(s), slowest 'magickey' 18.9 ms.
+2026-11-02 08:05:27:848 [DEBUG] [init] Loading language TOML file: french_autocorrection…
+2026-11-02 08:05:27:858 [DEBUG] [init] Loading language TOML file: french_magickey…
+2026-11-02 08:05:27:874 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / language hotstring files took 26.5 ms.
+2026-11-02 08:05:27:917 [INFO] [init] Loaded 2 TOML hotstring file(s) and 2 language file(s) in 94.9ms.
+2026-11-02 08:05:27:917 [INFO] [init] TOML snapshot cache: 14 hit(s), 0 miss(es), 0 write(s) (enabled=true).
+2026-11-02 08:05:27:917 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / choice catalogue and cache stats took 42.9 ms.
+2026-11-02 08:05:27:917 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 202.7 ms (+203.0 ms, total 1293.8 ms, cpu 183.9 ms).
+2026-11-02 08:05:27:918 [INFO] [BootProfile] Boot stage requires: Hotstring groups registered (personal + dynamic + common) loaded 2 module(s) in 5.9 ms (own time); slowest: infra.personal_hotstrings=3.3 ms.
+2026-11-02 08:05:27:918 [START] [BootProfile] Boot stage started: Final mapping sort + tail-index rebuild.
+2026-11-02 08:05:27:923 [INFO] [init] Final mapping sort completed in 4.9ms.
+2026-11-02 08:05:27:923 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 5.2 ms (+5.6 ms, total 1299.4 ms, cpu 5.1 ms).
+2026-11-02 08:05:27:923 [START] [BootProfile] Boot stage started: Keymap engine started.
+2026-11-02 08:05:27:983 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 59.7 ms (+60.0 ms, total 1359.3 ms, cpu 31.8 ms).
+2026-11-02 08:05:27:983 [INFO] [BootProfile] Boot stage requires: Keymap engine started loaded 7 module(s) in 19.2 ms (own time); slowest: unicode_case.data=8.5 ms, hs.libaxuielement=4.2 ms, hs.axuielement=3.1 ms.
+2026-11-02 08:05:27:983 [START] [BootProfile] Boot stage started: UI: karabiner.init.
+2026-11-02 08:05:28:055 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 72.0 ms (+72.4 ms, total 1431.7 ms, cpu 67.2 ms).
+2026-11-02 08:05:28:055 [INFO] [BootProfile] Boot stage requires: UI: karabiner.init loaded 2 module(s) in 2.6 ms (own time).
+2026-11-02 08:05:28:055 [START] [BootProfile] Boot stage started: UI: menu.start (menubar + state sync + engines + LLM handler).
+2026-11-02 08:05:28:056 [DEBUG] [init] Starting user interface components…
+2026-11-02 08:05:28:056 [START] [menu_paths] Initializing paths editor…
+2026-11-02 08:05:28:056 [SUCCESS] [menu_paths] Paths editor initialized.
+2026-11-02 08:05:28:099 [DEBUG] [BootProfile] ↑ "Boot sub-stage: %s / %s took %.1f ms." repeated 1 more time between 2026-11-02 08:05:27:743 and 2026-11-02 08:05:27:743 (last: Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / extension packs took 10.2 ms.).
+2026-11-02 08:05:28:100 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-11-02 08:05:27:665 and 2026-11-02 08:05:27:983 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-11-02 08:05:28:241 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 185.3 ms (+185.6 ms, total 1617.3 ms, cpu 172.5 ms).
+2026-11-02 08:05:28:241 [INFO] [BootProfile] Boot stage requires: UI: menu.start (menubar + state sync + engines + LLM handler) loaded 31 module(s) in 70.1 ms (own time); slowest: ui.menu.menu_llm.models_manager_mlx_download=12.8 ms, hs.spaces=5.7 ms, ui.menu.menu_llm.models_manager_mlx_server=4.1 ms, ui.menu.menu_llm.models_manager_mlx_hf=3.8 ms, modules.shortcuts.magic_editor=3.4 ms.
+2026-11-02 08:05:28:241 [START] [BootProfile] Boot stage started: UI: menu ready.
+2026-11-02 08:05:28:241 [INFO] [init] User interface initialized successfully.
+2026-11-02 08:05:28:241 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.3 ms (+0.6 ms, total 1617.9 ms, cpu 0.1 ms).
+2026-11-02 08:05:28:242 [START] [BootProfile] Boot stage started: File watchers armed.
+2026-11-02 08:05:28:250 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 8.7 ms (+9.0 ms, total 1626.8 ms, cpu 7.0 ms).
+2026-11-02 08:05:28:250 [INFO] [BootProfile] Boot stage requires: File watchers armed loaded 1 module(s) in 4.4 ms (own time); slowest: infra.file_watchers=4.4 ms.
+2026-11-02 08:05:28:250 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-02 08:05:28:253 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 2.8 ms (+3.0 ms, total 1629.8 ms, cpu 2.4 ms).
+2026-11-02 08:05:28:254 [SUCCESS] [BootProfile] Boot complete in 1630 ms.
+2026-11-02 08:05:28:254 [INFO] [BootProfile] Boot CPU: 1211 ms of process CPU over 1630 ms of boot.
+2026-11-02 08:05:28:255 [INFO] [init] ════════════════════════════════════════════════════════════
+2026-11-02 08:05:28:255 [INFO] [init] ✅ Hammerspoon boot SUCCESSFUL.
+2026-11-02 08:05:28:373 [INFO] [init] Boot complete — triggering Karabiner async deploy…
+2026-11-02 08:05:31:820 [INFO] [init] ↑ "════════════════════════════════════════════════════════════" repeated 1 more time between 2026-11-02 08:05:28:255 and 2026-11-02 08:05:28:255.
+2026-11-02 08:12:06:218 [INFO] [init] Hammerspoon local teardown started (reload).
+2026-11-02 08:12:06:219 [DEBUG] [init] Owned Ollama teardown is awaiting exact task completion.
+2026-11-02 08:12:06:320 [INFO] [init] Hammerspoon local owners stopped; draining acknowledged diagnostics.
+2026-11-02 08:12:07:016 [INFO] [init] Log folder chosen: ~/perso/ergopti/ergopti_plus/ (directory; usable: true).
+2026-11-02 08:12:07:016 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 1.9 ms (+2.6 ms, total 490.6 ms, cpu 0.8 ms).
+2026-11-02 08:12:07:017 [START] [BootProfile] Boot stage started: Path: native asynchronous logger transport committed.
+2026-11-02 08:12:07:024 [INFO] [init] Native logger handshake committed: the launcher worker owns ~/perso/ergopti/ergopti_plus/.
+2026-11-02 08:12:07:027 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 10.3 ms (+10.9 ms, total 501.4 ms, cpu 3.6 ms).
+2026-11-02 08:12:07:028 [INFO] [BootProfile] Boot stage requires: Path: native asynchronous logger transport committed loaded 3 module(s) in 1.5 ms (own time).
+2026-11-02 08:12:07:028 [START] [BootProfile] Boot stage started: Path: runtime error capture installed.
+2026-11-02 08:12:07:028 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.3 ms (+1.0 ms, total 502.4 ms, cpu 0.1 ms).
+2026-11-02 08:12:07:029 [START] [BootProfile] Boot stage started: Factory-reset recovery reconciled.
+2026-11-02 08:12:07:031 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 2.7 ms (+3.1 ms, total 505.5 ms, cpu 1.4 ms).
+2026-11-02 08:12:07:032 [INFO] [BootProfile] Boot stage requires: Factory-reset recovery reconciled loaded 1 module(s) in 1.6 ms (own time).
+2026-11-02 08:12:07:032 [START] [BootProfile] Boot stage started: TOML hotstring cache wired.
+2026-11-02 08:12:07:035 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 2.8 ms (+3.2 ms, total 508.7 ms, cpu 1.5 ms).
+2026-11-02 08:12:07:035 [INFO] [BootProfile] Boot stage requires: TOML hotstring cache wired loaded 1 module(s) in 1.9 ms (own time).
+2026-11-02 08:12:07:035 [START] [BootProfile] Boot stage started: Config-dependent module requires.
+2026-11-02 08:12:07:648 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 613.6 ms (+613.9 ms, total 1122.6 ms, cpu 276.7 ms).
+2026-11-02 08:12:07:649 [INFO] [BootProfile] Boot stage requires: Config-dependent module requires loaded 160 module(s) in 600.8 ms (own time); slowest: ui.menu.menu_llm=201.8 ms, ui.menu.menu_tap_holds=52.8 ms, ui.changelog=10.3 ms, platform.remap=7.4 ms, platform.remap.defaults=7.1 ms, ui.menu=6.7 ms, ui.menu.menu_hotstrings_custom=6.4 ms, ui.menu.menu_llm.models_manager_ollama=6.0 ms.
+2026-11-02 08:12:07:649 [START] [BootProfile] Boot stage started: Config schema migration.
+2026-11-02 08:12:07:654 [START] [config_migrate] Checking the config schema version of '<config>/hammerspoon/config.toml' (hs driver)…
+2026-11-02 08:12:07:695 [SUCCESS] [config_migrate] '<config>/hammerspoon/config.toml' is at schema v20; nothing to migrate.
+2026-11-02 08:12:07:696 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 46.4 ms (+47.2 ms, total 1169.8 ms, cpu 41.9 ms).
+2026-11-02 08:12:07:696 [INFO] [BootProfile] Boot stage requires: Config schema migration loaded 2 module(s) in 7.2 ms (own time); slowest: config_unused_keys=5.1 ms.
+2026-11-02 08:12:07:696 [START] [BootProfile] Boot stage started: First-launch guard (onboarding check).
+2026-11-02 08:12:07:705 [INFO] [init] config.toml is present at <config>/hammerspoon/config.toml: the full boot continues.
+2026-11-02 08:12:07:706 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 9.7 ms (+10.4 ms, total 1180.2 ms, cpu 7.2 ms).
+2026-11-02 08:12:07:706 [INFO] [BootProfile] Boot stage requires: First-launch guard (onboarding check) loaded 2 module(s) in 8.2 ms (own time); slowest: ui.onboarding=6.1 ms.
+2026-11-02 08:12:07:706 [START] [BootProfile] Boot stage started: Accessibility permission.
+2026-11-02 08:12:07:708 [INFO] [init] Accessibility permission is granted; arming input owners.
+2026-11-02 08:12:07:708 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 1.9 ms (+2.2 ms, total 1182.4 ms, cpu 0.8 ms).
+2026-11-02 08:12:07:709 [START] [BootProfile] Boot stage started: Shortcuts pre-start.
+2026-11-02 08:12:07:709 [DEBUG] [init] Starting shortcuts module…
+2026-11-02 08:12:07:906 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 197.5 ms (+197.9 ms, total 1380.3 ms, cpu 57.3 ms).
+2026-11-02 08:12:07:907 [INFO] [BootProfile] Boot stage requires: Shortcuts pre-start loaded 20 module(s) in 33.2 ms (own time); slowest: modules.keymap.layout_registry=3.9 ms.
+2026-11-02 08:12:07:907 [START] [BootProfile] Boot stage started: Script control engine started (panic-button eventtap).
+2026-11-02 08:12:07:907 [DEBUG] [init] Starting script control engine…
+2026-11-02 08:12:07:907 [INFO] [init] Main modules initialized successfully.
+2026-11-02 08:12:07:907 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 0.7 ms (+1.2 ms, total 1381.5 ms, cpu 0.4 ms).
+2026-11-02 08:12:07:908 [START] [BootProfile] Boot stage started: MLX server cleanup started asynchronously.
+2026-11-02 08:12:07:914 [START] [config_overrides] Applying user overrides from '<config>/hammerspoon/config.toml'…
+2026-11-02 08:12:07:914 [SUCCESS] [config_overrides] User overrides applied (0 value(s)).
+2026-11-02 08:12:07:919 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 11.4 ms (+11.7 ms, total 1393.2 ms, cpu 9.9 ms).
+2026-11-02 08:12:07:920 [INFO] [BootProfile] Boot stage requires: MLX server cleanup started asynchronously loaded 2 module(s) in 5.2 ms (own time); slowest: infra.config_overrides=4.0 ms.
+2026-11-02 08:12:07:920 [START] [BootProfile] Boot stage started: LLM backend bootstrap.
+2026-11-02 08:12:07:920 [INFO] [init] LLM boot disabled at startup — skipping backend bootstrap.
+2026-11-02 08:12:07:920 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 0.8 ms (+1.2 ms, total 1394.4 ms, cpu 0.5 ms).
+2026-11-02 08:12:07:921 [START] [BootProfile] Boot stage started: TOML discovery + ordering.
+2026-11-02 08:12:07:931 [INFO] [init] No shared hotstring groups in '<config>/' — using bundled directory '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/'.
+2026-11-02 08:12:07:964 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 43.3 ms (+43.6 ms, total 1438.0 ms, cpu 34.2 ms).
+2026-11-02 08:12:07:964 [INFO] [BootProfile] Boot stage requires: TOML discovery + ordering loaded 4 module(s) in 17.0 ms (own time); slowest: hotstrings.catalogue_files=6.6 ms, ui.hotstrings_config_window=6.3 ms.
+2026-11-02 08:12:07:964 [START] [BootProfile] Boot stage started: Hotstring groups registered (personal + dynamic + common).
+2026-11-02 08:12:07:982 [DEBUG] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / personal hotstrings took 18.0 ms.
+2026-11-02 08:12:07:989 [DEBUG] [init] Starting dynamic hotstrings module…
+2026-11-02 08:12:08:069 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / dynamic hotstrings took 80.6 ms.
+2026-11-02 08:12:08:069 [DEBUG] [init] Loading common TOML hotstring files…
+2026-11-02 08:12:08:071 [DEBUG] [init] Loading TOML file: autocorrection…
+2026-11-02 08:12:08:076 [DEBUG] [init] Loading TOML file: magickey…
+2026-11-02 08:12:08:097 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / common hotstring files took 27.7 ms.
+2026-11-02 08:12:08:097 [INFO] [init] Common hotstring load: 2 file(s), slowest 'magickey' 20.8 ms.
+2026-11-02 08:12:08:097 [DEBUG] [init] Loading language TOML file: french_autocorrection…
+2026-11-02 08:12:08:109 [DEBUG] [init] Loading language TOML file: french_magickey…
+2026-11-02 08:12:08:137 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / language hotstring files took 39.6 ms.
+2026-11-02 08:12:08:187 [INFO] [init] Loaded 2 TOML hotstring file(s) and 2 language file(s) in 117.2ms.
+2026-11-02 08:12:08:187 [INFO] [init] TOML snapshot cache: 14 hit(s), 0 miss(es), 0 write(s) (enabled=true).
+2026-11-02 08:12:08:187 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / choice catalogue and cache stats took 50.3 ms.
+2026-11-02 08:12:08:187 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 222.6 ms (+223.0 ms, total 1661.0 ms, cpu 199.4 ms).
+2026-11-02 08:12:08:187 [INFO] [BootProfile] Boot stage requires: Hotstring groups registered (personal + dynamic + common) loaded 2 module(s) in 5.7 ms (own time); slowest: infra.personal_hotstrings=3.9 ms.
+2026-11-02 08:12:08:187 [START] [BootProfile] Boot stage started: Final mapping sort + tail-index rebuild.
+2026-11-02 08:12:08:192 [INFO] [init] Final mapping sort completed in 5.1ms.
+2026-11-02 08:12:08:192 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 5.3 ms (+5.6 ms, total 1666.6 ms, cpu 5.2 ms).
+2026-11-02 08:12:08:193 [START] [BootProfile] Boot stage started: Keymap engine started.
+2026-11-02 08:12:08:221 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 28.2 ms (+28.5 ms, total 1695.1 ms, cpu 24.6 ms).
+2026-11-02 08:12:08:221 [INFO] [BootProfile] Boot stage requires: Keymap engine started loaded 5 module(s) in 13.0 ms (own time); slowest: unicode_case.data=9.0 ms.
+2026-11-02 08:12:08:221 [START] [BootProfile] Boot stage started: UI: karabiner.init.
+2026-11-02 08:12:08:297 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 75.8 ms (+76.3 ms, total 1771.4 ms, cpu 70.1 ms).
+2026-11-02 08:12:08:298 [INFO] [BootProfile] Boot stage requires: UI: karabiner.init loaded 2 module(s) in 1.0 ms (own time).
+2026-11-02 08:12:08:298 [START] [BootProfile] Boot stage started: UI: menu.start (menubar + state sync + engines + LLM handler).
+2026-11-02 08:12:08:298 [DEBUG] [init] Starting user interface components…
+2026-11-02 08:12:08:298 [START] [menu_paths] Initializing paths editor…
+2026-11-02 08:12:08:298 [SUCCESS] [menu_paths] Paths editor initialized.
+2026-11-02 08:12:08:338 [DEBUG] [BootProfile] ↑ "Boot sub-stage: %s / %s took %.1f ms." repeated 1 more time between 2026-11-02 08:12:07:989 and 2026-11-02 08:12:07:989 (last: Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / extension packs took 6.5 ms.).
+2026-11-02 08:12:08:339 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-11-02 08:12:07:907 and 2026-11-02 08:12:08:222 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-11-02 08:12:08:491 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 193.0 ms (+193.4 ms, total 1964.8 ms, cpu 165.0 ms).
+2026-11-02 08:12:08:491 [INFO] [BootProfile] Boot stage requires: UI: menu.start (menubar + state sync + engines + LLM handler) loaded 33 module(s) in 67.4 ms (own time); slowest: ui.menu.menu_llm.models_manager_mlx_download=12.5 ms, ui.menu.menu_llm.models_manager_mlx_server=5.0 ms, ui.menu.menu_llm.models_manager_mlx_hf=4.6 ms, hs.spaces=4.4 ms, modules.shortcuts.magic_editor=4.1 ms, hs.axuielement=3.3 ms.
+2026-11-02 08:12:08:491 [START] [BootProfile] Boot stage started: UI: menu ready.
+2026-11-02 08:12:08:491 [INFO] [init] User interface initialized successfully.
+2026-11-02 08:12:08:491 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.2 ms (+0.4 ms, total 1965.2 ms, cpu 0.1 ms).
+2026-11-02 08:12:08:491 [START] [BootProfile] Boot stage started: File watchers armed.
+2026-11-02 08:12:08:500 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 8.8 ms (+9.0 ms, total 1974.2 ms, cpu 6.8 ms).
+2026-11-02 08:12:08:500 [INFO] [BootProfile] Boot stage requires: File watchers armed loaded 1 module(s) in 4.7 ms (own time); slowest: infra.file_watchers=4.7 ms.
+2026-11-02 08:12:08:500 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-02 08:12:08:503 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 2.4 ms (+2.8 ms, total 1977.0 ms, cpu 2.4 ms).
+2026-11-02 08:12:08:503 [SUCCESS] [BootProfile] Boot complete in 1977 ms.
+2026-11-02 08:12:08:503 [INFO] [BootProfile] Boot CPU: 1250 ms of process CPU over 1977 ms of boot.
+2026-11-02 08:12:08:504 [INFO] [init] Reload completed in 2288 ms (reload call to boot complete).
+2026-11-02 08:12:08:505 [INFO] [init] ════════════════════════════════════════════════════════════
+2026-11-02 08:12:08:505 [INFO] [init] ✅ Hammerspoon boot SUCCESSFUL.
+2026-11-02 08:12:08:618 [INFO] [init] Boot complete — triggering Karabiner async deploy…
+2026-11-02 08:12:11:885 [INFO] [init] ↑ "════════════════════════════════════════════════════════════" repeated 1 more time between 2026-11-02 08:12:08:505 and 2026-11-02 08:12:08:505.
+2026-11-02 10:21:22:213 [INFO] [init] Log folder chosen: ~/perso/ergopti/ergopti_plus/ (directory; usable: true).
+2026-11-02 10:21:22:232 [INFO] [init] Native logger handshake committed: the launcher worker owns ~/perso/ergopti/ergopti_plus/.
+2026-11-02 10:21:22:789 [START] [config_migrate] Checking the config schema version of '~/perso/config/ergopti_plus/hammerspoon/config.toml' (hs driver)…
+2026-11-02 10:21:22:849 [ERROR] [config_migrate] Config migration of '~/perso/config/ergopti_plus/hammerspoon/config.toml' refused (newer): canonical schema version is newer than this build. The file is left untouched and this session will not write it.
+2026-11-02 10:21:22:862 [INFO] [init] config.toml is present at ~/perso/config/ergopti_plus/hammerspoon/config.toml: the full boot continues.
+2026-11-02 10:24:15:723 [INFO] [init] Log folder chosen: ~/perso/ergopti/ergopti_plus/ (directory; usable: true).
+2026-11-02 10:24:15:725 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 2.0 ms (+2.9 ms, total 537.8 ms, cpu 0.8 ms).
+2026-11-02 10:24:15:725 [START] [BootProfile] Boot stage started: Path: native asynchronous logger transport committed.
+2026-11-02 10:24:15:737 [INFO] [init] Native logger handshake committed: the launcher worker owns ~/perso/ergopti/ergopti_plus/.
+2026-11-02 10:24:15:738 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 12.7 ms (+13.4 ms, total 551.2 ms, cpu 8.1 ms).
+2026-11-02 10:24:15:738 [INFO] [BootProfile] Boot stage requires: Path: native asynchronous logger transport committed loaded 3 module(s) in 5.4 ms (own time).
+2026-11-02 10:24:15:738 [START] [BootProfile] Boot stage started: Path: runtime error capture installed.
+2026-11-02 10:24:15:738 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.5 ms, total 551.7 ms, cpu 0.1 ms).
+2026-11-02 10:24:15:739 [START] [BootProfile] Boot stage started: Factory-reset recovery reconciled.
+2026-11-02 10:24:15:741 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 2.5 ms (+2.7 ms, total 554.4 ms, cpu 1.4 ms).
+2026-11-02 10:24:15:742 [INFO] [BootProfile] Boot stage requires: Factory-reset recovery reconciled loaded 1 module(s) in 1.3 ms (own time).
+2026-11-02 10:24:15:742 [START] [BootProfile] Boot stage started: TOML hotstring cache wired.
+2026-11-02 10:24:15:744 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 2.5 ms (+2.8 ms, total 557.2 ms, cpu 1.5 ms).
+2026-11-02 10:24:15:744 [INFO] [BootProfile] Boot stage requires: TOML hotstring cache wired loaded 1 module(s) in 1.2 ms (own time).
+2026-11-02 10:24:15:744 [START] [BootProfile] Boot stage started: Config-dependent module requires.
+2026-11-02 10:24:16:138 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 393.6 ms (+394.0 ms, total 951.2 ms, cpu 251.1 ms).
+2026-11-02 10:24:16:138 [INFO] [BootProfile] Boot stage requires: Config-dependent module requires loaded 160 module(s) in 380.7 ms (own time); slowest: ui.menu.menu_llm=69.9 ms, ui.changelog=9.0 ms, platform.remap=7.5 ms, platform.remap.defaults=7.5 ms, ui.menu=7.0 ms, ui.menu.menu_hotstrings_custom=5.7 ms, updater.release_sources=5.2 ms, platform.remap.watchers=5.2 ms.
+2026-11-02 10:24:16:138 [START] [BootProfile] Boot stage started: Config schema migration.
+2026-11-02 10:24:16:142 [START] [config_migrate] Checking the config schema version of '<config>/hammerspoon/config.toml' (hs driver)…
+2026-11-02 10:24:16:168 [SUCCESS] [config_migrate] '<config>/hammerspoon/config.toml' is at schema v20; nothing to migrate.
+2026-11-02 10:24:16:169 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 30.4 ms (+30.7 ms, total 981.9 ms, cpu 28.0 ms).
+2026-11-02 10:24:16:169 [INFO] [BootProfile] Boot stage requires: Config schema migration loaded 2 module(s) in 4.7 ms (own time); slowest: config_unused_keys=3.3 ms.
+2026-11-02 10:24:16:169 [START] [BootProfile] Boot stage started: First-launch guard (onboarding check).
+2026-11-02 10:24:16:175 [INFO] [init] config.toml is present at <config>/hammerspoon/config.toml: the full boot continues.
+2026-11-02 10:24:16:176 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 6.3 ms (+7.0 ms, total 988.9 ms, cpu 4.8 ms).
+2026-11-02 10:24:16:176 [INFO] [BootProfile] Boot stage requires: First-launch guard (onboarding check) loaded 2 module(s) in 5.7 ms (own time); slowest: ui.onboarding=4.3 ms.
+2026-11-02 10:24:16:176 [START] [BootProfile] Boot stage started: Accessibility permission.
+2026-11-02 10:25:12:190 [DEBUG] [BootProfile] Boot stage 'Accessibility permission' resumed.
+2026-11-02 10:25:12:190 [INFO] [init] Accessibility permission is granted; arming input owners.
+2026-11-02 10:25:12:190 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 56014.2 ms (+56014.4 ms, total 57003.3 ms, cpu 997.9 ms).
+2026-11-02 10:25:12:191 [INFO] [BootProfile] Boot stage requires: Accessibility permission loaded 12 module(s) in 27.7 ms (own time); slowest: hs.libwebviewdatastore=5.1 ms, hs.libwebview=3.3 ms, hs.drawing_canvasWrapper=3.3 ms.
+2026-11-02 10:25:12:191 [START] [BootProfile] Boot stage started: Shortcuts pre-start.
+2026-11-02 10:25:12:191 [DEBUG] [init] Starting shortcuts module…
+2026-11-02 10:25:12:412 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 221.4 ms (+221.8 ms, total 57225.2 ms, cpu 58.1 ms).
+2026-11-02 10:25:12:413 [INFO] [BootProfile] Boot stage requires: Shortcuts pre-start loaded 15 module(s) in 38.9 ms (own time); slowest: layouts.registry_store=5.0 ms, layouts.keylayout=4.9 ms, layouts.composer=3.9 ms, modules.keymap.layout_registry=3.7 ms.
+2026-11-02 10:25:12:413 [START] [BootProfile] Boot stage started: Script control engine started (panic-button eventtap).
+2026-11-02 10:25:12:413 [DEBUG] [init] Starting script control engine…
+2026-11-02 10:25:12:413 [INFO] [init] Main modules initialized successfully.
+2026-11-02 10:25:12:414 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 1.1 ms (+1.5 ms, total 57226.7 ms, cpu 0.3 ms).
+2026-11-02 10:25:12:414 [START] [BootProfile] Boot stage started: MLX server cleanup started asynchronously.
+2026-11-02 10:25:12:420 [START] [config_overrides] Applying user overrides from '<config>/hammerspoon/config.toml'…
+2026-11-02 10:25:12:420 [SUCCESS] [config_overrides] User overrides applied (0 value(s)).
+2026-11-02 10:25:12:429 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 14.9 ms (+15.2 ms, total 57241.9 ms, cpu 12.8 ms).
+2026-11-02 10:25:12:433 [INFO] [BootProfile] Boot stage requires: MLX server cleanup started asynchronously loaded 3 module(s) in 5.9 ms (own time); slowest: infra.config_overrides=3.4 ms.
+2026-11-02 10:25:12:433 [START] [BootProfile] Boot stage started: LLM backend bootstrap.
+2026-11-02 10:25:12:434 [DEBUG] [init] LLM bootstrap is waiting for MLX boot cleanup settlement.
+2026-11-02 10:25:12:434 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 0.6 ms (+4.8 ms, total 57246.7 ms, cpu 0.5 ms).
+2026-11-02 10:25:12:434 [START] [BootProfile] Boot stage started: TOML discovery + ordering.
+2026-11-02 10:25:12:438 [INFO] [init] No shared hotstring groups in '<config>/' — using bundled directory '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/'.
+2026-11-02 10:25:12:475 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 40.9 ms (+41.5 ms, total 57288.1 ms, cpu 27.0 ms).
+2026-11-02 10:25:12:476 [INFO] [BootProfile] Boot stage requires: TOML discovery + ordering loaded 4 module(s) in 13.9 ms (own time); slowest: ui.hotstrings_config_window=5.9 ms, infra.extension_packs=4.4 ms.
+2026-11-02 10:25:12:476 [START] [BootProfile] Boot stage started: Hotstring groups registered (personal + dynamic + common).
+2026-11-02 10:25:12:502 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / personal hotstrings took 26.0 ms.
+2026-11-02 10:25:12:510 [DEBUG] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / extension packs took 8.2 ms.
+2026-11-02 10:25:12:510 [DEBUG] [init] Starting dynamic hotstrings module…
+2026-11-02 10:25:12:612 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / dynamic hotstrings took 102.0 ms.
+2026-11-02 10:25:12:612 [DEBUG] [init] Loading common TOML hotstring files…
+2026-11-02 10:25:12:613 [DEBUG] [init] Loading TOML file: autocorrection…
+2026-11-02 10:25:12:618 [DEBUG] [init] Loading TOML file: magickey…
+2026-11-02 10:25:12:641 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / common hotstring files took 28.9 ms.
+2026-11-02 10:25:12:641 [INFO] [init] Common hotstring load: 2 file(s), slowest 'magickey' 22.3 ms.
+2026-11-02 10:25:12:641 [DEBUG] [init] Loading language TOML file: french_autocorrection…
+2026-11-02 10:25:12:653 [DEBUG] [init] Loading language TOML file: french_magickey…
+2026-11-02 10:25:12:672 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / language hotstring files took 31.2 ms.
+2026-11-02 10:25:12:725 [INFO] [init] Loaded 2 TOML hotstring file(s) and 2 language file(s) in 113.6ms.
+2026-11-02 10:25:12:726 [INFO] [init] TOML snapshot cache: 14 hit(s), 0 miss(es), 0 write(s) (enabled=true).
+2026-11-02 10:25:12:726 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / choice catalogue and cache stats took 53.7 ms.
+2026-11-02 10:25:12:726 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 250.1 ms (+250.4 ms, total 57538.5 ms, cpu 225.5 ms).
+2026-11-02 10:25:12:726 [INFO] [BootProfile] Boot stage requires: Hotstring groups registered (personal + dynamic + common) loaded 2 module(s) in 4.8 ms (own time); slowest: infra.personal_hotstrings=3.7 ms.
+2026-11-02 10:25:12:726 [START] [BootProfile] Boot stage started: Final mapping sort + tail-index rebuild.
+2026-11-02 10:25:12:732 [INFO] [init] Final mapping sort completed in 6.0ms.
+2026-11-02 10:25:12:732 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 6.3 ms (+6.7 ms, total 57545.3 ms, cpu 6.2 ms).
+2026-11-02 10:25:12:733 [START] [BootProfile] Boot stage started: Keymap engine started.
+2026-11-02 10:25:12:796 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 62.9 ms (+63.4 ms, total 57608.6 ms, cpu 38.7 ms).
+2026-11-02 10:25:12:796 [INFO] [BootProfile] Boot stage requires: Keymap engine started loaded 7 module(s) in 17.6 ms (own time); slowest: hs.libaxuielement=5.1 ms, hs.axuielement=3.9 ms, unicode_case.data=3.6 ms.
+2026-11-02 10:25:12:796 [START] [BootProfile] Boot stage started: UI: karabiner.init.
+2026-11-02 10:25:12:915 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 118.3 ms (+118.8 ms, total 57727.4 ms, cpu 104.8 ms).
+2026-11-02 10:25:12:915 [INFO] [BootProfile] Boot stage requires: UI: karabiner.init loaded 2 module(s) in 3.0 ms (own time).
+2026-11-02 10:25:12:915 [START] [BootProfile] Boot stage started: UI: menu.start (menubar + state sync + engines + LLM handler).
+2026-11-02 10:25:12:915 [DEBUG] [init] Starting user interface components…
+2026-11-02 10:25:12:916 [START] [menu_paths] Initializing paths editor…
+2026-11-02 10:25:12:916 [SUCCESS] [menu_paths] Paths editor initialized.
+2026-11-02 10:25:12:967 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-11-02 10:25:12:413 and 2026-11-02 10:25:12:797 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-11-02 10:25:13:185 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 270.3 ms (+270.7 ms, total 57998.2 ms, cpu 206.8 ms).
+2026-11-02 10:25:13:186 [INFO] [BootProfile] Boot stage requires: UI: menu.start (menubar + state sync + engines + LLM handler) loaded 31 module(s) in 85.3 ms (own time); slowest: modules.updater.channel=10.2 ms, ui.menu.menu_llm.models_manager_mlx_download=6.4 ms, hs.spaces=6.2 ms, ui.menu.menu_llm.models_manager_mlx_server=5.3 ms, ui.menu.menu_llm.models_manager_mlx_hf=5.0 ms, infra.personal_shortcuts=4.3 ms, modules.shortcuts.magic_editor=4.0 ms, adapters.keyboard_source_probe=3.3 ms.
+2026-11-02 10:25:13:186 [START] [BootProfile] Boot stage started: UI: menu ready.
+2026-11-02 10:25:13:187 [INFO] [init] User interface initialized successfully.
+2026-11-02 10:25:13:187 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.7 ms (+1.2 ms, total 57999.4 ms, cpu 1.7 ms).
+2026-11-02 10:25:13:188 [START] [BootProfile] Boot stage started: File watchers armed.
+2026-11-02 10:25:13:202 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 13.9 ms (+15.5 ms, total 58014.9 ms, cpu 7.8 ms).
+2026-11-02 10:25:13:203 [INFO] [BootProfile] Boot stage requires: File watchers armed loaded 1 module(s) in 6.0 ms (own time); slowest: infra.file_watchers=6.0 ms.
+2026-11-02 10:25:13:203 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-02 10:25:13:206 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 3.4 ms (+3.9 ms, total 58018.8 ms, cpu 2.7 ms).
+2026-11-02 10:25:13:207 [SUCCESS] [BootProfile] Boot complete in 58020 ms.
+2026-11-02 10:25:13:207 [INFO] [BootProfile] Boot CPU: 2344 ms of process CPU over 58020 ms of boot.
+2026-11-02 10:25:13:208 [WARNING] [BootProfile] Over budget: boot took 58020 ms (budget 2500 ms).
+2026-11-02 10:25:13:209 [INFO] [init] ════════════════════════════════════════════════════════════
+2026-11-02 10:25:13:209 [INFO] [init] ✅ Hammerspoon boot SUCCESSFUL.
+2026-11-02 10:25:13:465 [INFO] [init] Boot complete — triggering Karabiner async deploy…
+2026-11-02 10:25:13:474 [INFO] [init] Bootstrapping default LLM backend: api
+2026-11-02 10:25:16:565 [INFO] [init] ↑ "════════════════════════════════════════════════════════════" repeated 1 more time between 2026-11-02 10:25:13:209 and 2026-11-02 10:25:13:209.
+2026-11-02 10:29:21:618 [INFO] [init] Hammerspoon local teardown started (reload).
+2026-11-02 10:29:21:619 [DEBUG] [init] Owned Ollama teardown is awaiting exact task completion.
+2026-11-02 10:29:21:724 [INFO] [init] Hammerspoon local owners stopped; draining acknowledged diagnostics.
+2026-11-02 10:29:22:480 [INFO] [init] Log folder chosen: ~/perso/ergopti/ergopti_plus/ (directory; usable: true).
+2026-11-02 10:29:22:481 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 2.6 ms (+3.7 ms, total 555.7 ms, cpu 1.3 ms).
+2026-11-02 10:29:22:482 [START] [BootProfile] Boot stage started: Path: native asynchronous logger transport committed.
+2026-11-02 10:29:22:490 [INFO] [init] Native logger handshake committed: the launcher worker owns ~/perso/ergopti/ergopti_plus/.
+2026-11-02 10:29:22:491 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 9.0 ms (+9.7 ms, total 565.4 ms, cpu 4.3 ms).
+2026-11-02 10:29:22:492 [INFO] [BootProfile] Boot stage requires: Path: native asynchronous logger transport committed loaded 3 module(s) in 1.9 ms (own time).
+2026-11-02 10:29:22:492 [START] [BootProfile] Boot stage started: Path: runtime error capture installed.
+2026-11-02 10:29:22:492 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.3 ms (+0.6 ms, total 566.0 ms, cpu 0.1 ms).
+2026-11-02 10:29:22:492 [START] [BootProfile] Boot stage started: Factory-reset recovery reconciled.
+2026-11-02 10:29:22:495 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 2.7 ms (+2.9 ms, total 569.0 ms, cpu 1.7 ms).
+2026-11-02 10:29:22:495 [INFO] [BootProfile] Boot stage requires: Factory-reset recovery reconciled loaded 1 module(s) in 1.6 ms (own time).
+2026-11-02 10:29:22:495 [START] [BootProfile] Boot stage started: TOML hotstring cache wired.
+2026-11-02 10:29:22:497 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 2.2 ms (+2.6 ms, total 571.5 ms, cpu 1.7 ms).
+2026-11-02 10:29:22:497 [INFO] [BootProfile] Boot stage requires: TOML hotstring cache wired loaded 1 module(s) in 1.4 ms (own time).
+2026-11-02 10:29:22:497 [START] [BootProfile] Boot stage started: Config-dependent module requires.
+2026-11-02 10:29:22:955 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 457.1 ms (+457.3 ms, total 1028.8 ms, cpu 279.5 ms).
+2026-11-02 10:29:22:955 [INFO] [BootProfile] Boot stage requires: Config-dependent module requires loaded 160 module(s) in 443.0 ms (own time); slowest: ui.menu.menu_llm=93.6 ms, ui.menu.menu_llm.menu_layout=20.0 ms, ui.changelog=8.6 ms, platform.remap=8.5 ms, ui.menu=8.0 ms, platform.remap.defaults=7.9 ms, platform.remap.generator=6.6 ms, ui.menu.menu_hotstrings_custom=6.1 ms.
+2026-11-02 10:29:22:955 [START] [BootProfile] Boot stage started: Config schema migration.
+2026-11-02 10:29:22:959 [START] [config_migrate] Checking the config schema version of '<config>/hammerspoon/config.toml' (hs driver)…
+2026-11-02 10:29:22:988 [SUCCESS] [config_migrate] '<config>/hammerspoon/config.toml' is at schema v20; nothing to migrate.
+2026-11-02 10:29:22:989 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 33.7 ms (+34.2 ms, total 1063.0 ms, cpu 31.4 ms).
+2026-11-02 10:29:22:989 [INFO] [BootProfile] Boot stage requires: Config schema migration loaded 2 module(s) in 5.5 ms (own time); slowest: config_unused_keys=3.8 ms.
+2026-11-02 10:29:22:989 [START] [BootProfile] Boot stage started: First-launch guard (onboarding check).
+2026-11-02 10:29:22:997 [INFO] [init] config.toml is present at <config>/hammerspoon/config.toml: the full boot continues.
+2026-11-02 10:29:22:997 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 7.9 ms (+8.5 ms, total 1071.5 ms, cpu 5.3 ms).
+2026-11-02 10:29:22:997 [INFO] [BootProfile] Boot stage requires: First-launch guard (onboarding check) loaded 2 module(s) in 7.0 ms (own time); slowest: ui.onboarding=5.6 ms.
+2026-11-02 10:29:22:997 [START] [BootProfile] Boot stage started: Accessibility permission.
+2026-11-02 10:29:22:998 [INFO] [init] Accessibility permission is granted; arming input owners.
+2026-11-02 10:29:22:998 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 0.8 ms (+1.0 ms, total 1072.5 ms, cpu 0.7 ms).
+2026-11-02 10:29:22:999 [START] [BootProfile] Boot stage started: Shortcuts pre-start.
+2026-11-02 10:29:22:999 [DEBUG] [init] Starting shortcuts module…
+2026-11-02 10:29:23:224 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 225.9 ms (+226.2 ms, total 1298.7 ms, cpu 54.2 ms).
+2026-11-02 10:29:23:225 [INFO] [BootProfile] Boot stage requires: Shortcuts pre-start loaded 20 module(s) in 39.1 ms (own time); slowest: modules.keymap.layout_registry=5.1 ms, hs.alert=3.7 ms, hs.libtask=3.7 ms, adapters.system_curl=3.5 ms.
+2026-11-02 10:29:23:225 [START] [BootProfile] Boot stage started: Script control engine started (panic-button eventtap).
+2026-11-02 10:29:23:225 [DEBUG] [init] Starting script control engine…
+2026-11-02 10:29:23:226 [INFO] [init] Main modules initialized successfully.
+2026-11-02 10:29:23:226 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 1.0 ms (+1.5 ms, total 1300.2 ms, cpu 0.5 ms).
+2026-11-02 10:29:23:227 [START] [BootProfile] Boot stage started: MLX server cleanup started asynchronously.
+2026-11-02 10:29:23:234 [START] [config_overrides] Applying user overrides from '<config>/hammerspoon/config.toml'…
+2026-11-02 10:29:23:234 [SUCCESS] [config_overrides] User overrides applied (0 value(s)).
+2026-11-02 10:29:23:246 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 19.6 ms (+20.2 ms, total 1320.4 ms, cpu 17.4 ms).
+2026-11-02 10:29:23:250 [INFO] [BootProfile] Boot stage requires: MLX server cleanup started asynchronously loaded 3 module(s) in 6.5 ms (own time); slowest: infra.config_overrides=4.0 ms.
+2026-11-02 10:29:23:250 [START] [BootProfile] Boot stage started: LLM backend bootstrap.
+2026-11-02 10:29:23:251 [DEBUG] [init] LLM bootstrap is waiting for MLX boot cleanup settlement.
+2026-11-02 10:29:23:251 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 1.2 ms (+5.0 ms, total 1325.4 ms, cpu 0.6 ms).
+2026-11-02 10:29:23:252 [START] [BootProfile] Boot stage started: TOML discovery + ordering.
+2026-11-02 10:29:23:255 [INFO] [init] No shared hotstring groups in '<config>/' — using bundled directory '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/'.
+2026-11-02 10:29:23:285 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 33.1 ms (+33.5 ms, total 1358.9 ms, cpu 26.3 ms).
+2026-11-02 10:29:23:285 [INFO] [BootProfile] Boot stage requires: TOML discovery + ordering loaded 4 module(s) in 11.5 ms (own time); slowest: ui.hotstrings_config_window=5.8 ms.
+2026-11-02 10:29:23:285 [START] [BootProfile] Boot stage started: Hotstring groups registered (personal + dynamic + common).
+2026-11-02 10:29:23:305 [DEBUG] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / personal hotstrings took 20.1 ms.
+2026-11-02 10:29:23:317 [DEBUG] [init] Starting dynamic hotstrings module…
+2026-11-02 10:29:23:401 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / dynamic hotstrings took 83.5 ms.
+2026-11-02 10:29:23:401 [DEBUG] [init] Loading common TOML hotstring files…
+2026-11-02 10:29:23:404 [DEBUG] [init] Loading TOML file: autocorrection…
+2026-11-02 10:29:23:409 [DEBUG] [init] Loading TOML file: magickey…
+2026-11-02 10:29:23:429 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / common hotstring files took 28.8 ms.
+2026-11-02 10:29:23:429 [INFO] [init] Common hotstring load: 2 file(s), slowest 'magickey' 20.4 ms.
+2026-11-02 10:29:23:429 [DEBUG] [init] Loading language TOML file: french_autocorrection…
+2026-11-02 10:29:23:440 [DEBUG] [init] Loading language TOML file: french_magickey…
+2026-11-02 10:29:23:458 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / language hotstring files took 28.8 ms.
+2026-11-02 10:29:23:574 [INFO] [init] Loaded 2 TOML hotstring file(s) and 2 language file(s) in 173.9ms.
+2026-11-02 10:29:23:575 [INFO] [init] TOML snapshot cache: 14 hit(s), 0 miss(es), 0 write(s) (enabled=true).
+2026-11-02 10:29:23:575 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / choice catalogue and cache stats took 116.6 ms.
+2026-11-02 10:29:23:575 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 289.8 ms (+290.1 ms, total 1649.0 ms, cpu 199.0 ms).
+2026-11-02 10:29:23:581 [INFO] [BootProfile] Boot stage requires: Hotstring groups registered (personal + dynamic + common) loaded 2 module(s) in 6.6 ms (own time); slowest: infra.personal_hotstrings=3.4 ms, infra.common_hotstrings_boot=3.2 ms.
+2026-11-02 10:29:23:581 [START] [BootProfile] Boot stage started: Final mapping sort + tail-index rebuild.
+2026-11-02 10:29:23:596 [INFO] [init] Final mapping sort completed in 7.4ms.
+2026-11-02 10:29:23:596 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 14.9 ms (+21.5 ms, total 1670.5 ms, cpu 7.5 ms).
+2026-11-02 10:29:23:597 [START] [BootProfile] Boot stage started: Keymap engine started.
+2026-11-02 10:29:23:669 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 72.1 ms (+72.4 ms, total 1742.9 ms, cpu 31.5 ms).
+2026-11-02 10:29:23:675 [INFO] [BootProfile] Boot stage requires: Keymap engine started loaded 7 module(s) in 51.9 ms (own time); slowest: adapters.one_shot_shift=21.2 ms, modules.keymap.one_shot_shift=13.0 ms, hs.axuielement=5.6 ms, unicode_case.data=5.2 ms, hs.libaxuielement=3.1 ms.
+2026-11-02 10:29:23:675 [START] [BootProfile] Boot stage started: UI: karabiner.init.
+2026-11-02 10:29:23:811 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 136.5 ms (+142.8 ms, total 1885.7 ms, cpu 92.7 ms).
+2026-11-02 10:29:23:812 [INFO] [BootProfile] Boot stage requires: UI: karabiner.init loaded 2 module(s) in 2.4 ms (own time).
+2026-11-02 10:29:23:813 [START] [BootProfile] Boot stage started: UI: menu.start (menubar + state sync + engines + LLM handler).
+2026-11-02 10:29:23:814 [DEBUG] [init] Starting user interface components…
+2026-11-02 10:29:23:818 [START] [menu_paths] Initializing paths editor…
+2026-11-02 10:29:23:818 [SUCCESS] [menu_paths] Paths editor initialized.
+2026-11-02 10:29:23:866 [DEBUG] [BootProfile] ↑ "Boot sub-stage: %s / %s took %.1f ms." repeated 1 more time between 2026-11-02 10:29:23:317 and 2026-11-02 10:29:23:317 (last: Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / extension packs took 11.9 ms.).
+2026-11-02 10:29:23:868 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-11-02 10:29:23:226 and 2026-11-02 10:29:23:676 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-11-02 10:29:24:049 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 235.7 ms (+237.0 ms, total 2122.7 ms, cpu 171.7 ms).
+2026-11-02 10:29:24:049 [INFO] [BootProfile] Boot stage requires: UI: menu.start (menubar + state sync + engines + LLM handler) loaded 31 module(s) in 92.7 ms (own time); slowest: ui.menu.menu_llm.models_manager_mlx_repo=8.2 ms, hs.spaces=7.4 ms, ui.menu.menu_llm.models_manager_mlx_download=6.7 ms, ui.menu.start_at_login=6.4 ms, ui.menu.menu_llm.models_manager_mlx_hf=5.2 ms, ui.menu.menu_llm.models_manager_mlx_server=4.7 ms, infra.personal_shortcuts=4.6 ms, ui.window_toggle=4.3 ms.
+2026-11-02 10:29:24:049 [START] [BootProfile] Boot stage started: UI: menu ready.
+2026-11-02 10:29:24:050 [INFO] [init] User interface initialized successfully.
+2026-11-02 10:29:24:050 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.7 ms (+1.2 ms, total 2123.9 ms, cpu 0.1 ms).
+2026-11-02 10:29:24:050 [START] [BootProfile] Boot stage started: File watchers armed.
+2026-11-02 10:29:24:070 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 20.3 ms (+20.6 ms, total 2144.5 ms, cpu 7.2 ms).
+2026-11-02 10:29:24:071 [INFO] [BootProfile] Boot stage requires: File watchers armed loaded 1 module(s) in 6.1 ms (own time); slowest: infra.file_watchers=6.1 ms.
+2026-11-02 10:29:24:071 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-02 10:29:24:074 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 3.0 ms (+3.8 ms, total 2148.4 ms, cpu 2.7 ms).
+2026-11-02 10:29:24:075 [SUCCESS] [BootProfile] Boot complete in 2149 ms.
+2026-11-02 10:29:24:075 [INFO] [BootProfile] Boot CPU: 1315 ms of process CPU over 2149 ms of boot.
+2026-11-02 10:29:24:076 [INFO] [init] Reload completed in 2462 ms (reload call to boot complete).
+2026-11-02 10:29:24:077 [INFO] [init] ════════════════════════════════════════════════════════════
+2026-11-02 10:29:24:077 [INFO] [init] ✅ Hammerspoon boot SUCCESSFUL.
+2026-11-02 10:29:24:190 [INFO] [init] Boot complete — triggering Karabiner async deploy…
+2026-11-02 10:29:24:290 [INFO] [init] Bootstrapping default LLM backend: api
+2026-11-02 10:29:26:293 [INFO] [init] ↑ "════════════════════════════════════════════════════════════" repeated 1 more time between 2026-11-02 10:29:24:077 and 2026-11-02 10:29:24:077.

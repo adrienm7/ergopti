@@ -1,0 +1,376 @@
+2026-11-02 08:05:02:265 [DEBUG] [menu_llm] Helper sweep 'expander' dispatched.
+2026-11-02 08:05:02:963 [START] [BootProfile] Boot stage started: TOML hotstring cache wired.
+2026-11-02 08:05:02:965 [START] [adapters.toml_cache] Initializing TOML hotstring cache…
+2026-11-02 08:05:02:965 [SUCCESS] [adapters.toml_cache] TOML hotstring cache ready at '~/Library/Caches/ergopti_plus/toml_hotstrings'.
+2026-11-02 08:05:02:965 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 2.2 ms (+2.5 ms, total 504.9 ms, cpu 1.7 ms).
+2026-11-02 08:05:02:966 [INFO] [BootProfile] Boot stage requires: TOML hotstring cache wired loaded 1 module(s) in 1.5 ms (own time).
+2026-11-02 08:05:03:162 [DEBUG] [menu] Module "hotstrings menu" loaded successfully (ui.menu.menu_hotstrings).
+2026-11-02 08:05:03:331 [DEBUG] [menu] Module "dynamic hotstrings engine" loaded successfully (modules.dynamic_hotstrings).
+2026-11-02 08:05:03:352 [INFO] [BootProfile] Boot stage requires: Config-dependent module requires loaded 160 module(s) in 371.8 ms (own time); slowest: ui.menu.menu_llm=38.4 ms, platform.remap=8.7 ms, ui.changelog=8.0 ms, platform.remap.defaults=7.7 ms, ui.menu=7.2 ms, ui.menu.menu_hotstrings_custom=6.6 ms, modules.llm.ollama_deps_checker=6.2 ms, platform.remap.generator=5.9 ms.
+2026-11-02 08:05:03:534 [INFO] [init] No shared hotstring groups in '<config>/' — using bundled directory '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/'.
+2026-11-02 08:05:03:548 [SUCCESS] [extension_packs] Discovered 2 extension(s): 2 hotstring pack(s), 6 bound geometry file(s).
+2026-11-02 08:05:03:548 [START] [hotstrings_config] Initializing…
+2026-11-02 08:05:03:553 [SUCCESS] [hotstrings_config] Initialized (override file: '<config>/hotstrings_config.toml').
+2026-11-02 08:05:03:559 [DEBUG] [hotstrings_config_window] Personal dir configured: '<config>/hotstrings/'.
+2026-11-02 08:05:03:559 [DEBUG] [hotstrings_config_window] Extensions dir configured: '~/perso/ergopti/static/ergopti_plus/macos/../extensions'.
+2026-11-02 08:05:03:561 [INFO] [BootProfile] Boot stage requires: TOML discovery + ordering loaded 4 module(s) in 12.9 ms (own time); slowest: ui.hotstrings_config_window=5.5 ms, hotstrings.catalogue_files=4.0 ms.
+2026-11-02 08:05:03:561 [START] [BootProfile] Boot stage started: Hotstring groups registered (personal + dynamic + common).
+2026-11-02 08:05:03:575 [DEBUG] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / personal hotstrings took 14.6 ms.
+2026-11-02 08:05:03:582 [DEBUG] [extension_packs] Registered 2 extension hotstring pack(s).
+2026-11-02 08:05:03:582 [DEBUG] [init] Starting dynamic hotstrings module…
+2026-11-02 08:05:03:582 [DEBUG] [dynamic_hotstrings] Starting the personal info tracker…
+2026-11-02 08:05:03:582 [DEBUG] [dynamic_hotstrings] Injecting personal data into the rules engine…
+2026-11-02 08:05:03:582 [DEBUG] [dynamic_hotstrings.rules] Personal data received before keymap wiring; prefix registration deferred to M.start().
+2026-11-02 08:05:03:582 [DEBUG] [dynamic_hotstrings] Starting the dynamic rules engine…
+2026-11-02 08:05:03:582 [DEBUG] [dynamic_hotstrings.rules] Starting dynamic rules engine…
+2026-11-02 08:05:03:582 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+2026-11-02 08:05:03:582 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-02 08:05:03:657 [DEBUG] [dynamic_hotstrings.rules] Registering prefix-based dynamic hotstrings…
+2026-11-02 08:05:03:657 [INFO] [dynamic_hotstrings.rules] Prefix-based dynamic hotstrings registered.
+2026-11-02 08:05:03:657 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+2026-11-02 08:05:03:657 [INFO] [dynamic_hotstrings.rules] Dynamic rules engine started successfully.
+2026-11-02 08:05:03:657 [INFO] [dynamic_hotstrings] The dynamic hotstrings core initialized successfully.
+2026-11-02 08:05:03:657 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / dynamic hotstrings took 75.4 ms.
+2026-11-02 08:05:03:657 [DEBUG] [init] Loading common TOML hotstring files…
+2026-11-02 08:05:03:684 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / common hotstring files took 26.6 ms.
+2026-11-02 08:05:03:684 [INFO] [init] Common hotstring load: 2 file(s), slowest 'magickey' 20.6 ms.
+2026-11-02 08:05:03:713 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / language hotstring files took 29.0 ms.
+2026-11-02 08:05:03:758 [SUCCESS] [infra.hotstring_choice_catalogue] Hotstring choice catalogue published.
+2026-11-02 08:05:03:758 [INFO] [init] Loaded 2 TOML hotstring file(s) and 2 language file(s) in 100.7ms.
+2026-11-02 08:05:03:758 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / choice catalogue and cache stats took 45.4 ms.
+2026-11-02 08:05:03:758 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 197.5 ms (+197.8 ms, total 1298.0 ms, cpu 182.7 ms).
+2026-11-02 08:05:03:758 [INFO] [BootProfile] Boot stage requires: Hotstring groups registered (personal + dynamic + common) loaded 2 module(s) in 4.1 ms (own time); slowest: infra.personal_hotstrings=3.1 ms.
+2026-11-02 08:05:03:919 [DEBUG] [BootProfile] ↑ "Boot sub-stage: %s / %s took %.1f ms." repeated 1 more time between 2026-11-02 08:05:03:582 and 2026-11-02 08:05:03:582 (last: Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / extension packs took 6.4 ms.).
+2026-11-02 08:05:03:920 [DEBUG] [dynamic_hotstrings.shared] ↑ "Rule registered: suffix='%s' section='%s'." repeated 2 more times between 2026-11-02 08:05:03:582 and 2026-11-02 08:05:03:582 (last: Rule registered: suffix='date' section='datelongfr'.).
+2026-11-02 08:05:03:921 [DEBUG] [keymap.llm_bridge] LLM chain after hotstring: on.
+2026-11-02 08:05:03:921 [DEBUG] [dynamic_hotstrings.rules] Trigger char: '★'.
+2026-11-02 08:05:03:926 [DEBUG] [adapters.toml_cache] ↑ "Snapshot hit for '%s'." repeated 20 more times between 2026-11-02 08:05:03:566 and 2026-11-02 08:05:03:915 (last: Snapshot hit for '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/autocorrection.toml'.).
+2026-11-02 08:05:03:926 [DEBUG] [keymap] ↑ "Delay '%s': %.3fs." repeated 6 more times between 2026-11-02 08:05:03:913 and 2026-11-02 08:05:03:915 (last: Delay 'dynamichotstrings': 2.000s.).
+2026-11-02 08:05:03:951 [INFO] [menu_state] Hotstring group sync: 12 enable / 0 disable in 0.0 ms.
+2026-11-02 08:05:27:080 [START] [BootProfile] Boot stage started: TOML hotstring cache wired.
+2026-11-02 08:05:27:083 [START] [adapters.toml_cache] Initializing TOML hotstring cache…
+2026-11-02 08:05:27:083 [SUCCESS] [adapters.toml_cache] TOML hotstring cache ready at '~/Library/Caches/ergopti_plus/toml_hotstrings'.
+2026-11-02 08:05:27:083 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 3.0 ms (+3.8 ms, total 459.8 ms, cpu 1.6 ms).
+2026-11-02 08:05:27:085 [INFO] [BootProfile] Boot stage requires: TOML hotstring cache wired loaded 1 module(s) in 1.3 ms (own time).
+2026-11-02 08:05:27:276 [DEBUG] [menu] Module "hotstrings menu" loaded successfully (ui.menu.menu_hotstrings).
+2026-11-02 08:05:27:450 [DEBUG] [menu] Module "dynamic hotstrings engine" loaded successfully (modules.dynamic_hotstrings).
+2026-11-02 08:05:27:683 [INFO] [init] No shared hotstring groups in '<config>/' — using bundled directory '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/'.
+2026-11-02 08:05:27:703 [SUCCESS] [extension_packs] Discovered 2 extension(s): 2 hotstring pack(s), 6 bound geometry file(s).
+2026-11-02 08:05:27:704 [START] [hotstrings_config] Initializing…
+2026-11-02 08:05:27:708 [SUCCESS] [hotstrings_config] Initialized (override file: '<config>/hotstrings_config.toml').
+2026-11-02 08:05:27:713 [DEBUG] [hotstrings_config_window] Personal dir configured: '<config>/hotstrings/'.
+2026-11-02 08:05:27:713 [DEBUG] [hotstrings_config_window] Extensions dir configured: '~/perso/ergopti/static/ergopti_plus/macos/../extensions'.
+2026-11-02 08:05:27:715 [INFO] [BootProfile] Boot stage requires: TOML discovery + ordering loaded 4 module(s) in 11.1 ms (own time); slowest: ui.hotstrings_config_window=4.7 ms.
+2026-11-02 08:05:27:715 [START] [BootProfile] Boot stage started: Hotstring groups registered (personal + dynamic + common).
+2026-11-02 08:05:27:733 [DEBUG] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / personal hotstrings took 18.6 ms.
+2026-11-02 08:05:27:743 [DEBUG] [extension_packs] Registered 2 extension hotstring pack(s).
+2026-11-02 08:05:27:743 [DEBUG] [init] Starting dynamic hotstrings module…
+2026-11-02 08:05:27:743 [DEBUG] [dynamic_hotstrings] Starting the personal info tracker…
+2026-11-02 08:05:27:746 [DEBUG] [dynamic_hotstrings] Injecting personal data into the rules engine…
+2026-11-02 08:05:27:746 [DEBUG] [dynamic_hotstrings.rules] Personal data received before keymap wiring; prefix registration deferred to M.start().
+2026-11-02 08:05:27:746 [DEBUG] [dynamic_hotstrings] Starting the dynamic rules engine…
+2026-11-02 08:05:27:746 [DEBUG] [dynamic_hotstrings.rules] Starting dynamic rules engine…
+2026-11-02 08:05:27:746 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+2026-11-02 08:05:27:746 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-02 08:05:27:822 [DEBUG] [dynamic_hotstrings.rules] Registering prefix-based dynamic hotstrings…
+2026-11-02 08:05:27:822 [INFO] [dynamic_hotstrings.rules] Prefix-based dynamic hotstrings registered.
+2026-11-02 08:05:27:822 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+2026-11-02 08:05:27:822 [INFO] [dynamic_hotstrings.rules] Dynamic rules engine started successfully.
+2026-11-02 08:05:27:822 [INFO] [dynamic_hotstrings] The dynamic hotstrings core initialized successfully.
+2026-11-02 08:05:27:822 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / dynamic hotstrings took 78.7 ms.
+2026-11-02 08:05:27:822 [DEBUG] [init] Loading common TOML hotstring files…
+2026-11-02 08:05:27:848 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / common hotstring files took 25.8 ms.
+2026-11-02 08:05:27:848 [INFO] [init] Common hotstring load: 2 file(s), slowest 'magickey' 18.9 ms.
+2026-11-02 08:05:27:874 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / language hotstring files took 26.5 ms.
+2026-11-02 08:05:27:917 [SUCCESS] [infra.hotstring_choice_catalogue] Hotstring choice catalogue published.
+2026-11-02 08:05:27:917 [INFO] [init] Loaded 2 TOML hotstring file(s) and 2 language file(s) in 94.9ms.
+2026-11-02 08:05:27:917 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / choice catalogue and cache stats took 42.9 ms.
+2026-11-02 08:05:27:917 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 202.7 ms (+203.0 ms, total 1293.8 ms, cpu 183.9 ms).
+2026-11-02 08:05:27:918 [INFO] [BootProfile] Boot stage requires: Hotstring groups registered (personal + dynamic + common) loaded 2 module(s) in 5.9 ms (own time); slowest: infra.personal_hotstrings=3.3 ms.
+2026-11-02 08:05:28:099 [DEBUG] [BootProfile] ↑ "Boot sub-stage: %s / %s took %.1f ms." repeated 1 more time between 2026-11-02 08:05:27:743 and 2026-11-02 08:05:27:743 (last: Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / extension packs took 10.2 ms.).
+2026-11-02 08:05:28:099 [DEBUG] [dynamic_hotstrings.shared] ↑ "Rule registered: suffix='%s' section='%s'." repeated 2 more times between 2026-11-02 08:05:27:746 and 2026-11-02 08:05:27:746 (last: Rule registered: suffix='date' section='datelongfr'.).
+2026-11-02 08:05:28:100 [DEBUG] [keymap.llm_bridge] LLM chain after hotstring: on.
+2026-11-02 08:05:28:101 [DEBUG] [dynamic_hotstrings.rules] Trigger char: '★'.
+2026-11-02 08:05:28:106 [DEBUG] [adapters.toml_cache] ↑ "Snapshot hit for '%s'." repeated 20 more times between 2026-11-02 08:05:27:722 and 2026-11-02 08:05:28:095 (last: Snapshot hit for '~/perso/ergopti/static/ergopti_plus/_shared/../../../static/layouts/registry/ergopti/hotstrings/rolls.toml'.).
+2026-11-02 08:05:28:135 [INFO] [menu_state] Hotstring group sync: 12 enable / 0 disable in 0.0 ms.
+2026-11-02 08:05:31:667 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-02 08:05:31:667 [DEBUG] [hotstring_counter] Counted: common=2813 ergopti=194 personal=264 ext=0.
+2026-11-02 08:05:31:685 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-02 08:05:57:480 [INFO] [field_check.session] Boot stage 3 of the slowest: Hotstring groups registered (personal + dynamic + common) in 202.7 ms.
+2026-11-02 08:06:43:503 [START] [field_check] Field check 'hotstring_roundtrip' started.
+2026-11-02 08:06:44:245 [DEBUG] [keymap.llm_bridge] Hotstring 'h' → 'heure' [star].
+2026-11-02 08:06:45:141 [TRACE] [keymap.expander] Performing replacement (11 deletion(s))…
+2026-11-02 08:06:45:148 [DONE] [keymap.expander] Replacement complete.
+2026-11-02 08:06:45:148 [DEBUG] [keymap.expander] Terminator-expand: 'hammerspoon' → <bundled>.
+2026-11-02 08:06:45:150 [DONE] [keymap.terminator_replay] Terminator replay activated (replacement transaction complete).
+2026-11-02 08:06:45:616 [INFO] [field_check] Field check result: check=hotstring_roundtrip verdict=pass steps=8 hotstring_trigger=pass:candidates_301 hotstring_trigger_chars=info:11 space_consumed=info:no scratch_focus=pass:focused keys_posted=pass:13 hotstring_expanded=pass:exact terminator_to_text_ms=info:81 front_restored=pass:yes
+2026-11-02 08:06:45:616 [DONE] [field_check] Field check 'hotstring_roundtrip' finished: pass.
+2026-11-02 08:06:45:625 [INFO] [field_run] Field run step result: step=hotstring_roundtrip verdict=pass codes=none
+2026-11-02 08:06:46:880 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-02 08:06:46:881 [DEBUG] [hotstring_counter] Counted: common=2813 ergopti=194 personal=264 ext=0.
+2026-11-02 08:06:46:900 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-02 08:06:46:991 [INFO] [menu] Menu tree rebuilt in 1313.7 ms (22 top-level item(s)). Slowest: shortcuts=1060.6 ms, keyboard_layout=117.2 ms, gestures=49.5 ms, llm=29.3 ms, hotstrings=27.9 ms.
+2026-11-02 08:10:28:257 [INFO] [phase_stats] Phase summary [boot_sub] over 300 s: dynamic hotstrings n=1 mean=78.71 max=78.71 total=78.7 ms | choice catalogue and cache stats n=1 mean=42.89 max=42.89 total=42.9 ms | language hotstring files n=1 mean=26.53 max=26.53 total=26.5 ms | common hotstring files n=1 mean=25.80 max=25.80 total=25.8 ms | personal hotstrings n=1 mean=18.56 max=18.56 total=18.6 ms | extension packs n=1 mean=10.20 max=10.20 total=10.2 ms.
+2026-11-02 08:10:28:258 [INFO] [phase_stats] Phase summary [hotpath] over 300 s: keydown n=18 mean=3.00 max=8.85 total=54.0 ms | preview.rebuild n=14 mean=1.45 max=6.29 total=20.3 ms | hotstring.match n=15 mean=0.55 max=7.48 total=8.2 ms | hotstring.expand n=1 mean=4.95 max=4.95 total=5.0 ms.
+2026-11-02 08:10:28:259 [INFO] [phase_stats] Phase summary [hotstring_load] over 300 s: common_file n=2 mean=11.31 max=18.88 total=22.6 ms.
+2026-11-02 08:10:28:262 [INFO] [phase_stats] Phase summary [menu_item] over 300 s: shortcuts n=2 mean=1033.32 max=1060.61 total=2066.6 ms | keyboard_layout n=2 mean=90.32 max=117.19 total=180.6 ms | gestures n=2 mean=47.70 max=49.55 total=95.4 ms | llm n=2 mean=30.17 max=31.01 total=60.3 ms | hotstrings n=2 mean=26.87 max=27.93 total=53.7 ms | metrics n=2 mean=17.93 max=29.18 total=35.9 ms | about n=2 mean=12.10 max=18.64 total=24.2 ms | debug n=2 mean=6.03 max=8.91 total=12.1 ms | configuration n=2 mean=2.60 max=3.30 total=5.2 ms | tap_holds n=2 mean=1.14 max=1.17 total=2.3 ms | apps n=2 mean=0.15 max=0.15 total=0.3 ms | language n=2 mean=0.04 max=0.04 total=0.1 ms | reload n=2 mean=0.01 max=0.01 total=0.0 ms | quit n=2 mean=0.01 max=0.01 total=0.0 ms.
+2026-11-02 08:10:39:292 [DEBUG] [adapters.toml_cache] ↑ "Snapshot hit for '%s'." repeated 4 more times between 2026-11-02 08:06:32:201 and 2026-11-02 08:06:44:244 (last: Snapshot hit for '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/french/magickey.toml'.).
+2026-11-02 08:11:48:426 [DEBUG] [keymap.llm_bridge] ↑ "Hotstring '%s' → '%s' [%s]." repeated 2 more times between 2026-11-02 08:06:44:249 and 2026-11-02 08:06:45:060 (last: Hotstring 'hammerspoon' → 'Hammerspoon' [autocorrect].).
+2026-11-02 08:12:06:309 [DEBUG] [menu_llm] Helper sweep 'expander' dispatched.
+2026-11-02 08:12:07:032 [START] [BootProfile] Boot stage started: TOML hotstring cache wired.
+2026-11-02 08:12:07:034 [START] [adapters.toml_cache] Initializing TOML hotstring cache…
+2026-11-02 08:12:07:034 [SUCCESS] [adapters.toml_cache] TOML hotstring cache ready at '~/Library/Caches/ergopti_plus/toml_hotstrings'.
+2026-11-02 08:12:07:035 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 2.8 ms (+3.2 ms, total 508.7 ms, cpu 1.5 ms).
+2026-11-02 08:12:07:035 [INFO] [BootProfile] Boot stage requires: TOML hotstring cache wired loaded 1 module(s) in 1.9 ms (own time).
+2026-11-02 08:12:07:220 [DEBUG] [menu] Module "hotstrings menu" loaded successfully (ui.menu.menu_hotstrings).
+2026-11-02 08:12:07:627 [DEBUG] [menu] Module "dynamic hotstrings engine" loaded successfully (modules.dynamic_hotstrings).
+2026-11-02 08:12:07:649 [INFO] [BootProfile] Boot stage requires: Config-dependent module requires loaded 160 module(s) in 600.8 ms (own time); slowest: ui.menu.menu_llm=201.8 ms, ui.menu.menu_tap_holds=52.8 ms, ui.changelog=10.3 ms, platform.remap=7.4 ms, platform.remap.defaults=7.1 ms, ui.menu=6.7 ms, ui.menu.menu_hotstrings_custom=6.4 ms, ui.menu.menu_llm.models_manager_ollama=6.0 ms.
+2026-11-02 08:12:07:931 [INFO] [init] No shared hotstring groups in '<config>/' — using bundled directory '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/'.
+2026-11-02 08:12:07:949 [SUCCESS] [extension_packs] Discovered 2 extension(s): 2 hotstring pack(s), 6 bound geometry file(s).
+2026-11-02 08:12:07:950 [START] [hotstrings_config] Initializing…
+2026-11-02 08:12:07:955 [SUCCESS] [hotstrings_config] Initialized (override file: '<config>/hotstrings_config.toml').
+2026-11-02 08:12:07:962 [DEBUG] [hotstrings_config_window] Personal dir configured: '<config>/hotstrings/'.
+2026-11-02 08:12:07:962 [DEBUG] [hotstrings_config_window] Extensions dir configured: '~/perso/ergopti/static/ergopti_plus/macos/../extensions'.
+2026-11-02 08:12:07:964 [INFO] [BootProfile] Boot stage requires: TOML discovery + ordering loaded 4 module(s) in 17.0 ms (own time); slowest: hotstrings.catalogue_files=6.6 ms, ui.hotstrings_config_window=6.3 ms.
+2026-11-02 08:12:07:964 [START] [BootProfile] Boot stage started: Hotstring groups registered (personal + dynamic + common).
+2026-11-02 08:12:07:982 [DEBUG] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / personal hotstrings took 18.0 ms.
+2026-11-02 08:12:07:989 [DEBUG] [extension_packs] Registered 2 extension hotstring pack(s).
+2026-11-02 08:12:07:989 [DEBUG] [init] Starting dynamic hotstrings module…
+2026-11-02 08:12:07:989 [DEBUG] [dynamic_hotstrings] Starting the personal info tracker…
+2026-11-02 08:12:07:990 [DEBUG] [dynamic_hotstrings] Injecting personal data into the rules engine…
+2026-11-02 08:12:07:990 [DEBUG] [dynamic_hotstrings.rules] Personal data received before keymap wiring; prefix registration deferred to M.start().
+2026-11-02 08:12:07:990 [DEBUG] [dynamic_hotstrings] Starting the dynamic rules engine…
+2026-11-02 08:12:07:990 [DEBUG] [dynamic_hotstrings.rules] Starting dynamic rules engine…
+2026-11-02 08:12:07:990 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+2026-11-02 08:12:07:990 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-02 08:12:08:069 [DEBUG] [dynamic_hotstrings.rules] Registering prefix-based dynamic hotstrings…
+2026-11-02 08:12:08:069 [INFO] [dynamic_hotstrings.rules] Prefix-based dynamic hotstrings registered.
+2026-11-02 08:12:08:069 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+2026-11-02 08:12:08:069 [INFO] [dynamic_hotstrings.rules] Dynamic rules engine started successfully.
+2026-11-02 08:12:08:069 [INFO] [dynamic_hotstrings] The dynamic hotstrings core initialized successfully.
+2026-11-02 08:12:08:069 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / dynamic hotstrings took 80.6 ms.
+2026-11-02 08:12:08:069 [DEBUG] [init] Loading common TOML hotstring files…
+2026-11-02 08:12:08:097 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / common hotstring files took 27.7 ms.
+2026-11-02 08:12:08:097 [INFO] [init] Common hotstring load: 2 file(s), slowest 'magickey' 20.8 ms.
+2026-11-02 08:12:08:137 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / language hotstring files took 39.6 ms.
+2026-11-02 08:12:08:187 [SUCCESS] [infra.hotstring_choice_catalogue] Hotstring choice catalogue published.
+2026-11-02 08:12:08:187 [INFO] [init] Loaded 2 TOML hotstring file(s) and 2 language file(s) in 117.2ms.
+2026-11-02 08:12:08:187 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / choice catalogue and cache stats took 50.3 ms.
+2026-11-02 08:12:08:187 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 222.6 ms (+223.0 ms, total 1661.0 ms, cpu 199.4 ms).
+2026-11-02 08:12:08:187 [INFO] [BootProfile] Boot stage requires: Hotstring groups registered (personal + dynamic + common) loaded 2 module(s) in 5.7 ms (own time); slowest: infra.personal_hotstrings=3.9 ms.
+2026-11-02 08:12:08:329 [DEBUG] [keymap] Delay 'dynamichotstrings': 2.000s.
+2026-11-02 08:12:08:338 [DEBUG] [BootProfile] ↑ "Boot sub-stage: %s / %s took %.1f ms." repeated 1 more time between 2026-11-02 08:12:07:989 and 2026-11-02 08:12:07:989 (last: Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / extension packs took 6.5 ms.).
+2026-11-02 08:12:08:338 [DEBUG] [dynamic_hotstrings.shared] ↑ "Rule registered: suffix='%s' section='%s'." repeated 2 more times between 2026-11-02 08:12:07:990 and 2026-11-02 08:12:07:990 (last: Rule registered: suffix='date' section='datelongfr'.).
+2026-11-02 08:12:08:339 [DEBUG] [keymap.llm_bridge] LLM chain after hotstring: on.
+2026-11-02 08:12:08:340 [DEBUG] [dynamic_hotstrings.rules] Trigger char: '★'.
+2026-11-02 08:12:08:345 [DEBUG] [adapters.toml_cache] ↑ "Snapshot hit for '%s'." repeated 20 more times between 2026-11-02 08:12:07:971 and 2026-11-02 08:12:08:334 (last: Snapshot hit for '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/autocorrection.toml'.).
+2026-11-02 08:12:08:376 [INFO] [menu_state] Hotstring group sync: 12 enable / 0 disable in 0.0 ms.
+2026-11-02 08:12:11:754 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-02 08:12:11:754 [DEBUG] [hotstring_counter] Counted: common=2813 ergopti=194 personal=264 ext=0.
+2026-11-02 08:12:11:772 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-02 08:12:11:885 [INFO] [menu] Menu tree rebuilt in 1197.7 ms (22 top-level item(s)). Slowest: shortcuts=978.8 ms, keyboard_layout=56.5 ms, gestures=51.5 ms, llm=26.9 ms, hotstrings=25.3 ms.
+2026-11-02 08:17:33:393 [INFO] [phase_stats] Phase summary [boot_sub] over 300 s: dynamic hotstrings n=1 mean=80.61 max=80.61 total=80.6 ms | choice catalogue and cache stats n=1 mean=50.29 max=50.29 total=50.3 ms | language hotstring files n=1 mean=39.57 max=39.57 total=39.6 ms | common hotstring files n=1 mean=27.69 max=27.69 total=27.7 ms | personal hotstrings n=1 mean=18.01 max=18.01 total=18.0 ms | extension packs n=1 mean=6.46 max=6.46 total=6.5 ms.
+2026-11-02 08:17:33:395 [INFO] [phase_stats] Phase summary [hotstring_load] over 300 s: common_file n=2 mean=12.63 max=20.79 total=25.3 ms.
+2026-11-02 08:17:33:397 [INFO] [phase_stats] Phase summary [menu_item] over 300 s: shortcuts n=3 mean=1069.12 max=1119.63 total=3207.3 ms | keyboard_layout n=3 mean=101.78 max=195.75 total=305.3 ms | gestures n=3 mean=51.78 max=55.17 total=155.3 ms | llm n=3 mean=28.28 max=30.90 total=84.9 ms | hotstrings n=3 mean=26.36 max=27.76 total=79.1 ms | metrics n=3 mean=12.09 max=15.27 total=36.3 ms | about n=3 mean=9.31 max=18.71 total=27.9 ms | debug n=3 mean=5.14 max=9.62 total=15.4 ms | configuration n=3 mean=2.26 max=3.29 total=6.8 ms | tap_holds n=3 mean=0.97 max=1.21 total=2.9 ms | apps n=3 mean=0.16 max=0.17 total=0.5 ms | language n=3 mean=0.04 max=0.04 total=0.1 ms | reload n=3 mean=0.01 max=0.01 total=0.0 ms | quit n=3 mean=0.00 max=0.00 total=0.0 ms.
+2026-11-02 08:33:14:077 [DEBUG] [builder] ↑ "Building hotstrings submenu…" repeated 2 more times between 2026-11-02 08:15:36:605 and 2026-11-02 08:15:37:992.
+2026-11-02 08:33:14:077 [DEBUG] [hotstring_counter] ↑ "Counted: common=%d ergopti=%d personal=%d ext=%d." repeated 2 more times between 2026-11-02 08:15:36:605 and 2026-11-02 08:15:37:993 (last: Counted: common=2813 ergopti=194 personal=264 ext=0.).
+2026-11-02 08:33:14:077 [DEBUG] [builder] ↑ "Built manifest row '%s' (%d extension(s))." repeated 2 more times between 2026-11-02 08:15:36:625 and 2026-11-02 08:15:38:011 (last: Built manifest row 'hotstring_extensions' (2 extension(s)).).
+2026-11-02 08:33:14:077 [INFO] [menu] ↑ "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s" repeated 2 more times between 2026-11-02 08:15:36:712 and 2026-11-02 08:15:38:109 (last: Menu tree rebuilt in 1302.0 ms (22 top-level item(s)). Slowest: shortcuts=1108.9 ms, keyboard_layout=53.1 ms, gestures=48.6 ms, llm=30.9 ms, hotstrings=26.0 ms.).
+2026-11-02 10:02:11:959 [WARNING] [preferences] Slow preferences save 2048 ms (prepare=1272 write=776 ms; operations=292; prepare: snapshot=6 decode=0 models=0 sparse=260 wrap=10 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=989 ms; proposed=294; metadata_commands=2 in 157 ms; lua_heap=34->47 MB).
+2026-11-02 10:02:13:404 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-02 10:02:13:404 [DEBUG] [hotstring_counter] Counted: common=2813 ergopti=194 personal=264 ext=0.
+2026-11-02 10:02:13:425 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-02 10:02:13:542 [INFO] [menu] Menu tree rebuilt in 1450.4 ms (22 top-level item(s)). Slowest: shortcuts=1173.7 ms, keyboard_layout=107.8 ms, gestures=60.1 ms, llm=32.7 ms, hotstrings=29.3 ms.
+2026-11-02 10:02:22:218 [INFO] [phase_stats] Phase summary [hotpath] over 300 s: keydown n=13 mean=0.28 max=1.72 total=3.6 ms | preview.rebuild n=1 mean=1.08 max=1.08 total=1.1 ms | hotstring.match n=1 mean=0.01 max=0.01 total=0.0 ms.
+2026-11-02 10:02:22:219 [INFO] [phase_stats] Phase summary [menu_item] over 300 s: shortcuts n=2 mean=1103.62 max=1173.72 total=2207.2 ms | keyboard_layout n=2 mean=84.21 max=107.78 total=168.4 ms | gestures n=2 mean=55.31 max=60.06 total=110.6 ms | llm n=2 mean=34.33 max=35.94 total=68.7 ms | hotstrings n=2 mean=27.68 max=29.27 total=55.4 ms | debug n=2 mean=6.34 max=9.57 total=12.7 ms | metrics n=2 mean=6.22 max=6.73 total=12.4 ms | about n=2 mean=5.71 max=6.07 total=11.4 ms | configuration n=2 mean=5.34 max=8.81 total=10.7 ms | tap_holds n=2 mean=0.78 max=0.79 total=1.6 ms | language n=2 mean=0.36 max=0.68 total=0.7 ms | apps n=2 mean=0.18 max=0.19 total=0.4 ms | reload n=2 mean=0.01 max=0.01 total=0.0 ms | quit n=2 mean=0.00 max=0.01 total=0.0 ms.
+2026-11-02 10:08:22:345 [DEBUG] [builder] ↑ "Building hotstrings submenu…" repeated 1 more time between 2026-11-02 10:02:14:787 and 2026-11-02 10:02:14:787.
+2026-11-02 10:08:22:347 [DEBUG] [hotstring_counter] ↑ "Counted: common=%d ergopti=%d personal=%d ext=%d." repeated 1 more time between 2026-11-02 10:02:14:787 and 2026-11-02 10:02:14:787 (last: Counted: common=2813 ergopti=194 personal=264 ext=0.).
+2026-11-02 10:08:22:375 [DEBUG] [builder] ↑ "Built manifest row '%s' (%d extension(s))." repeated 1 more time between 2026-11-02 10:02:14:805 and 2026-11-02 10:02:14:805 (last: Built manifest row 'hotstring_extensions' (2 extension(s)).).
+2026-11-02 10:08:37:543 [INFO] [menu] ↑ "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s" repeated 1 more time between 2026-11-02 10:02:14:903 and 2026-11-02 10:02:14:903 (last: Menu tree rebuilt in 1234.5 ms (22 top-level item(s)). Slowest: shortcuts=1033.5 ms, keyboard_layout=60.6 ms, gestures=50.6 ms, llm=35.9 ms, hotstrings=26.1 ms.).
+2026-11-02 10:08:49:349 [WARNING] [preferences] Slow preferences save 1853 ms (prepare=1240 write=612 ms; operations=292; prepare: snapshot=4 decode=0 models=0 sparse=258 wrap=1 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=970 ms; proposed=294; metadata_commands=0 in 0 ms; lua_heap=32->43 MB).
+2026-11-02 10:08:51:539 [WARNING] [preferences] Slow preferences save 2039 ms (prepare=1255 write=784 ms; operations=292; prepare: snapshot=4 decode=0 models=0 sparse=267 wrap=0 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=977 ms; proposed=294; metadata_commands=2 in 157 ms; lua_heap=43->54 MB).
+2026-11-02 10:08:52:779 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-02 10:08:52:779 [DEBUG] [hotstring_counter] Counted: common=2813 ergopti=194 personal=264 ext=0.
+2026-11-02 10:08:52:799 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-02 10:08:52:924 [INFO] [menu] Menu tree rebuilt in 1296.9 ms (22 top-level item(s)). Slowest: shortcuts=1072.6 ms, keyboard_layout=59.9 ms, llm=52.6 ms, gestures=49.8 ms, hotstrings=28.6 ms.
+2026-11-02 10:10:27:276 [DEBUG] [keymap.llm_bridge] No hotstring for 'o' — LLM timer armed.
+2026-11-02 10:11:24:122 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-02 10:11:24:123 [DEBUG] [hotstring_counter] Counted: common=2813 ergopti=194 personal=264 ext=0.
+2026-11-02 10:11:24:142 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-02 10:11:24:238 [INFO] [menu] Menu tree rebuilt in 1329.3 ms (22 top-level item(s)). Slowest: shortcuts=1119.5 ms, keyboard_layout=70.9 ms, gestures=49.4 ms, llm=31.0 ms, hotstrings=27.4 ms.
+2026-11-02 10:12:22:192 [INFO] [phase_stats] Phase summary [hotpath] over 300 s: keydown n=20 mean=0.44 max=3.53 total=8.8 ms | preview.rebuild n=2 mean=2.51 max=2.65 total=5.0 ms | hotstring.match n=2 mean=0.05 max=0.07 total=0.1 ms.
+2026-11-02 10:12:22:193 [INFO] [phase_stats] Phase summary [menu_item] over 300 s: shortcuts n=2 mean=1096.05 max=1119.51 total=2192.1 ms | keyboard_layout n=2 mean=65.37 max=70.88 total=130.7 ms | gestures n=2 mean=49.60 max=49.80 total=99.2 ms | llm n=2 mean=41.76 max=52.57 total=83.5 ms | hotstrings n=2 mean=27.96 max=28.55 total=55.9 ms | about n=2 mean=7.07 max=8.62 total=14.1 ms | metrics n=2 mean=6.49 max=7.32 total=13.0 ms | debug n=2 mean=3.46 max=3.80 total=6.9 ms | configuration n=2 mean=2.07 max=2.16 total=4.1 ms | tap_holds n=2 mean=1.11 max=1.45 total=2.2 ms | apps n=2 mean=0.18 max=0.21 total=0.4 ms | language n=2 mean=0.04 max=0.05 total=0.1 ms | reload n=2 mean=0.01 max=0.01 total=0.0 ms | quit n=2 mean=0.01 max=0.01 total=0.0 ms.
+2026-11-02 10:16:52:440 [DEBUG] [keymap.llm_bridge] ↑ "No hotstring for '%s' — LLM timer armed." repeated 1 more time between 2026-11-02 10:10:28:279 and 2026-11-02 10:10:28:279 (last: No hotstring for 'nil' — LLM timer armed.).
+2026-11-02 10:17:23:604 [DEBUG] [keymap.llm_bridge] No hotstring for 'c' — LLM timer armed.
+2026-11-02 10:18:13:320 [TRACE] [keymap.expander] Performing replacement (1 deletion(s))…
+2026-11-02 10:18:13:323 [DONE] [keymap.expander] Replacement complete.
+2026-11-02 10:18:13:323 [DEBUG] [keymap.expander] Auto-expand: <personal trigger> → <personal>.
+2026-11-02 10:18:13:324 [DEBUG] [keystats] Recording synthetic text from 'hotstring' (1 delete(s), 2 byte(s))…
+2026-11-02 10:18:13:714 [DEBUG] [adapters.toml_cache] Snapshot hit for '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/french/magickey.toml'.
+2026-11-02 10:18:13:715 [DEBUG] [keymap.llm_bridge] Hotstring 'n' → 'nouveau' [star].
+2026-11-02 10:18:13:900 [TRACE] [keymap.expander] Performing replacement (1 deletion(s))…
+2026-11-02 10:18:13:904 [DONE] [keymap.expander] Replacement complete.
+2026-11-02 10:18:14:966 [TRACE] [keymap.expander] Performing replacement (0 deletion(s))…
+2026-11-02 10:18:14:969 [DONE] [keymap.expander] Replacement complete.
+2026-11-02 10:18:14:969 [DEBUG] [keymap.expander] Repeat feature: repeated 'r'.
+2026-11-02 10:18:27:702 [TRACE] [keymap.expander] Performing replacement (3 deletion(s))…
+2026-11-02 10:18:27:714 [DONE] [keymap.expander] Replacement complete.
+2026-11-02 10:18:27:714 [WARNING] [HotPath] Slow hotstring.expand: 9.40 ms own, 9.40 ms total, parent hotstring.match (0 similar since the last line).
+2026-11-02 10:18:27:714 [WARNING] [HotPath] Slow hotstring.match: 5.02 ms own, 14.42 ms total, parent keydown (0 similar since the last line).
+2026-11-02 10:18:38:115 [TRACE] [keymap.expander] Performing replacement (24 deletion(s))…
+2026-11-02 10:18:38:119 [DONE] [keymap.expander] Replacement complete.
+2026-11-02 10:18:42:449 [TRACE] [keymap.expander] Performing replacement (3 deletion(s))…
+2026-11-02 10:18:42:462 [DONE] [keymap.expander] Replacement complete.
+2026-11-02 10:18:42:462 [WARNING] [HotPath] Slow hotstring.expand: 11.57 ms own, 11.57 ms total, parent hotstring.match (0 similar since the last line).
+2026-11-02 10:18:47:315 [TRACE] [keymap.expander] Performing replacement (0 deletion(s))…
+2026-11-02 10:18:47:331 [DONE] [keymap.expander] Replacement complete.
+2026-11-02 10:20:49:150 [DEBUG] [adapters.toml_cache] ↑ "Snapshot hit for '%s'." repeated 1 more time between 2026-11-02 10:18:16:185 and 2026-11-02 10:18:16:185 (last: Snapshot hit for '<config>/hotstrings/personal_hotstrings.toml'.).
+2026-11-02 10:20:49:312 [DEBUG] [keymap.expander] ↑ "Auto-expand: '%s' → '%s'." repeated 3 more times between 2026-11-02 10:18:13:904 and 2026-11-02 10:18:42:462 (last: Auto-expand: 'cdg★' → 'Charles de Gaulle'.).
+2026-11-02 10:21:22:237 [START] [BootProfile] Boot stage started: TOML hotstring cache wired.
+2026-11-02 10:21:22:239 [START] [adapters.toml_cache] Initializing TOML hotstring cache…
+2026-11-02 10:21:22:239 [SUCCESS] [adapters.toml_cache] TOML hotstring cache ready at '~/Library/Caches/ergopti_plus/toml_hotstrings'.
+2026-11-02 10:21:22:239 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 1.5 ms (+1.9 ms, total 428.8 ms).
+2026-11-02 10:21:22:387 [DEBUG] [menu] Module "hotstrings menu" loaded successfully (ui.menu.menu_hotstrings).
+2026-11-02 10:21:22:771 [DEBUG] [menu] Module "dynamic hotstrings engine" loaded successfully (modules.dynamic_hotstrings).
+2026-11-02 10:24:15:742 [START] [BootProfile] Boot stage started: TOML hotstring cache wired.
+2026-11-02 10:24:15:744 [START] [adapters.toml_cache] Initializing TOML hotstring cache…
+2026-11-02 10:24:15:744 [SUCCESS] [adapters.toml_cache] TOML hotstring cache ready at '~/Library/Caches/ergopti_plus/toml_hotstrings'.
+2026-11-02 10:24:15:744 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 2.5 ms (+2.8 ms, total 557.2 ms, cpu 1.5 ms).
+2026-11-02 10:24:15:744 [INFO] [BootProfile] Boot stage requires: TOML hotstring cache wired loaded 1 module(s) in 1.2 ms (own time).
+2026-11-02 10:24:15:927 [DEBUG] [menu] Module "hotstrings menu" loaded successfully (ui.menu.menu_hotstrings).
+2026-11-02 10:24:16:122 [DEBUG] [menu] Module "dynamic hotstrings engine" loaded successfully (modules.dynamic_hotstrings).
+2026-11-02 10:24:16:138 [INFO] [BootProfile] Boot stage requires: Config-dependent module requires loaded 160 module(s) in 380.7 ms (own time); slowest: ui.menu.menu_llm=69.9 ms, ui.changelog=9.0 ms, platform.remap=7.5 ms, platform.remap.defaults=7.5 ms, ui.menu=7.0 ms, ui.menu.menu_hotstrings_custom=5.7 ms, updater.release_sources=5.2 ms, platform.remap.watchers=5.2 ms.
+2026-11-02 10:25:12:438 [INFO] [init] No shared hotstring groups in '<config>/' — using bundled directory '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/'.
+2026-11-02 10:25:12:460 [SUCCESS] [extension_packs] Discovered 2 extension(s): 2 hotstring pack(s), 6 bound geometry file(s).
+2026-11-02 10:25:12:461 [START] [hotstrings_config] Initializing…
+2026-11-02 10:25:12:467 [SUCCESS] [hotstrings_config] Initialized (override file: '<config>/hotstrings_config.toml').
+2026-11-02 10:25:12:474 [DEBUG] [hotstrings_config_window] Personal dir configured: '<config>/hotstrings/'.
+2026-11-02 10:25:12:474 [DEBUG] [hotstrings_config_window] Extensions dir configured: '~/perso/ergopti/static/ergopti_plus/macos/../extensions'.
+2026-11-02 10:25:12:476 [INFO] [BootProfile] Boot stage requires: TOML discovery + ordering loaded 4 module(s) in 13.9 ms (own time); slowest: ui.hotstrings_config_window=5.9 ms, infra.extension_packs=4.4 ms.
+2026-11-02 10:25:12:476 [START] [BootProfile] Boot stage started: Hotstring groups registered (personal + dynamic + common).
+2026-11-02 10:25:12:502 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / personal hotstrings took 26.0 ms.
+2026-11-02 10:25:12:510 [DEBUG] [extension_packs] Registered 2 extension hotstring pack(s).
+2026-11-02 10:25:12:510 [DEBUG] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / extension packs took 8.2 ms.
+2026-11-02 10:25:12:510 [DEBUG] [init] Starting dynamic hotstrings module…
+2026-11-02 10:25:12:510 [DEBUG] [dynamic_hotstrings] Starting the personal info tracker…
+2026-11-02 10:25:12:511 [DEBUG] [dynamic_hotstrings] Injecting personal data into the rules engine…
+2026-11-02 10:25:12:511 [DEBUG] [dynamic_hotstrings.rules] Personal data received before keymap wiring; prefix registration deferred to M.start().
+2026-11-02 10:25:12:511 [DEBUG] [dynamic_hotstrings] Starting the dynamic rules engine…
+2026-11-02 10:25:12:511 [DEBUG] [dynamic_hotstrings.rules] Starting dynamic rules engine…
+2026-11-02 10:25:12:511 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+2026-11-02 10:25:12:511 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-02 10:25:12:611 [DEBUG] [dynamic_hotstrings.rules] Registering prefix-based dynamic hotstrings…
+2026-11-02 10:25:12:611 [INFO] [dynamic_hotstrings.rules] Prefix-based dynamic hotstrings registered.
+2026-11-02 10:25:12:611 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+2026-11-02 10:25:12:611 [INFO] [dynamic_hotstrings.rules] Dynamic rules engine started successfully.
+2026-11-02 10:25:12:612 [INFO] [dynamic_hotstrings] The dynamic hotstrings core initialized successfully.
+2026-11-02 10:25:12:612 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / dynamic hotstrings took 102.0 ms.
+2026-11-02 10:25:12:612 [DEBUG] [init] Loading common TOML hotstring files…
+2026-11-02 10:25:12:641 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / common hotstring files took 28.9 ms.
+2026-11-02 10:25:12:641 [INFO] [init] Common hotstring load: 2 file(s), slowest 'magickey' 22.3 ms.
+2026-11-02 10:25:12:672 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / language hotstring files took 31.2 ms.
+2026-11-02 10:25:12:725 [SUCCESS] [infra.hotstring_choice_catalogue] Hotstring choice catalogue published.
+2026-11-02 10:25:12:725 [INFO] [init] Loaded 2 TOML hotstring file(s) and 2 language file(s) in 113.6ms.
+2026-11-02 10:25:12:726 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / choice catalogue and cache stats took 53.7 ms.
+2026-11-02 10:25:12:726 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 250.1 ms (+250.4 ms, total 57538.5 ms, cpu 225.5 ms).
+2026-11-02 10:25:12:726 [INFO] [BootProfile] Boot stage requires: Hotstring groups registered (personal + dynamic + common) loaded 2 module(s) in 4.8 ms (own time); slowest: infra.personal_hotstrings=3.7 ms.
+2026-11-02 10:25:12:966 [DEBUG] [dynamic_hotstrings.shared] ↑ "Rule registered: suffix='%s' section='%s'." repeated 2 more times between 2026-11-02 10:25:12:511 and 2026-11-02 10:25:12:511 (last: Rule registered: suffix='date' section='datelongfr'.).
+2026-11-02 10:25:12:967 [DEBUG] [keymap.llm_bridge] LLM chain after hotstring: on.
+2026-11-02 10:25:12:967 [DEBUG] [dynamic_hotstrings.rules] Trigger char: '★'.
+2026-11-02 10:25:12:975 [DEBUG] [adapters.toml_cache] ↑ "Snapshot hit for '%s'." repeated 20 more times between 2026-11-02 10:25:12:484 and 2026-11-02 10:25:12:960 (last: Snapshot hit for '~/perso/ergopti/static/ergopti_plus/_shared/../../../static/layouts/registry/ergopti/hotstrings/sfbsreduction.toml'.).
+2026-11-02 10:25:13:010 [INFO] [menu_state] Hotstring group sync: 12 enable / 0 disable in 0.0 ms.
+2026-11-02 10:25:16:655 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-02 10:25:16:656 [DEBUG] [hotstring_counter] Counted: common=2813 ergopti=194 personal=264 ext=0.
+2026-11-02 10:25:16:677 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-02 10:25:16:819 [INFO] [menu] Menu tree rebuilt in 1390.9 ms (22 top-level item(s)). Slowest: shortcuts=1102.2 ms, keyboard_layout=90.0 ms, gestures=58.1 ms, llm=32.5 ms, hotstrings=29.8 ms.
+2026-11-02 10:25:25:521 [DEBUG] [keymap.llm_bridge] No hotstring for 'o' — LLM timer armed.
+2026-11-02 10:25:58:168 [DEBUG] [adapters.toml_cache] Snapshot hit for '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/french/magickey.toml'.
+2026-11-02 10:25:58:168 [DEBUG] [keymap.llm_bridge] Hotstring 'l' → 'elle' [star].
+2026-11-02 10:26:16:373 [DEBUG] [adapters.toml_cache] ↑ "Snapshot hit for '%s'." repeated 1 more time between 2026-11-02 10:25:58:280 and 2026-11-02 10:25:58:280 (last: Snapshot hit for '<config>/hotstrings/personal_hotstrings.toml'.).
+2026-11-02 10:26:16:383 [DEBUG] [keymap.llm_bridge] ↑ "Hotstring '%s' → '%s' [%s]." repeated 10 more times between 2026-11-02 10:25:58:281 and 2026-11-02 10:26:03:249 (last: Hotstring 'stp' → 's’il te plaît' [star].).
+2026-11-02 10:26:31:009 [DEBUG] [keymap.llm_bridge] ↑ "No hotstring for '%s' — LLM timer armed." repeated 36 more times between 2026-11-02 10:25:25:599 and 2026-11-02 10:26:03:620 (last: No hotstring for 'nil' — LLM timer armed.).
+2026-11-02 10:26:32:574 [START] [field_check] Field check 'hotstring_roundtrip' started.
+2026-11-02 10:26:33:306 [DEBUG] [keymap.llm_bridge] Hotstring 'h' → 'heure' [star].
+2026-11-02 10:26:33:391 [DEBUG] [keymap.llm_bridge] No hotstring for 'ha' — LLM timer armed.
+2026-11-02 10:26:34:212 [TRACE] [keymap.expander] Performing replacement (11 deletion(s))…
+2026-11-02 10:26:34:222 [DONE] [keymap.expander] Replacement complete.
+2026-11-02 10:26:34:222 [DEBUG] [keymap.expander] Terminator-expand: 'hammerspoon' → <bundled>.
+2026-11-02 10:26:34:222 [WARNING] [HotPath] Slow hotstring.match: 5.07 ms own, 9.66 ms total, parent keydown (0 similar since the last line).
+2026-11-02 10:26:34:224 [DEBUG] [keystats] Recording synthetic text from 'hotstring' (11 delete(s), 12 byte(s))…
+2026-11-02 10:26:34:225 [DONE] [keymap.terminator_replay] Terminator replay activated (replacement transaction complete).
+2026-11-02 10:26:34:689 [INFO] [field_check] Field check result: check=hotstring_roundtrip verdict=pass steps=8 hotstring_trigger=pass:candidates_301 hotstring_trigger_chars=info:11 space_consumed=info:no scratch_focus=pass:focused keys_posted=pass:13 hotstring_expanded=pass:exact terminator_to_text_ms=info:80 front_restored=pass:yes
+2026-11-02 10:26:34:689 [DONE] [field_check] Field check 'hotstring_roundtrip' finished: pass.
+2026-11-02 10:26:34:694 [INFO] [field_run] Field run step result: step=hotstring_roundtrip verdict=pass codes=none
+2026-11-02 10:26:36:046 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-02 10:26:36:047 [DEBUG] [hotstring_counter] Counted: common=2813 ergopti=194 personal=264 ext=0.
+2026-11-02 10:26:36:068 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-02 10:26:36:187 [INFO] [menu] Menu tree rebuilt in 1443.1 ms (22 top-level item(s)). Slowest: shortcuts=1205.4 ms, keyboard_layout=70.4 ms, gestures=56.2 ms, llm=47.0 ms, hotstrings=31.0 ms.
+2026-11-02 10:26:37:811 [TRACE] [keymap.expander] Performing replacement (0 deletion(s))…
+2026-11-02 10:26:37:822 [WARNING] [HotPath] Slow hotstring.expand: 10.89 ms own, 10.89 ms total, parent none (0 similar since the last line).
+2026-11-02 10:26:37:822 [DONE] [keymap.expander] Replacement complete.
+2026-11-02 10:26:44:593 [DEBUG] [keymap.llm_bridge] ↑ "Hotstring '%s' → '%s' [%s]." repeated 2 more times between 2026-11-02 10:26:33:309 and 2026-11-02 10:26:34:132 (last: Hotstring 'hammerspoon' → 'Hammerspoon' [autocorrect].).
+2026-11-02 10:26:44:772 [DEBUG] [keymap.llm_bridge] ↑ "No hotstring for '%s' — LLM timer armed." repeated 9 more times between 2026-11-02 10:26:33:471 and 2026-11-02 10:26:34:225 (last: No hotstring for 'nil' — LLM timer armed.).
+2026-11-02 10:26:53:819 [DEBUG] [keymap.llm_bridge] Hotstring 'v' → 'version' [star].
+2026-11-02 10:26:54:245 [DEBUG] [keymap.llm_bridge] No hotstring for 'nil' — LLM timer armed.
+2026-11-02 10:29:17:218 [INFO] [field_check] Field check result: check=slow_lines verdict=pass steps=20 slow_log=pass slow_dominant=info:none slow_dominant_own_ms=info:0 slow_ingest_ticks=info:0:0 slow_ingest_stage=info:none slow_ingest_forks=info:0:0 slow_preferences_saves=info:3:2048 slow_preferences_save_stage=info:hotstrings slow_preferences_save_forks=info:2:157 slow_ignored_window_probes=info:1:528 slow_ignored_window_stage=info:focused_window slow_diagnostics=info:7:248 slow_diagnostics_collector=info:none slow_hold_phase=info:none slow_layout_menu_phase=info:none log_lease_bound_failures=pass:0 log_layout_change_before_baseline=pass:0 log_keystats_database_locked=pass:0 log_shortcuts_still_unregistered=pass:0 log_shortcut_rebind_retries=info:0
+2026-11-02 10:29:21:701 [DEBUG] [keymap.llm_bridge] ↑ "Hotstring '%s' → '%s' [%s]." repeated 7 more times between 2026-11-02 10:26:53:822 and 2026-11-02 10:29:06:143 (last: Hotstring 'c' → 'c’est' [star].).
+2026-11-02 10:29:21:715 [DEBUG] [keymap.llm_bridge] ↑ "No hotstring for '%s' — LLM timer armed." repeated 13 more times between 2026-11-02 10:26:54:422 and 2026-11-02 10:29:07:054 (last: No hotstring for 'nil' — LLM timer armed.).
+2026-11-02 10:29:21:715 [DEBUG] [menu_llm] Helper sweep 'expander' dispatched.
+2026-11-02 10:29:22:495 [START] [BootProfile] Boot stage started: TOML hotstring cache wired.
+2026-11-02 10:29:22:497 [START] [adapters.toml_cache] Initializing TOML hotstring cache…
+2026-11-02 10:29:22:497 [SUCCESS] [adapters.toml_cache] TOML hotstring cache ready at '~/Library/Caches/ergopti_plus/toml_hotstrings'.
+2026-11-02 10:29:22:497 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 2.2 ms (+2.6 ms, total 571.5 ms, cpu 1.7 ms).
+2026-11-02 10:29:22:497 [INFO] [BootProfile] Boot stage requires: TOML hotstring cache wired loaded 1 module(s) in 1.4 ms (own time).
+2026-11-02 10:29:22:691 [DEBUG] [menu] Module "hotstrings menu" loaded successfully (ui.menu.menu_hotstrings).
+2026-11-02 10:29:22:932 [DEBUG] [menu] Module "dynamic hotstrings engine" loaded successfully (modules.dynamic_hotstrings).
+2026-11-02 10:29:22:955 [INFO] [BootProfile] Boot stage requires: Config-dependent module requires loaded 160 module(s) in 443.0 ms (own time); slowest: ui.menu.menu_llm=93.6 ms, ui.menu.menu_llm.menu_layout=20.0 ms, ui.changelog=8.6 ms, platform.remap=8.5 ms, ui.menu=8.0 ms, platform.remap.defaults=7.9 ms, platform.remap.generator=6.6 ms, ui.menu.menu_hotstrings_custom=6.1 ms.
+2026-11-02 10:29:23:255 [INFO] [init] No shared hotstring groups in '<config>/' — using bundled directory '~/perso/ergopti/static/ergopti_plus/macos/../_shared/modules/hotstrings/'.
+2026-11-02 10:29:23:272 [SUCCESS] [extension_packs] Discovered 2 extension(s): 2 hotstring pack(s), 6 bound geometry file(s).
+2026-11-02 10:29:23:273 [START] [hotstrings_config] Initializing…
+2026-11-02 10:29:23:277 [SUCCESS] [hotstrings_config] Initialized (override file: '<config>/hotstrings_config.toml').
+2026-11-02 10:29:23:283 [DEBUG] [hotstrings_config_window] Personal dir configured: '<config>/hotstrings/'.
+2026-11-02 10:29:23:283 [DEBUG] [hotstrings_config_window] Extensions dir configured: '~/perso/ergopti/static/ergopti_plus/macos/../extensions'.
+2026-11-02 10:29:23:285 [INFO] [BootProfile] Boot stage requires: TOML discovery + ordering loaded 4 module(s) in 11.5 ms (own time); slowest: ui.hotstrings_config_window=5.8 ms.
+2026-11-02 10:29:23:285 [START] [BootProfile] Boot stage started: Hotstring groups registered (personal + dynamic + common).
+2026-11-02 10:29:23:305 [DEBUG] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / personal hotstrings took 20.1 ms.
+2026-11-02 10:29:23:317 [DEBUG] [extension_packs] Registered 2 extension hotstring pack(s).
+2026-11-02 10:29:23:317 [DEBUG] [init] Starting dynamic hotstrings module…
+2026-11-02 10:29:23:317 [DEBUG] [dynamic_hotstrings] Starting the personal info tracker…
+2026-11-02 10:29:23:318 [DEBUG] [dynamic_hotstrings] Injecting personal data into the rules engine…
+2026-11-02 10:29:23:318 [DEBUG] [dynamic_hotstrings.rules] Personal data received before keymap wiring; prefix registration deferred to M.start().
+2026-11-02 10:29:23:318 [DEBUG] [dynamic_hotstrings] Starting the dynamic rules engine…
+2026-11-02 10:29:23:318 [DEBUG] [dynamic_hotstrings.rules] Starting dynamic rules engine…
+2026-11-02 10:29:23:318 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+2026-11-02 10:29:23:318 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-02 10:29:23:400 [DEBUG] [dynamic_hotstrings.rules] Registering prefix-based dynamic hotstrings…
+2026-11-02 10:29:23:400 [INFO] [dynamic_hotstrings.rules] Prefix-based dynamic hotstrings registered.
+2026-11-02 10:29:23:400 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+2026-11-02 10:29:23:400 [INFO] [dynamic_hotstrings.rules] Dynamic rules engine started successfully.
+2026-11-02 10:29:23:401 [INFO] [dynamic_hotstrings] The dynamic hotstrings core initialized successfully.
+2026-11-02 10:29:23:401 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / dynamic hotstrings took 83.5 ms.
+2026-11-02 10:29:23:401 [DEBUG] [init] Loading common TOML hotstring files…
+2026-11-02 10:29:23:429 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / common hotstring files took 28.8 ms.
+2026-11-02 10:29:23:429 [INFO] [init] Common hotstring load: 2 file(s), slowest 'magickey' 20.4 ms.
+2026-11-02 10:29:23:458 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / language hotstring files took 28.8 ms.
+2026-11-02 10:29:23:574 [SUCCESS] [infra.hotstring_choice_catalogue] Hotstring choice catalogue published.
+2026-11-02 10:29:23:574 [INFO] [init] Loaded 2 TOML hotstring file(s) and 2 language file(s) in 173.9ms.
+2026-11-02 10:29:23:575 [INFO] [BootProfile] Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / choice catalogue and cache stats took 116.6 ms.
+2026-11-02 10:29:23:575 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 289.8 ms (+290.1 ms, total 1649.0 ms, cpu 199.0 ms).
+2026-11-02 10:29:23:581 [INFO] [BootProfile] Boot stage requires: Hotstring groups registered (personal + dynamic + common) loaded 2 module(s) in 6.6 ms (own time); slowest: infra.personal_hotstrings=3.4 ms, infra.common_hotstrings_boot=3.2 ms.
+2026-11-02 10:29:23:866 [DEBUG] [BootProfile] ↑ "Boot sub-stage: %s / %s took %.1f ms." repeated 1 more time between 2026-11-02 10:29:23:317 and 2026-11-02 10:29:23:317 (last: Boot sub-stage: Hotstring groups registered (personal + dynamic + common) / extension packs took 11.9 ms.).
+2026-11-02 10:29:23:866 [DEBUG] [dynamic_hotstrings.shared] ↑ "Rule registered: suffix='%s' section='%s'." repeated 2 more times between 2026-11-02 10:29:23:318 and 2026-11-02 10:29:23:318 (last: Rule registered: suffix='date' section='datelongfr'.).
+2026-11-02 10:29:23:867 [DEBUG] [keymap.llm_bridge] LLM chain after hotstring: on.
+2026-11-02 10:29:23:868 [DEBUG] [dynamic_hotstrings.rules] Trigger char: '★'.
+2026-11-02 10:29:23:875 [DEBUG] [adapters.toml_cache] ↑ "Snapshot hit for '%s'." repeated 20 more times between 2026-11-02 10:29:23:293 and 2026-11-02 10:29:23:862 (last: Snapshot hit for '~/perso/ergopti/static/ergopti_plus/_shared/../../../static/layouts/registry/ergopti/hotstrings/sfbsreduction.toml'.).
+2026-11-02 10:29:23:906 [INFO] [menu_state] Hotstring group sync: 12 enable / 0 disable in 0.0 ms.
+2026-11-02 10:29:27:580 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-02 10:29:27:581 [DEBUG] [hotstring_counter] Counted: common=2813 ergopti=194 personal=264 ext=0.
+2026-11-02 10:29:27:602 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-02 10:31:50:410 [DEBUG] [builder] ↑ "Building hotstrings submenu…" repeated 1 more time between 2026-11-02 10:29:29:948 and 2026-11-02 10:29:29:948.
+2026-11-02 10:31:50:800 [DEBUG] [hotstring_counter] ↑ "Counted: common=%d ergopti=%d personal=%d ext=%d." repeated 1 more time between 2026-11-02 10:29:29:949 and 2026-11-02 10:29:29:949 (last: Counted: common=2813 ergopti=194 personal=264 ext=0.).
+2026-11-02 10:31:50:954 [DEBUG] [builder] ↑ "Built manifest row '%s' (%d extension(s))." repeated 1 more time between 2026-11-02 10:29:29:969 and 2026-11-02 10:29:29:969 (last: Built manifest row 'hotstring_extensions' (2 extension(s)).).
+2026-11-02 10:31:54:944 [INFO] [menu] ↑ "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s" repeated 1 more time between 2026-11-02 10:29:30:069 and 2026-11-02 10:29:30:069 (last: Menu tree rebuilt in 1349.2 ms (22 top-level item(s)). Slowest: shortcuts=1133.3 ms, keyboard_layout=69.9 ms, gestures=51.9 ms, llm=33.1 ms, hotstrings=30.7 ms.).
+2026-11-02 10:32:51:278 [DEBUG] [builder] Building hotstrings submenu…
+2026-11-02 10:32:51:279 [DEBUG] [hotstring_counter] Counted: common=2813 ergopti=194 personal=264 ext=0.
+2026-11-02 10:32:51:303 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-11-02 10:32:51:418 [INFO] [menu] Menu tree rebuilt in 1530.3 ms (22 top-level item(s)). Slowest: shortcuts=1143.9 ms, keyboard_layout=210.1 ms, gestures=69.2 ms, llm=36.5 ms, hotstrings=35.1 ms.

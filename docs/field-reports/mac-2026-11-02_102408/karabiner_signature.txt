@@ -1,0 +1,7 @@
+/Applications/Karabiner-Elements.app: resource fork, Finder information, or similar detritus not allowed
+file with invalid attached data: Disallowed xattr com.apple.FinderInfo found on /Applications/Karabiner-Elements.app
+codesign exit=1
+/Applications/Karabiner-Elements.app: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: Fumihiko Takayama (G43BCU2T37)
+spctl exit=0

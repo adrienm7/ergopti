@@ -1,0 +1,25 @@
+2026-11-02 00:12:01:195 [INFO] [runtime] Main-thread hold of 609 ms in an hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:1844). Lua heap 60->40 MB.
+2026-11-02 00:43:59:859 [INFO] [runtime] Main-thread hold of 267 ms in an hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:1844). Lua heap 44->44 MB.
+2026-11-02 08:06:44:245 [WARNING] [HotPath] Slow preview.rebuild: 6.29 ms own, 6.29 ms total, parent keydown (0 similar since the last line).
+2026-11-02 08:16:09:063 [INFO] [runtime] Main-thread hold of 502 ms in an hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:364). Lua heap 56->56 MB.
+2026-11-02 10:00:21:603 [WARNING] [keymap.utils] Slow ignored-window probe 528 ms (watchers=0 focused_window=528 ms).
+2026-11-02 10:00:21:603 [INFO] [runtime] Main-thread hold of 528 ms in an hs.timer.new callback (...gopti/static/ergopti_plus/macos/modules/keymap/utils.lua:1567). Lua heap 64->64 MB.
+2026-11-02 10:00:22:107 [INFO] [runtime] Main-thread hold of 502 ms in an hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:364). Lua heap 64->64 MB.
+2026-11-02 10:02:11:959 [WARNING] [preferences] Slow preferences save 2048 ms (prepare=1272 write=776 ms; operations=292; prepare: snapshot=6 decode=0 models=0 sparse=260 wrap=10 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=989 ms; proposed=294; metadata_commands=2 in 157 ms; lua_heap=34->47 MB).
+2026-11-02 10:08:49:349 [WARNING] [preferences] Slow preferences save 1853 ms (prepare=1240 write=612 ms; operations=292; prepare: snapshot=4 decode=0 models=0 sparse=258 wrap=1 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=970 ms; proposed=294; metadata_commands=0 in 0 ms; lua_heap=32->43 MB).
+2026-11-02 10:08:51:539 [WARNING] [preferences] Slow preferences save 2039 ms (prepare=1255 write=784 ms; operations=292; prepare: snapshot=4 decode=0 models=0 sparse=267 wrap=0 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=977 ms; proposed=294; metadata_commands=2 in 157 ms; lua_heap=43->54 MB).
+2026-11-02 10:18:13:715 [WARNING] [HotPath] Slow preview.rebuild: 12.21 ms own, 12.21 ms total, parent keydown (0 similar since the last line).
+2026-11-02 10:18:27:063 [WARNING] [HotPath] Slow preview.rebuild: 6.02 ms own, 6.02 ms total, parent keydown (3 similar since the last line).
+2026-11-02 10:18:27:714 [WARNING] [HotPath] Slow hotstring.expand: 9.40 ms own, 9.40 ms total, parent hotstring.match (0 similar since the last line).
+2026-11-02 10:18:27:714 [WARNING] [HotPath] Slow hotstring.match: 5.02 ms own, 14.42 ms total, parent keydown (0 similar since the last line).
+2026-11-02 10:18:36:038 [WARNING] [HotPath] Slow tooltip.show_predictions: 14.51 ms own, 14.51 ms total, parent none (0 similar since the last line).
+2026-11-02 10:18:42:462 [WARNING] [HotPath] Slow hotstring.expand: 11.57 ms own, 11.57 ms total, parent hotstring.match (0 similar since the last line).
+2026-11-02 10:19:59:820 [WARNING] [HotPath] Slow preview.rebuild: 5.13 ms own, 5.13 ms total, parent keydown (0 similar since the last line).
+2026-11-02 10:25:58:168 [WARNING] [HotPath] Slow preview.rebuild: 10.99 ms own, 10.99 ms total, parent keydown (0 similar since the last line).
+2026-11-02 10:26:34:222 [WARNING] [HotPath] Slow hotstring.match: 5.07 ms own, 9.66 ms total, parent keydown (0 similar since the last line).
+2026-11-02 10:26:36:201 [WARNING] [HotPath] Slow tooltip.show_predictions: 6.01 ms own, 6.01 ms total, parent none (0 similar since the last line).
+2026-11-02 10:26:37:822 [WARNING] [HotPath] Slow hotstring.expand: 10.89 ms own, 10.89 ms total, parent none (0 similar since the last line).
+2026-11-02 10:26:54:627 [WARNING] [HotPath] Slow preview.rebuild: 6.51 ms own, 6.51 ms total, parent keydown (7 similar since the last line).
+2026-11-02 10:29:05:998 [INFO] [runtime] Main-thread hold of 287 ms in an hs.timer.new callback (...s/macos/ui/menu/menu_llm/models_manager_mlx_download.lua:238). Phases inside the hold: shell.curl=83.3 ms. Lua heap 53->53 MB.
+2026-11-02 10:29:06:872 [WARNING] [HotPath] Slow preview.rebuild: 6.48 ms own, 6.48 ms total, parent keydown (0 similar since the last line).
+2026-11-02 10:29:13:908 [INFO] [runtime] Main-thread hold of 292 ms in an hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:2338). Lua heap 61->61 MB.
