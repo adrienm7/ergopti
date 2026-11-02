@@ -759,6 +759,8 @@ jobs:
           $env:ERGOPTI_AHK_EXE = $ahk
           node tools/test/test-ahk-full-startup-smoke.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node tools/test/test-ahk-tray-rows-read-as-text.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Test fresh Git clone bootstrap and warm startup
         if: matrix.lot == 'Fresh clone bootstrap'
