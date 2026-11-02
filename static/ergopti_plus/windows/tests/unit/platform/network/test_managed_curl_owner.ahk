@@ -114,9 +114,13 @@ _ManagedCurlControlPollInterruptedAfterPublication() {
 	Request.ManagedOwnerCurrent := Interrupt
 	try {
 		AssertTrue(Request.Send("private-user-payload"))
+		; The real -1 timer must not publish first on a slow runner: the direct poll
+		; below has to be the one the second poll interrupts.
+		Critical("On")
 		_ManagedCurlControlAck(State)
 		Armed := true
 		Request._PollManagedAdmission()
+		Critical("Off")
 		AssertEqual(1, Interrupted, "the second poll must complete inside the first one's checks")
 		AssertFalse(Request.Aborted, "an interrupted poll leaves the published request live")
 		AssertFalse(FileExist(State["directory"] . "transport.pending"), "the interrupted poll stages nothing more")
