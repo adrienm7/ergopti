@@ -1,0 +1,23 @@
+
+LocalAddress LocalPort OwningProcess Process   
+------------ --------- ------------- -------   
+::                 135          1428 svchost   
+0.0.0.0            135          1428 svchost   
+::                 445             4 System    
+0.0.0.0           5040          1728 svchost   
+127.0.0.1        16587          6100 RescueTime
+127.0.0.1        45278         15236 opencode  
+0.0.0.0          49664          1108 lsass     
+::               49664          1108 lsass     
+0.0.0.0          49665          1020 wininit   
+::               49665          1020 wininit   
+0.0.0.0          49666          2008 svchost   
+::               49666          2008 svchost   
+::               49667          1692 svchost   
+0.0.0.0          49667          1692 svchost   
+::               49668          3328 spoolsv   
+0.0.0.0          49668          3328 spoolsv   
+::               49673          1080 services  
+0.0.0.0          49673          1080 services  
+
+

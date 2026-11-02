@@ -1,0 +1,21 @@
+{
+	"codes": [
+		"proxy_settings_info:discovery",
+		"pac_download_skip:no_pac",
+		"pac_script_skip:no_pac",
+		"route_lookup_pass:selected",
+		"tls_pass:trusted",
+		"transfer_pass:http_200",
+		"digest_skip:get_only"
+	],
+	"deadline_ms": 60000,
+	"elapsed_ms": 4750,
+	"finished_at": "2026-11-02T07:40:04Z",
+	"index": 2,
+	"kind": "field_check",
+	"request_id": "win-2026-11-02_083950",
+	"schema": 1,
+	"started_at": "2026-11-02T07:39:59Z",
+	"step": "field_network",
+	"verdict": "pass"
+}

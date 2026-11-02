@@ -1,0 +1,4 @@
+check=autohotkey verdict=pass codes=v2_x64_found
+check=driver_running verdict=pass codes=one_instance
+check=python verdict=pass codes=runs
+check=webview2 verdict=pass codes=installed

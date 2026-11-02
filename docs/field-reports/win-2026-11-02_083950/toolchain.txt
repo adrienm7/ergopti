@@ -1,0 +1,4 @@
+git version 2.50.0.windows.1
+v22.16.0
+C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe 2.0.26
+~\AppData\Local\Programs\AutoHotkey\v2\AutoHotkey64.exe missing

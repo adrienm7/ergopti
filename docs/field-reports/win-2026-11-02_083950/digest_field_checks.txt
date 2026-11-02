@@ -1,0 +1,2 @@
+2026-11-02 08:40:04:116 [INFO] [NetworkCheck] Network check result: check=network verdict=pass steps=7 proxy_settings=info:discovery pac_download=skip:no_pac pac_script=skip:no_pac route_lookup=pass:selected tls=pass:trusted transfer=pass:http_200 digest=skip:get_only
+2026-11-02 08:40:04:247 [INFO] [ComposerCheck] Composer check result: check=composer verdict=pass steps=6 composer_fixture=pass composer_mode=info:fresh composer_install=pass composer_copy=pass composer_ready=pass:keys:49 composer_cleanup=pass

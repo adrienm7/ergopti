@@ -1,0 +1,6 @@
+2026-11-02 08:39:26:708 [WARNING] [Menu] Over budget: menu.rebuild took 1656 ms (budget 250 ms).
+2026-11-02 08:39:28:914 [WARNING] [HotPath] Slow Config.TomlBuild: 27.85 ms own, 32.04 ms total, parent none (0 similar since the last line).
+2026-11-02 08:39:28:914 [WARNING] [HotPath] Slow Config.TomlBuild detail: 0 update(s).
+2026-11-02 08:39:29:283 [WARNING] [BootProfile] Over budget: boot took 7187 ms (budget 2500 ms).
+2026-11-02 08:39:30:690 [WARNING] [HotPath] Slow Menu.populate_leaf: 15.15 ms own, 15.15 ms total, parent none (0 similar since the last line).
+2026-11-02 08:39:30:691 [WARNING] [HotPath] Slow Menu.populate_leaf detail: background; list=locales; rows=16; remaining=4.

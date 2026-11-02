@@ -1,0 +1,13 @@
+{
+	"codes": ["boot_ms_37264", "budget_ms_2500"],
+	"deadline_ms": 10000,
+	"elapsed_ms": 0,
+	"finished_at": "2026-11-02T07:39:59Z",
+	"index": 1,
+	"kind": "field_check",
+	"request_id": "win-2026-11-02_083950",
+	"schema": 1,
+	"started_at": "2026-11-02T07:39:59Z",
+	"step": "field_boot_cost",
+	"verdict": "fail"
+}
