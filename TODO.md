@@ -8,6 +8,38 @@ the field-run step or the hand action that proves it and the commits it confirms
 [workflow and verification memory](docs/memory/workflow-and-verification.md). Finished items are in Git
 (`git show 2a0083cb11:TODO.md` is the long form before this shrink).
 
+## Release 1.0.9 (maintainer requests of 1-2 November, written so the work survives a lost session)
+
+Release as 1.0.9 on `main` by fast-forward from `dev`, with `Release-As: 1.0.9` if the computed version differs, once the
+three-OS CI is green on the final source. Last all-green CI: run 41398601166 on b58acec0d. Work in progress lives on
+the local branches `worktree-agent-*`: land them, then remove the worktrees so one repository remains. Unpushed:
+7d346897f6 (one registry comparison across the boot, never booted).
+
+- [ ] **Macos field report 2026-11-02.** Rotation warnings at midnight during the recovery; `event_taps` run loop late:
+      main thread held 1.5 s, `menu.rebuild` 1.3 s (`menu_item.shortcuts` about 1 s); `diagnostics` phase A over 5 ms;
+      `idle_cost` 8.35 %; Ollama `digest_mismatch` on `granite4:350m-h` twice, after the retry. Then rerun the report
+      without touching the Mac.
+- [ ] **Slowness, every driver.** Windows boot 7 s, `menu.rebuild` 1.7 s: lazy submenus, single-toggle update, one
+      registry proof, full save after ready, disk caches; a toggle must not rebuild 1000 rows.
+- [ ] **AI menu.** "Test a prediction" under the profile row: group model, profile, test, never two separators in a row.
+      The test uses a high temperature, bypasses the cache, never a fixed string, and shows the generation time.
+- [ ] **Generation parameters submenu.** Predictions count, min and max words with no separator; one separator; all the
+      context rows at the bottom (two separators become one).
+- [ ] **Prediction indentation default -3**, recommended -3, all drivers.
+- [ ] **French punctuation.** Space before `:` in composed `label: value` rows and about 21 strings, with a gate.
+- [ ] **Multi-prediction tooltip.** The number is right-aligned in the tooltip, not stuck to the text.
+- [ ] **Model selection page.** Install Ollama and Install MLX buttons act or say why, disabled when installed; a whole
+      section header opens its list; header on two lines (install, port, status; then add a model by hand); Ollama and MLX
+      models grouped in collapsible sections per provider, alphabetical; search crosses sections; gate for page actions
+      with no host handler.
+- [ ] **Options greyed.** Disable in browser address bars and in password fields can be changed, or say why not.
+- [ ] **Defaults and recommended.** Each manifest row declares feature or setting, CI gate, empty config boots neutral,
+      missing option takes its manifest default, Restore recommended restores adjusted settings too (see
+      docs/memory/maintainer-decisions.md).
+- [ ] **Keep Ollama behind a proxy.** 0.40.4 downloads blobs outside the proxy; 0.40.6 fixes it, shared pin needs a Mac rebuild.
+- [ ] **Before publishing.** Whole AHK suite on a quiet machine with no resident driver, `npm run test:ahk-tray-rows-read-as-text`,
+      all live checks including `quit-over-a-log-flush`, JS, macOS and Linux suites, Windows field report with a driver.
+
 ## To confirm on the Mac
 
 Check out `dev` (or the branch to test), set Debug > Log level > DEBUG, then run
