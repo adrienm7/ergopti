@@ -56,7 +56,9 @@ const EN = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales
 // History: 111 → 110 (2026-08-02: the driver namespace left the description_key,
 //                     which reconnected shortcuts.personal to the translation
 //                     that had been sitting in all 21 catalogues unused.)
-const FALLTHROUGH_BASELINE = 110;
+//          110 → 107 (2026-11-02: layout.pause_switch_enabled, on_pause and
+//                     on_resume left the section key for their own.)
+const FALLTHROUGH_BASELINE = 107;
 
 /** Segments that name a driver rather than a feature. */
 const DRIVER_SEGMENTS = ['ahk', 'hs', 'linux', 'macos', 'windows'];

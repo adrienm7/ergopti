@@ -271,9 +271,9 @@ global FEATURES_MANIFEST := Map(
         Map("path", "category_enabled.sfbs_reduction", "id", "sfbs_reduction", "section", "category_enabled", "default", false, "type", "boolean", "description_key", "category.sfbs_reduction", "platforms", ["ahk"], "recommended", true, "input_altering", true),
         Map("path", "category_enabled.rolls", "id", "rolls", "section", "category_enabled", "default", false, "type", "boolean", "description_key", "category.rolls", "platforms", ["ahk"], "recommended", true, "input_altering", true),
         Map("path", "category_enabled.magic_key", "id", "magic_key", "section", "category_enabled", "default", false, "type", "boolean", "description_key", "category.magic_key", "platforms", ["ahk"], "recommended", true, "input_altering", true),
-        Map("path", "layout.pause_switch_enabled", "id", "pause_switch_enabled", "section", "layout", "default", false, "type", "boolean", "description_key", "menu.layout", "platforms", ["ahk", "hs", "linux"], "recommended", false, "input_altering", true),
-        Map("path", "layout.on_pause", "id", "on_pause", "section", "layout", "default", "", "type", "string", "description_key", "menu.layout", "platforms", ["ahk", "hs", "linux"], "recommended", "", "input_altering", true),
-        Map("path", "layout.on_resume", "id", "on_resume", "section", "layout", "default", "", "type", "string", "description_key", "menu.layout", "platforms", ["ahk", "hs", "linux"], "recommended", "", "input_altering", true)
+        Map("path", "layout.pause_switch_enabled", "id", "pause_switch_enabled", "section", "layout", "default", false, "type", "boolean", "description_key", "menu.layout.pause_layout_enabled", "platforms", ["ahk", "hs", "linux"], "recommended", false, "input_altering", true),
+        Map("path", "layout.on_pause", "id", "on_pause", "section", "layout", "default", "", "type", "string", "description_key", "menu.layout.layout_on_pause", "platforms", ["ahk", "hs", "linux"], "recommended", "", "input_altering", true),
+        Map("path", "layout.on_resume", "id", "on_resume", "section", "layout", "default", "", "type", "string", "description_key", "menu.layout.layout_on_resume", "platforms", ["ahk", "hs", "linux"], "recommended", "", "input_altering", true)
     ],
     "unavailable", [
         Map("path", "hotstrings.enabled", "section", "hotstrings", "reason_key", "platform_reason.hotstrings_master_is_macos_engine", "platforms", ["hs"]),
