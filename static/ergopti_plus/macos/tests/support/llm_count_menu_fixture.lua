@@ -36,11 +36,15 @@ return function(callback, options)
 			return options.real_model_selector or key:match("^menu%.profiles%.") or key:match("^llm%.profile%.")
 		end
 		package.loaded["infra.i18n"] = { get = function(key)
+			if options.catalogue then return options.catalogue[key] or key end
 			if real_caption(key) then return real_strings[key] or key end
 			if key == "menu.llm.prediction_count_label_one" then return "%d prediction" end
 			if key == "menu.llm.prediction_count_label_other" then return "%d predictions" end
 			return require("tests.helpers").I18N_PLACEHOLDER_FORMATS[key] or key
-		end, section = function(key) return real_caption(key) and real_strings[key] or key end }
+		end, section = function(key)
+			if options.catalogue then return options.catalogue[key] or key end
+			return real_caption(key) and real_strings[key] or key
+		end }
 		package.loaded["modules.llm"] = { DEFAULT_STATE = defaults,
 			get_backend = function() return state.llm_backend end, set_backend = accept,
 			get_current_model = function() return "" end }

@@ -110,13 +110,15 @@ local function shortcuts_double()
 end
 
 --- Builds the real tray and records every WARNING/ERROR the build logs.
+--- @param observe_layout function|nil Layout observer.
+--- @param catalogue table|nil A real locale catalogue to draw the tray from.
 --- @return table|nil menu, table lines, string|nil err
-local function build_tray(observe_layout)
+local function build_tray(observe_layout, catalogue)
 	-- The real LLM row, built by its own module over the doubles its suite uses.
 	local llm_item = nil
 	require("tests.support.llm_count_menu_fixture")(function(llm_menu)
 		llm_item = llm_menu.build_item()
-	end)
+	end, { catalogue = catalogue })
 
 	local lines = {}
 	package.loaded["infra.logger"] = nil
@@ -142,9 +144,17 @@ local function build_tray(observe_layout)
 	-- echoes keys would make the renderer hide rows a real tray shows.
 	local echo = i18n.get
 	i18n.get = function(key)
+		if catalogue then
+			local text = catalogue[key]
+			return (text == nil or text == "") and key or text
+		end
 		if type(key) == "string" and key:find("^platform_reason%.") then return "Reason for " .. key end
 		if key == "menu.global.config_folder" then return CONFIG_FOLDER end
 		return echo(key)
+	end
+	if catalogue then
+		-- The i18n double decorates its own echo: headers must read the catalogue too.
+		i18n.section = function(key) return "— " .. i18n.get(key) .. " —" end
 	end
 	i18n.build_language_menu_items = function()
 		return { { label = "Français", checked = true, action = function() end } }
@@ -199,6 +209,34 @@ local function walk(rows, visit, path, depth)
 		end
 	end
 end
+
+local RowText = require("test.menu_row_text")
+local SHARED_ROOT = helpers.driver_root() .. "/../_shared"
+-- The whole tray holds many more; fewer means a builder gave up.
+local MIN_TRAY_ROWS = 100
+
+helpers.describe("the real macOS tray reads as text", LayoutFixture.scoped(function()
+	local decode = require("json").decode
+
+	helpers.it("the walk itself refuses each shape of raw text", function()
+		local rows = { { title = "Disposition", menu = {
+			{ title = "on_pause" }, { title = "menu.layout.layout_on_pause" },
+			{ title = "some_raw_id" }, { title = "Layout {1}" }, { title = "Disposition" },
+		} } }
+		local defects = RowText.defects(rows, SHARED_ROOT, decode)
+		helpers.assert_eq(#defects, 4, "only the plain label may pass: " .. table.concat(defects, " | "))
+	end)
+
+	for _, locale in ipairs({ "fr", "en" }) do
+		helpers.it("shows no raw id in " .. locale, function()
+			local menu, _, build_error = build_tray(nil, RowText.catalogue(SHARED_ROOT, locale, decode))
+			helpers.assert_nil(build_error, "the tray must build over the real catalogue")
+			local defects, rows = RowText.defects(menu, SHARED_ROOT, decode)
+			helpers.assert_true(rows >= MIN_TRAY_ROWS, "the walk stopped early at " .. rows .. " rows")
+			helpers.assert_eq(defects, {}, "a row must read as text")
+		end)
+	end
+end))
 
 helpers.describe("the real macOS tray: every submenu reaches the menu bar populated", LayoutFixture.scoped(function()
 	local MENU, LINES, BUILD_ERROR = build_tray()
