@@ -111,6 +111,7 @@ function matches(el, selector) {
 	if (selector === 'tr[data-key]')
 		return el.tagName === 'TR' && el.getAttribute('data-key') !== null;
 	if (selector === 'th[data-sort]') return false;
+	if (selector === '[data-nav]') return el.getAttribute('data-nav') !== null;
 	return false;
 }
 
@@ -776,6 +777,128 @@ assert.ok(
 	'a reason the header already states is not repeated'
 );
 page.context.injectModels(payload);
+
+// model-selector-provider-sections: a long local list folds by catalogue provider,
+// alphabetically, as the tray's provider sub-menus did. The user's own models stay
+// directly under the backend, and the API stays flat.
+{
+	const sectioned = loadPage(en);
+	const row = (name, provider, extra = {}) => ({
+		backend: 'ollama',
+		name,
+		provider,
+		installed: true,
+		...extra
+	});
+	const sectionPayload = {
+		...payload,
+		active: 'Qwen-Small',
+		models: [
+			row('Qwen-Small', 'Alibaba'),
+			row('Qwen-Large', 'Alibaba', { family: 'Qwen' }),
+			row('Gemma-Tiny', 'Google'),
+			row('Mistral-Mini', 'mistral'),
+			row('Bloom', 'BigScience'),
+			{ backend: 'ollama', name: 'my-tag', installed: true, custom: true },
+			{ backend: 'api', name: 'OpenAI/gpt-4o-mini', provider: 'OpenAI', installed: true }
+		]
+	};
+	sectioned.context.injectModels(sectionPayload);
+	const open = () => rowNames(sectioned);
+	const sectionsOf = () =>
+		bodies(sectioned)
+			.find((tb) => tb.getAttribute('data-group') === 'ollama')
+			.children.filter((tr) => tr.className.includes('section'));
+	const sectionToggle = (provider) =>
+		sectionsOf()
+			.map((tr) => tr.children[0].children[0])
+			.find((el) => el.getAttribute('data-section') === `ollama\u0000${provider}`);
+	assert.equal(sectionsOf().length, 0, 'a collapsed backend draws no section');
+	toggleOf(sectioned, 'ollama').onclick();
+	assert.deepEqual(
+		sectionsOf().map(
+			(tr) => tr.children[0].children[0].getAttribute('data-section').split('\u0000')[1]
+		),
+		['Alibaba', 'BigScience', 'Google', 'mistral'],
+		'sections sort alphabetically, whatever their case'
+	);
+	assert.deepEqual(
+		open(),
+		['my-tag', 'Qwen-Large', 'Qwen-Small'],
+		'the own models stay out of the sections; only the current model section opens'
+	);
+	assert.equal(sectionToggle('Alibaba').getAttribute('aria-expanded'), 'true');
+	assert.equal(sectionToggle('Google').getAttribute('aria-expanded'), 'false');
+	assert.ok(sectionToggle('Alibaba').innerHTML.includes(countText(2, 2)), 'it counts its models');
+	assert.ok(!sectionToggle('Alibaba').innerHTML.includes('group-active'));
+
+	// Mouse and keyboard, on the toggle and on the whole header.
+	sectionToggle('Google').onclick();
+	assert.ok(open().includes('Gemma-Tiny'), 'a click opens a section');
+	assert.equal(sectioned.doc.activeElement, sectionToggle('Google'), 'its toggle keeps the focus');
+	sectionToggle('Google').onkeydown(keyEvent('Enter'));
+	assert.ok(!open().includes('Gemma-Tiny'), 'Enter closes it');
+	sectionToggle('Google').onkeydown(keyEvent(' '));
+	assert.ok(open().includes('Gemma-Tiny'), 'Space opens it');
+	sectionsOf()[2].children[0].onclick({ target: sectionsOf()[2].children[0] });
+	assert.ok(!open().includes('Gemma-Tiny'), 'the whole section header toggles');
+
+	// The current model's section can be closed, and names the model then.
+	sectionToggle('Alibaba').onclick();
+	assert.ok(!open().includes('Qwen-Small'), 'the user can close the current model section');
+	assert.ok(sectionToggle('Alibaba').innerHTML.includes('group-active'));
+	// The state survives a new payload while the page lives.
+	sectioned.context.injectModels(sectionPayload);
+	assert.deepEqual(open(), ['my-tag'], 'a closed section stays closed across a payload');
+	sectionToggle('Alibaba').onclick();
+
+	// Arrows walk rows and section headers, so a collapsed section is reachable.
+	drawnRows(sectioned.byId)['Qwen-Small'].focus();
+	const qwenSmall = drawnRows(sectioned.byId)['Qwen-Small'];
+	qwenSmall.onkeydown({ key: 'ArrowDown', target: qwenSmall, preventDefault() {} });
+	assert.equal(sectioned.doc.activeElement, sectionToggle('BigScience'));
+	sectionToggle('BigScience').onkeydown(keyEvent('ArrowDown'));
+	assert.equal(sectioned.doc.activeElement, sectionToggle('Google'));
+	sectionToggle('Google').onkeydown(keyEvent('ArrowUp'));
+	assert.equal(sectioned.doc.activeElement, sectionToggle('BigScience'));
+
+	// A selected row keeps working, and its section stays open across a payload.
+	sectionToggle('BigScience').onclick();
+	sectioned.context.selectRow('ollama\u0000Bloom');
+	assert.equal(sectioned.byId['btn-use'].disabled, false, 'the selection reaches the footer');
+	sectioned.context.useSelected();
+	assert.deepEqual(sectioned.messages.splice(0), [
+		{ action: 'select_model', name: 'Bloom', backend: 'ollama' }
+	]);
+
+	// A search reaches into closed sections and opens only those it matches in.
+	sectionToggle('BigScience').onclick();
+	sectioned.byId.search.value = 'gemma';
+	sectioned.byId.search.dispatch('input');
+	assert.deepEqual(open(), ['Gemma-Tiny'], 'a search opens the section it matches in');
+	assert.equal(sectionsOf().length, 1, 'and draws no other section');
+	sectionToggle('Google').onclick();
+	assert.deepEqual(open(), [], 'the user can close it again');
+	sectioned.byId.search.value = '';
+	sectioned.byId.search.dispatch('input');
+	assert.ok(!open().includes('Gemma-Tiny'), 'clearing the search restores the closed section');
+	// The backend filter alone opens no section: it does not name a model.
+	sectioned.byId['backend-filter'].value = 'ollama';
+	sectioned.byId['backend-filter'].dispatch('change');
+	assert.ok(!open().includes('Gemma-Tiny'));
+	sectioned.byId['backend-filter'].value = '';
+	sectioned.byId['backend-filter'].dispatch('change');
+
+	// The API group stays flat: its rows carry a provider too.
+	toggleOf(sectioned, 'api').onclick();
+	assert.ok(open().includes('OpenAI/gpt-4o-mini'));
+	assert.equal(
+		bodies(sectioned)
+			.find((tb) => tb.getAttribute('data-group') === 'api')
+			.children.filter((tr) => tr.className.includes('section')).length,
+		0
+	);
+}
 
 // The page and the shared Lua rule accept and refuse the same identifiers.
 const corpus = JSON.parse(

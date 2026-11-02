@@ -463,4 +463,14 @@ _MBClick_PausedDriverStatesThePause() {
 }
 Test("model browser: a paused driver states the pause on the install button", _MBClick_PausedDriverStatesThePause)
 
+; model-selector-provider-sections: the page groups Ollama rows by the catalogue
+; provider, as the Lua drivers send it; the user's own model carries none.
+_MBInject_RowsNameTheirProvider() {
+	Listed := _LLM_MBW_LocalRow("Qwen3.5-2B", "qwen3.5:2b", Map("provider", "Alibaba"), false, false, false, false)
+	AssertContains(Listed["json"], ',provider:"Alibaba",')
+	Own := _LLM_MBW_LocalRow("my-tag", "my-tag", Map(), true, false, true, false)
+	AssertContains(Own["json"], ',provider:"",')
+}
+Test("model browser: a catalogue row names its provider, a custom one none", _MBInject_RowsNameTheirProvider)
+
 RunTests()

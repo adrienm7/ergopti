@@ -736,6 +736,7 @@ _LLM_MBW_LocalRow(Name, Tag, Info, IsInstalled, IsDefault, Custom, Deletable) {
 		. ",name:" . JsonStringLiteral(Name)
 		. ",runtime_name:" . JsonStringLiteral(Tag)
 		. ",family:" . JsonStringLiteral(Custom ? "" : _LLM_ModelBrowser_GuessFamily(Name))
+		. ",provider:" . JsonStringLiteral(Custom || !Info.Has("provider") ? "" : Info["provider"])
 		. ",params_b:" . _LLM_MBW_Num(Params)
 		. ",active_b:" . _LLM_MBW_Num(ActiveB)
 		. ",is_moe:" . ((ActiveB > 0 && ActiveB < Params) ? "true" : "false")

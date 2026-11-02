@@ -323,6 +323,13 @@ tbody tr.group .group-toggle {
 	padding: 2px 4px;
 }
 
+/* A provider inside a backend: a step in from the backend's own header. */
+tbody tr.group.section th {
+	background: var(--bg-alt);
+	font-weight: 400;
+	padding: 5px 10px 5px 24px;
+}
+
 tbody tr.group .group-toggle:focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: 0;

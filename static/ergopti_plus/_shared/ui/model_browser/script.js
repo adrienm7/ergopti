@@ -44,10 +44,11 @@ var _sortKey = 'name';
 var _sortDir = 1;
 var _filter = ''; // Backend id the table is narrowed to; '' shows every backend.
 var _capabilities = {}; // { disable: bool }.
-var _expanded = {}; // Group id -> true while the user keeps it open; lives as long as the page.
+// Each map below is keyed by group id or by provider section key.
+var _expanded = {}; // Open or closed as the user left it; lives as long as the page.
 var _narrowKey = ''; // The filter and search the narrowed groups were opened for.
-var _narrowCollapsed = {}; // Group id -> true when the user closed a group a narrowing opened.
-var _toggles = {}; // Group id -> its header toggle in the last render, to keep focus across renders.
+var _narrowCollapsed = {}; // True when the user closed what a narrowing opened.
+var _toggles = {}; // Its header toggle in the last render, to keep focus across renders.
 
 // Which column reads which row field. The numeric fields are the catalogue's
 // own (models.json hardware_requirements.<backend>.download_gb / ram_gb and
@@ -573,11 +574,7 @@ function render() {
 			tbody.setAttribute('data-group', g.backend.id);
 			tbody.appendChild(buildGroupHead(g.backend, g.rows, expanded, narrowed));
 		}
-		if (expanded) {
-			g.rows.forEach(function (m) {
-				tbody.appendChild(buildRow(m));
-			});
-		}
+		if (expanded) appendGroupRows(tbody, g, !!query);
 		table.appendChild(tbody);
 	});
 
@@ -597,13 +594,138 @@ function groupExpanded(g, narrowed) {
 	return _expanded[id] === true;
 }
 
-/** Opens or closes one group, then gives its toggle the focus back. */
-function toggleGroup(id, narrowedWithRows) {
+/**
+ * Opens or closes one group or provider section, then gives its toggle the
+ * focus back.
+ * @param {string} id - Group id or section key.
+ * @param {boolean} narrowedWithRows - Whether a narrowing opened it.
+ * @param {boolean} [open] - Whether it is open now; a section may be open with no record of it.
+ */
+function toggleGroup(id, narrowedWithRows, open) {
 	if (narrowedWithRows) _narrowCollapsed[id] = _narrowCollapsed[id] !== true;
-	else _expanded[id] = _expanded[id] !== true;
+	else _expanded[id] = !(open === undefined ? _expanded[id] === true : open);
 	render();
 	var toggle = _toggles[id];
 	if (toggle && typeof toggle.focus === 'function') toggle.focus();
+}
+
+/**
+ * A local backend's rows split by catalogue provider, sections in alphabetical
+ * order. A row without a provider (the user's own models) stays directly under
+ * the backend, and an API group stays flat: its names already start with it.
+ * @param {object} g - The group.
+ * @returns {object} { loose, sections: [{ key, provider, rows }] }
+ */
+function splitByProvider(g) {
+	if (!g.backend || !isLocalBackend(g.backend)) return { loose: g.rows, sections: [] };
+	var loose = [];
+	var byProvider = {};
+	var sections = [];
+	g.rows.forEach(function (m) {
+		if (!m.provider) {
+			loose.push(m);
+			return;
+		}
+		var key = g.backend.id + '\u0000' + m.provider;
+		if (!Object.prototype.hasOwnProperty.call(byProvider, key)) {
+			byProvider[key] = { key: key, provider: m.provider, rows: [] };
+			sections.push(byProvider[key]);
+		}
+		byProvider[key].rows.push(m);
+	});
+	sections.sort(function (a, b) {
+		return compareNames([a.provider.toLowerCase()], [b.provider.toLowerCase()]);
+	});
+	return { loose: loose, sections: sections };
+}
+
+/**
+ * Whether a provider section shows its rows. A search opens every section it
+ * matches in, unless the user closes it under that search; otherwise the
+ * user's choice holds, and until they made one only the section of the
+ * current or selected model is open.
+ */
+function sectionExpanded(section, searching) {
+	if (searching) return _narrowCollapsed[section.key] !== true;
+	if (_expanded[section.key] !== undefined) return _expanded[section.key] === true;
+	return section.rows.some(function (m) {
+		return isCurrent(m) || rowKey(m) === _selected;
+	});
+}
+
+/** Draws an open group's rows: those without a provider, then each section. */
+function appendGroupRows(tbody, g, searching) {
+	var split = splitByProvider(g);
+	split.loose.forEach(function (m) {
+		tbody.appendChild(buildRow(m));
+	});
+	split.sections.forEach(function (section) {
+		var open = sectionExpanded(section, searching);
+		tbody.appendChild(buildSectionHead(g.backend, section, open, searching));
+		if (open) {
+			section.rows.forEach(function (m) {
+				tbody.appendChild(buildRow(m));
+			});
+		}
+	});
+}
+
+/**
+ * One provider's header inside a backend: the same toggle as a backend's, with
+ * its model count and, while collapsed, the current model it holds.
+ * @param {object} b - The backend.
+ * @param {object} section - { key, provider, rows }.
+ * @param {boolean} open - Whether its rows are shown.
+ * @param {boolean} searching - Whether a search opened it.
+ */
+function buildSectionHead(b, section, open, searching) {
+	var catalogueOwner = _catalogueOwner;
+	var head = document.createElement('tr');
+	head.className =
+		'group section' + (b.available === false ? ' unavailable' : '') + (open ? ' expanded' : '');
+	var th = document.createElement('th');
+	th.setAttribute('scope', 'rowgroup');
+	th.setAttribute('colspan', String(COLUMNS.length));
+	var total = _models.filter(function (m) {
+		return m.backend === b.id && m.provider === section.provider;
+	}).length;
+	var current = open ? null : section.rows.filter(isCurrent)[0];
+	var toggle = document.createElement('span');
+	toggle.className = 'group-toggle';
+	toggle.setAttribute('role', 'button');
+	toggle.setAttribute('tabindex', '0');
+	toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+	toggle.setAttribute('data-section', section.key);
+	toggle.setAttribute('data-nav', 'true');
+	toggle.innerHTML =
+		'<span class="chevron" aria-hidden="true">▸</span> ' +
+		'<span class="group-title">' +
+		_escHtml(section.provider) +
+		'</span>' +
+		' <span class="group-count">' +
+		_escHtml(_fmt('model_browser.count_label', { n: section.rows.length, total: total })) +
+		'</span>' +
+		(current
+			? ' <span class="group-active">' +
+				_escHtml(_fmt('model_browser.current_label', { model: current.name })) +
+				'</span>'
+			: '');
+	bindHeaderToggle(th, toggle, function () {
+		if (_catalogueOwner === catalogueOwner) toggleGroup(section.key, searching, open);
+	});
+	var activate = toggle.onkeydown;
+	toggle.onkeydown = function (ev) {
+		if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+			ev.preventDefault();
+			moveFocus(toggle, ev.key === 'ArrowDown' ? 1 : -1);
+			return;
+		}
+		activate(ev);
+	};
+	_toggles[section.key] = toggle;
+	th.appendChild(toggle);
+	head.appendChild(th);
+	return head;
 }
 
 /** The thin line between the local backends and the remote ones. */
@@ -1006,6 +1128,7 @@ function buildRow(m) {
 	tr.tabIndex = 0;
 	if (typeof tr.setAttribute === 'function') {
 		tr.setAttribute('data-key', key);
+		tr.setAttribute('data-nav', 'true');
 		tr.setAttribute('aria-disabled', isSelectable(m) ? 'false' : 'true');
 		tr.setAttribute('aria-selected', key === _selected ? 'true' : 'false');
 	}
@@ -1057,11 +1180,13 @@ function buildRow(m) {
 	return tr;
 }
 
-/** Moves keyboard focus to the next or previous model row, across groups. */
-function moveFocus(fromRow, step) {
-	var rows = Array.prototype.slice.call(document.querySelectorAll('tr[data-key]'));
-	var index = rows.indexOf(fromRow);
-	var next = rows[index + step];
+/**
+ * Moves keyboard focus to the next or previous model row or provider header,
+ * across groups, so a collapsed section can be reached and opened by keyboard.
+ */
+function moveFocus(from, step) {
+	var stops = Array.prototype.slice.call(document.querySelectorAll('[data-nav]'));
+	var next = stops[stops.indexOf(from) + step];
 	if (next && typeof next.focus === 'function') next.focus();
 }
 
