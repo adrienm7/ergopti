@@ -40,6 +40,22 @@ and its keystats ledger recorded the test keys. Judge such a check from the
 private driver's own state (`HSE_Buffer`, its log), and leave CapsWord, which
 writes the real CapsLock state, to a desktop with no other driver.
 
+### project-a-smoke-boot-never-owns-the-session-keyboard
+
+A smoke skips the single-owner mutex, so it boots a whole driver beside the
+resident one. On 2026-11-02 a boot-cost bench on the maintainer's copied config
+failed its readiness receipt and stayed resident: its log showed his physical
+Enter, and he got `ppoouurr` and `jjoou` for `a,ou`. Two remappers each emit the
+key, and two engines each send the same paced burst, Backspaces included.
+`DriverSmokeInput_Decide` now boots a smoke paused unless it runs on CI or asks
+for `ERGOPTI_STARTUP_SMOKE_LIVE_INPUT`; that request beside a resident ends the
+boot. The native hook ignores Suspend, so it is not started. Any uncaught error
+ends a smoke, ready or not, and a 150 s deadline ends an orphan. A pause guard
+on a boot write must let a quarantined smoke through (`_PersonalWritesPaused`).
+Action: never bypass `ERGOPTI_STARTUP_SMOKE_DIR` to boot the entry beside a
+driver. Read suspended state from `A_IsSuspended`: `ListHotkeys` still shows
+`k-hook` for a paused parse-time hotkey. `(smoke-input-quarantine)` pins it.
+
 ### project-live-checks-hse-reset-makes-the-word-start-unknown
 
 `hse_reset` calls `HSE_HardReset`, which no driver path calls and which leaves

@@ -103,6 +103,8 @@ LiveRegister(Name, Fn) {
 /** The startup smoke's inspection hook: serves commands until a stop file appears. */
 LiveServe(*) {
 	global _LiveStopped
+	; This session outlives a smoke by design; its orchestrator owns its end.
+	SetTimer(StartupSmokeDeadlineExit, 0)
 	Dir := LiveDir()
 	LiveWrite(Dir . "\alive.txt", ProcessExist() . "`n")
 	LiveTrace("serving")

@@ -173,7 +173,11 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		; resident with a partial set of hotkeys/hooks and no reliable recovery path.
 		; Cleanup is best-effort because this handler also covers failures before
 		; those modules are loaded; ExitApp is the only publication boundary here.
-		if (_DriverBootPhase != "ready") {
+		; A smoke ends on any error, ready or not: one that survived a failed readiness
+		; receipt stayed resident and hooked until its harness killed it. It exits
+		; through ExitProcess, as its ready path does, because a teardown can veto ExitApp.
+		SmokeRun := IsSet(_DriverStartupSmokeDir) && _DriverStartupSmokeDir != ""
+		if (_DriverBootPhase != "ready" or SmokeRun) {
 				try LoggerError("ErgoptiPlus", "Fatal startup error during phase '{1}': {2}",
 						_DriverBootPhase, ErrorNet_Describe(Exc)
 								. (Exc.HasProp("Stack") ? " | " . Exc.Stack : ""))
@@ -200,12 +204,14 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 				; Tell the user WHY the driver is exiting. A modal is safe here: no input
 				; pipeline is owned yet and we are about to ExitApp. i18n may not be loaded
 				; this early, so the message is a hardcoded French string (last-resort path).
-				if !(IsSet(_DriverStartupSmokeDir) && _DriverStartupSmokeDir != "")
+				if !SmokeRun
 						try Ui_MsgBox("ErgoptiPlus n'a pas pu démarrer (phase « " . _DriverBootPhase . " ») :`n`n"
 								. Exc.Message . "`n`nLe driver va se fermer. Le journal des erreurs contient le détail.",
 								"erreur de démarrage", "Iconx")
 				try KL_Stop()
 				try HookDispatcher.Stop()
+				if SmokeRun
+						DllCall("ExitProcess", "UInt", 1)
 				ExitApp(1)
 				return true
 		}

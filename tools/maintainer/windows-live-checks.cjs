@@ -141,6 +141,7 @@ class LiveSession {
 	 */
 	constructor(ahk, scratch, name) {
 		this.ahk = ahk;
+		this.scratch = scratch;
 		this.name = name;
 		this.root = path.join(scratch, name);
 		this.live = path.join(this.root, 'live');
@@ -224,6 +225,9 @@ class LiveSession {
 			LOCALAPPDATA: this.root,
 			ERGOPTI_STARTUP_SMOKE_DIR: this.root,
 			ERGOPTI_STARTUP_SMOKE_NONCE: crypto.randomBytes(16).toString('hex'),
+			// A session owns real input only on a desktop with no other driver. Beside
+			// one it boots paused; the driver itself refuses a request made beside it.
+			ERGOPTI_STARTUP_SMOKE_LIVE_INPUT: otherDriverPids(this.scratch).length === 0 ? '1' : '',
 			...(options.env || {})
 		};
 		this.child = spawn(this.ahk, ['/ErrorStdOut', this.wrapper], {
@@ -597,7 +601,6 @@ async function main() {
 		for (const check of CHECKS) console.log(`${check.id}  ${check.title}`);
 		return 0;
 	}
-	const allowOtherDriver = args.includes('--allow-other-driver');
 	const revertIndex = args.indexOf('--without-fix-of');
 	if (revertIndex >= 0) overlay = driverSourcesBefore(args[revertIndex + 1]);
 	const onlyIndex = args.indexOf('--only');
@@ -631,13 +634,12 @@ async function main() {
 				 * @returns {string|null} The reason to skip, or null when the desktop is quiet.
 				 */
 				otherDriverReason: () => {
-					if (allowOtherDriver) return null;
 					const drivers = otherDriverPids(scratch);
 					return drivers.length === 0
 						? null
-						: `another ErgoptiPlus driver runs on this desktop (pid ${drivers.join(', ')}) and its hooks would act on the same keys; close it, or pass --allow-other-driver to run anyway`;
+						: `another ErgoptiPlus driver runs on this desktop (pid ${drivers.join(', ')}) and a session beside it stays paused; close it to run this check`;
 				},
-				/** The pids of other ErgoptiPlus drivers, whatever --allow-other-driver says. */
+				/** The pids of other ErgoptiPlus drivers. */
 				otherDriverPids: () => otherDriverPids(scratch),
 				newSession: (name) => {
 					const session = new LiveSession(ahk, scratch, `${check.id}-${name}`);
