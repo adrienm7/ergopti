@@ -49,8 +49,11 @@ _LTP_Result() {
 		AssertEqual(t("llm.test_prediction.sample"), Calls[1][1], "on the sample, never on what was typed")
 		AssertEqual(Typed, _LLM_Bridge_Buffer, "the typed context is untouched")
 		Calls[1][2].Call("  mardi à 14 h`n", "usage")
-		AssertEqual(StrReplace(t("llm.test_prediction.result"), "{1}", "mardi à 14 h"), _LPP_PendingNotice(),
-			"the trimmed answer is shown")
+		Prefix := SubStr(t("llm.test_prediction.result"), 1, InStr(t("llm.test_prediction.result"), "{") - 1)
+		AssertEqual(1, InStr(_LPP_PendingNotice(), Prefix), "the result's own wording is shown")
+		AssertContains(_LPP_PendingNotice(), "mardi à 14 h", "the trimmed answer is shown")
+		AssertFalse(InStr(_LPP_PendingNotice(), "{"), "with no placeholder left")
+		AssertFalse(InStr(_LPP_PendingNotice(), "  mardi"), "and trimmed")
 		AssertEqual(0, Sent.Length, "nothing is typed")
 		AssertEqual(0, _LVS_LinesMentioning(Lines, "mardi"), "and the answer is not logged")
 		; A long answer is cut, a new test supersedes the old one's late answer.
@@ -97,13 +100,16 @@ Test("AI menu test prediction: a failure says why, the switch-off withdraws it (
 _LTP_ActiveBackend() {
 	_LTP_Run(_Body)
 	_Body(Fx, Lines, Sent) {
-		global _LLM_Menu, _LLM_Engine, _LLM_Engine_RemoteTransport
+		global _LLM_Menu, _LLM_Engine, _LLM_Engine_RemoteTransport, LLM_Defaults
+		LLM_Defaults_Load()
+		_LLM_Engine["temperature"] := 0.1
 		SavedTransport := _LLM_Engine_RemoteTransport
 		Remote := [], OnDevice := []
 		try {
 			_LLM_Engine_RemoteTransport := (Args*) => Remote.Push(Args)
 			AssertTrue(LLM_Menu_TestPrediction())
 			AssertEqual(1, Remote.Length, "the API backend's transport is asked")
+			AssertEqual(LLM_Defaults["llm_test_prediction_temperature"] + 0.0, Remote[1][4], "at the test's own temperature")
 			AssertEqual("remote-a", Remote[1][1]["Id"], "with the active entry")
 			AssertEqual(t("llm.test_prediction.sample"), Remote[1][3], "on the sample")
 			_LLM_Menu["backend"] := "ollama"
@@ -111,6 +117,7 @@ _LTP_ActiveBackend() {
 			_AAG_WithFn(LLM_OllamaGenerate_Async, (Self, Args*) => OnDevice.Push(Args), _SendLocal)
 			AssertEqual(1, Remote.Length, "and the API one is not")
 			AssertEqual(1, OnDevice.Length, "the local backend is asked")
+			AssertEqual(LLM_Defaults["llm_test_prediction_temperature"] + 0.0, OnDevice[1][4], "at the test's own temperature")
 			AssertEqual(t("llm.test_prediction.sample"), OnDevice[1][3], "on the sample")
 		} finally _LLM_Engine_RemoteTransport := SavedTransport
 		_SendLocal() {
@@ -120,6 +127,18 @@ _LTP_ActiveBackend() {
 	}
 }
 Test("AI menu test prediction: the request reaches the active backend (ai-test-prediction)", _LTP_ActiveBackend)
+
+; The time is localized in both forms and never reads a raw placeholder.
+_LTP_Duration() {
+	Seconds(Whole, Tenth) => StrReplace(StrReplace(t("llm.test_prediction.duration_s"), "{1}", Whole), "{2}", Tenth)
+	AssertEqual(StrReplace(t("llm.test_prediction.duration_ms"), "{1}", 0), LLM_Menu_TestPredictionDuration(0))
+	AssertEqual(StrReplace(t("llm.test_prediction.duration_ms"), "{1}", 999), LLM_Menu_TestPredictionDuration(999))
+	AssertEqual(Seconds(1, 0), LLM_Menu_TestPredictionDuration(1000))
+	AssertEqual(Seconds(1, 9), LLM_Menu_TestPredictionDuration(1949))
+	AssertEqual(Seconds(2, 0), LLM_Menu_TestPredictionDuration(1950))
+	AssertEqual(Seconds(12, 3), LLM_Menu_TestPredictionDuration(12340))
+}
+Test("AI menu test prediction: the duration reads ms, then tenths of a second (ai-test-prediction)", _LTP_Duration)
 
 _LTP_MenuRow() {
 	Row := 0

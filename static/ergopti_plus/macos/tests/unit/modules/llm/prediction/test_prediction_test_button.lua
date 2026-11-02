@@ -19,9 +19,20 @@ helpers.describe("macOS test prediction wiring", function()
 		local stop = assert(engine:find("\nend\n", start, true))
 		local body = engine:sub(start, stop)
 		helpers.assert_true(body:find("core_llm.fetch_raw_completion(", 1, true) ~= nil, "the backend's one request")
+		helpers.assert_true(body:find("test_prediction_temperature()", 1, true) ~= nil, "at the test's own temperature")
+		helpers.assert_true(body:find("now_ms = function() return hs.timer.absoluteTime() / 1e6 end", 1, true) ~= nil,
+			"on the monotonic clock")
 		for _, forbidden in ipairs({ "perform_check", "fetch_llm_prediction", "show_predictions", "open_answer_surface" }) do
 			helpers.assert_eq(body:find(forbidden, 1, true), nil, "no engine answer: " .. forbidden)
 		end
+	end)
+
+	helpers.it("reads the test's temperature from the shared defaults", function()
+		local raw = assert(io.open(helpers.shared("modules/llm/defaults.json"), "rb"))
+		local defaults = hs.json.decode(raw:read("*a")); raw:close()
+		helpers.assert_true(defaults.llm_test_prediction_temperature > defaults.llm_temperature, "above the setting")
+		helpers.assert_eq(require("modules.llm.api_common").test_prediction_temperature(),
+			defaults.llm_test_prediction_temperature)
 	end)
 
 	helpers.it("the row reaches the engine", function()

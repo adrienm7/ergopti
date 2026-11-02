@@ -985,6 +985,8 @@ LLM_Menu_TriggerPrediction(FireFn := 0) {
 	return true
 }
 
+; From this many milliseconds on, the test prediction shows seconds.
+global LLM_TEST_PREDICTION_MS_PER_SECOND := 1000
 ; The most characters of an answer the test prediction's notice shows.
 global LLM_TEST_PREDICTION_EXCERPT_CHARS := 200
 ; Shown to the user, so prose rather than a closed log reason id.
@@ -1018,7 +1020,7 @@ LLM_Menu_TestPrediction(SendFn := 0) {
 	LoggerStart("LLM", "Test prediction #{1} sent to the active backend.", Generation)
 	_LLM_Menu_ShowManualPredictionNotice("llm.test_prediction.running")
 	Transport := HasMethod(SendFn, "Call") ? SendFn : _LLM_Menu_TestPredictionSend
-	try Transport.Call(Sample, _LLM_Menu_OnTestPredictionAnswer.Bind(Generation),
+	try Transport.Call(Sample, _LLM_Menu_OnTestPredictionAnswer.Bind(Generation, A_TickCount),
 		_LLM_Menu_OnTestPredictionFailure.Bind(Generation), _LLM_Menu_TestPredictionIsCurrent.Bind(Generation))
 	catch as Err {
 		_LLM_Menu_OnTestPredictionFailure(Generation, Map("reason", Err.Message))
@@ -1027,13 +1029,16 @@ LLM_Menu_TestPrediction(SendFn := 0) {
 	return true
 }
 
-; Sends the sample to the active backend, with the active prompt and settings.
+; Sends the sample to the active backend, with the active prompt and the test's
+; own high temperature: the same sample at the low generation temperature repeats
+; one answer, which proves nothing. Nothing here reads the prediction cache. The
+; remote body builder drops the temperature of a default-sampling-only model.
 _LLM_Menu_TestPredictionSend(Sample, OnSuccess, OnFail, Current) {
-	global _LLM_Menu, _LLM_Engine
+	global _LLM_Menu, _LLM_Engine, LLM_Defaults
 	Profile := LLM_FindProfile(_LLM_Menu["profile_id"], _LLM_Menu[ConfigLeaf.USER_PROFILES])
 	System := LLM_ResolveSystemPrompt(Profile, 1, _LLM_Engine[ConfigLeaf.MIN_WORDS], _LLM_Engine[ConfigLeaf.MAX_WORDS],
 		_LLM_Engine["language"])
-	Temperature := _LLM_Engine["temperature"] + 0.0
+	Temperature := LLM_Defaults["llm_test_prediction_temperature"] + 0.0
 	if (_LLM_Menu["backend"] == "api") {
 		Entry := _LLM_Engine_GetActiveApiEntry()
 		if (Entry == "")
@@ -1051,8 +1056,21 @@ _LLM_Menu_TestPredictionIsCurrent(Generation) {
 	return (Generation == _LLM_Menu_TestPredictionGeneration && !A_IsSuspended && LLM_Menu_AiEnabled()) ? true : false
 }
 
+/**
+ * The generation time as the notice shows it, milliseconds under one second.
+ * @param {Integer} Ms The elapsed milliseconds.
+ * @returns {String} The localized duration.
+ */
+LLM_Menu_TestPredictionDuration(Ms) {
+	global LLM_TEST_PREDICTION_MS_PER_SECOND
+	if (Ms < LLM_TEST_PREDICTION_MS_PER_SECOND)
+		return StrReplace(t("llm.test_prediction.duration_ms"), "{1}", Ms)
+	Tenths := Round(Ms * 10 / LLM_TEST_PREDICTION_MS_PER_SECOND)
+	return StrReplace(StrReplace(t("llm.test_prediction.duration_s"), "{1}", Tenths // 10), "{2}", Mod(Tenths, 10))
+}
+
 ; The backend answered: show the answer, a blank one being a failure.
-_LLM_Menu_OnTestPredictionAnswer(Generation, Text, *) {
+_LLM_Menu_OnTestPredictionAnswer(Generation, StartTick, Text, *) {
 	global LLM_TEST_PREDICTION_EXCERPT_CHARS, LLM_TEST_PREDICTION_EMPTY_ANSWER
 	if !_LLM_Menu_TestPredictionIsCurrent(Generation)
 		return
@@ -1061,11 +1079,14 @@ _LLM_Menu_OnTestPredictionAnswer(Generation, Text, *) {
 		_LLM_Menu_OnTestPredictionFailure(Generation, Map("reason", LLM_TEST_PREDICTION_EMPTY_ANSWER))
 		return
 	}
+	Elapsed := TickElapsed(StartTick)
 	; Sizes only: the answer stays out of the log, like every prediction.
-	LoggerSuccess("LLM", "Test prediction #{1} answered ({2} character(s)).", Generation, StrLen(Answer))
+	LoggerSuccess("LLM", "Test prediction #{1} answered ({2} character(s), {3} ms).", Generation, StrLen(Answer), Elapsed)
 	Shown := StrLen(Answer) > LLM_TEST_PREDICTION_EXCERPT_CHARS
 		? SubStr(Answer, 1, LLM_TEST_PREDICTION_EXCERPT_CHARS) . "…" : Answer
-	_LLM_Menu_ShowNotice(StrReplace(t("llm.test_prediction.result"), "{1}", Shown))
+	; The duration first: an answer may itself hold the text « {2} ».
+	_LLM_Menu_ShowNotice(StrReplace(StrReplace(t("llm.test_prediction.result"), "{2}",
+		LLM_Menu_TestPredictionDuration(Elapsed)), "{1}", Shown))
 }
 
 ; The backend refused or failed: show why.
