@@ -294,14 +294,26 @@ tbody tr.group th {
 	text-align: left;
 }
 
-/* The whole header opens and closes its group; its tools keep their own cursor. */
+/* The whole header opens and closes its group; only its controls keep their cursor. */
 tbody tr.group th,
 tbody tr.group .group-toggle {
 	cursor: pointer;
 }
 
-tbody tr.group .group-tools {
-	cursor: default;
+/* One line for the install, the port and the status, one to add a model. */
+tbody tr.group .group-tools,
+tbody tr.group .group-add {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	font-weight: 400;
+	gap: 6px;
+	margin-top: 4px;
+}
+
+tbody tr.group .group-tools:empty,
+tbody tr.group .group-add:empty {
+	display: none;
 }
 
 tbody tr.group .group-toggle {

@@ -694,11 +694,12 @@ function installNote(text) {
 }
 
 /**
- * One backend's header: the toggle that shows or hides its rows (chevron,
- * emoji and name, model count, the active model while collapsed, why it
- * cannot run now), then its tools — the driver's own actions (install,
- * port, token…), the field that adds a model by identifier, and the
- * provider list that adds an API.
+ * One backend's header. Its first line is the toggle that shows or hides its
+ * rows (chevron, emoji and name, model count, the active model while
+ * collapsed); the next holds the install, the driver's own actions (port,
+ * token…) and why the backend cannot run now; the last adds a model by
+ * identifier or an API by provider. A click anywhere on the header toggles,
+ * except on a real control.
  * @param {object} b - The backend.
  * @param {Array} rows - Its rows the filters keep.
  * @param {boolean} expanded - Whether its rows are shown.
@@ -735,27 +736,18 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 			? ' <span class="group-active">' +
 				_escHtml(_fmt('model_browser.current_label', { model: active.name })) +
 				'</span>'
-			: '') +
-		(reason ? ' <span class="reason">' + _escHtml(reason) + '</span>' : '');
+			: '');
 	var narrowedWithRows = narrowed && rows.length > 0;
 	var toggleHere = function () {
 		if (_catalogueOwner === catalogueOwner) toggleGroup(b.id, narrowedWithRows);
 	};
-	toggle.onclick = toggleHere;
-	toggle.onkeydown = function (ev) {
-		if (ev.key === 'Enter' || ev.key === ' ') {
-			ev.preventDefault();
-			toggleHere();
-		}
-	};
-	// The header's empty space toggles too; its tools keep their own clicks.
-	th.onclick = function (ev) {
-		if (ev && ev.target === th) toggleHere();
-	};
+	bindHeaderToggle(th, toggle, toggleHere);
 	_toggles[b.id] = toggle;
 	th.appendChild(toggle);
 	var tools = document.createElement('div');
 	tools.className = 'group-tools';
+	var adders = document.createElement('div');
+	adders.className = 'group-add';
 
 	if (b.install) {
 		tools.appendChild(buildInstallButton(b, catalogueOwner));
@@ -779,6 +771,13 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 		};
 		tools.appendChild(btn);
 	});
+
+	if (reason) {
+		var status = document.createElement('span');
+		status.className = 'reason';
+		status.textContent = reason;
+		tools.appendChild(status);
+	}
 
 	if (b.add_model && b.available !== false) {
 		var texts = ADD_MODEL_TEXT_KEYS[b.id];
@@ -817,9 +816,9 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 				submit();
 			}
 		};
-		tools.appendChild(input);
-		tools.appendChild(addBtn);
-		tools.appendChild(error);
+		adders.appendChild(input);
+		adders.appendChild(addBtn);
+		adders.appendChild(error);
 	}
 
 	if (Array.isArray(b.providers) && b.providers.length > 0) {
@@ -841,13 +840,43 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 			var id = select.value || b.providers[0].id;
 			postModelAction({ action: 'add_provider', backend: b.id, provider: id });
 		};
-		tools.appendChild(select);
-		tools.appendChild(providerBtn);
+		adders.appendChild(select);
+		adders.appendChild(providerBtn);
 	}
 
 	th.appendChild(tools);
+	th.appendChild(adders);
 	head.appendChild(th);
 	return head;
+}
+
+// What keeps its own click inside a header; everything else toggles it.
+var HEADER_CONTROLS = 'button, input, select, textarea, a, label';
+
+/**
+ * Makes a whole header cell toggle: the mouse anywhere but on a real control,
+ * Enter or Space on its focusable toggle. The toggle stops its click, which
+ * would otherwise reach the cell and toggle twice.
+ * @param {object} cell - The header cell.
+ * @param {object} toggle - Its focusable toggle.
+ * @param {function} run - Opens or closes the header's rows.
+ */
+function bindHeaderToggle(cell, toggle, run) {
+	toggle.onclick = function (ev) {
+		if (ev && ev.stopPropagation) ev.stopPropagation();
+		run();
+	};
+	toggle.onkeydown = function (ev) {
+		if (ev.key === 'Enter' || ev.key === ' ') {
+			ev.preventDefault();
+			run();
+		}
+	};
+	cell.onclick = function (ev) {
+		var target = ev && ev.target;
+		if (target && target.closest && target.closest(HEADER_CONTROLS)) return;
+		run();
+	};
 }
 
 /** The cells of one row, in COLUMNS order. */
