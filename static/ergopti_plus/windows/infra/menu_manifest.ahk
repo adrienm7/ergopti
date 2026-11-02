@@ -122,6 +122,7 @@ _MM_GetManifestRoot() {
 	}
 
 	_MM_MANIFEST_ROOT_CACHE := Root
+	JsonKnownRoot(FileContent, Root)
 	return Root
 }
 
