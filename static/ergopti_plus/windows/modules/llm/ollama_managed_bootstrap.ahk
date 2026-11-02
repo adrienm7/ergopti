@@ -39,10 +39,14 @@ global LLM_PULL_PERCENT_TAIL_BYTES := 4096
 ; succeeded and its last line, the only one that names a failure, is lost.
 global LLM_OLLAMA_PULL_CAPTURE_BYTES := 67108864
 ; What marks each class of a failed pull, first match wins: the closed vocabulary
-; of macos/modules/llm/managed_ollama_pull.py ERROR_CLASSES.
+; of macos/modules/llm/managed_ollama_pull.py ERROR_CLASSES. The transport classes
+; come before "manifest": Ollama prefixes a failed fetch with "pull model manifest".
 global LLM_OLLAMA_PULL_ERROR_CLASSES := [["digest mismatch", "digest_mismatch"], ["no space left", "no_space"],
 	["permission denied", "permission_denied"], ["context canceled", "cancelled"],
-	["max retries", "max_retries"], ["manifest", "manifest"]]
+	["max retries", "max_retries"], ["deadline exceeded", "timeout"], ["timeout", "timeout"],
+	["certificate", "certificate"], ["tls", "certificate"], ["no such host", "dns"],
+	["connection refused", "connection"], ["connection reset", "connection"], ["unexpected eof", "connection"],
+	["too many requests", "rate_limited"], ["manifest", "manifest"], ["file does not exist", "not_found"]]
 
 /** Dispatches explicit installation without an administrator/system fallback. */
 LLM_Deps_RunManagedInstaller(Model, Epoch, OnReady?, OnFailed?, Silent := false) {
