@@ -678,8 +678,11 @@ class OllamaBlobHost(unittest.TestCase):
     def setUp(self):
         self.helper = load("network_check_blob", MACOS / "modules/llm/managed_network_check.py")
         self.registry, self.planned = self.helper.ollama_planned_hosts()
+        self.ranges = []
 
-    def run_blob(self, manifest_status=200, manifest=None, blob=(307, None)):
+    def run_blob(
+        self, manifest_status=200, manifest=None, blob=(307, None), ranged=(206, "bytes 1-2/9")
+    ):
         """Runs main_blob over a stand-in transport; blob is (status, location)."""
         requests = []
         body = json.dumps(
@@ -710,6 +713,9 @@ class OllamaBlobHost(unittest.TestCase):
                 requests.append((url, options["method"]))
                 if "/manifests/" in url:
                     return Response(manifest_status, payload=body)
+                if options["method"] == "GET":
+                    self.ranges.append(dict(options["headers"]).get("Range"))
+                    return Response(ranged[0], [["Content-Range", ranged[1]]] if ranged[1] else [])
                 status, location = blob
                 return Response(status, [["Location", location]] if location else [])
 
@@ -727,14 +733,37 @@ class OllamaBlobHost(unittest.TestCase):
             "https://" + self.planned_blob_host() + "/ollama/docker/registry/v2/blobs/x?sig=1"
         )
         lines, requests = self.run_blob(blob=(307, location))
-        self.assertEqual(lines, ["step blob_manifest pass http_200", "step blob_host pass planned"])
+        self.assertEqual(
+            lines,
+            [
+                "step blob_manifest pass http_200",
+                "step blob_host pass planned",
+                "step blob_range pass honoured",
+            ],
+        )
         self.assertEqual(
             requests,
             [
                 (self.registry + "/v2/library/tiny/manifests/0.5b", "GET"),
                 (self.registry + "/v2/library/tiny/blobs/sha256:" + "a" * 64, "HEAD"),
+                (location, "GET"),
             ],
         )
+        self.assertEqual(self.ranges, ["bytes=1-2"])
+
+    def test_the_range_probe_names_a_relay_that_ignores_or_misplaces_it(self):
+        location = "https://" + self.planned_blob_host() + "/x"
+        ignored, _ = self.run_blob(blob=(307, location), ranged=(200, None))
+        self.assertIn("step blob_range info ignored", ignored)
+        moved, _ = self.run_blob(blob=(307, location), ranged=(206, "bytes 0-1/9"))
+        self.assertIn("step blob_range fail wrong_range", moved)
+        refused, _ = self.run_blob(blob=(307, location), ranged=(403, None))
+        self.assertIn("step blob_range fail http_403", refused)
+        served, requests = self.run_blob(blob=(200, None))
+        self.assertIn("step blob_range pass honoured", served)
+        self.assertEqual(requests[-1], (requests[-2][0], "GET"), "a served blob is asked in place")
+        unplanned, _ = self.run_blob(blob=(302, "https://blobs.elsewhere.example/x"))
+        self.assertIn("step blob_range skip no_blob", unplanned)
 
     def test_a_redirect_to_an_unplanned_host_fails_without_naming_it(self):
         lines, _ = self.run_blob(blob=(302, "https://blobs.elsewhere.example/x"))

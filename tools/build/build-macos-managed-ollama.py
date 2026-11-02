@@ -135,6 +135,19 @@ def apply_hooks(source: Path, repository: Path) -> dict[str, str]:
                 "\t\tresp, err := client.Do(req)\n",
                 "\t\tresp, err := nativehttp.Do(client, req)\n",
             )
+            # Upstream copies the body at the part's offset without reading the
+            # status, so a relay ignoring Range wrote the blob's head into every
+            # part. The keep-alive feeds the stall watchdog during a skip.
+            text = replace_once(
+                text,
+                "\t\tn, err := io.CopyN(w, io.TeeReader(resp.Body, part), part.Size-part.Completed.Load())\n",
+                "\t\tif err := nativehttp.AlignRange(resp, part.StartsAt(), func() {\n"
+                "\t\t\tpart.lastUpdatedMu.Lock()\n"
+                "\t\t\tpart.lastUpdated = time.Now()\n"
+                "\t\t\tpart.lastUpdatedMu.Unlock()\n"
+                "\t\t}); err != nil {\n\t\t\treturn err\n\t\t}\n\n"
+                "\t\tn, err := io.CopyN(w, io.TeeReader(resp.Body, part), part.Size-part.Completed.Load())\n",
+            )
         if relative == "server/routes.go":
             text = replace_once(
                 text,

@@ -1381,7 +1381,10 @@ A full aggregate rebuild (a new `AGGREGATE_CACHE_REVISION`, a fresh cache) costs
 minutes of main-thread Lua on a months-old ledger. At 8 ms slices with a 10 ms
 pause it took 45 % of a core on battery, and every reload threw the work away:
 the field run of 2026-11-01 interrupted it after 10315 slices and started over
-(ledger read, 60 s scan, clear). `_recovery_pause_sec` now scales the pause to
+(ledger read, 60 s scan, clear). Midnight waits with the ingest: `day_rollover`
+returns `false, ROLLOVER_WAITS_FOR_RECOVERY` without draining, the watcher says
+so once at INFO and completes the rotation on the first tick after the recovery;
+a real stall stays a WARNING. `_recovery_pause_sec` now scales the pause to
 0.5 % of a core on battery (`adapters/power_source.lua`) and keeps full speed on
 the mains. `aggregate_recovery_progress` in meta commits in the same
 transaction as the rows it counts, so a start resumes after the last flushed
@@ -1400,6 +1403,16 @@ missing parents require the filesystem transaction adapter and `lstat` semantics
 
 Ignored/private applications bypass all Ergopti text features, including repeat,
 preview, logging, and expansion.
+
+### project-hs-require-wrapper-walks-package-loaded
+
+Hammerspoon 1.1.1 replaces the global `require` (`_coresetup.lua`): every call,
+for a loaded module too, lists, sorts and joins `package.loaded` for its crash
+reporter, about 300 us and 4 KB on the main thread. The unit runner's plain
+`require` cannot show it: one lazy `require` per script-chord row cost 47 ms ->
+1 s in the field only. `infra/direct_require.lua` restores the original
+(`rawrequire`) first thing in init.lua. Action: compare a field number before
+blaming row counts, and keep that install ahead of every module load.
 
 ### project-macos-eventtap-no-blocking
 
@@ -1975,6 +1988,9 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
   downloaded.
 - `field_ollama_blob_host`: the blob host is the Ollama registry's redirect
   target; Windows ports the route plan in `vendor/ergopti_route_plan.ps1`.
+  `blob_range` asks two bytes of that blob: `honoured`, `ignored` (information:
+  a relay answers 200, and the managed daemon's `AlignRange` skips to each
+  part's offset, reloading the skipped bytes) or `wrong_range`.
 - `field_app_health` runs after the AI steps. "Since the app start" is the
   launcher's `ps` elapsed time (`app_uptime_s`); it reads the driver's
   `crash_reports` folder and `~/Library/Logs/DiagnosticReports` for
