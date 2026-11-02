@@ -2200,6 +2200,10 @@ ScriptShortcutSlotRunsAction(Slot, Suspended := A_IsSuspended) {
 		global ScriptShortcutAssignments, GESTURE_ACTIONS, SCRIPT_SHORTCUT_SUSPEND_ALLOWED
 		if !ScriptShortcutAssignments.Has(Slot)
 				throw ValueError("Unknown script shortcut slot.", -1, Slot)
+		; These chords are exempt from Suspend, so a quarantined smoke closes them
+		; here: the resident driver keeps its pause, reload and quit.
+		if Suspended && IsSet(_DriverSmokeInputQuarantined) && _DriverSmokeInputQuarantined
+				return false
 		; The submenu's switch: off leaves every chord native and keeps the actions.
 		if !ScriptShortcutChordsAreOn()
 				return false
