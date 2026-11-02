@@ -413,6 +413,21 @@ thead th:focus-visible,
 	border-color: var(--accent);
 }
 
+/* A greyed button must read as greyed: it answers no click, so it takes no hover. */
+.act:disabled,
+.act:disabled:hover {
+	border-color: var(--border);
+	color: var(--text-dim);
+	cursor: default;
+	opacity: 0.6;
+}
+
+.install-note {
+	color: var(--theme-hue-f87171);
+	font-size: 12px;
+	margin-left: 8px;
+}
+
 .act.danger:hover {
 	border-color: var(--theme-danger);
 	color: var(--theme-hue-f87171);
