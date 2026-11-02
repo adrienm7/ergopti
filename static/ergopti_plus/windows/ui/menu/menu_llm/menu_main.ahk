@@ -504,7 +504,7 @@ _LLM_MenuLayout_Fallback() {
  * The spec (_LLM_MenuLayout_Rows) owns the ORDER and the `disabled` flag; this
  * dispatch owns the platform-native label formatting and submenu construction
  * (which read Win32/tray state and so cannot live in shared data). Conditional native-only rows that have no shared
- * entry — the thinking-model info row and the separator after the profile row —
+ * entry — the thinking-model info row —
  * are returned here with their anchor row to preserve menu order.
  * @param {String}  id                  Row id from the manifest's llm_menu.
  * @param {Boolean} disabled            Greying flag already resolved from the spec policy.
@@ -563,12 +563,10 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, CapturedWarningRows := unset) {
 		}
 		return ModelRows
 	case "llm_profile":
-		; Admit the actual boundary and whole frame before building the native child.
-		BoundaryRows := MenuRenderer_TemplateRows("llm_after_profile_boundary", Map(), Map(), Map())
+		; Admit the whole frame before building the native child.
 		Admission := MenuRenderer_TemplateRows("llm_profile_parent_frame_ahk", Map(), Map(),
 			Map("llm_profile_parent_rows", (*) => []))
-		if !(BoundaryRows is Array) || BoundaryRows.Length != 1 || !BoundaryRows[1].Get("separator", false)
-			|| !(Admission is Array) || Admission.Length != 1 || !Admission[1].Get("separator", false)
+		if !(Admission is Array) || Admission.Length != 0
 			throw Error("Declared profile parent frame was refused.")
 		; Admit the separate genuine parent before profile data or child construction.
 		; An empty scalar is valid for the existing translated prefix contract.
@@ -585,7 +583,7 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, CapturedWarningRows := unset) {
 		ProfileMenu := LLM_Menu_BuildProfileMenu()
 		try {
 			ProfileRows := _LLM_Menu_ProfileParentRows(ProfileMenu, ProfileCaption, disabled)
-			if !(ProfileRows is Array) || ProfileRows.Length != 2
+			if !(ProfileRows is Array) || ProfileRows.Length != 1
 				throw Error("Declared profile parent frame was withdrawn.")
 		} catch as Err {
 			ProfileMenu.Delete()
@@ -631,7 +629,6 @@ _LLM_Menu_ProfileParentRows(NativeChild, Caption, Disabled) {
 	Root := _MR_GetManifestRoot()
 	ParentDefinition := Root.Get("llm_profile_parent_ahk", false)
 	FrameDefinition := Root.Get("llm_profile_parent_frame_ahk", false)
-	BoundaryDefinition := Root.Get("llm_after_profile_boundary", false)
 	Getters := Map("llm_profile_parent_caption", (*) => Caption,
 		"llm_profile_parent_ready", (*) => !Disabled)
 	Parent := MenuRenderer_GroupRow("llm_profile_parent_ahk", "llm_profile_parent", NativeChild, Getters)
@@ -640,10 +637,9 @@ _LLM_Menu_ProfileParentRows(NativeChild, Caption, Disabled) {
 	ParentRows := [Parent]
 	Rows := MenuRenderer_TemplateRows("llm_profile_parent_frame_ahk", Map(), Map(),
 		Map("llm_profile_parent_rows", (*) => ParentRows))
-	if !(Rows is Array) || Rows.Length != 2 || _MR_GetManifestRoot() != Root
+	if !(Rows is Array) || Rows.Length != 1 || _MR_GetManifestRoot() != Root
 		|| Root.Get("llm_profile_parent_ahk", false) != ParentDefinition
 		|| Root.Get("llm_profile_parent_frame_ahk", false) != FrameDefinition
-		|| Root.Get("llm_after_profile_boundary", false) != BoundaryDefinition
 		return false
 	return Rows
 }

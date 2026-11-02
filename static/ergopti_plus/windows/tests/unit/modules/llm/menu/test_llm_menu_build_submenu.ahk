@@ -84,6 +84,61 @@ _LBMS_Labels(TargetMenu) {
 	return Labels
 }
 
+; Refuses a separator that leads, trails or follows another one. A separator
+; reads as an empty label.
+_LBMS_AssertCleanSeparators(Labels, State) {
+	AssertTrue(Labels[1] != "", State . ": no leading separator")
+	AssertTrue(Labels[Labels.Length] != "", State . ": no trailing separator")
+	for Position, Label in Labels
+		AssertFalse(Position > 1 && Label == "" && Labels[Position - 1] == "", State . ": two separators in a row at " . Position)
+}
+
+; ai-test-prediction-row: model, profile and test are one block in every AI
+; state, closed by one separator before the trigger group.
+_LBMS_AiBlock(State, Prepare) {
+	global _LLM_Menu, _LLM_Menu_Handle
+	SavedMenu := _LBMS_Fixture()
+	HadHandle := IsSet(_LLM_Menu_Handle), PriorHandle := HadHandle ? _LLM_Menu_Handle : 0
+	_LLM_Menu_Handle := Menu()
+	try {
+		Prepare.Call()
+		Built := LLM_Menu_BuildSubmenu()
+		try {
+			Labels := _LBMS_Labels(Built)
+			_LBMS_AssertCleanSeparators(Labels, State)
+			TestRow := _LBMS_ParentPosition(Labels, t("menu.llm.test_prediction"))
+			Trigger := _LBMS_ParentPosition(Labels, t("menu.llm.trigger_menu_title"))
+			AssertTrue(TestRow > 0, State . ": the test row is drawn")
+			AssertTrue(DllCall("GetSubMenu", "ptr", Built.Handle, "int", TestRow - 1, "ptr") != 0,
+				State . ": the test row follows the profile parent")
+			AssertEqual("", Labels[TestRow + 2], State . ": one separator closes the block")
+			AssertEqual(TestRow + 2, Trigger, State . ": the trigger group follows that separator")
+			AssertTrue(Labels[TestRow - 1] != "", State . ": no separator splits the block")
+		} finally Built.Delete()
+	} finally {
+		_LLM_Menu := SavedMenu
+		_LLM_Menu_Handle := HadHandle ? PriorHandle : unset
+	}
+}
+_LBMS_AiOff() {
+	global _LLM_Menu
+	_LLM_Menu["enabled"] := false
+}
+_LBMS_NoModel() {
+	global _LLM_Menu
+	_LLM_Menu["api_entry_id"] := ""
+	_LLM_Menu["api_entries"] := []
+}
+_LBMS_NoLocalModel() {
+	global _LLM_Menu
+	_LLM_Menu["backend"] := "ollama"
+	_LLM_Menu["model"] := ""
+}
+Test("ai-test-prediction-row: the block stands with the AI on", _LBMS_AiBlock.Bind("on", (*) => 0))
+Test("ai-test-prediction-row: the block stands with the AI off", _LBMS_AiBlock.Bind("off", _LBMS_AiOff))
+Test("ai-test-prediction-row: the block stands with no API entry", _LBMS_AiBlock.Bind("no entry", _LBMS_NoModel))
+Test("ai-test-prediction-row: the block stands with no local model", _LBMS_AiBlock.Bind("no local model", _LBMS_NoLocalModel))
+
 ; Runs Body with a fresh private configuration the session may write, so the
 ; persistence rows draw ready; Ready false keeps the harness's unwritable
 ; destination. Restores every global it replaces.

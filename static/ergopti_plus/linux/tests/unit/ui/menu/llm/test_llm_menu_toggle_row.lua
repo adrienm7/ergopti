@@ -114,6 +114,25 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 			helpers.assert_true(row.title ~= clear, "row " .. index .. " of the AI submenu is a clear row")
 		end
 	end)
+
+	-- ai-test-prediction-row: model, profile and test are one block in every AI
+	-- state, closed by one separator; none lands next to another one.
+	for state, enabled in pairs({ ["on"] = true, ["off"] = false }) do
+		for model_state, model in pairs({ ["a model"] = "local-a", ["no model"] = false }) do
+			helpers.it("keeps the model, profile and test block with the AI " .. state .. " and " .. model_state, function()
+				local i18n = require("infra.i18n")
+				local llm = fake_llm(enabled)
+				llm.get_current_model = function() return model or nil end
+				llm.get_prediction_model = llm.get_current_model
+				local rows = submenu_of(build(llm), "menu.llm.title")
+				require("test.ai_menu_layout_contract").assert_block(helpers, rows, {
+					profile = i18n.get("menu.profiles.profile_label_prefix"):match("^[^%%{]*"),
+					test = i18n.get("menu.llm.test_prediction"),
+					trigger = i18n.get("menu.llm.trigger_menu_title"),
+				}, state .. "/" .. model_state)
+			end)
+		end
+	end
 end)
 
 helpers.describe("tray (linux): keyboard slot groups need a key catalogue", function()

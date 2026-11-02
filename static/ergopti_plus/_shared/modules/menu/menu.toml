@@ -470,17 +470,6 @@ disabled_reasons = [
 [[menu.llm_menu]]
 type = "---"
 
-# Straight to the backend, never through an engine answer the user could accept
-# into a document. Each driver answers with its own backend's seam. Below the
-# first group, which holds only the switch and the restore.
-[[menu.llm_menu]]
-type = "command"
-id = "llm_test_prediction"
-i18n = "menu.llm.test_prediction"
-
-[[menu.llm_menu]]
-type = "---"
-
 # One button opens the model selector page, where the backend and the model are
 # chosen together (maintainer, 2026-10-27): it reads the backend's emoji, then
 # the model (« 🦙 qwen3:4b », « 🌐 OpenAI/gpt-4o-mini »). The Backend chooser,
@@ -499,8 +488,8 @@ i18n = "menu.llm.model_label"
 disabled_when_off = false
 platforms = ["ahk", "hs", "linux"]
 
-# The model and the prompt rows form one block on every driver: no separator
-# between them (maintainer, 2026-10-29).
+# The model, the prompt and the test form one block on every driver: no separator
+# between them (maintainer, 2026-10-29 and 2026-11-02).
 [[menu.llm_menu]]
 type = "list"
 id = "llm_profile"
@@ -508,12 +497,16 @@ i18n = "menu.profiles.profile_label_prefix"
 disabled_when_off = true
 platforms = ["ahk", "hs", "linux"]
 
-# Keep the macOS profile boundary in the complete parent, where separators defer.
+# Straight to the backend, never through an engine answer the user could accept
+# into a document. Each driver answers with its own backend's seam.
 [[menu.llm_menu]]
-type = "list"
-id = "llm_after_profile_boundary"
-platforms = ["hs"]
-unavailable = "hide"
+type = "command"
+id = "llm_test_prediction"
+i18n = "menu.llm.test_prediction"
+
+# The one boundary after the block, on every driver: no provider brings its own.
+[[menu.llm_menu]]
+type = "---"
 
 # The suggestion count ("Nombre de suggestions") is a generation parameter: it
 # is the first row of the generation settings on every driver (the
@@ -3882,11 +3875,6 @@ i18n = "menu.llm.thinking_model_info"
 platforms = ["ahk", "hs"]
 unavailable = "hide"
 
-[[menu.llm_after_profile_boundary]]
-type = "---"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
-
 # Native MLX port and generation controls retain their actual transaction owners.
 
 [[menu.llm_generation_context_control]]
@@ -4999,10 +4987,6 @@ type = "list"
 id = "llm_profile_parent_rows"
 platforms = ["ahk"]
 unavailable = "hide"
-
-[[menu.llm_profile_parent_frame_ahk]]
-type = "include"
-section = "llm_after_profile_boundary"
 
 # Shared picker/clear frame for Linux keyboard, tap-key, chord and gesture slots.
 

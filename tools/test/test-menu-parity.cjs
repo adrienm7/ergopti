@@ -1087,15 +1087,6 @@ OPENS_SUBMENU.llm.push({
 	native_sources: { hs: 'macos/ui/menu/menu_llm/init.lua' }
 });
 OPENS_SUBMENU.llm_profile.push({
-	menu: 'llm_after_profile_boundary',
-	platforms: ['ahk', 'hs'],
-	kind: 'compose',
-	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_main.ahk',
-		hs: 'macos/ui/menu/menu_llm/init.lua'
-	}
-});
-OPENS_SUBMENU.llm_profile.push({
 	menu: 'llm_profile_app_override_frame',
 	platforms: ['ahk'],
 	kind: 'compose',
@@ -1311,7 +1302,7 @@ OPENS_SUBMENU.agent_system_model_rows = {
 };
 OPENS_SUBMENU.agent_system_off_rows = 'agent_system_controls';
 
-// Actual Windows dynamic profile emitter composes its finished native child and boundary.
+// Actual Windows dynamic profile emitter composes its finished native child.
 OPENS_SUBMENU.llm_profile.push({
 	menu: 'llm_profile_parent_frame_ahk',
 	platforms: ['ahk'],

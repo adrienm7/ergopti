@@ -7970,8 +7970,8 @@ console.log(
 		.replace(') {', ', CapturedWarningRows := unset) {');
 	assert.equal(
 		expected.producer_edges.filter((edge) => edge.signatures.ahk === frozenWarningLocator).length,
-		2,
-		'both independent warning-owner locators retain their original two parameters'
+		1,
+		'the independent warning-owner locator retains its original two parameters'
 	);
 	const warningOwnerSource = readSourceFile(
 		resolve(SHARED, '../windows/ui/menu/menu_llm/menu_main.ahk')
@@ -8035,16 +8035,27 @@ console.log(
 			'the whole native parent context owns its genuine macOS boundary'
 		);
 	}
-	// The model and the profile rows form one block on every driver: no row,
-	// separator or boundary list may sit between them, whatever the platform.
-	const [joinedFirst, joinedSecond] = outerBoundary.adjacent_without_boundary;
+	// The model, the profile and the test rows form one block on every driver: no
+	// row, separator or boundary list may sit between them, whatever the platform.
+	const joined = outerBoundary.adjacent_without_boundary;
 	const outerRows = declaredFrames[outerBoundary.section];
-	const joinedIndex = outerRows.findIndex((row) => row.id === joinedFirst);
+	const joinedIndex = outerRows.findIndex((row) => row.id === joined[0]);
 	assert(joinedIndex >= 0, 'the actual model button remains declared');
+	assert.deepEqual(
+		outerRows.slice(joinedIndex, joinedIndex + joined.length).map((row) => row.id),
+		joined,
+		'the block stays contiguous on every platform'
+	);
+	assert.equal(outerRows[joinedIndex - 1]?.type, '---', 'one declared separator opens the block');
 	assert.equal(
-		outerRows[joinedIndex + 1]?.id,
-		joinedSecond,
-		'the profile row directly follows the model row on every platform'
+		outerRows[joinedIndex + joined.length]?.type,
+		'---',
+		'one declared separator closes the block on every driver'
+	);
+	assert.equal(
+		outerRows[joinedIndex + joined.length]?.platforms,
+		undefined,
+		'the closing separator is not limited to a platform'
 	);
 	const outerSource = readSourceFile(resolve(SHARED, '..', outerBoundary.owner));
 	assert(
@@ -10927,8 +10938,7 @@ console.log(
 		unavailable: 'hide'
 	};
 	const expected = [
-		{ type: 'list', id: 'llm_profile_parent_rows', platforms: ['ahk'], unavailable: 'hide' },
-		{ type: 'include', section: 'llm_after_profile_boundary' }
+		{ type: 'list', id: 'llm_profile_parent_rows', platforms: ['ahk'], unavailable: 'hide' }
 	];
 	assert.deepEqual(records[frame], expected);
 	assert.deepEqual(records[group], [parent]);
