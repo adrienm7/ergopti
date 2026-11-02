@@ -2038,11 +2038,8 @@ reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 type = "list"
 id = "layout_features_base"
 
-# AHK-only, and the FEATURE manifest already said so. This row enumerates
-# features.layout.*, and all five of those entries are Windows-only
-# (ergopti_base, direct_access_digits, ergopti_alt_gr, ergopti_plus,
-# ctrl_magic_save). On the two Lua drivers it enumerated an empty set, so
-# the manifest promised a row neither of them could ever draw.
+# AHK-only: the row draws ergopti_base, a Windows-only feature, so on the two
+# Lua drivers it had nothing to draw.
 platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
 
