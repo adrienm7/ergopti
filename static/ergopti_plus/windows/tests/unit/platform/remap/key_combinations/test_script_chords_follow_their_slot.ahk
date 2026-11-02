@@ -114,6 +114,23 @@ _SCFS_GateMixed() {
 Test("script chords: a slot runs its chord only with an action, while paused only script management (script-chord-slot-2026-09-30)",
 	_SCFS_GateFollowsTheSlot)
 
+; These chords are exempt from Suspend: a quarantined smoke must leave them to
+; the resident driver.
+global _DriverSmokeInputQuarantined := false
+_SCFS_QuarantinedSmokeRunsNoChord() {
+	global _DriverSmokeInputQuarantined
+	_DriverSmokeInputQuarantined := true
+	try _SCFS_WithAssignments(_SCFS_Assignments(""), _SCFS_GateQuarantined)
+	finally _DriverSmokeInputQuarantined := false
+	_SCFS_WithAssignments(_SCFS_Assignments(""), _SCFS_GateRecommended)
+}
+_SCFS_GateQuarantined() {
+	for Slot in _SCFS_Slots()
+		AssertFalse(ScriptShortcutSlotRunsAction(Slot, true), Slot . ": a quarantined smoke is always paused")
+}
+Test("script chords: a quarantined smoke runs no chord (smoke-input-quarantine-chords)",
+	_SCFS_QuarantinedSmokeRunsNoChord)
+
 ; The switch at the head of « Raccourcis de gestion du script »: off leaves every
 ; chord to the system, running or paused, while the slots keep their actions.
 _SCFS_SwitchOffLeavesEveryChord() {
