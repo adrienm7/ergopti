@@ -1,0 +1,15 @@
+{
+	"_comment": "Visible menu text that legitimately looks like an identifier, read by every driver's rendered walk. `pattern` is the JavaScript expression, `lua_pattern` its Lua twin; each entry says why. A real technical name only, never a row that lacks a translation.",
+	"entries": [
+		{
+			"pattern": "config\\.toml",
+			"lua_pattern": "config%.toml",
+			"reason": "the user's configuration file, named as it is on disk"
+		},
+		{
+			"pattern": "\\d{4}_\\d{2}_\\d{2}",
+			"lua_pattern": "%d%d%d%d_%d%d_%d%d",
+			"reason": "the dynamic date hotstring shows today's date in the underscored form it types"
+		}
+	]
+}

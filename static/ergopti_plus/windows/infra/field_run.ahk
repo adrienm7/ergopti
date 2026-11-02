@@ -216,7 +216,9 @@ FieldRun_Runners() {
 
 ; The boot that started this driver, against [budgets] boot_total_ms.
 _FieldRun_RunBootCost(Spec, Done) {
-	Total := Round(BootProfile_TotalBootMs())
+	Total := Round(BootProfile_CompletedBootMs())
+	if Total < 0
+		return Done.Call("fail", ["boot_not_complete"])
 	Budget := TimingsGet("budgets", "boot_total_ms")
 	Done.Call(Total <= Budget ? "pass" : "fail", ["boot_ms_" . Total, "budget_ms_" . Budget])
 }

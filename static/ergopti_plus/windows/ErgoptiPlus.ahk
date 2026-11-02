@@ -181,6 +181,25 @@ if !(_DriverIsDetachedWorker || _DriverStartupSmokeDir != "") {
 	}
 }
 
+; The mutex exemption above lets a smoke boot beside a resident driver, so this
+; decision runs before anything can register a hook. Suspended, the boot's hotkeys
+; never reach the hook, and every other input path honors the pause.
+global _DriverSmokeInputQuarantined := false
+if (_DriverStartupSmokeDir != "" && !_DriverIsDetachedWorker) {
+	_DriverSmokeInputDecision := DriverSmokeInput_Decide(
+		EnvGet("ERGOPTI_STARTUP_SMOKE_LIVE_INPUT") == "1", EnvGet("CI") == "true",
+		DriverMutex_ResidentLives(DRIVER_MUTEX_NAME))
+	if (_DriverSmokeInputDecision == DRIVER_SMOKE_INPUT_REFUSE) {
+		try FileAppend("startup-smoke: live input refused, a resident driver owns this session.`n", "**")
+		DllCall("ExitProcess", "UInt", 1)
+	}
+	if (_DriverSmokeInputDecision == DRIVER_SMOKE_INPUT_QUARANTINE) {
+		_DriverSmokeInputQuarantined := true
+		Suspend(true)
+	}
+	SetTimer(StartupSmokeDeadlineExit, -STARTUP_SMOKE_DEADLINE_MS)
+}
+
 BootProfile_Stamp("Single-owner gate completed")
 
 ; Single source of truth for the driver's baseline (non-boosted) process
@@ -1460,7 +1479,9 @@ HotstringPrefixWatcherInit()
 ; while paced terminal output completes. A failed native admission is reported
 ; by the adapter and terminal expansions remain fail-open. It runs whatever the
 ; AI's state: the press ledger serves every user's first-key order.
-KeyboardArbiterEnsureForLedger()
+; The native hook does not obey Suspend: a quarantined smoke never starts it.
+if !_DriverSmokeInputQuarantined
+	KeyboardArbiterEnsureForLedger()
 HotstringPrefixWatcherRebuildIndex()
 BootProfile_StageEnd("prefix watcher")
 BootProfile_Mark("Prefix watcher index complete")
@@ -1501,7 +1522,7 @@ try {
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
-_BootTotalMs := BootProfile_TotalBootMs()
+_BootTotalMs := BootProfile_CompletedBootMs(BootProfile_TotalBootMs())
 _BootOpenStages := BootProfile_OpenStageNames()
 if (_BootOpenStages != "")
 	LoggerWarn("BootProfile", "Boot completed with unclosed stage(s): {1}.", _BootOpenStages)
@@ -1523,6 +1544,8 @@ try DiagSnapshot_Emit(_BootTotalMs)
 catch as _SnapshotErr
 	LoggerError("Diagnostics", "Diagnostic snapshot could not be collected: {1}.", _SnapshotErr.Message)
 if (_DriverStartupSmokeDir != "") {
+		if _DriverSmokeInputQuarantined
+				LoggerInfo("Lifecycle", "Startup smoke quarantined from session input.")
 		_StartupSmokeExpectedSuspend :=
 				EnvGet("ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED") == "1"
 		if _StartupSmokeExpectedSuspend {
@@ -1541,8 +1564,8 @@ if (_DriverStartupSmokeDir != "") {
 				_DriverStartupSmokeInspectAdmission.Call()
 		; The same driver must come back from that pause: lift it and wait for the
 		; AI hotkeys its paused build deferred. Any error the resume logs fails
-		; the fixture like any other.
-		if _StartupSmokeExpectedSuspend {
+		; the fixture like any other. A quarantined smoke stays paused.
+		if _StartupSmokeExpectedSuspend && !_DriverSmokeInputQuarantined {
 				ToggleSuspend()
 				_StartupSmokeResumeStarted := A_TickCount
 				while ((A_IsSuspended or _LLM_Menu_FirstRestoreHotkeysDeferred)

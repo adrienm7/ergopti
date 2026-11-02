@@ -54,39 +54,33 @@ _LAY_CustomLayoutRows(FeaturesSource := unset, Enabled := unset, Index := unset)
 ; derived from the declaration by MenuRowFromManifest — so there was never
 ; anything for a handler to decide that data could not carry.
 _LAY_LayoutFeatureBaseRows() {
-	Rows := []
-	for _, LayoutEntry in ManifestFeaturesForSection("layout") {
-		if (LayoutEntry["id"] == ConfigLeaf.ERGOPTI_BASE) {
-			Row := MenuRowFromManifest(LayoutEntry, "Layout")
-			if (Row != "") {
-				Rows.Push(Row)
-			}
-		}
-	}
-	return Rows
+	return _LAY_FeatureRows(ConfigKey.LAYOUT_ERGOPTI_BASE)
 }
 
 ; List provider: the independent Ergopti AltGr layer (ergopti_alt_gr).
 ; Built-in variant intent belongs to the existing emulation picker; it has no row.
 ; The rows that work on any layout are declared on their own in the manifest's
 ; « any layout » section: direct_access_digits, and ctrl_magic_save after the
-; magic-key replace option it depends on. emulated_layout names a registry
-; layout: a choice, not a switch, so no toggle row lists it.
+; magic-key replace option it depends on.
+;
+; Named, never « the section minus a list »: a row added to the section later
+; fell into that remainder, and the pause switch and its two pickers were drawn
+; here a second time, as raw text rows beside the declared layout_switching ones.
 _LAY_LayoutFeatureAltGrRows() {
-	static STANDALONE_IDS := Map(ConfigLeaf.ERGOPTI_BASE, true, ConfigLeaf.CTRL_MAGIC_SAVE, true,
-		ConfigLeaf.DIRECT_ACCESS_DIGITS, true, ConfigLeaf.EMULATED_LAYOUT, true, ConfigLeaf.ERGOPTI_VARIANT, true,
-		ConfigLeaf.NUMBER_ROW_REORDER_EDGES, true, ConfigLeaf.EMULATE_NUMBER_ROW, true, ConfigLeaf.EMULATE_TOP_ROW, true,
-		ConfigLeaf.EMULATE_HOME_ROW, true, ConfigLeaf.EMULATE_BOTTOM_ROW, true)
-	Rows := []
-	for _, LayoutEntry in ManifestFeaturesForSection("layout") {
-		if !STANDALONE_IDS.Has(LayoutEntry["id"]) {
-			Row := MenuRowFromManifest(LayoutEntry, "Layout")
-			if (Row != "") {
-				Rows.Push(Row)
-			}
-		}
-	}
-	return Rows
+	return _LAY_FeatureRows(ConfigKey.LAYOUT_ERGOPTI_ALT_GR)
+}
+
+/**
+ * The toggle row of one layout feature.
+ * @param {String} Path The feature's canonical path.
+ * @returns {Array} The row, or nothing when the feature does not resolve.
+ */
+_LAY_FeatureRows(Path) {
+	Entry := ManifestFindEntryByPath(Path)
+	if !(Entry is Map)
+		throw Error("The layout feature '" . Path . "' is not declared.")
+	Row := MenuRowFromManifest(Entry, "Layout")
+	return (Row == "") ? [] : [Row]
 }
 
 

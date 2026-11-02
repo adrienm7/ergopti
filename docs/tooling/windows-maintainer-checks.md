@@ -50,12 +50,11 @@ reported as "not executed".
 ## Real keys and a driver already running
 
 A check that types real keys refuses to run while another ErgoptiPlus driver
-(the maintainer's own, a build under test) is on the desktop. Its hooks see the
-same keys, expand or remap them too, and its metrics record them. Close it, or
-pass `--allow-other-driver` to run anyway: the checks that judge the private
-driver's own state (the engine buffer, its log) stay valid, the screen is then
-not judged. `capsword-auto-off` ignores the flag, because CapsWord writes the
-real CapsLock state, which that driver's CapsLock tap-hold would see.
+(the maintainer's own, a build under test) is on the desktop: close it first.
+Two drivers each act on the same keys, so the session's typing comes out
+doubled. A session started beside one boots paused and owns no input, and the
+driver refuses `ERGOPTI_STARTUP_SMOKE_LIVE_INPUT` when a resident holds the
+single-owner mutex.
 
 ## Checks
 

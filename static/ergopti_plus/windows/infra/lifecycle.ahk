@@ -425,6 +425,11 @@ _LifecycleSetNavEventOwnerSuspended(Suspended) {
 
 ToggleSuspend(*) {
 		global _SuspendPending, _SuspendPendingSince
+		; A quarantined smoke never takes the session's input, whoever asks.
+		if IsSet(_DriverSmokeInputQuarantined) && _DriverSmokeInputQuarantined {
+				LoggerInfo("Lifecycle", "Suspend toggle refused: this smoke run is quarantined from session input.")
+				return
+		}
 		; The reactors log the transition itself; this line records who asked,
 		; which is what separates a user pause from a restored or scripted one.
 		try LoggerInfo("Lifecycle", "Suspend toggle requested by {1} (currently {2}).",

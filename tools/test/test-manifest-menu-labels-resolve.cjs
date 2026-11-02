@@ -53,7 +53,7 @@ const LOCALE_DIR = 'static/ergopti_plus/_shared/data/locales';
 // Non-feature entries whose label does not resolve today. This number may only
 // go DOWN. It is not a target to be raised: every entry behind it is a menu
 // label that would render as a raw id if it were ever rendered.
-const NON_FEATURE_FALLTHROUGH_BASELINE = 82;
+const NON_FEATURE_FALLTHROUGH_BASELINE = 77;
 
 // Feature rows that legitimately have no locale key, because their label comes
 // from a DIFFERENT source. `hotstrings.personal.*` are the user's own sections:
