@@ -1007,6 +1007,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/infra/lifecycle/test_reload_deferral.ahk
 #Include unit/infra/lifecycle/test_dev_source.ahk
 #Include unit/ui/menu/test_tray_menu_separator_popup.ahk
+#Include unit/ui/menu/test_menu_deferred_children.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_hold_picker_options.ahk
 #Include unit/ui/menu/test_menu_command_deferral.ahk
 #Include unit/ui/menu/test_menu_reload_replay.ahk

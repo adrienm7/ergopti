@@ -223,9 +223,9 @@ _MI_StageLayout() {
 	)
 	; The accented-letter group stays enabled without the Ergopti emulation: the
 	; shortcuts then follow the user's own layout (accented_shortcuts.ahk).
-	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders,
+	LayoutMenu  := MenuDeferOrBuild((Target) => MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders,
 		_LAY_ScopeCommands(),
-		Map("layout_enabled", () => IsCategoryGated("Layout")))
+		Map("layout_enabled", () => IsCategoryGated("Layout")), Target), "layout_menu")
 	_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true)
 	BootProfile_Mark("MENU/initMenu: layout built+added")
 }
@@ -308,7 +308,7 @@ _MI_StageHotstrings() {
 		"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers, "", _HotListProviders, _HotParamCommands, _HotParamGetters),
 	)
 	BootProfile_Mark("MENU/initMenu: pre-hotstrings render")
-	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders, _HotCommands, _HotGetters)
+	HotstringsMenu := MenuDeferOrBuild((Target) => MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders, _HotCommands, _HotGetters, Target), "hotstrings_menu")
 	BootProfile_Mark("MENU/initMenu: hotstrings menu rendered")
 
 	HotstringsTotal := _HS_ComputeGrandTotal()

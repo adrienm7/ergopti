@@ -85,6 +85,8 @@ const INVENTORY = {
 		'the detached TOML candidate build before a transactional config publication, including exact-subtree reconstruction and stage verification',
 	'Menu.populate_leaf':
 		'prepared native leaf registration before popup paint or in one-shot background work, so menu construction stalls are attributed separately from startup',
+	'Menu.deferred_build':
+		'a whole submenu built at its first open, before Windows paints it, so the first-open wait is measured on its own',
 	'Updater.Poll':
 		'the async update check, which calls WaitForResponse(0) on a COM object every tick — a COM call that blocks stalls the whole message pump',
 	'Webview.Eval':
