@@ -54,6 +54,36 @@ fault equivalence. Reconsider only with mapped-I/O fault, parent publication and
 concurrent source-replacement evidence; keep ordinary-read regression assertions.
 See the mapped-source investigation (`docs/audits/performance/ahk/2026_09_13/mapped_clone/report.md` at 49c62d77a1).
 
+## Stripping comments from the driver source to speed its parse
+
+Do not build a comment-stripped source bundle for faster boots. Removing every
+full-line comment and doc block from the 499 production `.ahk` files took the
+source from 10.5 to 6.9 MB (35 %) and moved process-load parse from 806-881 ms
+to 772 ms: about 8 %. Parsing is dominated by code, not comments, and the
+compiled exe holds none. Reconsider only with evidence that code volume itself
+fell.
+
+## Typed disk caches for decoded boot data
+
+Do not cache decoded JSON, the prefix index or hotstring rows in
+`ConfigRegistryCodec` form by analogy with the registry cache. On the 125 KB menu
+manifest in one process, `JsonParse` took 141 ms, encode 69 ms and decode 84 ms
+for 202 KB, before the file read and the hash check that any invalidation needs,
+so the best case is about 40 % at the price of a new invalidation contract. The
+same manifest's real waste was a second decode, removed by sharing the root.
+Remove duplicate work first. Layout tables are no better a target: of a 547 ms
+`Ergopti layout registered` mark, `ErgoptiLayout_Init` took 137 ms and the
+`.keylayout` parses 68 ms; the rest is native hotkey registration, which no cache
+reaches. Reconsider only for one document whose decode costs several times the
+codec's, with the invalidation proved.
+
+## Building the remote AI catalogue on first use
+
+Do not defer `_LLMRemote_LoadCatalog` past boot while the AI root is eager: it
+decodes five documents (about 100 ms) even with the AI off, but
+`LLM_Menu_LocalServersInit` needs `LLM_LOCAL_API_SERVERS` at readiness and the AI
+submenu reads the providers. Reconsider if the AI submenu becomes deferred.
+
 ## Generated manifests at runtime
 
 Do not replace checked-in `_generated/` feature manifests with a runtime TOML
