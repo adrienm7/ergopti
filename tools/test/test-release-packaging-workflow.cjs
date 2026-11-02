@@ -1637,7 +1637,7 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 			asset_id: 626678404,
 			version: '1.0.0',
 			commit: '5ef675e08d9f75b0902026a21f36782e999b3ac2',
-			bundle_identity: '1.0.0',
+			bundle_identity: '1.0.0\n5ef675e08d9f75b0902026a21f36782e999b3ac2',
 			pid: 20,
 			executable: 'C:\\private\\prior\\ErgoptiPlus.exe',
 			created_utc: '2026-10-07T12:00:00.0000000Z',
