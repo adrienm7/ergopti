@@ -275,6 +275,9 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 ### macOS
 
+- **Next release after 1.0.9, maintainer priority: switch the driver to the owned Karabiner.** Today the driver still uses
+  the installed one and the owned runtime is dormant. Publish the runtime, write its pin, then WP8, WP9 and the real-Mac
+  acceptance below, and make `runtime = "owned"` the default.
 - **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md)). WP3, WP6
   and WP7 are built and dormant behind `[karabiner] runtime = "owned"`. Left: a green hosted runtime build of the
   installer shape is done (dev run 41276215019, artifact `owned-remap-runtime`): the maintainer publishes
