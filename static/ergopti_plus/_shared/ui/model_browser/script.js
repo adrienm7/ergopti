@@ -628,14 +628,22 @@ function activeIn(b) {
 }
 
 // The install states a local backend's payload names (b.install.state).
-var INSTALL_STATES = { available: true, installed: true, unsupported: true, running: true };
+var INSTALL_STATES = {
+	available: true,
+	installed: true,
+	unsupported: true,
+	checking: true,
+	running: true
+};
 
 /**
  * The "Install <backend>" button of a local backend's header. It acts only
- * while the runtime is missing (or its last install failed); installed,
- * unsupported on this machine and running installs grey it with the reason.
- * The click runs the driver's own owned-runtime install (group action
- * "install"), whose progress and outcome come back through the payload.
+ * while the runtime is missing (or its last install failed). Installed,
+ * unsupported on this machine, checking and running grey it, and its caption
+ * or the header's reason says why: a tooltip alone must not be the only answer
+ * to a click on a greyed button. The click runs the driver's own owned-runtime
+ * install (group action "install"), whose progress and outcome come back
+ * through the payload; a refusal comes back as install.failed_key.
  */
 function buildInstallButton(b, catalogueOwner) {
 	var install = b.install;
@@ -649,6 +657,10 @@ function buildInstallButton(b, catalogueOwner) {
 			typeof install.percent === 'number'
 				? _fmt('model_browser.install_running_percent', { name: brand, n: install.percent })
 				: _fmt('model_browser.install_running', { name: brand });
+	} else if (install.state === 'installed') {
+		btn.textContent = _t('model_browser.install_installed');
+	} else if (install.state === 'checking') {
+		btn.textContent = _fmt('model_browser.install_checking', { name: brand });
 	} else {
 		btn.textContent = _t('model_browser.install_runtime').replace('%s', brand);
 	}
@@ -670,6 +682,15 @@ function buildInstallButton(b, catalogueOwner) {
 		postModelAction({ action: 'group_action', backend: b.id, id: 'install' });
 	};
 	return btn;
+}
+
+/** The words next to an install button: why it refuses or why it did not start. */
+function installNote(text) {
+	var note = document.createElement('span');
+	note.className = 'install-note';
+	note.setAttribute('role', 'alert');
+	note.textContent = text;
+	return note;
 }
 
 /**
@@ -736,7 +757,15 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 	var tools = document.createElement('div');
 	tools.className = 'group-tools';
 
-	if (b.install) tools.appendChild(buildInstallButton(b, catalogueOwner));
+	if (b.install) {
+		tools.appendChild(buildInstallButton(b, catalogueOwner));
+		if (b.install.state === 'unsupported' && b.install.reason_key !== b.reason_key) {
+			tools.appendChild(installNote(_fmt(b.install.reason_key, { name: b.brand || b.id })));
+		}
+		if (b.install.failed_key) {
+			tools.appendChild(installNote(_fmt(b.install.failed_key, { name: b.brand || b.id })));
+		}
+	}
 
 	(Array.isArray(b.actions) ? b.actions : []).forEach(function (a) {
 		var btn = document.createElement('button');

@@ -539,7 +539,16 @@ const ollamaTools = toolsOf('ollama').children;
 const installText = (id) => en['model_browser.install_runtime'].replace('%s', brands[id].brand);
 // model-selector-install-button: an installed runtime greys its install button
 // with the reason, and a click on it reaches nothing.
-assert.equal(ollamaTools[0].textContent, installText('ollama'));
+// model-selector-greyed-install: the maintainer's Mac had both runtimes, so both
+// buttons were disabled; they still read "Install ..." with the hover of an
+// enabled button, and the click looked dead. The caption states the fact and
+// the sheet greys every disabled action.
+assert.equal(ollamaTools[0].textContent, en['model_browser.install_installed']);
+const browserCss = fs.readFileSync(path.join(SHARED_UI, 'model_browser/style.css'), 'utf8');
+const disabledRule = browserCss.match(/\.act:disabled,\s*\.act:disabled:hover\s*{([^}]*)}/);
+assert.ok(disabledRule, 'a greyed action has its own look, and no hover');
+assert.ok(/cursor:\s*default/.test(disabledRule[1]), 'a greyed action has no pointer');
+assert.ok(/color:\s*var\(--text-dim\)/.test(disabledRule[1]), 'a greyed action is dimmed');
 assert.equal(ollamaTools[0].disabled, true, 'an installed runtime cannot be installed again');
 assert.equal(ollamaTools[0].title, en['model_browser.install_installed']);
 ollamaTools[0].onclick();
@@ -700,6 +709,52 @@ assert.throws(
 			backends: [{ ...payload.backends[0], install: { state: 'maybe' } }]
 		}),
 	/Unknown install state/
+);
+// model-selector-checking-install: an unresolved runtime probe is no missing
+// runtime: the button is greyed and says so, and a click posts nothing.
+const withInstall = (install, extra = {}) => ({
+	...payload,
+	backends: [
+		{ ...payload.backends[0], install, ...extra },
+		payload.backends[1],
+		payload.backends[2]
+	]
+});
+page.context.injectModels(withInstall({ state: 'checking' }));
+const checking = toolsOf('ollama').children[0];
+assert.equal(
+	checking.textContent,
+	en['model_browser.install_checking'].replace('{name}', brands.ollama.brand)
+);
+assert.equal(checking.disabled, true);
+checking.onclick();
+assert.deepEqual(page.messages.splice(0), []);
+// model-selector-install-refusal: a click the driver could not honour comes back
+// in words next to a button that offers the install again.
+page.context.injectModels(
+	withInstall({ state: 'available', failed_key: 'model_browser.install_not_started' })
+);
+const refusedTools = toolsOf('ollama').children;
+assert.equal(refusedTools[0].disabled, false, 'an install that did not start is offered again');
+assert.equal(refusedTools[1].className, 'install-note');
+assert.equal(refusedTools[1].getAttribute('role'), 'alert');
+assert.equal(
+	refusedTools[1].textContent,
+	en['model_browser.install_not_started'].replace('{name}', brands.ollama.brand)
+);
+// An install greyed for a reason the header does not show states it in words.
+page.context.injectModels(
+	withInstall({ state: 'unsupported', reason_key: 'model_browser.install_paused' })
+);
+const pausedTools = toolsOf('ollama').children;
+assert.equal(pausedTools[0].disabled, true);
+assert.equal(
+	pausedTools[1].textContent,
+	en['model_browser.install_paused'].replace('{name}', brands.ollama.brand)
+);
+assert.ok(
+	toolsOf('mlx').children.every((el) => el.className !== 'install-note'),
+	'a reason the header already states is not repeated'
 );
 page.context.injectModels(payload);
 
