@@ -2369,14 +2369,22 @@ local function _start_ingest_timer()
 	return true
 end
 
+--- The reason day_rollover names when an aggregate recovery holds the ingest.
+M.ROLLOVER_WAITS_FOR_RECOVERY = "recovering"
+
 --- Day rollover handler. Drains remaining today.log then delegates to
 --- Rotation.rollover to reset the file and offset.
 --- @return boolean True when the drain fully completed and rollover ran; false
 --- when the drain stalled and today.log/state were deliberately preserved for
 --- retry on the next midnight tick.
+--- @return string|nil reason ROLLOVER_WAITS_FOR_RECOVERY when nothing was tried.
 function M.day_rollover()
 	if not _require_state("day_rollover") then return false end
 	if _pending_rollover then return _resume_pending_rollover() end
+	-- Ingest waits for the recovery, so a drain could only report a stall. On a
+	-- months-old ledger on battery that lasted 33 min over midnight, with three
+	-- warnings at each tick (field report 2026-11-02); today.log loses nothing.
+	if _recovery ~= nil or _local_ledger_replay_pending then return false, M.ROLLOVER_WAITS_FOR_RECOVERY end
 
 	-- read_new_entries caps at INGEST_BATCH_LINES per call, so a single
 	-- ingest_once may leave data behind. Loop until empty or stalled to prevent
