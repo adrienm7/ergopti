@@ -104,6 +104,11 @@ _STRP_WithCleanBuffer(Body) {
 	PrevPrivateBrowsing := MetricsFilters.private_browsing
 	PrevSecureField := MetricsFilters.secure_field
 	PrevSystemAuth := MetricsFilters.system_auth
+	; The real hook opens a session on the real clock: a later test on its own
+	; ticks must not inherit it.
+	PrevSession := Map()
+	for Field in ["is_session_active", "session_started_at", "last_authorized_tick", "session_generation"]
+		PrevSession[Field] := KLWatch.%Field%
 	Keystats.initialized   := true
 	Keystats.buffer_events := []
 	Keystats.buffer_text   := ""
@@ -146,6 +151,8 @@ _STRP_WithCleanBuffer(Body) {
 		MetricsFilters.private_browsing := PrevPrivateBrowsing
 		MetricsFilters.secure_field := PrevSecureField
 		MetricsFilters.system_auth := PrevSystemAuth
+		for Field, Value in PrevSession
+			KLWatch.%Field% := Value
 	}
 	return Captured
 }

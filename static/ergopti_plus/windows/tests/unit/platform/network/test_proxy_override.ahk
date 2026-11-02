@@ -286,7 +286,18 @@ _TPO_MenuRow() {
 	AssertEqual(Row["shown"][1], "error:" . t("proxy_override.not_saved"))
 }
 
+; The owner holds the timer, and the entry only asks for it once the boot is ready.
+_TPO_SealScheduledAfterReady() {
+	Scheduled := []
+	ProxyOverride_ScheduleSealAtStart((Seal) => Scheduled.Push(Seal))
+	AssertEqual(1, Scheduled.Length, "one sealing is scheduled")
+	Assert(Scheduled[1] == ProxyOverride_SealStoredAtStart, "what is scheduled is the sealing itself")
+	Assert(RegExMatch(_DriverSourceConcat(), 's)_DriverBootPhase := "ready".*\RProxyOverride_ScheduleSealAtStart\(\)'),
+		"a commit must not replace the snapshot the boot readers hold")
+}
+
 Test("proxy override: the shared grammar replayed", _TPO_Parse)
+Test("proxy override: the owner schedules the sealing once the boot is ready", _TPO_SealScheduledAfterReady)
 Test("proxy override: every relay of the grammar is published for the route owner", _TPO_WindowsReach)
 Test("proxy override: a relay with credentials stays out of the worker's input file", _TPO_NoCredentialInTheInputFile)
 Test("proxy override: run_command and Run children never inherit it", _TPO_NoChildInherits)

@@ -3706,7 +3706,7 @@ _LLM_NavEventOwnerLogDesktopWatch() {
 		if LLM_NavEventOwner_KeyLedgerHealth()["desktop_watch"]
 			LoggerDebug("KeyboardArbiter", "stage=key_ledger desktop_watch=1.")
 		else
-			LoggerWarn("KeyboardArbiter", "stage=key_ledger desktop_watch=0: a release missed on UAC or the lock screen can stay held.")
+			LoggerWarn("KeyboardArbiter", "stage=key_ledger desktop_watch=0: a release missed on a secure desktop or the lock screen can stay held.")
 	} catch as Failure
 		LoggerWarn("KeyboardArbiter", "stage=key_ledger outcome=unreadable detail={1}.", Failure.Message)
 }

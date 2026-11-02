@@ -136,6 +136,7 @@ graph TD
         MACOS_physical_lifecycle_event["PhysicalLifecycleEvent.lua"]
         MACOS_physical_observation_clock["PhysicalObservationClock.lua"]
         MACOS_physical_shortcut_hook["PhysicalShortcutHook.lua"]
+        MACOS_power_source["PowerSource.lua"]
         MACOS_prediction_tooltip_port["PredictionTooltipPort.lua"]
         MACOS_privacy_settings["PrivacySettings.lua"]
         MACOS_process_lifecycle["ProcessLifecycle.lua"]

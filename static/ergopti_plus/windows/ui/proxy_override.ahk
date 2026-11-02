@@ -75,9 +75,20 @@ _ProxyOverride_Store(Value) {
 }
 
 /**
- * Moves a password still clear in config.toml into its DPAPI envelope, once: the
- * stored form then says it is done. Scheduled after the boot is ready, since a
+ * Schedules the sealing below: the boot calls this once it is ready, since a
  * commit replaces the configuration snapshot the boot readers hold.
+ * @param ScheduleFn {Func} Test seam taking the sealing, a one-shot timer by default.
+ */
+ProxyOverride_ScheduleSealAtStart(ScheduleFn := 0) {
+	if HasMethod(ScheduleFn, "Call")
+		ScheduleFn.Call(ProxyOverride_SealStoredAtStart)
+	else
+		SetTimer(ProxyOverride_SealStoredAtStart, -1)
+}
+
+/**
+ * Moves a password still clear in config.toml into its DPAPI envelope, once: the
+ * stored form then says it is done.
  * @returns {Boolean} Whether the value was sealed now.
  */
 ProxyOverride_SealStoredAtStart(*) {

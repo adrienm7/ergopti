@@ -382,8 +382,15 @@ KL_Watchers_OnPointer(AppendFn := 0, Now := unset, GuardFn := unset) {
 	if !KLWatch.is_session_active || KLWatch.privacy_interrupted
 		|| KLWatch.session_close_draining || IsObject(KLWatch.session_close)
 		return false
+	; A key in flight carries an older tick and is about to own the activity: moving
+	; the tick past it would make its own gap run backwards.
+	if KL_Hook_HasPendingInput()
+		return false
 	Tick := IsSet(Now) ? Now : A_TickCount
 	Last := KLWatch.last_authorized_tick
+	; A key that interrupted after this pointer took its tick is the newer activity.
+	if Tick < Last
+		return true
 	if TickElapsed64(Last, Tick) > KLWatchConst.SESSION_TIMEOUT_MS
 		return _KL_Watchers_CloseSession(Last, Tick, AppendFn, GuardFn?)
 	KLWatch.last_authorized_tick := Tick

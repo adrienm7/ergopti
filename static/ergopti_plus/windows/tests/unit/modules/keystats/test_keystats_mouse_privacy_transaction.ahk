@@ -163,9 +163,12 @@ _KLMS_WithState(Ticks, HTicks, Start, Last, Action, InitialCritical := 0, Initia
 	SavedInitialized := Keystats.initialized
 	SavedApp := Keystats.session_app
 	SavedCritical := A_IsCritical
+	SavedSession := KLWatch.is_session_active
 	Recorder := {Calls: [], Events: [], Bumps: 0, Arms: []}
 	try {
 		Critical(InitialCritical)
+		; These small ticks are not in the domain of a session a real clock opened.
+		KLWatch.is_session_active := false
 		KLMouse.scroll_ticks := Ticks
 		KLMouse.scroll_h_ticks := HTicks
 		KLMouse.scroll_start := Start
@@ -179,8 +182,47 @@ _KLMS_WithState(Ticks, HTicks, Start, Last, Action, InitialCritical := 0, Initia
 			KLMouse.%Field% := Value
 		Keystats.initialized := SavedInitialized
 		Keystats.session_app := SavedApp
+		KLWatch.is_session_active := SavedSession
 		Critical(SavedCritical)
 	}
+}
+
+; Keys and pointers sample their ticks apart, so neither order may read as a clock
+; that ran backwards. Runs a body in an open session last active at tick 1000.
+_KLMS_WithOpenSession(Body) {
+	Fields := ["is_session_active", "last_authorized_tick", "is_idle", "privacy_interrupted",
+		"session_close", "session_close_draining"]
+	Saved := Map()
+	for Field in Fields
+		Saved[Field] := KLWatch.%Field%
+	SavedQueue := KLHook.capture_queue, SavedOwner := KLHook.capture_owner
+	SavedInitialized := Keystats.initialized
+	try {
+		KLWatch.is_session_active := true, KLWatch.last_authorized_tick := 1000, KLWatch.is_idle := false
+		KLWatch.privacy_interrupted := false, KLWatch.session_close := false
+		KLWatch.session_close_draining := false
+		KLHook.capture_queue := [], KLHook.capture_owner := 0
+		Keystats.initialized := true
+		Body.Call()
+	} finally {
+		for Field, Value in Saved
+			KLWatch.%Field% := Value
+		KLHook.capture_queue := SavedQueue, KLHook.capture_owner := SavedOwner
+		Keystats.initialized := SavedInitialized
+	}
+}
+
+_KLMS_OlderPointerSampleBody() {
+	AssertTrue(KL_Watchers_OnPointer(0, 900), "an older pointer sample is still activity")
+	AssertEqual(1000, KLWatch.last_authorized_tick, "it cannot move the activity back")
+}
+
+_KLMS_KeyInFlightBody() {
+	KLHook.capture_queue.Push({})
+	AssertFalse(KL_Watchers_OnPointer(0, 2000), "the key in flight owns the activity")
+	AssertEqual(1000, KLWatch.last_authorized_tick, "the pointer leaves the key its own gap")
+	AssertTrue(KL_Watchers_OnKeystroke(0, 1500), "the older key is accepted, not refused as a backwards clock")
+	AssertEqual(1500, KLWatch.last_authorized_tick)
 }
 
 _KLMS_Filter(Recorder, Name, Result := false) {
@@ -367,6 +409,8 @@ _KLMS_Empty() {
 	_KLMS_WithState(0, 0, 0, 0, _KLMS_EmptyAction)
 }
 
+Test("pointer activity: an older sample leaves the newer key's tick", _KLMS_WithOpenSession.Bind(_KLMS_OlderPointerSampleBody))
+Test("pointer activity: a key in flight keeps its own gap", _KLMS_WithOpenSession.Bind(_KLMS_KeyInFlightBody))
 Test("scroll-native64: vertical ordinary399", _KLMS_Gap.Bind("vertical", 399, false))
 Test("scroll-native64: vertical ordinary400", _KLMS_Gap.Bind("vertical", 400, false))
 Test("scroll-native64: vertical ordinary401", _KLMS_Gap.Bind("vertical", 401, true))
