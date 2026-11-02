@@ -353,7 +353,7 @@ function verifyUpgrade(summary, sha, packageDigest, verifyStartup, schemaVersion
 	assert.equal(old.commit, prior.commit);
 	assert.equal(
 		old.bundle_identity,
-		prior.version,
+		`${prior.version}\n${prior.commit}`,
 		'The actual released old bundle was not installed'
 	);
 	assert.ok(Number.isSafeInteger(old.pid) && old.pid > 0);
