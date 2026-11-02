@@ -4546,7 +4546,7 @@ default = false
 recommended = false
 input_altering = true
 type = "boolean"
-description_key = "menu.layout"
+description_key = "menu.layout.pause_layout_enabled"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = [], linux = [], windows = [] }
 
@@ -4556,7 +4556,7 @@ default = ""
 recommended = ""
 input_altering = true
 type = "string"
-description_key = "menu.layout"
+description_key = "menu.layout.layout_on_pause"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = [], linux = [], windows = [] }
 
@@ -4566,7 +4566,7 @@ default = ""
 recommended = ""
 input_altering = true
 type = "string"
-description_key = "menu.layout"
+description_key = "menu.layout.layout_on_resume"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = [], linux = [], windows = [] }
 
