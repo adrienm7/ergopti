@@ -359,6 +359,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.power_source",
+		contract = { "on_battery" },
+		-- Read by the keystats aggregate recovery, which paces its slices by it.
+		wired    = true,
+	},
+	{
 		id       = "adapters.managed_ollama_hint",
 		contract = { "get", "cancel" },
 		-- Structural dispatch wiring; source and image admission stay independent.
