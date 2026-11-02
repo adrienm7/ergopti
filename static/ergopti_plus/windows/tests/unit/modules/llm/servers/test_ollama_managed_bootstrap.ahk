@@ -522,6 +522,12 @@ _G4B_PullErrorClasses() {
 			["Error: write: no space left on device", "no_space"], ["Error: open: permission denied", "permission_denied"],
 			["Error: context canceled", "cancelled"], ["Error: max retries exceeded", "max_retries"],
 			["Error: pull model manifest: file does not exist", "manifest"], ["Error: something new", "other"],
+			["Error: pull model manifest: Get: context deadline exceeded", "timeout"],
+			["Error: pull model manifest: tls: handshake failure", "certificate"],
+			["Error: pull model manifest: dial tcp: lookup host: no such host", "dns"],
+			["Error: pull model manifest: read: connection reset by peer", "connection"],
+			["Error: pull model manifest: 429: too many requests", "rate_limited"],
+			["Error: open blob: file does not exist", "not_found"],
 			["pulling manifest`npulling 6a07: 100%`nsuccess", ""], ["", ""]]
 		AssertEqual(Row[2], LLM_OllamaPullErrorClass(Row[1]), Row[1])
 	; The vocabulary is the macOS worker's; a drift shows here, marker and class alike.
