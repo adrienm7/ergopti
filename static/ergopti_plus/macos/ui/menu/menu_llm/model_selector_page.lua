@@ -32,6 +32,7 @@ local M = {}
 local i18n           = require("infra.i18n")
 local Logger         = require("infra.logger")
 local DeferredWork   = require("infra.deferred_work")
+local Timings        = require("infra.timings")
 local dialog         = require("infra.dialog_util")
 local BackendLabels  = require("ui.menu.menu_llm.backend_labels")
 local CustomModels   = require("ui.menu.menu_llm.custom_models")
@@ -54,6 +55,13 @@ local _pending = {}
 -- Runtime installs the page started, by backend, until they settle:
 -- { percent = integer|nil }.
 local _installing = {}
+
+-- Why the last install click of a backend did not start, as a locale key the
+-- group shows next to its button until the next click.
+local _install_refused = {}
+
+-- Whether a refresh is scheduled for a runtime probe still in flight.
+local _recheck_armed = false
 
 
 
@@ -91,13 +99,17 @@ end
 
 --- Where a local backend's "Install <backend>" button stands: unsupported on
 --- this Mac (MLX on Intel) or while config.toml refuses writes, running while
---- its install runs, installed once its runtime can run, else available.
+--- its install runs, checking while the metadata of an owned Ollama is still
+--- being read (Ollama reads as absent then, and an installed one must not be
+--- offered), installed once its runtime can run, unsupported while paused, else
+--- available, with the reason its last click did not start.
 --- @param backend string "ollama" or "mlx".
 --- @param available boolean What backend_availability answered.
 --- @param probes table The runtime probes.
 --- @param blocked string|nil The config.toml refusal reason.
---- @return table install { state, reason_key?, percent? }
-function M.install_state(backend, available, probes, blocked)
+--- @param paused boolean|nil Whether the driver is paused.
+--- @return table install { state, reason_key?, percent?, failed_key? }
+function M.install_state(backend, available, probes, blocked, paused)
 	if blocked ~= nil then return { state = "unsupported", reason_key = blocked } end
 	if backend == "mlx" and probes.is_apple_silicon() ~= true then
 		return { state = "unsupported", reason_key = "model_browser.reason_mlx_intel" }
@@ -107,7 +119,10 @@ function M.install_state(backend, available, probes, blocked)
 	if held ~= nil or deps.is_task_running() == true then
 		return { state = "running", percent = held and held.percent or nil }
 	end
-	return { state = available and "installed" or "available" }
+	if available then return { state = "installed" } end
+	if backend == "ollama" and deps.runtime_pending() == true then return { state = "checking" } end
+	if paused == true then return { state = "unsupported", reason_key = "model_browser.install_paused" } end
+	return { state = "available", failed_key = _install_refused[backend] }
 end
 
 local DEFAULT_PROBES = {
@@ -360,8 +375,21 @@ function M.build_payload(ctx, probes, collected)
 		for _, b in ipairs(backends) do b.available, b.reason_key = false, blocked end
 	end
 	local install = {}
+	local paused = ctx.is_paused() ~= false
 	for index, backend in ipairs(LOCAL_BACKENDS) do
-		install[backend] = M.install_state(backend, backends[index].available == true and blocked == nil, probes, blocked)
+		install[backend] = M.install_state(backend, backends[index].available == true and blocked == nil, probes, blocked, paused)
+		if install[backend].state == "checking" then
+			-- Nothing is known to be missing yet, and nothing announces the
+			-- probe's end: the page asks again until it has settled.
+			backends[index].reason_key = nil
+			if not _recheck_armed then
+				_recheck_armed = true
+				DeferredWork.after(Timings.sec("ui", "webview_ready_safety_flush_ms"), function()
+					_recheck_armed = false
+					M.refresh()
+				end, "model_selector_page.runtime_probe")
+			end
+		end
 	end
 	local payload = ModelCatalogue.build_selector(models_mgr.get_all_presets(), {
 		active_backend = state.llm_backend,
@@ -540,12 +568,13 @@ end
 local function install_runtime(ctx, backend, probes)
 	if backend ~= "ollama" and backend ~= "mlx" then return false end
 	local available = M.backend_availability(backend, probes)
-	if M.install_state(backend, available, probes, ctx.config_reason()).state ~= "available" then
+	if M.install_state(backend, available, probes, ctx.config_reason(), ctx.is_paused() ~= false).state ~= "available" then
 		Logger.warn(LOG, "Refused installing the %s runtime from the page: it is not offered now.", backend)
 		return false
 	end
 	local held = {}
 	_installing[backend] = held
+	_install_refused[backend] = nil
 	Logger.start(LOG, "Installing the %s runtime from the model selector page…", backend)
 	local function settle(ok)
 		if _installing[backend] ~= held then return end
@@ -557,9 +586,11 @@ local function install_runtime(ctx, backend, probes)
 		end
 		M.refresh()
 	end
-	local accepted = probes.install_runtime(backend, settle) == true
+	local called, result = Logger.callback(LOG, "Runtime install", probes.install_runtime, backend, settle)
+	local accepted = called and result == true
 	if not accepted and _installing[backend] == held then
 		_installing[backend] = nil
+		_install_refused[backend] = "model_browser.install_not_started"
 		Logger.error(LOG, "The %s runtime install from the model selector page was not started.", backend)
 		M.refresh()
 	end
