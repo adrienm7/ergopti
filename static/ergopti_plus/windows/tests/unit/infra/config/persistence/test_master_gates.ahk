@@ -255,6 +255,24 @@ TestMasterGates_DecodeMemoNeverHidesInvalidOrChangedManifests() {
 Test("master gates: the decode memo never hides an invalid, changed or removed manifest (master-gates-decode-memo)",
 	TestMasterGates_DecodeMemoNeverHidesInvalidOrChangedManifests)
 
+; The same bytes the menu loader decoded are not decoded again. The seeded text is
+; invalid JSON, so reaching the decoder would throw; other text still decodes.
+TestMasterGates_SharesTheMenuLoadersDecode() {
+	Root := _MM_GetManifestRoot()
+	AssertTrue(Root is Map, "the real manifest is the subject")
+	RealText := FileRead(_SharedDir . "\modules\menu\menu_manifest.json", "UTF-8")
+	Seeded := Map("seeded", true), SeededText := "{ decoded text that is not json " . A_TickCount
+	try {
+		JsonKnownRoot(SeededText, Seeded)
+		AssertTrue(_MG_ParseManifestContent(SeededText) == Seeded, "identical text reuses the recorded root")
+		Other := _MG_ParseManifestContent('{"hotstring_category_keys": {"share_a": "ShareA"}}')
+		AssertTrue(Other != Seeded && Other.Has("hotstring_category_keys"), "any other text is decoded")
+		AssertFalse(JsonKnownRoot("different"), "the record answers only for its exact text")
+	} finally JsonKnownRoot(RealText, Root)
+}
+Test("master gates: identical manifest text shares the menu loader's decode (master-gates-shared-decode)",
+	TestMasterGates_SharesTheMenuLoadersDecode)
+
 TestMasterGates_TargetNamesRemainExplicit() {
 	Body := _DriverFuncBody("ApplyMasterGatesToFeatures")
 	Assert(Body != "", "ApplyMasterGatesToFeatures must exist")

@@ -285,6 +285,13 @@ _MG_ParseManifestContent(Content) {
 				PerfCount("master_gates.manifest_decode_skipped")
 				return LastRoot
 		}
+		Known := JsonKnownRoot(Content)
+		if (Known is Map) {
+				PerfCount("master_gates.manifest_decode_skipped")
+				LastContent := Content
+				LastRoot := Known
+				return Known
+		}
 		PerfCount("master_gates.manifest_decode")
 		Root := JsonParse(Content)
 		if (Root is Map) {
