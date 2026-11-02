@@ -24,7 +24,7 @@
 ; Build the Shortcuts submenu from the manifest-driven renderer.
 ; Dynamic handlers supply the platform-specific blocks (personal shortcuts,
 ; script control, extensions, edit action) that cannot be described in JSON.
-_BuildShortcutsSubmenu() {
+_BuildShortcutsSubmenu(TargetMenu := unset) {
 	DynHandlers := Map()
 	DeclaredFrames := Map("personal_shortcuts", Map(
 		"manifest_key", "personal_shortcuts_frame",
@@ -57,7 +57,8 @@ _BuildShortcutsSubmenu() {
 		"caps_word_auto_off", () => _SC_CapsWordAutoOffSubmenu(),
 		ConfigLeaf.SCRIPT_CONTROL,     () => _SC_ScriptControlSubmenu())
 
-	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, GroupBuilders, ListProviders, Commands, Getters, , , DeclaredFrames)
+	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, GroupBuilders, ListProviders, Commands, Getters,
+		IsSet(TargetMenu) ? TargetMenu : unset, , DeclaredFrames)
 }
 
 ; The checked_when getters of the Shortcuts submenu: its switch, and the ticks

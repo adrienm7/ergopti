@@ -84,7 +84,11 @@ _LMCC_Script(Framework, Receipt) {
 global _LMCC := 0
 global _LLM_Menu := Map("enabled", true)
 global _LLM_Menu_Handle := 0, _LLM_Menu_InTray := true
-global _DriverInputInitPending := false, _IniCache := Map()
+global _DriverInputInitPending := false, _IniCache := Map(), _LLM_Menu_Loaded := false
+global _MenuPopulationBuilding := false, _MenuPopulationPublished := false
+class MenuPopulation {
+ Pending := Map()
+}
 global _TrayMenuStage := false
 global _TrayTitleCache := Map(), _FmtCountCache := Map(), _I18nSortedLocalesCache := false
 global _TrayRootRequestedGeneration := 0, _TrayRootPublishedGeneration := 0

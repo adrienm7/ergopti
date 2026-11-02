@@ -471,24 +471,36 @@ _TrayRootRetireFatal(TargetGeneration) {
 }
 
 _TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn := 0, CallerLlm := 0) {
-	global _TrayRootBootDetailsPending, _LLM_Menu_Handle
+	global _TrayRootBootDetailsPending, _LLM_Menu_Handle, _MenuPopulationBuilding, _MenuPopulationPublished
 	if HasMethod(WorkerFn, "Call")
 		return WorkerFn.Call(PublishAuthorizeFn)
 	_HS_InvalidatePersonalCache()
-	InitSubMenus()
-	; The AI child lent by the request is attached through the root builder map
-	; while it is still the live IA submenu. A rebuild of the AI menu since then
-	; replaced it, and the default builder stages the current one.
-	if (CallerLlm is Menu) {
-		if IsSet(_LLM_Menu_Handle) && _LLM_Menu_Handle == CallerLlm
-			LiveLlm := CallerLlm
-		else
-			try LoggerDebug("Menu", "Full tray root: the AI submenu lent by its request was replaced; staging the current one.")
+	; A full rebuild publishes the root: each submenu is rebuilt where it is next
+	; opened, so one toggle does not redraw a thousand rows nobody is looking at.
+	if _MenuPopulationBuilding is MenuPopulation
+		throw Error("Native menu population already has a build owner")
+	PopulationOwner := MenuPopulation()
+	_MenuPopulationBuilding := PopulationOwner
+	try {
+		InitSubMenus()
+		; The AI child lent by the request is attached through the root builder map
+		; while it is still the live IA submenu. A rebuild of the AI menu since then
+		; replaced it, and the default builder stages the current one.
+		if (CallerLlm is Menu) {
+			if IsSet(_LLM_Menu_Handle) && _LLM_Menu_Handle == CallerLlm
+				LiveLlm := CallerLlm
+			else
+				try LoggerDebug("Menu", "Full tray root: the AI submenu lent by its request was replaced; staging the current one.")
+		}
+		Published := initMenu(PublishAuthorizeFn, false, LiveLlm?)
+		if ((Published is Integer) && Published == 1)
+			_TrayRootBootDetailsPending := false
+		return Published
+	} finally {
+		_MenuPopulationBuilding := false
+		if !IsSet(_MenuPopulationPublished) || _MenuPopulationPublished != PopulationOwner
+			PopulationOwner.Pending.Clear()
 	}
-	Published := initMenu(PublishAuthorizeFn, false, LiveLlm?)
-	if ((Published is Integer) && Published == 1)
-		_TrayRootBootDetailsPending := false
-	return Published
 }
 
 _TrayRootDrain(IsAutomaticRetry := false, LogFn := 0) {
