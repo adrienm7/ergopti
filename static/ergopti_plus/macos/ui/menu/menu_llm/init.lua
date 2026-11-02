@@ -1265,9 +1265,6 @@ local function create_menu(deps)
 					submenu = profiles_item.menu,
 				} }
 				list_providers.llm_profile = function() return profile_rows end
-				local profile_boundary_rows = ManifestMenu.template_rows("llm_after_profile_boundary", {}, {}, {})
-				if not profile_boundary_rows then return {} end
-				list_providers.llm_after_profile_boundary = function() return profile_boundary_rows end
 
 
 
