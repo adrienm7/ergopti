@@ -273,6 +273,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-linux-menu-parts.cjs"],
 			"repro": "npm run test:linux-menu-parts"
+		},
+		{
+			"id": "menu-shown-rows-have-own-label",
+			"ordinal": 564,
+			"name": "every manifest row a driver shows has its own key in all 21 locales, and every key the menus name exists",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-shown-rows-have-own-label.cjs"],
+			"repro": "npm run test:menu-shown-rows-have-own-label"
 		}
 	]
 }
