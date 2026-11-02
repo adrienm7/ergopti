@@ -1,0 +1,847 @@
+{
+	"continuations": 0,
+	"counters": {},
+	"error_keys": [
+		"WARNING|Menu|Over budget: menu.rebuild took <*> ms (budget <*> ms).",
+		"WARNING|HotPath|Slow Config.TomlBuild: <*> ms own, <*> ms total, parent none (<*> similar since the last line).",
+		"WARNING|HotPath|Slow Config.TomlBuild detail: <*> update(s).",
+		"WARNING|BootProfile|Over budget: boot took <*> ms (budget <*> ms).",
+		"WARNING|HotPath|Slow Menu.populate_leaf: <*> ms own, <*> ms total, parent none (<*> similar since the last line).",
+		"WARNING|HotPath|Slow Menu.populate_leaf detail: background; list=locales; rows=<*>; remaining=<*>."
+	],
+	"errors": [
+		{
+			"count": 1,
+			"example": "2026-11-02 08:39:26:708 [WARNING] [Menu] Over budget: menu.rebuild took 1656 ms (budget 250 ms).",
+			"first": "2026-11-02 08:39:26:708",
+			"key": "WARNING|Menu|Over budget: menu.rebuild took <*> ms (budget <*> ms).",
+			"last": "2026-11-02 08:39:26:708",
+			"level": "WARNING",
+			"module": "Menu",
+			"new": null,
+			"perf": true,
+			"template": "Over budget: menu.rebuild took <*> ms (budget <*> ms)."
+		},
+		{
+			"count": 1,
+			"example": "2026-11-02 08:39:28:914 [WARNING] [HotPath] Slow Config.TomlBuild: 27.85 ms own, 32.04 ms total, parent none (0 similar since the last line).",
+			"first": "2026-11-02 08:39:28:914",
+			"key": "WARNING|HotPath|Slow Config.TomlBuild: <*> ms own, <*> ms total, parent none (<*> similar since the last line).",
+			"last": "2026-11-02 08:39:28:914",
+			"level": "WARNING",
+			"module": "HotPath",
+			"new": null,
+			"perf": true,
+			"template": "Slow Config.TomlBuild: <*> ms own, <*> ms total, parent none (<*> similar since the last line)."
+		},
+		{
+			"count": 1,
+			"example": "2026-11-02 08:39:28:914 [WARNING] [HotPath] Slow Config.TomlBuild detail: 0 update(s).",
+			"first": "2026-11-02 08:39:28:914",
+			"key": "WARNING|HotPath|Slow Config.TomlBuild detail: <*> update(s).",
+			"last": "2026-11-02 08:39:28:914",
+			"level": "WARNING",
+			"module": "HotPath",
+			"new": null,
+			"perf": false,
+			"template": "Slow Config.TomlBuild detail: <*> update(s)."
+		},
+		{
+			"count": 1,
+			"example": "2026-11-02 08:39:29:283 [WARNING] [BootProfile] Over budget: boot took 7187 ms (budget 2500 ms).",
+			"first": "2026-11-02 08:39:29:283",
+			"key": "WARNING|BootProfile|Over budget: boot took <*> ms (budget <*> ms).",
+			"last": "2026-11-02 08:39:29:283",
+			"level": "WARNING",
+			"module": "BootProfile",
+			"new": null,
+			"perf": true,
+			"template": "Over budget: boot took <*> ms (budget <*> ms)."
+		},
+		{
+			"count": 1,
+			"example": "2026-11-02 08:39:30:690 [WARNING] [HotPath] Slow Menu.populate_leaf: 15.15 ms own, 15.15 ms total, parent none (0 similar since the last line).",
+			"first": "2026-11-02 08:39:30:690",
+			"key": "WARNING|HotPath|Slow Menu.populate_leaf: <*> ms own, <*> ms total, parent none (<*> similar since the last line).",
+			"last": "2026-11-02 08:39:30:690",
+			"level": "WARNING",
+			"module": "HotPath",
+			"new": null,
+			"perf": true,
+			"template": "Slow Menu.populate_leaf: <*> ms own, <*> ms total, parent none (<*> similar since the last line)."
+		},
+		{
+			"count": 1,
+			"example": "2026-11-02 08:39:30:691 [WARNING] [HotPath] Slow Menu.populate_leaf detail: background; list=locales; rows=16; remaining=4.",
+			"first": "2026-11-02 08:39:30:691",
+			"key": "WARNING|HotPath|Slow Menu.populate_leaf detail: background; list=locales; rows=<*>; remaining=<*>.",
+			"last": "2026-11-02 08:39:30:691",
+			"level": "WARNING",
+			"module": "HotPath",
+			"new": null,
+			"perf": false,
+			"template": "Slow Menu.populate_leaf detail: background; list=locales; rows=<*>; remaining=<*>."
+		}
+	],
+	"field_checks": {
+		"counts": {
+			"fail": 1,
+			"pass": 8
+		},
+		"items": [
+			{
+				"failures": 0,
+				"id": "network",
+				"runs": 1,
+				"source": "log",
+				"time": "2026-11-02 08:40:04:116",
+				"verdict": "pass"
+			},
+			{
+				"failures": 0,
+				"id": "composer",
+				"runs": 1,
+				"source": "log",
+				"time": "2026-11-02 08:40:04:247",
+				"verdict": "pass"
+			},
+			{
+				"id": "autohotkey",
+				"source": "collector_checks",
+				"verdict": "pass"
+			},
+			{
+				"id": "driver_running",
+				"source": "collector_checks",
+				"verdict": "pass"
+			},
+			{
+				"id": "python",
+				"source": "collector_checks",
+				"verdict": "pass"
+			},
+			{
+				"id": "webview2",
+				"source": "collector_checks",
+				"verdict": "pass"
+			},
+			{
+				"id": "field_boot_cost",
+				"source": "field_run_checks",
+				"verdict": "fail"
+			},
+			{
+				"id": "field_network",
+				"source": "field_run_checks",
+				"verdict": "pass"
+			},
+			{
+				"id": "field_composer",
+				"source": "field_run_checks",
+				"verdict": "pass"
+			}
+		]
+	},
+	"lifecycle": {
+		"start": {
+			"count": 1,
+			"events": [
+				{
+					"line": "===== 2026-11-02 08:39:24:204 — ErgoptiPlus session opened =====",
+					"time": "2026-11-02 08:39:24:204"
+				}
+			],
+			"first": "2026-11-02 08:39:24:204",
+			"last": "2026-11-02 08:39:24:204"
+		}
+	},
+	"lines": 505,
+	"logs": ["ErgoptiPlus_2026-11-02.log"],
+	"performance": [
+		{
+			"budget": {
+				"inclusive": false,
+				"source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+				"value": 2500.0
+			},
+			"count": 1,
+			"kind": "occurrences",
+			"max": 7187.0,
+			"mean": 7187.0,
+			"metric": "boot.total",
+			"over": 1,
+			"p50": 7187.0,
+			"p95": 7187.0,
+			"verdict": "over",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:29:283",
+					"value": 7187.0
+				}
+			]
+		},
+		{
+			"budget": {
+				"inclusive": false,
+				"source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+				"value": 5.0
+			},
+			"count": 1,
+			"kind": "occurrences",
+			"max": 27.85,
+			"mean": 27.85,
+			"metric": "hotpath:Config.TomlBuild",
+			"over": 1,
+			"p50": 27.85,
+			"p95": 27.85,
+			"verdict": "over",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:28:914",
+					"value": 27.85
+				}
+			]
+		},
+		{
+			"budget": {
+				"inclusive": false,
+				"source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+				"value": 250.0
+			},
+			"count": 2,
+			"kind": "occurrences",
+			"max": 1656.5,
+			"mean": 832.2,
+			"metric": "menu.rebuild",
+			"over": 1,
+			"p50": 7.9,
+			"p95": 1656.5,
+			"verdict": "over",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:707",
+					"value": 1656.5
+				},
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:28:858",
+					"value": 7.9
+				}
+			]
+		},
+		{
+			"budget": {
+				"inclusive": false,
+				"source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+				"value": 5.0
+			},
+			"count": 1,
+			"kind": "occurrences",
+			"max": 15.15,
+			"mean": 15.15,
+			"metric": "hotpath:Menu.populate_leaf",
+			"over": 1,
+			"p50": 15.15,
+			"p95": 15.15,
+			"verdict": "over",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:30:690",
+					"value": 15.15
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 1656.0,
+			"mean": 1656.0,
+			"metric": "boot.stage:tray menu",
+			"over": 0,
+			"p50": 1656.0,
+			"p95": 1656.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:706",
+					"value": 1656.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 954.0,
+			"mean": 954.0,
+			"metric": "boot.stage:layout and remaps",
+			"over": 0,
+			"p50": 954.0,
+			"p95": 954.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:27:695",
+					"value": 954.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 781.0,
+			"mean": 781.0,
+			"metric": "boot.stage:hotstrings",
+			"over": 0,
+			"p50": 781.0,
+			"p95": 781.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:28:496",
+					"value": 781.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 454.0,
+			"mean": 454.0,
+			"metric": "boot.stage:configuration",
+			"over": 0,
+			"p50": 454.0,
+			"p95": 454.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:24:824",
+					"value": 454.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 282.0,
+			"mean": 282.0,
+			"metric": "boot.stage:prefix watcher",
+			"over": 0,
+			"p50": 282.0,
+			"p95": 282.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:28:769",
+					"value": 282.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 281.0,
+			"mean": 281.0,
+			"metric": "boot.stage:menu row llm",
+			"over": 0,
+			"p50": 281.0,
+			"p95": 281.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:617",
+					"value": 281.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 94.0,
+			"mean": 94.0,
+			"metric": "boot.stage:shortcuts",
+			"over": 0,
+			"p50": 94.0,
+			"p95": 94.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:24:949",
+					"value": 94.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 78.0,
+			"mean": 78.0,
+			"metric": "boot.stage:menu row keyboard_layout",
+			"over": 0,
+			"p50": 78.0,
+			"p95": 78.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:266",
+					"value": 78.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 63.0,
+			"mean": 63.0,
+			"metric": "boot.stage:menu row about",
+			"over": 0,
+			"p50": 63.0,
+			"p95": 63.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:683",
+					"value": 63.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 47.0,
+			"mean": 47.0,
+			"metric": "boot.stage:menu row hotstrings",
+			"over": 0,
+			"p50": 47.0,
+			"p95": 47.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:324",
+					"value": 47.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 31.0,
+			"mean": 31.0,
+			"metric": "boot.stage:i18n",
+			"over": 0,
+			"p50": 31.0,
+			"p95": 31.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:24:341",
+					"value": 31.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 16.0,
+			"mean": 16.0,
+			"metric": "boot.stage:menu row gestures",
+			"over": 0,
+			"p50": 16.0,
+			"p95": 16.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:195",
+					"value": 16.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 15.0,
+			"mean": 15.0,
+			"metric": "boot.stage:menu row metrics",
+			"over": 0,
+			"p50": 15.0,
+			"p95": 15.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:333",
+					"value": 15.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 15.0,
+			"mean": 15.0,
+			"metric": "boot.stage:keyboard hook",
+			"over": 0,
+			"p50": 15.0,
+			"p95": 15.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:732",
+					"value": 15.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 0.0,
+			"mean": 0.0,
+			"metric": "boot.stage:feature gates",
+			"over": 0,
+			"p50": 0.0,
+			"p95": 0.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:24:826",
+					"value": 0.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 0.0,
+			"mean": 0.0,
+			"metric": "boot.stage:menu row tap_holds",
+			"over": 0,
+			"p50": 0.0,
+			"p95": 0.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:177",
+					"value": 0.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 0.0,
+			"mean": 0.0,
+			"metric": "boot.stage:menu row shortcuts",
+			"over": 0,
+			"p50": 0.0,
+			"p95": 0.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:184",
+					"value": 0.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 0.0,
+			"mean": 0.0,
+			"metric": "boot.stage:menu row agent",
+			"over": 0,
+			"p50": 0.0,
+			"p95": 0.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:618",
+					"value": 0.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 0.0,
+			"mean": 0.0,
+			"metric": "boot.stage:menu row configuration",
+			"over": 0,
+			"p50": 0.0,
+			"p95": 0.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:686",
+					"value": 0.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 0.0,
+			"mean": 0.0,
+			"metric": "boot.stage:menu row language",
+			"over": 0,
+			"p50": 0.0,
+			"p95": 0.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:688",
+					"value": 0.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 0.0,
+			"mean": 0.0,
+			"metric": "boot.stage:menu row suspend",
+			"over": 0,
+			"p50": 0.0,
+			"p95": 0.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:688",
+					"value": 0.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 0.0,
+			"mean": 0.0,
+			"metric": "boot.stage:menu row reload",
+			"over": 0,
+			"p50": 0.0,
+			"p95": 0.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:689",
+					"value": 0.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 0.0,
+			"mean": 0.0,
+			"metric": "boot.stage:menu row quit",
+			"over": 0,
+			"p50": 0.0,
+			"p95": 0.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:689",
+					"value": 0.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 0.0,
+			"mean": 0.0,
+			"metric": "boot.stage:menu row debug",
+			"over": 0,
+			"p50": 0.0,
+			"p95": 0.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:693",
+					"value": 0.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 0.0,
+			"mean": 0.0,
+			"metric": "boot.stage:magic key source",
+			"over": 0,
+			"p50": 0.0,
+			"p95": 0.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:708",
+					"value": 0.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 0.0,
+			"mean": 0.0,
+			"metric": "boot.stage:metrics",
+			"over": 0,
+			"p50": 0.0,
+			"p95": 0.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:733",
+					"value": 0.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 1,
+			"kind": "occurrences",
+			"max": 4611.0,
+			"mean": 4611.0,
+			"metric": "menu.usable",
+			"over": 0,
+			"p50": 4611.0,
+			"p95": 4611.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:707",
+					"value": 4611.0
+				}
+			]
+		},
+		{
+			"budget": null,
+			"count": 2,
+			"kind": "occurrences",
+			"max": 0.0,
+			"mean": 0.0,
+			"metric": "menu.llm_staging",
+			"over": 0,
+			"p50": 0.0,
+			"p95": 0.0,
+			"verdict": "no_budget",
+			"worst": [
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:26:569",
+					"value": 0.0
+				},
+				{
+					"context": "",
+					"time": "2026-11-02 08:39:28:780",
+					"value": 0.0
+				}
+			]
+		}
+	],
+	"previous": null,
+	"records": 503,
+	"schema": 1,
+	"span": {
+		"first": "2026-11-02 08:39:23:136",
+		"last": "2026-11-02 08:40:04:281"
+	},
+	"top_fixes": [
+		{
+			"count": 1,
+			"detail": "max 7187 ms at 2026-11-02 08:39:29:283",
+			"kind": "slow",
+			"score": 3,
+			"what": "boot.total over its 2500 ms budget"
+		},
+		{
+			"count": 1,
+			"detail": "max 27.85 ms at 2026-11-02 08:39:28:914",
+			"kind": "slow",
+			"score": 3,
+			"what": "hotpath:Config.TomlBuild over its 5 ms budget"
+		},
+		{
+			"count": 1,
+			"detail": "max 15.15 ms at 2026-11-02 08:39:30:690",
+			"kind": "slow",
+			"score": 3,
+			"what": "hotpath:Menu.populate_leaf over its 5 ms budget"
+		},
+		{
+			"count": 1,
+			"detail": "max 1656 ms at 2026-11-02 08:39:26:707",
+			"kind": "slow",
+			"score": 3,
+			"what": "menu.rebuild over its 250 ms budget"
+		},
+		{
+			"count": 1,
+			"detail": "2026-11-02 08:39:28:914 [WARNING] [HotPath] Slow Config.TomlBuild detail: 0 update(s).",
+			"kind": "warning",
+			"score": 1,
+			"what": "[HotPath] Slow Config.TomlBuild detail: <*> update(s)."
+		},
+		{
+			"count": 1,
+			"detail": "2026-11-02 08:39:30:691 [WARNING] [HotPath] Slow Menu.populate_leaf detail: background; list=locales; rows=16; remaining=4.",
+			"kind": "warning",
+			"score": 1,
+			"what": "[HotPath] Slow Menu.populate_leaf detail: background; list=locales; rows=<*>; remaining=<*>."
+		}
+	]
+}

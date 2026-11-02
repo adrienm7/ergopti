@@ -1,0 +1,2 @@
+Startup folder: ErgoptiPlus.ahk.lnk
+Run key: no Ergopti entry

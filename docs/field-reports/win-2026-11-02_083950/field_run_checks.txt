@@ -1,0 +1,3 @@
+check=field_boot_cost verdict=fail codes=boot_ms_37264,budget_ms_2500
+check=field_network verdict=pass codes=proxy_settings_info:discovery,pac_download_skip:no_pac,pac_script_skip:no_pac,route_lookup_pass:selected,tls_pass:trusted,transfer_pass:http_200,digest_skip:get_only
+check=field_composer verdict=pass codes=composer_fixture_pass,composer_mode_info:fresh,composer_install_pass,composer_copy_pass,composer_ready_pass:keys:49,composer_cleanup_pass

@@ -1,0 +1,40 @@
+2026-11-02 08:39:24:313 [INFO] [ErgoptiPlus] Boot environment (pid=8716 compiled=false version=local commit=b58acec0d os="Windows 11 Home" os_version=26100.9711 arch=x64 runtime="AutoHotkey 2.0.26" elevated=false keyboard_layout=0xFC06040C monitors=1 dpi=120 config_dir=<config>\).
+2026-11-02 08:39:24:805 [START] [TapHoldMigration] Checking the tap-hold file version of '<config>\autohotkey\tap_hold.toml'…
+2026-11-02 08:39:24:815 [SUCCESS] [TapHoldMigration] '<config>\autohotkey\tap_hold.toml' is at schema v1; nothing to migrate.
+2026-11-02 08:39:24:815 [DEBUG] [TapHoldLoader] LoadTapHoldToml start: user='<config>\autohotkey\tap_hold.toml', defaults='D:\Documents\GitHub\ergopti\static\ergopti_plus\_shared\tap_hold\defaults.toml'.
+2026-11-02 08:39:24:823 [DEBUG] [TapHoldLoader] Parsed user tap-hold: 8 key(s), inherit_defaults=0.
+2026-11-02 08:39:24:823 [DEBUG] [TapHoldLoader] Skipping shared defaults load because inherit_defaults=false in user tap-hold file.
+2026-11-02 08:39:24:823 [START] [TapHoldLoader] Loading tap-hold config from '<config>\autohotkey\tap_hold.toml'…
+2026-11-02 08:39:24:824 [SUCCESS] [BootProfile] Boot stage 'configuration' done in 454 ms: 127 config.toml value(s) applied, 8 tap-hold key(s).
+2026-11-02 08:39:25:181 [INFO] [NumberRow] 'digits' is not applied on this layout (digits_on_both); the stored choice is kept.
+2026-11-02 08:39:26:171 [START] [BootProfile] Boot stage 'menu row tap_holds'…
+2026-11-02 08:39:26:177 [SUCCESS] [BootProfile] Boot stage 'menu row tap_holds' done in 0 ms.
+2026-11-02 08:39:26:177 [INFO] [BootProfile] Boot stage 'menu row tap_holds' resources: wall=6.323 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=6.323 ms.
+2026-11-02 08:39:26:195 [START] [BootProfile] Boot stage 'menu row keyboard_layout'…
+2026-11-02 08:39:26:266 [INFO] [BootProfile] MENU/initMenu: layout built+added: +94 ms (total 1969 ms).
+2026-11-02 08:39:26:266 [SUCCESS] [BootProfile] Boot stage 'menu row keyboard_layout' done in 78 ms.
+2026-11-02 08:39:26:266 [INFO] [BootProfile] Boot stage 'menu row keyboard_layout' resources: wall=71.808 ms, process_cpu=78.125 ms, native_menu_wait=0.000 ms, wall_without_menu=71.808 ms.
+2026-11-02 08:39:26:708 [INFO] [ErgoptiPlus] Magic-key source: SC02E (layout).
+2026-11-02 08:39:26:708 [SUCCESS] [BootProfile] Boot stage 'magic key source' done in 0 ms: layout.
+2026-11-02 08:39:26:734 [START] [BootProfile] Boot stage 'layout and remaps'…
+2026-11-02 08:39:26:742 [START] [ErgoptiLayout] Reading the Ergopti layout tables from D:\Documents\GitHub\ergopti\static\..\static\layouts\registry\…
+2026-11-02 08:39:26:894 [SUCCESS] [ErgoptiLayout] Ergopti layout tables read from version 2.2.2 in 157 ms (7 dead keys).
+2026-11-02 08:39:27:303 [INFO] [BootProfile] LAYOUT: Ergopti layout registered: +563 ms (total 3000 ms).
+2026-11-02 08:39:27:310 [DEBUG] [KeyboardShortcuts] Hotkey 'primary_b' → 'microsoft_bold' shares the layout's ^SC014.
+2026-11-02 08:39:27:313 [INFO] [CapsWord] Auto-off settings read: delay=10000 ms, delimiters=[space,nbsp,nnbsp,tab,enter,comma,semicolon,period], pointer=[left_click=on,middle_click=on,other_buttons=on,pointer_motion=on,right_click=on].
+2026-11-02 08:39:27:473 [INFO] [BootProfile] LAYOUT: tap-holds and navigation registered: +156 ms (total 3172 ms).
+2026-11-02 08:39:27:695 [SUCCESS] [BootProfile] Boot stage 'layout and remaps' done in 954 ms.
+2026-11-02 08:39:27:695 [INFO] [BootProfile] Boot stage 'layout and remaps' resources: wall=961.273 ms, process_cpu=937.500 ms, native_menu_wait=0.000 ms, wall_without_menu=961.273 ms.
+2026-11-02 08:39:27:696 [INFO] [BootProfile] Layout/shortcuts/tap-holds + AltGr registered: +219 ms (total 3391 ms).
+2026-11-02 08:39:29:283 [INFO] [BootProfile] Boot summary: total_ms=7187 stage_ms: i18n=31 configuration=454 feature_gates=0 shortcuts=94 tray_menu=1656 magic_key_source=0 keyboard_hook=15 metrics=0 layout_and_remaps=954 hotstrings=781 prefix_watcher=282.
+2026-11-02 08:39:29:284 [INFO] [Diagnostics] Diagnostic snapshot (driver=windows version=local commit=b58acec0d os="Windows 11 Home" os_version=26100.9711 arch=x64 runtime="AutoHotkey 2.0.26" elevated=false locale=fr keyboard_layout=0xFC06040C monitors=1 dpi=120 display=win32 config_dir=<config>\ logs_dir=~\AppData\Local\ergopti_plus\logs\ log_level=DEBUG features_enabled=117/153 boot_ms=7187).
+2026-11-02 08:39:29:284 [START] [AltGrDetect] Following the foreground window's keyboard layout…
+2026-11-02 08:39:29:284 [SUCCESS] [AltGrDetect] The AltGr family follows the foreground window's keyboard layout.
+2026-11-02 08:40:04:123 [START] [LayoutComposer] Saving the composed layout…
+2026-11-02 08:40:04:172 [START] [LayoutCatalogue] Installing the 'composed' layout…
+2026-11-02 08:40:04:180 [SUCCESS] [LayoutCatalogue] Installed the 'composed' layout, version 1.0.0, from the composer copy.
+2026-11-02 08:40:04:180 [SUCCESS] [LayoutComposer] Saved the composed layout.
+2026-11-02 08:40:04:225 [START] [LayoutComposer] Removing the composed layout…
+2026-11-02 08:40:04:231 [START] [LayoutCatalogue] Uninstalling the 'composed' layout…
+2026-11-02 08:40:04:246 [SUCCESS] [LayoutCatalogue] Uninstalled the 'composed' layout.
+2026-11-02 08:40:04:247 [SUCCESS] [LayoutComposer] Removed the composed layout.

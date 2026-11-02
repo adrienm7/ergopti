@@ -1,0 +1,7 @@
+Get-MpComputerStatus : Classe non valide 
+Au caractère D:\Documents\GitHub\ergopti\tools\dev\collect-windows-field-report.ps1:617 : 3
++         Get-MpComputerStatus -ErrorAction Stop |
++         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : MetadataError: (MSFT_MpComputerStatus:ROOT\Microsoft\...pComputerStatus) [Get-MpComputer    Status], CimException
+    + FullyQualifiedErrorId : HRESULT 0x80041010,Get-MpComputerStatus
+ 

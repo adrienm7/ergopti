@@ -1,0 +1,7 @@
+ProxyEnable: 0
+ProxyServer: unset
+AutoConfigURL: unset
+AutoDetect: unset
+HTTP_PROXY: unset
+HTTPS_PROXY: unset
+NO_PROXY: unset

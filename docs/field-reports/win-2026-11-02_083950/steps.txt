@@ -1,0 +1,29 @@
+versions                     exit=0
+toolchain                    exit=0
+input_languages              exit=0
+processes                    exit=0
+listeners                    exit=0
+proxy                        exit=0
+antivirus                    exit=1
+proxy_winhttp                exit=0
+runtimes                     exit=0
+memory                       exit=0
+input_devices                exit=0
+autostart                    exit=0
+privileges                   exit=0
+crash_dumps                  exit=0
+collector_checks             exit=0
+ErgoptiPlus_2026-11-02.log   copied (scrubbed)
+ErgoptiPlus_errors_2026-11-02.log copied (scrubbed)
+ErgoptiPlus_llm.log          copied (scrubbed)
+bootstrap.log                copied (scrubbed)
+crash_reports                exit=0
+digest_boot                  exit=0
+digest_slow                  exit=0
+digest_errors                exit=0
+digest_snapshot              exit=0
+digest_field_checks          exit=0
+digest_input                 exit=0
+field_run_results            copied
+hotstring_collisions         exit=0
+analysis                     exit=0

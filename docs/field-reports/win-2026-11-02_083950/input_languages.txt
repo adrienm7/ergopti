@@ -1,0 +1,14 @@
+
+
+LanguageTag     : fr-FR
+InputMethodTips : {040C:B004040C, 040C:0002040C}
+
+
+
+
+
+2 : 0000040c
+1 : d001040c
+
+
+

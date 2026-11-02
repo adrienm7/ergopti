@@ -1,0 +1,505 @@
+2026-11-02 08:39:23:136 [INFO] [MenuDispatcher] WM_COMMAND retry hook installed (retry delay: 60 ms).
+2026-11-02 08:39:23:304 [DONE] [LLMDefaults] Loaded 25 default values from defaults.json.
+2026-11-02 08:39:23:327 [INFO] [HotstringsConfig] Shared defaults loaded (delay=0.75s dyn=2.0s color=#1e88e5 personal=#6e6e73).
+2026-11-02 08:39:23:345 [INFO] [Timings] Shared timings registry loaded (16 section(s)).
+2026-11-02 08:39:23:399 [DEBUG] [LLM] Ollama endpoint set to http://localhost:11435.
+2026-11-02 08:39:23:403 [INFO] [HotstringsConfig] Initialized (override file: '<config>\hotstrings_config.toml').
+2026-11-02 08:39:23:406 [DEBUG] [WrapSymbols] Built-in catalogue loaded (43 pair(s) in 7 group(s)).
+2026-11-02 08:39:23:407 [DEBUG] [WrapSymbols] Loaded: 0 disabled, 0 custom.
+2026-11-02 08:39:23:407 [INFO] [WrapSymbols] Initialized (65 active pair(s), 7 built-in group(s), 0 disabled).
+2026-11-02 08:39:23:542 [INFO] [ConfigMigration] Registry parse cache hit, validated in 109 ms.
+2026-11-02 08:39:23:552 [DEBUG] [Perf] Stage 'ConfigMigrate.row_load_registry' took 11.326 ms (count=-1).
+2026-11-02 08:39:23:577 [DEBUG] [Perf] Stage 'ConfigMigrate.row_compare_and_shadow' took 24.817 ms (count=-1).
+2026-11-02 08:39:23:595 [DEBUG] [Perf] Stage 'ConfigMigrate.registry_deep_compare' took 15.309 ms (count=-1).
+2026-11-02 08:39:23:596 [DEBUG] [Perf] Stage 'ConfigMigrate.row_read_image' took 0.877 ms (count=-1).
+2026-11-02 08:39:23:606 [DEBUG] [Perf] Stage 'ConfigMigrate.registry_deep_compare' took 12.202 ms (count=-1).
+2026-11-02 08:39:23:632 [DEBUG] [Perf] Stage 'ConfigMigrate.row_classify_image' took 37.689 ms (count=-1).
+2026-11-02 08:39:23:647 [DEBUG] [Perf] Stage 'ConfigMigrate.registry_deep_compare' took 12.776 ms (count=-1).
+2026-11-02 08:39:23:647 [START] [ConfigMigrate] Checking the config schema version of '<config>\autohotkey\config.toml' (ahk driver)…
+2026-11-02 08:39:23:650 [DEBUG] [Perf] Stage 'ConfigMigrate.registry_deep_compare' took 12.201 ms (count=-1).
+2026-11-02 08:39:23:667 [DEBUG] [Perf] Stage 'ConfigMigrate.registry_deep_compare' took 12.121 ms (count=-1).
+2026-11-02 08:39:23:734 [SUCCESS] [ConfigMigrate] '<config>\autohotkey\config.toml' is at schema v20; nothing to migrate.
+2026-11-02 08:39:23:759 [DEBUG] [Perf] Stage 'ConfigMigrate.registry_deep_compare' took 8.568 ms (count=-1).
+2026-11-02 08:39:23:769 [DEBUG] [Perf] Stage 'ConfigMigrate.registry_deep_compare' took 8.124 ms (count=-1).
+2026-11-02 08:39:23:776 [DEBUG] [Perf] Stage 'ConfigMigrate.registry_deep_compare' took 8.194 ms (count=-1).
+2026-11-02 08:39:23:787 [DEBUG] [Perf] Stage 'ConfigMigrate.registry_deep_compare' took 8.396 ms (count=-1).
+2026-11-02 08:39:23:808 [DEBUG] [Perf] Stage 'ConfigMigrate.registry_deep_compare' took 8.604 ms (count=-1).
+2026-11-02 08:39:23:835 [TRACE] [MenuManifest] Loading hotstring groups from the shared manifest…
+2026-11-02 08:39:23:987 [DONE] [MenuManifest] Hotstring groups loaded (2 std, 4 ergopti, 1 dynamic).
+2026-11-02 08:39:24:141 [TRACE] [i18n] Initialising i18n…
+2026-11-02 08:39:24:141 [DEBUG] [i18n] detect_system_locale: matched 'fr'.
+2026-11-02 08:39:24:141 [DEBUG] [i18n] Active locale cache requires loading after configuration initialization.
+2026-11-02 08:39:24:141 [DONE] [i18n] i18n initialised (locale: 'fr').
+2026-11-02 08:39:24:186 [DEBUG] [Perf] Stage 'ConfigMigrate.registry_deep_compare' took 10.210 ms (count=-1).
+
+===== 2026-11-02 08:39:24:204 — ErgoptiPlus session opened =====
+2026-11-02 08:39:24:219 [START] [ErrorDialog] Initialising the error window…
+2026-11-02 08:39:24:244 [DEBUG] [Perf] Stage 'ConfigMigrate.registry_deep_compare' took 8.811 ms (count=-1).
+2026-11-02 08:39:24:253 [SUCCESS] [ErrorDialog] Error window ready (enabled).
+2026-11-02 08:39:24:307 [INFO] [ProxyOverride] Proxy override in force: automatic.
+2026-11-02 08:39:24:307 [DEBUG] [Updater] Local source — background checks disabled.
+2026-11-02 08:39:24:307 [DEBUG] [Updater] Tray notification click and wake handlers registered.
+2026-11-02 08:39:24:307 [START] [ErgoptiPlus] Booting ErgoptiPlus driver (pid=8716, script='ErgoptiPlus.ahk')…
+2026-11-02 08:39:24:307 [INFO] [BootProfile] Boot timing started.
+2026-11-02 08:39:24:307 [INFO] [BootProfile] Pre-logger initialization (including script parse + load): ~2211 ms.
+2026-11-02 08:39:24:307 [INFO] [BootProfile] (pre-logger) Auto-execute entered: +992 ms (at 992 ms since process start).
+2026-11-02 08:39:24:307 [INFO] [BootProfile] Process CPU at first boot stamp: 921.875 ms.
+2026-11-02 08:39:24:307 [INFO] [BootProfile] (pre-logger) Single-owner gate completed: +0 ms (at 992 ms since process start).
+2026-11-02 08:39:24:307 [INFO] [BootProfile] Pre-logger phase 'Single-owner gate completed' resources: wall=0.447 ms, process_cpu=0.000 ms.
+2026-11-02 08:39:24:307 [INFO] [BootProfile] (pre-logger) Bundle extracted: +0 ms (at 992 ms since process start).
+2026-11-02 08:39:24:307 [INFO] [BootProfile] Pre-logger phase 'Bundle extracted' resources: wall=2.883 ms, process_cpu=0.000 ms.
+2026-11-02 08:39:24:307 [INFO] [BootProfile] (pre-logger) UIA include initialised: +16 ms (at 1008 ms since process start).
+2026-11-02 08:39:24:307 [INFO] [BootProfile] Pre-logger phase 'UIA include initialised' resources: wall=18.448 ms, process_cpu=15.625 ms.
+2026-11-02 08:39:24:307 [INFO] [BootProfile] (pre-logger) Diagnostics and core state initialised: +0 ms (at 1008 ms since process start).
+2026-11-02 08:39:24:307 [INFO] [BootProfile] Pre-logger phase 'Diagnostics and core state initialised' resources: wall=0.116 ms, process_cpu=0.000 ms.
+2026-11-02 08:39:24:307 [INFO] [BootProfile] (pre-logger) Adapters initialised: +0 ms (at 1008 ms since process start).
+2026-11-02 08:39:24:309 [INFO] [BootProfile] Pre-logger phase 'Adapters initialised' resources: wall=0.438 ms, process_cpu=0.000 ms.
+2026-11-02 08:39:24:309 [INFO] [BootProfile] (pre-logger) Hotstring and TOML state initialised: +0 ms (at 1008 ms since process start).
+2026-11-02 08:39:24:309 [INFO] [BootProfile] Pre-logger phase 'Hotstring and TOML state initialised' resources: wall=0.248 ms, process_cpu=0.000 ms.
+2026-11-02 08:39:24:309 [INFO] [BootProfile] (pre-logger) Manifest, updater and locale state initialised: +47 ms (at 1055 ms since process start).
+2026-11-02 08:39:24:309 [INFO] [BootProfile] Pre-logger phase 'Manifest, updater and locale state initialised' resources: wall=35.115 ms, process_cpu=46.875 ms.
+2026-11-02 08:39:24:309 [INFO] [BootProfile] (pre-logger) WebView and metrics UI state initialised: +0 ms (at 1055 ms since process start).
+2026-11-02 08:39:24:309 [INFO] [BootProfile] Pre-logger phase 'WebView and metrics UI state initialised' resources: wall=2.212 ms, process_cpu=0.000 ms.
+2026-11-02 08:39:24:309 [INFO] [BootProfile] (pre-logger) Keystats modules initialised: +0 ms (at 1055 ms since process start).
+2026-11-02 08:39:24:309 [INFO] [BootProfile] Pre-logger phase 'Keystats modules initialised' resources: wall=0.544 ms, process_cpu=0.000 ms.
+2026-11-02 08:39:24:309 [INFO] [BootProfile] (pre-logger) LLM defaults loaded: +156 ms (at 1211 ms since process start).
+2026-11-02 08:39:24:309 [INFO] [BootProfile] Pre-logger phase 'LLM defaults loaded' resources: wall=170.838 ms, process_cpu=171.875 ms.
+2026-11-02 08:39:24:309 [INFO] [BootProfile] (pre-logger) Module includes initialised: +16 ms (at 1227 ms since process start).
+2026-11-02 08:39:24:309 [INFO] [BootProfile] Pre-logger phase 'Module includes initialised' resources: wall=1.858 ms, process_cpu=0.000 ms.
+2026-11-02 08:39:24:309 [INFO] [BootProfile] (pre-logger) Paths and shared configuration loaded: +93 ms (at 1320 ms since process start).
+2026-11-02 08:39:24:309 [INFO] [BootProfile] Pre-logger phase 'Paths and shared configuration loaded' resources: wall=99.889 ms, process_cpu=78.125 ms.
+2026-11-02 08:39:24:309 [INFO] [BootProfile] (pre-logger) Personal shortcuts file ensured: +0 ms (at 1320 ms since process start).
+2026-11-02 08:39:24:309 [INFO] [BootProfile] Pre-logger phase 'Personal shortcuts file ensured' resources: wall=1.104 ms, process_cpu=0.000 ms.
+2026-11-02 08:39:24:309 [INFO] [BootProfile] (pre-logger) Safe tray and startup commands installed: +0 ms (at 1320 ms since process start).
+2026-11-02 08:39:24:309 [INFO] [BootProfile] Pre-logger phase 'Safe tray and startup commands installed' resources: wall=0.566 ms, process_cpu=0.000 ms.
+2026-11-02 08:39:24:309 [INFO] [BootProfile] (pre-logger) Configuration schema source prepared: +219 ms (at 1539 ms since process start).
+2026-11-02 08:39:24:311 [INFO] [BootProfile] Pre-logger phase 'Configuration schema source prepared' resources: wall=220.004 ms, process_cpu=203.125 ms.
+2026-11-02 08:39:24:311 [INFO] [BootProfile] (pre-logger) Tray reset + onboarding: +0 ms (at 1539 ms since process start).
+2026-11-02 08:39:24:311 [INFO] [BootProfile] Pre-logger phase 'Tray reset + onboarding' resources: wall=0.073 ms, process_cpu=0.000 ms.
+2026-11-02 08:39:24:311 [INFO] [BootProfile] (pre-logger) Configuration migration checked: +141 ms (at 1680 ms since process start).
+2026-11-02 08:39:24:311 [INFO] [BootProfile] Pre-logger phase 'Configuration migration checked' resources: wall=135.079 ms, process_cpu=140.625 ms.
+2026-11-02 08:39:24:311 [INFO] [BootProfile] (pre-logger) Configuration TOML snapshot parsed: +62 ms (at 1742 ms since process start).
+2026-11-02 08:39:24:311 [INFO] [BootProfile] Pre-logger phase 'Configuration TOML snapshot parsed' resources: wall=65.860 ms, process_cpu=62.500 ms.
+2026-11-02 08:39:24:311 [INFO] [BootProfile] (pre-logger) Script preferences applied: +0 ms (at 1742 ms since process start).
+2026-11-02 08:39:24:311 [INFO] [BootProfile] Pre-logger phase 'Script preferences applied' resources: wall=0.565 ms, process_cpu=0.000 ms.
+2026-11-02 08:39:24:311 [INFO] [BootProfile] (pre-logger) Config parsed (TOML + i18n): +313 ms (at 2055 ms since process start).
+2026-11-02 08:39:24:311 [INFO] [BootProfile] Pre-logger phase 'Config parsed (TOML + i18n)' resources: wall=306.719 ms, process_cpu=312.500 ms.
+2026-11-02 08:39:24:311 [INFO] [BootProfile] (pre-logger) Hotstring engine initialised: +0 ms (at 2055 ms since process start).
+2026-11-02 08:39:24:311 [INFO] [BootProfile] Pre-logger phase 'Hotstring engine initialised' resources: wall=0.446 ms, process_cpu=0.000 ms.
+2026-11-02 08:39:24:311 [INFO] [HotPath] Latency statistics started (interval=60000 ms, labels=128).
+2026-11-02 08:39:24:313 [INFO] [ErgoptiPlus] Boot environment (pid=8716 compiled=false version=local commit=b58acec0d os="Windows 11 Home" os_version=26100.9711 arch=x64 runtime="AutoHotkey 2.0.26" elevated=false keyboard_layout=0xFC06040C monitors=1 dpi=120 config_dir=<config>\).
+2026-11-02 08:39:24:314 [START] [BootProfile] Boot stage 'i18n'…
+2026-11-02 08:39:24:314 [TRACE] [i18n] Preloading active locale cache…
+2026-11-02 08:39:24:341 [DONE] [i18n] Locale 'fr' loaded (4015 key(s), fast).
+2026-11-02 08:39:24:341 [DONE] [i18n] Active locale warm (4015 key(s)); fallbacks deferred off the boot path.
+2026-11-02 08:39:24:341 [SUCCESS] [BootProfile] Boot stage 'i18n' done in 31 ms: locale fr.
+2026-11-02 08:39:24:341 [INFO] [BootProfile] Boot stage 'i18n' resources: wall=27.785 ms, process_cpu=31.250 ms, native_menu_wait=0.000 ms, wall_without_menu=27.785 ms.
+2026-11-02 08:39:24:341 [INFO] [BootProfile] i18n locale preloaded: +47 ms (total 47 ms).
+2026-11-02 08:39:24:357 [DONE] [UiStyle] Shared tooltip constants loaded (pad_x=14 corner_r=14 bg=242424 tmo=2.5s corr=40E666 nw=FF9E1A).
+2026-11-02 08:39:24:357 [INFO] [AltGrDetect] HKL=0xFFFFFFFFFC06040C, VK_RMENU→SC=0x0, AltGr VK=0xDF, AltGr level=false, _ALTGR_KANA_FIXUP=true (source=probe).
+2026-11-02 08:39:24:357 [START] [BootProfile] Boot stage 'configuration'…
+2026-11-02 08:39:24:590 [START] [TomlConfigLoader] Applying v2 config from '<config>\autohotkey\config.toml'…
+2026-11-02 08:39:24:672 [DEBUG] [TomlConfigLoader] [category_enabled].autocorrection is owned by FeatureState; Features apply skipped (1).
+2026-11-02 08:39:24:677 [DEBUG] [TomlConfigLoader] [category_enabled].hotstrings = 1.
+2026-11-02 08:39:24:785 [SUCCESS] [TomlConfigLoader] v2 config applied (127 value(s)).
+2026-11-02 08:39:24:785 [INFO] [TomlConfigLoader] Config summary for '<config>\autohotkey\config.toml': 127 applied, 0 rejected, 0 unknown key(s) ignored, 10 owned by another module, 3 key(s) in skipped sections, 0 obsolete section(s), 0 outdated value(s) ignored.
+2026-11-02 08:39:24:805 [START] [TapHoldMigration] Checking the tap-hold file version of '<config>\autohotkey\tap_hold.toml'…
+2026-11-02 08:39:24:815 [SUCCESS] [TapHoldMigration] '<config>\autohotkey\tap_hold.toml' is at schema v1; nothing to migrate.
+2026-11-02 08:39:24:815 [DEBUG] [TapHoldLoader] LoadTapHoldToml start: user='<config>\autohotkey\tap_hold.toml', defaults='D:\Documents\GitHub\ergopti\static\ergopti_plus\_shared\tap_hold\defaults.toml'.
+2026-11-02 08:39:24:823 [DEBUG] [TapHoldLoader] Parsed user tap-hold: 8 key(s), inherit_defaults=0.
+2026-11-02 08:39:24:823 [DEBUG] [TapHoldLoader] Skipping shared defaults load because inherit_defaults=false in user tap-hold file.
+2026-11-02 08:39:24:823 [START] [TapHoldLoader] Loading tap-hold config from '<config>\autohotkey\tap_hold.toml'…
+2026-11-02 08:39:24:823 [DEBUG] [TapHoldLoader] User override includes left_ctrl: tap_action='paste', hold_modifier='ctrl', hold_layer='<unset>'.
+2026-11-02 08:39:24:824 [DEBUG] [TapHoldLoader] Resolved left_ctrl after merge: tap_action='paste', hold_modifier='ctrl', hold_layer='<unset>', inherit_defaults=false.
+2026-11-02 08:39:24:824 [SUCCESS] [TapHoldLoader] Tap-hold config loaded (8 key(s)).
+2026-11-02 08:39:24:824 [SUCCESS] [BootProfile] Boot stage 'configuration' done in 454 ms: 127 config.toml value(s) applied, 8 tap-hold key(s).
+2026-11-02 08:39:24:824 [INFO] [BootProfile] Boot stage 'configuration' resources: wall=465.882 ms, process_cpu=468.750 ms, native_menu_wait=0.000 ms, wall_without_menu=465.882 ms.
+2026-11-02 08:39:24:825 [START] [BootProfile] Boot stage 'feature gates'…
+2026-11-02 08:39:24:826 [DEBUG] [MasterGates] ApplyMasterGatesToFeatures done.
+2026-11-02 08:39:24:826 [SUCCESS] [BootProfile] Boot stage 'feature gates' done in 0 ms: 117/153 feature switch(es) enabled, 1 forced off by a disabled category.
+2026-11-02 08:39:24:826 [INFO] [BootProfile] Boot stage 'feature gates' resources: wall=4.464 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=4.464 ms.
+2026-11-02 08:39:24:847 [START] [gestures] Initialising gestures module…
+2026-11-02 08:39:24:847 [SUCCESS] [gestures] Gestures module initialised — ready (window hook: active).
+2026-11-02 08:39:24:847 [START] [BootProfile] Boot stage 'shortcuts'…
+2026-11-02 08:39:24:949 [SUCCESS] [BootProfile] Boot stage 'shortcuts' done in 94 ms: 19 configured keyboard slot(s) read.
+2026-11-02 08:39:24:949 [INFO] [BootProfile] Boot stage 'shortcuts' resources: wall=101.872 ms, process_cpu=109.375 ms, native_menu_wait=0.000 ms, wall_without_menu=101.872 ms.
+2026-11-02 08:39:24:950 [INFO] [BootProfile] Config, features & shortcuts loaded: +609 ms (total 656 ms).
+2026-11-02 08:39:24:950 [DEBUG] [MenuDispatcher] Pruned 3 dead menu-item ID(s) after a single-menu rebuild.
+2026-11-02 08:39:24:951 [INFO] [TapKeys] Tap keys read: number_row_left=screenshot_fullscreen_save, number_row_right_1=none, number_row_right_2=none.
+2026-11-02 08:39:24:952 [INFO] [KeyCombinations] Key combinations read: 3 tap slot(s), 0 hold slot(s).
+2026-11-02 08:39:24:953 [INFO] [ErgoptiPlus] Shutdown handler registered before configured menu publication.
+2026-11-02 08:39:25:027 [INFO] [WebView] Shared browser warmup dispatched without awaiting.
+2026-11-02 08:39:25:051 [START] [BootProfile] Boot stage 'tray menu'…
+2026-11-02 08:39:25:051 [INFO] [BootProfile] MENU/InitSub: prescan personal: +94 ms (total 750 ms).
+2026-11-02 08:39:25:056 [INFO] [BootProfile] MENU/InitSub: flat cat Autocorrection: +0 ms (total 750 ms).
+2026-11-02 08:39:25:095 [INFO] [BootProfile] MENU/InitSub: flat cat DistancesReduction: +47 ms (total 797 ms).
+2026-11-02 08:39:25:105 [INFO] [BootProfile] MENU/InitSub: flat cat SFBsReduction: +0 ms (total 797 ms).
+2026-11-02 08:39:25:139 [INFO] [BootProfile] MENU/InitSub: flat cat Rolls: +47 ms (total 844 ms).
+2026-11-02 08:39:25:154 [INFO] [BootProfile] MENU/InitSub: flat cat MagicKey: +15 ms (total 859 ms).
+2026-11-02 08:39:25:156 [INFO] [BootProfile] MENU/InitSub: flat cat FrenchDistancesReduction: +0 ms (total 859 ms).
+2026-11-02 08:39:25:167 [INFO] [BootProfile] MENU/InitSub: flat cat FrenchAutocorrection: +0 ms (total 859 ms).
+2026-11-02 08:39:25:176 [INFO] [BootProfile] MENU/InitSub: flat cat FrenchMagicKey: +16 ms (total 875 ms).
+2026-11-02 08:39:25:176 [INFO] [BootProfile] MENU/InitSub: flat hotstring submenus: +0 ms (total 875 ms).
+2026-11-02 08:39:25:179 [INFO] [BootProfile] MENU/InitSub: dynamic submenu: +0 ms (total 875 ms).
+2026-11-02 08:39:25:181 [INFO] [NumberRow] 'digits' is not applied on this layout (digits_on_both); the stored choice is kept.
+2026-11-02 08:39:26:118 [INFO] [BootProfile] MENU/InitSub: shortcuts submenu: +937 ms (total 1812 ms).
+2026-11-02 08:39:26:146 [INFO] [WebView] Shared browser warm in 1191.717 ms; cpu=828.125 ms.
+2026-11-02 08:39:26:146 [INFO] [WebView] Shared browser warm-up main-thread time: begin=72.9 ms, environment_ready=18.6 ms, controller_ready=0.1 ms.
+2026-11-02 08:39:26:170 [INFO] [BootProfile] MENU/InitSub: tapholds submenu: +63 ms (total 1875 ms).
+2026-11-02 08:39:26:171 [INFO] [BootProfile] MENU/initMenu: caches reset + tray staged: +0 ms (total 1875 ms).
+2026-11-02 08:39:26:171 [START] [BootProfile] Boot stage 'menu row tap_holds'…
+2026-11-02 08:39:26:177 [SUCCESS] [BootProfile] Boot stage 'menu row tap_holds' done in 0 ms.
+2026-11-02 08:39:26:177 [INFO] [BootProfile] Boot stage 'menu row tap_holds' resources: wall=6.323 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=6.323 ms.
+2026-11-02 08:39:26:178 [START] [BootProfile] Boot stage 'menu row shortcuts'…
+2026-11-02 08:39:26:184 [SUCCESS] [BootProfile] Boot stage 'menu row shortcuts' done in 0 ms.
+2026-11-02 08:39:26:184 [INFO] [BootProfile] Boot stage 'menu row shortcuts' resources: wall=6.725 ms, process_cpu=15.625 ms, native_menu_wait=0.000 ms, wall_without_menu=6.725 ms.
+2026-11-02 08:39:26:184 [START] [BootProfile] Boot stage 'menu row gestures'…
+2026-11-02 08:39:26:188 [START] [gestures.status] Reading system gesture settings…
+2026-11-02 08:39:26:189 [SUCCESS] [gestures.status] System gesture settings cached.
+2026-11-02 08:39:26:195 [SUCCESS] [BootProfile] Boot stage 'menu row gestures' done in 16 ms.
+2026-11-02 08:39:26:195 [INFO] [BootProfile] Boot stage 'menu row gestures' resources: wall=10.808 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=10.808 ms.
+2026-11-02 08:39:26:195 [START] [BootProfile] Boot stage 'menu row keyboard_layout'…
+2026-11-02 08:39:26:266 [INFO] [BootProfile] MENU/initMenu: layout built+added: +94 ms (total 1969 ms).
+2026-11-02 08:39:26:266 [SUCCESS] [BootProfile] Boot stage 'menu row keyboard_layout' done in 78 ms.
+2026-11-02 08:39:26:266 [INFO] [BootProfile] Boot stage 'menu row keyboard_layout' resources: wall=71.808 ms, process_cpu=78.125 ms, native_menu_wait=0.000 ms, wall_without_menu=71.808 ms.
+2026-11-02 08:39:26:268 [START] [BootProfile] Boot stage 'menu row hotstrings'…
+2026-11-02 08:39:26:269 [INFO] [BootProfile] MENU/initMenu: pre-hotstrings render: +0 ms (total 1969 ms).
+2026-11-02 08:39:26:319 [INFO] [BootProfile] MENU/initMenu: hotstrings menu rendered: +47 ms (total 2016 ms).
+2026-11-02 08:39:26:324 [INFO] [BootProfile] MENU/initMenu: hotstrings grandtotal+added: +0 ms (total 2016 ms).
+2026-11-02 08:39:26:324 [SUCCESS] [BootProfile] Boot stage 'menu row hotstrings' done in 47 ms.
+2026-11-02 08:39:26:324 [INFO] [BootProfile] Boot stage 'menu row hotstrings' resources: wall=62.107 ms, process_cpu=62.500 ms, native_menu_wait=0.000 ms, wall_without_menu=62.107 ms.
+2026-11-02 08:39:26:324 [START] [BootProfile] Boot stage 'menu row metrics'…
+2026-11-02 08:39:26:333 [INFO] [BootProfile] MENU/initMenu: metrics menu: +15 ms (total 2031 ms).
+2026-11-02 08:39:26:333 [SUCCESS] [BootProfile] Boot stage 'menu row metrics' done in 15 ms.
+2026-11-02 08:39:26:333 [INFO] [BootProfile] Boot stage 'menu row metrics' resources: wall=4.235 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=4.235 ms.
+2026-11-02 08:39:26:335 [START] [BootProfile] Boot stage 'menu row llm'…
+2026-11-02 08:39:26:544 [DEBUG] [LLM] Ollama endpoint set to http://localhost:11435.
+2026-11-02 08:39:26:569 [INFO] [LLM] LLM_Menu_Build: pre-emit staging took 0 ms.
+2026-11-02 08:39:26:569 [INFO] [LLM] LLM_Menu_Build: emitting 6 settings row(s) from shared spec…
+2026-11-02 08:39:26:615 [INFO] [LLM] LLM_Menu_Build: settings rows emitted (12 item(s) so far).
+2026-11-02 08:39:26:617 [INFO] [BootProfile] MENU/initMenu: LLM IA submenu built inline: +281 ms (total 2312 ms).
+2026-11-02 08:39:26:617 [INFO] [BootProfile] MENU/initMenu: LLM tray init: +0 ms (total 2312 ms).
+2026-11-02 08:39:26:617 [SUCCESS] [BootProfile] Boot stage 'menu row llm' done in 281 ms.
+2026-11-02 08:39:26:618 [INFO] [BootProfile] Boot stage 'menu row llm' resources: wall=283.329 ms, process_cpu=281.250 ms, native_menu_wait=0.000 ms, wall_without_menu=283.329 ms.
+2026-11-02 08:39:26:618 [START] [BootProfile] Boot stage 'menu row agent'…
+2026-11-02 08:39:26:618 [SUCCESS] [BootProfile] Boot stage 'menu row agent' done in 0 ms.
+2026-11-02 08:39:26:618 [INFO] [BootProfile] Boot stage 'menu row agent' resources: wall=0.196 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=0.196 ms.
+2026-11-02 08:39:26:618 [START] [BootProfile] Boot stage 'menu row about'…
+2026-11-02 08:39:26:619 [INFO] [Updater] Build identity: local build from source, commit b58acec0d (source git).
+2026-11-02 08:39:26:683 [SUCCESS] [BootProfile] Boot stage 'menu row about' done in 63 ms.
+2026-11-02 08:39:26:683 [INFO] [BootProfile] Boot stage 'menu row about' resources: wall=65.387 ms, process_cpu=78.125 ms, native_menu_wait=0.000 ms, wall_without_menu=65.387 ms.
+2026-11-02 08:39:26:684 [START] [BootProfile] Boot stage 'menu row configuration'…
+2026-11-02 08:39:26:686 [SUCCESS] [BootProfile] Boot stage 'menu row configuration' done in 0 ms.
+2026-11-02 08:39:26:686 [INFO] [BootProfile] Boot stage 'menu row configuration' resources: wall=1.226 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=1.226 ms.
+2026-11-02 08:39:26:686 [START] [BootProfile] Boot stage 'menu row language'…
+2026-11-02 08:39:26:688 [SUCCESS] [BootProfile] Boot stage 'menu row language' done in 0 ms.
+2026-11-02 08:39:26:688 [INFO] [BootProfile] Boot stage 'menu row language' resources: wall=1.907 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=1.907 ms.
+2026-11-02 08:39:26:688 [START] [BootProfile] Boot stage 'menu row suspend'…
+2026-11-02 08:39:26:688 [SUCCESS] [BootProfile] Boot stage 'menu row suspend' done in 0 ms.
+2026-11-02 08:39:26:688 [INFO] [BootProfile] Boot stage 'menu row suspend' resources: wall=0.252 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=0.252 ms.
+2026-11-02 08:39:26:689 [START] [BootProfile] Boot stage 'menu row reload'…
+2026-11-02 08:39:26:689 [SUCCESS] [BootProfile] Boot stage 'menu row reload' done in 0 ms.
+2026-11-02 08:39:26:689 [INFO] [BootProfile] Boot stage 'menu row reload' resources: wall=0.508 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=0.508 ms.
+2026-11-02 08:39:26:689 [START] [BootProfile] Boot stage 'menu row quit'…
+2026-11-02 08:39:26:689 [SUCCESS] [BootProfile] Boot stage 'menu row quit' done in 0 ms.
+2026-11-02 08:39:26:689 [INFO] [BootProfile] Boot stage 'menu row quit' resources: wall=0.446 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=0.446 ms.
+2026-11-02 08:39:26:689 [START] [BootProfile] Boot stage 'menu row debug'…
+2026-11-02 08:39:26:693 [SUCCESS] [BootProfile] Boot stage 'menu row debug' done in 0 ms.
+2026-11-02 08:39:26:693 [INFO] [BootProfile] Boot stage 'menu row debug' resources: wall=3.830 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=3.830 ms.
+2026-11-02 08:39:26:693 [INFO] [BootProfile] MENU/initMenu: top level staged: +79 ms (total 2391 ms).
+2026-11-02 08:39:26:700 [DEBUG] [TrayMenu] Pause greying applied (paused=false) to 7 feature rows.
+2026-11-02 08:39:26:706 [DEBUG] [logger] ↑ 1 identical line suppressed
+2026-11-02 08:39:26:706 [SUCCESS] [BootProfile] Boot stage 'tray menu' done in 1656 ms: published.
+2026-11-02 08:39:26:706 [DEBUG] [TomlConfigLoader] ↑ "[{1}].{2} is owned by {3}; Features apply skipped ({4})." repeated 9 more times between 2026-11-02 08:39:24:672 and 2026-11-02 08:39:24:776 (last: [personal_editor].compact_view is owned by PersonalEditor; Features apply skipped (0).).
+2026-11-02 08:39:26:706 [INFO] [BootProfile] Boot stage 'tray menu' resources: wall=1655.055 ms, process_cpu=1359.375 ms, native_menu_wait=0.000 ms, wall_without_menu=1655.055 ms.
+2026-11-02 08:39:26:707 [DEBUG] [TomlConfigLoader] ↑ "[{1}].{2} = {3}." repeated 126 more times between 2026-11-02 08:39:24:677 and 2026-11-02 08:39:24:785 (last: [hotstrings.dynamic].enabled = 1.).
+2026-11-02 08:39:26:707 [INFO] [BootProfile] Configured tray menu published: +15 ms (total 2406 ms).
+2026-11-02 08:39:26:707 [INFO] [BootProfile] Complete configured menu usable at 4611 ms since process start; input initialization pending=true.
+2026-11-02 08:39:26:707 [INFO] [Menu] Menu tree rebuilt in 1656.5 ms (19 top-level item(s)).
+2026-11-02 08:39:26:708 [WARNING] [Menu] Over budget: menu.rebuild took 1656 ms (budget 250 ms).
+2026-11-02 08:39:26:708 [START] [BootProfile] Boot stage 'magic key source'…
+2026-11-02 08:39:26:708 [INFO] [ErgoptiPlus] Magic-key source: SC02E (layout).
+2026-11-02 08:39:26:708 [SUCCESS] [BootProfile] Boot stage 'magic key source' done in 0 ms: layout.
+2026-11-02 08:39:26:709 [INFO] [BootProfile] Boot stage 'magic key source' resources: wall=0.732 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=0.732 ms.
+2026-11-02 08:39:26:726 [START] [BootProfile] Boot stage 'keyboard hook'…
+2026-11-02 08:39:26:726 [START] [HookDispatcher] Starting unified hook dispatcher…
+2026-11-02 08:39:26:732 [SUCCESS] [HookDispatcher] Unified hook dispatcher started (0 event type(s) with subscribers).
+2026-11-02 08:39:26:732 [SUCCESS] [BootProfile] Boot stage 'keyboard hook' done in 15 ms: unified hook armed.
+2026-11-02 08:39:26:732 [INFO] [BootProfile] Boot stage 'keyboard hook' resources: wall=6.695 ms, process_cpu=15.625 ms, native_menu_wait=0.000 ms, wall_without_menu=6.695 ms.
+2026-11-02 08:39:26:733 [START] [BootProfile] Boot stage 'metrics'…
+2026-11-02 08:39:26:733 [SUCCESS] [BootProfile] Boot stage 'metrics' done in 0 ms: metrics disabled.
+2026-11-02 08:39:26:733 [INFO] [BootProfile] Boot stage 'metrics' resources: wall=0.301 ms, process_cpu=0.000 ms, native_menu_wait=0.000 ms, wall_without_menu=0.301 ms.
+2026-11-02 08:39:26:733 [INFO] [BootProfile] Metrics/keystats started: +31 ms (total 2437 ms).
+2026-11-02 08:39:26:734 [START] [BootProfile] Boot stage 'layout and remaps'…
+2026-11-02 08:39:26:742 [INFO] [BootProfile] LAYOUT: registry emulation registered: +0 ms (total 2437 ms).
+2026-11-02 08:39:26:742 [START] [ErgoptiLayout] Reading the Ergopti layout tables from D:\Documents\GitHub\ergopti\static\..\static\layouts\registry\…
+2026-11-02 08:39:26:894 [SUCCESS] [ErgoptiLayout] Ergopti layout tables read from version 2.2.2 in 157 ms (7 dead keys).
+2026-11-02 08:39:26:899 [START] [LayoutRows] Registering the row switches of the built-in emulation…
+2026-11-02 08:39:27:067 [SUCCESS] [LayoutRows] Row switches registered (240 variants).
+2026-11-02 08:39:27:110 [START] [LayoutShift] Registering Shift layer hotkeys…
+2026-11-02 08:39:27:203 [SUCCESS] [LayoutShift] Shift layer registered (49 entries).
+2026-11-02 08:39:27:203 [START] [LayoutNumberRow] Registering the built-in Ergopti number row…
+2026-11-02 08:39:27:220 [SUCCESS] [LayoutNumberRow] Built-in Ergopti number row registered (13 keys).
+2026-11-02 08:39:27:220 [START] [LayoutCaps] Registering CapsLock layer hotkeys…
+2026-11-02 08:39:27:256 [SUCCESS] [LayoutCaps] CapsLock layer registered (49 entries).
+2026-11-02 08:39:27:258 [START] [LayoutAltGr] Registering AltGr layer hotkeys…
+2026-11-02 08:39:27:299 [SUCCESS] [LayoutAltGr] AltGr layer registered (62 entries).
+2026-11-02 08:39:27:303 [INFO] [BootProfile] LAYOUT: Ergopti layout registered: +563 ms (total 3000 ms).
+2026-11-02 08:39:27:303 [START] [KeyboardShortcuts] Registering configurable keyboard hotkeys…
+2026-11-02 08:39:27:305 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc03a → hotkey#1.
+2026-11-02 08:39:27:306 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc03a (hotkey#1).
+2026-11-02 08:39:27:306 [DEBUG] [KeyboardShortcuts] Hotkey 'meta_capslock' → 'toggle_capslock' registered.
+2026-11-02 08:39:27:310 [DEBUG] [KeyboardShortcuts] Hotkey 'primary_b' → 'microsoft_bold' shares the layout's ^SC014.
+2026-11-02 08:39:27:312 [DEBUG] [adapters.hotkey_registrar] Reserved Ctrl+Shift+Sc02d → hotkey#2.
+2026-11-02 08:39:27:312 [DEBUG] [adapters.hotkey_registrar] Activated Ctrl+Shift+Sc02d (hotkey#2).
+2026-11-02 08:39:27:313 [SUCCESS] [KeyboardShortcuts] Configurable hotkeys registered (17 active).
+2026-11-02 08:39:27:313 [INFO] [CapsWord] Auto-off settings read: delay=10000 ms, delimiters=[space,nbsp,nnbsp,tab,enter,comma,semicolon,period], pointer=[left_click=on,middle_click=on,other_buttons=on,pointer_motion=on,right_click=on].
+2026-11-02 08:39:27:313 [INFO] [BootProfile] LAYOUT: shortcut modules registered: +16 ms (total 3016 ms).
+2026-11-02 08:39:27:360 [START] [NavLayer] Loading the navigation layer from '<config>\'…
+2026-11-02 08:39:27:473 [SUCCESS] [NavLayer] Navigation layer registered: 47 hotkey(s) for 46 key(s).
+2026-11-02 08:39:27:473 [INFO] [BootProfile] LAYOUT: tap-holds and navigation registered: +156 ms (total 3172 ms).
+2026-11-02 08:39:27:473 [START] [MagicEditor] Acquiring the shared physical shortcut cohort…
+2026-11-02 08:39:27:553 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc010 → hotkey#3.
+2026-11-02 08:39:27:555 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc011 → hotkey#4.
+2026-11-02 08:39:27:555 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc012 → hotkey#5.
+2026-11-02 08:39:27:555 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc013 → hotkey#6.
+2026-11-02 08:39:27:555 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc014 → hotkey#7.
+2026-11-02 08:39:27:555 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc015 → hotkey#8.
+2026-11-02 08:39:27:555 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc016 → hotkey#9.
+2026-11-02 08:39:27:555 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc017 → hotkey#10.
+2026-11-02 08:39:27:555 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc018 → hotkey#11.
+2026-11-02 08:39:27:555 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc019 → hotkey#12.
+2026-11-02 08:39:27:555 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc01a → hotkey#13.
+2026-11-02 08:39:27:563 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc01e → hotkey#14.
+2026-11-02 08:39:27:563 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc01f → hotkey#15.
+2026-11-02 08:39:27:565 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc020 → hotkey#16.
+2026-11-02 08:39:27:565 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc021 → hotkey#17.
+2026-11-02 08:39:27:568 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc022 → hotkey#18.
+2026-11-02 08:39:27:570 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc023 → hotkey#19.
+2026-11-02 08:39:27:572 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc024 → hotkey#20.
+2026-11-02 08:39:27:576 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc025 → hotkey#21.
+2026-11-02 08:39:27:579 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc026 → hotkey#22.
+2026-11-02 08:39:27:581 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc027 → hotkey#23.
+2026-11-02 08:39:27:583 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc028 → hotkey#24.
+2026-11-02 08:39:27:583 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc029 → hotkey#25.
+2026-11-02 08:39:27:583 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc02c → hotkey#26.
+2026-11-02 08:39:27:588 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc02d → hotkey#27.
+2026-11-02 08:39:27:588 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc02e → hotkey#28.
+2026-11-02 08:39:27:588 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc02f → hotkey#29.
+2026-11-02 08:39:27:588 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc030 → hotkey#30.
+2026-11-02 08:39:27:588 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc031 → hotkey#31.
+2026-11-02 08:39:27:588 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc032 → hotkey#32.
+2026-11-02 08:39:27:588 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc033 → hotkey#33.
+2026-11-02 08:39:27:588 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc034 → hotkey#34.
+2026-11-02 08:39:27:599 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc035 → hotkey#35.
+2026-11-02 08:39:27:599 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc039 → hotkey#36.
+2026-11-02 08:39:27:599 [DEBUG] [adapters.hotkey_registrar] Reserved Cmd+Sc056 → hotkey#37.
+2026-11-02 08:39:27:599 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc010 (hotkey#3).
+2026-11-02 08:39:27:599 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc011 (hotkey#4).
+2026-11-02 08:39:27:599 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc012 (hotkey#5).
+2026-11-02 08:39:27:599 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc013 (hotkey#6).
+2026-11-02 08:39:27:606 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc014 (hotkey#7).
+2026-11-02 08:39:27:606 [DEBUG] [MenuDispatcher] ↑ "Pruned {1} dead menu-item ID(s) after a single-menu rebuild." repeated 2 more times between 2026-11-02 08:39:26:594 and 2026-11-02 08:39:26:700 (last: Pruned 3 dead menu-item ID(s) after a single-menu rebuild.).
+2026-11-02 08:39:27:606 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc015 (hotkey#8).
+2026-11-02 08:39:27:608 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc016 (hotkey#9).
+2026-11-02 08:39:27:608 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc017 (hotkey#10).
+2026-11-02 08:39:27:608 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc018 (hotkey#11).
+2026-11-02 08:39:27:608 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc019 (hotkey#12).
+2026-11-02 08:39:27:608 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc01a (hotkey#13).
+2026-11-02 08:39:27:608 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc01e (hotkey#14).
+2026-11-02 08:39:27:608 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc01f (hotkey#15).
+2026-11-02 08:39:27:608 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc020 (hotkey#16).
+2026-11-02 08:39:27:608 [DEBUG] [Perf] ↑ "Stage '{1}' took {2} ms (count={3})." repeated 50 more times between 2026-11-02 08:39:24:289 and 2026-11-02 08:39:26:724 (last: Stage 'ConfigMigrate.registry_deep_compare' took 15.147 ms (count=-1).).
+2026-11-02 08:39:27:608 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc021 (hotkey#17).
+2026-11-02 08:39:27:616 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc022 (hotkey#18).
+2026-11-02 08:39:27:616 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc023 (hotkey#19).
+2026-11-02 08:39:27:616 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc024 (hotkey#20).
+2026-11-02 08:39:27:616 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc025 (hotkey#21).
+2026-11-02 08:39:27:616 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc026 (hotkey#22).
+2026-11-02 08:39:27:616 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc027 (hotkey#23).
+2026-11-02 08:39:27:616 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc028 (hotkey#24).
+2026-11-02 08:39:27:616 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc029 (hotkey#25).
+2026-11-02 08:39:27:616 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc02c (hotkey#26).
+2026-11-02 08:39:27:616 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc02d (hotkey#27).
+2026-11-02 08:39:27:686 [DEBUG] [KeyboardShortcuts] ↑ "Hotkey '{1}' → '{2}' registered." repeated 1 more time between 2026-11-02 08:39:27:313 and 2026-11-02 08:39:27:313 (last: Hotkey 'primary_shift_v' → 'paste_plain' registered.).
+2026-11-02 08:39:27:686 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc02e (hotkey#28).
+2026-11-02 08:39:27:686 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc02f (hotkey#29).
+2026-11-02 08:39:27:687 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc030 (hotkey#30).
+2026-11-02 08:39:27:688 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc031 (hotkey#31).
+2026-11-02 08:39:27:689 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc032 (hotkey#32).
+2026-11-02 08:39:27:689 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc033 (hotkey#33).
+2026-11-02 08:39:27:691 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc034 (hotkey#34).
+2026-11-02 08:39:27:691 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc035 (hotkey#35).
+2026-11-02 08:39:27:693 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc039 (hotkey#36).
+2026-11-02 08:39:27:693 [DEBUG] [adapters.hotkey_registrar] Activated Cmd+Sc056 (hotkey#37).
+2026-11-02 08:39:27:695 [SUCCESS] [MagicEditor] Physical shortcut cohort acquired (35 variant(s), contextual action: open_hotstrings_editor).
+2026-11-02 08:39:27:695 [SUCCESS] [BootProfile] Boot stage 'layout and remaps' done in 954 ms.
+2026-11-02 08:39:27:695 [INFO] [BootProfile] Boot stage 'layout and remaps' resources: wall=961.273 ms, process_cpu=937.500 ms, native_menu_wait=0.000 ms, wall_without_menu=961.273 ms.
+2026-11-02 08:39:27:696 [INFO] [BootProfile] Layout/shortcuts/tap-holds + AltGr registered: +219 ms (total 3391 ms).
+2026-11-02 08:39:27:700 [START] [BootProfile] Boot stage 'hotstrings'…
+2026-11-02 08:39:27:748 [DONE] [Hotstrings] Hotstring cache ready (17 section(s), fast).
+2026-11-02 08:39:27:748 [TRACE] [TomlLoader] Loading section [<name>.qu]…
+2026-11-02 08:39:27:750 [DONE] [TomlLoader] Section [<name>.qu]: 10 entry(ies) loaded.
+2026-11-02 08:39:27:757 [TRACE] [TomlLoader] Loading section [<name>.e_circumflex_e]…
+2026-11-02 08:39:27:757 [DONE] [TomlLoader] Section [<name>.e_circumflex_e]: 1 entry(ies) loaded.
+2026-11-02 08:39:27:774 [TRACE] [TomlLoader] Loading section [<name>.comma]…
+2026-11-02 08:39:27:784 [DONE] [TomlLoader] Section [<name>.comma]: 13 entry(ies) loaded.
+2026-11-02 08:39:27:785 [TRACE] [TomlLoader] Loading section [<name>.e_circ]…
+2026-11-02 08:39:27:786 [DONE] [TomlLoader] Section [<name>.e_circ]: 4 entry(ies) loaded.
+2026-11-02 08:39:27:786 [TRACE] [TomlLoader] Loading section [<name>.e_grave]…
+2026-11-02 08:39:27:788 [DONE] [TomlLoader] Section [<name>.e_grave]: 2 entry(ies) loaded.
+2026-11-02 08:39:27:790 [TRACE] [TomlLoader] Loading section [<name>.close_chevron_tag]…
+2026-11-02 08:39:27:792 [DONE] [TomlLoader] Section [<name>.close_chevron_tag]: 1 entry(ies) loaded.
+2026-11-02 08:39:27:793 [TRACE] [TomlLoader] Loading section [<name>.ez]…
+2026-11-02 08:39:27:795 [DONE] [TomlLoader] Section [<name>.ez]: 1 entry(ies) loaded.
+2026-11-02 08:39:27:795 [TRACE] [TomlLoader] Loading section [<name>.comment_open]…
+2026-11-02 08:39:27:797 [DONE] [TomlLoader] Section [<name>.comment_open]: 1 entry(ies) loaded.
+2026-11-02 08:39:27:797 [TRACE] [TomlLoader] Loading section [<name>.comment_close]…
+2026-11-02 08:39:27:799 [DONE] [TomlLoader] Section [<name>.comment_close]: 1 entry(ies) loaded.
+2026-11-02 08:39:27:799 [TRACE] [TomlLoader] Loading section [<name>.hashtag_parenthesis]…
+2026-11-02 08:39:27:801 [DONE] [TomlLoader] Section [<name>.hashtag_parenthesis]: 1 entry(ies) loaded.
+2026-11-02 08:39:27:801 [TRACE] [TomlLoader] Loading section [<name>.hashtag_open_bracket]…
+2026-11-02 08:39:27:803 [DONE] [TomlLoader] Section [<name>.hashtag_open_bracket]: 1 entry(ies) loaded.
+2026-11-02 08:39:27:804 [TRACE] [TomlLoader] Loading section [<name>.hashtag_close_bracket]…
+2026-11-02 08:39:27:806 [DONE] [TomlLoader] Section [<name>.hashtag_close_bracket]: 1 entry(ies) loaded.
+2026-11-02 08:39:27:806 [TRACE] [TomlLoader] Loading section [<name>.hc]…
+2026-11-02 08:39:27:808 [DONE] [TomlLoader] Section [<name>.hc]: 1 entry(ies) loaded.
+2026-11-02 08:39:27:809 [TRACE] [TomlLoader] Loading section [<name>.sx]…
+2026-11-02 08:39:27:812 [DONE] [TomlLoader] Section [<name>.sx]: 1 entry(ies) loaded.
+2026-11-02 08:39:27:812 [TRACE] [TomlLoader] Loading section [<name>.cx]…
+2026-11-02 08:39:27:814 [DONE] [TomlLoader] Section [<name>.cx]: 1 entry(ies) loaded.
+2026-11-02 08:39:27:816 [TRACE] [TomlLoader] Loading section [<name>.ct]…
+2026-11-02 08:39:27:819 [DONE] [TomlLoader] Section [<name>.ct]: 2 entry(ies) loaded.
+2026-11-02 08:39:27:819 [INFO] [BootProfile] HS sub: distances/SFBs/rolls registered: +125 ms (total 3516 ms).
+2026-11-02 08:39:27:820 [TRACE] [TomlLoader] Using generated loader for [french_autocorrection.typographic_apostrophe].
+2026-11-02 08:39:27:825 [DONE] [TomlLoader] Generated section [french_autocorrection.typographic_apostrophe] loaded.
+2026-11-02 08:39:27:836 [TRACE] [TomlLoader] Using generated loader for [french_autocorrection.errors].
+2026-11-02 08:39:27:839 [DONE] [TomlLoader] Generated section [french_autocorrection.errors] loaded.
+2026-11-02 08:39:27:839 [TRACE] [TomlLoader] Using generated loader for [french_autocorrection.ou].
+2026-11-02 08:39:27:840 [DONE] [TomlLoader] Generated section [french_autocorrection.ou] loaded.
+2026-11-02 08:39:27:841 [TRACE] [TomlLoader] Using generated loader for [french_autocorrection.multiple_punctuation_marks].
+2026-11-02 08:39:27:841 [DONE] [TomlLoader] Generated section [french_autocorrection.multiple_punctuation_marks] loaded.
+2026-11-02 08:39:27:842 [TRACE] [TomlLoader] Using generated loader for [french_autocorrection.suffixes_a_chaining].
+2026-11-02 08:39:27:844 [DONE] [TomlLoader] Generated section [french_autocorrection.suffixes_a_chaining] loaded.
+2026-11-02 08:39:27:844 [TRACE] [TomlLoader] Using generated loader for [french_autocorrection.minus].
+2026-11-02 08:39:27:851 [DONE] [TomlLoader] Generated section [french_autocorrection.minus] loaded.
+2026-11-02 08:39:27:851 [TRACE] [TomlLoader] Using generated loader for [french_autocorrection.minus_apostrophe].
+2026-11-02 08:39:27:859 [DONE] [TomlLoader] Generated section [french_autocorrection.minus_apostrophe] loaded.
+2026-11-02 08:39:27:877 [TRACE] [TomlLoader] Using generated loader for [french_autocorrection.names].
+2026-11-02 08:39:27:881 [DONE] [TomlLoader] Generated section [french_autocorrection.names] loaded.
+2026-11-02 08:39:27:881 [INFO] [BootProfile] HS sub: autocorrection registered (excl. accents): +62 ms (total 3578 ms).
+2026-11-02 08:39:27:881 [TRACE] [TomlLoader] Using generated loader for [french_autocorrection.accents].
+2026-11-02 08:39:27:965 [DONE] [TomlLoader] Generated section [french_autocorrection.accents] loaded.
+2026-11-02 08:39:27:965 [INFO] [BootProfile] HS sub: autocorrection.accents registered: +78 ms (total 3656 ms).
+2026-11-02 08:39:27:971 [INFO] [BootProfile] HS sub: @-personal-info combos registered: +16 ms (total 3672 ms).
+2026-11-02 08:39:27:972 [TRACE] [TomlLoader] Using generated loader for [french_magickey.text_expansion].
+2026-11-02 08:39:28:056 [DONE] [TomlLoader] Generated section [french_magickey.text_expansion] loaded.
+2026-11-02 08:39:28:056 [TRACE] [TomlLoader] Using generated loader for [french_magickey.text_expansion_auto].
+2026-11-02 08:39:28:056 [DONE] [TomlLoader] Generated section [french_magickey.text_expansion_auto] loaded.
+2026-11-02 08:39:28:056 [INFO] [BootProfile] HS sub: magickey text_expansion registered: +78 ms (total 3750 ms).
+2026-11-02 08:39:28:056 [TRACE] [TomlLoader] Using generated loader for [french_magickey.text_expansion_emojis].
+2026-11-02 08:39:28:093 [DONE] [TomlLoader] Generated section [french_magickey.text_expansion_emojis] loaded.
+2026-11-02 08:39:28:093 [TRACE] [TomlLoader] Using generated loader for [magickey.text_expansion_symbols].
+2026-11-02 08:39:28:108 [DONE] [TomlLoader] Generated section [magickey.text_expansion_symbols] loaded.
+2026-11-02 08:39:28:108 [TRACE] [TomlLoader] Using generated loader for [magickey.text_expansion_symbols_typst].
+2026-11-02 08:39:28:405 [DONE] [TomlLoader] Generated section [magickey.text_expansion_symbols_typst] loaded.
+2026-11-02 08:39:28:405 [TRACE] [TomlLoader] Loading section [magickey.repeat_corrections]…
+2026-11-02 08:39:28:415 [DONE] [TomlLoader] Section [magickey.repeat_corrections]: 14 entry(ies) loaded.
+2026-11-02 08:39:28:415 [INFO] [BootProfile] HS sub: dynamic + repeat-key registered: +359 ms (total 4109 ms).
+2026-11-02 08:39:28:415 [TRACE] [TomlLoader] Loading section [<name>.autocorrection]…
+2026-11-02 08:39:28:415 [DONE] [TomlLoader] Section [<name>.autocorrection]: 22 entry(ies) loaded.
+2026-11-02 08:39:28:415 [TRACE] [TomlLoader] Loading section [<name>.code]…
+2026-11-02 08:39:28:439 [DONE] [TomlLoader] Section [<name>.code]: 53 entry(ies) loaded.
+2026-11-02 08:39:28:439 [TRACE] [TomlLoader] Loading section [<name>.email_shortcuts]…
+2026-11-02 08:39:28:439 [DONE] [TomlLoader] Section [<name>.email_shortcuts]: 0 entry(ies) loaded.
+2026-11-02 08:39:28:439 [TRACE] [TomlLoader] Loading section [<name>.emailshortcuts]…
+2026-11-02 08:39:28:441 [DONE] [TomlLoader] Section [<name>.emailshortcuts]: 5 entry(ies) loaded.
+2026-11-02 08:39:28:441 [TRACE] [TomlLoader] Loading section [<name>.professional_vocabulary]…
+2026-11-02 08:39:28:441 [DONE] [TomlLoader] Section [<name>.professional_vocabulary]: 0 entry(ies) loaded.
+2026-11-02 08:39:28:443 [TRACE] [TomlLoader] Loading section [<name>.professionalvocabulary]…
+2026-11-02 08:39:28:462 [DONE] [TomlLoader] Section [<name>.professionalvocabulary]: 183 entry(ies) loaded.
+2026-11-02 08:39:28:462 [TRACE] [TomlLoader] Loading section [<name>.test]…
+2026-11-02 08:39:28:462 [DONE] [TomlLoader] Section [<name>.test]: 0 entry(ies) loaded.
+2026-11-02 08:39:28:495 [START] [TomlLoader] Loading extension TOML '<name>'…
+2026-11-02 08:39:28:495 [SUCCESS] [TomlLoader] Extension TOML '<name>': 2 entry(ies) loaded.
+2026-11-02 08:39:28:496 [START] [TomlLoader] Loading extension TOML '<name>'…
+2026-11-02 08:39:28:496 [SUCCESS] [TomlLoader] Extension TOML '<name>': 1 entry(ies) loaded.
+2026-11-02 08:39:28:496 [START] [TomlLoader] Loading extension TOML '<name>'…
+2026-11-02 08:39:28:496 [SUCCESS] [TomlLoader] Extension TOML '<name>': 1 entry(ies) loaded.
+2026-11-02 08:39:28:496 [START] [TomlLoader] Loading extension TOML '<name>'…
+2026-11-02 08:39:28:496 [SUCCESS] [TomlLoader] Extension TOML '<name>': 1 entry(ies) loaded.
+2026-11-02 08:39:28:496 [INFO] [BootProfile] HS sub: personal + extension TOML registered: +78 ms (total 4187 ms).
+2026-11-02 08:39:28:496 [SUCCESS] [BootProfile] Boot stage 'hotstrings' done in 781 ms.
+2026-11-02 08:39:28:496 [INFO] [BootProfile] Boot stage 'hotstrings' resources: wall=797.820 ms, process_cpu=796.875 ms, native_menu_wait=0.000 ms, wall_without_menu=797.820 ms.
+2026-11-02 08:39:28:496 [INFO] [BootProfile] Hotstrings registered (HSE complete): +0 ms (total 4187 ms).
+2026-11-02 08:39:28:496 [START] [BootProfile] Boot stage 'prefix watcher'…
+2026-11-02 08:39:28:496 [START] [PrefixWatcher] Initializing prefix watcher…
+2026-11-02 08:39:28:496 [DEBUG] [HookDispatcher] Subscriber registered for 'mouse_ldown' (total: 1).
+2026-11-02 08:39:28:496 [SUCCESS] [PrefixWatcher] Watcher started (index build deferred off the boot path).
+2026-11-02 08:39:28:636 [DEBUG] [KeyboardArbiter] stage=key_ledger desktop_watch=1.
+2026-11-02 08:39:28:769 [INFO] [PrefixWatcher] Index rebuilt: 3159 trigger(s) in 141 ms (ensure=0ms build=141ms cache=4 toml=6 ext=4 rows=17).
+2026-11-02 08:39:28:769 [SUCCESS] [BootProfile] Boot stage 'prefix watcher' done in 282 ms.
+2026-11-02 08:39:28:769 [INFO] [BootProfile] Boot stage 'prefix watcher' resources: wall=279.639 ms, process_cpu=265.625 ms, native_menu_wait=0.000 ms, wall_without_menu=279.639 ms.
+2026-11-02 08:39:28:779 [INFO] [BootProfile] Prefix watcher index complete: +297 ms (total 4484 ms).
+2026-11-02 08:39:28:779 [START] [LLM.local_servers] Initializing local server menu ownership…
+2026-11-02 08:39:28:780 [SUCCESS] [LLM.local_servers] Local server menu owner initialized.
+2026-11-02 08:39:28:780 [INFO] [LLMBuildObservation.local_servers_initialized] Build entered; generation=1.
+2026-11-02 08:39:28:780 [INFO] [LLM] LLM_Menu_Build: building IA submenu (enabled=false, inTray=true).
+2026-11-02 08:39:28:780 [INFO] [LLM] LLM_Menu_Build: pre-emit staging took 0 ms.
+2026-11-02 08:39:28:780 [INFO] [LLM] LLM_Menu_Build: emitting 6 settings row(s) from shared spec…
+2026-11-02 08:39:28:800 [DEBUG] [Perf] Stage 'ConfigMigrate.registry_deep_compare' took 16.461 ms (count=-1).
+2026-11-02 08:39:28:851 [INFO] [LLM] LLM_Menu_Build: settings rows emitted (12 item(s) so far).
+2026-11-02 08:39:28:858 [DEBUG] [TrayMenu] Pause greying applied (paused=false) to 1 feature rows.
+2026-11-02 08:39:28:858 [DEBUG] [LLM] IA submenu swapped in the published root.
+2026-11-02 08:39:28:858 [INFO] [Menu] Menu tree rebuilt in 7.9 ms (19 top-level item(s)).
+2026-11-02 08:39:28:864 [INFO] [LLM] LLM_Menu_Build: IA submenu built with 12 item(s) in 78ms.
+2026-11-02 08:39:28:864 [INFO] [LLM] Restored AI menu state activated with the AI off: its hotkeys and probes wait for the switch-on.
+2026-11-02 08:39:28:864 [START] [MenuPopulation] Prewarming 56 native leaf menu(s)…
+2026-11-02 08:39:28:864 [START] [DiagnosticsControl] Registering the diagnostics window control…
+2026-11-02 08:39:28:864 [SUCCESS] [DiagnosticsControl] Diagnostics window control registered.
+2026-11-02 08:39:28:864 [START] [DriverControl] Starting the local reload control…
+2026-11-02 08:39:28:914 [WARNING] [HotPath] Slow Config.TomlBuild: 27.85 ms own, 32.04 ms total, parent none (0 similar since the last line).
+2026-11-02 08:39:28:914 [WARNING] [HotPath] Slow Config.TomlBuild detail: 0 update(s).
+2026-11-02 08:39:29:054 [DEBUG] [ConfigIO] [_meta].schema_version has no manifest default (Unknown configuration path: _meta.schema_version); its update is kept.
+2026-11-02 08:39:29:221 [SUCCESS] [DriverControl] Local reload control ready.
+2026-11-02 08:39:29:221 [INFO] [ErgoptiPlus] Developer source mode; the driver runs from D:\Documents\GitHub\ergopti\static\ergopti_plus\windows (clone root from the script location).
+2026-11-02 08:39:29:270 [INFO] [DevSource] Developer source watcher started on D:\Documents\GitHub\ergopti\static\ergopti_plus\windows (476 file(s)).
+2026-11-02 08:39:29:270 [START] [FieldRun] Starting the developer field run…
+2026-11-02 08:39:29:274 [SUCCESS] [FieldRun] Developer field run ready (3 step(s)).
+2026-11-02 08:39:29:283 [SUCCESS] [ErgoptiPlus] Driver fully initialised — ready.
+2026-11-02 08:39:29:283 [INFO] [BootProfile] Boot complete in 7187 ms (since process start).
+2026-11-02 08:39:29:283 [WARNING] [BootProfile] Over budget: boot took 7187 ms (budget 2500 ms).
+2026-11-02 08:39:29:283 [INFO] [BootProfile] Boot summary: total_ms=7187 stage_ms: i18n=31 configuration=454 feature_gates=0 shortcuts=94 tray_menu=1656 magic_key_source=0 keyboard_hook=15 metrics=0 layout_and_remaps=954 hotstrings=781 prefix_watcher=282.
+2026-11-02 08:39:29:283 [INFO] [Perf] Interval counters (0 ms): config.apply=1 config.snapshot_read=11 config.snapshot_shared_hit=1 config.snapshot_shared_miss=1 config_io.full_state_can_persist=6 config_io.save_retry_deferred_before_admission=14 config_migrate.registry_checks=42 config_migrate.registry_deep_compares=30 config_migrate.registry_source_hash_match=1 config_migrate.request.boot=1 config_migrate.request.capture_noop=1 config_migrate.request.capture_read=1 config_migrate.request.check_write=12 config_migrate.request.known=1 config_migrate.request.prepare=1 config_migrate.request.read_only_status=1 master_gates.manifest_decode=1 master_gates.manifest_decode_skipped=3 menu.disabled_getter_evaluated=4 menu.frame_pending_skip=22 menu.frame_pending_walk=10 menu.rebuild_request=2 toml.document_parse=22 toml.document_shared_hit=8 toml.document_shared_miss=1 toml.file_cache_hit=65 toml.file_read=20 toml.group_config_hit=54 toml.group_config_parse=18 us.ConfigMigrate.registry_deep_compare=337841 us.ConfigMigrate.row_classify_image=37689 us.ConfigMigrate.row_compare_and_shadow=24817 us.ConfigMigrate.row_load_registry=11326 us.ConfigMigrate.row_read_image=877 us.Menu.cat.render=10963 us.Menu.cat.rows=109350 us.Menu.cat.sections_order=20407 us.Menu.frame.pending_walk=233326 us.Menu.register_language_categories=712 us.WebView.warmup_begin=72946 us.WebView.warmup_controller_ready=68 us.WebView.warmup_environment_ready=18602.
+2026-11-02 08:39:29:283 [INFO] [Perf] Process state: working_set_mb=160.2 peak_working_set_mb=160.4 private_mb=142.6 handles=296 gdi_objects=29 user_objects=136. Log volume over 0 s: debug=208 info=259 warn=4 error=0 dropped=0 suppressed=1 collapsed=199.
+2026-11-02 08:39:29:284 [INFO] [Diagnostics] Diagnostic snapshot (driver=windows version=local commit=b58acec0d os="Windows 11 Home" os_version=26100.9711 arch=x64 runtime="AutoHotkey 2.0.26" elevated=false locale=fr keyboard_layout=0xFC06040C monitors=1 dpi=120 display=win32 config_dir=<config>\ logs_dir=~\AppData\Local\ergopti_plus\logs\ log_level=DEBUG features_enabled=117/153 boot_ms=7187).
+2026-11-02 08:39:29:284 [START] [AltGrDetect] Following the foreground window's keyboard layout…
+2026-11-02 08:39:29:284 [SUCCESS] [AltGrDetect] The AltGr family follows the foreground window's keyboard layout.
+2026-11-02 08:39:29:284 [DEBUG] [MenuPopulation] Leaf 'keyboard_slots' completed for background; 55 pending.
+2026-11-02 08:39:29:491 [TRACE] [i18n] Warming fallback locale caches…
+2026-11-02 08:39:29:491 [DONE] [i18n] Fallback caches warm (4015 EN, 0 FR).
+2026-11-02 08:39:30:690 [WARNING] [HotPath] Slow Menu.populate_leaf: 15.15 ms own, 15.15 ms total, parent none (0 similar since the last line).
+2026-11-02 08:39:30:691 [WARNING] [HotPath] Slow Menu.populate_leaf detail: background; list=locales; rows=16; remaining=4.
+2026-11-02 08:39:31:024 [SUCCESS] [MenuPopulation] Native leaf prewarming completed: 56 menu(s).
+2026-11-02 08:39:59:359 [START] [FieldRun] Field run win-2026-11-02_083950 started: 3 step(s) within 300 s.
+2026-11-02 08:39:59:359 [INFO] [FieldRun] Field run step 1/3 'field_boot_cost' started.
+2026-11-02 08:39:59:363 [INFO] [FieldRun] Field run step result: step=field_boot_cost verdict=fail codes=boot_ms_37264,budget_ms_2500
+2026-11-02 08:39:59:364 [START] [NetworkCheck] Network check started…
+2026-11-02 08:39:59:380 [START] [HttpClient] Resolving the Windows PAC proxy for 1 destination(s)…
+2026-11-02 08:40:00:909 [SUCCESS] [HttpClient] Windows PAC proxy resolved for 1 destination(s).
+2026-11-02 08:40:04:116 [INFO] [NetworkCheck] Network check result: check=network verdict=pass steps=7 proxy_settings=info:discovery pac_download=skip:no_pac pac_script=skip:no_pac route_lookup=pass:selected tls=pass:trusted transfer=pass:http_200 digest=skip:get_only
+2026-11-02 08:40:04:116 [SUCCESS] [NetworkCheck] Network check finished: pass.
+2026-11-02 08:40:04:116 [INFO] [FieldRun] Field run step result: step=field_network verdict=pass codes=proxy_settings_info:discovery,pac_download_skip:no_pac,pac_script_skip:no_pac,route_lookup_pass:selected,tls_pass:trusted,transfer_pass:http_200,digest_skip:get_only
+2026-11-02 08:40:04:116 [START] [ComposerCheck] Composer check started…
+2026-11-02 08:40:04:123 [START] [LayoutComposer] Saving the composed layout…
+2026-11-02 08:40:04:172 [START] [LayoutCatalogue] Installing the 'composed' layout…
+2026-11-02 08:40:04:180 [SUCCESS] [LayoutCatalogue] Installed the 'composed' layout, version 1.0.0, from the composer copy.
+2026-11-02 08:40:04:180 [SUCCESS] [LayoutComposer] Saved the composed layout.
+2026-11-02 08:40:04:225 [START] [LayoutComposer] Removing the composed layout…
+2026-11-02 08:40:04:231 [START] [LayoutCatalogue] Uninstalling the 'composed' layout…
+2026-11-02 08:40:04:246 [SUCCESS] [LayoutCatalogue] Uninstalled the 'composed' layout.
+2026-11-02 08:40:04:247 [SUCCESS] [LayoutComposer] Removed the composed layout.
+2026-11-02 08:40:04:247 [INFO] [ComposerCheck] Composer check result: check=composer verdict=pass steps=6 composer_fixture=pass composer_mode=info:fresh composer_install=pass composer_copy=pass composer_ready=pass:keys:49 composer_cleanup=pass
+2026-11-02 08:40:04:249 [SUCCESS] [ComposerCheck] Composer check finished: pass.
+2026-11-02 08:40:04:257 [INFO] [FieldRun] Field run step result: step=field_composer verdict=pass codes=composer_fixture_pass,composer_mode_info:fresh,composer_install_pass,composer_copy_pass,composer_ready_pass:keys:49,composer_cleanup_pass
+2026-11-02 08:40:04:281 [SUCCESS] [FieldRun] Field run win-2026-11-02_083950 finished.

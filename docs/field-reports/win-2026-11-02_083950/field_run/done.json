@@ -1,0 +1,12 @@
+{
+	"counts": { "fail": 1, "pass": 2 },
+	"elapsed_ms": 4937,
+	"finished_at": "2026-11-02T07:40:04Z",
+	"interrupted": false,
+	"order": ["field_boot_cost", "field_network", "field_composer"],
+	"pid": 8716,
+	"request_id": "win-2026-11-02_083950",
+	"schema": 1,
+	"started_at": "2026-11-02T07:39:59Z",
+	"verdicts": { "field_boot_cost": "fail", "field_composer": "pass", "field_network": "pass" }
+}

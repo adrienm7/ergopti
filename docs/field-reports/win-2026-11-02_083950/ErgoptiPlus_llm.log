@@ -1,0 +1,14 @@
+2026-11-02 08:39:26:544 [DEBUG] [LLM] Ollama endpoint set to http://localhost:11435.
+2026-11-02 08:39:26:569 [INFO] [LLM] LLM_Menu_Build: pre-emit staging took 0 ms.
+2026-11-02 08:39:26:569 [INFO] [LLM] LLM_Menu_Build: emitting 6 settings row(s) from shared spec…
+2026-11-02 08:39:26:615 [INFO] [LLM] LLM_Menu_Build: settings rows emitted (12 item(s) so far).
+2026-11-02 08:39:28:779 [START] [LLM.local_servers] Initializing local server menu ownership…
+2026-11-02 08:39:28:780 [SUCCESS] [LLM.local_servers] Local server menu owner initialized.
+2026-11-02 08:39:28:780 [INFO] [LLMBuildObservation.local_servers_initialized] Build entered; generation=1.
+2026-11-02 08:39:28:780 [INFO] [LLM] LLM_Menu_Build: building IA submenu (enabled=false, inTray=true).
+2026-11-02 08:39:28:780 [INFO] [LLM] LLM_Menu_Build: pre-emit staging took 0 ms.
+2026-11-02 08:39:28:780 [INFO] [LLM] LLM_Menu_Build: emitting 6 settings row(s) from shared spec…
+2026-11-02 08:39:28:851 [INFO] [LLM] LLM_Menu_Build: settings rows emitted (12 item(s) so far).
+2026-11-02 08:39:28:858 [DEBUG] [LLM] IA submenu swapped in the published root.
+2026-11-02 08:39:28:864 [INFO] [LLM] LLM_Menu_Build: IA submenu built with 12 item(s) in 78ms.
+2026-11-02 08:39:28:864 [INFO] [LLM] Restored AI menu state activated with the AI off: its hotkeys and probes wait for the switch-on.

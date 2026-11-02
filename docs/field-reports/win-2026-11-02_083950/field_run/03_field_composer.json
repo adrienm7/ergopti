@@ -1,0 +1,20 @@
+{
+	"codes": [
+		"composer_fixture_pass",
+		"composer_mode_info:fresh",
+		"composer_install_pass",
+		"composer_copy_pass",
+		"composer_ready_pass:keys:49",
+		"composer_cleanup_pass"
+	],
+	"deadline_ms": 90000,
+	"elapsed_ms": 141,
+	"finished_at": "2026-11-02T07:40:04Z",
+	"index": 3,
+	"kind": "field_check",
+	"request_id": "win-2026-11-02_083950",
+	"schema": 1,
+	"started_at": "2026-11-02T07:40:04Z",
+	"step": "field_composer",
+	"verdict": "pass"
+}

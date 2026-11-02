@@ -1,0 +1,6 @@
+python: Python 3.13.5
+py: Python 3.13.5
+node: v22.16.0
+curl: curl 8.21.0 (Windows) libcurl/8.21.0 Schannel zlib/1.3.2 WinIDN WinLDAP
+ollama: Warning: could not connect to a running Ollama instance
+WebView2: 156.0.4314.58
