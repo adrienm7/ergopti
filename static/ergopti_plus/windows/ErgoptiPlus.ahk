@@ -766,6 +766,9 @@ BootProfile_Stamp("Tray reset + onboarding")
 ; untouched and every write to it is refused for the session
 ; (infra/config_migrate.ahk, docs/adr/009-config-versioning.md).
 ConfigMigrateBoot(ConfigurationFile)
+; From here to readiness the boot only reads config.toml: one registry comparison
+; serves those reads, and the close below compares again.
+ConfigMigrateBootReadsOpen()
 BootProfile_Stamp("Configuration migration checked")
 
 global _IniCache := ParseConfigTomlFile(ConfigurationFile)
@@ -1490,6 +1493,8 @@ _SuspendStateWatchdog()
 _DriverInputInitPending := false
 #InputLevel 0
 LLM_Menu_ActivateRuntime()
+if !ConfigMigrateBootReadsClose(ConfigurationFile)
+	LoggerError("ErgoptiPlus", "The configuration registry changed during boot; every later write of this session is refused.")
 _DriverReady := true
 if _LLM_Menu_RuntimeActivated
 	_MenuStartupCommands.NotifyReady()
