@@ -47,10 +47,25 @@ _CALC_AddBinaryFormat(FormatId) {
 	}
 }
 
-_CALC_Run(Held) {
+; A second process holds the lock for a moment, as clipboard history does right
+; after the setter's change.
+; @returns {Integer} The reader's PID, once it holds the lock.
+_CALC_StartForeignReader(Root) {
+	global _DriverDir
+	Marker := Root . "\reader.held"
+	Run('"' . A_AhkPath . '" "' . _DriverDir . '\tests\fixtures\clipboardall_foreign_reader.ahk" "'
+		. Marker . '" 400', , "Hide", &ReaderPid)
+	Started := A_TickCount
+	while !FileExist(Marker) && ProcessExist(ReaderPid) && TickElapsed(Started) < 10000
+		Sleep(5)
+	AssertTrue(FileExist(Marker) != "", "the foreign reader must hold the lock before the after probe")
+	return ReaderPid
+}
+
+_CALC_Run(Held, ForeignReader := false) {
 	global DriverPid, _DriverDir
 	PreviousCritical := Critical("On"), WasSuspended := A_IsSuspended
-	Original := 0, SnapshotTaken := false, Saved := 0, Token := 0, Primary := 0
+	Original := 0, SnapshotTaken := false, Saved := 0, Token := 0, Primary := 0, ReaderPid := 0
 	Task := 0, Retired := true, RootCreated := false, RawOpened := false
 	Root := A_Temp . "\ergopti_clipboard_lock_" . DriverPid . "_" . A_TickCount . "_" . Random(1000, 999999)
 	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}
@@ -80,7 +95,8 @@ _CALC_Run(Held) {
 		AssertFalse(Type(Captured) == "String" && Captured == "__CB_SAVE_ERROR__")
 		AssertTrue(CB_Write("temporary clipboard lock payload"))
 		Task := ShellRunner_SpawnTreeOwned(A_AhkPath,
-			["/ErrorStdOut=UTF-8", _DriverDir . "\tests\fixtures\clipboardall_lock_observer.ahk", Root, String(FormatId)],
+			["/ErrorStdOut=UTF-8", _DriverDir . "\tests\fixtures\clipboardall_lock_observer.ahk", Root, String(FormatId),
+				String(ProcessExist())],
 			_CALC_Completed.Bind(State))
 		Retired := false
 		AssertTrue(Task.start(), "the actual separate clipboard observer must start")
@@ -107,6 +123,8 @@ _CALC_Run(Held) {
 		AssertTrue(HolderPid != DllCall("Kernel32\GetCurrentProcessId", "UInt"),
 			"the real setter's internal CloseClipboard releases the lock without an external close")
 		RawOpened := false
+		if ForeignReader
+			ReaderPid := _CALC_StartForeignReader(Root)
 		AssertTrue(FSWriteCreateDurable(Root . "\after.request", "probe"))
 		Started := A_TickCount
 		while State.Calls == 0 && TickElapsed(Started) < 10000 {
@@ -127,6 +145,15 @@ _CALC_Run(Held) {
 		try {
 			if RawOpened && DllCall("User32\GetOpenClipboardWindow", "Ptr") == A_ScriptHwnd
 				DllCall("User32\CloseClipboard", "Int")
+		} catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+		try {
+			if ReaderPid && ProcessWaitClose(ReaderPid, 5) != 0 {
+				ProcessClose(ReaderPid)
+				throw Error("the foreign reader must let the lock go")
+			}
 		} catch as Err {
 			if !IsObject(Primary)
 				Primary := Err
@@ -194,6 +221,7 @@ _CALC_Run(Held) {
 
 Test("ClipboardAll lock: ordinary setter preserves both native formats (clipboardall-external-lock)", _CALC_Run.Bind(false))
 Test("ClipboardAll lock: same-HWND external open excludes another process through the real setter (clipboardall-external-lock)", _CALC_Run.Bind(true))
+Test("ClipboardAll lock: the after probe waits out a foreign clipboard reader (clipboardall-external-lock)", _CALC_Run.Bind(true, true))
 
 #Include test_plain_paste_snapshot_owner.ahk
 
