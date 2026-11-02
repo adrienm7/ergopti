@@ -55,6 +55,10 @@ M.OLLAMA_PORT_MAX = 65535
 --- macOS/Windows. Pinned equal by the single-source gate.
 M.DEFAULT_TEMPERATURE = 0.1
 
+--- Temperature of the AI menu's « Test a prediction », never a setting. Mirrors
+--- defaults.json (llm_test_prediction_temperature). Pinned equal by the gate.
+M.TEST_PREDICTION_TEMPERATURE = 1.0
+
 --- Default keep-alive window kept warm on the Ollama server. Mirrors the
 --- canonical defaults.json (llm_ollama_keep_alive). Pinned equal by the gate.
 M.DEFAULT_KEEP_ALIVE = "30m"

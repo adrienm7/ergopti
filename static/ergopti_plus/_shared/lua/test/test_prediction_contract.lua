@@ -12,13 +12,15 @@ return function(helpers)
 	local TestPrediction = require("llm.test_prediction")
 
 	local function fixture()
-		local fx = { shown = {}, sent = {}, logged = {}, refusal = nil, live = true }
+		local fx = { shown = {}, sent = {}, logged = {}, refusal = nil, live = true, clock = 1000 }
 		fx.owner = TestPrediction.new({
 			text = function(key)
 				return ({
 					["llm.test_prediction.sample"] = "SAMPLE",
 					["llm.test_prediction.running"] = "RUNNING",
-					["llm.test_prediction.result"] = "RESULT {1}",
+					["llm.test_prediction.result"] = "RESULT {1} ({2})",
+					["llm.test_prediction.duration_ms"] = "{1} ms",
+					["llm.test_prediction.duration_s"] = "{1}.{2} s",
 					["llm.test_prediction.failed"] = "FAILED {1}",
 				})[key] or key
 			end,
@@ -28,6 +30,7 @@ return function(helpers)
 				if fx.raises then error(fx.raises, 0) end
 				fx.sent[#fx.sent + 1] = { sample = sample, on_text = on_text, on_fail = on_fail, current = current }
 			end,
+			now_ms = function() return fx.clock end,
 			show = function(text) fx.shown[#fx.shown + 1] = text end,
 			info = function(fmt, ...) fx.logged[#fx.logged + 1] = string.format(fmt, ...) end,
 			warn = function(fmt, ...) fx.logged[#fx.logged + 1] = string.format(fmt, ...) end,
@@ -50,8 +53,9 @@ return function(helpers)
 		helpers.assert_eq(fx.owner.run(), true)
 		helpers.assert_eq(fx.last(), "RUNNING", "at once visible")
 		helpers.assert_eq(fx.sent[1].sample, "SAMPLE", "on the sample, never on what was typed")
+		fx.clock = fx.clock + 42
 		fx.sent[1].on_text("  mardi\n")
-		helpers.assert_eq(fx.last(), "RESULT mardi")
+		helpers.assert_eq(fx.last(), "RESULT mardi (42 ms)", "with the time the backend took")
 		for _, line in ipairs(fx.logged) do
 			helpers.assert_eq(line:find("mardi", 1, true), nil, "the answer is not logged")
 		end
@@ -61,7 +65,24 @@ return function(helpers)
 		local fx = fixture()
 		fx.owner.run()
 		fx.sent[1].on_text(string.rep("é", TestPrediction.EXCERPT_CHARS + 5))
-		helpers.assert_eq(fx.last(), "RESULT " .. string.rep("é", TestPrediction.EXCERPT_CHARS) .. "…")
+		helpers.assert_eq(fx.last(), "RESULT " .. string.rep("é", TestPrediction.EXCERPT_CHARS) .. "… (0 ms)")
+	end)
+
+	helpers.it("the duration reads milliseconds under a second, then tenths of a second", function()
+		local text = function(key)
+			return ({ ["llm.test_prediction.duration_ms"] = "{1} ms", ["llm.test_prediction.duration_s"] = "{1},{2} s" })[key]
+		end
+		for _, case in ipairs({ { 0, "0 ms" }, { 999, "999 ms" }, { 999.6, "1,0 s" }, { 1000, "1,0 s" }, { 1949, "1,9 s" },
+			{ 1950, "2,0 s" }, { 12340, "12,3 s" } }) do
+			helpers.assert_eq(TestPrediction.duration(case[1], text), case[2])
+		end
+	end)
+
+	helpers.it("an answer holding a placeholder stays as it is", function()
+		local fx = fixture()
+		fx.owner.run()
+		fx.sent[1].on_text("{2} {1}")
+		helpers.assert_eq(fx.last(), "RESULT {2} {1} (0 ms)")
 	end)
 
 	helpers.it("a failure says why, a blank answer is one", function()

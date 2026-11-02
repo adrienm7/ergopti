@@ -57,6 +57,11 @@ const bridgeChecks = [
 	['OLLAMA_STOCK_PORT', DEFAULTS.llm_ollama_port, 'defaults.json llm_ollama_port'],
 	['DEFAULT_TEMPERATURE', DEFAULTS.llm_temperature, 'defaults.json llm_temperature'],
 	[
+		'TEST_PREDICTION_TEMPERATURE',
+		DEFAULTS.llm_test_prediction_temperature,
+		'defaults.json llm_test_prediction_temperature'
+	],
+	[
 		'DEFAULT_KEEP_ALIVE',
 		`"${DEFAULTS.llm_ollama_keep_alive}"`,
 		'defaults.json llm_ollama_keep_alive'

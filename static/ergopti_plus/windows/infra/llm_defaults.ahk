@@ -209,6 +209,12 @@ LLM_Defaults_Load() {
 			d[key] := _LLMD_GetString(raw, key)
 	}
 
+	; The test prediction's temperature stays a number: it is sent, never displayed.
+	if !_LLMD_HasKey(raw, "llm_test_prediction_temperature")
+		missing.Push("llm_test_prediction_temperature")
+	else
+		d["llm_test_prediction_temperature"] := _LLMD_GetNumber(raw, "llm_test_prediction_temperature")
+
 	; Temperature stored as string to preserve decimal precision in display
 	if !_LLMD_HasKey(raw, "llm_temperature")
 		missing.Push("llm_temperature")
