@@ -257,6 +257,11 @@ helpers.describe("historical rebuild ownership", function()
 			helpers.assert_eq(manager.is_recovering(), true, "a large recovery must yield before init returns")
 			helpers.assert_true(walked < 300, "the first slice must not walk the whole cache")
 			helpers.assert_eq(manager.ingest_once(), false, "ingest waits while the recovery owns the aggregator")
+			value(value(manager.day_rollover, "_require_state"), "_state", {})
+			local rolled_over, reason = manager.day_rollover()
+			helpers.assert_eq(rolled_over, false, "the rollover waits with the ingest, and touches nothing")
+			helpers.assert_eq(reason, manager.ROLLOVER_WAITS_FOR_RECOVERY,
+				"a known wait names itself instead of reporting a stalled drain (rotation-waits-recovery)")
 			local slices = 1
 			while manager.is_recovering() do
 				local handle = table.remove(pending, 1)
