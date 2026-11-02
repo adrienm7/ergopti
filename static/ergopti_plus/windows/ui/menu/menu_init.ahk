@@ -206,8 +206,8 @@ _MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0) {
 
 
 ; ── 🌐 Disposition clavier — built from manifest via MenuRenderer_Build.
-; The two feature blocks are `list` providers: they enumerate ``ahk.layout``
-; entries and return one row per feature, which the renderer materialises.
+; The two feature blocks are `list` providers: each names its layout feature
+; and returns its row, which the renderer materialises.
 ; ``active_layouts`` is macOS-only and skipped by the AHK platform filter.
 _MI_StageLayout() {
 	Receiver := MenuRenderer_GroupReceiver("top_level", "keyboard_layout")
