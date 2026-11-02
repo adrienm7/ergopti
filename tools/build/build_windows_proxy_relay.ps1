@@ -46,9 +46,11 @@ $Sources = @(Join-Path $Module 'go.mod') + @(foreach ($Directory in @('proxyrela
 		Where-Object { $_.Name -cnotlike '*_test.go' } | ForEach-Object { $_.FullName }
 })
 $Identity = $Pin + "`n"
-foreach ($Source in @($Sources | Sort-Object { [IO.Path]::GetFullPath($_).Replace('\', '/') } -Culture ([Globalization.CultureInfo]::InvariantCulture))) {
-	$Relative = [IO.Path]::GetFullPath($Source).Substring([IO.Path]::GetFullPath($Module).Length + 1).Replace('\', '/')
-	$Identity += $Relative + "`n" + (Get-RelaySha256 $Source) + "`n"
+# Ordinal order on the relative path, as test-windows-proxy-relay-bundle.cjs recomputes it.
+$Relatives = [string[]]@($Sources | ForEach-Object { [IO.Path]::GetFullPath($_).Substring([IO.Path]::GetFullPath($Module).Length + 1).Replace('\', '/') })
+[Array]::Sort($Relatives, [StringComparer]::Ordinal)
+foreach ($Relative in $Relatives) {
+	$Identity += $Relative + "`n" + (Get-RelaySha256 (Join-Path $Module $Relative)) + "`n"
 }
 $Digest = [Security.Cryptography.SHA256]::Create()
 try {
