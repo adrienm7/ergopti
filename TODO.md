@@ -283,6 +283,8 @@ between workers) green alone. All live checks pass, typed by the harness.
   to write the `runtime.*` pin; WP8 native and WP9 real-Mac acceptance; then the
   `RUNTIME_DEFAULT` flip and the shared-mode deletion. Done on 1 November: the per-OS feature requirements table
   (`docs/design/feature-requirements.md`) and the driver-only VirtualHIDDevice update offer (3ebab93a17).
+- **When the owned Karabiner is the one used:** delete the Configuration rows `menu.global.karabiner_integration` and
+  `menu.global.remove_from_karabiner` (`macos/ui/menu/remap_switch.lua`), which act on the installed Karabiner.
 - **Owned runtimes.** The rows in state "to do" of `_shared/data/owned_runtimes.json` are all item 31 (shared
   Karabiner app, owned runtime, VirtualHIDDevice). The Swift-owned managed daemon under the proxy relay needs a short
   design note first (who launches the relay, how its refusal receipt reaches the Swift owner; Swift and Go). Done on 1
