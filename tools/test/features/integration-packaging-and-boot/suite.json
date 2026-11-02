@@ -35,6 +35,14 @@
 			"repro": "node tools/test/test-ahk-full-startup-smoke.cjs"
 		},
 		{
+			"id": "js-0506",
+			"ordinal": 564,
+			"name": "startup smoke owns no session input and ends on any error",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-smoke-input-quarantine.cjs"],
+			"repro": "node tools/test/test-ahk-smoke-input-quarantine.cjs"
+		},
+		{
 			"id": "js-0177",
 			"ordinal": 189,
 			"name": "macOS bundle payload ships every path the runtime reads and no excluded group",

@@ -72,6 +72,7 @@
 		"test:ahk-full-startup-smoke": "node ./tools/test/test-ahk-full-startup-smoke.cjs",
 		"test:ahk-tray-rows-read-as-text": "node ./tools/test/test-ahk-tray-rows-read-as-text.cjs",
 		"test:ahk-startup-smoke-readiness": "node ./tools/test/test-ahk-startup-smoke-readiness.cjs",
+		"test:ahk-smoke-input-quarantine": "node ./tools/test/test-ahk-smoke-input-quarantine.cjs",
 		"test:hardening-b-no-user-data-under-driver-dir": "node ./tools/test/test-hardening-b-no-user-data-under-driver-dir.cjs",
 		"test:hardening-c-ahk-scan-code-precedence": "node ./tools/test/test-hardening-c-ahk-scan-code-precedence.cjs",
 		"test:hardening-d-native-timeout-contract": "node ./tools/test/test-hardening-d-native-timeout-contract.cjs",
