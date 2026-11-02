@@ -1267,6 +1267,8 @@ LoggerInfo("ErgoptiPlus", "Shutdown handler registered before configured menu pu
 if _DriverStartupSmokeDir == ""
 	WebView_BeginBrowserWarmup()
 global _DriverInputInitPending := true
+; True until the ready line: the boot's full save is requested earlier, written after.
+global _DriverBootTailPending := true
 global _DriverMenuReady := false
 ; Commands clicked while the previous instance's reload was pending are replayed
 ; first, once input is ready (infra/menu_reload_replay.ahk).
@@ -1525,6 +1527,7 @@ try {
 } catch as _DevSourceErr
 	LoggerError("ErgoptiPlus", "Developer source mode refused: {1}.", _DevSourceErr.Message)
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
+_DriverBootTailPending := false
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
 _BootTotalMs := BootProfile_CompletedBootMs(BootProfile_TotalBootMs())
