@@ -165,6 +165,28 @@ helpers.describe("model browser inventory document", function()
 			ollama_ok = false
 			helpers.assert_eq(backends().ollama.install,
 				{ state = "unsupported", reason_key = "model_browser.reason_install_ai_on" })
+			-- model-selector-install-refusal: a click the AI enable refuses says so
+			-- on the page, the next click forgets it, a stale click repaints.
+			phase = "idle"
+			bridge.bind({
+				dialogs = {}, delete_model = function() return true end, on_changed = function() end,
+				ollama_state = function() return false, "model_browser.reason_ollama_missing" end,
+				ollama_install_phase = function() return phase end,
+				install_ollama = function(_, on_changed) installs[#installs + 1] = on_changed; return #installs > 2 end,
+			})
+			local painted = #f.effects
+			f.send({ action = "group_action", backend = "ollama", id = "install" })
+			helpers.assert_eq(#installs, 2, "the click reached the handler")
+			helpers.assert_eq(#f.effects, painted + 1, "the refusal reaches the page")
+			helpers.assert_eq(backends().ollama.install,
+				{ state = "available", failed_key = "model_browser.install_not_started" })
+			f.send({ action = "group_action", backend = "ollama", id = "install" })
+			helpers.assert_eq(backends().ollama.install, { state = "available" }, "an accepted click forgets it")
+			phase = "running"
+			painted = #f.effects
+			f.send({ action = "group_action", backend = "ollama", id = "install" })
+			helpers.assert_eq(#installs, 3, "a stale click starts nothing")
+			helpers.assert_eq(#f.effects, painted + 1, "and the page learns where the install stands")
 			bridge._reset()
 		end)
 		package.loaded["ui.menu.llm_backend_rows"] = saved_rows
