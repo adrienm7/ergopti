@@ -332,3 +332,11 @@ _TDL_FiredHotstringLeavesNoText() {
 	}
 }
 Test("privacy: a fired hotstring and the diagnostic lines leave no typed text in the log", _TDL_FiredHotstringLeavesNoText)
+
+_DiagLog_CompletedBootStaysFrozen() {
+	Frozen := BootProfile_CompletedBootMs(812)
+	Sleep(20)
+	AssertEqual(812, Frozen)
+	AssertEqual(812, BootProfile_CompletedBootMs(), "the boot total must not grow with the process")
+}
+Test("boot profile: the completed boot total stays frozen for later checks", _DiagLog_CompletedBootStaysFrozen)
