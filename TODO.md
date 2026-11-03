@@ -51,6 +51,14 @@ the local branches `worktree-agent-*`: land them, then remove the worktrees so o
       but with the AI on the prediction tooltip covers it. Never cover it: start the prediction once the hotstring
       tooltip expires, or show both. New option, all drivers: "AI prediction while a hotstring tooltip shows" = after
       the delay anyway (both shown, side by side) / wait until the hotstring tooltip expires (default to decide).
+      Found on Windows (lot CI, not implemented): the keystroke path already skips arming while `TooltipIsVisible()`
+      and `LLM_Bridge_ScheduleAfterHotstring` re-arms after the tooltip (when `llm.trigger.after_hotstring`), but
+      only live mode re-checks the hotstring tooltip when the debounce fires and when the answer renders
+      (`prediction_exec.ahk`, `_LLM_Engine_HotstringTooltipShown` in `LLM_Engine_FirePrediction`, the loading
+      spinner and the final render): an ordinary request armed before the tooltip appeared, or answering while it
+      shows, covers it, since both share one surface (`_TooltipPresentStack`). Wait = apply those three gates to
+      every request; both = present the hotstring rows and the prediction in that one stack. macOS
+      (`llm_bridge.update_preview`, `HOTSTRING_CHAIN_OFFSET_SEC`) and Linux still to read.
 - [ ] **Model selection page.** Install Ollama and Install MLX buttons act or say why, disabled when installed; a whole
       section header opens its list; header on two lines (install, port, status; then add a model by hand); Ollama and MLX
       models grouped in collapsible sections per provider, alphabetical; search crosses sections; gate for page actions
