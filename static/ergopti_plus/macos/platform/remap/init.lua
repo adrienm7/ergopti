@@ -4237,6 +4237,7 @@ local REGENERATION_REFUSED_BEFORE_DEPLOY = {
 	["pause-intent-pending"] = true,
 	["token-unavailable"] = true,
 	["layout-refresh-exhausted"] = true,
+	["owned-runtime-not-admitted"] = true,
 }
 
 --- Completes the original bulk caller exactly once.
@@ -4736,6 +4737,18 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 			transaction,
 			"persisted-integration-off",
 			"when Ergopti uses Karabiner again"
+		)
+		return true
+	end
+	-- Ergopti's own runtime not admitted yet (not installed, a user Karabiner
+	-- running, no network...): the regeneration would be refused before any
+	-- deploy, and Restore recommended reverted its saved edit behind a blocking
+	-- dialog. The admission's own regeneration builds from what is saved here.
+	if M._owned.selected() and not (M._owned.owner and M._owned.owner.admitted()) then
+		settle_bulk_settings_saved_for_later(
+			transaction,
+			"persisted-owned-runtime-not-admitted",
+			"when Ergopti's own Karabiner runtime is admitted"
 		)
 		return true
 	end
