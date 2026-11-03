@@ -98,9 +98,21 @@ LOOKUP_STAGE_IDENTITIES = [
     "TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_proxy_routes",
     "TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_wpad_discovery",
 ]
+# Literal identities of the Range alignment that keeps a pull's parts at their
+# offset behind a relay ignoring Range; a field build on 2026-11-03 refused its
+# own passing run because they were missing here.
+RANGE_ALIGNMENT_IDENTITIES = [
+    "TestAlignRangeSkipsAFullResponseToThePartOffset",
+    "TestAlignRangeKeepsTheBodyOfTheAskedRange",
+    "TestAlignRangeRefusesWhatWouldCorruptTheFile",
+]
 ADDED_IDENTITIES = (
-    ADDRESS_POLICY_IDENTITIES + SERVE_ENVIRONMENT_IDENTITIES + LOOKUP_STAGE_IDENTITIES
+    ADDRESS_POLICY_IDENTITIES
+    + SERVE_ENVIRONMENT_IDENTITIES
+    + LOOKUP_STAGE_IDENTITIES
+    + RANGE_ALIGNMENT_IDENTITIES
 )
+TOP_LEVEL_TEST = re.compile(r"^func (Test\w+)\(t \*testing\.T\)", re.MULTILINE)
 FROZEN = ROOT / "tools/test/fixtures/managed-ollama-go/linux-44.jsonl"
 PACKAGE = "ergopti/nativehttp"
 
@@ -164,7 +176,7 @@ class NativeGoEvidenceTests(unittest.TestCase):
             self.fail("The frozen original failure-stage subtests must be explicitly enrolled")
         self.assertEqual(POLICY["required_passes"], subjects)
         self.assertEqual(
-            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (88, 47, 41)
+            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (91, 50, 41)
         )
         self.assertEqual((fact["failed"], fact["skipped"], fact["package_completed"]), (0, 0, True))
         for name in added + ADDED_IDENTITIES:
@@ -195,6 +207,19 @@ class NativeGoEvidenceTests(unittest.TestCase):
                             changed.append(event)
                     with self.assertRaises(ValueError):
                         self.receive(changed, required=POLICY["required_passes"])
+
+    def testEveryCopiedTopLevelGoTestIsEnrolled(self):
+        # The producer copies each fingerprinted bridge file into the package it
+        # tests and refuses any run event outside required_passes, so a test
+        # function added without enrolment fails the build after its tests pass.
+        declared = []
+        for relative in CONTRACT["source_fingerprint_paths"]:
+            if relative.endswith("_test.go"):
+                source = (ROOT / relative).read_text(encoding="utf-8")
+                declared.extend(name for name in TOP_LEVEL_TEST.findall(source))
+        self.assertIn("TestAlignRangeKeepsTheBodyOfTheAskedRange", declared)
+        top_level = [name for name in POLICY["required_passes"] if "/" not in name]
+        self.assertEqual(sorted(declared), sorted(top_level))
 
     def testFrozenLinux44CannotQualifySixAddedListenerEventIdentities(self):
         required = [
