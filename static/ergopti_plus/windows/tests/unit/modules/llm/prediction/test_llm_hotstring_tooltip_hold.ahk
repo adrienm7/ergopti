@@ -150,17 +150,18 @@ Test("LLM hotstring tooltip: a prompt asked for by name is not held (llm-hotstri
 ; Waiting keeps the chain after the preview; showing both drops it, since the
 ; prediction already runs beside the preview.
 _LHTH_ChainFollowsTheChoice() {
-	for Choice, Expected in Map("wait", true, "both", false) {
-		_LHTH_Run("Je vous envoit", Choice, _Body)
-	}
-	_Body(Calls, Lines) {
-		global _LLM_Engine
-		_LLM_Engine["after_hotstring"] := true
-		Chain := _LLV_CaptureRealTimer(
-			() => LLM_Bridge_ScheduleAfterHotstring([{ Text: "x", DurationSec: 0.2 }]))
-		AssertEqual(Expected, Chain.Active ? true : false,
-			"the chain after the preview follows llm.trigger.while_hotstring_tooltip (" . Choice . ")")
-	}
+	for Choice, Expected in Map("wait", true, "both", false)
+		_LHTH_Run("Je vous envoit", Choice, _LHTH_AssertChain.Bind(Choice, Expected))
+}
+
+; One run of the scenario above, for one choice and the chain it expects.
+_LHTH_AssertChain(Choice, Expected, Calls, Lines) {
+	global _LLM_Engine
+	_LLM_Engine["after_hotstring"] := true
+	Chain := _LLV_CaptureRealTimer(
+		() => LLM_Bridge_ScheduleAfterHotstring([{ Text: "x", DurationSec: 0.2 }]))
+	AssertEqual(Expected, Chain.Active ? true : false,
+		"the chain after the preview follows llm.trigger.while_hotstring_tooltip (" . Choice . ")")
 }
 Test("LLM hotstring tooltip: the chain after the preview follows the choice (llm-hotstring-tooltip-both)",
 	_LHTH_ChainFollowsTheChoice)
