@@ -136,7 +136,7 @@ helpers.describe("the macOS Tap-Holds submenu lists its keys by hand", function(
 		local rows = render()
 		local keyed = 0
 		for _, row in ipairs(rows) do
-			if type(row.title) == "string" and row.title:match("^tap_hold%.group%.") then
+			if type(row.title) == "string" and row.title:match("^key_name%.") then
 				keyed = keyed + 1
 			end
 		end
@@ -455,7 +455,7 @@ helpers.describe("the macOS key slots open the shared action picker", function()
 			end
 			local keys = 0
 			for _, row in ipairs(built) do
-				if type(row.title) == "string" and row.title:match("^tap_hold%.group%.") then
+				if type(row.title) == "string" and row.title:match("^key_name%.") then
 					keys = keys + 1
 					walk(row.menu)
 				end
