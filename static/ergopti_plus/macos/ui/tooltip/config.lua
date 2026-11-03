@@ -333,13 +333,13 @@ local function load_from_shared()
 		-- the glyphs of the shared key name table.
 		shortcut_spec        = LlmLine.shortcut_spec(require_key("llm_ui", "shortcut_modifier_order"),
 			require_key("llm_ui", "shortcut_joiner_hs"), KeyNames.macos_symbol),
-		hint_accept_single   = require_key("llm_ui", "hint_accept_single"),
-		hint_nav_left        = require_key("llm_ui", "hint_nav_left"),
-		hint_nav_right       = require_key("llm_ui", "hint_nav_right"),
-		hint_accept_center   = require_key("llm_ui", "hint_accept_center"),
+		-- The footer's keys, as key name ids; its words are locale text
+		-- (tooltip_llm.lua footer_hints).
+		hint_accept_key      = require_key("llm_ui", "hint_accept_key"),
+		hint_nav_left_keys   = require_key("llm_ui", "hint_nav_left_keys"),
+		hint_nav_right_keys  = require_key("llm_ui", "hint_nav_right_keys"),
 		hint_arrow_left      = require_key("llm_ui", "hint_arrow_left"),
 		hint_arrow_right     = require_key("llm_ui", "hint_arrow_right"),
-		hint_or              = require_key("llm_ui", "hint_or"),
 		hint_arrow_sep_left  = require_key("llm_ui", "hint_arrow_sep_left"),
 		hint_arrow_sep_right = require_key("llm_ui", "hint_arrow_sep_right"),
 	}

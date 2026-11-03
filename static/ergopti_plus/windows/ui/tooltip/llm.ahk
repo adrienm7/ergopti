@@ -1309,31 +1309,45 @@ _LLM_FormatInfoLine(modelInfo, ttftMs := "", ttltMs := "", forSizing := false) {
 ; menu_llm/tab_accept.ahk consume, the left and right Shift+Tab, then the
 ; arrows with the configured modifiers, bare by default, as the macOS footer
 ; (tooltip_llm.lua) shows them. The bare arrows were left out, so the footer
-; hid the default chord (llm-nav-left-right-windows).
+; hid the default chord (llm-nav-left-right-windows). The words are locale
+; text and each key is named from the key name table (« Maj gauche + Tab ou
+; ↑/← »): the footer read French in every locale until 2026-11-03. Port of
+; macos/ui/tooltip/tooltip_llm.lua footer_hints.
 ; @param {Integer} slotCount - The number of predictions shown.
 ; @param {String} navMods - The configured nav_modifiers; "none" hides the arrows.
 ; @returns {String}
 _LLM_BuildNavHint(slotCount, navMods := "") {
-	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_SINGLE, UI_LLM_HINT_NAV_LEFT
-	global UI_LLM_HINT_NAV_RIGHT, UI_LLM_HINT_ACCEPT_CENTER, UI_LLM_HINT_ARROW_LEFT
-	global UI_LLM_HINT_ARROW_RIGHT, UI_LLM_HINT_OR, UI_LLM_HINT_ARROW_SEP_LEFT
+	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_KEY, UI_LLM_HINT_NAV_LEFT_KEYS
+	global UI_LLM_HINT_NAV_RIGHT_KEYS, UI_LLM_HINT_ARROW_LEFT
+	global UI_LLM_HINT_ARROW_RIGHT, UI_LLM_HINT_ARROW_SEP_LEFT
 	global UI_LLM_HINT_ARROW_SEP_RIGHT
 	spaceDiv := UI_LLM_FOOTER_SPACE_DIV
-	acceptSingle := UI_LLM_HINT_ACCEPT_SINGLE
+	acceptKey := KeyNameComboLabel(UI_LLM_HINT_ACCEPT_KEY)
 	if (slotCount <= 1)
-		return acceptSingle
-	hintLeft := UI_LLM_HINT_NAV_LEFT
-	hintRight := UI_LLM_HINT_NAV_RIGHT
+		return KeyNameFill("llm.tooltip.hint_accept_single", acceptKey)
+	hintLeft := KeyNameComboLabel(UI_LLM_HINT_NAV_LEFT_KEYS)
+	hintRight := KeyNameComboLabel(UI_LLM_HINT_NAV_RIGHT_KEYS)
 	if (navMods != "none") {
 		navStr := _LLM_FormatValModifiers(navMods)
 		chord := navStr == "" ? "" : navStr . " + "
-		hintLeft .= UI_LLM_HINT_OR . chord . UI_LLM_HINT_ARROW_LEFT
-		hintRight .= UI_LLM_HINT_OR . chord . UI_LLM_HINT_ARROW_RIGHT
+		hintLeft := _LLM_HintEither(hintLeft, chord . UI_LLM_HINT_ARROW_LEFT)
+		hintRight := _LLM_HintEither(hintRight, chord . UI_LLM_HINT_ARROW_RIGHT)
 	}
 	sepL := UI_LLM_HINT_ARROW_SEP_LEFT
 	sepR := UI_LLM_HINT_ARROW_SEP_RIGHT
-	acceptCenter := UI_LLM_HINT_ACCEPT_CENTER
+	acceptCenter := KeyNameFill("llm.tooltip.hint_accept_center", acceptKey)
 	return hintLeft . spaceDiv . sepL . spaceDiv . acceptCenter . spaceDiv . sepR . spaceDiv . hintRight
+}
+
+; Two chords of one footer step, joined by the locale's « or ».
+; @param {String} First - The Shift+Tab chord.
+; @param {String} Second - The arrows, with their modifiers.
+; @returns {String}
+_LLM_HintEither(First, Second) {
+	Template := t("llm.tooltip.hint_or")
+	if (Template == "llm.tooltip.hint_or")
+		return Template
+	return StrReplace(StrReplace(Template, "{1}", First), "{2}", Second)
 }
 
 ; The footer strings, shared by the sizing and the drawing pass. InfoSizing is
