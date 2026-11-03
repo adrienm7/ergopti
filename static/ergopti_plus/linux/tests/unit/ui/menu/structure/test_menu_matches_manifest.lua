@@ -369,6 +369,7 @@ local function full_context()
 			DEFAULT_GESTURES = require("modules.gestures.manager").DEFAULT_GESTURES,
 			is_reading     = function() return false end,
 			get_action_label = require("modules.gestures.manager").get_action_label,
+			slot_label     = require("modules.gestures.manager").slot_label,
 			is_enabled     = function() return true end,
 			toggle         = noop,
 			get_action     = function() return nil end,

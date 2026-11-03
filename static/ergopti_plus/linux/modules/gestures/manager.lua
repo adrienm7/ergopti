@@ -856,6 +856,16 @@ local function _execute_action(action_name, go_next, binding)
 	Logger.warn(LOG, "Unknown action: %s", action_name)
 end
 
+--- The name of one gesture slot in the user's language, the same
+--- gesture.slots.* text the Windows and macOS menus show. The menu rows used
+--- to read a French sentence built there (« Balayage 3 doigts vers haut ») in
+--- every locale.
+--- @param slot string A slot of the shared gesture catalogue.
+--- @return string
+function M.slot_label(slot)
+	return i18n.get("gesture.slots." .. tostring(slot))
+end
+
 --- Returns a human-readable label for an action.
 --- @param action_name string
 --- @return string
