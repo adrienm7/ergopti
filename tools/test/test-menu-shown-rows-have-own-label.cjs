@@ -379,6 +379,63 @@ for (const [text, refused] of [
 if (keyTexts < MIN_MENU_ROWS * LOCALE_COUNT)
 	errors.push(`only ${keyTexts} row texts judged for raw keys: the scan reads almost nothing`);
 
+// ==================================================
+// ==================================================
+// ======= 5/ Modifier templates name no key ========
+// ==================================================
+// ==================================================
+
+// Lot CH: the shortcut group headings and Add rows spelled their modifiers in
+// each locale's text (French « Raccourcis ^⇧ Ctrl+Shift », macOS « ⎇ Alt »
+// for Option). Each is now a template whose {1} the drivers fill from the key
+// name table, so no locale may write a modifier, its glyph or a stand-in of
+// its own into one: a spelled key would never follow the table again.
+const MODIFIER_TEMPLATES = [];
+for (const family of ['alt', 'ctrl', 'ctrl_shift', 'cmd', 'cmd_shift', 'win', 'super'])
+	for (const part of ['group', 'add']) MODIFIER_TEMPLATES.push(`menu.shortcuts.${family}_${part}`);
+const MODIFIER_IDS = ['shift', 'ctrl', 'alt', 'option', 'cmd', 'win', 'super', 'fn', 'alt_gr'];
+const MODIFIER_GLYPHS = ['⌃', '⌥', '⇧', '⌘', '⊞', '❖', '⎇', '^'];
+const englishNames = MODIFIER_IDS.map((id) => catalogues.get('en')[`key_name.${id}`]);
+let templatesJudged = 0;
+for (const [code, catalogue] of catalogues) {
+	const names = new Set([
+		...englishNames,
+		...MODIFIER_IDS.map((id) => catalogue[`key_name.${id}`]),
+		'Shift',
+		'Command'
+	]);
+	for (const key of MODIFIER_TEMPLATES) {
+		const text = catalogue[key];
+		if (typeof text !== 'string') {
+			errors.push(`${code}: ${key} is missing`);
+			continue;
+		}
+		templatesJudged += 1;
+		if (text.split('{1}').length !== 2)
+			errors.push(`${code}: ${key} must hold exactly one {1}, the group's modifiers`);
+		const spelled = text.split(/[^\p{L}\p{N}_]+/u).find((word) => names.has(word));
+		if (spelled)
+			errors.push(`${code}: ${key} spells the modifier "${spelled}" instead of filling {1}`);
+		const glyph = MODIFIER_GLYPHS.find((mark) => text.includes(mark));
+		if (glyph) errors.push(`${code}: ${key} draws the glyph "${glyph}" instead of filling {1}`);
+	}
+}
+if (templatesJudged !== MODIFIER_TEMPLATES.length * LOCALE_COUNT)
+	errors.push(`only ${templatesJudged} modifier templates judged in ${catalogues.size} catalogues`);
+// The judge refuses the old French heading and passes its template.
+for (const [text, refused] of [
+	['Raccourcis ^⇧ Ctrl+Shift', true],
+	['Raccourcis {1}', false]
+]) {
+	const names = new Set(englishNames);
+	const defect =
+		text.split('{1}').length !== 2 ||
+		text.split(/[^\p{L}\p{N}_]+/u).some((word) => names.has(word)) ||
+		MODIFIER_GLYPHS.some((mark) => text.includes(mark));
+	if (defect !== refused)
+		errors.push(`the modifier template judge ${refused ? 'passes' : 'refuses'} "${text}"`);
+}
+
 if (errors.length > 0) {
 	console.error(`\x1b[31m[ERROR] ${errors.length} menu label defect(s):\x1b[0m`);
 	for (const error of [...new Set(errors)]) console.error(`  ${error}`);
