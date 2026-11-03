@@ -792,12 +792,39 @@ end
 --- synchronous diagnostics at 90 to 150 ms against its 5 ms budget
 --- (field report 2026-10-31); as steps, the probe runs them in slices that
 --- each fit that budget, between run-loop turns.
+--- The versions, the keyboard state and the USB devices come first: 5.9, 5.2
+--- and 7.2 ms of the 21.5 ms phase A still took (field report 2026-11-03).
+--- @param snapshot table|nil The phase A snapshot: whether details are
+---   included, and the peripherals the bluetooth probe may already have added.
 --- @return table steps Functions run in order, each a bounded main-thread read.
---- @return table sections { network = { wifi_signal }, developer = { modules_ok, modules_failed } }
-function M.local_state_steps()
+--- @return table sections { versions, input, peripherals = { items },
+---   network = { wifi_signal }, developer = { modules_ok, modules_failed } }
+function M.local_state_steps(snapshot)
+	local detailed = type(snapshot) == "table" and snapshot.detailed == true
 	local ok_list, failed = {}, {}
-	local sections = { network = {}, developer = { modules_ok = ok_list, modules_failed = failed } }
+	local sections = {
+		versions    = {},
+		input       = {},
+		peripherals = {},
+		network     = {},
+		developer   = { modules_ok = ok_list, modules_failed = failed },
+	}
+	local function fill(target, values)
+		for key, value in pairs(values) do target[key] = value end
+	end
 	local steps = {
+		function() fill(sections.versions, H.collect_versions()) end,
+		function() fill(sections.input, H.collect_input()) end,
+		function()
+			local items = H.collect_peripherals(detailed).items
+			-- The bluetooth probe may have answered first; its devices stay listed
+			local current = type(snapshot) == "table" and type(snapshot.sections) == "table"
+				and snapshot.sections.peripherals and snapshot.sections.peripherals.items or {}
+			for _, item in ipairs(current) do
+				if item.bus == "bluetooth" then items[#items + 1] = item end
+			end
+			sections.peripherals.items = items
+		end,
 		function() sections.network.wifi_signal = H.collect_network().wifi_signal end,
 	}
 	for _, spec in ipairs(ADAPTER_SPECS) do
@@ -812,7 +839,7 @@ end
 --- @param snapshot table The phase A snapshot, completed in place.
 local function complete_local_state(snapshot)
 	local started = hs.timer.absoluteTime()
-	local steps, sections = M.local_state_steps()
+	local steps, sections = M.local_state_steps(snapshot)
 	local failures = {}
 	for index, step in ipairs(steps) do
 		local ok, err = pcall(step)
@@ -910,10 +937,12 @@ function M.run(opts)
 
 	local sections = {
 		paths       = section("paths", function() return H.collect_paths(schema.report.subdir) end),
-		versions    = section("versions", H.collect_versions),
+		-- The versions, the keyboard state and the USB devices are the
+		-- local_state probe's: together they held phase A 18 of its 21.5 ms
+		versions    = {},
 		hardware    = section("hardware", H.collect_hardware),
 		system      = section("system", function() return H.collect_system(detailed, os.time() - _load_time) end),
-		input       = section("input", H.collect_input),
+		input       = {},
 		features    = section("features", function() return H.collect_features(_menu_state) end),
 		-- Filled by the configuration probe: reading and decoding the files is far
 		-- over the phase A budget
@@ -924,7 +953,7 @@ function M.run(opts)
 		-- Filled by the local_state probe with the developer section's module check
 		network     = {},
 		permissions = section("permissions", function() return H.collect_permissions(permission_ids) end),
-		peripherals = section("peripherals", function() return H.collect_peripherals(detailed) end),
+		peripherals = { items = {} },
 		issues      = section("issues", collect_issues),
 		developer   = section("developer", collect_developer),
 	}
