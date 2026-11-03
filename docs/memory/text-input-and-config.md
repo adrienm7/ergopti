@@ -377,7 +377,8 @@ is an engine fallback outside the registry: never fold it into their preview.
 ### project-the-windows-time-gate-times-every-observed-key
 
 Every Windows hotstring loaded from TOML is time-gated: `LoadHotstringsSection`
-applies `HotstringsResolve().Delay`, which falls back to the shared 0.75 s.
+applies `HotstringsResolve().Delay`, which falls back to the shared 0.75 s
+when the section declares no delay.
 `_HSE_PrepareDispatchDecision` fails closed when `LastSentCharacterKeyTime`
 has no entry for the trigger's previous key, for the preview oracle and for
 dispatch alike. Only the layout emulation stamped that map, so with the
@@ -595,7 +596,9 @@ Linux, on each refused save on Windows).
 ### project-hotstring-delays-are-offsets-of-the-base
 
 `hotstrings.expansion_delay` (config.toml, default 0.75 s declared once) is the
-base every hotstring waits. The override file stores a category or section delay
+base a hotstring waits when its section declares no delay; a built-in section
+waits its manifest `time_activation_seconds` first (rung 3 of
+`delay_resolver.resolve`, see maintainer-decisions.md). The override file stores a category or section delay
 as `delay_offset` (signed seconds added to the base) or `delay_unlimited = true`,
 never as an absolute `delay`: moving the base moves every override with it. The
 UI still reads and writes effective seconds (`delay_resolver.offset_for` and

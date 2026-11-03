@@ -313,8 +313,12 @@ _HotstringsScopeSourceKey(Path) {
 }
 
 
-/** Resolves only source metadata and the base expansion delay, excluding user overrides. */
+/** Resolves the section's declared delay, source metadata and the base, excluding user overrides. */
 _HotstringsScopeInheritedDelay(Category, Section) {
+	; The section's own declaration comes first, as in HotstringsResolve.
+	Declared := HotstringsSectionDeclaredDelay(StrLower(Category), FoldAsciiLower(Section))
+	if Declared != ""
+		return Declared
 	Config := ParseTomlGroupConfig(Category)
 	if Config.Sections.Has(Section) && Config.Sections[Section].Delay != ""
 		return Config.Sections[Section].Delay

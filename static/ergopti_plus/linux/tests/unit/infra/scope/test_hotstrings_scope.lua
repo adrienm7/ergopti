@@ -224,12 +224,15 @@ helpers.describe("hotstrings scope: restore recommended", function()
 			local overrides = Codec.decode(read(c.override_path))
 			helpers.assert_nil(overrides.autocorrection.delay)
 			helpers.assert_nil(overrides.autocorrection.color)
+			-- Each family declares 0.5 s in the manifest and waits it whatever its
+			-- 1.0 s file says, so deletion already inherits the recommendation.
 			for _, family in ipairs(COMMON_FAMILIES) do
-				helpers.assert_eq(overrides.autocorrection[family].delay_offset, -0.25,
-					"deleting would inherit the corpus 1.0 s, so the recommendation is written, as an offset of the 0.75 s base: " .. family)
+				helpers.assert_nil(overrides.autocorrection[family].delay_offset,
+					"the declared delay is the recommendation, so none is written: " .. family)
 				helpers.assert_nil(overrides.autocorrection[family].delay, family)
 			end
-			helpers.assert_eq(overrides.french_autocorrection.accents.delay_offset, -0.25)
+			helpers.assert_nil((overrides.french_autocorrection or {}).accents
+				and overrides.french_autocorrection.accents.delay_offset)
 			helpers.assert_nil((overrides.rolls or {}).hc and overrides.rolls.hc.delay,
 				"an inheritance equal to the recommendation stays sparse")
 			helpers.assert_nil((overrides.rolls or {}).hc and overrides.rolls.hc.priority)
@@ -290,8 +293,8 @@ helpers.describe("hotstrings scope: clear", function()
 			end
 			helpers.assert_eq(overrides.foreign.unknown_field, "kept")
 			for index, family in ipairs(COMMON_FAMILIES) do
-				helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 1.0,
-					"a cleared section resolves to its corpus inheritance: " .. family)
+				helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 0.5,
+					"a cleared section waits its declared delay, not its 1.0 s file: " .. family)
 				local mapping = COMMON_TRIGGERS[index]
 				helpers.assert_eq(fires(c.engine, mapping.trigger, mapping.replacement), false, "nothing fires after clear")
 			end
@@ -426,7 +429,7 @@ helpers.describe("hotstrings scope: refusals", function()
 					helpers.assert_eq(questions, 0, "no scope row asks (restore-recommended-no-confirm)")
 					helpers.assert_eq(c.RepeatKey.is_enabled(), mode == "recommended")
 					for _, family in ipairs(COMMON_FAMILIES) do
-						helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, mode == "clear" and 1.0 or 0.5, family)
+						helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 0.5, family)
 					end
 				end)
 				root.top_level, os.execute = top, execute

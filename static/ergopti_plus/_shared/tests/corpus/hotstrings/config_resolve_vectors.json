@@ -1,7 +1,7 @@
 {
 	"$schema": "https://ergopti.com/schema/corpus/hotstrings_config_resolve.v1.json",
-	"description": "Cross-driver regression corpus for the hotstrings delay/color/show_tooltip/priority resolution cascade (DL-5). Every driver resolves each field independently through the SAME four levels, first non-empty wins: user_section > user_category > toml_section > toml_category > source/shared default. A user delay is an offset of the base expansion delay (hotstrings.expansion_delay); base_delay_vectors.json covers that, and these vectors run at the shared default base. A level object is OMITTED entirely when not set for a vector; a field key inside a present level is OMITTED when that specific field is not set at that level (both mean 'fall through to the next level' for that field).",
-	"version": "1.1.0",
+	"description": "Cross-driver regression corpus for the hotstrings delay/color/show_tooltip/priority resolution cascade (DL-5). Every driver resolves each field independently through the SAME levels, first non-empty wins: user_section > user_category > the delay the section declares (delay only: its manifest default, read from the real generated manifest) > toml_section > toml_category > source/shared default. A user delay is an offset of the base expansion delay (hotstrings.expansion_delay); base_delay_vectors.json covers that, and these vectors run at the shared default base. A level object is OMITTED entirely when not set for a vector; a field key inside a present level is OMITTED when that specific field is not set at that level (both mean 'fall through to the next level' for that field).",
+	"version": "1.2.0",
 	"vectors": [
 		{
 			"id": "toml_category_only",
@@ -124,6 +124,105 @@
 				"show_tooltip": true,
 				"priority": 72,
 				"has_override": true
+			}
+		},
+		{
+			"id": "declared_section_delay_beats_the_category_file",
+			"description": "A built-in section waits the delay its manifest row declares (autocorrection.names: 0.5 s), not its category file, whatever the file says for the category or the section (the maintainer's decision of 3 November 2026).",
+			"category": "autocorrection",
+			"section": "names",
+			"toml_category": { "delay": 1, "color": "#444444", "show_tooltip": true, "priority": 14 },
+			"toml_section": { "delay": 3 },
+			"expected": {
+				"delay": 0.5,
+				"color": "#444444",
+				"show_tooltip": true,
+				"priority": 14,
+				"has_override": false
+			}
+		},
+		{
+			"id": "user_category_beats_the_declared_delay",
+			"description": "The user's category delay still wins over what a section declares.",
+			"category": "autocorrection",
+			"section": "names",
+			"user_category": { "delay": 0.2 },
+			"toml_category": { "delay": 1, "color": "#444444", "show_tooltip": true, "priority": 14 },
+			"expected": {
+				"delay": 0.2,
+				"color": "#444444",
+				"show_tooltip": true,
+				"priority": 14,
+				"has_override": true
+			}
+		},
+		{
+			"id": "magic_key_section_declares_two_seconds",
+			"description": "The file stem magickey matches the manifest spelling magic_key: repeat_corrections waits its declared 2 s, not the file's.",
+			"category": "magickey",
+			"section": "repeat_corrections",
+			"toml_category": { "delay": 1, "color": "#444444", "show_tooltip": true, "priority": 14 },
+			"expected": {
+				"delay": 2,
+				"color": "#444444",
+				"show_tooltip": true,
+				"priority": 14,
+				"has_override": false
+			}
+		},
+		{
+			"id": "undeclared_section_reads_its_file",
+			"description": "A section whose row declares no delay (magic_key.replace) waits its category file.",
+			"category": "magickey",
+			"section": "replace",
+			"toml_category": { "delay": 1, "color": "#444444", "show_tooltip": true, "priority": 14 },
+			"expected": {
+				"delay": 1,
+				"color": "#444444",
+				"show_tooltip": true,
+				"priority": 14,
+				"has_override": false
+			}
+		},
+		{
+			"id": "category_row_declares_no_section_delay",
+			"description": "The category itself declares no section delay: its row reads its file.",
+			"category": "autocorrection",
+			"toml_category": { "delay": 1, "color": "#444444", "show_tooltip": true, "priority": 14 },
+			"expected": {
+				"delay": 1,
+				"color": "#444444",
+				"show_tooltip": true,
+				"priority": 14,
+				"has_override": false
+			}
+		},
+		{
+			"id": "declared_delay_without_a_file_delay",
+			"description": "A declared section of a category whose file sets no delay waits its declared 0.5 s, not the 0.75 s base.",
+			"category": "distancesreduction",
+			"section": "qu",
+			"toml_category": { "color": "#444444", "show_tooltip": true, "priority": 14 },
+			"expected": {
+				"delay": 0.5,
+				"color": "#444444",
+				"show_tooltip": true,
+				"priority": 14,
+				"has_override": false
+			}
+		},
+		{
+			"id": "undeclared_section_without_a_file_delay_waits_the_base",
+			"description": "The 0.75 s base is left to the sections that declare nothing.",
+			"category": "distancesreduction",
+			"section": "comma_j",
+			"toml_category": { "color": "#444444", "show_tooltip": true, "priority": 14 },
+			"expected": {
+				"delay": 0.75,
+				"color": "#444444",
+				"show_tooltip": true,
+				"priority": 14,
+				"has_override": false
 			}
 		}
 	]
