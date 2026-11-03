@@ -375,12 +375,13 @@ end
 --- is off. Needs no lease, token or Karabiner process; personal rules keep their
 --- exact bytes and an unprovable file is left untouched.
 --- @param context string Stable diagnostic label.
+--- @param path string|nil The karabiner.json to clean; this boot's output when nil.
 --- @return boolean removed True when no marked rule remains.
 --- @return string detail `absent`, `unchanged`, `removed`, or the refusal.
 --- @return integer removed_count Number of rules removed.
-local function remove_managed_rules(context)
+local function remove_managed_rules(context, path)
 	local call_ok, removed, detail, removed_count = xpcall(function()
-		return ManagedRuleRemoval.remove_managed_rules(KARABINER_OUT)
+		return ManagedRuleRemoval.remove_managed_rules(path or KARABINER_OUT)
 	end, debug.traceback)
 	if not call_ok then
 		Logger.error(LOG, "%s: managed-rule removal raised: %s.", context, tostring(removed))
@@ -6930,6 +6931,29 @@ function M._owned.bind()
 	return M._owned.activation
 end
 
+--- Removes the rules an earlier shared-mode build merged into the user's own
+--- `~/.config/karabiner/karabiner.json`. An owned boot writes its own file, so
+--- those rules would keep remapping inside the user's Karabiner-Elements, which
+--- the user gets back on a pause or a quit, with a lease nobody renews. Only
+--- rules carrying the exact ErgoptiPlus marker go, by byte-span surgery; personal
+--- rules keep their bytes, and an unprovable file stays untouched and is logged.
+--- @return boolean retired True when no marked rule remains in the shared file.
+function M._owned.retire_shared_rules()
+	local shared = M._owned.shared_config
+	if type(shared) ~= "string" or shared == "" then
+		-- ERGOPTI_KARABINER_OUT redirects this boot: the user's own file is not ours to read.
+		Logger.info(LOG, "Shared karabiner.json left alone: this boot's output path is overridden.")
+		return true
+	end
+	local removed, detail, count = remove_managed_rules("Owned runtime migration", shared)
+	if removed and count > 0 then
+		Logger.info(LOG, "Removed %d rule(s) an earlier build merged into '%s'.", count, shared)
+	elseif removed then
+		Logger.debug(LOG, "No earlier ErgoptiPlus rule in '%s' (%s).", shared, detail)
+	end
+	return removed
+end
+
 --- Applies the activation rule (platform/remap/runtime_activation.lua): while
 --- Ergopti runs and is not paused its own runtime is active and closes the
 --- user's Karabiner; paused, it stops and gives back a Karabiner it closed. Admission
@@ -7023,7 +7047,10 @@ function M.init(file_system)
 	end
 	if runtime == M._owned.paths.RUNTIME_OWNED then
 		Logger.warn(LOG, "Opted in to the owned Karabiner runtime (not shipped; hidden preference).")
+		M._owned.shared_config = nil
 		if not (env_override and env_override ~= "") then
+			-- Still the shared path here: the migration cleans it once this boot is owned.
+			M._owned.shared_config = KARABINER_OUT
 			KARABINER_OUT = file_system.expand_path(M._owned.paths.config_file_for(runtime))
 			Logger.info(LOG, "Owned KE config path resolved: '%s'.", KARABINER_OUT)
 		end
@@ -7314,6 +7341,7 @@ function M.init(file_system)
 		if M._owned.reconcile() ~= true then
 			Logger.error(LOG, "Owned Karabiner runtime could not be bound; remapping stays off.")
 		end
+		M._owned.retire_shared_rules()
 	end
 	if _state.enabled and not M._owned.selected() and not _wizard_ran_this_session then
 		_wizard_ran_this_session = true
