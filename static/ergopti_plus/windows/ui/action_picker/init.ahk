@@ -29,7 +29,8 @@ ShowKeyboardSlotPicker(Prefix) {
 		SlotLabels := []
 		for SlotId in Slots
 				SlotLabels.Push(_FormatSlotLabel(SlotId))
-		W := Gui_Create("", t("dialog.keyboard_shortcut.title_prefix") . Prefix)
+		; The group's modifiers by name, never its slot prefix (`primary_shift_`).
+		W := Gui_Create("", t("dialog.keyboard_shortcut.title_prefix") . _KeyboardSlotFamilyLabel(Prefix) . " + …")
 		W.OnEvent("Close", _ActionPickerNativeClose)
 		W.OnEvent("Escape", _ActionPickerNativeClose)
 		W.SetFont("s10", "Segoe UI")

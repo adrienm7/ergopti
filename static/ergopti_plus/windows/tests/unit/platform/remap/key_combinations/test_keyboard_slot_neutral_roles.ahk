@@ -99,13 +99,26 @@ _KSNR_FamiliesAndKeysMatch() {
 Test("neutral slots: families, menu groups and extra keys follow the role table", _KSNR_FamiliesAndKeysMatch)
 
 _KSNR_LabelsNameTheChord() {
-	AssertEqual("Ctrl + Shift + V", _FormatSlotLabel("primary_shift_v"), "the longest family wins")
-	AssertEqual("Ctrl + B", _FormatSlotLabel("primary_b"))
-	AssertEqual("Win + A", _FormatSlotLabel("meta_a"))
-	AssertEqual("Win + ²", _FormatSlotLabel("meta_sc029"))
-	AssertEqual("Win + '", _FormatSlotLabel("meta_quote"))
-	AssertEqual("Win + Caps Lock", _FormatSlotLabel("meta_capslock"))
-	AssertEqual("Alt + .", _FormatSlotLabel("alt_period"))
+	; The modifiers and named keys are the shared key name table's, in the
+	; user's language (« Ctrl + Maj + V »), never the catalogue's English.
+	Ctrl := t("key_name.ctrl"), Shift := t("key_name.shift"), Win := t("key_name.win")
+	AssertEqual(Ctrl . " + " . Shift . " + V", _FormatSlotLabel("primary_shift_v"), "the longest family wins")
+	AssertEqual(Ctrl . " + B", _FormatSlotLabel("primary_b"))
+	AssertEqual(Win . " + A", _FormatSlotLabel("meta_a"))
+	AssertEqual(Win . " + ²", _FormatSlotLabel("meta_sc029"))
+	AssertEqual(Win . " + '", _FormatSlotLabel("meta_quote"))
+	AssertEqual(Win . " + " . t("key_name.caps_lock"), _FormatSlotLabel("meta_capslock"))
+	AssertEqual(t("key_name.alt") . " + .", _FormatSlotLabel("alt_period"))
+	AssertEqual(Ctrl . " + " . Shift, _KeyboardSlotFamilyLabel("primary_shift_"),
+		"the slot picker names its group's modifiers, never the prefix")
+	for Text in [_FormatSlotLabel("primary_shift_v"), _KeyboardSlotFamilyLabel("meta_")] {
+		AssertFalse(InStr(Text, "_") || InStr(Text, "key_name."), "a slot label reads as text: " . Text)
+	}
+	; The English locale spells Shift as the catalogue does, so the source pins
+	; that no slot label reads the catalogue's untranslated modifier names.
+	Body := _DriverFuncBody("_FormatSlotLabel")
+	Assert(Body != "", "_FormatSlotLabel must be defined")
+	AssertFalse(InStr(Body, "native_labels"), "a slot label never prints the catalogue's English modifier names")
 }
 Test("neutral slots: the tray label names the Windows chord", _KSNR_LabelsNameTheChord)
 
