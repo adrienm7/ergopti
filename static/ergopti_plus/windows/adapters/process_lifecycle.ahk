@@ -272,6 +272,40 @@ PLC_CloseNativeHandle(Handle) {
 		return false
 }
 
+; Whether a process holds the named mutex, without taking it. Only "no such
+; mutex" proves absence: any other refusal counts as held.
+; @param Name {String} Exact mutex name.
+; @return {Boolean}
+PLC_NamedMutexHeld(Name) {
+	static SYNCHRONIZE := 0x00100000, ERROR_FILE_NOT_FOUND := 2
+	Handle := DllCall("Kernel32\OpenMutexW", "UInt", SYNCHRONIZE, "Int", 0, "Str", Name, "Ptr")
+	if !Handle
+		return A_LastError != ERROR_FILE_NOT_FOUND
+	PLC_CloseNativeHandle(Handle)
+	return true
+}
+
+; Ends this process at once, after one line on stderr when a message is given.
+; ExitProcess rather than ExitApp: an OnExit owner can veto ExitApp and keep a
+; wedged process resident with its hooks.
+; @param ExitCode {Integer} Process exit code.
+; @param Message {String} Line written to stderr first, or "".
+PLC_ExitProcessNow(ExitCode, Message := "") {
+	if Message != ""
+		try FileAppend(Message . "`n", "**")
+	DllCall("Kernel32\ExitProcess", "UInt", ExitCode)
+}
+
+; Arms a one-shot deadline for this process. A bare native timer: the boot arms it
+; before the timer scheduler adapter's state is initialised.
+; @param Callback {Func} Callback that ends the process; cancelled by its identity.
+; @param DelayMs {Integer} Positive delay in milliseconds.
+PLC_ArmProcessDeadline(Callback, DelayMs) {
+	if !HasMethod(Callback, "Call") || !IsInteger(DelayMs) || DelayMs <= 0
+		throw ValueError("A process deadline needs a callback and a positive delay.", -1, String(DelayMs))
+	SetTimer(Callback, -DelayMs)
+}
+
 ; Returns the native current process identity without a failure sentinel.
 ; @return {Integer} This process's positive DWORD identifier.
 ; @throws {Error} The native call fails or returns an invalid identifier.
