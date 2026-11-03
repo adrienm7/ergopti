@@ -139,6 +139,68 @@ Test("ai-test-prediction-row: the block stands with the AI off", _LBMS_AiBlock.B
 Test("ai-test-prediction-row: the block stands with no API entry", _LBMS_AiBlock.Bind("no entry", _LBMS_NoModel))
 Test("ai-test-prediction-row: the block stands with no local model", _LBMS_AiBlock.Bind("no local model", _LBMS_NoLocalModel))
 
+; The position of the first label starting like a translated caption.
+_LBMS_CaptionPosition(Labels, Key) {
+	Caption := t(Key)
+	Marker := InStr(Caption, "%")
+	Head := Marker ? SubStr(Caption, 1, Marker - 1) : Caption
+	for Position, Label in Labels
+		if InStr(Label, Head, true) == 1
+			return Position
+	return 0
+}
+
+; ai-generation-groups: the count and the words, one separator, then everything
+; about the context down to the last row, in every state.
+_LBMS_GenerationGroups(State, Prepare) {
+	global _LLM_Menu, _LLM_Menu_Handle
+	SavedMenu := _LBMS_Fixture()
+	HadHandle := IsSet(_LLM_Menu_Handle), PriorHandle := HadHandle ? _LLM_Menu_Handle : 0
+	_LLM_Menu_Handle := Menu()
+	try {
+		Prepare.Call()
+		Built := LLM_Menu_BuildSubmenu()
+		try {
+			Parent := _LBMS_CaptionPosition(_LBMS_Labels(Built), "menu.llm.generation_menu_title")
+			AssertTrue(Parent > 0, State . ": the generation parent is drawn")
+			Child := DllCall("GetSubMenu", "ptr", Built.Handle, "int", Parent - 1, "ptr")
+			AssertTrue(Child != 0, State . ": it opens a submenu")
+			Labels := _LBMS_Labels({Handle: Child})
+			_LBMS_AssertCleanSeparators(Labels, State)
+			Separators := []
+			for Position, Label in Labels
+				if Label == ""
+					Separators.Push(Position)
+			AssertEqual(1, Separators.Length, State . ": exactly one separator")
+			Count := _LBMS_CaptionPosition(Labels, "menu.llm.num_predictions_label")
+			MinWords := _LBMS_CaptionPosition(Labels, "menu.llm.min_words_label")
+			MaxWords := _LBMS_CaptionPosition(Labels, "menu.llm.max_words_label")
+			Context := _LBMS_CaptionPosition(Labels, "menu.llm.context_length_label")
+			Clear := _LBMS_CaptionPosition(Labels, "menu.llm.reset_on_nav")
+			AssertEqual(1, Count, State . ": the count comes first")
+			AssertTrue(Count < MinWords && MinWords < MaxWords && MaxWords < Separators[1],
+				State . ": the words follow, above the separator")
+			AssertTrue(Separators[1] < Context && Context < Clear, State . ": the context rows follow the separator")
+			AssertEqual(Labels.Length, Clear, State . ": clearing the context closes the submenu")
+		} finally Built.Delete()
+	} finally {
+		_LLM_Menu := SavedMenu
+		_LLM_Menu_Handle := HadHandle ? PriorHandle : unset
+	}
+}
+_LBMS_ChangedSettings() {
+	global _LLM_Menu
+	_LLM_Menu["n_predictions"] := 7
+	_LLM_Menu["ctx_chars"] := 321
+	_LLM_Menu["min_words"] := 2
+	_LLM_Menu["max_words"] := 9
+	_LLM_Menu["temperature"] := "0.70"
+}
+Test("ai-generation-groups: one separator with the AI on", _LBMS_GenerationGroups.Bind("on", (*) => 0))
+Test("ai-generation-groups: one separator with the AI off", _LBMS_GenerationGroups.Bind("off", _LBMS_AiOff))
+Test("ai-generation-groups: one separator with every reset row drawn", _LBMS_GenerationGroups.Bind("resets", _LBMS_ChangedSettings))
+Test("ai-generation-groups: one separator with no local model", _LBMS_GenerationGroups.Bind("no local model", _LBMS_NoLocalModel))
+
 ; Runs Body with a fresh private configuration the session may write, so the
 ; persistence rows draw ready; Ready false keeps the harness's unwritable
 ; destination. Restores every global it replaces.

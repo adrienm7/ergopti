@@ -239,16 +239,19 @@ _LLM_Menu_TriggerRows(Position := "all") {
  * All numeric values use InputBox dialogs (same UX as HS settings_manager).
  * @param {Func} AutoCommand Optional acknowledged command owner for native tests.
  * @param {Func} ValuesProvider Optional unrelated numeric provider for native tests.
+ * @param {Func} ContextProvider Optional context provider for native tests.
  * @returns {Menu} Populated generation submenu.
  */
-LLM_Menu_BuildGenerationMenu(AutoCommand := unset, ValuesProvider := unset) {
+LLM_Menu_BuildGenerationMenu(AutoCommand := unset, ValuesProvider := unset, ContextProvider := unset) {
 	global _LLM_Menu
 	if !IsSet(AutoCommand)
 		AutoCommand := (*) => LLM_Menu_ToggleBool(ConfigLeaf.AUTO_RAISE_TEMP)
 	if !IsSet(ValuesProvider)
 		ValuesProvider := (*) => _LLM_Menu_GenerationRows()
+	if !IsSet(ContextProvider)
+		ContextProvider := (*) => _LLM_Menu_GenerationContextRows()
 	return MenuRenderer_Build("llm_generation_menu", "LLM", Map(), Map(),
-		Map("llm_generation_values", ValuesProvider),
+		Map("llm_generation_values", ValuesProvider, "llm_generation_context_values", ContextProvider),
 		Map(MenuCommand.LLM_AUTO_RAISE_TEMPERATURE, (*) => _LLM_Menu_AutoRaiseReady() ? AutoCommand.Call() : false),
 		Map("llm_auto_raise_enabled", (*) => _LLM_Menu[ConfigLeaf.AUTO_RAISE_TEMP],
 			"llm_auto_raise_ready", (*) => _LLM_Menu_AutoRaiseReady()))
@@ -264,9 +267,9 @@ _LLM_Menu_AutoRaiseReady() {
 }
 
 /**
- * Row data for the generation submenu.
- * @returns {Array} The suggestion count, the four numeric prompts with their
- *     reset rows, plus the existing navigation reset toggle.
+ * Row data of the generation submenu's first group.
+ * @returns {Array} The suggestion count, the words and the temperature, each with
+ *     its reset row.
  */
 _LLM_Menu_GenerationRows() {
 	global _LLM_Menu
@@ -287,19 +290,35 @@ _LLM_Menu_GenerationRows() {
 		_LLM_DefaultFor("llm_num_predictions"),
 		(*) => _LLM_AssignAndRebuild("n_predictions", _LLM_DefaultFor("llm_num_predictions")))
 
-	CountBoundaryRows := MenuRenderer_TemplateRows("llm_generation_count_boundary", Map(), Map(), Map())
-	if !(CountBoundaryRows is Array)
+	Commands := _LLM_Menu_GenerationCommands()
+	Getters := _LLM_Menu_GenerationGetters()
+	WordRows := MenuRenderer_TemplateRows("llm_generation_word_controls", Commands, Getters, Map())
+	if !(WordRows is Array)
 		return []
-	for Row in CountBoundaryRows
+	for Row in WordRows
 		Rows.Push(Row)
+	TemperatureRows := MenuRenderer_TemplateRows("llm_generation_temperature_controls", Commands, Getters, Map())
+	if !(TemperatureRows is Array)
+		return []
+	for Row in TemperatureRows
+		Rows.Push(Row)
+	return Rows
+}
 
-	ContextDefault := _LLM_DefaultFor("llm_context_length", 500)
-	MinDefault := _LLM_DefaultFor("llm_min_words", 3)
-	MaxDefault := _LLM_DefaultFor("llm_max_words", 15)
+/**
+ * Row data of the generation submenu's context group, at its bottom.
+ * @returns {Array} The context size, its reset row and the clear-on-click toggle.
+ */
+_LLM_Menu_GenerationContextRows() {
+	Rows := MenuRenderer_TemplateRows("llm_generation_context_controls", _LLM_Menu_GenerationCommands(),
+		_LLM_Menu_GenerationGetters(), Map())
+	return (Rows is Array) ? Rows : []
+}
+
+; The commands of the generation prompts and toggles.
+_LLM_Menu_GenerationCommands() {
 	TempDefault := Format("{:.2f}", Float(_LLM_DefaultFor("llm_temperature", "0.10")) + 0)
-	max_val := _LLM_Menu[ConfigLeaf.MAX_WORDS]
-	max_display := (max_val == 0) ? t("menu.llm.unlimited") : max_val
-	GenerationCommands := Map(
+	return Map(
 		MenuCommand.LLM_GENERATION_CONTEXT, (*) => LLM_Menu_PromptCtxChars(),
 		MenuCommand.LLM_GENERATION_CONTEXT_RESET, (*) => _LLM_AssignAndRebuild("ctx_chars", _LLM_DefaultFor("llm_context_length", 500)),
 		MenuCommand.LLM_GENERATION_MIN_WORDS, (*) => LLM_Menu_PromptMinWords(),
@@ -309,7 +328,18 @@ _LLM_Menu_GenerationRows() {
 		MenuCommand.LLM_GENERATION_TEMPERATURE, (*) => LLM_Menu_PromptTemperature(),
 		MenuCommand.LLM_GENERATION_TEMPERATURE_RESET, (*) => _LLM_AssignAndRebuild("temperature", TempDefault),
 		MenuCommand.LLM_RESET_ON_NAV, (*) => LLM_Menu_ToggleBool(ConfigLeaf.RESET_ON_NAV))
-	GenerationGetters := Map(
+}
+
+; The captions and readiness of the generation rows, read at this build.
+_LLM_Menu_GenerationGetters() {
+	global _LLM_Menu
+	ContextDefault := _LLM_DefaultFor("llm_context_length", 500)
+	MinDefault := _LLM_DefaultFor("llm_min_words", 3)
+	MaxDefault := _LLM_DefaultFor("llm_max_words", 15)
+	TempDefault := Format("{:.2f}", Float(_LLM_DefaultFor("llm_temperature", "0.10")) + 0)
+	max_val := _LLM_Menu[ConfigLeaf.MAX_WORDS]
+	max_display := (max_val == 0) ? t("menu.llm.unlimited") : max_val
+	return Map(
 		"llm_generation_ready", () => true,
 		"llm_generation_context_caption", () => "" . _LLM_Menu["ctx_chars"],
 		"llm_generation_context_reset_caption", () => "" . ContextDefault,
@@ -324,33 +354,6 @@ _LLM_Menu_GenerationRows() {
 		"llm_generation_temperature_caption", () => _LLM_Menu["temperature"],
 		"llm_generation_temperature_reset_caption", () => TempDefault,
 		"llm_generation_temperature_reset_present", () => _LLM_Menu["temperature"] != TempDefault)
-	ContextRows := MenuRenderer_TemplateRows("llm_generation_context_controls", GenerationCommands, GenerationGetters, Map())
-	if !(ContextRows is Array)
-		return []
-	for Row in ContextRows
-		Rows.Push(Row)
-	ContextBoundaryRows := MenuRenderer_TemplateRows("llm_generation_context_boundary", Map(), Map(), Map())
-	if !(ContextBoundaryRows is Array)
-		return []
-	for Row in ContextBoundaryRows
-		Rows.Push(Row)
-	WordRows := MenuRenderer_TemplateRows("llm_generation_word_controls", GenerationCommands, GenerationGetters, Map())
-	if !(WordRows is Array)
-		return []
-	for Row in WordRows
-		Rows.Push(Row)
-	WordBoundaryRows := MenuRenderer_TemplateRows("llm_generation_words_boundary", Map(), Map(), Map())
-	if !(WordBoundaryRows is Array)
-		return []
-	for Row in WordBoundaryRows
-		Rows.Push(Row)
-	TemperatureRows := MenuRenderer_TemplateRows("llm_generation_temperature_controls", GenerationCommands, GenerationGetters, Map())
-	if !(TemperatureRows is Array)
-		return []
-	for Row in TemperatureRows
-		Rows.Push(Row)
-
-	return Rows
 }
 
 

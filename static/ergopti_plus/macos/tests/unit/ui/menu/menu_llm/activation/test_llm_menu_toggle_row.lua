@@ -95,24 +95,6 @@ helpers.describe("IA submenu on/off row", function()
 		end
 	end)
 
-	-- ai-test-prediction-row: model, profile and test are one block in every AI
-	-- state, closed by one separator; none lands next to another one.
-	for state, enabled in pairs({ ["on"] = true, ["off"] = false }) do
-		for model_state, model in pairs({ ["a model"] = "local-a", ["no model"] = "" }) do
-			helpers.it("keeps the model, profile and test block with the AI " .. state .. " and " .. model_state, function()
-				with_activation("ollama", { true }, nil, function(_action, live, calls)
-					live.llm_enabled, live.llm_model = enabled, model
-					local item = calls.handler.build_item()
-					require("test.ai_menu_layout_contract").assert_block(helpers, item.submenu, {
-						profile = "menu.profiles.profile_label_prefix",
-						test = "menu.llm.test_prediction",
-						trigger = "menu.llm.trigger_menu_title",
-					}, state .. "/" .. model_state)
-				end)
-			end)
-		end
-	end
-
 	-- A configuration saved by a newer version is read-only for the session:
 	-- the switch and the restore named only the generic "resume or open
 	-- Diagnostics" cause, which neither action can lift, and a restore row kept

@@ -65,15 +65,17 @@ helpers.describe("tray (linux): the AI suggestion count", function()
 	end)
 
 	-- The count is a generation parameter on every driver: here the generation
-	-- rows are inline, so it heads them, right above the temperature.
+	-- rows are inline, so it heads them, right above the minimum words
+	-- (ai-generation-groups).
 	helpers.it("heads the generation parameters, not the profile block (llm-count-row)", function()
 		local i18n = require("infra.i18n")
 		local rows = ai_rows(build())
 		local _, index = count_row(rows)
 		local next_row = rows[index + 1]
+		local min_words = i18n.get("menu.llm.min_words_label"):match("^[^%%]*")
 		helpers.assert_true(next_row ~= nil and type(next_row.title) == "string", "a row follows the count")
-		helpers.assert_true(next_row.title:find(i18n.get("menu.llm.generation.temperature"), 1, true) == 1,
-			"the first generation parameter after the count is the temperature, got: " .. tostring(next_row.title))
+		helpers.assert_true(next_row.title:find(min_words, 1, true) == 1,
+			"the first generation parameter after the count is the minimum words, got: " .. tostring(next_row.title))
 		local trigger_index = nil
 		for position, row in ipairs(rows) do
 			if row.title == i18n.get("menu.llm.trigger_menu_title") then trigger_index = position end

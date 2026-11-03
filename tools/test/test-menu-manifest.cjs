@@ -1137,11 +1137,15 @@ function checkAutoTemperatureControl() {
 	const definition = root.llm_generation_menu;
 	assert.deepEqual(corpus.states, [false, true]);
 	assert.deepEqual(corpus.prediction_counts, [1, 2]);
-	assert.equal(definition.length, 2);
+	assert.equal(definition.length, 4, 'the first group, one separator, the context group');
 	assert.deepEqual(definition[0], {
 		type: 'list',
 		id: 'llm_generation_values'
 	});
+	assert.deepEqual(definition.slice(2), [
+		{ type: '---' },
+		{ type: 'list', id: 'llm_generation_context_values' }
+	]);
 	assert.equal(definition[1].type, 'check');
 	assert.equal(definition[1].id, corpus.row.id);
 	assert.equal(definition[1].i18n, corpus.row.i18n);
@@ -4971,66 +4975,24 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	);
 }
 
-// Actual numeric providers retain each driver's existing boundary and caption policy.
+// The generation menu reads two groups with one separator, every row of the
+// context group below it, and no driver brings a boundary of its own.
 {
 	const assert = require('node:assert/strict');
-	const corpus = JSON.parse(
-		readSourceFile(resolve(SHARED, 'tests/corpus/menus/generation_boundaries.json'))
-	);
 	const manifest = JSON.parse(readSourceFile(MENU_PATH));
-	for (const key of ['count', 'context', 'words']) {
-		const expected = corpus.boundaries[key];
-		assert.deepEqual(manifest[expected.section], expected.rows);
-		assert.deepEqual(expected.projections.linux, [], 'Linux has no native numeric boundary');
-		if (key !== 'count')
-			assert.deepEqual(expected.projections.hs, [], 'macOS has no later numeric boundary');
-		for (const [driver, relative, call] of [
-			['windows', 'ui/menu/menu_llm/menu_settings.ahk', 'MenuRenderer_TemplateRows'],
-			['macos', 'ui/menu/menu_llm/init.lua', 'ManifestMenu.template_rows']
-		]) {
-			const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative));
-			assert.equal(
-				source.includes(call + '("' + expected.section + '"'),
-				driver === 'windows' || key === 'count'
-			);
-		}
-		const linux = readSourceFile(
-			resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
-		);
-		assert(!linux.includes('"' + expected.section + '"'));
-	}
-	for (const code of [
-		'ar',
-		'cs',
-		'da',
-		'de',
-		'en',
-		'es',
-		'fr',
-		'he',
-		'hi',
-		'it',
-		'ja',
-		'ko',
-		'no',
-		'nl',
-		'pl',
-		'pt',
-		'ru',
-		'sv',
-		'tr',
-		'uk',
-		'zh'
-	]) {
-		const strings = JSON.parse(readSourceFile(resolve(SHARED, 'data/locales/' + code + '.json')));
-		for (const key of [...corpus.caption_keys, corpus.published_marker_key]) {
-			assert.equal(typeof strings[key], 'string', code + ': existing numeric caption ' + key);
-			assert(strings[key].trim().length > 0);
-		}
-	}
-	console.log(
-		'Generation boundaries: four actual constructors, authentic cross-platform absence and21 unchanged caption sets.'
+	assert.deepEqual(
+		manifest.llm_generation_menu.map((row) => row.id ?? row.type),
+		['llm_generation_values', 'llm_auto_raise_temperature', '---', 'llm_generation_context_values'],
+		'one separator, then the context'
 	);
+	for (const retired of [
+		'llm_generation_count_boundary',
+		'llm_generation_context_boundary',
+		'llm_generation_words_boundary',
+		'llm_generation_native_controls'
+	])
+		assert.equal(manifest[retired], undefined, retired + ' stays retired');
+	console.log('Generation groups: one declared separator on every driver.');
 }
 
 // The extension-list boundary has two actual native owners, independent of its children.
