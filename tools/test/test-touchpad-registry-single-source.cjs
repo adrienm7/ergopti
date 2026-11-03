@@ -110,7 +110,8 @@ function functionBody(source, name) {
 	const labels = functionBody(constants, 'GestureShortcutLabels');
 	for (const slot of contract.slots) {
 		check(
-			new RegExp(`"${slot.id}",\\s*"Ctrl \\+ Win \\+ Shift \\+ F${slot.functionKey}"`).test(labels),
+			// Key name ids: the tutorial names them in the user's language.
+			new RegExp(`"${slot.id}",\\s*"ctrl\\+win\\+shift\\+F${slot.functionKey}"`).test(labels),
 			`${slot.id} writes F${slot.functionKey}, which the setup tutorial must show too`
 		);
 	}
