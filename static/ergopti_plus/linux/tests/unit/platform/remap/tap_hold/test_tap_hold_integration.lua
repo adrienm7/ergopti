@@ -346,9 +346,7 @@ helpers.describe("tap-holds end to end: a tray change is live", function()
 	helpers.it("uses a key's own delay", function()
 		-- With the lone tap window off: by default a Shift pressed alone taps up
 		-- to 1000 ms whatever its own delay (test_tap_hold_lone_tap_window).
-		with_session("[tap_hold]
-lone_modifier_tap_max_ms = 0
-", function(s)
+		with_session("[tap_hold]\nlone_modifier_tap_max_ms = 0\n", function(s)
 			s.drive({ { LSHIFT, DOWN, 0 }, { LSHIFT, UP, 500 } })
 			helpers.assert_eq(#s.actions, 0, "500 ms is a hold at the default 350 ms")
 			helpers.assert_true(s.writer.set_threshold("left_shift", 0.6))
