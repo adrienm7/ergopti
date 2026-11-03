@@ -1152,6 +1152,14 @@
 				"hs"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "proxy_override",
+			"i18n": "menu.debug.proxy_override"
 		}
 	],
 	"debug_menu": [
@@ -1270,15 +1278,6 @@
 			"type": "command",
 			"id": "open_error_log",
 			"i18n": "menu.debug.open_error_log"
-		},
-		{
-			"type": "---",
-			"id": "---"
-		},
-		{
-			"type": "command",
-			"id": "proxy_override",
-			"i18n": "menu.debug.proxy_override"
 		},
 		{
 			"type": "---",

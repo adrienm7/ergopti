@@ -95,12 +95,17 @@ _MLG_Order(MenuName) {
 ; The Configuration submenu: the global restore and clear, a separator, the
 ; cleanup and, right under it, the Windows-only touchpad restore (the
 ; maintainer's request of 2026-10-02: it stood at the very end), a separator,
-; then configuration windows and the macOS-only Karabiner rows,
-; with no separator left dangling at its end.
+; then configuration windows and the macOS-only Karabiner rows, then a
+; separator and the download proxy (moved from Debug on 2026-11-03), with no
+; separator left dangling at its end.
 _MLG_ConfigurationRowsInOrder() {
 	AssertEqual("scope_restore, scope_clear, ---, clean_unused_keys, restore_touchpad_gestures, ---, config_folder, "
-		. "setup_wizard, karabiner_integration, remove_from_karabiner",
+		. "setup_wizard, karabiner_integration, remove_from_karabiner, ---, proxy_override",
 		_MLG_Order("configuration_menu"), "configuration_menu must declare its rows in this order")
+	; The download proxy is configuration, not debugging (maintainer, 2026-11-03).
+	AssertFalse(InStr(_MLG_Order("debug_menu"), "proxy_override"), "Debug no longer declares the proxy row")
+	AssertEqual(0, InStr(_DriverFuncBody("_MI_BuildDebuggingMenu"), "ProxyOverride_Command"),
+		"Debug no longer dispatches the proxy row")
 	Body := _DriverFuncBody("_MI_BuildConfigurationMenu")
 	Assert(Body != "", "the Configuration builder must exist before checking its commands")
 	; Global Restore now composes every persistence owner at its terminal boundary.
@@ -113,7 +118,8 @@ _MLG_ConfigurationRowsInOrder() {
 	for _, Pair in [["clean_unused_keys", "ShowUnusedConfigKeysCleanup"],
 			["config_folder", "FilePathsEditor"],
 			["setup_wizard", "Onboarding_ShowFromMenu"],
-			["restore_touchpad_gestures", "TouchpadRegistryRestoreFromMenu"]]
+			["restore_touchpad_gestures", "TouchpadRegistryRestoreFromMenu"],
+			["proxy_override", "ProxyOverride_Command"]]
 		AssertTrue(RegExMatch(Body, '"' . Pair[1] . '",\s+' . Pair[2]) > 0,
 			"the Configuration menu must dispatch " . Pair[1] . " to " . Pair[2])
 	AssertEqual(0, InStr(Body, "ShowUninstallErgopti"), "Configuration no longer offers Uninstall")

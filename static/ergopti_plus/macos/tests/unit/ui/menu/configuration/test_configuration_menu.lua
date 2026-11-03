@@ -8,7 +8,8 @@
 --- restore of Ergopti's recommended values and the clear to the system's
 --- behaviour (the first group of every settings menu), a separator, the
 --- config.toml cleanup, a separator, the folders editor and the setup wizard,
---- and ends there: startup and Uninstall moved to Version / Updates
+--- then a separator and the download proxy (moved from Debug on 2026-11-03).
+--- Startup and Uninstall moved to Version / Updates
 --- (test_menu_about_uninstall.lua), with no separator left dangling here.
 ---
 --- PAUSE GATING, carried over from the global actions: pause owns the bindings
@@ -32,6 +33,8 @@ local EXPECTED = {
 	"-",
 	"menu.global.config_folder",
 	"menu.global.setup_wizard",
+	"-",
+	"menu.debug.proxy_override",
 }
 
 -- The rows that rewrite the configuration, and the action each one runs.
@@ -209,6 +212,8 @@ helpers.describe("configuration submenu (macOS): « Ergopti uses Karabiner »", 
 				"menu.global.setup_wizard",
 				"menu.global.karabiner_integration",
 				"menu.global.remove_from_karabiner",
+				"-",
+				"menu.debug.proxy_override",
 			}, ", "))
 			helpers.assert_eq(row_titled(rows, "menu.global.karabiner_integration").checked, enabled)
 		end
