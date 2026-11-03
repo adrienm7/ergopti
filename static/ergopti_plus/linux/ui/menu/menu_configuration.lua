@@ -123,6 +123,8 @@ local function _build_configuration(ctx)
 			ctx.webview.show("paths_editor")
 		end,
 		[require("config_keys").COMMAND.SETUP_WIZARD] = call_ctx("on_show_setup_wizard"),
+		-- Self-contained: the shared edit flow reads and writes its own setting.
+		[require("config_keys").COMMAND.PROXY_OVERRIDE] = function() require("ui.proxy_override").run() end,
 	}
 
 	render_ctx.state_getters = {}

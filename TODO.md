@@ -45,7 +45,7 @@ the local branches `worktree-agent-*`: land them, then remove the worktrees so o
       « Gestes Ergopti » title; « Gestes du système » gets a clearer title saying the system gestures are handed to
       Ergopti so it can change them (synchronisation of the system gestures), all drivers, 21 locales. In the
       shortcuts menu the « Sélection » section title becomes « Encadrement de la sélection ».
-- [ ] **Download proxy row out of Debug.** The download proxy setting is configuration, not debugging: move it from
+- [x] **Download proxy row out of Debug.** The download proxy setting is configuration, not debugging: move it from
       the Debug menu to the Configuration menu, all drivers.
 - [ ] **Hotstring tooltip under the AI tooltip.** A typed hotstring trigger shows its tooltip while it can still expand,
       but with the AI on the prediction tooltip covers it. Never cover it: start the prediction once the hotstring
