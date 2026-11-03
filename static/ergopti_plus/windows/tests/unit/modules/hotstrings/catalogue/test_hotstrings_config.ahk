@@ -451,9 +451,9 @@ Test("HotstringsConfig: resolve sources file-level toml metadata",
 TestHotstringsConfig_ResolveTomlSectionWinsOverFile() {
     _HCfgTestReset()
     Sections := Map()
-    Sections["ct"] := { Delay: 0.3, Color: "#2e7d32", Description: "" }
+    Sections["assign"] := { Delay: 0.3, Color: "#2e7d32", Description: "" }
     _HCfgTestSeedToml("rolls", 0.5, "#fb8c00", Sections)
-    R := HotstringsResolve("rolls", "ct")
+    R := HotstringsResolve("rolls", "assign")
     AssertEqual(0.3, R.Delay, "toml section delay wins over file delay")
     AssertEqual("#2e7d32", R.Color, "toml section color wins over file color")
 }
@@ -511,11 +511,11 @@ Test("HotstringsConfig: clearOverride reverts to toml metadata",
 
 TestHotstringsConfig_ClearOverrideAllFields() {
     _HCfgTestReset()
-    HotstringsSetOverride("rolls", "ct", "delay", 0.2)
-    HotstringsSetOverride("rolls", "ct", "color", "#abcdef")
+    HotstringsSetOverride("rolls", "assign", "delay", 0.2)
+    HotstringsSetOverride("rolls", "assign", "color", "#abcdef")
     ; Empty Field clears both delay and color.
-    HotstringsClearOverride("rolls", "ct", "")
-    R := HotstringsResolve("rolls", "ct")
+    HotstringsClearOverride("rolls", "assign", "")
+    R := HotstringsResolve("rolls", "assign")
     AssertEqual(GLOBAL_DEFAULT_DELAY, R.Delay,
         "clearing all fields drops the override to the global fallback")
     AssertEqual(GLOBAL_DEFAULT_COLOR, R.Color,
@@ -767,7 +767,7 @@ Test("HotstringsConfig: DYN_HOTSTRINGS_DEFAULT_DELAY is defined in the early con
 ; would disagree about the same hotstring.
 TestHotstringsConfig_PauseMustGateAllResolution() {
 	_HCfgTestReset()
-	_HCfgTestSeedToml("rolls", 0.5, "#fb8c00", Map("ct", { Delay: 0.3, Color: "#2e7d32", ShowTooltip: "" }))
+	_HCfgTestSeedToml("rolls", 0.5, "#fb8c00", Map("assign", { Delay: 0.3, Color: "#2e7d32", ShowTooltip: "" }))
 
 	; Resolution reads no suspend flag anywhere in its cascade.
 	Body := _DriverFuncBody("_HotstringsResolveUncached")
@@ -777,8 +777,8 @@ TestHotstringsConfig_PauseMustGateAllResolution() {
 
 	; And it is deterministic: the same query twice yields the same values, so a
 	; caller that resolves before a pause and acts after it sees one answer.
-	A := HotstringsResolve("rolls", "ct")
-	B := HotstringsResolve("rolls", "ct")
+	A := HotstringsResolve("rolls", "assign")
+	B := HotstringsResolve("rolls", "assign")
 	AssertEqual(A.Delay, B.Delay, "resolution must be deterministic across calls")
 	AssertEqual(A.Color, B.Color, "resolution must be deterministic across calls")
 	AssertEqual(0.3, A.Delay, "and it must still return the seeded section delay")
@@ -793,9 +793,10 @@ TestHotstringsConfig_SectionDelayPrecedenceRegression() {
 	AssertTrue(IsSet(DYN_HOTSTRINGS_DEFAULT_DELAY), "default must exist")
 
 	; Rung 1 — a section delay beats the file delay of the same category.
+	; rolls.assign declares no delay in the manifest, so its file decides.
 	_HCfgTestReset()
-	_HCfgTestSeedToml("rolls", 0.5, "", Map("ct", { Delay: 0.3, Color: "", ShowTooltip: "" }))
-	AssertEqual(0.3, HotstringsResolve("rolls", "ct").Delay,
+	_HCfgTestSeedToml("rolls", 0.5, "", Map("assign", { Delay: 0.3, Color: "", ShowTooltip: "" }))
+	AssertEqual(0.3, HotstringsResolve("rolls", "assign").Delay,
 		"section delay must win over the file delay")
 
 	; Rung 2 — with no section match, the file delay wins.
