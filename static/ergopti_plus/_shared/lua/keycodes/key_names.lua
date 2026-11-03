@@ -18,6 +18,7 @@
 --- ==============================================================================
 
 local Data = require("keycodes.key_names_data")
+local TableUtil = require("table_util")
 
 local M = {}
 
@@ -90,19 +91,13 @@ end
 --- Every key id of the table, sorted.
 --- @return table
 function M.ids()
-	local out = {}
-	for id in pairs(Data.keys) do out[#out + 1] = id end
-	table.sort(out)
-	return out
+	return TableUtil.sorted_keys(Data.keys)
 end
 
 --- Every alias of the table, sorted.
 --- @return table
 function M.aliases()
-	local out = {}
-	for alias in pairs(Data.aliases) do out[#out + 1] = alias end
-	table.sort(out)
-	return out
+	return TableUtil.sorted_keys(Data.aliases)
 end
 
 return M
