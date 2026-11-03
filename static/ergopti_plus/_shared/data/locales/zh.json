@@ -1413,6 +1413,7 @@
 	"menu.debug.report_bug": "报告问题",
 	"menu.debug.show_error_dialog": "每次出错时显示窗口",
 	"menu.debug.suggest_feature": "建议新功能",
+	"menu.debug.tests": "测试",
 	"menu.debug.title": "⚠ 调试",
 	"menu.debug.window_spy": "窗口侦察",
 	"menu.debug.send_probe": "测量 SendEvent 与 SendInput",

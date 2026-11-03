@@ -64,8 +64,12 @@ helpers.describe("field check menu rows", function()
 		local manifest = hs.json.decode(file:read("*a"))
 		file:close()
 		local rows = {}
-		for _, row in ipairs(manifest.debug_menu) do
+		for _, row in ipairs(manifest.debug_tests_menu) do
 			if row.id and row.id:find("^field_check_") then rows[row.id] = row end
+		end
+		for _, row in ipairs(manifest.debug_menu) do
+			helpers.assert_true(not (row.id and row.id:find("^field_check_")),
+				"a field check hangs in the Tests submenu, not among the Debug rows")
 		end
 		-- The one unit that dispatches the field checks, found by its dispatch call
 		-- rather than by its path.

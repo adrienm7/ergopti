@@ -1413,6 +1413,7 @@
 	"menu.debug.report_bug": "Rapportér en fejl",
 	"menu.debug.show_error_dialog": "Vis et vindue ved hver fejl",
 	"menu.debug.suggest_feature": "Foreslå en funktion",
+	"menu.debug.tests": "Tests",
 	"menu.debug.title": "⚠ Fejlfinding",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "Mål SendEvent mod SendInput",

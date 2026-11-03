@@ -1413,6 +1413,7 @@
 	"menu.debug.report_bug": "बग की रिपोर्ट करें",
 	"menu.debug.show_error_dialog": "हर त्रुटि पर एक विंडो दिखाएँ",
 	"menu.debug.suggest_feature": "सुविधा सुझाएँ",
+	"menu.debug.tests": "परीक्षण",
 	"menu.debug.title": "⚠ डिबग",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "SendEvent बनाम SendInput मापें",
