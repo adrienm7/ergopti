@@ -1714,7 +1714,7 @@
 									},
 									{
 										"path": "gestures.swipe_3_left",
-										"value": "tab_prev",
+										"value": "tab_next",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1724,13 +1724,13 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.tab_prev"
+												"key": "sg_actions.tab_next"
 											}
 										]
 									},
 									{
 										"path": "gestures.swipe_3_right",
-										"value": "tab_next",
+										"value": "tab_prev",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1740,7 +1740,7 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.tab_next"
+												"key": "sg_actions.tab_prev"
 											}
 										]
 									},
@@ -1778,7 +1778,7 @@
 									},
 									{
 										"path": "gestures.swipe_4_left",
-										"value": "desktop_prev",
+										"value": "desktop_next",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1788,13 +1788,13 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.desktop_prev"
+												"key": "sg_actions.desktop_next"
 											}
 										]
 									},
 									{
 										"path": "gestures.swipe_4_right",
-										"value": "desktop_next",
+										"value": "desktop_prev",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1804,7 +1804,7 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.desktop_next"
+												"key": "sg_actions.desktop_prev"
 											}
 										]
 									},
@@ -3644,7 +3644,7 @@
 								"items": [
 									{
 										"path": "gestures.swipe_3_down",
-										"value": "tab_next",
+										"value": "tab_close",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3654,13 +3654,13 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.tab_next"
+												"key": "sg_actions.tab_close"
 											}
 										]
 									},
 									{
 										"path": "gestures.swipe_3_left",
-										"value": "sel_word_prev",
+										"value": "tab_next",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3670,13 +3670,13 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.sel_word_prev"
+												"key": "sg_actions.tab_next"
 											}
 										]
 									},
 									{
 										"path": "gestures.swipe_3_right",
-										"value": "sel_word_next",
+										"value": "tab_prev",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3686,13 +3686,13 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.sel_word_next"
+												"key": "sg_actions.tab_prev"
 											}
 										]
 									},
 									{
 										"path": "gestures.swipe_3_up",
-										"value": "tab_prev",
+										"value": "tab_new",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3702,7 +3702,71 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.tab_prev"
+												"key": "sg_actions.tab_new"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_4_down",
+										"value": "win_app_prev",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_4_down"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.win_app_prev"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_4_left",
+										"value": "space_next",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_4_left"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.space_next"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_4_right",
+										"value": "space_prev",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_4_right"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.space_prev"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_4_up",
+										"value": "win_app_next",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_4_up"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.win_app_next"
 											}
 										]
 									},
@@ -3724,7 +3788,7 @@
 									},
 									{
 										"path": "gestures.tap_4",
-										"value": "win_app_next",
+										"value": "alt_tab_monitor",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3734,7 +3798,23 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.win_app_next"
+												"key": "sg_actions.alt_tab_monitor"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_5_up",
+										"value": "mission_control",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_5_up"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.mission_control"
 											}
 										]
 									},
