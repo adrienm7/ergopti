@@ -414,6 +414,8 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 			i18n.get("menu.global.setup_wizard"),
 			i18n.get("menu.global.karabiner_integration"),
 			i18n.get("menu.global.remove_from_karabiner"),
+			"-",
+			i18n.get("menu.debug.proxy_override"),
 		}, " | "))
 	end)
 
