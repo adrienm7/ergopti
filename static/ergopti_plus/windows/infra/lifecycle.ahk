@@ -1594,7 +1594,7 @@ Ergopti_OnShutdown(reason, code) {
 				try LLM_NavEventOwner_CancelShutdown()
 		}
 }
-; Publish the configured tray before input registration, then prewarm its leaves.
+; Publish the configured tray once input is registered, then prewarm its leaves.
 ; initMenu stages every subtree while the old root remains live and enters
 ; Critical only for the short root replacement. UpdateTrayIcon runs last, once
 ; MenuSuspend exists.
