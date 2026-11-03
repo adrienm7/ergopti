@@ -203,7 +203,9 @@ function M.new(opts)
 		layer_depth = 0,     -- how many layer keys are down
 		layer_keys = {},     -- code -> chord emitted for a key pressed on the layer
 		one_shot_until = nil,
-		one_shot_keys = {},  -- keys a one-shot Shift is wrapping (several can overlap)
+		-- code -> "shift" while a one-shot Shift wraps it, "spent" once a later
+		-- key took the Shift back, "rolled" for a key pressed then (several can overlap)
+		one_shot_keys = {},
 		one_shot_swallowed = {}, -- keys a one-shot Shift replaced by its result, until released
 		native_keys = {},    -- configured keys pressed under a modifier: themselves until released
 		instant_down = {},   -- keys with a tap and no hold, down since their tap fired
@@ -518,6 +520,24 @@ local function input_arm_current(self, arm)
 	if not arm then return true end
 	local ok, current = pcall(arm.current)
 	return ok and current == true and input_arms[self] == arm
+end
+
+--- Takes the one-shot Shift back from every key it still wraps. The Shift is
+--- that press's own, kept for its repeats only: a key struck before it is
+--- released is typed as it is, as on Windows, where the one-shot capture ends
+--- at the first character. Keeping it down capitalised a fast roll (« abc »
+--- gave « ABc »).
+--- @return boolean spent Whether a Shift went up.
+local function spend_one_shot_shift(self, out)
+	local spent = false
+	for wrapped, state in pairs(self.one_shot_keys) do
+		if state == "shift" then
+			self.one_shot_keys[wrapped] = "spent"
+			release(self, out, KEY_LEFTSHIFT)
+			spent = true
+		end
+	end
+	return spent
 end
 
 local function take_one_shot(self, code, now_ms)
@@ -944,6 +964,8 @@ local function process(self, code, value, now_ms)
 					return swallow_until_release(self, code, now_ms)
 				end
 			end
+			-- A tap-hold key struck under a wrapped key takes its Shift back too.
+			spend_one_shot_shift(self, out)
 			if config.instant then
 				cancel_taps(self, nil)
 				self.instant_down[code] = true
@@ -1031,27 +1053,36 @@ local function process(self, code, value, now_ms)
 	end
 
 	-- The one-shot Shift wraps the next key.
-	if self.one_shot_keys[code] and value == UP then
+	local wrapped = self.one_shot_keys[code]
+	if wrapped and value == UP then
 		self.one_shot_keys[code] = nil
 		release(self, out, code)
-		release(self, out, KEY_LEFTSHIFT)
+		if wrapped == "shift" then release(self, out, KEY_LEFTSHIFT) end
 		if input_arms[self] and input_arms[self].code == code then input_arms[self] = nil end
 		return out
 	end
-	if self.one_shot_keys[code] and value == REPEAT and input_arms[self] then
+	if wrapped and value == REPEAT and input_arms[self] then
 		hold_row(self, out, code, REPEAT)
 		return out
 	end
-	if value == DOWN and not self.one_shot_keys[code] then
+	if value == DOWN and not wrapped then
+		-- A key struck while a wrapped one is still down goes down after its
+		-- Shift is up, and is this engine's to release, like the wrapped key.
+		local rolled = not MODIFIER_KEYS[code] and spend_one_shot_shift(self, out)
 		local verdict, text = take_one_shot(self, code, now_ms)
 		if verdict == "shift" then
-			self.one_shot_keys[code] = true
+			self.one_shot_keys[code] = "shift"
 			press(self, out, KEY_LEFTSHIFT)
 			press(self, out, code)
 			return out
 		elseif verdict == "text" then
 			self.one_shot_swallowed[code] = true
 			return out, type_text(self, out, text)
+		end
+		if rolled then
+			self.one_shot_keys[code] = "rolled"
+			press(self, out, code)
+			return out
 		end
 	end
 	return pass(self, code, value)
