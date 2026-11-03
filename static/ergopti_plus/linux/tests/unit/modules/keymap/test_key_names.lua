@@ -61,12 +61,14 @@ helpers.describe("the shared key names", function()
 		helpers.assert_eq((pcall(KeyNames.macos_symbol, "tab")), false, "a key that is no modifier")
 	end)
 
-	helpers.it("key names: refuse an unknown key, platform or translation", function()
+	helpers.it("key names: refuse an unknown key, platform or empty text", function()
 		local en = translator("en")
 		helpers.assert_eq((pcall(KeyNames.label, "not_a_key", "linux", en)), false, "an unknown key")
 		helpers.assert_eq((pcall(KeyNames.label, "ctrl", "amiga", en)), false, "an unknown platform")
-		helpers.assert_eq((pcall(KeyNames.label, "ctrl", "linux", function(key) return key end)), false,
-			"a missing translation")
+		helpers.assert_eq((pcall(KeyNames.label, "ctrl", "linux", function() return "" end)), false,
+			"an empty text")
+		-- A miss reads as the dotted key, which the row walks refuse; never the id.
+		helpers.assert_eq(KeyNames.label("lctrl", "linux", function(key) return key end), "key_name.left_ctrl")
 		helpers.assert_eq((pcall(KeyNames.combo_label, "+", "linux", en)), false, "an empty combination")
 		helpers.assert_eq(KeyNames.canonical("not_a_key"), nil)
 	end)
