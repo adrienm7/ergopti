@@ -2949,25 +2949,29 @@ description_key = "menu.caps_word.pointer.other_buttons"
 # Windows (GESTURE_FACTORY_DEFAULTS) build what « Restaurer les valeurs
 # conseillées » writes from them rather than from a copy of their own;
 # test-gesture-defaults-single-source.cjs holds both drivers to this list.
-# Recommendation rule (maintainer decision, 2026-10-24): recommend nothing the
-# system already does with that gesture, unless the driver takes the system's
-# own assignment over itself. Every slot stays reassignable on every OS, and the
-# Gestures menu says to remove the system assignment first to avoid a double
-# action (menu.gestures.recommended_note).
-# - Linux: the touchpad is read without being grabbed, so GNOME, KWin, Hyprland
-#   and cosmic-comp also act on a three- or four-finger swipe; those eight slots
+# One recommended set on every OS (maintainer decision, 2026-11-03), in the
+# macOS direction where the content follows the fingers: three fingers left /
+# right = next / previous tab, up / down = new / close tab; four fingers left /
+# right = next / previous desktop (a Space on macOS), up / down = next /
+# previous window of the active app; tap_3 = left_click_toggle, tap_4 =
+# alt_tab_monitor; on macOS a five-finger swipe up keeps Mission Control.
+# Every slot stays reassignable on every OS, and the Gestures menu says to
+# remove the system assignment first to avoid a double action
+# (menu.gestures.recommended_note).
+# - Linux keeps the 2026-10-24 rule (recommend nothing the system already does):
+#   the touchpad is read without being grabbed, so GNOME, KWin, Hyprland and
+#   cosmic-comp also act on a three- or four-finger swipe; those eight slots
 #   are recommended "none" (menu.gestures.recommended_reason_linux). The taps
-#   have no desktop default and keep their binding.
-# - macOS: the three-finger tap is the system's « Look up & data detectors »
-#   (on by default), yet tap_3 stays recommended "left_click_toggle", as on
-#   Windows and Linux, by the maintainer's choice (2026-10-28); the menu's info
-#   dialog says to turn Look up off first (menu.gestures.recommended_reason_macos).
-#   The three-finger swipes are off in a default macOS install, and the
-#   four-finger swipes already recommend "none".
+#   have no desktop default and keep their binding. swipe_5_up stays "none":
+#   Linux has no Mission Control equivalent in the catalogue.
+# - macOS: the four-finger swipes are system gestures in a default install
+#   (Spaces, Mission Control, App Exposé) and the three-finger tap is « Look up
+#   & data detectors »; the driver cannot take them over, so the info dialog
+#   says to turn them off first (menu.gestures.recommended_reason_macos). The
+#   three-finger swipes are off in a default macOS install.
 # - Windows: every slot is a system gesture, but the driver writes the touchpad
 #   registry itself (modules/gestures/touchpad_registry.ahk, backed up first),
-#   so Windows runs only Ergopti's action: no double action, the recommendation
-#   stays.
+#   so Windows runs only Ergopti's action: no double action.
 [[features.gestures]]
 id = "enabled"
 platforms = ["ahk", "hs", "linux"]
@@ -2983,7 +2987,7 @@ id = "swipe_3_down"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
-recommended_per_platform = { ahk = "tab_close", hs = "tab_next", linux = "none" }
+recommended_per_platform = { ahk = "tab_close", hs = "tab_close", linux = "none" }
 family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_3_down"
@@ -2993,7 +2997,7 @@ id = "swipe_3_left"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
-recommended_per_platform = { ahk = "tab_prev", hs = "sel_word_prev", linux = "none" }
+recommended_per_platform = { ahk = "tab_next", hs = "tab_next", linux = "none" }
 family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_3_left"
@@ -3003,7 +3007,7 @@ id = "swipe_3_right"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
-recommended_per_platform = { ahk = "tab_next", hs = "sel_word_next", linux = "none" }
+recommended_per_platform = { ahk = "tab_prev", hs = "tab_prev", linux = "none" }
 family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_3_right"
@@ -3013,7 +3017,7 @@ id = "swipe_3_up"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
-recommended_per_platform = { ahk = "tab_new", hs = "tab_prev", linux = "none" }
+recommended_per_platform = { ahk = "tab_new", hs = "tab_new", linux = "none" }
 family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_3_up"
@@ -3023,7 +3027,7 @@ id = "swipe_4_down"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
-recommended_per_platform = { ahk = "win_app_prev", hs = "none", linux = "none" }
+recommended_per_platform = { ahk = "win_app_prev", hs = "win_app_prev", linux = "none" }
 family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_4_down"
@@ -3033,7 +3037,7 @@ id = "swipe_4_left"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
-recommended_per_platform = { ahk = "desktop_prev", hs = "none", linux = "none" }
+recommended_per_platform = { ahk = "desktop_next", hs = "space_next", linux = "none" }
 family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_4_left"
@@ -3043,7 +3047,7 @@ id = "swipe_4_right"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
-recommended_per_platform = { ahk = "desktop_next", hs = "none", linux = "none" }
+recommended_per_platform = { ahk = "desktop_prev", hs = "space_prev", linux = "none" }
 family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_4_right"
@@ -3053,7 +3057,7 @@ id = "swipe_4_up"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
-recommended_per_platform = { ahk = "win_app_next", hs = "none", linux = "none" }
+recommended_per_platform = { ahk = "win_app_next", hs = "win_app_next", linux = "none" }
 family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_4_up"
@@ -3073,7 +3077,7 @@ id = "tap_4"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
-recommended_per_platform = { ahk = "alt_tab_monitor", hs = "win_app_next", linux = "alt_tab_monitor" }
+recommended_per_platform = { ahk = "alt_tab_monitor", hs = "alt_tab_monitor", linux = "alt_tab_monitor" }
 family = "feature"
 type = "action"
 description_key = "menu.gestures.tap_4"
@@ -3096,7 +3100,7 @@ platforms = ["hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"] }
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
-recommended = "none"
+recommended_per_platform = { hs = "mission_control", linux = "none" }
 family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_5_up"

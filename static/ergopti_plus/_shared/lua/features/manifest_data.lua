@@ -723,40 +723,40 @@ M.features = {
 		path = "gestures.enabled", id = "enabled", section = "gestures", default = false, type = "boolean", description_key = "menu.gestures.enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
 	},
 	{
-		path = "gestures.swipe_3_down", id = "swipe_3_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_down", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "tab_next", linux = "none" }, family = "feature",
+		path = "gestures.swipe_3_down", id = "swipe_3_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_down", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "tab_close", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_3_left", id = "swipe_3_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_left", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "sel_word_prev", linux = "none" }, family = "feature",
+		path = "gestures.swipe_3_left", id = "swipe_3_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_left", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "tab_next", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_3_right", id = "swipe_3_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_right", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "sel_word_next", linux = "none" }, family = "feature",
+		path = "gestures.swipe_3_right", id = "swipe_3_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_right", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "tab_prev", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_3_up", id = "swipe_3_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_up", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "tab_prev", linux = "none" }, family = "feature",
+		path = "gestures.swipe_3_up", id = "swipe_3_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_up", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "tab_new", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_4_down", id = "swipe_4_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_down", platforms = { "ahk", "hs", "linux" }, recommended = "none", family = "feature",
+		path = "gestures.swipe_4_down", id = "swipe_4_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_down", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "win_app_prev", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_4_left", id = "swipe_4_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_left", platforms = { "ahk", "hs", "linux" }, recommended = "none", family = "feature",
+		path = "gestures.swipe_4_left", id = "swipe_4_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_left", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "space_next", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_4_right", id = "swipe_4_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_right", platforms = { "ahk", "hs", "linux" }, recommended = "none", family = "feature",
+		path = "gestures.swipe_4_right", id = "swipe_4_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_right", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "space_prev", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_4_up", id = "swipe_4_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_up", platforms = { "ahk", "hs", "linux" }, recommended = "none", family = "feature",
+		path = "gestures.swipe_4_up", id = "swipe_4_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_up", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "win_app_next", linux = "none" }, family = "feature",
 	},
 	{
 		path = "gestures.tap_3", id = "tap_3", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_3", platforms = { "ahk", "hs", "linux" }, recommended = "left_click_toggle", family = "feature",
 	},
 	{
-		path = "gestures.tap_4", id = "tap_4", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_4", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "win_app_next", linux = "alt_tab_monitor" }, family = "feature",
+		path = "gestures.tap_4", id = "tap_4", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_4", platforms = { "ahk", "hs", "linux" }, recommended = "alt_tab_monitor", family = "feature",
 	},
 	{
 		path = "gestures.swipe_2_left", id = "swipe_2_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_left", platforms = { "hs", "linux" }, recommended = "none", family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 	},
 	{
-		path = "gestures.swipe_5_up", id = "swipe_5_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_up", platforms = { "hs", "linux" }, recommended = "none", family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
+		path = "gestures.swipe_5_up", id = "swipe_5_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_up", platforms = { "hs", "linux" }, recommended_by = { hs = "mission_control", linux = "none" }, family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 	},
 	{
 		path = "gestures.swipe_5_down", id = "swipe_5_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_down", platforms = { "hs", "linux" }, recommended = "none", family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
