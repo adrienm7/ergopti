@@ -11,7 +11,8 @@
 --- shared renderer now normalises its output, and the probes in
 --- test.menu_separators return a separator on both sides of every driver row, the
 --- worst case any provider can produce. The first level of the tray is built by
---- the driver from `top_level`, so its declaration is checked on its own.
+--- the driver from `top_level`, so its declaration is checked on its own. The
+--- same render checks that every section header titles real rows.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -33,6 +34,22 @@ helpers.describe("menu: no separator doubles up on linux", function()
 		})
 		helpers.assert_true(rendered > 10, "every menu of the shared manifest must render, got " .. rendered)
 		helpers.assert_eq(defects, {}, "a separator must sit between two real rows")
+	end)
+
+	-- A section header titles the rows under it: never a separator, another
+	-- header or the end of its menu right after it (test.menu_section_headers).
+	helpers.it("renders every manifest menu with each section header over real rows", function()
+		package.loaded["menu.renderer"] = nil
+		local defects, rendered, headers = require("test.menu_section_headers").render_every_menu(
+			require("menu.renderer"), {
+				platform      = PLATFORM,
+				manifest_path = MANIFEST_PATH,
+				json_decode   = require("json").decode,
+				logger        = helpers.make_logger_stub(),
+			})
+		helpers.assert_true(rendered > 10, "every menu of the shared manifest must render, got " .. rendered)
+		helpers.assert_true(headers > 10, "the section headers must be drawn by the shared format, got " .. headers)
+		helpers.assert_eq(defects, {}, "a section header must title real rows")
 	end)
 
 	helpers.it("declares the first level of the tray without a misplaced separator", function()
