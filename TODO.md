@@ -46,8 +46,10 @@ the field-run step or the hand action that proves it and the commits it confirms
       already resized their view. Gates: `npm run test:browser:layout-composer`, `test_webview_fit_to_window.ahk`.
 - [x] **Layout menu: layers and rows apart.** Header « Couches émulées » above the two layer rows, the four row
       switches in the submenu « Rangées émulées (apprentissage progressif) »; decision in maintainer-decisions.md.
-- [ ] **Next:** full CI `gh workflow run ci.yml --ref wip/layout-composer-responsive -f os_lanes=all`, then fix
-      what it reports (Lua menu tests and eslint did not run locally). Never push `dev` or `main` from here.
+- [ ] **In progress: CI.** Run 41732511158 found the macOS greyed-row count, the OS-purity ratchet, the false-green
+      ratchet and the updater seal (fixed in 775e22a87f..e91ef5bfd7); its Kana installer timeout (Windows
+      config-updater) and Linux tap-hold timing cases look unrelated. Run 41738545832 checks the fixes; then land on
+      `dev` by rebase only when the maintainer asks. Never push `dev` or `main` from here.
 
 ## Release 1.0.9 (maintainer requests of 1-2 November, written so the work survives a lost session)
 
