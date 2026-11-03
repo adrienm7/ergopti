@@ -41,10 +41,12 @@ function M.assert_clean_separators(helpers, rows, state)
 end
 
 --- Asserts the block of the AI menu: the test row right under the profile row,
---- and one separator closing the block before the trigger group.
+--- one separator closing the block, then the settings section header over the
+--- trigger group.
 --- @param helpers table
 --- @param rows table Built AI menu rows.
---- @param captions table { profile, test, trigger }: texts the rows' titles hold.
+--- @param captions table { profile, test, trigger, settings }: texts the rows'
+---   titles hold; `settings` is the settings header's exact title.
 --- @param state string The state under test, for the failure message.
 function M.assert_block(helpers, rows, captions, state)
 	M.assert_clean_separators(helpers, rows, state)
@@ -54,7 +56,10 @@ function M.assert_block(helpers, rows, captions, state)
 	helpers.assert_true(profile ~= nil and test ~= nil and trigger ~= nil, state .. ": the block is drawn")
 	helpers.assert_eq(test, profile + 1, state .. ": the test row follows the profile row")
 	helpers.assert_true(is_separator(rows[test + 1]), state .. ": one separator closes the block")
-	helpers.assert_eq(trigger, test + 2, state .. ": the trigger group follows that separator")
+	local header = rows[test + 2]
+	helpers.assert_eq(header and header.title, captions.settings, state .. ": the settings header follows that separator")
+	helpers.assert_true(header.disabled == true and header.fn == nil, state .. ": the settings header is inert")
+	helpers.assert_eq(trigger, test + 3, state .. ": the trigger group follows the settings header")
 	helpers.assert_true(not is_separator(rows[profile - 1]), state .. ": no separator splits the block")
 end
 
