@@ -88,6 +88,14 @@ function M.macos_symbol(spelling)
 	return symbol
 end
 
+--- Whether the macOS menus draw a glyph for this key (Fn has none).
+--- @param spelling string Any id or alias.
+--- @return boolean
+function M.has_macos_symbol(spelling)
+	local id = M.canonical(spelling)
+	return id ~= nil and Data.macos_symbols[id] ~= nil
+end
+
 --- The translated names of a set of modifiers, joined with " + " in the order
 --- given (« Ctrl + Maj »).
 --- @param modifiers table Ids or aliases, in display order.

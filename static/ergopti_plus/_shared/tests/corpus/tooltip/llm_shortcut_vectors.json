@@ -1,5 +1,5 @@
 {
-	"description": "Cross-driver vectors of the AI prediction tooltip shortcut column: the chord each prediction row shows, from the validation modifiers (in any stored order) and the row index, under each OS native labels. The rule is _shared/lua/tooltip/llm_line.lua shortcut_label, read by macOS and Linux and ported by windows/ui/tooltip/llm.ahk; the labels, order and joiners are the [llm_ui] shortcut_* keys of _shared/modules/tooltip/constants.toml, which each driver test reads through its own configuration loader.",
+	"description": "Cross-driver vectors of the AI prediction tooltip shortcut column: the chord each prediction row shows, from the validation modifiers (in any stored order) and the row index. The rule is _shared/lua/tooltip/llm_line.lua shortcut_label, read by macOS and Linux and ported by windows/ui/tooltip/llm.ahk; the order and joiners are the [llm_ui] shortcut_* keys of _shared/modules/tooltip/constants.toml. Each expected text writes a modifier as {id}, the id of the shared key name table (_shared/data/keycodes/key_names.json): each driver test puts in its own name for it (its glyph on macOS, its translated name on Windows and Linux), so the vectors pin the order, the joiner and the digit while the names stay the table's.",
 	"vectors": [
 		{
 			"id": "bare_digit_row_1",
@@ -117,9 +117,9 @@
 			"modifiers": ["ctrl"],
 			"index": 2,
 			"expected": {
-				"ahk": "Ctrl+2",
-				"hs": "⌃2",
-				"linux": "Ctrl+2"
+				"ahk": "{ctrl}+2",
+				"hs": "{ctrl}2",
+				"linux": "{ctrl}+2"
 			}
 		},
 		{
@@ -128,9 +128,9 @@
 			"modifiers": ["alt"],
 			"index": 2,
 			"expected": {
-				"ahk": "Alt+2",
-				"hs": "⌥2",
-				"linux": "Alt+2"
+				"ahk": "{alt}+2",
+				"hs": "{alt}2",
+				"linux": "{alt}+2"
 			}
 		},
 		{
@@ -139,9 +139,9 @@
 			"modifiers": ["shift"],
 			"index": 2,
 			"expected": {
-				"ahk": "Shift+2",
-				"hs": "⇧2",
-				"linux": "Shift+2"
+				"ahk": "{shift}+2",
+				"hs": "{shift}2",
+				"linux": "{shift}+2"
 			}
 		},
 		{
@@ -150,9 +150,9 @@
 			"modifiers": ["cmd"],
 			"index": 2,
 			"expected": {
-				"ahk": "Win+2",
-				"hs": "⌘2",
-				"linux": "Super+2"
+				"ahk": "{cmd}+2",
+				"hs": "{cmd}2",
+				"linux": "{cmd}+2"
 			}
 		},
 		{
@@ -161,9 +161,9 @@
 			"modifiers": ["alt"],
 			"index": 10,
 			"expected": {
-				"ahk": "Alt+0",
-				"hs": "⌥0",
-				"linux": "Alt+0"
+				"ahk": "{alt}+0",
+				"hs": "{alt}0",
+				"linux": "{alt}+0"
 			}
 		},
 		{
@@ -172,9 +172,9 @@
 			"modifiers": ["shift", "alt", "ctrl"],
 			"index": 3,
 			"expected": {
-				"ahk": "Ctrl+Alt+Shift+3",
-				"hs": "⌃⌥⇧3",
-				"linux": "Ctrl+Alt+Shift+3"
+				"ahk": "{ctrl}+{alt}+{shift}+3",
+				"hs": "{ctrl}{alt}{shift}3",
+				"linux": "{ctrl}+{alt}+{shift}+3"
 			}
 		},
 		{
@@ -183,9 +183,9 @@
 			"modifiers": ["cmd", "shift", "alt", "ctrl"],
 			"index": 4,
 			"expected": {
-				"ahk": "Ctrl+Alt+Shift+Win+4",
-				"hs": "⌃⌥⇧⌘4",
-				"linux": "Ctrl+Alt+Shift+Super+4"
+				"ahk": "{ctrl}+{alt}+{shift}+{cmd}+4",
+				"hs": "{ctrl}{alt}{shift}{cmd}4",
+				"linux": "{ctrl}+{alt}+{shift}+{cmd}+4"
 			}
 		},
 		{

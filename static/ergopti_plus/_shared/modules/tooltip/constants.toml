@@ -349,14 +349,13 @@ footer_combined_separator = "|"
 # beyond), right-aligned against the panel's inner edge at least
 # [layout].label_gap from the widest line, at the hint size, in cmd_dim. The
 # modifiers follow shortcut_modifier_order whatever order the configuration
-# lists them in, under each OS's native labels (same positions), joined by its
-# joiner and then to the digit. No modifier means the bare digit. Vectors:
+# lists them in, each named by the shared key name table
+# (_shared/data/keycodes/key_names.json): its glyph on macOS, its translated
+# name on Windows and Linux (« Ctrl+Maj+3 »), joined by the OS's joiner and
+# then to the digit. No modifier means the bare digit. Vectors:
 # _shared/tests/corpus/tooltip/llm_shortcut_vectors.json; rule:
 # _shared/lua/tooltip/llm_line.lua (ported in windows/ui/tooltip/llm.ahk).
 shortcut_modifier_order = "ctrl,alt,shift,cmd"
-shortcut_labels_ahk = "Ctrl,Alt,Shift,Win"
-shortcut_labels_hs = "⌃,⌥,⇧,⌘"
-shortcut_labels_linux = "Ctrl,Alt,Shift,Super"
 shortcut_joiner_ahk = "+"
 shortcut_joiner_hs = ""
 shortcut_joiner_linux = "+"

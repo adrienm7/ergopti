@@ -163,8 +163,12 @@ helpers.describe("tooltip_llm: the shortcut column (llm-shortcut-column)", funct
 		helpers.it("(llm-shortcut-column) label: " .. vector.id, function()
 			support.with_fixture(function(fixture)
 				local context = fixture.load_tooltip(support.CASES[1])
+				-- {id} stands for the key name table's glyph of that modifier.
+				local expected = vector.expected.hs:gsub("{(%a+)}", function(id)
+					return require("keycodes.key_names").macos_symbol(id)
+				end)
 				helpers.assert_eq(LlmLine.shortcut_label(vector.index, vector.modifiers,
-					context.config.llm_ui.shortcut_spec), vector.expected.hs, vector.id)
+					context.config.llm_ui.shortcut_spec), expected, vector.id)
 			end)
 		end)
 	end

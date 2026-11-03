@@ -108,7 +108,6 @@ global UI_LLM_INACTIVE_ALIGN_CHAR   := ""
 global UI_LLM_FOOTER_SPACE_DIV      := ""
 global UI_LLM_FOOTER_COMBINED_SEP   := ""
 global UI_LLM_SHORTCUT_ORDER        := ""
-global UI_LLM_SHORTCUT_LABELS       := ""
 global UI_LLM_SHORTCUT_JOINER       := ""
 global UI_LLM_HINT_ACCEPT_SINGLE    := ""
 global UI_LLM_HINT_NAV_LEFT         := ""
@@ -242,11 +241,10 @@ UiStyle_LoadSharedConst() {
 	global UI_LLM_INACTIVE_ALIGN_CHAR  := _UiStyleRequire(c, "llm_ui", "inactive_align_char")
 	global UI_LLM_FOOTER_SPACE_DIV     := _UiStyleRequire(c, "llm_ui", "footer_space_divider")
 	global UI_LLM_FOOTER_COMBINED_SEP  := _UiStyleRequire(c, "llm_ui", "footer_combined_separator")
+	; The modifiers of the order are named by the shared key name table
+	; (KeyNameLabel), in the active language.
 	global UI_LLM_SHORTCUT_ORDER       := _UiStyleRequire(c, "llm_ui", "shortcut_modifier_order")
-	global UI_LLM_SHORTCUT_LABELS      := _UiStyleRequire(c, "llm_ui", "shortcut_labels_ahk")
 	global UI_LLM_SHORTCUT_JOINER      := _UiStyleRequire(c, "llm_ui", "shortcut_joiner_ahk")
-	if StrSplit(UI_LLM_SHORTCUT_ORDER, ",").Length != StrSplit(UI_LLM_SHORTCUT_LABELS, ",").Length
-		_UiStyleFatal("llm_ui", "shortcut_labels_ahk", "shortcut_modifier_order")
 	global UI_LLM_HINT_ACCEPT_SINGLE   := _UiStyleRequire(c, "llm_ui", "hint_accept_single")
 	global UI_LLM_HINT_NAV_LEFT        := _UiStyleRequire(c, "llm_ui", "hint_nav_left")
 	global UI_LLM_HINT_NAV_RIGHT       := _UiStyleRequire(c, "llm_ui", "hint_nav_right")

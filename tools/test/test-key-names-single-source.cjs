@@ -157,19 +157,18 @@ for (const [id, entry] of Object.entries(TABLE.keys)) {
 	if (!lua.includes(`\t\t${id} = "${entry.macos_symbol}",`))
 		errors.push(`key_names_data.lua lacks the macOS symbol of ${id}`);
 }
-// The AI tooltip's macOS shortcut column draws the same glyphs.
+// The AI tooltip's shortcut column names every modifier of its order from this
+// table: a glyph on macOS, a translated name elsewhere.
 const tooltip = TOML.parse(
 	fs.readFileSync(shared('modules', 'tooltip', 'constants.toml'), 'utf8')
 ).llm_ui;
-const tooltipOrder = tooltip.shortcut_modifier_order.split(',');
-const tooltipSymbols = tooltip.shortcut_labels_hs.split(',');
-tooltipOrder.forEach((modifier, index) => {
-	const symbol = TABLE.keys[canonical(modifier)].macos_symbol;
-	if (symbol !== tooltipSymbols[index])
+for (const modifier of tooltip.shortcut_modifier_order.split(',')) {
+	const id = canonical(modifier);
+	if (id === null || TABLE.keys[id].macos_symbol === undefined)
 		errors.push(
-			`tooltip shortcut_labels_hs draws ${modifier} as ${tooltipSymbols[index]}, not ${symbol}`
+			`tooltip shortcut_modifier_order names ${modifier}, which has no key name and glyph`
 		);
-});
+}
 for (const [code, legend] of Object.entries(legends))
 	if (!lua.includes(`\t\t\t${code} = ${JSON.stringify(legend)},`))
 		errors.push(`key_names_data.lua lacks the physical legend of ${code}`);

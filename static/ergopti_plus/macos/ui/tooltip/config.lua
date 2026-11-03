@@ -48,6 +48,7 @@ local M = {}
 local Logger = require("infra.logger")
 local NativePath = require("native_path")
 local LlmLine = require("tooltip.llm_line")
+local KeyNames = require("keycodes.key_names")
 local LOG = "tooltip_config"
 
 -- Populated strictly from _shared/modules/tooltip/constants.toml at require-time (fail fast).
@@ -328,9 +329,10 @@ local function load_from_shared()
 		inactive_align_char  = require_key("llm_ui", "inactive_align_char"),
 		footer_space_divider = require_key("llm_ui", "footer_space_divider"),
 		footer_combined_sep  = require_key("llm_ui", "footer_combined_separator"),
-		-- The shortcut column's modifier labels (_shared/lua/tooltip/llm_line.lua).
+		-- The shortcut column's modifiers (_shared/lua/tooltip/llm_line.lua), as
+		-- the glyphs of the shared key name table.
 		shortcut_spec        = LlmLine.shortcut_spec(require_key("llm_ui", "shortcut_modifier_order"),
-			require_key("llm_ui", "shortcut_labels_hs"), require_key("llm_ui", "shortcut_joiner_hs")),
+			require_key("llm_ui", "shortcut_joiner_hs"), KeyNames.macos_symbol),
 		hint_accept_single   = require_key("llm_ui", "hint_accept_single"),
 		hint_nav_left        = require_key("llm_ui", "hint_nav_left"),
 		hint_nav_right       = require_key("llm_ui", "hint_nav_right"),
@@ -342,7 +344,7 @@ local function load_from_shared()
 		hint_arrow_sep_right = require_key("llm_ui", "hint_arrow_sep_right"),
 	}
 	if not M.llm_ui.shortcut_spec then
-		error("[tooltip/config] [llm_ui].shortcut_labels_hs must label every modifier of shortcut_modifier_order")
+		error("[tooltip/config] [llm_ui].shortcut_modifier_order and shortcut_joiner_hs must declare the shortcut column")
 	end
 
 	-- [tint]
