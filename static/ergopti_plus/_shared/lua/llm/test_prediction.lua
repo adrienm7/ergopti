@@ -73,7 +73,7 @@ function M.duration(ms, text)
 	local whole = math.floor(ms + 0.5)
 	if whole < M.MS_PER_SECOND then return fill(text("llm.test_prediction.duration_ms"), tostring(whole)) end
 	local tenths = math.floor(whole * 10 / M.MS_PER_SECOND + 0.5)
-	return fill(text("llm.test_prediction.duration_s"), tostring(tenths // 10), tostring(tenths % 10))
+	return fill(text("llm.test_prediction.duration_s"), tostring(math.floor(tenths / 10)),tostring(tenths % 10))
 end
 
 --- The readable reason of a backend failure, whichever form the backend gives.
