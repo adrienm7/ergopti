@@ -23,7 +23,8 @@
  * @returns {Menu} The rendered submenu.
  */
 BuildGesturesMenu(Options := unset) {
-	ScopeOptions := IsSet(Options) ? Options : Map()
+	; The tray's clear restores the real touchpad; injected options carry a fake.
+	ScopeOptions := IsSet(Options) ? Options : Map("touchpad_restore", TouchpadRegistryRestore)
 	; The scope's restore and clear are `command` rows of the first group since
 	; 2026-09-30 (switch, restore, clear, separator): the renderer builds each row
 	; and its label from the declaration, and this driver registers only what the
@@ -72,13 +73,22 @@ _GES_IsEnabled() {
 
 ; Whole-scope actions use the manifest owner, including the master and parameters.
 ; The receipt remains pending until the existing terminal reload acknowledges it.
+; The clear also puts the touchpad back to its system state (the registry
+; backup, or the Windows factory defaults): « comportement du système » means
+; Windows' own gestures again, not only an empty Ergopti configuration. It runs
+; first because its touchpad restart asks for elevation, which must not hold
+; up the reload handoff the configuration commit starts.
 _GES_ApplyScope(Mode, Options := unset) {
 	Selected := IsSet(Options) ? Options.Clone() : Map()
 	if !(Selected is Map) || Selected.Has("supplement")
 		throw ValueError("Gesture scope requires its own persistence supplement.")
+	Touchpad := Mode == "clear" ? TouchpadRegistryClearFromScope(Selected) : ""
 	Selected["supplement"] := GestureScopeResetOperations
-	return ConfigScopeApply("gestures", Mode,
+	Receipt := ConfigScopeApply("gestures", Mode,
 		Map("action_parameters", ConfigScopeActionParameterPaths), Selected)
+	if (Touchpad != "")
+		Receipt["touchpad"] := Touchpad
+	return Receipt
 }
 
 ; List provider: the slots grouped by finger count, fewest fingers first, in

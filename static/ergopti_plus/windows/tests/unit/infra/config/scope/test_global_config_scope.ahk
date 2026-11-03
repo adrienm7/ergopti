@@ -1,5 +1,13 @@
 ﻿; tests/unit/infra/config/scope/test_global_config_scope.ahk
 
+; How many times Event was recorded.
+_GSC_Count(Events, Event) {
+	Count := 0
+	for Recorded in Events
+		Count += Recorded == Event
+	return Count
+}
+
 ; One real WAL and detached owners; native rollback denial uses a real sharing handle.
 _GlobalScopeComposition(Mode, Scenario := "late") {
 	global _ConfigTransitionRetainedBarrier
@@ -115,10 +123,14 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 			Assert(!Parsed["llm"].Has("ollama_port"))
 			if Mode == "clear" {
 				Assert(!Parsed["gestures"].Has("tap_4"))
+				; The global clear composes the Gestures clear, touchpad included.
+				AssertEqual("factory_defaults", Receipt.Get("touchpad", ""))
+				AssertEqual(1, _GSC_Count(Fixture.touchpad, "restore"), "the global clear restores the touchpad once")
 				AssertEqual(true, Parsed["category_enabled"]["tap_holds"],
 					"no clear rewrites the Tap-Holds switch (tap-hold-clear-keeps-switch)")
 				Assert(!Parsed["category_enabled"].Has("shortcuts"), "the other category switches are still cleared")
 			} else {
+				AssertEqual(0, Fixture.touchpad.Length, "the global restore leaves the touchpad alone")
 				AssertEqual(ManifestRecommendedFor("gestures.tap_4"), Parsed["gestures"]["tap_4"])
 				AssertEqual(ManifestRecommendedFor("category_enabled.tap_holds"), Parsed["category_enabled"]["tap_holds"])
 			}

@@ -5,7 +5,8 @@
 ; DESCRIPTION:
 ; F2: the Windows touchpad registry values come from one generated table, both
 ; writers read it, the prior values are backed up before the first write, and
-; « Restaurer les gestes du pavé tactile Windows » puts them back exactly.
+; the Gestures « Tout effacer » puts them back exactly (or the Windows factory
+; defaults when no backup exists).
 ;
 ; ROOT CAUSE ENCODED:
 ; The in-process writer and the wizard's elevated PowerShell script each carried
@@ -222,15 +223,99 @@ _TPR_RestorePutsTheUserSettingsBack() {
 Test("touchpad registry: restore puts the user's own values back (touchpad-restore-exact)",
 	_TPR_RestorePutsTheUserSettingsBack)
 
-_TPR_RestoreWithoutBackupChangesNothing() {
-	global _TPR_Registry
-	_TPR_Reset(Map())
-	AssertEqual("no_backup", TouchpadRegistryRestore(0, _TPR_RestoreSeams()))
-	AssertEqual(0, _TPR_Count("write ") + _TPR_Count("delete ") + _TPR_Count("restart"),
-		"Ergopti never changed these settings, so nothing is touched")
+; Without a backup the restore once changed nothing, so a clear left the
+; touchpad sending Ergopti's shortcuts. It now writes the Windows factory
+; defaults: each family enable gets its shipped value, every other name goes.
+_TPR_RestoreWithoutBackupWritesTheFactoryDefaults() {
+	global _TPR_Registry, _TPR_Log
+	Data := TouchpadRegistryData()
+	Factory := Data["factory_defaults"]
+	AssertEqual(4, Factory.Count, "each gesture family has a shipped value")
+	; A profile Ergopti configured without leaving a backup (it was deleted).
+	Configured := Map()
+	for _, Entry in Data["values"]
+		Configured[Entry["name"]] := Entry["value"]
+	_TPR_Reset(Configured)
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try Result := TouchpadRegistryRestore(0, _TPR_RestoreSeams())
+	finally LoggerSetTestSink(0)
+	AssertEqual("factory_defaults", Result)
+	AssertEqual(Factory.Count, _TPR_Registry.Count, "only the family enables remain")
+	for Name, Value in Factory
+		AssertEqual(Value, _TPR_Registry.Get(Name, ""), Name . " holds its Windows default")
+	AssertEqual(Factory.Count, _TPR_Count("write "), "only the shipped values are written")
+	AssertEqual(Data["values"].Length - Factory.Count, _TPR_Count("delete "),
+		"every other value Ergopti writes is deleted")
+	AssertEqual(0, _TPR_Count("remove backup"), "there is no backup to remove")
+	AssertEqual("restart", _TPR_Log[_TPR_Log.Length], "the touchpad restarts last, to reload its map")
+	Logged := ""
+	for Line in Lines
+		Logged .= Line . "`n"
+	AssertContains(Logged, "No touchpad backup: restoring the Windows factory defaults.",
+		"the log says which path ran")
 }
-Test("touchpad registry: no backup, nothing to restore (touchpad-restore-none)",
-	_TPR_RestoreWithoutBackupChangesNothing)
+Test("touchpad registry: no backup, the Windows factory defaults (touchpad-restore-factory)",
+	_TPR_RestoreWithoutBackupWritesTheFactoryDefaults)
+
+_TPR_RestoreLogsTheBackupPath() {
+	_TPR_Reset(_TPR_UserSettings())
+	AssertTrue(_TPR_Apply())
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try AssertEqual("restored", TouchpadRegistryRestore(0, _TPR_RestoreSeams()))
+	finally LoggerSetTestSink(0)
+	Logged := ""
+	for Line in Lines
+		Logged .= Line . "`n"
+	AssertContains(Logged, "Restoring the touchpad values backed up in", "the log names the backup path")
+	AssertEqual(0, InStr(Logged, "factory defaults"), "a backed-up restore writes no factory default")
+}
+Test("touchpad registry: a backup is restored, not the factory defaults (touchpad-restore-path-logged)",
+	_TPR_RestoreLogsTheBackupPath)
+
+; The clear tells the user which values came back; an unknown result is a bug.
+_TPR_ClearToSystemNotifiesEachPath() {
+	for _, Expected in [["restored", "notify.touchpad.restored"],
+			["factory_defaults", "notify.touchpad.factory_defaults"], ["failed", ""]] {
+		Shown := []
+		Result := TouchpadRegistryClearToSystem(((R) => () => R)(Expected[1]),
+			(Message, Opts) => (Shown.Push(Message), true))
+		AssertEqual(Expected[1], Result)
+		if (Expected[2] == "")
+			AssertEqual(0, Shown.Length, "a failure is already an ERROR, not a success notice")
+		else {
+			AssertEqual(1, Shown.Length)
+			AssertEqual(t(Expected[2]), Shown[1])
+		}
+	}
+	Threw := false
+	try TouchpadRegistryClearToSystem(() => "no_backup", (*) => true)
+	catch ValueError
+		Threw := true
+	AssertTrue(Threw, "a result the clear does not know is refused")
+	Threw := false
+	try TouchpadRegistryClearFromScope(Map())
+	catch ValueError
+		Threw := true
+	AssertTrue(Threw, "a scope clear without its touchpad port fails instead of skipping the touchpad")
+}
+Test("touchpad registry: the clear says which values came back (touchpad-clear-notice)",
+	_TPR_ClearToSystemNotifiesEachPath)
+
+; The Configuration row was merged into the Gestures clear (maintainer, 2026-11-03).
+_TPR_NoConfigurationRestoreRow() {
+	Body := _DriverFuncBody("_MI_BuildConfigurationMenu")
+	Assert(Body != "", "the Configuration builder must exist")
+	AssertEqual(0, InStr(Body, "Touchpad"), "Configuration no longer dispatches a touchpad restore")
+	for _, Entry in _MM_GetManifestRoot()["configuration_menu"]
+		AssertFalse(Entry.Get("id", "") == "restore_touchpad_gestures", "Configuration declares no touchpad row")
+	Clear := _DriverFuncBody("_GES_ApplyScope")
+	Assert(Clear != "", "the Gestures scope owner must exist")
+	AssertTrue(InStr(Clear, "TouchpadRegistryClearFromScope(") > 0, "the Gestures clear restores the touchpad")
+}
+Test("touchpad registry: the restore lives in the Gestures clear (gestures-clear-restores-touchpad)",
+	_TPR_NoConfigurationRestoreRow)
 
 _TPR_UnprovableBackupIsRefused() {
 	global _TPR_Files, _TPR_Registry, _TPR_DeleteFails
