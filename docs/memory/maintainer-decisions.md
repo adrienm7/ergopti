@@ -5,6 +5,19 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The layout menu keeps layers and rows apart (2026-11-03)
+
+The Windows Keyboard layout menu read as a duplicate: the Base/Shift and AltGr
+emulation rows, then the four `layout.emulate_*_row` switches. Both axes stay,
+because they answer different questions (which Ergopti layers the emulation
+types, and on which keyboard rows). The layer rows sit under the header
+« Couches émulées » (`menu.layout.header_layers`); the row switches moved into
+the submenu « Rangées émulées (apprentissage progressif) »
+(`menu.layout.emulated_rows`, `layout_emulated_rows_group` in `menu.toml`),
+since switching rows on one by one is how a user learns the layout gradually.
+macOS and Linux emulate no layout: they draw that submenu's row greyed with
+`platform_reason.layout_emulation_is_windows_only`.
+
 ## Restore holds its stage by handle (2026-11-01)
 
 The audit's "restore staging substitution" is fixed on Windows, after two rejected

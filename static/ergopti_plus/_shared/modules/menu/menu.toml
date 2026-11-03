@@ -2108,6 +2108,15 @@ status_rows.no_bundle = [{ type = "label", i18n = "menu.layout.no_bundle" }]
 platforms = ["hs"]
 reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
+# Two axes of the emulation, kept apart (maintainer, 2026-11-03): which Ergopti
+# LAYERS it types, under this header, and which keyboard ROWS, in the submenu
+# below. Read as one flat block they looked like the same switches twice.
+[[menu.layout_menu]]
+type = "section_header"
+i18n = "menu.layout.header_layers"
+platforms = ["ahk"]
+unavailable = "hide"
+
 # `list` rather than `dynamic` since 2026-08-07: the driver answers with row
 # DATA and the renderer materialises it, where a `dynamic` handler was handed the
 # menu object and built the rows itself.
@@ -2129,15 +2138,18 @@ platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
 
 # The rows the emulation types, one checkbox each (the layout.emulate_<row>
-# switches). The other drivers emulate no layout: they draw each row greyed
-# with why, in the custom-layout section, without this header.
+# switches), in their own submenu: switching rows on one by one is how a user
+# learns the layout progressively. The other drivers emulate no layout: they
+# draw this submenu's row greyed with why.
 [[menu.layout_menu]]
-type = "section_header"
-i18n = "menu.layout.header_rows"
+type = "group"
+id = "layout_emulated_rows"
+i18n = "menu.layout.emulated_rows"
 platforms = ["ahk"]
-unavailable = "hide"
+unavailable = "grey"
+reason_key = "platform_reason.layout_emulation_is_windows_only"
 
-[[menu.layout_menu]]
+[[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_number_row"
 i18n = "menu.layout.emulate_number_row"
@@ -2145,7 +2157,7 @@ platforms = ["ahk"]
 unavailable = "grey"
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 
-[[menu.layout_menu]]
+[[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_top_row"
 i18n = "menu.layout.emulate_top_row"
@@ -2153,7 +2165,7 @@ platforms = ["ahk"]
 unavailable = "grey"
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 
-[[menu.layout_menu]]
+[[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_home_row"
 i18n = "menu.layout.emulate_home_row"
@@ -2161,7 +2173,7 @@ platforms = ["ahk"]
 unavailable = "grey"
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 
-[[menu.layout_menu]]
+[[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_bottom_row"
 i18n = "menu.layout.emulate_bottom_row"

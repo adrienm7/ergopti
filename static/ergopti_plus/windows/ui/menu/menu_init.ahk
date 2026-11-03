@@ -223,8 +223,11 @@ _MI_StageLayout() {
 	)
 	; The accented-letter group stays enabled without the Ergopti emulation: the
 	; shortcuts then follow the user's own layout (accented_shortcuts.ahk).
-	LayoutMenu  := MenuDeferOrBuild((Target) => MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders,
-		_LAY_ScopeCommands(),
+	; The emulated-row switches are the manifest's layout_emulated_rows_group.
+	LayoutGroupBuilders := Map("layout_emulated_rows", () => MenuRenderer_Build("layout_emulated_rows_group", "Layout",
+		"", "", "", _LAY_ScopeCommands(), Map("layout_enabled", () => IsCategoryGated("Layout"))))
+	LayoutMenu  := MenuDeferOrBuild((Target) => MenuRenderer_Build("layout_menu", "Layout", "", LayoutGroupBuilders,
+		LayoutListProviders, _LAY_ScopeCommands(),
 		Map("layout_enabled", () => IsCategoryGated("Layout")), Target), "layout_menu")
 	_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true)
 	BootProfile_Mark("MENU/initMenu: layout built+added")

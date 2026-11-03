@@ -82,6 +82,29 @@ Test("manifest_menu: the key-combinations group opens with its own switch", () =
 	)
 ))
 
+; Maintainer decision of 2026-11-03: the layout menu keeps its two axes apart.
+; The emulated layers sit under their own header, the row switches in a
+; submenu; flat, the second block read as a copy of the first.
+_MM_LayoutAxesAreApart() {
+	Sequence := ""
+	for Row in _MR_GetMenuDef("layout_menu") {
+		if !_MR_IsForAhk(Row)
+			continue
+		Type := _MR_Get(Row, "type")
+		Name := Type == "section_header" ? _MR_Get(Row, "i18n") : _MR_Get(Row, Type == "feature" ? "path" : "id")
+		if InStr(Name, "layout_features_") || InStr(Name, "header_layers") || InStr(Name, "emulated_rows")
+			|| InStr(Name, "emulate_")
+			Sequence .= (Sequence == "" ? "" : ",") . Type . ":" . Name
+	}
+	AssertEqual("section_header:menu.layout.header_layers,list:layout_features_base,list:layout_features_altgr,"
+		. "group:layout_emulated_rows", Sequence,
+		"the layers header, its two layer rows, then the one row-switch submenu; no row switch left inline")
+	AssertEqual("layout.emulate_number_row,layout.emulate_top_row,layout.emulate_home_row,layout.emulate_bottom_row",
+		_MM_AhkRowIds("layout_emulated_rows_group", "feature"), "the submenu holds the four row switches in order")
+}
+Test("manifest_menu: the layout menu separates emulated layers and the row submenu (layout-menu-axes)",
+	_MM_LayoutAxesAreApart)
+
 ; Joins the ids (the paths, for ``feature`` rows) of the Windows rows of one type
 ; of a manifest section, in order.
 _MM_AhkRowIds(SectionKey, RowType) {
