@@ -221,6 +221,7 @@
 	"common.error_title": "错误",
 	"common.key_enter": "回车",
 	"common.key_space": "空格",
+	"common.label_value": "{1}：{2}",
 	"field_check.verdict_pass": "所有步骤均已通过。",
 	"field_check.verdict_fail": "至少有一个步骤失败。",
 	"field_check.copy": "复制报告",

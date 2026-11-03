@@ -221,6 +221,7 @@
 	"common.error_title": "Ошибка",
 	"common.key_enter": "Ввод",
 	"common.key_space": "Пробел",
+	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "Все шаги пройдены.",
 	"field_check.verdict_fail": "Хотя бы один шаг не пройден.",
 	"field_check.copy": "Копировать отчёт",

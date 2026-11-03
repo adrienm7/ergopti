@@ -22,6 +22,7 @@ local dialog        = require("infra.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
 local text_acts     = require("modules.shortcuts.actions.text")
 local i18n          = require("infra.i18n")
+local LabelValue = require("locale.label_value")
 local MenuUtils     = require("ui.menu.menu_utils")
 local ManifestMenu  = require("infra.manifest_menu")
 local WrapMutation  = require("menu.wrap_mutation")
@@ -204,7 +205,7 @@ local function make_shortcut_item(s, shortcuts, ctx)
 	-- materialises `items` the same way a `list` row's provider rows are, so a
 	-- group builder no longer has to assemble the driver's own tree.
 	return {
-		label    = pk .. (desc ~= "" and (" : " .. desc) or ""),
+		label    = desc ~= "" and LabelValue.compose(i18n.get, pk, desc) or pk,
 		checked  = is_on or nil,
 		disabled = not state.shortcuts or paused or nil,
 		action   = (state.shortcuts and not paused) and (function(id)
@@ -382,7 +383,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 			if type(cs) == "table" and type(cs.left) == "string" and cs.left ~= "" then
 				local right   = (type(cs.right) == "string" and cs.right ~= "") and cs.right or cs.left
 				local cs_lbl  = (cs.left == right) and cs.left or (cs.left .. " … " .. right)
-				cs_lbl = cs_lbl .. " : " .. i18n.get("menu.shortcuts.wrap_symbols_custom_label")
+				cs_lbl = LabelValue.compose(i18n.get, cs_lbl, i18n.get("menu.shortcuts.wrap_symbols_custom_label"))
 				local del_sub = ManifestMenu.template_rows("wrap_symbols_custom_controls", {
 					[require("config_keys").COMMAND.WRAP_SYMBOLS_DELETE_CUSTOM] = (function(i) return function()
 						return mutate_wrap(function(candidate)

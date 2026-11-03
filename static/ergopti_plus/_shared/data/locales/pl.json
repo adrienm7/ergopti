@@ -221,6 +221,7 @@
 	"common.error_title": "Błąd",
 	"common.key_enter": "Enter",
 	"common.key_space": "Spacja",
+	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "Wszystkie kroki zakończyły się powodzeniem.",
 	"field_check.verdict_fail": "Co najmniej jeden krok nie powiódł się.",
 	"field_check.copy": "Kopiuj raport",

@@ -1931,11 +1931,13 @@ _MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters) {
 				CurrentLabel .= " " . t(UnitI18n)
 		}
 	}
-	Label := t(I18nKey) . _MR_Get(Item, "current_choice_suffix")
+	Label := t(I18nKey)
 	if _MR_Get(Item, "show_current_choice", false) {
 		if CurrentLabel == ""
 			CurrentLabel := String(Current)
-		Label := StrReplace(Label, _MR_Get(Item, "current_choice_placeholder", "{1}"), CurrentLabel)
+		Label := _MR_Get(Item, "current_choice_label_value", false)
+			? LabelValue(Label, CurrentLabel)
+			: StrReplace(Label, _MR_Get(Item, "current_choice_placeholder", "{1}"), CurrentLabel)
 	}
 	Disabled := MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters)
 	; A greyed choice that declares why (``disabled_reason_key``) opens nothing

@@ -221,6 +221,7 @@
 	"common.error_title": "Error",
 	"common.key_enter": "Intro",
 	"common.key_space": "Espacio",
+	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "Todos los pasos se superaron.",
 	"field_check.verdict_fail": "Al menos un paso falló.",
 	"field_check.copy": "Copiar informe",

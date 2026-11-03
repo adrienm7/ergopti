@@ -248,7 +248,7 @@ TapKeyRows(Probe := "") {
 			? GestureActionDisplayLabel(Action, TapKeyBindingId(Id))
 			: t("menu.shortcuts.tap_keys.unassigned")
 		Name := TapKeyDisplayName(Id, Probe)
-		Rows.Push(Map("label", Name . " : " . ActionLabel, "action", _TapKeyPickerOpener(Id, Name)))
+		Rows.Push(Map("label", LabelValue(Name, ActionLabel), "action", _TapKeyPickerOpener(Id, Name)))
 	}
 	return Rows
 }

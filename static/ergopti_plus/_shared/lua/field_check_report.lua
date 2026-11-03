@@ -19,6 +19,8 @@
 ---    running, logging and presentation.
 --- ==============================================================================
 
+local LabelValue = require("locale.label_value")
+
 local M = {}
 
 --- Step states. A run passes when no step failed; info and skip never fail it.
@@ -128,7 +130,7 @@ function M.format_text(result, translate)
 	}
 	for _, step in ipairs(result.steps) do
 		local line = MARKS[step.state] .. " " .. translate("field_check.step." .. step.id)
-		if step.value then line = line .. " : " .. step.value end
+		if step.value then line = LabelValue.compose(translate, line, step.value) end
 		lines[#lines + 1] = line
 	end
 	return table.concat(lines, "\n")

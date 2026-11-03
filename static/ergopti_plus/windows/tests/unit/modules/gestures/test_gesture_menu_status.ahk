@@ -73,7 +73,7 @@ _GTB_AssertSlotRows(Rows, ExpectedLength, TapPosition) {
 	AssertEqual(ExpectedLength, Rows.Length)
 	for Pair in [[1, "swipe_3_up"], [TapPosition, "tap_4"], [TapPosition + 1, "tap_3"]] {
 		Row := Rows[Pair[1]]
-		AssertTrue(InStr(Row["label"], t("gesture.slots." . Pair[2]) . " : ") == 1)
+		AssertTrue(InStr(Row["label"], LabelValue(t("gesture.slots." . Pair[2]), "")) == 1)
 		Assert(Row["action"] is Func, "the existing slot action remains its native callback")
 		AssertFalse(Row["disabled"])
 	}
@@ -254,7 +254,7 @@ _GSS_RowsFollowAvailabilityInner() {
 	AssertFalse(InStr(Rows[1]["label"], Reason), "an available row carries no reason")
 	AssertTrue(Rows[3]["disabled"], "tap_4 is not assigned")
 	AssertTrue(SubStr(Rows[3]["label"], -StrLen(Reason)) == Reason, "the reason ends the greyed label")
-	AssertTrue(InStr(Rows[3]["label"], t("gesture.slots.tap_4") . " : ") == 1, "the slot name still leads")
+	AssertTrue(InStr(Rows[3]["label"], LabelValue(t("gesture.slots.tap_4"), "")) == 1, "the slot name still leads")
 	AssertFalse(Rows[4]["disabled"], "tap_3 is assigned")
 	; Nothing assigned and an unreadable registry grey every row.
 	for Reader in [(Name) => "", TestGestures_RefuseSystemRead] {

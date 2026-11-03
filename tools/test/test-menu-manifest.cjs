@@ -205,8 +205,8 @@ function main() {
 	);
 	require('node:assert/strict').deepEqual(frequencyDeclaration?.choices, frequencyCorpus.choices);
 	require('node:assert/strict').equal(
-		frequencyDeclaration?.current_choice_suffix,
-		frequencyCorpus.suffix
+		frequencyDeclaration?.current_choice_label_value,
+		frequencyCorpus.label_value
 	);
 
 	// Walk every array at the top level of the manifest and validate each
@@ -671,7 +671,7 @@ function checkChoiceProjection() {
 		const frequencyRow = menu.about_update_frequency_menu[0];
 		assert.deepEqual(frequencyRow.choices, frequencyCorpus.choices);
 		assert.equal(frequencyRow.path, frequencyCorpus.path);
-		assert.equal(frequencyRow.current_choice_suffix, frequencyCorpus.suffix);
+		assert.equal(frequencyRow.current_choice_label_value, frequencyCorpus.label_value);
 		assert.equal(Object.hasOwn(frequencyRow, 'choice_registry'), false);
 		const indentationCorpus = JSON.parse(
 			readSourceFile(path.join(SHARED, 'tests/corpus/menus/indentation_control.json'))
@@ -687,7 +687,7 @@ function checkChoiceProjection() {
 			}))
 		);
 		assert.equal(indentation[0].path, indentationCorpus.row.path);
-		assert.equal(indentation[0].current_choice_suffix, ': {1}');
+		assert.equal(indentation[0].current_choice_label_value, true);
 		assert.equal(
 			Object.hasOwn(indentation[0], 'platforms'),
 			false,
@@ -915,7 +915,7 @@ function checkChoiceProjection() {
 		assert.equal(logRow.type, 'choice');
 		assert.equal(logRow.path, 'script.log_level');
 		assert.deepEqual(logRow.choices, logCorpus.levels);
-		assert.equal(logRow.current_choice_suffix, ' : {1}');
+		assert.equal(logRow.current_choice_label_value, true);
 		for (const key of ['choice_values', 'choice_label_kind', 'choice_icons'])
 			assert.equal(Object.hasOwn(logRow, key), false, 'source metadata is consumed');
 		const logOrder = original.replace(
@@ -960,15 +960,15 @@ function checkChoiceProjection() {
 			],
 			['ERROR = "❌"', 'ERROR = "untranslated caption"', 'choice_icons'],
 			[
-				'current_choice_suffix = " : {1}"',
-				'current_choice_suffix = " level: {1}"',
-				'current_choice_suffix'
+				'current_choice_label_value = true',
+				'current_choice_label_value = false',
+				'current_choice_label_value'
 			],
 			['ERROR = "❌"', 'OTHER = "❌"', 'choice_icons'],
 			[
-				'current_choice_suffix = " : {1}"',
-				'current_choice_suffix = " : {2}"',
-				'current_choice_suffix'
+				'current_choice_label_value = true',
+				'current_choice_label_value = "{1}"',
+				'current_choice_label_value'
 			]
 		]) {
 			const invalid = original.replace(oldValue, invalidValue);
@@ -9634,12 +9634,12 @@ console.log(
 			type: 'command',
 			id: 'magic_key_config_linux',
 			command: 'magic_key_change',
-			i18n: 'menu.hotstrings.magic_key',
+			i18n: 'menu.hotstrings.magic_key_prefix',
 			platforms: ['linux'],
 			unavailable: 'hide',
 			caption_getter: 'magic_key_value',
 			caption_layout: 'prefix',
-			caption_joiner: ' : '
+			caption_joiner: ''
 		},
 		{ type: 'list', id: 'magic_key_reset_if_custom', platforms: ['linux'], unavailable: 'hide' }
 	]);

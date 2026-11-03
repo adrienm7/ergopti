@@ -81,6 +81,7 @@ local function reasoned_group_current(receipt, seen)
 end
 
 local utf8_length = require("compat.utf8").len
+local LabelValue = require("locale.label_value")
 
 -- Literal command decoration does not interpret percent bytes or native data.
 local function command_literal_prefix(item)
@@ -946,11 +947,16 @@ function M.new(deps)
 				end
 			end
 		end
-		local title = i18n.get(i18n_key) .. (item.current_choice_suffix or "")
+		local title = i18n.get(i18n_key)
 		-- Caption interpolation is declared alongside the shared choice, so
 		-- native consumers provide no competing mode-label policy.
 		if item.show_current_choice == true then
-			title = title:gsub(item.current_choice_placeholder or "{1}", function() return current_label or tostring(current or "") end)
+			local shown = current_label or tostring(current or "")
+			if item.current_choice_label_value == true then
+				title = LabelValue.compose(i18n.get, title, shown)
+			else
+				title = title:gsub(item.current_choice_placeholder or "{1}", function() return shown end)
+			end
 		end
 		local disabled = R.resolve_disabled_when(manifest_key, row_id, getters)
 		-- A greyed choice that declares why (`disabled_reason_key`) opens nothing

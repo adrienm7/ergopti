@@ -20,6 +20,7 @@ local M = {}
 local ParameterLabel = require("action_parameter_label")
 
 local i18n              = require("infra.i18n")
+local LabelValue = require("locale.label_value")
 local Logger            = require("infra.logger")
 local DeferredWork      = require("infra.deferred_work")
 local InputSourceBroker = require("adapters.input_source_broker")
@@ -174,7 +175,7 @@ function M.provide_rows(ctx, disabled)
 		action_label = ParameterLabel.for_binding(action_label, gestures, TapKeys.binding_id(key.id), action)
 		local name = TapKeys.display_name(key.id, i18n)
 		rows[#rows + 1] = {
-			label    = name .. " : " .. action_label,
+			label    = LabelValue.compose(i18n.get, name, action_label),
 			disabled = disabled or nil,
 			action   = function() choose_action_for(key.id, name, ctx) end,
 		}

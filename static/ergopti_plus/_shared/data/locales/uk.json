@@ -221,6 +221,7 @@
 	"common.error_title": "Помилка",
 	"common.key_enter": "Enter",
 	"common.key_space": "Пробіл",
+	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "Усі кроки пройдено.",
 	"field_check.verdict_fail": "Принаймні один крок не пройдено.",
 	"field_check.copy": "Копіювати звіт",

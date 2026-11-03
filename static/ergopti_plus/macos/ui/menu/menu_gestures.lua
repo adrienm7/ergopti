@@ -18,6 +18,7 @@ local gestures_mod  = require("modules.gestures")
 local MenuUtils = require("ui.menu.menu_utils")
 local dialog        = require("infra.dialog_util")
 local i18n          = require("infra.i18n")
+local LabelValue = require("locale.label_value")
 local ManifestMenu  = require("infra.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
@@ -375,7 +376,7 @@ function M.build(ctx)
 			})
 			if not swipeSubmenu then return nil end
 			return {
-				label    = slotLbl .. " : " .. actionLbl,
+				label    = LabelValue.compose(i18n.get, slotLbl, actionLbl),
 				disabled = not state.gestures or paused or nil,
 				items    = swipeSubmenu,
 			}
@@ -385,7 +386,7 @@ function M.build(ctx)
 		local change_action_rows = ManifestMenu.template_rows("gesture_change_action", slot_commands, slot_getters)
 		if not change_action_rows then return nil end
 		return {
-			label    = slotLbl .. " : " .. actionLbl,
+			label    = LabelValue.compose(i18n.get, slotLbl, actionLbl),
 			disabled = not state.gestures or paused or nil,
 			items    = change_action_rows,
 		}

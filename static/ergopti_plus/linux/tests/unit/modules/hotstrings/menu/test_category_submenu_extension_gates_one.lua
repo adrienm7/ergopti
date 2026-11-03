@@ -272,7 +272,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		local builder = helpers.load_module("ui.menu.builder")
 		local ctx = { config = config, _version = "9.9.9", paused = false, on_menu_changed = changed }
 		local key = kind == "global" and "menu.hotstrings.tooltip_default" or "menu.hotstrings.delay_magic_key"
-		local title = require("infra.i18n").get(key) .. " : "
+		local title = require("locale.label_value").compose(require("infra.i18n").get, require("infra.i18n").get(key), "")
 		local found
 		local function find(rows)
 			for _, row in ipairs(rows or {}) do

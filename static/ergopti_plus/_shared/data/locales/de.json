@@ -221,6 +221,7 @@
 	"common.error_title": "Fehler",
 	"common.key_enter": "Eingabe",
 	"common.key_space": "Leertaste",
+	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "Alle Schritte bestanden.",
 	"field_check.verdict_fail": "Mindestens ein Schritt ist fehlgeschlagen.",
 	"field_check.copy": "Bericht kopieren",

@@ -420,6 +420,22 @@ I18nLookup(Key) {
 	return ""
 }
 
+; Joins a translated label to its value the way the active locale spells it
+; (French spaces the colon, Chinese and Japanese use a full-width one). The Lua
+; drivers have the same rule in _shared/lua/locale/label_value.lua.
+; A lookup answering with the key itself has no catalogue behind it: the row
+; keeps its value, and t() already reported the raw key. All 21 locales hold the
+; key (tools/test/test-french-punctuation.cjs).
+; @param Label {String} The translated label.
+; @param Value {String|Number} The displayed value.
+; @param Translate {Func} The lookup, when a caller injects one; t by default.
+; @returns {String}
+LabelValue(Label, Value, Translate := "") {
+	static Key := "common.label_value", NoCatalogue := "{1}: {2}"
+	Template := Translate == "" ? t(Key) : Translate.Call(Key)
+	return Format(Template == Key ? NoCatalogue : Template, Label, Value)
+}
+
 ; Returns the localised string for the given dot-notation key.
 ; Falls back to the raw key name if the locale file is missing or the key is absent.
 ;

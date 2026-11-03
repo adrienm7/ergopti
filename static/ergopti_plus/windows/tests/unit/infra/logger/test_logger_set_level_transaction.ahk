@@ -273,7 +273,7 @@ _LSLT_MenuMatrix() {
 				AssertEqual(Expected["label"], Actual["label"])
 				AssertEqual(State["checked"][Index], Actual["checked"])
 				if Expected["value"] == State["selected"]
-					AssertEqual(t("menu.debug.log_level") . " : " . Expected["label"], Row["label"])
+					AssertEqual(LabelValue(t("menu.debug.log_level"), Expected["label"]), Row["label"])
 			}
 		}
 	} finally {
@@ -324,7 +324,7 @@ _LSLT_MenuOrderAndRefusal() {
 		AssertEqual("ERROR", _LSLT_SeenUpdates[1].Value)
 		AssertEqual("INFO", LOGGER_MIN_LEVEL, "refusal cannot publish the candidate threshold")
 		AssertEqual(0, _LSLT_RebuildCalls, "refusal cannot rebuild a successful-looking tree")
-		AssertEqual(t("menu.debug.log_level") . " : " . Labels["INFO"], _LSLT_NativeRow(Owned)["label"])
+		AssertEqual(LabelValue(t("menu.debug.log_level"), Labels["INFO"]), _LSLT_NativeRow(Owned)["label"])
 	} finally {
 		Declaration["choices"] := Previous
 		ConfigurationFile := SavedPath

@@ -55,7 +55,7 @@ Test("Keyboard slots: meta_space is a suppressing Win+Space hotkey (win-space-sl
 
 _KSWS_EditorSlotRowsCount(Slot) {
 	Count := 0
-	Prefix := _FormatSlotLabel(Slot) . " : "
+	Prefix := LabelValue(_FormatSlotLabel(Slot), "")
 	for Group in KeyboardSlotRows() {
 		for Row in Group["items"]
 			if InStr(Row.Get("label", ""), Prefix) == 1

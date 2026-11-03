@@ -221,6 +221,7 @@
 	"common.error_title": "خطأ",
 	"common.key_enter": "إدخال",
 	"common.key_space": "مسافة",
+	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "نجحت جميع الخطوات.",
 	"field_check.verdict_fail": "فشلت خطوة واحدة على الأقل.",
 	"field_check.copy": "نسخ التقرير",

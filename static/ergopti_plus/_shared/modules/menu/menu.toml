@@ -589,7 +589,7 @@ path = "updater.check_interval_seconds"
 i18n = "menu.about.frequency_menu"
 choice_registry = "updater.check_intervals"
 show_current_choice = true
-current_choice_suffix = ": {1}"
+current_choice_label_value = true
 
 [[menu.about_menu]]
 type = "list"
@@ -747,7 +747,7 @@ path = "llm.display.pred_indent"
 i18n = "menu.llm.indent_label"
 choice_registry = "llm.indentation"
 show_current_choice = true
-current_choice_suffix = ": {1}"
+current_choice_label_value = true
 disabled_when = ["llm_indentation_ready"]
 
 [[menu.llm_display_menu]]
@@ -1003,7 +1003,7 @@ choice_values = ["DEBUG", "INFO", "WARNING", "ERROR"]
 choice_label_kind = "log_level_token"
 choice_icons = { DEBUG = "🐛", INFO = "ℹ️", WARNING = "⚠️", ERROR = "❌" }
 show_current_choice = true
-current_choice_suffix = " : {1}"
+current_choice_label_value = true
 
 [[menu.debug_menu]]
 type = "command"
@@ -1729,7 +1729,7 @@ path = "shortcuts.caps_word.idle_timeout_seconds"
 i18n = "menu.caps_word.idle_timeout"
 choice_registry = "caps_word.idle_timeout"
 show_current_choice = true
-current_choice_suffix = ": {1}"
+current_choice_label_value = true
 
 [[menu.caps_word_auto_off_group]]
 type = "---"
@@ -2510,7 +2510,7 @@ path = "hotstrings.idle_reset_seconds"
 i18n = "menu.hotstrings.idle_reset"
 choice_registry = "hotstrings.idle_reset"
 show_current_choice = true
-current_choice_suffix = ": {1}"
+current_choice_label_value = true
 custom_command = "idle_reset_custom"
 custom_i18n = "menu.hotstrings.idle_reset_custom"
 custom_unit_i18n = "menu.hotstrings.idle_reset_unit"
@@ -2557,7 +2557,7 @@ path = "hotstrings.cascade_max_arrows"
 i18n = "menu.hotstrings.cascade_max_arrows"
 choice_registry = "hotstrings.cascade_max_arrows"
 show_current_choice = true
-current_choice_suffix = ": {1}"
+current_choice_label_value = true
 
 # The "linux" values across this menu were added on 2026-08-04. Before them the
 # manifest projected exactly ONE row for Linux — a bare separator — while
@@ -4337,12 +4337,12 @@ disabled_when = ["magic_key_ready"]
 type = "command"
 id = "magic_key_config_linux"
 command = "magic_key_change"
-i18n = "menu.hotstrings.magic_key"
+i18n = "menu.hotstrings.magic_key_prefix"
 platforms = ["linux"]
 unavailable = "hide"
 caption_getter = "magic_key_value"
 caption_layout = "prefix"
-caption_joiner = " : "
+caption_joiner = ""
 
 [[menu.hotstrings_magic_trigger_frame]]
 type = "list"
