@@ -225,6 +225,20 @@ menu. A module whose function the first render reaches must have its globals
 initialised before tray staging: `user_code.ahk` is included early in
 `ErgoptiPlus.ahk` for that reason.
 
+### project-boot-cost-is-counted-not-timed
+
+Boot wall time on the maintainer's PC and on hosted runners moves by a factor
+of two with machine load, so a boot regression is gated by counts: the full
+startup smoke reads each boot's first `[Perf] Interval counters (0 ms)` record
+and bounds snapshot reads, document parses, the characters the document lexer
+classified one at a time (`toml.document_slow_steps`), flat-parse values and
+registry deep compares (`BOOT_OPERATION_CEILINGS`). A `ConfigTomlReadSnapshot`
+hit compares the whole snapshot with its shadow twice, so a step that needs
+several boot values reads it once (`ConfigTomlBootSnapshot`, then
+`ConfigTomlBootSnapshotValue` per key). Action: compare boots by the summed
+`process_cpu` of the BootProfile resource lines over interleaved baseline and
+candidate runs on the smoke fixtures, never by one wall-clock run.
+
 ### project-compiled-first-launch-extraction-takes-seconds
 
 The compiled exe's first launch expands its bundle of several hundred files
