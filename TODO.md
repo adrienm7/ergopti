@@ -8,6 +8,23 @@ the field-run step or the hand action that proves it and the commits it confirms
 [workflow and verification memory](docs/memory/workflow-and-verification.md). Finished items are in Git
 (`git show 2a0083cb11:TODO.md` is the long form before this shrink).
 
+## Branch `wip/gesture-clear-touchpad` (gesture requests of 3 November)
+
+Resume from this branch alone; it is based on dev 6d6b743c4f and not yet integrated.
+
+- **Done.** Gestures « Tout effacer » restores the Windows touchpad (registry backup, else the Windows factory
+  defaults of `precision_touchpad_registry.toml`), global clear too; Configuration row and its locale key removed
+  (95ee89c868). Instant « Infos… » after a reload (27c7e13053, a18cfaecff). Infos text: the Windows rare-shortcut
+  trick, macOS/Linux read the touchpad (9d8d16237a). One recommended set on every OS, macOS direction (6bc43f8d44),
+  macOS five fingers up/down = Mission Control/App Exposé (6fd5f27e95); macOS tabs already scale (mode
+  incremental), Linux scalable swipes queued below (c99fe71d17). macOS greys and holds back a slot whose macOS
+  gesture is on, short « — pris par macOS » suffix, recheck every 20 s (bccbdb185c). Updater sources resealed
+  (5b6ee92094).
+- **In progress.** CI `os_lanes=all` on bccbdb185c. Known reds also red on dev 6d6b743c4f: Common Menus
+  (`test-menu-parity.cjs` macOS configuration dispatch fixture) and Linux fedora (OpenSSL signature tests).
+- **Next.** Rebase on dev and hand over for integration; on the Mac, check that a slot greys when its Trackpad
+  gesture is on and comes back when it is off, and that a three-finger swipe moves tabs with the distance.
+
 ## Release 1.0.9 (maintainer requests of 1-2 November, written so the work survives a lost session)
 
 Release as 1.0.9 on `main` by fast-forward from `dev`, with `Release-As: 1.0.9` if the computed version differs, once the
