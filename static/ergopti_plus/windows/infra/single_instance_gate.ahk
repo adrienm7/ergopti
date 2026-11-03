@@ -58,17 +58,17 @@ DriverSmokeInput_Decide(LiveInputRequested, RunsOnCi, ResidentLives) {
 ; @param Name {String} Mutex name.
 ; @return {Boolean}
 DriverMutex_ResidentLives(Name) {
-	static SYNCHRONIZE := 0x00100000, ERROR_FILE_NOT_FOUND := 2
-	Handle := DllCall("OpenMutexW", "UInt", SYNCHRONIZE, "Int", 0, "Str", Name, "Ptr")
-	if !Handle
-		return A_LastError != ERROR_FILE_NOT_FOUND
-	DllCall("CloseHandle", "Ptr", Handle)
-	return true
+	return PLC_NamedMutexHeld(Name)
 }
 
 ; Timer ending a smoke that outlived every harness. ExitProcess, as the smoke's
 ; own ready path: a wedged owner could veto ExitApp and stay resident.
 StartupSmokeDeadlineExit() {
-	try FileAppend("startup-smoke: deadline reached; the process ends.`n", "**")
-	DllCall("ExitProcess", "UInt", 124)
+	PLC_ExitProcessNow(124, "startup-smoke: deadline reached; the process ends.")
+}
+
+; Arms that deadline. Cancelled by its function identity (tests/live/live_harness.ahk).
+StartupSmokeArmDeadline() {
+	global STARTUP_SMOKE_DEADLINE_MS
+	PLC_ArmProcessDeadline(StartupSmokeDeadlineExit, STARTUP_SMOKE_DEADLINE_MS)
 }
