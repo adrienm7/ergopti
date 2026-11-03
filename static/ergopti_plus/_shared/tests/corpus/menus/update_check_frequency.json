@@ -3,7 +3,7 @@
 	"path": "updater.check_interval_seconds",
 	"id": "update_check_interval",
 	"i18n": "menu.about.frequency_menu",
-	"suffix": ": {1}",
+	"label_value": true,
 	"choices": [
 		{
 			"value": 300,

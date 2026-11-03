@@ -221,6 +221,7 @@
 	"common.error_title": "Feil",
 	"common.key_enter": "Enter",
 	"common.key_space": "Mellomrom",
+	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "Alle trinn besto.",
 	"field_check.verdict_fail": "Minst ett trinn mislyktes.",
 	"field_check.copy": "Kopier rapport",

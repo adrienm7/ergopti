@@ -221,6 +221,7 @@
 	"common.error_title": "त्रुटि",
 	"common.key_enter": "एंटर",
 	"common.key_space": "स्पेस",
+	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "सभी चरण सफल रहे।",
 	"field_check.verdict_fail": "कम से कम एक चरण विफल रहा।",
 	"field_check.copy": "रिपोर्ट कॉपी करें",

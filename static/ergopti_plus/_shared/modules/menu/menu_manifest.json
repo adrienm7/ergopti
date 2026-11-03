@@ -621,7 +621,7 @@
 			"path": "updater.check_interval_seconds",
 			"i18n": "menu.about.frequency_menu",
 			"show_current_choice": true,
-			"current_choice_suffix": ": {1}",
+			"current_choice_label_value": true,
 			"choices": [
 				{
 					"value": 300,
@@ -844,7 +844,7 @@
 			"path": "llm.display.pred_indent",
 			"i18n": "menu.llm.indent_label",
 			"show_current_choice": true,
-			"current_choice_suffix": ": {1}",
+			"current_choice_label_value": true,
 			"disabled_when": [
 				"llm_indentation_ready"
 			],
@@ -1195,7 +1195,7 @@
 			"i18n": "menu.debug.log_level",
 			"path": "script.log_level",
 			"show_current_choice": true,
-			"current_choice_suffix": " : {1}",
+			"current_choice_label_value": true,
 			"choices": [
 				{
 					"value": "DEBUG",
@@ -1992,7 +1992,7 @@
 			"path": "shortcuts.caps_word.idle_timeout_seconds",
 			"i18n": "menu.caps_word.idle_timeout",
 			"show_current_choice": true,
-			"current_choice_suffix": ": {1}",
+			"current_choice_label_value": true,
 			"choices": [
 				{
 					"value": 0,
@@ -2756,7 +2756,7 @@
 			"path": "hotstrings.idle_reset_seconds",
 			"i18n": "menu.hotstrings.idle_reset",
 			"show_current_choice": true,
-			"current_choice_suffix": ": {1}",
+			"current_choice_label_value": true,
 			"custom_command": "idle_reset_custom",
 			"custom_i18n": "menu.hotstrings.idle_reset_custom",
 			"custom_unit_i18n": "menu.hotstrings.idle_reset_unit",
@@ -2839,7 +2839,7 @@
 			"path": "hotstrings.cascade_max_arrows",
 			"i18n": "menu.hotstrings.cascade_max_arrows",
 			"show_current_choice": true,
-			"current_choice_suffix": ": {1}",
+			"current_choice_label_value": true,
 			"choices": [
 				{
 					"value": 1,
@@ -5297,14 +5297,14 @@
 			"type": "command",
 			"id": "magic_key_config_linux",
 			"command": "magic_key_change",
-			"i18n": "menu.hotstrings.magic_key",
+			"i18n": "menu.hotstrings.magic_key_prefix",
 			"platforms": [
 				"linux"
 			],
 			"unavailable": "hide",
 			"caption_getter": "magic_key_value",
 			"caption_layout": "prefix",
-			"caption_joiner": " : "
+			"caption_joiner": ""
 		},
 		{
 			"type": "list",

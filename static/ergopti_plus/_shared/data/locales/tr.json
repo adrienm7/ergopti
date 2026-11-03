@@ -221,6 +221,7 @@
 	"common.error_title": "Hata",
 	"common.key_enter": "Enter",
 	"common.key_space": "Boşluk",
+	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "Tüm adımlar başarılı.",
 	"field_check.verdict_fail": "En az bir adım başarısız oldu.",
 	"field_check.copy": "Raporu kopyala",

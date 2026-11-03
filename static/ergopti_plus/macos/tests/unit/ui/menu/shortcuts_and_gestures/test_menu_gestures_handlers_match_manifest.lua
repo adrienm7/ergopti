@@ -428,7 +428,7 @@ local function with_gesture_controls(options, callback)
 		function f.control_slot()
 			local item = f.control_build()
 			local slot = f.root.gesture_slots["2"][1]
-			local prefix = (f.strings["gesture.slots." .. slot] or "gesture.slots." .. slot) .. " : "
+			local prefix = require("locale.label_value").compose(function(key) return f.strings[key] or key end, f.strings["gesture.slots." .. slot] or "gesture.slots." .. slot, "")
 			for _, row in ipairs(item.submenu) do
 				if type(row.title) == "string" and row.title:sub(1, #prefix) == prefix then return row end
 			end

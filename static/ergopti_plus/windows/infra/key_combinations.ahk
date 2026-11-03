@@ -785,7 +785,7 @@ _KeyCombinationPairRow(First, Second) {
 	if KeyCombinationHoldOf(PairId) != KEY_COMBINATION_NONE
 		ActionLabel := KeyCombinationTapOf(PairId) == KEY_COMBINATION_NONE
 			? _KeyCombinationHoldLabel(PairId) : ActionLabel . " / " . _KeyCombinationHoldLabel(PairId)
-	Label := PairLabel . " : " . ActionLabel
+	Label := LabelValue(PairLabel, ActionLabel)
 	return Map("label", Label, "checked", IsAssigned, "action", _KeyCombinationPairMenuOpener(PairId, PairLabel))
 }
 

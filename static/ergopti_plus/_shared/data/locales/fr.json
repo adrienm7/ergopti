@@ -221,6 +221,7 @@
 	"common.error_title": "Erreur",
 	"common.key_enter": "Entrée",
 	"common.key_space": "Espace",
+	"common.label_value": "{1} : {2}",
 	"field_check.verdict_pass": "Toutes les étapes ont réussi.",
 	"field_check.verdict_fail": "Au moins une étape a échoué.",
 	"field_check.copy": "Copier le rapport",

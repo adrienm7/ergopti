@@ -30,6 +30,7 @@ local ParameterLabel = require("action_parameter_label")
 
 local hs           = hs
 local i18n         = require("infra.i18n")
+local LabelValue = require("locale.label_value")
 local Logger       = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
 local ActionPicker = require("ui.action_picker")
@@ -302,7 +303,7 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 				gestures, KbShortcuts.keyboard_binding_id(slot.id), slot.action)
 		end
 		assigned[#assigned + 1] = {
-			label    = KbShortcuts.get_keyboard_slot_label(slot.id) .. " : " .. action_label,
+			label    = LabelValue.compose(i18n.get, KbShortcuts.get_keyboard_slot_label(slot.id), action_label),
 			disabled = disabled or nil,
 			action   = function() choose_action_for(slot.id, ctx) end,
 		}

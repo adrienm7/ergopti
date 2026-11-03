@@ -2311,7 +2311,7 @@ ScriptShortcutRows() {
 				CurrentLabel := GESTURE_ACTIONS.Has(Current) ? GestureActionDisplayLabel(Current, GestureBindingId("script", Slot)) : t("dialog.action_picker.disabled")
 				SlotLabel := t(SCRIPT_SHORTCUT_LABELS[Slot])
 				Rows.Push(Map(
-					"label",  SlotLabel . " : " . CurrentLabel,
+					"label",  LabelValue(SlotLabel, CurrentLabel),
 					"action", ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id), false, GestureBindingId("script", _s)))(Slot, SlotLabel)))
 		}
 		return Rows
@@ -2785,7 +2785,7 @@ KeyboardSlotRows() {
 								continue
 						ActionLabel := GESTURE_ACTIONS.Has(Action) ? GestureActionDisplayLabel(Action, GestureBindingId("keyboard", Slot)) : Action
 						Items.Push(Map(
-								"label", _FormatSlotLabel(Slot) . " : " . ActionLabel,
+								"label", LabelValue(_FormatSlotLabel(Slot), ActionLabel),
 								"action", ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot)
 						))
 				}

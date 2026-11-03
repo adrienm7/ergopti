@@ -19,6 +19,7 @@ local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("infra.logger")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
+local LabelValue = require("locale.label_value")
 local TextUtils     = require("text_utils")
 local Models        = require("ui.menu.menu_llm.models_manager")
 local Profiles      = require("ui.menu.menu_llm.profiles_manager")
@@ -504,15 +505,15 @@ local function format_shortcut_title(action, mods, none_label, mod_label)
 		-- silently blanked the entire LLM submenu from the menubar. Treat any non-table
 		-- as "disabled" before the concat can ever run.
 		if type(mods) ~= "table" then
-				return action .. " : " .. i18n.get("common.disabled")
+				return LabelValue.compose(i18n.get, action, i18n.get("common.disabled"))
 		end
 		if not mods or mods_has_none(mods) then
-				return action .. " : " .. i18n.get("common.disabled")
+				return LabelValue.compose(i18n.get, action, i18n.get("common.disabled"))
 		elseif #mods == 0 then
-				return action .. " : " .. none_label
+				return LabelValue.compose(i18n.get, action, none_label)
 		else
 				local sym = format_mod_string(table.concat(mods, "+"))
-				return action .. " : " .. sym .. " " .. mod_label
+				return LabelValue.compose(i18n.get, action, sym .. " " .. mod_label)
 		end
 end
 

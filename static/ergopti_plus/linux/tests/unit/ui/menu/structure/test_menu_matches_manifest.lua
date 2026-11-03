@@ -584,7 +584,7 @@ helpers.describe("menu certification: published available component rows are ren
 							and i18n.section(row.i18n)
 							or i18n.get(row.i18n)
 						if row.id == "magic_key_source_heading" then
-							label = label .. " : " .. i18n.get("menu.layout.magic_key_source.auto")
+							label = require("locale.label_value").compose(i18n.get, label, i18n.get("menu.layout.magic_key_source.auto"))
 						end
 						if row.caption_getter ~= nil then
 							local caption = fixture_captions[row.caption_getter]

@@ -101,7 +101,7 @@ helpers.describe("Linux shared Debug log choices", function()
 				helpers.assert_eq(row.menu[index].title, level.label)
 				helpers.assert_eq(row.menu[index].checked == true, state.checked[index])
 				if level.value == state.selected then
-					helpers.assert_eq(row.title, require("infra.i18n").get("menu.debug.log_level") .. " : " .. level.label)
+					helpers.assert_eq(row.title, require("locale.label_value").compose(require("infra.i18n").get, require("infra.i18n").get("menu.debug.log_level"), level.label))
 				end
 				helpers.assert_eq(row.menu[index].fn(), true)
 			end

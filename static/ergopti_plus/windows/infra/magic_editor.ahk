@@ -638,7 +638,7 @@ MagicEditorSlotRows() {
 	global KeyboardShortcutAssignments, GESTURE_ACTIONS
 	Slot := MagicEditorSlot()
 	Action := KeyboardShortcutAssignments.Get(Slot["id"], ManifestDefaultFor(Slot["path"]))
-	Label := MagicEditorSlotLabel() . " : " . (GESTURE_ACTIONS.Has(Action)
+	Label := LabelValue(MagicEditorSlotLabel(), GESTURE_ACTIONS.Has(Action)
 		? GestureActionDisplayLabel(Action, Slot["binding_id"]) : t("dialog.action_picker.disabled"))
 	Decision := MagicEditorState()["decision"]
 	if (Decision is Map) && Decision["reason"] != ""

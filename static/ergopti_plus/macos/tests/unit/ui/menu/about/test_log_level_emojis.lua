@@ -69,7 +69,7 @@ helpers.describe("Menu — log level emojis", function()
 		
 		-- Check the parent label (it should now have an emoji)
 		local current_lvl_name = "INFO" -- Default in logger.lua mock or real
-		local expected_parent_prefix = "menu.debug.log_level : "
+		local expected_parent_prefix = "menu.debug.log_level: "
 		helpers.assert_true(log_level_item.title:find(expected_parent_prefix) ~= nil, "parent label should contain the key")
 		helpers.assert_true(log_level_item.title:find("ℹ️") ~= nil, "parent label should contain the emoji for INFO")
 		
@@ -135,7 +135,7 @@ helpers.describe("macOS shared Debug log choices", function()
 					helpers.assert_eq(row.menu[index].title, level.label)
 					helpers.assert_eq(row.menu[index].checked == true, state.checked[index])
 					if level.value == state.selected then
-						helpers.assert_eq(row.title, require("infra.i18n").get("menu.debug.log_level") .. " : " .. level.label)
+						helpers.assert_eq(row.title, require("locale.label_value").compose(require("infra.i18n").get, require("infra.i18n").get("menu.debug.log_level"), level.label))
 					end
 					helpers.assert_eq(row.menu[index].fn(), true)
 				end

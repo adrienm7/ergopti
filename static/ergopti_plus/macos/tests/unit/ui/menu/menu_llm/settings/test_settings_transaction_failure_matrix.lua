@@ -437,10 +437,10 @@ helpers.describe("HS-026 missed LLM setting callbacks share the owner", function
 			local navigation = find_item(submenu, "menu.llm.nav_menu_title")
 			helpers.assert_true(navigation ~= nil, "the real navigation row must rebuild")
 			helpers.assert_true(find_item(navigation.menu,
-				"menu.llm.nav_label : ⌃ menu.llm.arrows") ~= nil,
+				"menu.llm.nav_label: ⌃ menu.llm.arrows") ~= nil,
 				"navigation title must display the canonical state value")
 			helpers.assert_true(find_item(navigation.menu,
-				"menu.llm.val_label : ⇧ menu.llm.digits") ~= nil,
+				"menu.llm.val_label: ⇧ menu.llm.digits") ~= nil,
 				"validation title must display the canonical state value")
 			helpers.assert_eq(fixture.calls.runtime, 0,
 				"a render-only rebuild must not invoke either runtime setter")

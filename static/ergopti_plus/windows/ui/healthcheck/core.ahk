@@ -969,7 +969,7 @@ _HC_NativeAddValue(Tree, Label, Value, Parent) {
 			_HC_NativeAddValue(Tree, String(Key), Item, Node)
 		return Node
 	}
-	return Tree.Add(Label . ": " . _HealthCheck_PlainValue(Value), Parent)
+	return Tree.Add(LabelValue(Label, _HealthCheck_PlainValue(Value)), Parent)
 }
 
 ; Keeps the page filling the window when it is resized.

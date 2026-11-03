@@ -2112,11 +2112,15 @@ function render_media_keys() {
 				const breakdown = _t('onboarding.checklist.tap_hold')
 					.replace('{1}', String(row.tap))
 					.replace('{2}', String(row.hold));
-				details +=
-					` · ${escape_html(breakdown)} · ${escape_html(_t('ui_apps.col_duration'))}: ` +
+				const labelled = (label, value) =>
+					escape_html(_t('common.label_value'))
+						.replace('{1}', () => escape_html(label))
+						.replace('{2}', () => value);
+				const durations =
 					`${escape_html(_t('ui_typing.lbl_total'))} ${number(row.s)} ms · ` +
 					`${escape_html(_t('ui_typing.key_tip_avg_dur'))} ${number(Number((row.s / row.n).toFixed(1)))} ms · ` +
-					`${escape_html(_t('ui_typing.lbl_longest_time'))}: ${number(row.m)} ms`;
+					labelled(_t('ui_typing.lbl_longest_time'), `${number(row.m)} ms`);
+				details += ` · ${escape_html(breakdown)} · ${labelled(_t('ui_apps.col_duration'), durations)}`;
 			}
 			return `<li data-media-id="${row.id}"><strong>${escape_html(_t(row.label_key))}</strong><br>${details}</li>`;
 		})

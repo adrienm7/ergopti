@@ -221,6 +221,7 @@
 	"common.error_title": "שגיאה",
 	"common.key_enter": "Enter",
 	"common.key_space": "רווח",
+	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "כל השלבים עברו בהצלחה.",
 	"field_check.verdict_fail": "לפחות שלב אחד נכשל.",
 	"field_check.copy": "העתקת הדוח",

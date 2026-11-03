@@ -120,6 +120,28 @@
 			"reason": "keyboard-key-name",
 			"locales": ["cs", "da", "he", "ja", "ko", "nl", "no", "pl", "pt", "tr", "uk"]
 		},
+		"common.label_value": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk"
+			]
+		},
 		"common.later": {
 			"reason": "loanword-or-cognate",
 			"locales": ["nl"]

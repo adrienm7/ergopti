@@ -221,6 +221,7 @@
 	"common.error_title": "Fel",
 	"common.key_enter": "Retur",
 	"common.key_space": "Mellanslag",
+	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "Alla steg lyckades.",
 	"field_check.verdict_fail": "Minst ett steg misslyckades.",
 	"field_check.copy": "Kopiera rapport",
