@@ -26,9 +26,9 @@ local OWNERS = {
 	"adapters.running_application",
 	"program_parameter", "user_action_parameter",
 	"actions.assignable",
-	-- The chord labels name their keys through the key name table, which loads
-	-- with its data.
-	"keycodes.key_names", "keycodes.key_names_data",
+	-- The chord and sticky labels name their keys through the key name table,
+	-- which loads with its data.
+	"actions.sticky_label", "keycodes.key_names", "keycodes.key_names_data",
 	"_generated.action_catalogue",
 	-- The generated catalogue filters the shared data through this owner.
 	"actions.catalogue",

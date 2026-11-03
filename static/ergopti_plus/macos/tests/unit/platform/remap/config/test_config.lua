@@ -56,6 +56,15 @@ helpers.describe("Config.load_available_actions: shared modifier chords", functi
 		helpers.assert_eq(by_id.cmd_option_shift_ctrl, nil)
 		helpers.assert_eq(by_id.cmd_shift_ctrl.label, "⌘⇧⌃ key_name.cmd + key_name.shift + key_name.ctrl")
 	end)
+
+	helpers.it("names the layer hold as the hold picker names its layer", function()
+		-- It read « 🗂 Layer nav. — Actif tant que maintenu » in every locale.
+		local path = helpers.driver_root() .. "platform/remap/data/actions.json"
+		local by_id = {}
+		for _, action in ipairs(Config.load_available_actions(path)) do by_id[action.id] = action end
+		helpers.assert_eq(by_id.layer.label, "🗂 tap_hold.hold.nav_layer")
+		helpers.assert_eq(by_id.layer.short_label, "tap_hold.hold.nav_layer")
+	end)
 end)
 
 

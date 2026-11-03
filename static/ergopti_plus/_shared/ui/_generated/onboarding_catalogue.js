@@ -3032,7 +3032,7 @@
 													],
 													[
 														{
-															"text": "Layer (hold)"
+															"key": "tap_hold.hold.nav_layer"
 														}
 													]
 												]
@@ -3096,7 +3096,14 @@
 												"args": [
 													[
 														{
-															"key": "sg_actions.sticky_shift"
+															"template": "sg_actions.sticky_shift",
+															"args": [
+																[
+																	{
+																		"key": "key_name.shift"
+																	}
+																]
+															]
 														}
 													],
 													[

@@ -32,6 +32,7 @@ local Layout = require("modules.keymap.layout")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
 local KeyNames = require("keycodes.key_names")
+local StickyLabel = require("actions.sticky_label")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
 
@@ -242,8 +243,9 @@ local _chord_catalogue = nil
 ---
 --- The hold-only ones have no registry row by design, not by omission: a
 --- gesture has no duration. The bare modifiers and their combinations are named
---- from the key name table (name_modifier_holds); `layer` and the sticky holds
---- remain French.
+--- from the key name table (name_modifier_holds), the layer holds by the hold
+--- picker's layer label (name_held_layers). A sticky label is a template its
+--- modifiers fill from the same table (« 📌 {1} rémanents »).
 --- @param actions table The decoded action list, mutated in place.
 --- @return number localised How many labels came from the registry.
 local function localise_action_labels(actions)
@@ -264,6 +266,9 @@ local function localise_action_labels(actions)
 			-- signal that this action has no registry row and no alias. Writing it
 			-- through would put "sg_actions.hyper" in the menu.
 			if translated and translated ~= key and translated ~= "" then
+				if StickyLabel.is_sticky(action.id) then
+					translated = StickyLabel.label(action.id, key, "macos", i18n.get)
+				end
 				action.label = translated
 				action.short_label = translated
 				localised = localised + 1
@@ -287,6 +292,28 @@ local function name_modifier_holds(actions)
 			end
 			action.label = KeyNames.modifiers_heading(action.modifiers, "macos", i18n.get)
 			action.short_label = KeyNames.modifiers_label(action.modifiers, "macos", i18n.get)
+		end
+	end
+end
+
+--- Names the layer holds (those declaring `hold_layer`) by the label the shared
+--- hold picker gives that layer on every driver (_shared/lua/tap_hold/
+--- hold_options.lua: tap_hold.hold.<layer>_layer). The navigation layer hold
+--- read « Layer nav. — Actif tant que maintenu » in French in every locale.
+--- @param actions table The decoded action list, mutated in place.
+local function name_held_layers(actions)
+	for _, action in ipairs(actions) do
+		if type(action) == "table" and action.hold_layer ~= nil then
+			if type(action.hold_layer) ~= "string" or action.hold_layer == "" then
+				error("remap action " .. tostring(action.id) .. " declares no layer", 2)
+			end
+			local key = "tap_hold.hold." .. action.hold_layer .. "_layer"
+			local text = i18n.get(key)
+			if type(text) ~= "string" or text == "" then
+				error("remap action " .. tostring(action.id) .. ": " .. key .. " has no text", 2)
+			end
+			action.label = "🗂 " .. text
+			action.short_label = text
 		end
 	end
 end
@@ -413,6 +440,7 @@ function M.load_available_actions(actions_file)
 	end
 	localise_action_labels(list)
 	name_modifier_holds(list)
+	name_held_layers(list)
 	append_shared_modifier_chords(list)
 	local _, catalogue_err = ActionCatalogue.index_by_id(list)
 	if catalogue_err then

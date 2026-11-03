@@ -32,6 +32,15 @@ _SNA_Sticky() {
 		AssertTrue(GESTURE_ACTION_CATALOGUE.Actions.Has(Id), Id . " is offered on Windows")
 		Label := _GestureActionLabel(Id)
 		AssertFalse(InStr(Label, "Cmd", true) || InStr(Label, "Option", true), Id . " names Windows's keys: " . Label)
+		; The label is a template its modifiers fill from the key name table: it
+		; used to spell macOS's English names and swap two of them (2026-11-03).
+		AssertFalse(InStr(Label, "{1}"), Id . " fills its template: " . Label)
+		if (Id != "sticky_hyper") {
+			Named := ""
+			for Name in StrSplit(Names, "+")
+				Named .= (Named == "" ? "" : " + ") . KeyNameLabel(Name)
+			AssertTrue(InStr(Label, Named, true) > 0, Id . " names " . Named . ": " . Label)
+		}
 	}
 	Refused := false
 	try StickyModifierNames("sticky_fn")

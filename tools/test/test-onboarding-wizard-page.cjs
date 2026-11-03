@@ -1118,13 +1118,21 @@ function expectedTapHold(driver, key) {
 		const karabiner = JSON.parse(
 			fs.readFileSync(path.join(SP, 'macos/platform/remap/data/actions.json'), 'utf8')
 		);
-		// A modifier hold reads as its modifiers' key names (« Cmd + Shift »).
+		// A modifier hold reads as its modifiers' key names (« Cmd + Shift »), a
+		// sticky one fills its template with them, and the layer hold reads as
+		// the hold picker names the layer: until 2026-11-03 the sticky labels
+		// spelled « Cmd+Shift » and the layer hold « Layer (hold) » in every locale.
+		const names = (modifiers) =>
+			modifiers.map((modifier) => en[KeyNames.i18n(modifier, 'hs')]).join(' + ');
 		const name = (action) => {
 			const entry = karabiner.find((candidate) => candidate.id === action);
 			const registry = en['sg_actions.' + (aliases[action] || action)];
+			const sticky = KeyNames.stickyModifiers(action);
+			if (registry && sticky !== null) return registry.replace('{1}', names(sticky));
 			if (registry) return registry;
-			if (Array.isArray(entry.modifiers))
-				return entry.modifiers.map((modifier) => en[KeyNames.i18n(modifier, 'hs')]).join(' + ');
+			if (Array.isArray(entry.modifiers)) return names(entry.modifiers);
+			if (typeof entry.hold_layer === 'string')
+				return en['tap_hold.hold.' + entry.hold_layer + '_layer'];
 			return entry.short_label;
 		};
 		const slots = TAP_HOLD_DEFAULTS.hs_tap_hold[key];
