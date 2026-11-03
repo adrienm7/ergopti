@@ -46,6 +46,7 @@ local PhysicalSlots = require("shortcuts.physical_slots")
 local PhysicalSlotConstructor = PhysicalSlots.new
 local PhysicalAvailability = require("shortcuts.physical_availability")
 local i18n = require("infra.i18n")
+local KeyNames = require("keycodes.key_names")
 local AiActions = require("modules.shortcuts.ai_actions")
 local TableUtil = require("table_util")
 local ConfigKeys = require("config_keys")
@@ -114,14 +115,6 @@ end
 -- ======= 1/ Constants & State =======
 -- ====================================
 -- ====================================
-
--- Modifier symbols for labels
-local MOD_SYMBOLS = {
-	cmd        = "⌘",
-	shift      = "⇧",
-	ctrl       = "^",
-	alt        = "⌥",
-}
 
 -- Resolved from the shared modifier catalogue after its first acknowledged read.
 local SLOT_MODS = nil
@@ -413,14 +406,16 @@ local function slot_to_chord(slot_id)
 	return nil
 end
 
---- Returns a human-readable label for a slot (e.g. "⌘ A", "^ Espace").
+--- Returns a human-readable label for a slot (e.g. "⌘ A", "⌃ Espace"): the
+--- modifiers as the glyphs of the shared key name table, a named key under its
+--- translated name.
 --- @param slot_id string
 --- @return string
 local function slot_label(slot_id)
 	local descriptor = M.physical_slot_descriptor(slot_id)
 	if descriptor then
 		local parts = {}
-		for _, mod in ipairs(physical_modifiers(descriptor.mods)) do parts[#parts + 1] = MOD_SYMBOLS[mod] or mod end
+		for _, mod in ipairs(physical_modifiers(descriptor.mods)) do parts[#parts + 1] = KeyNames.macos_symbol(mod) end
 		parts[#parts + 1] = descriptor.code
 		return table.concat(parts, " ")
 	end
@@ -434,10 +429,15 @@ local function slot_label(slot_id)
 		local prefix, mods = entry[1], entry[2]
 		if slot_id:sub(1, #prefix) == prefix then
 			local suffix = slot_id:sub(#prefix + 1)
-			local key_display = key_labels()[suffix] or (suffix:sub(1, 1):upper() .. suffix:sub(2))
+			local key_display
+			if KeyNames.canonical(suffix) then
+				key_display = KeyNames.label(suffix, "macos", i18n.get)
+			else
+				key_display = key_labels()[suffix] or (suffix:sub(1, 1):upper() .. suffix:sub(2))
+			end
 			local mod_str = ""
 			for _, m in ipairs(mods) do
-				mod_str = mod_str .. (MOD_SYMBOLS[m] or m) .. " "
+				mod_str = mod_str .. KeyNames.macos_symbol(m) .. " "
 			end
 			return mod_str .. key_display
 		end

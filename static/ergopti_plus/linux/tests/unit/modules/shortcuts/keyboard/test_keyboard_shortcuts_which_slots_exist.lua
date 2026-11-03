@@ -55,14 +55,14 @@ end
 
 helpers.describe("keyboard shortcuts: which slots exist", function()
 
-	helpers.it("names the modifiers and the special keys of a label through the catalogue", function()
+	helpers.it("names the modifiers and the special keys of a label through the key name table", function()
 		local shortcuts = load_over_config()
 		local space = with_marked_translations(function() return shortcuts.get_slot_label("primary_space") end)
 		local enter = with_marked_translations(function() return shortcuts.get_slot_label("alt_enter") end)
 		drop_config()
-		helpers.assert_eq(space, "<layer_editor.key.ctrl> <layer_editor.key.space>",
+		helpers.assert_eq(space, "<key_name.ctrl> + <key_name.space>",
 			"a French literal here would show Espace to every language")
-		helpers.assert_eq(enter, "<layer_editor.key.alt> <layer_editor.key.enter>")
+		helpers.assert_eq(enter, "<key_name.alt> + <key_name.enter>")
 	end)
 
 	helpers.it("offers a slot per key from the shared catalogue", function()
@@ -79,8 +79,8 @@ helpers.describe("keyboard shortcuts: which slots exist", function()
 		local shortcuts = load_over_config()
 		local label = with_marked_translations(function() return shortcuts.get_slot_label("primary_shift_p") end)
 		drop_config()
-		helpers.assert_true(label:find("<layer_editor.key.ctrl>", 1, true) ~= nil, "the label must name the modifier")
-		helpers.assert_true(label:find("<layer_editor.key.shift>", 1, true) ~= nil,
+		helpers.assert_true(label:find("<key_name.ctrl>", 1, true) ~= nil, "the label must name the modifier")
+		helpers.assert_true(label:find("<key_name.shift>", 1, true) ~= nil,
 			"and both of them: a label that shows only the first modifier describes "
 				.. "a different chord from the one that fires")
 	end)
@@ -89,7 +89,7 @@ helpers.describe("keyboard shortcuts: which slots exist", function()
 		local shortcuts = load_over_config()
 		local label = with_marked_translations(function() return shortcuts.get_slot_label("primary_shift_a") end)
 		drop_config()
-		helpers.assert_true(label:find("<layer_editor.key.shift>", 1, true) ~= nil,
+		helpers.assert_true(label:find("<key_name.shift>", 1, true) ~= nil,
 			"'primary_shift_a' also starts with 'ctrl_', so a shorter prefix reached "
 				.. "first resolves the wrong chord — which is why the prefix list is "
 				.. "ordered and walked with ipairs")

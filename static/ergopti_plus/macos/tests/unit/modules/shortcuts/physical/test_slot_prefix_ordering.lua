@@ -68,7 +68,11 @@ helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 			helpers.assert_eq(subject.start(), true)
 			helpers.assert_eq(observed, { ["Cmd+Shift+A"]=1, ["Cmd+A"]=1, ["Ctrl+Shift+A"]=1, ["Ctrl+A"]=1 })
 			helpers.assert_eq(subject.get_slot_label("primary_shift_a"), "⌘ ⇧ A")
-			helpers.assert_eq(subject.get_slot_label("secondary_shift_a"), "^ ⇧ A")
+			helpers.assert_eq(subject.get_slot_label("secondary_shift_a"), "⌃ ⇧ A",
+				"Ctrl is the glyph of the shared key name table, never a caret")
+			helpers.assert_eq(subject.get_slot_label("secondary_space"),
+				"⌃ " .. require("infra.i18n").get("key_name.space"),
+				"a named key reads in the user's language, not as the catalogue's English legend")
 			helpers.assert_eq(subject.stop(), true)
 		end)
 	end)
