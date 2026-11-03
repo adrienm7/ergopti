@@ -1413,6 +1413,7 @@
 	"menu.debug.report_bug": "דיווח על באג",
 	"menu.debug.show_error_dialog": "הצג חלון בכל שגיאה",
 	"menu.debug.suggest_feature": "הצעת תכונה",
+	"menu.debug.tests": "בדיקות",
 	"menu.debug.title": "⚠ ניפוי שגיאות",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "מדידת SendEvent מול SendInput",

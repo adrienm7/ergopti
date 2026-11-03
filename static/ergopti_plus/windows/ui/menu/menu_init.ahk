@@ -648,7 +648,9 @@ _MI_ChannelPickerRow(SetChannelFn, IsLocal := Updater_IsLocalSource()) {
 ; Builds the Debug submenu from the manifest's debug_menu array.
 ;
 ; Shared commands and one enum choice: native code supplies only the actual
-; setter and current runtime value, while the manifest owns the row policy.
+; setter and current runtime value, while the manifest owns the row policy. The
+; checks and probes hang in its « Tests » group, built from debug_tests_menu
+; with the same command owners; no Tests row is drawn when none is for Windows.
 _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 	global LOGGER_MIN_LEVEL
 	if !HasMethod(LogLevelCommand, "Call")
@@ -673,7 +675,15 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 	)
 	StateGetters := Map("error_dialog_enabled", ErrorDialog_IsEnabled,
 		ConfigKey.SCRIPT_LOG_LEVEL, (*) => LOGGER_MIN_LEVEL)
-	return MenuRenderer_Build("debug_menu", "Debug", "", "", Map(), Commands, StateGetters)
+	GroupBuilders := Map("debug_tests", () => _MI_BuildDebugTestsMenu(Commands, StateGetters))
+	return MenuRenderer_Build("debug_menu", "Debug", "", GroupBuilders, Map(), Commands, StateGetters)
+}
+
+; The « Tests » submenu of Debug, or false when it would hold no row: the
+; renderer then draws no parent, so the menu never offers an empty submenu.
+_MI_BuildDebugTestsMenu(Commands, StateGetters) {
+	Tests := MenuRenderer_Build("debug_tests_menu", "Debug", "", "", Map(), Commands, StateGetters)
+	return TrayMenuItemCount(Tests) > 0 ? Tests : false
 }
 
 ; Keep command registration shared by the real menu and its persistence tests.

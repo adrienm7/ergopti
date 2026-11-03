@@ -1413,6 +1413,7 @@
 	"menu.debug.report_bug": "Zgłoś błąd",
 	"menu.debug.show_error_dialog": "Pokazuj okno przy każdym błędzie",
 	"menu.debug.suggest_feature": "Zaproponuj funkcję",
+	"menu.debug.tests": "Testy",
 	"menu.debug.title": "⚠ Debugowanie",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "Zmierz SendEvent i SendInput",

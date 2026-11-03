@@ -1413,6 +1413,7 @@
 	"menu.debug.report_bug": "버그 신고",
 	"menu.debug.show_error_dialog": "오류마다 창 표시",
 	"menu.debug.suggest_feature": "기능 제안",
+	"menu.debug.tests": "테스트",
 	"menu.debug.title": "⚠ 디버그",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "SendEvent와 SendInput 측정",
