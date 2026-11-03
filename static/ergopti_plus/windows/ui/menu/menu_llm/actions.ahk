@@ -250,6 +250,25 @@ LLM_Menu_ToggleBool(key) {
 ; ==================================
 ; ==================================
 
+/**
+ * Stores what an automatic prediction does while a hotstring tooltip shows.
+ * @param {String} Value "wait" or "both" (the manifest's enum values).
+ * @returns {Boolean} True when the choice is durable and live; false when it
+ *     is already the current one or the transaction refused it.
+ */
+LLM_Menu_SetWhileHotstringTooltip(Value) {
+	if !LLM_Option_TryNormalize(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP, Value, &Normalized)
+		throw ValueError("LLM_Menu_SetWhileHotstringTooltip: unknown value " . String(Value) . ".")
+	if (LLM_Menu_WhileHotstringTooltip() == Normalized)
+		return false
+	if LLM_Menu_CommitMutation("the AI prediction while a hotstring tooltip shows",
+			_LLM_Menu_SetCandidateWhileHotstringTooltip.Bind(Normalized),
+			_LLM_Menu_ApplyStandardCommitted) != true
+		return false
+	LoggerInfo("LLM", "AI prediction while a hotstring tooltip shows set to '{1}'.", Normalized)
+	return true
+}
+
 /** Changes one privacy leaf through the retained configuration lease owner. */
 LLM_Menu_SetPrivacy(Key, Value, Expected) {
 	return LLM_Menu_CommitMutation("the LLM privacy filter",

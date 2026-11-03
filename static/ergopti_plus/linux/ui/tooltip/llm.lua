@@ -26,6 +26,10 @@ local _screen_provider = nil
 local _candidates = {}
 local _active_index = 1
 local _meta = {}
+-- The hotstring preview sharing the window: { rows = fn, showing = fn,
+-- covered = fn }. rows() answers the preview rows to draw above the
+-- suggestions (llm.trigger.while_hotstring_tooltip = "both"), nil otherwise.
+local _companion = nil
 
 --- The pieces a candidate's line reads, each with its role.
 ---
@@ -126,6 +130,7 @@ function M.init(opts)
 	end
 	_anchor_provider = opts.anchor_provider
 	_screen_provider = opts.screen_provider
+	_companion = type(opts.companion) == "table" and opts.companion or nil
 	if type(_style) ~= "table" or type(_renderer) ~= "table" then
 		Logger.error(LOG, "Suggestion overlay initialisation failed: style or renderer unavailable.")
 		return false
@@ -133,10 +138,38 @@ function M.init(opts)
 	return true
 end
 
+--- The preview rows drawn above the suggestions, nil when they are drawn alone.
+--- @return table|nil
+local function companion_rows()
+	if not _companion or type(_companion.rows) ~= "function" then return nil end
+	local ok, rows = pcall(_companion.rows)
+	if not ok then
+		Logger.warn(LOG, "Hotstring rows unavailable: %s", tostring(rows))
+		return nil
+	end
+	return type(rows) == "table" and #rows > 0 and rows or nil
+end
+
+--- Whether the hotstring preview holds the window now.
+--- @return boolean
+local function companion_showing()
+	if not _companion or type(_companion.showing) ~= "function" then return false end
+	local ok, showing = pcall(_companion.showing)
+	return ok and showing == true
+end
+
 local function draw()
 	if type(_renderer) ~= "table" or type(_renderer.show) ~= "function" then return false end
 	local rows = M.build_rows(_candidates, _active_index, _meta)
 	if #rows == 0 then M.hide(); return false end
+	local preview_rows = companion_rows()
+	if preview_rows then
+		-- One stack: the hotstring rows that can still expand, then the suggestions.
+		for index = #preview_rows, 1, -1 do table.insert(rows, 1, preview_rows[index]) end
+	elseif companion_showing() and _companion and type(_companion.covered) == "function" then
+		-- Drawn alone over the preview, which then no longer owns the window.
+		pcall(_companion.covered)
+	end
 	local anchor = type(_anchor_provider) == "function" and _anchor_provider() or nil
 	local screen = type(_screen_provider) == "function" and _screen_provider()
 		or { x = 0, y = 0, w = 1920, h = 1080 }
@@ -184,12 +217,25 @@ function M.active_index()
 	return _active_index
 end
 
+--- Draws the shown candidates again, with or without the hotstring rows as
+--- they stand now. Does nothing while no candidate is shown.
+--- @return boolean drawn
+function M.redraw()
+	if #_candidates == 0 then return false end
+	return draw()
+end
+
 --- Hides and forgets every candidate.
 function M.hide()
-	if _renderer and type(_renderer.hide) == "function" and _renderer.hide() ~= true then return false end
+	-- The preview drawn over the suggestions keeps the window; it hides itself.
+	if not companion_showing() and _renderer and type(_renderer.hide) == "function"
+		and _renderer.hide() ~= true then return false end
+	local shared = #_candidates > 0 and companion_rows() ~= nil
 	_candidates = {}
 	_active_index = 1
 	_meta = {}
+	-- Shown together, the preview stays on screen alone.
+	if shared and _companion and type(_companion.redraw) == "function" then pcall(_companion.redraw) end
 	return true
 end
 

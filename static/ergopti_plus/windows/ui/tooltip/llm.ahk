@@ -575,6 +575,10 @@ LLM_TooltipShowLoading(PresentationMeta := 0) {
 	; so cancelling _TooltipTimerFn here would run 75 ms before the timer is armed
 	; and silently do nothing, letting the spinner vanish mid-inference.
 	Meta := (PresentationMeta is Map) ? PresentationMeta : Map()
+	; Shown together, the spinner would take the hotstring rows' surface and
+	; retire them; the prediction alone comes under them.
+	if (_LLM_TooltipSharedHotstringItems().Length > 0)
+		return false
 	CommitFn := _LLM_TooltipCommitLoadingState.Bind(Meta)
 	; Every loading ingress, including an all-placeholder streaming partial, must
 	; preserve the real prediction which already owns the pixels. Keep this guard
@@ -1400,6 +1404,121 @@ _LLM_TooltipColumnPlacement(ContentW, ZoneW, LabelW, LineW) {
 	return { LabelX: ContentW - LabelW, LineLimit: LineLimit, Truncated: LineW > LineLimit }
 }
 
+; The hotstring rows shown above a prediction when the user chose to see both
+; (llm.trigger.while_hotstring_tooltip = "both"): the preview rows of the surface
+; on screen that can still expand. A live prediction never shares, and a row
+; whose decision went stale or whose deadline passed is left out.
+; @returns {Array} Preview items (FireDecision rows), empty when shown alone.
+_LLM_TooltipSharedHotstringItems() {
+	global _TooltipActiveSurface, LLM_HOTSTRING_TOOLTIP_SHOW_BOTH
+	if !IsSet(LLM_Engine_WhileHotstringTooltip) || !IsSet(LLM_HOTSTRING_TOOLTIP_SHOW_BOTH)
+			|| LLM_Engine_WhileHotstringTooltip() != LLM_HOTSTRING_TOOLTIP_SHOW_BOTH
+		return []
+	if IsSet(LLM_Engine_LiveIsActive) && LLM_Engine_LiveIsActive()
+		return []
+	Surface := IsSet(_TooltipActiveSurface) ? _TooltipActiveSurface : 0
+	if !IsObject(Surface) || !Surface.HasOwnProp("DecisionItems") || !(Surface.DecisionItems is Array)
+		return []
+	Rows := []
+	for , Item in Surface.DecisionItems {
+		if IsObject(Item) && Item.HasOwnProp("FireDecision")
+			Rows.Push(Item)
+	}
+	if (Rows.Length == 0)
+		return Rows
+	Rows := _TooltipFilterUnexpiredDeadlineItems(Rows)
+	Current := false
+	try Current := _TooltipDecisionItemsStillCurrent(Rows)
+	return (Current && Rows.Length > 0) ? Rows : []
+}
+
+; Geometry of the hotstring rows heading a shared panel, drawn like the
+; hotstring stack: a band per row, each followed by its 1 px rule (the last one
+; separates the predictions). Pure, layout units.
+; @param Sizes       Array of { W, H } — each row's text.
+; @param LabelSizes  Array of { W, H } — each row's trigger label, W 0 when none.
+; @param Style       { PadX, PadY, LabelGap }.
+; @returns { W, H, TextW, LabelW, RowY[], RowH[], Sizes, LabelSizes }
+_LLM_TooltipHeaderLayout(Sizes, LabelSizes, Style) {
+	TextW := 0
+	LabelW := 0
+	for , Size in Sizes
+		TextW := Max(TextW, Size.W)
+	for , Size in LabelSizes
+		LabelW := Max(LabelW, Size.W)
+	LabelZone := LabelW > 0 ? Style.LabelGap + LabelW : 0
+	L := { W: Sizes.Length > 0 ? Style.PadX + TextW + LabelZone + Style.PadX : 0, H: 0,
+		TextW: TextW, LabelW: LabelW, RowY: [], RowH: [], Sizes: Sizes, LabelSizes: LabelSizes }
+	for , Size in Sizes {
+		RowH := Style.PadY + Size.H + Style.PadY
+		L.RowY.Push(L.H)
+		L.RowH.Push(RowH)
+		L.H += RowH + 1
+	}
+	return L
+}
+
+; Moves a prediction layout under a header of OffsetY and widens it to MinW.
+_LLM_TooltipShiftLayout(Layout, OffsetY, MinW) {
+	for Idx, Y in Layout.RowY
+		Layout.RowY[Idx] := Y + OffsetY
+	Layout.SepY += OffsetY
+	Layout.CombinedY += OffsetY
+	Layout.HintY += OffsetY
+	Layout.InfoY += OffsetY
+	Layout.H += OffsetY
+	Layout.W := Max(Layout.W, MinW)
+	return Layout
+}
+
+; Measures the shared hotstring rows with the hotstring stack's fonts.
+_LLM_TooltipMeasureHeader(Items) {
+	global _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_LABEL_GAP
+	Sizes := []
+	LabelSizes := []
+	for , Item in Items {
+		Sizes.Push(_TooltipMeasureText(Item.Text))
+		Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+		Measured := _LLM_TooltipMeasureOptional(Label, _TOOLTIP_LABEL_FONT_SIZE)
+		LabelSizes.Push(IsObject(Measured) ? Measured : { W: 0, H: 0 })
+	}
+	return _LLM_TooltipHeaderLayout(Sizes, LabelSizes,
+		{ PadX: _TOOLTIP_PADDING_X, PadY: _TOOLTIP_PADDING_Y, LabelGap: _TOOLTIP_LABEL_GAP })
+}
+
+; Draws the shared hotstring rows at the top of the prediction Gui.
+_LLM_TooltipDrawHeader(G, Items, Header, TotalW) {
+	global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_LABEL_FONT_SIZE
+	global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_DIM_COLOR_HEX
+	global _TOOLTIP_LABEL_COLOR_HEX, _TOOLTIP_SEP_COLOR_HEX
+	for Idx, Item in Items {
+		RowY := Header.RowY[Idx]
+		RowH := Header.RowH[Idx]
+		ColorHex := Item.HasOwnProp("ColorHex") ? Item.ColorHex : ""
+		G.SetFont("norm s1", _TOOLTIP_FONT_NAME)
+		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", _TooltipMixTintHex(ColorHex), RowY, TotalW, RowH), "")
+		IsDimmed := Item.HasOwnProp("IsDimmed") && Item.IsDimmed
+		if IsDimmed
+			G.SetFont("norm c" . _TOOLTIP_DIM_COLOR_HEX . " strike s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+		else
+			G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}", _TOOLTIP_PADDING_X,
+			RowY + _TOOLTIP_PADDING_Y, Header.TextW, Header.Sizes[Idx].H), Item.Text)
+		Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+		if (Label != "" && Header.LabelW > 0) {
+			LabelSize := Header.LabelSizes[Idx]
+			G.SetFont("norm c" . (IsDimmed ? _TOOLTIP_DIM_COLOR_HEX : _TOOLTIP_LABEL_COLOR_HEX)
+				. " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
+			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+				TotalW - _TOOLTIP_PADDING_X - Header.LabelW,
+				RowY + _TOOLTIP_PADDING_Y + Max(0, (Header.Sizes[Idx].H - LabelSize.H) // 2),
+				Header.LabelW, LabelSize.H), Label)
+		}
+		G.SetFont("s1", _TOOLTIP_FONT_NAME)
+		G.Add("Text", Format("Background{1} x0 y{2} w{3} h1", _TOOLTIP_SEP_COLOR_HEX, RowY + RowH, TotalW), "")
+	}
+}
+
 ; Geometry of the prediction panel — the Windows port of the macOS layout in
 ; tooltip_llm.lua show_predictions (width) and renderer.lua render (height).
 ; Pure, layout units, so it is tested without GDI.
@@ -1683,6 +1802,14 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		PadX: _TOOLTIP_PADDING_X, PadY: _TOOLTIP_PADDING_Y,
 		LineSpacing: _TOOLTIP_LINE_SPACING, HintSpacing: _TOOLTIP_HINT_SPACING,
 		ShortcutW: ShortcutColumnW, LabelGap: _TOOLTIP_LABEL_GAP, MaxPredsW: UI_LLM_MAX_CONTENT_WIDTH })
+	; Shown together, the hotstring rows that can still expand head the panel and
+	; stay the visible decisions; the predictions continue the stack under them.
+	HeaderItems := _LLM_TooltipSharedHotstringItems()
+	Header := 0
+	if (HeaderItems.Length > 0) {
+		Header := _LLM_TooltipMeasureHeader(HeaderItems)
+		_LLM_TooltipShiftLayout(Layout, Header.H, Header.W)
+	}
 
 	G := Gui("+AlwaysOnTop -Caption +E0x20 +E0x80 +LastFound")
 	G.BackColor := all_placeholder
@@ -1690,6 +1817,8 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		: _TOOLTIP_DEFAULT_BG_HEX
 	G.MarginX := 0
 	G.MarginY := 0
+	if IsObject(Header)
+		_LLM_TooltipDrawHeader(G, HeaderItems, Header, Layout.W)
 
 	for Idx, slot in slots {
 		RowY := Layout.RowY[Idx]
@@ -1767,11 +1896,13 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	CandidateHandedOff := true
 	; The direct rich renderer shares the same final owner/deadline/oracle commit
 	; as ordinary and destack renders. Empty decision items retire a hotstring
-	; snapshot when the LLM surface replaces it. Let presentation exceptions reach
+	; snapshot when the LLM surface replaces it; shared header rows stay the
+	; visible decisions and pass the same freshness and deadline fences.
+	; Let presentation exceptions reach
 	; LLM_TooltipShow, whose generation+request-fenced cleanup owns failure.
 	StateCommit := _LLM_TooltipCommitSurfaceState.Bind(
 		slots, active_idx, RenderGeneration, PresentationMeta)
-	Presented := _TooltipPresentStack(Pos, Row, false, [],
+	Presented := _TooltipPresentStack(Pos, Row, false, HeaderItems,
 		RenderGeneration, true, RequestSerial, 0, StateCommit, &PresentBreakdown)
     HotPath_LogIfSlow("Tooltip.LlmPresent", _hpLlmPresent, HotPath_BreakdownDetail(PresentBreakdown))
 	if !Presented

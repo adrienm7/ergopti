@@ -50,6 +50,13 @@ local DEFINITIONS = {
 		path = KEY.LLM_TRIGGER_AFTER_HOTSTRING,
 		type = "boolean",
 	},
+	-- What an automatic prediction does while a hotstring tooltip shows; the
+	-- manifest owns its values ("wait", "both").
+	while_hotstring_tooltip = {
+		path = KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP,
+		type = "string",
+		enum = true,
+	},
 	secure_filter_enabled = {
 		path = KEY.LLM_TRIGGER_SECURE_FILTER_ENABLED,
 		type = "boolean",
@@ -105,10 +112,27 @@ local function valid_apps(value)
 	return count == #value
 end
 
+--- Whether a value is one of the manifest's values for an enum setting.
+--- @param def table Setting definition.
+--- @param value string
+--- @return boolean
+local function valid_enum(def, value)
+	local ok, entry = pcall(Manifest.find_entry_by_path, def.path)
+	if not ok or type(entry) ~= "table" or type(entry.enum_values) ~= "table" then
+		Logger.error(LOG, "Manifest values for '%s' are unavailable.", def.path)
+		return false
+	end
+	for _, accepted in ipairs(entry.enum_values) do
+		if accepted == value then return true end
+	end
+	return false
+end
+
 local function valid(name, value)
 	local def = definition(name)
 	if not def or type(value) ~= def.type then return false end
 	if def.apps then return valid_apps(value) end
+	if def.enum then return valid_enum(def, value) end
 	if def.type == "number" then
 		if def.never ~= nil and value == def.never then return true end
 		return value == math.floor(value) and value >= def.min and value <= def.max

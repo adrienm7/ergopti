@@ -689,6 +689,18 @@ i18n = "menu.llm.after_hotstring"
 checked_when = ["llm_after_hotstring_enabled"]
 disabled_when = ["llm_trigger_ready"]
 
+# The enum feature owns the two values; the shared choice renderer owns the
+# ticks and the « label : value » caption on every driver.
+[[menu.llm_trigger_menu]]
+type = "choice"
+id = "llm_while_hotstring_tooltip"
+path = "llm.trigger.while_hotstring_tooltip"
+i18n = "menu.llm.while_hotstring_tooltip"
+choice_label_prefix = "menu.llm.while_hotstring_tooltip_"
+show_current_choice = true
+current_choice_label_value = true
+disabled_when = ["llm_trigger_ready"]
+
 [[menu.llm_trigger_menu]]
 type = "---"
 

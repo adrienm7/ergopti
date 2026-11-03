@@ -427,6 +427,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			local map = {
 			{ fn = "set_preview_ai_enabled",          val = state.preview_ai_enabled },
 			{ fn = "set_llm_after_hotstring",         val = state.llm_after_hotstring },
+			{ fn = "set_llm_while_hotstring_tooltip", val = state.llm_while_hotstring_tooltip },
 			{ fn = "set_llm_auto_raise_temp",         val = state.llm_auto_raise_temp },
 			{ fn = "set_llm_debounce",                val = state.llm_debounce },
 			{ fn = "set_llm_min_request_interval",    val = state.llm_min_request_interval },

@@ -140,6 +140,7 @@ global LLM_ENGINE_RUNTIME_POLICY_CONFIG_KEYS := [
 	ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
 	ConfigLeaf.INSTANT_ON_WORD_END,
 	ConfigLeaf.AFTER_HOTSTRING,
+	ConfigLeaf.WHILE_HOTSTRING_TOOLTIP,
 	ConfigLeaf.RESET_ON_NAV,
 	"disable_url_bars",
 	"disable_password_fields",
@@ -434,7 +435,7 @@ LLM_Engine_Init(opts) {
 		throw TypeError("LLM_Engine_Init options must be a Map.")
 	static _optionKeys := ["model", "profile_id", "backend", "n_predictions",
 		ConfigLeaf.MIN_WORDS, ConfigLeaf.MAX_WORDS, ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS, "ctx_chars", "language",
-		"temperature", ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING, ConfigLeaf.RESET_ON_NAV,
+		"temperature", ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING, ConfigLeaf.WHILE_HOTSTRING_TOOLTIP, ConfigLeaf.RESET_ON_NAV,
 		"disable_url_bars", "disable_password_fields", ConfigLeaf.SHOW_INFO_BAR,
 		"streaming", "show_all_at_once", ConfigLeaf.PRED_INDENT, ConfigLeaf.AUTO_RAISE_TEMP,
 		ConfigLeaf.NAV_MODIFIERS, ConfigLeaf.VAL_MODIFIERS, ConfigLeaf.INLINE_AUTOTYPE, "api_entry_id",
@@ -454,7 +455,7 @@ LLM_Engine_Init(opts) {
 
 		static _keys := ["model", "profile_id", "backend", "n_predictions", ConfigLeaf.MIN_WORDS, ConfigLeaf.MAX_WORDS,
 			ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS, "ctx_chars", "language", "temperature",
-			ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING, ConfigLeaf.RESET_ON_NAV,
+			ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING, ConfigLeaf.WHILE_HOTSTRING_TOOLTIP, ConfigLeaf.RESET_ON_NAV,
 			"disable_url_bars", "disable_password_fields",
 			ConfigLeaf.SHOW_INFO_BAR, "streaming", "show_all_at_once",
 			ConfigLeaf.PRED_INDENT, ConfigLeaf.AUTO_RAISE_TEMP, ConfigLeaf.NAV_MODIFIERS, ConfigLeaf.VAL_MODIFIERS,

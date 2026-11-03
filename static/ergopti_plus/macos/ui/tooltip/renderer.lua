@@ -397,6 +397,45 @@ function M.compute_position(anchor, canvas, screen_frame)
 	})
 end
 
+-- llm.trigger.while_hotstring_tooltip = "both": the standard canvas goes under the
+-- visible hotstring rows, so the two read as one stack.
+local _stack_below_hotstring = false
+
+--- Places the standard canvas under the hotstring rows while they are shown.
+--- @param enabled boolean
+function M.set_stack_below_hotstring(enabled)
+	_stack_below_hotstring = enabled == true
+end
+
+--- Where a canvas goes to continue the hotstring stack: under it, or above it
+--- when the screen ends first, left-aligned with it and kept on screen. Pure.
+--- @param stacked table { x, y, w, h } The hotstring canvas frame.
+--- @param canvas table { w, h } The canvas size.
+--- @param screen_frame table { x, y, w, h }
+--- @return table { x, y }
+function M.position_below_stack(stacked, canvas, screen_frame)
+	local margin = Config.layout.screen_margin
+	local gap = Config.layout.line_spacing
+	local y = stacked.y + stacked.h + gap
+	if y + canvas.h > screen_frame.y + screen_frame.h - margin then
+		y = stacked.y - canvas.h - gap
+	end
+	local x = math.max(screen_frame.x + margin,
+		math.min(stacked.x, screen_frame.x + screen_frame.w - canvas.w - margin))
+	y = math.max(screen_frame.y + margin, math.min(y, screen_frame.y + screen_frame.h - canvas.h - margin))
+	return { x = x, y = y }
+end
+
+--- The visible hotstring canvas frame the standard canvas continues, or nil.
+--- @return table|nil
+local function visible_stack_frame()
+	if not _stack_below_hotstring or not M.stacked_canvas then return nil end
+	local ok, frame = pcall(function()
+		return M.stacked_canvas:isShowing() and M.stacked_canvas:frame() or nil
+	end)
+	return ok and type(frame) == "table" and frame or nil
+end
+
 --- Compiles the component blocks, applies layout logic, and draws the canvas.
 --- @param blocks table|userdata The text payloads to draw.
 --- @param state table The orchestrator state object.
@@ -501,7 +540,10 @@ function M.render(blocks, state, start_watchers_callback)
 		local canvas_height = current_y - Config.layout.line_spacing + Config.layout.pad_y
 		local anchor, screen_frame = M.resolve_placement()
 
-		local placed = M.compute_position(anchor, { w = canvas_width, h = canvas_height }, screen_frame)
+		local stack_frame = visible_stack_frame()
+		local placed = stack_frame
+			and M.position_below_stack(stack_frame, { w = canvas_width, h = canvas_height }, screen_frame)
+			or M.compute_position(anchor, { w = canvas_width, h = canvas_height }, screen_frame)
 		local pos_x, pos_y = placed.x, placed.y
 
 		M.canvas:frame({ x = pos_x, y = pos_y, w = canvas_width, h = canvas_height })
