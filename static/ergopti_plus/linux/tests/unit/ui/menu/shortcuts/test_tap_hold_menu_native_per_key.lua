@@ -102,8 +102,10 @@ helpers.describe("inert existing-provider status data", function()
 			helpers.assert_eq(#rows, 3)
 			helpers.assert_true(rows[1].separator)
 			local tr = require("infra.i18n").get
-			helpers.assert_eq(rows[2].label, tr(Mutate and "menu.llm.local_servers.rescan" or "menu.llm.local_servers.header"))
-			helpers.assert_eq(rows[3].label, tr(Mutate and "menu.llm.local_servers.header" or "menu.llm.unavailable"))
+			-- The local servers heading is a section header, framed by the shared format.
+			local section = require("menu.labels").decorate_section
+			helpers.assert_eq(rows[2].label, Mutate and tr("menu.llm.local_servers.rescan") or section(tr("menu.llm.local_servers.header")))
+			helpers.assert_eq(rows[3].label, Mutate and section(tr("menu.llm.local_servers.header")) or tr("menu.llm.unavailable"))
 			for index = 2, 3 do
 				helpers.assert_eq(rows[index].disabled, true)
 				helpers.assert_nil(rows[index].action)
