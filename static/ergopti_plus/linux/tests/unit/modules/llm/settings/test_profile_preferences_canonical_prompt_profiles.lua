@@ -520,6 +520,10 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 					end
 					return key
 				end}, {__index=native_i18n})
+				-- The headings are section headers: the renderer reads them through
+				-- section, which frames whatever get currently answers, like the
+				-- native i18n.section does.
+				i18n.section=function(key) return native_i18n.decorate_section(i18n.get(key)) end
 				package.loaded["infra.i18n"]=i18n
 				local renderer=assert(require("menu.renderer").new({platform="linux",
 					manifest_path=function() return shared("modules/menu/menu_manifest.json") end,

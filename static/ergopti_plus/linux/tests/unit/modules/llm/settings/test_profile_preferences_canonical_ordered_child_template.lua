@@ -426,6 +426,9 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 						end
 						return key
 					end }, { __index = require("infra.i18n") })
+					-- The headings are section headers, read through section, which
+					-- frames whatever get currently answers, like the native one.
+					i18n.section = function(key) return i18n.decorate_section(i18n.get(key)) end
 					package.loaded["infra.i18n"] = i18n
 					package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
 						platform = "linux", manifest_path = function() return shared("modules/menu/menu_manifest.json") end,
@@ -458,6 +461,12 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 			end)
 		end)
 	end
+	-- The two profile headings are section headers, every other label plain text.
+	local HEADINGS = { builtin_heading = true, custom_heading = true }
+	local function caption(f, id)
+		local key = oracle.labels[id]
+		return HEADINGS[id] and f.i18n.section(key) or f.i18n.get(key)
+	end
 	local function at(rows, title)
 		for _, row in ipairs(rows or {}) do if row.title == title then return row end end
 	end
@@ -471,7 +480,7 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 			elseif native[row.title] then
 				if not counted_native then role, counted_native = "builtin_catalogue", true end
 			elseif row.title == "Canonical" then role = "custom:user_canonical"
-			else for id, key in pairs(oracle.labels) do if row.title == f.i18n.get(key) then role = id end end end
+			else for id in pairs(oracle.labels) do if row.title == caption(f, id) then role = id end end end
 			helpers.assert_true(role ~= nil or native[row.title], "every physical native row belongs to the independent frame or original catalogue")
 			if role then result[#result + 1] = role end
 		end
@@ -494,7 +503,7 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 	helpers.it("empty custom registry and custom active profile keep the original conditional boundaries", function()
 		with_frame({}, function(f)
 			local rows = assert(f.rows())
-			helpers.assert_nil(at(rows, f.i18n.get(oracle.labels.custom_heading)))
+			helpers.assert_nil(at(rows, caption(f, "custom_heading")))
 			helpers.assert_not_nil(at(rows, f.i18n.get(oracle.labels.clone)))
 		end)
 		with_frame({ custom = true, active = "user_canonical" }, function(f)
@@ -606,7 +615,7 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 				for _, id in ipairs({ "auto_detect", "builtin_heading", "custom_heading", "clone", "create" }) do
 					local key = oracle.labels[id]
 					helpers.assert_not_nil(values[key], language)
-					helpers.assert_not_nil(at(rows, values[key]), language .. ": native shared-caption publication")
+					helpers.assert_not_nil(at(rows, caption(f, id)), language .. ": native shared-caption publication")
 				end
 				helpers.assert_eq(roles(f, rows), oracle.expected.linux_custom_builtin)
 				helpers.assert_eq(Sandbox.read_bytes(f.path), f.initial)
