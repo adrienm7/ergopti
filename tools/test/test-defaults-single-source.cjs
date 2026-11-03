@@ -168,8 +168,9 @@ async function main() {
 	}
 	for (const [id, platforms, shipped] of [
 		['wpm_widget_visible', ['ahk', 'hs', 'linux'], false],
-		['wpm_widget_colors', ['ahk', 'hs', 'linux'], false],
-		['wpm_widget_graph', ['ahk', 'hs', 'linux'], false],
+		// Maintainer decision of 2026-11-03: colours and graph on, the pill itself off.
+		['wpm_widget_colors', ['ahk', 'hs', 'linux'], true],
+		['wpm_widget_graph', ['ahk', 'hs', 'linux'], true],
 		['wpm_menubar_visible', ['hs', 'linux'], false],
 		['wpm_menubar_colors', ['hs', 'linux'], true]
 	]) {

@@ -468,10 +468,10 @@ M.features = {
 		path = "metrics.wpm_widget_visible", id = "wpm_widget_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_visible", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "setting",
 	},
 	{
-		path = "metrics.wpm_widget_colors", id = "wpm_widget_colors", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_colors", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "setting",
+		path = "metrics.wpm_widget_colors", id = "wpm_widget_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.wpm_widget_colors", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "metrics.wpm_widget_graph", id = "wpm_widget_graph", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_graph", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "setting",
+		path = "metrics.wpm_widget_graph", id = "wpm_widget_graph", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.wpm_widget_graph", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
 		path = "metrics.wpm_menubar_visible", id = "wpm_menubar_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.show_wpm_menubar", platforms = { "hs", "linux" }, recommended = false, family = "setting", reason_key = "platform_reason.wpm_readout_needs_a_menubar",
