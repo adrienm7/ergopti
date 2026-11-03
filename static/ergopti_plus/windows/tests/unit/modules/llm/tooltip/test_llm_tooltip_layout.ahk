@@ -56,7 +56,7 @@ _TLL_RetainedSegmentSizesPreserveEmphasis() {
 	Slot := { Text: "", Chunks: [{ type: "equal", text: "a" },
 		{ type: "insert", text: "b" }], NextWords: " c", HasCorrections: true }
 	Row := _LLM_TooltipMeasurePredictionRow(Slot, { W: 30, H: 18 },
-		{ W: 5, H: 18 }, 10, 7,
+		{ W: 5, H: 18 }, 10,
 		(Text, Bold) => { W: StrLen(Text) * (Bold ? 20 : 10), H: Bold ? 22 : 18 })
 	for Selected in [true, false] {
 		G := _TLL_SegmentGui()
@@ -113,7 +113,8 @@ class _TLL_Native {
 }
 
 _TLL_Style() {
-	return { PadX: 14, PadY: 7, LineSpacing: 8, HintSpacing: 4 }
+	return { PadX: 14, PadY: 7, LineSpacing: 8, HintSpacing: 4,
+		ShortcutW: 0, LabelGap: 16, MaxPredsW: 800 }
 }
 
 _TLL_Footer(HintW, InfoW, InfoSizingW) {
@@ -130,6 +131,71 @@ _TLL_ConstantsSection(Name) {
 	Assert(Parsed.Has(Name), "constants.toml must declare [" . Name . "]")
 	return Parsed[Name]
 }
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 0/ The shortcut column =======
+; ======================================
+; ======================================
+
+_TLL_ColumnCorpusReplays() {
+	global _SharedDir
+	Data := JsonParse(FileRead(_SharedDir . "\tests\corpus\tooltip\llm_column_vectors.json", "UTF-8"))
+	for Vec in Data["vectors"] {
+		Column := _LLM_TooltipShortcutColumn(Vec["widest_line"], Vec["widest_label"], Vec["gap"], Vec["max_width"])
+		Place := _LLM_TooltipColumnPlacement(Vec["content_w"], Column.ZoneW, Vec["label_w"], Vec["line_w"])
+		Expected := Vec["expected"]
+		AssertEqual(Expected["zone_w"], Column.ZoneW, Vec["id"] . ": zone_w")
+		AssertEqual(Expected["preds_w"], Column.PredsW, Vec["id"] . ": preds_w")
+		AssertEqual(Expected["label_x"], Place.LabelX, Vec["id"] . ": label_x")
+		AssertEqual(Expected["line_limit"], Place.LineLimit, Vec["id"] . ": line_limit")
+		AssertEqual(!!Expected["truncated"], Place.Truncated, Vec["id"] . ": truncated")
+	}
+}
+Test("llm tooltip column: the shared corpus replays (llm-shortcut-column)", _TLL_ColumnCorpusReplays)
+
+_TLL_ColumnFollowsAWiderPanel() {
+	Style := _TLL_Style()
+	Style.ShortcutW := 14
+	Layout := _LLM_TooltipLayout([{ W: 120, H: 20 }], _TLL_Footer(260, 150, 170), Style)
+	AssertEqual(260, Layout.ContentW, "the wrapped footer widens the panel past the lines")
+	AssertEqual(30, Layout.ZoneW)
+	AssertEqual(246, _LLM_TooltipColumnPlacement(Layout.ContentW, Layout.ZoneW, 14, 120).LabelX,
+		"the chord ends on the inner edge, not label_gap past the line")
+}
+Test("llm tooltip column: the chord follows the panel a footer widened (llm-shortcut-column)",
+	_TLL_ColumnFollowsAWiderPanel)
+
+_TLL_LongLineStopsBeforeTheColumn() {
+	Style := _TLL_Style()
+	Style.ShortcutW := 14
+	Layout := _LLM_TooltipLayout([{ W: 1000, H: 20 }], _TLL_Footer(100, 100, 100), Style)
+	AssertEqual(800, Layout.ContentW, "the block stops at the cap, chord included")
+	Place := _LLM_TooltipColumnPlacement(Layout.ContentW, Layout.ZoneW, 14, 1000)
+	AssertTrue(Place.Truncated)
+	AssertEqual(770, Place.LineLimit)
+}
+Test("llm tooltip column: a long line stops before the column at the cap (llm-shortcut-column)",
+	_TLL_LongLineStopsBeforeTheColumn)
+
+_TLL_CutPieceEndsInAnEllipsis() {
+	G := _TLL_SegmentGui()
+	Slot := { Text: "", Chunks: [], NextWords: "abcdefghij", HasCorrections: false }
+	Segments := _LLM_SlotSegments(Slot, true)
+	Width := _LLM_TooltipDrawSegments(G, 0, 0, 20, Segments, true, [{ W: 100, H: 20 }], 60)
+	AssertEqual(60, Width, "the line stops at its limit")
+	Assert(InStr(G.Spans[1].Options, "0x4000"), "the cut piece carries SS_ENDELLIPSIS")
+	Assert(InStr(G.Spans[1].Options, " w60 "), "and the limit's width")
+	G := _TLL_SegmentGui()
+	AssertEqual(100, _LLM_TooltipDrawSegments(G, 0, 0, 20, Segments, true, [{ W: 100, H: 20 }], 200))
+	Assert(!InStr(G.Spans[1].Options, "0x4000"), "a line that fits is left whole")
+}
+Test("llm tooltip column: a line past its limit ends in an ellipsis (llm-shortcut-column)",
+	_TLL_CutPieceEndsInAnEllipsis)
 
 
 
