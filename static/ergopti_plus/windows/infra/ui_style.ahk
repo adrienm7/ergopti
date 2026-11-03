@@ -24,6 +24,7 @@
 ;   [layout]      pad_x                  → UI_PAD_X
 ;   [layout]      pad_y                  → UI_PAD_Y
 ;   [layout]      label_gap              → UI_LABEL_GAP
+;   [layout]      llm_max_content_width  → UI_LLM_MAX_CONTENT_WIDTH
 ;   [layout]      corner_radius × 2      → UI_CORNER_RADIUS (GDI diameter)
 ;   [colors]      bg_hex                 → UI_BG_HEX
 ;   [colors]      border_white/alpha_ahk → UI_BORDER_COLOR_HEX / UI_BORDER_ALPHA
@@ -60,6 +61,7 @@ global UI_FONT_SIZE_INFO  := 0
 global UI_PAD_X           := 0
 global UI_PAD_Y           := 0
 global UI_LABEL_GAP       := 0
+global UI_LLM_MAX_CONTENT_WIDTH := 0
 global UI_LINE_SPACING    := 0
 global UI_HINT_SPACING    := 0
 global UI_CORNER_RADIUS   := 0
@@ -185,6 +187,7 @@ UiStyle_LoadSharedConst() {
 	global UI_PAD_X                := Integer(_UiStyleRequire(c, "layout", "pad_x"))
 	global UI_PAD_Y                := Integer(_UiStyleRequire(c, "layout", "pad_y"))
 	global UI_LABEL_GAP            := Integer(_UiStyleRequire(c, "layout", "label_gap"))
+	global UI_LLM_MAX_CONTENT_WIDTH := Integer(_UiStyleRequire(c, "layout", "llm_max_content_width"))
 	global UI_LINE_SPACING         := Integer(_UiStyleRequire(c, "layout", "line_spacing"))
 	global UI_HINT_SPACING         := Integer(_UiStyleRequire(c, "layout", "hint_spacing"))
 	; GDI nWidth/nHeight = full ellipse diameter = 2 × corner_radius.

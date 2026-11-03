@@ -1389,6 +1389,31 @@ _LLM_TooltipJoinFooter(Footer, Info) {
 		H: Max(Footer.Hint.H, Footer.Sep.H, Info.H) }
 }
 
+; Port of shortcut_column in _shared/lua/tooltip/llm_line.lua: how wide the
+; prediction block wants to be with its shortcut column, pinned on the three
+; drivers by _shared/tests/corpus/tooltip/llm_column_vectors.json.
+; @param {Number} WidestLine - Widest line, prefix included, over its renderings.
+; @param {Number} WidestLabel - Widest shortcut label, 0 when no row has one.
+; @param {Number} Gap - [layout].label_gap.
+; @param {Number} MaxW - [layout].llm_max_content_width.
+; @returns {Object} { ZoneW, PredsW }
+_LLM_TooltipShortcutColumn(WidestLine, WidestLabel, Gap, MaxW) {
+	ZoneW := WidestLabel > 0 ? Gap + WidestLabel : 0
+	return { ZoneW: ZoneW, PredsW: Min(WidestLine + ZoneW, MaxW) }
+}
+
+; Port of column_placement in the same file: where one row goes once the
+; panel's content width is settled, in offsets from the content's left edge.
+; @param {Number} ContentW - Panel width between the paddings.
+; @param {Number} ZoneW - From _LLM_TooltipShortcutColumn.
+; @param {Number} LabelW - This row's label.
+; @param {Number} LineW - This row's line.
+; @returns {Object} { LabelX, LineLimit, Truncated }
+_LLM_TooltipColumnPlacement(ContentW, ZoneW, LabelW, LineW) {
+	LineLimit := ContentW - ZoneW
+	return { LabelX: ContentW - LabelW, LineLimit: LineLimit, Truncated: LineW > LineLimit }
+}
+
 ; Geometry of the prediction panel — the Windows port of the macOS layout in
 ; tooltip_llm.lua show_predictions (width) and renderer.lua render (height).
 ; Pure, layout units, so it is tested without GDI.
@@ -1403,15 +1428,17 @@ _LLM_TooltipJoinFooter(Footer, Info) {
 ;
 ; @param PredRows  Array of { W, H } — each line's widest rendering.
 ; @param Footer    _LLM_TooltipMeasureFooter() result (0 members when absent).
-; @param Style     { PadX, PadY, LineSpacing, HintSpacing }.
-; @returns { W, H, ContentW, RowY[], SepY, Mode, CombinedY, HintY, InfoY }
+; @param Style     { PadX, PadY, LineSpacing, HintSpacing, ShortcutW, LabelGap, MaxPredsW }.
+; @returns { W, H, ContentW, ZoneW, RowY[], SepY, Mode, CombinedY, HintY, InfoY }
 _LLM_TooltipLayout(PredRows, Footer, Style) {
-	PredsW := 0
+	WidestLine := 0
 	PredsH := 0
 	for , Row in PredRows {
-		PredsW := Max(PredsW, Row.W)
+		WidestLine := Max(WidestLine, Row.W)
 		PredsH += Row.H
 	}
+	Column := _LLM_TooltipShortcutColumn(WidestLine, Style.ShortcutW, Style.LabelGap, Style.MaxPredsW)
+	PredsW := Column.PredsW
 	HintW := IsObject(Footer.Hint) ? Footer.Hint.W : 0
 	InfoSizingW := IsObject(Footer.InfoSizing) ? Footer.InfoSizing.W : 0
 	ContentW := PredsW
@@ -1422,7 +1449,7 @@ _LLM_TooltipLayout(PredRows, Footer, Style) {
 		ContentW := Max(PredsW, HintW, InfoSizingW)
 	}
 
-	L := { W: ContentW + 2 * Style.PadX, H: 0, ContentW: ContentW, RowY: [],
+	L := { W: ContentW + 2 * Style.PadX, H: 0, ContentW: ContentW, ZoneW: Column.ZoneW, RowY: [],
 		SepY: 0, Mode: "none", CombinedY: 0, HintY: 0, InfoY: 0 }
 	Y := Style.PadY
 	for , Row in PredRows {
@@ -1491,16 +1518,17 @@ _LLM_TooltipMeasureSlotBody(Slot, Measure := _TooltipMeasureText) {
 ; Prefix, body weight and acceptance suffix belong to one rendering. Taking
 ; their maxima separately can reserve a width that neither rendering uses.
 _LLM_TooltipMeasurePredictionRow(Slot, ActivePrefix, InactivePrefix, SuffixW,
-		ShortcutW, Measure := _TooltipMeasureText) {
+		Measure := _TooltipMeasureText) {
 	Body := _LLM_TooltipMeasureSlotBody(Slot, Measure)
 	return { W: Max(ActivePrefix.W + Body.Selected.W + SuffixW,
-		InactivePrefix.W + Body.Unselected.W) + ShortcutW,
+		InactivePrefix.W + Body.Unselected.W),
 		H: Max(ActivePrefix.H, InactivePrefix.H, Body.H),
 		Selected: Body.Selected, Unselected: Body.Unselected }
 }
 
-; One transparent text span; the Gui background shows through.
-_LLM_TooltipDrawText(G, X, Y, H, ColorHex, FontSize, Text, Style := "norm", Size := 0) {
+; One transparent text span; the Gui background shows through. ClipW, when the
+; span is wider, cuts it there with an ellipsis (SS_ENDELLIPSIS).
+_LLM_TooltipDrawText(G, X, Y, H, ColorHex, FontSize, Text, Style := "norm", Size := 0, ClipW := 0) {
 	global _TOOLTIP_FONT_NAME
 	if (Text = "")
 		return 0
@@ -1513,20 +1541,27 @@ _LLM_TooltipDrawText(G, X, Y, H, ColorHex, FontSize, Text, Style := "norm", Size
 	}
 	G.SetFont(Style . " c" . ColorHex . " s" . FontSize, _TOOLTIP_FONT_NAME)
 	; +2: a GDI extent rounded to layout units can clip the last glyph's overhang.
-	G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-		X, Y + Max(0, H - Size.H), Size.W + 2, Size.H), Text)
-	return Size.W
+	Clipped := ClipW > 0 and Size.W > ClipW
+	G.Add("Text", Format("BackgroundTrans{1} x{2} y{3} w{4} h{5}", Clipped ? " 0x4000" : "",
+		X, Y + Max(0, H - Size.H), Clipped ? ClipW : Size.W + 2, Size.H), Text)
+	return Clipped ? ClipW : Size.W
 }
 
 ; Keep the paint owner and its measured advance together for every line piece.
-_LLM_TooltipDrawSegments(G, X, Y, H, Segments, IsSelected, Pieces := 0) {
+; LimitW, when set, ends the line there: the piece that reaches it is cut with
+; an ellipsis and the later ones are dropped.
+_LLM_TooltipDrawSegments(G, X, Y, H, Segments, IsSelected, Pieces := 0, LimitW := 0) {
 	global _TOOLTIP_FONT_SIZE
 	Start := X
-	for Index, Segment in Segments
+	for Index, Segment in Segments {
+		Room := LimitW - (X - Start)
+		if (LimitW > 0 and Room <= 0)
+			break
 		X += _LLM_TooltipDrawText(G, X, Y, H,
 			_LLM_SegmentColorHex(Segment.Role, IsSelected), _TOOLTIP_FONT_SIZE,
 			Segment.Text, Segment.Bold ? "bold" : "norm",
-			Pieces is Array ? Pieces[Index] : 0)
+			Pieces is Array ? Pieces[Index] : 0, LimitW > 0 ? Room : 0)
+	}
 	return X - Start
 }
 
@@ -1580,7 +1615,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	global _TOOLTIP_LINE_SPACING, _TOOLTIP_HINT_SPACING, _TOOLTIP_LOADING_TEXT_HEX
 	global _LLM_Tooltip_ValMods, LLM_TOOLTIP_PLACEHOLDER, LLM_TOOLTIP_TAB_SUFFIX
 	global UI_LLM_CORR_SEL_HEX, UI_LLM_NW_SEL_HEX, UI_LLM_UNSEL_GRAY_HEX, UI_LLM_LOADING_HEX
-	global UI_LLM_CURSOR_HEX, UI_LLM_CMD_DIM_HEX, _TOOLTIP_LABEL_GAP
+	global UI_LLM_CURSOR_HEX, UI_LLM_CMD_DIM_HEX, _TOOLTIP_LABEL_GAP, UI_LLM_MAX_CONTENT_WIDTH
 
 	G := 0
 	CandidateHandedOff := false
@@ -1606,8 +1641,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	InactivePrefixSize := _TooltipMeasureText(inactivePrefix)
 	; The shortcut column: every real row shows the chord that inserts it,
 	; right-aligned against the inner edge, label_gap past the widest line
-	; (_shared/modules/tooltip/constants.toml [llm_ui]). Its width is one column
-	; for every row, so it is measured before the lines.
+	; (_shared/modules/tooltip/constants.toml [llm_ui]).
 	ShortcutSizes := []
 	ShortcutColumnW := 0
 	for i, slot in slots {
@@ -1619,7 +1653,6 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		if IsObject(ShortcutSize)
 			ShortcutColumnW := Max(ShortcutColumnW, ShortcutSize.W)
 	}
-	ShortcutZoneW := ShortcutColumnW > 0 ? _TOOLTIP_LABEL_GAP + ShortcutColumnW : 0
 	for i, slot in slots {
 		Segments := []
 		if all_placeholder {
@@ -1645,7 +1678,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 				SuffixSize := _LLM_TooltipMeasureOptional(LLM_TOOLTIP_TAB_SUFFIX, _TOOLTIP_FONT_SIZE)
 			SuffixW := IsObject(SuffixSize) ? SuffixSize.W : 0
 			MeasuredRow := _LLM_TooltipMeasurePredictionRow(slot,
-				ActivePrefixSize, InactivePrefixSize, SuffixW, ShortcutZoneW)
+				ActivePrefixSize, InactivePrefixSize, SuffixW)
 			SpanSizes.Pieces := i == active_idx
 				? MeasuredRow.Selected.Pieces : MeasuredRow.Unselected.Pieces
 			PredRows.Push(MeasuredRow)
@@ -1654,8 +1687,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		Active := _TooltipMeasureText(activePrefix . Body)
 		Inactive := _TooltipMeasureText(inactivePrefix . Body)
 		SpanSizes.Body := _LLM_TooltipMeasureOptional(Body, _TOOLTIP_FONT_SIZE)
-		PredRows.Push({ W: Max(Active.W, Inactive.W) + ShortcutZoneW,
-			H: Max(Active.H, Inactive.H) })
+		PredRows.Push({ W: Max(Active.W, Inactive.W), H: Max(Active.H, Inactive.H) })
 	}
 	; The all-placeholder panel is the macOS loading panel: label only, no footer.
 	Texts := all_placeholder ? { Hint: "", Info: "", InfoSizing: "" }
@@ -1663,7 +1695,8 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	Footer := _LLM_TooltipMeasureFooter(Texts)
 	Layout := _LLM_TooltipLayout(PredRows, Footer, {
 		PadX: _TOOLTIP_PADDING_X, PadY: _TOOLTIP_PADDING_Y,
-		LineSpacing: _TOOLTIP_LINE_SPACING, HintSpacing: _TOOLTIP_HINT_SPACING })
+		LineSpacing: _TOOLTIP_LINE_SPACING, HintSpacing: _TOOLTIP_HINT_SPACING,
+		ShortcutW: ShortcutColumnW, LabelGap: _TOOLTIP_LABEL_GAP, MaxPredsW: UI_LLM_MAX_CONTENT_WIDTH })
 
 	G := Gui("+AlwaysOnTop -Caption +E0x20 +E0x80 +LastFound")
 	G.BackColor := all_placeholder
@@ -1684,6 +1717,8 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 			continue
 		}
 		is_active := (Idx == active_idx)
+		ShortcutW := IsObject(SpanSizes.Shortcut) ? SpanSizes.Shortcut.W : 0
+		Placement := _LLM_TooltipColumnPlacement(Layout.ContentW, Layout.ZoneW, ShortcutW, PredRows[Idx].W)
 		if _LLM_SlotIsEmpty(slot) {
 			X += InactivePrefixSize.W
 			X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_LOADING_HEX,
@@ -1697,7 +1732,8 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 			else
 				X += InactivePrefixSize.W
 			X += _LLM_TooltipDrawSegments(G, X, RowY, RowH,
-				RowSegments[Idx], is_active, SpanSizes.Pieces)
+				RowSegments[Idx], is_active, SpanSizes.Pieces,
+				Placement.Truncated ? _TOOLTIP_PADDING_X + Placement.LineLimit - X : 0)
 			if is_active
 				X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_NW_SEL_HEX,
 					_TOOLTIP_FONT_SIZE, LLM_TOOLTIP_TAB_SUFFIX, "norm", SuffixSize)
@@ -1705,7 +1741,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		; Right-aligned against the inner edge, bottom-aligned at the smaller hint
 		; size, muted on every row.
 		if IsObject(SpanSizes.Shortcut)
-			_LLM_TooltipDrawText(G, Layout.W - _TOOLTIP_PADDING_X - SpanSizes.Shortcut.W,
+			_LLM_TooltipDrawText(G, _TOOLTIP_PADDING_X + Placement.LabelX,
 				RowY, RowH, UI_LLM_CMD_DIM_HEX, _TOOLTIP_LABEL_FONT_SIZE, Shortcuts[Idx],
 				"norm", SpanSizes.Shortcut)
 	}

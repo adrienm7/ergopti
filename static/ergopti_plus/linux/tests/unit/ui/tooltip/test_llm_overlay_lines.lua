@@ -180,3 +180,53 @@ helpers.describe("AI overlay: the shortcut column (llm-shortcut-column)", functi
 		helpers.assert_eq(rows[1].label, "Ctrl+Shift+1")
 	end)
 end)
+
+helpers.describe("AI overlay: where the shortcut column goes (llm-shortcut-column)", function()
+	local fh = assert(io.open(shared_root .. "/tests/corpus/tooltip/llm_column_vectors.json", "r"))
+	local vectors = require("json").decode(fh:read("*a")).vectors
+	fh:close()
+
+	for _, vector in ipairs(vectors) do
+		helpers.it("(llm-shortcut-column) corpus: " .. vector.id, function()
+			local column = LlmLine.shortcut_column(vector.widest_line, vector.widest_label, vector.gap, vector.max_width)
+			local placement = LlmLine.column_placement(vector.content_w, column.zone_w, vector.label_w, vector.line_w)
+			helpers.assert_eq(column.zone_w, vector.expected.zone_w, "zone_w")
+			helpers.assert_eq(column.preds_w, vector.expected.preds_w, "preds_w")
+			helpers.assert_eq(placement.label_x, vector.expected.label_x, "label_x")
+			helpers.assert_eq(placement.line_limit, vector.expected.line_limit, "line_limit")
+			helpers.assert_eq(placement.truncated, vector.expected.truncated, "truncated")
+		end)
+	end
+
+	local LAYOUT = { label_gap = 16, llm_max_content_width = 800 }
+	local function row(text_w, label_w)
+		return { text_w = text_w, label_w = label_w, segments = {} }
+	end
+
+	helpers.it("(llm-shortcut-column) the panel fits the widest line and the widest chord", function()
+		local Renderer = require("adapters.graphics_renderer")
+		local metrics = { row(120, 14), row(40, 9) }
+		helpers.assert_eq(Renderer.fit_prediction_rows(metrics, 0, LAYOUT), 150)
+		helpers.assert_eq(metrics[2].line_limit, 120, "every line stops at the same place")
+	end)
+
+	helpers.it("(llm-shortcut-column) a wider info row moves the limit with the panel", function()
+		local Renderer = require("adapters.graphics_renderer")
+		local metrics = { row(120, 14) }
+		helpers.assert_eq(Renderer.fit_prediction_rows(metrics, 300, LAYOUT), 300)
+		helpers.assert_eq(metrics[1].line_limit, 270)
+	end)
+
+	helpers.it("(llm-shortcut-column) a long line stops the panel at the cap, before the column", function()
+		local Renderer = require("adapters.graphics_renderer")
+		local metrics = { row(1000, 14) }
+		helpers.assert_eq(Renderer.fit_prediction_rows(metrics, 0, LAYOUT), 800)
+		helpers.assert_eq(metrics[1].line_limit, 770)
+	end)
+
+	helpers.it("(llm-shortcut-column) rows that are not predictions take no part", function()
+		local Renderer = require("adapters.graphics_renderer")
+		helpers.assert_eq(Renderer.fit_prediction_rows({ { text_w = 900, label_w = 0 } }, 900, LAYOUT), 900,
+			"a hotstring row keeps its width")
+	end)
+end)

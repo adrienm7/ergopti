@@ -199,4 +199,39 @@ function M.shortcut_label(index, modifiers, spec)
 	return table.concat(parts, spec.joiner)
 end
 
+--- How wide the prediction block wants to be with its shortcut column.
+---
+--- Widths are measured by each driver in its own font, so a proportional font
+--- needs no padding of spaces and the indentation, which is part of a line's
+--- measured width, cannot displace the column. The block never passes
+--- max_width: the lines give way so the column stays on the panel.
+--- @param widest_line number Widest line, prefix included, over every rendering.
+--- @param widest_label number Widest shortcut label, 0 when no row has one.
+--- @param gap number [layout].label_gap.
+--- @param max_width number [layout].llm_max_content_width.
+--- @return table { zone_w, preds_w }: the column and its gap, the whole block.
+function M.shortcut_column(widest_line, widest_label, gap, max_width)
+	local zone_w = widest_label > 0 and (gap + widest_label) or 0
+	return { zone_w = zone_w, preds_w = math.min(widest_line + zone_w, max_width) }
+end
+
+--- Where one row goes once the panel's content width is settled.
+---
+--- The panel can end up wider than the prediction block (a footer widens it),
+--- so the column hangs from the panel's right edge, never from the end of the
+--- widest line: a label placed from the line stays stuck to the text.
+--- @param content_w number Panel width between the paddings.
+--- @param zone_w number From shortcut_column.
+--- @param label_w number This row's label.
+--- @param line_w number This row's line.
+--- @return table { label_x, line_limit, truncated }, offsets from the content's left.
+function M.column_placement(content_w, zone_w, label_w, line_w)
+	local line_limit = content_w - zone_w
+	return {
+		label_x = content_w - label_w,
+		line_limit = line_limit,
+		truncated = line_w > line_limit,
+	}
+end
+
 return M
