@@ -103,12 +103,15 @@ _GES_SlotRows(ReadFn := 0) {
 			Groups[Count] := []
 		Groups[Count].Push(Slot)
 	}
+	; Spelled out, not built from the count, so the manifest reader gate sees
+	; each declared header read.
+	HeaderStatus := Map(3, "fingers_3", 4, "fingers_4")
 	; A Map enumerates integer keys in ascending order.
 	Rows := []
 	for Count, Slots in Groups {
 		if Rows.Length > 0 && !_GES_PushStatusRows(Rows, "finger_group_boundary")
 			return []
-		if !_GES_PushStatusRows(Rows, "fingers_" . Count)
+		if !HeaderStatus.Has(Count) || !_GES_PushStatusRows(Rows, HeaderStatus[Count])
 			return []
 		for Slot in Slots
 			Rows.Push(_GES_SlotRow(Slot))
