@@ -1556,6 +1556,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ui/menu/test_menu_top_level_drift_gate.ahk
 ; Regression: no separator doubles up in any manifest menu.
 #Include unit/ui/menu/test_manifest_menu_no_double_separator.ahk
+; Regression: every section header titles real rows, drawn by the shared format.
+#Include unit/ui/menu/test_manifest_menu_section_headers.ahk
 #Include unit/ui/menu/test_menu_category_off_rule.ahk
 ; Regression: every category switch is a first-row checkbox with one label.
 #Include unit/modules/hotstrings/catalogue/test_category_toggle_checkbox.ahk
