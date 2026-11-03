@@ -1149,31 +1149,18 @@ _LLM_SegmentColorHex(Role, is_active) {
 	throw ValueError("Unknown prediction line role: " . Role, -1)
 }
 
-; The native label of each modifier, from the shared shortcut spec
-; (_shared/modules/tooltip/constants.toml [llm_ui]). Map keys are
-; case-insensitive, which tolerates "Alt"/"ALT" from config.
-_LLM_ValModifierLabels() {
-	global UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_LABELS
-	Labels := Map()
-	Labels.CaseSense := false
-	Texts := StrSplit(UI_LLM_SHORTCUT_LABELS, ",")
-	for Position, Name in StrSplit(UI_LLM_SHORTCUT_ORDER, ",")
-		Labels[Name] := Texts[Position]
-	return Labels
-}
-
-; Spells a modifier string out for the footer's navigation hint ("Alt+Shift").
+; Spells a modifier string out for the footer's navigation hint ("Alt+Maj"),
+; each modifier named by the shared key name table in the active language.
 ; Windows uses words: the macOS glyphs read as Cmd/Option shortcuts on a PC
 ; keyboard (llm-val-mods-windows-labels).
 _LLM_FormatValModifiers(valMods) {
 	if (valMods = "" or valMods = "none")
 		return ""
-	Labels := _LLM_ValModifierLabels()
 	out := ""
 	for part in StrSplit(valMods, "+", " `t") {
 		if (part = "")
 			continue
-		out .= (out = "" ? "" : "+") . Labels.Get(part, part)
+		out .= (out = "" ? "" : "+") . KeyNameLabel(part)
 	}
 	return out
 }
@@ -1188,7 +1175,7 @@ _LLM_FormatValModifiers(valMods) {
  * @returns {String} The label, "" when the row has no chord.
  */
 _LLM_PredictionShortcutLabel(Idx, ValMods) {
-	global UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_LABELS, UI_LLM_SHORTCUT_JOINER
+	global UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_JOINER
 	if !(Idx is Integer) || Idx < 1 || Idx > 10
 		return ""
 	Present := Map()
@@ -1196,11 +1183,10 @@ _LLM_PredictionShortcutLabel(Idx, ValMods) {
 	for Part in StrSplit(ValMods, "+", " `t")
 		if (Part != "")
 			Present[Part] := true
-	Texts := StrSplit(UI_LLM_SHORTCUT_LABELS, ",")
 	Out := ""
-	for Position, Name in StrSplit(UI_LLM_SHORTCUT_ORDER, ",")
+	for Name in StrSplit(UI_LLM_SHORTCUT_ORDER, ",")
 		if Present.Has(Name)
-			Out .= Texts[Position] . UI_LLM_SHORTCUT_JOINER
+			Out .= KeyNameLabel(Name) . UI_LLM_SHORTCUT_JOINER
 	return Out . (Idx == 10 ? "0" : String(Idx))
 }
 

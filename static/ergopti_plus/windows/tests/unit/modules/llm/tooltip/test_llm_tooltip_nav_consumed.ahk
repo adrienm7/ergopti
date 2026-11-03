@@ -357,15 +357,14 @@ _LTNC_FooterAdvertisesEveryChord() {
 	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_SINGLE, UI_LLM_HINT_NAV_LEFT
 	global UI_LLM_HINT_NAV_RIGHT, UI_LLM_HINT_ACCEPT_CENTER, UI_LLM_HINT_ARROW_LEFT
 	global UI_LLM_HINT_ARROW_RIGHT, UI_LLM_HINT_OR, UI_LLM_HINT_ARROW_SEP_LEFT
-	global UI_LLM_HINT_ARROW_SEP_RIGHT, UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_LABELS
+	global UI_LLM_HINT_ARROW_SEP_RIGHT, UI_LLM_SHORTCUT_ORDER
 	Saved := [UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_SINGLE, UI_LLM_HINT_NAV_LEFT,
 		UI_LLM_HINT_NAV_RIGHT, UI_LLM_HINT_ACCEPT_CENTER, UI_LLM_HINT_ARROW_LEFT,
 		UI_LLM_HINT_ARROW_RIGHT, UI_LLM_HINT_OR, UI_LLM_HINT_ARROW_SEP_LEFT,
-		UI_LLM_HINT_ARROW_SEP_RIGHT, UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_LABELS]
+		UI_LLM_HINT_ARROW_SEP_RIGHT, UI_LLM_SHORTCUT_ORDER]
 	try {
-		; The modifier words come from the shared shortcut spec.
+		; The modifier words come from the shared key name table.
 		UI_LLM_SHORTCUT_ORDER := "ctrl,alt,shift,cmd"
-		UI_LLM_SHORTCUT_LABELS := "Ctrl,Alt,Shift,Win"
 		UI_LLM_FOOTER_SPACE_DIV := "|"
 		UI_LLM_HINT_ACCEPT_SINGLE := "[single]"
 		UI_LLM_HINT_NAV_LEFT := "[left shift+tab]"
@@ -381,7 +380,8 @@ _LTNC_FooterAdvertisesEveryChord() {
 		AssertEqual("[left shift+tab] or [up/left]|<|[accept]|>|[right shift+tab] or [down/right]",
 			_LLM_BuildNavHint(3, ""),
 			"the bare arrows, the default chord, must be advertised beside Shift+Tab")
-		AssertEqual("[left shift+tab] or Ctrl + [up/left]|<|[accept]|>|[right shift+tab] or Ctrl + [down/right]",
+		Ctrl := t("key_name.ctrl")
+		AssertEqual("[left shift+tab] or " . Ctrl . " + [up/left]|<|[accept]|>|[right shift+tab] or " . Ctrl . " + [down/right]",
 			_LLM_BuildNavHint(3, "ctrl"),
 			"the arrows carry the configured modifiers")
 		AssertEqual("[left shift+tab]|<|[accept]|>|[right shift+tab]",
@@ -399,7 +399,6 @@ _LTNC_FooterAdvertisesEveryChord() {
 		UI_LLM_HINT_ARROW_SEP_LEFT := Saved[9]
 		UI_LLM_HINT_ARROW_SEP_RIGHT := Saved[10]
 		UI_LLM_SHORTCUT_ORDER := Saved[11]
-		UI_LLM_SHORTCUT_LABELS := Saved[12]
 	}
 }
 

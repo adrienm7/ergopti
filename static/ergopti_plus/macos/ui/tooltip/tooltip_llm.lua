@@ -23,6 +23,8 @@ local LOG = "tooltip_llm"
 local Config = require("ui.tooltip.config")
 local Renderer = require("ui.tooltip.renderer")
 local LlmLine = require("tooltip.llm_line")
+local KeyNames = require("keycodes.key_names")
+local i18n = require("infra.i18n")
 local HotPath = require("infra.hotpath_profiler")
 local TextUtils = require("text_utils")
 
@@ -1497,8 +1499,20 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 
 		local nav_modifier_string = "none"
 		if #flattened_nav_modifiers > 0 and not (#flattened_nav_modifiers == 1 and flattened_nav_modifiers[1] == "none") then
-			nav_modifier_string = table.concat(flattened_nav_modifiers, "+")
-			nav_modifier_string = nav_modifier_string:gsub("cmd", "⌘"):gsub("ctrl", "⌃"):gsub("alt", "⌥"):gsub("shift", "⇧"):gsub("%+", "")
+			-- The glyphs of the shared key name table, one per modifier, and the
+			-- translated name of one it draws no glyph for (Fn); the substitutions
+			-- here left any other spelling as its raw id.
+			local glyphs = {}
+			for _, mod in ipairs(flattened_nav_modifiers) do
+				if KeyNames.has_macos_symbol(mod) then
+					glyphs[#glyphs + 1] = KeyNames.macos_symbol(mod)
+				elseif KeyNames.canonical(mod) then
+					glyphs[#glyphs + 1] = KeyNames.label(mod, "macos", i18n.get)
+				else
+					Logger.warn(LOG, "Navigation modifier '%s' names no key; the hint leaves it out.", tostring(mod))
+				end
+			end
+			nav_modifier_string = table.concat(glyphs)
 		elseif #flattened_nav_modifiers == 0 then 
 			nav_modifier_string = "" 
 		end

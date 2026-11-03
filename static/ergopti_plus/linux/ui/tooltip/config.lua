@@ -27,6 +27,7 @@ local Logger = require("logger.shim")
 local Paths = require("infra.paths")
 local TomlReader = require("toml_codec.reader")
 local LlmLine = require("tooltip.llm_line")
+local KeyNames = require("keycodes.key_names")
 
 local LOG = "ui.tooltip.config"
 
@@ -185,11 +186,14 @@ local _llm_line = nil
 ---   next, cursor, label } }
 function M.llm_line()
 	if _llm_line then return _llm_line end
-	-- The shortcut column's modifier labels (_shared/lua/tooltip/llm_line.lua).
+	-- The shortcut column's modifiers (_shared/lua/tooltip/llm_line.lua), named
+	-- by the shared key name table in the active language (« Ctrl+Maj+3 »).
 	local shortcut_spec = LlmLine.shortcut_spec(require_key("llm_ui", "shortcut_modifier_order"),
-		require_key("llm_ui", "shortcut_labels_linux"), require_key("llm_ui", "shortcut_joiner_linux"))
+		require_key("llm_ui", "shortcut_joiner_linux"), function(name)
+			return KeyNames.label(name, "linux", require("infra.i18n").get)
+		end)
 	if not shortcut_spec then
-		error("[llm_ui].shortcut_labels_linux must label every modifier of shortcut_modifier_order")
+		error("[llm_ui].shortcut_modifier_order and shortcut_joiner_linux must declare the shortcut column")
 	end
 	_llm_line = {
 		mark          = require_key("llm_ui", "active_prefix"),
