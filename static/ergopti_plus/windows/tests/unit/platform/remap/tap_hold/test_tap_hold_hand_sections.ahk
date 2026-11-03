@@ -58,8 +58,9 @@ _THHS_Render() {
 		"tap_hold_keys_right", (*) => _THHS_KeyIdRows("right", Inert))
 	Commands := Map("tapholds_toggle", Inert, "scope_restore", Inert,
 		"scope_clear", Inert, "edit_nav_layer", Inert)
+	; Tap-holds on: an off category suffixes and greys every key row (category-off rule).
 	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", Providers, Commands,
-		Map("tapholds_enabled", () => false))
+		Map("tapholds_enabled", () => true))
 }
 
 ; One row per key of a hand, labelled by its id.
