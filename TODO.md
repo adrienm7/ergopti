@@ -8,12 +8,41 @@ the field-run step or the hand action that proves it and the commits it confirms
 [workflow and verification memory](docs/memory/workflow-and-verification.md). Finished items are in Git
 (`git show 2a0083cb11:TODO.md` is the long form before this shrink).
 
+## Handoff, 2026-11-03 late evening (read first if the session was lost)
+
+- **Release 1.0.9 is pending on CI only.** dev `ed2618c2fe` holds every 1.0.9 change; full CI run 41730677937 is the
+  release gate. Last reds before it were infrastructure (Ubuntu APT over 10 min in Shared UI rendering, macOS 26 XCTest
+  lease lost, Windows keystats `metrics-native-sender` deadline): rerun those jobs once; any other red is real. When
+  green: fast-forward `main` to that commit (`Release-As: 1.0.9` trailer only if the computed version differs), watch
+  the publish, then clean up (below). Never push main for anything else.
+- **Work for the next release, each on its own pushed branch** (rebase on dev, land by fast-forward only):
+  - `next/ai-hotstring-tooltip` — AI tooltip never covers a hotstring tooltip; choice wait (default) / both. Done, CI
+    reds same as dev. Left: try « both » by hand; Windows rows linger past expiry; macOS canvas does not follow height.
+  - `next/key-names` — chord action labels, sticky/layer holds, tooltip footer from the key name table; Arabic and
+    Chinese finger counts fixed. Left: physical shortcuts and metrics web pages; macOS `hyper`/`altgr` holds French.
+  - `wip/gesture-clear-touchpad` (agent running) — Gestures « Tout effacer » also restores the touchpad (backup, else
+    Windows factory defaults) and the Configuration row goes; « Infos… » instant (took 5 s) with a rewritten text in 21
+    locales explaining the rare-shortcut trick; recommended set on all OS, macOS direction: 3 fingers ←/→ tabs (macOS
+    incremental `ax_actions.tabs`, Windows discrete), ↑ new tab / ↓ close tab; 4 fingers ←/→ Space/desktop, ↑/↓ next /
+    previous window of the app; macOS 5 fingers ↑ Mission Control / ↓ App Exposé; tap 3 left click held; tap 4
+    `alt_tab_monitor`; macOS greys a slot whose system gesture is on (suffix about 20 characters, « — pris par macOS »)
+    and suspends it until the system gesture is None; never write the macOS prefs.
+  - `wip/layout-composer-responsive` (agent running) — the layout composer page reflows when the window is resized and
+    no button sits behind the preview, same page on the three OS; Layout menu: « Couches émulées » header, the four
+    rows in a « Rangées émulées (apprentissage progressif) » submenu.
+  - `wip/windows-boot-time` (agent running) — boot measured at 7.8 s (parse 1.7, layout 1.2, hotstrings 1.0, tray 1.0);
+    parser and snapshot fixes, counted-operations gate; approved: keyboard before tray, a tray click during boot waits
+    for input ready. Still too slow: keep cutting (lazy includes, caches).
+- **Cleanup after the release.** Remove every `.claude/worktrees/*` (delete the node_modules link first, never the
+  real folder); delete local branches except dev and main; delete remote branches except main, dev, sparkle-appcasts,
+  gh-pages and the `next/*` / live `wip/*` branches above; tag non-merged tips `archive/2026-11-03/<branch>` first.
+- **After that:** owned bundled Karabiner (`next/owned-karabiner`), one Ergopti folder name, one config layout on every
+  OS (items below); macOS field report rerun (`git pull && bash tools/dev/collect-macos-field-report.sh`).
+
 ## Release 1.0.9 (maintainer requests of 1-2 November, written so the work survives a lost session)
 
 Release as 1.0.9 on `main` by fast-forward from `dev`, with `Release-As: 1.0.9` if the computed version differs, once the
-three-OS CI is green on the final source. Last all-green CI: run 41398601166 on b58acec0d. Work in progress lives on
-the local branches `worktree-agent-*`: land them, then remove the worktrees so one repository remains. Unpushed:
-7d346897f6 (one registry comparison across the boot, never booted).
+three-OS CI is green on the final source. See the handoff above for the current state.
 
 - [ ] **Macos field report 2026-11-02.** Rotation warnings at midnight during the recovery; `event_taps` run loop late:
       main thread held 1.5 s, `menu.rebuild` 1.3 s (`menu_item.shortcuts` about 1 s); `diagnostics` phase A over 5 ms;
