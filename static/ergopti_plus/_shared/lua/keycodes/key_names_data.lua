@@ -24,7 +24,7 @@ return {
 		alt_gr = { windows = "key_name.alt_gr", macos = "key_name.alt_gr", linux = "key_name.alt_gr" },
 		win = { windows = "key_name.win", macos = "key_name.win", linux = "key_name.super" },
 		super = { windows = "key_name.super", macos = "key_name.super", linux = "key_name.super" },
-		cmd = { windows = "key_name.cmd", macos = "key_name.cmd", linux = "key_name.cmd" },
+		cmd = { windows = "key_name.win", macos = "key_name.cmd", linux = "key_name.super" },
 		left_command = { windows = "key_name.left_command", macos = "key_name.left_command", linux = "key_name.left_command" },
 		right_command = { windows = "key_name.right_command", macos = "key_name.right_command", linux = "key_name.right_command" },
 		option = { windows = "key_name.option", macos = "key_name.option", linux = "key_name.option" },

@@ -25,7 +25,7 @@ KeyNamesData() {
 			"alt_gr", "key_name.alt_gr",
 			"win", "key_name.win",
 			"super", "key_name.super",
-			"cmd", "key_name.cmd",
+			"cmd", "key_name.win",
 			"left_command", "key_name.left_command",
 			"right_command", "key_name.right_command",
 			"option", "key_name.option",

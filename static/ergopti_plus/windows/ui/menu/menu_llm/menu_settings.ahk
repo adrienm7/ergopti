@@ -622,8 +622,10 @@ _LLM_Menu_NavRows() {
 	global _LLM_Menu
 	n := _LLM_Menu["n_predictions"]
 
-	nav_display   := (_LLM_Menu[ConfigLeaf.NAV_MODIFIERS] != "") ? _LLM_Menu[ConfigLeaf.NAV_MODIFIERS] : t("menu.llm.arrows_only")
-	val_display   := (_LLM_Menu[ConfigLeaf.VAL_MODIFIERS] != "") ? _LLM_Menu[ConfigLeaf.VAL_MODIFIERS] : t("menu.llm.digits_only")
+	; The stored chord (« ctrl+alt ») reads as the shared key name table names
+	; its modifiers (« Ctrl + Alt »), never as the config spelling.
+	nav_display   := (_LLM_Menu[ConfigLeaf.NAV_MODIFIERS] != "") ? KeyNameComboLabel(_LLM_Menu[ConfigLeaf.NAV_MODIFIERS]) : t("menu.llm.arrows_only")
+	val_display   := (_LLM_Menu[ConfigLeaf.VAL_MODIFIERS] != "") ? KeyNameComboLabel(_LLM_Menu[ConfigLeaf.VAL_MODIFIERS]) : t("menu.llm.digits_only")
 	val_key_range := (n == 10) ? "1-0" : "1-" . n
 
 	Rows := []

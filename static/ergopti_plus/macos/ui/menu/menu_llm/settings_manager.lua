@@ -14,6 +14,7 @@ local llm_mod = require("modules.llm")
 local Logger  = require("infra.logger")
 local Storage = require("adapters.storage")
 local i18n    = require("infra.i18n")
+local KeyNames = require("keycodes.key_names")
 local dialog  = require("infra.dialog_util")
 local Notifications = require("infra.notifications")
 local ManifestMenu = require("infra.manifest_menu")
@@ -756,14 +757,17 @@ function M.new(deps)
 		local current_str = table.concat(current_mods, "+")
 		local paused = is_paused(deps, "Modifier menu pause-state read")
 
+		-- Each choice reads as its glyphs and the shared key name table's names
+		-- (« ⇧⌘ Maj + Cmd »), translated like every other row.
 		local opts = {
-			{title = "⇧ Shift", mods = {"shift"}},
-			{title = "⌘ Cmd", mods = {"cmd"}},
-			{title = "⌥ Option", mods = {"alt"}},
-			{title = "⌃ Ctrl", mods = {"ctrl"}},
-			{title = "⇧⌘ Shift + Cmd", mods = {"shift", "cmd"}},
-			{title = "⇧⌥ Shift + Option", mods = {"shift", "alt"}},
+			{mods = {"shift"}},
+			{mods = {"cmd"}},
+			{mods = {"alt"}},
+			{mods = {"ctrl"}},
+			{mods = {"shift", "cmd"}},
+			{mods = {"shift", "alt"}},
 		}
+		for _, opt in ipairs(opts) do opt.title = KeyNames.modifiers_heading(opt.mods, "macos", i18n.get) end
 		local function apply_modifiers(mods)
 			return obj.apply_setting_transaction({
 				key = key,

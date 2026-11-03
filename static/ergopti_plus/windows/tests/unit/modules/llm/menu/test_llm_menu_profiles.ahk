@@ -160,6 +160,19 @@ _LMT_SharedNavigationDeclarationOwner() {
 				AssertEqual(Rows[2]["label"], _CTC_LabelAt(Built, 1))
 			} finally _CTC_ReleaseMenu(Built)
 		}
+		; A stored chord reads as the key name table names it (« Ctrl + Maj »,
+		; the system key « Win »), never as the config spelling « ctrl+shift ».
+		_LLM_Menu["nav_modifiers"] := "ctrl+shift"
+		_LLM_Menu["val_modifiers"] := "cmd"
+		LastCount := _LLM_Menu["n_predictions"]
+		_LLM_Menu["n_predictions"] := 3
+		Rows := _LLM_Menu_NavRows()
+		AssertEqual(t("menu.llm.nav_label") . " — " . t("key_name.ctrl") . " + " . t("key_name.shift"), Rows[1]["label"])
+		AssertEqual(StrReplace(t("menu.llm.val_label"), "%s", "1-3") . " — " . t("key_name.win"),
+			Rows[2]["label"])
+		_LLM_Menu["nav_modifiers"] := ""
+		_LLM_Menu["val_modifiers"] := ""
+		_LLM_Menu["n_predictions"] := LastCount
 		Changed := [SavedDefinitions[2].Clone(), SavedDefinitions[1].Clone()]
 		Changed[1]["i18n"] := "button.cancel"
 		Root["llm_navigation_rows"] := Changed
