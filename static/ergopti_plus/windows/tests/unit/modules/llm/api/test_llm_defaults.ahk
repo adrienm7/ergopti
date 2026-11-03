@@ -92,3 +92,17 @@ _LLMDefaults_ModifierDefaultsUseChordForm() {
 }
 Test("LLMDefaults: modifier defaults are exposed in the tray chord form",
 	_LLMDefaults_ModifierDefaultsUseChordForm)
+
+; pred-indent-default: the selected suggestion's indentation defaults to -3 on
+; every driver, where every line starts at one column and only the mark moves.
+_LLMDefaults_PredIndentAligned() {
+	global LLM_Defaults
+	LLM_Defaults_Load()
+	AssertEqual(-3, LLM_Defaults["llm_pred_indent"], "the shared default")
+	AssertEqual(-3, ManifestDefaultFor("llm.display.pred_indent"), "the manifest default the menu marks")
+	Prefixes := _LLM_LinePrefixes(LLM_Defaults["llm_pred_indent"], 3, "▶", "·")
+	AssertEqual("▶", Prefixes.Selected, "the mark stands alone")
+	AssertEqual(Prefixes.Selected, Prefixes.Unselected, "the other lines carry the mark's width, so every line starts at one column")
+}
+Test("LLMDefaults: the prediction indentation defaults to the aligned -3 (pred-indent-default)",
+	_LLMDefaults_PredIndentAligned)

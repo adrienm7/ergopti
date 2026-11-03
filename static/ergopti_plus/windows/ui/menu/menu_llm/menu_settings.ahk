@@ -578,9 +578,9 @@ _LLM_Menu_DisplayRows(Position := "all") {
 
 	_LLM_MaybeResetRow(Rows,
 		_LLM_Menu[ConfigLeaf.PRED_INDENT],
-		_LLM_DefaultFor("llm_pred_indent", 0),
+		_LLM_DefaultFor("llm_pred_indent"),
 		(*) => _LLM_AssignAndRebuild(ConfigLeaf.PRED_INDENT,
-			_LLM_DefaultFor("llm_pred_indent", 0)))
+			_LLM_DefaultFor("llm_pred_indent")))
 
 	if Position == "remaining"
 		return LeadingRows

@@ -13,7 +13,7 @@
 	"llm_context_length": 500,
 	"llm_min_words": 3,
 	"llm_max_words": 15,
-	"llm_pred_indent": 0,
+	"llm_pred_indent": -3,
 	"llm_show_info_bar": true,
 	"llm_streaming": true,
 	"llm_streaming_multi": true,
