@@ -86,6 +86,27 @@ helpers.describe("owned runtime ports", function()
 		helpers.assert_nil(ports.process, "the Console belongs to the launcher's installed-source role")
 	end)
 
+	helpers.it("raises one notice for the first block the user can act on, and none otherwise", function()
+		-- An owned boot runs no setup wizard, so a missing runtime was silent.
+		local ports = load_ports(function() return 0, "" end)
+		helpers.assert_type(ports.observer, "function")
+		local Ports = package.loaded["adapters.runtime_owner_ports"]
+		local shown = {}
+		local observe = Ports.block_notice(function(text) shown[#shown + 1] = text end)
+		observe("starting")
+		observe("ready")
+		observe("failed", "capture_lost")
+		helpers.assert_eq(#shown, 0)
+		observe("unavailable", "runtime_not_installed")
+		helpers.assert_eq(shown, { "notify.karabiner.owned_blocked" })
+		observe("unavailable", "other_karabiner_running")
+		observe("failed", "close_other_failed")
+		helpers.assert_eq(#shown, 1, "one notice per launch")
+		local later = Ports.block_notice(function(text) shown[#shown + 1] = text end)
+		later("failed", "close_other_failed")
+		helpers.assert_eq(#shown, 2)
+	end)
+
 	helpers.it("hands the owner the shipped pin: the driver version and the capture declaration", function()
 		local ports = load_ports(function() return 0, "" end)
 		local pinned, reason = ports.artifact.pinned()
