@@ -191,6 +191,65 @@ function hotstringsRenderTimes(configRoot) {
 	].map((match) => Number(match[1] ?? match[2]));
 }
 
+// boot-operation-budget-2026-11-03: the boot's counted operations, read from the
+// driver's own first counter record. Wall time on a shared runner is too noisy
+// to gate, but each of these counts is deterministic for a fixture and named a
+// measured cost of the maintainer's 8-10 s boot: every snapshot read compared
+// the whole config.toml snapshot twice, the document lexer classified quoted
+// text one character at a time, and personal-file metadata decoded every
+// hotstring row. Lowering a ceiling is welcome; raising one needs the measured
+// reason in the commit.
+const BOOT_OPERATION_CEILINGS = {
+	'config.snapshot_read': { all: 9 },
+	'toml.document_parse': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
+	'config_migrate.registry_deep_compares': { all: 13, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
+	'toml.document_slow_steps': { all: 11895, [REALISTIC_HOTSTRINGS_FIXTURE]: 13420 },
+	'toml.flat_values': { all: 2176, [REALISTIC_HOTSTRINGS_FIXTURE]: 1198 }
+};
+
+/**
+ * The counted operations of every boot a fixture logged: the first counter
+ * record of a process, whose window starts at the process.
+ * @param {string} configRoot
+ * @returns {Array<Map<string, number>>}
+ */
+function bootOperationCounts(configRoot) {
+	return [...logText(configRoot).matchAll(/\[Perf\] Interval counters \(0 ms\): ([^\n]*)/g)].map(
+		(match) =>
+			new Map(
+				match[1]
+					.replace(/\.\s*$/, '')
+					.split(' ')
+					.map((pair) => pair.split('='))
+					.filter((pair) => pair.length === 2)
+					.map(([name, value]) => [name, Number(value)])
+			)
+	);
+}
+
+/**
+ * Whether a fixture's boots stayed within their operation ceilings.
+ * @param {string} fixture
+ * @param {string} configRoot
+ * @returns {string} The first excess, or '' when every boot is within budget.
+ */
+function bootOperationProblem(fixture, configRoot) {
+	const boots = bootOperationCounts(configRoot);
+	if (boots.length === 0) return 'no boot counter record was logged';
+	for (const [index, counts] of boots.entries()) {
+		console.log(
+			`${fixture} boot ${index + 1} operations: ${[...Object.keys(BOOT_OPERATION_CEILINGS)].map((name) => `${name}=${counts.get(name) ?? 0}`).join(' ')}`
+		);
+		for (const [name, ceilings] of Object.entries(BOOT_OPERATION_CEILINGS)) {
+			const ceiling = ceilings[fixture] ?? ceilings.all;
+			const count = counts.get(name) ?? 0;
+			if (count > ceiling)
+				return `boot ${index + 1} counted ${name}=${count}, over its ceiling of ${ceiling}`;
+		}
+	}
+	return '';
+}
+
 // These fields are foreign data after the dedicated Metrics bindings retired.
 // The real boot and its existing acknowledged full save must retain both their
 // values and their independently written source comments.
@@ -793,6 +852,8 @@ async function main() {
 				!logText(configRoot).includes("Deferred submenu 'hotstrings_menu' built in")
 			)
 				return fail(`${fixture}: no real Hotstrings submenu render was logged`);
+			const operations = bootOperationProblem(fixture, configRoot);
+			if (operations) return fail(`${fixture}: ${operations}`);
 			const slowest = Math.max(0, ...renders);
 			if (slowest > HOTSTRINGS_RENDER_BUDGET_MS)
 				return fail(
@@ -840,6 +901,8 @@ async function main() {
 
 				const reloaded = failOnLoggedErrors('reloaded-config', configRoot);
 				if (reloaded !== null) return reloaded;
+				const warmOperations = bootOperationProblem(`${fixture}/warm`, configRoot);
+				if (warmOperations) return fail(`${fixture}/warm: ${warmOperations}`);
 			}
 		}
 		console.log(
