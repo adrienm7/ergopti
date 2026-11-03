@@ -81,25 +81,58 @@ function collectLua(dir, acc) {
 
 console.log('\n=== Section-Title Decoration Parity & Single-Source ===');
 
-// 1. Shared kernel: _shared/lua/menu/labels.lua carries the canonical
-//    decorate_section kernel. macOS i18n.lua delegates to it.
-check(
-	'shared: menu/labels.lua defines decorate_section with the "— … —" kernel',
-	'static/ergopti_plus/_shared/lua/menu/labels.lua',
-	/function M\.decorate_section\(text\)[\s\S]*return "— " \.\. text \.\. " —"/
+// 1. One format: _shared/modules/menu/section_header.json, projected into the
+//    Lua data menu.labels reads and the AHK constants MenuSectionTitle reads.
+const FORMAT = JSON.parse(
+	fs.readFileSync(
+		path.join(REPO_ROOT, 'static/ergopti_plus/_shared/modules/menu/section_header.json'),
+		'utf8'
+	)
+).format;
+const [PREFIX, SUFFIX] = FORMAT.split('{label}');
+function generated(label, file, pattern) {
+	const content = fs.readFileSync(path.join(REPO_ROOT, file), 'utf8');
+	const match = pattern.exec(content);
+	const ok = match !== null && match[1] === PREFIX && match[2] === SUFFIX;
+	total_pass += ok ? 1 : 0;
+	total_fail += ok ? 0 : 1;
+	console.log(`  ${ok ? PASS_SYMBOL : FAIL_SYMBOL}  ${label}`);
+	if (!ok)
+		console.log(
+			`       Violation: ${file} is stale; run tools/codegen/codegen-menu-section-header.cjs`
+		);
+}
+generated(
+	'shared: menu/section_header_data.lua carries the format of section_header.json',
+	'static/ergopti_plus/_shared/lua/menu/section_header_data.lua',
+	/prefix = "([^"]*)",\s*suffix = "([^"]*)"/
 );
-
+generated(
+	'AHK: _generated/menu_section_header.ahk carries the format of section_header.json',
+	'static/ergopti_plus/windows/_generated/menu_section_header.ahk',
+	/MENU_SECTION_HEADER_PREFIX := "([^"]*)"\s*global MENU_SECTION_HEADER_SUFFIX := "([^"]*)"/
+);
+check(
+	'shared: menu/labels.lua decorate_section frames with the generated format',
+	'static/ergopti_plus/_shared/lua/menu/labels.lua',
+	/require\("menu\.section_header_data"\)[\s\S]*function M\.decorate_section\(text\)\s*return SectionHeader\.prefix \.\. text \.\. SectionHeader\.suffix/
+);
 check(
 	'macOS: infra/i18n.lua M.decorate_section delegates to shared Labels.decorate_section',
 	'static/ergopti_plus/macos/infra/i18n.lua',
 	/function M\.decorate_section\(text\)[\s\S]*return Labels\.decorate_section\(text\)/
 );
-
-// 2. AHK kernel uses the identical decoration.
 check(
-	'AHK: infra/menu_helpers.ahk MenuSectionTitle uses the identical "— … —" decoration',
+	'Linux: infra/i18n.lua M.decorate_section delegates to shared Labels.decorate_section',
+	'static/ergopti_plus/linux/infra/i18n.lua',
+	/function M\.decorate_section\(text\)[\s\S]*return Labels\.decorate_section\(text\)/
+);
+
+// 2. AHK kernel reads the same generated format.
+check(
+	'AHK: infra/menu_helpers.ahk MenuSectionTitle frames with the generated format',
 	'static/ergopti_plus/windows/infra/menu_helpers.ahk',
-	/MenuSectionTitle\(Text\)\s*\{[\s\S]*return "— " \. Text \. " —"/
+	/MenuSectionTitle\(Text\)\s*\{\s*return MENU_SECTION_HEADER_PREFIX \. Text \. MENU_SECTION_HEADER_SUFFIX/
 );
 
 // 3. Ratchet: only the kernel file may inline the decoration; every macOS menu
