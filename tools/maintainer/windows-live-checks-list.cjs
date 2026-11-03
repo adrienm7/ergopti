@@ -1190,7 +1190,10 @@ const CHECKS = [
 	},
 	{
 		id: 'hotstring-delays-recommended-cleared',
-		title: 'Hotstring delays: 0.5 s after Restore recommended, 1.0 s after Clear all',
+		// Each family declares 0.5 s in the manifest, which is also the recommended
+		// value, and the drivers wait it (the maintainer's decision of 3 November
+		// 2026): a restore has nothing to write and a clear leaves the declared delay.
+		title: 'Hotstring delays: the declared 0.5 s after Restore recommended and after Clear all',
 		async run(context) {
 			const { session, pid: first } = await bootEnglish(context, 'delays');
 			const problems = [];
@@ -1207,22 +1210,22 @@ const CHECKS = [
 				followReload: true
 			});
 			let pid = (await session.quiesce(first)).pid;
-			await judge('after Restore', 0.5, '1');
+			await judge('after Restore', 0.5, '0');
 			await session.run('click_confirming', ['.', menu, 're:Clear all'], 180000, {
 				followReload: true
 			});
 			pid = (await session.quiesce(pid)).pid;
-			await judge('after Clear', 1, '0');
+			await judge('after Clear', 0.5, '0');
 			const rows = await session.run('rows', ['Autocorrection delay', 'Delays and colours']);
-			if (!/Autocorrection delay : 1000 ms/.test(rows))
+			if (!/Autocorrection delay : 500 ms \(default\)/.test(rows))
 				problems.push(`after Clear the row reads: ${rows}`);
 			await session.restart();
-			await judge('after Clear and a restart', 1, '0');
+			await judge('after Clear and a restart', 0.5, '0');
 			const errors = session.loggedErrors();
 			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
 			if (problems.length > 0) return fail(problems.join('; '));
 			return pass(
-				`${families.join(', ')}: 0.5 s after Restore, inherited 1.0 s after Clear and a restart`
+				`${families.join(', ')}: the declared 0.5 s, no override, after Restore, Clear and a restart`
 			);
 		}
 	},
