@@ -21,12 +21,11 @@ the local branches `worktree-agent-*`: land them, then remove the worktrees so o
       without touching the Mac.
 - [ ] **Slowness, every driver.** Windows boot 7 s, `menu.rebuild` 1.7 s: lazy submenus, single-toggle update, one
       registry proof, full save after ready, disk caches; a toggle must not rebuild 1000 rows.
-      Resume here (branch `wip/windows-boot-time`): parse fixes and the smoke operation caps are committed. Next, approved
-      by the maintainer on 3 November, one measured commit each: (1) register layout, hotstrings and hooks before the
-      tray root, with the smoke's order assertion inverted; (2) a tray click during boot opens the menu only once input
-      is ready, with a regression test; record both in `docs/memory/maintainer-decisions.md`. Then attack script parse
-      (lighter boot includes, lazy modules), layout and hotstrings (disk caches with invalidation, deferred rare
-      categories). Measure with interleaved base/candidate smoke-fixture boots, compare summed `process_cpu`.
+      Resume here (branch `wip/windows-boot-time`): parse fixes, the smoke operation caps, keyboard before tray root
+      and the queued early tray click are committed (keyboard registered at 4.5 s instead of 5.1 s on the smoke
+      fixture). Next: script parse (lighter boot includes, lazy modules), layout and hotstrings (disk caches with
+      invalidation, deferred rare categories), each measured with interleaved base/candidate smoke-fixture boots
+      (summed `process_cpu`). CI of the branch: run 41732233161 and later.
       Windows boot, 3 November. Real logs: 4.75 s at best, 7.8 s typical, 15 s and more
       under load; parse 1-1.7 s, layout 1.2 s, hotstrings 1.0 s, tray 1.0 s (AI submenu 0.75 s), pre-logger 1.2 s.
       Three boots waited 24 s, 26 s and 446 s on a tray opened during boot (`native_menu_wait`): input waits for the
