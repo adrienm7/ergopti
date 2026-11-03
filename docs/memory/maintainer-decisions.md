@@ -18,6 +18,15 @@ since switching rows on one by one is how a user learns the layout gradually.
 macOS and Linux emulate no layout: they draw that submenu's row greyed with
 `platform_reason.layout_emulation_is_windows_only`.
 
+## Windows boot: keyboard before tray, early tray click queued (2026-11-03)
+
+The Windows boot registers the layout, shortcuts, tap-holds, hotstrings and the
+prefix watcher first, and builds the configured tray root only then, still
+before readiness: the first keystroke never waits for the menu build. A tray
+clicked before input is ready is queued and opened once it is, because an open
+native menu stops the auto-execute thread and three boots of 3 November waited
+24, 26 and 446 s on one. The startup smoke's shell receipt asserts this order.
+
 ## Restore holds its stage by handle (2026-11-01)
 
 The audit's "restore staging substitution" is fixed on Windows, after two rejected

@@ -728,11 +728,11 @@ global _TrayStartupCommands := TrayStartupCommands(
 if FileExist(ConfigurationFile)
 	_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 global _TrayStartupClick := TrayStartupClick(
-	() => IsSet(_DriverMenuReady) && _DriverMenuReady,
+	TrayStartupClickReadyNow,
 	_DriverStartupSmokeDir != "" ? (*) => 0 : 0, 0, 0, 0, 0,
 	_DriverStartupSmokeDir != "" ? 0 : TrayStartupOnboarding)
-; Retain context requests until the complete root exists. Entering the native
-; bootstrap menu here blocks auto-execute for the user's navigation interval.
+; Retain context requests until the complete root exists and input is ready.
+; Entering a native menu blocks auto-execute for the user's navigation interval.
 if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectBootstrap))
 	_DriverStartupSmokeInspectBootstrap.Call()
 ; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
@@ -1488,7 +1488,8 @@ BootProfile_StageEnd("prefix watcher")
 BootProfile_Mark("Prefix watcher index complete")
 ; The keyboard is registered first and the configured tray root after it, so the
 ; first keystroke never waits for the menu build (maintainer decision, 3 November
-; 2026). A tray clicked meanwhile is retained until the root publishes.
+; 2026). A tray clicked meanwhile keeps the bootstrap menu, or is queued until
+; input is ready (_TrayStartupClick): an open native menu stops this thread.
 if !BuildTrayMenuDeferred()
 	throw Error("the configured startup menu could not be published")
 if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectShell))
@@ -1541,6 +1542,11 @@ LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 _DriverBootTailPending := false
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
+; A tray clicked while the keyboard was registering opens now, from a timer, and
+; never earlier (maintainer decision, 3 November 2026). A root a restored pause
+; refused publishes later and releases the click itself (_TrayRootBuildBoot).
+if _DriverMenuReady
+	_TrayStartupClick.NotifyReady()
 _BootTotalMs := BootProfile_CompletedBootMs(BootProfile_TotalBootMs())
 _BootOpenStages := BootProfile_OpenStageNames()
 if (_BootOpenStages != "")
