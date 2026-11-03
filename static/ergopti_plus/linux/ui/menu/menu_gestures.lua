@@ -17,16 +17,6 @@ local plain_markup = require("ui.menu.menu_dialogs").plain_markup
 local assign_parameterized_action = require("ui.menu.menu_dialogs").assign_parameterized_action
 local slot_binding_rows = require("ui.menu.menu_dialogs").slot_binding_rows
 
---- The name of one gesture slot in the user's language, the same
---- gesture.slots.* text the Windows and macOS menus show. The rows used to
---- read a French sentence built here (« Balayage 3 doigts vers haut ») in
---- every locale.
---- @param slot string A slot of the shared gesture catalogue.
---- @return string
-local function gesture_slot_label(slot)
-	return i18n_safe("gesture.slots." .. tostring(slot))
-end
-
 --- Builds the gestures submenu.
 local function _build_gestures(ctx)
 	local receive = ManifestMenu and ManifestMenu.group_receiver("top_level", "gestures")
@@ -132,7 +122,7 @@ local function _build_gestures(ctx)
 				-- reads as a bug, and the user cannot tell "this hardware cannot"
 				-- from "this driver forgot".
 				out[#out + 1] = {
-					label    = gesture_slot_label(slot) .. " — "
+					label    = ge.slot_label(slot) .. " — "
 						.. i18n_safe("platform_reason.touchpad_cannot_count_that_many"),
 					disabled = true,
 				}
@@ -142,7 +132,7 @@ local function _build_gestures(ctx)
 			local action = ge.get_action(slot) or "none"
 			local label = ge.get_action_display_label and ge.get_action_display_label(slot)
 				or ge.get_action_label(action)
-			local slot_label = gesture_slot_label(slot)
+			local slot_label = ge.slot_label(slot)
 			local choices = slot_binding_rows(slot_label, action, slot, function(option, picked)
 				local assigned = assign_action(slot, option, picked)
 				if assigned and type(ctx.on_menu_changed) == "function" then
@@ -196,6 +186,5 @@ local function _build_gestures(ctx)
 end
 
 M.build = _build_gestures
-M.slot_label = gesture_slot_label
 
 return M

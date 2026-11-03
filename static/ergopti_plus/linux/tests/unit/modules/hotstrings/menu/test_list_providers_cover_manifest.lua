@@ -349,6 +349,7 @@ local function genuine_gesture_providers(damage)
 			is_enabled = function() return true end, is_reading = function() return false end,
 			get_action = function(name) return name == selected and "copy" or "none" end,
 			get_action_label = native.get_action_label,
+			slot_label = native.slot_label,
 			toggle = function() observed.effects = observed.effects + 1 end,
 			set_action = function() observed.effects = observed.effects + 1 end }
 		local build, template, rows_owner, settings = manifest.build, manifest.template_rows, producer.rows, producer.open_settings
