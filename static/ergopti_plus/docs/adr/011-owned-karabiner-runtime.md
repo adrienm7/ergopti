@@ -139,6 +139,12 @@ handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
   production path until the owned runtime passes native and real-Mac
   acceptance. New flags default to today's behaviour and use key names no older
   build ever wrote, so shared-mode generator output and boot stay identical.
+  **Revised by the maintainer for the release after 1.0.9:** owned becomes the
+  default (`Config.RUNTIME_DEFAULT`), shared stays readable as a hand-written
+  `runtime = "shared"`, and the Configuration rows that switched and cleaned
+  the user's Karabiner-Elements are deleted. The flip lands on its own commit
+  so it can wait for the native install and acceptance
+  (`docs/tooling/next-release-handoff.md`).
 - An incompatible VirtualHIDDevice (only one version can be active system-wide)
   blocks owned mode in an explicit named unavailable state with an explanation.
   The decided policy offers a driver-only update requiring explicit confirmation:

@@ -1,12 +1,12 @@
 --- tests/unit/platform/remap/runtime_owner/test_runtime_dormant.lua
 
 --- ==============================================================================
---- MODULE: Owned Runtime Stays Dormant By Default
+--- MODULE: Owned Runtime Selection
 --- DESCRIPTION:
---- Proves that nothing about the owned Karabiner runtime (ADR 011) changes
---- today's behaviour unless `[karabiner] runtime = "owned"` is written by hand:
---- the command line tool stays the shared one, the selection is made once, and
---- the remap bridge's source reaches the owner only behind that opt-in.
+--- Proves how the remap bridge selects the owned Karabiner runtime (ADR 011),
+--- the default since the release after 1.0.9: the command line tool follows
+--- the selection, which is made once, and the bridge's source reaches the owner
+--- only behind it, so a hand-kept `runtime = "shared"` never loads the owner.
 ---
 --- ROOT CAUSE ENCODED: the bridge's init.lua cannot be loaded by the unit
 --- suite, so a dormant guarantee that lived only in its control flow would be
@@ -157,12 +157,12 @@ helpers.describe("the remap bridge reaches the owned runtime only after an opt-i
 		helpers.assert_true(source:find("M._owned.teardown_reason = reason", revoke, true) ~= nil)
 	end)
 
-	helpers.it("selects the shared runtime when the preference is absent", function()
+	helpers.it("selects Ergopti's own runtime when the preference is absent, from the one default", function()
 		local source = init_source()
-		helpers.assert_true(source:find("user_cfg.runtime or M._owned.paths.RUNTIME_SHARED", 1, true) ~= nil)
+		helpers.assert_true(source:find("user_cfg.runtime or Config.RUNTIME_DEFAULT", 1, true) ~= nil)
 		package.loaded["platform.remap.ke_paths"] = nil
 		helpers.assert_eq(require("platform.remap.config") ~= nil, true)
-		helpers.assert_eq(require("platform.remap.config").RUNTIME_DEFAULT, "shared")
+		helpers.assert_eq(require("platform.remap.config").RUNTIME_DEFAULT, "owned")
 	end)
 
 	helpers.it("generates nothing for an owned boot until the owner admitted the runtime", function()

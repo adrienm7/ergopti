@@ -54,6 +54,7 @@ local function load_karabiner(paused)
 		compute_non_canonical_combos = function() return {} end,
 		load_user_config = function()
 			return {
+				runtime = "shared",
 				enabled = true,
 				tap_hold_config = {},
 				mod_combos_config = {},

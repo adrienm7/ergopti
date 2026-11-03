@@ -49,11 +49,11 @@ helpers.describe("karabiner disable owns guardian retirement", function()
 		end)
 	end)
 
-	helpers.it("uses the same retirement owner when removal starts with the switch already OFF", function()
+	helpers.it("uses the same retirement owner when turning off starts with the switch already OFF", function()
 		with_fixture(function(fixture)
 			local remap, calls = fixture.load_enabled_remap({ initially_enabled = false, unregister_mode = "async" })
 			local result
-			helpers.assert_true(remap.remove_from_karabiner(function(ok) result = ok end))
+			helpers.assert_true(remap.set_enabled(false, function(ok) result = ok end))
 			calls.finish_stop(true)
 			helpers.assert_eq(calls.unregister_guardian, 1)
 			helpers.assert_nil(result)

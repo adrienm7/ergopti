@@ -183,6 +183,17 @@ local function neutral_defaults(ctx)
 	ctx.world.install_karabiner(ctx.root .. "/machine", ctx.home)
 end
 
+--- The neutral defaults on a Mac that keeps Karabiner-Elements by hand
+--- (`[karabiner] runtime = "shared"`): the scenarios about the shared lease and
+--- the rules merged into the user's own karabiner.json. Ergopti's own runtime is
+--- the default, and the E2E Mac has none installed.
+--- @param ctx table Scenario context.
+local function kept_shared_runtime(ctx)
+	neutral_defaults(ctx)
+	write_home(ctx.home, ".config/ergopti_plus/hammerspoon/config_karabiner.toml",
+		'[karabiner]\nruntime = "shared"\n')
+end
+
 --- The neutral defaults with the AI turned on in config.toml only: no value in
 --- this Mac's preferences, as after a copied or restored configuration.
 --- @param ctx table Scenario context.
@@ -385,18 +396,23 @@ local function scenarios(repo)
 			facts = { wpm_input_counted = "true", wpm_canvas_visible = "1", wpm_position_recovered = "true" } },
 		-- Booted over the recommended preset, it then opens every window and file the
 		-- action catalogue can open, which the recommended shortcuts admit.
+		-- The navigation layer it deploys is read back from the user's karabiner.json.
 		{ name = "the recommended preset imported from the menu boots and opens its windows",
-			setup = neutral_defaults, steps = { "restore_recommended", "open_windows" }, marker = BOOTED_MARKER,
+			setup = kept_shared_runtime, steps = { "restore_recommended", "open_windows" }, marker = BOOTED_MARKER,
 			recommended = true },
+		-- The default: Ergopti's own runtime, absent from this Mac. The edit is saved for the
+		-- runtime's admission, with no error, dialog or reverted setting.
+		{ name = "the recommended preset imported without Ergopti's own runtime installed boots and saves",
+			setup = neutral_defaults, steps = { "restore_recommended" }, marker = BOOTED_MARKER },
 		-- world.MACHINES: the machine each boot runs on, and the lease facts it ends with.
 		{ name = "an Ergopti layout boots while the lease worker answers late, on one lease worker",
-			setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
+			setup = kept_shared_runtime, steps = { "boot" }, marker = BOOTED_MARKER,
 			machine = "ergopti_layout_slow_worker", facts = { lease_workers = "1", lease_phase = "active" } },
 		{ name = "a layout switch while the boot's RESUME is in flight activates a fresh lease",
-			setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
+			setup = kept_shared_runtime, steps = { "boot" }, marker = BOOTED_MARKER,
 			machine = "layout_switch_during_resume", facts = { lease_workers = "2", lease_phase = "active" } },
 		{ name = "a reload while the boot's RESUME is in flight fences the lease before reloading",
-			setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
+			setup = kept_shared_runtime, steps = { "boot" }, marker = BOOTED_MARKER,
 			machine = "reload_during_resume", facts = { native_reloads = "1", lease_phase = "idle" } },
 		-- hardening-h-no-rosetta: the recommended shortcuts, then a Python helper
 		-- (the display-mirror shortcut), which must pick the arm64 Homebrew.
