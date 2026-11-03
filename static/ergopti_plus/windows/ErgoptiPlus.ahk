@@ -1256,6 +1256,7 @@ _InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 TapKeysReadConfig(_IniCache)
 #Include infra/key_combinations.ahk
 KeyCombinationsReadConfig(_IniCache)
+TapHoldLoneTapReadConfig(_IniCache)
 #Include infra/quit_admission.ahk
 #Include infra/lifecycle.ahk
 ; Cleanup must own windows before the configured menu admits diagnostic clicks.

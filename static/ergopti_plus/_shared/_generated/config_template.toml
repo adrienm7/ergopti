@@ -847,7 +847,9 @@ menubar_icon = "v1"
 
 
 [tap_holds]
-enabled = false
+platform.hs.enabled = false
+platform.linux.enabled = false
+lone_modifier_tap_max_ms = 1000
 
 
 
@@ -959,6 +961,7 @@ sections = [
 	"layout",
 	"category_enabled",
 	"network",
+	"tap_holds",
 ]
 
 

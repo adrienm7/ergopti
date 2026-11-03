@@ -2890,11 +2890,6 @@ id = "tap_hold_timings"
 platforms = ["hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
-[[menu.tap_holds_menu]]
-type = "---"
-platforms = ["hs"]
-unavailable = "hide"
-
 # The GLOBAL tap / hold delay on Windows and Linux (macOS draws its own among
 # the rows above): the delay of every key that has none of its own, 200 ms
 # until the user changes it. The driver supplies the one row, captioned with the
@@ -2907,10 +2902,16 @@ id = "tap_hold_global_delay"
 platforms = ["ahk", "linux"]
 unavailable = "hide"
 
+# How long a modifier key pressed alone still taps (tap_holds.
+# lone_modifier_tap_max_ms): one row captioned with the value, opening its
+# choices, Off (the strict tap-hold) to 1500 ms.
+[[menu.tap_holds_menu]]
+type = "list"
+id = "tap_hold_lone_tap"
+platforms = ["ahk", "hs", "linux"]
+
 [[menu.tap_holds_menu]]
 type = "---"
-platforms = ["ahk", "linux"]
-unavailable = "hide"
 
 # The keys, one row each holding its disable / tap-picker / hold-picker rows,
 # under one header per hand and with a separator between the hands, so where

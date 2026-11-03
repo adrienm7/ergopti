@@ -99,7 +99,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events)
 	local kh = helpers.load_module("adapters.keyboard_hook")
 	local emitted = {}
 	local ok, err = pcall(function()
-		kh.set_remapper(Engine.new({ keys = KEYS, tap_min_ms = 0, one_shot_timeout_ms = 2000,
+		kh.set_remapper(Engine.new({ keys = KEYS, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 			nav_layer = wheel_layer() }), function() end)
 		kh.start({
 			intercept = true,

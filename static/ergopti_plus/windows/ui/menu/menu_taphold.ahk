@@ -54,6 +54,7 @@ _BuildTapHoldsSubmenu(TargetMenu := unset) {
 	Getters := Map("tapholds_enabled", () => IsCategoryGated("TapHolds"))
 	ListProviders := Map(
 		"tap_hold_global_delay", (*) => _TH_GlobalDelayRows(),
+		"tap_hold_lone_tap", (*) => _TH_LoneTapRows(),
 		"tap_hold_keys_left", (*) => _TH_KeyRows("left"),
 		"tap_hold_keys_right", (*) => _TH_KeyRows("right"))
 	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands, Getters,
@@ -67,6 +68,67 @@ _TH_GlobalDelayRows() {
 	GlobalMs := Round(TapHoldGlobalDuration(MasterGateDesiredTapHold(TapHold)) * 1000)
 	Label := StrReplace(t("menu.tapholds.tap_hold_title"), "%s", GlobalMs . " ms")
 	return [Map("label", Label, "action", _TH_MakeGlobalDelayFn())]
+}
+
+; The lone tap window's choices in milliseconds, in menu order; 0 is off (the
+; strict tap-hold).
+_TH_LoneTapChoicesMs() {
+	static Choices := [0, 500, 750, 1000, 1500]
+	return Choices
+}
+
+; How the lone tap window reads in the menu: « off (strict tap-hold) » for 0,
+; « up to 1000 ms » otherwise.
+; @param Ms {Integer} The window in milliseconds.
+; @returns {String}
+_TH_LoneTapCaption(Ms) {
+	return Ms == 0 ? t("menu.tapholds.lone_tap_off")
+		: StrReplace(t("menu.tapholds.lone_tap_up_to"), "%s", Ms . " ms")
+}
+
+; The lone tap window row (tap_holds.lone_modifier_tap_max_ms): its caption
+; carries the window in force and it opens the choices, the current one checked.
+; A window set by hand outside the choices is shown in the caption, unchecked.
+; @param CurrentMs {Integer} The window shown; the one in force by default.
+; @returns {Array} One row.
+_TH_LoneTapRows(CurrentMs := unset) {
+	Current := IsSet(CurrentMs) ? CurrentMs : TapHoldLoneTapMaxMs()
+	Choices := []
+	for _, Ms in _TH_LoneTapChoicesMs() {
+		Choices.Push(Map(
+			"label", Ms == 0 ? t("menu.tapholds.lone_tap_off") : Ms . " ms",
+			"checked", Ms == Current,
+			; The fat arrow drops the native menu arguments, which would otherwise
+			; fill the commit's Path and ReloadFn seams.
+			"action", ((Value, *) => _TH_CommitLoneTapMaxMs(Value)).Bind(Ms)))
+	}
+	Label := StrReplace(t("menu.tapholds.lone_tap_title"), "%s", _TH_LoneTapCaption(Current))
+	return [Map("label", Label, "items", Choices)]
+}
+
+; Persists the lone tap window chosen in the menu, then reloads.
+; @param Ms {Integer} 0 (strict) or a positive whole number of milliseconds.
+; @param Path {String} The config.toml to write; ConfigurationFile by default.
+; @param ReloadFn {Func} Replaces the reload in tests.
+; @returns {Boolean} False when nothing was committed.
+_TH_CommitLoneTapMaxMs(Ms, Path := "", ReloadFn := 0) {
+	global ConfigurationFile
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_CommitLoneTapMaxMs(Ms, Path, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	try TapHoldValidLoneTapMaxMs(Ms)
+	catch as Err {
+		try LoggerError("TapHoldMenu", "The lone modifier tap window is refused: {1}.", Err.Message)
+		return false
+	}
+	Rows := [ManifestSparseOperation(ConfigKey.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS, Ms)]
+	if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, Rows, "the lone modifier tap window")
+		return false
+	try LoggerInfo("TapHoldMenu", "Lone modifier tap window set to {1} ms (pid={2}).", Ms, DriverPid)
+	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
 }
 
 ; List provider: one row per configurable key of one hand.

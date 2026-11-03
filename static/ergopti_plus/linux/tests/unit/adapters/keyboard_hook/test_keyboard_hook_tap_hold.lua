@@ -27,7 +27,7 @@ local KEYS = {
 local function drive(events, extra)
 	local kh = helpers.load_module("adapters.keyboard_hook")
 	-- A zero minimum tap: the drive has no clock between events.
-	local engine = Engine.new({ keys = KEYS, tap_min_ms = 0, one_shot_timeout_ms = 2000,
+	local engine = Engine.new({ keys = KEYS, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 		nav_layer = require("tests.support.nav_layer_fixture").recommended() })
 	local taps, emitted, chars = {}, {}, {}
 	kh.set_remapper(engine, function(action) taps[#taps + 1] = action end)
@@ -101,7 +101,7 @@ helpers.describe("keyboard hook + tap-hold engine", function()
 	helpers.it("forwards the release of a key pressed before the engine came in", function()
 		local kh = helpers.load_module("adapters.keyboard_hook")
 		local emitted = {}
-		local engine = Engine.new({ keys = KEYS, tap_min_ms = 0, one_shot_timeout_ms = 2000 })
+		local engine = Engine.new({ keys = KEYS, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000 })
 		kh._test_drive({ { type = EV_KEY, code = 58, value = 1 }, { type = EV_KEY, code = 58, value = 0 } }, {
 			onEmitRaw = function(code, value)
 				emitted[#emitted + 1] = code .. ":" .. value
@@ -118,7 +118,7 @@ helpers.describe("keyboard hook + tap-hold engine", function()
 	local function shift_taps(stream)
 		local kh = helpers.load_module("adapters.keyboard_hook")
 		local engine = Engine.new({ keys = { left_shift = { tap_action = "copy", hold_modifier = "shift",
-			time_activation_seconds = 0.35 } }, tap_min_ms = 50, one_shot_timeout_ms = 2000 })
+			time_activation_seconds = 0.35 } }, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000 })
 		local taps = {}
 		kh.set_remapper(engine, function(action) taps[#taps + 1] = action end)
 		local events = {}
@@ -269,7 +269,7 @@ helpers.describe("keyboard hook + tap-hold engine: the pointer during a tap", fu
 		local kh = helpers.load_module("adapters.keyboard_hook")
 		local emitted = {}
 		local ok, err = pcall(function()
-			kh.set_remapper(Engine.new({ keys = KEYS, tap_min_ms = 0, one_shot_timeout_ms = 2000 }),
+			kh.set_remapper(Engine.new({ keys = KEYS, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000 }),
 				function() end)
 			kh.start({
 				intercept = true,
@@ -395,7 +395,7 @@ helpers.describe("keyboard hook + tap-hold engine: a modifier the XKB options mo
 		local taps, emitted = {}, {}
 		kh.set_remapper(Engine.new({
 			keys = { tab = { tap_action = "alt_tab_monitor", hold_modifier = "alt", time_activation_seconds = 10 } },
-			tap_min_ms = 0, one_shot_timeout_ms = 2000,
+			tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 			held_modifiers = function() return kh.held_modifiers() end,
 		}), function(action) taps[#taps + 1] = tostring(action) end)
 		local stream = {}
@@ -442,7 +442,7 @@ helpers.describe("keyboard hook + tap-hold engine: a hold taken past the thresho
 
 	--- An engine running RCtrl's one-shot Shift with no hold.
 	local function one_shot_engine()
-		return Engine.new({ keys = ONE_SHOT_KEYS, tap_min_ms = 50, one_shot_timeout_ms = 2000,
+		return Engine.new({ keys = ONE_SHOT_KEYS, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 			key_text = function(code) return code == KEY_A and "a" or nil end,
 			plan_text = function() return nil end,
 			one_shot_result = function() return nil end })

@@ -45,6 +45,11 @@ local ConfigKeys = require("config_keys")
 local LOG = "karabiner"
 
 local TAP_HOLD_TIMEOUT_MS_DEFAULT       = Defaults.tap_hold_timeout_ms
+local LoneTap = require("tap_hold.lone_tap")
+-- How long a modifier key pressed alone still taps: the manifest's
+-- tap_holds.lone_modifier_tap_max_ms (0 = the strict tap-hold).
+M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT = LoneTap.validate(
+	Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
 local STICKY_TIMEOUT_MS_DEFAULT         = Defaults.sticky_timeout_ms
 local SIMULTANEOUS_THRESHOLD_MS_DEFAULT = Defaults.simultaneous_threshold_ms
 local COMBO_SYMMETRIC_DEFAULT           = Defaults.combo_symmetric
@@ -60,6 +65,20 @@ local function timing_leaf(section, key, default, path, section_name)
 	if called and value ~= nil then return value, false end
 	Outdated.report_in_file(path, { section_name, key },
 		"a timing is numeric; the canonical default is used", Logger)
+	return default, true
+end
+
+--- Reads the lone modifier tap window, where 0 (the strict tap-hold) is a
+--- choice, not an absent value; a negative or fractional window is obsolete.
+--- @return number value The existing window or the canonical default.
+--- @return boolean outdated True when the raw leaf must survive ordinary saves.
+local function lone_tap_leaf(section, key, default, path, section_name)
+	if section[key] == nil then return default, false end
+	local valid, value = pcall(LoneTap.validate, section[key])
+	if valid then return value, false end
+	Outdated.report_in_file(path, { section_name, key },
+		"a lone modifier tap window is 0 or a positive whole number of milliseconds; the canonical default is used",
+		Logger)
 	return default, true
 end
 
@@ -498,6 +517,7 @@ local function build_state(tap_hold_keys, mod_combos, recommended)
 		tap_hold_config           = tap_hold_config,
 		mod_combos_config         = mod_combos_config,
 		tap_hold_timeout_ms       = TAP_HOLD_TIMEOUT_MS_DEFAULT,
+		lone_modifier_tap_max_ms  = M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT,
 		sticky_timeout_ms         = STICKY_TIMEOUT_MS_DEFAULT,
 		simultaneous_threshold_ms = SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
 		combo_symmetric           = COMBO_SYMMETRIC_DEFAULT,
@@ -687,6 +707,8 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS)
 	local sticky_ms = timing(tap_holds, "sticky_timeout_ms", STICKY_TIMEOUT_MS_DEFAULT,
 		ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
+	local lone_tap_ms = lone_tap_leaf(tap_holds, ConfigKeys.LEAF.LONE_MODIFIER_TAP_MAX_MS,
+		M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT, user_config_path, ConfigKeys.KEY.TAP_HOLDS)
 	local simultaneous_ms = timing(combos, ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS, SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
 		ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 
@@ -709,6 +731,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		tap_hold_config           = tap_hold_config,
 		mod_combos_config         = combos_config,
 		tap_hold_timeout_ms       = timeout_ms,
+		lone_modifier_tap_max_ms  = lone_tap_ms,
 		sticky_timeout_ms         = sticky_ms,
 		simultaneous_threshold_ms = simultaneous_ms,
 		combo_symmetric           = combo_symmetric,
@@ -718,6 +741,7 @@ end
 -- The scalar leaves a menu setter can name as explicitly set by the user.
 local INTENT_LEAVES = {
 	[ConfigKeys.KEY.TAP_HOLDS_ENABLED] = true, [ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS] = true, [ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS] = true,
+	[ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS] = true,
 	[ConfigKeys.KEY.MOD_COMBOS_ENABLED] = true, [ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS] = true,
 	[ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC] = true,
 }
@@ -824,8 +848,8 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			if not overwrite_corrupt and value == neutral then value = nil end
 			target[key] = value
 		end
-		local function assign_timing(target, section, key, value, neutral)
-			local _, outdated = timing_leaf(target, key, neutral, user_config_path, section)
+		local function assign_timing(target, section, key, value, neutral, read_leaf)
+			local _, outdated = (read_leaf or timing_leaf)(target, key, neutral, user_config_path, section)
 			if not overwrite_corrupt and outdated and not explicit[section .. "." .. key] then
 				if value ~= neutral then
 					candidate_refusal = "candidate has no explicit repair owner for " .. section .. "." .. key
@@ -922,12 +946,21 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			(state.tap_holds_enabled == nil or state.tap_holds_enabled == Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED))
 			and (state.tap_hold_timeout_ms == nil or state.tap_hold_timeout_ms == TAP_HOLD_TIMEOUT_MS_DEFAULT)
 			and (state.sticky_timeout_ms == nil or state.sticky_timeout_ms == STICKY_TIMEOUT_MS_DEFAULT)
+			and (state.lone_modifier_tap_max_ms == nil
+				or state.lone_modifier_tap_max_ms == M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT)
 			and bindings_neutral(state.tap_hold_config, { "tap", "hold", "timeout_ms" })) then
 			local tap_holds = table_at(document, ConfigKeys.KEY.TAP_HOLDS)
 			assign_boolean(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "enabled", state.tap_holds_enabled,
 				Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED), tap_holds_switch)
 			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
 			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
+			-- 0 is the strict tap-hold, a choice of its own: only the default is elided.
+			if state.lone_modifier_tap_max_ms ~= nil and not pcall(LoneTap.validate, state.lone_modifier_tap_max_ms) then
+				candidate_refusal = "candidate has an invalid " .. ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS
+				error(candidate_refusal, 0)
+			end
+			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, ConfigKeys.LEAF.LONE_MODIFIER_TAP_MAX_MS,
+				state.lone_modifier_tap_max_ms, M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT, lone_tap_leaf)
 			if not preserve_array(tap_holds.config, { ConfigKeys.KEY.TAP_HOLDS, "config" },
 				bindings_neutral(state.tap_hold_config, { "tap", "hold", "timeout_ms" })) then
 				merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" }, ConfigKeys.KEY.TAP_HOLDS)

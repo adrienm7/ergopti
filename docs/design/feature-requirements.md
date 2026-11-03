@@ -379,6 +379,7 @@ two disagree in either direction.
 | `network.proxy_override`                                      | n/a             | n/a                                    | —                    |
 | `ui.menubar_icon`                                             | —               | n/a                                    | n/a                  |
 | `tap_holds.enabled`                                           | `karabiner`     | `evdev`, `uinput`                      | n/a                  |
+| `tap_holds.lone_modifier_tap_max_ms`                          | `karabiner`     | `evdev`, `uinput`                      | —                    |
 | `shortcuts.keys.wrap_text_if_selected`                        | —               | n/a                                    | n/a                  |
 | `shortcuts.keys.cmd_star`                                     | —               | n/a                                    | n/a                  |
 | `category_enabled.autocorrection`                             | n/a             | n/a                                    | —                    |

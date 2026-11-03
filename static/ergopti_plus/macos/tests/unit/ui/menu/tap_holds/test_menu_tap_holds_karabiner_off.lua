@@ -48,6 +48,7 @@ local function menu_over_double(integration_enabled)
 		get_combo_hold_action = function() return "none" end,
 		get_tap_hold_timeout = function() return 200 end,
 		get_sticky_timeout = function() return 1000 end,
+		get_lone_modifier_tap_max_ms = function() return 1000 end,
 		get_simultaneous_threshold = function() return 50 end,
 	}
 	return menu, karabiner

@@ -13,7 +13,7 @@ local Engine = require("platform.remap.tap_hold_engine")
 
 local function engine()
 	return Engine.new({ keys = { caps_lock = { tap_action = "none", hold_modifier = "shift", time_activation_seconds = 10 } },
-		tap_min_ms = 0, one_shot_timeout_ms = 2000 })
+		tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000 })
 end
 
 helpers.describe("modifier consumers: independent causal wire and capture expectations", function()
@@ -171,7 +171,7 @@ helpers.describe("modifier broker: producer receipts and typed attach admission"
 
 	helpers.it("observes handoff restoration role before the actual XKB callback", function()
 		local Engine = require("platform.remap.tap_hold_engine")
-		local configured = Engine.new({ tap_min_ms = 0, tap_max_ms = 300, double_press_ms = 400, one_shot_timeout_ms = 2000, keys = {
+		local configured = Engine.new({ tap_min_ms = 0, lone_tap_max_ms = 0, tap_max_ms = 300, double_press_ms = 400, one_shot_timeout_ms = 2000, keys = {
 			caps_lock = { tap_action = "enter", hold_modifier = "shift", time_activation_seconds = 10 },
 		} })
 		Fixture.with_session({ engine = configured }, function(s)
@@ -240,7 +240,7 @@ end)
 helpers.describe("modifier broker: reentrant batch retirement", function()
 	for _, fail_inverse in ipairs({ false, true }) do
 		helpers.it(fail_inverse and "retires exact output after unacknowledged reentrant inverse" or "acknowledges the remaining inverse after producer withdrawal", function()
-			local configured = Engine.new({ tap_min_ms = 0, one_shot_timeout_ms = 2000, keys = {
+			local configured = Engine.new({ tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000, keys = {
 				caps_lock = { tap_action = "none", hold_modifier = "ctrl+shift", time_activation_seconds = 10 },
 			} })
 			local withdrawn, inner, inverse_sync, up_sync_attempts = false, nil, 0, 0

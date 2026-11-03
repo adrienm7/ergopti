@@ -670,3 +670,10 @@ magic_key = false
 
 [network]
 proxy_override = ""
+
+
+
+
+
+[tap_holds]
+lone_modifier_tap_max_ms = 1000

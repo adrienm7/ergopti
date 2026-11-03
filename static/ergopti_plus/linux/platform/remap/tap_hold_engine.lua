@@ -39,10 +39,14 @@
 ---    The waiting keys are then replayed in order, after the tap or under the
 ---    hold. Its tap needs no minimum duration and is not cancelled by the
 ---    release of an earlier key: both are what fast typing looks like.
+--- 6. A key whose hold is a modifier taken at key-down, pressed alone, still
+---    taps up to lone_tap_max_ms (tap_holds.lone_modifier_tap_max_ms, shared
+---    rule in tap_hold.lone_tap); 0 keeps the strict threshold.
 --- ==============================================================================
 
 local EvdevCodes = require("infra.evdev_codes")
 local OneShotShift = require("tap_hold.one_shot_shift")
+local LoneTap = require("tap_hold.lone_tap")
 local InputEvent = require("infra.input_event")
 
 local M = {}
@@ -148,6 +152,8 @@ local SWALLOWED_ON_LAYER = { left_alt = { tap = "backspace", layer = "nav" } }
 --- @param opts table {
 ---   keys = { [key_id] = { tap_action, hold_modifier, hold_layer, time_activation_seconds, enabled } },
 ---   tap_min_ms = number, one_shot_timeout_ms = number,
+---   lone_tap_max_ms = number, how long a modifier key pressed alone still taps,
+---     0 for the strict tap-hold (tap_hold.lone_tap),
 ---   roll_keys = { key_id }|nil, the typing keys decided by the order of the
 ---     releases when they keep their own key on a tap and have a hold,
 ---   nav_layer = table|nil, explicitly compiled navigation chords; absent is native,
@@ -184,6 +190,7 @@ function M.new(opts)
 		by_code = {},
 		nav_layer = options.nav_layer or {},
 		tap_min_ms = assert(tonumber(options.tap_min_ms), "tap_min_ms is required"),
+		lone_tap_max_ms = LoneTap.validate(options.lone_tap_max_ms),
 		one_shot_timeout_ms = assert(tonumber(options.one_shot_timeout_ms), "one_shot_timeout_ms is required"),
 		tap_blocked = options.tap_blocked,
 		key_text = options.key_text,
@@ -278,6 +285,15 @@ function M.new(opts)
 					and LAYER_BACKSPACE_TAP_NEEDS_UP_AT_RELEASE[key_id] or nil,
 				threshold_ms = math.floor((tonumber(config.time_activation_seconds) or 0) * 1000 + 0.5),
 			}
+			-- A modifier hold taken at key-down, on a key outside the typing keys:
+			-- pressed alone, its tap may last up to lone_tap_max_ms (see 6.).
+			local entry = self.by_code[code]
+			-- A one-shot Shift is no such tap: armed by a long press, it would shift
+			-- the next letter of a Shift the user held and let go unused.
+			-- Every typing key is left out, as on macOS and Windows, whatever its tap.
+			entry.lone_modifier = #entry.mods > 0 and not entry.layer and not roll_keys[key_id]
+				and not entry.hold_past_threshold and not entry.tap_at_down and not entry.instant
+				and tap ~= "one_shot_shift"
 		end
 		::continue::
 	end
@@ -977,7 +993,8 @@ local function process(self, code, value, now_ms)
 		if state.layer then self.layer_depth = math.max(0, self.layer_depth - 1) end
 		local elapsed = now_ms - state.down_at
 		local is_tap = not state.cancelled and not state.tap_blocked
-			and elapsed <= config.threshold_ms and elapsed >= self.tap_min_ms
+			and elapsed <= LoneTap.tap_max_ms(config.threshold_ms, config.lone_modifier, self.lone_tap_max_ms)
+			and elapsed >= self.tap_min_ms
 		for _, needed_up in ipairs(config.tap_needs_up_at_release or {}) do
 			if self.physical_down[needed_up] then is_tap = false end
 		end

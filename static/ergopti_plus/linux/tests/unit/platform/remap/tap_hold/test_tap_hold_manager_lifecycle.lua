@@ -55,7 +55,7 @@ helpers.describe("tap-hold manager", function()
 			local queued = Engine.new({ keys = {
 				space = { tap_action = "", hold_modifier = "ctrl", time_activation_seconds = 0.2 },
 				win = { tap_action = "alt_tab_monitor", time_activation_seconds = 0.2 },
-			}, roll_keys = { "space" }, tap_min_ms = 50, one_shot_timeout_ms = 2000 })
+			}, roll_keys = { "space" }, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000 })
 			queued:process(Engine.KEY_CODES.space, 1, 0)
 			queued:process(Engine.KEY_CODES.win, 1, 20)
 			local due = queued:tick(201)

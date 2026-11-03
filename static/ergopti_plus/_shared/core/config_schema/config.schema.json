@@ -19,7 +19,10 @@
 		"tap_holds": {
 			"type": "object",
 			"additionalProperties": false,
-			"properties": { "enabled": { "type": "boolean" } }
+			"properties": {
+				"enabled": { "type": "boolean" },
+				"lone_modifier_tap_max_ms": { "type": "integer", "minimum": 0 }
+			}
 		},
 		"mod_combos": {
 			"description": "Linux simultaneous settings and known pair combo leaves; native source/output admission remains separately owned.",

@@ -213,7 +213,9 @@ local function _run_tap(action, binding)
 	if tap_current and not tap_current() then return end
 	local source = binding or "tap_hold"
 	local ok, err
-	if action == COPY_ACTION and _tap_copy then
+	-- A dry run keeps the physical remap and touches no clipboard at all, not
+	-- even its counter: the copy is sent unchecked there.
+	if action == COPY_ACTION and _tap_copy and not _dry_run then
 		-- The copy is checked against the clipboard's change counter and sent
 		-- once more when it did not land (platform/remap/tap_copy.lua).
 		ok, err = pcall(_tap_copy.run, _tap_copy, source, function()
@@ -559,6 +561,8 @@ local function _build(loaded, boot)
 		roll_keys = loaded.roll_keys,
 		nav_layer = nav_layer,
 		tap_min_ms = Timings.ms("tap_hold", "tap_min_duration_ms"),
+		-- tap_hold.toml's [tap_hold] lone_modifier_tap_max_ms, or the manifest's default.
+		lone_tap_max_ms = loaded.lone_tap_max_ms,
 		one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),
 		key_text = function(code) return _hook.key_text(code) end,
 		plan_text = function(text) return (require("adapters.keyboard_layout").plan(text)) end,
@@ -758,6 +762,25 @@ function M.set_enabled(enabled)
 	local installed = _apply()
 	Logger.info(LOG, "Tap-holds switched %s.", enabled and "on" or "off")
 	return installed
+end
+
+--- How long a modifier key pressed alone still taps, in milliseconds (0 = strict):
+--- the value of the configuration in force, read from tap_hold.toml.
+--- @return number
+function M.lone_tap_max_ms()
+	_require_init()
+	return _loaded.lone_tap_max_ms
+end
+
+--- Sets how long a modifier key pressed alone still taps: written to
+--- tap_hold.toml by the writer, which reloads this manager, so the file stays
+--- the one source of the value.
+--- @param ms number 0 (strict) or a positive whole number of milliseconds.
+--- @param guard function|nil Original deferred editor, strict true required.
+--- @return boolean True when the new engine is in force.
+function M.set_lone_tap_max_ms(ms, guard)
+	_require_init()
+	return require("platform.remap.tap_hold_writer").set_lone_tap_max_ms(ms, guard)
 end
 
 --- Follows the daemon's pause: a paused script remaps nothing.

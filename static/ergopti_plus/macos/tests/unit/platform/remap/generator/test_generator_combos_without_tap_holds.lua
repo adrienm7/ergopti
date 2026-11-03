@@ -47,7 +47,9 @@ local TAP_HOLDS_ON_PINS = {
 	-- Windows and Linux ship, with no chord and no hold slot.
 	-- Re-pinned for PAR-15: the global delay is the registry's 200 ms (it was 250 ms)
 	-- and no key carries a threshold of its own.
-	recommended = { rules = 27, digest = "5b370a4cac965f05" },
+	-- Re-pinned for the lone tap window (tap_holds.lone_modifier_tap_max_ms,
+	-- 1000 ms): the recommended modifier keys' tap timeout is 1000 ms.
+	recommended = { rules = 27, digest = "7344424beab9022b" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the

@@ -46,6 +46,7 @@ local KeyCatalog = require("tap_hold.key_catalog")
 local Migration = require("platform.remap.tap_hold_migration")
 local Paths = require("infra.paths")
 local ConfigKeys = require("config_keys")
+local LoneTap = require("tap_hold.lone_tap")
 
 local LOG = "platform.remap.tap_hold_writer"
 
@@ -58,6 +59,12 @@ local MAX_THRESHOLD_SECONDS = 10
 -- The per-key fields whose runtime meaning belongs to this writer. A delay is
 -- only ever written when the user sets it: no key ships one.
 local OWNED_KEY_FIELDS = { "tap_action", "hold_modifier", "hold_layer", "enabled", ConfigKeys.LEAF.TIME_ACTIVATION_SECONDS }
+
+-- The [tap_hold] field of the lone modifier tap window (the loader's).
+local LONE_TAP_FIELD = require("platform.remap.tap_hold_loader").LONE_TAP_FIELD
+
+-- The manifest rows under tap_holds that tap_hold.toml's [tap_hold] owns.
+local SCOPE_ROW_FIELDS = { enabled = true, [LONE_TAP_FIELD] = true }
 
 local HEADER = {
 	"# tap_hold.toml — written by the Ergopti+ tray menu.",
@@ -559,6 +566,23 @@ function M.set_global_threshold(seconds, guard)
 	end, guard)
 end
 
+--- Sets how long a modifier key pressed alone still taps, in milliseconds
+--- ([tap_hold] lone_modifier_tap_max_ms, the manifest's
+--- tap_holds.lone_modifier_tap_max_ms): 0 is the strict tap-hold.
+--- @param ms number 0 or a positive whole number of milliseconds.
+--- @param guard function|nil Original deferred editor, strict true required.
+--- @return boolean
+function M.set_lone_tap_max_ms(ms, guard)
+	if not pcall(LoneTap.validate, ms) then
+		Logger.error(LOG, "set_lone_tap_max_ms: %s is not 0 or a whole number of milliseconds — nothing written.",
+			tostring(ms))
+		return false
+	end
+	return commit("lone modifier tap window = " .. tostring(ms) .. " ms", function(document, shapes)
+		section(document, shapes)[LONE_TAP_FIELD] = ms
+	end, guard)
+end
+
 --- Switches the feature on or off in the file ([tap_hold] enabled).
 --- @param enabled boolean
 --- @return boolean
@@ -600,10 +624,10 @@ function M.render_scope(mode, document, rows, preset, shapes)
 	tap_hold.time_activation_seconds = nil
 	clear_owned_keys(tap_hold, preset, shapes)
 	for _, row in ipairs(rows) do
-		if row.section ~= ConfigKeys.KEY.TAP_HOLDS or row.key ~= "enabled" then
+		if row.section ~= ConfigKeys.KEY.TAP_HOLDS or not SCOPE_ROW_FIELDS[row.key] then
 			error("tap-hold scope row has no tap_hold.toml owner: " .. tostring(row.section) .. "." .. tostring(row.key), 0)
 		end
-		if row.delete then tap_hold.enabled = nil else tap_hold.enabled = row.value end
+		if row.delete then tap_hold[row.key] = nil else tap_hold[row.key] = row.value end
 	end
 	if mode == "recommended" then
 		for key_id, fields in pairs(preset) do

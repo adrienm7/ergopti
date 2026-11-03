@@ -816,6 +816,44 @@ local function build_sticky_delay_item(karabiner, update_menu)
 	}
 end
 
+-- The lone modifier tap windows the menu offers, in milliseconds; 0 is the
+-- strict tap-hold (tap_holds.lone_modifier_tap_max_ms).
+local LONE_TAP_CHOICES_MS = { 0, 500, 750, 1000, 1500 }
+
+--- Captions one lone modifier tap window.
+--- @param ms number 0 for the strict tap-hold, else milliseconds.
+--- @return string caption
+local function lone_tap_caption(ms)
+	if ms == 0 then return i18n.get("menu.tapholds.lone_tap_off") end
+	return string.format(i18n.get("menu.tapholds.lone_tap_up_to"), string.format("%d ms", ms))
+end
+
+--- Builds the lone modifier tap window row and its choices: how long a
+--- modifier key pressed alone still types its tap.
+--- @param karabiner   table    The karabiner module.
+--- @param update_menu function Callback to refresh the menu bar.
+--- @return table Provider row carrying the choice rows.
+local function build_lone_tap_item(karabiner, update_menu)
+	local current_ms = karabiner.get_lone_modifier_tap_max_ms()
+	local choices = {}
+	for _, ms in ipairs(LONE_TAP_CHOICES_MS) do
+		choices[#choices + 1] = {
+			label   = ms == 0 and i18n.get("menu.tapholds.lone_tap_off") or string.format("%d ms", ms),
+			checked = ms == current_ms or nil,
+			action  = function()
+				return commit_menu_setting(karabiner, "Lone modifier tap window", function()
+					return karabiner.set_lone_modifier_tap_max_ms(ms)
+				end, update_menu)
+			end,
+		}
+	end
+	return {
+		label = string.format(i18n.get("menu.tapholds.lone_tap_title"),
+			current_ms ~= nil and lone_tap_caption(current_ms) or "?"),
+		items = choices,
+	}
+end
+
 --- Builds the combo activation window item. Clicking opens a free-text input dialog.
 --- Controls `basic.simultaneous_threshold_milliseconds` — the maximum delay
 --- between the two keys of a shortcut for KE to fire the combo (chord) slot.
@@ -1164,6 +1202,9 @@ function M.build(ctx)
 			rows[#rows + 1] = build_delay_item(karabiner, update_menu)
 			rows[#rows + 1] = build_sticky_delay_item(karabiner, update_menu)
 			return rows
+		end,
+		["tap_hold_lone_tap"] = function()
+			return { build_lone_tap_item(karabiner, update_menu) }
 		end,
 		-- With « Ergopti uses Karabiner » off the key rows are greyed: nothing
 		-- can deploy them. Say why right above the first of them, at the top of

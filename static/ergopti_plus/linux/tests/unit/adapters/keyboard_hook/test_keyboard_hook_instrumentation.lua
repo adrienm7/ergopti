@@ -23,7 +23,7 @@ local function drive(events, with_engine)
 	perf._reset_for_test()
 	local kh = helpers.load_module("adapters.keyboard_hook")
 	if with_engine then
-		kh.set_remapper(Engine.new({ keys = KEYS, tap_min_ms = 0, one_shot_timeout_ms = 2000 }), function() end)
+		kh.set_remapper(Engine.new({ keys = KEYS, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000 }), function() end)
 	end
 	local stream = {}
 	for index, pair in ipairs(events) do stream[index] = { type = EV_KEY, code = pair[1], value = pair[2] } end

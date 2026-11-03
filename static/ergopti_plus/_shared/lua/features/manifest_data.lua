@@ -1110,6 +1110,9 @@ M.features = {
 		path = "tap_holds.enabled", id = "enabled", section = "tap_holds", default = false, type = "boolean", description_key = "menu.tap_holds", platforms = { "hs", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.category_master_is_a_gate_on_windows",
 	},
 	{
+		path = "tap_holds.lone_modifier_tap_max_ms", id = "lone_modifier_tap_max_ms", section = "tap_holds", default = 1000, type = "number", description_key = "menu.tapholds.lone_tap_title", platforms = { "ahk", "hs", "linux" }, recommended = 1000, family = "setting",
+	},
+	{
 		path = "shortcuts.keys.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "hs" }, recommended = true, family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
