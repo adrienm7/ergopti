@@ -12,8 +12,8 @@
 ; FEATURES & RATIONALE:
 ; 1. One id, every spelling: `left_control`, `lctrl` and `LCtrl` all name
 ;    left_ctrl, matched without regard to case.
-; 2. Fail fast: an unknown id or a missing translation throws, so a row never
-;    falls back to the id it was meant to hide.
+; 2. Fail fast: an unknown id or an empty text throws, so a row never falls
+;    back to the id it was meant to hide.
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\_generated\key_names.ahk
@@ -46,10 +46,12 @@ KeyNameI18n(Spelling) {
 ; @param Translate {Func} The lookup, when a caller injects one; t by default.
 ; @returns {String}
 KeyNameLabel(Spelling, Translate := "") {
+	; A catalogue miss comes back as the dotted key, like every other label (t()
+	; logs it): the locale gates and the tray walk refuse it, never the id.
 	Key := KeyNameI18n(Spelling)
 	Text := Translate == "" ? t(Key) : Translate.Call(Key)
-	if (Text == "" || Text == Key)
-		throw ValueError("A key name has no translation.", -1, Key)
+	if (Text == "")
+		throw ValueError("A key name has no text.", -1, Key)
 	return Text
 }
 
