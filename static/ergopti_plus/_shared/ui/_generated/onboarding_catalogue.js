@@ -1959,7 +1959,7 @@
 												"path": "hotstrings.autocorrection.names.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#names"
@@ -1970,7 +1970,7 @@
 												"path": "hotstrings.autocorrection.abbreviations.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#abbreviations"
@@ -1981,7 +1981,7 @@
 												"path": "hotstrings.autocorrection.technical_terms.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#technical_terms"
@@ -2015,7 +2015,7 @@
 												"path": "hotstrings.magic_key.repeat_corrections.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/repeatcorrections.toml#repeat_corrections"
@@ -2026,7 +2026,7 @@
 												"path": "hotstrings.magic_key.text_expansion_symbols.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols"
@@ -2037,7 +2037,7 @@
 												"path": "hotstrings.magic_key.text_expansion_symbols_typst.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols_typst"
@@ -2060,7 +2060,7 @@
 												"path": "hotstrings.distances_reduction.qu.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#qu"
@@ -2071,7 +2071,7 @@
 												"path": "hotstrings.distances_reduction.comma_j.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#comma_j"
@@ -2082,7 +2082,7 @@
 												"path": "hotstrings.distances_reduction.comma_far_letters.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#comma_far_letters"
@@ -2093,7 +2093,7 @@
 												"path": "hotstrings.distances_reduction.dead_key_e_circumflex.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#dead_key_e_circumflex"
@@ -2104,7 +2104,7 @@
 												"path": "hotstrings.distances_reduction.e_circumflex_e.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#e_circumflex_e"
@@ -2115,7 +2115,7 @@
 												"path": "hotstrings.distances_reduction.space_around_symbols.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#space_around_symbols"
@@ -2138,7 +2138,7 @@
 												"path": "hotstrings.sfbs_reduction.comma.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#comma"
@@ -2149,7 +2149,7 @@
 												"path": "hotstrings.sfbs_reduction.e_circ.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_circ"
@@ -2160,7 +2160,7 @@
 												"path": "hotstrings.sfbs_reduction.e_grave.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_grave"
@@ -2171,7 +2171,7 @@
 												"path": "hotstrings.sfbs_reduction.bu.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#bu"
@@ -2182,7 +2182,7 @@
 												"path": "hotstrings.sfbs_reduction.i_e_acute.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#i_e_acute"
@@ -2205,7 +2205,7 @@
 												"path": "hotstrings.rolls.hc.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "HC ➜ WH"
@@ -2216,7 +2216,7 @@
 												"path": "hotstrings.rolls.sx.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "SX ➜ SK"
@@ -2227,7 +2227,7 @@
 												"path": "hotstrings.rolls.cx.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "CX ➜ CK"
@@ -2238,7 +2238,7 @@
 												"path": "hotstrings.rolls.english_negation.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "NT’ ➜ N’T"
@@ -2249,7 +2249,7 @@
 												"path": "hotstrings.rolls.ez.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "EÉ ➜ EZ"
@@ -2260,7 +2260,7 @@
 												"path": "hotstrings.rolls.ct.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "P’ ➜ CT"
@@ -2271,7 +2271,7 @@
 												"path": "hotstrings.rolls.close_chevron_tag.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "<@ ➜ </"
@@ -2282,7 +2282,7 @@
 												"path": "hotstrings.rolls.chevron_less.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "<% ➜ <="
@@ -2293,7 +2293,7 @@
 												"path": "hotstrings.rolls.chevron_greater.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": ">% ➜ >="
@@ -2304,7 +2304,7 @@
 												"path": "hotstrings.rolls.comment_open.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "\\\" ➜ /*"
@@ -2315,7 +2315,7 @@
 												"path": "hotstrings.rolls.comment_close.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "\"\\ ➜ */"
@@ -2326,7 +2326,7 @@
 												"path": "hotstrings.rolls.assign.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#! ➜ :="
@@ -2337,7 +2337,7 @@
 												"path": "hotstrings.rolls.not_equal.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "!# ➜ !="
@@ -2348,7 +2348,7 @@
 												"path": "hotstrings.rolls.paren_quote.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "(# ➜ (\""
@@ -2359,7 +2359,7 @@
 												"path": "hotstrings.rolls.bracket_quote.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "[# ➜ [\""
@@ -2370,7 +2370,7 @@
 												"path": "hotstrings.rolls.hashtag_parenthesis.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#( ➜ \")"
@@ -2381,7 +2381,7 @@
 												"path": "hotstrings.rolls.hashtag_open_bracket.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#[ ➜ \"]"
@@ -2392,7 +2392,7 @@
 												"path": "hotstrings.rolls.hashtag_close_bracket.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#] ➜ \"]"
@@ -2403,7 +2403,7 @@
 												"path": "hotstrings.rolls.equal_string.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "[) ➜ = \"\""
@@ -2414,7 +2414,7 @@
 												"path": "hotstrings.rolls.left_arrow.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "=+ = ➜"
@@ -2425,7 +2425,7 @@
 												"path": "hotstrings.rolls.assign_arrow_equal_right.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "$= ➜ =>"
@@ -2436,7 +2436,7 @@
 												"path": "hotstrings.rolls.assign_arrow_equal_left.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "=$ ➜ <="
@@ -2447,7 +2447,7 @@
 												"path": "hotstrings.rolls.assign_arrow_minus_right.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "+? ➜ ->"
@@ -2458,7 +2458,7 @@
 												"path": "hotstrings.rolls.assign_arrow_minus_left.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "?+ ➜ <-"
@@ -2491,7 +2491,7 @@
 												"path": "hotstrings.french_autocorrection.accents.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#accents"
@@ -2502,7 +2502,7 @@
 												"path": "hotstrings.french_autocorrection.names.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#names"
@@ -2513,7 +2513,7 @@
 												"path": "hotstrings.french_autocorrection.typographic_apostrophe.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#typographic_apostrophe"
@@ -2524,7 +2524,7 @@
 												"path": "hotstrings.french_autocorrection.errors.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#errors"
@@ -2535,7 +2535,7 @@
 												"path": "hotstrings.french_autocorrection.ou.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#ou"
@@ -2546,7 +2546,7 @@
 												"path": "hotstrings.french_autocorrection.multiple_punctuation_marks.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#multiple_punctuation_marks"
@@ -2557,7 +2557,7 @@
 												"path": "hotstrings.french_autocorrection.suffixes_a_chaining.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#suffixes_a_chaining"
@@ -2568,7 +2568,7 @@
 												"path": "hotstrings.french_autocorrection.minus.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#minus"
@@ -2579,7 +2579,7 @@
 												"path": "hotstrings.french_autocorrection.minus_apostrophe.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#minus_apostrophe"
@@ -2602,7 +2602,7 @@
 												"path": "hotstrings.french_magickey.text_expansion.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion"
@@ -2613,7 +2613,7 @@
 												"path": "hotstrings.french_magickey.text_expansion_auto.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion_auto"
@@ -2624,7 +2624,7 @@
 												"path": "hotstrings.french_magickey.text_expansion_emojis.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion_emojis"
@@ -3656,7 +3656,7 @@
 												"path": "hotstrings.modules.autocorrection.names",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#names"
@@ -3667,7 +3667,7 @@
 												"path": "hotstrings.modules.autocorrection.abbreviations",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#abbreviations"
@@ -3678,7 +3678,7 @@
 												"path": "hotstrings.modules.autocorrection.technical_terms",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#technical_terms"
@@ -3712,7 +3712,7 @@
 												"path": "hotstrings.modules.magickey.repeat_corrections",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/repeatcorrections.toml#repeat_corrections"
@@ -3723,7 +3723,7 @@
 												"path": "hotstrings.modules.magickey.text_expansion_symbols",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols"
@@ -3734,7 +3734,7 @@
 												"path": "hotstrings.modules.magickey.text_expansion_symbols_typst",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols_typst"
@@ -3757,7 +3757,7 @@
 												"path": "hotstrings.modules.distancesreduction.qu",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#qu"
@@ -3768,7 +3768,7 @@
 												"path": "hotstrings.modules.distancesreduction.comma_j",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#comma_j"
@@ -3779,7 +3779,7 @@
 												"path": "hotstrings.modules.distancesreduction.comma_far_letters",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#comma_far_letters"
@@ -3790,7 +3790,7 @@
 												"path": "hotstrings.modules.distancesreduction.dead_key_e_circumflex",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#dead_key_e_circumflex"
@@ -3801,7 +3801,7 @@
 												"path": "hotstrings.modules.distancesreduction.e_circumflex_e",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#e_circumflex_e"
@@ -3812,7 +3812,7 @@
 												"path": "hotstrings.modules.distancesreduction.space_around_symbols",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#space_around_symbols"
@@ -3835,7 +3835,7 @@
 												"path": "hotstrings.modules.sfbsreduction.comma",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#comma"
@@ -3846,7 +3846,7 @@
 												"path": "hotstrings.modules.sfbsreduction.e_circ",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_circ"
@@ -3857,7 +3857,7 @@
 												"path": "hotstrings.modules.sfbsreduction.e_grave",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_grave"
@@ -3868,7 +3868,7 @@
 												"path": "hotstrings.modules.sfbsreduction.bu",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#bu"
@@ -3879,7 +3879,7 @@
 												"path": "hotstrings.modules.sfbsreduction.i_e_acute",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#i_e_acute"
@@ -3902,7 +3902,7 @@
 												"path": "hotstrings.modules.rolls.hc",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "HC ➜ WH"
@@ -3913,7 +3913,7 @@
 												"path": "hotstrings.modules.rolls.sx",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "SX ➜ SK"
@@ -3924,7 +3924,7 @@
 												"path": "hotstrings.modules.rolls.cx",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "CX ➜ CK"
@@ -3935,7 +3935,7 @@
 												"path": "hotstrings.modules.rolls.english_negation",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "NT’ ➜ N’T"
@@ -3946,7 +3946,7 @@
 												"path": "hotstrings.modules.rolls.ez",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "EÉ ➜ EZ"
@@ -3957,7 +3957,7 @@
 												"path": "hotstrings.modules.rolls.ct",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "P’ ➜ CT"
@@ -3968,7 +3968,7 @@
 												"path": "hotstrings.modules.rolls.close_chevron_tag",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "<@ ➜ </"
@@ -3979,7 +3979,7 @@
 												"path": "hotstrings.modules.rolls.chevron_less",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "<% ➜ <="
@@ -3990,7 +3990,7 @@
 												"path": "hotstrings.modules.rolls.chevron_greater",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": ">% ➜ >="
@@ -4001,7 +4001,7 @@
 												"path": "hotstrings.modules.rolls.comment_open",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "\\\" ➜ /*"
@@ -4012,7 +4012,7 @@
 												"path": "hotstrings.modules.rolls.comment_close",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "\"\\ ➜ */"
@@ -4023,7 +4023,7 @@
 												"path": "hotstrings.modules.rolls.assign",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#! ➜ :="
@@ -4034,7 +4034,7 @@
 												"path": "hotstrings.modules.rolls.not_equal",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "!# ➜ !="
@@ -4045,7 +4045,7 @@
 												"path": "hotstrings.modules.rolls.paren_quote",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "(# ➜ (\""
@@ -4056,7 +4056,7 @@
 												"path": "hotstrings.modules.rolls.bracket_quote",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "[# ➜ [\""
@@ -4067,7 +4067,7 @@
 												"path": "hotstrings.modules.rolls.hashtag_parenthesis",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#( ➜ \")"
@@ -4078,7 +4078,7 @@
 												"path": "hotstrings.modules.rolls.hashtag_open_bracket",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#[ ➜ \"]"
@@ -4089,7 +4089,7 @@
 												"path": "hotstrings.modules.rolls.hashtag_close_bracket",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#] ➜ \"]"
@@ -4100,7 +4100,7 @@
 												"path": "hotstrings.modules.rolls.equal_string",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "[) ➜ = \"\""
@@ -4111,7 +4111,7 @@
 												"path": "hotstrings.modules.rolls.left_arrow",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "=+ = ➜"
@@ -4122,7 +4122,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_equal_right",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "$= ➜ =>"
@@ -4133,7 +4133,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_equal_left",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "=$ ➜ <="
@@ -4144,7 +4144,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_minus_right",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "+? ➜ ->"
@@ -4155,7 +4155,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_minus_left",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "?+ ➜ <-"
@@ -4188,7 +4188,7 @@
 												"path": "hotstrings.modules.french_autocorrection.accents",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#accents"
@@ -4199,7 +4199,7 @@
 												"path": "hotstrings.modules.french_autocorrection.names",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#names"
@@ -4210,7 +4210,7 @@
 												"path": "hotstrings.modules.french_autocorrection.typographic_apostrophe",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#typographic_apostrophe"
@@ -4221,7 +4221,7 @@
 												"path": "hotstrings.modules.french_autocorrection.errors",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#errors"
@@ -4232,7 +4232,7 @@
 												"path": "hotstrings.modules.french_autocorrection.ou",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#ou"
@@ -4243,7 +4243,7 @@
 												"path": "hotstrings.modules.french_autocorrection.multiple_punctuation_marks",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#multiple_punctuation_marks"
@@ -4254,7 +4254,7 @@
 												"path": "hotstrings.modules.french_autocorrection.suffixes_a_chaining",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#suffixes_a_chaining"
@@ -4265,7 +4265,7 @@
 												"path": "hotstrings.modules.french_autocorrection.minus",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#minus"
@@ -4276,7 +4276,7 @@
 												"path": "hotstrings.modules.french_autocorrection.minus_apostrophe",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#minus_apostrophe"
@@ -4299,7 +4299,7 @@
 												"path": "hotstrings.modules.french_magickey.text_expansion",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion"
@@ -4310,7 +4310,7 @@
 												"path": "hotstrings.modules.french_magickey.text_expansion_auto",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion_auto"
@@ -4321,7 +4321,7 @@
 												"path": "hotstrings.modules.french_magickey.text_expansion_emojis",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion_emojis"
@@ -4970,7 +4970,7 @@
 												"path": "hotstrings.modules.autocorrection.names",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#names"
@@ -4981,7 +4981,7 @@
 												"path": "hotstrings.modules.autocorrection.abbreviations",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#abbreviations"
@@ -4992,7 +4992,7 @@
 												"path": "hotstrings.modules.autocorrection.technical_terms",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#technical_terms"
@@ -5026,7 +5026,7 @@
 												"path": "hotstrings.modules.magickey.repeat_corrections",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/repeatcorrections.toml#repeat_corrections"
@@ -5037,7 +5037,7 @@
 												"path": "hotstrings.modules.magickey.text_expansion_symbols",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols"
@@ -5048,7 +5048,7 @@
 												"path": "hotstrings.modules.magickey.text_expansion_symbols_typst",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols_typst"
@@ -5071,7 +5071,7 @@
 												"path": "hotstrings.modules.distancesreduction.qu",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#qu"
@@ -5082,7 +5082,7 @@
 												"path": "hotstrings.modules.distancesreduction.comma_j",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#comma_j"
@@ -5093,7 +5093,7 @@
 												"path": "hotstrings.modules.distancesreduction.comma_far_letters",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#comma_far_letters"
@@ -5104,7 +5104,7 @@
 												"path": "hotstrings.modules.distancesreduction.dead_key_e_circumflex",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#dead_key_e_circumflex"
@@ -5115,7 +5115,7 @@
 												"path": "hotstrings.modules.distancesreduction.e_circumflex_e",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#e_circumflex_e"
@@ -5126,7 +5126,7 @@
 												"path": "hotstrings.modules.distancesreduction.space_around_symbols",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#space_around_symbols"
@@ -5149,7 +5149,7 @@
 												"path": "hotstrings.modules.sfbsreduction.comma",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#comma"
@@ -5160,7 +5160,7 @@
 												"path": "hotstrings.modules.sfbsreduction.e_circ",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_circ"
@@ -5171,7 +5171,7 @@
 												"path": "hotstrings.modules.sfbsreduction.e_grave",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_grave"
@@ -5182,7 +5182,7 @@
 												"path": "hotstrings.modules.sfbsreduction.bu",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#bu"
@@ -5193,7 +5193,7 @@
 												"path": "hotstrings.modules.sfbsreduction.i_e_acute",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#i_e_acute"
@@ -5216,7 +5216,7 @@
 												"path": "hotstrings.modules.rolls.hc",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "HC ➜ WH"
@@ -5227,7 +5227,7 @@
 												"path": "hotstrings.modules.rolls.sx",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "SX ➜ SK"
@@ -5238,7 +5238,7 @@
 												"path": "hotstrings.modules.rolls.cx",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "CX ➜ CK"
@@ -5249,7 +5249,7 @@
 												"path": "hotstrings.modules.rolls.english_negation",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "NT’ ➜ N’T"
@@ -5260,7 +5260,7 @@
 												"path": "hotstrings.modules.rolls.ez",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "EÉ ➜ EZ"
@@ -5271,7 +5271,7 @@
 												"path": "hotstrings.modules.rolls.ct",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "P’ ➜ CT"
@@ -5282,7 +5282,7 @@
 												"path": "hotstrings.modules.rolls.close_chevron_tag",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "<@ ➜ </"
@@ -5293,7 +5293,7 @@
 												"path": "hotstrings.modules.rolls.chevron_less",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "<% ➜ <="
@@ -5304,7 +5304,7 @@
 												"path": "hotstrings.modules.rolls.chevron_greater",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": ">% ➜ >="
@@ -5315,7 +5315,7 @@
 												"path": "hotstrings.modules.rolls.comment_open",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "\\\" ➜ /*"
@@ -5326,7 +5326,7 @@
 												"path": "hotstrings.modules.rolls.comment_close",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "\"\\ ➜ */"
@@ -5337,7 +5337,7 @@
 												"path": "hotstrings.modules.rolls.assign",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#! ➜ :="
@@ -5348,7 +5348,7 @@
 												"path": "hotstrings.modules.rolls.not_equal",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "!# ➜ !="
@@ -5359,7 +5359,7 @@
 												"path": "hotstrings.modules.rolls.paren_quote",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "(# ➜ (\""
@@ -5370,7 +5370,7 @@
 												"path": "hotstrings.modules.rolls.bracket_quote",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "[# ➜ [\""
@@ -5381,7 +5381,7 @@
 												"path": "hotstrings.modules.rolls.hashtag_parenthesis",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#( ➜ \")"
@@ -5392,7 +5392,7 @@
 												"path": "hotstrings.modules.rolls.hashtag_open_bracket",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#[ ➜ \"]"
@@ -5403,7 +5403,7 @@
 												"path": "hotstrings.modules.rolls.hashtag_close_bracket",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#] ➜ \"]"
@@ -5414,7 +5414,7 @@
 												"path": "hotstrings.modules.rolls.equal_string",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "[) ➜ = \"\""
@@ -5425,7 +5425,7 @@
 												"path": "hotstrings.modules.rolls.left_arrow",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "=+ = ➜"
@@ -5436,7 +5436,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_equal_right",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "$= ➜ =>"
@@ -5447,7 +5447,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_equal_left",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "=$ ➜ <="
@@ -5458,7 +5458,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_minus_right",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "+? ➜ ->"
@@ -5469,7 +5469,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_minus_left",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "?+ ➜ <-"
@@ -5502,7 +5502,7 @@
 												"path": "hotstrings.modules.french_autocorrection.accents",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#accents"
@@ -5513,7 +5513,7 @@
 												"path": "hotstrings.modules.french_autocorrection.names",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#names"
@@ -5524,7 +5524,7 @@
 												"path": "hotstrings.modules.french_autocorrection.typographic_apostrophe",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#typographic_apostrophe"
@@ -5535,7 +5535,7 @@
 												"path": "hotstrings.modules.french_autocorrection.errors",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#errors"
@@ -5546,7 +5546,7 @@
 												"path": "hotstrings.modules.french_autocorrection.ou",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#ou"
@@ -5557,7 +5557,7 @@
 												"path": "hotstrings.modules.french_autocorrection.multiple_punctuation_marks",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#multiple_punctuation_marks"
@@ -5568,7 +5568,7 @@
 												"path": "hotstrings.modules.french_autocorrection.suffixes_a_chaining",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#suffixes_a_chaining"
@@ -5579,7 +5579,7 @@
 												"path": "hotstrings.modules.french_autocorrection.minus",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#minus"
@@ -5590,7 +5590,7 @@
 												"path": "hotstrings.modules.french_autocorrection.minus_apostrophe",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#minus_apostrophe"
@@ -5613,7 +5613,7 @@
 												"path": "hotstrings.modules.french_magickey.text_expansion",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion"
@@ -5624,7 +5624,7 @@
 												"path": "hotstrings.modules.french_magickey.text_expansion_auto",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion_auto"
@@ -5635,7 +5635,7 @@
 												"path": "hotstrings.modules.french_magickey.text_expansion_emojis",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion_emojis"

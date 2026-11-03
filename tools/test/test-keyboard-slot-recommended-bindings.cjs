@@ -59,7 +59,7 @@ function validate(input) {
 			`recommendation: ${entry.id} needs an independent recommended action`
 		);
 		check(
-			entry.type === 'action' && entry.input_altering === true,
+			entry.type === 'action' && entry.family === 'feature',
 			`metadata: ${entry.id} must declare an input-altering action`
 		);
 		for (const platform of entry.platforms) {

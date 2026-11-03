@@ -128,7 +128,7 @@ check(
 	JSON.stringify(toggle.platforms) === JSON.stringify(PLATFORMS) &&
 		toggle.default === true &&
 		toggle.recommended === true &&
-		toggle.input_altering === false,
+		toggle.family === 'setting',
 	'chords_enabled must be a parameter on the three drivers that starts on'
 );
 

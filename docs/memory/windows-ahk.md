@@ -987,7 +987,7 @@ never let them read the real foreground window.
 
 ### project-ahk-altgr-family-setting-defaults-to-the-probe
 
-`script.alt_gr_is_kana_remap` is a parameter (`input_altering = false`,
+`script.alt_gr_is_kana_remap` is a setting (`family = "setting"`,
 default `"auto"`), not an activation. The neutral-configuration pass gave it
 the neutral `false`, which is a forced override: every configuration that did
 not name it took the standard family, the probe never decided, and on a

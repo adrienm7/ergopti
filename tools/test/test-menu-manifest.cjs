@@ -1550,7 +1550,7 @@ function checkNumericChoiceSchema() {
 		id: 'pred_indent',
 		default: 0,
 		recommended: 0,
-		input_altering: false,
+		family: 'setting',
 		requires: {
 			macos: ['mlx', 'ollama'],
 			linux: ['evdev', 'ollama', 'uinput', 'xdotool'],
