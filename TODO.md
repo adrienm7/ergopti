@@ -32,6 +32,9 @@ the local branches `worktree-agent-*`: land them, then remove the worktrees so o
       by the first key; today it seems to end only on its timeout (configurable in the menu, can be infinite). Check
       the F20 one-shot sentinel path (modules/keymap/one_shot_shift.lua, adapters/one_shot_shift.lua) against Windows
       and Linux, with a regression test typing three keys inside the timeout.
+- [ ] **Metrics and gestures section titles.** The metrics section « Mots par minute » becomes « Vitesse de frappe »;
+      the gestures menu gets one section title per finger count (« Gestes à 2 doigts », « à 3 doigts », …), all
+      drivers, 21 locales.
 - [ ] **Hotstring tooltip under the AI tooltip.** A typed hotstring trigger shows its tooltip while it can still expand,
       but with the AI on the prediction tooltip covers it. Never cover it: start the prediction once the hotstring
       tooltip expires, or show both. New option, all drivers: "AI prediction while a hotstring tooltip shows" = after
