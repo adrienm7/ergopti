@@ -130,7 +130,9 @@ function M.assert_category(helpers, i18n, manifest_rows, parent, off)
 	for _, row in ipairs(manifest_rows) do
 		if row.submenu_off_reason_key ~= nil or row.readable_when_off == true then shown = shown + 1 end
 	end
-	local head = i18n.get("menu.category_off_reason"):match("^[^:：]*")
+	local reason = i18n.get("menu.category_off_reason")
+	local cut = reason:find(":", 1, true) or reason:find("\239\188\154", 1, true)
+	local head = (cut and reason:sub(1, cut - 1) or reason):match("^%s*(.-)%s*$")
 	local live, others = 0, 0
 	for _, row in ipairs(parent.menu) do
 		if row.title ~= "-" then
