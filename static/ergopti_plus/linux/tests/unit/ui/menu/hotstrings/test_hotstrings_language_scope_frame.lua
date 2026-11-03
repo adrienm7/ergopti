@@ -36,6 +36,8 @@ local function fixture(body)
 	}
 	local writes, selected, desired, acknowledgement = 0, nil, nil, true
 	local config = {
+		-- Every category is on, so is the Hotstrings switch (category-off rule).
+		any_enabled = function() return true end,
 		get_groups = function() return { "french_autocorrection", "french_magickey" } end,
 		get_categories = function() return categories end,
 		get_category = function(id) return categories[id] end,

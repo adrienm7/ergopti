@@ -35,6 +35,8 @@ helpers.describe("menu_builder: group toggles call hotstrings_config with the gr
 		local enabled_args = {}
 		local toggle_args, scope_args = {}, {}
 		local mock_config = {
+			-- Every group is on, so is the Hotstrings switch (category-off rule).
+			any_enabled = function() return true end,
 			get_groups = function() return { "code", "email" } end,
 			is_group_enabled = function(gn) enabled_args[#enabled_args + 1] = gn; return true end,
 			toggle_group = function(gn) toggle_args[#toggle_args + 1] = gn end,

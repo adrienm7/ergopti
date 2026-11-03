@@ -565,15 +565,17 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 					if found then return found end
 				end
 			end
+			-- The menu reads the Shortcuts category on: an off category greys every
+			-- row of its submenu (category-off rule), so the slot names no reason.
 			local function build()
-				return builder.build({ shortcuts = setmetatable({ is_enabled = function() return false end },
+				return builder.build({ shortcuts = setmetatable({ is_enabled = function() return true end },
 					{ __index = require("modules.shortcuts.manager") }), on_quit = function() end,
 					on_menu_changed = function() changed = changed + 1 end })
 			end
 			local group = contextual(build())
 			helpers.assert_type(group, "table", "the stable logical slot must be visible through the ordinary menu provider")
 			helpers.assert_eq(#group.menu, 1)
-			helpers.assert_eq(group.menu[1].title, "Super + ★ (" .. i18n.get("menu.shortcuts.keyboard.magic_editor_reason.shortcuts_disabled") .. ") → " .. require("modules.gestures.manager").get_action_label("open_hotstrings_editor"))
+			helpers.assert_eq(group.menu[1].title, "Super + ★ → " .. require("modules.gestures.manager").get_action_label("open_hotstrings_editor"))
 			helpers.assert_type(group.menu[1].menu[1].fn, "function", "the ordinary action picker offers reassignment")
 			helpers.assert_eq(group.menu[1].menu[2].title, i18n.get("dialog.action_picker.disabled"))
 			group.menu[1].menu[2].fn()

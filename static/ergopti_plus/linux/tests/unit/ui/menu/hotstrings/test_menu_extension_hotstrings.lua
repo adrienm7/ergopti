@@ -39,6 +39,8 @@ local function fake_config(with_ergopti)
 			if with_ergopti then out[#out + 1] = "rolls"; out[#out + 1] = "sfbsreduction" end
 			return out
 		end,
+		-- Every category is on, so is the Hotstrings switch (category-off rule).
+		any_enabled = function() return true end,
 		is_group_enabled = function() return true end,
 		toggle_group = function() end,
 		enable_all = function() end,

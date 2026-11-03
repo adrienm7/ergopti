@@ -379,7 +379,9 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		-- The base expansion delay (0.4 s) is the canonical config.toml leaf; the category
 		-- delay (0.3 s) is stored as its offset, -0.1 s.
 		local original = '# hand-written delay preferences\n[magickey]\ndelay_offset = -0.1\n' .. foreign
-		local config_original = '[future]\nuser = "kept"\n[hotstrings]\nexpansion_delay = 0.4\n'
+		-- The magic key category reads on, so does the Hotstrings switch: an off
+		-- category greys every row of its submenu (category-off rule).
+		local config_original = '[future]\nuser = "kept"\n[hotstrings]\nexpansion_delay = 0.4\ngroups = { magickey = true }\n'
 		write(path, original);write(config_path, config_original)
 		local loaded = {};for name, value in pairs(package.loaded) do loaded[name] = value end
 		local preferences = require("infra.hotstring_preferences")

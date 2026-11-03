@@ -246,6 +246,8 @@ local function make_remap(observations, mode)
 			from = { simultaneous = { { key_code = "left_shift" }, { key_code = "right_shift" } } } } },
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return true end,
+		-- Tap-holds on: an off category greys every row of its submenu.
+		get_tap_holds_enabled = function() return true end,
 		set_enabled = function() return true end,
 		get_combo_symmetric = function() return false end,
 		set_combo_symmetric = function() return true end,

@@ -100,7 +100,9 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 			os.remove(prefs_file)
 			local refuse, saves = false, 0
 			local ctx = { hotfiles = { "magickey", "french_distancesreduction" }, extension_packs = found, keymap = Keymap,
-				state = { hotstrings = { magickey = true, french_distancesreduction = true }, keymap = false,
+				-- The Hotstrings master on: an off category greys every row of its
+				-- submenu (category-off rule), the extension's included.
+				state = { hotstrings = { magickey = true, french_distancesreduction = true }, keymap = true,
 					sections_order_overrides = {}, delays = {} }, paused = false,
 				config = { log_level = 2 }, base_dir = helpers.driver_root(),
 				get_group_name = function(name) return name end,

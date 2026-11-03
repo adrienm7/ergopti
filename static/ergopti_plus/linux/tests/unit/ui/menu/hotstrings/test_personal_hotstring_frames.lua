@@ -58,7 +58,9 @@ local function with_personal_frame(scenario, options)
 			sections = { alpha = { count = 2 }, module = { count = 0 }, beta = { count = 3 } } }
 		local changes, openings = 0, 0
 		local context = {
-			config = { get_groups = function() return {} end, is_group_enabled = function() return true end,
+			-- Hotstrings on: an off category greys its submenu (category-off rule).
+			config = { any_enabled = function() return true end,
+				get_groups = function() return {} end, is_group_enabled = function() return true end,
 				is_section_enabled = function() return true end,
 				get_category = function(id) return id == "personal" and category or nil end },
 			paused = options.paused == true,

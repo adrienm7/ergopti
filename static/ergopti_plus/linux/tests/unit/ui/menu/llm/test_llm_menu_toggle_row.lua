@@ -159,6 +159,13 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 end)
 
 helpers.describe("tray (linux): keyboard slot groups need a key catalogue", function()
+	--- The real Shortcuts owner, read on by the menu: an off category greys every
+	--- row of its submenu (category-off rule), slot groups included.
+	local function shortcuts_on()
+		return setmetatable({ is_enabled = function() return true end },
+			{ __index = require("modules.shortcuts.manager") })
+	end
+
 	--- Menu inventory stays editable when its native source is unavailable.
 	--- This fixture owns that dependency rather than inheriting another test's
 	--- initialized physical-source owner or its expired private config path.
@@ -185,7 +192,7 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 			local mb = helpers.load_module("ui.menu.builder")
 			local rows = submenu_of(mb.build({
 				_version = "0.0.0-dev.12",
-				shortcuts = require("modules.shortcuts.manager"),
+				shortcuts = shortcuts_on(),
 				on_quit = function() end,
 			}), "menu.shortcuts.title")
 			local i18n = require("infra.i18n")
@@ -217,7 +224,7 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 				local mb = helpers.load_module("ui.menu.builder")
 				local items = mb.build({
 					_version = "0.0.0-dev.12",
-					shortcuts = require("modules.shortcuts.manager"),
+					shortcuts = shortcuts_on(),
 					on_quit = function() end,
 				})
 				local rows = submenu_of(items, "menu.shortcuts.title")
