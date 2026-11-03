@@ -661,6 +661,8 @@
 	"gesture.slots.swipe_4_up": "4-finger-stryg ↑",
 	"gesture.slots.swipe_5_diag": "5-finger-stryg ↗↙",
 	"gesture.slots.swipe_5_down": "5-finger-stryg ↓",
+	"gesture.slots.swipe_3_horiz": "3-finger-stryg ↔",
+	"gesture.slots.swipe_4_horiz": "4-finger-stryg ↔",
 	"gesture.slots.swipe_5_horiz": "5-finger-stryg ↔",
 	"gesture.slots.swipe_5_left": "5-finger-stryg ←",
 	"gesture.slots.swipe_5_left_down": "5-finger-stryg ↙",

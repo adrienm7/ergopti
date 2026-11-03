@@ -661,6 +661,8 @@
 	"gesture.slots.swipe_4_up": "Přejetí 4 prsty ↑",
 	"gesture.slots.swipe_5_diag": "Přejetí 5 prsty ↗↙",
 	"gesture.slots.swipe_5_down": "Přejetí 5 prsty ↓",
+	"gesture.slots.swipe_3_horiz": "Přejetí 3 prsty ↔",
+	"gesture.slots.swipe_4_horiz": "Přejetí 4 prsty ↔",
 	"gesture.slots.swipe_5_horiz": "Přejetí 5 prsty ↔",
 	"gesture.slots.swipe_5_left": "Přejetí 5 prsty ←",
 	"gesture.slots.swipe_5_left_down": "Přejetí 5 prsty ↙",

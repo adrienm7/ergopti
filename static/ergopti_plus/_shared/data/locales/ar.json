@@ -661,6 +661,8 @@
 	"gesture.slots.swipe_4_up": "تمرير بأربعة أصابع ↑",
 	"gesture.slots.swipe_5_diag": "تمرير بأربعة أصابع ↗↙",
 	"gesture.slots.swipe_5_down": "تمرير بأربعة أصابع ↓",
+	"gesture.slots.swipe_3_horiz": "تمرير بأربعة أصابع ↔",
+	"gesture.slots.swipe_4_horiz": "تمرير بأربعة أصابع ↔",
 	"gesture.slots.swipe_5_horiz": "تمرير بأربعة أصابع ↔",
 	"gesture.slots.swipe_5_left": "تمرير بأربعة أصابع ←",
 	"gesture.slots.swipe_5_left_down": "تمرير بأربعة أصابع ↙",

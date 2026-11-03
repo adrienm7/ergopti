@@ -661,6 +661,8 @@
 	"gesture.slots.swipe_4_up": "החלקה ב-4 אצבעות ↑",
 	"gesture.slots.swipe_5_diag": "החלקה ב-5 אצבעות ↗↙",
 	"gesture.slots.swipe_5_down": "החלקה ב-5 אצבעות ↓",
+	"gesture.slots.swipe_3_horiz": "החלקה ב-3 אצבעות ↔",
+	"gesture.slots.swipe_4_horiz": "החלקה ב-4 אצבעות ↔",
 	"gesture.slots.swipe_5_horiz": "החלקה ב-5 אצבעות ↔",
 	"gesture.slots.swipe_5_left": "החלקה ב-5 אצבעות ←",
 	"gesture.slots.swipe_5_left_down": "החלקה ב-5 אצבעות ↙",

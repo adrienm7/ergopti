@@ -656,6 +656,8 @@
 	"gesture.slots.swipe_4_up": "Swipe 4 doigts ↑",
 	"gesture.slots.swipe_5_diag": "Swipe 5 doigts ↗↙",
 	"gesture.slots.swipe_5_down": "Swipe 5 doigts ↓",
+	"gesture.slots.swipe_3_horiz": "Swipe horizontal 3 doigts",
+	"gesture.slots.swipe_4_horiz": "Swipe horizontal 4 doigts",
 	"gesture.slots.swipe_5_horiz": "Swipe 5 doigts ↔",
 	"gesture.slots.swipe_5_left": "Swipe 5 doigts ←",
 	"gesture.slots.swipe_5_left_down": "Swipe 5 doigts ↙",
