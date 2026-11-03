@@ -2726,12 +2726,19 @@ reason_key = "platform_reason.touchpad_stack_is_per_driver"
 [[menu.gestures_menu]]
 type = "---"
 
-[[menu.gestures_menu]]
-type = "section_header"
-i18n = "menu.gestures.header_ergopti"
-
+# Ergopti's gesture slots, one section per finger count (maintainer request of
+# 2026-11-03; it replaced the single « Gestes d'Ergopti » header, since two
+# headers in a row are refused). macOS declares each group here; Windows and
+# Linux draw one list and frame its groups with the status rows of that list
+# (fingers_N, then finger_group_boundary between two groups), the same headers.
+#
 # The circular Spaces checkbox that stood here is retired: the wrap is its own
 # pair of actions (space_prev_wrap / space_next_wrap), bindable like any other.
+[[menu.gestures_menu]]
+type = "section_header"
+i18n = "menu.gestures.header_fingers_2"
+platforms = ["hs"]
+unavailable = "hide"
 [[menu.gestures_menu]]
 type = "list"
 id = "gesture_slots_2"
@@ -2743,6 +2750,11 @@ platforms = ["hs"]
 unavailable = "hide"
 
 [[menu.gestures_menu]]
+type = "section_header"
+i18n = "menu.gestures.header_fingers_3"
+platforms = ["hs"]
+unavailable = "hide"
+[[menu.gestures_menu]]
 type = "list"
 id = "gesture_slots_3"
 platforms = ["hs"]
@@ -2753,6 +2765,11 @@ platforms = ["hs"]
 unavailable = "hide"
 
 [[menu.gestures_menu]]
+type = "section_header"
+i18n = "menu.gestures.header_fingers_4"
+platforms = ["hs"]
+unavailable = "hide"
+[[menu.gestures_menu]]
 type = "list"
 id = "gesture_slots_4"
 platforms = ["hs"]
@@ -2762,6 +2779,11 @@ type = "---"
 platforms = ["hs"]
 unavailable = "hide"
 
+[[menu.gestures_menu]]
+type = "section_header"
+i18n = "menu.gestures.header_fingers_5"
+platforms = ["hs"]
+unavailable = "hide"
 [[menu.gestures_menu]]
 type = "list"
 id = "gesture_slots_5"
@@ -2775,11 +2797,12 @@ type = "list"
 id = "gesture_slots_ahk"
 platforms = ["ahk"]
 reason_key = "platform_reason.touchpad_stack_is_per_driver"
-status_rows.tap_group_boundary = [{ type = "---" }]
+status_rows.finger_group_boundary = [{ type = "---" }]
+status_rows.fingers_3 = [{ type = "section_header", i18n = "menu.gestures.header_fingers_3" }]
+status_rows.fingers_4 = [{ type = "section_header", i18n = "menu.gestures.header_fingers_4" }]
 
-# One flat list rather than the per-finger-count groups macOS uses. The slots come
-# from gestures.DEFAULT_GESTURES, which is keyed by slot name and not by finger
-# count, so grouping would mean parsing the names back apart to regroup them.
+# One list whose provider groups the slots by the finger count in their names
+# and frames each group with these status rows, as Windows does.
 # A `list`, not a `dynamic`, since 2026-08-05: a dynamic handler appends its rows
 # inside the driver, so the manifest would name the slot while ui/menu/builder.lua
 # still built all thirty-odd rows and their nested action pickers. A list provider
@@ -2789,6 +2812,11 @@ type = "list"
 id = "gesture_slots_linux"
 platforms = ["linux"]
 reason_key = "platform_reason.touchpad_stack_is_per_driver"
+status_rows.finger_group_boundary = [{ type = "---" }]
+status_rows.fingers_2 = [{ type = "section_header", i18n = "menu.gestures.header_fingers_2" }]
+status_rows.fingers_3 = [{ type = "section_header", i18n = "menu.gestures.header_fingers_3" }]
+status_rows.fingers_4 = [{ type = "section_header", i18n = "menu.gestures.header_fingers_4" }]
+status_rows.fingers_5 = [{ type = "section_header", i18n = "menu.gestures.header_fingers_5" }]
 [[menu.gestures_menu]]
 type = "---"
 platforms = ["linux"]
