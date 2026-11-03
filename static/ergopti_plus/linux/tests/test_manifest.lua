@@ -185,6 +185,7 @@ return {
 	"tests.unit.infra.lifecycle.test_callback_error_description",
 	"tests.unit.modules.keymap.test_combination_labels",
 	"tests.unit.modules.keymap.test_key_names",
+	"tests.unit.ui.menu.test_menu_gestures_slot_names",
 	"tests.unit.adapters.atspi.test_atspi_focus",
 	"tests.unit.adapters.atspi.test_atspi_focus_chains",
 	"tests.unit.adapters.synthetic_input.test_clipboard_failure_atomic",
