@@ -226,6 +226,7 @@ helpers.describe("Complete LLM outer boundary context", function()
 						profile = head("menu.profiles.profile_label_prefix"),
 						test = head("menu.llm.test_prediction"),
 						trigger = head("menu.llm.trigger_menu_title"),
+						settings = i18n.section("menu.llm.header_settings"),
 					}, state .. "/" .. model_state)
 				end)
 			end)
