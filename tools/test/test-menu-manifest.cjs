@@ -730,13 +730,15 @@ function checkChoiceProjection() {
 			);
 			assert.deepEqual(fs.readFileSync(output), publishedIndentation);
 		}
-		result = execute(original.replace(numericChoices, 'choice_values = [-1, 0, 1]'));
+		// The narrowed range must still hold the shipped default and recommended
+		// value (-3), or the compiler rightly refuses it.
+		result = execute(original.replace(numericChoices, 'choice_values = [-3, -2, -1, 0, 1]'));
 		assert.equal(result.status, 0, result.stderr);
 		assert.deepEqual(
 			JSON.parse(fs.readFileSync(output))
 				.llm_display_menu.find((row) => row.id === 'llm_indentation')
 				.choices.map((row) => row.value),
-			[-1, 0, 1],
+			[-3, -2, -1, 0, 1],
 			'the actual feature catalogue, not a native copied range, drives codegen'
 		);
 		result = execute(original);
@@ -1496,8 +1498,9 @@ function checkIndentationControl() {
 		[...feature.choice_values],
 		corpus.choices.map((choice) => choice.value)
 	);
-	assert.equal(feature.default, 0);
-	assert.equal(feature.recommended, 0);
+	// -3 since the maintainer's 2026-11-02 choice: every line at one column.
+	assert.equal(feature.default, -3);
+	assert.equal(feature.recommended, -3);
 	const declaration = JSON.parse(readSourceFile(MENU_PATH)).llm_display_menu;
 	const row = declaration.find((entry) => entry.id === corpus.row.id);
 	assert.equal(declaration.filter((entry) => entry.id === corpus.row.id).length, 1);
