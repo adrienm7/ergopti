@@ -37,6 +37,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const TOML = require('smol-toml');
 const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
+const KeyNames = require('../lib/key-names.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SP = path.join(ROOT, 'static/ergopti_plus');
@@ -642,7 +643,7 @@ function cataloguePaths(driver) {
 		items.map((item) =>
 			item.label.map((segment) => (segment.key ? locale('en')[segment.key] : segment.text)).join('')
 		),
-		['AltGr + LAlt', 'AltGr + CapsLock', 'LAlt + CapsLock'],
+		['AltGr + Left Alt', 'AltGr + Caps Lock', 'Left Alt + Caps Lock'],
 		'a pair is named by its two keys, the key held first then the key struck under it'
 	);
 	assert.deepEqual(described.sub_switch, {
@@ -1028,7 +1029,11 @@ function recommendedTapHoldKeys(driver) {
 			: Object.keys(TAP_HOLD_DEFAULTS.tap_hold.keys);
 	return TAP_HOLD_DEFAULTS.tap_hold.catalog.keys
 		.filter((entry) => entry[platform] !== undefined && preset.includes(entry[platform]))
-		.map((entry) => ({ id: entry[platform], hand: entry.hand, label_key: entry.label_key }));
+		.map((entry) => ({
+			id: entry[platform],
+			hand: entry.hand,
+			label_key: KeyNames.i18n(entry.id, driver)
+		}));
 }
 
 (function tapHoldPagesListEachEngineRecommendedKeys() {
@@ -1126,7 +1131,7 @@ function expectedTapHold(driver, key) {
 	else if (preset.hold_modifier) {
 		hold = preset.hold_modifier
 			.split('+')
-			.map((modifier) => en['tap_hold.hold.' + modifier])
+			.map((modifier) => en[KeyNames.i18n(modifier, driver)])
 			.join(' + ');
 	}
 	return { tap, hold };
@@ -1193,7 +1198,7 @@ function assertSeparated(row, where) {
 			answer(page, true);
 			return page;
 		})()
-	).find((row) => row.name === 'CapsLock');
+	).find((row) => row.name === 'Caps Lock');
 	assert.equal(winCaps.action, 'tap: ↵ Enter · hold: Ctrl');
 })();
 

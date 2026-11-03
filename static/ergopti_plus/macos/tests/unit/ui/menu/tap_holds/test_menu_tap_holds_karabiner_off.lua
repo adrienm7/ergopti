@@ -101,11 +101,11 @@ helpers.describe("the macOS Tap-Holds submenu when Ergopti does not use Karabine
 	helpers.it("draws a disabled hint right above the greyed key rows", function()
 		local rows = tap_hold_rows(false)
 		helpers.assert_eq(rows[1].title, "menu.tapholds.enable", "the switch stays the first row")
-		assert_hint_leads(rows, "tap_hold.group.tab")
+		assert_hint_leads(rows, "key_name.tab")
 	end)
 
 	helpers.it("draws the hint above the greyed chord rows, in their Shortcuts group", function()
-		assert_hint_leads(key_combination_rows(false), "tap_hold.group.left_shift + tap_hold.group.right_shift")
+		assert_hint_leads(key_combination_rows(false), "key_name.left_shift + key_name.right_shift")
 	end)
 
 	helpers.it("draws no hint while the integration is on", function()

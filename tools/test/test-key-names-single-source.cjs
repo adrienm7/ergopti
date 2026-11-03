@@ -79,7 +79,15 @@ for (const entry of catalog) {
 	resolve(entry.id, '[tap_hold.catalog] id');
 	for (const column of ['ahk', 'hs', 'linux'])
 		if (entry[column] !== undefined) resolve(entry[column], `[tap_hold.catalog] ${column}`);
+	if (Object.hasOwn(entry, 'label_key'))
+		errors.push(`[tap_hold.catalog] ${entry.id} carries a label_key: key_names.json names it`);
 }
+
+// The per-menu name families this table replaced may not come back.
+const RETIRED = /^(tap_hold\.group\.|tap_hold\.hold\.(ctrl|shift|alt|alt_gr|win)$)/;
+for (const { code, data } of catalogues)
+	for (const key of Object.keys(data))
+		if (RETIRED.test(key)) errors.push(`${code}: ${key} names a key outside key_names.json`);
 
 const picker = defaults.tap_hold.hold_picker;
 for (const modifier of picker.modifiers) resolve(modifier, '[tap_hold.hold_picker] modifier');

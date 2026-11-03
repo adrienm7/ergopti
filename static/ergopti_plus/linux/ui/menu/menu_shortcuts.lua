@@ -403,7 +403,7 @@ local function _build_shortcuts(ctx)
 	group_builders["key_combinations"] = function()
 		return require("ui.menu.key_combinations").build(ctx, {
 			manifest = ManifestMenu, get = i18n_safe, key_label = function(entry)
-				local label = i18n_safe(entry.label_key); return label == entry.label_key and entry.id or label
+				return require("keycodes.key_names").label(entry.key, "linux", i18n_safe)
 			end,
 			action_label = function(action, gestures) return gestures.get_action_label(action) end,
 			open_picker = open_action_picker, error = show_error,
