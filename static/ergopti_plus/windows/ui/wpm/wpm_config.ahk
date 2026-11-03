@@ -136,10 +136,15 @@ WPMWidget_LoadSharedConst() {
 }
 
 
-; Called once at startup to restore position and visibility from config.
+; Reads one [metrics] widget boolean. An absent key takes its manifest default,
+; never a local false: the manifest is the single owner of the shipped answer.
 _WPMWidget_ConfigBoolean(Raw, Key) {
-	if (Raw is String) && Raw == "_"
-		return false
+	if (Raw is String) && Raw == "_" {
+		Default := ManifestDefaultFor("metrics." . Key)
+		if !(Default is Integer) || (Default != 0 && Default != 1)
+			throw TypeError("WPM manifest default must be a boolean", -1, Key)
+		return Default == 1
+	}
 	if !(Raw is Integer) || (Raw != 0 && Raw != 1)
 		throw TypeError("WPM config value must be a TOML boolean", -1, Key)
 	return Raw == 1
@@ -172,6 +177,9 @@ _WPMWidget_CurrentWorkAreas() {
 ; injectable for tests and returns "_" for an absent key.
 _WPMWidget_StoreGet(Key) => ST_Get(Key, "_")
 
+; Called once at startup, whether Metrics is on or off: SaveFullConfig writes the
+; three widget booleans back, so they must hold the user's or the manifest's
+; answer rather than the class placeholders.
 WPMWidget_LoadConfig(Cache, WorkAreas := unset, StoreFn := 0) {
 		if !WPMWidget_LoadSharedConst() {
 				WPMWidget.visible := false

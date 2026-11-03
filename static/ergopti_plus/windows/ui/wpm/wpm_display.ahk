@@ -176,7 +176,8 @@ class WPMWidget {
     ; used as a color fallback so personal hotstrings match their group color.
     static _last_hs_section   := ""
 
-    ; Display options.
+    ; Display options. Placeholders only: WPMWidget_LoadConfig() replaces them at
+    ; boot with the configured value or the manifest default.
     static use_colors     := false
     static show_graph     := false
 
