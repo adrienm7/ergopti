@@ -217,6 +217,20 @@ class PersonalFileControls {
 	}
 }
 
+/**
+ * Whether a raw header names a table ReadMetadata reads: the same key-path test
+ * it applies, so the section-filtered parse keeps exactly the tables it used.
+ * @param {String} Header - Raw header text of the flat parse.
+ * @returns {Boolean} True for `_meta` and every table below it.
+ */
+_PersonalFileMetadataHeader(Header) {
+	try Parts := TOML_ParseKeyPath(Header, true)
+	catch
+		return false
+	; Case-insensitive, as ReadMetadata's own `!=` test.
+	return Parts.Length > 0 && Parts[1] = "_meta"
+}
+
 /** A captured owner is a generation-bound capability, not a transport descriptor. */
 class PersonalFileAdoptedOwner {
 	__New(Record, Stored) {
@@ -306,7 +320,9 @@ class PersonalFileAdoptedOwner {
 	/** Parse only source metadata, retaining quoted keys and metadata after arrays of tables. */
 	ReadMetadata(Content) {
 		Config := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
-		Parsed := _ParseTomlFileImpl(this.path, false, false, Content, true)
+		; Only the [_meta] tables are read: decoding every hotstring row of the file
+		; as well cost about 130 ms per 35 KB file at each boot.
+		Parsed := _ParseTomlFileImpl(this.path, false, false, Content, true, , _PersonalFileMetadataHeader)
 		for Header, Fields in Parsed {
 			try Parts := TOML_ParseKeyPath(Header, true)
 			catch

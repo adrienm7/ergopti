@@ -1034,6 +1034,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/infra/toml/test_toml_array_element_types.ahk
 #Include unit/infra/toml/test_toml_inline_tables.ahk
 #Include unit/infra/toml/test_toml_document_quoted_runs.ahk
+#Include unit/infra/toml/test_toml_section_filter.ahk
 #Include unit/infra/toml/test_toml_nested_arrays.ahk
 #Include unit/infra/toml/test_toml_float_roundtrip.ahk
 #Include unit/infra/toml/test_toml_incomplete_write.ahk
