@@ -1179,6 +1179,7 @@ RunTests(PlanModuleOf := 0) {
 		Status := "ok"
 		Detail := ""
 		StartedMs := _TestClockMs()
+		AuxMark := _TestLlmAuxMark()
 		try {
 			try TestEntry.callback.Call()
 			finally {
@@ -1191,6 +1192,9 @@ RunTests(PlanModuleOf := 0) {
 			}
 			if LeakedCritical
 				throw Error("Test LEAKED Critical: " . TestEntry.name)
+			LeakedWorkers := _TestLlmAuxLeaked(AuxMark)
+			if LeakedWorkers != ""
+				throw Error("Test LEFT an LLM worker in flight (" . LeakedWorkers . "): " . TestEntry.name)
 		} catch Any as e {
 			if e is TestNotExecutedSignal {
 				Status := "not executed"
@@ -1269,6 +1273,32 @@ _TestClockMs() {
 	if !DllCall("Kernel32\QueryPerformanceCounter", "Int64*", &Counter)
 		throw Error("Test performance counter is unavailable.")
 	return Counter * 1000.0 / Frequency
+}
+
+; A test that starts an LLM auxiliary request (an Ollama health or tags probe,
+; a pull, a server check) must retire it before it returns. A request left in
+; flight keeps its native process and poll timer alive, and its completion
+; runs inside whichever later test next yields: a rebuild launched from there
+; reached a proof that forbids every launch, in a whole-group CI run only.
+; @returns {Integer} The owner counter before the test, or -1 without the module.
+_TestLlmAuxMark() {
+	global _LLM_AuxOwnerCounter
+	return IsSet(_LLM_AuxOwnerCounter) ? _LLM_AuxOwnerCounter : -1
+}
+
+; @param {Integer} Mark The counter _TestLlmAuxMark returned before the test.
+; @returns {String} The kinds of the owners the test opened and left current,
+;   comma-separated; "" when it retired every one.
+_TestLlmAuxLeaked(Mark) {
+	global _LLM_AuxOwners
+	if Mark < 0 || !IsSet(_LLM_AuxOwners) || !(_LLM_AuxOwners is Map)
+		return ""
+	Kinds := ""
+	for Kind, Owner in _LLM_AuxOwners {
+		if Owner is Map && Owner.Get("token", 0) > Mark
+			Kinds .= (Kinds == "" ? "" : ", ") . Kind
+	}
+	return Kinds
 }
 
 ; CI and local tooling read %TEMP%\ergopti_test_results.txt (fixed name).
