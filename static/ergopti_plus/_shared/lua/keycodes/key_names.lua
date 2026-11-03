@@ -13,8 +13,8 @@
 ---    left_ctrl, matched without regard to case.
 --- 2. The platform picks the usual name: Alt reads Option on macOS, the system
 ---    key Super on Linux.
---- 3. Fail fast: an unknown id or an empty translation raises, so a row never
----    falls back to the id it was meant to hide.
+--- 3. Fail fast: an unknown id or an empty text raises, so a row never falls
+---    back to the id it was meant to hide.
 --- ==============================================================================
 
 local Data = require("keycodes.key_names_data")
@@ -52,10 +52,12 @@ end
 --- @return string
 function M.label(spelling, platform, translate)
 	if type(translate) ~= "function" then error("key names: a label needs a translate function", 2) end
+	-- A catalogue miss comes back as the dotted key, like every other label:
+	-- the locale gates and the rendered-row walks refuse it, never the id.
 	local key = M.i18n(spelling, platform)
 	local text = translate(key)
-	if type(text) ~= "string" or text == "" or text == key then
-		error("key names: " .. key .. " has no translation", 2)
+	if type(text) ~= "string" or text == "" then
+		error("key names: " .. key .. " has no text", 2)
 	end
 	return text
 end
