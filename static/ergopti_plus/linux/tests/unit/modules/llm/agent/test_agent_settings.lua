@@ -516,7 +516,8 @@ helpers.describe("AI agent shared system Off row (agent-system-off)", function()
 
 	helpers.it("preserves foreign physical source and refuses an actual scoped writer before Off ACK (agent-system-off)", function()
 		local sandbox = require("test.config_unused_keys_contract").sandbox
-		sandbox.with_config('[llm]\nagent_system1 = "cerebras"\n[future]\nkeep = "initial"\n', function(path)
+		-- The agent reads on: an off category greys every row of its submenu.
+		sandbox.with_config('[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras"\n[future]\nkeep = "initial"\n', function(path)
 			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.agent_settings", "ui.menu.agent_rows" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -535,7 +536,7 @@ helpers.describe("AI agent shared system Off row (agent-system-off)", function()
 				helpers.assert_eq(preferences.release(owner), true)
 				local writer = require("toml_codec.writer")
 				local original_batch = writer.batch_write
-				local foreign = '[llm]\nagent_system1 = "cerebras"\n[future]\nkeep = "external"\n'
+				local foreign = '[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras"\n[future]\nkeep = "external"\n'
 				local observed = {}
 				writer.batch_write = function(target, operations, drop, source)
 					observed.path_matches = target == path
@@ -694,9 +695,10 @@ end)
 helpers.describe("Agent model physical-source ownership (agent-system-model)", function()
 	helpers.it("preserves physical bytes on scope/CAS refusal and retries the real model writer (agent-system-model)", function()
 		local sandbox = require("test.config_unused_keys_contract").sandbox
-		local initial = '[llm]\nagent_system1 = "cerebras|hand/50%"\n[future]\nkeep = "initial"\n'
-		local foreign = '[llm]\nagent_system1 = "cerebras|hand/50%"\n[future]\nkeep = "external"\n'
-		local expected = '[llm]\nagent_system1 = "cerebras|changed-model"\n[future]\nkeep = "external"\n'
+		-- The agent reads on: an off category greys every row of its submenu.
+		local initial = '[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras|hand/50%"\n[future]\nkeep = "initial"\n'
+		local foreign = '[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras|hand/50%"\n[future]\nkeep = "external"\n'
+		local expected = '[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras|changed-model"\n[future]\nkeep = "external"\n'
 		sandbox.with_config(initial, function(path)
 			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.agent_settings", "ui.menu.agent_rows" }
 			local previous = {}

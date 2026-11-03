@@ -390,7 +390,10 @@ helpers.describe("hotstrings scope: refusals", function()
 	end)
 
 	-- Neither row asks: the maintainer retired the clear's question on
-	-- 2026-09-30, the scope owner's backups being the way back.
+	-- 2026-09-30, the scope owner's backups being the way back. One category
+	-- reads on, so does the Hotstrings switch: an off category greys every row
+	-- of its submenu (category-off rule).
+	local ROLLS_ON_CONFIG = CONFIG:gsub("rolls = false", "rolls = true")
 	for _, mode in ipairs({ "clear", "recommended" }) do
 		helpers.it("routes the rendered " .. mode .. " request to the public terminal", function()
 			with_scope(function(c)
@@ -431,7 +434,7 @@ helpers.describe("hotstrings scope: refusals", function()
 				end)
 				root.top_level, os.execute = top, execute
 				if not passed then error(err, 0) end
-			end)
+			end, ROLLS_ON_CONFIG)
 		end)
 	end
 

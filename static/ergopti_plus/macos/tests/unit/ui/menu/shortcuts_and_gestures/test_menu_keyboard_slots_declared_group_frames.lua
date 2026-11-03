@@ -60,7 +60,8 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 		local add_label = i18n.get("menu.shortcuts.alt_add")
 		local restore_label = i18n.get("common.restore_recommended")
 		local clear_label = i18n.get("common.clear_to_system")
-		local assigned_label = shortcuts.get_keyboard_slot_label(slot) .. " : Label:lookup"
+		-- No catalogue behind this fixture: common.label_value falls back to "{1}: {2}".
+		local assigned_label = shortcuts.get_keyboard_slot_label(slot) .. ": Label:lookup"
 		local cases = {
 			{ fixed = false, assigned = false, labels = { restore_label, clear_label, "-", add_label } },
 			{ fixed = true, assigned = false, labels = { restore_label, clear_label, "-", fixed.label, "-", add_label } },

@@ -35,6 +35,7 @@ local function fake_config(gates_on, sections_on)
 		language_packs = function()
 			return { { id = "en", locale = "en", categories = { "typos" } } }
 		end,
+		any_enabled = function() return gates_on end,
 		is_group_enabled = function() return gates_on end,
 		is_section_enabled = function() return gates_on and sections_on end,
 		is_section_checked = function() return sections_on end,
@@ -184,7 +185,9 @@ helpers.describe("hotstring bulk controls are one checkbox each (linux)", functi
 			for _, paused in ipairs({ true, false }) do
 				helpers.it("dynamic bulk menu: explicit " .. tostring(enabled) .. " from " .. tostring(posture)
 					.. " paused " .. tostring(paused), function()
-					local config = fake_config(false, true)
+					-- The other categories read on, so the Hotstrings switch does while
+					-- the dynamic category is off: an off switch greys the whole submenu.
+					local config = fake_config(true, true)
 					local dyn, log = fake_dyn(posture, not posture)
 					local menu = hotstrings_menu(config, dyn, paused)
 					local category = row_for(menu, "category.dynamic_hotstrings")

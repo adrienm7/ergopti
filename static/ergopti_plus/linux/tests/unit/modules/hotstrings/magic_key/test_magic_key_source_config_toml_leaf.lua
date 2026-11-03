@@ -399,7 +399,9 @@ end)
 
 helpers.describe("magic replacement: the Ergopti extension control", function()
 	local Choices = require("tests.support.hotstring_choices")
-	local SOURCE = '[hotstrings]\ngroups = { magickey = true }\n'
+	-- A second category (rolls) stays on, so closing the magic key alone leaves
+	-- the Hotstrings switch on: an off switch greys the whole submenu.
+	local SOURCE = '[hotstrings]\ngroups = { magickey = true, rolls = true }\n'
 		.. '[hotstrings.modules.magickey]\nreplace = false\n'
 		.. '[future]\nchoice = "preserve exact bytes" # untouched\n'
 
@@ -418,6 +420,7 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 					magickey = { id = "magickey", sections_order = { "replace" },
 						sections = { replace = { count = 1, description = "Native replacement",
 							extension = { id = "ergopti", name = "Ergopti+" } } }, count = 1 },
+					rolls = { id = "rolls", sections_order = { "hc" }, sections = { hc = { count = 0 } }, count = 0 },
 				}, mappings = { { trigger = "j", replacement = "★", group = "magickey", section = "replace" } } }
 			end,
 		}
