@@ -61,6 +61,34 @@ helpers.describe("the shared key names", function()
 		helpers.assert_eq((pcall(KeyNames.macos_symbol, "tab")), false, "a key that is no modifier")
 	end)
 
+	helpers.it("key names: a physical position by its name, never its W3C code", function()
+		local fr = translator("fr")
+		helpers.assert_eq(KeyNames.physical_label("KeyA", "macos", fr), "A")
+		helpers.assert_eq(KeyNames.physical_label("Digit7", "linux", fr), "7")
+		helpers.assert_eq(KeyNames.physical_label("F12", "linux", fr), "F12")
+		helpers.assert_eq(KeyNames.physical_label("Minus", "macos", fr), "-")
+		helpers.assert_eq(KeyNames.physical_label("PageUp", "linux", fr), "Page préc.")
+		helpers.assert_eq(KeyNames.physical_label("Escape", "macos", fr), "Échap")
+		helpers.assert_eq(KeyNames.physical_label("Numpad7", "linux", fr), "Pavé num. 7")
+		helpers.assert_eq(KeyNames.physical_label("NumpadEnter", "linux", fr), "Pavé num. Entrée")
+		-- Every key position a physical slot can hold reads as text in both locales.
+		local registry = require("json").decode(assert(io.open(SHARED_ROOT .. "/data/keycodes/physical_keys.json")):read("*a"))
+		local modifiers = { ShiftLeft = true, ShiftRight = true, ControlLeft = true, ControlRight = true,
+			AltLeft = true, AltRight = true, MetaLeft = true, MetaRight = true, CapsLock = true }
+		for _, locale in ipairs({ "fr", "en" }) do
+			local translate = translator(locale)
+			for code, record in pairs(registry.keys) do
+				if record.kind == "key" and not modifiers[code] then
+					local label = KeyNames.physical_label(code, "linux", translate)
+					-- English names some keys as W3C does (Space, Home, F5): that is the name.
+					helpers.assert_true(label ~= code or KeyNames.canonical(code) ~= nil or code:match("^F%d") ~= nil,
+						code .. " reads as its code in " .. locale)
+					helpers.assert_true(not label:find("key_name.", 1, true), code .. " has no " .. locale .. " text")
+				end
+			end
+		end
+	end)
+
 	helpers.it("key names: refuse an unknown key, platform or empty text", function()
 		local en = translator("en")
 		helpers.assert_eq((pcall(KeyNames.label, "not_a_key", "linux", en)), false, "an unknown key")

@@ -54,6 +54,7 @@ for (const entry of Object.values(TABLE.keys)) {
 	named.add(entry.i18n);
 	for (const key of Object.values(entry.platforms || {})) named.add(key);
 }
+named.add(TABLE.physical.numpad);
 for (const key of named)
 	for (const { code, data } of catalogues)
 		if (typeof data[key] !== 'string' || data[key].trim() === '')
@@ -108,6 +109,26 @@ const chords = JSON.parse(
 for (const [platform, data] of Object.entries(chords.platforms))
 	for (const modifier of data.modifiers) resolve(modifier.id, `modifier chord on ${platform}`);
 
+// Every position a physical shortcut slot can hold is named, never shown as
+// its W3C code (`KeyA`): the rule of key_names.lua physical_label.
+const physicalKeys = JSON.parse(
+	fs.readFileSync(shared('data', 'keycodes', 'physical_keys.json'), 'utf8')
+).keys;
+const MODIFIER_POSITIONS = /^(Shift|Control|Alt|Meta)(Left|Right)$|^CapsLock$/;
+const legends = TABLE.physical.legends;
+const physicalNamed = (code) => {
+	if (/^Key[A-Z]$|^Digit\d$|^F\d\d?$/.test(code) || Object.hasOwn(legends, code)) return true;
+	const pad = code.match(/^Numpad(.+)$/);
+	if (pad) return /^\d$/.test(pad[1]) || canonical(pad[1]) !== null;
+	return canonical(code) !== null;
+};
+for (const [code, record] of Object.entries(physicalKeys))
+	if (record.kind === 'key' && !MODIFIER_POSITIONS.test(code) && !physicalNamed(code))
+		errors.push(`physical key ${code} has no name in key_names.json`);
+for (const { code, data } of catalogues)
+	if (!String(data[TABLE.physical.numpad] || '').includes('{1}'))
+		errors.push(`${code}: ${TABLE.physical.numpad} must hold {1}`);
+
 // The usual name on each OS, as the maintainer asked (2026-11-03).
 const expect = (spelling, platform, key) => {
 	if (i18n(spelling, platform) !== key)
@@ -149,6 +170,9 @@ tooltipOrder.forEach((modifier, index) => {
 			`tooltip shortcut_labels_hs draws ${modifier} as ${tooltipSymbols[index]}, not ${symbol}`
 		);
 });
+for (const [code, legend] of Object.entries(legends))
+	if (!lua.includes(`\t\t\t${code} = ${JSON.stringify(legend)},`))
+		errors.push(`key_names_data.lua lacks the physical legend of ${code}`);
 for (const [alias, id] of Object.entries(TABLE.aliases)) {
 	if (!lua.includes(`\t\t["${alias}"] = "${id}",`))
 		errors.push(`key_names_data.lua lacks alias ${alias}`);

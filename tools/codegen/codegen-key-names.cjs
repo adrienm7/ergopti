@@ -43,6 +43,12 @@ for (const [alias, id] of Object.entries(data.aliases)) {
 	if (!data.keys[id]) throw new Error(`alias "${alias}" names no key ("${id}")`);
 	if (data.keys[alias]) throw new Error(`alias "${alias}" shadows a key id`);
 }
+const physical = data.physical;
+if (!physical || !/^key_name\.[a-z_]+$/.test(physical.numpad))
+	throw new Error('physical.numpad must name a key_name.* template');
+for (const [code, legend] of Object.entries(physical.legends || {}))
+	if (!/^[A-Z][A-Za-z]+$/.test(code) || typeof legend !== 'string' || legend === '')
+		throw new Error(`physical legend "${code}" must be a W3C code with a nonempty legend`);
 
 /** @param {string} value @returns {string} A double-quoted literal (JSON and Lua agree on ASCII). */
 const quote = (value) => JSON.stringify(value);
@@ -76,6 +82,12 @@ const lua = [
 	'\taliases = {',
 	// Bracketed: `return` is a spelling of Enter and a Lua keyword.
 	...Object.entries(data.aliases).map(([alias, id]) => `\t\t[${quote(alias)}] = ${quote(id)},`),
+	'\t},',
+	'\tphysical = {',
+	`\t\tnumpad = ${quote(physical.numpad)},`,
+	'\t\tlegends = {',
+	...Object.entries(physical.legends).map(([code, legend]) => `\t\t\t${code} = ${quote(legend)},`),
+	'\t\t},',
 	'\t},',
 	'}',
 	''

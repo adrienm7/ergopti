@@ -38,7 +38,10 @@ const PROSE_SPELLINGS = new Set([
 	'caps',
 	'escape',
 	'shift',
-	'meta'
+	'meta',
+	'insert',
+	'home',
+	'end'
 ]);
 
 /**

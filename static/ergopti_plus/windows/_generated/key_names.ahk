@@ -30,7 +30,21 @@ KeyNamesData() {
 			"right_command", "key_name.right_command",
 			"option", "key_name.option",
 			"left_option", "key_name.left_option",
-			"right_option", "key_name.right_option"
+			"right_option", "key_name.right_option",
+			"insert", "key_name.insert",
+			"home", "key_name.home",
+			"end_key", "key_name.end",
+			"page_up", "key_name.page_up",
+			"page_down", "key_name.page_down",
+			"arrow_up", "key_name.arrow_up",
+			"arrow_down", "key_name.arrow_down",
+			"arrow_left", "key_name.arrow_left",
+			"arrow_right", "key_name.arrow_right",
+			"context_menu", "key_name.context_menu",
+			"num_lock", "key_name.num_lock",
+			"volume_mute", "key_name.volume_mute",
+			"volume_down", "key_name.volume_down",
+			"volume_up", "key_name.volume_up"
 		),
 		"aliases", Map(
 			"esc", "escape",
@@ -54,7 +68,19 @@ KeyNamesData() {
 			"meta", "super",
 			"command", "cmd",
 			"left_cmd", "left_command",
-			"right_cmd", "right_command"
+			"right_cmd", "right_command",
+			"end", "end_key",
+			"pageup", "page_up",
+			"pagedown", "page_down",
+			"arrowup", "arrow_up",
+			"arrowdown", "arrow_down",
+			"arrowleft", "arrow_left",
+			"arrowright", "arrow_right",
+			"contextmenu", "context_menu",
+			"numlock", "num_lock",
+			"audiovolumemute", "volume_mute",
+			"audiovolumedown", "volume_down",
+			"audiovolumeup", "volume_up"
 		)
 	)
 	return Data
