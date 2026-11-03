@@ -1118,9 +1118,15 @@ function expectedTapHold(driver, key) {
 		const karabiner = JSON.parse(
 			fs.readFileSync(path.join(SP, 'macos/platform/remap/data/actions.json'), 'utf8')
 		);
-		const name = (action) =>
-			en['sg_actions.' + (aliases[action] || action)] ||
-			karabiner.find((entry) => entry.id === action).short_label;
+		// A modifier hold reads as its modifiers' key names (« Cmd + Shift »).
+		const name = (action) => {
+			const entry = karabiner.find((candidate) => candidate.id === action);
+			const registry = en['sg_actions.' + (aliases[action] || action)];
+			if (registry) return registry;
+			if (Array.isArray(entry.modifiers))
+				return entry.modifiers.map((modifier) => en[KeyNames.i18n(modifier, 'hs')]).join(' + ');
+			return entry.short_label;
+		};
 		const slots = TAP_HOLD_DEFAULTS.hs_tap_hold[key];
 		return { tap: name(slots.tap), hold: name(slots.hold) };
 	}
@@ -1217,7 +1223,8 @@ function assertSeparated(row, where) {
 		'Ctrl + A': en['sg_actions.select_line'],
 		'Ctrl + E': en['sg_actions.open_file_manager'],
 		'Ctrl + .': en['sg_actions.open_emoji_picker'],
-		'Ctrl + CapsLock': en['sg_actions.toggle_capslock'],
+		// The named keys read through the key name table, as the menus name them.
+		[`Ctrl + ${en['key_name.caps_lock']}`]: en['sg_actions.toggle_capslock'],
 		'Ctrl + Space': en['sg_actions.llm_generate_prediction']
 	};
 	// The layer's wheel is edited with the layer (Tap-Holds › Edit the layer),
@@ -1250,6 +1257,25 @@ function assertSeparated(row, where) {
 	const superSpace = checkRows(linux).find((candidate) => candidate.trigger === 'Super + Space');
 	assert.ok(superSpace, 'Linux names its Super + Space chord alone');
 	assert.equal(superSpace.action, en['sg_actions.llm_generate_prediction']);
+	// Lot CH: the chords spelled their modifiers as English text (« Ctrl + Shift
+	// + V » in every language); each modifier is now a key_name.* segment the
+	// page translates, so no literal segment of the catalogue names one.
+	const catalogue = fs.readFileSync(
+		path.join(
+			ROOT,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'ui',
+			'_generated',
+			'onboarding_catalogue.json'
+		),
+		'utf8'
+	);
+	const spelled = [...catalogue.matchAll(/"text":\s*"([^"]*)"/g)]
+		.map((match) => match[1])
+		.filter((text) => /\b(Ctrl|Shift|Alt|Cmd|Option|Win|Super|CapsLock)\b/.test(text));
+	assert.deepEqual(spelled, [], 'no checklist segment spells a modifier outside key_name.*');
 })();
 
 (function everyActionItemDrawsTheSeparatorElement() {

@@ -219,8 +219,6 @@
 	"common.disabled": "Uitgeschakeld",
 	"common.error_prefix": "Fout — ",
 	"common.error_title": "Fout",
-	"common.key_enter": "Enter",
-	"common.key_space": "Spatie",
 	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "Alle stappen zijn geslaagd.",
 	"field_check.verdict_fail": "Minstens één stap is mislukt.",

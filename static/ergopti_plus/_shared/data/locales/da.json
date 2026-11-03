@@ -219,8 +219,6 @@
 	"common.disabled": "Deaktiveret",
 	"common.error_prefix": "Fejl — ",
 	"common.error_title": "Fejl",
-	"common.key_enter": "Enter",
-	"common.key_space": "Mellemrum",
 	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "Alle trin bestod.",
 	"field_check.verdict_fail": "Mindst ét trin mislykkedes.",

@@ -457,34 +457,38 @@ function createLabels(locales) {
 // (macos/ui/menu/menu_shortcuts.lua pretty_key) and the Linux slot prefixes
 // (linux/modules/shortcuts/keyboard_shortcuts.lua SLOT_MODS). Longest prefix
 // first; only named keys translate.
+// Each prefix's modifiers, as ids of the shared key name table: the page names
+// them in the reader's language (« Ctrl + Maj + V »), as the menus do. They
+// were English text here (« Ctrl + Shift + »).
 const CHORD_PREFIXES = {
 	ahk: [
-		['primary_shift_', 'Ctrl + Shift + '],
-		['primary_', 'Ctrl + '],
-		['meta_', 'Win + '],
-		['alt_', 'Alt + ']
+		['primary_shift_', ['ctrl', 'shift']],
+		['primary_', ['ctrl']],
+		['meta_', ['win']],
+		['alt_', ['alt']]
 	],
 	hs: [
-		['secondary_shift_', 'Ctrl + Shift + '],
-		['secondary_', 'Ctrl + '],
-		['alt_', 'Option + '],
-		['primary_shift_', 'Cmd + Shift + '],
-		['primary_', 'Cmd + '],
+		['secondary_shift_', ['ctrl', 'shift']],
+		['secondary_', ['ctrl']],
+		['alt_', ['option']],
+		['primary_shift_', ['cmd', 'shift']],
+		['primary_', ['cmd']],
 		// The built-in switches that are not slots yet (ctrl_g, cmd_star).
-		['cmd_', 'Cmd + '],
-		['ctrl_', 'Ctrl + ']
+		['cmd_', ['cmd']],
+		['ctrl_', ['ctrl']]
 	],
 	linux: [
-		['primary_shift_', 'Ctrl + Shift + '],
-		['meta_shift_', 'Super + Shift + '],
-		['alt_shift_', 'Alt + Shift + '],
-		['primary_', 'Ctrl + '],
-		['meta_', 'Super + '],
-		['alt_', 'Alt + ']
+		['primary_shift_', ['ctrl', 'shift']],
+		['meta_shift_', ['super', 'shift']],
+		['alt_shift_', ['alt', 'shift']],
+		['primary_', ['ctrl']],
+		['meta_', ['super']],
+		['alt_', ['alt']]
 	]
 };
-const CHORD_KEY_NAMES = { space: 'common.key_space', enter: 'common.key_enter' };
-const CHORD_KEY_GLYPHS = { period: '.', comma: ',', quote: "'", sc029: '²', capslock: 'CapsLock' };
+// The signs a slot key spells by its legend; a named key (Space, Enter, Caps
+// Lock) reads through the key name table.
+const CHORD_KEY_GLYPHS = { period: '.', comma: ',', quote: "'", sc029: '²' };
 // The key the macOS Cmd + star shortcut names: the hotstring trigger character.
 const CHORD_TRIGGER_KEY = 'star';
 const TRIGGER_CHARACTER_PATH = KEY.HOTSTRINGS_TRIGGER_CHAR;
@@ -531,15 +535,25 @@ function combinationSegments(slot, platform, labels, context) {
  * @returns {object[]|null} Segments.
  */
 function chordSegments(slot, platform, labels, triggerCharacter) {
-	for (const [prefix, text] of CHORD_PREFIXES[platform]) {
+	for (const [prefix, modifiers] of CHORD_PREFIXES[platform]) {
 		if (!slot.startsWith(prefix)) continue;
 		const key = slot.slice(prefix.length);
 		if (key === '') return null;
-		if (Object.hasOwn(CHORD_KEY_NAMES, key)) {
-			return [{ text }, { key: labels.requireKey(CHORD_KEY_NAMES[key], slot) }];
+		const segments = [];
+		for (const modifier of modifiers) {
+			segments.push(
+				{ key: labels.requireKey(KeyNames.i18n(modifier, platform), slot) },
+				{ text: ' + ' }
+			);
 		}
-		if (key === CHORD_TRIGGER_KEY) return [{ text: text + triggerCharacter() }];
-		return [{ text: text + (CHORD_KEY_GLYPHS[key] || key.toUpperCase()) }];
+		if (KeyNames.canonical(key) !== null) {
+			segments.push({ key: labels.requireKey(KeyNames.i18n(key, platform), slot) });
+		} else if (key === CHORD_TRIGGER_KEY) {
+			segments.push({ text: triggerCharacter() });
+		} else {
+			segments.push({ text: CHORD_KEY_GLYPHS[key] || key.toUpperCase() });
+		}
+		return segments;
 	}
 	return null;
 }
@@ -1105,6 +1119,16 @@ function createKarabinerLabels(labels) {
 		const registryKey = `sg_actions.${aliases[action] || action}`;
 		if (labels.hasKey(registryKey)) return [{ key: labels.requireKey(registryKey, context) }];
 		const entry = actions.find((candidate) => candidate.id === action);
+		// A modifier hold names its modifiers from the key name table, as the
+		// tray's name_modifier_holds does (« Cmd + Maj »).
+		if (entry && Array.isArray(entry.modifiers)) {
+			const segments = [];
+			entry.modifiers.forEach((modifier, index) => {
+				if (index > 0) segments.push({ text: ' + ' });
+				segments.push({ key: labels.requireKey(KeyNames.i18n(modifier, 'hs'), context) });
+			});
+			return segments;
+		}
 		const text = entry && (entry.short_label || entry.label);
 		if (typeof text !== 'string' || text === '') {
 			throw new Error(`${context}: Karabiner action ${action} has no label`);
