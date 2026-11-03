@@ -152,6 +152,7 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 					profile = i18n.get("menu.profiles.profile_label_prefix"):match("^[^%%{]*"),
 					test = i18n.get("menu.llm.test_prediction"),
 					trigger = i18n.get("menu.llm.trigger_menu_title"),
+					settings = i18n.section("menu.llm.header_settings"),
 				}, state .. "/" .. model_state)
 			end)
 		end
