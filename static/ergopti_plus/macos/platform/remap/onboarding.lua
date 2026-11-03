@@ -79,7 +79,8 @@ local MANIFEST_PATH = _SELF_DIR .. "../../vendor/karabiner-elements/manifest.lua
 
 -- Where the downloaded DMG is cached. Standard macOS cache location for
 -- regenerable, app-specific data.
-local CACHE_DIR = (os.getenv("HOME") or "") .. "/Library/Caches/Ergopti/karabiner-elements/"
+local CACHE_DIR = (os.getenv("HOME") or "") .. "/" .. require("app_dirs").macos.cache_relative
+	.. "/karabiner-elements/"
 
 -- Filesystem signposts revealing the install state of KE.
 local KE_APP_PATH      = "/Applications/Karabiner-Elements.app"

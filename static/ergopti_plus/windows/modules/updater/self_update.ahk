@@ -1035,7 +1035,7 @@ _Updater_SwapFailureTerminalPath() {
 	LocalAppData := ResolveLocalAppDataDir()
 	if (LocalAppData == "")
 		return ""
-	return LocalAppData . "\Ergopti\updates\swap_update.ps1.log.terminal"
+	return AppFoldersRoot() . "updates\swap_update.ps1.log.terminal"
 }
 
 ; The inherited path is a capability, not an arbitrary file-read request. Only
@@ -2221,7 +2221,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install", "Icon!", 0, InstallObserver)
 		return false
 	}
-	StagingDir := LocalAppData . "\Ergopti\updates"
+	StagingDir := AppFoldersRoot() . "updates"
 	NewExe := StagingDir . "\ErgoptiPlus_new.exe"
 	SwapScriptPath := StagingDir . "\swap_update.ps1"
 	CurrentExe := A_ScriptFullPath

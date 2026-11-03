@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One resolver. Every path comes from the logger sink (LogsDirPath, or
----    ${XDG_STATE_HOME:-~/.local/state}/ergopti_plus/logs) at the moment of
+---    ${XDG_STATE_HOME:-~/.local/state}/ergopti/logs) at the moment of
 ---    the click, so a daemon up past midnight never opens yesterday's file.
 --- 2. A missing errors file is an answer, not a failure. It only exists once
 ---    something warned that day, and xdg-open on a missing path fails without

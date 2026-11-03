@@ -64,6 +64,15 @@ function requireSegments(table, key, where) {
 const parsed = toml.parse(fs.readFileSync(SOURCE, 'utf8'));
 const folderName = requireString(parsed.app, 'folder_name', 'app');
 if (/[\\/]/.test(folderName)) fail('app.folder_name must be one path component.');
+const linuxFolderName = requireString(parsed.app, 'linux_folder_name', 'app');
+if (/[\\/]/.test(linuxFolderName)) fail('app.linux_folder_name must be one path component.');
+if (linuxFolderName !== linuxFolderName.toLowerCase())
+	fail('app.linux_folder_name must be lower case, as XDG folder names are.');
+if (linuxFolderName !== folderName.toLowerCase())
+	fail('app.linux_folder_name must be app.folder_name in lower case: one name on every OS.');
+
+// The folder name "{app}" stands for in each OS's segments.
+const FOLDER_BY_OS = { macos: folderName, windows: folderName, linux: linuxFolderName };
 
 /** Returns the isolated Windows runtime directory component. */
 function requireWindowsRuntimeFolder(value, appFolder) {
@@ -108,13 +117,38 @@ const data = {
 };
 if (data.unifiedPrefix === data.errorsPrefix) fail('the unified and errors prefixes must differ.');
 
-/** Resolves an OS segment list into its relative path, checking the app folder. */
-function relative(osName, separator) {
-	const segments = requireSegments(data[osName], 'segments', `logs.${osName}`);
+/**
+ * Resolves one segment list of an OS into its relative path, naming the OS
+ * application folder exactly once.
+ */
+function resolveSegments(table, key, where, osName, separator) {
+	const segments = requireSegments(table, key, where);
 	if (segments.filter((s) => s === APP_PLACEHOLDER).length !== 1) {
-		fail(`logs.${osName}.segments must name "${APP_PLACEHOLDER}" exactly once.`);
+		fail(`${where}.${key} must name "${APP_PLACEHOLDER}" exactly once.`);
 	}
-	return segments.map((s) => (s === APP_PLACEHOLDER ? folderName : s)).join(separator);
+	return segments.map((s) => (s === APP_PLACEHOLDER ? FOLDER_BY_OS[osName] : s)).join(separator);
+}
+
+/** Resolves an OS logs segment list into its relative path. */
+function relative(osName, separator) {
+	return resolveSegments(data[osName], 'segments', `logs.${osName}`, osName, separator);
+}
+
+/** Returns a required table of the parsed TOML, by dotted name. */
+function requireTable(dotted) {
+	let table = parsed;
+	for (const part of dotted.split('.')) table = table ? table[part] : undefined;
+	if (!table || typeof table !== 'object') fail(`[${dotted}] is missing.`);
+	return table;
+}
+
+/** A purpose folder of macOS or Windows: its base variable and relative path. */
+function purposeFolder(dotted, osName, separator) {
+	const table = requireTable(dotted);
+	return {
+		base: requireString(table, 'base', dotted),
+		relative: resolveSegments(table, 'segments', dotted, osName, separator)
+	};
 }
 
 const macos = {
@@ -133,24 +167,132 @@ const linux = {
 	baseFallback: requireSegments(data.linux, 'base_fallback', 'logs.linux').join('/'),
 	relative: relative('linux', '/')
 };
-const configSection = parsed.config || fail('[config] is missing.');
-const configMacos = configSection.macos || fail('[config.macos] is missing.');
-const configSegments = requireSegments(configMacos, 'segments', 'config.macos');
-if (configSegments.filter((s) => s === APP_PLACEHOLDER).length !== 1) {
-	fail(`config.macos.segments must name "${APP_PLACEHOLDER}" exactly once.`);
-}
+const configSection = requireTable('config');
+const configMacos = purposeFolder('config.macos', 'macos', '/');
+const configWindows = purposeFolder('config.windows', 'windows', '\\');
 const config = {
 	overrideKey: requireString(configSection, 'override_key', 'config'),
 	hotstringsDir: requireString(configSection, 'hotstrings_dir', 'config'),
 	personalHotstringsFile: requireString(configSection, 'personal_hotstrings_file', 'config'),
-	macosBase: requireString(configMacos, 'base', 'config.macos'),
-	macosRelative: configSegments.map((s) => (s === APP_PLACEHOLDER ? folderName : s)).join('/'),
-	macosPathsFile: requireSegments(configMacos, 'paths_file', 'config.macos').join('/')
+	macosBase: configMacos.base,
+	macosRelative: configMacos.relative,
+	macosPathsFile: resolveSegments(
+		requireTable('config.macos'),
+		'paths_file',
+		'config.macos',
+		'macos',
+		'/'
+	),
+	windowsBase: configWindows.base,
+	windowsRelative: configWindows.relative,
+	windowsPathsFile: resolveSegments(
+		requireTable('config.windows'),
+		'paths_file',
+		'config.windows',
+		'windows',
+		'\\'
+	)
 };
 if (!macos.relative.endsWith(folderName)) {
 	fail(
 		'logs.macos.segments must end with the application folder: the launcher restricts only that folder.'
 	);
+}
+
+const support = {
+	macos: purposeFolder('support.macos', 'macos', '/'),
+	windows: purposeFolder('support.windows', 'windows', '\\')
+};
+const cache = {
+	macos: purposeFolder('cache.macos', 'macos', '/'),
+	windows: purposeFolder('cache.windows', 'windows', '\\')
+};
+// One root per OS: the configuration and the paths.toml of macOS and Windows
+// live inside the support root, never in a second folder.
+for (const [osName, root, configRelative, pathsFile] of [
+	['macos', support.macos.relative + '/', config.macosRelative, config.macosPathsFile],
+	['windows', support.windows.relative + '\\', config.windowsRelative, config.windowsPathsFile]
+]) {
+	if (!configRelative.startsWith(root) || !pathsFile.startsWith(root))
+		fail(`config.${osName} must live inside support.${osName}: one root folder per OS.`);
+}
+const xdgTable = requireTable('xdg.linux');
+const xdg = {
+	configBase: requireString(xdgTable, 'config_base', 'xdg.linux'),
+	configFallback: requireSegments(xdgTable, 'config_fallback', 'xdg.linux').join('/'),
+	dataBase: requireString(xdgTable, 'data_base', 'xdg.linux'),
+	dataFallback: requireSegments(xdgTable, 'data_fallback', 'xdg.linux').join('/'),
+	cacheBase: requireString(xdgTable, 'cache_base', 'xdg.linux'),
+	cacheFallback: requireSegments(xdgTable, 'cache_fallback', 'xdg.linux').join('/'),
+	runtimeBase: requireString(xdgTable, 'runtime_base', 'xdg.linux')
+};
+const ownedRuntimeFolder = requireString(
+	requireTable('owned_runtime.macos'),
+	'folder_name',
+	'owned_runtime.macos'
+);
+
+const migrationTable = requireTable('migration');
+const migrationMacos = requireTable('migration.macos');
+const migrationWindows = requireTable('migration.windows');
+const migrationLinux = requireTable('migration.linux');
+const migration = {
+	backupSuffix: requireString(migrationTable, 'backup_suffix', 'migration'),
+	macos: {
+		legacySupportRelative: support.macos.relative.replace(
+			new RegExp(`${folderName}$`),
+			requireString(migrationMacos, 'legacy_support_folder', 'migration.macos')
+		),
+		movedSupportEntries: requireSegments(
+			migrationMacos,
+			'moved_support_entries',
+			'migration.macos'
+		),
+		legacyConfigRelative: requireSegments(migrationMacos, 'legacy_config', 'migration.macos').join(
+			'/'
+		),
+		legacyLogsRelative: requireSegments(migrationMacos, 'legacy_logs', 'migration.macos').join('/')
+	},
+	windows: {
+		legacyPathsFileBase: requireString(
+			migrationWindows,
+			'legacy_paths_file_base',
+			'migration.windows'
+		),
+		legacyPathsFile: requireSegments(
+			migrationWindows,
+			'legacy_paths_file',
+			'migration.windows'
+		).join('\\'),
+		legacyConfigBase: requireString(migrationWindows, 'legacy_config_base', 'migration.windows'),
+		legacyConfig: requireSegments(migrationWindows, 'legacy_config', 'migration.windows').join(
+			'\\'
+		),
+		legacyLocalFolder: requireString(migrationWindows, 'legacy_local_folder', 'migration.windows'),
+		legacyOllamaFolder: requireString(migrationWindows, 'legacy_ollama_folder', 'migration.windows')
+	},
+	linux: {
+		legacyFolder: requireString(migrationLinux, 'legacy_folder', 'migration.linux')
+	}
+};
+if (!support.macos.relative.endsWith(folderName))
+	fail('support.macos.segments must end with the application folder.');
+// The Lua and Swift consumers join every macOS folder to the one home folder.
+for (const [name, base] of [
+	['support.macos', support.macos.base],
+	['cache.macos', cache.macos.base],
+	['config.macos', config.macosBase]
+]) {
+	if (base !== macos.base) fail(`${name}.base must be ${macos.base}, as logs.macos.base is.`);
+}
+for (const legacy of [
+	migration.macos.legacySupportRelative.split('/').pop(),
+	migration.windows.legacyLocalFolder,
+	migration.windows.legacyOllamaFolder,
+	migration.linux.legacyFolder
+]) {
+	if (legacy === folderName || legacy === linuxFolderName)
+		fail(`the legacy folder "${legacy}" must differ from the current folder name.`);
 }
 
 /** A Lua double-quoted string literal. */
@@ -179,14 +321,16 @@ function emitLua() {
 		'--- ==============================================================================\n' +
 		'--- DATA: Application Folders and Log File Names\n' +
 		'--- DESCRIPTION:\n' +
-		'--- The application folder name, the default logs folder of each Lua driver and\n' +
-		'--- the log file-name prefixes. Each driver has ONE logs-folder resolver built on\n' +
-		'--- this table (macOS infra/logger.lua, Linux infra/logger_sink.lua); nothing\n' +
-		'--- else spells a prefix or a folder formula.\n' +
+		'--- The application folder name of each Lua driver, its root and purpose\n' +
+		'--- folders, the log file-name prefixes and the old folder names the one-time\n' +
+		'--- boot migration moves away from. Each driver has ONE logs-folder resolver\n' +
+		'--- built on this table (macOS infra/logger.lua, Linux infra/logger_sink.lua);\n' +
+		'--- nothing else spells a prefix or a folder formula. The folder name lives\n' +
+		'--- under the OS table (`macos.folder_name`, `linux.folder_name`) because it\n' +
+		'--- differs in case between the two Lua drivers.\n' +
 		'--- ==============================================================================\n' +
 		'\n' +
 		'return {\n' +
-		`\tfolder_name = ${luaStr(data.folderName)},\n` +
 		`\toverride_key = ${luaStr(data.overrideKey)},\n` +
 		`\tlinux_storage_key = ${luaStr(data.linuxStorageKey)},\n` +
 		`\tcrash_reports_dir = ${luaStr(data.crashReportsDir)},\n` +
@@ -198,16 +342,27 @@ function emitLua() {
 		`\t\tbootstrap_log = ${luaStr(data.bootstrapLog)},\n` +
 		'\t},\n' +
 		'\tmacos = {\n' +
+		`\t\tfolder_name = ${luaStr(folderName)},\n` +
 		`\t\tbase_env = ${luaStr(macos.base)},\n` +
 		`\t\trelative = ${luaStr(macos.relative)},\n` +
+		`\t\tsupport_relative = ${luaStr(support.macos.relative)},\n` +
+		`\t\tcache_relative = ${luaStr(cache.macos.relative)},\n` +
 		`\t\tlauncher_log = ${luaStr(macos.launcherLog)},\n` +
 		`\t\tfatal_report = ${luaStr(macos.fatalReport)},\n` +
 		`\t\treload_breadcrumb = ${luaStr(macos.reloadBreadcrumb)},\n` +
 		'\t},\n' +
 		'\tlinux = {\n' +
+		`\t\tfolder_name = ${luaStr(linuxFolderName)},\n` +
 		`\t\tbase_env = ${luaStr(linux.base)},\n` +
 		`\t\tbase_fallback = ${luaStr(linux.baseFallback)},\n` +
 		`\t\trelative = ${luaStr(linux.relative)},\n` +
+		`\t\tconfig_env = ${luaStr(xdg.configBase)},\n` +
+		`\t\tconfig_fallback = ${luaStr(xdg.configFallback)},\n` +
+		`\t\tdata_env = ${luaStr(xdg.dataBase)},\n` +
+		`\t\tdata_fallback = ${luaStr(xdg.dataFallback)},\n` +
+		`\t\tcache_env = ${luaStr(xdg.cacheBase)},\n` +
+		`\t\tcache_fallback = ${luaStr(xdg.cacheFallback)},\n` +
+		`\t\truntime_env = ${luaStr(xdg.runtimeBase)},\n` +
 		'\t},\n' +
 		'\tconfig = {\n' +
 		`\t\toverride_key = ${luaStr(config.overrideKey)},\n` +
@@ -216,6 +371,21 @@ function emitLua() {
 		`\t\tmacos_base_env = ${luaStr(config.macosBase)},\n` +
 		`\t\tmacos_relative = ${luaStr(config.macosRelative)},\n` +
 		`\t\tmacos_paths_file = ${luaStr(config.macosPathsFile)},\n` +
+		'\t},\n' +
+		'\towned_runtime = {\n' +
+		`\t\tmacos_folder_name = ${luaStr(ownedRuntimeFolder)},\n` +
+		'\t},\n' +
+		'\tmigration = {\n' +
+		`\t\tbackup_suffix = ${luaStr(migration.backupSuffix)},\n` +
+		'\t\tmacos = {\n' +
+		`\t\t\tlegacy_support_relative = ${luaStr(migration.macos.legacySupportRelative)},\n` +
+		`\t\t\tmoved_support_entries = { ${migration.macos.movedSupportEntries.map(luaStr).join(', ')} },\n` +
+		`\t\t\tlegacy_config_relative = ${luaStr(migration.macos.legacyConfigRelative)},\n` +
+		`\t\t\tlegacy_logs_relative = ${luaStr(migration.macos.legacyLogsRelative)},\n` +
+		'\t\t},\n' +
+		'\t\tlinux = {\n' +
+		`\t\t\tlegacy_folder = ${luaStr(migration.linux.legacyFolder)},\n` +
+		'\t\t},\n' +
 		'\t},\n' +
 		'}\n'
 	);
@@ -242,7 +412,11 @@ function emitAhk() {
 		'; boot reads them before the logger include has run its own top level.\n' +
 		'; ==============================================================================\n' +
 		'\n' +
-		fn('AppDirsFolderName', data.folderName, 'Folder named after the application, on every OS.') +
+		fn(
+			'AppDirsFolderName',
+			data.folderName,
+			'Folder named after the application on Windows (and macOS).'
+		) +
 		'\n' +
 		fn(
 			'AppDirsWindowsManagedOllamaFolderName',
@@ -298,6 +472,90 @@ function emitAhk() {
 			'AppDirsWindowsLogsRelative',
 			windows.relative,
 			'Default logs folder, relative to that root.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsWindowsSupportBaseEnv',
+			support.windows.base,
+			'Environment variable holding the Ergopti root.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsWindowsSupportRelative',
+			support.windows.relative,
+			'The Ergopti root, relative to that variable.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsWindowsConfigBaseEnv',
+			config.windowsBase,
+			'Environment variable holding the default configuration folder.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsWindowsConfigRelative',
+			config.windowsRelative,
+			'Default configuration folder, relative to that variable.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsWindowsPathsFileRelative',
+			config.windowsPathsFile,
+			'The installed paths.toml, relative to the configuration variable.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsWindowsCacheBaseEnv',
+			cache.windows.base,
+			'Environment variable holding the cache folder.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsWindowsCacheRelative',
+			cache.windows.relative,
+			'Cache folder, relative to that variable.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsMigrationBackupSuffix',
+			migration.backupSuffix,
+			'Suffix of the copy the legacy folder migration keeps of a rewritten paths.toml.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsMigrationWindowsLegacyPathsFileBaseEnv',
+			migration.windows.legacyPathsFileBase,
+			'Environment variable holding the paths.toml of the builds before the single folder.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsMigrationWindowsLegacyPathsFileRelative',
+			migration.windows.legacyPathsFile,
+			'That legacy paths.toml, relative to its variable.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsMigrationWindowsLegacyConfigBaseEnv',
+			migration.windows.legacyConfigBase,
+			'Environment variable holding the legacy default configuration folder.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsMigrationWindowsLegacyConfigRelative',
+			migration.windows.legacyConfig,
+			'That legacy configuration folder, relative to its variable.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsMigrationWindowsLegacyLocalFolder',
+			migration.windows.legacyLocalFolder,
+			'Legacy LocalApplicationData folder whose entries move into the root.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsMigrationWindowsLegacyOllamaFolder',
+			migration.windows.legacyOllamaFolder,
+			'Legacy managed Ollama folder, renamed to the managed runtime folder.'
 		)
 	);
 }
@@ -323,7 +581,7 @@ function emitSwift() {
 		constant(
 			'kAppFolderName',
 			data.folderName,
-			'Folder named after the application, on every OS.'
+			'Folder named after the application on macOS (and Windows).'
 		) +
 		'\n' +
 		constant(
@@ -368,6 +626,24 @@ function emitSwift() {
 			'kMacOSPathsFileHomeRelativePath',
 			config.macosPathsFile,
 			'The paths.toml that may move the configuration folder, relative to the home folder.'
+		) +
+		'\n' +
+		constant(
+			'kMacOSSupportHomeRelativePath',
+			support.macos.relative,
+			'The Ergopti root (managed runtimes, locks, control), relative to the home folder.'
+		) +
+		'\n' +
+		constant(
+			'kMacOSCacheHomeRelativePath',
+			cache.macos.relative,
+			'The cache folder, relative to the home folder.'
+		) +
+		'\n' +
+		constant(
+			'kMacOSOwnedRuntimeFolderName',
+			ownedRuntimeFolder,
+			'Folder name the owned Karabiner runtime is compiled with, kept until its rebuild.'
 		)
 	);
 }
@@ -389,7 +665,7 @@ for (const [abs, content] of targets) {
 }
 
 console.log(
-	`[OK] application folders generated: folder "${folderName}", ` +
+	`[OK] application folders generated: folder "${folderName}" (Linux "${linuxFolderName}"), ` +
 		`macOS ~/${macos.relative}, Windows %${windows.base}%\\${windows.relative}, ` +
 		`Linux $${linux.base}/${linux.relative}.`
 );

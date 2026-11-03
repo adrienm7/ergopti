@@ -231,7 +231,7 @@ func writeLauncherLogData(
 }
 
 enum LauncherLog {
-	// Standard macOS per-app log location (~/Library/Logs/ergopti_plus, from the
+	// Standard macOS per-app log location (~/Library/Logs/Ergopti, from the
 	// shared application-folders registry), readable by the user without
 	// special permissions and the default folder of the Lua logs too. It is
 	// written before any configuration is read, so a LogsDirPath override never
@@ -262,7 +262,7 @@ enum LauncherLog {
 		return f
 	}()
 
-	/// Appends one timestamped line to ~/Library/Logs/ergopti_plus/launcher.log.
+	/// Appends one timestamped line to ~/Library/Logs/Ergopti/launcher.log.
 	/// Best-effort: a logging failure must never prevent the launcher from
 	/// proceeding, so every step here is wrapped defensively.
 	static func write(_ message: String) {

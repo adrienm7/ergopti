@@ -270,10 +270,10 @@ M.BOOT_CHECK_DELAY_SEC = BOOT_CHECK_DELAY_SEC
 M.LINUX_ASSET_NAME     = LINUX_ASSET_NAME
 M.LINUX_CHECKSUM_ASSET_NAME = LINUX_CHECKSUM_ASSET_NAME
 
--- Path for the ETag cache (one per channel).
+-- Path for the ETag cache (one per channel), in the driver's cache folder
+-- that the legacy folder migration creates at boot.
 local function etag_cache_path(channel)
-	local home = require("infra.config_paths").home()
-	return home .. "/.cache/ergopti_updater_etag_" .. channel .. ".txt"
+	return require("infra.config_paths").cache("updater_etag_" .. channel .. ".txt")
 end
 
 -- =========================================
