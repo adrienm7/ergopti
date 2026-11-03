@@ -667,6 +667,12 @@ local function mutate_ax_value_watcher(observer, method, element, label)
 	end, debug.traceback)
 	if ok and result ~= false then return true end
 	local message = not ok and ax_watcher_error(result) or nil
+	if message == AXResponsiveness.UNANSWERED_ERROR then
+		-- The post-wake focused-window read of the same application then waited
+		-- the timeout out again (1005 ms, field run 2026-11-03)
+		local ok_pid, pid = pcall(function() return element:pid() end)
+		if ok_pid then AXResponsiveness.mark_unanswered(pid) end
+	end
 	if method == "removeWatcher" and AX_RELEASED_ON_REMOVAL[message] then
 		Logger.debug(LOG, "%s: the element is released without a confirmed removal (%s).", label, message)
 		return true
