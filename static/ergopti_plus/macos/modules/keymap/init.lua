@@ -2636,6 +2636,8 @@ local function build_tap_copy()
 			Logger.error(log_name, "Copy failure notice was not delivered: %s.", tostring(sent_or_err))
 		end
 	end
+	local report = CopyCheck.reporter(log, warn_user)
+	local watch
 	local checker = CopyCheck.new({
 		verify_ms = require("infra.timings").ms("tap_hold", "copy_verify_ms"),
 		read_counter = function() return (Clipboard._change_count()) end,
@@ -2645,22 +2647,38 @@ local function build_tap_copy()
 			return committed == true and handle or nil
 		end,
 		cancel = TimerScheduler.cancel,
-		report = CopyCheck.reporter(log, warn_user),
+		-- Each outcome is counted for the field run (TapCopy statistics).
+		report = function(outcome, detail)
+			if watch then watch:note_outcome(outcome) end
+			report(outcome, detail)
+		end,
 	})
-	return TapCopy.new({
+	watch = TapCopy.new({
 		change_count = function() return (Clipboard._change_count()) end,
 		duration_ms = EventClock.duration_ms,
 		defer = SyntheticInput.defer_after_callback,
 		event_flags = function(event) return event:getFlags() end,
 		event_chars = function(event) return event:getCharacters(true) end,
+		-- The tap timeout Karabiner was given for the key: the lone tap window
+		-- when it applies (Generator.last_tap_timeouts), else its delay.
 		key_config = function(key_id)
 			local Remap = require("platform.remap")
 			if Remap.get_tap_holds_enabled() ~= true then return nil, nil end
-			return Remap.get_tap_action(key_id), Remap.get_tap_timeout(key_id) or Remap.get_tap_hold_timeout()
+			local deployed = require("platform.remap.generator").last_tap_timeouts() or {}
+			return Remap.get_tap_action(key_id),
+				deployed[key_id] or Remap.get_tap_timeout(key_id) or Remap.get_tap_hold_timeout()
 		end,
 		log = log,
 		checker = checker,
 	})
+	return watch
+end
+
+--- The tap-hold copy watch's statistics since the keymap started, for the field
+--- run (infra/field_check_tap_copy.lua).
+--- @return table|nil stats nil before the keymap started.
+function M.tap_copy_statistics()
+	return _tap_copy and _tap_copy:statistics() or nil
 end
 
 --- Starts the eventtap listeners and attaches them to the OS event queue.
