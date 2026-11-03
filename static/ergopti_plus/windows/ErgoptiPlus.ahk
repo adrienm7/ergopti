@@ -189,15 +189,13 @@ if (_DriverStartupSmokeDir != "" && !_DriverIsDetachedWorker) {
 	_DriverSmokeInputDecision := DriverSmokeInput_Decide(
 		EnvGet("ERGOPTI_STARTUP_SMOKE_LIVE_INPUT") == "1", EnvGet("CI") == "true",
 		DriverMutex_ResidentLives(DRIVER_MUTEX_NAME))
-	if (_DriverSmokeInputDecision == DRIVER_SMOKE_INPUT_REFUSE) {
-		try FileAppend("startup-smoke: live input refused, a resident driver owns this session.`n", "**")
-		DllCall("ExitProcess", "UInt", 1)
-	}
+	if (_DriverSmokeInputDecision == DRIVER_SMOKE_INPUT_REFUSE)
+		PLC_ExitProcessNow(1, "startup-smoke: live input refused, a resident driver owns this session.")
 	if (_DriverSmokeInputDecision == DRIVER_SMOKE_INPUT_QUARANTINE) {
 		_DriverSmokeInputQuarantined := true
 		Suspend(true)
 	}
-	SetTimer(StartupSmokeDeadlineExit, -STARTUP_SMOKE_DEADLINE_MS)
+	StartupSmokeArmDeadline()
 }
 
 BootProfile_Stamp("Single-owner gate completed")

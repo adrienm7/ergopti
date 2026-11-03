@@ -167,7 +167,10 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 ;              once the WPM widget's window-ownership check moved into the
 ;              window_manager adapter, and tightened to that value.
 ; entry point: 2026-07-31, first measurement (DllCall=3, FileIO=5).
-_AOPR_BASELINE_CORE  := 252
+; 2026-11-03: the startup smoke's mutex probe, exit and deadline moved into
+; adapters/process_lifecycle.ahk; read from this counter at modules+lib 248
+; (DllCall=157 COM=2 FileIO=89) and entry 7 (DllCall=6 FileIO=1), tightened.
+_AOPR_BASELINE_CORE  := 248
 _AOPR_BASELINE_UI    := 125
 _AOPR_BASELINE_ENTRY := 7
 
@@ -306,7 +309,9 @@ _AOPR_AssertFamilies(Label, Files, Baseline) {
 ; core: 601 (Timer=202 Binding=241 GuiMenu=30 Process=29 Window=47 KeyState=52)
 ; ui:   186 (Timer=107 Binding=19 GuiMenu=46 Process=5 Window=7 KeyState=2)
 ; entry: 10 (Timer=8 Binding=1 GuiMenu=0 Process=0 Window=0 KeyState=1)
-_AOPR_FAMILY_BASELINE_CORE  := 601
+; 2026-11-03, read from this counter: core 593 (Timer=226 Binding=230 GuiMenu=32
+; Process=25 Window=49 KeyState=31), tightened; entry 10 (Timer=9 KeyState=1).
+_AOPR_FAMILY_BASELINE_CORE  := 593
 _AOPR_FAMILY_BASELINE_UI    := 186
 _AOPR_FAMILY_BASELINE_ENTRY := 10
 
