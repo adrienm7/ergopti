@@ -1940,6 +1940,13 @@
 			"stays_in_lua": []
 		},
 		{
+			"contract": "menu_section_headers.lua",
+			"lua_sites": 0,
+			"note": "A helper module for the section header checks of the tray walks: it registers no case of its own.",
+			"data_driven": [],
+			"stays_in_lua": []
+		},
+		{
 			"contract": "menu_separators.lua",
 			"lua_sites": 0,
 			"note": "A helper module for the menu contracts: it registers no case of its own.",
