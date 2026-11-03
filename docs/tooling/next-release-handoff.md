@@ -4,6 +4,27 @@
 
 ## Branch `next/owned-karabiner`
 
+### Where this stopped (2026-11-03, paused by the coordinator until 1.0.9 ships)
+
+The agent ran on the maintainer's PC, not a cloud container, and was paused for memory. State at the pause:
+
+- **Runtime published:** prerelease
+  <https://github.com/adrienm7/ergopti/releases/tag/remap-runtime-v16.3.0-ergopti.2>, not latest (latest stays
+  `v1.0.8`); the pinned `source_url` serves sha256 `ad1541f8…2de8e`, 12176523 bytes (downloaded back and checked).
+- **Branch:** rebased on `origin/dev` `5cda4606d1`, eight commits, the flip last.
+- **Hosted macOS lane:** run 41638220479 against `dev`'s 41638225996 (same day, `dev` is red on its own): three
+  modules still fail only here, all from the flip: `test_rule_removal` (3 cases, for instance « copy_tap_actions_to_combos
+  persists without a deploy »), `test_set_enabled_lease_transaction` (1) and `test_startup_publication_owner` (4).
+  Linux lane and Common jobs add no failure over `dev`.
+
+Next steps, in order:
+
+1. Read those three modules' errors in run 41638220479 and make their fixtures state the runtime they model, as
+   the rest now do (`runtime = "shared"` in a stubbed user config, `RUNTIME_DEFAULT = "shared"` on a wrapped real
+   config module); rerun the macOS lane against a `dev` run of the same day.
+2. The native install below (WP6 install half), then WP8 hosted install acceptance, then WP9 on a real Mac.
+3. Only then merge the flip commit; the seven before it can land on their own.
+
 Base: `origin/dev` at `d9b0e6c970`. Goal (maintainer, TODO.md "Next release after 1.0.9"): the macOS driver
 uses Ergopti's own bundled Karabiner runtime, never a Karabiner installed on the Mac.
 
@@ -103,5 +124,16 @@ the tree, Node 22.22.2 (the pinned version, downloaded and checked against its S
 - macOS E2E: 181/181 on the final source (179 before; the flip without the fixes failed 38).
 - Packager suite 14/14 (Python 3.13 in WSL); `test-remap-runtime-manifest.cjs` passes but for the Windows
   `python3` Store stub, which also fails it on `dev` here.
-- The full macOS and Linux unit suites, compared with `origin/dev` on the same host, and the hosted CI runs: see
-  the end of this file.
+- macOS unit suite on `origin/dev` on this host: 26808 passed, 217 failed (host-only: tooltip renderer corpus,
+  French label punctuation and others). The same run on this branch was killed twice by the host (WSL, 3 GB), so
+  the hosted lanes are the comparison.
+- `dev` is red on hosted CI today (menu parity « language owner », `llm.indentation` choices, the 1.0.9 work in
+  flight), so each lane is judged by the failures it adds over a `dev` run of the same day, by test name:
+  - Linux lane, run 41625820152 (this branch) against 41619212552 (`dev`, through `next/linux-todo`): no failure added.
+  - Common jobs: the menu-row ratchet and the native-menu census refused the retired `remap_switch.lua`; both now
+    admit its retirement only while no macOS UI source requires it and no compiled row carries its ids.
+  - macOS lane, run 41625808937 against 41625799247: 48 remap and shortcut modules failed only here. Their fixtures
+    model a Mac on the shared runtime without saying so, which the owned default no longer implies; they now state
+    `runtime = "shared"`. Rerun: see the agent's report (run 41638220479 against 41638225996).
+- The editor-shortcut contract test `test_magic_editor_source_owner_native` pinned `refresh() == false` for a
+  deferred retarget; it now pins `true`, and `stop()` still reports a refused cancel.
