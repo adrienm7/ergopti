@@ -6,7 +6,8 @@
  * DESCRIPTION:
  * Says whether the visible text of one menu row is an unresolved identifier.
  * `_shared/lua/test/menu_row_text.lua` is the same rule for the Lua walks; both
- * read `_shared/tests/corpus/menu_row_text_allowlist.json`.
+ * read `_shared/tests/corpus/menu_row_text_allowlist.json`. French rows also
+ * keep a space before `:`, `?`, `!` and `;` in both.
  * ==============================================================================
  */
 
@@ -52,4 +53,16 @@ function rowTextDefect(text, identifiers, allowlist) {
 	return '';
 }
 
-module.exports = { loadAllowlist, rowTextDefect };
+/**
+ * Finds where a French text glues high punctuation to the word before it.
+ * URL schemes are the technical tokens that legitimately do so.
+ * @param {string} text French text.
+ * @returns {string} The glued word and its mark, or '' for correct text.
+ */
+function frenchPunctuationDefect(text) {
+	for (const match of text.matchAll(/(\S*[\p{L}\p{N})\]}»])([:?!;])(?=\s|$)/gu))
+		if (!(match[2] === ':' && /(^|[^\p{L}])(https?|msteams)$/u.test(match[1]))) return match[0];
+	return '';
+}
+
+module.exports = { frenchPunctuationDefect, loadAllowlist, rowTextDefect };

@@ -4,7 +4,8 @@
 --- MODULE: Shared Menu Row Text Check
 --- DESCRIPTION:
 --- Walks a rendered Lua tray and reports each row whose visible text is an id,
---- a config path, a raw key, snake_case or an unfilled placeholder. The Windows
+--- a config path, a raw key, snake_case or an unfilled placeholder, and each
+--- French row gluing `:`, `?`, `!` or `;` to its word. The Windows
 --- walk applies the same rule from tools/test/lib/menu-row-text.cjs; both read
 --- _shared/tests/corpus/menu_row_text_allowlist.json.
 ---
@@ -122,12 +123,36 @@ local function walk(rows, trail, visit)
 	end
 end
 
+--- Names the glued word and mark of a French row, nil when it reads right. The
+--- bytes before a mark also start with a high byte in « é », so a no-break space
+--- is told apart by its full spelling.
+--- @param text string French row text.
+--- @return string|nil
+function M.french_punctuation_defect(text)
+	local probe = text .. " "
+	local start = 1
+	while true do
+		local at = probe:find("[:?!;]%s", start)
+		if at == nil then return nil end
+		local before = probe:sub(1, at - 1)
+		local spaced = before:find("%s$") or before:find("\194\160$") or before:find("\226\128\175$")
+		local glued = not spaced and before:find("[%w\128-\255%)%]}]$")
+		if glued then
+			local word = before:match("[^%s]*$")
+			local scheme = probe:sub(at, at) == ":" and (word:match("https?$") or word:match("msteams$"))
+			if not scheme then return word .. probe:sub(at, at) end
+		end
+		start = at + 1
+	end
+end
+
 --- Judges every row of a rendered tray.
 --- @param tray table Rendered rows, `title` and `menu`.
 --- @param shared_root string Path of _shared.
 --- @param json_decode function JSON decoder.
+--- @param locale string|nil Locale of the texts; "fr" adds the punctuation rule.
 --- @return table defects, number rows
-function M.defects(tray, shared_root, json_decode)
+function M.defects(tray, shared_root, json_decode, locale)
 	local allowlist = read_json(shared_root, "tests/corpus/menu_row_text_allowlist.json", json_decode).entries
 	local known = identifiers(shared_root, json_decode)
 	local defects, rows = {}, 0
@@ -135,8 +160,47 @@ function M.defects(tray, shared_root, json_decode)
 		rows = rows + 1
 		local defect = M.defect(text, known, allowlist)
 		if defect then defects[#defects + 1] = trail .. " > \"" .. text .. "\" " .. defect end
+		local glued = locale == "fr" and M.french_punctuation_defect(text) or nil
+		if glued then defects[#defects + 1] = trail .. " > \"" .. text .. "\" glues \"" .. glued .. "\"" end
 	end)
 	return defects, rows
+end
+
+--- Proves the French walk reaches each submenu row that joins a label to its
+--- value: a walk that stops short would judge none of them.
+--- @param tray table Rendered rows.
+--- @param shared_root string Path of _shared.
+--- @param json_decode function JSON decoder.
+--- @param catalogue table The French catalogue.
+--- @param platform string Manifest platform name.
+--- @return table The labels no rendered row spells with « label : ».
+function M.missing_label_value_rows(tray, shared_root, json_decode, catalogue, platform)
+	local titles = {}
+	walk(tray, "tray", function(text) titles[#titles + 1] = text end)
+	local missing, seen = {}, {}
+	local function shown_here(platforms)
+		if platforms == nil then return true end
+		for _, name in ipairs(platforms) do
+			if name == platform then return true end
+		end
+		return false
+	end
+	local function visit(node)
+		if type(node) ~= "table" then return end
+		if node.current_choice_label_value == true and shown_here(node.platforms) and not seen[node.i18n] then
+			seen[node.i18n] = true
+			local spelled = catalogue[node.i18n] .. " : "
+			local found = false
+			for _, title in ipairs(titles) do
+				found = found or title:find(spelled, 1, true) ~= nil
+			end
+			if not found then missing[#missing + 1] = spelled end
+		end
+		for _, value in pairs(node) do visit(value) end
+	end
+	visit(read_json(shared_root, "modules/menu/menu_manifest.json", json_decode))
+	table.sort(missing)
+	return missing
 end
 
 return M

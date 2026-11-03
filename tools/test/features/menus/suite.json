@@ -276,11 +276,19 @@
 		},
 		{
 			"id": "menu-shown-rows-have-own-label",
-			"ordinal": 564,
+			"ordinal": 567,
 			"name": "every manifest row a driver shows has its own key in all 21 locales, and every key the menus name exists",
 			"cmd": "node",
 			"args": ["tools/test/test-menu-shown-rows-have-own-label.cjs"],
 			"repro": "npm run test:menu-shown-rows-have-own-label"
+		},
+		{
+			"id": "french-punctuation",
+			"ordinal": 568,
+			"name": "no French string glues high punctuation to a word, and every label joins its value through common.label_value",
+			"cmd": "node",
+			"args": ["tools/test/test-french-punctuation.cjs"],
+			"repro": "npm run test:french-punctuation"
 		}
 	]
 }
