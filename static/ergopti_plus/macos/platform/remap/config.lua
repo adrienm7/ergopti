@@ -31,6 +31,7 @@ local Logger = require("infra.logger")
 local Layout = require("modules.keymap.layout")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
+local KeyNames = require("keycodes.key_names")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
 
@@ -238,9 +239,10 @@ local _chord_catalogue = nil
 --- and `alt_tab_apps_list`≡`app_switcher`) and resolve through the alias table
 --- rather than duplicating a translated string in twenty-one files.
 ---
---- The 19 that remain French are the hold-only ones — `layer`, the bare
---- modifiers and their combinations. A gesture has no duration, so they have no
---- registry row by design, not by omission.
+--- The hold-only ones have no registry row by design, not by omission: a
+--- gesture has no duration. The bare modifiers and their combinations are named
+--- from the key name table (name_modifier_holds); `layer` and the sticky holds
+--- remain French.
 --- @param actions table The decoded action list, mutated in place.
 --- @return number localised How many labels came from the registry.
 local function localise_action_labels(actions)
@@ -269,6 +271,23 @@ local function localise_action_labels(actions)
 	end
 	Logger.debug(LOG, "Localised %d of %d action label(s) from the shared registry.", localised, #actions)
 	return localised
+end
+
+--- Names the bare modifier and modifier-combination holds (those declaring
+--- `modifiers`) from the shared key name table: their glyphs, then their names
+--- in the user's language (« ⌘⇧ Cmd + Maj »). They read « ⌘⇧ — Cmd+Shift »
+--- in English in every locale.
+--- @param actions table The decoded action list, mutated in place.
+local function name_modifier_holds(actions)
+	for _, action in ipairs(actions) do
+		if type(action) == "table" and action.modifiers ~= nil then
+			if type(action.modifiers) ~= "table" or #action.modifiers == 0 then
+				error("remap action " .. tostring(action.id) .. " declares no modifier", 2)
+			end
+			action.label = KeyNames.modifiers_heading(action.modifiers, "macos", i18n.get)
+			action.short_label = KeyNames.modifiers_label(action.modifiers, "macos", i18n.get)
+		end
+	end
 end
 
 local function append_shared_modifier_chords(actions)
@@ -393,6 +412,7 @@ function M.load_available_actions(actions_file)
 		return nil
 	end
 	localise_action_labels(list)
+	name_modifier_holds(list)
 	append_shared_modifier_chords(list)
 	local _, catalogue_err = ActionCatalogue.index_by_id(list)
 	if catalogue_err then

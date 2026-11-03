@@ -103,7 +103,8 @@ end
 
 --- A set of modifiers as a heading names it: on macOS the glyphs its menus
 --- draw before the names (« ⌘⇧ Cmd + Maj », « ⌥ Option »), elsewhere the
---- names alone (« Ctrl + Maj »).
+--- names alone (« Ctrl + Maj »). A set holding a key the table gives no glyph
+--- (Fn) reads by its names alone, as a partial row of glyphs would misname it.
 --- @param modifiers table Ids or aliases, in display order.
 --- @param platform string "windows", "macos" or "linux".
 --- @param translate function Takes a locale key, returns its text.
@@ -112,7 +113,11 @@ function M.modifiers_heading(modifiers, platform, translate)
 	local names = M.modifiers_label(modifiers, platform, translate)
 	if platform ~= "macos" then return names end
 	local glyphs = {}
-	for index, modifier in ipairs(modifiers) do glyphs[index] = M.macos_symbol(modifier) end
+	for index, modifier in ipairs(modifiers) do
+		local symbol = Data.macos_symbols[M.canonical(modifier)]
+		if symbol == nil then return names end
+		glyphs[index] = symbol
+	end
 	return table.concat(glyphs) .. " " .. names
 end
 
