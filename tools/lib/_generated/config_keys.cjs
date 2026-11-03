@@ -516,7 +516,6 @@ module.exports = Object.freeze({
 		REPEAT_KEY: "repeat_key",
 		REPORT_BUG: "report_bug",
 		RESET_WPM_POSITION: "reset_wpm_position",
-		RESTORE_TOUCHPAD_GESTURES: "restore_touchpad_gestures",
 		SCOPE_CLEAR: "scope_clear",
 		SCOPE_RESTORE: "scope_restore",
 		SCRIPT_CONTROL_TOGGLE: "script_control_toggle",

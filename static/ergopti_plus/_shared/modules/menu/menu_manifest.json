@@ -1111,15 +1111,6 @@
 			"i18n": "menu.global.clean_unused_keys"
 		},
 		{
-			"type": "command",
-			"id": "restore_touchpad_gestures",
-			"i18n": "menu.global.restore_touchpad_gestures",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
-		},
-		{
 			"type": "---"
 		},
 		{

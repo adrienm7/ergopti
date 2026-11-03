@@ -54,7 +54,13 @@ ConfigGlobalScopeApply(Mode, Options := unset) {
 		}
 		return Rows
 	}
-	return ConfigScopeCommitOperations("global", Mode, Operations, Selected, Files)
+	; The global clear composes the Gestures clear, so it also puts the touchpad
+	; back to its system state, before the commit for the reason _GES_ApplyScope gives.
+	Touchpad := Mode == "clear" ? TouchpadRegistryClearFromScope(Selected) : ""
+	Receipt := ConfigScopeCommitOperations("global", Mode, Operations, Selected, Files)
+	if (Touchpad != "")
+		Receipt["touchpad"] := Touchpad
+	return Receipt
 }
 
 ; This composition has no lifecycle, backup, publication or recovery authority.
