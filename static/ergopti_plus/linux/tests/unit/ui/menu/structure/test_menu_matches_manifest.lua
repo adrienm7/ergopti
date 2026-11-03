@@ -54,6 +54,16 @@ local PLATFORM = "linux"
 -- the caller, and carries no label this test could look for.
 local RENDERED_TYPES = { action = true, group = true, section_header = true }
 
+-- Sections the tray draws only for state the whole-tray fixture does not hold.
+-- Each is certified by its own test, which builds the tray with that state.
+local STATE_GATED_SECTIONS = {
+	-- Drawn only when the user registry holds a profile (llm_profile_custom_present),
+	-- a section header since 2026-11; the profile-headings cases of
+	-- tests/unit/modules/llm/settings/test_profile_preferences_canonical_prompt_profiles.lua
+	-- draw it, and prove it absent with an empty registry.
+	llm_profile_custom_heading = true,
+}
+
 --- Whether the manifest declares a row for this platform.
 --- @param row table
 --- @return boolean
@@ -575,7 +585,7 @@ helpers.describe("menu certification: published available component rows are ren
 		local checked, missing = 0, {}
 		for menu_key in pairs(root) do
 			local rows = ManifestMenu.get_array(menu_key)
-			if type(rows) == "table" then
+			if type(rows) == "table" and not STATE_GATED_SECTIONS[menu_key] then
 				for _, row in ipairs(rows) do
 					local kind = row.type or ""
 					if RENDERED_TYPES[kind] and visible(row) and type(row.i18n) == "string" then
