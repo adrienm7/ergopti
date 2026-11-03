@@ -82,17 +82,7 @@ WebView_ClearDocumentCache(WebView) {
  * @param Controller {WebView2.Controller} The controller to fit.
  */
 WebView_FitToWindow(Controller) {
-	Host := Controller.ParentWindow
-	; GA_PARENT, unlike GetParent, never answers a top-level window's owner.
-	Window := DllCall("user32\GetAncestor", "ptr", Host, "uint", 1, "ptr")
-	if Window && Window != DllCall("user32\GetDesktopWindow", "ptr") {
-		Rect := Buffer(16, 0)
-		if !DllCall("user32\GetClientRect", "ptr", Window, "ptr", Rect, "int")
-			throw OSError(A_LastError, -1, "GetClientRect")
-		Width := NumGet(Rect, 8, "int"), Height := NumGet(Rect, 12, "int")
-		if !DllCall("user32\MoveWindow", "ptr", Host, "int", 0, "int", 0, "int", Width, "int", Height, "int", true, "int")
-			throw OSError(A_LastError, -1, "MoveWindow")
-	}
+	WMFitChildToParentClient(Controller.ParentWindow)
 	Controller.Fill()
 }
 
