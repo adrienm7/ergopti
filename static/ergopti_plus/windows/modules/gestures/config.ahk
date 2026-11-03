@@ -865,8 +865,8 @@ GestureConsumeAutoConfigureFlag(Path, WriterFn := 0, NotifyFn := 0, TimerFn := 0
 ; slots send Ctrl+Win+Shift+F1..F10 without any manual Settings configuration.
 ; The values come from the generated touchpad table and are written by its one
 ; owner (modules/gestures/touchpad_registry.ahk), which backs up the prior
-; values before the first write so « Restaurer les gestes du pavé tactile
-; Windows » can put them back.
+; values before the first write so the Gestures « Tout effacer » can put them
+; back.
 ; Returns true on success, false if the backup or any registry write failed.
 GestureAutoConfigureRegistry(OnDone := 0) {
 		LoggerStart("gestures", "Auto-configuring touchpad gestures via registry…")

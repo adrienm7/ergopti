@@ -507,7 +507,6 @@ class MenuCommand {
 	static REPEAT_KEY := "repeat_key"
 	static REPORT_BUG := "report_bug"
 	static RESET_WPM_POSITION := "reset_wpm_position"
-	static RESTORE_TOUCHPAD_GESTURES := "restore_touchpad_gestures"
 	static SCOPE_CLEAR := "scope_clear"
 	static SCOPE_RESTORE := "scope_restore"
 	static SCRIPT_CONTROL_TOGGLE := "script_control_toggle"

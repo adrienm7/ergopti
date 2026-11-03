@@ -527,7 +527,6 @@ _MI_BuildConfigurationMenu() {
 		MenuCommand.CLEAN_UNUSED_KEYS,   ShowUnusedConfigKeysCleanup,
 		MenuCommand.CONFIG_FOLDER,       FilePathsEditor,
 		MenuCommand.SETUP_WIZARD,        Onboarding_ShowFromMenu,
-		MenuCommand.RESTORE_TOUCHPAD_GESTURES, TouchpadRegistryRestoreFromMenu,
 		MenuCommand.PROXY_OVERRIDE,      ProxyOverride_Command
 	)
 		Commands[Id] := Callback
@@ -706,7 +705,9 @@ _LAY_ScopeCommands(Options := unset) {
  */
 _MI_GlobalScopeCommands(Options := unset) {
 	global _ConfigDir
-	Selected := IsSet(Options) ? Options : Map("layers_config_dir", _ConfigDir)
+	; The clear also restores the real touchpad (TouchpadRegistryClearFromScope).
+	Selected := IsSet(Options) ? Options
+		: Map("layers_config_dir", _ConfigDir, "touchpad_restore", TouchpadRegistryRestore)
 	return Map(
 		MenuCommand.SCOPE_RESTORE, (*) => ConfigGlobalScopeApply("recommended", Selected),
 		MenuCommand.SCOPE_CLEAR, (*) => ConfigGlobalScopeApply("clear", Selected))

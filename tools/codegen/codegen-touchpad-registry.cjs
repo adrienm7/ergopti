@@ -86,11 +86,18 @@ function buildContract(data) {
 	};
 	const values = [];
 	const families = new Map();
+	// Only the family enables have a shipped value; every other name is absent
+	// on a fresh profile, so the factory restore deletes it.
+	const factoryDefaults = [];
 	for (const family of data.families || []) {
 		if (typeof family.id !== 'string' || families.has(family.id))
 			throw new Error(`family id ${JSON.stringify(family.id)} is missing or duplicated`);
 		families.set(family.id, claim(family.enable, `family ${family.id}`));
 		values.push({ name: family.enable, value: customValue });
+		const factory = dword(family.factory_default, `family ${family.id} factory_default`);
+		if (factory === customValue)
+			throw new Error(`family ${family.id}: factory_default cannot be the custom value`);
+		factoryDefaults.push({ name: family.enable, value: factory });
 	}
 	if (families.size === 0) throw new Error('at least one gesture family is required');
 
@@ -139,7 +146,8 @@ function buildContract(data) {
 		customTapValue,
 		familyEnables: [...families.values()],
 		slots,
-		values
+		values,
+		factoryDefaults
 	};
 }
 
@@ -183,6 +191,9 @@ function emitAhk(contract) {
 				])}`
 		)
 		.join(',\n');
+	const factory = ahkMap(
+		contract.factoryDefaults.map((entry) => [entry.name, String(entry.value)])
+	);
 	return (
 		'﻿; _generated/touchpad_registry.ahk\n' +
 		'; AUTO-GENERATED from windows/modules/gestures/precision_touchpad_registry.toml.\n' +
@@ -195,7 +206,9 @@ function emitAhk(contract) {
 		'; Every registry value Ergopti writes so each gesture slot sends its\n' +
 		'; Ctrl + Win + Shift + Fn shortcut, in write order. The in-process writer and\n' +
 		"; the first-run wizard's elevated PowerShell script both read this data, and\n" +
-		'; modules/gestures/touchpad_registry.ahk backs it up and restores it.\n' +
+		'; modules/gestures/touchpad_registry.ahk backs it up and restores it, or\n' +
+		'; writes factory_defaults back (and deletes every other name) when no\n' +
+		'; backup exists.\n' +
 		'; ==============================================================================\n' +
 		'\n' +
 		'; A function rather than a global initialiser so include ORDER cannot matter:\n' +
@@ -214,7 +227,8 @@ function emitAhk(contract) {
 		'\n\t\t),\n' +
 		'\t\t"values", [\n' +
 		values +
-		'\n\t\t])\n' +
+		'\n\t\t],\n' +
+		`\t\t"factory_defaults", ${factory})\n` +
 		'}\n'
 	);
 }

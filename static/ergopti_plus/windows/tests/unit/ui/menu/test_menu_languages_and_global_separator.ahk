@@ -93,13 +93,12 @@ _MLG_Order(MenuName) {
 }
 
 ; The Configuration submenu: the global restore and clear, a separator, the
-; cleanup and, right under it, the Windows-only touchpad restore (the
-; maintainer's request of 2026-10-02: it stood at the very end), a separator,
-; then configuration windows and the macOS-only Karabiner rows, then a
-; separator and the download proxy (moved from Debug on 2026-11-03), with no
-; separator left dangling at its end.
+; cleanup, a separator, then configuration windows and the macOS-only
+; Karabiner rows, then a separator and the download proxy (moved from Debug on
+; 2026-11-03), with no separator left dangling at its end. The Windows-only
+; touchpad restore was merged into the Gestures clear (2026-11-03).
 _MLG_ConfigurationRowsInOrder() {
-	AssertEqual("scope_restore, scope_clear, ---, clean_unused_keys, restore_touchpad_gestures, ---, config_folder, "
+	AssertEqual("scope_restore, scope_clear, ---, clean_unused_keys, ---, config_folder, "
 		. "setup_wizard, karabiner_integration, remove_from_karabiner, ---, proxy_override",
 		_MLG_Order("configuration_menu"), "configuration_menu must declare its rows in this order")
 	; The download proxy is configuration, not debugging (maintainer, 2026-11-03).
@@ -118,7 +117,6 @@ _MLG_ConfigurationRowsInOrder() {
 	for _, Pair in [["clean_unused_keys", "ShowUnusedConfigKeysCleanup"],
 			["config_folder", "FilePathsEditor"],
 			["setup_wizard", "Onboarding_ShowFromMenu"],
-			["restore_touchpad_gestures", "TouchpadRegistryRestoreFromMenu"],
 			["proxy_override", "ProxyOverride_Command"]]
 		AssertTrue(RegExMatch(Body, '"' . Pair[1] . '",\s+' . Pair[2]) > 0,
 			"the Configuration menu must dispatch " . Pair[1] . " to " . Pair[2])
