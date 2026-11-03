@@ -28,6 +28,9 @@ local OWNERS = {
 	-- captures hs at require time, so each scenario loads it afresh.
 	"adapters.accessibility_permission",
 	"infra.vscode_bridge", "tooltip.layout", "tooltip.llm_line", "tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
+	-- The configuration names the shortcut column's modifiers through the key
+	-- name table, which it loads with its data and sorting helper.
+	"keycodes.key_names", "keycodes.key_names_data", "table_util",
 }
 
 --- Loads a fresh production renderer with an observable file-logger surface.
