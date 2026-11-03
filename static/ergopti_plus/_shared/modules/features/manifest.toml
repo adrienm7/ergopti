@@ -1750,7 +1750,7 @@ recommended = "wait"
 family = "setting"
 type = "enum"
 enum_values = ["wait", "both"]
-description_key = "menu.llm.trigger.while_hotstring_tooltip"
+description_key = "menu.llm.while_hotstring_tooltip"
 
 [[features.llm.trigger]]
 id = "inline_autotype"
