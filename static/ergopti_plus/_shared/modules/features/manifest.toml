@@ -1888,21 +1888,21 @@ description_key = "menu.metrics.wpm_widget_visible"
 [[features.metrics]]
 id = "wpm_widget_colors"
 requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
-# Linux used to colour the pill by keystroke origin while Windows ships it
-# neutral. The maintainer decided on 2026-10-22 that Linux recommends what
-# Windows recommends, and a pure parameter's default is its recommendation.
-# macOS shipped it on until 2026-10-24: the three drivers now share one answer.
-default = false
-recommended = false
+# The maintainer decided on 2026-11-03 that the pill shows its colours and its
+# graph by default and recommends both, on the three drivers; only showing the
+# pill itself (wpm_widget_visible) stays off.
+default = true
+recommended = true
 family = "setting"
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_colors"
 
+# Same decision of 2026-11-03 as wpm_widget_colors.
 [[features.metrics]]
 id = "wpm_widget_graph"
 requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
-default = false
-recommended = false
+default = true
+recommended = true
 family = "setting"
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_graph"
