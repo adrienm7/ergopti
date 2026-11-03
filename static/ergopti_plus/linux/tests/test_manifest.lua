@@ -463,6 +463,7 @@ return {
 	"tests.unit.infra.logger.test_logger_sink_config_dir_redaction",
 	"tests.unit.infra.logger.test_logger_sink_retention",
 	"tests.unit.ui.menu.structure.test_menu_builder_group_calls",
+	"tests.unit.ui.menu.structure.test_menu_category_off_rule",
 	"tests.unit.ui.menu.structure.test_menu_choice_row",
 	"tests.unit.ui.menu.structure.test_custom_layout_selection",
 	"tests.unit.ui.menu.structure.test_pause_layout_rows",

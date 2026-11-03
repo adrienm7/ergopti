@@ -33,12 +33,12 @@ local helpers = require("tests.helpers")
 
 local DRIVER_ROOT = helpers.driver_root()  -- trailing slash
 
--- Canonical row order + greying policy. greys_off=false -> stays usable while the
--- feature is off (configure before enabling); true -> greyed while off.
+-- Canonical row order + greying policy. greys_off=true -> greyed while the feature
+-- is off: every row, by the category-off rule of 2026-11-02.
 -- The Backend chooser moved to the model selector page on 2026-10-27; the
 -- model row is the page's button.
 local CANON = {
-	{ id = "llm_model",               greys_off = false },
+	{ id = "llm_model",               greys_off = true },
 	{ id = "llm_profile",             greys_off = true },
 	{ id = "llm_trigger",             greys_off = true },
 	{ id = "llm_generation_settings", greys_off = true },
@@ -125,8 +125,8 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 		end
 		-- row_disabled must map the policy to hs's disabled convention: greys-off rows
 		-- disable on (off OR paused); the rest disable only on paused.
-		helpers.assert_true(MenuLayout.row_disabled("llm_model", true, false) == nil,
-			"llm_model (stays usable off) must NOT be disabled when off-but-not-paused")
+		helpers.assert_true(MenuLayout.row_disabled("llm_model", true, false) == true,
+			"llm_model must be disabled when the feature is off")
 		helpers.assert_true(MenuLayout.row_disabled("llm_model", true, true) == true,
 			"llm_model must be disabled when paused")
 		helpers.assert_true(MenuLayout.row_disabled("llm_profile", true, false) == true,

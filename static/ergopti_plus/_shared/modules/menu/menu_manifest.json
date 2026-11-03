@@ -440,6 +440,7 @@
 			"checked_when": [
 				"llm_enabled"
 			],
+			"submenu_off_reason_key": "menu.category_off_reason",
 			"disabled_when": [
 				"llm_toggle_ready"
 			],
@@ -497,7 +498,7 @@
 				]
 			},
 			"i18n": "menu.llm.model_label",
-			"disabled_when_off": false,
+			"disabled_when_off": true,
 			"platforms": [
 				"ahk",
 				"hs",
@@ -957,6 +958,8 @@
 			"disabled_when": [
 				"agent_mode_ready"
 			],
+			"submenu_off_reason_key": "menu.category_off_reason",
+			"submenu_off_value": "off",
 			"choices": [
 				{
 					"value": "off",
@@ -1343,7 +1346,8 @@
 			"checked_when": [
 				"shortcuts_enabled"
 			],
-			"category": "Shortcuts"
+			"category": "Shortcuts",
+			"submenu_off_reason_key": "menu.category_off_reason"
 		},
 		{
 			"type": "command",
@@ -2060,7 +2064,8 @@
 			"checked_when": [
 				"keystats_enabled"
 			],
-			"category": "Metrics"
+			"category": "Metrics",
+			"submenu_off_reason_key": "menu.category_off_reason"
 		},
 		{
 			"type": "command",
@@ -2074,17 +2079,13 @@
 			"type": "command",
 			"id": "show_typing",
 			"i18n": "menu.metrics.show_typing",
-			"disabled_when": [
-				"keystats_enabled"
-			]
+			"readable_when_off": true
 		},
 		{
 			"type": "command",
 			"id": "show_apps",
 			"i18n": "menu.metrics.show_apps",
-			"disabled_when": [
-				"keystats_enabled"
-			]
+			"readable_when_off": true
 		},
 		{
 			"type": "---"
@@ -2261,6 +2262,7 @@
 				"layout_enabled"
 			],
 			"category": "Layout",
+			"submenu_off_reason_key": "menu.category_off_reason",
 			"platforms": [
 				"ahk"
 			],
@@ -2552,7 +2554,8 @@
 			"checked_when": [
 				"hotstrings_enabled"
 			],
-			"category": "Hotstrings"
+			"category": "Hotstrings",
+			"submenu_off_reason_key": "menu.category_off_reason"
 		},
 		{
 			"type": "command",
@@ -2961,7 +2964,8 @@
 			"checked_when": [
 				"gestures_enabled"
 			],
-			"category": "Gestures"
+			"category": "Gestures",
+			"submenu_off_reason_key": "menu.category_off_reason"
 		},
 		{
 			"type": "command",
@@ -3183,7 +3187,8 @@
 			"checked_when": [
 				"tapholds_enabled"
 			],
-			"category": "TapHolds"
+			"category": "TapHolds",
+			"submenu_off_reason_key": "menu.category_off_reason"
 		},
 		{
 			"type": "command",
