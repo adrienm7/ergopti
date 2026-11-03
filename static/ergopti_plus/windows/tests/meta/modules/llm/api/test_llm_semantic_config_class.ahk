@@ -74,8 +74,8 @@ _AHK16_ConfigClassPartitionIsExhaustive() {
 		"show_info_bar", "show_all_at_once", "pred_indent", "nav_modifiers", "val_modifiers"
 	]
 	ExpectedPolicy := [
-		"debounce_ms", "min_request_interval_ms", "instant_on_word_end", "after_hotstring", "reset_on_nav",
-		"disable_url_bars", "disable_password_fields", "disabled_apps", "streaming"
+		"debounce_ms", "min_request_interval_ms", "instant_on_word_end", "after_hotstring",
+		"while_hotstring_tooltip", "reset_on_nav", "disable_url_bars", "disable_password_fields", "disabled_apps", "streaming"
 	]
 	_AHK16_AssertExactClass(LLM_ENGINE_SEMANTIC_CONFIG_KEYS, ExpectedSemantic, "semantic")
 	_AHK16_AssertExactClass(LLM_ENGINE_DISPLAY_ONLY_CONFIG_KEYS, ExpectedDisplay, "display-only")
