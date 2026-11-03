@@ -6175,8 +6175,8 @@ console.log(
 			'the declared frame binding has closed fields'
 		],
 		[
-			'Getters, , , DeclaredFrames)',
-			'Getters, , , Map())',
+			'TargetMenu : unset, , DeclaredFrames)',
+			'TargetMenu : unset, , Map())',
 			'actual optional Build argument carries the genuine registration'
 		],
 		[
@@ -6422,11 +6422,13 @@ console.log(
 	);
 	assert.notEqual(renamedProvider, source);
 	publishedPersonalFrame(renamedProvider);
-	const renamedRegistration = source.replace(/_BuildShortcutsSubmenu\(\) \{[\s\S]*?\n\}/, (body) =>
-		body.replace(
-			/\b(DynHandlers|DeclaredFrames|ListProviders|Commands|Getters|GroupBuilders)\b/g,
-			(name) => 'PersonalFrame' + name
-		)
+	const renamedRegistration = source.replace(
+		/_BuildShortcutsSubmenu\(TargetMenu := unset\) \{[\s\S]*?\n\}/,
+		(body) =>
+			body.replace(
+				/\b(DynHandlers|DeclaredFrames|ListProviders|Commands|Getters|GroupBuilders)\b/g,
+				(name) => 'PersonalFrame' + name
+			)
 	);
 	assert.notEqual(renamedRegistration, source);
 	publishedPersonalFrame(renamedRegistration);
