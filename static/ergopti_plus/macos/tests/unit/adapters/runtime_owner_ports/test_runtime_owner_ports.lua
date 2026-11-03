@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- Pins how adapters/runtime_owner_ports.lua turns command results into the
 --- owner's answers: only read-only commands run, an unknown exit status is an
---- unknown answer (never "not loaded" or "none running"), and the artifact is
---- reported as not shipped.
+--- unknown answer (never "not loaded" or "none running"), and the shipped
+--- manifest pins the artifact the owner admits.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -86,18 +86,19 @@ helpers.describe("owned runtime ports", function()
 		helpers.assert_nil(ports.process, "the Console belongs to the launcher's installed-source role")
 	end)
 
-	helpers.it("refuses the artifact with a named reason while the shipped manifest is unpinned", function()
+	helpers.it("hands the owner the shipped pin: the driver version and the capture declaration", function()
 		local ports = load_ports(function() return 0, "" end)
 		local pinned, reason = ports.artifact.pinned()
-		helpers.assert_nil(pinned)
-		helpers.assert_contains(reason, "not pinned")
-		helpers.assert_contains(reason, "runtime.version")
+		helpers.assert_nil(reason)
+		helpers.assert_eq(pinned.virtual_hid_version, "8.5.0")
+		helpers.assert_contains(pinned.capture.requirement, 'identifier "com.ergoptiplus.app"')
+		helpers.assert_true(pinned.capture.batch_limit >= 1)
 	end)
 
-	helpers.it("names the shipped driver version and the unpinned count from the same manifest", function()
+	helpers.it("names the shipped driver version and no unpinned field from the same manifest", function()
 		load_ports(function() return 0, "" end)
 		local Ports = package.loaded["adapters.runtime_owner_ports"]
 		helpers.assert_eq(Ports.virtual_hid_version(), "8.5.0")
-		helpers.assert_eq(Ports.unpinned_count(), 5)
+		helpers.assert_eq(Ports.unpinned_count(), 0)
 	end)
 end)

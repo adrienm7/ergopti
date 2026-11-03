@@ -5,16 +5,16 @@
  * MODULE: Owned Runtime Artifact Manifest Gate
  * DESCRIPTION:
  * Guards static/ergopti_plus/macos/vendor/remap-runtime/manifest.json, the pin
- * of the owned Karabiner runtime (ADR 011, WP5), and refuses an unpinned
- * artifact when asked to (`--require-pinned`, for the hosted signed build and
- * any release that would ship the runtime).
+ * of the owned Karabiner runtime (ADR 011, WP5), and refuses a shipped
+ * manifest with any field unpinned.
  *
  * WHY THIS EXISTS: the digest of the runtime tarball and the designated
  * requirement can only be written after a hosted macOS run has built and signed
- * the artifact. Until then those fields are null, honestly. What must never
- * happen is a half-pinned manifest (a digest without its address, or a
- * VirtualHIDDevice digest quietly nulled) or a release that ships while any
- * field is still null.
+ * the artifact (`remap_runtime_publish.py apply` writes them). That pin is now
+ * written, so a field returning to null, a half-pinned manifest (a digest
+ * without its address, or a VirtualHIDDevice digest quietly nulled) or an
+ * address that does not follow the packager's file and tag naming fails here.
+ * The fixture half of the judge still proves both modes can fail.
  *
  * FEATURES & RATIONALE:
  * 1. One Field List: the paths a complete pin needs are read from
@@ -56,6 +56,7 @@ const UNBUILT_RUNTIME = [
 const UNBUILT = new Set(UNBUILT_RUNTIME);
 const IDENTIFIERS = path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.json');
 const PUBLISH_TEST = path.join(ROOT, 'tools/build/remap_runtime_publish_test.py');
+const PUBLISHER = path.join(ROOT, 'tools/build/remap_runtime_publish.py');
 
 /**
  * Reads the dotted field paths from the Lua validator.
@@ -212,9 +213,9 @@ check(
 	'a nulled VirtualHIDDevice digest is refused'
 );
 
-// 2. The shipped manifest.
+// 2. The shipped manifest. The hosted build's artifact is pinned, so the shipped
+// manifest is judged as a release would judge it: a pin never returns to null.
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const requirePinned = process.argv.includes('--require-pinned');
 check(manifest.schema === 1, 'the manifest declares schema 1');
 const known = new Set(paths.map((dotted) => dotted.split('.')[0]).concat(['schema']));
 check(
@@ -223,9 +224,39 @@ check(
 );
 check(
 	paths.every((dotted) => lookup(manifest, dotted) !== undefined),
-	'every pin field is written in the manifest, as null while it waits for the hosted build'
+	'every pin field is written in the manifest'
 );
-for (const message of judge(manifest, paths, requirePinned)) check(false, message);
+for (const message of judge(manifest, paths, true)) check(false, message);
+
+// 2b. The runtime pin follows the packager's naming: one version names the
+// file and the release tag the driver downloads it from.
+const publisher = fs.readFileSync(PUBLISHER, 'utf8');
+const prefix = /^FILE_PREFIX = "([^"]+)"$/m.exec(publisher);
+const suffix = /^FILE_SUFFIX = "([^"]+)"$/m.exec(publisher);
+const tagPrefix = /^RELEASE_TAG_PREFIX = "([^"]+)"$/m.exec(publisher);
+check(
+	prefix !== null && suffix !== null && tagPrefix !== null,
+	'remap_runtime_publish.py still declares the file and tag naming this gate reads'
+);
+if (prefix && suffix && tagPrefix) {
+	const runtime = manifest.runtime;
+	const fileName = `${prefix[1]}${runtime.version}${suffix[1]}`;
+	check(runtime.file_name === fileName, `the runtime file name is ${fileName}`);
+	check(
+		String(runtime.source_url).endsWith(
+			`/releases/download/${tagPrefix[1]}${runtime.version}/${fileName}`
+		),
+		`the runtime address is the release ${tagPrefix[1]}${runtime.version}`
+	);
+	check(
+		/^[0-9a-f]{64}$/.test(String(runtime.sha256)),
+		'the runtime digest is a lower-case SHA-256'
+	);
+	check(
+		Number.isInteger(runtime.size) && runtime.size > 0,
+		'the runtime size is a positive integer'
+	);
+}
 
 // 3. The capture requirement names the launcher and one certificate leaf.
 const launcherId = JSON.parse(fs.readFileSync(IDENTIFIERS, 'utf8')).bundle_ids.launcher;
@@ -270,6 +301,4 @@ if (failures.length > 0) {
 	console.error(`\n[FAIL] owned runtime manifest: ${failures.length} problem(s)`);
 	process.exit(1);
 }
-console.log(
-	`\n[OK] owned runtime manifest: ${passes} check(s) passed${requirePinned ? ' (pinned)' : ''}.`
-);
+console.log(`\n[OK] owned runtime manifest: ${passes} check(s) passed (pinned).`);
