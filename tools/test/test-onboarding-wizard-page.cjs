@@ -1735,7 +1735,10 @@ function assertSeparated(row, where) {
 	const items = described.groups[0].items;
 	const custom = items[0];
 	const kept = items[1];
-	const current = { 'gestures.enabled': true, [kept.path]: kept.value, [custom.path]: 'tab_close' };
+	// Any action other than the slot's recommendation: the recommended set
+	// changes over time (2026-11-03 made tab_close a macOS recommendation).
+	const customValue = custom.value === 'sel_word_prev' ? 'sel_word_next' : 'sel_word_prev';
+	const current = { 'gestures.enabled': true, [kept.path]: kept.value, [custom.path]: customValue };
 	const page = openWizard({ platform: 'macos', current });
 	page.platform = 'macos';
 	goToPage(page, 'gestures');
