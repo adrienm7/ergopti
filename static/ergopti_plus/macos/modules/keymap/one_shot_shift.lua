@@ -64,25 +64,28 @@ end
 --- @param now number Monotonic seconds.
 --- @param magic string Current user-selected magic key.
 --- @param can_shift function Whether this key with Shift alone types the title.
+--- The Shift a shifted press carries belongs to that press alone (its repeats
+--- and its release): a key pressed while it is still down is typed as it is,
+--- as on Windows, where the one-shot capture ends at the first character.
+--- Lending it to every key pressed meanwhile capitalised a fast roll
+--- (« abc » gave « ABc » or « ABC »).
 --- @return string|nil kind "consume", "shift", "shift-held", "text", or nil.
 --- @return string|nil result
 function Owner:take(key, control, text, now, magic, can_shift)
 	if self.absorbed[key] then return "consume" end
 	if self.shifted[key] then return "shift-held" end
-	local held = next(self.shifted) ~= nil and "shift-held" or nil
-	if self.deadline == nil then return held end
-	if Policy.spends_unshifted(control) then self.deadline = nil; return held end
+	if self.deadline == nil then return nil end
+	if Policy.spends_unshifted(control) then self.deadline = nil; return nil end
 	-- Modifiers, navigation, function keys and dead keys do not spend it. The
 	-- native adapter classifies them before interpreting AppKit control strings.
-	if control ~= nil or type(text) ~= "string" or text == "" then return held end
+	if control ~= nil or type(text) ~= "string" or text == "" then return nil end
 	local armed = now <= self.deadline
 	self.deadline = nil
-	if not armed then return held end
-	local kind, result = Policy.resolve(text, function(character)
+	if not armed then return nil end
+	return Policy.resolve(text, function(character)
 		if character == magic then return self.magic end
 		return self.results[character]
 	end, can_shift)
-	return kind or held, result
 end
 
 --- Records ownership only after the native event or text output is accepted.
@@ -114,7 +117,7 @@ end
 --- @return string|nil kind
 function Owner:release(key)
 	if self.absorbed[key] then self.absorbed[key] = nil; return "consume" end
-	local shifted = next(self.shifted) ~= nil
+	local shifted = self.shifted[key] == true
 	self.shifted[key] = nil
 	return shifted and "shift" or nil
 end

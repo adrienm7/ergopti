@@ -37,7 +37,7 @@
 
 ; The vector count, pinned as _shared/lua/test/tap_hold_decision_contract.lua
 ; pins it, so a truncated corpus fails instead of shrinking the contract.
-global _CTHD_VECTOR_COUNT := 29
+global _CTHD_VECTOR_COUNT := 30
 
 _CTHD_Corpus() {
 	static Corpus := JsonParse(FileRead(A_ScriptDir . "\..\..\_shared\tests\corpus\tap_hold\decision_vectors.json", "UTF-8"))
