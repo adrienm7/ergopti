@@ -70,7 +70,11 @@ _GBA_FindItemById(Items, Id) {
 ; Maps every dynamic/action id BuildGesturesMenu registers to the handler
 ; function it registers for it, straight from the driver source.
 _GBA_HandlerMap() {
-	Body := _DriverFuncBody("BuildGesturesMenu")
+	; The command table moved into _GES_MenuCommands on 2026-11-03, so « Infos… »
+	; could become a startup UI command; both bodies are read.
+	Commands := _DriverFuncBody("_GES_MenuCommands")
+	Assert(Commands != "", "_GES_MenuCommands must exist")
+	Body := _DriverFuncBody("BuildGesturesMenu") . "`n" . Commands
 	Handlers := Map()
 	Pos := 1
 	while (Found := RegExMatch(Body, '"([a-z0-9_]+)"\s*,\s*\(M,\s*C\)\s*=>\s*(_GES_\w+)\(', &M, Pos)) {
@@ -91,7 +95,7 @@ _GBA_HandlerMap() {
 	; indirection they only existed to provide went away — so it broadened instead,
 	; which also brings the list providers registered the same way into the map.
 	Pos := 1
-	while (Found := RegExMatch(Body, '"([a-z0-9_]+)"\s*,\s*\(\*\)\s*=>\s*(\w+)\(', &C, Pos)) {
+	while (Found := RegExMatch(Body, '"([a-z0-9_]+)"\s*,\s*(?:MenuStartupUiCommand\()?\(\*\)\s*=>\s*(\w+)\(', &C, Pos)) {
 		Handlers[C[1]] := C[2]
 		Pos := Found + StrLen(C[0])
 	}
