@@ -15,6 +15,11 @@
 ; cost is mostly its parses, so tests pin how many one transaction spends.
 global _TOML_DocumentParses := 0
 
+; Monotonic count of characters the lexer classified one at a time. That is the
+; slow path, so the boot record publishes it per parse and the startup smoke
+; bounds it: a native run that stops matching shows up here, not in a wall clock.
+global _TOML_DocumentSlowSteps := 0
+
 /** Returns a case-sensitive semantic table without native configuration effects. */
 _TOML_DocumentTable() {
 	Table := Map()
@@ -34,6 +39,7 @@ _TOML_DocumentRunNeedle(Separator) {
 ; One lexical owner serves physical records and nested value containers. Only
 ; an unquoted top-level separator ends a token; comments never acquire ownership.
 _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0, &SpanEnd := 0, StopAfterContainer := false) {
+	global _TOML_DocumentSlowSteps
 	Separated := false
 	SpanStart := 0, SpanEnd := 0
 	Result := "", Quote := "", Closers := [], Length := StrLen(Text)
@@ -60,6 +66,22 @@ _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0
 				continue
 			}
 		}
+		; Inside a one-line string, every character except its closing quote, a
+		; basic-string escape or a line break only extends the token: take the run
+		; in one native search too. Character-by-character classification of quoted
+		; text made a 33 KB personal hotstrings file cost about 460 ms per parse.
+		if StrLen(Quote) == 1 && Type(Position) == "Integer" && Position > 0 {
+			Stop := RegExMatch(Text, Quote == Chr(34) ? '["\\\r\n]' : "['\r\n]", , Position)
+			if Stop > Position {
+				if !SpanStart
+					SpanStart := Position
+				SpanEnd := Stop - 1
+				Result .= SubStr(Text, Position, Stop - Position)
+				Position := Stop
+				continue
+			}
+		}
+		_TOML_DocumentSlowSteps += 1
 		Char := SubStr(Text, Position, 1)
 		Triple := SubStr(Text, Position, 3)
 		; Report original token offsets without changing the decoded token. Quote
@@ -273,11 +295,18 @@ _TOML_DocumentContainer(Root, Parts, Limit, Arrays, Sealed) {
  * @returns {Map} Case-sensitive semantic document; malformed namespaces throw.
  */
 TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
-	global _TOML_DocumentParses
+	global _TOML_DocumentParses, _TOML_DocumentSlowSteps
 	if !(Source is String)
 		throw TypeError("TOML document source must be a String")
 	_TOML_DocumentParses += 1
 	PerfCount("toml.document_parse")
+	PerfCount("toml.document_chars", StrLen(Source))
+	SlowStepsBefore := _TOML_DocumentSlowSteps
+	try return _TOML_ParseDocumentRecords(Source, &Records, &Physical)
+	finally PerfCount("toml.document_slow_steps", _TOML_DocumentSlowSteps - SlowStepsBefore)
+}
+
+_TOML_ParseDocumentRecords(Source, &Records, &Physical) {
 	if SubStr(Source, 1, 1) == Chr(0xFEFF)
 		Source := SubStr(Source, 2)
 	Root := _TOML_DocumentTable(), Current := Root, CurrentPath := [], NativeSection := ""
