@@ -290,6 +290,8 @@ helpers.describe("conditional publication retained admission", function()
 			package.loaded["adapters.file_system"] = fs
 			package.loaded["platform.remap.config"] = nil
 			local actual = helpers.load_with_stubs("platform.remap.config")
+			-- A Mac on the shared runtime; Ergopti's own runtime is the product default.
+			actual.RUNTIME_DEFAULT = "shared"
 			configured.save_user_config = actual.save_user_config
 			package.loaded["platform.remap.config"] = configured
 			seed(path, "[custom]\nkeep = 17\n")
@@ -554,6 +556,8 @@ helpers.describe("conditional publication retained admission", function()
 			package.loaded["adapters.file_system"] = fs
 			package.loaded["platform.remap.config"] = nil
 			local actual = helpers.load_with_stubs("platform.remap.config")
+			-- A Mac on the shared runtime; Ergopti's own runtime is the product default.
+			actual.RUNTIME_DEFAULT = "shared"
 			configured.save_user_config, configured.load_user_config = actual.save_user_config, actual.load_user_config
 			package.loaded["platform.remap.config"] = configured
 			body(remap, calls)

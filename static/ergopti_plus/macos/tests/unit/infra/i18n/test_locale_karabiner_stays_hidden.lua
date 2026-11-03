@@ -26,14 +26,20 @@ local RETIRED_KEYS = {
 }
 
 -- The texts about a Karabiner decision the user makes: they must name what
--- they decide. The F2 switch, and the Layout row choosing the type of
--- Karabiner's virtual keyboard (which keycodes the two ISO-only keys reach).
+-- they decide. The hint of a hand-written `integration_enabled = false`, and
+-- the Layout row choosing the type of Karabiner's virtual keyboard (which
+-- keycodes the two ISO-only keys reach). The F2 switch and its removal command
+-- left the tray with the owned runtime default and must not come back.
 local SWITCH_KEYS = {
-	["menu.global.karabiner_integration"] = true,
-	["menu.global.remove_from_karabiner"] = true,
 	["menu.tapholds.karabiner_off_hint"] = true,
-	["notify.karabiner.removed"] = true,
 	["menu.layout.virtual_keyboard"] = true,
+}
+
+-- The deleted F2 rows' texts: nothing may draw them again.
+local DELETED_SWITCH_KEYS = {
+	"menu.global.karabiner_integration",
+	"menu.global.remove_from_karabiner",
+	"notify.karabiner.removed",
 }
 
 -- The texts about the user's own Karabiner-Elements, which Ergopti's own runtime
@@ -160,6 +166,9 @@ helpers.describe("no macOS tray text names Karabiner, in any locale", function()
 			end
 			for _, key in ipairs(RETIRED_KEYS) do
 				helpers.assert_nil(locale[key], key .. " belonged to the retired enable toggle (" .. code .. ")")
+			end
+			for _, key in ipairs(DELETED_SWITCH_KEYS) do
+				helpers.assert_nil(locale[key], key .. " belonged to the deleted Karabiner switch rows (" .. code .. ")")
 			end
 		end)
 	end

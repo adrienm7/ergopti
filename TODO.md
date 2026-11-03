@@ -598,8 +598,6 @@ between workers) green alone. All live checks pass, typed by the harness.
   `RemapLeaseGuardian.swift`), and an Ergopti-signed DriverKit extension in `Contents/Library/SystemExtensions`
   activated with `OSSystemExtensionRequest` (needs Apple's DriverKit HID entitlements for the team). The root Core
   keeps its own Input Monitoring row either way: launchd starts it, not Ergopti.
-- **When the owned Karabiner is the one used:** delete the Configuration rows `menu.global.karabiner_integration` and
-  `menu.global.remove_from_karabiner` (`macos/ui/menu/remap_switch.lua`), which act on the installed Karabiner.
 - **Owned runtimes.** The rows in state "to do" of `_shared/data/owned_runtimes.json` are all item 31 (shared
   Karabiner app, owned runtime, VirtualHIDDevice). The Swift-owned managed daemon under the proxy relay needs a short
   design note first (who launches the relay, how its refusal receipt reaches the Swift owner; Swift and Go). Done on 1

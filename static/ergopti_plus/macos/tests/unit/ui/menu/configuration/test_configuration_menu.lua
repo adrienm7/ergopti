@@ -150,12 +150,12 @@ end)
 
 -- ============================================
 -- ============================================
--- ======= 3/ Ergopti Uses Karabiner ==========
+-- ======= 3/ No Karabiner Switch =============
 -- ============================================
 -- ============================================
 
 --- Builds the Configuration submenu over a remap owner double.
---- @param enabled boolean Current « Ergopti uses Karabiner » state.
+--- @param enabled boolean What the remap owner reports for `integration_enabled`.
 --- @param calls table Receives the owner requests.
 --- @return table|nil rows
 local function rows_with_karabiner(enabled, calls)
@@ -168,11 +168,6 @@ local function rows_with_karabiner(enabled, calls)
 		set_enabled = function(value, on_done)
 			calls[#calls + 1] = "set_enabled:" .. tostring(value)
 			on_done(true, "stopped")
-			return true
-		end,
-		remove_from_karabiner = function(on_done)
-			calls[#calls + 1] = "remove_from_karabiner"
-			on_done(true, "removed", 2)
 			return true
 		end,
 	}
@@ -196,10 +191,14 @@ local function row_titled(rows, title)
 	return nil
 end
 
-helpers.describe("configuration submenu (macOS): « Ergopti uses Karabiner »", function()
-	helpers.it("draws the switch ticked from the remap owner and the removal after the configuration windows", function()
+helpers.describe("configuration submenu (macOS): no row acts on the user's Karabiner", function()
+	helpers.it("draws no Karabiner switch or removal, whatever the remap owner reports", function()
+		-- Ergopti runs its own remapping runtime (ADR 011): « Ergopti uses
+		-- Karabiner » and « Remove Ergopti from Karabiner » acted on the user's
+		-- Karabiner-Elements and were deleted with the owned default.
 		for _, enabled in ipairs({ true, false }) do
-			local rows = rows_with_karabiner(enabled, {})
+			local calls = {}
+			local rows = rows_with_karabiner(enabled, calls)
 			local drawn = {}
 			for index, row in ipairs(rows) do drawn[index] = row.title end
 			helpers.assert_eq(table.concat(drawn, ", "), table.concat({
@@ -210,26 +209,13 @@ helpers.describe("configuration submenu (macOS): « Ergopti uses Karabiner »", 
 				"-",
 				"menu.global.config_folder",
 				"menu.global.setup_wizard",
-				"menu.global.karabiner_integration",
-				"menu.global.remove_from_karabiner",
 				"-",
 				"menu.debug.proxy_override",
 			}, ", "))
-			helpers.assert_eq(row_titled(rows, "menu.global.karabiner_integration").checked, enabled)
+			helpers.assert_nil(row_titled(rows, "menu.global.karabiner_integration"))
+			helpers.assert_nil(row_titled(rows, "menu.global.remove_from_karabiner"))
+			helpers.assert_eq(#calls, 0, "building the menu asks nothing of the remap owner")
 		end
-	end)
-
-	helpers.it("turns the switch to the opposite state and removes through the owner", function()
-		local calls = {}
-		local rows = rows_with_karabiner(true, calls)
-		row_titled(rows, "menu.global.karabiner_integration").fn()
-		row_titled(rows, "menu.global.remove_from_karabiner").fn()
-		helpers.assert_eq(table.concat(calls, ", "), "set_enabled:false, remove_from_karabiner")
-
-		calls = {}
-		rows = rows_with_karabiner(false, calls)
-		row_titled(rows, "menu.global.karabiner_integration").fn()
-		helpers.assert_eq(table.concat(calls, ", "), "set_enabled:true")
 	end)
 end)
 

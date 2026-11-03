@@ -26,10 +26,12 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = ['windows', 'macos', 'linux'];
 const RETIRED = 'macos/ui/menu/menu_llm/live_mode_panel.lua';
 // The tray model list retired with the model selector page (2026-10-27), the
-// Windows chord switches with schema v19.
+// Windows chord switches with schema v19, the macOS Karabiner switch rows with
+// the owned runtime default.
 const RETIRED_SOURCES = new Set([
 	RETIRED,
 	'macos/ui/menu/menu_llm/models_selector.lua',
+	'macos/ui/menu/remap_switch.lua',
 	'windows/modules/shortcuts/ctrl.ahk'
 ]);
 const TOOL = 'tools/test/test-native-menu-rows.cjs';
@@ -113,7 +115,7 @@ function rows(driver, count) {
 			// The immutable legacy classifier still receives every original excerpt.
 			// Current fixture actors cannot resurrect retired menu identities.
 			const retired =
-				/\b(?:models_selector|ModelsSelector|live_mode_panel|LiveModePanel|llm_live_mode(?:_off)?|llm_live_controls|llm_live_is_off|llm_live_off_ready|llm_live_off_boundary|LLM_Menu_BuildLiveModeMenu|_LLM_Menu_LiveModeRows|_LLM_Menu_MakeLiveModeHandler)\b/i;
+				/\b(?:models_selector|ModelsSelector|remap_switch|live_mode_panel|LiveModePanel|llm_live_mode(?:_off)?|llm_live_controls|llm_live_is_off|llm_live_off_ready|llm_live_off_boundary|LLM_Menu_BuildLiveModeMenu|_LLM_Menu_LiveModeRows|_LLM_Menu_MakeLiveModeHandler)\b/i;
 			return !RETIRED_SOURCES.has(entry.rel) && !retired.test(entry.source);
 		});
 	assert.ok(

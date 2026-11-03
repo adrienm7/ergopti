@@ -69,6 +69,7 @@ local function run_disabled_init(removal_succeeds)
 			compute_non_canonical_combos = function() return {} end,
 			load_user_config = function()
 				return {
+					runtime = "shared",
 					enabled = false,
 					tap_hold_config = { left_shift = { tap = "none", hold = "none" } },
 					mod_combos_config = {},

@@ -77,6 +77,8 @@ helpers.describe("enabled preference conditional publication ownership", functio
 				package.loaded["adapters.file_system"] = fs
 				package.loaded["platform.remap.config"] = nil
 				local actual = helpers.load_with_stubs("platform.remap.config")
+				-- A Mac on the shared runtime; Ergopti's own runtime is the product default.
+				actual.RUNTIME_DEFAULT = "shared"
 				local receipts = {}
 				configured.save_user_config = function(...)
 					local saved, detail, receipt = actual.save_user_config(...)
