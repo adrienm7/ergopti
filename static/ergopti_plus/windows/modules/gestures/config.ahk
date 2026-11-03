@@ -1108,9 +1108,25 @@ GestureBuildSetupInstructions() {
 		Labels := GestureShortcutLabels()
 		for _, Slot in GestureSlotIds() {
 				Body .= "  " . t("gesture.slots." . Slot) . " :  "
-						. Labels[Slot] . "`n"
+						. GestureShortcutText(Labels[Slot]) . "`n"
 		}
 		return Body
+}
+
+; One tutorial shortcut as the user reads it: its modifiers named by the shared
+; key name table (« Ctrl + Win + Maj + F1 »), the function key as written. The
+; tutorial used to print the English « Shift » in every locale.
+; @param Ids {String} Key name ids joined with "+", the key last ("ctrl+win+shift+F1").
+; @returns {String}
+GestureShortcutText(Ids) {
+		Parts := StrSplit(Ids, "+")
+		if (Parts.Length < 2)
+				throw ValueError("A gesture shortcut names its modifiers and its key.", -1, Ids)
+		Key := Parts.Pop()
+		Text := ""
+		for Modifier in Parts
+				Text .= KeyNameLabel(Modifier) . " + "
+		return Text . Key
 }
 
 ; Public entry point: shows the gesture setup tutorial in a single panel with
