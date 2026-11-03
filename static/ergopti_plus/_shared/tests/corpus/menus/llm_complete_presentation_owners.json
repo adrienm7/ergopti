@@ -96,32 +96,26 @@
 		},
 		{
 			"parent": "llm_generation_settings",
-			"section": "llm_generation_native_controls",
+			"section": "llm_generation_context_controls",
 			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk",
 				"hs": "macos/ui/menu/menu_llm/init.lua"
 			},
 			"signatures": {
+				"ahk": "_LLM_Menu_GenerationContextRows() {",
 				"hs": "local function build_item()"
-			}
-		},
-		{
-			"parent": "llm_generation_settings",
-			"section": "llm_generation_context_controls",
-			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk"
-			},
-			"signatures": {
-				"ahk": "_LLM_Menu_GenerationRows() {"
 			}
 		},
 		{
 			"parent": "llm_generation_settings",
 			"section": "llm_generation_word_controls",
 			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk"
+				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk",
+				"hs": "macos/ui/menu/menu_llm/init.lua"
 			},
 			"signatures": {
-				"ahk": "_LLM_Menu_GenerationRows() {"
+				"ahk": "_LLM_Menu_GenerationRows() {",
+				"hs": "local function build_item()"
 			}
 		},
 		{

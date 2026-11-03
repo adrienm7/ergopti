@@ -1316,9 +1316,6 @@ local function create_menu(deps)
 					if not reset_rows then return {} end
 					for _, row in ipairs(reset_rows) do generation_rows[#generation_rows + 1] = row end
 				end
-				local count_boundary_rows = ManifestMenu.template_rows("llm_generation_count_boundary", {}, {}, {})
-				if not count_boundary_rows then return {} end
-				for _, row in ipairs(count_boundary_rows) do generation_rows[#generation_rows + 1] = row end
 
 				local mw_min = tonumber(state.llm_min_words)
 				local min_words_display = (mw_min and mw_min > 0) and tostring(mw_min) or "1"
@@ -1326,7 +1323,7 @@ local function create_menu(deps)
 				local max_words_display = (mw_max and mw_max > 0) and tostring(mw_max) or i18n.get("menu.llm.unlimited")
 				local default_max_display = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0)
 					and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or i18n.get("menu.llm.unlimited")
-				local native_generation_rows = ManifestMenu.template_rows("llm_generation_native_controls", {
+				local generation_commands = {
 					[require("config_keys").COMMAND.LLM_GENERATION_CONTEXT] = settings_mgr.set_context_length,
 					[require("config_keys").COMMAND.LLM_GENERATION_CONTEXT_RESET] = settings_mgr.reset_context_length,
 					[require("config_keys").COMMAND.LLM_GENERATION_MIN_WORDS] = settings_mgr.set_min_words,
@@ -1341,7 +1338,8 @@ local function create_menu(deps)
 							publish_setting = false,
 						})
 					end,
-				}, {
+				}
+				local generation_getters = {
 					llm_generation_ready = function() return not is_disabled end,
 					llm_generation_context_caption = function() return tostring(state.llm_context_length) end,
 					llm_generation_context_reset_caption = function() return tostring(llm_mod.DEFAULT_STATE.llm_context_length) end,
@@ -1353,9 +1351,12 @@ local function create_menu(deps)
 					llm_generation_max_words_caption = function() return max_words_display end,
 					llm_generation_max_words_reset_caption = function() return default_max_display end,
 					llm_generation_max_words_reset_present = function() return state.llm_max_words ~= llm_mod.DEFAULT_STATE.llm_max_words end,
-				}, {})
-				if not native_generation_rows then return {} end
-				for _, row in ipairs(native_generation_rows) do generation_rows[#generation_rows + 1] = row end
+				}
+				local word_rows = ManifestMenu.template_rows("llm_generation_word_controls", generation_commands, generation_getters, {})
+				if not word_rows then return {} end
+				for _, row in ipairs(word_rows) do generation_rows[#generation_rows + 1] = row end
+				local context_rows = ManifestMenu.template_rows("llm_generation_context_controls", generation_commands, generation_getters, {})
+				if not context_rows then return {} end
 
 				local generation_ctx = TempPanel.build({
 						state        = state,
@@ -1369,6 +1370,7 @@ local function create_menu(deps)
 				if not generation_ctx then return {} end
 				child_group_for("llm_generation_settings", ManifestMenu.build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
 					["llm_generation_values"] = function() return generation_rows end,
+					["llm_generation_context_values"] = function() return context_rows end,
 				}), MenuLayout.row_disabled("llm_generation_settings", is_disabled, paused))
 
 

@@ -938,6 +938,13 @@
 			"disabled_when": [
 				"llm_auto_raise_ready"
 			]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "list",
+			"id": "llm_generation_context_values"
 		}
 	],
 	"agent_menu": [
@@ -3320,34 +3327,6 @@
 			"unavailable": "hide"
 		}
 	],
-	"llm_generation_count_boundary": [
-		{
-			"type": "---",
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
-		}
-	],
-	"llm_generation_context_boundary": [
-		{
-			"type": "---",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "hide"
-		}
-	],
-	"llm_generation_words_boundary": [
-		{
-			"type": "---",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "hide"
-		}
-	],
 	"llm_api_add_provider_group": [
 		{
 			"type": "group",
@@ -4790,16 +4769,6 @@
 			"type": "include",
 			"section": "llm_generation_max_words_reset_control",
 			"present_when": "llm_generation_max_words_reset_present"
-		}
-	],
-	"llm_generation_native_controls": [
-		{
-			"type": "include",
-			"section": "llm_generation_context_controls"
-		},
-		{
-			"type": "include",
-			"section": "llm_generation_word_controls"
 		}
 	],
 	"llm_api_active_boundary": [

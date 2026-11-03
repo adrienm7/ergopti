@@ -835,14 +835,10 @@ local function _build_llm(ctx)
 			Logger.error(LOG, "LLM settings unavailable — the generation rows cannot be built.")
 			return {}
 		end
-		local rows = {}
-		rows[#rows + 1] = suggestion_count_row()
-		for _, setting in ipairs({
-			{ name = "temperature", key = "menu.llm.generation.temperature" },
-			{ name = "context_length", key = "menu.llm.generation.context_length" },
-			{ name = "min_words", key = "menu.llm.min_words_label", formatted = true },
-			{ name = "max_words", key = "menu.llm.max_words_label", formatted = true },
-		}) do
+		--- One numeric setting's row with its presets and free entry.
+		--- @param setting table { name, key, formatted? }
+		--- @return table row
+		local function numeric_row(setting)
 			local current = Settings.get(setting.name)
 			local choices = {}
 			for _, value in ipairs(Settings.presets(setting.name)) do
@@ -884,12 +880,22 @@ local function _build_llm(ctx)
 				for _, row in ipairs(custom_rows or {}) do choices[#choices + 1] = row end
 			end
 
-			rows[#rows + 1] = {
+			return {
 				label = setting.formatted and string.format(i18n_safe(setting.key), current)
 					or (i18n_safe(setting.key) .. " — " .. tostring(current)),
 				items = choices,
 			}
 		end
+		local rows = {}
+		rows[#rows + 1] = suggestion_count_row()
+		for _, setting in ipairs({
+			{ name = "min_words", key = "menu.llm.min_words_label", formatted = true },
+			{ name = "max_words", key = "menu.llm.max_words_label", formatted = true },
+			{ name = "temperature", key = "menu.llm.generation.temperature" },
+		}) do
+			rows[#rows + 1] = numeric_row(setting)
+		end
+		local context_rows = { numeric_row({ name = "context_length", key = "menu.llm.generation.context_length" }) }
 		--- Reads current group, pause and prediction-count facts before delivery.
 		--- @return boolean ready
 		local function ready()
@@ -913,6 +919,7 @@ local function _build_llm(ctx)
 		}
 		local generation_rows = ManifestMenu.build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
 			["llm_generation_values"] = function() return rows end,
+			["llm_generation_context_values"] = function() return context_rows end,
 		})
 		-- Whether a navigation or Escape clears the AI's typing context, the row
 		-- Windows and macOS show in the same submenu.

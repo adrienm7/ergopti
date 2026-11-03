@@ -115,6 +115,28 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 		end
 	end)
 
+	-- ai-generation-groups: Linux draws the generation rows inline, in the same two
+	-- groups with one separator as the submenu of the other drivers.
+	for state, enabled in pairs({ ["on"] = true, ["off"] = false }) do
+		helpers.it("draws the generation groups with the AI " .. state, function()
+			local i18n = require("infra.i18n")
+			local rows = submenu_of(build(fake_llm(enabled)), "menu.llm.title")
+			local head = function(key) return i18n.get(key):match("^[^%%]*") end
+			local first, last
+			for index, row in ipairs(rows) do
+				if row.title:find(head("menu.llm.num_predictions_label"), 1, true) then first = index end
+				if row.title:find(head("menu.llm.reset_on_nav"), 1, true) then last = index end
+			end
+			helpers.assert_true(first ~= nil and last ~= nil, "the generation rows are drawn")
+			require("test.ai_menu_layout_contract").assert_generation(helpers, { table.unpack(rows, first, last) }, {
+				count = head("menu.llm.num_predictions_label"), min_words = head("menu.llm.min_words_label"),
+				max_words = head("menu.llm.max_words_label"), context = head("menu.llm.generation.context_length"),
+				clear_context = head("menu.llm.reset_on_nav"),
+			}, state)
+			require("test.ai_menu_layout_contract").assert_clean_separators(helpers, rows, state)
+		end)
+	end
+
 	-- ai-test-prediction-row: model, profile and test are one block in every AI
 	-- state, closed by one separator; none lands next to another one.
 	for state, enabled in pairs({ ["on"] = true, ["off"] = false }) do

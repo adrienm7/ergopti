@@ -747,8 +747,11 @@ disabled_when = ["llm_indentation_ready"]
 type = "list"
 id = "llm_display_trailing"
 
-# Generation numeric providers retain their native prompts; the common diversity
-# checkbox has one label, checked state and current readiness owner on every OS.
+# The generation settings read in two groups on every OS, with one separator
+# (maintainer, 2026-11-02): the count, the words and the temperature, then
+# everything about the context at the bottom. Numeric providers retain their
+# native prompts; the common diversity checkbox has one label, checked state and
+# current readiness owner on every OS.
 [[menu.llm_generation_menu]]
 type = "list"
 id = "llm_generation_values"
@@ -759,6 +762,13 @@ id = "llm_auto_raise_temperature"
 i18n = "menu.llm.auto_raise_temp"
 checked_when = ["llm_auto_raise_enabled"]
 disabled_when = ["llm_auto_raise_ready"]
+
+[[menu.llm_generation_menu]]
+type = "---"
+
+[[menu.llm_generation_menu]]
+type = "list"
+id = "llm_generation_context_values"
 
 [[menu.agent_menu]]
 type = "choice"
@@ -2899,22 +2909,6 @@ i18n = "menu.extensions.header"
 platforms = ["ahk", "hs"]
 unavailable = "hide"
 
-# Native generation groups retain their existing per-driver presentation boundaries.
-[[menu.llm_generation_count_boundary]]
-type = "---"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
-
-[[menu.llm_generation_context_boundary]]
-type = "---"
-platforms = ["ahk"]
-unavailable = "hide"
-
-[[menu.llm_generation_words_boundary]]
-type = "---"
-platforms = ["ahk"]
-unavailable = "hide"
-
 [[menu.llm_api_add_provider_group]]
 type = "group"
 id = "api_add_entry"
@@ -3968,14 +3962,6 @@ section = "llm_generation_max_words_control"
 type = "include"
 section = "llm_generation_max_words_reset_control"
 present_when = "llm_generation_max_words_reset_present"
-
-[[menu.llm_generation_native_controls]]
-type = "include"
-section = "llm_generation_context_controls"
-
-[[menu.llm_generation_native_controls]]
-type = "include"
-section = "llm_generation_word_controls"
 
 # Native API selection and management boundaries retain their actual entry transactions.
 
