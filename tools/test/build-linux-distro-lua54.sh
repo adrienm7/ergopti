@@ -20,7 +20,11 @@ test "$(git -C "$luv_source" rev-parse HEAD)" = "$luv_revision"
 git -C "$luv_source" fsck --strict
 mkdir -m 0755 "$destination"
 mkdir -m 0755 "$destination/bin" "$destination/modules"
-curl --fail --silent --show-error --location --max-time 120 "$url" -o "$destination/lua.tar.gz"
+# lua.org intermittently times out (curl 28) or drops the TLS handshake (35) on
+# the hosted runners: retry each bounded attempt; the pinned digest below still
+# admits only the exact archive.
+curl --fail --silent --show-error --location --connect-timeout 30 --max-time 120 \
+    --retry 4 --retry-delay 10 --retry-all-errors "$url" -o "$destination/lua.tar.gz"
 printf '%s  %s\n' "$digest" "$destination/lua.tar.gz" | sha256sum --check
 # This archive is admitted before extraction; build the original Linux target,
 # whose exported Lua symbols bind the extension to this exact interpreter.
