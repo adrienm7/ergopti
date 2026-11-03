@@ -80,11 +80,15 @@ _MLG_LanguageRowCarriesItsFlag() {
 Test("menu layout: each hotstring language row carries its locale's flag (menu-languages-flag)",
 	_MLG_LanguageRowCarriesItsFlag)
 
-; The rows of one manifest menu, ids and separators, joined in order.
+; The rows of one manifest menu, ids, separators and section headers (which
+; carry no id), joined in order.
 _MLG_Order(MenuName) {
 	Order := ""
-	for _, Entry in _MM_GetManifestRoot()[MenuName]
-		Order .= (Order == "" ? "" : ", ") . (Entry.Get("type", "") == "---" ? "---" : Entry["id"])
+	for _, Entry in _MM_GetManifestRoot()[MenuName] {
+		Kind := Entry.Get("type", "")
+		Order .= (Order == "" ? "" : ", ") . (Kind == "---" ? "---"
+			: Kind == "section_header" && !Entry.Has("id") ? "header " . Entry["i18n"] : Entry["id"])
+	}
 	return Order
 }
 
