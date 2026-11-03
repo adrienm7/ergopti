@@ -8467,13 +8467,13 @@ console.log(
 		assert.equal(hand[code].parent, locale['menu.debug.title']);
 		// The row joins its label to its value through the locale's common.label_value.
 		assert.equal(
-			hand[code].linux[5],
+			hand[code].linux[7],
 			locale['common.label_value']
 				.replace('{1}', locale['menu.debug.log_level'])
 				.replace('{2}', 'ℹ️ INFO')
 		);
 		assert.equal(hand[code].tests, locale['menu.debug.tests']);
-		assert.equal(hand[code].hs[7], hand[code].linux[5]);
+		assert.equal(hand[code].hs[9], hand[code].linux[7]);
 	}
 	function tokenDepths(tokens) {
 		let depth = 0,
