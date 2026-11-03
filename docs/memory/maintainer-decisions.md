@@ -272,3 +272,16 @@ shared (`Catalogue.registry_source` and `registry_changes_args` in
 ## Defaults and recommended values (2 November 2026)
 
 A manifest row is a feature or a setting. A feature changes the keyboard or the behaviour: its default is neutral (off, none) and its recommended value is the Ergopti setup, so an empty config leaves the keyboard alone. A setting says how a feature works once active (prediction style and count, indentation, delays, the password and address bar filters): its recommended value equals its default. An option missing from the file takes its manifest default, not `false`. "Restore recommended" puts back every recommended value, adjusted settings included: the user wants to revert their trials. Each row declares its `family`; `test-feature-family-rule.cjs` and the generator enforce the rule, exceptions justified in the manifest (`rule_exception`, `restore_exempt_reason`).
+
+## Built-in hotstring sections wait their declared delay (3 November 2026)
+
+A built-in section waits, in order: the user's own delay (the override file, then
+on Windows the section's `time_activation_seconds` in config.toml), else the
+`time_activation_seconds` its manifest row declares, else its category file's
+`[_meta]` delay, else the 0.75 s base. The base is only for sections that
+declare nothing (the user's personal files, rows without a delay). Every driver
+reads it through `hotstrings.languages.section_default_delay` or its AHK twin
+`HotstringsSectionDefaultDelay`. "Restore recommended" keeps writing the
+recommended value where the inheritance differs, so today it writes no delay.
+A category file's `[_meta]` delay names the delay its declared sections wait,
+which the category rows of the delay menus show; a CI check pins the two equal.

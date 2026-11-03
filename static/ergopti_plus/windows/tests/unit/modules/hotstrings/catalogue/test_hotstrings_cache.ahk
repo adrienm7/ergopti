@@ -606,7 +606,10 @@ _HsCacheCommonSplitNative(Selection, ThroughTsv := false, ThroughRegistrar := fa
 			AssertEqual(Row["final_result"], Actual.FinalResult)
 			AssertEqual(false, Actual.CaseSensitive)
 			AssertEqual(Reference["source_priority"], Actual.Priority)
-			AssertEqual(Reference["meta"]["delay"], Actual.TimeActivationSeconds)
+			; Each family waits the delay its manifest row declares, not the
+			; historical file's 1.0 s (the maintainer's decision of 3 November 2026).
+			AssertEqual(ManifestValueFor("hotstrings.autocorrection." . Section . ".time_activation_seconds", "default"),
+				Actual.TimeActivationSeconds)
 			AssertTrue(HSE_RegistryByGroup.Has("autocorrection." . Section), "the current section owns its native registrations")
 		}
 		for ExpansionCase in [
