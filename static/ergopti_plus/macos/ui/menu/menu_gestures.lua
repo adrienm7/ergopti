@@ -311,6 +311,18 @@ function M.build(ctx)
 
 		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
 
+		-- A slot whose macOS gesture is on is greyed with a short suffix and the
+		-- engine holds it back (never a double action); the Infos dialog says
+		-- where to turn the macOS gesture off. The row stays short on purpose.
+		local system_state = type(gestures.system_slot_state) == "function"
+			and gestures.system_slot_state(slot) or "free"
+		local held_suffix = (system_state == "taken" and i18n.get("menu.gestures.slot_taken_by_macos"))
+			or (system_state == "unverified" and i18n.get("menu.gestures.slot_unverified_macos"))
+			or nil
+		local rowLabel = LabelValue.compose(i18n.get, slotLbl, actionLbl)
+			.. (held_suffix and (" — " .. held_suffix) or "")
+		local rowDisabled = not state.gestures or paused or held_suffix ~= nil or nil
+
 		-- Provider data from here down: `label` / `action` / `items`, which the
 		-- renderer materialises. These rows used to be built in this driver's own
 		-- dialect and translated one by one on the way out, so the tree was still
@@ -376,8 +388,8 @@ function M.build(ctx)
 			})
 			if not swipeSubmenu then return nil end
 			return {
-				label    = LabelValue.compose(i18n.get, slotLbl, actionLbl),
-				disabled = not state.gestures or paused or nil,
+				label    = rowLabel,
+				disabled = rowDisabled,
 				items    = swipeSubmenu,
 			}
 		end
@@ -386,8 +398,8 @@ function M.build(ctx)
 		local change_action_rows = ManifestMenu.template_rows("gesture_change_action", slot_commands, slot_getters)
 		if not change_action_rows then return nil end
 		return {
-			label    = LabelValue.compose(i18n.get, slotLbl, actionLbl),
-			disabled = not state.gestures or paused or nil,
+			label    = rowLabel,
+			disabled = rowDisabled,
 			items    = change_action_rows,
 		}
 	end
@@ -479,6 +491,12 @@ function M.build(ctx)
 		["gesture_slots_4"] = slots_provider(4),
 		["gesture_slots_5"] = slots_provider(5),
 	}
+
+	-- A macOS gesture turned on or off since the last read greys or restores its
+	-- slot: the recheck asks for the next build.
+	if type(gestures.set_system_gestures_listener) == "function" and type(ctx.updateMenu) == "function" then
+		gestures.set_system_gestures_listener(ctx.updateMenu)
+	end
 
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end

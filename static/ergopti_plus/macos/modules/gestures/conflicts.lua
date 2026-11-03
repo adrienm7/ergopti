@@ -5,6 +5,17 @@
 --- DESCRIPTION:
 --- Manages macOS system gesture conflicts to prevent double-triggering.
 --- Provides instructional alerts to guide the user in disabling native gestures.
+---
+--- FEATURES & RATIONALE:
+--- 1. Never a double action (maintainer, 2026-11-03): while a three-or-more
+---    finger macOS gesture is on, the Ergopti slots it covers are "taken"
+---    (slot_system_state): the menu greys them and the engine does not fire
+---    them. The preferences are only read, never written.
+--- 2. Two-finger touches (scroll, secondary click) never block a slot: they are
+---    the pointer itself, and the engine already leaves those axes to macOS.
+--- 3. The snapshot is re-read by a cheap timer (recheck), off the touch path, so
+---    turning a macOS gesture back on greys and suspends its slot, and turning it
+---    off brings the slot back, without a reload.
 --- ==============================================================================
 
 local M = {}
@@ -12,6 +23,7 @@ local M = {}
 local Logger      = require("infra.logger")
 local i18n        = require("infra.i18n")
 local ShellRunner = require("adapters.shell_runner")
+local Timings     = require("infra.timings")
 local TextUtils = require("text_utils")
 local LOG         = "gestures.conflicts"
 
@@ -31,10 +43,19 @@ local MACOS_PREFERENCE_COMMANDS = {
 	{ "read", "com.apple.AppleMultitouchTrackpad" },
 	{ "read", "com.apple.driver.AppleBluetoothMultitouch.trackpad" },
 	{ "-currentHost", "read", "-globalDomain" },
+	-- The Dock owns the Mission Control and App Exposé switches of the
+	-- vertical swipes (showMissionControlGestureEnabled, showAppExposeGestureEnabled).
+	{ "read", "com.apple.dock" },
 }
 
 local cached_preferences = {}
+-- False until one complete read is published: before it nothing is known, so
+-- no slot is reported taken (the boot read follows within a second).
+local snapshot_ready = false
 local pending_probe = nil
+-- The recheck timer and whoever wants to hear that a slot changed state.
+local watch_handle = nil
+local state_listener = nil
 local boot_notified = false
 -- Last logged posture per system group ("conflict" or "disabled"). Every menu
 -- rebuild asks for the active conflicts, so only a change is worth a line.
@@ -61,10 +82,16 @@ local MACOS_PREFERENCE_KEYS = {
 	"com.apple.trackpad.fourFingerHorizSwipeGesture",
 	"TrackpadFourFingerVertSwipeGesture",
 	"com.apple.trackpad.fourFingerVertSwipeGesture",
+	"showMissionControlGestureEnabled",
+	"showAppExposeGestureEnabled",
 }
 
 -- Each group maps a human-readable description to the slots that conflict with
--- a built-in macOS gesture, plus the exact preferences that disable it
+-- a built-in macOS gesture, plus the exact preferences that disable it.
+-- `blocks` marks the groups whose slots are taken while the macOS gesture is
+-- on; `absent_on` is what an unwritten preference means, the macOS default
+-- (three-finger swipes are off in a default install, four-finger ones on);
+-- `dock` is the Dock switch the vertical swipes also need, with its default.
 local MACOS_GESTURE_GROUPS = {
 	{
 		key = "tap_2_conflict", slots = { "tap_2" },
@@ -96,6 +123,7 @@ local MACOS_GESTURE_GROUPS = {
 		hint         = i18n.get("gestures.conflict_hint_tap_3"),
 		settings_url = SETTINGS_URL,
 		preferences  = { "TrackpadThreeFingerTapGesture", "com.apple.trackpad.threeFingerTapGesture" },
+		blocks       = true, absent_on = true,
 	},
 	{
 		key          = "swipe_3_horiz_conflict",
@@ -105,6 +133,7 @@ local MACOS_GESTURE_GROUPS = {
 		settings_url = SETTINGS_URL,
 		preferences  = { "TrackpadThreeFingerHorizSwipeGesture", "com.apple.trackpad.threeFingerHorizSwipeGesture" },
 		drag_preferences = THREE_FINGER_DRAG_KEYS,
+		blocks       = true, absent_on = false,
 	},
 	{
 		key          = "swipe_3_vert_conflict",
@@ -114,6 +143,7 @@ local MACOS_GESTURE_GROUPS = {
 		settings_url = SETTINGS_URL,
 		preferences  = { "TrackpadThreeFingerVertSwipeGesture", "com.apple.trackpad.threeFingerVertSwipeGesture" },
 		drag_preferences = THREE_FINGER_DRAG_KEYS,
+		blocks       = true, absent_on = false,
 	},
 	{
 		key          = "swipe_4_horiz_conflict",
@@ -122,18 +152,35 @@ local MACOS_GESTURE_GROUPS = {
 		hint         = i18n.get("gestures.conflict_hint_swipe_4_horiz"),
 		settings_url = SETTINGS_URL,
 		preferences  = { "TrackpadFourFingerHorizSwipeGesture", "com.apple.trackpad.fourFingerHorizSwipeGesture" },
+		blocks       = true, absent_on = true,
 	},
+	-- The vertical swipes are two macOS gestures: up is Mission Control (on by
+	-- default), down is App Exposé (off by default), each with its Dock switch.
 	{
-		key          = "swipe_4_vert_conflict",
-		slots        = { 
-			"swipe_4_up", "swipe_4_down", "swipe_5_up", "swipe_5_down",
-			"swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down",
-			"swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down"
+		key          = "swipe_4_up_conflict",
+		slots        = {
+			"swipe_4_up", "swipe_5_up",
+			"swipe_4_left_up", "swipe_4_right_up", "swipe_5_left_up", "swipe_5_right_up",
 		},
 		description  = i18n.get("gestures.conflict_desc_swipe_4_vert"),
 		hint         = i18n.get("gestures.conflict_hint_swipe_4_vert"),
 		settings_url = SETTINGS_URL,
 		preferences  = { "TrackpadFourFingerVertSwipeGesture", "com.apple.trackpad.fourFingerVertSwipeGesture" },
+		dock         = { key = "showMissionControlGestureEnabled", absent_on = true },
+		blocks       = true, absent_on = true,
+	},
+	{
+		key          = "swipe_4_down_conflict",
+		slots        = {
+			"swipe_4_down", "swipe_5_down",
+			"swipe_4_left_down", "swipe_4_right_down", "swipe_5_left_down", "swipe_5_right_down",
+		},
+		description  = i18n.get("gestures.conflict_desc_swipe_4_vert"),
+		hint         = i18n.get("gestures.conflict_hint_swipe_4_vert"),
+		settings_url = SETTINGS_URL,
+		preferences  = { "TrackpadFourFingerVertSwipeGesture", "com.apple.trackpad.fourFingerVertSwipeGesture" },
+		dock         = { key = "showAppExposeGestureEnabled", absent_on = false },
+		blocks       = true, absent_on = true,
 	},
 }
 
@@ -227,6 +274,7 @@ function M.refresh(on_done)
 			probe.remaining = probe.remaining - 1
 			if probe.remaining ~= 0 then return end
 			cached_preferences = probe.values
+			snapshot_ready = true
 			pending_probe = nil
 			if next(cached_preferences) == nil then
 				Logger.warn(LOG, "System gesture preferences are unavailable; conflicts remain unverified.")
@@ -260,13 +308,51 @@ local function preference_is_disabled(keys, preferences)
 	return found
 end
 
---- Native dragging and swiping are independent policies, not aliases of each other.
+--- Whether one macOS policy is on: any observed non-zero value, all observed
+--- values zero means off, and no value at all means the macOS default.
+--- @param keys table Native aliases for one policy.
+--- @param preferences table Cached native values.
+--- @param absent_on boolean What an unwritten preference means.
+--- @return boolean on
+local function preference_on(keys, preferences, absent_on)
+	local found = false
+	for _, key in ipairs(keys) do
+		for _, value in ipairs(preferences[key] or {}) do
+			found = true
+			if value ~= 0 then return true end
+		end
+	end
+	if found then return false end
+	return absent_on == true
+end
+
+--- Native dragging and swiping are independent policies, not aliases of each
+--- other. A vertical swipe whose Dock switch is off does nothing in macOS.
 --- @param grp table Gesture conflict group.
 --- @param preferences table Cached native values.
 --- @return boolean disabled
 local function macos_gesture_is_disabled(grp, preferences)
+	if grp.dock and not preference_on({ grp.dock.key }, preferences, grp.dock.absent_on) then
+		return true
+	end
 	return preference_is_disabled(grp.preferences, preferences)
 		and (not grp.drag_preferences or preference_is_disabled(grp.drag_preferences, preferences))
+end
+
+--- Whether the macOS gesture of a blocking group is on, with the macOS
+--- defaults for unwritten preferences. A three-finger drag turns the
+--- three-finger swipes into drags, so it takes them too.
+--- @param grp table Gesture conflict group.
+--- @param preferences table Cached native values.
+--- @return boolean on
+local function system_gesture_on(grp, preferences)
+	if grp.drag_preferences and preference_on(grp.drag_preferences, preferences, false) then
+		return true
+	end
+	if grp.dock and not preference_on({ grp.dock.key }, preferences, grp.dock.absent_on) then
+		return false
+	end
+	return preference_on(grp.preferences, preferences, grp.absent_on == true)
 end
 
 
@@ -327,6 +413,7 @@ function M.apply_all_overrides(active_actions, is_enabled)
 		Logger.error(LOG, "apply_all_overrides(): active_actions must be a table.")
 		return
 	end
+	M.start_watch()
 	return M.refresh(function()
 		if boot_notified or not is_enabled or is_enabled() ~= true then return end
 		boot_notified = true
@@ -355,6 +442,94 @@ function M.active_conflicts(actions)
 	return warnings
 end
 
+--- Whether macOS itself uses a slot's gesture right now.
+--- "taken": the macOS gesture is on, so the slot is greyed and never fired;
+--- "unverified": the read completed but returned nothing, so it is held too;
+--- "free": no blocking macOS gesture, or nothing read yet (the boot read).
+--- @param slot string Gesture slot identifier.
+--- @return string state "free", "taken" or "unverified".
+function M.slot_system_state(slot)
+	if not snapshot_ready then return "free" end
+	local grp = SLOT_TO_GROUP[slot]
+	if not grp or grp.blocks ~= true then return "free" end
+	if next(cached_preferences) == nil then return "unverified" end
+	return system_gesture_on(grp, cached_preferences) and "taken" or "free"
+end
+
+--- Whether the engine must hold a slot back; a cheap table read, safe on the
+--- touch path.
+--- @param slot string Gesture slot identifier.
+--- @return boolean held
+function M.slot_held_by_system(slot)
+	return M.slot_system_state(slot) ~= "free"
+end
+
+--- The macOS gesture that takes a slot, for the Infos dialog and the log.
+--- @param slot string Gesture slot identifier.
+--- @return string|nil description
+function M.slot_system_gesture(slot)
+	local grp = SLOT_TO_GROUP[slot]
+	return grp and grp.blocks == true and grp.description or nil
+end
+
+--- The state of every blocking slot, to compare two reads.
+--- @return string digest
+local function state_digest()
+	local parts = {}
+	for _, grp in ipairs(MACOS_GESTURE_GROUPS) do
+		if grp.blocks == true then
+			parts[#parts + 1] = grp.key .. "=" .. M.slot_system_state(grp.slots[1])
+		end
+	end
+	return table.concat(parts, ",")
+end
+
+--- Reads the preferences again and tells the listener when a slot changed
+--- state, so the menu greys or restores it without a reload.
+--- @return boolean accepted
+function M.recheck()
+	local before = state_digest()
+	return M.refresh(function()
+		if state_digest() == before then return end
+		Logger.info(LOG, "System gesture settings changed: %s.", state_digest())
+		if type(state_listener) == "function" then
+			local ok, err = xpcall(state_listener, debug.traceback)
+			if not ok then Logger.error(LOG, "Gesture state listener failed: %s.", tostring(err)) end
+		end
+	end)
+end
+
+--- Names who hears a slot change state (the menu's rebuild request).
+--- @param listener function|nil Called with no argument after a change.
+function M.set_state_listener(listener)
+	state_listener = type(listener) == "function" and listener or nil
+end
+
+--- Re-reads the preferences on a slow timer, off the touch path: a `defaults
+--- read` per domain, never a watcher on the hot path.
+--- @param scheduler table|nil TimerScheduler-like { every, cancel } (tests).
+--- @return boolean started
+function M.start_watch(scheduler)
+	if watch_handle then return true end
+	local timers = scheduler or require("adapters.timer_scheduler")
+	local handle, committed = timers.every(Timings.sec("gestures", "system_prefs_recheck_ms"),
+		function() M.recheck() end)
+	if not handle or committed ~= true then
+		Logger.error(LOG, "The system gesture settings recheck could not be scheduled.")
+		return false
+	end
+	watch_handle = { handle = handle, timers = timers }
+	Logger.debug(LOG, "System gesture settings recheck armed.")
+	return true
+end
+
+--- Stops the recheck timer.
+function M.stop_watch()
+	local watch = watch_handle
+	watch_handle = nil
+	if watch then watch.timers.cancel(watch.handle) end
+end
+
 --- Reports native pinch configuration without inventing an Ergopti pinch slot.
 --- @return boolean|nil enabled Nil means the native setting was not readable.
 function M.native_pinch_enabled()
@@ -372,6 +547,7 @@ end
 
 --- Cancels owned probes during shutdown; system preferences are never modified.
 function M.restore_all_overrides()
+	M.stop_watch()
 	local probe = pending_probe
 	pending_probe = nil
 	if probe then
