@@ -492,6 +492,7 @@ InstallSendNoOps()
 #Include unit/modules/gestures/test_gesture_unhook_ownership.ahk
 #Include unit/ui/menu/test_tray_root_lifecycle_retained.ahk
 #Include unit/ui/menu/test_tray_bootstrap_publication_transaction.ahk
+#Include unit/ui/menu/test_tray_startup_click_waits_for_input.ahk
 #Include unit/infra/lifecycle/test_boot_menu_wait_clock.ahk
 #Include unit/modules/llm/menu/test_llm_menu_build_coordinator.ahk
 #Include unit/modules/hotstrings/catalogue/test_hotstring_count_policy.ahk
