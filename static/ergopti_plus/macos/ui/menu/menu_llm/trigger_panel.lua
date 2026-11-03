@@ -225,6 +225,11 @@ function M.build(ctx)
 				return apply_setting_transaction(settings_mgr, ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING,
 					not state.llm_after_hotstring, "set_llm_after_hotstring")
 			end,
+			[ConfigKeys.COMMAND.LLM_WHILE_HOTSTRING_TOOLTIP] = function(value)
+				if not ready() or state.llm_while_hotstring_tooltip == value then return false end
+				return apply_setting_transaction(settings_mgr, ConfigKeys.COMMAND.LLM_WHILE_HOTSTRING_TOOLTIP,
+					value, "set_llm_while_hotstring_tooltip")
+			end,
 		},
 		state_getters = {
 			["llm_url_bar_filter_enabled"] = function() return state.llm_url_bar_filter_enabled end,
@@ -233,6 +238,7 @@ function M.build(ctx)
 			["llm_secure_field_filter_ready"] = function() return PrivacyPolicy.ready(secure_source) end,
 			["llm_instant_on_word_end_enabled"] = function() return state.llm_instant_on_word_end end,
 			["llm_after_hotstring_enabled"] = function() return state.llm_after_hotstring end,
+			[ConfigKeys.KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP] = function() return state.llm_while_hotstring_tooltip end,
 			["llm_trigger_ready"] = ready,
 		},
 	}

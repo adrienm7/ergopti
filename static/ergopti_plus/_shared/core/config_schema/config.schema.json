@@ -251,6 +251,7 @@
 						"min_request_interval_ms": { "type": "integer", "minimum": 0 },
 						"instant_on_word_end": { "type": "boolean" },
 						"after_hotstring": { "type": "boolean" },
+						"while_hotstring_tooltip": { "type": "string", "enum": ["wait", "both"] },
 						"inline_autotype": { "type": "boolean" },
 						"secure_filter_enabled": { "type": "boolean" },
 						"url_bar_filter_enabled": { "type": "boolean" },

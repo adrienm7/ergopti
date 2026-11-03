@@ -509,6 +509,29 @@ function _debounce.input(event)
 	return _debounce.plan:on_input(event)
 end
 
+--- Whether suggestions are drawn together with the hotstring rows: the
+--- llm.trigger.while_hotstring_tooltip value "both" (the manifest owns the list).
+--- @return boolean
+function M.shows_with_hotstring_rows()
+	return TriggerSettings.get(require("config_keys").LEAF.WHILE_HOTSTRING_TOOLTIP) == "both"
+end
+
+--- Whether an automatic or live suggestion must leave the window to the
+--- hotstring preview shown now. Covering it would hide a hotstring that can
+--- still expand, so every such request waits unless the user chose to see
+--- both; a live one always waits, its tooltip following every keystroke.
+--- @param live boolean
+--- @return boolean
+function _debounce.preview_holds(live)
+	-- Injected by init(): whether a hotstring preview that can still expand holds
+	-- the shared tooltip window (ui/tooltip/preview.lua is_showing).
+	local provider = _debounce.preview_showing
+	if type(provider) ~= "function" then return false end
+	local ok, showing = pcall(provider)
+	if not ok or showing ~= true then return false end
+	return live == true or not M.shows_with_hotstring_rows()
+end
+
 local function schedule(context, output_context, event, live)
 	if type(context) ~= "string" or context == "" then return false end
 	local decisions = _debounce.input(event)
@@ -534,6 +557,12 @@ local function schedule(context, output_context, event, live)
 		-- A timer a newer keystroke or a cancel already superseded sends nothing.
 		if _debounce.plan:on_timer(arm.token)[1].action ~= "fire" then return end
 		_pending_trigger = nil
+		-- A preview drawn since the timer was armed keeps the window; its
+		-- expiry asks again (on_hotstring_expired).
+		if (captured.automatic or live) and _debounce.preview_holds(live) then
+			Logger.debug(LOG, "%s prediction deferred: a hotstring tooltip is shown.", live and "Live" or "Automatic")
+			return
+		end
 		if not live then
 			M.predict(context, captured)
 			return
@@ -606,6 +635,8 @@ function M.init(opts)
 	_is_paused = type(options.is_paused) == "function" and options.is_paused or NEVER_PAUSED
 	_notify = type(options.notify) == "function" and options.notify or nil
 	_privacy_guard, _privacy_context = options.privacy_guard, options.privacy_context
+	_debounce.preview_showing = type(options.hotstring_preview_showing) == "function"
+		and options.hotstring_preview_showing or nil
 	_read_selection = type(options.read_selection) == "function" and options.read_selection or nil
 	_replace_selection = type(options.replace_selection) == "function" and options.replace_selection or nil
 	_cancel_selection = type(options.cancel_selection) == "function" and options.cancel_selection or nil
@@ -701,9 +732,11 @@ function M.on_char(ch, buffer, output_context)
 	end
 	-- While a hotstring preview is on screen, the AI tooltip waits for it to go:
 	-- always in live mode, whose tooltip would otherwise cover it at every
-	-- keystroke; with the "after a hotstring" setting otherwise.
+	-- keystroke; unless the suggestions are shown together with it otherwise
+	-- (llm.trigger.while_hotstring_tooltip). The preview's expiry asks again
+	-- when llm.trigger.after_hotstring is on.
 	if type(output_context) == "table" and output_context.hotstring_preview_visible == true
-		and (_live or TriggerSettings.get(require("config_keys").LEAF.AFTER_HOTSTRING) == true) then return end
+		and (_live or not M.shows_with_hotstring_rows()) then return end
 	if _live then
 		-- The live prompt, count and debounce replace the menu's; a new keystroke
 		-- has already withdrawn the request in flight above.
@@ -726,6 +759,8 @@ function M.on_hotstring_expired(context, output_context)
 	if not _enabled then return false end
 	-- Live mode held its request back while the preview was shown (on_char).
 	if not _live and TriggerSettings.get(require("config_keys").LEAF.AFTER_HOTSTRING) ~= true then return false end
+	-- Shown together, the keystroke's own request already ran beside the preview.
+	if not _live and M.shows_with_hotstring_rows() then return false end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
 	if _live then return schedule(context, output_context, { cause = "expiry" }, true) end
 	return schedule(context, output_context, { cause = "expiry" })
@@ -916,6 +951,13 @@ function M.predict(context, output_context, override)
 		for index, candidate in ipairs(candidates) do visible[index] = candidate end
 		if partial then append_unique(visible, partial, 0) end
 		meta.loading = _predicting
+		-- A preview shown meanwhile keeps the window: nothing is offered, and its
+		-- expiry asks again.
+		local ctx = _suggestion_context
+		if type(ctx) == "table" and (ctx.automatic or ctx.live) and _debounce.preview_holds(ctx.live) then
+			Logger.debug(LOG, "Prediction not shown: a hotstring tooltip is shown.")
+			return
+		end
 		if #visible > 0 or meta.loading then show_candidates(visible, meta) end
 	end
 

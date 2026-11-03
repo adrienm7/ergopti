@@ -1331,7 +1331,7 @@ LLM_Bridge_FeedKeyDownIfActive(vk, IsPhysicalEvent := false) {
  * @param {Object} SurfaceToken - Optional immutable owner from the pixel commit.
  */
 LLM_Bridge_ScheduleAfterHotstring(items, SurfaceToken := 0) {
-	global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Engine
+	global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Engine, LLM_HOTSTRING_TOOLTIP_SHOW_BOTH
 	global _LLM_HOTSTRING_CHAIN_OFFSET_SEC, _LLM_INFINITE_TOOLTIP_SEC
 	global _LLM_MIN_TOOLTIP_DURATION_SEC
 
@@ -1342,6 +1342,11 @@ LLM_Bridge_ScheduleAfterHotstring(items, SurfaceToken := 0) {
 	if !(IsSet(_LLM_Engine) && _LLM_Engine["enabled"]
 			&& (_LLM_Engine[ConfigLeaf.AFTER_HOTSTRING] || LLM_Engine_LiveIsActive()))
 		return
+	; Shown together, the prediction keeps the keystroke's own debounce: pushing
+	; it past the tooltip would show the two one after the other.
+	if !LLM_Engine_LiveIsActive()
+			&& LLM_Engine_WhileHotstringTooltip() == LLM_HOTSTRING_TOOLTIP_SHOW_BOTH
+		return false
 	if !(IsObject(items) && items.Length > 0)
 		return false
 	if (IsObject(SurfaceToken)
@@ -1458,8 +1463,9 @@ _LLM_Bridge_NotifyChar(ch, Buffer, PublishGuard := unset) {
 	; Hotstring tooltip priority: if the PrefixWatcher's tooltip is visible,
 	; update the buffer but do NOT arm the LLM timer — LLM_Bridge_ScheduleAfterHotstring
 	; (fired from _LookupAndRender) owns the chain delay until
-	; the overlay closes, mirroring HS update_preview().
-	if TooltipIsVisible()
+	; the overlay closes, mirroring HS update_preview(). With
+	; llm.trigger.while_hotstring_tooltip = "both" the keystroke arms as usual.
+	if _LLM_Engine_HotstringTooltipHolds(LLM_Engine_LiveOverride())
 		return
 	; Only hide OUR tooltip — never dismiss a hotstring overlay. The canonical
 	; lifecycle emits dismissal for the exact offer this keystroke supersedes.
@@ -1537,7 +1543,7 @@ LLM_Bridge_OnBackspace() {
 		LLM_Agent_OnTyping(_LLM_Bridge_Buffer)
 
 	; Same hotstring-priority guard as OnChar.
-	if TooltipIsVisible()
+	if _LLM_Engine_HotstringTooltipHolds(LLM_Engine_LiveOverride())
 		return
 	if LLM_Tooltip_IsVisible()
 		LLM_Bridge_DeferTooltipHide()

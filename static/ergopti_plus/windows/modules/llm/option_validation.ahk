@@ -41,6 +41,9 @@ global LLM_AGENT_SETTING_KEYS := [ConfigLeaf.AGENT_SYSTEM1, ConfigLeaf.AGENT_SYS
 ; The agent's modes, in menu order: every agent action refuses, the actions
 ; only, the actions and the detection while typing.
 global LLM_AGENT_MODES := ["off", "action", "auto"]
+; The llm.trigger.while_hotstring_tooltip value that shows the hotstring rows
+; and the prediction together; the manifest owns the full value list.
+global LLM_HOTSTRING_TOOLTIP_SHOW_BOTH := "both"
 
 _LLM_Option_TryConsumeString(Value, &AggregateChars, AllowEmpty := true) {
 	global LLM_OPTION_MAX_SCALAR_CHARS, LLM_OPTION_MAX_AGGREGATE_CHARS
@@ -447,6 +450,19 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 	}
 	if (Key == ConfigLeaf.AGENT_MODE) {
 		for Mode in LLM_AGENT_MODES {
+			if (Value is String) && Value == Mode {
+				Normalized := Value
+				return true
+			}
+		}
+		return false
+	}
+	; The features manifest owns the accepted values of this enum.
+	if (Key == ConfigLeaf.WHILE_HOTSTRING_TOOLTIP) {
+		Entry := ManifestFindEntryByPath(ConfigKey.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
+		if !(Entry is Map) || !Entry.Has("enum_values")
+			return false
+		for Mode in Entry["enum_values"] {
 			if (Value is String) && Value == Mode {
 				Normalized := Value
 				return true

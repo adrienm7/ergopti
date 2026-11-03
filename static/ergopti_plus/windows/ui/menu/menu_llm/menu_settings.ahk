@@ -80,12 +80,15 @@ _LLM_Menu_NRows() {
  * URL bar filter, password field filter, and the app-exclusion picker.
  * @returns {Menu} Populated trigger submenu.
  */
-LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset, PrivacyCommands := 0) {
+LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset, PrivacyCommands := 0,
+		WhileHotstringCommand := unset) {
 	global _LLM_Menu
 	if !IsSet(InstantCommand)
 		InstantCommand := LLM_Menu_OnInstantToggle
 	if !IsSet(AfterCommand)
 		AfterCommand := (*) => LLM_Menu_ToggleBool(ConfigLeaf.AFTER_HOTSTRING)
+	if !IsSet(WhileHotstringCommand)
+		WhileHotstringCommand := LLM_Menu_SetWhileHotstringTooltip
 	UrlSource := _LLM_Menu_PrivacySnapshot("disable_url_bars")
 	SecureSource := _LLM_Menu_PrivacySnapshot("disable_password_fields")
 	return MenuRenderer_Build("llm_trigger_menu", "LLM", "", "",
@@ -93,12 +96,15 @@ LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset, Privac
 			"llm_trigger_remaining", (*) => _LLM_Menu_TriggerRows("remaining")),
 		Map(MenuCommand.LLM_INSTANT_ON_WORD_END, (*) => _LLM_Menu_TriggerReady() && InstantCommand.Call(),
 			MenuCommand.LLM_AFTER_HOTSTRING, (*) => _LLM_Menu_TriggerReady() && AfterCommand.Call(),
+			MenuCommand.LLM_WHILE_HOTSTRING_TOOLTIP, (Value, *) => _LLM_Menu_TriggerReady()
+				&& WhileHotstringCommand.Call(Value),
 			MenuCommand.LLM_URL_BAR_FILTER, (*) => _LLM_Menu_PrivacyCommand(UrlSource, "disable_url_bars",
 				PrivacyCommands is Map ? PrivacyCommands.Get("disable_url_bars", 0) : 0),
 			MenuCommand.LLM_SECURE_FIELD_FILTER, (*) => _LLM_Menu_PrivacyCommand(SecureSource, "disable_password_fields",
 				PrivacyCommands is Map ? PrivacyCommands.Get("disable_password_fields", 0) : 0)),
 		Map("llm_instant_on_word_end_enabled", (*) => _LLM_Menu[ConfigLeaf.INSTANT_ON_WORD_END],
 			"llm_after_hotstring_enabled", (*) => _LLM_Menu[ConfigLeaf.AFTER_HOTSTRING],
+			ConfigKey.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP, (*) => LLM_Menu_WhileHotstringTooltip(),
 			"llm_trigger_ready", _LLM_Menu_TriggerReady,
 			"llm_url_bar_filter_enabled", (*) => _LLM_Menu["disable_url_bars"],
 			"llm_secure_field_filter_enabled", (*) => _LLM_Menu["disable_password_fields"],

@@ -25,7 +25,9 @@ helpers.describe("llm_bridge update_preview re-arms inactivity timer when chain 
 
 		-- Find the chain block; immediately after it there must be an `elseif llm_on`
 		-- that re-arms the inactivity timer (start_timer / start_timer_word_end).
-		local chain = src:find("if fire_llm_after_hotstring and llm_on then", 1, true)
+		-- The chain also stands aside while the suggestions share the rows' stack
+		-- (llm.trigger.while_hotstring_tooltip = "both"): the same re-arm applies.
+		local chain = src:find("if fire_llm_after_hotstring and llm_on and not shown_together then", 1, true)
 		helpers.assert_true(chain ~= nil, "could not find the chain-after-hotstring block")
 		local region = src:sub(chain, chain + 1600)
 		helpers.assert_true(region:find("elseif llm_on then", 1, true) ~= nil,
