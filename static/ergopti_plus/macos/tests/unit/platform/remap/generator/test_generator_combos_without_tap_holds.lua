@@ -50,8 +50,9 @@ local TAP_HOLDS_ON_PINS = {
 	-- Re-pinned for the lone tap window (tap_holds.lone_modifier_tap_max_ms,
 	-- 1000 ms): the recommended modifier keys' tap timeout is 1000 ms. Then for
 	-- the hold labels named from the key name table, which the rule descriptions
-	-- carry (« ⇧ Maj »).
-	recommended = { rules = 27, digest = "4825a1514a21e5af" },
+	-- carry (« ⇧ Maj »). Then for the navigation-layer hold named as the hold
+	-- picker names the layer, which the left Command rule's description carries.
+	recommended = { rules = 27, digest = "2aeebd435b52486e" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the
