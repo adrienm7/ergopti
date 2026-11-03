@@ -148,6 +148,26 @@ local function tap_hold_threshold_facts()
 	return facts
 end
 
+--- What the tap-hold copy check needs, for infra/field_check_tap_copy.lua: the
+--- lone tap window, each key whose tap is copy with the tap timeout Karabiner
+--- was given, the pasteboard counter now, and the copy watch statistics.
+--- @return table facts
+local function tap_copy_facts()
+	local Remap = require("platform.remap")
+	local deployed = require("platform.remap.generator").last_tap_timeouts() or {}
+	local rollover = require("platform.remap.defaults").rollover_keys
+	local facts = { window_ms = Remap.get_lone_modifier_tap_max_ms(), keys = {},
+		change_count = (require("adapters.clipboard")._change_count()),
+		stats = require("modules.keymap").tap_copy_statistics() }
+	for _, key in ipairs(Remap.TAP_HOLD_KEYS or {}) do
+		if Remap.get_tap_action(key.id) == "copy" then
+			facts.keys[#facts.keys + 1] = { id = key.id, deployed_ms = deployed[key.id],
+				eligible = not rollover[key.id] and Remap.get_hold_action(key.id) ~= "none" }
+		end
+	end
+	return facts
+end
+
 --- The note and status of this lifecycle's guardian registration, read from memory.
 --- @return string|nil note `developer_adhoc_*`, or nil when no reset ran.
 --- @return string|nil status The registration's answer, nil before it settled.
@@ -393,6 +413,7 @@ function M.new()
 		home = function() return os.getenv("HOME") end,
 		remap_facts = remap_facts,
 		tap_hold_threshold_facts = tap_hold_threshold_facts,
+		tap_copy_facts = tap_copy_facts,
 		guardian_registration_note = guardian_registration_note,
 		keystats_facts = keystats_facts,
 		health_counts = function() return require("infra.key_event_health").counts() end,

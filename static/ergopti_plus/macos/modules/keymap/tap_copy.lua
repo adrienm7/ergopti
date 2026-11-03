@@ -79,7 +79,42 @@ function M.new(ports)
 	end
 	assert(type(ports.checker) == "table" and type(ports.checker.start) == "function",
 		"tap_copy.new: checker must be a tap_hold.copy_check checker")
-	return setmetatable({ ports = ports, down = {}, candidate = nil, released = nil }, Owner)
+	return setmetatable({ ports = ports, down = {}, candidate = nil, released = nil, stats = M.empty_stats() }, Owner)
+end
+
+-- How many press durations the statistics keep, the most recent ones.
+M.HELD_SAMPLES = 20
+
+--- Fresh session statistics for the field run (infra/field_check_tap_copy.lua):
+--- the watched copy taps since the driver started, how each ended, and the
+--- press durations, so a report from a real Mac says why copies were missing.
+--- @return table stats
+function M.empty_stats()
+	return { sent = 0, missing_past = 0, missing_within = 0, outcomes = {}, held_ms = {}, missing_held_ms = {} }
+end
+
+--- Appends one duration to a bounded sample list.
+local function sample(list, ms)
+	if type(ms) ~= "number" then return end
+	list[#list + 1] = math.floor(ms + 0.5)
+	if #list > M.HELD_SAMPLES then table.remove(list, 1) end
+end
+
+--- Counts one copy check outcome (tap_hold.copy_check).
+--- @param outcome string
+function Owner:note_outcome(outcome)
+	self.stats.outcomes[outcome] = (self.stats.outcomes[outcome] or 0) + 1
+end
+
+--- A detached copy of the session statistics.
+--- @return table stats
+function Owner:statistics()
+	local copy = M.empty_stats()
+	copy.sent, copy.missing_past, copy.missing_within = self.stats.sent, self.stats.missing_past, self.stats.missing_within
+	for outcome, count in pairs(self.stats.outcomes) do copy.outcomes[outcome] = count end
+	for _, ms in ipairs(self.stats.held_ms) do copy.held_ms[#copy.held_ms + 1] = ms end
+	for _, ms in ipairs(self.stats.missing_held_ms) do copy.missing_held_ms[#copy.missing_held_ms + 1] = ms end
+	return copy
 end
 
 --- Rounds a duration for a log line; nil reads as unknown.
@@ -98,10 +133,16 @@ function Owner:report_missing(released, why)
 	ports.defer("tap copy missing", function()
 		local tap, threshold_ms = ports.key_config(released.key_id)
 		if tap ~= COPY_ACTION then return end
-		local verdict = (type(released.held_ms) == "number" and type(threshold_ms) == "number"
-			and released.held_ms > threshold_ms)
-			and "held past the threshold, so Karabiner took it as a hold"
+		local past = type(released.held_ms) == "number" and type(threshold_ms) == "number"
+			and released.held_ms > threshold_ms
+		local verdict = past and "held past the threshold, so Karabiner took it as a hold"
 			or "within the threshold, so Karabiner cancelled the tap or its Cmd+C was lost"
+		if past then
+			self.stats.missing_past = self.stats.missing_past + 1
+		else
+			self.stats.missing_within = self.stats.missing_within + 1
+		end
+		sample(self.stats.missing_held_ms, released.held_ms)
 		ports.log("info", "Tap-hold copy: %s held %s ms (threshold %s ms) sent no Cmd+C (%s; %s).",
 			released.key_id, ms_text(released.held_ms), ms_text(threshold_ms), verdict, why)
 	end)
@@ -187,6 +228,8 @@ function Owner:key_down(event, stamp, lateness_ms)
 	ports.defer("tap copy check", function()
 		local tap, threshold_ms = ports.key_config(released.key_id)
 		if tap ~= COPY_ACTION then return end
+		self.stats.sent = self.stats.sent + 1
+		sample(self.stats.held_ms, released.held_ms)
 		ports.log("debug",
 			"Tap-hold copy: %s held %s ms (threshold %s ms); Cmd+C %s ms after its release, reached the tap %s ms late; changeCount %s.",
 			released.key_id, ms_text(released.held_ms), ms_text(threshold_ms), ms_text(gap_ms),
