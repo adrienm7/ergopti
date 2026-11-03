@@ -642,7 +642,7 @@ _PromptEdWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_PromptEdWeb_Controller)
-		try _PromptEdWeb_Controller.Fill()
+		try WebView_FitToWindow(_PromptEdWeb_Controller)
 }
 
 ; Window-close (X / Alt+F4) and the frontend "cancel" button both land here.

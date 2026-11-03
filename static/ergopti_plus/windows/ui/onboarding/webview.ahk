@@ -829,7 +829,7 @@ _OnbWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_OnbWeb_Controller)
-		try _OnbWeb_Controller.Fill()
+		try WebView_FitToWindow(_OnbWeb_Controller)
 }
 
 ; Window-close (X / Alt+F4) without committing: restore AltGr, drop the WebView2

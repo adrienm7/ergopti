@@ -623,7 +623,7 @@ _LayMgrWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_LayMgrWeb_Controller)
-		try _LayMgrWeb_Controller.Fill()
+		try WebView_FitToWindow(_LayMgrWeb_Controller)
 }
 
 _LayMgrWeb_Close(*) {

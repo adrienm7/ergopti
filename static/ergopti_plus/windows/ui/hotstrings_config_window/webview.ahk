@@ -639,7 +639,7 @@ _HCWWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_HCWWeb_Controller)
-		try _HCWWeb_Controller.Fill()
+		try WebView_FitToWindow(_HCWWeb_Controller)
 }
 
 ; Window-close (X / Alt+F4) and the frontend "close" button both land here.

@@ -182,6 +182,27 @@ page sends (bounds, schema, name, map set) and never trust it.
   there: the host sends `shortcuts: "single"` and the page locks those rows and
   says why.
 
+### One page, three hosts
+
+The three drivers load the same `_shared/ui/layout_manager/index.html` with the
+same composer script, model and stylesheet; no driver has a copy or a fork of
+them. Windows serves the shared folder from a WebView2 virtual host, macOS and
+Linux inline the same files into their WebKit view. What differs per OS comes
+from the host as data, never from a test of the platform in the page:
+`shortcuts` ("single" on Linux, above), `platform` (which registry layouts
+apply) and `shortcut_menu_path`.
+
+The window is resizable on the three OS at the `layout_manager` size of
+`_shared/ui/apps.manifest.json`. The page scales to it: the board's keys are
+placed in fractions of a board that takes the width of the view, and only the
+composer body scrolls, so the action buttons stay in a footer below it. On
+Windows the controller is parented to a placeholder control, which every Size
+handler grows to the window through `WebView_FitToWindow` before filling it
+(`infra/webview_utils.ahk`); filling alone left the page at its opening size.
+`tools/test/browser/layout-composer.playwright.cjs` measures the page in
+Chromium and WebKit at four window sizes and the AHK test
+`test_webview_fit_to_window.ahk` covers the Windows host.
+
 ## What exists already, and how it relates
 
 - **Number-row and row switches** (`layout.emulate_number_row`, `emulate_top_row`,

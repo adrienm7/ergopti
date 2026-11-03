@@ -658,7 +658,7 @@ _HsEdWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_HsEdWeb_Controller)
-		try _HsEdWeb_Controller.Fill()
+		try WebView_FitToWindow(_HsEdWeb_Controller)
 }
 
 ; Window-close (X / Alt+F4): drop the controller, clear the singleton sentinel.

@@ -1276,6 +1276,15 @@ serialize bridge payloads with the shared adapter, reject stale generations,
 and release native handlers on teardown. A page loading is not proof that its
 bridge is alive.
 
+### project-webview2-fill-reads-the-parent-control
+
+`Controller.Fill()` copies the client rect of the controller's parent window.
+When that parent is a placeholder Text control (most hosts), Fill alone keeps
+the page at the placeholder's opening size however the window is resized. A
+Size handler calls `WebView_FitToWindow(Controller)`, which grows the parent
+control to the window first; `test_webview_fit_to_window.ahk` refuses a Size
+handler that fills without resizing its host control.
+
 ### project-webview2-retained-host-document-fence
 
 A retained controller keeps native queues and virtual-host subresource caches

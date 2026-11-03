@@ -616,7 +616,7 @@ _ActPickWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_ActPickWeb_Controller)
-		try _ActPickWeb_Controller.Fill()
+		try WebView_FitToWindow(_ActPickWeb_Controller)
 }
 
 ; Window-close (X / Alt+F4) and the frontend "cancel" button both land here.

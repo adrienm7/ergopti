@@ -380,7 +380,7 @@ _PiEdWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_PiEdWeb_Controller)
-		try _PiEdWeb_Controller.Fill()
+		try WebView_FitToWindow(_PiEdWeb_Controller)
 }
 
 ; Window-close (X / Alt+F4) and the frontend "cancel" button both land here.
