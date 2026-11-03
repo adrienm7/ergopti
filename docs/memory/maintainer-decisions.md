@@ -112,9 +112,13 @@ when the AI is on and when it gets turned on, and with the AI off nothing opens.
 ## French sticky modifiers are « rémanents » (2026-10-31)
 
 The French sticky-modifier labels say « rémanent »: `📌 Maj rémanente`,
-`📌 Ctrl rémanent`, `📌 Option rémanente`, a chord `📌 Cmd+Shift rémanents`, and
+`📌 Ctrl rémanent`, `📌 Option rémanente`, a chord `📌 Cmd + Maj rémanents`, and
 the delay strings say « modificateur rémanent ». Other Latin-script locales keep
-their own wording. The French rows of
+their own wording. Since 2026-11-03 each `sg_actions.sticky_<mods>` value is a
+template (`📌 {1} rémanents`) whose `{1}` the modifiers fill from the key name
+table on the platform that shows it (`_shared/lua/actions/sticky_label.lua`,
+Win and Alt on Windows); keep the gender and number agreement in the template.
+The French rows of
 `_shared/tests/corpus/menus/script_action_original_catalogue_projection.json`
 pin the labels.
 

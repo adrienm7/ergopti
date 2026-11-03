@@ -28,7 +28,7 @@
 const fs = require('fs');
 const path = require('path');
 const TOML = require('smol-toml');
-const { TABLE, canonical, i18n } = require('../lib/key-names.cjs');
+const { TABLE, canonical, i18n, stickyModifiers } = require('../lib/key-names.cjs');
 const { shared } = require('../lib/paths.cjs');
 
 const LOCALE_COUNT = 21;
@@ -123,6 +123,32 @@ for (const key of chords.keys) {
 			errors.push(
 				`modifier chord key ${key.id} needs key_name: its legend "${key.label}" is a word`
 			);
+	}
+}
+
+// A sticky label is a template its modifiers fill from this table
+// (_shared/lua/actions/sticky_label.lua): it spelled « Cmd+Shift » in every
+// locale until 2026-11-03. sticky_hyper is named by its own word.
+const actionRows = TOML.parse(
+	fs.readFileSync(shared('modules', 'actions', 'actions.toml'), 'utf8')
+).sg_actions;
+const stickyIds = Object.keys(actionRows).filter((id) => id.startsWith('sticky_'));
+if (stickyIds.length < 15) errors.push(`only ${stickyIds.length} sticky actions found`);
+for (const id of stickyIds) {
+	let modifiers = null;
+	try {
+		modifiers = stickyModifiers(id);
+	} catch (error) {
+		errors.push(error.message);
+		continue;
+	}
+	for (const modifier of modifiers || []) resolve(modifier, `sticky action ${id}`);
+	for (const { code, data } of catalogues) {
+		const holes = String(data[`sg_actions.${id}`]).split('{1}').length - 1;
+		if (holes !== (modifiers === null ? 0 : 1))
+			errors.push(`${code}: sg_actions.${id} holds {1} ${holes} time(s)`);
+		if (modifiers !== null && /Cmd|Option|Shift|Ctrl|Maj/.test(String(data[`sg_actions.${id}`])))
+			errors.push(`${code}: sg_actions.${id} spells a key name the table should fill`);
 	}
 }
 

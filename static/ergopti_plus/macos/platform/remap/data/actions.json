@@ -9,6 +9,7 @@
 	},
 	{
 		"id": "layer",
+		"hold_layer": "nav",
 		"short_label": "Layer (hold)",
 		"label": "🗂 Layer nav. — Actif tant que maintenu",
 		"holdable": true,

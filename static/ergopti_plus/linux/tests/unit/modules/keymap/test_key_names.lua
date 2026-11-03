@@ -139,6 +139,22 @@ helpers.describe("the shared key names", function()
 		helpers.assert_eq((pcall(KeyNames.chord_label, {}, enter, "linux", fr)), false, "no modifier")
 	end)
 
+	helpers.it("key names: a sticky label names its modifiers on each platform", function()
+		-- 2026-11-03: « 📌 Cmd+Shift rémanents » in every locale, swapped to Win on Windows.
+		local StickyLabel = require("actions.sticky_label")
+		local fr, en = translator("fr"), translator("en")
+		helpers.assert_eq(StickyLabel.label("sticky_cmd_shift", "sg_actions.sticky_cmd_shift", "macos", fr),
+			"📌 Cmd + Maj rémanents")
+		helpers.assert_eq(StickyLabel.label("sticky_cmd_shift", "sg_actions.sticky_cmd_shift", "windows", fr),
+			"📌 Win + Maj rémanents")
+		helpers.assert_eq(StickyLabel.label("sticky_option", "sg_actions.sticky_option", "macos", en), "📌 Sticky Option")
+		helpers.assert_eq(StickyLabel.label("sticky_option", "sg_actions.sticky_option", "windows", en), "📌 Sticky Alt")
+		helpers.assert_eq(StickyLabel.label("sticky_shift", "sg_actions.sticky_shift", "macos", fr), "📌 Maj rémanente")
+		helpers.assert_eq(StickyLabel.label("sticky_hyper", "sg_actions.sticky_hyper", "macos", fr), "📌 Hyper rémanent")
+		helpers.assert_eq((pcall(StickyLabel.modifiers, "sticky_fn")), false, "an unknown modifier")
+		helpers.assert_eq((pcall(StickyLabel.modifiers, "copy")), false, "not a sticky action")
+	end)
+
 	helpers.it("key names: refuse an unknown key, platform or empty text", function()
 		local en = translator("en")
 		helpers.assert_eq((pcall(KeyNames.label, "not_a_key", "linux", en)), false, "an unknown key")
