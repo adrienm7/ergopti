@@ -180,7 +180,11 @@ function actualLocalRoles(names) {
 
 function personalRegistration(unit) {
 	const body = unit.owner('_BuildShortcutsSubmenu');
-	if (body.parameters.length) throw Error('Actual shortcut builder signature required');
+	// The submenu is built at its first open into the menu the tray already
+	// published (MenuDeferOrBuild), so its one parameter is that destination.
+	const signature = reader(body.parameters);
+	signature.take('TargetMenu := unset');
+	if (!signature.done()) throw Error('Actual shortcut builder signature required');
 	const r = reader(unit.tokens.slice(body.first, body.end));
 	const dynamic = r.name();
 	r.take(':= Map()');
@@ -230,7 +234,7 @@ function personalRegistration(unit) {
 			commands +
 			', ' +
 			getters +
-			', , , ' +
+			', IsSet(TargetMenu) ? TargetMenu : unset, , ' +
 			registration +
 			')'
 	);
