@@ -25,7 +25,9 @@ local SCHEMA = require("healthcheck.snapshot").load_config(require("infra.paths"
 --- The real core over a counted network adapter.
 --- @param body function(Core, world)
 local function with_core(body)
-	helpers.with_stub_scope({
+	-- A case may script hs.usb; the shared hs stub outlives this module
+	local saved_usb = hs.usb
+	local ok, err = pcall(helpers.with_stub_scope, {
 		"infra.logger", "adapters.network_info", "ui.healthcheck.core", "ui.healthcheck.helpers",
 	}, function()
 		helpers.load_with_stubs("infra.logger")
@@ -40,6 +42,8 @@ local function with_core(body)
 		package.loaded["ui.healthcheck.core"] = nil
 		body(require("ui.healthcheck.core"), world)
 	end)
+	hs.usb = saved_usb
+	if not ok then error(err, 0) end
 end
 
 --- The real probes over recorded timers and a scripted core; the monotonic
@@ -130,9 +134,44 @@ helpers.describe("healthcheck (macOS): local_state probe (healthcheck-local-stat
 			for _, step in ipairs(steps) do step() end
 			helpers.assert_eq(world.signal_reads, 1)
 			helpers.assert_eq(sections.network.wifi_signal, "64%")
-			helpers.assert_true(#sections.developer.modules_ok + #sections.developer.modules_failed == #steps - 1,
-				"one step per adapter, after the Wi-Fi one")
+			helpers.assert_true(#sections.developer.modules_ok + #sections.developer.modules_failed == #steps - 4,
+				"one step per adapter, after the versions, input, USB and Wi-Fi ones")
 			helpers.assert_true(#steps > 10, "the adapter specs were enumerated")
+		end)
+	end)
+
+	-- Field report 2026-11-03: phase A still took 21.5 ms against 5, of which
+	-- the USB devices 7.2, the versions 5.9 and the keyboard state 5.2.
+	helpers.it("phase A leaves the versions, the keyboard state and the USB devices to the steps (healthcheck-local-state)", function()
+		with_core(function(Core)
+			hs.usb = { attachedDevices = function() return { { productName = "USB Keyboard", vendorID = 1, productID = 2 } } end }
+			local snapshot = Core.run()
+			helpers.assert_nil(next(snapshot.sections.versions), "phase A collected the versions")
+			helpers.assert_nil(next(snapshot.sections.input), "phase A read the keyboard state")
+			helpers.assert_eq(snapshot.sections.peripherals.items, {}, "phase A listed the USB devices")
+			for _, collector in ipairs(Core.last_phase_a().collectors) do
+				helpers.assert_true(collector.name ~= "versions" and collector.name ~= "input"
+					and collector.name ~= "peripherals", "phase A still runs " .. collector.name)
+			end
+			local completed = Core.run({ complete_local = true, configuration = {} })
+			helpers.assert_true(completed.sections.versions.commit ~= nil, "the steps fill the versions")
+			helpers.assert_true(completed.sections.input.shift ~= nil, "the steps fill the keyboard state")
+			helpers.assert_eq(#completed.sections.peripherals.items, 1, "the steps list the USB devices")
+			local undeclared = require("healthcheck.snapshot").check_fields(completed, Core.config().schema)
+			helpers.assert_eq(undeclared, {}, "the moved fields stay declared")
+		end)
+	end)
+
+	helpers.it("the USB step keeps the Bluetooth devices a faster probe already added (healthcheck-local-state)", function()
+		with_core(function(Core)
+			hs.usb = { attachedDevices = function() return { { productName = "USB Mouse", vendorID = 3, productID = 4 } } end }
+			local bluetooth = { bus = "bluetooth", kind = "keyboard", vendor_id = "004c", product_id = "029c" }
+			local snapshot = { detailed = false, sections = { peripherals = { items = { bluetooth } } } }
+			local steps, sections = Core.local_state_steps(snapshot)
+			for _, step in ipairs(steps) do pcall(step) end
+			helpers.assert_eq(#sections.peripherals.items, 2)
+			helpers.assert_eq(sections.peripherals.items[1].bus, "usb")
+			helpers.assert_eq(sections.peripherals.items[2], bluetooth)
 		end)
 	end)
 
