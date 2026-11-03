@@ -125,6 +125,20 @@ helpers.describe("the shared key names", function()
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("key names: a modifier chord names its keys, a legend prints as written", function()
+		-- 2026-11-03: the chord rows read « Cmd + Option + Shift + Enter » in every locale.
+		local fr = translator("fr")
+		local enter = { id = "enter", key_name = "enter", label = "Enter" }
+		helpers.assert_eq(KeyNames.chord_label({ "cmd", "option", "shift" }, enter, "macos", fr),
+			"Cmd + Option + Maj + Entrée")
+		helpers.assert_eq(KeyNames.chord_label({ "ctrl", "super" }, { id = "space", key_name = "space", label = "Space" },
+			"linux", fr), "Ctrl + Super + Espace")
+		helpers.assert_eq(KeyNames.chord_label({ "win" }, { id = "period", label = "." }, "windows", fr), "Win + .")
+		helpers.assert_eq((pcall(KeyNames.chord_label, { "ctrl" }, { id = "x" }, "linux", fr)), false,
+			"a key with neither key_name nor label")
+		helpers.assert_eq((pcall(KeyNames.chord_label, {}, enter, "linux", fr)), false, "no modifier")
+	end)
+
 	helpers.it("key names: refuse an unknown key, platform or empty text", function()
 		local en = translator("en")
 		helpers.assert_eq((pcall(KeyNames.label, "not_a_key", "linux", en)), false, "an unknown key")

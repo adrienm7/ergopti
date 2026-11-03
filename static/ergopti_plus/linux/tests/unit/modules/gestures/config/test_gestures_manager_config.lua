@@ -254,9 +254,16 @@ helpers.describe("modules.gestures.manager", function()
     helpers.assert_true(type(label) == "string")
   end)
 
-  helpers.it("renders the complete shared modifier matrix with universal labels", function()
-    helpers.assert_eq(M.get_action_label("ctrl_a"), "Ctrl + A")
-    helpers.assert_eq(M.get_action_label("ctrl_alt_super_enter"), "Ctrl + Alt + Super + Enter")
+  -- 2026-11-03: the chords read the catalogue's English names (« Enter ») in
+  -- every locale; each key is now named from the key name table.
+  helpers.it("renders the complete shared modifier matrix in the user's language", function()
+    local i18n = require("infra.i18n")
+    local function name(id) return i18n.get("key_name." .. id) end
+    helpers.assert_eq(M.get_action_label("ctrl_a"), name("ctrl") .. " + A")
+    local label = M.get_action_label("ctrl_alt_super_enter")
+    helpers.assert_eq(label, name("ctrl") .. " + " .. name("alt") .. " + " .. name("super") .. " + " .. name("enter"))
+    helpers.assert_true(not label:find("key_name.", 1, true), "every key has a text: " .. label)
+    helpers.assert_eq(M.get_action_label("shift_period"), name("shift") .. " + .")
   end)
 
   helpers.it("get_action_names follows the catalogue order", function()

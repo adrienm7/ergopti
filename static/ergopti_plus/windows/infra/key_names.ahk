@@ -73,6 +73,42 @@ KeyNameComboLabel(Combo, Translate := "") {
 	return Out
 }
 
+; How one modifier-chord action of modifier_chords.json reads: its modifiers'
+; names, then its key (« Ctrl + Maj + Entrée »). A key the table names carries
+; key_name; any other prints its legend (A, 1, .), the same in every language.
+; Port of key_names.lua chord_label.
+; @param Modifiers {Array} Ids or aliases, in display order.
+; @param KeyDef {Map} A key of modifier_chords.json, with key_name or label.
+; @param Translate {Func} The lookup, when a caller injects one; t by default.
+; @returns {String}
+KeyNameChordLabel(Modifiers, KeyDef, Translate := "") {
+	if !(Modifiers is Array) || (Modifiers.Length == 0)
+		throw ValueError("A modifier set must not be empty.", -1)
+	if !(KeyDef is Map)
+		throw ValueError("A chord needs its key.", -1)
+	if KeyDef.Has("key_name")
+		KeyText := KeyNameLabel(KeyDef["key_name"], Translate)
+	else if KeyDef.Has("label") && (KeyDef["label"] is String) && (KeyDef["label"] != "")
+		KeyText := KeyDef["label"]
+	else
+		throw ValueError("A chord key has neither key_name nor label.", -1, KeyDef.Has("id") ? KeyDef["id"] : "")
+	return KeyNameModifiersLabel(Modifiers, Translate) . " + " . KeyText
+}
+
+; The translated names of a set of modifiers, joined with " + " in the order
+; given (« Ctrl + Maj »). Port of key_names.lua modifiers_label.
+; @param Modifiers {Array} Ids or aliases, in display order.
+; @param Translate {Func} The lookup, when a caller injects one; t by default.
+; @returns {String}
+KeyNameModifiersLabel(Modifiers, Translate := "") {
+	if !(Modifiers is Array) || (Modifiers.Length == 0)
+		throw ValueError("A modifier set must not be empty.", -1)
+	Out := ""
+	for _, Modifier in Modifiers
+		Out .= (Out == "" ? "" : " + ") . KeyNameLabel(Modifier, Translate)
+	return Out
+}
+
 ; Fills the {1} of a translated template with one value. A catalogue miss
 ; comes back as the dotted key, like every other label, so the locale gates and
 ; the tray walk refuse it; a template without {1} throws.
