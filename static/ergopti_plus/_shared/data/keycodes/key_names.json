@@ -29,7 +29,44 @@
 		"right_command": { "i18n": "key_name.right_command" },
 		"option": { "i18n": "key_name.option", "macos_symbol": "⌥" },
 		"left_option": { "i18n": "key_name.left_option" },
-		"right_option": { "i18n": "key_name.right_option" }
+		"right_option": { "i18n": "key_name.right_option" },
+		"insert": { "i18n": "key_name.insert" },
+		"home": { "i18n": "key_name.home" },
+		"end_key": { "i18n": "key_name.end" },
+		"page_up": { "i18n": "key_name.page_up" },
+		"page_down": { "i18n": "key_name.page_down" },
+		"arrow_up": { "i18n": "key_name.arrow_up" },
+		"arrow_down": { "i18n": "key_name.arrow_down" },
+		"arrow_left": { "i18n": "key_name.arrow_left" },
+		"arrow_right": { "i18n": "key_name.arrow_right" },
+		"context_menu": { "i18n": "key_name.context_menu" },
+		"num_lock": { "i18n": "key_name.num_lock" },
+		"volume_mute": { "i18n": "key_name.volume_mute" },
+		"volume_down": { "i18n": "key_name.volume_down" },
+		"volume_up": { "i18n": "key_name.volume_up" }
+	},
+	"physical": {
+		"_comment": "How a physical position (the W3C codes of physical_keys.json) reads in a row: KeyA as A, Digit1 as 1, F5 as F5, a sign position as its US legend, a numpad position through `numpad` (« Pavé num. 7 »), every other code as the key it names here (PageUp is page_up). The physical layer is position-based, so the legend is the position's, not the active layout's.",
+		"numpad": "key_name.numpad",
+		"legends": {
+			"Backquote": "`",
+			"Minus": "-",
+			"Equal": "=",
+			"BracketLeft": "[",
+			"BracketRight": "]",
+			"Backslash": "\\",
+			"Semicolon": ";",
+			"Quote": "'",
+			"IntlBackslash": "<",
+			"Comma": ",",
+			"Period": ".",
+			"Slash": "/",
+			"NumpadDivide": "/",
+			"NumpadMultiply": "*",
+			"NumpadSubtract": "-",
+			"NumpadAdd": "+",
+			"NumpadDecimal": "."
+		}
 	},
 	"aliases": {
 		"esc": "escape",
@@ -53,7 +90,19 @@
 		"meta": "super",
 		"command": "cmd",
 		"left_cmd": "left_command",
-		"right_cmd": "right_command"
+		"right_cmd": "right_command",
+		"end": "end_key",
+		"pageup": "page_up",
+		"pagedown": "page_down",
+		"arrowup": "arrow_up",
+		"arrowdown": "arrow_down",
+		"arrowleft": "arrow_left",
+		"arrowright": "arrow_right",
+		"contextmenu": "context_menu",
+		"numlock": "num_lock",
+		"audiovolumemute": "volume_mute",
+		"audiovolumedown": "volume_down",
+		"audiovolumeup": "volume_up"
 	},
 	"platforms": ["windows", "macos", "linux"]
 }

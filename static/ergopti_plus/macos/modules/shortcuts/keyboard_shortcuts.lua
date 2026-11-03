@@ -416,7 +416,7 @@ local function slot_label(slot_id)
 	if descriptor then
 		local parts = {}
 		for _, mod in ipairs(physical_modifiers(descriptor.mods)) do parts[#parts + 1] = KeyNames.macos_symbol(mod) end
-		parts[#parts + 1] = descriptor.code
+		parts[#parts + 1] = KeyNames.physical_label(descriptor.code, "macos", i18n.get)
 		return table.concat(parts, " ")
 	end
 	if slot_id == MagicPolicy.SLOT_ID then

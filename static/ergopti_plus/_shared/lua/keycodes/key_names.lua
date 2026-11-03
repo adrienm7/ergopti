@@ -88,6 +88,37 @@ function M.macos_symbol(spelling)
 	return symbol
 end
 
+--- How one physical position reads in a row: KeyA as A, Digit1 as 1, F5 as
+--- F5, a sign position as its legend, a numpad position as « Pavé num. 7 »,
+--- any other code as the key it names (PageUp, Escape). A physical slot row
+--- used to print the W3C code itself (`KeyA`).
+--- @param code string A W3C code of physical_keys.json.
+--- @param platform string "windows", "macos" or "linux".
+--- @param translate function Takes a locale key, returns its text.
+--- @return string
+function M.physical_label(code, platform, translate)
+	if type(code) ~= "string" then error("key names: a physical code must be a string", 2) end
+	local letter = code:match("^Key(%u)$") or code:match("^Digit(%d)$")
+	if letter then return letter end
+	if code:match("^F%d%d?$") then return code end
+	local legend = Data.physical.legends[code]
+	local pad = code:match("^Numpad(.+)$")
+	if pad then
+		local inner = pad:match("^%d$") and pad or legend or (M.canonical(pad) and M.label(pad, platform, translate))
+		if not inner then error("key names: no name for the physical key " .. code, 2) end
+		local template = translate(Data.physical.numpad)
+		-- A catalogue miss shows its dotted key, like every other label.
+		if template == Data.physical.numpad then return template .. " " .. inner end
+		if type(template) ~= "string" or not template:find("{1}", 1, true) then
+			error("key names: " .. Data.physical.numpad .. " does not hold {1}", 2)
+		end
+		return (template:gsub("{1}", function() return inner end))
+	end
+	if legend then return legend end
+	if not M.canonical(code) then error("key names: no name for the physical key " .. code, 2) end
+	return M.label(code, platform, translate)
+end
+
 --- Every key id of the table, sorted.
 --- @return table
 function M.ids()
