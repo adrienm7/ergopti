@@ -44,9 +44,12 @@ helpers.describe("the real Linux tray reads as text", function()
 		local rows = { { title = "Disposition", menu = {
 			{ title = "on_pause" }, { title = "menu.layout.layout_on_pause" },
 			{ title = "some_raw_id" }, { title = "Layout {1}" }, { title = "Disposition" },
+			-- Lot CB: a key row shows the key's name, never its id or abbreviation.
+			{ title = "LCtrl  :  Copier  /  Ctrl" }, { title = "Hold → lalt" },
+			{ title = "Ctrl gauche  :  Copier  /  Maj" },
 		} } }
 		local defects = check.defects(rows, SHARED_ROOT, require("json").decode)
-		helpers.assert_eq(#defects, 4, "only the plain label may pass: " .. table.concat(defects, " | "))
+		helpers.assert_eq(#defects, 6, "only the plain labels may pass: " .. table.concat(defects, " | "))
 	end)
 
 	helpers.it("the walk refuses a French row that glues its punctuation", function()

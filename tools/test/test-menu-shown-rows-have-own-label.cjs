@@ -25,6 +25,11 @@
  *    new listing cannot pass unseen, and the rendered walks of each driver
  *    (test_tray_rows_read_as_text) catch what a scan cannot reach.
  *
+ * KEYS READ AS THEIR NAMES (lot CB):
+ * The Tap-Hold rows read LCtrl, RShift and a hold printed `lalt`. No row
+ * text, nor any name of _shared/data/keycodes/key_names.json, may hold a key
+ * id or abbreviation in any locale; the rendered walks apply the same judge.
+ *
  * THE STRICT RULE, MENU OR NOT:
  * No feature may carry a section's own key. The exceptions below each give a
  * reason; an exception that stopped being true fails, so the list can only
@@ -37,6 +42,7 @@
 const fs = require('fs');
 const path = require('path');
 const { candidateKeys } = require('../lib/manifest-label-keys.cjs');
+const { RAW_KEY_SPELLINGS, rowTextDefect } = require('./lib/menu-row-text.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const ERGOPTI = path.join(ROOT, 'static', 'ergopti_plus');
@@ -333,6 +339,45 @@ for (const { file, source } of drivers) {
 }
 if (menuKeys + driverKeys < MIN_DRIVER_KEYS)
 	errors.push(`only ${menuKeys + driverKeys} static keys found: the scan matches almost nothing`);
+
+// ==========================================
+// ==========================================
+// ======= 4/ Keys read as their names ======
+// ==========================================
+// ==========================================
+
+// Lot CB: the Tap-Hold rows read LCtrl, RShift in every locale. A row key's
+// text, and every name of the shared key name table, holds no key id or
+// abbreviation (case-exact, as the rendered walks judge a row).
+const rowKeys = new Set();
+for (const row of menuRows)
+	for (const field of MENU_KEY_FIELDS)
+		if (typeof row[field] === 'string' && row[field] !== '') rowKeys.add(row[field]);
+for (const key of Object.keys(catalogues.get('en')))
+	if (/^(key_name|tap_hold|gesture\.slots)\./.test(key)) rowKeys.add(key);
+let keyTexts = 0;
+for (const [code, catalogue] of catalogues) {
+	for (const key of rowKeys) {
+		if (!hasText(catalogue, key)) continue;
+		keyTexts += 1;
+		const raw = catalogue[key]
+			.split(/[^\p{L}\p{N}_]+/u)
+			.find((word) => RAW_KEY_SPELLINGS.has(word));
+		if (raw) errors.push(`${code}: ${key} shows the raw key "${raw}": name it through key_name.*`);
+	}
+}
+// The judge the rendered walks use refuses each raw spelling and passes the names.
+for (const [text, refused] of [
+	['LCtrl  :  Copier  /  Ctrl', true],
+	['Hold → lalt', true],
+	['caps_lock + tab', true],
+	['Ctrl gauche  :  Copier  /  Maj', false],
+	['Échap + Tab', false]
+])
+	if (Boolean(rowTextDefect(text, new Set(), [])) !== refused)
+		errors.push(`the row judge ${refused ? 'passes' : 'refuses'} "${text}"`);
+if (keyTexts < MIN_MENU_ROWS * LOCALE_COUNT)
+	errors.push(`only ${keyTexts} row texts judged for raw keys: the scan reads almost nothing`);
 
 if (errors.length > 0) {
 	console.error(`\x1b[31m[ERROR] ${errors.length} menu label defect(s):\x1b[0m`);
