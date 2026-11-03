@@ -108,6 +108,23 @@ const chords = JSON.parse(
 );
 for (const [platform, data] of Object.entries(chords.platforms))
 	for (const modifier of data.modifiers) resolve(modifier.id, `modifier chord on ${platform}`);
+// A chord key the table names is named from it in the picker rows, which read
+// « Cmd + Option + Shift + Enter » in every locale until 2026-11-03; any other
+// key prints its legend, which no table translates (A, 1, .).
+for (const key of chords.keys) {
+	if (key.key_name !== undefined) {
+		resolve(key.key_name, `modifier chord key ${key.id} key_name`);
+		if (canonical(key.key_name) !== canonical(key.id))
+			errors.push(`modifier chord key ${key.id} names another key: ${key.key_name}`);
+	} else {
+		if (canonical(key.id) !== null || canonical(String(key.label)) !== null)
+			errors.push(`modifier chord key ${key.id} is a named key without key_name`);
+		if (typeof key.label !== 'string' || key.label === '' || /[a-z]{2}/i.test(key.label))
+			errors.push(
+				`modifier chord key ${key.id} needs key_name: its legend "${key.label}" is a word`
+			);
+	}
+}
 
 // Every position a physical shortcut slot can hold is named, never shown as
 // its W3C code (`KeyA`): the rule of key_names.lua physical_label.
