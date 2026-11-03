@@ -28,6 +28,14 @@ the local branches `worktree-agent-*`: land them, then remove the worktrees so o
 - [ ] **Prediction indentation default -3**, recommended -3, all drivers.
 - [ ] **French punctuation.** Space before `:` in composed `label: value` rows and about 21 strings, with a gate.
 - [ ] **Multi-prediction tooltip.** The number is right-aligned in the tooltip, not stuck to the text.
+- [ ] **macOS one-shot Shift is not one-shot.** Tap it then type « abc » quickly: « ABc » or « ABC ». It must be spent
+      by the first key; today it seems to end only on its timeout (configurable in the menu, can be infinite). Check
+      the F20 one-shot sentinel path (modules/keymap/one_shot_shift.lua, adapters/one_shot_shift.lua) against Windows
+      and Linux, with a regression test typing three keys inside the timeout.
+- [ ] **Hotstring tooltip under the AI tooltip.** A typed hotstring trigger shows its tooltip while it can still expand,
+      but with the AI on the prediction tooltip covers it. Never cover it: start the prediction once the hotstring
+      tooltip expires, or show both. New option, all drivers: "AI prediction while a hotstring tooltip shows" = after
+      the delay anyway (both shown, side by side) / wait until the hotstring tooltip expires (default to decide).
 - [ ] **Model selection page.** Install Ollama and Install MLX buttons act or say why, disabled when installed; a whole
       section header opens its list; header on two lines (install, port, status; then add a model by hand); Ollama and MLX
       models grouped in collapsible sections per provider, alphabetical; search crosses sections; gate for page actions
