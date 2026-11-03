@@ -93,7 +93,7 @@ M.features = {
 		path = "hotstrings.repeat_key_enabled", id = "repeat_key_enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.repeat_key_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
 	},
 	{
-		path = "hotstrings.idle_reset_seconds", id = "idle_reset_seconds", section = "hotstrings", default = 3, type = "number", description_key = "menu.hotstrings.idle_reset", platforms = { "ahk", "hs", "linux" }, recommended = 3, family = "setting",
+		path = "hotstrings.idle_reset_seconds", id = "idle_reset_seconds", section = "hotstrings", default = 3, type = "number", description_key = "menu.hotstrings.idle_reset", platforms = { "ahk", "hs", "linux" }, recommended = 3, family = "setting", preset_values = { 0, 1, 2, 3, 5, 10 },
 	},
 	{
 		path = "hotstrings.click_resets_word", id = "click_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.click_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
@@ -108,7 +108,7 @@ M.features = {
 		path = "hotstrings.tap_hold_resets_word", id = "tap_hold_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.tap_hold_resets_word", platforms = { "ahk", "linux" }, recommended = true, family = "setting", reason_key = "platform_reason.tap_hold_word_reset_not_on_macos",
 	},
 	{
-		path = "hotstrings.cascade_max_arrows", id = "cascade_max_arrows", section = "hotstrings", default = 3, type = "number", description_key = "menu.hotstrings.cascade_max_arrows", platforms = { "ahk", "hs", "linux" }, recommended = 3, family = "setting",
+		path = "hotstrings.cascade_max_arrows", id = "cascade_max_arrows", section = "hotstrings", default = 3, type = "number", description_key = "menu.hotstrings.cascade_max_arrows", platforms = { "ahk", "hs", "linux" }, recommended = 3, family = "setting", preset_values = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 },
 	},
 	{
 		path = "hotstrings.expansion_delay", id = "expansion_delay", section = "hotstrings", default = 0.75, type = "number", description_key = "menu.hotstrings.expansion_delay", platforms = { "ahk", "hs", "linux" }, recommended = 0.75, family = "setting",
@@ -696,7 +696,7 @@ M.features = {
 		path = "shortcuts.tap_keys.number_row_right_2", id = "number_row_right_2", section = "shortcuts.tap_keys", default = "none", type = "action", description_key = "menu.shortcuts.tap_keys.number_row_right_2", platforms = { "ahk", "hs", "linux" }, recommended = "none", family = "feature",
 	},
 	{
-		path = "shortcuts.caps_word.idle_timeout_seconds", id = "idle_timeout_seconds", section = "shortcuts.caps_word", default = 10, type = "number", description_key = "menu.caps_word.idle_timeout", platforms = { "ahk", "hs", "linux" }, recommended = 10, family = "setting",
+		path = "shortcuts.caps_word.idle_timeout_seconds", id = "idle_timeout_seconds", section = "shortcuts.caps_word", default = 10, type = "number", description_key = "menu.caps_word.idle_timeout", platforms = { "ahk", "hs", "linux" }, recommended = 10, family = "setting", preset_values = { 0, 1, 3, 5, 10, 30, 60 },
 	},
 	{
 		path = "shortcuts.caps_word.terminators", id = "terminators", section = "shortcuts.caps_word", default = { "space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period" }, type = "array", description_key = "menu.caps_word.terminators_header", platforms = { "ahk", "hs", "linux" }, recommended = { "space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period" }, family = "setting",
@@ -1110,7 +1110,7 @@ M.features = {
 		path = "tap_holds.enabled", id = "enabled", section = "tap_holds", default = false, type = "boolean", description_key = "menu.tap_holds", platforms = { "hs", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.category_master_is_a_gate_on_windows",
 	},
 	{
-		path = "tap_holds.lone_modifier_tap_max_ms", id = "lone_modifier_tap_max_ms", section = "tap_holds", default = 1000, type = "number", description_key = "menu.tapholds.lone_tap_title", platforms = { "ahk", "hs", "linux" }, recommended = 1000, family = "setting",
+		path = "tap_holds.lone_modifier_tap_max_ms", id = "lone_modifier_tap_max_ms", section = "tap_holds", default = 1000, type = "number", description_key = "menu.tapholds.lone_tap_title", platforms = { "ahk", "hs", "linux" }, recommended = 1000, family = "setting", preset_values = { 0, 500, 750, 1000, 1500 },
 	},
 	{
 		path = "shortcuts.keys.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "hs" }, recommended = true, family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",

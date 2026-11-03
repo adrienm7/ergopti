@@ -4492,13 +4492,16 @@ reason_key = "platform_reason.category_master_is_a_gate_on_windows"
 # (field report mac-2026-11-03). 0 is the strict tap-hold: the tap only under
 # the threshold. A key's own longer delay is kept. The typing keys
 # ([tap_hold.rollover]) and the holds that wait for their threshold (a layer, a
-# one-shot Shift) never take it.
+# one-shot Shift) never take it. The menu of every driver offers exactly the
+# preset_values, 0 (Off) first; a value set by hand outside them shows in the
+# row's caption, unchecked.
 [[features.tap_holds]]
 id = "lone_modifier_tap_max_ms"
 default = 1000
 recommended = 1000
 family = "setting"
 type = "number"
+preset_values = [0, 500, 750, 1000, 1500]
 description_key = "menu.tapholds.lone_tap_title"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }

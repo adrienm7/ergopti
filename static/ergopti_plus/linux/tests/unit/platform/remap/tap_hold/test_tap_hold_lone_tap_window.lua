@@ -174,3 +174,23 @@ helpers.describe("tap-hold storage: the window in tap_hold.toml (lone-tap-window
 		helpers.assert_nil(decoded.tap_hold and decoded.tap_hold.lone_modifier_tap_max_ms)
 	end)
 end)
+
+helpers.describe("tap-hold menu choices: the manifest's one list (lone-tap-window)", function()
+
+	-- The three menus used to hold their own copy of the list (duplicate-constant
+	-- ratchet); they read the feature's preset_values now.
+	helpers.it("offers the feature's preset_values, Off first, and refuses a feature without them", function()
+		local LoneTap = require("tap_hold.lone_tap")
+		local feature = Manifest.find_entry_by_path(ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
+		helpers.assert_type(feature.preset_values, "table", "the generated manifest carries the presets")
+		local choices = LoneTap.choices(feature)
+		helpers.assert_eq(choices, feature.preset_values)
+		helpers.assert_true(not rawequal(choices, feature.preset_values), "the menu gets a copy")
+		helpers.assert_eq(choices[1], 0, "Off, the strict tap-hold, comes first")
+		local default_offered = false
+		for _, ms in ipairs(choices) do default_offered = default_offered or ms == Loader.LONE_TAP_DEFAULT_MS end
+		helpers.assert_true(default_offered, "the default is one of the choices")
+		helpers.assert_eq((pcall(LoneTap.choices, { type = "number" })), false, "no presets, no menu")
+		helpers.assert_eq((pcall(LoneTap.choices, { preset_values = { 0, -5 } })), false, "a negative window is refused")
+	end)
+end)
