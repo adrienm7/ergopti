@@ -57,7 +57,11 @@ local function with_window(composer_env, body)
 		local logger = helpers.make_logger_stub()
 		logger.evidence = function(_, message, ...) world.evidence[#world.evidence + 1] = string.format(message, ...) end
 		package.loaded["infra.logger"] = logger
-		package.loaded["infra.i18n"] = { get = function(key) return "[" .. key .. "]" end }
+		-- The label-value join is the locale's own template (common.label_value).
+		package.loaded["infra.i18n"] = { get = function(key)
+			if key == "common.label_value" then return "{1} : {2}" end
+			return "[" .. key .. "]"
+		end }
 		package.loaded["infra.field_check"] = nil
 		package.loaded["infra.field_check_checks"] = nil
 		package.loaded["ui.field_check"] = nil
