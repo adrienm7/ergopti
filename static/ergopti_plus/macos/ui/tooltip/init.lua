@@ -15,7 +15,6 @@ local Config          = require("ui.tooltip.config")
 local TooltipLLM      = require("ui.tooltip.tooltip_llm")
 local TooltipHotstring = require("ui.tooltip.tooltip_hotstring")
 local Logger          = require("infra.logger")
-local Renderer        = require("ui.tooltip.renderer")
 
 local LOG = "tooltip"
 
@@ -454,7 +453,9 @@ function M.has_visible_hotstring_rows() return TooltipHotstring.has_visible_rows
 --- @param enabled boolean True for llm.trigger.while_hotstring_tooltip = "both".
 function M.set_shared_hotstring_stack(enabled)
 	_shared_hotstring_stack = enabled == true
-	Renderer.set_stack_below_hotstring(_shared_hotstring_stack)
+	-- Required here: loading the renderer reads the tooltip layout configuration,
+	-- which the facade's own load must not depend on.
+	require("ui.tooltip.renderer").set_stack_below_hotstring(_shared_hotstring_stack)
 	TooltipHotstring.set_standard_canvas_owner(_shared_hotstring_stack
 		and function() return TooltipLLM.is_visible() == true end or nil)
 end

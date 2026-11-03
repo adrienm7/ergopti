@@ -45,6 +45,22 @@
 					"checked": false
 				},
 				{
+					"title": "menu.llm.while_hotstring_tooltip: menu.llm.while_hotstring_tooltip_wait",
+					"callback": false,
+					"children": [
+						{
+							"title": "menu.llm.while_hotstring_tooltip_wait",
+							"callback": true,
+							"checked": true
+						},
+						{
+							"title": "menu.llm.while_hotstring_tooltip_both",
+							"callback": true,
+							"checked": false
+						}
+					]
+				},
+				{
 					"title": "-",
 					"callback": false
 				},
@@ -392,6 +408,22 @@
 					"title": "Suggestion après expiration d’une bulle hotstring",
 					"callback": true,
 					"checked": false
+				},
+				{
+					"title": "Prédiction IA pendant une bulle hotstring : Attendre l’expiration de la bulle hotstring",
+					"callback": false,
+					"children": [
+						{
+							"title": "Attendre l’expiration de la bulle hotstring",
+							"callback": true,
+							"checked": true
+						},
+						{
+							"title": "Afficher les deux",
+							"callback": true,
+							"checked": false
+						}
+					]
 				},
 				{
 					"title": "-",

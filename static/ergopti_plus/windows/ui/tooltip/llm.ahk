@@ -1486,39 +1486,6 @@ _LLM_TooltipMeasureHeader(Items) {
 		{ PadX: _TOOLTIP_PADDING_X, PadY: _TOOLTIP_PADDING_Y, LabelGap: _TOOLTIP_LABEL_GAP })
 }
 
-; Draws the shared hotstring rows at the top of the prediction Gui.
-_LLM_TooltipDrawHeader(G, Items, Header, TotalW) {
-	global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_LABEL_FONT_SIZE
-	global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_DIM_COLOR_HEX
-	global _TOOLTIP_LABEL_COLOR_HEX, _TOOLTIP_SEP_COLOR_HEX
-	for Idx, Item in Items {
-		RowY := Header.RowY[Idx]
-		RowH := Header.RowH[Idx]
-		ColorHex := Item.HasOwnProp("ColorHex") ? Item.ColorHex : ""
-		G.SetFont("norm s1", _TOOLTIP_FONT_NAME)
-		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", _TooltipMixTintHex(ColorHex), RowY, TotalW, RowH), "")
-		IsDimmed := Item.HasOwnProp("IsDimmed") && Item.IsDimmed
-		if IsDimmed
-			G.SetFont("norm c" . _TOOLTIP_DIM_COLOR_HEX . " strike s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-		else
-			G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}", _TOOLTIP_PADDING_X,
-			RowY + _TOOLTIP_PADDING_Y, Header.TextW, Header.Sizes[Idx].H), Item.Text)
-		Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
-		if (Label != "" && Header.LabelW > 0) {
-			LabelSize := Header.LabelSizes[Idx]
-			G.SetFont("norm c" . (IsDimmed ? _TOOLTIP_DIM_COLOR_HEX : _TOOLTIP_LABEL_COLOR_HEX)
-				. " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
-			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-				TotalW - _TOOLTIP_PADDING_X - Header.LabelW,
-				RowY + _TOOLTIP_PADDING_Y + Max(0, (Header.Sizes[Idx].H - LabelSize.H) // 2),
-				Header.LabelW, LabelSize.H), Label)
-		}
-		G.SetFont("s1", _TOOLTIP_FONT_NAME)
-		G.Add("Text", Format("Background{1} x0 y{2} w{3} h1", _TOOLTIP_SEP_COLOR_HEX, RowY + RowH, TotalW), "")
-	}
-}
-
 ; Geometry of the prediction panel — the Windows port of the macOS layout in
 ; tooltip_llm.lua show_predictions (width) and renderer.lua render (height).
 ; Pure, layout units, so it is tested without GDI.
@@ -1818,7 +1785,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	G.MarginX := 0
 	G.MarginY := 0
 	if IsObject(Header)
-		_LLM_TooltipDrawHeader(G, HeaderItems, Header, Layout.W)
+		_TooltipDrawSharedHotstringRows(G, HeaderItems, Header, Layout.W)
 
 	for Idx, slot in slots {
 		RowY := Layout.RowY[Idx]
