@@ -75,6 +75,27 @@ helpers.describe("update asset signature (Linux)", function()
 		helpers.assert_true(ok, "refused: " .. tostring(reason))
 	end)
 
+	-- Fedora 45 ships OpenSSL 4 and no libcrypto.so.3: the library owner only
+	-- tried .so.3, so the signature check reported OpenSSL as missing there.
+	helpers.it("(linux-asset-signature) the library owner loads OpenSSL 4 when OpenSSL 3 is absent", function()
+		local real_ffi = package.loaded["ffi"]
+		local tried = {}
+		package.loaded["ffi"] = {
+			load = function(name)
+				tried[#tried + 1] = name
+				if name ~= "libcrypto.so.4" then error("cannot open " .. name) end
+				return { fake = true }
+			end,
+		}
+		package.loaded["infra.openssl_library"] = nil
+		local ok, Library = pcall(require, "infra.openssl_library")
+		package.loaded["ffi"] = real_ffi
+		package.loaded["infra.openssl_library"] = nil
+		helpers.assert_true(ok, tostring(Library))
+		helpers.assert_eq(Library.soname, "libcrypto.so.4")
+		helpers.assert_eq(table.concat(tried, ","), "libcrypto.so.3,libcrypto.so.4")
+	end)
+
 	helpers.it("(linux-asset-signature) every tampered record is refused with the valid signature", function()
 		helpers.assert_true(#V.tampered >= 3)
 		for _, entry in ipairs(V.tampered) do

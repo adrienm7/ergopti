@@ -7,10 +7,20 @@
 --- ==============================================================================
 
 local M = {}
+
+-- OpenSSL 4 (Fedora 45 onwards) keeps the EVP functions these primitives use
+-- and ships only libcrypto.so.4; refusing it reported "no OpenSSL" there.
+M.SONAMES = { "libcrypto.so.3", "libcrypto.so.4" }
+
 local loaded, ffi = pcall(require, "ffi")
 if loaded then
-	local available, library = pcall(ffi.load, "libcrypto.so.3")
-	if available then M.ffi, M.library = ffi, library end
+	for _, soname in ipairs(M.SONAMES) do
+		local available, library = pcall(ffi.load, soname)
+		if available then
+			M.ffi, M.library, M.soname = ffi, library, soname
+			break
+		end
+	end
 end
 
 --- Declares each C declaration, one at a time, accepting one already declared.
