@@ -381,7 +381,9 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 						Decoded += 1
 				}
 		}
-		PerfCount("toml.flat_values", Decoded)
+		; Detached compositions (workers, child fixtures) load this parser without the profiler.
+		if IsSet(PerfCount)
+				PerfCount("toml.flat_values", Decoded)
 		if HasPendingValue {
 				DiscardedArrays += 1
 				try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)
