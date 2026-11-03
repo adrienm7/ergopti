@@ -143,6 +143,58 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 		end
 	end)
 
+	helpers.it("explains every block the owner names, above the consent row, and no other state", function()
+		-- An owned boot with the runtime missing, a user Karabiner left running or a
+		-- failed download had the tap-holds off with no row saying why.
+		local CONSENT = "menu.tapholds.close_other_karabiner"
+		local function rows_for(status)
+			return tap_hold_rows(true, {
+				owned_runtime_selected = function() return true end,
+				get_close_other_instances = function() return false end,
+				set_close_other_instances = function() return true end,
+				owned_runtime_status = function() return status end,
+			})
+		end
+		local function find(rows, title)
+			for index, row in ipairs(rows) do if row.title == title then return row, index end end
+			return nil
+		end
+		local expected = {
+			{ "unavailable", "runtime_not_installed", "menu.tapholds.owned_not_installed" },
+			{ "unavailable", "runtime_job_not_loaded", "menu.tapholds.owned_not_installed" },
+			{ "unavailable", "virtual_hid_absent", "menu.tapholds.owned_not_installed" },
+			{ "unavailable", "other_karabiner_running", "menu.tapholds.owned_other_running" },
+			{ "unavailable", "close_other_unsupported", "menu.tapholds.owned_close_failed" },
+			{ "failed", "close_other_failed", "menu.tapholds.owned_close_failed" },
+			{ "unavailable", "other_karabiner_still_running", "menu.tapholds.owned_close_failed" },
+			{ "unavailable", "artifact_fetch_failed", "menu.tapholds.owned_fetch_failed" },
+		}
+		for _, case in ipairs(expected) do
+			local rows = rows_for({ state = case[1], reason = case[2] })
+			local row, at = find(rows, case[3])
+			helpers.assert_true(row ~= nil, case[2] .. " must be explained by " .. case[3])
+			helpers.assert_eq(row.disabled, true, case[2])
+			local _, consent_at = find(rows, CONSENT)
+			helpers.assert_true(consent_at ~= nil and at < consent_at, case[2] .. ": the explanation comes first")
+		end
+		for _, status in ipairs({ { state = "ready" }, { state = "starting" },
+			{ state = "failed", reason = "capture_lost" }, { state = "stopped", reason = "runtime_not_installed" } }) do
+			local rows = rows_for(status)
+			for _, case in ipairs(expected) do
+				helpers.assert_nil(find(rows, case[3]), tostring(status.reason) .. " in " .. status.state)
+			end
+		end
+	end)
+
+	helpers.it("explains exactly the blocks the owner declares for the user", function()
+		local menu = menu_over_double(true)
+		package.loaded["platform.remap.runtime_owner"] = nil
+		local declared = require("platform.remap.runtime_owner").USER_BLOCKS
+		local explained = menu._explained_owned_reasons()
+		for reason in pairs(declared) do helpers.assert_true(explained[reason] == true, reason .. " has no row") end
+		for reason in pairs(explained) do helpers.assert_true(declared[reason] == true, reason .. " is not declared") end
+	end)
+
 	helpers.it("offers the driver-only update under an incompatible driver and only there", function()
 		local UPDATE = "menu.tapholds.vhid_update"
 		local opened = {}
