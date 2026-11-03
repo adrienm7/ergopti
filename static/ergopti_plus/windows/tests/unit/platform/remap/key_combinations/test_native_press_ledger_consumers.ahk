@@ -49,7 +49,10 @@ Test("press ledger: KS_IsHeld adds only the press AutoHotkey cannot see (todo91-
 ; The owner starts for everyone: no AI gate stands before it, and a hook that cannot
 ; install or read leaves the keyboard working, on the catalogue order (item4).
 _NPL_OwnerRunsForEveryoneAndFailsSoft() {
-	Assert(RegExMatch(_DriverSourceNoComments(), "m)^KeyboardArbiterEnsureForLedger\(\)$"), "the boot starts it at top level, under no condition")
+	; The only guard: a quarantined startup smoke never starts the native hook,
+	; which ignores Suspend (3d65b7da79). No user setting stands before it.
+	Assert(RegExMatch(_DriverSourceNoComments(), "m)^if !_DriverSmokeInputQuarantined\R\s*KeyboardArbiterEnsureForLedger\(\)$"),
+		"the boot starts it at top level, under the smoke quarantine alone")
 	AssertTrue(KeyboardArbiterEnsureForLedger(() => true))
 	AssertFalse(KeyboardArbiterEnsureForLedger(() => false), "a refused start is reported, not raised")
 	AssertFalse(KeyboardArbiterEnsureForLedger(_NPL_Raises), "a raising start is reported, not raised")
