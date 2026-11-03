@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local table_unpack = table.unpack or unpack
 
 --- The submenu of the top-level row whose title contains the translation of `key`.
 --- @param items table
@@ -128,7 +129,7 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 				if row.title:find(head("menu.llm.reset_on_nav"), 1, true) then last = index end
 			end
 			helpers.assert_true(first ~= nil and last ~= nil, "the generation rows are drawn")
-			require("test.ai_menu_layout_contract").assert_generation(helpers, { table.unpack(rows, first, last) }, {
+			require("test.ai_menu_layout_contract").assert_generation(helpers, { table_unpack(rows, first, last) }, {
 				count = head("menu.llm.num_predictions_label"), min_words = head("menu.llm.min_words_label"),
 				max_words = head("menu.llm.max_words_label"), context = head("menu.llm.generation.context_length"),
 				clear_context = head("menu.llm.reset_on_nav"),
