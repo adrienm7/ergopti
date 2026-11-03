@@ -661,6 +661,8 @@
 	"gesture.slots.swipe_4_up": "Змахування 4 пальцями ↑",
 	"gesture.slots.swipe_5_diag": "Змахування 5 пальцями ↗↙",
 	"gesture.slots.swipe_5_down": "Змахування 5 пальцями ↓",
+	"gesture.slots.swipe_3_horiz": "Змахування 3 пальцями ↔",
+	"gesture.slots.swipe_4_horiz": "Змахування 4 пальцями ↔",
 	"gesture.slots.swipe_5_horiz": "Змахування 5 пальцями ↔",
 	"gesture.slots.swipe_5_left": "Змахування 5 пальцями ←",
 	"gesture.slots.swipe_5_left_down": "Змахування 5 пальцями ↙",

@@ -661,6 +661,8 @@
 	"gesture.slots.swipe_4_up": "Deslizar 4 dedos ↑",
 	"gesture.slots.swipe_5_diag": "Deslizar 5 dedos ↗↙",
 	"gesture.slots.swipe_5_down": "Deslizar 5 dedos ↓",
+	"gesture.slots.swipe_3_horiz": "Deslizar 3 dedos ↔",
+	"gesture.slots.swipe_4_horiz": "Deslizar 4 dedos ↔",
 	"gesture.slots.swipe_5_horiz": "Deslizar 5 dedos ↔",
 	"gesture.slots.swipe_5_left": "Deslizar 5 dedos ←",
 	"gesture.slots.swipe_5_left_down": "Deslizar 5 dedos ↙",

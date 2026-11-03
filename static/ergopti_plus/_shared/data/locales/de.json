@@ -661,6 +661,8 @@
 	"gesture.slots.swipe_4_up": "4-Finger-Wisch ↑",
 	"gesture.slots.swipe_5_diag": "5-Finger-Wisch ↗↙",
 	"gesture.slots.swipe_5_down": "5-Finger-Wisch ↓",
+	"gesture.slots.swipe_3_horiz": "3-Finger-Wisch ↔",
+	"gesture.slots.swipe_4_horiz": "4-Finger-Wisch ↔",
 	"gesture.slots.swipe_5_horiz": "5-Finger-Wisch ↔",
 	"gesture.slots.swipe_5_left": "5-Finger-Wisch ←",
 	"gesture.slots.swipe_5_left_down": "5-Finger-Wisch ↙",

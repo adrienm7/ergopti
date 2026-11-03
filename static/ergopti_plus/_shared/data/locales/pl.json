@@ -661,6 +661,8 @@
 	"gesture.slots.swipe_4_up": "Przesunięcie 4 palcami ↑",
 	"gesture.slots.swipe_5_diag": "Przesunięcie 5 palcami ↗↙",
 	"gesture.slots.swipe_5_down": "Przesunięcie 5 palcami ↓",
+	"gesture.slots.swipe_3_horiz": "Przesunięcie 3 palcami ↔",
+	"gesture.slots.swipe_4_horiz": "Przesunięcie 4 palcami ↔",
 	"gesture.slots.swipe_5_horiz": "Przesunięcie 5 palcami ↔",
 	"gesture.slots.swipe_5_left": "Przesunięcie 5 palcami ←",
 	"gesture.slots.swipe_5_left_down": "Przesunięcie 5 palcami ↙",
