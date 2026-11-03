@@ -281,8 +281,8 @@ between workers) green alone. All live checks pass, typed by the harness.
 - **One folder name for Ergopti on the three OS (maintainer, 3 November).** macOS has three folders in Application
   Support: `ErgoptiPlus` (paths.toml, runtime, locks, karabiner.json), `Ergopti` (managed Ollama, embedded Python, MLX)
   and `ergopti_plus` (the local reload control); Windows mixes `%LOCALAPPDATA%ergopti_plus` and `Ergoptiundle`, and the
-  config, logs and caches use other spellings. Decide one spelling per OS convention (e.g. `Ergopti` on macOS and
-  Windows, `ergopti` under XDG on Linux), put each driver's data under one root, name it once in the shared identifiers,
+  config, logs and caches use other spellings. Decided: `Ergopti` on macOS and
+  Windows, `ergopti` under XDG on Linux, no "Plus" in folder names; put each driver's data under one root, name it once in the shared identifiers,
   and migrate the old folders once at boot with a backup.
 - **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md)). WP3, WP6
   and WP7 are built and dormant behind `[karabiner] runtime = "owned"`. Left: a green hosted runtime build of the
