@@ -199,10 +199,13 @@ async function observe(source, root, scenario) {
 								fs.unlinkSync(path.join(probe, 'suspend_restore.marker'));
 							const logs = path.join(probe, 'ergopti_plus/logs');
 							fs.mkdirSync(logs, { recursive: true });
-							// A real boot logs the staged and the full Hotstrings menu
-							// renders; the smoke requires both, within its budget.
+							// A real boot logs the staged Hotstrings menu publication and
+							// the submenu's deferred build at its first open; the smoke
+							// requires both, within its budget.
 							const render = (ms) =>
 								`[INFO] [BootProfile] MENU/initMenu: hotstrings menu rendered: +${ms} ms (total ${ms} ms).\n`;
+							const deferredRender = (ms) =>
+								`[INFO] [MenuPopulation] Deferred submenu 'hotstrings_menu' built in ${ms} ms for the smoke.\n`;
 							// A paused AI-on boot defers its AI hotkeys and the resume
 							// activates them; the smoke requires both lines (#97).
 							let resume = '';
@@ -220,7 +223,7 @@ async function observe(source, root, scenario) {
 								warm && scenario === 'logged-error'
 									? '[ERROR] inert warm failure\n'
 									: render(15) +
-											render(scenario === 'slow-render' ? 3200 : 40) +
+											deferredRender(scenario === 'slow-render' ? 3200 : 40) +
 											resume +
 											'[INFO] inert ready\n'
 							);
