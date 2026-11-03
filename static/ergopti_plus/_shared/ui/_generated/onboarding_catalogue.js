@@ -903,7 +903,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.tab"
+												"key": "key_name.tab"
 											}
 										],
 										"value_label": [
@@ -917,7 +917,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.alt"
+															"key": "key_name.alt"
 														}
 													]
 												]
@@ -933,7 +933,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.caps_lock"
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -947,7 +947,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.ctrl"
+															"key": "key_name.ctrl"
 														}
 													]
 												]
@@ -963,7 +963,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_shift"
+												"key": "key_name.left_shift"
 											}
 										],
 										"value_label": [
@@ -977,7 +977,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.shift"
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -993,7 +993,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_ctrl"
+												"key": "key_name.left_ctrl"
 											}
 										],
 										"value_label": [
@@ -1007,7 +1007,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.ctrl"
+															"key": "key_name.ctrl"
 														}
 													]
 												]
@@ -1023,7 +1023,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_alt"
+												"key": "key_name.left_alt"
 											}
 										],
 										"value_label": [
@@ -1062,7 +1062,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.alt_gr"
+												"key": "key_name.alt_gr"
 											}
 										],
 										"value_label": [
@@ -1076,7 +1076,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.alt_gr"
+															"key": "key_name.alt_gr"
 														}
 													]
 												]
@@ -1092,7 +1092,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.right_ctrl"
+												"key": "key_name.right_ctrl"
 											}
 										],
 										"value_label": [
@@ -1106,7 +1106,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.shift"
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -1192,13 +1192,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "tap_hold.group.alt_gr"
+												"key": "key_name.alt_gr"
 											},
 											{
 												"text": " + "
 											},
 											{
-												"key": "tap_hold.group.left_alt"
+												"key": "key_name.left_alt"
 											}
 										],
 										"value_label": [
@@ -1214,13 +1214,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "tap_hold.group.alt_gr"
+												"key": "key_name.alt_gr"
 											},
 											{
 												"text": " + "
 											},
 											{
-												"key": "tap_hold.group.caps_lock"
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -1236,13 +1236,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "tap_hold.group.left_alt"
+												"key": "key_name.left_alt"
 											},
 											{
 												"text": " + "
 											},
 											{
-												"key": "tap_hold.group.caps_lock"
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -2721,7 +2721,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.tab"
+												"key": "key_name.tab"
 											}
 										],
 										"value_label": [
@@ -2751,7 +2751,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.caps_lock"
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -2781,7 +2781,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_shift"
+												"key": "key_name.left_shift"
 											}
 										],
 										"value_label": [
@@ -2811,7 +2811,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.fn"
+												"key": "key_name.fn"
 											}
 										],
 										"value_label": [
@@ -2841,7 +2841,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_ctrl"
+												"key": "key_name.left_ctrl"
 											}
 										],
 										"value_label": [
@@ -2871,7 +2871,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_option"
+												"key": "key_name.left_option"
 											}
 										],
 										"value_label": [
@@ -2901,7 +2901,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_command"
+												"key": "key_name.left_command"
 											}
 										],
 										"value_label": [
@@ -2940,7 +2940,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.right_command"
+												"key": "key_name.right_command"
 											}
 										],
 										"value_label": [
@@ -2970,7 +2970,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.right_option"
+												"key": "key_name.right_option"
 											}
 										],
 										"value_label": [
@@ -4418,7 +4418,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.tab"
+												"key": "key_name.tab"
 											}
 										],
 										"value_label": [
@@ -4432,7 +4432,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.alt"
+															"key": "key_name.alt"
 														}
 													]
 												]
@@ -4448,7 +4448,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.caps_lock"
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -4462,7 +4462,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.ctrl"
+															"key": "key_name.ctrl"
 														}
 													]
 												]
@@ -4478,7 +4478,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_shift"
+												"key": "key_name.left_shift"
 											}
 										],
 										"value_label": [
@@ -4492,7 +4492,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.shift"
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -4508,7 +4508,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_ctrl"
+												"key": "key_name.left_ctrl"
 											}
 										],
 										"value_label": [
@@ -4522,7 +4522,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.ctrl"
+															"key": "key_name.ctrl"
 														}
 													]
 												]
@@ -4538,7 +4538,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_alt"
+												"key": "key_name.left_alt"
 											}
 										],
 										"value_label": [
@@ -4577,7 +4577,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.alt_gr"
+												"key": "key_name.alt_gr"
 											}
 										],
 										"value_label": [
@@ -4591,7 +4591,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.alt_gr"
+															"key": "key_name.alt_gr"
 														}
 													]
 												]
@@ -4607,7 +4607,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.right_ctrl"
+												"key": "key_name.right_ctrl"
 											}
 										],
 										"value_label": [
@@ -4621,7 +4621,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.shift"
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -4663,13 +4663,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "tap_hold.group.alt_gr"
+												"key": "key_name.alt_gr"
 											},
 											{
 												"text": " + "
 											},
 											{
-												"key": "tap_hold.group.left_alt"
+												"key": "key_name.left_alt"
 											}
 										],
 										"value_label": [
@@ -4685,13 +4685,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "tap_hold.group.alt_gr"
+												"key": "key_name.alt_gr"
 											},
 											{
 												"text": " + "
 											},
 											{
-												"key": "tap_hold.group.caps_lock"
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -4707,13 +4707,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "tap_hold.group.left_alt"
+												"key": "key_name.left_alt"
 											},
 											{
 												"text": " + "
 											},
 											{
-												"key": "tap_hold.group.caps_lock"
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [

@@ -578,15 +578,15 @@ _KCT_MenuListsEveryOrderedPair() {
 			}
 		}
 		AssertEqual(All.Length * (All.Length - 1), Pairs, "every ordered pair is listed")
-		Assert(Groups.Has("space") and Left[Left.Length]["label"] == t("tap_hold.group.space"),
+		Assert(Groups.Has("space") and Left[Left.Length]["label"] == t("key_name.space"),
 			"Space is a left-hand key, the last of its hand")
 		Forward := "", Backward := ""
 		for _, Pair in Groups["left_alt"]["items"] {
-			if InStr(Pair["label"], t("tap_hold.group.left_alt") . " + " . t("tap_hold.group.caps_lock")) == 1
+			if InStr(Pair["label"], t("key_name.left_alt") . " + " . t("key_name.caps_lock")) == 1
 				Forward := Pair
 		}
 		for _, Pair in Groups["caps_lock"]["items"] {
-			if InStr(Pair["label"], t("tap_hold.group.caps_lock") . " + " . t("tap_hold.group.left_alt")) == 1
+			if InStr(Pair["label"], t("key_name.caps_lock") . " + " . t("key_name.left_alt")) == 1
 				Backward := Pair
 		}
 		Assert(Forward is Map and Backward is Map, "LAlt + CapsLock and CapsLock + LAlt are two rows")
@@ -594,7 +594,7 @@ _KCT_MenuListsEveryOrderedPair() {
 		Assert(InStr(Forward["label"], GestureActionDisplayLabel("caps_word")) > 0, "and names its tap")
 		Assert(InStr(Forward["label"], _TH_HoldOptionLabel("ctrl")) > 0, "and its hold")
 		AssertFalse(Backward["checked"], "the other order has its own, empty, slots")
-		AssertEqual(LabelValue(t("tap_hold.group.caps_lock") . " + " . t("tap_hold.group.left_alt"),
+		AssertEqual(LabelValue(t("key_name.caps_lock") . " + " . t("key_name.left_alt"),
 			t("dialog.action_picker.disabled")), Backward["label"], "an empty pair explicitly names its disabled action")
 		AssertTrue(Groups["left_alt"]["checked"], "a first key with a pair is ticked")
 		AssertFalse(Groups["caps_lock"]["checked"])

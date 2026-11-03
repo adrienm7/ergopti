@@ -30,6 +30,7 @@
 
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\infra\key_names.ahk
 #Include ../../adapters/native_number.ahk
 
 ; ===========================
@@ -53,8 +54,9 @@
 global _TH_KeyDefs := _TH_BuildKeyDefs()
 
 ; Reads this driver's column of the shared key catalogue. An entry that names
-; no hand or no label is a broken catalogue: it is logged as an ERROR and left
-; out, so the tray never shows a guessed hand.
+; no hand is a broken catalogue: it is logged as an ERROR and left out, so the
+; tray never shows a guessed hand. Its name is the shared key name table's
+; (infra/key_names.ahk), which throws on a key it does not name.
 ; @returns {Array} One Map per Windows key, in catalogue order.
 _TH_BuildKeyDefs() {
 	global _SharedDir
@@ -68,8 +70,8 @@ _TH_BuildKeyDefs() {
 		return Out
 	}
 	for Index, Entry in Keys {
-		if !(Entry is Map) || !Entry.Has("id") || !Entry.Has("hand") || !Entry.Has("label_key") {
-			try LoggerError("TapHoldWriter", "[tap_hold.catalog] keys[{1}] needs an id, a hand and a label_key — left out.", Index)
+		if !(Entry is Map) || !Entry.Has("id") || !Entry.Has("hand") {
+			try LoggerError("TapHoldWriter", "[tap_hold.catalog] keys[{1}] needs an id and a hand — left out.", Index)
 			continue
 		}
 		Hand := Entry["hand"]
@@ -79,7 +81,7 @@ _TH_BuildKeyDefs() {
 		}
 		if !Entry.Has("ahk")
 			continue
-		Out.Push(Map("id", Entry["ahk"], "i18n", Entry["label_key"], "hand", Hand))
+		Out.Push(Map("id", Entry["ahk"], "i18n", KeyNameI18n(Entry["id"]), "hand", Hand))
 	}
 	return Out
 }
@@ -242,36 +244,21 @@ TapHoldCurrentHoldLabel(KeyId) {
 			return t(Opt["i18n"])
 		}
 	}
-	return HoldMod != "" ? HoldMod : (HoldLayer != "" ? HoldLayer : t(_TH_HoldOptions[1]["i18n"]))
+	; A hand-written spelling the picker does not list (`lctrl`, `shift+ctrl`)
+	; is still named, never printed as written.
+	if (HoldMod != "")
+		return _TH_HoldOptionLabel(HoldMod)
+	if (HoldLayer != "")
+		return t("tap_hold.hold." . HoldLayer . "_layer")
+	return t(_TH_HoldOptions[1]["i18n"])
 }
 
-; Human label for a hold modifier identifier.
-; Built from base i18n keys when possible, then joined with ' + '.
+; Human label for a hold modifier identifier: the shared key name of each
+; modifier ("Ctrl gauche" for lctrl), joined with ' + '.
 _TH_HoldOptionLabel(HoldId) {
-	if (HoldId == "") {
+	if (Trim(HoldId, " +") == "")
 		return t("tap_hold.hold.none")
-	}
-	Parts := StrSplit(HoldId, "+")
-	Out := []
-	for _, Part in Parts {
-		Clean := Trim(Part)
-		if (Clean == "") {
-			continue
-		}
-		Label := t("tap_hold.hold." . Clean)
-		if (InStr(Label, "tap_hold.hold.") > 0) {
-			Label := Clean
-		}
-		Out.Push(Label)
-	}
-	if (Out.Length == 0) {
-		return t("tap_hold.hold.none")
-	}
-	Result := ""
-	for Index, Label in Out {
-		Result .= (Index = 1 ? "" : " + ") . Label
-	}
-	return Result
+	return KeyNameComboLabel(HoldId)
 }
 
 ; Return true when the tap action for a key matches the given action id.
