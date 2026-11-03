@@ -22,6 +22,12 @@ return function(callback, options)
 		local raw = file:read("*a"); file:close()
 		local defaults, state = hs.json.decode(raw), hs.json.decode(raw)
 		state.llm_enabled, state.llm_backend, state.llm_model = true, options.backend or "ollama", ""
+		-- The macOS state keeps these in seconds (modules/llm/init.lua), as the real
+		-- Trigger rows read them (real_trigger_panel).
+		for _, table_ in ipairs({ defaults, state }) do
+			table_.llm_debounce = table_.llm_debounce_ms / 1000
+			table_.llm_min_request_interval = table_.llm_min_request_interval_ms / 1000
+		end
 		local noop = function() end
 		local accept = function() return true end
 		local calls = {}
@@ -74,8 +80,9 @@ return function(callback, options)
 				end }
 		end }
 		for _, name in ipairs({ "temperature_panel", "streaming_panel", "trigger_panel" }) do
-			-- A whole-tray walk reads the real Display rows (their label-value joins).
-			if not (name == "streaming_panel" and options.real_streaming_panel) then
+			-- A whole-tray walk reads the real Display and Trigger rows (their label-value joins).
+			if not (name == "streaming_panel" and options.real_streaming_panel)
+				and not (name == "trigger_panel" and options.real_trigger_panel) then
 				package.loaded["ui.menu.menu_llm." .. name] = { build = function() return {} end }
 			end
 		end

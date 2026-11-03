@@ -119,7 +119,7 @@ local function build_tray(observe_layout, catalogue)
 	local llm_item = nil
 	require("tests.support.llm_count_menu_fixture")(function(llm_menu)
 		llm_item = llm_menu.build_item()
-	end, { catalogue = catalogue, real_streaming_panel = true })
+	end, { catalogue = catalogue, real_streaming_panel = true, real_trigger_panel = true })
 
 	local lines = {}
 	package.loaded["infra.logger"] = nil
