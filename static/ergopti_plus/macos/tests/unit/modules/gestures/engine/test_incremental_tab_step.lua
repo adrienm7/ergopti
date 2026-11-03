@@ -46,8 +46,9 @@ local GESTURES = {
 
 --- Builds a fresh engine with the shipped incremental defaults.
 --- @param sensitivity number|nil Step to use instead of the manifest default.
+--- @param held function|nil The core state's system_held predicate.
 --- @return table harness { path, lift, fired, finish }
-local function new_harness(sensitivity)
+local function new_harness(sensitivity, held)
 	local hs = _G.hs
 	local saved_clock = hs.timer.secondsSinceEpoch
 	local saved_absolute = hs.timer.absoluteTime
@@ -71,6 +72,7 @@ local function new_harness(sensitivity)
 		ga = GESTURES,
 		modes = { swipe_3_up = "incremental", swipe_3_down = "incremental" },
 		sensitivities = { swipe_3_up = step_up, swipe_3_down = step_down },
+		system_held = held,
 	}, {
 		execute_single = function(a) fired[#fired + 1] = a; return true end,
 		execute_axis   = function(a) fired[#fired + 1] = a; return true end,
@@ -131,8 +133,8 @@ end
 --- @param waypoints table
 --- @param sensitivity number|nil
 --- @return table fired
-local function swipe(waypoints, sensitivity)
-	local h = new_harness(sensitivity)
+local function swipe(waypoints, sensitivity, held)
+	local h = new_harness(sensitivity, held)
 	h.path(waypoints)
 	h.lift()
 	local fired = h.fired
@@ -181,6 +183,18 @@ helpers.describe("a three-finger swipe switches one tab (three-finger-tab-step)"
 
 	helpers.it("a very long 60-unit swipe switches three tabs", function()
 		assert_fires(swipe({ 60 }), 3, "tab_next", "a very long swipe past 54")
+	end)
+end)
+
+-- Never a double action (maintainer, 2026-11-03): while macOS uses the slot's
+-- gesture itself, the engine fires none of the slot's steps.
+helpers.describe("a slot macOS uses fires nothing (gesture-held-by-macos)", function()
+	helpers.it("a held slot fires no step, the other slots still do", function()
+		local asked = {}
+		local function held(slot) asked[#asked + 1] = slot; return slot == "swipe_3_down" end
+		assert_fires(swipe({ 60 }, nil, held), 0, "tab_next", "macOS runs its own gesture on swipe_3_down")
+		helpers.assert_true(#asked > 0, "the engine asks before it fires")
+		assert_fires(swipe({ -60 }, nil, held), 3, "tab_prev", "swipe_3_up is not held")
 	end)
 end)
 

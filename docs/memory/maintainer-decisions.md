@@ -306,6 +306,18 @@ the user to turn the four-finger swipes and Look up off first. The set lives in
 the features manifest (`recommended_per_platform`) and
 `test-gesture-defaults-single-source.cjs` pins it.
 
+## Never a double action on macOS; menu rows stay short (3 November 2026)
+
+While a three-or-more-finger macOS gesture is on (Spaces, Mission Control, App
+Exposé, Look up, the three-finger swipes or drag), the Ergopti slots it covers
+are greyed in the Gestures menu with a suffix of about 20 characters
+(« — pris par macOS ») and the engine does not fire them; turning the macOS
+gesture off brings them back without a reload (`gestures/conflicts.lua`
+rechecks the Trackpad and Dock preferences every `system_prefs_recheck_ms`,
+off the touch path, and never writes them). Two-finger touches never block a
+slot. The long explanation goes in « Infos… », never in a row: every menu row
+stays short so the menu does not stretch.
+
 ## The Gestures clear restores the Windows touchpad (3 November 2026)
 
 « Tout effacer (comportement du système) » in Gestures, and the global clear
