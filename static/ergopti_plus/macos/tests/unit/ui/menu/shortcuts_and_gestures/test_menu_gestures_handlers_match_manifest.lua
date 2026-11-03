@@ -263,6 +263,34 @@ helpers.describe("Gestures: shared swipe mode declaration and actual native muta
 			helpers.assert_eq(f.updates, 1)
 		end)
 	end)
+	-- Never a double action (maintainer, 2026-11-03): a slot macOS uses itself is
+	-- greyed with a short suffix, and a change in the macOS settings rebuilds the menu.
+	for _, case in ipairs({ { "taken", "menu.gestures.slot_taken_by_macos" },
+			{ "unverified", "menu.gestures.slot_unverified_macos" }, { "free", nil } }) do
+		helpers.it("greys a slot macOS uses with a short suffix: " .. case[1], function()
+			with_mode_fixture({}, function(f)
+				local listener
+				f.gestures.system_slot_state = function() return case[1] end
+				f.gestures.set_system_gestures_listener = function(fn) listener = fn end
+				local item = f.build()
+				local base = f.strings["common.label_value"]:gsub("{1}", f.strings["gesture.slots.swipe_2_left"])
+					:gsub("{2}", "None")
+				local expected = case[2] and (base .. " — " .. f.strings[case[2]]) or base
+				local found
+				for _, row in ipairs(item.submenu) do
+					if row.title == expected then found = row end
+				end
+				helpers.assert_type(found, "table", "the slot row reads " .. expected)
+				helpers.assert_eq(found.disabled == true, case[2] ~= nil, "only a held slot is greyed")
+				if case[2] then
+					helpers.assert_true(#f.strings[case[2]] <= 20, "the suffix stays short")
+				end
+				helpers.assert_type(listener, "function", "the menu listens for macOS setting changes")
+				listener()
+				helpers.assert_eq(f.updates, 1, "a change asks for a rebuild")
+			end)
+		end)
+	end
 	helpers.it("reads caption, check predicate and platform mutations from the declaration", function()
 		with_mode_fixture({}, function(f)
 			local row = f.root[f.corpus.section][1]
