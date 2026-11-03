@@ -465,6 +465,22 @@ generator, both renderers and `test-menu-unavailable-rows.cjs` hold the rule; a
 greyed reason's head must stay short in all 21 locales.
 Action: classify a restriction you add or touch, never with a long reason head.
 
+### project-section-headers-are-one-format
+
+Maintainer rule (2026-11-03): every disabled section header of every tray is a
+`section_header` row framed by the one format of
+`_shared/modules/menu/section_header.json` (« — Section truc — »), which
+`codegen-menu-section-header.cjs` projects into `menu.section_header_data`
+(read by `menu.labels.decorate_section`, so macOS and Linux `i18n.section`) and
+the constants `MenuSectionTitle` reads on Windows. A locale value holds the
+title only, in sentence case as its language writes it, never capitals or
+dashes; a provider that draws a heading of its own calls the kernel. A header
+is never followed by a separator, another header or the end of its menu, except
+in a fragment a driver splices into its rows. Action: restyle headers in the
+JSON alone; `test-section-decoration-parity.cjs` and the built-menu tests
+(`test.menu_section_headers`, `test_manifest_menu_section_headers.ahk`) hold
+the rule.
+
 ### project-a-category-off-greys-its-submenu
 
 Maintainer rule (2026-11-02): the row of a top-level category in the main menu
