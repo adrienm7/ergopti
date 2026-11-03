@@ -18,11 +18,17 @@
 --- THE PRECEDENCE, from strongest to weakest:
 ---   1. the user's override for this SECTION
 ---   2. the user's override for the CATEGORY
----   3. [_meta.section_delays] in the category's own TOML
----   4. [_meta] in the category's own TOML
----   5. the shared defaults in _shared/modules/hotstrings/defaults.toml
---- A per-category default colour sits between 4 and 5 for colour only, because a
+---   3. the delay the SECTION declares (delay only): the user's config.toml leaf
+---      where the driver's layout has one, else its manifest row's default
+---      (hotstrings.languages.section_default_delay)
+---   4. [_meta.section_delays] in the category's own TOML
+---   5. [_meta] in the category's own TOML
+---   6. the shared defaults in _shared/modules/hotstrings/defaults.toml
+--- A per-category default colour sits between 5 and 6 for colour only, because a
 --- category with no declared colour still wants its own rather than the global.
+--- Rung 3 is the maintainer's decision of 3 November 2026: a built-in section
+--- waits what the manifest declares for it, and the base expansion delay is
+--- left to the sections that declare nothing.
 ---
 --- WHY `nil` AND `false` ARE NOT THE SAME THING HERE:
 --- show_tooltip is a boolean, so "unset" cannot be spelled as falsy. A rung that
@@ -69,6 +75,7 @@ end
 ---   user_section   table|nil  The user's override table for the section.
 ---   meta_category  table|nil  [_meta] from the category's TOML.
 ---   meta_section   table|nil  The section's entry in [_meta.section_delays].
+---   declared_delay number|nil The delay the section declares (rung 3), in seconds.
 ---   default_delay  number     Shared fallback, in seconds.
 ---   default_color  string     Shared fallback colour.
 ---   category_color string|nil Per-category default colour, if the driver has one.
@@ -84,6 +91,7 @@ function M.resolve(inputs)
 	local delay = M.first_set(
 		user_sec.delay,
 		user_cat.delay,
+		inputs.declared_delay,
 		meta_sec.delay,
 		meta_cat.delay,
 		inputs.default_delay)

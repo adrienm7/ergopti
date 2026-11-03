@@ -56,6 +56,33 @@ HotstringsScopeDelayRecommendations(Mode, Features, Groups, Inherited) {
 	return Recommendations
 }
 
+/**
+ * The delay one built-in section declares: its manifest row's default
+ * time_activation_seconds (the maintainer's decision of 3 November 2026).
+ * Twin of hotstrings.languages.section_default_delay; both replay
+ * _shared/tests/corpus/hotstrings/section_default_delay_vectors.json.
+ * @param {Array} Features The generated shared manifest's feature rows.
+ * @param {String} Group Hotstring group (file stem or language group id).
+ * @param {String} Section Section name; empty asks for the category, which declares none.
+ * @returns {Number|String} Seconds, or "" when the section declares no delay,
+ *   has no row, or is one of the personal rows (the user's own files).
+ */
+HotstringsSectionDefaultDelay(Features, Group, Section) {
+	if !(Features is Array)
+		throw TypeError("The section delay lookup requires the manifest's feature rows.")
+	if !(Group is String) || !(Section is String) || Section == ""
+		return ""
+	if StrReplace(Group, "_") == "personal"
+		return ""
+	Entry := _HotstringsScopeSectionFeature(Features, Group, Section)
+	if !(Entry is Map) || !Entry["default"].Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+		return ""
+	Seconds := Entry["default"][ConfigLeaf.TIME_ACTIVATION_SECONDS]
+	if !(Seconds is Integer || Seconds is Float) || Seconds < 0
+		throw TypeError("The manifest declares an invalid delay for " . Entry.Get("path", Group . "." . Section) . ".")
+	return Seconds
+}
+
 /** Matches the same bundled section identity as shared hotstrings.languages. */
 _HotstringsScopeSectionFeature(Features, Group, Section) {
 	Wanted := StrReplace(Group, "_")
