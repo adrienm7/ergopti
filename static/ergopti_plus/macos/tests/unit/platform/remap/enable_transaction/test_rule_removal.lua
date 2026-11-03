@@ -81,12 +81,12 @@ helpers.describe("the Karabiner switch turned off", function()
 	end)
 end)
 
-helpers.describe("Remove Ergopti from Karabiner", function()
+helpers.describe("set_enabled(false) on the shared runtime", function()
 	helpers.it("turns an enabled integration off through the exact lease", function()
 		with_fixture(function(fixture)
 			local remap, calls = fixture.load_enabled_remap()
 			local result = nil
-			helpers.assert_true(remap.remove_from_karabiner(function(ok) result = ok end))
+			helpers.assert_true(remap.set_enabled(false, function(ok) result = ok end))
 			helpers.assert_eq(calls.stop, 1)
 			helpers.assert_eq(#calls.rule_removals, 0)
 			calls.finish_stop(true, "stopped")
@@ -100,7 +100,7 @@ helpers.describe("Remove Ergopti from Karabiner", function()
 		with_fixture(function(fixture)
 			local remap, calls = fixture.load_enabled_remap({ initially_enabled = false })
 			local result, reason = nil, nil
-			helpers.assert_true(remap.remove_from_karabiner(function(ok, detail)
+			helpers.assert_true(remap.set_enabled(false, function(ok, detail)
 				result, reason = ok, detail
 			end))
 			helpers.assert_eq(calls.stop, 1, "removal joins every retained generation before unregistering")
@@ -120,7 +120,7 @@ helpers.describe("Remove Ergopti from Karabiner", function()
 				initially_enabled = false, rule_removal_succeeds = false,
 			})
 			local result = nil
-			helpers.assert_true(remap.remove_from_karabiner(function(ok) result = ok end))
+			helpers.assert_true(remap.set_enabled(false, function(ok) result = ok end))
 			helpers.assert_nil(result, "accepted retirement has not acknowledged cleanup")
 			calls.finish_stop(true, "stopped")
 			helpers.assert_eq(calls.unregister_guardian, 1)

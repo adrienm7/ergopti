@@ -560,6 +560,22 @@ local function lease_worker(api)
 	end
 end
 
+--- Whether every path a command names is inside Ergopti's own runtime folder.
+--- @param args table Arguments of /bin/rm or /bin/mkdir.
+--- @return boolean inside
+local function owned_artifact_paths(args)
+	local paths = 0
+	for _, arg in ipairs(args) do
+		if tostring(arg):sub(1, 1) ~= "-" then
+			if not tostring(arg):find("/Library/Application Support/ErgoptiPlus/RemapRuntime/", 1, true) then
+				return false
+			end
+			paths = paths + 1
+		end
+	end
+	return paths > 0
+end
+
 --- Answers one command of the set-up Mac.
 --- @param path string Executable.
 --- @param args table Arguments.
@@ -637,6 +653,13 @@ local function machine_answer(path, args, helper, environment, launcher_environm
 		return { code = 0, stdout = "CPU usage: 1.0% user, 1.0% sys, 98.0% idle\nPhysMem: 8G used (1G wired)\n" }
 	end
 	if path == "/bin/sh" or path == "/bin/zsh" or path == "/bin/bash" then return { code = 0, stdout = "" } end
+	-- Ergopti's own runtime artifact (platform/remap/runtime_artifact_fetch.lua):
+	-- its folder steps succeed and the E2E Mac is offline, so the download fails
+	-- by name and the owned boot reports artifact_fetch_failed.
+	if (path == "/bin/rm" or path == "/bin/mkdir") and owned_artifact_paths(args) then return { code = 0 } end
+	if path == "/usr/bin/curl" and tostring(args[#args]):find("/releases/download/remap-runtime-v", 1, true) then
+		return { code = 6, stderr = "curl: (6) Could not resolve host: github.com" }
+	end
 	return { code = 127, stderr = tostring(path) .. ": this command is not modelled by the E2E Mac" }
 end
 
