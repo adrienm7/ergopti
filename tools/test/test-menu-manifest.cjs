@@ -407,7 +407,8 @@ function checkChoiceProjection() {
 			const rows = menu[key];
 			return Array.isArray(rows) ? rows.filter((row) => row.type === 'section_header') : [];
 		});
-		assert.equal(legacyHeaders.length, 13, 'all existing id-less headers survive compilation');
+		// 3 Shortcuts, 3 Metrics, 4 Layout, 4 Hotstrings and 2 Tap-Hold headers.
+		assert.equal(legacyHeaders.length, 16, 'all existing id-less headers survive compilation');
 		assert(
 			legacyHeaders.every((row) => !Object.hasOwn(row, 'id')),
 			'the header primitive cannot impose identities on existing records'
