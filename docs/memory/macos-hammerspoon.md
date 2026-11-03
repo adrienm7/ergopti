@@ -1280,6 +1280,20 @@ does, so a key or combo with a tap and no hold sends its tap as `to`. Action:
 prove a generator rule change through the model, extending the model from the
 source.
 
+### project-karabiner-tap-decisions-are-only-visible-as-events
+
+Karabiner decides every macOS tap-hold inside its core and logs nothing about
+it, so a missing tap output (Left Shift tapped for Cmd+C) left no trace in the
+driver logs. Hammerspoon sees the decision only as the events Karabiner posts:
+a key whose hold is its own modifier reaches the flagsChanged tap as its press
+and release, and a tap's output follows the release within milliseconds; the
+window-server stamps give the press duration a held main thread cannot skew.
+Action: diagnose or verify a tap output from that stream
+(`modules/keymap/tap_copy.lua` does it for the copy tap, one log line per
+watched tap with the press time against the threshold), and read the
+clipboard counter in the keyDown tap, before the application has the
+keystroke.
+
 ### project-sparkle-consent-is-plist-owned
 
 Sparkle 2.9 reads `SUAllowsAutomaticUpdates` from Info.plist only, and
