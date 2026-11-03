@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "Затримка автодоповнення",
 	"menu.hotstrings.tooltip_autocorrect": "Попередній перегляд автокорекції",
 	"menu.hotstrings.tooltip_colored": "Кольоровий попередній перегляд",
-	"menu.hotstrings.tooltip_default": "Затримка за замовчуванням (усі групи)",
+	"menu.hotstrings.tooltip_default": "Базова затримка (групи без власної)",
 	"menu.hotstrings.tooltip_magic": "★ Попередній перегляд",
 	"menu.hotstrings.uncheck_all": "□ Зняти всі",
 	"menu.hotstrings.word_delimiters": "Роздільники слів",

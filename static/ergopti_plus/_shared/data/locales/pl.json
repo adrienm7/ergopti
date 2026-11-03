@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "Opóźnienie autouzupełniania",
 	"menu.hotstrings.tooltip_autocorrect": "Podgląd autokorekty",
 	"menu.hotstrings.tooltip_colored": "Kolorowe podglądy",
-	"menu.hotstrings.tooltip_default": "Domyślne opóźnienie (wszystkie grupy)",
+	"menu.hotstrings.tooltip_default": "Opóźnienie bazowe (grupy bez własnego)",
 	"menu.hotstrings.tooltip_magic": "★ Podgląd",
 	"menu.hotstrings.uncheck_all": "□ Odznacz wszystko",
 	"menu.hotstrings.word_delimiters": "Separatory wyrazów",

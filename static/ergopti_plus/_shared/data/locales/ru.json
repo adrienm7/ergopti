@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "Задержка автодополнения",
 	"menu.hotstrings.tooltip_autocorrect": "Предпросмотр автокоррекции",
 	"menu.hotstrings.tooltip_colored": "Цветные предпросмотры",
-	"menu.hotstrings.tooltip_default": "Задержка по умолчанию (все группы)",
+	"menu.hotstrings.tooltip_default": "Базовая задержка (группы без своей)",
 	"menu.hotstrings.tooltip_magic": "★ Предпросмотр",
 	"menu.hotstrings.uncheck_all": "□ Снять все",
 	"menu.hotstrings.word_delimiters": "Разделители слов",

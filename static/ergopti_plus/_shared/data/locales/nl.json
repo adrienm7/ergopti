@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "Vertraging automatisch aanvullen",
 	"menu.hotstrings.tooltip_autocorrect": "Voorbeeld automatische correctie",
 	"menu.hotstrings.tooltip_colored": "Gekleurde voorbeelden",
-	"menu.hotstrings.tooltip_default": "Standaardvertraging (alle groepen)",
+	"menu.hotstrings.tooltip_default": "Basisvertraging (groepen zonder eigen)",
 	"menu.hotstrings.tooltip_magic": "★ Voorbeeld",
 	"menu.hotstrings.uncheck_all": "□ Alles uitvinken",
 	"menu.hotstrings.word_delimiters": "Woordscheidingstekens",

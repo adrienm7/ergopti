@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "تأخير الإكمال التلقائي",
 	"menu.hotstrings.tooltip_autocorrect": "معاينة التصحيح التلقائي",
 	"menu.hotstrings.tooltip_colored": "معاينات ملوّنة",
-	"menu.hotstrings.tooltip_default": "التأخير الافتراضي (جميع المجموعات)",
+	"menu.hotstrings.tooltip_default": "التأخير الأساسي (المجموعات بلا تأخير خاص)",
 	"menu.hotstrings.tooltip_magic": "★ معاينة",
 	"menu.hotstrings.uncheck_all": "□ إلغاء تحديد الكل",
 	"menu.hotstrings.word_delimiters": "محددات الكلمات",

@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "השהיית השלמה אוטומטית",
 	"menu.hotstrings.tooltip_autocorrect": "תצוגה מקדימה של תיקון אוטומטי",
 	"menu.hotstrings.tooltip_colored": "תצוגות מקדימות צבעוניות",
-	"menu.hotstrings.tooltip_default": "השהיית ברירת מחדל (כל הקבוצות)",
+	"menu.hotstrings.tooltip_default": "השהיית בסיס (קבוצות ללא השהיה משלהן)",
 	"menu.hotstrings.tooltip_magic": "תצוגה מקדימה של ★",
 	"menu.hotstrings.uncheck_all": "□ בטל בחירה",
 	"menu.hotstrings.word_delimiters": "מפרידי מילים",

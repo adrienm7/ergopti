@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "स्वचालित समापन विलंब",
 	"menu.hotstrings.tooltip_autocorrect": "ऑटोकरेक्ट पूर्वावलोकन",
 	"menu.hotstrings.tooltip_colored": "रंगीन पूर्वावलोकन",
-	"menu.hotstrings.tooltip_default": "डिफ़ॉल्ट विलंब (सभी समूह)",
+	"menu.hotstrings.tooltip_default": "आधार विलंब (बिना अपने विलंब वाले समूह)",
 	"menu.hotstrings.tooltip_magic": "★ पूर्वावलोकन",
 	"menu.hotstrings.uncheck_all": "□ सब हटाएं",
 	"menu.hotstrings.word_delimiters": "शब्द विभाजक",

@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "Autokompletering-fördröjning",
 	"menu.hotstrings.tooltip_autocorrect": "Autokorrigering-förhandsvisning",
 	"menu.hotstrings.tooltip_colored": "Färgade förhandsvisningar",
-	"menu.hotstrings.tooltip_default": "Standardfördröjning (alla grupper)",
+	"menu.hotstrings.tooltip_default": "Basfördröjning (grupper utan egen)",
 	"menu.hotstrings.tooltip_magic": "★ Förhandsvisning",
 	"menu.hotstrings.uncheck_all": "□ Avmarkera alla",
 	"menu.hotstrings.word_delimiters": "Ordavgränsare",

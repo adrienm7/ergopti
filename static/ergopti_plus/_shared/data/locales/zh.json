@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "自动补全延迟",
 	"menu.hotstrings.tooltip_autocorrect": "自动更正预览",
 	"menu.hotstrings.tooltip_colored": "彩色预览",
-	"menu.hotstrings.tooltip_default": "默认延迟（所有组）",
+	"menu.hotstrings.tooltip_default": "基础延迟（无自有延迟的组）",
 	"menu.hotstrings.tooltip_magic": "★ 预览",
 	"menu.hotstrings.uncheck_all": "□ 取消全选",
 	"menu.hotstrings.word_delimiters": "单词分隔符",
