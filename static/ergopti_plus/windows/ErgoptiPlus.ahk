@@ -1235,8 +1235,9 @@ ReadKeyboardShortcutsConfig()
 _BootMetricsCache := CS_Load()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()
-if MetricsShortcuts.enabled
-		WPMWidget_LoadConfig(_BootMetricsCache)
+; Loaded with Metrics off too: SaveFullConfig writes the widget booleans back, so
+; they must carry the user's or the manifest's answer, not the class placeholders.
+WPMWidget_LoadConfig(_BootMetricsCache)
 
 BootProfile_StageEnd("shortcuts", KeyboardShortcutAssignments.Count . " configured keyboard slot(s) read")
 BootProfile_Mark("Config, features & shortcuts loaded")
