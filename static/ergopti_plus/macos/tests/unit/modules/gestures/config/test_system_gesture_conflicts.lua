@@ -53,7 +53,7 @@ helpers.describe("system gesture snapshots (gesture-conflicts)", function()
 			helpers.assert_eq(callbacks, 0)
 			helpers.assert_type(subject.on_action_changed("tap_2", "lookup"), "table")
 			subject.refresh()
-			helpers.assert_eq(#pending, 6)
+			helpers.assert_eq(#pending, 8, "a second read queries the four sources again")
 		end)
 	end)
 	helpers.it("checks the live enabled posture at boot completion and warns once per group", function()
@@ -88,10 +88,11 @@ helpers.describe("system gesture snapshots (gesture-conflicts)", function()
 		fixture(function(subject, pending)
 			local completions = 0
 			subject.refresh(function() completions = completions + 1 end)
-			helpers.assert_eq(#pending, 3)
-			for i = 1, 2 do pending[i].done(0, "TrackpadThreeFingerTapGesture = 0;", "") end
+			-- Three Trackpad sources and the Dock (Mission Control, App Exposé).
+			helpers.assert_eq(#pending, 4)
+			for i = 1, 3 do pending[i].done(0, "TrackpadThreeFingerTapGesture = 0;", "") end
 			helpers.assert_eq(completions, 0)
-			pending[3].done(0, "", "")
+			pending[4].done(0, "", "")
 			helpers.assert_eq(completions, 1)
 			helpers.assert_nil(subject.on_action_changed("tap_3", "lookup"))
 		end)
@@ -140,7 +141,7 @@ helpers.describe("system gesture snapshots (gesture-conflicts)", function()
 			local count = 0
 			subject.refresh(function() count = count + 1 end)
 			subject.refresh(function() count = count + 1 end)
-			helpers.assert_eq(#pending, 3)
+			helpers.assert_eq(#pending, 4)
 			for _, task in ipairs(pending) do task.done(0, "TrackpadRightClick = 0;", ""); task.done(1, "", "") end
 			helpers.assert_eq(count, 2)
 			helpers.assert_nil(subject.on_action_changed("tap_2", "lookup"))

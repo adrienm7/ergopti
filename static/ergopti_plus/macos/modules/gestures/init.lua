@@ -195,6 +195,9 @@ local CoreState = {
 	-- Flat binding__action → parameter map. Keeping this separate from action
 	-- assignments prevents a URL selected for one gesture leaking into another.
 	action_params  = {},
+	-- Whether macOS itself uses a slot's gesture right now: the engine fires no
+	-- action of a slot it holds, so there is never a double action.
+	system_held    = Conflicts.slot_held_by_system,
 }
 
 -- Initialize active actions with defaults
@@ -664,6 +667,8 @@ function M.refresh_system_gestures(callback) return Conflicts.refresh(callback) 
 function M.system_gesture_conflicts() return Conflicts.active_conflicts(CoreState.enabled and CoreState.ga or {}) end
 function M.open_system_gestures() return Conflicts.open_settings() end
 function M.system_pinch_enabled() return Conflicts.native_pinch_enabled() end
+function M.system_slot_state(slot) return Conflicts.slot_system_state(slot) end
+function M.set_system_gestures_listener(listener) return Conflicts.set_state_listener(listener) end
 function M.get_action(slot)         return CoreState.ga[slot]                   end
 
 --- Stores one gesture action through an exact project-level setter contract.
