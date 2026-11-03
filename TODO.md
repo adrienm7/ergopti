@@ -59,6 +59,11 @@ the local branches `worktree-agent-*`: land them, then remove the worktrees so o
       shows, covers it, since both share one surface (`_TooltipPresentStack`). Wait = apply those three gates to
       every request; both = present the hotstring rows and the prediction in that one stack. macOS
       (`llm_bridge.update_preview`, `HOTSTRING_CHAIN_OFFSET_SEC`) and Linux still to read.
+- [ ] **Key names, what lot CH left.** Menus now name keys from `_shared/data/keycodes/key_names.json` in the 21
+      locales. Still raw or French: the shared modifier-chord action labels (« Cmd + Option + Shift + Enter » in the
+      action pickers, all drivers; tests pin this label family, so it needs its own change); the macOS sticky holds
+      and `layer` hold labels; the tooltip footer hints in `_shared/modules/tooltip/constants.toml`; the physical
+      shortcuts and metrics web pages. Arabic `gesture.slots.swipe_5_horiz` says four fingers.
 - [ ] **Model selection page.** Install Ollama and Install MLX buttons act or say why, disabled when installed; a whole
       section header opens its list; header on two lines (install, port, status; then add a model by hand); Ollama and MLX
       models grouped in collapsible sections per provider, alphabetical; search crosses sections; gate for page actions
