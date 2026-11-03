@@ -2004,7 +2004,10 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
   target; Windows ports the route plan in `vendor/ergopti_route_plan.ps1`.
   `blob_range` asks two bytes of that blob: `honoured`, `ignored` (information:
   a relay answers 200, and the managed daemon's `AlignRange` skips to each
-  part's offset, reloading the skipped bytes) or `wrong_range`.
+  part's offset, reloading the skipped bytes) or `wrong_range`. The registry
+  answers a blob HEAD itself (`registry_served`) but a GET with a 307 to its
+  storage, so the ranged GET follows up to ten HTTPS hops to planned hosts,
+  as the daemon does, before it judges the answer.
 - `field_app_health` runs after the AI steps. "Since the app start" is the
   launcher's `ps` elapsed time (`app_uptime_s`); it reads the driver's
   `crash_reports` folder and `~/Library/Logs/DiagnosticReports` for

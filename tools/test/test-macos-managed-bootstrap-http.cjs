@@ -237,3 +237,88 @@ const actualWorkspaceCases = [
 assert.deepEqual(actualWorkspaceCases, expectedWorkspaceCases);
 process.stdout.write(mlxWorkspaces.stdout);
 process.stdout.write(mlxWorkspaces.stderr);
+
+// The field run's blob probe against the fake registry, which answers a blob
+// HEAD itself and sends its GET to storage with a 307, as the real registry
+// does (field run 2026-11-03: blob_range fail http_307 before the probe
+// followed it). The transport is a plain HTTP client that follows nothing, as
+// the native one; only the planned hosts are pointed at the loopback registry.
+const BLOB_PROBE = String.raw`
+import importlib.util, sys, urllib.error, urllib.request
+port = sys.argv[1]
+spec = importlib.util.spec_from_file_location(
+    "network_check", "static/ergopti_plus/macos/modules/llm/managed_network_check.py")
+helper = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(helper)
+class Refuse(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *arguments):
+        return None
+opener = urllib.request.build_opener(Refuse)
+class Response:
+    def __init__(self, answer):
+        self.answer, self.status = answer, answer.status
+        self.headers = list(answer.headers.items())
+    def read(self, maximum=None):
+        return self.answer.read(maximum or 65536)
+    def __enter__(self):
+        return self
+    def __exit__(self, *_):
+        self.answer.close()
+        return False
+class Bootstrap:
+    @staticmethod
+    def _direct_route(url):
+        return True
+    @staticmethod
+    def _native_request(url, headers, method, **_):
+        try:
+            return Response(opener.open(urllib.request.Request(url, headers=dict(headers), method=method), timeout=10))
+        except urllib.error.HTTPError as answer:
+            return Response(answer)
+helper.load_bootstrap = lambda: Bootstrap
+helper.ollama_planned_hosts = lambda: ("http://127.0.0.1:" + port, {"127.0.0.1"})
+helper.main_blob("tiny:0.5b")
+`;
+
+(async () => {
+	const { spawn } = require('node:child_process');
+	const { startFakeOllamaRegistry } = require('./lib/fake-network.cjs');
+	const registry = await startFakeOllamaRegistry({
+		config: {
+			mediaType: 'application/vnd.docker.container.image.v1+json',
+			bytes: Buffer.from('{}')
+		},
+		layers: [{ mediaType: 'application/vnd.ollama.image.model', bytes: Buffer.from('layer') }]
+	});
+	try {
+		const child = spawn(pythonExecutable(), ['-c', BLOB_PROBE, String(registry.port)], {
+			cwd: path.resolve(__dirname, '../..')
+		});
+		let stdout = '';
+		let stderr = '';
+		child.stdout.on('data', (chunk) => (stdout += chunk));
+		child.stderr.on('data', (chunk) => (stderr += chunk));
+		const status = await new Promise((resolve) => child.on('close', resolve));
+		assert.equal(status, 0, stderr);
+		assert.deepEqual(stdout.trim().split(/\r?\n/), [
+			'step blob_manifest pass http_200',
+			'step blob_host pass registry_served',
+			// The fake storage answers the whole blob: what a relay ignoring Range does.
+			'step blob_range info ignored'
+		]);
+		const ranged = registry.requests.filter((row) => row.method === 'GET' && row.range);
+		assert.deepEqual(
+			ranged.map((row) => [row.path.replace(/sha256:[0-9a-f]{64}/, 'DIGEST'), row.range]),
+			[
+				['/v2/library/tiny/blobs/DIGEST', 'bytes=1-2'],
+				['/storage/DIGEST', 'bytes=1-2']
+			]
+		);
+		process.stdout.write('ok - the blob range probe follows the registry redirect to storage\n');
+	} finally {
+		await registry.close();
+	}
+})().catch((error) => {
+	console.error(error);
+	process.exitCode = 1;
+});
