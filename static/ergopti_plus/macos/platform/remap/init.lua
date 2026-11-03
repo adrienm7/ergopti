@@ -6035,6 +6035,7 @@ function M.apply_scope(request, on_done)
 		-- The manifest rows of the scope, each with its state field.
 		local fields = {
 			[require("config_keys").KEY.TAP_HOLDS_ENABLED] = "tap_holds_enabled",
+			-- config-key-literal-ok: the value is the remap state field, named like its leaf
 			[require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS] = "lone_modifier_tap_max_ms",
 		}
 		for _, row in ipairs(Manifest.scope_plan(request.scope, request.mode).operations) do
