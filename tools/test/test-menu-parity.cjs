@@ -5682,7 +5682,9 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // Linux 19 → 20: navigation and validation now use their declared list providers.
 // Linux 21 → 22: « Vider le contexte sur clic/navigation » (llm_generation_reset_navigation)
 // is a row of the Linux AI submenu now that the AI context is its own buffer.
-const RENDERED_THROUGH_SHARED = { hs: 23, linux: 22 };
+// hs 23 → 24, linux 22 → 23: the Debug checks gathered in one Tests submenu
+// (debug_tests_menu, 7ba86d9506) render through the shared renderer.
+const RENDERED_THROUGH_SHARED = { hs: 24, linux: 23 };
 
 const DRIVER_ROOTS = {
 	hs: path.join(SP, 'macos'),
@@ -6341,7 +6343,13 @@ function languageParentSource(source, driver) {
 			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.debug.title']);
-		assert.equal(hand[code].linux[5], locale['menu.debug.log_level'] + ' : ℹ️ INFO');
+		// The row joins its label to its value through the locale's common.label_value.
+		assert.equal(
+			hand[code].linux[5],
+			locale['common.label_value']
+				.replace('{1}', locale['menu.debug.log_level'])
+				.replace('{2}', 'ℹ️ INFO')
+		);
 		assert.equal(hand[code].tests, locale['menu.debug.tests']);
 		assert.equal(hand[code].hs[7], hand[code].linux[5]);
 	}

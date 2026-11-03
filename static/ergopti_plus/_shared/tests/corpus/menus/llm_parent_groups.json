@@ -176,7 +176,7 @@
 			"callback": false,
 			"children": [
 				{
-					"title": "menu.llm.nav_label : ⌃ menu.llm.arrows",
+					"title": "menu.llm.nav_label: ⌃ menu.llm.arrows",
 					"callback": false,
 					"children": [
 						{
@@ -215,7 +215,7 @@
 					]
 				},
 				{
-					"title": "menu.llm.val_label : ⇧ menu.llm.digits",
+					"title": "menu.llm.val_label: ⇧ menu.llm.digits",
 					"callback": false,
 					"children": [
 						{
@@ -443,7 +443,7 @@
 					"callback": false
 				},
 				{
-					"title": "Indentation de la suggestion sélectionnée: Aucune indentation",
+					"title": "Indentation de la suggestion sélectionnée : Aucune indentation",
 					"callback": false,
 					"children": [
 						{
