@@ -212,6 +212,26 @@ for (const modifier of tooltip.shortcut_modifier_order.split(',')) {
 			`tooltip shortcut_modifier_order names ${modifier}, which has no key name and glyph`
 		);
 }
+// The footer's navigation hints name their keys from this table and their words
+// from the locales: they read French (« Tab pour accepter », « ⇧G + Tab ») in
+// every locale until 2026-11-03.
+for (const field of ['hint_accept_key', 'hint_nav_left_keys', 'hint_nav_right_keys']) {
+	const value = tooltip[field];
+	if (typeof value !== 'string' || value === '')
+		errors.push(`tooltip [llm_ui].${field} is missing`);
+	else for (const part of value.split('+')) resolve(part, `tooltip [llm_ui].${field}`);
+}
+for (const field of Object.keys(tooltip))
+	if (/^hint_(accept_single|accept_center|or|nav_left|nav_right)$/.test(field))
+		errors.push(`tooltip [llm_ui].${field} spells words the locales own`);
+for (const [key, holes] of [
+	['llm.tooltip.hint_accept_single', ['{1}']],
+	['llm.tooltip.hint_accept_center', ['{1}']],
+	['llm.tooltip.hint_or', ['{1}', '{2}']]
+])
+	for (const { code, data } of catalogues)
+		if (typeof data[key] !== 'string' || !holes.every((hole) => data[key].includes(hole)))
+			errors.push(`${code}: ${key} must hold ${holes.join(' and ')}`);
 for (const [code, legend] of Object.entries(legends))
 	if (!lua.includes(`\t\t\t${code} = ${JSON.stringify(legend)},`))
 		errors.push(`key_names_data.lua lacks the physical legend of ${code}`);
