@@ -130,8 +130,10 @@ for (const file of localeFiles) {
 const DIALOG_OWNERS = [
 	{
 		file: 'windows/ui/menu/menu_gestures.ahk',
+		// A startup UI command: the dialog opens at once, even before input
+		// initialization completes after a reload.
 		register:
-			/^\s*MenuCommand\.GESTURE_RECOMMENDED_INFO, \(\*\) => GestureShowRecommendedInfo\(\),\s*$/m,
+			/^\s*MenuCommand\.GESTURE_RECOMMENDED_INFO,\s*MenuStartupUiCommand\(\(\*\) => GestureShowRecommendedInfo\(\), MenuStartupDiagnosticsReady\),\s*$/m,
 		body: /\nGestureShowRecommendedInfo\(\) \{\n([\s\S]*?)\n\}/,
 		helper: 'Ui_MsgBox(',
 		keys: ['menu.gestures.recommended_reason_windows'],
