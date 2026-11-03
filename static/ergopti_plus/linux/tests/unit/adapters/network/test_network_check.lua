@@ -380,7 +380,11 @@ local function with_window(ports, body)
 		local Window = require("ui.field_check.network_check")
 		Window._reset()
 		world.services = {
-			translate = function(key) return "[" .. key .. "]" end,
+			-- The label-value join is the locale's own template (common.label_value).
+			translate = function(key)
+				if key == "common.label_value" then return "{1} : {2}" end
+				return "[" .. key .. "]"
+			end,
 			env = function() return ports end,
 			notify = function(message) world.notes[#world.notes + 1] = message end,
 			dialog = function(title, text, copy_label, close_label)
