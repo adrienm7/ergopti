@@ -539,7 +539,7 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 					end
 				end
 				body({document=document,i18n=i18n,heading_index=2,other_platform="hs",
-					caption=function(key) return i18n.get(key) end,decorate=function(value) return value end,
+					caption=function(key) return require("menu.labels").decorate_section(i18n.get(key)) end,decorate=function(value) return require("menu.labels").decorate_section(value) end,
 					rows=function() return assert(find(builder.build(ctx)),"actual profile parent missing") end,
 					untouched=function() helpers.assert_eq(Sandbox.read_bytes(path),initial);helpers.assert_eq(redraws,0) end,
 					settings=settings,path=path,ctx=ctx,redraws=function() return redraws end})

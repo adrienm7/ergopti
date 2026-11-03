@@ -39,7 +39,7 @@ _LSMR_OrderedIdentityAndAuthRows() {
 	Options := _LSMR_Options()
 	Rows := LocalServerMenuRows(Options)
 	AssertTrue(Rows[1]["separator"])
-	AssertEqual("menu.llm.local_servers.header", Rows[2]["label"])
+	AssertEqual(MenuSectionTitle("menu.llm.local_servers.header"), Rows[2]["label"])
 	AssertEqual("LM Studio 🖥️ — Configured-HOST:1234", Rows[3]["label"])
 	AssertTrue(Rows[3]["checked"])
 	Models := Rows[3]["items"]

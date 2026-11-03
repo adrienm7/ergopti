@@ -552,8 +552,9 @@ _LSPN_InertStatusRows(Mode, Mutate := false) {
 		AssertEqual(3, Rows.Length, "cold and refused source paths retain exact three-row data")
 		AssertEqual(1, Rows[1].Count)
 		AssertTrue(Rows[1]["separator"])
-		AssertEqual(t(Mutate ? "menu.llm.local_servers.rescan" : "menu.llm.local_servers.header"), Rows[2]["label"])
-		AssertEqual(t(Mutate ? "menu.llm.local_servers.header" : "menu.llm.unavailable"), Rows[3]["label"])
+		; The local servers heading is a section header, framed by the shared format.
+		AssertEqual(Mutate ? t("menu.llm.local_servers.rescan") : MenuSectionTitle(t("menu.llm.local_servers.header")), Rows[2]["label"])
+		AssertEqual(Mutate ? MenuSectionTitle(t("menu.llm.local_servers.header")) : t("menu.llm.unavailable"), Rows[3]["label"])
 		for Index in [2, 3] {
 			AssertEqual(2, Rows[Index].Count, "inert labels carry only their caption and disabled state")
 			AssertTrue(Rows[Index]["disabled"])

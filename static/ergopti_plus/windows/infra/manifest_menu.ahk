@@ -1065,7 +1065,8 @@ MenuRenderer_StatusRows(ManifestKey, RowId, Status) {
 		if !(Item is Map)
 			return false
 		ItemType := Item.Get("type", "")
-		Label := ItemType == "label" && Item.Get("i18n", false) is String && Item["i18n"] != ""
+		Label := (ItemType == "label" || ItemType == "section_header")
+			&& Item.Get("i18n", false) is String && Item["i18n"] != ""
 		if ItemType != "---" && !Label
 			return false
 		for Field in Item

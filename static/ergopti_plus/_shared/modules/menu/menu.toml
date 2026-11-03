@@ -487,11 +487,11 @@ type = "---"
 [[menu.llm_menu]]
 type = "list"
 id = "llm_model"
-# Static provider status of the local servers, before their panel exists.
-# Inert labels are status text, not section headings or executable commands.
+# Static provider status of the local servers, before their panel exists: the
+# section header the live rows open with, then inert status text.
 status_rows.unavailable = [
 	{ type = "---" },
-	{ type = "label", i18n = "menu.llm.local_servers.header" },
+	{ type = "section_header", i18n = "menu.llm.local_servers.header" },
 	{ type = "label", i18n = "menu.llm.unavailable" },
 ]
 i18n = "menu.llm.model_label"
@@ -3314,37 +3314,20 @@ checked_when = ["llm_debounce_is_never"]
 platforms = ["linux"]
 unavailable = "hide"
 
-# Fixed native profile headings retain each platform's existing decoration.
-[[menu.llm_profile_builtin_heading]]
-type = "label"
-id = "llm_profile_builtin_plain_heading"
-i18n = "menu.profiles.header_default_profiles"
-platforms = ["ahk", "linux"]
-unavailable = "hide"
-
+# The profile headings are section headers on every driver, drawn by the one
+# shared header format (Windows and Linux used to show a bare caption).
 [[menu.llm_profile_builtin_heading]]
 type = "section_header"
-id = "llm_profile_builtin_decorated_heading"
+id = "llm_profile_builtin_heading_title"
 i18n = "menu.profiles.header_default_profiles"
-platforms = ["hs"]
-unavailable = "hide"
 
 [[menu.llm_profile_custom_heading]]
 type = "---"
 
 [[menu.llm_profile_custom_heading]]
-type = "label"
-id = "llm_profile_custom_plain_heading"
-i18n = "menu.profiles.header_custom_profiles"
-platforms = ["ahk", "linux"]
-unavailable = "hide"
-
-[[menu.llm_profile_custom_heading]]
 type = "section_header"
-id = "llm_profile_custom_decorated_heading"
+id = "llm_profile_custom_heading_title"
 i18n = "menu.profiles.header_custom_profiles"
-platforms = ["hs"]
-unavailable = "hide"
 
 # Ordered frames consume native profile data without owning its callbacks.
 

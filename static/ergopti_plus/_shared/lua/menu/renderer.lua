@@ -1586,7 +1586,8 @@ function M.new(deps)
 		end
 		for _, item in ipairs(declaration) do
 			if type(item) ~= "table" then return nil end
-			local label = item.type == "label" and type(item.i18n) == "string" and item.i18n ~= ""
+			local label = (item.type == "label" or item.type == "section_header")
+				and type(item.i18n) == "string" and item.i18n ~= ""
 			if item.type ~= "---" and not label then return nil end
 			for field in pairs(item) do
 				if field ~= "type" and not (label and field == "i18n") then return nil end
