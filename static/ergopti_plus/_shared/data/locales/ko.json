@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "AI 제안",
 	"notify.personal_info": "개인 정보",
 	"notify.quit_refused": "지금은 종료할 수 없습니다. 다른 작업이 아직 진행 중입니다. 잠시 후 다시 시도하세요.",
+	"notify.tap_hold.copy_failed": "아무것도 복사되지 않았습니다. 두 번째 시도에서도 복사 내용이 클립보드에 도달하지 않았습니다. 텍스트를 선택한 후 다시 복사하세요.",
 	"notify.karabiner.removed": "Karabiner에서 Ergopti 규칙을 제거했습니다. 사용자 규칙은 그대로입니다.",
 	"notify.karabiner.user_closed": "Ergopti가 실행되는 동안 Karabiner-Elements는 닫혀 있으며, Ergopti를 일시 중지하거나 종료하면 다시 열립니다",
 	"notify.open_downloads_failed": "다운로드 폴더를 열 수 없습니다.",

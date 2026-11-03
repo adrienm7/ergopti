@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "Návrhy AI",
 	"notify.personal_info": "Osobní informace",
 	"notify.quit_refused": "Nyní nelze ukončit, jiná operace stále probíhá. Zkuste to znovu za chvíli.",
+	"notify.tap_hold.copy_failed": "Nic nebylo zkopírováno: kopie se nedostala do schránky ani při druhém pokusu. Vyberte text a zkopírujte jej znovu.",
 	"notify.karabiner.removed": "Pravidla Ergopti byla z Karabineru odebrána. Vaše vlastní pravidla zůstala beze změny.",
 	"notify.karabiner.user_closed": "Váš Karabiner-Elements je zavřený, dokud běží Ergopti; znovu se otevře, když se Ergopti pozastaví nebo ukončí",
 	"notify.open_downloads_failed": "Složku Stažené soubory se nepodařilo otevřít.",

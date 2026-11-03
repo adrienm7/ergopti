@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "KI-suggesties",
 	"notify.personal_info": "Persoonlijke gegevens",
 	"notify.quit_refused": "Afsluiten is nu niet mogelijk, er loopt nog een andere bewerking. Probeer het zo opnieuw.",
+	"notify.tap_hold.copy_failed": "Er is niets gekopieerd: de kopie is ook bij de tweede poging niet op het klembord aangekomen. Selecteer de tekst en kopieer opnieuw.",
 	"notify.karabiner.removed": "De regels van Ergopti zijn uit Karabiner verwijderd. Je eigen regels zijn ongewijzigd.",
 	"notify.karabiner.user_closed": "Je Karabiner-Elements is gesloten zolang Ergopti draait; het opent weer wanneer Ergopti pauzeert of stopt",
 	"notify.open_downloads_failed": "Downloads kon niet worden geopend.",

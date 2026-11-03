@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "Suggestions IA",
 	"notify.personal_info": "Informations personnelles",
 	"notify.quit_refused": "Impossible de quitter pour l’instant, une autre opération est en cours. Réessayez dans un instant.",
+	"notify.tap_hold.copy_failed": "Rien n’a été copié : la copie n’est pas arrivée dans le presse-papiers, même au second essai. Sélectionnez le texte et copiez à nouveau.",
 	"notify.karabiner.removed": "Les règles d’Ergopti ont été retirées de Karabiner. Vos propres règles sont inchangées.",
 	"notify.karabiner.user_closed": "Votre Karabiner-Elements est fermé tant qu’Ergopti tourne ; il se rouvre quand Ergopti est en pause ou quitté",
 	"notify.open_downloads_failed": "Impossible d'ouvrir Téléchargements.",

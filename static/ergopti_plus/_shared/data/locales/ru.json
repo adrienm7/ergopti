@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "Предложения ИИ",
 	"notify.personal_info": "Личная информация",
 	"notify.quit_refused": "Сейчас невозможно выйти: другая операция ещё выполняется. Повторите попытку через мгновение.",
+	"notify.tap_hold.copy_failed": "Ничего не скопировано: копия не попала в буфер обмена даже со второй попытки. Выделите текст и скопируйте снова.",
 	"notify.karabiner.removed": "Правила Ergopti удалены из Karabiner. Ваши собственные правила не изменились.",
 	"notify.karabiner.user_closed": "Ваш Karabiner-Elements закрыт, пока работает Ergopti; он снова откроется, когда Ergopti будет приостановлен или закрыт",
 	"notify.open_downloads_failed": "Не удалось открыть папку «Загрузки».",

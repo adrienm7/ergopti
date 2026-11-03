@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "הצעות AI",
 	"notify.personal_info": "מידע אישי",
 	"notify.quit_refused": "לא ניתן לצאת כעת, פעולה אחרת עדיין מתבצעת. נסו שוב בעוד רגע.",
+	"notify.tap_hold.copy_failed": "דבר לא הועתק: ההעתקה לא הגיעה ללוח גם בניסיון השני. סמנו את הטקסט והעתיקו שוב.",
 	"notify.karabiner.removed": "הכללים של Ergopti הוסרו מ-Karabiner. הכללים שלכם לא השתנו.",
 	"notify.karabiner.user_closed": "Karabiner-Elements שלך סגור כל עוד Ergopti פועל; הוא ייפתח שוב כש-Ergopti מושהה או נסגר",
 	"notify.open_downloads_failed": "לא ניתן היה לפתוח את התיקייה הורדות.",

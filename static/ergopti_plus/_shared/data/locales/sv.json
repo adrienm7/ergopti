@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "AI-förslag",
 	"notify.personal_info": "Personlig information",
 	"notify.quit_refused": "Det går inte att avsluta just nu, en annan åtgärd pågår fortfarande. Försök igen om en stund.",
+	"notify.tap_hold.copy_failed": "Inget kopierades: kopian nådde inte urklippet, inte ens vid andra försöket. Markera texten och kopiera igen.",
 	"notify.karabiner.removed": "Ergoptis regler har tagits bort från Karabiner. Dina egna regler är oförändrade.",
 	"notify.karabiner.user_closed": "Ditt Karabiner-Elements är stängt medan Ergopti körs; det öppnas igen när Ergopti pausas eller avslutas",
 	"notify.open_downloads_failed": "Det gick inte att öppna Hämtade filer.",

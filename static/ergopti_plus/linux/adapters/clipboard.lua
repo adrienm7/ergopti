@@ -71,6 +71,10 @@ local RESTORE_DELAY_MS = 120
 -- Time allowed for the focused application to publish a Ctrl+C selection.
 local COPY_SETTLE_MS = 80
 
+-- Seconds the change-counter read may take. It runs just before a tap-hold's
+-- Ctrl+C, so a hung selection owner must not hold the copy back for long.
+local COUNTER_TIMEOUT_S = "0.5"
+
 -- evdev key values.
 local VALUE_DOWN = 1
 local VALUE_UP   = 0
@@ -223,6 +227,40 @@ function M.read_checked()
 		return false, "", why
 	end
 	return read_backend_checked(selected_backend)
+end
+
+--- Decodes the TIMESTAMP an X11 selection owner answers: xclip prints the raw
+--- 32-bit property, little-endian, and some builds print it as decimal text.
+--- @param raw string xclip's output.
+--- @return number|nil timestamp
+local function decode_selection_timestamp(raw)
+	local digits = raw:match("^%s*(%d+)%s*$")
+	if digits then return tonumber(digits) end
+	if #raw == 4 or #raw == 8 then
+		local b1, b2, b3, b4 = raw:byte(1, 4)
+		return b1 + b2 * 256 + b3 * 65536 + b4 * 16777216
+	end
+	return nil
+end
+
+--- The clipboard's change counter, for the tap-hold copy check: the X11
+--- CLIPBOARD owner's TIMESTAMP (ICCCM), which a toolkit renews each time it
+--- takes the selection, so copying the same text again still moves it.
+--- Wayland gives clients no such counter (only a data-control watcher would
+--- see each new selection, and GNOME offers none), so there it is nil with
+--- its reason and the copy goes unchecked.
+--- @return number|nil counter
+--- @return string|nil reason Why there is none: "unsupported" when the session
+---   can never have one, "unreadable" when this read failed.
+function M.change_counter()
+	if not DisplayServer.is_x11() then return nil, "unsupported" end
+	if not Shell.has_command("xclip") then return nil, "unsupported" end
+	local ok, output = Shell.exec_checked(string.format(
+		"timeout %s xclip -selection clipboard -t TIMESTAMP -o 2>/dev/null", COUNTER_TIMEOUT_S))
+	if not ok then return nil, "unreadable" end
+	local counter = decode_selection_timestamp(output)
+	if counter == nil then return nil, "unreadable" end
+	return counter
 end
 
 --- The command that prints the PRIMARY selection, or nil when no tool can.

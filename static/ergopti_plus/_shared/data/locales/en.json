@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "AI Suggestions",
 	"notify.personal_info": "Personal information",
 	"notify.quit_refused": "Cannot quit right now: another operation is still in progress. Try again in a moment.",
+	"notify.tap_hold.copy_failed": "Nothing was copied: the copy did not reach the clipboard, even on a second try. Select the text and copy again.",
 	"notify.karabiner.removed": "Ergopti's rules were removed from Karabiner. Your own rules are unchanged.",
 	"notify.karabiner.user_closed": "Your Karabiner-Elements is closed while Ergopti runs; it reopens when Ergopti pauses or quits",
 	"notify.open_downloads_failed": "Could not open Downloads.",

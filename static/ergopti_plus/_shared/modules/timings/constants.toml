@@ -626,6 +626,15 @@ default_activation_ms = 200
 # AHK: tap_holds/constants.ahk ONE_SHOT_SHIFT_TIMEOUT_SEC (seconds).
 one_shot_shift_timeout_ms = 2000
 
+# How long a tap-hold copy (Cmd+C / Ctrl+C) waits before reading the
+# clipboard's change counter, for the copy and again for its one retry. A busy
+# application publishes its selection within the 200 ms the clipboard settle
+# delay already allows; this leaves it a little more before the copy is sent
+# again, and the wait is a timer, never a sleep on the input thread.
+# AHK: platform/remap/constants.ahk TAP_COPY_VERIFY_MS. HS: modules/keymap/init.lua
+# build_tap_copy. LX: platform/remap/tap_hold_manager.lua.
+copy_verify_ms = 300
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Hotstring expansion delay: complex keystrokes (PAR-7)

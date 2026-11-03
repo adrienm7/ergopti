@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "AI 建议",
 	"notify.personal_info": "个人信息",
 	"notify.quit_refused": "暂时无法退出，另一项操作仍在进行中。请稍后再试。",
+	"notify.tap_hold.copy_failed": "未复制任何内容：即使重试一次，复制内容也未到达剪贴板。请选中文本后重新复制。",
 	"notify.karabiner.removed": "已从 Karabiner 中移除 Ergopti 的规则。你自己的规则保持不变。",
 	"notify.karabiner.user_closed": "Ergopti 运行期间您的 Karabiner-Elements 已关闭；Ergopti 暂停或退出时会重新打开",
 	"notify.open_downloads_failed": "无法打开“下载”文件夹。",

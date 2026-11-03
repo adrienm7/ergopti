@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "AI सुझाव",
 	"notify.personal_info": "व्यक्तिगत जानकारी",
 	"notify.quit_refused": "अभी बंद नहीं किया जा सकता, एक अन्य प्रक्रिया अभी चल रही है। कुछ क्षण बाद फिर से प्रयास करें।",
+	"notify.tap_hold.copy_failed": "कुछ भी कॉपी नहीं हुआ: दूसरी कोशिश में भी कॉपी क्लिपबोर्ड तक नहीं पहुँची। टेक्स्ट चुनें और फिर से कॉपी करें।",
 	"notify.karabiner.removed": "Ergopti के नियम Karabiner से हटा दिए गए। आपके अपने नियम अपरिवर्तित हैं।",
 	"notify.karabiner.user_closed": "Ergopti चलने तक आपका Karabiner-Elements बंद रहता है; Ergopti रुकने या बंद होने पर यह फिर खुलता है",
 	"notify.open_downloads_failed": "डाउनलोड फ़ोल्डर नहीं खोला जा सका।",

@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "KI-Vorschläge",
 	"notify.personal_info": "Persönliche Informationen",
 	"notify.quit_refused": "Beenden ist gerade nicht möglich, ein anderer Vorgang läuft noch. Versuchen Sie es gleich erneut.",
+	"notify.tap_hold.copy_failed": "Nichts wurde kopiert: Die Kopie ist auch beim zweiten Versuch nicht in der Zwischenablage angekommen. Markieren Sie den Text und kopieren Sie erneut.",
 	"notify.karabiner.removed": "Die Regeln von Ergopti wurden aus Karabiner entfernt. Ihre eigenen Regeln bleiben unverändert.",
 	"notify.karabiner.user_closed": "Dein Karabiner-Elements ist geschlossen, solange Ergopti läuft; es öffnet sich wieder, wenn Ergopti pausiert oder beendet wird",
 	"notify.open_downloads_failed": "Downloads konnte nicht geöffnet werden.",

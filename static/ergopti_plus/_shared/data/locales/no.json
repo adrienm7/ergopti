@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "AI-forslag",
 	"notify.personal_info": "Personlig informasjon",
 	"notify.quit_refused": "Kan ikke avslutte akkurat nå, en annen operasjon pågår fortsatt. Prøv igjen om et øyeblikk.",
+	"notify.tap_hold.copy_failed": "Ingenting ble kopiert: kopien kom ikke frem til utklippstavlen, heller ikke ved andre forsøk. Merk teksten og kopier på nytt.",
 	"notify.karabiner.removed": "Ergoptis regler er fjernet fra Karabiner. Dine egne regler er uendret.",
 	"notify.karabiner.user_closed": "Karabiner-Elements er lukket mens Ergopti kjører; det åpnes igjen når Ergopti settes på pause eller avsluttes",
 	"notify.open_downloads_failed": "Kunne ikke åpne Nedlastinger.",

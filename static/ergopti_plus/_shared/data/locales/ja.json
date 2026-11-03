@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "AI提案",
 	"notify.personal_info": "個人情報",
 	"notify.quit_refused": "現在は終了できません。別の処理がまだ実行中です。しばらくしてからもう一度お試しください。",
+	"notify.tap_hold.copy_failed": "何もコピーされませんでした。2 回目の試行でもコピーがクリップボードに届きませんでした。テキストを選択して、もう一度コピーしてください。",
 	"notify.karabiner.removed": "Ergopti のルールを Karabiner から削除しました。ご自身のルールは変更されていません。",
 	"notify.karabiner.user_closed": "Ergopti の実行中は Karabiner-Elements を閉じています。Ergopti を一時停止または終了すると再び開きます",
 	"notify.open_downloads_failed": "ダウンロードフォルダーを開けませんでした。",
