@@ -60,6 +60,7 @@ const RECOMMENDED_SET = {
 	swipe_4_up: ['win_app_next', 'win_app_next', 'none'],
 	swipe_4_down: ['win_app_prev', 'win_app_prev', 'none'],
 	swipe_5_up: [undefined, 'mission_control', 'none'],
+	swipe_5_down: [undefined, 'app_expose', 'none'],
 	tap_3: ['left_click_toggle', 'left_click_toggle', 'left_click_toggle'],
 	tap_4: ['alt_tab_monitor', 'alt_tab_monitor', 'alt_tab_monitor']
 };
