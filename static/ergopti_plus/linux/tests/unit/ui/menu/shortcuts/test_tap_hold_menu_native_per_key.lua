@@ -39,7 +39,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 					if current.throws then error("controlled native threshold refusal") end
 					return current.value
 				end
-				local key = assert(find(key_rows(section), i18n.get("tap_hold.group.left_shift")))
+				local key = assert(find(key_rows(section), i18n.get("key_name.left_shift")))
 				local callback = key.menu[6].fn
 				helpers.assert_eq(callback(), false)
 				helpers.assert_eq(calls, { { "left_shift", 0.376 } })
@@ -66,7 +66,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 					if command:find("dialog_host.lua' --error", 1, true) then return 1 end
 					return original_execute(command)
 				end
-				local key = assert(find(key_rows(section), require("infra.i18n").get("tap_hold.group.left_shift")))
+				local key = assert(find(key_rows(section), require("infra.i18n").get("key_name.left_shift")))
 				helpers.assert_eq(key.menu[6].fn(), false)
 				helpers.assert_eq(#calls, 0, "invalid input reaches no mutation owner")
 			end)
