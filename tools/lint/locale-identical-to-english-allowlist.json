@@ -599,6 +599,10 @@
 				"zh"
 			]
 		},
+		"key_name.context_menu": {
+			"reason": "keyboard-key-name",
+			"locales": ["da", "fr", "it", "nl", "pl", "pt"]
+		},
 		"key_name.ctrl": {
 			"reason": "keyboard-key-name",
 			"locales": [
@@ -626,6 +630,27 @@
 		"key_name.delete": {
 			"reason": "keyboard-key-name",
 			"locales": [
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"key_name.end": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
 				"cs",
 				"da",
 				"he",
@@ -672,6 +697,71 @@
 				"zh"
 			]
 		},
+		"key_name.home": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"key_name.insert": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"es",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"key_name.num_lock": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
 		"key_name.option": {
 			"reason": "keyboard-key-name",
 			"locales": [
@@ -688,6 +778,48 @@
 				"pl",
 				"pt",
 				"ru",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"key_name.page_down": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"key_name.page_up": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
 				"tr",
 				"uk",
 				"zh"
