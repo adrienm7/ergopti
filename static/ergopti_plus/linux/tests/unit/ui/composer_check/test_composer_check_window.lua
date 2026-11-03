@@ -169,10 +169,13 @@ helpers.describe("composer check window (Linux)", function()
 		local manifest = Json.decode(handle:read("*a"))
 		handle:close()
 		local rows = {}
-		for _, row in ipairs(manifest.debug_menu) do
-			if row.id == "composer_check" then rows[#rows + 1] = row end
+		for _, key in ipairs({ "debug_menu", "debug_tests_menu" }) do
+			for _, row in ipairs(manifest[key]) do
+				if row.id == "composer_check" then rows[#rows + 1] = row; rows.key = key end
+			end
 		end
 		helpers.assert_eq(#rows, 1, "declared once")
+		helpers.assert_eq(rows.key, "debug_tests_menu", "it hangs in the Tests submenu")
 		helpers.assert_eq(rows[1].i18n, "menu.debug.composer_check")
 		helpers.assert_nil(rows[1].platforms, "shown on every platform")
 		local source = helpers.read_menu_source()

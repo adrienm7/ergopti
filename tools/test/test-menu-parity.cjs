@@ -297,6 +297,7 @@ const OPENS_SUBMENU = {
 	],
 	configuration: 'configuration_menu',
 	debug: 'debug_menu',
+	debug_tests: 'debug_tests_menu',
 	shortcuts: [
 		'shortcuts_menu',
 		{
@@ -6340,8 +6341,9 @@ function languageParentSource(source, driver) {
 			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.debug.title']);
-		assert.equal(hand[code].linux[0], locale['menu.debug.log_level'] + ' : ℹ️ INFO');
-		assert.equal(hand[code].hs[2], hand[code].linux[0]);
+		assert.equal(hand[code].linux[5], locale['menu.debug.log_level'] + ' : ℹ️ INFO');
+		assert.equal(hand[code].tests, locale['menu.debug.tests']);
+		assert.equal(hand[code].hs[7], hand[code].linux[5]);
 	}
 	function tokenDepths(tokens) {
 		let depth = 0,
@@ -6487,7 +6489,7 @@ function languageParentSource(source, driver) {
 		const chronology = [
 			`local root, top, section, parent, fields = debug_source(ManifestMenu, "${driver}")`,
 			`if root == nil then return ${refused} end`,
-			`local ${child} = ManifestMenu.build("debug_menu", "Debug", nil, nil, ${context}, {})`,
+			`local ${child} = ManifestMenu.build("debug_menu", "Debug", nil, debug_groups, ${context}, {})`,
 			`if not debug_dense(${child}, true) then return ${refused} end`,
 			`local current_root, current_top, current_section, current_parent = debug_source(ManifestMenu, "${driver}")`,
 			`if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not debug_parent_unchanged(parent, fields) then return ${refused} end`,

@@ -11,7 +11,8 @@
 ; submenu opens with the global restore and clear (the first group of every
 ; settings menu), a separator, the cleanup, a separator, then the rows that
 ; open a window, and ends there: startup precedes Uninstall in the
-; Version / Updates submenu, after a separator, since 2026-09.
+; Version / Updates submenu, after a separator, since 2026-09. The Debug
+; submenu opens with its user-facing rows and closes with one Tests submenu.
 ; ============================================================================
 
 ; Index of the first manifest entry of ``Key`` whose ``Field`` equals ``Value``.
@@ -130,6 +131,88 @@ _MLG_RowsFollowTheRequestedOrder() {
 }
 Test("menu layout: Versions, Configuration, Language; the error window under the diagnostics (menu-order-2026-10-02)",
 	_MLG_RowsFollowTheRequestedOrder)
+
+; The zero-based position of the first native row whose text starts with a
+; translated caption, or -1.
+_MLG_RowStarting(TargetMenu, Key) {
+	Caption := t(Key)
+	loop TrayMenuItemCount(TargetMenu) {
+		if InStr(_CTC_LabelAt(TargetMenu, A_Index - 1), Caption, true) == 1
+			return A_Index - 1
+	}
+	return -1
+}
+
+; The texts of every native row, a separator reading as an empty text.
+_MLG_NativeLabels(TargetMenu) {
+	Labels := []
+	loop TrayMenuItemCount(TargetMenu)
+		Labels.Push(_CTC_LabelAt(TargetMenu, A_Index - 1))
+	return Labels
+}
+
+; Refuses a separator that leads, trails or follows another one.
+_MLG_AssertCleanSeparators(Labels, State) {
+	AssertTrue(Labels.Length > 0, State . ": rows are drawn")
+	AssertTrue(Labels[1] != "", State . ": no leading separator")
+	AssertTrue(Labels[Labels.Length] != "", State . ": no trailing separator")
+	for Position, Label in Labels
+		AssertFalse(Position > 1 && Label == "" && Labels[Position - 1] == "",
+			State . ": two separators in a row at " . Position)
+}
+
+; debug-tests-submenu (maintainer, 2026-11-03): the built Debug menu shows the
+; user-facing rows first (diagnostics, report a bug, suggest a feature, then the
+; logs), and one « Tests » submenu, after a separator, closes it with every
+; Windows check and probe in topic order; none of them stays among the rows.
+_MLG_DebugTestsCloseTheMenu() {
+	Built := _MI_BuildDebuggingMenu()
+	try {
+		Labels := _MLG_NativeLabels(Built)
+		_MLG_AssertCleanSeparators(Labels, "Debug")
+		Diagnostics := _MLG_RowStarting(Built, "menu.debug.healthcheck")
+		Report := _MLG_RowStarting(Built, "menu.debug.report_bug")
+		Suggest := _MLG_RowStarting(Built, "menu.debug.suggest_feature")
+		Logs := _MLG_RowStarting(Built, "menu.debug.log_level")
+		AssertTrue(Diagnostics >= 0 && Diagnostics < Report && Report < Suggest && Suggest < Logs,
+			"diagnostics, report and suggest come first, then the logs: " . Diagnostics . " " . Report
+			. " " . Suggest . " " . Logs)
+		Last := TrayMenuItemCount(Built) - 1
+		AssertEqual(t("menu.debug.tests"), Labels[Last + 1], "the Tests submenu closes Debug")
+		AssertEqual("", Labels[Last], "one separator sets Tests apart")
+		Child := DllCall("GetSubMenu", "ptr", Built.Handle, "int", Last, "ptr")
+		AssertTrue(Child != 0, "Tests opens a submenu")
+		Tests := _MLG_NativeLabels(MenuFromHandle(Child))
+		_MLG_AssertCleanSeparators(Tests, "Tests")
+		Keys := ["menu.debug.field_check_network", "menu.debug.composer_check",
+			"menu.debug.send_probe", "menu.debug.hook_probe"]
+		AssertEqual(Keys.Length, Tests.Length, "Tests holds the four Windows checks")
+		for Position, Key in Keys {
+			AssertEqual(t(Key), Tests[Position], "Tests keeps the topic order at " . Position)
+			AssertEqual(-1, _MLG_RowStarting(Built, Key), "no check stays among the Debug rows: " . Key)
+		}
+	} finally _CTC_ReleaseMenu(Built)
+}
+Test("menu layout: the user-facing Debug rows come first and Tests closes the menu (debug-tests-submenu)",
+	_MLG_DebugTestsCloseTheMenu)
+
+; With no check for Windows, Debug draws no empty Tests submenu and leaves no
+; separator behind it.
+_MLG_DebugDrawsNoEmptyTests() {
+	Root := _MR_GetManifestRoot()
+	Saved := Root["debug_tests_menu"]
+	Root["debug_tests_menu"] := []
+	try {
+		Built := _MI_BuildDebuggingMenu()
+		try {
+			Labels := _MLG_NativeLabels(Built)
+			_MLG_AssertCleanSeparators(Labels, "Debug without a check")
+			AssertEqual(-1, _MLG_RowStarting(Built, "menu.debug.tests"), "no Tests row without a check")
+		} finally _CTC_ReleaseMenu(Built)
+	} finally Root["debug_tests_menu"] := Saved
+}
+Test("menu layout: Debug draws no empty Tests submenu (debug-tests-submenu-empty)",
+	_MLG_DebugDrawsNoEmptyTests)
 
 ; Uninstall closes the Version / Updates submenu, after a separator, and keeps
 ; its label key and its action owner.
