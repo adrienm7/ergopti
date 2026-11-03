@@ -1,0 +1,37 @@
+== /Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/bin
+total 72648
+drwx------@ 3 b519hs@login.axa  staff        96 28 oct.  08:55 .
+drwx------@ 7 b519hs@login.axa  staff       224 28 oct.  08:55 ..
+-rwxr-xr-x@ 1 b519hs@login.axa  staff  37194640 28 oct.  08:55 uv
+== /Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/python-bin
+total 0
+drwx------@ 3 b519hs@login.axa  staff   96 28 oct.  08:56 .
+drwx------@ 7 b519hs@login.axa  staff  224 28 oct.  08:55 ..
+lrwx------@ 1 b519hs@login.axa  staff  123 28 oct.  08:56 python3.11 -> /Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/python/cpython-3.11.16-macos-aarch64-none/bin/python3.11
+== /Users/b519hs/Library/Application Support/Ergopti/ollama-native-http
+ls: /Users/b519hs/Library/Application Support/Ergopti/ollama-native-http: No such file or directory
+== codesign /Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/bin/uv
+/Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/bin/uv: valid on disk
+/Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/bin/uv: satisfies its Designated Requirement
+Executable=/Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/bin/uv
+Identifier=uv-1dcedb59c92e2a84
+Format=Mach-O thin (arm64)
+CodeDirectory v=20500 size=288415 flags=0x10000(runtime) hashes=9007+2 location=embedded
+Signature size=9046
+Timestamp=29 Sep 2026 at 23:02:05
+Info.plist=not bound
+TeamIdentifier=2DC432GLL2
+== codesign /Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/python-bin/python3.11
+/Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/python-bin/python3.11: valid on disk
+/Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/python-bin/python3.11: satisfies its Designated Requirement
+Executable=/Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/python/cpython-3.11.16-macos-aarch64-none/bin/python3.11
+Identifier=-
+Format=Mach-O thin (arm64)
+CodeDirectory v=20400 size=134184 flags=0x20002(adhoc,linker-signed) hashes=4190+0 location=embedded
+Signature=adhoc
+Info.plist=not bound
+TeamIdentifier=not set
+Sealed Resources=none
+== diagnostic reports of the last hour
+== kernel and code-signing kills of the last 30 minutes
+log: Could not open local log store: Operation not permitted

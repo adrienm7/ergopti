@@ -1,0 +1,18 @@
+2026-11-03 01:04:23:146 [INFO] [runtime] Main-thread hold of 458 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 672->499 MB.
+2026-11-03 02:58:09:784 [INFO] [runtime] Main-thread hold of 253 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 326->400 MB.
+2026-11-03 03:46:30:790 [INFO] [runtime] Main-thread hold of 295 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 429->502 MB.
+2026-11-03 04:32:25:589 [INFO] [runtime] Main-thread hold of 271 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 533->606 MB.
+2026-11-03 06:17:06:795 [INFO] [runtime] Main-thread hold of 262 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 323->396 MB.
+2026-11-03 07:50:27:522 [INFO] [runtime] Main-thread hold of 264 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 428->502 MB.
+2026-11-03 09:33:17:824 [INFO] [runtime] Main-thread hold of 351 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 636->383 MB.
+2026-11-03 09:50:59:655 [INFO] [runtime] Main-thread hold of 277 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 426->500 MB.
+2026-11-03 09:52:56:627 [INFO] [runtime] Main-thread hold of 250 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 412->485 MB.
+2026-11-03 09:53:56:631 [INFO] [runtime] Main-thread hold of 252 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 513->587 MB.
+2026-11-03 09:55:06:605 [INFO] [runtime] Main-thread hold of 329 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 715->382 MB.
+2026-11-03 09:56:26:639 [INFO] [runtime] Main-thread hold of 259 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 511->584 MB.
+2026-11-03 09:57:56:634 [INFO] [runtime] Main-thread hold of 257 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 511->584 MB.
+2026-11-03 09:58:56:662 [INFO] [runtime] Main-thread hold of 285 ms in an hs.timer.new callback (...so/ergopti/static/ergopti_plus/macos/infra/paced_job.lua:121). Lua heap 410->483 MB.
+2026-11-03 10:28:28:714 [INFO] [runtime] Main-thread hold of 349 ms in an hs.timer.new callback (...ergopti/static/ergopti_plus/macos/ui/menu/menu_state.lua:541). Phases inside the hold: shell.ioreg=151.7 ms. Lua heap 28->28 MB.
+2026-11-03 10:28:30:565 [INFO] [runtime] Main-thread hold of 317 ms in an hs.timer.new callback (...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:1801). Phases inside the hold: menu.rebuild=115.6 ms, shell.find=44.0 ms, menu_item.shortcuts=39.8 ms, menu_item.metrics=19.8 ms, menu_item.keyboard_layout=12.9 ms. Lua heap 40->36 MB.
+2026-11-03 10:29:54:945 [WARNING] [HotPath] Slow preview.rebuild: 9.36 ms own, 9.36 ms total, parent keydown (0 similar since the last line).
+2026-11-03 10:31:25:545 [INFO] [runtime] Main-thread hold of 309 ms in an hs.timer.new callback (...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:1801). Phases inside the hold: menu.rebuild=98.7 ms, menu_item.shortcuts=40.2 ms, shell.find=34.6 ms, menu_item.keyboard_layout=13.9 ms, menu_keyboard_layout.rows=12.8 ms. Lua heap 43->37 MB.
