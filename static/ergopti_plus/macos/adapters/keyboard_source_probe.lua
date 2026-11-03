@@ -206,6 +206,9 @@ function M.request(request, callback)
 		owner.done = true
 		active_operations[operation] = nil
 		if result.receipt then Logger.done(LOG, "Native keyboard source proof committed.")
+		elseif result.reason == "cancelled" then
+			-- The caller's own cancellation (a newer proof replaces this one), not a refusal.
+			Logger.warn(LOG, "Native keyboard source proof cancelled by its caller.")
 		else Logger.error(LOG, "Native keyboard source proof refused: %s.", tostring(result.reason)) end
 		invoke(callback, result.receipt, result.reason)
 		local observers = owner.observers
