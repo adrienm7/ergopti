@@ -55,6 +55,21 @@ local function with_scope(body)
 end
 
 helpers.describe("Linux metrics scope transaction", function()
+	helpers.it("restores an adjusted setting: it leaves the file and the runtime takes the default again", function()
+		with_scope(function(owner, collector, _, _, _, path)
+			local private_title = "Firefox (Private Browsing)"
+			helpers.assert_eq(collector.is_context_protected("app", private_title), false,
+				"the fixture adjusted the filter")
+			helpers.assert_eq(owner.apply("recommended"), true)
+			local document = Codec.decode(Sandbox.read_bytes(path))
+			helpers.assert_eq(document.metrics.private_filter_enabled, nil)
+			helpers.assert_eq(document.metrics.wpm_widget_visible, nil)
+			helpers.assert_eq(document.metrics.enabled, true, "the consent stays out of a restore")
+			helpers.assert_eq(collector.is_context_protected("app", private_title), true,
+				"the runtime takes the default again")
+		end)
+	end)
+
 	helpers.it("clears an outdated owned value instead of refusing (config-outdated-metrics)", function()
 		-- An old-shape leaf is outdated configuration: the reset that removes
 		-- it must never be refused because of it.
