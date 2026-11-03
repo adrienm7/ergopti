@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 --- A config module standing in for hotstrings_config, recording what it is asked.
---- @param opts table { enabled = boolean, sections_enabled = table }
+--- @param opts table { enabled = boolean, sections_enabled = table, hotstrings_enabled = boolean }
 --- @return table config, table log
 local function fake_config(opts)
 	opts = opts or {}
@@ -20,6 +20,9 @@ local function fake_config(opts)
 	local section_state = opts.sections_enabled or {}
 
 	return {
+		-- The Hotstrings switch reads on while any category is (another one here),
+		-- or the category-off rule greys every row of the menu.
+		any_enabled = function() return opts.hotstrings_enabled ~= false end,
 		get_groups = function() return { "rolls" } end,
 		is_group_enabled = function(id) return id == "rolls" and enabled or false end,
 		toggle_group = function(id) log.toggled[#log.toggled + 1] = id end,

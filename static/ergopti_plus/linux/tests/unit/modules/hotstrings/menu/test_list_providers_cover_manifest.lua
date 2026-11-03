@@ -274,7 +274,8 @@ local function genuine_trigger_providers(damage, default_source)
 		local active = select(2, debug.getupvalue(builder.build, slot))
 		local active_body = select(2, debug.getupvalue(hotstrings, body_slot))
 		if rawequal(active, hotstrings) and rawequal(active_body, body) then
-			local config = { any_enabled = function() return false end,
+			-- On: an off Hotstrings menu greys its rows and hides their leaves.
+			local config = { any_enabled = function() return true end,
 				get_categories = function() return {} end, get_groups = function() return {} end }
 			local rows = active({ config = config, state = {}, paused = false,
 				on_menu_changed = function() observed.effects = observed.effects + 1 end })
@@ -511,6 +512,8 @@ local function genuine_language_providers(damage, exercise)
 		}
 		local audit, acknowledgement = false, true
 		local config = {
+			-- Every category is on, so is the Hotstrings switch (category-off rule).
+			any_enabled = function() return true end,
 			get_groups = function() return { "french_magickey", "french_autocorrection" } end,
 			get_categories = function() return categories end,
 			get_category = function(id) return categories[id] end,

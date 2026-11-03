@@ -186,8 +186,11 @@ local function with_mode_fixture(options, callback)
 		end
 		function fixture.rows()
 			local item = fixture.build()
+			-- The slot row joins its label to its action with the locale's template.
+			local title = strings["common.label_value"]:gsub("{1}", i18n.get("gesture.slots.swipe_2_left"))
+				:gsub("{2}", "None")
 			for _, row in ipairs(item.submenu) do
-				if row.title == i18n.get("gesture.slots.swipe_2_left") .. " : None" then
+				if row.title == title then
 					return assert(row.menu[3].menu)
 				end
 			end
