@@ -19,7 +19,7 @@ _LMT_PrivacyCorpus() {
 	return JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\privacy_trigger_controls.json"))
 }
 
-_LMT_PrivacyFixture(States, Body) {
+_LMT_PrivacyFixture(States, Body, Sparse := false) {
 	global _LLM_Menu, _LLM_Engine, Features, ConfigurationFile
 	PreviousEngine := _LLM_Engine
 	Previous := _LMT_InstallFixture()
@@ -42,6 +42,9 @@ _LMT_PrivacyFixture(States, Body) {
 			. (States[1] ? "true" : "false") . "`nsecure_filter_enabled = "
 			. (States[2] ? "true" : "false") . "`n[foreign]`n"
 			. 'future = "keep exact" # retained neighbour' . "`n"
+		if Sparse
+			Image := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n[llm]`nenabled = true`n[foreign]`n"
+				. 'future = "keep exact" # retained neighbour' . "`n"
 		FileAppend(Image, ConfigurationFile, "UTF-8-RAW")
 		AssertEqual("current", ConfigMigrateBoot(ConfigurationFile)["status"], "the actual current privacy fixture constructs before native writes")
 		Body.Call()
@@ -140,6 +143,18 @@ _LMT_SharedPrivacyReplay() {
 	}
 }
 Test("LLM privacy: shared independent bools publish through exact native source lease", _LMT_SharedPrivacyReplay)
+
+; Saves are sparse: at their shipped values neither filter nor the backend is in
+; the file. Both rows must stay enabled; the macOS row greyed exactly there.
+_LMT_SharedPrivacySparse() {
+	Corpus := _LMT_PrivacyCorpus()
+	Shipped := [Corpus["rows"][1]["neutral"], Corpus["rows"][2]["neutral"]]
+	for Index, Expected in Corpus["rows"] {
+		Other := Index == 1 ? 2 : 1
+		_LMT_PrivacyFixture(Shipped, _LMT_PrivacyReplayBody.Bind(Expected, Shipped[Index], Corpus["rows"][Other], Shipped[Other]), true)
+	}
+}
+Test("LLM privacy: a sparse configuration keeps both rows enabled and a click persists", _LMT_SharedPrivacySparse)
 
 _LMT_PrivacyRefusalBody(Expected, Condition) {
 	global _LLM_Menu, _LLM_Engine, _LMT_WriterCalls, _LMT_ApplyCalls, _LMT_WriterResult, ConfigurationFile
