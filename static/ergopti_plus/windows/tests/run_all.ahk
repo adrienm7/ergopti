@@ -563,6 +563,7 @@ InstallSendNoOps()
 #Include unit/infra/config/persistence/test_config_semantic_snapshot.ahk
 #Include unit/infra/config/persistence/test_config_snapshot_inline_records.ahk
 #Include unit/infra/config/persistence/test_config_snapshot_obsolete_parent.ahk
+#Include unit/infra/config/persistence/test_config_snapshot_equal.ahk
 #Include unit/infra/config/persistence/test_neutral_config_manifest.ahk
 #Include unit/test_config_scope_manifest.ahk
 #Include unit/infra/config/scope/test_config_scope_menus.ahk

@@ -299,6 +299,9 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 	else
 		_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_NAVIGATION_VAL_MODIFIERS)
 	if IsSet(Cache) {
+		; One admitted snapshot serves the four manifest reads below: each read of
+		; its own compared the whole snapshot with its shadow twice.
+		BootSnapshot := ConfigTomlBootSnapshot(Cache)
 		raw := IniCacheGet(Cache, "llm", "ollama_port")
 		; Earlier releases saved the stock port, which now belongs to the user's
 		; own Ollama: such a value is dropped once, as on macOS, and is no error.
@@ -322,7 +325,7 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 			else
 				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_USER_PROFILES)
 		}
-		if !ConfigTomlTryReadBootValue(Cache, ConfigKey.LLM, ConfigLeaf.ONBOARDING_SEEN, &raw)
+		if !(IsObject(BootSnapshot) && ConfigTomlBootSnapshotValue(BootSnapshot, ConfigKey.LLM, ConfigLeaf.ONBOARDING_SEEN, &raw))
 			raw := IniCacheGet(Cache, "llm", ConfigLeaf.ONBOARDING_SEEN)
 		if !((raw is String) && raw == "_") {
 			if LLM_Option_TryParseConfigBoolean(raw, &OnboardingSeen)
@@ -330,7 +333,7 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 			else
 				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_ONBOARDING_SEEN)
 		}
-		if !ConfigTomlTryReadBootValue(Cache, ConfigKey.LLM_NAVIGATION, ConfigLeaf.VAL_MODIFIERS, &raw)
+		if !(IsObject(BootSnapshot) && ConfigTomlBootSnapshotValue(BootSnapshot, ConfigKey.LLM_NAVIGATION, ConfigLeaf.VAL_MODIFIERS, &raw))
 			raw := IniCacheGet(Cache, ConfigKey.LLM_NAVIGATION, ConfigLeaf.VAL_MODIFIERS)
 		if !((raw is String) && raw == "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)
@@ -343,7 +346,7 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_NAVIGATION_VAL_MODIFIERS)
 			}
 		}
-		if !ConfigTomlTryReadBootValue(Cache, ConfigKey.LLM_NAVIGATION, ConfigLeaf.NAV_MODIFIERS, &raw)
+		if !(IsObject(BootSnapshot) && ConfigTomlBootSnapshotValue(BootSnapshot, ConfigKey.LLM_NAVIGATION, ConfigLeaf.NAV_MODIFIERS, &raw))
 			raw := IniCacheGet(Cache, ConfigKey.LLM_NAVIGATION, ConfigLeaf.NAV_MODIFIERS)
 		if !((raw is String) && raw == "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)
@@ -353,7 +356,7 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 			else
 				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_NAVIGATION_NAV_MODIFIERS)
 		}
-		if !ConfigTomlTryReadBootValue(Cache, ConfigKey.LLM_TRIGGER, ConfigLeaf.DISABLED_APPS, &raw)
+		if !(IsObject(BootSnapshot) && ConfigTomlBootSnapshotValue(BootSnapshot, ConfigKey.LLM_TRIGGER, ConfigLeaf.DISABLED_APPS, &raw))
 			raw := IniCacheGet(Cache, ConfigKey.LLM_TRIGGER, ConfigLeaf.DISABLED_APPS)
 		if !((raw is String) && raw == "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)
