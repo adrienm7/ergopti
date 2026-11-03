@@ -65,6 +65,9 @@ return function(run, dependencies)
 			package.loaded["adapters.file_system"] = dependencies.files
 		end
 		local RealConfig = helpers.load_with_stubs("platform.remap.config")
+		-- This fixture models a Mac on the shared runtime: a file that names no
+		-- runtime reads as shared here, while Ergopti's own runtime is the product default.
+		RealConfig.RUNTIME_DEFAULT = "shared"
 
 		local REAL_ONBOARDING_CACHE_PATH = "/__ergopti_hs011_integration__/Karabiner-Elements.dmg"
 
@@ -167,6 +170,8 @@ return function(run, dependencies)
 					end
 					if options.config_error then return nil, "error" end
 					return {
+						-- This fixture models a Mac on the shared runtime; owned is the default.
+						runtime = "shared",
 						enabled = options.initially_enabled ~= false,
 						tap_hold_config = {},
 						mod_combos_config = {},

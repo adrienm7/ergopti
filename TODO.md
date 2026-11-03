@@ -275,34 +275,29 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 ### macOS
 
-- **Next release after 1.0.9, maintainer priority: switch the driver to the owned Karabiner.** Today the driver still uses
-  the installed one and the owned runtime is dormant. Publish the runtime, write its pin, then WP8, WP9 and the real-Mac
-  acceptance below, and make `runtime = "owned"` the default.
+- **Next release after 1.0.9, maintainer priority: switch the driver to the owned Karabiner.** On branch
+  `next/owned-karabiner` ([handoff](docs/tooling/next-release-handoff.md)): runtime published (prerelease
+  `remap-runtime-v16.3.0-ergopti.2`) and pinned, shared-rule migration, block rows and notice, the owned
+  `RUNTIME_DEFAULT` and the two Configuration rows deleted. Left before merging the flip: the native install (the `.2`
+  helper publishes files only; no Core or VirtualHIDDevice LaunchDaemon, no install role), WP8 hosted install
+  acceptance, WP9.
 - **One folder name for Ergopti on the three OS (maintainer, 3 November).** macOS has three folders in Application
   Support: `ErgoptiPlus` (paths.toml, runtime, locks, karabiner.json), `Ergopti` (managed Ollama, embedded Python, MLX)
   and `ergopti_plus` (the local reload control); Windows mixes `%LOCALAPPDATA%ergopti_plus` and `Ergoptiundle`, and the
   config, logs and caches use other spellings. Decided: `Ergopti` on macOS and
   Windows, `ergopti` under XDG on Linux, no "Plus" in folder names; put each driver's data under one root, name it once in the shared identifiers,
   and migrate the old folders once at boot with a backup.
-- **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md)). WP3, WP6
-  and WP7 are built and dormant behind `[karabiner] runtime = "owned"`. Left: a green hosted runtime build of the
-  installer shape is done (dev run 41276215019, artifact `owned-remap-runtime`): the maintainer publishes
-  `ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.2.tar.gz` (sha256 `ad1541f8…de8e`, 12176523 bytes) under the tag
-  `remap-runtime-v16.3.0-ergopti.2`, then runs `python3 tools/build/remap_runtime_publish.py apply runtime-pin.json`
-  to write the `runtime.*` pin; WP8 native and WP9 real-Mac acceptance; then the
-  `RUNTIME_DEFAULT` flip and the shared-mode deletion. Done on 1 November: the per-OS feature requirements table
+- **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md)). Left: the
+  native install in the handoff's order (helper roster with the Core provisioning and the VirtualHIDDevice job and pkg,
+  a `--request-owned-runtime-install` launcher role and its Lua port, artifact `16.3.0-ergopti.3`), WP8 and WP9, then the
+  shared-mode deletion. Done on 1 November: the per-OS feature requirements table
   (`docs/design/feature-requirements.md`) and the driver-only VirtualHIDDevice update offer (3ebab93a17).
-- **When the owned Karabiner is the one used:** delete the Configuration rows `menu.global.karabiner_integration` and
-  `menu.global.remove_from_karabiner` (`macos/ui/menu/remap_switch.lua`), which act on the installed Karabiner.
 - **Owned runtimes.** The rows in state "to do" of `_shared/data/owned_runtimes.json` are all item 31 (shared
   Karabiner app, owned runtime, VirtualHIDDevice). The Swift-owned managed daemon under the proxy relay needs a short
   design note first (who launches the relay, how its refusal receipt reaches the Swift owner; Swift and Go). Done on 1
   November: App Cloner on the managed Python with pinned PyObjC 12.1 (managed-pyobjc.json, ensure-managed-pyobjc.sh
   under the native PTY guardian, consent offer from the Apps menu, stable link `native-bootstrap/app-cloner/python3`;
   existing clones keep /usr/bin/python3 until re-cloned).
-- **Proxy variables in `network-retry.sh`.** Four hand-typed spellings of the proxy variables now live there (the
-  direct override and the refused sign-in start, 3597ee4f, among them); `test-proxy-policy-single-source` allows 4.
-  Factor one `clear_proxy_environment()` both paths call, then lower the allowance.
 - **Checks left to a program from the Mac session.** Done on 1 November: `field_tap_hold_thresholds` (9901da4d94;
   PAR-15 is confirmed by the next field run's result);
   the HTTPS downgrade refusal is already covered by `ManagedPACSourceTests` and `ManagedBootstrapDownloadTests`.
