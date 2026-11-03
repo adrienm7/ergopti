@@ -419,6 +419,7 @@
 		"test:native-menu-rows": "node ./tools/test/test-native-menu-rows.cjs",
 		"test:native-menu-census-admission": "node ./tools/test/test-native-menu-census-admission.cjs",
 		"test:menu-unavailable-rows": "node ./tools/test/test-menu-unavailable-rows.cjs",
+		"test:menu-category-off-rule": "node ./tools/test/test-menu-category-off-rule.cjs",
 		"test:shortcuts-wrap-group": "node ./tools/test/test-shortcuts-wrap-group.cjs",
 		"test:restore-recommended-no-confirm": "node ./tools/test/test-restore-recommended-no-confirm.cjs",
 		"test:approved-menu-labels": "node ./tools/test/test-approved-menu-labels.cjs",

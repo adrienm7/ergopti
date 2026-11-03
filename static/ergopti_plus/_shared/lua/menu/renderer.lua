@@ -495,6 +495,55 @@ function M.new(deps)
 		return { title = i18n.get(item.i18n) .. " — " .. reason_head(i18n.get(item.reason_key)), disabled = true }
 	end
 
+	--- Whether a menu's enable row reads off. An unanswered state is not "off":
+	--- the row reports its drift where it is drawn, and the menu stays as built.
+	--- @param manifest_key string Menu definition key.
+	--- @param item table The enable row: a `toggle`, or a `choice` with its off value.
+	--- @param getters table Native state readers.
+	--- @return boolean
+	local function enable_row_reads_off(manifest_key, item, getters)
+		if item.type == "toggle" then
+			for _, key in ipairs(item.checked_when or {}) do
+				if type(getters[key]) ~= "function" then return false end
+			end
+			return R.resolve_checked_when(manifest_key, item.id, getters) ~= true
+		end
+		return type(getters[item.path]) == "function" and getters[item.path]() == item.submenu_off_value
+	end
+
+	--- What the category-off rule does to the rows one manifest entry draws.
+	--- @param item table Manifest entry.
+	--- @return string role "live" stays clickable; "unreasoned" may already be
+	---   grey for another cause and still owes the reason; "plain" owes it unless
+	---   already grey, as a caption or a row naming its own reason is.
+	local function off_rule_role(item)
+		if item.submenu_off_reason_key ~= nil or item.readable_when_off == true then return "live" end
+		if item.disabled_when ~= nil and item.disabled_reason_key == nil and is_for_platform(item) then
+			return "unreasoned"
+		end
+		return "plain"
+	end
+
+	--- Greys a finished category submenu whose enable row reads off: one rule,
+	--- declared on that row in the manifest, so no driver restates it.
+	--- @param rows table Finished rows.
+	--- @param roles table Finished row -> off_rule_role.
+	--- @param reason_key string Locale key of the shared reason.
+	local function apply_category_off(rows, roles, reason_key)
+		local suffix = " — " .. reason_head(i18n.get(reason_key))
+		for _, row in ipairs(rows) do
+			local role = roles[row]
+			if row.title ~= "-" and role ~= "live" then
+				if (not row.disabled or role == "unreasoned") and type(row.title) == "string" then
+					row.title = row.title .. suffix
+				end
+				row.disabled = true
+				row.fn = nil
+				row.menu = nil
+			end
+		end
+	end
+
 
 
 
@@ -1617,7 +1666,24 @@ function M.new(deps)
 		local commands = (type(ctx) == "table" and type(ctx.commands) == "table") and ctx.commands or {}
 		local getters  = (type(ctx) == "table" and type(ctx.state_getters) == "table") and ctx.state_getters or {}
 
+		-- The rows each entry draws are read off `result` when the next entry
+		-- starts: the branches below leave through `goto continue`, whose label
+		-- must stay last in its block.
+		local roles, settled, previous, off_reason_key = {}, 0, nil, nil
+		local function settle_previous_item()
+			if previous == nil then return end
+			if #result > settled and previous.submenu_off_reason_key ~= nil
+				and enable_row_reads_off(manifest_key, previous, getters) then
+				off_reason_key = previous.submenu_off_reason_key
+			end
+			local role = off_rule_role(previous)
+			for index = settled + 1, #result do roles[result[index]] = role end
+			settled = #result
+		end
+
 		for _, item in ipairs(menu_def) do
+			settle_previous_item()
+			previous = item
 			local prefix = command_literal_prefix(item)
 			if prefix == nil then
 				Logger.error(LOG, "Invalid literal command prefix in '%s' — row refused.", manifest_key)
@@ -1941,8 +2007,11 @@ function M.new(deps)
 
 			::continue::
 		end
+		settle_previous_item()
 
-		return normalize_separators(result)
+		local finished = normalize_separators(result)
+		if off_reason_key ~= nil then apply_category_off(finished, roles, off_reason_key) end
+		return finished
 	end
 
 

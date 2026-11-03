@@ -271,6 +271,28 @@ helpers.describe("the real macOS tray: every category switch is reachable", Capt
 		end)
 	end
 
+	-- Category-off rule: only the enable row and the reader rows stay live.
+	local MENU_KEYS = {
+		["menu.hotstrings.title"] = "hotstrings_menu", ["menu.llm.title"] = "llm_menu",
+		["menu.metrics.title"] = "metrics_menu", ["menu.shortcuts.title"] = "shortcuts_menu",
+		["menu.tapholds.title"] = "tap_holds_menu", ["menu.gestures.title"] = "gestures_menu",
+	}
+	helpers.it("greys every gated manifest menu but its enable and reader rows", function()
+		require("test.category_off_contract").assert_every_gated_menu(helpers,
+			require("infra.manifest_menu"), require("infra.i18n"), "hs")
+	end)
+	for _, posture in ipairs({ true, false }) do
+		helpers.it("applies the category-off rule to the built tray, on " .. tostring(posture), function()
+			local tray = build_tray(posture)
+			local i18n, Contract = require("infra.i18n"), require("test.category_off_contract")
+			local ManifestMenu = require("infra.manifest_menu")
+			for _, category in ipairs(CATEGORIES) do
+				Contract.assert_category(helpers, i18n, ManifestMenu.get_array(MENU_KEYS[category.title]),
+					top_row(tray, category.title), not posture)
+			end
+		end)
+	end
+
 	-- The key combinations left the Tap-Holds submenu for a group under
 	-- Shortcuts that opens with a switch of its own, and whose title is ticked
 	-- while that switch is on.

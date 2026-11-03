@@ -12782,6 +12782,9 @@ console.log(
 			i18n: 'menu.agent.mode_title',
 			show_current_choice: true,
 			disabled_when: ['agent_mode_ready'],
+			// The agent's enable row under the category-off rule.
+			submenu_off_reason_key: 'menu.category_off_reason',
+			submenu_off_value: 'off',
 			choices: [
 				{ value: 'off', i18n: 'menu.agent.mode_off' },
 				{ value: 'action', i18n: 'menu.agent.mode_action' },

@@ -41,11 +41,11 @@
 ; ==================================================
 
 ; The canonical row order + greying policy. Index order IS the menu order.
-; disabled_when_off: false = stays usable while the feature is off (configure
-; before enabling), true = greyed while off. Mirrors macOS is_disabled vs paused.
+; disabled_when_off: true = greyed while the feature is off, every row by the
+; category-off rule of 2026-11-02. Mirrors macOS is_disabled vs paused.
 _LMLS_Canonical() {
 	return [
-		Map("id", "llm_model",               "off", false),
+		Map("id", "llm_model",               "off", true),
 		Map("id", "llm_profile",             "off", true),
 		Map("id", "llm_trigger",             "off", true),
 		Map("id", "llm_generation_settings", "off", true),

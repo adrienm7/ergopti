@@ -47,9 +47,9 @@ local PLATFORM = "hs"
 --- Built-in fallback — mirrors the disabled_when_off policy the manifest declares.
 --- Pinned to the manifest by the contract test so the two cannot diverge; exists
 --- only so a missing/corrupt manifest still yields a correctly-greyed menu.
---- false = stays usable while OFF (configure before enabling); true = greyed while OFF.
+--- false = stays usable while OFF; true = greyed while OFF.
 local FALLBACK_GREYS_WHEN_OFF = {
-	llm_model               = false,
+	llm_model               = true,
 	llm_profile             = true,
 	llm_trigger             = true,
 	llm_generation_settings = true,

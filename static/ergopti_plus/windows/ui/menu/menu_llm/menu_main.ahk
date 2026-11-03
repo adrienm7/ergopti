@@ -213,9 +213,8 @@ LLM_Menu_BuildSubmenu() {
 	; bug this prevents).
 	; The per-row native label + submenu builder are dispatched by id inside
 	; _LLM_Menu_EmitRow — those must stay native because they read Win32/tray state;
-	; the spec owns only the order and the greying. backend/model carry
-	; disabled_when_off=false (usable while off, so the user can configure before
-	; enabling); the rest carry true (greyed while off). Conditional/native-only rows
+	; the spec owns only the order and the greying. Every row carries
+	; disabled_when_off=true (the category-off rule). Conditional/native-only rows
 	; (thinking-model info, the num-predictions reset, the inner separator) are
 	; emitted from inside _LLM_Menu_EmitRow at their anchor row.
 	_rows := _LLM_MenuLayout_Rows()
@@ -488,7 +487,7 @@ _LLM_MenuLayout_Rows() {
  */
 _LLM_MenuLayout_Fallback() {
 	return [
-		Map("id", "llm_model",               "disabled_when_off", false),
+		Map("id", "llm_model",               "disabled_when_off", true),
 		Map("id", "llm_profile",             "disabled_when_off", true),
 		Map("id", "llm_trigger",             "disabled_when_off", true),
 		Map("id", "llm_generation_settings", "disabled_when_off", true),
