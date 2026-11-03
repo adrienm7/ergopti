@@ -1157,7 +1157,12 @@ in a row multiplies it (2026-10-31: 2515 ms for the tooltip caret, 1512 ms for
 the post-wake capture of loginwindow). Stop a cascade at the first unanswered
 read and go through `adapters/accessibility_permission` (`is_askable`,
 `is_unanswering`, `note_read`, `mark_unanswered`): one cooldown
-(`unresponsive_ax_backoff_ms`) shared by every reader. Reads of this process's
+(`unresponsive_ax_backoff_ms`) shared by every reader. A reader that does not
+consult the cooldown must still feed it: the secure-field classification and
+the AXValueChanged watch call `mark_unanswered` on a "Messaging failed"
+answer, as the tooltip anchor does (timing it would add clock reads that the
+context-tracker observation tests count), else the next checked reader waits again
+(2026-11-03: 1045 ms, 500 ms, then a 1005 ms post-wake hold). Reads of this process's
 own windows can wait out the timeout too, as its AX server answers on the
 waiting thread: use a native signal (a webview's `windowCallback`
 `focusChange`) once a first read proved the window.
