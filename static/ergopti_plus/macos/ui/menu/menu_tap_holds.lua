@@ -35,6 +35,8 @@ local ManifestMenu = require("infra.manifest_menu")
 local Paths       = require("infra.paths")
 local KeyCatalog  = require("tap_hold.key_catalog")
 local CombinationLabels = require("tap_hold.combination_labels")
+local LoneTap     = require("tap_hold.lone_tap")
+local Manifest    = require("infra.manifest_reader")
 local LOG         = "menu.tap_holds"
 local i18n        = require("infra.i18n")
 local text_utils  = require("infra.text_utils")
@@ -816,10 +818,6 @@ local function build_sticky_delay_item(karabiner, update_menu)
 	}
 end
 
--- The lone modifier tap windows the menu offers, in milliseconds; 0 is the
--- strict tap-hold (tap_holds.lone_modifier_tap_max_ms).
-local LONE_TAP_CHOICES_MS = { 0, 500, 750, 1000, 1500 }
-
 --- Captions one lone modifier tap window.
 --- @param ms number 0 for the strict tap-hold, else milliseconds.
 --- @return string caption
@@ -835,8 +833,11 @@ end
 --- @return table Provider row carrying the choice rows.
 local function build_lone_tap_item(karabiner, update_menu)
 	local current_ms = karabiner.get_lone_modifier_tap_max_ms()
+	-- The windows offered are the feature's preset_values, the one list the
+	-- three drivers read; 0 is the strict tap-hold.
+	local offered = LoneTap.choices(Manifest.find_entry_by_path(ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
 	local choices = {}
-	for _, ms in ipairs(LONE_TAP_CHOICES_MS) do
+	for _, ms in ipairs(offered) do
 		choices[#choices + 1] = {
 			label   = ms == 0 and i18n.get("menu.tapholds.lone_tap_off") or string.format("%d ms", ms),
 			checked = ms == current_ms or nil,

@@ -21,10 +21,6 @@ local show_error = require("ui.menu.menu_dialogs").show_error
 
 local LOG = "ui.menu.menu_tap_holds"
 
--- The lone modifier tap windows the menu offers, in milliseconds; 0 is Off,
--- the strict tap-hold (tap_holds.lone_modifier_tap_max_ms).
-local LONE_TAP_CHOICES_MS = { 0, 500, 750, 1000, 1500 }
-
 --- Display name of a tap-hold key: its name in the shared key name table, the
 --- one the Windows and macOS menus show. A key the table does not name raises
 --- rather than printing its id.
@@ -240,7 +236,7 @@ local function _build_tap_holds(ctx)
 	end
 
 	--- Persists how long a modifier key pressed alone still taps, live.
-	--- @param ms number One of LONE_TAP_CHOICES_MS.
+	--- @param ms number One of the feature's preset_values.
 	--- @return boolean
 	local function set_lone_tap(ms)
 		local guard, setter = edit_guard("set_lone_tap_max_ms")
@@ -338,8 +334,12 @@ local function _build_tap_holds(ctx)
 		end,
 		["tap_hold_lone_tap"] = function()
 			local current_ms = th.lone_tap_max_ms()
+			-- The windows offered are the feature's preset_values, the one list the
+			-- three drivers read; 0 is Off, the strict tap-hold.
+			local offered = require("tap_hold.lone_tap").choices(require("infra.manifest_reader")
+				.find_entry_by_path(require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
 			local choices = {}
-			for _, ms in ipairs(LONE_TAP_CHOICES_MS) do
+			for _, ms in ipairs(offered) do
 				choices[#choices + 1] = {
 					label = lone_tap_caption(ms),
 					checked = ms == current_ms or nil,

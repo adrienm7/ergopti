@@ -44,4 +44,19 @@ function M.tap_max_ms(threshold_ms, lone_modifier, window_ms)
 	return threshold_ms
 end
 
+--- The windows the menu offers, in order, 0 (Off) first: the feature's
+--- preset_values in the manifest, the one list the three drivers read.
+--- @param feature table The generated tap_holds.lone_modifier_tap_max_ms entry.
+--- @return table choices_ms A copy of the declared windows.
+function M.choices(feature)
+	assert(type(feature) == "table" and type(feature.preset_values) == "table"
+		and #feature.preset_values >= 2,
+		"tap_holds.lone_modifier_tap_max_ms declares no preset_values in the manifest")
+	local choices = {}
+	for index, value in ipairs(feature.preset_values) do
+		choices[index] = M.validate(value)
+	end
+	return choices
+end
+
 return M

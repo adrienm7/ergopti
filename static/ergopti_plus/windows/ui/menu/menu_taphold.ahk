@@ -71,9 +71,16 @@ _TH_GlobalDelayRows() {
 }
 
 ; The lone tap window's choices in milliseconds, in menu order; 0 is off (the
-; strict tap-hold).
+; strict tap-hold). They are the feature's preset_values in the manifest, the
+; one list the macOS and Linux menus read too.
+; @returns {Array}
 _TH_LoneTapChoicesMs() {
-	static Choices := [0, 500, 750, 1000, 1500]
+	Feature := ManifestFindEntryByPath(ConfigKey.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
+	Choices := (Feature is Map) ? Feature.Get("preset_values", 0) : 0
+	if !(Choices is Array) || Choices.Length < 2
+		throw ValueError("tap_holds.lone_modifier_tap_max_ms declares no preset_values in the manifest.")
+	for _, Ms in Choices
+		TapHoldValidLoneTapMaxMs(Ms)
 	return Choices
 }
 
