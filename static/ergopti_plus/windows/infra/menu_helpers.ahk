@@ -10,6 +10,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\_generated\menu_section_header.ahk
 
 
 
@@ -223,8 +224,11 @@ FmtCount(N) {
 }
 NoAction(*) {
 }
+; Frames a translated title as a disabled menu section header. The frame is the
+; one format of _shared/modules/menu/section_header.json, which macOS and Linux
+; read through menu.labels too.
 MenuSectionTitle(Text) {
-		return "— " . Text . " —"
+		return MENU_SECTION_HEADER_PREFIX . Text . MENU_SECTION_HEADER_SUFFIX
 }
 
 ; Build a Map(SecName -> disambiguated description) for the personal-hotstrings

@@ -491,7 +491,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- AFTER calling load_with_stubs (this baseline is always restored here).
 	-- decorate_section / section mirror the real i18n: menu builders (via
 	-- ui.menu.menu_utils.build_section_header) wrap disabled headers in the
-	-- canonical "— … —" decoration, so the stub must expose them or any builder
+	-- shared header format (menu.labels), so the stub must expose them or any builder
 	-- that renders a section header crashes with a nil-field call.
 	-- A caption that takes several getters (caption_getters) refuses a format without its
 	-- placeholders, so the keys the AI menu builds that way carry their English format.
@@ -500,8 +500,8 @@ function M.load_with_stubs(module_name, hs_overrides)
 		get             = function(key) return PLACEHOLDER_FORMATS[key] or key end,
 		get_locale      = function() return "fr" end,
 		set_locale      = function() end,
-		decorate_section = function(text) return "— " .. text .. " —" end,
-		section          = function(key) return "— " .. key .. " —" end,
+		decorate_section = function(text) return require("menu.labels").decorate_section(text) end,
+		section          = function(key) return require("menu.labels").decorate_section(key) end,
 		-- Mirrors the real {n} substitution. A stub narrower than the module it
 		-- stands in for is how a production call to a missing function reaches
 		-- nil under test and nobody notices: every consumer of i18n.format would
