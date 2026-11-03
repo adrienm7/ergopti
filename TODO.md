@@ -64,9 +64,13 @@ three-OS CI is green on the final source. See the handoff above for the current 
       registry proof, full save after ready, disk caches; a toggle must not rebuild 1000 rows.
       Resume here (branch `wip/windows-boot-time`): parse fixes, the smoke operation caps, keyboard before tray root
       and the queued early tray click are committed (keyboard registered at 4.5 s instead of 5.1 s on the smoke
-      fixture). Next: script parse (lighter boot includes, lazy modules), layout and hotstrings (disk caches with
-      invalidation, deferred rare categories), each measured with interleaved base/candidate smoke-fixture boots
-      (summed `process_cpu`). CI of the branch: run 41732233161 and later.
+      fixture). Next, largest first: the emoji and symbol sections take 406 of the 1031 ms hotstrings stage on that
+      fixture; defer them after ready in slices of a few tens of ms, but their registration order feeds the
+      collision tie-break (`_DynHS_RegisterAll` and the repeat key must stay after them): reserve their `Seq` block at
+      the boot position, and keep the preview index complete. Then script parse (lighter boot includes; AHK has no
+      runtime include, so only a smaller graph or a worker helps) and layout (rejected disk cache: native hotkey
+      registration). Measure each with interleaved base/candidate smoke-fixture boots (summed `process_cpu`). CI of
+      the branch: runs 41732233161 and 41735464699.
       Windows boot, 3 November. Real logs: 4.75 s at best, 7.8 s typical, 15 s and more
       under load; parse 1-1.7 s, layout 1.2 s, hotstrings 1.0 s, tray 1.0 s (AI submenu 0.75 s), pre-logger 1.2 s.
       Three boots waited 24 s, 26 s and 446 s on a tray opened during boot (`native_menu_wait`): input waits for the
