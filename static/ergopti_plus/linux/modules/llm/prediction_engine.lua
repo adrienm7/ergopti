@@ -2151,8 +2151,10 @@ function M.translate_selection(value)
 end
 
 --- Sends the test sample straight to the active backend, with the active prompt
---- and settings. A candidate offer would be a text the user could accept into the
---- focused document, so none is opened and no engine state changes.
+--- and the test's own high temperature: the same sample at the low generation
+--- temperature repeats one answer, which proves nothing. Nothing here reads a
+--- cache. A candidate offer would be a text the user could accept into the focused
+--- document, so none is opened and no engine state changes.
 --- @param sample string
 --- @param on_text function Receives the answer.
 --- @param on_fail function Receives the failure.
@@ -2165,15 +2167,17 @@ function M._send_test_prediction(sample, on_text, on_fail)
 		max_words = Settings.get(require("config_keys").LEAF.MAX_WORDS),
 		min_words = Settings.get(require("config_keys").LEAF.MIN_WORDS),
 		num_predictions = 1,
-		temperature = Settings.get("temperature"),
+		temperature = HttpBridge.TEST_PREDICTION_TEMPERATURE,
 		auto_raise_temp = false,
 		language = prompt_language(),
 		context_window_chars = max_context_chars(),
 	})
 	local system_prompt = resolve_system_prompt(profile, params, 1)
 	if type(system_prompt) ~= "string" then error("the active prompt has no usable system prompt", 0) end
+	local request = offer_request_opts(params.max_tokens, nil, runtime_response)
+	request.temperature = HttpBridge.TEST_PREDICTION_TEMPERATURE
 	backend.chat(target, model, PromptBuilder.build_messages(system_prompt, params.context, params.context_tail),
-		offer_request_opts(params.max_tokens, nil, runtime_response), nil,
+		request, nil,
 		function(full_text, err)
 			if err then return on_fail(err) end
 			on_text(Parser.strip_thinking(full_text or ""))
@@ -2199,6 +2203,7 @@ function M.test_prediction()
 				return not _runtime_closed and not _scope_owner and _enabled == true and not _is_paused()
 			end,
 			send = M._send_test_prediction,
+			now_ms = function() return _clock_ms() end,
 			show = function(text)
 				if not _notify then
 					Logger.error(LOG, "No notice surface injected: the test prediction is only logged.")

@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local ConfigKeys = require("config_keys")
+local LabelValue = require("locale.label_value")
 local M = {}
 local FEATURE = ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_USER_CODE
 
@@ -91,7 +92,7 @@ function M.build(ports)
 						local live, interval = ports.get()
 						return mutation(not live, interval)
 					end },
-				{ label = ports.i18n("hs_config.label_delay") .. ": " .. tostring(seconds * 1000), disabled = blocked,
+				{ label = LabelValue.compose(ports.i18n, ports.i18n("hs_config.label_delay"), seconds * 1000), disabled = blocked,
 					action = function()
 						local live, interval = ports.get()
 						local selected = ports.prompt(interval * 1000)

@@ -35,10 +35,6 @@ const LEADING_ICON = /^\p{Extended_Pictographic}\uFE0F?\s+/u;
 // Each hint and the menu labels, in click order, it must quote verbatim; with
 // withoutIcon, the labels are quoted without their leading icon.
 const HINTS = [
-	{
-		hint: 'keystats_ui.metrics_disabled_body',
-		labels: ['menu.metrics.title', 'menu.metrics.enable']
-	},
 	...[
 		'dialog.action_picker.count_default',
 		'mlx.repair_reveal_hint',

@@ -49,14 +49,15 @@
 ; modifiers, their combinations and the nav layer; its « none » row clears it).
 ; Both pickers persist immediately via WriteTapHoldTap / TapHoldSetHold and
 ; reload the script to refresh the menu; a refused hold keeps its picker open.
-_BuildTapHoldsSubmenu() {
+_BuildTapHoldsSubmenu(TargetMenu := unset) {
 	Commands := _TH_ScopeCommands()
 	Getters := Map("tapholds_enabled", () => IsCategoryGated("TapHolds"))
 	ListProviders := Map(
 		"tap_hold_global_delay", (*) => _TH_GlobalDelayRows(),
 		"tap_hold_keys_left", (*) => _TH_KeyRows("left"),
 		"tap_hold_keys_right", (*) => _TH_KeyRows("right"))
-	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands, Getters)
+	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands, Getters,
+		IsSet(TargetMenu) ? TargetMenu : unset)
 }
 
 ; The GLOBAL delay row: the delay of every key that has none of its own. The label

@@ -265,7 +265,7 @@ _HS_DefaultDelayLabel(CaptionKey := "menu.hotstrings.tooltip_default") {
 	Ms        := Round(Seconds * 1000)
 	Display   := (Ms == 0) ? t("menu.hotstrings.infinite") : (Ms . " ms")
 	; menu.settings.default_indicator already carries a leading space.
-	return t(CaptionKey) . " : " . Display . (Seconds == GLOBAL_DEFAULT_DELAY ? t("menu.settings.default_indicator") : "")
+	return LabelValue(t(CaptionKey), Display) . (Seconds == GLOBAL_DEFAULT_DELAY ? t("menu.settings.default_indicator") : "")
 }
 
 ; Prompt for and persist the base expansion delay (entered in ms), mirroring the
@@ -299,7 +299,7 @@ _HS_CategoryDelayLabel(Cat, I18nKey, DefaultSec := "") {
 	Ms      := Round(Sec * 1000)
 	Display := (Ms == 0) ? t("menu.hotstrings.infinite") : (Ms . " ms")
 	; menu.settings.default_indicator already carries a leading space.
-	return t(I18nKey) . " : " . Display . (R.HasOverride ? "" : t("menu.settings.default_indicator"))
+	return LabelValue(t(I18nKey), Display) . (R.HasOverride ? "" : t("menu.settings.default_indicator"))
 }
 
 ; Prompt for and persist a per-category default expansion delay (entered in ms),
@@ -1249,7 +1249,7 @@ _HS_PersonalFileControlRows(Owner, Section, Options := unset) {
 		if !(Row is Map)
 			continue
 		if Values.Has(Id)
-			Row["label"] .= " : " . Values[Id]
+			Row["label"] := LabelValue(Row["label"], Values[Id])
 		Field := Id == MenuCommand.PERSONAL_FILE_TOOLTIP ? "show_tooltip"
 			: (Id == MenuCommand.PERSONAL_FILE_DELAY ? "delay" : (Id == MenuCommand.PERSONAL_FILE_PRIORITY ? "priority"
 				: (Id == MenuCommand.PERSONAL_FILE_COLOR ? "color" : "")))
@@ -1620,7 +1620,7 @@ _HS_DelimAddRecordCommit(Char, Consume, Options := unset) {
 			|| (Consume != 0 && Consume != 1) || A_IsSuspended
 		return false
 	Record := Map("key", "custom_" . Format("{:X}", Ord(Char)), "char", Char,
-		"label", Char . " : " . t("menu.hotstrings.custom_label"), "consume", TOML_Bool(Consume))
+		"label", LabelValue(Char, t("menu.hotstrings.custom_label")), "consume", TOML_Bool(Consume))
 	return HotstringsTerminatorRecordsEdit(Map("mode", "add", "record", Record), Options?)
 }
 

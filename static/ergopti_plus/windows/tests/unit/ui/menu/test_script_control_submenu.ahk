@@ -77,7 +77,7 @@ _SCSM_AssertOrder(ChordsOn) {
 		AssertEqual(t("common.clear_to_system"), _SCSM_LabelAt(Rendered, 2), "the clear comes third")
 		Assert((_SCSM_StateAt(Rendered, 3) & MF_SEPARATOR) != 0, "a separator closes the first group")
 		for Index, Slot in _SCSM_SLOTS {
-			AssertEqual(1, InStr(_SCSM_LabelAt(Rendered, 3 + Index), t("sg_labels." . Slot) . " : "),
+			AssertEqual(1, InStr(_SCSM_LabelAt(Rendered, 3 + Index), LabelValue(t("sg_labels." . Slot), "")),
 				Slot . " keeps its row, in order")
 		}
 	} finally Rendered.Delete()

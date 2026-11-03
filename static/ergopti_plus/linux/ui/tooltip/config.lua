@@ -134,6 +134,7 @@ function M.load()
 			line_spacing     = require_key("layout", "line_spacing"),
 			hint_spacing     = require_key("layout", "hint_spacing"),
 			label_gap        = require_key("layout", "label_gap"),
+			llm_max_content_width = require_key("layout", "llm_max_content_width"),
 			corner_radius    = require_key("layout", "corner_radius"),
 			separator_height = require_key("layout", "separator_height"),
 			-- SPEC.md files this under [positioning]; the TOML declares it under

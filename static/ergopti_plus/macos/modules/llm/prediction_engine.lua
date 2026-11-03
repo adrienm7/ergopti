@@ -2428,8 +2428,10 @@ end
 
 --- The AI menu's « Test a prediction »: one prediction on a sample context, showing
 --- the answer or why it could not run (llm/test_prediction.lua). It goes straight
---- to the backend: the notice is plain text, whereas a prediction tooltip is a
---- text the user could accept into the focused document.
+--- to the backend, past the prediction cache: the notice is plain text, whereas a
+--- prediction tooltip is a text the user could accept into the focused document.
+--- It sends its own high temperature: the same sample at the low generation
+--- temperature repeats one answer, which proves nothing.
 --- @return boolean sent True when the request left.
 function M.test_prediction()
 	if not require_state("test_prediction") then return false end
@@ -2449,8 +2451,10 @@ function M.test_prediction()
 			may_publish = function() return runtime_available() and live_refusal() == nil end,
 			send = function(sample, on_text, on_fail, current)
 				core_llm.fetch_raw_completion(core_llm.get_active_profile(), sample, sample, core_llm.get_current_model(),
-					temperature, Rewrite.max_tokens(sample), on_text, on_fail, current)
+					require("modules.llm.api_common").test_prediction_temperature(), Rewrite.max_tokens(sample),
+					on_text, on_fail, current)
 			end,
+			now_ms = function() return hs.timer.absoluteTime() / 1e6 end,
 			show = function(text)
 				local ok_show, shown = pcall(tooltip.show, text, true, true)
 				if not ok_show or shown ~= true then

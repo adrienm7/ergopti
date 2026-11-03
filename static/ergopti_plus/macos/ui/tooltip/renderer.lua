@@ -47,6 +47,7 @@ M.ELEM_SEPARATOR   = 4  -- Thin horizontal separator above hint/info
 M.ELEM_HINT        = 5  -- Hint line (or hint+info combined when they fit on one row)
 M.ELEM_INFO        = 6  -- Info bar (variable zone — TTFT/TTLT timing line)
 M.ELEM_MODEL_INFO  = 7  -- Stable "model + prompt" header (FIXED zone — render once per chain)
+M.ELEM_LABELS      = 8  -- Shortcut column, right-aligned over the predictions block
 
 M.canvas = hs.canvas.new({ x = 0, y = 0, w = 0, h = 0 })
 if M.canvas then
@@ -59,6 +60,7 @@ if M.canvas then
 		{ type = "rectangle" },
 		{ type = "text" },
 		{ type = "text" },
+		{ type = "text", action = "skip" },
 		{ type = "text", action = "skip" }
 	)
 end
@@ -449,7 +451,16 @@ function M.render(blocks, state, start_watchers_callback)
 		local current_y = Config.layout.pad_y
 
 		M.canvas[3].text  = blocks.preds
-		M.canvas[3].frame = { x = Config.layout.pad_x, y = current_y, w = max_width, h = size_predictions.h }
+		M.canvas[3].frame = { x = Config.layout.pad_x, y = current_y, w = blocks.line_limit or max_width, h = size_predictions.h }
+		-- The column gets the block's whole frame, so it ends on the inner edge
+		-- of the panel however far a footer widened it past the lines.
+		if blocks.labels_st then
+			M.canvas[M.ELEM_LABELS].text   = blocks.labels_st
+			M.canvas[M.ELEM_LABELS].frame  = { x = Config.layout.pad_x, y = current_y, w = max_width, h = size_predictions.h }
+			M.canvas[M.ELEM_LABELS].action = "fill"
+		else
+			M.canvas[M.ELEM_LABELS].action = "skip"
+		end
 		current_y = current_y + size_predictions.h + Config.layout.line_spacing
 
 		if hint_styled or info_styled then

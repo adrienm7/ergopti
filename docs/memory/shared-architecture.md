@@ -331,13 +331,13 @@ never a shortcut row or a dedicated shortcut setting;
 
 ### project-script-chords-are-active-by-default
 
-An empty configuration alters no input: every input-altering manifest entry
-defaults to off. The one exception is the script-management chords. The
-maintainer decided on 2026-09-30 that they are no typing feature, since they
-pause, reload, quit and edit the driver. Such an entry carries
-`active_by_default = true` and a default equal to its recommended value. The
-builder refuses any other shape, and `test-defaults-single-source.cjs` pins
-the approved list. A config.toml that names "none" keeps a chord off, and a
+An empty configuration alters no input: every `family = "feature"` manifest row
+defaults to off (`tools/lib/feature-family-rule.cjs`). The one exception is the
+script-management chords. The maintainer decided on 2026-09-30 that they are no
+typing feature, since they pause, reload, quit and edit the driver. Such an
+entry carries `active_by_default = true`, its `rule_exception` and a default
+equal to its recommended value. The builder refuses any other shape, and
+`test-defaults-single-source.cjs` pins the approved list. A config.toml that names "none" keeps a chord off, and a
 missing key takes the preset. The wizard lists only entries whose preset
 differs from their default, so the chords left its Shortcuts page. Action:
 never extend the list without a maintainer decision. A clear that must give
@@ -464,6 +464,22 @@ platforms it leaves out. Provider rows take `disabled_reason_key` too. The
 generator, both renderers and `test-menu-unavailable-rows.cjs` hold the rule; a
 greyed reason's head must stay short in all 21 locales.
 Action: classify a restriction you add or touch, never with a long reason head.
+
+### project-a-category-off-greys-its-submenu
+
+Maintainer rule (2026-11-02): the row of a top-level category in the main menu
+is never greyed for being off, and inside an off category only the row that
+turns it on stays clickable. The enable row (a `toggle`, or the `agent_mode`
+choice with `submenu_off_value`) declares `submenu_off_reason_key`; both
+renderers grey every other row at the end of their build, with that reason, so
+provider rows and native groups follow without a driver knowing. A row declaring
+`readable_when_off` stays live: it must only read data (Metrics' two windows, so
+the user can consult the past), and its window must open with the category off.
+The layout has an enable row on Windows only, since macOS and Linux have no off
+state for it. Action: a new top-level category declares its enable row, a new
+reader is a maintainer decision; `test-menu-category-off-rule.cjs` and the
+built-menu test of each driver hold the rule. Pause greying (`greyed_when_paused`)
+is a separate rule and does grey the parents.
 
 ### project-a-local-version-greys-its-update-rows
 

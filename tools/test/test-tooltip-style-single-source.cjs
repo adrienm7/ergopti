@@ -64,6 +64,7 @@ const SHARED = [
 	['layout', 'pad_y'],
 	['layout', 'line_spacing'],
 	['layout', 'hint_spacing'],
+	['layout', 'llm_max_content_width'],
 	['layout', 'corner_radius'],
 	['layout', 'screen_margin'],
 	['positioning', 'caret_offset_x'],

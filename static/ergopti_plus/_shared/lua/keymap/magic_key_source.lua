@@ -24,6 +24,8 @@
 ---    key the user chose (layout_registry.ahk LayoutRegistry_MagicKeyHotkeys).
 --- ==============================================================================
 
+local LabelValue = require("locale.label_value")
+
 local M = {}
 
 -- The modifier names the two drivers report: macOS event flags (shift, ctrl,
@@ -299,7 +301,7 @@ function M.menu_rows(resolver, opts)
 	})
 	if type(rows) ~= "table" or #rows ~= 1 or type(rows[1].items) ~= "table" then return nil end
 	local shown = current == resolver.automatic and t(AUTOMATIC_KEY) or label_of(current)
-	rows[1].label = rows[1].label .. " : " .. shown
+	rows[1].label = LabelValue.compose(t, rows[1].label, shown)
 	return rows
 end
 

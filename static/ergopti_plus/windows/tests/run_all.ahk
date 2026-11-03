@@ -1007,6 +1007,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/infra/lifecycle/test_reload_deferral.ahk
 #Include unit/infra/lifecycle/test_dev_source.ahk
 #Include unit/ui/menu/test_tray_menu_separator_popup.ahk
+#Include unit/ui/menu/test_menu_deferred_children.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_hold_picker_options.ahk
 #Include unit/ui/menu/test_menu_command_deferral.ahk
 #Include unit/ui/menu/test_menu_reload_replay.ahk
@@ -1555,6 +1556,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ui/menu/test_menu_top_level_drift_gate.ahk
 ; Regression: no separator doubles up in any manifest menu.
 #Include unit/ui/menu/test_manifest_menu_no_double_separator.ahk
+#Include unit/ui/menu/test_menu_category_off_rule.ahk
 ; Regression: every category switch is a first-row checkbox with one label.
 #Include unit/modules/hotstrings/catalogue/test_category_toggle_checkbox.ahk
 #Include unit/ui/menu/test_menu_choice_row.ahk

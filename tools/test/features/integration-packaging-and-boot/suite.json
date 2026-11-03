@@ -35,14 +35,6 @@
 			"repro": "node tools/test/test-ahk-full-startup-smoke.cjs"
 		},
 		{
-			"id": "js-0506",
-			"ordinal": 564,
-			"name": "startup smoke owns no session input and ends on any error",
-			"cmd": "node",
-			"args": ["tools/test/test-ahk-smoke-input-quarantine.cjs"],
-			"repro": "node tools/test/test-ahk-smoke-input-quarantine.cjs"
-		},
-		{
 			"id": "js-0177",
 			"ordinal": 189,
 			"name": "macOS bundle payload ships every path the runtime reads and no excluded group",
@@ -161,12 +153,28 @@
 			"repro": "npm run test:linux-distro-native-prerequisites"
 		},
 		{
+			"id": "js-0506",
+			"ordinal": 564,
+			"name": "startup smoke owns no session input and ends on any error",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-smoke-input-quarantine.cjs"],
+			"repro": "node tools/test/test-ahk-smoke-input-quarantine.cjs"
+		},
+		{
 			"id": "ahk-tray-rows-read-as-text",
 			"ordinal": 565,
 			"name": "the real Windows tray shows no raw id, key or placeholder in French and English",
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-tray-rows-read-as-text.cjs"],
 			"repro": "npm run test:ahk-tray-rows-read-as-text"
+		},
+		{
+			"id": "js-feature-family-rule",
+			"ordinal": 567,
+			"name": "every manifest row is a feature or a setting, follows its rule, and a restore reaches it",
+			"cmd": "node",
+			"args": ["tools/test/test-feature-family-rule.cjs"],
+			"repro": "npm run test:feature-family-rule"
 		}
 	]
 }

@@ -78,6 +78,19 @@ helpers.describe("Linux test prediction engine", function()
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("sends the test's own high temperature, whatever the generation setting", function()
+		local engine, seen = fixture({ model = "local-a" })
+		local ok, err = pcall(function()
+			local Settings = require("modules.llm.settings")
+			local Bridge = require("infra.llm_bridge")
+			helpers.assert_true(Bridge.TEST_PREDICTION_TEMPERATURE > Settings.get("temperature"), "above the setting")
+			engine.test_prediction()
+			helpers.assert_eq(seen.chats[1].opts.temperature, Bridge.TEST_PREDICTION_TEMPERATURE)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("shows the backend's failure", function()
 		local engine, seen = fixture({ model = "local-a" })
 		local ok, err = pcall(function()

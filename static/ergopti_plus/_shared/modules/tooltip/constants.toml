@@ -96,6 +96,12 @@ hint_spacing = 4
 # the shortcut column of the AI tooltip (layout units).
 label_gap = 16
 
+# Widest the prediction block of the AI tooltip grows, shortcut column included
+# (layout units). A longer line is cut with an ellipsis in front of the column:
+# past this the panel would run off the screen with its chords. Accepting a
+# line still inserts all of it.
+llm_max_content_width = 800
+
 # Corner arc radius applied to the rounded rectangle (layout units).
 # AHK passes 2 * corner_radius as the GDI ellipse diameter (nWidth/nHeight),
 # HS passes corner_radius directly as xRadius/yRadius on the canvas element.

@@ -17,6 +17,8 @@ SOURCE_COMMIT = "45e6011815c74acde6a346512856b69dd79dd22b"
 SOURCE_FILES = (
     "tools/build/build-macos-managed-ollama.py",
     "static/ergopti_plus/_shared/go/native_http/transport.go",
+    "static/ergopti_plus/_shared/go/native_http/range_response.go",
+    "static/ergopti_plus/_shared/go/native_http/range_response_test.go",
     "static/ergopti_plus/_shared/go/native_http/worker_darwin.go",
     "static/ergopti_plus/_shared/go/native_http/worker_other.go",
     "static/ergopti_plus/_shared/go/native_http/admission.go",

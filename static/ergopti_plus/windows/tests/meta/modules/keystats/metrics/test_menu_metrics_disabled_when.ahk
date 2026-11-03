@@ -29,11 +29,10 @@
 ; — metrics_menu items restricted to platforms=["hs"] (wpm_menubar,
 ; menubar_colors, encryption) are never rendered on AHK and are covered by
 ; the manifest-only assertions in 2/ instead.
+; The two windows are `readable_when_off` instead: they read stored history only.
 _MMDW_Canonical() {
 	return Map(
-		"show_typing",        ["keystats_enabled"],
-		"show_apps",          ["keystats_enabled"],
-		"wpm_widget",         ["keystats_enabled"],
+		"wpm_widget",        ["keystats_enabled"],
 		"widget_colors",      ["keystats_enabled", "wpm_widget_visible"],
 		"include_realtime",   ["keystats_enabled", "wpm_widget_visible"],
 		"reset_wpm_position", ["keystats_enabled", "wpm_widget_visible"],

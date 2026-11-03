@@ -1222,6 +1222,15 @@ function M.runtime_available()
 	return path ~= nil
 end
 
+--- Reports whether the owned runtime's metadata is still being read. Until it
+--- settles runtime_available() answers false on a Mac that has the runtime, so
+--- that answer must not be read as "not installed".
+--- @return boolean pending
+function M.runtime_pending()
+	local path, _, state = OllamaBinary.native_candidate()
+	return path == nil and state == "pending"
+end
+
 --- Installs the separately owned native runtime under this original task owner.
 --- Consent is a shared issued choice, consumed by the native preparation port.
 --- A stock grant or a paused replay never supplies that choice implicitly.

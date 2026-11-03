@@ -1071,6 +1071,35 @@ global ConfigMigrateRegistryDeepCompares := 0
 ; shadow whose deep comparison already succeeded inside the open scope.
 global ConfigMigrateRegistryProof := { depth: 0, registry: 0, shadow: 0 }
 
+; Memo of the boot's read-only stretch: one comparison serves the boot's reads.
+global ConfigMigrateBootReadProof := { open: false, registry: 0, shadow: 0 }
+
+; Opens the read-only stretch of the boot. Boot reads config.toml about twenty
+; times and each read paid two whole-registry comparisons. Nothing here holds
+; Critical, so unlike a proof scope this memo serves reads and write pre-checks
+; only: a read classifies with the private shadow, never the live registry, and
+; every durable effect still compares (RegistryLive). The close compares once.
+ConfigMigrateBootReadsOpen() {
+	global ConfigMigrateBootReadProof
+	if ConfigMigrateBootReadProof.open
+		throw Error("The boot read stretch is already open")
+	ConfigMigrateBootReadProof.open := true
+}
+
+; Closes the read stretch with one fresh comparison, so a registry changed while
+; it was open is reported at the close instead of having served reads unnoticed.
+; @param {String} Path The boot configuration destination.
+; @returns {Boolean} True when the registry still matches its private shadow.
+ConfigMigrateBootReadsClose(Path) {
+	global ConfigMigrateBootReadProof
+	Proof := ConfigMigrateBootReadProof
+	if !Proof.open
+		throw Error("The boot read stretch is not open")
+	Proof.open := false, Proof.registry := 0, Proof.shadow := 0
+	Result := ConfigMigrateBoot(Path, "close_boot_reads")
+	return (Result is Integer) && Result == 1
+}
+
 ; True while a proof scope is open (the caller already runs under Critical).
 ConfigMigrateRegistryProofOpen() {
 	global ConfigMigrateRegistryProof
@@ -1222,6 +1251,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 
 	RegistryLive(Row, Fresh := false) {
 		global ConfigMigrateRegistryChecks, ConfigMigrateRegistryProof, ConfigMigrateRegistryDeepCompares
+		global ConfigMigrateBootReadProof
 		; Each check deep-compares the whole shipped registry (about 10 ms); the
 		; count lets performance tests see how many a transaction pays for.
 		ConfigMigrateRegistryChecks += 1
@@ -1237,6 +1267,11 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			if !Fresh && Proof.depth && Proof.registry == CurrentRegistry
 					&& Proof.shadow == Row.registry_shadow
 				return true
+			ReadProof := ConfigMigrateBootReadProof
+			if !Fresh && ReadProof.open && (Request == "capture_read" || Request == "check_write"
+					|| Request == "read_only_status") && ReadProof.registry == CurrentRegistry
+					&& ReadProof.shadow == Row.registry_shadow
+				return true
 			ConfigMigrateRegistryDeepCompares += 1
 			CompareStarted := PerfStage_Begin()
 			Same := ConfigMigrateSameRegistry(CurrentRegistry, Row.registry_shadow)
@@ -1245,6 +1280,8 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 				return false
 			if Proof.depth
 				Proof.registry := CurrentRegistry, Proof.shadow := Row.registry_shadow
+			if ReadProof.open
+				ReadProof.registry := CurrentRegistry, ReadProof.shadow := Row.registry_shadow
 			return true
 		} catch {
 			return false
@@ -1311,7 +1348,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 	}
 
 	if !(Request is String) || !(Request == "boot" || Request == "prepare" || Request == "prepare_owned" || Request == "settle_owned"
-			|| Request == "capture_read" || Request == "capture_write" || Request == "capture_noop" || Request == "capture_reconcile_noop" || Request == "capture_transition" || Request == "capture_recovery" || Request == "known" || Request == "check_write" || Request == "consume_read_failure" || Request == "read_only_status")
+			|| Request == "capture_read" || Request == "capture_write" || Request == "capture_noop" || Request == "capture_reconcile_noop" || Request == "capture_transition" || Request == "capture_recovery" || Request == "known" || Request == "check_write" || Request == "consume_read_failure" || Request == "read_only_status" || Request == "close_boot_reads")
 		throw ValueError("Unknown configuration journal request")
 	PerfCount("config_migrate.request." . Request)
 	if !(FilePath is String) || FilePath == "" || !NativeLive()
@@ -1326,6 +1363,8 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 	Key := Native.key.Call(FilePath)
 	if Request == "known"
 		return Destinations.Has(Key)
+	if Request == "close_boot_reads"
+		return Destinations.Has(Key) && RegistryLive(Destinations[Key], true)
 	if Request == "read_only_status" {
 		; Observation returns only the retained boot classification, never source
 		; bytes, a mutable journal row or preparation/write permission.

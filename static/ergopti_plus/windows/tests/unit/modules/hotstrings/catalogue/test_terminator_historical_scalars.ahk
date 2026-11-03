@@ -25,12 +25,12 @@ _HTHS_With(Mode) {
 			Built := _HSDT_NativeControlMenu(_HSDT_AcceptWriter)
 			Labels := []
 			_HTHS_CollectLabels(Built, Labels)
-			Expected := Chr(0x1F600) . " : " . t("menu.hotstrings.custom_label")
+			Expected := LabelValue(Chr(0x1F600), t("menu.hotstrings.custom_label"))
 			Matching := 0, CustomRows := 0
 			for Label in Labels {
 				if Label == Expected
 					Matching += 1
-				if InStr(Label, " : " . t("menu.hotstrings.custom_label"))
+				if InStr(Label, LabelValue("", t("menu.hotstrings.custom_label")))
 					CustomRows += 1
 				for Character in _TextCodepoints(Label)
 					AssertTrue(HotstringsTerminatorRecordCharacter(Character), "native row labels cannot expose orphan units")

@@ -223,9 +223,9 @@ _MI_StageLayout() {
 	)
 	; The accented-letter group stays enabled without the Ergopti emulation: the
 	; shortcuts then follow the user's own layout (accented_shortcuts.ahk).
-	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders,
+	LayoutMenu  := MenuDeferOrBuild((Target) => MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders,
 		_LAY_ScopeCommands(),
-		Map("layout_enabled", () => IsCategoryGated("Layout")))
+		Map("layout_enabled", () => IsCategoryGated("Layout")), Target), "layout_menu")
 	_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true)
 	BootProfile_Mark("MENU/initMenu: layout built+added")
 }
@@ -308,7 +308,7 @@ _MI_StageHotstrings() {
 		"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers, "", _HotListProviders, _HotParamCommands, _HotParamGetters),
 	)
 	BootProfile_Mark("MENU/initMenu: pre-hotstrings render")
-	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders, _HotCommands, _HotGetters)
+	HotstringsMenu := MenuDeferOrBuild((Target) => MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders, _HotCommands, _HotGetters, Target), "hotstrings_menu")
 	BootProfile_Mark("MENU/initMenu: hotstrings menu rendered")
 
 	HotstringsTotal := _HS_ComputeGrandTotal()
@@ -324,10 +324,16 @@ _MI_StageHotstrings() {
 ; timer can build the IA menu before this root does, and the stale flag would
 ; then skip the row in the root being staged.
 _MI_StageLlm() {
-	global _LLM_Menu_InTray, _DriverInputInitPending
+	global _LLM_Menu_InTray, _DriverInputInitPending, _LLM_Menu_Loaded, _IniCache
 	_LLM_Menu_InTray := false
-	_LlmSavedOpts := LLM_Menu_BuildSavedOpts(_IniCache)
-	_LLM_Menu_LoadAppProfileOverridesFromCache(_LlmSavedOpts, _IniCache)
+	; The boot snapshot serves the one build that restores it. A later rebuild would
+	; throw the options away, and the read refuses once a save has changed
+	; config.toml, which failed the rebuild (stale-boot-snapshot-replayed-by-rebuild).
+	_LlmSavedOpts := Map()
+	if !_LLM_Menu_Loaded {
+		_LlmSavedOpts := LLM_Menu_BuildSavedOpts(_IniCache)
+		_LLM_Menu_LoadAppProfileOverridesFromCache(_LlmSavedOpts, _IniCache)
+	}
 	LLM_Menu_Init(_LlmSavedOpts, !(IsSet(_DriverInputInitPending) && _DriverInputInitPending))
 	BootProfile_Mark("MENU/initMenu: LLM tray init")
 }

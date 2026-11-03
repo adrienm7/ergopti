@@ -60,17 +60,30 @@
 #                               requirements.toml) and fails on any difference;
 #                               docs/design/feature-requirements.md is the
 #                               generated table.
-#       active_by_default       Optional, true only on an input_altering entry
-#                               the maintainer decided to switch on in an empty
-#                               configuration: its default must equal its
-#                               recommended value. Every other input-altering
-#                               entry defaults to off (false / "none" / "");
-#                               tools/test/test-defaults-single-source.cjs
-#                               pins the approved list.
-#       cleared                 Required with active_by_default, forbidden
-#                               without it: the off value a clear writes
-#                               explicitly, since deleting the key of such an
-#                               entry restores its preset.
+#       family                  Required. "feature" changes the keyboard or the
+#                               behaviour: its default is neutral (false, "none",
+#                               "") so an empty configuration leaves the keyboard
+#                               alone, and its recommended value is the Ergopti
+#                               setup (which may leave it off). "setting" says
+#                               how a feature works once active: its recommended
+#                               value equals its default (decision of
+#                               2026-11-02). tools/lib/feature-family-rule.cjs
+#                               holds the rule; the generator and
+#                               tools/test/test-feature-family-rule.cjs apply it.
+#       rule_exception          Required on a row its family's rule would refuse,
+#                               forbidden on any other: the reason it is one.
+#       active_by_default       Optional, true only on a feature the maintainer
+#                               decided to switch on in an empty configuration:
+#                               its default must equal its recommended value;
+#                               tools/test/test-defaults-single-source.cjs pins
+#                               the approved list.
+#       cleared                 Required with active_by_default, and optional on
+#                               a setting that starts on: the off value a clear
+#                               writes explicitly, since deleting the key of such
+#                               an entry restores its preset. Forbidden elsewhere.
+#       restore_exempt_reason   Optional. Why a row stays out of every
+#                               configuration scope, so that no restore touches
+#                               it; every other row belongs to [scopes.global].
 #       superseded_reason_key   Optional, Windows-only booleans. i18n key of
 #                               why the feature is off while a registry layout
 #                               is emulated (layout.emulated_layout): the master
@@ -368,7 +381,7 @@ id = "locale"
 requires = { macos = [], linux = [], windows = [] }
 default = "fr"
 recommended = "fr"
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.script.locale"
 
@@ -376,7 +389,7 @@ description_key = "menu.script.locale"
 id = "log_level"
 default = "INFO"
 recommended = "INFO"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR"]
 description_key = "menu.script.log_level"
@@ -392,7 +405,7 @@ id = "show_error_dialog"
 requires = { macos = [], linux = [], windows = ["webview2"] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.debug.show_error_dialog"
 
@@ -406,7 +419,7 @@ description_key = "menu.debug.show_error_dialog"
 id = "alt_gr_is_kana_remap"
 default = "auto"
 recommended = "auto"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["auto", true, false]
 description_key = "menu.script.alt_gr_is_kana_remap"
@@ -429,7 +442,7 @@ reason_key = "platform_reason.alt_gr_is_kana_remap"
 id = "enabled"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.hotstrings"
 platforms = ["hs"]
@@ -440,7 +453,7 @@ reason_key = "platform_reason.hotstrings_master_is_macos_engine"
 id = "enabled"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.hotstrings"
 platforms = ["ahk", "hs", "linux"]
@@ -451,7 +464,7 @@ id = "trigger_char"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "★"
 recommended = "★"
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.hotstrings.trigger_char"
 
@@ -475,7 +488,7 @@ id = "magic_key_source"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "auto"
 recommended = "auto"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["auto", "Backquote", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal", "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft", "BracketRight", "KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote", "Backslash", "IntlBackslash", "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period", "Slash"]
 description_key = "menu.hotstrings.magic_key_source"
@@ -487,7 +500,7 @@ description_key = "menu.hotstrings.magic_key_source"
 id = "magic_key_source_char"
 default = "j"
 recommended = "j"
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.hotstrings.magic_key_source_char"
 platforms = ["ahk"]
@@ -508,7 +521,7 @@ id = "repeat_key_enabled"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.hotstrings.repeat_key_enabled"
 
@@ -531,7 +544,7 @@ id = "idle_reset_seconds"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = 3
 recommended = 3
-input_altering = false
+family = "setting"
 type = "number"
 preset_values = [0, 1, 2, 3, 5, 10]
 description_key = "menu.hotstrings.idle_reset"
@@ -545,7 +558,7 @@ id = "click_resets_word"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.hotstrings.click_resets_word"
 
@@ -559,7 +572,7 @@ id = "arrow_resets_word"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.hotstrings.arrow_resets_word"
 
@@ -575,7 +588,7 @@ id = "shortcut_resets_word"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.hotstrings.shortcut_resets_word"
 
@@ -592,7 +605,7 @@ platforms = ["ahk", "linux"]
 requires = { linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.hotstrings.tap_hold_resets_word"
 reason_key = "platform_reason.tap_hold_word_reset_not_on_macos"
@@ -626,7 +639,7 @@ id = "cascade_max_arrows"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = 3
 recommended = 3
-input_altering = false
+family = "setting"
 type = "number"
 preset_values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 description_key = "menu.hotstrings.cascade_max_arrows"
@@ -636,20 +649,21 @@ id = "expansion_delay"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = 0.75
 recommended = 0.75
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.hotstrings.expansion_delay"
 
 # The four preview-bubble switches start on in an empty configuration on all
 # three drivers (the coordinator's decision of 2026-10-24), so a fresh install
-# shows the bubble; a clear writes them off explicitly (cleared).
+# shows the bubble. They are settings: they say how the hotstrings and the AI
+# show themselves once active and change no key; a clear writes them off
+# explicitly (cleared).
 [[features.hotstrings]]
 id = "preview_ai_enabled"
 requires = { macos = [], linux = ["evdev", "uinput", "xdotool"], windows = [] }
 default = true
 recommended = true
-input_altering = true
-active_by_default = true
+family = "setting"
 cleared = false
 type = "boolean"
 description_key = "menu.hotstrings.preview_ai_enabled"
@@ -659,8 +673,7 @@ id = "preview_autocorrect_enabled"
 requires = { macos = [], linux = ["evdev", "uinput", "xdotool"], windows = [] }
 default = true
 recommended = true
-input_altering = true
-active_by_default = true
+family = "setting"
 cleared = false
 type = "boolean"
 description_key = "menu.hotstrings.preview_autocorrect_enabled"
@@ -670,8 +683,7 @@ id = "preview_colored_tooltips"
 requires = { macos = [], linux = ["evdev", "uinput", "xdotool"], windows = [] }
 default = true
 recommended = true
-input_altering = true
-active_by_default = true
+family = "setting"
 cleared = false
 type = "boolean"
 description_key = "menu.hotstrings.preview_colored_tooltips"
@@ -681,8 +693,7 @@ id = "preview_star_enabled"
 requires = { macos = [], linux = ["evdev", "uinput", "xdotool"], windows = [] }
 default = true
 recommended = true
-input_altering = true
-active_by_default = true
+family = "setting"
 cleared = false
 type = "boolean"
 description_key = "menu.hotstrings.preview_star_enabled"
@@ -697,8 +708,8 @@ description_key = "menu.hotstrings.preview_star_enabled"
 id = "names"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.autocorrection.names"
 
@@ -706,8 +717,8 @@ description_key = "menu.hotstrings.autocorrection.names"
 id = "abbreviations"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.autocorrection.abbreviations"
 
@@ -715,8 +726,8 @@ description_key = "menu.hotstrings.autocorrection.abbreviations"
 id = "technical_terms"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.autocorrection.technical_terms"
 
@@ -730,8 +741,8 @@ description_key = "menu.hotstrings.autocorrection.technical_terms"
 id = "qu"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.distances_reduction.qu"
 
@@ -739,8 +750,8 @@ description_key = "menu.hotstrings.distances_reduction.qu"
 id = "comma_j"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.distances_reduction.comma_j"
 
@@ -748,8 +759,8 @@ description_key = "menu.hotstrings.distances_reduction.comma_j"
 id = "comma_far_letters"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.distances_reduction.comma_far_letters"
 
@@ -757,8 +768,8 @@ description_key = "menu.hotstrings.distances_reduction.comma_far_letters"
 id = "dead_key_e_circumflex"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.distances_reduction.dead_key_e_circumflex"
 
@@ -766,8 +777,8 @@ description_key = "menu.hotstrings.distances_reduction.dead_key_e_circumflex"
 id = "e_circumflex_e"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.distances_reduction.e_circumflex_e"
 
@@ -775,8 +786,8 @@ description_key = "menu.hotstrings.distances_reduction.e_circumflex_e"
 id = "space_around_symbols"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.distances_reduction.space_around_symbols"
 
@@ -790,8 +801,8 @@ description_key = "menu.hotstrings.distances_reduction.space_around_symbols"
 id = "comma"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.sfbs_reduction.comma"
 
@@ -799,8 +810,8 @@ description_key = "menu.hotstrings.sfbs_reduction.comma"
 id = "e_circ"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.sfbs_reduction.e_circ"
 
@@ -808,8 +819,8 @@ description_key = "menu.hotstrings.sfbs_reduction.e_circ"
 id = "e_grave"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.sfbs_reduction.e_grave"
 
@@ -817,8 +828,8 @@ description_key = "menu.hotstrings.sfbs_reduction.e_grave"
 id = "bu"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.sfbs_reduction.bu"
 
@@ -826,8 +837,8 @@ description_key = "menu.hotstrings.sfbs_reduction.bu"
 id = "i_e_acute"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.sfbs_reduction.i_e_acute"
 
@@ -841,8 +852,8 @@ description_key = "menu.hotstrings.sfbs_reduction.i_e_acute"
 id = "hc"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.hc"
 
@@ -850,8 +861,8 @@ description_key = "menu.hotstrings.rolls.hc"
 id = "sx"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.sx"
 
@@ -859,8 +870,8 @@ description_key = "menu.hotstrings.rolls.sx"
 id = "cx"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.cx"
 
@@ -868,8 +879,8 @@ description_key = "menu.hotstrings.rolls.cx"
 id = "ct"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.ct"
 
@@ -877,8 +888,8 @@ description_key = "menu.hotstrings.rolls.ct"
 id = "ez"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.ez"
 
@@ -886,8 +897,8 @@ description_key = "menu.hotstrings.rolls.ez"
 id = "assign"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.assign"
 
@@ -895,8 +906,8 @@ description_key = "menu.hotstrings.rolls.assign"
 id = "assign_arrow_equal_left"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.assign_arrow_equal_left"
 
@@ -904,8 +915,8 @@ description_key = "menu.hotstrings.rolls.assign_arrow_equal_left"
 id = "assign_arrow_equal_right"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.assign_arrow_equal_right"
 
@@ -913,8 +924,8 @@ description_key = "menu.hotstrings.rolls.assign_arrow_equal_right"
 id = "assign_arrow_minus_left"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.assign_arrow_minus_left"
 
@@ -922,8 +933,8 @@ description_key = "menu.hotstrings.rolls.assign_arrow_minus_left"
 id = "assign_arrow_minus_right"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.assign_arrow_minus_right"
 
@@ -931,8 +942,8 @@ description_key = "menu.hotstrings.rolls.assign_arrow_minus_right"
 id = "bracket_quote"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.bracket_quote"
 
@@ -940,8 +951,8 @@ description_key = "menu.hotstrings.rolls.bracket_quote"
 id = "chevron_equal"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.chevron_equal"
 
@@ -949,8 +960,8 @@ description_key = "menu.hotstrings.rolls.chevron_equal"
 id = "chevron_greater"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.chevron_greater"
 
@@ -958,8 +969,8 @@ description_key = "menu.hotstrings.rolls.chevron_greater"
 id = "chevron_less"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.chevron_less"
 
@@ -967,8 +978,8 @@ description_key = "menu.hotstrings.rolls.chevron_less"
 id = "close_chevron_tag"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.close_chevron_tag"
 
@@ -976,8 +987,8 @@ description_key = "menu.hotstrings.rolls.close_chevron_tag"
 id = "comment_close"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.comment_close"
 
@@ -985,8 +996,8 @@ description_key = "menu.hotstrings.rolls.comment_close"
 id = "comment_open"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.comment_open"
 
@@ -994,8 +1005,8 @@ description_key = "menu.hotstrings.rolls.comment_open"
 id = "english_negation"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.english_negation"
 
@@ -1003,8 +1014,8 @@ description_key = "menu.hotstrings.rolls.english_negation"
 id = "equal_string"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.equal_string"
 
@@ -1012,8 +1023,8 @@ description_key = "menu.hotstrings.rolls.equal_string"
 id = "hashtag_close_bracket"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.hashtag_close_bracket"
 
@@ -1021,8 +1032,8 @@ description_key = "menu.hotstrings.rolls.hashtag_close_bracket"
 id = "hashtag_open_bracket"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.hashtag_open_bracket"
 
@@ -1030,8 +1041,8 @@ description_key = "menu.hotstrings.rolls.hashtag_open_bracket"
 id = "hashtag_parenthesis"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.hashtag_parenthesis"
 
@@ -1039,8 +1050,8 @@ description_key = "menu.hotstrings.rolls.hashtag_parenthesis"
 id = "hashtag_quote"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.hashtag_quote"
 
@@ -1048,8 +1059,8 @@ description_key = "menu.hotstrings.rolls.hashtag_quote"
 id = "left_arrow"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.left_arrow"
 
@@ -1057,8 +1068,8 @@ description_key = "menu.hotstrings.rolls.left_arrow"
 id = "not_equal"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.not_equal"
 
@@ -1066,8 +1077,8 @@ description_key = "menu.hotstrings.rolls.not_equal"
 id = "paren_quote"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
-recommended = { enabled = false }
-input_altering = true
+recommended = { enabled = true }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.rolls.paren_quote"
 
@@ -1082,7 +1093,7 @@ id = "replace"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
 recommended = { enabled = true }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.magic_key.replace"
 
@@ -1090,8 +1101,8 @@ description_key = "menu.hotstrings.magic_key.replace"
 id = "repeat_corrections"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 2.0 }
-recommended = { enabled = false, time_activation_seconds = 2.0 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 2.0 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.magic_key.repeat_corrections"
 
@@ -1099,8 +1110,8 @@ description_key = "menu.hotstrings.magic_key.repeat_corrections"
 id = "text_expansion_symbols"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 2.0 }
-recommended = { enabled = false, time_activation_seconds = 2.0 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 2.0 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.magic_key.text_expansion_symbols"
 
@@ -1108,8 +1119,8 @@ description_key = "menu.hotstrings.magic_key.text_expansion_symbols"
 id = "text_expansion_symbols_typst"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 2.0 }
-recommended = { enabled = false, time_activation_seconds = 2.0 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 2.0 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.magic_key.text_expansion_symbols_typst"
 
@@ -1123,8 +1134,8 @@ description_key = "menu.hotstrings.magic_key.text_expansion_symbols_typst"
 id = "suffixes_a"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.distances_reduction.suffixes_a"
 
@@ -1138,8 +1149,8 @@ description_key = "menu.hotstrings.distances_reduction.suffixes_a"
 id = "accents"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.autocorrection.accents"
 
@@ -1147,8 +1158,8 @@ description_key = "menu.hotstrings.autocorrection.accents"
 id = "names"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.autocorrection.names"
 
@@ -1156,8 +1167,8 @@ description_key = "menu.hotstrings.autocorrection.names"
 id = "typographic_apostrophe"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.autocorrection.typographic_apostrophe"
 
@@ -1165,8 +1176,8 @@ description_key = "menu.hotstrings.autocorrection.typographic_apostrophe"
 id = "errors"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.autocorrection.errors"
 
@@ -1174,8 +1185,8 @@ description_key = "menu.hotstrings.autocorrection.errors"
 id = "ou"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.autocorrection.ou"
 
@@ -1183,8 +1194,8 @@ description_key = "menu.hotstrings.autocorrection.ou"
 id = "multiple_punctuation_marks"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.autocorrection.multiple_punctuation_marks"
 
@@ -1192,8 +1203,8 @@ description_key = "menu.hotstrings.autocorrection.multiple_punctuation_marks"
 id = "suffixes_a_chaining"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.autocorrection.suffixes_a_chaining"
 
@@ -1201,8 +1212,8 @@ description_key = "menu.hotstrings.autocorrection.suffixes_a_chaining"
 id = "minus"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.autocorrection.minus"
 
@@ -1210,8 +1221,8 @@ description_key = "menu.hotstrings.autocorrection.minus"
 id = "minus_apostrophe"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
-recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 0.5 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.autocorrection.minus_apostrophe"
 
@@ -1225,8 +1236,8 @@ description_key = "menu.hotstrings.autocorrection.minus_apostrophe"
 id = "text_expansion"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 2.0 }
-recommended = { enabled = false, time_activation_seconds = 2.0 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 2.0 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.magic_key.text_expansion"
 
@@ -1234,8 +1245,8 @@ description_key = "menu.hotstrings.magic_key.text_expansion"
 id = "text_expansion_auto"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 2.0 }
-recommended = { enabled = false, time_activation_seconds = 2.0 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 2.0 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.magic_key.text_expansion_auto"
 
@@ -1243,8 +1254,8 @@ description_key = "menu.hotstrings.magic_key.text_expansion_auto"
 id = "text_expansion_emojis"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 2.0 }
-recommended = { enabled = false, time_activation_seconds = 2.0 }
-input_altering = true
+recommended = { enabled = true, time_activation_seconds = 2.0 }
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.magic_key.text_expansion_emojis"
 
@@ -1259,7 +1270,7 @@ id = "date"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
 recommended = { enabled = false }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.dynamic.date"
 
@@ -1268,7 +1279,7 @@ id = "date_fr"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
 recommended = { enabled = false }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.dynamic.date_fr"
 
@@ -1277,7 +1288,7 @@ id = "date_long_fr"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
 recommended = { enabled = false }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.dynamic.date_long_fr"
 
@@ -1286,7 +1297,7 @@ id = "iban_prefixes"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
 recommended = { enabled = false }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.dynamic.iban_prefixes"
 
@@ -1295,7 +1306,7 @@ id = "phone_prefixes"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
 recommended = { enabled = false }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.dynamic.phone_prefixes"
 
@@ -1304,7 +1315,7 @@ id = "ssn_prefixes"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false }
 recommended = { enabled = false }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.dynamic.ssn_prefixes"
 
@@ -1313,7 +1324,7 @@ id = "user_code"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
 recommended = { enabled = false, time_activation_seconds = 0.5 }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.user_code.title"
 
@@ -1322,7 +1333,7 @@ id = "text_expansion_personal_information"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, pattern_max_length = 1 }
 recommended = { enabled = false, pattern_max_length = 1 }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.dynamic.text_expansion_personal_information"
 
@@ -1337,7 +1348,7 @@ id = "autocorrection"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.75 }
 recommended = { enabled = true, time_activation_seconds = 0.75 }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.personal.autocorrection"
 
@@ -1346,7 +1357,7 @@ id = "code"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.75 }
 recommended = { enabled = true, time_activation_seconds = 0.75 }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.personal.code"
 
@@ -1355,7 +1366,7 @@ id = "email_shortcuts"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.75 }
 recommended = { enabled = true, time_activation_seconds = 0.75 }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.personal.email_shortcuts"
 
@@ -1364,7 +1375,7 @@ id = "professional_vocabulary"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.75 }
 recommended = { enabled = true, time_activation_seconds = 0.75 }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.personal.professional_vocabulary"
 
@@ -1373,7 +1384,7 @@ id = "test"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.75 }
 recommended = { enabled = true, time_activation_seconds = 0.75 }
-input_altering = true
+family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.personal.test"
 
@@ -1388,7 +1399,7 @@ id = "enabled"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = false
 recommended = false
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.llm.enabled"
 
@@ -1396,7 +1407,7 @@ description_key = "menu.llm.enabled"
 id = "onboarding_seen"
 default = false
 recommended = false
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.onboarding_seen"
 platforms = ["ahk"]
@@ -1407,7 +1418,7 @@ reason_key = "platform_reason.ai_menu_bookkeeping_is_windows"
 id = "app_profile_overrides"
 default = ""
 recommended = ""
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.llm.app_profile_overrides"
 platforms = ["ahk", "hs", "linux"]
@@ -1417,7 +1428,7 @@ requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], w
 id = "user_profiles"
 default = ""
 recommended = ""
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.llm.profiles"
 platforms = ["ahk", "hs", "linux"]
@@ -1428,7 +1439,7 @@ id = "agent_system1"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = ""
 recommended = ""
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.agent.system1_desc"
 
@@ -1437,7 +1448,7 @@ id = "agent_system2"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = ""
 recommended = ""
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.agent.system2_desc"
 
@@ -1449,7 +1460,7 @@ description_key = "menu.agent.system2_desc"
 id = "agent_mode"
 default = "off"
 recommended = "off"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["off", "action", "auto"]
 platforms = ["ahk", "hs", "linux"]
@@ -1462,7 +1473,7 @@ id = "agent_disabled_apps"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = []
 recommended = []
-input_altering = false
+family = "setting"
 type = "array"
 description_key = "menu.agent.disabled_apps"
 
@@ -1475,9 +1486,11 @@ description_key = "menu.agent.disabled_apps"
 [[features.llm.display]]
 id = "pred_indent"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput", "xdotool"], windows = ["ollama", "webview2"] }
-default = 0
-recommended = 0
-input_altering = false
+# -3: every line starts at the same column and only the selection mark moves
+# (maintainer, 2026-11-02).
+default = -3
+recommended = -3
+family = "setting"
 type = "number"
 choice_values = [-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7]
 description_key = "menu.llm.display.pred_indent"
@@ -1487,7 +1500,7 @@ id = "show_info_bar"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput", "xdotool"], windows = ["ollama", "webview2"] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.display.show_info_bar"
 
@@ -1496,7 +1509,7 @@ id = "streaming"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput", "xdotool"], windows = ["ollama", "webview2"] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.display.streaming"
 
@@ -1505,7 +1518,7 @@ id = "streaming_multi"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput", "xdotool"], windows = ["ollama", "webview2"] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.display.streaming_multi"
 
@@ -1520,7 +1533,7 @@ id = "context_length"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = 500
 recommended = 500
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.llm.generation.context_length"
 
@@ -1529,7 +1542,7 @@ id = "min_words"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = 3
 recommended = 3
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.llm.generation.min_words"
 
@@ -1538,7 +1551,7 @@ id = "max_words"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = 15
 recommended = 15
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.llm.generation.max_words"
 
@@ -1547,7 +1560,7 @@ id = "temperature"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = 0.10
 recommended = 0.10
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.llm.generation.temperature"
 
@@ -1556,7 +1569,7 @@ id = "auto_raise_temp"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.generation.auto_raise_temp"
 
@@ -1565,7 +1578,7 @@ id = "reset_on_nav"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.generation.reset_on_nav"
 
@@ -1574,7 +1587,7 @@ id = "sequential_mode"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = false
 recommended = false
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.generation.sequential_mode"
 
@@ -1588,7 +1601,7 @@ description_key = "menu.llm.generation.sequential_mode"
 id = "user_models"
 default = []
 recommended = []
-input_altering = false
+family = "setting"
 type = "array"
 description_key = "menu.llm.title"
 platforms = ["hs"]
@@ -1604,7 +1617,7 @@ requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], w
 # payload agreeing about which backend is in use.
 default_per_platform = { ahk = "ollama", hs = "mlx", linux = "ollama" }
 recommended_per_platform = { ahk = "ollama", hs = "mlx", linux = "ollama" }
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.llm.models.selected"
 
@@ -1613,7 +1626,7 @@ id = "ollama"
 requires = { macos = ["ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default_per_platform = { ahk = "Qwen3.5-0.8B", hs = "gemma-4-E2B-it", linux = "Qwen3.5-0.8B" }
 recommended_per_platform = { ahk = "Qwen3.5-0.8B", hs = "gemma-4-E2B-it", linux = "Qwen3.5-0.8B" }
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.llm.models.ollama"
 
@@ -1621,7 +1634,7 @@ description_key = "menu.llm.models.ollama"
 id = "mlx"
 default = "Qwen3.5-2B"
 recommended = "Qwen3.5-2B"
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.llm.models.mlx"
 platforms = ["hs"]
@@ -1645,7 +1658,7 @@ id = "active"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = "basic"
 recommended = "basic"
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.llm.profiles.active"
 
@@ -1654,7 +1667,7 @@ id = "num_predictions"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = 3
 recommended = 3
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.llm.profiles.num_predictions"
 
@@ -1662,7 +1675,7 @@ description_key = "menu.llm.profiles.num_predictions"
 id = "auto_profile_for_model"
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.profiles.auto_profile_for_model"
 platforms = ["ahk", "linux"]
@@ -1680,7 +1693,7 @@ id = "disabled_apps"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = []
 recommended = []
-input_altering = false
+family = "setting"
 type = "array"
 description_key = "menu.llm.title"
 
@@ -1689,7 +1702,7 @@ id = "debounce_ms"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = 500
 recommended = 500
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.llm.trigger.debounce_ms"
 
@@ -1702,7 +1715,7 @@ id = "min_request_interval_ms"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = 300
 recommended = 300
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.llm.trigger.min_request_interval_ms"
 
@@ -1711,7 +1724,7 @@ id = "instant_on_word_end"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.trigger.instant_on_word_end"
 
@@ -1720,7 +1733,7 @@ id = "after_hotstring"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.trigger.after_hotstring"
 
@@ -1728,7 +1741,7 @@ description_key = "menu.llm.trigger.after_hotstring"
 id = "inline_autotype"
 default = false
 recommended = false
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.trigger.inline_autotype"
 platforms = ["ahk"]
@@ -1740,7 +1753,7 @@ id = "secure_filter_enabled"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.trigger.secure_filter_enabled"
 
@@ -1749,7 +1762,7 @@ id = "url_bar_filter_enabled"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = false
 recommended = false
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.trigger.url_bar_filter_enabled"
 
@@ -1773,7 +1786,7 @@ id = "nav_modifiers"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = []
 recommended = []
-input_altering = false
+family = "setting"
 type = "array"
 description_key = "menu.llm.nav_modifiers_prompt"
 
@@ -1782,7 +1795,7 @@ id = "val_modifiers"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 default = []
 recommended = []
-input_altering = false
+family = "setting"
 type = "array"
 description_key = "menu.llm.navigation.val_modifiers"
 
@@ -1790,7 +1803,7 @@ description_key = "menu.llm.navigation.val_modifiers"
 id = "arrow_nav_enabled"
 default = false
 recommended = false
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.llm.navigation.arrow_nav_enabled"
 platforms = ["hs"]
@@ -1808,7 +1821,7 @@ id = "enabled"
 requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.metrics.enabled"
 
@@ -1817,7 +1830,7 @@ id = "private_filter_enabled"
 requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.metrics.private_filter_enabled"
 
@@ -1826,7 +1839,7 @@ id = "secure_filter_enabled"
 requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.metrics.secure_filter_enabled"
 
@@ -1835,7 +1848,7 @@ id = "system_auth_filter_enabled"
 requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.metrics.system_auth_filter_enabled"
 
@@ -1844,7 +1857,7 @@ id = "encrypt"
 requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
 default = false
 recommended = false
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.metrics.encrypt_toggle"
 
@@ -1856,7 +1869,7 @@ id = "disabled_apps"
 requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
 default = []
 recommended = []
-input_altering = false
+family = "setting"
 type = "array"
 description_key = "menu.metrics.metrics_disabled_apps"
 
@@ -1865,7 +1878,7 @@ id = "wpm_widget_visible"
 requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
 default = false
 recommended = false
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_visible"
 
@@ -1881,7 +1894,7 @@ requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
 # macOS shipped it on until 2026-10-24: the three drivers now share one answer.
 default = false
 recommended = false
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_colors"
 
@@ -1890,7 +1903,7 @@ id = "wpm_widget_graph"
 requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
 default = false
 recommended = false
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_graph"
 
@@ -1903,7 +1916,7 @@ requires = { macos = ["karabiner"], linux = ["evdev"] }
 reason_key = "platform_reason.wpm_readout_needs_a_menubar"
 default = false
 recommended = false
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.metrics.show_wpm_menubar"
 
@@ -1914,7 +1927,7 @@ requires = { macos = ["karabiner"], linux = ["evdev"] }
 reason_key = "platform_reason.wpm_readout_needs_a_menubar"
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.metrics.colors_by_source"
 
@@ -1928,7 +1941,7 @@ description_key = "menu.metrics.colors_by_source"
 id = "enabled"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.enabled"
 platforms = ["hs", "linux"]
@@ -1940,7 +1953,7 @@ id = "chatgpt_url"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "https://chat.openai.com"
 recommended = "https://chat.openai.com"
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.shortcuts.chatgpt_url"
 
@@ -1948,7 +1961,7 @@ description_key = "menu.shortcuts.chatgpt_url"
 id = "wrap_text_if_selected"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "shortcuts.label_wrap_text"
 # Linux decides in its keyboard hook's consumption callback, from the PRIMARY
@@ -1970,7 +1983,7 @@ reason_key = "platform_reason.wrap_selection_is_a_shortcut_key_on_macos"
 id = "search_engine"
 default = "https://www.google.com"
 recommended = "https://www.google.com"
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.shortcuts.search"
 platforms = ["ahk"]
@@ -1981,7 +1994,7 @@ reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 id = "search_engine_url_query"
 default = "https://www.google.com/search?q="
 recommended = "https://www.google.com/search?q="
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.shortcuts.search"
 platforms = ["ahk"]
@@ -1992,7 +2005,7 @@ reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 id = "dated_notes"
 default = false
 recommended = false
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.shortcuts.take_note"
 platforms = ["ahk"]
@@ -2003,7 +2016,7 @@ reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 id = "destination_folder"
 default = "D:\\Bureau"
 recommended = "D:\\Bureau"
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.shortcuts.take_note"
 platforms = ["ahk"]
@@ -2021,7 +2034,7 @@ reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 id = "enabled"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.a_grave"
 platforms = ["ahk"]
@@ -2032,7 +2045,7 @@ reason_key = "platform_reason.accented_shortcuts_are_windows"
 id = "letter"
 default = "v"
 recommended = "v"
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.shortcuts.a_grave.letter"
 platforms = ["ahk"]
@@ -2049,7 +2062,7 @@ reason_key = "platform_reason.accented_shortcuts_are_windows"
 id = "enabled"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.e_acute"
 platforms = ["ahk"]
@@ -2060,7 +2073,7 @@ reason_key = "platform_reason.accented_shortcuts_are_windows"
 id = "letter"
 default = "c"
 recommended = "c"
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.shortcuts.e_acute.letter"
 platforms = ["ahk"]
@@ -2077,7 +2090,7 @@ reason_key = "platform_reason.accented_shortcuts_are_windows"
 id = "enabled"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.e_circ"
 platforms = ["ahk"]
@@ -2088,7 +2101,7 @@ reason_key = "platform_reason.accented_shortcuts_are_windows"
 id = "letter"
 default = "x"
 recommended = "x"
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.shortcuts.e_circ.letter"
 platforms = ["ahk"]
@@ -2105,7 +2118,7 @@ reason_key = "platform_reason.accented_shortcuts_are_windows"
 id = "enabled"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.e_grave"
 platforms = ["ahk"]
@@ -2116,7 +2129,7 @@ reason_key = "platform_reason.accented_shortcuts_are_windows"
 id = "letter"
 default = "z"
 recommended = "z"
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.shortcuts.e_grave.letter"
 platforms = ["ahk"]
@@ -2145,7 +2158,7 @@ platforms = ["ahk", "linux"]
 requires = { linux = ["evdev", "uinput"], windows = [] }
 default = "none"
 recommended = "ctrl_backspace"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.key_combinations"
 
@@ -2155,7 +2168,7 @@ platforms = ["ahk", "linux"]
 requires = { linux = ["evdev", "uinput"], windows = [] }
 default = "none"
 recommended = "ctrl_delete"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.key_combinations"
 
@@ -2165,7 +2178,7 @@ platforms = ["ahk", "linux"]
 requires = { linux = ["evdev", "uinput"], windows = [] }
 default = "none"
 recommended = "caps_word"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.key_combinations"
 
@@ -2178,7 +2191,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = 100
 recommended = 100
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.tapholds.simultaneous_dialog_title"
 
@@ -2188,7 +2201,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = false
 recommended = false
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.tapholds.symmetric"
 
@@ -2202,7 +2215,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.personal.laptop_broken_key"
 
@@ -2212,7 +2225,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.personal.mouse_drag_window"
 
@@ -2222,7 +2235,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.personal.mouse_tab_switching"
 
@@ -2232,7 +2245,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = false
 recommended = false
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.personal.professional_environment"
 
@@ -2242,7 +2255,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.personal.programmable_keyboard"
 
@@ -2259,8 +2272,8 @@ description_key = "menu.shortcuts.personal.programmable_keyboard"
 # tout en commun sur les 3 OS »): AltGr on Windows and Linux, the right Option
 # key on macOS, with Enter, Backspace, Delete (fn+Delete on a Mac keyboard
 # without the key) or Escape. _shared/modules/actions/script_chords.json names
-# each slot's key on every driver and the actions a paused driver still runs. They are the declared exception to "every input-altering
-# feature is off by default" (active_by_default); a config.toml that names
+# each slot's key on every driver and the actions a paused driver still runs. They are the declared exception to "every feature is off
+# by default" (active_by_default); a config.toml that names
 # "none" for a slot keeps it off, which is what every clear writes (cleared).
 #
 # chords_enabled is the switch at the head of their submenu: off leaves every
@@ -2275,7 +2288,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.shortcuts.script_shortcuts_enable"
 
@@ -2285,8 +2298,9 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = "script_reload"
 recommended = "script_reload"
-input_altering = true
+family = "feature"
 active_by_default = true
+rule_exception = "Maintainer decision of 2026-09-30, confirmed for the three drivers: this chord pauses, reloads, quits or edits the driver, types nothing, and has to work from a fresh install."
 cleared = "none"
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_backspace"
@@ -2297,8 +2311,9 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = "open_personal_shortcuts"
 recommended = "open_personal_shortcuts"
-input_altering = true
+family = "feature"
 active_by_default = true
+rule_exception = "Maintainer decision of 2026-09-30, confirmed for the three drivers: this chord pauses, reloads, quits or edits the driver, types nothing, and has to work from a fresh install."
 cleared = "none"
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_delete"
@@ -2309,8 +2324,9 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = "script_pause_toggle"
 recommended = "script_pause_toggle"
-input_altering = true
+family = "feature"
 active_by_default = true
+rule_exception = "Maintainer decision of 2026-09-30, confirmed for the three drivers: this chord pauses, reloads, quits or edits the driver, types nothing, and has to work from a fresh install."
 cleared = "none"
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_enter"
@@ -2321,8 +2337,9 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = "script_quit"
 recommended = "script_quit"
-input_altering = true
+family = "feature"
 active_by_default = true
+rule_exception = "Maintainer decision of 2026-09-30, confirmed for the three drivers: this chord pauses, reloads, quits or edits the driver, types nothing, and has to work from a fresh install."
 cleared = "none"
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_escape"
@@ -2338,8 +2355,9 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "open_hotstrings_editor"
 recommended = "open_hotstrings_editor"
-input_altering = true
+family = "feature"
 active_by_default = true
+rule_exception = "Maintainer decision of 2026-10-02: the conditional editor shortcut ships on; it follows only the unmodified physical magic source and types nothing."
 cleared = "none"
 type = "action"
 description_key = "menu.shortcuts.keyboard.magic_editor"
@@ -2352,7 +2370,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "microsoft_bold"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.ctrl_b"
 
@@ -2362,7 +2380,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "select_line"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_a"
 
@@ -2372,7 +2390,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "open_downloads"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_d"
 
@@ -2382,7 +2400,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "open_chatgpt"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_g"
 
@@ -2392,7 +2410,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "screen_capture"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_h"
 
@@ -2402,7 +2420,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "activity_simulation"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_m"
 
@@ -2412,7 +2430,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "take_note"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_n"
 
@@ -2422,7 +2440,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "surround_parens"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_o"
 
@@ -2432,7 +2450,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "copy_selected_path"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_s"
 
@@ -2442,7 +2460,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "screen_capture_instant"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_sc029"
 
@@ -2452,7 +2470,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "teleport_mouse"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_t"
 
@@ -2462,7 +2480,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "uppercase_selection"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_u"
 
@@ -2472,7 +2490,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "titlecase_selection"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_w"
 
@@ -2482,7 +2500,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "pick_color"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_x"
 
@@ -2492,7 +2510,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "toggle_capslock"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.meta_capslock"
 
@@ -2502,7 +2520,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "spotlight_mouse"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.meta_quote"
 
@@ -2518,7 +2536,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "llm_generate_prediction"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.hs_ctrl_space"
 
@@ -2529,7 +2547,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "select_line"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_a"
 
@@ -2540,7 +2558,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "open_downloads"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_d"
 
@@ -2551,7 +2569,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "open_file_manager"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_e"
 
@@ -2562,7 +2580,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "open_chatgpt"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_g"
 
@@ -2573,7 +2591,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "screenshot_region_clipboard"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_h"
 
@@ -2584,7 +2602,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "open_system_settings"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_i"
 
@@ -2595,7 +2613,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "activity_simulation"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_m"
 
@@ -2606,7 +2624,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "surround_parens"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_o"
 
@@ -2617,7 +2635,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "display_mirror_toggle"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_p"
 
@@ -2628,7 +2646,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "copy_selected_path"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_s"
 
@@ -2639,7 +2657,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "teleport_mouse"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_t"
 
@@ -2650,7 +2668,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "uppercase_selection"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_u"
 
@@ -2661,7 +2679,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "titlecase_selection"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_w"
 
@@ -2672,7 +2690,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "pick_color"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_x"
 
@@ -2683,7 +2701,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "toggle_capslock"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_capslock"
 
@@ -2694,7 +2712,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "lock_screen"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_l"
 
@@ -2705,7 +2723,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "open_emoji_picker"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_period"
 
@@ -2716,7 +2734,7 @@ requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "spotlight_mouse"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_quote"
 
@@ -2727,7 +2745,7 @@ requires = { macos = [], windows = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "paste_plain"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_cmd_shift_v"
 
@@ -2738,7 +2756,7 @@ requires = { linux = ["evdev", "uinput"] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "open_chatgpt"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_g"
 
@@ -2749,7 +2767,7 @@ requires = { linux = ["evdev", "uinput"], windows = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "llm_generate_prediction"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.super_space"
 
@@ -2773,7 +2791,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "none"
 recommended = "screenshot_fullscreen_save"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.tap_keys.number_row_left"
 
@@ -2783,7 +2801,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.tap_keys.number_row_right_1"
 
@@ -2793,7 +2811,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.shortcuts.tap_keys.number_row_right_2"
 
@@ -2822,7 +2840,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = 10
 recommended = 10
-input_altering = false
+family = "setting"
 type = "number"
 preset_values = [0, 1, 3, 5, 10, 30, 60]
 description_key = "menu.caps_word.idle_timeout"
@@ -2844,7 +2862,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"]
 recommended = ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"]
-input_altering = false
+family = "setting"
 type = "array"
 description_key = "menu.caps_word.terminators_header"
 
@@ -2866,7 +2884,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput"] }
 reason_key = "platform_reason.caps_word_gestures_stay_with_windows"
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.caps_word.pointer.gesture"
 
@@ -2876,7 +2894,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.caps_word.pointer.pointer_motion"
 
@@ -2886,7 +2904,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.caps_word.pointer.left_click"
 
@@ -2896,7 +2914,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.caps_word.pointer.right_click"
 
@@ -2906,7 +2924,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.caps_word.pointer.middle_click"
 
@@ -2916,7 +2934,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.caps_word.pointer.other_buttons"
 
@@ -2956,7 +2974,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.gestures.enabled"
 
@@ -2966,7 +2984,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "tab_close", hs = "tab_next", linux = "none" }
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_3_down"
 
@@ -2976,7 +2994,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "tab_prev", hs = "sel_word_prev", linux = "none" }
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_3_left"
 
@@ -2986,7 +3004,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "tab_next", hs = "sel_word_next", linux = "none" }
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_3_right"
 
@@ -2996,7 +3014,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "tab_new", hs = "tab_prev", linux = "none" }
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_3_up"
 
@@ -3006,7 +3024,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "win_app_prev", hs = "none", linux = "none" }
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_4_down"
 
@@ -3016,7 +3034,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "desktop_prev", hs = "none", linux = "none" }
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_4_left"
 
@@ -3026,7 +3044,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "desktop_next", hs = "none", linux = "none" }
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_4_right"
 
@@ -3036,7 +3054,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "win_app_next", hs = "none", linux = "none" }
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_4_up"
 
@@ -3046,7 +3064,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "left_click_toggle", hs = "left_click_toggle", linux = "left_click_toggle" }
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.tap_3"
 
@@ -3056,7 +3074,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdotool"], windows = [] }
 default = "none"
 recommended_per_platform = { ahk = "alt_tab_monitor", hs = "win_app_next", linux = "alt_tab_monitor" }
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.tap_4"
 
@@ -3068,7 +3086,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_2_left"
 
@@ -3079,7 +3097,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_5_up"
 
@@ -3090,7 +3108,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_5_down"
 
@@ -3101,7 +3119,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_5_left"
 
@@ -3112,7 +3130,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_5_right"
 
@@ -3123,7 +3141,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_2_right"
 
@@ -3134,7 +3152,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_2_up"
 
@@ -3145,7 +3163,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_2_down"
 
@@ -3156,7 +3174,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_2_left_down"
 
@@ -3167,7 +3185,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_2_left_up"
 
@@ -3178,7 +3196,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_2_right_down"
 
@@ -3189,7 +3207,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_2_right_up"
 
@@ -3202,7 +3220,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_3_left_down"
 
@@ -3213,7 +3231,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_3_left_up"
 
@@ -3224,7 +3242,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_3_right_down"
 
@@ -3235,7 +3253,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_3_right_up"
 
@@ -3247,7 +3265,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended_per_platform = { hs = "words", linux = "none" }
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_3_horiz"
 
@@ -3259,7 +3277,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_4_left_down"
 
@@ -3270,7 +3288,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_4_left_up"
 
@@ -3281,7 +3299,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_4_right_down"
 
@@ -3292,7 +3310,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_4_right_up"
 
@@ -3304,7 +3322,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended_per_platform = { hs = "spaces", linux = "none" }
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_4_horiz"
 
@@ -3316,7 +3334,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_5_left_down"
 
@@ -3327,7 +3345,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_5_left_up"
 
@@ -3338,7 +3356,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_5_right_down"
 
@@ -3349,7 +3367,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_5_right_up"
 
@@ -3361,7 +3379,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended_per_platform = { hs = "windows", linux = "none" }
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.swipe_5_horiz"
 
@@ -3373,7 +3391,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.tap_2"
 
@@ -3384,7 +3402,7 @@ requires = { macos = ["karabiner"], linux = ["evdev", "uinput", "wmctrl", "xdoto
 reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
-input_altering = true
+family = "feature"
 type = "action"
 description_key = "menu.gestures.tap_5"
 
@@ -3405,7 +3423,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_2_left"
@@ -3416,7 +3434,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_2_right"
@@ -3427,7 +3445,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_2_up"
@@ -3438,7 +3456,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_2_down"
@@ -3449,7 +3467,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_2_left_down"
@@ -3460,7 +3478,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_2_left_up"
@@ -3471,7 +3489,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_2_right_down"
@@ -3482,7 +3500,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_2_right_up"
@@ -3494,7 +3512,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_3_left"
@@ -3505,7 +3523,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_3_right"
@@ -3516,7 +3534,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_3_up"
@@ -3527,7 +3545,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_3_down"
@@ -3538,7 +3556,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_3_left_down"
@@ -3549,7 +3567,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_3_left_up"
@@ -3560,7 +3578,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_3_right_down"
@@ -3571,7 +3589,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_3_right_up"
@@ -3583,7 +3601,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_4_left"
@@ -3594,7 +3612,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_4_right"
@@ -3605,7 +3623,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_4_up"
@@ -3616,7 +3634,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_4_down"
@@ -3627,7 +3645,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_4_left_down"
@@ -3638,7 +3656,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_4_left_up"
@@ -3649,7 +3667,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_4_right_down"
@@ -3660,7 +3678,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_4_right_up"
@@ -3672,7 +3690,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_5_left"
@@ -3683,7 +3701,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_5_right"
@@ -3694,7 +3712,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_5_up"
@@ -3705,7 +3723,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_5_down"
@@ -3716,7 +3734,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_5_left_down"
@@ -3727,7 +3745,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_5_left_up"
@@ -3738,7 +3756,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_5_right_down"
@@ -3749,7 +3767,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "incremental"
 recommended = "incremental"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_5_right_up"
@@ -3776,7 +3794,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_2_left"
 
@@ -3786,7 +3804,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_2_right"
 
@@ -3796,7 +3814,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_2_up"
 
@@ -3806,7 +3824,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_2_down"
 
@@ -3816,7 +3834,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_2_left_down"
 
@@ -3826,7 +3844,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_2_left_up"
 
@@ -3836,7 +3854,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_2_right_down"
 
@@ -3846,7 +3864,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_2_right_up"
 
@@ -3856,7 +3874,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_left"
 
@@ -3866,7 +3884,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_right"
 
@@ -3876,7 +3894,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 25
 recommended = 25
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_up"
 
@@ -3886,7 +3904,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 25
 recommended = 25
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_down"
 
@@ -3896,7 +3914,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_left_down"
 
@@ -3906,7 +3924,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_left_up"
 
@@ -3916,7 +3934,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_right_down"
 
@@ -3926,7 +3944,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_right_up"
 
@@ -3936,7 +3954,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_4_left"
 
@@ -3946,7 +3964,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_4_right"
 
@@ -3956,7 +3974,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_4_up"
 
@@ -3966,7 +3984,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_4_down"
 
@@ -3976,7 +3994,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_4_left_down"
 
@@ -3986,7 +4004,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_4_left_up"
 
@@ -3996,7 +4014,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_4_right_down"
 
@@ -4006,7 +4024,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_4_right_up"
 
@@ -4016,7 +4034,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_5_left"
 
@@ -4026,7 +4044,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_5_right"
 
@@ -4036,7 +4054,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_5_up"
 
@@ -4046,7 +4064,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_5_down"
 
@@ -4056,7 +4074,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_5_left_down"
 
@@ -4066,7 +4084,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_5_left_up"
 
@@ -4076,7 +4094,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_5_right_down"
 
@@ -4086,7 +4104,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_5_right_up"
 
@@ -4107,7 +4125,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes"
@@ -4118,7 +4136,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes"
@@ -4129,7 +4147,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "x1"
 recommended = "x1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes"
@@ -4140,7 +4158,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities"
 
@@ -4150,7 +4168,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities"
 
@@ -4160,7 +4178,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = 3.5
 recommended = 3.5
-input_altering = false
+family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities"
 
@@ -4171,7 +4189,7 @@ requires = { windows = [] }
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.layout.ergopti_base"
 superseded_reason_key = "menu.layout.superseded_ergopti_only"
@@ -4184,7 +4202,8 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = [], linux = [], windows = [] }
 default = "native"
 recommended_per_platform = { ahk = "digits", hs = "native", linux = "native" }
-input_altering = true
+family = "feature"
+rule_exception = "Its neutral value has a name: native leaves the number row to the layout in use, which is what off means for this enum."
 type = "enum"
 enum_values = ["native", "digits", "symbols"]
 description_key = "menu.layout.number_row"
@@ -4198,7 +4217,7 @@ description_key = "menu.layout.number_row"
 # explicit "iso" or "ansi" is deployed as chosen and never replaced by what the
 # active layout would suggest. Only macOS has a virtual keyboard: Windows
 # (SC029/SC056) and Linux (evdev 41/86) name these keys by position. Not
-# input-altering on its own: it only decides how the generated rules name keys.
+# a feature on its own: it only decides how the generated rules name keys.
 [[features.layout]]
 id = "virtual_keyboard"
 platforms = ["hs"]
@@ -4206,7 +4225,7 @@ requires = { macos = ["karabiner"] }
 reason_key = "platform_reason.virtual_keyboard_is_karabiner"
 default = "auto"
 recommended = "auto"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["auto", "iso", "ansi"]
 description_key = "menu.layout.virtual_keyboard"
@@ -4224,7 +4243,7 @@ platforms = ["ahk", "hs", "linux"]
 requires = { macos = [], linux = [], windows = [] }
 default = false
 recommended = false
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.layout.number_row_edges"
 
@@ -4235,7 +4254,7 @@ requires = { windows = [] }
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.layout.ergopti_alt_gr"
 superseded_reason_key = "menu.layout.superseded_ergopti_only"
@@ -4247,7 +4266,7 @@ requires = { windows = [] }
 reason_key = "platform_reason.legacy_helpers_use_windows_scan_code_hotkeys"
 default = "none"
 recommended = "ergopti_plus"
-input_altering = true
+family = "feature"
 type = "enum"
 enum_values = ["none", "ergopti", "ergopti_plus"]
 description_key = "menu.layout.ergopti_plus"
@@ -4271,7 +4290,7 @@ requires = { windows = [] }
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.layout.emulate_number_row"
 
@@ -4282,7 +4301,7 @@ requires = { windows = [] }
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.layout.emulate_top_row"
 
@@ -4293,7 +4312,7 @@ requires = { windows = [] }
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.layout.emulate_home_row"
 
@@ -4304,7 +4323,7 @@ requires = { windows = [] }
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.layout.emulate_bottom_row"
 
@@ -4315,7 +4334,7 @@ requires = { windows = [] }
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = false
 recommended = false
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.layout.ctrl_magic_save"
 
@@ -4332,7 +4351,7 @@ requires = { windows = [] }
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = ""
 recommended = ""
-input_altering = true
+family = "feature"
 type = "string"
 description_key = "menu.layout.emulated_layout"
 
@@ -4348,7 +4367,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.category_enabled.hotstrings"
 
@@ -4358,7 +4377,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.category_enabled.layout"
 
@@ -4368,7 +4387,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.category_enabled.shortcuts"
 
@@ -4378,7 +4397,7 @@ platforms = ["ahk"]
 requires = { windows = [] }
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.category_enabled.tap_holds"
 
@@ -4397,7 +4416,7 @@ requires = { linux = ["evdev", "uinput"], windows = [] }
 reason_key = "platform_reason.key_combinations_are_karabiner_settings_on_macos"
 default = true
 recommended = true
-input_altering = false
+family = "setting"
 type = "boolean"
 description_key = "menu.shortcuts.key_combinations"
 
@@ -4412,11 +4431,12 @@ description_key = "menu.shortcuts.key_combinations"
 # in the driver; it is a config.toml setting like every other one now.
 [[features.network]]
 id = "proxy_override"
+restore_exempt_reason = "It describes the machine's network, not a trial of Ergopti: a restore that dropped a company proxy would cut every download."
 platforms = ["ahk"]
 requires = { windows = [] }
 default = ""
 recommended = ""
-input_altering = false
+family = "setting"
 type = "string"
 description_key = "menu.debug.proxy_override"
 
@@ -4426,7 +4446,7 @@ platforms = ["hs"]
 requires = { macos = [] }
 default = "v1"
 recommended = "v1"
-input_altering = false
+family = "setting"
 type = "enum"
 enum_values = ["v1", "v2"]
 description_key = "menu.layout.menubar_icon"
@@ -4457,7 +4477,7 @@ description_key = "menu.layout.menubar_icon"
 id = "enabled"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.tap_holds"
 platforms = ["hs", "linux"]
@@ -4468,7 +4488,7 @@ reason_key = "platform_reason.category_master_is_a_gate_on_windows"
 id = "wrap_text_if_selected"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "shortcuts.label_wrap_text"
 platforms = ["hs"]
@@ -4479,7 +4499,7 @@ reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 id = "cmd_star"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "shortcuts.label_cmd_star"
 platforms = ["hs"]
@@ -4490,7 +4510,7 @@ reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 id = "autocorrection"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "category.autocorrection"
 platforms = ["ahk"]
@@ -4500,7 +4520,7 @@ requires = { windows = [] }
 id = "distances_reduction"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "category.distances_reduction"
 platforms = ["ahk"]
@@ -4510,7 +4530,7 @@ requires = { windows = [] }
 id = "sfbs_reduction"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "category.sfbs_reduction"
 platforms = ["ahk"]
@@ -4520,7 +4540,7 @@ requires = { windows = [] }
 id = "rolls"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "category.rolls"
 platforms = ["ahk"]
@@ -4530,7 +4550,7 @@ requires = { windows = [] }
 id = "magic_key"
 default = false
 recommended = true
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "category.magic_key"
 platforms = ["ahk"]
@@ -4544,7 +4564,7 @@ requires = { windows = [] }
 id = "pause_switch_enabled"
 default = false
 recommended = false
-input_altering = true
+family = "feature"
 type = "boolean"
 description_key = "menu.layout.pause_layout_enabled"
 platforms = ["ahk", "hs", "linux"]
@@ -4554,7 +4574,7 @@ requires = { macos = [], linux = [], windows = [] }
 id = "on_pause"
 default = ""
 recommended = ""
-input_altering = true
+family = "feature"
 type = "string"
 description_key = "menu.layout.layout_on_pause"
 platforms = ["ahk", "hs", "linux"]
@@ -4564,7 +4584,7 @@ requires = { macos = [], linux = [], windows = [] }
 id = "on_resume"
 default = ""
 recommended = ""
-input_altering = true
+family = "feature"
 type = "string"
 description_key = "menu.layout.layout_on_resume"
 platforms = ["ahk", "hs", "linux"]
@@ -4610,7 +4630,7 @@ clear_exclude = ["gestures.enabled"]
 # owner (infra/keyboard_layout_scope.lua) restores or clears these rows in
 # config.toml. macOS applies the same rows to its menu state.
 [scopes.keyboard_layout]
-prefixes = ["layout", "category_enabled.layout", "script.alt_gr_is_kana_remap"]
+prefixes = ["layout", "category_enabled.layout", "script.alt_gr_is_kana_remap", "ui"]
 restore_exclude = []
 
 # A restore leaves the user's own hotstrings as they are: the personal sections
@@ -4653,7 +4673,7 @@ restore_exclude = []
 #   master       Per-platform manifest path of the category switch the question
 #                sets. A platform without one keeps the question as the import
 #                decision only; nothing is persisted for the answer itself.
-#   checklist    "recommended": every input-altering feature of the page's scope
+#   checklist    "recommended": every feature of the page's scope
 #                whose recommendation differs from its neutral default.
 #                "hotstrings": every bundled section, language -> file ->
 #                section from _shared/modules/hotstrings/_index.toml.

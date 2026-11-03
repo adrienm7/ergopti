@@ -489,7 +489,7 @@ _PFC_DeclaredRowsAndStaleCallbackRefuse() {
 	try {
 		Rows := _HS_PersonalFileControlRows(Fixture.owner, "live", Fixture.options)
 		AssertEqual(5, Rows.Length, "the declared per-file menu exposes all five real native controls")
-		ExpectedLabels := [t("menu.common.enabled"), t("hs_config.label_delay") . " : 500",
+		ExpectedLabels := [t("menu.common.enabled"), LabelValue(t("hs_config.label_delay"), "500"),
 			t("hs_config.label_priority") . " : 67", t("hs_config.label_color") . " : 123456", t("hs_config.label_tooltip")]
 		for Index, Expected in ExpectedLabels
 			AssertEqual(Expected, Rows[Index]["label"], "fixed labels and order come from the shared declarations")

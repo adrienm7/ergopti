@@ -866,7 +866,7 @@ function recommendedItems(id, page, platform, master, features, projection, labe
 	const items = [];
 	for (const feature of features.values()) {
 		if (projection.scopeOf(feature.path) !== id) continue;
-		if (!feature.platforms.includes(platform) || feature.input_altering !== true) continue;
+		if (!feature.platforms.includes(platform) || feature.family !== 'feature') continue;
 		if (excluded.some((prefix) => feature.path === prefix || feature.path.startsWith(prefix + '.')))
 			continue;
 		const itemPath = feature.type === 'feature' ? `${feature.path}.enabled` : feature.path;

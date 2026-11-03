@@ -527,7 +527,7 @@ function personalCentral(unit) {
 	const registrationEnd = unit.pairs.get(snapshotOpen) + 1;
 	const iteration = reader(unit.tokens.slice(registrationEnd, branchAt));
 	iteration.take(
-		'MenuDef := _MR_GetMenuDef(ManifestKey) if IsSet(TargetMenu) Result := TargetMenu else Result := Menu() ItemCount := 0 PendingSep := false BuildMemo := _MR_BuildMemoEnter() try { for Item in MenuDef {'
+		'MenuDef := _MR_GetMenuDef(ManifestKey) if IsSet(TargetMenu) Result := TargetMenu else Result := Menu() ItemCount := 0 PendingSep := false BuildMemo := _MR_BuildMemoEnter() OffRule := Map("reason_key", "", "roles", Map(), "settled", 0, "item", 0) try { for Item in MenuDef { _MR_OffRuleSettle(OffRule, Result, ManifestKey, StateGetters) OffRule["item"] := Item'
 	);
 	iteration.take('if !_MR_CommandLiteralPrefix(Item, &Prefix) { try LoggerError("MenuRenderer",');
 	iteration.refusal();

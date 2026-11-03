@@ -325,7 +325,9 @@ const CHOICE_REGISTRIES = {
  * established label keys. The logger alone may expose its existing technical
  * tokens with source-owned emoji; these are not untranslated natural language.
  * `show_current_choice` lets the shared renderer fill
- * a declared placeholder (default {1}) from the selected label.
+ * a declared placeholder (default {1}) from the selected label;
+ * `current_choice_label_value` instead joins the row's label to it through the
+ * locale's common.label_value, so no row spells the colon.
  * Registered updater choices carry distinct short and full locale keys.
  * A row whose path is not an enum feature, that lists its choices by hand, or
  * that is shown on a platform the feature does not
@@ -393,11 +395,14 @@ function projectChoices(menu, raw) {
 					`${where}: current_choice_placeholder needs one token and show_current_choice`
 				);
 			if (
-				row.current_choice_suffix !== undefined &&
-				row.current_choice_placeholder !== undefined &&
-				row.current_choice_placeholder !== '{1}'
+				row.current_choice_label_value !== undefined &&
+				(row.current_choice_label_value !== true ||
+					row.show_current_choice !== true ||
+					row.current_choice_placeholder !== undefined)
 			)
-				throw new Error(`${where}: current_choice_suffix uses the {1} placeholder`);
+				throw new Error(
+					`${where}: current_choice_label_value is true, with show_current_choice and no placeholder`
+				);
 			const values = row.choice_values === undefined ? feature.enum_values : row.choice_values;
 			if (
 				!Array.isArray(values) ||
@@ -430,16 +435,6 @@ function projectChoices(menu, raw) {
 			} else if (icons !== undefined) {
 				throw new Error(`${where}: choice_icons belongs to log_level_token only`);
 			}
-			if (
-				row.current_choice_suffix !== undefined &&
-				(typeof row.current_choice_suffix !== 'string' ||
-					row.show_current_choice !== true ||
-					(row.current_choice_suffix.match(/\{1\}/g) || []).length !== 1 ||
-					/[\p{L}\p{N}\r\n\t]/u.test(row.current_choice_suffix.replace('{1}', '')))
-			)
-				throw new Error(
-					`${where}: current_choice_suffix needs punctuation, one {1} and show_current_choice`
-				);
 			// A free-entry row closes the submenu: the driver's command prompts for a
 			// value outside the presets. Both fields or neither, and only beside a
 			// registry whose stored value can legitimately leave the preset list.

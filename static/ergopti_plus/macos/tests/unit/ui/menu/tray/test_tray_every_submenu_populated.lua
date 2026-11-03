@@ -231,11 +231,17 @@ helpers.describe("the real macOS tray reads as text", LayoutFixture.scoped(funct
 		helpers.it("shows no raw id in " .. locale, function()
 			local menu, _, build_error = build_tray(nil, RowText.catalogue(SHARED_ROOT, locale, decode))
 			helpers.assert_nil(build_error, "the tray must build over the real catalogue")
-			local defects, rows = RowText.defects(menu, SHARED_ROOT, decode)
+			local defects, rows = RowText.defects(menu, SHARED_ROOT, decode, locale)
 			helpers.assert_true(rows >= MIN_TRAY_ROWS, "the walk stopped early at " .. rows .. " rows")
 			helpers.assert_eq(defects, {}, "a row must read as text")
 		end)
 	end
+
+	helpers.it("reaches every French submenu row joining a label to its value", function()
+		local catalogue = RowText.catalogue(SHARED_ROOT, "fr", decode)
+		local menu = build_tray(nil, catalogue)
+		helpers.assert_eq(RowText.missing_label_value_rows(menu, SHARED_ROOT, decode, catalogue, "hs"), {})
+	end)
 end))
 
 helpers.describe("the real macOS tray: every submenu reaches the menu bar populated", LayoutFixture.scoped(function()

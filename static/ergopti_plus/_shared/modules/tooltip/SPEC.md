@@ -274,9 +274,14 @@ the validation modifiers in `shortcut_modifier_order`, under the OS's
 `shortcut_labels_*` and `shortcut_joiner_*`, then the row's digit (0 for the
 tenth row, nothing beyond); no modifier means the bare digit. The rule is
 `_shared/lua/tooltip/llm_line.lua` `shortcut_label`, pinned by
-`_shared/tests/corpus/tooltip/llm_shortcut_vectors.json`. macOS places the
-column on a right tab stop carried by each line's prefix; Windows and Linux
-draw it at `canvas_w − pad_x − shortcut_w`. The footer never widens the panel while its
+`_shared/tests/corpus/tooltip/llm_shortcut_vectors.json`. The column hangs from
+the panel, `canvas_w − pad_x − shortcut_w`, whatever widened it: Windows and
+Linux draw each chord there, macOS draws a second text element over the same
+frame, right-aligned, whose rows repeat the lines invisibly so they keep the
+lines' heights. `preds_w` stops at `llm_max_content_width`; a longer line ends
+in an ellipsis at `canvas_w − 2 × pad_x − label_gap − max_shortcut_w`.
+`shortcut_column` and `column_placement` in the same file hold the arithmetic,
+pinned by `_shared/tests/corpus/tooltip/llm_column_vectors.json`. The footer never widens the panel while its
 combined row fits (`combined_w ≤ preds_w`); otherwise it wraps into a hint row
 and an info row, and only the wider of those may widen it. Width is sized with
 the worst-case timing line so a later TTLT never clips.

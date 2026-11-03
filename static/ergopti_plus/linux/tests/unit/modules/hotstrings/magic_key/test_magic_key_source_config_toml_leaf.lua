@@ -266,7 +266,7 @@ helpers.describe("magic key source: the keyboard-layout menu", function()
 				if item.title == I18n.get("menu.layout.title") then layout = item.menu end
 			end
 			helpers.assert_type(layout, "table", "the tray has a keyboard-layout submenu")
-			local prefix = I18n.get("menu.layout.magic_key_source") .. " : "
+			local prefix = require("locale.label_value").compose(I18n.get, I18n.get("menu.layout.magic_key_source"), "")
 			local row
 			for _, item in ipairs(layout) do
 				if type(item.title) == "string" and item.title:sub(1, #prefix) == prefix then row = item end

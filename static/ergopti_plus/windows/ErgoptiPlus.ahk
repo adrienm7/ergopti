@@ -766,6 +766,9 @@ BootProfile_Stamp("Tray reset + onboarding")
 ; untouched and every write to it is refused for the session
 ; (infra/config_migrate.ahk, docs/adr/009-config-versioning.md).
 ConfigMigrateBoot(ConfigurationFile)
+; From here to readiness the boot only reads config.toml: one registry comparison
+; serves those reads, and the close below compares again.
+ConfigMigrateBootReadsOpen()
 BootProfile_Stamp("Configuration migration checked")
 
 global _IniCache := ParseConfigTomlFile(ConfigurationFile)
@@ -1264,6 +1267,8 @@ LoggerInfo("ErgoptiPlus", "Shutdown handler registered before configured menu pu
 if _DriverStartupSmokeDir == ""
 	WebView_BeginBrowserWarmup()
 global _DriverInputInitPending := true
+; True until the ready line: the boot's full save is requested earlier, written after.
+global _DriverBootTailPending := true
 global _DriverMenuReady := false
 ; Commands clicked while the previous instance's reload was pending are replayed
 ; first, once input is ready (infra/menu_reload_replay.ahk).
@@ -1490,6 +1495,8 @@ _SuspendStateWatchdog()
 _DriverInputInitPending := false
 #InputLevel 0
 LLM_Menu_ActivateRuntime()
+if !ConfigMigrateBootReadsClose(ConfigurationFile)
+	LoggerError("ErgoptiPlus", "The configuration registry changed during boot; every later write of this session is refused.")
 _DriverReady := true
 if _LLM_Menu_RuntimeActivated
 	_MenuStartupCommands.NotifyReady()
@@ -1520,6 +1527,7 @@ try {
 } catch as _DevSourceErr
 	LoggerError("ErgoptiPlus", "Developer source mode refused: {1}.", _DevSourceErr.Message)
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
+_DriverBootTailPending := false
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
 _BootTotalMs := BootProfile_CompletedBootMs(BootProfile_TotalBootMs())

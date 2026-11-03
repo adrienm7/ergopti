@@ -41,6 +41,10 @@ refuses it. `platforms = ["ahk", "hs", "linux"]` restricts a row; with
 `unavailable = "hide"` it is absent elsewhere, with `unavailable = "grey"` and a
 `reason_key` it is drawn greyed with the reason.
 
+A category's enable row declares `submenu_off_reason_key`: while it reads off,
+the renderers grey every other row of the menu with that reason, except a
+`command` declaring `readable_when_off`, which only reads data.
+
 What a feature behind a row needs outside the driver (Karabiner on macOS, evdev
 and uinput on Linux, WebView2 on Windows, Ollama…) is the `requires` field of
 its `manifest.toml` entry, not a menu attribute; the generated

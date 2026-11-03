@@ -7,7 +7,8 @@
  * Boots the real ErgoptiPlus.ahk in an isolated profile, in French and in
  * English, walks the native tray at ready (tests/fixtures/tray_rows_walker.ahk)
  * and fails on a row whose visible text is an id, a config path, a raw key,
- * snake_case or an unfilled placeholder.
+ * snake_case or an unfilled placeholder, or a French row gluing `:`, `?`, `!`
+ * or `;` to its word.
  *
  * WHY A BOOT AND NOT A UNIT TEST:
  * The rows that showed `pause_switch_enabled` came from a provider, and a unit
@@ -26,7 +27,11 @@ const {
 	createStartupCodeFixture,
 	prepareStartupPersonalInclude
 } = require('./lib/ahk-startup-fixture.cjs');
-const { loadAllowlist, rowTextDefect } = require('./lib/menu-row-text.cjs');
+const {
+	frenchPunctuationDefect,
+	loadAllowlist,
+	rowTextDefect
+} = require('./lib/menu-row-text.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
@@ -62,6 +67,32 @@ function readIdentifiers() {
 	};
 	visit(JSON.parse(fs.readFileSync(MENU_MANIFEST, 'utf8')));
 	return identifiers;
+}
+
+/**
+ * Spells each submenu row joining a label to its value, so a walk stopping
+ * short of them fails instead of judging nothing.
+ * @param {string} platform Manifest platform name.
+ * @returns {string[]} The French « label : » of every such row.
+ */
+function labelValueRows(platform) {
+	const french = JSON.parse(
+		fs.readFileSync(path.join(WINDOWS, '..', '_shared', 'data', 'locales', 'fr.json'), 'utf8')
+	);
+	const spelled = new Set();
+	const visit = (node) => {
+		if (Array.isArray(node)) node.forEach(visit);
+		else if (node && typeof node === 'object') {
+			if (
+				node.current_choice_label_value === true &&
+				(!node.platforms || node.platforms.includes(platform))
+			)
+				spelled.add(`${french[node.i18n]} : `);
+			Object.values(node).forEach(visit);
+		}
+	};
+	visit(JSON.parse(fs.readFileSync(MENU_MANIFEST, 'utf8')));
+	return [...spelled];
 }
 
 /**
@@ -131,7 +162,13 @@ function main() {
 			for (const { trail, text } of rows) {
 				const defect = rowTextDefect(text, identifiers, allowlist);
 				if (defect) defects.push(`${locale}: ${trail} > "${text}" ${defect}`);
+				const glued = locale === 'fr' ? frenchPunctuationDefect(text) : '';
+				if (glued) defects.push(`fr: ${trail} > "${text}" glues "${glued}"`);
 			}
+			if (locale === 'fr')
+				for (const spelled of labelValueRows('ahk'))
+					if (!rows.some(({ text }) => text.includes(spelled)))
+						defects.push(`fr: no walked row spells "${spelled}"`);
 			console.log(`${locale}: ${rows.length} rows walked`);
 			if (process.argv.includes('--dump'))
 				for (const { trail, text } of rows) console.log(`  ${trail} > ${text}`);

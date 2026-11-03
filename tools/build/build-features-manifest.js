@@ -31,8 +31,10 @@ import sharedPaths from '../lib/paths.cjs';
 import scopeMetadata from '../lib/configuration-scopes.cjs';
 import configKeys from '../lib/_generated/config_keys.cjs';
 import ConfigTemplate from '../lib/config-template-projection.cjs';
+import familyRule from '../lib/feature-family-rule.cjs';
 
 const { KEY } = configKeys;
+const { familyRuleViolations, NEUTRAL_VALUES } = familyRule;
 
 const { shared } = sharedPaths;
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -193,6 +195,8 @@ function resolveRecommended(feature, platform) {
 }
 
 function validate(features) {
+	const violations = familyRuleViolations(features);
+	if (violations.length > 0) throw new Error(`feature family rule:\n${violations.join('\n')}`);
 	// A feature is addressed by its dotted path, so two blocks sharing one is a
 	// silent overwrite, not a merge. This was unenforceable while every driver
 	// had its own namespace — [[features.ahk.gestures]] and
@@ -212,13 +216,8 @@ function validate(features) {
 		seen.set(key, f);
 	}
 	for (const f of features) {
-		if (
-			(f.recommended !== undefined) === (f.recommended_per_platform !== undefined) ||
-			typeof f.input_altering !== 'boolean'
-		) {
-			throw new Error(
-				`feature ${f.path} needs one recommended source and an input_altering classification`
-			);
+		if ((f.recommended !== undefined) === (f.recommended_per_platform !== undefined)) {
+			throw new Error(`feature ${f.path} needs one recommended source`);
 		}
 		const hasDefault = f.default !== undefined;
 		const hasDefaultPerPlatform = f.default_per_platform !== undefined;
@@ -228,13 +227,11 @@ function validate(features) {
 			);
 		}
 		// The one declared exception to "an empty configuration alters no input":
-		// an entry the maintainer switched on starts with its preset, never with a
-		// third value only this flag would explain.
+		// a feature the maintainer switched on starts with its preset, never with
+		// a third value only this flag would explain.
 		if (f.active_by_default !== undefined) {
-			if (f.active_by_default !== true || f.input_altering !== true) {
-				throw new Error(
-					`feature ${f.path}: active_by_default is only "true" on an input_altering entry`
-				);
+			if (f.active_by_default !== true) {
+				throw new Error(`feature ${f.path}: active_by_default is only "true"`);
 			}
 			for (const platform of f.platforms || PLATFORMS) {
 				if (
@@ -248,14 +245,23 @@ function validate(features) {
 			}
 		}
 		// A clear must give the system's behaviour, and deleting the key of an
-		// entry active by default restores its preset: such an entry names the
-		// off value a clear writes explicitly, and no other entry may.
-		if ((f.cleared !== undefined) !== (f.active_by_default === true)) {
+		// entry that starts on restores its preset: such an entry names the off
+		// value a clear writes explicitly. A feature active by default must, a
+		// setting that starts on may, and no other entry can.
+		const startsOn = !NEUTRAL_VALUES.includes(resolveDefault(f, f.platforms[0]));
+		if (f.active_by_default === true && f.cleared === undefined) {
+			throw new Error(`feature ${f.path} is active_by_default, so it declares "cleared"`);
+		}
+		if (
+			f.cleared !== undefined &&
+			f.active_by_default !== true &&
+			!(f.family === 'setting' && startsOn)
+		) {
 			throw new Error(
-				`feature ${f.path} declares "cleared" if and only if it is active_by_default`
+				`feature ${f.path} declares "cleared" without being active_by_default or a setting that starts on`
 			);
 		}
-		if (f.cleared !== undefined && ![false, 'none', ''].includes(f.cleared)) {
+		if (f.cleared !== undefined && !NEUTRAL_VALUES.includes(f.cleared)) {
 			throw new Error(`feature ${f.path}: "cleared" must be an off value (false, "none" or "")`);
 		}
 		// An open catalogue: the menu offers these values and a free entry for any
@@ -455,7 +461,7 @@ function renderAhkManifest(manifest, sections, features) {
 			description_key: f.description_key || '',
 			platforms: f.platforms,
 			recommended: resolveRecommended(f, 'ahk'),
-			input_altering: f.input_altering
+			family: f.family
 		};
 		if (f.enum_values) entry.enum_values = f.enum_values;
 		if (f.choice_values) entry.choice_values = f.choice_values;
@@ -531,7 +537,7 @@ function luaFeatureEntry(f, platform) {
 		description_key: f.description_key || '',
 		platforms: f.platforms,
 		recommended: resolveRecommended(f, platform),
-		input_altering: f.input_altering
+		family: f.family
 	};
 	if (f.enum_values) entry.enum_values = f.enum_values;
 	if (f.choice_values) entry.choice_values = f.choice_values;

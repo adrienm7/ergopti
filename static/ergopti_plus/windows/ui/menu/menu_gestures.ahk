@@ -110,7 +110,7 @@ _GES_SlotRows(ReadFn := 0) {
 			: t("dialog.action_picker.disabled")
 		Reason := GestureSystemUnavailableReason(Slot)
 		Rows.Push(Map(
-			"label",    SlotLabel . " : " . CurrentLabel . (Reason != "" ? " — " . Reason : ""),
+			"label",    LabelValue(SlotLabel, CurrentLabel) . (Reason != "" ? " — " . Reason : ""),
 			"disabled", !GestEnabled || Reason != "",
 			"action",   ((_s, _l) => (*) => ShowActionPicker(_l,
 				GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none",

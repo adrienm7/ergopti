@@ -442,7 +442,7 @@ agent_disabled_apps = []
 
 
 [llm.display]
-pred_indent = 0
+pred_indent = -3
 show_info_bar = true
 streaming = true
 streaming_multi = true

@@ -604,6 +604,50 @@ _CMJ_RegistryProofScope() {
 }
 Test("config journal: one registry proof scope serves every file guard and still refuses mutation", _CMJ_RegistryProofScope)
 
+; The boot's read stretch pays one comparison for every read and pre-check, and a
+; durable effect still compares: a registry mutated while it is open is refused
+; by the first write admission and reported by the close.
+_CMJ_BootReadStretch() {
+	global ConfigurationFile, ConfigMigrateRegistryDeepCompares, ConfigMigrateBootReadProof
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Source := _CMJ_CurrentSource(), Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Registry := ConfigMigrateShippedRegistry(), OriginalCurrent := Registry["current"]
+	try {
+		ConfigurationFile := Path
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		ConfigMigrateBootReadsOpen()
+		AssertThrows(() => ConfigMigrateBootReadsOpen(), "a second open is refused")
+		Before := ConfigMigrateRegistryDeepCompares
+		loop 4 {
+			Guard := ConfigMigrateBoot(Path, "capture_read")
+			AssertTrue(HasMethod(Guard, "Call"))
+			AssertTrue(Guard.Call(Source, 1))
+			AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		}
+		AssertEqual(1, ConfigMigrateRegistryDeepCompares - Before, "twelve read checks share one comparison")
+		Before := ConfigMigrateRegistryDeepCompares
+		AssertTrue(HasMethod(ConfigMigrateBoot(Path, "capture_noop"), "Call"))
+		Assert(ConfigMigrateRegistryDeepCompares > Before, "a write admission compares even inside the stretch")
+		Registry["current"] := OriginalCurrent + 1
+		AssertFalse(ConfigMigrateBoot(Path, "capture_noop"), "a mutated registry refuses a write inside the stretch")
+		AssertFalse(ConfigMigrateBootReadsClose(Path), "the close reports a registry mutated while it was open")
+		AssertFalse(ConfigMigrateBootReadProof.open, "a refused close still closes the stretch")
+		AssertFalse(ConfigMigrateBoot(Path, "capture_read"), "after the close a read compares again")
+		Registry["current"] := OriginalCurrent
+		ConfigMigrateBootReadsOpen()
+		AssertTrue(ConfigMigrateBootReadsClose(Path), "an intact registry closes cleanly")
+		AssertThrows(() => ConfigMigrateBootReadsClose(Path), "a stretch closes once")
+	} finally {
+		Registry["current"] := OriginalCurrent
+		ConfigMigrateBootReadProof.open := false
+		ConfigMigrateBootReadProof.registry := 0, ConfigMigrateBootReadProof.shadow := 0
+		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: the boot read stretch shares one comparison and never admits a write on it", _CMJ_BootReadStretch)
+
 _CMJ_BootRegistryWithdrawal(When := "prepared") {
 	global ConfigurationFile, _LOGGER_TEST_SINK, LOGGER_MIN_LEVEL
 	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset

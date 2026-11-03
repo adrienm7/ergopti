@@ -1,0 +1,124 @@
+{
+	"_comment": "Where the shortcut column of the AI tooltip goes: shortcut_column and column_placement in _shared/lua/tooltip/llm_line.lua, ported in windows/ui/tooltip/llm.ahk. Replayed by the three drivers.",
+	"vectors": [
+		{
+			"id": "the panel fits the block: the widest label touches the widest line's gap",
+			"widest_line": 120,
+			"widest_label": 14,
+			"gap": 16,
+			"max_width": 800,
+			"content_w": 150,
+			"label_w": 14,
+			"line_w": 120,
+			"expected": {
+				"zone_w": 30,
+				"preds_w": 150,
+				"label_x": 136,
+				"line_limit": 120,
+				"truncated": false
+			}
+		},
+		{
+			"id": "a footer widens the panel: the column follows the panel, not the line",
+			"widest_line": 120,
+			"widest_label": 14,
+			"gap": 16,
+			"max_width": 800,
+			"content_w": 300,
+			"label_w": 14,
+			"line_w": 120,
+			"expected": {
+				"zone_w": 30,
+				"preds_w": 150,
+				"label_x": 286,
+				"line_limit": 270,
+				"truncated": false
+			}
+		},
+		{
+			"id": "a narrower label ends on the same right edge",
+			"widest_line": 120,
+			"widest_label": 14,
+			"gap": 16,
+			"max_width": 800,
+			"content_w": 300,
+			"label_w": 9,
+			"line_w": 40,
+			"expected": {
+				"zone_w": 30,
+				"preds_w": 150,
+				"label_x": 291,
+				"line_limit": 270,
+				"truncated": false
+			}
+		},
+		{
+			"id": "a long line stops before the column at the cap",
+			"widest_line": 1000,
+			"widest_label": 14,
+			"gap": 16,
+			"max_width": 800,
+			"content_w": 800,
+			"label_w": 14,
+			"line_w": 1000,
+			"expected": {
+				"zone_w": 30,
+				"preds_w": 800,
+				"label_x": 786,
+				"line_limit": 770,
+				"truncated": true
+			}
+		},
+		{
+			"id": "a short line beside a long one is left whole",
+			"widest_line": 1000,
+			"widest_label": 14,
+			"gap": 16,
+			"max_width": 800,
+			"content_w": 800,
+			"label_w": 14,
+			"line_w": 300,
+			"expected": {
+				"zone_w": 30,
+				"preds_w": 800,
+				"label_x": 786,
+				"line_limit": 770,
+				"truncated": false
+			}
+		},
+		{
+			"id": "a footer past the cap gives the long line its room",
+			"widest_line": 1000,
+			"widest_label": 14,
+			"gap": 16,
+			"max_width": 800,
+			"content_w": 900,
+			"label_w": 14,
+			"line_w": 1000,
+			"expected": {
+				"zone_w": 30,
+				"preds_w": 800,
+				"label_x": 886,
+				"line_limit": 870,
+				"truncated": true
+			}
+		},
+		{
+			"id": "no chord: no column and no gap, the cap still holds",
+			"widest_line": 1000,
+			"widest_label": 0,
+			"gap": 16,
+			"max_width": 800,
+			"content_w": 800,
+			"label_w": 0,
+			"line_w": 1000,
+			"expected": {
+				"zone_w": 0,
+				"preds_w": 800,
+				"label_x": 800,
+				"line_limit": 800,
+				"truncated": true
+			}
+		}
+	]
+}

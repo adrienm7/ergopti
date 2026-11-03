@@ -156,7 +156,7 @@ async function checkPlatform(manifest, platform, spec) {
 
 	for (const entry of layoutEntries) {
 		const name = `layout.${entry.id}`;
-		if (entry.input_altering) {
+		if (entry.family === 'feature') {
 			assert(
 				Object.hasOwn(values, entry.id),
 				`${driver}: ${name} alters input; list its neutral value in this test`
@@ -170,7 +170,7 @@ async function checkPlatform(manifest, platform, spec) {
 				`${driver}: the first-run template enables ${name}`
 			);
 		} else if (EMULATION_ROW_PARAMETERS.includes(entry.id)) {
-			assert.equal(entry.input_altering, false, `${driver}: ${name} must stay a parameter`);
+			assert.equal(entry.family, 'setting', `${driver}: ${name} must stay a setting`);
 		}
 	}
 
@@ -240,16 +240,12 @@ async function main() {
 		(entry) => entry.section === 'category_enabled' && entry.id === 'layout'
 	);
 	assert.equal(master.default, false, 'the layout master must default off');
-	assert.equal(master.input_altering, true, 'the layout master is an activation');
+	assert.equal(master.family, 'feature', 'the layout master is an activation');
 
 	for (const id of EMULATION_ROW_PARAMETERS) {
 		const row = manifest.entries.find((entry) => entry.section === 'layout' && entry.id === id);
 		assert(row, `layout.${id} must stay declared`);
-		assert.equal(
-			row.input_altering,
-			false,
-			`layout.${id} narrows an emulation, it never starts one`
-		);
+		assert.equal(row.family, 'setting', `layout.${id} narrows an emulation, it never starts one`);
 	}
 
 	for (const [platform, spec] of Object.entries(NEUTRAL_LAYOUT)) {

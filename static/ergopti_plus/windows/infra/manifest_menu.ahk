@@ -246,8 +246,13 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 	; One question about write admission (a registry deep compare of about 21 ms) is asked by
 	; every greyed row of a build. Within this synchronous build it has one answer.
 	BuildMemo := _MR_BuildMemoEnter()
+	; The rows each entry draws are read off the menu when the next entry starts:
+	; the branches below leave through `continue`.
+	OffRule := Map("reason_key", "", "roles", Map(), "settled", 0, "item", 0)
 	try {
 		for Item in MenuDef {
+			_MR_OffRuleSettle(OffRule, Result, ManifestKey, StateGetters)
+			OffRule["item"] := Item
 			if !_MR_CommandLiteralPrefix(Item, &Prefix) {
 				try LoggerError("MenuRenderer", "Invalid literal command prefix — row refused.")
 				continue
@@ -370,10 +375,77 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 				try LoggerWarn("MenuRenderer", "Unknown item type '{1}' in '{2}' — skipped.", ItemType, ManifestKey)
 			}
 		}
+		_MR_OffRuleSettle(OffRule, Result, ManifestKey, StateGetters)
 	} finally _MR_BuildMemoLeave(BuildMemo)
 
+	; Positions are read before the separator pass can move a row.
+	_MR_ApplyCategoryOff(Result, OffRule)
 	_MR_NormalizeSeparators(Result)
 	return Result
+}
+
+; Whether a menu's enable row reads off. An unanswered state is not "off": the
+; row reports its drift where it is drawn, and the menu stays as built.
+; @param Item {Map} The enable row: a toggle, or a choice with its off value.
+; @returns {Boolean}
+_MR_EnableRowReadsOff(Item, ManifestKey, StateGetters) {
+	if _MR_Get(Item, "type") == "toggle" {
+		for Key in Item["checked_when"] {
+			if !StateGetters.Has(Key)
+				return false
+		}
+		return !MenuRenderer_ResolveCheckedWhen(ManifestKey, Item["id"], StateGetters)
+	}
+	Path := Item["path"]
+	return StateGetters.Has(Path) && (StateGetters[Path])() == Item["submenu_off_value"]
+}
+
+; What the category-off rule does to the rows one manifest entry draws: "live"
+; stays clickable, "unreasoned" may already be grey for another cause and still
+; owes the reason, "plain" owes it unless already grey, as a caption or a row
+; naming its own reason is. The shared Lua renderer classifies identically.
+_MR_OffRuleRole(Item) {
+	if Item.Has("submenu_off_reason_key") || _MR_Get(Item, "readable_when_off", false)
+		return "live"
+	if Item.Has("disabled_when") && !Item.Has("disabled_reason_key") && _MR_IsForAhk(Item)
+		return "unreasoned"
+	return "plain"
+}
+
+; Records the rows the previous entry drew, by one-based native position.
+_MR_OffRuleSettle(OffRule, Result, ManifestKey, StateGetters) {
+	Count := TrayMenuItemCount(Result)
+	Item := OffRule["item"]
+	if Item is Map {
+		if Count > OffRule["settled"] && Item.Has("submenu_off_reason_key")
+			&& _MR_EnableRowReadsOff(Item, ManifestKey, StateGetters)
+			OffRule["reason_key"] := Item["submenu_off_reason_key"]
+		Role := _MR_OffRuleRole(Item)
+		loop Count - OffRule["settled"]
+			OffRule["roles"][OffRule["settled"] + A_Index] := Role
+	}
+	OffRule["settled"] := Count
+}
+
+; Greys a finished category submenu whose enable row reads off: one rule,
+; declared on that row in the manifest, so no driver restates it. A greyed row
+; that opens a submenu opens nothing.
+_MR_ApplyCategoryOff(Result, OffRule) {
+	if OffRule["reason_key"] == ""
+		return
+	Suffix := " — " . _MR_ReasonHead(t(OffRule["reason_key"]))
+	Handle := Result.Handle
+	for Position, Role in OffRule["roles"] {
+		Caption := TrayMenuHandleItemText(Handle, Position - 1)
+		if Role == "live" || Caption == ""
+			continue
+		State := TrayMenuHandleItemState(Handle, Position - 1)
+		if State == 0xFFFFFFFF
+			throw OSError(A_LastError, -1, "GetMenuState failed")
+		if !(State & 1) || Role == "unreasoned"	; MF_GRAYED
+			Result.Rename(Position . "&", Caption . Suffix)
+		Result.Disable(Position . "&")
+	}
 }
 
 
@@ -1931,11 +2003,13 @@ _MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters) {
 				CurrentLabel .= " " . t(UnitI18n)
 		}
 	}
-	Label := t(I18nKey) . _MR_Get(Item, "current_choice_suffix")
+	Label := t(I18nKey)
 	if _MR_Get(Item, "show_current_choice", false) {
 		if CurrentLabel == ""
 			CurrentLabel := String(Current)
-		Label := StrReplace(Label, _MR_Get(Item, "current_choice_placeholder", "{1}"), CurrentLabel)
+		Label := _MR_Get(Item, "current_choice_label_value", false)
+			? LabelValue(Label, CurrentLabel)
+			: StrReplace(Label, _MR_Get(Item, "current_choice_placeholder", "{1}"), CurrentLabel)
 	}
 	Disabled := MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters)
 	; A greyed choice that declares why (``disabled_reason_key``) opens nothing

@@ -50,6 +50,15 @@
 # "this tray toggles from the parent row" — no tray can: AppKit never sends the
 # action of an item that opens a submenu, and neither appindicator nor Win32
 # binds a click on one.
+#
+# Category-off rule (maintainer, 2026-11-02). A menu's enable row, its `toggle`
+# or the choice naming its off value in `submenu_off_value`, declares
+# `submenu_off_reason_key`. While that row reads off, the renderers grey every
+# other row of the menu with that reason and run nothing, a greyed group opening
+# nothing beneath it. Only a row declaring `readable_when_off = true` stays
+# live: it must only READ data, so the user can consult the past. The parent row
+# in the main menu is never greyed for it. Both renderers apply this once, in
+# their build; no driver restates it. test-menu-category-off-rule.cjs holds it.
 
 [menu]
 # Shared child records drive the Dynamic family order, separators and native
@@ -438,6 +447,7 @@ type = "toggle"
 id = "llm_toggle"
 i18n = "menu.llm.enable"
 checked_when = ["llm_enabled"]
+submenu_off_reason_key = "menu.category_off_reason"
 # Greyed, never absent, while the switch cannot run its activation transaction:
 # during a pause, a protected configuration, or before activation is ready.
 # The row used to vanish in those states, leaving the IA submenu without a switch.
@@ -470,17 +480,6 @@ disabled_reasons = [
 [[menu.llm_menu]]
 type = "---"
 
-# Straight to the backend, never through an engine answer the user could accept
-# into a document. Each driver answers with its own backend's seam. Below the
-# first group, which holds only the switch and the restore.
-[[menu.llm_menu]]
-type = "command"
-id = "llm_test_prediction"
-i18n = "menu.llm.test_prediction"
-
-[[menu.llm_menu]]
-type = "---"
-
 # One button opens the model selector page, where the backend and the model are
 # chosen together (maintainer, 2026-10-27): it reads the backend's emoji, then
 # the model (« 🦙 qwen3:4b », « 🌐 OpenAI/gpt-4o-mini »). The Backend chooser,
@@ -496,11 +495,11 @@ status_rows.unavailable = [
 	{ type = "label", i18n = "menu.llm.unavailable" },
 ]
 i18n = "menu.llm.model_label"
-disabled_when_off = false
+disabled_when_off = true
 platforms = ["ahk", "hs", "linux"]
 
-# The model and the prompt rows form one block on every driver: no separator
-# between them (maintainer, 2026-10-29).
+# The model, the prompt and the test form one block on every driver: no separator
+# between them (maintainer, 2026-10-29 and 2026-11-02).
 [[menu.llm_menu]]
 type = "list"
 id = "llm_profile"
@@ -508,12 +507,16 @@ i18n = "menu.profiles.profile_label_prefix"
 disabled_when_off = true
 platforms = ["ahk", "hs", "linux"]
 
-# Keep the macOS profile boundary in the complete parent, where separators defer.
+# Straight to the backend, never through an engine answer the user could accept
+# into a document. Each driver answers with its own backend's seam.
 [[menu.llm_menu]]
-type = "list"
-id = "llm_after_profile_boundary"
-platforms = ["hs"]
-unavailable = "hide"
+type = "command"
+id = "llm_test_prediction"
+i18n = "menu.llm.test_prediction"
+
+# The one boundary after the block, on every driver: no provider brings its own.
+[[menu.llm_menu]]
+type = "---"
 
 # The suggestion count ("Nombre de suggestions") is a generation parameter: it
 # is the first row of the generation settings on every driver (the
@@ -589,7 +592,7 @@ path = "updater.check_interval_seconds"
 i18n = "menu.about.frequency_menu"
 choice_registry = "updater.check_intervals"
 show_current_choice = true
-current_choice_suffix = ": {1}"
+current_choice_label_value = true
 
 [[menu.about_menu]]
 type = "list"
@@ -689,7 +692,9 @@ type = "check"
 id = "llm_url_bar_filter"
 i18n = "menu.llm.disable_url_bars"
 checked_when = ["llm_url_bar_filter_enabled"]
+# Greyed only while the setting cannot be written, and the row says so.
 disabled_when = ["llm_url_bar_filter_ready"]
+disabled_reason_key = "menu.llm.save_unavailable"
 
 [[menu.llm_trigger_menu]]
 type = "check"
@@ -697,6 +702,7 @@ id = "llm_secure_field_filter"
 i18n = "menu.llm.disable_password_fields"
 checked_when = ["llm_secure_field_filter_enabled"]
 disabled_when = ["llm_secure_field_filter_ready"]
+disabled_reason_key = "menu.llm.save_unavailable"
 
 [[menu.llm_trigger_menu]]
 type = "list"
@@ -744,15 +750,18 @@ path = "llm.display.pred_indent"
 i18n = "menu.llm.indent_label"
 choice_registry = "llm.indentation"
 show_current_choice = true
-current_choice_suffix = ": {1}"
+current_choice_label_value = true
 disabled_when = ["llm_indentation_ready"]
 
 [[menu.llm_display_menu]]
 type = "list"
 id = "llm_display_trailing"
 
-# Generation numeric providers retain their native prompts; the common diversity
-# checkbox has one label, checked state and current readiness owner on every OS.
+# The generation settings read in two groups on every OS, with one separator
+# (maintainer, 2026-11-02): the count, the words and the temperature, then
+# everything about the context at the bottom. Numeric providers retain their
+# native prompts; the common diversity checkbox has one label, checked state and
+# current readiness owner on every OS.
 [[menu.llm_generation_menu]]
 type = "list"
 id = "llm_generation_values"
@@ -764,6 +773,13 @@ i18n = "menu.llm.auto_raise_temp"
 checked_when = ["llm_auto_raise_enabled"]
 disabled_when = ["llm_auto_raise_ready"]
 
+[[menu.llm_generation_menu]]
+type = "---"
+
+[[menu.llm_generation_menu]]
+type = "list"
+id = "llm_generation_context_values"
+
 [[menu.agent_menu]]
 type = "choice"
 id = "agent_mode"
@@ -772,6 +788,9 @@ i18n = "menu.agent.mode_title"
 choice_label_prefix = "menu.agent.mode_"
 show_current_choice = true
 disabled_when = ["agent_mode_ready"]
+# The agent has no checkbox: this choice is its enable row, and "off" its off state.
+submenu_off_reason_key = "menu.category_off_reason"
+submenu_off_value = "off"
 
 [[menu.agent_menu]]
 type = "---"
@@ -1000,7 +1019,7 @@ choice_values = ["DEBUG", "INFO", "WARNING", "ERROR"]
 choice_label_kind = "log_level_token"
 choice_icons = { DEBUG = "🐛", INFO = "ℹ️", WARNING = "⚠️", ERROR = "❌" }
 show_current_choice = true
-current_choice_suffix = " : {1}"
+current_choice_label_value = true
 
 [[menu.debug_menu]]
 type = "command"
@@ -1129,6 +1148,7 @@ id = "shortcuts_toggle"
 i18n = "menu.shortcuts.enable"
 checked_when = ["shortcuts_enabled"]
 category = "Shortcuts"
+submenu_off_reason_key = "menu.category_off_reason"
 
 # The Shortcuts scope's restore and clear, right after its switch like every
 # category's (the first group: switch, restore, clear, separator). Windows and
@@ -1726,7 +1746,7 @@ path = "shortcuts.caps_word.idle_timeout_seconds"
 i18n = "menu.caps_word.idle_timeout"
 choice_registry = "caps_word.idle_timeout"
 show_current_choice = true
-current_choice_suffix = ": {1}"
+current_choice_label_value = true
 
 [[menu.caps_word_auto_off_group]]
 type = "---"
@@ -1761,6 +1781,7 @@ id = "metrics_toggle"
 i18n = "menu.metrics.enable"
 checked_when = ["keystats_enabled"]
 category = "Metrics"
+submenu_off_reason_key = "menu.category_off_reason"
 
 # The restore alone: the maintainer retired the Metrics clear on 2026-09-30,
 # because clearing these settings to the system's behaviour means nothing (there
@@ -1781,7 +1802,8 @@ type = "---"
 type = "command"
 id = "show_typing"
 i18n = "menu.metrics.show_typing"
-disabled_when = ["keystats_enabled"]
+# Reads stored history only, so the user can consult the past with metrics off.
+readable_when_off = true
 
 # The two rows that open a window form one group. Each was followed, until
 # 2026-10-01, by a row that set a dedicated shortcut for it (`shortcut_typing`,
@@ -1793,7 +1815,7 @@ disabled_when = ["keystats_enabled"]
 type = "command"
 id = "show_apps"
 i18n = "menu.metrics.show_apps"
-disabled_when = ["keystats_enabled"]
+readable_when_off = true
 
 [[menu.metrics_menu]]
 type = "---"
@@ -1964,6 +1986,7 @@ id = "layout_toggle"
 i18n = "menu.layout.enable"
 checked_when = ["layout_enabled"]
 category = "Layout"
+submenu_off_reason_key = "menu.category_off_reason"
 # Only Windows emulates the Ergopti layout itself, so only Windows has an
 # emulation to switch off. macOS installs the layout as a system input source and
 # Linux remaps through kanata; declared for them, this row had no command and was
@@ -2223,6 +2246,7 @@ id = "hotstrings_toggle"
 i18n = "menu.hotstrings.enable"
 checked_when = ["hotstrings_enabled"]
 category = "Hotstrings"
+submenu_off_reason_key = "menu.category_off_reason"
 
 # The Hotstrings scope, beside its switch like the Metrics one. Each
 # driver registers both commands on its scope owner, which changes config.toml
@@ -2507,7 +2531,7 @@ path = "hotstrings.idle_reset_seconds"
 i18n = "menu.hotstrings.idle_reset"
 choice_registry = "hotstrings.idle_reset"
 show_current_choice = true
-current_choice_suffix = ": {1}"
+current_choice_label_value = true
 custom_command = "idle_reset_custom"
 custom_i18n = "menu.hotstrings.idle_reset_custom"
 custom_unit_i18n = "menu.hotstrings.idle_reset_unit"
@@ -2554,7 +2578,7 @@ path = "hotstrings.cascade_max_arrows"
 i18n = "menu.hotstrings.cascade_max_arrows"
 choice_registry = "hotstrings.cascade_max_arrows"
 show_current_choice = true
-current_choice_suffix = ": {1}"
+current_choice_label_value = true
 
 # The "linux" values across this menu were added on 2026-08-04. Before them the
 # manifest projected exactly ONE row for Linux — a bare separator — while
@@ -2572,6 +2596,7 @@ id = "gestures_toggle"
 i18n = "menu.gestures.enable"
 checked_when = ["gestures_enabled"]
 category = "Gestures"
+submenu_off_reason_key = "menu.category_off_reason"
 
 # The Gestures scope's restore and clear, right after its switch (the first
 # group of every settings menu: switch, restore, clear, separator). Each driver
@@ -2762,6 +2787,7 @@ id = "tapholds_toggle"
 i18n = "menu.tapholds.enable"
 checked_when = ["tapholds_enabled"]
 category = "TapHolds"
+submenu_off_reason_key = "menu.category_off_reason"
 # macOS switches the feature, not its remap engine: off stops generating the
 # per-key rules while keeping every assignment, like a pause. The engine has
 # its own switch, « Ergopti uses Karabiner » (on by default); while it is off
@@ -2901,22 +2927,6 @@ type = "section_header"
 id = "shortcut_extension_heading"
 i18n = "menu.extensions.header"
 platforms = ["ahk", "hs"]
-unavailable = "hide"
-
-# Native generation groups retain their existing per-driver presentation boundaries.
-[[menu.llm_generation_count_boundary]]
-type = "---"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
-
-[[menu.llm_generation_context_boundary]]
-type = "---"
-platforms = ["ahk"]
-unavailable = "hide"
-
-[[menu.llm_generation_words_boundary]]
-type = "---"
-platforms = ["ahk"]
 unavailable = "hide"
 
 [[menu.llm_api_add_provider_group]]
@@ -3879,11 +3889,6 @@ i18n = "menu.llm.thinking_model_info"
 platforms = ["ahk", "hs"]
 unavailable = "hide"
 
-[[menu.llm_after_profile_boundary]]
-type = "---"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
-
 # Native MLX port and generation controls retain their actual transaction owners.
 
 [[menu.llm_generation_context_control]]
@@ -3977,14 +3982,6 @@ section = "llm_generation_max_words_control"
 type = "include"
 section = "llm_generation_max_words_reset_control"
 present_when = "llm_generation_max_words_reset_present"
-
-[[menu.llm_generation_native_controls]]
-type = "include"
-section = "llm_generation_context_controls"
-
-[[menu.llm_generation_native_controls]]
-type = "include"
-section = "llm_generation_word_controls"
 
 # Native API selection and management boundaries retain their actual entry transactions.
 
@@ -4334,12 +4331,12 @@ disabled_when = ["magic_key_ready"]
 type = "command"
 id = "magic_key_config_linux"
 command = "magic_key_change"
-i18n = "menu.hotstrings.magic_key"
+i18n = "menu.hotstrings.magic_key_prefix"
 platforms = ["linux"]
 unavailable = "hide"
 caption_getter = "magic_key_value"
 caption_layout = "prefix"
-caption_joiner = " : "
+caption_joiner = ""
 
 [[menu.hotstrings_magic_trigger_frame]]
 type = "list"
@@ -4996,10 +4993,6 @@ type = "list"
 id = "llm_profile_parent_rows"
 platforms = ["ahk"]
 unavailable = "hide"
-
-[[menu.llm_profile_parent_frame_ahk]]
-type = "include"
-section = "llm_after_profile_boundary"
 
 # Shared picker/clear frame for Linux keyboard, tap-key, chord and gesture slots.
 

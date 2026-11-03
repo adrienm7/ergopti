@@ -721,3 +721,6 @@ helpers.describe("LLM retained Info Bar admission", function()
 		end)
 	end
 end)
+
+require("test.pred_indent_default_contract")(helpers,
+	require("infra.manifest_reader").default_for(require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT))

@@ -440,6 +440,7 @@
 			"checked_when": [
 				"llm_enabled"
 			],
+			"submenu_off_reason_key": "menu.category_off_reason",
 			"disabled_when": [
 				"llm_toggle_ready"
 			],
@@ -479,14 +480,6 @@
 			"type": "---"
 		},
 		{
-			"type": "command",
-			"id": "llm_test_prediction",
-			"i18n": "menu.llm.test_prediction"
-		},
-		{
-			"type": "---"
-		},
-		{
 			"type": "list",
 			"id": "llm_model",
 			"status_rows": {
@@ -505,7 +498,7 @@
 				]
 			},
 			"i18n": "menu.llm.model_label",
-			"disabled_when_off": false,
+			"disabled_when_off": true,
 			"platforms": [
 				"ahk",
 				"hs",
@@ -524,12 +517,12 @@
 			]
 		},
 		{
-			"type": "list",
-			"id": "llm_after_profile_boundary",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
+			"type": "command",
+			"id": "llm_test_prediction",
+			"i18n": "menu.llm.test_prediction"
+		},
+		{
+			"type": "---"
 		},
 		{
 			"type": "group",
@@ -621,7 +614,7 @@
 			"path": "updater.check_interval_seconds",
 			"i18n": "menu.about.frequency_menu",
 			"show_current_choice": true,
-			"current_choice_suffix": ": {1}",
+			"current_choice_label_value": true,
 			"choices": [
 				{
 					"value": 300,
@@ -767,7 +760,8 @@
 			],
 			"disabled_when": [
 				"llm_url_bar_filter_ready"
-			]
+			],
+			"disabled_reason_key": "menu.llm.save_unavailable"
 		},
 		{
 			"type": "check",
@@ -778,7 +772,8 @@
 			],
 			"disabled_when": [
 				"llm_secure_field_filter_ready"
-			]
+			],
+			"disabled_reason_key": "menu.llm.save_unavailable"
 		},
 		{
 			"type": "list",
@@ -842,7 +837,7 @@
 			"path": "llm.display.pred_indent",
 			"i18n": "menu.llm.indent_label",
 			"show_current_choice": true,
-			"current_choice_suffix": ": {1}",
+			"current_choice_label_value": true,
 			"disabled_when": [
 				"llm_indentation_ready"
 			],
@@ -944,6 +939,13 @@
 			"disabled_when": [
 				"llm_auto_raise_ready"
 			]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "list",
+			"id": "llm_generation_context_values"
 		}
 	],
 	"agent_menu": [
@@ -956,6 +958,8 @@
 			"disabled_when": [
 				"agent_mode_ready"
 			],
+			"submenu_off_reason_key": "menu.category_off_reason",
+			"submenu_off_value": "off",
 			"choices": [
 				{
 					"value": "off",
@@ -1193,7 +1197,7 @@
 			"i18n": "menu.debug.log_level",
 			"path": "script.log_level",
 			"show_current_choice": true,
-			"current_choice_suffix": " : {1}",
+			"current_choice_label_value": true,
 			"choices": [
 				{
 					"value": "DEBUG",
@@ -1342,7 +1346,8 @@
 			"checked_when": [
 				"shortcuts_enabled"
 			],
-			"category": "Shortcuts"
+			"category": "Shortcuts",
+			"submenu_off_reason_key": "menu.category_off_reason"
 		},
 		{
 			"type": "command",
@@ -1990,7 +1995,7 @@
 			"path": "shortcuts.caps_word.idle_timeout_seconds",
 			"i18n": "menu.caps_word.idle_timeout",
 			"show_current_choice": true,
-			"current_choice_suffix": ": {1}",
+			"current_choice_label_value": true,
 			"choices": [
 				{
 					"value": 0,
@@ -2059,7 +2064,8 @@
 			"checked_when": [
 				"keystats_enabled"
 			],
-			"category": "Metrics"
+			"category": "Metrics",
+			"submenu_off_reason_key": "menu.category_off_reason"
 		},
 		{
 			"type": "command",
@@ -2073,17 +2079,13 @@
 			"type": "command",
 			"id": "show_typing",
 			"i18n": "menu.metrics.show_typing",
-			"disabled_when": [
-				"keystats_enabled"
-			]
+			"readable_when_off": true
 		},
 		{
 			"type": "command",
 			"id": "show_apps",
 			"i18n": "menu.metrics.show_apps",
-			"disabled_when": [
-				"keystats_enabled"
-			]
+			"readable_when_off": true
 		},
 		{
 			"type": "---"
@@ -2260,6 +2262,7 @@
 				"layout_enabled"
 			],
 			"category": "Layout",
+			"submenu_off_reason_key": "menu.category_off_reason",
 			"platforms": [
 				"ahk"
 			],
@@ -2551,7 +2554,8 @@
 			"checked_when": [
 				"hotstrings_enabled"
 			],
-			"category": "Hotstrings"
+			"category": "Hotstrings",
+			"submenu_off_reason_key": "menu.category_off_reason"
 		},
 		{
 			"type": "command",
@@ -2754,7 +2758,7 @@
 			"path": "hotstrings.idle_reset_seconds",
 			"i18n": "menu.hotstrings.idle_reset",
 			"show_current_choice": true,
-			"current_choice_suffix": ": {1}",
+			"current_choice_label_value": true,
 			"custom_command": "idle_reset_custom",
 			"custom_i18n": "menu.hotstrings.idle_reset_custom",
 			"custom_unit_i18n": "menu.hotstrings.idle_reset_unit",
@@ -2837,7 +2841,7 @@
 			"path": "hotstrings.cascade_max_arrows",
 			"i18n": "menu.hotstrings.cascade_max_arrows",
 			"show_current_choice": true,
-			"current_choice_suffix": ": {1}",
+			"current_choice_label_value": true,
 			"choices": [
 				{
 					"value": 1,
@@ -2960,7 +2964,8 @@
 			"checked_when": [
 				"gestures_enabled"
 			],
-			"category": "Gestures"
+			"category": "Gestures",
+			"submenu_off_reason_key": "menu.category_off_reason"
 		},
 		{
 			"type": "command",
@@ -3182,7 +3187,8 @@
 			"checked_when": [
 				"tapholds_enabled"
 			],
-			"category": "TapHolds"
+			"category": "TapHolds",
+			"submenu_off_reason_key": "menu.category_off_reason"
 		},
 		{
 			"type": "command",
@@ -3322,34 +3328,6 @@
 			"platforms": [
 				"ahk",
 				"hs"
-			],
-			"unavailable": "hide"
-		}
-	],
-	"llm_generation_count_boundary": [
-		{
-			"type": "---",
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
-		}
-	],
-	"llm_generation_context_boundary": [
-		{
-			"type": "---",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "hide"
-		}
-	],
-	"llm_generation_words_boundary": [
-		{
-			"type": "---",
-			"platforms": [
-				"ahk"
 			],
 			"unavailable": "hide"
 		}
@@ -4654,16 +4632,6 @@
 			"unavailable": "hide"
 		}
 	],
-	"llm_after_profile_boundary": [
-		{
-			"type": "---",
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
-		}
-	],
 	"llm_generation_context_control": [
 		{
 			"type": "command",
@@ -4806,16 +4774,6 @@
 			"type": "include",
 			"section": "llm_generation_max_words_reset_control",
 			"present_when": "llm_generation_max_words_reset_present"
-		}
-	],
-	"llm_generation_native_controls": [
-		{
-			"type": "include",
-			"section": "llm_generation_context_controls"
-		},
-		{
-			"type": "include",
-			"section": "llm_generation_word_controls"
 		}
 	],
 	"llm_api_active_boundary": [
@@ -5295,14 +5253,14 @@
 			"type": "command",
 			"id": "magic_key_config_linux",
 			"command": "magic_key_change",
-			"i18n": "menu.hotstrings.magic_key",
+			"i18n": "menu.hotstrings.magic_key_prefix",
 			"platforms": [
 				"linux"
 			],
 			"unavailable": "hide",
 			"caption_getter": "magic_key_value",
 			"caption_layout": "prefix",
-			"caption_joiner": " : "
+			"caption_joiner": ""
 		},
 		{
 			"type": "list",
@@ -6229,10 +6187,6 @@
 				"ahk"
 			],
 			"unavailable": "hide"
-		},
-		{
-			"type": "include",
-			"section": "llm_after_profile_boundary"
 		}
 	],
 	"slot_binding_frame": [

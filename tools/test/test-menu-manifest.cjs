@@ -205,8 +205,8 @@ function main() {
 	);
 	require('node:assert/strict').deepEqual(frequencyDeclaration?.choices, frequencyCorpus.choices);
 	require('node:assert/strict').equal(
-		frequencyDeclaration?.current_choice_suffix,
-		frequencyCorpus.suffix
+		frequencyDeclaration?.current_choice_label_value,
+		frequencyCorpus.label_value
 	);
 
 	// Walk every array at the top level of the manifest and validate each
@@ -671,7 +671,7 @@ function checkChoiceProjection() {
 		const frequencyRow = menu.about_update_frequency_menu[0];
 		assert.deepEqual(frequencyRow.choices, frequencyCorpus.choices);
 		assert.equal(frequencyRow.path, frequencyCorpus.path);
-		assert.equal(frequencyRow.current_choice_suffix, frequencyCorpus.suffix);
+		assert.equal(frequencyRow.current_choice_label_value, frequencyCorpus.label_value);
 		assert.equal(Object.hasOwn(frequencyRow, 'choice_registry'), false);
 		const indentationCorpus = JSON.parse(
 			readSourceFile(path.join(SHARED, 'tests/corpus/menus/indentation_control.json'))
@@ -687,7 +687,7 @@ function checkChoiceProjection() {
 			}))
 		);
 		assert.equal(indentation[0].path, indentationCorpus.row.path);
-		assert.equal(indentation[0].current_choice_suffix, ': {1}');
+		assert.equal(indentation[0].current_choice_label_value, true);
 		assert.equal(
 			Object.hasOwn(indentation[0], 'platforms'),
 			false,
@@ -915,7 +915,7 @@ function checkChoiceProjection() {
 		assert.equal(logRow.type, 'choice');
 		assert.equal(logRow.path, 'script.log_level');
 		assert.deepEqual(logRow.choices, logCorpus.levels);
-		assert.equal(logRow.current_choice_suffix, ' : {1}');
+		assert.equal(logRow.current_choice_label_value, true);
 		for (const key of ['choice_values', 'choice_label_kind', 'choice_icons'])
 			assert.equal(Object.hasOwn(logRow, key), false, 'source metadata is consumed');
 		const logOrder = original.replace(
@@ -960,15 +960,15 @@ function checkChoiceProjection() {
 			],
 			['ERROR = "❌"', 'ERROR = "untranslated caption"', 'choice_icons'],
 			[
-				'current_choice_suffix = " : {1}"',
-				'current_choice_suffix = " level: {1}"',
-				'current_choice_suffix'
+				'current_choice_label_value = true',
+				'current_choice_label_value = false',
+				'current_choice_label_value'
 			],
 			['ERROR = "❌"', 'OTHER = "❌"', 'choice_icons'],
 			[
-				'current_choice_suffix = " : {1}"',
-				'current_choice_suffix = " : {2}"',
-				'current_choice_suffix'
+				'current_choice_label_value = true',
+				'current_choice_label_value = "{1}"',
+				'current_choice_label_value'
 			]
 		]) {
 			const invalid = original.replace(oldValue, invalidValue);
@@ -1137,11 +1137,15 @@ function checkAutoTemperatureControl() {
 	const definition = root.llm_generation_menu;
 	assert.deepEqual(corpus.states, [false, true]);
 	assert.deepEqual(corpus.prediction_counts, [1, 2]);
-	assert.equal(definition.length, 2);
+	assert.equal(definition.length, 4, 'the first group, one separator, the context group');
 	assert.deepEqual(definition[0], {
 		type: 'list',
 		id: 'llm_generation_values'
 	});
+	assert.deepEqual(definition.slice(2), [
+		{ type: '---' },
+		{ type: 'list', id: 'llm_generation_context_values' }
+	]);
 	assert.equal(definition[1].type, 'check');
 	assert.equal(definition[1].id, corpus.row.id);
 	assert.equal(definition[1].i18n, corpus.row.i18n);
@@ -1550,7 +1554,7 @@ function checkNumericChoiceSchema() {
 		id: 'pred_indent',
 		default: 0,
 		recommended: 0,
-		input_altering: false,
+		family: 'setting',
 		requires: {
 			macos: ['mlx', 'ollama'],
 			linux: ['evdev', 'ollama', 'uinput', 'xdotool'],
@@ -4971,66 +4975,24 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	);
 }
 
-// Actual numeric providers retain each driver's existing boundary and caption policy.
+// The generation menu reads two groups with one separator, every row of the
+// context group below it, and no driver brings a boundary of its own.
 {
 	const assert = require('node:assert/strict');
-	const corpus = JSON.parse(
-		readSourceFile(resolve(SHARED, 'tests/corpus/menus/generation_boundaries.json'))
-	);
 	const manifest = JSON.parse(readSourceFile(MENU_PATH));
-	for (const key of ['count', 'context', 'words']) {
-		const expected = corpus.boundaries[key];
-		assert.deepEqual(manifest[expected.section], expected.rows);
-		assert.deepEqual(expected.projections.linux, [], 'Linux has no native numeric boundary');
-		if (key !== 'count')
-			assert.deepEqual(expected.projections.hs, [], 'macOS has no later numeric boundary');
-		for (const [driver, relative, call] of [
-			['windows', 'ui/menu/menu_llm/menu_settings.ahk', 'MenuRenderer_TemplateRows'],
-			['macos', 'ui/menu/menu_llm/init.lua', 'ManifestMenu.template_rows']
-		]) {
-			const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative));
-			assert.equal(
-				source.includes(call + '("' + expected.section + '"'),
-				driver === 'windows' || key === 'count'
-			);
-		}
-		const linux = readSourceFile(
-			resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
-		);
-		assert(!linux.includes('"' + expected.section + '"'));
-	}
-	for (const code of [
-		'ar',
-		'cs',
-		'da',
-		'de',
-		'en',
-		'es',
-		'fr',
-		'he',
-		'hi',
-		'it',
-		'ja',
-		'ko',
-		'no',
-		'nl',
-		'pl',
-		'pt',
-		'ru',
-		'sv',
-		'tr',
-		'uk',
-		'zh'
-	]) {
-		const strings = JSON.parse(readSourceFile(resolve(SHARED, 'data/locales/' + code + '.json')));
-		for (const key of [...corpus.caption_keys, corpus.published_marker_key]) {
-			assert.equal(typeof strings[key], 'string', code + ': existing numeric caption ' + key);
-			assert(strings[key].trim().length > 0);
-		}
-	}
-	console.log(
-		'Generation boundaries: four actual constructors, authentic cross-platform absence and21 unchanged caption sets.'
+	assert.deepEqual(
+		manifest.llm_generation_menu.map((row) => row.id ?? row.type),
+		['llm_generation_values', 'llm_auto_raise_temperature', '---', 'llm_generation_context_values'],
+		'one separator, then the context'
 	);
+	for (const retired of [
+		'llm_generation_count_boundary',
+		'llm_generation_context_boundary',
+		'llm_generation_words_boundary',
+		'llm_generation_native_controls'
+	])
+		assert.equal(manifest[retired], undefined, retired + ' stays retired');
+	console.log('Generation groups: one declared separator on every driver.');
 }
 
 // The extension-list boundary has two actual native owners, independent of its children.
@@ -7970,8 +7932,8 @@ console.log(
 		.replace(') {', ', CapturedWarningRows := unset) {');
 	assert.equal(
 		expected.producer_edges.filter((edge) => edge.signatures.ahk === frozenWarningLocator).length,
-		2,
-		'both independent warning-owner locators retain their original two parameters'
+		1,
+		'the independent warning-owner locator retains its original two parameters'
 	);
 	const warningOwnerSource = readSourceFile(
 		resolve(SHARED, '../windows/ui/menu/menu_llm/menu_main.ahk')
@@ -8035,16 +7997,27 @@ console.log(
 			'the whole native parent context owns its genuine macOS boundary'
 		);
 	}
-	// The model and the profile rows form one block on every driver: no row,
-	// separator or boundary list may sit between them, whatever the platform.
-	const [joinedFirst, joinedSecond] = outerBoundary.adjacent_without_boundary;
+	// The model, the profile and the test rows form one block on every driver: no
+	// row, separator or boundary list may sit between them, whatever the platform.
+	const joined = outerBoundary.adjacent_without_boundary;
 	const outerRows = declaredFrames[outerBoundary.section];
-	const joinedIndex = outerRows.findIndex((row) => row.id === joinedFirst);
+	const joinedIndex = outerRows.findIndex((row) => row.id === joined[0]);
 	assert(joinedIndex >= 0, 'the actual model button remains declared');
+	assert.deepEqual(
+		outerRows.slice(joinedIndex, joinedIndex + joined.length).map((row) => row.id),
+		joined,
+		'the block stays contiguous on every platform'
+	);
+	assert.equal(outerRows[joinedIndex - 1]?.type, '---', 'one declared separator opens the block');
 	assert.equal(
-		outerRows[joinedIndex + 1]?.id,
-		joinedSecond,
-		'the profile row directly follows the model row on every platform'
+		outerRows[joinedIndex + joined.length]?.type,
+		'---',
+		'one declared separator closes the block on every driver'
+	);
+	assert.equal(
+		outerRows[joinedIndex + joined.length]?.platforms,
+		undefined,
+		'the closing separator is not limited to a platform'
 	);
 	const outerSource = readSourceFile(resolve(SHARED, '..', outerBoundary.owner));
 	assert(
@@ -9634,12 +9607,12 @@ console.log(
 			type: 'command',
 			id: 'magic_key_config_linux',
 			command: 'magic_key_change',
-			i18n: 'menu.hotstrings.magic_key',
+			i18n: 'menu.hotstrings.magic_key_prefix',
 			platforms: ['linux'],
 			unavailable: 'hide',
 			caption_getter: 'magic_key_value',
 			caption_layout: 'prefix',
-			caption_joiner: ' : '
+			caption_joiner: ''
 		},
 		{ type: 'list', id: 'magic_key_reset_if_custom', platforms: ['linux'], unavailable: 'hide' }
 	]);
@@ -10927,8 +10900,7 @@ console.log(
 		unavailable: 'hide'
 	};
 	const expected = [
-		{ type: 'list', id: 'llm_profile_parent_rows', platforms: ['ahk'], unavailable: 'hide' },
-		{ type: 'include', section: 'llm_after_profile_boundary' }
+		{ type: 'list', id: 'llm_profile_parent_rows', platforms: ['ahk'], unavailable: 'hide' }
 	];
 	assert.deepEqual(records[frame], expected);
 	assert.deepEqual(records[group], [parent]);
@@ -12810,6 +12782,9 @@ console.log(
 			i18n: 'menu.agent.mode_title',
 			show_current_choice: true,
 			disabled_when: ['agent_mode_ready'],
+			// The agent's enable row under the category-off rule.
+			submenu_off_reason_key: 'menu.category_off_reason',
+			submenu_off_value: 'off',
 			choices: [
 				{ value: 'off', i18n: 'menu.agent.mode_off' },
 				{ value: 'action', i18n: 'menu.agent.mode_action' },

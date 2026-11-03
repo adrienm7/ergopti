@@ -584,7 +584,7 @@ helpers.describe("menu certification: published available component rows are ren
 							and i18n.section(row.i18n)
 							or i18n.get(row.i18n)
 						if row.id == "magic_key_source_heading" then
-							label = label .. " : " .. i18n.get("menu.layout.magic_key_source.auto")
+							label = require("locale.label_value").compose(i18n.get, label, i18n.get("menu.layout.magic_key_source.auto"))
 						end
 						if row.caption_getter ~= nil then
 							local caption = fixture_captions[row.caption_getter]
@@ -991,10 +991,10 @@ local function control_boundary_corpus()
 end
 
 --- Reuses the existing physical-source sandbox with genuine native preference/settings owners.
-local function with_control_trigger_source(scenario)
+local function with_control_trigger_source(scenario, source)
 	local Sandbox = require("test.config_unused_keys_contract").sandbox
-	Sandbox.with_config('# hand trigger source\n[llm]\nenabled = true\n[llm.models]\nselected = "api"\n'
-		.. '[llm.trigger]\ndebounce_ms = 500\nfuture = "keep exact" # retained\n', function(path)
+	Sandbox.with_config(source or ('# hand trigger source\n[llm]\nenabled = true\n[llm.models]\nselected = "api"\n'
+		.. '[llm.trigger]\ndebounce_ms = 500\nfuture = "keep exact" # retained\n'), function(path)
 		local names = { "infra.llm_preferences", "modules.llm.trigger_settings" }
 		local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name); rawset(package.loaded, name, nil) end
 		local Paths = require("infra.config_paths")
@@ -1021,6 +1021,8 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 				local root, original = ManifestMenu.get_root(), ManifestMenu.get_array(boundary.section)
 				local context, changes = full_context(), 0
 				context.on_menu_changed = function() changes = changes + 1 end
+				context.paused, context.is_paused = false, function() return false end
+				context.llm.streaming_revision = function() return 0 end
 				local function build()
 					return with_api_source(function(builder, entries, api_path)
 						local source = Sandbox.read_bytes(api_path)
@@ -1061,6 +1063,35 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 				helpers.assert_eq(changes, 1)
 			end)
 		end)
+	end)
+
+	-- Only user changes are stored, so at their shipped values neither filter nor
+	-- the backend is in the file. The macOS rows greyed exactly there.
+	helpers.it("keeps both privacy rows enabled over a sparse source and persists a click (shared-privacy-triggers)", function()
+		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/privacy_trigger_controls.json"), "rb"))
+		local corpus = assert(require("json").decode(file:read("*a"))); assert(file:close())
+		for _, expected in ipairs(corpus.rows) do
+			with_absent_english(function()
+				with_control_trigger_source(function(settings, path, Sandbox)
+					local context = full_context()
+					context.paused = false
+					context.is_paused = function() return false end
+					context.llm.get_backend = function() return "ollama" end
+					context.llm.streaming_revision = function() return 0 end
+					local row = assert(with_api_source(function(builder)
+						return find_item(builder.build(context), i18n.get("menu.llm.trigger_menu_title"))
+					end))
+					local privacy = assert(find_item(row.menu, i18n.get(expected.i18n)))
+					helpers.assert_eq(privacy.disabled or false, false, "a filter at its shipped value stays changeable")
+					helpers.assert_eq(privacy.checked or false, expected.neutral)
+					helpers.assert_eq(privacy.fn(), true)
+					helpers.assert_eq(settings.get(expected.linux), not expected.neutral)
+					local leaf = expected.path:match("[^.]+$")
+					helpers.assert_true(Sandbox.read_bytes(path):find(leaf .. " = " .. tostring(not expected.neutral), 1, true) ~= nil,
+						"the click reaches config.toml")
+				end, '[llm]\nenabled = true\n')
+			end)
+		end
 	end)
 
 	helpers.it("projects independent platform boundaries using the actual initialized renderer (llm-control-boundaries)", function()

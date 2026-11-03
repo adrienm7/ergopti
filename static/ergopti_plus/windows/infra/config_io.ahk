@@ -1695,7 +1695,7 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		; a partial config flush triggered by the -500 ms boot timer from clobbering the
 		; user's file with uninitialised defaults (e.g. before Features or GestureAssignments
 		; have been populated by ApplyConfigToml and the deferred tray-menu build).
-		global _DriverReady
+		global _DriverReady, _DriverBootTailPending
 		; Guard: refuse to serialize the feature tree when boot could not READ an
 		; existing config.toml. In that case ApplyConfigToml applied nothing and the
 		; tree below is ManifestBuildFeaturesMap() DEFAULTS — writing it out replaces
@@ -1724,6 +1724,13 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		; pay the admission (a registry deep compare of about 21 ms): the 100 ms retry ran it
 		; 27 times per boot. A new request and every attempt once the driver is ready are
 		; still admitted before anything is collected or written.
+		; The request stays recorded early, but the write waits for the ready line: on
+		; the boot's last message pump it stalled the tail of the boot by 860 ms.
+		if !RegisterRequest && IsSet(_DriverBootTailPending) && _DriverBootTailPending && !PublicationDebt {
+			PerfCount("config_io.save_retry_deferred_boot_tail")
+			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+				? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
+		}
 		if !RegisterRequest && !_DriverReady && !PublicationDebt {
 			PerfCount("config_io.save_retry_deferred_before_admission")
 			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
@@ -2311,7 +2318,7 @@ ScriptShortcutRows() {
 				CurrentLabel := GESTURE_ACTIONS.Has(Current) ? GestureActionDisplayLabel(Current, GestureBindingId("script", Slot)) : t("dialog.action_picker.disabled")
 				SlotLabel := t(SCRIPT_SHORTCUT_LABELS[Slot])
 				Rows.Push(Map(
-					"label",  SlotLabel . " : " . CurrentLabel,
+					"label",  LabelValue(SlotLabel, CurrentLabel),
 					"action", ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id), false, GestureBindingId("script", _s)))(Slot, SlotLabel)))
 		}
 		return Rows
@@ -2785,7 +2792,7 @@ KeyboardSlotRows() {
 								continue
 						ActionLabel := GESTURE_ACTIONS.Has(Action) ? GestureActionDisplayLabel(Action, GestureBindingId("keyboard", Slot)) : Action
 						Items.Push(Map(
-								"label", _FormatSlotLabel(Slot) . " : " . ActionLabel,
+								"label", LabelValue(_FormatSlotLabel(Slot), ActionLabel),
 								"action", ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot)
 						))
 				}

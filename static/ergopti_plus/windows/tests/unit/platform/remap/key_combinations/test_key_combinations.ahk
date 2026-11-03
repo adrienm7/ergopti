@@ -594,8 +594,8 @@ _KCT_MenuListsEveryOrderedPair() {
 		Assert(InStr(Forward["label"], GestureActionDisplayLabel("caps_word")) > 0, "and names its tap")
 		Assert(InStr(Forward["label"], _TH_HoldOptionLabel("ctrl")) > 0, "and its hold")
 		AssertFalse(Backward["checked"], "the other order has its own, empty, slots")
-		AssertEqual(t("tap_hold.group.caps_lock") . " + " . t("tap_hold.group.left_alt") . " : "
-			. t("dialog.action_picker.disabled"), Backward["label"], "an empty pair explicitly names its disabled action")
+		AssertEqual(LabelValue(t("tap_hold.group.caps_lock") . " + " . t("tap_hold.group.left_alt"),
+			t("dialog.action_picker.disabled")), Backward["label"], "an empty pair explicitly names its disabled action")
 		AssertTrue(Groups["left_alt"]["checked"], "a first key with a pair is ticked")
 		AssertFalse(Groups["caps_lock"]["checked"])
 		; The menu a pair opens is the manifest's: its clear row, a separator,

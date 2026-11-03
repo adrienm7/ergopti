@@ -284,6 +284,7 @@ local function load_from_shared()
 	M.layout.screen_margin = require_key("layout", "screen_margin")
 	M.layout.corner_radius = require_key("layout", "corner_radius")
 	M.layout.label_gap     = require_key("layout", "label_gap")
+	M.layout.llm_max_content_width = require_key("layout", "llm_max_content_width")
 
 	-- [positioning]
 	M.layout.caret_offset_x      = require_key("positioning", "caret_offset_x")

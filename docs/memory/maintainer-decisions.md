@@ -268,3 +268,7 @@ shared (`Catalogue.registry_source` and `registry_changes_args` in
   running » stays. The shared-mode merge into the user's `karabiner.json` is retired.
 - **Maintainer workflow**: partial work is delivered into dev after the feasible container or CI
   work, with native or device gaps documented here rather than holding a branch.
+
+## Defaults and recommended values (2 November 2026)
+
+A manifest row is a feature or a setting. A feature changes the keyboard or the behaviour: its default is neutral (off, none) and its recommended value is the Ergopti setup, so an empty config leaves the keyboard alone. A setting says how a feature works once active (prediction style and count, indentation, delays, the password and address bar filters): its recommended value equals its default. An option missing from the file takes its manifest default, not `false`. "Restore recommended" puts back every recommended value, adjusted settings included: the user wants to revert their trials. Each row declares its `family`; `test-feature-family-rule.cjs` and the generator enforce the rule, exceptions justified in the manifest (`rule_exception`, `restore_exempt_reason`).

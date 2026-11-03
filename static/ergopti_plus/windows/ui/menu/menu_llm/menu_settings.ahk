@@ -239,16 +239,19 @@ _LLM_Menu_TriggerRows(Position := "all") {
  * All numeric values use InputBox dialogs (same UX as HS settings_manager).
  * @param {Func} AutoCommand Optional acknowledged command owner for native tests.
  * @param {Func} ValuesProvider Optional unrelated numeric provider for native tests.
+ * @param {Func} ContextProvider Optional context provider for native tests.
  * @returns {Menu} Populated generation submenu.
  */
-LLM_Menu_BuildGenerationMenu(AutoCommand := unset, ValuesProvider := unset) {
+LLM_Menu_BuildGenerationMenu(AutoCommand := unset, ValuesProvider := unset, ContextProvider := unset) {
 	global _LLM_Menu
 	if !IsSet(AutoCommand)
 		AutoCommand := (*) => LLM_Menu_ToggleBool(ConfigLeaf.AUTO_RAISE_TEMP)
 	if !IsSet(ValuesProvider)
 		ValuesProvider := (*) => _LLM_Menu_GenerationRows()
+	if !IsSet(ContextProvider)
+		ContextProvider := (*) => _LLM_Menu_GenerationContextRows()
 	return MenuRenderer_Build("llm_generation_menu", "LLM", Map(), Map(),
-		Map("llm_generation_values", ValuesProvider),
+		Map("llm_generation_values", ValuesProvider, "llm_generation_context_values", ContextProvider),
 		Map(MenuCommand.LLM_AUTO_RAISE_TEMPERATURE, (*) => _LLM_Menu_AutoRaiseReady() ? AutoCommand.Call() : false),
 		Map("llm_auto_raise_enabled", (*) => _LLM_Menu[ConfigLeaf.AUTO_RAISE_TEMP],
 			"llm_auto_raise_ready", (*) => _LLM_Menu_AutoRaiseReady()))
@@ -264,9 +267,9 @@ _LLM_Menu_AutoRaiseReady() {
 }
 
 /**
- * Row data for the generation submenu.
- * @returns {Array} The suggestion count, the four numeric prompts with their
- *     reset rows, plus the existing navigation reset toggle.
+ * Row data of the generation submenu's first group.
+ * @returns {Array} The suggestion count, the words and the temperature, each with
+ *     its reset row.
  */
 _LLM_Menu_GenerationRows() {
 	global _LLM_Menu
@@ -287,19 +290,35 @@ _LLM_Menu_GenerationRows() {
 		_LLM_DefaultFor("llm_num_predictions"),
 		(*) => _LLM_AssignAndRebuild("n_predictions", _LLM_DefaultFor("llm_num_predictions")))
 
-	CountBoundaryRows := MenuRenderer_TemplateRows("llm_generation_count_boundary", Map(), Map(), Map())
-	if !(CountBoundaryRows is Array)
+	Commands := _LLM_Menu_GenerationCommands()
+	Getters := _LLM_Menu_GenerationGetters()
+	WordRows := MenuRenderer_TemplateRows("llm_generation_word_controls", Commands, Getters, Map())
+	if !(WordRows is Array)
 		return []
-	for Row in CountBoundaryRows
+	for Row in WordRows
 		Rows.Push(Row)
+	TemperatureRows := MenuRenderer_TemplateRows("llm_generation_temperature_controls", Commands, Getters, Map())
+	if !(TemperatureRows is Array)
+		return []
+	for Row in TemperatureRows
+		Rows.Push(Row)
+	return Rows
+}
 
-	ContextDefault := _LLM_DefaultFor("llm_context_length", 500)
-	MinDefault := _LLM_DefaultFor("llm_min_words", 3)
-	MaxDefault := _LLM_DefaultFor("llm_max_words", 15)
+/**
+ * Row data of the generation submenu's context group, at its bottom.
+ * @returns {Array} The context size, its reset row and the clear-on-click toggle.
+ */
+_LLM_Menu_GenerationContextRows() {
+	Rows := MenuRenderer_TemplateRows("llm_generation_context_controls", _LLM_Menu_GenerationCommands(),
+		_LLM_Menu_GenerationGetters(), Map())
+	return (Rows is Array) ? Rows : []
+}
+
+; The commands of the generation prompts and toggles.
+_LLM_Menu_GenerationCommands() {
 	TempDefault := Format("{:.2f}", Float(_LLM_DefaultFor("llm_temperature", "0.10")) + 0)
-	max_val := _LLM_Menu[ConfigLeaf.MAX_WORDS]
-	max_display := (max_val == 0) ? t("menu.llm.unlimited") : max_val
-	GenerationCommands := Map(
+	return Map(
 		MenuCommand.LLM_GENERATION_CONTEXT, (*) => LLM_Menu_PromptCtxChars(),
 		MenuCommand.LLM_GENERATION_CONTEXT_RESET, (*) => _LLM_AssignAndRebuild("ctx_chars", _LLM_DefaultFor("llm_context_length", 500)),
 		MenuCommand.LLM_GENERATION_MIN_WORDS, (*) => LLM_Menu_PromptMinWords(),
@@ -309,7 +328,18 @@ _LLM_Menu_GenerationRows() {
 		MenuCommand.LLM_GENERATION_TEMPERATURE, (*) => LLM_Menu_PromptTemperature(),
 		MenuCommand.LLM_GENERATION_TEMPERATURE_RESET, (*) => _LLM_AssignAndRebuild("temperature", TempDefault),
 		MenuCommand.LLM_RESET_ON_NAV, (*) => LLM_Menu_ToggleBool(ConfigLeaf.RESET_ON_NAV))
-	GenerationGetters := Map(
+}
+
+; The captions and readiness of the generation rows, read at this build.
+_LLM_Menu_GenerationGetters() {
+	global _LLM_Menu
+	ContextDefault := _LLM_DefaultFor("llm_context_length", 500)
+	MinDefault := _LLM_DefaultFor("llm_min_words", 3)
+	MaxDefault := _LLM_DefaultFor("llm_max_words", 15)
+	TempDefault := Format("{:.2f}", Float(_LLM_DefaultFor("llm_temperature", "0.10")) + 0)
+	max_val := _LLM_Menu[ConfigLeaf.MAX_WORDS]
+	max_display := (max_val == 0) ? t("menu.llm.unlimited") : max_val
+	return Map(
 		"llm_generation_ready", () => true,
 		"llm_generation_context_caption", () => "" . _LLM_Menu["ctx_chars"],
 		"llm_generation_context_reset_caption", () => "" . ContextDefault,
@@ -324,33 +354,6 @@ _LLM_Menu_GenerationRows() {
 		"llm_generation_temperature_caption", () => _LLM_Menu["temperature"],
 		"llm_generation_temperature_reset_caption", () => TempDefault,
 		"llm_generation_temperature_reset_present", () => _LLM_Menu["temperature"] != TempDefault)
-	ContextRows := MenuRenderer_TemplateRows("llm_generation_context_controls", GenerationCommands, GenerationGetters, Map())
-	if !(ContextRows is Array)
-		return []
-	for Row in ContextRows
-		Rows.Push(Row)
-	ContextBoundaryRows := MenuRenderer_TemplateRows("llm_generation_context_boundary", Map(), Map(), Map())
-	if !(ContextBoundaryRows is Array)
-		return []
-	for Row in ContextBoundaryRows
-		Rows.Push(Row)
-	WordRows := MenuRenderer_TemplateRows("llm_generation_word_controls", GenerationCommands, GenerationGetters, Map())
-	if !(WordRows is Array)
-		return []
-	for Row in WordRows
-		Rows.Push(Row)
-	WordBoundaryRows := MenuRenderer_TemplateRows("llm_generation_words_boundary", Map(), Map(), Map())
-	if !(WordBoundaryRows is Array)
-		return []
-	for Row in WordBoundaryRows
-		Rows.Push(Row)
-	TemperatureRows := MenuRenderer_TemplateRows("llm_generation_temperature_controls", GenerationCommands, GenerationGetters, Map())
-	if !(TemperatureRows is Array)
-		return []
-	for Row in TemperatureRows
-		Rows.Push(Row)
-
-	return Rows
 }
 
 
@@ -575,9 +578,9 @@ _LLM_Menu_DisplayRows(Position := "all") {
 
 	_LLM_MaybeResetRow(Rows,
 		_LLM_Menu[ConfigLeaf.PRED_INDENT],
-		_LLM_DefaultFor("llm_pred_indent", 0),
+		_LLM_DefaultFor("llm_pred_indent"),
 		(*) => _LLM_AssignAndRebuild(ConfigLeaf.PRED_INDENT,
-			_LLM_DefaultFor("llm_pred_indent", 0)))
+			_LLM_DefaultFor("llm_pred_indent")))
 
 	if Position == "remaining"
 		return LeadingRows
@@ -985,6 +988,8 @@ LLM_Menu_TriggerPrediction(FireFn := 0) {
 	return true
 }
 
+; From this many milliseconds on, the test prediction shows seconds.
+global LLM_TEST_PREDICTION_MS_PER_SECOND := 1000
 ; The most characters of an answer the test prediction's notice shows.
 global LLM_TEST_PREDICTION_EXCERPT_CHARS := 200
 ; Shown to the user, so prose rather than a closed log reason id.
@@ -1018,7 +1023,7 @@ LLM_Menu_TestPrediction(SendFn := 0) {
 	LoggerStart("LLM", "Test prediction #{1} sent to the active backend.", Generation)
 	_LLM_Menu_ShowManualPredictionNotice("llm.test_prediction.running")
 	Transport := HasMethod(SendFn, "Call") ? SendFn : _LLM_Menu_TestPredictionSend
-	try Transport.Call(Sample, _LLM_Menu_OnTestPredictionAnswer.Bind(Generation),
+	try Transport.Call(Sample, _LLM_Menu_OnTestPredictionAnswer.Bind(Generation, A_TickCount),
 		_LLM_Menu_OnTestPredictionFailure.Bind(Generation), _LLM_Menu_TestPredictionIsCurrent.Bind(Generation))
 	catch as Err {
 		_LLM_Menu_OnTestPredictionFailure(Generation, Map("reason", Err.Message))
@@ -1027,13 +1032,16 @@ LLM_Menu_TestPrediction(SendFn := 0) {
 	return true
 }
 
-; Sends the sample to the active backend, with the active prompt and settings.
+; Sends the sample to the active backend, with the active prompt and the test's
+; own high temperature: the same sample at the low generation temperature repeats
+; one answer, which proves nothing. Nothing here reads the prediction cache. The
+; remote body builder drops the temperature of a default-sampling-only model.
 _LLM_Menu_TestPredictionSend(Sample, OnSuccess, OnFail, Current) {
-	global _LLM_Menu, _LLM_Engine
+	global _LLM_Menu, _LLM_Engine, LLM_Defaults
 	Profile := LLM_FindProfile(_LLM_Menu["profile_id"], _LLM_Menu[ConfigLeaf.USER_PROFILES])
 	System := LLM_ResolveSystemPrompt(Profile, 1, _LLM_Engine[ConfigLeaf.MIN_WORDS], _LLM_Engine[ConfigLeaf.MAX_WORDS],
 		_LLM_Engine["language"])
-	Temperature := _LLM_Engine["temperature"] + 0.0
+	Temperature := LLM_Defaults["llm_test_prediction_temperature"] + 0.0
 	if (_LLM_Menu["backend"] == "api") {
 		Entry := _LLM_Engine_GetActiveApiEntry()
 		if (Entry == "")
@@ -1051,8 +1059,21 @@ _LLM_Menu_TestPredictionIsCurrent(Generation) {
 	return (Generation == _LLM_Menu_TestPredictionGeneration && !A_IsSuspended && LLM_Menu_AiEnabled()) ? true : false
 }
 
+/**
+ * The generation time as the notice shows it, milliseconds under one second.
+ * @param {Integer} Ms The elapsed milliseconds.
+ * @returns {String} The localized duration.
+ */
+LLM_Menu_TestPredictionDuration(Ms) {
+	global LLM_TEST_PREDICTION_MS_PER_SECOND
+	if (Ms < LLM_TEST_PREDICTION_MS_PER_SECOND)
+		return StrReplace(t("llm.test_prediction.duration_ms"), "{1}", Ms)
+	Tenths := Round(Ms * 10 / LLM_TEST_PREDICTION_MS_PER_SECOND)
+	return StrReplace(StrReplace(t("llm.test_prediction.duration_s"), "{1}", Tenths // 10), "{2}", Mod(Tenths, 10))
+}
+
 ; The backend answered: show the answer, a blank one being a failure.
-_LLM_Menu_OnTestPredictionAnswer(Generation, Text, *) {
+_LLM_Menu_OnTestPredictionAnswer(Generation, StartTick, Text, *) {
 	global LLM_TEST_PREDICTION_EXCERPT_CHARS, LLM_TEST_PREDICTION_EMPTY_ANSWER
 	if !_LLM_Menu_TestPredictionIsCurrent(Generation)
 		return
@@ -1061,11 +1082,14 @@ _LLM_Menu_OnTestPredictionAnswer(Generation, Text, *) {
 		_LLM_Menu_OnTestPredictionFailure(Generation, Map("reason", LLM_TEST_PREDICTION_EMPTY_ANSWER))
 		return
 	}
+	Elapsed := TickElapsed(StartTick)
 	; Sizes only: the answer stays out of the log, like every prediction.
-	LoggerSuccess("LLM", "Test prediction #{1} answered ({2} character(s)).", Generation, StrLen(Answer))
+	LoggerSuccess("LLM", "Test prediction #{1} answered ({2} character(s), {3} ms).", Generation, StrLen(Answer), Elapsed)
 	Shown := StrLen(Answer) > LLM_TEST_PREDICTION_EXCERPT_CHARS
 		? SubStr(Answer, 1, LLM_TEST_PREDICTION_EXCERPT_CHARS) . "…" : Answer
-	_LLM_Menu_ShowNotice(StrReplace(t("llm.test_prediction.result"), "{1}", Shown))
+	; The duration first: an answer may itself hold the text « {2} ».
+	_LLM_Menu_ShowNotice(StrReplace(StrReplace(t("llm.test_prediction.result"), "{2}",
+		LLM_Menu_TestPredictionDuration(Elapsed)), "{1}", Shown))
 }
 
 ; The backend refused or failed: show why.

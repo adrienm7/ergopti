@@ -18,7 +18,7 @@
 _WPF_WithState(Body) {
 	global _I18nCache, _I18nCacheLoaded, _SharedDir
 	Root := _MR_GetManifestRoot()
-	Keys := ["llm_profile_parent_ahk", "llm_profile_parent_frame_ahk", "llm_after_profile_boundary"]
+	Keys := ["llm_profile_parent_ahk", "llm_profile_parent_frame_ahk"]
 	Previous := Map()
 	for Key in Keys {
 		AssertTrue(Root.Has(Key), "the genuine profile presentation declaration exists")
@@ -53,16 +53,14 @@ _WPF_CheckCaptions(Root) {
 			Child.Add("Original native profile", (*) => Calls["count"] += 1)
 			Rows := _LLM_Menu_ProfileParentRows(Child, Subject["subject"], false)
 			AssertTrue(Rows is Array, "the actual native profile parent provider returns data")
-			AssertEqual(2, Rows.Length, "the completed parent precedes exactly one boundary")
+			AssertEqual(1, Rows.Length, "the completed parent brings no boundary: the test row follows it")
 			AssertEqual(Subject["expected"], Rows[1]["label"], "the frozen old translated caption stays exact")
 			AssertTrue(Rows[1]["submenu"] == Child, "the original Menu object is the child, not a reconstructed copy")
 			AssertFalse(Rows[1].Get("disabled", false), "enabled settings retain their active parent")
-			AssertTrue(Rows[2].Get("separator", false), "the whole frame owns its following boundary")
 			AssertEqual(1, MenuRenderer_AppendRows(Target, "llm_menu", "llm_profile_parent_frame_ahk", Rows))
-			AssertEqual(2, TrayMenuItemCount(Target), "native Win32 image keeps its literal terminal separator")
+			AssertEqual(1, TrayMenuItemCount(Target), "the native image is the parent alone")
 			AssertEqual(Subject["expected"], _CLP_NativeCaption(Target, 1))
 			AssertEqual(Child.Handle, DllCall("GetSubMenu", "Ptr", Target.Handle, "Int", 0, "Ptr"))
-			AssertTrue(TrayMenuIsSeparatorAt(Target, 1), "actual native order agrees with the independent image")
 			AssertEqual(0, Calls["count"], "building the parent never executes a profile choice")
 		} finally {
 			try Target.Delete()
@@ -85,7 +83,6 @@ _WPF_CheckDisabled(Root) {
 		AssertTrue(Rows is Array)
 		AssertTrue(Rows[1].Get("disabled", false), "off state greys the completed native parent")
 		AssertTrue(Rows[1]["submenu"] == Child, "disabled state retains even an empty original Menu")
-		AssertTrue(Rows[2]["separator"], "disabled state does not remove the boundary")
 	} finally Child.Delete()
 }
 
@@ -106,30 +103,6 @@ _WPF_CheckWithdrawn(Root) {
 		AssertFalse(_LLM_Menu_ProfileParentRows(Map(), "Native profile", false), "a copied public Map is not the original Menu child")
 		AssertTrue(_LLM_Menu_ProfileParentRows(Child, "Native profile", false) is Array, "exact repaired source restores provider")
 	} finally Child.Delete()
-}
-
-_WPF_Order() {
-	_WPF_WithState(_WPF_CheckOrder)
-}
-
-_WPF_CheckOrder(Root) {
-	Frame := Root["llm_profile_parent_frame_ahk"]
-	Root["llm_profile_parent_frame_ahk"] := [Frame[2], Frame[1]]
-	Child := Menu(), Target := Menu()
-	try {
-		Rows := _LLM_Menu_ProfileParentRows(Child, "Native profile", false)
-		AssertTrue(Rows[1].Get("separator", false), "declaration order controls genuine first position")
-		AssertTrue(Rows[2]["submenu"] == Child, "reordering declaration moves the genuine native child")
-		AssertEqual(1, MenuRenderer_AppendRows(Target, "llm_menu", "llm_profile_parent_frame_ahk", Rows))
-		AssertTrue(TrayMenuIsSeparatorAt(Target, 0))
-		AssertEqual(Child.Handle, DllCall("GetSubMenu", "Ptr", Target.Handle, "Int", 1, "Ptr"))
-	} finally {
-		try Target.Delete()
-		finally {
-			MenuDispatcher_PruneMenu(Target)
-			Child.Delete()
-		}
-	}
 }
 
 ; Calls the same original production entry on predecessor and candidate.
@@ -162,13 +135,12 @@ _WPF_CheckProductionRefusal(Root) {
 	}
 }
 
-Test("Windows profile parent: all 21 frozen captions retain actual native child and boundary", _WPF_Captions)
+Test("Windows profile parent: all 21 frozen captions retain actual native child", _WPF_Captions)
 Test("Windows profile parent: disabled and empty original Menu identity remain exact", _WPF_Disabled)
 Test("Windows profile parent: source withdrawal and fake native identity refuse completely", _WPF_Withdrawn)
-Test("Windows profile parent: declaration reorder controls the actual native image", _WPF_Order)
 Test("Windows profile parent: actual original entry admits frame before profile data reads", _WPF_ProductionRefusal)
 
-; Keeps frame and boundary admitted while withdrawing only their separate parent owner.
+; Keeps the frame admitted while withdrawing only their separate parent owner.
 ; The absent native profile datum arms the actual-entry ordering regression independently.
 _WPF_ProductionParentRefusal() {
 	_WPF_WithState(_WPF_CheckProductionParentRefusal)
@@ -185,7 +157,6 @@ _WPF_CheckProductionParentRefusal(Root) {
 		_LLM_Menu_Handle := Target
 		AssertFalse(_LLM_Menu.Has("profile_id"), "missing profile datum is armed before the actual original entry")
 		AssertTrue(Root.Has("llm_profile_parent_frame_ahk"), "the complete frame remains present")
-		AssertTrue(Root.Has("llm_after_profile_boundary"), "the existing boundary remains present")
 		Root.Delete("llm_profile_parent_ahk")
 		try _LLM_Menu_EmitRow(_LLM_Menu_Handle, "llm_profile", false)
 		catch as Err
@@ -219,7 +190,6 @@ _WPF_CheckCurrentCapturedParentRefusal(Root) {
 		_LLM_Menu_Handle := Target
 		AssertFalse(_LLM_Menu.Has("profile_id"), "absent actual profile state arms the read-order regression")
 		AssertTrue(Root.Has("llm_profile_parent_frame_ahk"), "the whole frame is still admitted")
-		AssertTrue(Root.Has("llm_after_profile_boundary"), "the original following boundary is still admitted")
 		Root.Delete("llm_profile_parent_ahk")
 		try _LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle, "llm_profile", false, [], Target, "LLM")
 		catch as Err

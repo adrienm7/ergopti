@@ -439,7 +439,7 @@ MagicKeySourceMenuRows() {
 		return []
 	Shown := (Current == Automatic) ? t("menu.layout.magic_key_source.auto")
 		: _MagicKeySourceLabel(Current, Keycodes, Hkl)
-	Rows[1]["label"] .= " : " . Shown
+	Rows[1]["label"] := LabelValue(Rows[1]["label"], Shown)
 	return Rows
 }
 
@@ -921,7 +921,7 @@ ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 
 	PersonalInformationSummary := ""
 	for Key, _ in Changed
-		PersonalInformationSummary .= Key . ": " . PersonalInformation[Key] . "`n"
+		PersonalInformationSummary .= LabelValue(Key, PersonalInformation[Key]) . "`n"
 	try {
 		if HasMethod(ConfirmFn, "Call")
 			ConfirmFn.Call(t("dialog.personal_info.saved") "`n`n" PersonalInformationSummary)

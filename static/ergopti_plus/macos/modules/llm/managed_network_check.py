@@ -262,6 +262,24 @@ def blob_redirect_verdict(status, location, planned):
     return ("pass", "planned") if target in planned else ("fail", "unplanned_host")
 
 
+# Two bytes past the start: an answer that ignores Range cannot pass by chance.
+BLOB_RANGE_PROBE = "bytes=1-2"
+
+
+def blob_range_verdict(status, content_range):
+    """The blob_range step for a ranged blob answer: (state, value).
+
+    The Ollama pull fetches its parts by range. "ignored" is information: the
+    managed daemon skips to each part's offset, at the cost of the skipped bytes.
+    """
+    if status == 206:
+        served = (content_range or "").startswith("bytes 1-2/")
+        return ("pass", "honoured") if served else ("fail", "wrong_range")
+    if status == 200:
+        return "info", "ignored"
+    return "fail", "http_" + str(status)
+
+
 def request(bootstrap, url, method, headers):
     return bootstrap._native_request(
         url,
@@ -306,9 +324,24 @@ def main_blob(model):
             state, value = blob_redirect_verdict(
                 response.status, header(response, "location"), planned
             )
+            location = header(response, "location")
     except Exception as failure:
         state, value = "fail", getattr(failure, "reason", "unavailable")
     emit("blob_host", state, value)
+    if state != "pass":
+        emit("blob_range", "skip", "no_blob")
+        return
+    try:
+        with request(
+            bootstrap,
+            location or blob_url,
+            "GET",
+            (("Range", BLOB_RANGE_PROBE), ("Accept-Encoding", "identity")),
+        ) as response:
+            state, value = blob_range_verdict(response.status, header(response, "content-range"))
+    except Exception as failure:
+        state, value = "fail", getattr(failure, "reason", "unavailable")
+    emit("blob_range", state, value)
 
 
 if __name__ == "__main__":

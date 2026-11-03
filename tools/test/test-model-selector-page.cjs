@@ -111,6 +111,7 @@ function matches(el, selector) {
 	if (selector === 'tr[data-key]')
 		return el.tagName === 'TR' && el.getAttribute('data-key') !== null;
 	if (selector === 'th[data-sort]') return false;
+	if (selector === '[data-nav]') return el.getAttribute('data-nav') !== null;
 	return false;
 }
 
@@ -354,13 +355,29 @@ toggleOf(page, 'mlx').onkeydown(keyEvent(' '));
 assert.equal(toggleOf(page, 'mlx').getAttribute('aria-expanded'), 'false');
 toggleOf(page, 'mlx').onkeydown(keyEvent('a'));
 assert.equal(toggleOf(page, 'mlx').getAttribute('aria-expanded'), 'false');
-// The header's empty space toggles; a click inside its tools does not.
-const apiCell = groupHead(page, 'api').children[0];
-apiCell.onclick({ target: apiCell.children[1] });
+// model-selector-whole-header: the whole header toggles, its lower lines
+// included (a click there used to do nothing); a real control keeps its click.
+// The selector is the page's own, read against a browser's closest().
+const controlClick = { closest: (selector) => (selector.includes('button') ? {} : null) };
+const headCell = (id) => groupHead(page, id).children[0];
+assert.equal(typeof headCell('api').onclick, 'function');
+headCell('api').onclick({ target: controlClick });
+assert.equal(
+	toggleOf(page, 'api').getAttribute('aria-expanded'),
+	'false',
+	'a control keeps its click'
+);
+headCell('api').onclick({ target: headCell('api').children[1] });
+assert.equal(toggleOf(page, 'api').getAttribute('aria-expanded'), 'true', 'the tools line toggles');
+headCell('api').onclick({ target: headCell('api').children[2] });
+assert.equal(toggleOf(page, 'api').getAttribute('aria-expanded'), 'false', 'the add line toggles');
+headCell('api').onclick({ target: headCell('api') });
+assert.equal(toggleOf(page, 'api').getAttribute('aria-expanded'), 'true', 'its padding toggles');
+// The toggle stops its click: reaching the cell too would toggle it twice.
+let stopped = 0;
+toggleOf(page, 'api').onclick({ stopPropagation: () => (stopped += 1) });
+assert.equal(stopped, 1, 'a click on the toggle does not reach the cell');
 assert.equal(toggleOf(page, 'api').getAttribute('aria-expanded'), 'false');
-apiCell.onclick({ target: apiCell });
-assert.equal(toggleOf(page, 'api').getAttribute('aria-expanded'), 'true');
-toggleOf(page, 'api').onclick();
 // The open groups survive a new payload while the page lives.
 page.context.injectModels(payload);
 assert.equal(toggleOf(page, 'ollama').getAttribute('aria-expanded'), 'true');
@@ -435,10 +452,6 @@ assert.equal(
 	'one group per backend with rows'
 );
 assert.ok(groups[0].includes(`${brands.ollama.emoji} ${brands.ollama.brand}`));
-assert.ok(
-	groups[1].includes(en['model_browser.reason_mlx_intel']),
-	'the unavailable backend says why'
-);
 
 // Unavailable backend: greyed, no use button, the select path refuses it.
 assert.ok(rows['Mlx-Installed'].className.includes('unavailable'));
@@ -534,12 +547,27 @@ page.byId['btn-disable'].dispatch('click');
 assert.deepEqual(page.messages.splice(0), [], 'a hidden capability cannot be invoked');
 
 // Group tools: a driver action, the add-a-model field and the provider list.
+// model-selector-two-lines: install, port and status on one line, adding on the other.
 const toolsOf = (id) => groupHead(page, id).children[0].children[1];
+const addOf = (id) => groupHead(page, id).children[0].children[2];
 const ollamaTools = toolsOf('ollama').children;
+assert.equal(toolsOf('ollama').className, 'group-tools');
+assert.equal(addOf('ollama').className, 'group-add');
+assert.equal(toolsOf('mlx').children[1].className, 'reason', 'the status stands on the tools line');
+assert.equal(toolsOf('mlx').children[1].textContent, en['model_browser.reason_mlx_intel']);
 const installText = (id) => en['model_browser.install_runtime'].replace('%s', brands[id].brand);
 // model-selector-install-button: an installed runtime greys its install button
 // with the reason, and a click on it reaches nothing.
-assert.equal(ollamaTools[0].textContent, installText('ollama'));
+// model-selector-greyed-install: the maintainer's Mac had both runtimes, so both
+// buttons were disabled; they still read "Install ..." with the hover of an
+// enabled button, and the click looked dead. The caption states the fact and
+// the sheet greys every disabled action.
+assert.equal(ollamaTools[0].textContent, en['model_browser.install_installed']);
+const browserCss = fs.readFileSync(path.join(SHARED_UI, 'model_browser/style.css'), 'utf8');
+const disabledRule = browserCss.match(/\.act:disabled,\s*\.act:disabled:hover\s*{([^}]*)}/);
+assert.ok(disabledRule, 'a greyed action has its own look, and no hover');
+assert.ok(/cursor:\s*default/.test(disabledRule[1]), 'a greyed action has no pointer');
+assert.ok(/color:\s*var\(--text-dim\)/.test(disabledRule[1]), 'a greyed action is dimmed');
 assert.equal(ollamaTools[0].disabled, true, 'an installed runtime cannot be installed again');
 assert.equal(ollamaTools[0].title, en['model_browser.install_installed']);
 ollamaTools[0].onclick();
@@ -549,7 +577,7 @@ const mlxInstall = toolsOf('mlx').children[0];
 assert.equal(mlxInstall.textContent, installText('mlx'));
 assert.equal(mlxInstall.disabled, true);
 assert.equal(mlxInstall.title, en['model_browser.reason_mlx_intel']);
-const [, input, addButton, addError] = ollamaTools;
+const [input, addButton, addError] = addOf('ollama').children;
 input.value = 'Qwen3 4b';
 addButton.onclick();
 assert.deepEqual(
@@ -566,10 +594,11 @@ assert.deepEqual(page.messages.splice(0), [
 ]);
 assert.deepEqual(
 	toolsOf('mlx').children.map((el) => el.className),
-	['act install'],
+	['act install', 'reason'],
 	'an unavailable backend offers only its greyed install, no add field'
 );
-const [select, providerButton] = toolsOf('api').children;
+assert.equal(addOf('mlx').children.length, 0);
+const [select, providerButton] = addOf('api').children;
 select.value = 'groq';
 providerButton.onclick();
 assert.deepEqual(page.messages.splice(0), [
@@ -701,7 +730,175 @@ assert.throws(
 		}),
 	/Unknown install state/
 );
+// model-selector-checking-install: an unresolved runtime probe is no missing
+// runtime: the button is greyed and says so, and a click posts nothing.
+const withInstall = (install, extra = {}) => ({
+	...payload,
+	backends: [
+		{ ...payload.backends[0], install, ...extra },
+		payload.backends[1],
+		payload.backends[2]
+	]
+});
+page.context.injectModels(withInstall({ state: 'checking' }));
+const checking = toolsOf('ollama').children[0];
+assert.equal(
+	checking.textContent,
+	en['model_browser.install_checking'].replace('{name}', brands.ollama.brand)
+);
+assert.equal(checking.disabled, true);
+checking.onclick();
+assert.deepEqual(page.messages.splice(0), []);
+// model-selector-install-refusal: a click the driver could not honour comes back
+// in words next to a button that offers the install again.
+page.context.injectModels(
+	withInstall({ state: 'available', failed_key: 'model_browser.install_not_started' })
+);
+const refusedTools = toolsOf('ollama').children;
+assert.equal(refusedTools[0].disabled, false, 'an install that did not start is offered again');
+assert.equal(refusedTools[1].className, 'install-note');
+assert.equal(refusedTools[1].getAttribute('role'), 'alert');
+assert.equal(
+	refusedTools[1].textContent,
+	en['model_browser.install_not_started'].replace('{name}', brands.ollama.brand)
+);
+// An install greyed for a reason the header does not show states it in words.
+page.context.injectModels(
+	withInstall({ state: 'unsupported', reason_key: 'model_browser.install_paused' })
+);
+const pausedTools = toolsOf('ollama').children;
+assert.equal(pausedTools[0].disabled, true);
+assert.equal(
+	pausedTools[1].textContent,
+	en['model_browser.install_paused'].replace('{name}', brands.ollama.brand)
+);
+assert.ok(
+	toolsOf('mlx').children.every((el) => el.className !== 'install-note'),
+	'a reason the header already states is not repeated'
+);
 page.context.injectModels(payload);
+
+// model-selector-provider-sections: a long local list folds by catalogue provider,
+// alphabetically, as the tray's provider sub-menus did. The user's own models stay
+// directly under the backend, and the API stays flat.
+{
+	const sectioned = loadPage(en);
+	const row = (name, provider, extra = {}) => ({
+		backend: 'ollama',
+		name,
+		provider,
+		installed: true,
+		...extra
+	});
+	const sectionPayload = {
+		...payload,
+		active: 'Qwen-Small',
+		models: [
+			row('Qwen-Small', 'Alibaba'),
+			row('Qwen-Large', 'Alibaba', { family: 'Qwen' }),
+			row('Gemma-Tiny', 'Google'),
+			row('Mistral-Mini', 'mistral'),
+			row('Bloom', 'BigScience'),
+			{ backend: 'ollama', name: 'my-tag', installed: true, custom: true },
+			{ backend: 'api', name: 'OpenAI/gpt-4o-mini', provider: 'OpenAI', installed: true }
+		]
+	};
+	sectioned.context.injectModels(sectionPayload);
+	const open = () => rowNames(sectioned);
+	const sectionsOf = () =>
+		bodies(sectioned)
+			.find((tb) => tb.getAttribute('data-group') === 'ollama')
+			.children.filter((tr) => tr.className.includes('section'));
+	const sectionToggle = (provider) =>
+		sectionsOf()
+			.map((tr) => tr.children[0].children[0])
+			.find((el) => el.getAttribute('data-section') === `ollama\u0000${provider}`);
+	assert.equal(sectionsOf().length, 0, 'a collapsed backend draws no section');
+	toggleOf(sectioned, 'ollama').onclick();
+	assert.deepEqual(
+		sectionsOf().map(
+			(tr) => tr.children[0].children[0].getAttribute('data-section').split('\u0000')[1]
+		),
+		['Alibaba', 'BigScience', 'Google', 'mistral'],
+		'sections sort alphabetically, whatever their case'
+	);
+	assert.deepEqual(
+		open(),
+		['my-tag', 'Qwen-Large', 'Qwen-Small'],
+		'the own models stay out of the sections; only the current model section opens'
+	);
+	assert.equal(sectionToggle('Alibaba').getAttribute('aria-expanded'), 'true');
+	assert.equal(sectionToggle('Google').getAttribute('aria-expanded'), 'false');
+	assert.ok(sectionToggle('Alibaba').innerHTML.includes(countText(2, 2)), 'it counts its models');
+	assert.ok(!sectionToggle('Alibaba').innerHTML.includes('group-active'));
+
+	// Mouse and keyboard, on the toggle and on the whole header.
+	sectionToggle('Google').onclick();
+	assert.ok(open().includes('Gemma-Tiny'), 'a click opens a section');
+	assert.equal(sectioned.doc.activeElement, sectionToggle('Google'), 'its toggle keeps the focus');
+	sectionToggle('Google').onkeydown(keyEvent('Enter'));
+	assert.ok(!open().includes('Gemma-Tiny'), 'Enter closes it');
+	sectionToggle('Google').onkeydown(keyEvent(' '));
+	assert.ok(open().includes('Gemma-Tiny'), 'Space opens it');
+	sectionsOf()[2].children[0].onclick({ target: sectionsOf()[2].children[0] });
+	assert.ok(!open().includes('Gemma-Tiny'), 'the whole section header toggles');
+
+	// The current model's section can be closed, and names the model then.
+	sectionToggle('Alibaba').onclick();
+	assert.ok(!open().includes('Qwen-Small'), 'the user can close the current model section');
+	assert.ok(sectionToggle('Alibaba').innerHTML.includes('group-active'));
+	// The state survives a new payload while the page lives.
+	sectioned.context.injectModels(sectionPayload);
+	assert.deepEqual(open(), ['my-tag'], 'a closed section stays closed across a payload');
+	sectionToggle('Alibaba').onclick();
+
+	// Arrows walk rows and section headers, so a collapsed section is reachable.
+	drawnRows(sectioned.byId)['Qwen-Small'].focus();
+	const qwenSmall = drawnRows(sectioned.byId)['Qwen-Small'];
+	qwenSmall.onkeydown({ key: 'ArrowDown', target: qwenSmall, preventDefault() {} });
+	assert.equal(sectioned.doc.activeElement, sectionToggle('BigScience'));
+	sectionToggle('BigScience').onkeydown(keyEvent('ArrowDown'));
+	assert.equal(sectioned.doc.activeElement, sectionToggle('Google'));
+	sectionToggle('Google').onkeydown(keyEvent('ArrowUp'));
+	assert.equal(sectioned.doc.activeElement, sectionToggle('BigScience'));
+
+	// A selected row keeps working, and its section stays open across a payload.
+	sectionToggle('BigScience').onclick();
+	sectioned.context.selectRow('ollama\u0000Bloom');
+	assert.equal(sectioned.byId['btn-use'].disabled, false, 'the selection reaches the footer');
+	sectioned.context.useSelected();
+	assert.deepEqual(sectioned.messages.splice(0), [
+		{ action: 'select_model', name: 'Bloom', backend: 'ollama' }
+	]);
+
+	// A search reaches into closed sections and opens only those it matches in.
+	sectionToggle('BigScience').onclick();
+	sectioned.byId.search.value = 'gemma';
+	sectioned.byId.search.dispatch('input');
+	assert.deepEqual(open(), ['Gemma-Tiny'], 'a search opens the section it matches in');
+	assert.equal(sectionsOf().length, 1, 'and draws no other section');
+	sectionToggle('Google').onclick();
+	assert.deepEqual(open(), [], 'the user can close it again');
+	sectioned.byId.search.value = '';
+	sectioned.byId.search.dispatch('input');
+	assert.ok(!open().includes('Gemma-Tiny'), 'clearing the search restores the closed section');
+	// The backend filter alone opens no section: it does not name a model.
+	sectioned.byId['backend-filter'].value = 'ollama';
+	sectioned.byId['backend-filter'].dispatch('change');
+	assert.ok(!open().includes('Gemma-Tiny'));
+	sectioned.byId['backend-filter'].value = '';
+	sectioned.byId['backend-filter'].dispatch('change');
+
+	// The API group stays flat: its rows carry a provider too.
+	toggleOf(sectioned, 'api').onclick();
+	assert.ok(open().includes('OpenAI/gpt-4o-mini'));
+	assert.equal(
+		bodies(sectioned)
+			.find((tb) => tb.getAttribute('data-group') === 'api')
+			.children.filter((tr) => tr.className.includes('section')).length,
+		0
+	);
+}
 
 // The page and the shared Lua rule accept and refuse the same identifiers.
 const corpus = JSON.parse(

@@ -35,7 +35,7 @@ _CTHL_Items(Hand, FirstLabel) {
 
 _CTHL_HasPair(Items, PairLabel) {
 	for Item in Items
-		if InStr(Item["label"], PairLabel . " : ", true) == 1
+		if InStr(Item["label"], LabelValue(PairLabel, ""), true) == 1
 			return true
 	return false
 }

@@ -12,6 +12,7 @@
 local M = {}
 
 local SaveFailure = require("config_save_failure")
+local LabelValue = require("locale.label_value")
 local Logger = require("logger.shim")
 local Extensions = require("hotstrings.extensions")
 local PersonalFiles = require("hotstrings.personal_files")
@@ -547,7 +548,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		if type(current) ~= "number" then
 			Logger.error(LOG, "hotstrings_config exposes no base delay — the row cannot show a value.")
 			return {
-				label    = i18n_safe(captions.default) .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
+				label    = LabelValue.compose(i18n_safe, i18n_safe(captions.default), i18n_safe("menu.hotstrings.missing_value")),
 				disabled = true,
 			}
 		end
@@ -556,7 +557,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		local title = i18n_safe(captions.default)
 		return {
 			-- menu.settings.default_indicator carries its own leading space.
-			label = title .. " : " .. delay_display(current)
+			label = LabelValue.compose(i18n_safe, title, delay_display(current))
 				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
 			action = function()
 				local chosen = prompt_delay(title, current)
@@ -581,14 +582,14 @@ local function _manifest_hotstring_rows(ctx, config)
 		if type(current) ~= "number" then
 			Logger.error(LOG, "No resolvable delay for category '%s' — its row shows no value.", tostring(category))
 			return {
-				label    = title .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
+				label    = LabelValue.compose(i18n_safe, title, i18n_safe("menu.hotstrings.missing_value")),
 				disabled = true,
 			}
 		end
 
 		local overridden = resolved.has_override == true
 		return {
-			label = title .. " : " .. delay_display(current)
+			label = LabelValue.compose(i18n_safe, title, delay_display(current))
 				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
 			action = function()
 				local chosen = prompt_delay(title, current)

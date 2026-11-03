@@ -193,10 +193,51 @@ function classifyMenuRow(row, where) {
 			: 'unclassified';
 }
 
+/**
+ * Refuses a category-off declaration the renderers cannot honour: one enable
+ * row per menu, a toggle or a choice naming its off value, and reader rows only
+ * in a menu that has an enable row.
+ * @param {object} menu The parsed [menu] tables.
+ */
+function validateCategoryOffRule(menu) {
+	for (const [key, rows] of Object.entries(menu)) {
+		if (!Array.isArray(rows)) continue;
+		const switches = rows.filter((row) => row?.submenu_off_reason_key !== undefined);
+		if (switches.length > 1) throw new Error(`menu.${key}: a menu has one enable row`);
+		for (const row of switches) {
+			const where = `menu.${key} row "${row.id}"`;
+			if (typeof row.submenu_off_reason_key !== 'string' || row.submenu_off_reason_key === '')
+				throw new Error(`${where}: submenu_off_reason_key must name a locale key`);
+			if (row.type === 'toggle' ? row.submenu_off_value !== undefined : row.type !== 'choice')
+				throw new Error(`${where}: an enable row is a toggle, or a choice with its off value`);
+			// The source tables reach this check before the generator projects `choices`.
+			if (
+				row.type === 'choice' &&
+				(row.submenu_off_value === undefined ||
+					(row.choices !== undefined &&
+						!row.choices.some((choice) => choice.value === row.submenu_off_value)))
+			)
+				throw new Error(`${where}: submenu_off_value must be one of the row's choices`);
+			if (row.readable_when_off !== undefined)
+				throw new Error(`${where}: the enable row is live already`);
+		}
+		for (const row of rows) {
+			if (row?.readable_when_off === undefined) continue;
+			if (row.readable_when_off !== true || row.type !== 'command' || switches.length === 0)
+				throw new Error(
+					`menu.${key} row "${row.id}": readable_when_off is true on a command row of a gated menu`
+				);
+			if (row.disabled_when !== undefined)
+				throw new Error(`menu.${key} row "${row.id}": a reader row cannot also grey on state`);
+		}
+	}
+}
+
 /** Validates actual canonical menu tables without projecting or writing them. */
 function validateMenuAvailability(menu) {
 	// Before any other check: a retired row type names itself, not a symptom.
 	validateNoRetiredRows(menu);
+	validateCategoryOffRule(menu);
 	for (const [key, rows] of Object.entries(menu)) {
 		if (!Array.isArray(rows)) continue;
 		for (const row of rows) {
