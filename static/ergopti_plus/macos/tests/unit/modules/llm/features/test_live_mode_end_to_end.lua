@@ -799,7 +799,7 @@ helpers.describe("automatic prediction while a hotstring tooltip shows (llm-hots
 			fire_debounce(world, MENU_DEBOUNCE_SEC, "the ordinary debounce")
 			helpers.assert_eq(#world.posts, 1, "the request runs while the hotstring tooltip is shown")
 		end)
-		helpers.assert_false(world.engine.set_llm_while_hotstring_tooltip("always"),
+		helpers.assert_eq(world.engine.set_llm_while_hotstring_tooltip("always"), false,
 			"a value the manifest does not list is refused")
 		helpers.assert_eq(select(2, world.engine.get_llm_runtime_setting("llm_while_hotstring_tooltip")), "both",
 			"and the choice in force is kept")
