@@ -1486,8 +1486,10 @@ description_key = "menu.agent.disabled_apps"
 [[features.llm.display]]
 id = "pred_indent"
 requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput", "xdotool"], windows = ["ollama", "webview2"] }
-default = 0
-recommended = 0
+# -3: every line starts at the same column and only the selection mark moves
+# (maintainer, 2026-11-02).
+default = -3
+recommended = -3
 family = "setting"
 type = "number"
 choice_values = [-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7]
