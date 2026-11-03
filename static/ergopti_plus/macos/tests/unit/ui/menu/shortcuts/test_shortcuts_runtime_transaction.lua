@@ -378,7 +378,8 @@ local function with_chord_fixture(mode, body)
 		local failure, inverse_blocked, paused, terminal = mode, false, false, false
 		local called, result = xpcall(function()
 			return require("tests.support.toml_output_fixture").with_output(function(path)
-				local source = '# retained chord header\n[shortcuts]\nenabled = false\n[shortcuts.script_control]\nchords_enabled = true\nfuture = "retain" # neighbor\n[foreign]\nflag = false # independent\n'
+				-- Shortcuts on: an off category greys the script-chord row (category-off rule).
+				local source = '# retained chord header\n[shortcuts]\nenabled = true\n[shortcuts.script_control]\nchords_enabled = true\nfuture = "retain" # neighbor\n[foreign]\nflag = false # independent\n'
 				local file = assert(io.open(path, "wb")); assert(file:write(source)); file:close()
 				local loaded, status = Preferences.load(path)
 				helpers.assert_eq(status, "ok")
