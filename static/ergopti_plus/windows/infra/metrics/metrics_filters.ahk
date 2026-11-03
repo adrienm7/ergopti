@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Persists and evaluates the privacy filters that gate the keystats hot
 ; path: private browsing detection, system-auth dialogs, and a per-app
-; exclusion list. Mirrors the « FILTRES DE CONFIDENTIALITÉ » section of
+; exclusion list. Mirrors the « Filtres de confidentialité » section of
 ; the Hammerspoon menu_metrics.lua.
 ;
 ; FEATURES & RATIONALE:
