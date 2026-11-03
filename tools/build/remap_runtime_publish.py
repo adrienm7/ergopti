@@ -197,6 +197,12 @@ def verify_archive(data, pin):
     return names
 
 
+def write_json(path, value):
+    """Writes JSON with LF line ends on every OS, as the repository stores text."""
+    data = json.dumps(value, indent=2, ensure_ascii=False) + "\n"
+    Path(path).write_bytes(data.encode("utf-8"))
+
+
 def package(root, output, repository=DEFAULT_REPOSITORY, version=RUNTIME_VERSION):
     """Writes the artifact and its pin next to it; returns the pin."""
     data = archive_bytes(root)
@@ -211,7 +217,7 @@ def package(root, output, repository=DEFAULT_REPOSITORY, version=RUNTIME_VERSION
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     (output / pin["file_name"]).write_bytes(data)
-    (output / "runtime-pin.json").write_text(json.dumps(pin, indent=2) + "\n", encoding="utf-8")
+    write_json(output / "runtime-pin.json", pin)
     return pin
 
 
@@ -224,9 +230,7 @@ def apply_pin(manifest_path, pin):
     runtime = manifest["runtime"]
     for key in PIN_KEYS:
         runtime[key] = pin[key]
-    manifest_path.write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    write_json(manifest_path, manifest)
     return manifest
 
 
