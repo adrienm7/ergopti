@@ -759,7 +759,7 @@ M.features = {
 		path = "gestures.swipe_5_up", id = "swipe_5_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_up", platforms = { "hs", "linux" }, recommended_by = { hs = "mission_control", linux = "none" }, family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 	},
 	{
-		path = "gestures.swipe_5_down", id = "swipe_5_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_down", platforms = { "hs", "linux" }, recommended = "none", family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
+		path = "gestures.swipe_5_down", id = "swipe_5_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_down", platforms = { "hs", "linux" }, recommended_by = { hs = "app_expose", linux = "none" }, family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 	},
 	{
 		path = "gestures.swipe_5_left", id = "swipe_5_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_left", platforms = { "hs", "linux" }, recommended = "none", family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",

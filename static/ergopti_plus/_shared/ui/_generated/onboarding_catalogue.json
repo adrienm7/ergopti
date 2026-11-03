@@ -3806,6 +3806,22 @@
 									]
 								},
 								{
+									"path": "gestures.swipe_5_down",
+									"value": "app_expose",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"key": "menu.gestures.swipe_5_down"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.app_expose"
+										}
+									]
+								},
+								{
 									"path": "gestures.swipe_3_horiz",
 									"value": "words",
 									"default": "none",
