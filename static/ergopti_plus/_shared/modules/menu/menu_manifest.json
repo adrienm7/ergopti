@@ -525,6 +525,10 @@
 			"type": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.llm.header_settings"
+		},
+		{
 			"type": "group",
 			"id": "llm_trigger",
 			"i18n": "menu.llm.trigger_menu_title",
@@ -1192,6 +1196,10 @@
 			"id": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.debug.header_logs"
+		},
+		{
 			"type": "choice",
 			"id": "log_level",
 			"i18n": "menu.debug.log_level",
@@ -1235,6 +1243,10 @@
 		{
 			"type": "---",
 			"id": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.debug.header_diagnostics"
 		},
 		{
 			"type": "command",
@@ -1395,20 +1407,16 @@
 			"type": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.shortcuts.header_selection"
+		},
+		{
 			"type": "feature",
 			"path": "shortcuts.wrap_text_if_selected"
 		},
 		{
 			"type": "list",
 			"id": "wrap_symbols_menu"
-		},
-		{
-			"type": "section_header",
-			"i18n": "menu.shortcuts.header_selection",
-			"platforms": [
-				"linux"
-			],
-			"reason_key": "platform_reason.selection_operations_are_a_block_on_linux"
 		},
 		{
 			"type": "list",
@@ -1438,6 +1446,10 @@
 		},
 		{
 			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.shortcuts.header_modifier_groups"
 		},
 		{
 			"type": "list",
@@ -2091,6 +2103,10 @@
 			"type": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.metrics.header_wpm"
+		},
+		{
 			"type": "check",
 			"id": "wpm_menubar",
 			"i18n": "menu.metrics.show_wpm_menubar",
@@ -2230,6 +2246,10 @@
 		},
 		{
 			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.metrics.header_collection"
 		},
 		{
 			"type": "check",
@@ -2753,6 +2773,10 @@
 			"type": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.hotstrings.header_new_word"
+		},
+		{
 			"type": "choice",
 			"id": "idle_reset",
 			"path": "hotstrings.idle_reset_seconds",
@@ -2981,6 +3005,10 @@
 			"type": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.gestures.header_system"
+		},
+		{
 			"type": "command",
 			"id": "gesture_recommended_info",
 			"i18n": "menu.gestures.recommended_info"
@@ -3019,6 +3047,10 @@
 		},
 		{
 			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.gestures.header_ergopti"
 		},
 		{
 			"type": "list",

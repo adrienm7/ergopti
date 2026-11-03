@@ -522,6 +522,11 @@ type = "---"
 # is the first row of the generation settings on every driver (the
 # `llm_generation_settings` submenu, or Linux's inline `llm_generation` handler),
 # not a row of this top level.
+# The settings submenus share one title, above the first of them.
+[[menu.llm_menu]]
+type = "section_header"
+i18n = "menu.llm.header_settings"
+
 [[menu.llm_menu]]
 type = "group"
 id = "llm_trigger"
@@ -1009,6 +1014,10 @@ type = "---"
 id = "---"
 
 [[menu.debug_menu]]
+type = "section_header"
+i18n = "menu.debug.header_logs"
+
+[[menu.debug_menu]]
 type = "choice"
 id = "log_level"
 i18n = "menu.debug.log_level"
@@ -1039,6 +1048,10 @@ i18n = "menu.debug.open_error_log"
 [[menu.debug_menu]]
 type = "---"
 id = "---"
+
+[[menu.debug_menu]]
+type = "section_header"
+i18n = "menu.debug.header_diagnostics"
 
 [[menu.debug_menu]]
 type = "command"
@@ -1201,6 +1214,12 @@ type = "---"
 # form one group, with no separator between them (the maintainer's request of
 # 2026-09-30): the switch and the symbols it wraps with go together. The label
 # names no AltGr, since only Ergopti puts the symbols there.
+# Everything below acts on the selection, up to the next separator: the wrap
+# switch (Windows, Linux), its symbols, and the Linux selection operations.
+[[menu.shortcuts_menu]]
+type = "section_header"
+i18n = "menu.shortcuts.header_selection"
+
 [[menu.shortcuts_menu]]
 type = "feature"
 path = "shortcuts.wrap_text_if_selected"
@@ -1235,12 +1254,6 @@ id = "wrap_symbols_menu"
 # `key_combinations`. Declaring one shared row would put a second copy of these
 # operations in two menus that already have them.
 [[menu.shortcuts_menu]]
-type = "section_header"
-i18n = "menu.shortcuts.header_selection"
-platforms = ["linux"]
-reason_key = "platform_reason.selection_operations_are_a_block_on_linux"
-
-[[menu.shortcuts_menu]]
 type = "list"
 id = "selection_operations"
 platforms = ["linux"]
@@ -1274,6 +1287,10 @@ disabled_reason_key = "physical_shortcuts.window_unavailable"
 
 [[menu.shortcuts_menu]]
 type = "---"
+
+[[menu.shortcuts_menu]]
+type = "section_header"
+i18n = "menu.shortcuts.header_modifier_groups"
 
 [[menu.shortcuts_menu]]
 type = "list"
@@ -1824,6 +1841,12 @@ type = "---"
 # the declaration, so this driver supplies only the toggle and the state behind
 # the tick. It was `dynamic`, which hands the id back and had the driver build a
 # checkbox the renderer already knows how to draw.
+# The typing-speed displays: the menu bar figure (macOS and Linux), then the
+# floating widget and its options, on every driver.
+[[menu.metrics_menu]]
+type = "section_header"
+i18n = "menu.metrics.header_wpm"
+
 [[menu.metrics_menu]]
 type = "check"
 id = "wpm_menubar"
@@ -1956,6 +1979,10 @@ type = "---"
 # the keystats's own pause state: it used to glue a " ✓" onto the label, which
 # puts one platform's convention inside a string twenty other languages also
 # read — and bypasses the tray's native check item.
+[[menu.metrics_menu]]
+type = "section_header"
+i18n = "menu.metrics.header_collection"
+
 [[menu.metrics_menu]]
 type = "check"
 id = "metrics_suspend"
@@ -2525,6 +2552,10 @@ checked_when = ["hotstrings_repeat_enabled"]
 type = "---"
 
 [[menu.hotstrings_params_group]]
+type = "section_header"
+i18n = "menu.hotstrings.header_new_word"
+
+[[menu.hotstrings_params_group]]
 type = "choice"
 id = "idle_reset"
 path = "hotstrings.idle_reset_seconds"
@@ -2626,6 +2657,11 @@ type = "---"
 # menu.gestures.recommended_reason_windows, because the driver takes the
 # system's own assignment over itself and the "remove it first" advice does not
 # apply there.
+# The rows about the system's own gestures, then Ergopti's gesture slots.
+[[menu.gestures_menu]]
+type = "section_header"
+i18n = "menu.gestures.header_system"
+
 [[menu.gestures_menu]]
 type = "command"
 id = "gesture_recommended_info"
@@ -2662,6 +2698,10 @@ reason_key = "platform_reason.touchpad_stack_is_per_driver"
 
 [[menu.gestures_menu]]
 type = "---"
+
+[[menu.gestures_menu]]
+type = "section_header"
+i18n = "menu.gestures.header_ergopti"
 
 # The circular Spaces checkbox that stood here is retired: the wrap is its own
 # pair of actions (space_prev_wrap / space_next_wrap), bindable like any other.
