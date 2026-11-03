@@ -91,11 +91,11 @@ _MLG_Order(MenuName) {
 ; The Configuration submenu: the global restore and clear, a separator, the
 ; cleanup and, right under it, the Windows-only touchpad restore (the
 ; maintainer's request of 2026-10-02: it stood at the very end), a separator,
-; then configuration windows and the macOS-only Karabiner rows,
-; with no separator left dangling at its end.
+; then the configuration windows, with no separator left dangling at its end.
+; The macOS-only Karabiner rows left with the owned runtime default (ADR 011).
 _MLG_ConfigurationRowsInOrder() {
 	AssertEqual("scope_restore, scope_clear, ---, clean_unused_keys, restore_touchpad_gestures, ---, config_folder, "
-		. "setup_wizard, karabiner_integration, remove_from_karabiner",
+		. "setup_wizard",
 		_MLG_Order("configuration_menu"), "configuration_menu must declare its rows in this order")
 	Body := _DriverFuncBody("_MI_BuildConfigurationMenu")
 	Assert(Body != "", "the Configuration builder must exist before checking its commands")

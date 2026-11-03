@@ -237,7 +237,38 @@ function admittedSourceRetirements(driver, traversed) {
 					`retired live-menu executable owner reappeared: ${path.relative(SP, file)}: ${token.value}`
 				);
 	}
-	return new Set([retired, ...admittedSelectorRetirement()]);
+	return new Set([
+		retired,
+		...admittedSelectorRetirement(),
+		...admittedRemapSwitchRetirement(manifest)
+	]);
+}
+
+/**
+ * The two Karabiner Configuration rows (remap_switch.lua) retired when
+ * Ergopti's own runtime became the default. Their retirement is admitted only
+ * while no macOS UI source names the module and no compiled row carries their ids.
+ * @param {object} manifest The compiled menu manifest.
+ * @returns {Set<string>} The admitted retired source.
+ */
+function admittedRemapSwitchRetirement(manifest) {
+	const retired = 'macos/ui/menu/remap_switch.lua';
+	const ids = new Set(['karabiner_integration', 'remove_from_karabiner']);
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	for (const file of sourceFiles(path.join(SP, 'macos/ui'), '.lua'))
+		for (const token of scriptTokens(fs.readFileSync(file, 'utf8'), '.lua'))
+			assert.ok(
+				!(token.kind === 'string' && /(?:^|[./])remap_switch$/.test(token.value)),
+				`retired Karabiner switch rows are required again: ${path.relative(SP, file)}`
+			);
+	const rows = (value) => {
+		if (Array.isArray(value)) return value.flatMap(rows);
+		if (!value || typeof value !== 'object') return [];
+		return [value, ...Object.values(value).flatMap(rows)];
+	};
+	for (const row of rows(manifest))
+		assert.ok(!ids.has(row.id), `retired Karabiner switch row is declared again: ${row.id}`);
+	return new Set([retired]);
 }
 
 /**
@@ -395,9 +426,11 @@ const LEGACY = JSON.parse(legacyBytes.toString('utf8'));
 // Any other absent source, or resurrection of this removed provider, refuses.
 const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
 	// models_selector.lua retired with the tray model list (model selector page, 2026-10-27).
+	// remap_switch.lua retired with the two Karabiner Configuration rows (owned runtime default).
 	macos: Object.freeze([
 		'macos/ui/menu/menu_llm/live_mode_panel.lua',
-		'macos/ui/menu/menu_llm/models_selector.lua'
+		'macos/ui/menu/menu_llm/models_selector.lua',
+		'macos/ui/menu/remap_switch.lua'
 	]),
 	// ctrl.ahk retired when schema v19 turned the chord switches into keyboard slots.
 	windows: Object.freeze(['windows/modules/shortcuts/ctrl.ahk'])

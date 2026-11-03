@@ -7013,17 +7013,17 @@ function M.init(file_system)
 	end
 	local first_launch = user_config_status == "absent"
 
-	-- The runtime this boot targets: shared unless config_karabiner.toml opted
-	-- in by hand. The command line tool every variable writer spells is chosen
-	-- here, once, and an owned boot writes its own complete file.
-	local runtime = user_cfg.runtime or M._owned.paths.RUNTIME_SHARED
+	-- The runtime this boot targets: owned unless config_karabiner.toml keeps
+	-- the shared one by hand. The command line tool every variable writer spells
+	-- is chosen here, once, and an owned boot writes its own complete file.
+	local runtime = user_cfg.runtime or Config.RUNTIME_DEFAULT
 	local runtime_ok, runtime_err = pcall(M._owned.paths.select_runtime, runtime)
 	if not runtime_ok then
 		Logger.error(LOG, "Karabiner bridge initialization refused: %s", tostring(runtime_err))
 		return false
 	end
 	if runtime == M._owned.paths.RUNTIME_OWNED then
-		Logger.warn(LOG, "Opted in to the owned Karabiner runtime (not shipped; hidden preference).")
+		Logger.info(LOG, "Ergopti's own Karabiner runtime is selected.")
 		M._owned.shared_config = nil
 		if not (env_override and env_override ~= "") then
 			-- Still the shared path here: the migration cleans it once this boot is owned.

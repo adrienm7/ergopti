@@ -299,7 +299,7 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.runtime_owner_ports",
 		contract = { "new", "unpinned_count" },
-		-- Required only by the remap bridge after the hidden `runtime = "owned"` opt-in.
+		-- Required by the remap bridge on an owned boot, the default unless `runtime = "shared"`.
 		wired    = true,
 	},
 	{
