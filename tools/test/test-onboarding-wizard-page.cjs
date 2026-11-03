@@ -977,11 +977,13 @@ function cataloguePaths(driver) {
 		}
 	}
 	answer(page, true);
-	// The whole-language checkbox selects every section of the pack.
+	// A Yes pre-selects the recommended catalogue; the whole-language checkbox
+	// then releases every section of the pack and selects them all again.
 	const french = described.groups[1];
-	const frenchRow = checkRows(page).find((row) => row.text === french.label[0].text);
-	assert.ok(frenchRow, 'the language pack has its own checkbox');
-	toggle(frenchRow);
+	const frenchRow = () => checkRows(page).find((row) => row.text === french.label[0].text);
+	assert.ok(frenchRow(), 'the language pack has its own checkbox');
+	toggle(frenchRow());
+	toggle(frenchRow());
 	const done = finish(page);
 	const operations = done.answers.operations;
 	for (const file of french.groups) {

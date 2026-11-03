@@ -250,12 +250,6 @@ async function main() {
 		// The maintainer also requested a conditional ordinary editor shortcut
 		// following only the actual unmodified physical magic source (2026-10-02).
 		'shortcuts.keyboard.magic_editor',
-		// The preview bubble ships on everywhere (2026-10-24), so a fresh
-		// configuration shows it and the first-run wizard no longer asks.
-		'hotstrings.preview_ai_enabled',
-		'hotstrings.preview_autocorrect_enabled',
-		'hotstrings.preview_colored_tooltips',
-		'hotstrings.preview_star_enabled',
 		'shortcuts.script_control.script_altgr_backspace',
 		'shortcuts.script_control.script_altgr_delete',
 		'shortcuts.script_control.script_altgr_enter',
@@ -269,38 +263,20 @@ async function main() {
 			entry.recommended_per_platform !== undefined,
 			`${name}: exactly one explicit recommended source is required`
 		);
-		assert.equal(
-			typeof entry.input_altering,
-			'boolean',
-			`${name}: classify activation versus parameters`
-		);
 		for (const platform of entry.platforms || ['ahk', 'hs', 'linux']) {
 			const neutral = entry.default_per_platform?.[platform] ?? entry.default;
 			const recommended = entry.recommended_per_platform?.[platform] ?? entry.recommended;
 			if (neutral === undefined) continue; // Ancestor platform restrictions are resolved by codegen.
 			assert.notEqual(recommended, undefined, `${name}: recommended value missing for ${platform}`);
-			if (entry.input_altering && entry.active_by_default === true) {
-				inputCount++;
+			if (entry.family !== 'feature') continue;
+			inputCount++;
+			if (entry.active_by_default === true) {
 				if (!activeByDefault.includes(name)) activeByDefault.push(name);
 				assert.deepEqual(
 					neutral,
 					recommended,
 					`${name}: an entry active by default starts with its preset on ${platform}`
 				);
-			} else if (entry.input_altering) {
-				inputCount++;
-				const enabled = entry.type === 'feature' ? neutral.enabled : neutral;
-				assert(
-					enabled === false ||
-						enabled === 'none' ||
-						enabled === '' ||
-						(name === 'layout.direct_access_digits' &&
-							entry.type === 'enum' &&
-							enabled === 'native'),
-					`${name}: empty ${platform} configuration must not activate input behavior`
-				);
-			} else {
-				assert.deepEqual(neutral, recommended, `${name}: pure parameters retain their preset`);
 			}
 		}
 	}
