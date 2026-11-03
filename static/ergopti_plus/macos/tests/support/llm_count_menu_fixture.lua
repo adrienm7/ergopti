@@ -47,7 +47,12 @@ return function(callback, options)
 		end }
 		package.loaded["modules.llm"] = { DEFAULT_STATE = defaults,
 			get_backend = function() return state.llm_backend end, set_backend = accept,
-			get_current_model = function() return "" end }
+			get_current_model = function() return "" end,
+			-- What the real Display rows read (real_streaming_panel).
+			streaming_snapshot = function()
+				return { generation = 0, enabled = state.llm_enabled, backend = state.llm_backend,
+					streaming = state.llm_streaming }
+			end }
 		local models = { get_presets = function() return {} end,
 			get_installed_models = function() return {} end,
 			get_actual_model_name = function(name) return name end,
@@ -56,6 +61,7 @@ return function(callback, options)
 		package.loaded["ui.menu.menu_llm.settings_manager"] = { new = function()
 			return { build_nav_modifier_menu = function() return {} end,
 				build_val_modifier_menu = function() return {} end,
+				setting_snapshot = function(key) return { value = state[key], generation = 0, owner = {} } end,
 				set_context_length = unobserved_command,
 				reset_context_length = unobserved_command,
 				set_min_words = unobserved_command,
@@ -68,7 +74,10 @@ return function(callback, options)
 				end }
 		end }
 		for _, name in ipairs({ "temperature_panel", "streaming_panel", "trigger_panel" }) do
-			package.loaded["ui.menu.menu_llm." .. name] = { build = function() return {} end }
+			-- A whole-tray walk reads the real Display rows (their label-value joins).
+			if not (name == "streaming_panel" and options.real_streaming_panel) then
+				package.loaded["ui.menu.menu_llm." .. name] = { build = function() return {} end }
+			end
 		end
 		-- The menu itself must build neither panel: the model selector page
 		-- collects them only when it opens (maintainer, 2026-10-27).

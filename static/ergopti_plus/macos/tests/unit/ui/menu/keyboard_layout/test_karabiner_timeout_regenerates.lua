@@ -62,6 +62,8 @@ local function make_karabiner()
 			from = { simultaneous = { { key_code = "escape" }, { key_code = "tab" } } } } },
 		NON_CANONICAL_COMBOS = {},
 		get_enabled            = function() return true end,
+		-- Tap-holds on: an off category greys every row of its submenu.
+		get_tap_holds_enabled  = function() return true end,
 		set_enabled            = function() end,
 		get_combo_symmetric    = function() return false end,
 		set_combo_symmetric    = function() end,

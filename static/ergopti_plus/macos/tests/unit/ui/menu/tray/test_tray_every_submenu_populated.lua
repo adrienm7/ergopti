@@ -118,7 +118,7 @@ local function build_tray(observe_layout, catalogue)
 	local llm_item = nil
 	require("tests.support.llm_count_menu_fixture")(function(llm_menu)
 		llm_item = llm_menu.build_item()
-	end, { catalogue = catalogue })
+	end, { catalogue = catalogue, real_streaming_panel = true })
 
 	local lines = {}
 	package.loaded["infra.logger"] = nil
@@ -167,7 +167,9 @@ local function build_tray(observe_layout, catalogue)
 	local ctx = {
 		config     = { log_level = 2 },
 		base_dir   = helpers.driver_root(),
-		state      = { shortcuts = true, gestures = true, hotstrings = {} },
+		-- Every category on, the Hotstrings master (keymap) included: an off
+		-- category greys every row of its submenu (category-off rule).
+		state      = { shortcuts = true, gestures = true, keymap = true, hotstrings = {} },
 		hotfiles   = {},
 		save_prefs = function() return true end,
 		updateMenu = function() end,

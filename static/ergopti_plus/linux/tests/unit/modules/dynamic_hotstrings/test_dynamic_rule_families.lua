@@ -268,6 +268,9 @@ end)
 --- @return table
 local function empty_config()
 	return {
+		-- Another category keeps the Hotstrings switch on, so the dynamic
+		-- category alone can be off: an off switch greys the whole submenu.
+		any_enabled        = function() return true end,
 		get_groups         = function() return {} end,
 		is_group_enabled   = function() return false end,
 		toggle_group       = function() end,

@@ -29,7 +29,9 @@ end
 local function menu_rows(gestures, path, extra)
 	package.loaded["modules.shortcuts.manager"] = nil
 	local shortcuts = require("modules.shortcuts.manager")
-	shortcuts.init({ persist = true, config_path = path })
+	-- Both categories read on: an off one greys every row of its submenu
+	-- (category-off rule), and these scenarios click the binding rows.
+	shortcuts.init({ persist = true, config_path = path, enabled = true })
 	-- A renderer captures its native dependencies and manifest cache at load.
 	-- This fixture owns that instance as well as the real binding providers.
 	package.loaded["infra.manifest_menu"] = nil
@@ -53,7 +55,13 @@ local function menu_rows(gestures, path, extra)
 	local ctx = { gestures = gestures, shortcuts = shortcuts,
 		is_paused = function() return false end, on_quit = function() end }
 	for name, value in pairs(extra or {}) do ctx[name] = value end
-	return require("ui.menu.builder").build(ctx)
+	-- The touchpad reader stays off in this fixture; the menu reads gestures on.
+	local is_enabled = gestures.is_enabled
+	gestures.is_enabled = function() return true end
+	local built, rows = pcall(require("ui.menu.builder").build, ctx)
+	gestures.is_enabled = is_enabled
+	if not built then error(rows, 0) end
+	return rows
 end
 
 local function with_case(spec, body)
