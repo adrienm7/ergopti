@@ -96,7 +96,7 @@ function M.build(ctx,ui)
 	local function pick_hold(pair,label,current)
 		local source=snapshot();if not source then return feedback(false) end
 		if type(ui.open_hold_picker)~="function" then return feedback(false) end
-		local items,by_id=HoldOptions.picker_items(holds,t)
+		local items,by_id=HoldOptions.picker_items(holds,t,"linux")
 		local chosen=hold_option(current)
 		return ui.open_hold_picker(label,chosen and HoldOptions.picker_id(chosen) or Shared.NONE,items,function(picked)
 			local choice=type(picked)=="string" and by_id[picked] or nil
@@ -116,10 +116,12 @@ function M.build(ctx,ui)
 					local tap,hold=pairs.get_action(pair),pairs.get_hold(pair)
 					local chord_pair=chord_declared and pairs.chord_pair(pair) or nil
 					local chord=chord_pair and pairs.get_chord(pair) or Shared.NONE
-					local label=ui.key_label(first).." → "..ui.key_label(second)
+					-- « Échap + Tab », the key held first then the one struck, as the
+					-- Windows and macOS menus and the first-run wizard name a pair.
+					local label=ui.key_label(first).." + "..ui.key_label(second)
 					local tap_label=action_label(tap)
 					local chosen=hold_option(hold)
-					local hold_label=chosen and HoldOptions.label(chosen,t) or t("tap_hold.hold.none")
+					local hold_label=chosen and HoldOptions.label(chosen,t,"linux") or t("tap_hold.hold.none")
 					local assigned=tap~=Shared.NONE or hold~=Shared.NONE or chord~=Shared.NONE
 					local sub=renderer.build("key_combination_pair_menu","KeyCombinations",nil,nil,{
 						commands={[require("config_keys").COMMAND.KEY_COMBINATION_CLEAR]=function()

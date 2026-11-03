@@ -51,6 +51,7 @@ const TOML = require('smol-toml');
 const { REPO_ROOT, shared, sharedRel } = require('../lib/paths.cjs');
 const { candidateKeys } = require('../lib/manifest-label-keys.cjs');
 const { KEY } = require('../lib/_generated/config_keys.cjs');
+const KeyNames = require('../lib/key-names.cjs');
 
 const MANIFEST_PATH = shared('modules', 'features', 'manifest.toml');
 const HOTSTRINGS_DIR = shared('modules', 'hotstrings');
@@ -500,21 +501,23 @@ const BUILT_IN_SHORTCUT_SECTION = KEY.SHORTCUTS_KEYS;
 
 /**
  * Label segments of a key-combination slot: its two tap-hold keys, each under
- * the name the Tap-Hold menu gives it.
+ * the name the shared key name table gives it on the platform, as the
+ * Tap-Hold menu names it.
  * @param {string} slot Id such as alt_gr_then_left_alt.
+ * @param {string} platform Manifest platform token.
  * @param {object} labels Label helpers.
  * @param {string} context Error context.
  * @returns {object[]} Segments.
  */
-function combinationSegments(slot, labels, context) {
+function combinationSegments(slot, platform, labels, context) {
 	const keys = slot.split(COMBINATION_SEPARATOR);
 	if (keys.length !== 2 || keys.some((key) => key === '')) {
 		throw new Error(`${context}: ${slot} names no pair of tap-hold keys`);
 	}
 	return [
-		{ key: labels.requireKey(`tap_hold.group.${keys[0]}`, context) },
+		{ key: labels.requireKey(KeyNames.i18n(keys[0], platform), context) },
 		{ text: ' + ' },
-		{ key: labels.requireKey(`tap_hold.group.${keys[1]}`, context) }
+		{ key: labels.requireKey(KeyNames.i18n(keys[1], platform), context) }
 	];
 }
 
@@ -883,7 +886,7 @@ function recommendedItems(id, page, platform, master, features, projection, labe
 			label = chordSegments(feature.id, platform, labels, triggerCharacter);
 			if (!label) label = [{ key: labels.featureLabelKey(feature, context) }];
 		} else if (feature.type === 'action' && feature.section === COMBINATION_SECTION) {
-			label = combinationSegments(feature.id, labels, context);
+			label = combinationSegments(feature.id, platform, labels, context);
 		} else if (feature.section === BUILT_IN_SHORTCUT_SECTION) {
 			// The label names what the shortcut does, so its trigger comes first.
 			if (Object.hasOwn(triggers, itemPath)) {
@@ -1144,7 +1147,7 @@ function tapHoldAssignment(platform, key, defaults, labels, karabinerLabel, cont
 		hold = [];
 		for (const modifier of preset.hold_modifier.split('+')) {
 			if (hold.length > 0) hold.push({ text: ' + ' });
-			hold.push({ key: labels.requireKey(`tap_hold.hold.${modifier.trim()}`, context) });
+			hold.push({ key: labels.requireKey(KeyNames.i18n(modifier.trim(), platform), context) });
 		}
 	} else {
 		hold = [{ key: labels.requireKey('tap_hold.hold.none', context) }];
@@ -1191,7 +1194,7 @@ function tapHoldGroups(id, platform, labels) {
 			recommended: true,
 			tap_hold_key: key,
 			customised_value: TAP_HOLD_CUSTOMISED,
-			label: [{ key: labels.requireKey(entry.label_key, context) }],
+			label: [{ key: labels.requireKey(KeyNames.i18n(entry.id, platform), context) }],
 			value_label: [{ template, args: [assignment.tap, assignment.hold] }]
 		});
 	}

@@ -11,6 +11,7 @@
 local M = {}
 
 local SaveFailure = require("config_save_failure")
+local KeyNames = require("keycodes.key_names")
 local Logger = require("logger.shim")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
@@ -20,14 +21,13 @@ local show_error = require("ui.menu.menu_dialogs").show_error
 
 local LOG = "ui.menu.menu_tap_holds"
 
---- Display name of a tap-hold key: the label key the shared key catalogue
---- gives it, the one the Windows and macOS menus show.
+--- Display name of a tap-hold key: its name in the shared key name table, the
+--- one the Windows and macOS menus show. A key the table does not name raises
+--- rather than printing its id.
 --- @param entry table One entry of the manager's key_catalog().
 --- @return string
 local function _tap_hold_key_label(entry)
-	local label = i18n_safe(entry.label_key)
-	if label == entry.label_key then return entry.id end
-	return label
+	return KeyNames.label(entry.key, "linux", i18n_safe)
 end
 
 --- Display name of a tap action: the key itself for "", else the catalogue's.
@@ -161,7 +161,7 @@ local function _build_tap_holds(ctx)
 			Logger.error(LOG, "Action picker is unavailable for the hold of '%s'.", key_id)
 			return false
 		end
-		local items, by_id = HoldOptions.picker_items(options, i18n_safe)
+		local items, by_id = HoldOptions.picker_items(options, i18n_safe, "linux")
 		local opened = Picker.open({
 			presentation_id = "tap_hold_hold_action",
 			presentation_suffix = _tap_hold_key_label(catalog_entry),
@@ -262,7 +262,7 @@ local function _build_tap_holds(ctx)
 			local tap = active and type(entry.tap_action) == "string" and entry.tap_action or ""
 			local hold = active and _tap_hold_current_hold(options, entry) or options[1]
 			local tap_label = _tap_hold_action_label(tap, ctx.gestures)
-			local hold_label = hold and HoldOptions.label(hold, i18n_safe) or i18n_safe("tap_hold.hold.none")
+			local hold_label = hold and HoldOptions.label(hold, i18n_safe, "linux") or i18n_safe("tap_hold.hold.none")
 			local configured = tap ~= "" or (hold ~= nil and hold.kind ~= "none")
 			-- A key follows the global delay until the user gives it one of its own;
 			-- `entry` carries the effective value either way.
