@@ -1,0 +1,73 @@
+--- tests/unit/modules/keymap/test_key_names.lua
+
+--- ==============================================================================
+--- MODULE: Shared Key Name Contract
+--- DESCRIPTION:
+--- Replays the shared key name table over the real French and English
+--- catalogues: every spelling of a key reads as its human name, the platform
+--- picks the usual name, and an unknown id or a missing translation raises
+--- instead of showing the id.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local KeyNames = require("keycodes.key_names")
+local check = require("test.menu_row_text")
+
+local SHARED_ROOT = "../_shared"
+
+--- A translate function over one real catalogue; a miss returns the key, as
+--- the drivers' accessors do.
+--- @param locale string Locale code.
+--- @return function
+local function translator(locale)
+	local catalogue = check.catalogue(SHARED_ROOT, locale, require("json").decode)
+	return function(key)
+		local text = catalogue[key]
+		return (text == nil or text == "") and key or text
+	end
+end
+
+helpers.describe("the shared key names", function()
+	helpers.it("key names: every spelling of a key by its human name", function()
+		local fr = translator("fr")
+		helpers.assert_eq(KeyNames.label("left_ctrl", "windows", fr), "Ctrl gauche")
+		helpers.assert_eq(KeyNames.label("LCtrl", "windows", fr), "Ctrl gauche")
+		helpers.assert_eq(KeyNames.label("left_control", "macos", fr), "Ctrl gauche")
+		helpers.assert_eq(KeyNames.label("right_shift", "linux", fr), "Maj droite")
+		helpers.assert_eq(KeyNames.label("lalt", "windows", fr), "Alt gauche")
+		helpers.assert_eq(KeyNames.label("caps_lock", "linux", fr), "Verr. Maj")
+		helpers.assert_eq(KeyNames.label("RShift", "windows", translator("en")), "Right Shift")
+	end)
+
+	helpers.it("key names: each platform's usual name", function()
+		local en = translator("en")
+		helpers.assert_eq(KeyNames.label("alt", "macos", en), "Option")
+		helpers.assert_eq(KeyNames.label("alt", "windows", en), "Alt")
+		helpers.assert_eq(KeyNames.label("win", "linux", en), "Super")
+		helpers.assert_eq(KeyNames.label("win", "windows", en), "Win")
+	end)
+
+	helpers.it("key names: a combination in the order written", function()
+		helpers.assert_eq(KeyNames.combo_label("ctrl+shift", "linux", translator("fr")), "Ctrl + Maj")
+		helpers.assert_eq(KeyNames.combo_label("lctrl + alt_gr", "windows", translator("en")), "Left Ctrl + AltGr")
+	end)
+
+	helpers.it("key names: one macOS glyph per modifier, a caret never", function()
+		helpers.assert_eq(KeyNames.macos_symbol("ctrl"), "⌃")
+		helpers.assert_eq(KeyNames.macos_symbol("alt"), "⌥")
+		helpers.assert_eq(KeyNames.macos_symbol("option"), "⌥")
+		helpers.assert_eq(KeyNames.macos_symbol("command"), "⌘")
+		helpers.assert_eq(KeyNames.macos_symbol("shift"), "⇧")
+		helpers.assert_eq((pcall(KeyNames.macos_symbol, "tab")), false, "a key that is no modifier")
+	end)
+
+	helpers.it("key names: refuse an unknown key, platform or translation", function()
+		local en = translator("en")
+		helpers.assert_eq((pcall(KeyNames.label, "not_a_key", "linux", en)), false, "an unknown key")
+		helpers.assert_eq((pcall(KeyNames.label, "ctrl", "amiga", en)), false, "an unknown platform")
+		helpers.assert_eq((pcall(KeyNames.label, "ctrl", "linux", function(key) return key end)), false,
+			"a missing translation")
+		helpers.assert_eq((pcall(KeyNames.combo_label, "+", "linux", en)), false, "an empty combination")
+		helpers.assert_eq(KeyNames.canonical("not_a_key"), nil)
+	end)
+end)
