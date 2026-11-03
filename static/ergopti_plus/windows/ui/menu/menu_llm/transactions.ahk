@@ -71,7 +71,8 @@ LLM_Menu_BuildOpts() {
 		"temperature",             _LLM_Menu["temperature"],
 		ConfigLeaf.INSTANT_ON_WORD_END,     _LLM_Menu[ConfigLeaf.INSTANT_ON_WORD_END],
 		ConfigLeaf.AFTER_HOTSTRING,         _LLM_Menu[ConfigLeaf.AFTER_HOTSTRING],
-		ConfigLeaf.RESET_ON_NAV,            _LLM_Menu[ConfigLeaf.RESET_ON_NAV],
+		ConfigLeaf.WHILE_HOTSTRING_TOOLTIP, LLM_Menu_WhileHotstringTooltip(),
+		ConfigLeaf.RESET_ON_NAV,           _LLM_Menu[ConfigLeaf.RESET_ON_NAV],
 		"disable_url_bars",        _LLM_Menu["disable_url_bars"],
 		"disable_password_fields", _LLM_Menu["disable_password_fields"],
 		ConfigLeaf.DISABLED_APPS,           _LLM_Menu[ConfigLeaf.DISABLED_APPS],
@@ -89,6 +90,28 @@ LLM_Menu_BuildOpts() {
 		ConfigLeaf.INLINE_AUTOTYPE,         _LLM_Menu[ConfigLeaf.INLINE_AUTOTYPE],
 		ConfigLeaf.APP_PROFILE_OVERRIDES,   _LLM_Menu[ConfigLeaf.APP_PROFILE_OVERRIDES]
 	)
+}
+
+/**
+ * Reads what an automatic prediction does while a hotstring tooltip shows: the
+ * menu's value once the user's settings are restored, the manifest default
+ * before (the option is not part of the tray's placeholder state).
+ * @returns {String} One of the manifest's enum values ("wait" or "both").
+ */
+LLM_Menu_WhileHotstringTooltip() {
+	global _LLM_Menu
+	if IsSet(_LLM_Menu) && (_LLM_Menu is Map) && _LLM_Menu.Has(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP)
+		return _LLM_Menu[ConfigLeaf.WHILE_HOTSTRING_TOOLTIP]
+	return ManifestDefaultFor(ConfigKey.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
+}
+
+; Candidate mutation of the hotstring tooltip choice: the key may be absent
+; from a state that still carries the manifest default.
+_LLM_Menu_SetCandidateWhileHotstringTooltip(Value, Candidate) {
+	if !(Candidate is Map)
+		return false
+	Candidate[ConfigLeaf.WHILE_HOTSTRING_TOOLTIP] := Value
+	return true
 }
 
 _LLM_Menu_SetCandidateValue(Candidate, Key, Value) {

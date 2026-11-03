@@ -114,7 +114,18 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 		}
 		AgentValues[Key] := Normalized
 	}
-	ValModifiers := _LLM_Menu_ModifiersStringToArray(Validated[ConfigLeaf.VAL_MODIFIERS])
+	; Absent until the user's settings are restored: Features then keeps the
+	; manifest default it was built with.
+	WhileHotstringTooltip := false
+	if MenuState.Has(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP) {
+		if !LLM_Option_TryNormalize(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP,
+				MenuState[ConfigLeaf.WHILE_HOTSTRING_TOOLTIP], &WhileHotstringTooltip) {
+			try LoggerError("LLM",
+				"Refusing to sync invalid option '{1}' into Features.", ConfigLeaf.WHILE_HOTSTRING_TOOLTIP)
+			return false
+		}
+	}
+	ValModifiers :=_LLM_Menu_ModifiersStringToArray(Validated[ConfigLeaf.VAL_MODIFIERS])
 	if !(ValModifiers is Array) {
 		try LoggerError("LLM",
 			"Refusing to sync invalid validation modifiers into Features.")
@@ -147,6 +158,8 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 	llm["navigation"][ConfigLeaf.VAL_MODIFIERS]          := ValModifiers
 	for Key, Value in AgentValues
 		llm[Key] := Value
+	if WhileHotstringTooltip is String
+		llm["trigger"][ConfigLeaf.WHILE_HOTSTRING_TOOLTIP] := WhileHotstringTooltip
 	return true
 }
 
@@ -263,6 +276,7 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 		[ConfigLeaf.MIN_REQUEST_INTERVAL_MS, llm["trigger"][ConfigLeaf.MIN_REQUEST_INTERVAL_MS], ConfigKey.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS],
 		[ConfigLeaf.INSTANT_ON_WORD_END, llm["trigger"][ConfigLeaf.INSTANT_ON_WORD_END], ConfigKey.LLM_TRIGGER_INSTANT_ON_WORD_END],
 		[ConfigLeaf.AFTER_HOTSTRING, llm["trigger"][ConfigLeaf.AFTER_HOTSTRING], ConfigKey.LLM_TRIGGER_AFTER_HOTSTRING],
+		[ConfigLeaf.WHILE_HOTSTRING_TOOLTIP, llm["trigger"][ConfigLeaf.WHILE_HOTSTRING_TOOLTIP], ConfigKey.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP],
 		[ConfigLeaf.RESET_ON_NAV, llm["generation"][ConfigLeaf.RESET_ON_NAV], ConfigKey.LLM_GENERATION_RESET_ON_NAV],
 		[ConfigLeaf.AUTO_RAISE_TEMP, llm["generation"][ConfigLeaf.AUTO_RAISE_TEMP], ConfigKey.LLM_GENERATION_AUTO_RAISE_TEMP],
 		[ConfigLeaf.INLINE_AUTOTYPE, llm["trigger"][ConfigLeaf.INLINE_AUTOTYPE], ConfigKey.LLM_TRIGGER_INLINE_AUTOTYPE],

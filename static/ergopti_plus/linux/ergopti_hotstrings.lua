@@ -1560,8 +1560,9 @@ local function main()
 					-- The AI completes its own typing context, not the word buffer.
 					prediction_engine.on_char(ch, engine:ai_context():text(), {
 						app_id = app_id,
+						-- The preview's own rows: the window also shows AI suggestions.
 						hotstring_preview_visible = tooltip_preview
-							and tooltip_preview.is_visible() or false,
+							and tooltip_preview.is_showing() or false,
 					})
 				end)
 			end
@@ -1671,6 +1672,7 @@ local function main()
 			is_paused     = script_actions.is_paused,
 			privacy_guard = secure_focus_guard.blocks_text,
 			privacy_context = secure_focus_guard.current_context,
+			hotstring_preview_showing = tooltip_preview and tooltip_preview.is_showing or nil,
 			-- How a manual prediction request says why it was refused: the daemon's
 			-- one transient surface outside the prediction overlay.
 			notify        = function(text)
@@ -2625,6 +2627,14 @@ local function main()
 						})
 					end
 				end,
+				-- A suggestion shown together with the preview stays, drawn alone.
+				-- Deferred: a keystroke hides the preview, then dismisses the
+				-- suggestion in the same turn.
+				on_hidden = function()
+					TimerScheduler.after(0, function()
+						if llm_overlay then llm_overlay.redraw() end
+					end)
+				end,
 			})
 			if not privacy_owners.startup_checkpoint() then return end
 			-- Placed where the hotstring preview goes: without these the
@@ -2633,6 +2643,16 @@ local function main()
 				style = style,
 				anchor_provider = tooltip_preview.resolve_anchor,
 				screen_provider = tooltip_preview.screen_frame,
+				-- llm.trigger.while_hotstring_tooltip = "both": one stack.
+				companion = {
+					rows = function()
+						if not (prediction_engine and prediction_engine.shows_with_hotstring_rows()) then return nil end
+						return tooltip_preview.showing_rows()
+					end,
+					showing = tooltip_preview.is_showing,
+					covered = tooltip_preview.note_covered,
+					redraw = tooltip_preview.redraw,
+				},
 			}) then llm_overlay = nil end
 			Logger.info(LOG, "Preview tooltip initialised (renderer available: %s).",
 				tostring(require("adapters.graphics_renderer").is_available()))

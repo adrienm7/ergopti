@@ -429,6 +429,9 @@ M.features = {
 		path = "llm.trigger.after_hotstring", id = "after_hotstring", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.after_hotstring", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
+		path = "llm.trigger.while_hotstring_tooltip", id = "while_hotstring_tooltip", section = "llm.trigger", default = "wait", type = "enum", description_key = "menu.llm.trigger.while_hotstring_tooltip", platforms = { "ahk", "hs", "linux" }, recommended = "wait", family = "setting", enum_values = { "wait", "both" },
+	},
+	{
 		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "platform_reason.inline_autotype_is_windows", platforms = { "ahk" },
 	},
 	{

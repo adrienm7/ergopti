@@ -267,8 +267,9 @@ _LLM_Engine_DispatchDecision(Override, NowMs) {
  *     llm_prompt_prediction action): Map("profile_id", Id, "num_predictions",
  *     Count or 0 for the menu's). It wins over the active and per-app profiles
  *     and never changes them. With "live" (live mode's automatic trigger) the
- *     minimum word count is live.json's, and the request waits while a
- *     hotstring tooltip is shown. 0 for an ordinary request.
+ *     minimum word count is live.json's, and the request always waits while a
+ *     hotstring tooltip is shown. 0 for an ordinary request, which waits too
+ *     unless llm.trigger.while_hotstring_tooltip is "both".
  */
 LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	global _LLM_Engine
@@ -307,10 +308,12 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		return
 	}
 	IsLive := (Override is Map) && Override["live"]
-	; Hotstring tooltips win: a live prediction would replace the preview on the
-	; shared surface. The chain armed when it closes asks again.
-	if (IsLive && _LLM_Engine_HotstringTooltipShown()) {
-		try LoggerDebug("LLM", "Live prediction deferred: a hotstring tooltip is shown.")
+	; Hotstring tooltips win: a prediction would replace the preview on the
+	; shared surface and retire a hotstring that can still expand. The chain
+	; armed when it closes asks again (llm.trigger.while_hotstring_tooltip).
+	if _LLM_Engine_HotstringTooltipHolds(Override) {
+		try LoggerDebug("LLM", "{1} prediction deferred: a hotstring tooltip is shown.",
+			IsLive ? "Live" : "Automatic")
 		return
 	}
 	AcceptSource := _LLM_Engine_NormalizeAcceptSource(AcceptSource?)
@@ -800,8 +803,8 @@ _LLM_Engine_ShowLoadingTooltip() {
 			and IsSet(LLM_Tooltip_IsLoading) and !LLM_Tooltip_IsLoading())
 		return
 	RequestId := _LLM_Engine.Get("request_id", 0)
-	; A hotstring tooltip wins over a live one on the shared surface
-	if (_LLM_Engine_RequestIsLive(RequestId) && _LLM_Engine_HotstringTooltipShown())
+	; A hotstring tooltip wins over the spinner on the shared surface
+	if _LLM_Engine_RequestHeldByHotstring(RequestId)
 		return
 	_LLM_Engine_ApplyTooltipDisplayOpts(1)
 	SemanticSignature := _LLM_Engine.Get("active_request_signature", "")
@@ -1477,11 +1480,10 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 		try LoggerInfo("LLM", "Prediction superseded during render — discarding request #{1}.", request_id)
 		return
 	}
-	; A hotstring preview shown meanwhile keeps the surface: the live answer is
+	; A hotstring preview shown meanwhile keeps the surface: the answer is
 	; dropped, and the chain armed when the preview closes asks again.
-	if (request_id != "" && _LLM_Engine_RequestIsLive(request_id)
-			&& _LLM_Engine_HotstringTooltipShown()) {
-		try LoggerDebug("LLM", "Live prediction #{1} dropped: a hotstring tooltip is shown.", request_id)
+	if (request_id != "" && _LLM_Engine_RequestHeldByHotstring(request_id)) {
+		try LoggerDebug("LLM", "Prediction #{1} dropped: a hotstring tooltip is shown.", request_id)
 		return
 	}
 	; Freeze the chain timings BEFORE the final render, not after it. The render

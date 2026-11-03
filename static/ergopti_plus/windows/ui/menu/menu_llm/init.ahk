@@ -72,7 +72,8 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 		throw TypeError("LLM saved options must be a Map.")
 	static _str_keys := ["model", "profile_id", "temperature",
 		ConfigLeaf.NAV_MODIFIERS, ConfigLeaf.VAL_MODIFIERS, "backend",
-		"api_entry_id", ConfigLeaf.AGENT_SYSTEM1, ConfigLeaf.AGENT_SYSTEM2, ConfigLeaf.AGENT_MODE]
+		"api_entry_id", ConfigLeaf.AGENT_SYSTEM1, ConfigLeaf.AGENT_SYSTEM2, ConfigLeaf.AGENT_MODE,
+		ConfigLeaf.WHILE_HOTSTRING_TOOLTIP]
 	static _num_keys := ["n_predictions", ConfigLeaf.MIN_WORDS, ConfigLeaf.MAX_WORDS, ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
 		"ctx_chars", ConfigLeaf.PRED_INDENT, "ollama_port"]
 	static _bool_keys := ["enabled", ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING,

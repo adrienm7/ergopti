@@ -753,6 +753,27 @@
 			]
 		},
 		{
+			"type": "choice",
+			"id": "llm_while_hotstring_tooltip",
+			"path": "llm.trigger.while_hotstring_tooltip",
+			"i18n": "menu.llm.while_hotstring_tooltip",
+			"show_current_choice": true,
+			"current_choice_label_value": true,
+			"disabled_when": [
+				"llm_trigger_ready"
+			],
+			"choices": [
+				{
+					"value": "wait",
+					"i18n": "menu.llm.while_hotstring_tooltip_wait"
+				},
+				{
+					"value": "both",
+					"i18n": "menu.llm.while_hotstring_tooltip_both"
+				}
+			]
+		},
+		{
 			"type": "---"
 		},
 		{

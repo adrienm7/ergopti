@@ -915,6 +915,7 @@ M.set_llm_disabled_apps      = LLMBridge.set_llm_disabled_apps
 M.set_llm_app_profile_overrides = LLMBridge.set_llm_app_profile_overrides
 M.set_llm_enabled            = LLMBridge.set_llm_enabled
 M.set_llm_after_hotstring    = LLMBridge.set_llm_after_hotstring
+M.set_llm_while_hotstring_tooltip = LLMBridge.set_llm_while_hotstring_tooltip
 M.set_llm_debounce           = LLMBridge.set_llm_debounce
 M.set_llm_min_request_interval = LLMBridge.set_llm_min_request_interval
 M.set_llm_auto_raise_temp    = LLMBridge.set_llm_auto_raise_temp

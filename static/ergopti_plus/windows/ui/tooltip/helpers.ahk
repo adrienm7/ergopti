@@ -104,7 +104,7 @@ _TooltipHideSurfaceObjects(Surface) {
 _TooltipCreateDetachedSurface(Row, Generation, Pos := 0) {
 		Surface := { Gui: Row.Gui, Rows: [Row], Border: 0, Pos: Pos, Anchor: 0,
 			ContentHwnds: [], BorderHwnds: [], Generation: Generation,
-			LlmPresented: 0 }
+			LlmPresented: 0, DecisionItems: [] }
 		try Surface.ContentHwnds.Push(Row.Gui.Hwnd)
 		return Surface
 }
@@ -555,6 +555,10 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 						_TooltipHideSurfaceObjects(RetiredSurface)
 						HotPath_BreakdownMark("retire", _hpRetire, Breakdown)
 
+						; The decision rows the surface shows travel with it: a prediction
+						; drawn under them (llm.trigger.while_hotstring_tooltip = "both")
+						; reads them back from the surface it replaces.
+						PreparedSurface.DecisionItems := PublishItems
 						; One assignment publishes content, border, trackers, position and
 						; owner generation together. No callback can observe a half-swap.
 						_TooltipActiveSurface := PreparedSurface

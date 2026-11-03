@@ -1737,6 +1737,21 @@ family = "setting"
 type = "boolean"
 description_key = "menu.llm.trigger.after_hotstring"
 
+# What an automatic prediction does while a hotstring tooltip that can still
+# expand is on screen: "wait" holds it until that tooltip expires (the
+# after_hotstring chain asks again then), "both" shows the hotstring rows and
+# the prediction in one stack. A prediction never covers the hotstring tooltip.
+[[features.llm.trigger]]
+id = "while_hotstring_tooltip"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
+default = "wait"
+recommended = "wait"
+family = "setting"
+type = "enum"
+enum_values = ["wait", "both"]
+description_key = "menu.llm.trigger.while_hotstring_tooltip"
+
 [[features.llm.trigger]]
 id = "inline_autotype"
 default = false

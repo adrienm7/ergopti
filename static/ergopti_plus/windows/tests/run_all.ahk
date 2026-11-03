@@ -993,6 +993,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/llm/actions/test_llm_agent_requester.ahk
 #Include unit/modules/llm/api/test_llm_remote_formats.ahk
 #Include unit/modules/llm/prediction/test_llm_live_mode.ahk
+#Include unit/modules/llm/prediction/test_llm_hotstring_tooltip_hold.ahk
 #Include unit/modules/shortcuts/test_send_input_actions.ahk
 #Include unit/platform/remap/keys/test_tap_keys.ahk
 #Include unit/platform/remap/keys/test_ai_action_gate.ahk
