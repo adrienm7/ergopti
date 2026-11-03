@@ -76,7 +76,10 @@ _NPR_Run(Kind, Mode) {
 	OwnedWindows := []
 	CleanupErrors := []
 	Prefix := "native_picker_" . DriverPid . "_" . A_TickCount . "_"
-	Title := WindowTitle(Kind == "slots" ? t("dialog.keyboard_shortcut.title_prefix") . Prefix : Prefix)
+	; The slot picker names a real group's modifiers (« Ctrl + … »), never its
+	; prefix, so it opens on a declared group; the driver PID keeps it unique.
+	SlotPrefix := "primary_"
+	Title := WindowTitle(Kind == "slots" ? t("dialog.keyboard_shortcut.title_prefix") . _KeyboardSlotFamilyLabel(SlotPrefix) . " + …" : Prefix)
 	try {
 		Critical("Off")
 		Suspend(false)
@@ -90,7 +93,7 @@ _NPR_Run(Kind, Mode) {
 		loop 3 {
 			AssertEqual(0, _NPR_Windows(Title, DriverPid).Length, "an older hidden picker must not survive a new opening")
 			if Kind == "slots"
-				ShowKeyboardSlotPicker(Prefix)
+				ShowKeyboardSlotPicker(SlotPrefix)
 			else
 				ShowActionPicker(Prefix, "none", _NPR_Picked.Bind(State))
 			Windows := _NPR_Windows(Title, DriverPid)
