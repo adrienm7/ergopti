@@ -24,7 +24,9 @@ registry, then asks for one of its blobs without following the redirect, and
 prints whether the host the registry sends the blob to is one the route
 inventory plans (_shared/modules/network/route_origins.json): the daemon's
 pull is routed by that inventory, so an unplanned blob host would be fetched
-on the wrong route. Only verdicts are printed, never a host or a digest.
+on the wrong route. It then asks two bytes of that blob, following each
+redirect the way the daemon does, and judges whether the final answer honours
+Range. Only verdicts are printed, never a host or a digest.
 """
 
 import importlib.util
@@ -32,6 +34,7 @@ import json
 import sys
 import tempfile
 import time
+import urllib.parse
 from pathlib import Path
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
@@ -248,18 +251,29 @@ def read_bounded(response):
             raise ValueError("manifest too large")
 
 
-def blob_redirect_verdict(status, location, planned):
-    """The blob_host step for a blob answer: (state, value)."""
+REDIRECT_STATUSES = (301, 302, 303, 307, 308)
+
+# Hops a ranged blob request follows, as many as Go's default client (and so
+# the daemon's downloader) does before it gives up.
+MAX_BLOB_REDIRECTS = 10
+
+
+def blob_redirect_verdict(status, location, planned, origin="https://"):
+    """The blob_host step for a blob answer: (state, value).
+
+    A redirect may not leave the scheme of the URL that answered it: the
+    registry is HTTPS, so its storage must be too.
+    """
     if 200 <= status < 300:
         return "pass", "registry_served"
-    if status not in (301, 302, 303, 307, 308):
+    if status not in REDIRECT_STATUSES:
         return "fail", "http_" + str(status)
     if not location:
         return "fail", "no_location"
-    target = location.split("://", 1)[-1].split("/", 1)[0].split(":", 1)[0].lower()
-    if not location.lower().startswith("https://"):
+    target = urllib.parse.urlsplit(location)
+    if origin.lower().startswith("https:") and target.scheme.lower() != "https":
         return "fail", "not_https"
-    return ("pass", "planned") if target in planned else ("fail", "unplanned_host")
+    return ("pass", "planned") if (target.hostname or "") in planned else ("fail", "unplanned_host")
 
 
 # Two bytes past the start: an answer that ignores Range cannot pass by chance.
@@ -321,10 +335,10 @@ def main_blob(model):
     blob_url = registry + "/v2/" + repository + "/blobs/" + digest
     try:
         with request(bootstrap, blob_url, "HEAD", (("Accept-Encoding", "identity"),)) as response:
-            state, value = blob_redirect_verdict(
-                response.status, header(response, "location"), planned
-            )
             location = header(response, "location")
+            if location:
+                location = urllib.parse.urljoin(blob_url, location)
+            state, value = blob_redirect_verdict(response.status, location, planned)
     except Exception as failure:
         state, value = "fail", getattr(failure, "reason", "unavailable")
     emit("blob_host", state, value)
@@ -332,16 +346,35 @@ def main_blob(model):
         emit("blob_range", "skip", "no_blob")
         return
     try:
-        with request(
-            bootstrap,
-            location or blob_url,
-            "GET",
-            (("Range", BLOB_RANGE_PROBE), ("Accept-Encoding", "identity")),
-        ) as response:
-            state, value = blob_range_verdict(response.status, header(response, "content-range"))
+        state, value = ranged_blob_verdict(bootstrap, location or blob_url, planned)
     except Exception as failure:
         state, value = "fail", getattr(failure, "reason", "unavailable")
     emit("blob_range", state, value)
+
+
+def ranged_blob_verdict(bootstrap, url, planned):
+    """Ask two bytes of a blob, following its redirects, and judge the final answer.
+
+    The registry answers a HEAD itself but sends a GET to its storage host
+    (field run of 2026-11-03: blob_host registry_served, then a 307 to the
+    GET). The daemon follows that redirect before it asks its ranges, so the
+    probe follows it too; each hop must stay on HTTPS and a planned host.
+    """
+    for _ in range(MAX_BLOB_REDIRECTS + 1):
+        with request(
+            bootstrap, url, "GET", (("Range", BLOB_RANGE_PROBE), ("Accept-Encoding", "identity"))
+        ) as response:
+            status = response.status
+            location = header(response, "location")
+            content_range = header(response, "content-range")
+        if status not in REDIRECT_STATUSES:
+            return blob_range_verdict(status, content_range)
+        target = urllib.parse.urljoin(url, location) if location else None
+        state, value = blob_redirect_verdict(status, target, planned, url)
+        if state != "pass":
+            return state, value
+        url = target
+    return "fail", "too_many_redirects"
 
 
 if __name__ == "__main__":
