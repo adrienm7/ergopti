@@ -335,16 +335,16 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `sticky_ctrl` | 📌 Sticky Ctrl | yes | yes | no, R27 |
 | `sticky_cmd` | 📌 Sticky Cmd | yes | yes | no, R27 |
 | `sticky_option` | 📌 Sticky Option | yes | yes | no, R27 |
-| `sticky_cmd_shift` | 📌 Sticky Cmd+Shift | yes | yes | no, R27 |
-| `sticky_cmd_option` | 📌 Sticky Cmd+Option | yes | yes | no, R27 |
-| `sticky_cmd_ctrl` | 📌 Sticky Cmd+Ctrl | yes | yes | no, R27 |
-| `sticky_option_shift` | 📌 Sticky Option+Shift | yes | yes | no, R27 |
-| `sticky_option_ctrl` | 📌 Sticky Option+Ctrl | yes | yes | no, R27 |
-| `sticky_ctrl_shift` | 📌 Sticky Ctrl+Shift | yes | yes | no, R27 |
-| `sticky_cmd_option_shift` | 📌 Sticky Cmd+Option+Shift | yes | yes | no, R27 |
-| `sticky_cmd_option_ctrl` | 📌 Sticky Cmd+Option+Ctrl | yes | yes | no, R27 |
-| `sticky_cmd_shift_ctrl` | 📌 Sticky Cmd+Shift+Ctrl | yes | yes | no, R27 |
-| `sticky_option_shift_ctrl` | 📌 Sticky Option+Shift+Ctrl | yes | yes | no, R27 |
+| `sticky_cmd_shift` | 📌 Sticky Cmd + Shift | yes | yes | no, R27 |
+| `sticky_cmd_option` | 📌 Sticky Cmd + Option | yes | yes | no, R27 |
+| `sticky_cmd_ctrl` | 📌 Sticky Cmd + Ctrl | yes | yes | no, R27 |
+| `sticky_option_shift` | 📌 Sticky Option + Shift | yes | yes | no, R27 |
+| `sticky_option_ctrl` | 📌 Sticky Option + Ctrl | yes | yes | no, R27 |
+| `sticky_ctrl_shift` | 📌 Sticky Ctrl + Shift | yes | yes | no, R27 |
+| `sticky_cmd_option_shift` | 📌 Sticky Cmd + Option + Shift | yes | yes | no, R27 |
+| `sticky_cmd_option_ctrl` | 📌 Sticky Cmd + Option + Ctrl | yes | yes | no, R27 |
+| `sticky_cmd_shift_ctrl` | 📌 Sticky Cmd + Shift + Ctrl | yes | yes | no, R27 |
+| `sticky_option_shift_ctrl` | 📌 Sticky Option + Shift + Ctrl | yes | yes | no, R27 |
 | `sticky_hyper` | 📌 Sticky Hyper | yes | yes | no, R27 |
 | `open_metrics_typing` | 📊 Typing stats | yes | yes | yes |
 | `open_metrics_apps` | 📊 App stats | yes | yes | yes |

@@ -1117,18 +1117,30 @@ function createKarabinerLabels(labels) {
 	const actions = JSON.parse(fs.readFileSync(MACOS_REMAP_ACTIONS_PATH, 'utf8'));
 	return function karabinerActionSegments(action, context) {
 		const registryKey = `sg_actions.${aliases[action] || action}`;
-		if (labels.hasKey(registryKey)) return [{ key: labels.requireKey(registryKey, context) }];
-		const entry = actions.find((candidate) => candidate.id === action);
-		// A modifier hold names its modifiers from the key name table, as the
-		// tray's name_modifier_holds does (« Cmd + Maj »).
-		if (entry && Array.isArray(entry.modifiers)) {
+		// A modifier set names its modifiers from the key name table, as the tray
+		// does (« Cmd + Maj »).
+		const modifierSegments = (modifiers) => {
 			const segments = [];
-			entry.modifiers.forEach((modifier, index) => {
+			modifiers.forEach((modifier, index) => {
 				if (index > 0) segments.push({ text: ' + ' });
 				segments.push({ key: labels.requireKey(KeyNames.i18n(modifier, 'hs'), context) });
 			});
 			return segments;
-		}
+		};
+		// A sticky label is a template its modifiers fill, as
+		// _shared/lua/actions/sticky_label.lua fills it (« 📌 {1} rémanents »).
+		const sticky = KeyNames.stickyModifiers(action);
+		if (sticky !== null && labels.hasKey(registryKey))
+			return [
+				{ template: labels.requireKey(registryKey, context), args: [modifierSegments(sticky)] }
+			];
+		if (labels.hasKey(registryKey)) return [{ key: labels.requireKey(registryKey, context) }];
+		const entry = actions.find((candidate) => candidate.id === action);
+		if (entry && Array.isArray(entry.modifiers)) return modifierSegments(entry.modifiers);
+		// A layer hold reads as the hold picker names that layer, as the tray's
+		// name_held_layers does.
+		if (entry && typeof entry.hold_layer === 'string')
+			return [{ key: labels.requireKey(`tap_hold.hold.${entry.hold_layer}_layer`, context) }];
 		const text = entry && (entry.short_label || entry.label);
 		if (typeof text !== 'string' || text === '') {
 			throw new Error(`${context}: Karabiner action ${action} has no label`);

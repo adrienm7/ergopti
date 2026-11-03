@@ -19,6 +19,7 @@ local Paths         = require("infra.paths")
 local Timings       = require("infra.timings")
 local i18n          = require("infra.i18n")
 local KeyNames      = require("keycodes.key_names")
+local StickyLabel   = require("actions.sticky_label")
 local text_utils    = require("infra.text_utils")
 local FileSystem    = require("adapters.file_system")
 local KeyState      = require("adapters.key_state")
@@ -2989,7 +2990,11 @@ function M.get_label(name)
 	local keys = meta and { meta.label_key } or { "sg_actions." .. name, "ax_actions." .. name }
 	for _, key in ipairs(keys) do
 		local s = i18n.get(key)
-		if s ~= key then return s end
+		if s ~= key then
+			-- A sticky label is a template its modifiers fill (« 📌 {1} rémanents »).
+			if StickyLabel.is_sticky(name) then return StickyLabel.label(name, key, "macos", i18n.get) end
+			return s
+		end
 	end
 	return name
 end
