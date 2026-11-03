@@ -689,7 +689,9 @@ type = "check"
 id = "llm_url_bar_filter"
 i18n = "menu.llm.disable_url_bars"
 checked_when = ["llm_url_bar_filter_enabled"]
+# Greyed only while the setting cannot be written, and the row says so.
 disabled_when = ["llm_url_bar_filter_ready"]
+disabled_reason_key = "menu.llm.save_unavailable"
 
 [[menu.llm_trigger_menu]]
 type = "check"
@@ -697,6 +699,7 @@ id = "llm_secure_field_filter"
 i18n = "menu.llm.disable_password_fields"
 checked_when = ["llm_secure_field_filter_enabled"]
 disabled_when = ["llm_secure_field_filter_ready"]
+disabled_reason_key = "menu.llm.save_unavailable"
 
 [[menu.llm_trigger_menu]]
 type = "list"

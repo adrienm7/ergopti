@@ -1343,7 +1343,8 @@ end
 --- @param prefs_file string Canonical configuration path.
 --- @param tolerate_outdated boolean|nil True for a read-only consumer: an entry this build
 ---   no longer knows is then left out of the view (already warned once) instead of refusing it.
----   A transaction that writes the file back keeps the strict view, which would drop that entry.
+---   A transaction that writes this view back keeps the strict one, which would drop that
+---   entry; a save of the loaded state keeps it (see _load_outdated) and may read tolerantly.
 --- @return table|nil flat Current owned preferences, nil on a refused view.
 --- @return table|nil source Exact classified bytes read for this view.
 --- @return string|nil reason Closed refusal cause when flat is nil: invalid_path,
