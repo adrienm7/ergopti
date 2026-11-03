@@ -39,7 +39,8 @@ function M.publication_guard(preferences, path, expected_source)
 	local before_id
 	return function(phase)
 		if phase == "before" then
-			local _, source = preferences.current_view(path)
+			-- Only the bytes are compared, and the save keeps an outdated entry.
+			local _, source = preferences.current_view(path, true)
 			if not preferences.source_matches(expected, source) then return false end
 			local receipt = preferences.publication_receipt(path)
 			if type(receipt) ~= "table" or type(receipt.id) ~= "number" or receipt.id < 0

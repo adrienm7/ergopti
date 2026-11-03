@@ -767,7 +767,8 @@
 			],
 			"disabled_when": [
 				"llm_url_bar_filter_ready"
-			]
+			],
+			"disabled_reason_key": "menu.llm.save_unavailable"
 		},
 		{
 			"type": "check",
@@ -778,7 +779,8 @@
 			],
 			"disabled_when": [
 				"llm_secure_field_filter_ready"
-			]
+			],
+			"disabled_reason_key": "menu.llm.save_unavailable"
 		},
 		{
 			"type": "list",

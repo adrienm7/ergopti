@@ -26,8 +26,16 @@ local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
 local SettingsManager = require("ui.menu.menu_llm.settings_manager")
 local ConfigKeys = require("config_keys")
+local Manifest = require("infra.manifest_reader")
 
 local LOG = "menu_llm.trigger_panel"
+
+-- The manifest owns these two defaults: their flat state keys are not the
+-- llm_disable_* names the shared defaults use.
+local PRIVACY_PATHS = {
+	llm_url_bar_filter_enabled = ConfigKeys.KEY.LLM_TRIGGER_URL_BAR_FILTER_ENABLED,
+	llm_secure_field_filter_enabled = ConfigKeys.KEY.LLM_TRIGGER_SECURE_FILTER_ENABLED,
+}
 
 --- Routes one trigger setting through the shared transactional owner.
 --- @param settings_mgr table Settings manager instance.
@@ -128,13 +136,18 @@ function M.build(ctx)
 			local core = llm_mod.streaming_snapshot()
 			local runtime = settings_mgr.setting_snapshot(key)
 			local path = ConfigPaths.get("ConfigTomlPath")
-			local canonical, physical = Preferences.current_view(path)
+			-- Read-only here: an outdated entry belongs to the config cleanup, and
+			-- the save keeps it, so it must not take these rows away meanwhile.
+			local canonical, physical = Preferences.current_view(path, true)
 			snapshot.source = Preferences.source_snapshot(path)
 			snapshot.paused = ctx.is_paused()
 			snapshot.generation = core.generation + (runtime and runtime.generation or 0)
-			local function canonical_value(field)
+			-- Saves are sparse: a value at its shipped default is absent from the
+			-- file, and each field names the owner of that default. The absent
+			-- backend has none here, since the machine chose it at boot.
+			local function stored_or(field, shipped)
 				if canonical == nil then return nil end
-				if canonical[field] == nil then return llm_mod.DEFAULT_STATE[field] end
+				if canonical[field] == nil then return shipped end
 				return canonical[field]
 			end
 			snapshot.blocked = ctx.is_disabled ~= false or core.blocked ~= false
@@ -142,9 +155,9 @@ function M.build(ctx)
 				or (runtime and (runtime.owner ~= settings_mgr or runtime.value ~= snapshot.value))
 				or core.enabled ~= snapshot.enabled or core.backend ~= snapshot.backend
 				or not Preferences.source_matches(snapshot.source, physical)
-				or canonical_value(key) ~= snapshot.value
-				or canonical_value("llm_enabled") ~= snapshot.enabled
-				or canonical_value("llm_backend") ~= snapshot.backend
+				or stored_or(key, Manifest.default_for(PRIVACY_PATHS[key])) ~= snapshot.value
+				or stored_or("llm_enabled", llm_mod.DEFAULT_STATE.llm_enabled) ~= snapshot.enabled
+				or stored_or("llm_backend", snapshot.backend) ~= snapshot.backend
 		end, debug.traceback)
 		if not ok then
 			Logger.warn(LOG, "Privacy row source is unavailable: %s.", tostring(detail))
