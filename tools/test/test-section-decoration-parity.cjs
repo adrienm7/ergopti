@@ -4,24 +4,27 @@
  * ==============================================================================
  * MODULE: Section-Title Decoration Parity & Single-Source Guard
  * DESCRIPTION:
- * The disabled menu section headers are decorated as "— Label —" on both
- * drivers. That decoration must live in exactly one place per driver and stay
- * identical across drivers, so a future edit cannot make Windows and macOS
- * render section titles differently (MS-3 audit item).
+ * Every disabled menu section header of the three drivers is drawn by one
+ * format, _shared/modules/menu/section_header.json, so its style changes in one
+ * place and no title frames itself (the maintainer, 2026-11-03: « — Section
+ * truc — », the case as the locale writes it, never capitals by hand).
  *
- * This guard locks the root cause three ways (text-scan, no runtime needed —
- * runs in CI on any OS):
- *   1. macOS kernel: infra/i18n.lua exposes M.decorate_section wrapping text in
- *      the canonical dashes.
- *   2. AHK kernel: infra/menu_helpers.ahk's MenuSectionTitle uses the identical
- *      "— … —" decoration.
- *   3. Ratchet: NO macOS menu file re-inlines the decoration ("— " .. …) — every
- *      builder must route through the kernel (M.decorate_section / M.section /
- *      MenuUtils.build_section_header). Only the kernel file itself may contain
- *      the literal.
- *   4. No section header the menu source (menu.toml) declares carries a dash of its
- *      own in any locale: the kernel frames it, and « Main gauche — Tap / Hold »
- *      read « — Main gauche — Tap / Hold — » (section-header-no-inner-dash).
+ * This guard locks it five ways (text scan, no runtime needed; runs in CI on
+ * any OS):
+ *   1. The generated Lua data and AHK constants carry the format of the JSON,
+ *      and the Lua kernel (menu.labels, delegated to by macOS and Linux i18n)
+ *      and the AHK kernel (MenuSectionTitle) frame with them.
+ *   2. (part of 1) the AHK kernel reads the generated constants.
+ *   3. Ratchet: no driver or shared Lua/AHK source outside the tests frames a
+ *      header by hand (a literal joined to the prefix or the suffix, or a
+ *      literal framed at both ends) (section-header-one-format).
+ *   4. No locale value is framed by dashes, no section header title holds one
+ *      (« Main gauche — Tap / Hold » read « — Main gauche — Tap / Hold — »), and
+ *      no menu title is written in capitals (section-header-locale-case).
+ *   5. Per platform, a declared header is never followed by a separator or by
+ *      another header, and ends its menu only in a fragment a driver splices
+ *      into its own rows (section-header-titles-rows). The built-menu tests of
+ *      each driver check the same rule on the rendered menus.
  * ==============================================================================
  */
 
@@ -135,62 +138,164 @@ check(
 	/MenuSectionTitle\(Text\)\s*\{\s*return MENU_SECTION_HEADER_PREFIX \. Text \. MENU_SECTION_HEADER_SUFFIX/
 );
 
-// 3. Ratchet: only the kernel file may inline the decoration; every macOS menu
-//    builder must route through it. Test files are exempt — they legitimately
-//    stub the i18n kernel (tests/helpers mirrors decorate_section verbatim).
-const INLINE_DECORATION = /"— "\s*\.\./;
-const isTest = (f) => /[\\/]tests[\\/]/.test(f);
-const offenders = collectLua(MACOS_ROOT, [])
-	.filter((f) => path.resolve(f) !== path.resolve(I18N_KERNEL))
-	.filter((f) => path.resolve(f) !== path.resolve(SHARED_LABELS))
-	.filter((f) => !isTest(f))
-	.filter((f) => INLINE_DECORATION.test(fs.readFileSync(f, 'utf8')));
-
-if (offenders.length === 0) {
-	total_pass++;
-	console.log(`  ${PASS_SYMBOL}  Ratchet: no macOS file re-inlines "— " .. (single source upheld)`);
-} else {
-	total_fail++;
-	console.log(
-		`  ${FAIL_SYMBOL}  Ratchet: ${offenders.length} macOS file(s) re-inline the decoration`
-	);
-	for (const f of offenders) {
-		console.log(
-			`       - ${path.relative(REPO_ROOT, f)} (route through i18n.decorate_section / M.section)`
-		);
-	}
-}
-
-// --- 4. Section header labels carry no dash of their own --------------------
-const LOCALE_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/_shared/data/locales');
-const HEADER_KEY = /type\s*=\s*"section_header"\s*\n\s*i18n\s*=\s*"([^"]+)"/g;
-// The section headers are menu rows: they live in the tray-menu source.
-const headerKeys = [...require('../lib/menu-source.cjs').readMenuSource().matchAll(HEADER_KEY)].map(
-	(m) => m[1]
+// 3. Ratchet: no driver or shared source frames a header by hand. Every builder
+//    routes through the kernel (Labels.decorate_section, i18n.section,
+//    MenuUtils.build_section_header, MenuSectionTitle); only the kernels hold the
+//    frame, and they read it from the generated format. Test files are exempt:
+//    they stub the kernel.
+const DRIVER_ROOTS = ['macos', 'linux', 'windows', '_shared/lua', '_shared/modules'].map((d) =>
+	path.join(REPO_ROOT, 'static/ergopti_plus', d)
 );
-const dashed = [];
-for (const file of fs.readdirSync(LOCALE_DIR).filter((f) => f.endsWith('.json'))) {
-	const strings = JSON.parse(
-		fs.readFileSync(path.join(LOCALE_DIR, file), 'utf8').replace(/^\uFEFF/, '')
-	);
-	for (const key of headerKeys) {
-		if (typeof strings[key] === 'string' && strings[key].includes('—')) {
-			dashed.push(`${file} ${key}: ${strings[key]}`);
+function collectSources(dir, acc) {
+	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+		const full = path.join(dir, entry.name);
+		if (entry.isDirectory()) {
+			if (entry.name !== 'tests' && entry.name !== 'test' && entry.name !== 'node_modules')
+				collectSources(full, acc);
+		} else if (entry.isFile() && /\.(lua|ahk)$/.test(entry.name)) {
+			acc.push(full);
 		}
 	}
+	return acc;
 }
-if (headerKeys.length > 0 && dashed.length === 0) {
+const escaped = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// A string literal that opens with the frame's prefix and is joined to more
+// text, or one literal framed at both ends.
+const HAND_FRAMES = [
+	new RegExp(`["']${escaped(PREFIX)}["']\\s*(?:\\.\\.|\\.)`),
+	new RegExp(`(?:\\.\\.|\\.)\\s*["']${escaped(SUFFIX)}["']`),
+	new RegExp(`["']${escaped(PREFIX)}[^"'\\n]+${escaped(SUFFIX)}["']`)
+];
+const handFramed = [];
+for (const file of DRIVER_ROOTS.flatMap((dir) => collectSources(dir, []))) {
+	const lines = fs.readFileSync(file, 'utf8').split('\n');
+	lines.forEach((line, index) => {
+		const code = line.replace(/^\s*(?:--|;).*$/, '');
+		if (HAND_FRAMES.some((pattern) => pattern.test(code)))
+			handFramed.push(`${path.relative(REPO_ROOT, file)}:${index + 1}: ${line.trim()}`);
+	});
+}
+if (handFramed.length === 0) {
+	total_pass++;
+	console.log(`  ${PASS_SYMBOL}  Ratchet: no driver or shared source frames a header by hand`);
+} else {
+	total_fail++;
+	console.log(
+		`  ${FAIL_SYMBOL}  Ratchet: ${handFramed.length} hand-framed header(s) (section-header-one-format)`
+	);
+	for (const line of handFramed)
+		console.log(`       - ${line} (route through decorate_section / MenuSectionTitle)`);
+}
+
+// 4. No locale value forms a header by hand: no value framed by a dash at both
+//    ends, no section header title carrying a dash, and no menu title in
+//    capitals, which the maintainer retired (« Section truc », as the locale
+//    writes it).
+const LOCALE_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/_shared/data/locales');
+const MANIFEST = JSON.parse(
+	fs.readFileSync(
+		path.join(REPO_ROOT, 'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'),
+		'utf8'
+	)
+);
+// Every section_header row of the manifest, status rows included.
+const headerKeys = new Set();
+(function visit(node) {
+	if (Array.isArray(node)) node.forEach(visit);
+	else if (node && typeof node === 'object') {
+		if (node.type === 'section_header' && typeof node.i18n === 'string') headerKeys.add(node.i18n);
+		Object.values(node).forEach(visit);
+	}
+})(MANIFEST);
+const FRAMED = /^\s*[—–]\s.*\s[—–]\s*$/u;
+// Capitals: every cased letter upper case, cased letters the majority of the
+// letters (so a Japanese title holding « GNOME » is not one), and one word of
+// five capitals for a menu row (units and acronyms such as « GB RAM » or « ANSI »
+// stay), of two for a header.
+function shouted(value, minimum) {
+	const text = value.replace(/%[sd]|\{[^}]*\}/g, '');
+	const letters = text.match(/\p{L}/gu) || [];
+	const cased = letters.filter((c) => c.toLowerCase() !== c.toUpperCase());
+	const longest = Math.max(0, ...(text.match(/\p{Lu}+/gu) || []).map((word) => word.length));
+	return (
+		longest >= minimum &&
+		cased.length * 2 >= letters.length &&
+		cased.every((c) => c === c.toUpperCase())
+	);
+}
+const localeDefects = [];
+for (const file of fs.readdirSync(LOCALE_DIR).filter((f) => f.endsWith('.json'))) {
+	const strings = JSON.parse(
+		fs.readFileSync(path.join(LOCALE_DIR, file), 'utf8').replace(/^﻿/, '')
+	);
+	for (const [key, value] of Object.entries(strings)) {
+		if (typeof value !== 'string') continue;
+		const header = headerKeys.has(key);
+		if (FRAMED.test(value)) localeDefects.push(`${file} ${key}: framed by hand: ${value}`);
+		else if (header && value.includes('—'))
+			localeDefects.push(`${file} ${key}: a header title holds a dash: ${value}`);
+		if ((header || key.startsWith('menu.')) && shouted(value, header ? 2 : 5))
+			localeDefects.push(`${file} ${key}: written in capitals: ${value}`);
+	}
+}
+if (headerKeys.size > 10 && localeDefects.length === 0) {
 	total_pass++;
 	console.log(
-		`  ${PASS_SYMBOL}  ${headerKeys.length} manifest section header(s) carry no dash of their own`
+		`  ${PASS_SYMBOL}  no locale value frames a header, in capitals or with dashes (${headerKeys.size} header titles)`
 	);
 } else {
 	total_fail++;
 	console.log(
-		`  ${FAIL_SYMBOL}  section headers the kernel frames must not add a dash (section-header-no-inner-dash)`
+		`  ${FAIL_SYMBOL}  locale values form headers by hand (section-header-no-inner-dash, section-header-locale-case)`
 	);
-	if (headerKeys.length === 0) console.log('       - no section_header found in menu.toml');
-	for (const line of dashed) console.log(`       - ${line}`);
+	if (headerKeys.size <= 10)
+		console.log(`       - only ${headerKeys.size} section_header row(s) found`);
+	for (const line of localeDefects) console.log(`       - ${line}`);
+}
+
+// 5. Declaration layout, per platform: a header titles the rows under it, so the
+//    next row drawn there is never a separator or another header, and only a
+//    fragment a driver splices into its own rows (an include target, a template
+//    it renders with template_rows) may end with its header.
+const PLATFORMS = ['ahk', 'hs', 'linux'];
+const drawnOn = (row, platform) =>
+	!Array.isArray(row.platforms) || row.unavailable === 'grey' || row.platforms.includes(platform);
+const templateSources = DRIVER_ROOTS.flatMap((dir) => collectSources(dir, []))
+	.map((file) => fs.readFileSync(file, 'utf8'))
+	.join('\n');
+const fragments = new Set();
+for (const [key, rows] of Object.entries(MANIFEST)) {
+	if (!Array.isArray(rows)) continue;
+	for (const row of rows) if (row && row.type === 'include') fragments.add(row.section);
+	if (
+		new RegExp(`(?:template_rows|TemplateRows)\\(\\s*["']${escaped(key)}["']`).test(templateSources)
+	)
+		fragments.add(key);
+}
+const layoutDefects = [];
+for (const [key, rows] of Object.entries(MANIFEST)) {
+	if (!Array.isArray(rows) || !rows.every((row) => row && typeof row.type === 'string')) continue;
+	for (const platform of PLATFORMS) {
+		const drawn = rows.filter((row) => drawnOn(row, platform));
+		drawn.forEach((row, index) => {
+			if (row.type !== 'section_header') return;
+			const next = drawn[index + 1];
+			const where = `${platform} ${key}: header ${row.i18n}`;
+			if (next === undefined && !fragments.has(key)) layoutDefects.push(`${where} ends its menu`);
+			else if (next && next.type === '---')
+				layoutDefects.push(`${where} is followed by a separator`);
+			else if (next && next.type === 'section_header')
+				layoutDefects.push(`${where} is followed by another header`);
+		});
+	}
+}
+if (layoutDefects.length === 0) {
+	total_pass++;
+	console.log(`  ${PASS_SYMBOL}  every declared section header titles real rows on each platform`);
+} else {
+	total_fail++;
+	console.log(`  ${FAIL_SYMBOL}  section headers that title nothing (section-header-titles-rows)`);
+	for (const line of layoutDefects) console.log(`       - ${line}`);
 }
 
 console.log(`\nResults: ${total_pass} passed, ${total_fail} failed.`);

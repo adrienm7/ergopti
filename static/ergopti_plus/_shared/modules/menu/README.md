@@ -19,6 +19,7 @@ Adding, removing or renaming a row happens in `menu.toml`, never in a driver.
 | `startup_tray.toml`           | Recovery tray policy, projected with the menu                             |
 | `startup_tray_projection.ahk` | Generated Windows recovery tray, written by the same build                |
 | `row_order.json`              | Shared row-order rules some native menus apply                            |
+| `section_header.json`         | The one frame of every section header (`npm run gen` projects it)         |
 
 ## Row types
 
@@ -30,7 +31,7 @@ Adding, removing or renaming a row happens in `menu.toml`, never in a driver.
 | `choice`         | One enum setting as one row, its values beneath it (projected by the generator) | the command and the state getter  |
 | `group`          | A named submenu                                                                 | optionally a group builder        |
 | `list`           | Rows whose contents are runtime data                                            | the provider's row DATA           |
-| `section_header` | A disabled header                                                               | nothing                           |
+| `section_header` | A disabled header, framed by the one format of `section_header.json`            | nothing                           |
 | `label`          | An inert caption inside a template                                              | nothing                           |
 | `---`            | A separator (deferred, never doubled or trailing)                               | nothing                           |
 
