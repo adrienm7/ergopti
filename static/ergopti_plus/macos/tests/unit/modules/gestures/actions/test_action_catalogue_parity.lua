@@ -152,7 +152,9 @@ helpers.describe("action picker headings (macOS)", function()
 			for _, code in ipairs({ "de", "en" }) do
 				Locale.set_locale(code)
 				local chords_title = i18n.get("sg_actions.sg_order.header.modifier_chords")
-				local ctrl_title = i18n.format("sg_actions.sg_order.header.modifier_chord_group", "Ctrl")
+				-- The group names its modifiers in the locale's words: « Strg » in German.
+				local ctrl_title = i18n.format("sg_actions.sg_order.header.modifier_chord_group",
+					i18n.get("key_name.ctrl"))
 				local found_h1, found_ctrl, headings = false, false, 0
 				for _, name in ipairs(Actions.get_sg_names()) do
 					if name:sub(1, 1) == "#" then
@@ -177,6 +179,14 @@ helpers.describe("action picker headings (macOS)", function()
 					end
 				end
 				helpers.assert_true(labelled >= 100, code .. ": only " .. labelled .. " label(s) checked")
+				-- 2026-11-03: the chords read « Cmd + Option + Shift + Enter » in every
+				-- locale; each key is now named from the key name table.
+				local chord = { de = "Befehl + Wahltaste + Umschalt + Eingabe", en = "Cmd + Option + Shift + Enter" }
+				helpers.assert_eq(Actions.get_label("cmd_option_shift_enter"), chord[code],
+					code .. ": a chord names its keys in the user's language")
+				helpers.assert_eq(Actions.get_label("ctrl_space"),
+					(code == "de" and "Strg" or "Ctrl") .. " + " .. i18n.get("key_name.space"),
+					code .. ": Space is named too")
 				helpers.assert_true(found_h1, code .. ": the chord H1 must read " .. chords_title)
 				helpers.assert_true(found_ctrl, code .. ": the Ctrl group must read " .. ctrl_title)
 			end

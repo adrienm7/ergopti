@@ -129,6 +129,28 @@ function M.modifiers_heading(modifiers, platform, translate)
 	return table.concat(glyphs) .. " " .. names
 end
 
+--- How one modifier-chord action of modifier_chords.json reads: its modifiers'
+--- names, then its key (« Cmd + Option + Maj + Entrée »). A key the table
+--- names carries `key_name`; any other prints its legend (A, 1, .), the same in
+--- every language. The rows used to print the catalogue's English names.
+--- @param modifiers table Ids or aliases, in display order.
+--- @param key table A key of modifier_chords.json: { key_name } or { label }.
+--- @param platform string "windows", "macos" or "linux".
+--- @param translate function Takes a locale key, returns its text.
+--- @return string
+function M.chord_label(modifiers, key, platform, translate)
+	if type(key) ~= "table" then error("key names: a chord needs its key", 2) end
+	local key_text
+	if key.key_name ~= nil then
+		key_text = M.label(key.key_name, platform, translate)
+	elseif type(key.label) == "string" and key.label ~= "" then
+		key_text = key.label
+	else
+		error("key names: the chord key " .. tostring(key.id) .. " has neither key_name nor label", 2)
+	end
+	return M.modifiers_label(modifiers, platform, translate) .. " + " .. key_text
+end
+
 --- Fills the {1} of a translated template with one value. A catalogue miss
 --- comes back as the dotted key, like every other label, so the locale gates
 --- and the rendered-row walks refuse it; a template without {1} raises.

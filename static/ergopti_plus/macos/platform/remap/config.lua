@@ -221,8 +221,9 @@ local function load_json_file(path)
 end
 
 --- Appends the full shared modifier × key matrix used by gesture and tap-hold
---- action pickers. The labels come verbatim from the catalogue, so "Ctrl + A"
---- never depends on the active UI language.
+--- action pickers. Each label names its modifiers and its key from the shared
+--- key name table in the user's language (« Cmd + Maj + Entrée »); they used to
+--- keep the catalogue's English names in every locale.
 -- Decoded once. The shared modifier-chord catalogue is a file on disk that does
 -- not change while the driver runs, and this whole function re-ran on EVERY
 -- layout change — re-reading and re-decoding the JSON to rebuild the same 673
@@ -304,21 +305,20 @@ local function append_shared_modifier_chords(actions)
 
 	local max_mask = (2 ^ #modifiers) - 1
 	for mask = 1, max_mask do
-		local ids, labels, karabiner_modifiers = {}, {}, {}
+		local ids, karabiner_modifiers = {}, {}
 		for index, modifier in ipairs(modifiers) do
 			if math.floor(mask / (2 ^ (index - 1))) % 2 == 1 then
 				ids[#ids + 1] = modifier.id
-				labels[#labels + 1] = modifier.label
 				karabiner_modifiers[#karabiner_modifiers + 1] = modifier.karabiner
 			end
 		end
 		local id_prefix = table.concat(ids, "_")
-		local label_prefix = table.concat(labels, " + ")
 		for _, key_def in ipairs(keys) do
+			local label = KeyNames.chord_label(ids, key_def, "macos", i18n.get)
 			local action = {
 				id = id_prefix .. "_" .. key_def.id,
-				short_label = label_prefix .. " + " .. key_def.label,
-				label = label_prefix .. " + " .. key_def.label,
+				short_label = label,
+				label = label,
 				category = "Keyboard shortcuts",
 				holdable = false,
 			}

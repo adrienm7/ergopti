@@ -1807,9 +1807,9 @@ reason_linux = "platform_reason.debug_surface_is_each_drivers_own"
 
 # --- Modifier + key shortcuts ---
 # The exhaustive matrix is declared once in modifier_chords.json. Each driver
-# registers every non-empty combination of its native modifiers and shows them
-# under language-neutral labels such as "Ctrl + A"; the internal ids are never
-# displayed. In the picker they sit under the localized
+# registers every non-empty combination of its native modifiers and names each
+# key from _shared/data/keycodes/key_names.json in the user's language
+# (« Ctrl + Maj + Entrée »); the internal ids are never displayed. In the picker they sit under the localized
 # sg_order.header.modifier_chords heading, one sub-heading per modifier
 # combination built from sg_order.header.modifier_chord_group.
 
