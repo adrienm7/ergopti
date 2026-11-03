@@ -315,8 +315,11 @@ the content follows the fingers: three fingers left / right = next / previous
 tab, up / down = new / close tab; four fingers left / right = next / previous
 desktop (`space_next` / `space_prev` on macOS), up / down = next / previous
 window of the active app; `tap_3` = `left_click_toggle`, `tap_4` =
-`alt_tab_monitor`; on macOS a five-finger swipe up = `mission_control`, so the
-Spaces overview survives turning the system's four-finger gestures off. Linux
+`alt_tab_monitor`; on macOS five fingers up / down = `mission_control` /
+`app_expose` (the macOS order), so both overviews survive turning the system's
+four-finger gestures off. On macOS the three-finger horizontal swipes scale with
+the distance (mode "incremental"); Windows gets one shortcut per swipe and
+cannot, and the four-finger swipes stay one step per swipe everywhere. Linux
 keeps the 2026-10-24 rule for its swipes, which stay "none": the touchpad is
 read without a grab, so the desktop acts on the same swipes (a double action);
 its five-finger swipe stays "none" too (no Mission Control equivalent). macOS
