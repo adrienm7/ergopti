@@ -42,6 +42,31 @@ _TRFE_HandlesWindowsPathWithSpaces() {
 }
 Test("runner failure: call site parses a path containing spaces", _TRFE_HandlesWindowsPathWithSpaces)
 
+; A test that leaves an LLM auxiliary request current fails its own case: the
+; request's completion would otherwise run, and launch, inside a later test.
+_TRFE_LlmWorkerLeak() {
+	Earlier := LLM_AuxBegin("runner-leak-earlier")
+	try {
+		Mark := _TestLlmAuxMark()
+		AssertTrue(Mark >= 0, "the runner reads the real LLM auxiliary owner registry")
+		AssertEqual("", _TestLlmAuxLeaked(Mark), "a request opened before the test is not charged to it")
+		Opened := LLM_AuxBegin("runner-leak-probe")
+		try AssertEqual("runner-leak-probe", _TestLlmAuxLeaked(Mark),
+			"a request the test opened and left current names the leak")
+		finally LLM_AuxFinish(Opened)
+		AssertEqual("", _TestLlmAuxLeaked(Mark), "a request the test retired is not a leak")
+	} finally LLM_AuxFinish(Earlier)
+	Source := _DriverDirConcat("tests")
+	AssertTrue(Source != "", "registered test owners must be readable")
+	Code := _DriverMaskNonCode(&Source)
+	Body := _DriverExtractFunctionBody(&Code, "RunTests", 1, true)
+	AssertTrue(Body != "", "the actual runner must be readable")
+	AssertTrue(InStr(Body, "AuxMark := _TestLlmAuxMark()") > 0
+		&& InStr(Body, "_TestLlmAuxLeaked(AuxMark)") > InStr(Body, "TestEntry.callback.Call()"),
+		"the runner marks the registry before each case and checks it after the callback returns")
+}
+Test("runner failure: a test that leaves an LLM worker in flight fails (llm-worker-leak)", _TRFE_LlmWorkerLeak)
+
 ; A terminal stdout receipt cannot compensate for a dropped disk observation.
 _TRFE_ResultWrite(Locked) {
 	global TEST_RESULTS_FILE
