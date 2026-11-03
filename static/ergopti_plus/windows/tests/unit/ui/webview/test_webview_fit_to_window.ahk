@@ -91,11 +91,11 @@ _WVFW_LayoutManagerFollowsItsWindow() {
 _WVFW_NoHandlerFillsAFixedPlaceholder() {
 	Source := _DriverSourceNoComments()
 	Position := 1, Handlers := 0, Fitted := 0
-	while RegExMatch(Source, "im)^[ \t]*(\w*On(?:Gui)?(?:Resize|Size))\(", &Match, Position) {
+	; Definitions only: the signature is followed by its opening brace.
+	while RegExMatch(Source, "im)^[ \t]*(\w*On(?:Gui)?(?:Resize|Size))\([^)\r\n]*\)\s*\{", &Match, Position) {
 		Position := Match.Pos + Match.Len
-		Body := _DriverFuncBodyOrEmpty(Match[1])
-		if Body == ""
-			continue
+		Body := _DriverFuncBody(Match[1])
+		AssertTrue(InStr(Body, Match[1] . "("), "the scanned body is the handler's own")
 		Handlers += 1
 		if InStr(Body, "WebView_FitToWindow(")
 			Fitted += 1
