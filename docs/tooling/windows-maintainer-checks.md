@@ -80,7 +80,7 @@ single-owner mutex.
 | `capsword-auto-off`                     | CapsWord auto-off                                             | `test_capsword_state.ahk`, the shared corpus                            |
 | `clear-restore-categories`              | Clear and Restore: per category and global, then restart      | `test_keyboard_slot_group_scope.ahk`                                    |
 | `number-row-layouts`                    | Number row on each installed layout, each ordering            | `test_number_row_symbols.ahk`                                           |
-| `hotstring-delays-recommended-cleared`  | Hotstrings: delays 0.5 s recommended, cleared back to 1.0     | `test_hotstring_delimiter_scope_preservation.ahk`                       |
+| `hotstring-delays-recommended-cleared`  | Hotstrings: the declared 0.5 s after Restore and after Clear  | `test_hotstrings_scope.ahk`, `section_default_delay_vectors.json`       |
 | `handwritten-delimiters`                | Handwritten delimiters: Add, toggle, Delete, restart          | `test_terminator_admission.ahk`                                         |
 | `consume-submenu`                       | The delimiters an expansion consumes                          | `test_hotstring_delimiter_global_transaction.ahk`                       |
 | `ai-off-inert`                          | AI off (#97)                                                  | `test_llm_hotkeys_deferred_by_pause.ahk`                                |
