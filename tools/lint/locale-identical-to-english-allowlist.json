@@ -938,6 +938,10 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["fr", "it", "nl", "pt"]
 		},
+		"menu.debug.header_logs": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "fr", "nl", "pt"]
+		},
 		"menu.debug.tests": {
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "de", "fr", "nl"]
