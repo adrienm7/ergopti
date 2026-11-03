@@ -162,7 +162,7 @@
 		},
 		{
 			"id": "ahk-tray-rows-read-as-text",
-			"ordinal": 566,
+			"ordinal": 567,
 			"name": "the real Windows tray shows no raw id, key or placeholder in French and English",
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-tray-rows-read-as-text.cjs"],
@@ -170,7 +170,7 @@
 		},
 		{
 			"id": "js-feature-family-rule",
-			"ordinal": 567,
+			"ordinal": 568,
 			"name": "every manifest row is a feature or a setting, follows its rule, and a restore reaches it",
 			"cmd": "node",
 			"args": ["tools/test/test-feature-family-rule.cjs"],
