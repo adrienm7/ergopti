@@ -198,6 +198,20 @@ helpers.describe("the remap bridge reaches the owned runtime only after an opt-i
 		helpers.assert_true(source:find("ManagedRuleRemoval.remove_managed_rules(path or KARABINER_OUT)", 1, true) ~= nil)
 	end)
 
+	helpers.it("saves a bulk edit for the admission instead of reverting it while ours is not admitted", function()
+		-- Restore recommended on a Mac without the runtime reverted its edit and
+		-- opened a blocking dialog (E2E, hardening-a/b, owned default).
+		local source = init_source()
+		local off = source:find('"persisted-integration-off"', 1, true)
+		local owned = source:find('"persisted-owned-runtime-not-admitted"', 1, true)
+		local dispatch = source:find('transaction.phase = "candidate-regeneration-pending"', 1, true)
+		helpers.assert_true(off ~= nil and owned ~= nil and dispatch ~= nil and off < owned and owned < dispatch,
+			"the owned settlement sits with the integration-off one, before the candidate dispatch")
+		local gate = source:find("local REGENERATION_REFUSED_BEFORE_DEPLOY = {", 1, true)
+		local gate_end = source:find("\n}\n", gate, true)
+		helpers.assert_true(source:sub(gate, gate_end):find('["owned-runtime-not-admitted"] = true', 1, true) ~= nil)
+	end)
+
 	helpers.it("deploys an owned boot only through the owned writer", function()
 		local source = init_source()
 		local owned_deploy = source:find("Generator.deploy_owned_config(result, KARABINER_OUT)", 1, true)
