@@ -49,9 +49,22 @@ helpers.describe("the real Linux tray reads as text", function()
 		helpers.assert_eq(#defects, 4, "only the plain label may pass: " .. table.concat(defects, " | "))
 	end)
 
+	helpers.it("the walk refuses a French row that glues its punctuation", function()
+		helpers.assert_eq(check.french_punctuation_defect("Délai: 100"), "Délai:")
+		helpers.assert_eq(check.french_punctuation_defect("Vraiment?"), "Vraiment?")
+		helpers.assert_eq(check.french_punctuation_defect("Délai : 100"), nil)
+		helpers.assert_eq(check.french_punctuation_defect("Voir https://ergopti.fr"), nil)
+	end)
+
+	helpers.it("reaches every French submenu row joining a label to its value", function()
+		local decode = require("json").decode
+		local catalogue = check.catalogue(SHARED_ROOT, "fr", decode)
+		helpers.assert_eq(check.missing_label_value_rows(tray("fr"), SHARED_ROOT, decode, catalogue, "linux"), {})
+	end)
+
 	for _, locale in ipairs({ "fr", "en" }) do
 		helpers.it("shows no raw id in " .. locale, function()
-			local defects, rows = check.defects(tray(locale), SHARED_ROOT, require("json").decode)
+			local defects, rows = check.defects(tray(locale), SHARED_ROOT, require("json").decode, locale)
 			helpers.assert_true(rows >= MIN_ROWS, "the walk stopped early at " .. rows .. " rows")
 			helpers.assert_eq(defects, {}, "a row must read as text")
 		end)

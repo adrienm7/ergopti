@@ -7,7 +7,9 @@
 			"ordinal": 111,
 			"name": "Linux install.sh leaves a working first install (sandboxed real run)",
 			"cmd": "node",
-			"args": ["tools/test/test-linux-install-sandbox.cjs"],
+			"args": [
+				"tools/test/test-linux-install-sandbox.cjs"
+			],
 			"repro": "node tools/test/test-linux-install-sandbox.cjs"
 		},
 		{
@@ -15,7 +17,9 @@
 			"ordinal": 114,
 			"name": "Linux uninstall preserves personal data and rejects unrelated installations",
 			"cmd": "node",
-			"args": ["tools/test/test-linux-uninstall-sandbox.cjs"],
+			"args": [
+				"tools/test/test-linux-uninstall-sandbox.cjs"
+			],
 			"repro": "npm run test:linux-uninstall-sandbox"
 		},
 		{
@@ -23,7 +27,9 @@
 			"ordinal": 120,
 			"name": "every _shared resolver executes and lands on a real file (Linux + macOS, and the unset-HOME fallback)",
 			"cmd": "node",
-			"args": ["tools/test/test-shared-root-resolvers.cjs"],
+			"args": [
+				"tools/test/test-shared-root-resolvers.cjs"
+			],
 			"repro": "node tools/test/test-shared-root-resolvers.cjs"
 		},
 		{
@@ -31,7 +37,9 @@
 			"ordinal": 137,
 			"name": "full AHK startup smoke (real auto-execute to ready, isolated config)",
 			"cmd": "node",
-			"args": ["tools/test/test-ahk-full-startup-smoke.cjs"],
+			"args": [
+				"tools/test/test-ahk-full-startup-smoke.cjs"
+			],
 			"repro": "node tools/test/test-ahk-full-startup-smoke.cjs"
 		},
 		{
@@ -39,7 +47,9 @@
 			"ordinal": 189,
 			"name": "macOS bundle payload ships every path the runtime reads and no excluded group",
 			"cmd": "node",
-			"args": ["tools/test/test-macos-bundle-payload.cjs"],
+			"args": [
+				"tools/test/test-macos-bundle-payload.cjs"
+			],
 			"repro": "npm run test:macos-bundle-payload"
 		},
 		{
@@ -47,7 +57,9 @@
 			"ordinal": 196,
 			"name": "Linux bundle copies tracked bytes without per-file shell processes",
 			"cmd": "node",
-			"args": ["tools/test/test-linux-tracked-copy.cjs"],
+			"args": [
+				"tools/test/test-linux-tracked-copy.cjs"
+			],
 			"repro": "node tools/test/test-linux-tracked-copy.cjs"
 		},
 		{
@@ -55,7 +67,9 @@
 			"ordinal": 210,
 			"name": "Linux standalone upgrades refresh intact canonical packs and preserve explicit overrides",
 			"cmd": "node",
-			"args": ["tools/test/test-linux-canonical-pack-upgrade.cjs"],
+			"args": [
+				"tools/test/test-linux-canonical-pack-upgrade.cjs"
+			],
 			"repro": "npm run test:linux-canonical-pack-upgrade"
 		},
 		{
@@ -63,7 +77,9 @@
 			"ordinal": 211,
 			"name": "Linux checkout installs ship the layout registry and its Ergopti extension hotstrings",
 			"cmd": "node",
-			"args": ["tools/test/test-linux-install-layout-registry.cjs"],
+			"args": [
+				"tools/test/test-linux-install-layout-registry.cjs"
+			],
 			"repro": "npm run test:linux-install-layout-registry"
 		},
 		{
@@ -71,7 +87,9 @@
 			"ordinal": 219,
 			"name": "Linux launcher starts where install.sh leaves a machine (no hard dep the installer skips; every exported shared path exists)",
 			"cmd": "node",
-			"args": ["tools/test/test-linux-launcher-deps.cjs"],
+			"args": [
+				"tools/test/test-linux-launcher-deps.cjs"
+			],
 			"repro": "node tools/test/test-linux-launcher-deps.cjs"
 		},
 		{
@@ -79,7 +97,9 @@
 			"ordinal": 230,
 			"name": "Windows exe bundle ships every file the driver and its pages read, and no test, Lua, doc or dev-only group",
 			"cmd": "node",
-			"args": ["tools/test/test-windows-bundle-manifest.cjs"],
+			"args": [
+				"tools/test/test-windows-bundle-manifest.cjs"
+			],
 			"repro": "npm run test:windows-bundle-manifest"
 		},
 		{
@@ -87,7 +107,9 @@
 			"ordinal": 276,
 			"name": "feature-state boot smoke (4 fixtures, real include graph, own process)",
 			"cmd": "node",
-			"args": ["tools/test/test-feature-state-boot-smoke.cjs"],
+			"args": [
+				"tools/test/test-feature-state-boot-smoke.cjs"
+			],
 			"repro": "node tools/test/test-feature-state-boot-smoke.cjs"
 		},
 		{
@@ -95,61 +117,87 @@
 			"ordinal": 462,
 			"name": "Arch recipe stages native runtime and executes canonical package entry points",
 			"cmd": "node",
-			"args": ["tools/test/test-linux-arch-package.cjs"],
+			"args": [
+				"tools/test/test-linux-arch-package.cjs"
+			],
 			"repro": "node tools/test/test-linux-arch-package.cjs",
-			"platforms": ["linux"]
+			"platforms": [
+				"linux"
+			]
 		},
 		{
 			"id": "js-linux-deb-package-owner",
 			"ordinal": 463,
 			"name": "Rootless DEB archives preserve public ownership and modes without changing private source state",
 			"cmd": "node",
-			"args": ["tools/test/test-linux-deb-package-owner.cjs"],
+			"args": [
+				"tools/test/test-linux-deb-package-owner.cjs"
+			],
 			"repro": "node tools/test/test-linux-deb-package-owner.cjs",
-			"platforms": ["linux"]
+			"platforms": [
+				"linux"
+			]
 		},
 		{
 			"id": "js-linux-package-version",
 			"ordinal": 464,
 			"name": "Linux package metadata follows copied runtime releases and native prerelease ordering",
 			"cmd": "node",
-			"args": ["tools/test/test-linux-package-version.cjs"],
+			"args": [
+				"tools/test/test-linux-package-version.cjs"
+			],
 			"repro": "node tools/test/test-linux-package-version.cjs",
-			"platforms": ["linux"]
+			"platforms": [
+				"linux"
+			]
 		},
 		{
 			"id": "js-linux-flatpak-icon",
 			"ordinal": 465,
 			"name": "Flatpak exports the canonical desktop logo and refuses missing icon assets",
 			"cmd": "node",
-			"args": ["tools/test/test-linux-flatpak-icon.cjs"],
+			"args": [
+				"tools/test/test-linux-flatpak-icon.cjs"
+			],
 			"repro": "node tools/test/test-linux-flatpak-icon.cjs",
-			"platforms": ["linux"]
+			"platforms": [
+				"linux"
+			]
 		},
 		{
 			"id": "js-linux-package-options",
 			"ordinal": 466,
 			"name": "System package entry points refuse unknown arguments before staging side effects",
 			"cmd": "node",
-			"args": ["tools/test/test-linux-package-options.cjs"],
+			"args": [
+				"tools/test/test-linux-package-options.cjs"
+			],
 			"repro": "node tools/test/test-linux-package-options.cjs",
-			"platforms": ["linux"]
+			"platforms": [
+				"linux"
+			]
 		},
 		{
 			"id": "js-linux-rpm-publish",
 			"ordinal": 467,
 			"name": "RPM publication admits one canonical runtime package and retains native debug outputs",
 			"cmd": "node",
-			"args": ["tools/test/test-linux-rpm-publish.cjs"],
+			"args": [
+				"tools/test/test-linux-rpm-publish.cjs"
+			],
 			"repro": "node tools/test/test-linux-rpm-publish.cjs",
-			"platforms": ["linux"]
+			"platforms": [
+				"linux"
+			]
 		},
 		{
 			"id": "js-linux-distro-native-prerequisites",
 			"ordinal": 468,
 			"name": "Distribution unit preparation installs native GLib and SQLite before executing unchanged groups",
 			"cmd": "node",
-			"args": ["tools/test/test-linux-distro-native-prerequisites.cjs"],
+			"args": [
+				"tools/test/test-linux-distro-native-prerequisites.cjs"
+			],
 			"repro": "npm run test:linux-distro-native-prerequisites"
 		},
 		{
@@ -157,7 +205,9 @@
 			"ordinal": 565,
 			"name": "startup smoke owns no session input and ends on any error",
 			"cmd": "node",
-			"args": ["tools/test/test-ahk-smoke-input-quarantine.cjs"],
+			"args": [
+				"tools/test/test-ahk-smoke-input-quarantine.cjs"
+			],
 			"repro": "node tools/test/test-ahk-smoke-input-quarantine.cjs"
 		},
 		{
@@ -165,7 +215,9 @@
 			"ordinal": 567,
 			"name": "the real Windows tray shows no raw id, key or placeholder in French and English",
 			"cmd": "node",
-			"args": ["tools/test/test-ahk-tray-rows-read-as-text.cjs"],
+			"args": [
+				"tools/test/test-ahk-tray-rows-read-as-text.cjs"
+			],
 			"repro": "npm run test:ahk-tray-rows-read-as-text"
 		},
 		{
@@ -173,7 +225,9 @@
 			"ordinal": 568,
 			"name": "every manifest row is a feature or a setting, follows its rule, and a restore reaches it",
 			"cmd": "node",
-			"args": ["tools/test/test-feature-family-rule.cjs"],
+			"args": [
+				"tools/test/test-feature-family-rule.cjs"
+			],
 			"repro": "npm run test:feature-family-rule"
 		}
 	]
