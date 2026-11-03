@@ -2693,7 +2693,10 @@ type = "---"
 # platform's reason on macOS and Linux; on Windows only
 # menu.gestures.recommended_reason_windows, because the driver takes the
 # system's own assignment over itself and the "remove it first" advice does not
-# apply there.
+# apply there. The texts say how each driver gets the gesture (maintainer,
+# 2026-11-03): macOS and Linux read the touchpad themselves, so nothing is set
+# up; Windows cannot be told what a gesture does, so each gesture sends a rare
+# key combination Ergopti catches, assigned automatically or by the tutorial.
 # The rows about the system's own gestures, then Ergopti's gesture slots.
 [[menu.gestures_menu]]
 type = "section_header"
