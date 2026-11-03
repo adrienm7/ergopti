@@ -292,7 +292,7 @@ function updateCbDescs() {
 	document.getElementById('desc-final').innerHTML = f
 		? _t('editor.hotstrings.desc_final_on') || 'The result will not be re-parsed as a trigger.'
 		: _t('editor.hotstrings.desc_final_off') ||
-			'The result can trigger other hotstrings in cascade.';
+			'The result can trigger other hotstrings in a chain.';
 }
 
 /**
