@@ -49,68 +49,76 @@
 		</div>
 
 		<section id="composer" class="composer" hidden>
-			<h1 data-i18n="layout_composer.title"></h1>
-			<p class="subtitle" data-i18n="layout_composer.subtitle"></p>
+			<div class="composer-body">
+				<h1 data-i18n="layout_composer.title"></h1>
+				<p class="subtitle" data-i18n="layout_composer.subtitle"></p>
 
-			<div class="composer-row">
-				<label class="composer-label" for="composer-name" data-i18n="layout_composer.name"></label>
-				<input type="text" id="composer-name" maxlength="64" />
-				<select id="composer-form">
-					<option value="iso" data-i18n="layout_composer.keyboard_iso"></option>
-					<option value="ansi" data-i18n="layout_composer.keyboard_ansi"></option>
-				</select>
-				<span
-					id="composer-active"
-					class="badge badge-active"
+				<div class="composer-row">
+					<label
+						class="composer-label"
+						for="composer-name"
+						data-i18n="layout_composer.name"
+					></label>
+					<input type="text" id="composer-name" maxlength="64" />
+					<select id="composer-form">
+						<option value="iso" data-i18n="layout_composer.keyboard_iso"></option>
+						<option value="ansi" data-i18n="layout_composer.keyboard_ansi"></option>
+					</select>
+					<span
+						id="composer-active"
+						class="badge badge-active"
+						hidden
+						data-i18n="layout_composer.active"
+					></span>
+				</div>
+
+				<h2 data-i18n="layout_composer.section_layers"></h2>
+				<div id="composer-layers"></div>
+
+				<h2 data-i18n="layout_composer.section_shortcuts"></h2>
+				<p
+					id="composer-shortcuts-note"
+					class="note"
 					hidden
-					data-i18n="layout_composer.active"
-				></span>
+					data-i18n="layout_composer.shortcuts_unsupported"
+				></p>
+				<div id="composer-shortcuts"></div>
+
+				<h2 data-i18n="layout_composer.section_keys"></h2>
+				<div id="composer-tabs" class="composer-tabs"></div>
+				<div id="composer-board" class="composer-board"></div>
+				<div id="composer-key-editor" class="composer-key-editor" hidden></div>
 			</div>
 
-			<h2 data-i18n="layout_composer.section_layers"></h2>
-			<div id="composer-layers"></div>
+			<div class="composer-footer">
+				<ul id="composer-problems" class="composer-problems" hidden></ul>
+				<p id="composer-result" class="result" role="alert" hidden></p>
 
-			<h2 data-i18n="layout_composer.section_shortcuts"></h2>
-			<p
-				id="composer-shortcuts-note"
-				class="note"
-				hidden
-				data-i18n="layout_composer.shortcuts_unsupported"
-			></p>
-			<div id="composer-shortcuts"></div>
-
-			<h2 data-i18n="layout_composer.section_keys"></h2>
-			<div id="composer-tabs" class="composer-tabs"></div>
-			<div id="composer-board" class="composer-board"></div>
-			<div id="composer-key-editor" class="composer-key-editor" hidden></div>
-
-			<ul id="composer-problems" class="composer-problems" hidden></ul>
-			<p id="composer-result" class="result" role="alert" hidden></p>
-
-			<div class="btns">
-				<button
-					type="button"
-					id="composer-back"
-					class="secondary"
-					data-i18n="layout_composer.btn_back"
-				></button>
-				<button
-					type="button"
-					id="composer-remove"
-					class="danger"
-					data-i18n="layout_composer.btn_remove"
-				></button>
-				<button
-					type="button"
-					id="composer-save"
-					class="secondary"
-					data-i18n="layout_composer.btn_save"
-				></button>
-				<button
-					type="button"
-					id="composer-save-use"
-					data-i18n="layout_composer.btn_save_use"
-				></button>
+				<div class="btns">
+					<button
+						type="button"
+						id="composer-back"
+						class="secondary"
+						data-i18n="layout_composer.btn_back"
+					></button>
+					<button
+						type="button"
+						id="composer-remove"
+						class="danger"
+						data-i18n="layout_composer.btn_remove"
+					></button>
+					<button
+						type="button"
+						id="composer-save"
+						class="secondary"
+						data-i18n="layout_composer.btn_save"
+					></button>
+					<button
+						type="button"
+						id="composer-save-use"
+						data-i18n="layout_composer.btn_save_use"
+					></button>
+				</div>
 			</div>
 		</section>
 

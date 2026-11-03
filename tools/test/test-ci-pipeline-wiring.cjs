@@ -3143,7 +3143,8 @@ function commonProblems(files) {
 		['Install shared UI browsers', 'node tools/ci/install-playwright.cjs chromium webkit'],
 		['Test shared layer editor rendering', 'npm run test:browser:layer-editor'],
 		['Test shared physical shortcut rendering', 'npm run test:browser:physical-shortcuts'],
-		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install']
+		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install'],
+		['Test shared layout composer rendering', 'npm run test:browser:layout-composer']
 	])
 		exactStep(browser, name, command);
 	if (browser) {

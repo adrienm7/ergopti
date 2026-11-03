@@ -72,6 +72,30 @@ WebView_ClearDocumentCache(WebView) {
 	LoggerDone("WebView", "Retained browser document cache invalidated.")
 }
 
+/**
+ * Resizes a controller's host control to its window's client area, then fills it.
+ *
+ * Controller.Fill() only copies the client rect of the controller's parent
+ * window. Hosts parent the controller to a placeholder Text control created at
+ * the default size, which no layout ever grows, so filling it alone kept the
+ * page at its opening size however far the window was widened.
+ * @param Controller {WebView2.Controller} The controller to fit.
+ */
+WebView_FitToWindow(Controller) {
+	Host := Controller.ParentWindow
+	; GA_PARENT, unlike GetParent, never answers a top-level window's owner.
+	Window := DllCall("user32\GetAncestor", "ptr", Host, "uint", 1, "ptr")
+	if Window && Window != DllCall("user32\GetDesktopWindow", "ptr") {
+		Rect := Buffer(16, 0)
+		if !DllCall("user32\GetClientRect", "ptr", Window, "ptr", Rect, "int")
+			throw OSError(A_LastError, -1, "GetClientRect")
+		Width := NumGet(Rect, 8, "int"), Height := NumGet(Rect, 12, "int")
+		if !DllCall("user32\MoveWindow", "ptr", Host, "int", 0, "int", 0, "int", Width, "int", Height, "int", true, "int")
+			throw OSError(A_LastError, -1, "MoveWindow")
+	}
+	Controller.Fill()
+}
+
 ; One stable user-data folder for the whole session. Unlike the former per-open
 ; "<prefix>_<A_TickCount>" folders, this fixed path cannot accumulate (there is
 ; exactly one and it is reused forever), so it is leak-free by construction.
@@ -779,7 +803,7 @@ class WebViewHost {
 				if A_IsSuspended || this.ResetDone || (MinMax == -1) || this.CloseRequested
 						return
 				if this.HasOwnProp("Controller")
-						try this.Controller.Fill()
+						try WebView_FitToWindow(this.Controller)
 		}
 
 		_OnClose(*) {

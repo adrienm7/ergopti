@@ -937,7 +937,8 @@ function checkCore(
 	for (const [name, command] of [
 		['Install shared UI browsers', 'node tools/ci/install-playwright.cjs chromium webkit'],
 		['Test shared layer editor rendering', 'npm run test:browser:layer-editor'],
-		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install']
+		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install'],
+		['Test shared layout composer rendering', 'npm run test:browser:layout-composer']
 	]) {
 		const step = pipeline.step(browser, name);
 		assert.equal(pipeline.stepField(step, 'if'), null);
@@ -1020,6 +1021,7 @@ for (const [from, to] of [
 for (const [from, to] of [
 	['run: npm run test:browser:layer-editor', 'run: echo skipped browser gate'],
 	['run: npm run test:browser:changelog-install', 'run: echo skipped Versions browser gate'],
+	['run: npm run test:browser:layout-composer', 'run: echo skipped composer browser gate'],
 	[
 		'run: npm run test:browser:changelog-install',
 		'continue-on-error: true\n        run: npm run test:browser:changelog-install'

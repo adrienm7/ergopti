@@ -1292,7 +1292,7 @@ _LLM_MBW_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_LLM_MBW_Controller)
-		try _LLM_MBW_Controller.Fill()
+		try WebView_FitToWindow(_LLM_MBW_Controller)
 }
 
 _LLM_MBW_Reset(ExpectedEpoch := unset, ExpectedWindow := unset) {

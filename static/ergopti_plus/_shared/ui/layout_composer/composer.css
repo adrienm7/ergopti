@@ -26,7 +26,27 @@
 	min-height: 0;
 }
 
-.composer {
+/* Only the body scrolls: the footer with the problems, the result and the
+   action buttons stays in normal flow below it, so the drawn board can never
+   cover the buttons and a short window still shows them. */
+.composer-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.composer-footer {
+	border-top: 1px solid var(--theme-grey-e0e0e0);
+	flex-shrink: 0;
+}
+
+/* A narrow window wraps the buttons onto a second row, not their labels. */
+.composer-footer .btns button {
+	white-space: nowrap;
+}
+
+.composer-footer .composer-problems {
+	max-height: 25vh;
 	overflow-y: auto;
 }
 
@@ -91,17 +111,19 @@
 	color: var(--theme-white);
 }
 
+/* The page sets the board's aspect ratio and widest size from the drawn rows;
+   its keys are placed in fractions of it, so it scales with the window. */
 .composer-board {
 	margin-bottom: 8px;
 	position: relative;
+	width: 100%;
 }
 
 .composer-key {
 	background: var(--theme-white);
 	border: 1px solid var(--theme-hue-c8c8cc);
 	color: var(--theme-label);
-	font-size: 14px;
-	height: 42px;
+	font-size: clamp(10px, 1.9vw, 18px);
 	overflow: hidden;
 	padding: 0;
 	position: absolute;
@@ -168,6 +190,10 @@
 		background: var(--theme-grey-2a2a2c);
 		border-color: var(--theme-gray4-dark);
 		color: var(--theme-page-background);
+	}
+
+	.composer-footer {
+		border-color: var(--theme-gray4-dark);
 	}
 
 	.composer-tab {

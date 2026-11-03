@@ -1439,5 +1439,5 @@ _CLW_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_CLW_Controller)
-		try _CLW_Controller.Fill()
+		try WebView_FitToWindow(_CLW_Controller)
 }
