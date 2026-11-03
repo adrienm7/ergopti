@@ -4139,24 +4139,6 @@ function M.set_enabled(value, on_done, onboarding_gate)
 end
 
 
---- « Remove Ergopti from Karabiner »: turns the integration off through the
---- exact lease when it is on, then removes every ErgoptiPlus rule from
---- karabiner.json. With the switch already off it only cleans the file.
---- Karabiner itself is never quit, launched or reconfigured.
---- @param on_done function|nil Callback fn(ok, reason, removed_count).
---- @return boolean accepted True when accepted or settled successfully.
-function M.remove_from_karabiner(on_done)
-	Logger.info(LOG, "Remove Ergopti from Karabiner requested.")
-	if not require_state(require("config_keys").COMMAND.REMOVE_FROM_KARABINER) then
-		invoke_public_callback("remove from Karabiner", on_done, false, "not-initialized", 0)
-		return false
-	end
-	if _state.enabled == true or _enabled_transition ~= nil or _enabled_preflight ~= nil then
-		return M.set_enabled(false, on_done)
-	end
-	return M.set_enabled(false, on_done)
-end
-
 --- Clones the persisted settings without sharing either nested binding table.
 --- @param source table Source state.
 --- @return table candidate Detached settings candidate.
@@ -7049,17 +7031,17 @@ function M.init(file_system)
 	end
 	local first_launch = user_config_status == "absent"
 
-	-- The runtime this boot targets: shared unless config_karabiner.toml opted
-	-- in by hand. The command line tool every variable writer spells is chosen
-	-- here, once, and an owned boot writes its own complete file.
-	local runtime = user_cfg.runtime or M._owned.paths.RUNTIME_SHARED
+	-- The runtime this boot targets: owned unless config_karabiner.toml keeps
+	-- the shared one by hand. The command line tool every variable writer spells
+	-- is chosen here, once, and an owned boot writes its own complete file.
+	local runtime = user_cfg.runtime or Config.RUNTIME_DEFAULT
 	local runtime_ok, runtime_err = pcall(M._owned.paths.select_runtime, runtime)
 	if not runtime_ok then
 		Logger.error(LOG, "Karabiner bridge initialization refused: %s", tostring(runtime_err))
 		return false
 	end
 	if runtime == M._owned.paths.RUNTIME_OWNED then
-		Logger.warn(LOG, "Opted in to the owned Karabiner runtime (not shipped; hidden preference).")
+		Logger.info(LOG, "Ergopti's own Karabiner runtime is selected.")
 		M._owned.shared_config = nil
 		if not (env_override and env_override ~= "") then
 			-- Still the shared path here: the migration cleans it once this boot is owned.
