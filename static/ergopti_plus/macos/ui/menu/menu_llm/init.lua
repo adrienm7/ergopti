@@ -188,6 +188,7 @@ M.DEFAULT_STATE = {
 		llm_agent_system1       = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_SYSTEM1),
 		llm_agent_system2       = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_SYSTEM2),
 		llm_agent_mode          = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_MODE),
+		llm_while_hotstring_tooltip = Manifest.default_for(require("config_keys").KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP),
 		llm_agent_disabled_apps = {},
 }
 
