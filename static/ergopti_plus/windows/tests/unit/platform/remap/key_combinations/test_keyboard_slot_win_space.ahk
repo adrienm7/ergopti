@@ -37,7 +37,7 @@ _KSWS_WinSpaceResolvesToASuppressingSpec() {
 	Spec := HotkeyRegistrarNativeSpec(Parsed["mods"], Parsed["key"])
 	AssertEqual("#space", Spec,
 		"meta_space must register as #space, with no ~ prefix: the key must never reach Windows")
-	AssertEqual("Win + " . t("common.key_space"), _FormatSlotLabel("meta_space"),
+	AssertEqual(t("key_name.win") . " + " . t("key_name.space"), _FormatSlotLabel("meta_space"),
 		"the menu must name the chord in the user's language")
 }
 Test("Keyboard slots: meta_space is a suppressing Win+Space hotkey (win-space-slot)",
