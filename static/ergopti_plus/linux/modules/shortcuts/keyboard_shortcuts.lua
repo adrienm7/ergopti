@@ -123,6 +123,18 @@ M.SLOT_GROUPS = {
 	{ prefix = "meta_", group_key = "menu.shortcuts.super_group", add_key = "menu.shortcuts.super_add" },
 }
 
+--- The heading of one group's submenu: the contextual group's own title, a
+--- modifier group's template filled with its modifiers by the shared key name
+--- table (« Raccourcis Ctrl + Maj »), never the template's own spelling.
+--- @param group table An entry of M.SLOT_GROUPS.
+--- @return string
+function M.get_group_label(group)
+	local translate = require("infra.i18n").get
+	if group.add_key == nil then return translate(group.group_key) end
+	local modifiers = KeyNames.modifiers_label(SlotRoles.family_modifiers("linux", group.prefix), "linux", translate)
+	return KeyNames.fill(group.group_key, modifiers, translate)
+end
+
 -- The manifest section whose entries are this driver's shipped slot bindings
 -- (Super+Space generates an AI prediction).
 -- tools/test/test-keyboard-slot-recommended-bindings.cjs pins what it holds.

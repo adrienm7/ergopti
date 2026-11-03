@@ -261,6 +261,8 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 		keyboard_group_add_ctrl_shift = add_for("secondary_shift_"),
 		keyboard_group_add_cmd = add_for("primary_"),
 		keyboard_group_add_cmd_shift = add_for("primary_shift_"),
+		-- The {1} of the Add row's template: the group's modifiers by name.
+		keyboard_group_add_caption = function() return KbShortcuts.get_keyboard_group_modifiers_label(group) end,
 	}
 	local function add_action()
 		if not getters.keyboard_group_ready() then return false end
@@ -342,7 +344,7 @@ function M.provide_rows(ctx, disabled, fixed_by_prefix)
 		local items = build_group_rows(group, ctx, disabled, fixed)
 		if not items then return {} end
 		rows[#rows + 1] = {
-			label    = i18n.get(group.group_key),
+			label    = KbShortcuts.get_keyboard_group_label(group),
 			disabled = disabled or nil,
 			items    = items,
 		}

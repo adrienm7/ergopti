@@ -2763,6 +2763,18 @@ _KeyboardSlotFamilyLabel(Prefix) {
 		return Label
 }
 
+; The heading or the Add row of one keyboard-slot group: the contextual
+; group's own title, a modifier group's template filled with its modifiers
+; (« Raccourcis Ctrl + Maj », « [+ Ajouter un raccourci Win + …] »).
+; @param GroupInfo {Map} An entry of KEYBOARD_SLOT_GROUPS.
+; @param Field {String} "group_key" or "add_key".
+; @returns {String}
+_KeyboardSlotGroupText(GroupInfo, Field) {
+		if GroupInfo["prefix"] == "magic_"
+				return t(GroupInfo[Field])
+		return KeyNameFill(GroupInfo[Field], _KeyboardSlotFamilyLabel(GroupInfo["prefix"]))
+}
+
 ; The keyboard-shortcut groups, in display order. The i18n KEYS are stored, never
 ; the translated labels: a static initialised with t() would freeze the language
 ; at first call, and the menu is rebuilt on a language switch expecting the new one
@@ -2812,10 +2824,10 @@ KeyboardSlotRows() {
 						))
 				}
 				Items.Push(Map(
-						"label", t(GroupInfo["add_key"]),
+						"label", _KeyboardSlotGroupText(GroupInfo, "add_key"),
 						"action", ((_p) => (*) => ShowKeyboardSlotPicker(_p))(Prefix)
 				))
-				Rows.Push(Map("label", t(GroupInfo["group_key"]), "items", Items))
+				Rows.Push(Map("label", _KeyboardSlotGroupText(GroupInfo, "group_key"), "items", Items))
 		}
 		return Rows
 }
