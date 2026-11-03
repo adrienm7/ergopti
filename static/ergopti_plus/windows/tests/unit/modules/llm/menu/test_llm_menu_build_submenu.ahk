@@ -131,6 +131,7 @@ _LBMS_AiBlock(State, Prepare) {
 			AssertTrue(Labels[TestRow - 1] != "", State . ": no separator splits the block")
 		} finally Built.Delete()
 	} finally {
+		_LBMS_LeaveBackend()
 		_LLM_Menu := SavedMenu
 		_LLM_Menu_Handle := HadHandle ? PriorHandle : unset
 	}
@@ -148,6 +149,13 @@ _LBMS_NoLocalModel() {
 	global _LLM_Menu
 	_LLM_Menu["backend"] := "ollama"
 	_LLM_Menu["model"] := ""
+}
+; Drawing the menu on the Ollama backend fires the real health and tags probes.
+; Restoring the fixture's backend without the driver's own transition boundary
+; left both in flight, and their completion rebuilt the menu, launching two
+; more, inside a later test that forbids every launch.
+_LBMS_LeaveBackend() {
+	LLM_AuxInvalidate("test fixture leaves its backend")
 }
 Test("ai-test-prediction-row: the block stands with the AI on", _LBMS_AiBlock.Bind("on", (*) => 0))
 Test("ai-test-prediction-row: the block stands with the AI off", _LBMS_AiBlock.Bind("off", _LBMS_AiOff))
@@ -199,6 +207,7 @@ _LBMS_GenerationGroups(State, Prepare) {
 			AssertEqual(Labels.Length, Clear, State . ": clearing the context closes the submenu")
 		} finally Built.Delete()
 	} finally {
+		_LBMS_LeaveBackend()
 		_LLM_Menu := SavedMenu
 		_LLM_Menu_Handle := HadHandle ? PriorHandle : unset
 	}
