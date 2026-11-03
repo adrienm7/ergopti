@@ -268,7 +268,7 @@
 			"kind": "field_check",
 			"check": "tap_copy",
 			"deadline_seconds": 10,
-			"proves": "The copy a tap-hold key sends: the lone tap window Karabiner was given, the pasteboard counter readable, and since the driver started how many copies were sent, verified, landed only on the retry or never, and how many taps sent no Cmd+C, held past the timeout or cancelled within it, with their press durations. Nothing is typed and the clipboard is never written."
+			"proves": "The copy a tap-hold key sends reaches the pasteboard: the lone tap window Karabiner got, a readable counter, and how many copies since start were verified, retried or lost, without typing or writing the clipboard."
 		},
 		{
 			"id": "field_apple_shortcuts",
