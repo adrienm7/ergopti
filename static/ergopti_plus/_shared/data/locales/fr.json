@@ -1640,7 +1640,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "Délai autocomplétion",
 	"menu.hotstrings.tooltip_autocorrect": "Aperçu autocorrection",
 	"menu.hotstrings.tooltip_colored": "Aperçus colorés",
-	"menu.hotstrings.tooltip_default": "Délai par défaut (tous groupes)",
+	"menu.hotstrings.tooltip_default": "Délai de base (groupes sans délai propre)",
 	"menu.hotstrings.tooltip_magic": "Aperçu ★",
 	"menu.hotstrings.uncheck_all": "□ Tout décocher",
 	"menu.hotstrings.word_delimiters": "Délimiteurs de mots",

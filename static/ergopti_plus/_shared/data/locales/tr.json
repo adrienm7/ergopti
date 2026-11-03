@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "Otomatik tamamlama gecikmesi",
 	"menu.hotstrings.tooltip_autocorrect": "Otomatik düzeltme önizlemesi",
 	"menu.hotstrings.tooltip_colored": "Renkli önizlemeler",
-	"menu.hotstrings.tooltip_default": "Varsayılan gecikme (tüm gruplar)",
+	"menu.hotstrings.tooltip_default": "Temel gecikme (kendi gecikmesi olmayan gruplar)",
 	"menu.hotstrings.tooltip_magic": "★ Önizleme",
 	"menu.hotstrings.uncheck_all": "□ Tümünün işaretini kaldır",
 	"menu.hotstrings.word_delimiters": "Sözcük sınırlayıcıları",

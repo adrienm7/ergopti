@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "Zpoždění automatického doplňování",
 	"menu.hotstrings.tooltip_autocorrect": "Náhled automatické opravy",
 	"menu.hotstrings.tooltip_colored": "Barevné náhledy",
-	"menu.hotstrings.tooltip_default": "Výchozí zpoždění (všechny skupiny)",
+	"menu.hotstrings.tooltip_default": "Základní zpoždění (skupiny bez vlastního)",
 	"menu.hotstrings.tooltip_magic": "★ Náhled",
 	"menu.hotstrings.uncheck_all": "□ Zrušit výběr",
 	"menu.hotstrings.word_delimiters": "Oddělovače slov",

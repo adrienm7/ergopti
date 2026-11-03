@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "Autofuldføring-forsinkelse",
 	"menu.hotstrings.tooltip_autocorrect": "Autokorrektur-forhåndsvisning",
 	"menu.hotstrings.tooltip_colored": "Farvede forhåndsvisninger",
-	"menu.hotstrings.tooltip_default": "Standardforsinkelse (alle grupper)",
+	"menu.hotstrings.tooltip_default": "Basisforsinkelse (grupper uden egen)",
 	"menu.hotstrings.tooltip_magic": "★ Forhåndsvisning",
 	"menu.hotstrings.uncheck_all": "□ Fravælg alle",
 	"menu.hotstrings.word_delimiters": "Ordafgrænsere",

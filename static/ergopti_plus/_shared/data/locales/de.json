@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "Autovervollständigungsverzögerung",
 	"menu.hotstrings.tooltip_autocorrect": "Autokorrektur-Vorschau",
 	"menu.hotstrings.tooltip_colored": "Farbige Vorschauen",
-	"menu.hotstrings.tooltip_default": "Standardverzögerung (alle Gruppen)",
+	"menu.hotstrings.tooltip_default": "Basisverzögerung (Gruppen ohne eigene)",
 	"menu.hotstrings.tooltip_magic": "★ Vorschau",
 	"menu.hotstrings.uncheck_all": "□ Alle abwählen",
 	"menu.hotstrings.word_delimiters": "Worttrennzeichen",

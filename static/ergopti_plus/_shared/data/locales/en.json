@@ -1640,7 +1640,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "Autocompletion delay",
 	"menu.hotstrings.tooltip_autocorrect": "Autocorrect preview",
 	"menu.hotstrings.tooltip_colored": "Coloured previews",
-	"menu.hotstrings.tooltip_default": "Default delay (all groups)",
+	"menu.hotstrings.tooltip_default": "Base delay (groups without their own)",
 	"menu.hotstrings.tooltip_magic": "★ Preview",
 	"menu.hotstrings.uncheck_all": "□ Uncheck all",
 	"menu.hotstrings.word_delimiters": "Word delimiters",

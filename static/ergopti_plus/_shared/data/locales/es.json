@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "Retardo de autocompletado",
 	"menu.hotstrings.tooltip_autocorrect": "Vista previa autocorrección",
 	"menu.hotstrings.tooltip_colored": "Vistas previas con color",
-	"menu.hotstrings.tooltip_default": "Retardo predeterminado (todos los grupos)",
+	"menu.hotstrings.tooltip_default": "Retardo base (grupos sin uno propio)",
 	"menu.hotstrings.tooltip_magic": "Vista previa ★",
 	"menu.hotstrings.uncheck_all": "□ Desmarcar todo",
 	"menu.hotstrings.word_delimiters": "Delimitadores de palabras",

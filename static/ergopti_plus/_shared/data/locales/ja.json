@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "自動補完遅延",
 	"menu.hotstrings.tooltip_autocorrect": "自動修正プレビュー",
 	"menu.hotstrings.tooltip_colored": "カラープレビュー",
-	"menu.hotstrings.tooltip_default": "デフォルト遅延（全グループ）",
+	"menu.hotstrings.tooltip_default": "基本遅延（独自の遅延がないグループ）",
 	"menu.hotstrings.tooltip_magic": "★ プレビュー",
 	"menu.hotstrings.uncheck_all": "□ すべて解除",
 	"menu.hotstrings.word_delimiters": "単語区切り文字",

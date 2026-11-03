@@ -1645,7 +1645,7 @@
 	"menu.hotstrings.tooltip_autocompletion": "자동 완성 지연",
 	"menu.hotstrings.tooltip_autocorrect": "자동 교정 미리보기",
 	"menu.hotstrings.tooltip_colored": "색상 미리보기",
-	"menu.hotstrings.tooltip_default": "기본 지연 (모든 그룹)",
+	"menu.hotstrings.tooltip_default": "기본 지연 (자체 지연이 없는 그룹)",
 	"menu.hotstrings.tooltip_magic": "★ 미리보기",
 	"menu.hotstrings.uncheck_all": "□ 모두 해제",
 	"menu.hotstrings.word_delimiters": "단어 구분자",
