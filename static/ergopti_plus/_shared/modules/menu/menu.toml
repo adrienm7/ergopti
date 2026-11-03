@@ -2705,10 +2705,15 @@ id = "system_gesture_status"
 platforms = ["hs", "linux"]
 unavailable = "hide"
 
+# Not on Windows since 2026-11-03 (maintainer request): its manual setup
+# tutorial already opens the touchpad settings, so a menu shortcut beside it
+# was one row too many. macOS and Linux have no tutorial and keep the row.
 [[menu.gestures_menu]]
 type = "command"
 id = "system_gesture_settings"
 i18n = "menu.gestures.system_settings"
+platforms = ["hs", "linux"]
+unavailable = "hide"
 
 [[menu.gestures_menu]]
 type = "command"
