@@ -79,8 +79,11 @@ _LAY_FeatureRows(Path) {
 	Entry := ManifestFindEntryByPath(Path)
 	if !(Entry is Map)
 		throw Error("The layout feature '" . Path . "' is not declared.")
+	Rows := []
 	Row := MenuRowFromManifest(Entry, "Layout")
-	return (Row == "") ? [] : [Row]
+	if Row != ""
+		Rows.Push(Row)
+	return Rows
 }
 
 
