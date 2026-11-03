@@ -83,6 +83,9 @@ local function _build_gestures(ctx)
 	-- the finger count in their names, fewest fingers first, each group under
 	-- the header macOS declares for its own group (status rows fingers_N, with
 	-- finger_group_boundary between two groups).
+	-- Spelled out, not built from the count, so the manifest reader gate sees
+	-- each declared header read.
+	local FINGER_HEADER_STATUS = { [2] = "fingers_2", [3] = "fingers_3", [4] = "fingers_4", [5] = "fingers_5" }
 	local providers = {}
 	providers["system_gesture_status"] = function() return require("ui.gesture_conflicts").rows(ge) end
 	-- The recommended-defaults rule and why Linux recommends no swipe, behind
@@ -140,7 +143,8 @@ local function _build_gestures(ctx)
 			local count = opens[position]
 			if count then
 				if position > 1 and not push_status("finger_group_boundary") then return {} end
-				if not push_status("fingers_" .. count) then return {} end
+				local header = FINGER_HEADER_STATUS[count]
+				if not header or not push_status(header) then return {} end
 			end
 			local reachable = true
 			if ok_finder and type(Finder.slot_is_reachable) == "function" then
