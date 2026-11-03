@@ -183,8 +183,8 @@ handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
   Ergopti labels only, and `test_owned_runtime_uninstall_scope.lua` pins them).
 - The artifact pin is `static/ergopti_plus/macos/vendor/remap-runtime/manifest.json`,
   judged by `platform/remap/runtime_manifest.lua` and gated by
-  `tools/test/test-remap-runtime-manifest.cjs` (`--require-pinned` refuses the
-  unbuilt runtime fields until the hosted build fills them).
+  `tools/test/test-remap-runtime-manifest.cjs`, which refuses any unpinned
+  field since the hosted build's `16.3.0-ergopti.2` artifact was pinned.
 - The HS-274 tooling in `tools/diagnostics/hs274*` is an input of the owned
   runtime, not a closed study: `tools/build/remap_runtime_source.py` pins the
   producer patch set (`hs274_raw_patch.py`, `hs274_stream_patch.py`) and the
