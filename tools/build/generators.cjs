@@ -228,6 +228,13 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-menu-section-header.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/lua/menu/section_header_data.lua',
+			'static/ergopti_plus/windows/_generated/menu_section_header.ahk'
+		]
+	},
+	{
 		script: 'codegen/codegen-file-system-ports.cjs',
 		outputs: ['static/ergopti_plus/windows/_generated/file_system_ports.ahk']
 	},
