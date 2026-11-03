@@ -1367,7 +1367,9 @@ helpers.describe("same-device third slot through original production consumers (
 			helpers.assert_eq(native_rows(s), "", "equality remains inside the positive delay")
 			s.pump_at(1101)
 			helpers.assert_eq(native_rows(s), "29:1", "the genuine idle pump expires after the deadline")
-			s.edge("a", 58, 0, 1401)
+			-- Released past the lone modifier tap window (1000 ms by default in the
+			-- manager's tap_hold.toml), so CapsLock stays the hold and types no Enter.
+			s.edge("a", 58, 0, 2101)
 			helpers.assert_eq(native_rows(s), "29:1 29:0")
 			helpers.assert_eq(s.actions, {})
 		end)
