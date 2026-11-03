@@ -304,9 +304,12 @@ return function(helpers)
 		end)
 	end)
 
-	--- A preset owner over a separate file, routing the manifest's tap_holds rows.
-	--- Its runtime marker follows the preset candidate's master flag.
+	--- A preset owner over a separate file, routing the manifest's tap_holds rows:
+	--- the master flag and the lone modifier tap window, the two leaves the Linux
+	--- writer stores in tap_hold.toml. Its runtime marker follows the preset
+	--- candidate's master flag.
 	local function preset_fixture(preset_source)
+		local KEY = require("config_keys").KEY
 		local options, files, writes, runtime, controls, original = fixture()
 		files.taps = preset_source
 		options.presets = { tap_hold = {
@@ -315,8 +318,10 @@ return function(helpers)
 				helpers.assert_true(mode == "recommended" or mode == "clear")
 				local tap_hold = document.tap_hold or {}
 				for _, row in ipairs(rows) do
-					helpers.assert_eq(row.section .. "." .. row.key, "tap_holds.enabled")
-					tap_hold.enabled = not row.delete and row.value or nil
+					local path = row.section .. "." .. row.key
+					helpers.assert_true(path == KEY.TAP_HOLDS_ENABLED or path == KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS,
+						"a tap_holds scope row the preset file owns: " .. path)
+					if row.delete then tap_hold[row.key] = nil else tap_hold[row.key] = row.value end
 				end
 				tap_hold.keys = mode == "recommended" and { caps_lock = { tap_action = "escape" } } or nil
 				document.tap_hold = tap_hold
