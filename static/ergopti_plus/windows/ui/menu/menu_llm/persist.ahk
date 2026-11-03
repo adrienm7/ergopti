@@ -276,7 +276,6 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 		[ConfigLeaf.MIN_REQUEST_INTERVAL_MS, llm["trigger"][ConfigLeaf.MIN_REQUEST_INTERVAL_MS], ConfigKey.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS],
 		[ConfigLeaf.INSTANT_ON_WORD_END, llm["trigger"][ConfigLeaf.INSTANT_ON_WORD_END], ConfigKey.LLM_TRIGGER_INSTANT_ON_WORD_END],
 		[ConfigLeaf.AFTER_HOTSTRING, llm["trigger"][ConfigLeaf.AFTER_HOTSTRING], ConfigKey.LLM_TRIGGER_AFTER_HOTSTRING],
-		[ConfigLeaf.WHILE_HOTSTRING_TOOLTIP, llm["trigger"][ConfigLeaf.WHILE_HOTSTRING_TOOLTIP], ConfigKey.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP],
 		[ConfigLeaf.RESET_ON_NAV, llm["generation"][ConfigLeaf.RESET_ON_NAV], ConfigKey.LLM_GENERATION_RESET_ON_NAV],
 		[ConfigLeaf.AUTO_RAISE_TEMP, llm["generation"][ConfigLeaf.AUTO_RAISE_TEMP], ConfigKey.LLM_GENERATION_AUTO_RAISE_TEMP],
 		[ConfigLeaf.INLINE_AUTOTYPE, llm["trigger"][ConfigLeaf.INLINE_AUTOTYPE], ConfigKey.LLM_TRIGGER_INLINE_AUTOTYPE],
@@ -298,6 +297,11 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 			Format("{:.2f}", TemperatureRaw + 0), ConfigKey.LLM_GENERATION_TEMPERATURE)
 	else
 		_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_GENERATION_TEMPERATURE)
+	; A feature tree written before this option keeps the manifest default the
+	; reader falls back to (LLM_Menu_WhileHotstringTooltip).
+	if llm["trigger"].Has(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP)
+		_LLM_Menu_PutValidatedPersistedOption(opts, ConfigLeaf.WHILE_HOTSTRING_TOOLTIP,
+			llm["trigger"][ConfigLeaf.WHILE_HOTSTRING_TOOLTIP], ConfigKey.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
 	for Key in LLM_AGENT_SETTING_KEYS {
 		if llm.Has(Key)
 			_LLM_Menu_PutValidatedPersistedOption(opts, Key, llm[Key], "llm." . Key)
