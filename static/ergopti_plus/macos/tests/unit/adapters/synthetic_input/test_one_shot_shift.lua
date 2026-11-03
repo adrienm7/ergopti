@@ -122,11 +122,16 @@ helpers.describe("one-shot native boundary", function()
 			helpers.assert_eq(key:rawFlags(), 130)
 			helpers.assert_eq(key:getCharacters(false), "A")
 		end
+		-- A key rolled in while the shifted one is still down is not shifted
+		-- (one-shot-roll): the Shift is that press's own, not a held Shift.
 		local other = event(3)
 		adapter.key_down(other, 3)
 		adapter.finish(true)
-		helpers.assert_eq(other:getCharacters(false), "B")
-		adapter.key_up(event(0), 0)
+		helpers.assert_eq(other:getCharacters(false), "b")
+		helpers.assert_eq(other:rawFlags(), 0)
+		local released = event(0, 128)
+		adapter.key_up(released, 0)
+		helpers.assert_eq(released:rawFlags(), 130, "the shifted press is released under its own Shift")
 		other = event(3)
 		adapter.key_down(other, 3)
 		helpers.assert_eq(other:getCharacters(false), "b")

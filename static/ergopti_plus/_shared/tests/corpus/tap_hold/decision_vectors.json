@@ -448,6 +448,30 @@
 			}
 		},
 		{
+			"id": "one_shot_is_spent_by_one_letter_typed_in_a_roll",
+			"description": "Letters typed fast, each pressed before the one before it is released, take the one-shot Shift on the first letter only (on macOS a one-shot tap then « abc » typed fast gave « ABc »).",
+			"bindings": {
+				"caps_lock": {
+					"tap": "one_shot_shift",
+					"hold": "shift",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["up", "caps_lock", 100],
+				["down", "a", 300],
+				["down", "j", 320],
+				["up", "a", 330],
+				["down", "a", 340],
+				["up", "j", 350],
+				["up", "a", 360]
+			],
+			"expected": {
+				"strokes": ["shift+a", "j", "a"]
+			}
+		},
+		{
 			"id": "one_shot_hold_is_shift_and_arms_nothing",
 			"description": "Held over a letter, the key is its Shift hold and arms no one-shot for the letter after.",
 			"bindings": {

@@ -28,7 +28,7 @@ the local branches `worktree-agent-*`: land them, then remove the worktrees so o
 - [ ] **Prediction indentation default -3**, recommended -3, all drivers.
 - [ ] **French punctuation.** Space before `:` in composed `label: value` rows and about 21 strings, with a gate.
 - [ ] **Multi-prediction tooltip.** The number is right-aligned in the tooltip, not stuck to the text.
-- [ ] **macOS one-shot Shift is not one-shot.** Tap it then type « abc » quickly: « ABc » or « ABC ». It must be spent
+- [x] **macOS one-shot Shift is not one-shot.** Tap it then type « abc » quickly: « ABc » or « ABC ». It must be spent
       by the first key; today it seems to end only on its timeout (configurable in the menu, can be infinite). Check
       the F20 one-shot sentinel path (modules/keymap/one_shot_shift.lua, adapters/one_shot_shift.lua) against Windows
       and Linux, with a regression test typing three keys inside the timeout.
