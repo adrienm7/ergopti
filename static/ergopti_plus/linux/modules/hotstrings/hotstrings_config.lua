@@ -1057,8 +1057,7 @@ function M.init(engine, config_dir, on_change)
 	if type(config_dir) == "string" and config_dir ~= "" then
 		_config_dir = config_dir
 	else
-		local home = require("infra.config_paths").home()
-		local xdg = home .. "/.config/ergopti/hotstrings"
+		local xdg = require("infra.config_paths").default_config_dir() .. "/hotstrings"
 		local fh = io.open(xdg, "r")
 		if fh then fh:close(); _config_dir = xdg end
 	end

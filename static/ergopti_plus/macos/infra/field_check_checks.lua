@@ -45,7 +45,7 @@ local LOG = "field_check"
 
 local STATE = { pass = "pass", fail = "fail", info = "info", skip = "skip" }
 
-local OWNED_RUNTIME_DIR = "/Library/Application Support/ErgoptiPlus/Runtime"
+local OWNED_RUNTIME_DIR = KePaths.OWNED.RUNTIME_DIR
 local OWNED_JOB_FILE = "/Library/LaunchDaemons/" .. Identifiers.service_labels.macos_core .. ".plist"
 local OWNED_JOB = "system/" .. Identifiers.service_labels.macos_core
 local OWNED_VHID_JOB_FILE = "/Library/LaunchDaemons/" .. Identifiers.service_labels.macos_virtual_hid .. ".plist"

@@ -93,7 +93,7 @@ function M.new(deps)
 		if status == UNAVAILABLE and logged ~= status then
 			deps.logger.error(deps.log,
 				"Remap guardian status is '%s': the background helper is not registered, so tap-holds and remaps"
-					.. " stay inert; ~/Library/Logs/ergopti_plus/launcher.log names the registration cause.",
+					.. " stay inert; ~/Library/Logs/Ergopti/launcher.log names the registration cause.",
 				status)
 		end
 		logged = status

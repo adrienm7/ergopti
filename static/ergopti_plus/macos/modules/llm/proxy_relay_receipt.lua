@@ -18,9 +18,10 @@
 local M = {}
 
 local FileSystem = require("adapters.file_system")
+local AppDirs = require("app_dirs")
 
 -- Under the user's own caches, not the temporary folder of one login shell.
-local RELATIVE = "/Library/Caches/ergopti_plus/proxy_relay_refusal"
+local RELATIVE = "/" .. AppDirs.macos.cache_relative .. "/proxy_relay_refusal"
 local _path_override = nil
 
 --- The receipt's path, handed to the daemon start.

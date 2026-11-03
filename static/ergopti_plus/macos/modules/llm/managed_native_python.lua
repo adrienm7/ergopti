@@ -62,7 +62,7 @@ function M.resolve(remaining_seconds)
 		return nil, Probe.cancel() ~= true and "pending" or nil
 	end
 	local relative = Locator[arch]
-	local root = home:gsub("/+$", "") .. "/Library/Application Support/Ergopti/native-bootstrap/python/"
+	local root = home:gsub("/+$", "") .. "/" .. require("app_dirs").macos.support_relative .. "/native-bootstrap/python/"
 	local installation = relative:match("^([^/]+)/bin/python%d+%.%d+$")
 	return Probe.get(root .. relative, root .. installation .. "/", arch, remaining_seconds, deadline)
 end

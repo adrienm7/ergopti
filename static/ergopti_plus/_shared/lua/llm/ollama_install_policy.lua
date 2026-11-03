@@ -89,7 +89,8 @@ end
 function M.posix_plan(environment, app_dirs, asset)
 	local root, reason = M.data_root(environment)
 	if not root then return nil, reason end
-	local app = type(app_dirs) == "table" and rawget(app_dirs, "folder_name") or nil
+	local linux = type(app_dirs) == "table" and rawget(app_dirs, "linux") or nil
+	local app = type(linux) == "table" and rawget(linux, "folder_name") or nil
 	if not segment(app) then return nil, "application_directory_unreadable" end
 	if type(asset) ~= "table" or not segment(asset.key) or type(asset.version) ~= "string"
 		or not asset.version:match("^%d+%.%d+%.%d+$") or type(asset.sha256) ~= "string"

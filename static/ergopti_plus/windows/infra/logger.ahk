@@ -6,7 +6,7 @@
 ; Lightweight central logger for ErgoptiPlus, matching the 8-variant taxonomy
 ; in _shared/modules/logger/SPEC.md (debug / trace / done / info / start / success /
 ; warn / error). Writes structured lines to the daily log in the logs folder
-; (LoggerLogsDir: LogsDirPath, or %LOCALAPPDATA%\ergopti_plus\logs\) and keeps
+; (LoggerLogsDir: LogsDirPath, or %LOCALAPPDATA%\Ergopti\logs\) and keeps
 ; a small in-memory ring buffer that the tray menu can dump for live debugging
 ; without re-reading the file.
 ;
@@ -281,7 +281,7 @@ global _LOGGER_STAMP_FN := 0
 ; =============================
 ; =============================
 
-; The OS-default logs folder, %LOCALAPPDATA%\ergopti_plus\logs\ (from
+; The OS-default logs folder, %LOCALAPPDATA%\Ergopti\logs\ (from
 ; _generated/app_dirs.ahk). Local, not Roaming: logs are machine state.
 ; @returns {String} Absolute folder with a trailing backslash.
 LoggerDefaultLogsDir() {

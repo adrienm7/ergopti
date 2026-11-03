@@ -6,7 +6,7 @@
 --- Linux implementation of the Storage port contract defined in
 --- static/ergopti_plus/_shared/core/ports/Storage.spec.js. Provides a key-value
 --- persistent store backed by a JSON file under XDG_CONFIG_HOME
---- (~/.config/ergopti_plus/storage.json) so settings survive daemon restarts
+--- (~/.config/ergopti/storage.json) so settings survive daemon restarts
 --- and reboots without depending on D-Bus or gconf.
 ---
 --- FEATURES & RATIONALE:
@@ -73,12 +73,12 @@ local ENOENT = 2 -- Native Linux errno: only a proven missing store may start em
 -- ========================================
 
 local function _config_dir()
-	-- NOTE the directory is "ergopti_plus", not "ergopti" as everywhere else.
-	-- Preserved deliberately: this is where existing installs keep their
-	-- storage.json, and unifying the name would orphan every stored setting
-	-- with no migration. The HOME fallback is the shared one.
+	-- The default configuration folder, never the ConfigDirPath override: the
+	-- override itself is stored here, so the store must not move with it. The
+	-- builds before the single folder name kept it in a second folder, which
+	-- infra/legacy_folder_migration.lua moves here once at boot.
 	local ConfigPaths = require("infra.config_paths")
-	return ConfigPaths.config_home() .. "/ergopti_plus/"
+	return ConfigPaths.default_config_dir() .. "/"
 end
 
 local _STORE_PATH = _config_dir() .. "storage.json"

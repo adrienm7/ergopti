@@ -111,6 +111,10 @@ do
 		return
 	end
 end
+-- The builds before the single folder name kept paths.toml and the default
+-- configuration folder elsewhere; they move once, here, before config_paths
+-- reads paths.toml.
+require("adapters.legacy_folder_migration").run(Logger)
 local Storage            = require("adapters.storage")
 if not direct_require_installed then
 	Logger.warn("init", "Hammerspoon exposes no rawrequire: each require keeps costing about 300 us on the main thread.")
@@ -414,7 +418,7 @@ Boot.mark("Path: config dir + paths.toml (config_paths.init)")
 Boot.stage("Path: log file open (retention purge deferred)")
 
 -- Re-point the logger to the logs folder (LogsDirPath, or
--- ~/Library/Logs/ergopti_plus/) now that paths.toml is read. Earlier boot lines
+-- ~/Library/Logs/Ergopti/) now that paths.toml is read. Earlier boot lines
 -- went to the fallback file in the default folder.
 -- (The old-log retention purge is scheduled off the boot path inside this call.)
 do
@@ -531,7 +535,7 @@ local TOML_CACHE_DIR = nil
 do
 	local home = os.getenv("HOME")
 	if type(home) == "string" and home ~= "" then
-		TOML_CACHE_DIR = home .. "/Library/Caches/" .. require("app_dirs").folder_name .. "/toml_hotstrings"
+		TOML_CACHE_DIR = home .. "/" .. require("app_dirs").macos.cache_relative .. "/toml_hotstrings"
 	end
 end
 do
