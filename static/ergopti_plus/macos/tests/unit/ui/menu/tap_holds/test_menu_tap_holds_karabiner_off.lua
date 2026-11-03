@@ -156,11 +156,11 @@ helpers.describe("the declared integration-off hint retains cached native childr
 			helpers.assert_eq(#hidden, #before - 1, "platform policy removes the hint, not key data")
 			local keys_before, keys_after = {}, {}
 			for _, item in ipairs(before) do
-				if type(item.title) == "string" and item.title:match("^tap_hold%.group%.") then keys_before[#keys_before + 1] = item end
+				if type(item.title) == "string" and item.title:match("^key_name%.") then keys_before[#keys_before + 1] = item end
 			end
 			for _, item in ipairs(hidden) do
 				helpers.assert_true(item.title ~= HINT)
-				if type(item.title) == "string" and item.title:match("^tap_hold%.group%.") then
+				if type(item.title) == "string" and item.title:match("^key_name%.") then
 					helpers.assert_true(item.disabled)
 					keys_after[#keys_after + 1] = item
 				end
