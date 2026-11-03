@@ -3065,7 +3065,11 @@
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.gestures.header_ergopti"
+			"i18n": "menu.gestures.header_fingers_2",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "list",
@@ -3077,6 +3081,14 @@
 		},
 		{
 			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.gestures.header_fingers_3",
 			"platforms": [
 				"hs"
 			],
@@ -3098,6 +3110,14 @@
 			"unavailable": "hide"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.gestures.header_fingers_4",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
 			"type": "list",
 			"id": "gesture_slots_4",
 			"platforms": [
@@ -3107,6 +3127,14 @@
 		},
 		{
 			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.gestures.header_fingers_5",
 			"platforms": [
 				"hs"
 			],
@@ -3128,9 +3156,21 @@
 			],
 			"reason_key": "platform_reason.touchpad_stack_is_per_driver",
 			"status_rows": {
-				"tap_group_boundary": [
+				"finger_group_boundary": [
 					{
 						"type": "---"
+					}
+				],
+				"fingers_3": [
+					{
+						"type": "section_header",
+						"i18n": "menu.gestures.header_fingers_3"
+					}
+				],
+				"fingers_4": [
+					{
+						"type": "section_header",
+						"i18n": "menu.gestures.header_fingers_4"
 					}
 				]
 			}
@@ -3141,7 +3181,38 @@
 			"platforms": [
 				"linux"
 			],
-			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
+			"reason_key": "platform_reason.touchpad_stack_is_per_driver",
+			"status_rows": {
+				"finger_group_boundary": [
+					{
+						"type": "---"
+					}
+				],
+				"fingers_2": [
+					{
+						"type": "section_header",
+						"i18n": "menu.gestures.header_fingers_2"
+					}
+				],
+				"fingers_3": [
+					{
+						"type": "section_header",
+						"i18n": "menu.gestures.header_fingers_3"
+					}
+				],
+				"fingers_4": [
+					{
+						"type": "section_header",
+						"i18n": "menu.gestures.header_fingers_4"
+					}
+				],
+				"fingers_5": [
+					{
+						"type": "section_header",
+						"i18n": "menu.gestures.header_fingers_5"
+					}
+				]
+			}
 		},
 		{
 			"type": "---",

@@ -79,10 +79,10 @@ local function _build_gestures(ctx)
 		return committed
 	end
 
-	-- The manifest's `gesture_slots_linux` row. One flat list rather than the
-	-- per-finger-count groups macOS splits into (gesture_slots_2 … _5): the slots
-	-- come from ge.DEFAULT_GESTURES, which is keyed by slot name and not by finger
-	-- count, so grouping would mean parsing the names apart only to regroup them.
+	-- The manifest's `gesture_slots_linux` row: one list, its slots grouped by
+	-- the finger count in their names, fewest fingers first, each group under
+	-- the header macOS declares for its own group (status rows fingers_N, with
+	-- finger_group_boundary between two groups).
 	local providers = {}
 	providers["system_gesture_status"] = function() return require("ui.gesture_conflicts").rows(ge) end
 	-- The recommended-defaults rule and why Linux recommends no swipe, behind
@@ -112,7 +112,36 @@ local function _build_gestures(ctx)
 		local max_fingers = touchpad and touchpad.max_fingers or nil
 		local ok_finder, Finder = pcall(require, "modules.gestures.touchpad_finder")
 
+		local groups, counts = {}, {}
 		for _, slot in ipairs(slots) do
+			local count = tonumber(tostring(slot):match("^%a+_(%d+)"))
+			assert(count, "gesture slot without a finger count: " .. tostring(slot))
+			if not groups[count] then groups[count] = {}; counts[#counts + 1] = count end
+			table.insert(groups[count], slot)
+		end
+		table.sort(counts)
+		--- Appends one declared status template; false refuses the whole list.
+		local function push_status(status)
+			local rows = ManifestMenu and ManifestMenu.status_rows("gestures_menu", "gesture_slots_linux", status)
+			if type(rows) ~= "table" then return false end
+			for _, row in ipairs(rows) do out[#out + 1] = row end
+			return true
+		end
+		slots = {}
+		local opens = {}
+		for _, count in ipairs(counts) do
+			for index, slot in ipairs(groups[count]) do
+				slots[#slots + 1] = slot
+				if index == 1 then opens[#slots] = count end
+			end
+		end
+
+		for position, slot in ipairs(slots) do
+			local count = opens[position]
+			if count then
+				if position > 1 and not push_status("finger_group_boundary") then return {} end
+				if not push_status("fingers_" .. count) then return {} end
+			end
 			local reachable = true
 			if ok_finder and type(Finder.slot_is_reachable) == "function" then
 				reachable = Finder.slot_is_reachable(slot, max_fingers)
