@@ -117,6 +117,10 @@ for (const key of ['menu.gestures.auto_configure', 'menu.gestures.manual_tutoria
 		`the Windows Infos text names the ${key} row`
 	);
 assert.match(en['menu.gestures.recommended_note'], /reads the touchpad itself/);
+// macOS recommends Ergopti actions on its own four-finger swipes since
+// 2026-11-03, so the dialog says to turn those system gestures off first.
+assert.match(en['menu.gestures.recommended_reason_macos'], /four-finger swipes/);
+assert.match(en['menu.gestures.recommended_reason_macos'], /turn them off/);
 // Every row the Gestures menu declares itself stays a short menu caption.
 const MENU_CAPTION_MAX_UNITS = 80;
 const localeDir = path.join(SP, '_shared', 'data', 'locales');
