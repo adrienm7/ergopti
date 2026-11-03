@@ -21,6 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 const toml = require('smol-toml');
+const KeyNames = require('../lib/key-names.cjs');
 
 const SP = path.resolve(__dirname, '../../static/ergopti_plus');
 const read = (file) => fs.readFileSync(path.join(SP, file), 'utf8').replace(/^﻿/, '');
@@ -84,8 +85,16 @@ function validate(input) {
 		for (const [locale, strings] of Object.entries(input.locales)) {
 			const byLabel = new Map();
 			for (const id of offered(platform)) {
-				const label = strings[`sg_actions.${id}`];
+				let label = strings[`sg_actions.${id}`];
 				if (label === undefined) continue;
+				// A sticky label is a template its modifiers fill on the driver
+				// (_shared/lua/actions/sticky_label.lua): compare what it shows.
+				const sticky = KeyNames.stickyModifiers(id);
+				if (sticky !== null)
+					label = label.replace(
+						'{1}',
+						sticky.map((key) => strings[KeyNames.i18n(key, platform)]).join(' + ')
+					);
 				check(
 					!byLabel.has(label),
 					`unique: ${platform} ${locale} labels ${byLabel.get(label)} and ${id} "${label}"`
