@@ -21,6 +21,23 @@ the local branches `worktree-agent-*`: land them, then remove the worktrees so o
       without touching the Mac.
 - [ ] **Slowness, every driver.** Windows boot 7 s, `menu.rebuild` 1.7 s: lazy submenus, single-toggle update, one
       registry proof, full save after ready, disk caches; a toggle must not rebuild 1000 rows.
+      Resume here (branch `wip/windows-boot-time`): parse fixes and the smoke operation caps are committed. Next, approved
+      by the maintainer on 3 November, one measured commit each: (1) register layout, hotstrings and hooks before the
+      tray root, with the smoke's order assertion inverted; (2) a tray click during boot opens the menu only once input
+      is ready, with a regression test; record both in `docs/memory/maintainer-decisions.md`. Then attack script parse
+      (lighter boot includes, lazy modules), layout and hotstrings (disk caches with invalidation, deferred rare
+      categories). Measure with interleaved base/candidate smoke-fixture boots, compare summed `process_cpu`.
+      Windows boot, 3 November. Real logs: 4.75 s at best, 7.8 s typical, 15 s and more
+      under load; parse 1-1.7 s, layout 1.2 s, hotstrings 1.0 s, tray 1.0 s (AI submenu 0.75 s), pre-logger 1.2 s.
+      Three boots waited 24 s, 26 s and 446 s on a tray opened during boot (`native_menu_wait`): input waits for the
+      open menu. Done, measured on a smoke fixture made from the maintainer's config (median of 3 interleaved runs,
+      process CPU 7.75 → 7.20 s, menu usable 6.6 → 5.5 s; realistic-hotstrings fixture: hotstrings stage 1.9 → 1.1 s):
+      quoted TOML text lexed in native runs (personal file parse 463 → 165 ms), snapshot comparison without map
+      copies, one boot snapshot read for the AI options (4 → 1), personal-file metadata decodes only `[_meta]`
+      (468 → 29 ms for three 35 KB files). Gate: the startup smoke bounds the boot's counted operations
+      (`BOOT_OPERATION_CEILINGS`). Left, deliberate or rejected: parse, layout and hotstring registration (about
+      4.4 s) are needed at the first key; the remote AI catalogue (212 ms, rejected while the AI root is eager); the
+      boot's 9-13 registry deep compares (every write compares).
 - [ ] **AI menu.** "Test a prediction" under the profile row: group model, profile, test, never two separators in a row.
       The test uses a high temperature, bypasses the cache, never a fixed string, and shows the generation time.
 - [ ] **Generation parameters submenu.** Predictions count, min and max words with no separator; one separator; all the
