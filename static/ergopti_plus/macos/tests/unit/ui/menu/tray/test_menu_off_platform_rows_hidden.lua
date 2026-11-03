@@ -10,8 +10,10 @@
 --- whose title carries a `platform_reason.*` text, except the stand-in of a row
 --- declared `unavailable = "grey"` (not yet ported here, the maintainer's rule
 --- of 2026-09-30): the Shortcuts restore and clear, the tap-hold word reset
---- (Karabiner owns tap-hold on macOS), and the four layout row emulation
---- switches (macOS emulates no layout). The fixture cases for every
+--- (Karabiner owns tap-hold on macOS), and the row of the emulated-rows
+--- submenu (macOS emulates no layout). This check renders every declared menu
+--- on its own, so the four row switches of that submenu's table count too,
+--- though the tray never opens them on macOS. The fixture cases for every
 --- row shape live in the Linux suite, which runs the same shared renderer.
 --- ==============================================================================
 
@@ -42,8 +44,8 @@ helpers.describe("menu: no off-platform explanation is rendered on macOS", funct
 		})
 		helpers.assert_true(rendered > 10, "every menu of the shared manifest must render, got " .. rendered)
 		helpers.assert_eq(found, {}, "a row another platform has must not reach the macOS tray")
-		helpers.assert_eq(greyed, 7,
-			"the Shortcuts restore and clear, the tap-hold word reset and the four layout row switches are drawn greyed with their reason")
+		helpers.assert_eq(greyed, 8,
+			"the Shortcuts restore and clear, the tap-hold word reset, the emulated-rows submenu row and its four switches are drawn greyed with their reason")
 	end)
 
 end)
