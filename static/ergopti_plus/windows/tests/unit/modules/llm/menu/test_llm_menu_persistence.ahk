@@ -951,7 +951,14 @@ _LLM_Persist_BootSourceKind(Section, Key, Raw, Outdated, OptionKey, Kind) {
 		Expected := Kind == "modifiers" ? _LLM_Menu_ModifiersArrayToString(Admitted) : Admitted
 		if Kind == "modifiers"
 			AssertTrue(Expected is String, "the admitted typed modifier vector must have a valid native representation")
+		global _ConfigTomlSnapshotReads
+		ReadsBefore := _ConfigTomlSnapshotReads
 		Opts := LLM_Menu_BuildSavedOpts(Cache)
+		; boot-snapshot-one-read-2026-11-03: each snapshot read compares the whole
+		; snapshot with its shadow twice; four reads of one image took about
+		; 0.35 s of the maintainer's boot tray build.
+		AssertEqual(1, _ConfigTomlSnapshotReads - ReadsBefore,
+			"the saved-options build must read the boot snapshot once for all its manifest values")
 		AssertTrue(Opts.Has(OptionKey), "the actually authored native option must be published")
 		_LLM_Persist_AssertBootOption(Opts[OptionKey], Expected)
 		AssertTrue(ConfigTomlReadSnapshot(ConfigurationFile) == _BootConfigSnapshot,
