@@ -39,6 +39,16 @@ the field-run step or the hand action that proves it and the commits it confirms
 - **After that:** owned bundled Karabiner (`next/owned-karabiner`), one Ergopti folder name, one config layout on every
   OS (items below); macOS field report rerun (`git pull && bash tools/dev/collect-macos-field-report.sh`).
 
+## Branch `wip/layout-composer-responsive` (3 November, resume from this branch alone)
+
+- [x] **Responsive layout composer, same page on the three OS.** Done in 47e87f0f0b: board in fractions of a
+      full-width board, footer action bar, `WebView_FitToWindow` in every Windows Size handler; macOS and Linux
+      already resized their view. Gates: `npm run test:browser:layout-composer`, `test_webview_fit_to_window.ahk`.
+- [x] **Layout menu: layers and rows apart.** Header « Couches émulées » above the two layer rows, the four row
+      switches in the submenu « Rangées émulées (apprentissage progressif) »; decision in maintainer-decisions.md.
+- [ ] **Next:** full CI `gh workflow run ci.yml --ref wip/layout-composer-responsive -f os_lanes=all`, then fix
+      what it reports (Lua menu tests and eslint did not run locally). Never push `dev` or `main` from here.
+
 ## Release 1.0.9 (maintainer requests of 1-2 November, written so the work survives a lost session)
 
 Release as 1.0.9 on `main` by fast-forward from `dev`, with `Release-As: 1.0.9` if the computed version differs, once the

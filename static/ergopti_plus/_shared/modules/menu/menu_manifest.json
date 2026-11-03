@@ -2363,6 +2363,14 @@
 			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.layout.header_layers",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		},
+		{
 			"type": "list",
 			"id": "layout_features_base",
 			"platforms": [
@@ -2379,47 +2387,9 @@
 			"reason_key": "platform_reason.lists_windows_only_settings"
 		},
 		{
-			"type": "section_header",
-			"i18n": "menu.layout.header_rows",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "hide"
-		},
-		{
-			"type": "feature",
-			"path": "layout.emulate_number_row",
-			"i18n": "menu.layout.emulate_number_row",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_emulation_is_windows_only"
-		},
-		{
-			"type": "feature",
-			"path": "layout.emulate_top_row",
-			"i18n": "menu.layout.emulate_top_row",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_emulation_is_windows_only"
-		},
-		{
-			"type": "feature",
-			"path": "layout.emulate_home_row",
-			"i18n": "menu.layout.emulate_home_row",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_emulation_is_windows_only"
-		},
-		{
-			"type": "feature",
-			"path": "layout.emulate_bottom_row",
-			"i18n": "menu.layout.emulate_bottom_row",
+			"type": "group",
+			"id": "layout_emulated_rows",
+			"i18n": "menu.layout.emulated_rows",
 			"platforms": [
 				"ahk"
 			],
@@ -2544,6 +2514,48 @@
 				"ahk"
 			],
 			"reason_key": "platform_reason.lists_windows_only_settings"
+		}
+	],
+	"layout_emulated_rows_group": [
+		{
+			"type": "feature",
+			"path": "layout.emulate_number_row",
+			"i18n": "menu.layout.emulate_number_row",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.layout_emulation_is_windows_only"
+		},
+		{
+			"type": "feature",
+			"path": "layout.emulate_top_row",
+			"i18n": "menu.layout.emulate_top_row",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.layout_emulation_is_windows_only"
+		},
+		{
+			"type": "feature",
+			"path": "layout.emulate_home_row",
+			"i18n": "menu.layout.emulate_home_row",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.layout_emulation_is_windows_only"
+		},
+		{
+			"type": "feature",
+			"path": "layout.emulate_bottom_row",
+			"i18n": "menu.layout.emulate_bottom_row",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.layout_emulation_is_windows_only"
 		}
 	],
 	"accented_letters_group": [
