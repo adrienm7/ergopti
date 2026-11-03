@@ -209,7 +209,8 @@ helpers.describe("shared personal editor command", function()
 		local calls, found = 0, nil
 		local ok, err = pcall(function()
 			declaration[1].i18n = "menu.hotstrings.shortcut_none"
-			local rows = hotstrings_rows(fake_config({ all_enabled = false }), {
+			-- Master on: an off category greys every row of its submenu (category-off rule).
+			local rows = hotstrings_rows(fake_config({ all_enabled = true }), {
 				is_paused = function() return false end,
 				webview = { show = function() calls = calls + 1 end },
 			})
@@ -238,7 +239,8 @@ helpers.describe("shared personal editor command", function()
 	for _, vector in ipairs(vectors) do
 		helpers.it("shared-personal-editor: " .. vector.name, function()
 			local current, calls = vector.initial_paused, 0
-			local config = fake_config({ all_enabled = false })
+			-- Master on: an off category greys every row of its submenu (category-off rule).
+			local config = fake_config({ all_enabled = true })
 			local ctx = { paused = false, webview = {} }
 			if vector.opener then ctx.webview.show = function(name)
 				calls = calls + 1

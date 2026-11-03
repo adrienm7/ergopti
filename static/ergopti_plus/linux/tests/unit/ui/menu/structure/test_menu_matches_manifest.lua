@@ -157,6 +157,10 @@ local LIVE_SOURCE_MODULES = {
 	"modules.llm.agent_settings", "ui.menu.agent_rows",
 }
 
+-- The agent reads on: an off category greys every row of its submenu and drops
+-- its frames (category-off rule), and this certification walks every row.
+local AGENT_ON_SOURCE = '[llm]\nagent_mode = "auto"\n'
+
 local function with_live_source(context, scenario)
 	if type(context.llm) ~= "table" or context.llm.get_live ~= nil then return scenario() end
 	local prior = {}; for _, name in ipairs(LIVE_SOURCE_MODULES) do prior[name] = rawget(package.loaded, name) end
@@ -165,14 +169,14 @@ local function with_live_source(context, scenario)
 	local descriptor
 	local acquired, result = false, nil
 	local ok, detail = xpcall(function()
-		descriptor = assert(io.open(path, "wb")); assert(descriptor:write("")); assert(descriptor:close()); descriptor = nil
+		descriptor = assert(io.open(path, "wb")); assert(descriptor:write(AGENT_ON_SOURCE)); assert(descriptor:close()); descriptor = nil
 		for _, name in ipairs(LIVE_SOURCE_MODULES) do rawset(package.loaded, name, nil) end
 		preferences = require("infra.llm_preferences")
 		local bytes, status = require("toml_codec.writer").read_classified(path)
-		assert(status == "ok" and bytes == "")
+		assert(status == "ok" and bytes == AGENT_ON_SOURCE)
 		assert(preferences.acquire(owner)); acquired = true
 		assert(preferences.with_configuration(owner, { status = status, content = bytes }, function()
-			-- Independent neutral physical input: both systems are Off, no model or excluded app.
+			-- Independent physical input: the agent on, both systems Off, no model or excluded app.
 			local settings = require("modules.llm.agent_settings")
 			for _, system in ipairs({ "system1", "system2" }) do
 				helpers.assert_eq(settings.get_spec(system), "")
@@ -181,7 +185,7 @@ local function with_live_source(context, scenario)
 				helpers.assert_eq(reason, "off")
 			end
 			helpers.assert_eq(#settings.get_disabled_apps(), 0)
-			helpers.assert_eq(settings.get_mode(), "off")
+			helpers.assert_eq(settings.get_mode(), "auto")
 			local engine = require("modules.llm.prediction_engine")
 			assert(engine.get_live() == nil)
 			context.llm.get_live, context.llm.set_live = engine.get_live, engine.set_live
@@ -1270,7 +1274,7 @@ helpers.describe("Whole LLM tray genuine live owner scope", function()
 							helpers.assert_nil(context.llm.get_live())
 							helpers.assert_eq(context.llm.set_live(nil), true)
 							local values, source = require("infra.llm_preferences").get_many({ "llm.profiles.num_predictions" })
-							helpers.assert_eq(source.content, "")
+							helpers.assert_eq(source.content, AGENT_ON_SOURCE)
 							helpers.assert_type(values["llm.profiles.num_predictions"], "number")
 							if raises then error("actual live scope sentinel") end
 							return "actual live scope result"

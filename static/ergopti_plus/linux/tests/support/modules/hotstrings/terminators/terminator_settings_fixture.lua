@@ -160,6 +160,8 @@ local function menu_controls(Settings, paused, reordered)
 	local ctx = {
 		paused = paused,
 		config = {
+			-- Hotstrings on: an off category greys its submenu (category-off rule).
+			any_enabled = function() return true end,
 			get_groups = function() return {} end,
 			get_categories = function() return {} end,
 			language_packs = function() return {} end,

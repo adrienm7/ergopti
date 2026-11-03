@@ -186,8 +186,11 @@ local function with_mode_fixture(options, callback)
 		end
 		function fixture.rows()
 			local item = fixture.build()
+			-- The slot row joins its label to its action with the locale's template.
+			local title = strings["common.label_value"]:gsub("{1}", i18n.get("gesture.slots.swipe_2_left"))
+				:gsub("{2}", "None")
 			for _, row in ipairs(item.submenu) do
-				if row.title == i18n.get("gesture.slots.swipe_2_left") .. " : None" then
+				if row.title == title then
 					return assert(row.menu[3].menu)
 				end
 			end
@@ -485,8 +488,14 @@ helpers.describe("Gestures: declared sensitivity head and real action-choice own
 				if refusal == "paused" then f.control_paused = true else f.control_state.gestures = false end
 				local slot = assert(f.control_slot())
 				helpers.assert_true(slot.disabled)
-				helpers.assert_true(slot.menu[1].disabled)
-				helpers.assert_eq(false, slot.menu[1].fn())
+				if refusal == "disabled" then
+					-- Category-off rule: an off Gestures menu greys the slot and opens nothing.
+					helpers.assert_nil(slot.menu)
+					helpers.assert_nil(slot.fn)
+				else
+					helpers.assert_true(slot.menu[1].disabled)
+					helpers.assert_eq(false, slot.menu[1].fn())
+				end
 				helpers.assert_eq(f.queue, {})
 			end)
 		end)

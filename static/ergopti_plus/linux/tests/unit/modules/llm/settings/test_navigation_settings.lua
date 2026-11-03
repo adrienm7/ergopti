@@ -331,7 +331,8 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 			for _, parent in ipairs(parents) do
 				local row = assert(parent_named(rows, fixture.i18n.get(parent.key)))
 				helpers.assert_eq(row.disabled, true)
-				helpers.assert_true(type(row.menu) == "table")
+				-- Category-off rule: a greyed group of an off category opens nothing.
+				helpers.assert_nil(row.menu)
 			end
 			helpers.assert_eq(Sandbox.read_bytes(fixture.path), before)
 			helpers.assert_eq(fixture.changed(), 0)

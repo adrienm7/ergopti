@@ -64,7 +64,8 @@ local function with_wrap_controls(options, callback)
 		"ui.menu.menu_tap_keys", "infra.manifest_reader",
 	}, function()
 		local renderer = helpers.load_with_stubs("infra.manifest_menu")
-		local translations = {}
+		-- Keys read as themselves, except the label-value join, the French template.
+		local translations = { ["common.label_value"] = "{1} : {2}" }
 		package.loaded["infra.i18n"].get = function(key) return translations[key] or key end
 		local calls = { saves = 0, updates = 0, prompts = 0 }
 		local responses = options.responses or {}
