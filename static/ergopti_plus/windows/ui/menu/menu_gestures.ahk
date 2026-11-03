@@ -34,7 +34,6 @@ BuildGesturesMenu(Options := unset) {
 	; CategoryEnabled flip the master-gated menus register.
 	Commands := Map(
 		MenuCommand.GESTURES_TOGGLE, (*) => ToggleGesturesEnabled(),
-		MenuCommand.SYSTEM_GESTURE_SETTINGS, (*) => GestureOpenTouchpadSettings(),
 		MenuCommand.SCOPE_RESTORE, (*) => _GES_ApplyScope("recommended", ScopeOptions),
 		MenuCommand.SCOPE_CLEAR, (*) => _GES_ApplyScope("clear", ScopeOptions),
 		MenuCommand.AUTO_CONFIGURE, (*) => GestureAutoConfigureAction(),

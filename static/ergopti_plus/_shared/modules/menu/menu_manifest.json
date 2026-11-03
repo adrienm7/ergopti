@@ -3039,7 +3039,12 @@
 		{
 			"type": "command",
 			"id": "system_gesture_settings",
-			"i18n": "menu.gestures.system_settings"
+			"i18n": "menu.gestures.system_settings",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "command",
