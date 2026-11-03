@@ -50,7 +50,7 @@ LocalServerMenuLabelOf(Servers, Id, Verdict) {
 LocalServerMenuRows(Options) {
 	Tr := Options["tr"], Fmt := Options["format"]
 	Paused := Options["paused"], Actions := Options["actions"]
-	Rows := [Map("separator", true), Map("label", Tr.Call("menu.llm.local_servers.header"), "disabled", true)]
+	Rows := [Map("separator", true), Map("label", MenuSectionTitle(Tr.Call("menu.llm.local_servers.header")), "disabled", true)]
 	Result := Options["result"], Unavailable := false
 	for Id in Options["order"] {
 		Verdict := Result.Call(Id)
