@@ -29,7 +29,7 @@ local function type_events(events, space_tap_hold)
 		local TapHoldEngine = require("platform.remap.tap_hold_engine")
 		kh.set_remapper(TapHoldEngine.new({
 			keys = { space = { tap_action = "space", hold_modifier = "ctrl", time_activation_seconds = 10 } },
-			tap_min_ms = 0, one_shot_timeout_ms = 2000,
+			tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 			nav_layer = require("tests.support.nav_layer_fixture").recommended(),
 		}), function() end)
 	end

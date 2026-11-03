@@ -474,7 +474,7 @@ helpers.describe("tap-hold engine: LAlt's Backspace under held keys", function()
 	helpers.it("keeps up a modifier its own release just lifted (lalt-backspace-logic)", function()
 		local e = Engine.new({ keys = { left_alt = { tap_action = "backspace", hold_modifier = "alt",
 				time_activation_seconds = 0.2 } },
-			tap_min_ms = 50, one_shot_timeout_ms = 2000,
+			tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 			held_text_modifier_codes = function() return { LSHIFT } end,
 			held_shortcut_modifier_codes = function() return { ALT } end })
 		e:process(LSHIFT, DOWN, 0)

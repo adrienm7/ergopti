@@ -158,7 +158,7 @@ helpers.describe("tap-hold config: the spellings of a hold", function()
 
 	--- The modifier codes the engine presses when `key_id` goes down.
 	local function held_codes(keys, key_id)
-		local engine = Engine.new({ keys = keys, tap_min_ms = 50, one_shot_timeout_ms = 2000, key_text = function() return nil end,
+		local engine = Engine.new({ keys = keys, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000, key_text = function() return nil end,
 			plan_text = function() return nil end, one_shot_result = function() return nil end, })
 		local codes = {}
 		for _, event in ipairs(engine:process(Engine.KEY_CODES[key_id], 1, 0) or {}) do
@@ -257,7 +257,7 @@ helpers.describe("tap-hold config: the spellings of a hold", function()
 			helpers.assert_eq(#warnings, 1, case[2] .. " is reported")
 			helpers.assert_contains(warnings[1], case[2])
 			helpers.assert_contains(warnings[1], "tap_hold.keys.caps_lock." .. case[1])
-			local engine = Engine.new({ keys = loaded.keys, tap_min_ms = 50, one_shot_timeout_ms = 2000,
+			local engine = Engine.new({ keys = loaded.keys, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 				key_text = function() return nil end, plan_text = function() return nil end, one_shot_result = function() return nil end, })
 			-- A tap and no hold: Enter at key-down (tap-no-hold-instant), no Ctrl.
 			local out = engine:process(Engine.KEY_CODES.caps_lock, 1, 0)

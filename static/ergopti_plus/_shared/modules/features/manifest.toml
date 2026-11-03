@@ -4484,6 +4484,25 @@ platforms = ["hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"] }
 reason_key = "platform_reason.category_master_is_a_gate_on_windows"
 
+# How long a tap-hold key whose hold is a modifier may stay down, alone, and
+# still type its tap. Alone means no other key, click or wheel turn during the
+# press, so nothing was typed under the hold and waiting costs nothing; the
+# hold threshold still decides a chord at once. A deliberate Shift tap for Copy
+# often lasts 200 to 300 ms, past the 200 ms threshold, and copied nothing
+# (field report mac-2026-11-03). 0 is the strict tap-hold: the tap only under
+# the threshold. A key's own longer delay is kept. The typing keys
+# ([tap_hold.rollover]) and the holds that wait for their threshold (a layer, a
+# one-shot Shift) never take it.
+[[features.tap_holds]]
+id = "lone_modifier_tap_max_ms"
+default = 1000
+recommended = 1000
+family = "setting"
+type = "number"
+description_key = "menu.tapholds.lone_tap_title"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
+
 [[features.shortcuts.keys]]
 id = "wrap_text_if_selected"
 default = false

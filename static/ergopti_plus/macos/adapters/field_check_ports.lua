@@ -124,11 +124,14 @@ local function tap_hold_threshold_facts()
 	local facts = { enabled = Remap.get_enabled() == true, expected = {},
 		tag = require("platform.remap.lease_contract").MANAGED_TAG_LABEL }
 	local global = Remap.get_tap_hold_timeout()
+	-- A modifier key pressed alone may tap for longer than its delay (the lone
+	-- tap window): the generator says what it gave each key.
+	local deployed = require("platform.remap.generator").last_tap_timeouts() or {}
 	for _, key in ipairs(Remap.TAP_HOLD_KEYS or {}) do
 		local key_code = type(key.from) == "table" and key.from.key_code
 		if type(key_code) == "string" then
 			local own = Remap.get_tap_timeout(key.id)
-			facts.expected[key_code] = { id = key.id, ms = (own and own > 0) and own or global }
+			facts.expected[key_code] = { id = key.id, ms = deployed[key.id] or ((own and own > 0) and own or global) }
 		end
 	end
 	local text = FileSystem.read(FileSystem.expand_path(KePaths.config_file_for(KePaths.selected_runtime())))

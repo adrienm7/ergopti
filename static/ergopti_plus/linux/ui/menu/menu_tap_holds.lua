@@ -21,6 +21,10 @@ local show_error = require("ui.menu.menu_dialogs").show_error
 
 local LOG = "ui.menu.menu_tap_holds"
 
+-- The lone modifier tap windows the menu offers, in milliseconds; 0 is Off,
+-- the strict tap-hold (tap_holds.lone_modifier_tap_max_ms).
+local LONE_TAP_CHOICES_MS = { 0, 500, 750, 1000, 1500 }
+
 --- Display name of a tap-hold key: its name in the shared key name table, the
 --- one the Windows and macOS menus show. A key the table does not name raises
 --- rather than printing its id.
@@ -235,6 +239,29 @@ local function _build_tap_holds(ctx)
 		return true
 	end
 
+	--- Persists how long a modifier key pressed alone still taps, live.
+	--- @param ms number One of LONE_TAP_CHOICES_MS.
+	--- @return boolean
+	local function set_lone_tap(ms)
+		local guard, setter = edit_guard("set_lone_tap_max_ms")
+		if not guard then changed(false); return false end
+		local call_ok, persisted = pcall(setter, ms, guard)
+		if not call_ok or persisted ~= true then
+			changed(false)
+			return false
+		end
+		changed(true)
+		return true
+	end
+
+	--- The window's caption: Off for the strict tap-hold, else its length.
+	--- @param ms number
+	--- @return string
+	local function lone_tap_caption(ms)
+		if ms == 0 then return i18n_safe("menu.tapholds.lone_tap_off") end
+		return string.format(i18n_safe("menu.tapholds.lone_tap_up_to"), ms .. " ms")
+	end
+
 	--- Removes a key's own delay, so it follows the global delay again.
 	local function reset_delay(key_id)
 		local guard, setter = edit_guard("set_threshold")
@@ -307,6 +334,21 @@ local function _build_tap_holds(ctx)
 			return { {
 				label = string.format(i18n_safe("menu.tapholds.tap_hold_title"), global_ms .. " ms"),
 				action = function() return ask_global_delay(global_ms) end,
+			} }
+		end,
+		["tap_hold_lone_tap"] = function()
+			local current_ms = th.lone_tap_max_ms()
+			local choices = {}
+			for _, ms in ipairs(LONE_TAP_CHOICES_MS) do
+				choices[#choices + 1] = {
+					label = lone_tap_caption(ms),
+					checked = ms == current_ms or nil,
+					action = function() return set_lone_tap(ms) end,
+				}
+			end
+			return { {
+				label = string.format(i18n_safe("menu.tapholds.lone_tap_title"), lone_tap_caption(current_ms)),
+				items = choices,
 			} }
 		end,
 		["tap_hold_keys_left"] = function() return hand_rows("left") end,

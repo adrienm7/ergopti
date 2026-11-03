@@ -4191,6 +4191,7 @@ local function publish_settings_state(candidate)
 	_state.tap_hold_config = candidate.tap_hold_config
 	_state.mod_combos_config = candidate.mod_combos_config
 	_state.tap_hold_timeout_ms = candidate.tap_hold_timeout_ms
+	_state.lone_modifier_tap_max_ms = candidate.lone_modifier_tap_max_ms
 	_state.sticky_timeout_ms = candidate.sticky_timeout_ms
 	_state.simultaneous_threshold_ms = candidate.simultaneous_threshold_ms
 	_state.combo_symmetric = candidate.combo_symmetric
@@ -5055,6 +5056,31 @@ function M.set_tap_hold_timeout(ms)
 	return committed
 end
 
+--- Returns how long a modifier key pressed alone still types its tap.
+--- @return number milliseconds 0 for the strict tap-hold.
+function M.get_lone_modifier_tap_max_ms()
+	if not require_state("get_lone_modifier_tap_max_ms") then return nil end
+	return _state.lone_modifier_tap_max_ms
+end
+
+--- Sets the lone modifier tap window and persists it.
+--- Logs an error and returns without saving if the value is invalid.
+--- Does NOT regenerate — call M.regenerate() explicitly when ready.
+--- @param ms number 0 (the strict tap-hold) or a positive whole number of milliseconds.
+function M.set_lone_modifier_tap_max_ms(ms)
+	if not require_state("set_lone_modifier_tap_max_ms") then return false end
+	local valid, value = pcall(require("tap_hold.lone_tap").validate, ms)
+	if not valid then
+		Logger.error(LOG, "set_lone_modifier_tap_max_ms: invalid value '%s' — ignoring.", tostring(ms))
+		return false
+	end
+	local committed = commit_state_mutation(function(candidate)
+		candidate.lone_modifier_tap_max_ms = value
+	end, nil, require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
+	if committed then Logger.debug(LOG, "Lone modifier tap window: %d ms.", value) end
+	return committed
+end
+
 --- Returns the sticky/one-shot modifier timeout in milliseconds.
 --- @return number milliseconds
 function M.get_sticky_timeout()
@@ -5472,6 +5498,7 @@ local function clone_persisted_settings(source)
 		or type(source.enabled) ~= "boolean"
 		or type(source.tap_hold_timeout_ms) ~= "number"
 		or type(source.sticky_timeout_ms) ~= "number"
+		or (source.lone_modifier_tap_max_ms ~= nil and type(source.lone_modifier_tap_max_ms) ~= "number")
 		or type(source.simultaneous_threshold_ms) ~= "number"
 		or type(source.combo_symmetric) ~= "boolean"
 		or (source.mod_combos_enabled ~= nil and type(source.mod_combos_enabled) ~= "boolean") then
@@ -5485,6 +5512,7 @@ local function clone_persisted_settings(source)
 		tap_hold_config = detached.tap_hold_config,
 		mod_combos_config = detached.mod_combos_config,
 		tap_hold_timeout_ms = detached.tap_hold_timeout_ms,
+		lone_modifier_tap_max_ms = detached.lone_modifier_tap_max_ms,
 		sticky_timeout_ms = detached.sticky_timeout_ms,
 		simultaneous_threshold_ms = detached.simultaneous_threshold_ms,
 		combo_symmetric = detached.combo_symmetric == true,
@@ -5830,6 +5858,7 @@ function M.restore_settings(snapshot, on_done, layer_receipt)
 		candidate.tap_hold_config = restored.tap_hold_config
 		candidate.mod_combos_config = restored.mod_combos_config
 		candidate.tap_hold_timeout_ms = restored.tap_hold_timeout_ms
+		candidate.lone_modifier_tap_max_ms = restored.lone_modifier_tap_max_ms
 		candidate.sticky_timeout_ms = restored.sticky_timeout_ms
 		candidate.simultaneous_threshold_ms = restored.simultaneous_threshold_ms
 		candidate.combo_symmetric = restored.combo_symmetric
@@ -6003,13 +6032,18 @@ function M.apply_scope(request, on_done)
 			candidate.combo_symmetric = target.combo_symmetric
 			return #M.MOD_COMBOS
 		end
+		-- The manifest rows of the scope, each with its state field.
+		local fields = {
+			[require("config_keys").KEY.TAP_HOLDS_ENABLED] = "tap_holds_enabled",
+			[require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS] = "lone_modifier_tap_max_ms",
+		}
 		for _, row in ipairs(Manifest.scope_plan(request.scope, request.mode).operations) do
 			local path = row.section .. "." .. row.key
-			assert(path == require("config_keys").KEY.TAP_HOLDS_ENABLED, "tap-hold scope row has no remap owner: " .. path)
+			local field = assert(fields[path], "tap-hold scope row has no remap owner: " .. path)
 			if row.delete then
-				candidate.tap_holds_enabled = Manifest.default_for(path)
+				candidate[field] = Manifest.default_for(path)
 			else
-				candidate.tap_holds_enabled = row.value
+				candidate[field] = row.value
 			end
 		end
 		candidate.tap_hold_config = target.tap_hold_config
@@ -6034,6 +6068,7 @@ function M.reset_to_defaults(on_done, scope)
 		candidate.tap_holds_enabled         = defaults.tap_holds_enabled
 		candidate.tap_hold_config           = defaults.tap_hold_config
 		candidate.tap_hold_timeout_ms       = defaults.tap_hold_timeout_ms
+		candidate.lone_modifier_tap_max_ms  = defaults.lone_modifier_tap_max_ms
 		candidate.sticky_timeout_ms         = defaults.sticky_timeout_ms
 		if not includes_combos then return #M.TAP_HOLD_KEYS end
 		candidate.mod_combos_enabled        = defaults.mod_combos_enabled
@@ -7060,6 +7095,7 @@ function M.init(file_system)
 		tap_hold_config           = user_cfg.tap_hold_config,
 		mod_combos_config         = user_cfg.mod_combos_config,
 		tap_hold_timeout_ms       = user_cfg.tap_hold_timeout_ms,
+		lone_modifier_tap_max_ms  = user_cfg.lone_modifier_tap_max_ms,
 		sticky_timeout_ms         = user_cfg.sticky_timeout_ms,
 		simultaneous_threshold_ms = user_cfg.simultaneous_threshold_ms,
 		combo_symmetric           = user_cfg.combo_symmetric,

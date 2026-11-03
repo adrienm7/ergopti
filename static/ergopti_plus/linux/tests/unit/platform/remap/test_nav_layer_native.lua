@@ -16,7 +16,7 @@ local ALT, KEY_J, KEY_T = 56, 36, 20
 local function engine(layer)
 	local instance = Engine.new({
 		keys = { left_alt = { hold_layer = "nav", tap_action = "none", time_activation_seconds = 0.2 } },
-		tap_min_ms = 50, one_shot_timeout_ms = 2000, nav_layer = layer,
+		tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000, nav_layer = layer,
 	})
 	instance:process(ALT, DOWN, 0)
 	return instance

@@ -227,7 +227,7 @@ local function start_session(with_shift_hold)
 	local keys = { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } }
 	if with_shift_hold then keys.left_shift = { tap_action = "copy", hold_modifier = "shift", time_activation_seconds = .3 } end
 	local base = Engine.new({ keys = keys,
-		tap_min_ms = 0, one_shot_timeout_ms = 1000,
+		tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 1000,
 		key_text = function(code) return Hook.key_text(code) end,
 		plan_text = function(text) return Layout.plan(text) end,
 		one_shot_result = function() return nil end,

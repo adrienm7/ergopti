@@ -204,7 +204,7 @@ function M.with_session(options, body)
 		if options.before_hook then options.before_hook(s) end
 		if not s.hook then s.hook = h.load_module("adapters.keyboard_hook") end
 		s.base = Engine.new({ keys = options.keys or { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
-			tap_min_ms = 0, one_shot_timeout_ms = 1000,
+			tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 1000,
 			key_text = function(code) return s.hook.key_text(code) end,
 			plan_text = function(text)
 				if options.on_plan then options.on_plan(s) end
