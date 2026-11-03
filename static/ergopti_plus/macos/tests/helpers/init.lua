@@ -26,8 +26,17 @@ require("test.runner_home").isolate()
 --- English formats of the keys a caption with several getters (caption_getters) reads.
 --- Such a caption refuses a format without its placeholders, so a stub that echoes
 --- the key (the usual one) would drop the whole row; a stub that replaces the
---- baseline starts from these.
-M.I18N_PLACEHOLDER_FORMATS = { ["menu.llm.server_port_label"] = "%s server port: %s" }
+--- baseline starts from these. A numbered caption (caption_format "numbered")
+--- refuses one without its {1} the same way: the keyboard groups' Add rows echo
+--- their key followed by the modifiers they are filled with.
+M.I18N_PLACEHOLDER_FORMATS = {
+	["menu.llm.server_port_label"] = "%s server port: %s",
+	["menu.shortcuts.alt_add"] = "menu.shortcuts.alt_add {1}",
+	["menu.shortcuts.ctrl_add"] = "menu.shortcuts.ctrl_add {1}",
+	["menu.shortcuts.ctrl_shift_add"] = "menu.shortcuts.ctrl_shift_add {1}",
+	["menu.shortcuts.cmd_add"] = "menu.shortcuts.cmd_add {1}",
+	["menu.shortcuts.cmd_shift_add"] = "menu.shortcuts.cmd_shift_add {1}",
+}
 
 --- The shared timing registry, built from the real file on first use. A fixture that virtualises
 --- the file system or the shared paths calls M.provide_timings() before it does, so a call-time

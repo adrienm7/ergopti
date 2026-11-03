@@ -39,8 +39,19 @@ _KGS_RowsOpenWithRestoreAndClear() {
 			Assert(Items[3].Get("separator", false), Row["label"] . " closes its first group")
 			Assert(HasMethod(Items[1]["action"], "Call") && HasMethod(Items[2]["action"], "Call"),
 				Row["label"] . " scope rows are clickable")
-			AssertEqual(t(KEYBOARD_SLOT_GROUPS[Index]["add_key"]), Items[Items.Length]["label"],
+			; The heading and the Add row name the group's modifiers from the key
+			; name table (« Raccourcis Ctrl + Maj »), never the template's own
+			; English spelling (« Ctrl+Shift ») or a glyph standing for a key.
+			Names := ""
+			for Modifier in SlotRoleNative(KEYBOARD_SLOT_GROUPS[Index]["prefix"] . "a")["modifiers"]
+				Names .= (Names == "" ? "" : " + ") . t("key_name." . Modifier)
+			AssertEqual(StrReplace(t(KEYBOARD_SLOT_GROUPS[Index]["add_key"]), "{1}", Names), Items[Items.Length]["label"],
 				Row["label"] . " keeps its Add row")
+			AssertEqual(StrReplace(t(KEYBOARD_SLOT_GROUPS[Index]["group_key"]), "{1}", Names), Row["label"],
+				"the group heading names " . Names)
+			for Text in [Row["label"], Items[Items.Length]["label"]]
+				AssertFalse(InStr(Text, "{1}") || InStr(Text, "^") || InStr(Text, "⊞") || InStr(Text, "Ctrl+Shift"),
+					"a group caption reads as text: " . Text)
 		}
 		AssertEqual(4, Bindable, "the four modifier groups carry the scope rows")
 	} finally {

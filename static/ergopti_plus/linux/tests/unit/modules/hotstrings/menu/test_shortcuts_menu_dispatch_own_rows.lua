@@ -232,6 +232,7 @@ helpers.describe("shortcuts menu: configured binding labels", function()
 					["owner_tap__number_row_left"] = "https://tap.example" }
 				package.loaded[owned[1]] = {
 					SLOT_GROUPS = { { prefix = "primary_", group_key = "menu.shortcuts.mod_ctrl" } },
+					get_group_label = function(group) return group.group_key end,
 					available_slots = function() return { "primary_k" } end,
 					get_action = function() return "open_url" end,
 					get_slot_label = function() return "Ctrl+K" end,

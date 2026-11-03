@@ -72,3 +72,21 @@ KeyNameComboLabel(Combo, Translate := "") {
 		throw ValueError("An empty key combination has no name.", -1, Combo)
 	return Out
 }
+
+; Fills the {1} of a translated template with one value. A catalogue miss
+; comes back as the dotted key, like every other label, so the locale gates and
+; the tray walk refuse it; a template without {1} throws.
+; @param Key {String} The locale key of the template.
+; @param Value {String} The text {1} stands for.
+; @param Translate {Func} The lookup, when a caller injects one; t by default.
+; @returns {String}
+KeyNameFill(Key, Value, Translate := "") {
+	if !(Value is String) || (Value == "")
+		throw ValueError("A key name template needs a value.", -1, Key)
+	Template := Translate == "" ? t(Key) : Translate.Call(Key)
+	if (Template == Key)
+		return Template
+	if !InStr(Template, "{1}")
+		throw ValueError("A key name template does not hold {1}.", -1, Key)
+	return StrReplace(Template, "{1}", Value)
+}

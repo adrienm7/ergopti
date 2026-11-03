@@ -132,6 +132,25 @@ M.SLOT_GROUPS = {
 	{ prefix = "primary_shift_",    group_key = "menu.shortcuts.cmd_shift_group",  add_key = "menu.shortcuts.cmd_shift_add" },
 }
 
+--- The names of a modifier group's modifiers (« Cmd + Maj »), the {1} of its
+--- Add row: the shared key name table's, never a spelling of the template.
+--- @param group table An entry of M.SLOT_GROUPS with modifiers.
+--- @return string
+function M.get_keyboard_group_modifiers_label(group)
+	return KeyNames.modifiers_label(SlotRoles.family_modifiers("macos", group.prefix), "macos", i18n.get)
+end
+
+--- The heading of one group's submenu: the contextual group's own title, a
+--- modifier group's template filled with its glyphs and names (« ⌥ Option
+--- shortcuts », « ⌘⇧ Cmd + Maj shortcuts »).
+--- @param group table An entry of M.SLOT_GROUPS.
+--- @return string
+function M.get_keyboard_group_label(group)
+	if group.fixed then return i18n.get(group.group_key) end
+	local modifiers = SlotRoles.family_modifiers("macos", group.prefix)
+	return KeyNames.fill(group.group_key, KeyNames.modifiers_heading(modifiers, "macos", i18n.get), i18n.get)
+end
+
 -- Path to the shared key catalogue. The slot space is prefix × key, and the keys
 -- are the same 40 the gesture actions and the Windows driver already use — a
 -- private list here would be a fourth answer to "which keys exist".

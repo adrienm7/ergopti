@@ -196,9 +196,8 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 				shortcuts = shortcuts_on(),
 				on_quit = function() end,
 			}), "menu.shortcuts.title")
-			local i18n = require("infra.i18n")
 			for _, group in ipairs(kbd.SLOT_GROUPS) do
-				local label, found = i18n.get(group.group_key), nil
+				local label, found = kbd.get_group_label(group), nil
 				for _, row in ipairs(rows or {}) do
 					if row.title == label then found = row end
 				end
@@ -230,9 +229,8 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 				})
 				local rows = submenu_of(items, "menu.shortcuts.title")
 				helpers.assert_true(rows ~= nil, "the shortcuts submenu must be drawn")
-				local i18n = require("infra.i18n")
 				for _, group in ipairs(kbd.SLOT_GROUPS) do
-					local label, found = i18n.get(group.group_key), nil
+					local label, found = kbd.get_group_label(group), nil
 					for _, row in ipairs(rows) do
 						if group.prefix == "contextual" and row.title == label then found = row
 						else helpers.assert_true(row.title ~= label,

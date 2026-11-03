@@ -89,6 +89,42 @@ helpers.describe("the shared key names", function()
 		end
 	end)
 
+	helpers.it("key names: a shortcut group heading names its modifiers in the user's language", function()
+		local fr = translator("fr")
+		-- 2026-11-03: the French headings read « Ctrl+Shift » and the macOS
+		-- Option group « ⎇ Alt »; each is now its template filled from the table.
+		helpers.assert_eq(KeyNames.modifiers_label({ "ctrl", "shift" }, "linux", fr), "Ctrl + Maj")
+		helpers.assert_eq(KeyNames.modifiers_heading({ "ctrl", "shift" }, "linux", fr), "Ctrl + Maj")
+		helpers.assert_eq(KeyNames.modifiers_heading({ "option" }, "macos", fr), "⌥ Option")
+		helpers.assert_eq(KeyNames.modifiers_heading({ "cmd", "shift" }, "macos", fr), "⌘⇧ Cmd + Maj")
+		helpers.assert_eq(KeyNames.fill("menu.shortcuts.ctrl_shift_group", "Ctrl + Maj", fr), "Raccourcis Ctrl + Maj")
+		helpers.assert_eq(KeyNames.fill("menu.shortcuts.super_add", "Super", fr), "[+ Ajouter un raccourci Super + …]")
+		helpers.assert_eq(KeyNames.fill("absent.key", "Ctrl", fr), "absent.key", "a miss reads as its dotted key")
+		helpers.assert_eq((pcall(KeyNames.fill, "key_name.ctrl", "Ctrl", fr)), false, "a template without {1}")
+		local Keyboard = require("modules.shortcuts.keyboard_shortcuts")
+		local i18n = require("infra.i18n")
+		local saved = i18n.get
+		i18n.get = fr
+		local ok, err = pcall(function()
+			local seen = 0
+			for _, group in ipairs(Keyboard.SLOT_GROUPS) do
+				local label = Keyboard.get_group_label(group)
+				helpers.assert_true(not label:find("{1}", 1, true) and not label:find("Ctrl+Shift", 1, true)
+					and not label:find("❖", 1, true), "a heading reads as text: " .. label)
+				if group.prefix == "primary_shift_" then
+					helpers.assert_eq(label, "Raccourcis Ctrl + Maj")
+					seen = seen + 1
+				elseif group.prefix == "meta_" then
+					helpers.assert_eq(label, "Raccourcis Super")
+					seen = seen + 1
+				end
+			end
+			helpers.assert_eq(seen, 2, "the Ctrl + Shift and Super groups are offered")
+		end)
+		i18n.get = saved
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("key names: refuse an unknown key, platform or empty text", function()
 		local en = translator("en")
 		helpers.assert_eq((pcall(KeyNames.label, "not_a_key", "linux", en)), false, "an unknown key")

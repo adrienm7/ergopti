@@ -5388,6 +5388,8 @@
 			"id": "keyboard_group_add_option",
 			"command": "keyboard_group_add",
 			"i18n": "menu.shortcuts.alt_add",
+			"caption_getter": "keyboard_group_add_caption",
+			"caption_format": "numbered",
 			"disabled_when": [
 				"keyboard_group_ready"
 			],
@@ -5403,6 +5405,8 @@
 			"id": "keyboard_group_add_ctrl",
 			"command": "keyboard_group_add",
 			"i18n": "menu.shortcuts.ctrl_add",
+			"caption_getter": "keyboard_group_add_caption",
+			"caption_format": "numbered",
 			"disabled_when": [
 				"keyboard_group_ready"
 			],
@@ -5418,6 +5422,8 @@
 			"id": "keyboard_group_add_ctrl_shift",
 			"command": "keyboard_group_add",
 			"i18n": "menu.shortcuts.ctrl_shift_add",
+			"caption_getter": "keyboard_group_add_caption",
+			"caption_format": "numbered",
 			"disabled_when": [
 				"keyboard_group_ready"
 			],
@@ -5433,6 +5439,8 @@
 			"id": "keyboard_group_add_cmd",
 			"command": "keyboard_group_add",
 			"i18n": "menu.shortcuts.cmd_add",
+			"caption_getter": "keyboard_group_add_caption",
+			"caption_format": "numbered",
 			"disabled_when": [
 				"keyboard_group_ready"
 			],
@@ -5448,6 +5456,8 @@
 			"id": "keyboard_group_add_cmd_shift",
 			"command": "keyboard_group_add",
 			"i18n": "menu.shortcuts.cmd_shift_add",
+			"caption_getter": "keyboard_group_add_caption",
+			"caption_format": "numbered",
 			"disabled_when": [
 				"keyboard_group_ready"
 			],

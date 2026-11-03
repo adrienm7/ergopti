@@ -43,6 +43,8 @@ helpers.describe("configured shortcut row labels", function()
 					get_keyboard_slot_groups = function() return { { prefix = "secondary_", group_key = "menu.shortcuts.ctrl_group", add_key = "menu.shortcuts.ctrl_add" } } end,
 					assigned_keyboard_slots = function() return { { id = "secondary_a", action = "open_url" } } end,
 					get_keyboard_slot_label = function() return "Ctrl+A" end,
+					get_keyboard_group_label = function(group) return group.group_key end,
+					get_keyboard_group_modifiers_label = function() return "Ctrl" end,
 					keyboard_binding_id = keyboard_binding,
 				}
 				package.loaded["modules.shortcuts"] = shortcuts
@@ -54,7 +56,10 @@ helpers.describe("configured shortcut row labels", function()
 				package.loaded["modules.shortcuts.bindings"] = {}
 				package.loaded["modules.shortcuts.actions.text"] = {}
 				package.loaded["infra.i18n"] = {
-					get = function(key) return key:find("right_opt", 1, true) and "%s" or key end,
+					get = function(key)
+						return key:find("right_opt", 1, true) and "%s"
+							or helpers.I18N_PLACEHOLDER_FORMATS[key] or key
+					end,
 					section = function(key) return key end,
 					decorate_section = function(label) return label end,
 				}

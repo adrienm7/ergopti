@@ -88,6 +88,51 @@ function M.macos_symbol(spelling)
 	return symbol
 end
 
+--- The translated names of a set of modifiers, joined with " + " in the order
+--- given (« Ctrl + Maj »).
+--- @param modifiers table Ids or aliases, in display order.
+--- @param platform string "windows", "macos" or "linux".
+--- @param translate function Takes a locale key, returns its text.
+--- @return string
+function M.modifiers_label(modifiers, platform, translate)
+	if type(modifiers) ~= "table" or #modifiers == 0 then error("key names: a modifier set must not be empty", 2) end
+	local labels = {}
+	for index, modifier in ipairs(modifiers) do labels[index] = M.label(modifier, platform, translate) end
+	return table.concat(labels, " + ")
+end
+
+--- A set of modifiers as a heading names it: on macOS the glyphs its menus
+--- draw before the names (« ⌘⇧ Cmd + Maj », « ⌥ Option »), elsewhere the
+--- names alone (« Ctrl + Maj »).
+--- @param modifiers table Ids or aliases, in display order.
+--- @param platform string "windows", "macos" or "linux".
+--- @param translate function Takes a locale key, returns its text.
+--- @return string
+function M.modifiers_heading(modifiers, platform, translate)
+	local names = M.modifiers_label(modifiers, platform, translate)
+	if platform ~= "macos" then return names end
+	local glyphs = {}
+	for index, modifier in ipairs(modifiers) do glyphs[index] = M.macos_symbol(modifier) end
+	return table.concat(glyphs) .. " " .. names
+end
+
+--- Fills the {1} of a translated template with one value. A catalogue miss
+--- comes back as the dotted key, like every other label, so the locale gates
+--- and the rendered-row walks refuse it; a template without {1} raises.
+--- @param key string The locale key of the template.
+--- @param value string The text {1} stands for.
+--- @param translate function Takes a locale key, returns its text.
+--- @return string
+function M.fill(key, value, translate)
+	if type(value) ~= "string" or value == "" then error("key names: " .. tostring(key) .. " needs a value", 2) end
+	local template = translate(key)
+	if template == key then return template end
+	if type(template) ~= "string" or not template:find("{1}", 1, true) then
+		error("key names: " .. tostring(key) .. " does not hold {1}", 2)
+	end
+	return (template:gsub("{1}", function() return value end))
+end
+
 --- How one physical position reads in a row: KeyA as A, Digit1 as 1, F5 as
 --- F5, a sign position as its legend, a numpad position as « Pavé num. 7 »,
 --- any other code as the key it names (PageUp, Escape). A physical slot row
