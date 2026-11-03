@@ -21,6 +21,8 @@ require("perf_budget") -- pure: the remote backend judges its request time with 
 require("infra.main_thread_hold") -- pure: the logger reads its read-only hold bounds from it
 require("llm.local_server_fingerprint") -- pure: the local server rows identify a server by its models answer
 require("llm.local_server_menu") -- pure: the remote backend names the local server rows with it
+require("keycodes.key_names") -- pure, with its data: the gesture actions name their chord keys with it
+require("actions.sticky_label") -- pure: the gesture actions name their sticky holds with it
 local World = require("tests.support.modules.llm.selection_translation_fixture")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
 local SharedLogger = require("logger")
