@@ -30,17 +30,7 @@ BuildGesturesMenu(Options := unset) {
 	; and its label from the declaration, and this driver registers only what the
 	; click does. The two buttons below became `command` rows on 2026-08-07: each
 	; handler's whole body was one row with a static label.
-	; The category switch is the manifest's `gestures_toggle` row. Its command is
-	; the dedicated writer (gestures.enabled + reload) rather than the generic
-	; CategoryEnabled flip the master-gated menus register.
-	Commands := Map(
-		MenuCommand.GESTURES_TOGGLE, (*) => ToggleGesturesEnabled(),
-		MenuCommand.SCOPE_RESTORE, (*) => _GES_ApplyScope("recommended", ScopeOptions),
-		MenuCommand.SCOPE_CLEAR, (*) => _GES_ApplyScope("clear", ScopeOptions),
-		MenuCommand.AUTO_CONFIGURE, (*) => GestureAutoConfigureAction(),
-		MenuCommand.MANUAL_TUTORIAL, (*) => GestureShowManualTutorialDialog(),
-		MenuCommand.GESTURE_RECOMMENDED_INFO, (*) => GestureShowRecommendedInfo(),
-	)
+	Commands := _GES_MenuCommands(ScopeOptions)
 	Getters := Map("gestures_enabled", _GES_IsEnabled)
 	; There is no status provider: the slot rows below carry the availability
 	; themselves, and « Infos… » explains it in a dialog.
@@ -52,7 +42,32 @@ BuildGesturesMenu(Options := unset) {
 }
 
 /**
+ * What each Gestures row does when clicked.
+ * The category switch is the manifest's `gestures_toggle` row. Its command is
+ * the dedicated writer (gestures.enabled + reload) rather than the generic
+ * CategoryEnabled flip the master-gated menus register.
+ * « Infos… » only opens a message box, so it is a startup UI command: a click
+ * right after a (re)load opens it at once instead of waiting about five
+ * seconds for input initialization like a command that changes state.
+ * @param {Map} ScopeOptions Options of the scope restore and clear.
+ * @returns {Map} Command id => callback.
+ */
+_GES_MenuCommands(ScopeOptions) {
+	return Map(
+		MenuCommand.GESTURES_TOGGLE, (*) => ToggleGesturesEnabled(),
+		MenuCommand.SCOPE_RESTORE, (*) => _GES_ApplyScope("recommended", ScopeOptions),
+		MenuCommand.SCOPE_CLEAR, (*) => _GES_ApplyScope("clear", ScopeOptions),
+		MenuCommand.AUTO_CONFIGURE, (*) => GestureAutoConfigureAction(),
+		MenuCommand.MANUAL_TUTORIAL, (*) => GestureShowManualTutorialDialog(),
+		MenuCommand.GESTURE_RECOMMENDED_INFO,
+			MenuStartupUiCommand((*) => GestureShowRecommendedInfo(), MenuStartupDiagnosticsReady),
+	)
+}
+
+/**
  * Shows why a gesture is offered or greyed out, behind the menu's « Infos… » row.
+ * It reads no registry and rebuilds nothing: the text is static, so the click
+ * path stays a single message box.
  * The text is several sentences long, and AutoHotkey refuses a menu item name
  * over 260 UTF-16 units. On Windows the driver takes the system's own
  * assignment over itself, so the shared "remove the system assignment first"
