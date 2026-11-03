@@ -284,7 +284,7 @@ ConfigMigrateShippedRegistry() {
 	static Registry := 0
 	if !(Registry is Map)
 		Registry := ConfigRegistryCacheLoad(ConfigMigrateRegistryPath(),
-			EnvGet("LOCALAPPDATA") . "\ergopti_plus\cache\migration-registry-v1.cache")
+			AppFoldersCacheDir() . "migration-registry-v1.cache")
 	return Registry
 }
 

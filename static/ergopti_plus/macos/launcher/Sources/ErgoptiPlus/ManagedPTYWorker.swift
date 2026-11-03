@@ -133,7 +133,7 @@ enum ManagedPTYSource {
 	/// - Parameter home: Absolute home folder.
 	/// - Returns: The root path.
 	static func root(home: String) -> String {
-		return URL(fileURLWithPath: home).appendingPathComponent("Library/Application Support/ErgoptiPlus")
+		return URL(fileURLWithPath: home).appendingPathComponent(kMacOSSupportHomeRelativePath)
 			.appendingPathComponent(folderName).standardizedFileURL.path
 	}
 

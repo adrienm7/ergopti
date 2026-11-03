@@ -7,7 +7,7 @@
 --- which one predictions use.
 ---
 --- FEATURES & RATIONALE:
---- 1. One private file, ~/.config/ergopti_plus/api_keys.json, created with mode
+--- 1. One private file, ~/.config/ergopti/api_keys.json, created with mode
 ---    0600 like ~/.netrc: the key is readable by its owner and nobody else. It
 ---    lives beside storage.json rather than in the configuration folder, which
 ---    users may point at a synced or shared directory.
@@ -72,7 +72,7 @@ local _create_private = nil
 --- The private entries file.
 --- @return string
 function M.path()
-	return _path_override or (ConfigPaths.config_home() .. "/ergopti_plus/api_keys.json")
+	return _path_override or (ConfigPaths.default_config_dir() .. "/api_keys.json")
 end
 
 --- The libc primitive: open(2) with O_CREAT | O_EXCL and mode 0600, so the

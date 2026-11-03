@@ -333,7 +333,7 @@ function M.start(opts)
 		local text = require("adapters.file_system").read(declaration)
 		if type(text) ~= "string" then error("the declaration could not be read: " .. tostring(declaration), 0) end
 		local spec = Policy.validate(Json.decode(text))
-		local folder, why = Policy.folder(spec, "macos", os.getenv, require("app_dirs").folder_name, "/")
+		local folder, why = Policy.folder(spec, "macos", os.getenv, require("app_dirs").macos.folder_name, "/")
 		if not folder then error(why, 0) end
 		local session = M.new({ spec = spec, folder = folder, pid = opts.pid, request_reload = opts.request_reload })
 		_session = session
