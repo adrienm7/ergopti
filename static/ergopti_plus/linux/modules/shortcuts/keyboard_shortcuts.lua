@@ -306,7 +306,7 @@ function M.get_slot_label(slot_id, reason)
 		for _, name in ipairs(PhysicalSlots.modifiers()) do
 			if physical.mods[name] then parts[#parts + 1] = key_name(name) end
 		end
-		parts[#parts + 1] = physical.code
+		parts[#parts + 1] = KeyNames.physical_label(physical.code, "linux", require("infra.i18n").get)
 		return table.concat(parts, " + ")
 	end
 	local mods, suffix = split_slot(slot_id)
