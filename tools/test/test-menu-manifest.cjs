@@ -8463,7 +8463,13 @@ console.log(
 			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.debug.title']);
-		assert.equal(hand[code].linux[5], locale['menu.debug.log_level'] + ' : ℹ️ INFO');
+		// The row joins its label to its value through the locale's common.label_value.
+		assert.equal(
+			hand[code].linux[5],
+			locale['common.label_value']
+				.replace('{1}', locale['menu.debug.log_level'])
+				.replace('{2}', 'ℹ️ INFO')
+		);
 		assert.equal(hand[code].tests, locale['menu.debug.tests']);
 		assert.equal(hand[code].hs[7], hand[code].linux[5]);
 	}
