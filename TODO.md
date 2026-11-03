@@ -126,18 +126,12 @@ three-OS CI is green on the final source. See the handoff above for the current 
       shortcuts menu the « Sélection » section title becomes « Encadrement de la sélection ».
 - [x] **Download proxy row out of Debug.** The download proxy setting is configuration, not debugging: move it from
       the Debug menu to the Configuration menu, all drivers.
-- [ ] **Hotstring tooltip under the AI tooltip.** A typed hotstring trigger shows its tooltip while it can still expand,
-      but with the AI on the prediction tooltip covers it. Never cover it: start the prediction once the hotstring
-      tooltip expires, or show both. New option, all drivers: "AI prediction while a hotstring tooltip shows" = after
-      the delay anyway (both shown, side by side) / wait until the hotstring tooltip expires (default to decide).
-      Found on Windows (lot CI, not implemented): the keystroke path already skips arming while `TooltipIsVisible()`
-      and `LLM_Bridge_ScheduleAfterHotstring` re-arms after the tooltip (when `llm.trigger.after_hotstring`), but
-      only live mode re-checks the hotstring tooltip when the debounce fires and when the answer renders
-      (`prediction_exec.ahk`, `_LLM_Engine_HotstringTooltipShown` in `LLM_Engine_FirePrediction`, the loading
-      spinner and the final render): an ordinary request armed before the tooltip appeared, or answering while it
-      shows, covers it, since both share one surface (`_TooltipPresentStack`). Wait = apply those three gates to
-      every request; both = present the hotstring rows and the prediction in that one stack. macOS
-      (`llm_bridge.update_preview`, `HOTSTRING_CHAIN_OFFSET_SEC`) and Linux still to read.
+- [x] **Hotstring tooltip under the AI tooltip.** Option `llm.trigger.while_hotstring_tooltip` in the AI trigger
+      menu, 21 locales: "wait" (default and recommended) holds every automatic request at the debounce, the spinner
+      and the render while a hotstring tooltip shows, and the chain after the hotstring asks again; "both" draws the
+      hotstring rows and the prediction in one stack (Windows one surface, Linux one window, macOS the prediction
+      canvas under the rows). Live mode always waits; a prompt asked for by name is never held. Field check left:
+      "both" on a real desktop, and the Windows header rows stay until the next render after their own expiry.
 - [ ] **Key names, what lot CH left.** Menus now name keys from `_shared/data/keycodes/key_names.json` in the 21
       locales. Still raw or French: the shared modifier-chord action labels (« Cmd + Option + Shift + Enter » in the
       action pickers, all drivers; tests pin this label family, so it needs its own change); the macOS sticky holds
