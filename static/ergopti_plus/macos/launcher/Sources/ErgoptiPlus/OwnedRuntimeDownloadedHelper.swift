@@ -7,7 +7,7 @@ import Foundation
 ///
 /// `platform/remap/runtime_artifact_fetch.lua` downloads the pinned artifact, checks its size,
 /// digest and closed member list, extracts it to
-/// `~/Library/Application Support/ErgoptiPlus/RemapRuntime/<version>/payload/` and writes the
+/// `~/Library/Application Support/Ergopti/RemapRuntime/<version>/payload/` and writes the
 /// `receipt`, which names the pinned SHA-256, last. The helper comes from that payload only, and
 /// only while the receipt names the digest the manifest pins: an absent download or a receipt of
 /// another artifact is a named refusal, never the copy inside the application bundle. The checks
@@ -45,7 +45,7 @@ enum OwnedRuntimeDownloadedHelper {
 	/// The artifact's one top-level member (runtime_artifact_fetch.lua `HELPER`).
 	static let helperName = "ErgoptiPlus-Runtime-Installer.app"
 	/// `ke_paths.lua` `OWNED.ARTIFACT_HOME`, relative to the account's home folder.
-	static let artifactHomeRelative = "Library/Application Support/ErgoptiPlus/RemapRuntime"
+	static let artifactHomeRelative = kMacOSSupportHomeRelativePath + "/RemapRuntime"
 	/// The manifest the Lua fetch reads, relative to the driver folder.
 	static let manifestRelative = "vendor/remap-runtime/manifest.json"
 	/// The receipt holds one digest line; anything larger is not a receipt.

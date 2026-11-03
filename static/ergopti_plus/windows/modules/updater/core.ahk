@@ -2149,10 +2149,7 @@ _Updater_ListCachePath() {
 	global _UpdaterListCacheDir, UPDATER_LIST_CACHE_FILE
 	Dir := _UpdaterListCacheDir
 	if (Dir == "") {
-		Root := ResolveLocalAppDataDir()
-		if (Root == "")
-			throw Error("Local AppData cannot be resolved for the release list copy.")
-		Dir := Root . "\" . AppDirsFolderName() . "\updater"
+		Dir := AppFoldersRoot() . "updater"
 	}
 	return RTrim(Dir, "\/") . "\" . UPDATER_LIST_CACHE_FILE
 }

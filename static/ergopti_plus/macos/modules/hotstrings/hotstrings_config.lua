@@ -6,7 +6,7 @@
 --- Resolves the effective delay (in seconds) and tooltip color for any
 --- hotstring group/section by merging three layers, in order of decreasing
 --- precedence:
----   1. User overrides — `~/.config/ergopti_plus/hotstrings_config.toml`,
+---   1. User overrides — `<config folder>/hotstrings_config.toml`,
 ---      edited from the "Délais & couleurs hotstrings" window.
 ---   2. TOML metadata — `delay` / `color` declared in each category TOML
 ---      under `[_meta]` (file scope) or `[_meta.sections.<name>]` (section).

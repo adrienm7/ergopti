@@ -67,7 +67,7 @@ end
 --- @return string|nil directory Native owned location, not a trust statement.
 function M.native_managed_install_dir()
 	local home = home_directory()
-	return home and home .. "/Library/Application Support/Ergopti/ollama-native-http" or nil
+	return home and home .. "/" .. require("app_dirs").macos.support_relative .. "/ollama-native-http" or nil
 end
 
 --- Receives only a provisional installed-receipt hint for the native runtime.
