@@ -347,6 +347,12 @@ between workers) green alone. All live checks pass, typed by the harness.
   Qianfan confirmed; left: SambaNova toggle unverified (its docs answer 403 to automated reads), Chutes Qwen field
   inferred; watch Perplexity Sonar chat completions (ended
   2026-09-27), `dashscope-intl`, Moonshot K2 retiring by December.
+- **Linux: scalable three-finger swipes (maintainer, 3 November).** macOS steps tab_next / tab_prev with the swipe's
+  distance (mode "incremental"); the Linux gesture manager acts once, when the swipe ends, and has no per-slot mode, so
+  a long swipe moves one tab. Its evdev decoder sees the travel, so it could count steps at the end of the swipe (live
+  stepping would need a new path in `linux/modules/gestures/manager.lua`). Not small: the mode settings, their menu
+  rows and the step accounting are macOS-only today. Linux recommends no swipe anyway (the desktop acts on them), so
+  this is for users who bind one.
 - **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods` (macOS capture is item 31's).
