@@ -491,7 +491,7 @@ function checkChoiceProjection() {
 			backendStatus.unavailable,
 			[
 				{ type: '---' },
-				{ type: 'label', i18n: 'menu.llm.local_servers.header' },
+				{ type: 'section_header', i18n: 'menu.llm.local_servers.header' },
 				{ type: 'label', i18n: 'menu.llm.unavailable' }
 			],
 			'existing provider owns exact independent status data'
@@ -4462,7 +4462,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		(d) => d.llm_profile_custom_heading.reverse(),
 		(d) => (d.llm_profile_builtin_heading[0].i18n = 'button.cancel'),
 		(d) => (d.llm_profile_custom_heading[1].platforms = ['hs']),
-		(d) => (d.llm_profile_builtin_heading[1].type = 'label'),
+		(d) => (d.llm_profile_builtin_heading[0].type = 'label'),
+		(d) => (d.llm_profile_builtin_heading[0].platforms = ['hs']),
 		(d) => (d.llm_profile_custom_heading[0].type = 'label')
 	]) {
 		const wrong = structuredClone(declared);

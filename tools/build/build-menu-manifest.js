@@ -129,7 +129,10 @@ function validateProviderStatus(menu) {
 				if (status === '' || !Array.isArray(declaration) || declaration.length === 0)
 					throw new Error(`${where}: provider status needs nonempty inert rows`);
 				for (const item of declaration) {
-					const label = item?.type === 'label' && typeof item.i18n === 'string' && item.i18n !== '';
+					const label =
+						(item?.type === 'label' || item?.type === 'section_header') &&
+						typeof item.i18n === 'string' &&
+						item.i18n !== '';
 					if (
 						!item ||
 						typeof item !== 'object' ||
@@ -138,7 +141,7 @@ function validateProviderStatus(menu) {
 						Object.keys(item).some((field) => field !== 'type' && !(label && field === 'i18n'))
 					)
 						throw new Error(
-							`${where}: provider status admits only inert separators and translated labels`
+							`${where}: provider status admits only inert separators, translated labels and section headers`
 						);
 				}
 			}
