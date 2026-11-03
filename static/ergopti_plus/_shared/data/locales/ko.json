@@ -219,8 +219,6 @@
 	"common.disabled": "비활성화됨",
 	"common.error_prefix": "오류 — ",
 	"common.error_title": "오류",
-	"common.key_enter": "Enter",
-	"common.key_space": "스페이스",
 	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "모든 단계를 통과했습니다.",
 	"field_check.verdict_fail": "하나 이상의 단계가 실패했습니다.",

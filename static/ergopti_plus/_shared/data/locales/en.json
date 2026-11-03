@@ -219,8 +219,6 @@
 	"common.disabled": "Disabled",
 	"common.error_prefix": "Error — ",
 	"common.error_title": "Error",
-	"common.key_enter": "Enter",
-	"common.key_space": "Space",
 	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "Every step passed.",
 	"field_check.verdict_fail": "At least one step failed.",

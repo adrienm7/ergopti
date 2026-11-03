@@ -219,8 +219,6 @@
 	"common.disabled": "Zakázáno",
 	"common.error_prefix": "Chyba — ",
 	"common.error_title": "Chyba",
-	"common.key_enter": "Enter",
-	"common.key_space": "Mezerník",
 	"common.label_value": "{1}: {2}",
 	"field_check.verdict_pass": "Všechny kroky prošly.",
 	"field_check.verdict_fail": "Alespoň jeden krok selhal.",

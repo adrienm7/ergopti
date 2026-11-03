@@ -219,8 +219,6 @@
 	"common.disabled": "無効",
 	"common.error_prefix": "エラー — ",
 	"common.error_title": "エラー",
-	"common.key_enter": "Enter",
-	"common.key_space": "スペース",
 	"common.label_value": "{1}：{2}",
 	"field_check.verdict_pass": "すべてのステップに合格しました。",
 	"field_check.verdict_fail": "少なくとも1つのステップが失敗しました。",

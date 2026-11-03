@@ -1258,7 +1258,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + B"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "B"
 											}
 										],
 										"value_label": [
@@ -1274,7 +1280,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + A"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "A"
 											}
 										],
 										"value_label": [
@@ -1290,7 +1302,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + D"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "D"
 											}
 										],
 										"value_label": [
@@ -1306,7 +1324,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + G"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "G"
 											}
 										],
 										"value_label": [
@@ -1322,7 +1346,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + H"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "H"
 											}
 										],
 										"value_label": [
@@ -1338,7 +1368,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + M"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "M"
 											}
 										],
 										"value_label": [
@@ -1354,7 +1390,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + N"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "N"
 											}
 										],
 										"value_label": [
@@ -1370,7 +1412,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + O"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "O"
 											}
 										],
 										"value_label": [
@@ -1386,7 +1434,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + S"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "S"
 											}
 										],
 										"value_label": [
@@ -1402,7 +1456,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + ²"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "²"
 											}
 										],
 										"value_label": [
@@ -1418,7 +1478,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + T"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "T"
 											}
 										],
 										"value_label": [
@@ -1434,7 +1500,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + U"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "U"
 											}
 										],
 										"value_label": [
@@ -1450,7 +1522,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + W"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "W"
 											}
 										],
 										"value_label": [
@@ -1466,7 +1544,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + X"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "X"
 											}
 										],
 										"value_label": [
@@ -1482,7 +1566,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + CapsLock"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -1498,7 +1588,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + '"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "'"
 											}
 										],
 										"value_label": [
@@ -1514,7 +1610,19 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + Shift + V"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"key": "key_name.shift"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "V"
 											}
 										],
 										"value_label": [
@@ -1530,10 +1638,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + "
+												"key": "key_name.win"
 											},
 											{
-												"key": "common.key_space"
+												"text": " + "
+											},
+											{
+												"key": "key_name.space"
 											}
 										],
 										"value_label": [
@@ -2735,7 +2846,7 @@
 													],
 													[
 														{
-															"text": "Option"
+															"key": "key_name.option"
 														}
 													]
 												]
@@ -2765,7 +2876,7 @@
 													],
 													[
 														{
-															"text": "Cmd"
+															"key": "key_name.cmd"
 														}
 													]
 												]
@@ -2795,7 +2906,7 @@
 													],
 													[
 														{
-															"text": "Shift"
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -2825,7 +2936,7 @@
 													],
 													[
 														{
-															"text": "Cmd"
+															"key": "key_name.cmd"
 														}
 													]
 												]
@@ -2855,7 +2966,7 @@
 													],
 													[
 														{
-															"text": "Ctrl"
+															"key": "key_name.ctrl"
 														}
 													]
 												]
@@ -2885,7 +2996,13 @@
 													],
 													[
 														{
-															"text": "Cmd+Shift"
+															"key": "key_name.cmd"
+														},
+														{
+															"text": " + "
+														},
+														{
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -2984,7 +3101,7 @@
 													],
 													[
 														{
-															"text": "Shift"
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -3015,10 +3132,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + "
+												"key": "key_name.ctrl"
 											},
 											{
-												"key": "common.key_space"
+												"text": " + "
+											},
+											{
+												"key": "key_name.space"
 											}
 										],
 										"value_label": [
@@ -3034,7 +3154,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + A"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "A"
 											}
 										],
 										"value_label": [
@@ -3050,7 +3176,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + D"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "D"
 											}
 										],
 										"value_label": [
@@ -3066,7 +3198,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + E"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "E"
 											}
 										],
 										"value_label": [
@@ -3082,7 +3220,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + G"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "G"
 											}
 										],
 										"value_label": [
@@ -3098,7 +3242,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + H"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "H"
 											}
 										],
 										"value_label": [
@@ -3114,7 +3264,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + I"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "I"
 											}
 										],
 										"value_label": [
@@ -3130,7 +3286,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + M"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "M"
 											}
 										],
 										"value_label": [
@@ -3146,7 +3308,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + O"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "O"
 											}
 										],
 										"value_label": [
@@ -3162,7 +3330,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + P"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "P"
 											}
 										],
 										"value_label": [
@@ -3178,7 +3352,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + S"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "S"
 											}
 										],
 										"value_label": [
@@ -3194,7 +3374,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + T"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "T"
 											}
 										],
 										"value_label": [
@@ -3210,7 +3396,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + U"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "U"
 											}
 										],
 										"value_label": [
@@ -3226,7 +3418,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + W"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "W"
 											}
 										],
 										"value_label": [
@@ -3242,7 +3440,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + X"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "X"
 											}
 										],
 										"value_label": [
@@ -3258,7 +3462,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + CapsLock"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -3274,7 +3484,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + L"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "L"
 											}
 										],
 										"value_label": [
@@ -3290,7 +3506,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + ."
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "."
 											}
 										],
 										"value_label": [
@@ -3306,7 +3528,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + '"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "'"
 											}
 										],
 										"value_label": [
@@ -3322,7 +3550,19 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Cmd + Shift + V"
+												"key": "key_name.cmd"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"key": "key_name.shift"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "V"
 											}
 										],
 										"value_label": [
@@ -3370,7 +3610,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Cmd + ★"
+												"key": "key_name.cmd"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "★"
 											}
 										],
 										"value_label": [
@@ -4729,7 +4975,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + G"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "G"
 											}
 										],
 										"value_label": [
@@ -4745,10 +4997,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"text": "Super + "
+												"key": "key_name.super"
 											},
 											{
-												"key": "common.key_space"
+												"text": " + "
+											},
+											{
+												"key": "key_name.space"
 											}
 										],
 										"value_label": [
