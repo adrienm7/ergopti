@@ -98,7 +98,16 @@ local function _build_debug(ctx)
 		return require("ui.error_dialog.bridge").is_enabled()
 	end
 
-	local rows = ManifestMenu.build("debug_menu", "Debug", nil, nil, render_ctx, {})
+	-- The checks and probes hang in the « Tests » group, from the same
+	-- context; no Tests row is drawn when none of them is for Linux.
+	local debug_groups = {
+		debug_tests = function(context)
+			local tests = ManifestMenu.build("debug_tests_menu", "Debug", nil, nil, context, {})
+			if type(tests) ~= "table" or #tests == 0 then return nil end
+			return tests
+		end,
+	}
+	local rows = ManifestMenu.build("debug_menu", "Debug", nil, debug_groups, render_ctx, {})
 	if not debug_dense(rows, true) then return nil end
 	local current_root, current_top, current_section, current_parent = debug_source(ManifestMenu, "linux")
 	if not rawequal(root, current_root) or not rawequal(top, current_top)

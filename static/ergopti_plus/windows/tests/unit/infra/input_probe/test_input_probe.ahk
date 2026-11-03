@@ -193,10 +193,13 @@ _IPT_EnglishStrings() {
 _IPT_MenuRows() {
 	Root := JsonParse(FileRead(_SharedDir . "\modules\menu\menu_manifest.json", "UTF-8"))
 	Rows := Map()
-	for Row in Root["debug_menu"] {
+	for Row in Root["debug_tests_menu"] {
 		if Row.Has("id")
 			Rows[Row["id"]] := Row
 	}
+	for Row in Root["debug_menu"]
+		Assert(!InStr("|send_probe|hook_probe|", "|" . Row.Get("id", "") . "|"),
+			"the probes hang in the Tests submenu, not among the Debug rows")
 	return Rows
 }
 

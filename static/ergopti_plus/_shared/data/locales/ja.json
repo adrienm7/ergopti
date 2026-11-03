@@ -1413,6 +1413,7 @@
 	"menu.debug.report_bug": "不具合を報告",
 	"menu.debug.show_error_dialog": "エラーごとにウィンドウを表示",
 	"menu.debug.suggest_feature": "機能を提案",
+	"menu.debug.tests": "テスト",
 	"menu.debug.title": "⚠ デバッグ",
 	"menu.debug.window_spy": "ウィンドウスパイ",
 	"menu.debug.send_probe": "SendEvent と SendInput を計測",

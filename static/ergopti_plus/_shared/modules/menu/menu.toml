@@ -1008,6 +1008,37 @@ reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 type = "---"
 id = "---"
 
+# The user-facing rows come first, the same on every driver (maintainer,
+# 2026-11-03): the diagnostics window, then reporting a bug or suggesting a
+# feature from it, then the logs. Every check and probe lives in the one Tests
+# submenu at the bottom, never among these rows.
+[[menu.debug_menu]]
+type = "command"
+id = "healthcheck"
+i18n = "menu.debug.healthcheck"
+
+# Right under the diagnostics window (the maintainer's request of 2026-10-02):
+# it decides whether an error shows itself, which that window then explains.
+[[menu.debug_menu]]
+type = "check"
+id = "show_error_dialog"
+i18n = "menu.debug.show_error_dialog"
+checked_when = ["error_dialog_enabled"]
+
+[[menu.debug_menu]]
+type = "command"
+id = "report_bug"
+i18n = "menu.debug.report_bug"
+
+[[menu.debug_menu]]
+type = "command"
+id = "suggest_feature"
+i18n = "menu.debug.suggest_feature"
+
+[[menu.debug_menu]]
+type = "---"
+id = "---"
+
 [[menu.debug_menu]]
 type = "choice"
 id = "log_level"
@@ -1040,77 +1071,54 @@ i18n = "menu.debug.open_error_log"
 type = "---"
 id = "---"
 
-[[menu.debug_menu]]
-type = "command"
-id = "healthcheck"
-i18n = "menu.debug.healthcheck"
-
-# Right under the diagnostics window (the maintainer's request of 2026-10-02):
-# it decides whether an error shows itself, which that window then explains.
-[[menu.debug_menu]]
-type = "check"
-id = "show_error_dialog"
-i18n = "menu.debug.show_error_dialog"
-checked_when = ["error_dialog_enabled"]
-
-# One-click field checks of the macOS input and network chain (issue #101, item
-# 31). The network check runs on all three drivers (macOS and Linux share its
-# steps in Lua, Windows runs the same steps in AutoHotkey); the others are macOS
-# only. Each runs read-only steps, opens a result window with a Copy report
-# button and writes one compact record, with no key, path or URL, to the log.
-[[menu.debug_menu]]
-type = "command"
-id = "field_check_lease"
-i18n = "menu.debug.field_check_lease"
-platforms = ["hs"]
-reason_key = "platform_reason.debug_surface_is_each_drivers_own"
-
-[[menu.debug_menu]]
-type = "command"
-id = "field_check_owned_runtime"
-i18n = "menu.debug.field_check_owned_runtime"
-platforms = ["hs"]
-reason_key = "platform_reason.debug_surface_is_each_drivers_own"
-
-[[menu.debug_menu]]
-type = "command"
-id = "field_check_network"
-i18n = "menu.debug.field_check_network"
-
 # The proxy override (Issue #101 point 2): automatic (the system settings, a
 # company PAC included), direct, or one relay every managed download uses. Its
 # key and default are _shared/modules/network/proxy_override.json; the shared
-# proxy policy applies it before an exported relay and the PAC lookup.
+# proxy policy applies it before an exported relay and the PAC lookup. A setting
+# the user changes, not a check, so it stays out of Tests.
 [[menu.debug_menu]]
 type = "command"
 id = "proxy_override"
 i18n = "menu.debug.proxy_override"
 
+[[menu.debug_menu]]
+type = "---"
+id = "---"
+
+# « Tests »: every one-click check and probe, in one submenu on every driver.
+# Each driver builds its rows from debug_tests_menu with the same command owners
+# and draws no Tests row when none of them is for its platform.
+[[menu.debug_menu]]
+type = "group"
+id = "debug_tests"
+i18n = "menu.debug.tests"
+
+# The rows of « Tests », grouped by topic: the network, then the typing chain
+# (the composed layout, the key accounting, the two Windows input probes), then
+# the macOS Karabiner runtime and the system around it. At most seven rows reach
+# one driver (macOS), so the topics need no separator between them.
+#
+# One-click field checks of the macOS input and network chain (issue #101, item
+# 31). The network check runs on all three drivers (macOS and Linux share its
+# steps in Lua, Windows runs the same steps in AutoHotkey); the others are macOS
+# only. Each runs read-only steps, opens a result window with a Copy report
+# button and writes one compact record, with no key, path or URL, to the log.
+[[menu.debug_tests_menu]]
+type = "command"
+id = "field_check_network"
+i18n = "menu.debug.field_check_network"
+
 # The composed-layout check installs the shipped check composition through the
 # composer's save path, verifies it and removes it again; every driver routes it.
-[[menu.debug_menu]]
+[[menu.debug_tests_menu]]
 type = "command"
 id = "composer_check"
 i18n = "menu.debug.composer_check"
 
-[[menu.debug_menu]]
+[[menu.debug_tests_menu]]
 type = "command"
 id = "field_check_key_accounting"
 i18n = "menu.debug.field_check_key_accounting"
-platforms = ["hs"]
-reason_key = "platform_reason.debug_surface_is_each_drivers_own"
-
-[[menu.debug_menu]]
-type = "command"
-id = "field_check_toolchain"
-i18n = "menu.debug.field_check_toolchain"
-platforms = ["hs"]
-reason_key = "platform_reason.debug_surface_is_each_drivers_own"
-
-[[menu.debug_menu]]
-type = "command"
-id = "field_check_login_items"
-i18n = "menu.debug.field_check_login_items"
 platforms = ["hs"]
 reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 
@@ -1118,29 +1126,47 @@ reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 # 49 and 50): they exercise AutoHotkey's SendInput and its keyboard hook, which
 # no other driver has. Each writes a compact record, with no typed content, to
 # today's log under the InputProbe tag.
-[[menu.debug_menu]]
+[[menu.debug_tests_menu]]
 type = "command"
 id = "send_probe"
 i18n = "menu.debug.send_probe"
 platforms = ["ahk"]
 reason_key = "platform_reason.input_probe_is_autohotkey_specific"
 
-[[menu.debug_menu]]
+[[menu.debug_tests_menu]]
 type = "command"
 id = "hook_probe"
 i18n = "menu.debug.hook_probe"
 platforms = ["ahk"]
 reason_key = "platform_reason.input_probe_is_autohotkey_specific"
 
-[[menu.debug_menu]]
+[[menu.debug_tests_menu]]
 type = "command"
-id = "report_bug"
-i18n = "menu.debug.report_bug"
+id = "field_check_lease"
+i18n = "menu.debug.field_check_lease"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 
-[[menu.debug_menu]]
+[[menu.debug_tests_menu]]
 type = "command"
-id = "suggest_feature"
-i18n = "menu.debug.suggest_feature"
+id = "field_check_owned_runtime"
+i18n = "menu.debug.field_check_owned_runtime"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+[[menu.debug_tests_menu]]
+type = "command"
+id = "field_check_toolchain"
+i18n = "menu.debug.field_check_toolchain"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+[[menu.debug_tests_menu]]
+type = "command"
+id = "field_check_login_items"
+i18n = "menu.debug.field_check_login_items"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 
 [[menu.shortcuts_menu]]
 type = "toggle"

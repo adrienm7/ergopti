@@ -1413,6 +1413,7 @@
 	"menu.debug.report_bug": "Hata bildir",
 	"menu.debug.show_error_dialog": "Her hatada bir pencere göster",
 	"menu.debug.suggest_feature": "Özellik öner",
+	"menu.debug.tests": "Testler",
 	"menu.debug.title": "⚠ Hata ayıklama",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "SendEvent ve SendInput'u ölç",

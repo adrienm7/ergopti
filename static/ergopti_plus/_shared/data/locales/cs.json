@@ -1413,6 +1413,7 @@
 	"menu.debug.report_bug": "Nahlásit chybu",
 	"menu.debug.show_error_dialog": "Zobrazit okno při každé chybě",
 	"menu.debug.suggest_feature": "Navrhnout funkci",
+	"menu.debug.tests": "Testy",
 	"menu.debug.title": "⚠ Ladění",
 	"menu.debug.window_spy": "Sledování okna",
 	"menu.debug.send_probe": "Změřit SendEvent a SendInput",
