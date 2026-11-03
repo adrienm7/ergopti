@@ -60,6 +60,21 @@ helpers.describe("update asset signature (Linux)", function()
 		helpers.assert_true(ok, "refused: " .. tostring(reason))
 	end)
 
+	-- The archive digest (infra/fd_sha256.lua) declares EVP_MD_CTX_new too. When
+	-- it loaded first, LuaJIT refused the signature check's whole declaration
+	-- block, which then reported OpenSSL as missing on the distros where the
+	-- shard ran the digest tests earlier.
+	helpers.it("(linux-asset-signature) the valid vector verifies after another module declared the EVP functions", function()
+		local ffi = require("ffi")
+		pcall(ffi.cdef, "typedef struct evp_md_ctx_st EVP_MD_CTX;")
+		pcall(ffi.cdef, "EVP_MD_CTX *EVP_MD_CTX_new(void);")
+		pcall(ffi.cdef, "void EVP_MD_CTX_free(EVP_MD_CTX *ctx);")
+		package.loaded["infra.asset_signature"] = nil
+		local Fresh = require("infra.asset_signature")
+		local ok, reason = Fresh.verify(V.public_key_spki_base64, valid_record(), V.valid.signature_base64)
+		helpers.assert_true(ok, "refused: " .. tostring(reason))
+	end)
+
 	helpers.it("(linux-asset-signature) every tampered record is refused with the valid signature", function()
 		helpers.assert_true(#V.tampered >= 3)
 		for _, entry in ipairs(V.tampered) do
