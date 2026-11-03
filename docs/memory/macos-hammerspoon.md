@@ -2095,6 +2095,15 @@ baseline` line (item 38).
   the owner's closed category, or `not_started`). Without that shortcut
   `field_test_shortcut` is skipped as `absent` (`no_listing` when the list
   failed): create it once in Shortcuts as a shortcut that does nothing.
+- `field_tap_copy` reads what the user's own copy taps did since the driver
+  started (`modules/keymap/tap_copy.lua` statistics) and never types or writes
+  the clipboard. `copy_watch` fails as `keymap_not_started`; `copy_window` is
+  `w<window>:<key>:<deployed ms>+...` and fails as `short:` when Karabiner got
+  a key a timeout below the lone tap window (`no_copy_tap` skips it);
+  `copy_counter` fails as `unreadable`. `copies_sent` (`<n>:held_<ms>+...`),
+  `copies_verified`, `copies_on_retry`, `copies_unchecked` and
+  `taps_without_copy` (`past_<n>:within_<n>:held_...`) are information;
+  `copies_lost` fails on any copy that never landed, even sent again.
 - `field_pac_fallback` runs after the AI downloads: one `awk` pass counts the
   PAC-then-direct lines of every writer (shell admission, Swift spool, Python
   receiver, Ollama pull). `pac_fallback_counts` is `warnings:worked:failed`,
