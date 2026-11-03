@@ -542,10 +542,12 @@ check(
 		);
 		for (const feature of distanceFeatures) {
 			assert.strictEqual(feature.default.enabled, false, `${feature.id} must stay opt-in`);
+			// A catalogue section is a feature: neutral by default, recommended as
+			// the Ergopti setup on every driver (maintainer rule, 2026-11-02).
 			assert.strictEqual(
 				feature.recommended.enabled,
-				false,
-				`${feature.id} must not be newly recommended`
+				true,
+				`${feature.id} is recommended like every catalogue section`
 			);
 		}
 	}
