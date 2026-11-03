@@ -66,4 +66,22 @@ function rawSpellings() {
 	return out;
 }
 
-module.exports = { TABLE, canonical, i18n, rawSpellings };
+/**
+ * The key ids a sticky action holds, read from its id as
+ * _shared/lua/actions/sticky_label.lua reads them (Option is the Alt key);
+ * null for an action that is no sticky combination (sticky_hyper is named by
+ * its own word, with no {1}).
+ * @param {string} action Action id.
+ * @returns {string[]|null}
+ */
+function stickyModifiers(action) {
+	const match = /^sticky_(.+)$/.exec(action);
+	if (match === null || match[1] === 'hyper') return null;
+	const ids = { cmd: 'cmd', ctrl: 'ctrl', option: 'alt', shift: 'shift' };
+	return match[1].split('_').map((token) => {
+		if (!Object.hasOwn(ids, token)) throw new Error(`sticky action ${action} names ${token}`);
+		return ids[token];
+	});
+}
+
+module.exports = { TABLE, canonical, i18n, rawSpellings, stickyModifiers };

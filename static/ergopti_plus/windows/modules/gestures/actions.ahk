@@ -444,11 +444,15 @@ _GestureActionLabel(Name) {
 		: "sg_actions." . Name
 	Translated := t(Key)
 	; t() returns the raw key when no translation is found — treat that as a miss
-	if (Translated != Key)
-		; The sticky labels name macOS's keys; every locale keeps those two words.
-		return InStr(Name, "sticky_") == 1
-			? StrReplace(StrReplace(Translated, "Cmd", "Win", true), "Option", "Alt", true) : Translated
-	return Name
+	if (Translated == Key)
+		return Name
+	; A sticky label is a template its modifiers fill from the key name table
+	; (« 📌 {1} rémanents »), Cmd being Win and Option Alt. It used to spell
+	; macOS's English names and swap two of them. sticky_hyper is named by its
+	; own word. Port of _shared/lua/actions/sticky_label.lua.
+	if (InStr(Name, "sticky_") == 1) && (Name != "sticky_hyper")
+		return KeyNameFill(Key, KeyNameModifiersLabel(StickyModifierNames(Name)))
+	return Translated
 }
 
 
