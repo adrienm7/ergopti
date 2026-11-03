@@ -381,8 +381,10 @@ _GSS_InfoOpensTheWindowsReason() {
 	for Item in _MR_GetMenuDef("gestures_menu")
 		if _MR_IsForAhk(Item)
 			AssertTrue(Item.Get("type", "") != "label", "the Gestures menu shows no explanation row")
-	AssertContains(_DriverFuncBody("BuildGesturesMenu"),
-		'"gesture_recommended_info", (*) => GestureShowRecommendedInfo()',
+	AssertContains(_DriverFuncBody("BuildGesturesMenu"), "_GES_MenuCommands(",
+		"the Gestures menu registers its commands from one table")
+	AssertContains(_DriverFuncBody("_GES_MenuCommands"),
+		"MenuStartupUiCommand((*) => GestureShowRecommendedInfo(), MenuStartupDiagnosticsReady)",
 		"the Infos row opens the explanation dialog")
 	InfoShown := []
 	try {
@@ -399,6 +401,40 @@ _GSS_InfoOpensTheWindowsReason() {
 		"Windows takes the system assignment over itself: no remove-it-first advice")
 }
 Test("Gestures menu: Infos opens the Windows reason in a message box", _GSS_InfoOpensTheWindowsReason)
+
+; « Infos… » took about five seconds after a reload: the click was retained
+; like a state-changing command until input initialization completed
+; ("Retained startup selection runs after 5265 ms" in the maintainer's log).
+; It is now a startup UI command, so it opens while input is still pending,
+; and its handler reads no registry and rebuilds nothing.
+_GSS_InfoOpensAtOnce(Owner, State) {
+	global _DriverUiCleanupReady, _DriverMenuReady
+	SavedCleanup := IsSet(_DriverUiCleanupReady) ? _DriverUiCleanupReady : unset
+	SavedMenu := IsSet(_DriverMenuReady) ? _DriverMenuReady : unset
+	Shown := []
+	try {
+		; The configured tray is published, input registration is not done yet.
+		_DriverUiCleanupReady := true, _DriverMenuReady := true
+		Command := _GES_MenuCommands(Map())["gesture_recommended_info"]
+		AssertTrue(Command is MenuStartupUiCommand, "Infos is a startup UI command")
+		TestMsgBoxResponder((Text, *) => (Shown.Push(Text), "OK"))
+		MenuCommandRun(Command, [])
+		AssertEqual(1, Shown.Length, "the dialog opens before input initialization completes")
+		AssertEqual(0, Owner.Pending.Length, "the click is not retained")
+		AssertEqual(t("menu.gestures.recommended_reason_windows"), Shown[1])
+	} finally {
+		TestMsgBoxResponder("")
+		_DriverUiCleanupReady := IsSet(SavedCleanup) ? SavedCleanup : unset
+		_DriverMenuReady := IsSet(SavedMenu) ? SavedMenu : unset
+	}
+	Body := _DriverFuncBody("GestureShowRecommendedInfo")
+	Assert(Body != "", "the Infos handler must exist")
+	for _, Slow in ["GestureSystemRefresh", "GestureSystemReadSnapshot", "RegRead", "RebuildTrayMenu",
+			"GestureSystemRequestRefresh", "MenuRenderer_Build"]
+		AssertEqual(0, InStr(Body, Slow), "Infos does no slow work before its dialog: " . Slow)
+}
+Test("Gestures menu: Infos opens at once, even right after a reload (gesture-info-instant)",
+	(*) => _MSC_WithOwner(_GSS_InfoOpensAtOnce))
 
 ; Whoever rewrites the registry asks for a re-read, so the greying follows it.
 ; The touchpad restore is part of the Gestures and global clears, which reload
