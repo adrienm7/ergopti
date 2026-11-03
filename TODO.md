@@ -70,7 +70,8 @@ three-OS CI is green on the final source. See the handoff above for the current 
       the boot position, and keep the preview index complete. Then script parse (lighter boot includes; AHK has no
       runtime include, so only a smaller graph or a worker helps) and layout (rejected disk cache: native hotkey
       registration). Measure each with interleaved base/candidate smoke-fixture boots (summed `process_cpu`). CI of
-      the branch: runs 41732233161 and 41735464699.
+      the branch: run 41737399378 (first run 41732233161 found two branch regressions, fixed since; its PAC and
+      action-picker WebView reds pass locally).
       Windows boot, 3 November. Real logs: 4.75 s at best, 7.8 s typical, 15 s and more
       under load; parse 1-1.7 s, layout 1.2 s, hotstrings 1.0 s, tray 1.0 s (AI submenu 0.75 s), pre-logger 1.2 s.
       Three boots waited 24 s, 26 s and 446 s on a tray opened during boot (`native_menu_wait`): input waits for the
