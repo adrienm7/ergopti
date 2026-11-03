@@ -20,6 +20,7 @@ local Logger        = require("infra.logger")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local LabelValue = require("locale.label_value")
+local KeyNames = require("keycodes.key_names")
 local TextUtils     = require("text_utils")
 local Models        = require("ui.menu.menu_llm.models_manager")
 local Profiles      = require("ui.menu.menu_llm.profiles_manager")
@@ -476,12 +477,14 @@ end
 -- =================================
 -- =================================
 
-local function format_mod_string(m_str)
-		if type(m_str) ~= "string" then return "⌃" end
-		local dict = { ctrl="⌃", cmd="⌘", alt="⌥", shift="⇧" }
-		local res = ""
-		for p in m_str:gmatch("[^+]+") do res = res .. (dict[p] or p) end
-		return res == "" and "⌃" or res
+--- The modifiers of a navigation or validation chord as the macOS menus name
+--- them: their glyphs, then the shared key name table's names (« ⌃⇧ Ctrl +
+--- Maj »). The row used to show the glyphs alone, or the stored id itself for
+--- a modifier its own glyph list lacked.
+--- @param mods table Stored modifier ids.
+--- @return string
+local function format_mods(mods)
+		return KeyNames.modifiers_heading(mods, "macos", i18n.get)
 end
 
 
@@ -512,8 +515,7 @@ local function format_shortcut_title(action, mods, none_label, mod_label)
 		elseif #mods == 0 then
 				return LabelValue.compose(i18n.get, action, none_label)
 		else
-				local sym = format_mod_string(table.concat(mods, "+"))
-				return LabelValue.compose(i18n.get, action, sym .. " " .. mod_label)
+				return LabelValue.compose(i18n.get, action, format_mods(mods) .. " + " .. mod_label)
 		end
 end
 

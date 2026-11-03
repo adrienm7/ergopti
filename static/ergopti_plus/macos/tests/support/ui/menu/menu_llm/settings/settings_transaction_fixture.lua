@@ -734,7 +734,7 @@ local ENTRY_SPECS = {
 		candidate = {"shift"},
 		publishes_setting = true,
 		invoke = function(fixture)
-			return find_item(fixture.manager.build_nav_modifier_menu(), "⇧ Shift").fn()
+			return find_item(fixture.manager.build_nav_modifier_menu(), "⇧ key_name.shift").fn()
 		end,
 	},
 }

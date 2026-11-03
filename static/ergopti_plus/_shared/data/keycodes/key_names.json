@@ -1,5 +1,5 @@
 {
-	"_comment": "The one table naming a keyboard key or modifier in visible text, on every driver and web page. `keys` maps each key id to the locale key of its human name; `platforms` names the locale key a driver shows instead, where that OS calls the key otherwise (Option for Alt on macOS, Super for the system key on Linux). `macos_symbol` is the glyph the macOS menus draw for a modifier where they already use symbols (⌃⇧⌥⌘), one spelling for every such place. `aliases` maps every other spelling a driver, a config file or a slot id uses to its key id. tools/codegen/codegen-key-names.cjs projects it for Lua and AutoHotkey; tools/test/test-key-names-single-source.cjs holds the projections, the catalogue and the 21 locales to it. Keycap legends drawn on a keyboard picture (layer_editor.key.*) are short on purpose and are not row text.",
+	"_comment": "The one table naming a keyboard key or modifier in visible text, on every driver and web page. `keys` maps each key id to the locale key of its human name; `platforms` names the locale key a driver shows instead, where that OS calls the key otherwise (Option for Alt on macOS, Super for the system key on Linux; the chord notation's `cmd` is the system key, so it reads Win on Windows and Super on Linux). `macos_symbol` is the glyph the macOS menus draw for a modifier where they already use symbols (⌃⇧⌥⌘), one spelling for every such place. `aliases` maps every other spelling a driver, a config file or a slot id uses to its key id. tools/codegen/codegen-key-names.cjs projects it for Lua and AutoHotkey; tools/test/test-key-names-single-source.cjs holds the projections, the catalogue and the 21 locales to it. Keycap legends drawn on a keyboard picture (layer_editor.key.*) are short on purpose and are not row text.",
 	"keys": {
 		"escape": { "i18n": "key_name.escape" },
 		"tab": { "i18n": "key_name.tab" },
@@ -24,7 +24,11 @@
 		"alt_gr": { "i18n": "key_name.alt_gr" },
 		"win": { "i18n": "key_name.win", "platforms": { "linux": "key_name.super" } },
 		"super": { "i18n": "key_name.super" },
-		"cmd": { "i18n": "key_name.cmd", "macos_symbol": "⌘" },
+		"cmd": {
+			"i18n": "key_name.cmd",
+			"platforms": { "windows": "key_name.win", "linux": "key_name.super" },
+			"macos_symbol": "⌘"
+		},
 		"left_command": { "i18n": "key_name.left_command" },
 		"right_command": { "i18n": "key_name.right_command" },
 		"option": { "i18n": "key_name.option", "macos_symbol": "⌥" },
