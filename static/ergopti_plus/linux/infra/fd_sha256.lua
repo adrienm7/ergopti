@@ -222,17 +222,19 @@ function M.native()
 	assert(ffi.os == "Linux", "FD digest requires Linux")
 	-- Exact opaque typedefs/prototypes from installed OpenSSL types.h/evp.h.
 	-- No ABI layout, EVP context fields or version-dependent sizes are guessed.
-	ffi.cdef([[
-		typedef struct evp_md_st EVP_MD;
-		typedef struct evp_md_ctx_st EVP_MD_CTX;
-		typedef struct engine_st ENGINE;
-		EVP_MD_CTX *EVP_MD_CTX_new(void);
-		void EVP_MD_CTX_free(EVP_MD_CTX *ctx);
-		const EVP_MD *EVP_sha256(void);
-		int EVP_DigestInit_ex(EVP_MD_CTX *ctx, const EVP_MD *type, ENGINE *impl);
-		int EVP_DigestUpdate(EVP_MD_CTX *ctx, const void *data, size_t count);
-		int EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s);
-	]])
+	-- Declared through the library owner: the signature check declares the
+	-- same EVP context functions, and a second ffi.cdef of them is refused.
+	assert(require("infra.openssl_library").declare({
+		"typedef struct evp_md_st EVP_MD;",
+		"typedef struct evp_md_ctx_st EVP_MD_CTX;",
+		"typedef struct engine_st ENGINE;",
+		"EVP_MD_CTX *EVP_MD_CTX_new(void);",
+		"void EVP_MD_CTX_free(EVP_MD_CTX *ctx);",
+		"const EVP_MD *EVP_sha256(void);",
+		"int EVP_DigestInit_ex(EVP_MD_CTX *ctx, const EVP_MD *type, ENGINE *impl);",
+		"int EVP_DigestUpdate(EVP_MD_CTX *ctx, const void *data, size_t count);",
+		"int EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s);",
+	}))
 	local null_pointer = ffi.cast("void *", 0)
 	local crypto = ffi.load(soname)
 	local Clock, Deadline = require("infra.monotonic"), require("infra.managed_http_deadline")
