@@ -40,7 +40,7 @@ the local branches `worktree-agent-*`: land them, then remove the worktrees so o
       `[[features.*]]` row, one shared tap-hold file for the keys), move each driver's reader and writer to it,
       with one migration of the old files, and a cross-driver test that writes a file on one driver and reads it on
       the other two.
-- [ ] **Metrics and gestures section titles.** The metrics section « Mots par minute » becomes « Vitesse de frappe »;
+- [x] **Metrics and gestures section titles.** The metrics section « Mots par minute » becomes « Vitesse de frappe »;
       the gestures menu gets one section title per finger count (« Gestes à 2 doigts », « à 3 doigts », …) and no
       « Gestes Ergopti » title; « Gestes du système » gets a clearer title saying the system gestures are handed to
       Ergopti so it can change them (synchronisation of the system gestures), all drivers, 21 locales. In the
