@@ -401,10 +401,20 @@ _GSS_InfoOpensTheWindowsReason() {
 Test("Gestures menu: Infos opens the Windows reason in a message box", _GSS_InfoOpensTheWindowsReason)
 
 ; Whoever rewrites the registry asks for a re-read, so the greying follows it.
+; The touchpad restore is part of the Gestures and global clears, which reload
+; the driver: the successor's first build reads the registry again, and a
+; refused clear is caught by the open-time check below.
 _GSS_RegistryWritersRequestRefresh() {
-	for Name in ["GestureAutoConfigureRegistry", "TouchpadRegistryRestoreFromMenu"]
+	for Name in ["GestureAutoConfigureRegistry"]
 		AssertContains(_DriverFuncBody(Name), "GestureSystemRequestRefresh(",
 			Name . " must refresh the availability after changing the registry")
+	for Name in ["_GES_ApplyScope", "ConfigGlobalScopeApply"] {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Name . " must exist")
+		ClearAt := InStr(Body, "TouchpadRegistryClearFromScope(")
+		AssertTrue(ClearAt > 0 && ClearAt < InStr(Body, "Receipt :="),
+			Name . " restores the touchpad before the commit that reloads the driver")
+	}
 	AssertContains(_DriverFuncBody("GestureSystemWatchMenu"), "OnMessage(0x117",
 		"the Gestures submenu is re-checked when it opens")
 	AssertContains(_DriverFuncBody("BuildGesturesMenu"), "GestureSystemWatchMenu(",

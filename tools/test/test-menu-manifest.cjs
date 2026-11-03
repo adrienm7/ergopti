@@ -8731,7 +8731,9 @@ console.log(
 			locale['menu.global.clean_unused_keys'],
 			'-',
 			locale['menu.global.config_folder'],
-			locale['menu.global.setup_wizard']
+			locale['menu.global.setup_wizard'],
+			'-',
+			locale['menu.debug.proxy_override']
 		]);
 	}
 	function tokenDepths(tokens) {

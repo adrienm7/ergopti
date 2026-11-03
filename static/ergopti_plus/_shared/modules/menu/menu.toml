@@ -931,16 +931,6 @@ type = "command"
 id = "clean_unused_keys"
 i18n = "menu.global.clean_unused_keys"
 
-# Puts back the Precision Touchpad registry values backed up before Ergopti's
-# first gesture configuration (windows/modules/gestures/touchpad_registry.ahk).
-# With the cleanup above it: both put something back as it was.
-[[menu.configuration_menu]]
-type = "command"
-id = "restore_touchpad_gestures"
-i18n = "menu.global.restore_touchpad_gestures"
-platforms = ["ahk"]
-reason_key = "platform_reason.touchpad_stack_is_per_driver"
-
 # Set apart by a separator: the rows above rewrite the configuration, the rows
 # below open a window onto it.
 [[menu.configuration_menu]]
@@ -2666,6 +2656,14 @@ type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
 
+# On Windows the clear also puts the Precision Touchpad registry back to its
+# system state: the values backed up before Ergopti's first gesture
+# configuration, or the Windows factory defaults without a backup
+# (windows/modules/gestures/touchpad_registry.ahk). It replaced the
+# Configuration menu's « Restaurer les gestes du pavé tactile Windows » row
+# (maintainer, 2026-11-03), and the global clear composes it too. macOS and
+# Linux read the touchpad themselves and change no system setting, so their
+# clear has nothing to put back.
 [[menu.gestures_menu]]
 type = "command"
 id = "scope_clear"
