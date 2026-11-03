@@ -42,11 +42,35 @@ const WINDOWS_SLOTS_FILE = 'windows/modules/gestures/constants.ahk';
 
 const errors = [];
 
-// This user-visible Windows recommendation must not change another platform.
-if (manifestDefaults('ahk').get('tap_4') !== 'alt_tab_monitor')
-	errors.push('Windows four-finger tap must recommend monitor-local Alt-Tab.');
-if (manifestDefaults('hs').get('tap_4') !== 'win_app_next')
-	errors.push('The Windows four-finger recommendation must preserve the macOS application switch.');
+// One recommended gesture set on every OS (maintainer, 2026-11-03): the
+// four-finger tap is the monitor-local Alt-Tab on all three.
+for (const platform of ['ahk', 'hs', 'linux'])
+	if (manifestDefaults(platform).get('tap_4') !== 'alt_tab_monitor')
+		errors.push(`The four-finger tap must recommend monitor-local Alt-Tab on ${platform}.`);
+// The macOS direction, where the content follows the fingers, on Windows and
+// macOS; Linux keeps its swipes "none" because the desktop also acts on them
+// (the 2026-10-24 rule), and has no Mission Control for the five-finger swipe.
+const RECOMMENDED_SET = {
+	swipe_3_left: ['tab_next', 'tab_next', 'none'],
+	swipe_3_right: ['tab_prev', 'tab_prev', 'none'],
+	swipe_3_up: ['tab_new', 'tab_new', 'none'],
+	swipe_3_down: ['tab_close', 'tab_close', 'none'],
+	swipe_4_left: ['desktop_next', 'space_next', 'none'],
+	swipe_4_right: ['desktop_prev', 'space_prev', 'none'],
+	swipe_4_up: ['win_app_next', 'win_app_next', 'none'],
+	swipe_4_down: ['win_app_prev', 'win_app_prev', 'none'],
+	swipe_5_up: [undefined, 'mission_control', 'none'],
+	tap_3: ['left_click_toggle', 'left_click_toggle', 'left_click_toggle'],
+	tap_4: ['alt_tab_monitor', 'alt_tab_monitor', 'alt_tab_monitor']
+};
+['ahk', 'hs', 'linux'].forEach((platform, index) => {
+	const actual = manifestDefaults(platform);
+	for (const [slot, values] of Object.entries(RECOMMENDED_SET))
+		if (actual.get(slot) !== values[index])
+			errors.push(
+				`${platform} must recommend ${values[index]} for ${slot}, got ${actual.get(slot)} (maintainer, 2026-11-03).`
+			);
+});
 
 // ==================================================
 // ==================================================

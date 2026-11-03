@@ -285,3 +285,30 @@ reads it through `hotstrings.languages.section_default_delay` or its AHK twin
 recommended value where the inheritance differs, so today it writes no delay.
 A category file's `[_meta]` delay names the delay its declared sections wait,
 which the category rows of the delay menus show; a CI check pins the two equal.
+
+## One recommended gesture set, in the macOS direction (3 November 2026)
+
+The recommended gestures are the same on every OS, in the macOS direction where
+the content follows the fingers: three fingers left / right = next / previous
+tab, up / down = new / close tab; four fingers left / right = next / previous
+desktop (`space_next` / `space_prev` on macOS), up / down = next / previous
+window of the active app; `tap_3` = `left_click_toggle`, `tap_4` =
+`alt_tab_monitor`; on macOS a five-finger swipe up = `mission_control`, so the
+Spaces overview survives turning the system's four-finger gestures off. Linux
+keeps the 2026-10-24 rule for its swipes, which stay "none": the touchpad is
+read without a grab, so the desktop acts on the same swipes (a double action);
+its five-finger swipe stays "none" too (no Mission Control equivalent). macOS
+cannot take the system gestures over, so its Gestures « Infos… » dialog tells
+the user to turn the four-finger swipes and Look up off first. The set lives in
+the features manifest (`recommended_per_platform`) and
+`test-gesture-defaults-single-source.cjs` pins it.
+
+## The Gestures clear restores the Windows touchpad (3 November 2026)
+
+« Tout effacer (comportement du système) » in Gestures, and the global clear
+that composes it, also put the Precision Touchpad registry back on Windows: the
+values backed up before Ergopti's first gesture configuration, or, without a
+backup, the Windows factory defaults declared in
+`precision_touchpad_registry.toml`. The separate Configuration row « Restaurer
+les gestes du pavé tactile Windows » is gone. The Windows factory defaults stay
+the real Windows values; they are not Ergopti's recommended gestures.
