@@ -524,7 +524,8 @@ _MI_BuildConfigurationMenu() {
 		MenuCommand.CLEAN_UNUSED_KEYS,   ShowUnusedConfigKeysCleanup,
 		MenuCommand.CONFIG_FOLDER,       FilePathsEditor,
 		MenuCommand.SETUP_WIZARD,        Onboarding_ShowFromMenu,
-		MenuCommand.RESTORE_TOUCHPAD_GESTURES, TouchpadRegistryRestoreFromMenu
+		MenuCommand.RESTORE_TOUCHPAD_GESTURES, TouchpadRegistryRestoreFromMenu,
+		MenuCommand.PROXY_OVERRIDE,      ProxyOverride_Command
 	)
 		Commands[Id] := Callback
 	return MenuRenderer_Build("configuration_menu", "Configuration", "", "", "", Commands)
@@ -667,7 +668,6 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 		MenuCommand.HOOK_PROBE, InputProbe_HookOrderCommand,
 		MenuCommand.COMPOSER_CHECK, ComposerCheck_Command,
 		MenuCommand.FIELD_CHECK_NETWORK, NetworkCheck_Command,
-		MenuCommand.PROXY_OVERRIDE, ProxyOverride_Command,
 		MenuCommand.REPORT_BUG,      (*) => HealthCheck_ReportBug(),
 		MenuCommand.SUGGEST_FEATURE, (*) => HealthCheck_SuggestFeature(),
 		ConfigLeaf.SHOW_ERROR_DIALOG, (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),
