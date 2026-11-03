@@ -65,7 +65,7 @@ helpers.describe("AI overlay: one window shared with the hotstring preview", fun
 		helpers.assert_true(overlay.hide())
 		helpers.assert_eq(window.hides, 0, "the preview rows that can still expand stay")
 		helpers.assert_eq(calls.redraw, 1, "the preview is drawn again alone")
-		helpers.assert_false(overlay.is_showing())
+		helpers.assert_eq(overlay.is_showing(), false)
 		package.loaded["ui.tooltip.llm"] = nil
 	end)
 
@@ -95,7 +95,7 @@ helpers.describe("AI overlay: one window shared with the hotstring preview", fun
 	helpers.it("redraws a shown suggestion and ignores a redraw without one", function()
 		local preview = { rows = nil, both = true }
 		local overlay, window = overlay_with(preview)
-		helpers.assert_false(overlay.redraw(), "nothing shown, nothing drawn")
+		helpers.assert_eq(overlay.redraw(), false, "nothing shown, nothing drawn")
 		overlay.show({ { to_type = "que tout va bien", deletes = 0 } }, {})
 		window.rows = nil
 		helpers.assert_true(overlay.redraw())
@@ -139,7 +139,7 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 
 	helpers.it("reports its rows while shown and forgets them once hidden or covered", function()
 		local preview, window, state, restore = preview_with()
-		helpers.assert_false(preview.is_showing())
+		helpers.assert_eq(preview.is_showing(), false)
 		helpers.assert_true(preview.show({
 			{ trigger = "btw", replacement = "by the way", group = "rolls", fires = true },
 		}, "autocorrect"))
@@ -149,14 +149,14 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 		helpers.assert_true(preview.redraw(), "the rows are drawn again alone")
 		helpers.assert_eq(window.rows[1].text, "by the way")
 		preview.note_covered()
-		helpers.assert_false(preview.is_showing(), "covered rows are no longer the preview's")
+		helpers.assert_eq(preview.is_showing(), false, "covered rows are no longer the preview's")
 		helpers.assert_eq(preview.showing_rows(), nil)
 		preview.hide()
 		helpers.assert_eq(state.hidden, 0, "hiding rows that were covered tells nobody")
 		preview.show({ { trigger = "btw", replacement = "by the way", group = "rolls", fires = true } }, "autocorrect")
 		preview.hide()
 		helpers.assert_eq(state.hidden, 1, "hiding its own rows tells the shared suggestion")
-		helpers.assert_false(preview.is_showing())
+		helpers.assert_eq(preview.is_showing(), false)
 		restore()
 	end)
 
