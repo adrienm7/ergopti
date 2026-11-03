@@ -7,8 +7,9 @@
  * While the AI tooltip shows several predictions, the user moves between them
  * with the chords its footer and its menu advertise. The shared tooltip
  * constants (_shared/modules/tooltip/constants.toml [llm_ui]) are that
- * contract: the chords left of "Tab = accepter" step back, those right of it
- * step forward. "⇧G + Tab" / "⇧D + Tab" name the left and right Shift with Tab,
+ * contract: the chords left of the accept hint step back, those right of it
+ * step forward. "left_shift+tab" / "right_shift+tab" name the left and right
+ * Shift with Tab (each named in the user's language by the key name table),
  * "↑/←" / "↓/→" the arrows, and menu.llm.nav_label repeats the arrows. This
  * gate reads that contract and every driver's tables, and requires each
  * advertised chord in its direction on Windows, macOS and Linux
@@ -60,10 +61,10 @@ const ARROW_GLYPHS = new Map([
 	['←', 'ArrowLeft'],
 	['→', 'ArrowRight']
 ]);
-// The French canonical footer names the Shift side by its initial: Gauche, Droite.
-const SHIFT_GLYPHS = new Map([
-	['⇧G', 'ShiftLeft'],
-	['⇧D', 'ShiftRight']
+// The footer names each Shift side by its key name id.
+const SHIFT_KEYS = new Map([
+	['left_shift', 'ShiftLeft'],
+	['right_shift', 'ShiftRight']
 ]);
 
 /**
@@ -94,13 +95,13 @@ for (const [key, step] of [
 	for (const glyph of glyphs) contract.arrows.set(ARROW_GLYPHS.get(glyph), step);
 }
 for (const [key, step] of [
-	['hint_nav_left', -1],
-	['hint_nav_right', 1]
+	['hint_nav_left_keys', -1],
+	['hint_nav_right_keys', 1]
 ]) {
 	const hint = llmUi(toml, key);
-	const match = /^(⇧[GD]) \+ Tab$/.exec(hint);
+	const match = /^(left_shift|right_shift)\+tab$/.exec(hint);
 	check(match !== null, `[llm_ui] ${key} must name one Shift side with Tab, found "${hint}"`);
-	if (match) contract.shiftTab.set(SHIFT_GLYPHS.get(match[1]), step);
+	if (match) contract.shiftTab.set(SHIFT_KEYS.get(match[1]), step);
 }
 check(
 	contract.arrows.size === 4 &&
@@ -186,8 +187,12 @@ const luaTable = (source, name) =>
 		'macOS tooltip watcher: Shift+Tab must step back with the left Shift and forward with the right one'
 	);
 	check(
-		/hint_left\s*=\s*ui\.hint_nav_left/.test(watcher) &&
-			/hint_left\s*\.\. hint_or \.\. optional_nav_mod \.\. ui\.hint_arrow_left/.test(watcher),
+		/local left = KeyNames\.combo_label\(ui\.hint_nav_left_keys, "macos", i18n\.get\)/.test(
+			watcher
+		) &&
+			/left = i18n\.format\("llm\.tooltip\.hint_or", left, chord \.\. ui\.hint_arrow_left\)/.test(
+				watcher
+			),
 		'macOS footer: Shift+Tab, then the arrows with the optional navigation modifiers'
 	);
 }
@@ -280,7 +285,7 @@ const luaTable = (source, name) =>
 	);
 	const footer = read('windows/ui/tooltip/llm.ahk');
 	check(
-		/hintLeft \.= UI_LLM_HINT_OR \. chord \. UI_LLM_HINT_ARROW_LEFT/.test(footer) &&
+		/hintLeft := _LLM_HintEither\(hintLeft, chord \. UI_LLM_HINT_ARROW_LEFT\)/.test(footer) &&
 			/chord := navStr == "" \? "" : navStr \. " \+ "/.test(footer),
 		'Windows footer: the arrows must follow Shift+Tab, bare when no navigation modifier is set'
 	);
