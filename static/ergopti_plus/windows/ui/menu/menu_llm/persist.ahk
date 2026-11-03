@@ -125,7 +125,7 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 			return false
 		}
 	}
-	ValModifiers :=_LLM_Menu_ModifiersStringToArray(Validated[ConfigLeaf.VAL_MODIFIERS])
+	ValModifiers := _LLM_Menu_ModifiersStringToArray(Validated[ConfigLeaf.VAL_MODIFIERS])
 	if !(ValModifiers is Array) {
 		try LoggerError("LLM",
 			"Refusing to sync invalid validation modifiers into Features.")
