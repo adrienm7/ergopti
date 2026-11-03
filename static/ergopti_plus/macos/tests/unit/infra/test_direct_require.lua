@@ -45,8 +45,8 @@ helpers.describe("direct require", function()
 	end)
 
 	helpers.it("runs before the first module init.lua loads and says when it could not", function()
-		local file = assert(io.open(helpers.driver_root() .. "/init.lua", "rb"))
-		local source = assert(file:read("*a")); assert(file:close())
+		-- The boot unit is found by the install call it owns, not by its path.
+		local source = assert(helpers.read_driver_unit('require("infra.direct_require").install(_G)'))
 		local install = source:find('require("infra.direct_require").install(_G)', 1, true)
 		helpers.assert_true(install ~= nil, "init.lua must install the direct require")
 		helpers.assert_true(install < source:find('require("infra.logger")', 1, true),
