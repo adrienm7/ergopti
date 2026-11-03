@@ -36,6 +36,20 @@ helpers.describe("Config.load_available_actions: shared modifier chords", functi
 		helpers.assert_eq(by_id.cmd_option_shift_enter.karabiner_to[1].key_code, "return_or_enter")
 		helpers.assert_eq(#by_id.cmd_option_shift_enter.karabiner_to[1].modifiers, 3)
 	end)
+
+	helpers.it("names the modifier holds from the shared key name table", function()
+		-- They read « ⌘⇧ — Cmd+Shift » in English in every locale; the stub
+		-- catalogue answers each key name with its own key.
+		local path = helpers.driver_root() .. "platform/remap/data/actions.json"
+		local by_id = {}
+		for _, action in ipairs(Config.load_available_actions(path)) do by_id[action.id] = action end
+		helpers.assert_eq(by_id.cmd_shift.label, "⌘⇧ key_name.cmd + key_name.shift")
+		helpers.assert_eq(by_id.cmd_shift.short_label, "key_name.cmd + key_name.shift")
+		helpers.assert_eq(by_id.alt.label, "⌥ key_name.option")
+		helpers.assert_eq(by_id.fn_shift.label, "key_name.fn + key_name.shift", "Fn has no glyph")
+		helpers.assert_eq(by_id.cmd_option_shift_ctrl, nil)
+		helpers.assert_eq(by_id.cmd_shift_ctrl.label, "⌘⇧⌃ key_name.cmd + key_name.shift + key_name.ctrl")
+	end)
 end)
 
 
