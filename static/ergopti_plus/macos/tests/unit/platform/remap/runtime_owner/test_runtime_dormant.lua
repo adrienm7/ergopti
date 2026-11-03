@@ -177,6 +177,27 @@ helpers.describe("the remap bridge reaches the owned runtime only after an opt-i
 		helpers.assert_true(source:find("if _state.enabled and not M._owned.selected() and not _wizard_ran_this_session", 1, true) ~= nil)
 	end)
 
+	helpers.it("removes an earlier build's rules from the user's own karabiner.json on an owned boot", function()
+		-- The README promised this migration while no code did it: shared-mode rules
+		-- stayed active inside the user's Karabiner-Elements after the switch.
+		local source = init_source()
+		local boot = source:find("if M._owned.selected() then\n\t\tif M._owned.reconcile() ~= true then", 1, true)
+		local retire = source:find("M._owned.retire_shared_rules()", boot, true)
+		local wizard = source:find("if _state.enabled and not M._owned.selected() and not _wizard_ran_this_session", 1, true)
+		helpers.assert_true(boot ~= nil and retire ~= nil and retire < wizard, "the owned boot calls the migration")
+		local owned = source:find("if runtime == M._owned.paths.RUNTIME_OWNED then", 1, true)
+		local kept = source:find("M._owned.shared_config = KARABINER_OUT", owned, true)
+		local moved = source:find("KARABINER_OUT = file_system.expand_path(M._owned.paths.config_file_for(runtime))", owned, true)
+		helpers.assert_true(kept ~= nil and moved ~= nil and kept < moved,
+			"the shared path is kept before the output moves to the owned file")
+		local body = source:find("function M._owned.retire_shared_rules()", 1, true)
+		local body_end = source:find("\nend\n", body, true)
+		local text = source:sub(body, body_end)
+		helpers.assert_true(text:find('remove_managed_rules("Owned runtime migration", shared)', 1, true) ~= nil,
+			"the marker-exact byte-span removal owner does the cleaning")
+		helpers.assert_true(source:find("ManagedRuleRemoval.remove_managed_rules(path or KARABINER_OUT)", 1, true) ~= nil)
+	end)
+
 	helpers.it("deploys an owned boot only through the owned writer", function()
 		local source = init_source()
 		local owned_deploy = source:find("Generator.deploy_owned_config(result, KARABINER_OUT)", 1, true)
