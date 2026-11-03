@@ -242,9 +242,13 @@ try {
 		reference.entries.map((row) => ({ ...row, section: assignment.get(row.trigger) })),
 		'the shipped split preserves all 140 original rules, flags and physical order'
 	);
-	for (const key of ['color', 'delay', 'show_tooltip', 'description']) {
+	// The delay left the split's preserved metadata on 3 November 2026: the file
+	// now names the 0.5 s its sections declare, which the check below pins.
+	for (const key of ['color', 'show_tooltip', 'description']) {
 		assert.deepStrictEqual(current._meta[key], reference.meta[key]);
 	}
+	assert.strictEqual(reference.meta.delay, 1, 'the capture keeps the historical 1.0 s');
+	assert.strictEqual(current._meta.delay, 0.5, "the file names its sections' declared delay");
 	for (const entry of classification.sections) {
 		assert.strictEqual(
 			current[entry.id].reduce((sum, block) => sum + Object.keys(block).length, 0),
@@ -302,6 +306,35 @@ for (const lang of languages) {
 			}
 		}
 	}
+}
+
+// A built-in section waits the delay its manifest row declares (the maintainer's
+// decision of 3 November 2026); its file's [_meta] delay is what the category row
+// of the delay menus shows. The two agree, or that row names a delay none of the
+// category's declared sections waits (autocorrection showed 1.0 s over sections
+// waiting 0.5 s).
+{
+	const flat = (id) => id.replace(/_/g, '');
+	const rowsByCategory = new Map(
+		Object.entries(featureRows).map(([category, rows]) => [flat(category), rows])
+	);
+	let compared = 0;
+	for (const [category, file] of categoryOwners) {
+		if (!fs.existsSync(file)) continue;
+		const declared = readToml(file)._meta?.delay;
+		if (typeof declared !== 'number') continue;
+		for (const row of rowsByCategory.get(flat(category)) ?? []) {
+			const seconds = row.default?.time_activation_seconds;
+			if (seconds === undefined) continue;
+			compared += 1;
+			if (seconds !== declared)
+				errors.push(
+					`${category}.${row.id}: declares ${seconds} s in the manifest, its file's [_meta] delay is ${declared} s`
+				);
+		}
+	}
+	if (compared < 20)
+		errors.push(`only ${compared} declared section delays were compared with their file`);
 }
 
 // Opt-in: every bundled or dynamic hotstring section ships disabled.
