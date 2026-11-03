@@ -57,6 +57,10 @@ global ONE_SHOT_SHIFT_TIMEOUT_SEC := 0
 ; pins this loader to it.
 global TAPHOLD_DEFAULT_ACTIVATION_SECONDS := 0
 
+; Wait (ms) before a tap-hold copy reads the clipboard's sequence number, for
+; the copy and again for its one retry (section 2.1).
+global TAP_COPY_VERIFY_MS := 0
+
 ; Failsafe ceiling (s) on any KeyWait that holds a SYNTHETIC modifier Down while
 ; waiting for the physical tap-hold key to be released. The arm/release pair is
 ; guarded by try/finally, but an unbounded wait could still latch the modifier
@@ -77,6 +81,8 @@ global TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS := 3
 TapHoldsLoadTimings() {
 	global TAP_MIN_DURATION_MS, KEY_REPEAT_INITIAL_DELAY_MS
 	global KEY_REPEAT_INTERVAL_MS, ONE_SHOT_SHIFT_TIMEOUT_SEC, TAPHOLD_DEFAULT_ACTIVATION_SECONDS
+	global TAP_COPY_VERIFY_MS
+	TAP_COPY_VERIFY_MS          := TimingsGet("tap_hold", "copy_verify_ms")
 	TAP_MIN_DURATION_MS         := TimingsGet("tap_hold", "tap_min_duration_ms")
 	KEY_REPEAT_INITIAL_DELAY_MS := TimingsGet("tap_hold", "key_repeat_initial_delay_ms")
 	KEY_REPEAT_INTERVAL_MS      := TimingsGet("tap_hold", "key_repeat_interval_ms")
@@ -1344,6 +1350,8 @@ _TapHoldInvokeConfiguredAction(KeyId) {
 		; the catalogue paste's admission before any temporary payload is read.
 		if ActionId == "paste"
 			return _GestureWithPasteAdmission(TapHoldEmitKeyTap.Bind(Action.Key, Action.Mods))
+		if ActionId == "copy"
+			return TapCopySend(KeyId, TapHoldEmitKeyTap.Bind(Action.Key, Action.Mods))
 		TapHoldEmitKeyTap(Action.Key, Action.Mods)
 		return
 	}
@@ -1353,6 +1361,143 @@ _TapHoldInvokeConfiguredAction(KeyId) {
 ; Fire the configured generic tap action through the shared gate.
 _TapHoldFireAction(KeyId) {
 	return TapHoldDispatchTap(KeyId, _TapHoldInvokeConfiguredAction.Bind(KeyId))
+}
+
+
+
+
+
+; =====================================
+; =====================================
+; ======= 2.1) Copy check =============
+; =====================================
+; =====================================
+
+; A tap's copy (Ctrl+C) is proved by the clipboard's sequence number
+; (GetClipboardSequenceNumber), never by its content: copying the same text
+; again moves the number and leaves the content as it was. The number is read
+; before Ctrl+C is sent, read again by a one-shot timer (never a Sleep on the
+; hook thread), Ctrl+C is sent once more when it did not move, and the user is
+; warned when it still did not. The states and outcomes are those of
+; _shared/lua/tap_hold/copy_check.lua, which the macOS and Linux drivers run.
+
+; How many times a copy is sent again when the clipboard did not move.
+global TAP_COPY_RETRIES := 1
+; The pending check (a Map), or 0. A newer copy supersedes it.
+global _TapCopyPending := 0
+global _TapCopyGeneration := 0
+; Seams for the test suite: the counter, the timer and the notice.
+global _TapCopyCounterFn := () => DllCall("User32\GetClipboardSequenceNumber", "UInt")
+global _TapCopyTimerFn := (Callback, DelayMs) => SetTimer(Callback, -DelayMs)
+global _TapCopyWarnFn := () => NotifierSend(t("notify.tap_hold.copy_failed"), Map("level", "warning"))
+
+; Sends one tap-hold copy and starts its check.
+; @param KeyId {String} The tap-hold key that tapped, for the log.
+; @param SendFn {Func} Sends the copy keystroke; returns the sender's verdict.
+;   The retry calls it again.
+TapCopySend(KeyId, SendFn) {
+	global _TapCopyCounterFn
+	Baseline := _TapCopyCounterFn.Call()
+	Sent := SendFn.Call()
+	TapCopyCheckStart(Baseline, KeyId, SendFn)
+	return Sent
+}
+
+; Starts checking one copy keystroke.
+; @param Baseline {Integer} The sequence number read before the keystroke.
+; @param Source {String} What sent the copy, for the log.
+; @param SendFn {Func} Sends the copy keystroke again for the retry.
+; @return {Boolean} Whether a check is now pending.
+TapCopyCheckStart(Baseline, Source, SendFn) {
+	global _TapCopyPending, _TapCopyGeneration, _TapCopyTimerFn, TAP_COPY_VERIFY_MS
+	if IsObject(_TapCopyPending)
+		try LoggerDebug("TapHoldCopy", "Tap-hold copy check from {1} superseded by a newer copy.", _TapCopyPending["source"])
+	_TapCopyGeneration += 1
+	_TapCopyPending := 0
+	; GetClipboardSequenceNumber returns 0 when the session gives no access to
+	; the clipboard (a locked or another window station): nothing can be checked.
+	if !(Baseline is Integer) or Baseline == 0 {
+		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be checked (counter_unreadable).", Source)
+		return false
+	}
+	_TapCopyPending := Map("baseline", Baseline, "attempts", 1, "source", Source,
+		"generation", _TapCopyGeneration, "send", SendFn)
+	Generation := _TapCopyGeneration
+	_TapCopyTimerFn.Call(() => _TapCopyCheckTick(Generation), TAP_COPY_VERIFY_MS)
+	return true
+}
+
+; Abandons the pending check without a report (pause, reload).
+TapCopyCheckStop() {
+	global _TapCopyPending, _TapCopyGeneration
+	_TapCopyPending := 0
+	_TapCopyGeneration += 1
+}
+
+; Reads the counter once an attempt has had its time.
+; @param Generation {Integer} The check this timer belongs to.
+_TapCopyCheckTick(Generation) {
+	global _TapCopyPending, _TapCopyCounterFn, _TapCopySendFn, _TapCopyTimerFn, _TapCopyWarnFn
+	global TAP_COPY_RETRIES, TAP_COPY_VERIFY_MS
+	Pending := _TapCopyPending
+	if !IsObject(Pending) or Pending["generation"] != Generation
+		return
+	; A paused driver sends nothing: the check ends with the pause.
+	if A_IsSuspended {
+		_TapCopyPending := 0
+		return
+	}
+	Counter := _TapCopyCounterFn.Call()
+	WaitedMs := Pending["attempts"] * TAP_COPY_VERIFY_MS
+	if !(Counter is Integer) or Counter == 0 {
+		_TapCopyPending := 0
+		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be checked (counter_unreadable).", Pending["source"])
+		return
+	}
+	if Counter != Pending["baseline"] {
+		_TapCopyPending := 0
+		if (Pending["attempts"] > 1) {
+			try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} reached the clipboard only when sent again ({2} ms).", Pending["source"], WaitedMs)
+		} else {
+			try LoggerDebug("TapHoldCopy", "Tap-hold copy from {1} verified: the clipboard changed within {2} ms.", Pending["source"], WaitedMs)
+		}
+		return
+	}
+	if Pending["attempts"] > TAP_COPY_RETRIES {
+		_TapCopyPending := 0
+		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} never reached the clipboard (not_copied after {2} ms); the user is warned.", Pending["source"], WaitedMs)
+		_TapCopyWarnUser()
+		return
+	}
+	Pending["attempts"] += 1
+	Pending["baseline"] := Counter
+	Refusal := ""
+	try {
+		if !Pending["send"].Call()
+			Refusal := "the sender refused the keystroke"
+	} catch as Err {
+		Refusal := Err.Message
+	}
+	if (Refusal != "") {
+		_TapCopyPending := 0
+		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} never reached the clipboard (retry_refused after {2} ms: {3}); the user is warned.", Pending["source"], WaitedMs, Refusal)
+		_TapCopyWarnUser()
+		return
+	}
+	_TapCopyTimerFn.Call(() => _TapCopyCheckTick(Generation), TAP_COPY_VERIFY_MS)
+}
+
+; Shows the localized notice; a refused notice is logged, never fatal.
+_TapCopyWarnUser() {
+	global _TapCopyWarnFn
+	try {
+		Shown := _TapCopyWarnFn.Call()
+	} catch as Err {
+		try LoggerError("TapHoldCopy", "Copy failure notice was not delivered: {1}.", Err.Message)
+		return
+	}
+	if !Shown
+		try LoggerError("TapHoldCopy", "Copy failure notice was not delivered.")
 }
 
 ; Whether modifier Name is logically down. A global holding a function, as

@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "Sugestões de IA",
 	"notify.personal_info": "Informações pessoais",
 	"notify.quit_refused": "Não é possível sair agora, outra operação ainda está em andamento. Tente novamente em instantes.",
+	"notify.tap_hold.copy_failed": "Nada foi copiado: a cópia não chegou à área de transferência, nem na segunda tentativa. Selecione o texto e copie novamente.",
 	"notify.karabiner.removed": "As regras do Ergopti foram removidas do Karabiner. Suas próprias regras não foram alteradas.",
 	"notify.karabiner.user_closed": "O seu Karabiner-Elements fica fechado enquanto o Ergopti está ativo; reabre quando o Ergopti é pausado ou encerrado",
 	"notify.open_downloads_failed": "Não foi possível abrir Downloads.",

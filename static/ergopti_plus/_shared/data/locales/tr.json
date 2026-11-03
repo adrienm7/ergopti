@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "YZ Önerileri",
 	"notify.personal_info": "Kişisel bilgiler",
 	"notify.quit_refused": "Şu anda çıkılamıyor, başka bir işlem hâlâ sürüyor. Birazdan tekrar deneyin.",
+	"notify.tap_hold.copy_failed": "Hiçbir şey kopyalanmadı: kopya ikinci denemede bile panoya ulaşmadı. Metni seçip yeniden kopyalayın.",
 	"notify.karabiner.removed": "Ergopti kuralları Karabiner'dan kaldırıldı. Kendi kurallarınız değişmedi.",
 	"notify.karabiner.user_closed": "Karabiner-Elements, Ergopti çalışırken kapalıdır; Ergopti duraklatıldığında veya kapatıldığında yeniden açılır",
 	"notify.open_downloads_failed": "İndirilenler klasörü açılamadı.",

@@ -137,6 +137,10 @@ local _paused = false        -- The daemon's pause.
 local _combinations = nil
 local _installed_engine = nil
 local _generation = 0        -- Revokes queued actions across runtime installations.
+local _tap_copy = nil        -- Checks each tap's copy (platform/remap/tap_copy.lua).
+
+-- The catalogue action whose tap is checked against the clipboard.
+local COPY_ACTION = "copy"
 local managed_options = setmetatable({}, { __mode = "k" })
 local managed_owners = setmetatable({}, { __mode = "k" })
 
@@ -207,8 +211,49 @@ local function _run_tap(action, binding)
 	Logger.debug(LOG, "Tap action '%s'.", action)
 	if pair_current and not pair_current() then return end
 	if tap_current and not tap_current() then return end
-	local ok, err = pcall(execute, action, binding or "tap_hold")
+	local source = binding or "tap_hold"
+	local ok, err
+	if action == COPY_ACTION and _tap_copy then
+		-- The copy is checked against the clipboard's change counter and sent
+		-- once more when it did not land (platform/remap/tap_copy.lua).
+		ok, err = pcall(_tap_copy.run, _tap_copy, source, function()
+			local sent, send_err = pcall(execute, action, source)
+			if not sent then error(send_err, 0) end
+		end)
+	else
+		ok, err = pcall(execute, action, source)
+	end
 	if not ok then Logger.error(LOG, "Tap action '%s' failed: %s.", action, tostring(err)) end
+end
+
+--- Builds the copy owner over the live clipboard, timer and notifier.
+--- @param execute function The catalogue executor init() was handed.
+--- @return table owner platform/remap/tap_copy.lua
+local function build_tap_copy(execute)
+	return require("platform.remap.tap_copy").new({
+		verify_ms = Timings.ms("tap_hold", "copy_verify_ms"),
+		read_counter = function() return require("adapters.clipboard").change_counter() end,
+		-- The retry runs on a timer: only while this initialisation still owns the
+		-- executor and the daemon is not paused.
+		send_copy = function()
+			if not _initialized or _paused or _execute_action ~= execute then return false end
+			local sent = pcall(execute, COPY_ACTION, "tap_hold")
+			return sent
+		end,
+		after = function(delay_ms, callback)
+			local handle = require("adapters.timer_scheduler").after(delay_ms / MS_PER_SECOND, callback)
+			return handle.armed == true and handle or nil
+		end,
+		cancel = function(handle) require("adapters.timer_scheduler").cancel(handle) end,
+		log = function(level, fmt, ...) Logger[level](LOG, fmt, ...) end,
+		warn_user = function()
+			local sent_ok, sent = pcall(require("adapters.notifier").send,
+				require("infra.i18n").get("notify.tap_hold.copy_failed"), { level = "warning" })
+			if not sent_ok or sent == false then
+				Logger.error(LOG, "Copy failure notice was not delivered: %s.", tostring(sent))
+			end
+		end,
+	})
 end
 
 --- Reads what the one-shot Shift types for a character, from the table the
@@ -624,6 +669,7 @@ function M.init(opts)
 	_execute_action = opts.execute_action
 	_action_names = opts.action_names
 	_on_text_injected = opts.on_text_injected
+	_tap_copy = build_tap_copy(opts.execute_action)
 	_defaults_path = opts.defaults_path
 	_user_path = opts.user_path
 	_enabled, _paused = true, false
@@ -719,6 +765,7 @@ end
 function M.set_paused(paused)
 	_require_init()
 	_paused = paused == true
+	if _paused and _tap_copy then _tap_copy:stop() end
 	return _apply()
 end
 
@@ -938,6 +985,8 @@ function M._reset_for_test()
 	if _hook and _hook.set_remapper(nil) == false then return false end
 	_initialized, _hook, _execute_action, _action_names, _loaded, _engine = false, nil, nil, nil, nil, nil
 	_on_text_injected = nil
+	if _tap_copy then _tap_copy:stop() end
+	_tap_copy = nil
 	_combinations, _installed_engine = nil, nil
 	_enabled, _paused = true, false
 	_dry_run = false

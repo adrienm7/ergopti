@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "Sugestie SI",
 	"notify.personal_info": "Dane osobowe",
 	"notify.quit_refused": "Nie można teraz zakończyć, inna operacja jest wciąż w toku. Spróbuj ponownie za chwilę.",
+	"notify.tap_hold.copy_failed": "Nic nie zostało skopiowane: kopia nie trafiła do schowka, nawet przy drugiej próbie. Zaznacz tekst i skopiuj ponownie.",
 	"notify.karabiner.removed": "Reguły Ergopti zostały usunięte z Karabinera. Twoje własne reguły pozostały bez zmian.",
 	"notify.karabiner.user_closed": "Twój Karabiner-Elements jest zamknięty, gdy działa Ergopti; otworzy się ponownie po wstrzymaniu lub zamknięciu Ergopti",
 	"notify.open_downloads_failed": "Nie udało się otworzyć folderu Pobrane.",

@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "Suggerimenti IA",
 	"notify.personal_info": "Informazioni personali",
 	"notify.quit_refused": "Impossibile uscire ora, un’altra operazione è ancora in corso. Riprova tra un momento.",
+	"notify.tap_hold.copy_failed": "Non è stato copiato nulla: la copia non è arrivata negli appunti, nemmeno al secondo tentativo. Selezioni il testo e copi di nuovo.",
 	"notify.karabiner.removed": "Le regole di Ergopti sono state rimosse da Karabiner. Le tue regole non sono cambiate.",
 	"notify.karabiner.user_closed": "Il tuo Karabiner-Elements è chiuso mentre Ergopti è attivo; si riapre quando Ergopti è in pausa o viene chiuso",
 	"notify.open_downloads_failed": "Impossibile aprire Download.",

@@ -2335,6 +2335,7 @@
 	"notify.llm_suggestions": "اقتراحات الذكاء الاصطناعي",
 	"notify.personal_info": "معلومات شخصية",
 	"notify.quit_refused": "تعذّر الإنهاء الآن، لا تزال عملية أخرى قيد التنفيذ. حاول مرة أخرى بعد لحظة.",
+	"notify.tap_hold.copy_failed": "لم يُنسخ شيء: لم يصل النسخ إلى الحافظة حتى في المحاولة الثانية. حدّد النص وانسخه مرة أخرى.",
 	"notify.karabiner.removed": "أُزيلت قواعد Ergopti من Karabiner. قواعدك الخاصة لم تتغير.",
 	"notify.karabiner.user_closed": "تطبيق Karabiner-Elements مغلق أثناء تشغيل Ergopti؛ ويُعاد فتحه عند إيقاف Ergopti مؤقتًا أو إنهائه",
 	"notify.open_downloads_failed": "تعذّر فتح مجلد التنزيلات.",
