@@ -32,6 +32,14 @@ the local branches `worktree-agent-*`: land them, then remove the worktrees so o
       by the first key; today it seems to end only on its timeout (configurable in the menu, can be infinite). Check
       the F20 one-shot sentinel path (modules/keymap/one_shot_shift.lua, adapters/one_shot_shift.lua) against Windows
       and Linux, with a regression test typing three keys inside the timeout.
+- [ ] **One configuration layout on every OS.** A macOS configuration imported on Windows or Linux must work as it
+      did, Cmd versus Ctrl aside. Today the tap-hold settings live in three shapes: Windows `config.toml` plus
+      `tap_hold.toml`, macOS `config_karabiner.toml` (keys, global delay, sticky delay, key combinations, and now
+      `tap_holds.lone_modifier_tap_max_ms`), Linux `tap_hold.toml` (keys, switch, and the lone tap window) plus
+      `config.toml` (`mod_combos`). Pick one home per manifest path (the manifest's `config.toml` for every
+      `[[features.*]]` row, one shared tap-hold file for the keys), move each driver's reader and writer to it,
+      with one migration of the old files, and a cross-driver test that writes a file on one driver and reads it on
+      the other two.
 - [ ] **Metrics and gestures section titles.** The metrics section « Mots par minute » becomes « Vitesse de frappe »;
       the gestures menu gets one section title per finger count (« Gestes à 2 doigts », « à 3 doigts », …), all
       drivers, 21 locales.
