@@ -28,6 +28,10 @@
  * 3. A dynamic prefix keeps its whole family alive. A key built at run time
  *    cannot be traced statically, so any literal ending in "." protects the keys
  *    below it; that errs towards keeping a key, never towards deleting one.
+ * 4. A manifest row's label key is used. The drivers derive it from the row's
+ *    description_key and path (tools/lib/manifest-label-keys.cjs ports that
+ *    chain), so it appears in no source; only a coincidental prefix literal
+ *    used to keep the folded French autocorrection labels alive.
  *
  * USAGE:  node tools/lint/audit-translations.cjs [--write-baseline]
  * ==============================================================================
@@ -38,6 +42,7 @@
 const fs = require('fs');
 const path = require('path');
 const { shared, sharedRel } = require('../lib/paths.cjs');
+const { readManifestLabelRows, resolvedLabelKey } = require('../lib/manifest-label-keys.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '../../');
 const DRIVERS_DIR = path.join(REPO_ROOT, 'static/ergopti_plus');
@@ -226,6 +231,22 @@ function findMissingKeys(available) {
 }
 
 /**
+ * The locale keys the drivers read the manifest rows' labels from. The
+ * resolver derives them from each row's description_key and path (folding
+ * underscores, dropping the `menu.` and `hotstrings.` prefixes), so no source
+ * names them literally: `menu.hotstrings.autocorrection.minus_apostrophe`
+ * reads `autocorrection.minusapostrophe`.
+ * @returns {string[]} One resolved key per labelled row.
+ */
+function manifestLabelKeys() {
+	const raw = fs.readFileSync(path.join(LOCALES_DIR, 'en.json'), 'utf8').replace(/^﻿+/, '');
+	const catalogue = JSON.parse(raw);
+	return readManifestLabelRows(REPO_ROOT)
+		.map((row) => resolvedLabelKey(row, catalogue))
+		.filter((key) => key !== null);
+}
+
+/**
  * Finds the keys of en.json that no source names.
  * @param {Set<string>} available The English keys.
  * @returns {string[]} The unused keys, sorted.
@@ -255,6 +276,7 @@ function findUnusedKeys(available) {
 			// The HTML attributes are quoted, so the literal scan already saw them.
 		}
 	}
+	for (const key of manifestLabelKeys()) literals.add(key);
 	const unused = [];
 	for (const key of available) {
 		if (literals.has(key)) continue;

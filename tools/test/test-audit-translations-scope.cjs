@@ -62,6 +62,12 @@ assert.deepEqual(audit.extractKeys('Label := t("menu.win")', '.ahk', false), ['m
 const available = audit.loadAvailableKeys();
 const unused = new Set(audit.findUnusedKeys(available));
 assert(!unused.has('apps.cloner.btn_back'), 'AppleScript usage must keep a key alive');
+// A manifest row's folded label key is named by no source: the resolver derives
+// it from the row, and the French minus-apostrophe row reads this one.
+assert(
+	!unused.has('autocorrection.minusapostrophe'),
+	'a key the manifest label resolver reads must stay alive'
+);
 
 // 4. The baseline is sorted, duplicate-free and names real keys.
 const baseline = JSON.parse(

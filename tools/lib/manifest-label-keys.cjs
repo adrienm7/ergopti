@@ -16,10 +16,18 @@
  *    resolve labels through the same chain the driver uses, so a label the
  *    wizard shows is the label the tray shows.
  * 2. Order is significant: the first candidate present in the locale wins.
+ * 3. The translations audit counts each row's resolved key as used, because no
+ *    source names a key this chain derives.
  * ==============================================================================
  */
 
 'use strict';
+
+const fs = require('fs');
+const path = require('path');
+
+// The generated Windows manifest is the table the AHK resolver itself walks.
+const MANIFEST_RELATIVE = 'static/ergopti_plus/windows/_generated/features_manifest.ahk';
 
 /**
  * Removes underscores from every dotted segment, keeping the dots.
@@ -70,4 +78,50 @@ function candidateKeys(descKey, entryPath) {
 	return out;
 }
 
-module.exports = { candidateKeys, strip };
+/**
+ * Reads every manifest row that carries a description_key.
+ * @param {string} repoRoot Repository root.
+ * @returns {{path: string, key: string, type: string}[]} Rows in manifest order.
+ * @throws {Error} When the generated manifest yields almost no rows.
+ */
+function readManifestLabelRows(repoRoot) {
+	const src = fs.readFileSync(path.join(repoRoot, MANIFEST_RELATIVE), 'utf8');
+	const rows = [];
+	const rowRe = /Map\("path",\s*"([^"]*)"[^\n]*?"description_key",\s*"([^"]*)"/g;
+	let m;
+	while ((m = rowRe.exec(src)) !== null) {
+		const lineEnd = src.indexOf('\n', m.index);
+		const line = src.slice(m.index, lineEnd === -1 ? undefined : lineEnd);
+		const typeMatch = line.match(/"type",\s*"([^"]*)"/);
+		rows.push({ path: m[1], key: m[2], type: typeMatch ? typeMatch[1] : '' });
+	}
+	// A scan that matches almost nothing would silently resolve no label.
+	if (rows.length < 150) {
+		throw new Error(
+			`${MANIFEST_RELATIVE} yielded ${rows.length} labelled row(s); its shape changed.`
+		);
+	}
+	return rows;
+}
+
+/**
+ * The locale key a manifest row's label is read from: its first candidate
+ * the catalogue holds with a non-empty value.
+ * @param {{path: string, key: string}} row Manifest row.
+ * @param {Object<string, string>} catalogue Flat locale catalogue.
+ * @returns {string|null} The resolved key, or null when the row shows its raw id.
+ */
+function resolvedLabelKey(row, catalogue) {
+	for (const candidate of candidateKeys(row.key, row.path)) {
+		if (
+			candidate !== '' &&
+			typeof catalogue[candidate] === 'string' &&
+			catalogue[candidate] !== ''
+		) {
+			return candidate;
+		}
+	}
+	return null;
+}
+
+module.exports = { candidateKeys, readManifestLabelRows, resolvedLabelKey, strip };
