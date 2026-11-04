@@ -236,3 +236,82 @@ helpers.describe("layout_install: one copy per bundle (composer-macos26)", funct
 		end, true)
 	end)
 end)
+
+helpers.describe("layout_install: fresh bundle resources", function()
+	helpers.it("sees added and removed layouts without launching a directory scan", function()
+		local layouts = { "first.keylayout" }
+		local original_popen = io.popen
+		local original_fs, original_dir = package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"]
+		package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"] = nil, nil
+		local ok, err = xpcall(function()
+			io.popen = function() error("native enumeration must not spawn find") end
+			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+				fs = {
+					symlinkAttributes = function() return { mode = "directory" } end,
+					dir = function(path)
+						local rows = {}
+						if path:match("/Resources$") then rows = layouts
+						elseif path:match("/Keyboard Layouts$") then rows = { "Custom.bundle" } end
+						local position = 0
+						return function()
+							position = position + 1
+							return rows[position]
+						end
+					end,
+				},
+			})
+			local names = install.bundle_keylayout_names()
+			helpers.assert_true(names.first)
+			layouts = { "second.keylayout" }
+			names = install.bundle_keylayout_names()
+			helpers.assert_nil(names.first)
+			helpers.assert_true(names.second)
+		end, debug.traceback)
+		io.popen = original_popen
+		package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"] = original_fs, original_dir
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("does not publish a partial native resource enumeration", function()
+		local original_popen = io.popen
+		local original_fs, original_dir = package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"]
+		package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"] = nil, nil
+		local ok, err = xpcall(function()
+			local scans, fail_stat = 0, false
+			io.popen = function()
+				scans = scans + 1
+				local delivered = false
+				return { lines = function() return function()
+					if delivered then return nil end
+					delivered = true
+					return "/root/Fallback.bundle/Contents/Resources/fallback.keylayout"
+				end end, close = function() return true end }
+			end
+			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+				fs = {
+					symlinkAttributes = function()
+						if fail_stat then error("attribute read refused") end
+						return { mode = "directory" }
+					end,
+					dir = function(path)
+						if path:match("/Resources$") then error("unreadable") end
+						local delivered = false
+						return function()
+							if delivered then return nil end
+							delivered = true
+							return "Custom.bundle"
+						end
+					end,
+				},
+			})
+			helpers.assert_true(install.bundle_keylayout_names().fallback)
+			helpers.assert_eq(scans, 2, "both failed native reads must retry via find")
+			fail_stat = true
+			helpers.assert_true(install.bundle_keylayout_names().fallback)
+			helpers.assert_eq(scans, 4, "attribute errors must also retry via find")
+		end, debug.traceback)
+		io.popen = original_popen
+		package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"] = original_fs, original_dir
+		if not ok then error(err, 0) end
+	end)
+end)

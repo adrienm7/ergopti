@@ -210,7 +210,10 @@ local function invoke(run)
 	local function admitted()
 		return _run == run and not run.cancelled and not AuxOwner.is_paused(run.parent)
 	end
+	local discovery_delivered = false
 	local accepted, refused = current.discover(function(result, discover_reason)
+		if discovery_delivered then return end
+		discovery_delivered = true
 		if not admitted() then release(run, false, "admission_refused"); return end
 		if not result then
 			report_refusal(run, discover_reason)
@@ -230,8 +233,11 @@ local function invoke(run)
 			release(run, false, category)
 			return
 		end
+		local invocation_delivered = false
 		local invoked, invoke_reason = current.invoke(result.choices[index].key, M.CONSUMER, admitted,
 			function(success, terminal)
+				if invocation_delivered then return end
+				invocation_delivered = true
 				if success then
 					Logger.success(LOG, "A shortcut run completed.")
 					deliver(run)
@@ -240,12 +246,14 @@ local function invoke(run)
 				end
 				release(run, success, terminal)
 			end)
-		if not invoked then
+		if not invoked and not invocation_delivered then
+			invocation_delivered = true
 			report_refusal(run, invoke_reason)
 			release(run, false, invoke_reason)
 		end
 	end)
-	if not accepted then
+	if not accepted and not discovery_delivered then
+		discovery_delivered = true
 		report_refusal(run, refused)
 		release(run, false, refused)
 	end

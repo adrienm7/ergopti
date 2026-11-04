@@ -19,8 +19,7 @@
 ---    Info.plist (bundle_variants), and the keyboard names every installed bundle
 ---    provides (bundle_keylayout_names), so no driver table repeats them.
 ---
---- Owns the bundle-discovery memo (_installed_cache / _latest_bundle_cache /
---- _keylayout_index_cache); the
+--- Owns the bundle-discovery memo (_installed_cache / _latest_bundle_cache); the
 --- input-source layer (input_sources.lua) and the menu builder consume this
 --- module's public functions, never its private caches.
 --- ==============================================================================
@@ -32,6 +31,7 @@ local text_utils = require("infra.text_utils")
 local i18n          = require("infra.i18n")
 local notifications = require("infra.notifications")
 local FileSystem    = require("adapters.file_system")
+local FsDir         = require("infra.fs_dir")
 local LOG           = "menu.keyboard_layout"
 
 -- Target install paths on macOS
@@ -42,8 +42,6 @@ local SYSTEM_LAYOUTS_DIR = "/Library/Keyboard Layouts/"
 local _installed_cache = {}
 -- pick_latest_bundle(dir) result and directory revision, keyed by directory.
 local _latest_bundle_cache = {}
--- keylayout_index(dir) result and directory revision, keyed by directory.
-local _keylayout_index_cache = {}
 -- User and system installs rewrite both layout directories. One module-owned
 -- admission bit keeps a reentrant menu callback from interleaving those writes.
 local _install_in_flight = false
@@ -101,7 +99,6 @@ end
 local function invalidate_bundle_caches()
 	_installed_cache       = {}
 	_latest_bundle_cache   = {}
-	_keylayout_index_cache = {}
 end
 
 
@@ -309,17 +306,47 @@ local function read_bundle_version(bundle_path)
 end
 
 --- Maps every keylayout installed in `dir` to the bundle that ships it, so an
---- active input source can be traced back to its bundle whatever the bundle's
---- folder name. One `find` per directory revision, memoised like the other
---- discovery scans.
+--- active input source can be traced back to its bundle whatever its folder name.
+--- A parent directory revision cannot describe files inside Resources. Enumerate
+--- those directories with native calls each time, avoiding a shell subprocess on
+--- the normal Hammerspoon path and observing even same-second changes.
 --- @param dir string Keyboard Layouts directory.
 --- @return table Map { [keylayout basename without extension] = bundle basename }.
 local function keylayout_index(dir)
 	if type(dir) ~= "string" or dir == "" then return {} end
-	local revision = directory_revision(dir)
-	local hit, cached = read_revision_cache(_keylayout_index_cache, dir, revision)
-	if hit then return cached or {} end
 	local index = {}
+	if hs and hs.fs and type(hs.fs.symlinkAttributes) == "function" then
+		local function physical_directory(path)
+			local attrs, status = FileSystem.classify_no_follow(path)
+			if status == "error" then error("directory classification refused") end
+			return status == "ok" and attrs.mode == "directory"
+		end
+		local function entries(path, visit)
+			local names, listed = FsDir.try_entries(path)
+			if not listed then return false end
+			for _, name in ipairs(names) do visit(name) end
+			return true
+		end
+		local root = NativePath.without_trailing_separators(dir)
+		local read_ok, ok = pcall(entries, root, function(bundle)
+			if not bundle:match("%.bundle$") then return end
+			local bundle_path = root .. "/" .. bundle
+			local contents = bundle_path .. "/Contents"
+			local resources = contents .. "/Resources"
+			-- find does not follow directory symlinks: retain that boundary.
+			if not physical_directory(bundle_path) or not physical_directory(contents)
+				or not physical_directory(resources) then return end
+			local read_ok = entries(resources, function(filename)
+				local layout = filename:match("^(.*)%.keylayout$")
+				if layout and index[layout] == nil then index[layout] = bundle end
+			end)
+			if not read_ok then error("resource enumeration refused") end
+		end)
+		if read_ok and ok then return index end
+		index = {}
+	end
+	-- Narrow test doubles and hosts without native enumeration still get fresh
+	-- results, never a memo keyed only to the outer directory.
 	local cmd = string.format(
 		"find %s -maxdepth 4 -path '*.bundle/Contents/Resources/*.keylayout' 2>/dev/null",
 		text_utils.shell_quote(dir))
@@ -334,7 +361,6 @@ local function keylayout_index(dir)
 		if bundle and index[layout] == nil then index[layout] = bundle end
 	end
 	p:close()
-	publish_revision_cache(_keylayout_index_cache, dir, revision, index)
 	return index
 end
 
