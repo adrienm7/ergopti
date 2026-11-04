@@ -683,3 +683,375 @@ _LAT_ProgressShowSupersession() {
 }
 Test("llm api progress: public probe cannot overwrite reentrant teardown ownership (api-progress-opening-supersession)",
 	_LAT_ProgressShowSupersession)
+
+
+; Native thinking-retry requester ownership: genuine Menu and managed HTTP.
+; Native Windows/GUI qualification required. The subject functions are not replaced.
+; This uses existing _LAT, _LTO, _TLOG and managed-LLM-timings test helpers.
+global _LATRT_Debt := Map()
+
+_LATRT_Done(State, Code, Output, ErrorText) {
+    State.PeerCalls += 1
+    State.PeerCode := Code
+    State.PeerOutput := Output
+    State.PeerErrors := ErrorText
+}
+
+_LATRT_Marker(State) {
+    State.AfterCutpoint := true
+}
+
+_LATRT_Sink(State, Line) {
+    global _LLM_Menu_ApiTestProgress, _LLM_Remote_Async
+    if State.Cutpoint || !InStr(Line,
+            "Provider 'deepseek' refused the thinking field 'thinking'", true)
+        return
+    State.Cutpoint := true
+    try {
+        if _LLM_Menu_ApiTestProgress != State.Progress
+            throw Error("The exact probe progress was replaced before the cutpoint.")
+        State.OriginalGone := !_LLM_Remote_Async.Has(State.OriginalId)
+        State.OwnerCurrentAtCutpoint := LLM_AuxIsCurrent(State.Owner)
+        if !State.OriginalGone || !State.OwnerCurrentAtCutpoint
+            throw Error("The actual retired-original/live-requester cutpoint was not reached.")
+        if State.Cancel {
+            State.Cancelled := _LLM_Menu_ApiTestProgressCancel(State.Progress)
+            State.OwnerRetiredAtCutpoint := !LLM_AuxIsCurrent(State.Owner)
+            State.WindowRetiredAtCutpoint := !State.Progress.Has("gui")
+                || !WMHandleExists(State.Progress["gui"].Hwnd)
+        }
+        ; The principal test thread cannot resume _LATRT_Wait's predicate before
+        ; this synchronous poll callback, or the timer interrupting it, returns.
+        ; The marker itself does not claim a separate quiet-time guarantee.
+        SetTimer(State.Marker, -1)
+    } catch Any as Failure {
+        ; Logger intentionally catches sink exceptions; preserve ours explicitly.
+        State.Failure := Failure
+        State.AfterCutpoint := true
+    }
+}
+
+_LATRT_Wait(Predicate, Milliseconds) {
+    Started := A_TickCount
+    while !Predicate.Call() && TickElapsed(Started) < Milliseconds {
+        _SR_TreePoll()
+        Sleep(10)
+    }
+    return Predicate.Call()
+}
+
+_LATRT_RegistryKey(Nonce) {
+    ; Exclusive native acquisition, never reuse/delete an existing key.
+    Subkey := "Software\Ergopti\Tests\ThinkingRetry\" . Nonce
+    Handle := 0, Disposition := 0
+    Status := DllCall("Advapi32\RegCreateKeyExW", "Ptr", -2147483647,
+        "Str", Subkey, "UInt", 0, "Ptr", 0, "UInt", 0, "UInt", 0x20006,
+        "Ptr", 0, "Ptr*", &Handle, "UInt*", &Disposition, "UInt")
+    if Handle
+        DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt")
+    if Status != 0 || Disposition != 1
+        throw Error("Exclusive private registry acquisition refused.")
+    return "HKCU\" . Subkey
+}
+
+_LATRT_HoldRetry(State) {
+    global _LLM_Remote_RetryOf, _LLM_Remote_Async
+    RetryId := _LLM_Remote_RetryOf.Get(State.OriginalId, 0)
+    if RetryId {
+        State.RetryId := RetryId
+        if _LLM_Remote_Async.Has(RetryId)
+            State.RetryEntry := _LLM_Remote_Async[RetryId]
+    }
+}
+
+_LATRT_RequestsGone(State) {
+    global _LLM_Remote_Async
+    _LATRT_HoldRetry(State)
+    return !_LLM_Remote_Async.Has(State.OriginalId)
+        && (!State.RetryId || !_LLM_Remote_Async.Has(State.RetryId))
+}
+
+_LATRT_CancelRequests(State) {
+    global _LLM_Remote_Async
+    _LATRT_HoldRetry(State)
+    if State.OriginalId && _LLM_Remote_Async.Has(State.OriginalId)
+            && IsObject(State.OriginalEntry)
+            && _LLM_Remote_Async[State.OriginalId] == State.OriginalEntry
+        LLM_RemoteCancelAsync(State.OriginalId)
+    if State.RetryId && _LLM_Remote_Async.Has(State.RetryId)
+            && IsObject(State.RetryEntry)
+            && _LLM_Remote_Async[State.RetryId] == State.RetryEntry
+        LLM_RemoteCancelAsync(State.RetryId)
+}
+
+_LATRT_Control(State, Name) {
+    Path := State.Directory . "\" . Name
+    if FSStrictExists(Path) {
+        if FSReadUtf8Exact(Path) != State.Nonce
+            throw Error("Foreign private control refused.")
+        return 1
+    }
+    Pending := Path . ".pending"
+    if FSWriteCreateDurable(Pending, State.Nonce) != 1
+        throw Error("Private control write refused.")
+    FileMove(Pending, Path, false)
+    return 1
+}
+
+_LATRT_StopPeer(State) {
+    if !IsObject(State.Peer)
+        return true
+    _LATRT_Control(State, "stop")
+    _LATRT_Wait(() => State.PeerCalls > 0, 5000)
+    Started := A_TickCount
+    loop {
+        Ack := State.Peer.terminate()
+        if Ack is Integer && Ack == 1
+            return true
+        if TickElapsed(Started) >= 5000
+            return false
+        _SR_TreePoll()
+        Sleep(10)
+    }
+}
+
+_LATRT_Retire(State) {
+    global _LLM_Menu_ApiTestProgress
+    Complete := true
+    try SetTimer(State.Marker, 0)
+    if State.Progress is Map {
+        try {
+            if _LLM_Menu_ApiTestProgress == State.Progress
+                _LLM_Menu_ApiTestProgressCancel(State.Progress)
+            ; Retain the exact GUI object if a prior Destroy refused.
+            if State.Progress.Has("gui") && WMHandleExists(State.Progress["gui"].Hwnd)
+                State.Progress["gui"].Destroy()
+            if State.Progress.Has("gui") && WMHandleExists(State.Progress["gui"].Hwnd)
+                Complete := false
+        } catch {
+            Complete := false
+        }
+    }
+    if State.Owner is Map {
+        try {
+            if LLM_AuxIsCurrent(State.Owner)
+                LLM_AuxFinish(State.Owner)
+            if LLM_AuxIsCurrent(State.Owner)
+                Complete := false
+        } catch {
+            Complete := false
+        }
+    }
+    try {
+        _LATRT_CancelRequests(State)
+        if !_LATRT_Wait(() => _LATRT_RequestsGone(State), 10000)
+            Complete := false
+    } catch {
+        Complete := false
+    }
+    try {
+        if !_LATRT_StopPeer(State)
+            Complete := false
+    } catch {
+        Complete := false
+    }
+    return Complete
+}
+
+_LATRT_DeletePrivate(State) {
+    ; Called only after exact native peer ACK and remote-request retirement.
+    if State.Registry != "" {
+        RegDeleteKey(State.Registry)
+        State.Registry := ""
+    }
+    if State.Directory != "" && DirExist(State.Directory) {
+        DirDelete(State.Directory, true)
+        State.Directory := ""
+    }
+}
+
+_LATRT_DrainDebt() {
+    global _LATRT_Debt
+    Keys := []
+    for Key in _LATRT_Debt
+        Keys.Push(Key)
+    for Key in Keys {
+        State := _LATRT_Debt[Key]
+        if !_LATRT_Retire(State)
+            return false
+        try _LATRT_DeletePrivate(State)
+        catch
+            return false
+        _LATRT_Debt.Delete(Key)
+    }
+    return true
+}
+
+_LATRT_Case(Cancel) {
+    global _DriverDir, _LLM_Menu, _LLM_Menu_ApiTestProgress
+    global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_Remote_RetryOf
+    global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_ThinkingRefused
+    global STORAGE_REG_BASE, LLM_API_TEST_TIMEOUT_MS
+    global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
+    global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS, _LOGGER_FLUSH_ACTIVE
+    global _HealthCheckWarnCount, _HealthCheckErrCount, _HealthCheckLastError, _LATRT_Debt
+    if !_LATRT_DrainDebt()
+        throw Error("An earlier exact thinking-retry fixture still owns retirement debt.")
+    AssertFalse(A_IsSuspended, "native managed admission requires an active driver")
+    AssertEqual(0, _LLM_Remote_Async.Count, "no foreign remote request may be borrowed")
+    AssertEqual(0, _LLM_AuxOwners.Count, "the private probe requires an idle auxiliary census")
+    AssertEqual(0, _LLM_AuxCleanupDebt.Count, "foreign cleanup debt cannot be serviced by this fixture")
+    AssertFalse(_LOGGER_FLUSH_ACTIVE, "foreign logger flush cannot be borrowed")
+    AssertFalse(_LLM_Menu_ApiTestProgress.Has("entry"), "no foreign progress can be replaced")
+
+    Nonce := DllCall("GetCurrentProcessId", "UInt") . "_" . A_TickCount . "_" . Random(100000, 999999)
+    Mode := Cancel ? "cancel" : "positive"
+    State := {Cancel: Cancel, Nonce: Nonce, Mode: Mode, Directory: "", Registry: "",
+        Peer: 0, PeerPid: 0, PeerCalls: 0, PeerCode: -1, PeerOutput: "", PeerErrors: "",
+        Progress: 0, Owner: 0, OriginalId: 0, OriginalEntry: 0, RetryId: 0, RetryEntry: 0,
+        Cutpoint: false, AfterCutpoint: false, OriginalGone: false, Cancelled: false,
+        OwnerCurrentAtCutpoint: false, OwnerRetiredAtCutpoint: false,
+        WindowRetiredAtCutpoint: false, Failure: 0, Marker: 0}
+    State.Marker := _LATRT_Marker.Bind(State)
+    Saved := {Menu: _LLM_Menu, Progress: _LLM_Menu_ApiTestProgress, Storage: STORAGE_REG_BASE,
+        Thinking: _LLM_ThinkingRefused, Budget: LLM_API_TEST_TIMEOUT_MS,
+        Sink: _LOGGER_TEST_SINK, Repeat: _LOGGER_REPEAT_ENABLED, Clock: _LOGGER_CLOCK_FN,
+        Stamp: _LOGGER_STAMP_FN, Warn: _HealthCheckWarnCount, Errors: _HealthCheckErrCount,
+        LastError: _HealthCheckLastError, Logger: _TLOG_CaptureLoggerState()}
+    PreviousCritical := Critical("Off")
+    Primary := 0, Retired := false, Notices := [], CounterBefore := _LLM_Remote_AsyncCounter
+    try {
+        State.Directory := A_Temp . "\ergopti_llm_retry_proposal_" . Nonce . "_" . Mode
+        FSCreateDirectoryExclusiveStrict(State.Directory)
+        State.Registry := _LATRT_RegistryKey(Nonce)
+        STORAGE_REG_BASE := State.Registry
+        _LLM_ThinkingRefused := Map()
+        LLM_API_TEST_TIMEOUT_MS := 20000
+        _ResetLogger()
+        _LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
+        LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
+        LoggerSetTestSink(_LATRT_Sink.Bind(State))
+
+        PeerScript := _DriverDir . "\tests\fixtures\llm_thinking_retry_peer.ps1"
+        Services := _DriverDir . "\tests\fixtures\winhttp_test_services.ps1"
+        AssertTrue(FSStrictExists(PeerScript) && FSStrictExists(Services), "reviewed native peer files must exist")
+        State.Peer := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
+            ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", PeerScript,
+                "-Directory", State.Directory, "-ServicesPath", Services, "-Nonce", Nonce, "-Case", Mode],
+            _LATRT_Done.Bind(State))
+        AssertEqual(1, State.Peer.start(), "the exact peer Job must start")
+        State.PeerPid := State.Peer.processId()
+        AssertTrue(State.PeerPid is Integer && State.PeerPid > 0)
+        AssertTrue(_LATRT_Wait(() => FSStrictExists(State.Directory . "\ready.json")
+            || State.PeerCalls > 0, 30000), "the private listener must publish")
+        AssertTrue(FSStrictExists(State.Directory . "\ready.json"), State.PeerOutput . State.PeerErrors)
+        Ready := JsonParse(FSReadUtf8Exact(State.Directory . "\ready.json"))
+        AssertEqual(Nonce, Ready["nonce"])
+        AssertEqual(Mode, Ready["case"])
+        AssertEqual(State.PeerPid, Ready["pid"])
+        AssertTrue(Ready["port"] is Integer && Ready["port"] > 0 && Ready["port"] <= 65535)
+
+        EntryId := "thinking_retry_" . Nonce
+        Entry := Map("Id", EntryId, "Name", "Owned probe", "Provider", "deepseek",
+            "BaseUrl", "http://127.0.0.1:" . Ready["port"] . "/v1",
+            "Token", "owned-fixture-secret", "Model", "deepseek-chat")
+        _LLM_Menu := Map("enabled", true, "backend", "api", "api_entry_id", EntryId, "api_entries", [Entry])
+        _LLM_Menu_ApiTestProgress := Map()
+        AssertTrue(_LLM_Menu_TestActiveApiEntry((Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))),
+            "the genuine Menu API Test must admit the original request")
+        State.Progress := _LLM_Menu_ApiTestProgress
+        AssertTrue(State.Progress.Has("entry") && State.Progress["entry"] == EntryId)
+        State.Owner := State.Progress["owner"]
+        State.OriginalId := State.Progress["req_id"]
+        AssertEqual(CounterBefore + 1, State.OriginalId, "the actual handler must publish its initial id")
+        AssertTrue(_LLM_Remote_Async.Has(State.OriginalId), "the original must be live before peer release")
+        State.OriginalEntry := _LLM_Remote_Async[State.OriginalId]
+        AssertTrue(LLM_AuxIsCurrent(State.Owner))
+        AssertEqual(1, _LATRT_Control(State, "release"))
+        AssertTrue(_LATRT_Wait(() => State.AfterCutpoint || IsObject(State.Failure), 30000),
+            "the genuine HTTP 400 must reach the actual thinking-refusal logger")
+        if IsObject(State.Failure)
+            throw State.Failure
+        AssertTrue(State.Cutpoint && State.OriginalGone && State.OwnerCurrentAtCutpoint)
+        _LATRT_HoldRetry(State)
+        AssertTrue(_LATRT_Wait(() => _LATRT_RequestsGone(State), 30000),
+            "every published original/retry must deliver genuine managed completion")
+
+        ; Before checking the repaired outcome, obtain independent HTTP evidence.
+        AssertEqual(1, _LATRT_Control(State, "stop"))
+        AssertTrue(_LATRT_Wait(() => State.PeerCalls > 0, 10000), "the peer must exit and publish its exact receipt")
+        AssertEqual(1, State.PeerCalls)
+        AssertEqual(0, State.PeerCode, State.PeerOutput . State.PeerErrors)
+        AssertEqual("", State.PeerErrors)
+        Receipt := JsonParse(FSReadUtf8Exact(State.Directory . "\receipt.json"))
+        AssertEqual(Nonce, Receipt["nonce"])
+        AssertEqual(State.PeerPid, Receipt["pid"])
+        AssertTrue(Receipt["ok"] && Receipt["released"] && Receipt["stop_received"] && Receipt["listener_retired"])
+        Delta := _LLM_Remote_AsyncCounter - CounterBefore
+        _TestPrint("# THINKING_RETRY " . KL_JsonEncode(Map("case", Mode, "counter_delta", Delta,
+            "http_requests", Receipt["http_requests"], "original_gone", State.OriginalGone,
+            "cancelled", State.Cancelled, "owner_retired", !LLM_AuxIsCurrent(State.Owner),
+            "peer_pid", State.PeerPid)))
+
+        if Cancel {
+            AssertTrue(State.Cancelled && State.OwnerRetiredAtCutpoint && State.WindowRetiredAtCutpoint)
+            AssertEqual(0, Notices.Length, "a cancelled owner must never publish a verdict")
+            AssertEqual(1, Delta, "cancel at the exact retired-original gap must prevent retry reservation")
+            AssertEqual(1, Receipt["http_requests"], "cancel must prevent the real second POST")
+            AssertFalse(_LLM_Remote_RetryOf.Has(State.OriginalId), "cancelled work must not gain a retry link")
+        } else {
+            AssertEqual(2, Delta, "positive control must really reserve its thinking retry")
+            AssertEqual(2, Receipt["http_requests"], "positive control must send both actual native HTTP POSTs")
+            AssertEqual(1, Notices.Length, "positive control must publish exactly once")
+            AssertTrue(Notices[1]["ok"], "second response must complete through the genuine Menu callback")
+        }
+        AssertFalse(LLM_AuxIsCurrent(State.Owner))
+        AssertFalse(_LLM_Menu_ApiTestProgress.Has("entry"))
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        try Retired := _LATRT_Retire(State)
+        catch Any as CleanupFailure {
+            if !IsObject(Primary)
+                Primary := CleanupFailure
+        }
+        if !Retired
+            _LATRT_Debt[Nonce] := State
+        ; Keep real request registry and monotonic counters untouched.
+        _LLM_Menu := Saved.Menu
+        _LLM_Menu_ApiTestProgress := Saved.Progress
+        _LLM_ThinkingRefused := Saved.Thinking
+        STORAGE_REG_BASE := Saved.Storage
+        LLM_API_TEST_TIMEOUT_MS := Saved.Budget
+        _LOGGER_TEST_SINK := Saved.Sink
+        _LOGGER_REPEAT_ENABLED := Saved.Repeat
+        _LOGGER_CLOCK_FN := Saved.Clock
+        _LOGGER_STAMP_FN := Saved.Stamp
+        _HealthCheckWarnCount := Saved.Warn
+        _HealthCheckErrCount := Saved.Errors
+        _HealthCheckLastError := Saved.LastError
+        _TLOG_RestoreLoggerState(Saved.Logger)
+        Critical(PreviousCritical)
+        if Retired {
+            try _LATRT_DeletePrivate(State)
+            catch Any as CleanupFailure {
+                _LATRT_Debt[Nonce] := State
+                if !IsObject(Primary)
+                    Primary := CleanupFailure
+            }
+        }
+    }
+    if !Retired && !IsObject(Primary)
+        Primary := Error("Owned native retirement remains unacknowledged; exact handles/files retained.")
+    if IsObject(Primary)
+        throw Primary
+}
+
+_LATRT_Run(Cancel) {
+    _ManagedRemoteFixtureWithLlmTimings(_LTO_WithoutListingFetch.Bind(_LATRT_Case.Bind(Cancel)))
+}
+
+Test("llm API native thinking retry: positive control (api-thinking-retry-owner)",
+    _LATRT_Run.Bind(false))
+Test("llm API native thinking retry: cancel at retired-original gap (api-thinking-retry-owner)",
+    _LATRT_Run.Bind(true))
