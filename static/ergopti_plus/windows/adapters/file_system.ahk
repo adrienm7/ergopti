@@ -1481,9 +1481,12 @@ _FSPublishIfUnchanged(Path, Content, Expected, OnError, AdmissionFn) {
 	Stage := Path . "." . A_ScriptHwnd . "-" . (++StageSerial) . ".tmp"
 	if !FSWriteDurable(Stage, Content)
 		return Refuse("the publication stage cannot be written")
+	; Staging and logical admission may yield or change the source. Revalidate
+	; after the caller's final admission, inside the publication boundary.
+	FinalAdmission := () => _FSNativeAdmissionAccepted(AdmissionFn) && _FSSourceIsUnchanged(Path, Expected)
 	Committed := Expected["status"] == FS_STATUS_ABSENT
-		? FSConfigAtomicMoveCreate(Stage, Path, AdmissionFn)
-		: FSConfigAtomicMoveReplace(Stage, Path, , AdmissionFn)
+		? FSConfigAtomicMoveCreate(Stage, Path, FinalAdmission)
+		: FSConfigAtomicMoveReplace(Stage, Path, , FinalAdmission)
 	if Committed
 		return Map("committed", true, "detail", "")
 	FSDelete(Stage)
