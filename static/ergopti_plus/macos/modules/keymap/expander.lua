@@ -566,8 +566,6 @@ local function resolve_terminator_match(mapping, buffer, chars, explicit_magic)
 			extra_bs_bytes = #NNBSP
 		elseif nbsp_pos >= 1 and buffer:sub(nbsp_pos, nbsp_pos + #NBSP - 1) == NBSP then
 			extra_bs_bytes = #NBSP
-		else
-			return nil
 		end
 	end
 

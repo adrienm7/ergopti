@@ -37,6 +37,15 @@ end
 helpers.describe("macOS n-gram reads: the shared catalogue", function()
 	local Queries = require("keystats.queries")
 
+	helpers.it("marks non-finite SQL totals incomplete instead of returning infinite metrics", function()
+		for _, counter in ipairs({math.huge, -math.huge, 0/0}) do
+			local reader = reader_with({{token = "a", c = counter, td = 1, e = 0, esrc_json = "{}"}})
+			local out, complete = reader.read_ngrams("/declared/db.sqlite")
+			helpers.assert_eq(complete, false, "an unusable projection cannot be cached as complete")
+			helpers.assert_true(out.c.a == nil or out.c.a.c == 0, "the non-finite value cannot escape")
+		end
+	end)
+
 	helpers.it("issues the catalogue rendering for every family", function()
 		local reader, statements = reader_with({})
 		reader.read_ngrams("/declared/db.sqlite", "2026-10-01", "2026-10-02", { "Code" })

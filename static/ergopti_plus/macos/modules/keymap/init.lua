@@ -1380,7 +1380,17 @@ local function run_trigger_checks()
 		local chars_b    = #chars
 		local before_end = #buf - chars_b
 		if before_end <= 0 then return false end
-		local prev_sub      = buf:sub(1, before_end)
+		local prev_sub = buf:sub(1, before_end)
+		-- A separately typed French spacing character belongs to the delimiter,
+		-- not to the trigger whose final scalar chooses the registry bucket.
+		if chars == ":" or chars == ";" then
+			local nbsp, nnbsp = "\xC2\xA0", "\xE2\x80\xAF"
+			if prev_sub:sub(-#nnbsp) == nnbsp then
+				prev_sub = prev_sub:sub(1, -#nnbsp - 1)
+			elseif prev_sub:sub(-#nbsp) == nbsp then
+				prev_sub = prev_sub:sub(1, -#nbsp - 1)
+			end
+		end
 		local ok_poff, poff = pcall(utf8.offset, prev_sub, -1)
 		-- Malformed UTF-8 in the buffer tail is non-fatal: skip terminator expansion
 		-- for this keystroke rather than propagating a pcall error up the hot path

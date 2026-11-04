@@ -174,19 +174,21 @@ class ManagedHTTPTransport(httpx.BaseTransport):
                 )
             except Native.NativeHTTPError as error:
                 raise _failure(error, request) from None
+            # Publish the exact owner before any fallible redirect cleanup so
+            # transport shutdown can retry a refused close.
+            stream = _NativeStream(response, request, self._retired)
+            self.active.add(stream)
             if response.status in (301, 302, 303, 307, 308):
                 # HTTPX otherwise drains the redirect body before dispatching
                 # its successor. Retire the exact native child at headers so a
                 # stalled/error body cannot hold the next full-URL PAC lookup.
-                response.close()
+                stream.close()
                 return httpx.Response(
                     response.status,
                     headers=response.headers,
                     stream=httpx.ByteStream(b""),
                     extensions={"ergopti_native": True},
                 )
-            stream = _NativeStream(response, request, self._retired)
-            self.active.add(stream)
         return httpx.Response(
             response.status,
             headers=response.headers,

@@ -404,6 +404,34 @@ class ManagedTransportAdmissionReceiving(unittest.TestCase):
         self.factory.stop()
         self.environment.stop()
 
+    def test_refused_redirect_close_keeps_worker_owned_for_shutdown_retry(self):
+        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        self.addCleanup(lambda: process.poll() is None and (process.kill(), process.wait()))
+
+        class Response:
+            status = 302
+            headers = [("Location", "https://other.example/")]
+            calls = 0
+
+            def close(self):
+                self.calls += 1
+                if self.calls == 1:
+                    raise OSError("temporary cleanup refusal")
+                process.kill()
+                process.wait()
+
+        native = Response()
+        with mock.patch.object(self.owner.policy, "route", return_value=("direct", None)):
+            with mock.patch.object(self.managed.Native, "open_request", return_value=native):
+                with self.assertRaises(OSError):
+                    self.owner.handle_request(self.httpx.Request("GET", "https://first.example/"))
+        self.assertEqual(len(self.owner.active), 1)
+        self.assertIsNone(process.poll())
+        self.owner.close()
+        self.assertEqual(native.calls, 2)
+        self.assertIsNotNone(process.returncode)
+        self.assertEqual(self.owner.active, set())
+
     def test_shutdown_cannot_finish_before_inflight_relay_header_acquisition(self):
         entered = threading.Event()
         release = threading.Event()

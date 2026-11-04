@@ -273,6 +273,24 @@ end
 -- =================================================
 
 helpers.describe("keystats hardware watchers form one exact transaction", function()
+	helpers.it("keeps a lock interval open when the system wakes before screen unlock", function()
+		with_fixture({}, function(watchers, fixture, state)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.now_ms = 1000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.screensDidLock)
+			fixture.now_ms = 2000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemWillSleep)
+			fixture.now_ms = 3000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemDidWake)
+			helpers.assert_eq(fixture.passive_period, nil)
+			helpers.assert_eq(state.passive_kind, "lock")
+			fixture.now_ms = 4000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.screensDidUnlock)
+			helpers.assert_eq(fixture.passive_period.kind, "lock")
+			helpers.assert_eq(fixture.passive_period.duration, 3000)
+		end)
+	end)
+
 	helpers.it("keeps the original sleep start across screen and system sleep events", function()
 		with_fixture({}, function(watchers, fixture)
 			helpers.assert_eq(watchers.init_hardware_watchers(), true)

@@ -135,15 +135,28 @@ helpers.describe("release_installer: staging and replacement dispatch", function
 		helpers.assert_eq(call.args[7], "0.0.0-dev.139")
 		helpers.assert_eq(call.args[8], "/Applications/ErgoptiPlus.app")
 		helpers.assert_true(call.args[6]:match("^/Applications/%.ergopti%-release%-install%-%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d%-%d+$") ~= nil, "the private stage belongs to the destination parent, regardless of TMPDIR")
-		call.on_done(0, "READY /private/tmp/user/x/app/ErgoptiPlus.app\n", "")
+		call.on_done(0, "READY " .. call.args[6] .. "/app/ErgoptiPlus.app\n", "")
 		call.on_done(10, "", "curl: (6) Could not resolve host")
 		call.on_done(21, "", "")
 		call.on_done(27, "", "code object is not signed")
-		helpers.assert_eq(results[1][1], "/private/tmp/user/x/app/ErgoptiPlus.app")
+		helpers.assert_eq(results[1][1], call.args[6] .. "/app/ErgoptiPlus.app")
 		helpers.assert_eq(results[2][2], "download")
 		helpers.assert_eq(results[3][2], "verify")
 		helpers.assert_eq(results[4][2], "verify")
 		helpers.assert_nil(results[4][1])
+	end)
+
+	helpers.it("refuses a stage receipt naming a different application", function()
+		local callback, result
+		Installer._spawn = function(_, _, on_done)
+			callback = on_done
+			return { start = function() return true end }
+		end
+		local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = "zip" }
+		helpers.assert_true(Installer.stage(asset, function(...) result = { ... } end))
+		callback(0, "READY /private/tmp/foreign/app/ErgoptiPlus.app\n", "")
+		helpers.assert_nil(result[1], "a foreign receipt must not reach the swap owner")
+		helpers.assert_eq(result[2], "verify")
 	end)
 
 	helpers.it("uses distinct stages for retries started in the same second", function()

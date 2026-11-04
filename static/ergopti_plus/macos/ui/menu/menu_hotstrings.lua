@@ -23,6 +23,13 @@ local PersonalInfoSource = require("menu.frames.personal_info_source")
 local Custom        = require("ui.menu.menu_hotstrings_custom")
 local LOG           = "menu_hotstrings"
 
+--- Reject extension changes unless the live pause owner confirms they are safe.
+local function extension_paused(ctx)
+	if ctx.paused == true or type(ctx.is_paused) ~= "function" then return true end
+	local ok, paused = pcall(ctx.is_paused)
+	return not ok or paused ~= false
+end
+
 --- Resolves a description value that may be a plain string or a multilingual table.
 --- Falls back to the "fr" locale, then to an empty string.
 --- @param desc string|table|nil The raw description field.
@@ -342,7 +349,7 @@ function M.build_bound_section_rows(ctx, bound)
 					label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
 					checked  = sec_on or nil,
 					action   = (enabled and not ctx.paused) and function()
-						if ctx.paused or (type(ctx.is_paused) == "function" and ctx.is_paused())
+						if extension_paused(ctx)
 							or not groupEnabled(ctx, entry.group) then return false end
 						local enable = not ctx.keymap.is_section_enabled(entry.group, entry.section)
 						return M.commit_extension_selection(ctx, {}, { entry }, enable)
@@ -365,7 +372,7 @@ end
 --- @param enabled boolean Explicit choice.
 --- @return boolean committed
 function M.commit_extension_selection(ctx, groups, bound, enabled)
-	if ctx.paused or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
+	if extension_paused(ctx) then return false end
 	local km = ctx.keymap
 	if not km or type(km.set_groups_sections_enabled) ~= "function" then return false end
 	local inventory = {}

@@ -380,6 +380,25 @@ helpers.describe("magic validation through the real keymap eventtap", function()
 			reset_context()
 			helpers.assert_eq(press("é"), true, "one two-byte Unicode scalar remains one character")
 			helpers.assert_eq(effects.emitted, { "TWO_BYTE_SCALAR" })
+			for _, delimiter in ipairs({ ":", ";" }) do
+				reset_context()
+				for _, character in ipairs({ "p", "l", "a", "i", "n" }) do press(character) end
+				helpers.assert_eq(press(delimiter), true, "bare punctuation must terminate the ordinary mapping")
+				helpers.assert_eq(effects.emitted, { "PLAIN_END" .. delimiter })
+			end
+			for _, carrier in ipairs({ { NBSP, ":" }, { NNBSP, ";" } }) do
+				reset_context()
+				for _, character in ipairs({ "p", "l", "a", "i", "n" }) do press(character) end
+				press(carrier[1])
+				local consumed, events = press(carrier[2])
+				helpers.assert_eq(consumed, true, "a separately typed typographic space must not hide the trigger")
+				local deletes = 0
+				for _, event in ipairs(events or {}) do
+					if event.isDown and event.key == "delete" then deletes = deletes + 1 end
+				end
+				helpers.assert_eq(deletes, 6, "the on-screen trigger and prior space must be erased")
+				helpers.assert_eq(effects.emitted, { "PLAIN_END" .. carrier[2] })
+			end
 			reset_context()
 			for _, character in ipairs({ "s", "l", "o", "w" }) do press(character) end
 			drain_immediate_timers(hs_stub)
