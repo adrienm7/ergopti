@@ -689,7 +689,9 @@ function M.init_hardware_watchers()
 			_audio_callback_installed = true
 			watcher.setCallback(function(event_code)
 				run_hardware_callback("Audio", generation, function()
-					if event_code ~= "vOut " and event_code ~= "mOut " then return end
+					-- The global Hammerspoon watcher reports default output changes
+					-- as dOut; vOut/mOut belong to device-specific notifications.
+					if event_code ~= "dOut" and event_code ~= "vOut " and event_code ~= "mOut " then return end
 					local device = hs.audiodevice.defaultOutputDevice()
 					if not device then return end
 					local volume = device:volume()

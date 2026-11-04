@@ -465,7 +465,8 @@ function M.unbind(handle)
 			-- captured chord with no remaining owner capable of deleting it. Disable is
 			-- a fail-safe best effort so personal bindings are not intercepted while a
 			-- later teardown retries the actual delete.
-			local disabled_ok, disable_err = pcall(function() entry.hotkey:disable() end)
+			local disable_called, disable_err = pcall(function() return entry.hotkey:disable() end)
+			local disabled_ok = disable_called and disable_err ~= nil and disable_err ~= false
 			entry.native_settled = disabled_ok
 			Logger.error(LOG, "unbind(): %s failed to release — %s; retained for retry (disabled=%s%s).",
 				entry.chord,

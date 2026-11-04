@@ -421,6 +421,21 @@ helpers.describe("hotkey_registrar: delivery guard", function()
 end)
 
 helpers.describe("hotkey_registrar: native factory claims", function()
+	helpers.it("does not bypass an unacknowledged disable after failed deletion (hotkey-delete-disable-refusal)", function()
+		for _, refusal in ipairs({ "nil", "false" }) do
+			local adapter, native = fresh()
+			local token = assert(adapter.bind_conditional({ "ctrl" }, native.keycodes.map.a, function() end))
+			local hotkey = native.hotkey._bound[1]
+			local delete, disable = hotkey.delete, hotkey.disable
+			hotkey.delete = function() error("injected delete failure") end
+			hotkey.disable = function() if refusal == "false" then return false end; return nil end
+			helpers.assert_eq(adapter.unbind(token), false)
+			helpers.assert_nil(adapter.bind("Ctrl+A", function() end), "a refused native disable must block competing acquisition")
+			helpers.assert_eq(#native.hotkey._bound, 1, "no competing native bind may be attempted")
+			hotkey.delete, hotkey.disable = delete, disable
+			helpers.assert_true(adapter.unbind(token))
+		end
+	end)
 	helpers.it("suspends an existing conditional for late explicit acquisition and restores it after the last claim", function()
 		local adapter, native = fresh()
 		local token = assert(adapter.bind_conditional({"ctrl"}, native.keycodes.map.a, function() end))

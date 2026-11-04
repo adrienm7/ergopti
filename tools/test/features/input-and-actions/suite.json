@@ -754,6 +754,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-token-prompt-focus.cjs"],
 			"repro": "node tools/test/test-token-prompt-focus.cjs"
+		},
+		{
+			"id": "js-hotstring-editor-trailing-enter",
+			"ordinal": 579,
+			"name": "hotstring editor preserves trailing Enter commands when saving",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-editor-trailing-enter.cjs"],
+			"repro": "node tools/test/test-hotstring-editor-trailing-enter.cjs"
 		}
 	]
 }

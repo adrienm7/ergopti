@@ -48,7 +48,10 @@ M._overrides = nil
 --- @return string|nil error Why the link target cannot be classified
 local function classify(path)
 	local status, attributes = FileSystem.path_status(path)
-	if status ~= "present" or type(attributes) ~= "table" then return "other" end
+	if status == "absent" then return "other" end
+	if status ~= "present" or type(attributes) ~= "table" or type(attributes.mode) ~= "string" then
+		return nil, "cannot classify " .. path
+	end
 	if attributes.mode == "directory" then return "dir" end
 	if attributes.mode == "file" then return "file" end
 	if attributes.mode == "link" then
