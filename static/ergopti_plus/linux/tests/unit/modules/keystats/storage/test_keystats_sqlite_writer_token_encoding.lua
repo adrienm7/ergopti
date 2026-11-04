@@ -22,6 +22,9 @@ local function migrate(answers)
 	local file = assert(io.open(path, "w"))
 	assert(file:write("existing native database fixture") and file:close())
 	local commands = {}
+	local refused_once = false
+	local uv = require("luv")
+	local created_dirs, mkdtemp = {}, uv.fs_mkdtemp
 	os.execute = function() return 0 end
 	io.popen = function(command)
 		local content, status = "", 0
@@ -37,6 +40,25 @@ local function migrate(answers)
 			if family then content = (answers.keys or {})[family] or "" end
 			commands[#commands + 1] = command
 			if answers.refuse and command:find(answers.refuse, 1, true) then status = 7 end
+			if answers.refuse_once and not refused_once and command:find("UPDATE OR ROLLBACK", 1, true) then
+				status, refused_once = 7, true
+			end
+			local snapshot = command:match("VACUUM INTO '([^']+)';")
+			if snapshot and status == 0 then
+				local output = assert(io.open(snapshot, "wb"))
+				if answers.bad_backup ~= "empty" then assert(output:write("synthetic SQLite backup")) end
+				assert(output:close())
+				assert(uv.fs_chmod(snapshot, answers.bad_backup == "mode" and 420 or 384))
+				if answers.bad_backup == "replaced" then
+					local directory = assert(snapshot:match("^(.*)/snapshot%.sqlite$"))
+					assert(uv.fs_rename(directory, directory .. ".moved"))
+					created_dirs[#created_dirs + 1] = directory .. ".moved"
+					assert(uv.fs_mkdir(directory, 448))
+					local replacement = assert(io.open(snapshot, "wb"))
+					assert(replacement:write("foreign replacement") and replacement:close())
+					assert(uv.fs_chmod(snapshot, 384))
+				end
+			end
 		end
 		return {
 			read = function()
@@ -46,15 +68,13 @@ local function migrate(answers)
 			end,
 			lines = function() return content:gmatch("([^\n]*)\n") end,
 			close = function()
+				if answers.backup_close_false and command:find("VACUUM INTO", 1, true) then return false end
 				if (answers.key_close_false and command:find("SELECT DISTINCT hex(token)", 1, true))
 					or (answers.version_close_false and command:find("key='ngram_token_encoding'", 1, true)) then return false end
 				return true
 			end,
 		}
 	end
-	local uv = require("luv")
-	local Reader = require("infra.regular_file_reader")
-	local original_reader = Reader.open
 	local backup = path .. require("keystats.token_encoding").BACKUP_SUFFIX
 	local exited, process = false, nil
 	local ok, result = xpcall(function()
@@ -64,12 +84,11 @@ local function migrate(answers)
 			local existing = assert(io.open(backup, "wb"))
 			assert(existing:write("previous backup") and existing:close())
 		end
-		if answers.backup_close_throw then
-			Reader.open = function(target, ...)
-				local stream, detail, code = original_reader(target, ...)
-				if target ~= backup or not stream then return stream, detail, code end
-				return { close = function() assert(stream:close()); error("injected backup close failure") end }, detail, code
-			end
+		uv.fs_mkdtemp = function(template)
+			if answers.backup_dir_throw then error("injected directory creation failure") end
+			local created, detail, code = mkdtemp(template)
+			if created then created_dirs[#created_dirs + 1] = created end
+			return created, detail, code
 		end
 		if answers.fifo then
 			local made = previous_execute("mkfifo '" .. backup .. "'")
@@ -79,10 +98,21 @@ local function migrate(answers)
 				process:close()
 			end))
 		end
-		return writer.ensure_token_encoding()
+		local first = writer.ensure_token_encoding()
+		if answers.refuse_once then
+			assert(first == false, "first transaction must fail")
+			return writer.ensure_token_encoding()
+		end
+		return first
 	end, debug.traceback)
 	os.execute, io.popen = previous_execute, previous_popen
-	Reader.open = original_reader
+	uv.fs_mkdtemp = mkdtemp
+	local observations = { dirs = #created_dirs }
+	if answers.existing_backup then
+		local existing = assert(io.open(backup, "rb")); observations.old = existing:read("*a"); assert(existing:close())
+	end
+	if answers.fifo then local stat = uv.fs_lstat(backup); observations.fifo = stat and stat.type end
+	for _, dir in ipairs(created_dirs) do os.remove(dir .. "/snapshot.sqlite"); os.remove(dir) end
 	writer.close_db()
 	os.remove(path)
 	if answers.fifo then
@@ -93,7 +123,7 @@ local function migrate(answers)
 	end
 	if answers.existing_backup then os.remove(backup) end
 	if not ok then error(result, 0) end
-	return result, commands
+	return result, commands, observations
 end
 
 local function position(commands, needle)
@@ -151,23 +181,35 @@ helpers.describe("keystats sqlite writer: n-gram token encoding", function()
 		helpers.assert_eq(#commands, 0, "keys already escaped are never escaped twice")
 	end)
 
-	helpers.it("token-encoding: an existing regular backup remains usable", function()
-		local result, commands = migrate({ keys = { ngram_chars = "5B\n" }, existing_backup = true })
+	helpers.it("token-encoding: an existing backup cannot replace a fresh snapshot", function()
+		local result, commands, observed = migrate({ keys = { ngram_chars = "5B\n" }, existing_backup = true })
 		helpers.assert_true(result)
-		helpers.assert_nil(position(commands, "VACUUM INTO"))
+		helpers.assert_eq(observed.old, "previous backup", "existing backup bytes are never replaced")
+		helpers.assert_eq(observed.dirs, 1)
+		local backup = position(commands, "VACUUM INTO")
+		local update = position(commands, "UPDATE OR ROLLBACK")
+		helpers.assert_true(backup ~= nil and update ~= nil and backup < update,
+			"every migration requires a fresh snapshot of this database")
+	end)
+
+	helpers.it("token-encoding refuses an unacknowledged backup process close", function()
+		local result, commands = migrate({ keys = { ngram_chars = "5B\n" }, backup_close_false = true })
+		helpers.assert_eq(result, false)
+		helpers.assert_nil(position(commands, "UPDATE OR ROLLBACK"))
+	end)
+
+	helpers.it("token-encoding refuses a backup directory creation exception", function()
+		local result, commands = migrate({ keys = { ngram_chars = "5B\n" }, existing_backup = true, backup_dir_throw = true })
+		helpers.assert_eq(result, false)
+		helpers.assert_nil(position(commands, "UPDATE OR ROLLBACK"))
+	end)
+
+	helpers.it("token-encoding: a FIFO at the old backup path is left untouched", function()
+		local result, commands, observed = migrate({ keys = { ngram_chars = "5B\n" }, fifo = true })
+		helpers.assert_eq(observed.fifo, "fifo", "the pre-existing FIFO is not opened or removed")
+		helpers.assert_true(result)
+		helpers.assert_true(position(commands, "VACUUM INTO") ~= nil)
 		helpers.assert_true(position(commands, "UPDATE OR ROLLBACK") ~= nil)
-	end)
-
-	helpers.it("token-encoding refuses a backup close exception", function()
-		local result, commands = migrate({ keys = { ngram_chars = "5B\n" }, existing_backup = true, backup_close_throw = true })
-		helpers.assert_eq(result, false)
-		helpers.assert_nil(position(commands, "UPDATE OR ROLLBACK"))
-	end)
-
-	helpers.it("token-encoding: a FIFO backup refuses migration without blocking", function()
-		local result, commands = migrate({ keys = { ngram_chars = "5B\n" }, fifo = true })
-		helpers.assert_eq(result, false)
-		helpers.assert_nil(position(commands, "UPDATE OR ROLLBACK"))
 	end)
 
 	for _, fault in ipairs({ "version_read_throw", "version_close_false" }) do
@@ -186,6 +228,20 @@ helpers.describe("keystats sqlite writer: n-gram token encoding", function()
 			helpers.assert_nil(position(commands, "UPDATE OR ROLLBACK"))
 		end)
 	end
+
+	for _, failure in ipairs({ "empty", "mode", "replaced" }) do
+		helpers.it("token-encoding refuses an unowned or incomplete backup " .. failure, function()
+			local result, commands = migrate({ keys = { ngram_chars = "5B\n" }, bad_backup = failure })
+			helpers.assert_eq(result, false)
+			helpers.assert_nil(position(commands, "UPDATE OR ROLLBACK"))
+		end)
+	end
+
+	helpers.it("token-encoding retries with a distinct fresh backup", function()
+		local result, _, observed = migrate({ keys = { ngram_chars = "5B\n" }, refuse_once = true })
+		helpers.assert_true(result)
+		helpers.assert_eq(observed.dirs, 2, "each attempt retains its own private backup")
+	end)
 
 	helpers.it("token-encoding: a refused backup rewrites nothing", function()
 		local result, commands = migrate({ keys = { ngram_chars = "5B\n" }, refuse = "VACUUM INTO" })
