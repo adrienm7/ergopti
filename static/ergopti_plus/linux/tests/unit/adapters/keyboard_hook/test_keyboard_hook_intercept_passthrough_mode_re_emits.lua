@@ -513,6 +513,21 @@ end)
 -- ================================================
 
 helpers.describe("keyboard_hook: a failing callback still forwards the grabbed event", function()
+	helpers.it("forward-on-fail: does not salvage if emergency cleanup raises", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local emitted = {}
+		local emergency = kh.emergency_stop
+		kh.emergency_stop = function() error("controlled cleanup failure") end
+		local ok, err = pcall(function()
+			kh._test_drive({ ev(EV_KEY, 30, 1) }, {
+				onPhysical = function() error("controlled callback failure") end,
+				onEmitRaw = function(code, value) emitted[#emitted + 1] = { code, value }; return true end,
+			}, true)
+		end)
+		kh.emergency_stop = emergency
+		if not ok then error(err, 0) end
+		helpers.assert_eq(emitted, {}, "an unacknowledged cleanup cannot authorize a new output")
+	end)
 
 	helpers.it("forward-on-fail: a raising onPhysical still delivers the press", function()
 		-- Regression: _on_physical ran before _forward_raw, so a throwing
