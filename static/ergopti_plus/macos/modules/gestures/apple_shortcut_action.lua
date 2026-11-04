@@ -298,7 +298,8 @@ function M.run(fields, parent, max_typed, on_finished)
 		UserActions.notify("user_actions.shortcut_busy")
 		return false
 	end
-	local run = { fields = fields, parent = parent, max_typed = max_typed,
+	local scope_id = type(parent) == "string" and parent ~= "" and parent or "gestures"
+	local run = { fields = fields, parent = scope_id, max_typed = max_typed,
 		timeout_sec = M.RUN_TIMEOUT_SEC, max_bytes = M.MAX_OUTPUT_BYTES, on_finished = on_finished }
 	_run = run
 	if fields.output ~= "none" then
@@ -326,6 +327,7 @@ function M.run(fields, parent, max_typed, on_finished)
 		end
 		invoke(run)
 	end, function()
+		if _run ~= run or run.cancelled then return end
 		Logger.warn(LOG, "Nothing was selected: the shortcut was not run.")
 		UserActions.notify("user_actions.no_selection")
 		release(run, false, "no_selection")

@@ -147,6 +147,7 @@ local function with_world(body)
 		}
 		package.loaded["modules.shortcuts.actions.text"] = {
 			read_copied_selection = function(_, on_selection, on_empty)
+				if world.defer_selection then world.empty_selection = on_empty; return true end
 				if world.selection then on_selection(world.selection) else on_empty() end
 				return true
 			end,
@@ -533,6 +534,33 @@ helpers.describe("run_apple_shortcut runs a library shortcut through its owner (
 			helpers.assert_eq(outcome, { false, "cancelled" })
 			helpers.assert_eq(#world.notices, 0)
 			helpers.assert_eq(#world.typed, 0)
+			helpers.assert_eq(world.Shortcut.busy(), false)
+		end)
+	end)
+
+	helpers.it("ignores an empty selection delivered after the run was cancelled", function()
+		with_world(function(world)
+			world.defer_selection = true
+			local outcome
+			world.Shortcut.run(shortcut({ input = "selection" }), "gestures", 500, function(ok, category)
+				outcome = { ok, category }
+			end)
+			world.listeners.run_apple_shortcut("gestures")
+			world.empty_selection()
+			helpers.assert_eq(outcome, { false, "cancelled" })
+			helpers.assert_eq(world.notices, {}, "a cancelled run cannot announce a missing selection")
+		end)
+	end)
+
+	helpers.it("cancels an implicit gesture parent when that parent is paused", function()
+		with_world(function(world)
+			world.defer_selection = true
+			local outcome
+			world.Shortcut.run(shortcut({ input = "selection" }), nil, 500, function(ok, category)
+				outcome = { ok, category }
+			end)
+			world.listeners.run_apple_shortcut("gestures")
+			helpers.assert_eq(outcome, { false, "cancelled" })
 			helpers.assert_eq(world.Shortcut.busy(), false)
 		end)
 	end)
