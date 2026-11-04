@@ -88,6 +88,7 @@ local UNGOVERNED_CHORDS = { backspace = true, delete = true, home = true, ["end"
 -- editor submits on Enter and ignores a Backspace at the start of the prompt.
 local TERMINAL_APPS = {
 	terminal = true, ["gnome-terminal"] = true, ["gnome-terminal-server"] = true,
+	["gnome-terminal-"] = true, -- Linux /proc/<pid>/comm truncates at 15 bytes.
 	console = true, kgx = true, ptyxis = true, konsole = true, yakuake = true,
 	kitty = true, alacritty = true, foot = true, footclient = true, wezterm = true,
 	["wezterm-gui"] = true, ghostty = true, tilix = true, terminator = true,
