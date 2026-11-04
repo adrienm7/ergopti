@@ -189,6 +189,8 @@ local _user_hotstring_lifecycle = {}
 local _user_hotstring_input = {}
 local _user_hotstring_elapsed = 0
 local _one_shot_shift = nil
+-- The copy watch participates in pause and stop as well as tap callbacks.
+local _tap_copy = nil
 local _diagnostic_mailbox_started = false
 
 local ACTION_EPOCH_LISTENER_ID = "modules.keymap.action_epoch"
@@ -419,6 +421,7 @@ end
 --- may reuse a buffer or word-start claim assembled in the other context.
 local function discard_paused_text_context()
 	if _one_shot_shift then _one_shot_shift.disarm() end
+	if _tap_copy then _tap_copy:stop() end
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
 	CoreState.llm_private_mark = ""
@@ -1563,9 +1566,6 @@ local _interceptor_error_logged = {}
 local _key_down_context = { keycode = nil, stale = false }
 
 -- The tap-hold copy watch (modules/keymap/tap_copy.lua), built by M.start.
--- Declared above every tap callback that reads it, for the same reason.
-local _tap_copy = nil
-
 local function onKeyDownRaw(e, provenance, provenance_status)
 	-- A stale internal loopback has lost the live transaction identity required to
 	-- re-enter the LLM, but it is still an Ergopti-only control key. Consume it in
@@ -2084,7 +2084,8 @@ local function onKeyDown(e)
 				and event_lateness_ms >= SyntheticInput.STALE_PHYSICAL_EVENT_MS
 			-- First delivery only: the application has not received this key yet, so
 			-- a tap-hold's Cmd+C is checked against the clipboard as it was before.
-			if _tap_copy and _tap_copy:watching() then
+			if _tap_copy and CoreState.processing_paused ~= true and SyntheticInput.admission_open()
+				and _tap_copy:watching() then
 				pcall(_tap_copy.key_down, _tap_copy, e, event_stamp, event_lateness_ms)
 			end
 		end
@@ -2303,7 +2304,7 @@ shift_tap = eventtap.new(
 			local kc = e:getKeyCode()
 			local f  = e:getFlags()
 			-- Its own pcall: a watch failure must never pass for a shift-side one.
-			if _tap_copy then
+			if _tap_copy and CoreState.processing_paused ~= true and SyntheticInput.admission_open() then
 				local _, stamp = EventClock.lateness_ms(e)
 				pcall(_tap_copy.modifier_edge, _tap_copy, kc, f, stamp)
 			end

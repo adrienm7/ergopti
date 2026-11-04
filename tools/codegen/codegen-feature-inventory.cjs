@@ -45,7 +45,7 @@ function withSectionReasons(features, sections) {
 	});
 }
 
-function render(features, locales, actions, menu) {
+function render(features, locales, actions, menu, layers = {}) {
 	if (features.length < 300) throw new Error('Feature inventory unexpectedly small');
 	const seen = new Set();
 	const rows = features.map((feature) => {
@@ -107,6 +107,33 @@ function render(features, locales, actions, menu) {
 				platforms: Object.fromEntries(
 					Object.entries(OS).map(([os, key]) => [os, platforms.includes(key)])
 				),
+				reasons
+			});
+		}
+	}
+	for (const family of ['actions', 'modifiers', 'source_kinds', 'parameters']) {
+		for (const [id, entry] of Object.entries(layers[family] || {})) {
+			const available =
+				entry.platforms ||
+				Object.keys(OS).filter((os) => entry[os] !== undefined || entry.all !== undefined);
+			if (!available.length || available.some((os) => !Object.hasOwn(OS, os)))
+				throw new Error(`Invalid layer platforms: ${family}.${id}`);
+			const reasons = {};
+			for (const os of Object.keys(OS).filter((os) => !available.includes(os))) {
+				if (!entry.reason_key || !locales.en[entry.reason_key])
+					throw new Error(`Missing layer reason: ${family}.${id}`);
+				reasons[os] = {
+					en: locales.en[entry.reason_key],
+					fr: locales.fr[entry.reason_key] || locales.en[entry.reason_key],
+					equivalents: []
+				};
+			}
+			actionRows.push({
+				path: `layers.${family}.${id}`,
+				labels: Object.fromEntries(
+					['fr', 'en'].map((lang) => [lang, locales[lang][`sg_actions.${id}`] || id])
+				),
+				platforms: Object.fromEntries(Object.keys(OS).map((os) => [os, available.includes(os)])),
 				reasons
 			});
 		}
@@ -252,12 +279,19 @@ function outputs() {
 			'utf8'
 		)
 	);
+	const layers = toml.parse(
+		fs.readFileSync(
+			path.join(ROOT, 'static/ergopti_plus/_shared/keymap/layer_actions.toml'),
+			'utf8'
+		)
+	);
 	const model = loadFeatureModel();
 	return render(
 		withSectionReasons(model.features, model.manifest.sections),
 		locales,
 		actions,
-		menu
+		menu,
+		layers
 	);
 }
 
