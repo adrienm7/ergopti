@@ -643,4 +643,36 @@ helpers.describe("original configured Navigation source reservations", function(
 			helpers.assert_nil(s.manager.capture_collision_inventory(), "the retained wrapper is not a proven empty Nav domain")
 		end, '[shortcuts]\nenabled = true\n[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "copy"\n')
 	end)
+
+	for _, fault in ipairs({ "refusal", "exception" }) do
+		helpers.it("(reload-after-removal) preserves effective state after " .. fault .. " and permits retry", function()
+			owned(NAV_NONE, nil, function(s)
+				helpers.assert_true(s.start())
+				local old, old_install = s.manager.configuration_snapshot(), s.hook.set_remapper
+				local calls = 0
+				s.hook.set_remapper = function(engine, on_tap)
+					calls = calls + 1
+					if calls == 1 then
+						helpers.assert_nil(engine, "old wrapper is retired first")
+						return old_install(engine, on_tap)
+					end
+					if fault == "exception" then error("controlled installation exception") end
+					return false
+				end
+				local called, result = pcall(s.manager.reload)
+				local snapshot, installed, active = s.manager.configuration_snapshot(), s.hook.engine, s.manager.is_active()
+				s.hook.set_remapper = old_install
+				local retried = s.manager.reload()
+				helpers.assert_true(called, "reload reports installation exceptions as failures")
+				helpers.assert_eq(result, false)
+				helpers.assert_true(calls >= 2)
+				helpers.assert_true(rawequal(snapshot.loaded, old.loaded), "no partial candidate is published")
+				helpers.assert_true(rawequal(snapshot.engine, old.engine))
+				helpers.assert_nil(installed, "the old wrapper was actually removed")
+				helpers.assert_eq(active, false, "a removed wrapper cannot be reported active")
+				helpers.assert_true(retried, "a later valid reload reinstalls a wrapper")
+				helpers.assert_true(s.manager.is_active())
+			end, '[shortcuts]\nenabled = true\n[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "copy"\n')
+		end)
+	end
 end)
