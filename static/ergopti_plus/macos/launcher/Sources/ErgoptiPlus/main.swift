@@ -74,6 +74,23 @@ func managedPathsFile(homeDirectory: String = NSHomeDirectory()) -> String {
 ///   - launcherBundleId: Current launcher bundle identifier when observable.
 ///   - loggerEndpoint: Pre-bound native logger authority for this exact child.
 /// - Returns: Environment safe to assign to the embedded Hammerspoon child.
+/// The clone the field-report collector named when it opened this app (`open --env ERGOPTI_FIELD_RUN_ROOT=…`,
+/// tools/dev/collect-macos-field-report.sh --installed): an absolute folder of the current user, not group- or
+/// world-writable, holding the field-run declaration. Anything else is dropped, so the packaged runtime watches nothing.
+/// - Parameter candidate: The launcher's inherited value.
+/// - Returns: The admitted clone path, or nil.
+func fieldRunRoot(_ candidate: String?) -> String? {
+	guard let path = candidate, path.hasPrefix("/"), !path.hasSuffix("/"), !path.contains("\0"), !path.contains("\n"),
+		!path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) else { return nil }
+	var info = stat()
+	guard lstat(path, &info) == 0, info.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR), info.st_uid == getuid(),
+		info.st_mode & 0o022 == 0 else { return nil }
+	var declaration = stat()
+	guard lstat(path + "/static/ergopti_plus/macos/data/field_run.json", &declaration) == 0,
+		declaration.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), declaration.st_uid == getuid() else { return nil }
+	return path
+}
+
 func launcherChildEnvironment(
 	base: [String: String],
 	launcherPid: Int32,
@@ -88,6 +105,11 @@ func launcherChildEnvironment(
 	environment.removeValue(forKey: Identifiers.DevSource.environment)
 	if let developerSourceRoot {
 		environment[Identifiers.DevSource.environment] = developerSourceRoot
+	}
+	// The field-report collector's clone reaches the child only once proven a clone of this user.
+	environment.removeValue(forKey: Identifiers.FieldReport.environment)
+	if let fieldRunRoot = fieldRunRoot(base[Identifiers.FieldReport.environment]) {
+		environment[Identifiers.FieldReport.environment] = fieldRunRoot
 	}
 	// Launch Services injects the outer app identity into its environment.
 	// Process inherits it verbatim, but the child is a second GUI bundle: keeping

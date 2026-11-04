@@ -41,5 +41,6 @@ enum Identifiers {
 		static let branchPrefix = "field/"
 		static let folder = "docs/field-reports"
 		static let baseConfigKey = "ergoptiFieldBase"
+		static let environment = "ERGOPTI_FIELD_RUN_ROOT"
 	}
 }

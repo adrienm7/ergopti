@@ -2054,6 +2054,16 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
   `never_delivered`, drop the slot's macOS recommendation with a reason.
 - `field_gesture_frames` proves the capture stamps that L46's three-finger
   timing uses.
+- `field_owned_install` (before `field_owned_runtime`): on a Mac without the owned
+  runtime it calls the facade's install directly (no dialog); the macOS
+  administrator prompt is the one human step. `installed` fails with the
+  install port's reason (`install_cancelled`, `install_refused`,
+  `install_driver_failed`); `driver_active` waits up to 840 s for pqrs' driver,
+  opening Login Items & Extensions once, and fails `not_approved`. The next
+  step, `owned_install_reload`, reloads so the owner admits the runtime. An
+  installed signed app runs the field run only when the collector opened it
+  with `ERGOPTI_FIELD_RUN_ROOT` (`--installed`); the automatic install offer
+  and the approval watch stay off while a field run drives.
 - `field_owned_start` and `field_owned_pause`: the pause's resume follows the
   run and reloads, so the next run's `field_owned_start` proves close on
   resume.
