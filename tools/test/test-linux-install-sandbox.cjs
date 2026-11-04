@@ -119,6 +119,13 @@ function runInstaller(scenario) {
 			'for arg in "$@"; do case "$arg" in */ergopti-hotstrings.service) exit 1 ;; esac; done\nexec /usr/bin/mv "$@"'
 		);
 	}
+	if (scenario.refuseUnitMode) {
+		stub(
+			stubs,
+			'chmod',
+			'for arg in "$@"; do case "$arg" in */.ergopti-service.*) exit 1 ;; esac; done\nexec /usr/bin/chmod "$@"'
+		);
+	}
 	if (process.platform === 'win32') {
 		stub(
 			stubs,
@@ -179,7 +186,13 @@ function runInstaller(scenario) {
 	// Git Bash may reconstruct PATH when a child Bash starts. Keep the same
 	// inert command boundary in the installer and its newly installed helpers.
 	const bashEnvironment = path.join(sandbox, 'bash-environment');
-	fs.writeFileSync(bashEnvironment, 'export PATH="$TEST_STUBS:/usr/bin:/bin"\n');
+	fs.writeFileSync(
+		bashEnvironment,
+		'export PATH="$TEST_STUBS:/usr/bin:/bin"\n' +
+			(scenario.refuseUnitWrite
+				? 'printf() { if [[ "$1" = "%s\\n" && "${2:-}" = ExecStart=* ]]; then return 1; fi; builtin printf "$@"; }\n'
+				: '')
+	);
 	env.TEST_STUBS = bashPath(stubs);
 	env.BASH_ENV = bashPath(bashEnvironment);
 	const installArgs =
@@ -755,11 +768,12 @@ for (const kind of [
 	}
 }
 
-// A failed service publication keeps the previous unit complete.
-{
+// A failed service generation, chmod or publication keeps the previous unit
+// complete and retires its private temporary file.
+for (const fault of ['refuseUnitWrite', 'refuseUnitMode', 'refuseUnitPublish']) {
 	const run = runInstaller({
 		desktopProvided: true,
-		refuseUnitPublish: true,
+		[fault]: true,
 		seed(home, configRoot) {
 			const unit = path.join(configRoot, 'systemd/user/ergopti-hotstrings.service');
 			fs.mkdirSync(path.dirname(unit), { recursive: true });
@@ -774,6 +788,13 @@ for (const kind of [
 		assert.equal(
 			fs.readFileSync(path.join(run.configRoot, 'systemd/user/ergopti-hotstrings.service'), 'utf8'),
 			`[Service]\nExecStart=${bashPath(run.home)}/.local/bin/ergopti-hotstrings --tray\n# previous unit\n`
+		);
+		assert.equal(
+			fs
+				.readdirSync(path.join(run.configRoot, 'systemd/user'))
+				.filter((name) => name.startsWith('.ergopti-service.')).length,
+			0,
+			`${fault} must retire its temporary file`
 		);
 	} finally {
 		run.cleanup();
