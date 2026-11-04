@@ -170,6 +170,21 @@ helpers.describe("TimerScheduler adapter — every()", function()
 end)
 
 helpers.describe("TimerScheduler adapter — monotonic clock", function()
+	helpers.it("uses the fallback when a native wall-clock sample is invalid (timer-invalid-wall-clock)", function()
+		for _, sample in ipairs({ false, "invalid", 0 / 0, math.huge, -math.huge }) do
+			local timer_stub = make_timer_stub()
+			timer_stub.secondsSinceEpoch = function() return sample end
+			timer_stub.absoluteTime = function() error("absolute clock unavailable") end
+			local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+			local before = os.time()
+			local now = TS.now()
+			local awake = TS.awake_time()
+			local after = os.time()
+			helpers.assert_true(now >= before and now <= after, "invalid wall time must not reach callers")
+			helpers.assert_true(awake >= before and awake <= after, "elapsed-time fallback must be usable")
+		end
+	end)
+
 	helpers.it("reports awake time independently of wall-clock sleep", function()
 		local wall_sec = 100
 		local awake_ns = 5000000000

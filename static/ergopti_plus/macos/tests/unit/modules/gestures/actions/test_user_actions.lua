@@ -128,7 +128,11 @@ local function with_world(body)
 			return true
 		end }
 		package.loaded["adapters.timer_scheduler"] = {
-			after = function(_, fn) local handle = { fn = fn }; world.timers[#world.timers + 1] = handle; return handle, true end,
+			after = function(_, fn)
+				local handle = { fn = fn }
+				world.timers[#world.timers + 1] = handle
+				return handle, not world.refuse_timer
+			end,
 			cancel = function(handle) handle.cancelled = true; return true end,
 		}
 		package.loaded["adapters.apple_shortcuts_native"] = {
@@ -423,6 +427,19 @@ helpers.describe("run_apple_shortcut runs a library shortcut through its owner (
 			world.timers[#world.timers].fn()
 			helpers.assert_eq(run.terminated, true)
 			helpers.assert_eq(world.notices, { "user_actions.shortcut_timeout|Resize Image|60" })
+			helpers.assert_eq(world.Shortcut.busy(), false)
+		end)
+	end)
+
+	helpers.it("stops a running shortcut if its deadline cannot be armed", function()
+		with_world(function(world)
+			world.library = { { id = SHORTCUT_ID, name = "Resize Image" } }
+			world.hold_run = true
+			world.refuse_timer = true
+			world.Shortcut.run(shortcut(), "gestures", 500)
+			local run = shortcut_runs(world)[1]
+			helpers.assert_true(run ~= nil, "the refused deadline must follow process start")
+			helpers.assert_eq(run.terminated, true, "an unbounded shortcut must be stopped")
 			helpers.assert_eq(world.Shortcut.busy(), false)
 		end)
 	end)

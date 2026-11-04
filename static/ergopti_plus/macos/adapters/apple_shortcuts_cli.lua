@@ -177,11 +177,22 @@ local function spawn_bounded(args, limit, timeout_sec, done)
 	function handle.start()
 		local started = raw.start() == true
 		if started and not raw.isSettled() then
-			timer = TimerScheduler.after(timeout_sec, function()
+			local scheduled, candidate, committed = pcall(TimerScheduler.after, timeout_sec, function()
 				timer = nil
 				timed_out = true
 				pcall(raw.terminate)
 			end)
+			if not scheduled or committed ~= true then
+				-- A running tool without its deadline is not an accepted bounded run.
+				-- The owner keeps this exact process until termination is acknowledged.
+				pcall(raw.terminate)
+				return false
+			end
+			if raw.isSettled() then
+				TimerScheduler.cancel(candidate)
+			else
+				timer = candidate
+			end
 		end
 		return started
 	end
