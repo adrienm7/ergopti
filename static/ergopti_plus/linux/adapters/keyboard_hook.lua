@@ -2132,6 +2132,10 @@ local function _dispatch_event(ev, source)
 	-- virtual keyboard all see one consistent stream.
 	local owned_key = source_key(source, ev.code)
 	if not ev.remapped then
+		-- A repeat has no press to own on this source (for example a key held
+		-- before capture). It cannot repeat another keyboard's output owner.
+		if _intercept and ev.value == InputEvent.VALUE_REPEAT
+			and not _physical_down[owned_key] and not _forwarded_down[owned_key] then return end
 		if ev.value == InputEvent.VALUE_DOWN and not _physical_down[owned_key] then
 			_physical_down[owned_key] = { source = source, code = ev.code, origin = _event_receipts[ev] }
 		elseif ev.value == InputEvent.VALUE_UP then _physical_down[owned_key] = nil end
