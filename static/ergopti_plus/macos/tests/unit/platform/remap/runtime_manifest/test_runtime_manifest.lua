@@ -87,12 +87,12 @@ helpers.describe("owned runtime manifest: what ships", function()
 
 	helpers.it("pins the artifact of the green hosted build, under its release tag", function()
 		local runtime = shipped().runtime
-		helpers.assert_eq(runtime.version, "16.3.0-ergopti.2")
-		helpers.assert_eq(runtime.file_name, "ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.2.tar.gz")
+		helpers.assert_eq(runtime.version, "16.3.0-ergopti.3")
+		helpers.assert_eq(runtime.file_name, "ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.3.tar.gz")
 		helpers.assert_eq(runtime.source_url, "https://github.com/adrienm7/ergopti/releases/download/"
-			.. "remap-runtime-v16.3.0-ergopti.2/ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.2.tar.gz")
-		helpers.assert_eq(runtime.sha256, "ad1541f838a9d3d8c4d6aaa45cda82fddb36c34c381e866d0b69391cae42de8e")
-		helpers.assert_eq(runtime.size, 12176523)
+			.. "remap-runtime-v16.3.0-ergopti.3/ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.3.tar.gz")
+		helpers.assert_eq(runtime.sha256, "eced1bfd39a10e6a461e37a211e3e415c2a31cd382f451c5f471e88f59dc4567")
+		helpers.assert_eq(runtime.size, 12351916)
 	end)
 
 	helpers.it("pins the capture to the launcher signed by the stable identity", function()
