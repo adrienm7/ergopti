@@ -72,8 +72,8 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 		return true
 	}
 	func requestStop() { lock.lock(); stopped = true; let channel = channel; lock.unlock(); _ = channel?.withdraw() }
-	private static func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'" }
-	private static func appleQuote(_ value: String) -> String { "\"" + value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\"" }
+	static func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'" }
+	static func appleQuote(_ value: String) -> String { "\"" + value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\"" }
 	private func prepareAndPrompt() {
 		guard sourceCurrent() else { lock.lock(); refused = true; lock.unlock(); return }
 		var selfImage = ergopti_vhd_report_self_image()
@@ -242,6 +242,13 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 	private func markRefused() { lock.lock(); refused = true; lock.unlock() }
 	/// Fixed system tools only. No runtime publication/service/driver command is admitted by this purpose.
 	private static func stagingProgram(source: String, stage: URL, requirement: String, digest: String, route: String) -> String {
+		stagedHelperProgram(source: source, stage: stage, requirement: requirement, digest: digest) { executable in
+			"/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin ERGOPTI_VHD_REPORT_ROUTE=\(quote(route)) \(quote(executable)) --virtual-hid-daemon-report-worker"
+		}
+	}
+	/// Copies the helper root-owned into a fresh UUID stage, proves its requirement and digest, then runs the
+	/// one command the purpose names on that exact staged executable (the report worker or the first install).
+	static func stagedHelperProgram(source: String, stage: URL, requirement: String, digest: String, then command: (String) -> String) -> String {
 		let parent = "/Library/Application Support/ErgoptiPlus", directory = stage.deletingLastPathComponent().path
 		let executable = stage.appendingPathComponent("Contents/MacOS/ErgoptiPlus-Runtime-Installer").path
 		let program = """
@@ -267,7 +274,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 		assert_directory \(quote(directory))
 		/usr/bin/codesign --verify --strict --all-architectures --deep --test-requirement \(quote(requirement)) \(quote(stage.path))
 		task_digest=$(/usr/bin/shasum -a 256 \(quote(executable))); task_digest=${task_digest%% *}; [ "$task_digest" = \(quote(digest)) ] || exit 77
-		/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin ERGOPTI_VHD_REPORT_ROUTE=\(quote(route)) \(quote(executable)) --virtual-hid-daemon-report-worker
+		\(command(executable))
 		"""
 		return "/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin /bin/sh -c " + quote(program)
 	}
