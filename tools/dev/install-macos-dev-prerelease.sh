@@ -33,20 +33,25 @@ log() { printf '[dev-prerelease] %s\n' "$*"; }
 
 [ "$(uname -s)" = Darwin ] || fail "a Mac is required."
 APP="/Applications/$ERGOPTI_APP_BUNDLE"
-API="https://${ERGOPTI_HOST_GITHUB_API}/repos/adrienm7/ergopti/releases?per_page=30"
+# The repository comes from the updater defaults, the one source of every GitHub link.
+DEFAULTS="$REPO_ROOT/static/ergopti_plus/_shared/modules/updater/defaults.json"
+repository="$(/usr/bin/python3 -c 'import json,sys; g=json.load(open(sys.argv[1]))["github"]; print(g["owner"] + "/" + g["repo"])' "$DEFAULTS")" \
+	|| fail "the updater defaults name no GitHub repository."
+ARCHIVE="$ERGOPTI_APP_BUNDLE.zip"
+API="https://${ERGOPTI_HOST_GITHUB_API}/repos/$repository/releases?per_page=30"
 MANIFEST="$REPO_ROOT/static/ergopti_plus/macos/vendor/remap-runtime/manifest.json"
 work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-dev-prerelease.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
 
 # The newest dev prerelease (v0.0.0-dev.N), and its two macOS assets.
 curl -fsSL --proto =https "$API" -o "$work/releases.json" || fail "GitHub's release list could not be read."
-release="$(/usr/bin/python3 - "$work/releases.json" <<'PY'
+release="$(/usr/bin/python3 - "$work/releases.json" "$ARCHIVE" <<'PY'
 import json, sys
 for release in json.load(open(sys.argv[1])):
     if release.get("prerelease") and release.get("tag_name", "").startswith("v0.0.0-dev."):
         assets = {a["name"]: a["browser_download_url"] for a in release.get("assets", [])}
-        if "macos-publication.json" in assets and "ErgoptiPlus.app.zip" in assets:
-            print(release["tag_name"], assets["macos-publication.json"], assets["ErgoptiPlus.app.zip"])
+        if "macos-publication.json" in assets and sys.argv[2] in assets:
+            print(release["tag_name"], assets["macos-publication.json"], assets[sys.argv[2]])
             break
 PY
 )" || fail "the release list could not be parsed."
@@ -62,8 +67,8 @@ else
 	curl -fL --proto =https --progress-bar "$archive_url" -o "$work/app.zip" || fail "the macOS archive could not be downloaded."
 	expected="$(/usr/bin/python3 -c 'import json,sys
 for a in json.load(open(sys.argv[1]))["archives"]:
-    if a["name"] == "ErgoptiPlus.app.zip": print(a["size"], a["sha256"])' "$work/publication.json")" \
-		|| fail "macos-publication.json names no ErgoptiPlus.app.zip."
+    if a["name"] == sys.argv[2]: print(a["size"], a["sha256"])' "$work/publication.json" "$ARCHIVE")" \
+		|| fail "macos-publication.json names no $ARCHIVE."
 	read -r size sha256 <<<"$expected"
 	[ "$(stat -f %z "$work/app.zip")" = "$size" ] || fail "the archive is not the size the release publishes."
 	[ "$(shasum -a 256 "$work/app.zip" | cut -d' ' -f1)" = "$sha256" ] || fail "the archive is not the one the release publishes."
