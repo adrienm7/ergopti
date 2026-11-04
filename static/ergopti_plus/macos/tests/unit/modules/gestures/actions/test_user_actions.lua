@@ -218,6 +218,27 @@ helpers.describe("run_command runs the user's line hidden or in Terminal (macOS)
 		end)
 	end)
 
+	helpers.it("counts Unicode code points and removes trailing line endings before typing", function()
+		with_world(function(world)
+			world.User.run_command({ command = "print", mode = "hidden", output = "type" }, "gestures", 3)
+			world.runs[1].callback({ code = 0, stdout = "é日🙂\r\n", stderr = "" })
+			helpers.assert_eq(world.typed, { "é日🙂" })
+			helpers.assert_eq(world.notices, {})
+		end)
+	end)
+
+	helpers.it("refuses invalid UTF-8 for both typing and clipboard output", function()
+		with_world(function(world)
+			for _, output in ipairs({ "type", "copy" }) do
+				world.User.run_command({ command = "print", mode = "hidden", output = output }, "gestures", 5)
+				world.runs[#world.runs].callback({ code = 0, stdout = "ok\255", stderr = "" })
+			end
+			helpers.assert_eq(world.typed, {})
+			helpers.assert_eq(world.clipboard, {})
+			helpers.assert_eq(world.notices, { "user_actions.output_not_text", "user_actions.output_not_text" })
+		end)
+	end)
+
 	helpers.it("notifies a failure with its first stderr line, and logs only the exit code", function()
 		with_world(function(world)
 			world.User.run_command({ command = SECRET, mode = "hidden", output = "none" }, "gestures", 500)
