@@ -134,7 +134,7 @@ helpers.describe("release_installer: staging and replacement dispatch", function
 		helpers.assert_eq(call.args[5], DIGEST)
 		helpers.assert_eq(call.args[7], "0.0.0-dev.139")
 		helpers.assert_eq(call.args[8], "/Applications/ErgoptiPlus.app")
-		helpers.assert_true(call.args[6]:match("^/Applications/%.ergopti%-release%-install%-%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d$") ~= nil, "the private stage belongs to the destination parent, regardless of TMPDIR")
+		helpers.assert_true(call.args[6]:match("^/Applications/%.ergopti%-release%-install%-%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d%-%d+$") ~= nil, "the private stage belongs to the destination parent, regardless of TMPDIR")
 		call.on_done(0, "READY /private/tmp/user/x/app/ErgoptiPlus.app\n", "")
 		call.on_done(10, "", "curl: (6) Could not resolve host")
 		call.on_done(21, "", "")
@@ -144,6 +144,24 @@ helpers.describe("release_installer: staging and replacement dispatch", function
 		helpers.assert_eq(results[3][2], "verify")
 		helpers.assert_eq(results[4][2], "verify")
 		helpers.assert_nil(results[4][1])
+	end)
+
+	helpers.it("uses distinct stages for retries started in the same second", function()
+		local paths = {}
+		Installer._spawn = function(_, args)
+			paths[#paths + 1] = args[6]
+			return { start = function() return true end }
+		end
+		local old_date = os.date
+		os.date = function() return "20261104-120000" end
+		local ok, err = xpcall(function()
+			local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = "zip" }
+			helpers.assert_true(Installer.stage(asset, function() end))
+			helpers.assert_true(Installer.stage(asset, function() end))
+			helpers.assert_true(paths[1] ~= paths[2], "a retry must not reuse the first stage")
+		end, debug.traceback)
+		os.date = old_date
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("arms the replacement detached, with the previous app kept aside", function()

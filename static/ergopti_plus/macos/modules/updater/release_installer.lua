@@ -42,6 +42,8 @@ local Archives    = require("updater.release_assets")
 local LOG = "updater.release_installer"
 local ARMING_RECEIPT = "ARMED"
 local RENAME_FLAG = "--release-rename"
+-- Distinguish attempts started within one wall-clock second in this process.
+local stage_sequence = 0
 
 -- The executable inside the app bundle the launcher runs from.
 local EXECUTABLE_SUFFIX = "/Contents/MacOS/ErgoptiPlus"
@@ -231,7 +233,9 @@ function M.stage(asset, done)
 	end
 	-- Publication must remain a rename: a failed cross-device mv can leave a
 	-- partial destination that makes rollback nest the original app inside it.
-	local stage_dir = (parent:gsub("/+$", "")) .. "/.ergopti-release-install-" .. os.date("!%Y%m%d-%H%M%S")
+	stage_sequence = stage_sequence + 1
+	local stage_dir = (parent:gsub("/+$", "")) .. "/.ergopti-release-install-"
+		.. os.date("!%Y%m%d-%H%M%S") .. "-" .. tostring(stage_sequence)
 	-- Keep JSON release data out of shell source and bind the native request to
 	-- this exact stage, using the existing per-child environment override.
 	local request, request_err = JsonCodec.encode({ version = 1, url = asset.url, sha256 = asset.digest,
