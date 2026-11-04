@@ -356,6 +356,7 @@ local function save_all(state, data, context)
 	for index = 1, #order do
 		local name = order[index]
 		if type(name) ~= "string" or name == "" or listed[name] or type(data.sections[name]) ~= "table" then return false end
+		if type(data.sections[name].description) ~= "string" then return false end
 		local entries = data.sections[name].entries
 		if type(entries) ~= "table" then return false end
 		for entry_index in pairs(entries) do
