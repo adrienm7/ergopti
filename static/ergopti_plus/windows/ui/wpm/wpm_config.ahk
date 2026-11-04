@@ -172,6 +172,10 @@ _WPMWidget_CurrentWorkAreas() {
 	return Areas
 }
 
+; Only the legacy pair is the automatic-position sentinel. A single -1 can
+; be a real coordinate on a monitor to the left or above the primary screen.
+_WPMWidget_IsAutoPosition(X, Y) => X == -1 && Y == -1
+
 ; The saved position is read from the Storage port, never from config.toml:
 ; it is where the user left the widget, not a preference. StoreFn(Key) is
 ; injectable for tests and returns "_" for an absent key.

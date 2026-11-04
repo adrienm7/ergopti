@@ -455,7 +455,7 @@ WPMWidget_ShowPos(&out_x, &out_y) {
 _WPMWidget_ApplySurfaceGeometry(gui_ref) {
     if !gui_ref
         return
-    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1) {
+    if _WPMWidget_IsAutoPosition(WPMWidget.pos_x, WPMWidget.pos_y) {
         WPMWidget_DefaultPos(&def_x, &def_y)
         WPMWidget.pos_x := def_x
         WPMWidget.pos_y := def_y
