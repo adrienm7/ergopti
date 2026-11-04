@@ -35,6 +35,20 @@ local function load_adapter()
 end
 
 helpers.describe("task_lifecycle: only a real native start commits", function()
+	helpers.it("refuses an invalid completion callback before constructing a task (task-invalid-completion)", function()
+		local original_new = hs.task.new
+		local constructed = 0
+		hs.task.new = function() constructed = constructed + 1; return nil end
+		local ok, err = xpcall(function()
+			local adapter, errors = load_adapter()
+			helpers.assert_nil(adapter.native("invalid callback", "/bin/echo", "not a function", {}))
+			helpers.assert_eq(constructed, 0, "a task without its completion owner must never be created")
+			helpers.assert_eq(#errors, 1)
+		end, debug.traceback)
+		hs.task.new = original_new
+		if not ok then error(err) end
+	end)
+
 	helpers.it("rejects nil and throwing construction (task-lifecycle-create-contract)", function()
 		local adapter, errors = load_adapter()
 		helpers.assert_nil(adapter.create(function() return nil end, "nil probe"))
