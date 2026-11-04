@@ -110,11 +110,7 @@ end
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	local fh = io.open(path, "rb")
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
-	return content
+	return require("infra.regular_file_reader").read_source(path)
 end
 
 --- The folder part of a path.
@@ -354,21 +350,24 @@ local function collect_ai(state)
 	}
 end
 
---- Whether the daemon may open a device, without keeping it open.
---- @param path string
---- @param mode string io.open mode.
+--- Whether a character device is readable without opening the device itself.
+--- @param path string Candidate event node.
 --- @return string "granted", "missing" or "unknown"
-local function device_access(path, mode)
-	local fh, err, code = io.open(path, mode)
-	if fh then
-		fh:close()
-		return "granted"
+local function device_access(path)
+	local uv = require("luv")
+	local inspected, attrs, _, code = pcall(uv.fs_stat, path)
+	if not inspected or type(attrs) ~= "table" then
+		if code == "EACCES" or code == "EPERM" or code == 13 or code == 1 then return "missing" end
+		return "unknown"
 	end
-	-- EACCES and EPERM: the file exists and this user may not open it
-	if code == 13 or code == 1 then return "missing" end
-	Logger.warn(LOG, "Diagnostics could not check %s: %s.", path, tostring(err))
+	if attrs.type ~= "char" then return "unknown" end
+	local checked, allowed, _, access_code = pcall(uv.fs_access, path, "R")
+	if checked and allowed == true then return "granted" end
+	if checked and (allowed == false or access_code == "EACCES" or access_code == "EPERM"
+		or access_code == 13 or access_code == 1) then return "missing" end
 	return "unknown"
 end
+M._device_access_for_test = device_access
 
 --- Whether the daemon may write a device node, asked through access(2).
 --- Opening for writing from Lua means O_CREAT: with the uinput module absent, a
@@ -417,7 +416,7 @@ local function collect_permissions(ids)
 		end
 	end
 	local readers = {
-		input_devices = function() return event and device_access(event, "rb") or "unknown" end,
+		input_devices = function() return event and device_access(event) or "unknown" end,
 		uinput        = function() return device_writable(require("adapters.uinput_writer").UINPUT_PATH) end,
 	}
 	local items = {}
