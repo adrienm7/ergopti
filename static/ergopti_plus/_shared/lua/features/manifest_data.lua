@@ -93,7 +93,7 @@ M.features = {
 		path = "hotstrings.repeat_key_enabled", id = "repeat_key_enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.repeat_key_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
 	},
 	{
-		path = "hotstrings.idle_reset_seconds", id = "idle_reset_seconds", section = "hotstrings", default = 3, type = "number", description_key = "menu.hotstrings.idle_reset", platforms = { "ahk", "hs", "linux" }, recommended = 3, family = "setting",
+		path = "hotstrings.idle_reset_seconds", id = "idle_reset_seconds", section = "hotstrings", default = 3, type = "number", description_key = "menu.hotstrings.idle_reset", platforms = { "ahk", "hs", "linux" }, recommended = 3, family = "setting", preset_values = { 0, 1, 2, 3, 5, 10 },
 	},
 	{
 		path = "hotstrings.click_resets_word", id = "click_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.click_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
@@ -108,7 +108,7 @@ M.features = {
 		path = "hotstrings.tap_hold_resets_word", id = "tap_hold_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.tap_hold_resets_word", platforms = { "ahk", "linux" }, recommended = true, family = "setting", reason_key = "platform_reason.tap_hold_word_reset_not_on_macos",
 	},
 	{
-		path = "hotstrings.cascade_max_arrows", id = "cascade_max_arrows", section = "hotstrings", default = 3, type = "number", description_key = "menu.hotstrings.cascade_max_arrows", platforms = { "ahk", "hs", "linux" }, recommended = 3, family = "setting",
+		path = "hotstrings.cascade_max_arrows", id = "cascade_max_arrows", section = "hotstrings", default = 3, type = "number", description_key = "menu.hotstrings.cascade_max_arrows", platforms = { "ahk", "hs", "linux" }, recommended = 3, family = "setting", preset_values = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 },
 	},
 	{
 		path = "hotstrings.expansion_delay", id = "expansion_delay", section = "hotstrings", default = 0.75, type = "number", description_key = "menu.hotstrings.expansion_delay", platforms = { "ahk", "hs", "linux" }, recommended = 0.75, family = "setting",
@@ -429,6 +429,9 @@ M.features = {
 		path = "llm.trigger.after_hotstring", id = "after_hotstring", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.after_hotstring", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
+		path = "llm.trigger.while_hotstring_tooltip", id = "while_hotstring_tooltip", section = "llm.trigger", default = "wait", type = "enum", description_key = "menu.llm.while_hotstring_tooltip", platforms = { "ahk", "hs", "linux" }, recommended = "wait", family = "setting", enum_values = { "wait", "both" },
+	},
+	{
 		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "platform_reason.inline_autotype_is_windows", platforms = { "ahk" },
 	},
 	{
@@ -468,10 +471,10 @@ M.features = {
 		path = "metrics.wpm_widget_visible", id = "wpm_widget_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_visible", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "setting",
 	},
 	{
-		path = "metrics.wpm_widget_colors", id = "wpm_widget_colors", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_colors", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "setting",
+		path = "metrics.wpm_widget_colors", id = "wpm_widget_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.wpm_widget_colors", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "metrics.wpm_widget_graph", id = "wpm_widget_graph", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_graph", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "setting",
+		path = "metrics.wpm_widget_graph", id = "wpm_widget_graph", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.wpm_widget_graph", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
 		path = "metrics.wpm_menubar_visible", id = "wpm_menubar_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.show_wpm_menubar", platforms = { "hs", "linux" }, recommended = false, family = "setting", reason_key = "platform_reason.wpm_readout_needs_a_menubar",
@@ -696,7 +699,7 @@ M.features = {
 		path = "shortcuts.tap_keys.number_row_right_2", id = "number_row_right_2", section = "shortcuts.tap_keys", default = "none", type = "action", description_key = "menu.shortcuts.tap_keys.number_row_right_2", platforms = { "ahk", "hs", "linux" }, recommended = "none", family = "feature",
 	},
 	{
-		path = "shortcuts.caps_word.idle_timeout_seconds", id = "idle_timeout_seconds", section = "shortcuts.caps_word", default = 10, type = "number", description_key = "menu.caps_word.idle_timeout", platforms = { "ahk", "hs", "linux" }, recommended = 10, family = "setting",
+		path = "shortcuts.caps_word.idle_timeout_seconds", id = "idle_timeout_seconds", section = "shortcuts.caps_word", default = 10, type = "number", description_key = "menu.caps_word.idle_timeout", platforms = { "ahk", "hs", "linux" }, recommended = 10, family = "setting", preset_values = { 0, 1, 3, 5, 10, 30, 60 },
 	},
 	{
 		path = "shortcuts.caps_word.terminators", id = "terminators", section = "shortcuts.caps_word", default = { "space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period" }, type = "array", description_key = "menu.caps_word.terminators_header", platforms = { "ahk", "hs", "linux" }, recommended = { "space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period" }, family = "setting",
@@ -723,43 +726,43 @@ M.features = {
 		path = "gestures.enabled", id = "enabled", section = "gestures", default = false, type = "boolean", description_key = "menu.gestures.enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
 	},
 	{
-		path = "gestures.swipe_3_down", id = "swipe_3_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_down", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "tab_next", linux = "none" }, family = "feature",
+		path = "gestures.swipe_3_down", id = "swipe_3_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_down", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "tab_close", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_3_left", id = "swipe_3_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_left", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "sel_word_prev", linux = "none" }, family = "feature",
+		path = "gestures.swipe_3_left", id = "swipe_3_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_left", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "tab_next", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_3_right", id = "swipe_3_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_right", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "sel_word_next", linux = "none" }, family = "feature",
+		path = "gestures.swipe_3_right", id = "swipe_3_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_right", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "tab_prev", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_3_up", id = "swipe_3_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_up", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "tab_prev", linux = "none" }, family = "feature",
+		path = "gestures.swipe_3_up", id = "swipe_3_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_up", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "tab_new", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_4_down", id = "swipe_4_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_down", platforms = { "ahk", "hs", "linux" }, recommended = "none", family = "feature",
+		path = "gestures.swipe_4_down", id = "swipe_4_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_down", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "win_app_prev", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_4_left", id = "swipe_4_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_left", platforms = { "ahk", "hs", "linux" }, recommended = "none", family = "feature",
+		path = "gestures.swipe_4_left", id = "swipe_4_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_left", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "space_next", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_4_right", id = "swipe_4_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_right", platforms = { "ahk", "hs", "linux" }, recommended = "none", family = "feature",
+		path = "gestures.swipe_4_right", id = "swipe_4_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_right", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "space_prev", linux = "none" }, family = "feature",
 	},
 	{
-		path = "gestures.swipe_4_up", id = "swipe_4_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_up", platforms = { "ahk", "hs", "linux" }, recommended = "none", family = "feature",
+		path = "gestures.swipe_4_up", id = "swipe_4_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_up", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "win_app_next", linux = "none" }, family = "feature",
 	},
 	{
 		path = "gestures.tap_3", id = "tap_3", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_3", platforms = { "ahk", "hs", "linux" }, recommended = "left_click_toggle", family = "feature",
 	},
 	{
-		path = "gestures.tap_4", id = "tap_4", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_4", platforms = { "ahk", "hs", "linux" }, recommended_by = { hs = "win_app_next", linux = "alt_tab_monitor" }, family = "feature",
+		path = "gestures.tap_4", id = "tap_4", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_4", platforms = { "ahk", "hs", "linux" }, recommended = "alt_tab_monitor", family = "feature",
 	},
 	{
 		path = "gestures.swipe_2_left", id = "swipe_2_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_left", platforms = { "hs", "linux" }, recommended = "none", family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 	},
 	{
-		path = "gestures.swipe_5_up", id = "swipe_5_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_up", platforms = { "hs", "linux" }, recommended = "none", family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
+		path = "gestures.swipe_5_up", id = "swipe_5_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_up", platforms = { "hs", "linux" }, recommended_by = { hs = "mission_control", linux = "none" }, family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 	},
 	{
-		path = "gestures.swipe_5_down", id = "swipe_5_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_down", platforms = { "hs", "linux" }, recommended = "none", family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
+		path = "gestures.swipe_5_down", id = "swipe_5_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_down", platforms = { "hs", "linux" }, recommended_by = { hs = "app_expose", linux = "none" }, family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 	},
 	{
 		path = "gestures.swipe_5_left", id = "swipe_5_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_left", platforms = { "hs", "linux" }, recommended = "none", family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
@@ -870,10 +873,10 @@ M.features = {
 		path = "gestures.modes.swipe_3_right", id = "swipe_3_right", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_right", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_up", id = "swipe_3_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_up", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_up", id = "swipe_3_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_3_up", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_down", id = "swipe_3_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_down", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_down", id = "swipe_3_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_3_down", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
 		path = "gestures.modes.swipe_3_left_down", id = "swipe_3_left_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_left_down", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
@@ -1108,6 +1111,9 @@ M.features = {
 	},
 	{
 		path = "tap_holds.enabled", id = "enabled", section = "tap_holds", default = false, type = "boolean", description_key = "menu.tap_holds", platforms = { "hs", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.category_master_is_a_gate_on_windows",
+	},
+	{
+		path = "tap_holds.lone_modifier_tap_max_ms", id = "lone_modifier_tap_max_ms", section = "tap_holds", default = 1000, type = "number", description_key = "menu.tapholds.lone_tap_title", platforms = { "ahk", "hs", "linux" }, recommended = 1000, family = "setting", preset_values = { 0, 500, 750, 1000, 1500 },
 	},
 	{
 		path = "shortcuts.keys.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "hs" }, recommended = true, family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",

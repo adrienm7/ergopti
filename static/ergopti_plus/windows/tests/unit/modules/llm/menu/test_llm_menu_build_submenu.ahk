@@ -94,7 +94,8 @@ _LBMS_AssertCleanSeparators(Labels, State) {
 }
 
 ; ai-test-prediction-row: model, profile and test are one block in every AI
-; state, closed by one separator before the trigger group.
+; state, closed by one separator, then the settings header over the trigger
+; group.
 _LBMS_AiBlock(State, Prepare) {
 	global _LLM_Menu, _LLM_Menu_Handle
 	SavedMenu := _LBMS_Fixture()
@@ -106,16 +107,31 @@ _LBMS_AiBlock(State, Prepare) {
 		try {
 			Labels := _LBMS_Labels(Built)
 			_LBMS_AssertCleanSeparators(Labels, State)
-			TestRow := _LBMS_ParentPosition(Labels, t("menu.llm.test_prediction"))
-			Trigger := _LBMS_ParentPosition(Labels, t("menu.llm.trigger_menu_title"))
+			; With the AI off every row but its switch is greyed with the category-off
+			; reason, and a greyed group opens nothing (category-off rule).
+			Off := State == "off"
+			TestRow := _LBMS_RowPosition(Labels, t("menu.llm.test_prediction"), Off)
+			Trigger := _LBMS_RowPosition(Labels, t("menu.llm.trigger_menu_title"), Off)
 			AssertTrue(TestRow > 0, State . ": the test row is drawn")
-			AssertTrue(DllCall("GetSubMenu", "ptr", Built.Handle, "int", TestRow - 1, "ptr") != 0,
-				State . ": the test row follows the profile parent")
+			if Off {
+				MF_BYPOSITION := 0x400, MF_GRAYED := 0x1
+				AssertTrue(DllCall("GetMenuState", "ptr", Built.Handle, "uint", TestRow, "uint", MF_BYPOSITION, "uint") & MF_GRAYED,
+					State . ": the test row is greyed")
+			} else
+				AssertTrue(DllCall("GetSubMenu", "ptr", Built.Handle, "int", TestRow - 1, "ptr") != 0,
+					State . ": the test row follows the profile parent")
 			AssertEqual("", Labels[TestRow + 2], State . ": one separator closes the block")
-			AssertEqual(TestRow + 2, Trigger, State . ": the trigger group follows that separator")
+			; The settings header, already greyed, keeps its exact title when the AI is off.
+			AssertEqual(MenuSectionTitle(t("menu.llm.header_settings")), Labels[TestRow + 3],
+				State . ": the settings header follows that separator")
+			MF_BYPOSITION := 0x400, MF_GRAYED := 0x1
+			AssertTrue(DllCall("GetMenuState", "ptr", Built.Handle, "uint", TestRow + 2, "uint", MF_BYPOSITION, "uint") & MF_GRAYED,
+				State . ": the settings header is inert")
+			AssertEqual(TestRow + 3, Trigger, State . ": the trigger group follows the settings header")
 			AssertTrue(Labels[TestRow - 1] != "", State . ": no separator splits the block")
 		} finally Built.Delete()
 	} finally {
+		_LBMS_LeaveBackend()
 		_LLM_Menu := SavedMenu
 		_LLM_Menu_Handle := HadHandle ? PriorHandle : unset
 	}
@@ -133,6 +149,13 @@ _LBMS_NoLocalModel() {
 	global _LLM_Menu
 	_LLM_Menu["backend"] := "ollama"
 	_LLM_Menu["model"] := ""
+}
+; Drawing the menu on the Ollama backend fires the real health and tags probes.
+; Restoring the fixture's backend without the driver's own transition boundary
+; left both in flight, and their completion rebuilt the menu, launching two
+; more, inside a later test that forbids every launch.
+_LBMS_LeaveBackend() {
+	LLM_AuxInvalidate("test fixture leaves its backend")
 }
 Test("ai-test-prediction-row: the block stands with the AI on", _LBMS_AiBlock.Bind("on", (*) => 0))
 Test("ai-test-prediction-row: the block stands with the AI off", _LBMS_AiBlock.Bind("off", _LBMS_AiOff))
@@ -184,6 +207,7 @@ _LBMS_GenerationGroups(State, Prepare) {
 			AssertEqual(Labels.Length, Clear, State . ": clearing the context closes the submenu")
 		} finally Built.Delete()
 	} finally {
+		_LBMS_LeaveBackend()
 		_LLM_Menu := SavedMenu
 		_LLM_Menu_Handle := HadHandle ? PriorHandle : unset
 	}
@@ -341,6 +365,14 @@ _LBMS_GroupDeclaration(Rows, Id) {
 		if Row is Map && _MR_Get(Row, "id") == Id
 			return Row
 	throw Error("A genuine group declaration is missing: " . Id)
+}
+; Zero-based position of a row. With Suffixed, the row may carry the category-off
+; reason; one already greyed for its own cause keeps its plain caption.
+_LBMS_RowPosition(Labels, Label, Suffixed) {
+	for Position, Present in Labels
+		if Present == Label || (Suffixed && InStr(Present, Label . " — ") == 1)
+			return Position - 1
+	return -1
 }
 _LBMS_ParentPosition(Labels, Label) {
 	for Position, Present in Labels

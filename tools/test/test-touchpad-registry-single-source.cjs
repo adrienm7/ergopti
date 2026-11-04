@@ -6,7 +6,8 @@
  * DESCRIPTION:
  * F2: the Precision Touchpad registry values Ergopti writes come from one data
  * file, both writers read the generated table, and one owner backs up the
- * prior values before the first write and restores them from Configuration.
+ * prior values before the first write; the Gestures clear restores them, or the
+ * Windows factory defaults when no backup exists.
  *
  * ROOT CAUSE ENCODED:
  * The first-run wizard's elevated PowerShell script hand-typed every value
@@ -110,7 +111,8 @@ function functionBody(source, name) {
 	const labels = functionBody(constants, 'GestureShortcutLabels');
 	for (const slot of contract.slots) {
 		check(
-			new RegExp(`"${slot.id}",\\s*"Ctrl \\+ Win \\+ Shift \\+ F${slot.functionKey}"`).test(labels),
+			// Key name ids: the tutorial names them in the user's language.
+			new RegExp(`"${slot.id}",\\s*"ctrl\\+win\\+shift\\+F${slot.functionKey}"`).test(labels),
 			`${slot.id} writes F${slot.functionKey}, which the setup tutorial must show too`
 		);
 	}
@@ -192,18 +194,27 @@ function functionBody(source, name) {
 	// ==================================
 	// ==================================
 
+	// The Configuration row was merged into the Gestures clear (maintainer,
+	// 2026-11-03): « Tout effacer » puts the touchpad back to its system state.
 	const manifest = JSON.parse(read(MENU_MANIFEST));
-	const row = (manifest.configuration_menu || []).find((r) => r.id === 'restore_touchpad_gestures');
 	check(
-		row && row.type === 'command' && JSON.stringify(row.platforms) === '["ahk"]' && row.reason_key,
-		'Configuration must declare the Windows-only touchpad restore row with its reason'
+		!(manifest.configuration_menu || []).some((r) => r.id === 'restore_touchpad_gestures'),
+		'Configuration must not declare a separate touchpad restore row any more'
 	);
-	const menuInit = read(path.join(WIN, 'ui', 'menu', 'menu_init.ahk'));
+	const menuGestures = read(path.join(WIN, 'ui', 'menu', 'menu_gestures.ahk'));
+	const clearAt = functionBody(menuGestures, '_GES_ApplyScope').indexOf(
+		'TouchpadRegistryClearFromScope('
+	);
+	check(clearAt > 0, 'the Gestures clear must restore the touchpad through the owner');
+	const globalScope = read(path.join(WIN, 'infra', 'config_global_scope.ahk'));
 	check(
-		/"restore_touchpad_gestures",\s+TouchpadRegistryRestoreFromMenu/.test(
-			functionBody(menuInit, '_MI_BuildConfigurationMenu')
-		),
-		'the Windows Configuration menu must dispatch the restore row to the owner'
+		functionBody(globalScope, 'ConfigGlobalScopeApply').includes('TouchpadRegistryClearFromScope('),
+		'the global clear must restore the touchpad through the owner too'
+	);
+	const restore = functionBody(owner, 'TouchpadRegistryRestore');
+	check(
+		restore.includes('_TouchpadRegistryFactoryEntries(') && contract.factoryDefaults.length > 0,
+		'without a backup the restore must write the generated factory defaults'
 	);
 
 	if (failures.length > 0) {
@@ -213,7 +224,7 @@ function functionBody(source, name) {
 	}
 	console.log(
 		`[OK] Windows touchpad registry: ${contract.values.length} value(s) from one data file, ` +
-			'written through one backing-up owner by both writers, restorable from Configuration.'
+			'written through one backing-up owner by both writers, restored by the Gestures clear.'
 	);
 })().catch((error) => {
 	console.error(`[ERROR] ${error.stack || error.message}`);

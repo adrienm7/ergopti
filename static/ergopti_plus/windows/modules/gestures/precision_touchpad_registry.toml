@@ -10,7 +10,8 @@
 # PowerShell script of the first-run wizard
 # (ui/onboarding/gesture_registration.ahk).
 # modules/gestures/touchpad_registry.ahk owns every write: it backs up the
-# prior values before the first one, and restores them on request.
+# prior values before the first one, and restores them (or, without a backup,
+# the factory defaults below) when the Gestures scope is cleared.
 #
 # Values were confirmed by reading the registry after a manual configuration
 # in Windows Settings. Every value is a REG_DWORD.
@@ -30,21 +31,41 @@ custom_tap_value = 7
 key_params_modifiers = 7
 
 # Gesture families, turned on before any slot is written.
+#
+# factory_default is the value Windows ships for the family, which the Gestures
+# « Tout effacer » writes back when no backup of the user's own values exists
+# (TouchpadRegistryRestore). Every other value Ergopti writes (the direction
+# enables, Custom*Tap, *KeyParams and *Action) is absent on a fresh profile and
+# is deleted instead. Microsoft documents the behaviour, not the numbers: three
+# fingers swipe between apps (up: all windows, down: desktop), four fingers
+# swipe between desktops, and the taps open search (three) and the notification
+# centre (four) (https://support.microsoft.com/help/17210). The numbers are the
+# Settings choices as the registry stores them: ThreeFingerSlideEnabled 1
+# « Switch apps and show desktop », FourFingerSlideEnabled 2 « Switch desktops
+# and show desktop », ThreeFingerTapEnabled 1 « Open search »,
+# FourFingerTapEnabled 2 « Notification center »
+# (https://geekrewind.com/how-to-change-touchpad-three-finger-swipe-gestures-in-windows-11/,
+# https://geekrewind.com/how-to-change-touchpad-four-finger-swipe-gestures-in-windows-11/,
+# https://geekrewind.com/how-to-change-touchpad-three-finger-tap-gesture-in-windows-11/).
 [[families]]
 id = "three_finger_slide"
 enable = "ThreeFingerSlideEnabled"
+factory_default = 1
 
 [[families]]
 id = "three_finger_tap"
 enable = "ThreeFingerTapEnabled"
+factory_default = 1
 
 [[families]]
 id = "four_finger_slide"
 enable = "FourFingerSlideEnabled"
+factory_default = 2
 
 [[families]]
 id = "four_finger_tap"
 enable = "FourFingerTapEnabled"
+factory_default = 2
 
 # One entry per gesture slot, in menu order. A tap slot carries its Custom*Tap
 # sentinel, a swipe slot its direction enable.

@@ -487,11 +487,11 @@ type = "---"
 [[menu.llm_menu]]
 type = "list"
 id = "llm_model"
-# Static provider status of the local servers, before their panel exists.
-# Inert labels are status text, not section headings or executable commands.
+# Static provider status of the local servers, before their panel exists: the
+# section header the live rows open with, then inert status text.
 status_rows.unavailable = [
 	{ type = "---" },
-	{ type = "label", i18n = "menu.llm.local_servers.header" },
+	{ type = "section_header", i18n = "menu.llm.local_servers.header" },
 	{ type = "label", i18n = "menu.llm.unavailable" },
 ]
 i18n = "menu.llm.model_label"
@@ -522,6 +522,11 @@ type = "---"
 # is the first row of the generation settings on every driver (the
 # `llm_generation_settings` submenu, or Linux's inline `llm_generation` handler),
 # not a row of this top level.
+# The settings submenus share one title, above the first of them.
+[[menu.llm_menu]]
+type = "section_header"
+i18n = "menu.llm.header_settings"
+
 [[menu.llm_menu]]
 type = "group"
 id = "llm_trigger"
@@ -682,6 +687,18 @@ type = "check"
 id = "llm_after_hotstring"
 i18n = "menu.llm.after_hotstring"
 checked_when = ["llm_after_hotstring_enabled"]
+disabled_when = ["llm_trigger_ready"]
+
+# The enum feature owns the two values; the shared choice renderer owns the
+# ticks and the « label : value » caption on every driver.
+[[menu.llm_trigger_menu]]
+type = "choice"
+id = "llm_while_hotstring_tooltip"
+path = "llm.trigger.while_hotstring_tooltip"
+i18n = "menu.llm.while_hotstring_tooltip"
+choice_label_prefix = "menu.llm.while_hotstring_tooltip_"
+show_current_choice = true
+current_choice_label_value = true
 disabled_when = ["llm_trigger_ready"]
 
 [[menu.llm_trigger_menu]]
@@ -926,16 +943,6 @@ type = "command"
 id = "clean_unused_keys"
 i18n = "menu.global.clean_unused_keys"
 
-# Puts back the Precision Touchpad registry values backed up before Ergopti's
-# first gesture configuration (windows/modules/gestures/touchpad_registry.ahk).
-# With the cleanup above it: both put something back as it was.
-[[menu.configuration_menu]]
-type = "command"
-id = "restore_touchpad_gestures"
-i18n = "menu.global.restore_touchpad_gestures"
-platforms = ["ahk"]
-reason_key = "platform_reason.touchpad_stack_is_per_driver"
-
 # Set apart by a separator: the rows above rewrite the configuration, the rows
 # below open a window onto it.
 [[menu.configuration_menu]]
@@ -971,6 +978,20 @@ id = "remove_from_karabiner"
 i18n = "menu.global.remove_from_karabiner"
 platforms = ["hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
+
+# The proxy override (Issue #101 point 2): automatic (the system settings, a
+# company PAC included), direct, or one relay every managed download uses. Its
+# key and default are _shared/modules/network/proxy_override.json; the shared
+# proxy policy applies it before an exported relay and the PAC lookup. A setting
+# of the configuration, not a check: it moved here from Debug on 2026-11-03
+# (maintainer request), which keeps Diagnostics, Logs and Tests only.
+[[menu.configuration_menu]]
+type = "---"
+
+[[menu.configuration_menu]]
+type = "command"
+id = "proxy_override"
+i18n = "menu.debug.proxy_override"
 
 # These four carried an id and nothing else until 2026-08-07 — no type, no label
 # key — so every driver that drew one spelled its label out in its own source.
@@ -1008,6 +1029,46 @@ reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 type = "---"
 id = "---"
 
+# The user-facing rows come first, the same on every driver (maintainer,
+# 2026-11-03): the diagnostics window, then reporting a bug or suggesting a
+# feature from it, then the logs. Every check and probe lives in the one Tests
+# submenu at the bottom, never among these rows. The diagnostics header titles
+# these rows, the logs header the next group.
+[[menu.debug_menu]]
+type = "section_header"
+i18n = "menu.debug.header_diagnostics"
+
+[[menu.debug_menu]]
+type = "command"
+id = "healthcheck"
+i18n = "menu.debug.healthcheck"
+
+# Right under the diagnostics window (the maintainer's request of 2026-10-02):
+# it decides whether an error shows itself, which that window then explains.
+[[menu.debug_menu]]
+type = "check"
+id = "show_error_dialog"
+i18n = "menu.debug.show_error_dialog"
+checked_when = ["error_dialog_enabled"]
+
+[[menu.debug_menu]]
+type = "command"
+id = "report_bug"
+i18n = "menu.debug.report_bug"
+
+[[menu.debug_menu]]
+type = "command"
+id = "suggest_feature"
+i18n = "menu.debug.suggest_feature"
+
+[[menu.debug_menu]]
+type = "---"
+id = "---"
+
+[[menu.debug_menu]]
+type = "section_header"
+i18n = "menu.debug.header_logs"
+
 [[menu.debug_menu]]
 type = "choice"
 id = "log_level"
@@ -1040,77 +1101,40 @@ i18n = "menu.debug.open_error_log"
 type = "---"
 id = "---"
 
+# « Tests »: every one-click check and probe, in one submenu on every driver.
+# Each driver builds its rows from debug_tests_menu with the same command owners
+# and draws no Tests row when none of them is for its platform.
 [[menu.debug_menu]]
-type = "command"
-id = "healthcheck"
-i18n = "menu.debug.healthcheck"
+type = "group"
+id = "debug_tests"
+i18n = "menu.debug.tests"
 
-# Right under the diagnostics window (the maintainer's request of 2026-10-02):
-# it decides whether an error shows itself, which that window then explains.
-[[menu.debug_menu]]
-type = "check"
-id = "show_error_dialog"
-i18n = "menu.debug.show_error_dialog"
-checked_when = ["error_dialog_enabled"]
-
+# The rows of « Tests », grouped by topic: the network, then the typing chain
+# (the composed layout, the key accounting, the two Windows input probes), then
+# the macOS Karabiner runtime and the system around it. At most seven rows reach
+# one driver (macOS), so the topics need no separator between them.
+#
 # One-click field checks of the macOS input and network chain (issue #101, item
 # 31). The network check runs on all three drivers (macOS and Linux share its
 # steps in Lua, Windows runs the same steps in AutoHotkey); the others are macOS
 # only. Each runs read-only steps, opens a result window with a Copy report
 # button and writes one compact record, with no key, path or URL, to the log.
-[[menu.debug_menu]]
-type = "command"
-id = "field_check_lease"
-i18n = "menu.debug.field_check_lease"
-platforms = ["hs"]
-reason_key = "platform_reason.debug_surface_is_each_drivers_own"
-
-[[menu.debug_menu]]
-type = "command"
-id = "field_check_owned_runtime"
-i18n = "menu.debug.field_check_owned_runtime"
-platforms = ["hs"]
-reason_key = "platform_reason.debug_surface_is_each_drivers_own"
-
-[[menu.debug_menu]]
+[[menu.debug_tests_menu]]
 type = "command"
 id = "field_check_network"
 i18n = "menu.debug.field_check_network"
 
-# The proxy override (Issue #101 point 2): automatic (the system settings, a
-# company PAC included), direct, or one relay every managed download uses. Its
-# key and default are _shared/modules/network/proxy_override.json; the shared
-# proxy policy applies it before an exported relay and the PAC lookup.
-[[menu.debug_menu]]
-type = "command"
-id = "proxy_override"
-i18n = "menu.debug.proxy_override"
-
 # The composed-layout check installs the shipped check composition through the
 # composer's save path, verifies it and removes it again; every driver routes it.
-[[menu.debug_menu]]
+[[menu.debug_tests_menu]]
 type = "command"
 id = "composer_check"
 i18n = "menu.debug.composer_check"
 
-[[menu.debug_menu]]
+[[menu.debug_tests_menu]]
 type = "command"
 id = "field_check_key_accounting"
 i18n = "menu.debug.field_check_key_accounting"
-platforms = ["hs"]
-reason_key = "platform_reason.debug_surface_is_each_drivers_own"
-
-[[menu.debug_menu]]
-type = "command"
-id = "field_check_toolchain"
-i18n = "menu.debug.field_check_toolchain"
-platforms = ["hs"]
-reason_key = "platform_reason.debug_surface_is_each_drivers_own"
-
-[[menu.debug_menu]]
-type = "command"
-id = "field_check_login_items"
-i18n = "menu.debug.field_check_login_items"
 platforms = ["hs"]
 reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 
@@ -1118,29 +1142,47 @@ reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 # 49 and 50): they exercise AutoHotkey's SendInput and its keyboard hook, which
 # no other driver has. Each writes a compact record, with no typed content, to
 # today's log under the InputProbe tag.
-[[menu.debug_menu]]
+[[menu.debug_tests_menu]]
 type = "command"
 id = "send_probe"
 i18n = "menu.debug.send_probe"
 platforms = ["ahk"]
 reason_key = "platform_reason.input_probe_is_autohotkey_specific"
 
-[[menu.debug_menu]]
+[[menu.debug_tests_menu]]
 type = "command"
 id = "hook_probe"
 i18n = "menu.debug.hook_probe"
 platforms = ["ahk"]
 reason_key = "platform_reason.input_probe_is_autohotkey_specific"
 
-[[menu.debug_menu]]
+[[menu.debug_tests_menu]]
 type = "command"
-id = "report_bug"
-i18n = "menu.debug.report_bug"
+id = "field_check_lease"
+i18n = "menu.debug.field_check_lease"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 
-[[menu.debug_menu]]
+[[menu.debug_tests_menu]]
 type = "command"
-id = "suggest_feature"
-i18n = "menu.debug.suggest_feature"
+id = "field_check_owned_runtime"
+i18n = "menu.debug.field_check_owned_runtime"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+[[menu.debug_tests_menu]]
+type = "command"
+id = "field_check_toolchain"
+i18n = "menu.debug.field_check_toolchain"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+[[menu.debug_tests_menu]]
+type = "command"
+id = "field_check_login_items"
+i18n = "menu.debug.field_check_login_items"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 
 [[menu.shortcuts_menu]]
 type = "toggle"
@@ -1201,6 +1243,12 @@ type = "---"
 # form one group, with no separator between them (the maintainer's request of
 # 2026-09-30): the switch and the symbols it wraps with go together. The label
 # names no AltGr, since only Ergopti puts the symbols there.
+# Everything below acts on the selection, up to the next separator: the wrap
+# switch (Windows, Linux), its symbols, and the Linux selection operations.
+[[menu.shortcuts_menu]]
+type = "section_header"
+i18n = "menu.shortcuts.header_selection"
+
 [[menu.shortcuts_menu]]
 type = "feature"
 path = "shortcuts.wrap_text_if_selected"
@@ -1235,12 +1283,6 @@ id = "wrap_symbols_menu"
 # `key_combinations`. Declaring one shared row would put a second copy of these
 # operations in two menus that already have them.
 [[menu.shortcuts_menu]]
-type = "section_header"
-i18n = "menu.shortcuts.header_selection"
-platforms = ["linux"]
-reason_key = "platform_reason.selection_operations_are_a_block_on_linux"
-
-[[menu.shortcuts_menu]]
 type = "list"
 id = "selection_operations"
 platforms = ["linux"]
@@ -1274,6 +1316,10 @@ disabled_reason_key = "physical_shortcuts.window_unavailable"
 
 [[menu.shortcuts_menu]]
 type = "---"
+
+[[menu.shortcuts_menu]]
+type = "section_header"
+i18n = "menu.shortcuts.header_modifier_groups"
 
 [[menu.shortcuts_menu]]
 type = "list"
@@ -1824,6 +1870,12 @@ type = "---"
 # the declaration, so this driver supplies only the toggle and the state behind
 # the tick. It was `dynamic`, which hands the id back and had the driver build a
 # checkbox the renderer already knows how to draw.
+# The typing-speed displays: the menu bar figure (macOS and Linux), then the
+# floating widget and its options, on every driver.
+[[menu.metrics_menu]]
+type = "section_header"
+i18n = "menu.metrics.header_wpm"
+
 [[menu.metrics_menu]]
 type = "check"
 id = "wpm_menubar"
@@ -1957,6 +2009,10 @@ type = "---"
 # puts one platform's convention inside a string twenty other languages also
 # read — and bypasses the tray's native check item.
 [[menu.metrics_menu]]
+type = "section_header"
+i18n = "menu.metrics.header_collection"
+
+[[menu.metrics_menu]]
 type = "check"
 id = "metrics_suspend"
 i18n = "menu.metrics.suspend_collection"
@@ -2054,6 +2110,15 @@ status_rows.no_bundle = [{ type = "label", i18n = "menu.layout.no_bundle" }]
 platforms = ["hs"]
 reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
+# Two axes of the emulation, kept apart (maintainer, 2026-11-03): which Ergopti
+# LAYERS it types, under this header, and which keyboard ROWS, in the submenu
+# below. Read as one flat block they looked like the same switches twice.
+[[menu.layout_menu]]
+type = "section_header"
+i18n = "menu.layout.header_layers"
+platforms = ["ahk"]
+unavailable = "hide"
+
 # `list` rather than `dynamic` since 2026-08-07: the driver answers with row
 # DATA and the renderer materialises it, where a `dynamic` handler was handed the
 # menu object and built the rows itself.
@@ -2075,15 +2140,18 @@ platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
 
 # The rows the emulation types, one checkbox each (the layout.emulate_<row>
-# switches). The other drivers emulate no layout: they draw each row greyed
-# with why, in the custom-layout section, without this header.
+# switches), in their own submenu: switching rows on one by one is how a user
+# learns the layout progressively. The other drivers emulate no layout: they
+# draw this submenu's row greyed with why.
 [[menu.layout_menu]]
-type = "section_header"
-i18n = "menu.layout.header_rows"
+type = "group"
+id = "layout_emulated_rows"
+i18n = "menu.layout.emulated_rows"
 platforms = ["ahk"]
-unavailable = "hide"
+unavailable = "grey"
+reason_key = "platform_reason.layout_emulation_is_windows_only"
 
-[[menu.layout_menu]]
+[[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_number_row"
 i18n = "menu.layout.emulate_number_row"
@@ -2091,7 +2159,7 @@ platforms = ["ahk"]
 unavailable = "grey"
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 
-[[menu.layout_menu]]
+[[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_top_row"
 i18n = "menu.layout.emulate_top_row"
@@ -2099,7 +2167,7 @@ platforms = ["ahk"]
 unavailable = "grey"
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 
-[[menu.layout_menu]]
+[[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_home_row"
 i18n = "menu.layout.emulate_home_row"
@@ -2107,7 +2175,7 @@ platforms = ["ahk"]
 unavailable = "grey"
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 
-[[menu.layout_menu]]
+[[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_bottom_row"
 i18n = "menu.layout.emulate_bottom_row"
@@ -2525,6 +2593,10 @@ checked_when = ["hotstrings_repeat_enabled"]
 type = "---"
 
 [[menu.hotstrings_params_group]]
+type = "section_header"
+i18n = "menu.hotstrings.header_new_word"
+
+[[menu.hotstrings_params_group]]
 type = "choice"
 id = "idle_reset"
 path = "hotstrings.idle_reset_seconds"
@@ -2608,6 +2680,14 @@ type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
 
+# On Windows the clear also puts the Precision Touchpad registry back to its
+# system state: the values backed up before Ergopti's first gesture
+# configuration, or the Windows factory defaults without a backup
+# (windows/modules/gestures/touchpad_registry.ahk). It replaced the
+# Configuration menu's « Restaurer les gestes du pavé tactile Windows » row
+# (maintainer, 2026-11-03), and the global clear composes it too. macOS and
+# Linux read the touchpad themselves and change no system setting, so their
+# clear has nothing to put back.
 [[menu.gestures_menu]]
 type = "command"
 id = "scope_clear"
@@ -2625,7 +2705,15 @@ type = "---"
 # platform's reason on macOS and Linux; on Windows only
 # menu.gestures.recommended_reason_windows, because the driver takes the
 # system's own assignment over itself and the "remove it first" advice does not
-# apply there.
+# apply there. The texts say how each driver gets the gesture (maintainer,
+# 2026-11-03): macOS and Linux read the touchpad themselves, so nothing is set
+# up; Windows cannot be told what a gesture does, so each gesture sends a rare
+# key combination Ergopti catches, assigned automatically or by the tutorial.
+# The rows about the system's own gestures, then Ergopti's gesture slots.
+[[menu.gestures_menu]]
+type = "section_header"
+i18n = "menu.gestures.header_system"
+
 [[menu.gestures_menu]]
 type = "command"
 id = "gesture_recommended_info"
@@ -2642,10 +2730,15 @@ id = "system_gesture_status"
 platforms = ["hs", "linux"]
 unavailable = "hide"
 
+# Not on Windows since 2026-11-03 (maintainer request): its manual setup
+# tutorial already opens the touchpad settings, so a menu shortcut beside it
+# was one row too many. macOS and Linux have no tutorial and keep the row.
 [[menu.gestures_menu]]
 type = "command"
 id = "system_gesture_settings"
 i18n = "menu.gestures.system_settings"
+platforms = ["hs", "linux"]
+unavailable = "hide"
 
 [[menu.gestures_menu]]
 type = "command"
@@ -2663,8 +2756,19 @@ reason_key = "platform_reason.touchpad_stack_is_per_driver"
 [[menu.gestures_menu]]
 type = "---"
 
+# Ergopti's gesture slots, one section per finger count (maintainer request of
+# 2026-11-03; it replaced the single « Gestes d'Ergopti » header, since two
+# headers in a row are refused). macOS declares each group here; Windows and
+# Linux draw one list and frame its groups with the status rows of that list
+# (fingers_N, then finger_group_boundary between two groups), the same headers.
+#
 # The circular Spaces checkbox that stood here is retired: the wrap is its own
 # pair of actions (space_prev_wrap / space_next_wrap), bindable like any other.
+[[menu.gestures_menu]]
+type = "section_header"
+i18n = "menu.gestures.header_fingers_2"
+platforms = ["hs"]
+unavailable = "hide"
 [[menu.gestures_menu]]
 type = "list"
 id = "gesture_slots_2"
@@ -2676,6 +2780,11 @@ platforms = ["hs"]
 unavailable = "hide"
 
 [[menu.gestures_menu]]
+type = "section_header"
+i18n = "menu.gestures.header_fingers_3"
+platforms = ["hs"]
+unavailable = "hide"
+[[menu.gestures_menu]]
 type = "list"
 id = "gesture_slots_3"
 platforms = ["hs"]
@@ -2686,6 +2795,11 @@ platforms = ["hs"]
 unavailable = "hide"
 
 [[menu.gestures_menu]]
+type = "section_header"
+i18n = "menu.gestures.header_fingers_4"
+platforms = ["hs"]
+unavailable = "hide"
+[[menu.gestures_menu]]
 type = "list"
 id = "gesture_slots_4"
 platforms = ["hs"]
@@ -2695,6 +2809,11 @@ type = "---"
 platforms = ["hs"]
 unavailable = "hide"
 
+[[menu.gestures_menu]]
+type = "section_header"
+i18n = "menu.gestures.header_fingers_5"
+platforms = ["hs"]
+unavailable = "hide"
 [[menu.gestures_menu]]
 type = "list"
 id = "gesture_slots_5"
@@ -2708,11 +2827,12 @@ type = "list"
 id = "gesture_slots_ahk"
 platforms = ["ahk"]
 reason_key = "platform_reason.touchpad_stack_is_per_driver"
-status_rows.tap_group_boundary = [{ type = "---" }]
+status_rows.finger_group_boundary = [{ type = "---" }]
+status_rows.fingers_3 = [{ type = "section_header", i18n = "menu.gestures.header_fingers_3" }]
+status_rows.fingers_4 = [{ type = "section_header", i18n = "menu.gestures.header_fingers_4" }]
 
-# One flat list rather than the per-finger-count groups macOS uses. The slots come
-# from gestures.DEFAULT_GESTURES, which is keyed by slot name and not by finger
-# count, so grouping would mean parsing the names back apart to regroup them.
+# One list whose provider groups the slots by the finger count in their names
+# and frames each group with these status rows, as Windows does.
 # A `list`, not a `dynamic`, since 2026-08-05: a dynamic handler appends its rows
 # inside the driver, so the manifest would name the slot while ui/menu/builder.lua
 # still built all thirty-odd rows and their nested action pickers. A list provider
@@ -2722,6 +2842,11 @@ type = "list"
 id = "gesture_slots_linux"
 platforms = ["linux"]
 reason_key = "platform_reason.touchpad_stack_is_per_driver"
+status_rows.finger_group_boundary = [{ type = "---" }]
+status_rows.fingers_2 = [{ type = "section_header", i18n = "menu.gestures.header_fingers_2" }]
+status_rows.fingers_3 = [{ type = "section_header", i18n = "menu.gestures.header_fingers_3" }]
+status_rows.fingers_4 = [{ type = "section_header", i18n = "menu.gestures.header_fingers_4" }]
+status_rows.fingers_5 = [{ type = "section_header", i18n = "menu.gestures.header_fingers_5" }]
 [[menu.gestures_menu]]
 type = "---"
 platforms = ["linux"]
@@ -2823,11 +2948,6 @@ id = "tap_hold_timings"
 platforms = ["hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
-[[menu.tap_holds_menu]]
-type = "---"
-platforms = ["hs"]
-unavailable = "hide"
-
 # The GLOBAL tap / hold delay on Windows and Linux (macOS draws its own among
 # the rows above): the delay of every key that has none of its own, 200 ms
 # until the user changes it. The driver supplies the one row, captioned with the
@@ -2840,10 +2960,16 @@ id = "tap_hold_global_delay"
 platforms = ["ahk", "linux"]
 unavailable = "hide"
 
+# How long a modifier key pressed alone still taps (tap_holds.
+# lone_modifier_tap_max_ms): one row captioned with the value, opening its
+# choices, Off (the strict tap-hold) to 1500 ms.
+[[menu.tap_holds_menu]]
+type = "list"
+id = "tap_hold_lone_tap"
+platforms = ["ahk", "hs", "linux"]
+
 [[menu.tap_holds_menu]]
 type = "---"
-platforms = ["ahk", "linux"]
-unavailable = "hide"
 
 # The keys, one row each holding its disable / tap-picker / hold-picker rows,
 # under one header per hand and with a separator between the hands, so where
@@ -3288,37 +3414,20 @@ checked_when = ["llm_debounce_is_never"]
 platforms = ["linux"]
 unavailable = "hide"
 
-# Fixed native profile headings retain each platform's existing decoration.
-[[menu.llm_profile_builtin_heading]]
-type = "label"
-id = "llm_profile_builtin_plain_heading"
-i18n = "menu.profiles.header_default_profiles"
-platforms = ["ahk", "linux"]
-unavailable = "hide"
-
+# The profile headings are section headers on every driver, drawn by the one
+# shared header format (Windows and Linux used to show a bare caption).
 [[menu.llm_profile_builtin_heading]]
 type = "section_header"
-id = "llm_profile_builtin_decorated_heading"
+id = "llm_profile_builtin_heading_title"
 i18n = "menu.profiles.header_default_profiles"
-platforms = ["hs"]
-unavailable = "hide"
 
 [[menu.llm_profile_custom_heading]]
 type = "---"
 
 [[menu.llm_profile_custom_heading]]
-type = "label"
-id = "llm_profile_custom_plain_heading"
-i18n = "menu.profiles.header_custom_profiles"
-platforms = ["ahk", "linux"]
-unavailable = "hide"
-
-[[menu.llm_profile_custom_heading]]
 type = "section_header"
-id = "llm_profile_custom_decorated_heading"
+id = "llm_profile_custom_heading_title"
 i18n = "menu.profiles.header_custom_profiles"
-platforms = ["hs"]
-unavailable = "hide"
 
 # Ordered frames consume native profile data without owning its callbacks.
 
@@ -4433,6 +4542,8 @@ type = "command"
 id = "keyboard_group_add_option"
 command = "keyboard_group_add"
 i18n = "menu.shortcuts.alt_add"
+caption_getter = "keyboard_group_add_caption"
+caption_format = "numbered"
 disabled_when = ["keyboard_group_ready"]
 platforms = ["hs"]
 unavailable = "hide"
@@ -4442,6 +4553,8 @@ type = "command"
 id = "keyboard_group_add_ctrl"
 command = "keyboard_group_add"
 i18n = "menu.shortcuts.ctrl_add"
+caption_getter = "keyboard_group_add_caption"
+caption_format = "numbered"
 disabled_when = ["keyboard_group_ready"]
 platforms = ["hs"]
 unavailable = "hide"
@@ -4451,6 +4564,8 @@ type = "command"
 id = "keyboard_group_add_ctrl_shift"
 command = "keyboard_group_add"
 i18n = "menu.shortcuts.ctrl_shift_add"
+caption_getter = "keyboard_group_add_caption"
+caption_format = "numbered"
 disabled_when = ["keyboard_group_ready"]
 platforms = ["hs"]
 unavailable = "hide"
@@ -4460,6 +4575,8 @@ type = "command"
 id = "keyboard_group_add_cmd"
 command = "keyboard_group_add"
 i18n = "menu.shortcuts.cmd_add"
+caption_getter = "keyboard_group_add_caption"
+caption_format = "numbered"
 disabled_when = ["keyboard_group_ready"]
 platforms = ["hs"]
 unavailable = "hide"
@@ -4469,6 +4586,8 @@ type = "command"
 id = "keyboard_group_add_cmd_shift"
 command = "keyboard_group_add"
 i18n = "menu.shortcuts.cmd_shift_add"
+caption_getter = "keyboard_group_add_caption"
+caption_format = "numbered"
 disabled_when = ["keyboard_group_ready"]
 platforms = ["hs"]
 unavailable = "hide"

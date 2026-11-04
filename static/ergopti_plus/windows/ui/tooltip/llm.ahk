@@ -575,6 +575,10 @@ LLM_TooltipShowLoading(PresentationMeta := 0) {
 	; so cancelling _TooltipTimerFn here would run 75 ms before the timer is armed
 	; and silently do nothing, letting the spinner vanish mid-inference.
 	Meta := (PresentationMeta is Map) ? PresentationMeta : Map()
+	; Shown together, the spinner would take the hotstring rows' surface and
+	; retire them; the prediction alone comes under them.
+	if (_LLM_TooltipSharedHotstringItems().Length > 0)
+		return false
 	CommitFn := _LLM_TooltipCommitLoadingState.Bind(Meta)
 	; Every loading ingress, including an all-placeholder streaming partial, must
 	; preserve the real prediction which already owns the pixels. Keep this guard
@@ -1149,31 +1153,18 @@ _LLM_SegmentColorHex(Role, is_active) {
 	throw ValueError("Unknown prediction line role: " . Role, -1)
 }
 
-; The native label of each modifier, from the shared shortcut spec
-; (_shared/modules/tooltip/constants.toml [llm_ui]). Map keys are
-; case-insensitive, which tolerates "Alt"/"ALT" from config.
-_LLM_ValModifierLabels() {
-	global UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_LABELS
-	Labels := Map()
-	Labels.CaseSense := false
-	Texts := StrSplit(UI_LLM_SHORTCUT_LABELS, ",")
-	for Position, Name in StrSplit(UI_LLM_SHORTCUT_ORDER, ",")
-		Labels[Name] := Texts[Position]
-	return Labels
-}
-
-; Spells a modifier string out for the footer's navigation hint ("Alt+Shift").
+; Spells a modifier string out for the footer's navigation hint ("Alt+Maj"),
+; each modifier named by the shared key name table in the active language.
 ; Windows uses words: the macOS glyphs read as Cmd/Option shortcuts on a PC
 ; keyboard (llm-val-mods-windows-labels).
 _LLM_FormatValModifiers(valMods) {
 	if (valMods = "" or valMods = "none")
 		return ""
-	Labels := _LLM_ValModifierLabels()
 	out := ""
 	for part in StrSplit(valMods, "+", " `t") {
 		if (part = "")
 			continue
-		out .= (out = "" ? "" : "+") . Labels.Get(part, part)
+		out .= (out = "" ? "" : "+") . KeyNameLabel(part)
 	}
 	return out
 }
@@ -1188,7 +1179,7 @@ _LLM_FormatValModifiers(valMods) {
  * @returns {String} The label, "" when the row has no chord.
  */
 _LLM_PredictionShortcutLabel(Idx, ValMods) {
-	global UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_LABELS, UI_LLM_SHORTCUT_JOINER
+	global UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_JOINER
 	if !(Idx is Integer) || Idx < 1 || Idx > 10
 		return ""
 	Present := Map()
@@ -1196,11 +1187,10 @@ _LLM_PredictionShortcutLabel(Idx, ValMods) {
 	for Part in StrSplit(ValMods, "+", " `t")
 		if (Part != "")
 			Present[Part] := true
-	Texts := StrSplit(UI_LLM_SHORTCUT_LABELS, ",")
 	Out := ""
-	for Position, Name in StrSplit(UI_LLM_SHORTCUT_ORDER, ",")
+	for Name in StrSplit(UI_LLM_SHORTCUT_ORDER, ",")
 		if Present.Has(Name)
-			Out .= Texts[Position] . UI_LLM_SHORTCUT_JOINER
+			Out .= KeyNameLabel(Name) . UI_LLM_SHORTCUT_JOINER
 	return Out . (Idx == 10 ? "0" : String(Idx))
 }
 
@@ -1319,31 +1309,45 @@ _LLM_FormatInfoLine(modelInfo, ttftMs := "", ttltMs := "", forSizing := false) {
 ; menu_llm/tab_accept.ahk consume, the left and right Shift+Tab, then the
 ; arrows with the configured modifiers, bare by default, as the macOS footer
 ; (tooltip_llm.lua) shows them. The bare arrows were left out, so the footer
-; hid the default chord (llm-nav-left-right-windows).
+; hid the default chord (llm-nav-left-right-windows). The words are locale
+; text and each key is named from the key name table (« Maj gauche + Tab ou
+; ↑/← »): the footer read French in every locale until 2026-11-03. Port of
+; macos/ui/tooltip/tooltip_llm.lua footer_hints.
 ; @param {Integer} slotCount - The number of predictions shown.
 ; @param {String} navMods - The configured nav_modifiers; "none" hides the arrows.
 ; @returns {String}
 _LLM_BuildNavHint(slotCount, navMods := "") {
-	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_SINGLE, UI_LLM_HINT_NAV_LEFT
-	global UI_LLM_HINT_NAV_RIGHT, UI_LLM_HINT_ACCEPT_CENTER, UI_LLM_HINT_ARROW_LEFT
-	global UI_LLM_HINT_ARROW_RIGHT, UI_LLM_HINT_OR, UI_LLM_HINT_ARROW_SEP_LEFT
+	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_KEY, UI_LLM_HINT_NAV_LEFT_KEYS
+	global UI_LLM_HINT_NAV_RIGHT_KEYS, UI_LLM_HINT_ARROW_LEFT
+	global UI_LLM_HINT_ARROW_RIGHT, UI_LLM_HINT_ARROW_SEP_LEFT
 	global UI_LLM_HINT_ARROW_SEP_RIGHT
 	spaceDiv := UI_LLM_FOOTER_SPACE_DIV
-	acceptSingle := UI_LLM_HINT_ACCEPT_SINGLE
+	acceptKey := KeyNameComboLabel(UI_LLM_HINT_ACCEPT_KEY)
 	if (slotCount <= 1)
-		return acceptSingle
-	hintLeft := UI_LLM_HINT_NAV_LEFT
-	hintRight := UI_LLM_HINT_NAV_RIGHT
+		return KeyNameFill("llm.tooltip.hint_accept_single", acceptKey)
+	hintLeft := KeyNameComboLabel(UI_LLM_HINT_NAV_LEFT_KEYS)
+	hintRight := KeyNameComboLabel(UI_LLM_HINT_NAV_RIGHT_KEYS)
 	if (navMods != "none") {
 		navStr := _LLM_FormatValModifiers(navMods)
 		chord := navStr == "" ? "" : navStr . " + "
-		hintLeft .= UI_LLM_HINT_OR . chord . UI_LLM_HINT_ARROW_LEFT
-		hintRight .= UI_LLM_HINT_OR . chord . UI_LLM_HINT_ARROW_RIGHT
+		hintLeft := _LLM_HintEither(hintLeft, chord . UI_LLM_HINT_ARROW_LEFT)
+		hintRight := _LLM_HintEither(hintRight, chord . UI_LLM_HINT_ARROW_RIGHT)
 	}
 	sepL := UI_LLM_HINT_ARROW_SEP_LEFT
 	sepR := UI_LLM_HINT_ARROW_SEP_RIGHT
-	acceptCenter := UI_LLM_HINT_ACCEPT_CENTER
+	acceptCenter := KeyNameFill("llm.tooltip.hint_accept_center", acceptKey)
 	return hintLeft . spaceDiv . sepL . spaceDiv . acceptCenter . spaceDiv . sepR . spaceDiv . hintRight
+}
+
+; Two chords of one footer step, joined by the locale's « or ».
+; @param {String} First - The Shift+Tab chord.
+; @param {String} Second - The arrows, with their modifiers.
+; @returns {String}
+_LLM_HintEither(First, Second) {
+	Template := t("llm.tooltip.hint_or")
+	if (Template == "llm.tooltip.hint_or")
+		return Template
+	return StrReplace(StrReplace(Template, "{1}", First), "{2}", Second)
 }
 
 ; The footer strings, shared by the sizing and the drawing pass. InfoSizing is
@@ -1412,6 +1416,88 @@ _LLM_TooltipShortcutColumn(WidestLine, WidestLabel, Gap, MaxW) {
 _LLM_TooltipColumnPlacement(ContentW, ZoneW, LabelW, LineW) {
 	LineLimit := ContentW - ZoneW
 	return { LabelX: ContentW - LabelW, LineLimit: LineLimit, Truncated: LineW > LineLimit }
+}
+
+; The hotstring rows shown above a prediction when the user chose to see both
+; (llm.trigger.while_hotstring_tooltip = "both"): the preview rows of the surface
+; on screen that can still expand. A live prediction never shares, and a row
+; whose decision went stale or whose deadline passed is left out.
+; @returns {Array} Preview items (FireDecision rows), empty when shown alone.
+_LLM_TooltipSharedHotstringItems() {
+	global _TooltipActiveSurface, LLM_HOTSTRING_TOOLTIP_SHOW_BOTH
+	if !IsSet(LLM_Engine_WhileHotstringTooltip) || !IsSet(LLM_HOTSTRING_TOOLTIP_SHOW_BOTH)
+			|| LLM_Engine_WhileHotstringTooltip() != LLM_HOTSTRING_TOOLTIP_SHOW_BOTH
+		return []
+	if IsSet(LLM_Engine_LiveIsActive) && LLM_Engine_LiveIsActive()
+		return []
+	Surface := IsSet(_TooltipActiveSurface) ? _TooltipActiveSurface : 0
+	if !IsObject(Surface) || !Surface.HasOwnProp("DecisionItems") || !(Surface.DecisionItems is Array)
+		return []
+	Rows := []
+	for , Item in Surface.DecisionItems {
+		if IsObject(Item) && Item.HasOwnProp("FireDecision")
+			Rows.Push(Item)
+	}
+	if (Rows.Length == 0)
+		return Rows
+	Rows := _TooltipFilterUnexpiredDeadlineItems(Rows)
+	Current := false
+	try Current := _TooltipDecisionItemsStillCurrent(Rows)
+	return (Current && Rows.Length > 0) ? Rows : []
+}
+
+; Geometry of the hotstring rows heading a shared panel, drawn like the
+; hotstring stack: a band per row, each followed by its 1 px rule (the last one
+; separates the predictions). Pure, layout units.
+; @param Sizes       Array of { W, H } — each row's text.
+; @param LabelSizes  Array of { W, H } — each row's trigger label, W 0 when none.
+; @param Style       { PadX, PadY, LabelGap }.
+; @returns { W, H, TextW, LabelW, RowY[], RowH[], Sizes, LabelSizes }
+_LLM_TooltipHeaderLayout(Sizes, LabelSizes, Style) {
+	TextW := 0
+	LabelW := 0
+	for , Size in Sizes
+		TextW := Max(TextW, Size.W)
+	for , Size in LabelSizes
+		LabelW := Max(LabelW, Size.W)
+	LabelZone := LabelW > 0 ? Style.LabelGap + LabelW : 0
+	L := { W: Sizes.Length > 0 ? Style.PadX + TextW + LabelZone + Style.PadX : 0, H: 0,
+		TextW: TextW, LabelW: LabelW, RowY: [], RowH: [], Sizes: Sizes, LabelSizes: LabelSizes }
+	for , Size in Sizes {
+		RowH := Style.PadY + Size.H + Style.PadY
+		L.RowY.Push(L.H)
+		L.RowH.Push(RowH)
+		L.H += RowH + 1
+	}
+	return L
+}
+
+; Moves a prediction layout under a header of OffsetY and widens it to MinW.
+_LLM_TooltipShiftLayout(Layout, OffsetY, MinW) {
+	for Idx, Y in Layout.RowY
+		Layout.RowY[Idx] := Y + OffsetY
+	Layout.SepY += OffsetY
+	Layout.CombinedY += OffsetY
+	Layout.HintY += OffsetY
+	Layout.InfoY += OffsetY
+	Layout.H += OffsetY
+	Layout.W := Max(Layout.W, MinW)
+	return Layout
+}
+
+; Measures the shared hotstring rows with the hotstring stack's fonts.
+_LLM_TooltipMeasureHeader(Items) {
+	global _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_LABEL_GAP
+	Sizes := []
+	LabelSizes := []
+	for , Item in Items {
+		Sizes.Push(_TooltipMeasureText(Item.Text))
+		Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+		Measured := _LLM_TooltipMeasureOptional(Label, _TOOLTIP_LABEL_FONT_SIZE)
+		LabelSizes.Push(IsObject(Measured) ? Measured : { W: 0, H: 0 })
+	}
+	return _LLM_TooltipHeaderLayout(Sizes, LabelSizes,
+		{ PadX: _TOOLTIP_PADDING_X, PadY: _TOOLTIP_PADDING_Y, LabelGap: _TOOLTIP_LABEL_GAP })
 }
 
 ; Geometry of the prediction panel — the Windows port of the macOS layout in
@@ -1697,6 +1783,14 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		PadX: _TOOLTIP_PADDING_X, PadY: _TOOLTIP_PADDING_Y,
 		LineSpacing: _TOOLTIP_LINE_SPACING, HintSpacing: _TOOLTIP_HINT_SPACING,
 		ShortcutW: ShortcutColumnW, LabelGap: _TOOLTIP_LABEL_GAP, MaxPredsW: UI_LLM_MAX_CONTENT_WIDTH })
+	; Shown together, the hotstring rows that can still expand head the panel and
+	; stay the visible decisions; the predictions continue the stack under them.
+	HeaderItems := _LLM_TooltipSharedHotstringItems()
+	Header := 0
+	if (HeaderItems.Length > 0) {
+		Header := _LLM_TooltipMeasureHeader(HeaderItems)
+		_LLM_TooltipShiftLayout(Layout, Header.H, Header.W)
+	}
 
 	G := Gui("+AlwaysOnTop -Caption +E0x20 +E0x80 +LastFound")
 	G.BackColor := all_placeholder
@@ -1704,6 +1798,8 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		: _TOOLTIP_DEFAULT_BG_HEX
 	G.MarginX := 0
 	G.MarginY := 0
+	if IsObject(Header)
+		_TooltipDrawSharedHotstringRows(G, HeaderItems, Header, Layout.W)
 
 	for Idx, slot in slots {
 		RowY := Layout.RowY[Idx]
@@ -1781,11 +1877,13 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	CandidateHandedOff := true
 	; The direct rich renderer shares the same final owner/deadline/oracle commit
 	; as ordinary and destack renders. Empty decision items retire a hotstring
-	; snapshot when the LLM surface replaces it. Let presentation exceptions reach
+	; snapshot when the LLM surface replaces it; shared header rows stay the
+	; visible decisions and pass the same freshness and deadline fences.
+	; Let presentation exceptions reach
 	; LLM_TooltipShow, whose generation+request-fenced cleanup owns failure.
 	StateCommit := _LLM_TooltipCommitSurfaceState.Bind(
 		slots, active_idx, RenderGeneration, PresentationMeta)
-	Presented := _TooltipPresentStack(Pos, Row, false, [],
+	Presented := _TooltipPresentStack(Pos, Row, false, HeaderItems,
 		RenderGeneration, true, RequestSerial, 0, StateCommit, &PresentBreakdown)
     HotPath_LogIfSlow("Tooltip.LlmPresent", _hpLlmPresent, HotPath_BreakdownDetail(PresentBreakdown))
 	if !Presented

@@ -1386,6 +1386,11 @@ function hotstringScopePublication(source, platform, manifest) {
 }
 
 /** Admits only an actual registered language producer and its completed canonical frame. */
+// The Hotstrings child is built at its first open (MenuDeferOrBuild), so the
+// retained child begins at the deferred build, not at a bare render call.
+const HOTSTRINGS_MENU_BUILD =
+	'HotstringsMenu := MenuDeferOrBuild((Target) => MenuRenderer_Build("hotstrings_menu"';
+
 /** Retains the completed native Hotstrings child through its declared parent receiver.
  * The finite publication helper checks the row's exact native child identity before
  * AddFeature, propagates the declared checked state and disposes a refused child.
@@ -1410,20 +1415,9 @@ function ahkDeclaredHotstringsTransport(stage, consumer) {
 	)
 		return false;
 	if (
-		!route(stage, '.ahk', [
-			[capture],
-			['HotstringsMenu := MenuRenderer_Build("hotstrings_menu"'],
-			[publish]
-		]) ||
+		!route(stage, '.ahk', [[capture], [HOTSTRINGS_MENU_BUILD], [publish]]) ||
 		!retainedChild(stage, '.ahk', 'Receiver', capture, publish, 0) ||
-		!retainedChild(
-			stage,
-			'.ahk',
-			'HotstringsMenu',
-			'HotstringsMenu := MenuRenderer_Build("hotstrings_menu"',
-			publish,
-			0
-		) ||
+		!retainedChild(stage, '.ahk', 'HotstringsMenu', HOTSTRINGS_MENU_BUILD, publish, 0) ||
 		!route(stage, '.ahk', [
 			[
 				`if !Receiver
@@ -1496,7 +1490,7 @@ function hotstringLanguagePublication(sources, manifest, platform, target) {
 					stage,
 					'.ahk',
 					'HotstringsMenu',
-					'HotstringsMenu := MenuRenderer_Build("hotstrings_menu"',
+					HOTSTRINGS_MENU_BUILD,
 					'TrayMenuStage_AddFeature(HotstringsMenuTitle, HotstringsMenu)',
 					0
 				) &&
@@ -1585,7 +1579,7 @@ function hotstringLanguagePublication(sources, manifest, platform, target) {
 				route(owner(sources[consumerFile], '_MI_StageHotstrings() {', '.ahk'), '.ahk', [
 					['"hotstring_languages", (*) => _HS_LanguageRows(),'],
 					[
-						'HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders, _HotCommands, _HotGetters)'
+						'HotstringsMenu := MenuDeferOrBuild((Target) => MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders, _HotCommands, _HotGetters, Target), "hotstrings_menu")'
 					]
 				])
 			);

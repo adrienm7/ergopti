@@ -237,11 +237,15 @@ const bareLabelOf = (label) => label.replace(/\s*\[[^\]]+\]$/, '');
 const tapHoldDefaults = readToml(join(SHARED_ROOT, 'tap_hold/defaults.toml')).tap_hold;
 const tapHolds = Object.entries(tapHoldDefaults.keys).map(([id, key]) => ({
 	id,
-	key: t(`tap_hold.group.${id}`),
+	// The Windows column of _shared/data/keycodes/key_names.json names these ids.
+	key: t(`key_name.${id}`),
 	tap: t(`sg_actions.${key.tap_action}`),
 	hold: key.hold_layer
 		? t(`tap_hold.hold.${key.hold_layer}_layer`)
-		: t(`tap_hold.hold.${key.hold_modifier}`)
+		: key.hold_modifier
+				.split('+')
+				.map((modifier) => t(`key_name.${modifier.trim()}`))
+				.join(' + ')
 }));
 
 const windowsActions = allActions

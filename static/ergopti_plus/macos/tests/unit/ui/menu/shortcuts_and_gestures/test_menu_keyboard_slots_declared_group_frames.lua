@@ -57,10 +57,11 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 		local slot = group.prefix .. "a"
 		local fixed = { label = "Independent fixed row", action = function() error("a fixed row must not run during build") end }
 		local i18n = require("infra.i18n")
-		local add_label = i18n.get("menu.shortcuts.alt_add")
+		local add_label = (i18n.get("menu.shortcuts.alt_add"):gsub("{1}", i18n.get("key_name.option")))
 		local restore_label = i18n.get("common.restore_recommended")
 		local clear_label = i18n.get("common.clear_to_system")
-		local assigned_label = shortcuts.get_keyboard_slot_label(slot) .. " : Label:lookup"
+		-- No catalogue behind this fixture: common.label_value falls back to "{1}: {2}".
+		local assigned_label = shortcuts.get_keyboard_slot_label(slot) .. ": Label:lookup"
 		local cases = {
 			{ fixed = false, assigned = false, labels = { restore_label, clear_label, "-", add_label } },
 			{ fixed = true, assigned = false, labels = { restore_label, clear_label, "-", fixed.label, "-", add_label } },
@@ -100,15 +101,22 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 		helpers.assert_eq(picker.opened[1].opts.current, "none")
 	end)
 
-	it("retains the five translated physical Add labels in all twenty-one catalogues", function()
+	it("names each group's modifiers in its heading and Add row in all twenty-one catalogues", function()
 		local ui, shortcuts = fresh()
 		local ctx = make_ctx()
 		local i18n = require("infra.i18n")
 		local locales = keyboard_frame_json("data/locale_order.json").order
 		helpers.assert_eq(#locales, 21, "this assertion covers every actual supported catalogue")
-		local add_keys = {
-			"menu.shortcuts.alt_add", "menu.shortcuts.ctrl_add", "menu.shortcuts.ctrl_shift_add",
-			"menu.shortcuts.cmd_add", "menu.shortcuts.cmd_shift_add",
+		-- Spelled here, not read from the driver: the groups are Option, Ctrl,
+		-- Ctrl + Shift, Cmd and Cmd + Shift, each modifier under the shared key
+		-- name table's translation and its macOS glyph (2026-11-03: the French
+		-- heading read « Ctrl+Shift » and the Option group « ⎇ Alt »).
+		local groups = {
+			{ key = "alt", names = { "key_name.option" }, glyphs = "⌥" },
+			{ key = "ctrl", names = { "key_name.ctrl" }, glyphs = "⌃" },
+			{ key = "ctrl_shift", names = { "key_name.ctrl", "key_name.shift" }, glyphs = "⌃⇧" },
+			{ key = "cmd", names = { "key_name.cmd" }, glyphs = "⌘" },
+			{ key = "cmd_shift", names = { "key_name.cmd", "key_name.shift" }, glyphs = "⌘⇧" },
 		}
 		local previous_get = i18n.get
 		local ok, detail = xpcall(function()
@@ -117,10 +125,21 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 				i18n.get = function(key) return catalogue[key] or key end
 				local rows = physical_rows(ui.provide_rows(ctx, nil), shortcuts)
 				helpers.assert_eq(#rows, 5)
-				for index, key in ipairs(add_keys) do
-					helpers.assert_type(catalogue[key], "string", locale .. " supplies the real Add caption")
-					helpers.assert_eq(rows[index].items[#rows[index].items].label, catalogue[key],
-						locale .. " retains the independent canonical caption")
+				for index, group in ipairs(groups) do
+					local names = {}
+					for position, name in ipairs(group.names) do names[position] = catalogue[name] end
+					local joined = table.concat(names, " + ")
+					local add = catalogue["menu.shortcuts." .. group.key .. "_add"]
+					local heading = catalogue["menu.shortcuts." .. group.key .. "_group"]
+					helpers.assert_type(add, "string", locale .. " supplies the real Add caption")
+					helpers.assert_true(add:find("{1}", 1, true) ~= nil, locale .. " Add caption is a template")
+					helpers.assert_eq(rows[index].items[#rows[index].items].label,
+						(add:gsub("{1}", function() return joined end)), locale .. " Add row names " .. joined)
+					helpers.assert_eq(rows[index].label,
+						(heading:gsub("{1}", function() return group.glyphs .. " " .. joined end)),
+						locale .. " heading names " .. joined)
+					helpers.assert_true(not rows[index].label:find("⎇", 1, true)
+						and not rows[index].label:find("Ctrl+Shift", 1, true), locale .. " heading reads as text")
 				end
 			end
 		end, debug.traceback)

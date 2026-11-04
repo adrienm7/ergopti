@@ -223,8 +223,11 @@ _MI_StageLayout() {
 	)
 	; The accented-letter group stays enabled without the Ergopti emulation: the
 	; shortcuts then follow the user's own layout (accented_shortcuts.ahk).
-	LayoutMenu  := MenuDeferOrBuild((Target) => MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders,
-		_LAY_ScopeCommands(),
+	; The emulated-row switches are the manifest's layout_emulated_rows_group.
+	LayoutGroupBuilders := Map("layout_emulated_rows", () => MenuRenderer_Build("layout_emulated_rows_group", "Layout",
+		"", "", "", _LAY_ScopeCommands(), Map("layout_enabled", () => IsCategoryGated("Layout"))))
+	LayoutMenu  := MenuDeferOrBuild((Target) => MenuRenderer_Build("layout_menu", "Layout", "", LayoutGroupBuilders,
+		LayoutListProviders, _LAY_ScopeCommands(),
 		Map("layout_enabled", () => IsCategoryGated("Layout")), Target), "layout_menu")
 	_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true)
 	BootProfile_Mark("MENU/initMenu: layout built+added")
@@ -524,7 +527,7 @@ _MI_BuildConfigurationMenu() {
 		MenuCommand.CLEAN_UNUSED_KEYS,   ShowUnusedConfigKeysCleanup,
 		MenuCommand.CONFIG_FOLDER,       FilePathsEditor,
 		MenuCommand.SETUP_WIZARD,        Onboarding_ShowFromMenu,
-		MenuCommand.RESTORE_TOUCHPAD_GESTURES, TouchpadRegistryRestoreFromMenu
+		MenuCommand.PROXY_OVERRIDE,      ProxyOverride_Command
 	)
 		Commands[Id] := Callback
 	return MenuRenderer_Build("configuration_menu", "Configuration", "", "", "", Commands)
@@ -648,7 +651,9 @@ _MI_ChannelPickerRow(SetChannelFn, IsLocal := Updater_IsLocalSource()) {
 ; Builds the Debug submenu from the manifest's debug_menu array.
 ;
 ; Shared commands and one enum choice: native code supplies only the actual
-; setter and current runtime value, while the manifest owns the row policy.
+; setter and current runtime value, while the manifest owns the row policy. The
+; checks and probes hang in its « Tests » group, built from debug_tests_menu
+; with the same command owners; no Tests row is drawn when none is for Windows.
 _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 	global LOGGER_MIN_LEVEL
 	if !HasMethod(LogLevelCommand, "Call")
@@ -665,7 +670,6 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 		MenuCommand.HOOK_PROBE, InputProbe_HookOrderCommand,
 		MenuCommand.COMPOSER_CHECK, ComposerCheck_Command,
 		MenuCommand.FIELD_CHECK_NETWORK, NetworkCheck_Command,
-		MenuCommand.PROXY_OVERRIDE, ProxyOverride_Command,
 		MenuCommand.REPORT_BUG,      (*) => HealthCheck_ReportBug(),
 		MenuCommand.SUGGEST_FEATURE, (*) => HealthCheck_SuggestFeature(),
 		ConfigLeaf.SHOW_ERROR_DIALOG, (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),
@@ -673,7 +677,15 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 	)
 	StateGetters := Map("error_dialog_enabled", ErrorDialog_IsEnabled,
 		ConfigKey.SCRIPT_LOG_LEVEL, (*) => LOGGER_MIN_LEVEL)
-	return MenuRenderer_Build("debug_menu", "Debug", "", "", Map(), Commands, StateGetters)
+	GroupBuilders := Map("debug_tests", () => _MI_BuildDebugTestsMenu(Commands, StateGetters))
+	return MenuRenderer_Build("debug_menu", "Debug", "", GroupBuilders, Map(), Commands, StateGetters)
+}
+
+; The « Tests » submenu of Debug, or false when it would hold no row: the
+; renderer then draws no parent, so the menu never offers an empty submenu.
+_MI_BuildDebugTestsMenu(Commands, StateGetters) {
+	Tests := MenuRenderer_Build("debug_tests_menu", "Debug", "", "", Map(), Commands, StateGetters)
+	return TrayMenuItemCount(Tests) > 0 ? Tests : false
 }
 
 ; Keep command registration shared by the real menu and its persistence tests.
@@ -693,7 +705,9 @@ _LAY_ScopeCommands(Options := unset) {
  */
 _MI_GlobalScopeCommands(Options := unset) {
 	global _ConfigDir
-	Selected := IsSet(Options) ? Options : Map("layers_config_dir", _ConfigDir)
+	; The clear also restores the real touchpad (TouchpadRegistryClearFromScope).
+	Selected := IsSet(Options) ? Options
+		: Map("layers_config_dir", _ConfigDir, "touchpad_restore", TouchpadRegistryRestore)
 	return Map(
 		MenuCommand.SCOPE_RESTORE, (*) => ConfigGlobalScopeApply("recommended", Selected),
 		MenuCommand.SCOPE_CLEAR, (*) => ConfigGlobalScopeApply("clear", Selected))

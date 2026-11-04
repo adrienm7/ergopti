@@ -239,6 +239,8 @@ button.danger {
 .btns {
 	display: flex;
 	flex-shrink: 0;
+	flex-wrap: wrap;
+	gap: 6px;
 	justify-content: flex-end;
 	margin-top: 10px;
 }

@@ -8,12 +8,70 @@ the field-run step or the hand action that proves it and the commits it confirms
 [workflow and verification memory](docs/memory/workflow-and-verification.md). Finished items are in Git
 (`git show 2a0083cb11:TODO.md` is the long form before this shrink).
 
+## Handoff, 2026-11-03 late evening (read first if the session was lost)
+
+- **Release 1.0.9 is pending on CI only.** dev `ed2618c2fe` holds every 1.0.9 change; full CI run 41730677937 is the
+  release gate. Last reds before it were infrastructure (Ubuntu APT over 10 min in Shared UI rendering, macOS 26 XCTest
+  lease lost, Windows keystats `metrics-native-sender` deadline): rerun those jobs once; any other red is real. When
+  green: fast-forward `main` to that commit (`Release-As: 1.0.9` trailer only if the computed version differs), watch
+  the publish, then clean up (below). Never push main for anything else.
+- **Work for the next release, each on its own pushed branch** (rebase on dev, land by fast-forward only):
+  - `next/ai-hotstring-tooltip` — AI tooltip never covers a hotstring tooltip; choice wait (default) / both. Done, CI
+    reds same as dev. Left: try « both » by hand; Windows rows linger past expiry; macOS canvas does not follow height.
+  - `next/key-names` — chord action labels, sticky/layer holds, tooltip footer from the key name table; Arabic and
+    Chinese finger counts fixed. Left: physical shortcuts and metrics web pages; macOS `hyper`/`altgr` holds French.
+  - `wip/gesture-clear-touchpad` (agent running) — Gestures « Tout effacer » also restores the touchpad (backup, else
+    Windows factory defaults) and the Configuration row goes; « Infos… » instant (took 5 s) with a rewritten text in 21
+    locales explaining the rare-shortcut trick; recommended set on all OS, macOS direction: 3 fingers ←/→ tabs (macOS
+    incremental `ax_actions.tabs`, Windows discrete), ↑ new tab / ↓ close tab; 4 fingers ←/→ Space/desktop, ↑/↓ next /
+    previous window of the app; macOS 5 fingers ↑ Mission Control / ↓ App Exposé; tap 3 left click held; tap 4
+    `alt_tab_monitor`; macOS greys a slot whose system gesture is on (suffix about 20 characters, « — pris par macOS »)
+    and suspends it until the system gesture is None; never write the macOS prefs.
+  - `wip/layout-composer-responsive` (agent running) — the layout composer page reflows when the window is resized and
+    no button sits behind the preview, same page on the three OS; Layout menu: « Couches émulées » header, the four
+    rows in a « Rangées émulées (apprentissage progressif) » submenu.
+  - `wip/windows-boot-time` (agent running) — boot measured at 7.8 s (parse 1.7, layout 1.2, hotstrings 1.0, tray 1.0);
+    parser and snapshot fixes, counted-operations gate; approved: keyboard before tray, a tray click during boot waits
+    for input ready. Still too slow: keep cutting (lazy includes, caches).
+- **Cleanup after the release.** Remove every `.claude/worktrees/*` (delete the node_modules link first, never the
+  real folder); delete local branches except dev and main; delete remote branches except main, dev, sparkle-appcasts,
+  gh-pages and the `next/*` / live `wip/*` branches above; tag non-merged tips `archive/2026-11-03/<branch>` first.
+- **After that:** owned bundled Karabiner (`next/owned-karabiner`), one Ergopti folder name, one config layout on every
+  OS (items below); macOS field report rerun (`git pull && bash tools/dev/collect-macos-field-report.sh`).
+
+## Branch `wip/layout-composer-responsive` (3 November, resume from this branch alone)
+
+- [x] **Responsive layout composer, same page on the three OS.** Done in 47e87f0f0b: board in fractions of a
+      full-width board, footer action bar, `WebView_FitToWindow` in every Windows Size handler; macOS and Linux
+      already resized their view. Gates: `npm run test:browser:layout-composer`, `test_webview_fit_to_window.ahk`.
+- [x] **Layout menu: layers and rows apart.** Header « Couches émulées » above the two layer rows, the four row
+      switches in the submenu « Rangées émulées (apprentissage progressif) »; decision in maintainer-decisions.md.
+- [ ] **Next: land on `dev`** by rebase and fast-forward when the maintainer asks (never push `dev` or `main` from
+      here). Branch rebased on dev 41e2888d08; CI run 41742438444 green except Linux alpine integration
+      (`test_sqlite_first_open.lua` system-event capture, metrics, untouched here) and the macOS 26 build still
+      running when noted. Chromium and WebKit ran the composer gate: 24 cases.
+
+## Branch `wip/gesture-clear-touchpad` (gesture requests of 3 November)
+
+Resume from this branch alone; it is based on dev 6d6b743c4f and not yet integrated.
+
+- **Done.** Gestures « Tout effacer » restores the Windows touchpad (registry backup, else the Windows factory
+  defaults of `precision_touchpad_registry.toml`), global clear too; Configuration row and its locale key removed
+  (95ee89c868). Instant « Infos… » after a reload (27c7e13053, a18cfaecff). Infos text: the Windows rare-shortcut
+  trick, macOS/Linux read the touchpad (9d8d16237a). One recommended set on every OS, macOS direction (6bc43f8d44),
+  macOS five fingers up/down = Mission Control/App Exposé (6fd5f27e95); macOS tabs already scale (mode
+  incremental), Linux scalable swipes queued below (c99fe71d17). macOS greys and holds back a slot whose macOS
+  gesture is on, short « — pris par macOS » suffix, recheck every 20 s (bccbdb185c). Updater sources resealed
+  (5b6ee92094).
+- **In progress.** CI `os_lanes=all` on bccbdb185c. Known reds also red on dev 6d6b743c4f: Common Menus
+  (`test-menu-parity.cjs` macOS configuration dispatch fixture) and Linux fedora (OpenSSL signature tests).
+- **Next.** Rebase on dev and hand over for integration; on the Mac, check that a slot greys when its Trackpad
+  gesture is on and comes back when it is off, and that a three-finger swipe moves tabs with the distance.
+
 ## Release 1.0.9 (maintainer requests of 1-2 November, written so the work survives a lost session)
 
 Release as 1.0.9 on `main` by fast-forward from `dev`, with `Release-As: 1.0.9` if the computed version differs, once the
-three-OS CI is green on the final source. Last all-green CI: run 41398601166 on b58acec0d. Work in progress lives on
-the local branches `worktree-agent-*`: land them, then remove the worktrees so one repository remains. Unpushed:
-7d346897f6 (one registry comparison across the boot, never booted).
+three-OS CI is green on the final source. See the handoff above for the current state.
 
 - [ ] **Macos field report 2026-11-02.** Rotation warnings at midnight during the recovery; `event_taps` run loop late:
       main thread held 1.5 s, `menu.rebuild` 1.3 s (`menu_item.shortcuts` about 1 s); `diagnostics` phase A over 5 ms;
@@ -21,6 +79,27 @@ the local branches `worktree-agent-*`: land them, then remove the worktrees so o
       without touching the Mac.
 - [ ] **Slowness, every driver.** Windows boot 7 s, `menu.rebuild` 1.7 s: lazy submenus, single-toggle update, one
       registry proof, full save after ready, disk caches; a toggle must not rebuild 1000 rows.
+      Resume here (branch `wip/windows-boot-time`): parse fixes, the smoke operation caps, keyboard before tray root
+      and the queued early tray click are committed (keyboard registered at 4.5 s instead of 5.1 s on the smoke
+      fixture). Next, largest first: the emoji and symbol sections take 406 of the 1031 ms hotstrings stage on that
+      fixture; defer them after ready in slices of a few tens of ms, but their registration order feeds the
+      collision tie-break (`_DynHS_RegisterAll` and the repeat key must stay after them): reserve their `Seq` block at
+      the boot position, and keep the preview index complete. Then script parse (lighter boot includes; AHK has no
+      runtime include, so only a smaller graph or a worker helps) and layout (rejected disk cache: native hotkey
+      registration). Measure each with interleaved base/candidate smoke-fixture boots (summed `process_cpu`). CI of
+      the branch: run 41737399378 (first run 41732233161 found two branch regressions, fixed since; its PAC and
+      action-picker WebView reds pass locally).
+      Windows boot, 3 November. Real logs: 4.75 s at best, 7.8 s typical, 15 s and more
+      under load; parse 1-1.7 s, layout 1.2 s, hotstrings 1.0 s, tray 1.0 s (AI submenu 0.75 s), pre-logger 1.2 s.
+      Three boots waited 24 s, 26 s and 446 s on a tray opened during boot (`native_menu_wait`): input waits for the
+      open menu. Done, measured on a smoke fixture made from the maintainer's config (median of 3 interleaved runs,
+      process CPU 7.75 → 7.20 s, menu usable 6.6 → 5.5 s; realistic-hotstrings fixture: hotstrings stage 1.9 → 1.1 s):
+      quoted TOML text lexed in native runs (personal file parse 463 → 165 ms), snapshot comparison without map
+      copies, one boot snapshot read for the AI options (4 → 1), personal-file metadata decodes only `[_meta]`
+      (468 → 29 ms for three 35 KB files). Gate: the startup smoke bounds the boot's counted operations
+      (`BOOT_OPERATION_CEILINGS`). Left, deliberate or rejected: parse, layout and hotstring registration (about
+      4.4 s) are needed at the first key; the remote AI catalogue (212 ms, rejected while the AI root is eager); the
+      boot's 9-13 registry deep compares (every write compares).
 - [ ] **AI menu.** "Test a prediction" under the profile row: group model, profile, test, never two separators in a row.
       The test uses a high temperature, bypasses the cache, never a fixed string, and shows the generation time.
 - [ ] **Generation parameters submenu.** Predictions count, min and max words with no separator; one separator; all the
@@ -28,6 +107,36 @@ the local branches `worktree-agent-*`: land them, then remove the worktrees so o
 - [ ] **Prediction indentation default -3**, recommended -3, all drivers.
 - [ ] **French punctuation.** Space before `:` in composed `label: value` rows and about 21 strings, with a gate.
 - [ ] **Multi-prediction tooltip.** The number is right-aligned in the tooltip, not stuck to the text.
+- [x] **macOS one-shot Shift is not one-shot.** Tap it then type « abc » quickly: « ABc » or « ABC ». It must be spent
+      by the first key; today it seems to end only on its timeout (configurable in the menu, can be infinite). Check
+      the F20 one-shot sentinel path (modules/keymap/one_shot_shift.lua, adapters/one_shot_shift.lua) against Windows
+      and Linux, with a regression test typing three keys inside the timeout.
+- [ ] **One configuration layout on every OS.** A macOS configuration imported on Windows or Linux must work as it
+      did, Cmd versus Ctrl aside. Today the tap-hold settings live in three shapes: Windows `config.toml` plus
+      `tap_hold.toml`, macOS `config_karabiner.toml` (keys, global delay, sticky delay, key combinations, and now
+      `tap_holds.lone_modifier_tap_max_ms`), Linux `tap_hold.toml` (keys, switch, and the lone tap window) plus
+      `config.toml` (`mod_combos`). Pick one home per manifest path (the manifest's `config.toml` for every
+      `[[features.*]]` row, one shared tap-hold file for the keys), move each driver's reader and writer to it,
+      with one migration of the old files, and a cross-driver test that writes a file on one driver and reads it on
+      the other two.
+- [x] **Metrics and gestures section titles.** The metrics section « Mots par minute » becomes « Vitesse de frappe »;
+      the gestures menu gets one section title per finger count (« Gestes à 2 doigts », « à 3 doigts », …) and no
+      « Gestes Ergopti » title; « Gestes du système » gets a clearer title saying the system gestures are handed to
+      Ergopti so it can change them (synchronisation of the system gestures), all drivers, 21 locales. In the
+      shortcuts menu the « Sélection » section title becomes « Encadrement de la sélection ».
+- [x] **Download proxy row out of Debug.** The download proxy setting is configuration, not debugging: move it from
+      the Debug menu to the Configuration menu, all drivers.
+- [x] **Hotstring tooltip under the AI tooltip.** Option `llm.trigger.while_hotstring_tooltip` in the AI trigger
+      menu, 21 locales: "wait" (default and recommended) holds every automatic request at the debounce, the spinner
+      and the render while a hotstring tooltip shows, and the chain after the hotstring asks again; "both" draws the
+      hotstring rows and the prediction in one stack (Windows one surface, Linux one window, macOS the prediction
+      canvas under the rows). Live mode always waits; a prompt asked for by name is never held. Field check left:
+      "both" on a real desktop, and the Windows header rows stay until the next render after their own expiry.
+- [ ] **Key names, what lot CH left.** Menus now name keys from `_shared/data/keycodes/key_names.json` in the 21
+      locales. Still raw or French: the shared modifier-chord action labels (« Cmd + Option + Shift + Enter » in the
+      action pickers, all drivers; tests pin this label family, so it needs its own change); the macOS sticky holds
+      and `layer` hold labels; the tooltip footer hints in `_shared/modules/tooltip/constants.toml`; the physical
+      shortcuts and metrics web pages. Arabic `gesture.slots.swipe_5_horiz` says four fingers.
 - [ ] **Model selection page.** Install Ollama and Install MLX buttons act or say why, disabled when installed; a whole
       section header opens its list; header on two lines (install, port, status; then add a model by hand); Ollama and MLX
       models grouped in collapsible sections per provider, alphabetical; search crosses sections; gate for page actions
@@ -316,6 +425,12 @@ between workers) green alone. All live checks pass, typed by the harness.
   Qianfan confirmed; left: SambaNova toggle unverified (its docs answer 403 to automated reads), Chutes Qwen field
   inferred; watch Perplexity Sonar chat completions (ended
   2026-09-27), `dashscope-intl`, Moonshot K2 retiring by December.
+- **Linux: scalable three-finger swipes (maintainer, 3 November).** macOS steps tab_next / tab_prev with the swipe's
+  distance (mode "incremental"); the Linux gesture manager acts once, when the swipe ends, and has no per-slot mode, so
+  a long swipe moves one tab. Its evdev decoder sees the travel, so it could count steps at the end of the swipe (live
+  stepping would need a new path in `linux/modules/gestures/manager.lua`). Not small: the mode settings, their menu
+  rows and the step accounting are macOS-only today. Linux recommends no swipe anyway (the desktop acts on them), so
+  this is for users who bind one.
 - **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods` (macOS capture is item 31's).

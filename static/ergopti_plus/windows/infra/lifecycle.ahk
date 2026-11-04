@@ -1594,7 +1594,7 @@ Ergopti_OnShutdown(reason, code) {
 				try LLM_NavEventOwner_CancelShutdown()
 		}
 }
-; Publish the configured tray before input registration, then prewarm its leaves.
+; Publish the configured tray once input is registered, then prewarm its leaves.
 ; initMenu stages every subtree while the old root remains live and enters
 ; Critical only for the short root replacement. UpdateTrayIcon runs last, once
 ; MenuSuspend exists.
@@ -1661,7 +1661,9 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 	_DriverMenuReady := true
 	try LoggerInfo("BootProfile", "Complete configured menu usable at {1} ms since process start; input initialization pending={2}.",
 		BootProfile_TotalBootMs(), InputPending ? "true" : "false")
-	if IsSet(_TrayStartupClick)
+	; A click retained during boot waits for ready input too; the boot releases it
+	; once the keyboard is registered (maintainer decision, 3 November 2026).
+	if IsSet(_TrayStartupClick) && !InputPending
 		_TrayStartupClick.NotifyReady()
 	return true
 }

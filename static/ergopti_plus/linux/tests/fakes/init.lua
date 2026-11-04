@@ -516,7 +516,14 @@ function M.clipboard(opts)
 		if opts.available == false then return false, "", "clipboard unavailable" end
 		return true, fake.contents, nil
 	end
-	function fake.write(text) fake.contents = tostring(text) ; return true end
+	-- The change counter moves on every write, even of the same text, as the X11
+	-- owner's TIMESTAMP does; unavailable is the Wayland answer.
+	fake.counter = 0
+	function fake.write(text) fake.contents = tostring(text) ; fake.counter = fake.counter + 1 ; return true end
+	function fake.change_counter()
+		if opts.available == false then return nil, "unsupported" end
+		return fake.counter
+	end
 	-- The PRIMARY selection: what the application published, never written here.
 	function fake.read_primary()
 		if opts.available == false then return false, "", "clipboard unavailable" end

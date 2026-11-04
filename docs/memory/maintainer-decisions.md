@@ -5,6 +5,28 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The layout menu keeps layers and rows apart (2026-11-03)
+
+The Windows Keyboard layout menu read as a duplicate: the Base/Shift and AltGr
+emulation rows, then the four `layout.emulate_*_row` switches. Both axes stay,
+because they answer different questions (which Ergopti layers the emulation
+types, and on which keyboard rows). The layer rows sit under the header
+« Couches émulées » (`menu.layout.header_layers`); the row switches moved into
+the submenu « Rangées émulées (apprentissage progressif) »
+(`menu.layout.emulated_rows`, `layout_emulated_rows_group` in `menu.toml`),
+since switching rows on one by one is how a user learns the layout gradually.
+macOS and Linux emulate no layout: they draw that submenu's row greyed with
+`platform_reason.layout_emulation_is_windows_only`.
+
+## Windows boot: keyboard before tray, early tray click queued (2026-11-03)
+
+The Windows boot registers the layout, shortcuts, tap-holds, hotstrings and the
+prefix watcher first, and builds the configured tray root only then, still
+before readiness: the first keystroke never waits for the menu build. A tray
+clicked before input is ready is queued and opened once it is, because an open
+native menu stops the auto-execute thread and three boots of 3 November waited
+24, 26 and 446 s on one. The startup smoke's shell receipt asserts this order.
+
 ## Restore holds its stage by handle (2026-11-01)
 
 The audit's "restore staging substitution" is fixed on Windows, after two rejected
@@ -90,9 +112,13 @@ when the AI is on and when it gets turned on, and with the AI off nothing opens.
 ## French sticky modifiers are « rémanents » (2026-10-31)
 
 The French sticky-modifier labels say « rémanent »: `📌 Maj rémanente`,
-`📌 Ctrl rémanent`, `📌 Option rémanente`, a chord `📌 Cmd+Shift rémanents`, and
+`📌 Ctrl rémanent`, `📌 Option rémanente`, a chord `📌 Cmd + Maj rémanents`, and
 the delay strings say « modificateur rémanent ». Other Latin-script locales keep
-their own wording. The French rows of
+their own wording. Since 2026-11-03 each `sg_actions.sticky_<mods>` value is a
+template (`📌 {1} rémanents`) whose `{1}` the modifiers fill from the key name
+table on the platform that shows it (`_shared/lua/actions/sticky_label.lua`,
+Win and Alt on Windows); keep the gender and number agreement in the template.
+The French rows of
 `_shared/tests/corpus/menus/script_action_original_catalogue_projection.json`
 pin the labels.
 
@@ -272,3 +298,58 @@ shared (`Catalogue.registry_source` and `registry_changes_args` in
 ## Defaults and recommended values (2 November 2026)
 
 A manifest row is a feature or a setting. A feature changes the keyboard or the behaviour: its default is neutral (off, none) and its recommended value is the Ergopti setup, so an empty config leaves the keyboard alone. A setting says how a feature works once active (prediction style and count, indentation, delays, the password and address bar filters): its recommended value equals its default. An option missing from the file takes its manifest default, not `false`. "Restore recommended" puts back every recommended value, adjusted settings included: the user wants to revert their trials. Each row declares its `family`; `test-feature-family-rule.cjs` and the generator enforce the rule, exceptions justified in the manifest (`rule_exception`, `restore_exempt_reason`).
+
+## Built-in hotstring sections wait their declared delay (3 November 2026)
+
+A built-in section waits, in order: the user's own delay (the override file, then
+on Windows the section's `time_activation_seconds` in config.toml), else the
+`time_activation_seconds` its manifest row declares, else its category file's
+`[_meta]` delay, else the 0.75 s base. The base is only for sections that
+declare nothing (the user's personal files, rows without a delay). Every driver
+reads it through `hotstrings.languages.section_default_delay` or its AHK twin
+`HotstringsSectionDefaultDelay`. "Restore recommended" keeps writing the
+recommended value where the inheritance differs, so today it writes no delay.
+A category file's `[_meta]` delay names the delay its declared sections wait,
+which the category rows of the delay menus show; a CI check pins the two equal.
+
+## One recommended gesture set, in the macOS direction (3 November 2026)
+
+The recommended gestures are the same on every OS, in the macOS direction where
+the content follows the fingers: three fingers left / right = next / previous
+tab, up / down = new / close tab; four fingers left / right = next / previous
+desktop (`space_next` / `space_prev` on macOS), up / down = next / previous
+window of the active app; `tap_3` = `left_click_toggle`, `tap_4` =
+`alt_tab_monitor`; on macOS five fingers up / down = `mission_control` /
+`app_expose` (the macOS order), so both overviews survive turning the system's
+four-finger gestures off. On macOS the three-finger horizontal swipes scale with
+the distance (mode "incremental"); Windows gets one shortcut per swipe and
+cannot, and the four-finger swipes stay one step per swipe everywhere. Linux
+keeps the 2026-10-24 rule for its swipes, which stay "none": the touchpad is
+read without a grab, so the desktop acts on the same swipes (a double action);
+its five-finger swipe stays "none" too (no Mission Control equivalent). macOS
+cannot take the system gestures over, so its Gestures « Infos… » dialog tells
+the user to turn the four-finger swipes and Look up off first. The set lives in
+the features manifest (`recommended_per_platform`) and
+`test-gesture-defaults-single-source.cjs` pins it.
+
+## Never a double action on macOS; menu rows stay short (3 November 2026)
+
+While a three-or-more-finger macOS gesture is on (Spaces, Mission Control, App
+Exposé, Look up, the three-finger swipes or drag), the Ergopti slots it covers
+are greyed in the Gestures menu with a suffix of about 20 characters
+(« — pris par macOS ») and the engine does not fire them; turning the macOS
+gesture off brings them back without a reload (`gestures/conflicts.lua`
+rechecks the Trackpad and Dock preferences every `system_prefs_recheck_ms`,
+off the touch path, and never writes them). Two-finger touches never block a
+slot. The long explanation goes in « Infos… », never in a row: every menu row
+stays short so the menu does not stretch.
+
+## The Gestures clear restores the Windows touchpad (3 November 2026)
+
+« Tout effacer (comportement du système) » in Gestures, and the global clear
+that composes it, also put the Precision Touchpad registry back on Windows: the
+values backed up before Ergopti's first gesture configuration, or, without a
+backup, the Windows factory defaults declared in
+`precision_touchpad_registry.toml`. The separate Configuration row « Restaurer
+les gestes du pavé tactile Windows » is gone. The Windows factory defaults stay
+the real Windows values; they are not Ergopti's recommended gestures.

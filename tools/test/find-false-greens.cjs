@@ -432,13 +432,21 @@ function findDeadTests(file, src, ext) {
 	// string-literal-only pattern skipped entirely. Greedy up to the last comma
 	// takes the callback whatever the title is made of.
 	for (const m of src.matchAll(/^[ \t]*Test\s*\([^\n]*,\s*([A-Za-z_]\w*)\s*\)/gm)) {
-		const block = byName.get(m[1]);
+		// A bound callback (`Body.Bind("state", Setup)`) registers Body: the last
+		// identifier is one of its arguments, which may be a setup asserting
+		// nothing by design or the asserting body a fixture wrapper runs. Either
+		// of the two proving is enough.
+		const bound = /,\s*([A-Za-z_]\w*)\.Bind\(/.exec(m[0]);
+		const callback = m[1];
+		const block = byName.get(callback);
 		if (!block) continue;
-		if (!proves(block, DELEGATION_DEPTH, new Set())) {
+		const boundProves =
+			bound && byName.has(bound[1]) && proves(byName.get(bound[1]), DELEGATION_DEPTH, new Set());
+		if (!boundProves && !proves(block, DELEGATION_DEPTH, new Set())) {
 			out.push({
 				file: rel(file),
 				line: block.start,
-				text: `${m[1]}()`,
+				text: `${callback}()`,
 				detail: 'registered test body asserts nothing'
 			});
 		}

@@ -479,6 +479,59 @@ _HotstringsScopeDelayVectors() {
 }
 Test("hotstrings-scope: independent delay vectors agree with both Lua drivers", _HotstringsScopeDelayVectors)
 
+_HotstringsScopeSectionDefaultDelayVectors() {
+	global _SharedDir
+	Fixture := JsonParse(FSReadUtf8Exact(_SharedDir .
+		"\tests\corpus\hotstrings\section_default_delay_vectors.json"))
+	AssertTrue(Fixture["vectors"].Length >= 10, "the corpus must hold its vectors")
+	for Vector in Fixture["vectors"]
+		AssertEqual(Vector.Has("expected") ? Vector["expected"] : "",
+			HotstringsSectionDefaultDelay(Fixture["features"], Vector["group"], Vector["section"]), Vector["name"])
+}
+Test("hotstrings-scope: declared section delays agree with both Lua drivers", _HotstringsScopeSectionDefaultDelayVectors)
+
+; The user's config.toml leaf of a built-in section comes before its manifest
+; default; a section that declares nothing falls through to its file and the base.
+_HotstringsScopeDeclaredDelayReadsConfig() {
+	global Features, _HotstringsOverrides, _HSResolveCache, _HSResolveGen, HotstringGroupConfig
+	Saved := { overrides: _HotstringsOverrides, cache: _HSResolveCache, generation: _HSResolveGen,
+		groups: HotstringGroupConfig }
+	Node := Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION]["qu"]
+	Had := Node.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+	Previous := Had ? Node[ConfigLeaf.TIME_ACTIVATION_SECONDS] : ""
+	try {
+		_HotstringsOverrides := Map()
+		_HSResolveCache := Map()
+		HotstringGroupConfig := Map("distancesreduction", { Delay: 1.25, Color: "", ShowTooltip: "",
+			Priority: "", Sections: Map() })
+		Node[ConfigLeaf.TIME_ACTIVATION_SECONDS] := 0.5
+		HotstringsResolveBumpGen()
+		AssertEqual(0.5, HotstringsResolve("distancesreduction", "qu").Delay,
+			"the manifest default beats the category file")
+		AssertEqual(1.25, HotstringsResolve("distancesreduction", "comma_j").Delay,
+			"a section declaring no delay waits its category file")
+		AssertEqual(1.25, HotstringsResolve("distancesreduction", "").Delay,
+			"the category row reads its file")
+		Node[ConfigLeaf.TIME_ACTIVATION_SECONDS] := 0.3
+		HotstringsResolveBumpGen()
+		AssertEqual(0.3, HotstringsResolve("distancesreduction", "qu").Delay,
+			"the user's config.toml leaf beats the manifest default")
+		AssertFalse(HotstringsResolve("distancesreduction", "qu").HasOverride,
+			"a declared delay is not an override-file value")
+	} finally {
+		if Had
+			Node[ConfigLeaf.TIME_ACTIVATION_SECONDS] := Previous
+		else if Node.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+			Node.Delete(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+		_HotstringsOverrides := Saved.overrides
+		_HSResolveCache := Saved.cache
+		_HSResolveGen := Saved.generation
+		HotstringGroupConfig := Saved.groups
+	}
+}
+Test("hotstrings-scope: a built-in section waits its config.toml leaf, else its manifest default",
+	_HotstringsScopeDeclaredDelayReadsConfig)
+
 ; The three measured families share one fixture and one transaction per mode: the
 ; journal is the same whichever sections it carries, and it costs far more than
 ; the per-family checks. Each family keeps its own assertions.
@@ -507,9 +560,12 @@ _HotstringsScopeMeasuredDelayRoundTrip() {
 		; generation counter after bumping it, so a stale entry of an earlier suite
 		; can carry the very generation this round trip reaches. Own a fresh memo.
 		_HSResolveCache := Map()
+		; A built-in section waits the delay its manifest row declares (the
+		; maintainer's decision of 3 November 2026), so deletion already inherits
+		; the recommendation and neither mode writes a delay.
 		for Family in Families {
-			AssertEqual(1.0, _HotstringsScopeInheritedDelay("autocorrection", Family),
-				"the real corpus makes deletion inherit 1.0 seconds: " . Family)
+			AssertEqual(0.5, _HotstringsScopeInheritedDelay("autocorrection", Family),
+				"deletion inherits the section's declared 0.5 seconds: " . Family)
 			AssertEqual(0.5, ManifestValueFor("hotstrings.autocorrection." . Family . ".time_activation_seconds", "recommended"),
 				"the real shared manifest recommends 0.5 seconds: " . Family)
 		}
@@ -520,14 +576,8 @@ _HotstringsScopeMeasuredDelayRoundTrip() {
 			Overrides := TOML_ParseFreshFile(Fixture.overrides)
 			for Family in Families {
 				OwnedSection := "autocorrection." . Family
-				if Mode == "recommended" {
-					AssertTrue(Overrides[OwnedSection]["delay_offset"] is Float,
-						"the acknowledged offset must retain its TOML numeric type through persistence: " . Family)
-					AssertEqual(Round(0.5 - HotstringsBaseDelay(), 3), Overrides[OwnedSection]["delay_offset"],
-						"the acknowledged candidate explicitly stores the recommendation as an offset of the base: " . Family)
-				} else
-					Assert(!Overrides.Has(OwnedSection) || !Overrides[OwnedSection].Has("delay_offset"),
-						"clear removes the recommendation and returns to corpus inheritance: " . Family)
+				Assert(!Overrides.Has(OwnedSection) || !Overrides[OwnedSection].Has("delay_offset"),
+					Mode . " stores no delay: the section inherits its declared one: " . Family)
 				Assert(!Overrides.Has(OwnedSection) || !Overrides[OwnedSection].Has("delay"),
 					"the absolute spelling of earlier builds is never written back: " . Family)
 			}
@@ -535,9 +585,8 @@ _HotstringsScopeMeasuredDelayRoundTrip() {
 			HotstringsOverridesApplyBase()
 			HotstringsResolveBumpGen()
 			for Family in Families
-				AssertEqual(Mode == "recommended" ? 0.5 : 1.0,
-					HotstringsResolve("autocorrection", Family).Delay,
-					"the actual native resolver delivers the requested delay: " . Family)
+				AssertEqual(0.5, HotstringsResolve("autocorrection", Family).Delay,
+					"the actual native resolver delivers the declared delay: " . Family)
 			AssertEqual("keep", Overrides["autocorrection"]["unknown"])
 			AssertEqual(9, Overrides["foreign"]["delay"])
 			Personal := TOML_ParseFreshFile(Fixture.personal[1])
@@ -562,7 +611,7 @@ _HotstringsScopeMeasuredDelayRoundTrip() {
 	}
 	Assert(HotstringGroupConfig == Saved.groups, "the original metadata cache identity is restored")
 }
-Test("hotstrings-scope: recommended delays differ from clear and restore exact stores on refusal in every measured family",
+Test("hotstrings-scope: recommended and clear both leave every measured family on its declared delay and restore exact stores on refusal",
 	_HotstringsScopeMeasuredDelayRoundTrip)
 
 

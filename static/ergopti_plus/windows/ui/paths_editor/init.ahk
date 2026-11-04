@@ -568,7 +568,7 @@ _PathsEdWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_PathsEdWeb_Controller)
-		try _PathsEdWeb_Controller.Fill()
+		try WebView_FitToWindow(_PathsEdWeb_Controller)
 }
 
 ; Window-close (X / Alt+F4) and the frontend "cancel" button both land here.

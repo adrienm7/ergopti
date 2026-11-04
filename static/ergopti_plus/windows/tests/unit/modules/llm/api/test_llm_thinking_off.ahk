@@ -252,6 +252,22 @@ Test("LLM thinking off: a malformed table is refused whole (thinking-off-everywh
 ; =============================================
 ; =============================================
 
+; Runs Body with every provider's capability listing just read and empty.
+; Turning thinking off in a request also schedules the fetch of a missing
+; listing: with the process-wide cache still empty, these payload checks armed a
+; real HTTP request whose owner and poll outlived them.
+_LTO_WithoutListingFetch(Body) {
+	global LLM_THINKING_FAMILIES, _LLM_RemoteCapabilities
+	Saved := _LLM_RemoteCapabilities
+	Fresh := Map()
+	for Provider in LLM_THINKING_FAMILIES.Capability["providers"]
+		LLM_ModelCapsFinish(Fresh, Provider, "", _LLMRemoteEpochNow())
+	AssertTrue(Fresh.Count > 0, "the shared table must name the providers that publish a listing")
+	_LLM_RemoteCapabilities := Fresh
+	try Body.Call()
+	finally _LLM_RemoteCapabilities := Saved
+}
+
 _LTO_Resolved(Provider, Model) {
 	R := _LLMRemoteResolveEntry(Map("Provider", Provider, "BaseUrl", "", "Token", "sekret", "Model", Model))
 	AssertTrue(R is Map, Provider . " must resolve")
@@ -274,7 +290,8 @@ _LTO_PredictionPayload() {
 	AssertTrue(InStr(Generate, "_LLMRemoteThinkingRetryFail.Bind(") > 0,
 		"LLM_RemoteGenerate_Async must give a refused thinking field one more chance")
 }
-Test("LLM thinking off: the prediction payload turns thinking off (thinking-off-everywhere)", _LTO_PredictionPayload)
+Test("LLM thinking off: the prediction payload turns thinking off (thinking-off-everywhere)",
+	_LTO_WithoutListingFetch.Bind(_LTO_PredictionPayload))
 
 _LTO_PrebuiltBodies() {
 	global _LLM_Vision_RemoteTransport
@@ -298,7 +315,7 @@ _LTO_PrebuiltBodies() {
 	AssertFalse(JsonParse(Sent[2]).Has("reasoning_effort"), "a model no rule names is sent as it is")
 }
 Test("LLM thinking off: the screen reading and the agent turn thinking off (thinking-off-everywhere)",
-	_LTO_PrebuiltBodies)
+	_LTO_WithoutListingFetch.Bind(_LTO_PrebuiltBodies))
 
 _LTO_LocalServerPrebuilt() {
 	global LLM_LOCAL_API_SERVERS
@@ -314,7 +331,8 @@ _LTO_LocalServerPrebuilt() {
 		AssertEqual("low", Oss["chat_template_kwargs"]["reasoning_effort"], Id . ": gpt-oss gets its lowest level on top")
 	}
 }
-Test("LLM thinking off: a local server's screenshot request turns thinking off", _LTO_LocalServerPrebuilt)
+Test("LLM thinking off: a local server's screenshot request turns thinking off",
+	_LTO_WithoutListingFetch.Bind(_LTO_LocalServerPrebuilt))
 
 ; A remote transport that records what it was handed.
 _LTO_RecordSent(Sent, Resolved, Url, Body, OnSuccess, OnFail, CurrentFn) {
@@ -351,7 +369,7 @@ _LTO_RefusedFieldRetried() {
 	}
 }
 Test("LLM thinking off: a refused field is sent once more without it, then never (thinking-off-everywhere)",
-	_LTO_RefusedFieldRetried)
+	_LTO_WithoutListingFetch.Bind(_LTO_RefusedFieldRetried))
 
 _LTO_RefusalPersists() {
 	global _LLM_ThinkingRefused, LLM_THINKING_REFUSED_KEY
@@ -373,7 +391,8 @@ _LTO_RefusalPersists() {
 		try ST_Set(LLM_THINKING_REFUSED_KEY, Map())
 	}
 }
-Test("LLM thinking off: a refused field is remembered across restarts", _LTO_RefusalPersists)
+Test("LLM thinking off: a refused field is remembered across restarts",
+	_LTO_WithoutListingFetch.Bind(_LTO_RefusalPersists))
 
 _LTO_DefaultSamplingOnly() {
 	Opus := _LLMRemoteApplyThinkingOff(_LTO_Resolved("anthropic", "claude-opus-4-8"),
@@ -383,7 +402,8 @@ _LTO_DefaultSamplingOnly() {
 		_LLMRemoteBuildPayload("anthropic", "claude-haiku-4-5", "s", "u", 0.7, 40))
 	AssertTrue(JsonParse(Haiku).Has("temperature"), "Claude Haiku 4.5 keeps it")
 }
-Test("LLM thinking off: models that accept only the default sampling get no temperature", _LTO_DefaultSamplingOnly)
+Test("LLM thinking off: models that accept only the default sampling get no temperature",
+	_LTO_WithoutListingFetch.Bind(_LTO_DefaultSamplingOnly))
 
 _LTO_RetryCancelReachesTheRetry() {
 	global _LLM_Remote_RetryOf

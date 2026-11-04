@@ -191,6 +191,65 @@ function hotstringsRenderTimes(configRoot) {
 	].map((match) => Number(match[1] ?? match[2]));
 }
 
+// boot-operation-budget-2026-11-03: the boot's counted operations, read from the
+// driver's own first counter record. Wall time on a shared runner is too noisy
+// to gate, but each of these counts is deterministic for a fixture and named a
+// measured cost of the maintainer's 8-10 s boot: every snapshot read compared
+// the whole config.toml snapshot twice, the document lexer classified quoted
+// text one character at a time, and personal-file metadata decoded every
+// hotstring row. Lowering a ceiling is welcome; raising one needs the measured
+// reason in the commit.
+const BOOT_OPERATION_CEILINGS = {
+	'config.snapshot_read': { all: 9 },
+	'toml.document_parse': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
+	'config_migrate.registry_deep_compares': { all: 13, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
+	'toml.document_slow_steps': { all: 11943, [REALISTIC_HOTSTRINGS_FIXTURE]: 13420 },
+	'toml.flat_values': { all: 2179, [REALISTIC_HOTSTRINGS_FIXTURE]: 1198 }
+};
+
+/**
+ * The counted operations of every boot a fixture logged: the first counter
+ * record of a process, whose window starts at the process.
+ * @param {string} configRoot
+ * @returns {Array<Map<string, number>>}
+ */
+function bootOperationCounts(configRoot) {
+	return [...logText(configRoot).matchAll(/\[Perf\] Interval counters \(0 ms\): ([^\n]*)/g)].map(
+		(match) =>
+			new Map(
+				match[1]
+					.replace(/\.\s*$/, '')
+					.split(' ')
+					.map((pair) => pair.split('='))
+					.filter((pair) => pair.length === 2)
+					.map(([name, value]) => [name, Number(value)])
+			)
+	);
+}
+
+/**
+ * Whether a fixture's boots stayed within their operation ceilings.
+ * @param {string} fixture
+ * @param {string} configRoot
+ * @returns {string} The first excess, or '' when every boot is within budget.
+ */
+function bootOperationProblem(fixture, configRoot) {
+	const boots = bootOperationCounts(configRoot);
+	if (boots.length === 0) return 'no boot counter record was logged';
+	for (const [index, counts] of boots.entries()) {
+		console.log(
+			`${fixture} boot ${index + 1} operations: ${[...Object.keys(BOOT_OPERATION_CEILINGS)].map((name) => `${name}=${counts.get(name) ?? 0}`).join(' ')}`
+		);
+		for (const [name, ceilings] of Object.entries(BOOT_OPERATION_CEILINGS)) {
+			const ceiling = ceilings[fixture] ?? ceilings.all;
+			const count = counts.get(name) ?? 0;
+			if (count > ceiling)
+				return `boot ${index + 1} counted ${name}=${count}, over its ceiling of ${ceiling}`;
+		}
+	}
+	return '';
+}
+
 // These fields are foreign data after the dedicated Metrics bindings retired.
 // The real boot and its existing acknowledged full save must retain both their
 // values and their independently written source comments.
@@ -536,7 +595,7 @@ async function main() {
 				'_StartupSmokePumpReceipt(*) {\n\tglobal _TrayStartupClick, _DriverReady\n\tif !_TrayStartupClick.Pending || (IsSet(_DriverReady) && _DriverReady) || _TrayStartupClick.MenuLoopOpen\n\t\tthrow Error("the retained probe must leave bootstrap and timers running")\n\tFileAppend("pumped", EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\startup-pump.txt", "UTF-8")\n}\n' +
 				'_StartupSmokeReceipts(*) {\n\tif EnvGet("ERGOPTI_STARTUP_SMOKE_EXPECT_READ_ONLY") != "1"\n\t\t_StartupSmokeFullSaveReceipt()\n\t_StartupSmokeConfigTypesReceipt()\n\t_ScriptChordSmokeReceipt()\n\t_LayoutExtensionSmokeReceipt()\n\t_StartupSmokeOpenTray(A_TrayMenu.Handle, Map())\n}\n' +
 				'_StartupSmokeOpenTray(Handle, Seen) {\n\tif Seen.Has(Handle)\n\t\treturn\n\tSeen[Handle] := true\n\tMenuPopulation_OnInitPopup(Handle)\n\tloop TrayMenuHandleItemCount(Handle) {\n\t\tSub := TrayMenuSubmenuHandle(Handle, A_Index - 1)\n\t\tif Sub\n\t\t\t_StartupSmokeOpenTray(Sub, Seen)\n\t}\n}\n' +
-				'_StartupSmokeShellReceipt(*) {\n\tglobal _TrayFeatureHeadLabels, _TrayRootBootDetailsPending, _TrayStartupClick, _DriverReady, _DriverMenuReady, _MenuStartupCommands\n\tif _DriverReady || !_DriverMenuReady || _TrayRootBootDetailsPending || _TrayFeatureHeadLabels.Length < 4\n\t\tthrow Error("the complete configured root must be published before input readiness")\n\tif _TrayStartupClick.RequestCount != 1\n\t\tthrow Error("the early native context request was lost")\n\tglobal _StartupSmokeSelections\n\tSelections := []\n\t_StartupSmokeSelections := Selections\n\tMenuCommandRun((*) => Selections.Push(1), [])\n\tif Selections.Length || _MenuStartupCommands.Pending.Length != 1\n\t\tthrow Error("an early feature command bypassed startup admission")\n\tRows := Map()\n\tloop TrayMenuItemCount(A_TrayMenu) {\n\t\tText := Buffer(2048, 0)\n\t\tDllCall("GetMenuStringW", "ptr", A_TrayMenu.Handle, "uint", A_Index - 1, "ptr", Text, "int", 1024, "uint", 0x400)\n\t\tRows[StrGet(Text, "UTF-16")] := DllCall("GetMenuState", "ptr", A_TrayMenu.Handle, "uint", A_Index - 1, "uint", 0x400, "uint")\n\t}\n\tif Rows.Has(t("common.loading")) || Rows.Has(t("menu.global.starting"))\n\t\tthrow Error("the usable root still advertises driver startup")\n\tfor Key in ["menu.global.suspend", "menu.global.reload", "menu.global.quit"] {\n\t\tLabel := t(Key)\n\t\tif !Rows.Has(Label) || (Rows[Label] & 3) || (Rows[Label] & 0x10)\n\t\t\tthrow Error("the configured root has no enabled command for " . Key)\n\t}\n\tFileAppend("ready", EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\tray-shell.txt", "UTF-8")\n}\n' +
+				'_StartupSmokeShellReceipt(*) {\n\tglobal _TrayFeatureHeadLabels, _TrayRootBootDetailsPending, _TrayStartupClick, _DriverReady, _DriverMenuReady, _MenuStartupCommands, _BootHotstringsReceipt\n\tif _DriverReady || !_DriverMenuReady || _TrayRootBootDetailsPending || _TrayFeatureHeadLabels.Length < 4\n\t\tthrow Error("the complete configured root must be published before input readiness")\n\tif !IsSet(_BootHotstringsReceipt) || !HookDispatcher._started\n\t\tthrow Error("the keyboard must be registered before the configured root is built")\n\tif _TrayStartupClick.RequestCount != 1\n\t\tthrow Error("the early native context request was lost")\n\tglobal _StartupSmokeSelections\n\tSelections := []\n\t_StartupSmokeSelections := Selections\n\tMenuCommandRun((*) => Selections.Push(1), [])\n\tif Selections.Length || _MenuStartupCommands.Pending.Length != 1\n\t\tthrow Error("an early feature command bypassed startup admission")\n\tRows := Map()\n\tloop TrayMenuItemCount(A_TrayMenu) {\n\t\tText := Buffer(2048, 0)\n\t\tDllCall("GetMenuStringW", "ptr", A_TrayMenu.Handle, "uint", A_Index - 1, "ptr", Text, "int", 1024, "uint", 0x400)\n\t\tRows[StrGet(Text, "UTF-16")] := DllCall("GetMenuState", "ptr", A_TrayMenu.Handle, "uint", A_Index - 1, "uint", 0x400, "uint")\n\t}\n\tif Rows.Has(t("common.loading")) || Rows.Has(t("menu.global.starting"))\n\t\tthrow Error("the usable root still advertises driver startup")\n\tfor Key in ["menu.global.suspend", "menu.global.reload", "menu.global.quit"] {\n\t\tLabel := t(Key)\n\t\tif !Rows.Has(Label) || (Rows[Label] & 3) || (Rows[Label] & 0x10)\n\t\t\tthrow Error("the configured root has no enabled command for " . Key)\n\t}\n\tFileAppend("ready", EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\tray-shell.txt", "UTF-8")\n}\n' +
 				'_StartupSmokeAdmissionReceipt(*) {\n\tglobal _StartupSmokeSelections\n\tExpected := (EnvGet("ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED") == "1" || _DriverSmokeInputQuarantined) ? 0 : 1\n\tStarted := A_TickCount\n\tif Expected\n\t\twhile !_StartupSmokeSelections.Length && !TickExpired(Started, 1000)\n\t\t\tSleep(10)\n\telse\n\t\tSleep(50)\n\tif _StartupSmokeSelections.Length != Expected\n\t\tthrow Error("retained startup selection did not obey restored pause or execute exactly once")\n}\n' +
 				'_StartupSmokeFullSaveReceipt() {\n\tglobal DriverPid\n\t_StartupSmokeRequireFullSaveAcknowledged()\n\tSaveState := _ConfigFullSaveCoordinator()\n\tPreviousCritical := Critical("On")\n\ttry {\n\t\tRequested := SaveState.requested_generation\n\t\tCommitted := SaveState.committed_generation\n\t\tSettled := SaveState.settled_generation\n\t\tPending := _ConfigFullSaveHasPending()\n\t} finally Critical(PreviousCritical)\n\tNonce := EnvGet("ERGOPTI_STARTUP_SMOKE_NONCE")\n\tif !RegExMatch(Nonce, "^[0-9a-f]{32}$")\n\t\tthrow ValueError("Invalid startup full-save nonce.")\n\tReceipt := \'{"schema_version":1,"nonce":\' . JsonStringLiteral(Nonce)\n\t\t. \',"pid":\' . DriverPid . \',"requested":\' . Requested\n\t\t. \',"committed":\' . Committed . \',"settled":\' . Settled\n\t\t. \',"pending":\' . (Pending ? "true" : "false") . \'}\' . "`n"\n\tif !FSWriteCreateDurable(EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\full-save.json", Receipt)\n\t\tthrow Error("The startup full-save receipt could not be created durably.")\n}\n' +
 				'_ScriptChordSmokeReceipt() {\n' +
@@ -726,9 +785,11 @@ async function main() {
 				return fail(
 					`${fixture}: timers did not progress while the headless tray request was retained`
 				);
+			// keyboard-before-tray-2026-11-03: the maintainer chose to register the keyboard first
+			// and to build the configured root after it, still before readiness.
 			if (!fs.existsSync(path.join(configRoot, 'tray-shell.txt')))
 				return fail(
-					`${fixture}: no complete configured root was published before input registration`
+					`${fixture}: no configured root was published between input registration and readiness`
 				);
 			if (extensionFixture) {
 				const receipt = path.join(configRoot, 'extension-receipt.txt');
@@ -793,6 +854,8 @@ async function main() {
 				!logText(configRoot).includes("Deferred submenu 'hotstrings_menu' built in")
 			)
 				return fail(`${fixture}: no real Hotstrings submenu render was logged`);
+			const operations = bootOperationProblem(fixture, configRoot);
+			if (operations) return fail(`${fixture}: ${operations}`);
 			const slowest = Math.max(0, ...renders);
 			if (slowest > HOTSTRINGS_RENDER_BUDGET_MS)
 				return fail(
@@ -840,6 +903,8 @@ async function main() {
 
 				const reloaded = failOnLoggedErrors('reloaded-config', configRoot);
 				if (reloaded !== null) return reloaded;
+				const warmOperations = bootOperationProblem(`${fixture}/warm`, configRoot);
+				if (warmOperations) return fail(`${fixture}/warm: ${warmOperations}`);
 			}
 		}
 		console.log(

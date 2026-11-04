@@ -16,6 +16,7 @@ local TextPrompt = require("ui.text_prompt")
 local PrivacyPolicy = require("llm.trigger_policy")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
 local COMMAND = require("config_keys").COMMAND
+local KeyNames = require("keycodes.key_names")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
@@ -246,6 +247,13 @@ local function _build_llm(ctx)
 				[require("config_keys").COMMAND.LLM_SECURE_FIELD_FILTER] = function() return privacy_command(secure_source, require("config_keys").LEAF.SECURE_FILTER_ENABLED) end,
 				[require("config_keys").COMMAND.LLM_INSTANT_ON_WORD_END] = function() return toggle(require("config_keys").LEAF.INSTANT_ON_WORD_END) end,
 				[require("config_keys").COMMAND.LLM_AFTER_HOTSTRING] = function() return toggle(require("config_keys").LEAF.AFTER_HOTSTRING) end,
+				[require("config_keys").COMMAND.LLM_WHILE_HOTSTRING_TOOLTIP] = function(value)
+					local leaf = require("config_keys").LEAF.WHILE_HOTSTRING_TOOLTIP
+					if not ready() or TriggerSettings.get(leaf) == value then return false end
+					if TriggerSettings.set(leaf, value) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
 			},
 			state_getters = {
 				["llm_url_bar_filter_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.URL_BAR_FILTER_ENABLED) end,
@@ -254,6 +262,9 @@ local function _build_llm(ctx)
 				["llm_secure_field_filter_ready"] = function() return PrivacyPolicy.ready(secure_source) end,
 				["llm_instant_on_word_end_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.INSTANT_ON_WORD_END) end,
 				["llm_after_hotstring_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.AFTER_HOTSTRING) end,
+				[require("config_keys").KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP] = function()
+					return TriggerSettings.get(require("config_keys").LEAF.WHILE_HOTSTRING_TOOLTIP)
+				end,
 				["llm_trigger_ready"] = ready,
 			},
 		}
@@ -655,11 +666,16 @@ local function _build_llm(ctx)
 		local ok_navigation, NavigationSettings = pcall(require, "modules.llm.navigation_settings")
 		if not ok_navigation then return end
 		-- One choice list per chord: the navigation modifiers held with Up and
-		-- Down, and the validation modifiers held with a digit.
+		-- Down, and the validation modifiers held with a digit. A chord reads as
+		-- the shared key name table names its modifiers (« Ctrl + Maj »), never
+		-- as its stored ids (« ctrl+shift »).
+		local function chord_label(modifiers, bare_label)
+			return #modifiers > 0 and KeyNames.modifiers_label(modifiers, "linux", i18n_safe) or bare_label
+		end
 		local function chord_rows(current, bare_label, set)
 			local rows = {}
 			for _, option in ipairs(NavigationSettings.options()) do
-				local label = #option > 0 and table.concat(option, "+") or bare_label
+				local label = chord_label(option, bare_label)
 				local checked = #option == #current
 				for index, modifier in ipairs(option) do checked = checked and current[index] == modifier end
 				rows[#rows + 1] = {
@@ -697,7 +713,7 @@ local function _build_llm(ctx)
 				if not definition then return {} end
 				return { {
 					label = i18n_safe(definition.i18n) .. " — "
-						.. (#navigation > 0 and table.concat(navigation, "+") or arrows_only),
+						.. chord_label(navigation, arrows_only),
 					items = chord_rows(navigation, arrows_only, NavigationSettings.set_navigation),
 				} }
 			end,
@@ -706,7 +722,7 @@ local function _build_llm(ctx)
 				if not definition then return {} end
 				return { {
 					label = string.format(i18n_safe(definition.i18n),
-						#validation > 0 and table.concat(validation, "+") or no_modifier),
+						chord_label(validation, no_modifier)),
 					items = chord_rows(validation, no_modifier, NavigationSettings.set),
 				} }
 			end,

@@ -16,6 +16,41 @@ local SHARED_ROOT = "../_shared"
 -- The whole tray holds many more; fewer means a builder gave up.
 local MIN_ROWS = 100
 
+--- A tray context with every category on: an off category greys every row of
+--- its submenu and drops its submenus (category-off rule), so a walk over off
+--- categories never reaches the rows it has to read.
+--- @return table
+local function every_category_on()
+	local function noop() end
+	local on = function() return true end
+	return {
+		_version = "9.9.9",
+		log_level = "INFO",
+		on_set_log_level = noop,
+		llm = { is_enabled = on, toggle = noop, get_backend = function() return "ollama" end, set_backend = noop },
+		config = { any_enabled = on, get_groups = function() return {} end, is_group_enabled = on,
+			is_section_enabled = on, get_category = function() return nil end, get_categories = function() return {} end },
+		shortcuts = { is_enabled = on, toggle = noop, is_caps_word_active = function() return false end,
+			get_wrap_pairs = function() return {} end },
+		keystats = { is_enabled = on, toggle = noop,
+			get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end },
+		dyn_hotstrings = { is_enabled = on, set_enabled = noop, get_rules_count = function() return 0 end,
+			active_count = function() return 0 end, rule_families = function() return {} end,
+			user_code_problem = function() return nil end },
+		-- An updater over the real registries, so About draws its channel and
+		-- frequency rows.
+		updater = (function()
+			local real = require("modules.updater.manager")
+			return { CHANNELS = real.CHANNELS, INTERVAL_PRESETS = real.INTERVAL_PRESETS, TIMING = real.TIMING,
+				current_version = function() return "9.9.9" end, get_channel = function() return "stable" end,
+				get_check_interval = function() return real.INTERVAL_PRESETS[1].seconds end,
+				get_menu_label = function() return require("infra.i18n").get("menu.about.check_for_updates") end,
+				get_state = function() return "idle" end, get_cached_release = function() return nil end,
+				releases_page_url = function() return real.releases_page_url() end }
+		end)(),
+	}
+end
+
 --- Builds the tray with one real catalogue behind i18n.
 --- @param locale string Locale code.
 --- @return table Rendered rows.
@@ -29,10 +64,7 @@ local function tray(locale)
 		return (text == nil or text == "") and key or text
 	end
 	local ok, rows = pcall(function()
-		return helpers.load_module("ui.menu.builder").build({
-			_version = "9.9.9",
-			config = { get_groups = function() return {} end },
-		})
+		return helpers.load_module("ui.menu.builder").build(every_category_on())
 	end)
 	i18n.get = previous
 	helpers.assert_true(ok, "the tray must build: " .. tostring(rows))
@@ -44,9 +76,12 @@ helpers.describe("the real Linux tray reads as text", function()
 		local rows = { { title = "Disposition", menu = {
 			{ title = "on_pause" }, { title = "menu.layout.layout_on_pause" },
 			{ title = "some_raw_id" }, { title = "Layout {1}" }, { title = "Disposition" },
+			-- Lot CB: a key row shows the key's name, never its id or abbreviation.
+			{ title = "LCtrl  :  Copier  /  Ctrl" }, { title = "Hold → lalt" },
+			{ title = "Ctrl gauche  :  Copier  /  Maj" },
 		} } }
 		local defects = check.defects(rows, SHARED_ROOT, require("json").decode)
-		helpers.assert_eq(#defects, 4, "only the plain label may pass: " .. table.concat(defects, " | "))
+		helpers.assert_eq(#defects, 6, "only the plain labels may pass: " .. table.concat(defects, " | "))
 	end)
 
 	helpers.it("the walk refuses a French row that glues its punctuation", function()

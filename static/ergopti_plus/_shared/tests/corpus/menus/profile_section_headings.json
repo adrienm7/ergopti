@@ -1,20 +1,11 @@
 {
-	"_comment": "Handwritten declaration and original native presentation expectations; locale captions captured from unchanged original catalogues before implementation. Native list-presence and callbacks remain driver-owned.",
+	"_comment": "Handwritten declaration of the two profile headings: one section header each, on every driver, drawn by the shared header format; locale captions in their own case. Native list-presence and callbacks remain driver-owned.",
 	"sections": {
 		"llm_profile_builtin_heading": [
 			{
-				"type": "label",
-				"id": "llm_profile_builtin_plain_heading",
-				"i18n": "menu.profiles.header_default_profiles",
-				"platforms": ["ahk", "linux"],
-				"unavailable": "hide"
-			},
-			{
 				"type": "section_header",
-				"id": "llm_profile_builtin_decorated_heading",
-				"i18n": "menu.profiles.header_default_profiles",
-				"platforms": ["hs"],
-				"unavailable": "hide"
+				"id": "llm_profile_builtin_heading_title",
+				"i18n": "menu.profiles.header_default_profiles"
 			}
 		],
 		"llm_profile_custom_heading": [
@@ -22,38 +13,29 @@
 				"type": "---"
 			},
 			{
-				"type": "label",
-				"id": "llm_profile_custom_plain_heading",
-				"i18n": "menu.profiles.header_custom_profiles",
-				"platforms": ["ahk", "linux"],
-				"unavailable": "hide"
-			},
-			{
 				"type": "section_header",
-				"id": "llm_profile_custom_decorated_heading",
-				"i18n": "menu.profiles.header_custom_profiles",
-				"platforms": ["hs"],
-				"unavailable": "hide"
+				"id": "llm_profile_custom_heading_title",
+				"i18n": "menu.profiles.header_custom_profiles"
 			}
 		]
 	},
 	"keys": ["menu.profiles.header_default_profiles", "menu.profiles.header_custom_profiles"],
 	"captions": {
-		"da": ["STANDARDPROFILER", "BRUGERDEFINEREDE PROFILER"],
-		"de": ["STANDARDPROFILE", "BENUTZERDEFINIERTE PROFILE"],
-		"en": ["DEFAULT PROFILES", "CUSTOM PROFILES"],
-		"es": ["PERFILES PREDETERMINADOS", "PERFILES PERSONALIZADOS"],
-		"fr": ["PROFILS PAR DÉFAUT", "PROFILS PERSONNALISÉS"],
-		"it": ["PROFILI PREDEFINITI", "PROFILI PERSONALIZZATI"],
-		"nl": ["STANDAARDPROFIELEN", "AANGEPASTE PROFIELEN"],
-		"no": ["STANDARDPROFILER", "EGENDEFINERTE PROFILER"],
-		"pl": ["DOMYŚLNE PROFILE", "NIESTANDARDOWE PROFILE"],
-		"pt": ["PERFIS PADRÃO", "PERFIS PERSONALIZADOS"],
-		"sv": ["STANDARDPROFILER", "ANPASSADE PROFILER"],
-		"tr": ["VARSAYILAN PROFİLLER", "ÖZEL PROFİLLER"],
-		"cs": ["VÝCHOZÍ PROFILY", "VLASTNÍ PROFILY"],
-		"ru": ["ПРОФИЛИ ПО УМОЛЧАНИЮ", "ПОЛЬЗОВАТЕЛЬСКИЕ ПРОФИЛИ"],
-		"uk": ["ПРОФІЛІ ЗА ЗАМОВЧУВАННЯМ", "ВЛАСНІ ПРОФІЛІ"],
+		"da": ["Standardprofiler", "Brugerdefinerede profiler"],
+		"de": ["Standardprofile", "Benutzerdefinierte Profile"],
+		"en": ["Default profiles", "Custom profiles"],
+		"es": ["Perfiles predeterminados", "Perfiles personalizados"],
+		"fr": ["Profils par défaut", "Profils personnalisés"],
+		"it": ["Profili predefiniti", "Profili personalizzati"],
+		"nl": ["Standaardprofielen", "Aangepaste profielen"],
+		"no": ["Standardprofiler", "Egendefinerte profiler"],
+		"pl": ["Domyślne profile", "Niestandardowe profile"],
+		"pt": ["Perfis padrão", "Perfis personalizados"],
+		"sv": ["Standardprofiler", "Anpassade profiler"],
+		"tr": ["Varsayılan profiller", "Özel profiller"],
+		"cs": ["Výchozí profily", "Vlastní profily"],
+		"ru": ["Профили по умолчанию", "Пользовательские профили"],
+		"uk": ["Профілі за замовчуванням", "Власні профілі"],
 		"he": ["פרופילי ברירת מחדל", "פרופילים מותאמים"],
 		"ar": ["الملفات الشخصية الافتراضية", "الملفات الشخصية المخصصة"],
 		"hi": ["डिफ़ॉल्ट प्रोफ़ाइलें", "कस्टम प्रोफ़ाइलें"],

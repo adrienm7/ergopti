@@ -165,17 +165,17 @@ local function split_list(value)
 	return items
 end
 
---- The labels of one OS from the [llm_ui] keys of constants.toml.
+--- The shortcut spec of one OS from the [llm_ui] keys of constants.toml.
 --- @param order string shortcut_modifier_order.
---- @param labels string The OS's shortcut_labels_* list, same positions.
 --- @param joiner string The OS's shortcut_joiner_*.
---- @return table|nil spec { order, labels, joiner }, nil when the lists differ.
-function M.shortcut_spec(order, labels, joiner)
-	local names, texts = split_list(order), split_list(labels)
-	if #names == 0 or #names ~= #texts or type(joiner) ~= "string" then return nil end
-	local by_name = {}
-	for index, name in ipairs(names) do by_name[name] = texts[index] end
-	return { order = names, labels = by_name, joiner = joiner }
+--- @param label function Names one modifier of the order, asked at each
+---   rendering so a language switch is followed: the shared key name table's
+---   glyph on macOS, its translated name on Windows and Linux.
+--- @return table|nil spec { order, label, joiner }, nil when malformed.
+function M.shortcut_spec(order, joiner, label)
+	local names = split_list(order)
+	if #names == 0 or type(joiner) ~= "string" or type(label) ~= "function" then return nil end
+	return { order = names, label = label, joiner = joiner }
 end
 
 --- The chord that inserts prediction `index`, as its row shows it.
@@ -193,7 +193,7 @@ function M.shortcut_label(index, modifiers, spec)
 	for _, name in ipairs(type(modifiers) == "table" and modifiers or {}) do present[name] = true end
 	local parts = {}
 	for _, name in ipairs(spec.order) do
-		if present[name] then parts[#parts + 1] = spec.labels[name] end
+		if present[name] then parts[#parts + 1] = spec.label(name) end
 	end
 	parts[#parts + 1] = index == 10 and "0" or tostring(index)
 	return table.concat(parts, spec.joiner)

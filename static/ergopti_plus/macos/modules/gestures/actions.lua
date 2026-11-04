@@ -18,6 +18,8 @@ local Logger        = require("infra.logger")
 local Paths         = require("infra.paths")
 local Timings       = require("infra.timings")
 local i18n          = require("infra.i18n")
+local KeyNames      = require("keycodes.key_names")
+local StickyLabel   = require("actions.sticky_label")
 local text_utils    = require("infra.text_utils")
 local FileSystem    = require("adapters.file_system")
 local KeyState      = require("adapters.key_state")
@@ -2841,10 +2843,11 @@ function M.get_all_action_parameters()
 	return out
 end
 
--- Labels for modifier-key actions are intentionally kept outside i18n: the
--- shared catalogue defines their exact, language-neutral display form (for
--- example "Ctrl + A") for every driver.
-local MODIFIER_ACTION_LABELS = {}
+-- The modifier-key actions are named at each read from the shared key name
+-- table, in the active language (« Cmd + Maj + Entrée »): they used to keep the
+-- catalogue's English names in every locale. Each entry holds the modifier ids
+-- and the catalogue key the label is built from.
+local MODIFIER_ACTION_PARTS = {}
 local MODIFIER_ACTION_GROUPS = {}
 
 local function load_modifier_chords(path)
@@ -2873,29 +2876,26 @@ local function register_modifier_chords(catalogue)
 
 	local max_mask = (2 ^ #modifiers) - 1
 	for mask = 1, max_mask do
-		local ids, labels, native_mods = {}, {}, {}
+		local ids, native_mods = {}, {}
 		for index, modifier in ipairs(modifiers) do
 			if math.floor(mask / (2 ^ (index - 1))) % 2 == 1 then
 				ids[#ids + 1] = modifier.id
-				labels[#labels + 1] = modifier.label
 				native_mods[#native_mods + 1] = modifier.hammerspoon
 			end
 		end
 		local id_prefix = join(ids, "_")
-		local label_prefix = join(labels, " + ")
 		local action_ids = {}
 		for _, key_def in ipairs(keys) do
 			local action_id = id_prefix .. "_" .. key_def.id
-			local action_label = label_prefix .. " + " .. key_def.label
 			local key = key_def.macos_key or key_def.id
 			local mods = {}
 			for index, modifier in ipairs(native_mods) do mods[index] = modifier end
-			MODIFIER_ACTION_LABELS[action_id] = action_label
+			MODIFIER_ACTION_PARTS[action_id] = { modifiers = ids, key = key_def }
 			action_ids[#action_ids + 1] = action_id
 			sg(action_id, function() postKeyStroke(mods, key) end)
 		end
 		MODIFIER_ACTION_GROUPS[#MODIFIER_ACTION_GROUPS + 1] = {
-			label = label_prefix,
+			modifiers = ids,
 			actions = action_ids,
 		}
 	end
@@ -2926,8 +2926,8 @@ M.SG_NAMES = nil  -- populated below after get_sg_names() is defined
 --- Returns the ordered SG names with translated section headers: action ids,
 --- and headings as "#" (level 1) or "##" (level 2) followed by their text. The
 --- modifier-chord block expands into one sub-heading per modifier combination,
---- built from the localized group key and the language-neutral combination
---- label; it used to be a hardcoded French heading in every locale.
+--- built from the localized group key and the combination's names from the key
+--- name table; it used to be a hardcoded French heading in every locale.
 --- Called at menu-build time so headers always reflect the active locale.
 function M.get_sg_names()
 	local out = {}
@@ -2938,7 +2938,8 @@ function M.get_sg_names()
 			out[#out + 1] = string.rep("#", item.level) .. heading_text(item.key)
 		elseif item.kind == "modifier_chords" then
 			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
-				out[#out + 1] = string.rep("#", item.level) .. i18n.format(item.group_key, group.label)
+				out[#out + 1] = string.rep("#", item.level)
+					.. i18n.format(item.group_key, KeyNames.modifiers_label(group.modifiers, "macos", i18n.get))
 				for _, action_id in ipairs(group.actions) do out[#out + 1] = action_id end
 			end
 		else
@@ -2978,7 +2979,8 @@ function M.get_label(name)
 	if not name or name == "none" then
 		return i18n.get("sg_actions.none")
 	end
-	if MODIFIER_ACTION_LABELS[name] then return MODIFIER_ACTION_LABELS[name] end
+	local chord = MODIFIER_ACTION_PARTS[name]
+	if chord then return KeyNames.chord_label(chord.modifiers, chord.key, "macos", i18n.get) end
 	-- The label key the generated catalogue declares. An id this platform does
 	-- not offer (a binding written on another OS) still resolves through the
 	-- conventional keys. No hardcoded fallback: an action without a label key is
@@ -2988,7 +2990,11 @@ function M.get_label(name)
 	local keys = meta and { meta.label_key } or { "sg_actions." .. name, "ax_actions." .. name }
 	for _, key in ipairs(keys) do
 		local s = i18n.get(key)
-		if s ~= key then return s end
+		if s ~= key then
+			-- A sticky label is a template its modifiers fill (« 📌 {1} rémanents »).
+			if StickyLabel.is_sticky(name) then return StickyLabel.label(name, key, "macos", i18n.get) end
+			return s
+		end
 	end
 	return name
 end

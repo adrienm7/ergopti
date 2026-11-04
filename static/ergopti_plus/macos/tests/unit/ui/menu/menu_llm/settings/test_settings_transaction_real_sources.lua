@@ -601,7 +601,12 @@ helpers.describe("LLM fixed parents: actual shared group topology", function()
 				for _, parent in ipairs(parents) do
 					local row = assert(find_item(rows, parent.key))
 					helpers.assert_eq(row.disabled, true)
-					helpers.assert_true(type(row.menu) == "table", "gating retains the genuine child tree")
+					if condition.paused then
+						helpers.assert_true(type(row.menu) == "table", "gating retains the genuine child tree")
+					else
+						-- Category-off rule: a greyed group of an off category opens nothing.
+						helpers.assert_nil(row.menu, "an off category's group opens nothing")
+					end
 				end
 			end)
 		end)

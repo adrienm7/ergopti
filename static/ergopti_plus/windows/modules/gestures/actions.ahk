@@ -434,19 +434,25 @@ _GestureMakeVisionRunner(ActionId) {
 ; single source of truth, and test-action-catalogue-codegen.cjs fails on a
 ; catalogue label key missing from any locale.
 _GestureActionLabel(Name) {
-	global GESTURE_MODIFIER_ACTION_LABELS, GESTURE_ACTION_CATALOGUE
-	if GESTURE_MODIFIER_ACTION_LABELS.Has(Name)
-		return GESTURE_MODIFIER_ACTION_LABELS[Name]
+	global GESTURE_MODIFIER_ACTION_PARTS, GESTURE_ACTION_CATALOGUE
+	if GESTURE_MODIFIER_ACTION_PARTS.Has(Name) {
+		Parts := GESTURE_MODIFIER_ACTION_PARTS[Name]
+		return KeyNameChordLabel(Parts.Modifiers, Parts.KeyDef)
+	}
 	Key := (IsSet(GESTURE_ACTION_CATALOGUE) && GESTURE_ACTION_CATALOGUE.Actions.Has(Name))
 		? GESTURE_ACTION_CATALOGUE.Actions[Name].LabelKey
 		: "sg_actions." . Name
 	Translated := t(Key)
 	; t() returns the raw key when no translation is found — treat that as a miss
-	if (Translated != Key)
-		; The sticky labels name macOS's keys; every locale keeps those two words.
-		return InStr(Name, "sticky_") == 1
-			? StrReplace(StrReplace(Translated, "Cmd", "Win", true), "Option", "Alt", true) : Translated
-	return Name
+	if (Translated == Key)
+		return Name
+	; A sticky label is a template its modifiers fill from the key name table
+	; (« 📌 {1} rémanents »), Cmd being Win and Option Alt. It used to spell
+	; macOS's English names and swap two of them. sticky_hyper is named by its
+	; own word. Port of _shared/lua/actions/sticky_label.lua.
+	if (InStr(Name, "sticky_") == 1) && (Name != "sticky_hyper")
+		return KeyNameFill(Key, KeyNameModifiersLabel(StickyModifierNames(Name)))
+	return Translated
 }
 
 
@@ -880,8 +886,11 @@ GesturePastePlain() {
 
 ; Modifier + key actions are generated from the cross-driver catalogue. This
 ; replaces the former partial, AHK-only Ctrl/Alt/Win tables with every non-empty
-; combination of Ctrl, Shift, Alt and Win for every catalogue key.
-global GESTURE_MODIFIER_ACTION_LABELS := Map()
+; combination of Ctrl, Shift, Alt and Win for every catalogue key. Each action
+; keeps the modifier ids and the catalogue key its label is named from at each
+; read, in the active language (« Ctrl + Maj + Entrée »): the labels used to
+; keep the catalogue's English names in every locale.
+global GESTURE_MODIFIER_ACTION_PARTS := Map()
 global GESTURE_MODIFIER_ACTION_GROUPS := []
 
 _GestureJoin(Values, Separator) {
@@ -892,7 +901,7 @@ _GestureJoin(Values, Separator) {
 }
 
 _GestureRegisterModifierChords() {
-		global GESTURE_ACTIONS, GESTURE_MODIFIER_ACTION_LABELS, GESTURE_MODIFIER_ACTION_GROUPS, _SharedDir
+		global GESTURE_ACTIONS, GESTURE_MODIFIER_ACTION_PARTS, GESTURE_MODIFIER_ACTION_GROUPS, _SharedDir
 
 		Path := _SharedDir . "\modules\actions\modifier_chords.json"
 		Raw := FSRead(Path)
@@ -917,7 +926,6 @@ _GestureRegisterModifierChords() {
 		loop MaxMask {
 				Mask      := A_Index
 				IdParts   := []
-				LabelParts := []
 				Prefixes  := []
 				loop Modifiers.Length {
 						Bit := A_Index - 1
@@ -925,13 +933,11 @@ _GestureRegisterModifierChords() {
 								continue
 						Modifier := Modifiers[A_Index]
 						IdParts.Push(Modifier["id"])
-						LabelParts.Push(Modifier["label"])
 						Prefixes.Push(Modifier["ahk_prefix"])
 				}
 				IdPrefix := _GestureJoin(IdParts, "_")
-				LabelPrefix := _GestureJoin(LabelParts, " + ")
 				SendPrefix := _GestureJoin(Prefixes, "")
-				Group := { Label: LabelPrefix, Actions: [] }
+				Group := { Modifiers: IdParts, Actions: [] }
 				for _, KeyDef in Keys {
 						KeyId   := KeyDef["id"]
 						KeyCode := KeyDef.Has("windows_key") ? KeyDef["windows_key"] : KeyId
@@ -939,7 +945,7 @@ _GestureRegisterModifierChords() {
 						; types is the bare name, which the hotkey form always is.
 						BareKey := KeyDef.Has("windows_hotkey_key") ? KeyDef["windows_hotkey_key"] : KeyCode
 						ActionId := IdPrefix . "_" . KeyId
-						GESTURE_MODIFIER_ACTION_LABELS[ActionId] := LabelPrefix . " + " . KeyDef["label"]
+						GESTURE_MODIFIER_ACTION_PARTS[ActionId] := { Modifiers: IdParts, KeyDef: KeyDef }
 						Group.Actions.Push(ActionId)
 						GESTURE_ACTIONS[ActionId] := {
 								Fn: ((_keys) => (*) => GestureSendShortcut(_keys))(SendPrefix . KeyCode),
@@ -1186,13 +1192,13 @@ GestureActionPickerItems() {
 								if (Item.Id != "none")
 										Items.Push(_GesturePickerActionItem(Item.Id))
 						case "modifier_chords":
-								; One sub-heading per modifier combination. The combination label
-								; ("Ctrl + Shift") is language-neutral; the words around it are not,
-								; which is why this used to read "Raccourcis Ctrl" in every locale.
+								; One sub-heading per modifier combination, its names from the key
+								; name table (« Raccourcis Ctrl + Maj »). The template used to be
+								; French in every locale, then the names English.
 								Template := t(Item.GroupKey)
 								for _, Group in GESTURE_MODIFIER_ACTION_GROUPS {
 										Items.Push({ Type: "heading", Level: Item.Level,
-												Text: StrReplace(Template, "{1}", Group.Label) })
+												Text: StrReplace(Template, "{1}", KeyNameModifiersLabel(Group.Modifiers)) })
 										for _, ActionId in Group.Actions
 												Items.Push(_GesturePickerActionItem(ActionId))
 								}

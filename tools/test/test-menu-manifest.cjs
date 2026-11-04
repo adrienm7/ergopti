@@ -407,7 +407,8 @@ function checkChoiceProjection() {
 			const rows = menu[key];
 			return Array.isArray(rows) ? rows.filter((row) => row.type === 'section_header') : [];
 		});
-		assert.equal(legacyHeaders.length, 13, 'all existing id-less headers survive compilation');
+		// 3 Shortcuts, 3 Metrics, 4 Layout, 4 Hotstrings and 2 Tap-Hold headers.
+		assert.equal(legacyHeaders.length, 16, 'all existing id-less headers survive compilation');
 		assert(
 			legacyHeaders.every((row) => !Object.hasOwn(row, 'id')),
 			'the header primitive cannot impose identities on existing records'
@@ -491,7 +492,7 @@ function checkChoiceProjection() {
 			backendStatus.unavailable,
 			[
 				{ type: '---' },
-				{ type: 'label', i18n: 'menu.llm.local_servers.header' },
+				{ type: 'section_header', i18n: 'menu.llm.local_servers.header' },
 				{ type: 'label', i18n: 'menu.llm.unavailable' }
 			],
 			'existing provider owns exact independent status data'
@@ -730,13 +731,15 @@ function checkChoiceProjection() {
 			);
 			assert.deepEqual(fs.readFileSync(output), publishedIndentation);
 		}
-		result = execute(original.replace(numericChoices, 'choice_values = [-1, 0, 1]'));
+		// The narrowed range must still hold the shipped default and recommended
+		// value (-3), or the compiler rightly refuses it.
+		result = execute(original.replace(numericChoices, 'choice_values = [-3, -2, -1, 0, 1]'));
 		assert.equal(result.status, 0, result.stderr);
 		assert.deepEqual(
 			JSON.parse(fs.readFileSync(output))
 				.llm_display_menu.find((row) => row.id === 'llm_indentation')
 				.choices.map((row) => row.value),
-			[-1, 0, 1],
+			[-3, -2, -1, 0, 1],
 			'the actual feature catalogue, not a native copied range, drives codegen'
 		);
 		result = execute(original);
@@ -1376,6 +1379,7 @@ function checkAutomaticTriggerControls() {
 			'llm_trigger_leading',
 			'llm_instant_on_word_end',
 			'llm_after_hotstring',
+			'llm_while_hotstring_tooltip',
 			undefined,
 			'llm_url_bar_filter',
 			'llm_secure_field_filter',
@@ -1496,8 +1500,9 @@ function checkIndentationControl() {
 		[...feature.choice_values],
 		corpus.choices.map((choice) => choice.value)
 	);
-	assert.equal(feature.default, 0);
-	assert.equal(feature.recommended, 0);
+	// -3 since the maintainer's 2026-11-02 choice: every line at one column.
+	assert.equal(feature.default, -3);
+	assert.equal(feature.recommended, -3);
 	const declaration = JSON.parse(readSourceFile(MENU_PATH)).llm_display_menu;
 	const row = declaration.find((entry) => entry.id === corpus.row.id);
 	assert.equal(declaration.filter((entry) => entry.id === corpus.row.id).length, 1);
@@ -1611,9 +1616,12 @@ function checkPrivacyTriggerControls() {
 		[true, true]
 	]);
 	assert.deepEqual(corpus.prediction_counts, [1, 2]);
-	assert.equal(root.llm_trigger_menu[3].type, '---');
+	// The privacy filters follow the menu's only separator, after the timing rows.
+	const separator = root.llm_trigger_menu.findIndex((row) => row.type === '---');
+	assert(separator > 0, 'the trigger menu parts its timing rows from the privacy filters');
+	assert.equal(root.llm_trigger_menu.filter((row) => row.type === '---').length, 1);
 	for (const [index, expected] of corpus.rows.entries()) {
-		const declaration = root.llm_trigger_menu[index + 4];
+		const declaration = root.llm_trigger_menu[separator + 1 + index];
 		assert.equal(declaration.type, 'check');
 		assert.equal(declaration.id, expected.id);
 		assert.equal(declaration.i18n, expected.i18n);
@@ -4459,7 +4467,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		(d) => d.llm_profile_custom_heading.reverse(),
 		(d) => (d.llm_profile_builtin_heading[0].i18n = 'button.cancel'),
 		(d) => (d.llm_profile_custom_heading[1].platforms = ['hs']),
-		(d) => (d.llm_profile_builtin_heading[1].type = 'label'),
+		(d) => (d.llm_profile_builtin_heading[0].type = 'label'),
+		(d) => (d.llm_profile_builtin_heading[0].platforms = ['hs']),
 		(d) => (d.llm_profile_custom_heading[0].type = 'label')
 	]) {
 		const wrong = structuredClone(declared);
@@ -6175,8 +6184,8 @@ console.log(
 			'the declared frame binding has closed fields'
 		],
 		[
-			'Getters, , , DeclaredFrames)',
-			'Getters, , , Map())',
+			'TargetMenu : unset, , DeclaredFrames)',
+			'TargetMenu : unset, , Map())',
 			'actual optional Build argument carries the genuine registration'
 		],
 		[
@@ -6422,11 +6431,13 @@ console.log(
 	);
 	assert.notEqual(renamedProvider, source);
 	publishedPersonalFrame(renamedProvider);
-	const renamedRegistration = source.replace(/_BuildShortcutsSubmenu\(\) \{[\s\S]*?\n\}/, (body) =>
-		body.replace(
-			/\b(DynHandlers|DeclaredFrames|ListProviders|Commands|Getters|GroupBuilders)\b/g,
-			(name) => 'PersonalFrame' + name
-		)
+	const renamedRegistration = source.replace(
+		/_BuildShortcutsSubmenu\(TargetMenu := unset\) \{[\s\S]*?\n\}/,
+		(body) =>
+			body.replace(
+				/\b(DynHandlers|DeclaredFrames|ListProviders|Commands|Getters|GroupBuilders)\b/g,
+				(name) => 'PersonalFrame' + name
+			)
 	);
 	assert.notEqual(renamedRegistration, source);
 	publishedPersonalFrame(renamedRegistration);
@@ -8458,8 +8469,15 @@ console.log(
 			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.debug.title']);
-		assert.equal(hand[code].linux[0], locale['menu.debug.log_level'] + ' : ℹ️ INFO');
-		assert.equal(hand[code].hs[2], hand[code].linux[0]);
+		// The row joins its label to its value through the locale's common.label_value.
+		assert.equal(
+			hand[code].linux[7],
+			locale['common.label_value']
+				.replace('{1}', locale['menu.debug.log_level'])
+				.replace('{2}', 'ℹ️ INFO')
+		);
+		assert.equal(hand[code].tests, locale['menu.debug.tests']);
+		assert.equal(hand[code].hs[9], hand[code].linux[7]);
 	}
 	function tokenDepths(tokens) {
 		let depth = 0,
@@ -8605,7 +8623,7 @@ console.log(
 		const chronology = [
 			`local root, top, section, parent, fields = debug_source(ManifestMenu, "${driver}")`,
 			`if root == nil then return ${refused} end`,
-			`local ${child} = ManifestMenu.build("debug_menu", "Debug", nil, nil, ${context}, {})`,
+			`local ${child} = ManifestMenu.build("debug_menu", "Debug", nil, debug_groups, ${context}, {})`,
 			`if not debug_dense(${child}, true) then return ${refused} end`,
 			`local current_root, current_top, current_section, current_parent = debug_source(ManifestMenu, "${driver}")`,
 			`if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not debug_parent_unchanged(parent, fields) then return ${refused} end`,
@@ -8717,7 +8735,9 @@ console.log(
 			locale['menu.global.clean_unused_keys'],
 			'-',
 			locale['menu.global.config_folder'],
-			locale['menu.global.setup_wizard']
+			locale['menu.global.setup_wizard'],
+			'-',
+			locale['menu.debug.proxy_override']
 		]);
 	}
 	function tokenDepths(tokens) {

@@ -26,8 +26,17 @@ require("test.runner_home").isolate()
 --- English formats of the keys a caption with several getters (caption_getters) reads.
 --- Such a caption refuses a format without its placeholders, so a stub that echoes
 --- the key (the usual one) would drop the whole row; a stub that replaces the
---- baseline starts from these.
-M.I18N_PLACEHOLDER_FORMATS = { ["menu.llm.server_port_label"] = "%s server port: %s" }
+--- baseline starts from these. A numbered caption (caption_format "numbered")
+--- refuses one without its {1} the same way: the keyboard groups' Add rows echo
+--- their key followed by the modifiers they are filled with.
+M.I18N_PLACEHOLDER_FORMATS = {
+	["menu.llm.server_port_label"] = "%s server port: %s",
+	["menu.shortcuts.alt_add"] = "menu.shortcuts.alt_add {1}",
+	["menu.shortcuts.ctrl_add"] = "menu.shortcuts.ctrl_add {1}",
+	["menu.shortcuts.ctrl_shift_add"] = "menu.shortcuts.ctrl_shift_add {1}",
+	["menu.shortcuts.cmd_add"] = "menu.shortcuts.cmd_add {1}",
+	["menu.shortcuts.cmd_shift_add"] = "menu.shortcuts.cmd_shift_add {1}",
+}
 
 --- The shared timing registry, built from the real file on first use. A fixture that virtualises
 --- the file system or the shared paths calls M.provide_timings() before it does, so a call-time
@@ -491,7 +500,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- AFTER calling load_with_stubs (this baseline is always restored here).
 	-- decorate_section / section mirror the real i18n: menu builders (via
 	-- ui.menu.menu_utils.build_section_header) wrap disabled headers in the
-	-- canonical "— … —" decoration, so the stub must expose them or any builder
+	-- shared header format (menu.labels), so the stub must expose them or any builder
 	-- that renders a section header crashes with a nil-field call.
 	-- A caption that takes several getters (caption_getters) refuses a format without its
 	-- placeholders, so the keys the AI menu builds that way carry their English format.
@@ -500,8 +509,8 @@ function M.load_with_stubs(module_name, hs_overrides)
 		get             = function(key) return PLACEHOLDER_FORMATS[key] or key end,
 		get_locale      = function() return "fr" end,
 		set_locale      = function() end,
-		decorate_section = function(text) return "— " .. text .. " —" end,
-		section          = function(key) return "— " .. key .. " —" end,
+		decorate_section = function(text) return require("menu.labels").decorate_section(text) end,
+		section          = function(key) return require("menu.labels").decorate_section(key) end,
 		-- Mirrors the real {n} substitution. A stub narrower than the module it
 		-- stands in for is how a production call to a missing function reaches
 		-- nil under test and nobody notices: every consumer of i18n.format would

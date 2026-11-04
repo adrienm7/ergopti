@@ -488,7 +488,7 @@
 						"type": "---"
 					},
 					{
-						"type": "label",
+						"type": "section_header",
 						"i18n": "menu.llm.local_servers.header"
 					},
 					{
@@ -523,6 +523,10 @@
 		},
 		{
 			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.llm.header_settings"
 		},
 		{
 			"type": "group",
@@ -746,6 +750,27 @@
 			],
 			"disabled_when": [
 				"llm_trigger_ready"
+			]
+		},
+		{
+			"type": "choice",
+			"id": "llm_while_hotstring_tooltip",
+			"path": "llm.trigger.while_hotstring_tooltip",
+			"i18n": "menu.llm.while_hotstring_tooltip",
+			"show_current_choice": true,
+			"current_choice_label_value": true,
+			"disabled_when": [
+				"llm_trigger_ready"
+			],
+			"choices": [
+				{
+					"value": "wait",
+					"i18n": "menu.llm.while_hotstring_tooltip_wait"
+				},
+				{
+					"value": "both",
+					"i18n": "menu.llm.while_hotstring_tooltip_both"
+				}
 			]
 		},
 		{
@@ -1107,15 +1132,6 @@
 			"i18n": "menu.global.clean_unused_keys"
 		},
 		{
-			"type": "command",
-			"id": "restore_touchpad_gestures",
-			"i18n": "menu.global.restore_touchpad_gestures",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
-		},
-		{
 			"type": "---"
 		},
 		{
@@ -1148,6 +1164,14 @@
 				"hs"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "proxy_override",
+			"i18n": "menu.debug.proxy_override"
 		}
 	],
 	"debug_menu": [
@@ -1190,6 +1214,41 @@
 		{
 			"type": "---",
 			"id": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.debug.header_diagnostics"
+		},
+		{
+			"type": "command",
+			"id": "healthcheck",
+			"i18n": "menu.debug.healthcheck"
+		},
+		{
+			"type": "check",
+			"id": "show_error_dialog",
+			"i18n": "menu.debug.show_error_dialog",
+			"checked_when": [
+				"error_dialog_enabled"
+			]
+		},
+		{
+			"type": "command",
+			"id": "report_bug",
+			"i18n": "menu.debug.report_bug"
+		},
+		{
+			"type": "command",
+			"id": "suggest_feature",
+			"i18n": "menu.debug.suggest_feature"
+		},
+		{
+			"type": "---",
+			"id": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.debug.header_logs"
 		},
 		{
 			"type": "choice",
@@ -1237,45 +1296,16 @@
 			"id": "---"
 		},
 		{
-			"type": "command",
-			"id": "healthcheck",
-			"i18n": "menu.debug.healthcheck"
-		},
-		{
-			"type": "check",
-			"id": "show_error_dialog",
-			"i18n": "menu.debug.show_error_dialog",
-			"checked_when": [
-				"error_dialog_enabled"
-			]
-		},
-		{
-			"type": "command",
-			"id": "field_check_lease",
-			"i18n": "menu.debug.field_check_lease",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
-		},
-		{
-			"type": "command",
-			"id": "field_check_owned_runtime",
-			"i18n": "menu.debug.field_check_owned_runtime",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
-		},
+			"type": "group",
+			"id": "debug_tests",
+			"i18n": "menu.debug.tests"
+		}
+	],
+	"debug_tests_menu": [
 		{
 			"type": "command",
 			"id": "field_check_network",
 			"i18n": "menu.debug.field_check_network"
-		},
-		{
-			"type": "command",
-			"id": "proxy_override",
-			"i18n": "menu.debug.proxy_override"
 		},
 		{
 			"type": "command",
@@ -1286,24 +1316,6 @@
 			"type": "command",
 			"id": "field_check_key_accounting",
 			"i18n": "menu.debug.field_check_key_accounting",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
-		},
-		{
-			"type": "command",
-			"id": "field_check_toolchain",
-			"i18n": "menu.debug.field_check_toolchain",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
-		},
-		{
-			"type": "command",
-			"id": "field_check_login_items",
-			"i18n": "menu.debug.field_check_login_items",
 			"platforms": [
 				"hs"
 			],
@@ -1329,13 +1341,39 @@
 		},
 		{
 			"type": "command",
-			"id": "report_bug",
-			"i18n": "menu.debug.report_bug"
+			"id": "field_check_lease",
+			"i18n": "menu.debug.field_check_lease",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
 		},
 		{
 			"type": "command",
-			"id": "suggest_feature",
-			"i18n": "menu.debug.suggest_feature"
+			"id": "field_check_owned_runtime",
+			"i18n": "menu.debug.field_check_owned_runtime",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
+		},
+		{
+			"type": "command",
+			"id": "field_check_toolchain",
+			"i18n": "menu.debug.field_check_toolchain",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
+		},
+		{
+			"type": "command",
+			"id": "field_check_login_items",
+			"i18n": "menu.debug.field_check_login_items",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
 		}
 	],
 	"shortcuts_menu": [
@@ -1395,20 +1433,16 @@
 			"type": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.shortcuts.header_selection"
+		},
+		{
 			"type": "feature",
 			"path": "shortcuts.wrap_text_if_selected"
 		},
 		{
 			"type": "list",
 			"id": "wrap_symbols_menu"
-		},
-		{
-			"type": "section_header",
-			"i18n": "menu.shortcuts.header_selection",
-			"platforms": [
-				"linux"
-			],
-			"reason_key": "platform_reason.selection_operations_are_a_block_on_linux"
 		},
 		{
 			"type": "list",
@@ -1438,6 +1472,10 @@
 		},
 		{
 			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.shortcuts.header_modifier_groups"
 		},
 		{
 			"type": "list",
@@ -2091,6 +2129,10 @@
 			"type": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.metrics.header_wpm"
+		},
+		{
 			"type": "check",
 			"id": "wpm_menubar",
 			"i18n": "menu.metrics.show_wpm_menubar",
@@ -2232,6 +2274,10 @@
 			"type": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.metrics.header_collection"
+		},
+		{
 			"type": "check",
 			"id": "metrics_suspend",
 			"i18n": "menu.metrics.suspend_collection",
@@ -2329,6 +2375,14 @@
 			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.layout.header_layers",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		},
+		{
 			"type": "list",
 			"id": "layout_features_base",
 			"platforms": [
@@ -2345,47 +2399,9 @@
 			"reason_key": "platform_reason.lists_windows_only_settings"
 		},
 		{
-			"type": "section_header",
-			"i18n": "menu.layout.header_rows",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "hide"
-		},
-		{
-			"type": "feature",
-			"path": "layout.emulate_number_row",
-			"i18n": "menu.layout.emulate_number_row",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_emulation_is_windows_only"
-		},
-		{
-			"type": "feature",
-			"path": "layout.emulate_top_row",
-			"i18n": "menu.layout.emulate_top_row",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_emulation_is_windows_only"
-		},
-		{
-			"type": "feature",
-			"path": "layout.emulate_home_row",
-			"i18n": "menu.layout.emulate_home_row",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_emulation_is_windows_only"
-		},
-		{
-			"type": "feature",
-			"path": "layout.emulate_bottom_row",
-			"i18n": "menu.layout.emulate_bottom_row",
+			"type": "group",
+			"id": "layout_emulated_rows",
+			"i18n": "menu.layout.emulated_rows",
 			"platforms": [
 				"ahk"
 			],
@@ -2510,6 +2526,48 @@
 				"ahk"
 			],
 			"reason_key": "platform_reason.lists_windows_only_settings"
+		}
+	],
+	"layout_emulated_rows_group": [
+		{
+			"type": "feature",
+			"path": "layout.emulate_number_row",
+			"i18n": "menu.layout.emulate_number_row",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.layout_emulation_is_windows_only"
+		},
+		{
+			"type": "feature",
+			"path": "layout.emulate_top_row",
+			"i18n": "menu.layout.emulate_top_row",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.layout_emulation_is_windows_only"
+		},
+		{
+			"type": "feature",
+			"path": "layout.emulate_home_row",
+			"i18n": "menu.layout.emulate_home_row",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.layout_emulation_is_windows_only"
+		},
+		{
+			"type": "feature",
+			"path": "layout.emulate_bottom_row",
+			"i18n": "menu.layout.emulate_bottom_row",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.layout_emulation_is_windows_only"
 		}
 	],
 	"accented_letters_group": [
@@ -2753,6 +2811,10 @@
 			"type": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.hotstrings.header_new_word"
+		},
+		{
 			"type": "choice",
 			"id": "idle_reset",
 			"path": "hotstrings.idle_reset_seconds",
@@ -2981,6 +3043,10 @@
 			"type": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.gestures.header_system"
+		},
+		{
 			"type": "command",
 			"id": "gesture_recommended_info",
 			"i18n": "menu.gestures.recommended_info"
@@ -2997,7 +3063,12 @@
 		{
 			"type": "command",
 			"id": "system_gesture_settings",
-			"i18n": "menu.gestures.system_settings"
+			"i18n": "menu.gestures.system_settings",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "command",
@@ -3021,6 +3092,14 @@
 			"type": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.gestures.header_fingers_2",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
 			"type": "list",
 			"id": "gesture_slots_2",
 			"platforms": [
@@ -3030,6 +3109,14 @@
 		},
 		{
 			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.gestures.header_fingers_3",
 			"platforms": [
 				"hs"
 			],
@@ -3051,6 +3138,14 @@
 			"unavailable": "hide"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.gestures.header_fingers_4",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
 			"type": "list",
 			"id": "gesture_slots_4",
 			"platforms": [
@@ -3060,6 +3155,14 @@
 		},
 		{
 			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.gestures.header_fingers_5",
 			"platforms": [
 				"hs"
 			],
@@ -3081,9 +3184,21 @@
 			],
 			"reason_key": "platform_reason.touchpad_stack_is_per_driver",
 			"status_rows": {
-				"tap_group_boundary": [
+				"finger_group_boundary": [
 					{
 						"type": "---"
+					}
+				],
+				"fingers_3": [
+					{
+						"type": "section_header",
+						"i18n": "menu.gestures.header_fingers_3"
+					}
+				],
+				"fingers_4": [
+					{
+						"type": "section_header",
+						"i18n": "menu.gestures.header_fingers_4"
 					}
 				]
 			}
@@ -3094,7 +3209,38 @@
 			"platforms": [
 				"linux"
 			],
-			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
+			"reason_key": "platform_reason.touchpad_stack_is_per_driver",
+			"status_rows": {
+				"finger_group_boundary": [
+					{
+						"type": "---"
+					}
+				],
+				"fingers_2": [
+					{
+						"type": "section_header",
+						"i18n": "menu.gestures.header_fingers_2"
+					}
+				],
+				"fingers_3": [
+					{
+						"type": "section_header",
+						"i18n": "menu.gestures.header_fingers_3"
+					}
+				],
+				"fingers_4": [
+					{
+						"type": "section_header",
+						"i18n": "menu.gestures.header_fingers_4"
+					}
+				],
+				"fingers_5": [
+					{
+						"type": "section_header",
+						"i18n": "menu.gestures.header_fingers_5"
+					}
+				]
+			}
 		},
 		{
 			"type": "---",
@@ -3212,13 +3358,6 @@
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
-		},
-		{
 			"type": "list",
 			"id": "tap_hold_global_delay",
 			"platforms": [
@@ -3228,12 +3367,16 @@
 			"unavailable": "hide"
 		},
 		{
-			"type": "---",
+			"type": "list",
+			"id": "tap_hold_lone_tap",
 			"platforms": [
 				"ahk",
+				"hs",
 				"linux"
-			],
-			"unavailable": "hide"
+			]
+		},
+		{
+			"type": "---"
 		},
 		{
 			"type": "section_header",
@@ -3844,23 +3987,9 @@
 	],
 	"llm_profile_builtin_heading": [
 		{
-			"type": "label",
-			"id": "llm_profile_builtin_plain_heading",
-			"i18n": "menu.profiles.header_default_profiles",
-			"platforms": [
-				"ahk",
-				"linux"
-			],
-			"unavailable": "hide"
-		},
-		{
 			"type": "section_header",
-			"id": "llm_profile_builtin_decorated_heading",
-			"i18n": "menu.profiles.header_default_profiles",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
+			"id": "llm_profile_builtin_heading_title",
+			"i18n": "menu.profiles.header_default_profiles"
 		}
 	],
 	"llm_profile_custom_heading": [
@@ -3868,23 +3997,9 @@
 			"type": "---"
 		},
 		{
-			"type": "label",
-			"id": "llm_profile_custom_plain_heading",
-			"i18n": "menu.profiles.header_custom_profiles",
-			"platforms": [
-				"ahk",
-				"linux"
-			],
-			"unavailable": "hide"
-		},
-		{
 			"type": "section_header",
-			"id": "llm_profile_custom_decorated_heading",
-			"i18n": "menu.profiles.header_custom_profiles",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
+			"id": "llm_profile_custom_heading_title",
+			"i18n": "menu.profiles.header_custom_profiles"
 		}
 	],
 	"llm_profile_lua_frame": [
@@ -5372,6 +5487,8 @@
 			"id": "keyboard_group_add_option",
 			"command": "keyboard_group_add",
 			"i18n": "menu.shortcuts.alt_add",
+			"caption_getter": "keyboard_group_add_caption",
+			"caption_format": "numbered",
 			"disabled_when": [
 				"keyboard_group_ready"
 			],
@@ -5387,6 +5504,8 @@
 			"id": "keyboard_group_add_ctrl",
 			"command": "keyboard_group_add",
 			"i18n": "menu.shortcuts.ctrl_add",
+			"caption_getter": "keyboard_group_add_caption",
+			"caption_format": "numbered",
 			"disabled_when": [
 				"keyboard_group_ready"
 			],
@@ -5402,6 +5521,8 @@
 			"id": "keyboard_group_add_ctrl_shift",
 			"command": "keyboard_group_add",
 			"i18n": "menu.shortcuts.ctrl_shift_add",
+			"caption_getter": "keyboard_group_add_caption",
+			"caption_format": "numbered",
 			"disabled_when": [
 				"keyboard_group_ready"
 			],
@@ -5417,6 +5538,8 @@
 			"id": "keyboard_group_add_cmd",
 			"command": "keyboard_group_add",
 			"i18n": "menu.shortcuts.cmd_add",
+			"caption_getter": "keyboard_group_add_caption",
+			"caption_format": "numbered",
 			"disabled_when": [
 				"keyboard_group_ready"
 			],
@@ -5432,6 +5555,8 @@
 			"id": "keyboard_group_add_cmd_shift",
 			"command": "keyboard_group_add",
 			"i18n": "menu.shortcuts.cmd_shift_add",
+			"caption_getter": "keyboard_group_add_caption",
+			"caption_format": "numbered",
 			"disabled_when": [
 				"keyboard_group_ready"
 			],

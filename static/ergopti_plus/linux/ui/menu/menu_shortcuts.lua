@@ -341,7 +341,7 @@ local function _build_shortcuts(ctx)
 					local scope_rows = group_scope_rows(group.prefix)
 					for index = #scope_rows, 1, -1 do table.insert(rows, 1, scope_rows[index]) end
 				end
-				out[#out + 1] = { label = i18n_safe(group.group_key), items = rows }
+				out[#out + 1] = { label = Keyboard.get_group_label(group), items = rows }
 			else
 				skipped[#skipped + 1] = group.prefix
 			end
@@ -403,7 +403,7 @@ local function _build_shortcuts(ctx)
 	group_builders["key_combinations"] = function()
 		return require("ui.menu.key_combinations").build(ctx, {
 			manifest = ManifestMenu, get = i18n_safe, key_label = function(entry)
-				local label = i18n_safe(entry.label_key); return label == entry.label_key and entry.id or label
+				return require("keycodes.key_names").label(entry.key, "linux", i18n_safe)
 			end,
 			action_label = function(action, gestures) return gestures.get_action_label(action) end,
 			open_picker = open_action_picker, error = show_error,

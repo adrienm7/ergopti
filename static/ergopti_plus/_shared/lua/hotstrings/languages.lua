@@ -158,6 +158,33 @@ function M.section_default(features, group, section)
 	return nil
 end
 
+--- The manifest group whose rows describe the user's own files, not a
+--- built-in section: they carry no built-in delay.
+M.PERSONAL_GROUP = "personal"
+
+--- The delay one built-in section declares: its manifest row's default
+--- `time_activation_seconds`, which every driver waits when the user set none
+--- (the maintainer's decision of 3 November 2026). Answers nil for a section
+--- whose row declares no delay, for a section with no row and for the personal
+--- rows, so the caller falls through to the category file and the base.
+--- The AutoHotkey twin is HotstringsSectionDefaultDelay
+--- (_shared/modules/hotstrings/scope_overrides.ahk); both replay
+--- _shared/tests/corpus/hotstrings/section_default_delay_vectors.json.
+--- @param features table The generated manifest's `features` array.
+--- @param group string Hotstring group (file stem or language group id).
+--- @param section string|nil Section name; nil asks for the category, which declares none.
+--- @return number|nil seconds
+function M.section_default_delay(features, group, section)
+	if type(group) ~= "string" or type(section) ~= "string" or section == "" then return nil end
+	if flatten(group) == M.PERSONAL_GROUP then return nil end
+	local entry = M.section_feature(features, group, section)
+	local seconds = entry and entry.default.time_activation_seconds
+	if seconds == nil then return nil end
+	assert(type(seconds) == "number" and seconds == seconds and seconds >= 0 and seconds < math.huge,
+		"the manifest declares an invalid delay for " .. tostring(entry.path))
+	return seconds
+end
+
 --- Whether a section carries a persisted choice rather than an inert module marker.
 --- The declared native replacement feature has no mappings; unrelated module
 --- placeholders remain owned by their module even when that module has a feature.

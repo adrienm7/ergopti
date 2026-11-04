@@ -117,10 +117,15 @@ _GCAO_AllTenSlotRowsPresent() {
 	}
 
 	Body := GestureBuildSetupInstructions()
-	Assert(InStr(Body, "Ctrl + Win + Shift + F1") > 0,
+	; The modifiers read in the user's language (« Maj » in French), never the
+	; English « Shift » the table used to hold.
+	Chord := t("key_name.ctrl") . " + " . t("key_name.win") . " + " . t("key_name.shift") . " + "
+	Assert(InStr(Body, Chord . "F1`n") > 0,
 		"the built tutorial must contain the first slot's shortcut")
-	Assert(InStr(Body, "Ctrl + Win + Shift + F10") > 0,
+	Assert(InStr(Body, Chord . "F10`n") > 0,
 		"the built tutorial must contain the last slot's shortcut — a body that stops at the header is the exact symptom this regression encodes")
+	if (t("key_name.shift") != "Shift")
+		AssertFalse(InStr(Body, "Shift"), "the tutorial names Shift in the active language")
 }
 Test("gestures: the manual-setup tutorial lists all ten shortcut rows (gesture-manual-tutorial-empty)",
 	_GCAO_AllTenSlotRowsPresent)

@@ -160,6 +160,19 @@ _LMT_SharedNavigationDeclarationOwner() {
 				AssertEqual(Rows[2]["label"], _CTC_LabelAt(Built, 1))
 			} finally _CTC_ReleaseMenu(Built)
 		}
+		; A stored chord reads as the key name table names it (« Ctrl + Maj »,
+		; the system key « Win »), never as the config spelling « ctrl+shift ».
+		_LLM_Menu["nav_modifiers"] := "ctrl+shift"
+		_LLM_Menu["val_modifiers"] := "cmd"
+		LastCount := _LLM_Menu["n_predictions"]
+		_LLM_Menu["n_predictions"] := 3
+		Rows := _LLM_Menu_NavRows()
+		AssertEqual(t("menu.llm.nav_label") . " — " . t("key_name.ctrl") . " + " . t("key_name.shift"), Rows[1]["label"])
+		AssertEqual(StrReplace(t("menu.llm.val_label"), "%s", "1-3") . " — " . t("key_name.win"),
+			Rows[2]["label"])
+		_LLM_Menu["nav_modifiers"] := ""
+		_LLM_Menu["val_modifiers"] := ""
+		_LLM_Menu["n_predictions"] := LastCount
 		Changed := [SavedDefinitions[2].Clone(), SavedDefinitions[1].Clone()]
 		Changed[1]["i18n"] := "button.cancel"
 		Root["llm_navigation_rows"] := Changed
@@ -202,16 +215,16 @@ _LMT_ProfileHeadingsNativeOwner() {
 			}
 		}
 		Rows := _LLM_Menu_ProfileRows()
-		AssertEqual(t("menu.profiles.header_default_profiles"), Rows[1]["label"])
+		AssertEqual(MenuSectionTitle(t("menu.profiles.header_default_profiles")), Rows[1]["label"])
 		AssertTrue(Rows[1]["disabled"])
 		AssertFalse(Rows[1].Has("action"))
 		Built := LLM_Menu_BuildProfileMenu()
 		try {
-			AssertEqual(t("menu.profiles.header_default_profiles"), _CTC_LabelAt(Built, 0))
+			AssertEqual(MenuSectionTitle(t("menu.profiles.header_default_profiles")), _CTC_LabelAt(Built, 0))
 			State := DllCall("GetMenuState", "ptr", Built.Handle, "uint", 0, "uint", 0x400, "uint")
 			AssertFalse(State == 0xFFFFFFFF, "the native heading state must be a real Win32 receipt")
 			AssertTrue((State & 3) != 0)
-			Position := _LMT_ShowAllPosition(Built, t("menu.profiles.header_custom_profiles"))
+			Position := _LMT_ShowAllPosition(Built, MenuSectionTitle(t("menu.profiles.header_custom_profiles")))
 			AssertTrue(Position > 0)
 			AssertTrue((DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position - 1, "uint", 0x400, "uint") & 0x800) != 0)
 			AssertTrue((DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint") & 3) != 0)
@@ -227,7 +240,7 @@ _LMT_ProfileHeadingsNativeOwner() {
 		Root["llm_profile_custom_heading"] := Changed
 		Built := LLM_Menu_BuildProfileMenu()
 		try {
-			Position := _LMT_ShowAllPosition(Built, t("button.cancel"))
+			Position := _LMT_ShowAllPosition(Built, MenuSectionTitle(t("button.cancel")))
 			AssertTrue((DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position + 1, "uint", 0x400, "uint") & 0x800) != 0)
 			AssertTrue(InStr(_CTC_LabelAt(Built, Position + 2), "Live label") == 1)
 		} finally _CTC_ReleaseMenu(Built)
@@ -273,8 +286,8 @@ _LMT_ProfileHeadingsMissingDeclaration() {
 			SawCustom := false
 			for Row in Rows {
 				if Row.Has("label") {
-					AssertFalse(Row["label"] == t("menu.profiles.header_default_profiles"))
-					AssertFalse(Row["label"] == t("menu.profiles.header_custom_profiles"))
+					AssertFalse(Row["label"] == MenuSectionTitle(t("menu.profiles.header_default_profiles")))
+					AssertFalse(Row["label"] == MenuSectionTitle(t("menu.profiles.header_custom_profiles")))
 					if InStr(Row["label"], "Live label") == 1 {
 						SawCustom := true
 						AssertTrue(HasMethod(Row["action"], "Call"))
@@ -301,14 +314,14 @@ _LMT_ProfileHeadingsEmptyRegistry() {
 	try {
 		_LLM_Menu["user_profiles"] := []
 		Before := _LLM_Menu_ProfileRows()
-		Root["llm_profile_custom_heading"] := [Map("type", "label", "id", "empty_registry_probe", "i18n", "button.cancel")]
+		Root["llm_profile_custom_heading"] := [Map("type", "section_header", "id", "empty_registry_probe", "i18n", "button.cancel")]
 		After := _LLM_Menu_ProfileRows()
 		AssertEqual(Before.Length, After.Length)
 		for Index, Row in After {
 			if Row.Has("label") {
 				AssertEqual(Before[Index]["label"], Row["label"])
-				AssertFalse(Row["label"] == t("menu.profiles.header_custom_profiles"))
-				AssertFalse(Row["label"] == t("button.cancel"))
+				AssertFalse(Row["label"] == MenuSectionTitle(t("menu.profiles.header_custom_profiles")))
+				AssertFalse(Row["label"] == MenuSectionTitle(t("button.cancel")))
 			}
 		}
 		AssertEqual(0, _LMT_WriterCalls)
@@ -337,7 +350,7 @@ _LMT_ProfileFrameNativeOrder(Empty := false) {
 			_LLM_Menu["user_profiles"] := []
 		Rows := _LLM_Menu_ProfileRows()
 		Assert(Rows is Array, "real native profile frame must materialize")
-		AssertEqual(t("menu.profiles.header_default_profiles"), Rows[1]["label"])
+		AssertEqual(MenuSectionTitle(t("menu.profiles.header_default_profiles")), Rows[1]["label"])
 		AssertTrue(Rows[1]["disabled"])
 		AssertFalse(Rows[1].Has("action"))
 		for Index, Id in LLM_PROFILE_BUILTIN_ORDER {
@@ -357,9 +370,9 @@ _LMT_ProfileFrameNativeOrder(Empty := false) {
 		AssertTrue(Rows[Apps]["items"] is Array && Rows[Apps]["items"].Length > 0, "actual native per-app child provider is retained")
 		if Empty {
 			AssertEqual(0, Clone, "custom active profile has no builtin clone")
-			AssertEqual(0, _LMT_FrameAt(Rows, t("menu.profiles.header_custom_profiles")))
+			AssertEqual(0, _LMT_FrameAt(Rows, MenuSectionTitle(t("menu.profiles.header_custom_profiles"))))
 		} else {
-			Custom := _LMT_FrameAt(Rows, t("menu.profiles.header_custom_profiles"))
+			Custom := _LMT_FrameAt(Rows, MenuSectionTitle(t("menu.profiles.header_custom_profiles")))
 			AssertEqual(LLM_PROFILE_BUILTIN_ORDER.Length + 3, Custom, "custom heading follows the complete native catalogue and its separator")
 			AssertTrue(Rows[Custom - 1]["separator"])
 			AssertTrue(InStr(Rows[Custom + 1]["label"], "Live label") == 1)

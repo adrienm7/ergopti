@@ -482,6 +482,7 @@ debounce_ms = 500
 min_request_interval_ms = 300
 instant_on_word_end = true
 after_hotstring = true
+while_hotstring_tooltip = "wait"
 inline_autotype = false
 secure_filter_enabled = true
 url_bar_filter_enabled = false
@@ -504,8 +505,8 @@ system_auth_filter_enabled = true
 encrypt = false
 disabled_apps = []
 wpm_widget_visible = false
-wpm_widget_colors = false
-wpm_widget_graph = false
+wpm_widget_colors = true
+wpm_widget_graph = true
 
 
 
@@ -670,3 +671,10 @@ magic_key = false
 
 [network]
 proxy_override = ""
+
+
+
+
+
+[tap_holds]
+lone_modifier_tap_max_ms = 1000

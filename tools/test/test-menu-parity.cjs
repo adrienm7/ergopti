@@ -297,6 +297,7 @@ const OPENS_SUBMENU = {
 	],
 	configuration: 'configuration_menu',
 	debug: 'debug_menu',
+	debug_tests: 'debug_tests_menu',
 	shortcuts: [
 		'shortcuts_menu',
 		{
@@ -731,6 +732,9 @@ const OPENS_SUBMENU = {
 	// « CapsWord : désactivation automatique », the same submenu on the three drivers.
 	caps_word_auto_off: 'caps_word_auto_off_group',
 	accented_letters: 'accented_letters_group',
+	// « Rangées émulées », the row switches of the Windows emulation; the Lua
+	// drivers emulate no layout and draw the parent row greyed with its reason.
+	layout_emulated_rows: { menu: 'layout_emulated_rows_group', platforms: ['ahk'] },
 	hotstring_extensions: [
 		{
 			menu: 'hotstring_extension_content_frame',
@@ -5681,7 +5685,9 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // Linux 19 → 20: navigation and validation now use their declared list providers.
 // Linux 21 → 22: « Vider le contexte sur clic/navigation » (llm_generation_reset_navigation)
 // is a row of the Linux AI submenu now that the AI context is its own buffer.
-const RENDERED_THROUGH_SHARED = { hs: 23, linux: 22 };
+// hs 23 → 24, linux 22 → 23: the Debug checks gathered in one Tests submenu
+// (debug_tests_menu, 7ba86d9506) render through the shared renderer.
+const RENDERED_THROUGH_SHARED = { hs: 24, linux: 23 };
 
 const DRIVER_ROOTS = {
 	hs: path.join(SP, 'macos'),
@@ -6340,8 +6346,16 @@ function languageParentSource(source, driver) {
 			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.debug.title']);
-		assert.equal(hand[code].linux[0], locale['menu.debug.log_level'] + ' : ℹ️ INFO');
-		assert.equal(hand[code].hs[2], hand[code].linux[0]);
+		// The row joins its label to its value through the locale's common.label_value; it
+		// follows the Diagnostic block and the Logs header.
+		assert.equal(
+			hand[code].linux[7],
+			locale['common.label_value']
+				.replace('{1}', locale['menu.debug.log_level'])
+				.replace('{2}', 'ℹ️ INFO')
+		);
+		assert.equal(hand[code].tests, locale['menu.debug.tests']);
+		assert.equal(hand[code].hs[9], hand[code].linux[7]);
 	}
 	function tokenDepths(tokens) {
 		let depth = 0,
@@ -6487,7 +6501,7 @@ function languageParentSource(source, driver) {
 		const chronology = [
 			`local root, top, section, parent, fields = debug_source(ManifestMenu, "${driver}")`,
 			`if root == nil then return ${refused} end`,
-			`local ${child} = ManifestMenu.build("debug_menu", "Debug", nil, nil, ${context}, {})`,
+			`local ${child} = ManifestMenu.build("debug_menu", "Debug", nil, debug_groups, ${context}, {})`,
 			`if not debug_dense(${child}, true) then return ${refused} end`,
 			`local current_root, current_top, current_section, current_parent = debug_source(ManifestMenu, "${driver}")`,
 			`if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not debug_parent_unchanged(parent, fields) then return ${refused} end`,
@@ -6606,7 +6620,9 @@ function languageParentSource(source, driver) {
 			locale['menu.global.clean_unused_keys'],
 			'-',
 			locale['menu.global.config_folder'],
-			locale['menu.global.setup_wizard']
+			locale['menu.global.setup_wizard'],
+			'-',
+			locale['menu.debug.proxy_override']
 		]);
 	}
 	function tokenDepths(tokens) {

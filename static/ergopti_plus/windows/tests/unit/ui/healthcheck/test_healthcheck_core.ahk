@@ -448,9 +448,13 @@ _TestHC_StructuredNativeFallback() {
 		AssertEqual(t("healthcheck.section.system"), Tree.GetText(System),
 			"sections must follow the shared schema, not Map's key order")
 		Item := Tree.GetChild(System)
-		AssertEqual(t("healthcheck.field.keyboard_layout") . ": 0xFC06040C", Tree.GetText(Item))
+		; Each field joins its label to its value with the locale's common.label_value.
+		Join := t("common.label_value")
+		AssertEqual(StrReplace(StrReplace(Join, "{1}", t("healthcheck.field.keyboard_layout")), "{2}", "0xFC06040C"),
+			Tree.GetText(Item))
 		Item := Tree.GetNext(Item)
-		AssertEqual(t("healthcheck.field.ram_free") . ": 1512222720", Tree.GetText(Item))
+		AssertEqual(StrReplace(StrReplace(Join, "{1}", t("healthcheck.field.ram_free")), "{2}", "1512222720"),
+			Tree.GetText(Item))
 		Issues := Tree.GetNext(System)
 		AssertEqual(t("healthcheck.section.issues"), Tree.GetText(Issues))
 		Node := Tree.GetChild(Issues)
@@ -458,8 +462,8 @@ _TestHC_StructuredNativeFallback() {
 			Node := Tree.GetNext(Node)
 		Assert(Node != 0, "recent issues must be a separate expandable field")
 		First := Tree.GetChild(Node)
-		AssertEqual("1: first warning", Tree.GetText(First))
-		AssertEqual("2: second warning", Tree.GetText(Tree.GetNext(First)),
+		AssertEqual(StrReplace(StrReplace(Join, "{1}", "1"), "{2}", "first warning"), Tree.GetText(First))
+		AssertEqual(StrReplace(StrReplace(Join, "{1}", "2"), "{2}", "second warning"), Tree.GetText(Tree.GetNext(First)),
 			"each log record must be readable separately")
 		AssertEqual(0, Tree.GetNext(Issues), "absent sections must not create empty headings")
 		_HC_OnSize(Tree, Window, 0, 720, 520)

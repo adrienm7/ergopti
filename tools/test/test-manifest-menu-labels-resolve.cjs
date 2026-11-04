@@ -46,7 +46,6 @@ const PASS_SYMBOL = '✓';
 const FAIL_SYMBOL = '✗';
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
-const MANIFEST = 'static/ergopti_plus/windows/_generated/features_manifest.ahk';
 const RESOLVER = 'static/ergopti_plus/windows/infra/manifest_descriptions.ahk';
 const LOCALE_DIR = 'static/ergopti_plus/_shared/data/locales';
 
@@ -120,7 +119,7 @@ function t(key) {
 }
 
 // The driver's candidate chain, shared with the onboarding catalogue generator.
-const { candidateKeys } = require('../lib/manifest-label-keys.cjs');
+const { candidateKeys, readManifestLabelRows } = require('../lib/manifest-label-keys.cjs');
 
 // Port of TryMenuLabelFromDescriptionKey: first candidate that resolves wins.
 function resolvesToALabel(descKey, entryPath) {
@@ -147,18 +146,10 @@ function fallbackLabel(descKey, entryPath) {
 // ==============================================================
 // ==============================================================
 
+// The row reader is shared with the translations audit, which counts the keys
+// these rows resolve to as used.
 function manifestRows() {
-	const src = fs.readFileSync(path.join(REPO_ROOT, MANIFEST), 'utf8');
-	const rows = [];
-	const rowRe = /Map\("path",\s*"([^"]*)"[^\n]*?"description_key",\s*"([^"]*)"/g;
-	let m;
-	while ((m = rowRe.exec(src)) !== null) {
-		const lineEnd = src.indexOf('\n', m.index);
-		const line = src.slice(m.index, lineEnd === -1 ? undefined : lineEnd);
-		const typeMatch = line.match(/"type",\s*"([^"]*)"/);
-		rows.push({ path: m[1], key: m[2], type: typeMatch ? typeMatch[1] : '' });
-	}
-	return rows;
+	return readManifestLabelRows(REPO_ROOT);
 }
 
 console.log('Manifest menu-label resolution guard');

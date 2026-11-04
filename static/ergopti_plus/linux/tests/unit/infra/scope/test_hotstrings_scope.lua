@@ -224,12 +224,15 @@ helpers.describe("hotstrings scope: restore recommended", function()
 			local overrides = Codec.decode(read(c.override_path))
 			helpers.assert_nil(overrides.autocorrection.delay)
 			helpers.assert_nil(overrides.autocorrection.color)
+			-- Each family declares 0.5 s in the manifest and waits it, so deletion
+			-- already inherits the recommendation.
 			for _, family in ipairs(COMMON_FAMILIES) do
-				helpers.assert_eq(overrides.autocorrection[family].delay_offset, -0.25,
-					"deleting would inherit the corpus 1.0 s, so the recommendation is written, as an offset of the 0.75 s base: " .. family)
+				helpers.assert_nil(overrides.autocorrection[family].delay_offset,
+					"the declared delay is the recommendation, so none is written: " .. family)
 				helpers.assert_nil(overrides.autocorrection[family].delay, family)
 			end
-			helpers.assert_eq(overrides.french_autocorrection.accents.delay_offset, -0.25)
+			helpers.assert_nil((overrides.french_autocorrection or {}).accents
+				and overrides.french_autocorrection.accents.delay_offset)
 			helpers.assert_nil((overrides.rolls or {}).hc and overrides.rolls.hc.delay,
 				"an inheritance equal to the recommendation stays sparse")
 			helpers.assert_nil((overrides.rolls or {}).hc and overrides.rolls.hc.priority)
@@ -260,7 +263,7 @@ helpers.describe("hotstrings scope: restore recommended", function()
 end)
 
 helpers.describe("hotstrings scope: clear", function()
-	helpers.it("returns every choice to neutral and every section to its corpus delay", function()
+	helpers.it("returns every choice to neutral and every section to its declared delay", function()
 		with_scope(function(c)
 			helpers.assert_true(c.Config.enable_group("autocorrection"))
 			for index, family in ipairs(COMMON_FAMILIES) do
@@ -290,8 +293,8 @@ helpers.describe("hotstrings scope: clear", function()
 			end
 			helpers.assert_eq(overrides.foreign.unknown_field, "kept")
 			for index, family in ipairs(COMMON_FAMILIES) do
-				helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 1.0,
-					"a cleared section resolves to its corpus inheritance: " .. family)
+				helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 0.5,
+					"a cleared section waits its declared delay: " .. family)
 				local mapping = COMMON_TRIGGERS[index]
 				helpers.assert_eq(fires(c.engine, mapping.trigger, mapping.replacement), false, "nothing fires after clear")
 			end
@@ -390,7 +393,10 @@ helpers.describe("hotstrings scope: refusals", function()
 	end)
 
 	-- Neither row asks: the maintainer retired the clear's question on
-	-- 2026-09-30, the scope owner's backups being the way back.
+	-- 2026-09-30, the scope owner's backups being the way back. One category
+	-- reads on, so does the Hotstrings switch: an off category greys every row
+	-- of its submenu (category-off rule).
+	local ROLLS_ON_CONFIG = CONFIG:gsub("rolls = false", "rolls = true")
 	for _, mode in ipairs({ "clear", "recommended" }) do
 		helpers.it("routes the rendered " .. mode .. " request to the public terminal", function()
 			with_scope(function(c)
@@ -426,12 +432,12 @@ helpers.describe("hotstrings scope: refusals", function()
 					helpers.assert_eq(questions, 0, "no scope row asks (restore-recommended-no-confirm)")
 					helpers.assert_eq(c.RepeatKey.is_enabled(), mode == "recommended")
 					for _, family in ipairs(COMMON_FAMILIES) do
-						helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, mode == "clear" and 1.0 or 0.5, family)
+						helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 0.5, family)
 					end
 				end)
 				root.top_level, os.execute = top, execute
 				if not passed then error(err, 0) end
-			end)
+			end, ROLLS_ON_CONFIG)
 		end)
 	end
 

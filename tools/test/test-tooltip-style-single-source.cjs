@@ -151,22 +151,19 @@ for (const [section, ahkKey, hsKey] of PAIRED) {
 	}
 }
 
-// The shortcut column's labels and joiner are each OS's own spelling of one
-// list: Windows and macOS read their own, the same length as the shared order.
-const SHORTCUT_LISTS = [
-	['shortcut_labels_ahk', 'shortcut_joiner_ahk', ahkReads],
-	['shortcut_labels_hs', 'shortcut_joiner_hs', luaReads]
-];
-const listLength = (raw) => JSON.parse(raw).split(',').length;
-for (const [labels, joiner, reads] of SHORTCUT_LISTS) {
-	if (!declared('llm_ui', labels) || !declared('llm_ui', joiner)) continue;
-	if (!reads('llm_ui', labels) || !reads('llm_ui', joiner))
-		errors.push(`[llm_ui].${labels} / ${joiner} are not read by their driver`);
-	if (
-		declared('llm_ui', 'shortcut_modifier_order') &&
-		listLength(toml.llm_ui[labels]) !== listLength(toml.llm_ui.shortcut_modifier_order)
-	)
-		errors.push(`[llm_ui].${labels} must label every modifier of shortcut_modifier_order`);
+// The shortcut column's joiner is each OS's own; its modifiers are named by the
+// shared key name table (key_names.json), so no OS keeps a label list of its
+// own here: one held the English « Shift » in every locale.
+for (const [joiner, reads] of [
+	['shortcut_joiner_ahk', ahkReads],
+	['shortcut_joiner_hs', luaReads]
+]) {
+	if (!declared('llm_ui', joiner)) errors.push(`[llm_ui].${joiner} must be declared`);
+	else if (!reads('llm_ui', joiner)) errors.push(`[llm_ui].${joiner} is not read by its driver`);
+}
+for (const key of Object.keys(toml.llm_ui ?? {})) {
+	if (key.startsWith('shortcut_labels'))
+		errors.push(`[llm_ui].${key} names modifiers outside the shared key name table`);
 }
 
 // Style globals must start empty: a literal is a second source that silently
@@ -196,7 +193,6 @@ const STYLE_GLOBALS = [
 	'UI_LLM_LOADING_HEX',
 	'UI_LLM_CURSOR_HEX',
 	'UI_LLM_SHORTCUT_ORDER',
-	'UI_LLM_SHORTCUT_LABELS',
 	'UI_LLM_SHORTCUT_JOINER',
 	'UI_LLM_CMD_DIM_HEX',
 	'UI_AI_LOADING_HEX'

@@ -23,6 +23,8 @@ local LOG = "tooltip_llm"
 local Config = require("ui.tooltip.config")
 local Renderer = require("ui.tooltip.renderer")
 local LlmLine = require("tooltip.llm_line")
+local KeyNames = require("keycodes.key_names")
+local i18n = require("infra.i18n")
 local HotPath = require("infra.hotpath_profiler")
 local TextUtils = require("text_utils")
 
@@ -987,6 +989,30 @@ end
 -- ==================================
 
 --- Safely appends styled segments to a result string.
+--- The footer's navigation hints in the user's language: the words from the
+--- locale, each key from the shared key name table (« Maj gauche + Tab ou ↑/← »).
+--- They read French in every locale until 2026-11-03. Port:
+--- windows/ui/tooltip/llm.ahk _LLM_BuildNavHint.
+--- @param ui table Config.llm_ui.
+--- @param nav_mod_str string The navigation modifiers shown before the arrows; "none" hides them.
+--- @return table { accept_single, accept_center, left, right }
+function M.footer_hints(ui, nav_mod_str)
+	local accept_key = KeyNames.combo_label(ui.hint_accept_key, "macos", i18n.get)
+	local left = KeyNames.combo_label(ui.hint_nav_left_keys, "macos", i18n.get)
+	local right = KeyNames.combo_label(ui.hint_nav_right_keys, "macos", i18n.get)
+	if nav_mod_str ~= "none" then
+		local chord = (nav_mod_str ~= nil and nav_mod_str ~= "") and (nav_mod_str .. " + ") or ""
+		left = i18n.format("llm.tooltip.hint_or", left, chord .. ui.hint_arrow_left)
+		right = i18n.format("llm.tooltip.hint_or", right, chord .. ui.hint_arrow_right)
+	end
+	return {
+		accept_single = KeyNames.fill("llm.tooltip.hint_accept_single", accept_key, i18n.get),
+		accept_center = KeyNames.fill("llm.tooltip.hint_accept_center", accept_key, i18n.get),
+		left = left,
+		right = right,
+	}
+end
+
 local function append_segment(result, text, color, is_bold, paragraph)
 	if not text or tostring(text) == "" then return result end
 	local font_name = is_bold and Config.fonts.bold or Config.fonts.main
@@ -1111,23 +1137,15 @@ local function assemble_blocks(state, reserved_count)
 	local styled_hint
 
 	if display_count > 1 then
-		local hint_left  = ui.hint_nav_left
-		local hint_right = ui.hint_nav_right
-		if state.nav_mod_str ~= "none" then
-			local optional_nav_mod = (state.nav_mod_str ~= "" and state.nav_mod_str ~= "none") and (state.nav_mod_str .. " + ") or ""
-			local hint_or = ui.hint_or
-			hint_left  = hint_left  .. hint_or .. optional_nav_mod .. ui.hint_arrow_left
-			hint_right = hint_right .. hint_or .. optional_nav_mod .. ui.hint_arrow_right
-		end
-
+		local hints = M.footer_hints(ui, state.nav_mod_str)
 		styled_hint = hs.styledtext.new(
-			hint_left .. space_divider .. ui.hint_arrow_sep_left .. space_divider
-				.. ui.hint_accept_center .. space_divider
-				.. ui.hint_arrow_sep_right .. space_divider .. hint_right,
+			hints.left .. space_divider .. ui.hint_arrow_sep_left .. space_divider
+				.. hints.accept_center .. space_divider
+				.. ui.hint_arrow_sep_right .. space_divider .. hints.right,
 			{ font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.hint, paragraphStyle = { alignment = "center" } }
 		)
 	else
-		styled_hint = hs.styledtext.new(ui.hint_accept_single,
+		styled_hint = hs.styledtext.new(M.footer_hints(ui, state.nav_mod_str).accept_single,
 			{ font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.hint, paragraphStyle = { alignment = "center" } })
 	end
 
@@ -1497,8 +1515,20 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 
 		local nav_modifier_string = "none"
 		if #flattened_nav_modifiers > 0 and not (#flattened_nav_modifiers == 1 and flattened_nav_modifiers[1] == "none") then
-			nav_modifier_string = table.concat(flattened_nav_modifiers, "+")
-			nav_modifier_string = nav_modifier_string:gsub("cmd", "⌘"):gsub("ctrl", "⌃"):gsub("alt", "⌥"):gsub("shift", "⇧"):gsub("%+", "")
+			-- The glyphs of the shared key name table, one per modifier, and the
+			-- translated name of one it draws no glyph for (Fn); the substitutions
+			-- here left any other spelling as its raw id.
+			local glyphs = {}
+			for _, mod in ipairs(flattened_nav_modifiers) do
+				if KeyNames.has_macos_symbol(mod) then
+					glyphs[#glyphs + 1] = KeyNames.macos_symbol(mod)
+				elseif KeyNames.canonical(mod) then
+					glyphs[#glyphs + 1] = KeyNames.label(mod, "macos", i18n.get)
+				else
+					Logger.warn(LOG, "Navigation modifier '%s' names no key; the hint leaves it out.", tostring(mod))
+				end
+			end
+			nav_modifier_string = table.concat(glyphs)
 		elseif #flattened_nav_modifiers == 0 then 
 			nav_modifier_string = "" 
 		end

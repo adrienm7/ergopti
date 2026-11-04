@@ -62,7 +62,7 @@ helpers.describe("neutral configuration contract", function()
 		helpers.assert_eq(defaults.default_for("shortcuts.enabled"), false)
 		helpers.assert_eq(defaults.recommended_for("shortcuts.enabled"), true)
 		helpers.assert_eq(defaults.default_for("gestures.swipe_3_down"), "none")
-		helpers.assert_eq(defaults.recommended_for("gestures.swipe_3_down"), "tab_next")
+		helpers.assert_eq(defaults.recommended_for("gestures.swipe_3_down"), "tab_close")
 		helpers.assert_eq(defaults.default_for("llm.generation.temperature"), 0.1)
 	end)
 

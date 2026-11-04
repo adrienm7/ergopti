@@ -194,12 +194,14 @@ TOML_ParseFreshFileTyped(Path, &DiscardedArrays := 0) {
 }
 
 _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
-		PreserveBooleanLiterals := false, &DiscardedArrays := 0) {
+		PreserveBooleanLiterals := false, &DiscardedArrays := 0, SectionFilter := 0) {
 		global _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles
 		; Writers request this local diagnostic on fresh, uncached parses.
 		DiscardedArrays := 0
 		if PreserveBooleanLiterals && (UseCache || StoreCache)
 				throw ValueError("Writer Boolean sentinels cannot use the reader cache")
+		if IsObject(SectionFilter) && (UseCache || StoreCache)
+				throw ValueError("A section-filtered parse cannot use the reader cache")
 		Key := _TOML_WriteRefusalKey(Path)
 		Owners := _TOML_ParseCacheOwners()
 		PreviousCritical := Critical("On")
@@ -269,6 +271,13 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 		PendingDepth := 0
 		PendingQuote := ""
 		PendingEscaped := false
+		; A caller that reads only some sections (personal-file metadata reads the
+		; [_meta] tables of a file holding hundreds of hotstrings) skips decoding
+		; every other section's values; the line state that finds headers and
+		; multi-line arrays runs exactly as in a full parse.
+		SectionKept := true
+		; Values decoded by this parse, published per parse for the boot budget.
+		Decoded := 0
 
 		loop parse, Content, "`n", "`r" {
 				Line := Trim(A_LoopField)
@@ -296,6 +305,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 								HasPendingValue := false
 								PendingVal := ""
 								Section := Trim(RegExReplace(Line, "^\[+|\]+$", ""))
+								SectionKept := !IsObject(SectionFilter) || SectionFilter.Call(Section)
 								if !Sections.Has(Section)
 										Sections[Section] := Map()
 								continue
@@ -307,8 +317,11 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 						if (PendingDepth <= 0) {
 								if !Sections.Has(Section)
 										Sections[Section] := Map()
-								Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal),
-										PreserveBooleanLiterals)
+								if SectionKept {
+										Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal),
+												PreserveBooleanLiterals)
+										Decoded += 1
+								}
 								PendingKey := ""
 								HasPendingValue := false
 								PendingVal := ""
@@ -328,6 +341,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 						Header := TOML_StripInlineComment(Line)
 						inner := RegExReplace(Header, "^\[+|\]+$", "")
 						Section := Trim(inner)
+						SectionKept := !IsObject(SectionFilter) || SectionFilter.Call(Section)
 						if !Sections.Has(Section)
 								Sections[Section] := Map()
 						continue
@@ -335,6 +349,9 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 
 				eq := _TOML_AssignmentDelimiter(Line)
 				if !eq
+						continue
+				; In a skipped section only an opening array changes the line state.
+				if !SectionKept && SubStr(LTrim(SubStr(Line, eq + 1), " `t"), 1, 1) != "["
 						continue
 				key := TOML_DecodeKey(Trim(SubStr(Line, 1, eq - 1)))
 				val := Trim(SubStr(Line, eq + 1))
@@ -359,8 +376,14 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 
 				; Whole-file writers must retain source Boolean intent before AHK
 				; erases it into integer 0/1. Ordinary readers keep native values.
-				Sections[Section][key] := TOML_CoerceValue(val, PreserveBooleanLiterals)
+				if SectionKept {
+						Sections[Section][key] := TOML_CoerceValue(val, PreserveBooleanLiterals)
+						Decoded += 1
+				}
 		}
+		; Detached compositions (workers, child fixtures) load this parser without the profiler.
+		if IsSet(PerfCount)
+				PerfCount("toml.flat_values", Decoded)
 		if HasPendingValue {
 				DiscardedArrays += 1
 				try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)

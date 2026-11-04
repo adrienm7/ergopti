@@ -264,6 +264,7 @@ global Features := Map(
             "min_request_interval_ms", 300,
             "instant_on_word_end",  true,
             "after_hotstring",      true,
+            "while_hotstring_tooltip", "wait",
             "inline_autotype",      false,
             "secure_filter_enabled", true,
             "url_bar_filter_enabled", true,

@@ -37,7 +37,7 @@
 
 ; The vector count, pinned as _shared/lua/test/tap_hold_decision_contract.lua
 ; pins it, so a truncated corpus fails instead of shrinking the contract.
-global _CTHD_VECTOR_COUNT := 23
+global _CTHD_VECTOR_COUNT := 30
 
 _CTHD_Corpus() {
 	static Corpus := JsonParse(FileRead(A_ScriptDir . "\..\..\_shared\tests\corpus\tap_hold\decision_vectors.json", "UTF-8"))
@@ -333,7 +333,7 @@ _CTHD_HoldPickerOrder() {
 _CTHD_Replay(Vector) {
 	global TapHold, _AHK_SendInput, _TapHoldModifierIsHeld, _TapHoldKeyIsDown
 	global _TH_TapHoldTrackState, _TH_SyntheticHeldKeys, _TH_SyntheticUserHeldKeys
-	global TAP_MIN_DURATION_MS, ONE_SHOT_SHIFT_TIMEOUT_SEC
+	global TAP_MIN_DURATION_MS, ONE_SHOT_SHIFT_TIMEOUT_SEC, TAP_HOLD_LONE_TAP_MAX_MS
 	World := _CTHD_World(Vector)
 	Keys := Map()
 	for Key, Binding in Vector["bindings"] {
@@ -348,7 +348,8 @@ _CTHD_Replay(Vector) {
 	}
 	Saved := { TapHold: TapHold, Send: _AHK_SendInput, Held: _TapHoldModifierIsHeld, IsDown: _TapHoldKeyIsDown,
 		Track: _TH_TapHoldTrackState, Synth: _TH_SyntheticHeldKeys, User: _TH_SyntheticUserHeldKeys,
-		TapMin: TAP_MIN_DURATION_MS, OneShot: ONE_SHOT_SHIFT_TIMEOUT_SEC, Wheel: HookDispatcher._last_wheel_tick }
+		TapMin: TAP_MIN_DURATION_MS, OneShot: ONE_SHOT_SHIFT_TIMEOUT_SEC, Wheel: HookDispatcher._last_wheel_tick,
+		Lone: TAP_HOLD_LONE_TAP_MAX_MS }
 	TapHold := Map("keys", Keys, "layers", Map())
 	_TH_TapHoldTrackState := Map()
 	_TH_SyntheticHeldKeys := Map()
@@ -356,6 +357,8 @@ _CTHD_Replay(Vector) {
 	HookDispatcher._last_wheel_tick := 0
 	TAP_MIN_DURATION_MS := TimingsGet("tap_hold", "tap_min_duration_ms")
 	ONE_SHOT_SHIFT_TIMEOUT_SEC := TimingsGetSec("tap_hold", "one_shot_shift_timeout_ms")
+	; A vector names its lone tap window; absent, it is the strict tap-hold.
+	TapHoldSetLoneTapMaxMs(Vector.Has("lone_tap_max_ms") ? Vector["lone_tap_max_ms"] : 0)
 	_AHK_SendInput := (Payload) => World.OnSend(Payload)
 	_TapHoldModifierIsHeld := (Name) => World.Logical.Has(Name)
 	_TapHoldKeyIsDown := (Name, Mode) => (Mode == "") ? World.Logical.Has(Name) : _CTHD_PhysicalName(World, Name)
@@ -372,6 +375,7 @@ _CTHD_Replay(Vector) {
 		_TH_SyntheticUserHeldKeys := Saved.User
 		TAP_MIN_DURATION_MS := Saved.TapMin
 		ONE_SHOT_SHIFT_TIMEOUT_SEC := Saved.OneShot
+		TAP_HOLD_LONE_TAP_MAX_MS := Saved.Lone
 		HookDispatcher._last_wheel_tick := Saved.Wheel
 	}
 	return World

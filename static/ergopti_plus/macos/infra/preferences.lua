@@ -162,6 +162,7 @@ local KEY_MAP = {
 	llm_min_request_interval             = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.MIN_REQUEST_INTERVAL_MS, units_per_state = 1000 },
 	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.INSTANT_ON_WORD_END },
 	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.AFTER_HOTSTRING },
+	llm_while_hotstring_tooltip          = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.WHILE_HOTSTRING_TOOLTIP },
 	llm_url_bar_filter_enabled           = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.URL_BAR_FILTER_ENABLED },
 	llm_secure_field_filter_enabled      = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.SECURE_FILTER_ENABLED },
 	llm_context_length                   = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.CONTEXT_LENGTH },
@@ -640,6 +641,14 @@ local SCALAR_VALUE_RULES = {
 	llm_agent_mode = function(value)
 		if Agent.MODES[value] then return true end
 		return false, "'" .. tostring(value) .. "' is no longer an agent mode"
+	end,
+	-- The manifest owns the values of this enum.
+	llm_while_hotstring_tooltip = function(value)
+		local entry = Manifest.find_entry_by_path(ConfigKeys.KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
+		for _, accepted in ipairs(type(entry) == "table" and entry.enum_values or {}) do
+			if accepted == value then return true end
+		end
+		return false, "'" .. tostring(value) .. "' is not a choice for the AI prediction while a hotstring tooltip shows"
 	end,
 	llm_app_profile_overrides = function(value)
 		local overrides, reason = AppProfileOverrides.decode(value)

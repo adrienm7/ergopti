@@ -80,6 +80,7 @@ local function remap_double()
 		get_combo_hold_action = function() return "none" end,
 		get_tap_hold_timeout = function() return 200 end,
 		get_sticky_timeout = function() return 1000 end,
+		get_lone_modifier_tap_max_ms = function() return 1000 end,
 		get_simultaneous_threshold = function() return 50 end,
 		regenerate = function() error("building the tray must not regenerate") end,
 	}
@@ -118,7 +119,7 @@ local function build_tray(observe_layout, catalogue)
 	local llm_item = nil
 	require("tests.support.llm_count_menu_fixture")(function(llm_menu)
 		llm_item = llm_menu.build_item()
-	end, { catalogue = catalogue })
+	end, { catalogue = catalogue, real_streaming_panel = true, real_trigger_panel = true })
 
 	local lines = {}
 	package.loaded["infra.logger"] = nil
@@ -167,7 +168,9 @@ local function build_tray(observe_layout, catalogue)
 	local ctx = {
 		config     = { log_level = 2 },
 		base_dir   = helpers.driver_root(),
-		state      = { shortcuts = true, gestures = true, hotstrings = {} },
+		-- Every category on, the Hotstrings master (keymap) included: an off
+		-- category greys every row of its submenu (category-off rule).
+		state      = { shortcuts = true, gestures = true, keymap = true, hotstrings = {} },
 		hotfiles   = {},
 		save_prefs = function() return true end,
 		updateMenu = function() end,
@@ -411,6 +414,8 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 			i18n.get("menu.global.setup_wizard"),
 			i18n.get("menu.global.karabiner_integration"),
 			i18n.get("menu.global.remove_from_karabiner"),
+			"-",
+			i18n.get("menu.debug.proxy_override"),
 		}, " | "))
 	end)
 

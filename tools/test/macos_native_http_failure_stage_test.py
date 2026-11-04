@@ -681,9 +681,18 @@ class OllamaBlobHost(unittest.TestCase):
         self.ranges = []
 
     def run_blob(
-        self, manifest_status=200, manifest=None, blob=(307, None), ranged=(206, "bytes 1-2/9")
+        self,
+        manifest_status=200,
+        manifest=None,
+        blob=(307, None),
+        ranged=(206, "bytes 1-2/9"),
+        get_redirects=None,
     ):
-        """Runs main_blob over a stand-in transport; blob is (status, location)."""
+        """Runs main_blob over a stand-in transport; blob is (status, location).
+
+        get_redirects maps a GET URL to the (status, location) it answers
+        instead of the ranged answer, as the registry does for its blobs.
+        """
         requests = []
         body = json.dumps(
             manifest if manifest is not None else {"config": {"digest": "sha256:" + "a" * 64}}
@@ -715,6 +724,9 @@ class OllamaBlobHost(unittest.TestCase):
                     return Response(manifest_status, payload=body)
                 if options["method"] == "GET":
                     self.ranges.append(dict(options["headers"]).get("Range"))
+                    if get_redirects and url in get_redirects:
+                        status, location = get_redirects[url]
+                        return Response(status, [["Location", location]] if location else [])
                     return Response(ranged[0], [["Content-Range", ranged[1]]] if ranged[1] else [])
                 status, location = blob
                 return Response(status, [["Location", location]] if location else [])
@@ -764,6 +776,41 @@ class OllamaBlobHost(unittest.TestCase):
         self.assertEqual(requests[-1], (requests[-2][0], "GET"), "a served blob is asked in place")
         unplanned, _ = self.run_blob(blob=(302, "https://blobs.elsewhere.example/x"))
         self.assertIn("step blob_range skip no_blob", unplanned)
+
+    def test_a_registry_that_serves_the_head_but_redirects_the_get_is_followed(self):
+        # Field run 2026-11-03: blob_host registry_served, then blob_range fail
+        # http_307, because the ranged GET did not follow the storage redirect.
+        blob_url = self.registry + "/v2/library/tiny/blobs/sha256:" + "a" * 64
+        storage = "https://" + self.planned_blob_host() + "/storage/x?sig=1"
+        lines, requests = self.run_blob(blob=(200, None), get_redirects={blob_url: (307, storage)})
+        self.assertEqual(
+            lines,
+            [
+                "step blob_manifest pass http_200",
+                "step blob_host pass registry_served",
+                "step blob_range pass honoured",
+            ],
+        )
+        self.assertEqual(requests[-2:], [(blob_url, "GET"), (storage, "GET")])
+        self.assertEqual(self.ranges, ["bytes=1-2", "bytes=1-2"])
+
+    def test_a_followed_redirect_keeps_https_a_planned_host_and_a_hop_bound(self):
+        blob_url = self.registry + "/v2/library/tiny/blobs/sha256:" + "a" * 64
+        planned = "https://" + self.planned_blob_host()
+        cases = {
+            "unplanned_host": {blob_url: (302, "https://blobs.elsewhere.example/x")},
+            "not_https": {blob_url: (307, "http://" + self.planned_blob_host() + "/x")},
+            "no_location": {blob_url: (307, None)},
+        }
+        for value, redirects in cases.items():
+            with self.subTest(value=value):
+                lines, _ = self.run_blob(blob=(200, None), get_redirects=redirects)
+                self.assertEqual(lines[-1], "step blob_range fail " + value)
+                self.assertFalse(any("elsewhere" in line for line in lines))
+        loop = {blob_url: (307, planned + "/a"), planned + "/a": (307, "/a")}
+        lines, requests = self.run_blob(blob=(200, None), get_redirects=loop)
+        self.assertEqual(lines[-1], "step blob_range fail too_many_redirects")
+        self.assertEqual(len(requests), 2 + self.helper.MAX_BLOB_REDIRECTS + 1)
 
     def test_a_redirect_to_an_unplanned_host_fails_without_naming_it(self):
         lines, _ = self.run_blob(blob=(302, "https://blobs.elsewhere.example/x"))

@@ -52,6 +52,7 @@
 const fs = require('fs');
 const path = require('path');
 const toml = require('smol-toml');
+const KeyNames = require('../lib/key-names.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -697,7 +698,14 @@ function renderAvailability(data, english) {
 	};
 	const label = (id, family) => {
 		const text = localeText(english, `sg_actions.${id}`) ?? localeText(english, `ax_actions.${id}`);
-		return text === undefined ? id : text;
+		if (text === undefined) return id;
+		// A sticky label is a template its modifiers fill from the key name
+		// table (_shared/lua/actions/sticky_label.lua); the table names them as
+		// macOS does.
+		const sticky = KeyNames.stickyModifiers(id);
+		if (sticky === null) return text;
+		const names = sticky.map((key) => localeText(english, KeyNames.i18n(key, 'hs'))).join(' + ');
+		return text.replace('{1}', names);
 	};
 	const rowsOf = (items, family, name) =>
 		items

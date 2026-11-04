@@ -492,6 +492,7 @@ InstallSendNoOps()
 #Include unit/modules/gestures/test_gesture_unhook_ownership.ahk
 #Include unit/ui/menu/test_tray_root_lifecycle_retained.ahk
 #Include unit/ui/menu/test_tray_bootstrap_publication_transaction.ahk
+#Include unit/ui/menu/test_tray_startup_click_waits_for_input.ahk
 #Include unit/infra/lifecycle/test_boot_menu_wait_clock.ahk
 #Include unit/modules/llm/menu/test_llm_menu_build_coordinator.ahk
 #Include unit/modules/hotstrings/catalogue/test_hotstring_count_policy.ahk
@@ -563,6 +564,7 @@ InstallSendNoOps()
 #Include unit/infra/config/persistence/test_config_semantic_snapshot.ahk
 #Include unit/infra/config/persistence/test_config_snapshot_inline_records.ahk
 #Include unit/infra/config/persistence/test_config_snapshot_obsolete_parent.ahk
+#Include unit/infra/config/persistence/test_config_snapshot_equal.ahk
 #Include unit/infra/config/persistence/test_neutral_config_manifest.ahk
 #Include unit/test_config_scope_manifest.ahk
 #Include unit/infra/config/scope/test_config_scope_menus.ahk
@@ -991,6 +993,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/llm/actions/test_llm_agent_requester.ahk
 #Include unit/modules/llm/api/test_llm_remote_formats.ahk
 #Include unit/modules/llm/prediction/test_llm_live_mode.ahk
+#Include unit/modules/llm/prediction/test_llm_hotstring_tooltip_hold.ahk
 #Include unit/modules/shortcuts/test_send_input_actions.ahk
 #Include unit/platform/remap/keys/test_tap_keys.ahk
 #Include unit/platform/remap/keys/test_ai_action_gate.ahk
@@ -1032,6 +1035,8 @@ _LogBootProgress("loading gestures modules")
 #Include unit/infra/toml/test_toml_numeric_strings.ahk
 #Include unit/infra/toml/test_toml_array_element_types.ahk
 #Include unit/infra/toml/test_toml_inline_tables.ahk
+#Include unit/infra/toml/test_toml_document_quoted_runs.ahk
+#Include unit/infra/toml/test_toml_section_filter.ahk
 #Include unit/infra/toml/test_toml_nested_arrays.ahk
 #Include unit/infra/toml/test_toml_float_roundtrip.ahk
 #Include unit/infra/toml/test_toml_incomplete_write.ahk
@@ -1051,6 +1056,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/ui/webview/test_webview_range_cleanup_reentry.ahk
 #Include unit/ui/webview/test_webview_range_mount.ahk
 #Include unit/ui/webview/test_webview_profile_ownership.ahk
+#Include unit/ui/webview/test_webview_fit_to_window.ahk
 #Include unit/modules/keystats/metrics/test_metrics_file_urls.ahk
 #Include unit/infra/toml/test_uridecode_literal_unicode.ahk
 #Include meta/ui/webview/test_webview_script_observer.ahk
@@ -1313,6 +1319,8 @@ global _AhkSubDir := ""
 #Include unit/platform/remap/tap_hold/test_tap_hold_owned_press.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_prior_key.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_tap_keeps_held_modifiers.ahk
+#Include unit/platform/remap/tap_hold/test_tap_copy_check.ahk
+#Include unit/platform/remap/tap_hold/test_tap_hold_lone_tap.ahk
 #Include unit/platform/remap/keys/test_timings_config.ahk
 _LogBootProgress("keystats modules + tests included")
 
@@ -1556,6 +1564,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ui/menu/test_menu_top_level_drift_gate.ahk
 ; Regression: no separator doubles up in any manifest menu.
 #Include unit/ui/menu/test_manifest_menu_no_double_separator.ahk
+; Regression: every section header titles real rows, drawn by the shared format.
+#Include unit/ui/menu/test_manifest_menu_section_headers.ahk
 #Include unit/ui/menu/test_menu_category_off_rule.ahk
 ; Regression: every category switch is a first-row checkbox with one label.
 #Include unit/modules/hotstrings/catalogue/test_category_toggle_checkbox.ahk

@@ -199,10 +199,13 @@ async function observe(source, root, scenario) {
 								fs.unlinkSync(path.join(probe, 'suspend_restore.marker'));
 							const logs = path.join(probe, 'ergopti_plus/logs');
 							fs.mkdirSync(logs, { recursive: true });
-							// A real boot logs the staged and the full Hotstrings menu
-							// renders; the smoke requires both, within its budget.
+							// A real boot logs the staged Hotstrings menu publication and
+							// the submenu's deferred build at its first open; the smoke
+							// requires both, within its budget.
 							const render = (ms) =>
 								`[INFO] [BootProfile] MENU/initMenu: hotstrings menu rendered: +${ms} ms (total ${ms} ms).\n`;
+							const deferredRender = (ms) =>
+								`[INFO] [MenuPopulation] Deferred submenu 'hotstrings_menu' built in ${ms} ms for the smoke.\n`;
 							// A paused AI-on boot defers its AI hotkeys and the resume
 							// activates them; the smoke requires both lines (#97).
 							let resume = '';
@@ -220,8 +223,10 @@ async function observe(source, root, scenario) {
 								warm && scenario === 'logged-error'
 									? '[ERROR] inert warm failure\n'
 									: render(15) +
-											render(scenario === 'slow-render' ? 3200 : 40) +
+											deferredRender(scenario === 'slow-render' ? 3200 : 40) +
 											resume +
+											// The boot's first counter record; the smoke caps its counts.
+											`[INFO] [Perf] Interval counters (0 ms): config.snapshot_read=${scenario === 'operation-over-budget' ? 99 : 1} toml.document_parse=1.\n` +
 											'[INFO] inert ready\n'
 							);
 							const receipt = {
@@ -697,6 +702,7 @@ async function check(source, root = ROOT) {
 		'ai-deferral-missing',
 		'ai-resume-missing',
 		'slow-render',
+		'operation-over-budget',
 		'types-cold-pid',
 		'types-cold-level',
 		'types-cold-numeric',
@@ -738,7 +744,11 @@ async function check(source, root = ROOT) {
 		);
 		assert.equal(
 			result.warmCalls,
-			['first-early-exit', 'first-save-missing', 'slow-render'].includes(scenario) ? 0 : 1,
+			['first-early-exit', 'first-save-missing', 'slow-render', 'operation-over-budget'].includes(
+				scenario
+			)
+				? 0
+				: 1,
 			scenario + ': the intended real runner branch must execute'
 		);
 		if (scenario.startsWith('save-'))
@@ -747,6 +757,11 @@ async function check(source, root = ROOT) {
 			assert.match(
 				result.diagnostics.join('\n'),
 				/fresh-config: a Hotstrings menu render took 3200 ms \(budget 2000 ms/
+			);
+		if (scenario === 'operation-over-budget')
+			assert.match(
+				result.diagnostics.join('\n'),
+				/fresh-config: boot 1 counted config\.snapshot_read=99, over its ceiling of 9/
 			);
 		if (scenario === 'first-save-missing')
 			assert.match(result.diagnostics.join('\n'), /fresh-config:.*no fresh full-save receipt/);

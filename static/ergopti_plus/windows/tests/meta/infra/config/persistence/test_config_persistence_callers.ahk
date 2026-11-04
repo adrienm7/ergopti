@@ -224,7 +224,9 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; false and skip their reload on a refusal, driven for real by
 	; test_key_combination_chord_engine.ahk.
 	; 48: _ProxyOverride_Store returns the commit's answer to the menu row, which says so.
-	AssertEqual(48, Calls,
+	; 49: the lone tap window writer (_TH_CommitLoneTapMaxMs) returns false and
+	; skips its reload on a refusal, driven for real by test_tap_hold_lone_tap.ahk.
+	AssertEqual(49, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",

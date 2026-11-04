@@ -124,11 +124,14 @@ local function tap_hold_threshold_facts()
 	local facts = { enabled = Remap.get_enabled() == true, expected = {},
 		tag = require("platform.remap.lease_contract").MANAGED_TAG_LABEL }
 	local global = Remap.get_tap_hold_timeout()
+	-- A modifier key pressed alone may tap for longer than its delay (the lone
+	-- tap window): the generator says what it gave each key.
+	local deployed = require("platform.remap.generator").last_tap_timeouts() or {}
 	for _, key in ipairs(Remap.TAP_HOLD_KEYS or {}) do
 		local key_code = type(key.from) == "table" and key.from.key_code
 		if type(key_code) == "string" then
 			local own = Remap.get_tap_timeout(key.id)
-			facts.expected[key_code] = { id = key.id, ms = (own and own > 0) and own or global }
+			facts.expected[key_code] = { id = key.id, ms = deployed[key.id] or ((own and own > 0) and own or global) }
 		end
 	end
 	local text = FileSystem.read(FileSystem.expand_path(KePaths.config_file_for(KePaths.selected_runtime())))
@@ -142,6 +145,26 @@ local function tap_hold_threshold_facts()
 		return facts
 	end
 	facts.config = decoded
+	return facts
+end
+
+--- What the tap-hold copy check needs, for infra/field_check_tap_copy.lua: the
+--- lone tap window, each key whose tap is copy with the tap timeout Karabiner
+--- was given, the pasteboard counter now, and the copy watch statistics.
+--- @return table facts
+local function tap_copy_facts()
+	local Remap = require("platform.remap")
+	local deployed = require("platform.remap.generator").last_tap_timeouts() or {}
+	local rollover = require("platform.remap.defaults").rollover_keys
+	local facts = { window_ms = Remap.get_lone_modifier_tap_max_ms(), keys = {},
+		change_count = (require("adapters.clipboard")._change_count()),
+		stats = require("modules.keymap").tap_copy_statistics() }
+	for _, key in ipairs(Remap.TAP_HOLD_KEYS or {}) do
+		if Remap.get_tap_action(key.id) == "copy" then
+			facts.keys[#facts.keys + 1] = { id = key.id, deployed_ms = deployed[key.id],
+				eligible = not rollover[key.id] and Remap.get_hold_action(key.id) ~= "none" }
+		end
+	end
 	return facts
 end
 
@@ -390,6 +413,7 @@ function M.new()
 		home = function() return os.getenv("HOME") end,
 		remap_facts = remap_facts,
 		tap_hold_threshold_facts = tap_hold_threshold_facts,
+		tap_copy_facts = tap_copy_facts,
 		guardian_registration_note = guardian_registration_note,
 		keystats_facts = keystats_facts,
 		health_counts = function() return require("infra.key_event_health").counts() end,

@@ -2729,23 +2729,50 @@ _FormatSlotLabel(SlotId) {
 		Native := SlotRoleNative(SlotId)
 		if !Native.Has("modifiers")
 				return SlotId
-		; Only the two NAMED keys are translatable; the others print the catalogue's
-		; own language-neutral label. The map holds i18n KEYS, never labels: a static
-		; initialised with t() would freeze the language at first call, and the menu
-		; is rebuilt on a language switch expecting the new one.
-		static _KeyNameKeys := Map("space", "common.key_space", "enter", "common.key_enter")
+		; A named key (Space, Caps Lock) and every modifier read as the shared key
+		; name table names them in the user's language (« Ctrl + Maj + V »); a
+		; letter, digit or sign prints the catalogue's own legend.
 		Suffix := Native["key"]
-		Key := StrUpper(Suffix)
-		for Entry in SlotRolesData()["keys"] {
-				if Entry["id"] == Suffix
-						Key := Entry["label"]
+		if (KeyNameCanonical(Suffix) != "") {
+				Key := KeyNameLabel(Suffix)
+		} else {
+				Key := StrUpper(Suffix)
+				for Entry in SlotRolesData()["keys"] {
+						if Entry["id"] == Suffix
+								Key := Entry["label"]
+				}
 		}
-		if _KeyNameKeys.Has(Suffix)
-				Key := t(_KeyNameKeys[Suffix])
 		Label := ""
 		for Modifier in Native["modifiers"]
-				Label .= SlotRolesData()["native_labels"][Modifier] . " + "
+				Label .= KeyNameLabel(Modifier) . " + "
 		return Label . Key
+}
+
+; The modifiers of one keyboard-slot group, named as its rows name them
+; (« Ctrl + Maj »), for the picker that adds a slot to the group.
+; @param Prefix {String} A group prefix of KEYBOARD_SLOT_GROUPS, e.g. "primary_shift_".
+; @returns {String}
+_KeyboardSlotFamilyLabel(Prefix) {
+		; Any key of the family carries its modifiers; "a" is in every slot domain.
+		Native := SlotRoleNative(Prefix . "a")
+		if !Native.Has("modifiers") || Native["modifiers"].Length == 0
+				throw ValueError("The keyboard-slot group names no modifier.", -1, Prefix)
+		Label := ""
+		for Modifier in Native["modifiers"]
+				Label .= (Label == "" ? "" : " + ") . KeyNameLabel(Modifier)
+		return Label
+}
+
+; The heading or the Add row of one keyboard-slot group: the contextual
+; group's own title, a modifier group's template filled with its modifiers
+; (« Raccourcis Ctrl + Maj », « [+ Ajouter un raccourci Win + …] »).
+; @param GroupInfo {Map} An entry of KEYBOARD_SLOT_GROUPS.
+; @param Field {String} "group_key" or "add_key".
+; @returns {String}
+_KeyboardSlotGroupText(GroupInfo, Field) {
+		if GroupInfo["prefix"] == "magic_"
+				return t(GroupInfo[Field])
+		return KeyNameFill(GroupInfo[Field], _KeyboardSlotFamilyLabel(GroupInfo["prefix"]))
 }
 
 ; The keyboard-shortcut groups, in display order. The i18n KEYS are stored, never
@@ -2797,10 +2824,10 @@ KeyboardSlotRows() {
 						))
 				}
 				Items.Push(Map(
-						"label", t(GroupInfo["add_key"]),
+						"label", _KeyboardSlotGroupText(GroupInfo, "add_key"),
 						"action", ((_p) => (*) => ShowKeyboardSlotPicker(_p))(Prefix)
 				))
-				Rows.Push(Map("label", t(GroupInfo["group_key"]), "items", Items))
+				Rows.Push(Map("label", _KeyboardSlotGroupText(GroupInfo, "group_key"), "items", Items))
 		}
 		return Rows
 }

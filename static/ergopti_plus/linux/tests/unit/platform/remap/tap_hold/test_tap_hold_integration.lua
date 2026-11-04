@@ -145,7 +145,9 @@ helpers.describe("tap-holds end to end: the shipped defaults", function()
 	helpers.it("ignores a bounce below the minimum and a hold past the threshold", function()
 		with_session(nil, function(s)
 			s.drive({ { LSHIFT, DOWN, 0 }, { LSHIFT, UP, 20 } })
-			s.drive({ { LSHIFT, DOWN, 1000 }, { LSHIFT, UP, 1600 } })
+			-- Past the lone modifier tap window too (1000 ms by default), which
+			-- lets a modifier pressed alone tap long after its own threshold.
+			s.drive({ { LSHIFT, DOWN, 1000 }, { LSHIFT, UP, 2200 } })
 			helpers.assert_eq(#s.actions, 0)
 			assert_balanced(s.last)
 		end)
@@ -342,7 +344,9 @@ helpers.describe("tap-holds end to end: a tray change is live", function()
 	end)
 
 	helpers.it("uses a key's own delay", function()
-		with_session(nil, function(s)
+		-- With the lone tap window off: by default a Shift pressed alone taps up
+		-- to 1000 ms whatever its own delay (test_tap_hold_lone_tap_window).
+		with_session("[tap_hold]\nlone_modifier_tap_max_ms = 0\n", function(s)
 			s.drive({ { LSHIFT, DOWN, 0 }, { LSHIFT, UP, 500 } })
 			helpers.assert_eq(#s.actions, 0, "500 ms is a hold at the default 350 ms")
 			helpers.assert_true(s.writer.set_threshold("left_shift", 0.6))

@@ -42,8 +42,10 @@
 
 var COMPOSER_FORM_STORAGE_KEY = 'layout_composer.form';
 
-// Pixels of one key unit on the drawn board.
-var COMPOSER_KEY_UNIT = 46;
+// Pixels between two drawn keys, and the widest a key unit grows when the
+// window is widened (the board otherwise takes the whole width of the view).
+var COMPOSER_KEY_GAP = 4;
+var COMPOSER_KEY_MAX_UNIT = 72;
 // Where a registry layout's unreadable reason is shown at most.
 var COMPOSER_MAX_REASON_LENGTH = 120;
 
@@ -371,13 +373,23 @@ function composerRenderBoard() {
 	var board = composerEl('composer-board');
 	composerClear(board);
 	var form = composerState.declaration.keycode_convention;
+	var keys = LAYOUT_COMPOSER_DATA.keys.filter(function (key) {
+		return Boolean(key.geometry[form]);
+	});
 	var maxRow = 0;
 	var maxCol = 0;
-	LAYOUT_COMPOSER_DATA.keys.forEach(function (key) {
+	keys.forEach(function (key) {
+		maxRow = Math.max(maxRow, key.geometry[form].row);
+		maxCol = Math.max(maxCol, key.geometry[form].col + key.geometry[form].width);
+	});
+	// Positions are fractions of the board, whose width follows the window and
+	// whose height follows from its aspect ratio: the drawing scales with the
+	// window instead of overflowing it or leaving it empty.
+	var percent = function (units, total) {
+		return (units / total) * 100 + '%';
+	};
+	keys.forEach(function (key) {
 		var geometry = key.geometry[form];
-		if (!geometry) return;
-		maxRow = Math.max(maxRow, geometry.row);
-		maxCol = Math.max(maxCol, geometry.col + geometry.width);
 		var legend = composerLegend(key.code, composerState.level);
 		var overridden = composerOverrideOf(key.code) !== undefined;
 		var cap = element(
@@ -390,9 +402,10 @@ function composerRenderBoard() {
 		cap.type = 'button';
 		cap.dataset.code = key.code;
 		cap.title = key.code;
-		cap.style.left = geometry.col * COMPOSER_KEY_UNIT + 'px';
-		cap.style.top = (geometry.row - 1) * COMPOSER_KEY_UNIT + 'px';
-		cap.style.width = geometry.width * COMPOSER_KEY_UNIT - 4 + 'px';
+		cap.style.left = percent(geometry.col, maxCol);
+		cap.style.top = percent(geometry.row - 1, maxRow);
+		cap.style.width = 'calc(' + percent(geometry.width, maxCol) + ' - ' + COMPOSER_KEY_GAP + 'px)';
+		cap.style.height = 'calc(' + percent(1, maxRow) + ' - ' + COMPOSER_KEY_GAP + 'px)';
 		cap.textContent = legend.text;
 		cap.addEventListener('click', function () {
 			composerState.selected = key.code;
@@ -400,8 +413,8 @@ function composerRenderBoard() {
 		});
 		board.appendChild(cap);
 	});
-	board.style.width = maxCol * COMPOSER_KEY_UNIT + 'px';
-	board.style.height = maxRow * COMPOSER_KEY_UNIT + 'px';
+	board.style.aspectRatio = maxCol + ' / ' + maxRow;
+	board.style.maxWidth = maxCol * COMPOSER_KEY_MAX_UNIT + 'px';
 }
 
 function composerRenderKeyEditor() {

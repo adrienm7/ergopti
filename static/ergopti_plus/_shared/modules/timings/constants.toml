@@ -320,6 +320,12 @@ native_switcher_deadline_ms = 8000
 # HS: gestures/native_app_switcher_action.lua.
 native_switcher_poll_ms = 20
 
+# How often the macOS Trackpad and Dock gesture preferences are read again, so a
+# slot whose macOS gesture was turned on is greyed and held back, and comes back
+# once it is off (one `defaults read` per domain, never on the touch path).
+# HS: gestures/conflicts.lua start_watch.
+system_prefs_recheck_ms = 20000
+
 # Slow health-check cadence once touch frames are flowing normally.
 # HS: gestures/init.lua HEALTH_CHECK_INTERVAL_SEC.
 health_check_interval_ms = 30000
@@ -625,6 +631,15 @@ default_activation_ms = 200
 # One-shot shift: auto-cancel timeout if no subsequent key is pressed.
 # AHK: tap_holds/constants.ahk ONE_SHOT_SHIFT_TIMEOUT_SEC (seconds).
 one_shot_shift_timeout_ms = 2000
+
+# How long a tap-hold copy (Cmd+C / Ctrl+C) waits before reading the
+# clipboard's change counter, for the copy and again for its one retry. A busy
+# application publishes its selection within the 200 ms the clipboard settle
+# delay already allows; this leaves it a little more before the copy is sent
+# again, and the wait is a timer, never a sleep on the input thread.
+# AHK: platform/remap/constants.ahk TAP_COPY_VERIFY_MS. HS: modules/keymap/init.lua
+# build_tap_copy. LX: platform/remap/tap_hold_manager.lua.
+copy_verify_ms = 300
 
 
 # ──────────────────────────────────────────────────────────────────────

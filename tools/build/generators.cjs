@@ -149,6 +149,13 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/windows/_generated/config_migration_ops.ahk']
 	},
 	{
+		script: 'codegen/codegen-key-names.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/lua/keycodes/key_names_data.lua',
+			'static/ergopti_plus/windows/_generated/key_names.ahk'
+		]
+	},
+	{
 		script: 'codegen/codegen-slot-roles.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/lua/shortcuts/slot_roles_data.lua',
@@ -218,6 +225,13 @@ const GENERATORS = [
 		outputs: [
 			'static/ergopti_plus/_shared/lua/menu/row_order_data.lua',
 			'static/ergopti_plus/windows/_generated/menu_row_order.ahk'
+		]
+	},
+	{
+		script: 'codegen/codegen-menu-section-header.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/lua/menu/section_header_data.lua',
+			'static/ergopti_plus/windows/_generated/menu_section_header.ahk'
 		]
 	},
 	{

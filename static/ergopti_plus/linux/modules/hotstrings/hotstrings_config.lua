@@ -744,6 +744,19 @@ local function commit_override_candidate(candidate, reorder)
 	return true
 end
 
+--- The delay a built-in section declares, rung 3 of the shared cascade: its
+--- manifest default (the maintainer's decision of 3 November 2026). This
+--- driver's config.toml stores a section as a boolean under hotstrings.modules,
+--- so the user's own delay for it lives in the override file, rungs 1 and 2.
+--- Personal and extension groups declare none.
+--- @param category string
+--- @param section string|nil
+--- @return number|nil seconds
+local function declared_delay(category, section)
+	if PersonalFiles.components(category) or Extensions.parse_category_key(category) then return nil end
+	return Languages.section_default_delay(ManifestReader.features(), category, section)
+end
+
 --- The effective delay, colour and preview setting for a category or section.
 ---
 --- The cascade lives in _shared/lua/hotstrings/delay_resolver.lua and is shared
@@ -770,6 +783,7 @@ function M.resolve(category, section)
 	local resolved = DelayResolver.resolve({
 		user_category  = DelayResolver.with_effective_delay(user, base),
 		user_section   = section and DelayResolver.with_effective_delay((user.sections or {})[section], base) or nil,
+		declared_delay = declared_delay(category, section),
 		meta_category  = meta,
 		meta_section   = section and (meta.sections or {})[section] or nil,
 		default_delay  = PersonalFiles.components(category) and PersonalFiles.additional_default_delay_seconds
@@ -2418,8 +2432,9 @@ function M.override_path()
 end
 
 --- The delay a section inherits once every user override is removed: its
---- corpus rungs, then the shared default. The scope compares it with the
---- manifest recommendation instead of assuming deletion restores it.
+--- declared delay, its corpus rungs, then the shared default. The scope
+--- compares it with the manifest recommendation instead of assuming deletion
+--- restores it.
 --- @param category string Loaded category.
 --- @param section string Section name.
 --- @param base number|nil Base expansion delay to measure against; the user's by default.
@@ -2428,6 +2443,7 @@ function M.inherited_delay(category, section, base)
 	local meta = _categories[category]
 	assert(type(meta) == "table", "unknown hotstring category: " .. tostring(category))
 	return DelayResolver.resolve({
+		declared_delay = declared_delay(category, section),
 		meta_category = meta,
 		meta_section = (meta.sections or {})[section],
 		default_delay = base or base_delay(),

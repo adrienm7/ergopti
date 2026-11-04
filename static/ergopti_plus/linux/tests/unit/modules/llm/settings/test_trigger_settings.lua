@@ -507,8 +507,13 @@ end
 --- @param key string Canonical translated label key.
 --- @return table row
 local function trigger_row(parent, key)
+	-- A greyed row is drawn « label — reason » (33c0db4fa4 gave the privacy
+	-- filters their save_unavailable reason), so the label is its prefix.
+	local label = require("infra.i18n").get(key)
 	for _, row in ipairs(parent.menu) do
-		if row.title == require("infra.i18n").get(key) then return row end
+		if type(row.title) == "string" and (row.title == label or row.title:sub(1, #label + 1) == label .. " ") then
+			return row
+		end
 	end
 	error("actual trigger menu omitted " .. key)
 end
@@ -765,7 +770,8 @@ helpers.describe("Privacy callback native epoch retirement", function()
 			with_trigger_menu(value, function(parent, _, _, observed)
 				local row = trigger_row(parent, privacy_corpus().rows[1].i18n)
 				helpers.assert_eq(row.disabled, true)
-				helpers.assert_eq(row.fn(), false)
+				-- A row greyed with its reason carries nothing to run (33c0db4fa4).
+				helpers.assert_nil(row.fn)
 				helpers.assert_eq(observed.writes, 0)
 				helpers.assert_eq(observed.redraws, 0)
 			end)

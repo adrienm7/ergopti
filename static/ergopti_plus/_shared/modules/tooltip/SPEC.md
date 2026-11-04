@@ -270,8 +270,9 @@ Each line that carries a prediction ends with the chord that inserts it, in a
 shortcut column: `preds_w = max_line_w + label_gap + max_shortcut_w` when any
 row has a chord, each chord right-aligned against the inner edge, bottom
 aligned with its line at the hint size, in `cmd_dim` on every row. The chord is
-the validation modifiers in `shortcut_modifier_order`, under the OS's
-`shortcut_labels_*` and `shortcut_joiner_*`, then the row's digit (0 for the
+the validation modifiers in `shortcut_modifier_order`, each named by the shared
+key name table (its glyph on macOS, its translated name elsewhere) and joined
+by the OS's `shortcut_joiner_*`, then the row's digit (0 for the
 tenth row, nothing beyond); no modifier means the bare digit. The rule is
 `_shared/lua/tooltip/llm_line.lua` `shortcut_label`, pinned by
 `_shared/tests/corpus/tooltip/llm_shortcut_vectors.json`. The column hangs from

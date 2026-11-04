@@ -4,7 +4,8 @@
  * ==============================================================================
  * MODULE: Menu Row Text Judge
  * DESCRIPTION:
- * Says whether the visible text of one menu row is an unresolved identifier.
+ * Says whether the visible text of one menu row is an unresolved identifier,
+ * a raw key id or an abbreviation no locale translates (`lalt`, `LCtrl`).
  * `_shared/lua/test/menu_row_text.lua` is the same rule for the Lua walks; both
  * read `_shared/tests/corpus/menu_row_text_allowlist.json`. French rows also
  * keep a space before `:`, `?`, `!` and `;` in both.
@@ -18,6 +19,49 @@ const path = require('path');
 
 const ERGOPTI = path.resolve(__dirname, '..', '..', '..', 'static', 'ergopti_plus');
 const ALLOWLIST = path.join(ERGOPTI, '_shared', 'tests', 'corpus', 'menu_row_text_allowlist.json');
+const KEY_NAMES = path.join(ERGOPTI, '_shared', 'data', 'keycodes', 'key_names.json');
+
+// Spellings of the key name table that are also plain words of a sentence
+// (« Insert a space », « tab »; `alt` is « all » in Danish and Norwegian, « old »
+// in German, « sub » in Turkish): a row may hold them, so only the others count.
+const PROSE_SPELLINGS = new Set([
+	'alt',
+	'tab',
+	'space',
+	'enter',
+	'delete',
+	'option',
+	'return',
+	'command',
+	'control',
+	'super',
+	'caps',
+	'escape',
+	'shift',
+	'meta',
+	'insert',
+	'home',
+	'end'
+]);
+
+/**
+ * Every key spelling a row must never show: the lowercase ids and aliases of
+ * _shared/data/keycodes/key_names.json that read as no word, and the side
+ * abbreviations the Tap-Hold rows used to print (LCtrl, RShift, LAlt…).
+ * `_shared/lua/test/menu_row_text.lua` builds the same set.
+ * @returns {Set<string>}
+ */
+function loadRawKeySpellings() {
+	const table = JSON.parse(fs.readFileSync(KEY_NAMES, 'utf8'));
+	const out = new Set();
+	for (const spelling of [...Object.keys(table.keys), ...Object.keys(table.aliases)])
+		if (!PROSE_SPELLINGS.has(spelling)) out.add(spelling);
+	for (const side of ['L', 'R'])
+		for (const name of ['Ctrl', 'Shift', 'Alt', 'Win', 'Cmd', 'Option']) out.add(side + name);
+	return out;
+}
+
+const RAW_KEY_SPELLINGS = loadRawKeySpellings();
 
 /**
  * Loads the allowlisted patterns.
@@ -50,6 +94,9 @@ function rowTextDefect(text, identifiers, allowlist) {
 	if (/(^|[^\p{L}\p{N}_])[a-z0-9]+(_[a-z0-9]+)+($|[^\p{L}\p{N}_])/u.test(label))
 		return 'reads as snake_case';
 	if (/\{\d*\}|%[sd]/.test(label)) return 'holds an unfilled placeholder';
+	// Case-exact: « Ctrl » and « Alt » are the names, `ctrl`, `lalt`, `LCtrl` the ids.
+	for (const word of label.split(/[^\p{L}\p{N}_]+/u))
+		if (RAW_KEY_SPELLINGS.has(word)) return `shows the raw key "${word}"`;
 	return '';
 }
 
@@ -65,4 +112,4 @@ function frenchPunctuationDefect(text) {
 	return '';
 }
 
-module.exports = { frenchPunctuationDefect, loadAllowlist, rowTextDefect };
+module.exports = { frenchPunctuationDefect, loadAllowlist, RAW_KEY_SPELLINGS, rowTextDefect };

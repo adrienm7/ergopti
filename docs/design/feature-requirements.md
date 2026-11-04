@@ -152,6 +152,7 @@ two disagree in either direction.
 | `llm.trigger.min_request_interval_ms`                         | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
 | `llm.trigger.instant_on_word_end`                             | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
 | `llm.trigger.after_hotstring`                                 | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
+| `llm.trigger.while_hotstring_tooltip`                         | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
 | `llm.trigger.inline_autotype`                                 | n/a             | n/a                                    | `ollama`, `webview2` |
 | `llm.trigger.secure_filter_enabled`                           | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
 | `llm.trigger.url_bar_filter_enabled`                          | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
@@ -379,6 +380,7 @@ two disagree in either direction.
 | `network.proxy_override`                                      | n/a             | n/a                                    | —                    |
 | `ui.menubar_icon`                                             | —               | n/a                                    | n/a                  |
 | `tap_holds.enabled`                                           | `karabiner`     | `evdev`, `uinput`                      | n/a                  |
+| `tap_holds.lone_modifier_tap_max_ms`                          | `karabiner`     | `evdev`, `uinput`                      | —                    |
 | `shortcuts.keys.wrap_text_if_selected`                        | —               | n/a                                    | n/a                  |
 | `shortcuts.keys.cmd_star`                                     | —               | n/a                                    | n/a                  |
 | `category_enabled.autocorrection`                             | n/a             | n/a                                    | —                    |

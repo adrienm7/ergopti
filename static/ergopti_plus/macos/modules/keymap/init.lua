@@ -71,7 +71,7 @@ local LOG = "keymap"
 M.DELAYS_DEFAULT = {
 	STAR_TRIGGER       = 2.0,  -- Manual expansions with ★ (magic key)
 	dynamichotstrings  = 2.0,  -- Phone numbers, SSN, dates…
-	autocorrection     = 1.0,  -- Spell checking
+	autocorrection     = 0.5,  -- Spell checking
 	rolls              = 0.5,  -- Rolls (e.g. sx → sk)
 	sfbsreduction      = 0.5,  -- Comma combos (e.g. ,t → pt)
 	distancesreduction = 0.5,  -- Dead keys and suffixes
@@ -915,6 +915,7 @@ M.set_llm_disabled_apps      = LLMBridge.set_llm_disabled_apps
 M.set_llm_app_profile_overrides = LLMBridge.set_llm_app_profile_overrides
 M.set_llm_enabled            = LLMBridge.set_llm_enabled
 M.set_llm_after_hotstring    = LLMBridge.set_llm_after_hotstring
+M.set_llm_while_hotstring_tooltip = LLMBridge.set_llm_while_hotstring_tooltip
 M.set_llm_debounce           = LLMBridge.set_llm_debounce
 M.set_llm_min_request_interval = LLMBridge.set_llm_min_request_interval
 M.set_llm_auto_raise_temp    = LLMBridge.set_llm_auto_raise_temp
@@ -1560,6 +1561,10 @@ local _interceptor_error_logged = {}
 -- Declared above onKeyDownRaw for the same reason; cleared after every call.
 local _key_down_context = { keycode = nil, stale = false }
 
+-- The tap-hold copy watch (modules/keymap/tap_copy.lua), built by M.start.
+-- Declared above every tap callback that reads it, for the same reason.
+local _tap_copy = nil
+
 local function onKeyDownRaw(e, provenance, provenance_status)
 	-- A stale internal loopback has lost the live transaction identity required to
 	-- re-enter the LLM, but it is still an Ergopti-only control key. Consume it in
@@ -2076,6 +2081,11 @@ local function onKeyDown(e)
 			physical_keycode = observe_key_health(e, "down", event_lateness_ms, event_stamp)
 			stale = event_lateness_ms ~= nil
 				and event_lateness_ms >= SyntheticInput.STALE_PHYSICAL_EVENT_MS
+			-- First delivery only: the application has not received this key yet, so
+			-- a tap-hold's Cmd+C is checked against the clipboard as it was before.
+			if _tap_copy and _tap_copy:watching() then
+				pcall(_tap_copy.key_down, _tap_copy, e, event_stamp, event_lateness_ms)
+			end
 		end
 	else
 		pcall(Logger.error, LOG, "Synthetic event provenance classification failed: %s.",
@@ -2291,6 +2301,11 @@ shift_tap = eventtap.new(
 		local ok, result = pcall(function()
 			local kc = e:getKeyCode()
 			local f  = e:getFlags()
+			-- Its own pcall: a watch failure must never pass for a shift-side one.
+			if _tap_copy then
+				local _, stamp = EventClock.lateness_ms(e)
+				pcall(_tap_copy.modifier_edge, _tap_copy, kc, f, stamp)
+			end
 
 			-- The keycode on a flagsChanged event identifies which modifier
 			-- just toggled. We flip the matching side's flag, then resync
@@ -2357,6 +2372,8 @@ mouse_tap = eventtap.new(
 		-- passes through, but PAUSE owns every keymap mutation and deferred reset.
 		-- Claim any older synthetic fence above, then stop before touching context.
 		if CoreState.processing_paused == true then return false, fence_events end
+		-- A modifier held through a click was used with it: its release is no tap.
+		if _tap_copy then _tap_copy:activity() end
 		if provenance_status == EventProvenance.STATUS_UNREADABLE then
 			invalidate_observed_context()
 			return false, fence_events
@@ -2605,6 +2622,66 @@ tap_watchdog = function(timer, generation)
 	end
 end
 
+--- Builds the tap-hold copy watch over the live adapters.
+--- @return table watch modules/keymap/tap_copy.lua owner.
+local function build_tap_copy()
+	local TapCopy = require("modules.keymap.tap_copy")
+	local CopyCheck = require("tap_hold.copy_check")
+	local Clipboard = require("adapters.clipboard")
+	local log_name = "keymap.tap_copy"
+	local function log(level, fmt, ...) Logger[level](log_name, fmt, ...) end
+	local function warn_user()
+		local ok, sent_or_err = pcall(require("infra.notifications").notify,
+			require("infra.i18n").get("notify.tap_hold.copy_failed"), nil, "warning")
+		if not ok or sent_or_err ~= true then
+			Logger.error(log_name, "Copy failure notice was not delivered: %s.", tostring(sent_or_err))
+		end
+	end
+	local report = CopyCheck.reporter(log, warn_user)
+	local watch
+	local checker = CopyCheck.new({
+		verify_ms = require("infra.timings").ms("tap_hold", "copy_verify_ms"),
+		read_counter = function() return (Clipboard._change_count()) end,
+		send_copy = function() return SyntheticInput.emit_key_stroke({ "cmd" }, "c", 0) == true end,
+		after = function(delay_ms, callback)
+			local handle, committed = TimerScheduler.after(delay_ms / 1000, callback)
+			return committed == true and handle or nil
+		end,
+		cancel = TimerScheduler.cancel,
+		-- Each outcome is counted for the field run (TapCopy statistics).
+		report = function(outcome, detail)
+			if watch then watch:note_outcome(outcome) end
+			report(outcome, detail)
+		end,
+	})
+	watch = TapCopy.new({
+		change_count = function() return (Clipboard._change_count()) end,
+		duration_ms = EventClock.duration_ms,
+		defer = SyntheticInput.defer_after_callback,
+		event_flags = function(event) return event:getFlags() end,
+		event_chars = function(event) return event:getCharacters(true) end,
+		-- The tap timeout Karabiner was given for the key: the lone tap window
+		-- when it applies (Generator.last_tap_timeouts), else its delay.
+		key_config = function(key_id)
+			local Remap = require("platform.remap")
+			if Remap.get_tap_holds_enabled() ~= true then return nil, nil end
+			local deployed = require("platform.remap.generator").last_tap_timeouts() or {}
+			return Remap.get_tap_action(key_id),
+				deployed[key_id] or Remap.get_tap_timeout(key_id) or Remap.get_tap_hold_timeout()
+		end,
+		log = log,
+		checker = checker,
+	})
+	return watch
+end
+
+--- The tap-hold copy watch's statistics since the keymap started, for the field
+--- run (infra/field_check_tap_copy.lua).
+--- @return table|nil stats nil before the keymap started.
+function M.tap_copy_statistics()
+	return _tap_copy and _tap_copy:statistics() or nil
+end
+
 --- Starts the eventtap listeners and attaches them to the OS event queue.
 function M.start()
 	_user_hotstring_lifecycle = {}
@@ -2630,6 +2707,7 @@ function M.start()
 	if not _one_shot_shift then
 		_one_shot_shift = require("adapters.one_shot_shift").new({ magic = M.get_trigger_char })
 	end
+	if not _tap_copy then _tap_copy = build_tap_copy() end
 	ControlSentinels.set_listener("keymap.one_shot_shift", function(signal)
 		if signal == ControlSentinels.ONE_SHOT_SHIFT then M.arm_one_shot_shift() end
 	end)
@@ -2731,6 +2809,7 @@ function M.stop(teardown)
 	CoreState.lifecycle_generation = (CoreState.lifecycle_generation or 0) + 1
 	_started = false
 	if _one_shot_shift then _one_shot_shift.reset() end
+	if _tap_copy then _tap_copy:stop() end
 	local listener_stopped = true
 	if _action_listener_registered then
 		local ok, result = pcall(SyntheticInput.unregister_action_listener, ACTION_EPOCH_LISTENER_ID)

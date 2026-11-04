@@ -617,6 +617,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-launcher-sleep-registry.cjs"],
 			"repro": "npm run test:launcher-sleep-registry"
+		},
+		{
+			"id": "key-names-single-source",
+			"ordinal": 571,
+			"name": "one shared table names every key in all locales, and every driver id and both projections resolve through it",
+			"cmd": "node",
+			"args": ["tools/test/test-key-names-single-source.cjs"],
+			"repro": "npm run test:key-names-single-source"
 		}
 	]
 }

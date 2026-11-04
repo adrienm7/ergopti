@@ -104,6 +104,23 @@ assert.match(en['menu.gestures.recommended_note'], /remove the system/i);
 assert.match(en['menu.gestures.recommended_reason_macos'], /Look up/);
 assert.match(en['menu.gestures.recommended_reason_windows'], /greyed out/i);
 assert.match(en['menu.gestures.recommended_reason_windows'], /no double action/i);
+// The Infos text says how each driver gets the gesture (maintainer, 2026-11-03):
+// Windows cannot be told what a gesture does, so each one sends a rare key
+// combination Ergopti catches, assigned automatically or by the tutorial;
+// macOS and Linux read the touchpad themselves.
+assert.match(en['menu.gestures.recommended_reason_windows'], /very rare key combination/);
+for (const key of ['menu.gestures.auto_configure', 'menu.gestures.manual_tutorial'])
+	assert.ok(
+		en['menu.gestures.recommended_reason_windows'].includes(
+			en[key].replace(/^\S+\s+/, '').replace(/\s*\(.*\)$/, '')
+		),
+		`the Windows Infos text names the ${key} row`
+	);
+assert.match(en['menu.gestures.recommended_note'], /reads the touchpad itself/);
+// macOS recommends Ergopti actions on its own four-finger swipes since
+// 2026-11-03, so the dialog says to turn those system gestures off first.
+assert.match(en['menu.gestures.recommended_reason_macos'], /four-finger swipes/);
+assert.match(en['menu.gestures.recommended_reason_macos'], /turn them off/);
 // Every row the Gestures menu declares itself stays a short menu caption.
 const MENU_CAPTION_MAX_UNITS = 80;
 const localeDir = path.join(SP, '_shared', 'data', 'locales');
@@ -130,8 +147,10 @@ for (const file of localeFiles) {
 const DIALOG_OWNERS = [
 	{
 		file: 'windows/ui/menu/menu_gestures.ahk',
+		// A startup UI command: the dialog opens at once, even before input
+		// initialization completes after a reload.
 		register:
-			/^\s*MenuCommand\.GESTURE_RECOMMENDED_INFO, \(\*\) => GestureShowRecommendedInfo\(\),\s*$/m,
+			/^\s*MenuCommand\.GESTURE_RECOMMENDED_INFO,\s*MenuStartupUiCommand\(\(\*\) => GestureShowRecommendedInfo\(\), MenuStartupDiagnosticsReady\),\s*$/m,
 		body: /\nGestureShowRecommendedInfo\(\) \{\n([\s\S]*?)\n\}/,
 		helper: 'Ui_MsgBox(',
 		keys: ['menu.gestures.recommended_reason_windows'],

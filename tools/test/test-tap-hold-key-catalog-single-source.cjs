@@ -18,8 +18,8 @@
  * Fn under « Main droite ». Nothing compared any of them.
  *
  * WHAT IS HELD:
- * 1. The catalogue parses, every entry names a hand and a translated label,
- *    and Fn sits on the left.
+ * 1. The catalogue parses, every entry names a hand and a key of the shared
+ *    key name table translated in all 21 locales, and Fn sits on the left.
  * 2. Each driver's column is exactly the set of keys its engine can remap:
  *    macOS `tap_hold_keys.json` (in the same order), the Linux engine's evdev
  *    table, and the keys the Windows `platform/remap/*.ahk` hotkeys arm.
@@ -36,6 +36,7 @@ const path = require('path');
 // The Linux tray root is read with its split section modules folded back in.
 const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 const TOML = require('smol-toml');
+const KeyNames = require('../lib/key-names.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -123,18 +124,21 @@ for (const [index, entry] of entries.entries()) {
 			`${where} "${entry.id}": hand must be "left" or "right", got ${JSON.stringify(entry.hand)}`
 		);
 	}
-	if (typeof entry.label_key !== 'string' || entry.label_key === '') {
-		errors.push(`${where} "${entry.id}" has no label_key`);
-	} else {
-		for (const locale of locales) {
-			if (typeof locale.data[entry.label_key] !== 'string') {
-				errors.push(`${where} "${entry.id}": ${locale.name} has no "${entry.label_key}"`);
-			}
-		}
+	// The name is the shared key name table's, under each OS's usual name.
+	if (KeyNames.canonical(entry.id) !== entry.id) {
+		errors.push(`${where} "${entry.id}" is no key of _shared/data/keycodes/key_names.json`);
 	}
 	let platforms = 0;
 	for (const platform of PLATFORMS) {
 		if (entry[platform] === undefined) continue;
+		if (KeyNames.canonical(entry.id) === entry.id) {
+			const key = KeyNames.i18n(entry.id, platform);
+			for (const locale of locales) {
+				if (typeof locale.data[key] !== 'string' || locale.data[key].trim() === '') {
+					errors.push(`${where} "${entry.id}": ${locale.name} has no "${key}"`);
+				}
+			}
+		}
 		if (typeof entry[platform] !== 'string' || entry[platform] === '') {
 			errors.push(`${where} "${entry.id}": ${platform} must be a non-empty key id`);
 			continue;
@@ -144,7 +148,7 @@ for (const [index, entry] of entries.entries()) {
 	}
 	if (platforms === 0) errors.push(`${where} "${entry.id}" names no driver's key`);
 	for (const field of Object.keys(entry)) {
-		if (!['id', 'hand', 'label_key', ...PLATFORMS].includes(field)) {
+		if (!['id', 'hand', ...PLATFORMS].includes(field)) {
 			errors.push(`${where} "${entry.id}": unknown field "${field}" — no driver reads it`);
 		}
 	}

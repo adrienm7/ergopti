@@ -199,6 +199,22 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 		helpers.assert_nil(e:process(KEY_A, DOWN, 750), "and a long press arms nothing")
 	end)
 
+	-- A one-shot tap then « abc » typed fast, each letter down before the one
+	-- before it is up, gave « ABc »: the wrapped A kept its Shift down for B.
+	helpers.it("shifts only the first of three rolled letters (one-shot-roll)", function()
+		local KEY_B = 48
+		local e = engine({ right_ctrl = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } })
+		e:process(RCTRL, DOWN, 0)
+		e:process(RCTRL, UP, 100)
+		helpers.assert_eq(trail((e:process(KEY_A, DOWN, 300))), "42↓ 30↓", "A is shifted")
+		helpers.assert_eq(trail((e:process(KEY_B, DOWN, 320))), "42↑ 48↓", "Shift is up before B goes down")
+		helpers.assert_eq(trail((e:process(KEY_A, UP, 330))), "30↑", "A's release has no Shift left to release")
+		helpers.assert_nil(e:process(KEY_J, DOWN, 340), "the next letter passes as it is")
+		helpers.assert_eq(trail((e:process(KEY_B, UP, 350))), "48↑", "the engine releases the B it pressed")
+		helpers.assert_nil(e:process(KEY_J, UP, 360))
+		helpers.assert_eq(trail(e:release_all()), "", "nothing left to release")
+	end)
+
 	helpers.it("types a key pressed within RCtrl's threshold unshifted (rctrl-one-shot-hold-past-threshold)", function()
 		local e = engine({ right_ctrl = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } })
 		e:process(RCTRL, DOWN, 0)
@@ -474,7 +490,7 @@ helpers.describe("tap-hold engine: LAlt's Backspace under held keys", function()
 	helpers.it("keeps up a modifier its own release just lifted (lalt-backspace-logic)", function()
 		local e = Engine.new({ keys = { left_alt = { tap_action = "backspace", hold_modifier = "alt",
 				time_activation_seconds = 0.2 } },
-			tap_min_ms = 50, one_shot_timeout_ms = 2000,
+			tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 			held_text_modifier_codes = function() return { LSHIFT } end,
 			held_shortcut_modifier_codes = function() return { ALT } end })
 		e:process(LSHIFT, DOWN, 0)

@@ -458,15 +458,15 @@ helpers.describe("shared profile section headings: actual macOS provider", funct
 		with_profiles_fixture({user_profiles = custom and {{id="user_canonical",label="Canonical"}} or {}}, function(fixture)
 			local document = read_json("modules/menu/menu_manifest.json")
 			local i18n = package.loaded["infra.i18n"]
-			i18n.section = function(key) return "— " .. i18n.get(key) .. " —" end
+			i18n.section = function(key) return require("menu.labels").decorate_section(i18n.get(key)) end
 			local renderer = assert(require("menu.renderer").new({platform="hs",
 				manifest_path=function() return helpers.shared("modules/menu/menu_manifest.json") end,
 				json_decode=function() return document end,i18n=i18n,logger=package.loaded["infra.logger"]}))
 			local binding = package.loaded["infra.manifest_menu"]
 			binding.template_rows, binding.render_rows = renderer.template_rows, renderer.render_rows
-			body({document=document,i18n=i18n,heading_index=3,other_platform="linux",
+			body({document=document,i18n=i18n,heading_index=2,other_platform="linux",
 				caption=function(key) return i18n.section(key) end,
-				decorate=function(value) return "— " .. value .. " —" end,
+				decorate=function(value) return require("menu.labels").decorate_section(value) end,
 				rows=function() return fixture.manager.get_menu_item().menu end,
 				untouched=function()
 					helpers.assert_eq(#fixture.selections,0); helpers.assert_eq(fixture.direct_saves(),0)

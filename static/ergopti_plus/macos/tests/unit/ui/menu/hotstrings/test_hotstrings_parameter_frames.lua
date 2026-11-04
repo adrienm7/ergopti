@@ -231,12 +231,21 @@ helpers.describe("fixed feature parent: actual Mac Hotstrings (fixed-feature-par
 								helpers.assert_true(#completed > 0)
 								if state then helpers.assert_eq(rows[1].checked, true) else helpers.assert_nil(rows[1].checked) end
 								local parameters
+								local caption = f.captions("menu.hotstrings.params")
 								for _, row in ipairs(completed) do
-									if row.title == f.captions("menu.hotstrings.params") then parameters = row end
+									if type(row.title) == "string" and row.title:sub(1, #caption) == caption then parameters = row end
 								end
-								helpers.assert_type(parameters, "table"); helpers.assert_type(parameters.menu, "table")
-								local delays = children({menu = parameters.menu}, f.captions("menu.hotstrings.delays_colors"))
-								helpers.assert_eq(#delays, 8)
+								helpers.assert_type(parameters, "table")
+								if state then
+									helpers.assert_eq(parameters.title, caption)
+									helpers.assert_type(parameters.menu, "table")
+									local delays = children({menu = parameters.menu}, f.captions("menu.hotstrings.delays_colors"))
+									helpers.assert_eq(#delays, 8)
+								else
+									-- Category-off rule: with Hotstrings off its parameters are greyed and open nothing.
+									helpers.assert_true(parameters.disabled == true)
+									helpers.assert_nil(parameters.menu)
+								end
 								helpers.assert_eq(f.calls.writes, 0); helpers.assert_eq(f.calls.redraws, 0); helpers.assert_eq(f.calls.notices, 0)
 							end, debug.traceback)
 							counter.count_all, manifest.group_row = actual_counter, actual_parent
@@ -319,6 +328,9 @@ local function with_parameter_parent_consumer(f, body)
 		end } }
 		local context = {}; for key, value in pairs(f.context) do context[key] = value end
 		context.config, context.base_dir, context.hotfiles = { log_level = 2 }, helpers.driver_root(), {}
+		-- The Hotstrings master is on: an off category greys its parameter parent.
+		context.state = {}; for key, value in pairs(f.context.state) do context.state[key] = value end
+		context.state.keymap = true
 		local function build(expected_caption)
 			completed, calls = nil, 0
 			local roots = consumer(context, modules)
@@ -412,6 +424,13 @@ local function with_word_reset(body, idle_seconds, prompt_answer)
 	end)
 end
 
+--- A label joined to its value by the catalogue's own template (common.label_value).
+local function joined(f, label, value)
+	return (f.captions("common.label_value"):gsub("{([12])}", function(slot)
+		return slot == "1" and label or value
+	end))
+end
+
 local function word_reset_rows(f)
 	local idle_caption = f.captions("menu.hotstrings.idle_reset")
 	local idle_row, click_row
@@ -427,7 +446,7 @@ helpers.describe("hotstrings word-reset rows", function()
 		with_word_reset(function(f, set)
 			local idle, click = word_reset_rows(f)
 			local unit = f.captions("menu.hotstrings.idle_reset_unit")
-			helpers.assert_eq(idle.title, f.captions("menu.hotstrings.idle_reset") .. ": 3 " .. unit)
+			helpers.assert_eq(idle.title, joined(f, f.captions("menu.hotstrings.idle_reset"), "3 " .. unit))
 			local titles = {}
 			for index, row in ipairs(idle.menu) do titles[index] = row.title end
 			helpers.assert_eq(titles, { f.captions("menu.hotstrings.idle_reset_off"), "1 " .. unit, "2 " .. unit,
@@ -448,8 +467,8 @@ helpers.describe("hotstrings word-reset rows", function()
 	helpers.it("ticks the free entry for a value outside the presets and names it", function()
 		with_word_reset(function(f)
 			local idle = word_reset_rows(f)
-			helpers.assert_eq(idle.title, f.captions("menu.hotstrings.idle_reset") .. ": 4.5 "
-				.. f.captions("menu.hotstrings.idle_reset_unit"))
+			helpers.assert_eq(idle.title, joined(f, f.captions("menu.hotstrings.idle_reset"),
+				"4.5 " .. f.captions("menu.hotstrings.idle_reset_unit")))
 			helpers.assert_eq(idle.menu[8].checked, true)
 			for index = 1, 6 do helpers.assert_true(idle.menu[index].checked ~= true) end
 		end, 4.5)
@@ -499,7 +518,7 @@ helpers.describe("hotstrings word-reset rows", function()
 			end
 			assert(row, "the cascade arrow choice must be drawn")
 			local unit = f.captions("menu.hotstrings.cascade_max_arrows_unit")
-			helpers.assert_eq(row.title, caption .. ": 3 " .. unit)
+			helpers.assert_eq(row.title, joined(f, caption, "3 " .. unit))
 			local titles = {}
 			for index, entry in ipairs(row.menu) do titles[index] = entry.title end
 			local expected = { "1 " .. f.captions("menu.hotstrings.cascade_max_arrows_single") }

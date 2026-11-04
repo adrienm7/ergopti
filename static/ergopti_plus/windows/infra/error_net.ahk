@@ -211,7 +211,7 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 				try KL_Stop()
 				try HookDispatcher.Stop()
 				if SmokeRun
-						DllCall("ExitProcess", "UInt", 1)
+						PLC_ExitProcessNow(1)
 				ExitApp(1)
 				return true
 		}

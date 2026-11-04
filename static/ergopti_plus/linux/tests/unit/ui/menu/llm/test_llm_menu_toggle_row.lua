@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local table_unpack = table.unpack or unpack
 
 --- The submenu of the top-level row whose title contains the translation of `key`.
 --- @param items table
@@ -128,7 +129,7 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 				if row.title:find(head("menu.llm.reset_on_nav"), 1, true) then last = index end
 			end
 			helpers.assert_true(first ~= nil and last ~= nil, "the generation rows are drawn")
-			require("test.ai_menu_layout_contract").assert_generation(helpers, { table.unpack(rows, first, last) }, {
+			require("test.ai_menu_layout_contract").assert_generation(helpers, { table_unpack(rows, first, last) }, {
 				count = head("menu.llm.num_predictions_label"), min_words = head("menu.llm.min_words_label"),
 				max_words = head("menu.llm.max_words_label"), context = head("menu.llm.generation.context_length"),
 				clear_context = head("menu.llm.reset_on_nav"),
@@ -151,6 +152,7 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 					profile = i18n.get("menu.profiles.profile_label_prefix"):match("^[^%%{]*"),
 					test = i18n.get("menu.llm.test_prediction"),
 					trigger = i18n.get("menu.llm.trigger_menu_title"),
+					settings = i18n.section("menu.llm.header_settings"),
 				}, state .. "/" .. model_state)
 			end)
 		end
@@ -158,6 +160,13 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 end)
 
 helpers.describe("tray (linux): keyboard slot groups need a key catalogue", function()
+	--- The real Shortcuts owner, read on by the menu: an off category greys every
+	--- row of its submenu (category-off rule), slot groups included.
+	local function shortcuts_on()
+		return setmetatable({ is_enabled = function() return true end },
+			{ __index = require("modules.shortcuts.manager") })
+	end
+
 	--- Menu inventory stays editable when its native source is unavailable.
 	--- This fixture owns that dependency rather than inheriting another test's
 	--- initialized physical-source owner or its expired private config path.
@@ -184,12 +193,11 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 			local mb = helpers.load_module("ui.menu.builder")
 			local rows = submenu_of(mb.build({
 				_version = "0.0.0-dev.12",
-				shortcuts = require("modules.shortcuts.manager"),
+				shortcuts = shortcuts_on(),
 				on_quit = function() end,
 			}), "menu.shortcuts.title")
-			local i18n = require("infra.i18n")
 			for _, group in ipairs(kbd.SLOT_GROUPS) do
-				local label, found = i18n.get(group.group_key), nil
+				local label, found = kbd.get_group_label(group), nil
 				for _, row in ipairs(rows or {}) do
 					if row.title == label then found = row end
 				end
@@ -216,14 +224,13 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 				local mb = helpers.load_module("ui.menu.builder")
 				local items = mb.build({
 					_version = "0.0.0-dev.12",
-					shortcuts = require("modules.shortcuts.manager"),
+					shortcuts = shortcuts_on(),
 					on_quit = function() end,
 				})
 				local rows = submenu_of(items, "menu.shortcuts.title")
 				helpers.assert_true(rows ~= nil, "the shortcuts submenu must be drawn")
-				local i18n = require("infra.i18n")
 				for _, group in ipairs(kbd.SLOT_GROUPS) do
-					local label, found = i18n.get(group.group_key), nil
+					local label, found = kbd.get_group_label(group), nil
 					for _, row in ipairs(rows) do
 						if group.prefix == "contextual" and row.title == label then found = row
 						else helpers.assert_true(row.title ~= label,

@@ -57,6 +57,7 @@ local Vision = require("llm.vision")
 local AppParameter = require("app_parameter")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
+local KeyNames = require("keycodes.key_names")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local AiActions = require("modules.shortcuts.ai_actions")
 local ShellRunner = require("adapters.shell_runner")
@@ -298,15 +299,14 @@ end
 -- =========================================
 -- =========================================
 
---- Labels COMPUTED at registration time for the modifier-chord actions
---- ("Ctrl + Shift + A"). They are language-neutral by construction — modifier
---- and key names are the same in every locale — so they are stored as labels
---- rather than as catalogue keys.
-local ACTION_COMPUTED_LABELS = {}
+--- The parts each modifier-chord action is named from at every read: its
+--- modifier ids and its catalogue key, which the shared key name table turns
+--- into « Ctrl + Maj + Entrée » in the active language. They used to be English
+--- labels computed once, the same in every locale.
+local MODIFIER_ACTION_PARTS = {}
 
 -- Dynamic modifier-key actions use the same shared catalogue as Windows and
--- macOS. Their labels are intentionally language-neutral (for example
--- "Ctrl + A") and therefore bypass the locale layer entirely.
+-- macOS.
 local MODIFIER_ACTION_COMMANDS = {}
 
 -- The chord matrix in picker order: one { label, actions } group per modifier
@@ -347,21 +347,19 @@ local function register_modifier_chords(catalogue)
 
 	local max_mask = (2 ^ #modifiers) - 1
 	for mask = 1, max_mask do
-		local ids, labels, native_modifiers = {}, {}, {}
+		local ids, native_modifiers = {}, {}
 		for index, modifier in ipairs(modifiers) do
 			if math.floor(mask / (2 ^ (index - 1))) % 2 == 1 then
 				ids[#ids + 1] = modifier.id
-				labels[#labels + 1] = modifier.label
 				native_modifiers[#native_modifiers + 1] = modifier.xdotool
 			end
 		end
 		local id_prefix = table.concat(ids, "_")
-		local label_prefix = table.concat(labels, " + ")
-		local group = { label = label_prefix, actions = {} }
+		local group = { modifiers = ids, actions = {} }
 		for _, key_def in ipairs(keys) do
 			local action_id = id_prefix .. "_" .. key_def.id
 			local key = key_def.linux_key or key_def.id
-			ACTION_COMPUTED_LABELS[action_id] = label_prefix .. " + " .. key_def.label
+			MODIFIER_ACTION_PARTS[action_id] = { modifiers = ids, key = key_def }
 			MODIFIER_ACTION_COMMANDS[action_id] = table.concat(native_modifiers, "+") .. "+" .. key
 			group.actions[#group.actions + 1] = action_id
 		end
@@ -856,13 +854,23 @@ local function _execute_action(action_name, go_next, binding)
 	Logger.warn(LOG, "Unknown action: %s", action_name)
 end
 
+--- The name of one gesture slot in the user's language, the same
+--- gesture.slots.* text the Windows and macOS menus show. The menu rows used
+--- to read a French sentence built there (« Balayage 3 doigts vers haut ») in
+--- every locale.
+--- @param slot string A slot of the shared gesture catalogue.
+--- @return string
+function M.slot_label(slot)
+	return i18n.get("gesture.slots." .. tostring(slot))
+end
+
 --- Returns a human-readable label for an action.
 --- @param action_name string
 --- @return string
 function M.get_action_label(action_name)
 	if not action_name or action_name == "" then return "∅" end
-	local computed = ACTION_COMPUTED_LABELS[action_name]
-	if computed then return computed end
+	local chord = MODIFIER_ACTION_PARTS[action_name]
+	if chord then return KeyNames.chord_label(chord.modifiers, chord.key, "linux", i18n.get) end
 	local meta = Catalogue.actions[action_name]
 	if not meta then return action_name end
 	return i18n.get(meta.label_key)
@@ -1051,9 +1059,10 @@ function M.get_picker_items()
 		elseif item.kind == "modifier_chords" then
 			local template = i18n.get(item.group_key)
 			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
+				local names = KeyNames.modifiers_label(group.modifiers, "linux", i18n.get)
 				items[#items + 1] = {
 					type = "heading", level = item.level,
-					text = (template:gsub("{1}", function() return group.label end)),
+					text = (template:gsub("{1}", function() return names end)),
 				}
 				for _, action_name in ipairs(group.actions) do push_action(action_name) end
 			end

@@ -31,9 +31,10 @@
 ---    timer after phase A. It reads only local files, so it also runs without
 ---    the extensive opt-in (local_only), and an answer past its timeout_ms is a
 ---    timeout without sections.
---- 8. local_state reads the main-thread facts phase A leaves out (the Wi-Fi
----    signal, the module contract check) in slices of the phase A budget, on
----    timers after phase A; local, like the configuration.
+--- 8. local_state reads the main-thread facts phase A leaves out (the
+---    versions, the keyboard state, the USB devices, the Wi-Fi signal, the
+---    module contract check) in slices of the phase A budget, on timers after
+---    phase A; local, like the configuration.
 --- ==============================================================================
 
 local M = {}
@@ -466,12 +467,13 @@ end
 --- event taps behind them. A raising step costs its own fact and turns the
 --- answer into an error that still carries the others.
 --- @param slice_ms number The phase A budget, the most one slice may hold.
+--- @param snapshot table The phase A snapshot the steps complete.
 --- @return function Probe body.
-local function local_state(slice_ms)
+local function local_state(slice_ms, snapshot)
 	return function(done, on_cancel)
 		local Timers = require("adapters.timer_scheduler")
 		local yield = require("infra.timings").sec("ui", "healthcheck_probe_yield_ms")
-		local steps, sections = require("ui.healthcheck.core").local_state_steps()
+		local steps, sections = require("ui.healthcheck.core").local_state_steps(snapshot)
 		local next_step, failures, handle = 1, {}, nil
 		local function slice()
 			handle = nil
@@ -507,11 +509,12 @@ local function local_state(slice_ms)
 	end
 end
 
---- The Bluetooth input devices, after the USB ones phase A listed.
---- @param usb_items table The snapshot's peripherals items.
+--- The Bluetooth input devices, after the USB ones the local_state probe lists.
+--- @param peripherals table The snapshot's live peripherals section, read when
+---   the answer comes: the local_state probe fills its USB devices meanwhile.
 --- @param detailed boolean
 --- @return function Probe body.
-local function bluetooth(usb_items, detailed)
+local function bluetooth(peripherals, detailed)
 	return function(done, on_cancel)
 		run_task(SYSTEM_PROFILER, { "SPBluetoothDataType", "-json" }, on_cancel, function(stdout)
 			local devices, err = M.bluetooth_devices(stdout, detailed)
@@ -520,7 +523,9 @@ local function bluetooth(usb_items, detailed)
 				return
 			end
 			local items = {}
-			for _, item in ipairs(usb_items) do items[#items + 1] = item end
+			for _, item in ipairs(peripherals.items or {}) do
+				if item.bus ~= "bluetooth" then items[#items + 1] = item end
+			end
 			for _, item in ipairs(devices) do items[#items + 1] = item end
 			done({ state = "ok" }, { peripherals = { items = items } })
 		end, function(detail) done({ state = "error", detail = detail }) end)
@@ -551,7 +556,7 @@ function M.start(schema, snapshot, publish, options)
 	local config = schema.probes
 	local sections = snapshot.sections
 	start_probe(run, "configuration", config.configuration.timeout_ms, configuration(schema, options.overrides))
-	start_probe(run, "local_state", config.local_state.timeout_ms, local_state(schema.phase_a_budget_ms))
+	start_probe(run, "local_state", config.local_state.timeout_ms, local_state(schema.phase_a_budget_ms, snapshot))
 	if options.local_only == true then
 		function run.refresh_cleanup() end
 		function run.has_pending_cleanup() return false end
@@ -567,7 +572,7 @@ function M.start(schema, snapshot, publish, options)
 	start_probe(run, "system_details", config.system_details.timeout_ms, system_details(sections.paths.logs_dir))
 	start_probe(run, "cpu_load", config.cpu_load.timeout_ms, cpu_load(config.cpu_load))
 	start_probe(run, "bluetooth", config.bluetooth.timeout_ms,
-		bluetooth(sections.peripherals.items or {}, snapshot.detailed == true))
+		bluetooth(sections.peripherals, snapshot.detailed == true))
 	start_probe(run, "appleevent_transport", config.appleevent_transport.timeout_ms,
 		require("ui.healthcheck.appleevents").body(config.appleevent_transport))
 	function run.refresh_cleanup()

@@ -133,6 +133,8 @@ local function build_world()
 			return true
 		end,
 		is_hotstring_visible = function() return world.hotstring_visible end,
+		has_visible_hotstring_rows = function() return world.hotstring_visible end,
+		set_shared_hotstring_stack = function(enabled) world.shared_stack = enabled end,
 		get_current_index = function() return 1 end,
 		make_diff_styled = function() return true end,
 		reset_llm_timer = function() return true end,
@@ -727,4 +729,81 @@ helpers.it("retains a free-language live receipt through the actual typing timer
 	helpers.assert_true(world.posts[1].body.messages[1].content:find("Translate TAIL into Esperanto", 1, true) ~= nil)
 	helpers.assert_eq(world.posts[1].body.messages[2].content, 'PREFIX: "on se voit demain"\nTAIL: "on se voit demain"')
 	helpers.assert_eq(world.engine.get_live_prompt().translation_target, "Esperanto")
+end)
+
+
+-- llm.trigger.while_hotstring_tooltip: an automatic prediction never covers a
+-- hotstring tooltip that can still expand ("wait", the default), or runs beside
+-- it ("both").
+helpers.describe("automatic prediction while a hotstring tooltip shows (llm-hotstring-tooltip-wait)", function()
+	local TYPED = "on se voit demain"
+
+	--- Runs body with the bridge's chain-after-hotstring flag answered as given.
+	--- @param chained boolean
+	--- @param body function
+	local function with_chain(chained, body)
+		local saved = package.loaded["modules.keymap.llm_bridge"]
+		package.loaded["modules.keymap.llm_bridge"] = {
+			get_llm_runtime_setting = function(key)
+				if key == "llm_after_hotstring" then return true, chained end
+				return false, nil
+			end,
+		}
+		local ok, err = pcall(body)
+		package.loaded["modules.keymap.llm_bridge"] = saved
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("waits by default: a request armed before the tooltip sends nothing", function()
+		local world = build_world()
+		world.engine.set_llm_min_words(1)
+		helpers.assert_eq(select(2, world.engine.get_llm_runtime_setting("llm_while_hotstring_tooltip")), "wait",
+			"the manifest default waits")
+		with_chain(false, function()
+			keystroke(world, TYPED)
+			world.hotstring_visible = true
+			fire_debounce(world, MENU_DEBOUNCE_SEC, "the ordinary debounce")
+			helpers.assert_eq(#world.posts, 0, "no request while the hotstring tooltip is shown")
+			helpers.assert_eq(#running_timers(world, MENU_DEBOUNCE_SEC), 0,
+				"without the chain after the hotstring the request is dropped, as on Windows and Linux")
+			world.hotstring_visible = false
+			keystroke(world, TYPED .. " ")
+			fire_debounce(world, MENU_DEBOUNCE_SEC, "the next keystroke's debounce")
+			helpers.assert_eq(#world.posts, 1, "positive control: without the tooltip the request is sent")
+		end)
+	end)
+
+	helpers.it("asks again once the tooltip is gone when the chain is on", function()
+		local world = build_world()
+		world.engine.set_llm_min_words(1)
+		with_chain(true, function()
+			keystroke(world, TYPED)
+			world.hotstring_visible = true
+			fire_debounce(world, MENU_DEBOUNCE_SEC, "the ordinary debounce")
+			helpers.assert_eq(#world.posts, 0, "no request while the hotstring tooltip is shown")
+			world.hotstring_visible = false
+			fire_debounce(world, MENU_DEBOUNCE_SEC, "the wait re-arms the debounce")
+			helpers.assert_eq(#world.posts, 1, "the request follows once the hotstring tooltip is gone")
+		end)
+	end)
+
+	helpers.it("runs beside the tooltip when both are shown", function()
+		local world = build_world()
+		world.engine.set_llm_min_words(1)
+		helpers.assert_true(world.engine.set_llm_while_hotstring_tooltip("both"))
+		helpers.assert_eq(world.shared_stack, true, "the tooltip stacks the suggestions under the rows")
+		helpers.assert_eq(world.engine.shows_with_hotstring_rows(), true)
+		with_chain(true, function()
+			keystroke(world, TYPED)
+			world.hotstring_visible = true
+			fire_debounce(world, MENU_DEBOUNCE_SEC, "the ordinary debounce")
+			helpers.assert_eq(#world.posts, 1, "the request runs while the hotstring tooltip is shown")
+		end)
+		helpers.assert_eq(world.engine.set_llm_while_hotstring_tooltip("always"), false,
+			"a value the manifest does not list is refused")
+		helpers.assert_eq(select(2, world.engine.get_llm_runtime_setting("llm_while_hotstring_tooltip")), "both",
+			"and the choice in force is kept")
+		helpers.assert_true(world.engine.set_llm_while_hotstring_tooltip("wait"))
+		helpers.assert_eq(world.shared_stack, false)
+	end)
 end)

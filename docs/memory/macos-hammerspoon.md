@@ -1157,7 +1157,12 @@ in a row multiplies it (2026-10-31: 2515 ms for the tooltip caret, 1512 ms for
 the post-wake capture of loginwindow). Stop a cascade at the first unanswered
 read and go through `adapters/accessibility_permission` (`is_askable`,
 `is_unanswering`, `note_read`, `mark_unanswered`): one cooldown
-(`unresponsive_ax_backoff_ms`) shared by every reader. Reads of this process's
+(`unresponsive_ax_backoff_ms`) shared by every reader. A reader that does not
+consult the cooldown must still feed it: the secure-field classification and
+the AXValueChanged watch call `mark_unanswered` on a "Messaging failed"
+answer, as the tooltip anchor does (timing it would add clock reads that the
+context-tracker observation tests count), else the next checked reader waits again
+(2026-11-03: 1045 ms, 500 ms, then a 1005 ms post-wake hold). Reads of this process's
 own windows can wait out the timeout too, as its AX server answers on the
 waiting thread: use a native signal (a webview's `windowCallback`
 `focusChange`) once a first read proved the window.
@@ -1279,6 +1284,20 @@ held before a key never cancels its `to_if_alone`, but any later key_down
 does, so a key or combo with a tap and no hold sends its tap as `to`. Action:
 prove a generator rule change through the model, extending the model from the
 source.
+
+### project-karabiner-tap-decisions-are-only-visible-as-events
+
+Karabiner decides every macOS tap-hold inside its core and logs nothing about
+it, so a missing tap output (Left Shift tapped for Cmd+C) left no trace in the
+driver logs. Hammerspoon sees the decision only as the events Karabiner posts:
+a key whose hold is its own modifier reaches the flagsChanged tap as its press
+and release, and a tap's output follows the release within milliseconds; the
+window-server stamps give the press duration a held main thread cannot skew.
+Action: diagnose or verify a tap output from that stream
+(`modules/keymap/tap_copy.lua` does it for the copy tap, one log line per
+watched tap with the press time against the threshold), and read the
+clipboard counter in the keyDown tap, before the application has the
+keystroke.
 
 ### project-sparkle-consent-is-plist-owned
 
@@ -1990,7 +2009,10 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
   target; Windows ports the route plan in `vendor/ergopti_route_plan.ps1`.
   `blob_range` asks two bytes of that blob: `honoured`, `ignored` (information:
   a relay answers 200, and the managed daemon's `AlignRange` skips to each
-  part's offset, reloading the skipped bytes) or `wrong_range`.
+  part's offset, reloading the skipped bytes) or `wrong_range`. The registry
+  answers a blob HEAD itself (`registry_served`) but a GET with a 307 to its
+  storage, so the ranged GET follows up to ten HTTPS hops to planned hosts,
+  as the daemon does, before it judges the answer.
 - `field_app_health` runs after the AI steps. "Since the app start" is the
   launcher's `ps` elapsed time (`app_uptime_s`); it reads the driver's
   `crash_reports` folder and `~/Library/Logs/DiagnosticReports` for
@@ -2073,6 +2095,15 @@ baseline` line (item 38).
   the owner's closed category, or `not_started`). Without that shortcut
   `field_test_shortcut` is skipped as `absent` (`no_listing` when the list
   failed): create it once in Shortcuts as a shortcut that does nothing.
+- `field_tap_copy` reads what the user's own copy taps did since the driver
+  started (`modules/keymap/tap_copy.lua` statistics) and never types or writes
+  the clipboard. `copy_watch` fails as `keymap_not_started`; `copy_window` is
+  `w<window>:<key>:<deployed ms>+...` and fails as `short:` when Karabiner got
+  a key a timeout below the lone tap window (`no_copy_tap` skips it);
+  `copy_counter` fails as `unreadable`. `copies_sent` (`<n>:held_<ms>+...`),
+  `copies_verified`, `copies_on_retry`, `copies_unchecked` and
+  `taps_without_copy` (`past_<n>:within_<n>:held_...`) are information;
+  `copies_lost` fails on any copy that never landed, even sent again.
 - `field_pac_fallback` runs after the AI downloads: one `awk` pass counts the
   PAC-then-direct lines of every writer (shell admission, Swift spool, Python
   receiver, Ollama pull). `pac_fallback_counts` is `warnings:worked:failed`,

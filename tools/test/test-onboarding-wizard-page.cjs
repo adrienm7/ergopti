@@ -37,6 +37,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const TOML = require('smol-toml');
 const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
+const KeyNames = require('../lib/key-names.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SP = path.join(ROOT, 'static/ergopti_plus');
@@ -642,7 +643,7 @@ function cataloguePaths(driver) {
 		items.map((item) =>
 			item.label.map((segment) => (segment.key ? locale('en')[segment.key] : segment.text)).join('')
 		),
-		['AltGr + LAlt', 'AltGr + CapsLock', 'LAlt + CapsLock'],
+		['AltGr + Left Alt', 'AltGr + Caps Lock', 'Left Alt + Caps Lock'],
 		'a pair is named by its two keys, the key held first then the key struck under it'
 	);
 	assert.deepEqual(described.sub_switch, {
@@ -1028,7 +1029,11 @@ function recommendedTapHoldKeys(driver) {
 			: Object.keys(TAP_HOLD_DEFAULTS.tap_hold.keys);
 	return TAP_HOLD_DEFAULTS.tap_hold.catalog.keys
 		.filter((entry) => entry[platform] !== undefined && preset.includes(entry[platform]))
-		.map((entry) => ({ id: entry[platform], hand: entry.hand, label_key: entry.label_key }));
+		.map((entry) => ({
+			id: entry[platform],
+			hand: entry.hand,
+			label_key: KeyNames.i18n(entry.id, driver)
+		}));
 }
 
 (function tapHoldPagesListEachEngineRecommendedKeys() {
@@ -1113,9 +1118,23 @@ function expectedTapHold(driver, key) {
 		const karabiner = JSON.parse(
 			fs.readFileSync(path.join(SP, 'macos/platform/remap/data/actions.json'), 'utf8')
 		);
-		const name = (action) =>
-			en['sg_actions.' + (aliases[action] || action)] ||
-			karabiner.find((entry) => entry.id === action).short_label;
+		// A modifier hold reads as its modifiers' key names (« Cmd + Shift »), a
+		// sticky one fills its template with them, and the layer hold reads as
+		// the hold picker names the layer: until 2026-11-03 the sticky labels
+		// spelled « Cmd+Shift » and the layer hold « Layer (hold) » in every locale.
+		const names = (modifiers) =>
+			modifiers.map((modifier) => en[KeyNames.i18n(modifier, 'hs')]).join(' + ');
+		const name = (action) => {
+			const entry = karabiner.find((candidate) => candidate.id === action);
+			const registry = en['sg_actions.' + (aliases[action] || action)];
+			const sticky = KeyNames.stickyModifiers(action);
+			if (registry && sticky !== null) return registry.replace('{1}', names(sticky));
+			if (registry) return registry;
+			if (Array.isArray(entry.modifiers)) return names(entry.modifiers);
+			if (typeof entry.hold_layer === 'string')
+				return en['tap_hold.hold.' + entry.hold_layer + '_layer'];
+			return entry.short_label;
+		};
 		const slots = TAP_HOLD_DEFAULTS.hs_tap_hold[key];
 		return { tap: name(slots.tap), hold: name(slots.hold) };
 	}
@@ -1126,7 +1145,7 @@ function expectedTapHold(driver, key) {
 	else if (preset.hold_modifier) {
 		hold = preset.hold_modifier
 			.split('+')
-			.map((modifier) => en['tap_hold.hold.' + modifier])
+			.map((modifier) => en[KeyNames.i18n(modifier, driver)])
 			.join(' + ');
 	}
 	return { tap, hold };
@@ -1193,7 +1212,7 @@ function assertSeparated(row, where) {
 			answer(page, true);
 			return page;
 		})()
-	).find((row) => row.name === 'CapsLock');
+	).find((row) => row.name === 'Caps Lock');
 	assert.equal(winCaps.action, 'tap: ↵ Enter · hold: Ctrl');
 })();
 
@@ -1212,7 +1231,8 @@ function assertSeparated(row, where) {
 		'Ctrl + A': en['sg_actions.select_line'],
 		'Ctrl + E': en['sg_actions.open_file_manager'],
 		'Ctrl + .': en['sg_actions.open_emoji_picker'],
-		'Ctrl + CapsLock': en['sg_actions.toggle_capslock'],
+		// The named keys read through the key name table, as the menus name them.
+		[`Ctrl + ${en['key_name.caps_lock']}`]: en['sg_actions.toggle_capslock'],
 		'Ctrl + Space': en['sg_actions.llm_generate_prediction']
 	};
 	// The layer's wheel is edited with the layer (Tap-Holds › Edit the layer),
@@ -1245,6 +1265,25 @@ function assertSeparated(row, where) {
 	const superSpace = checkRows(linux).find((candidate) => candidate.trigger === 'Super + Space');
 	assert.ok(superSpace, 'Linux names its Super + Space chord alone');
 	assert.equal(superSpace.action, en['sg_actions.llm_generate_prediction']);
+	// Lot CH: the chords spelled their modifiers as English text (« Ctrl + Shift
+	// + V » in every language); each modifier is now a key_name.* segment the
+	// page translates, so no literal segment of the catalogue names one.
+	const catalogue = fs.readFileSync(
+		path.join(
+			ROOT,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'ui',
+			'_generated',
+			'onboarding_catalogue.json'
+		),
+		'utf8'
+	);
+	const spelled = [...catalogue.matchAll(/"text":\s*"([^"]*)"/g)]
+		.map((match) => match[1])
+		.filter((text) => /\b(Ctrl|Shift|Alt|Cmd|Option|Win|Super|CapsLock)\b/.test(text));
+	assert.deepEqual(spelled, [], 'no checklist segment spells a modifier outside key_name.*');
 })();
 
 (function everyActionItemDrawsTheSeparatorElement() {
@@ -1704,7 +1743,10 @@ function assertSeparated(row, where) {
 	const items = described.groups[0].items;
 	const custom = items[0];
 	const kept = items[1];
-	const current = { 'gestures.enabled': true, [kept.path]: kept.value, [custom.path]: 'tab_close' };
+	// Any action other than the slot's recommendation: the recommended set
+	// changes over time (2026-11-03 made tab_close a macOS recommendation).
+	const customValue = custom.value === 'sel_word_prev' ? 'sel_word_next' : 'sel_word_prev';
+	const current = { 'gestures.enabled': true, [kept.path]: kept.value, [custom.path]: customValue };
 	const page = openWizard({ platform: 'macos', current });
 	page.platform = 'macos';
 	goToPage(page, 'gestures');

@@ -24,17 +24,46 @@ local Config = helpers.load_with_stubs("platform.remap.config")
 
 
 helpers.describe("Config.load_available_actions: shared modifier chords", function()
-	helpers.it("adds all macOS modifier combinations with invariant labels", function()
+	helpers.it("adds all macOS modifier combinations named from the key name table", function()
+		-- They read « Cmd + Option + Shift + Enter » in English in every locale;
+		-- the stub catalogue answers each key name with its own key, and a key
+		-- the table does not name keeps its legend.
 		local path = helpers.driver_root() .. "platform/remap/data/actions.json"
 		local actions = Config.load_available_actions(path)
 		local by_id = {}
 		for _, action in ipairs(actions) do by_id[action.id] = action end
 
-		helpers.assert_eq(by_id.ctrl_a.label, "Ctrl + A")
-		helpers.assert_eq(by_id.cmd_option_shift_enter.short_label, "Cmd + Option + Shift + Enter")
-		helpers.assert_eq(by_id.cmd_ctrl_option_shift_z.label, "Cmd + Ctrl + Option + Shift + Z")
+		helpers.assert_eq(by_id.ctrl_a.label, "key_name.ctrl + A")
+		helpers.assert_eq(by_id.cmd_option_shift_enter.short_label,
+			"key_name.cmd + key_name.option + key_name.shift + key_name.enter")
+		helpers.assert_eq(by_id.cmd_ctrl_option_shift_z.label,
+			"key_name.cmd + key_name.ctrl + key_name.option + key_name.shift + Z")
+		helpers.assert_eq(by_id.shift_space.label, "key_name.shift + key_name.space")
 		helpers.assert_eq(by_id.cmd_option_shift_enter.karabiner_to[1].key_code, "return_or_enter")
 		helpers.assert_eq(#by_id.cmd_option_shift_enter.karabiner_to[1].modifiers, 3)
+	end)
+
+	helpers.it("names the modifier holds from the shared key name table", function()
+		-- They read « ⌘⇧ — Cmd+Shift » in English in every locale; the stub
+		-- catalogue answers each key name with its own key.
+		local path = helpers.driver_root() .. "platform/remap/data/actions.json"
+		local by_id = {}
+		for _, action in ipairs(Config.load_available_actions(path)) do by_id[action.id] = action end
+		helpers.assert_eq(by_id.cmd_shift.label, "⌘⇧ key_name.cmd + key_name.shift")
+		helpers.assert_eq(by_id.cmd_shift.short_label, "key_name.cmd + key_name.shift")
+		helpers.assert_eq(by_id.alt.label, "⌥ key_name.option")
+		helpers.assert_eq(by_id.fn_shift.label, "key_name.fn + key_name.shift", "Fn has no glyph")
+		helpers.assert_eq(by_id.cmd_option_shift_ctrl, nil)
+		helpers.assert_eq(by_id.cmd_shift_ctrl.label, "⌘⇧⌃ key_name.cmd + key_name.shift + key_name.ctrl")
+	end)
+
+	helpers.it("names the layer hold as the hold picker names its layer", function()
+		-- It read « 🗂 Layer nav. — Actif tant que maintenu » in every locale.
+		local path = helpers.driver_root() .. "platform/remap/data/actions.json"
+		local by_id = {}
+		for _, action in ipairs(Config.load_available_actions(path)) do by_id[action.id] = action end
+		helpers.assert_eq(by_id.layer.label, "🗂 tap_hold.hold.nav_layer")
+		helpers.assert_eq(by_id.layer.short_label, "tap_hold.hold.nav_layer")
 	end)
 end)
 

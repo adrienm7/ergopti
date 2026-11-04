@@ -34,12 +34,30 @@ _LAT_RestoreMenu(SavedMenu) {
 	_LLM_Menu := SavedMenu
 }
 
+; @returns {Array} The registry it replaced, for _LAT_RestoreOwners.
 _LAT_ResetOwners() {
-	global _LLM_AuxGeneration := 41
-	global _LLM_AuxOwnerCounter := 0
-	global _LLM_AuxOwners := Map()
-	global _LLM_AuxCleanupDebt := Map()
-	global _LLM_AuxCleanupDebtCounter := 0
+	global _LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners
+	global _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	Saved := [_LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners,
+		_LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter]
+	_LLM_AuxGeneration := 41
+	_LLM_AuxOwnerCounter := 0
+	_LLM_AuxOwners := Map()
+	_LLM_AuxCleanupDebt := Map()
+	_LLM_AuxCleanupDebtCounter := 0
+	return Saved
+}
+
+; A scenario's owners are records of its own private registry: putting the
+; suite's back keeps them from reading as requests still in flight.
+_LAT_RestoreOwners(Saved) {
+	global _LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners
+	global _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	_LLM_AuxGeneration := Saved[1]
+	_LLM_AuxOwnerCounter := Saved[2]
+	_LLM_AuxOwners := Saved[3]
+	_LLM_AuxCleanupDebt := Saved[4]
+	_LLM_AuxCleanupDebtCounter := Saved[5]
 }
 
 _LAT_TestOwner(EntryId := "prod") {
@@ -174,8 +192,8 @@ _LAT_CompletionOwnership() {
 	SavedMenu := _LAT_FixtureMenu()
 	Notices := []
 	NotifyFn := (Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))
+	SavedOwners := _LAT_ResetOwners()
 	try {
-		_LAT_ResetOwners()
 		Owner := _LAT_TestOwner()
 		AssertTrue(_LLM_Menu_OnApiTestDone(true, "OK", "prod", "Prod",
 			A_TickCount - 12, Owner, NotifyFn),
@@ -198,7 +216,10 @@ _LAT_CompletionOwnership() {
 			"a deleted entry must never produce a late notification")
 		AssertEqual(1, Notices.Length,
 			"only the current completion may notify")
-	} finally _LAT_RestoreMenu(SavedMenu)
+	} finally {
+		_LAT_RestoreOwners(SavedOwners)
+		_LAT_RestoreMenu(SavedMenu)
+	}
 }
 Test("llm api test: completion ownership silences stale and deleted entries (api-test-entry-ownership)",
 	_LAT_CompletionOwnership)
@@ -210,8 +231,8 @@ _LAT_FailureCompletionNotifies() {
 	SavedMenu := _LAT_FixtureMenu()
 	Notices := []
 	NotifyFn := (Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))
+	SavedOwners := _LAT_ResetOwners()
 	try {
-		_LAT_ResetOwners()
 		Owner := _LAT_TestOwner()
 		AssertTrue(_LLM_Menu_OnApiTestDone(false, "", "prod", "Prod",
 			A_TickCount - 30031, Owner, NotifyFn),
@@ -219,7 +240,10 @@ _LAT_FailureCompletionNotifies() {
 		AssertEqual(1, Notices.Length, "exactly one notification may survive")
 		AssertFalse(Notices[1]["ok"])
 		AssertEqual(t("menu.llm.api_unreachable_title"), Notices[1]["tip"]["title"])
-	} finally _LAT_RestoreMenu(SavedMenu)
+	} finally {
+		_LAT_RestoreOwners(SavedOwners)
+		_LAT_RestoreMenu(SavedMenu)
+	}
 }
 Test("llm api test: failed probe notifies through the seam (api-test-entry-failure)",
 	_LAT_FailureCompletionNotifies)
@@ -230,8 +254,8 @@ _LAT_FailureServerMessageNotifies() {
 	SavedMenu := _LAT_FixtureMenu()
 	Notices := []
 	NotifyFn := (Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))
+	SavedOwners := _LAT_ResetOwners()
 	try {
-		_LAT_ResetOwners()
 		Owner := _LAT_TestOwner()
 		Info := Map("reason", "no_completion", "status", 402,
 			"message", "Payment required to access this resource. Visit your billing tab.")
@@ -242,7 +266,10 @@ _LAT_FailureServerMessageNotifies() {
 		AssertFalse(Notices[1]["ok"])
 		AssertContains(Notices[1]["tip"]["body"], "402")
 		AssertContains(Notices[1]["tip"]["body"], "Payment required")
-	} finally _LAT_RestoreMenu(SavedMenu)
+	} finally {
+		_LAT_RestoreOwners(SavedOwners)
+		_LAT_RestoreMenu(SavedMenu)
+	}
 }
 Test("llm api test: failure verdict carries the server message (api-test-entry-server-message)",
 	_LAT_FailureServerMessageNotifies)
@@ -358,18 +385,20 @@ Test("llm api test: progress label names entry and elapsed time (api-test-entry-
 ; never touches UI.
 _LAT_ProgressCancel() {
 	global _LLM_Menu_ApiTestProgress
-	_LAT_ResetOwners()
-	Owner := _LAT_TestOwner()
-	_LLM_Menu_ApiTestProgress := Map("entry", "prod", "name", "Prod",
-		"req_id", 999888, "owner", Owner, "start", A_TickCount)
-	AssertTrue(_LLM_Menu_ApiTestProgressCancel(),
-		"cancel must succeed when a probe is showing")
-	AssertFalse(_LLM_Menu_ApiTestProgress.Has("entry"),
-		"cancel must clear the progress state")
-	AssertFalse(LLM_AuxIsCurrent(Owner),
-		"cancel must finish the owner so a late completion stays silent")
-	AssertFalse(_LLM_Menu_ApiTestProgressCancel(),
-		"cancel with nothing showing must report false, not throw")
+	SavedOwners := _LAT_ResetOwners()
+	try {
+		Owner := _LAT_TestOwner()
+		_LLM_Menu_ApiTestProgress := Map("entry", "prod", "name", "Prod",
+			"req_id", 999888, "owner", Owner, "start", A_TickCount)
+		AssertTrue(_LLM_Menu_ApiTestProgressCancel(),
+			"cancel must succeed when a probe is showing")
+		AssertFalse(_LLM_Menu_ApiTestProgress.Has("entry"),
+			"cancel must clear the progress state")
+		AssertFalse(LLM_AuxIsCurrent(Owner),
+			"cancel must finish the owner so a late completion stays silent")
+		AssertFalse(_LLM_Menu_ApiTestProgressCancel(),
+			"cancel with nothing showing must report false, not throw")
+	} finally _LAT_RestoreOwners(SavedOwners)
 }
 Test("llm api test: cancel aborts headlessly and stays silent (api-test-entry-progress-cancel)",
 	_LAT_ProgressCancel)

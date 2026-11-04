@@ -17,21 +17,6 @@ local plain_markup = require("ui.menu.menu_dialogs").plain_markup
 local assign_parameterized_action = require("ui.menu.menu_dialogs").assign_parameterized_action
 local slot_binding_rows = require("ui.menu.menu_dialogs").slot_binding_rows
 
-local function gesture_slot_label(slot)
-	local fingers, direction = tostring(slot):match("^swipe_(%d+)_(.+)$")
-	if fingers and direction then
-		local directions = {
-			left = "gauche", right = "droite", up = "haut", down = "bas",
-			up_left = "haut-gauche", up_right = "haut-droite",
-			down_left = "bas-gauche", down_right = "bas-droite",
-		}
-		return "Balayage " .. fingers .. " doigts vers " .. (directions[direction] or direction)
-	end
-	local tap_fingers = tostring(slot):match("^tap_(%d+)$")
-	if tap_fingers then return "Tap " .. tap_fingers .. " doigts" end
-	return tostring(slot)
-end
-
 --- Builds the gestures submenu.
 local function _build_gestures(ctx)
 	local receive = ManifestMenu and ManifestMenu.group_receiver("top_level", "gestures")
@@ -94,10 +79,13 @@ local function _build_gestures(ctx)
 		return committed
 	end
 
-	-- The manifest's `gesture_slots_linux` row. One flat list rather than the
-	-- per-finger-count groups macOS splits into (gesture_slots_2 … _5): the slots
-	-- come from ge.DEFAULT_GESTURES, which is keyed by slot name and not by finger
-	-- count, so grouping would mean parsing the names apart only to regroup them.
+	-- The manifest's `gesture_slots_linux` row: one list, its slots grouped by
+	-- the finger count in their names, fewest fingers first, each group under
+	-- the header macOS declares for its own group (status rows fingers_N, with
+	-- finger_group_boundary between two groups).
+	-- Spelled out, not built from the count, so the manifest reader gate sees
+	-- each declared header read.
+	local FINGER_HEADER_STATUS = { [2] = "fingers_2", [3] = "fingers_3", [4] = "fingers_4", [5] = "fingers_5" }
 	local providers = {}
 	providers["system_gesture_status"] = function() return require("ui.gesture_conflicts").rows(ge) end
 	-- The recommended-defaults rule and why Linux recommends no swipe, behind
@@ -127,7 +115,37 @@ local function _build_gestures(ctx)
 		local max_fingers = touchpad and touchpad.max_fingers or nil
 		local ok_finder, Finder = pcall(require, "modules.gestures.touchpad_finder")
 
+		local groups, counts = {}, {}
 		for _, slot in ipairs(slots) do
+			local count = tonumber(tostring(slot):match("^%a+_(%d+)"))
+			assert(count, "gesture slot without a finger count: " .. tostring(slot))
+			if not groups[count] then groups[count] = {}; counts[#counts + 1] = count end
+			table.insert(groups[count], slot)
+		end
+		table.sort(counts)
+		--- Appends one declared status template; false refuses the whole list.
+		local function push_status(status)
+			local rows = ManifestMenu and ManifestMenu.status_rows("gestures_menu", "gesture_slots_linux", status)
+			if type(rows) ~= "table" then return false end
+			for _, row in ipairs(rows) do out[#out + 1] = row end
+			return true
+		end
+		slots = {}
+		local opens = {}
+		for _, count in ipairs(counts) do
+			for index, slot in ipairs(groups[count]) do
+				slots[#slots + 1] = slot
+				if index == 1 then opens[#slots] = count end
+			end
+		end
+
+		for position, slot in ipairs(slots) do
+			local count = opens[position]
+			if count then
+				if position > 1 and not push_status("finger_group_boundary") then return {} end
+				local header = FINGER_HEADER_STATUS[count]
+				if not header or not push_status(header) then return {} end
+			end
 			local reachable = true
 			if ok_finder and type(Finder.slot_is_reachable) == "function" then
 				reachable = Finder.slot_is_reachable(slot, max_fingers)
@@ -137,7 +155,7 @@ local function _build_gestures(ctx)
 				-- reads as a bug, and the user cannot tell "this hardware cannot"
 				-- from "this driver forgot".
 				out[#out + 1] = {
-					label    = gesture_slot_label(slot) .. " — "
+					label    = ge.slot_label(slot) .. " — "
 						.. i18n_safe("platform_reason.touchpad_cannot_count_that_many"),
 					disabled = true,
 				}
@@ -147,7 +165,7 @@ local function _build_gestures(ctx)
 			local action = ge.get_action(slot) or "none"
 			local label = ge.get_action_display_label and ge.get_action_display_label(slot)
 				or ge.get_action_label(action)
-			local slot_label = gesture_slot_label(slot)
+			local slot_label = ge.slot_label(slot)
 			local choices = slot_binding_rows(slot_label, action, slot, function(option, picked)
 				local assigned = assign_action(slot, option, picked)
 				if assigned and type(ctx.on_menu_changed) == "function" then

@@ -291,6 +291,9 @@ jobs:
       - name: Test shared Versions installation rendering
         run: npm run test:browser:changelog-install
 
+      - name: Test shared layout composer rendering
+        run: npm run test:browser:layout-composer
+
       - name: Plan both production site targets
         id: site-plan
         run: node tools/ci/site-matrix.cjs plan

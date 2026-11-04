@@ -218,3 +218,46 @@ _LLM_Engine_RequestIsLive(RequestId) {
 _LLM_Engine_HotstringTooltipShown() {
 	return IsSet(TooltipIsVisible) && TooltipIsVisible()
 }
+
+/**
+ * The llm.trigger.while_hotstring_tooltip choice the engine runs on: the value
+ * LLM_Engine_Init published, the manifest default before the first one.
+ * @returns {String} "wait" or "both".
+ */
+LLM_Engine_WhileHotstringTooltip() {
+	global _LLM_Engine
+	if (_LLM_Engine is Map) && _LLM_Engine.Has(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP)
+		return _LLM_Engine[ConfigLeaf.WHILE_HOTSTRING_TOOLTIP]
+	return ManifestDefaultFor(ConfigKey.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
+}
+
+/**
+ * Tells whether a prediction must leave the shared surface to the hotstring
+ * tooltip shown now. Covering it would retire a hotstring that can still
+ * expand, so every request waits unless the user chose to see both; a live
+ * request always waits, its tooltip following every keystroke. A prompt the
+ * user asked for by name (a prompt action) is never held.
+ * @param {Map|Integer} Override The request's prompt override, 0 for none.
+ * @returns {Integer} True while the request must not paint.
+ */
+_LLM_Engine_HotstringTooltipHolds(Override) {
+	global LLM_HOTSTRING_TOOLTIP_SHOW_BOTH
+	IsLive := (Override is Map) && Override.Get("live", false)
+	if (Override is Map) && !IsLive
+		return false
+	if !_LLM_Engine_HotstringTooltipShown()
+		return false
+	return IsLive || LLM_Engine_WhileHotstringTooltip() != LLM_HOTSTRING_TOOLTIP_SHOW_BOTH
+}
+
+/**
+ * The same hold for a request already dispatched, from the override it recorded.
+ * @param {Integer} RequestId The request.
+ * @returns {Integer} True while that request must not paint.
+ */
+_LLM_Engine_RequestHeldByHotstring(RequestId) {
+	global _LLM_Engine
+	Override := _LLM_Engine.Get("request_prompt_override", "")
+	Owned := (Override is Map) && Override["request_id"] == RequestId
+	return _LLM_Engine_HotstringTooltipHolds(Owned ? Override : 0)
+}

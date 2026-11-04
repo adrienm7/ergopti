@@ -465,6 +465,7 @@ function renderAhkManifest(manifest, sections, features) {
 		};
 		if (f.enum_values) entry.enum_values = f.enum_values;
 		if (f.choice_values) entry.choice_values = f.choice_values;
+		if (f.preset_values) entry.preset_values = f.preset_values;
 		if (f.superseded_reason_key) entry.superseded_reason_key = f.superseded_reason_key;
 		if (f.cleared !== undefined) entry.cleared = f.cleared;
 		return `        ${ahkLiteral(entry)}`;
@@ -541,6 +542,7 @@ function luaFeatureEntry(f, platform) {
 	};
 	if (f.enum_values) entry.enum_values = f.enum_values;
 	if (f.choice_values) entry.choice_values = f.choice_values;
+	if (f.preset_values) entry.preset_values = f.preset_values;
 	if (f.cleared !== undefined) entry.cleared = f.cleared;
 	return entry;
 }

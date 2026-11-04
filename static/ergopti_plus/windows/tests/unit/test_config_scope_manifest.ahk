@@ -121,9 +121,14 @@ _ScopeOwnerFixture(InitialSource := unset) {
 	AssertEqual("current", Boot["status"], "the actual source must complete its genuine default constructor")
 	AssertEqual(0, Boot["read_only"])
 	AssertTrue(FSUtf8ExactMatches(Path, Source), "ordinary current startup preserves the independently authored source")
+	; A clear restores the touchpad through this fake, never the real registry:
+	; each call is recorded for the clears that assert it.
+	Touchpad := []
 	Options := Map("path", Path, "locator", Directory . "\paths.toml", "stamp", "scope-test",
-		"settle", (*) => 1, "notify", (*) => 0)
-	return { directory: Directory, path: Path, source: Source, options: Options }
+		"settle", (*) => 1, "notify", (*) => 0,
+		"touchpad_restore", () => (Touchpad.Push("restore"), "factory_defaults"),
+		"touchpad_notify", (Message, *) => (Touchpad.Push(Message), true))
+	return { directory: Directory, path: Path, source: Source, options: Options, touchpad: Touchpad }
 }
 
 _ScopeOwnerCleanup(Fixture) {
@@ -250,8 +255,15 @@ _SGM_LabelAt(TargetMenu, Position) {
 ; conseillées », « Tout effacer », then a separator (menu-first-group), and a
 ; click on either scope row runs the gesture scope owner over the fixture.
 _ScopeGestureMenuOwnsParameters() {
-	global GestureActionParameters, _MenuDispatchCallbacks
+	global GestureActionParameters, _MenuDispatchCallbacks, Features
 	SavedParameters := GestureActionParameters
+	; The menu reads Gestures on, as the fixture's file says: an off category
+	; greys its restore and clear (category-off rule).
+	HadGestures := Features.Has("gestures")
+	SavedGestures := HadGestures ? Features["gestures"] : 0
+	ShownGestures := HadGestures ? SavedGestures.Clone() : Map()
+	ShownGestures["enabled"] := true
+	Features["gestures"] := ShownGestures
 	Source := '[gestures]`nenabled = true`ntap_4 = "open_url"`n[action_parameters]`ngesture__tap_4__open_url = "https://example.com/old"`nkeyboard__meta_a__open_url = "https://example.com/keep"`nunknown_user_key = "keep"`n[llm]`nenabled = true`n'
 	Fixture := _ScopeOwnerFixture(Source)
 	Source := Fixture.source
@@ -297,8 +309,19 @@ _ScopeGestureMenuOwnsParameters() {
 				; (gestures-clear-keeps-switch).
 				AssertEqual(true, Parsed["gestures"]["enabled"], "clear removes the assignments and keeps the switch")
 				Assert(!Parsed["gestures"].Has("tap_4"), "clear removes the assignment")
-			} else
+				; The Configuration menu's touchpad restore was merged into this
+				; clear (gestures-clear-restores-touchpad).
+				AssertEqual("factory_defaults", Receipt.Get("touchpad", ""),
+					"the Gestures clear also puts the touchpad back to its system state")
+				AssertEqual("restore", Fixture.touchpad[1], "the touchpad restore runs once")
+				AssertEqual(t("notify.touchpad.factory_defaults"), Fixture.touchpad[2],
+					"and says the factory defaults were written")
+				AssertEqual(2, Fixture.touchpad.Length)
+			} else {
 				AssertEqual(Parsed["gestures"]["enabled"], ManifestRecommendedFor("gestures.enabled"))
+				AssertEqual(0, Fixture.touchpad.Length, "a restore of the recommendations leaves the touchpad alone")
+				AssertFalse(Receipt.Has("touchpad"))
+			}
 			AssertEqual(GestureActionParameters["gesture__tap_4__open_url"], "https://example.com/old",
 				"pending reload preserves current runtime authority")
 			Refusal.Call("refused")
@@ -307,6 +330,10 @@ _ScopeGestureMenuOwnsParameters() {
 		}
 	} finally {
 		GestureActionParameters := SavedParameters
+		if HadGestures
+			Features["gestures"] := SavedGestures
+		else
+			Features.Delete("gestures")
 		if Bundle is Object
 			_ConfigWriteTerminalRelease(Bundle)
 		_ScopeOwnerCleanup(Fixture)

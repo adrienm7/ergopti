@@ -167,6 +167,31 @@ try {
 	errors.push(e.message);
 }
 
+// Every slot label names its own finger count: in each locale and label family,
+// two slots of different finger counts never read the same. Arabic and Chinese
+// named every five-finger slot and the three-finger horizontal swipe as a
+// four-finger one until 2026-11-03.
+try {
+	const LABEL_FAMILY =
+		/^(gesture\.slots|menu\.gestures|menu\.gestures\.modes|menu\.gestures\.sensitivities)\.(tap|swipe)_(\d)(?:_[a-z_]+)?$/;
+	const localesDir = path.join(SP, '_shared/data/locales');
+	for (const file of fs.readdirSync(localesDir).filter((name) => name.endsWith('.json'))) {
+		const data = JSON.parse(fs.readFileSync(path.join(localesDir, file), 'utf8'));
+		const owners = new Map();
+		for (const [key, value] of Object.entries(data)) {
+			const match = LABEL_FAMILY.exec(key);
+			if (!match || typeof value !== 'string') continue;
+			const slot = `${match[1]}|${value}`;
+			const owner = owners.get(slot);
+			if (owner && owner.count !== match[3])
+				errors.push(`${file}: ${owner.key} and ${key} both read "${value}"`);
+			if (!owner) owners.set(slot, { key, count: match[3] });
+		}
+	}
+} catch (e) {
+	errors.push(e.message);
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] Gesture slot-space is not single-sourced:\x1b[0m');
 	for (const e of errors) console.error('    ' + e);

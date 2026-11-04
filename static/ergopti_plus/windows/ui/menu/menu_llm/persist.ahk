@@ -114,6 +114,17 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 		}
 		AgentValues[Key] := Normalized
 	}
+	; Absent until the user's settings are restored: Features then keeps the
+	; manifest default it was built with.
+	WhileHotstringTooltip := false
+	if MenuState.Has(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP) {
+		if !LLM_Option_TryNormalize(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP,
+				MenuState[ConfigLeaf.WHILE_HOTSTRING_TOOLTIP], &WhileHotstringTooltip) {
+			try LoggerError("LLM",
+				"Refusing to sync invalid option '{1}' into Features.", ConfigLeaf.WHILE_HOTSTRING_TOOLTIP)
+			return false
+		}
+	}
 	ValModifiers := _LLM_Menu_ModifiersStringToArray(Validated[ConfigLeaf.VAL_MODIFIERS])
 	if !(ValModifiers is Array) {
 		try LoggerError("LLM",
@@ -147,6 +158,8 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 	llm["navigation"][ConfigLeaf.VAL_MODIFIERS]          := ValModifiers
 	for Key, Value in AgentValues
 		llm[Key] := Value
+	if WhileHotstringTooltip is String
+		llm["trigger"][ConfigLeaf.WHILE_HOTSTRING_TOOLTIP] := WhileHotstringTooltip
 	return true
 }
 
@@ -284,6 +297,11 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 			Format("{:.2f}", TemperatureRaw + 0), ConfigKey.LLM_GENERATION_TEMPERATURE)
 	else
 		_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_GENERATION_TEMPERATURE)
+	; A feature tree written before this option keeps the manifest default the
+	; reader falls back to (LLM_Menu_WhileHotstringTooltip).
+	if llm["trigger"].Has(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP)
+		_LLM_Menu_PutValidatedPersistedOption(opts, ConfigLeaf.WHILE_HOTSTRING_TOOLTIP,
+			llm["trigger"][ConfigLeaf.WHILE_HOTSTRING_TOOLTIP], ConfigKey.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
 	for Key in LLM_AGENT_SETTING_KEYS {
 		if llm.Has(Key)
 			_LLM_Menu_PutValidatedPersistedOption(opts, Key, llm[Key], "llm." . Key)
@@ -299,6 +317,9 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 	else
 		_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_NAVIGATION_VAL_MODIFIERS)
 	if IsSet(Cache) {
+		; One admitted snapshot serves the four manifest reads below: each read of
+		; its own compared the whole snapshot with its shadow twice.
+		BootSnapshot := ConfigTomlBootSnapshot(Cache)
 		raw := IniCacheGet(Cache, "llm", "ollama_port")
 		; Earlier releases saved the stock port, which now belongs to the user's
 		; own Ollama: such a value is dropped once, as on macOS, and is no error.
@@ -322,7 +343,7 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 			else
 				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_USER_PROFILES)
 		}
-		if !ConfigTomlTryReadBootValue(Cache, ConfigKey.LLM, ConfigLeaf.ONBOARDING_SEEN, &raw)
+		if !(IsObject(BootSnapshot) && ConfigTomlBootSnapshotValue(BootSnapshot, ConfigKey.LLM, ConfigLeaf.ONBOARDING_SEEN, &raw))
 			raw := IniCacheGet(Cache, "llm", ConfigLeaf.ONBOARDING_SEEN)
 		if !((raw is String) && raw == "_") {
 			if LLM_Option_TryParseConfigBoolean(raw, &OnboardingSeen)
@@ -330,7 +351,7 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 			else
 				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_ONBOARDING_SEEN)
 		}
-		if !ConfigTomlTryReadBootValue(Cache, ConfigKey.LLM_NAVIGATION, ConfigLeaf.VAL_MODIFIERS, &raw)
+		if !(IsObject(BootSnapshot) && ConfigTomlBootSnapshotValue(BootSnapshot, ConfigKey.LLM_NAVIGATION, ConfigLeaf.VAL_MODIFIERS, &raw))
 			raw := IniCacheGet(Cache, ConfigKey.LLM_NAVIGATION, ConfigLeaf.VAL_MODIFIERS)
 		if !((raw is String) && raw == "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)
@@ -343,7 +364,7 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_NAVIGATION_VAL_MODIFIERS)
 			}
 		}
-		if !ConfigTomlTryReadBootValue(Cache, ConfigKey.LLM_NAVIGATION, ConfigLeaf.NAV_MODIFIERS, &raw)
+		if !(IsObject(BootSnapshot) && ConfigTomlBootSnapshotValue(BootSnapshot, ConfigKey.LLM_NAVIGATION, ConfigLeaf.NAV_MODIFIERS, &raw))
 			raw := IniCacheGet(Cache, ConfigKey.LLM_NAVIGATION, ConfigLeaf.NAV_MODIFIERS)
 		if !((raw is String) && raw == "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)
@@ -353,7 +374,7 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 			else
 				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_NAVIGATION_NAV_MODIFIERS)
 		}
-		if !ConfigTomlTryReadBootValue(Cache, ConfigKey.LLM_TRIGGER, ConfigLeaf.DISABLED_APPS, &raw)
+		if !(IsObject(BootSnapshot) && ConfigTomlBootSnapshotValue(BootSnapshot, ConfigKey.LLM_TRIGGER, ConfigLeaf.DISABLED_APPS, &raw))
 			raw := IniCacheGet(Cache, ConfigKey.LLM_TRIGGER, ConfigLeaf.DISABLED_APPS)
 		if !((raw is String) && raw == "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)

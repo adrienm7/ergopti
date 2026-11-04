@@ -189,15 +189,13 @@ if (_DriverStartupSmokeDir != "" && !_DriverIsDetachedWorker) {
 	_DriverSmokeInputDecision := DriverSmokeInput_Decide(
 		EnvGet("ERGOPTI_STARTUP_SMOKE_LIVE_INPUT") == "1", EnvGet("CI") == "true",
 		DriverMutex_ResidentLives(DRIVER_MUTEX_NAME))
-	if (_DriverSmokeInputDecision == DRIVER_SMOKE_INPUT_REFUSE) {
-		try FileAppend("startup-smoke: live input refused, a resident driver owns this session.`n", "**")
-		DllCall("ExitProcess", "UInt", 1)
-	}
+	if (_DriverSmokeInputDecision == DRIVER_SMOKE_INPUT_REFUSE)
+		PLC_ExitProcessNow(1, "startup-smoke: live input refused, a resident driver owns this session.")
 	if (_DriverSmokeInputDecision == DRIVER_SMOKE_INPUT_QUARANTINE) {
 		_DriverSmokeInputQuarantined := true
 		Suspend(true)
 	}
-	SetTimer(StartupSmokeDeadlineExit, -STARTUP_SMOKE_DEADLINE_MS)
+	StartupSmokeArmDeadline()
 }
 
 BootProfile_Stamp("Single-owner gate completed")
@@ -730,11 +728,11 @@ global _TrayStartupCommands := TrayStartupCommands(
 if FileExist(ConfigurationFile)
 	_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 global _TrayStartupClick := TrayStartupClick(
-	() => IsSet(_DriverMenuReady) && _DriverMenuReady,
+	TrayStartupClickReadyNow,
 	_DriverStartupSmokeDir != "" ? (*) => 0 : 0, 0, 0, 0, 0,
 	_DriverStartupSmokeDir != "" ? 0 : TrayStartupOnboarding)
-; Retain context requests until the complete root exists. Entering the native
-; bootstrap menu here blocks auto-execute for the user's navigation interval.
+; Retain context requests until the complete root exists and input is ready.
+; Entering a native menu blocks auto-execute for the user's navigation interval.
 if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectBootstrap))
 	_DriverStartupSmokeInspectBootstrap.Call()
 ; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
@@ -1235,14 +1233,16 @@ ReadKeyboardShortcutsConfig()
 _BootMetricsCache := CS_Load()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()
-if MetricsShortcuts.enabled
-		WPMWidget_LoadConfig(_BootMetricsCache)
+; Loaded with Metrics off too: SaveFullConfig writes the widget booleans back, so
+; they must carry the user's or the manifest's answer, not the class placeholders.
+WPMWidget_LoadConfig(_BootMetricsCache)
 
 BootProfile_StageEnd("shortcuts", KeyboardShortcutAssignments.Count . " configured keyboard slot(s) read")
 BootProfile_Mark("Config, features & shortcuts loaded")
-; Publish the configured native root before registering the input surface. Leaf
-; pickers finish before paint or prewarm after input readiness; command admission
-; retains feature selections until their runtime owners genuinely exist.
+; The configured native root is published once the input surface is registered
+; (below the prefix watcher). Leaf pickers finish before paint or prewarm after
+; input readiness; command admission retains feature selections until their
+; runtime owners genuinely exist.
 ; Stock tray items (Pause/Suspend/Reload/Exit/Edit) are cleared once at boot,
 ; before Onboarding_Run (AHK-21), so they are never live during the first-run wizard.
 ; Keep the real native commands throughout boot and refresh their locale before
@@ -1257,6 +1257,7 @@ _InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 TapKeysReadConfig(_IniCache)
 #Include infra/key_combinations.ahk
 KeyCombinationsReadConfig(_IniCache)
+TapHoldLoneTapReadConfig(_IniCache)
 #Include infra/quit_admission.ahk
 #Include infra/lifecycle.ahk
 ; Cleanup must own windows before the configured menu admits diagnostic clicks.
@@ -1274,11 +1275,6 @@ global _DriverMenuReady := false
 ; first, once input is ready (infra/menu_reload_replay.ahk).
 MenuStartupCommands_Begin(() => _DriverReady && _LLM_Menu_RuntimeActivated, MenuReloadReplay_Consume())
 _TrayRootBootDetailsPending := true
-if !BuildTrayMenuDeferred()
-	throw Error("the configured startup menu could not be published")
-if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectShell))
-	_DriverStartupSmokeInspectShell.Call()
-ConfigRegistryCacheFlushPending()
 BootProfile_StageBegin("magic key source")
 ; The physical key typing the magic key (LayoutRegistry_MagicKeySource): the
 ; key the user chose in [hotstrings] magic_key_source always wins; then the key
@@ -1490,6 +1486,15 @@ if !_DriverSmokeInputQuarantined
 HotstringPrefixWatcherRebuildIndex()
 BootProfile_StageEnd("prefix watcher")
 BootProfile_Mark("Prefix watcher index complete")
+; The keyboard is registered first and the configured tray root after it, so the
+; first keystroke never waits for the menu build (maintainer decision, 3 November
+; 2026). A tray clicked meanwhile keeps the bootstrap menu, or is queued until
+; input is ready (_TrayStartupClick): an open native menu stops this thread.
+if !BuildTrayMenuDeferred()
+	throw Error("the configured startup menu could not be published")
+if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectShell))
+	_DriverStartupSmokeInspectShell.Call()
+ConfigRegistryCacheFlushPending()
 SuspendWatchdogStart()
 _SuspendStateWatchdog()
 _DriverInputInitPending := false
@@ -1526,10 +1531,22 @@ try {
 	}
 } catch as _DevSourceErr
 	LoggerError("ErgoptiPlus", "Developer source mode refused: {1}.", _DevSourceErr.Message)
+; The counted operations of the whole boot (parses, reads, rebuilds), published as
+; their own window so the first minute's interval record starts from ready. Flushed
+; before the boot tail ends: a save or a queued tray waiting for it would run at the
+; first yield and be counted as boot work.
+PerfCount("config_migrate.registry_checks", ConfigMigrateRegistryChecks)
+PerfCount("config_migrate.registry_deep_compares", ConfigMigrateRegistryDeepCompares)
+PerfCounters_Flush()
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 _DriverBootTailPending := false
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
+; A tray clicked while the keyboard was registering opens now, from a timer, and
+; never earlier (maintainer decision, 3 November 2026). A root a restored pause
+; refused publishes later and releases the click itself (_TrayRootBuildBoot).
+if _DriverMenuReady
+	_TrayStartupClick.NotifyReady()
 _BootTotalMs := BootProfile_CompletedBootMs(BootProfile_TotalBootMs())
 _BootOpenStages := BootProfile_OpenStageNames()
 if (_BootOpenStages != "")
@@ -1541,11 +1558,6 @@ catch as _BootBudgetErr
 ; Evidence, never collapsed: the per-stage table that boot-time comparisons need.
 LoggerEvidence("BootProfile", "Boot summary: total_ms={1} stage_ms: {2}.", _BootTotalMs,
 	BootProfile_StageSummary())
-; The counted operations of the whole boot (parses, reads, rebuilds), published as
-; their own window so the first minute's interval record starts from ready.
-PerfCount("config_migrate.registry_checks", ConfigMigrateRegistryChecks)
-PerfCount("config_migrate.registry_deep_compares", ConfigMigrateRegistryDeepCompares)
-PerfCounters_Flush()
 ; One environment summary with the same field names on every driver. A probe
 ; failure is reported and never allowed to turn a ready driver into a dead one.
 try DiagSnapshot_Emit(_BootTotalMs)
@@ -1564,8 +1576,9 @@ if (_DriverStartupSmokeDir != "") {
 				if !A_IsSuspended
 						throw Error("suspend marker was not restored before ready")
 		}
-		; The complete configured root precedes input registration, including a
-		; paused reload. Reaching ready alone cannot prove that publication order.
+		; The complete configured root follows input registration and precedes
+		; readiness, including a paused reload (maintainer decision, 3 November
+		; 2026); the wrapper's shell receipt proves both sides of that order.
 		if !_DriverMenuReady
 				throw Error("the complete configured menu was not published before input readiness")
 		if IsSet(_DriverStartupSmokeInspectAdmission)

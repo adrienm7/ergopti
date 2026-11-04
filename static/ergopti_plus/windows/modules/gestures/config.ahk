@@ -865,8 +865,8 @@ GestureConsumeAutoConfigureFlag(Path, WriterFn := 0, NotifyFn := 0, TimerFn := 0
 ; slots send Ctrl+Win+Shift+F1..F10 without any manual Settings configuration.
 ; The values come from the generated touchpad table and are written by its one
 ; owner (modules/gestures/touchpad_registry.ahk), which backs up the prior
-; values before the first write so « Restaurer les gestes du pavé tactile
-; Windows » can put them back.
+; values before the first write so the Gestures « Tout effacer » can put them
+; back.
 ; Returns true on success, false if the backup or any registry write failed.
 GestureAutoConfigureRegistry(OnDone := 0) {
 		LoggerStart("gestures", "Auto-configuring touchpad gestures via registry…")
@@ -1108,9 +1108,25 @@ GestureBuildSetupInstructions() {
 		Labels := GestureShortcutLabels()
 		for _, Slot in GestureSlotIds() {
 				Body .= "  " . t("gesture.slots." . Slot) . " :  "
-						. Labels[Slot] . "`n"
+						. GestureShortcutText(Labels[Slot]) . "`n"
 		}
 		return Body
+}
+
+; One tutorial shortcut as the user reads it: its modifiers named by the shared
+; key name table (« Ctrl + Win + Maj + F1 »), the function key as written. The
+; tutorial used to print the English « Shift » in every locale.
+; @param Ids {String} Key name ids joined with "+", the key last ("ctrl+win+shift+F1").
+; @returns {String}
+GestureShortcutText(Ids) {
+		Parts := StrSplit(Ids, "+")
+		if (Parts.Length < 2)
+				throw ValueError("A gesture shortcut names its modifiers and its key.", -1, Ids)
+		Key := Parts.Pop()
+		Text := ""
+		for Modifier in Parts
+				Text .= KeyNameLabel(Modifier) . " + "
+		return Text . Key
 }
 
 ; Public entry point: shows the gesture setup tutorial in a single panel with

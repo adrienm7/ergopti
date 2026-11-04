@@ -21,7 +21,13 @@ local with_fixture = Fixture.with_fixture
 
 helpers.describe("Complete LLM fixed controls: real transaction owners", function()
 	helpers.it("the modifier frame owns translated choices and retains every physical-key callback", function()
-		with_fixture({}, function(f)
+		-- The choices name their modifiers from the shared key name table in the
+		-- user's language: French reads « Maj », never the English « Shift ».
+		local file = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
+		local french = require("adapters.json_codec").decode(file:read("*a"))
+		file:close()
+		local translate = function(key) return key:find("^key_name%.") and french[key] or nil end
+		with_fixture({ translate = translate }, function(f)
 			local menu = package.loaded["infra.manifest_menu"]
 			local root, frame = menu.get_root(), menu.get_array("llm_modifier_picker_frame")
 			local original = frame[1].i18n
@@ -30,12 +36,12 @@ helpers.describe("Complete LLM fixed controls: real transaction owners", functio
 				helpers.assert_eq(#before, 8)
 				helpers.assert_eq(before[1].title, "menu.settings.disabled")
 				helpers.assert_eq(before[2].title, "menu.settings.no_modifier")
-				helpers.assert_eq(before[3].title, "⇧ Shift")
+				helpers.assert_eq(before[3].title, "⇧ Maj")
 				helpers.assert_eq(before[4].title, "⌘ Cmd")
 				helpers.assert_eq(before[5].title, "⌥ Option")
 				helpers.assert_eq(before[6].title, "⌃ Ctrl")
-				helpers.assert_eq(before[7].title, "⇧⌘ Shift + Cmd")
-				helpers.assert_eq(before[8].title, "⇧⌥ Shift + Option")
+				helpers.assert_eq(before[7].title, "⇧⌘ Maj + Cmd")
+				helpers.assert_eq(before[8].title, "⇧⌥ Maj + Option")
 				helpers.assert_eq(before[6].checked, true)
 				for _, row in ipairs(before) do helpers.assert_type(row.fn, "function") end
 				frame[1].i18n = "button.cancel"
@@ -226,6 +232,7 @@ helpers.describe("Complete LLM outer boundary context", function()
 						profile = head("menu.profiles.profile_label_prefix"),
 						test = head("menu.llm.test_prediction"),
 						trigger = head("menu.llm.trigger_menu_title"),
+						settings = i18n.section("menu.llm.header_settings"),
 					}, state .. "/" .. model_state)
 				end)
 			end)

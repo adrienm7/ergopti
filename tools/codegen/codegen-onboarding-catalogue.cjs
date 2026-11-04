@@ -51,6 +51,7 @@ const TOML = require('smol-toml');
 const { REPO_ROOT, shared, sharedRel } = require('../lib/paths.cjs');
 const { candidateKeys } = require('../lib/manifest-label-keys.cjs');
 const { KEY } = require('../lib/_generated/config_keys.cjs');
+const KeyNames = require('../lib/key-names.cjs');
 
 const MANIFEST_PATH = shared('modules', 'features', 'manifest.toml');
 const HOTSTRINGS_DIR = shared('modules', 'hotstrings');
@@ -456,34 +457,38 @@ function createLabels(locales) {
 // (macos/ui/menu/menu_shortcuts.lua pretty_key) and the Linux slot prefixes
 // (linux/modules/shortcuts/keyboard_shortcuts.lua SLOT_MODS). Longest prefix
 // first; only named keys translate.
+// Each prefix's modifiers, as ids of the shared key name table: the page names
+// them in the reader's language (« Ctrl + Maj + V »), as the menus do. They
+// were English text here (« Ctrl + Shift + »).
 const CHORD_PREFIXES = {
 	ahk: [
-		['primary_shift_', 'Ctrl + Shift + '],
-		['primary_', 'Ctrl + '],
-		['meta_', 'Win + '],
-		['alt_', 'Alt + ']
+		['primary_shift_', ['ctrl', 'shift']],
+		['primary_', ['ctrl']],
+		['meta_', ['win']],
+		['alt_', ['alt']]
 	],
 	hs: [
-		['secondary_shift_', 'Ctrl + Shift + '],
-		['secondary_', 'Ctrl + '],
-		['alt_', 'Option + '],
-		['primary_shift_', 'Cmd + Shift + '],
-		['primary_', 'Cmd + '],
+		['secondary_shift_', ['ctrl', 'shift']],
+		['secondary_', ['ctrl']],
+		['alt_', ['option']],
+		['primary_shift_', ['cmd', 'shift']],
+		['primary_', ['cmd']],
 		// The built-in switches that are not slots yet (ctrl_g, cmd_star).
-		['cmd_', 'Cmd + '],
-		['ctrl_', 'Ctrl + ']
+		['cmd_', ['cmd']],
+		['ctrl_', ['ctrl']]
 	],
 	linux: [
-		['primary_shift_', 'Ctrl + Shift + '],
-		['meta_shift_', 'Super + Shift + '],
-		['alt_shift_', 'Alt + Shift + '],
-		['primary_', 'Ctrl + '],
-		['meta_', 'Super + '],
-		['alt_', 'Alt + ']
+		['primary_shift_', ['ctrl', 'shift']],
+		['meta_shift_', ['super', 'shift']],
+		['alt_shift_', ['alt', 'shift']],
+		['primary_', ['ctrl']],
+		['meta_', ['super']],
+		['alt_', ['alt']]
 	]
 };
-const CHORD_KEY_NAMES = { space: 'common.key_space', enter: 'common.key_enter' };
-const CHORD_KEY_GLYPHS = { period: '.', comma: ',', quote: "'", sc029: '²', capslock: 'CapsLock' };
+// The signs a slot key spells by its legend; a named key (Space, Enter, Caps
+// Lock) reads through the key name table.
+const CHORD_KEY_GLYPHS = { period: '.', comma: ',', quote: "'", sc029: '²' };
 // The key the macOS Cmd + star shortcut names: the hotstring trigger character.
 const CHORD_TRIGGER_KEY = 'star';
 const TRIGGER_CHARACTER_PATH = KEY.HOTSTRINGS_TRIGGER_CHAR;
@@ -500,21 +505,23 @@ const BUILT_IN_SHORTCUT_SECTION = KEY.SHORTCUTS_KEYS;
 
 /**
  * Label segments of a key-combination slot: its two tap-hold keys, each under
- * the name the Tap-Hold menu gives it.
+ * the name the shared key name table gives it on the platform, as the
+ * Tap-Hold menu names it.
  * @param {string} slot Id such as alt_gr_then_left_alt.
+ * @param {string} platform Manifest platform token.
  * @param {object} labels Label helpers.
  * @param {string} context Error context.
  * @returns {object[]} Segments.
  */
-function combinationSegments(slot, labels, context) {
+function combinationSegments(slot, platform, labels, context) {
 	const keys = slot.split(COMBINATION_SEPARATOR);
 	if (keys.length !== 2 || keys.some((key) => key === '')) {
 		throw new Error(`${context}: ${slot} names no pair of tap-hold keys`);
 	}
 	return [
-		{ key: labels.requireKey(`tap_hold.group.${keys[0]}`, context) },
+		{ key: labels.requireKey(KeyNames.i18n(keys[0], platform), context) },
 		{ text: ' + ' },
-		{ key: labels.requireKey(`tap_hold.group.${keys[1]}`, context) }
+		{ key: labels.requireKey(KeyNames.i18n(keys[1], platform), context) }
 	];
 }
 
@@ -528,15 +535,25 @@ function combinationSegments(slot, labels, context) {
  * @returns {object[]|null} Segments.
  */
 function chordSegments(slot, platform, labels, triggerCharacter) {
-	for (const [prefix, text] of CHORD_PREFIXES[platform]) {
+	for (const [prefix, modifiers] of CHORD_PREFIXES[platform]) {
 		if (!slot.startsWith(prefix)) continue;
 		const key = slot.slice(prefix.length);
 		if (key === '') return null;
-		if (Object.hasOwn(CHORD_KEY_NAMES, key)) {
-			return [{ text }, { key: labels.requireKey(CHORD_KEY_NAMES[key], slot) }];
+		const segments = [];
+		for (const modifier of modifiers) {
+			segments.push(
+				{ key: labels.requireKey(KeyNames.i18n(modifier, platform), slot) },
+				{ text: ' + ' }
+			);
 		}
-		if (key === CHORD_TRIGGER_KEY) return [{ text: text + triggerCharacter() }];
-		return [{ text: text + (CHORD_KEY_GLYPHS[key] || key.toUpperCase()) }];
+		if (KeyNames.canonical(key) !== null) {
+			segments.push({ key: labels.requireKey(KeyNames.i18n(key, platform), slot) });
+		} else if (key === CHORD_TRIGGER_KEY) {
+			segments.push({ text: triggerCharacter() });
+		} else {
+			segments.push({ text: CHORD_KEY_GLYPHS[key] || key.toUpperCase() });
+		}
+		return segments;
 	}
 	return null;
 }
@@ -883,7 +900,7 @@ function recommendedItems(id, page, platform, master, features, projection, labe
 			label = chordSegments(feature.id, platform, labels, triggerCharacter);
 			if (!label) label = [{ key: labels.featureLabelKey(feature, context) }];
 		} else if (feature.type === 'action' && feature.section === COMBINATION_SECTION) {
-			label = combinationSegments(feature.id, labels, context);
+			label = combinationSegments(feature.id, platform, labels, context);
 		} else if (feature.section === BUILT_IN_SHORTCUT_SECTION) {
 			// The label names what the shortcut does, so its trigger comes first.
 			if (Object.hasOwn(triggers, itemPath)) {
@@ -1100,8 +1117,30 @@ function createKarabinerLabels(labels) {
 	const actions = JSON.parse(fs.readFileSync(MACOS_REMAP_ACTIONS_PATH, 'utf8'));
 	return function karabinerActionSegments(action, context) {
 		const registryKey = `sg_actions.${aliases[action] || action}`;
+		// A modifier set names its modifiers from the key name table, as the tray
+		// does (« Cmd + Maj »).
+		const modifierSegments = (modifiers) => {
+			const segments = [];
+			modifiers.forEach((modifier, index) => {
+				if (index > 0) segments.push({ text: ' + ' });
+				segments.push({ key: labels.requireKey(KeyNames.i18n(modifier, 'hs'), context) });
+			});
+			return segments;
+		};
+		// A sticky label is a template its modifiers fill, as
+		// _shared/lua/actions/sticky_label.lua fills it (« 📌 {1} rémanents »).
+		const sticky = KeyNames.stickyModifiers(action);
+		if (sticky !== null && labels.hasKey(registryKey))
+			return [
+				{ template: labels.requireKey(registryKey, context), args: [modifierSegments(sticky)] }
+			];
 		if (labels.hasKey(registryKey)) return [{ key: labels.requireKey(registryKey, context) }];
 		const entry = actions.find((candidate) => candidate.id === action);
+		if (entry && Array.isArray(entry.modifiers)) return modifierSegments(entry.modifiers);
+		// A layer hold reads as the hold picker names that layer, as the tray's
+		// name_held_layers does.
+		if (entry && typeof entry.hold_layer === 'string')
+			return [{ key: labels.requireKey(`tap_hold.hold.${entry.hold_layer}_layer`, context) }];
 		const text = entry && (entry.short_label || entry.label);
 		if (typeof text !== 'string' || text === '') {
 			throw new Error(`${context}: Karabiner action ${action} has no label`);
@@ -1144,7 +1183,7 @@ function tapHoldAssignment(platform, key, defaults, labels, karabinerLabel, cont
 		hold = [];
 		for (const modifier of preset.hold_modifier.split('+')) {
 			if (hold.length > 0) hold.push({ text: ' + ' });
-			hold.push({ key: labels.requireKey(`tap_hold.hold.${modifier.trim()}`, context) });
+			hold.push({ key: labels.requireKey(KeyNames.i18n(modifier.trim(), platform), context) });
 		}
 	} else {
 		hold = [{ key: labels.requireKey('tap_hold.hold.none', context) }];
@@ -1191,7 +1230,7 @@ function tapHoldGroups(id, platform, labels) {
 			recommended: true,
 			tap_hold_key: key,
 			customised_value: TAP_HOLD_CUSTOMISED,
-			label: [{ key: labels.requireKey(entry.label_key, context) }],
+			label: [{ key: labels.requireKey(KeyNames.i18n(entry.id, platform), context) }],
 			value_label: [{ template, args: [assignment.tap, assignment.hold] }]
 		});
 	}

@@ -4,7 +4,8 @@
 --- MODULE: Shared Menu Row Text Check
 --- DESCRIPTION:
 --- Walks a rendered Lua tray and reports each row whose visible text is an id,
---- a config path, a raw key, snake_case or an unfilled placeholder, and each
+--- a config path, a raw key, snake_case, an unfilled placeholder or a key id
+--- or abbreviation the shared key name table names (`lalt`, `LCtrl`), and each
 --- French row gluing `:`, `?`, `!` or `;` to its word. The Windows
 --- walk applies the same rule from tools/test/lib/menu-row-text.cjs; both read
 --- _shared/tests/corpus/menu_row_text_allowlist.json.
@@ -60,6 +61,35 @@ local function collect_ids(node, out)
 	for _, value in pairs(node) do collect_ids(value, out) end
 end
 
+-- Spellings of the key name table that are also plain words of a sentence
+-- (`alt` is « all » in Danish, « old » in German): a row may hold them.
+-- tools/test/lib/menu-row-text.cjs keeps the same list.
+local PROSE_SPELLINGS = {
+	alt = true, tab = true, space = true, enter = true, delete = true, option = true, ["return"] = true,
+	command = true, control = true, super = true, caps = true, escape = true, shift = true, meta = true,
+	insert = true, home = true, ["end"] = true,
+}
+
+--- Every key spelling a row must never show: the ids and aliases of
+--- data/keycodes/key_names.json that read as no word, and the side
+--- abbreviations the Tap-Hold rows used to print (LCtrl, RShift, LAlt…).
+--- @param shared_root string Path of _shared.
+--- @param json_decode function JSON decoder.
+--- @return table Set of spellings, matched case-exactly.
+function M.raw_key_spellings(shared_root, json_decode)
+	local table_ = read_json(shared_root, "data/keycodes/key_names.json", json_decode)
+	local out = {}
+	for _, field in ipairs({ "keys", "aliases" }) do
+		for spelling in pairs(table_[field]) do
+			if not PROSE_SPELLINGS[spelling] then out[spelling] = true end
+		end
+	end
+	for _, side in ipairs({ "L", "R" }) do
+		for _, name in ipairs({ "Ctrl", "Shift", "Alt", "Win", "Cmd", "Option" }) do out[side .. name] = true end
+	end
+	return out
+end
+
 --- The ids and config paths no row may show.
 --- @param shared_root string Path of _shared.
 --- @param json_decode function JSON decoder.
@@ -91,8 +121,9 @@ end
 --- @param text string Visible row text.
 --- @param known table Set of ids and paths.
 --- @param allowlist table Allowlist entries.
+--- @param raw_keys table|nil Set from M.raw_key_spellings.
 --- @return string|nil The defect, nil for a text that reads as text.
-function M.defect(text, known, allowlist)
+function M.defect(text, known, allowlist, raw_keys)
 	for _, entry in ipairs(allowlist) do
 		if text:find(entry.lua_pattern) then return nil end
 	end
@@ -107,6 +138,10 @@ function M.defect(text, known, allowlist)
 		if word:match("^[%l%d]+_[%l%d_]+$") then return "reads as snake_case" end
 	end
 	if label:find("{%d*}") or label:find("%%[sd]") then return "holds an unfilled placeholder" end
+	-- Case-exact: « Ctrl » and « Alt » are the names, `ctrl`, `lalt`, `LCtrl` the ids.
+	for word in label:gmatch("[%w_\128-\255]+") do
+		if raw_keys and raw_keys[word] then return "shows the raw key \"" .. word .. "\"" end
+	end
 	return nil
 end
 
@@ -155,10 +190,11 @@ end
 function M.defects(tray, shared_root, json_decode, locale)
 	local allowlist = read_json(shared_root, "tests/corpus/menu_row_text_allowlist.json", json_decode).entries
 	local known = identifiers(shared_root, json_decode)
+	local raw_keys = M.raw_key_spellings(shared_root, json_decode)
 	local defects, rows = {}, 0
 	walk(tray, "tray", function(text, trail)
 		rows = rows + 1
-		local defect = M.defect(text, known, allowlist)
+		local defect = M.defect(text, known, allowlist, raw_keys)
 		if defect then defects[#defects + 1] = trail .. " > \"" .. text .. "\" " .. defect end
 		local glued = locale == "fr" and M.french_punctuation_defect(text) or nil
 		if glued then defects[#defects + 1] = trail .. " > \"" .. text .. "\" glues \"" .. glued .. "\"" end

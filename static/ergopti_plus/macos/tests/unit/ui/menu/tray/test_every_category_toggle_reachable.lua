@@ -71,6 +71,7 @@ local function remap_double(observed)
 		get_combo_hold_action = function() return "none" end,
 		get_tap_hold_timeout = function() return 200 end,
 		get_sticky_timeout = function() return 1000 end,
+		get_lone_modifier_tap_max_ms = function() return 1000 end,
 		get_simultaneous_threshold = function() return 50 end,
 		regenerate = function() error("building the tray must not regenerate") end,
 	}
@@ -301,10 +302,18 @@ helpers.describe("the real macOS tray: every category switch is reachable", Capt
 			local tray = build_tray(posture)
 			local i18n = require("infra.i18n")
 			local group = nil
+			local label = i18n.get("menu.shortcuts.key_combinations")
 			for _, row in ipairs(top_row(tray, "menu.shortcuts.title").menu or {}) do
-				if row.title == i18n.get("menu.shortcuts.key_combinations") then group = row end
+				if type(row.title) == "string" and row.title:sub(1, #label) == label then group = row end
 			end
 			helpers.assert_not_nil(group, "the Shortcuts submenu holds the key-combinations group")
+			if not posture then
+				-- Category-off rule: with Shortcuts off the group is greyed and opens nothing.
+				helpers.assert_eq(group.disabled, true, "an off Shortcuts menu greys the group")
+				helpers.assert_nil(group.menu, "a greyed group opens nothing")
+				return
+			end
+			helpers.assert_eq(group.title, label)
 			helpers.assert_eq(group.checked == true, posture, "the group title shows its switch")
 			local first = type(group.menu) == "table" and group.menu[1] or nil
 			helpers.assert_true(first ~= nil, "the group is not empty")
