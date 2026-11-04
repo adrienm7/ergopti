@@ -44,7 +44,7 @@ end
 --- @return boolean valid
 function M.is_state(state)
 	if type(state) ~= "table" or state.version ~= M.STATE_VERSION then return false end
-	if math.type(state.offset) ~= "integer" and not (type(state.offset) == "number" and state.offset % 1 == 0) then
+	if type(state.offset) ~= "number" or math.tointeger(state.offset) == nil then
 		return false
 	end
 	if state.offset < 0 then return false end

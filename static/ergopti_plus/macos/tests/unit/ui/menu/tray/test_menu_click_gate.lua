@@ -98,6 +98,27 @@ helpers.describe("menubar click gate", function()
 		helpers.assert_eq(#record.clicks, 2, "the logger drain still accepts clicks; they are handed over too")
 	end)
 
+	helpers.it("does not renew an expired hand-off when a later reload hands off a click", function()
+		local f = fixture()
+		f.store[KEY] = json.encode({ schema = 1, at = f.clock - 61,
+			clicks = { { path = { "Features", "Old" }, desired = true } } })
+		f.terminal = true; f.reloading = true
+		click(f); f.gate.handoff()
+		local record = json.decode(f.store[KEY])
+		helpers.assert_eq(#record.clicks, 1)
+		helpers.assert_eq(record.clicks[1].path, { "Features", "Preview" })
+	end)
+
+	helpers.it("does not let a malformed earlier hand-off poison a new click", function()
+		local f = fixture()
+		f.store[KEY] = json.encode({ schema = 1, at = f.clock, clicks = { { path = { 3 } } } })
+		f.terminal = true; f.reloading = true
+		click(f); f.gate.handoff()
+		local record = json.decode(f.store[KEY])
+		helpers.assert_eq(#record.clicks, 1)
+		helpers.assert_eq(record.clicks[1].path, { "Features", "Preview" })
+	end)
+
 	helpers.it("(menu-click-handoff-once) consumes the hand-off once and refuses a second inherit", function()
 		local f = fixture()
 		f.store[KEY] = json.encode({ schema = 1, at = f.clock, clicks = { { path = { "Features", "Preview" }, desired = true } } })
