@@ -447,6 +447,13 @@ helpers.describe("word reset events: erasing what was typed (bs-word-start)", fu
 			"the 15-byte /proc comm name must preserve terminal prompt handling")
 	end)
 
+	helpers.it("recognizes the procfs-truncated Chromium browser at its address bar (chromium-comm)", function()
+		local events = seq(chord({ K.lctrl }, K.l), tap(K.backspace), tap(K.r))
+		helpers.assert_eq(type_through_hook(events, on, nil, "chromium-browse"),
+			type_through_hook(events, on, nil, "chromium-browser"),
+			"the 15-byte /proc comm name must preserve browser address-bar handling")
+	end)
+
 	helpers.it("bs-word-start: Ctrl+A and a browser's Ctrl+L leave an empty field", function()
 		local select_all = seq(tap(K.a), chord({ K.lctrl }, K.a), tap(K.backspace), tap(K.backspace), tap(K.r))
 		helpers.assert_eq(type_through_hook(select_all, on, nil, "org.gnome.TextEditor"), "R",

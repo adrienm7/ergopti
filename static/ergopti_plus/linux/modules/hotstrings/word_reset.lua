@@ -102,7 +102,7 @@ local TERMINAL_APPS = {
 -- Browsers, whose Ctrl+L selects the whole address of the address bar.
 local BROWSER_APPS = {
 	firefox = true, ["firefox-esr"] = true, librewolf = true, waterfox = true,
-	chromium = true, ["chromium-browser"] = true, ["google-chrome"] = true,
+	chromium = true, ["chromium-browser"] = true, ["chromium-browse"] = true, ["google-chrome"] = true,
 	chrome = true, brave = true, ["brave-browser"] = true, vivaldi = true,
 	["vivaldi-stable"] = true, opera = true, ["microsoft-edge"] = true,
 	epiphany = true, falkon = true, floorp = true, zen = true,
