@@ -184,6 +184,28 @@ end
 -- ===================================
 
 helpers.describe("CapsWord watcher: pointer kinds follow the settings", function()
+	helpers.it("retries a refused pointer-motion clear on a subsequent click (capsword-click-retry)", function()
+		local h = fresh_harness()
+		activate(h)
+		local variables = package.loaded["platform.remap.ke_variables"]
+		local supersede = variables.supersede_capsword_activation
+		variables.supersede_capsword_activation = function(callback)
+			if h.supersede_calls == 0 then h.supersede_calls = 1; return false end
+			return supersede(callback)
+		end
+		pointer(h, TYPES.mouseMoved)
+		helpers.assert_true(h.active)
+		h.callback({ getType = function() return TYPES.leftMouseDown end })
+		helpers.assert_eq(#h.writers, 1, "a discrete click must retry the refused clear")
+	end)
+	helpers.it("accepts the first click after activation despite a recent inactive pointer event (capsword-activation-throttle)", function()
+		local h = fresh_harness()
+		pointer(h, TYPES.mouseMoved)
+		helpers.assert_eq(h.supersede_calls, 1)
+		activate(h)
+		h.callback({ getType = function() return TYPES.leftMouseDown end })
+		helpers.assert_eq(#h.writers, 1, "the first click must end the newly activated CapsWord")
+	end)
 	helpers.it("pointer motion ends CapsWord only while it is checked", function()
 		local h = fresh_harness({ [ "caps_word_pointer_pointer_motion" ] = false })
 		activate(h)
@@ -244,6 +266,23 @@ end)
 -- ===================================
 
 helpers.describe("CapsWord watcher: a typed delimiter ends CapsWord only when checked", function()
+	helpers.it("does not disable a reactivation during synchronous clear settlement (capsword-sync-reactivation)", function()
+		local h = fresh_harness({ caps_word_idle_timeout_seconds = 1 })
+		activate(h)
+		local variables = package.loaded["platform.remap.ke_variables"]
+		local supersede = variables.supersede_capsword_activation
+		variables.supersede_capsword_activation = function(callback)
+			local accepted, revision = supersede(callback)
+			callback(true, nil, revision)
+			activate(h)
+			return accepted, revision
+		end
+		key(h, " ")
+		helpers.assert_true(h.active, "the reentrant activation remains current")
+		helpers.assert_eq(h.capslock, { false }, "only the clear settled before reactivation may affect the LED")
+		local timers = timers_at(h, 1)
+		helpers.assert_eq(#timers, 1, "the new activation must retain its inactivity timer")
+	end)
 	helpers.it("Space ends CapsWord at once, CapsLock off before the next letter", function()
 		local h = fresh_harness()
 		activate(h)

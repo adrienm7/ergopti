@@ -126,6 +126,7 @@ local function load_utils()
 		pasteboard = {
 			changeCount = function() return clipboard_generation end,
 			getContents  = function() return "" end,
+			allContentTypes = function() return { {} } end,
 			readAllData  = function() return {} end,
 			writeAllData = function(_)
 				clipboard_generation = clipboard_generation + 1

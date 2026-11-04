@@ -64,6 +64,20 @@ function M.rewrite_configured(path, value)
 	return committed == true
 end
 
+function M.rewrite_configured_owned(path, value)
+	assert(ALIAS_NAMES[path] ~= nil, "not a native script row: " .. tostring(path))
+	return require("script_config_authority").rewrite_owned({
+		path = require("infra.config_paths").config("config.toml"), manifest = Manifest, key = path, value = value })
+end
+
+function M.restore_configured_rewrite(receipt)
+	return require("script_config_authority").restore_rewrite(receipt)
+end
+
+function M.verify_configured_rewrite(receipt)
+	return require("script_config_authority").verify_rewrite(receipt)
+end
+
 --- Creates the direct participant's existing file transaction and native fences.
 --- @param options table Path, backup path, storage backup path, files and pause getter.
 --- @return table owner Apply/revert/release/pending/retry_restore.

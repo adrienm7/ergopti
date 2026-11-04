@@ -118,7 +118,9 @@ end)
 
 
 helpers.describe("HttpClient: an invalid replacement keeps the request in flight (http-validate-before-cancel-2026-10-21)", function()
-	for _, invalid in ipairs({ { "nil URL", nil }, { "NUL URL", "http://h/\0" }, { "file URL", "file:///tmp/x" } }) do
+ for _, invalid in ipairs({ { "nil URL", nil }, { "NUL URL", "http://h/\0" }, { "file URL", "file:///tmp/x" },
+		{ "missing authority", "http:///path" }, { "invalid port", "http://h:65536/" },
+		{ "space in URL", "http://example.test/a b" } }) do
 		helpers.it("delivers the first response after a refused " .. invalid[1], function()
 			local client, state = load_client()
 			state.hold = true
@@ -135,6 +137,16 @@ end)
 
 
 helpers.describe("HttpClient: public HTTPS never follows a downgrade (https-public-downgrade-2026-10-21)", function()
+	helpers.it("does not reinterpret a non-HTTP redirect scheme as a relative path", function()
+		for _, location in ipairs({ "mailto:user@example.test", "file:/private/document" }) do
+			local source = "https://releases.example.test/current"
+			local client, state = load_client({ [source] = location })
+			local terminal
+			client.get(source, {}, function(result) terminal = result end)
+			helpers.assert_eq(state.fetched, { source })
+			helpers.assert_eq(terminal and terminal.ok, false)
+		end
+	end)
 	helpers.it("refuses an HTTPS-to-HTTP redirect without fetching the HTTP hop", function()
 		local client, state = load_client({ ["https://releases.example.test/latest"] = "http://releases.example.test/latest" })
 		local terminal

@@ -144,6 +144,7 @@ local function fresh_apps()
 		frontmostApplication = function() return front_app end,
 	}
 	hs_stub.pasteboard = {
+		allContentTypes = function() return { {} } end,
 		readAllData = function()
 			fixture.read_all_calls = fixture.read_all_calls + 1
 			if type(fixture.read_all_hook) == "function" then fixture.read_all_hook() end

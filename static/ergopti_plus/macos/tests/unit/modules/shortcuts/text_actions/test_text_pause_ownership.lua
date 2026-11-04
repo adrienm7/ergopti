@@ -147,6 +147,7 @@ local function fresh_fixture()
 
 	hs_stub.pasteboard = {
 		changeCount = function() return fixture.change_count end,
+		allContentTypes = function() return { {} } end,
 		readAllData = function()
 			fixture.snapshot_calls = fixture.snapshot_calls + 1
 			return clone(fixture.clipboard)

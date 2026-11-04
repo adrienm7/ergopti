@@ -24,6 +24,7 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 			getContents = function() return selected end,
 			setContents = function() change_count = change_count + 1; return true end,
 			clearContents = function() change_count = change_count + 1 end,
+			allContentTypes = function() return { {} } end,
 			readAllData = function()
 				return { ["public.utf8-plain-text"] = "USER_CLIPBOARD" }
 			end,

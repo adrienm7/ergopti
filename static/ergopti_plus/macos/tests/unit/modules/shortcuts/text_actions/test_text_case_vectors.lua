@@ -66,6 +66,7 @@ local function transformed_by(action_name, selected)
 		getContents = function() return selected end,
 		setContents = function(value) change_count = change_count + 1; written = value; return true end,
 		clearContents = function() change_count = change_count + 1 end,
+		allContentTypes = function() return { {} } end,
 		readAllData = function() return { ["public.utf8-plain-text"] = "USER_CLIPBOARD" } end,
 		writeAllData = function() change_count = change_count + 1; return true end,
 	}

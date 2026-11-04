@@ -207,6 +207,7 @@ function mediaFixture() {
 	for (const file of [
 		'dom_utils.js',
 		'host_bridge.js',
+		'metrics_manifest_keys.js',
 		'metrics_typing/_generated/keycode_data.js',
 		'metrics_typing/_generated/keystats_tokens.js',
 		'metrics_typing/key_tokens.js',
@@ -284,6 +285,19 @@ mediaTest('renders all five fixed identities through the existing tab entry poin
 	}
 	assertMedia.equal((f.html().match(/<li /g) || []).length, 5);
 	assertMedia.equal(f.elements.media_keys_container.hidden, false);
+});
+mediaTest('media filtering uses the original reserved application label', () => {
+	const f = mediaFixture();
+	f.setManifest({
+		'2026-10-13': {
+			'~_system': { media_keys: { 'media.play_pause': 7 } },
+			_system: { media_keys: { 'media.play_pause': 99 } }
+		}
+	});
+	f.select(['_system']);
+	f.render();
+	assertMedia.ok(f.html().includes('7 keys pressed'));
+	assertMedia.ok(!f.html().includes('99 keys pressed'));
 });
 mediaTest('retains independent hold sums, samples, max and inclusive tap split', () => {
 	const f = mediaFixture();

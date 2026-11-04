@@ -49,7 +49,7 @@ function M.read()
 		return nil
 	end
 
-	if type(result) ~= "string" or result == "" then
+	if type(result) ~= "string" then
 		return nil
 	end
 
@@ -118,6 +118,17 @@ end
 --- @return table|nil Pasteboard data table, or nil if empty/error.
 --- @return boolean read_ok True when nil means an empty clipboard, false on error.
 function M.save()
+	-- Hammerspoon's readAllData() snapshots only the first pasteboard item.
+	-- Refuse known multi-item content so a later restore cannot discard items.
+	if not hs or not hs.pasteboard or type(hs.pasteboard.allContentTypes) ~= "function" then
+		Logger.error(LOG, "save(): pasteboard item enumeration is unavailable.")
+		return nil, false
+	end
+	local checked, items = pcall(hs.pasteboard.allContentTypes)
+	if not checked or type(items) ~= "table" or #items > 1 then
+		Logger.error(LOG, "save(): cannot preserve every pasteboard item.")
+		return nil, false
+	end
 	local ok, result = pcall(function()
 		return hs.pasteboard.readAllData()
 	end)

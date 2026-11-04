@@ -342,8 +342,11 @@ local function bundle_variants(bundle_path)
 		local tis_id = body:match("<key>%s*TISInputSourceID%s*</key>%s*<string>%s*([^<]-)%s*</string>")
 		local keylayout = root .. "/Contents/Resources/" .. name .. ".keylayout"
 		-- A name is a file basename here; anything else would read outside the bundle.
-		if tis_id and name:match("^[%w_.%-]+$") and path_exists(keylayout) then
-			variants[#variants + 1] = { name = name, tis_id = tis_id, keylayout = keylayout }
+		if tis_id and name:match("^[%w_.%-]+$") then
+			local file_status, mode = FileSystem.followed_mode(keylayout)
+			if file_status == "present" and mode == "file" then
+				variants[#variants + 1] = { name = name, tis_id = tis_id, keylayout = keylayout }
+			end
 		end
 	end
 	if #variants == 0 then
@@ -431,6 +434,11 @@ local function build_install_transaction(target_dir, bundles_dir, bundle_name)
 		'mkdir "$backup" || { rm -rf "$work"; exit 1; };',
 		'cp -R "$source" "$stage" || { rm -rf "$work"; exit 1; };',
 		'test -f "$stage/Contents/Info.plist" || { rm -rf "$work"; exit 1; };',
+		'has_layout=0;',
+		'for layout in "$stage"/Contents/Resources/*.keylayout; do',
+			'if [ -f "$layout" ]; then has_layout=1; break; fi;',
+		'done;',
+		'[ "$has_layout" -eq 1 ] || { echo "Staged bundle contains no regular keyboard layout."; rm -rf "$work"; exit 1; };',
 		'committed=0;',
 		'restore_install() {',
 			'if [ "$committed" -eq 0 ]; then',

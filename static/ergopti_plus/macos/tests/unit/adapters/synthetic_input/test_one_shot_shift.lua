@@ -47,6 +47,25 @@ local function fixture()
 end
 
 helpers.describe("one-shot native boundary", function()
+	helpers.it("checks the actual shifted Option combination before native emission (one-shot-option-shift)", function()
+		local emitted, raw, text = {}, 16, "é"
+		local event = {
+			getFlags = function() return { alt = true } end,
+			rawFlags = function(_, value) if value ~= nil then raw = value end; return raw end,
+			getCharacters = function() return text end,
+			setUnicodeString = function(_, value) text = value end,
+		}
+		local adapter = require("adapters.one_shot_shift").new({
+			data = data, magic = function() return "★" end, now = function() return 10 end,
+			event = { rawFlagMasks = { shift = 2 } }, is_repeat = function() return false end,
+			translate = function(_, flags) return ({ [16] = "é", [2] = "É", [18] = "Ω" })[flags] end,
+			emit = function(value) emitted[#emitted + 1] = value; return true end,
+		})
+		adapter.arm(2)
+		helpers.assert_true(adapter.key_down(event, 1), "different Option+Shift output needs Unicode emission")
+		adapter.finish(true)
+		helpers.assert_eq(emitted, { "É" })
+	end)
 	helpers.it("keeps native translation probes private to the synthetic adapter (one-shot-probe)", function()
 		helpers.with_stub_scope({ "adapters.synthetic_input", "adapters.event_provenance", "tests.stubs.hs" }, function()
 			package.loaded["adapters.synthetic_input"] = nil

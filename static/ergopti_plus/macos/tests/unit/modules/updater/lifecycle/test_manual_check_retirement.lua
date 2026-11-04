@@ -67,6 +67,7 @@ local function with_owner(run)
 				},
 				storage = {
 					get = function(key, default) local value = env.values[key]; if value == nil then return default end; return value end,
+					read_exact = function(key) return true, env.values[key] end,
 					set = function(key, value) env.writes = env.writes + 1; env.values[key] = value; return true end,
 				},
 				http = { get = get }, manual_http = { get = get },

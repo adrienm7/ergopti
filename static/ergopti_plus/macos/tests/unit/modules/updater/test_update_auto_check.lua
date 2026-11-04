@@ -74,6 +74,7 @@ local function build(opts)
 		end,
 		on_available = function(release)
 			ctx.announced[#ctx.announced + 1] = release.tag
+			if ctx.notification_hook then ctx.notification_hook() end
 			if ctx.notification_refusal == "throw" then error("notification unavailable") end
 			return ctx.notification_refusal ~= "false"
 		end,
@@ -95,7 +96,14 @@ local function build(opts)
 			end,
 		},
 		storage = {
-			get = function(key, default) local v = ctx.values[key]; if v == nil then return default end; return v end,
+			get = function(key, default)
+				if key == ctx.state_key and ctx.record_read_error then return default end
+				local v = ctx.values[key]; if v == nil then return default end; return v
+			end,
+			read_exact = function(key)
+				if key == ctx.state_key and ctx.record_read_error then return false, nil end
+				return true, ctx.values[key]
+			end,
 			set = function(key, value) ctx.values[key] = value; return true end,
 		},
 		http = transport(), manual_http = transport(),
@@ -116,6 +124,28 @@ local function fire(ctx)
 end
 
 helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check", function()
+	helpers.it("refuses a storage port without exact-read capability", function()
+		local ok, err = pcall(load_module().new, {
+			state = {}, save = function() end, channel = function() end, is_paused = function() end,
+			on_available = function() end, timer = {}, storage = { get = function() end },
+			http = {}, manual_http = {}, now = function() end,
+		})
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("exact storage read", 1, true) ~= nil)
+	end)
+	helpers.it("retains the stored check record across an unavailable read", function()
+		local original = { seed = SEED, last_check_at = T0 - 120, last_notified_tag = "v0.0.0-dev.150" }
+		local ctx = build({ now = T0, record = original, defer = true })
+		ctx.record_read_error = true
+		helpers.assert_true(ctx.owner.start())
+		helpers.assert_eq(ctx.values[ctx.state_key], original, "an unavailable read cannot overwrite stored state")
+		helpers.assert_eq(#ctx.requests, 0)
+		ctx.record_read_error = false
+		ctx.clock.now = ctx.clock.now + ctx.timing.reevaluate_sec
+		fire(ctx)
+		helpers.assert_eq(ctx.values[ctx.state_key], original)
+		helpers.assert_eq(#ctx.requests, 0, "the recovered record still controls the schedule")
+	end)
 	helpers.it("restarts the boot delay if the wall clock moves behind startup", function()
 		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
 		helpers.assert_true(ctx.owner.start())
@@ -252,6 +282,21 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		helpers.assert_nil(ctx.values[ctx.state_key].last_check_at)
 		ctx.pending[#ctx.pending]({ ok = true, status = 200, body = LIST, headers = {} })
 		helpers.assert_eq(#ctx.announced, 1, "the current generation still publishes")
+	end)
+
+	helpers.it("does not save an old notification after its callback changes channel", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		helpers.assert_true(ctx.owner.start())
+		ctx.notification_hook = function()
+			ctx.channel = "main"
+			ctx.owner.on_channel_changed()
+		end
+		ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+		fire(ctx)
+		ctx.pending[1]({ ok = true, status = 200, body = LIST, headers = {} })
+		helpers.assert_nil(ctx.values[ctx.state_key].last_notified_tag,
+			"the retired channel cannot save a notification after reentry")
+		helpers.assert_nil(ctx.owner.latest())
 	end)
 
 	helpers.it("notification refusal leaves the release retryable", function()
@@ -405,6 +450,46 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		package.loaded["modules.updater.auto_check"] = nil
 	end)
 
+	helpers.it("retains failed startup cleanup until the next session retries it", function()
+		local AutoCheck = load_module()
+		local old_new, old_config = AutoCheck.new, AutoCheck.load_config
+		local created, first_stops = 0, 0
+		local ok, err = pcall(function()
+			helpers.with_stub_scope({ "adapters.wake_watcher", "adapters.http_client", "adapters.storage",
+				"adapters.timer_scheduler" }, function()
+				package.loaded["adapters.wake_watcher"] = { new = function() return {
+					start = function() return true end, stop = function() return true end,
+				} end }
+				package.loaded["adapters.http_client"] = { new = function() return {} end }
+				package.loaded["adapters.storage"] = {}
+				package.loaded["adapters.timer_scheduler"] = {}
+				AutoCheck.load_config = function() return { timeout_sec = 1 } end
+				AutoCheck.new = function()
+					created = created + 1
+					local id = created
+					return {
+						on_wake = function() end,
+						start = function() return id ~= 1 end,
+						stop = function()
+							if id == 1 then first_stops = first_stops + 1; return first_stops > 2 end
+							return true
+						end,
+					}
+				end
+				local started = pcall(AutoCheck.start_session, {})
+				helpers.assert_eq(started, false)
+				helpers.assert_eq(first_stops, 1)
+				helpers.assert_eq(pcall(AutoCheck.start_session, {}), false, "unreleased cleanup blocks a successor")
+				helpers.assert_eq(created, 1)
+				local owner = AutoCheck.start_session({})
+				helpers.assert_eq(first_stops, 3, "the previous owner is retried before its successor")
+				helpers.assert_true(owner.stop())
+			end)
+		end)
+		AutoCheck.new, AutoCheck.load_config = old_new, old_config
+		if not ok then error(err, 0) end
+	end)
+
 	-- Windows opens its update prompt from the balloon; here a click on the
 	-- notification asks Sparkle for the found release on its channel.
 	helpers.it("announces a release with a click that asks Sparkle for it", function()
@@ -463,6 +548,15 @@ local function check_now(ctx, channel)
 end
 
 helpers.describe("updater.auto_check (macOS): the manual check answers the update-check window", function()
+	helpers.it("answers a manual check without overwriting an unreadable record", function()
+		local original = { seed = SEED, last_check_at = T0 - 120, last_notified_tag = "v0.0.0-dev.149" }
+		local ctx = build({ now = T0, record = original,
+			responses = { { ok = true, status = 200, body = MIXED, headers = {} } } })
+		ctx.record_read_error = true
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
+		helpers.assert_eq(ctx.values[ctx.state_key], original)
+	end)
 	helpers.it("a late automatic check cannot overwrite a newer manual check", function()
 		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
 		helpers.assert_true(ctx.owner.start())

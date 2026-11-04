@@ -289,6 +289,7 @@ local function public_owner_retirement(mutation)
 				timer = { after = function() error("inactive public owner must not arm a timer") end,
 					cancel = function() return true end },
 				storage = { get = function(key, default) return values[key] or default end,
+					read_exact = function(key) return true, values[key] end,
 					set = function(key, value) values[key] = value; return true end },
 				http = { get = get }, manual_http = { get = get },
 			})

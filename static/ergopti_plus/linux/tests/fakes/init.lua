@@ -481,6 +481,7 @@ function M.storage(opts)
 		if stored == nil then return default_value end
 		return stored
 	end
+	function fake.read_exact(key) return true, fake.values[key] end
 	function fake.delete(key)
 		if opts.writes_fail or aliases[key] ~= nil then return false end
 		fake.values[key] = nil

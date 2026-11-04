@@ -25,7 +25,7 @@ local FakeSqlite = require("tests.support.fake_ngram_sqlite")
 
 local PAYLOAD = '{"manifest":{"2026-09-01":{"Code":{"chars":42}}},"app_icons":{},"initial_data":null,"kc_layout":{}}'
 local GENERATED_AT = 1790000000
-local SNAPSHOT = "ERGOPTI_TYPING_METRICS_SNAPSHOT 2 " .. GENERATED_AT .. " " .. #PAYLOAD .. "\n" .. PAYLOAD
+local SNAPSHOT = "ERGOPTI_TYPING_METRICS_SNAPSHOT 3 " .. GENERATED_AT .. " " .. #PAYLOAD .. "\n" .. PAYLOAD
 
 --- Runs a dashboard scenario over a fake store whose statements are counted.
 local function with_store(callback)
@@ -126,9 +126,10 @@ helpers.describe("metrics-instant-open: dashboard", function()
 
 	for _, corrupt in ipairs({
 		'{"manifest":"{}","app_icons":"{}","initial_data":"null","kc_layout":"{}"}',
-		"ERGOPTI_TYPING_METRICS_SNAPSHOT 2 " .. GENERATED_AT .. " 9999\n" .. PAYLOAD,
+		"ERGOPTI_TYPING_METRICS_SNAPSHOT 2 " .. GENERATED_AT .. " " .. #PAYLOAD .. "\n" .. PAYLOAD,
+		"ERGOPTI_TYPING_METRICS_SNAPSHOT 3 " .. GENERATED_AT .. " 9999\n" .. PAYLOAD,
 		"ERGOPTI_TYPING_METRICS_SNAPSHOT 1 " .. GENERATED_AT .. " " .. #PAYLOAD .. "\n" .. PAYLOAD,
-		"ERGOPTI_TYPING_METRICS_SNAPSHOT 2 " .. GENERATED_AT .. " 5\n<svg>",
+		"ERGOPTI_TYPING_METRICS_SNAPSHOT 3 " .. GENERATED_AT .. " 5\n<svg>",
 	}) do
 		helpers.it("ignores and deletes a corrupt or old-format cache: " .. corrupt:sub(1, 36), function()
 			with_store(function(t)

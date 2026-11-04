@@ -8,13 +8,37 @@ return function(helpers, driver)
 		local saved, names = {}, { name, "infra.locale", "locale.core", "adapters.storage" }
 		for _, module in ipairs(names) do saved[module] = package.loaded[module]; package.loaded[module] = nil end
 		local writes = 0
+		local values = { locale = "fr", i18n_locale = "fr", ["script.show_error_dialog"] = true }
+		local storage_owner
 		package.loaded["adapters.storage"] = {
 			get = function(alias, default)
-				if alias == "locale" or alias == "i18n_locale" then return "fr" end
-				if alias == "script.show_error_dialog" then return true end
-				return default
+				if values[alias] == nil then return default end
+				return values[alias]
 			end,
-			set = function() writes = writes + 1; return true end,
+			set = function(alias, value) writes = writes + 1; values[alias] = value; return true end,
+			read_exact = function(alias) return true, values[alias] end,
+			delete_exact = function(alias) values[alias] = nil; return true end,
+			acquire_owned = function(owner)
+				if storage_owner then return false end
+				storage_owner = owner; return true
+			end,
+			capture_owned = function(owner)
+				if owner ~= storage_owner then return nil end
+				return { before = values.i18n_locale }, { i18n_locale = { present = true, value = values.i18n_locale } }
+			end,
+			publish_owned = function(owner, _, updates)
+				if owner ~= storage_owner then return false end
+				writes = writes + 1; values.i18n_locale = updates.i18n_locale.value; return true
+			end,
+			restore_owned = function(owner, receipt)
+				if owner ~= storage_owner then return false end
+				values.i18n_locale = receipt.before; return true
+			end,
+			release_owned = function(owner)
+				if owner ~= storage_owner then return false end
+				storage_owner = nil; return true
+			end,
+			forget_owned = function() return true end,
 		}
 		local called, failure = pcall(function()
 			local native = require(name)

@@ -29,7 +29,7 @@ function openAppDrilldown(appName) {
 	selectedDates.forEach((dateKey) => {
 		const day = manifestData[dateKey];
 		if (!day) return;
-		const app_data = day[appName];
+		const app_data = day[metricsManifestKey(appName)];
 		if (!app_data || !app_data.hourly) return;
 		let totalAppChars = 0;
 		Object.values(app_data.hourly).forEach((h) => (totalAppChars += h.c || 0));
@@ -168,8 +168,8 @@ function openAppDrilldown(appName) {
 	selectedDates.forEach((dateKey) => {
 		const ls =
 			manifestData[dateKey] &&
-			manifestData[dateKey][appName] &&
-			manifestData[dateKey][appName].layouts_seen;
+			manifestData[dateKey][metricsManifestKey(appName)] &&
+			manifestData[dateKey][metricsManifestKey(appName)].layouts_seen;
 		if (!ls) return;
 		Object.entries(ls).forEach(([id, n]) => {
 			layouts[id] = (layouts[id] || 0) + (n || 0);

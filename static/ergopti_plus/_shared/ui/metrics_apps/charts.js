@@ -301,8 +301,9 @@ function renderDayTimeline() {
 	const byHour = {};
 	for (let h = 0; h < 24; h++) byHour[String(h).padStart(2, '0')] = [];
 
-	Object.entries(dayData).forEach(([appName, appData]) => {
-		if (appName === '_sys' || appName === '_system') return;
+	Object.entries(dayData).forEach(([appKey, appData]) => {
+		if (appKey === '_sys' || appKey === '_system') return;
+		const appName = metricsManifestLabel(appKey);
 		if (!appData.hourly) return;
 		Object.entries(appData.hourly).forEach(([hh, hData]) => {
 			let ms = hData.time_ms || 0;
@@ -584,8 +585,9 @@ function renderTopSessionsTable() {
 	if (!tbody) return;
 	const rows = [];
 	Object.entries(manifestData || {}).forEach(([dateStr, dayData]) => {
-		Object.entries(dayData || {}).forEach(([appName, appData]) => {
-			if (appName === '_sys' || appName === '_system') return;
+		Object.entries(dayData || {}).forEach(([appKey, appData]) => {
+			if (appKey === '_sys' || appKey === '_system') return;
+			const appName = metricsManifestLabel(appKey);
 			const longest = Number(appData.session_longest_ms) || 0;
 			if (longest > 0) {
 				rows.push({

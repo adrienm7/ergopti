@@ -154,6 +154,20 @@ ST_Get(Key, DefaultValue) {
 	}
 }
 
+; Exact read: a missing registry value is distinct from an unreadable store.
+ST_ReadExact(Key) {
+	try {
+		Result := RegRead(STORAGE_REG_BASE, Key)
+	} catch as Err {
+		if (Err is OSError && Err.Number == 2)
+			return { Ok: true, Value: "" }
+		return { Ok: false }
+	}
+	try return { Ok: true, Value: _ST_DecodeValue(Result) }
+	catch
+		return { Ok: false }
+}
+
 ; Deletes a value from the registry. Reg_DeleteValue itself already treats a
 ; missing value as success (idempotent delete); only a genuine failure (e.g.
 ; permission denied) returns false, honouring the Storage port's

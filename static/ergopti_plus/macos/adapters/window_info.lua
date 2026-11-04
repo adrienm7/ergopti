@@ -163,7 +163,7 @@ end
 --- @return table Array of WindowInfo objects (may be empty).
 function M.getAll()
 	local ok, result = pcall(function()
-		local windows = hs.window and hs.window.allWindows and hs.window.allWindows()
+		local windows = hs.window and hs.window.visibleWindows and hs.window.visibleWindows()
 		if type(windows) ~= "table" then return {} end
 
 		local infos = {}

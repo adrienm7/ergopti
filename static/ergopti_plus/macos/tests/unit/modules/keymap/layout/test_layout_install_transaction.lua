@@ -93,6 +93,44 @@ end
 
 
 helpers.describe("layout_install: transactional replacement", function()
+	helpers.it("keeps the old bundle when the staged bundle has no layouts (layout-empty-staging)", function()
+		local quote = require("text_utils").shell_quote
+		local root = os.tmpname(); os.remove(root)
+		local target, source, launcher = root .. "/target", root .. "/source", root .. "/launcher"
+		local old, new = "Ergopti_v1.0.0.bundle", "Ergopti_v2.0.0.bundle"
+		local fixture = helpers.driver_root() .. "/tests/support/release_rename_physical_port.py"
+		local ok, err = xpcall(function()
+			assert(os.execute("mkdir -p " .. quote(target .. "/" .. old) .. " " .. quote(source .. "/" .. new .. "/Contents")))
+			local resources = source .. "/" .. new .. "/Contents/Resources"
+			assert(os.execute("mkdir -p " .. quote(resources)))
+			assert(os.execute("ln -s . " .. quote(resources .. "/Directory.keylayout")))
+			assert(os.execute("ln -s missing " .. quote(resources .. "/Dangling.keylayout")))
+			local f = assert(io.open(source .. "/" .. new .. "/Contents/Info.plist", "w")); f:write("staged"); f:close()
+			f = assert(io.open(target .. "/" .. old .. "/original", "w")); f:write("original"); f:close()
+			f = assert(io.open(launcher, "w")); f:write("#!/bin/sh\nexec /usr/bin/env python3 " .. quote(fixture) .. " \"$@\"\n"); f:close()
+			assert(os.execute("chmod +x " .. quote(launcher)))
+			local command
+			local getenv = os.getenv
+			os.getenv = function(name) if name == "ERGOPTI_LAUNCHER_EXECUTABLE" then return launcher end; return getenv(name) end
+			local captured, capture_err = pcall(function()
+				local install = helpers.load_with_stubs("modules.keymap.layout_install", { execute = function(value) command = value; return "", false end })
+				install.install_user(source, new)
+			end)
+			os.getenv = getenv
+			assert(captured, capture_err); assert(type(command) == "string")
+			local rewritten, count = command:gsub("^target=.-;", "target=" .. quote(target) .. ";", 1); assert(count == 1)
+			local result = os.execute("/bin/sh -c " .. quote(rewritten) .. " >/dev/null 2>&1")
+			helpers.assert_true(result ~= true, "a bundle without keylayout files must be refused")
+			f = assert(io.open(target .. "/" .. old .. "/original", "r")); f:close()
+			helpers.assert_eq(io.open(target .. "/" .. new .. "/Contents/Info.plist", "r"), nil)
+			f = assert(io.open(resources .. "/real", "w")); f:write("layout"); f:close()
+			assert(os.execute("ln -s real " .. quote(resources .. "/Linked.keylayout")))
+			helpers.assert_true(os.execute("/bin/sh -c " .. quote(rewritten) .. " >/dev/null 2>&1"))
+			f = assert(io.open(target .. "/" .. new .. "/Contents/Resources/Linked.keylayout", "r")); f:close()
+		end, debug.traceback)
+		os.execute("rm -rf " .. quote(root))
+		if not ok then error(err, 0) end
+	end)
 	helpers.it("refuses reentrant installs while a user replacement is running", function()
 		local install, calls, nested_user, nested_system
 		calls = 0
@@ -190,6 +228,9 @@ helpers.describe("layout_install: transactional replacement", function()
 				.. " " .. quote(source .. "/" .. new .. "/Contents")))
 			local file = assert(io.open(source .. "/" .. new .. "/Contents/Info.plist", "w"))
 			assert(file:write("staged")); assert(file:close())
+			assert(os.execute("mkdir -p " .. quote(source .. "/" .. new .. "/Contents/Resources")))
+			file = assert(io.open(source .. "/" .. new .. "/Contents/Resources/valid.keylayout", "w"))
+			assert(file:write("layout")); assert(file:close())
 			file = assert(io.open(target .. "/" .. old .. "/original", "w"))
 			assert(file:write("original")); assert(file:close())
 			file = assert(io.open(launcher, "w"))

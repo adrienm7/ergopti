@@ -32,6 +32,7 @@ local function multi_type_pasteboard()
 		return out
 	end
 	local pasteboard = {
+		allContentTypes = function() return { {} } end,
 		readAllData = function() return copy(state.types) end,
 		writeAllData = function(data)
 			state.types, state.generation = copy(data), state.generation + 1

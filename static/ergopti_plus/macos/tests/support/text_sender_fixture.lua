@@ -34,6 +34,7 @@ local function with_sender(callback)
 				if f.count_failure == "nil" then return nil end
 				return f.change_count
 			end,
+			allContentTypes = function() return { {} } end,
 			readAllData = function() return clipboard end,
 			setContents = function(value)
 				f.change_count = f.change_count + 1

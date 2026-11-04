@@ -83,6 +83,7 @@ local function load_wrap_fixture(restore_outcomes)
 
 	local pasteboard = {
 		changeCount = function() return change_count end,
+		allContentTypes = function() return { {} } end,
 		readAllData = function()
 			snapshots = snapshots + 1
 			return clone(clipboard)

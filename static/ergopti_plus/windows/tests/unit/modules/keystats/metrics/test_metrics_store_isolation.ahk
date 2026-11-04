@@ -81,6 +81,8 @@ for Mode in ["disk", "ram", "legacy"]
 _MSI_PathIdentity() {
 	Root := A_Temp . "\ergopti_metrics_store_identity"
 	Path := KLPF_PrefetchPath("typing", Root)
+	OldPath := A_Temp . "\ergopti_metrics_prefetch_" . CryptoSha256.Call(ConfigTransitionNormalizeConfigDir(Root)) . "_typing.json"
+	AssertFalse(Path == OldPath, "old manifests must not be read with the new key codec")
 	AssertEqual(Path, KLPF_PrefetchPath("typing", StrReplace(Root, "\", "/") . "/"),
 		"separator spelling and a trailing separator must preserve store identity")
 	AssertFalse(Path == KLPF_PrefetchPath("typing", Root . "_other"))

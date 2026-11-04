@@ -53,6 +53,8 @@ _RIT_Backup(Opts, Release) {
 _RIT_Asset(Opts, Release) {
 	global _RIT_Events
 	_RIT_Events.Push("asset")
+	if Opts.Get("asset_throws", false)
+		throw Error("asset resolver unavailable")
 	return Opts.Get("asset", true) ? {Url: "u", Digest: "d"} : 0
 }
 
@@ -128,6 +130,15 @@ _RIT_RefusesMissingAsset() {
 }
 Test("Release install: a release without the Windows asset is refused after the backup (release-install-no-asset)",
 	_RIT_RefusesMissingAsset)
+
+_RIT_AssetErrorReleasesOwner() {
+	_RIT_Reset()
+	AssertFalse(ReleaseInstall_Start("v0.0.0-dev.139", "dev", _RIT_Deps(Map("asset_throws", true))))
+	AssertFalse(ReleaseInstall_Busy(), "a resolver failure frees the installation owner")
+	AssertEqual("failed", _RIT_Last()["phase"])
+	AssertEqual("changelog_window.install_error_unexpected", _RIT_Last()["reason_key"])
+}
+Test("Release install: an asset resolver error releases ownership", _RIT_AssetErrorReleasesOwner)
 
 _RIT_VerificationFailureReportedOnce() {
 	_RIT_Reset()

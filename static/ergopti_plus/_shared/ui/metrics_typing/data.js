@@ -268,8 +268,10 @@ function update_manifest_scope() {
 	app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
 	const app_set = new Set();
 	app_state.manifest_dates_sorted.forEach((date) => {
-		Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
-			if (app_name !== 'Unknown' && app_name !== '_sys' && app_name !== '_system') {
+		Object.keys(window.metrics_manifest[date]).forEach((app_key) => {
+			if (app_key === '_sys' || app_key === '_system') return;
+			const app_name = metricsManifestLabel(app_key);
+			if (app_name !== 'Unknown') {
 				app_set.add(app_name);
 			}
 		});
@@ -394,10 +396,12 @@ function compute_manifest_metrics() {
 		if (start_val && date_str < start_val) return;
 		if (end_val && date_str > end_val) return;
 
-		Object.keys(window.metrics_manifest[date_str]).forEach((app_name) => {
+		Object.keys(window.metrics_manifest[date_str]).forEach((app_key) => {
+			if (app_key === '_sys' || app_key === '_system') return;
+			const app_name = metricsManifestLabel(app_key);
 			if (!matches_typing_app_selection(app_name)) return;
 
-			const app = window.metrics_manifest[date_str][app_name];
+			const app = window.metrics_manifest[date_str][app_key];
 
 			if (!app_state.time_series[date_str]) {
 				app_state.time_series[date_str] = {
@@ -726,9 +730,11 @@ function recompute_speed_kpi() {
 	manifest_dates.forEach((date_str) => {
 		if (start_val && date_str < start_val) return;
 		if (end_val && date_str > end_val) return;
-		Object.keys(window.metrics_manifest[date_str] || {}).forEach((app_name) => {
+		Object.keys(window.metrics_manifest[date_str] || {}).forEach((app_key) => {
+			if (app_key === '_sys' || app_key === '_system') return;
+			const app_name = metricsManifestLabel(app_key);
 			if (!matches_typing_app_selection(app_name)) return;
-			accumulate(window.metrics_manifest[date_str][app_name]);
+			accumulate(window.metrics_manifest[date_str][app_key]);
 		});
 	});
 	const today_str = get_local_date_string();
@@ -904,7 +910,6 @@ function apply_local_filters() {
 	// the first projection would be stored under its pre-discovery selection.
 	if (include_today && app_state.today_live_data) {
 		Object.keys(app_state.today_live_data).forEach((app_name) => {
-			if (app_name === '_sys' || app_name === '_system') return;
 			// Register newly seen apps from live data
 			if (app_name !== 'Unknown' && !app_state.available_apps.includes(app_name)) {
 				app_state.available_apps.push(app_name);
@@ -980,8 +985,6 @@ function apply_local_filters() {
 
 		if (include_today && app_state.today_live_data) {
 			Object.keys(app_state.today_live_data).forEach((app_name) => {
-				if (app_name === '_sys' || app_name === '_system') return;
-
 				if (!matches_typing_app_selection(app_name)) return;
 
 				const app_data = app_state.today_live_data[app_name];
@@ -2474,9 +2477,11 @@ function render_roi_kpi() {
 	manifest_dates.forEach((date_str) => {
 		if (start_val && date_str < start_val) return;
 		if (end_val && date_str > end_val) return;
-		Object.keys(window.metrics_manifest[date_str] || {}).forEach((app_name) => {
+		Object.keys(window.metrics_manifest[date_str] || {}).forEach((app_key) => {
+			if (app_key === '_sys' || app_key === '_system') return;
+			const app_name = metricsManifestLabel(app_key);
 			if (!matches_typing_app_selection(app_name)) return;
-			accumulate(window.metrics_manifest[date_str][app_name]);
+			accumulate(window.metrics_manifest[date_str][app_key]);
 		});
 	});
 	const today_str = get_local_date_string();
@@ -2660,7 +2665,9 @@ function _foreach_filtered_app(fn) {
 	dates.forEach((date_str) => {
 		if (start_val && date_str < start_val) return;
 		if (end_val && date_str > end_val) return;
-		Object.entries(window.metrics_manifest[date_str] || {}).forEach(([app_name, app]) => {
+		Object.entries(window.metrics_manifest[date_str] || {}).forEach(([app_key, app]) => {
+			if (app_key === '_sys' || app_key === '_system') return;
+			const app_name = metricsManifestLabel(app_key);
 			if (!matches_typing_app_selection(app_name)) return;
 			fn(app, date_str, app_name);
 		});
@@ -2875,7 +2882,10 @@ function render_records_kpi() {
 
 	if (window.metrics_manifest) {
 		Object.entries(window.metrics_manifest).forEach(([date_str, apps]) => {
-			Object.entries(apps || {}).forEach(([app_name, app]) => visit(app, date_str, app_name));
+			Object.entries(apps || {}).forEach(([app_key, app]) => {
+				if (app_key === '_sys' || app_key === '_system') return;
+				visit(app, date_str, metricsManifestLabel(app_key));
+			});
 		});
 	}
 	if (app_state.today_live_data) {

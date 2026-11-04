@@ -41,6 +41,7 @@ function appsFixture() {
 	vm.runInContext(read('host_bridge.js'), context);
 	vm.runInContext(read('_generated/metrics_general_category_aliases.js'), context);
 	vm.runInContext(read('metrics_calendar.js'), context);
+	vm.runInContext(read('metrics_manifest_keys.js'), context);
 	for (const name of ['helpers.js', 'state.js', 'main.js']) {
 		assert.ok(index.includes(`src="${name}"`), `${name} must be loaded by the actual page`);
 		vm.runInContext(read(`metrics_apps/${name}`), context);
@@ -172,6 +173,7 @@ function typingFixture() {
 	});
 	context.window = context;
 	installHostCapabilities(context);
+	vm.runInContext(read('metrics_manifest_keys.js'), context);
 	vm.runInContext(read('metrics_typing/_generated/keystats_tokens.js'), context);
 	vm.runInContext(read('metrics_typing/key_tokens.js'), context);
 	vm.runInContext(read('metrics_typing/data.js'), context);
@@ -252,14 +254,14 @@ test('typing keys source mode, selection, dates and local midnight', () => {
 	assert.ok(f.stats.entries <= 2);
 });
 
-test('typing live discovery is keyed after ALL selection and rejects system pseudo-apps', () => {
+test('typing live discovery retains reserved-looking real application labels', () => {
 	const f = typingFixture();
 	f.state.today_live_data.New = { c: { n: { c: 9 } } };
 	f.state.today_live_data._system = { c: { invalid: { c: 100 } } };
 	f.apply();
 	assert.ok(f.state.selected_apps.has('New'));
 	assert.equal(f.state.data.c.n.count, 9);
-	assert.equal(f.state.data.c.invalid, undefined);
+	assert.equal(f.state.data.c.invalid.count, 100);
 	const first = f.state.data;
 	f.apply();
 	assert.strictEqual(f.state.data, first);
@@ -359,8 +361,8 @@ test('typing NONE preserves availability discovery and cache ownership', () => {
 	f.apply();
 	assert.ok(f.state.available_apps.includes('New'), 'discovery must continue with NONE');
 	assert.equal(f.state.selected_apps.size, 0, 'discovery must not select apps under NONE');
-	assert.equal(f.state.available_apps.includes('_sys'), false);
-	assert.equal(f.state.available_apps.includes('_system'), false);
+	assert.equal(f.state.available_apps.includes('_sys'), true);
+	assert.equal(f.state.available_apps.includes('_system'), true);
 	const none = f.state.data;
 	f.apply();
 	assert.strictEqual(f.state.data, none);
@@ -457,6 +459,7 @@ assert.equal(passed, 12, 'all original seven and five selection regressions must
 		vm.runInContext(read('dom_utils.js'), context);
 		vm.runInContext(read('_generated/metrics_general_category_aliases.js'), context);
 		vm.runInContext(read('metrics_calendar.js'), context);
+		vm.runInContext(read('metrics_manifest_keys.js'), context);
 		for (const name of ['helpers.js', 'state.js', 'main.js', 'charts.js', 'modal.js']) {
 			assert.ok(read('metrics_apps/index.html').includes(`src="${name}"`));
 			vm.runInContext(read(`metrics_apps/${name}`), context);
@@ -4097,5 +4100,40 @@ assert.equal(
 	1214,
 	'all native structured endpoint, subset and refresh controls must execute'
 );
+
+test('reserved app labels remain distinct from system data in both dashboards', () => {
+	const f = appsFixture();
+	const day = JSON.parse(
+		'{"~_system":{"chars":7},"~_sys":{"chars":8},"~~app":{"chars":9},' +
+			'"Editor":{"chars":10},"__proto__":{"chars":11},"constructor":{"chars":12},' +
+			'"_system":{"awake_ms":5}}'
+	);
+	f.context.window.bootstrapMetricsAppsData({ '2026-10-01': day }, {}, {});
+	f.set("currentPeriod = 'all';");
+	const result = f.get();
+	assert.equal(result.apps._system.chars, 7);
+	assert.equal(result.apps._sys.chars, 8);
+	assert.equal(result.apps['~app'].chars, 9);
+	assert.equal(result.apps.Editor.chars, 10);
+	assert.equal(result.apps.__proto__.chars, 11);
+	assert.equal(result.apps.constructor.chars, 12);
+	assert.equal(Object.getPrototypeOf(result.apps), null);
+	assert.equal(Object.prototype.chars, undefined);
+	assert.equal(result.rich.time.awake_ms, 5);
+	const typing = typingFixture();
+	typing.context.metrics_manifest = { '2026-10-01': day };
+	typing.context.update_manifest_scope();
+	assert.deepEqual(
+		Array.from(typing.state.selected_apps).sort(),
+		['Editor', '_sys', '_system', '~app', '__proto__', 'constructor'].sort()
+	);
+	assert.equal(typing.context.matches_typing_app_selection('_system'), true);
+	typing.state.app_selection_mode = 'subset';
+	typing.state.selected_apps = new Set(['_system', '~app', '__proto__', 'constructor']);
+	assert.deepEqual(
+		Array.from(typing.context.get_app_selection_request_apps()).sort(),
+		['_system', '~app', '__proto__', 'constructor'].sort()
+	);
+});
 
 console.log(`${passed} passed, 0 failed.`);

@@ -79,6 +79,7 @@ local function with_owner(run)
 			},
 			storage = {
 				get = function(key, default) local value = ctx.values[key]; if value == nil then return default end; return value end,
+				read_exact = function(key) return true, ctx.values[key] end,
 				set = function(key, value) ctx.writes = ctx.writes + 1; ctx.values[key] = value; return true end,
 			},
 			http = ctx.http, manual_http = ctx.manual_http,

@@ -238,6 +238,20 @@ end
 -- =========================================
 
 helpers.describe("CapsWord native activation reaches the pointer owner", function()
+	helpers.it("a new activation owns a clear while the old clear is pending (capsword-clear-reentrant)", function()
+		local h = fresh_harness()
+		h.sentinels.claim_key(90, true, { ctrl = true, alt = true, shift = true })
+		pointer(h)
+		h.sentinels.claim_key(90, true, { ctrl = true, alt = true, shift = true })
+		pointer(h)
+		helpers.assert_eq(#h.writers, 2, "the new activation must receive its own clear")
+		settle(h, 1, true)
+		h.pending_activation = true
+		pointer(h)
+		helpers.assert_eq(#h.writers, 2, "old settlement must not release the newer pending clear")
+		settle(h, 2, true)
+		helpers.assert_true(h.watchers.stop_gesture_watcher(h.watcher))
+	end)
 	helpers.it("clears a Karabiner activation only after the exact writer acknowledges", function()
 		local h = fresh_harness()
 		h.sentinels.claim_key(90, true, { ctrl = true, alt = true, shift = true })

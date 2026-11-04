@@ -122,6 +122,7 @@ local function load_fixture(options)
 
 	local pasteboard = {
 		changeCount = function() return change_count end,
+		allContentTypes = function() return { {} } end,
 		readAllData = function()
 			calls.read = calls.read + 1
 			local outcome = next_outcome(read_outcomes, calls.read)

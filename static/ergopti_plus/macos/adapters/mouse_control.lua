@@ -36,8 +36,13 @@ local LOG = "adapters.mouse_control"
 --- @param y number Vertical coordinate in pixels.
 --- @return boolean True when Hammerspoon accepted the position.
 function M.setPos(x, y)
+	x, y = tonumber(x), tonumber(y)
+	if not x or not y or x ~= x or y ~= y
+		or x == math.huge or x == -math.huge or y == math.huge or y == -math.huge then
+		return false
+	end
 	local ok = pcall(function()
-		hs.mouse.absolutePosition({ x = tonumber(x) or 0, y = tonumber(y) or 0 })
+		hs.mouse.absolutePosition({ x = x, y = y })
 	end)
 	return ok
 end
@@ -78,10 +83,12 @@ end
 --- @return table { left: number, top: number, right: number, bottom: number }
 function M.getMonitorBounds(n)
 	local empty = { left = 0, top = 0, right = 0, bottom = 0 }
+	local index = tonumber(n)
+	if not index or index ~= index or index < 1 or index >= math.huge or index % 1 ~= 0 then return empty end
 	local ok, result = pcall(function()
 		local screens = hs.screen.allScreens()
 		if type(screens) ~= "table" then return empty end
-		local screen = screens[tonumber(n) or 1]
+		local screen = screens[index]
 		if not screen then return empty end
 		local frame = screen:fullFrame()
 		if type(frame) ~= "table" then return empty end

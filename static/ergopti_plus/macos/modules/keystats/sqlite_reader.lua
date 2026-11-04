@@ -31,6 +31,7 @@
 --- ==============================================================================
 
 local M = {}
+local ManifestKeys = require("keystats.manifest_keys")
 
 local hs      = hs
 local json    = require("hs.json")
@@ -196,6 +197,7 @@ end
 
 --- Get-or-create a (date, app) cell in `manifest`.
 local function _get(manifest, date_str, app)
+	app = ManifestKeys.encode(app)
 	local d = manifest[date_str]
 	if not d then d = {}; manifest[date_str] = d end
 	local a = d[app]
@@ -995,7 +997,9 @@ local FINGERPRINT_SOURCES = {
 	{ "ngram_media_keys",        "c" },
 	{ "ngram_shortcuts",         "c" },
 	{ "ngram_shortcut_bigrams",  "c" },
-	{ "agg_app_day",             "chars", "time_ms", "think_time_ms", "app_time_ms", "hs_triggers", "llm_triggers" },
+	{ "agg_app_day",             "chars", "pauses", "time_ms", "think_time_ms", "app_time_ms",
+		"hs_chars", "llm_chars", "hs_triggers", "llm_triggers", "hs_suggested", "llm_suggested",
+		"hs_input_chars", "llm_input_chars" },
 	{ "agg_app_day_buckets",     "time_sum", "credited", "hs_input_time_sum", "llm_input_time_sum" },
 	{ "agg_app_day_burst",       "count_total", "inter_delay_sum", "length(length_buckets_json)" },
 	{ "agg_app_day_session",     "count_total", "total_active_ms", "length(durations_json)" },

@@ -71,6 +71,22 @@ function M.rewrite_configured(path, value)
 	return committed == true
 end
 
+--- Rewrites one configured row and retains its exact inverse for its caller.
+function M.rewrite_configured_owned(path, value)
+	assert(ALIAS_NAMES[path] ~= nil, "not a native script row: " .. tostring(path))
+	return require("script_config_authority").rewrite_owned({
+		path = require("infra.config_paths").get("ConfigTomlPath"),
+		file_adapter = require("adapters.file_system"), manifest = Manifest, key = path, value = value })
+end
+
+function M.restore_configured_rewrite(receipt)
+	return require("script_config_authority").restore_rewrite(receipt)
+end
+
+function M.verify_configured_rewrite(receipt)
+	return require("script_config_authority").verify_rewrite(receipt)
+end
+
 --- Returns detached alias descriptors bound to the existing native field owners.
 --- Each call constructs fresh descriptor tables; native module identities remain
 --- the exact live providers used by the ordinary participant, without policy copies.
