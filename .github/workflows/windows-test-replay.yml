@@ -242,7 +242,16 @@ jobs:
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.navigation.outcome == 'success' && steps.entry_inputs.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 12
+        env:
+          ERGOPTI_REPLAY_SELECTION: ${{ inputs.selection || '.github/ci/ahk-replay/windows-audit-20261104.json' }}
         run: |
+          $selection = Get-Content -LiteralPath $env:ERGOPTI_REPLAY_SELECTION -Raw | ConvertFrom-Json
+          $httpSelection = $selection.PSObject.Properties['native_http_client_e2e']
+          if ($null -ne $httpSelection -and $httpSelection.Value -isnot [bool]) { throw 'The native HTTP E2E selector must be Boolean.' }
+          if ($null -eq $httpSelection -or -not $httpSelection.Value) {
+              Write-Host 'Native HTTP adapter E2E is outside this declared replay selection.'
+              return
+          }
           $env:ERGOPTI_AHK_EXE = $env:ERGOPTI_REPLAY_AHK
           $proxyOutput = & node tools/test/test-windows-proxy-override-e2e.cjs --required '--only=http_client:' 2>&1
           $proxyExit = $LASTEXITCODE
