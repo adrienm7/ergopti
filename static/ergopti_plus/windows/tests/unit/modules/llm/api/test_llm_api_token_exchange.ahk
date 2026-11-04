@@ -715,3 +715,82 @@ _LTERP_Run(Mode) {
 for _LTERP_Mode in ["fresh", "renewed", "exchange", "cancel", "deadline", "pause"]
     Test("Token exchange: raw POST " . _LTERP_Mode . " preserves current access and owner (token-rawpost-owner)",
         _LTERP_Run.Bind(_LTERP_Mode))
+
+; Public readiness, genuine token engine/PostFn and actual AHK timer delivery.
+_LTED_Reply(State, Post, Owner, Expired) {
+    PreviousCritical := Critical("On")
+    try {
+        State.TimerCalls += 1
+        AssertTrue(LLM_AuxIsCurrent(Owner), "the controlled answer timer must enter before the real deadline timer")
+        AssertFalse(_LLM_DeadlineExpired(Owner["network_start_tick"], Owner["network_timeout_ms"]),
+            "the answer timer must begin under the live original clock")
+        if Expired {
+            ; Model a reply handler whose processing straddles the actual budget.
+            ; No origin/deadline is changed; the due deadline timer cannot interrupt
+            ; this real timer thread. Waiting is bounded by the owned 96 ms budget.
+            while !_LLM_DeadlineExpired(Owner["network_start_tick"], Owner["network_timeout_ms"]) {
+            }
+        }
+        State.ElapsedAtAnswer := TickElapsed(Owner["network_start_tick"])
+        State.OwnerCurrentAtAnswer := LLM_AuxIsCurrent(Owner)
+        _LTE_Answer(Post, "fixture-access-token")
+    } catch Any as Failure {
+        State.Failure := Failure
+    } finally {
+        State.TimerDone := true
+        Critical(PreviousCritical)
+    }
+}
+
+_LTED_Body(Expired, Posts, Lines) {
+    global LLM_REMOTE_READY_PING_DEADLINE_MS, _LLM_AuxOwners, LTE_PROVIDER, LLM_API_PROVIDERS
+    SavedBudget := LLM_REMOTE_READY_PING_DEADLINE_MS
+    State := {TimerCalls: 0, TimerDone: false, Failure: 0, ElapsedAtAnswer: -1, OwnerCurrentAtAnswer: false}
+    Heard := [], Owner := 0, Reply := 0
+    PreviousCritical := Critical("Off")
+    try {
+        AssertFalse(A_IsSuspended)
+        AssertEqual(0, _LLM_AuxOwners.Count, "no foreign auxiliary owner may be borrowed")
+        LLM_REMOTE_READY_PING_DEADLINE_MS := 96
+        Owner := LLM_RemoteIsReady_Async(_LTE_Entry(), (Value) => Heard.Push(Value))
+        Origin := Owner["network_start_tick"], Budget := Owner["network_timeout_ms"]
+        _LTE_Pump()
+        AssertEqual(1, Posts.Length, "the genuine exchange must be pending")
+        AssertEqual(0, Heard.Length, "readiness waits for the genuine token answer")
+        Reply := _LTED_Reply.Bind(State, Posts[1], Owner, Expired)
+        SetTimer(Reply, -1)
+        StartedWait := A_TickCount
+        while !State.TimerDone && TickElapsed(StartedWait) < 3000
+            Sleep(1)
+        AssertTrue(State.TimerDone, "the actual owned answer timer must execute")
+        if IsObject(State.Failure)
+            throw State.Failure
+        AssertEqual(1, State.TimerCalls)
+        AssertTrue(State.OwnerCurrentAtAnswer)
+        AssertEqual(Origin, Owner["network_start_tick"], "the real original clock must remain unchanged")
+        AssertEqual(Budget, Owner["network_timeout_ms"])
+        AssertEqual(1, Heard.Length, "the actual request must settle exactly once")
+        _TestPrint("# TOKEN_READY_DEADLINE " . KL_JsonEncode(Map("expired", Expired,
+            "elapsed_at_answer", State.ElapsedAtAnswer, "budget", Budget,
+            "owner_current_at_answer", State.OwnerCurrentAtAnswer,
+            "answer_timer_calls", State.TimerCalls, "posts", Posts.Length, "reachable", Heard[1])))
+        AssertEqual(!Expired, Heard[1], "a late usable token must not turn an expired validation into success")
+        AssertFalse(LLM_AuxIsCurrent(Owner))
+        ; The deadline belongs to this requester, not to the shared token cache.
+        AssertEqual("fixture-access-token", LLM_TokenExchange_Current(LTE_PROVIDER,
+            LLM_API_PROVIDERS[LTE_PROVIDER]["Auth"], _LTE_Key()))
+    } finally {
+        if IsObject(Reply)
+            SetTimer(Reply, 0)
+        if Owner is Map && LLM_AuxIsCurrent(Owner)
+            LLM_AuxFinish(Owner)
+        LLM_REMOTE_READY_PING_DEADLINE_MS := SavedBudget
+        Critical(PreviousCritical)
+    }
+}
+
+_LTED_Run(Expired) {
+    _ManagedRemoteFixtureWithLlmTimings(_LTE_Run.Bind(_LTED_Body.Bind(Expired)))
+}
+Test("Token exchange: readiness accepts a timely actual token timer (token-ready-deadline)", _LTED_Run.Bind(false))
+Test("Token exchange: readiness refuses a late actual token timer (token-ready-deadline)", _LTED_Run.Bind(true))
