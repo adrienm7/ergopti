@@ -21,6 +21,8 @@ local function with_editor(body, options)
 	if not options.absent then write(path, options.file_off and INITIAL:gsub("enabled = true", "enabled = false") or INITIAL) end
 	local Prompt = require("ui.text_prompt")
 	local ask, execute, open = Prompt.ask, os.execute, io.open
+	local FileWriter = require("infra.regular_file_writer")
+	local writer_open = FileWriter.open
 	local manager
 	local ok, err = xpcall(function()
 		manager = require(MODULES[1])
@@ -87,18 +89,19 @@ local function with_editor(body, options)
 		s.pause = function(value) s.paused = value; assert(manager.set_paused(value)) end
 		s.prompt = function(callback) Prompt.ask = function() callback(); return "450" end end
 		s.stage = function(callback)
-			io.open = function(filename, mode)
-				local f, detail = open(filename, mode)
-				if filename ~= path .. ".tmp" or not f then return f, detail end
+			FileWriter.open = function(filename, mode)
+				local f, detail, code, remove_owned, current_image = writer_open(filename, mode)
+				if filename ~= path .. ".tmp" or not f then return f, detail, code, remove_owned, current_image end
 				local proxy = {}
 				proxy.write = function(_, text) local ack = f:write(text); return ack and proxy end
-				proxy.close = function() local ack = f:close(); callback(); return ack end
-				return proxy
+				proxy.close = function() local ack = f:close(); s.staged = true; callback(); return ack end
+				return proxy, detail, code, remove_owned, current_image
 			end
 		end
 		body(s)
 	end, debug.traceback)
 	Prompt.ask, os.execute, io.open = ask, execute, open
+	FileWriter.open = writer_open
 	if manager then manager._reset_for_test() end
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved[name] end
 	for _, filename in ipairs({ path, defaults, path .. ".tmp" }) do os.remove(filename) end
@@ -142,6 +145,7 @@ helpers.describe("TapHold deferred configuration owner", function()
 					local accepted
 					if route == "tap" then s.tap(); accepted = s.confirm("backspace")
 					else s.prompt(function() end); accepted = s.delay() end
+					helpers.assert_true(s.staged, "the change was retired after the staging file closed")
 					helpers.assert_eq(accepted, false)
 					helpers.assert_eq(read(s.path), before)
 					helpers.assert_eq(read(s.path .. ".tmp"), nil)
