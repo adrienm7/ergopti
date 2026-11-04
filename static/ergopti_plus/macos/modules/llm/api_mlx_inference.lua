@@ -608,6 +608,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	local line_buf      = ""
 	local event_data_lines = {}
 	local stream_complete = false
+	local provider_failed = false
 	local in_reasoning  = false  -- Currently accumulating delta.reasoning(_content) tokens — close </think> on transition or end
 	local t0_req        = TimerScheduler.now()
 	local task_completed = false
@@ -645,6 +646,11 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 			Logger.debug(LOG, "process_sse_payload: JSON parse failed — skipping event.")
 			return
 		end
+		if type(obj) == "table" and rawget(obj, "error") ~= nil then
+			provider_failed = true
+			return
+		end
+		if provider_failed then return end
 		if type(obj) ~= "table" or type(obj.choices) ~= "table" or not obj.choices[1] then
 			Logger.debug(LOG, "[%s] #%d SSE decode fail: type_obj=%s",
 				model_name, req_id, type(obj))
@@ -915,6 +921,12 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		end
 		-- HTTP/1.0 closes a streamed body at EOF even when the model generator
 		-- raised. curl exit zero proves transport closure, not provider completion.
+		if provider_failed then
+			Logger.warn(LOG, "[%s] #%d STREAM provider reported failure — discarding partial output.",
+				tostring(model_name), req_id)
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+			return
+		end
 		if not stream_complete then
 			Logger.warn(LOG, "[%s] #%d STREAM ended without its completion marker — discarding partial output.",
 				tostring(model_name), req_id)

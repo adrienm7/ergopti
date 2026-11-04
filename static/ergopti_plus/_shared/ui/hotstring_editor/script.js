@@ -385,6 +385,13 @@ function serializeTrigEditor(el) {
 	return s.trim();
 }
 
+// Distinguish an intentional Enter command from WebKit's empty-editor BR.
+function makeEnterBreak() {
+	const br = document.createElement('br');
+	br.dataset.enter = 'true';
+	return br;
+}
+
 function parseToNodes(text) {
 	if (!text) return [document.createTextNode('')];
 	text = toDisplay(text);
@@ -395,7 +402,7 @@ function parseToNodes(text) {
 	while ((m = re.exec(text)) !== null) {
 		if (m.index > last) nodes.push(document.createTextNode(text.slice(last, m.index)));
 		const tname = normToken(m[1]);
-		if (tname === 'Enter') nodes.push(document.createElement('br'));
+		if (tname === 'Enter') nodes.push(makeEnterBreak());
 		else nodes.push(makeChip(tname));
 		last = re.lastIndex;
 	}
@@ -407,7 +414,12 @@ function serializeEditor(el) {
 	const nodes = Array.from(el.childNodes);
 	while (nodes.length > 0) {
 		const last = nodes[nodes.length - 1];
-		if (last.nodeType === 1 && last.tagName === 'BR' && !last.classList.contains('token-chip')) {
+		if (
+			last.nodeType === 1 &&
+			last.tagName === 'BR' &&
+			!last.dataset.enter &&
+			!last.classList.contains('token-chip')
+		) {
 			nodes.pop();
 		} else {
 			break;
@@ -440,7 +452,7 @@ function insertBrAtCursor() {
 	const ed = document.getElementById('e-out');
 	ed.focus();
 	let sel = window.getSelection();
-	const br = document.createElement('br');
+	const br = makeEnterBreak();
 	if (sel && sel.rangeCount) {
 		const r = sel.getRangeAt(0);
 		if (ed.contains(r.commonAncestorContainer)) {
@@ -549,7 +561,7 @@ function tryConvertToken(editor) {
 
 	if (tokenName === 'Enter') {
 		const anch = sel.getRangeAt(0);
-		const br = document.createElement('br');
+		const br = makeEnterBreak();
 		anch.insertNode(br);
 		if (!br.nextSibling) br.parentNode.appendChild(document.createTextNode(''));
 		const nr = document.createRange();
@@ -664,7 +676,7 @@ function applyAc(name) {
 	if (normToken(name) === 'Enter') {
 		const sel2 = window.getSelection();
 		const anch = sel2.getRangeAt(0);
-		const br = document.createElement('br');
+		const br = makeEnterBreak();
 		anch.insertNode(br);
 		if (!br.nextSibling) br.parentNode.appendChild(document.createTextNode(''));
 		const nr = document.createRange();

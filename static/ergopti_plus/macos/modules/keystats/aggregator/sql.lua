@@ -78,11 +78,13 @@ end
 
 --- Encodes a number map or a list as the compact JSON text a statement stores.
 --- @param value table|nil The map, or nil.
---- @return string The JSON text, "{}" for anything that is not a table or cannot be encoded.
+--- @return string The JSON text, "{}" for an absent map. Encoding failures abort the transaction.
 local function json_text(value)
 	if type(value) ~= "table" then return "{}" end
 	local ok, encoded = pcall(json.encode, value)
-	if not ok then return "{}" end
+	if not ok or type(encoded) ~= "string" or encoded == "" then
+		error("Cannot encode aggregate distribution", 0)
+	end
 	return encoded
 end
 

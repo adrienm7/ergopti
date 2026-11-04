@@ -83,6 +83,9 @@ local function run_stream_case(case)
 	parser.process_prediction = function(_, _, raw) return { to_type = raw } end
 	json_codec.decode = function(raw)
 		decoded_payloads[#decoded_payloads + 1] = raw
+		if raw == '{"error":{"message":"generation failed"}}' then
+			return require("json").decode(raw), nil
+		end
 		if raw ~= (case.expected_payload or JSON_SINGLE) then
 			return nil, "unexpected SSE payload"
 		end
@@ -181,6 +184,13 @@ local function run_stream_case(case)
 			"a nil decode error is authoritative even for a false value")
 		return
 	end
+	if case.expect_provider_error then
+		helpers.assert_eq(#decoded_payloads, 2)
+		helpers.assert_eq(#partials, 1)
+		helpers.assert_eq(#successes, 0, "provider failure cannot publish a partial answer")
+		helpers.assert_eq(failures, 1, "provider failure is reported once")
+		return
+	end
 	if case.expect_transport_incomplete then
 		helpers.assert_eq(#decoded_payloads, 1, "the truncated stream must contain a valid decoded token")
 		helpers.assert_eq(#partials, 1, "the provider must have started a real partial prediction")
@@ -207,6 +217,11 @@ end
 
 helpers.describe("MLX SSE event parser", function()
 	for _, case in ipairs({
+		{
+			name = "rejects provider error after partial text even with a DONE marker",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:{"error":{"message":"generation failed"}}\n\n', SSE_DONE },
+			expect_provider_error = true,
+		},
 		{
 			name = "ignores superseded EOF without clearing its successor (mlx-stream-terminal-receipt)",
 			chunks = { "data:" .. JSON_SINGLE .. "\n\n" },

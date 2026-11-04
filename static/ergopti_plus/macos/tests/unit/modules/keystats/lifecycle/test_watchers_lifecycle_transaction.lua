@@ -348,6 +348,19 @@ helpers.describe("keystats hardware watchers form one exact transaction", functi
 		end)
 	end)
 
+	helpers.it("observes the documented default output device change event", function()
+		with_fixture({}, function(watchers, fixture, state)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			state.current_audio_volume = nil
+			fixture.audio.callback("dOut")
+			helpers.assert_eq(state.current_audio_volume, 40)
+			helpers.assert_eq(#fixture.system_events, 1)
+			helpers.assert_eq(fixture.system_events[1].kind, "audio_change")
+			helpers.assert_eq(fixture.system_events[1].payload.event_code, "dOut")
+			helpers.assert_eq(watchers.stop_hardware_watchers(), true)
+		end)
+	end)
+
 	helpers.it("rolls back earlier siblings when a later watcher refuses startup", function()
 		with_fixture({ start_results = { battery = false } }, function(watchers, fixture)
 			helpers.assert_eq(watchers.init_hardware_watchers(), false)
