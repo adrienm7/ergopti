@@ -501,6 +501,11 @@ function native() {
 		const shared = path.join(root, 'installed driver/_shared');
 		const cwd = path.join(root, 'unrelated cwd');
 		fs.mkdirSync(path.join(driver, 'platform/network'), { recursive: true });
+		fs.mkdirSync(path.join(driver, 'infra'), { recursive: true });
+		fs.copyFileSync(
+			path.join(ROOT, DRIVER, 'infra/regular_file_reader.lua'),
+			path.join(driver, 'infra/regular_file_reader.lua')
+		);
 		fs.mkdirSync(path.join(driver, '_generated'), { recursive: true });
 		fs.mkdirSync(path.join(shared, 'lua'), { recursive: true });
 		fs.mkdirSync(cwd);
