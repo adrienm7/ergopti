@@ -195,6 +195,18 @@ helpers.describe("ui.bridge_handlers", function()
       -- a shade nothing else in the product uses.
       helpers.assert_eq(#seen, 0, "a missing neutral colour must stop the repaint, not invent one")
     end)
+    helpers.it("(hotstrings-reset-refusal) refuses a partial reset when personal files are present", function()
+      local s2, notices, clears = build_mock_state(), {}, 0
+      local personal = require("hotstrings.personal_files").describe({ "independent.toml" }).id
+      s2.config.get_categories = function() return { accents = {}, [personal] = { sections_order = { "work" } } } end
+      s2.config.clear_override = function() clears = clears + 1; return true end
+      s2.notify_error = function(key) notices[#notices + 1] = key end
+      local result = handler.on_message({ action = "reset_all" }, s2)
+      helpers.assert_eq(result, { reset = false })
+      helpers.assert_eq(clears, 0, "no other setting is changed by the refused batch")
+      helpers.assert_eq(notices, { "hs_config.reset_all_personal_unavailable" })
+    end)
+
     helpers.it("'reset_all' clears every category's overrides", function()
       local cleared = {}
       local s2 = build_mock_state()

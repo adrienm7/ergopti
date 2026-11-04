@@ -951,6 +951,7 @@
 	"hs_config.notify_delimiters_saved": "Word delimiters updated.",
 	"hs_config.notify_reset_all": "Delays and colors have been reset.",
 	"hs_config.override_active": "override active",
+	"hs_config.reset_all_personal_unavailable": "Reset all is unavailable while personal hotstring files are present. No settings were changed.",
 	"hs_config.section_prefix": "Section: ",
 	"hs_config.window_title": "Hotstring delays and colors",
 	"init.reload_files": "Files changed — reloading…",
