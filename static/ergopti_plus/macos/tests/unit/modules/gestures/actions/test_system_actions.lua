@@ -44,7 +44,7 @@ local OWN_BUNDLE = "com.ergoptiplus.app"
 local function with_system(body, options)
 	options = options or {}
 	helpers.with_fresh_modules(OWNED, function()
-		local record = { runs = {}, notices = {}, cleared = {}, moved = {}, created = {} }
+		local record = { runs = {}, notices = {}, cleared = {}, moved = {}, created = {}, listeners = {} }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.notifications"] = {
@@ -54,12 +54,14 @@ local function with_system(body, options)
 			end,
 		}
 		package.loaded["modules.gestures.actions_aux_owner"] = {
+			register_pause_listener = function(id, listener) record.listeners[id] = listener end,
+			has_pending = function() return record.pending == true end,
 			run = function(executable, args, label, callback, parent)
 				record.runs[#record.runs + 1] = {
 					executable = executable, args = args, label = label,
 					callback = callback, parent = parent,
 				}
-				return true
+				return not options.refuse_start
 			end,
 		}
 		package.loaded["adapters.clipboard"] = {
@@ -281,6 +283,42 @@ helpers.describe("macOS system actions start their exact native command", functi
 				{ "-e", string.format(System.SCRIPTS.mic_toggle, 70) })
 			helpers.assert_contains(record.runs[2].args[2], "set volume input volume 70")
 		end)
+	end)
+
+	helpers.it("serializes microphone toggles until the previous result is known", function()
+		with_system(function(System, record)
+			helpers.assert_eq(System.mic_mute_toggle(PARENT), true)
+			helpers.assert_eq(System.mic_mute_toggle("gestures"), false)
+			helpers.assert_eq(#record.runs, 1)
+			complete(record.runs[1], true, "muted 23")
+			helpers.assert_eq(System.mic_mute_toggle("gestures"), true)
+			helpers.assert_contains(record.runs[2].args[2], "set volume input volume 23")
+		end)
+	end)
+
+	helpers.it("keeps a paused microphone process fenced until it settles", function()
+		with_system(function(System, record)
+			helpers.assert_eq(System.mic_mute_toggle(PARENT), true)
+			record.pending = true
+			record.listeners.system_actions_mic(PARENT)
+			helpers.assert_eq(System.mic_mute_toggle("gestures"), false)
+			complete(record.runs[1], true, "muted 23")
+			record.pending = false
+			helpers.assert_eq(System.mic_mute_toggle("gestures"), true)
+			helpers.assert_contains(record.runs[2].args[2], "set volume input volume 50")
+		end)
+	end)
+
+	helpers.it("keeps a refused microphone start fenced while native cleanup is pending", function()
+		with_system(function(System, record)
+			record.pending = true
+			helpers.assert_eq(System.mic_mute_toggle(PARENT), false)
+			helpers.assert_eq(System.mic_mute_toggle("gestures"), false)
+			helpers.assert_eq(#record.runs, 1)
+			record.pending = false
+			System.mic_mute_toggle("gestures")
+			helpers.assert_eq(#record.runs, 2)
+		end, { refuse_start = true })
 	end)
 end)
 
