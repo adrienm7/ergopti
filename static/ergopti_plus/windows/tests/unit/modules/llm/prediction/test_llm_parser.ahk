@@ -185,3 +185,15 @@ Test("LLM raw separator parity: preserves an already-separated ASCII tail",
 	TestLLMParser_RawSeparatorParity.Bind("hello ", "world", "world"))
 Test("LLM raw separator parity: does not separate an apostrophe suffix",
 	TestLLMParser_RawSeparatorParity.Bind("l'", "arbre", "arbre"))
+
+; An incomplete reasoning block must never become a selectable prediction.
+TestLLMParser_UnfinishedThinking() {
+	AssertEqual("answer ", LLM_Parser_StripThinking("answer <THINK>private`nreasoning"))
+	AssertEqual("answer ", LLM_Parser_StripThinking("<think>old</think>answer <thinking>private"))
+	AssertEqual("answer", LLM_Parser_StripThinking("<thinking>private</thinking>answer"))
+	AssertEqual("answer ", LLM_Parser_StripThinking("answer <thi", true))
+	AssertEqual("answer ", LLM_Parser_StripThinking("answer <THINK", true))
+	AssertEqual(0, LLM_Parser_ParseResponse("<think>private", "", "", 1, 0, false, 1).Length)
+	AssertEqual(0, LLM_Parser_ParseResponse("<thinking>private", "", "", 1, 0, true, 2).Length)
+}
+Test("LLM parser: unfinished thinking stays private (llm-truncated-thinking)", TestLLMParser_UnfinishedThinking)

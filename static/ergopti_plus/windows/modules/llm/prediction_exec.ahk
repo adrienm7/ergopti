@@ -1030,7 +1030,7 @@ _LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
 	while (preview.Length < slot_idx - 1)
 		preview.Push("")
 	; Strip thinking tags during streaming; full parser runs on on_success.
-	display := LLM_Parser_StripThinking(partial)
+	display := LLM_Parser_StripThinking(partial, true)
 	preview.Push(display)
 	; Active = the slot currently streaming, so Tab during streaming still
 	; produces something sensible.
