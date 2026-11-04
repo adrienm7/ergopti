@@ -282,7 +282,17 @@ M.HANDLERS = {
 		end
 	end,
 	make_executable_selection = function(deps)
-		local ok, uri_list, reason = deps.clipboard.read_selection_uri_list(deps.emit_combo, deps.sleep_ms)
+		local admitted = require("modules.shortcuts.open_selection").capture_file_manager()
+		if not admitted then
+			Logger.warn(LOG, "make_executable_selection: no focused file manager; copy refused.")
+			return
+		end
+		local function guarded_copy(combo)
+			if admitted() ~= true then return false end
+			return deps.emit_combo(combo)
+		end
+		local ok, uri_list, reason = deps.clipboard.read_selection_uri_list(guarded_copy, deps.sleep_ms)
+		if admitted() ~= true then return end
 		if not ok then
 			if reason == "no_file_selection" then
 				Logger.info(LOG, "make_executable_selection: no file is selected.")

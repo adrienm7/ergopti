@@ -266,6 +266,18 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 		end
 	end)
 
+	helpers.it("retains the active Wayland file manager and revokes it on focus change", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local frame = "nautilus"
+		Subject._set_deps_for_test({ focused_app = function() return "" end, active_frame_app = function() return frame end })
+		local admitted = Subject.capture_file_manager()
+		helpers.assert_type(admitted, "function")
+		helpers.assert_eq(admitted(), true)
+		frame = "gnome-terminal-server"
+		helpers.assert_eq(admitted(), false)
+		Subject._set_deps_for_test(nil)
+	end)
+
 	helpers.it("(linux-copy-path-wayland-frame) keeps opening when the frame is unknown or not a file manager", function()
 		for _, frame in ipairs({ false, "gnome-terminal-", "firefox" }) do
 			local world, Subject, primary = record_in("", { ok = true, uri_list = "file:///tmp/a\n" }, frame or nil)
