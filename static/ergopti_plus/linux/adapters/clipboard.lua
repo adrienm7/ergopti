@@ -533,17 +533,17 @@ local function copy_selection(b, emit_combo, sleep_ms, publication)
 	local function current() return publication == nil or admitted(publication.current) end
 	if not current() then return false, "destination_changed" end
 	local sentinel = "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__"
-	if not write_backend_checked(b, sentinel) then return false, "clipboard_probe_write_failed" end
-	if not current() then return false, "destination_changed" end
+	if not write_backend_checked(b, sentinel) then return false, "clipboard_probe_write_failed", sentinel end
+	if not current() then return false, "destination_changed", sentinel end
 	local copy_ok, copied = pcall(emit_combo, "ctrl+c", publication)
-	if not copy_ok or copied ~= true then return false, "copy_chord_failed" end
-	if not current() then return false, "destination_changed" end
-	if not wait_checked(sleep_ms, COPY_SETTLE_MS) then return false, "copy_settle_failed" end
-	if not current() then return false, "destination_changed" end
+	if not copy_ok or copied ~= true then return false, "copy_chord_failed", sentinel end
+	if not current() then return false, "destination_changed", sentinel end
+	if not wait_checked(sleep_ms, COPY_SETTLE_MS) then return false, "copy_settle_failed", sentinel end
+	if not current() then return false, "destination_changed", sentinel end
 	local selection_ok, selected, selection_error = read_backend_checked(b)
-	if not current() then return false, "destination_changed" end
-	if not selection_ok then return false, selection_error or "selection_read_failed" end
-	if selected == sentinel then return false, "no_selection" end
+	if not current() then return false, "destination_changed", selection_ok and selected or sentinel end
+	if not selection_ok then return false, selection_error or "selection_read_failed", sentinel end
+	if selected == sentinel then return false, "no_selection", sentinel end
 	return true, selected
 end
 
@@ -576,7 +576,12 @@ function M.read_selection(emit_combo, sleep_ms)
 	if not b then return false, "", why end
 	local snapshot_ok, saved, snapshot_error = read_restorable_snapshot(b)
 	if not snapshot_ok then return false, "", snapshot_error or "clipboard_snapshot_failed" end
-	local copied, selected = copy_selection(b, emit_combo, sleep_ms)
+	local copied, selected, probe = copy_selection(b, emit_combo, sleep_ms)
+	if not copied and probe ~= nil then
+		local ok, current = read_backend_checked(b)
+		if not ok then return false, "", "clipboard_ownership_unknown" end
+		if current ~= probe and current ~= saved then return false, "", selected end
+	end
 	if copied then
 		-- A later copy must not be replaced with the old snapshot.
 		local read_ok, current = read_backend_checked(b)
@@ -608,6 +613,9 @@ function M.read_selection_uri_list(emit_combo, sleep_ms)
 	-- would otherwise still answer the uri-list read when nothing is selected.
 	local sentinel = "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__"
 	if not write_backend_checked(b, sentinel) then
+		local ok, current = read_backend_checked(b)
+		if not ok then return false, "", "clipboard_ownership_unknown" end
+		if current ~= sentinel and current ~= saved then return false, "", "clipboard_probe_write_failed" end
 		if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
 		return false, "", "clipboard_probe_write_failed"
 	end
@@ -618,6 +626,14 @@ function M.read_selection_uri_list(emit_combo, sleep_ms)
 	-- text, so the read returns the sentinel itself. Both are "no file selected".
 	local read_ok, uri_list = false, ""
 	if settled then read_ok, uri_list = Shell.exec_checked(b.read_uri_list) end
+	if settled and read_ok and uri_list ~= "" and uri_list ~= sentinel then
+		local ok, current = Shell.exec_checked(b.read_uri_list)
+		if not ok or current ~= uri_list then return false, "", "clipboard_ownership_unknown" end
+	else
+		local ok, current = read_backend_checked(b)
+		if not ok then return false, "", "clipboard_ownership_unknown" end
+		if current ~= sentinel and current ~= saved then return false, "", "clipboard_ownership_unknown" end
+	end
 	if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
 	if not settled then return false, "", "copy_chord_failed" end
 	if not read_ok or uri_list == "" or uri_list == sentinel then return false, "", "no_file_selection" end
@@ -657,8 +673,11 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 		return false, reason
 	end
 	if not current() then return fail("destination_changed") end
-	local copied, selected = copy_selection(b, emit_combo, sleep_ms, publication)
-	if not copied then return fail(selected) end
+	local copied, selected, probe = copy_selection(b, emit_combo, sleep_ms, publication)
+	if not copied then
+		owned, previous_owned = probe, saved
+		return fail(selected)
+	end
 	owned = selected
 
 	local transformed_ok, replacement = pcall(transform, selected)
