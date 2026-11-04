@@ -266,6 +266,86 @@ for _PEMO_Mode in ["cancel", "closed", "reopened", "section"]
 
 ; Entry receipt regressions share the real source/session/private-config fixture.
 
+
+_PECASE_RegistryScope(Restore := 0) {
+	global _PrefixInputHook, _PrefixVisibleFireDecisions, HS_PERSONAL_RELOAD_INDEX_DELAY_MS
+	global HSE_MAX_BUFFER_LEN, HSE_WORD_TERMINATORS, HSE_RebuildInProgress, HSE_CONSUMED_DELIMITERS, HSE_PRIORITY_COMMON
+	global HSE_PRIORITY_PACKAGE, HSE_PRIORITY_PERSONAL, HSE_Buffer, HSE_FinalNoOpPending, HSE_FinalNoOpFound
+	global HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_RegistryByLastChar, HSE_RegistryByGroup, HSE_DisabledGroups
+	global HSE_SeqCounter, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration, HSE_RegistryTransitionDepth, HSE_StarSpecs
+	global HSE_StarPrefixSetCI, HSE_StarPrefixSetCS, HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
+	global HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_MaxEndTriggerLen, HSE_Suppressed, HSE_LastMatch
+	global HSE_LastEndChar, HSE_RepeatEnabled, HSE_IdleResetSeconds, HSE_ClickResetsWord, HSE_CascadeMaxArrows
+	global HSE_CASCADE_MIN_ARROWS, HSE_CASCADE_MAX_ARROWS, HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
+	global HSE_PersonalInfoCombosEnabled, HSE_TypoNbspStripped
+	Names := ["HSE_MAX_BUFFER_LEN", "HSE_WORD_TERMINATORS", "HSE_RebuildInProgress", "HSE_CONSUMED_DELIMITERS", "HSE_PRIORITY_COMMON", "HSE_PRIORITY_PACKAGE", "HSE_PRIORITY_PERSONAL", "HSE_Buffer", "HSE_FinalNoOpPending", "HSE_FinalNoOpFound", "HSE_StartIsWordBoundary", "HSE_StartIsLineStart", "HSE_RegistryByLastChar", "HSE_RegistryByGroup", "HSE_DisabledGroups", "HSE_SeqCounter", "HSE_RegistryGeneration", "HSE_RuntimeDecisionGeneration", "HSE_RegistryTransitionDepth", "HSE_StarSpecs", "HSE_StarPrefixSetCI", "HSE_StarPrefixSetCS", "HSE_StarByTriggerCI", "HSE_StarByTriggerCS", "HSE_MaxStarTriggerLen", "HSE_EndByTriggerCI", "HSE_EndByTriggerCS", "HSE_MaxEndTriggerLen", "HSE_Suppressed", "HSE_LastMatch", "HSE_LastEndChar", "HSE_RepeatEnabled", "HSE_IdleResetSeconds", "HSE_ClickResetsWord", "HSE_CascadeMaxArrows", "HSE_CASCADE_MIN_ARROWS", "HSE_CASCADE_MAX_ARROWS", "HSE_ArrowResetsWord", "HSE_ShortcutResetsWord", "HSE_TapHoldResetsWord", "HSE_PersonalInfoCombosEnabled", "HSE_TypoNbspStripped"]
+	if IsObject(Restore) {
+		; Real section publications arm the auxiliary 120 ms index timer.
+		; Its genuine callback returns before touching state while no watcher
+		; exists. Drain it while our detached registry remains installed.
+		Sleep(HS_PERSONAL_RELOAD_INDEX_DELAY_MS + 40)
+		SetTimer(HotstringPrefixWatcherRebuildIndex, 0)
+		for Name, State in Restore
+			%Name% := State.had ? State.value : unset
+		return
+	}
+	; This unit runner does not start a keyboard watcher. Fail before any
+	; mutation if a host instead owns one: its prior timers are not ours.
+	AssertTrue(!_PrefixInputHook, "The native case fixture requires the runner's inactive keyboard watcher")
+	AssertTrue(_PrefixVisibleFireDecisions is Array && _PrefixVisibleFireDecisions.Length == 0,
+		"No host registry projection may be retired by this fixture")
+	Saved := Map()
+	for Name in Names {
+		Had := IsSet(%Name%)
+		Saved[Name] := Had ? {had: true, value: %Name%} : {had: false}
+	}
+	; Install detached indexes before genuine native publications can mutate
+	; buckets. Saving references alone would not preserve the host's maps.
+	HSE_MAX_BUFFER_LEN := 256
+	HSE_WORD_TERMINATORS := " `t`r`n.,;:?!" . Chr(0x27) . Chr(0x2019)
+	HSE_RebuildInProgress := false
+	HSE_CONSUMED_DELIMITERS := ""
+	HSE_PRIORITY_COMMON := 10
+	HSE_PRIORITY_PACKAGE := 30
+	HSE_PRIORITY_PERSONAL := 50
+	HSE_Buffer := ""
+	HSE_FinalNoOpPending := false
+	HSE_FinalNoOpFound := false
+	HSE_StartIsWordBoundary := true
+	HSE_StartIsLineStart := false
+	HSE_RegistryByLastChar := Map()
+	HSE_RegistryByGroup := Map()
+	HSE_DisabledGroups := Map()
+	HSE_SeqCounter := 0
+	HSE_RegistryGeneration := 0
+	HSE_RuntimeDecisionGeneration := 0
+	HSE_RegistryTransitionDepth := 0
+	HSE_StarSpecs := []
+	HSE_StarPrefixSetCI := Map()
+	HSE_StarPrefixSetCS := Map()
+	HSE_StarByTriggerCI := Map()
+	HSE_StarByTriggerCS := Map()
+	HSE_MaxStarTriggerLen := 0
+	HSE_EndByTriggerCI := Map()
+	HSE_EndByTriggerCS := Map()
+	HSE_MaxEndTriggerLen := 0
+	HSE_Suppressed := 0
+	HSE_LastMatch := ""
+	HSE_LastEndChar := ""
+	HSE_RepeatEnabled := true
+	HSE_IdleResetSeconds := ""
+	HSE_ClickResetsWord := ""
+	HSE_CascadeMaxArrows := ""
+	HSE_CASCADE_MIN_ARROWS := 1
+	HSE_CASCADE_MAX_ARROWS := 10
+	HSE_ArrowResetsWord := ""
+	HSE_ShortcutResetsWord := ""
+	HSE_TapHoldResetsWord := ""
+	HSE_PersonalInfoCombosEnabled := true
+	HSE_TypoNbspStripped := false
+	return Saved
+}
+
 _PEER_Args(State) {
 	Old := State.Window
 	Args := [Old.Window, Old.List]
@@ -406,6 +486,7 @@ _PEER_Case(Operation) {
 	; Proposed production globals are intentionally absent in the red baseline.
 	SavedCohort := IsSet(_PersonalEditorEntryCohort) ? _PersonalEditorEntryCohort : 0
 	SavedBusy := IsSet(_PersonalEditorEntryBusy) ? _PersonalEditorEntryBusy : false
+	RegistryScope := 0
 	Fixture := _ScopeOwnerFixture(), Lock := 0
 	Source := '[_meta]`ndescription = "Entry receipt fixture"`nsections_order = ["alpha", "beta"]`n'
 		. '[_meta.sections.alpha]`ndescription = "Alpha"`n[_meta.sections.beta]`ndescription = "Beta"`n'
@@ -423,6 +504,8 @@ _PEER_Case(Operation) {
 		ScriptInformation["PersonalTomlPath"] := Fixture.directory . "\personal.toml"
 		Features := _PersonalTomlCloneDetached(Saved.Features)
 		MasterGateState()["features"] := _PersonalTomlCloneDetached(Saved.Desired)
+		if Operation == "case-uncheck"
+			Source := StrReplace(Source, '"private_alpha" = { output = "Alpha output", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }', '"private_alpha" = { output = "Alpha output", is_word = true, auto_expand = true, is_case_sensitive = true, is_case_sensitive_strict = true, final_result = false }')
 		AssertTrue(FSWriteDurable(PersonalTomlPath(), Source))
 		State.Window := _PEMO_Open(Windows, "alpha")
 		Old := State.Window
@@ -432,7 +515,45 @@ _PEER_Case(Operation) {
 		State.Button := Old.Window.AddButton("w120", "Private native operation")
 		State.Button.OnEvent("Click", _PEER_Event.Bind(State))
 		Old.Window.Show("NA")
+		RegistryScope := (Operation == "case-add" || Operation == "case-uncheck") ? _PECASE_RegistryScope() : 0
 		Original := KL_JsonEncode(_PersonalEditorData)
+		if Operation == "case-add" || Operation == "case-uncheck" {
+			Features["hotstrings"] := Map("personal", Map("alpha", Map("enabled", true, "time_activation_seconds", 0)))
+			State.Operation := Operation == "case-add" ? "add" : "save"
+			Old.Controls[1].Value := Operation == "case-add" ? "zzpersonalcaseprobe" : "private_alpha"
+			Old.Controls[2].Value := "Private case output"
+			Old.Controls[3].Value := 1
+			Old.Controls[4].Value := 1
+			Old.Controls[5].Value := Operation == "case-add" ? 1 : 0
+			_PEER_Click(State)
+			Fresh := ReadPersonalToml(true)
+			Entries := Fresh["sections"]["alpha"]["entries"]
+			Entry := Entries[Operation == "case-add" ? Entries.Length : 1]
+			if Operation == "case-add" {
+				AssertTrue(Entry["is_case_sensitive"])
+				AssertTrue(Entry.Get("strict_case", false), "The native checked case box must persist exact matching, as the shared editor does")
+			} else {
+				AssertTrue(!Entry["is_case_sensitive"])
+				AssertTrue(!Entry.Get("strict_case", false), "Unchecking must retire the old exact-match flag")
+			}
+			_PEER_RowsAgree(State)
+			; Exercise the genuine section loader and matcher after the native
+			; durable publication; never dispatch an output into the desktop.
+			HSE_HardReset()
+			HSE_FeedReset(true)
+			Match := ""
+			for Char in StrSplit(StrUpper(Entry["trigger"]))
+				Match := HSE_FeedChar(Char)
+			if Operation == "case-add"
+				AssertEqual("", Match, "A checked lowercase native trigger cannot match uppercase input")
+			else
+				AssertTrue(IsObject(Match), "Unchecked case must restore the ordinary case-conforming match")
+			HSE_FeedReset(true)
+			for Char in StrSplit(Entry["trigger"])
+				Match := HSE_FeedChar(Char)
+			AssertTrue(IsObject(Match), "The literal trigger remains reachable")
+			return
+		}
 		if InStr(Operation, "cohort") == 1 {
 			Outer := _PersonalTomlCloneDetached(_PersonalEditorData)
 			Outer["meta_description"] := "Independent live owner stage"
@@ -550,10 +671,12 @@ _PEER_Case(Operation) {
 				Store.Delete(Fixture.path)
 		}
 		_ScopeOwnerCleanup(Fixture)
+		if IsObject(RegistryScope)
+			_PECASE_RegistryScope(RegistryScope)
 		Suspend(Saved.Suspended), Critical(Saved.Critical)
 	}
 }
 
-for _PEER_Mode in ["add", "delete", "save", "cohort", "cohort-failure", "cohort-section", "section-rename", "section-delete", "section-new", "legacy"]
+for _PEER_Mode in ["add", "delete", "save", "cohort", "cohort-failure", "cohort-section", "section-rename", "section-delete", "section-new", "legacy", "case-add", "case-uncheck"]
 	Test("Personal editor entry receipts: native " . _PEER_Mode . " preserves rows and retry (personal-entry-receipts)",
 		_PEER_Case.Bind(_PEER_Mode))

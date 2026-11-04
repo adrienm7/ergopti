@@ -1109,3 +1109,57 @@ _HCO_OffsetRetainsIntent(Mode) {
 }
 for _HCO_Mode in ["rebase", "colour", "base-roundtrip", "unclipped-control", "unlimited-control", "replace-clipped-delay"]
 	Test("HotstringsConfig persistent offset: " . _HCO_Mode, _HCO_OffsetRetainsIntent.Bind(_HCO_Mode))
+
+; A valid source may carry both recognised delay leaves. The shared resolver
+; explicitly gives true unlimited priority over an offset, independently of
+; source line order. The offset here stays above the clamp: this is not the
+; separate clipped-offset information-loss regression.
+_HCU_UnlimitedPrecedence(Mode) {
+	global Features, _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {features: Features, overrides: _HotstringsOverrides,
+		path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_unlimited_precedence_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		Features := Features.Clone()
+		Features["hotstrings"] := Features["hotstrings"].Clone()
+		Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+		_HotstringsOverridesPath := Path
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		switch Mode {
+			case "unlimited-only": Leaves := "delay_unlimited = true`n"
+			case "offset-only": Leaves := "delay_offset = -0.25`n"
+			case "unlimited-first": Leaves := "delay_unlimited = true`ndelay_offset = -0.25`n"
+			case "offset-first": Leaves := "delay_offset = -0.25`ndelay_unlimited = true`n"
+			default: throw ValueError("unknown unlimited precedence control")
+		}
+		Source := "[magickey]`n" . Leaves . "[magickey.text_expansion_symbols]`n" . Leaves
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		Document := TOML_ParseDocument(FSReadStrict(Path))
+		if Mode != "offset-only" {
+			AssertTrue(Document["magickey"]["delay_unlimited"] is TOML_Bool)
+			AssertTrue(Document["magickey"]["delay_unlimited"].Value)
+		}
+		if Mode != "unlimited-only"
+			AssertEqual(-0.25, Document["magickey"]["delay_offset"])
+		_HotstringsOverrides := _ParseOverrides(Path)
+		HotstringsOverridesApplyBase()
+		HotstringsResolveBumpGen()
+		Expected := Mode == "offset-only" ? 0.5 : 0
+		AssertEqual(Expected, HotstringsResolve("magickey", "").Delay,
+			"the actual category resolver must give true unlimited precedence over a finite source offset")
+		AssertEqual(Expected, HotstringsResolve("magickey", "text_expansion_symbols").Delay,
+			"the actual section resolver must use the same unlimited precedence")
+		AssertEqual(Source, FSReadStrict(Path), "reading/applying overrides must not normalize or rewrite source bytes")
+	} finally {
+		Features := Saved.features
+		_HotstringsOverrides := Saved.overrides
+		_HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HCU_Mode in ["unlimited-only", "offset-only", "unlimited-first", "offset-first"]
+	Test("HotstringsConfig unlimited precedence: " . _HCU_Mode, _HCU_UnlimitedPrecedence.Bind(_HCU_Mode))
