@@ -158,6 +158,7 @@ local _gtk_pump_registered = false
 local _native_ready = false
 local _native_query_generation = 0
 local _shutting_down = false
+local _shutdown_gate_owner = nil
 
 -- Monotonic identity for each newly-created page context. A late blur or crash
 -- callback from an older WebView must not release ownership acquired by its
@@ -389,15 +390,23 @@ end
 -- =========================================
 -- =========================================
 
-local function _release_app_ownership(app_name, epoch)
+local function gate_owner_current(owner)
+	if not owner then return true end
 	local gate = _daemon_state.input_capture_gate
+	return gate == owner.gate and (type(gate) ~= "table" or gate.release == owner.release)
+end
+
+local function _release_app_ownership(app_name, epoch, owner)
+	local gate = _daemon_state.input_capture_gate
+	if not gate_owner_current(owner) then return false end
 	if type(gate) ~= "table" or type(gate.release) ~= "function" then return true end
-	local ok, accepted = pcall(gate.release, app_name, epoch)
+	local release = gate.release
+	local ok, accepted = pcall(release, app_name, epoch)
 	if not ok then
 		Logger.error(LOG, "Input ownership release for '%s' refused.", tostring(app_name))
 		return false
 	end
-	if accepted ~= true then
+	if accepted ~= true or _daemon_state.input_capture_gate ~= gate or gate.release ~= release then
 		Logger.debug(LOG, "Ignored stale input release for '%s' at epoch %s.",
 			tostring(app_name), tostring(epoch))
 		return false
@@ -418,7 +427,8 @@ end
 --- @return boolean current
 function M.page_current(app_name, epoch)
 	local owned, native = _windows[app_name], _gtk_windows[app_name]
-	return owned ~= nil and native ~= nil and native.epoch == epoch and not native.settled
+	return owned ~= nil and gate_owner_current(owned.gate_owner)
+		and native ~= nil and native.epoch == epoch and not native.settled
 		and not native.view_settled and native.registration == true and native.signal_id ~= nil
 		and owned.epoch == epoch and not owned.acquiring
 		and not owned.closing and not owned.debt and not owned.failed
@@ -511,6 +521,9 @@ function M.show(app_name, active_locale, contextual_receipt)
 
 	if not contextual_title_live(app_name, contextual_receipt) then return false end
 
+	-- Pin the input owner for this page even if a later daemon-state copy replaces it.
+	local gate = _daemon_state.input_capture_gate
+	local gate_owner = { gate = gate, release = type(gate) == "table" and gate.release or nil }
 	-- Store window state.
 	_next_window_epoch = _next_window_epoch + 1
 	_windows[app_name] = {
@@ -518,7 +531,7 @@ function M.show(app_name, active_locale, contextual_receipt)
 		handler = handler,
 		visible = false,
 		epoch   = _next_window_epoch,
-		opened_ms = Monotonic.now_ms(), acquiring = true,
+		opened_ms = Monotonic.now_ms(), acquiring = true, gate_owner = gate_owner,
 	}
 
 	local owned = _windows[app_name]
@@ -586,7 +599,7 @@ function M.hide(app_name, expected_epoch)
 			return false
 		end
 	end
-	if _release_app_ownership(app_name, owned.epoch) ~= true or _windows[app_name] ~= owned then
+	if _release_app_ownership(app_name, owned.epoch, owned.gate_owner) ~= true or _windows[app_name] ~= owned then
 		owned.closing, owned.debt = false, true
 		return false
 	end
@@ -828,6 +841,7 @@ function M.route_message(app_name, bridge_name, payload, source_epoch)
 	end
 
 	local owned = _windows[app_name]
+	if owned and not gate_owner_current(owned.gate_owner) then return nil end
 	-- Cleanup debt retains resource ownership, never permission to mutate settings.
 	-- Initial ready messages remain admitted while a live page is acquiring.
 	if source_epoch ~= nil and owned and (owned.debt or owned.failed or owned.closing or owned.cancelled) then return nil end
@@ -1028,7 +1042,10 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 	if not _gtk_available or not _lgi then return false, "GTK/WebKit unavailable" end
 	if _gtk_windows[app_name] then return false, "native acquisition already owned" end
 	local window_epoch = M.current_epoch(app_name) or 0
-	local attempt = { epoch = window_epoch, acquiring = true }
+	local logical = _windows[app_name]
+	local gate = _daemon_state.input_capture_gate
+	local gate_owner = logical and logical.gate_owner or { gate = gate, release = type(gate) == "table" and gate.release or nil }
+	local attempt = { epoch = window_epoch, acquiring = true, gate_owner = gate_owner }
 	_gtk_windows[app_name] = attempt
 	local called, created, detail = pcall(function()
 
@@ -1244,7 +1261,7 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 			elseif _gtk_windows[app_name] == attempt and not attempt.retiring then
 				if attempt.acquiring then attempt.cancelled = true
 				elseif M._destroy_gtk_window(app_name, window_epoch) == true and not document_entry then
-					_release_app_ownership(app_name, window_epoch)
+					_release_app_ownership(app_name, window_epoch, attempt.gate_owner)
 				end
 			end
 		end
@@ -1353,7 +1370,7 @@ function M._destroy_gtk_window(app_name, expected_epoch)
 			if not removed or accepted == false then return false end
 			wref.settled = true
 		end
-		if close_without_page and _release_app_ownership(app_name, wref.epoch) ~= true then return false end
+		if close_without_page and _release_app_ownership(app_name, wref.epoch, wref.gate_owner) ~= true then return false end
 		return true
 	end)
 	wref.retiring = false
@@ -1427,6 +1444,11 @@ end
 function M.shutdown()
 	if _shutting_down then return false end
 	_shutting_down = true
+	if not _shutdown_gate_owner then
+		local gate = _daemon_state.input_capture_gate
+		_shutdown_gate_owner = { gate = gate, release = type(gate) == "table" and gate.release_all or nil }
+	end
+	local gate_owner = _shutdown_gate_owner
 	_native_query_generation = _native_query_generation + 1
 	_native_ready = false
 	local retired = true
@@ -1457,14 +1479,16 @@ function M.shutdown()
 		or next(_document_windows) ~= nil or next(_document_debts) ~= nil then retired = false end
 	if retired then
 		local gate = _daemon_state.input_capture_gate
-		if type(gate) == "table" and type(gate.release_all) == "function" then
-			local called, accepted = pcall(gate.release_all)
-			if not called or accepted == false then
-				retired = false
-				Logger.error(LOG, "Input ownership shutdown refused.")
-			end
+		if gate ~= gate_owner.gate or (type(gate) == "table" and gate.release_all ~= gate_owner.release) then
+			retired = false
+		elseif type(gate_owner.release) == "function" then
+			local called, accepted = pcall(gate_owner.release)
+			if not called or accepted == false or _daemon_state.input_capture_gate ~= gate_owner.gate
+				or gate.release_all ~= gate_owner.release then retired = false end
 		end
+		if not retired then Logger.error(LOG, "Input ownership shutdown refused.") end
 	end
+	if retired then _shutdown_gate_owner = nil end
 	_shutting_down = false
 	if retired then Logger.info(LOG, "WebView manager shut down.") end
 	return retired

@@ -86,10 +86,10 @@ helpers.describe("ui.bridge_handlers", function()
 		end)
 		helpers.it("hide releases only the input ownership of that page epoch", function()
 			local gate = helpers.load_module("infra.input_capture_gate").new()
+			wm.set_daemon_state({ input_capture_gate = gate })
 			helpers.assert_true(wm.show("hotstring_editor", "en"))
 			local epoch = wm.current_epoch("hotstring_editor")
 			helpers.assert_true(type(epoch) == "number")
-			wm.set_daemon_state({ input_capture_gate = gate })
 			local stale_message = wm.route_message("hotstring_editor", "hsEditor", {
 				action = "window_focus", data = { focused = true },
 			}, epoch - 1)
