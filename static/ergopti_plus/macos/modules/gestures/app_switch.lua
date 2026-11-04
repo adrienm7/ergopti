@@ -63,9 +63,9 @@ local function scope_screen(scope)
 end
 
 --- Lists the other applications with a window in scope, most recent first,
---- each with its frontmost usable window.
+--- retaining every usable window in each application as a focus fallback.
 --- @param screen_id number|nil Keep only windows on this screen; nil for all.
---- @return table records One window record per application, by recency.
+--- @return table groups Windows grouped by application, by recency.
 local function other_applications(screen_id)
 	local front_pid = WindowManager.frontmost_pid()
 	local own_pid = WindowManager.own_pid()
@@ -73,16 +73,32 @@ local function other_applications(screen_id)
 		Logger.warn(LOG, "Cannot identify the frontmost application or this runtime — no application switch.")
 		return {}
 	end
-	local seen, records = {}, {}
+	local seen, groups = {}, {}
 	for _, record in ipairs(WindowManager.ordered_windows()) do
 		if record.standard and not record.minimized and record.pid ~= nil
 			and record.pid ~= front_pid and record.pid ~= own_pid
 			and (screen_id == nil or record.screen_id == screen_id) then
-			if not seen[record.pid] then
-				seen[record.pid] = true
-				records[#records + 1] = record
+			local group = seen[record.pid]
+			if not group then
+				group = {}
+				seen[record.pid] = group
+				groups[#groups + 1] = group
 			end
+			group[#group + 1] = record
 		end
+	end
+	return groups
+end
+
+--- Flattens application groups in the requested order, preserving window recency.
+--- @param groups table Application groups from other_applications().
+--- @param reverse boolean Whether to try the least recent application first.
+--- @return table records
+local function application_candidates(groups, reverse)
+	local records = {}
+	for index = 1, #groups do
+		local group = groups[reverse and (#groups - index + 1) or index]
+		for _, record in ipairs(group) do records[#records + 1] = record end
 	end
 	return records
 end
@@ -114,17 +130,15 @@ end
 function M.previous_app(scope)
 	local usable, screen_id = scope_screen(scope)
 	if not usable then return false end
-	return focus_first(other_applications(screen_id), "previous application, " .. scope)
+	return focus_first(application_candidates(other_applications(screen_id), false),
+		"previous application, " .. scope)
 end
 
 --- Activates the least recently used application, the one a Cmd+Shift+Tab tap
 --- selects, on every screen.
 --- @return boolean switched True when another application was activated.
 function M.least_recent_app()
-	local records = other_applications(nil)
-	local reversed = {}
-	for index = #records, 1, -1 do reversed[#reversed + 1] = records[index] end
-	return focus_first(reversed, "least recent application")
+	return focus_first(application_candidates(other_applications(nil), true), "least recent application")
 end
 
 
