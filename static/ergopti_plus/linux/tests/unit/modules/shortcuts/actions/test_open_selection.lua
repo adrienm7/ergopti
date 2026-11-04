@@ -28,14 +28,12 @@ local function read_corpus()
 	return assert(json.decode(raw), "the open-target corpus is not valid JSON")
 end
 
---- Runs body with xclip answering `selection`.
+--- Runs body with the session PRIMARY reader answering `selection`.
 local function with_selection(selection, body)
-	local real_popen = io.popen
-	io.popen = function()
-		return { read = function() return selection end, close = function() return true end }
-	end
+	local previous = package.loaded["adapters.clipboard"]
+	package.loaded["adapters.clipboard"] = { read_primary = function() return true, selection end }
 	local ok, err = pcall(body)
-	io.popen = real_popen
+	package.loaded["adapters.clipboard"] = previous
 	if not ok then error(err, 0) end
 end
 

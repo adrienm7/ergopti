@@ -386,10 +386,8 @@ local function url_encode_query(value)
 end
 
 local function primary_selection()
-	local pipe = io.popen("xclip -o -selection primary 2>/dev/null", "r")
-	if not pipe then return "" end
-	local value = pipe:read("*a") or ""
-	pipe:close()
+	local called, ok, value = pcall(function() return require("adapters.clipboard").read_primary() end)
+	if not called or ok ~= true or type(value) ~= "string" then return "" end
 	return (value:gsub("%s+$", ""))
 end
 
