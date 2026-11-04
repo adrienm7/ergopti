@@ -214,6 +214,7 @@ function M.new(opts)
 
 	-- When the first finger landed, so a hold can be told from a tap.
 	local _started_at = nil
+	local _last_frame_at, _clock_invalid = nil, false
 	local _dropping = false -- invalid queue contents through the next SYN_REPORT
 
 	--- Discards everything and returns to "no fingers down".
@@ -234,6 +235,7 @@ function M.new(opts)
 		_origin_x, _origin_y = nil, nil
 		_last_x, _last_y = nil, nil
 		_started_at = nil
+		_last_frame_at, _clock_invalid = nil, false
 	end
 
 	--- The mean position of every live contact, or nil when there is none.
@@ -328,10 +330,12 @@ function M.new(opts)
 		if code ~= SYN_REPORT then return nil end
 
 		local cx, cy = centroid()
+		local now = frame_time(event)
+		if _last_frame_at and now < _last_frame_at then _clock_invalid = true end
+		if _touching or _started_at then _last_frame_at = now end
 
 		if _touching then
 			if cx and cy then
-				local now = frame_time(event)
 				if not _origin_x then
 					_origin_x, _origin_y = cx, cy
 					_started_at = now
@@ -405,14 +409,18 @@ function M.new(opts)
 		local fingers = _peak_fingers
 		local dx, dy = _travel_x, _travel_y
 		local direction = direction_of(dx, dy)
-		local now = frame_time(event)
 		local elapsed = (_started_at and now - _started_at) or 0
 		local started_at = _started_at
 		local aborted = _aborted
+		local clock_invalid = _clock_invalid
 
 		reset()
+		if _last_scroll_end_at and started_at < _last_scroll_end_at then _last_scroll_end_at = nil end
 
-		if aborted then
+		if clock_invalid then
+			Logger.debug(LOG, "Gesture ignored: its frame clock moved backwards.")
+			return nil
+		elseif aborted then
 			Logger.debug(LOG, "%d-finger gesture continued as a scrolling pair; ignored.", fingers)
 			_last_scroll_end_at = now
 			return nil
