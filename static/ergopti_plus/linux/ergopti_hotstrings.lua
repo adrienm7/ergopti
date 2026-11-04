@@ -1390,6 +1390,7 @@ local function main()
 		-- A bare Enter in a terminal submitted the line: the next prompt is
 		-- empty, and a Backspace there deletes nothing (word_reset rule 7).
 		if not result then WordReset.apply_typed_newline(engine, ch, app_id) end
+		local queued_input, expansion_committed = nil, false
 		if result then
 			-- A private mapping's trigger is a fragment of its own secret — the
 			-- first six characters of the IBAN, the first five digits of the SSN —
@@ -1406,8 +1407,7 @@ local function main()
 				utf8.len(result.trigger or "") or #(result.trigger or ""),
 				utf8.len(result.replacement or "") or #(result.replacement or ""),
 				result.backspace_count)
-			local expansion_committed = opts.dry_run
-			local queued_input = nil
+			expansion_committed = opts.dry_run
 			if not opts.dry_run then
 				injector._begin_injection()
 				local replay_terminator = result.replay_terminator
@@ -1475,16 +1475,6 @@ local function main()
 					engine:reset(nil, nil, "keep")
 				else
 					engine:apply_expansion(result)
-				end
-				-- The queued characters follow the committed output in the field.
-				-- Advance the matcher first so a replay can itself match or chain.
-				for _, queued in ipairs(queued_input or {}) do
-					local queued_ch = type(queued) == "table" and queued.char or queued
-					local queued_scancode = type(queued) == "table" and queued.scancode or nil
-					local ok, err = pcall(on_char, queued_ch, queued_scancode)
-					if not ok then
-						Logger.error(LOG, "Error replaying a queued character: %s", tostring(err))
-					end
 				end
 			end
 		end
@@ -1612,6 +1602,17 @@ local function main()
 			end
 		end
 
+		-- Finish the triggering character's prediction work before newer input.
+		-- The matcher already reflects the committed expansion, so queued input
+		-- can itself match or chain without reversing the AI's character order.
+		if expansion_committed then
+			for _, queued in ipairs(queued_input or {}) do
+				local queued_ch = type(queued) == "table" and queued.char or queued
+				local queued_scancode = type(queued) == "table" and queued.scancode or nil
+				local ok, err = pcall(on_char, queued_ch, queued_scancode)
+				if not ok then Logger.error(LOG, "Error replaying a queued character: %s", tostring(err)) end
+			end
+		end
 
 	end
 	on_char = input_capture_gate.guard(handle_char)
