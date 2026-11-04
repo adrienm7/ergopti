@@ -35,7 +35,7 @@ local function controller_with(state)
 		read_primary = function()
 			log.reads = log.reads + 1
 			if state.on_read then state.on_read(controller, log, state) end
-			return true, state.primary or ""
+			return state.read_ok ~= false, state.primary or ""
 		end,
 		type_text = function(text)
 			if state.type_ok == false then return false end
@@ -84,6 +84,14 @@ helpers.describe("wrap on type (linux): the decision", function()
 		controller.on_pointer_down()
 		helpers.assert_true(not controller.on_key(symbol("(")),
 			"PRIMARY unchanged since the click is an old selection, not a live one")
+		helpers.assert_eq(log.typed, {})
+	end)
+
+	helpers.it("does not wrap stale PRIMARY after its baseline could not be read", function()
+		local controller, log, state = controller_with({ primary = "stale", read_ok = false })
+		controller.on_pointer_down()
+		state.read_ok = true
+		helpers.assert_eq(controller.on_key(symbol("(")), false)
 		helpers.assert_eq(log.typed, {})
 	end)
 
