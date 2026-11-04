@@ -180,7 +180,7 @@ Test("gestures: accepted keyboard watcher stop retires the exact owner (gesture-
 _GCHT_StartCannotReplaceRefusedOwner() {
 	Body := _DriverFuncBody("GestureStartKeyboardWatcher")
 	StopGateIdx := InStr(Body, "if !GestureStopKeyboardWatcher()")
-	ConstructIdx := InStr(Body, 'InputHook("V L3")')
+	ConstructIdx := InStr(Body, 'InputHook("V L0")')
 	PublishIdx := InStr(Body, "GestureKeyboardHook := Hook")
 	StartIdx := InStr(Body, "Hook.Start()")
 	Assert(StopGateIdx > 0 and ConstructIdx > StopGateIdx,

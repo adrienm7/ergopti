@@ -620,6 +620,17 @@
 			"root_cause": "The native personal editor permits automatic header sorting but its form, Save and Delete handlers use the visible row number directly as the TOML entry-array index. Header ordering therefore separates displayed identity from the record mutated. This differs from AHK-031’s initial active-model insertion ordering.",
 			"silent_failure": "Editing or deleting the selected visible row can mutate another persistent personal expansion. The form and confirmation may also describe the wrong record, rather than the row the user selected.",
 			"regression_test": "Two personal-native-sort-owner probes use the production public native fallback, a real header HWND click, actual selection and BM_CLICK on the original buttons. Independent durable TOML checks follow the displayed trigger identity and inspect the result before the form assertion. No copied ListView style or fake writer is used. Adding NoSort retains TOML row order; the native editor does not advertise a separate sorting feature. Native fail-before measured; post-fix qualification pending."
+		},
+		{
+			"id": "AHK-057",
+			"title": "The click-release watcher stops after three characters while Button Up is still owed",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Raw native evidence from run41919871873 at2298478 proves Down accepted, two genuine keyboard callbacks with refused Up, then Input=abc/EndReason=Max/InProgress=false on the third character. Sending d returns under the owned Edit target guard, but no further Up is attempted and the final held-debt assertion fails, individually and reversed. The one-character retry control passes. The generic last-observation phase label was initially misread as an acquisition failure; the actual failing assertion is subject.ahk:554 after the next-key observation.",
+			"root_cause": "GestureStartKeyboardWatcher constructs InputHook(\"V L3\") and describes L3 as an input level. L is a collected-text length limit, so three characters terminate the only shared keyboard observer even when a refused mouse release still needs later retries.",
+			"silent_failure": "A synthetic held mouse button can remain held after later keyboard input because its recovery observer has already ended. Retaining typed text is unnecessary for a key-down observer.",
+			"regression_test": "Three gesture-keywatcher-length cases use the actual native hook and callbacks, keyboard injection confined to an explicitly opted-in verified child-owned Edit, and passive mouse I/O. One, three and eight refused-key sequences must retain the same observer, recover at the next allowed Up and pass the complete typed text through. The fix uses V L0 and KeyOpt All NI, preserving MinSendLevel0, notifications and visible input while ignoring text collection. Old pins are adapted; final held-state and cleanup oracles remain strict. Native three-character fail-before measured; long/text-retention coverage and post-fix qualification pending. No physical mouse injection or physical-key claim is made."
 		}
 	]
 }

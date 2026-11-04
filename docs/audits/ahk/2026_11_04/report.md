@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **56 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **57 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1029,3 +1029,17 @@ The ongoing register now contains **56 distinct new findings**. The requested ta
 ## Native partial qualification checkpoint: 41919871873
 
 At `2298478`, discovery succeeded and all **85 cases executed: 76 passed and nine failed**, identically in individual and reversed runs. The nine rollover recovery cases plus nine adjacent metadata/EOF cases qualify AHK-052; all three native sticky cases qualify AHK-053; all35 wrap loader/transaction cases qualify AHK-055. All five genuine layer-ready/source cases and ten host cases pass, but two old layer-save fixtures lack the newly required public page receipt and never reach their logger cutpoint; those fixtures remain to adapt and replay. The already-paused layer-save control passes. Native sort failures establish AHK-056. Both default-section cases fail an incorrect fixture control-type lookup (DropDownList instead of DDL), so that hypothesis remains unconfirmed. The two incomplete-journal drains need their bounded lifecycle escape; the advancing empty-batch control passes. Raw gesture logs separately establish acquisition and Max termination followed by the final held-debt failure; they are not an acquisition failure despite the last generic observation label. Production compile passed; E2E was outside this replay and the unchanged production-source90/90 hotstring evidence remains the previous checkpoint.
+
+## AHK-057: The click-release watcher stops after three characters while Button Up is still owed
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+GestureStartKeyboardWatcher constructs InputHook("V L3") and describes L3 as an input level. L is a collected-text length limit, so three characters terminate the only shared keyboard observer even when a refused mouse release still needs later retries.
+
+Reproduction: Raw native evidence from run41919871873 at2298478 proves Down accepted, two genuine keyboard callbacks with refused Up, then Input=abc/EndReason=Max/InProgress=false on the third character. Sending d returns under the owned Edit target guard, but no further Up is attempted and the final held-debt assertion fails, individually and reversed. The one-character retry control passes. The generic last-observation phase label was initially misread as an acquisition failure; the actual failing assertion is subject.ahk:554 after the next-key observation.
+
+Consequence: A synthetic held mouse button can remain held after later keyboard input because its recovery observer has already ended. Retaining typed text is unnecessary for a key-down observer.
+
+Regression: Three gesture-keywatcher-length cases use the actual native hook and callbacks, keyboard injection confined to an explicitly opted-in verified child-owned Edit, and passive mouse I/O. One, three and eight refused-key sequences must retain the same observer, recover at the next allowed Up and pass the complete typed text through. The fix uses V L0 and KeyOpt All NI, preserving MinSendLevel0, notifications and visible input while ignoring text collection. Old pins are adapted; final held-state and cleanup oracles remain strict. Native three-character fail-before measured; long/text-retention coverage and post-fix qualification pending. No physical mouse injection or physical-key claim is made.
+
+The ongoing register now contains **57 distinct new findings**. The requested target of 1,000 remains unmet.
