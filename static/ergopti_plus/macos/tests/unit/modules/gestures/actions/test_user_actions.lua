@@ -409,6 +409,20 @@ helpers.describe("run_apple_shortcut runs a library shortcut through its owner (
 		end)
 	end)
 
+	helpers.it("refuses oversized and invalid shortcut output before changing the clipboard", function()
+		with_world(function(world)
+			world.library = { { id = SHORTCUT_ID, name = "Resize Image" } }
+			world.run_output = string.rep("x", world.Shortcut.MAX_OUTPUT_BYTES + 1)
+			world.Shortcut.run(shortcut({ output = "copy" }), "gestures", 500)
+			helpers.assert_eq(world.clipboard, {})
+			helpers.assert_eq(world.notices, { "user_actions.command_output_too_large|65536" })
+			world.run_output = "invalid\255"
+			world.Shortcut.run(shortcut({ output = "copy" }), "gestures", 500)
+			helpers.assert_eq(world.clipboard, {})
+			helpers.assert_eq(world.notices[2], "user_actions.output_not_text")
+		end)
+	end)
+
 	helpers.it("notifies a failed run with its first stderr line", function()
 		with_world(function(world)
 			world.library = { { id = SHORTCUT_ID, name = "Resize Image" } }
