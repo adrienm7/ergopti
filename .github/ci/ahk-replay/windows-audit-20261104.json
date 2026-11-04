@@ -1,5 +1,5 @@
 {
-	"expected_count": 23,
+	"expected_count": 31,
 	"filters": [
 		{
 			"contains": "Model browser selection: native-refused ",
@@ -10,35 +10,31 @@
 			"expected_count": 1
 		},
 		{
-			"contains": "Keep-awake timer ownership: retired-keyboard ",
+			"contains": "tap-copy-verified",
+			"expected_count": 5
+		},
+		{
+			"contains": "tap-copy-owner",
+			"expected_count": 7
+		},
+		{
+			"contains": "native-paths-pause-owner",
 			"expected_count": 1
 		},
 		{
-			"contains": "token-status-classification",
-			"expected_count": 6
-		},
-		{
-			"contains": "token-status-authentication",
-			"expected_count": 3
-		},
-		{
-			"contains": "token-status-readiness",
+			"contains": "paths-close-request-owner",
 			"expected_count": 2
 		},
 		{
-			"contains": "log-openers-buffered-owner",
-			"expected_count": 6
+			"contains": "boot-explicit-root",
+			"expected_count": 12
 		},
 		{
-			"contains": "log openers: a missing errors file is announced",
+			"contains": "config-transition-runtime-boot-unused-default",
 			"expected_count": 1
 		},
 		{
-			"contains": "log openers: an undelivered no-errors notice is a failure",
-			"expected_count": 1
-		},
-		{
-			"contains": "log openers: the folder and today's log come from the resolver",
+			"contains": "config-transition-runtime-boot-exact-default",
 			"expected_count": 1
 		}
 	]
