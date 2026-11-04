@@ -558,107 +558,104 @@ _WS_PublishCandidate(Disabled, Custom, Active, StartEpoch) {
 ; ===========================================================
 ; ===========================================================
 
-; Parse the TOML persistence file and populate _WS_Disabled + _WS_Custom.
+; Adapt the owner's legacy semicolon comments with the canonical lexical owner.
+; Its quote/container state spans multiline values, so cited semicolons never
+; become comments. The returned text is read-only input, never written to disk.
+_WS_CanonicalTomlSource(Content) {
+	Result := "", Position := 1, Length := StrLen(Content)
+	while Position <= Length {
+		Start := Position
+		_TOML_DocumentToken(Content, &Position, ";", &Separated)
+		if !Separated {
+			Result .= SubStr(Content, Start)
+			break
+		}
+		Semicolon := Position - 1
+		Result .= SubStr(Content, Start, Semicolon - Start) . "#"
+		NextLine := InStr(Content, "`n", true, Position)
+		End := NextLine ? NextLine + 1 : Length + 1
+		Result .= SubStr(Content, Position, End - Position)
+		Position := End
+	}
+	return Result
+}
+
+_WS_ProjectDisabled(Entry, Disabled) {
+	if !(Entry is Map)
+		throw ValueError("A wrap-symbol disabled entry must be a table.")
+	if Entry.Has("char") {
+		Character := Entry["char"]
+		if !(Character is String) || Character == ""
+			throw ValueError("A disabled wrap symbol must be nonempty text.")
+		; Built-in spaced guillemets can contain several UTF-16 units.
+		Disabled[Character] := true
+	}
+	if Entry.Has("chars") {
+		if !(Entry["chars"] is String)
+			throw ValueError("Legacy disabled wrap symbols must be comma-separated text.")
+		for Character in StrSplit(Entry["chars"], ",") {
+			Character := Trim(Character, " `t")
+			if Character != ""
+				Disabled[Character] := true
+		}
+	}
+}
+
+_WS_ProjectCustom(Entry, Custom) {
+	if !(Entry is Map)
+		throw ValueError("A custom wrap-symbol entry must be a table.")
+	if !Entry.Has("left") {
+		if Entry.Has("right")
+			throw ValueError("A custom wrap-symbol entry has no opening symbol.")
+		return
+	}
+	Left := Entry["left"], Right := Entry.Get("right", "")
+	if !(Left is String) || !(Right is String) || Left == ""
+		throw ValueError("Custom wrap symbols must be nonempty text.")
+	; The legacy reader treats an absent/empty right side as a symmetric pair.
+	Right := Right == "" ? Left : Right
+	if StrLen(Left) != 1 || StrLen(Right) != 1
+		throw ValueError("Custom wrap symbols must fit the native single-symbol domain.")
+	Custom.Push(Map("left", Left, "right", Right))
+}
+
+; Parse into detached state, then publish only a complete admitted projection.
+; Unknown roots retain the previous owner's ignored-root policy; malformed or
+; unprojectable owned leaves latch so a later save cannot erase their data.
 _WS_Load() {
-		global _WS_Config_Path, _WS_Disabled, _WS_Custom, _WS_LoadFailed
-		if (!FileExist(_WS_Config_Path)) {
-				; A genuinely absent file is not a failure: a fresh install must still be
-				; able to save. Only an existing-but-unreadable one blocks persistence.
-				return
+	global _WS_Config_Path, _WS_Disabled, _WS_Custom, _WS_LoadFailed
+	if !FileExist(_WS_Config_Path)
+		return
+	try {
+		Content := FileRead(_WS_Config_Path, "UTF-8")
+		Document := TOML_ParseDocument(_WS_CanonicalTomlSource(Content), &Records, &Physical)
+		for Record in Physical
+			if Record.Kind == "opaque"
+				throw ValueError("The wrap-symbol source contains an uninterpreted record.")
+		Disabled := Map(), Custom := []
+		if Document.Has("disabled") {
+			Entries := Document["disabled"]
+			if Entries is Map
+				_WS_ProjectDisabled(Entries, Disabled)
+			else if Entries is Array {
+				for Entry in Entries
+					_WS_ProjectDisabled(Entry, Disabled)
+			} else
+				throw ValueError("The disabled wrap-symbol source has an unsupported shape.")
 		}
-		try {
-				InDisabled := false
-				InCustom   := false
-				CurLeft    := ""
-				CurRight   := ""
-				; _WS_Save writes UTF-8 without a BOM. Loop Read would decode it with
-				; the ANSI code page, so a disabled guillemet came back mangled (and
-				; enabled) after every reload.
-				Content := FileRead(_WS_Config_Path, "UTF-8")
-				loop parse, Content, "`n", "`r" {
-						Line := Trim(A_LoopField, " `t")
-						if (Line == "" or SubStr(Line, 1, 1) == ";") {
-								continue
-						}
-						if (Line == "[disabled]" or Line == "[[disabled]]") {
-								; Flush a pending custom entry first. This branch predates the flush
-								; logic the [[custom]] and generic [ branches already perform, so a
-								; [[custom]] block immediately followed by [[disabled]] silently lost
-								; the user's wrap pair. It is masked today only because _WS_Save happens
-								; to emit disabled blocks before custom ones — a hand-edited or
-								; reordered file loses data.
-								if (InCustom and CurLeft != "") {
-										R := (CurRight != "") ? CurRight : CurLeft
-										_WS_Custom.Push(Map("left", CurLeft, "right", R))
-								}
-								InDisabled := true
-								InCustom   := false
-								CurLeft    := ""
-								CurRight   := ""
-								continue
-						}
-						if (Line == "[[custom]]") {
-								; Flush the previous custom entry when entering a new block
-								if (CurLeft != "") {
-										R := (CurRight != "") ? CurRight : CurLeft
-										_WS_Custom.Push(Map("left", CurLeft, "right", R))
-								}
-								InDisabled := false
-								InCustom   := true
-								CurLeft    := ""
-								CurRight   := ""
-								continue
-						}
-						if (SubStr(Line, 1, 1) == "[") {
-								; Flush pending custom entry on any new section
-								if (InCustom and CurLeft != "") {
-										R := (CurRight != "") ? CurRight : CurLeft
-										_WS_Custom.Push(Map("left", CurLeft, "right", R))
-										CurLeft := ""
-										CurRight := ""
-								}
-								InDisabled := false
-								InCustom   := false
-								continue
-						}
-						if InDisabled {
-								; Modern format: [[disabled]] char = "..."
-								if RegExMatch(Line, '^char\s*=\s*"(.*)"', &M) {
-										_WS_Disabled[_WS_UnescapeToml(M[1])] := true
-								}
-								; Legacy format: [disabled] chars = "a,b,c"
-								else if RegExMatch(Line, '^chars\s*=\s*"(.*)"', &M) {
-										for _, Ch in StrSplit(M[1], ",") {
-												Trimmed := Trim(Ch, " `t")
-												if (Trimmed != "") {
-														_WS_Disabled[Trimmed] := true
-												}
-										}
-								}
-						} else if InCustom {
-								if RegExMatch(Line, '^left\s*=\s*"(.*)"', &M) {
-										CurLeft := _WS_UnescapeToml(M[1])
-								} else if RegExMatch(Line, '^right\s*=\s*"(.*)"', &M) {
-										CurRight := _WS_UnescapeToml(M[1])
-								}
-						}
-				}
-				; Flush the last custom block
-				if (InCustom and CurLeft != "") {
-						R := (CurRight != "") ? CurRight : CurLeft
-						_WS_Custom.Push(Map("left", CurLeft, "right", R))
-				}
-				try LoggerDebug("WrapSymbols", "Loaded: {1} disabled, {2} custom.", _WS_Disabled.Count, _WS_Custom.Length)
-		} catch as Err {
-				; Latch the failure. The maps above are now EMPTY, and empty is exactly
-				; what "the user has disabled nothing and defined no custom pair" looks
-				; like — so the next toggle would serialize that emptiness over the real
-				; file: every disabled built-in silently re-enabled, every custom pair
-				; permanently gone. Same class as the config.toml boot read, and the same
-				; cure: an unreadable file must be distinguishable from an empty one.
-				_WS_LoadFailed := true
-				try LoggerError("WrapSymbols", "Could not read wrap_symbols.toml: {1}. Persistence is now BLOCKED for this session so the settings in that file are not overwritten with an empty set; restart the driver once it is readable.", Err.Message)
+		if Document.Has("custom") {
+			if !(Document["custom"] is Array)
+				throw ValueError("Custom wrap symbols require a table array.")
+			for Entry in Document["custom"]
+				_WS_ProjectCustom(Entry, Custom)
 		}
+		_WS_Disabled := Disabled, _WS_Custom := Custom
+		try LoggerDebug("WrapSymbols", "Loaded: {1} disabled, {2} custom.", _WS_Disabled.Count, _WS_Custom.Length)
+	} catch as Err {
+		; Only Init may clear this latch. Never serialize an incomplete view.
+		_WS_LoadFailed := true
+		try LoggerError("WrapSymbols", "Could not read or interpret wrap_symbols.toml: {1}. Persistence is now BLOCKED for this session so source data cannot be overwritten by an incomplete projection; restart once the file is readable and valid.", Err.Message)
+	}
 }
 
 ; Serialize, stage and commit one detached state. The no-argument form remains

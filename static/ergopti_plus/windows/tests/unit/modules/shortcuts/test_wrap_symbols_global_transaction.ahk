@@ -802,8 +802,16 @@ _WSIC_CommentRoundTrip(Mode) {
 			. "[[disabled]]" . HeaderTail . "`nchar = " . TOML_RenderString("(") . DisabledTail . "`n"
 			. "[[custom]]" . HeaderTail . "`nleft = " . TOML_RenderString(Left) . "`n"
 			. "right = " . TOML_RenderString(Right) . CustomTail . "`n"
+		if Mode == "custom-before-disabled"
+			Source := "[[custom]]`nleft = " . TOML_RenderString(Left) . "`nright = " . TOML_RenderString(Right)
+				. "`n[[disabled]]`nchar = " . TOML_RenderString("(") . "`n"
 		AssertTrue(FSWriteCreateDurable(Path, Source))
-		Independent := _WSIC_Document(FSReadStrict(Path))
+		PhysicalSource := FSReadStrict(Path)
+		if Mode == "custom-before-disabled"
+			AssertTrue(InStr(PhysicalSource, "[[custom]]") > 0
+				&& InStr(PhysicalSource, "[[custom]]") < InStr(PhysicalSource, "[[disabled]]"),
+				"the genuine source must put its custom block before the disabled block")
+		Independent := _WSIC_Document(PhysicalSource)
 		AssertTrue(_WSIC_DiskDisabled(Independent, "("), "the authored source really disables its one-character builtin")
 		AssertTrue(_WSIC_HasPair(Independent["custom"], Left, Right), "the independent semantic decoder must admit the original pair")
 		AssertTrue(WrapSymbols_Init(Root . "\"), "the real public initializer must accept the private source")
@@ -831,3 +839,87 @@ _WSIC_CommentRoundTrip(Mode) {
 for _WSIC_Mode in ["canonical-control", "header-comment", "disabled-field-comment", "custom-field-comment",
 	"quoted-hash-control", "escaped-quote-control", "legacy-semicolon-control"]
 	Test("wrap symbols TOML inline comments: " . _WSIC_Mode, _WSIC_CommentRoundTrip.Bind(_WSIC_Mode))
+
+_WSC_Field(Name, Value, Style) {
+	if Style == "literal"
+		return Name . " = " . Chr(39) . Value . Chr(39) . "`n"
+	if Style == "multiline-basic" || Style == "multiline-literal" || Style == "one-line-multiline" {
+		Quote := Style == "multiline-literal" ? Chr(39) : Chr(34)
+		Delimiter := Quote . Quote . Quote
+		return Name . " = " . Delimiter . (Style == "one-line-multiline" ? "" : "`n") . Value . Delimiter . "`n"
+	}
+	return Name . " = " . TOML_RenderString(Value) . "`n"
+}
+_WSC_RecognizedSource(Mode) {
+	global _WS_Config_Path, _WS_Disabled, _WS_Custom, _WS_LoadFailed, _WS_StateEpoch
+	global _WS_ACTIVE_PAIRS, _WS_BUILTIN_PAIRS, _WS_BUILTIN_GROUPS
+	Saved := {path: _WS_Config_Path, disabled: _WS_Disabled, custom: _WS_Custom,
+		failed: _WS_LoadFailed, epoch: _WS_StateEpoch, active: _WS_ACTIVE_PAIRS,
+		builtins: _WS_BUILTIN_PAIRS, groups: _WS_BUILTIN_GROUPS}
+	Root := A_Temp . "\ergopti_wrap_canonical_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\wrap_symbols.toml"
+	try {
+		AssertFalse(A_IsSuspended)
+		Style := Mode == "literal" ? "literal" : (InStr(Mode, "multiline-basic") == 1 ? "multiline-basic"
+			: (InStr(Mode, "multiline-literal") == 1 ? "multiline-literal"
+				: (Mode == "one-line-multiline" ? "one-line-multiline" : "basic")))
+		Left := InStr(Mode, "semicolon-data") ? ";" : "a"
+		Right := Left == ";" ? ":" : "b"
+		Disabled := "[[disabled]]`n" . (Mode == "bad-disabled-type" ? "char = 1`n" : _WSC_Field("char", "(", Style))
+		if Mode == "legacy-disabled-map"
+			Disabled := '[disabled]`nchars = "(,["`n'
+		Body := Disabled . "[[custom]]`n" . _WSC_Field("left", Left, Style)
+		if Mode == "bad-custom-type"
+			Body .= "right = true`n"
+		else if Mode != "symmetric-custom"
+			Body .= _WSC_Field("right", Right, Style)
+		else
+			Right := Left
+		; The independent decoder gets precisely the semantic body. Known legacy
+		; comments below are deliberate source decoration, not fixture data.
+		Expected := TOML_ParseDocument(Body)
+		Source := Body
+		if Mode == "legacy-comment-control"
+			Source := '; legacy = "unterminated comment quote`n' . Source
+		if Mode == "legacy-inline-comment-control"
+			Source := StrReplace(Source, 'char = "("', 'char = "(" ; legacy inline note')
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		Initialized := WrapSymbols_Init(Root . "\")
+		if Mode == "bad-disabled-type" || Mode == "bad-custom-type" {
+			if Mode == "bad-disabled-type"
+				AssertTrue(Expected["disabled"][1]["char"] is Integer)
+			else
+				AssertTrue(Expected["custom"][1]["right"] is TOML_Bool)
+			Committed := WrapSymbols_AddCustom("c", "d")
+			AssertFalse(Committed, "a recognized unprojectable owned leaf must refuse the actual unrelated write")
+			AssertEqual(Source, FSReadStrict(Path), "a rejected owned projection must retain all exact source bytes")
+			AssertTrue(_WS_LoadFailed, "the source's unprojectable known leaf must remain latched")
+			return
+		}
+		AssertTrue(Initialized)
+		AssertFalse(_WS_LoadFailed)
+		AssertTrue(WrapSymbols_AddCustom("c", "d"), "the actual public writer must persist an unrelated new pair")
+		; The writer's legacy semicolon banner has no assignment. The canonical
+		; semantic decoder reports it as opaque trivia and still decodes the data;
+		; no test-side quote or multiline scanner is used.
+		Disk := TOML_ParseDocument(FSReadStrict(Path))
+		AssertTrue(_WSIC_HasPair(Disk["custom"], Left, Right), "a valid literal/multiline original must survive the actual native save")
+		AssertTrue(_WSIC_HasPair(Disk["custom"], "c", "d"))
+		AssertTrue(_WSIC_DiskDisabled(Disk, "("), "source disabled choice must survive native persistence")
+		AssertTrue(WrapSymbols_Init(Root . "\"))
+		AssertTrue(_WSIC_HasPair(_WS_Custom, Left, Right))
+		AssertFalse(WrapSymbols_IsEnabled("("))
+		if Mode == "legacy-disabled-map"
+			AssertFalse(WrapSymbols_IsEnabled("["), "the legacy CSV map remains supported")
+	} finally {
+		_WS_Config_Path := Saved.path, _WS_Disabled := Saved.disabled, _WS_Custom := Saved.custom
+		_WS_LoadFailed := Saved.failed, _WS_StateEpoch := Saved.epoch, _WS_ACTIVE_PAIRS := Saved.active
+		_WS_BUILTIN_PAIRS := Saved.builtins, _WS_BUILTIN_GROUPS := Saved.groups
+		DirDelete(Root, true)
+	}
+}
+for _WSC_Mode in ["literal", "multiline-basic", "multiline-literal", "one-line-multiline",
+	"multiline-basic-semicolon-data", "multiline-literal-semicolon-data", "legacy-comment-control",
+	"legacy-inline-comment-control", "legacy-disabled-map", "symmetric-custom", "bad-disabled-type", "bad-custom-type"]
+	Test("wrap symbols canonical owned source: " . _WSC_Mode, _WSC_RecognizedSource.Bind(_WSC_Mode))
