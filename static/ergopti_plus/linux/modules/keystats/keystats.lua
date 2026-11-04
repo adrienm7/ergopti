@@ -1169,8 +1169,16 @@ end
 --- @param value integer|nil evdev value.
 --- @param source any|nil Pointer device identity.
 function M.record_pointer(kind, code, value, source)
+	if not may_record() or M.is_unrecorded_app(_focused_app_id) then
+		_pointer.discard_frames()
+		-- Keep device lifecycle and queue-loss state in sync while collection is off.
+		if kind == "reset" or kind == "dropped" or kind == "frame" then
+			_pointer.observe(kind, code, value, source)
+		end
+		return
+	end
 	local delta = _pointer.observe(kind, code, value, source)
-	if not delta or not may_record() then return end
+	if not delta then return end
 	local clock = capture_input_clock()
 	queue_session_events(forward_session(clock, "input", clock.mono_ms, false), clock)
 	local app_id = _focused_app_id
@@ -1249,6 +1257,7 @@ end
 --- @param timestamp_ms number|nil Monotonic transition timestamp in milliseconds.
 function M.on_app_focus(app_id, timestamp_ms)
 	if type(app_id) ~= "string" or app_id == "" then return end
+	if _focused_app_id ~= app_id then _pointer.discard_frames() end
 	M.observe_hold_focus(app_id)
 	local clock = observe_calendar()
 	-- Gated like every other recording entry point: focus time and app
@@ -1644,6 +1653,7 @@ end
 local hold_password_app = M.is_unrecorded_app
 settle_capture_policy = function()
 	if not may_record() or hold_password_app(_hold_focus_app) then
+		_pointer.discard_frames()
 		retire_focus_prefix()
 		_hold_token = {}
 		-- Privacy can close while the same window stays focused. Retire its
