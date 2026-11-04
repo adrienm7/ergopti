@@ -4061,7 +4061,7 @@ function M.get_max_tokens() return _max_tokens or PromptBuilder.DEFAULT_MAX_TOKE
 
 function M.set_max_tokens(value)
 	local tokens = tonumber(value)
-	if not tokens or tokens < 1 then return false end
+	if not tokens or tokens ~= tokens or tokens == math.huge or tokens < 1 then return false end
 	_max_tokens = math.floor(tokens)
 	return true
 end
