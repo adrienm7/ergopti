@@ -75,10 +75,8 @@ end
 local function contract()
 	if not _contract then
 		local path = require("infra.paths").shared("modules/network/managed_network.json")
-		local file = assert(io.open(path, "rb"), "managed network policy unavailable")
-		local ok, source = pcall(file.read, file, "*a")
-		local closed = file:close()
-		assert(ok and closed, "managed network policy read or close refused")
+		local source, status = require("toml_codec.writer").read_classified(path)
+		assert(status == "ok", "managed network policy read or close refused")
 		_contract = require("network.failure").new(Json.decode(source))
 	end
 	return _contract

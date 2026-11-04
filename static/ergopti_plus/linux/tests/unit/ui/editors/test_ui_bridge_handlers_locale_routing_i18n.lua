@@ -709,3 +709,33 @@ helpers.describe("ui.bridge_handlers", function()
 end)
 
 restore_loaded()
+
+helpers.it("download window refuses FIFO managed network policy without blocking", function()
+	local uv, Paths = require("luv"), require("infra.paths")
+	local previous_bridge, previous_manager, original_shared = package.loaded["ui.download_window.bridge"],
+		package.loaded["ui.webview_manager"], Paths.shared
+	local source = assert(original_shared("modules/network/managed_network.json"))
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-download-fifo-XXXXXX"))
+	local path = dir .. "/policy.json"
+	local made = os.execute("mkfifo '" .. path .. "'"); assert(made == 0 or made == true)
+	local shown = 0
+	package.loaded["ui.webview_manager"] = { show = function() shown = shown + 1; return false end, hide = function() end }
+	package.loaded["ui.download_window.bridge"] = nil
+	local Bridge = require("ui.download_window.bridge")
+	Paths.shared = function(relative)
+		if relative == "modules/network/managed_network.json" then return path end
+		return original_shared(relative)
+	end
+	local exited, code, process = false, nil, nil
+	process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path, source } }, function(result)
+		code, exited = result, true; process:close()
+	end))
+	local called = pcall(Bridge.show, { kind = "app_update", label = "Update" })
+	Paths.shared, package.loaded["ui.download_window.bridge"], package.loaded["ui.webview_manager"] =
+		original_shared, previous_bridge, previous_manager
+	os.remove(path); os.remove(dir)
+	while not exited do uv.run("once") end
+	helpers.assert_true(code ~= 0, "loading the policy opened the FIFO")
+	helpers.assert_eq(called, false, "invalid policy must refuse admission")
+	helpers.assert_eq(shown, 0)
+end)
