@@ -63,7 +63,11 @@ end
 --- @param visit function Receives mono_ms, previous_date, next_date, wall_ms.
 function M.boundaries(previous, current, visit)
 	if previous.date == current.date then return end
-	if current.wall_ms < previous.wall_ms then
+	-- The local timezone may have changed since the previous observation.
+	-- Its saved date then cannot be reconstructed with today's timezone rules;
+	-- close at the new observation rather than inventing a past midnight.
+	local previous_local = os.date("%Y-%m-%d", math.floor(previous.wall_ms / MS_PER_SECOND))
+	if current.wall_ms < previous.wall_ms or previous_local ~= previous.date then
 		visit(current.mono_ms, previous.date, current.date, current.wall_ms)
 		return
 	end

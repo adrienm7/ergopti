@@ -590,6 +590,33 @@ helpers.describe("system metrics: owned restart hydration", function()
 end)
 
 helpers.describe("capture calendar ownership", function()
+	helpers.it("splits at the observation when the local timezone changes its date", function()
+		local calendar = require("modules.keystats.calendar")
+		local today = os.date("*t")
+		local noon = os.time({ year = today.year, month = today.month, day = today.day, hour = 12 })
+		local old_date = os.date("%Y-%m-%d", noon - 86400)
+		local new_date = os.date("%Y-%m-%d", noon)
+		local cuts = {}
+		calendar.boundaries({ wall_ms = noon * 1000, mono_ms = 1000, date = old_date },
+			{ wall_ms = (noon + 60) * 1000, mono_ms = 61000, date = new_date },
+			function(...) cuts[#cuts + 1] = { ... } end)
+		helpers.assert_eq(cuts, { { 61000, old_date, new_date, (noon + 60) * 1000 } })
+	end)
+
+	helpers.it("still splits at an observed local midnight", function()
+		local calendar = require("modules.keystats.calendar")
+		local today = os.date("*t")
+		local noon = os.time({ year = today.year, month = today.month, day = today.day, hour = 12 })
+		local midnight = calendar.next_midnight(noon * 1000)
+		local previous_wall, current_wall = midnight - 60000, midnight + 60000
+		local previous_date = os.date("%Y-%m-%d", previous_wall / 1000)
+		local current_date = os.date("%Y-%m-%d", current_wall / 1000)
+		local cuts = {}
+		calendar.boundaries({ wall_ms = previous_wall, mono_ms = 1000, date = previous_date },
+			{ wall_ms = current_wall, mono_ms = 121000, date = current_date },
+			function(...) cuts[#cuts + 1] = { ... } end)
+		helpers.assert_eq(cuts, { { 61000, previous_date, current_date, midnight } })
+	end)
 	helpers.it("retires closed sources only after their complete exact prefix is acknowledged", function()
 		local calendar = require("modules.keystats.calendar")
 		local store = calendar.new(function() return { count = 0 } end)
