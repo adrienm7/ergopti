@@ -80,6 +80,60 @@ try {
 				...(configHome ? { XDG_CONFIG_HOME: bashPath(configHome) } : {})
 			}
 		});
+	if (process.platform === 'linux') {
+		// The selected XDG root itself may be a deliberate link. The receipt
+		// still admits each startup file and the personal configuration stays.
+		const other = path.join(sandbox, 'linked-config-prefix');
+		const otherLibrary = path.join(other, 'lib/ergopti');
+		const otherWrapper = path.join(other, 'bin/ergopti-hotstrings');
+		const configTarget = path.join(sandbox, 'physical-config');
+		const configAlias = path.join(sandbox, 'selected-config');
+		const driver = path.join(otherLibrary, 'linux/ergopti_hotstrings.lua');
+		const locale = path.join(otherLibrary, '_shared/data/locales/en.json');
+		const startup = path.join(configTarget, 'autostart/ergopti-hotstrings.desktop');
+		const unit = path.join(configTarget, 'systemd/user/ergopti-hotstrings.service');
+		const personal = path.join(configTarget, 'ergopti/personal.toml');
+		for (const file of [driver, locale, otherWrapper, startup, unit, personal])
+			fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(driver, 'driver');
+		fs.writeFileSync(locale, 'locale');
+		fs.writeFileSync(
+			otherWrapper,
+			`DRIVER_ROOT="${otherLibrary}/linux"\nexec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"\n`
+		);
+		fs.writeFileSync(startup, `Exec=${otherWrapper} --tray\n`);
+		fs.writeFileSync(unit, `ExecStart=${otherWrapper} --tray\n`);
+		fs.writeFileSync(personal, 'personal data\n');
+		fs.symlinkSync(configTarget, configAlias);
+		const row = (file, relative) =>
+			`${createHash('sha256').update(fs.readFileSync(file)).digest('hex')}\t${relative}\n`;
+		fs.writeFileSync(
+			path.join(otherLibrary, '.ergopti-owned-files'),
+			row(driver, 'linux/ergopti_hotstrings.lua') +
+				row(locale, '_shared/data/locales/en.json') +
+				row(otherWrapper, '@wrapper') +
+				row(startup, '@autostart') +
+				row(unit, '@unit')
+		);
+		const result = spawnSync(
+			bashExecutable(),
+			[bashPath(script), '--prefix', bashPath(other), '--yes'],
+			{
+				encoding: 'utf8',
+				timeout: 15000,
+				env: {
+					HOME: bashPath(home),
+					XDG_CONFIG_HOME: bashPath(configAlias),
+					PATH: `${bashPath(stubs)}:/usr/bin:/bin`
+				}
+			}
+		);
+		assert.equal(result.status, 0, `linked XDG root: ${result.stderr}`);
+		assert.equal(fs.existsSync(startup), false);
+		assert.equal(fs.existsSync(unit), false);
+		assert.equal(fs.readFileSync(personal, 'utf8'), 'personal data\n');
+		assert.equal(fs.lstatSync(configAlias).isSymbolicLink(), true);
+	}
 	assert.notEqual(run('--yes').status, 0, 'an unrelated wrapper must prevent removal');
 	assert.ok(fs.existsSync(library), 'refusal preserves the installation');
 	// The failure is shown in Ergopti's own dialog host, run by the source
@@ -132,6 +186,15 @@ try {
 	);
 	const ownershipPath = path.join(library, '.ergopti-owned-files');
 	const validOwnership = fs.readFileSync(ownershipPath, 'utf8');
+	if (process.platform === 'linux') {
+		const alias = path.join(sandbox, 'missing-config-alias');
+		fs.symlinkSync(path.join(home, '.config'), alias);
+		configHome = path.join(alias, 'missing', 'nested');
+		const checked = run('--check');
+		assert.equal(checked.status, 0, `missing linked XDG root: ${checked.stderr}`);
+		assert.equal(fs.existsSync(path.join(home, '.config/missing')), false);
+		configHome = null;
+	}
 	{
 		const noHome = spawnSync(
 			bashExecutable(),

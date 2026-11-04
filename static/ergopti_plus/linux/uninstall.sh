@@ -84,6 +84,22 @@ uninstall_invalid_source() {
 	printf '%s path=%q\n' "$record" "$1" >&2
 }
 
+# The XDG root is an explicit user selection and may itself be a symlink (as
+# /home can be). Resolve that root once, then retain the existing direct-path
+# checks for every component and file below it. Missing suffixes stay missing.
+resolve_selected_config_root() {
+	local probe="$CONFIG_ROOT" suffix= component physical
+	while [ ! -e "$probe" ] && [ ! -L "$probe" ]; do
+		component="${probe##*/}"
+		suffix="/$component$suffix"
+		probe="${probe%/*}"
+		[ -n "$probe" ] || probe=/
+	done
+	[ -d "$probe" ] || return 1
+	IFS= read -r -d '' physical < <(CDPATH= cd -Pe -- "$probe" && printf '%s\0' "$PWD") || return 1
+	CONFIG_ROOT="${physical%/}$suffix"
+	[ -n "$CONFIG_ROOT" ] || CONFIG_ROOT=/
+}
 # Cache only complete native directory catalogs during pre-mutation admission.
 # A failed stat cannot authorize absence, including below an external XDG root.
 catalog_directory() {
@@ -264,6 +280,11 @@ report_exit() {
 	exit "$status"
 }
 trap report_exit EXIT
+
+if ! resolve_selected_config_root; then
+	uninstall_invalid_source "$CONFIG_ROOT"
+	exit 1
+fi
 
 if ! "$CONFIRMED" && ! "$CHECK_ONLY"; then
 	ergopti_msg uninstall.confirmation_required >&2
