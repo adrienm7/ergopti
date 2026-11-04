@@ -30,7 +30,7 @@
 ---    the rule the macOS and Windows drivers use, pinned by a shared corpus.
 --- 2. A query that fails is reported, never read as "workspace 0": the action
 ---    then presses the desktop's own shortcut, which is the plain step. A
----    switch refused after a good read walks to the target with that shortcut.
+---    switch with an inconclusive result never launches a second producer.
 --- 3. Every tool call is bounded by `timeout`: the daemon waits for it while
 ---    it holds the keyboard, so a hung display server must cost a second, not
 ---    the keyboard.
@@ -293,7 +293,7 @@ end
 --- @param direction string DesktopNavigation.PREVIOUS or .NEXT.
 --- @param wrap boolean True to go on to the other end from an edge.
 --- @param press_combo function Presses one xdotool-style combination.
---- @return string outcome "switched", "stayed" or "pressed".
+--- @return string outcome "switched", "stayed", "pressed" or "unconfirmed".
 function M.switch(direction, wrap, press_combo)
 	if M.COMBO[direction] == nil then
 		error("workspace_switcher: unknown direction '" .. tostring(direction) .. "'", 2)
@@ -320,16 +320,10 @@ function M.switch(direction, wrap, press_combo)
 					backend.name, state.index + 1, target + 1, #state.ids)
 				return "switched"
 			end
-			-- The position is known, so walk to the target as the macOS and
-			-- Windows drivers do: a wrap from an edge is several steps the
-			-- other way, and one press in the requested direction would run
-			-- into the edge.
-			local steps = target - state.index
-			local combo = M.COMBO[steps > 0 and DesktopNavigation.NEXT or DesktopNavigation.PREVIOUS]
-			Logger.warn(LOG, "%s refused to switch to workspace %d — pressing %s %d time(s) instead.",
-				backend.name, target + 1, combo, math.abs(steps))
-			for _ = 1, math.abs(steps) do press_combo(combo) end
-			return "pressed"
+			-- A timed-out or failed command may already have reached the compositor.
+			-- A second producer could then move a second time from the new workspace.
+			Logger.warn(LOG, "%s did not confirm the workspace switch; no second command was sent.", backend.name)
+			return "unconfirmed"
 		else
 			Logger.warn(LOG, "%s could not list the workspaces (%s) — pressing %s instead.",
 				backend.name, tostring(result), M.COMBO[direction])
