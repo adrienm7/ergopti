@@ -537,6 +537,11 @@ assemble_app() {
 	local hs_plist="$APP_PATH/Contents/Frameworks/Hammerspoon.app/Contents/Info.plist"
 	[ -f "$hs_plist" ] || fail "embedded Hammerspoon Info.plist missing."
 	plutil -replace CFBundleIdentifier -string "$HAMMERSPOON_BUNDLE_ID" "$hs_plist"
+	# The embedded engine is what macOS names in Accessibility, Input
+	# Monitoring and Notifications: it carries the application's own name, so
+	# the user authorizes one app, never a « Hammerspoon » they did not install.
+	plutil -replace CFBundleName -string "$ERGOPTI_APP_NAME" "$hs_plist"
+	plutil -replace CFBundleDisplayName -string "$ERGOPTI_APP_NAME" "$hs_plist"
 
 	# Disarm the embedded Hammerspoon's own Sparkle so it never tries to
 	# update itself behind our back. Updates are owned exclusively by the
