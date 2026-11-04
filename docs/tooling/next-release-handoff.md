@@ -4,69 +4,73 @@
 
 ## Branch `next/owned-karabiner`
 
-### Where this stopped (2026-11-03, paused by the coordinator until 1.0.9 ships)
+### Where this stands (2026-11-04)
 
-The agent ran on the maintainer's PC, not a cloud container, and was paused for memory. State at the pause:
+Goal (maintainer, TODO.md "Next release after 1.0.9"): the macOS driver uses Ergopti's own bundled Karabiner
+runtime, never a Karabiner installed on the Mac.
 
 - **Runtime published:** prerelease
-  <https://github.com/adrienm7/ergopti/releases/tag/remap-runtime-v16.3.0-ergopti.2>, not latest (latest stays
-  `v1.0.8`); the pinned `source_url` serves sha256 `ad1541f8…2de8e`, 12176523 bytes (downloaded back and checked).
-- **Branch:** rebased on `origin/dev` `5cda4606d1`, eight commits, the flip last.
-- **Hosted macOS lane:** run 41638220479 against `dev`'s 41638225996 (same day, `dev` is red on its own): three
-  modules still fail only here, all from the flip: `test_rule_removal` (3 cases, for instance « copy_tap_actions_to_combos
-  persists without a deploy »), `test_set_enabled_lease_transaction` (1) and `test_startup_publication_owner` (4).
-  Linux lane and Common jobs add no failure over `dev`.
+  <https://github.com/adrienm7/ergopti/releases/tag/remap-runtime-v16.3.0-ergopti.2>, not latest; downloaded back on
+  2026-11-04 with `gh release download`: sha256 `ad1541f8…2de8e`, 12176523 bytes, identical to the pin.
+- **Branch `next/owned-karabiner`:** rebased on `origin/dev` `9701b3f05a` (1.0.9), flip-free: everything on it can
+  land on `dev` on its own. Its last commits add WP8 step 1 (the idle Core service in the live helper, proven by an
+  unsigned hosted compile, Remap runtime build run 41813372448) and the parity gate mapping of the four owned
+  Tap-Holds rows (the Menus job of run 41812126200 refused them).
+- **Branch `next/owned-karabiner-flip`:** one commit on top, « feat(macos)!: make Ergopti's own Karabiner runtime
+  the default », ported from the pause and finished: the three modules that failed at the pause pass
+  (`platform.remap.remove_from_karabiner`, only called by the deleted row, is gone; the remap fixture's stub config
+  carries `RUNTIME_DEFAULT`), and the parity gate no longer pins the Configuration recovery route of
+  `remap_switch.lua`. Local proof: those modules, the macOS E2E and the menu gates pass; the AHK test of the
+  Configuration order passes. Merge it only after WP8 and WP9.
 
-Next steps, in order:
-
-1. Read those three modules' errors in run 41638220479 and make their fixtures state the runtime they model, as
-   the rest now do (`runtime = "shared"` in a stubbed user config, `RUNTIME_DEFAULT = "shared"` on a wrapped real
-   config module); rerun the macOS lane against a `dev` run of the same day.
-2. The native install below (WP6 install half), then WP8 hosted install acceptance, then WP9 on a real Mac.
-3. Only then merge the flip commit; the seven before it can land on their own.
-
-Base: `origin/dev` at `d9b0e6c970`. Goal (maintainer, TODO.md "Next release after 1.0.9"): the macOS driver
-uses Ergopti's own bundled Karabiner runtime, never a Karabiner installed on the Mac.
+Next steps, in order: the rest of WP8 below (native install), WP9 on a real Mac, then merge the flip branch.
 
 ### What this branch does
 
-| Commit                                                                             | What                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fix(build): write the owned runtime pin with LF line ends on every OS`            | `remap_runtime_publish.py` wrote CRLF on Windows (text mode); one `write_json` now writes LF bytes.                                                                                                                                                                                                                                                                                                                                                                             |
-| `build(macos): pin the owned remap runtime 16.3.0-ergopti.2`                       | The manifest pins the artifact of run 41276215019 (sha256 `ad1541f8…2de8e`, 12176523 bytes, re-verified with `verify_archive`: 31 members). The manifest gate refuses any null field from now on and checks the file and tag naming.                                                                                                                                                                                                                                            |
-| `fix(macos): remove an earlier build's rules from karabiner.json on an owned boot` | Migration: the README promised it, no code did it. The owned boot runs the marker-exact byte-span removal on `~/.config/karabiner/karabiner.json`.                                                                                                                                                                                                                                                                                                                              |
-| `feat(macos): say why Ergopti's own remapping runtime does not run`                | Tap-Holds rows for every block the user can act on (not installed, driver absent, user Karabiner running with the consent off, quit refused, download failed) and one notice per launch. 21 locales.                                                                                                                                                                                                                                                                            |
-| `fix(macos): read no missing artifact receipt and warn on an offline fetch`        | Every first owned start logged an ERROR reading a receipt in a folder not created yet; an offline download is now a WARNING.                                                                                                                                                                                                                                                                                                                                                    |
-| `fix(macos): retarget the editor shortcut after a running source proof settles`    | A second retarget during a running keyboard source proof logged two ERRORs (cleanup debt, « refused: cancelled »); the settled proof retargets.                                                                                                                                                                                                                                                                                                                                 |
-| `fix(macos): save a bulk edit for the owned runtime's admission`                   | Restore recommended before admission reverted its edit behind a blocking dialog; it is now saved and deployed at admission.                                                                                                                                                                                                                                                                                                                                                     |
-| `feat(macos)!: make Ergopti's own Karabiner runtime the default`                   | `RUNTIME_DEFAULT = "owned"`; `runtime = "shared"` stays readable as a hand-written fallback. The Configuration rows `menu.global.karabiner_integration` and `menu.global.remove_from_karabiner` (`ui/menu/remap_switch.lua`) are deleted with their strings. The E2E Mac models the owned fetch offline; the shared-lease and navigation-layer scenarios keep `runtime = "shared"` explicitly, and a new scenario restores the recommended preset on a Mac without the runtime. |
+| Commit                                                                             | What                                                                                                                                                                                                                                                                                                                                                       |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fix(build): write the owned runtime pin with LF line ends on every OS`            | `remap_runtime_publish.py` wrote CRLF on Windows (text mode); one `write_json` now writes LF bytes.                                                                                                                                                                                                                                                        |
+| `build(macos): pin the owned remap runtime 16.3.0-ergopti.2`                       | The manifest pins the artifact of run 41276215019 (sha256 `ad1541f8…2de8e`, 12176523 bytes, re-verified with `verify_archive`: 31 members). The manifest gate refuses any null field from now on and checks the file and tag naming.                                                                                                                       |
+| `fix(macos): remove an earlier build's rules from karabiner.json on an owned boot` | Migration: the README promised it, no code did it. The owned boot runs the marker-exact byte-span removal on `~/.config/karabiner/karabiner.json`.                                                                                                                                                                                                         |
+| `feat(macos): say why Ergopti's own remapping runtime does not run`                | Tap-Holds rows for every block the user can act on (not installed, driver absent, user Karabiner running with the consent off, quit refused, download failed) and one notice per launch. 21 locales.                                                                                                                                                       |
+| `fix(macos): read no missing artifact receipt and warn on an offline fetch`        | Every first owned start logged an ERROR reading a receipt in a folder not created yet; an offline download is now a WARNING.                                                                                                                                                                                                                               |
+| `fix(macos): retarget the editor shortcut after a running source proof settles`    | A second retarget during a running keyboard source proof logged two ERRORs (cleanup debt, « refused: cancelled »); the settled proof retargets.                                                                                                                                                                                                            |
+| `fix(macos): save a bulk edit for the owned runtime's admission`                   | Restore recommended before admission reverted its edit behind a blocking dialog; it is now saved and deployed at admission.                                                                                                                                                                                                                                |
+| `feat(build): start the idle Core service from the owned runtime's first install`  | The live (daemon-report) helper roster enrolls `OwnedRuntimeIdleServiceEntry` and the `OwnedRuntimeCore*` owners; `InstallerMain.swift` selects that entry under `ERGOPTI_OWNED_IDLE_CORE`. The Remap runtime build workflow compiles that roster unsigned on a hosted Mac (`owned_runtime_helper_compile_check.py`). The builder hash chain is re-pinned. |
+| `test(menu): map the owned runtime's Tap-Holds block rows in the parity gate`      | The four owned block rows' menus join `OPENS_SUBMENU`.                                                                                                                                                                                                                                                                                                     |
+
+The flip, « feat(macos)!: make Ergopti's own Karabiner runtime the default », lives on `next/owned-karabiner-flip`:
+`RUNTIME_DEFAULT = "owned"`; `runtime = "shared"` stays readable as a hand-written fallback. The Configuration rows
+`menu.global.karabiner_integration` and `menu.global.remove_from_karabiner` (`ui/menu/remap_switch.lua`) are deleted
+with their strings in 21 locales, with `platform.remap.remove_from_karabiner`. The E2E Mac models the owned fetch
+offline; the shared-lease and navigation-layer scenarios keep `runtime = "shared"` explicitly, and a new scenario
+restores the recommended preset on a Mac without the runtime.
 
 Every change is macOS only: Karabiner exists only in the macOS driver. Windows is touched in one AHK test that lists
 the shared Configuration manifest rows (the two macOS rows left it).
 
-### Do not merge the last commit before the native install exists
+### Do not merge the flip before the native install exists
 
-The pinned `16.3.0-ergopti.2` helper (`InstallerMain.swift`, `HELPER_SOURCES` of
-`tools/build/owned_runtime_product_build.py`) runs `OwnedRuntimeInstallerEntry.runFirstInstallation()`: it publishes
-`/Library/Application Support/ErgoptiPlus/Runtime` and nothing else. Nothing in the tree:
+The pinned `16.3.0-ergopti.2` helper runs `OwnedRuntimeInstallerEntry.runFirstInstallation()`: it publishes
+`/Library/Application Support/ErgoptiPlus/Runtime` and nothing else. The source on this branch now also provisions
+and starts `com.ergoptiplus.runtime.core` (WP8 step 1, not in a published artifact yet). Nothing in the tree:
 
 1. starts that helper with the administrator prompt for an install (the only launcher role that stages it,
    `--request-virtual-hid-daemon-report`, is a read-only report);
-2. writes or bootstraps `com.ergoptiplus.runtime.core` (`OwnedRuntimeCoreProvisionOwner` and
-   `OwnedRuntimeIdleServiceEntry` exist in the launcher sources but are not in the helper's roster);
-3. writes `com.ergoptiplus.runtime.vhid` (no source writes this LaunchDaemon; only the uninstaller removes it);
-4. installs the pqrs VirtualHIDDevice package on a Mac that has none (only the driver-only update of an
-   incompatible one exists, `runtime_vhid_update.lua`).
+2. writes `com.ergoptiplus.runtime.vhid` (no source writes this LaunchDaemon; only the uninstaller removes it);
+3. installs the pqrs VirtualHIDDevice package on a Mac that has none (only the driver-only update of an
+   incompatible one exists, `runtime_vhid_update.lua`);
+4. reads the helper's `OWNED_RUNTIME_INSTALL|1|<result>` line (the live values are now
+   `files-published-idle-core-observed-staging-retired` and `files-published-service-cleanup-pending`).
 
 `runtime_owner.lua` requires the files and both jobs, so with the flip a Mac without a hand-installed runtime stops at
 `runtime_not_installed` and its tap-holds stay off. The new Tap-Holds row and notice say so; they do not install it.
-Native work that remains (WP6 install half and WP8), in this order:
+Native work that remains (WP8), in this order:
 
-1. Enroll `OwnedRuntimeIdleServiceEntry`, `OwnedRuntimeCoreProvisionOwner` and the `OwnedRuntimeCore*` owners in
-   `HELPER_SOURCES`, call `OwnedRuntimeIdleServiceEntry.runFirstInstallation()` from `InstallerMain.swift` (its
-   result values differ: update the `OWNED_RUNTIME_INSTALL|1|` line and its reader), and add the
+1. Done 2026-11-04: the idle Core service in the live helper (above). Left in the helper: the
    `com.ergoptiplus.runtime.vhid` LaunchDaemon (the pqrs daemon plist is already a helper resource,
-   `VIRTUAL_HID_RESOURCE_NAMES`) and the pkg install when no driver is active.
+   `VIRTUAL_HID_RESOURCE_NAMES`) and the pkg install when no driver is active; prove each roster change with
+   `owned_runtime_helper_compile_check.py` (dispatch "Remap runtime build" without the artifact input).
 2. A launcher role `--request-owned-runtime-install` modelled on `OwnedVirtualHIDDaemonReportMainOperation`: same
    `OwnedRuntimeDownloadedHelper.current()` source, same staging program, last line
    `… --owned-install-first` instead of the report worker; a Lua port that calls it after the user confirms, from the
@@ -116,9 +120,53 @@ branch for `.2`), and the downloaded-back asset must match the pin's digest and 
   wake, reload and crash returning the keyboard to native input, uninstall leaving no Ergopti job.
 - The heatmap counting physical keys from the stream (ADR 011 decisions 6 and 7).
 
+### WP9: the real-Mac acceptance
+
+The maintainer's Mac takes no copy-paste, so each pass is one command typed in the clone; the field-report collector
+runs every Debug field check in the developer app, then commits and pushes the evidence to a `field/mac-…` branch the
+agent reads (`docs/field-reports/`).
+
+Now (baseline, before the install exists), on the shared default:
+
+```sh
+git switch next/owned-karabiner && bash tools/dev/collect-macos-field-report.sh
+```
+
+It proves what `field_owned_runtime` reports on that Mac today: the owned runtime dormant, which stock Karabiner and
+VirtualHIDDevice are installed or running, and whether the owner would accept that driver.
+
+After WP8 (install role, `16.3.0-ergopti.3` pinned), the same command on `next/owned-karabiner-flip`
+(`git switch next/owned-karabiner-flip && bash tools/dev/collect-macos-field-report.sh`), with the checklist:
+
+1. Tap-Holds shows « not installed »; its row installs with one administrator prompt; `field_owned_runtime` reads
+   the receipt of `16.3.0-ergopti.3` and both jobs loaded.
+2. The DriverKit approval in System Settings (once), Input Monitoring and Accessibility for the owned Console, the
+   Login Items entries.
+3. `field_owned_start` passes; a running Karabiner-Elements is closed with the notice, and reopens on pause and on
+   quit; `field_owned_pause` passes; the next run's `field_owned_start` proves close-on-resume.
+4. Typing (the maintainer, by hand): tap-holds, chords and the navigation layer on the internal keyboard with
+   fn/globe, autorepeat, sleep and wake; a reload and a crash return the keyboard to native input.
+5. A shared-mode `karabiner.json` loses exactly Ergopti's rules; personal rules stay byte-identical.
+6. Uninstall leaves no Ergopti job.
+
+When the six hold, merge `next/owned-karabiner-flip` (rebase, fast-forward) and start the shared-mode deletion.
+
 ### Proof
 
-The agent ran on the maintainer's Windows PC, not a Linux container: Lua 5.4 and LuaJIT in WSL Debian on a copy of
+2026-11-04 (this host, Windows with WSL Debian, Lua 5.4.7, Node 22.16 because the pinned 22.22.2 is not installed
+here, so the full JS gate ran only in CI):
+
+- Rebased branch, macOS lane run 41812126200: every macOS unit group green; Common « Menus » red on the four
+  unmapped owned rows, fixed by the parity commit (gate green locally).
+- WP8 step 1: product build tests 25/25 in WSL, Remap runtime build run 41813372448 green (11 unsigned compile
+  commands, both architectures). The SDK test's « unavailable live source » case fails in WSL on `HEAD` too (it
+  needs Darwin).
+- Flip branch, locally: the three modules of the pause, `test_configuration_menu`, `test_tray_every_submenu_populated`,
+  `test_runtime_dormant`, `test_config_runtime_key` and the macOS E2E pass; menu parity, native menu rows and census
+  pass; the AHK `(menu-configuration)` test passes. Hosted macOS lanes: run 41819929221 (flip) against 41819945934
+  (this branch, same hour).
+
+2026-11-03: the agent ran on the maintainer's Windows PC, not a Linux container: Lua 5.4 and LuaJIT in WSL Debian on a copy of
 the tree, Node 22.22.2 (the pinned version, downloaded and checked against its SHASUMS256) on Windows.
 
 - macOS E2E: 181/181 on the final source (179 before; the flip without the fixes failed 38).
