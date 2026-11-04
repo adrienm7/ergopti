@@ -1754,8 +1754,9 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		-- Accepted close and its later native callback are separate observations.
 		-- Cleanup also runs when the causal before-fix assertion fails.
 		scheduler.cancelAll, state.admitted = cancel_all, true
-		local cancelled = scheduler.cancelAll()
+		scheduler.cancelAll()
 		uv.run("nowait")
+		local cancelled = scheduler.cancelAll()
 		local _, owned = census(state.handle)
 		local _, witness = census(foreign)
 		local foreign_preserved = foreign ~= nil and witness == 1 and uv.is_active(foreign)
@@ -1801,13 +1802,16 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 					helpers.assert_eq(main.loops, 0)
 				end
 				state.admitted = true
-				helpers.assert_true(coordinator.poll(), "the same scheduler's true receipt admits loop stop")
-				helpers.assert_eq(main.loops, 1); helpers.assert_eq(main.hooks, 1)
-				helpers.assert_eq(coordinator.is_pending(), false)
+				helpers.assert_eq(coordinator.poll(), false, "scheduled close is not a physical acknowledgement")
+				helpers.assert_eq(main.loops, 0); helpers.assert_eq(main.hooks, 1)
+				helpers.assert_true(coordinator.is_pending())
 				helpers.assert_eq(token.timer, nil); helpers.assert_eq(scheduler.activeCount(), 0)
 				helpers.assert_true(uv.is_closing(state.handle), "successful cancellation has scheduled the actual close")
-				helpers.assert_eq(state.physical_closes, 0, "close acceptance is not the later physical close callback")
+				helpers.assert_eq(state.physical_closes, 0)
 				uv.run("nowait")
+				helpers.assert_true(coordinator.poll(), "the physical callback admits loop stop")
+				helpers.assert_eq(main.loops, 1)
+				helpers.assert_eq(coordinator.is_pending(), false)
 				local _, owned = census(state.handle)
 				helpers.assert_eq(state.physical_closes, 1); helpers.assert_eq(owned, 0)
 				helpers.assert_eq(state.allocations, 1); helpers.assert_eq(state.business_calls, 0)
@@ -1816,13 +1820,15 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		end)
 	end
 
-	helpers.it("(timer-main-shutdown-ack) accepts real cancellation before its separate physical close phase", function()
+	helpers.it("(timer-main-shutdown-ack) waits for real cancellation's physical close phase", function()
 		with_native_scheduler("accepted", function(scheduler, token, state, uv)
 			local coordinator, main = actual_main(nil, false, scheduler)
 			helpers.assert_true(coordinator.request("tray quit"))
-			helpers.assert_eq(coordinator.is_pending(), false); helpers.assert_eq(main.loops, 1)
+			helpers.assert_true(coordinator.is_pending()); helpers.assert_eq(main.loops, 0)
 			helpers.assert_eq(token.timer, nil); helpers.assert_eq(scheduler.activeCount(), 0)
 			helpers.assert_true(uv.is_closing(state.handle)); helpers.assert_eq(state.physical_closes, 0)
+			uv.run("nowait")
+			helpers.assert_true(coordinator.poll()); helpers.assert_eq(main.loops, 1)
 		end)
 	end)
 

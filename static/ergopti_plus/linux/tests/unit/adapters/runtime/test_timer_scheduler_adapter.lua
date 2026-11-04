@@ -26,7 +26,7 @@ local function timer_fixture()
 		return 0
 	end
 	function backend.timer_stop(timer) timer.stopped = true; return 0 end
-	function backend.close(timer) timer.closed = true; timer.callback = nil end
+	function backend.close(timer, callback) timer.closed = true; timer.callback = nil; if callback then callback() end end
 	function state.fire(index)
 		local timer = state.timers[index]
 		if not timer.closed and not timer.stopped then timer.callback() end
@@ -352,6 +352,22 @@ local function with_luv(fake_luv, body)
   helpers.assert_true(ok, "luv timer probe must not throw: " .. tostring(err))
 end
 
+helpers.describe("timer shutdown physical retirement", function()
+  local available, uv = pcall(require, "luv")
+  if available then
+    helpers.it("timer shutdown waits for the native close acknowledgement", function()
+      with_luv(uv, function(scheduler)
+        local fired = 0
+        scheduler.every(60, function() fired = fired + 1 end)
+        helpers.assert_eq(scheduler.cancelAll(), false, "a scheduled native close is not its callback")
+        uv.run("nowait")
+        helpers.assert_eq(scheduler.cancelAll(), true, "the actual close callback retires the timer")
+        helpers.assert_eq(fired, 0)
+      end)
+    end)
+  end
+end)
+
 helpers.describe("timer_scheduler armed ownership", function()
   helpers.it("linux-relative-clock: simulated refresh exception closes unarmed timers", function()
     local closed, starts = 0, 0
@@ -445,9 +461,10 @@ helpers.describe("timer_scheduler armed ownership", function()
             if refusal == "stop" and not allow then return nil, "stop refused" end
             return true
           end,
-          close = function()
+          close = function(_, callback)
             closes = closes + 1
             if refusal == "close" and not allow then return false, "close refused" end
+            if callback then callback() end
           end,
         }, function(scheduler)
           local handle = scheduler.after(1, function() fired = fired + 1 end)
@@ -473,7 +490,10 @@ helpers.describe("timer_scheduler armed ownership", function()
       new_timer = function() return {} end,
       timer_start = function() return nil, "start refused" end,
       timer_stop = function() return true end,
-      close = function() if not allow then return false, "close refused" end end,
+      close = function(_, callback)
+        if not allow then return false, "close refused" end
+        if callback then callback() end
+      end,
     }, function(scheduler)
       local handle = scheduler.every(1, function() end)
       helpers.assert_true(handle.fired and not handle.armed and handle.timer ~= nil)
@@ -624,7 +644,7 @@ helpers.describe("native timer constructor rollback ownership", function()
 							end
 							state.allow_close = true
 							if start == "false" then helpers.assert_true(scheduler.cancel(token))
-							else helpers.assert_true(scheduler.cancelAll()) end
+							else helpers.assert_eq(scheduler.cancelAll(), false) end
 						else
 							helpers.assert_eq(state.closes, 1, "accepted constructor rollback needs one native close")
 						end

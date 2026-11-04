@@ -25,7 +25,8 @@ local function elapsed(start) return (uv.hrtime() - start) / 1000000 end
 local function check(name, test)
 	checks = checks + 1
 	local ok, err = xpcall(test, debug.traceback)
-	assert(Scheduler.cancelAll())
+	Scheduler.cancelAll()
+	await(function() return Scheduler.cancelAll() end)
 	await(function() return not uv.loop_alive() end)
 	assert(Scheduler.activeCount() == 0, "scheduler retained native ownership")
 	local remaining = 0
@@ -113,7 +114,9 @@ check("delayed native timers remain individually and collectively cancellable", 
 	local one = Scheduler.after(0.080, function() callbacks = callbacks + 1 end)
 	local repeat_timer = Scheduler.every(0.080, function() callbacks = callbacks + 1 end)
 	assert(one.armed and repeat_timer.armed and Scheduler.activeCount() == 2)
-	assert(Scheduler.cancel(one) and Scheduler.cancelAll())
+	assert(Scheduler.cancel(one))
+	Scheduler.cancelAll()
+	await(function() return Scheduler.cancelAll() end)
 	await(function() return not uv.loop_alive() end)
 	assert(callbacks == 0 and not one.armed and not repeat_timer.armed)
 end)
