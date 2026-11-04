@@ -24,6 +24,11 @@ if [ "$#" -ne 1 ] || [[ "$1" == */* ]] || [ -z "$1" ]; then
 	exit 2
 fi
 ASSET="$1"
+case "$ASSET" in
+	.|..|linux|_shared|bin|install.sh|AppDir)
+		echo "[ERR] Bundle asset name collides with a build input: $ASSET" >&2
+		exit 2 ;;
+esac
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 IFS= read -r -d '' PROJECT_ROOT < <(cd -- "$SCRIPT_DIR/../.." && printf '%s\0' "$PWD")
 BUILD_DIR="${ERGOPTI_LINUX_BUILD_DIR:-$PROJECT_ROOT/build/linux}"
@@ -31,6 +36,12 @@ case "$BUILD_DIR" in
 	/?*) ;;
 	*) echo "[ERR] ERGOPTI_LINUX_BUILD_DIR must be an absolute path, got '$BUILD_DIR'" >&2; exit 1 ;;
 esac
+for output in "$BUILD_DIR/$ASSET" "$BUILD_DIR/$ASSET.sha256"; do
+	if [ -L "$output" ] || { [ -e "$output" ] && [ ! -f "$output" ]; }; then
+		echo "[ERR] Bundle output is not a direct regular file: $output" >&2
+		exit 1
+	fi
+done
 
 bash "$SCRIPT_DIR/write_build_stamp.sh" verify "$BUILD_DIR/_shared"
 STAGE="$(mktemp -d "$BUILD_DIR/.bundle-archive.XXXXXX")"
@@ -42,7 +53,7 @@ bash "$SCRIPT_DIR/stage-linux-private-runtime.sh" "$BUILD_DIR/AppDir" "$STAGE/li
 install -m 644 "$BUILD_DIR/AppDir/usr/lib/ergopti/network-runtime-env.sh" "$STAGE/linux/network-runtime-env.sh"
 
 tar -czf "$BUILD_DIR/$ASSET" -C "$STAGE" linux _shared bin install.sh
-(cd "$BUILD_DIR" && sha256sum "$ASSET" > "$ASSET.sha256" && sha256sum --check "$ASSET.sha256")
+(cd "$BUILD_DIR" && sha256sum -- "$ASSET" > "$ASSET.sha256" && sha256sum --check -- "$ASSET.sha256")
 echo "Bundle contents:"
 tar -tzf "$BUILD_DIR/$ASSET" | sed -n '1,20p'
 echo "... $(tar -tzf "$BUILD_DIR/$ASSET" | wc -l) entries"
