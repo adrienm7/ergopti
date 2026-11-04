@@ -253,6 +253,21 @@ try {
 			'an unterminated final ownership row survives startup changes'
 		);
 		fs.writeFileSync(desktop, disabled);
+		for (const invalid of [
+			'',
+			'broken\n',
+			`${'a'.repeat(64)}\tlinux/../foreign\n`,
+			`${'a'.repeat(64)}\tlinux/owned\n${'b'.repeat(64)}\tlinux/owned\n`
+		]) {
+			fs.writeFileSync(manifest, invalid);
+			const callsBefore = fs.readFileSync(calls, 'utf8');
+			const refusal = run('enable');
+			assert.notEqual(refusal.status, 0, 'a malformed ownership receipt must be refused');
+			assert.match(refusal.stderr, /code=invalid-receipt role=receipt/);
+			assert.equal(fs.readFileSync(manifest, 'utf8'), invalid);
+			assert.equal(fs.readFileSync(desktop, 'utf8'), disabled);
+			assert.equal(fs.readFileSync(calls, 'utf8'), callsBefore);
+		}
 		const previousReceipt =
 			`${'a'.repeat(64)}\tlinux/retained-file\n` +
 			`${createHash('sha256').update(disabled).digest('hex')}\t@autostart\n`;
