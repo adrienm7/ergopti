@@ -62,9 +62,10 @@ local function native_owner(receipt)
 		"the actual daemon log-level callback must be captured")
 	local logger = { info = function() end, error = function() end, warn = function() end,
 		level_of = require("logger.shim").level_of,
-		set_level = function(value) observed.threshold = value end }
+		set_level = function(value) observed.threshold = value end,
+		get_level = function() return observed.threshold end }
 	package.loaded["logger.shim"] = logger
-	package.loaded["adapters.storage"] = {
+	local storage = {
 		get = function(key, default) local value = observed.durable[key]; if value == nil then return default end; return value end,
 		set = function(key, value)
 			observed.requested, observed.detached = value, observed.threshold
@@ -74,6 +75,7 @@ local function native_owner(receipt)
 			return true
 		end,
 	}
+	package.loaded["adapters.storage"] = storage
 	package.loaded["infra.script_settings"] = nil
 	local settings = require("infra.script_settings")
 	settings.apply("INFO")
@@ -84,7 +86,23 @@ local function native_owner(receipt)
 		package.loaded[name] = previous[key]
 	end
 	return function(value)
-		local result = callback(value)
+		local saved_scope, saved_settings = package.loaded["infra.script_scope"], package.loaded["infra.script_settings"]
+		local saved_shim, saved_logger = package.loaded["logger.shim"], package.loaded["logger"]
+		package.loaded["infra.script_settings"], package.loaded["logger.shim"], package.loaded["logger"] = settings, logger, logger
+		-- The transaction owns persistence followed by publication to the real settings owner.
+		package.loaded["infra.script_scope"] = { retry_edit = function() return true end, edit_setting = function(key, level)
+			if storage.set(key, level) ~= true then return false end
+			local token = { pending = function() return false end }
+			assert(settings.scope_acquire(token))
+			local captured = assert(settings.scope_capture(token))
+			local applied = settings.scope_apply(token, captured, level)
+			assert(settings.scope_release(token)); assert(settings.scope_forget(token, captured))
+			return applied
+		end }
+		local ok, result = pcall(callback, value)
+		package.loaded["infra.script_scope"], package.loaded["infra.script_settings"] = saved_scope, saved_settings
+		package.loaded["logger.shim"], package.loaded["logger"] = saved_shim, saved_logger
+		if not ok then error(result, 0) end
 		observed.selected = settings.current()
 		return result
 	end, observed
