@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **54 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **55 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -993,3 +993,17 @@ Consequence: Saving an unchanged older page erases a newer navigation binding an
 Regression: The real LRDT host/native GUI, SDK callback, host timer dispatch and canonical corpus drive source-stale plus a fresh-host successful save. The fix captures the offered source once per host and uses the existing lease and admitted unchanged-source publisher; explicit non-GUI Save retains its existing contract. Exact host/epoch/folders/target admission persists through publication and is checked again after success logging before apply. A separate real WM_CLOSE-at-success-log probe observes saved=true/applied=false with zero apply calls. FakeHost save cases become explicitly inert rather than manufacturing consent. Native stale-source fail-before measured; post-fix pending. Linux already retains this opening receipt; the macOS sibling remains outside this Windows correction.
 
 The ongoing register now contains **54 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-055: Wrap-symbol TOML projection can erase or corrupt valid settings
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+\_WS_Load interprets TOML using exact header strings and greedy double-quote regex captures without canonical lexical handling. Comments can hide a recognized table or enter its value. Literal/multiline strings and invalid recognized types also need a trustworthy typed projection so an incomplete interpretation cannot later be acknowledged as empty configuration.
+
+Reproduction: Native run41912869071 ate4e5e62 passes four canonical/quoted/legacy controls. Three annotated valid TOML cases fail individually and reversed: an unrelated accepted AddCustom deletes the original pair after an annotated header; an annotated disabled value is serialized incorrectly; an annotated custom value prevents an otherwise valid save.
+
+Consequence: A routine unrelated wrap-symbol edit can permanently remove a valid custom pair or re-enable/corrupt a disabled symbol. Valid source annotations can also make persistence unusable.
+
+Regression: Seven inline-comment/quote/legacy cases use real Init, the actual shared catalogue, public AddCustom, independent typed disk decoding and genuine reload. The corrected loader alone uses the existing canonical lexer/decoder, preserves legacy semicolon comments and CSV/default-right behavior, projects into detached state and latches recognized unprojectable data. Writer and transactions are unchanged. Twelve extra spelling/compatibility/type-preservation probes cover the same family without increasing the count. The historical custom-before-disabled metadata test becomes an actual save/reload fixture retaining its original test identity. Native three-case fail-before measured; post-fix pending. Extra grammar variants are coverage, not separate native-confirmed findings.
+
+The ongoing register now contains **55 distinct new findings**. The requested target of 1,000 remains unmet.
