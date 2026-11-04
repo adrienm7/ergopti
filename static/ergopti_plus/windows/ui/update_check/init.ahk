@@ -71,6 +71,7 @@ global _UC_MsgSub      := unset
 global _UC_Native      := false
 global _UC_WindowEpoch := 0
 global _UC_ResetDone   := true
+global _UC_RetiredHosts := []
 
 
 
@@ -481,8 +482,8 @@ _UpdateCheck_Open() {
 	G.MarginY := 0
 	ContentCtl := G.Add("Text", "x0 y0 w" . Geo.w . " h" . Geo.h, "")
 	G.WVC := 0
-	G.OnEvent("Close",  (*) => _UpdateCheck_CloseWindow())
-	G.OnEvent("Escape", (*) => _UpdateCheck_CloseWindow())
+	G.OnEvent("Close",  (*) => _UpdateCheck_CloseWindow(Epoch))
+	G.OnEvent("Escape", (*) => _UpdateCheck_CloseWindow(Epoch))
 	; No position: Gui.Show centers the window on the screen
 	G.Show("w" . Geo.w . " h" . Geo.h)
 	_UC_Gui := G
@@ -586,8 +587,8 @@ _UpdateCheck_BuildNative() {
 		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "update", ""))
 	}
 	_UpdateCheck_CenterRow(Row, Geo.w)
-	G.OnEvent("Close",  (*) => _UpdateCheck_CloseWindow())
-	G.OnEvent("Escape", (*) => _UpdateCheck_CloseWindow())
+	G.OnEvent("Close",  (*) => _UpdateCheck_CloseWindow(Owner.epoch))
+	G.OnEvent("Escape", (*) => _UpdateCheck_CloseWindow(Owner.epoch))
 	; No position: Gui.Show centers the window on the screen; the texts span
 	; the canonical width with the margins, so the native height fits its content
 	G.Show("AutoSize")
@@ -623,29 +624,89 @@ _UpdateCheck_NativeClick(Owner, Name, Channel, *) {
 
 ; Closes the window: the controller first, while its host window lives, then
 ; the window.
-_UpdateCheck_CloseWindow() {
-	ManagedNetworkTerminalFailure.Retire("updater_check")
+_UpdateCheck_CloseWindow(ExpectedEpoch := unset) {
 	global _UC_Gui, _UC_Controller, _UC_WebView, _UC_MsgSub, _UC_ResetDone, _UC_WindowEpoch, _UC_State
-	global _UC_Release, _UC_RequestId, _UC_Native
-	SavedGui := IsSet(_UC_Gui) ? _UC_Gui : 0
-	if !_UC_Native && IsSet(_UC_Controller) {
-		_UC_MsgSub := unset
-		try _UC_Controller.Close()
-	}
-	_UC_Controller := unset
-	_UC_WebView := unset
-	_UC_ResetDone := true
-	_UC_Native := false
-	_UC_WindowEpoch += 1
-	_UC_State := 0
-	_UC_Release := 0
-	_UC_RequestId := 0
+	global _UC_Release, _UC_RequestId, _UC_Native, _UC_RetiredHosts
+	PreviousCritical := Critical("On")
 	try {
-		if SavedGui
-			SavedGui.Destroy()
-	}
-	_UC_Gui := unset
+		if IsSet(ExpectedEpoch) && ExpectedEpoch != _UC_WindowEpoch
+			return false
+		RetryOnly := _UC_ResetDone && !IsSet(_UC_Gui) && !IsSet(_UC_Controller) && _UC_RequestId == 0
+		if !RetryOnly {
+			; Retain references before detaching: native unsubscribe and Close may
+			; pump messages and open a successor, which this stack must never clear.
+			SavedGui := IsSet(_UC_Gui) ? _UC_Gui : 0
+			SavedController := IsSet(_UC_Controller) ? _UC_Controller : 0
+			SavedView := IsSet(_UC_WebView) ? _UC_WebView : 0
+			SavedSub := IsSet(_UC_MsgSub) ? _UC_MsgSub : 0
+			SavedFailure := ManagedNetworkTerminalFailure.Owners.Get("updater_check", 0)
+			Host := {gui: SavedGui, controller: SavedController, view: SavedView,
+				subscription: SavedSub, closing: false}
+			_UC_RetiredHosts.Push(Host)
+			_UC_ResetDone := true
+			_UC_WindowEpoch += 1
+			_UC_State := 0
+			_UC_Release := 0
+			_UC_RequestId := 0
+			_UC_Native := false
+			_UC_Gui := unset
+			_UC_Controller := unset
+			_UC_WebView := unset
+			_UC_MsgSub := unset
+		}
+	} finally Critical(PreviousCritical)
+	if RetryOnly
+		return _UpdateCheck_RetireHosts()
+	; The retained host now owns the subscription's last reference.
+	SavedSub := 0
+	if IsObject(SavedFailure)
+		ManagedNetworkTerminalFailure.Retire("updater_check", SavedFailure)
+	Retired := _UpdateCheck_RetireHosts()
 	LoggerInfo("UpdateCheck", "Update-check window closed.")
+	return Retired
+}
+
+; Retain failed COM/native cleanup for a later close instead of destroying a
+; host HWND while its controller still owns it. A reentrant drain skips owners
+; whose native Close is already in flight.
+_UpdateCheck_RetireHosts() {
+	global _UC_RetiredHosts
+	AllRetired := true
+	for Host in _UC_RetiredHosts.Clone() {
+		PreviousCritical := Critical("On")
+		try {
+			if Host.closing {
+				AllRetired := false
+				continue
+			}
+			Host.closing := true
+		} finally Critical(PreviousCritical)
+		try {
+			Host.subscription := 0
+			if IsObject(Host.controller) {
+				Host.controller.Close()
+				Host.controller := 0
+			}
+			Host.view := 0
+			if IsObject(Host.gui) {
+				Host.gui.Destroy()
+				Host.gui := 0
+			}
+			PreviousCritical := Critical("On")
+			try {
+				for Index, Owned in _UC_RetiredHosts {
+					if Owned == Host {
+						_UC_RetiredHosts.RemoveAt(Index)
+						break
+					}
+				}
+			} finally Critical(PreviousCritical)
+		} catch as Err {
+			AllRetired := false
+			LoggerWarn("UpdateCheck", "Window retirement failed; cleanup ownership retained: {1}.", Err.Message)
+		} finally Host.closing := false
+	}
+	return AllRetired
 }
 
 ; Sends one message into the window's page.

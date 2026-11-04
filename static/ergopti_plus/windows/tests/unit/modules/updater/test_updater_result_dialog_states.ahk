@@ -428,3 +428,92 @@ Test("update check: a manual check keeps the other channels with a newer release
 	_TUCD_OtherChannelsOnManualChecks)
 
 #Include test_update_check_native_consent.ahk
+
+
+class _TUCD_RetiredGui {
+	__New(Events, Name) {
+		this.Events := Events, this.Name := Name
+	}
+	Destroy() => this.Events.Push("destroy-" . this.Name)
+}
+class _TUCD_RetiredSubscription {
+	__New(Events) => this.Events := Events
+	__Delete() => this.Events.Push("unsubscribe")
+}
+class _TUCD_RetiredController {
+	__New(Events, Epoch, Replace := false) {
+		this.Events := Events, this.Epoch := Epoch, this.Replace := Replace
+		this.Calls := 0, this.Fail := false
+		this.CallerCritical := A_IsCritical
+	}
+	Close() {
+		global _UC_Controller, _UC_Gui, _UC_WindowEpoch, _UC_RequestId, _UC_ResetDone, _UC_State
+		AssertEqual(this.CallerCritical, A_IsCritical, "native Close must run after restoring the caller's thread mode")
+		this.Calls += 1
+		this.Events.Push("close")
+		if this.Fail
+			throw Error("injected retirement refusal")
+		if this.Replace {
+			_UC_WindowEpoch += 1
+			_UC_RequestId := 202
+			_UC_ResetDone := false
+			_UC_State := Map("state", "checking")
+			_UC_Gui := _TUCD_RetiredGui(this.Events, "B")
+			_UC_Controller := _TUCD_RetiredController(this.Events, _UC_WindowEpoch)
+		}
+		if this.Replace
+			_UpdateCheck_CloseWindow(this.Epoch)
+		else
+			_UpdateCheck_CloseWindow()
+	}
+}
+
+_TUCD_ReentrantRetirement(Replace := false, Refuse := false) {
+	global _UC_Gui, _UC_Controller, _UC_WebView, _UC_MsgSub, _UC_WindowEpoch, _UC_RequestId
+	global _UC_ResetDone, _UC_State, _UC_Release, _UC_Native, _UC_RetiredHosts
+	AssertFalse(IsSet(_UC_Gui) || IsSet(_UC_Controller) || IsSet(_UC_MsgSub) || IsSet(_UC_WebView),
+		"the passive retirement fixture must not replace a live native host")
+	AssertEqual(0, _UC_RetiredHosts.Length, "the passive fixture must not replace existing cleanup debt")
+	Saved := [_UC_WindowEpoch, _UC_RequestId, _UC_ResetDone, _UC_State, _UC_Release, _UC_Native]
+	Events := []
+	try {
+		_UC_WindowEpoch += 1
+		Epoch := _UC_WindowEpoch
+		_UC_RequestId := 101
+		_UC_ResetDone := false
+		_UC_Native := false
+		_UC_State := Map("state", "checking")
+		_UC_Gui := _TUCD_RetiredGui(Events, "A")
+		Controller := _TUCD_RetiredController(Events, Epoch, Replace)
+		Controller.Fail := Refuse
+		_UC_Controller := Controller
+		_UC_MsgSub := _TUCD_RetiredSubscription(Events)
+		AssertEqual(!Refuse, _UpdateCheck_CloseWindow(Epoch))
+		AssertEqual("unsubscribe", Events[1], "unsubscribe must precede native controller closure")
+		if Refuse {
+			AssertEqual(2, Events.Length, "a refused controller must retain its undestroyed host")
+			AssertEqual(1, _UC_RetiredHosts.Length)
+			Controller.Fail := false
+			AssertTrue(_UpdateCheck_CloseWindow(), "detached cleanup debt remains retryable")
+			AssertEqual(2, Controller.Calls, "the refused attempt is retried exactly once")
+		} else
+			AssertEqual(1, Controller.Calls, "reentrant closure cannot close the old controller twice")
+		AssertEqual("destroy-A", Events[Events.Length], "host destruction follows successful controller closure")
+		AssertEqual(0, _UC_RetiredHosts.Length)
+		if Replace {
+			AssertEqual(202, _UC_RequestId, "the retired stack preserves the replacement request")
+			AssertFalse(_UC_ResetDone)
+			AssertTrue(_UC_Controller != Controller, "the replacement controller remains owned")
+		}
+	} finally {
+		Controller.Fail := false
+		_UpdateCheck_CloseWindow()
+		_UC_WindowEpoch := Saved[1], _UC_RequestId := Saved[2], _UC_ResetDone := Saved[3]
+		_UC_State := Saved[4], _UC_Release := Saved[5], _UC_Native := Saved[6]
+	}
+}
+Test("update check: reentrant Close retires once (update-check-retirement-owner)", _TUCD_ReentrantRetirement)
+Test("update check: retirement preserves a replacement (update-check-retirement-owner)",
+	_TUCD_ReentrantRetirement.Bind(true))
+Test("update check: refused retirement keeps retry ownership (update-check-retirement-owner)",
+	_TUCD_ReentrantRetirement.Bind(false, true))
