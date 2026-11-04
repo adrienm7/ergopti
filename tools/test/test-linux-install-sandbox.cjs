@@ -631,13 +631,23 @@ const errors = [];
 	}
 }
 
-// Refuse foreign or linked startup entries before replacing the payload.
-for (const kind of ['unit', 'desktop', 'linked-unit', 'linked-desktop']) {
-	const relative = kind.endsWith('unit')
-		? 'systemd/user/ergopti-hotstrings.service'
-		: 'autostart/ergopti-hotstrings.desktop';
+// Refuse foreign or linked launchers and startup entries before replacing the payload.
+for (const kind of [
+	'unit',
+	'desktop',
+	'linked-unit',
+	'linked-desktop',
+	'launcher',
+	'linked-launcher'
+]) {
+	const relative = kind.endsWith('launcher')
+		? '../.local/bin/ergopti-hotstrings'
+		: kind.endsWith('unit')
+			? 'systemd/user/ergopti-hotstrings.service'
+			: 'autostart/ergopti-hotstrings.desktop';
 	const run = runInstaller({
 		desktopProvided: true,
+		noService: kind.endsWith('launcher'),
 		seed(home, configRoot) {
 			const entry = path.join(configRoot, relative);
 			fs.mkdirSync(path.dirname(entry), { recursive: true });
@@ -655,6 +665,27 @@ for (const kind of ['unit', 'desktop', 'linked-unit', 'linked-desktop']) {
 			assert.equal(fs.readFileSync(path.join(run.home, 'foreign-target'), 'utf8'), 'keep target\n');
 		} else assert.equal(fs.readFileSync(entry, 'utf8'), 'foreign startup\n');
 		assert.equal(fs.existsSync(path.join(run.home, '.local/lib/ergopti')), false);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// Reinstalling over this prefix's own launcher remains supported.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		seed(home) {
+			const bin = path.join(home, '.local/bin');
+			fs.mkdirSync(bin, { recursive: true });
+			fs.writeFileSync(
+				path.join(bin, 'ergopti-hotstrings'),
+				`INSTALL_ROOT=${bashPath(home)}/.local/lib/ergopti\nexec bash "\${INSTALL_ROOT}/bin/ergopti-hotstrings" "$@"\n`
+			);
+		}
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
 	} finally {
 		run.cleanup();
 	}

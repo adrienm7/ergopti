@@ -156,6 +156,29 @@ ergopti_resolve_config_home CONFIG_ROOT
 CONFIG_DIR="${CONFIG_ROOT}/ergopti/hotstrings"
 SYSTEMD_DIR="${CONFIG_ROOT}/systemd/user"
 
+# The public launcher is outside the payload tree. Do not truncate a foreign
+# command or follow a link when installing over an existing prefix.
+if ! $SETUP_PERMS_ONLY; then
+	public_launcher="${BIN_DIR}/ergopti-hotstrings"
+	if [ -L "$public_launcher" ] || { [ -e "$public_launcher" ] && [ ! -f "$public_launcher" ]; }; then
+		printf '[install] code=invalid-launcher path=%q\n' "$public_launcher" >&2
+		exit 1
+	fi
+	if [ -f "$public_launcher" ]; then
+		if { grep -Fqx "INSTALL_ROOT=$(printf '%q' "$LIB_DIR")" "$public_launcher" \
+			&& grep -Fqx 'exec bash "${INSTALL_ROOT}/bin/ergopti-hotstrings" "$@"' "$public_launcher"; } \
+			|| { { grep -Fqx "DRIVER_ROOT=\"$LIB_DIR/linux\"" "$public_launcher" \
+				|| grep -Fqx "DRIVER_ROOT=$(printf '%q' "$LIB_DIR/linux")" "$public_launcher"; } \
+				&& { grep -Fqx 'exec bash "${DRIVER_ROOT}/install/launch.sh" --service "$@"' "$public_launcher" \
+					|| grep -Fqx 'exec luajit "${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"' "$public_launcher"; }; }; then
+			:
+		else
+			printf '[install] code=foreign-launcher path=%q\n' "$public_launcher" >&2
+			exit 1
+		fi
+	fi
+fi
+
 # Startup paths may already belong to another application or installation.
 # Check them before copying the payload: truncating a link or a foreign unit
 # would destroy user data and make the subsequent ownership receipt misleading.
