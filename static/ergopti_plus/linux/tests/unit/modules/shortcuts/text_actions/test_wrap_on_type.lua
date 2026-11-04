@@ -56,6 +56,21 @@ local function symbol(char, mods)
 end
 
 helpers.describe("wrap on type (linux): the decision", function()
+	for _, boundary in ipairs({ "baseline", "selected" }) do
+		helpers.it("passes input through when the " .. boundary .. " PRIMARY read raises (wrap-primary-exception)", function()
+			local controller, log, state = controller_with({ primary = "old", on_read = function(_, observed)
+				if observed.reads == (boundary == "baseline" and 1 or 2) then error("controlled PRIMARY failure") end
+			end })
+			local clicked = pcall(controller.on_pointer_down)
+			state.primary = "selected"
+			local called, consumed = pcall(controller.on_key, symbol("("))
+			helpers.assert_true(clicked, "pointer handling must not stop capture")
+			helpers.assert_true(called, "the symbol must remain deliverable")
+			helpers.assert_eq(consumed, false)
+			helpers.assert_eq(log.typed, {})
+			helpers.assert_eq(controller.selection_window_open(), false)
+		end)
+	end
 	helpers.it("wraps a mouse selection and swallows the symbol", function()
 		local controller, log, state = controller_with({ primary = "old" })
 		controller.on_pointer_down()
