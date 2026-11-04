@@ -107,18 +107,18 @@ local function handle(payload, state, request)
 		return with_payload({ exported = false })
 	end
 
-	if action == "pause" then
-		if state.keystats and type(state.keystats.suppress) == "function" then
-			state.keystats.suppress()
-		end
-		return with_payload({ suppressed = true })
-	end
-
-	if action == "resume" then
-		if state.keystats and type(state.keystats.unsuppress) == "function" then
-			state.keystats.unsuppress()
-		end
-		return with_payload({ suppressed = false })
+	if action == "pause" or action == "resume" then
+		local stats = state.keystats
+		local operation = stats and (action == "pause" and stats.suspend_collection or stats.resume_collection)
+		if type(operation) ~= "function" or type(stats.is_collection_suspended) ~= "function"
+			or type(stats.is_suppressed) ~= "function" then return with_payload({ supported = false }) end
+		local called = pcall(operation)
+		if not called or not request.valid() then return with_payload({ supported = false }) end
+		local read_pause, suspended = pcall(stats.is_collection_suspended)
+		local read_secure, secure = pcall(stats.is_suppressed)
+		if not read_pause or not read_secure or type(suspended) ~= "boolean" or type(secure) ~= "boolean"
+			or suspended ~= (action == "pause") then return with_payload({ supported = false }) end
+		return with_payload({ suspended = suspended, suppressed = suspended or secure })
 	end
 
 	-- The category editor. This is the one control on the page that writes
