@@ -56,8 +56,11 @@ local function report(ok, reason, reload)
 	local message = ok and i18n.get("karabiner.vhid_update.done")
 		or i18n.format("karabiner.vhid_update.failed", tostring(reason))
 	local committed = require("infra.deferred_work").after(0, function()
-		require("infra.dialog_util").block_alert(i18n.get("karabiner.vhid_update.title"), message,
-			i18n.get("common.ok"))
+		local shown, err = pcall(function()
+			require("infra.dialog_util").block_alert(i18n.get("karabiner.vhid_update.title"), message,
+				i18n.get("common.ok"))
+		end)
+		if not shown then Logger.error(LOG, "The driver update result could not be shown: %s.", tostring(err)) end
 		if ok then reload() end
 	end, "virtual_hid_update.report")
 	if committed ~= true then

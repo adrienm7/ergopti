@@ -36,7 +36,11 @@ local function load_probe(options)
 					task.inputs[#task.inputs + 1] = data
 					return true
 				end,
-				close_input = function() task.closed = true; return true end,
+				close_input = function()
+					task.closed = true
+					if options.close_raises then error("close failed") end
+					return options.close_result ~= false
+				end,
 				terminate = function() task.terminated = true; return true end,
 			}
 		end,
@@ -52,6 +56,21 @@ local function with_probe(callback)
 end
 
 helpers.describe("task output turn probe", function()
+	helpers.it("terminates the echo child if closing its input fails (output-turn-close-refusal)", function()
+		for _, options in ipairs({ { close_result = false }, { close_raises = true } }) do
+			with_probe(function()
+				local Probe, spawns = load_probe(options)
+				local delivered = 0
+				helpers.assert_not_nil(Probe.request("test", function() delivered = delivered + 1 end))
+				spawns[1].on_chunk(nil, "turn\n", "")
+				helpers.assert_eq(delivered, 1)
+				helpers.assert_true(spawns[1].terminated, "a refused close must not leave cat running")
+				spawns[1].on_done(0, "", "")
+				helpers.assert_eq(delivered, 1)
+			end)
+		end
+	end)
+
 	helpers.it("(task-output-turn) reports a turn only once its echo is read", function()
 		with_probe(function()
 			local Probe, spawns = load_probe()
