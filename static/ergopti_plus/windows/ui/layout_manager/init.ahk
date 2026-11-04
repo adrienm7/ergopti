@@ -258,8 +258,7 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		}
 		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 			return false
-		Deps["open_url"].Call(Homepage)
-		return true
+		return Deps["open_url"].Call(Homepage)
 	}
 	if (Action == "install" || Action == "update") {
 		if !(Entry is Map) {

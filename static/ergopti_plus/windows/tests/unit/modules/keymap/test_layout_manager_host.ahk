@@ -135,6 +135,9 @@ _LMH_AllowlistCase() {
 		AssertEqual("select ergopti", _LMH_Calls(Log)[2])
 		AssertTrue(LayoutManager_HandleMessage(Map("action", "open_homepage", "id", "ergol", "url", "https://evil.test"), Deps))
 		AssertEqual("open https://ergol.org", _LMH_Calls(Log)[3], "the page never chooses the URL")
+		Deps["open_url"] := (*) => false
+		AssertFalse(LayoutManager_HandleMessage(Map("action", "open_homepage", "id", "ergol"), Deps),
+			"a refused native URL launch must not report success")
 		AssertTrue(LayoutManager_HandleMessage(Map("action", "close"), Deps))
 		AssertEqual("close", _LMH_Calls(Log)[4])
 	} finally {
