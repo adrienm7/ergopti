@@ -90,7 +90,9 @@ _PersonalTomlRenderEntry(Entry, Original := 0) {
 		_TOML_DocumentToken(Raw, &Position, "", , , &ValueEnd)
 		Tail := SubStr(Raw, ValueEnd + 1)
 	}
-	return TOML_RenderKey(Entry["trigger"]) . " = { " . ArrayJoin(Members, ", ") . " }" . Tail
+	; Always a quoted key, like the macOS and Linux writers: a bare `par = {...}`
+	; is valid TOML, but it is not the row shape every shipped file uses.
+	return TOML_RenderString(Entry["trigger"]) . " = { " . ArrayJoin(Members, ", ") . " }" . Tail
 }
 
 _PersonalTomlAppendSource(&Content, Text) {
