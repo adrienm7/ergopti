@@ -31,6 +31,7 @@ Range. Only verdicts are printed, never a host or a digest.
 
 import importlib.util
 import json
+import re
 import sys
 import tempfile
 import time
@@ -287,7 +288,9 @@ def blob_range_verdict(status, content_range):
     managed daemon skips to each part's offset, at the cost of the skipped bytes.
     """
     if status == 206:
-        served = (content_range or "").startswith("bytes 1-2/")
+        match = re.fullmatch(r"bytes 1-2/(\*|[0-9]+)", content_range or "")
+        total = match.group(1).lstrip("0") if match else ""
+        served = bool(match) and (total == "*" or len(total) > 1 or total >= "3")
         return ("pass", "honoured") if served else ("fail", "wrong_range")
     if status == 200:
         return "info", "ignored"

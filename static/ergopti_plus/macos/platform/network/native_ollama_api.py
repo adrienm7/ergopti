@@ -61,6 +61,7 @@ def listener(value):
             not isinstance(text, str)
             or not text.isascii()
             or not text.isdigit()
+            or len(text) > 20  # The largest uint64 has 20 decimal digits.
             or str(int(text)) != text
             or int(text) >= 1 << 64
         ):

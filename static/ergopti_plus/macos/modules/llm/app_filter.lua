@@ -114,14 +114,17 @@ end
 --- @return boolean True if a URL-bar-type element has input focus.
 local function is_url_bar_focused(front, resolve_focused)
 	if not front then return false end
-	local bid = front:bundleID() or ""
-	if not BROWSER_BUNDLE_IDS[bid] then return false end
+	local ok_bid, bid = pcall(function() return front:bundleID() end)
+	if not ok_bid or (bid ~= nil and type(bid) ~= "string") then return true end
+	if not BROWSER_BUNDLE_IDS[bid or ""] then return false end
 
 	local focused = resolve_focused()
 	if not focused then return false end
 
 	local ok_role, role = pcall(function() return focused:attributeValue("AXRole") end)
-	if not ok_role or role ~= "AXTextField" then return false end
+	-- A missing or malformed role cannot prove that this is not a URL field.
+	if not ok_role or type(role) ~= "string" or role == "" then return true end
+	if role ~= "AXTextField" then return false end
 
 	-- Layer 1 — Safari / WebKit: AXSubrole is explicitly "AXURLField"
 	local ok_sub, subrole = pcall(function() return focused:attributeValue("AXSubrole") end)
@@ -161,11 +164,15 @@ end
 --- @return userdata|nil hs.application object, or nil on failure.
 local function get_focused_app()
 	local ok_fw, fw = pcall(hs.window.focusedWindow)
-	if ok_fw and fw then
+	if not ok_fw then return nil, true end
+	if fw then
 		local ok_app, app = pcall(function() return fw:application() end)
-		if ok_app and app then return app end
+		if not ok_app or not app then return nil, true end
+		return app, false
 	end
-	return hs.application.frontmostApplication()
+	local ok_front, front = pcall(hs.application.frontmostApplication)
+	if not ok_front then return nil, true end
+	return front, false
 end
 
 
@@ -207,7 +214,11 @@ function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field
 		return true
 	end
 
-	local front = get_focused_app()
+	local front, focus_failed = get_focused_app()
+	if focus_failed then
+		Logger.debug(LOG, "Focused application could not be established — LLM request skipped.")
+		return true
+	end
 
 	-- Both filters used to resolve the focused AX element independently, so a
 	-- browser with both enabled paid the cross-process round-trip TWICE per
@@ -239,9 +250,15 @@ function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field
 	end
 	if not front then return false end
 
-	local bid  = front:bundleID() or ""
-	local path = front:path() or ""
-	local name = (front:name() or ""):lower()
+	local metadata_ok, bid, path, name = pcall(function()
+		return front:bundleID(), front:path(), front:name()
+	end)
+	if not metadata_ok or (bid ~= nil and type(bid) ~= "string")
+		or (path ~= nil and type(path) ~= "string") or (name ~= nil and type(name) ~= "string") then
+		Logger.debug(LOG, "Focused application metadata is unreadable — LLM request skipped.")
+		return true
+	end
+	bid, path, name = bid or "", path or "", (name or ""):lower()
 
 	for _, app in ipairs(excluded_apps) do
 		local has_path = type(app.appPath) == "string" and app.appPath ~= ""

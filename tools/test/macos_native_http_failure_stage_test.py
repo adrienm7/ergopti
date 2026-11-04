@@ -777,6 +777,16 @@ class OllamaBlobHost(unittest.TestCase):
         unplanned, _ = self.run_blob(blob=(302, "https://blobs.elsewhere.example/x"))
         self.assertIn("step blob_range skip no_blob", unplanned)
 
+    def test_range_probe_rejects_invalid_content_range_totals(self):
+        for value in ("bytes 1-2/0", "bytes 1-2/2", "bytes 1-2/garbage", "bytes 1-2/9 extra"):
+            with self.subTest(value=value):
+                lines, _ = self.run_blob(blob=(200, None), ranged=(206, value))
+                self.assertIn("step blob_range fail wrong_range", lines)
+        for value in ("bytes 1-2/*", "bytes 1-2/3", "bytes 1-2/0009"):
+            with self.subTest(value=value):
+                lines, _ = self.run_blob(blob=(200, None), ranged=(206, value))
+                self.assertIn("step blob_range pass honoured", lines)
+
     def test_a_registry_that_serves_the_head_but_redirects_the_get_is_followed(self):
         # Field run 2026-11-03: blob_host registry_served, then blob_range fail
         # http_307, because the ranged GET did not follow the storage redirect.

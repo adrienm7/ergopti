@@ -71,6 +71,7 @@ M.COHESION_MIN_SHARE = 0.3
 -- ===================================
 -- ======= 2/ Geometry Helpers =======
 -- ===================================
+-- ===================================
 
 --- Rejects a frame whose centroid cannot be computed from every contact.
 --- @param touches table Trackpad touch array.

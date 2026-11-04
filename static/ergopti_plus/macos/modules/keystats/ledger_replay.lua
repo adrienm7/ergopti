@@ -49,7 +49,13 @@ function M.is_state(state)
 	end
 	if state.offset < 0 then return false end
 	for _, key in ipairs({ "rollover", "first_batch", "last_batch" }) do
-		if state[key] ~= nil and type(state[key]) ~= "string" then return false end
+		local marker = state[key]
+		if marker ~= nil then
+			if type(marker) ~= "string" or marker:find("[\r\n]")
+				or marker:find("-- ===", 2, true) then return false end
+			local pattern = key == "rollover" and ROLLOVER_LINE or BATCH_LINE
+			if not marker:match(pattern) then return false end
+		end
 	end
 	return true
 end

@@ -252,7 +252,7 @@ def download(url, output, digest, size, deadline, idle_timeout, request=_native_
         return output
     finally:
         if not complete:
-            output.unlink()
+            output.unlink(missing_ok=True)
 
 
 def _run_uv(arguments, deadline, environment=None):

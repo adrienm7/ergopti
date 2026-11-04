@@ -95,6 +95,16 @@ class BootstrapDownloadTests(unittest.TestCase):
         parameters.update(overrides)
         return BOOTSTRAP.download(**parameters)
 
+    def test_missing_partial_file_does_not_mask_transfer_failure(self):
+        def request(*_args, **_kwargs):
+            self.output.unlink()
+            raise BOOTSTRAP.BootstrapFailure("connect")
+
+        with self.assertRaises(BOOTSTRAP.BootstrapFailure) as caught:
+            self.receive(request)
+        self.assertEqual(caught.exception.reason, "connect")
+        self.assertFalse(self.output.exists())
+
     def test_full_url_identity_hash_and_physical_terminal_before_publication(self):
         response = Response()
         calls = []

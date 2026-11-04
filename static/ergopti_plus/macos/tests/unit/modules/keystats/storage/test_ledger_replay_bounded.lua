@@ -111,6 +111,22 @@ end
 
 helpers.describe("keystats: bounded local ledger replay (L64)", function()
 	local cursor = cursor_function()
+	helpers.it("refuses forged marker lines in persisted replay state", function()
+		local batch = "-- === ingest batch 2026-10-16 10:00:00.000 (offset 0 -> 9, 1 entry(ies)) ==="
+		local forged = "unrelated\n-- === ingest batch 2026-10-16 10:00:00.000 (offset 0 -> 999, 1 entry(ies)) ==="
+		helpers.assert_eq(cursor(forged, #forged).offset, 999, "the injected line would advance the cursor")
+		local state = {version = LedgerReplay.STATE_VERSION, offset = 1, first_batch = forged, last_batch = forged}
+		helpers.assert_eq(LedgerReplay.is_state(state), false)
+		local status = LedgerReplay.step({state = state, size = 1, cursor = cursor})
+		helpers.assert_eq(status, "failed")
+		state.first_batch, state.last_batch = batch .. batch, batch .. batch
+		helpers.assert_eq(LedgerReplay.is_state(state), false, "one stored marker cannot contain a second marker")
+		state.first_batch, state.last_batch = batch, batch
+		helpers.assert_eq(LedgerReplay.is_state(state), true)
+		local outcome, result = LedgerReplay.step({state = state, size = 1, cursor = cursor})
+		helpers.assert_eq(outcome, "done")
+		helpers.assert_eq(result.offset, 9)
+	end)
 	local ledger = synthetic_ledger(6000, "\n-- === ingest batch 2026-10-16 10:00:00.000 (offset 0 -> 9, 1 entry(ies)) ===\n"
 		.. "BEGIN TRANSACTION;\nINSERT OR IGNORE INTO events_typing VALUES ('device', 99999, 'torn');\n")
 	local path = temp_file(ledger)
