@@ -238,6 +238,18 @@ jobs:
               $receipt | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $evidence 'e2e.receipt.json') -Encoding utf8
           }
 
+      - name: Validate the managed HTTP adapter through proxy overrides
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.navigation.outcome == 'success' && steps.entry_inputs.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 12
+        run: |
+          $env:ERGOPTI_AHK_EXE = $env:ERGOPTI_REPLAY_AHK
+          $proxyOutput = & node tools/test/test-windows-proxy-override-e2e.cjs --required '--only=http_client:' 2>&1
+          $proxyExit = $LASTEXITCODE
+          $proxyOutput | ForEach-Object { Write-Host $_ }
+          if ($proxyExit -ne 0) { exit $proxyExit }
+          if ($proxyOutput -notcontains '# 11 passed, 0 failed, 0 not executed') { throw 'The native HTTP override selection did not execute all eleven cases.' }
+
       - name: Replay every case alone and the selection in reverse
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.navigation.outcome == 'success' }}
         shell: pwsh
