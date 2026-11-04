@@ -10,9 +10,13 @@
 --- module owns what is moved, what is refused and what the report says.
 ---
 --- FEATURES & RATIONALE:
---- 1. Never Overwrite: an entry moves only when nothing exists at its
----    destination. Otherwise both stay and the report names the kept entry, so a
----    folder written by a newer build is never replaced by an older one.
+--- 1. Never Overwrite: an entry moves when nothing but an empty folder exists
+---    at its destination. Otherwise the destination stays as it is and the old
+---    entry is renamed into the backup folder of the new root, so a folder
+---    written by a newer build is never replaced by an older one, every old
+---    folder empties and is removed, and the migration has nothing left to do
+---    at the next boot. Only a taken backup slot or a failed rename keeps an old
+---    entry where it is, with a warning naming both paths.
 --- 2. Rename, Not Copy: a move is one rename inside the same home folder. It
 ---    loses nothing on failure and costs nothing for the multi-gigabyte managed
 ---    runtimes, so the folders themselves need no copy.
@@ -60,51 +64,89 @@ local function require_ports(ports)
 	end
 end
 
---- Moves one entry when its destination is free.
+--- Renames one entry after creating the parent of its destination.
+--- @param from string Old path.
+--- @param to string New path, known to be free.
+--- @param ports table Native effects.
+--- @return boolean moved
+--- @return string|nil reason Why it was not moved.
+--- @return string|nil detail The rename error.
+local function rename_into(from, to, ports)
+	local parent = to:match("^(.*)/[^/]+$")
+	if parent and parent ~= "" and not ports.make_dir(parent) then return false, "parent_unavailable" end
+	local moved, why = ports.rename(from, to)
+	if not moved then return false, "rename_failed", why end
+	return true
+end
+
+--- Moves one entry to its destination, or into the backup folder when the
+--- destination holds something.
 --- @param from string Old path.
 --- @param to string New path.
+--- @param backup string Path the old entry takes when `to` is taken.
 --- @param ports table Native effects.
 --- @param report table Report being filled.
-local function move_entry(from, to, ports, report)
+local function move_entry(from, to, backup, ports, report)
 	if not ports.exists(from) then return end
 	if ports.exists(to) then
-		report.kept[#report.kept + 1] = { from = from, to = to, reason = "destination_exists" }
-		return
+		-- An empty folder a newer build created ahead of the migration holds no
+		-- data: it gives way to the old entry.
+		local left = ports.list(to)
+		if not (left and #left == 0 and ports.remove_empty_dir(to)) then
+			if ports.exists(backup) then
+				report.kept[#report.kept + 1] = { from = from, to = backup, reason = "backup_exists" }
+				return
+			end
+			local saved, reason, detail = rename_into(from, backup, ports)
+			if saved then
+				report.backed_up[#report.backed_up + 1] = { from = from, to = backup, taken = to }
+			else
+				report.kept[#report.kept + 1] = { from = from, to = backup, reason = reason, detail = detail }
+			end
+			return
+		end
 	end
-	local parent = to:match("^(.*)/[^/]+$")
-	if parent and parent ~= "" and not ports.make_dir(parent) then
-		report.kept[#report.kept + 1] = { from = from, to = to, reason = "parent_unavailable" }
-		return
-	end
-	local moved, why = ports.rename(from, to)
+	local moved, reason, detail = rename_into(from, to, ports)
 	if moved then
 		report.moved[#report.moved + 1] = { from = from, to = to }
 	else
-		report.kept[#report.kept + 1] = { from = from, to = to, reason = "rename_failed", detail = why }
+		report.kept[#report.kept + 1] = { from = from, to = to, reason = reason, detail = detail }
 	end
 end
 
 --- Applies a plan of folder moves.
 ---
---- Each step is either a single move (`from`, `to`) or a merge (`from_dir`,
---- `to_dir`, optional `entries`): every entry of `from_dir` (or only the named
---- ones) moves to the same name in `to_dir`, and `from_dir` is removed once it
---- is empty. A merge keeps entries it is not asked to move.
+--- Each step is either a single move (`from`, `to`, `backup`) or a merge
+--- (`from_dir`, `to_dir`, `backup_dir`, optional `entries`): every entry of
+--- `from_dir` (or only the named ones) moves to the same name in `to_dir`, or
+--- to the same name in `backup_dir` when that name is taken, and `from_dir` is
+--- removed once it is empty. A merge keeps entries it is not asked to move.
 --- @param plan table Array of steps.
 --- @param ports table exists, list, rename, make_dir, remove_empty_dir.
---- @return table report { moved = {{from,to}}, kept = {{from,to,reason}}, removed = {dir} }.
+--- @return table report { moved = {{from,to}}, backed_up = {{from,to,taken}},
+---   kept = {{from,to,reason}}, removed = {dir} }.
 function M.apply(plan, ports)
 	assert(type(plan) == "table", "legacy folder migration needs a plan")
 	require_ports(ports)
-	local report = { moved = {}, kept = {}, removed = {} }
-	for _, step in ipairs(plan) do
+	local report = { moved = {}, backed_up = {}, kept = {}, removed = {} }
+	for index, step in ipairs(plan) do
 		if step.from then
-			move_entry(step.from, step.to, ports, report)
-		elseif step.from_dir and ports.exists(step.from_dir) then
-			local names = step.entries or ports.list(step.from_dir) or {}
+			assert(type(step.to) == "string" and type(step.backup) == "string",
+				"legacy folder migration step " .. index .. " needs to and backup")
+			move_entry(step.from, step.to, step.backup, ports, report)
+		else
+			assert(type(step.from_dir) == "string" and type(step.to_dir) == "string"
+				and type(step.backup_dir) == "string",
+				"legacy folder migration step " .. index .. " needs from_dir, to_dir and backup_dir")
+		end
+		if step.from_dir and ports.exists(step.from_dir) then
+			-- A copy: the named entries come from the generated app_dirs table.
+			local names = {}
+			for _, name in ipairs(step.entries or ports.list(step.from_dir) or {}) do names[#names + 1] = name end
 			table.sort(names)
 			for _, name in ipairs(names) do
-				move_entry(join(step.from_dir, name), join(step.to_dir, name), ports, report)
+				move_entry(join(step.from_dir, name), join(step.to_dir, name), join(step.backup_dir, name), ports,
+					report)
 			end
 			local left = ports.list(step.from_dir)
 			if left and #left == 0 and ports.remove_empty_dir(step.from_dir) then
@@ -201,9 +243,13 @@ function M.log_report(logger, log, report)
 	for _, entry in ipairs(report.moved) do
 		logger.info(log, "Moved legacy folder entry %s to %s.", entry.from, entry.to)
 	end
+	for _, entry in ipairs(report.backed_up) do
+		logger.warn(log, "Moved legacy folder entry %s to the backup %s: %s is already taken.", entry.from,
+			entry.to, entry.taken)
+	end
 	for _, entry in ipairs(report.kept) do
 		logger.warn(log, "Kept legacy folder entry %s: %s at %s (%s).", entry.from,
-			entry.reason == "destination_exists" and "an entry already exists" or "it could not be moved",
+			entry.reason == "backup_exists" and "a backup already exists" or "it could not be moved",
 			entry.to, tostring(entry.detail or entry.reason))
 	end
 	for _, dir in ipairs(report.removed) do

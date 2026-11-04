@@ -238,6 +238,7 @@ const migrationWindows = requireTable('migration.windows');
 const migrationLinux = requireTable('migration.linux');
 const migration = {
 	backupSuffix: requireString(migrationTable, 'backup_suffix', 'migration'),
+	backupFolder: requireString(migrationTable, 'backup_folder', 'migration'),
 	macos: {
 		legacySupportRelative: support.macos.relative.replace(
 			new RegExp(`${folderName}$`),
@@ -251,7 +252,15 @@ const migration = {
 		legacyConfigRelative: requireSegments(migrationMacos, 'legacy_config', 'migration.macos').join(
 			'/'
 		),
-		legacyLogsRelative: requireSegments(migrationMacos, 'legacy_logs', 'migration.macos').join('/')
+		legacyLogsRelative: requireSegments(migrationMacos, 'legacy_logs', 'migration.macos').join('/'),
+		legacyCacheRelative: requireSegments(migrationMacos, 'legacy_cache', 'migration.macos').join(
+			'/'
+		),
+		legacyControlRelative: requireSegments(
+			migrationMacos,
+			'legacy_control',
+			'migration.macos'
+		).join('/')
 	},
 	windows: {
 		legacyPathsFileBase: requireString(
@@ -277,6 +286,10 @@ const migration = {
 };
 if (!support.macos.relative.endsWith(folderName))
 	fail('support.macos.segments must end with the application folder.');
+// The backup folder is one entry of each new root: a rename into it stays on
+// the volume of that root.
+if (!/^[A-Za-z0-9._-]+$/.test(migration.backupFolder))
+	fail('migration.backup_folder must be one plain folder name.');
 // The Lua and Swift consumers join every macOS folder to the one home folder.
 for (const [name, base] of [
 	['support.macos', support.macos.base],
@@ -377,11 +390,14 @@ function emitLua() {
 		'\t},\n' +
 		'\tmigration = {\n' +
 		`\t\tbackup_suffix = ${luaStr(migration.backupSuffix)},\n` +
+		`\t\tbackup_folder = ${luaStr(migration.backupFolder)},\n` +
 		'\t\tmacos = {\n' +
 		`\t\t\tlegacy_support_relative = ${luaStr(migration.macos.legacySupportRelative)},\n` +
 		`\t\t\tmoved_support_entries = { ${migration.macos.movedSupportEntries.map(luaStr).join(', ')} },\n` +
 		`\t\t\tlegacy_config_relative = ${luaStr(migration.macos.legacyConfigRelative)},\n` +
 		`\t\t\tlegacy_logs_relative = ${luaStr(migration.macos.legacyLogsRelative)},\n` +
+		`\t\t\tlegacy_cache_relative = ${luaStr(migration.macos.legacyCacheRelative)},\n` +
+		`\t\t\tlegacy_control_relative = ${luaStr(migration.macos.legacyControlRelative)},\n` +
 		'\t\t},\n' +
 		'\t\tlinux = {\n' +
 		`\t\t\tlegacy_folder = ${luaStr(migration.linux.legacyFolder)},\n` +
@@ -520,6 +536,12 @@ function emitAhk() {
 			'AppDirsMigrationBackupSuffix',
 			migration.backupSuffix,
 			'Suffix of the copy the legacy folder migration keeps of a rewritten paths.toml.'
+		) +
+		'\n' +
+		fn(
+			'AppDirsMigrationBackupFolder',
+			migration.backupFolder,
+			'Folder of the root that receives an old entry whose destination is taken.'
 		) +
 		'\n' +
 		fn(

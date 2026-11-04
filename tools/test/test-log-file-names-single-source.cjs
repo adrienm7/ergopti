@@ -299,11 +299,15 @@ function assertManagedWindowsRuntimeContract() {
 	const ahk = healthy.writes.get(path.join(SP, 'windows/_generated/app_dirs.ahk'));
 	assert(ahk.startsWith('\uFEFF'));
 	assert(!ahk.includes('\r'));
+	const managedFolder = declared.runtime.windows.managed_ollama_folder_name;
 	assert(
-		ahk.includes(`${nativeFunction}() {\n\treturn "ergopti_plus_ollama"\n}`),
+		ahk.includes(`${nativeFunction}() {\n\treturn "${managedFolder}"\n}`),
 		'The actual generator must emit AppDirsWindowsManagedOllamaFolderName from the shared declaration.'
 	);
-	assert.equal(declared.runtime.windows.managed_ollama_folder_name, 'ergopti_plus_ollama');
+	// One folder name: the managed runtime sibling is named after the root, and
+	// its old name is only ever the migration's source.
+	assert(managedFolder.startsWith(declared.app.folder_name));
+	assert.notEqual(managedFolder, declared.migration.windows.legacy_ollama_folder);
 	assert.equal(ahk, fs.readFileSync(path.join(SP, 'windows/_generated/app_dirs.ahk'), 'utf8'));
 	for (const file of GENERATED_OWNERS.filter((p) => !p.endsWith('.ahk'))) {
 		assert.equal(

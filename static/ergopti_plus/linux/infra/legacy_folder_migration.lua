@@ -84,7 +84,9 @@ end
 -- ================================
 -- ================================
 
---- The merge steps of every XDG base that held a legacy folder.
+--- The merge steps of every XDG base that held a legacy folder. An old entry
+--- whose destination is taken goes to <base>/ergopti/<backup folder>/<old
+--- folder>/, on the volume of that base.
 --- @param config_paths table infra/config_paths (or a test double with the same bases).
 --- @return table plan
 function M.plan(config_paths)
@@ -92,7 +94,9 @@ function M.plan(config_paths)
 	local name = AppDirs.linux.folder_name
 	local plan = {}
 	for _, base in ipairs({ config_paths.config_home(), config_paths.state_home(), config_paths.data_home() }) do
-		plan[#plan + 1] = { from_dir = base .. "/" .. legacy, to_dir = base .. "/" .. name }
+		local root = base .. "/" .. name
+		plan[#plan + 1] = { from_dir = base .. "/" .. legacy, to_dir = root,
+			backup_dir = root .. "/" .. AppDirs.migration.backup_folder .. "/" .. legacy }
 	end
 	return plan
 end

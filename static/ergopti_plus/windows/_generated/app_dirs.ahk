@@ -109,6 +109,11 @@ AppDirsMigrationBackupSuffix() {
 	return ".before-folder-migration"
 }
 
+; Folder of the root that receives an old entry whose destination is taken.
+AppDirsMigrationBackupFolder() {
+	return "before-folder-migration"
+}
+
 ; Environment variable holding the paths.toml of the builds before the single folder.
 AppDirsMigrationWindowsLegacyPathsFileBaseEnv() {
 	return "APPDATA"

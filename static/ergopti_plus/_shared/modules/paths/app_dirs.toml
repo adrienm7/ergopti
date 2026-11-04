@@ -213,26 +213,34 @@ folder_name = "ErgoptiPlus"
 # =====================================
 
 # The folders of the builds before the single name, moved once at boot into the
-# new root by each driver's legacy folder migration. A move never overwrites:
-# when the destination exists the old entry stays and a warning names both.
-# paths.toml is rewritten only where it named an old default folder, and its
-# previous text is kept beside it with the backup suffix. Nothing else may
-# spell these names (tools/test/test-legacy-folder-names.cjs).
+# new root by each driver's legacy folder migration. A move is a rename and
+# never overwrites: an empty destination folder is replaced, and an old entry
+# whose destination holds something is renamed into the backup folder of the
+# new root (<root>/<backup_folder>/<old path below its base>), so every old
+# folder empties, is removed, and the migration never runs twice. paths.toml is
+# rewritten only where it named an old default folder, and its previous text
+# is kept beside it with the backup suffix. Nothing else may spell these names
+# (tools/test/test-legacy-folder-names.cjs).
 [migration]
 backup_suffix = ".before-folder-migration"
+backup_folder = "before-folder-migration"
 
 [migration.macos]
 # ~/Library/Application Support/<legacy_support_folder>/<entry> moves to the
 # same entry of the support root. Only these entries are moved: the others are
-# runtime state recreated at launch, or the owned runtime kept above.
+# runtime state of a build that may still run until the next login (locks, the
+# lease guardian, the PTY sources), or the owned runtime kept above.
 legacy_support_folder = "ErgoptiPlus"
 moved_support_entries = ["paths.toml", "RemapRuntime"]
 # The old default configuration folder, relative to HOME.
 legacy_config = [".config", "ergopti_plus"]
-# The old default logs folder, relative to HOME: its logs are not moved (the
-# launcher writes the new folder before the driver starts), only a paths.toml
-# LogsDirPath that names it is rewritten.
+# The old default logs folder, relative to HOME: every entry merges into the
+# logs folder, and a paths.toml LogsDirPath that names it is rewritten.
 legacy_logs = ["Library", "Logs", "ergopti_plus"]
+# The old cache folder and the old local reload control folder, relative to
+# HOME: every entry merges into the cache folder and the support root.
+legacy_cache = ["Library", "Caches", "ergopti_plus"]
+legacy_control = ["Library", "Application Support", "ergopti_plus"]
 
 [migration.windows]
 # The old paths.toml in Roaming AppData.

@@ -25,6 +25,8 @@ global _DriverStartupSmokeDir := ""
 OnError(ErgoptiGlobalErrorHandler)
 OnExit(_PathsEarlyObserveExit)
 #Include ../../infra/hotpath_profiler.ahk
+#Include ../../_generated/app_dirs.ahk
+#Include ../../infra/app_folders.ahk
 #Include ../../infra/toml/toml_helpers.ahk
 
 if IsSet(Features) || IsSet(_SharedDir) || IsSet(_ConfigDir) || IsSet(ConfigurationFile)

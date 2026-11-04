@@ -11,11 +11,13 @@
 ; rewritten to the new one, after a backup of its previous text.
 ;
 ; FEATURES & RATIONALE:
-; 1. Same Rules as Lua: an entry moves only when nothing exists at its
-;    destination, a move is a rename, the emptied old folder is removed, and
-;    paths.toml is backed up before its text changes. The shared vectors
-;    (_shared/tests/corpus/paths/legacy_folder_migration_vectors.json) pin the
-;    rewrite; _shared/lua/legacy_folder_migration.lua is the Lua twin.
+; 1. Same Rules as Lua: a move is a rename that never overwrites. An empty
+;    destination folder gives way; an entry whose destination holds something
+;    goes to <root>\<backup folder>\ instead, so every old folder empties and is
+;    removed and the migration has nothing to do at the next boot. paths.toml
+;    is backed up before its text changes. The shared vectors
+;    (_shared/tests/corpus/paths/legacy_folder_migration_vectors.json) pin both;
+;    _shared/lua/legacy_folder_migration.lua is the Lua twin.
 ; 2. Before paths.toml: infra/boot.ahk runs it before the configuration
 ;    transition recovery reads paths.toml, and before the logger opens its
 ;    folder; its lines are queued until LoggerInit.
@@ -37,61 +39,102 @@
 ; ===============================
 ; ===============================
 
-; Moves one file or folder when its destination is free; reports the outcome.
+; Renames one file or folder to a free path after creating its parent.
 ; @param From {String} Old path.
-; @param To {String} New path.
-; @param Report {Map} Receives "moved" and "kept" rows.
-LegacyFolderMoveEntry(From, To, Report) {
-		Attributes := FileExist(From)
-		if (Attributes == "")
-				return
-		if (FileExist(To) != "") {
-				Report["kept"].Push(Map("from", From, "to", To, "reason", "destination_exists"))
-				return
-		}
+; @param To {String} New path, known to be free.
+; @returns {String} "" when renamed, else the error message.
+LegacyFolderRenameInto(From, To) {
 		SplitPath(To, , &Parent)
 		try {
 				if (Parent != "" && !DirExist(Parent))
 						DirCreate(Parent)
-				if InStr(Attributes, "D")
+				if InStr(FileExist(From), "D")
 						DirMove(From, To)
 				else
 						FileMove(From, To)
 		} catch as MoveError {
-				Report["kept"].Push(Map("from", From, "to", To, "reason", "rename_failed", "detail", MoveError.Message))
-				return
+				return MoveError.Message
 		}
-		Report["moved"].Push(Map("from", From, "to", To))
+		return ""
 }
 
-; Moves every entry of a folder into another one, then removes the old folder
-; when nothing is left in it.
+; Whether a path is a folder that holds nothing.
+; @param Dir {String}
+; @returns {Boolean}
+LegacyFolderIsEmptyDir(Dir) {
+		if !DirExist(Dir)
+				return false
+		loop files, Dir . "\*", "FD"
+				return false
+		return true
+}
+
+; Moves one file or folder to its destination; when the destination holds
+; something, moves it into the backup slot instead. Mirrors move_entry of
+; _shared/lua/legacy_folder_migration.lua.
+; @param From {String} Old path.
+; @param To {String} New path.
+; @param Backup {String} Path the old entry takes when To is taken.
+; @param Report {Map} Receives "moved", "backed_up" and "kept" rows.
+LegacyFolderMoveEntry(From, To, Backup, Report) {
+		if (FileExist(From) == "")
+				return
+		if (FileExist(To) != "") {
+				; An empty folder created ahead of the migration holds no data.
+				Freed := false
+				if LegacyFolderIsEmptyDir(To) {
+						try {
+								DirDelete(To, false)
+								Freed := true
+						}
+				}
+				if !Freed {
+						if (FileExist(Backup) != "") {
+								Report["kept"].Push(Map("from", From, "to", Backup, "reason", "backup_exists"))
+								return
+						}
+						Failure := LegacyFolderRenameInto(From, Backup)
+						if (Failure == "")
+								Report["backed_up"].Push(Map("from", From, "to", Backup, "taken", To))
+						else
+								Report["kept"].Push(Map("from", From, "to", Backup, "reason", "rename_failed", "detail", Failure))
+						return
+				}
+		}
+		Failure := LegacyFolderRenameInto(From, To)
+		if (Failure == "")
+				Report["moved"].Push(Map("from", From, "to", To))
+		else
+				Report["kept"].Push(Map("from", From, "to", To, "reason", "rename_failed", "detail", Failure))
+}
+
+; Moves every entry of a folder into another one (a taken name goes to the
+; backup folder), then removes the old folder when nothing is left in it.
 ; @param FromDir {String} Old folder, without a trailing backslash.
 ; @param ToDir {String} New folder, without a trailing backslash.
-; @param Report {Map} Receives "moved", "kept" and "removed" rows.
-LegacyFolderMergeEntries(FromDir, ToDir, Report) {
+; @param BackupDir {String} Folder receiving the entries whose name is taken.
+; @param Report {Map} Receives "moved", "backed_up", "kept" and "removed" rows.
+LegacyFolderMergeEntries(FromDir, ToDir, BackupDir, Report) {
 		if !DirExist(FromDir)
 				return
 		Names := []
 		loop files, FromDir . "\*", "FD"
 				Names.Push(A_LoopFileName)
 		for Name in Names
-				LegacyFolderMoveEntry(FromDir . "\" . Name, ToDir . "\" . Name, Report)
+				LegacyFolderMoveEntry(FromDir . "\" . Name, ToDir . "\" . Name, BackupDir . "\" . Name, Report)
 		LegacyFolderRemoveIfEmpty(FromDir, Report)
 }
 
 ; Removes a folder that holds nothing.
 ; @param Dir {String} Folder, without a trailing backslash.
-; @param Report {Map} Receives the "removed" row.
+; @param Report {Map} Receives the "removed" row, or a "kept" row on failure.
 LegacyFolderRemoveIfEmpty(Dir, Report) {
-		if !DirExist(Dir)
-				return
-		loop files, Dir . "\*", "FD"
+		if !LegacyFolderIsEmptyDir(Dir)
 				return
 		try {
 				DirDelete(Dir, false)
 		} catch as DeleteError {
-				LoggerWarn("Boot", "The emptied legacy folder '{1}' could not be removed: {2}.", Dir, DeleteError.Message)
+				Report["kept"].Push(Map("from", Dir, "to", Dir, "reason", "remove_failed", "detail", DeleteError.Message))
 				return
 		}
 		Report["removed"].Push(Dir)
@@ -201,8 +244,11 @@ LegacyFolderRewritePathsFile(Path, Rewrites) {
 ; @param PathsFile {String} The paths.toml boot is about to read.
 ; @returns {Map} Report with "moved", "kept", "removed" and "paths_file".
 LegacyFolderMigrationRun(PathsFile) {
-		Report := Map("moved", [], "kept", [], "removed", [], "paths_file", "absent")
+		Report := Map("moved", [], "backed_up", [], "kept", [], "removed", [], "paths_file", "absent")
 		Root := RTrim(AppFoldersRoot(), "\")
+		; An old entry whose destination is taken goes to
+		; <root>\<backup folder>\<its path below its environment folder>.
+		Backup := Root . "\" . AppDirsMigrationBackupFolder()
 		LocalAppData := AppFoldersBase("LOCALAPPDATA")
 		LegacyPaths := AppFoldersBase(AppDirsMigrationWindowsLegacyPathsFileBaseEnv()) . "\"
 				. AppDirsMigrationWindowsLegacyPathsFileRelative()
@@ -210,13 +256,14 @@ LegacyFolderMigrationRun(PathsFile) {
 				. AppDirsMigrationWindowsLegacyConfigRelative()
 		LegacyLocal := LocalAppData . "\" . AppDirsMigrationWindowsLegacyLocalFolder()
 		NewConfig := RTrim(AppFoldersDefaultConfigDir(), "\")
-		LegacyFolderMoveEntry(LegacyPaths, AppFoldersPathsFile(), Report)
+		LegacyFolderMoveEntry(LegacyPaths, AppFoldersPathsFile(),
+				Backup . "\" . AppDirsMigrationWindowsLegacyPathsFileRelative(), Report)
 		SplitPath(LegacyPaths, , &LegacyPathsDir)
 		LegacyFolderRemoveIfEmpty(LegacyPathsDir, Report)
-		LegacyFolderMoveEntry(LegacyConfig, NewConfig, Report)
-		LegacyFolderMergeEntries(LegacyLocal, Root, Report)
+		LegacyFolderMoveEntry(LegacyConfig, NewConfig, Backup . "\" . AppDirsMigrationWindowsLegacyConfigRelative(), Report)
+		LegacyFolderMergeEntries(LegacyLocal, Root, Backup . "\" . AppDirsMigrationWindowsLegacyLocalFolder(), Report)
 		LegacyFolderMoveEntry(LocalAppData . "\" . AppDirsMigrationWindowsLegacyOllamaFolder(),
-				AppFoldersManagedOllamaRoot(), Report)
+				AppFoldersManagedOllamaRoot(), Backup . "\" . AppDirsMigrationWindowsLegacyOllamaFolder(), Report)
 		Rewrites := [
 				Map("key", "ConfigDirPath", "old", [LegacyConfig], "new", NewConfig),
 				Map("key", AppDirsLogsOverrideKey(), "old", [LegacyLocal . "\logs"], "new", RTrim(LoggerDefaultLogsDir(), "\"))
@@ -231,10 +278,13 @@ LegacyFolderMigrationRun(PathsFile) {
 LegacyFolderLogReport(Report) {
 		for Row in Report["moved"]
 				LoggerInfo("Boot", "Moved legacy folder entry '{1}' to '{2}'.", Row["from"], Row["to"])
+		for Row in Report["backed_up"]
+				LoggerWarn("Boot", "Moved legacy folder entry '{1}' to the backup '{2}': '{3}' is already taken.",
+						Row["from"], Row["to"], Row["taken"])
 		for Row in Report["kept"]
-				LoggerWarn("Boot", "Kept legacy folder entry '{1}': {2} at '{3}'.", Row["from"],
-						Row["reason"] == "destination_exists" ? "an entry already exists" : "it could not be moved",
-						Row["to"])
+				LoggerWarn("Boot", "Kept legacy folder entry '{1}': {2} at '{3}' ({4}).", Row["from"],
+						Row["reason"] == "backup_exists" ? "a backup already exists" : "it could not be moved",
+						Row["to"], Row.Has("detail") ? Row["detail"] : Row["reason"])
 		for Dir in Report["removed"]
 				LoggerInfo("Boot", "Removed the emptied legacy folder '{1}'.", Dir)
 		if (Report["paths_file"] == "rewritten")
