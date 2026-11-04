@@ -271,11 +271,11 @@ _MBPO_NativeRefused() {
 	}
 	_MBPO_NativeClick(ButtonHwnd, _MBPO.MutationReturns + 1)
 	Parsed := TOML_ParseFreshFile(ConfigurationFile)
-	_MBPO_Require(Parsed is Map && Parsed.Has("llm") && Parsed["llm"] is Map
-		&& Parsed["llm"].Has("models") && Parsed["llm"]["models"] is Map,
-		"The genuine uncached TOML parser must expose the durable model table.")
+	_MBPO_Require(Parsed is Map && Parsed.Has("llm.models") && Parsed["llm.models"] is Map
+		&& Parsed["llm.models"].Has("ollama"),
+		"The genuine uncached TOML parser must expose the literal llm.models section and its model leaf.")
 	_MBPO_Require(_LLM_Menu["model"] == _MBPO.ModelB && Features["llm"]["models"]["ollama"] == _MBPO.ModelB
-		&& Parsed["llm"]["models"]["ollama"] == _MBPO.ModelB && _MBPO.WriterConfirmed == 1
+		&& Parsed["llm.models"]["ollama"] == _MBPO.ModelB && _MBPO.WriterConfirmed == 1
 		&& _MBPO.MutationConfirmed == 1, "retry must really publish B through the unchanged durable writer")
 	_MBPO_Require(!DllCall("User32\IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
 		"the acknowledged retry may hide its exact original browser")
