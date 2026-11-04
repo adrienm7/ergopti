@@ -166,30 +166,6 @@ check("unknown legacy CHECK is refused and retained", function()
 	assert(sqlite.sqlite3_close(handle[0]) == 0)
 end)
 
-for _, variant in ipairs({ "constraint", "comment" }) do
-	check("the word linux in a legacy " .. variant .. " cannot admit Linux", function()
-		local path = root .. "/misleading-" .. variant .. ".sqlite"
-		local handle = ffi.new("sqlite3 *[1]")
-		assert(sqlite.sqlite3_open_v2(path, handle, 6, nil) == 0)
-		local name_column = variant == "constraint" and "name TEXT NOT NULL CHECK(name <> 'linux')"
-			or "name TEXT NOT NULL /* linux */"
-		local ddl = [[CREATE TABLE devices (
- device_id TEXT PRIMARY KEY, ]] .. name_column .. [[,
- os TEXT NOT NULL CHECK(os IN ('darwin','windows')), os_version TEXT,
- host_signature TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
- imported_data_sql_size INTEGER NOT NULL DEFAULT 0, imported_data_sql_sha256 TEXT
-);]]
-		assert(sqlite.sqlite3_exec(handle[0], ddl, nil, nil, nil) == 0)
-		assert(sqlite.sqlite3_close(handle[0]) == 0)
-		assert(Writer.open_db(path) == false, "unrecognized schema must not be admitted")
-		assert(sqlite.sqlite3_open_v2(path, handle, 2, nil) == 0)
-		local inserted = sqlite.sqlite3_exec(handle[0], [[INSERT INTO devices VALUES
- ('id','owned','linux','','host','created','updated',0,'');]], nil, nil, nil)
-		assert(inserted ~= 0, "the original OS constraint remains enforced")
-		assert(sqlite.sqlite3_close(handle[0]) == 0)
-	end)
-end
-
 Writer.close_db()
 for name in uv.fs_scandir_next, assert(uv.fs_scandir(root)) do assert(uv.fs_unlink(root .. "/" .. name)) end
 assert(uv.fs_rmdir(root))

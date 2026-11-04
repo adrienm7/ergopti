@@ -97,7 +97,7 @@ local function write(events)
 		if sql:find("INSERT OR IGNORE INTO events_llm", 1, true) then statement = sql end
 		body = ""
 		if sql:find("SELECT sql FROM sqlite_master", 1, true) then
-			body = require("tests.support.modules.keystats.storage.current_device_schema")
+			body = "CREATE TABLE devices(os CHECK(os IN ('linux')));\n"
 		elseif sql:find("SELECT CAST(value AS INTEGER)", 1, true) then body = "1\n" end
 		return previous_build(selected, sql, options)
 	end

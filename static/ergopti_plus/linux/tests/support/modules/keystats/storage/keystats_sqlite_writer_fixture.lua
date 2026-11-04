@@ -34,7 +34,7 @@ local function with_writer_read_receipts(body, status, test, startup_status)
 	io.popen = function(command)
 		local content, code
 		if command:find("SELECT sql FROM sqlite_master", 1, true) then
-			content, code = require("tests.support.modules.keystats.storage.current_device_schema"), 0
+			content, code = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n", 0
 		elseif is_media_schema_startup(command) then
 			content, code = "", startup_status or 0
 		else
@@ -78,7 +78,7 @@ local function with_category_commands(refusal, test, retain_startup)
 	io.popen = function(command)
 		local content, status = "", 0
 		if command:find("SELECT sql FROM sqlite_master", 1, true) then
-			content = require("tests.support.modules.keystats.storage.current_device_schema")
+			content = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n"
 		else
 			commands[#commands + 1] = command
 			if refusal == "legacy_scores" and command:find("DELETE FROM meta", 1, true) then status = 7 end
@@ -130,7 +130,7 @@ local function with_meta_value_output(value, status, test)
 	io.popen = function(command)
 		local content, code = "", status
 		if command:find("SELECT sql FROM sqlite_master", 1, true) then
-			content, code = require("tests.support.modules.keystats.storage.current_device_schema"), 0
+			content, code = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n", 0
 		elseif is_media_schema_startup(command) then
 			content, code = "", 0
 		elseif command:find("SELECT json_quote(value)", 1, true) then
