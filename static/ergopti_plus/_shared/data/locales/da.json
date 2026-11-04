@@ -1736,6 +1736,8 @@
 	"menu.gestures.reading_off": "libinput-læsning: fra",
 	"menu.keyboard_layout.add_ergopti": "➕ Tilføj Ergopti v%s til layoutliste",
 	"menu.keyboard_layout.open_system_prefs": "Åbn Systemindstillinger → Tastatur",
+	"menu.layout.install_failed": "Tastaturlayoutet kunne ikke installeres. Se loggene og de bevarede sikkerhedskopier.",
+	"menu.layout.install_launcher_required": "Åbn ErgoptiPlus, og prøv at installere tastaturlayoutet igen.",
 	"menu.layout.active_layouts": "Inputkilder",
 	"menu.layout.header_any": "Alle layouts",
 	"menu.layout.header_custom": "Brugerdefineret layout",

@@ -9,6 +9,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local original_getenv = os.getenv
+os.getenv = function(name)
+	if name == "ERGOPTI_LAUNCHER_EXECUTABLE" then return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus" end
+	return original_getenv(name)
+end
 
 
 --- The listing is the user folder's; the system folder is empty unless
@@ -61,14 +66,106 @@ local function assert_copy_precedes_replacement(command, label)
 		label .. " must not delete or move an installed bundle before staging")
 	helpers.assert_true(command_view:find("restore_install", 1, true) ~= nil,
 		label .. " must own a rollback path after installed bundles move")
-	helpers.assert_true(command_view:find('mv "$prior" "$target/"', 1, true) ~= nil,
-		label .. " must restore every retained bundle after a publication failure")
+	helpers.assert_true(command_view:find('--release-rename move "$prior" "$target/${prior##*/}"', 1, true) ~= nil,
+		label .. " must restore retained bundles only with an exclusive native rename")
 	helpers.assert_true(command_view:find("restore_ok=0", 1, true) ~= nil,
 		label .. " must preserve the rollback directory when restoration refuses")
 end
 
 
 helpers.describe("layout_install: transactional replacement", function()
+	helpers.it("refuses standalone installation before authorization (layout-install-native-role)", function()
+		local getenv = os.getenv
+		os.getenv = function(name) if name == "ERGOPTI_LAUNCHER_EXECUTABLE" then return nil end; return getenv(name) end
+		local ok, err = xpcall(function()
+			local prompts = 0
+			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+				osascript = { applescript = function() prompts = prompts + 1; return true end },
+			})
+			local installed, reason = install.install_system("/tmp/source", "Ergopti_v2.0.0.bundle")
+			helpers.assert_eq(installed, false)
+			helpers.assert_eq(reason, "launcher_unavailable")
+			helpers.assert_eq(prompts, 0)
+		end, debug.traceback)
+		os.getenv = getenv
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("reports only the retained backup path from an AppleScript failure", function()
+		local previous = package.loaded["infra.logger"]
+		local logger, messages = helpers.make_logger_stub(), {}
+		logger.error = function(_, fmt, ...) messages[#messages + 1] = string.format(fmt, ...) end
+		package.loaded["infra.logger"] = logger
+		local ok, err = xpcall(function()
+			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+				osascript = { applescript = function() return false, nil,
+					"native private text /Library/Keyboard Layouts/.ergopti-install.Abc123/backup. ignored" end },
+			})
+			helpers.assert_eq(install.install_system("/tmp/source", "Ergopti_v2.0.0.bundle"), false)
+			helpers.assert_eq(messages[#messages],
+				"Keyboard layout backups retained at /Library/Keyboard Layouts/.ergopti-install.Abc123/backup.")
+		end, debug.traceback)
+		package.loaded["infra.logger"] = previous
+		if not ok then error(err, 0) end
+	end)
+	helpers.it("retains the backup when a concurrent bundle occupies rollback (layout-rollback-exclusive)", function()
+		local quote = require("text_utils").shell_quote
+		local root = os.tmpname()
+		os.remove(root)
+		local target, source, launcher = root .. "/target", root .. "/source", root .. "/launcher"
+		local old, new = "Ergopti_v1.0.0.bundle", "Ergopti_v2.0.0.bundle"
+		local fixture = helpers.driver_root() .. "/tests/support/release_rename_physical_port.py"
+		local ok, err = xpcall(function()
+			assert(os.execute("mkdir -p " .. quote(target .. "/" .. old)
+				.. " " .. quote(source .. "/" .. new .. "/Contents")))
+			local file = assert(io.open(source .. "/" .. new .. "/Contents/Info.plist", "w"))
+			assert(file:write("staged")); assert(file:close())
+			file = assert(io.open(target .. "/" .. old .. "/original", "w"))
+			assert(file:write("original")); assert(file:close())
+			file = assert(io.open(launcher, "w"))
+			assert(file:write("#!/bin/sh\ncase \"$3\" in */.ergopti-install.*/" .. new .. ")\n"
+				.. "mkdir -p " .. quote(target .. "/" .. old) .. "\n"
+				.. "ls -di " .. quote(target .. "/" .. old) .. " > " .. quote(root .. "/identity") .. "\nexit 1;; esac\n"
+				.. "exec /usr/bin/env python3 " .. quote(fixture) .. " \"$@\"\n"))
+			assert(file:close()); assert(os.execute("chmod +x " .. quote(launcher)))
+			-- The old shell implementation uses mv; inject the identical race at
+			-- its publication call so this test fails against that implementation.
+			file = assert(io.open(root .. "/mv", "w"))
+			assert(file:write("#!/bin/sh\ncase \"$1\" in */.ergopti-install.*/" .. new .. ")\n"
+				.. "mkdir -p " .. quote(target .. "/" .. old) .. "\n"
+				.. "ls -di " .. quote(target .. "/" .. old) .. " > " .. quote(root .. "/identity") .. "\nexit 1;; esac\n"
+				.. "exec /bin/mv \"$@\"\n"))
+			assert(file:close()); assert(os.execute("chmod +x " .. quote(root .. "/mv")))
+			local command
+			local getenv = os.getenv
+			os.getenv = function(name) if name == "ERGOPTI_LAUNCHER_EXECUTABLE" then return launcher end; return getenv(name) end
+			local captured, capture_error = pcall(function()
+				local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+					execute = function(value) command = value; return "", false end,
+				})
+				install.install_user(source, new)
+			end)
+			os.getenv = getenv
+			assert(captured, capture_error)
+			assert(type(command) == "string")
+			local rewritten, count = command:gsub("^target=.-;", "target=" .. quote(target) .. ";", 1)
+			assert(count == 1)
+			local committed = os.execute("PATH=" .. quote(root .. ":" .. getenv("PATH"))
+				.. " /bin/sh -c " .. quote(rewritten) .. " >/dev/null 2>&1")
+			helpers.assert_eq(committed, nil, "the collision must refuse publication")
+			local identity = assert(io.open(root .. "/identity", "r"))
+			local before = assert(identity:read("*l")):match("^%s*(%d+)"); identity:close()
+			local listing = assert(io.popen("ls -di " .. quote(target .. "/" .. old), "r"))
+			local after = assert(listing:read("*l")):match("^%s*(%d+)"); listing:close()
+			helpers.assert_eq(after, before, "the concurrent empty bundle must remain untouched")
+			local found = os.execute("find " .. quote(target) .. " -path "
+				.. quote("*/backup/" .. old .. "/original") .. " -print | grep -q .")
+			helpers.assert_true(found == true, "the original remains recoverable in the backup")
+		end, debug.traceback)
+		os.execute("rm -rf " .. quote(root))
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("stages before replacement and invalidates cache after user failure", function()
 		with_fake_bundle_listing("Ergopti_v1.0.0.bundle", function(listing)
 			local commands = {}
@@ -212,6 +309,8 @@ helpers.describe("layout_install: transactional replacement", function()
 			"the admitted user install must run one replacement and one cleanup")
 	end)
 end)
+
+os.getenv = original_getenv
 
 
 -- The macOS 26 TIS probe showed that the same bundle in both folders makes macOS load both copies

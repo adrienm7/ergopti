@@ -1736,6 +1736,8 @@
 	"menu.gestures.reading_off": "Leitura libinput: desativada",
 	"menu.keyboard_layout.add_ergopti": "➕ Adicionar Ergopti v%s à lista de layouts",
 	"menu.keyboard_layout.open_system_prefs": "Abrir Preferências do Sistema → Teclado",
+	"menu.layout.install_failed": "Não foi possível instalar o layout de teclado. Consulte os registros e os backups mantidos.",
+	"menu.layout.install_launcher_required": "Abra o ErgoptiPlus e tente instalar o layout de teclado novamente.",
 	"menu.layout.active_layouts": "Fontes de entrada",
 	"menu.layout.header_any": "Todos os layouts",
 	"menu.layout.header_custom": "Disposição personalizada",

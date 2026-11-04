@@ -16,6 +16,25 @@ local hs     = hs
 local Logger = require("infra.logger")
 local ManifestMenu = require("infra.manifest_menu")
 local LOG    = "canvas_badge"
+local pending_canvas = nil
+local canvas_busy = false
+
+--- Releases the exact canvas even when badge rendering failed.
+--- @return boolean settled
+local function release_canvas()
+	if canvas_busy then return false end
+	if not pending_canvas then return true end
+	local canvas = pending_canvas
+	canvas_busy = true
+	local ok = pcall(function() canvas:delete() end)
+	canvas_busy = false
+	if not ok then
+		Logger.error(LOG, "Canvas badge cleanup failed; exact canvas retained.")
+		return false
+	end
+	if pending_canvas == canvas then pending_canvas = nil end
+	return true
+end
 
 
 
@@ -32,6 +51,7 @@ local LOG    = "canvas_badge"
 --- @param ctx table Menu context, used for ctx.paused and ctx.script_control.
 --- @param on_click function Callback invoked when the badge is clicked.
 function M.prepend_to(items, ctx, on_click)
+	if not release_canvas() then return false end
 	local paused = ctx and ctx.paused
 	local frame = ManifestMenu.template_rows("macos_canvas_badge_frame", {}, {
 		["macos_badge_is_paused"] = function() return not not paused end,
@@ -96,6 +116,9 @@ function M.prepend_to(items, ctx, on_click)
 	end
 
 	local canvas_obj = hs.canvas.new({ x = 0, y = 0, w = canvas_w, h = pill_h })
+	if not canvas_obj then return false end
+	pending_canvas = canvas_obj
+	canvas_busy = true
 
 	local rect_elem = {
 		type             = "rectangle",
@@ -109,25 +132,32 @@ function M.prepend_to(items, ctx, on_click)
 		rect_elem.strokeWidth = rect_stroke_w
 	end
 
-	canvas_obj:appendElements(
-		rect_elem,
-		{
-			type          = "text",
-			text          = display_text,
-			textColor     = text_color,
-			textAlignment = "center",
-			textSize      = 14,
-			textFont      = "Helvetica-Bold",
-			-- Adjust Y slightly (pad_y - 2) to account for font baseline rendering
-			frame         = { x = pill_x, y = pad_y - 2, w = pill_w, h = pill_h }
-		}
-	)
+	local rendered, img = xpcall(function()
+		canvas_obj:appendElements(
+			rect_elem,
+			{
+				type          = "text",
+				text          = display_text,
+				textColor     = text_color,
+				textAlignment = "center",
+				textSize      = 14,
+				textFont      = "Helvetica-Bold",
+				-- Adjust Y slightly (pad_y - 2) to account for font baseline rendering
+				frame         = { x = pill_x, y = pad_y - 2, w = pill_w, h = pill_h }
+			}
+		)
 
-	Logger.debug(LOG, "Canvas badge built (canvas_w=%d pill_w=%d paused=%s).", canvas_w, pill_w, tostring(paused))
+		Logger.debug(LOG, "Canvas badge built (canvas_w=%d pill_w=%d paused=%s).", canvas_w, pill_w, tostring(paused))
 
-	local img = canvas_obj:imageFromCanvas()
+		return canvas_obj:imageFromCanvas()
+	end, debug.traceback)
+	canvas_busy = false
 	-- Release the NSWindow handle immediately; the image is already captured
-	canvas_obj:delete()
+	if not release_canvas() then return false end
+	if not rendered or not img then
+		Logger.error(LOG, "Canvas badge rendering failed: %s.", tostring(img))
+		return false
+	end
 	local badge = {
 		title = "",
 		image = img,

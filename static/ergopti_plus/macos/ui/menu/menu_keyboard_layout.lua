@@ -181,9 +181,13 @@ end
 --- @param legacy_active table Legacy entries in the active input-source list.
 --- @param update_menu function|nil Menu rebuild callback.
 local function run_install_and_chain(install_fn, legacy_active, update_menu)
-	local ok = false
-	pcall(function() ok = install_fn() end)
-	if ok and type(legacy_active) == "table" and #legacy_active > 0 then
+	local called, ok, reason = pcall(install_fn)
+	if not called or ok ~= true then
+		local key = reason == "launcher_unavailable" and "menu.layout.install_launcher_required"
+			or "menu.layout.install_failed"
+		pcall(notifications.notify, i18n.get(key), nil, "error")
+	end
+	if called and ok == true and type(legacy_active) == "table" and #legacy_active > 0 then
 		Logger.info(LOG, "Install succeeded — auto-upgrading %d legacy entry(ies) in the active list.", #legacy_active)
 		upgrade_active_list_async(legacy_active, function()
 			schedule_menu_refresh(update_menu)

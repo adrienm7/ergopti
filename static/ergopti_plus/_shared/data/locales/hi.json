@@ -1736,6 +1736,8 @@
 	"menu.gestures.reading_off": "libinput पठन: बंद",
 	"menu.keyboard_layout.add_ergopti": "➕ Ergopti v%s को लेआउट सूची में जोड़ें",
 	"menu.keyboard_layout.open_system_prefs": "सिस्टम प्राथमिकताएं खोलें → कीबोर्ड",
+	"menu.layout.install_failed": "कीबोर्ड लेआउट इंस्टॉल नहीं हो सका। विवरण और रखे गए बैकअप के लिए लॉग देखें।",
+	"menu.layout.install_launcher_required": "ErgoptiPlus खोलें और कीबोर्ड लेआउट फिर से इंस्टॉल करें।",
 	"menu.layout.active_layouts": "इनपुट स्रोत",
 	"menu.layout.header_any": "सभी लेआउट",
 	"menu.layout.header_custom": "कस्टम लेआउट",

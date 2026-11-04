@@ -1736,6 +1736,8 @@
 	"menu.gestures.reading_off": "libinput-läsning: av",
 	"menu.keyboard_layout.add_ergopti": "➕ Lägg till Ergopti v%s i layoutlistan",
 	"menu.keyboard_layout.open_system_prefs": "Öppna Systeminställningar → Tangentbord",
+	"menu.layout.install_failed": "Tangentbordslayouten kunde inte installeras. Se loggarna och de sparade säkerhetskopiorna.",
+	"menu.layout.install_launcher_required": "Öppna ErgoptiPlus och försök installera tangentbordslayouten igen.",
 	"menu.layout.active_layouts": "Inmatningskällor",
 	"menu.layout.header_any": "Alla layouter",
 	"menu.layout.header_custom": "Anpassad layout",

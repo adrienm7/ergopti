@@ -1736,6 +1736,8 @@
 	"menu.gestures.reading_off": "Odczyt libinput: wyłączony",
 	"menu.keyboard_layout.add_ergopti": "➕ Dodaj Ergopti v%s do listy układów",
 	"menu.keyboard_layout.open_system_prefs": "Otwórz Preferencje systemowe → Klawiatura",
+	"menu.layout.install_failed": "Nie udało się zainstalować układu klawiatury. Sprawdź dzienniki i zachowane kopie zapasowe.",
+	"menu.layout.install_launcher_required": "Otwórz ErgoptiPlus i ponów instalację układu klawiatury.",
 	"menu.layout.active_layouts": "Źródła wprowadzania",
 	"menu.layout.header_any": "Wszystkie układy",
 	"menu.layout.header_custom": "Układ niestandardowy",

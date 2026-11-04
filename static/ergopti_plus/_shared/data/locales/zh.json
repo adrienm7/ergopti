@@ -1736,6 +1736,8 @@
 	"menu.gestures.reading_off": "libinput 读取：关",
 	"menu.keyboard_layout.add_ergopti": "➕ 将 Ergopti v%s 添加到布局列表",
 	"menu.keyboard_layout.open_system_prefs": "打开系统偏好设置 → 键盘",
+	"menu.layout.install_failed": "无法安装键盘布局。请查看日志中的详细信息和保留的备份。",
+	"menu.layout.install_launcher_required": "请打开 ErgoptiPlus，然后重新安装键盘布局。",
 	"menu.layout.active_layouts": "输入法",
 	"menu.layout.header_any": "所有布局",
 	"menu.layout.header_custom": "自定义布局",

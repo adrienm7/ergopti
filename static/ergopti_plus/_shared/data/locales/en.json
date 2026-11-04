@@ -1731,6 +1731,8 @@
 	"menu.gestures.reading_off": "libinput reading: off",
 	"menu.keyboard_layout.add_ergopti": "➕ Add Ergopti v%s to layout list",
 	"menu.keyboard_layout.open_system_prefs": "Open System Preferences → Keyboard",
+	"menu.layout.install_failed": "Could not install the keyboard layout. Check the logs for details and retained backups.",
+	"menu.layout.install_launcher_required": "Open ErgoptiPlus and retry the keyboard layout installation.",
 	"menu.layout.active_layouts": "Input sources",
 	"menu.layout.header_any": "Any layout",
 	"menu.layout.header_custom": "Custom layout",

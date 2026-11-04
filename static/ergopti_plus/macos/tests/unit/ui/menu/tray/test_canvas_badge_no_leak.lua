@@ -58,6 +58,7 @@ local function make_canvas_stub()
 			local mock = {}
 
 			function mock:appendElements(...)
+				if counters.fail_render then error("render failed") end
 				-- Accept any number of element tables; no-op for test purposes
 				counters.elements = { ... }
 			end
@@ -68,6 +69,7 @@ local function make_canvas_stub()
 			end
 
 			function mock:delete()
+				if counters.fail_delete then error("delete failed") end
 				counters.delete_count = counters.delete_count + 1
 			end
 
@@ -111,6 +113,27 @@ end
 -- ========================================
 
 helpers.describe("canvas_badge: prepend_to deletes every canvas it creates", function()
+	helpers.it("cleans up a canvas when native rendering raises", function()
+		local canvas, counters = make_canvas_stub()
+		local M = helpers.load_with_stubs("ui.menu.canvas_badge", { canvas = canvas, drawing = make_drawing_stub() })
+		counters.fail_render = true
+		helpers.assert_eq(M.prepend_to({ { title = "Row" } }, {}, function() end), false)
+		helpers.assert_eq(counters.create_count, 1)
+		helpers.assert_eq(counters.delete_count, 1)
+	end)
+
+	helpers.it("retries refused canvas cleanup before allocating another", function()
+		local canvas, counters = make_canvas_stub()
+		local M = helpers.load_with_stubs("ui.menu.canvas_badge", { canvas = canvas, drawing = make_drawing_stub() })
+		counters.fail_delete = true
+		helpers.assert_eq(M.prepend_to({ { title = "Row" } }, {}, function() end), false)
+		helpers.assert_eq(M.prepend_to({ { title = "Row" } }, {}, function() end), false)
+		helpers.assert_eq(counters.create_count, 1, "unsettled canvas blocks a successor")
+		counters.fail_delete = false
+		M.prepend_to({ { title = "Row" } }, {}, function() end)
+		helpers.assert_eq(counters.create_count, 2)
+		helpers.assert_eq(counters.delete_count, 2)
+	end)
 	helpers.it("centers the whole badge for both short and long menu rows", function()
 		for _, row_width in ipairs({ 20, 200 }) do
 			local canvas, counters = make_canvas_stub()

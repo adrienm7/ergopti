@@ -1736,6 +1736,8 @@
 	"menu.gestures.reading_off": "libinput-Lesen: aus",
 	"menu.keyboard_layout.add_ergopti": "➕ Ergopti v%s zur Belegungsliste hinzufügen",
 	"menu.keyboard_layout.open_system_prefs": "Systemeinstellungen → Tastatur öffnen",
+	"menu.layout.install_failed": "Das Tastaturlayout konnte nicht installiert werden. Details und erhaltene Sicherungen stehen im Protokoll.",
+	"menu.layout.install_launcher_required": "Öffne ErgoptiPlus und installiere das Tastaturlayout erneut.",
 	"menu.layout.active_layouts": "Eingabequellen",
 	"menu.layout.header_any": "Alle Layouts",
 	"menu.layout.header_custom": "Benutzerdefiniertes Layout",

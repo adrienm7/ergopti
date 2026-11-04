@@ -26,6 +26,28 @@ local with_switch_frame = Fixture.with_switch_frame
 
 
 helpers.describe("Layout owns install-state choices, bundle truth and every frozen original caption", function()
+	helpers.it("reports failed installs from the actual menu action (layout-install-visible-failure)", function()
+		local file = assert(io.open(require("infra.paths").shared("data/locales/en.json"), "rb"))
+		local labels = assert(require("json").decode(assert(file:read("*a")))); assert(file:close())
+		for _, case in ipairs({ { "launcher_unavailable", "menu.layout.install_launcher_required" },
+			{ "other", "menu.layout.install_failed" }, { "throw", "menu.layout.install_failed" } }) do
+			local notices = {}
+			with_switch_frame(function(build, fixture)
+				fixture.latest = "Ergopti_v2.2.2.bundle"
+				local row = assert(switch_row(assert(build()), "🔐 Install Ergopti (system)"))
+				assert(type(row.fn) == "function"); row.fn()
+				helpers.assert_eq(notices, { { labels[case[2]], "error" } })
+			end, labels, function(_, installer)
+				installer.install_system = function()
+					if case[1] == "throw" then error("installation exception") end
+					return false, case[1]
+				end
+				package.loaded["infra.notifications"] = { notify = function(message, _, level)
+					notices[#notices + 1] = { message, level }
+				end }
+			end)
+		end
+	end)
 	for _, state in ipairs({"fresh", "older", "current"}) do
 		helpers.it("retains system/user/status order for " .. state .. " actual native installation state", function()
 			local Json, Paths = require("json"), require("infra.paths")
