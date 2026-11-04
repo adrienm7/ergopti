@@ -77,6 +77,8 @@ _EditorPrefSet(Key, Value, WriterFn := 0, NotifyFn := 0) {
 global _PersonalEditorGui := ""
 global _PersonalEditorOpeningSource := false
 global _PersonalEditorSessionEpoch := 0
+global _PersonalEditorEntryCohort := 0
+global _PersonalEditorEntryBusy := false
 global _PersonalEditorData := ""   ; last loaded TOML data (Map)
 global _PersonalEditorSection := "" ; currently selected section name
 ; Priority Edit control. Held as a module global rather than threaded through the
@@ -117,7 +119,7 @@ _GetSharedPersonalDefault() {
 ; DefaultSection — if set, the editor pre-selects that section.
 OpenPersonalEditor(DefaultSection := "") {
 	global _PersonalEditorGui, _PersonalEditorData, _PersonalEditorSection
-	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch
+	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch, _PersonalEditorEntryCohort
 
 	; Prefer the shared WebView2 frontend (identical to the macOS editor) when
 	; available; fall back to the native Gui below otherwise. _HsEdWeb_TryOpen
@@ -144,6 +146,7 @@ OpenPersonalEditor(DefaultSection := "") {
 	OpeningData := ReadPersonalToml(false, OpeningSource)
 	if SessionEpoch != _PersonalEditorSessionEpoch
 		return
+	_PersonalEditorEntryCohort := 0
 	_PersonalEditorData := OpeningData
 
 	; Resolve the section to open
@@ -434,8 +437,8 @@ _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFina
 
 _PersonalEditorDeferredSaveCompleted(LV, StatusText, Candidate, SectionName,
 		SuccessFn, OpeningSource, CommitResult) {
-	global PERSONAL_TOML_COMMIT_FAILED
-	if !_PersonalTomlOpeningSessionCurrent(OpeningSource)
+	global PERSONAL_TOML_COMMIT_FAILED, _PersonalEditorData
+	if Candidate != _PersonalEditorData || !_PersonalTomlOpeningSessionCurrent(OpeningSource)
 		return
 	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
 		try StatusText.Value := t("editor.hotstrings.err_write")
@@ -458,36 +461,10 @@ _PersonalEditorDeferredSaveCompleted(LV, StatusText, Candidate, SectionName,
 }
 
 _SaveData(W, LV, StatusText, DeferredSuccessFn := 0) {
-	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
-	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_DEFERRED
-	OpeningSource := _PersonalEditorOpeningSource
-	if !_PersonalTomlOpeningSessionCurrent(OpeningSource)
-		|| !(W is Gui) || ObjPtr(W) != ObjPtr(OpeningSource["window"]) {
-		try StatusText.Value := t("editor.hotstrings.err_write")
-		return false
-	}
-	Candidate := _PersonalTomlCloneDetached(_PersonalEditorData)
-	CompletionFn := _PersonalEditorDeferredSaveCompleted.Bind(
-		LV, StatusText, Candidate, _PersonalEditorSection,
-		DeferredSuccessFn, OpeningSource)
-	CommitResult := PersonalTomlCommitAndReload(
-		Candidate, [_PersonalEditorSection], 0, 0, 0, 0, 0, CompletionFn, 0, OpeningSource)
-	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
-		StatusText.Value := t("editor.hotstrings.err_write")
-		return false
-	}
-	if (CommitResult == PERSONAL_TOML_COMMIT_DEFERRED) {
-		try LoggerInfo("PersonalEditor", "The personal-hotstring save was deferred behind an active publication; the newest editor snapshot will be committed next.")
-		; A deferred admission is not a save. Keep the action visibly incomplete
-		; until its terminal callback replaces this conservative failure state.
-		StatusText.Value := t("editor.hotstrings.err_write")
-		return false
-	}
-	if !_PersonalTomlOpeningSessionCurrent(OpeningSource)
-		return false
-	_PopulateList(LV, Candidate, _PersonalEditorSection)
-	StatusText.Value := t("editor.hotstrings.saved_prefix") . A_Now
-	return true
+	global _PersonalEditorData, _PersonalEditorSection
+	Data := _PersonalEditorData, Section := _PersonalEditorSection
+	return _PersonalEditorSaveEntryCandidate(W, LV, StatusText,
+		_PersonalTomlCloneDetached(Data), DeferredSuccessFn, Data, Section)
 }
 
 _PersonalEditorCompleteAddedEntry(W, TriggerEdit, OutputEdit, ChkIsWord,
@@ -505,8 +482,109 @@ _PersonalEditorCompleteAddedEntry(W, TriggerEdit, OutputEdit, ChkIsWord,
 	}
 }
 
-_AddEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, CloseOnAddChk, StatusText) {
+; Entry producers build detached candidates. A DEFERRED receipt publishes a
+; visibly unsaved draft to RAM AND rows; immediate refusal installs neither.
+; The single current receipt also fences superseded completion notifications.
+_PersonalEditorEntryCohortCurrent(Cohort) {
+	global _PersonalEditorEntryCohort, _PersonalEditorData
+	return IsObject(Cohort) && _PersonalEditorEntryCohort == Cohort
+		&& _PersonalTomlOpeningSessionCurrent(Cohort.Source)
+		&& _PersonalEditorData == Cohort.Current
+}
+
+_PersonalEditorEntryRender(Cohort, Data) {
 	global _PersonalEditorData, _PersonalEditorSection
+	PreviousCritical := Critical("On")
+	try {
+		if !_PersonalEditorEntryCohortCurrent(Cohort)
+			return false
+		Changed := Cohort.Current != Data
+		_PersonalEditorData := Data, Cohort.Current := Data
+		Section := _PersonalEditorSection
+	} finally Critical(PreviousCritical)
+	if Changed
+		_PopulateList(Cohort.List, Data, Section)
+	return _PersonalEditorEntryCohortCurrent(Cohort)
+}
+
+_PersonalEditorEntryCompleted(Request, Result) {
+	global PERSONAL_TOML_COMMIT_OK, _PersonalEditorSection, _PersonalEditorEntryBusy
+	if Request.Terminal
+		return false
+	Request.Terminal := true
+	InheritedBusy := _PersonalEditorEntryBusy
+	_PersonalEditorEntryBusy := true
+	try {
+		Cohort := Request.Cohort
+		if !_PersonalEditorEntryCohortCurrent(Cohort) || Request.Sequence != Cohort.Sequence
+			return false
+		Saved := Result == PERSONAL_TOML_COMMIT_OK
+		if Saved && !_PersonalEditorEntryRender(Cohort, Request.Candidate)
+			return false
+		; A failed DEFERRED draft remains visible and unsaved, matching the editor's
+		; existing retention contract. Never roll back other durable or staged edits.
+		Cohort.Status.Value := Saved ? t("editor.hotstrings.saved_prefix") . A_Now : t("editor.hotstrings.err_write")
+		if Saved && _PersonalEditorEntryCohortCurrent(Cohort) && Request.Sequence == Cohort.Sequence
+			&& Request.Section == _PersonalEditorSection && HasMethod(Request.Success, "Call")
+			Request.Success.Call()
+		return Saved
+	} finally _PersonalEditorEntryBusy := InheritedBusy
+}
+
+_PersonalEditorSaveEntryCandidate(Window, List, Status, Candidate, Success := 0,
+		ExpectedData := unset, ExpectedSection := unset) {
+	global _PersonalEditorEntryCohort, _PersonalEditorEntryBusy
+	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
+	global PERSONAL_TOML_COMMIT_DEFERRED, PERSONAL_TOML_COMMIT_FAILED
+	PreviousCritical := Critical("On")
+	try {
+		Source := _PersonalEditorOpeningSource
+		if _PersonalEditorEntryBusy
+			return false
+		if (IsSet(ExpectedData) && ExpectedData != _PersonalEditorData)
+			|| (IsSet(ExpectedSection) && ExpectedSection != _PersonalEditorSection)
+			|| !_PersonalEditorSectionActionCurrent(Window, Source, _PersonalEditorData, _PersonalEditorSection) {
+			Rejected := true
+		} else {
+			Rejected := false
+			_PersonalEditorEntryBusy := true
+		}
+	} finally Critical(PreviousCritical)
+	if Rejected {
+		Status.Value := t("editor.hotstrings.err_write")
+		return false
+	}
+	try {
+		Cohort := _PersonalEditorEntryCohort
+		if !_PersonalEditorEntryCohortCurrent(Cohort) {
+			Cohort := {Source: Source, Current: _PersonalEditorData, List: List, Status: Status, Sequence: 0}
+			_PersonalEditorEntryCohort := Cohort
+		}
+		Cohort.Sequence += 1
+		Request := {Cohort: Cohort, Sequence: Cohort.Sequence, Candidate: Candidate,
+			Section: _PersonalEditorSection, Success: Success, Terminal: false}
+		try Result := PersonalTomlCommitAndReload(Candidate, [Request.Section],
+			0, 0, 0, 0, 0, _PersonalEditorEntryCompleted.Bind(Request), 0, Source)
+		catch as Err {
+			_PersonalEditorEntryCompleted(Request, PERSONAL_TOML_COMMIT_FAILED)
+			try LoggerError("PersonalEditor", "The entry transaction raised before its receipt: {1}.", Err.Message)
+			return false
+		}
+		if Result == PERSONAL_TOML_COMMIT_DEFERRED {
+			if _PersonalEditorEntryRender(Cohort, Candidate)
+				Status.Value := t("editor.hotstrings.err_write")
+			return false
+		}
+		return _PersonalEditorEntryCompleted(Request, Result)
+	} finally _PersonalEditorEntryBusy := false
+}
+
+_AddEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, CloseOnAddChk, StatusText) {
+	global _PersonalEditorEntryBusy
+	if _PersonalEditorEntryBusy
+		return false
+	global _PersonalEditorData, _PersonalEditorSection
+	Data := _PersonalEditorData, SectionName := _PersonalEditorSection
 	TriggerVal := Trim(TriggerEdit.Value)
 	O := Trim(OutputEdit.Value)
 	if (TriggerVal == "" or O == "") {
@@ -525,24 +603,28 @@ _AddEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, Ch
 		try LoggerWarn("PersonalEditor", "Section {1} no longer exists — ignoring the action.", _PersonalEditorSection)
 		return
 	}
-	for E in _PersonalEditorData["sections"][_PersonalEditorSection]["entries"] {
+	for E in Data["sections"][SectionName]["entries"] {
 		if (E["trigger"] == TriggerVal) {
 			StatusText.Value := t("editor.hotstrings.err_duplicate")
 			return
 		}
 	}
 	Entry := _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal)
-	_PersonalEditorData["sections"][_PersonalEditorSection]["entries"].Push(Entry)
+	Candidate := _PersonalTomlCloneDetached(Data)
+	Candidate["sections"][SectionName]["entries"].Push(Entry)
 	CloseAfterSave := CloseOnAddChk.Value
 	CompleteFn := _PersonalEditorCompleteAddedEntry.Bind(W, TriggerEdit,
 		OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal,
 		CloseAfterSave)
-	if _SaveData(W, LV, StatusText, CompleteFn)
-		CompleteFn.Call()
+	return _PersonalEditorSaveEntryCandidate(W, LV, StatusText, Candidate, CompleteFn, Data, SectionName)
 }
 
 _SaveEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText) {
+	global _PersonalEditorEntryBusy
+	if _PersonalEditorEntryBusy
+		return false
 	global _PersonalEditorData, _PersonalEditorSection
+	Data := _PersonalEditorData, SectionName := _PersonalEditorSection
 	Row := LV.GetNext(0)
 	if !Row {
 		StatusText.Value := t("editor.hotstrings.err_select_to_edit")
@@ -561,18 +643,22 @@ _SaveEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, C
 		try LoggerWarn("PersonalEditor", "Section {1} no longer exists — ignoring the action.", _PersonalEditorSection)
 		return
 	}
-	Entries := _PersonalEditorData["sections"][_PersonalEditorSection]["entries"]
+	Entries := Data["sections"][SectionName]["entries"]
 	if Row > Entries.Length {
 		return
 	}
 	Entry := _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal,
 		Entries[Row].Get("strict_case", false))
 	Entry["line_index"] := Entries[Row]["line_index"]
-	Entries[Row] := Entry
-	_SaveData(W, LV, StatusText)
+	Candidate := _PersonalTomlCloneDetached(Data)
+	Candidate["sections"][SectionName]["entries"][Row] := Entry
+	return _PersonalEditorSaveEntryCandidate(W, LV, StatusText, Candidate, 0, Data, SectionName)
 }
 
 _DeleteEntry(W, LV, StatusText) {
+	global _PersonalEditorEntryBusy
+	if _PersonalEditorEntryBusy
+		return false
 	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
 	Row := LV.GetNext(0)
 	if !Row {
@@ -603,12 +689,17 @@ _DeleteEntry(W, LV, StatusText) {
 	}
 	if !_PersonalEditorSectionActionCurrent(W, Source, Data, SectionName)
 		return false
-	Entries.RemoveAt(Row)
-	return _SaveData(W, LV, StatusText)
+	Candidate := _PersonalTomlCloneDetached(Data)
+	Candidate["sections"][SectionName]["entries"].RemoveAt(Row)
+	return _PersonalEditorSaveEntryCandidate(W, LV, StatusText, Candidate, 0, Data, SectionName)
 }
 
 _OnSectionChange(SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText) {
-	global _PersonalEditorSection
+	global _PersonalEditorSection, _PersonalEditorEntryBusy
+	if _PersonalEditorEntryBusy {
+		_SelectDropDown(SectionDrop, _PersonalEditorSection)
+		return false
+	}
 	_PersonalEditorSection := _CurrentSectionFromDrop(SectionDrop)
 	_EditorPrefSet("default_section", _PersonalEditorSection)
 	global _PersonalEditorData
@@ -618,6 +709,9 @@ _OnSectionChange(SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp
 }
 
 _NewSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText) {
+	global _PersonalEditorEntryBusy
+	if _PersonalEditorEntryBusy
+		return false
 	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
 	Data := _PersonalEditorData, SectionName := _PersonalEditorSection, Source := _PersonalEditorOpeningSource
 	if !_PersonalEditorSectionActionCurrent(W, Source, Data, SectionName)
@@ -694,6 +788,9 @@ _PersonalEditorSectionActionCurrent(Window, Source, Data, SectionName) {
 ; Refused or retired writes leave the mutable editor model untouched. The
 ; writer independently fences the exact captured source at native replacement.
 _PersonalEditorCommitSectionAction(Window, Source, Data, SectionName, Candidate, NextSection) {
+	global _PersonalEditorEntryCohort, _PersonalEditorEntryBusy
+	if _PersonalEditorEntryBusy
+		return false
 	global _PersonalEditorData, _PersonalEditorSection
 	if !_PersonalEditorSectionActionCurrent(Window, Source, Data, SectionName)
 		return false
@@ -707,6 +804,7 @@ _PersonalEditorCommitSectionAction(Window, Source, Data, SectionName, Candidate,
 			return false
 		_PersonalEditorData := Candidate
 		_PersonalEditorSection := NextSection
+		_PersonalEditorEntryCohort := 0
 		return true
 	} finally Critical(PreviousCritical)
 }
@@ -735,6 +833,9 @@ _PersonalEditorRequireSection(FuncName) {
 }
 
 _RenameSection(W, SectionDrop) {
+	global _PersonalEditorEntryBusy
+	if _PersonalEditorEntryBusy
+		return false
 	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
 	if !_PersonalEditorRequireSection("_RenameSection")
 		return false
@@ -758,6 +859,9 @@ _RenameSection(W, SectionDrop) {
 }
 
 _DeleteSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText) {
+	global _PersonalEditorEntryBusy
+	if _PersonalEditorEntryBusy
+		return false
 	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
 	if !_PersonalEditorRequireSection("_DeleteSection")
 		return false
@@ -820,6 +924,7 @@ _PersonalEditorWindowClose(Window, SessionEpoch, *) {
 }
 
 _OnEditorClose(Window := 0, SessionEpoch := 0) {
+	global _PersonalEditorEntryCohort
 	global _PersonalEditorGui, _PersonalEditorPrioCtrl
 	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch
 	if Window is Gui {
@@ -829,6 +934,7 @@ _OnEditorClose(Window := 0, SessionEpoch := 0) {
 	if SessionEpoch != 0 && SessionEpoch != _PersonalEditorSessionEpoch
 		return false
 	_PersonalEditorSessionEpoch += 1
+	_PersonalEditorEntryCohort := 0
 	_PersonalEditorOpeningSource := false
 	_PersonalEditorGui := ""
 	; Drop the reference to the now-destroyed control so no form helper touches it

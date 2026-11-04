@@ -433,6 +433,17 @@
 			"root_cause": "Windows walker constructors concatenate unescaped fields using Chr1 and then store that text in AutoHotkey Maps, whose string keys end at NUL. N-gram SQL reconstructs original field values by splitting the already ambiguous key. Other projection and per-application context constructors share that identity assumption.",
 			"silent_failure": "Accepted replay data silently combines independent counts and delays and can persist truncated or reassigned application/token values. This concerns supported literal replay/JSON values; no physical-keyboard NUL sequence is claimed.",
 			"regression_test": "Three native fail-before probes retain literal SQL hex(app)/hex(token), repeated additive controls and a genuine typing replay. The fix escapes only internal tuple fields and preserves raw row values for SQL. Five further cases cover shared array byte vectors, real JSON context roundtrip and legacy retirement, cache17 refusal, checkpoint3 restart and obsolete stage cleanup. Existing aggregation, distribution merge, rollover and current checkpoint controls remain. Cache18/checkpoint4 force reconstruction without changing raw ledgers or persisted token encoding2. Scope is Windows: the separately measured shared Lua Chr1 collision and Linux aggregate-history migration remain open outside this OS correction; no Lua source is changed. Post-fix native qualification is pending."
+		},
+		{
+			"id": "AHK-040",
+			"title": "Refused native entry edits leave a ghost editor model and block retry",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": "Use the actual native personal editor and a real read-shared file handle denying write/delete. Click Add, Delete or Save through BM_CLICK. The native rename refuses, but the mutable editor model already contains the edit while the file and ListView retain their old values. Native run41900510051 at7306179ef66936fd43660b7382c65d702d0f1cc0 reproduces the exact unchanged-model failures for all three operations, alone and reversed, plus section/legacy variants.",
+			"root_cause": "_AddEntry, _SaveEntry and _DeleteEntry in ui/personal_toml_editor.ahk mutate _PersonalEditorData before _SaveData obtains the durable/live transaction receipt. Failure never restores model/ListView agreement. A simple rollback would lose overlapping DEFERRED snapshots, so complete detached candidates and exact completion ownership are required.",
+			"silent_failure": "An invisible non-durable added entry blocks its own retry as a duplicate. A refused deletion leaves old native row indices pointing into a different model, so a later retry can address another entry. Deferred and section publications must preserve their visible unsaved drafts without stale completion effects.",
+			"regression_test": "Ten reachable personal-entry-receipts cases use real GUI controls, native button messages, a real sharing-denial handle and unlocked same-form retry. They also drive actual coalesced publication, terminal deferred failure and complete-snapshot recovery, dropdown/section changes and the legacy save entry point. The fix installs detached candidates only after immediate success or explicit DEFERRED admission, keeps RAM and rows coherent, and fences completions by source/cohort/sequence. Existing modal and live transaction controls remain; native post-fix qualification is pending."
 		}
 	]
 }
