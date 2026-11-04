@@ -4015,17 +4015,16 @@ function M.start(opts)
 		and options.device ~= "" and options.device or nil
 	_pinned_missing = false
 	_reacquiring = false
-	if type(options.onChar) == "function" then _on_char = options.onChar end
-	if type(options.onKey)  == "function" then _on_key  = options.onKey  end
-	if type(options.onPhysical) == "function" then _on_physical = options.onPhysical end
-	if type(options.onHold) == "function" then _on_hold = options.onHold end
-	if type(options.onClick) == "function" then _on_click = options.onClick end
-	if type(options.onPointerEvent) == "function" then _on_pointer_event = options.onPointerEvent end
+	_on_char = type(options.onChar) == "function" and options.onChar or nil
+	_on_key = type(options.onKey) == "function" and options.onKey or nil
+	_on_physical = type(options.onPhysical) == "function" and options.onPhysical or nil
+	_on_hold = type(options.onHold) == "function" and options.onHold or nil
+	_on_click = type(options.onClick) == "function" and options.onClick or nil
+	_on_pointer_event = type(options.onPointerEvent) == "function" and options.onPointerEvent or nil
 	_on_consume = type(options.onConsume) == "function" and options.onConsume or nil
 	_on_desync = type(options.onDesync) == "function" and options.onDesync or nil
 	_intercept = options.intercept == true
-	-- Bound unconditionally (not "kept if absent" like the domain callbacks):
-	-- an emitter left over from an earlier session would satisfy the guard below
+	-- An emitter left over from an earlier session would satisfy the guard below
 	-- while pointing at a channel this session never asked for.
 	_emit_raw  = type(options.onEmitRaw) == "function" and options.onEmitRaw or nil
 	LayerPointer.emit_relative = type(options.onEmitRelative) == "function" and options.onEmitRelative or nil

@@ -42,6 +42,29 @@ local helpers, load_hook, fake_node, stub_device_finder, recorder, multi_recorde
 
 helpers.describe("keyboard_hook: re-acquires when the preferred device changes", function()
 
+	helpers.it("does not retain callbacks from a stopped capture session (session-callback-reset)", function()
+		local node = fake_node("session-callback")
+		stub_device_finder(node)
+		local Input = require("infra.input_event")
+		local queues = { [node] = {} }
+		local reader = helpers.load_module("adapters.evdev_reader")
+		reader._set_backend(multi_recorder(queues))
+		local kh = load_hook()
+		local received = 0
+		kh.start({ device = node, onChar = function() received = received + 1 end,
+			onPhysical = function() received = received + 1 end })
+		helpers.assert_true(kh.isRunning())
+		kh.stop()
+		kh.start({ device = node })
+		helpers.assert_true(kh.isRunning())
+		queues[node][1] = Input.encode(Input.EV_KEY, 30, Input.VALUE_DOWN, nil, 1)
+		kh.pump()
+		kh.stop()
+		reader._reset_backend()
+		os.remove(node)
+		helpers.assert_eq(received, 0, "the new capture must not call the retired session's callbacks")
+	end)
+
 	helpers.it("switches to the device the finder now prefers, and grabs it", function()
 		local node_a, node_b = fake_node("a"), fake_node("b")
 		local set_device = stub_device_finder(node_a)
