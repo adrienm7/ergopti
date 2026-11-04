@@ -1303,7 +1303,7 @@ _LLMRemoteExtractUsageRoot(format, root, model) {
         out["completion_tokens"] := Integer(usage[completionKey])
     if usage.Has(totalKey) and usage[totalKey] is Number and usage[totalKey] >= 0
         out["total_tokens"] := Integer(usage[totalKey])
-    if (out["total_tokens"] == 0 and out["prompt_tokens"] > 0)
+    if (out["total_tokens"] == 0)
         out["total_tokens"] := out["prompt_tokens"] + out["completion_tokens"]
     out["est_cost_usd"] := _LLMRemoteEstimateCost(model, out["prompt_tokens"], out["completion_tokens"])
     return out
