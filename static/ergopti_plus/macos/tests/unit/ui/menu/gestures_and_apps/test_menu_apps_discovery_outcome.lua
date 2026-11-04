@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local function with_apps(callback)
 	local previous_hs = _G.hs
 	local ok, err = xpcall(function()
-		helpers.with_stub_scope({ "ui.menu.menu_apps", "infra.logger", "infra.paths",
+		helpers.with_stub_scope({ "ui.menu.menu_apps", "infra.logger", "infra.paths", "infra.fs_dir",
 			"infra.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils",
 			"adapters.json_codec", "menu.renderer", "logger.shim" }, function()
 			local state = { calls = {}, warnings = {}, images = {}, app_scans = 0,
@@ -23,6 +23,19 @@ local function with_apps(callback)
 			package.loaded["infra.logger"] = logger
 			package.loaded["infra.paths"] = { shared = function() return "/virtual/locales" end }
 			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["infra.fs_dir"] = { try_entries_quiet = function(directory)
+				state.calls[#state.calls + 1] = directory
+				if directory:find("/Contents/Resources", 1, true) then
+					if state.icon_failure then return {}, false end
+					return {}, true
+				end
+				state.app_scans = state.app_scans + 1
+				if state.throw or state.status ~= true or state.kind ~= "exit" or state.code ~= 0
+					or type(state.output) ~= "string" then return {}, false end
+				local names = {}
+				for path in state.output:gmatch("([^%z]+)%z") do names[#names + 1] = path:match("([^/]+)$") end
+				return names, true
+			end }
 			package.loaded["infra.manifest_menu"] = { build = function(key, title, dynamic, on_click, ctx, providers)
 				if state.render_native then
 					return state.binding.build(key, title, dynamic, on_click, ctx, providers)
@@ -43,16 +56,6 @@ local function with_apps(callback)
 			}
 			local module = helpers.load_with_stubs("ui.menu.menu_apps", {
 				fs = { attributes = function() return { mode = "directory" } end },
-				execute = function(command)
-					state.calls[#state.calls + 1] = command
-					if command:find("*.icns", 1, true) then
-						if state.icon_failure then return "/private/Partial.icns\0", nil, "exit", 1 end
-						return "", true, "exit", 0
-					end
-					state.app_scans = state.app_scans + 1
-					if state.throw then error("PRIVATE_FAILURE") end
-					return state.output, state.status, state.kind, state.code
-				end,
 				application = { infoForBundlePath = function() return {} end },
 				image = { imageFromPath = function(path)
 					state.images[#state.images + 1] = path
@@ -260,7 +263,7 @@ local function with_native_apps_parent(language, body)
 	local result, detail = xpcall(function()
 		for _, name in ipairs({ "ui.menu.menu_apps", "infra.i18n", "infra.locale", "locale.core",
 			"infra.manifest_menu", "infra.config_paths", "infra.paths", "adapters.json_codec", "menu.renderer",
-			"adapters.task_lifecycle", "infra.text_utils" }) do
+			"adapters.task_lifecycle", "infra.text_utils", "infra.fs_dir" }) do
 			package.loaded[name] = nil
 		end
 		helpers.load_with_stubs("infra.logger")
@@ -287,12 +290,14 @@ local function with_native_apps_parent(language, body)
 			if path == "/virtual/Apps/apps" then return { mode = "directory" } end
 			return old_attributes(path)
 		end
-		hs.execute = function(command)
+		package.loaded["infra.fs_dir"] = { try_entries_quiet = function(directory)
 			state.scans = state.scans + 1
 			if state.on_scan then state.on_scan() end
-			if command:find("*.icns", 1, true) then return "", true, "exit", 0 end
-			return state.output, true, "exit", 0
-		end
+			if directory:find("/Contents/Resources", 1, true) then return {}, true end
+			local names = {}
+			for path in state.output:gmatch("([^%z]+)%z") do names[#names + 1] = path:match("([^/]+)$") end
+			return names, true
+		end }
 		hs.application.infoForBundlePath = function() return nil end
 		local icon = {}
 		hs.image.imageFromPath = function() return icon end

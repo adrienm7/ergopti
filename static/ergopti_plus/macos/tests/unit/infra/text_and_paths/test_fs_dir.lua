@@ -52,4 +52,18 @@ helpers.describe("infra/fs_dir.entries — directory listing", function()
 		helpers.assert_true(type(list_err) == "string" and list_err:find("permission denied", 1, true) ~= nil,
 			"try_entries must preserve the enumeration failure for its caller")
 	end)
+
+	helpers.it("quiet listing preserves refusal without logging private details", function()
+		local fs_dir = require("infra.fs_dir")
+		local logger, previous_dir = require("infra.logger"), hs.fs.dir
+		local previous_error, calls = logger.error, 0
+		logger.error = function() calls = calls + 1 end
+		hs.fs.dir = function() error("private path") end
+		local names, listed, detail = fs_dir.try_entries_quiet("/private")
+		hs.fs.dir, logger.error = previous_dir, previous_error
+		helpers.assert_eq(names, {})
+		helpers.assert_eq(listed, false)
+		helpers.assert_type(detail, "string")
+		helpers.assert_eq(calls, 0)
+	end)
 end)

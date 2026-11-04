@@ -3,25 +3,15 @@
 --- ==============================================================================
 --- MODULE: Bundled App Pathname Framing
 --- DESCRIPTION:
---- Actual shell/find output and scratch pathnames exercise bundled-app and icon
---- discovery. Metadata/image ports only record arguments; no app is launched.
---- Hammerspoon 1.1.1 _coresetup.lua:250-259 uses io.popen plus read('*a'), which
---- preserves NUL. Apple BSD find/function.c f_print0 emits path followed by NUL.
+--- Actual native directory iteration and scratch pathnames exercise bundled-app
+--- and icon discovery. Metadata/image ports only record arguments; no app runs.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local OWNED = {
 	"ui.menu.menu_apps", "infra.logger", "infra.paths", "infra.i18n",
-	"infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils", "text_utils", "compat.utf8", "lfs",
+	"infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils", "infra.fs_dir", "text_utils", "compat.utf8", "lfs",
 }
-
---- Runs the native hs.execute transport shape without a login shell or conversion.
-local function execute(command)
-	local child = assert(io.popen(command, "r"))
-	local output = child:read("*a")
-	local ok, kind, code = child:close()
-	return output, ok, kind, code
-end
 
 --- Owns only named scratch files and directories, restoring cold native imports.
 local function with_apps(newline, scenario)
@@ -49,6 +39,11 @@ local function with_apps(newline, scenario)
 				end
 				return path
 			end
+			function f.link(name, target)
+				local path = base .. "/apps/" .. name .. ".app"
+				assert(fs.link(target, path, true)); files[#files + 1] = path
+				return path
+			end
 			local logger = helpers.make_logger_stub()
 			logger.warn = function(_, format, ...) f.warnings[#f.warnings + 1] = string.format(format, ...) end
 			package.loaded["infra.logger"] = logger
@@ -57,19 +52,25 @@ local function with_apps(newline, scenario)
 			package.loaded["infra.manifest_menu"] = {}
 			package.loaded["adapters.task_lifecycle"] = { native = function() error("application launch forbidden") end }
 			local menu = helpers.load_with_stubs("ui.menu.menu_apps", {
-				fs = { attributes = fs.attributes },
+				fs = { attributes = fs.attributes, dir = function(path)
+					f.commands[#f.commands + 1] = path
+					if f.exit_failure and path == base .. "/apps" then
+						local iterator, state = fs.dir(path)
+						local seen = false
+						return function()
+							if seen then error("partial directory read") end
+							seen = true
+							return iterator(state)
+						end
+					end
+					return fs.dir(path)
+				end },
 				application = { infoForBundlePath = function(path)
 					f.metadata[#f.metadata + 1] = path
 					return nil -- Real native metadata may be unavailable; discovery keeps the basename.
 				end },
 				image = { imageFromPath = function(path) f.images[#f.images + 1] = path; return nil end },
-				execute = function(command)
-					f.commands[#f.commands + 1] = command
-					local app_scan = command:find("-name '*.app'", 1, true) ~= nil
-					local output, succeeded, kind, code = execute(command .. (app_scan and f.exit_failure and "; exit 9" or ""))
-					if app_scan and f.output_transform then output = f.output_transform(output) end
-					return output, succeeded, kind, code
-				end,
+				execute = function() error("directory discovery must not execute a shell") end,
 			})
 			function f.prime() menu.prime({ base_dir = base }) end
 			scenario(f)
@@ -85,6 +86,14 @@ local function with_apps(newline, scenario)
 end
 
 helpers.describe("bundled application discovery preserves native pathname boundaries", function()
+	helpers.it("retains symlinked application entries without following them during enumeration", function()
+		with_apps(false, function(f)
+			local target = f.app("Target")
+			local link = f.link("Alias", target)
+			f.prime()
+			helpers.assert_eq(f.metadata, { link, target })
+		end)
+	end)
 	for _, newline in ipairs({ false, true }) do
 		helpers.it("preserves spaces, Unicode, apostrophe and newline=" .. tostring(newline), function()
 			with_apps(newline, function(f)
@@ -126,28 +135,7 @@ helpers.describe("bundled application discovery preserves native pathname bounda
 		end)
 	end)
 
-	for _, mode in ipairs({ "missing terminator", "partial second path", "leading empty", "interior empty", "read nil" }) do
-		helpers.it("rejects " .. mode .. " before metadata and permits a complete retry", function()
-			with_apps(false, function(f)
-				local first = f.app("App Cloner")
-				local second = mode == "partial second path" and f.app("Encryptor") or nil
-				f.output_transform = function(output)
-					if mode == "read nil" then return nil end
-					if mode == "leading empty" then return "\0" .. output end
-					if mode == "interior empty" then return output .. "\0" end
-					return output:sub(1, -2)
-				end
-				f.prime()
-				helpers.assert_eq(f.metadata, {}, "an incomplete stream cannot hydrate even its complete prefix")
-				helpers.assert_eq(#f.warnings, 1)
-				f.output_transform = nil
-				f.prime()
-				helpers.assert_eq(f.metadata, second and { first, second } or { first })
-			end)
-		end)
-	end
-
-	helpers.it("rejects real nonzero exit with output and retries without poisoning the cache", function()
+	helpers.it("rejects a partial native enumeration and retries without poisoning the cache", function()
 		with_apps(false, function(f)
 			local path = f.app("App Cloner")
 			f.exit_failure = true

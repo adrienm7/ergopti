@@ -27,7 +27,7 @@ local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
 local ManifestMenu = require("infra.manifest_menu")
 local TaskLifecycle = require("adapters.task_lifecycle")
-local text_utils = require("infra.text_utils")
+local FsDir = require("infra.fs_dir")
 
 local LOG = "menu_apps"
 
@@ -38,7 +38,7 @@ M._active_tasks = {}
 
 -- Session cache of discovered app bundles (names, descriptions, icons). The
 -- apps/ directory only changes on install, which requires an hs.reload() anyway,
--- so we scan it once and reuse — keeping the `find` subprocess, the per-app
+-- so we scan it once and reuse — keeping directory reads, the per-app
 -- Info.plist reads, and the icon loads off every menu open. Mirrors
 -- HotCounter._ext_meta_cache. Nil until the first discovery.
 local _apps_cache = nil
@@ -63,19 +63,14 @@ local function release_icon_canvas()
 	return true
 end
 
---- Enumerates sorted paths only after the shell command commits successfully.
+--- Enumerates sorted paths only after the native directory read succeeds.
 --- @param directory string Directory to inspect.
---- @param pattern string Internal filename pattern.
+--- @param suffix string Internal filename suffix.
 --- @param category string Fixed diagnostic category.
 --- @return table|nil paths Nil on failure, including partial command output.
-local function scan_paths(directory, pattern, category)
-	local ok, output, succeeded, kind, code = pcall(hs.execute, string.format(
-		"find %s -maxdepth 1 -name %s -print0 2>/dev/null",
-		text_utils.shell_quote(directory), text_utils.shell_quote(pattern)
-	))
-	if not ok or type(output) ~= "string" or succeeded ~= true or kind ~= "exit" or code ~= 0
-		or (output ~= "" and output:sub(-1) ~= "\0")
-		or output:sub(1, 1) == "\0" or output:find("\0\0", 1, true) then
+local function scan_paths(directory, suffix, category)
+	local names, listed = FsDir.try_entries_quiet(directory)
+	if listed ~= true or type(names) ~= "table" then
 		if not _scan_failures[category] then
 			_scan_failures[category] = true
 			Logger.warn(LOG, "Bundled app %s scan failed (details withheld; repeats suppressed).", category)
@@ -84,8 +79,12 @@ local function scan_paths(directory, pattern, category)
 	end
 	_scan_failures[category] = nil
 	local paths = {}
-	-- A native pathname may contain LF; only NUL is excluded by the filesystem.
-	for path in output:gmatch("([^%z]+)%z") do paths[#paths + 1] = path end
+	-- Keep symlinks and any native name, including embedded newlines, as find did.
+	for _, name in ipairs(names) do
+		if name ~= "." and name ~= ".." and name:sub(-#suffix) == suffix then
+			paths[#paths + 1] = directory .. "/" .. name
+		end
+	end
 	table.sort(paths)
 	return paths
 end
@@ -195,7 +194,7 @@ local function load_icon(app_path, info)
 	end
 
 	-- Last resort: any .icns found in Resources/
-	local paths = scan_paths(resources, "*.icns", "icon")
+	local paths = scan_paths(resources, ".icns", "icon")
 	if paths then
 		local icns_path = paths[1]
 		if icns_path then
@@ -222,7 +221,7 @@ local function discover_bundled_apps(ctx)
 	end
 
 	Logger.trace(LOG, "Scanning bundled app directory…")
-	local paths = scan_paths(dir, "*.app", "directory")
+	local paths = scan_paths(dir, ".app", "directory")
 	if not paths then return {} end
 
 	local entries = {}
