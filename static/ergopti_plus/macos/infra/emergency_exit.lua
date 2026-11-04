@@ -98,7 +98,8 @@ function M.request(options)
 			force_exit("deadline-expired")
 		end)
 	end, debug.traceback)
-	if not schedule_ok or not timer_or_err then
+	local handle_ok, stop = pcall(function() return timer_or_err and timer_or_err.stop end)
+	if not schedule_ok or not handle_ok or type(stop) ~= "function" then
 		report_error("Emergency exit deadline could not be armed: %s", tostring(timer_or_err))
 		force_exit("deadline-unavailable")
 		return false

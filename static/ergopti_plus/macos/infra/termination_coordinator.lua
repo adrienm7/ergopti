@@ -611,7 +611,8 @@ local function arm_reload_deadline(transaction)
 		local ok, err = xpcall(expire_reload, debug.traceback, transaction)
 		if not ok then pcall(Logger.error, LOG, "Controlled reload deadline raised: %s.", tostring(err)) end
 	end)
-	if armed and timer then
+	local handle_ok, stop = pcall(function() return timer and timer.stop end)
+	if armed and handle_ok and type(stop) == "function" then
 		transaction.reload_deadline = timer
 		return true
 	else

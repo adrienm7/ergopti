@@ -762,6 +762,66 @@ end)
 
 
 helpers.describe("terminator replay: construction refusal never consumes the key", function()
+	helpers.it("retains a committed replay when its cancellation is refused (terminator-cancel-refusal)", function()
+		local fixture = load_gate()
+		local tx = new_transaction(fixture)
+		local pending = assert(fixture.replay.prepare({
+			kind = "key", key = "return", chars = "\r", transaction = tx,
+		}))
+		helpers.assert_true(fixture.replay.authorize_prepared(pending))
+		helpers.assert_true(fixture.replay.commit_prepared(pending))
+		local cancel = fixture.synthetic.cancel_reserved_successor
+		fixture.synthetic.cancel_reserved_successor = function() return false end
+		helpers.assert_eq(fixture.replay.cancel_prepared(pending), false)
+		helpers.assert_true(fixture.replay.is_pending(), "refusal must retain the exact queued owner")
+		helpers.assert_eq(fixture.replay.is_settled(), false)
+		fixture.synthetic.cancel_reserved_successor = cancel
+		helpers.assert_true(fixture.replay.cancel_prepared(pending))
+		helpers.assert_eq(fixture.replay.is_pending(), false)
+		fixture.synthetic.cancel(tx)
+	end)
+
+	helpers.it("retries an uncommitted reservation cancellation on its watchdog (terminator-cancel-refusal)", function()
+		for _, raises in ipairs({ false, true }) do
+			local fixture = load_gate()
+			local tx = new_transaction(fixture)
+			local pending = assert(fixture.replay.prepare({ kind = "key", key = "return", chars = "\r", transaction = tx }))
+			local cancel = fixture.synthetic.cancel_reserved_successor
+			fixture.synthetic.cancel_reserved_successor = function()
+				if raises then error("cancel refused") end
+				return false
+			end
+			helpers.assert_eq(fixture.replay.cancel_prepared(pending), false)
+			helpers.assert_eq(fixture.replay.is_settled(), false, "uncommitted cleanup still owns a reservation")
+			fixture.synthetic.cancel_reserved_successor = cancel
+			helpers.assert_true(fire_timer(fixture), "the existing watchdog must retry cleanup")
+			helpers.assert_true(fixture.replay.is_settled())
+			helpers.assert_eq(#fixture.sent, 0)
+			fixture.synthetic.cancel(tx)
+		end
+	end)
+
+	helpers.it("does not retain a debt after synchronous settlement during a refused cancel (terminator-cancel-reentrant)", function()
+		local fixture = load_gate()
+		local tx = new_transaction(fixture)
+		local register = fixture.synthetic.on_reserved_complete
+		local callback
+		fixture.synthetic.on_reserved_complete = function(owner, fn)
+			callback = fn
+			return register(owner, fn)
+		end
+		local pending = assert(fixture.replay.prepare({ kind = "key", key = "return", chars = "\r", transaction = tx }))
+		local cancel = fixture.synthetic.cancel_reserved_successor
+		fixture.synthetic.cancel_reserved_successor = function()
+			callback(nil, "cancelled")
+			return false
+		end
+		helpers.assert_eq(fixture.replay.cancel_prepared(pending), false)
+		helpers.assert_true(fixture.replay.is_settled(), "the settled reservation must not leave a phantom debt")
+		fixture.synthetic.cancel_reserved_successor = cancel
+		cancel(pending.reservation)
+		fixture.synthetic.cancel(tx)
+	end)
 	helpers.it("rolls the reserved owner back when predecessor registration throws", function()
 		local fixture = load_gate()
 		local tx = new_transaction(fixture)
@@ -784,6 +844,27 @@ helpers.describe("terminator replay: construction refusal never consumes the key
 		helpers.assert_eq(fixture.synthetic.stats().active_transactions, 0,
 			"the private reservation transaction and periodic owner must roll back")
 		helpers.assert_eq(#fixture.sent, 0)
+	end)
+
+	helpers.it("retains cleanup when registration and cancellation both fail (terminator-cancel-refusal)", function()
+		local fixture = load_gate()
+		local tx = new_transaction(fixture)
+		local on_complete = fixture.synthetic.on_complete
+		local cancel = fixture.synthetic.cancel_reserved_successor
+		local registrations = 0
+		fixture.synthetic.on_complete = function(...)
+			registrations = registrations + 1
+			if registrations == 2 then error("registration refused") end
+			return on_complete(...)
+		end
+		fixture.synthetic.cancel_reserved_successor = function() return false end
+		helpers.assert_nil(fixture.replay.prepare({ kind = "key", key = "return", chars = "\r", transaction = tx }))
+		helpers.assert_eq(fixture.replay.is_settled(), false, "the private reservation remains owned")
+		fixture.synthetic.on_complete = on_complete
+		fixture.synthetic.cancel_reserved_successor = cancel
+		helpers.assert_true(fire_timer(fixture))
+		helpers.assert_true(fixture.replay.is_settled())
+		fixture.synthetic.cancel(tx)
 	end)
 
 	helpers.it("refuses Enter ownership before commit and accepts a fresh retry", function()

@@ -104,6 +104,18 @@ helpers.describe("bounded emergency exit", function()
 			"a failed deadline must exit before starting an unbounded async request")
 	end)
 
+	helpers.it("rejects a malformed deadline handle before starting the fence (emergency-deadline-handle)", function()
+		for _, malformed in ipairs({ true, {} }) do
+			local emergency = load_emergency()
+			local request_calls = 0
+			local options, calls = harness(function() request_calls = request_calls + 1; return true end)
+			options.schedule = function() return malformed end
+			helpers.assert_eq(emergency.request(options), false)
+			helpers.assert_eq(calls.exits, 1, "an unproven deadline requires the EOF backstop")
+			helpers.assert_eq(request_calls, 0)
+		end
+	end)
+
 	helpers.it("does not retain or start work after an inline deadline fires", function()
 		local emergency = load_emergency()
 		local request_calls = 0
