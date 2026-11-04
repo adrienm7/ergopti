@@ -32,6 +32,13 @@
 # missing; base.txt in the report names the base and the commit):
 #   bash tools/dev/collect-macos-field-report.sh            update, collect, commit, push
 #   bash tools/dev/collect-macos-field-report.sh --no-push  same, without the push
+#   bash tools/dev/collect-macos-field-report.sh --installed  the installed signed
+#     build (the CI dev or release app) instead of building the developer app:
+#     no in-app field run, the Debug menu checks come from the copied logs
+#
+# The owned Karabiner runtime needs the stable certificate the CI signs with,
+# so it is field-tested on the installed signed build, never on an ad hoc
+# developer app (docs/tooling/next-release-handoff.md, WP9).
 #
 # Each step records its exit status in steps.txt; a failed step never hides
 # the others, and the summary names it. Ctrl-C or a TERM never loses the
@@ -83,11 +90,14 @@ fail() { printf '[field-report] ERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '[field-report] %s\n' "$*"; }
 
 push=true
-case "$#:${1:-}" in
-	0:) ;;
-	1:--no-push) push=false ;;
-	*) fail "Expected no argument or --no-push." ;;
-esac
+installed=false
+for argument in "$@"; do
+	case "${argument}" in
+		--no-push) push=false ;;
+		--installed) installed=true ;;
+		*) fail "Expected no argument, --no-push or --installed." ;;
+	esac
+done
 
 [ "$(uname -s)" = "Darwin" ] || fail "This collector runs on macOS only."
 cd "${REPO_ROOT}" || fail "Cannot enter the repository root."
@@ -284,6 +294,18 @@ step proxy sh -c 'scutil --proxy | sed -nE "s/^ *([A-Za-z]+Enable) : ([0-9]+)$/\
 step crash_reports sh -c 'names="$(find "${HOME}/Library/Logs/DiagnosticReports" /Library/Logs/DiagnosticReports -maxdepth 2 -type f -mtime -1 2>/dev/null | sed "s#.*/##" | grep -iE "^(ErgoptiPlus|Hammerspoon|karabiner|ollama|omlx|python|uv)[-_. ]")"; [ -n "$names" ] && printf "%s\n" "$names" || echo "no crash report today"'
 step launch_agents sh -c 'ls "${HOME}/Library/LaunchAgents" /Library/LaunchAgents /Library/LaunchDaemons 2>/dev/null | grep -iE "ergopti|pqrs|karabiner|ollama|hammerspoon" || echo "none"'
 step disk sh -c 'df -h / "${TMPDIR:-/tmp}" | sed "s#${HOME}#~#g"'
+# Ergopti's own Karabiner runtime (ADR 011) without the app: both launchd jobs,
+# the installed files, the DriverKit approval, the verified download and the
+# signing authority of the installed app (the install needs a certificate).
+step owned_runtime sh -c '
+	for label in "$1" "$2"; do launchctl print "system/$label" >/dev/null 2>&1; echo "$label: launchctl print exit=$?"; done
+	for path in "/Library/Application Support/ErgoptiPlus/Runtime" "/Library/LaunchDaemons/$1.plist" "/Library/LaunchDaemons/$2.plist"; do
+		[ -e "$path" ] && echo "present: $path" || echo "absent: $path"
+	done
+	systemextensionsctl list 2>&1 | grep -i "Karabiner-DriverKit-VirtualHIDDevice" || echo "no pqrs driver extension listed"
+	ls "${HOME}/Library/Application Support/ErgoptiPlus/RemapRuntime"/*/receipt 2>/dev/null | sed "s#${HOME}#~#" || echo "no verified runtime download"
+	codesign -dv --verbose=2 "/Applications/$3" 2>&1 | grep -E "^(Authority|TeamIdentifier|Signature)=" || echo "no installed $3"
+' sh "${ERGOPTI_SERVICE_LABEL_MACOS_CORE}" "${ERGOPTI_SERVICE_LABEL_MACOS_VIRTUAL_HID}" "${ERGOPTI_APP_BUNDLE}"
 
 # ===========================================
 # ======= 3/ Field run in the app ===========
@@ -500,8 +522,17 @@ run_field_run() {
 	return 0
 }
 
-run_field_run 2>&1 | tee "${out}/field_run.txt"
-field_run_status=${PIPESTATUS[0]}
+if [ "${installed}" = true ]; then
+	# The installed signed build never runs the developer field run (packaged
+	# runtimes do not watch the clone); its Debug menu checks write their
+	# results to the day log this report copies.
+	printf 'skipped: --installed uses the installed signed build; its Debug field checks are in the copied logs\n' \
+		> "${out}/field_run.txt"
+	field_run_status=0
+else
+	run_field_run 2>&1 | tee "${out}/field_run.txt"
+	field_run_status=${PIPESTATUS[0]}
+fi
 printf '%-28s exit=%s\n' "field_run" "${field_run_status}" >> "${steps}"
 [ "${field_run_status}" -eq 0 ] || log "step 'field_run' exited ${field_run_status} (kept in ${out}/field_run.txt)"
 
