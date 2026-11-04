@@ -39,6 +39,9 @@ migrate_canonical_packs() {
 	local -a user_packs=() backups=() backup_present=()
 
 	if [ -f "${marker}" ]; then
+		# The published completion record is nonempty. An empty file cannot
+		# certify that migration ran, and stat does not open or read the path.
+		[ -s "${marker}" ] || return 1
 		return 0
 	fi
 

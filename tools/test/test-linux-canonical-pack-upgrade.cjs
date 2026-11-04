@@ -124,6 +124,31 @@ const installed = path.join(sandbox, 'installed');
 const config = path.join(sandbox, 'config');
 
 try {
+	// An empty marker cannot be the two-byte completion record written by this
+	// migration. Refuse it without changing the user's legacy seed.
+	{
+		const root = path.join(sandbox, 'empty-marker');
+		const source = path.join(root, 'source');
+		const previous = path.join(root, 'previous');
+		const user = path.join(root, 'user');
+		write(path.join(source, 'seed.toml'), 'new\n');
+		write(path.join(previous, 'seed.toml'), 'old\n');
+		write(path.join(user, 'seed.toml'), 'old\n');
+		const marker = path.join(user, '.ergopti-canonical-packs-v2');
+		fs.writeFileSync(marker, '');
+		const command = `source ${shellQuote(bashPath(MIGRATOR))}; migrate_canonical_packs ${shellQuote(bashPath(source))} ${shellQuote(bashPath(previous))} ${shellQuote(bashPath(user))}`;
+		const refused = childProcess.spawnSync(bashExecutable(), ['-c', command], {
+			encoding: 'utf8',
+			timeout: 3000
+		});
+		if (refused.error || refused.status === 0) fail('an empty marker must be promptly refused');
+		if (
+			fs.readFileSync(path.join(user, 'seed.toml'), 'utf8') !== 'old\n' ||
+			fs.readFileSync(marker, 'utf8') !== ''
+		)
+			fail('empty-marker refusal must preserve the seed and marker');
+	}
+
 	// A stale PID-derived temporary name may contain unrelated bytes. The real
 	// migration must allocate a different file rather than truncate and rename it.
 	{
