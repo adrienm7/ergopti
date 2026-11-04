@@ -69,6 +69,26 @@ it("tries the next resolved address when the first connection is refused", funct
 	helpers.assert_eq(answers[1][1], true, "a later reachable address must keep the proxy usable")
 end)
 
+it("publishes the answer only after its native timer and socket retire", function()
+	local server, port = listener()
+	local owned = {}
+	local backend = setmetatable({
+		new_timer = function() local handle = assert(luv.new_timer()); owned[handle] = true; return handle end,
+		new_tcp = function() local handle = assert(luv.new_tcp()); owned[handle] = true; return handle end,
+	}, { __index = luv })
+	local observed = nil
+	local child = assert(Probe.probe("127.0.0.1", port, 1000, function(reachable)
+		local count = 0
+		luv.walk(function(handle) if owned[handle] then count = count + 1 end end)
+		observed = { reachable = reachable, remaining = count }
+	end, backend))
+	run_until(function() return child.is_settled() end)
+	server:close()
+	luv.run("nowait")
+	helpers.assert_true(observed and observed.reachable)
+	helpers.assert_eq(observed.remaining, 0, "a successor must not replace an unsettled native child")
+end)
+
 it("a closed loopback port answers unreachable with the connect reason", function()
 	local server, port = listener()
 	server:close()

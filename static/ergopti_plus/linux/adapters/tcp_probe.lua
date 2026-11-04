@@ -39,13 +39,19 @@ function M.probe(host, port, timeout_ms, callback, luv)
 	luv = luv or require("luv")
 	local answered, cancelled, settled = false, false, false
 	local open_handles, resolving, listeners = 0, false, {}
-	local timer, tcp, request
+	local timer, tcp, request, result
 
 	local function settle()
 		if settled or not answered or resolving or open_handles > 0 then return end
 		settled = true
 		local pending = listeners
 		listeners = {}
+		-- A successor may replace this child as soon as it receives the answer.
+		-- Publish only after the resolver and both exact handles have retired.
+		if not cancelled then
+			local ok = pcall(callback, result.reachable, result.reason)
+			if not ok then Logger.error(LOG, "TCP probe completion callback raised.") end
+		end
 		for _, listener in ipairs(pending) do
 			local ok = pcall(listener)
 			if not ok then Logger.error(LOG, "TCP probe settlement callback raised.") end
@@ -64,13 +70,10 @@ function M.probe(host, port, timeout_ms, callback, luv)
 	local function answer(reachable, reason)
 		if answered then return end
 		answered = true
+		result = { reachable = reachable, reason = reason }
 		if resolving and request then pcall(luv.cancel, request) end
 		close(timer)
 		close(tcp)
-		if not cancelled then
-			local ok = pcall(callback, reachable, reason)
-			if not ok then Logger.error(LOG, "TCP probe completion callback raised.") end
-		end
 		settle()
 	end
 
