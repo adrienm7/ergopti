@@ -186,11 +186,16 @@ KL_DayRollover(Token := 0) {
 	        ; The delete is unreachable until the reader reports EOF from a
 	        ; successful ingest; a failed append/read/save leaves today.log intact.
 	        loop {
+	            BeforeOffset := Keystats.today_log_offset
 	            ingest_result := KL_IngestOnce(true, true, Scope.Token)
 	            if !ingest_result["ok"]
 	                return Map("ok", false, "reason", ingest_result["reason"])
 	            if ingest_result["eof"]
 	                break
+	            ; An unterminated final record is deliberately retained. It cannot
+	            ; be completed by the resident writer before this owner yields.
+	            if Keystats.today_log_offset <= BeforeOffset
+	                return Map("ok", false, "reason", "journal_no_progress")
 	        }
 
 	        ; The marker joins the acknowledged ledger through the same receipt, so
