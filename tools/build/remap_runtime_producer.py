@@ -653,7 +653,11 @@ def owned_idle_core_project(source):
     source = replace_once(
         source,
         "      CODE_SIGN_ENTITLEMENTS: ''\n",
-        "      ERGOPTI_OWNED_CORE_IDLE_ADMISSION_REVISION: '1'\n      CODE_SIGN_ENTITLEMENTS: ''\n",
+        # The phase edits the built Info.plist in place, which it cannot declare
+        # as an output (Xcode's own Info.plist step produces that file).
+        "      ERGOPTI_OWNED_CORE_IDLE_ADMISSION_REVISION: '1'\n"
+        "      ENABLE_USER_SCRIPT_SANDBOXING: 'NO'\n"
+        "      CODE_SIGN_ENTITLEMENTS: ''\n",
     )
     return replace_once(
         source,
@@ -661,8 +665,6 @@ def owned_idle_core_project(source):
         "    postBuildScripts:\n"
         "      - name: Ergopti idle admission revision\n"
         "        basedOnDependencyAnalysis: false\n"
-        "        outputFiles:\n"
-        "          - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)\n"
         "        script: |\n"
         '          /usr/libexec/PlistBuddy -c "Add :ErgoptiOwnedCoreIdleAdmissionRevision string'
         ' ${ERGOPTI_OWNED_CORE_IDLE_ADMISSION_REVISION}" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"\n'
