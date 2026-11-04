@@ -166,8 +166,8 @@ for _, failure in ipairs({ "migration", "registration", "migration_throw", "regi
 			acknowledge = function() end, take_events = function() return {} end }
 		local called, detail = pcall(function()
 			local keystats = require(names[2])
-			local blocked = failure ~= "open_unavailable"
-			helpers.assert_eq(keystats.init(Home.options()), not blocked, "only explicit missing sqlite uses fallback")
+			local blocked = true
+			helpers.assert_eq(keystats.init(Home.options()), false, "SQLite refusal or absence must block initialization")
 			helpers.assert_eq(keystats.get_privacy_state().storage_blocked, blocked, "diagnostics can observe the capture gate")
 			require("tests.support.metrics_consent_fixture").enable(keystats)
 			keystats.on_keydown("a", 1000, "owned-app")
