@@ -52,8 +52,9 @@ local function with_page(page, body)
 	WindowToggle._set_ui_builder(function()
 		return {
 			is_window_focused = function(view) return view == state.view and state.focused end,
-			force_focus = function(view)
+			force_focus = function(view, _, lifecycle)
 				state.presented = state.presented + 1
+				state.presentation_owner = lifecycle.is_current
 				if view == state.view then state.focused = true end
 				return true
 			end,
@@ -110,6 +111,19 @@ helpers.describe("window toggle (macOS)", function()
 			state.focused = true
 			helpers.assert_true(WindowToggle.toggle("layer_editor"))
 			helpers.assert_eq(state.closed, 1, "a focused context page closes through its module")
+		end)
+	end)
+
+	helpers.it("revokes pending focus retries when the page closes or is replaced", function()
+		with_page("metrics_typing", function(state)
+			helpers.assert_true(WindowToggle.toggle("metrics_typing"))
+			helpers.assert_true(WindowToggle.toggle("metrics_typing"))
+			local is_current = state.presentation_owner
+			helpers.assert_true(is_current(), "the original window owns the presentation")
+			state.view = nil
+			helpers.assert_eq(is_current(), false, "a closed window cannot receive a retry")
+			state.view = { page = "metrics_typing" }
+			helpers.assert_eq(is_current(), false, "a replacement cannot revive the old retry")
 		end)
 	end)
 

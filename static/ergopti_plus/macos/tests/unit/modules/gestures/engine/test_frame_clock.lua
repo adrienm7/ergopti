@@ -39,6 +39,20 @@ helpers.describe("gestures frame clock (three-finger-swipe-stuck)", function()
 		helpers.assert_eq(anchored, false, "and says so")
 	end)
 
+	helpers.it("re-anchors after an unstamped frame in a delayed burst (gesture-frame-clock-unstamped)", function()
+		local clock = load().new()
+		clock.capture(5.0, 100.0)
+		local unstamped = clock.capture(nil, 101.0)
+		local next_time, anchored = clock.capture(5.1, 101.01)
+		local later = clock.capture(5.2, 101.11)
+		helpers.assert_eq(unstamped, 101.0)
+		helpers.assert_eq(anchored, false, "the next stamp needs a fresh anchor")
+		helpers.assert_true(next_time >= unstamped and next_time <= 101.01,
+			"the next frame cannot precede the delivery-timed frame")
+		helpers.assert_true(math.abs(later - next_time - 0.1) < 1e-9,
+			"capture spacing resumes after the new anchor")
+	end)
+
 	helpers.it("re-anchors on a device stamp that runs backward", function()
 		local clock = load().new()
 		clock.capture(500.0, 1000.0)
