@@ -6,13 +6,13 @@
     <title>Ergopti</title>
     <link>https://github.com/adrienm7/ergopti</link>
     <item>
-      <title>Ergopti 0.0.0-dev.160</title>
-      <pubDate>Wed, 4 Nov 2026 09:13:37 +0100</pubDate>
-      <sparkle:version>3280</sparkle:version>
-      <sparkle:shortVersionString>0.0.0-dev.160</sparkle:shortVersionString>
+      <title>Ergopti 0.0.0-dev.161</title>
+      <pubDate>Wed, 4 Nov 2026 12:59:30 +0000</pubDate>
+      <sparkle:version>3305</sparkle:version>
+      <sparkle:shortVersionString>0.0.0-dev.161</sparkle:shortVersionString>
       <enclosure
-        url="https://github.com/adrienm7/ergopti/releases/download/v0.0.0-dev.160/ErgoptiPlus.app.tar.xz"
-        sparkle:edSignature="Fe9J101+3A3uA2O9hVaLeD8ek5QD+g4CxUOMoGHneQSANkNK6cMbpJjRjE1N//F2ftOdVEXPcAhfVPKctirvBQ==" length="14920668"
+        url="https://github.com/adrienm7/ergopti/releases/download/v0.0.0-dev.161/ErgoptiPlus.app.tar.xz"
+        sparkle:edSignature="uj8I6QSmKjIBJyO+HwfUD2XSOTk5zBYiDIj3J57VjTT4xbl/JFnIUzSNSqS02KuHJi5mcJsJesM1xnCvXC+lAQ==" length="14931152"
         type="application/octet-stream"
       />
     </item>
