@@ -911,6 +911,17 @@ for _, result in ipairs({ true, false }) do
     else fn = assert(load(body, "metrics-startup", "t", env)) end
     fn()
     if result then helpers.assert_eq(notices, {})
-    else helpers.assert_eq(notices, { { "menu.metrics.unavailable", "warning" } }) end
+    else helpers.assert_eq(notices, { { "dialog.metrics.storage_unavailable", "warning" } }) end
   end)
 end
+
+helpers.it("metrics storage warning explains blocked collection in English and French", function()
+  local json = require("json")
+  for _, lang in ipairs({ "en", "fr" }) do
+    local path = assert(require("infra.paths").shared("data/locales/" .. lang .. ".json"))
+    local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close())
+    local message = assert(json.decode(text))["dialog.metrics.storage_unavailable"]
+    helpers.assert_true(type(message) == "string" and message:find("SQLite", 1, true) ~= nil)
+    helpers.assert_true(#message > 40, "warning must explain the unavailable storage")
+  end
+end)

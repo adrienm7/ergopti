@@ -970,7 +970,7 @@ local function main()
 	if metrics_initialized == false and notifier then
 		local notice_i18n = RuntimeGuard.optional_require("infra.i18n")
 		if notice_i18n then
-			pcall(function() notifier.send(notice_i18n.get("menu.metrics.unavailable"), { level = "warning" }) end)
+			pcall(function() notifier.send(notice_i18n.get("dialog.metrics.storage_unavailable"), { level = "warning" }) end)
 		end
 	end
 	BootProfiler.stage_done("keystats")
