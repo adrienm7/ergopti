@@ -82,6 +82,22 @@ helpers.describe("download fresh presentation preserves original operation conse
 		end)
 	end
 
+	helpers.it("terminal close cannot replace a session opened by its callback", function()
+		with_session(function(bridge, document, world)
+			world.ready()
+			helpers.assert_true(bridge.complete(world.id, true, "done"))
+			local manager, original, successor = document.manager, document.manager.hide, nil
+			manager.hide = function(app, epoch)
+				manager.hide = original
+				helpers.assert_true(original(app, epoch))
+				successor = assert(world.show("successor"))
+				return true
+			end
+			helpers.assert_nil(world.show("superseded"))
+			helpers.assert_true(bridge.update(successor, 33, "successor progress"))
+		end)
+	end)
+
 	helpers.it("reopened real document displays retained terminal data under its own lease", function()
 		with_session(function(bridge, document, world)
 			helpers.assert_true(world.ready().pushed)
