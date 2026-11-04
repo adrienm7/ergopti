@@ -344,12 +344,21 @@ local function save_all(state, data, context)
 	local path = personal_path(state)
 	local writer = get_writer()
 	if not path or not writer or not (_opening == opening and opening_current(opening, state, context)) then return false end
-	if type(data) ~= "table" or type(data.sections) ~= "table" then
-		Logger.error(LOG, "Save rejected: the payload carries no sections.")
+	if type(data) ~= "table" or type(data.sections) ~= "table" or type(data.sections_order) ~= "table" then
+		Logger.error(LOG, "Save rejected: the section model is incomplete.")
 		return false
 	end
 
-	local order = type(data.sections_order) == "table" and data.sections_order or {}
+	local order, listed = data.sections_order, {}
+	for index in pairs(order) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #order then return false end
+	end
+	for index = 1, #order do
+		local name = order[index]
+		if type(name) ~= "string" or name == "" or listed[name] or type(data.sections[name]) ~= "table" then return false end
+		listed[name] = true
+	end
+	for name in pairs(data.sections) do if not listed[name] then return false end end
 	local toml = {
 		meta           = { description = "Personal" },
 		sections_order = {},
