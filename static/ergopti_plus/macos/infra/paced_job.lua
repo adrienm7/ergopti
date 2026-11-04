@@ -84,7 +84,8 @@ function M.start(opts)
 	end
 	local slice_ms = opts.slice_ms or M.DEFAULT_SLICE_MS
 	local gap_sec  = opts.gap_sec or M.DEFAULT_GAP_SEC
-	if type(slice_ms) ~= "number" or slice_ms <= 0 or type(gap_sec) ~= "number" or gap_sec < 0 then
+	if type(slice_ms) ~= "number" or slice_ms ~= slice_ms or slice_ms == math.huge or slice_ms <= 0
+		or type(gap_sec) ~= "number" or gap_sec ~= gap_sec or gap_sec == math.huge or gap_sec < 0 then
 		error("PacedJob.start requires a positive slice budget and a non-negative gap", 2)
 	end
 
@@ -185,7 +186,7 @@ function M.start(opts)
 		return settled
 	end
 
-	Logger.start(LOG, "%s scheduled (slice budget %d ms).", job.label, slice_ms)
+	Logger.start(LOG, "%s scheduled (slice budget %g ms).", job.label, slice_ms)
 	if not schedule() then return nil, "slice timer refused" end
 	return job
 end

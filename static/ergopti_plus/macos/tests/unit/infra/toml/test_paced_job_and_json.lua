@@ -40,6 +40,40 @@ end
 helpers.describe("infra.paced_job", function()
 	local owners = { "infra.paced_job", "infra.logger", "adapters.timer_scheduler" }
 
+	helpers.it("rejects non-finite budgets and gaps before arming a timer", function()
+		helpers.with_fresh_modules(owners, function()
+			local runner, _, queue = load_runner()
+			for _, value in ipairs({0/0, math.huge, -math.huge}) do
+				for _, field in ipairs({"slice_ms", "gap_sec"}) do
+					local opts = {label = "invalid budget", body = function() end, on_done = function() end}
+					opts[field] = value
+					helpers.assert_eq(pcall(runner.start, opts), false)
+					helpers.assert_eq(#queue, 0)
+				end
+			end
+		end)
+	end)
+
+	helpers.it("accepts a fractional slice budget", function()
+		helpers.with_fresh_modules(owners, function()
+			local runner, clock, _, run_next = load_runner()
+			local steps = 0
+			local job = runner.start({label = "fractional budget", slice_ms = 0.5,
+				body = function(pacer)
+					steps = steps + 1
+					clock.now_ns = clock.now_ns + 500000
+					pacer.pause()
+					steps = steps + 1
+				end,
+				on_done = function() end})
+			run_next()
+			helpers.assert_eq(steps, 1)
+			run_next()
+			helpers.assert_eq(steps, 2)
+			helpers.assert_eq(job.state, "done")
+		end)
+	end)
+
 	helpers.it("never runs inline and yields once the slice budget is spent", function()
 		helpers.with_fresh_modules(owners, function()
 			local runner, clock, queue, run_next = load_runner()
