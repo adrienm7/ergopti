@@ -64,8 +64,9 @@ local function run(program, args, accepted, timeout_ms, on_text)
 	end
 	local admitted = M._run(program, args, { timeout_ms = timeout_ms },
 		function(result)
-			-- A deadline, an output bound or a failed start reads as exit code -1
-			if type(result) ~= "table" or accepted[result.exit_code] ~= true then
+			-- A zero-exit leader may still leave an unretired process group;
+			-- that supervision error makes its captured output inconclusive.
+			if type(result) ~= "table" or result.error ~= nil or accepted[result.exit_code] ~= true then
 				local cause = tostring(type(result) == "table" and (result.error or result.exit_code) or "no result")
 				Logger.warn(LOG, "%s failed (%s): no reading this sweep.", program, cause)
 				finish(nil, program .. ": " .. cause)
