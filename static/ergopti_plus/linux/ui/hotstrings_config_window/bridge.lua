@@ -544,12 +544,30 @@ function M.on_message(payload, state, context)
 					return { reset = false }
 				end
 			end
+			local config, clear = state.config, state.config.clear_override
+			local manager = require("ui.webview_manager")
+			local function reset_one(id, section)
+				if state.config ~= config or config.clear_override ~= clear
+					or context ~= nil and not window_current(context, manager) then return false end
+				local ok, cleared = pcall(clear, id, section)
+				return ok and cleared == true
+			end
+			local function refused()
+				Logger.error(LOG, "Reset all stopped because an override could not be cleared; earlier changes may remain.")
+				if context == nil or window_current(context, manager) then
+					push_state(state, context)
+					if type(state.notify_error) == "function" and (context == nil or window_current(context, manager)) then
+						pcall(state.notify_error, "healthcheck.status.failed")
+					end
+				end
+				return { reset = false }
+			end
 			for id, category in pairs(categories) do
-				state.config.clear_override(id, nil)
+				if not reset_one(id, nil) then return refused() end
 				-- Sections too: a per-section delay left behind after "reset
 				-- everything" is a setting the user cannot see and did not keep.
 				for _, section in ipairs(type(category) == "table" and category.sections_order or {}) do
-					state.config.clear_override(id, section)
+					if not reset_one(id, section) then return refused() end
 				end
 			end
 		end

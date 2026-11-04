@@ -225,12 +225,38 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_eq({ notices, clears }, { 0, 0 })
     end)
 
+    helpers.it("(hotstrings-reset-refusal) reports a refused category reset", function()
+      local s2, notices, calls = build_mock_state(), {}, 0
+      s2.config.get_categories = function() return { accents = { sections_order = { "common" } } } end
+      s2.config.clear_override = function() calls = calls + 1; return false end
+      s2.notify_error = function(key) notices[#notices + 1] = key end
+      local result = handler.on_message({ action = "reset_all" }, s2)
+      helpers.assert_eq(result, { reset = false })
+      helpers.assert_eq(calls, 1, "no subsequent changes follow the refusal")
+      helpers.assert_eq(notices, { "healthcheck.status.failed" })
+    end)
+
+    helpers.it("(hotstrings-reset-refusal) stops when the page is replaced during reset", function()
+      local s2, notices, calls, epoch = build_mock_state(), 0, 0, 1
+      s2.config.get_categories = function() return { accents = { sections_order = { "common" } } } end
+      s2.config.clear_override = function() calls = calls + 1; epoch = 2; return true end
+      s2.notify_error = function() notices = notices + 1 end
+      local previous = package.loaded["ui.webview_manager"]
+      package.loaded["ui.webview_manager"] = { current_epoch = function() return epoch end }
+      local ok, result = pcall(handler.on_message, { action = "reset_all" }, s2,
+        { app_name = "hotstrings_config_window", epoch = 1 })
+      package.loaded["ui.webview_manager"] = previous
+      helpers.assert_true(ok, tostring(result))
+      helpers.assert_eq(result, { reset = false })
+      helpers.assert_eq({ calls, notices }, { 1, 0 })
+    end)
+
     helpers.it("'reset_all' clears every category's overrides", function()
       local cleared = {}
       local s2 = build_mock_state()
       s2.config.reset_defaults = function() end
       s2.config.get_categories = function() return { accents = {}, code = {} } end
-      s2.config.clear_override = function(id) cleared[#cleared + 1] = id end
+      s2.config.clear_override = function(id) cleared[#cleared + 1] = id; return true end
       handler.on_message({ action = "reset_all" }, s2)
       helpers.assert_eq(#cleared, 2, "every category must be reset, not the first one found")
     end)
