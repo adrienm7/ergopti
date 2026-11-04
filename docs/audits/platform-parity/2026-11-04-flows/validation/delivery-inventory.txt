@@ -1,0 +1,5 @@
+
+> svelte-static@3.0.0 test:js-feature-inventory
+> node ./tools/test/test-js-feature-inventory.cjs
+
+PASS literal feature inventory, platform projections and actual runner dispatch

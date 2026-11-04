@@ -1,0 +1,6 @@
+
+> svelte-static@3.0.0 test:windows-bundle-manifest
+> node ./tools/test/test-windows-bundle-manifest.cjs
+
+Native flags: 21 bitmaps match every authoritative PNG pixel.
+[32m[OK] the Windows bundle ships 380 files (1490 excluded by 15 groups); 463 literal file names, 174 root-anchored paths (15 dynamic), 174 page and 42 data references all resolve to shipped files; 60 self-checks fail as they must.[0m

@@ -1,0 +1,58 @@
+[OK] ten newer prereleases cannot bury the stable download assets
+[OK] a release without the Linux AppImage links its page, never "#"
+[OK] dev selects the newest published prerelease without borrowing the stable endpoint
+[OK] successful requests cache independently for each actual branch
+[OK] main API errors remain cached refusal without parsing a failed response
+[OK] main network and JSON failures do not fabricate a release
+[OK] dev API errors remain cached refusal without parsing a failed response
+[OK] dev network and JSON failures do not fabricate a release
+[OK] a dev channel without a prerelease stays unavailable
+[OK] the stable endpoint cannot publish a prerelease response
+[OK] raw installation scripts preserve the same channel authority
+[OK] a prerelease beyond a complete stable page remains available
+[OK] publication time selects the latest prerelease despite creation-list order
+[OK] drafts never become real prerelease downloads
+[OK] a failed later page cannot publish an incomplete older result
+[OK] repeated pages and invalid publication dates refuse a complete dev lookup
+[OK] only the exact public dev path selects prereleases
+[OK] site-branch-identity: failed Git refuses before either metadata write
+[OK] site-branch-identity: detached local HEAD refuses before writing
+[OK] site-branch-identity: legitimate attached feature branches stay exact
+[OK] site-branch-identity: both explicit targets bind the same real commit
+[OK] site-branch-identity: incomplete or foreign target context refuses
+[OK] site-branch-identity: wrong checkout and failed commit lookup refuse
+[OK] site-branch-identity: GitHub cannot silently use local mode
+[OK] site-branch-identity: ambiguous branch metadata refuses
+[OK] site-branch-identity: directory and both write failures propagate
+[OK] site-artifact-integrity: received files and producer context stay exact
+[OK] site-artifact-limits: exact limits accept and successors refuse
+[OK] site-artifact-growth: a fresh file snapshot cannot exceed remaining capture budget
+[OK] site-testbuild: complete browser proof binds exact build context and bytes
+Received exact source/run output and browser proof: 123 / main
+Target branch still names admitted source: 123 / main
+Received exact source/run output and browser proof: 123 / dev
+Target branch still names admitted source: 123 / dev
+Admitted exact source/run site artifacts: 123 / main
+[OK] deployment receives the exact successful source/run artifact and browser proof
+[OK] site-artifact-smoke portable: root and dev have distinct mounted URLs
+[OK] site-artifact-smoke portable: raw traversal and encoded path ambiguity refuse
+[OK] site-artifact-smoke portable: real layout selects one HTML file and declared resource MIME
+[OK] site-artifact-smoke portable: missing hotstrings and ambiguous generated HTML refuse
+[OK] site-artifact-smoke portable: symlink root/file/parent and unknown MIME refuse
+[OK] site-artifact-smoke portable: only the four declared inert GitHub API routes exist
+[OK] site-artifact-smoke portable: actual browser assertion body visits all authored routes and toggles twice
+[OK] site-artifact-smoke portable: client navigation retains the target prefix and document identity
+[OK] site-artifact-smoke portable: emulation readiness precedes hard navigation and refuses incomplete owners
+[OK] site-artifact-smoke portable: rendered fixture downloads and local HEAD refusals remain distinct
+[OK] site-artifact-smoke portable: unhydrated/absent UI, HTTP, page and resource errors cannot qualify
+[OK] site-artifact-smoke portable: owned browser retirement runs on success and assertion failure
+[OK] site-artifact-smoke portable: actual CLI orders both verifications and publishes exclusively after completion
+[OK] site-artifact-smoke portable: encoded filename spaces serve actual owned bytes in GET and HEAD
+[OK] site-artifact-smoke portable: actual browser context admits the declared desktop Header navigation
+[OK] site-artifact-smoke portable: complete browser transport admits only exact authored external fixtures
+[OK] production output browser assertions reject inert causal failures
+[OK] final shared Verdict receives both exact Build and browser proofs
+[OK] human site lots retain the one target and base authority
+[OK] both production build legs forward the same complete admitted map
+[OK] foreign, partial, duplicated and reassigned site lot transports refuse
+Website release resolver and branch identity: 35 actual-source controls passed; no network used.

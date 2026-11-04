@@ -40,6 +40,8 @@ the field-run step or the hand action that proves it and the commits it confirms
 
 - [ ] **[CODE] macOS:** declare the existing `/usr/sbin/installer` child in the owned-runtime program inventory through its canonical owner and regenerate consumers. The unchanged inventory test rejects this pre-existing omission at all three reviewed source revisions. [Baseline proof](docs/audits/platform-parity/2026-11-04-flows/validation/installer-baseline/report.md). This metadata item is outside the 26 flow findings.
 
+- [ ] **[CODE] CI:** resolve the current pipeline-wiring permission mismatch for `remap-runtime-build.yml` / `install-acceptance` (`actions: read`) without weakening the closed permission policy. [Integrated-source failure receipt](docs/audits/platform-parity/2026-11-04-flows/validation/delivery-ci.txt).
+
 ## End-to-end parity follow-up
 
 Evidence: [12-scope flow review](docs/audits/platform-parity/2026-11-04-flows/report.md). These are OS/flow work items, not a claim of 26 unique causes or native acceptance. Preserve intentional policies and all current refusal guards.

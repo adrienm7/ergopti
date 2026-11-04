@@ -1,0 +1,10 @@
+verify-change: 431 changed file(s).
+verify-change: silent-failure pre-checks passed.
+
+  Gates required by this change:
+   - format  (CI checks actual Prettier/Ruff formatting before suites; formatter self-tests do not validate source files)
+       e.g. README.md, TODO.md, docs/audits/platform-parity/2026-11-04-flows/check_validator.py
+   - ahk-encoding  (every .ahk must stay UTF-8 BOM + LF; a stray CRLF or a lost BOM breaks the parser in ways that are hard to read)
+       e.g. docs/audits/platform-parity/2026-11-04-flows/windows-clipboard/probes/selection-startup-foreground-probe.ahk, docs/audits/platform-parity/2026-11-04-flows/windows-clipboard/probes/selection-startup-native-probe.ahk, docs/audits/platform-parity/2026-11-04-flows/windows-clipboard/probes/sendinstant-pause-native-probe.ahk
+   - js  (port compliance, single-source, parity and document-consumer checks live here; doc-paths rejects obsolete roots in driver docs only)
+       e.g. README.md, TODO.md, docs/audits/platform-parity/2026-11-04-flows/delivery-delta-paths-linux.md

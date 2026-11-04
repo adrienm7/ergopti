@@ -1,0 +1,2 @@
+
+Encoding check passed — 2563 .ahk file(s) verified (UTF-8 BOM + LF).
