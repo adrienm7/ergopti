@@ -212,3 +212,32 @@ helpers.describe("Shared process pattern matcher (local-server-ports)", function
 		helpers.assert_eq(pcall(Policy.process_matcher, ""), false)
 	end)
 end)
+
+for _, kind in ipairs({ "settings", "proc" }) do
+	for _, fault in ipairs({ "read_throw", "read_nil", "close_throw", "close_false" }) do
+		helpers.it("local server " .. kind .. " refuses incomplete read " .. fault, function()
+			local Scanner, Reader = require("modules.llm.local_server_ports"), require("infra.regular_file_reader")
+			local original_open, original_reader = io.open, Reader.open_source
+			local closed, maximum = 0, nil
+			local stream = { read = function(_, limit)
+				maximum = limit
+				if fault == "read_throw" then error("injected read error") end
+				if fault == "read_nil" then return nil, "injected read error" end
+				return "synthetic valid data"
+			end, close = function()
+				closed = closed + 1
+				if fault == "close_throw" then error("injected close error") end
+				return fault ~= "close_false"
+			end }
+			if kind == "settings" then Reader.open_source = function() return stream end
+			else io.open = function() return stream end end
+			local called, value = pcall(kind == "settings" and Scanner._read_file or Scanner._read_cmdline,
+				kind == "settings" and "/synthetic/settings.json" or 42)
+			io.open, Reader.open_source = original_open, original_reader
+			helpers.assert_true(called, "failed kernel or settings read must not escape discovery")
+			helpers.assert_nil(value, "unacknowledged data is not valid discovery evidence")
+			helpers.assert_eq(closed, 1, "every opened stream is closed")
+			helpers.assert_true(type(maximum) == "number" and maximum > 0, "the read remains bounded")
+		end)
+	end
+end
