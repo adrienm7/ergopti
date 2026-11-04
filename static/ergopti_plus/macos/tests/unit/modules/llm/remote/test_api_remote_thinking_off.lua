@@ -287,3 +287,26 @@ helpers.describe("api_remote: models that accept only the default sampling get n
 	end)
 
 end)
+
+helpers.describe("api_remote: empty system prompt", function()
+	for _, provider in ipairs({ "anthropic", "gemini" }) do
+		helpers.it("omits empty instructions for " .. provider, function()
+			with_remote(function(remote, _, posts)
+				local entry = { id = "raw", provider = provider, token = "plain-key", model = "fixture-model" }
+				remote.set_entries({ entry })
+				remote.set_active_entry_id(entry.id)
+				remote.request_raw(entry.model, "", "typed context", "", 0.2, 8,
+					function() end, function() end)
+				helpers.assert_eq(#posts, 1)
+				local body = require("json").decode(posts[1].body)
+				if provider == "anthropic" then
+					helpers.assert_nil(body.system)
+					helpers.assert_eq(body.messages[1].content, "typed context")
+				else
+					helpers.assert_nil(body.systemInstruction)
+					helpers.assert_eq(body.contents[1].parts[1].text, "typed context")
+				end
+			end)
+		end)
+	end
+end)

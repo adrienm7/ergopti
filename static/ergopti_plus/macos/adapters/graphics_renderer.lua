@@ -50,7 +50,7 @@ function M.createWindow(opts)
 		if not canvas then return INVALID_HANDLE end
 		canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces)
 		canvas:level(o.alwaysOnTop == false
-			and hs.canvas.windowLevels.floating
+			and hs.canvas.windowLevels.normal
 			or hs.canvas.windowLevels.overlay)
 		if o.clickThrough ~= false then
 			canvas:ignoresMouseEvents(true)

@@ -1807,7 +1807,11 @@ _LLMRemote_BuildRequestContext(system_prompt, full_text, tail_text) {
     sys := system_prompt
     user := full_text
     tail := (tail_text != "") ? tail_text : full_text
-    if (InStr(sys, "PREFIX") and InStr(sys, "TAIL")) {
+    if (sys == "{context}") {
+        ; The built-in raw profile has no system instruction.
+        sys := ""
+        user := full_text
+    } else if (InStr(sys, "PREFIX") and InStr(sys, "TAIL")) {
         user := Format('PREFIX: "{1}"`nTAIL: "{2}"', full_text, tail)
     } else if (sys != "" and InStr(sys, "{context}")) {
         sys := StrReplace(sys, "{context}", full_text)
@@ -1924,14 +1928,16 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
     if (Fmt == "anthropic") {
         ; Anthropic Messages API: top-level ``system`` field, ``messages`` is
         ; user/assistant turns only. ``max_tokens`` is REQUIRED by Anthropic.
-        return Format('{"model":"{1}","system":"{2}","messages":[{"role":"user","content":"{3}"}],"max_tokens":{5},"temperature":{4}}',
-            ModelEsc, SysEsc, UserEsc, Temp, MaxTok)
+        SysField := (SystemPrompt != "") ? Format('"system":"{1}",', SysEsc) : ""
+        return Format('{"model":"{1}",{2}"messages":[{"role":"user","content":"{3}"}],"max_tokens":{5},"temperature":{4}}',
+            ModelEsc, SysField, UserEsc, Temp, MaxTok)
     }
     if (Fmt == "gemini") {
         ; Gemini wraps the system instruction in ``systemInstruction`` and the
         ; user turn in ``contents.parts.text``.
-        return Format('{"systemInstruction":{"parts":[{"text":"{1}"}]},"contents":[{"role":"user","parts":[{"text":"{2}"}]}],"generationConfig":{"temperature":{3},"maxOutputTokens":{4}}}',
-            SysEsc, UserEsc, Temp, MaxTok)
+        SysField := (SystemPrompt != "") ? Format('"systemInstruction":{"parts":[{"text":"{1}"}]},', SysEsc) : ""
+        return "{" . SysField . Format('"contents":[{"role":"user","parts":[{"text":"{1}"}]}],"generationConfig":{"temperature":{2},"maxOutputTokens":{3}}}',
+            UserEsc, Temp, MaxTok)
     }
     if (Fmt == LLM_AGENT_FORMAT)
         return LLM_RemoteFormats_AgentBody(Model, SystemPrompt, UserText, MaxTok, Temp)
@@ -1959,8 +1965,9 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
                 ExtraFrag .= "," . JsonStringLiteral(Field) . ":" . Source
         }
     }
-    return Format('{"model":"{1}","messages":[{"role":"system","content":"{2}"},{"role":"user","content":"{3}"}],"temperature":{4},"max_tokens":{5},"stream":false{6}}',
-        ModelEsc, SysEsc, UserEsc, Temp, MaxTok, ExtraFrag)
+    SysMessage := (SystemPrompt != "") ? Format('{"role":"system","content":"{1}"},', SysEsc) : ""
+    return Format('{"model":"{1}","messages":[{2}{"role":"user","content":"{3}"}],"temperature":{4},"max_tokens":{5},"stream":false{6}}',
+        ModelEsc, SysMessage, UserEsc, Temp, MaxTok, ExtraFrag)
 }
 
 ; The reasoning control of every model family (thinking_off.json), loaded with

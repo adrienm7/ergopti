@@ -778,6 +778,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-editors-ime-keyboard.cjs"],
 			"repro": "node tools/test/test-editors-ime-keyboard.cjs"
+		},
+		{
+			"id": "js-hotstrings-config-zero-delay",
+			"ordinal": 582,
+			"name": "hotstring settings display zero unlimited delay after saving",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstrings-config-zero-delay.cjs"],
+			"repro": "node tools/test/test-hotstrings-config-zero-delay.cjs"
 		}
 	]
 }

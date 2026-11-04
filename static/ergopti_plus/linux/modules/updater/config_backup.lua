@@ -105,6 +105,10 @@ local function file_ports()
 			if Shell.run("mkdir -p -- " .. Shell.quote(path)) then return true end
 			return nil, "mkdir failed"
 		end,
+		make_dir_exclusive = function(path)
+			if Shell.run("mkdir -- " .. Shell.quote(path)) then return true end
+			return nil, "mkdir failed"
+		end,
 		create = function(path, content)
 			return Writer.publish_if_unchanged(path, content, nil, { status = "absent" })
 		end,

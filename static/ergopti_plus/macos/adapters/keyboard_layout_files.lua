@@ -41,10 +41,10 @@ end
 --- @return boolean removed
 --- @return string|nil err
 function M.remove(path)
-	local status, mode = FileSystem.followed_mode(path)
-	if status == "absent" or (status == "error" and not FileSystem.exists(path)) then return true, nil end
-	if status ~= "present" or mode ~= "file" then
-		Logger.warn(LOG, "'%s' is not a regular file (%s); left in place.", tostring(path), tostring(mode or status))
+	local attributes, status, detail = FileSystem.classify_no_follow(path)
+	if status == "absent" then return true, nil end
+	if status ~= "ok" or not attributes or attributes.mode ~= "file" then
+		Logger.warn(LOG, "'%s' is not a regular file (%s); left in place.", tostring(path), tostring(detail or (attributes and attributes.mode) or status))
 		return false, "not a regular file"
 	end
 	local removed, remove_err = os.remove(path)

@@ -331,6 +331,11 @@ helpers.describe("Profiles.resolve_system_prompt", function()
 		helpers.assert_eq(prompt, "SINGLE")
 	end)
 
+	helpers.it("keeps fallback for an absent or empty template", function()
+		local prompt = Profiles.resolve_system_prompt({ system_single = "" }, 1)
+		helpers.assert_true(type(prompt) == "string" and prompt ~= "")
+	end)
+
 	helpers.it("falls back when profile is not a table", function()
 		local prompt = Profiles.resolve_system_prompt(nil, 1)
 		helpers.assert_true(type(prompt) == "string" and prompt ~= "")

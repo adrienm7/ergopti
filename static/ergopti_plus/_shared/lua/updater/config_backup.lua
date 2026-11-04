@@ -167,7 +167,7 @@ function M.new(options)
 	assert(type(options.roots) == "table" and #options.roots > 0, "config_backup needs its roots")
 	local io_port, json, clock = options.io, options.json, options.clock
 	assert(type(io_port) == "table" and type(io_port.list) == "function" and type(io_port.read) == "function"
-		and type(io_port.make_dir) == "function" and type(io_port.create) == "function"
+		and type(io_port.make_dir) == "function" and type(io_port.make_dir_exclusive) == "function" and type(io_port.create) == "function"
 		and type(io_port.replace) == "function", "config_backup needs its file ports")
 	assert(type(json) == "table" and type(json.encode) == "function" and type(json.decode) == "function",
 		"config_backup needs a JSON codec")
@@ -336,6 +336,11 @@ function M.new(options)
 			id = base .. "-" .. (carry == 1 and "1" or "") .. table.concat(digits)
 		end
 		local path = join(folder, id)
+		local path_ok, path_err = io_port.make_dir_exclusive(path)
+		if not path_ok then
+			Logger.error(LOG, "Configuration backup refused: cannot create %s: %s.", path, tostring(path_err))
+			return nil, "cannot create " .. path
+		end
 		local manifest_files = {}
 		for _, entry in ipairs(entries) do
 			local copy = join(path, entry.root .. "/" .. entry.path)
@@ -435,17 +440,30 @@ function M.new(options)
 		assert(prefix ~= nil, "unknown config_backup kind")
 		local entries = io_port.list(folder)
 		if entries == nil then return nil end
-		local best = nil
+		local candidates = {}
 		for _, entry in ipairs(entries) do
 			local name = entry.name
 			if entry.kind == "dir" and type(name) == "string" and name:sub(1, #prefix + 1) == prefix .. "-" then
 				local record = load(name)
-				if record and record.kind == kind and (best == nil or newer(record, best)) then
-					best = record
-				end
+				if record and record.kind == kind then candidates[#candidates + 1] = record end
 			end
 		end
-		return best
+		while #candidates > 0 do
+			local best = 1
+			for index = 2, #candidates do
+				if newer(candidates[index], candidates[best]) then best = index end
+			end
+			local record = table.remove(candidates, best)
+			local complete = true
+			for _, file in ipairs(record.files) do
+				if io_port.read(join(record.path, file.root .. "/" .. file.path)) == nil then
+					complete = false
+					break
+				end
+			end
+			if complete then return record end
+		end
+		return nil
 	end
 
 	--- Puts a backup back: backs the current configuration up first, checks

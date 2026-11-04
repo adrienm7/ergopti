@@ -337,6 +337,24 @@ _RIT_BackupAndRestoreRealFiles() {
 Test("Config backup: backs up and restores the configuration's exact bytes (config-backup-real-files)",
 	_RIT_BackupAndRestoreRealFiles)
 
+_RIT_BackupSkipsMissingCopy() {
+	Root := A_Temp . "\ergopti_rit_missing_copy_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "[script]`n")
+		Rules := ConfigBackup_Rules()
+		First := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Second := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Healthy := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, First)
+		Damaged := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Second)
+		FileDelete(Damaged["path"] . "\config\config.toml")
+		AssertEqual(Healthy["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"])
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+Test("Config backup: selects an older backup when the newest copy is missing", _RIT_BackupSkipsMissingCopy)
+
 
 ; A damaged manifest must not make the complete backup picker throw or replace
 ; a usable backup with metadata that its page/restore consumers cannot read.

@@ -205,7 +205,8 @@ function bindDelay(field, cat, sec) {
 	const input = field.querySelector('input');
 	const reset = field.querySelector('.reset');
 
-	input.value = ms || defaultMs;
+	// Zero is the effective unlimited delay, not a missing value.
+	input.value = ms ?? defaultMs;
 	input.placeholder = defaultMs;
 	field.classList.toggle('overridden', !!overridden);
 
