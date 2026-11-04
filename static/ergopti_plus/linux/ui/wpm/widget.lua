@@ -80,6 +80,7 @@ local _state = {
 -- The drawing surface; replaceable by tests.
 local _surface = nil
 local _restore_debt = nil
+local _hide_pending = false
 
 local clone = TableUtil.deep_copy
 
@@ -275,10 +276,12 @@ local function hide()
 	local Surface = surface()
 	if Surface and type(Surface.hide) == "function" then
 		local called, hidden = pcall(Surface.hide)
-		if not called or hidden ~= true then return false end
+		if not called or hidden ~= true then _hide_pending = true; return false end
 	elseif _state.shown then
+		_hide_pending = true
 		return false
 	end
+	_hide_pending = false
 	_state.shown = false
 	return true
 end
@@ -286,7 +289,7 @@ end
 --- Captures the exact frame and choices without writing preferences.
 --- @return table snapshot Detached runtime state.
 function M.configuration_snapshot()
-	if _restore_debt then return nil end
+	if _restore_debt or _hide_pending then return nil end
 	return clone(_state)
 end
 
@@ -306,6 +309,7 @@ function M.apply_configuration(candidate)
 		local x, y = Model.frame_origin(canon, candidate.last_frame, candidate.anchor.x, candidate.anchor.y)
 		local called, drawn = pcall(Surface.draw, clone(candidate.last_frame), x, y)
 		if not called or drawn ~= true then return false end
+		_hide_pending = false
 	elseif hide() ~= true then
 		return false
 	end
@@ -422,6 +426,7 @@ end
 function M.tick(stats, now_s)
 	if _restore_debt or not Preferences.admit() then return nil end
 	if not _state.running then return nil end
+	if _hide_pending and not hide() then return nil end
 	if _state.last_draw_s and (now_s - _state.last_draw_s) < UPDATE_S then return nil end
 	_state.last_draw_s = now_s
 	local canon = Constants.load()
@@ -488,6 +493,7 @@ end
 --- Clears module state. Tests only.
 function M._reset()
 	_restore_debt = nil
+	_hide_pending = false
 	_state.running = false
 	_state.use_source_colors = DEFAULTS.source_colors
 	_state.graph = DEFAULTS.graph
