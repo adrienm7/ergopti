@@ -340,3 +340,27 @@ _DiagLog_CompletedBootStaysFrozen() {
 	AssertEqual(812, BootProfile_CompletedBootMs(), "the boot total must not grow with the process")
 }
 Test("boot profile: the completed boot total stays frozen for later checks", _DiagLog_CompletedBootStaysFrozen)
+
+; Controls only the native SYSTEM_INFO boundary, independent of A_PtrSize.
+_TDL_SetNativeArchitecture(Code, Info) {
+	NumPut("UShort", Code, Info)
+}
+
+_TDL_NativeArchitecture() {
+	for Code, Expected in Map(0, "x86", 9, "x64", 12, "arm64", 5, "arm", 6, "ia64")
+		AssertEqual(Expected, DiagSnapshot_NativeArchitecture(_TDL_SetNativeArchitecture.Bind(Code)),
+			"native architecture must remain independent of interpreter bitness")
+	Rejected := false
+	try DiagSnapshot_NativeArchitecture(_TDL_SetNativeArchitecture.Bind(0xffff))
+	catch ValueError
+		Rejected := true
+	AssertTrue(Rejected, "unknown native architecture must not become x64")
+	Native := DiagSnapshot_NativeArchitecture()
+	AssertTrue(Native == "x86" || Native == "x64" || Native == "arm64" || Native == "arm" || Native == "ia64",
+		"the real native API must return a recognized architecture")
+	AssertEqual(Native, _HealthCheck_Hardware()["arch"], "health diagnostics use the native architecture")
+	Snapshot := DiagSnapshot_Collect(0)
+	AssertEqual(Native . (A_PtrSize == 8 ? "" : " (32-bit process)"), Snapshot["arch"],
+		"boot diagnostics retain the process width separately")
+}
+Test("diagnostics: ARM64 host architecture survives x64 emulation", _TDL_NativeArchitecture)
