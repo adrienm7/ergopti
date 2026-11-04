@@ -88,6 +88,16 @@ helpers.describe("keyboard hook: a physical layout-family change", function()
 		helpers.assert_eq(hook.get_layout(), "qwerty")
 	end)
 
+	helpers.it("does not publish an initial layout when another start option is refused", function()
+		install_recording_reader()
+		local hook = helpers.load_module("adapters.keyboard_hook")
+		helpers.assert_true(hook.set_layout("qwerty"))
+		local started = hook.start({ layout = "azerty", onHoldAdmission = true })
+		package.loaded["modules.hotstrings.input_reader"] = _saved_reader
+		helpers.assert_eq(started, false)
+		helpers.assert_eq(hook.get_layout(), "qwerty")
+	end)
+
 	helpers.it("rejects a non-string without changing anything", function()
 		install_recording_reader()
 		local hook = helpers.load_module("adapters.keyboard_hook")
