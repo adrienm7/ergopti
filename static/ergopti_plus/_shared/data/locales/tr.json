@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "Yollar",
 	"paths_editor.label_config_dir": "Yapılandırma klasörü",
 	"paths_editor.label_logs_dir": "Günlük klasörü",
-	"paths_editor.hint_logs_dir": "Günlükler, seçilen klasörün ergopti_plus alt klasörüne yazılır.",
+	"paths_editor.hint_logs_dir": "Günlükler, seçilen klasörün kendine ait bir alt klasörüne yazılır.",
 	"paths_editor.subtitle": "Tüm kişisel dosyalar (kısayollar, hotstring'ler…) bu klasörden yüklenir.",
 	"paths_editor.tag_default": "varsayılan",
 	"paths_editor.default_label": "Varsayılan:",

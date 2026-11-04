@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "Stier",
 	"paths_editor.label_config_dir": "Konfigurationsmappe",
 	"paths_editor.label_logs_dir": "Logmappe",
-	"paths_editor.hint_logs_dir": "Logfilerne skrives i en undermappe ergopti_plus i den valgte mappe.",
+	"paths_editor.hint_logs_dir": "Logfilerne skrives i en særskilt undermappe i den valgte mappe.",
 	"paths_editor.subtitle": "Alle personlige filer (genveje, hotstrings…) løses fra denne mappe.",
 	"paths_editor.tag_default": "standard",
 	"paths_editor.default_label": "Standard:",

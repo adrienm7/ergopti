@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "パス",
 	"paths_editor.label_config_dir": "設定フォルダー",
 	"paths_editor.label_logs_dir": "ログフォルダー",
-	"paths_editor.hint_logs_dir": "ログは選択したフォルダー内のサブフォルダー ergopti_plus に書き込まれます。",
+	"paths_editor.hint_logs_dir": "ログは選択したフォルダー内の専用サブフォルダーに書き込まれます。",
 	"paths_editor.subtitle": "すべての個人ファイル（ショートカット、ホットストリング…）はこのフォルダーから解決されます。",
 	"paths_editor.tag_default": "デフォルト",
 	"paths_editor.default_label": "デフォルト:",

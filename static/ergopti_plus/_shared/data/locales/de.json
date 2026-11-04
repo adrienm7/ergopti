@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "Pfade",
 	"paths_editor.label_config_dir": "Konfigurationsordner",
 	"paths_editor.label_logs_dir": "Protokollordner",
-	"paths_editor.hint_logs_dir": "Die Protokolle werden in einen Unterordner ergopti_plus des gewählten Ordners geschrieben.",
+	"paths_editor.hint_logs_dir": "Die Protokolle werden in einen eigenen Unterordner des gewählten Ordners geschrieben.",
 	"paths_editor.subtitle": "Alle persönlichen Dateien (Shortcuts, Hotstrings…) werden aus diesem Ordner geladen.",
 	"paths_editor.tag_default": "Standard",
 	"paths_editor.default_label": "Standard:",

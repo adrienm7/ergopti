@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "Caminhos",
 	"paths_editor.label_config_dir": "Pasta de configuração",
 	"paths_editor.label_logs_dir": "Pasta de logs",
-	"paths_editor.hint_logs_dir": "Os logs são gravados em uma subpasta ergopti_plus da pasta escolhida.",
+	"paths_editor.hint_logs_dir": "Os logs são gravados em uma subpasta própria da pasta escolhida.",
 	"paths_editor.subtitle": "Todos os ficheiros pessoais (atalhos, hotstrings…) são resolvidos a partir desta pasta.",
 	"paths_editor.tag_default": "padrão",
 	"paths_editor.default_label": "Padrão:",

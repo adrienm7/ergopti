@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "Cesty",
 	"paths_editor.label_config_dir": "Konfigurační složka",
 	"paths_editor.label_logs_dir": "Složka protokolů",
-	"paths_editor.hint_logs_dir": "Protokoly se zapisují do podsložky ergopti_plus ve zvolené složce.",
+	"paths_editor.hint_logs_dir": "Protokoly se zapisují do vlastní podsložky ve zvolené složce.",
 	"paths_editor.subtitle": "Všechny osobní soubory (zkratky, hotstring…) jsou načítány z této složky.",
 	"paths_editor.tag_default": "výchozí",
 	"paths_editor.default_label": "Výchozí:",
