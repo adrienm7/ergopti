@@ -147,7 +147,7 @@ if "$receipt_present"; then
 	cp -p -- "$manifest" "$receipt_previous"
 	receipt_tmp="$(mktemp "$manifest.XXXXXX")"
 	cp -p -- "$receipt_previous" "$receipt_tmp"
-	while IFS=$'\t' read -r digest relative; do
+	while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
 		if [ "$relative" != @autostart ]; then printf '%s\t%s\n' "$digest" "$relative"; fi
 	done < "$receipt_previous" > "$receipt_tmp"
 	digest="$(sha256sum < "$desktop_tmp")"

@@ -1008,7 +1008,7 @@ if [ -z "$NATIVE_LUV_STAGE" ] && [ -f "${LIB_DIR}/.ergopti-owned-files" ] \
 	&& [ -f "${LIB_DIR}/linux/native_modules/luv.so" ] \
 	&& [ ! -L "${LIB_DIR}/linux/native_modules/luv.so" ]; then
 	NATIVE_LUV_EXISTING_DIGEST="$(sha256sum < "${LIB_DIR}/linux/native_modules/luv.so")"
-	while IFS=$'\t' read -r prior_digest prior_relative; do
+	while IFS=$'\t' read -r prior_digest prior_relative || [ -n "$prior_digest$prior_relative" ]; do
 		if [ "$prior_relative" = "linux/native_modules/luv.so" ] \
 			&& [ "$prior_digest" = "${NATIVE_LUV_EXISTING_DIGEST%% *}" ]; then
 			NATIVE_LUV_RETAINED_DIGEST="$prior_digest"
@@ -1053,7 +1053,7 @@ if [ -n "$NATIVE_OUTPUT_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then
 	# actual installed bytes need their own canonical ownership entry.
 	NATIVE_OUTPUT_DIGEST="$(sha256sum < "${LIB_DIR}/linux/bin/libergopti_archive_publication.so")"
 	NATIVE_OUTPUT_MANIFEST="$(mktemp "${LIB_DIR}/.ergopti-owned-native.XXXXXX")"
-	while IFS=$'\t' read -r native_digest native_relative; do
+	while IFS=$'\t' read -r native_digest native_relative || [ -n "$native_digest$native_relative" ]; do
 		[ "$native_relative" = "linux/bin/libergopti_archive_publication.so" ] && continue
 		[ "$native_relative" = "linux/native_modules/luv.so" ] && continue
 		printf '%s\t%s\n' "$native_digest" "$native_relative" >> "$NATIVE_OUTPUT_MANIFEST"

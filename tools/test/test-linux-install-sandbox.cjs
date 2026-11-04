@@ -732,6 +732,39 @@ for (const kind of [
 	}
 }
 
+// A valid receipt's last row remains authoritative without a trailing newline.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		seed(home) {
+			const library = path.join(home, '.local/lib/ergopti');
+			const module = path.join(library, 'linux/native_modules/luv.so');
+			fs.mkdirSync(path.dirname(module), { recursive: true });
+			fs.writeFileSync(module, 'previous native module');
+			const digest = createHash('sha256').update(fs.readFileSync(module)).digest('hex');
+			fs.writeFileSync(
+				path.join(library, '.ergopti-owned-files'),
+				`${digest}\tlinux/native_modules/luv.so`
+			);
+		}
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+		const receipt = fs.readFileSync(
+			path.join(run.home, '.local/lib/ergopti/.ergopti-owned-files'),
+			'utf8'
+		);
+		assert.ok(
+			receipt.includes('\tlinux/native_modules/luv.so\n'),
+			'retained native module remains owned'
+		);
+		verifyOwnership(run, receipt, path.join(run.home, '.local'), false);
+	} finally {
+		run.cleanup();
+	}
+}
+
 // Reinstalling over this prefix's own launcher remains supported.
 {
 	const run = runInstaller({
