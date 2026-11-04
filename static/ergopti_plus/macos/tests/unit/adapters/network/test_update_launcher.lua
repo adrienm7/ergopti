@@ -26,7 +26,7 @@ local function load_subject(open_url, alert)
 		block_alert = alert or function(...) dialogs[#dialogs + 1] = { ... }; return "OK" end,
 	}
 	package.loaded["adapters.application_notifier"] = {
-		send = function(...) notifications[#notifications + 1] = { ... } end,
+		send = function(...) notifications[#notifications + 1] = { ... }; return true end,
 	}
 	local subject = helpers.load_with_stubs("adapters.update_launcher", {
 		urlevent = { openURL = open_url },
@@ -105,6 +105,20 @@ helpers.describe("update_launcher: exact native updater command", function()
 		local subject, _, _, notifications = load_subject(function() return false end, function() return nil end)
 		helpers.assert_eq(subject.request_check("main"), false)
 		helpers.assert_eq(#notifications, 1, "a modal without a result must fall back")
+	end)
+
+	helpers.it("contains a failed fallback notification", function()
+		for _, failure in ipairs({ "throw", "refuse" }) do
+			local subject, errors = load_subject(function() return false end, function() error("dialog unavailable") end)
+			package.loaded["adapters.application_notifier"].send = function()
+				if failure == "throw" then error("notification unavailable") end
+				return false
+			end
+			local ok, sent = pcall(subject.request_check, "main")
+			helpers.assert_true(ok, "notification failure must not escape the adapter")
+			helpers.assert_eq(sent, false)
+			helpers.assert_eq(#errors, 2, "both the failed check and failed notification must be logged")
+		end
 	end)
 
 	helpers.it("falls back to a notification when the modal boundary throws", function()

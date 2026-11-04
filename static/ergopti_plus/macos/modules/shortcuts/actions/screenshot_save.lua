@@ -167,6 +167,21 @@ local function finish_operation(operation)
 	return true
 end
 
+--- Keeps allocation owned until its pathname can be cleaned after a pause.
+local function allocate_capture_file(operation)
+	if not operation_is_authorized(operation) then return nil, nil, true end
+	operation.acquisitions = operation.acquisitions + 1
+	local ok, path, detail = pcall(FileSystem.create_secure_temp_file)
+	if ok and type(path) == "string" and path ~= "" then operation.temp_path = path end
+	operation.acquisitions = operation.acquisitions - 1
+	if not operation_is_authorized(operation) then
+		finish_operation(operation)
+		return nil, nil, true
+	end
+	if not operation.temp_path then return nil, ok and detail or path, false end
+	return operation.temp_path, nil, false
+end
+
 local function create_operation(label, parent)
 	local scope_id = action_parent(parent)
 	if not screenshot_admission_open(scope_id) then return nil end
@@ -519,15 +534,15 @@ function M.capture(flags, parent)
 	local operation = create_operation("clipboard screenshot", scope_id)
 	if not operation then return false end
 
-	local allocated, target, allocation_detail = pcall(FileSystem.create_secure_temp_file)
-	if not allocated or type(target) ~= "string" or target == "" then
+	local target, allocation_detail, cancelled = allocate_capture_file(operation)
+	if cancelled then return false end
+	if not target then
 		report_operation_failure(operation, "temporary file allocation",
-			allocated and allocation_detail or target, "shortcuts.screenshot_clipboard_failed")
+			allocation_detail, "shortcuts.screenshot_clipboard_failed")
 		operation.authorized = false
 		finish_operation(operation)
 		return false
 	end
-	operation.temp_path = target
 
 	local args = {}
 	for _, flag in ipairs(flags) do args[#args + 1] = tostring(flag) end
@@ -622,15 +637,15 @@ function M.capture_image(flags, parent, max_edge, on_image)
 	if not operation then return false end
 	operation.quiet = true
 
-	local allocated, target, allocation_detail = pcall(FileSystem.create_secure_temp_file)
-	if not allocated or type(target) ~= "string" or target == "" then
+	local target, allocation_detail, cancelled = allocate_capture_file(operation)
+	if cancelled then return false end
+	if not target then
 		Logger.error(LOG, "Screen reading capture refused: no temporary file (%s).",
-			tostring(allocated and allocation_detail or target))
+			tostring(allocation_detail))
 		operation.authorized = false
 		finish_operation(operation)
 		return false
 	end
-	operation.temp_path = target
 
 	--- Hands the capture to the caller.
 	--- @param data string|nil The file bytes already read, nil to read the file now.
