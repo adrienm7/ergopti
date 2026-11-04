@@ -726,7 +726,10 @@ _PESORT_Case(Operation) {
 		Cohort: _PersonalEditorEntryCohort, Busy: _PersonalEditorEntryBusy,
 		Critical: A_IsCritical, Suspended: A_IsSuspended, Responder: TestMsgBoxResponder()}
 	HadTotal := IsSet(_HS_GrandTotalCache), SavedTotal := HadTotal ? _HS_GrandTotalCache : unset
-	Fixture := _ScopeOwnerFixture(), RegistryScope := 0, Window := 0, CloseHwnd := 0
+	IsDefault := Operation == "default-missing" || Operation == "default-live"
+	Fixture := IsDefault ? _ScopeOwnerFixture('[personal_editor]`ndefault_section = "'
+		. (Operation == "default-missing" ? "deleted_section" : "alpha") . '"`n') : _ScopeOwnerFixture()
+	RegistryScope := 0, Window := 0, CloseHwnd := 0
 	Primary := 0, CleanupFailure := 0, WindowEpoch := 0
 	State := {HeaderClicks: 0, HeaderColumn: 0, Selections: 0, Confirmations: 0, Confirmation: "", Entered: 0}
 	Source := '[_meta]`ndescription = "Native sort owner fixture"`nsections_order = ["alpha"]`n'
@@ -744,16 +747,21 @@ _PESORT_Case(Operation) {
 		_PersonalEditorGui := "", _PersonalEditorOpeningSource := false
 		_PersonalEditorEntryCohort := 0, _PersonalEditorEntryBusy := false
 		AssertTrue(FSWriteDurable(PersonalTomlPath(), Source))
-		OpenPersonalEditor("alpha")
+		if IsDefault
+			OpenPersonalEditor()
+		else
+			OpenPersonalEditor("alpha")
 		Window := _PersonalEditorGui
 		CloseHwnd := Window.Hwnd, WindowEpoch := _PersonalEditorSessionEpoch
 		AssertTrue(Window is Gui && _PersonalEditorOpeningSource["window"] == Window,
 			"The production native constructor must publish its own actual source and controls")
-		List := 0, Edits := [], Button := 0, ButtonY := -1
+		List := 0, Drop := 0, Edits := [], Button := 0, ButtonY := -1
 		Caption := t(Operation == "save" ? "editor.hotstrings.btn_edit" : "editor.hotstrings.btn_delete_entry")
 		for Control in Window {
 			if Control.Type == "ListView"
 				List := Control
+			if Control.Type == "DropDownList"
+				Drop := Control
 			if Control.Type == "Edit"
 				Edits.Push(Control)
 			if Control.Type == "Button" && Control.Text == Caption {
@@ -763,6 +771,22 @@ _PESORT_Case(Operation) {
 			}
 		}
 		AssertTrue(IsObject(List) && Edits.Length == 3 && IsObject(Button))
+		if IsDefault {
+			AssertTrue(IsObject(Drop))
+			AssertEqual(1, Drop.Value, "The genuine dropdown must already display the first live section")
+			AssertEqual("Alpha", Drop.Text)
+			AssertEqual(2, _PersonalEditorData["sections"]["alpha"]["entries"].Length,
+				"The original parser must really load the source entries before the GUI projects them")
+			AssertTrue(FSUtf8ExactMatches(ConfigurationFile, Fixture.source), "Opening cannot repair the stale preference by writing config")
+			AssertTrue(FSUtf8ExactMatches(PersonalTomlPath(), Source), "Opening cannot modify personal entries")
+			_TestPrint("# personal-native-default mode=" . Operation . " pointer=" . _PersonalEditorSection . " dropdown=" . Drop.Text
+				. " source_entries=" . _PersonalEditorData["sections"]["alpha"]["entries"].Length . " visible_entries=" . List.GetCount())
+			AssertEqual(2, List.GetCount(), "A stale saved section cannot hide every entry of the section already shown by the native dropdown")
+			AssertEqual("alpha", _PersonalEditorSection, "The selected model pointer and dropdown must describe the same live section")
+			AssertEqual("zeta_native_sort", List.GetText(1, 1))
+			AssertEqual("alpha_native_sort", List.GetText(2, 1))
+			return
+		}
 		AssertEqual(2, List.GetCount())
 		AssertEqual("zeta_native_sort", List.GetText(1, 1), "The source order must really differ from lexical order")
 		AssertEqual("alpha_native_sort", List.GetText(2, 1))
@@ -873,3 +897,7 @@ _PESORT_Case(Operation) {
 for _PESORT_Mode in ["save", "delete"]
 	Test("Personal editor native sort: " . _PESORT_Mode . " retains the visibly selected durable entry (personal-native-sort-owner)",
 		_PESORT_Case.Bind(_PESORT_Mode))
+
+for _PEDEFAULT_Mode in ["default-missing", "default-live"]
+	Test("Personal editor native default: " . _PEDEFAULT_Mode . " keeps the displayed section entries visible (personal-native-default-owner)",
+		_PESORT_Case.Bind(_PEDEFAULT_Mode))
