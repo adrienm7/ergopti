@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **36 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **37 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -613,3 +613,17 @@ an admitted control passed, while the revoked dispatcher emitted one tap
 instead of zero. These are one gesture-authority family, counted once.
 Source fixes are `7b0d49c` and `8ecf909`. The 99-case owner qualification
 and post-fix dispatch replay remain pending at this documentation checkpoint.
+
+## AHK-037: A raced physical modifier restoration loses its failed balancing release
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+TapHoldRestoreLiftedKey in platform/remap/constants.ahk directly sends a compensating Up after detecting a physical release racing its successful scalar re-press. Unlike failed Array-acquisition rollback, this independent producer never transfers the proven Down to the release-pending ledger when that Up fails.
+
+Reproduction: On a Kana layout, run the genuine hotstring output lift around a delivered user-held AltGr. Release the physical key immediately after its synthetic restoration Down succeeds, then refuse the compensating Up. Native run41895428966 atd17134a05d7dcea57f92ff0dbf2b6bc3e7f80540 reproduces the missing pending-release assertion in both controls, individually and reversed.
+
+Consequence: The restored modifier can remain logically down after the user lets go. Suspend or shutdown reports no outstanding key and never retries the missing balancing Up.
+
+Regression: Two reachable raced-repress-release-debt cases run the actual hotstring lift/restore path on the production Kana key mapping with an explicit passive transport and physical-state observations. They distinguish successful delivery from refused attempts, require retained debt through refused real lifecycle cleanup, and verify subsequent cleanup or a fresh owner repairs it before further acquisition. Native fail-before proof is retained; post-fix native execution remains pending.
+
+The ongoing register now contains **37 distinct new findings**. The requested target of 1,000 remains unmet.
