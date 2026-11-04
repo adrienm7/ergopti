@@ -857,7 +857,8 @@ function M.emit(code, value)
 	end
 	if _busy or _debt or _transaction ~= nil then return false end
 	if _output ~= nil then return emit_owned(_output.capability, code, value) end
-	if type(code) ~= "number" or type(value) ~= "number" then
+	if type(code) ~= "number" or code ~= math.floor(code) or code < 1 or code > KEY_CODE_MAX
+		or (value ~= 0 and value ~= 1 and value ~= 2) then
 		Logger.error(LOG, "emit(): invalid arguments — code=%s value=%s.",
 			tostring(code), tostring(value))
 		return false
