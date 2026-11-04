@@ -489,6 +489,49 @@ helpers.describe("Linux system actions", function()
 		if not ok then error(err, 0) end
 	end)
 
+	for _, variant in ipairs({ "empty-success", "partial-failure" }) do
+		helpers.it("saved screenshots continue after " .. variant .. " from the first tool", function()
+			local target = os.tmpname()
+			os.remove(target)
+			assert(os.execute("mkdir '" .. target .. "'") == 0)
+			local old_getenv = os.getenv
+			os.getenv = function(key) if key == "XDG_PICTURES_DIR" then return target end; return old_getenv(key) end
+			local ok, err = pcall(function()
+				local command = backgrounded(Gestures, "screenshot_fullscreen_save")
+				local log = run_with_stubs(command, {
+					grim = variant == "empty-success" and "exit 0" or 'printf partial > "$1"; exit 1',
+					["gnome-screenshot"] = 'printf GOOD > "$2"', spectacle = "exit 1", maim = "exit 1",
+				})
+				helpers.assert_true(log:find("gnome%-screenshot") ~= nil, "fallback must run: " .. log)
+				local pipe = assert(io.popen("cat '" .. target .. "'/*.png 2>/dev/null"))
+				helpers.assert_eq(pipe:read("*a"), "GOOD")
+				pipe:close()
+			end)
+			os.getenv = old_getenv
+			os.execute("rm -rf '" .. target .. "'")
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("does not retain an earlier failed tool's partial screenshot", function()
+		local target = os.tmpname()
+		os.remove(target)
+		assert(os.execute("mkdir '" .. target .. "'") == 0)
+		local old_getenv = os.getenv
+		os.getenv = function(key) if key == "XDG_PICTURES_DIR" then return target end; return old_getenv(key) end
+		local ok, err = pcall(function()
+			local command = backgrounded(Gestures, "screenshot_fullscreen_save")
+			run_with_stubs(command, { grim = 'printf partial > "$1"; exit 1',
+				["gnome-screenshot"] = "exit 0", spectacle = "exit 1", maim = "exit 1" })
+			local pipe = assert(io.popen("find '" .. target .. "' -mindepth 1 -print"))
+			helpers.assert_eq(pipe:read("*a"), "", "partial data cannot masquerade as a later success")
+			pipe:close()
+		end)
+		os.getenv = old_getenv
+		os.execute("rm -rf '" .. target .. "'")
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("screen_capture_instant saves the active window like screenshot_window_save (action-parity-linux-system)",
 		function()
 			local instant = backgrounded(Gestures, "screen_capture_instant")

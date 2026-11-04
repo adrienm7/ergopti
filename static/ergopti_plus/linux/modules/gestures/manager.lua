@@ -491,24 +491,33 @@ local function screenshot_to_clipboard(capture, writer)
 		.. writer .. ' < "$f" )'
 end
 
+-- Each candidate gets an empty reserved destination: a later command's
+-- successful exit cannot turn an earlier command's partial output into a PNG.
+local function screenshot_to_file(capture)
+	return "{ : > %s && " .. capture .. " %s && [ -s %s ]; }"
+end
+
 local SCREENSHOT_COMMANDS = {
 	["screenshot_fullscreen_clipboard"] =
 		screenshot_to_clipboard("grim", "wl-copy --type image/png")
 		.. " || gnome-screenshot -c || spectacle -bnc || "
 		.. screenshot_to_clipboard("maim", "xclip -selection clipboard -t image/png"),
 	["screenshot_fullscreen_save"] =
-		"grim %s || gnome-screenshot -f %s || spectacle -bno %s || maim %s",
+		screenshot_to_file("grim") .. " || " .. screenshot_to_file("gnome-screenshot -f")
+		.. " || " .. screenshot_to_file("spectacle -bno") .. " || " .. screenshot_to_file("maim"),
 	["screenshot_region_clipboard"] =
 		screenshot_to_clipboard('grim -g "$(slurp)"', "wl-copy --type image/png")
 		.. " || gnome-screenshot -ac || spectacle -bnrc || "
 		.. screenshot_to_clipboard("maim -s", "xclip -selection clipboard -t image/png"),
 	["screenshot_region_save"] =
-		"grim -g \"$(slurp)\" %s || gnome-screenshot -af %s || spectacle -bnro %s || maim -s %s",
+		screenshot_to_file('grim -g "$(slurp)"') .. " || " .. screenshot_to_file("gnome-screenshot -af")
+		.. " || " .. screenshot_to_file("spectacle -bnro") .. " || " .. screenshot_to_file("maim -s"),
 	["screenshot_window_clipboard"] =
 		"gnome-screenshot -wc || spectacle -bnac || "
 		.. screenshot_to_clipboard('maim -i "$(xdotool getactivewindow)"', "xclip -selection clipboard -t image/png"),
 	["screenshot_window_save"] =
-		"gnome-screenshot -wf %s || spectacle -bnao %s || maim -i \"$(xdotool getactivewindow)\" %s",
+		screenshot_to_file("gnome-screenshot -wf") .. " || " .. screenshot_to_file("spectacle -bnao")
+		.. " || " .. screenshot_to_file('maim -i "$(xdotool getactivewindow)"'),
 }
 -- The frontmost window saved at once, with no selection: what macOS and
 -- Windows name screen_capture_instant is this driver's window capture.
