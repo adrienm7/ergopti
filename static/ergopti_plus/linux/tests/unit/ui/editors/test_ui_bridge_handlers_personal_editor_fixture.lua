@@ -95,6 +95,24 @@ helpers.describe("personal editor opening-source admission", function()
 		end)
 	end
 
+	for _, mode in ipairs({ "missing_entries", "invalid_entries", "missing_output", "invalid_output" }) do
+		helpers.it("(personal-save-entries) refuses incomplete entry model: " .. mode, function()
+			with_opening_file(function(f)
+				helpers.assert_true(f.ready())
+				local data = opening_model("edited")
+				local section = data.sections.english
+				if mode == "missing_entries" then section.entries = nil
+				elseif mode == "invalid_entries" then section.entries = "invalid"
+				elseif mode == "missing_output" then section.entries[1].output = nil
+				else section.entries[1].output = {} end
+				local result = f.handler.on_message({ action = "save", data = data }, f.state, f.context)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(f.read(), OPENING_SOURCE)
+				helpers.assert_eq(f.seen.writes, 0)
+			end)
+		end)
+	end
+
 	helpers.it("refuses a foreign section added after the actual displayed model", function()
 		with_opening_file(function(f)
 			helpers.assert_eq(f.ready(), true)
