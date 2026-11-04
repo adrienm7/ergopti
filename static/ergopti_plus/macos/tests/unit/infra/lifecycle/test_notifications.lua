@@ -159,6 +159,33 @@ helpers.describe("notifications.notify", function()
 		helpers.assert_eq(focused, 0, "the app must not steal focus from the place the notice opens")
 	end)
 
+	helpers.it("does not redeliver an already retired notification click (notification-click-once)", function()
+		local click
+		_G.hs.notify.new = function(callback)
+			click = callback
+			local native = {}
+			native.send = function() return native end
+			return native
+		end
+		local actions = 0
+		helpers.assert_true(notifications.notify("approve", nil, "warning", function() actions = actions + 1 end))
+		click()
+		click()
+		helpers.assert_eq(actions, 1, "a retired notification must not repeat its action")
+		local scheduler = require("adapters.timer_scheduler")
+		local previous_after = scheduler.after
+		local expire
+		scheduler.after = function(_, callback) expire = callback; return {}, true end
+		local ok, err = pcall(function()
+			helpers.assert_true(notifications.notify("late", nil, "warning", function() actions = actions + 1 end))
+			expire()
+			click()
+			helpers.assert_eq(actions, 1, "a queued click must not revive an expired owner")
+		end)
+		scheduler.after = previous_after
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("refuses a click action that is not a function", function()
 		local dispatched, detail = notifications.notify("approve", nil, "warning", "open")
 		helpers.assert_eq(dispatched, false)
