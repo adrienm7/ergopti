@@ -35,6 +35,21 @@ helpers.describe("i18n persistence", function()
   -- ==========================================================================
 
   helpers.describe("locale discovery", function()
+    helpers.it("(locale-order-close) falls back when the order stream close is refused", function()
+      local reader, directory, paths = require("infra.regular_file_reader"), require("infra.native_directory"), require("infra.paths")
+      local original_open, original_entries, original_shared = reader.open_source, directory.entries, paths.shared
+      reader.open_source = function()
+        return { read = function() return '{"order":["fr","en"]}' end, close = function() return nil, "close failed" end }
+      end
+      directory.entries = function() return { { name = "fr.json", kind = "file" }, { name = "en.json", kind = "file" } } end
+      paths.shared = function(name) if name == "data" or name == "data/locales" then return "/synthetic" end; return original_shared(name) end
+      local ok, err = pcall(function()
+        local i18n = helpers.load_module("infra.i18n")
+        helpers.assert_eq(i18n.list_locales(), { "en", "fr" })
+      end)
+      reader.open_source, directory.entries, paths.shared = original_open, original_entries, original_shared
+      if not ok then error(err, 0) end
+    end)
     helpers.it("native-locale-catalog: only actual locale files establish availability", function()
       local shell = require("adapters.shell_runner")
       helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
