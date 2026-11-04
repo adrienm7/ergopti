@@ -110,6 +110,19 @@ helpers.describe("numeric prompt: opening it", function()
 		helpers.assert_eq(#webview.shown, 0)
 	end)
 
+	helpers.it("(numeric-prompt-finite) refuses non-finite values and bounds before opening", function()
+		for _, field in ipairs({ "value", "min", "max" }) do
+			for _, invalid in ipairs({ 0 / 0, math.huge, -math.huge }) do
+				Prompt._reset()
+				local webview = fake_webview()
+				local request = { value = 0.5, min = 0, max = 1, on_save = function() end }
+				request[field] = invalid
+				helpers.assert_eq(Prompt.ask(request, webview), false)
+				helpers.assert_eq(#webview.shown, 0)
+			end
+		end
+	end)
+
 	helpers.it("refuses a request with no callback", function()
 		Prompt._reset()
 		local webview = fake_webview()
@@ -144,6 +157,19 @@ end)
 -- =================================================================
 
 helpers.describe("numeric prompt: the value that comes back", function()
+	helpers.it("(numeric-prompt-finite) refuses non-finite answers before calling the setter", function()
+		Prompt._reset()
+		local received = 0
+		helpers.assert_true(Prompt.ask({ value = 0.5, min = 0, max = 1,
+			on_save = function() received = received + 1 end }, fake_webview()))
+		local epoch = Prompt.on_message("ready", {}).request.request_epoch
+		for _, invalid in ipairs({ 0 / 0, math.huge, -math.huge }) do
+			local result = Prompt.on_message({ action = "save", value = invalid, request_epoch = epoch }, {})
+			helpers.assert_eq(result.saved, false)
+		end
+		helpers.assert_eq(received, 0)
+		Prompt._reset()
+	end)
 
 	helpers.it("hands an in-range value to the caller", function()
 		Prompt._reset()
