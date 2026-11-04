@@ -241,6 +241,28 @@ H.describe("metrics flush bridge", function()
 		H.assert_eq(F.c.writes, 1)
 		H.assert_eq(#F.pushed, 1)
 	end)
+	for _, invalid in ipairs({ "invalid", {}, math.huge, 3 }) do
+		H.it("(metrics-edit-score) rejects invalid score " .. type(invalid), function()
+			local F = fixture("metrics_apps")
+			F.read_safe()
+			local result = F.B.on_message({ action = "edit", app = "app", cat = "Work", score = invalid }, F.state, F.context)
+			H.assert_eq(result.saved, false)
+			H.assert_eq(F.c.writes, 0, "invalid input cannot overwrite a score")
+		end)
+	end
+
+	for _, field in ipairs({ "app", "cat" }) do
+		H.it("(metrics-edit-score) rejects non-text " .. field, function()
+			local F = fixture("metrics_apps")
+			F.read_safe()
+			local payload = { action = "edit", app = "app", cat = "Work", score = 1 }
+			payload[field] = {}
+			local result = F.B.on_message(payload, F.state, F.context)
+			H.assert_eq(result.saved, false)
+			H.assert_eq(F.c.writes, 0)
+		end)
+	end
+
 	H.it("rollback permits full data while category mutation refuses", function()
 		local F = fixture("metrics_apps")
 		F.B._push = function(reply) F.pushed[#F.pushed + 1] = reply return true end
