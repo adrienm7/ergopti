@@ -54,6 +54,38 @@ local function with_store(callback)
 end
 
 helpers.describe("metrics-instant-open: dashboard", function()
+	helpers.it("refuses a snapshot its own reader would reject before replacing the cache", function()
+		with_store(function()
+			local snapshot = require("ui.metrics_typing.snapshot")
+			local previous_open, previous_rename = io.open, os.rename
+			local opens, renames = 0, 0
+			io.open = function()
+				opens = opens + 1
+				local file = {}
+				file.write = function(self) return self end
+				file.close = function() return true end
+				return file
+			end
+			os.rename = function() renames = renames + 1; return true end
+			local ok, err = xpcall(function()
+				for _, input in ipairs({
+					{payload = '{"manifest":', stamp = GENERATED_AT},
+					{payload = PAYLOAD, stamp = 0.5},
+					{payload = PAYLOAD, stamp = 0/0},
+					{payload = PAYLOAD, stamp = math.huge},
+				}) do
+					local called, saved = pcall(snapshot.save, input.payload, input.stamp)
+					helpers.assert_true(called, "invalid metadata must not escape the snapshot boundary")
+					helpers.assert_eq(saved, false)
+				end
+				helpers.assert_eq(opens, 0)
+				helpers.assert_eq(renames, 0, "a refused snapshot must preserve the last good cache")
+			end, debug.traceback)
+			io.open, os.rename = previous_open, previous_rename
+			if not ok then error(err) end
+		end)
+	end)
+
 	helpers.it("renders the cached snapshot before any aggregation, then replaces it", function()
 		with_store(function(t)
 			local saved = nil

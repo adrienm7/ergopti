@@ -1468,6 +1468,18 @@ window.initData = function (d) {
 	}
 };
 
+// A host preference change must not replace the user's unsaved document.
+window.updatePreferences = function (d) {
+	if (!d) return;
+	TRIGGER_CHAR = d.trigger_char || TRIGGER_CHAR;
+	compactView = !!d.compact_view;
+	autoClose = !!d.auto_close;
+	defaultSec = d.default_section || null;
+	updateHints();
+	updateCompactBtn();
+	render();
+};
+
 window.updateData = function (d) {
 	if (D && D.sections && d && d.sections) {
 		const m = {};

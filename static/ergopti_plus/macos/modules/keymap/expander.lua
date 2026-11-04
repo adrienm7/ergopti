@@ -1084,12 +1084,13 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	-- trigger is erased and the whole replacement typed, the net edit every
 	-- driver applies (no shared prefix is kept on screen). The typed event is on
 	-- screen only in an ignored window, where it is erased with the trigger.
-	-- A trigger shorter than the typed event (a multi-codepoint composed
-	-- character arriving as one event) cannot require a negative number of
-	-- on-screen deletions; the plan clamps it at zero.
+	-- When a consumed event contains text before the trigger, that text was
+	-- never delivered to the app. Re-emit it literally in the same transaction.
+	local event_prefix = ""
 	if not is_ignored and trig_len < char_len then
-		Logger.warn(LOG, "Trigger shorter than the typed event (%d < %d) — clamping deletes to 0.",
-			trig_len, char_len)
+		local ok, event_start = pcall(utf8.offset, active_buffer, -char_len)
+		if not ok or event_start == nil or event_start > tstart_byte then return false end
+		event_prefix = active_buffer:sub(event_start, tstart_byte - 1)
 	end
 	local injection = InjectionPlan.build({
 		path = InjectionPlan.PATH_AUTO, trigger_len = trig_len, event_len = char_len,
@@ -1098,7 +1099,12 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 
 	local replaced = M.perform_text_replacement(
 		injection.erase,
-		function() return emit_dispatch(m, injection.text) end,
+		function()
+			if event_prefix == "" then return emit_dispatch(m, injection.text) end
+			assert(SyntheticInput.emit_key_strokes(event_prefix), "composite event prefix could not be dispatched")
+			local count, echo, logical, delay = emit_dispatch(m, injection.text)
+			return text_utils.utf8_len(event_prefix) + count, event_prefix .. echo, event_prefix .. logical, delay
+		end,
 		function()
 			_state.buffer = active_buffer:sub(1, tstart_byte - 1) .. injection.buffer_suffix
 			forget_buffer_after_keys(m)

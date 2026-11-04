@@ -680,7 +680,15 @@ end
 function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
 		if not require_active_operation() then return false end
 
+		if pct_str ~= nil and type(pct_str) ~= "number" and type(pct_str) ~= "string" then
+			Logger.warn(LOG, "Invalid download progress was refused.")
+			return false
+		end
 		local pct = tonumber(pct_str) or 0
+		if pct ~= pct or pct == math.huge or pct == -math.huge then
+			Logger.warn(LOG, "Invalid download progress was refused.")
+			return false
+		end
 		local elapsed = TimerScheduler.awake_time() - (_start_ts or TimerScheduler.awake_time())
 
 		local dl_str, speed_str, eta_str, file_count_str
@@ -880,7 +888,10 @@ end
 --- @param pct number|nil Percentage in [0, 100], or nil for indeterminate.
 function M.set_progress(pct)
     if not require_active_operation() then return false end
-    if pct ~= nil and type(pct) ~= "number" then return end
+    if pct ~= nil and (type(pct) ~= "number" or pct ~= pct or pct < 0 or pct > 100) then
+        Logger.warn(LOG, "Invalid bootstrap progress was refused.")
+        return false
+    end
     note_progress("p|" .. tostring(pct))
     -- The model selector page shows a runtime install's progress in its group.
     if pct ~= nil and pct < 100 then tell_percent(math.floor(pct)) end

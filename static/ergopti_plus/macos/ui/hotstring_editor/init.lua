@@ -394,11 +394,16 @@ local function submit_data(owner, webview, method, data)
 	return executed and owner_is_current(owner)
 end
 
---- Pushes preferences through the exact current native owner.
+--- Pushes only preferences, preserving unsaved edits and the source snapshot.
 local function push_update_to_webview()
 	local owner, webview = _owner, _webview
 	if not owner_is_current(owner) or not webview then return end
-	submit_data(owner, webview, "updateData", load_js_data(_pending_mode))
+	submit_data(owner, webview, "updatePreferences", {
+		trigger_char = _prefs.trigger_char,
+		compact_view = _prefs.compact_view,
+		auto_close = _prefs.auto_close,
+		default_section = _prefs.default_section,
+	})
 end
 
 
