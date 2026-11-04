@@ -11,7 +11,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. The logger is not included: its file sink would write the maintainer's
-;    %LOCALAPPDATA%\ergopti_plus logs, which a test must never touch.
+;    %LOCALAPPDATA%\Ergopti logs, which a test must never touch.
 ; 2. The texts are the shipped English locale, so "refused in words" is asserted
 ;    on what a user would read.
 ; ==============================================================================

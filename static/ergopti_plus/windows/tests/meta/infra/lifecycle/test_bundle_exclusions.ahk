@@ -16,7 +16,7 @@
 ;    #Include (ErgoptiPlus.ahk resolves it from %LOCALAPPDATA%), so shipping it
 ;    only adds a stale hardcoded path with no benefit.
 ; 2. paths.toml is excluded the same way. The file contains a machine-specific
-;    ConfigDirPath override and lives under %APPDATA%\Ergopti\ at runtime — a
+;    ConfigDirPath override and lives under %LOCALAPPDATA%\Ergopti\ at runtime — a
 ;    development copy is always the developer's local path.
 ; tools/test/test-windows-bundle-manifest.cjs proves on the resolved selection
 ; that neither ships; this test keeps the declaration from being dropped.

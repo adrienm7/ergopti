@@ -532,7 +532,7 @@ TestTL_CategoryLogNameMasksUserCategories() {
 	SavedPaths := _HotstringExtensionPaths, SavedDir := _ConfigDir
 	Placeholder := LoggerUserNamePlaceholder()
 	try {
-		_ConfigDir := "D:\Private Folder\ergopti_plus\"
+		_ConfigDir := "D:\Private Folder\Ergopti\"
 		_HotstringExtensionPaths := Map("my_pack", _ConfigDir . "extensions\my_pack\my_pack.toml")
 		AssertEqual(Placeholder, HotstringCategoryLogName("my_pack"), "an extension under the configuration directory")
 		AssertEqual(Placeholder, HotstringCategoryLogName("a__b"), "a personal file's owner backs no shipped file")

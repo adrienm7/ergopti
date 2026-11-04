@@ -52,7 +52,7 @@ _TestResultsBeginRun()
 #Include ../_generated/app_dirs.ahk
 #Include ../infra/app_folders.ahk
 #Include ../infra/legacy_folder_migration.ahk
-global _LogsDir := A_Temp . "\ergopti_test_logs\ergopti_plus\"
+global _LogsDir := A_Temp . "\ergopti_test_logs\" . AppDirsFolderName() . "\"
 global _DefaultLogsDir := _LogsDir
 #Include ../infra/logger.ahk
 #Include ../adapters/file_system.ahk

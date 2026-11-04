@@ -23,7 +23,7 @@ No direct domain spec. Implements the schema defined in `_shared/data/KEYSTATS_S
 
 | Function                  | Description                                                    |
 | ------------------------- | -------------------------------------------------------------- |
-| `KL_Init(config_dir)`     | Initialize the keystats for the given config root directory    |
+| `KL_Init(metrics_dir)`    | Initialize the keystats for the given metrics directory        |
 | `KL_Start()`              | Arm the keystroke hook and start the ingest timer              |
 | `KL_Stop()`               | Disarm the hook and flush all pending buffers                  |
 | `KL_AppendLog(event_map)` | Append a single event to the in-memory buffer (hot path)       |
@@ -32,7 +32,7 @@ No direct domain spec. Implements the schema defined in `_shared/data/KEYSTATS_S
 ## Init pattern
 
 ```ahk
-KL_Init(A_AppData "\\ergopti_plus")
+KL_Init(KL_MetricsDirFor(_ConfigDir))
 KL_Start()
 ```
 

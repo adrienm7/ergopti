@@ -80,8 +80,8 @@ LLM_Menu_SetBackend(Id) {
 	_MBW_BackendSets.Push(Id)
 	return false
 }
-; No managed runtime is published under this folder name on a test runner.
-AppDirsWindowsManagedOllamaFolderName() => "ErgoptiModelBrowserRunnerNoManagedOllama"
+; No managed runtime is published under this folder on a test runner.
+AppFoldersManagedOllamaRoot() => A_Temp . "\ErgoptiModelBrowserRunnerNoManagedOllama"
 _LLM_Menu_ModelDisplayText() => ""
 _LLM_DefaultFor(Key, Default := "") => (Key == "llm_ollama_owned_port" ? 11435 : Default)
 _LLM_Menu_ApiEntryPageRows(Rows, Models, Listings := 0) => ""

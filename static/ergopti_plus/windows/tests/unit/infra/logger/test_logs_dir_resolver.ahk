@@ -10,9 +10,11 @@
 ;
 ; ROOT CAUSES ENCODED (logs-dir-resolver):
 ; 1. The folder was <ConfigDir>\autohotkey\logs\, re-derived in four places;
-;    it is now %LOCALAPPDATA%\ergopti_plus\logs\, or the LogsDirPath override.
-; 2. An override naming a folder the user merely picked gets an ergopti_plus
-;    subfolder, so retention never deletes in the user's own folder.
+;    it is now %LOCALAPPDATA%\Ergopti\logs\, or the LogsDirPath override.
+; 2. An override naming a folder the user merely picked gets an Ergopti
+;    subfolder (AppDirsFolderName), so retention never deletes in the user's
+;    own folder. The fixtures below spell that name through the generated
+;    accessor, so a renamed folder keeps them meaningful.
 ; 3. The errors file only exists once something warned that day; opening it
 ;    blindly made Notepad offer to create an empty file. The user is told.
 ; 4. Lines written before paths.toml is read (a yielding second instance, a
@@ -33,24 +35,25 @@
 ; ======================================
 
 _LDIR_DefaultIsLocalAppData() {
-	Expected := EnvGet("LOCALAPPDATA") . "\ergopti_plus\logs\"
+	Expected := EnvGet("LOCALAPPDATA") . "\Ergopti\logs\"
 	Assert(EnvGet("LOCALAPPDATA") != "", "the test host must define LOCALAPPDATA")
 	AssertEqual(Expected, LoggerDefaultLogsDir(),
 		"the default logs folder is local machine state, never the roaming profile")
 }
-Test("logs folder: the default is %LOCALAPPDATA%\ergopti_plus\logs (logs-dir-resolver)",
+Test("logs folder: the default is %LOCALAPPDATA%\Ergopti\logs (logs-dir-resolver)",
 	_LDIR_DefaultIsLocalAppData)
 
 _LDIR_OverrideIsNormalizedIntoAnOwnedFolder() {
-	Default := "C:\Default\ergopti_plus\logs\"
+	App := AppDirsFolderName()
+	Default := "C:\Default\" . App . "\logs\"
 	AssertEqual(Default, LoggerResolveLogsDir("", Default), "an empty override is the default")
-	AssertEqual(Default, LoggerResolveLogsDir("c:/default/ergopti_plus/logs", Default),
+	AssertEqual(Default, LoggerResolveLogsDir("c:/default/" . StrLower(App) . "/logs", Default),
 		"the default folder, however spelled, is not a foreign folder")
-	AssertEqual("D:\Sync\Logs\ergopti_plus\", LoggerResolveLogsDir("D:\Sync\Logs", Default),
+	AssertEqual("D:\Sync\Logs\" . App . "\", LoggerResolveLogsDir("D:\Sync\Logs", Default),
 		"a picked folder gets the application subfolder")
-	AssertEqual("D:\Sync\ergopti_plus\", LoggerResolveLogsDir("D:/Sync/ergopti_plus/", Default),
+	AssertEqual("D:\Sync\" . App . "\", LoggerResolveLogsDir("D:/Sync/" . App . "/", Default),
 		"a folder already named after the application is used as is")
-	AssertEqual("\\nas\share\ergopti_plus\", LoggerResolveLogsDir("\\nas\share", Default),
+	AssertEqual("\\nas\share\" . App . "\", LoggerResolveLogsDir("\\nas\share", Default),
 		"a UNC share is an absolute folder")
 	AssertEqual(Default, LoggerResolveLogsDir("relative\logs", Default),
 		"a relative override is refused and the default is used")
@@ -61,7 +64,7 @@ Test("logs folder: LogsDirPath resolves to a folder the application owns (logs-d
 _LDIR_EveryArtifactFollowsTheFolder() {
 	global _LogsDir
 	Saved := _LogsDir
-	_LogsDir := A_Temp . "\ergopti_ldir_artifacts\ergopti_plus\"
+	_LogsDir := A_Temp . "\ergopti_ldir_artifacts\" . AppDirsFolderName() . "\"
 	try {
 		Today := FormatTime(, "yyyy-MM-dd")
 		AssertEqual(_LogsDir, LoggerLogsDir())
@@ -86,22 +89,23 @@ _LDIR_PathsTomlKeepsTheLogsOverride() {
 	global _LogsDir, _DefaultLogsDir
 	SavedLogs := _LogsDir
 	SavedDefault := _DefaultLogsDir
+	App := AppDirsFolderName()
 	try {
 		Content := ConfigTransitionPathsTomlContent("C:\Config", "C:\Default\",
-			"D:\Sync\ergopti_plus\", "C:\Local\ergopti_plus\logs\")
+			"D:\Sync\" . App . "\", "C:\Local\" . App . "\logs\")
 		AssertContains(Content, 'ConfigDirPath = "C:/Config/"')
-		AssertContains(Content, 'LogsDirPath = "D:/Sync/ergopti_plus/"')
-		AssertContains(Content, "logs are written to: C:/Local/ergopti_plus/logs/")
+		AssertContains(Content, 'LogsDirPath = "D:/Sync/' . App . '/"')
+		AssertContains(Content, "logs are written to: C:/Local/" . App . "/logs/")
 		AssertFalse(InStr(ConfigTransitionPathsTomlContent("C:\Config", "C:\Default\"), "LogsDirPath ="),
 			"no override, no LogsDirPath line")
 		AssertThrows(() => ConfigTransitionPathsTomlContent("C:\Config", "C:\Default\", "relative"),
 			"an invalid logs folder must never reach paths.toml bytes")
 
-		_DefaultLogsDir := "C:\Local\ergopti_plus\logs\"
+		_DefaultLogsDir := "C:\Local\" . App . "\logs\"
 		_LogsDir := _DefaultLogsDir
 		AssertEqual("", ConfigTransitionCurrentLogsOverride(), "the default is never written as an override")
-		_LogsDir := "D:\Sync\ergopti_plus\"
-		AssertEqual("D:\Sync\ergopti_plus\", ConfigTransitionCurrentLogsOverride(),
+		_LogsDir := "D:\Sync\" . App . "\"
+		AssertEqual("D:\Sync\" . App . "\", ConfigTransitionCurrentLogsOverride(),
 			"a configuration-folder rewrite keeps the user's logs folder")
 	} finally {
 		_LogsDir := SavedLogs
@@ -119,7 +123,7 @@ _LDIR_BootstrapLinesGoToTheDefaultLogsFolder() {
 	try {
 		; A refused configuration transition: boot has named the default
 		; folder, paths.toml has not been read.
-		_DefaultLogsDir := Root . "\smoke\ergopti_plus\logs\"
+		_DefaultLogsDir := Root . "\smoke\" . AppDirsFolderName() . "\logs\"
 		Written := LoggerAppendBootstrapLine("ERROR", "ConfigTransition", "refused")
 		AssertEqual(_DefaultLogsDir . "bootstrap.log", Written,
 			"a line written before paths.toml is read lands in the default logs folder")
@@ -129,7 +133,7 @@ _LDIR_BootstrapLinesGoToTheDefaultLogsFolder() {
 		_DefaultLogsDir := ""
 		EnvSet("LOCALAPPDATA", Root . "\local")
 		Written := LoggerAppendBootstrapLine("WARNING", "ErgoptiPlus", "yielded")
-		AssertEqual(Root . "\local\ergopti_plus\logs\bootstrap.log", Written,
+		AssertEqual(Root . "\local\" . AppDirsWindowsLogsRelative() . "\bootstrap.log", Written,
 			"before boot, the OS-default logs folder is the sink, created on demand")
 		AssertContains(FileRead(Written, "UTF-8"), "[WARNING] [ErgoptiPlus] yielded")
 	} finally {
@@ -155,7 +159,7 @@ _LDIR_MissingErrorsFileIsAnnounced() {
 	global _LogsDir
 	Saved := _LogsDir
 	Root := A_Temp . "\ergopti_ldir_openers_" . A_TickCount
-	_LogsDir := Root . "\ergopti_plus\"
+	_LogsDir := Root . "\" . AppDirsFolderName() . "\"
 	Launched := []
 	Notified := []
 	RecordLaunch(Command) {
@@ -191,7 +195,7 @@ _LDIR_UndeliveredNoticeIsAFailure() {
 	global _LogsDir
 	Saved := _LogsDir
 	Root := A_Temp . "\ergopti_ldir_notice_" . A_TickCount
-	_LogsDir := Root . "\ergopti_plus\"
+	_LogsDir := Root . "\" . AppDirsFolderName() . "\"
 	Launched := []
 	RecordLaunch(Command) {
 		Launched.Push(Command)
@@ -215,7 +219,7 @@ _LDIR_OpenersUseTheResolver() {
 	global _LogsDir
 	Saved := _LogsDir
 	Root := A_Temp . "\ergopti_ldir_folder_" . A_TickCount
-	_LogsDir := Root . "\ergopti_plus\"
+	_LogsDir := Root . "\" . AppDirsFolderName() . "\"
 	Launched := []
 	RecordLaunch(Command) {
 		Launched.Push(Command)
