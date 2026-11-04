@@ -43,6 +43,31 @@ local function fake_channel(open)
 	return ch
 end
 
+helpers.describe("injector: unbrokered channel retirement", function()
+	helpers.it("retains an unbrokered channel when close is refused", function()
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		local attempts = 0
+		local channel = { close = function() attempts = attempts + 1; return attempts > 1 end }
+		injector._set_uinput(channel)
+		helpers.assert_eq(injector.close_fast_channel(), false)
+		helpers.assert_eq(attempts, 1)
+		helpers.assert_eq(injector.close_fast_channel(), true)
+		helpers.assert_eq(attempts, 2, "the original channel must remain available for retirement")
+	end)
+
+	helpers.it("does not forget a successor installed during channel close", function()
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		local closed = 0
+		local successor = { close = function() closed = closed + 1; return true end }
+		local original = { close = function() injector._set_uinput(successor); return true end }
+		injector._set_uinput(original)
+		helpers.assert_eq(injector.close_fast_channel(), false)
+		helpers.assert_eq(closed, 0)
+		helpers.assert_eq(injector.close_fast_channel(), true)
+		helpers.assert_eq(closed, 1, "the successor remains available to its own retirement")
+	end)
+end)
+
 
 
 
