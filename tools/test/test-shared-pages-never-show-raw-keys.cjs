@@ -250,11 +250,16 @@ const LINUX_BOOT_CASES = [
 /** Executes one actual boot script and checks the page's received locale data. */
 function assertLinuxBootDelivery(html, fixture) {
 	assert.equal(typeof html, 'string', 'Linux boot HTML must be a string');
-	const script = /^<script>([\s\S]*)<\/script>$/.exec(html);
-	assert.ok(script, 'Linux boot HTML must contain its executable script');
-	assert.equal((html.match(/<\/script>/gi) || []).length, 1, 'data must not end the script');
+	const open = '<script>';
+	const close = '</script>';
+	assert.ok(
+		html.startsWith(open) && html.endsWith(close),
+		'Linux boot HTML must be exactly its executable script'
+	);
+	// Any "</script" in any case ends the element in HTML, whatever follows it.
+	assert.equal((html.match(/<\/script/gi) || []).length, 1, 'data must not end the script');
 	const window = {};
-	vm.runInNewContext(script[1], { window }, { timeout: 1000 });
+	vm.runInNewContext(html.slice(open.length, -close.length), { window }, { timeout: 1000 });
 	assert.equal(window._i18n_locale, fixture.locale, 'Linux boot locale must reach the page');
 	assert.equal(window.__i18n_base, fixture.base, 'Linux boot base URL must preserve the path');
 	assert.equal(typeof window._i18n_strings, 'object', 'Linux boot catalogue must reach the page');
