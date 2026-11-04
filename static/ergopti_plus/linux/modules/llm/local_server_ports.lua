@@ -157,7 +157,8 @@ end
 M._read_cmdline = function(pid)
 	-- A vanished pid or a hidden one (hidepid) cannot be opened: no row
 	local file = io.open(M._proc_root .. "/" .. tostring(pid) .. "/cmdline", "rb")
-	return read_bounded(file, MAX_CMDLINE_BYTES)
+	-- A truncated final argument may look like a different valid port.
+	return read_bounded(file, MAX_CMDLINE_BYTES, true)
 end
 M._now_ms = function() return Monotonic.now_ms() end
 M._defer = function(fn) return TimerScheduler.after(0, fn).fired ~= true end
