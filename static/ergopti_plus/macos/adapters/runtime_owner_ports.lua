@@ -184,6 +184,51 @@ function M.block_notice(notify)
 	end
 end
 
+local approval_watch
+
+--- The one approval watch of this launch (platform/remap/runtime_approval_watch.lua).
+--- @return table watch
+local function approval()
+	approval_watch = approval_watch or require("platform.remap.runtime_approval_watch").new({
+		listing = function(callback)
+			FieldCheckPorts.exec("/usr/bin/systemextensionsctl", { "list" }, COMMAND_TIMEOUT, function(code, output)
+				callback(code == 0 and output or nil)
+			end)
+		end,
+		after = function(seconds, fn) return require("adapters.timer_scheduler").after(seconds, fn) end,
+		cancel = function(handle) return require("adapters.timer_scheduler").cancel(handle) end,
+		open_settings = function(url) return hs.urlevent.openURL(url) end,
+		reload = function() hs.reload() end,
+		version = M.virtual_hid_version,
+	})
+	return approval_watch
+end
+
+--- Builds the owner's state observer with the automatic steps of the first
+--- install (WP8): a missing runtime offers the install once by itself (one
+--- confirmation, then the macOS administrator prompt), and a driver waiting
+--- for approval opens its System Settings pane and reloads once it is allowed.
+--- Every other block keeps the one notice of M.block_notice.
+--- @param notify function fn(text) showing a notice.
+--- @return function observer fn(state, reason).
+function M.automatic_observer(notify)
+	local notice = M.block_notice(notify)
+	local offered = false
+	return function(state, reason)
+		if state == "unavailable" and not offered
+			and require("platform.remap").OWNED_INSTALL_REASONS[reason] == true then
+			offered = true
+			local committed = require("infra.deferred_work").after(0, function()
+				require("ui.owned_runtime_install").open(require("platform.remap"))
+			end, "owned_runtime_install.offer")
+			if committed == true then return end
+		elseif state == "unavailable" and reason == require("platform.remap.runtime_vhid").REASON_NOT_ACTIVE then
+			approval().start()
+		end
+		notice(state, reason)
+	end
+end
+
 --- The ports of the activation rule (platform/remap/runtime_activation.lua).
 --- @param owner table The bound runtime owner module.
 --- @param close_other_instances function fn() -> boolean, the user's consent.
@@ -236,7 +281,7 @@ function M.new()
 		},
 		capture = require("adapters.runtime_capture_port").new(),
 		timer = require("adapters.timer_scheduler"),
-		observer = M.block_notice(function(text)
+		observer = M.automatic_observer(function(text)
 			require("infra.notifications").notify(text, nil, "warning")
 		end),
 	}

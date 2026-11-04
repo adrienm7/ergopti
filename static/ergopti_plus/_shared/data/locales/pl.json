@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ Dotknięcie-przytrzymanie wstrzymane: zezwól na sterownik wirtualnej klawiatury Karabiner w Ustawieniach systemowych",
 	"menu.tapholds.vhid_update": "Zaktualizuj sterownik Karabiner dla Ergopti…",
 	"menu.tapholds.owned_not_installed": "⚠️ Tap-holdy są wyłączone: silnik przemapowania Ergopti nie jest jeszcze zainstalowany na tym Macu",
-	"menu.tapholds.owned_install": "Zainstaluj silnik przemapowania Ergopti…",
+	"menu.tapholds.owned_install": "Ponów instalację silnika przemapowania Ergopti…",
 	"menu.tapholds.owned_other_running": "⚠️ Tap-holdy są wyłączone: działa inny Karabiner; zaznacz wiersz poniżej lub go zamknij",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-holdy są wyłączone: nie udało się zamknąć Twojego Karabiner-Elements; zamknij go z ikony na pasku menu",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-holdy są wyłączone: nie udało się pobrać silnika przemapowania Ergopti; sprawdź połączenie i przeładuj Ergopti",

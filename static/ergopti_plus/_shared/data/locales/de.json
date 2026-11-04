@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ Tap-Holds pausiert: Erlaube den virtuellen Karabiner-Tastaturtreiber in den Systemeinstellungen",
 	"menu.tapholds.vhid_update": "Karabiner-Treiber für Ergopti aktualisieren…",
 	"menu.tapholds.owned_not_installed": "⚠️ Tap-Holds sind aus: Ergoptis Remapping-Engine ist auf diesem Mac noch nicht installiert",
-	"menu.tapholds.owned_install": "Ergoptis Remapping-Engine installieren…",
+	"menu.tapholds.owned_install": "Installation von Ergoptis Remapping-Engine erneut versuchen…",
 	"menu.tapholds.owned_other_running": "⚠️ Tap-Holds sind aus: ein anderes Karabiner läuft; aktiviere die Zeile unten oder beende es",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-Holds sind aus: dein Karabiner-Elements konnte nicht beendet werden; beende es über sein Menüleistensymbol",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-Holds sind aus: Ergoptis Remapping-Engine konnte nicht geladen werden; prüfe die Verbindung und lade Ergopti neu",

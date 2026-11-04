@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ Dokunma-basılı tutma duraklatıldı: Sistem Ayarları’nda Karabiner sanal klavye sürücüsüne izin verin",
 	"menu.tapholds.vhid_update": "Ergopti için Karabiner sürücüsünü güncelle…",
 	"menu.tapholds.owned_not_installed": "⚠️ Tap-hold kapalı: Ergopti’nin tuş eşleme motoru bu Mac’e henüz kurulmadı",
-	"menu.tapholds.owned_install": "Ergopti’nin yeniden eşleme motorunu yükle…",
+	"menu.tapholds.owned_install": "Ergopti’nin yeniden eşleme motorunu yüklemeyi yeniden dene…",
 	"menu.tapholds.owned_other_running": "⚠️ Tap-hold kapalı: başka bir Karabiner çalışıyor; aşağıdaki satırı işaretleyin ya da onu kapatın",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-hold kapalı: Karabiner-Elements kapatılamadı; menü çubuğundaki simgesinden çıkın",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-hold kapalı: Ergopti’nin tuş eşleme motoru indirilemedi; bağlantıyı denetleyip Ergopti’yi yeniden yükleyin",
