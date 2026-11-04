@@ -477,3 +477,17 @@ Consequence: A valid stored credential is blamed for transient service or endpoi
 Regression: Eleven reachable owner-level tests retain 400/401/403 authentication refusals and replay 404/405/408/413/429/503 through genuine exchange settlement, retained retry backoff and waiter reuse; 408/429 additionally exercise actual remote readiness and menu failure classification. Existing OAuth 400 and 401 authentication controls remain. Transport is a declared passive PostFn port; native AHK execution is pending.
 
 The ongoing register now contains **32 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-033: Log openers report no errors before buffered warnings reach disk
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+LogOpeners_OpenTodayErrors in static/ergopti_plus/windows/ui/log_openers.ahk checks FileExist without first settling the real logger queues. Warnings are intentionally buffered until the periodic flush. The main-log sibling likewise opens a stale disk snapshot. A flush return alone is insufficient because refused appends are requeued.
+
+Reproduction: Emit a real warning with the periodic logger flush not yet delivered, then immediately invoke the errors-log action; alternatively open the main log while that warning is still buffered.
+
+Consequence: The UI says no errors today despite an accepted warning, or opens a file missing the latest diagnostic. A locked sink can produce the same false answer unless retained delivery debt is checked.
+
+Regression: Six isolated owned native logger children cover main/errors, genuine native sharing denial with retained exactly-once retry, and an explicitly controlled busy-owner observation. Launch reads the genuine file at the action boundary and requires the warning; notification must remain unused. Existing resolver action tests isolate their own logger queues. Native Windows execution is pending; the original failure is source-derived.
+
+The ongoing register now contains **33 distinct new findings**. The requested target of 1,000 remains unmet.

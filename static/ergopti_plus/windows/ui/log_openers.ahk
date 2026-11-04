@@ -52,6 +52,8 @@ LogOpeners_OpenFolder(RunFn := 0) {
 ; @param RunFn {Func|Integer} Launch seam for tests; 0 means Run.
 ; @returns {Boolean}
 LogOpeners_OpenTodayLog(RunFn := 0) {
+	if !LoggerFlushForRead()
+		return false
 	(HasMethod(RunFn, "Call") ? RunFn : Run).Call('notepad.exe "' . LoggerTodayLogPath() . '"')
 	return true
 }
@@ -63,6 +65,8 @@ LogOpeners_OpenTodayLog(RunFn := 0) {
 ; @returns {Boolean} True when the file was opened or the user was told; false
 ;   when the notice was not delivered, since it is the whole answer to the click.
 LogOpeners_OpenTodayErrors(RunFn := 0, NotifyFn := 0) {
+	if !LoggerFlushForRead()
+		return false
 	Path := LoggerTodayErrorsPath()
 	if FileExist(Path) {
 		(HasMethod(RunFn, "Call") ? RunFn : Run).Call('notepad.exe "' . Path . '"')
