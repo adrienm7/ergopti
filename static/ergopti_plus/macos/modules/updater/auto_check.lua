@@ -150,7 +150,7 @@ end
 local function stored_interval(state, timing)
 	local raw = state[M.STATE_KEY]
 	if raw == nil then return timing.default_check_interval_sec end
-	if type(raw) ~= "number" or raw < 0 or raw ~= math.floor(raw) then
+	if type(raw) ~= "number" or raw < 0 or raw == math.huge or raw ~= math.floor(raw) then
 		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds.", tostring(raw))
 		return timing.default_check_interval_sec
 	end

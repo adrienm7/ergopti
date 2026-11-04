@@ -882,6 +882,7 @@ function M.stop_server()
 	if not _server and not _server_cleanup then return true end
 	Logger.debug(LOG, "Stopping HTTP server…")
 	if stop_owned_server("shutdown") ~= true then return false end
+	_caret = nil
 	Logger.info(LOG, "HTTP server stopped.")
 	return true
 end

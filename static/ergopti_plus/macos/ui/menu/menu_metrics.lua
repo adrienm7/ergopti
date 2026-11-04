@@ -124,16 +124,26 @@ function M.build(ctx)
 	-- menubar's 0.5 s timer while « tout est éteint », and restarts them on resume.
 	-- Without it the WPM timers kept polling get_live_stats() and re-rendering the
 	-- canvas under pause.
-	local paused = script_control and type(script_control.is_paused) == "function"
-		and script_control.is_paused() or false
 	-- Live pause state for the interactive toggle handlers below. They run at CLICK
 	-- time (later than this build), so re-derive pause then — toggling a WPM feature
 	-- ON while paused must record the preference but NOT arm the 0.2s render timer +
 	-- global mouse eventtap until resume (« pause = tout éteint », F-L10).
+	local pause_warning_logged = false
 	local function paused_now()
-		return script_control and type(script_control.is_paused) == "function"
-			and script_control.is_paused() or false
+		local ok, value = false, nil
+		if type(script_control) == "table" and type(script_control.is_paused) == "function" then
+			ok, value = pcall(script_control.is_paused)
+		end
+		if not ok or type(value) ~= "boolean" then
+			if not pause_warning_logged then
+				pause_warning_logged = true
+				Logger.warn(LOG, "Pause state is unavailable; WPM surfaces remain stopped.")
+			end
+			return true
+		end
+		return value
 	end
+	local paused = paused_now()
 
 	--- Persists one WPM state transition without letting a menu callback throw.
 	--- @param label string Diagnostic operation label.
