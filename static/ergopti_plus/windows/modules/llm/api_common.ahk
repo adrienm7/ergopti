@@ -494,6 +494,8 @@ _LLM_InvokeCallback(Fn, Name, Args*) {
     try {
         Fn(Args*)
     } catch as Err {
-        try LoggerError("LLM", "Callback '{1}' raised: {2}. This request is abandoned — nothing downstream retries it, so the user simply never sees a prediction.", Name, Err.Message)
+        ; Retain a useful source location without logging callback arguments.
+        Location := RegExReplace(Err.File, "^.*[\\/]", "") . ":" . Err.Line
+        try LoggerError("LLM", "Callback '{1}' raised: {2}. Location: {3}. This request is abandoned — nothing downstream retries it, so the user simply never sees a prediction.", Name, Err.Message, Location)
     }
 }
