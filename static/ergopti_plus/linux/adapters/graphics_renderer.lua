@@ -69,6 +69,8 @@ local _gtk = nil
 -- The live window and its cached drawing state.
 local _window = nil
 local _destroying = false
+local _hiding = false
+local _showing = false
 local _surface_rows = nil
 local _style = nil
 local _size = { w = 0, h = 0 }
@@ -509,8 +511,7 @@ end
 ---   anchor table|nil    { type, x, y, h } from the anchoring cascade.
 ---   screen table        { x, y, w, h } the frame to clamp within.
 --- @return boolean True when something was drawn.
-function M.show(rows, opts)
-	if _destroying then return false end
+local function show_owned(rows, opts)
 	local g = bind()
 	if not g or type(rows) ~= "table" or #rows == 0 then return false end
 
@@ -543,23 +544,35 @@ function M.show(rows, opts)
 		screen_margin   = _style.layout.screen_margin,
 	})
 
-	window:resize(math.floor(size.w + 0.5), math.floor(size.h + 0.5))
-	window:move(math.floor(position.x + 0.5), math.floor(position.y + 0.5))
-	window:show_all()
+	if window:resize(math.floor(size.w + 0.5), math.floor(size.h + 0.5)) == false then return false end
+	if window:move(math.floor(position.x + 0.5), math.floor(position.y + 0.5)) == false then return false end
+	if window:show_all() == false then return false end
 	make_click_through(window)
-	window:queue_draw()
+	if window:queue_draw() == false then return false end
 	return true
+end
+
+function M.show(rows, opts)
+	if _destroying or _hiding or _showing then return false end
+	_showing = true
+	local called, result = pcall(show_owned, rows, opts)
+	_showing = false
+	if not called then error(result, 0) end
+	return result
 end
 
 --- Hides the preview.
 function M.hide()
-	if _destroying then return false end
+	if _destroying or _hiding or _showing then return false end
 	if not _window then return true end
+	local window = _window
+	_hiding = true
 	local ok, hidden = pcall(function()
-		_window:hide()
-		return _window:get_visible() == false
+		window:hide()
+		return window:get_visible() == false
 	end)
-	if not ok or hidden ~= true then
+	_hiding = false
+	if not ok or hidden ~= true or not rawequal(_window, window) then
 		Logger.error(LOG, "Preview hide was not acknowledged.")
 		return false
 	end
@@ -575,7 +588,7 @@ end
 
 --- Destroys the window.
 function M.destroy()
-	if _destroying then return false end
+	if _destroying or _hiding or _showing then return false end
 	if not _window then return true end
 	local window = _window
 	_destroying = true
