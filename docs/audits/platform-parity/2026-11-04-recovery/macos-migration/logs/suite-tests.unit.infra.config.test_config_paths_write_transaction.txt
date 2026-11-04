@@ -1,0 +1,15 @@
+MODULE tests.unit.infra.config.test_config_paths_write_transaction
+
+=== ConfigPaths publishes only confirmed paths.toml writes ===
+  ok   rolls back when the target cannot be opened
+  ok   rolls back when write returns disk-full without raising
+  ok   rolls back when close reports a late flush failure
+
+=== ConfigPaths accepts only absolute config-directory overrides ===
+  ok   rejects '~/ErgoptiConfig' before filesystem mutation
+  ok   rejects 'relative/config' before filesystem mutation
+  ok   refuses an already-persisted relative override during initialization
+
+=== ConfigPaths protects the exact bootstrap snapshot ===
+  ok   preserves and adopts a foreign edit that lands before publication
+RESULT 7 passed 0 failed

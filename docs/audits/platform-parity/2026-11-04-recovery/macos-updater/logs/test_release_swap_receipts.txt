@@ -1,0 +1,26 @@
+Selecting exact test module: "tests.unit.modules.updater.lifecycle.test_release_swap_receipts"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.lifecycle.test_release_swap_receipts
+
+=== release swap physical command receipts ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_swap_receipts","name":"refuses a closed arming descriptor before touching applications (release-arming-write-refusal)","status":"pass","elapsed_ms":229.841579,"timing_error":""}
+  ok   refuses a closed arming descriptor before touching applications (release-arming-write-refusal)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_swap_receipts","name":"reports a refused replacement launch (release-swap-receipts)","status":"pass","elapsed_ms":300.915816,"timing_error":""}
+  ok   reports a refused replacement launch (release-swap-receipts)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_swap_receipts","name":"retains the previous app and reports a refused rollback (release-swap-receipts)","status":"pass","elapsed_ms":226.399137,"timing_error":""}
+  ok   retains the previous app and reports a refused rollback (release-swap-receipts)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_swap_receipts","name":"keeps a successful replacement and launch (release-swap-receipts)","status":"pass","elapsed_ms":226.443590,"timing_error":""}
+  ok   keeps a successful replacement and launch (release-swap-receipts)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_swap_receipts","name":"restores and opens the previous app after refused publication (release-swap-receipts)","status":"pass","elapsed_ms":238.790062,"timing_error":""}
+  ok   restores and opens the previous app after refused publication (release-swap-receipts)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.lifecycle.test_release_swap_receipts","name":"tests.unit.modules.updater.lifecycle.test_release_swap_receipts","status":"pass","elapsed_ms":1222.806470,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  5
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

@@ -1,0 +1,2 @@
+PASS metadata: 6 scopes, 17 unique OS-scoped IDs, 16 capability rows; source/TODO/shared groups/evidence/encoding/rendered table/links.
+Revision-pinned artifact validation only; no native, exhaustiveness or current-runtime certification.

@@ -1,0 +1,5 @@
+CONTROL normal public migration/real resolver preserves config bytes+unrelated bootstrap comment; second run no-op
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-eentsi_w/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-eentsi_w/Library/Application Support/Ergopti/paths.toml.
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-eentsi_w/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-eentsi_w/Library/Application Support/Ergopti/config.
+INFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-eentsi_w/Library/Application Support/ErgoptiPlus.
+INFO paths.toml now names the new default folders; its previous text is kept beside it.

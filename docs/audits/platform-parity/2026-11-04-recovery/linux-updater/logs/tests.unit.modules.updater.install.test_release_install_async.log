@@ -1,0 +1,18 @@
+
+=== Shared Async Release Installation ===
+  ok   legacy sibling literal success retains immediate completed behavior
+  ok   legacy sibling failure never starts a restart
+  ok   async admission holds running state without completed publication
+  ok   actual async failure keeps backup and never restarts
+  ok   async false admission is one failure without waiting for callback
+  ok   async truthy admission cannot manufacture completed installation
+  ok   async callback truthy string refuses actual success
+  ok   synchronous success before refused admission cannot authorize restart
+  ok   synchronous success before throwing admission cannot authorize restart
+  ok   duplicate completion cannot restart twice
+  ok   old failure callback cannot complete a successor release
+  ok   captured async port cannot borrow a later mutable replacement
+  ok   invalid optional async capability refuses constructor
+  ok   presentation retirement preserves already accepted installation completion
+  ok   synchronous success with literal admitted return restarts exactly once
+TOTAL 15 passed 0 failed

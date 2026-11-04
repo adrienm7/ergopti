@@ -1,0 +1,20 @@
+
+=== changelog_bridge: one-click release install ===
+  ok   announces the installed build and the restorable backup when the page is ready
+  ok   backs up first, then downloads, verifies, installs through the update path and restarts
+  ok   refuses a release without the Linux bundle, keeping the backup
+  ok   never installs an archive whose checksum does not match
+  ok   downloads nothing when the backup fails
+  ok   greys a source run and refuses its request without a backup
+  ok   greys a system-package installation
+  ok   refuses to install from the Atom feed, which lists no files
+  ok   restores a backup and restarts the daemon on it
+  ok   names why a restore failed and keeps the replaced configuration's backup
+
+=== updater: nothing installs without a click (Linux) ===
+  ok   a background check announces a newer release and downloads nothing
+
+=== changelog_bridge: captured post-backup resolver lineage ===
+  ok   resolves a missing asset only after preserving the actual configuration backup
+  ok   a resolver replaced during backup cannot supply successor asset authority
+TOTAL 13 passed 0 failed

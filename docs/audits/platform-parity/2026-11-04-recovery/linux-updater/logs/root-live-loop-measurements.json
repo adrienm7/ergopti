@@ -1,0 +1,25 @@
+{
+  "basis": "Actual install_owned/default smoke inside an active libuv callback with real private POSIX launcher and original native rollback. Not typical desktop latency.",
+  "observations": [
+    {
+      "slow": "false",
+      "elapsed_ms": "90.8",
+      "budget_ms": "250",
+      "ticks_before": "3",
+      "ticks_during": "0",
+      "ticks_after": "1",
+      "max_heartbeat_gap_ms": "101.0",
+      "installed": "true"
+    },
+    {
+      "slow": "true",
+      "elapsed_ms": "727.7",
+      "budget_ms": "250",
+      "ticks_before": "3",
+      "ticks_during": "0",
+      "ticks_after": "1",
+      "max_heartbeat_gap_ms": "738.0",
+      "installed": "false"
+    }
+  ]
+}

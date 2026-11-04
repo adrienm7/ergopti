@@ -1,0 +1,23 @@
+{
+	"schema_version": 1,
+	"scope": "linux-updater",
+	"audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+	"created_at": "2026-11-04",
+	"report_path": "docs/audits/platform-parity/2026-11-04-recovery/linux-updater/report.md",
+	"findings": [
+		{
+			"id": "LUR-001",
+			"title": "Owned async installation blocks the daemon event loop during an unbounded launcher smoke",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G4"],
+			"basis": "Actual install_owned + original default transaction/filesystem/ownership/smoke, real Linux LuaJIT renameat2 and libuv heartbeat, bounded scratch launcher; only previously admitted archive reader/factory is modeled. Independent root replay corroborates. No native desktop latency claim. Supplemental real running-libuv callback and pre/post ticks independently observed by root; all native effects remain private fixtures.",
+			"reproduction": "Run /workspace/scratch/parity-toolchain/ci-bin/luajit /workspace/scratch/parity-recovery/linux-updater/probes/smoke-blocks-loop.lua from static/ergopti_plus/linux. Healthy launcher succeeds. With actual candidate launcher sleep0.65, real shared InstallBudget250ms and10ms libuv heartbeat, call takes724.4ms and no heartbeat fires until return; then failure restores old tree. Root independently measured716.3ms. All effects confined to disposable fixture installation. Supplemental actual active-loop callback control: probes/smoke-live-loop.lua; three heartbeat ticks before entry, none during727.7ms slow call, resumed tick after, max gap738.0ms, original250ms budget; healthy90.8ms control succeeds. Initial fixture-clock setup failure retained separately.",
+			"root_cause": "linux/modules/updater/installer.lua:288-289 DEFAULT_OPS.smoke calls run_command -> synchronous os.execute at57-58, no timeout/owned child. install_transaction:447 checks admission only before and after it. install_owned:590-604 replaces tar and cleanup readers with coroutine awaits but retains synchronous smoke, and coroutine.resume:630 cannot preempt the blocking call. Deadline cannot be observed/cancelled while blocked.",
+			"silent_failure": "No timeout/cancel owner is acquired for smoke; updater remains busy and daemon Lua/libuv callbacks cannot execute until child returns. After a finite slow child it finally detects deadline and rolls back, hiding the earlier event-loop starvation from boolean-only transaction tests. A child that never returns has no local bound in this path.",
+			"regression_test": "Drive actual install_owned/default smoke via a disposable launcher with bounded delayed help, a ticking loop and a short original deadline. Require install admission to return without blocking the loop, an owned bounded smoke child with cancellation/physical settlement, no duplicate completion, and exact original-tree rollback on timeout. Preserve complete ownership checks and failure cleanup.",
+			"counterparts": "Linux owns this custom standalone archive transaction and LuaJIT daemon loop. macOS packaged update uses Sparkle/native handoff; Windows compiled updater owns a separate replacement process. No equivalent live stall was measured on either counterpart; different mechanics do not imply stronger universal behavior.",
+			"source_report": "docs/audits/platform-parity/2026-11-04-recovery/linux-updater/report.md"
+		}
+	]
+}

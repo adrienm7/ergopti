@@ -1,0 +1,28 @@
+Selecting exact test module: "tests.unit.modules.updater.test_update_channel_owner"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.test_update_channel_owner
+
+=== updater channel owner (macOS) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.test_update_channel_owner","name":"follows the installed build until config.toml names a channel","status":"pass","elapsed_ms":16.146220,"timing_error":""}
+  ok   follows the installed build until config.toml names a channel
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.test_update_channel_owner","name":"persists through the transaction, then tells the launcher and the subscribers","status":"pass","elapsed_ms":5.437227,"timing_error":""}
+  ok   persists through the transaction, then tells the launcher and the subscribers
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.test_update_channel_owner","name":"a source run has no launcher to tell","status":"pass","elapsed_ms":3.411210,"timing_error":""}
+  ok   a source run has no launcher to tell
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.test_update_channel_owner","name":"keeps the previous channel when the save does not commit (false)","status":"pass","elapsed_ms":2.972430,"timing_error":""}
+  ok   keeps the previous channel when the save does not commit (false)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.updater.test_update_channel_owner","name":"keeps the previous channel when the save does not commit (raise)","status":"pass","elapsed_ms":3.603679,"timing_error":""}
+  ok   keeps the previous channel when the save does not commit (raise)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.updater.test_update_channel_owner","name":"refuses aliases and unknown ids before saving","status":"pass","elapsed_ms":3.424249,"timing_error":""}
+  ok   refuses aliases and unknown ids before saving
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.test_update_channel_owner","name":"tests.unit.modules.updater.test_update_channel_owner","status":"pass","elapsed_ms":35.324199,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  6
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

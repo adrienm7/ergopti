@@ -1,0 +1,7 @@
+
+=== Archive Phase Publication ===
+  ok   checksum source probe reentry cannot acquire archive twice
+  ok   checksum physical probe reentry cannot acquire archive twice
+  ok   adoption source probe reentry consumes one completion
+  ok   physical probe source withdrawal refuses successor acquisition
+TOTAL 4 passed 0 failed

@@ -1,0 +1,22 @@
+Selecting exact test module: "tests.unit.modules.updater.test_updater_packaged_identity"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.test_updater_packaged_identity
+
+=== updater: packaged launcher identity ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.test_updater_packaged_identity","name":"recognises the nested runtime and uses the outer launcher version","status":"pass","elapsed_ms":13.572711,"timing_error":""}
+  ok   recognises the nested runtime and uses the outer launcher version
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.test_updater_packaged_identity","name":"shows the release version without the launcher's build number","status":"pass","elapsed_ms":4.105954,"timing_error":""}
+  ok   shows the release version without the launcher's build number
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.test_updater_packaged_identity","name":"keeps stable launcher versions on the stable channel","status":"pass","elapsed_ms":2.905950,"timing_error":""}
+  ok   keeps stable launcher versions on the stable channel
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.test_updater_packaged_identity","name":"tests.unit.modules.updater.test_updater_packaged_identity","status":"pass","elapsed_ms":20.833218,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  3
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

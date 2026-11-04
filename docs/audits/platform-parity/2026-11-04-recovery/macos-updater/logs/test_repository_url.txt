@@ -1,0 +1,20 @@
+Selecting exact test module: "tests.unit.modules.updater.test_repository_url"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.test_repository_url
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.test_repository_url","name":"repository_url: opens the root and anything below it","status":"pass","elapsed_ms":0.011136,"timing_error":""}
+  ok   repository_url: opens the root and anything below it
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.test_repository_url","name":"repository_url: refuses every other host, scheme, repository and spelling","status":"pass","elapsed_ms":0.023425,"timing_error":""}
+  ok   repository_url: refuses every other host, scheme, repository and spelling
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.test_repository_url","name":"repository_url: refuses anything but strings and a malformed repository identity","status":"pass","elapsed_ms":0.010115,"timing_error":""}
+  ok   repository_url: refuses anything but strings and a malformed repository identity
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.test_repository_url","name":"tests.unit.modules.updater.test_repository_url","status":"pass","elapsed_ms":1.069899,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  3
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

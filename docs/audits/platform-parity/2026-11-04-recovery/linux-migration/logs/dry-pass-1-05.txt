@@ -1,0 +1,4 @@
+same-root-alias	moved=0	backed=1	kept=0	removed=0	cache=true
+same-root-alias-active-config-archived=true
+same-root-alias-restart	moved=0	backed=0	kept=1	removed=0	cache=true
+PASS scratch fixture retired; no live user paths or driver boot executed

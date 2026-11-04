@@ -10,6 +10,10 @@ entry is not the same thing as a user-facing capability: an OS can provide the
 same capability through a different path. A declaration is not a runtime or
 hardware test.
 
+## Migration and update continuation
+
+The [six-scope recovery audit](audits/platform-parity/2026-11-04-recovery/report.md) covers the previously excluded folder migration and updater/reload handoff at `3a680d9f530a9af686fccc16d3f7611ec7fb034c`. It adds 17 qualified OS follow-ups and a [machine-readable, rendered capability/intent comparison](audits/platform-parity/2026-11-04-recovery/capabilities.md). Actual native boundaries, shared causes, receiving gaps and two final dry passes are explicit; the Windows updater scope adds controls without a new confirmed root.
+
 ## End-to-end continuation
 
 The [12-scope flow audit](audits/platform-parity/2026-11-04-flows/report.md) follows clipboard/selection, crypto/credential storage, configuration publication and fixed native system actions through their actual acknowledgment and cleanup boundaries at `213d65af24d2aa4845ba47743c9bab6787b61964`. Its 26 OS/flow follow-ups include shared causes, explicitly qualified source-only Windows cases and an approved-overwrite data-loss risk. [Intentional behavior and constraints](audits/platform-parity/2026-11-04-flows/intentional-differences.md) remain separate from defects. Canonical declarations still do not certify native behavior.

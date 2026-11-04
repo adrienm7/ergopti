@@ -1,0 +1,148 @@
+33:_Updater_FindAsset(Json, AssetName, Tag) {
+112:_Updater_EpochNow() {
+119:_Updater_CheckStateRead(Key) {
+126:_Updater_CheckStateWrite(Key, Value) {
+136:_Updater_CheckState() {
+159:_Updater_SaveCheckState(State) {
+176:_Updater_RecordBackgroundCheck(Ok, Request) {
+188:_Updater_RecordNotifiedTag(Tag) {
+197:_Updater_ScheduleDecision() {
+216:_Updater_OnPowerBroadcast(wParam, lParam, msg, hwnd, ReevaluateFn := 0) {
+229:_Updater_ReevaluateAfterWake(*) {
+237:_Updater_RearmBackgroundOwner(Reason) {
+281:Updater_StartBackgroundChecks(ScheduleFn := 0, IsLocalSource := unset) {
+370:_Updater_ArmBackgroundOwner(Owner, DelayMs) {
+451:_Updater_BackgroundSchedule(Owner, DelayMs, TimerFn := unset) {
+471:Updater_StopBackgroundChecks(CancelInFlight := true, ExpectedOwner := 0) {
+536:_Updater_BackgroundMayDispatch(IsLocalSource := unset, ExpectedOwner := 0) {
+556:Updater_BackgroundTick(Owner := 0, ArmEpoch := 0, *) {
+635:_Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0, CheckOnly := false, FeedFn := 0, ShowFn := 0) {
+727:_Updater_AnnounceCheckOnlyRelease(Latest, Current, Request, ShowFn := 0) {
+754:_Updater_ShowReleaseBalloon(Text) {
+770:_Updater_ClaimBalloon() {
+777:_Updater_ReleaseBalloon() {
+785:_Updater_OnBalloonShown() {
+795:_Updater_TakeBalloonClick() {
+809:Updater_InitTrayNotifyHandler() {
+821:_Updater_OnTrayMsg(wParam, lParam, msg, hwnd, ShowFn := 0) {
+909:_Updater_RetireCurlCapture(Capture) {
+938:_Updater_RetryCurlCaptureDebt(*) {
+949:_Updater_RetireCurlCaptureArtifacts(Artifacts, DiscardStaging := false) {
+974:_Updater_RecoveryTargetForExecutable(Path) {
+985:_Updater_RecoveryCleanupPathForCurrent(CurrentPath, CandidatePath) {
+1000:_Updater_LoadRecoveryDescriptor(RecoveryPath) {
+1026:_Updater_ValidateBootReadyEventName(Name) {
+1034:_Updater_SwapFailureTerminalPath() {
+1043:_Updater_LoadSwapFailureTerminal(CandidatePath, ExpectedPath := "") {
+1060:_Updater_ArmInheritedSwapFailureNotice() {
+1067:_Updater_SurfaceInheritedSwapFailure(*) {
+1088:_Updater_SignalInheritedBootReady() {
+1101:_Updater_RecoveryRetryDelay(AttemptCount) {
+1112:_Updater_RepublishRecoveryExecutable(StagePath, TargetPath, ExpectedSize) {
+1127:_Updater_ArmRecoveryMaintenanceAfterReady() {
+1143:_Updater_RecoveryRepublishPoll(*) {
+1172:_Updater_RecoveryReadySignalPoll(*) {
+1182:_Updater_RecoveryCleanupPoll(*) {
+1213:_Updater_RequestRecoveryHandoffExit(*) {
+1236:_Updater_PrepareRecoverySuspendHandoff() {
+1257:_Updater_RecoveryMayEnterTerminalShutdown() {
+1265:_Updater_DeferRecoveryHandoffRetry() {
+1279:_Updater_CompleteRecoveryHandoffOnExit() {
+1326:Updater_ShowUpdatePrompt(Release, Request := unset) {
+1441:_Updater_OpenPromptReleaseUrl(Release, IsSuspended := unset, NotifyFn := 0, RunFn := 0) {
+1477:_Updater_InstallPromptRelease(G, Release) {
+1490:_Updater_CloseGui(G) {
+1512:Updater_ShowAvailableUpdate(*) {
+1516:_Updater_ShowAvailableUpdateEntry(IsSuspended := unset, NotifyFn := 0, ContinueFn := 0) {
+1526:_Updater_ShowAvailableUpdateRunning() {
+1562:_Updater_ShowAvailableUpdateCallback(Json, Request, Terminal := 0, NotifyFn := 0, PromptFn := 0, Current := unset) {
+1646:_Updater_CaptureInstallObservation() {
+1653:_Updater_InstallObservationValid(Observation) {
+1659:_Updater_InstallObservationCurrent(Observation) {
+1668:_Updater_ArtifactInstallObservation(Artifacts) {
+1679:_Updater_NotifyInstallPhase(Phase, ReasonKey := "", FailureReceipt := 0, ExpectedObserver := unset, ExpectedEpoch := unset) {
+1716:_Updater_ReportInstallFailure(MessageKey, ReasonKey, Icon := "Icon!", FailureReceipt := 0, Observation := unset) {
+1735:_Updater_StagingFailureIsVerification(Stdout) {
+1742:Updater_ConfigureManagedFailurePresenter(Contract, Presenter, RetireFn := 0) {
+1753:_Updater_GetManagedFailureOwner() {
+1760:_Updater_GetManagedFailureOwnerFor(Request, Release) {
+1772:_Updater_ExactFailureField(Record, Name, Default := 0) {
+1786:_Updater_StagingNativeDebtToken(Stdout) {
+1821:_Updater_ParseStagingFailure(Stdout) {
+1875:_Updater_AdmitStagingReceipt(Receipt, Contract) {
+1892:_Updater_NewManagedFailureOwner(Release, Request, AssetUrl, Digest, StagingEpoch, ExpectedObserver := unset, ExpectedObserverEpoch := unset) {
+1906:_Updater_DispatchManagedFailureRetirement(Owner) {
+1915:_Updater_RetireManagedFailure(ExpectedOwner := unset) {
+1935:_Updater_ManagedFailureOwnerIsCurrent(Owner) {
+1948:_Updater_RetryManagedFailure(Owner, Observer := unset) {
+1962:_Updater_PublishManagedFailure(Failure, Owner, StagingEpoch, Observation := 0) {
+2018:_Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailureOwner := 0, Observation := unset) {
+2068:_Updater_BeginDownloadTransaction(Request, BoundarySuspended, Tag, AssetUrl, ExpectedFailureOwner := 0, Observation := unset) {
+2095:Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, RebuildFn := 0, NotifyFn := 0, ExpectedFailureOwner := 0) {
+2278:_Updater_PowerShellPath() {
+2285:_Updater_StagingWorkerPath() {
+2290:_Updater_SwapWorkerPath() {
+2302:_Updater_BuildStagingTransport(WorkerPath, SwapSourcePath, AssetUrl, ExpectedSha256, NewExe,
+2360:_Updater_BindCurlCaptureTransport(Transport, Capture) {
+2382:_Updater_ClearStagingTransport(Transport) {
+2389:_Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch, Release := 0, Request := 0, InstallObserver := unset, AuthenticatedSize := 0) {
+2500:_Updater_MonitorStagingWorker(*) {
+2511:_Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
+2519:_Updater_RegisterDownloadArtifacts(StagingEpoch, NewExe, SwapScriptPath) {
+2545:_Updater_CancelSelfUpdateForSuspend() {
+2550:_Updater_QuiesceSelfUpdateForSuspend() {
+2559:_Updater_ReleaseDownloadRetirement(Owner) {
+2572:_Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false, ExpectedEpoch := 0) {
+2644:_Updater_EnforceDownloadDeadline(NowTick := unset, RebuildMenu := true,
+2676:_Updater_AdmitStagingCompletion(StagingEpoch) {
+2692:_Updater_AcquireStagingArtifacts(StagingEpoch) {
+2708:_Updater_RetainVerifiedStagingArtifacts(StagingEpoch) {
+2724:_Updater_ClearNotifiedTagForStaging(StagingEpoch) {
+2738:_Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, CurrentExe, Tag, StagingEpoch, FailureOwner := 0, CompletionTick := unset, DeadlineNotifyFn := 0) {
+2805:_Updater_QuoteCreateProcessArg(Value) {
+2832:_Updater_CreateNamedSwapEvent(Name) {
+2836:_Updater_QueueSwapCleanupDebt(Handle, Terminate) {
+2857:_Updater_ScheduleSwapCleanupRetry() {
+2884:_Updater_TrySwapCleanupRecord(Record) {
+2894:_Updater_DrainSwapCleanupRecord(DebtId) {
+2929:_Updater_ReleaseSwapHandle(Handle, Terminate := false) {
+2939:_Updater_RetrySwapCleanupDebt() {
+2956:_Updater_CloseNativeSwapHandle(Handle) {
+2960:_Updater_TakeSwapHandle(Owner, Name) {
+2973:_Updater_TakeSwapResumeHandles(Owner) {
+2988:_Updater_TakeSwapProcessHandles(Owner) {
+3016:_Updater_CloseSwapOwner(Owner, TerminateChild := false) {
+3037:_Updater_MakeSwapEventName(TransactionId, Role) {
+3045:_Updater_NewSwapOwner(TransactionId) {
+3069:_Updater_ReserveSwapOwner(TransactionId, StagingEpoch := 0) {
+3096:_Updater_CloseUnpublishedSwapHandles(Handles, TerminateChild := false) {
+3125:_Updater_CreateSuspendedSwapOwner(SwapScriptPath, NewExe, CurrentExe, TransactionId, ParentProcessHandle := 0, ReservedOwner := 0, BeforePublishFn := 0) {
+3225:_Updater_ResumeSwapOwner(Owner) {
+3259:_Updater_CurrentSwapOwner(TransactionId := 0) {
+3274:_Updater_ClaimSwapOwner(TransactionId := 0) {
+3296:_Updater_WaitHandleState(Handle) {
+3311:_Updater_SetSwapEvent(Handle) {
+3318:_Updater_WaitSwapOwnerHandleState(Owner, Name) {
+3329:_Updater_SetSwapOwnerEvent(Owner, Name) {
+3340:_Updater_ArmSwapHandshakePoll(TransactionId) {
+3346:_Updater_StartSwapTransaction(SwapScriptPath, NewExe, CurrentExe, Tag, StagingEpoch) {
+3377:_Updater_FailSwapTransaction(TransactionId, Message, ShowUi := true) {
+3396:_Updater_ShowDeferredSwapFailureNotice(*) {
+3417:_Updater_AttemptLifecycleRecovery(NotifyFn, ArmRetryFn, ReloadFn) {
+3456:_Updater_ArmLifecycleRecoveryRetry(ArmRetryFn, RetryDelayMs, *) {
+3462:_Updater_ScheduleLifecycleRecoveryReload(ShowUpdaterFailureNotice := false) {
+3482:_Updater_SetSwapPhase(TransactionId, Phase) {
+3498:_Updater_PublishExitIntent(TransactionId, Owner) {
+3516:_Updater_PollSwapHandshake(TransactionId, NowTick := unset,
+3596:_Updater_IntentOwner(TransactionId := 0) {
+3619:_Updater_PublishExitInvocation(TransactionId, Owner) {
+3641:_Updater_ClearExitInvocation(TransactionId, Owner) {
+3654:_Updater_ExitInvocationOwner(TransactionId := 0) {
+3678:_Updater_ExitIntentStillAuthorized(Owner, SuspendedOverride := unset) {
+3692:_Updater_RequestExitForIntent(TransactionId) {
+3725:_Updater_SignalFinalExitForIntent() {
+3761:_Updater_DeferExitIntentRetry() {
+3785:_Updater_ExhaustExitIntentRetry(TransactionId) {
+3794:_Updater_CancelExitIntentAfterLifecycleTeardown(Message) {
+3808:_Updater_TransferExitIntentAfterShutdownGates() {
+3848:_Updater_EndDownloadTransaction(StagingEpoch := 0) {

@@ -1,0 +1,13 @@
+
+=== exact allocator refusal receiving boundary ===
+  ok   known physically settled allocation refusal preserves established callback message
+  ok   no target with unsettled allocator retains generic message and actual debt
+  ok   unknown allocator acquisition cannot borrow no-target cleanup authority
+  ok   source withdrawal inside actual physical probe preserves generic refusal
+  ok   throwing physical probe cannot select settled-allocation message
+  ok   physical ACK listener reentry cannot duplicate allocation callback
+
+=== known allocation refusal producer fact ===
+  ok   only actual closed allocator admission supplies the fixed receiving fact
+  ok   withdrawn source cannot supply the closed allocator receiving fact
+TOTAL 8 passed 0 failed

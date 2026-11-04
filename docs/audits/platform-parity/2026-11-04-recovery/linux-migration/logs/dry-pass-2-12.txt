@@ -1,0 +1,2 @@
+NATIVE_PERMISSION_REFUSAL	uid=1000	moved=0	kept=0	cache=true
+PERMISSION_RESTORED	moved=1	legacy-storage-preserved=true

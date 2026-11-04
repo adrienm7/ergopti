@@ -1,0 +1,36 @@
+Selecting exact test module: "tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert
+
+=== init: controlled reload owns the native shutdown handoff ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert","name":"hands every logged ERROR to the error window, template included (error-dialog-macos)","status":"pass","elapsed_ms":265.357668,"timing_error":""}
+  ok   hands every logged ERROR to the error window, template included (error-dialog-macos)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert","name":"awaits the real root MLX callback before final teardown and reload (HS-008)","status":"pass","elapsed_ms":19.423059,"timing_error":""}
+  ok   awaits the real root MLX callback before final teardown and reload (HS-008)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert","name":"reloads natively once when MLX cleanup is refused (HS-008)","status":"pass","elapsed_ms":15.862139,"timing_error":""}
+  ok   reloads natively once when MLX cleanup is refused (HS-008)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert","name":"keeps uncontrolled shutdown active but makes the post-finalizer callback inert","status":"pass","elapsed_ms":16.327778,"timing_error":""}
+  ok   keeps uncontrolled shutdown active but makes the post-finalizer callback inert
+
+=== init: supplemental scripting state has no boot authority ===
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert","name":"keeps the real onboarding and shutdown owner after true observation","status":"pass","elapsed_ms":14.989960,"timing_error":""}
+  ok   keeps the real onboarding and shutdown owner after true observation
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert","name":"keeps the real onboarding and shutdown owner after false observation","status":"pass","elapsed_ms":15.673506,"timing_error":""}
+  ok   keeps the real onboarding and shutdown owner after false observation
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert","name":"keeps the real onboarding and shutdown owner after nil observation","status":"pass","elapsed_ms":14.063812,"timing_error":""}
+  ok   keeps the real onboarding and shutdown owner after nil observation
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert","name":"keeps the real onboarding and shutdown owner after truthy observation","status":"pass","elapsed_ms":12.492257,"timing_error":""}
+  ok   keeps the real onboarding and shutdown owner after truthy observation
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert","name":"keeps the real onboarding and shutdown owner after throw observation","status":"pass","elapsed_ms":13.690146,"timing_error":""}
+  ok   keeps the real onboarding and shutdown owner after throw observation
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert","name":"tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert","status":"pass","elapsed_ms":400.032200,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  9
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

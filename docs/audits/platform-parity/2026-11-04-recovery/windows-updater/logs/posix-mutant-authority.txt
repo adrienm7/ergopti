@@ -1,0 +1,7 @@
+PASS default
+PASS owned
+PASS bad-identity
+PASS withdrawn
+FAIL withdraw-before-copy error=Exact artifact output authority was withdrawn. bytes=abc factory=1 current=2
+PASS route-refused
+RESULT passed=5 failed=1 native_requests=0 filesystem_operations=0

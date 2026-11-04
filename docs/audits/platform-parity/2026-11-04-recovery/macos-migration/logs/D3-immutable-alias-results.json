@@ -1,0 +1,25 @@
+{
+  "audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+  "created_at": "2026-11-04T19:57:28.317778+00:00",
+  "source": "4 immutable Git-blob modules only; hash verified",
+  "results": [
+    {
+      "mode": "alias",
+      "exit": 0,
+      "stdout": "before: legacy/current active.log same dev+ino=true\nREPRO: active destination inode archived through legacy alias; current path absent; backup same dev+ino; next public run does not restore\nWARN Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-f65oaa9p/Library/Logs/ergopti_plus/active.log to the backup /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-f65oaa9p/Library/Application Support/Ergopti/before-folder-migration/Library/Logs/ergopti_plus/active.log: /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-f65oaa9p/Library/Logs/Ergopti/active.log is already taken.\nimmutable-source modules only; actual public plan/core/native POSIX ports; no live repository modules or tests loaded\n",
+      "stderr": ""
+    },
+    {
+      "mode": "distinct",
+      "exit": 0,
+      "stdout": "CONTROL: distinct legacy/current roots preserve active destination and archive only distinct old file\nWARN Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-_ay_sd4i/Library/Logs/ergopti_plus/active.log to the backup /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-_ay_sd4i/Library/Application Support/Ergopti/before-folder-migration/Library/Logs/ergopti_plus/active.log: /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-_ay_sd4i/Library/Logs/Ergopti/active.log is already taken.\nINFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-_ay_sd4i/Library/Logs/ergopti_plus.\nimmutable-source modules only; actual public plan/core/native POSIX ports; no live repository modules or tests loaded\n",
+      "stderr": ""
+    },
+    {
+      "mode": "absent",
+      "exit": 0,
+      "stdout": "CONTROL: no legacy root leaves active destination unchanged\nimmutable-source modules only; actual public plan/core/native POSIX ports; no live repository modules or tests loaded\n",
+      "stderr": ""
+    }
+  ]
+}

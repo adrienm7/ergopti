@@ -36,6 +36,45 @@ the field-run step or the hand action that proves it and the commits it confirms
 - [ ] **Windows and Linux:** evaluate equivalents of the macOS bundled App Cloner (isolated application copies and profiles) and Encryptor (file encryption/decryption by drag-and-drop). These are bundled apps, distinct from the shared text and metrics encryption features.
 - [ ] Triage each OS-specific configuration entry, action and greyed menu item in the generated [feature inventory](docs/feature-inventory.md). The recorded reason and equivalent distinguish OS-specific mechanisms from actual product gaps. Recheck runtime and hardware behavior before declaring parity.
 
+## Migration and update parity follow-up
+
+Evidence: [six-scope recovery/lifecycle audit](docs/audits/platform-parity/2026-11-04-recovery/report.md). These 17 OS manifestations include shared causes; keep intentional platform policies and all current refusal guards.
+
+### Windows
+
+- [ ] **[CODE] WFM-001:** Independent migration moves and locator publication can select an empty configuration after a refusal. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md).
+- [ ] **[CODE] WFM-002:** Moving a legacy ancestor leaves a selected custom descendant pointing to its removed path. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md).
+- [ ] **[CODE] WFM-003:** Valid quoted TOML locator keys are missed by the migration rewriter after data moves. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md).
+- [ ] **[CODE] WFM-004:** Migrating only the locator hides the old configuration-transition recovery journal. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md).
+
+### macOS
+
+- [ ] **[CODE] MFM-001:** Refused bootstrap rewrite leaves a backup that blocks automatic restart recovery. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
+- [ ] **[CODE] MFM-002:** Refused configuration move still publishes a locator to the absent new folder. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
+- [ ] **[CODE] MFM-003:** Valid explicit configuration locators become dangling after their containing folder migrates. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
+- [ ] **[CODE] MFM-004:** Destination check followed by POSIX rename can overwrite a newer concurrently published file. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
+- [ ] **[CODE] MFM-005:** Native directory listing refusal escapes migration and aborts driver initialization. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
+- [ ] **[CODE] MFM-006:** Legacy log alias archives active files from the current destination root. [Physical identity proof and immutable post-discovery controls](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
+- [ ] **[CODE] MUR-001:** Refused restart reports a retained armed installation as failed and idle. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-updater/report.md).
+
+### Linux
+
+- [ ] **[CODE] LFM-001:** Concurrent migration destination arrival is overwritten by native replacing rename. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md).
+- [ ] **[CODE] LFM-002:** Newline-bearing legacy filenames are split and silently skipped. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md).
+- [ ] **[CODE] LFM-003:** Relocated configuration directory retains its obsolete native bootstrap locator. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md).
+- [ ] **[CODE] LFM-004:** Native directory enumeration failure is accepted as an empty successful scan. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md).
+- [ ] **[CODE] LFM-005:** Legacy root aliasing current root archives active configuration as its own conflict. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md).
+- [ ] **[CODE] LUR-001:** Owned async installation blocks the daemon event loop during an unbounded launcher smoke. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/linux-updater/report.md).
+
+- [ ] **[PHYS-W]:** receive the recovery audit scenarios on isolated Windows: actual AHK migration, DirMove/ACL refusal, old-locator transition recovery and native swap/boot-ready events. Private shared-Lua/PowerShell fixtures do not close Win32 qualification.
+- [ ] **[PHYS-M]:** receive the recovery audit scenarios on isolated macOS: Darwin migration/permission/rename contracts, selected-profile restart adoption and Versions ARMED/refused-exit reconciliation. Linux physical ports do not close Hammerspoon/APFS qualification.
+- [ ] **[PHYS-L]:** receive the recovery audit scenarios in an isolated real standalone installation: owned smoke deadline and responsive input/event loop, actual systemd/relay restart and successor observation. Disposable filesystem fixtures do not close live daemon qualification.
+
+### Capability parity review
+
+- [ ] **[CODE] macOS chosen-release updater:** evaluate an equivalent of Windows successor boot-ready/probation and post-launch recovery. The custom armed swap currently observes dispatch/rename, not a healthy successor; Sparkle is a distinct engine. Preserve intentional ARMED-on-quit semantics and record any deliberate lower guarantee. [Compared contracts](docs/audits/platform-parity/2026-11-04-recovery/capabilities.md).
+- [ ] **[CODE] Linux standalone updater:** evaluate successor-ready receiving and recovery beyond pre-restart wrapper smoke plus systemd/relay request admission. Windows has the stronger boot-ready/probation contract; an equivalent or an explicit scoped reason remains to be established. [Compared contracts](docs/audits/platform-parity/2026-11-04-recovery/capabilities.md).
+
 ## Audit validation follow-up
 
 - [ ] **[CODE] macOS:** declare the existing `/usr/sbin/installer` child in the owned-runtime program inventory through its canonical owner and regenerate consumers. The unchanged inventory test rejects this pre-existing omission at all three reviewed source revisions. [Baseline proof](docs/audits/platform-parity/2026-11-04-flows/validation/installer-baseline/report.md). This metadata item is outside the 26 flow findings.

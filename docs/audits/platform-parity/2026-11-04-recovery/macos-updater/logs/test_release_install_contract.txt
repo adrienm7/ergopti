@@ -1,0 +1,150 @@
+Selecting exact test module: "tests.unit.modules.updater.test_release_install_contract"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.test_release_install_contract
+
+=== shared configuration backup (config_backup) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"reads its rules from the shared updater defaults","status":"pass","elapsed_ms":0.005127,"timing_error":""}
+  ok   reads its rules from the shared updater defaults
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"copies every configuration file, and only those, before writing its manifest","status":"pass","elapsed_ms":0.199160,"timing_error":""}
+  ok   copies every configuration file, and only those, before writing its manifest
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"does not copy a file root twice when it lies in the configuration folder","status":"pass","elapsed_ms":0.140691,"timing_error":""}
+  ok   does not copy a file root twice when it lies in the configuration folder
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"refuses the whole backup when one file cannot be read, and writes no manifest","status":"pass","elapsed_ms":0.176936,"timing_error":""}
+  ok   refuses the whole backup when one file cannot be read, and writes no manifest
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"stops at a copy it cannot write and leaves the folder without a manifest","status":"pass","elapsed_ms":0.120781,"timing_error":""}
+  ok   stops at a copy it cannot write and leaves the folder without a manifest
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"gives two backups of one second distinct folders","status":"pass","elapsed_ms":0.273561,"timing_error":""}
+  ok   gives two backups of one second distinct folders
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"offers the newest complete backup of a kind","status":"pass","elapsed_ms":0.448315,"timing_error":""}
+  ok   offers the newest complete backup of a kind
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"restores after backing the replaced configuration up","status":"pass","elapsed_ms":0.283957,"timing_error":""}
+  ok   restores after backing the replaced configuration up
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"refuses to report a substituted staging file as restored","status":"pass","elapsed_ms":0.225199,"timing_error":""}
+  ok   refuses to report a substituted staging file as restored
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"writes nothing back when a copy is missing","status":"pass","elapsed_ms":0.181653,"timing_error":""}
+  ok   writes nothing back when a copy is missing
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"refuses a manifest naming a path outside the configuration","status":"pass","elapsed_ms":0.102805,"timing_error":""}
+  ok   refuses a manifest naming a path outside the configuration
+
+=== shared one-click release install (release_install) ===
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"does nothing until the click","status":"pass","elapsed_ms":0.016244,"timing_error":""}
+  ok   does nothing until the click
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"backs up first, then downloads, verifies, installs and restarts","status":"pass","elapsed_ms":0.226541,"timing_error":""}
+  ok   backs up first, then downloads, verifies, installs and restarts
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"refuses a release without this system's asset and keeps the backup","status":"pass","elapsed_ms":0.020451,"timing_error":""}
+  ok   refuses a release without this system's asset and keeps the backup
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"never installs a download that failed its verification","status":"pass","elapsed_ms":0.020351,"timing_error":""}
+  ok   never installs a download that failed its verification
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"reports a failed download as one, and never as a verification","status":"pass","elapsed_ms":0.015243,"timing_error":""}
+  ok   reports a failed download as one, and never as a verification
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"downloads nothing when the backup fails","status":"pass","elapsed_ms":0.015774,"timing_error":""}
+  ok   downloads nothing when the backup fails
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"shows an install refusal and restarts nothing","status":"pass","elapsed_ms":0.018267,"timing_error":""}
+  ok   shows an install refusal and restarts nothing
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"refuses a blocked build before any backup","status":"pass","elapsed_ms":0.037086,"timing_error":""}
+  ok   refuses a blocked build before any backup
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"refuses a tag the loaded list does not hold, with the host's reason","status":"pass","elapsed_ms":0.016085,"timing_error":""}
+  ok   refuses a tag the loaded list does not hold, with the host's reason
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"refuses a tag the loaded API list lacks as an error: the page is stale","status":"pass","elapsed_ms":0.014301,"timing_error":""}
+  ok   refuses a tag the loaded API list lacks as an error: the page is stale
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"runs one install at a time","status":"pass","elapsed_ms":0.020260,"timing_error":""}
+  ok   runs one install at a time
+
+=== shared release install capabilities (release-install-capabilities) ===
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"runs a sync-only capability through its actual completion","status":"pass","elapsed_ms":0.020460,"timing_error":""}
+  ok   runs a sync-only capability through its actual completion
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"runs an async-only capability and waits for its actual completion","status":"pass","elapsed_ms":0.024266,"timing_error":""}
+  ok   runs an async-only capability and waits for its actual completion
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"prefers async over sync without fallback after completion true","status":"pass","elapsed_ms":0.020471,"timing_error":""}
+  ok   prefers async over sync without fallback after completion true
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"prefers async over sync without fallback after completion false","status":"pass","elapsed_ms":0.020090,"timing_error":""}
+  ok   prefers async over sync without fallback after completion false
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"refuses missing install capabilities before any side effect","status":"pass","elapsed_ms":0.011838,"timing_error":""}
+  ok   refuses missing install capabilities before any side effect
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"refuses install false despite a valid counterpart","status":"pass","elapsed_ms":0.010226,"timing_error":""}
+  ok   refuses install false despite a valid counterpart
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"refuses install_async false despite a valid counterpart","status":"pass","elapsed_ms":0.009875,"timing_error":""}
+  ok   refuses install_async false despite a valid counterpart
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"refuses install string despite a valid counterpart","status":"pass","elapsed_ms":0.010166,"timing_error":""}
+  ok   refuses install string despite a valid counterpart
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"refuses install_async string despite a valid counterpart","status":"pass","elapsed_ms":0.009294,"timing_error":""}
+  ok   refuses install_async string despite a valid counterpart
+
+=== Versions managed network receipt ownership ===
+# lua_timing {"schema":1,"driver":"macos","id":33,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"classifies typed proxy evidence without exposing native secrets","status":"pass","elapsed_ms":0.056735,"timing_error":""}
+  ok   classifies typed proxy evidence without exposing native secrets
+# lua_timing {"schema":1,"driver":"macos","id":34,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"keeps untyped adapter errors unknown despite hostile detail","status":"pass","elapsed_ms":0.056746,"timing_error":""}
+  ok   keeps untyped adapter errors unknown despite hostile detail
+# lua_timing {"schema":1,"driver":"macos","id":35,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"never treats an unproved origin 407 as proxy evidence","status":"pass","elapsed_ms":0.100731,"timing_error":""}
+  ok   never treats an unproved origin 407 as proxy evidence
+# lua_timing {"schema":1,"driver":"macos","id":36,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"keeps failed verification separate and never installs","status":"pass","elapsed_ms":0.020051,"timing_error":""}
+  ok   keeps failed verification separate and never installs
+# lua_timing {"schema":1,"driver":"macos","id":37,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"requires exact operation and failure epoch before retry","status":"pass","elapsed_ms":0.038438,"timing_error":""}
+  ok   requires exact operation and failure epoch before retry
+# lua_timing {"schema":1,"driver":"macos","id":38,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"retry reruns backup-first and duplicate old callbacks cannot install","status":"pass","elapsed_ms":0.055594,"timing_error":""}
+  ok   retry reruns backup-first and duplicate old callbacks cannot install
+# lua_timing {"schema":1,"driver":"macos","id":39,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"new same-tag failure rejects the previous terminal owner","status":"pass","elapsed_ms":0.104798,"timing_error":""}
+  ok   new same-tag failure rejects the previous terminal owner
+# lua_timing {"schema":1,"driver":"macos","id":40,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"rechecks actual owner and build policy after failure","status":"pass","elapsed_ms":0.044937,"timing_error":""}
+  ok   rechecks actual owner and build policy after failure
+# lua_timing {"schema":1,"driver":"macos","id":41,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"recomputes real external capability and never takes a page path","status":"pass","elapsed_ms":0.045538,"timing_error":""}
+  ok   recomputes real external capability and never takes a page path
+# lua_timing {"schema":1,"driver":"macos","id":42,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"reentrant native capability probe cannot lend a retired owner","status":"pass","elapsed_ms":0.038247,"timing_error":""}
+  ok   reentrant native capability probe cannot lend a retired owner
+# lua_timing {"schema":1,"driver":"macos","id":43,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"native probe failure preserves the failed phase without unbound actions","status":"pass","elapsed_ms":0.023375,"timing_error":""}
+  ok   native probe failure preserves the failed phase without unbound actions
+# lua_timing {"schema":1,"driver":"macos","id":44,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"native owner inspection cannot resurrect a retired reservation","status":"pass","elapsed_ms":0.012859,"timing_error":""}
+  ok   native owner inspection cannot resurrect a retired reservation
+# lua_timing {"schema":1,"driver":"macos","id":45,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"contract loading cannot publish a predecessor into a same-tag successor","status":"pass","elapsed_ms":0.057517,"timing_error":""}
+  ok   contract loading cannot publish a predecessor into a same-tag successor
+# lua_timing {"schema":1,"driver":"macos","id":46,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"capability inspection cannot retire or publish into a successor","status":"pass","elapsed_ms":0.078028,"timing_error":""}
+  ok   capability inspection cannot retire or publish into a successor
+# lua_timing {"schema":1,"driver":"macos","id":47,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"current-owner inspection cannot replace a successor terminal","status":"pass","elapsed_ms":0.077226,"timing_error":""}
+  ok   current-owner inspection cannot replace a successor terminal
+# lua_timing {"schema":1,"driver":"macos","id":48,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"contract loading cannot restore publication after exact page retirement","status":"pass","elapsed_ms":0.020450,"timing_error":""}
+  ok   contract loading cannot restore publication after exact page retirement
+# lua_timing {"schema":1,"driver":"macos","id":49,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"policy-error logging cannot publish an obsolete failed phase","status":"pass","elapsed_ms":0.061913,"timing_error":""}
+  ok   policy-error logging cannot publish an obsolete failed phase
+# lua_timing {"schema":1,"driver":"macos","id":50,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"keeps the original private report owner outside the public payload","status":"pass","elapsed_ms":0.059239,"timing_error":""}
+  ok   keeps the original private report owner outside the public payload
+# lua_timing {"schema":1,"driver":"macos","id":51,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"retires the exact failed reservation when native owner inspection throws","status":"pass","elapsed_ms":0.017627,"timing_error":""}
+  ok   retires the exact failed reservation when native owner inspection throws
+# lua_timing {"schema":1,"driver":"macos","id":52,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"cannot publish or clear a successor when owner fault logging reenters","status":"pass","elapsed_ms":0.023015,"timing_error":""}
+  ok   cannot publish or clear a successor when owner fault logging reenters
+# lua_timing {"schema":1,"driver":"macos","id":53,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"page retirement during report preserves accepted native transaction without later publication","status":"pass","elapsed_ms":0.020621,"timing_error":""}
+  ok   page retirement during report preserves accepted native transaction without later publication
+# lua_timing {"schema":1,"driver":"macos","id":54,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"page retirement during backup preserves accepted native transaction without later publication","status":"pass","elapsed_ms":0.021282,"timing_error":""}
+  ok   page retirement during backup preserves accepted native transaction without later publication
+# lua_timing {"schema":1,"driver":"macos","id":55,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"page retirement during asset preserves accepted native transaction without later publication","status":"pass","elapsed_ms":0.020802,"timing_error":""}
+  ok   page retirement during asset preserves accepted native transaction without later publication
+# lua_timing {"schema":1,"driver":"macos","id":56,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"page retirement during install preserves accepted native transaction without later publication","status":"pass","elapsed_ms":0.026630,"timing_error":""}
+  ok   page retirement during install preserves accepted native transaction without later publication
+# lua_timing {"schema":1,"driver":"macos","id":57,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"page retirement during success preserves accepted native transaction without later publication","status":"pass","elapsed_ms":0.021803,"timing_error":""}
+  ok   page retirement during success preserves accepted native transaction without later publication
+# lua_timing {"schema":1,"driver":"macos","id":58,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"page retirement during restart preserves accepted native transaction without later publication","status":"pass","elapsed_ms":0.025979,"timing_error":""}
+  ok   page retirement during restart preserves accepted native transaction without later publication
+# lua_timing {"schema":1,"driver":"macos","id":59,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"reentrant blocked cannot overwrite a successor reservation before backup","status":"pass","elapsed_ms":0.021853,"timing_error":""}
+  ok   reentrant blocked cannot overwrite a successor reservation before backup
+# lua_timing {"schema":1,"driver":"macos","id":60,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"reentrant find cannot overwrite a successor reservation before backup","status":"pass","elapsed_ms":0.155984,"timing_error":""}
+  ok   reentrant find cannot overwrite a successor reservation before backup
+# lua_timing {"schema":1,"driver":"macos","id":61,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"retirement during pre-acceptance blocked refuses old work but permits fresh successor","status":"pass","elapsed_ms":0.018288,"timing_error":""}
+  ok   retirement during pre-acceptance blocked refuses old work but permits fresh successor
+# lua_timing {"schema":1,"driver":"macos","id":62,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"native document replacement during blocked cannot borrow pre-acceptance","status":"pass","elapsed_ms":0.016224,"timing_error":""}
+  ok   native document replacement during blocked cannot borrow pre-acceptance
+# lua_timing {"schema":1,"driver":"macos","id":63,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"retirement during pre-acceptance find refuses old work but permits fresh successor","status":"pass","elapsed_ms":0.017045,"timing_error":""}
+  ok   retirement during pre-acceptance find refuses old work but permits fresh successor
+# lua_timing {"schema":1,"driver":"macos","id":64,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"native document replacement during find cannot borrow pre-acceptance","status":"pass","elapsed_ms":0.017516,"timing_error":""}
+  ok   native document replacement during find cannot borrow pre-acceptance
+# lua_timing {"schema":1,"driver":"macos","id":65,"kind":"case","module":"tests.unit.modules.updater.test_release_install_contract","name":"retires action authority on close without cancelling native work","status":"pass","elapsed_ms":0.049805,"timing_error":""}
+  ok   retires action authority on close without cancelling native work
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.test_release_install_contract","name":"tests.unit.modules.updater.test_release_install_contract","status":"pass","elapsed_ms":11.606203,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  64
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

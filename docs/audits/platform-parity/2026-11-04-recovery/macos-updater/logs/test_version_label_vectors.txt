@@ -1,0 +1,24 @@
+Selecting exact test module: "tests.unit.modules.updater.test_version_label_vectors"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.test_version_label_vectors
+
+=== updater.version_label — shared vectors (macOS) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.test_version_label_vectors","name":"uses the locale keys the contract names","status":"pass","elapsed_ms":0.004877,"timing_error":""}
+  ok   uses the locale keys the contract names
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.test_version_label_vectors","name":"formats every vector","status":"pass","elapsed_ms":0.016234,"timing_error":""}
+  ok   formats every vector
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.test_version_label_vectors","name":"refuses an unknown kind and a release without a version","status":"pass","elapsed_ms":0.003005,"timing_error":""}
+  ok   refuses an unknown kind and a release without a version
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.test_version_label_vectors","name":"every locale carries exactly the placeholders each key is filled with","status":"pass","elapsed_ms":471.391979,"timing_error":""}
+  ok   every locale carries exactly the placeholders each key is filled with
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.test_version_label_vectors","name":"tests.unit.modules.updater.test_version_label_vectors","status":"pass","elapsed_ms":472.882270,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  4
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

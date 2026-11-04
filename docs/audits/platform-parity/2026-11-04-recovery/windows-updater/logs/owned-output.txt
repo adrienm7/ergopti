@@ -1,0 +1,7 @@
+FAIL default error=Foreign parent. bytes= factory=0 current=0
+FAIL owned error=Foreign parent. bytes= factory=0 current=0
+FAIL bad-identity error=Foreign parent. bytes= factory=0 current=0
+FAIL withdrawn error=Foreign parent. bytes= factory=0 current=0
+FAIL withdraw-before-copy error=Foreign parent. bytes= factory=0 current=0
+FAIL route-refused error=Foreign parent. bytes= factory=0 current=0
+RESULT passed=0 failed=6 native_requests=0 filesystem_operations=0

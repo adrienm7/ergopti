@@ -1,0 +1,30 @@
+[
+  {
+    "before": "'D:\\owned'",
+    "after": "'/virtual-owned'"
+  },
+  {
+    "before": "'D:\\owned\\curl.'",
+    "after": "'/virtual-owned/curl.'"
+  },
+  {
+    "before": "'D:\\owned\\curl.*\\*'",
+    "after": "'/virtual-owned/curl.*/*'"
+  },
+  {
+    "before": "'D:\\owned\\curl.'",
+    "after": "'/virtual-owned/curl.'"
+  },
+  {
+    "before": "'D:\\owned\\archive.zip'",
+    "after": "'/virtual-owned/archive.zip'"
+  },
+  {
+    "before": "'D:\\owned\\archive.zip'",
+    "after": "'/virtual-owned/archive.zip'"
+  },
+  {
+    "before": "'D:\\owned\\archive.zip'",
+    "after": "'/virtual-owned/archive.zip'"
+  }
+]

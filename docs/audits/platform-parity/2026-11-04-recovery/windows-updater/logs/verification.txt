@@ -1,0 +1,1 @@
+PASS exact-source receipts, four actual swap branches, baseline-positive/two-negative mutation sensitivity, retained probe identities

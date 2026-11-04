@@ -1,0 +1,3 @@
+ACTIVE_LOOP slow=false elapsed_ms=90.8 budget_ms=250 ticks_before=3 ticks_during=0 ticks_after=1 max_heartbeat_gap_ms=101.0 installed=true detail=nil
+ACTIVE_LOOP slow=true elapsed_ms=727.7 budget_ms=250 ticks_before=3 ticks_during=0 ticks_after=1 max_heartbeat_gap_ms=738.0 installed=false detail=updated wrapper smoke failed; previous installation restored
+PASS actual default smoke ran inside active libuv callback; before/after heartbeat and bounded slow-launcher control. No desktop/input/network/systemd or user installation.

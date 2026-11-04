@@ -1,0 +1,32 @@
+Selecting exact test module: "tests.unit.infra.config.test_reload_guard"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.infra.config.test_reload_guard
+
+=== reload_guard: reload-vs-quit signal ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.infra.config.test_reload_guard","name":"reports false on a fresh, cleared state (= genuine quit)","status":"pass","elapsed_ms":3.006467,"timing_error":""}
+  ok   reports false on a fresh, cleared state (= genuine quit)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.infra.config.test_reload_guard","name":"reports true right after a reload is marked","status":"pass","elapsed_ms":1.977390,"timing_error":""}
+  ok   reports true right after a reload is marked
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.infra.config.test_reload_guard","name":"clear() resets a previously marked reload","status":"pass","elapsed_ms":1.570219,"timing_error":""}
+  ok   clear() resets a previously marked reload
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.infra.config.test_reload_guard","name":"treats a stale sentinel as not-a-reload (TTL expiry)","status":"pass","elapsed_ms":1.437390,"timing_error":""}
+  ok   treats a stale sentinel as not-a-reload (TTL expiry)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.infra.config.test_reload_guard","name":"ignores a non-numeric sentinel value","status":"pass","elapsed_ms":3.917069,"timing_error":""}
+  ok   ignores a non-numeric sentinel value
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.infra.config.test_reload_guard","name":"hands the recorded reload start to the next boot once","status":"pass","elapsed_ms":1.842238,"timing_error":""}
+  ok   hands the recorded reload start to the next boot once
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.infra.config.test_reload_guard","name":"refuses a reload start that is not a positive time","status":"pass","elapsed_ms":1.475927,"timing_error":""}
+  ok   refuses a reload start that is not a positive time
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.infra.config.test_reload_guard","name":"clears terminal rollback state without logging after sink finalization","status":"pass","elapsed_ms":0.624198,"timing_error":""}
+  ok   clears terminal rollback state without logging after sink finalization
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.infra.config.test_reload_guard","name":"tests.unit.infra.config.test_reload_guard","status":"pass","elapsed_ms":22.473686,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  8
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

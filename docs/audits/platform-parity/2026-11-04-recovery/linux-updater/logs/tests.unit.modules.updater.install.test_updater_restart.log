@@ -1,0 +1,38 @@
+
+=== updater restart: starting the installed version ===
+  ok   (quit-wins-over-reload) cancels a pending systemd restart with a stop job
+  ok   (quit-wins-over-reload) cancels a relay by its marker with no XDG_RUNTIME_DIR
+  ok   (quit-wins-over-reload) a relay command checks the cancellation marker after the wait
+  ok   (quit-wins-over-reload) a relay whose marker exists does not start the launcher
+  ok   asks systemd to restart the unit that runs the daemon
+  ok   otherwise relaunches the installed launcher once this process has exited
+  ok   (restart-relay-dispatch-ack) refuses shutdown when native relay dispatch exits unsuccessfully
+  ok   really waits for the process and then runs the launcher
+  ok   reports a restart it could not start
+  ok   reads its process id from its stat line, and its unit from its cgroup
+  ok   reads its own process id from the kernel
+
+=== updater restart: the tray tells and acts ===
+  ok   hands a manual check's answer to the daemon when no window can show it
+  ok   installs a downloaded update and hands the result on for the restart
+  ok   downloads only the release the row showed
+  ok   greys the update row of a source run, naming why
+  ok   hands a failed download on, which is not installed
+
+=== updater restart: the daemon restarts on an installed update ===
+  ok   wires the tray's outcomes to the notifier and the restarter
+
+=== Main restart pause wiring ===
+  ok   passes pause through both actual Main helpers
+  ok   captures current pause at all three complete-restart callsites
+TOTAL 19 passed 0 failed
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.

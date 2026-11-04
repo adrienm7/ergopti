@@ -1,0 +1,23 @@
+
+=== updater (linux): the check schedule follows the persisted record ===
+  ok   (update-rows-greyed-on-local-2026-10-01) a local version run from source arms no automatic check
+  ok   a system package arms no automatic check
+  ok   notification refusal leaves the release retryable
+  ok   a restart mid-interval does not check at boot
+  ok   an overdue check catches up after the boot delay and is recorded
+  ok   a failed check retries on the shared backoff
+  ok   a paused driver dispatches nothing and leaves the record
+  ok   a wake restarts the boot delay before a catch-up check
+  ok   a release is announced once, across restarts
+  ok   the interval lives in config.toml and snaps to a preset
+
+=== updater automatic schedule publication ownership ===
+  ok   a stopped schedule rejects its held and duplicate completion
+  ok   restart rejects the predecessor and admits its own completion once
+  ok   failed native timer cancellation revokes publication but retains cleanup: false
+  ok   failed native timer cancellation revokes publication but retains cleanup: nil
+  ok   failed native timer cancellation revokes publication but retains cleanup: text
+  ok   a retired timer cannot enter the restarted schedule
+  ok   same-generation completion publishes exactly once
+  ok   notification reentry cannot stamp a retired owner's receipt
+TOTAL 18 passed 0 failed

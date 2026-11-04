@@ -1,0 +1,4 @@
+REPRO valid literal-override remains unchanged after containing root moves; actual resolver selects nonexistent old path
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-qe4nukbx/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-qe4nukbx/Library/Application Support/Ergopti/paths.toml.
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-qe4nukbx/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-qe4nukbx/Library/Application Support/Ergopti/config.
+INFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-qe4nukbx/Library/Application Support/ErgoptiPlus.

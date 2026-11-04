@@ -1,0 +1,20 @@
+[
+  {
+    "case": "posix-owned-output",
+    "exit": 0,
+    "expected": 0,
+    "tail": "RESULT passed=6 failed=0 native_requests=0 filesystem_operations=0"
+  },
+  {
+    "case": "posix-mutant-authority",
+    "exit": 1,
+    "expected": 1,
+    "tail": "RESULT passed=5 failed=1 native_requests=0 filesystem_operations=0"
+  },
+  {
+    "case": "posix-mutant-copy",
+    "exit": 1,
+    "expected": 1,
+    "tail": "RESULT passed=4 failed=2 native_requests=0 filesystem_operations=0"
+  }
+]

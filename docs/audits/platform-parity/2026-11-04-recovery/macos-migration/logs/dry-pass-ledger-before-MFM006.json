@@ -1,0 +1,24 @@
+[
+  {
+    "pass_id": "D1",
+    "started_at": "2026-11-04T19:33:55.889160+00:00",
+    "finished_at": "2026-11-04T19:33:56.605288+00:00",
+    "source_review": "Rechecked source-to-destination authority, backup publication/refusal, actual parser and loader adoption, native directory/read/write returns and restart recovery.",
+    "public_modes": 12,
+    "fresh_registered_modules": 6,
+    "registered_cases": 36,
+    "new_confirmed_roots": 0,
+    "uid": 1000
+  },
+  {
+    "pass_id": "D2",
+    "started_at": "2026-11-04T19:33:56.605319+00:00",
+    "finished_at": "2026-11-04T19:33:57.273712+00:00",
+    "source_review": "Rechecked common/newer destination policy, occupied backups, custom/nested/TOML locators, symlink/nesting uncertainty and explicit cross-OS/compiled-runtime differences; no additional confirmed root.",
+    "public_modes": 12,
+    "fresh_registered_modules": 6,
+    "registered_cases": 36,
+    "new_confirmed_roots": 0,
+    "uid": 1000
+  }
+]

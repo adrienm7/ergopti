@@ -1,0 +1,5 @@
+MODULE tests.unit.infra.config.test_config_paths_first_launch
+
+=== ConfigPaths on the first launch of a packaged app ===
+  ok   reads a missing managed folder as an absent bootstrap, without an error
+RESULT 1 passed 0 failed

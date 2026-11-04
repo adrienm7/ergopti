@@ -1,0 +1,261 @@
+Selecting exact test module: "tests.unit.modules.updater.test_release_installer"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.test_release_installer
+
+=== release_installer: the authenticated asset ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"binds the exact repository URL and GitHub's SHA-256","status":"pass","elapsed_ms":0.014882,"timing_error":""}
+  ok   binds the exact repository URL and GitHub's SHA-256
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses an archive without its digest, at another URL, or absent","status":"pass","elapsed_ms":0.097186,"timing_error":""}
+  ok   refuses an archive without its digest, at another URL, or absent
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"names the declared macOS archive from the shared defaults","status":"pass","elapsed_ms":0.232169,"timing_error":""}
+  ok   names the declared macOS archive from the shared defaults
+
+=== release_installer: staging and replacement dispatch ===
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"reads the installed app and the launcher from the launcher's environment","status":"pass","elapsed_ms":0.003295,"timing_error":""}
+  ok   reads the installed app and the launcher from the launcher's environment
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"passes every release value as an argument and classifies the exit","status":"pass","elapsed_ms":15.006071,"timing_error":""}
+  ok   passes every release value as an argument and classifies the exit
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"arms the replacement detached, with the previous app kept aside","status":"pass","elapsed_ms":0.024267,"timing_error":""}
+  ok   arms the replacement detached, with the previous app kept aside
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses outside a packaged launch","status":"pass","elapsed_ms":0.016515,"timing_error":""}
+  ok   refuses outside a packaged launch
+
+=== release_installer: the staging script under /bin/sh ===
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"retires only the verified owned archive before READY and refuses failed retirement","status":"pass","elapsed_ms":164.610414,"timing_error":""}
+  ok   retires only the verified owned archive before READY and refuses failed retirement
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses a destination parent without write access before downloading","status":"pass","elapsed_ms":50.292477,"timing_error":""}
+  ok   refuses a destination parent without write access before downloading
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"prints READY only after the digest, the version and the signature pass","status":"pass","elapsed_ms":79.680421,"timing_error":""}
+  ok   prints READY only after the digest, the version and the signature pass
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"uses only the declared tar extractor after integrity verification","status":"pass","elapsed_ms":133.908156,"timing_error":""}
+  ok   uses only the declared tar extractor after integrity verification
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses tar extraction, version and signing failures without READY","status":"pass","elapsed_ms":221.204144,"timing_error":""}
+  ok   refuses tar extraction, version and signing failures without READY
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses undeclared formats and foreign bundle paths before download","status":"pass","elapsed_ms":328.478558,"timing_error":""}
+  ok   refuses undeclared formats and foreign bundle paths before download
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"stops at a failed download","status":"pass","elapsed_ms":52.962502,"timing_error":""}
+  ok   stops at a failed download
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"never extracts an archive whose SHA-256 differs","status":"pass","elapsed_ms":52.816042,"timing_error":""}
+  ok   never extracts an archive whose SHA-256 differs
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses an archive carrying another version","status":"pass","elapsed_ms":73.892266,"timing_error":""}
+  ok   refuses an archive carrying another version
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses an app its signing identity does not match","status":"pass","elapsed_ms":83.904348,"timing_error":""}
+  ok   refuses an app its signing identity does not match
+
+=== release_installer: the replacement script under /bin/sh ===
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"waits for the launcher, keeps the previous app and opens the chosen one","status":"pass","elapsed_ms":563.481615,"timing_error":""}
+  ok   waits for the launcher, keeps the previous app and opens the chosen one
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"puts the previous app back and opens it when the chosen one cannot move in","status":"pass","elapsed_ms":358.653093,"timing_error":""}
+  ok   puts the previous app back and opens it when the chosen one cannot move in
+
+=== release_installer: declared archive preference and historical compatibility ===
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"uses actual shared declarations against independent exact release records","status":"pass","elapsed_ms":26.772890,"timing_error":""}
+  ok   uses actual shared declarations against independent exact release records
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"preserves other platform assets and requires declared format-key bindings","status":"pass","elapsed_ms":3.259582,"timing_error":""}
+  ok   preserves other platform assets and requires declared format-key bindings
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"passes the admitted format to the actual native stage and refuses unknown formats before dispatch","status":"pass","elapsed_ms":0.808836,"timing_error":""}
+  ok   passes the admitted format to the actual native stage and refuses unknown formats before dispatch
+
+=== release_installer: the native stage request ===
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"binds a bounded request to the original arguments and child environment","status":"pass","elapsed_ms":0.062274,"timing_error":""}
+  ok   binds a bounded request to the original arguments and child environment
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses failed or oversized serialization before native acquisition","status":"pass","elapsed_ms":0.340532,"timing_error":""}
+  ok   refuses failed or oversized serialization before native acquisition
+
+=== release_installer: filesystem publication admission ===
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"executes real filesystem refusals and preserves every owned original","status":"pass","elapsed_ms":1576.199389,"timing_error":""}
+  ok   executes real filesystem refusals and preserves every owned original
+
+=== release_installer: concurrent filesystem publication ===
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses racing destinations and serializes detached installers before arming (release-exclusive-publication)","status":"fail","elapsed_ms":79.105364,"timing_error":""}
+  FAIL refuses racing destinations and serializes detached installers before arming (release-exclusive-publication) — test_release_installer.lua:516: Traceback (most recent call last):
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 553, in <module>
+    main()
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 507, in main
+    program, detach, physical, arming = emitted(
+                                        ^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 119, in emitted
+    command = command_from(
+              ^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 68, in command_from
+    arming.resolve_lua(),
+    ^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/modules/updater/release_arming_fixture.py", line 58, in resolve_lua
+    raise RuntimeError("Lua 5.4 is required for the native arming control")
+RuntimeError: Lua 5.4 is required for the native arming control
+:
+  expected: 0
+    actual: 1
+stack traceback:
+	[C]: in function 'error'
+	...opti/static/ergopti_plus/_shared/lua/test/assertions.lua:64: in function 'tests.helpers.assert_eq'
+	...os/tests/unit/modules/updater/test_release_installer.lua:516: in function <...os/tests/unit/modules/updater/test_release_installer.lua:513>
+	[C]: in function 'xpcall'
+	...os/tests/unit/modules/updater/test_release_installer.lua:513: in upvalue 'callback'
+	...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:110: in function <...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:108>
+	[C]: in function 'pcall'
+	...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in function <...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:74>
+	(...tail calls...)
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:841: in function 'tests.helpers.it'
+	...os/tests/unit/modules/updater/test_release_installer.lua:511: in function <...os/tests/unit/modules/updater/test_release_installer.lua:510>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...os/tests/unit/modules/updater/test_release_installer.lua:510: in main chunk
+	[C]: in function 'require'
+	tests/run.lua:181: in function <tests/run.lua:181>
+	[C]: in function 'pcall'
+	...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	tests/run.lua:181: in main chunk
+	[C]: in ?
+
+=== release_installer: complete literal extraction ===
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"rejects four valid Lua suffix expressions on both literal authorities","status":"pass","elapsed_ms":299.349692,"timing_error":""}
+  ok   rejects four valid Lua suffix expressions on both literal authorities
+
+=== release_installer: explicit native script observation ===
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"executes only the explicit script observer without discovering Lua (release-native-script-scope)","status":"pass","elapsed_ms":1433.962348,"timing_error":""}
+  ok   executes only the explicit script observer without discovering Lua (release-native-script-scope)
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"binds both extracted scripts and complete argv to actual Lua emission (release-native-script-scope)","status":"fail","elapsed_ms":71.479401,"timing_error":""}
+  FAIL binds both extracted scripts and complete argv to actual Lua emission (release-native-script-scope) — test_release_installer.lua:615: Traceback (most recent call last):
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 553, in <module>
+    main()
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 500, in main
+    print(json.dumps(emission_controls(args.driver.resolve(strict=True), args.root)))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 138, in emission_controls
+    _, _, physical, arming = emitted(driver, root, "actual-lua")
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 119, in emitted
+    command = command_from(
+              ^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 68, in command_from
+    arming.resolve_lua(),
+    ^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/modules/updater/release_arming_fixture.py", line 58, in resolve_lua
+    raise RuntimeError("Lua 5.4 is required for the native arming control")
+RuntimeError: Lua 5.4 is required for the native arming control
+:
+  expected: 0
+    actual: 1
+stack traceback:
+	[C]: in function 'error'
+	...opti/static/ergopti_plus/_shared/lua/test/assertions.lua:64: in function 'tests.helpers.assert_eq'
+	...os/tests/unit/modules/updater/test_release_installer.lua:615: in function <...os/tests/unit/modules/updater/test_release_installer.lua:611>
+	[C]: in function 'xpcall'
+	...os/tests/unit/modules/updater/test_release_installer.lua:611: in upvalue 'callback'
+	...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:110: in function <...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:108>
+	[C]: in function 'pcall'
+	...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in function <...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:74>
+	(...tail calls...)
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:841: in function 'tests.helpers.it'
+	...os/tests/unit/modules/updater/test_release_installer.lua:609: in function <...os/tests/unit/modules/updater/test_release_installer.lua:588>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...os/tests/unit/modules/updater/test_release_installer.lua:588: in main chunk
+	[C]: in function 'require'
+	tests/run.lua:181: in function <tests/run.lua:181>
+	[C]: in function 'pcall'
+	...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	tests/run.lua:181: in main chunk
+	[C]: in ?
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.test_release_installer","name":"tests.unit.modules.updater.test_release_installer","status":"pass","elapsed_ms":5685.952444,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  27
+Failed tests:  2
+========================================
+
+--- DETAILED FAILURES ---
+[1] refuses racing destinations and serializes detached installers before arming (release-exclusive-publication)
+    Error: test_release_installer.lua:516: Traceback (most recent call last):
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 553, in <module>
+    main()
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 507, in main
+    program, detach, physical, arming = emitted(
+                                        ^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 119, in emitted
+    command = command_from(
+              ^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 68, in command_from
+    arming.resolve_lua(),
+    ^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/modules/updater/release_arming_fixture.py", line 58, in resolve_lua
+    raise RuntimeError("Lua 5.4 is required for the native arming control")
+RuntimeError: Lua 5.4 is required for the native arming control
+:
+  expected: 0
+    actual: 1
+stack traceback:
+	[C]: in function 'error'
+	...opti/static/ergopti_plus/_shared/lua/test/assertions.lua:64: in function 'tests.helpers.assert_eq'
+	...os/tests/unit/modules/updater/test_release_installer.lua:516: in function <...os/tests/unit/modules/updater/test_release_installer.lua:513>
+	[C]: in function 'xpcall'
+	...os/tests/unit/modules/updater/test_release_installer.lua:513: in upvalue 'callback'
+	...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:110: in function <...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:108>
+	[C]: in function 'pcall'
+	...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in function <...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:74>
+	(...tail calls...)
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:841: in function 'tests.helpers.it'
+	...os/tests/unit/modules/updater/test_release_installer.lua:511: in function <...os/tests/unit/modules/updater/test_release_installer.lua:510>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...os/tests/unit/modules/updater/test_release_installer.lua:510: in main chunk
+	[C]: in function 'require'
+	tests/run.lua:181: in function <tests/run.lua:181>
+	[C]: in function 'pcall'
+	...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	tests/run.lua:181: in main chunk
+	[C]: in ?
+    replay: lua tests/run.lua --only 'refuses racing destinations and serializes detached installers before arming (release-exclusive-publication)'
+
+[2] binds both extracted scripts and complete argv to actual Lua emission (release-native-script-scope)
+    Error: test_release_installer.lua:615: Traceback (most recent call last):
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 553, in <module>
+    main()
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 500, in main
+    print(json.dumps(emission_controls(args.driver.resolve(strict=True), args.root)))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 138, in emission_controls
+    _, _, physical, arming = emitted(driver, root, "actual-lua")
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 119, in emitted
+    command = command_from(
+              ^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 68, in command_from
+    arming.resolve_lua(),
+    ^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/modules/updater/release_arming_fixture.py", line 58, in resolve_lua
+    raise RuntimeError("Lua 5.4 is required for the native arming control")
+RuntimeError: Lua 5.4 is required for the native arming control
+:
+  expected: 0
+    actual: 1
+stack traceback:
+	[C]: in function 'error'
+	...opti/static/ergopti_plus/_shared/lua/test/assertions.lua:64: in function 'tests.helpers.assert_eq'
+	...os/tests/unit/modules/updater/test_release_installer.lua:615: in function <...os/tests/unit/modules/updater/test_release_installer.lua:611>
+	[C]: in function 'xpcall'
+	...os/tests/unit/modules/updater/test_release_installer.lua:611: in upvalue 'callback'
+	...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:110: in function <...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:108>
+	[C]: in function 'pcall'
+	...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in function <...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:74>
+	(...tail calls...)
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:841: in function 'tests.helpers.it'
+	...os/tests/unit/modules/updater/test_release_installer.lua:609: in function <...os/tests/unit/modules/updater/test_release_installer.lua:588>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...os/tests/unit/modules/updater/test_release_installer.lua:588: in main chunk
+	[C]: in function 'require'
+	tests/run.lua:181: in function <tests/run.lua:181>
+	[C]: in function 'pcall'
+	...i/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	tests/run.lua:181: in main chunk
+	[C]: in ?
+    replay: lua tests/run.lua --only 'binds both extracted scripts and complete argv to actual Lua emission (release-native-script-scope)'

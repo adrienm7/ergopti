@@ -1,0 +1,76 @@
+[
+  {
+    "case": "success",
+    "exit_code": 0,
+    "canonical_bytes": "NEW-VERIFIED-FIXTURE",
+    "boot_calls": [
+      {
+        "path": "/workspace/scratch/parity-recovery/windows-updater/probes/case-success/Unicode \u00e9 current.exe",
+        "allow_launcher_exit": false,
+        "bytes": "NEW-VERIFIED-FIXTURE",
+        "call": 1
+      }
+    ],
+    "verified": true
+  },
+  {
+    "case": "primary-failure",
+    "exit_code": 1,
+    "canonical_bytes": "OLD-GENUINE-FIXTURE",
+    "boot_calls": [
+      {
+        "allow_launcher_exit": false,
+        "call": 1,
+        "bytes": "NEW-VERIFIED-FIXTURE",
+        "path": "/workspace/scratch/parity-recovery/windows-updater/probes/case-primary-failure/Unicode \u00e9 current.exe"
+      },
+      {
+        "allow_launcher_exit": false,
+        "call": 2,
+        "bytes": "OLD-GENUINE-FIXTURE",
+        "path": "/workspace/scratch/parity-recovery/windows-updater/probes/case-primary-failure/Unicode \u00e9 current.exe"
+      }
+    ],
+    "verified": true
+  },
+  {
+    "case": "recovery-fallback",
+    "exit_code": 1,
+    "canonical_bytes": "OLD-GENUINE-FIXTURE",
+    "boot_calls": [
+      {
+        "path": "/workspace/scratch/parity-recovery/windows-updater/probes/case-recovery-fallback/Unicode \u00e9 current.exe",
+        "allow_launcher_exit": false,
+        "call": 1,
+        "bytes": "NEW-VERIFIED-FIXTURE"
+      },
+      {
+        "path": "/workspace/scratch/parity-recovery/windows-updater/probes/case-recovery-fallback/Unicode \u00e9 current.exe",
+        "allow_launcher_exit": false,
+        "call": 2,
+        "bytes": "OLD-GENUINE-FIXTURE"
+      },
+      {
+        "path": "/workspace/scratch/parity-recovery/windows-updater/probes/case-recovery-fallback/Unicode \u00e9 current.exe.aa213066dc5348be8a4e942212468419.recovery.exe",
+        "allow_launcher_exit": true,
+        "call": 3,
+        "bytes": "OLD-GENUINE-FIXTURE"
+      }
+    ],
+    "verified": true
+  },
+  {
+    "case": "stage-missing",
+    "exit_code": 1,
+    "canonical_bytes": "OLD-GENUINE-FIXTURE",
+    "boot_calls": [
+      {
+        "allow_launcher_exit": false,
+        "call": 1,
+        "path": "/workspace/scratch/parity-recovery/windows-updater/probes/case-stage-missing/Unicode \u00e9 current.exe",
+        "bytes": "OLD-GENUINE-FIXTURE"
+      }
+    ],
+    "verified": true
+  }
+]

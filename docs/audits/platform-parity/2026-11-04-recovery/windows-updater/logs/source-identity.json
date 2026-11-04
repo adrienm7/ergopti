@@ -1,0 +1,85 @@
+{
+  "audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+  "sources": [
+    {
+      "path": "static/ergopti_plus/windows/modules/updater/asset_signature.ahk",
+      "sha256": "56f71b21e68e3a232d05872cf73f54f1aa4e627dbde649a2c01d6eeb9ae8c44b",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/updater/schedule.ahk",
+      "sha256": "546a68c7f6524297d2309847dba6ee43f21ae5f7aaf88c1776df56062272de40",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/updater/changelog.ahk",
+      "sha256": "047e274588b1620e30825844066e84ae88b33a7d50f52534702dbf6a1278877e",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/updater/self_update.ahk",
+      "sha256": "32478ee766331857312f2661da0aec29ba2083be0ff71e397ff1128b41d9a0a1",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/updater/config_backup.ahk",
+      "sha256": "2d496a7b47bc63f0d7f9e6bd7335769c50b695e183b0e591d7a3306352c41797",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/updater/channels.ahk",
+      "sha256": "d65f0823227bca1f86d102542629bd369c8a28de064036680e49c754961c8961",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/updater/core.ahk",
+      "sha256": "96446eb45c9f8931c91143a3635d47f206fb8903eda84ce2297aeb26b22ad567",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/updater/release_install.ahk",
+      "sha256": "964dcfd4d411d94ac916434eaed44c557ba69c1b3a5c3e90b73b51acf033779e",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/reload_terminal_handoff.ahk",
+      "sha256": "cd9fb6d898e68e1a7a59174cf3694a2720c355c8f3dfef768fdfdd32e0f8999f",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/reload_successor.ahk",
+      "sha256": "460ed70fef556bb3b646ec3ad6106d330b46d7b54e3f864dcb02492f4815b7c1",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/reload_deferral.ahk",
+      "sha256": "0eb38c37002863c7c35b712ba3912867d187481432305b2deb830925909b884c",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+      "sha256": "82f831243cc220a81da56ad61fe5ee97d2eb84d1790ce2d9f35bd30c44bf1b8f",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/adapters/updater_curl_capture.ahk",
+      "sha256": "6e78638c2d38825bebcbf75eabffb3323bc1b476ff2302bc12287e1b2d15a48e",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/vendor/ergopti_updater_staging.ps1",
+      "sha256": "d6aaeb1c5015d3f0e995b362478821facdf7e538fe489c3038bd6efda2963546",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/vendor/ergopti_updater_swap.ps1",
+      "sha256": "4a0ab0603ae8264836aa9757d5a3e0042f517d1f2449f04b9595f92ebea7abc7",
+      "matches_pin": true
+    },
+    {
+      "path": "static/ergopti_plus/windows/vendor/ergopti_updater_download.ps1",
+      "sha256": "15188a9eb46720a57c7dd99ee5111d05856d412ede8546170ffdc9ab5243cb4a",
+      "matches_pin": true
+    }
+  ]
+}

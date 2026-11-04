@@ -1,0 +1,3 @@
+healthy	moved=2	backed=1	kept=0	removed=1	cache=true
+healthy-restart	moved=0	backed=0	kept=0	removed=0	cache=true
+PASS scratch fixture retired; no live user paths or driver boot executed

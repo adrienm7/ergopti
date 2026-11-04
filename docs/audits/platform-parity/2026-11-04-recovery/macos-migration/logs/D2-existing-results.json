@@ -1,0 +1,38 @@
+[
+  {
+    "module": "tests.unit.adapters.test_legacy_folder_migration",
+    "exit": 0,
+    "summary": "RESULT 9 passed 0 failed",
+    "log": "/workspace/scratch/parity-recovery/macos-migration/logs/suite-tests.unit.adapters.test_legacy_folder_migration.txt"
+  },
+  {
+    "module": "tests.unit.infra.config.test_config_paths_managed_bootstrap",
+    "exit": 0,
+    "summary": "RESULT 6 passed 0 failed",
+    "log": "/workspace/scratch/parity-recovery/macos-migration/logs/suite-tests.unit.infra.config.test_config_paths_managed_bootstrap.txt"
+  },
+  {
+    "module": "tests.unit.infra.config.paths.test_bootstrap_toml",
+    "exit": 0,
+    "summary": "RESULT 8 passed 0 failed",
+    "log": "/workspace/scratch/parity-recovery/macos-migration/logs/suite-tests.unit.infra.config.paths.test_bootstrap_toml.txt"
+  },
+  {
+    "module": "tests.unit.infra.config.test_config_paths_first_launch",
+    "exit": 0,
+    "summary": "RESULT 1 passed 0 failed",
+    "log": "/workspace/scratch/parity-recovery/macos-migration/logs/suite-tests.unit.infra.config.test_config_paths_first_launch.txt"
+  },
+  {
+    "module": "tests.unit.infra.config.test_config_paths_home_fallback",
+    "exit": 0,
+    "summary": "RESULT 5 passed 0 failed",
+    "log": "/workspace/scratch/parity-recovery/macos-migration/logs/suite-tests.unit.infra.config.test_config_paths_home_fallback.txt"
+  },
+  {
+    "module": "tests.unit.infra.config.test_config_paths_write_transaction",
+    "exit": 0,
+    "summary": "RESULT 7 passed 0 failed",
+    "log": "/workspace/scratch/parity-recovery/macos-migration/logs/suite-tests.unit.infra.config.test_config_paths_write_transaction.txt"
+  }
+]

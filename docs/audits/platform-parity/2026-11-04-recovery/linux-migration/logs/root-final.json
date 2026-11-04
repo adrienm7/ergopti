@@ -1,0 +1,124 @@
+{
+  "pass": "root-final",
+  "engine": "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+  "results": [
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "healthy"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/root-final-00.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "race"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/root-final-01.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "newline"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/root-final-02.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "refused_rename"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/root-final-03.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "override"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/root-final-04.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "alias"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/root-final-05.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "symlink"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/root-final-06.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "backup_retry"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/root-final-07.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "name_controls"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/root-final-08.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "parent_refusal"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/root-final-09.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "cache_refusal"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/root-final-10.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/registered.lua"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/root-final-11.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/list-permission.lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/permission-naywoaut"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/root-final-12.txt"
+    }
+  ],
+  "status": "passed",
+  "new_confirmed_roots": 0
+}

@@ -1,0 +1,96 @@
+Selecting exact test module: "tests.unit.modules.updater.test_update_auto_check"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.test_update_auto_check
+
+=== updater.auto_check (macOS): Lua owns the cadence and the check ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a retired timer cannot replace the current timer (updater-owner-boundary)","status":"pass","elapsed_ms":29.289605,"timing_error":""}
+  ok   a retired timer cannot replace the current timer (updater-owner-boundary)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"duplicate completions cannot rewrite a recorded check (updater-owner-boundary)","status":"pass","elapsed_ms":1.113284,"timing_error":""}
+  ok   duplicate completions cannot rewrite a recorded check (updater-owner-boundary)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"transport exceptions are recorded and allow a retry (updater-owner-boundary)","status":"pass","elapsed_ms":0.843609,"timing_error":""}
+  ok   transport exceptions are recorded and allow a retry (updater-owner-boundary)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a refused live timer remains owned until cleanup succeeds","status":"pass","elapsed_ms":1.165102,"timing_error":""}
+  ok   a refused live timer remains owned until cleanup succeeds
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a refused timer leaves no active schedule","status":"pass","elapsed_ms":0.939553,"timing_error":""}
+  ok   a refused timer leaves no active schedule
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a stopped session cannot complete into its restarted owner","status":"pass","elapsed_ms":0.781034,"timing_error":""}
+  ok   a stopped session cannot complete into its restarted owner
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a channel change discards the previous in-flight offer","status":"pass","elapsed_ms":1.229349,"timing_error":""}
+  ok   a channel change discards the previous in-flight offer
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"malformed successful responses use failure backoff","status":"pass","elapsed_ms":3.925553,"timing_error":""}
+  ok   malformed successful responses use failure backoff
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"channel changes revoke an old response even after returning to that channel","status":"pass","elapsed_ms":1.201307,"timing_error":""}
+  ok   channel changes revoke an old response even after returning to that channel
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"notification refusal leaves the release retryable","status":"pass","elapsed_ms":3.105330,"timing_error":""}
+  ok   notification refusal leaves the release retryable
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a restart mid-interval does not check at boot","status":"pass","elapsed_ms":1.379665,"timing_error":""}
+  ok   a restart mid-interval does not check at boot
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"an overdue check catches up, reads the registry and announces once","status":"pass","elapsed_ms":6.046136,"timing_error":""}
+  ok   an overdue check catches up, reads the registry and announces once
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a paused driver sends nothing and leaves the record","status":"pass","elapsed_ms":0.995768,"timing_error":""}
+  ok   a paused driver sends nothing and leaves the record
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a failed check retries on the shared backoff","status":"pass","elapsed_ms":3.450278,"timing_error":""}
+  ok   a failed check retries on the shared backoff
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"the interval is the persisted preference snapped to a preset","status":"pass","elapsed_ms":1.587507,"timing_error":""}
+  ok   the interval is the persisted preference snapped to a preset
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a refused save keeps the previous interval","status":"pass","elapsed_ms":1.664433,"timing_error":""}
+  ok   a refused save keeps the previous interval
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a menu session wires the production ports and a wake watcher","status":"pass","elapsed_ms":6.945345,"timing_error":""}
+  ok   a menu session wires the production ports and a wake watcher
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"announces a release with a click that asks Sparkle for it","status":"pass","elapsed_ms":0.664309,"timing_error":""}
+  ok   announces a release with a click that asks Sparkle for it
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"never is never checked","status":"pass","elapsed_ms":0.849718,"timing_error":""}
+  ok   never is never checked
+
+=== updater.auto_check (macOS): the manual check answers the update-check window ===
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"offers a newer release of the checked channel without announcing it","status":"pass","elapsed_ms":1.783472,"timing_error":""}
+  ok   offers a newer release of the checked channel without announcing it
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"leaves the About row to a channel switched to while the check ran","status":"pass","elapsed_ms":2.294531,"timing_error":""}
+  ok   leaves the About row to a channel switched to while the check ran
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"says up to date and still lists newer releases of other channels","status":"pass","elapsed_ms":2.082461,"timing_error":""}
+  ok   says up to date and still lists newer releases of other channels
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"says the checked channel has no release yet","status":"pass","elapsed_ms":1.643702,"timing_error":""}
+  ok   says the checked channel has no release yet
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"answers a failed request with the connection reason and records the failure","status":"pass","elapsed_ms":0.979503,"timing_error":""}
+  ok   answers a failed request with the connection reason and records the failure
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"stores the fields it reads from a listed release with its ETag","status":"pass","elapsed_ms":0.913814,"timing_error":""}
+  ok   stores the fields it reads from a listed release with its ETag
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a restarted owner revalidates the stored copy and reads a 304 from it","status":"pass","elapsed_ms":2.269022,"timing_error":""}
+  ok   a restarted owner revalidates the stored copy and reads a 304 from it
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"drops a stored copy of another list URL and sends a full request","status":"pass","elapsed_ms":0.986313,"timing_error":""}
+  ok   drops a stored copy of another list URL and sends a full request
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"names an exhausted GitHub rate limit and its reset time","status":"pass","elapsed_ms":0.785021,"timing_error":""}
+  ok   names an exhausted GitHub rate limit and its reset time
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"answers an unusable list with the parse reason","status":"pass","elapsed_ms":0.748245,"timing_error":""}
+  ok   answers an unusable list with the parse reason
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"answers once when the transport throws","status":"pass","elapsed_ms":1.027845,"timing_error":""}
+  ok   answers once when the transport throws
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"refuses a channel the registry does not declare, without a request","status":"pass","elapsed_ms":1.182508,"timing_error":""}
+  ok   refuses a channel the registry does not declare, without a request
+# lua_timing {"schema":1,"driver":"macos","id":33,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"runs while the driver is paused: the user asked for it","status":"pass","elapsed_ms":0.864250,"timing_error":""}
+  ok   runs while the driver is paused: the user asked for it
+# lua_timing {"schema":1,"driver":"macos","id":34,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"reuses the session's list on a 304 with the same ETag","status":"pass","elapsed_ms":1.130660,"timing_error":""}
+  ok   reuses the session's list on a 304 with the same ETag
+
+=== updater.auto_check (macOS): the Atom feed answers when the API gives no list (update-check-feed-99) ===
+# lua_timing {"schema":1,"driver":"macos","id":35,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"reads the feed's repository tags in order, as the update check's list","status":"pass","elapsed_ms":0.100992,"timing_error":""}
+  ok   reads the feed's repository tags in order, as the update check's list
+# lua_timing {"schema":1,"driver":"macos","id":36,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a manual check offers the release the feed lists when the API rate limit is spent","status":"pass","elapsed_ms":1.298823,"timing_error":""}
+  ok   a manual check offers the release the feed lists when the API rate limit is spent
+# lua_timing {"schema":1,"driver":"macos","id":37,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a manual check names both causes when the feed fails too","status":"pass","elapsed_ms":0.947925,"timing_error":""}
+  ok   a manual check names both causes when the feed fails too
+# lua_timing {"schema":1,"driver":"macos","id":38,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a manual check reads no feed for a list the API answered unusable","status":"pass","elapsed_ms":0.690448,"timing_error":""}
+  ok   a manual check reads no feed for a list the API answered unusable
+# lua_timing {"schema":1,"driver":"macos","id":39,"kind":"case","module":"tests.unit.modules.updater.test_update_auto_check","name":"a background check announces the release the feed lists","status":"pass","elapsed_ms":0.931751,"timing_error":""}
+  ok   a background check announces the release the feed lists
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.test_update_auto_check","name":"tests.unit.modules.updater.test_update_auto_check","status":"pass","elapsed_ms":92.517359,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  38
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

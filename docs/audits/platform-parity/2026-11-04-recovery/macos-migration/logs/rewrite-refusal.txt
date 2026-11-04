@@ -1,0 +1,6 @@
+REPRO rewrite refused after full backup/config move; retry blocked by backup; actual next-start resolver keeps nonexistent old config
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3mblydpm/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3mblydpm/Library/Application Support/Ergopti/paths.toml.
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3mblydpm/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3mblydpm/Library/Application Support/Ergopti/config.
+INFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3mblydpm/Library/Application Support/ErgoptiPlus.
+WARN paths.toml still names an old default folder: its backup could not be written.
+WARN paths.toml still names an old default folder: its backup could not be written.

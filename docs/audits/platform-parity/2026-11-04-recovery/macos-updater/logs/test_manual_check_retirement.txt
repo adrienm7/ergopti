@@ -1,0 +1,36 @@
+Selecting exact test module: "tests.unit.modules.updater.lifecycle.test_manual_check_retirement"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.lifecycle.test_manual_check_retirement
+
+=== manual updater request follows its owner lifetime ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_manual_check_retirement","name":"answers a current request once with schedule started=false","status":"pass","elapsed_ms":12.767610,"timing_error":""}
+  ok   answers a current request once with schedule started=false
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_manual_check_retirement","name":"answers a current request once with schedule started=true","status":"pass","elapsed_ms":8.116213,"timing_error":""}
+  ok   answers a current request once with schedule started=true
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_manual_check_retirement","name":"retires a successful manual response across none","status":"pass","elapsed_ms":9.183366,"timing_error":""}
+  ok   retires a successful manual response across none
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_manual_check_retirement","name":"retires a successful manual response across same","status":"pass","elapsed_ms":11.185874,"timing_error":""}
+  ok   retires a successful manual response across same
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_manual_check_retirement","name":"retires a successful manual response across replacement","status":"pass","elapsed_ms":8.760842,"timing_error":""}
+  ok   retires a successful manual response across replacement
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_manual_check_retirement","name":"retires a successful manual response across before_start","status":"pass","elapsed_ms":8.799549,"timing_error":""}
+  ok   retires a successful manual response across before_start
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_manual_check_retirement","name":"retires a successful manual response across start","status":"pass","elapsed_ms":8.837216,"timing_error":""}
+  ok   retires a successful manual response across start
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_manual_check_retirement","name":"retires a failed manual response with body=nil","status":"pass","elapsed_ms":8.685498,"timing_error":""}
+  ok   retires a failed manual response with body=nil
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_manual_check_retirement","name":"retires a failed manual response with body=[","status":"pass","elapsed_ms":8.801492,"timing_error":""}
+  ok   retires a failed manual response with body=[
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_manual_check_retirement","name":"preserves the manual answer across a channel change without retiring its owner","status":"pass","elapsed_ms":8.515713,"timing_error":""}
+  ok   preserves the manual answer across a channel change without retiring its owner
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.lifecycle.test_manual_check_retirement","name":"tests.unit.modules.updater.lifecycle.test_manual_check_retirement","status":"pass","elapsed_ms":94.263199,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  10
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

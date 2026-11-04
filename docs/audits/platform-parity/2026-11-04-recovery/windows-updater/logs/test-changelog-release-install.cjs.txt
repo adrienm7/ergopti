@@ -1,0 +1,1 @@
+[32m[OK] Versions page installs a chosen release in one click through the host (84 checks).[0m

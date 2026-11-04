@@ -1,0 +1,118 @@
+Selecting exact test module: "tests.unit.modules.updater.test_update_check_session_vectors"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.test_update_check_session_vectors
+
+=== update-check session vectors: the phase of each action ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"close in checking","status":"pass","elapsed_ms":0.012880,"timing_error":""}
+  ok   close in checking
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"close in up_to_date","status":"pass","elapsed_ms":0.011137,"timing_error":""}
+  ok   close in up_to_date
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"close in available","status":"pass","elapsed_ms":0.036105,"timing_error":""}
+  ok   close in available
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"close in no_release","status":"pass","elapsed_ms":0.009905,"timing_error":""}
+  ok   close in no_release
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"close in error","status":"pass","elapsed_ms":0.016785,"timing_error":""}
+  ok   close in error
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"update in checking","status":"pass","elapsed_ms":0.029414,"timing_error":""}
+  ok   update in checking
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"update in up_to_date","status":"pass","elapsed_ms":0.012769,"timing_error":""}
+  ok   update in up_to_date
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"update in available","status":"pass","elapsed_ms":0.022794,"timing_error":""}
+  ok   update in available
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"update in no_release","status":"pass","elapsed_ms":0.009535,"timing_error":""}
+  ok   update in no_release
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"update in error","status":"pass","elapsed_ms":0.010376,"timing_error":""}
+  ok   update in error
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"whats_new in checking","status":"pass","elapsed_ms":0.006159,"timing_error":""}
+  ok   whats_new in checking
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"whats_new in up_to_date","status":"pass","elapsed_ms":0.008163,"timing_error":""}
+  ok   whats_new in up_to_date
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"whats_new in available","status":"pass","elapsed_ms":0.020551,"timing_error":""}
+  ok   whats_new in available
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"whats_new in no_release","status":"pass","elapsed_ms":0.017496,"timing_error":""}
+  ok   whats_new in no_release
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"whats_new in error","status":"pass","elapsed_ms":0.009124,"timing_error":""}
+  ok   whats_new in error
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"open_url in checking","status":"pass","elapsed_ms":0.006049,"timing_error":""}
+  ok   open_url in checking
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"open_url in up_to_date","status":"pass","elapsed_ms":0.008843,"timing_error":""}
+  ok   open_url in up_to_date
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"open_url in available","status":"pass","elapsed_ms":0.022594,"timing_error":""}
+  ok   open_url in available
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"open_url in no_release","status":"pass","elapsed_ms":0.009133,"timing_error":""}
+  ok   open_url in no_release
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"open_url in error","status":"pass","elapsed_ms":0.008163,"timing_error":""}
+  ok   open_url in error
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"switch_channel in checking","status":"pass","elapsed_ms":0.028834,"timing_error":""}
+  ok   switch_channel in checking
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"switch_channel in up_to_date","status":"pass","elapsed_ms":0.008743,"timing_error":""}
+  ok   switch_channel in up_to_date
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"switch_channel in available","status":"pass","elapsed_ms":0.019489,"timing_error":""}
+  ok   switch_channel in available
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"switch_channel in no_release","status":"pass","elapsed_ms":0.008433,"timing_error":""}
+  ok   switch_channel in no_release
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"switch_channel in error","status":"pass","elapsed_ms":0.009174,"timing_error":""}
+  ok   switch_channel in error
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"report in checking","status":"pass","elapsed_ms":0.007441,"timing_error":""}
+  ok   report in checking
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"report in up_to_date","status":"pass","elapsed_ms":0.007721,"timing_error":""}
+  ok   report in up_to_date
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"report in available","status":"pass","elapsed_ms":0.018488,"timing_error":""}
+  ok   report in available
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"report in no_release","status":"pass","elapsed_ms":0.007170,"timing_error":""}
+  ok   report in no_release
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"report in error","status":"pass","elapsed_ms":0.010456,"timing_error":""}
+  ok   report in error
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"open_log in checking","status":"pass","elapsed_ms":0.006180,"timing_error":""}
+  ok   open_log in checking
+# lua_timing {"schema":1,"driver":"macos","id":33,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"open_log in up_to_date","status":"pass","elapsed_ms":0.009144,"timing_error":""}
+  ok   open_log in up_to_date
+# lua_timing {"schema":1,"driver":"macos","id":34,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"open_log in available","status":"pass","elapsed_ms":0.019539,"timing_error":""}
+  ok   open_log in available
+# lua_timing {"schema":1,"driver":"macos","id":35,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"open_log in no_release","status":"pass","elapsed_ms":0.008092,"timing_error":""}
+  ok   open_log in no_release
+# lua_timing {"schema":1,"driver":"macos","id":36,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"open_log in error","status":"pass","elapsed_ms":0.008443,"timing_error":""}
+  ok   open_log in error
+
+=== update-check session vectors: the page's state message ===
+# lua_timing {"schema":1,"driver":"macos","id":37,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"up-to-date-names-no-notes","status":"pass","elapsed_ms":0.124017,"timing_error":""}
+  ok   up-to-date-names-no-notes
+# lua_timing {"schema":1,"driver":"macos","id":38,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"available-carries-the-notes","status":"pass","elapsed_ms":0.021182,"timing_error":""}
+  ok   available-carries-the-notes
+# lua_timing {"schema":1,"driver":"macos","id":39,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"available-from-the-feed-is-check-only","status":"pass","elapsed_ms":0.049014,"timing_error":""}
+  ok   available-from-the-feed-is-check-only
+# lua_timing {"schema":1,"driver":"macos","id":40,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"no-release-names-no-notes","status":"pass","elapsed_ms":0.015803,"timing_error":""}
+  ok   no-release-names-no-notes
+# lua_timing {"schema":1,"driver":"macos","id":41,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"failure-names-its-reason","status":"pass","elapsed_ms":0.013480,"timing_error":""}
+  ok   failure-names-its-reason
+
+=== update-check session vectors: the exhausted rate limit ===
+# lua_timing {"schema":1,"driver":"macos","id":42,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"exhausted-403-names-the-reset","status":"pass","elapsed_ms":0.145228,"timing_error":""}
+  ok   exhausted-403-names-the-reset
+# lua_timing {"schema":1,"driver":"macos","id":43,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"exhausted-429-at-the-epoch","status":"pass","elapsed_ms":0.003846,"timing_error":""}
+  ok   exhausted-429-at-the-epoch
+# lua_timing {"schema":1,"driver":"macos","id":44,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"exhausted-remaining-as-a-number","status":"pass","elapsed_ms":0.002954,"timing_error":""}
+  ok   exhausted-remaining-as-a-number
+# lua_timing {"schema":1,"driver":"macos","id":45,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"no-reset-still-names-the-limit","status":"pass","elapsed_ms":0.001833,"timing_error":""}
+  ok   no-reset-still-names-the-limit
+# lua_timing {"schema":1,"driver":"macos","id":46,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"malformed-reset-is-no-time","status":"pass","elapsed_ms":0.001572,"timing_error":""}
+  ok   malformed-reset-is-no-time
+# lua_timing {"schema":1,"driver":"macos","id":47,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"negative-reset-is-no-time","status":"pass","elapsed_ms":0.001522,"timing_error":""}
+  ok   negative-reset-is-no-time
+# lua_timing {"schema":1,"driver":"macos","id":48,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"calls-left-is-another-refusal","status":"pass","elapsed_ms":0.000851,"timing_error":""}
+  ok   calls-left-is-another-refusal
+# lua_timing {"schema":1,"driver":"macos","id":49,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"no-header-is-another-refusal","status":"pass","elapsed_ms":0.000932,"timing_error":""}
+  ok   no-header-is-another-refusal
+# lua_timing {"schema":1,"driver":"macos","id":50,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"other-status-is-no-limit","status":"pass","elapsed_ms":0.000811,"timing_error":""}
+  ok   other-status-is-no-limit
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.test_update_check_session_vectors","name":"tests.unit.modules.updater.test_update_check_session_vectors","status":"pass","elapsed_ms":4.999708,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  49
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

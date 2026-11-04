@@ -1,0 +1,11 @@
+
+=== updater: the channel an installation follows ===
+  ok   follows prereleases when it is itself a prerelease
+  ok   follows stable releases when it is one
+  ok   keeps the channel the user picked
+
+=== updater: a found release stays found ===
+  ok   still offers the release when the next check answers 304
+  ok   still offers the release when the next check fails
+  ok   forgets it when a fresh answer says the installation is current
+TOTAL 6 passed 0 failed

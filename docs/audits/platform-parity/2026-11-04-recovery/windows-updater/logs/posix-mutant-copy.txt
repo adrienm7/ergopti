@@ -1,0 +1,7 @@
+PASS default
+FAIL owned error= bytes=abc factory=1 current=1
+PASS bad-identity
+PASS withdrawn
+FAIL withdraw-before-copy error= bytes=abc factory=1 current=1
+PASS route-refused
+RESULT passed=4 failed=2 native_requests=0 filesystem_operations=0

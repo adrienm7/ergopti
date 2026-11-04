@@ -1,0 +1,38 @@
+[
+  {
+    "module": "tests.unit.modules.updater.check.test_updater_channel_and_recheck",
+    "exit": 0,
+    "passed": 6,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.check.test_updater_check_schedule",
+    "exit": 0,
+    "passed": 18,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.check.test_updater_check_only_fallback",
+    "exit": 0,
+    "passed": 5,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.check.test_updater_manager_set_channel_refuses",
+    "exit": 0,
+    "passed": 27,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.check.test_updater_manager_etag_failed_second",
+    "exit": 0,
+    "passed": 17,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.infra.lifecycle.test_daemon_restart",
+    "exit": 0,
+    "passed": 19,
+    "failed": 0
+  }
+]

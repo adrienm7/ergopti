@@ -1,0 +1,1 @@
+Job log retrieval followed GitHub redirect but the redirected host returned Forbidden. Detailed macOS failure assertions were not obtained; no cause is inferred. Temporary signed redirect query omitted.

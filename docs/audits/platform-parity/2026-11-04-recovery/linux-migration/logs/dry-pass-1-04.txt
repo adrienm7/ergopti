@@ -1,0 +1,3 @@
+override	moved=2	backed=0	kept=0	removed=1	cache=true
+override-effective=/workspace/scratch/parity-recovery/linux-migration/probes/native-vAH5Nh/override/cfg/ergopti_plus/custom/config.toml	relocated=/workspace/scratch/parity-recovery/linux-migration/probes/native-vAH5Nh/override/cfg/ergopti/custom/config.toml	active_config_absent=true
+PASS scratch fixture retired; no live user paths or driver boot executed

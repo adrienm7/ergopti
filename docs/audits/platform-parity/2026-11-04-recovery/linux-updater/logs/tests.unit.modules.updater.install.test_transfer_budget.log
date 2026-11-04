@@ -1,0 +1,25 @@
+
+=== Captured Archive Phase Budget ===
+  ok   total is derived from all captured caps
+  ok   noncanonical caps derive their own total
+  ok   mutating defaults cannot extend captured caps
+  ok   token fields cannot extend private deadline
+  ok   checksum begins once within cap
+  ok   archive continuation does not restart on relay or redirect
+  ok   final hash is capped by original total
+  ok   hash receives its own smaller cap when total permits
+  ok   phase cannot be skipped
+  ok   old phase cannot regain dispatch consent
+  ok   expired checksum cannot proceed
+  ok   expired archive cannot proceed
+  ok   regressing monotonic clock is refused
+  ok   retirement cannot restore consent
+  ok   forged token is refused
+  ok   missing cap has no fallback
+  ok   fractional and nonpositive caps refused
+  ok   overflowed original total refused
+  ok   metatable cannot supply absent policy
+  ok   nonfinite observation cannot dispatch
+  ok   actual high-resolution monotonic shape preserves fractional time
+  ok   nil phase before admission refuses without throwing
+TOTAL 22 passed 0 failed

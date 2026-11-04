@@ -1,0 +1,10 @@
+accepted
+phases=backing_up,downloading,installing,restarting
+busy=true exit=0 lease=1 schedule=1 admission=1
+concurrent installer: lease refused exit=4; first stage retained
+after private launcher exit: app=CHOSEN previous=ORIGINAL worker=0
+refused
+phases=backing_up,downloading,installing,restarting,failed
+busy=false exit=0 lease=0 schedule=0 admission=1
+concurrent installer: lease refused exit=4; first stage retained
+after private launcher exit: app=CHOSEN previous=ORIGINAL worker=0

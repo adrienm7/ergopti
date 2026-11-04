@@ -1,0 +1,1 @@
+[32m[OK] only clicks install, on every driver; one set of install reasons (64 checks).[0m

@@ -1,0 +1,61 @@
+{
+	"schema_version": 1,
+	"scope": "windows-migration",
+	"audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+	"created_at": "2026-11-04",
+	"report_path": "/workspace/scratch/parity-recovery/windows-migration/report.md",
+	"findings": [
+		{
+			"id": "WFM-001",
+			"title": "Independent migration moves and locator publication can select an empty configuration after a refusal",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_property": "Preservation of a coherent authoritative config and locator after automatic migration failure.",
+			"reproduction": "Start with the old default config containing personal data and its old Roaming locator. Either refuse the config directory move and allow locator rewrite, or pre-create the immutable locator backup and allow all moves. In the first schedule the locator selects empty new config while old data stays; in the second it selects removed old config while personal bytes have moved. A failed opened locator FSWrite can remove the active locator, after which boot generates defaults; backup remains but no recovery consumes it. Actual shared Lua core reproduced these states on real private files, with modeled native refusals; production AHK/Win32 was not executed.",
+			"root_cause": "windows/infra/legacy_folder_migration.ahk:243-270 performs moves independently, unconditionally rewrites the static old-to-new rules, and returns a report ignored by boot. RewritePathsFile:211-227 refuses occupied backup or failed destructive FSWrite but neither restores prior effects nor blocks boot. windows/infra/boot.ahk:66-80 continues to selected config; native FSWrite opens active path with w and removes partial output.",
+			"silent_failure": "Initial move/backup refusal is WARNed, so the finding does not allege a silent primary I/O failure. The incoherent selected profile and missing recovery debt are not acknowledged. The backup_refused log also misattributes a failed active write to backup failure.",
+			"regression_test": "Drive real full migration plus boot with every move/backup/open/write/close/cleanup refusal and crash boundary. Require complete old/new selection or explicit boot refusal, retained immutable backups, restart recovery and no selection of empty defaults. Keep documented conflict-wins policy and test actual source-fresh conditional publication.",
+			"evidence_basis": "Source-derived Windows production integration; executed actual shared Lua core over private real POSIX files; native Windows/AHK unexecuted."
+		},
+		{
+			"id": "WFM-002",
+			"title": "Moving a legacy ancestor leaves a selected custom descendant pointing to its removed path",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_property": "Preservation of explicit user config-directory identity while its containing directory is relocated.",
+			"reproduction": "Place the chosen profile at old-default/profiles/private/config.toml and set ConfigDirPath to that descendant. Successful migration moves the whole old-default ancestor to new config, but reports locator unchanged because descendant does not equal the old default. Boot recreates the missing old descendant and loads default state; private data remains at new config/profiles/private. Actual shared core real-file case confirms moved bytes and stale path; external chosen Documents-folder control remains live. Native AHK boot was not executed.",
+			"root_cause": "LegacyFolderMigrationRun:260 moves the complete legacy config directory. Rewrite rule:265 and LegacyFolderRewritePathsText:184 only match exact normalized old-default values, with no binding from selected descendants to actual moved-object receipts. Boot trusts the unchanged nonempty override and creates a missing selected directory.",
+			"silent_failure": "All moves succeed and locator outcome is unchanged, so no migration refusal is logged. The informational move log does not warn that the configured selected descendant was detached from its bytes.",
+			"regression_test": "Run actual migration/readback with exact default, external chosen path, selected descendants, aliases and destination-conflict branches. Require selected-object identity preserved at old path or correctly rebased to the actual receipt destination, without switching to another profile or rewriting unrelated custom paths.",
+			"evidence_basis": "Source-derived Windows production integration; executed actual shared Lua core over private real POSIX files; native Windows/AHK unexecuted."
+		},
+		{
+			"id": "WFM-003",
+			"title": "Valid quoted TOML locator keys are missed by the migration rewriter after data moves",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_property": "Semantic equivalence of accepted locator TOML must not change authoritative user selection during migration.",
+			"reproduction": "Use valid locator syntax \"ConfigDirPath\" = \"C:/Users/u/.config/ergopti_plus/\" with the actual old default. The semantic boot reader accepts that key, but the migration regex ignores it, moves config away and leaves the locator unchanged. The next boot selects and recreates the missing old path. Real-file actual shared core plus actual TOML codec confirms the quoted key still decodes to the stale old value; native Windows reader execution was unavailable.",
+			"root_cause": "windows/infra/legacy_folder_migration.ahk:175 recognizes only bare word keys and basic double-quoted values. Actual windows/infra/toml/toml_helpers.ahk:ReadPathsToml deliberately uses TOML_ParseDocument for quoted key identities and escapes. Exact decoded old-default identity is not used by the migration owner.",
+			"silent_failure": "No I/O operation refuses and rewrite returns unchanged; no warning says a valid parsed default was missed. This differs from custom descendants because the decoded value is the exact legacy default.",
+			"regression_test": "Exercise the full migration and real reader using semantically equivalent bare/quoted/literal keys and strings, legal escapes, comments and non-ASCII paths. Require identical retained selection without rewriting unknown data or changing deliberate no-op preservation.",
+			"evidence_basis": "Source-derived Windows production integration; executed actual shared Lua core over private real POSIX files; native Windows/AHK unexecuted."
+		},
+		{
+			"id": "WFM-004",
+			"title": "Migrating only the locator hides the old configuration-transition recovery journal",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_property": "Existing configuration transition recovery and quarantine must remain authoritative across locator migration.",
+			"reproduction": "Leave paths.toml.config-transition.wal beside the old Roaming paths.toml after a pre-upgrade interruption. A malformed nonempty WAL is a decisive quarantine control; valid pending cohorts are required native follow-up. Migration moves only paths.toml and may move target directories. Boot then looks beside the new LocalAppData locator, where WAL is absent, and bypasses old recovery/quarantine. Real private files confirm old WAL/artifact remain and new WAL is absent; source confirms old malformed inspection quarantines and new absent namespace returns absent. No valid native prepared cohort was executed.",
+			"root_cause": "LegacyFolderMigrationRun:256-260 relocates the exact legacy locator and config before recovery, without recovering or adopting the old WAL/artifact namespace. boot.ahk:66-70 recovers only the new locator. ConfigTransitionWalPath derives a sibling .config-transition.wal; ConfigTransitionInspect:879-904 returns absent before parsing when the new sibling is absent. Validated record namespaces retain the original locator and absolute targets, so blindly moving WAL alone is insufficient.",
+			"silent_failure": "Normal migration reports successful moves; the nonempty old directory is simply retained. No diagnostic discovers the orphaned old WAL. The recovery owner is bypassed before its malformed/unreadable quarantine can run.",
+			"regression_test": "Before legacy locator/target relocation, execute or explicitly refuse its existing recovery namespace. Test each actual journal phase and malformed/unreadable WAL with whole-cohort old/new receipts on isolated Windows. Assert that changing locator path cannot hide a pending or quarantined transaction; do not accept an unvalidated WAL under a new namespace.",
+			"evidence_basis": "Source-derived Windows production integration; executed actual shared Lua core over private real POSIX files; native Windows/AHK unexecuted."
+		}
+	]
+}

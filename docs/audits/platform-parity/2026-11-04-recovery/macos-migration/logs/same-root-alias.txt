@@ -1,0 +1,4 @@
+before: legacy/current active.log same dev+ino=true
+REPRO: active destination inode archived through legacy alias; current path absent; backup same dev+ino; next public run does not restore
+WARN Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-dts2uzlm/Library/Logs/ergopti_plus/active.log to the backup /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-dts2uzlm/Library/Application Support/Ergopti/before-folder-migration/Library/Logs/ergopti_plus/active.log: /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-dts2uzlm/Library/Logs/Ergopti/active.log is already taken.
+immutable-source modules only; actual public plan/core/native POSIX ports; no live repository modules or tests loaded

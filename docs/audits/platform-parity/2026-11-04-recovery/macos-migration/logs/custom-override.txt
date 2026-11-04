@@ -1,0 +1,4 @@
+CONTROL unrelated custom override and user bytes preserved; legacy default still migrates
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-vmoqgl27/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-vmoqgl27/Library/Application Support/Ergopti/paths.toml.
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-vmoqgl27/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-vmoqgl27/Library/Application Support/Ergopti/config.
+INFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-vmoqgl27/Library/Application Support/ErgoptiPlus.

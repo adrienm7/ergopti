@@ -1,0 +1,28 @@
+Selecting exact test module: "tests.unit.infra.lifecycle.test_emergency_exit"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.infra.lifecycle.test_emergency_exit
+
+=== bounded emergency exit ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.infra.lifecycle.test_emergency_exit","name":"forces EOF when an accepted exact fence never settles","status":"pass","elapsed_ms":0.127802,"timing_error":""}
+  ok   forces EOF when an accepted exact fence never settles
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.infra.lifecycle.test_emergency_exit","name":"forces EOF immediately when the controlled request is rejected","status":"pass","elapsed_ms":0.116535,"timing_error":""}
+  ok   forces EOF immediately when the controlled request is rejected
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.infra.lifecycle.test_emergency_exit","name":"forces EOF when the exact-fence abort callback fires","status":"pass","elapsed_ms":0.128593,"timing_error":""}
+  ok   forces EOF when the exact-fence abort callback fires
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.infra.lifecycle.test_emergency_exit","name":"exits synchronously when no deadline timer can be retained","status":"pass","elapsed_ms":0.106350,"timing_error":""}
+  ok   exits synchronously when no deadline timer can be retained
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.infra.lifecycle.test_emergency_exit","name":"does not retain or start work after an inline deadline fires","status":"pass","elapsed_ms":0.096094,"timing_error":""}
+  ok   does not retain or start work after an inline deadline fires
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.infra.lifecycle.test_emergency_exit","name":"the raw deadline exits even when timer stop and logger diagnostics fail","status":"pass","elapsed_ms":0.750286,"timing_error":""}
+  ok   the raw deadline exits even when timer stop and logger diagnostics fail
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.infra.lifecycle.test_emergency_exit","name":"tests.unit.infra.lifecycle.test_emergency_exit","status":"pass","elapsed_ms":1.716075,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  6
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

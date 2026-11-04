@@ -1,0 +1,2 @@
+CONTROL: no legacy root leaves active destination unchanged
+immutable-source modules only; actual public plan/core/native POSIX ports; no live repository modules or tests loaded

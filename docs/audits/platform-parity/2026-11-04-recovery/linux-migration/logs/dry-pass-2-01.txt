@@ -1,0 +1,3 @@
+race	moved=1	backed=0	kept=0	removed=1	cache=true
+race-newer-target-replaced=true	native=os.rename	report=successful-move
+PASS scratch fixture retired; no live user paths or driver boot executed

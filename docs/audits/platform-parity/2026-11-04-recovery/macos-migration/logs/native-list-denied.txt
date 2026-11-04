@@ -1,0 +1,1 @@
+REPRO real unprivileged POSIX directory denial throws from public native list; original files retained; no report returned: .../ergopti_plus/macos/adapters/legacy_folder_migration.lua:56: cannot open /workspace/scratch/parity-recovery/macos-migration/probes/tmp-1yvl65qn/Library/Application Support/ErgoptiPlus: Permission denied

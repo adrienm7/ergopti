@@ -1,0 +1,24 @@
+[
+  {
+    "module": "tests.unit.modules.updater.test_release_installer",
+    "exit": 0,
+    "tail": [
+      "Passed tests:  29",
+      "Failed tests:  0",
+      "========================================",
+      "",
+      "[OK] All Lua unit tests passed."
+    ]
+  },
+  {
+    "module": "tests.unit.modules.updater.lifecycle.test_release_arming_receipt",
+    "exit": 0,
+    "tail": [
+      "Passed tests:  21",
+      "Failed tests:  0",
+      "========================================",
+      "",
+      "[OK] All Lua unit tests passed."
+    ]
+  }
+]

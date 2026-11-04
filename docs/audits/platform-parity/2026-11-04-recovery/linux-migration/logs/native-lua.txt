@@ -1,0 +1,14 @@
+healthy	moved=2	backed=1	kept=0	removed=1	cache=true
+healthy-restart	moved=0	backed=0	kept=0	removed=0	cache=true
+race	moved=1	backed=0	kept=0	removed=1	cache=true
+race-newer-target-replaced=true	native=os.rename	report=successful-move
+newline-list	["line","break"]
+newline	moved=0	backed=0	kept=0	removed=0	cache=true
+newline-restart-same-silent-stall=true
+refusal	moved=0	backed=0	kept=1	removed=0	cache=true
+rename-refusal-restart-recovers=true
+override	moved=2	backed=0	kept=0	removed=1	cache=true
+override-effective=/workspace/scratch/parity-recovery/linux-migration/probes/native-gXq0ST/override/cfg/ergopti_plus/custom/config.toml	relocated=/workspace/scratch/parity-recovery/linux-migration/probes/native-gXq0ST/override/cfg/ergopti/custom/config.toml	active_config_absent=true
+symlink-observation	moved=1	backed=0	kept=0	removed=0	cache=true
+symlink-source-target-drained=true	policy=unresolved-not-finding
+PASS scratch fixture retired; no live user paths or driver boot executed

@@ -1,0 +1,4 @@
+CONTROL: distinct legacy/current roots preserve active destination and archive only distinct old file
+WARN Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-gsr4kqmz/Library/Logs/ergopti_plus/active.log to the backup /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-gsr4kqmz/Library/Application Support/Ergopti/before-folder-migration/Library/Logs/ergopti_plus/active.log: /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-gsr4kqmz/Library/Logs/Ergopti/active.log is already taken.
+INFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-alias-gsr4kqmz/Library/Logs/ergopti_plus.
+immutable-source modules only; actual public plan/core/native POSIX ports; no live repository modules or tests loaded
