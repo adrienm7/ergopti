@@ -221,14 +221,26 @@ helpers.describe("clipboard selection transaction", function()
 		end)
 	end)
 
-	helpers.it("restores before reporting a timing failure", function()
+	helpers.it("keeps an external copy when transform selection settling fails", function()
+		with_session("x11", nil, function(clipboard, shell, combos, _, emit)
+			local ok = clipboard.transform_selection(string.upper, emit, function()
+				shell.current = "new user copy"
+				return false
+			end)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(combos, { "ctrl+c" })
+			helpers.assert_eq(shell.current, "new user copy")
+		end)
+	end)
+
+	helpers.it("preserves an unidentified copy after a timing failure", function()
 		with_session("x11", "selected", function(clipboard, shell, _, _, emit)
 			local ok, reason = clipboard.transform_selection(string.upper, emit, function() return false end)
 
 			helpers.assert_true(not ok, "an uncompleted wait must abort the transaction")
 			helpers.assert_eq(reason, "copy_settle_failed")
-			helpers.assert_eq(shell.writes[#shell.writes].text, "saved",
-				"all post-snapshot failures must restore the clipboard")
+			helpers.assert_eq(shell.current, "selected",
+				"a changed clipboard may belong to another application")
 		end)
 	end)
 
@@ -275,6 +287,19 @@ helpers.describe("clipboard selection transaction", function()
 			helpers.assert_eq(shell.current, "selected")
 		end)
 	end)
+
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		helpers.it("keeps a copy made while the copy wait fails (" .. kind .. ")", function()
+			with_session(kind, nil, function(clipboard, shell, _, _, emit)
+				local ok = clipboard.read_selection(emit, function()
+					shell.current = "new user copy"
+					return false
+				end)
+				helpers.assert_eq(ok, false)
+				helpers.assert_eq(shell.current, "new user copy")
+			end)
+		end)
+	end
 
 	helpers.it("reports no selection from the read probe and restores the clipboard", function()
 		with_session("wayland", nil, function(clipboard, shell, _, _, emit, sleep_ms)
@@ -325,6 +350,33 @@ helpers.describe("clipboard file-selection probe (text/uri-list)", function()
 			end)
 		end)
 	end
+
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		helpers.it("keeps a copy made while the file selection wait fails (" .. kind .. ")", function()
+			with_session(kind, nil, function(clipboard, shell, _, _, emit)
+				local ok = clipboard.read_selection_uri_list(emit, function()
+					shell.current = "new user copy"
+					return false
+				end)
+				helpers.assert_eq(ok, false)
+				helpers.assert_eq(shell.current, "new user copy")
+			end)
+		end)
+	end
+
+	helpers.it("preserves a copy made after reading the file selection", function()
+		with_session("x11", "file:///selected", function(clipboard, shell, _, _, emit, sleep_ms)
+			local original = shell.exec_checked
+			shell.exec_checked = function(command)
+				local ok, text, reason = original(command)
+				if command:find("text/uri-list", 1, true) then shell.current = "new user copy" end
+				return ok, text, reason
+			end
+			local ok = clipboard.read_selection_uri_list(emit, sleep_ms)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(shell.current, "new user copy")
+		end)
+	end)
 
 	helpers.it("reports no file selection when the copy published no uri-list", function()
 		with_session("x11", nil, function(clipboard, shell, _, _, emit, sleep_ms)
