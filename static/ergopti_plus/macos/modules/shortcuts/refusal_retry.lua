@@ -90,20 +90,20 @@ function M.new(log_tag, attempt)
 	function series.cancel()
 		generation = generation + 1
 		local live = handle
-		handle = nil
 		if live == nil then return true end
 		local ok, cancelled = pcall(TimerScheduler.cancel, live)
-		if not ok or cancelled == false then
+		if not ok or cancelled ~= true then
 			Logger.error(log_tag, "Refused shortcut retry timer did not cancel: %s.", tostring(cancelled))
 			return false
 		end
+		if handle == live then handle = nil end
 		return true
 	end
 
 	--- Starts a fresh bounded series, replacing any running one.
 	--- @return boolean armed
 	function series.schedule()
-		series.cancel()
+		if series.cancel() ~= true then return false end
 		return arm(1)
 	end
 
@@ -115,7 +115,7 @@ function M.new(log_tag, attempt)
 	function series.resume(index)
 		assert(math.type(index) == "integer" and index >= 1 and index <= #M.DELAYS_SEC,
 			"refusal retry resume needs a retry index")
-		series.cancel()
+		if series.cancel() ~= true then return false end
 		if index == #M.DELAYS_SEC then
 			warn_exhausted()
 			return false
