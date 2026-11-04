@@ -1,0 +1,5056 @@
+[
+	{
+		"path": "script.locale",
+		"family": "setting",
+		"labels": {
+			"fr": "script.locale",
+			"en": "script.locale"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "script.log_level",
+		"family": "setting",
+		"labels": {
+			"fr": "script.log_level",
+			"en": "script.log_level"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "script.show_error_dialog",
+		"family": "setting",
+		"labels": {
+			"fr": "Afficher une fenêtre à chaque erreur",
+			"en": "Show a window for every error"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "script.alt_gr_is_kana_remap",
+		"family": "setting",
+		"labels": {
+			"fr": "script.alt_gr_is_kana_remap",
+			"en": "script.alt_gr_is_kana_remap"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.alt_gr_is_kana_remap"
+	},
+	{
+		"path": "hotstrings.enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.enabled",
+			"en": "hotstrings.enabled"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.hotstrings_master_is_macos_engine"
+	},
+	{
+		"path": "hotstrings.dynamic.enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.dynamic.enabled",
+			"en": "hotstrings.dynamic.enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.trigger_char",
+		"family": "setting",
+		"labels": {
+			"fr": "hotstrings.trigger_char",
+			"en": "hotstrings.trigger_char"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.magic_key_source",
+		"family": "setting",
+		"labels": {
+			"fr": "Touche physique de la touche magique",
+			"en": "Physical key of the magic key"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.magic_key_source_char",
+		"family": "setting",
+		"labels": {
+			"fr": "Caractère de la touche source magique",
+			"en": "Magic-key source character"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.magic_key_detection_is_windows"
+	},
+	{
+		"path": "hotstrings.repeat_key_enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.repeat_key_enabled",
+			"en": "hotstrings.repeat_key_enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.idle_reset_seconds",
+		"family": "setting",
+		"labels": {
+			"fr": "Nouveau mot après une pause",
+			"en": "New word after a pause"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.click_resets_word",
+		"family": "setting",
+		"labels": {
+			"fr": "Un clic de souris commence un nouveau mot",
+			"en": "A mouse click starts a new word"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.arrow_resets_word",
+		"family": "setting",
+		"labels": {
+			"fr": "Une flèche commence un nouveau mot",
+			"en": "An arrow key starts a new word"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.shortcut_resets_word",
+		"family": "setting",
+		"labels": {
+			"fr": "Un raccourci clavier commence un nouveau mot",
+			"en": "A keyboard shortcut starts a new word"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.tap_hold_resets_word",
+		"family": "setting",
+		"labels": {
+			"fr": "Un tap ou un hold sur une touche tap-hold commence un nouveau mot",
+			"en": "A tap or hold of a tap-hold key starts a new word"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": true
+		},
+		"reason_key": "platform_reason.tap_hold_word_reset_not_on_macos"
+	},
+	{
+		"path": "hotstrings.cascade_max_arrows",
+		"family": "setting",
+		"labels": {
+			"fr": "Hotstrings en chaîne (a → b → c)",
+			"en": "Chained hotstrings (a → b → c)"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.expansion_delay",
+		"family": "setting",
+		"labels": {
+			"fr": "Délai d'expansion",
+			"en": "Expansion delay"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.preview_ai_enabled",
+		"family": "setting",
+		"labels": {
+			"fr": "hotstrings.preview_ai_enabled",
+			"en": "hotstrings.preview_ai_enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.preview_autocorrect_enabled",
+		"family": "setting",
+		"labels": {
+			"fr": "hotstrings.preview_autocorrect_enabled",
+			"en": "hotstrings.preview_autocorrect_enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.preview_colored_tooltips",
+		"family": "setting",
+		"labels": {
+			"fr": "hotstrings.preview_colored_tooltips",
+			"en": "hotstrings.preview_colored_tooltips"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.preview_star_enabled",
+		"family": "setting",
+		"labels": {
+			"fr": "hotstrings.preview_star_enabled",
+			"en": "hotstrings.preview_star_enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.autocorrection.names",
+		"family": "feature",
+		"labels": {
+			"fr": "Noms et produits",
+			"en": "Names and products"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.autocorrection.abbreviations",
+		"family": "feature",
+		"labels": {
+			"fr": "Abréviations",
+			"en": "Abbreviations"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.autocorrection.technical_terms",
+		"family": "feature",
+		"labels": {
+			"fr": "Termes techniques",
+			"en": "Technical terms"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.distances_reduction.qu",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.distances_reduction.qu",
+			"en": "hotstrings.distances_reduction.qu"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.distances_reduction.comma_j",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.distances_reduction.comma_j",
+			"en": "hotstrings.distances_reduction.comma_j"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.distances_reduction.comma_far_letters",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.distances_reduction.comma_far_letters",
+			"en": "hotstrings.distances_reduction.comma_far_letters"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.distances_reduction.dead_key_e_circumflex",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.distances_reduction.dead_key_e_circumflex",
+			"en": "hotstrings.distances_reduction.dead_key_e_circumflex"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.distances_reduction.e_circumflex_e",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.distances_reduction.e_circumflex_e",
+			"en": "hotstrings.distances_reduction.e_circumflex_e"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.distances_reduction.space_around_symbols",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.distances_reduction.space_around_symbols",
+			"en": "hotstrings.distances_reduction.space_around_symbols"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.sfbs_reduction.comma",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.sfbs_reduction.comma",
+			"en": "hotstrings.sfbs_reduction.comma"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.sfbs_reduction.e_circ",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.sfbs_reduction.e_circ",
+			"en": "hotstrings.sfbs_reduction.e_circ"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.sfbs_reduction.e_grave",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.sfbs_reduction.e_grave",
+			"en": "hotstrings.sfbs_reduction.e_grave"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.sfbs_reduction.bu",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.sfbs_reduction.bu",
+			"en": "hotstrings.sfbs_reduction.bu"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.sfbs_reduction.i_e_acute",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.sfbs_reduction.i_e_acute",
+			"en": "hotstrings.sfbs_reduction.i_e_acute"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.hc",
+		"family": "feature",
+		"labels": {
+			"fr": "HC ➜ WH",
+			"en": "HC ➜ WH"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.sx",
+		"family": "feature",
+		"labels": {
+			"fr": "SX ➜ SK",
+			"en": "SX ➜ SK"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.cx",
+		"family": "feature",
+		"labels": {
+			"fr": "CX ➜ CK",
+			"en": "CX ➜ CK"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.ct",
+		"family": "feature",
+		"labels": {
+			"fr": "P' ➜ CT",
+			"en": "P' ➜ CT"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.ez",
+		"family": "feature",
+		"labels": {
+			"fr": "EÉ ➜ EZ",
+			"en": "EÉ ➜ EZ"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.assign",
+		"family": "feature",
+		"labels": {
+			"fr": "#! ➜ :=",
+			"en": "#! ➜ :="
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.assign_arrow_equal_left",
+		"family": "feature",
+		"labels": {
+			"fr": "=$ ➜ <=",
+			"en": "=$ ➜ <="
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.assign_arrow_equal_right",
+		"family": "feature",
+		"labels": {
+			"fr": "$= ➜ =>",
+			"en": "$= ➜ =>"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.assign_arrow_minus_left",
+		"family": "feature",
+		"labels": {
+			"fr": "?+ ➜ <-",
+			"en": "?+ ➜ <-"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.assign_arrow_minus_right",
+		"family": "feature",
+		"labels": {
+			"fr": "+? ➜ ->",
+			"en": "+? ➜ ->"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.bracket_quote",
+		"family": "feature",
+		"labels": {
+			"fr": "[# ➜ [\"",
+			"en": "[# ➜ [\""
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.chevron_equal",
+		"family": "feature",
+		"labels": {
+			"fr": "= ➜ <=",
+			"en": "= ➜ <="
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.chevron_greater",
+		"family": "feature",
+		"labels": {
+			"fr": ">% ➜ >=",
+			"en": ">% ➜ >="
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.chevron_less",
+		"family": "feature",
+		"labels": {
+			"fr": "<% ➜ <=",
+			"en": "<% ➜ <="
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.close_chevron_tag",
+		"family": "feature",
+		"labels": {
+			"fr": "<@ ➜ </",
+			"en": "<@ ➜ </"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.comment_close",
+		"family": "feature",
+		"labels": {
+			"fr": "\"\\  ➜ */",
+			"en": "\"\\  ➜ */"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.comment_open",
+		"family": "feature",
+		"labels": {
+			"fr": "\\\" ➜ /*",
+			"en": "\\\" ➜ /*"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.english_negation",
+		"family": "feature",
+		"labels": {
+			"fr": "NT' ➜ N'T",
+			"en": "NT' ➜ N'T"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.equal_string",
+		"family": "feature",
+		"labels": {
+			"fr": "[) ➜ = \"\"",
+			"en": "[) ➜ = \"\""
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.hashtag_close_bracket",
+		"family": "feature",
+		"labels": {
+			"fr": "#] ➜ \"]",
+			"en": "#] ➜ \"]"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.hashtag_open_bracket",
+		"family": "feature",
+		"labels": {
+			"fr": "#[ ➜ \"[",
+			"en": "#[ ➜ \"["
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.hashtag_parenthesis",
+		"family": "feature",
+		"labels": {
+			"fr": "#( ➜ \")",
+			"en": "#( ➜ \")"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.hashtag_quote",
+		"family": "feature",
+		"labels": {
+			"fr": "#\" ➜ \"",
+			"en": "#\" ➜ \""
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.left_arrow",
+		"family": "feature",
+		"labels": {
+			"fr": "=+ = ➜",
+			"en": "=+ = ➜"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.not_equal",
+		"family": "feature",
+		"labels": {
+			"fr": "!# ➜ !=",
+			"en": "!# ➜ !="
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.rolls.paren_quote",
+		"family": "feature",
+		"labels": {
+			"fr": "(# ➜ (\"",
+			"en": "(# ➜ (\""
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.magic_key.replace",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.magic_key.replace",
+			"en": "hotstrings.magic_key.replace"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.magic_key.repeat_corrections",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.magic_key.repeat_corrections",
+			"en": "hotstrings.magic_key.repeat_corrections"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.magic_key.text_expansion_symbols",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.magic_key.text_expansion_symbols",
+			"en": "hotstrings.magic_key.text_expansion_symbols"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.magic_key.text_expansion_symbols_typst",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.magic_key.text_expansion_symbols_typst",
+			"en": "hotstrings.magic_key.text_expansion_symbols_typst"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.french_distancesreduction.suffixes_a",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.french_distancesreduction.suffixes_a",
+			"en": "hotstrings.french_distancesreduction.suffixes_a"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.french_autocorrection.accents",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.french_autocorrection.accents",
+			"en": "hotstrings.french_autocorrection.accents"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.french_autocorrection.names",
+		"family": "feature",
+		"labels": {
+			"fr": "Noms et produits",
+			"en": "Names and products"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.french_autocorrection.typographic_apostrophe",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.french_autocorrection.typographic_apostrophe",
+			"en": "hotstrings.french_autocorrection.typographic_apostrophe"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.french_autocorrection.errors",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.french_autocorrection.errors",
+			"en": "hotstrings.french_autocorrection.errors"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.french_autocorrection.ou",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.french_autocorrection.ou",
+			"en": "hotstrings.french_autocorrection.ou"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.french_autocorrection.multiple_punctuation_marks",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.french_autocorrection.multiple_punctuation_marks",
+			"en": "hotstrings.french_autocorrection.multiple_punctuation_marks"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.french_autocorrection.suffixes_a_chaining",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.french_autocorrection.suffixes_a_chaining",
+			"en": "hotstrings.french_autocorrection.suffixes_a_chaining"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.french_autocorrection.minus",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.french_autocorrection.minus",
+			"en": "hotstrings.french_autocorrection.minus"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.french_autocorrection.minus_apostrophe",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.french_autocorrection.minus_apostrophe",
+			"en": "hotstrings.french_autocorrection.minus_apostrophe"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.french_magickey.text_expansion",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.french_magickey.text_expansion",
+			"en": "hotstrings.french_magickey.text_expansion"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.french_magickey.text_expansion_auto",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.french_magickey.text_expansion_auto",
+			"en": "hotstrings.french_magickey.text_expansion_auto"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.french_magickey.text_expansion_emojis",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.french_magickey.text_expansion_emojis",
+			"en": "hotstrings.french_magickey.text_expansion_emojis"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.dynamic.date",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.dynamic.date",
+			"en": "hotstrings.dynamic.date"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.dynamic.date_fr",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.dynamic.date_fr",
+			"en": "hotstrings.dynamic.date_fr"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.dynamic.date_long_fr",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.dynamic.date_long_fr",
+			"en": "hotstrings.dynamic.date_long_fr"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.dynamic.iban_prefixes",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.dynamic.iban_prefixes",
+			"en": "hotstrings.dynamic.iban_prefixes"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.dynamic.phone_prefixes",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.dynamic.phone_prefixes",
+			"en": "hotstrings.dynamic.phone_prefixes"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.dynamic.ssn_prefixes",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.dynamic.ssn_prefixes",
+			"en": "hotstrings.dynamic.ssn_prefixes"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.dynamic.user_code",
+		"family": "feature",
+		"labels": {
+			"fr": "Hotstrings programmables",
+			"en": "Programmable hotstrings"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.dynamic.text_expansion_personal_information",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.dynamic.text_expansion_personal_information",
+			"en": "hotstrings.dynamic.text_expansion_personal_information"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.personal.autocorrection",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.personal.autocorrection",
+			"en": "hotstrings.personal.autocorrection"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.personal.code",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.personal.code",
+			"en": "hotstrings.personal.code"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.personal.email_shortcuts",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.personal.email_shortcuts",
+			"en": "hotstrings.personal.email_shortcuts"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.personal.professional_vocabulary",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.personal.professional_vocabulary",
+			"en": "hotstrings.personal.professional_vocabulary"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "hotstrings.personal.test",
+		"family": "feature",
+		"labels": {
+			"fr": "hotstrings.personal.test",
+			"en": "hotstrings.personal.test"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "llm.enabled",
+			"en": "llm.enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.onboarding_seen",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.onboarding_seen",
+			"en": "llm.onboarding_seen"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.ai_menu_bookkeeping_is_windows"
+	},
+	{
+		"path": "llm.app_profile_overrides",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.app_profile_overrides",
+			"en": "llm.app_profile_overrides"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.user_profiles",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.user_profiles",
+			"en": "llm.user_profiles"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.agent_system1",
+		"family": "setting",
+		"labels": {
+			"fr": "Modèle rapide qui repère une action possible dans ce que vous tapez",
+			"en": "Fast model that spots a possible action in what you type"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.agent_system2",
+		"family": "setting",
+		"labels": {
+			"fr": "Modèle réfléchi qui prépare les actions proposées",
+			"en": "Thorough model that prepares the proposed actions"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.agent_mode",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode : {1}",
+			"en": "Mode: {1}"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.agent_disabled_apps",
+		"family": "setting",
+		"labels": {
+			"fr": "Applications exclues du mode automatique ({1})",
+			"en": "Apps excluded from the automatic mode ({1})"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.display.pred_indent",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.display.pred_indent",
+			"en": "llm.display.pred_indent"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.display.show_info_bar",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.display.show_info_bar",
+			"en": "llm.display.show_info_bar"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.display.streaming",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.display.streaming",
+			"en": "llm.display.streaming"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.display.streaming_multi",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.display.streaming_multi",
+			"en": "llm.display.streaming_multi"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.generation.context_length",
+		"family": "setting",
+		"labels": {
+			"fr": "Longueur du contexte",
+			"en": "Context length"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.generation.min_words",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.generation.min_words",
+			"en": "llm.generation.min_words"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.generation.max_words",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.generation.max_words",
+			"en": "llm.generation.max_words"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.generation.temperature",
+		"family": "setting",
+		"labels": {
+			"fr": "Température",
+			"en": "Temperature"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.generation.auto_raise_temp",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.generation.auto_raise_temp",
+			"en": "llm.generation.auto_raise_temp"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.generation.reset_on_nav",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.generation.reset_on_nav",
+			"en": "llm.generation.reset_on_nav"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.generation.sequential_mode",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.generation.sequential_mode",
+			"en": "llm.generation.sequential_mode"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.models.user_models",
+		"family": "setting",
+		"labels": {
+			"fr": "✨ Intelligence Artificielle",
+			"en": "✨ Artificial Intelligence"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.llm_saved_user_models_are_macos"
+	},
+	{
+		"path": "llm.models.selected",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.models.selected",
+			"en": "llm.models.selected"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.models.ollama",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.models.ollama",
+			"en": "llm.models.ollama"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.models.mlx",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.models.mlx",
+			"en": "llm.models.mlx"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.llm_mlx_is_apple_silicon"
+	},
+	{
+		"path": "llm.profiles.active",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.profiles.active",
+			"en": "llm.profiles.active"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.profiles.num_predictions",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.profiles.num_predictions",
+			"en": "llm.profiles.num_predictions"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.profiles.auto_profile_for_model",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.profiles.auto_profile_for_model",
+			"en": "llm.profiles.auto_profile_for_model"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": true
+		},
+		"reason_key": "platform_reason.llm_profile_follows_model_is_not_on_macos"
+	},
+	{
+		"path": "llm.trigger.disabled_apps",
+		"family": "setting",
+		"labels": {
+			"fr": "✨ Intelligence Artificielle",
+			"en": "✨ Artificial Intelligence"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.trigger.debounce_ms",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.trigger.debounce_ms",
+			"en": "llm.trigger.debounce_ms"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.trigger.min_request_interval_ms",
+		"family": "setting",
+		"labels": {
+			"fr": "Intervalle des requêtes",
+			"en": "Request Interval"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.trigger.instant_on_word_end",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.trigger.instant_on_word_end",
+			"en": "llm.trigger.instant_on_word_end"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.trigger.after_hotstring",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.trigger.after_hotstring",
+			"en": "llm.trigger.after_hotstring"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.trigger.while_hotstring_tooltip",
+		"family": "setting",
+		"labels": {
+			"fr": "Prédiction IA pendant une bulle hotstring",
+			"en": "AI prediction while a hotstring tooltip shows"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.trigger.inline_autotype",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.trigger.inline_autotype",
+			"en": "llm.trigger.inline_autotype"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.inline_autotype_is_windows"
+	},
+	{
+		"path": "llm.trigger.secure_filter_enabled",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.trigger.secure_filter_enabled",
+			"en": "llm.trigger.secure_filter_enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.trigger.url_bar_filter_enabled",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.trigger.url_bar_filter_enabled",
+			"en": "llm.trigger.url_bar_filter_enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.navigation.nav_modifiers",
+		"family": "setting",
+		"labels": {
+			"fr": "Touche(s) modificatrice(s) pour naviguer avec les flèches (ex. ctrl, alt — laisser vide = flèches seules) :",
+			"en": "Modifier key(s) for navigating with arrows (e.g. ctrl, alt — leave empty = arrows alone):"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.navigation.val_modifiers",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.navigation.val_modifiers",
+			"en": "llm.navigation.val_modifiers"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "llm.navigation.arrow_nav_enabled",
+		"family": "setting",
+		"labels": {
+			"fr": "llm.navigation.arrow_nav_enabled",
+			"en": "llm.navigation.arrow_nav_enabled"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.arrow_navigation_is_macos"
+	},
+	{
+		"path": "metrics.enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "metrics.enabled",
+			"en": "metrics.enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "metrics.private_filter_enabled",
+		"family": "setting",
+		"labels": {
+			"fr": "metrics.private_filter_enabled",
+			"en": "metrics.private_filter_enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "metrics.secure_filter_enabled",
+		"family": "setting",
+		"labels": {
+			"fr": "metrics.secure_filter_enabled",
+			"en": "metrics.secure_filter_enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "metrics.system_auth_filter_enabled",
+		"family": "setting",
+		"labels": {
+			"fr": "metrics.system_auth_filter_enabled",
+			"en": "metrics.system_auth_filter_enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "metrics.encrypt",
+		"family": "setting",
+		"labels": {
+			"fr": "Chiffrer les logs sur le disque (Sécurité)",
+			"en": "Encrypt logs on disk (Security)"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "metrics.disabled_apps",
+		"family": "setting",
+		"labels": {
+			"fr": "metrics.disabled_apps",
+			"en": "metrics.disabled_apps"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "metrics.wpm_widget_visible",
+		"family": "setting",
+		"labels": {
+			"fr": "metrics.wpm_widget_visible",
+			"en": "metrics.wpm_widget_visible"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "metrics.wpm_widget_colors",
+		"family": "setting",
+		"labels": {
+			"fr": "metrics.wpm_widget_colors",
+			"en": "metrics.wpm_widget_colors"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "metrics.wpm_widget_graph",
+		"family": "setting",
+		"labels": {
+			"fr": "metrics.wpm_widget_graph",
+			"en": "metrics.wpm_widget_graph"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "metrics.wpm_menubar_visible",
+		"family": "setting",
+		"labels": {
+			"fr": "MPM dans la barre des menus",
+			"en": "WPM in menu bar"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.wpm_readout_needs_a_menubar"
+	},
+	{
+		"path": "metrics.wpm_menubar_colors",
+		"family": "setting",
+		"labels": {
+			"fr": "    ↳ Couleur par source de saisie",
+			"en": "    ↳ Colour by input source"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.wpm_readout_needs_a_menubar"
+	},
+	{
+		"path": "shortcuts.enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.enabled",
+			"en": "shortcuts.enabled"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.category_master_is_a_gate_on_windows"
+	},
+	{
+		"path": "shortcuts.chatgpt_url",
+		"family": "setting",
+		"labels": {
+			"fr": "shortcuts.chatgpt_url",
+			"en": "shortcuts.chatgpt_url"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.wrap_text_if_selected",
+		"family": "feature",
+		"labels": {
+			"fr": "Taper un symbole encadre la sélection",
+			"en": "Typing a symbol wraps the selection"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": true
+		},
+		"reason_key": "platform_reason.wrap_selection_is_a_shortcut_key_on_macos"
+	},
+	{
+		"path": "shortcuts.search.search_engine",
+		"family": "setting",
+		"labels": {
+			"fr": "shortcuts.search.search_engine",
+			"en": "shortcuts.search.search_engine"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.search.search_engine_url_query",
+		"family": "setting",
+		"labels": {
+			"fr": "shortcuts.search.search_engine_url_query",
+			"en": "shortcuts.search.search_engine_url_query"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.take_note.dated_notes",
+		"family": "setting",
+		"labels": {
+			"fr": "shortcuts.take_note.dated_notes",
+			"en": "shortcuts.take_note.dated_notes"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.take_note.destination_folder",
+		"family": "setting",
+		"labels": {
+			"fr": "shortcuts.take_note.destination_folder",
+			"en": "shortcuts.take_note.destination_folder"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.a_grave.enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.a_grave.enabled",
+			"en": "shortcuts.a_grave.enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.accented_shortcuts_are_windows"
+	},
+	{
+		"path": "shortcuts.a_grave.letter",
+		"family": "setting",
+		"labels": {
+			"fr": "shortcuts.a_grave.letter",
+			"en": "shortcuts.a_grave.letter"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.accented_shortcuts_are_windows"
+	},
+	{
+		"path": "shortcuts.e_acute.enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.e_acute.enabled",
+			"en": "shortcuts.e_acute.enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.accented_shortcuts_are_windows"
+	},
+	{
+		"path": "shortcuts.e_acute.letter",
+		"family": "setting",
+		"labels": {
+			"fr": "shortcuts.e_acute.letter",
+			"en": "shortcuts.e_acute.letter"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.accented_shortcuts_are_windows"
+	},
+	{
+		"path": "shortcuts.e_circ.enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.e_circ.enabled",
+			"en": "shortcuts.e_circ.enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.accented_shortcuts_are_windows"
+	},
+	{
+		"path": "shortcuts.e_circ.letter",
+		"family": "setting",
+		"labels": {
+			"fr": "shortcuts.e_circ.letter",
+			"en": "shortcuts.e_circ.letter"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.accented_shortcuts_are_windows"
+	},
+	{
+		"path": "shortcuts.e_grave.enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.e_grave.enabled",
+			"en": "shortcuts.e_grave.enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.accented_shortcuts_are_windows"
+	},
+	{
+		"path": "shortcuts.e_grave.letter",
+		"family": "setting",
+		"labels": {
+			"fr": "shortcuts.e_grave.letter",
+			"en": "shortcuts.e_grave.letter"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.accented_shortcuts_are_windows"
+	},
+	{
+		"path": "shortcuts.key_combination_taps.alt_gr_then_left_alt",
+		"family": "feature",
+		"labels": {
+			"fr": "Combinaisons de touches",
+			"en": "Key combinations"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.key_combination_taps.alt_gr_then_caps_lock",
+		"family": "feature",
+		"labels": {
+			"fr": "Combinaisons de touches",
+			"en": "Key combinations"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.key_combination_taps.left_alt_then_caps_lock",
+		"family": "feature",
+		"labels": {
+			"fr": "Combinaisons de touches",
+			"en": "Key combinations"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "mod_combos.simultaneous_threshold_ms",
+		"family": "setting",
+		"labels": {
+			"fr": "Délai d'activation des combos",
+			"en": "Combo activation delay"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "mod_combos.symmetric",
+		"family": "setting",
+		"labels": {
+			"fr": "Raccourcis symétriques (ordre des touches indifférent)",
+			"en": "Symmetric shortcuts (key order independent)"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.personal.laptop_broken_key",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.personal.laptop_broken_key",
+			"en": "shortcuts.personal.laptop_broken_key"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.personal.mouse_drag_window",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.personal.mouse_drag_window",
+			"en": "shortcuts.personal.mouse_drag_window"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.personal.mouse_tab_switching",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.personal.mouse_tab_switching",
+			"en": "shortcuts.personal.mouse_tab_switching"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.personal.professional_environment",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.personal.professional_environment",
+			"en": "shortcuts.personal.professional_environment"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.personal.programmable_keyboard",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.personal.programmable_keyboard",
+			"en": "shortcuts.personal.programmable_keyboard"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.script_control.chords_enabled",
+		"family": "setting",
+		"labels": {
+			"fr": "Activer les raccourcis de gestion du script",
+			"en": "Enable script management shortcuts"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.script_control.script_altgr_backspace",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.script_control.script_altgr_backspace",
+			"en": "shortcuts.script_control.script_altgr_backspace"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.script_control.script_altgr_delete",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.script_control.script_altgr_delete",
+			"en": "shortcuts.script_control.script_altgr_delete"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.script_control.script_altgr_enter",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.script_control.script_altgr_enter",
+			"en": "shortcuts.script_control.script_altgr_enter"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.script_control.script_altgr_escape",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.script_control.script_altgr_escape",
+			"en": "shortcuts.script_control.script_altgr_escape"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.magic_editor",
+		"family": "feature",
+		"labels": {
+			"fr": "Raccourci de la touche magique",
+			"en": "Magic-key shortcut"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.primary_b",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.primary_b",
+			"en": "shortcuts.keyboard.primary_b"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_a",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_a",
+			"en": "shortcuts.keyboard.meta_a"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_d",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_d",
+			"en": "shortcuts.keyboard.meta_d"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_g",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_g",
+			"en": "shortcuts.keyboard.meta_g"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_h",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_h",
+			"en": "shortcuts.keyboard.meta_h"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_m",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_m",
+			"en": "shortcuts.keyboard.meta_m"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_n",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_n",
+			"en": "shortcuts.keyboard.meta_n"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_o",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_o",
+			"en": "shortcuts.keyboard.meta_o"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_s",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_s",
+			"en": "shortcuts.keyboard.meta_s"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_sc029",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_sc029",
+			"en": "shortcuts.keyboard.meta_sc029"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_t",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_t",
+			"en": "shortcuts.keyboard.meta_t"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_u",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_u",
+			"en": "shortcuts.keyboard.meta_u"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_w",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_w",
+			"en": "shortcuts.keyboard.meta_w"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_x",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_x",
+			"en": "shortcuts.keyboard.meta_x"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_capslock",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_capslock",
+			"en": "shortcuts.keyboard.meta_capslock"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.meta_quote",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.keyboard.meta_quote",
+			"en": "shortcuts.keyboard.meta_quote"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_space",
+		"family": "feature",
+		"labels": {
+			"fr": "Ctrl + Espace : Générer une prédiction IA",
+			"en": "Ctrl + Space: Generate an AI prediction"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_a",
+		"family": "feature",
+		"labels": {
+			"fr": "Sélectionner la ligne",
+			"en": "Select line"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_d",
+		"family": "feature",
+		"labels": {
+			"fr": "Ouvrir Téléchargements",
+			"en": "Open Downloads"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_e",
+		"family": "feature",
+		"labels": {
+			"fr": "Ouvrir Finder",
+			"en": "Open Finder"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_g",
+		"family": "feature",
+		"labels": {
+			"fr": "Ouvrir ChatGPT (URL définie dans le menu)",
+			"en": "Open ChatGPT (URL set in menu)"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_h",
+		"family": "feature",
+		"labels": {
+			"fr": "Capture interactive vers le presse-papiers",
+			"en": "Interactive screenshot to clipboard"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_i",
+		"family": "feature",
+		"labels": {
+			"fr": "Ouvrir Réglages",
+			"en": "Open Settings"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_m",
+		"family": "feature",
+		"labels": {
+			"fr": "Anti-veille",
+			"en": "Anti-sleep"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_o",
+		"family": "feature",
+		"labels": {
+			"fr": "Entourer la ligne de parenthèses",
+			"en": "Surround line with parentheses"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_p",
+		"family": "feature",
+		"labels": {
+			"fr": "Basculer recopie / bureau étendu",
+			"en": "Toggle mirror / extended display"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_s",
+		"family": "feature",
+		"labels": {
+			"fr": "Ouvrir / Copier chemin",
+			"en": "Open / Copy path"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_t",
+		"family": "feature",
+		"labels": {
+			"fr": "Téléporter la souris sur l’autre moniteur",
+			"en": "Teleport mouse to other monitor"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_u",
+		"family": "feature",
+		"labels": {
+			"fr": "Toggle MAJUSCULES / minuscules",
+			"en": "Toggle UPPERCASE / lowercase"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_w",
+		"family": "feature",
+		"labels": {
+			"fr": "Toggle Casse De Titre / minuscules",
+			"en": "Toggle Title Case / lowercase"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_x",
+		"family": "feature",
+		"labels": {
+			"fr": "Copier la couleur hex du pixel sous le curseur",
+			"en": "Copy hex color of pixel under cursor"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_capslock",
+		"family": "feature",
+		"labels": {
+			"fr": "Basculer CapsLock",
+			"en": "Toggle CapsLock"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_l",
+		"family": "feature",
+		"labels": {
+			"fr": "Verrouiller l’écran",
+			"en": "Lock screen"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_period",
+		"family": "feature",
+		"labels": {
+			"fr": "Ouvrir le sélecteur d’emojis",
+			"en": "Open emoji picker"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_quote",
+		"family": "feature",
+		"labels": {
+			"fr": "Mettre la souris en surbrillance",
+			"en": "Spotlight mouse"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.primary_shift_v",
+		"family": "feature",
+		"labels": {
+			"fr": "Coller sans mise en forme",
+			"en": "Paste without formatting"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.primary_g",
+		"family": "feature",
+		"labels": {
+			"fr": "Ouvrir ChatGPT (URL définie dans le menu)",
+			"en": "Open ChatGPT (URL set in menu)"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": false,
+			"linux": true
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keyboard.meta_space",
+		"family": "feature",
+		"labels": {
+			"fr": "Super + Espace : Générer une prédiction IA",
+			"en": "Super + Space: Generate an AI prediction"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": true
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.tap_keys.number_row_left",
+		"family": "feature",
+		"labels": {
+			"fr": "Touche à gauche du 1",
+			"en": "Key left of 1"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.tap_keys.number_row_right_1",
+		"family": "feature",
+		"labels": {
+			"fr": "1re touche à droite du 0",
+			"en": "First key right of 0"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.tap_keys.number_row_right_2",
+		"family": "feature",
+		"labels": {
+			"fr": "2e touche à droite du 0",
+			"en": "Second key right of 0"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.caps_word.idle_timeout_seconds",
+		"family": "setting",
+		"labels": {
+			"fr": "Désactiver après une pause",
+			"en": "Deactivate after a pause"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.caps_word.terminators",
+		"family": "setting",
+		"labels": {
+			"fr": "Désactiver sur ces délimiteurs",
+			"en": "Deactivate on these delimiters"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.caps_word.pointer.gesture",
+		"family": "setting",
+		"labels": {
+			"fr": "Geste ou contact sur le pavé tactile",
+			"en": "Trackpad gesture or touch"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.caps_word_gestures_stay_with_windows"
+	},
+	{
+		"path": "shortcuts.caps_word.pointer.pointer_motion",
+		"family": "setting",
+		"labels": {
+			"fr": "Déplacement du pointeur ou défilement",
+			"en": "Pointer movement or scrolling"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.caps_word.pointer.left_click",
+		"family": "setting",
+		"labels": {
+			"fr": "Clic gauche",
+			"en": "Left click"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.caps_word.pointer.right_click",
+		"family": "setting",
+		"labels": {
+			"fr": "Clic droit",
+			"en": "Right click"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.caps_word.pointer.middle_click",
+		"family": "setting",
+		"labels": {
+			"fr": "Clic du milieu",
+			"en": "Middle click"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.caps_word.pointer.other_buttons",
+		"family": "setting",
+		"labels": {
+			"fr": "Autres boutons de la souris",
+			"en": "Other mouse buttons"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "️ Gestes",
+			"en": "️ Gestures"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.swipe_3_down",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 3 doigts ↓",
+			"en": "3-finger swipe ↓"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.swipe_3_left",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 3 doigts ←",
+			"en": "3-finger swipe ←"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.swipe_3_right",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 3 doigts →",
+			"en": "3-finger swipe →"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.swipe_3_up",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 3 doigts ↑",
+			"en": "3-finger swipe ↑"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.swipe_4_down",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 4 doigts ↓",
+			"en": "4-finger swipe ↓"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.swipe_4_left",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 4 doigts ←",
+			"en": "4-finger swipe ←"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.swipe_4_right",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 4 doigts →",
+			"en": "4-finger swipe →"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.swipe_4_up",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 4 doigts ↑",
+			"en": "4-finger swipe ↑"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.tap_3",
+		"family": "feature",
+		"labels": {
+			"fr": "Tap 3 doigts",
+			"en": "3-finger tap"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.tap_4",
+		"family": "feature",
+		"labels": {
+			"fr": "Tap 4 doigts",
+			"en": "4-finger tap"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.swipe_2_left",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 2 doigts ←",
+			"en": "2-finger swipe ←"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_5_up",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 5 doigts ↑",
+			"en": "5-finger swipe ↑"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_5_down",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 5 doigts ↓",
+			"en": "5-finger swipe ↓"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_5_left",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 5 doigts ←",
+			"en": "5-finger swipe ←"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_5_right",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 5 doigts →",
+			"en": "5-finger swipe →"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_2_right",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 2 doigts →",
+			"en": "2-finger swipe →"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_2_up",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 2 doigts ↑",
+			"en": "2-finger swipe ↑"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_2_down",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 2 doigts ↓",
+			"en": "2-finger swipe ↓"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_2_left_down",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 2 doigts ↙",
+			"en": "2-finger swipe ↙"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_2_left_up",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 2 doigts ↖",
+			"en": "2-finger swipe ↖"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_2_right_down",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 2 doigts ↘",
+			"en": "2-finger swipe ↘"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_2_right_up",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 2 doigts ↗",
+			"en": "2-finger swipe ↗"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_3_left_down",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 3 doigts ↙",
+			"en": "3-finger swipe ↙"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_3_left_up",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 3 doigts ↖",
+			"en": "3-finger swipe ↖"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_3_right_down",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 3 doigts ↘",
+			"en": "3-finger swipe ↘"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_3_right_up",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 3 doigts ↗",
+			"en": "3-finger swipe ↗"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_3_horiz",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe horizontal 3 doigts",
+			"en": "3-finger swipe ↔"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_4_left_down",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 4 doigts ↙",
+			"en": "4-finger swipe ↙"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_4_left_up",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 4 doigts ↖",
+			"en": "4-finger swipe ↖"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_4_right_down",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 4 doigts ↘",
+			"en": "4-finger swipe ↘"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_4_right_up",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 4 doigts ↗",
+			"en": "4-finger swipe ↗"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_4_horiz",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe horizontal 4 doigts",
+			"en": "4-finger swipe ↔"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_5_left_down",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 5 doigts ↙",
+			"en": "5-finger swipe ↙"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_5_left_up",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 5 doigts ↖",
+			"en": "5-finger swipe ↖"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_5_right_down",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 5 doigts ↘",
+			"en": "5-finger swipe ↘"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_5_right_up",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 5 doigts ↗",
+			"en": "5-finger swipe ↗"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.swipe_5_horiz",
+		"family": "feature",
+		"labels": {
+			"fr": "Swipe 5 doigts ↔",
+			"en": "5-finger swipe ↔"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.tap_2",
+		"family": "feature",
+		"labels": {
+			"fr": "Tap 2 doigts",
+			"en": "2-finger tap"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.tap_5",
+		"family": "feature",
+		"labels": {
+			"fr": "Tap 5 doigts",
+			"en": "5-finger tap"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
+	},
+	{
+		"path": "gestures.modes.swipe_2_left",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 2 doigts ←",
+			"en": "Mode — 2-finger swipe ←"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_2_right",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 2 doigts →",
+			"en": "Mode — 2-finger swipe →"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_2_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 2 doigts ↑",
+			"en": "Mode — 2-finger swipe ↑"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_2_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 2 doigts ↓",
+			"en": "Mode — 2-finger swipe ↓"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_2_left_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 2 doigts ↙",
+			"en": "Mode — 2-finger swipe ↙"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_2_left_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 2 doigts ↖",
+			"en": "Mode — 2-finger swipe ↖"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_2_right_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 2 doigts ↘",
+			"en": "Mode — 2-finger swipe ↘"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_2_right_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 2 doigts ↗",
+			"en": "Mode — 2-finger swipe ↗"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_3_left",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 3 doigts ←",
+			"en": "Mode — 3-finger swipe ←"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_3_right",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 3 doigts →",
+			"en": "Mode — 3-finger swipe →"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_3_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 3 doigts ↑",
+			"en": "Mode — 3-finger swipe ↑"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_3_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 3 doigts ↓",
+			"en": "Mode — 3-finger swipe ↓"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_3_left_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 3 doigts ↙",
+			"en": "Mode — 3-finger swipe ↙"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_3_left_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 3 doigts ↖",
+			"en": "Mode — 3-finger swipe ↖"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_3_right_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 3 doigts ↘",
+			"en": "Mode — 3-finger swipe ↘"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_3_right_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 3 doigts ↗",
+			"en": "Mode — 3-finger swipe ↗"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_4_left",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 4 doigts ←",
+			"en": "Mode — 4-finger swipe ←"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_4_right",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 4 doigts →",
+			"en": "Mode — 4-finger swipe →"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_4_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 4 doigts ↑",
+			"en": "Mode — 4-finger swipe ↑"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_4_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 4 doigts ↓",
+			"en": "Mode — 4-finger swipe ↓"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_4_left_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 4 doigts ↙",
+			"en": "Mode — 4-finger swipe ↙"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_4_left_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 4 doigts ↖",
+			"en": "Mode — 4-finger swipe ↖"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_4_right_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 4 doigts ↘",
+			"en": "Mode — 4-finger swipe ↘"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_4_right_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 4 doigts ↗",
+			"en": "Mode — 4-finger swipe ↗"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_5_left",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 5 doigts ←",
+			"en": "Mode — 5-finger swipe ←"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_5_right",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 5 doigts →",
+			"en": "Mode — 5-finger swipe →"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_5_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 5 doigts ↑",
+			"en": "Mode — 5-finger swipe ↑"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_5_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 5 doigts ↓",
+			"en": "Mode — 5-finger swipe ↓"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_5_left_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 5 doigts ↙",
+			"en": "Mode — 5-finger swipe ↙"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_5_left_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 5 doigts ↖",
+			"en": "Mode — 5-finger swipe ↖"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_5_right_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 5 doigts ↘",
+			"en": "Mode — 5-finger swipe ↘"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_5_right_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode  — Swipe 5 doigts ↗",
+			"en": "Mode — 5-finger swipe ↗"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_2_left",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 2 doigts ←",
+			"en": "Sensitivity — 2-finger swipe ←"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_2_right",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 2 doigts →",
+			"en": "Sensitivity — 2-finger swipe →"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_2_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 2 doigts ↑",
+			"en": "Sensitivity — 2-finger swipe ↑"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_2_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 2 doigts ↓",
+			"en": "Sensitivity — 2-finger swipe ↓"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_2_left_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 2 doigts ↙",
+			"en": "Sensitivity — 2-finger swipe ↙"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_2_left_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 2 doigts ↖",
+			"en": "Sensitivity — 2-finger swipe ↖"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_2_right_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 2 doigts ↘",
+			"en": "Sensitivity — 2-finger swipe ↘"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_2_right_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 2 doigts ↗",
+			"en": "Sensitivity — 2-finger swipe ↗"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_3_left",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 3 doigts ←",
+			"en": "Sensitivity — 3-finger swipe ←"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_3_right",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 3 doigts →",
+			"en": "Sensitivity — 3-finger swipe →"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_3_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 3 doigts ↑",
+			"en": "Sensitivity — 3-finger swipe ↑"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_3_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 3 doigts ↓",
+			"en": "Sensitivity — 3-finger swipe ↓"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_3_left_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 3 doigts ↙",
+			"en": "Sensitivity — 3-finger swipe ↙"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_3_left_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 3 doigts ↖",
+			"en": "Sensitivity — 3-finger swipe ↖"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_3_right_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 3 doigts ↘",
+			"en": "Sensitivity — 3-finger swipe ↘"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_3_right_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 3 doigts ↗",
+			"en": "Sensitivity — 3-finger swipe ↗"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_4_left",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 4 doigts ←",
+			"en": "Sensitivity — 4-finger swipe ←"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_4_right",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 4 doigts →",
+			"en": "Sensitivity — 4-finger swipe →"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_4_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 4 doigts ↑",
+			"en": "Sensitivity — 4-finger swipe ↑"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_4_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 4 doigts ↓",
+			"en": "Sensitivity — 4-finger swipe ↓"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_4_left_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 4 doigts ↙",
+			"en": "Sensitivity — 4-finger swipe ↙"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_4_left_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 4 doigts ↖",
+			"en": "Sensitivity — 4-finger swipe ↖"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_4_right_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 4 doigts ↘",
+			"en": "Sensitivity — 4-finger swipe ↘"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_4_right_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 4 doigts ↗",
+			"en": "Sensitivity — 4-finger swipe ↗"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_5_left",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 5 doigts ←",
+			"en": "Sensitivity — 5-finger swipe ←"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_5_right",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 5 doigts →",
+			"en": "Sensitivity — 5-finger swipe →"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_5_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 5 doigts ↑",
+			"en": "Sensitivity — 5-finger swipe ↑"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_5_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 5 doigts ↓",
+			"en": "Sensitivity — 5-finger swipe ↓"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_5_left_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 5 doigts ↙",
+			"en": "Sensitivity — 5-finger swipe ↙"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_5_left_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 5 doigts ↖",
+			"en": "Sensitivity — 5-finger swipe ↖"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_5_right_down",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 5 doigts ↘",
+			"en": "Sensitivity — 5-finger swipe ↘"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_5_right_up",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité  — Swipe 5 doigts ↗",
+			"en": "Sensitivity — 5-finger swipe ↗"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_3_horiz",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode ",
+			"en": "Mode"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_4_horiz",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode ",
+			"en": "Mode"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.modes.swipe_5_horiz",
+		"family": "setting",
+		"labels": {
+			"fr": "Mode ",
+			"en": "Mode"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_3_horiz",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité ",
+			"en": "Sensitivity"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_4_horiz",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité ",
+			"en": "Sensitivity"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "gestures.sensitivities.swipe_5_horiz",
+		"family": "setting",
+		"labels": {
+			"fr": "Sensibilité ",
+			"en": "Sensitivity"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "layout.ergopti_base",
+		"family": "feature",
+		"labels": {
+			"fr": "layout.ergopti_base",
+			"en": "layout.ergopti_base"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.layout_emulation_is_windows_only"
+	},
+	{
+		"path": "layout.direct_access_digits",
+		"family": "feature",
+		"labels": {
+			"fr": "Rangée des chiffres",
+			"en": "Number row"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "layout.virtual_keyboard",
+		"family": "setting",
+		"labels": {
+			"fr": "Clavier virtuel Karabiner",
+			"en": "Karabiner virtual keyboard"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.virtual_keyboard_is_karabiner"
+	},
+	{
+		"path": "layout.number_row_reorder_edges",
+		"family": "feature",
+		"labels": {
+			"fr": "Réordonner aussi les trois touches des bords",
+			"en": "Also reorder the three edge keys"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "layout.ergopti_alt_gr",
+		"family": "feature",
+		"labels": {
+			"fr": "layout.ergopti_alt_gr",
+			"en": "layout.ergopti_alt_gr"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.layout_emulation_is_windows_only"
+	},
+	{
+		"path": "layout.ergopti_variant",
+		"family": "feature",
+		"labels": {
+			"fr": "layout.ergopti_variant",
+			"en": "layout.ergopti_variant"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.legacy_helpers_use_windows_scan_code_hotkeys"
+	},
+	{
+		"path": "layout.emulate_number_row",
+		"family": "setting",
+		"labels": {
+			"fr": "Rangée des chiffres",
+			"en": "Number row"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.layout_emulation_is_windows_only"
+	},
+	{
+		"path": "layout.emulate_top_row",
+		"family": "setting",
+		"labels": {
+			"fr": "Rangée du haut",
+			"en": "Top letter row"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.layout_emulation_is_windows_only"
+	},
+	{
+		"path": "layout.emulate_home_row",
+		"family": "setting",
+		"labels": {
+			"fr": "Rangée de repos",
+			"en": "Home row"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.layout_emulation_is_windows_only"
+	},
+	{
+		"path": "layout.emulate_bottom_row",
+		"family": "setting",
+		"labels": {
+			"fr": "Rangée du bas",
+			"en": "Bottom row"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.layout_emulation_is_windows_only"
+	},
+	{
+		"path": "layout.ctrl_magic_save",
+		"family": "feature",
+		"labels": {
+			"fr": "layout.ctrl_magic_save",
+			"en": "layout.ctrl_magic_save"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.layout_emulation_is_windows_only"
+	},
+	{
+		"path": "layout.emulated_layout",
+		"family": "feature",
+		"labels": {
+			"fr": "Disposition à émuler",
+			"en": "Layout to emulate"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": "platform_reason.layout_emulation_is_windows_only"
+	},
+	{
+		"path": "category_enabled.hotstrings",
+		"family": "feature",
+		"labels": {
+			"fr": "category_enabled.hotstrings",
+			"en": "category_enabled.hotstrings"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "category_enabled.layout",
+		"family": "feature",
+		"labels": {
+			"fr": "category_enabled.layout",
+			"en": "category_enabled.layout"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "category_enabled.shortcuts",
+		"family": "feature",
+		"labels": {
+			"fr": "category_enabled.shortcuts",
+			"en": "category_enabled.shortcuts"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "category_enabled.tap_holds",
+		"family": "feature",
+		"labels": {
+			"fr": "category_enabled.tap_holds",
+			"en": "category_enabled.tap_holds"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "category_enabled.key_combinations",
+		"family": "setting",
+		"labels": {
+			"fr": "Combinaisons de touches",
+			"en": "Key combinations"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": true
+		},
+		"reason_key": "platform_reason.key_combinations_are_karabiner_settings_on_macos"
+	},
+	{
+		"path": "network.proxy_override",
+		"family": "setting",
+		"labels": {
+			"fr": "Proxy des téléchargements…",
+			"en": "Proxy for downloads…"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "ui.menubar_icon",
+		"family": "setting",
+		"labels": {
+			"fr": "Icône de la barre des menus",
+			"en": "Menu bar icon"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "tap_holds.enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "tap_holds.enabled",
+			"en": "tap_holds.enabled"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": "platform_reason.category_master_is_a_gate_on_windows"
+	},
+	{
+		"path": "tap_holds.lone_modifier_tap_max_ms",
+		"family": "setting",
+		"labels": {
+			"fr": "Modificateur tapé seul : %s",
+			"en": "Modifier tapped alone: %s"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "shortcuts.keys.wrap_text_if_selected",
+		"family": "feature",
+		"labels": {
+			"fr": "Taper un symbole encadre la sélection",
+			"en": "Typing a symbol wraps the selection"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "shortcuts.keys.cmd_star",
+		"family": "feature",
+		"labels": {
+			"fr": "Cmd + S (préserve mod.)",
+			"en": "Cmd + S (preserves mod.)"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+	},
+	{
+		"path": "category_enabled.autocorrection",
+		"family": "feature",
+		"labels": {
+			"fr": "Autocorrection",
+			"en": "Autocorrection"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "category_enabled.distances_reduction",
+		"family": "feature",
+		"labels": {
+			"fr": "Réduction des distances",
+			"en": "Distance reduction"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "category_enabled.sfbs_reduction",
+		"family": "feature",
+		"labels": {
+			"fr": "Réduction des SFBs",
+			"en": "SFB reduction"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "category_enabled.rolls",
+		"family": "feature",
+		"labels": {
+			"fr": "Roulements",
+			"en": "Rolls"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "category_enabled.magic_key",
+		"family": "feature",
+		"labels": {
+			"fr": "Touche ★ et expansion de texte",
+			"en": "★ key and text expansion"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": false
+		},
+		"reason_key": null
+	},
+	{
+		"path": "layout.pause_switch_enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "Changer de disposition à la pause / reprise",
+			"en": "Auto-switch layout on pause / resume"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "layout.on_pause",
+		"family": "feature",
+		"labels": {
+			"fr": "Disposition quand script en pause",
+			"en": "Layout when script is paused"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	},
+	{
+		"path": "layout.on_resume",
+		"family": "feature",
+		"labels": {
+			"fr": "Disposition quand script actif",
+			"en": "Layout when script is active"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null
+	}
+]

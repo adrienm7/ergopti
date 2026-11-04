@@ -17,8 +17,42 @@ const fs = require('fs');
 const path = require('path');
 const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
 const { buildParityRows, summarize } = require('./linux-feature-parity.cjs');
-
 const ROOT = path.resolve(__dirname, '..', '..');
+const inventory = require('../codegen/codegen-feature-inventory.cjs');
+inventory.check();
+// Both projections must react to a change in a platform declaration.
+const inventoryModel = require('../build/build-features-manifest.js').loadFeatureModel().features;
+const inventoryLocales = Object.fromEntries(
+	['fr', 'en'].map((lang) => [
+		lang,
+		JSON.parse(
+			fs.readFileSync(
+				path.join(ROOT, `static/ergopti_plus/_shared/data/locales/${lang}.json`),
+				'utf8'
+			)
+		)
+	])
+);
+const inventoryActions = require('smol-toml').parse(
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/modules/actions/actions.toml'),
+		'utf8'
+	)
+);
+const beforeInventory = inventory.render(inventoryModel, inventoryLocales, inventoryActions);
+const changedModel = structuredClone(inventoryModel);
+changedModel[0].platforms = ['ahk'];
+const afterInventory = inventory.render(changedModel, inventoryLocales, inventoryActions);
+for (const file of Object.keys(beforeInventory).filter(
+	(name) => !name.endsWith('action-inventory.json')
+)) {
+	assert.notStrictEqual(
+		beforeInventory[file],
+		afterInventory[file],
+		`${file} must reflect platform changes`
+	);
+}
+
 const EVIDENCE_PATH = path.join(
 	ROOT,
 	'static',
@@ -34,6 +68,23 @@ const evidenceConfig = JSON.parse(fs.readFileSync(EVIDENCE_PATH, 'utf8'));
 function build(config = evidenceConfig) {
 	return buildParityRows({ manifest, evidenceConfig: config, rootDirectory: ROOT });
 }
+
+const expandedActions = structuredClone(inventoryActions);
+expandedActions.sg_actions.lookup = { platform: 'all' };
+const expandedInventory = inventory.render(inventoryModel, inventoryLocales, expandedActions);
+for (const file of ['src/routes/ergopti-plus/action-inventory.json', 'docs/feature-inventory.md']) {
+	assert.notStrictEqual(
+		beforeInventory[file],
+		expandedInventory[file],
+		`${file} must reflect action changes`
+	);
+}
+const changedActions = structuredClone(inventoryActions);
+delete changedActions.sg_actions.lookup.reason_ahk;
+assert.throws(
+	() => inventory.render(inventoryModel, inventoryLocales, changedActions),
+	/Missing action reason/
+);
 
 const rows = build();
 const summary = summarize(rows);
