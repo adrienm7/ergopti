@@ -2604,7 +2604,7 @@ local function _dispatch_pointer(ev, slot)
 		-- the kernel reports a touch and no BTN_LEFT, and that touch moves the
 		-- caret all the same, so the password-field verdict and the typing
 		-- buffer must be dropped as on a click.
-		if ev.value == InputEvent.VALUE_DOWN then
+		if ev.value == InputEvent.VALUE_DOWN and _on_click then
 			if not _running or _capture_session ~= session then return end
 			_call_callback("pointer callback", _on_click, ev.code)
 		end
@@ -2744,7 +2744,7 @@ function LayerPointer.pump_once()
 		return
 	end
 
-	if _on_click then
+	if _on_click or _on_pointer_event then
 		for _, path in ipairs(_pointer_devices) do
 			local slot = pointer_slot(path)
 			if EvdevReader.is_open(slot) then
@@ -3740,7 +3740,7 @@ function M.check_device()
 	
 		local keyboards, pointers = {}, {}
 		if _pinned_device then
-			pointers = _on_click and _best_pointers() or {}
+			pointers = (_on_click or _on_pointer_event) and _best_pointers() or {}
 			local available = EvdevReader.is_available(_pinned_device)
 			if not available then
 				_pinned_missing = true
@@ -3775,7 +3775,7 @@ function M.check_device()
 			keyboards = { _pinned_device }
 		else
 			keyboards, pointers = _best_devices()
-			if not _on_click then pointers = {} end
+			if not _on_click and not _on_pointer_event then pointers = {} end
 		end
 		if #keyboards == 0 then
 			if not _reported_missing then
@@ -4076,10 +4076,10 @@ function M.start(opts)
 	local targets, pointers = {}, {}
 	if type(options.device) == "string" and options.device ~= "" then
 		targets = { options.device }
-		if _on_click then pointers = _best_pointers() end
+		if _on_click or _on_pointer_event then pointers = _best_pointers() end
 	else
 		targets, pointers = _best_devices()
-		if not _on_click then pointers = {} end
+		if not _on_click and not _on_pointer_event then pointers = {} end
 		if #targets == 0 then
 			Logger.error(LOG, "start(): no keyboard device found (set --device or check /proc/bus/input/devices).")
 			return
@@ -4142,7 +4142,7 @@ function M.start(opts)
 		-- It simply cannot notice a click, which is the behaviour this driver had for
 		-- its whole life until now.
 		-- Managed capture must also retain its complete original cleanup cohort.
-		if _on_click and _acquire_pointers(pointers, tx) == false then return false end
+		if (_on_click or _on_pointer_event) and _acquire_pointers(pointers, tx) == false then return false end
 	
 		_ticks_since_check = 0
 		_reported_missing = false
