@@ -441,7 +441,7 @@ KL_Watchers_IdleTick(Now := unset) {
 				SessionGeneration: KLWatch.session_generation,
 				IdleGeneration: KLWatch.idle_generation}
 		} finally Critical(ObservationCritical)
-		if IdleOwner.LastTick = 0
+		if LastTick == 0 && !KLWatch.is_session_active
 				return
 		now := IsSet(Now) ? Now : A_TickCount
 		gap := TickElapsed64(LastTick, now)

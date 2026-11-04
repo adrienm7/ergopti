@@ -434,3 +434,48 @@ Test("keystats input: Backspace preserves complete Unicode scalars (keystats-bac
 ; The pause and session-reset sequences drive this same hook, so they share its
 ; reachability from the runner.
 #Include test_keystats_collection.ahk
+
+_KLF_SyntheticSessionBoundary(Mode) {
+	global _Stub_AppendLogRows
+	KL_Hook_OnChar(0, "a", _KLF_ChangeSynthetic, 1000)
+	AssertEqual(0, KLHook.last_tick, "the real synthetic callback retires the key delay clock")
+	AssertEqual(1000, KLWatch.last_authorized_tick, "the real manual callback retains accepted session activity")
+	AssertTrue(KLWatch.is_session_active)
+	ExpectedDuration := 900
+	if Mode == "pointer-reset" {
+		AssertTrue(KL_Watchers_OnPointer(0, 1200), "actual pointer activity must extend the existing session")
+		ExpectedDuration := 1100
+	}
+	Resets := []
+	if Mode == "idle"
+		KL_Watchers_IdleTick(1000 + KLWatchConst.SESSION_TIMEOUT_MS + 1)
+	else
+		AssertTrue(KL_ResetSession(() => true, 0, () => Resets.Push(true)),
+			"the genuine session closer must accept reset after a synthetic clock retirement")
+	AssertFalse(KLWatch.is_session_active, "the session must close without a subsequent manual key")
+	AssertFalse(KLWatch.is_idle, "paired idle state must retire with the session")
+	Ends := []
+	for Row in _Stub_AppendLogRows
+		if Row["type"] == "session_end"
+			Ends.Push(Row)
+	AssertEqual(1, Ends.Length, "the recording queue boundary must receive one session end")
+	AssertEqual(ExpectedDuration, Ends[1]["duration_ms"], "duration uses accepted activity rather than the zero sentinel")
+	AssertEqual(Mode == "idle" ? 0 : 1, Resets.Length, "explicit reset acknowledges WPM exactly once")
+	AssertEqual(0, KLHook.last_tick, "session closure preserves the next physical key's zero-delay restart")
+}
+for _KLF_SessionMode in ["idle", "reset", "pointer-reset"]
+	Test("keystats session: synthetic clock retirement supports " . _KLF_SessionMode,
+		_KLF_WithState.Bind(_KLF_SyntheticSessionBoundary.Bind(_KLF_SessionMode)))
+
+_KLF_ZeroSessionClock() {
+	global _Stub_AppendLogRows
+	KLHook.last_tick := 0
+	KLWatch.last_authorized_tick := 0
+	KLWatch.session_started_at := 0
+	KL_Watchers_IdleTick(KLWatchConst.SESSION_TIMEOUT_MS + 1)
+	AssertFalse(KLWatch.is_session_active, "an accepted session at native tick zero can still expire")
+	AssertEqual(3, _Stub_AppendLogRows.Length, "idle start, idle end and session end are paired")
+	AssertEqual(0, _Stub_AppendLogRows[3]["duration_ms"], "zero elapsed session time is valid")
+}
+Test("keystats session: tick zero remains a valid accepted session boundary",
+	_KLF_WithState.Bind(_KLF_ZeroSessionClock))

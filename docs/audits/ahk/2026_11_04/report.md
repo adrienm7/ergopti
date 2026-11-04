@@ -305,3 +305,17 @@ Consequence: A candidate exceeds the 64-unit storage bound, or delimiters inside
 Regression: Use genuine hook and ROI owners to reject a 63-unit prefix plus a two-unit payload or surrogate pair, then assert separate candidates for a callback with an internal delimiter. Native payload shape is documented by AutoHotkey InputHook.OnChar; Windows execution remains pending.
 
 The ongoing register now contains **22 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-023: Session lifecycle requires a key clock retired by synthetic input
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+static/ergopti_plus/windows/modules/keystats/keystats_watchers.ahk:KL_Watchers_IdleTick returns on the retired key clock despite computing the valid accepted boundary. modules/keystats/keystats_collection.ahk:KL_ResetSession forwards the same zero sentinel to the genuine closer instead of considering last_authorized_tick.
+
+Reproduction: Use the existing genuine callback sequence from \_KLF_Synthetic, which retains accepted activity1000 but retires KLHook.last_tick to0. Before another manual key, expire the idle timer or request session reset.
+
+Consequence: An abandoned session never expires until another manual key; explicit reset can throw ValueError when elapsed time is computed from a positive session start to zero.
+
+Regression: Run genuine capture, synthesis, idle, pointer and session-close owners against the recording append boundary. Cover idle expiry, reset, pointer activity extending reset, and a session legitimately starting at tick zero. Preserve the key clock sentinel for the next manual key's delay.
+
+The ongoing register now contains **23 distinct new findings**. The requested target of 1,000 remains unmet.
