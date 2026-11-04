@@ -14,7 +14,13 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import macos_app_dirs as app_dirs  # noqa: E402
 import macos_launch_reset as reset  # noqa: E402
+
+# The folders a launch leaves, named as the driver names them.
+CONFIG = app_dirs.CONFIG_RELATIVE
+SUPPORT = app_dirs.SUPPORT_RELATIVE
+LOGS = app_dirs.LOGS_RELATIVE
 
 
 class FakeSystem:
@@ -56,7 +62,13 @@ class LaunchResetControls(unittest.TestCase):
         self.scratch = tempfile.TemporaryDirectory()
         root = Path(self.scratch.name)
         self.home = root / "home"
-        for folder in (".config", "Documents", "Library/Logs", "Library/Preferences"):
+        for folder in (
+            ".config",
+            "Documents",
+            "Library/Application Support",
+            "Library/Logs",
+            "Library/Preferences",
+        ):
             (self.home / folder).mkdir(parents=True)
         (self.home / ".config/gh").mkdir()
         (self.home / "Documents/notes.txt").write_text("user file\n", encoding="utf-8")
@@ -84,12 +96,11 @@ class LaunchResetControls(unittest.TestCase):
         (self.application / "Contents/MacOS").mkdir(parents=True)
         (self.application / "Contents/MacOS/ErgoptiPlus").write_text("", encoding="utf-8")
         (self.home / "gitcfg/ergopti_plus/hammerspoon").mkdir(parents=True)
-        (self.home / ".config/ergopti_plus").symlink_to(
-            self.home / "gitcfg/ergopti_plus", target_is_directory=True
-        )
+        (self.home / CONFIG).parent.mkdir(parents=True)
+        (self.home / CONFIG).symlink_to(self.home / "gitcfg/ergopti_plus", target_is_directory=True)
         (self.home / "Documents/GitHub/config").mkdir(parents=True)
-        (self.home / "Library/Logs/ergopti_plus").mkdir()
-        (self.home / "Library/Logs/ergopti_plus/launcher.log").write_text("x\n", encoding="utf-8")
+        (self.home / LOGS).mkdir()
+        (self.home / LOGS / app_dirs.LAUNCHER_LOG_NAME).write_text("x\n", encoding="utf-8")
         (self.home / "Library/Preferences/com.ergoptiplus.app.plist").write_text(
             "", encoding="utf-8"
         )
@@ -118,9 +129,9 @@ class LaunchResetControls(unittest.TestCase):
         self.assertFalse(self.application.exists())
         for gone in (
             "gitcfg",
-            ".config/ergopti_plus",
+            SUPPORT,
             "Documents/GitHub",
-            "Library/Logs/ergopti_plus",
+            LOGS,
         ):
             self.assertFalse((self.home / gone).exists() or (self.home / gone).is_symlink(), gone)
         self.assertTrue((self.home / "Documents/notes.txt").is_file())
@@ -200,11 +211,11 @@ class LaunchResetControls(unittest.TestCase):
 
     def test_a_vanished_owned_baseline_entry_refuses(self):
         self.restore()
-        (self.home / "Library/Logs/ergopti_plus").mkdir()
+        (self.home / LOGS).mkdir()
         record = Path(self.scratch.name) / "with-logs.json"
         reset.snapshot(record, self.home, self.system, self.application)
-        (self.home / "Library/Logs/ergopti_plus").rmdir()
-        with self.assertRaisesRegex(RuntimeError, "missing=.*ergopti_plus"):
+        (self.home / LOGS).rmdir()
+        with self.assertRaisesRegex(RuntimeError, "missing=.*" + app_dirs.FOLDER_NAME):
             reset.restore(record, self.home, self.system, self.application, killer=self.system.kill)
 
     def test_a_record_of_another_home_refuses(self):

@@ -22,10 +22,17 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const appDirs = require('./lib/app-dirs.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = 'tools/dev/run-macos-dev-app.sh';
 const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.sh';
+// The runner names the launcher log through the field report's folder reader.
+const FIELD_PATHS = [
+	'tools/dev/field-report-paths.py',
+	'static/ergopti_plus/_shared/modules/paths/app_dirs.toml',
+	'static/ergopti_plus/_shared/modules/logger/sub_files.toml'
+];
 
 if (process.platform === 'win32') {
 	console.log('[SKIP] The macOS developer app runner is a macOS shell tool; not run on Windows.');
@@ -46,7 +53,7 @@ function fixture(name) {
 	const home = path.join(scratch, name, 'home');
 	const bin = path.join(scratch, name, 'bin');
 	const log = path.join(scratch, name, 'calls.log');
-	for (const relative of [SCRIPT, IDENTIFIERS]) {
+	for (const relative of [SCRIPT, IDENTIFIERS, ...FIELD_PATHS]) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), path.join(clone, relative));
 	}
@@ -124,6 +131,13 @@ try {
 			`build ERGOPTI_DEV_SOURCE=1 ERGOPTI_LAUNCHER_ARCHS=native\ncatalogue\nopen ${app}\n`
 		);
 		assert.match(result.stdout, /Lua runs from .*clone with space\/static\/ergopti_plus\/macos/);
+		// The launcher log is named where the launcher writes it (app_dirs.toml).
+		const launcherLog = path.join(
+			paths.home,
+			...appDirs.segments('logs.macos', 'macos'),
+			appDirs.data.logs.macos.launcher_log
+		);
+		assert.ok(result.stdout.includes(`Launcher trail: ${launcherLog} `), result.stdout);
 	});
 
 	// The developer app reads the clone's shared data, where no managed Ollama

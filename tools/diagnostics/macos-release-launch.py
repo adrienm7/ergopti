@@ -14,6 +14,8 @@ import sys
 import time
 from urllib.parse import quote
 
+import macos_app_dirs as app_dirs
+
 # The job log shows the failure without downloading the artifact; the full logs
 # stay in the artifact, so a noisy failure is capped here.
 MAX_EVIDENCE_LINES = 60
@@ -225,8 +227,8 @@ def main():
     report = {"app": str(app), "samples": [], "full_functionality_validated": False}
     # launcher.log and, without a LogsDirPath override, the driver logs share
     # the default logs folder (_shared/modules/paths/app_dirs.toml).
-    logs = Path.home() / "Library/Logs/ergopti_plus"
-    launcher_log = logs / "launcher.log"
+    logs = Path.home() / app_dirs.LOGS_RELATIVE
+    launcher_log = logs / app_dirs.LAUNCHER_LOG_NAME
     if launcher_log.exists():
         raise RuntimeError("Release launch requires a fresh launcher log")
     started = time.monotonic()

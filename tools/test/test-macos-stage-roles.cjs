@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const YAML = require('yaml');
 const roles = require('../ci/macos-stage-roles.cjs');
+const appDirs = require('./lib/app-dirs.cjs');
 let controls = 0;
 function check(name, body) {
 	body();
@@ -1948,10 +1949,9 @@ check('Build only builds, packages and signs; the launcher cell owns the build-h
 	])
 		assert.equal(launcher.filter((step) => step.name === name).length, 1, name);
 	// The released launcher log is never left behind on the runner that builds it.
+	const launcherLogs = appDirs.segments('logs.macos', 'macos').join('/');
 	assert.equal(
-		workflow.jobs['package-macos'].steps.some((step) =>
-			/Library\/Logs\/ergopti_plus/.test(step.run ?? '')
-		),
+		workflow.jobs['package-macos'].steps.some((step) => (step.run ?? '').includes(launcherLogs)),
 		false
 	);
 	for (const name of [

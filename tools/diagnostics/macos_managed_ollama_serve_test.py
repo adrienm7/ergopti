@@ -14,6 +14,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import macos_app_dirs as app_dirs
+
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = Path(os.environ.get("ERGOPTI_SOURCE_ROOT", ROOT))
 DEPENDENCY = Path(os.environ.get("ERGOPTI_SERVE_DEPENDENCY", ROOT))
@@ -115,7 +117,7 @@ class ProductionServeControls(unittest.TestCase):
             ROOT / "static/ergopti_plus/macos/modules/llm/managed_ollama_serve.py", destination
         )
         self.subject = load("actual_production_serve", destination)
-        self.target = self.home / "Library/Application Support/Ergopti/ollama-native-http"
+        self.target = self.home / app_dirs.SUPPORT_RELATIVE / "ollama-native-http"
         self.target.mkdir(parents=True, mode=0o755)
         # The production alias policy requires an actual private owned ancestor.
         self.target.parent.chmod(0o700)
