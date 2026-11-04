@@ -194,7 +194,8 @@ _HTEI_MagicMove(Mode) {
 	try {
 		HSE_Terminators := Terminators()
 		_HotstringsTerminatorRecords := 0
-		HotstringsConfigApplyMagicKey("A")
+		; The real detached factory owns this setup; migration is the subject.
+		HSE_Terminators.updateMagicKey("A")
 		_HSDT_Seed("magic-exact-move-" . Mode)
 		Legacy := Mode == "lower" ? "a" : "A"
 		AssertEqual(1, HotstringsTerminatorMigrateStrings(Legacy, Legacy))
