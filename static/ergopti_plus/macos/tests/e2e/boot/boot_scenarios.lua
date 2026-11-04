@@ -195,7 +195,7 @@ end
 --- @param ctx table Scenario context.
 local function kept_shared_runtime(ctx)
 	neutral_defaults(ctx)
-	write_home(ctx.home, ".config/ergopti_plus/hammerspoon/config_karabiner.toml",
+	write_home(ctx.home, CONFIG_REL .. "/hammerspoon/config_karabiner.toml",
 		'[karabiner]\nruntime = "shared"\n')
 end
 
