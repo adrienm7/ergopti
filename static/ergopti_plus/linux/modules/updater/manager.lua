@@ -392,7 +392,7 @@ local function _read_persisted_interval(path)
 	local section = config[CONFIG_SECTION]
 	local raw = type(section) == "table" and section[CONFIG_INTERVAL_KEY] or nil
 	if raw == nil then return DEFAULT_INTERVAL_SEC end
-	if type(raw) ~= "number" or raw < 0 or raw ~= math.floor(raw) then
+	if type(raw) ~= "number" or raw < 0 or raw == math.huge or raw ~= math.floor(raw) then
 		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds; using %ds.",
 			tostring(raw), DEFAULT_INTERVAL_SEC)
 		return DEFAULT_INTERVAL_SEC

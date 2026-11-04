@@ -118,12 +118,35 @@ local function load_menu(options)
 			return true
 		end,
 		updateMenu = function() context.updates = context.updates + 1 end,
-		script_control = { is_paused = function() return options.paused == true end },
+		script_control = { is_paused = options.pause_reader or function() return options.paused == true end },
 	})
 	return context
 end
 
 helpers.describe("menu_metrics WPM lifecycle reaches persisted checkmarks", function()
+	for _, mode in ipairs({ "nil", "throw", "non_boolean" }) do
+		helpers.it("keeps WPM stopped when pause state is unavailable: " .. mode, function()
+			local unreadable = false
+			local context = load_menu({ pause_reader = function()
+				if not unreadable then return false end
+				if mode == "throw" then error("pause read failed") end
+				if mode == "non_boolean" then return "unknown" end
+				return nil
+			end })
+			unreadable = true
+			helpers.assert_true(context.commands.wpm_widget())
+			helpers.assert_eq(context.widget_starts, 0, "unknown pause state must not arm the widget")
+			helpers.assert_eq(context.state.keystats_float_wpm, true, "preference remains available on resume")
+		end)
+	end
+	helpers.it("does not start saved WPM widgets during a failed pause read on menu build", function()
+		local context = load_menu({ keystats_menubar_wpm = true, keystats_float_wpm = true,
+			pause_reader = function() error("pause read failed") end })
+		helpers.assert_eq(context.menubar_starts, 0)
+		helpers.assert_eq(context.widget_starts, 0)
+		helpers.assert_true(context.menubar_stops > 0)
+		helpers.assert_true(context.widget_stops > 0)
+	end)
 	helpers.it("compensates false, nil, and thrown menubar activation", function()
 		for _, case in ipairs({
 			{ label = "false", start = function() return false end },

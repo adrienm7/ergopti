@@ -29,8 +29,10 @@ helpers.describe("menu_metrics: WPM widget/menubar are pause-gated in build (F-M
 
 	helpers.it("derives a paused flag from script_control in build", function()
 		local src = read_src()
-		helpers.assert_true(src:find("script_control.is_paused()", 1, true) ~= nil,
-			"build must read the live pause state via script_control.is_paused()")
+		helpers.assert_true(src:find("pcall(script_control.is_paused)", 1, true) ~= nil,
+			"build must safely read the live pause state via script_control.is_paused")
+		helpers.assert_true(src:find("local paused = paused_now()", 1, true) ~= nil,
+			"build must use the same pause observation as interactive callbacks")
 	end)
 
 	helpers.it("gates the menubar + widget START on `not paused`", function()

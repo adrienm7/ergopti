@@ -328,6 +328,11 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		helpers.assert_eq(fresh.owner.interval(), fresh.timing.default_check_interval_sec, "absent: the shared default")
 	end)
 
+	helpers.it("uses the default for an infinite saved interval", function()
+		local ctx = build({ now = T0, state = { update_check_interval_seconds = math.huge } })
+		helpers.assert_eq(ctx.owner.interval(), ctx.timing.default_check_interval_sec)
+	end)
+
 	helpers.it("a refused save keeps the previous interval", function()
 		local ctx = build({ now = T0, state = { update_check_interval_seconds = 3600 }, save_refused = true })
 		helpers.assert_eq(ctx.owner.set_interval(86400), false)
