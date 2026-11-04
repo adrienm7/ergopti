@@ -111,3 +111,91 @@ Mixed horizontal and vertical scrolls intentionally follow the existing horizont
 ## Coverage gaps and watch-list
 
 This is not an exhaustive audit of every Windows file. Native fault injection, physical keyboard and touchpad receiving, WPM persistence and reconstruction, long-word LLM diff limits, and the shared PAC decoder remain open. Rejected SQLite grouping, mmap, caching and priority proposals were excluded. No zero-bug claim is made.
+
+## Second sweep of the same audited revision
+
+The second sweep adds 6 distinct findings, for 14 new findings in this ongoing audit. The goal of 100 remains unmet. The initial evidence above is retained.
+
+## AHK-009: Update result survives a superseding request
+
+Severity: medium. Confidence: high.
+
+static/ergopti_plus/windows/ui/update_check/init.ahk:UpdateCheck_ShowResult: Request identity is checked before yielding calls but not before presenting the result.
+
+Reproduction: Result A enters logging; close A and begin B before logging returns.
+
+Observed source consequence: A replaces B or reopens the closed window.
+
+Regression: Interrupt the actual logging boundary; reject A and retain B checking.
+
+## AHK-010: A stale successful WebView build overwrites its replacement
+
+Severity: high. Confidence: high.
+
+static/ergopti_plus/windows/ui/update_check/init.ahk:\_UpdateCheck_Open: Only the failure path rechecks the opening epoch; the successful path publishes global resources unconditionally.
+
+Reproduction: While WebView creation for A pumps messages, close A and open B; then return A controller.
+
+Observed source consequence: B loses its controller ownership to the old opening stack.
+
+Regression: Inject reentrant factory completion and require B resources unchanged and A resources retired once.
+
+## AHK-011: Update window teardown can close one controller twice
+
+Severity: high. Confidence: high.
+
+static/ergopti_plus/windows/ui/update_check/init.ahk:\_UpdateCheck_CloseWindow: Owner invalidation and ResetDone happen after the COM call; no reentrant teardown guard exists.
+
+Reproduction: Controller.Close reenters CloseWindow through a native window event.
+
+Observed source consequence: The same controller closes twice and the host can be destroyed before COM closure unwinds.
+
+Regression: A passive controller reenters on its first Close; require exact-once closure and destruction.
+
+## AHK-012: An absent Startup directory prevents portable uninstall
+
+Severity: medium. Confidence: high.
+
+static/ergopti_plus/windows/vendor/ergopti_uninstall.ps1:Remove-ErgoptiStartupShortcuts: Get-ChildItem enumerates an optional directory unconditionally under ErrorActionPreference Stop.
+
+Reproduction: Unregister startup shortcuts for an absent Startup folder during an authorized executable removal.
+
+Observed source consequence: The application has exited but recycling never runs.
+
+Regression: Execute the removal transaction with an absent private folder and a recorded recycle callback.
+
+## AHK-013: Crash reports confuse process and OS architecture
+
+Severity: low. Confidence: high.
+
+static/ergopti_plus/windows/vendor/ergopti_crash_worker.ps1:architecture enrichment: The worker replaces reliable snapshot os_arch with PROCESSOR_ARCHITECTURE, which describes its own process.
+
+Reproduction: Run the crash worker as PowerShell32 on Windows64.
+
+Observed source consequence: The report says OS x86 although Windows is64-bit.
+
+Regression: Execute a WOW64 worker with an OS64 snapshot and assert OS architecture remains64-bit.
+
+## AHK-014: Final file admission can overwrite a concurrent edit
+
+Severity: high. Confidence: high.
+
+static/ergopti_plus/windows/adapters/file_system.ahk:\_FSPublishIfUnchanged: Source equality is checked only before staging and before the reentrant logical admission.
+
+Reproduction: Read old as Expected; the final admission writes concurrent and returns1; request replacement.
+
+Observed source consequence: The publication reports success and replaces concurrent.
+
+Regression: Invoke the actual admitted publisher with a source-mutating admission; require refusal, preserved edit and no stage.
+
+## Limits and rejected hypotheses
+
+PowerShell and native UI fault injection remain unexecuted here. API and local-server dialogs checked source receipts after the inspected modals; no finding was counted there. Claims about unsupported display brightness levels were not counted without device evidence. SQLite first-wins and append receipts remain separate investigations until independently reproduced. This snapshot does not assert complete file coverage or zero remaining bugs.
+
+## AHK-015: Segmented replay keeps the last duplicate within a frame
+
+Severity: high. Confidence: high. The production AHK execution path was inspected; its complete Windows rebuild was not executed here. The trigger conflict was independently reproduced with SQLite 3.53.1 through Python. The exact reduced schema, trigger, statements and results are retained in `first-wins-sqlite.json`. One-pass replay retained `first.exe`; the production-generated trigger retained `later.exe`.
+
+`_KLR_RebuildInstallFirstWins` in `modules/keystats/keystats_reader_rebuild.ahk` removes every conflict, but `_KLR_RebuildStep` executes statements forward within each backward-read frame. The existing `_KLRNF_FirstCopyWins` fixture uses 700-byte reads that separate the duplicates. Repeat it with a large frame and compare the real derived fingerprint, surviving event and aggregate days against one-pass replay. Cache and checkpoint qualification must accompany the correction.
+
+This adds one independently reproduced finding, for **15 new distinct findings** in this ongoing audit. The goal of 100 remains unmet. Append-receipt failure remains an unconfirmed candidate and is not counted.

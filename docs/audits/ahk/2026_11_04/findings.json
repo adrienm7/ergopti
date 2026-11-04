@@ -92,6 +92,83 @@
 			"root_cause": "NetworkCheck_JudgePac in static/ergopti_plus/windows/ui/field_check/network_check.ahk: The UTF-16 BOM branch returns success without decoding or checking the PAC function.",
 			"silent_failure": "Diagnostics claim a valid PAC and FindProxyForURL despite absent script; the Lua sibling shares this defect.",
 			"regression_test": "Accept real UTF-16LE/BE PAC scripts; reject BOM-only, odd byte counts, invalid Unicode and content without the function."
+		},
+		{
+			"id": "AHK-009",
+			"title": "Update result survives a superseding request",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Result A enters logging; close A and begin B before logging returns.",
+			"root_cause": "static/ergopti_plus/windows/ui/update_check/init.ahk:UpdateCheck_ShowResult: Request identity is checked before yielding calls but not before presenting the result.",
+			"silent_failure": "A replaces B or reopens the closed window.",
+			"regression_test": "Interrupt the actual logging boundary; reject A and retain B checking."
+		},
+		{
+			"id": "AHK-010",
+			"title": "A stale successful WebView build overwrites its replacement",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "While WebView creation for A pumps messages, close A and open B; then return A controller.",
+			"root_cause": "static/ergopti_plus/windows/ui/update_check/init.ahk:_UpdateCheck_Open: Only the failure path rechecks the opening epoch; the successful path publishes global resources unconditionally.",
+			"silent_failure": "B loses its controller ownership to the old opening stack.",
+			"regression_test": "Inject reentrant factory completion and require B resources unchanged and A resources retired once."
+		},
+		{
+			"id": "AHK-011",
+			"title": "Update window teardown can close one controller twice",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Controller.Close reenters CloseWindow through a native window event.",
+			"root_cause": "static/ergopti_plus/windows/ui/update_check/init.ahk:_UpdateCheck_CloseWindow: Owner invalidation and ResetDone happen after the COM call; no reentrant teardown guard exists.",
+			"silent_failure": "The same controller closes twice and the host can be destroyed before COM closure unwinds.",
+			"regression_test": "A passive controller reenters on its first Close; require exact-once closure and destruction."
+		},
+		{
+			"id": "AHK-012",
+			"title": "An absent Startup directory prevents portable uninstall",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Unregister startup shortcuts for an absent Startup folder during an authorized executable removal.",
+			"root_cause": "static/ergopti_plus/windows/vendor/ergopti_uninstall.ps1:Remove-ErgoptiStartupShortcuts: Get-ChildItem enumerates an optional directory unconditionally under ErrorActionPreference Stop.",
+			"silent_failure": "The application has exited but recycling never runs.",
+			"regression_test": "Execute the removal transaction with an absent private folder and a recorded recycle callback."
+		},
+		{
+			"id": "AHK-013",
+			"title": "Crash reports confuse process and OS architecture",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Run the crash worker as PowerShell32 on Windows64.",
+			"root_cause": "static/ergopti_plus/windows/vendor/ergopti_crash_worker.ps1:architecture enrichment: The worker replaces reliable snapshot os_arch with PROCESSOR_ARCHITECTURE, which describes its own process.",
+			"silent_failure": "The report says OS x86 although Windows is64-bit.",
+			"regression_test": "Execute a WOW64 worker with an OS64 snapshot and assert OS architecture remains64-bit."
+		},
+		{
+			"id": "AHK-014",
+			"title": "Final file admission can overwrite a concurrent edit",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Read old as Expected; the final admission writes concurrent and returns1; request replacement.",
+			"root_cause": "static/ergopti_plus/windows/adapters/file_system.ahk:_FSPublishIfUnchanged: Source equality is checked only before staging and before the reentrant logical admission.",
+			"silent_failure": "The publication reports success and replaces concurrent.",
+			"regression_test": "Invoke the actual admitted publisher with a source-mutating admission; require refusal, preserved edit and no stage."
+		},
+		{
+			"id": "AHK-015",
+			"title": "Segmented replay keeps the last duplicate within a frame",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Put two INSERT OR IGNORE batches for the same (device_id,id), first with first.exe and then later.exe, inside one executable frame. One-pass replay keeps first.exe; the segmented first-wins trigger keeps later.exe.",
+			"root_cause": "static/ergopti_plus/windows/modules/keystats/keystats_reader_rebuild.ahk:_KLR_RebuildInstallFirstWins deletes every conflicting row, assuming every incoming insert is older. A frame executes its own statements forward, so this is false inside the frame.",
+			"silent_failure": "The existing first-copy regression intentionally uses a small frame size that separates the copies. Wrong survivors change event dates and derived aggregates without a SQL error.",
+			"regression_test": "Run the existing one-pass-versus-segmented fingerprint fixture with a frame large enough for both copies; retain the small-frame test and check duplicates inside one transaction."
 		}
 	]
 }
