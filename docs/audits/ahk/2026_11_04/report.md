@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **47 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **48 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -887,3 +887,17 @@ The ongoing register now contains **47 distinct new findings**. The requested ta
 ## Native partial qualification checkpoint: 41909512571
 
 At `a6373a4`, both native thinking-retry cases passed individually and reversed, qualifying AHK-044: the positive control issued two HTTP requests and cancellation retained exactly one. The complete production metrics JSON NUL regression also passed. Ordinary clipboard timing and timely readiness passed; the two native64 clipboard probes and late readiness case reproduced AHK-046/AHK-047. The eight-case mixed cohort is intentionally not reported green. Complete production compile passed; both E2E families were outside selection.
+
+## AHK-048: Clamped hotstring delays lose their persistent relative offset
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+\_HotstringsRecordApplyBase clears PendingOffset after storing only the clamped effective Delay. Rebase and serialisation later reconstruct the offset from this lossy projection, while transaction clones also omit the original finite intent. The shared delay corpus explicitly requires retaining the original offset when the effect clamps.
+
+Reproduction: Native run41910772341 atf7e7b2f passes the unclipped, unlimited and explicit replacement controls. Three cases fail individually and reversed: rebasing a clamped offset disagrees with a genuine reload; an unrelated colour save changes the source offset; returning the base after an intermediate clamp fails to restore the original effective delay.
+
+Consequence: Changing a base delay or saving an unrelated colour silently changes a user’s configured timing intention, both in the live projection and on disk.
+
+Regression: Six HotstringsConfig persistent offset cases use real TOML, the canonical typed decoder, production parser/projection/resolver, actual public colour and delay writers and fresh reload comparisons. The fix retains StoredOffset through projection and detached transaction clones; explicit delay edits replace it and clears retire it. Category and section paths are checked. Native fail-before measured; post-fix qualification pending. Shared Lua already preserves the offset in its rung and computes clamping only in projection.
+
+The ongoing register now contains **48 distinct new findings**. The requested target of 1,000 remains unmet.

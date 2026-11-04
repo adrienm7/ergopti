@@ -521,6 +521,17 @@
 			"root_cause": "_LLMRemote_ReadyOnAccess checks auxiliary identity but omits the stored absolute whole-request deadline. For a nonlisting request it publishes true immediately after successful token preparation even if the due deadline timer has not yet run.",
 			"silent_failure": "Save-time credential validation can report success after its total request budget expired, depending on native callback delivery order. The shared usable token may correctly remain cached while the expired individual validation must fail.",
 			"regression_test": "Two token-ready-deadline cases run public readiness and the genuine token engine through the existing passive exchange HTTP port, with actual AHK timer delivery. The late reply crosses the original real budget; neither origin nor duration is moved. Timely control, current-owner checks, exact one-result receipt and preserved token cache distinguish authority from credential lifetime. The narrow fix checks the original deadline in ReadyOnAccess. Native fail-before measured; post-fix pending. macOS/Linux token readiness continues through a request rather than this Windows-only nonlisting shortcut."
+		},
+		{
+			"id": "AHK-048",
+			"title": "Clamped hotstring delays lose their persistent relative offset",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Native run41910772341 atf7e7b2f passes the unclipped, unlimited and explicit replacement controls. Three cases fail individually and reversed: rebasing a clamped offset disagrees with a genuine reload; an unrelated colour save changes the source offset; returning the base after an intermediate clamp fails to restore the original effective delay.",
+			"root_cause": "_HotstringsRecordApplyBase clears PendingOffset after storing only the clamped effective Delay. Rebase and serialisation later reconstruct the offset from this lossy projection, while transaction clones also omit the original finite intent. The shared delay corpus explicitly requires retaining the original offset when the effect clamps.",
+			"silent_failure": "Changing a base delay or saving an unrelated colour silently changes a user’s configured timing intention, both in the live projection and on disk.",
+			"regression_test": "Six HotstringsConfig persistent offset cases use real TOML, the canonical typed decoder, production parser/projection/resolver, actual public colour and delay writers and fresh reload comparisons. The fix retains StoredOffset through projection and detached transaction clones; explicit delay edits replace it and clears retire it. Category and section paths are checked. Native fail-before measured; post-fix qualification pending. Shared Lua already preserves the offset in its rung and computes clamping only in projection."
 		}
 	]
 }
