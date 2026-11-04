@@ -157,6 +157,7 @@ local function path_is_within(path, root)
 	local key = canonical_path(path, identities)
 	local prefix = canonical_path(root, identities)
 	if key == nil or prefix == nil then return false end
+	if prefix == "/" then return key:sub(1, 1) == "/" end
 	return key == prefix or key:sub(1, #prefix + 1) == prefix .. "/"
 end
 
@@ -210,7 +211,7 @@ function M.start(ctx)
 	local ignored_dirs = {}
 	for _, d in ipairs(ctx.ignored_dirs or {}) do
 		local key = canonical_path(d)
-		if key then ignored_dirs[#ignored_dirs + 1] = key .. "/" end
+		if key then ignored_dirs[#ignored_dirs + 1] = key == "/" and "/" or key .. "/" end
 	end
 
 	--- True when a changed path lies inside an ignored runtime directory.

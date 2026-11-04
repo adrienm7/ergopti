@@ -79,7 +79,7 @@ helpers.describe("infra/file_watchers — arming contract", function()
 		_G.script_watchers = nil
 	end))
 
-	helpers.it("covers personal_info.toml exactly once in the bundle-fallback topology", with_scheduler_scope(function()
+	helpers.it("covers personal_info.toml exactly once in the bundle-fallback topology (file-watchers-root)", with_scheduler_scope(function()
 		local saved_file_watchers = package.loaded["infra.file_watchers"]
 		local saved_pathwatcher = hs.pathwatcher
 		local saved_timer = hs.timer
@@ -138,6 +138,21 @@ helpers.describe("infra/file_watchers — arming contract", function()
 			}))
 			helpers.assert_eq(#paths, 3,
 				"the recursive config watcher must prevent a duplicate personal-info owner")
+			helpers.assert_true(_G.script_watchers[1]:stop())
+
+			paths, callbacks, timer_arms, clock = {}, {}, 0, 0
+			_G.script_watchers = nil
+			helpers.assert_true(FileWatchers.start({
+				hotstrings_dir = "/",
+				base_dir = "/bundle/macos/",
+				personal_hotstrings_dir = "/config/hotstrings/",
+				personal_info_path = "/config/personal_info.toml",
+				ignored_dirs = { "/" },
+			}))
+			helpers.assert_eq(#paths, 3, "a root watcher already covers personal info")
+			clock = 10
+			callbacks[1]({ "/config/personal_info.toml" })
+			helpers.assert_eq(timer_arms, 0, "ignoring the root must cover its descendants")
 			helpers.assert_true(_G.script_watchers[1]:stop())
 		end, debug.traceback)
 

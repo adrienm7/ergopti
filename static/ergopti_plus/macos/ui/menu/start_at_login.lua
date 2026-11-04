@@ -31,8 +31,11 @@ function M.request(action, changed, deps)
 		if action == "toggle" then
 			local i18n = deps.i18n or require("infra.i18n")
 			local dialog = deps.dialog or require("infra.dialog_util")
-			dialog.block_alert(i18n.get("menu.global.start_at_login"),
-				i18n.get("dialog.start_at_login.failed"), i18n.get("button.ok"), nil, "critical")
+			local shown, err = pcall(function()
+				dialog.block_alert(i18n.get("menu.global.start_at_login"),
+					i18n.get("dialog.start_at_login.failed"), i18n.get("button.ok"), nil, "critical")
+			end)
+			if not shown then logger.error("ui.menu.start_at_login", "Startup failure dialog failed: %s.", tostring(err)) end
 		end
 	end
 	local executable, detail, environment = resolver.resolve()
@@ -57,7 +60,10 @@ function M.request(action, changed, deps)
 		local previous = enabled
 		enabled = state == "enabled"
 		if action == "toggle" and state == "approval" then fail("macOS approval is required") end
-		if previous ~= enabled and changed then changed() end
+		if previous ~= enabled and changed then
+			local updated, err = pcall(changed)
+			if not updated then logger.error("ui.menu.start_at_login", "Startup menu refresh failed: %s.", tostring(err)) end
+		end
 		drain_pending()
 	end, nil, environment)
 	if not task.start() then busy = false; fail("native worker could not start"); return false end
