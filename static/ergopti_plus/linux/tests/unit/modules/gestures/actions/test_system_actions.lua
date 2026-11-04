@@ -558,6 +558,20 @@ helpers.describe("Linux system actions", function()
 		helpers.assert_eq(leftover, "0", "the temporary capture is removed")
 	end)
 
+	for _, signal in ipairs({ "HUP", "INT", "TERM" }) do
+		helpers.it("cleans the private OCR image on SIG" .. signal, function()
+			local command = 'TMPDIR="$STUBS"; export TMPDIR; ' .. backgrounded(Gestures, "ocr_screenshot")
+			local log, dir = run_with_stubs(command, {
+				slurp = 'echo "10,10 50x20"',
+				grim = 'for last; do :; done; printf PNG > "$last"; kill -' .. signal .. ' "$PPID"; exit 0',
+				tesseract = 'printf text', ["wl-copy"] = 'cat > "$STUBS/clipboard"',
+			})
+			local pipe = assert(io.popen("find '" .. dir .. "' -name 'ergopti-ocr.*' -print"))
+			helpers.assert_eq(pipe:read("*a"), "", "OCR capture directory must be removed on signal: " .. log)
+			pipe:close()
+		end)
+	end
+
 	helpers.it("ocr_screenshot leaves the clipboard alone when the selection is cancelled (action-parity-linux-system)",
 		function()
 			local log, dir = run_with_stubs(backgrounded(Gestures, "ocr_screenshot"), {

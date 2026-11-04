@@ -528,13 +528,14 @@ SCREENSHOT_COMMANDS["screen_capture_instant"] = SCREENSHOT_COMMANDS["screenshot_
 --- installed (its own "osd" script detector is not a language), and the text
 --- left on the clipboard, Wayland first as for the captures. The capture is
 --- removed whatever happens; a cancelled selection leaves the clipboard alone.
-local OCR_COMMAND = "{ f=$(mktemp --suffix=.png) || exit 1; { "
+local OCR_COMMAND = '( d=$(mktemp -d "${TMPDIR:-/tmp}/ergopti-ocr.XXXXXXXX") || exit 1; '
+	.. [=[f="$d/capture.png"; trap 'rm -f "$f"; rmdir "$d"' 0; trap 'exit 1' HUP INT TERM; { ]=]
 	.. SCREENSHOT_COMMANDS["screenshot_region_save"]:gsub("%%s", '"$f"')
 	.. "; } && [ -s \"$f\" ]"
 	.. " && langs=$(tesseract --list-langs 2>/dev/null | tail -n +2 | grep -vx osd | tr '\\n' '+')"
 	.. " && text=$(tesseract \"$f\" - ${langs:+-l \"${langs%+}\"} 2>/dev/null)"
 	.. " && { printf '%s' \"$text\" | wl-copy 2>/dev/null || printf '%s' \"$text\" | xclip -selection clipboard; };"
-	.. " rm -f \"$f\"; }"
+	.. " )"
 
 --- Where a saved screenshot lands, and under what name.
 ---
