@@ -80,11 +80,9 @@ end
 --- @return string|nil text
 local function read_shared(relative)
 	local path = require("infra.paths").shared(relative)
-	local fh = path and io.open(path, "r")
-	if not fh then return nil end
-	local text = fh:read("*a")
-	fh:close()
-	return text
+	if not path then return nil end
+	local text, status = require("toml_codec.writer").read_classified(path)
+	return status == "ok" and text or nil
 end
 
 --- The shipped files, decoded. A missing or malformed one is an installation
