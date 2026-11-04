@@ -218,6 +218,6 @@ _KATO_Case(Mode) {
 
 }
 
-for _KATO_Mode in ["retired-session", "current-session"]
+for _KATO_Mode in ["retired-session", "current-session", "retired-keyboard"]
 	Test("Keep-awake timer ownership: " . _KATO_Mode . " preserves exact session cancellation (keepawake-timer-owner)",
 		_KATO_Case.Bind(_KATO_Mode))

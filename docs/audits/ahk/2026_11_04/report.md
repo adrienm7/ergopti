@@ -335,3 +335,17 @@ real GUI close events and the public update API, with a passive browser factory.
 The fake controller checks that its HWND exists and its subscription count is
 zero at Close. These regressions are added but remain unexecuted on this Linux
 host; they do not constitute a real Edge runtime test.
+
+## AHK-024: A retired keep-awake keyboard callback stops its successor
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+static/ergopti_plus/windows/modules/shortcuts/win.ahk:AwakeCancelOnKeypress checks the callback type and active flag but never compares the supplied InputHook to the current AwakeInputHook owner.
+
+Reproduction: Start keep-awake A and retain its genuine InputHook, stop A, start B, then deliver the queued callback AwakeCancelOnKeypress(HookA,0x41,0x1E).
+
+Consequence: A delayed callback from the stopped observer cancels the newly activated session B.
+
+Regression: Extend the isolated keep-awake native owner fixture with actual Start/Stop and two genuine InputHooks. Controlled old-callback delivery must preserve B; current B delivery must stop B. Position and timers remain passive, without physical mouse displacement.
+
+The ongoing register now contains **24 distinct new findings**. The requested target of 1,000 remains unmet.
