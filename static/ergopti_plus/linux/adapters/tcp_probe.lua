@@ -73,7 +73,10 @@ function M.probe(host, port, timeout_ms, callback, luv)
 			Logger.error(LOG, "TCP probe handle inspection failed; retirement remains pending.")
 			return
 		end
-		if closing then return end
+		if closing ~= false then
+			if closing ~= true then Logger.error(LOG, "TCP probe handle inspection was inconclusive.") end
+			return
+		end
 		entry.closing = true
 		local called, ack, detail = pcall(handle.close, handle, function()
 			if entry.closed then return end

@@ -69,7 +69,7 @@ it("tries the next resolved address when the first connection is refused", funct
 	helpers.assert_eq(answers[1][1], true, "a later reachable address must keep the proxy usable")
 end)
 
-for _, failure in ipairs({ "throw", "return", "inspect" }) do
+for _, failure in ipairs({ "throw", "return", "inspect", "inspect_nil" }) do
 it("retains a refused native close until cancellation retries it: " .. failure, function()
 	local resolve, connect, delivered = nil, nil, false
 	local attempts, fail = 0, true
@@ -77,6 +77,7 @@ it("retains a refused native close until cancellation retries it: " .. failure, 
 		return {
 			is_closing = function()
 				if is_timer and fail and failure == "inspect" then error("controlled inspection refusal") end
+				if is_timer and fail and failure == "inspect_nil" then return nil end
 				return false
 			end,
 			close = function(_, callback)
@@ -103,7 +104,7 @@ it("retains a refused native close until cancellation retries it: " .. failure, 
 	fail = false
 	helpers.assert_true(child.cancel())
 	helpers.assert_true(child.is_settled())
-	helpers.assert_eq(attempts, failure == "inspect" and 1 or 2)
+	helpers.assert_eq(attempts, (failure == "inspect" or failure == "inspect_nil") and 1 or 2)
 	helpers.assert_eq(delivered, false, "cancellation revokes the unanswered probe")
 end)
 end
