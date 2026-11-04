@@ -2004,7 +2004,7 @@ class _SigningSink(_PreparationSink):
 
 
 PRODUCTION_RELATIVE = "tools/build/owned_runtime_product_build.py"
-PRODUCTION_SHA256 = "874cea2133153965088b6aa3a5748a80c5e3dccac4247ab2637fe9bd6241987b"
+PRODUCTION_SHA256 = "a947e5e4b5a44f3b723f65ed9c174f14f10b14122b252d955e972d5dd0c5b53a"
 
 
 @dataclass(frozen=True, slots=True)
@@ -3153,7 +3153,7 @@ def observe_products(source, owner, *, repository=None):
     return validate_products(result)
 
 
-SOURCE_FACTORY_SHA256 = "eb9272fef1f9f0a42a4ddfb17f06c7f822b31a18c443623a589e047af3687582"
+SOURCE_FACTORY_SHA256 = "29996761282e0a5fd3dff34613b74b74da8a3f89c25a5a7e5d3dc3eccd879c8a"
 _SOURCE_FACTORY = None
 
 

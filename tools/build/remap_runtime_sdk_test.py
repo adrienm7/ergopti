@@ -432,8 +432,8 @@ class SDKRouteControls(unittest.TestCase):
             with self.subTest(sdk=sdk):
                 self.report_package_route(sdk=sdk, refuse_source=True)
 
-    QUEUE_BUILD_SHA = "2ff6c998577a867d860e47a74cbb25ad3d9ea4d36339c53e14d2d8c388332ad5"
-    PREVIOUS_BUILD_SHA = "80342781a2faf7d83e82023fbf67ce1fb63dc760399feec0b60aee4d6f914c8c"
+    QUEUE_BUILD_SHA = "0e3638f6e0d53d3b2ca51f3bec9997a7839557aab0172a87721a2bb1eda36c29"
+    PREVIOUS_BUILD_SHA = "58134f80774872eaff1f831a65045eda407a48587ad0428abfaa5ed2a8fa40c8"
 
     def protected_source_fixture(self, root):
         repository = Path(__file__).resolve().parents[2]
@@ -484,7 +484,7 @@ class SDKRouteControls(unittest.TestCase):
             self.assertIs(build._source_factory(), factory)
             self.assertEqual(
                 build.SOURCE_FACTORY_SHA256,
-                "eb9272fef1f9f0a42a4ddfb17f06c7f822b31a18c443623a589e047af3687582",
+                "29996761282e0a5fd3dff34613b74b74da8a3f89c25a5a7e5d3dc3eccd879c8a",
             )
             self.assertFalse(hasattr(build, "DRIVER_UPDATE_OWNED_SOURCE_PROFILE"))
 
