@@ -3679,7 +3679,12 @@ function request_range_data(show_loader = true) {
 				return;
 			}
 		}
-		window._lua_request = JSON.stringify(req);
+		// Naming the history this page holds lets the macOS host omit it when
+		// unchanged: resending it each minute held its main thread 250 ms.
+		window._lua_request = JSON.stringify({
+			...req,
+			historical_serial: app_state.historical_serial ?? null
+		});
 	};
 	setTimeout(dispatch, DISPATCH_DELAY_MS);
 }
@@ -3713,18 +3718,36 @@ function mark_incomplete_read(part, incomplete) {
  * Receives the decoded n-gram payload from the Lua backend and triggers the
  * local filter/render pipeline.
  * @param {Object} payload - Contains { historical, today } n-gram dictionaries,
- *     plus `incomplete: true` when the host read missed rows.
+ *     plus `incomplete: true` when the host read missed rows. A host may name
+ *     its history with `historical_serial`, and then replace `historical` with
+ *     `historical_reused: true` when the request named that same serial.
  * @param {number|null} [request_id=null] - Native request ownership token.
  * @returns {boolean} Whether the payload was current and rendered.
  */
 function receive_range_data(payload, request_id = null) {
 	if (!can_receive_range_data(request_id)) return false;
-	if (request_id !== null && !complete_range_request(request_id, payload ? 'ok' : 'failed')) {
+	const serial = Number.isSafeInteger(payload?.historical_serial)
+		? payload.historical_serial
+		: null;
+	// A reuse of a history this page no longer holds cannot render: fail it
+	const reuse_refused =
+		payload?.historical_reused === true &&
+		(serial === null || serial !== app_state.historical_serial || !app_state.historical_cache);
+	const usable = Boolean(payload) && !reuse_refused;
+	if (request_id !== null && !complete_range_request(request_id, usable ? 'ok' : 'failed')) {
+		return false;
+	}
+	if (reuse_refused) {
+		app_state.historical_serial = null;
+		console.error('receive_range_data: the host reused a history this page does not hold.');
 		return false;
 	}
 	if (!payload) return false;
 	invalidate_typing_projection_cache();
-	app_state.historical_cache = payload.historical;
+	if (payload.historical_reused !== true) {
+		app_state.historical_cache = payload.historical;
+		app_state.historical_serial = serial;
+	}
 	app_state.today_live_data = payload.today;
 	mark_incomplete_read('range', payload.incomplete === true);
 	apply_local_filters();

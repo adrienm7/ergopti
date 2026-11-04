@@ -229,6 +229,46 @@ test('same-query background refresh preserves foreground loader and deadline', (
 	assert.equal(f.state.range_request_previous_table_html, 'last-good');
 });
 
+// Field report 2026-11-03: every live update resent the whole history to the
+// macOS host's page, holding its main thread about 250 ms each minute.
+test('macos: the request names the held history and a reuse keeps it (ngram-history-reuse)', () => {
+	const f = fixture();
+	f.context.request_range_data(false);
+	f.dispatch();
+	assert.equal(f.requests[0].historical_serial, null, 'a page holding nothing names nothing');
+	const first = { ...payload('kept'), historical_serial: 7 };
+	assert.equal(f.context.receive_range_data(first, f.requests[0].request_id), true);
+	f.context.request_range_data(false);
+	f.dispatch();
+	assert.equal(f.requests[1].historical_serial, 7);
+	const reused = { historical_reused: true, historical_serial: 7, today: {} };
+	assert.equal(f.context.receive_range_data(reused, f.requests[1].request_id), true);
+	assert.equal(f.state.historical_cache, first.historical, 'the held history stays in place');
+	assert.deepEqual(f.renders.at(-1), ['kept']);
+	assert.equal(f.state.loading_data, false);
+});
+
+test('macos: a reuse of a history the page does not hold fails the request', () => {
+	const f = fixture();
+	f.context.request_range_data(false);
+	f.dispatch();
+	assert.equal(
+		f.context.receive_range_data(
+			{ ...payload('kept'), historical_serial: 7 },
+			f.requests[0].request_id
+		),
+		true
+	);
+	f.context.request_range_data(false);
+	f.dispatch();
+	const renders = f.renders.length;
+	const foreign = { historical_reused: true, historical_serial: 8, today: {} };
+	assert.equal(f.context.receive_range_data(foreign, f.requests[1].request_id), false);
+	assert.equal(f.renders.length, renders, 'nothing renders from a history the page lacks');
+	assert.equal(f.state.historical_serial, null, 'the next request asks for the whole history');
+	assert.equal(f.state.loading_data, false);
+});
+
 test('none selection is distinct from all available apps', () => {
 	const f = fixture();
 	f.state.app_selection_mode = 'all';
