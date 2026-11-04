@@ -133,7 +133,7 @@ _TNC_PacVerdict() {
 	AssertEqual("error", NetworkCheck_JudgePac(200, Wide), "a BOM with NUL is not a PAC")
 	for BigEndian in [false, true] {
 		Text := "// é " . Chr(0x1F600) . " " . Chr(0xFFFD) . "`nfunction FindProxyForURL(){return 'DIRECT';}"
-		Units := StrPut(Text, "UTF-16") - 1
+		Units := StrLen(Text)
 		Storage := Buffer(2 + (Units + 1) * 2, 0)
 		Valid := Buffer(2 + Units * 2, 0)
 		NumPut("UShort", 0xFEFF, Storage)
