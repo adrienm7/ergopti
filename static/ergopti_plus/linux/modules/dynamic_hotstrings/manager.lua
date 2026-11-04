@@ -944,7 +944,7 @@ function M.prefix_mappings()
 		Logger.error(LOG, "prefix_rules module unavailable — no prefix expansion is registered.")
 		return {}
 	end
-	return Prefix.build(_info, M.is_rule_enabled)
+	return Prefix.build(_info, M.is_rule_enabled, _trigger_char)
 end
 
 --- Whether one engine section may fire.

@@ -129,8 +129,9 @@ end
 --- @param is_section_enabled function|nil Predicate (group, section) → boolean.
 ---   Absent means every section is on, matching the shared engine's convention
 ---   for the same argument.
+--- @param magic_key string|nil Configured magic key; nil uses the manifest default.
 --- @return table Array of mapping tables, ready for the hotstring engine.
-function M.build(info, is_section_enabled)
+function M.build(info, is_section_enabled, magic_key)
 	local out, seen = {}, {}
 	if type(info) ~= "table" then return out end
 
@@ -139,6 +140,9 @@ function M.build(info, is_section_enabled)
 		return is_section_enabled(GROUP, section) and true or false
 	end
 
+	if magic_key == nil then
+		magic_key = require("infra.manifest_reader").default_for("hotstrings.trigger_char")
+	end
 	local phone  = field(info, "phone_number")
 	local fphone = field(info, "phone_number_clean")
 	-- A national trunk zero is not dialled after the French country code.
@@ -153,7 +157,9 @@ function M.build(info, is_section_enabled)
 
 	if enabled("phoneprefixes") then
 		if #phone >= PHONE_MIN_FOR_SHORT then
-			add(out, seen, "phoneprefixes", phone:sub(1, PHONE_MIN_FOR_SHORT), phone, true, "phone_number")
+			if type(magic_key) == "string" and magic_key ~= "" then
+				add(out, seen, "phoneprefixes", phone:sub(1, PHONE_MIN_FOR_SHORT) .. magic_key, phone, true, "phone_number")
+			end
 			add(out, seen, "phoneprefixes",
 				FRANCE_DIAL_PREFIX .. phone:sub(1, PHONE_MIN_FOR_SHORT),
 				international_phone, true, "phone_number")
