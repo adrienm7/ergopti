@@ -128,12 +128,18 @@ function M.probe(host, port, timeout_ms, callback, luv)
 			tcp = luv.new_tcp()
 			if not tcp then answer(false, "connect"); return end
 			local candidate = tcp
+			-- luv's getaddrinfo result exposes the numeric address but omits
+			-- sin6_scope_id. Retain the originating literal's interface zone.
+			local zone = host:match("^[%x:%.]+(%%[%w_.%-]+)$")
+			local destination = address.addr
+			if zone and address.family == "inet6" and type(destination) == "string"
+				and not destination:find("%", 1, true) then destination = destination .. zone end
 			local function failed()
 				close(candidate)
 				if tcp == candidate then tcp = nil end
 				try_next()
 			end
-			local started = candidate:connect(address.addr, address.port, function(connect_error)
+			local started = candidate:connect(destination, address.port, function(connect_error)
 				if answered then return end
 				if connect_error then failed() else answer(true) end
 			end)
@@ -181,14 +187,15 @@ function M.relay_address(relay)
 	scheme = scheme:lower()
 	authority = authority:gsub("^.*@", "")
 	-- IPv4-mapped IPv6 addresses may contain a dotted decimal suffix.
-	local host, port = authority:match("^%[([%x:%.]+)%]:(%d+)$")
+	local host, port = authority:match("^%[([^%]]+)%]:(%d+)$")
 	if not host then host, port = authority:match("^([^:]+):(%d+)$") end
 	if not host then
-		host = authority:match("^%[([%x:%.]+)%]$") or authority:match("^([^:%[%]]+)$")
+		host = authority:match("^%[([^%]]+)%]$") or authority:match("^([^:%[%]]+)$")
 		if host then port = scheme == "https" and 443 or 1080 end -- libcurl proxy defaults.
 	end
 	port = tonumber(port)
 	if not host or not port or port < 1 or port > 65535 then return nil, nil end
+	if host:find(":", 1, true) then host = host:gsub("%%25", "%%") end
 	return host, port
 end
 

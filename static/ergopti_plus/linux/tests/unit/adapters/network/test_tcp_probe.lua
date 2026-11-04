@@ -158,6 +158,26 @@ it("does not publish during a reentrant close callback", function()
 	helpers.assert_eq(observed, 2, "both exact handles must finish before publication")
 end)
 
+it("preserves the interface scope discarded by libuv DNS results", function()
+	local resolve, destination
+	local function handle()
+		return {
+			is_closing = function() return false end,
+			close = function(_, callback) callback() end,
+			connect = function(_, address, _, callback) destination = address; callback(nil); return true end,
+		}
+	end
+	local backend = {
+		new_timer = handle, new_tcp = handle, update_time = function() end,
+		timer_start = function() return true end,
+		getaddrinfo = function(_, _, _, callback) resolve = callback; return {} end,
+	}
+	local child = assert(Probe.probe("fe80::1%eth0", 80, 1000, function() end, backend))
+	resolve(nil, { { addr = "fe80::1", port = 80, family = "inet6" } })
+	helpers.assert_eq(destination, "fe80::1%eth0")
+	helpers.assert_true(child.is_settled())
+end)
+
 it("publishes the answer only after its native timer and socket retire", function()
 	local server, port = listener()
 	local owned = {}
@@ -238,6 +258,7 @@ it("reads the relay address of every relay form the policy admits", function()
 		{ "https://proxy.example", "proxy.example", 443 },
 		{ "HTTPS://proxy.example", "proxy.example", 443 },
 		{ "http://proxy.example:3128/path?name=value#fragment", "proxy.example", 3128 },
+		{ "http://[fe80::1%25eth0]:8080", "fe80::1%eth0", 8080 },
 		{ "socks5h://user:secret@[::1]", "::1", 1080 },
 	}
 	for _, case in ipairs(cases) do
