@@ -128,6 +128,29 @@ try {
 	);
 	assert.ok(fs.existsSync(wrapper), 'empty receipt refusal preserves the launcher');
 	fs.writeFileSync(ownershipPath, validOwnership);
+	if (process.platform === 'linux') {
+		const lockDir = path.join(home, '.cache/ergopti');
+		fs.mkdirSync(lockDir, { recursive: true });
+		const lockedRemoval = spawnSync(
+			pythonExecutable(),
+			[
+				'-c',
+				'import fcntl, os, subprocess, sys\n' +
+					'with open(sys.argv[1], "w") as lock:\n' +
+					' fcntl.flock(lock, fcntl.LOCK_EX)\n' +
+					' result = subprocess.run(["/bin/bash", sys.argv[2], "--prefix", sys.argv[3], "--yes"], env=os.environ.copy())\n' +
+					' sys.exit(result.returncode)\n',
+				path.join(lockDir, 'ergopti.lock'),
+				script,
+				prefix
+			],
+			{ encoding: 'utf8', timeout: 15000, env: { ...process.env, HOME: home, XDG_RUNTIME_DIR: '' } }
+		);
+		assert.equal(lockedRemoval.status, 75, lockedRemoval.stderr);
+		assert.match(lockedRemoval.stderr, /code=busy role=lock/);
+		assert.ok(fs.existsSync(wrapper), 'a running daemon keeps its installed files');
+		assert.equal(fs.readFileSync(ownershipPath, 'utf8'), validOwnership);
+	}
 	for (const invalidPath of ['linux/../../another-app/keep', 'linux//file', '@unknown']) {
 		for (const terminator of ['\n', '']) {
 			fs.writeFileSync(

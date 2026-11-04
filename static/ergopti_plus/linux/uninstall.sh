@@ -445,6 +445,29 @@ prepare_uninstall_snapshots
 if [ -f "$UNIT" ] && command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
 	systemctl --user disable --now ergopti-hotstrings.service
 fi
+# A terminal-launched daemon is not owned by systemd. Hold the same singleton
+# lock as every Linux entry point until removal finishes, so its live files are
+# never unlinked and a new session cannot start midway through removal.
+lock_root="${XDG_RUNTIME_DIR:-$HOME/.cache}"
+case "$lock_root" in /*) ;; *) uninstall_record invalid-source lock "$lock_root"; exit 1 ;; esac
+lock_root="$lock_root/ergopti"
+install -d -m 700 "$lock_root"
+exec 9<>"$lock_root/ergopti.lock"
+if [ ! -f /proc/self/fd/9 ]; then
+	uninstall_record invalid-source lock "$lock_root/ergopti.lock"
+	exit 1
+fi
+if lock_diagnostic="$(flock -n 9 2>&1)"; then
+	if [ -n "$lock_diagnostic" ]; then printf '%s\n' "$lock_diagnostic" >&2; fi
+else
+	lock_status=$?
+	if [ "$lock_status" -eq 1 ] && [ -z "$lock_diagnostic" ]; then
+		uninstall_record busy lock "$lock_root/ergopti.lock"
+		exit 75
+	fi
+	if [ -n "$lock_diagnostic" ]; then printf '%s\n' "$lock_diagnostic" >&2; fi
+	exit "$lock_status"
+fi
 UNINSTALL_REMOVAL_STARTED=true
 for owned in "${OWNED[@]}"; do rm -- "$owned"; done
 rm -- "$MANIFEST"
