@@ -396,18 +396,25 @@ function M.build(ctx)
 						function() return false end,
 						arguments
 					)
-					if not task then return end
+					if not task then return false end
 					M._active_tasks[task] = true
 					if not TaskLifecycle.start(task, "Bundled app launch") then
-						M._active_tasks[task] = nil
+						local inspected, running = pcall(function() return task:isRunning() end)
+						if inspected and running == false then
+							M._active_tasks[task] = nil
+						elseif M._active_tasks[task] then
+							TaskLifecycle.terminate(task, "Bundled app launch rollback")
+						end
+						return false
 					end
+					return true
 				end
 				-- App Cloner's helpers run on Ergopti's managed Python and its
 				-- pinned PyObjC, installed on the user's first agreement.
 				if app_name == APP_CLONER then
 					return require("ui.app_cloner_python_offer").open(require("modules.llm.managed_pyobjc").default(), launch)
 				end
-				launch({})
+				return launch({})
 			end,
 		})
 	end
