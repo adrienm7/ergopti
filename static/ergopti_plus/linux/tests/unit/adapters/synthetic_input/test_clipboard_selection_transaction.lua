@@ -139,6 +139,46 @@ helpers.describe("clipboard selection transaction", function()
 		end)
 	end)
 
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		helpers.it("does not restore over an unreadable external copy on transform failure (" .. kind .. ")", function()
+			with_session(kind, "selected", function(clipboard, shell, combos, _, emit, sleep_ms)
+				local read = shell.exec_checked
+				local unreadable = false
+				shell.exec_checked = function(command)
+					if unreadable then return false, "", "reader failed" end
+					return read(command)
+				end
+				local ok, reason = clipboard.transform_selection(function()
+					shell.current, unreadable = "external copy", true
+					error("transform failed")
+				end, emit, sleep_ms)
+				helpers.assert_eq(ok, false)
+				helpers.assert_eq(reason, "clipboard_ownership_unknown")
+				helpers.assert_eq(combos, { "ctrl+c" })
+				helpers.assert_eq(shell.current, "external copy")
+			end)
+		end)
+	end
+
+	helpers.it("does not restore over an unreadable copy after the paste", function()
+		with_session("x11", "selected", function(clipboard, shell, combos, _, emit)
+			local read, unreadable, waits = shell.exec_checked, false, 0
+			shell.exec_checked = function(command)
+				if unreadable then return false, "", "reader failed" end
+				return read(command)
+			end
+			local ok, reason = clipboard.transform_selection(string.upper, emit, function()
+				waits = waits + 1
+				if waits == 3 then shell.current, unreadable = "external copy", true end
+				return true
+			end)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(reason, "clipboard_ownership_unknown")
+			helpers.assert_eq(combos, { "ctrl+c", "ctrl+v" })
+			helpers.assert_eq(shell.current, "external copy")
+		end)
+	end)
+
 	helpers.it("does not paste when the replacement cannot be read back", function()
 		with_session("x11", "selected", function(clipboard, shell, combos, _, emit)
 			local original_read, waits, refuse = shell.exec_checked, 0, false
