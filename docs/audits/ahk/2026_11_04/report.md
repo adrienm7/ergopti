@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **40 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **41 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -761,3 +761,17 @@ increase the register beyond **40 distinct findings**. The earlier seven-case
 compatibility selection refused discovery because another ownership test shares
 its tag (eight matches); no behavioral pass is claimed from that refused plan.
 The next cohort uses exact discovered case names.
+
+## AHK-041: Cold hotstring caches can register rules from retired or replaced sources
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+infra/hotstrings/hotstrings_cache.ahk treats later TSV timestamps as source identity, skips missing dependencies, and derives cache paths from an effective resolver that can point at extensions. The TSV has no record of the canonical index image actually consumed, source paths/presence or content hashes. The initial rebuilt RAM projection also needs admission after the writer and its yielding diagnostics.
+
+Reproduction: Publish a genuine cache, remove its authoritative bundled TOML, or edit that TOML after actual BuildRows but before actual WriteTsv. Alternatively build while a real scanned extension binds autocorrection, then remove that extension and route. Native run41903520217 atdd8ee6ae63db99448f548466b3fbfba89389e8d0 passed the unchanged live control and reproduced all three ghost registrations through the real Ensure/category registrar, individually and reversed.
+
+Consequence: Removed or replaced rules become active native triggers on a cold load. A cache can silently retain extension data after its source is gone, or bless older parsed content with a newer publication timestamp.
+
+Regression: Four native fail-before cases use real temporary canonical sources, the actual index memo, real extension scan/routing and actual HSE registration. The single-file TSV fix records consumed index/source provenance plus closed row/count/payload proof and validates the exact parsed candidate. Physical bundled resolution is separate from adopted extension routes. Two additional initial-publication cases use real stage sharing denial and the genuine logger sink to edit a category or index after BuildRows. Rebuilt RAM snapshots are checked after writer callouts, retried at most twice and otherwise refused with cleared maps. Valid TOML loading still works when cache writes fail. Three existing freshness owners now publish genuine source-backed fixtures. Native post-fix qualification is pending; no cold-load performance measurement or filesystem-wide external CAS is claimed.
+
+The ongoing register now contains **41 distinct new findings**. The requested target of 1,000 remains unmet.

@@ -444,6 +444,17 @@
 			"root_cause": "_AddEntry, _SaveEntry and _DeleteEntry in ui/personal_toml_editor.ahk mutate _PersonalEditorData before _SaveData obtains the durable/live transaction receipt. Failure never restores model/ListView agreement. A simple rollback would lose overlapping DEFERRED snapshots, so complete detached candidates and exact completion ownership are required.",
 			"silent_failure": "An invisible non-durable added entry blocks its own retry as a duplicate. A refused deletion leaves old native row indices pointing into a different model, so a later retry can address another entry. Deferred and section publications must preserve their visible unsaved drafts without stale completion effects.",
 			"regression_test": "Ten reachable personal-entry-receipts cases use real GUI controls, native button messages, a real sharing-denial handle and unlocked same-form retry. They also drive actual coalesced publication, terminal deferred failure and complete-snapshot recovery, dropdown/section changes and the legacy save entry point. The fix installs detached candidates only after immediate success or explicit DEFERRED admission, keeps RAM and rows coherent, and fences completions by source/cohort/sequence. Existing modal and live transaction controls remain; native post-fix qualification is pending."
+		},
+		{
+			"id": "AHK-041",
+			"title": "Cold hotstring caches can register rules from retired or replaced sources",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Publish a genuine cache, remove its authoritative bundled TOML, or edit that TOML after actual BuildRows but before actual WriteTsv. Alternatively build while a real scanned extension binds autocorrection, then remove that extension and route. Native run41903520217 atdd8ee6ae63db99448f548466b3fbfba89389e8d0 passed the unchanged live control and reproduced all three ghost registrations through the real Ensure/category registrar, individually and reversed.",
+			"root_cause": "infra/hotstrings/hotstrings_cache.ahk treats later TSV timestamps as source identity, skips missing dependencies, and derives cache paths from an effective resolver that can point at extensions. The TSV has no record of the canonical index image actually consumed, source paths/presence or content hashes. The initial rebuilt RAM projection also needs admission after the writer and its yielding diagnostics.",
+			"silent_failure": "Removed or replaced rules become active native triggers on a cold load. A cache can silently retain extension data after its source is gone, or bless older parsed content with a newer publication timestamp.",
+			"regression_test": "Four native fail-before cases use real temporary canonical sources, the actual index memo, real extension scan/routing and actual HSE registration. The single-file TSV fix records consumed index/source provenance plus closed row/count/payload proof and validates the exact parsed candidate. Physical bundled resolution is separate from adopted extension routes. Two additional initial-publication cases use real stage sharing denial and the genuine logger sink to edit a category or index after BuildRows. Rebuilt RAM snapshots are checked after writer callouts, retried at most twice and otherwise refused with cleared maps. Valid TOML loading still works when cache writes fail. Three existing freshness owners now publish genuine source-backed fixtures. Native post-fix qualification is pending; no cold-load performance measurement or filesystem-wide external CAS is claimed."
 		}
 	]
 }

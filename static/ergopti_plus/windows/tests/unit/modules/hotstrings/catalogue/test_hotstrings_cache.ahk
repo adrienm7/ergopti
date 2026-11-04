@@ -178,12 +178,21 @@ TestHsCache_IndexChangeInvalidatesCache() {
 		_SharedDir := Directory
 		DirCreate(Directory . "\modules\hotstrings")
 		IndexPath := Directory . "\modules\hotstrings\_index.toml"
-		FileAppend('[menu]`ncategories_order = ["autocorrection", "magickey"]`n', IndexPath, "UTF-8")
+		FileAppend('[menu]`ncategories_order = ["magickey"]`n[languages]`norder = []`n', IndexPath, "UTF-8")
+		SourcePath := Directory . "\modules\hotstrings\magickey.toml"
+		AssertTrue(FSWriteCreateDurable(SourcePath,
+			'[[ct]]`n"indexprobe" = { output = "Index", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = true }`n'))
 		TsvPath := Directory . "\cache.tsv"
-		FileAppend("old cache", TsvPath, "UTF-8")
+		_HotstringsCacheWriteTsv(TsvPath, _HotstringsCacheBuildRows())
+		AssertTrue(_HotstringsCacheIsFresh(TsvPath), "the genuine initial cache must actually be eligible")
+		AssertTrue(FSWriteDurable(IndexPath,
+			'[menu]`ncategories_order = ["autocorrection", "magickey"]`n[languages]`norder = []`n'))
 		FileSetTime("20000102000000", TsvPath, "M")
 		FileSetTime("20000103000000", IndexPath, "M")
 		Assert(!_HotstringsCacheIsFresh(TsvPath), "a changed shared index must invalidate an existing cache")
+		; Native freshness is a witness, not permission to replace the canonical
+		; process snapshot. Explicit invalidation owns the following re-read.
+		_ParseTomlGroupConfig_InvalidatePath(IndexPath)
 		Common := HotstringsCommonCategories()
 		AssertEqual(2, Common.Length)
 		AssertEqual("autocorrection", Common[1])
@@ -825,3 +834,129 @@ _HSCI_CurrentOwner(Mode) {
 }
 for _HSCI_Mode in ["live", "deleted-source", "edited-during-build", "unbound-extension"]
 	Test("hotstrings cache source inventory: " . _HSCI_Mode, _HSCI_CurrentOwner.Bind(_HSCI_Mode))
+
+; Additional genuine INITIAL Ensure regression. A real exclusive stage handle
+; makes the real writer issue its real diagnostic. The existing logger observer
+; edits the authoritative input after BuildRows; neither producer is replaced.
+_HSCI_EnsureWriteCallout(Mode) {
+	global _SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS
+	global _HotstringsOverrides, HotstringGroupConfig, _HotstringBoundSources
+	global _TomlFileCache, _TomlFileSectionCounts, _TomlCountCache
+	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_PATH_DATE, _HealthCheckWarnCount
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+	AssertEqual(0, _LOGGER_TEST_SINK, "a foreign log observer cannot be detached")
+	LoggerState := _TLOG_CaptureLoggerState()
+	AssertFalse(LoggerState.FlushActive)
+	Saved := [_SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS,
+		_HotstringsOverrides, HotstringGroupConfig, _HotstringBoundSources,
+		_TomlFileCache, _TomlFileSectionCounts, _TomlCountCache]
+	SavedRepeat := _LOGGER_REPEAT_ENABLED, SavedDate := _LOGGER_PATH_DATE
+	HadWarnings := IsSet(_HealthCheckWarnCount)
+	SavedWarnings := HadWarnings ? _HealthCheckWarnCount : 0
+	Root := A_Temp . "\ergopti_initial_cache_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Lock := 0, Failure := 0, PreviousCritical := A_IsCritical
+	Facts := {logs: 0, critical: false, changed: false, failure: 0}
+	OnLog(Line) {
+		if !InStr(Line, "Could not write hotstring cache", true)
+			return
+		Facts.logs += 1
+		if Facts.logs != 1
+			return
+		Facts.critical := A_IsCritical
+		try {
+			if Mode == "index" {
+				NewIndex := StrReplace(IndexImage,
+					'categories_order = ["autocorrection", "magickey"]', 'categories_order = ["magickey"]', , &Replacements, 1)
+				if Replacements != 1
+					throw Error("the independent index fixture must remove precisely its common source")
+				Facts.changed := FSWriteDurable(Index, NewIndex)
+			} else
+				Facts.changed := FSWriteDurable(Source, _HSCI_Source("newcacheprobe", "New"))
+		} catch as Err
+			Facts.failure := Err
+	}
+	try {
+		Critical("Off")
+		DirCreate(Root . "\modules\hotstrings")
+		Index := Root . "\modules\hotstrings\_index.toml"
+		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Index)
+		_SharedDir := Root
+		_TomlFileCache := _TomlFileCache.Clone()
+		_TomlFileSectionCounts := _TomlFileSectionCounts.Clone()
+		_TomlCountCache := _TomlCountCache.Clone()
+		_HotstringsOverrides := Map(), HotstringGroupConfig := Map(), _HotstringBoundSources := Map()
+		HotstringsResolveBumpGen()
+		for Category in HotstringsBundledCategories() {
+			Path := _HotstringsCacheTomlPath(Category)
+			SplitPath(Path, , &Parent)
+			DirCreate(Parent)
+			AssertTrue(FSWriteCreateDurable(Path, Category == "autocorrection"
+				? _HSCI_Source("oldcacheprobe", "Old") : "# empty canonical source`n"))
+		}
+		IndexImage := ReadTomlFile(Index)
+		AssertEqual(FSReadStrict(Index), IndexImage, "the initial canonical memo must be the actual index A")
+		Source := _HotstringsCacheTomlPath("autocorrection")
+		Tsv := _HotstringsCacheTsvPath()
+		AssertFalse(FileExist(Tsv), "this must exercise the first production build, not a disk cache hit")
+		Lock := FileOpen(Tsv . ".tmp", "w-rwd", "UTF-8-RAW")
+		AssertTrue(IsObject(Lock), "the real cache stage must be physically exclusive")
+		_ResetLogger()
+		LOGGER_SUB_FILES := Map(), _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
+		_LOGGER_REPEAT_ENABLED := false, _LOGGER_PATH_DATE := ""
+		LoggerSetTestSink(OnLog)
+		_HS_CACHE_ROWS := Map(), _HS_CACHE_LOADED := false, _GENERATED_HOTSTRINGS := Map()
+		HSE_TestReset()
+		try LoadHotstringsCategory("autocorrection", Map("names", Map("enabled", true)), Map("IsPrivate", true))
+		catch as Err
+			Failure := Err
+		LoggerClearTestSink()
+		if Facts.failure is Error
+			throw Facts.failure
+		AssertTrue(Facts.logs >= 1, "the actual writer must really reach its post-build diagnostic")
+		AssertFalse(Facts.critical, "the genuine yielding diagnostic must stay interruptible")
+		AssertTrue(Facts.changed is Integer && Facts.changed == 1, "the observer must physically change its authoritative input")
+		AssertFalse(_HSCI_ContainsNative("oldcacheprobe"), "initial Ensure must never publish the pre-diagnostic rule")
+		AssertFalse(FileExist(Tsv), "a valid TOML load cannot depend on successful disk cache publication")
+		if Mode == "category" {
+			AssertFalse(Failure is Error)
+			AssertTrue(_HS_CACHE_LOADED)
+			AssertTrue(_HSCI_ContainsNative("newcacheprobe"), "the bounded retry must load the genuinely edited source")
+			AssertEqual("newcacheprobe", _HS_CACHE_ROWS["autocorrection.names"][1][2])
+		} else {
+			AssertTrue(Failure is Error, "stale canonical index A cannot authorize a memory projection against actual index B")
+			AssertContains(Failure.Message, "no cache projection was published")
+			AssertFalse(_HS_CACHE_LOADED)
+			AssertEqual(0, _HS_CACHE_ROWS.Count)
+			AssertEqual(0, _GENERATED_HOTSTRINGS.Count)
+			AssertEqual(IndexImage, ReadTomlFile(Index), "verification must not silently bless or replace the canonical memo A")
+			AssertTrue(StrCompare(IndexImage, FSReadStrict(Index), true) != 0, "the actual disk index B must remain changed")
+		}
+		AssertTrue(Facts.logs <= 2, "source movement must settle or refuse within the bounded producer attempts")
+	} finally {
+		LoggerClearTestSink()
+		_LOGGER_REPEAT_ENABLED := SavedRepeat, _LOGGER_PATH_DATE := SavedDate
+		_TLOG_RestoreLoggerState(LoggerState)
+		_HealthCheckWarnCount := HadWarnings ? SavedWarnings : unset
+		CloseFailure := 0
+		try {
+			if IsObject(Lock)
+				Lock.Close()
+		} catch as Err
+			CloseFailure := Err
+		HSE_TestReset()
+		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
+		_GENERATED_HOTSTRINGS := Saved[4], _HotstringsOverrides := Saved[5], HotstringGroupConfig := Saved[6]
+		_HotstringBoundSources := Saved[7], _TomlFileCache := Saved[8]
+		_TomlFileSectionCounts := Saved[9], _TomlCountCache := Saved[10]
+		HotstringsResolveBumpGen()
+		HotstringsCommonCategories()
+		try {
+			if CloseFailure is Error
+				throw CloseFailure
+			DirDelete(Root, true)
+		} finally Critical(PreviousCritical)
+	}
+}
+Test("hotstrings cache initial publication: real writer diagnostic edits category", _HSCI_EnsureWriteCallout.Bind("category"))
+Test("hotstrings cache initial publication: canonical memo A cannot bless actual index B", _HSCI_EnsureWriteCallout.Bind("index"))
