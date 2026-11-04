@@ -313,9 +313,11 @@ function M.new(port)
 		busy = true
 		read_listing(function(listing, reason)
 			local function done(ok, detail)
-				busy = false
+				-- Keep the slot occupied during delivery: a reentrant selection must
+				-- replace the queued request, not start alongside it.
 				local ran, err = pcall(on_done, ok, detail)
 				if not ran then Logger.error(LOG, "A switch completion callback failed: %s.", tostring(err)) end
+				busy = false
 				if queued ~= nil then
 					local next_request = queued
 					queued = nil
