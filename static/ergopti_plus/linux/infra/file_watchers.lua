@@ -220,8 +220,13 @@ end
 
 --- Checks if a path is a directory.
 --- @param path string
+--- @param nofollow boolean|nil Refuse a symbolic link to a directory.
 --- @return boolean
-local function _is_dir(path)
+local function _is_dir(path, nofollow)
+	if nofollow and luv and type(luv.fs_lstat) == "function" then
+		local ok, stat = pcall(luv.fs_lstat, path)
+		return ok and type(stat) == "table" and stat.type == "directory"
+	end
 	if posix and posix.stat then
 		local ok, st = pcall(posix.stat, path)
 		if ok and st and st.type then
@@ -231,7 +236,9 @@ local function _is_dir(path)
 		end
 	end
 	-- Fallback.
-	local fh = io.popen("test -d " .. TextUtils.shell_quote(path) .. " && echo 1 || echo 0", "r")
+	local quoted = TextUtils.shell_quote(path)
+	local link_guard = nofollow and (" && test ! -L " .. quoted) or ""
+	local fh = io.popen("test -d " .. quoted .. link_guard .. " && echo 1 || echo 0", "r")
 	if fh then
 		local out = fh:read("*l")
 		fh:close()
@@ -579,14 +586,19 @@ _personal_metadata = function(path)
 		end
 		return { dev = attributes.dev, ino = attributes.ino, kind = attributes.type or attributes.mode }
 	end
-	if luv and type(luv.fs_stat) == "function" then
-		local called, attributes = pcall(luv.fs_stat, path)
+	local native_stat
+	if luv then
+		if selected_root then native_stat = luv.fs_stat else native_stat = luv.fs_lstat end
+	end
+	if type(native_stat) == "function" then
+		local called, attributes = pcall(native_stat, path)
 		if not called or type(attributes) ~= "table" or attributes.dev == nil or attributes.ino == nil then
 			return nil, "personal native filesystem metadata is unavailable: " .. path
 		end
 		return { dev = attributes.dev, ino = attributes.ino, kind = attributes.type }
 	end
-	local content, detail = _personal_command("LC_ALL=C stat -L -c '%d:%i:%F' -- " .. Shell.quote(path) .. " 2>/dev/null")
+	local follow = selected_root and "-L " or ""
+	local content, detail = _personal_command("LC_ALL=C stat " .. follow .. "-c '%d:%i:%F' -- " .. Shell.quote(path) .. " 2>/dev/null")
 	if not content then return nil, detail end
 	local device, inode, kind = content:match("^(%d+):(%d+):([^\r\n]+)\n$")
 	if not device then return nil, "personal filesystem metadata is malformed: " .. path end
@@ -973,7 +985,7 @@ function M.start(opts)
 	-- ── 9.2) Personal hotstrings (recursive .toml scan) ──
 	if personal_dir ~= "" then
 		local clean_dir = _directory_path(personal_dir)
-		local is_directory = _is_dir(clean_dir)
+		local is_directory = _is_dir(clean_dir, true)
 		-- A selected TOML file is the user's explicit choice (--config FILE.toml):
 		-- a missing one is waited for, a symlink to one is followed, and any other
 		-- object under that name is refused loudly instead of silently unwatched.
