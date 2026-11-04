@@ -311,9 +311,8 @@ end
 --- The result is filtered to ``kTISTypeKeyboardLayout`` so non-keyboard
 --- entries that always sit in ``AppleEnabledInputSources`` (PressAndHold,
 --- CharacterPalette, IMEs) are dropped at the source rather than after the
---- fact. Exactly one record carries ``selected = true`` — the layout
---- macOS would route a keystroke to right now — which is what the menu
---- uses to render the checkmark on the active row.
+--- fact. A unique name match carries ``selected = true``; an ambiguous name
+--- cannot identify the active source and therefore selects no row.
 ---
 --- A defensive Lua-side filter also drops ids that look like input methods
 --- or services in case the TIS type predicate is partially honoured by
@@ -353,6 +352,22 @@ local function is_record_selected(kl_name, display, current_name)
 	return display_no_space == current_lower
 end
 
+--- A localized current name can match several distinct source identities.
+--- Refuse to choose when that happens: the name alone cannot prove which is live.
+--- @param records table Input-source records.
+--- @param current_name string|nil Current layout name.
+local function select_unique_record(records, current_name)
+	local match = nil
+	for _, record in ipairs(records) do
+		record.selected = false
+		if is_record_selected(record.id, record.name, current_name) then
+			if match then return end
+			match = record
+		end
+	end
+	if match then match.selected = true end
+end
+
 --- Parses the enabled input sources the HIToolbox probe printed into menu
 --- records: every entry whose kind is a keyboard layout (or unset) and that
 --- names its layout. Pure (no I/O), so it is unit-testable and never runs a
@@ -380,8 +395,9 @@ local function parse_active_layouts(raw_out, current_name)
 		-- hs.keycodes.setLayout() and currentLayout() understand.
 		local ergopti_display = format_ergopti_display(kl_name)
 		local display = ergopti_display or kl_name:gsub("_", " "):gsub("%s+v%d.*$", "")
-		out[#out + 1] = { id = kl_name, name = display, selected = is_record_selected(kl_name, display, current_name) }
+		out[#out + 1] = { id = kl_name, name = display, selected = false }
 	end
+	select_unique_record(out, current_name)
 	return out
 end
 
@@ -397,9 +413,10 @@ local function compute_active_layouts_fast(current_name)
 		local layouts = hs.keycodes.layouts() or {}
 		for _, name in ipairs(layouts) do
 			local display = format_ergopti_display(name) or name
-			out[#out + 1] = { id = name, name = display, selected = is_record_selected(name, display, current_name) }
+			out[#out + 1] = { id = name, name = display, selected = false }
 		end
 	end
+	select_unique_record(out, current_name)
 	return out
 end
 
