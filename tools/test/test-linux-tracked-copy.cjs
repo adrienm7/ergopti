@@ -24,6 +24,32 @@ function git(...args) {
 
 try {
 	if (process.platform === 'linux') {
+		// Command substitution strips trailing newlines from pwd output. The
+		// builder must still recognize and preserve the real checkout path.
+		{
+			const checkout = path.join(scratch, 'checkout-with-trailing-newline\n');
+			const builder = path.join(checkout, 'tools/build/build-linux-driver.sh');
+			const sentinel = path.join(checkout, 'keep');
+			fs.mkdirSync(path.dirname(builder), { recursive: true });
+			fs.writeFileSync(builder, subject);
+			fs.writeFileSync(sentinel, 'user data\n');
+			const result = spawnSync('/bin/bash', [builder, '--skip-smoke'], {
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, ERGOPTI_LINUX_BUILD_DIR: checkout }
+			});
+			assert.notEqual(result.status, 0);
+			assert.equal(fs.readFileSync(sentinel, 'utf8'), 'user data\n');
+			const output = path.join(checkout, 'build/linux');
+			const permitted = spawnSync('/bin/bash', [builder, '--skip-smoke'], {
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, ERGOPTI_LINUX_BUILD_DIR: output }
+			});
+			assert.notEqual(permitted.status, 0, 'the fake checkout has no source copier');
+			assert.ok(permitted.stdout.includes(`Source  : ${checkout}/static/ergopti_plus/linux`));
+			assert.ok(fs.existsSync(output), 'the ordinary output below build remains allowed');
+		}
 		// An output selector that names the checkout, its ancestor, or its source
 		// tree must never authorize deleting that data.
 		for (const kind of ['checkout', 'ancestor', 'source', 'alias']) {
