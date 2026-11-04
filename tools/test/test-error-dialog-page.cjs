@@ -127,7 +127,7 @@ const ERROR = {
 	kind: 'error',
 	module: 'keystats',
 	message: 'Flush failed: disk full\nstack traceback:\n\tkeystats.lua:12',
-	log_path: '~/.local/state/ergopti_plus/logs/ErgoptiPlus_errors_2026-09-24.log',
+	log_path: '~/.local/state/ergopti/logs/ErgoptiPlus_errors_2026-09-24.log',
 	text: REPORT,
 	more: 0
 };

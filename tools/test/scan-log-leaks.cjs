@@ -28,6 +28,8 @@ const os = require('os');
 const path = require('path');
 const vm = require('vm');
 
+const AppDirs = require('./lib/app-dirs.cjs');
+
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 
@@ -45,15 +47,19 @@ function loadRedactor() {
 }
 
 /**
- * Resolves the default log folder of this platform.
+ * Resolves the default log folder of this platform from app_dirs.toml.
  * @returns {string}
  */
 function defaultLogDir() {
-	if (process.platform === 'win32')
-		return path.join(process.env.LOCALAPPDATA || '', 'ergopti_plus', 'logs');
-	if (process.platform === 'darwin')
-		return path.join(os.homedir(), 'Library', 'Logs', 'ergopti_plus');
-	return path.join(os.homedir(), '.local', 'state', 'ergopti_plus', 'logs');
+	const osName =
+		process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux';
+	const table = AppDirs.data.logs[osName];
+	let base;
+	if (table.base === 'HOME') base = os.homedir();
+	else if (process.env[table.base]) base = process.env[table.base];
+	else if (table.base_fallback) base = path.join(os.homedir(), ...table.base_fallback);
+	else throw new Error(`${table.base} is not set: no default log folder on this machine`);
+	return path.join(base, ...AppDirs.segments(`logs.${osName}`, osName));
 }
 
 // The leak classes, as detectors over one line. The account and home classes

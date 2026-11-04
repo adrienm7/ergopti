@@ -7,7 +7,8 @@
  * Pins static/ergopti_plus/_shared/data/field_run_protocol.json, the request
  * and result files every driver and field report collector shares:
  * 1. the declaration is well formed: closed names, patterns that compile,
- *    one document key list per file, a steps file and a folder per driver;
+ *    one document key list per file, a steps file and a folder per driver
+ *    under that driver's root of _shared/modules/paths/app_dirs.toml;
  * 2. the macOS field run (macos/data/field_run.json, the first implementation)
  *    keeps every protocol key equal to the shared one, and its folder is the
  *    clone folder;
@@ -31,6 +32,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+
+const AppDirs = require('./lib/app-dirs.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const PROTOCOL = 'static/ergopti_plus/_shared/data/field_run_protocol.json';
@@ -88,6 +91,13 @@ check('the shared declaration is well formed', () => {
 		const folder = protocol.folder[os];
 		assert(folder && /^[A-Z_]+$/.test(folder.base) && folder.segments.length > 0, `${os} folder`);
 	}
+	// An installed driver's field run folder sits under its one root of
+	// app_dirs.toml: the Windows root, the Linux runtime folder.
+	const windowsRoot = AppDirs.segments('support.windows', 'windows');
+	assert.equal(protocol.folder.windows.base, AppDirs.data.support.windows.base);
+	assert.deepEqual(protocol.folder.windows.segments.slice(0, windowsRoot.length), windowsRoot);
+	assert.equal(protocol.folder.linux.base, AppDirs.data.xdg.linux.runtime_base);
+	assert.equal(protocol.folder.linux.segments[0], AppDirs.folderName('linux'));
 	assert(!path.isAbsolute(protocol.folder.clone), 'the clone folder is relative to the clone root');
 	assert.match('mac-2026-10-30_191337', new RegExp(protocol.request_id_pattern));
 	assert.match('03_field_network.json', new RegExp(protocol.result_file_pattern));

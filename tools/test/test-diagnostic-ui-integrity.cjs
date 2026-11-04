@@ -210,14 +210,14 @@ function rowPattern(label, value) {
 	const html = render('macos', {
 		versions: { commit: 'f58d15798 (build)' },
 		paths: {
-			config_dir: '/Volumes/Fixture/alice/Chosen/ergopti_plus',
+			config_dir: '/Volumes/Fixture/alice/Chosen/Ergopti',
 			app_dir: '/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos'
 		}
 	});
 	report(
 		'Shared: commit origin, config dir and app dir render under their own labels',
 		rowPattern(t('healthcheck.field.commit'), 'f58d15798 \\(build\\)').test(html) &&
-			html.includes('/Volumes/Fixture/alice/Chosen/ergopti_plus') &&
+			html.includes('/Volumes/Fixture/alice/Chosen/Ergopti') &&
 			rowPattern(
 				t('healthcheck.field.app_dir'),
 				'/Applications/ErgoptiPlus\\.app/Contents/Resources/static/ergopti_plus/macos'

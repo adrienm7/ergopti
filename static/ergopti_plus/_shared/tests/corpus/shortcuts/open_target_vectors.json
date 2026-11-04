@@ -4,7 +4,7 @@
 	"env": {
 		"windows": {
 			"USERPROFILE": "C:\\Users\\ada",
-			"APPDATA": "C:\\Users\\ada\\AppData\\Roaming"
+			"LOCALAPPDATA": "C:\\Users\\ada\\AppData\\Local"
 		},
 		"posix": {
 			"HOME": "/home/ada",
@@ -372,9 +372,13 @@
 		},
 		{
 			"id": "environment_variable_path",
-			"text": "%APPDATA%\\Ergopti",
-			"windows": { "kind": "path", "target": "C:\\Users\\ada\\AppData\\Roaming\\Ergopti" },
-			"posix": { "kind": "unsupported", "target": "%APPDATA%\\Ergopti", "reason": "windows_only" }
+			"text": "%LOCALAPPDATA%\\Ergopti",
+			"windows": { "kind": "path", "target": "C:\\Users\\ada\\AppData\\Local\\Ergopti" },
+			"posix": {
+				"kind": "unsupported",
+				"target": "%LOCALAPPDATA%\\Ergopti",
+				"reason": "windows_only"
+			}
 		},
 		{
 			"id": "unknown_environment_variable_stays_literal",

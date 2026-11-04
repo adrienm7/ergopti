@@ -43,13 +43,13 @@
 				"monitors": "2",
 				"dpi": "144",
 				"display": "win32",
-				"config_dir": "~/config/ergopti_plus",
-				"logs_dir": "~/AppData/Local/ergopti_plus/logs",
+				"config_dir": "~/AppData/Local/Ergopti/config",
+				"logs_dir": "~/AppData/Local/Ergopti/logs",
 				"log_level": "DEBUG",
 				"features_enabled": "42/97",
 				"boot_ms": "812"
 			},
-			"expected": "Diagnostic snapshot (driver=windows version=3.1.0 commit=3b924cd46 os=\"Windows 11 Home\" os_version=26100.4652 arch=x64 runtime=\"AutoHotkey 2.0.19\" elevated=false locale=fr keyboard_layout=0x040C040C monitors=2 dpi=144 display=win32 config_dir=~/config/ergopti_plus logs_dir=~/AppData/Local/ergopti_plus/logs log_level=DEBUG features_enabled=42/97 boot_ms=812)."
+			"expected": "Diagnostic snapshot (driver=windows version=3.1.0 commit=3b924cd46 os=\"Windows 11 Home\" os_version=26100.4652 arch=x64 runtime=\"AutoHotkey 2.0.19\" elevated=false locale=fr keyboard_layout=0x040C040C monitors=2 dpi=144 display=win32 config_dir=~/AppData/Local/Ergopti/config logs_dir=~/AppData/Local/Ergopti/logs log_level=DEBUG features_enabled=42/97 boot_ms=812)."
 		},
 		{
 			"id": "missing_values",
@@ -91,13 +91,13 @@
 				"monitors": "1",
 				"dpi": "2",
 				"display": "quartz",
-				"config_dir": "~/Library/Ergopti\tPlus",
-				"logs_dir": "~/Library/Logs/ergopti plus",
+				"config_dir": "~/Library/Application\tSupport/Ergopti/config",
+				"logs_dir": "~/My logs/Ergopti",
 				"log_level": "DEBUG",
 				"features_enabled": "10/12",
 				"boot_ms": "950"
 			},
-			"expected": "Diagnostic snapshot (driver=macos version=3.1.0 commit=abc1234 os=\"macOS 15.5\" os_version=15.5 arch=arm64 runtime=\"Hammerspoon '1.0.0'\" elevated=false locale=fr keyboard_layout=com.apple.keylayout.French monitors=1 dpi=2 display=quartz config_dir=\"~/Library/Ergopti Plus\" logs_dir=\"~/Library/Logs/ergopti plus\" log_level=DEBUG features_enabled=10/12 boot_ms=950)."
+			"expected": "Diagnostic snapshot (driver=macos version=3.1.0 commit=abc1234 os=\"macOS 15.5\" os_version=15.5 arch=arm64 runtime=\"Hammerspoon '1.0.0'\" elevated=false locale=fr keyboard_layout=com.apple.keylayout.French monitors=1 dpi=2 display=quartz config_dir=\"~/Library/Application Support/Ergopti/config\" logs_dir=\"~/My logs/Ergopti\" log_level=DEBUG features_enabled=10/12 boot_ms=950)."
 		}
 	]
 }
