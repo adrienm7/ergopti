@@ -10,6 +10,14 @@ the field-run step or the hand action that proves it and the commits it confirms
 
 ## Cross-platform feature inventory
 
+- [ ] **Dynamic hotstrings:** align or explicitly document the Windows `@td★` / `@dt★` / `@date★` date vocabulary versus bare Lua triggers and their boundary rules. Linux's shortest phone prefix must wait for the magic key, as Windows/macOS do; normalize the international phone output consistently (the Lua drivers currently keep the national zero after +33). Reproduce with the [module audit probe](docs/audits/platform-parity/2026-11-04/hotstrings.md).
+- [ ] **Linux AI:** implement bounded retries for failed/empty predictions and refill after deduplication, with the shared retry token/temperature policy. Windows already has `retry_extra_tokens`; remove obsolete claims that it has no owner. See [AI evidence](docs/audits/platform-parity/2026-11-04/llm.md).
+- [ ] **Linux metrics:** implement durable per-device append-only ledger export/import/replay for cross-device metrics; the current local metrics.sqlite has no Windows/macOS ledger synchronization. Do not advertise schema compatibility as synchronization.
+- [ ] **Metrics:** expose collection availability and units: Linux lacks passive-period counts, CPU/RAM samples and a real space-change KPI; its sleep is sampled-gap estimation and its mouse distance is device units, not screen pixels, with no evdev tap-to-click count. Windows has heuristic desktop-switch raw events but no producer feeding the shared space-change KPI. Night-wake count currently has no producer on any OS. See [metrics evidence](docs/audits/platform-parity/2026-11-04/metrics.md).
+- [ ] **macOS/Linux metrics:** evaluate Windows-only raw telemetry families: clipboard copy/paste bursts, Internet/VPN transitions, capture-process presence, detailed window topology and trigger ROI/manual-word/halflife events. These are raw collectors, not a claim that current dashboards display all of them.
+- [ ] **macOS onboarding:** expose live number-row ordering with the same selected-layout availability as its working menu; the wizard currently excludes macOS. Document the typing-priority rollover alternative to Windows/Linux release-order tap-holds; do not promise identical hold semantics.
+- [ ] **Windows/Linux diagnostics:** add the manifest-derived unavailable-features explanation already collected and rendered on macOS. Evaluate authenticated fallback metadata for feed-only update installation; retain current refusal without authenticated assets (macOS uses signed Sparkle metadata for newest-channel updates).
+- [ ] **Backup scope:** classify the macOS native settings that truly need restoration and document filtered backups; owned programmable .ahk/.lua sources are excluded by the common TOML/JSON extension policy on all OS. Do not export caches or all native settings indiscriminately.
 - [ ] **Layers:** evaluate repeat-count support on macOS/Linux (`parameters.repeat_count` currently Windows-only), and mouse-button layer sources on Linux (`source_kinds.mouse_button` excludes Linux because the observed button cannot be suppressed). Fn remains a macOS-specific modifier; layer Spotlight is a macOS-specific action. Source: `_shared/keymap/layer_actions.toml`.
 - [ ] **Windows:** implement the physical shortcuts editor (`physical_shortcuts.windows_unavailable`) and validate token-by-token prediction display (`platform_reason.token_streaming_unvalidated_on_windows`).
 - [ ] **macOS:** review the tap-hold word-reset option and automatic model-to-prompt-profile switching (`hotstrings.tap_hold_resets_word`, `llm.profiles.auto_profile_for_model`). Provide shortcut-only restore/clear if feasible; the configuration menu currently restores Karabiner settings together with other settings.
@@ -385,8 +393,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 State on 2026-11-01. Whole AHK suite at d85a24eb53: 17277/17288 in parallel, the other 11 (clipboard and focus contention
 between workers) green alone. All live checks pass, typed by the harness.
 
-- **LLM.** `retry_extra_tokens` has no Windows owner, so the corpus retry rows are not replayed there. Real IBM and Google
-  token services were never tried.
+- **LLM.** Windows has a production `retry_extra_tokens` owner and regression tests; the outstanding parity gap is Linux sequential retry/refill behavior (see the platform audit). Real IBM and Google token services were never tried.
 - **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
   keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left, the rest of the menu files need
   `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
