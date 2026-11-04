@@ -80,6 +80,22 @@ REPORT_SWIFT_SOURCES = tuple(
     # The worker's request poll reads its duration from the [launcher] registry.
     SWIFT + "LauncherTimings.generated.swift",
 )
+# The live helper's first install also provisions and starts the idle Core
+# control service (ADR 011, WP6 install half): OwnedRuntimeIdleServiceEntry
+# replaces the files-only entry. Its owners import the same CPOSIXCompatibility
+# module and objects as the report roster, so only the live (report) profile
+# enrolls them; ERGOPTI_OWNED_IDLE_CORE selects the entry in InstallerMain.
+IDLE_CORE_SWIFT_SOURCES = tuple(
+    SWIFT + "OwnedRuntime" + name + ".swift"
+    for name in (
+        "IdleServiceEntry",
+        "CoreProvisionOwner",
+        "CoreServiceOwner",
+        "CoreLaunchctl",
+        "CorePlistCustody",
+        "CoreExitObservation",
+    )
+)
 REPORT_C_SOURCES = (
     LAUNCHER + "CPOSIXCompatibility/CPOSIXCompatibility.c",
     LAUNCHER + "CPOSIXCompatibility/OwnedProgramCompatibility.c",
@@ -101,7 +117,13 @@ REPORT_HEADERS = tuple(
     )
 )
 REPORT_SOURCE_PATHS = tuple(
-    dict.fromkeys(SOURCE_PATHS + REPORT_SWIFT_SOURCES + REPORT_C_SOURCES + REPORT_HEADERS)
+    dict.fromkeys(
+        SOURCE_PATHS
+        + REPORT_SWIFT_SOURCES
+        + IDLE_CORE_SWIFT_SOURCES
+        + REPORT_C_SOURCES
+        + REPORT_HEADERS
+    )
 )
 
 
@@ -329,7 +351,11 @@ def compile_commands(repository, work, sdk, lua_headers, *, daemon_report=False)
                         ],
                     )
                 )
-        helper_sources = HELPER_SOURCES + REPORT_SWIFT_SOURCES if daemon_report else HELPER_SOURCES
+        helper_sources = (
+            HELPER_SOURCES + REPORT_SWIFT_SOURCES + IDLE_CORE_SWIFT_SOURCES
+            if daemon_report
+            else HELPER_SOURCES
+        )
         for role, sources in (("installer", helper_sources), ("validator", VALIDATOR_SOURCES)):
             command = [
                 "/usr/bin/xcrun",
@@ -345,6 +371,8 @@ def compile_commands(repository, work, sdk, lua_headers, *, daemon_report=False)
                 command += [
                     "-D",
                     "ERGOPTI_DAEMON_REPORT",
+                    "-D",
+                    "ERGOPTI_OWNED_IDLE_CORE",
                     "-D",
                     "SWIFT_PACKAGE",
                     "-I",
