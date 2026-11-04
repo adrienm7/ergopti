@@ -101,10 +101,28 @@ helpers.describe("i18n persistence", function()
   -- ==========================================================================
 
   helpers.describe("locale persistence", function()
+    local function stub_scope_for_store()
+      return {
+        retry_locale = function() return true end,
+        edit_locale = function(value)
+          if require("adapters.storage").set("locale", value) ~= true then return false end
+          local native = require("infra.i18n")
+          local token = { pending = function() return false end }
+          assert(native.scope_acquire(token))
+          local receipt = assert(native.scope_capture(token))
+          local applied = native.scope_apply(token, receipt, value)
+          assert(native.scope_release(token))
+          assert(native.scope_forget(token, receipt))
+          return applied
+        end,
+      }
+    end
     helpers.it("set_locale + get_locale round-trips", function()
       -- An in-memory store that acknowledges every write: the round trip must
       -- not depend on whichever storage adapter an earlier test file left loaded.
       local saved_storage = package.loaded["adapters.storage"]
+      local saved_scope = package.loaded["infra.script_scope"]
+      package.loaded["infra.script_scope"] = stub_scope_for_store()
       local stored = {}
       package.loaded["adapters.storage"] = {
         get = function(key) return stored[key] end,
@@ -126,12 +144,15 @@ helpers.describe("i18n persistence", function()
         helpers.assert_eq(i18n.get_locale(), before, "locale restored")
       end)
       package.loaded["adapters.storage"] = saved_storage
+      package.loaded["infra.script_scope"] = saved_scope
       package.loaded["infra.i18n"] = nil
       if not ok then error(err, 0) end
     end)
 
 		helpers.it("does not publish a locale whose durable write failed", function()
 			local saved_storage = package.loaded["adapters.storage"]
+			local saved_scope = package.loaded["infra.script_scope"]
+			package.loaded["infra.script_scope"] = stub_scope_for_store()
 			package.loaded["adapters.storage"] = {
 				get = function() return "fr" end,
 				set = function() return false end,
@@ -146,6 +167,7 @@ helpers.describe("i18n persistence", function()
 					"the active locale must remain aligned with durable storage")
 			end)
 			package.loaded["adapters.storage"] = saved_storage
+			package.loaded["infra.script_scope"] = saved_scope
 			package.loaded["infra.i18n"] = nil
 			if not ok then error(err, 0) end
 		end)
@@ -244,6 +266,12 @@ helpers.describe("i18n explicit wizard persistence", function()
 		os.remove(root)
 		local made = os.execute("mkdir -p " .. string.format("%q", root .. "/ergopti_plus"))
 		helpers.assert_true(made == true or made == 0)
+		local config = root .. "/config/config.toml"
+		if options.config then
+			local created = os.execute("mkdir -p " .. string.format("%q", root .. "/config"))
+			assert(created == true or created == 0)
+			local cf = assert(io.open(config, "wb")); assert(cf:write(options.config)); assert(cf:close())
+		end
 		local path = root .. "/ergopti_plus/storage.json"
 		local seed = '{"locale":"zz_UNSUPPORTED","future":{"retained":true}}\n'
 		local fh = assert(io.open(path, "wb"))
@@ -263,16 +291,22 @@ helpers.describe("i18n explicit wizard persistence", function()
 			os.rename = function(from, to)
 				if from == path .. ".tmp" and to == path then
 					attempts = attempts + 1
+					if options.on_publish then options.on_publish(config) end
 					if options.rename == "throw" then error("owned rename refused") end
 					if options.rename == "false" then return nil, "owned rename refused", 13 end
 				end
-				return original_rename(from, to)
+				local renamed, detail, errno = original_rename(from, to)
+				if renamed and from == path .. ".tmp" and to == path and options.after_publish then options.after_publish(config, path) end
+				return renamed, detail, errno
 			end
 			observations = body(i18n, path, seed)
 		end, debug.traceback)
 		os.rename = original_rename
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		os.remove(path .. ".tmp"); os.remove(path)
+		os.remove(config); os.execute("rm -f " .. string.format("%q", root .. "/config") .. "/*.bak")
+		os.execute("rm -f " .. string.format("%q", root .. "/ergopti_plus") .. "/*.bak")
+		if options.config then os.execute("rmdir " .. string.format("%q", root .. "/config")) end
 		os.execute("rmdir " .. string.format("%q", root .. "/ergopti_plus"))
 		os.execute("rmdir " .. string.format("%q", root))
 		if not ok then error(err, 0) end
@@ -284,6 +318,75 @@ helpers.describe("i18n explicit wizard persistence", function()
 		local raw = assert(fh:read("*a")); assert(fh:close())
 		return raw
 	end
+
+	helpers.it("(locale-atomic) preserves a configured row when storage refuses", function()
+		local initial = '[script]\nlocale = "fr"\n'
+		local observed = with_owned_store({ config = initial, rename = "false" }, function(i18n)
+			local accepted = i18n.persist_locale("en")
+			return { accepted = accepted, active = i18n.get_locale(), config = read(require("infra.config_paths").config("config.toml")) }
+		end)
+		helpers.assert_eq(observed, { accepted = false, active = "fr", config = initial })
+	end)
+
+	helpers.it("(locale-atomic) commits both configured and stored locale", function()
+		local initial = '[script]\nlocale = "fr"\n'
+		local observed = with_owned_store({ config = initial }, function(i18n, path)
+			local accepted = i18n.persist_locale("en")
+			return { accepted = accepted, active = i18n.get_locale(),
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path)).locale }
+		end)
+		helpers.assert_eq(observed, { accepted = true, active = "en", config = '[script]\nlocale = "en"\n', stored = "en" })
+	end)
+
+	helpers.it("(locale-atomic) never creates an absent source", function()
+		local observed = with_owned_store({}, function(i18n)
+			local accepted = i18n.persist_locale("en")
+			local file = io.open(require("infra.config_paths").config("config.toml"), "rb")
+			if file then file:close() end
+			return { accepted = accepted, absent = file == nil, active = i18n.get_locale() }
+		end)
+		helpers.assert_eq(observed, { accepted = true, absent = true, active = "en" })
+	end)
+
+	helpers.it("(locale-atomic) leaves an existing source without a locale row unchanged", function()
+		local initial = '[script]\nlog_level = "INFO"\n'
+		local observed = with_owned_store({ config = initial }, function(i18n)
+			local accepted = i18n.persist_locale("en")
+			return { accepted = accepted, config = read(require("infra.config_paths").config("config.toml")), active = i18n.get_locale() }
+		end)
+		helpers.assert_eq(observed, { accepted = true, config = initial, active = "en" })
+	end)
+
+	helpers.it("(locale-atomic) preserves a concurrent edit and compensates storage", function()
+		local initial, concurrent = '[script]\nlocale = "fr"\n', '[script]\nlocale = "de"\n'
+		local observed = with_owned_store({ config = initial, on_publish = function(path)
+			local file = assert(io.open(path, "wb")); assert(file:write(concurrent)); assert(file:close())
+		end }, function(i18n, path, seed)
+			local accepted = i18n.persist_locale("en")
+			return { accepted = accepted, active = i18n.get_locale(), config = read(require("infra.config_paths").config("config.toml")), storage = read(path) == seed }
+		end)
+		helpers.assert_eq(observed, { accepted = false, active = "fr", config = concurrent, storage = true })
+	end)
+
+	helpers.it("(locale-atomic) retains compensation debt until the storage owner can restore", function()
+		local initial, published = '[script]\nlocale = "fr"\n', nil
+		local once = true
+		local observed = with_owned_store({ config = initial, after_publish = function(config, path)
+			if not once then return end
+			once = false
+			published = read(path)
+			local cf = assert(io.open(config, "wb")); assert(cf:write('[script]\nlocale = "de"\n')); assert(cf:close())
+			local sf = assert(io.open(path, "wb")); assert(sf:write('{"locale":"es"}')); assert(sf:close())
+		end }, function(i18n, path)
+			local rejected = i18n.persist_locale("en")
+			local pending = require("infra.scope_registry").pending()
+			local sf = assert(io.open(path, "wb")); assert(sf:write(published)); assert(sf:close())
+			local recovered = i18n.persist_locale("en")
+			return { rejected = rejected, pending = pending, recovered = recovered,
+				still_pending = require("infra.scope_registry").pending() }
+		end)
+		helpers.assert_eq(observed, { rejected = false, pending = true, recovered = true, still_pending = false })
+	end)
 
 	for _, code in ipairs({ "fr", "en" }) do
 		for _, mode in ipairs({ "false", "throw" }) do

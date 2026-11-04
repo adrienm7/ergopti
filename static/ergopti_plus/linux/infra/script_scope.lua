@@ -8,8 +8,8 @@ local Transaction = require("config_scope_transaction")
 local Fenced = require("config_scope_fenced_transaction")
 local Logger = require("logger.shim")
 local ConfigKeys = require("config_keys")
-local _owner, _sequence = nil, 0
-require("infra.scope_registry").register("script_scope", function() return _owner ~= nil and _owner.pending() == true end)
+local _owner, _locale_owner, _sequence = nil, nil, 0
+require("infra.scope_registry").register("script_scope", function() return (_owner ~= nil and _owner.pending() == true) or (_locale_owner ~= nil and _locale_owner.pending() == true) end)
 
 --- Native storage alias of each directly declared script row.
 local ALIAS_NAMES = {
@@ -73,9 +73,11 @@ function M.new(options)
 	local token = { pending = function() return transaction ~= nil and transaction.pending() end }
 	local runtime = Runtime.new({ manifest = Manifest, platform = "linux", aliases = options.aliases or aliases(),
 		storage = options.storage or require("adapters.storage"), token = token, files = options.files,
-		storage_backup_path = function() return options.storage_backup_path end })
+		only = options.only, allow_invalid_source = options.allow_invalid_source, storage_backup_path = function() return options.storage_backup_path end })
 	transaction = Transaction.new({ path = options.path, backup_path = options.backup_path, files = options.files,
 		manifest = runtime.manifest,
+		prepare_batch = options.prepare_batch, preserve_unchanged = options.preserve_unchanged,
+		validate_update = options.validate_update,
 		capture = function(source, _, updates) return runtime.capture(updates, source) end,
 		apply = runtime.apply, restore = runtime.restore })
 	local owner
@@ -89,6 +91,45 @@ function M.new(options)
 		return runtime.forget() == true
 	end
 	return owner
+end
+
+--- Settles an earlier locale inverse before admitting another locale edit.
+--- @return boolean settled
+function M.retry_locale()
+	return not _locale_owner or not _locale_owner.pending() or _locale_owner.retry_restore() == true
+end
+
+--- Atomically changes the locale alias and any already configured source row.
+--- @param value string Locale admitted by the i18n owner.
+--- @return boolean committed
+function M.edit_locale(value)
+	if _locale_owner and _locale_owner.pending() and _locale_owner.retry_restore() ~= true then return false end
+	if _locale_owner and _locale_owner.release() ~= true then return false end
+	_sequence = _sequence + 1
+	local path = require("infra.config_paths").config("config.toml")
+	local backup = path .. ".locale-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak"
+	local key = ConfigKeys.KEY.SCRIPT_LOCALE
+	local function prepare(target, updates, files)
+		local Writer, Codec = require("toml_codec.writer"), require("toml_codec")
+		local content, status, detail = Writer.read_classified(target, files)
+		if status ~= "ok" and status ~= "absent" then return false, detail end
+		local source = { status = status, content = status == "ok" and content or nil }
+		local decoded = Codec.decode(content or "")
+		if type(decoded) ~= "table" then return false, "config.toml is not valid TOML" end
+		local script = decoded.script
+		if script ~= nil and type(script) ~= "table" then return false, "script configuration is not a table" end
+		return Writer.prepare_batch(target, script and script.locale ~= nil and updates or {}, files, source)
+	end
+	_locale_owner = M.new({ path = path, backup_path = backup, storage_backup_path = require("infra.config_paths").config_home() .. "/ergopti_plus/storage.locale-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
+		files = require("adapters.file_system"), is_paused = function() return false end, allow_invalid_source = true,
+		aliases = { [key] = { alias = "locale", native = require("infra.i18n") } }, only = { [key] = true },
+		prepare_batch = prepare, preserve_unchanged = true,
+		validate_update = function(scope, row)
+			return scope == "global" and row.section == "script" and row.key == "locale"
+		end })
+	local committed = _locale_owner.apply_updates({ { section = "script", key = "locale", value = value } })
+	if committed ~= true then return false end
+	return _locale_owner.release() == true
 end
 
 --- Applies requested script rows, retaining its exact native/file inverse.
