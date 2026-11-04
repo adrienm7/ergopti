@@ -532,6 +532,17 @@
 			"root_cause": "_HotstringsRecordApplyBase clears PendingOffset after storing only the clamped effective Delay. Rebase and serialisation later reconstruct the offset from this lossy projection, while transaction clones also omit the original finite intent. The shared delay corpus explicitly requires retaining the original offset when the effect clamps.",
 			"silent_failure": "Changing a base delay or saving an unrelated colour silently changes a user’s configured timing intention, both in the live projection and on disk.",
 			"regression_test": "Six HotstringsConfig persistent offset cases use real TOML, the canonical typed decoder, production parser/projection/resolver, actual public colour and delay writers and fresh reload comparisons. The fix retains StoredOffset through projection and detached transaction clones; explicit delay edits replace it and clears retire it. Category and section paths are checked. Native fail-before measured; post-fix qualification pending. Shared Lua already preserves the offset in its rung and computes clamping only in projection."
+		},
+		{
+			"id": "AHK-049",
+			"title": "Finite hotstring offsets override an explicit unlimited delay",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Native run41910772341 atf7e7b2f passes unlimited-only and offset-only controls but fails both source orders containing delay_unlimited=true and delay_offset=-0.25 at base0.75. The actual valid TOML resolves finite instead of unlimited, individually and reversed.",
+			"root_cause": "The Windows parser independently admits the two correctly typed leaves, then _HotstringsRecordApplyBase consumes the pending finite offset after Delay has already been set to zero by the explicit unlimited flag. The shared Lua resolver explicitly prioritizes true unlimited. This occurs above the clamp and is distinct from AHK-048.",
+			"silent_failure": "A valid explicit unlimited setting silently acquires a finite activation deadline, so expansions can be refused contrary to the chosen configuration.",
+			"regression_test": "Four HotstringsConfig unlimited precedence cases use real typed TOML, the actual parser/base projection/resolver and both category and section scope. Both leaf orders must be unlimited; single-leaf controls preserve finite and unlimited behavior. The fix clears finite projection state and returns when explicit unlimited has already been parsed. No format change. Native fail-before measured; post-fix pending."
 		}
 	]
 }

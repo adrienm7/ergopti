@@ -107,6 +107,15 @@ HotstringsOverridesApplyBase(Overrides := unset) {
 }
 
 _HotstringsRecordApplyBase(Record, Base) {
+		; True unlimited is the first rung in the shared delay resolver. An
+		; offset in the same valid source cannot turn that explicit flag finite.
+		if Record.Delay == 0 {
+				if Record.HasOwnProp("PendingOffset")
+						Record.PendingOffset := ""
+				if Record.HasOwnProp("StoredOffset")
+						Record.StoredOffset := ""
+				return
+		}
 		if Record.HasOwnProp("PendingOffset") && Record.PendingOffset != "" {
 				Record.StoredOffset := Record.PendingOffset
 				Record.PendingOffset := ""
