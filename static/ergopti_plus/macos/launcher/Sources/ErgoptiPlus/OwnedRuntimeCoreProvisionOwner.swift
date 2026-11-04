@@ -32,23 +32,32 @@ final class OwnedRuntimeCoreProvisionOwner {
 			let result = try owner.withPublishedNamespace { acquireOriginalNamespace(lifecycle: $0, publicationParent: owner) }
 			guard let result else { return nil }
 			try result.verifyForPlistCustody(); return result
-		} catch { return nil }
+		} catch { OwnedRuntimeInstallTrail.note("core-provision-custody-" + String(describing: error)); return nil }
 	}
 	private static func acquireOriginalNamespace(lifecycle: OwnedRuntimeServiceLifecycleLock,
 		publicationParent: OwnedRuntimeFirstInstallOwner?) -> OwnedRuntimeCoreProvisionOwner? {
 		var complete = false; defer { if !complete && publicationParent == nil { _ = lifecycle.retire() } }
 		guard !Thread.isMainThread, getuid() == 0, geteuid() == 0, Bundle.main.bundleIdentifier == identifier,
-			Bundle.main.bundleURL.pathExtension == "app", let publisher = OwnedRuntimePublisherIdentity.currentStagedInstaller() else { return nil }
+			Bundle.main.bundleURL.pathExtension == "app" else { OwnedRuntimeInstallTrail.note("core-provision-bundle"); return nil }
+		guard let publisher = OwnedRuntimePublisherIdentity.currentStagedInstaller() else { OwnedRuntimeInstallTrail.note("core-provision-publisher"); return nil }
 		var principal: SecCode?
-		guard SecCodeCopySelf([], &principal) == errSecSuccess, let principal, let leaf = signingLeaf(principal), leaf == publisher.leaf,
-			lifecycle.current(), lifecycle.permitsServiceProvision() else { return nil }
+		guard SecCodeCopySelf([], &principal) == errSecSuccess, let principal, let leaf = signingLeaf(principal), leaf == publisher.leaf else {
+			OwnedRuntimeInstallTrail.note("core-provision-principal"); return nil
+		}
+		guard lifecycle.current(), lifecycle.permitsServiceProvision() else { OwnedRuntimeInstallTrail.note("core-provision-lifecycle"); return nil }
+		var step = "trees"
 		do {
 			let helper = try OwnedRuntimeInstallTree(root: Bundle.main.bundleURL, protected: true)
 			let runtime = try OwnedRuntimeInstallTree(root: runtimeURL, protected: true)
 			guard let resources = Bundle.main.resourceURL else { throw OwnedRuntimeInstallFailure.source }
 			let payload = try OwnedRuntimeInstallTree(root: resources.appendingPathComponent("OwnedRuntime"), protected: true)
-			guard try payload.matchesBytes(of: runtime), idleRevision(try Data(contentsOf: runtimeURL.appendingPathComponent("ErgoptiPlus-Remap-Core.app/Contents/Info.plist"))) else { throw OwnedRuntimeInstallFailure.source }
+			step = "payload-match"
+			guard try payload.matchesBytes(of: runtime) else { throw OwnedRuntimeInstallFailure.source }
+			step = "idle-revision"
+			guard idleRevision(try Data(contentsOf: runtimeURL.appendingPathComponent("ErgoptiPlus-Remap-Core.app/Contents/Info.plist"))) else { throw OwnedRuntimeInstallFailure.source }
+			step = "signed-products"
 			try OwnedRuntimeInstallOwner.validateSignedProductsForBuild(at: runtimeURL, leaf: leaf)
+			step = "verify"
 			try helper.verify(); try runtime.verify(); try payload.verify()
 			guard publisher.current(), lifecycle.current(), lifecycle.permitsServiceProvision(), signingLeaf(principal) == leaf else {
 				throw OwnedRuntimeInstallFailure.principal
@@ -56,7 +65,7 @@ final class OwnedRuntimeCoreProvisionOwner {
 			let result = OwnedRuntimeCoreProvisionOwner(publisher: publisher, principal: principal, leaf: leaf, helper: helper,
 				runtime: runtime, payload: payload, lifecycle: lifecycle, publicationParent: publicationParent)
 			complete = true; return result
-		} catch { return nil }
+		} catch { OwnedRuntimeInstallTrail.note("core-provision-" + step + "-" + String(describing: error)); return nil }
 	}
 	deinit { _ = closeOwnedObservations() }
 	private static func signingLeaf(_ principal: SecCode) -> Data? {
@@ -148,7 +157,7 @@ final class OwnedRuntimeCoreProvisionOwner {
 		guard !serviceTouched, !committed, custody == nil else { throw OwnedRuntimeInstallFailure.destination }
 		try verifyForPlistCustody()
 		let absent = try OwnedRuntimeCoreLaunchctl.run(arguments: ["print", Self.target])
-		guard absent.status == 113 else { throw OwnedRuntimeInstallFailure.destination }
+		guard absent.status == 113 else { OwnedRuntimeInstallTrail.note("core-print-" + String(absent.status)); throw OwnedRuntimeInstallFailure.destination }
 		let custody = try OwnedRuntimeCorePlistCustody.createProduction(owner: self); self.custody = custody
 		try custody.prepare()
 		try Self.prepareDirectories(parent: Self.dataURL.deletingLastPathComponent(), protected: true, admission: { try self.verifyForPlistCustody() })
@@ -156,11 +165,11 @@ final class OwnedRuntimeCoreProvisionOwner {
 		guard custody.current() else { throw OwnedRuntimeInstallFailure.cleanupPending }
 		serviceTouched = true
 		let bootstrap = try OwnedRuntimeCoreLaunchctl.run(arguments: ["bootstrap", "system", "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosCore).plist"])
-		guard bootstrap.status == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard bootstrap.status == 0 else { OwnedRuntimeInstallTrail.note("core-bootstrap-" + String(bootstrap.status)); throw OwnedRuntimeInstallFailure.cleanupPending }
 		try verifyForPlistCustody(); try requireConfigurationAbsence()
 		guard custody.current() else { throw OwnedRuntimeInstallFailure.cleanupPending }
 		let start = try OwnedRuntimeCoreLaunchctl.run(arguments: ["kickstart", Self.target])
-		guard start.status == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard start.status == 0 else { OwnedRuntimeInstallTrail.note("core-kickstart-" + String(start.status)); throw OwnedRuntimeInstallFailure.cleanupPending }
 		// Real dynamic code, kernel birth, launchd observation and native exit monitor are required separately.
 		let deadline = ProcessInfo.processInfo.systemUptime + 10
 		var observed: OwnedRuntimeCoreServiceOwner?
@@ -168,7 +177,7 @@ final class OwnedRuntimeCoreProvisionOwner {
 			try verifyForPlistCustody(); guard custody.current() else { throw OwnedRuntimeInstallFailure.cleanupPending }
 			observed = OwnedRuntimeCoreServiceOwner.acquire(afterProvision: self)
 			if observed != nil { break }
-			if ProcessInfo.processInfo.systemUptime >= deadline { throw OwnedRuntimeInstallFailure.cleanupPending }
+			if ProcessInfo.processInfo.systemUptime >= deadline { OwnedRuntimeInstallTrail.note("core-observation-timeout"); throw OwnedRuntimeInstallFailure.cleanupPending }
 			usleep(LauncherTimings.ownedRuntimeCoreServicePoll.microseconds)
 		} while true
 		guard let core = observed, core.startedCoreObservation(forProvision: self),

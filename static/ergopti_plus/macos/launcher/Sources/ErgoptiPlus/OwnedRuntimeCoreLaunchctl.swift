@@ -24,7 +24,7 @@ enum OwnedRuntimeCoreLaunchctl {
 	/// pqrs' VirtualHIDDevice package is checked and installed only from this helper's own sealed payload.
 	private static func payloadPackage(_ package: URL) throws -> String {
 		guard let resources = Bundle.main.resourceURL?.standardizedFileURL,
-			package.standardizedFileURL.deletingLastPathComponent() == resources.appendingPathComponent(OwnedRuntimeVirtualHIDProvisionOwner.payloadDirectory, isDirectory: true).standardizedFileURL,
+			package.standardizedFileURL.deletingLastPathComponent().path == resources.appendingPathComponent(OwnedRuntimeVirtualHIDProvisionOwner.payloadDirectory, isDirectory: true).path,
 			package.pathExtension == "pkg" else { throw OwnedRuntimeInstallFailure.source }
 		return package.standardizedFileURL.path
 	}
