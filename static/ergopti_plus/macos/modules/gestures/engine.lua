@@ -926,6 +926,12 @@ function M.process_frame(touches, frame_stamp)
 		resetGS()
 		return
 	end
+	if n >= 2 and not Geometry.validPositions(touches) then
+		-- A substituted zero would move the centroid and may fire an action.
+		-- Quarantine the sequence until it drops below the ownership floor.
+		gs.aborted = true
+		stopScrollBlock()
+	end
 
 	-- A gesture of three or more fingers that dropped to two for good is a
 	-- scroll from then on: nothing fires, not even at the lift.

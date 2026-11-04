@@ -122,8 +122,8 @@ def digest_step(bootstrap, source):
     bytes the chain delivers are the pinned ones (a company proxy that
     rewrites or truncates a download answers a HEAD normally).
     """
-    with tempfile.TemporaryDirectory(prefix="ergopti-network-check-") as folder:
-        try:
+    try:
+        with tempfile.TemporaryDirectory(prefix="ergopti-network-check-") as folder:
             bootstrap.download(
                 source["url"],
                 Path(folder) / "input",
@@ -132,12 +132,12 @@ def digest_step(bootstrap, source):
                 time.monotonic() + DIGEST_TIMEOUT,
                 IDLE_TIMEOUT,
             )
-        except bootstrap.BootstrapFailure as failure:
-            emit("digest", "fail", "mismatch" if failure.reason == "integrity" else failure.reason)
-            return
-        except Exception as failure:
-            emit("digest", "fail", getattr(failure, "reason", "unavailable"))
-            return
+    except bootstrap.BootstrapFailure as failure:
+        emit("digest", "fail", "mismatch" if failure.reason == "integrity" else failure.reason)
+        return
+    except Exception as failure:
+        emit("digest", "fail", getattr(failure, "reason", "unavailable"))
+        return
     emit("digest", "pass", "sha256")
 
 

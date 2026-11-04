@@ -13,6 +13,33 @@
 local helpers = require("tests.helpers")
 
 helpers.describe("infra/fs_dir.entries — directory listing", function()
+	helpers.it("rejects embedded NUL before calling the native directory iterator (fs-dir-nul)", function()
+		local fs_dir = require("infra.fs_dir")
+		local previous, calls = hs.fs.dir, 0
+		hs.fs.dir = function(path)
+			calls = calls + 1
+			-- Native opendir receives a C string, whose first NUL terminates it.
+			local actual = path:match("^[^%z]*")
+			local done = false
+			return function()
+				if done then return nil end
+				done = true
+				return "entry from " .. actual
+			end
+		end
+		local ok, err = pcall(function()
+			for _, list in ipairs({ fs_dir.try_entries, fs_dir.try_entries_quiet }) do
+				local names, listed, detail = list("/safe\0/other")
+				helpers.assert_eq(names, {})
+				helpers.assert_eq(listed, false)
+				helpers.assert_contains(detail, "invalid directory path")
+			end
+			helpers.assert_eq(calls, 0, "the truncated prefix must not be enumerated")
+		end)
+		hs.fs.dir = previous
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("exposes entries() and lists registered names in order", function()
 		package.loaded["infra.fs_dir"] = nil
 		local fs_dir = require("infra.fs_dir")

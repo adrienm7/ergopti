@@ -71,6 +71,24 @@ M.COHESION_MIN_SHARE = 0.3
 -- ===================================
 -- ======= 2/ Geometry Helpers =======
 -- ===================================
+
+--- Rejects a frame whose centroid cannot be computed from every contact.
+--- @param touches table Trackpad touch array.
+--- @return boolean valid
+function M.validPositions(touches)
+	for _, touch in ipairs(touches) do
+		local position = type(touch) == "table" and type(touch.absoluteVector) == "table"
+			and touch.absoluteVector.position or nil
+		if type(position) ~= "table" then return false end
+		for _, axis in ipairs({ "x", "y" }) do
+			local value = position[axis]
+			if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
+				return false
+			end
+		end
+	end
+	return true
+end
 -- ===================================
 
 --- Calculates the central point among all current fingers.

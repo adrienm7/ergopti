@@ -112,6 +112,23 @@ local function engine_taps_watch_buttons()
 end
 
 helpers.describe("a click-drag is never a gesture (click-drag-selection)", function()
+	helpers.it("does not turn a missing contact position into a swipe", function()
+		with_engine(function(engine, fired)
+			current_time = 0
+			engine.process_frame(contacts(2, 60))
+			for frame = 1, 8 do
+				current_time = frame * 0.02
+				local malformed = contacts(2, 60)
+				malformed[1].absoluteVector.position.x = nil
+				engine.process_frame(malformed)
+			end
+			current_time = 0.3
+			engine.process_frame({})
+			helpers.assert_eq(fired, {})
+			slide_left(engine, 2)
+			helpers.assert_eq(fired, { "arrow_up" }, "a new healthy gesture must still work")
+		end)
+	end)
 	helpers.it("(click-drag-selection) the same frames without a held button are a swipe", function()
 		-- The control: these frames do fire, so the silence below is the button's.
 		with_engine(function(engine, fired)

@@ -1197,7 +1197,11 @@ end
 local function _replay_local_data_sql(db, state)
 	local empty_cursor = { offset = 0, date = nil }
 	local attrs = fs.attributes(_paths.data_sql_path)
-	local size = attrs and math.tointeger(attrs.size) or 0
+	local size = type(attrs) == "table" and math.tointeger(attrs.size) or nil
+	if size == nil or size < 0 or not LedgerReplay.is_state(state) or state.offset > size then
+		Logger.error(LOG, "Local data.sql size or replay state could not be verified.")
+		return false, empty_cursor
+	end
 	if size == 0 then return true, empty_cursor end
 	local started_ns, resumed_at = timer.absoluteTime(), state.offset or 0
 	local replay_job = _recovery
@@ -1253,6 +1257,9 @@ local function _replay_local_data_sql(db, state)
 		_recovery_pace()
 	end
 end
+
+-- Exposes the real replay boundary to the recovery regression fixture.
+M._replay_local_data_sql = _replay_local_data_sql
 
 --- Persists the resume point of a full rebuild.
 ---@param db userdata

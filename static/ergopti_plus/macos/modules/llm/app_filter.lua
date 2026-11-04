@@ -83,8 +83,9 @@ end
 --- @return any error_detail Native focus-read refusal or Lua exception, if any.
 local function get_focused_element(front)
 	if not front then return nil end
-	local ok_ax, ax = pcall(hs.axuielement.applicationElementForPID, front:pid())
-	if not ok_ax or not ax then return nil end
+	local ok_ax, ax = pcall(function() return hs.axuielement.applicationElementForPID(front:pid()) end)
+	if not ok_ax then return nil, true, ax end
+	if not ax then return nil, true, "Accessibility application element is unavailable" end
 	local ok_fe, focused, focus_error = pcall(function() return ax:attributeValue("AXFocusedUIElement") end)
 	if not ok_fe then return nil, true, focused end
 	return focused, focused == nil and focus_error ~= nil, focus_error
