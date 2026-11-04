@@ -179,17 +179,24 @@ helpers.describe("release_installer: staging and replacement dispatch", function
 
 	helpers.it("requires system curl only for an explicit proxy route", function()
 		local previous = package.loaded["adapters.system_curl"]
-		local checks, starts = 0, 0
-		package.loaded["adapters.system_curl"] = { check = function() checks = checks + 1; return false end }
-		Installer._spawn = function() return { start = function() starts = starts + 1; return true end } end
+		local checks, starts, child_environment, curl_available = 0, 0, nil, false
+		package.loaded["adapters.system_curl"] = { check = function() checks = checks + 1; return curl_available end }
+		Installer._spawn = function(_, _, _, _, environment)
+			child_environment = environment
+			return { start = function() starts = starts + 1; return true end }
+		end
 		local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = "zip" }
 		local ok, err = pcall(function()
 			helpers.assert_true(Installer.stage(asset, function() end), "native stage does not run curl")
 			helpers.assert_eq(checks, 0)
+			helpers.assert_eq(child_environment.https_proxy, "", "the child receives the admitted proxy snapshot")
 			env.https_proxy = "http://proxy.example:3128"
 			helpers.assert_eq(Installer.stage(asset, function() end), false, "the explicit proxy uses curl")
 			helpers.assert_eq(checks, 1)
 			helpers.assert_eq(starts, 1)
+			curl_available = true
+			helpers.assert_true(Installer.stage(asset, function() end))
+			helpers.assert_eq(child_environment.https_proxy, env.https_proxy)
 		end)
 		env.https_proxy = nil
 		package.loaded["adapters.system_curl"] = previous

@@ -807,7 +807,8 @@ function M.add(trigger, replacement, opts)
 		add_raw(t, r, is_auto, plain_r, conform, fold)
 		-- Only generate space variants for triggers that contain spaces but do not
 		-- *start* with a space (starting-space triggers are word-boundary guards).
-		local starts_with_space = t:match("^[ \194\160\226\128\175]") ~= nil
+		local starts_with_space = t:sub(1, 1) == " " or t:sub(1, 2) == "\194\160"
+			or t:sub(1, 3) == "\226\128\175"
 		if not starts_with_space and t:match(" ") then
 			add_raw((t:gsub(" ", "\194\160")),   r, is_auto, plain_r, conform, fold)  -- regular nbsp
 			add_raw((t:gsub(" ", "\226\128\175")), r, is_auto, plain_r, conform, fold) -- narrow nbsp

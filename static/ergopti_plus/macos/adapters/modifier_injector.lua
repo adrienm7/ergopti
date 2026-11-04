@@ -217,7 +217,7 @@ function M.arm(flags, on_applied)
 
 	tap_candidate = tap_or_err
 	_tap = tap_candidate
-	_delivering = true
+	_delivering = false
 	local ok_start, start_result = xpcall(function() return tap_candidate:start() end,
 		debug.traceback)
 	local probe_ok, enabled = xpcall(function()
@@ -227,16 +227,17 @@ function M.arm(flags, on_applied)
 		return tap_candidate:isEnabled()
 	end, debug.traceback)
 	if not ok_start or start_result == nil or start_result == false
-		or not probe_ok or enabled ~= true then
+		or not probe_ok or enabled ~= true or _tap ~= tap_candidate then
 		Logger.error(LOG, "arm(): eventtap:start() did not commit — %s",
 			tostring(not ok_start and start_result
 				or (start_result == nil and "returned nil")
 				or (start_result == false and "returned false")
 				or (not probe_ok and enabled)
 				or "tap remained disabled"))
-		M.disarm()
+		if _tap == tap_candidate then M.disarm() end
 		return false
 	end
+	_delivering = true
 	return true
 end
 

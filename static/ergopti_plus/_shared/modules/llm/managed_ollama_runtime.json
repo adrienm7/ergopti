@@ -168,7 +168,8 @@
 			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_wpad_discovery",
 			"TestAlignRangeSkipsAFullResponseToThePartOffset",
 			"TestAlignRangeKeepsTheBodyOfTheAskedRange",
-			"TestAlignRangeRefusesWhatWouldCorruptTheFile"
+			"TestAlignRangeRefusesWhatWouldCorruptTheFile",
+			"TestNotModifiedRepresentationLengthDoesNotRequireBody"
 		]
 	}
 }

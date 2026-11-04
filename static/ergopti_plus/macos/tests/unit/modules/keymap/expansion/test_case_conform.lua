@@ -106,6 +106,13 @@ local function fresh_registry()
 end
 
 helpers.describe("Registry — case-conform registration shape", function()
+	helpers.it("preserves leading-space guards without creating space variants (unicode-space-prefix)", function()
+		for _, space in ipairs({ " ", " ", " " }) do
+			local state, R = fresh_registry()
+			R.add(space .. "x y", "output", { auto_expand = true, is_case_sensitive = true })
+			helpers.assert_eq(#state.mappings, 1, "leading space must keep the guarded trigger literal")
+		end
+	end)
 	helpers.it("registers ONE lowercase entry for an auto/insensitive/plain/no-symbol trigger", function()
 		local state, R = fresh_registry()
 		R.add("ccê", "ccu", { auto_expand = true, is_case_sensitive = false })
@@ -122,6 +129,15 @@ helpers.describe("Registry — case-conform registration shape", function()
 		local bucket = R.mappings_for_tail("Ê")
 		helpers.assert_true(bucket ~= nil and #bucket == 1, "Ê resolves to the ê bucket")
 		helpers.assert_eq(bucket[1].trigger, "ccê")
+	end)
+
+	helpers.it("finds uppercase non-French accented triggers in the folded tail index (hotstring-unicode-fold)", function()
+		local state, R = fresh_registry()
+		R.add("á", "output", { auto_expand = true, is_case_sensitive = true })
+		R.sort_mappings()
+		local bucket = R.mappings_for_tail("Á")
+		helpers.assert_true(bucket ~= nil and #bucket == 1, "Spanish uppercase Á must use the á bucket")
+		helpers.assert_eq(bucket[1].trigger, "á")
 	end)
 
 	helpers.it("keeps the explicit-variant path for a comma (shift-symbol) trigger", function()
@@ -206,6 +222,58 @@ local function fire(R, E, state, trigger, repl, typed, opts)
 end
 
 helpers.describe("Expander — fire-time case conform", function()
+	helpers.it("expands space variants after non-space Unicode leading characters (unicode-space-prefix)", function()
+		for _, first in ipairs({ "©", "€" }) do
+			for _, space in ipairs({ " ", " " }) do
+				local state, R, E = fresh_engine()
+				R.add(first .. " x", "output", { auto_expand = true, is_case_sensitive = true })
+				R.sort_mappings()
+				state.buffer = first .. space .. "x"
+				state.start_is_word_boundary = true
+				local fired = false
+				for _, mapping in ipairs(state.mappings) do
+					if E.try_auto_expand(mapping, 1, false) then fired = true; break end
+				end
+				helpers.assert_true(fired, "non-space Unicode prefix must preserve space variants")
+				helpers.assert_eq(state.buffer, "output")
+			end
+		end
+	end)
+	helpers.it("matches a folded trigger whose typed character has a different UTF-8 width (hotstring-width-fold)", function()
+		local state, R, E = fresh_engine()
+		local fired, buffer = fire(R, E, state, "k", "output", "xK",
+			{ auto_expand = true, is_case_sensitive = true })
+		helpers.assert_true(fired, "Kelvin sign must fold to k")
+		helpers.assert_eq(buffer, "xoutput")
+	end)
+
+	helpers.it("retains the prefix on a width-changing folded terminator (hotstring-width-fold)", function()
+		local state, R, E = fresh_engine()
+		R.add("k", "output", { auto_expand = false, is_case_sensitive = true })
+		R.sort_mappings()
+		state.buffer = "xK "
+		state.start_is_word_boundary = true
+		helpers.assert_true(E.try_terminator_expand(state.mappings[1], " ", 1, false))
+		helpers.assert_eq(state.buffer, "xoutput ")
+	end)
+
+	helpers.it("expands a folded non-French accented trigger (hotstring-unicode-fold)", function()
+		local state, R, E = fresh_engine()
+		local fired, buffer = fire(R, E, state, "á", "output", "Á",
+			{ auto_expand = true, is_case_sensitive = true })
+		helpers.assert_true(fired, "a folded trigger must match Unicode case pairs")
+		helpers.assert_eq(buffer, "output")
+	end)
+
+	helpers.it("conforms default non-French accented and Greek triggers (hotstring-unicode-fold)", function()
+		for _, pair in ipairs({ { "á", "Á" }, { "σ", "Σ" } }) do
+			local state, R, E = fresh_engine()
+			local fired, buffer = fire(R, E, state, pair[1], "resultado", pair[2])
+			helpers.assert_true(fired, "default conform matching must recognize the Unicode uppercase")
+			helpers.assert_eq(buffer, "Resultado")
+		end
+	end)
+
 	helpers.it("expands a lowercase trigger to the lowercase replacement", function()
 		local state, R, E = fresh_engine()
 		local fired, buf = fire(R, E, state, "ccê", "ccu", "ccê")

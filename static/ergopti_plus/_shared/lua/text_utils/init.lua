@@ -453,12 +453,27 @@ M.UPPER_LETTERS = {
 
 M.LOWER_LETTERS = {}
 for k, v in pairs(M.UPPER_LETTERS) do M.LOWER_LETTERS[v] = k end
+-- Extend the French overrides with generated Unicode simple case pairs that
+-- preserve one Unicode scalar. Multi-scalar uppercase mappings require a
+-- separate matching path and are not admitted here.
+local unicode_case_data = require("unicode_case.data")
+for lower, upper in pairs(unicode_case_data.upper) do
+	if lower:byte(1) > 127 and strict_utf8_lib.len(upper) == 1
+		and M.UPPER_LETTERS[lower] == nil then M.UPPER_LETTERS[lower] = upper end
+end
+for upper, lower in pairs(unicode_case_data.lower) do
+	if upper:byte(1) > 127 and strict_utf8_lib.len(lower) == 1
+		and M.LOWER_LETTERS[upper] == nil then M.LOWER_LETTERS[upper] = lower end
+end
 -- The ASCII fast paths of trig_lower and repl_upper are exact only while both
 -- tables hold multibyte keys alone; a new ASCII key must fail loudly here.
 local NON_ASCII_BYTE = "[\128-\255]"
-for lower, upper in pairs(M.UPPER_LETTERS) do
-	assert(upper:find(NON_ASCII_BYTE) and lower:find(NON_ASCII_BYTE),
+for lower in pairs(M.UPPER_LETTERS) do
+	assert(lower:find(NON_ASCII_BYTE),
 		"case tables must hold multibyte keys only: " .. lower)
+end
+for upper in pairs(M.LOWER_LETTERS) do
+	assert(upper:find(NON_ASCII_BYTE), "case tables must hold multibyte keys only: " .. upper)
 end
 
 M.UPPER_TRIGGERS = {}

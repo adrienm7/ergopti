@@ -29,6 +29,34 @@ end
 -- ==========================================
 
 helpers.describe("keystats export — foreign directory enumeration", function()
+	helpers.it("distinguishes a missing directory from an uninspectable directory", function()
+		helpers.with_fresh_modules({"infra.logger", "infra.i18n", "infra.fs_dir", "adapters.file_system",
+			"modules.keystats.export"}, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["infra.i18n"] = {get = function(key) return key end}
+			local status, failing_path = "error", "/metrics/"
+			package.loaded["adapters.file_system"] = {classify_no_follow = function(path)
+				helpers.assert_eq(path, failing_path)
+				return nil, status
+			end}
+			local export = helpers.load_with_stubs("modules.keystats.export", {fs = {attributes = function(path)
+				if path == failing_path then return nil end
+				return {mode = "directory"}
+			end}})
+			export.init({paths = {metrics_dir = "/metrics/"}, device_id = "local", get_db = function() return {} end})
+			for _, path in ipairs({"/metrics/", "/metrics/by_device/"}) do
+				failing_path, status = path, "error"
+				local devices, detail = export.sync_foreign_data_sql()
+				helpers.assert_nil(devices, "unverified directory must not be reported as empty")
+				helpers.assert_true(type(detail) == "string")
+				status = "absent"
+				devices, detail = export.sync_foreign_data_sql()
+				helpers.assert_eq(devices, {})
+				helpers.assert_nil(detail)
+			end
+		end)
+	end)
+
 	helpers.it("returns the canonical directory refusal without throwing", function()
 		helpers.with_fresh_modules({
 			"infra.fs_dir",

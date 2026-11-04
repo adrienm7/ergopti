@@ -74,6 +74,12 @@ local function with_filter(filter, options, callback)
 			keystats_system_auth_filter_enabled = true,
 		},
 	}
+	keystats.set_disabled_apps = function(value)
+		observations.apps = value
+		observations.app_sets = (observations.app_sets or 0) + 1
+		if options.on_apps_set then options.on_apps_set(observations) end
+		if options.apps_setter_throws and observations.app_sets == 1 then error("app setter failed") end
+	end
 	keystats[filter.setter] = function(value)
 		observations.setter_values[#observations.setter_values + 1] = value
 		observations.runtime = value
@@ -84,7 +90,10 @@ local function with_filter(filter, options, callback)
 
 	local captured_commands
 	package.loaded["hs.fs"] = {}
-	package.loaded["infra.app_picker"] = { build_menu = function() return {} end }
+	package.loaded["infra.app_picker"] = { build_menu = function(_, on_change)
+		observations.change_apps = on_change
+		return {}
+	end }
 	package.loaded["infra.dialog_util"] = {}
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.logger"] = {
@@ -95,8 +104,9 @@ local function with_filter(filter, options, callback)
 		done = function() end,
 	}
 	package.loaded["infra.manifest_menu"] = {
-		build = function(_, _, _, _, ctx)
+		build = function(_, _, _, _, ctx, providers)
 			captured_commands = ctx.commands
+			providers.exclude_apps()
 			return {}
 		end,
 		resolve_disabled_when = function() return false end,
@@ -140,6 +150,36 @@ local function with_filter(filter, options, callback)
 end
 
 helpers.describe("menu_metrics filter toggles are transactional", function()
+	helpers.it("restores the excluded-app privacy list when saving fails", function()
+		with_filter(FILTERS[1], { save_result = false }, function(_, _, state, observations)
+			local original = state.keystats_disabled_apps
+			local candidate = { { name = "Private", appPath = "/Applications/Private.app" } }
+			helpers.assert_eq(observations.change_apps(candidate), false)
+			helpers.assert_true(rawequal(state.keystats_disabled_apps, original), "failed save must restore menu state")
+			helpers.assert_true(rawequal(observations.apps, original), "failed save must restore the runtime filter")
+		end)
+	end)
+	helpers.it("restores the excluded-app list after a runtime setter raises", function()
+		with_filter(FILTERS[1], { apps_setter_throws = true }, function(_, _, state, observations)
+			local original, before_saves = state.keystats_disabled_apps, observations.saves
+			helpers.assert_eq(observations.change_apps({ { name = "Private" } }), false)
+			helpers.assert_true(rawequal(state.keystats_disabled_apps, original))
+			helpers.assert_true(rawequal(observations.apps, original))
+			helpers.assert_eq(observations.saves, before_saves)
+		end)
+	end)
+	helpers.it("rejects a reentrant excluded-app update while publishing another", function()
+		local nested
+		with_filter(FILTERS[1], { on_apps_set = function(observations)
+			nested = observations.change_apps({ { name = "Nested" } })
+		end }, function(_, _, state, observations)
+			local candidate = { { name = "Original" } }
+			helpers.assert_true(observations.change_apps(candidate))
+			helpers.assert_eq(nested, false)
+			helpers.assert_true(rawequal(state.keystats_disabled_apps, candidate))
+			helpers.assert_true(rawequal(observations.apps, candidate))
+		end)
+	end)
 	for _, filter in ipairs(FILTERS) do
 		helpers.it(filter.command .. " compensates a setter that mutates then raises", function()
 			with_filter(filter, { setter_throws = true }, function(ok, result, state, observations)

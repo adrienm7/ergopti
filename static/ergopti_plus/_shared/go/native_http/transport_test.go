@@ -60,13 +60,15 @@ func TestMain(m *testing.M) {
 			metadata = `{"version":1,"version":1,"status":200,"headers":[]}`
 		} else if mode == "invalid-header" {
 			metadata = `{"version":1,"status":200,"headers":[["bad name","x"]]}`
+		} else if mode == "not-modified" {
+			metadata = `{"version":1,"status":304,"headers":[["Content-Length","100"]]}`
 		}
 		frame('H', metadata)
 		if mode == "stall-body" || mode == "cancel-body" {
 			time.Sleep(10 * time.Second)
 			os.Exit(9)
 		}
-		if request["method"] != "HEAD" && !strings.Contains(metadata, `"status":302`) {
+		if request["method"] != "HEAD" && !strings.Contains(metadata, `"status":302`) && mode != "not-modified" {
 			frame('D', "hello")
 		}
 		if mode == "truncated" {
@@ -88,6 +90,21 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
+}
+
+func TestNotModifiedRepresentationLengthDoesNotRequireBody(t *testing.T) {
+	transport, record := peerTransport(t, "not-modified")
+	request, _ := http.NewRequest("GET", "https://example.test/manifest", nil)
+	response, err := transport.RoundTrip(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	data, err := io.ReadAll(response.Body)
+	if err != nil || len(data) != 0 || response.StatusCode != 304 || response.Header.Get("Content-Length") != "100" {
+		t.Fatalf("invalid 304 response: status=%d body=%q error=%v", response.StatusCode, data, err)
+	}
+	records(t, record)
 }
 
 func peerTransport(t *testing.T, mode string) (*Transport, string) {

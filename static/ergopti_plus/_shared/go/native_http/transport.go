@@ -583,10 +583,10 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 		return nil, fail("content_encoding")
 	}
 	body.expected = response.ContentLength
-	if request.Method == http.MethodHead {
+	if request.Method == http.MethodHead || response.StatusCode == http.StatusNotModified {
 		body.expected = 0
 	}
-	if request.Method == http.MethodHead || response.ContentLength == 0 {
+	if request.Method == http.MethodHead || response.StatusCode == http.StatusNotModified || response.ContentLength == 0 {
 		tag, payload, err := body.frame()
 		if err == nil && tag == 'C' {
 			err = body.terminal(payload)

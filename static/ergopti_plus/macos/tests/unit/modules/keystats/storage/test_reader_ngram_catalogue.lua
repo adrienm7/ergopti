@@ -37,6 +37,34 @@ end
 helpers.describe("macOS n-gram reads: the shared catalogue", function()
 	local Queries = require("keystats.queries")
 
+	helpers.it("reads cross-device days even when the local timezone skipped a calendar date", function()
+		helpers.with_stub_scope({"modules.keystats.sqlite_reader", "infra.logger"}, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			local fake = require("tests.support.fake_ngram_sqlite").new({ngram_chars = {
+				{date = "2011-12-29", app = "Code", token = "a", c = 1},
+				{date = "2011-12-30", app = "Code", token = "a", c = 1},
+				{date = "2011-12-31", app = "Code", token = "a", c = 1},
+			}})
+			local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", {sqlite3 = fake})
+			if os.getenv("TZ") == "Pacific/Apia" then
+				helpers.assert_eq(reader.next_day("2011-12-29"), "2011-12-30",
+					"the skipped local day is still a valid cross-device calendar date")
+			end
+			local previous_time = os.time
+			os.time = function() error("date pagination must not depend on local timezone") end
+			local ok, err = xpcall(function()
+				helpers.assert_eq(reader.next_day("2011-12-29"), "2011-12-30")
+				helpers.assert_eq(reader.split_bounds(nil, nil, "2011-12-31").historical_end, "2011-12-30")
+				local out, complete = reader.read_ngrams("/fake/db", "2011-12-29", "2011-12-31", nil,
+					{pause = function() end})
+				helpers.assert_true(complete)
+				helpers.assert_eq(out.c.a.c, 3, "all three calendar days contribute")
+			end, debug.traceback)
+			os.time = previous_time
+			if not ok then error(err) end
+		end)
+	end)
+
 	helpers.it("does not issue per-day projections for an empty bounded range", function()
 		local reader, statements = reader_with({})
 		local out, complete = reader.read_ngrams("/declared/db.sqlite", "2025-01-01", "2025-12-31", nil,

@@ -134,7 +134,7 @@ end
 --- @return function hs.eventtap handler function.
 local function _make_handler(generation)
 	return function(event)
-		if generation ~= _handler_generation then return false end
+		if generation ~= _handler_generation or not _tap_committed then return false end
 		if _on_event then
 			local ok, consume, returned_events = Logger.pcall(LOG, _on_event, event)
 			if not ok then return false end

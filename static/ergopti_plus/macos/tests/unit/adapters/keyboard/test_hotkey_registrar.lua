@@ -55,6 +55,21 @@ end
 -- ==========================
 
 helpers.describe("hotkey_registrar: bind", function()
+	helpers.it("does not deliver a press before native bind commits", function()
+		local adapter, hs_stub = fresh()
+		local native_bind = hs_stub.hotkey.bind
+		local fired = 0
+		hs_stub.hotkey.bind = function(mods, key, pressed)
+			pressed()
+			return native_bind(mods, key, pressed)
+		end
+		local token = assert(adapter.bind("Ctrl+T", function() fired = fired + 1 end))
+		helpers.assert_eq(fired, 0)
+		hs_stub.hotkey._bound[1].pressed_fn()
+		helpers.assert_eq(fired, 1)
+		helpers.assert_eq(adapter.unbind(token), true)
+	end)
+
 	helpers.it("registers the chord with Hammerspoon and answers a handle", function()
 		local adapter, hs_stub = fresh()
 		local handle = adapter.bind("Ctrl+Shift+S", function() end)
@@ -365,6 +380,30 @@ helpers.describe("hotkey_registrar: delivery guard", function()
 		hs_stub.hotkey._bound[1].pressed_fn()
 		helpers.assert_eq(fired, 1,
 			"the same handle must resume without a fragile native rebind sweep")
+	end)
+
+	helpers.it("denies a press if its guard disables the binding while checking", function()
+		local adapter, hs_stub = fresh()
+		local fired = 0
+		local token = assert(adapter.bind("Ctrl+T", function() fired = fired + 1 end))
+		adapter.set_delivery_guard(function()
+			helpers.assert_eq(adapter.setEnabled(token, false), true)
+			return true
+		end)
+		hs_stub.hotkey._bound[1].pressed_fn()
+		helpers.assert_eq(fired, 0)
+	end)
+
+	helpers.it("denies a press if the live guard is replaced while checking", function()
+		local adapter, hs_stub = fresh()
+		local fired = 0
+		adapter.bind("Ctrl+T", function() fired = fired + 1 end)
+		adapter.set_delivery_guard(function()
+			adapter.set_delivery_guard(function() return false end)
+			return true
+		end)
+		hs_stub.hotkey._bound[1].pressed_fn()
+		helpers.assert_eq(fired, 0)
 	end)
 
 	helpers.it("audit pause fence: a throwing delivery guard fails closed", function()

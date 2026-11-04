@@ -104,6 +104,19 @@ _UCSch_With(Record, Now, StartedAt, Interval, Body) {
 	}
 }
 
+_UCSch_ClockRollbackRestartsBootDelay() {
+	Body(Store, Clock) {
+		global _UpdaterStartedAt
+		Decision := _Updater_ScheduleDecision()
+		AssertEqual(Clock.Now, _UpdaterStartedAt, "the startup anchor follows the rolled-back clock")
+		AssertEqual(UpdateSchedule_Timing()["boot_check_delay_sec"] * 1000, Decision.WaitMs)
+		Clock.Now += UpdateSchedule_Timing()["boot_check_delay_sec"]
+		AssertEqual(true, _Updater_ScheduleDecision().Due)
+	}
+	_UCSch_With(Map("seed", "7f3a9c21e5b04d68"), 1699913600, 1700000000, 86400, Body)
+}
+Test("Updater schedule: a clock rollback restarts the boot delay", _UCSch_ClockRollbackRestartsBootDelay)
+
 ; A restart in the middle of the interval arms for the persisted due time
 ; (bounded by the re-evaluation period), never for a boot check.
 _UCSch_RestartMidIntervalDoesNotCheckAtBoot() {

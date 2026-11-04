@@ -253,6 +253,20 @@ helpers.describe("shared hotstring engine — case sensitivity", function()
 		return result
 	end
 
+	helpers.it("matches Unicode case pairs outside French (hotstring-unicode-fold)", function()
+		for _, pair in ipairs({ {"á", "Á"}, {"σ", "Σ"} }) do
+			local result = type_into({ auto_expand = true, trigger = pair[1], replacement = "ok" }, pair[2])
+			helpers.assert_true(result ~= nil, "uppercase input should match " .. pair[1])
+		end
+	end)
+
+	helpers.it("matches a different-width Unicode case pair (hotstring-width-fold)", function()
+		local result = type_into({ auto_expand = true, trigger = "k", replacement = "output",
+			is_case_sensitive = true }, "K")
+		helpers.assert_true(result ~= nil, "Kelvin sign must fold to k")
+		helpers.assert_eq("output", result.replacement)
+	end)
+
 	-- The two schema flags are orthogonal, and reading them as one thing is the
 	-- bug these three tests exist to prevent. `is_case_sensitive` selects the
 	-- REGISTRATION shape (literal, no cased family); `is_case_sensitive_strict`

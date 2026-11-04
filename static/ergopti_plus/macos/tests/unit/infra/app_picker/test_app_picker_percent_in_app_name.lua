@@ -86,6 +86,20 @@ helpers.describe("app_picker — a '%' in the frontmost app name", function()
 		return false
 	end
 
+	helpers.it("removes only the selected installation when bundle IDs coincide", function()
+		local AppPicker = load_picker_with_front_app("Current")
+		local first = { name = "App A", appPath = "/Applications/A.app", bundleID = "org.example.app" }
+		local second = { name = "App B", appPath = "/Applications/B.app", bundleID = "org.example.app" }
+		local changed
+		local menu = AppPicker.build_menu({ first, second }, function(value) changed = value end, "search")
+		menu[1].action()
+		helpers.assert_eq(changed, { second }, "removing one path must retain the other installation")
+		local legacy = { name = "Legacy", bundleID = "org.example.legacy" }
+		menu = AppPicker.build_menu({ legacy, second }, function(value) changed = value end, "search")
+		menu[2].action()
+		helpers.assert_eq(changed, { second }, "a pathless legacy entry remains removable by bundle ID")
+	end)
+
 	helpers.it("build_menu does not throw when the frontmost app name contains '%'", function()
 		local AppPicker = load_picker_with_front_app("100% Orange Juice")
 

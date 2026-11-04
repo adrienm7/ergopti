@@ -132,6 +132,13 @@ local function header_value(headers, wanted)
 	return nil
 end
 
+--- An HTTP entity-tag is a quoted opaque value, optionally prefixed by W/.
+local function valid_etag(value)
+	if type(value) ~= "string" then return false end
+	local opaque = value:sub(1, 2) == "W/" and value:sub(3) or value
+	return opaque:match('^"[^"%c]*"$') ~= nil
+end
+
 
 
 
@@ -260,6 +267,10 @@ function M.new(opts)
 			Logger.warn(LOG, "Dropped the unusable stored copy of the release list: %s.", reason)
 			return nil
 		end
+		if not valid_etag(copy.etag) then
+			Logger.warn(LOG, "Dropped the stored release list with an invalid ETag.")
+			return nil
+		end
 		local decoded, decode_error = JsonCodec.decode(copy.body)
 		if decode_error or type(decoded) ~= "table" then
 			Logger.warn(LOG, "Dropped the malformed stored copy of the release list.")
@@ -281,7 +292,7 @@ function M.new(opts)
 	--- @param etag string|nil The response's validator.
 	local function store_list_cache(decoded, etag)
 		-- An empty array would encode as a JSON object, which no copy may hold.
-		if not etag or #decoded == 0 then
+		if not valid_etag(etag) or #decoded == 0 then
 			list_cache = nil
 			if opts.storage.set(config.list_key, nil) ~= true then
 				Logger.error(LOG, "The stale copy of the release list could not be removed.")
@@ -527,6 +538,10 @@ function M.new(opts)
 	evaluate = function()
 		if not active then return false end
 		local now = opts.now()
+		if now < started_at then
+			Logger.info(LOG, "The wall clock moved behind startup; restarting the update-check boot delay.")
+			started_at = now
+		end
 		local due_at, reason = Schedule.next_due({
 			now = now, started_at = started_at, interval = owner.interval(),
 			state = load_record(), timing = timing,
@@ -692,6 +707,7 @@ function M.new(opts)
 	--- Revokes pending results when the durable channel owner publishes a change.
 	function owner.on_channel_changed()
 		generation = generation + 1
+		check_sequence = check_sequence + 1
 		in_flight = false
 		latest = nil
 		if active and disarm() then return evaluate() end

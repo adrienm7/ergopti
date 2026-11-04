@@ -35,6 +35,7 @@ local Logger        = require("infra.logger")
 local ParentSource = require("menu.frames.parent_source")
 
 local LOG = "menu_metrics"
+local exclusion_transactions = setmetatable({}, { __mode = "k" })
 
 
 
@@ -381,6 +382,7 @@ function M.build(ctx)
 	end
 
 	local function rows_exclude_apps(_ctx)
+		local captured_apps = state.keystats_disabled_apps
 		local disabled_count = #(type(state.keystats_disabled_apps) == "table" and state.keystats_disabled_apps or {})
 		local label = disabled_count > 0
 			and string.format(i18n.get("menu.metrics.disabled_in_label"), disabled_count, disabled_count > 1 and "s" or "")
@@ -388,13 +390,39 @@ function M.build(ctx)
 		local exclusion_menu = AppPickerLib.build_menu(
 			state.keystats_disabled_apps,
 			function(new_list)
-				state.keystats_disabled_apps = new_list
-				local Keystats = require("modules.keystats")
-				if type(Keystats.set_disabled_apps) == "function" then
-					pcall(Keystats.set_disabled_apps, new_list)
+				if exclusion_transactions[state] then return false end
+				exclusion_transactions[state] = true
+				local completed, committed = xpcall(function()
+					if state.keystats_disabled_apps ~= captured_apps then return false end
+					local Keystats = require("modules.keystats")
+					local setter = Keystats.set_disabled_apps
+					if type(setter) ~= "function" then
+						Logger.error(LOG, "Excluded-app runtime setter is unavailable.")
+						return false
+					end
+					local applied, result = pcall(setter, new_list)
+					if not applied or result == false then
+						local restored = pcall(setter, captured_apps or {})
+						Logger.error(LOG, "Excluded-app runtime update failed; rollback called=%s.", tostring(restored))
+						return false
+					end
+					state.keystats_disabled_apps = new_list
+					local saved, receipt = pcall(save_prefs)
+					if not saved or receipt ~= true then
+						state.keystats_disabled_apps = captured_apps
+						local restored = pcall(setter, captured_apps or {})
+						Logger.error(LOG, "Excluded-app preferences were refused; runtime rollback called=%s.", tostring(restored))
+						return false
+					end
+					pcall(updateMenu)
+					return true
+				end, debug.traceback)
+				exclusion_transactions[state] = nil
+				if not completed then
+					Logger.error(LOG, "Excluded-app update raised; changes were not acknowledged.")
+					return false
 				end
-				if save_prefs() ~= true then return false end
-				pcall(updateMenu)
+				return committed == true
 			end,
 			i18n.get("menu.metrics.exclude_apps")
 		)
