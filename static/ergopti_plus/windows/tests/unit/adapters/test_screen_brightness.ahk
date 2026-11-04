@@ -642,7 +642,7 @@ _SBT_ThrowAcquisition(Args*) {
 	throw Error("fixture acquisition refusal")
 }
 _SBT_ConfigureAcquisitionRefusal(Throws, Fake) {
-	ScreenBrightnessOwner.spawn_fn := Throws ? _SBT_ThrowAcquisition : (*) => 0
+	ScreenBrightnessOwner.spawn_fn := Throws ? _SBT_ThrowAcquisition : ((*) => 0)
 }
 _SBT_ObserveAcquisitionRefusal(Fake, Observed, Notices) {
 	AssertFalse(IsObject(ScreenBrightnessOwner.job), "a failed acquisition releases its reservation")
