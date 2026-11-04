@@ -12,6 +12,8 @@
 		{ "id": "stable_over_prerelease", "a": "2.5.0", "b": "2.5.0-dev.4", "expect": 1 },
 		{ "id": "prerelease_under_stable", "a": "2.5.0-dev.4", "b": "2.5.0", "expect": -1 },
 		{ "id": "shorter_prerelease_is_less", "a": "2.5.0-dev", "b": "2.5.0-dev.4", "expect": -1 },
+		{ "id": "nonsemver_missing_prerelease_separator", "a": "2.5.1oops", "b": "2.5.0", "expect": 0 },
+		{ "id": "nonsemver_empty_prerelease", "a": "2.5.1-", "b": "2.5.0", "expect": 0 },
 		{ "id": "nonsemver_numeric_trap", "a": "10", "b": "9", "expect": 0 },
 		{ "id": "nonsemver_pair", "a": "foo", "b": "bar", "expect": 0 },
 		{ "id": "nonsemver_identical", "a": "rolling", "b": "rolling", "expect": 0 },

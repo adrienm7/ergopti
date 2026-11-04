@@ -33,6 +33,21 @@ local TableUtil = require("table_util")
 
 local LOG = "menu_llm.trigger_orchestrator"
 
+--- Refuses malformed persisted modifier arrays before logging or normalization.
+--- @param mods any Candidate array, or nil for a removed shortcut.
+--- @return boolean valid
+local function valid_modifiers(mods)
+	if mods == nil then return true end
+	if type(mods) ~= "table" then return false end
+	local length, count = #mods, 0
+	for index, value in pairs(mods) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length
+			or type(value) ~= "string" then return false end
+		count = count + 1
+	end
+	return count == length
+end
+
 
 
 
@@ -356,6 +371,10 @@ function M.new(ctx)
 	--- @param callback function Called on key press.
 	--- @return any|nil Opaque registrar handle or nil.
 	function inst.bind_hotkey(mods, key, callback)
+		if not valid_modifiers(mods) then
+			Logger.warn(LOG, "Hotkey bind refused malformed modifiers.")
+			return nil
+		end
 		Logger.debug(LOG, "Attempting hotkey bind: mods=%s, key=%s",
 			type(mods) == "table" and table.concat(mods, "+") or tostring(mods),
 			key or "nil")
@@ -649,11 +668,13 @@ function M.new(ctx)
 			end
 		end
 		for profile_id, shortcut in pairs(desired) do
-			if type(shortcut) == "table" then
+			if type(shortcut) == "table" and type(shortcut.key) == "string" and shortcut.key ~= "" then
 				if inst.apply_llm_profile_shortcut(profile_id, shortcut.mods, shortcut.key,
 					{persist = false}) ~= true then
 					restored = false
 				end
+			else
+				restored = false
 			end
 		end
 		return restored
@@ -783,8 +804,16 @@ function M.new(ctx)
 	--- @return boolean|table committed Or a deferred removal lease.
 	function inst.apply_llm_profile_shortcut(profile_id, mods, key, opts)
 		if type(profile_id) ~= "string" or profile_id == "" then return false end
+		if not valid_modifiers(mods) or (key ~= nil and (type(key) ~= "string" or key == "")) then
+			Logger.warn(LOG, "Profile shortcut refused malformed modifiers or key.")
+			return false
+		end
 		opts = type(opts) == "table" and opts or {}
 		local normalized = shortcut_ui.normalize_shortcut(mods, key, {"ctrl"})
+		if key ~= nil and not normalized then
+			Logger.warn(LOG, "Profile shortcut refused invalid chord.")
+			return false
+		end
 		Logger.debug(LOG, "apply_llm_profile_shortcut('%s', mods=%s, key=%s) -> normalized=%s",
 			profile_id,
 			type(mods) == "table" and table.concat(mods, "+") or tostring(mods),

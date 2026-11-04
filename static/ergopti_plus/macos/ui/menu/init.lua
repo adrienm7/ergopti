@@ -437,6 +437,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local llm_handler = nil
 	local base_delay_owner = nil
 	local script_chords_owner = nil
+	local script_action_owner = nil
 	local apply_preference_scope
 	local apply_global_scope
 	-- Features whose runtime refused the saved value this session: their state
@@ -762,9 +763,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				rollback_modules = script_chords_owner.rollback_modules(core_mods)
 				if type(rollback_modules) ~= "table" then return false end
 			end
+			if script_action_owner and script_action_owner.pending() then
+				if script_action_owner.restore_runtime() ~= true then return false end
+				rollback_modules = script_action_owner.rollback_modules(rollback_modules)
+				if type(rollback_modules) ~= "table" then return false end
+			end
 			if sync_state_to_modules(snapshot, false, true, rollback_modules) ~= true then return false end
 			if script_chords_owner and script_chords_owner.pending()
 				and script_chords_owner.restore_runtime() ~= true then return false end
+			if script_action_owner and script_action_owner.pending()
+				and script_action_owner.restore_runtime() ~= true then return false end
 			if type(llm_handler) == "table"
 				and type(llm_handler.restore_preference_runtime) == "function" then
 				return llm_handler.restore_preference_runtime(snapshot) == true
@@ -1568,7 +1576,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		state = state, script_control = core_mods.shortcuts_mod, admission = run_global_exclusive,
 		paused = live_pause, save_prefs = transactional_save_prefs,
 	})
-	local script_action_owner = require("ui.menu.script_action_transaction").new({
+	script_action_owner = require("ui.menu.script_action_transaction").new({
 		state = state, script_control = core_mods.shortcuts_mod, admission = run_global_exclusive,
 		paused = live_pause, save_prefs = transactional_save_prefs,
 	})

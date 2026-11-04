@@ -28,9 +28,14 @@ end
 --- @return table|nil  {major=int, minor=int, patch=int, prerelease=string[]|nil}
 local function parse_version(tag)
 	local norm = M.normalize_tag(tag)
-	local maj, min, pat, pre = norm:match("^(%d+)%.(%d+)%.(%d+)%-?(.*)$")
+	local maj, min, pat, suffix = norm:match("^(%d+)%.(%d+)%.(%d+)(.*)$")
 	if not maj then return nil end
-	if pre == "" then pre = nil end
+	local pre = nil
+	if suffix ~= "" then
+		if suffix:sub(1, 1) ~= "-" or #suffix == 1 or suffix:find("[\r\n]")
+			or suffix:find("\226\128\168", 1, true) or suffix:find("\226\128\169", 1, true) then return nil end
+		pre = suffix:sub(2)
+	end
 	return {
 		major = tonumber(maj),
 		minor = tonumber(min),

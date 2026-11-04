@@ -21,6 +21,32 @@ local seed_family = Seeds.seed_family
 local seed_inactive_family = Seeds.seed_inactive_family
 
 helpers.describe("HS-033 exact LLM shortcut transactions", function()
+	helpers.it("rejects malformed persisted shortcuts without disturbing the owner", function()
+		with_trigger_fixture({}, function(fixture)
+			local slot = seed_family(fixture, "profile")
+			local old_handle, old_preference = slot.get_handle(), slot.get_pref()
+			fixture.reset_observations()
+			for _, shortcut in ipairs({
+				{mods = {true}, key = "b"},
+				{mods = {{ }}, key = "b"},
+				{mods = {[1] = "ctrl", [3] = "alt"}, key = "b"},
+				{mods = {extra = "ctrl"}, key = "b"},
+				{mods = false, key = "b"},
+				{mods = {"ctrl"}},
+			}) do
+				helpers.assert_eq(fixture.orchestrator.restore_shortcuts({
+					llm_profile_shortcuts = {user_p = shortcut},
+				}), false)
+				helpers.assert_true(slot.get_handle() == old_handle)
+				helpers.assert_true(slot.get_pref() == old_preference)
+			end
+			helpers.assert_nil(fixture.orchestrator.bind_hotkey({true}, "b", function() end))
+			helpers.assert_eq(fixture.get_save_count(), 0)
+			fixture.fire(old_handle)
+			helpers.assert_eq(fixture.get_prediction_count(), 1)
+		end)
+	end)
+
 	for _, family in ipairs({"profile"}) do
 		for _, outcome in ipairs({"false", "nil", "throw"}) do
 			helpers.it("HS-033 " .. family .. " fresh bind rejects new " .. outcome, function()
