@@ -79,6 +79,22 @@ it("tries the next resolved address when the first connection is refused", funct
 	helpers.assert_eq(answers[1][1], true, "a later reachable address must keep the proxy usable")
 end)
 
+it("probes an IPv4-mapped IPv6 relay accepted by proxy policy", function()
+	local server, port = listener()
+	local relay = "http://[::ffff:127.0.0.1]:" .. port
+	local policy = assert(require("infra.proxy_policy").load())
+	local choices = assert(policy.selection({ ok = true, proxies = { relay, "direct://" } }))
+	helpers.assert_eq(choices[1].proxy, relay)
+	local host, parsed_port = Probe.relay_address(relay)
+	local reachable
+	local child = host and Probe.probe(host, parsed_port, 1000, function(value) reachable = value end, luv)
+	if child then run_until(function() return child.is_settled() end) end
+	server:close()
+	run_until(function() return server:is_closing() end)
+	helpers.assert_true(child ~= nil, "the mapped relay must be admitted")
+	helpers.assert_eq(reachable, true)
+end)
+
 for _, failure in ipairs({ "throw", "return", "inspect", "inspect_nil" }) do
 it("retains a refused native close until cancellation retries it: " .. failure, function()
 	local resolve, connect, delivered = nil, nil, false
@@ -217,6 +233,7 @@ it("reads the relay address of every relay form the policy admits", function()
 		{ "http://proxy.corp.example:3128", "proxy.corp.example", 3128 },
 		{ "socks5h://user:secret@gate.example:1080", "gate.example", 1080 },
 		{ "http://[::1]:8080", "::1", 8080 },
+		{ "http://[::ffff:127.0.0.1]:8080", "::ffff:127.0.0.1", 8080 },
 	}
 	for _, case in ipairs(cases) do
 		local host, port = Probe.relay_address(case[1])

@@ -178,7 +178,8 @@ function M.relay_address(relay)
 	local authority = relay:match("^%l[%l%d]*://([^/]+)$")
 	if not authority then return nil, nil end
 	authority = authority:gsub("^.*@", "")
-	local host, port = authority:match("^%[([%x:]+)%]:(%d+)$")
+	-- IPv4-mapped IPv6 addresses may contain a dotted decimal suffix.
+	local host, port = authority:match("^%[([%x:%.]+)%]:(%d+)$")
 	if not host then host, port = authority:match("^([^:]+):(%d+)$") end
 	port = tonumber(port)
 	if not host or not port or port < 1 or port > 65535 then return nil, nil end
