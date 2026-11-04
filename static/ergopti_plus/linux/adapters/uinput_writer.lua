@@ -73,7 +73,7 @@ local SYN_REPORT = 0x00
 -- The relative axes the device can send: pointer motion and both wheels, in
 -- their classic and high-resolution reports. The keyboard hook forwards a mouse
 -- through them while the navigation layer owns its wheel (adapters/keyboard_hook).
-local RELATIVE_AXES = { 0x00, 0x01, 0x06, 0x08, 0x0b, 0x0c }
+local RELATIVE_AXES = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0b, 0x0c }
 local RELATIVE_AXIS = {}
 for _, axis in ipairs(RELATIVE_AXES) do RELATIVE_AXIS[axis] = true end
 local RELATIVE_VALUE_LIMIT = 0x7FFFFFFF
@@ -892,7 +892,7 @@ end
 
 --- Writes one relative report (a pointer movement or a wheel notch) and its SYN.
 --- Refused while a key transaction or a dispatch owns the channel.
---- @param axis integer REL_X, REL_Y, REL_HWHEEL, REL_WHEEL or a high-resolution wheel.
+--- @param axis integer A non-reserved Linux REL_* axis.
 --- @param value integer Signed delta.
 --- @return boolean written
 function M.emit_relative(axis, value)
