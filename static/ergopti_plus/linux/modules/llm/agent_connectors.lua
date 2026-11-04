@@ -92,7 +92,11 @@ local function private_dir()
 	local base = os.getenv("XDG_RUNTIME_DIR")
 	if not base or base == "" then base = os.getenv("TMPDIR") end
 	if not base or base == "" then base = "/tmp" end
-	return ShellRunner.exec_line("mktemp -d " .. ShellRunner.quote(base .. "/ergopti-agent.XXXXXXXX"))
+	local created, output = ShellRunner.exec_checked(
+		"mktemp -d " .. ShellRunner.quote(base .. "/ergopti-agent.XXXXXXXX"), { output_dir = base })
+	if not created or type(output) ~= "string" then return nil end
+	local path = output:gsub("\n$", "")
+	return path ~= "" and path or nil
 end
 
 --- Random hexadecimal digits from the kernel's generator.
