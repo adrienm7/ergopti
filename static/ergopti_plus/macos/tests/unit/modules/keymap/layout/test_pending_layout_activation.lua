@@ -22,7 +22,10 @@ local function load(live)
 	local state = { stored = {}, selected = {}, live = live or {} }
 	Pending.init({
 		storage = {
-			get = function(key, default) local value = state.stored[key]; if value == nil then return default end return value end,
+			read_exact = function(key)
+				if state.fail_read then return false, nil end
+				return true, state.stored[key]
+			end,
 			set = function(key, value) state.stored[key] = value; return true end,
 			delete = function(key) state.stored[key] = nil; return true end,
 		},
@@ -135,6 +138,20 @@ helpers.describe("pending layout activation (composer-macos26)", function()
 		helpers.assert_eq(Pending.resume().unreadable, 1)
 		helpers.assert_not_nil(Pending.pending("composed"))
 		helpers.assert_eq(Pending.request_select("other"), false)
+	end)
+
+	helpers.it("does not overwrite pending requests when the stored record is unreadable (pending-layout-read-failure)", function()
+		local Pending, state = load({})
+		helpers.assert_true(Pending.record("first", "First"))
+		local original = state.stored[Pending.STORAGE_KEY]
+		state.fail_read = true
+		helpers.assert_eq(Pending.record("second", "Second"), false)
+		helpers.assert_eq(Pending.request_select("first"), false)
+		helpers.assert_eq(Pending.forget("first"), false)
+		helpers.assert_eq(Pending.resume().unreadable, 1)
+		helpers.assert_eq(state.stored[Pending.STORAGE_KEY], original, "a read failure must not publish an empty record")
+		state.fail_read = false
+		helpers.assert_not_nil(Pending.pending("first"))
 	end)
 
 	helpers.it("re-recording keeps the selection asked for", function()

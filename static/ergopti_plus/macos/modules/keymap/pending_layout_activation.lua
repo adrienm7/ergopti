@@ -49,7 +49,8 @@ end
 --- @return table|nil entries
 --- @return string|nil error
 local function read_entries()
-	local raw = _deps.storage.get(M.STORAGE_KEY, nil)
+	local read_ok, raw = _deps.storage.read_exact(M.STORAGE_KEY)
+	if read_ok ~= true then return nil, "the stored record could not be read" end
 	if raw == nil then return {}, nil end
 	if type(raw) ~= "string" then return nil, "the stored record is not a JSON string" end
 	local ok, decoded = pcall(_deps.decode_json, raw)
@@ -74,16 +75,16 @@ local function write_entries(entries)
 end
 
 --- Takes the collaborators. Called once, at boot.
---- @param deps table { storage = { get, set, delete }, is_live(keyboard_name) ->
+--- @param deps table { storage = { read_exact, set, delete }, is_live(keyboard_name) ->
 ---   boolean|nil, err, select(id, on_done(ok, code, detail)), encode_json,
 ---   decode_json, now() -> number, reason (the closed reason a layout still off
 ---   is logged with) }.
 function M.init(deps)
 	if _deps ~= nil then error("pending_layout_activation.init called twice", 2) end
 	assert(type(deps) == "table", "pending_layout_activation.init needs its collaborators")
-	assert(type(deps.storage) == "table" and type(deps.storage.get) == "function"
+	assert(type(deps.storage) == "table" and type(deps.storage.read_exact) == "function"
 		and type(deps.storage.set) == "function" and type(deps.storage.delete) == "function",
-		"pending_layout_activation.init needs storage get, set and delete")
+		"pending_layout_activation.init needs storage read_exact, set and delete")
 	for _, name in ipairs({ "is_live", "select", "encode_json", "decode_json", "now" }) do
 		assert(type(deps[name]) == "function", "pending_layout_activation.init needs " .. name)
 	end
@@ -236,7 +237,7 @@ function M.production_deps()
 	local Json = require("json")
 	local Storage = require("adapters.storage")
 	return {
-		storage = { get = Storage.get, set = Storage.set, delete = Storage.delete },
+		storage = { read_exact = Storage.read_exact, set = Storage.set, delete = Storage.delete },
 		is_live = function(keyboard_name)
 			return require("modules.keymap.input_sources").is_live_enabled(keyboard_name)
 		end,
