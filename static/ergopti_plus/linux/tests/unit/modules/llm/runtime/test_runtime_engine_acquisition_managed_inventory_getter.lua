@@ -65,6 +65,20 @@ local function with_model_pull(body)
 	end)
 end
 
+helpers.describe("model inventory projections", function()
+	test("a caller cannot change the retained installed-model inventory", function()
+		with_initialization(function(world, engine)
+			fetch(world, { "one:latest", "two:latest" })
+			local first = engine.get_cached_models()
+			first[1], first[3] = "fabricated:latest", "another:latest"
+			helpers.assert_eq(engine.get_cached_models(), { "one:latest", "two:latest" })
+			local second = engine.get_models()
+			second[2] = nil
+			helpers.assert_eq(engine.get_models(), { "one:latest", "two:latest" })
+		end)
+	end)
+end)
+
 helpers.describe("post-install inventory observation", function()
 	test("(linux-inventory-mutation) actual pull success waits old HTTP ACK then observes installed models afresh", function()
 		with_model_pull(function(world, engine, pulls, completions)

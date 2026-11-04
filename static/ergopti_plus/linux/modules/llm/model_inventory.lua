@@ -192,6 +192,13 @@ function M.new(context)
 		if frame.revoked then cancel_frame(frame) else finish(frame) end
 	end
 
+	-- Projections must not let a caller mutate the validated private cache.
+	local function copy_models(models)
+		local out = {}
+		for index, name in ipairs(models) do out[index] = name end
+		return out
+	end
+
 	local function project(explicit, cold, mutation)
 		local invocation = {}
 		reading = invocation
@@ -204,7 +211,7 @@ function M.new(context)
 		if not source_current(frame) or not unchanged() then return {} end
 		local cached = observed_cache and source_current(observed_cache.frame)
 		if not unchanged() then return {} end
-		if not explicit and cached then return observed_cache.models end
+		if not explicit and cached then return copy_models(observed_cache.models) end
 		if not explicit and not cold then return {} end
 		if observed_active then
 			if mutation and authorized(observed_active) and unchanged() and source_current(frame) and unchanged() then
@@ -214,7 +221,7 @@ function M.new(context)
 				cache = nil
 				finish(observed_active)
 			end
-			return cached and not mutation and observed_cache.models or {}
+			return cached and not mutation and copy_models(observed_cache.models) or {}
 		end
 		local tried = observed_attempt and source_current(observed_attempt)
 		if not unchanged() or not source_current(frame) or not unchanged() then return {} end
