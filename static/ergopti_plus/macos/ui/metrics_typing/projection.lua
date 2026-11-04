@@ -236,7 +236,7 @@ function M.session(reader, sqlite_path, today, pacer)
 						sqlite_path, reader.next_day(cached.through), through, apps, pacer)
 					-- Merged into a copy: a refused day cannot alter the accepted
 					-- history or its watermark, yet its partial counts are shown.
-					data = reader.merge_ngrams(reader.merge_ngrams({}, cached.data), added)
+					data = reader.merge_ngrams(reader.merge_ngrams({}, cached.data, pacer), added, pacer)
 					json = PacedJson.encode(data, pacer)
 					if history_complete == true then
 						Logger.info(LOG, "N-gram history extended from %s to %s.", cached.through, through)
