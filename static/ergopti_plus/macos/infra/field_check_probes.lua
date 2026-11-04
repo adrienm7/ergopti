@@ -977,7 +977,8 @@ M.PREDICTION_TEXT = "1 2 3 4"
 --- models; one token is predicted with the smallest catalogue model already
 --- installed, through the driver's own request path; the MLX runtime and the
 --- catalogue models in its cache are counted. A server that is not running
---- and a Mac with no model are skips, never a download.
+--- and a Mac with no model are skips, never a download; without the owned
+--- binary the server is not even asked.
 function M.ai_local(ports, report, finish)
 	local facts = ports.ai_facts()
 	report.step("mlx_runtime", STATE.info, facts.mlx_runtime == nil and "unknown" or (facts.mlx_runtime and "installed" or "absent"))
@@ -1004,8 +1005,12 @@ function M.ai_local(ports, report, finish)
 		end)
 	end
 	if type(facts.ollama_path) ~= "string" then
+		-- The endpoint is the owned daemon's alone, so nothing can answer it:
+		-- asking anyway logged the session an ERROR (field run 2026-11-03).
 		report.step("ollama_binary", STATE.skip, "not_installed")
-		return listing_stage()
+		report.step("ollama_listing", STATE.skip, "not_installed")
+		report.step("ollama_prediction", STATE.skip, "not_installed")
+		return finish()
 	end
 	ports.exec(CODESIGN, { "--verify", "--strict", "--verbose=2", facts.ollama_path }, PROBE_COMMAND_TIMEOUT,
 		function(code, output, errors)
