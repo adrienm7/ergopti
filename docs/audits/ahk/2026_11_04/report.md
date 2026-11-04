@@ -627,3 +627,22 @@ Consequence: The restored modifier can remain logically down after the user lets
 Regression: Two reachable raced-repress-release-debt cases run the actual hotstring lift/restore path on the production Kana key mapping with an explicit passive transport and physical-state observations. They distinguish successful delivery from refused attempts, require retained debt through refused real lifecycle cleanup, and verify subsequent cleanup or a fresh owner repairs it before further acquisition. Native fail-before proof is retained; post-fix native execution remains pending.
 
 The ongoing register now contains **37 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## Native qualification checkpoint: 41895036223
+
+At `7b0d49c1d628`, the primary AHK-036 owner protocol passed **99 cases
+individually and 99 in reverse order**, with exact non-skipped native receipts.
+The complete production-entry include graph compiled and the native hotstring
+E2E corpus passed **90/90**. HTTP E2E was explicitly outside this input-only
+selection. Evidence: [replay artifact](https://github.com/adrienm7/ergopti/actions/runs/41895036223/artifacts/13354254940)
+and [production parse / E2E artifact](https://github.com/adrienm7/ergopti/actions/runs/41895036223/artifacts/13355716365).
+This is targeted qualification, not a claim that the entire OS suite ran.
+
+The subsequent dispatch-log sibling and AHK-037 debt repair were committed
+as `8ecf909` and `a0048e1`. Their fail-before run `41895428966` passed the
+admitted tap control, failed the revoked tap with one output instead of zero,
+and failed both debt controls with a missing pending owner, alone and reversed.
+The next replay at `1cd88b3` selects 34 cases including those four probes,
+existing Kana lift / restore, synthetic transactions and dispatch controls.
+Post-fix qualification of those two later changes remains pending here.
+The register contains **37 distinct new findings**; the goal of 1,000 remains unmet.
