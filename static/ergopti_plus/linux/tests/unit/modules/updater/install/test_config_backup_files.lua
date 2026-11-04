@@ -45,6 +45,31 @@ local function scratch()
 end
 
 helpers.describe("config_backup (Linux): real files", function()
+	helpers.it("uses the same instant for the backup folder and manifest", function()
+		local dir = scratch()
+		local Backup = helpers.load_module("modules.updater.config_backup")
+		Backup._overrides = { roots = { { id = "config", dir = dir .. "/cfg" } } }
+		local original_date, calls = os.date, 0
+		local ok, err = pcall(function()
+			local owner = assert(Backup.owner())
+			os.date = function(format, epoch)
+				if format == "!%Y%m%d-%H%M%S" or format == "!%Y-%m-%dT%H:%M:%SZ" then
+					calls = calls + 1
+					return original_date(format, epoch or (1704067200 + calls - 1))
+				end
+				return original_date(format, epoch)
+			end
+			local record = assert(owner.create("pre_install"))
+			local stamp = record.id:match("(%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d)")
+			helpers.assert_eq(stamp, record.created_at:gsub("[-:TZ]", ""):sub(1, 8) .. "-"
+				.. record.created_at:gsub("[-:TZ]", ""):sub(9, 14))
+		end)
+		os.date = original_date
+		Backup._overrides = nil
+		os.execute("rm -rf " .. quote(dir))
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("lists files, folders, and a link to a folder as neither", function()
 		local dir = scratch()
 		local Backup = helpers.load_module("modules.updater.config_backup")
