@@ -110,6 +110,43 @@ try {
 		'enabled',
 		'a separately enabled systemd unit still starts despite Hidden=true'
 	);
+	{
+		const unit = path.join(config, 'systemd/user/ergopti-hotstrings.service');
+		fs.mkdirSync(path.dirname(unit), { recursive: true });
+		fs.writeFileSync(unit, '[Service]\nExecStart=/other/installation --tray\n');
+		const callsBefore = fs.readFileSync(calls, 'utf8');
+		assert.equal(run('status').stdout.trim(), 'other');
+		assert.notEqual(run('disable').status, 0, 'another installation must keep its unit');
+		assert.equal(
+			fs.readFileSync(calls, 'utf8'),
+			callsBefore,
+			'foreign unit must not reach systemctl'
+		);
+		assert.match(fs.readFileSync(unit, 'utf8'), /\/other\/installation/);
+		assert.match(fs.readFileSync(desktop, 'utf8'), /^Hidden=true$/m);
+		const ownLauncher = path.resolve(installed, '../../../../bin/ergopti-hotstrings');
+		const ownExec = spawnSync(
+			bashExecutable(),
+			[
+				'-c',
+				'source "$1"; ergopti_systemd_exec "$2"',
+				'unit',
+				posix(path.join(installed, 'desktop_entry.sh')),
+				posix(ownLauncher)
+			],
+			{ encoding: 'utf8' }
+		);
+		assert.equal(ownExec.status, 0, ownExec.stderr);
+		fs.writeFileSync(unit, `[Service]\n${ownExec.stdout}`);
+		assert.equal(
+			run('status').stdout.trim(),
+			'disabled',
+			'the matching user unit remains manageable'
+		);
+		fs.appendFileSync(unit, 'ExecStart=/other/installation --tray\n');
+		assert.equal(run('status').stdout.trim(), 'other', 'a second ExecStart cannot grant ownership');
+		fs.unlinkSync(unit);
+	}
 	assert.doesNotMatch(
 		fs.readFileSync(calls, 'utf8'),
 		/--now|restart|stop|start\b/,
