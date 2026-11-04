@@ -546,7 +546,7 @@ KL_Mouse_FlushScroll(NowTick?, FilterFn?, RefreshFn?, PositionFn?, AppendFn?) {
 		}
 
 		; A zero-net burst still owns timestamps that must be retired.
-		if (ticks = 0 and h_ticks = 0)
+		if (ticks == 0 and h_ticks == 0)
 				return
 
 		filtered := _KL_Mouse_ShouldFilter(FilterFn?)
