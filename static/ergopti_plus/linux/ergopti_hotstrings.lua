@@ -1402,6 +1402,7 @@ local function main()
 				utf8.len(result.replacement or "") or #(result.replacement or ""),
 				result.backspace_count)
 			local expansion_committed = opts.dry_run
+			local queued_input = nil
 			if not opts.dry_run then
 				injector._begin_injection()
 				local replay_terminator = result.replay_terminator
@@ -1417,7 +1418,7 @@ local function main()
 					replay_terminator,
 					destination
 				)
-				local queued_input = injector._end_injection()
+				queued_input = injector._end_injection()
 				expansion_committed = ok_delivery and type(delivery) == "table"
 					and delivery.ok == true
 				local delivery_error = ok_delivery and type(delivery) == "table"
@@ -1441,17 +1442,6 @@ local function main()
 						-- character an immediate Backspace actually removes.
 						replayed    = replay_terminator,
 					} or nil
-					-- Replay queued input only after output committed. On failure the
-					-- hook emergency-ungrabs and the logical text position is unknown.
-					for _, queued in ipairs(queued_input) do
-						local queued_ch = type(queued) == "table" and queued.char or queued
-						local queued_scancode = type(queued) == "table" and queued.scancode or nil
-						local ok, err = pcall(on_char, queued_ch, queued_scancode)
-						if not ok then
-							-- The character itself is typed text and stays out of the log.
-							Logger.error(LOG, "Error replaying a queued character: %s", tostring(err))
-						end
-					end
 				else
 					-- An uncommitted output leaves the line in an unknown state: the
 					-- next key must not borrow a word start it cannot prove.
@@ -1480,6 +1470,16 @@ local function main()
 					engine:reset(nil, nil, "keep")
 				else
 					engine:apply_expansion(result)
+				end
+				-- The queued characters follow the committed output in the field.
+				-- Advance the matcher first so a replay can itself match or chain.
+				for _, queued in ipairs(queued_input or {}) do
+					local queued_ch = type(queued) == "table" and queued.char or queued
+					local queued_scancode = type(queued) == "table" and queued.scancode or nil
+					local ok, err = pcall(on_char, queued_ch, queued_scancode)
+					if not ok then
+						Logger.error(LOG, "Error replaying a queued character: %s", tostring(err))
+					end
 				end
 			end
 		end
