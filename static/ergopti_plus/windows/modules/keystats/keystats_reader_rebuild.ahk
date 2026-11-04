@@ -267,9 +267,13 @@ _KLR_RebuildAcquire(md, logPath, &Waited) {
 	}
 	Waited := false
 	loop {
-		Guard := FSOpenExclusiveGuard(KLR_RebuildLockPath(md))
+		Guard := FSOpenExclusiveGuard(KLR_RebuildLockPath(md), &Contended)
 		if Guard
 			break
+		if !Contended {
+			try LoggerError("KLReader", "Metrics rebuild ownership was refused without a competing peer.")
+			return 0
+		}
 		if !Waited
 			KLR_PrefetchDebug(logPath, "KLR rebuild waits for a peer worker")
 		; The peer publishes the store's progress; this worker adds nothing to it.
