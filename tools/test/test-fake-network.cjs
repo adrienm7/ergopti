@@ -331,6 +331,13 @@ async function testOllamaRegistry() {
 }
 
 async function testPac() {
+	// A route outside the PAC grammar never becomes script text.
+	for (const route of ['PROXY a"; b:1', 'DIRECT\\', '', 'PROXY host'])
+		assert.throws(() => pacScript(route), /is not a PAC route/, JSON.stringify(route));
+	assert.equal(
+		pacScript('PROXY 127.0.0.1:3128; DIRECT'),
+		'function FindProxyForURL(url, host) { return "PROXY 127.0.0.1:3128; DIRECT"; }\n'
+	);
 	const pac = await startFakePacServer({ script: pacScript('PROXY 127.0.0.1:3128') });
 	const read = (url) =>
 		new Promise((resolve, reject) => {
