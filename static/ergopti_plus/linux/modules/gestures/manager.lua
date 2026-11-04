@@ -530,9 +530,8 @@ local OCR_COMMAND = "{ f=$(mktemp --suffix=.png) || exit 1; { "
 --- Where a saved screenshot lands, and under what name.
 ---
 --- $XDG_PICTURES_DIR when the user's desktop declares one, the conventional
---- ~/Pictures otherwise. The stamp is second-resolution so two captures in the
---- same minute do not overwrite each other — the failure would be silent, and
---- the file the user wanted is the one that disappeared.
+--- ~/Pictures otherwise. This is a prefix; the shell reserves a unique name
+--- before the capture tool can write it.
 --- @param kind string Short tag: "full", "reg" or "win".
 --- @return string An absolute path.
 local function screenshot_path(kind)
@@ -541,7 +540,7 @@ local function screenshot_path(kind)
 		local ok, Paths = pcall(require, "infra.config_paths")
 		dir = (ok and Paths.home() or ".") .. "/Pictures"
 	end
-	return string.format("%s/ergopti_%s_%s.png", dir, kind, os.date("%Y-%m-%d_%H-%M-%S"))
+	return string.format("%s/ergopti_%s_%s", dir, kind, os.date("%Y-%m-%d_%H-%M-%S"))
 end
 
 --- The tag each save action stamps into its filename.
@@ -810,10 +809,14 @@ local function _execute_action(action_name, go_next, binding)
 	if shot then
 		local kind = SCREENSHOT_KIND[action_name]
 		if kind then
-			-- Quoted once and substituted everywhere: the same path goes to each
-			-- candidate in the cascade, and a path with a space in it must survive
-			-- all four of them.
-			shot = shot:gsub("%%s", (shell_quote(screenshot_path(kind)):gsub("%%", "%%%%")))
+			-- mktemp -d provides a fresh name without GNU's --suffix option. The
+			-- noclobber reservation also refuses an existing PNG from an older run.
+			local template = shell_quote(screenshot_path(kind) .. ".XXXXXXXX")
+			shot = shot:gsub("%%s", '"$f"')
+			shot = '( d=$(mktemp -d ' .. template .. ') || exit 1; f="$d.png"; '
+				.. '( set -C; : > "$f" ) || { rmdir "$d"; exit 1; }; rmdir "$d"; '
+				.. [=[trap 'rm -f "$f"' 0; trap 'exit 1' HUP INT TERM; { ]=] .. shot
+				.. '; } && [ -s "$f" ] && trap - 0 )'
 		end
 		run_background(shot)
 		return
