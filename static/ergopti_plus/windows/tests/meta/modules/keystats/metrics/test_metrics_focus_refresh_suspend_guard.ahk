@@ -370,3 +370,32 @@ _MFRSG_PartialHookCleanup() {
 }
 Test("metrics focus: partial hook cleanup retains live callbacks (focus-hook-partial-cleanup)",
 	_MFRSG_PartialHookCleanup)
+
+
+_MFRSG_FailedCleanupCanRetry() {
+	SavedHooks := MetricsFocusCache.hooks
+	SavedCallback := MetricsFocusCache.event_callback
+	SavedMode := MetricsFocusCache.event_mode
+	SavedPending := MetricsFocusCache.event_refresh_pending
+	Freed := []
+	try {
+		MetricsFocusCache.hooks := [101, 102]
+		MetricsFocusCache.event_callback := 202
+		MetricsFocusCache.event_mode := false
+		AssertFalse(_MF_StopFocusWinEvents((Hook) => Hook == 101, (Address) => Freed.Push(Address)))
+		AssertEqual(1, MetricsFocusCache.hooks.Length, "only the refused hook remains owned")
+		AssertEqual(102, MetricsFocusCache.hooks[1])
+		AssertEqual(202, MetricsFocusCache.event_callback, "cleanup debt retains its callback")
+		AssertEqual(0, Freed.Length)
+		AssertTrue(_MF_StopFocusWinEvents((*) => true, (Address) => Freed.Push(Address)))
+		AssertEqual(0, MetricsFocusCache.hooks.Length)
+		AssertEqual(1, Freed.Length, "a later cleanup can release the callback exactly once")
+	} finally {
+		MetricsFocusCache.hooks := SavedHooks
+		MetricsFocusCache.event_callback := SavedCallback
+		MetricsFocusCache.event_mode := SavedMode
+		MetricsFocusCache.event_refresh_pending := SavedPending
+	}
+}
+Test("metrics focus: failed hook cleanup remains retryable (focus-hook-cleanup-retry)",
+	_MFRSG_FailedCleanupCanRetry)
