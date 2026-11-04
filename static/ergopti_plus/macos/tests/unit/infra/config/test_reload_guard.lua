@@ -66,6 +66,43 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 		helpers.assert_eq(rg.is_reloading(), false)
 	end)
 
+	helpers.it("uses the monotonic clock and rejects an unowned or expired sentinel", function()
+		local rg = fresh()
+		local storage = require("adapters.storage")
+		local timer = require("adapters.timer_scheduler")
+		local previous_clock, previous_wall = timer.now_ns, os.time
+		local tick, wall = 1000000000, 100000
+		timer.now_ns = function() return tick end
+		os.time = function() return wall end
+		local ok, err = xpcall(function()
+			storage.set("reload_in_progress", wall + 3600)
+			helpers.assert_eq(rg.is_reloading(), false, "a persisted future value has no owner")
+			rg.mark_reload()
+			wall = wall - 3600
+			tick = tick + 1000000000
+			helpers.assert_eq(rg.is_reloading(), true, "wall clock changes cannot cancel a fresh reload")
+			tick = tick + 60000000000
+			helpers.assert_eq(rg.is_reloading(), false, "the local owner still expires")
+		end, debug.traceback)
+		timer.now_ns, os.time = previous_clock, previous_wall
+		if not ok then error(err) end
+	end)
+
+	helpers.it("keeps the live reload marked when storage refuses to clear it", function()
+		local rg = fresh()
+		local storage = require("adapters.storage")
+		rg.mark_reload()
+		local previous_delete = storage.delete
+		storage.delete = function() return false end
+		local ok, err = xpcall(function()
+			rg.clear_silent()
+			helpers.assert_eq(rg.is_reloading(), true)
+		end, debug.traceback)
+		storage.delete = previous_delete
+		rg.clear_silent()
+		if not ok then error(err) end
+	end)
+
 	helpers.it("hands the recorded reload start to the next boot once", function()
 		local rg = fresh()
 		helpers.assert_eq(rg.take_started(), nil, "a boot that follows no reload measures none")
