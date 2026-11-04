@@ -156,8 +156,8 @@ local function validated(key_id, fields, hold_picker, origin, global_seconds)
 		key.enabled = false
 	end
 	-- The key's own delay when it has a usable one, else the global delay.
-	local seconds = tonumber(key.time_activation_seconds)
-	if not seconds or seconds ~= seconds or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS then
+	local seconds = key.time_activation_seconds
+	if type(seconds) ~= "number" or seconds ~= seconds or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS then
 		if key.time_activation_seconds ~= nil then
 			outdated(TIME_FIELD, string.format("%s is outside 0..%d s; the global delay %.3f s is used",
 				tostring(key.time_activation_seconds), MAX_THRESHOLD_SECONDS, global_seconds))
