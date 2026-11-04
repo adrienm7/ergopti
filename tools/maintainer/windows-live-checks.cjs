@@ -35,6 +35,7 @@ const { spawn, spawnSync } = require('child_process');
 const crypto = require('node:crypto');
 const { app } = require('../lib/identifiers.cjs');
 const { parse: parseToml } = require('smol-toml');
+const AppDirs = require('../test/lib/app-dirs.cjs');
 const {
 	createStartupCodeFixture,
 	prepareStartupPersonalInclude
@@ -159,7 +160,7 @@ class LiveSession {
 
 	/** The driver's log folder. */
 	get logs() {
-		return path.join(this.root, 'ergopti_plus', 'logs');
+		return path.join(this.root, ...AppDirs.segments('logs.windows', 'windows'));
 	}
 
 	/**

@@ -12,7 +12,7 @@
  * FEATURES & RATIONALE:
  * 1. The managed root must be a direct child of the user's LocalApplicationData
  *    (Open-OllamaManagedRoot refuses anything else), so the profile is a private
- *    ergopti-relay-e2e-<random> folder there, never the driver's ergopti_plus.
+ *    ergopti-relay-e2e-<random> folder there, never the driver's Ergopti-ollama.
  * 2. Exactly one production file differs: the WinINet reader in a private copy of
  *    the vendor folder answers the fake network's settings, because the real one
  *    reads the user's proxy settings. Everything after it (route lookup, PAC

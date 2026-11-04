@@ -28,7 +28,10 @@ if ([IntPtr]::Size -ne 8) { throw 'The driver control requires the Windows x64 h
 $shared = Join-Path $PSScriptRoot '..\..\static\ergopti_plus\_shared'
 $spec = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $shared 'modules\control\driver_control.json') | ConvertFrom-Json
 $appDirs = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $shared 'modules\paths\app_dirs.toml')
-if ($appDirs -notmatch '(?m)^folder_name = "([^"]+)"') { throw 'The application folder name is not declared.' }
+# The [app] folder name: another table ([owned_runtime.macos]) also declares one.
+if ($appDirs -notmatch '(?m)^\[app\]\r?\n(?:(?!\[)[^\n]*\n)*?folder_name = "([^"]+)"') {
+	throw 'The application folder name is not declared.'
+}
 $appFolder = $Matches[1]
 $base = [Environment]::GetEnvironmentVariable($spec.folders.windows.base)
 if (-not $base) { throw "$($spec.folders.windows.base) is not set." }

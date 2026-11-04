@@ -84,23 +84,42 @@ check('the field report names come from identifiers.json, never a second literal
 
 check('the logs folder and names come from app_dirs.toml', () => {
 	assert.match(code, /'app_dirs\.toml'\)\)$/m);
-	for (const section of ['app', 'logs', 'logs.files', 'logs.windows'])
+	for (const section of ['app', 'logs', 'logs.files', 'logs.windows', 'config.windows'])
 		assert.match(code, new RegExp(`Read-TomlSection '${section.replace('.', '\\.')}'`));
 	for (const literal of [LOG.main, LOG.bootstrap, `\\${LOG.folder}\\logs`])
 		assert(!code.includes(literal), `the collector spells ${literal} itself`);
 	const resolver = code.match(/^function Resolve-LogsDir \{\n([\s\S]*?)^\}$/m);
 	assert(resolver, 'no Resolve-LogsDir');
 	assert.doesNotMatch(resolver[1], /LOCALAPPDATA/, 'the logs base is the declared one');
-	assert.match(resolver[1], /GetEnvironmentVariable\(\$LogsBase\)/);
+	assert.match(resolver[1], /Join-AppDir \$LogsBase \$LogsSegments/);
+	const joiner = code.match(/^function Join-AppDir\(.*\) \{\n([\s\S]*?)^\}$/m);
+	assert(joiner, 'no Join-AppDir');
+	assert.match(joiner[1], /GetEnvironmentVariable\(\$Base\)/);
 	for (const key of [
 		'unified_prefix',
 		'errors_prefix',
 		'extension',
 		'bootstrap_log',
 		'base',
-		'segments'
+		'segments',
+		'paths_file'
 	])
 		assert.match(code, new RegExp(`Get-AppDir \\$\\w+ '[\\w.]+' '${key}'`));
+});
+
+// The builds before the single folder name read paths.toml from Roaming AppData
+// and defaulted the configuration to %USERPROFILE%\.config: the collector now
+// resolves both from [config.windows], like infra/app_folders.ahk.
+check('the paths.toml and configuration defaults come from app_dirs.toml', () => {
+	const resolver = code.match(/^function Resolve-ConfigDir \{\n([\s\S]*?)^\}$/m);
+	assert(resolver, 'no Resolve-ConfigDir');
+	assert.doesNotMatch(
+		resolver[1],
+		/APPDATA|USERPROFILE|\.config/,
+		'no folder is spelled by the collector'
+	);
+	assert.match(resolver[1], /Join-AppDir \$ConfigBase \$PathsFileSegments/);
+	assert.match(resolver[1], /Join-AppDir \$ConfigBase \$ConfigSegments/);
 });
 
 check('the field branch is derived from the current branch and the base is recorded', () => {
@@ -328,9 +347,9 @@ function fixture(name, start = 'dev') {
 	const clone = path.join(base, 'clone');
 	const origin = path.join(base, 'origin.git');
 	const local = path.join(base, 'localappdata');
-	// The configuration folder is resolved from APPDATA, then USERPROFILE: a
-	// runner without them (pwsh on Linux) made the step throw, and on Windows
-	// the runner's own profile would be read.
+	// The configuration folder is resolved from LOCALAPPDATA ([config.windows]).
+	// APPDATA and USERPROFILE still point into the fixture, so nothing the
+	// collector runs can read the runner's own profile.
 	const roaming = path.join(base, 'appdata');
 	const profile = path.join(base, 'profile');
 	fs.mkdirSync(roaming, { recursive: true });

@@ -8,6 +8,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
+const AppDirs = require('./lib/app-dirs.cjs');
+
+// The default logs folder below a startup smoke root ([logs.windows]).
+const LOGS_SEGMENTS = AppDirs.segments('logs.windows', 'windows');
 
 const ROOT = path.resolve(__dirname, '../..');
 const OWNER = 'tools/test/test-ahk-full-startup-smoke.cjs';
@@ -197,7 +201,7 @@ async function observe(source, root, scenario) {
 								);
 							if (fixture === 'suspend-marker')
 								fs.unlinkSync(path.join(probe, 'suspend_restore.marker'));
-							const logs = path.join(probe, 'ergopti_plus/logs');
+							const logs = path.join(probe, ...LOGS_SEGMENTS);
 							fs.mkdirSync(logs, { recursive: true });
 							// A real boot logs the staged Hotstrings menu publication and
 							// the submenu's deferred build at its first open; the smoke
@@ -301,6 +305,8 @@ async function observe(source, root, scenario) {
 						}
 					};
 				if (name === 'smol-toml') return require(require.resolve(name, { paths: [root] }));
+				// The one folder declaration the startup smoke names its logs folder from.
+				if (name === './lib/app-dirs.cjs') return AppDirs;
 				assert.ok(['fs', 'path', 'node:crypto'].includes(name), 'unexpected dependency: ' + name);
 				return require(name);
 			}
@@ -349,8 +355,8 @@ function checkStartupDiagnosticRetention() {
 		const observed = Buffer.from([239, 187, 191, 0, 255, 13, 10]);
 		function packet(name, configure = () => {}) {
 			const probe = path.join(temporary, name);
-			fs.mkdirSync(path.join(probe, 'ergopti_plus/logs'), { recursive: true });
-			const log = path.join(probe, 'ergopti_plus/logs/ErgoptiPlus_20261014.log');
+			fs.mkdirSync(path.join(probe, ...LOGS_SEGMENTS), { recursive: true });
+			const log = path.join(probe, ...LOGS_SEGMENTS, 'ErgoptiPlus_20261014.log');
 			const completeLog = Buffer.from(
 				'\uFEFF' + Array.from({ length: 40 }, (_, index) => `line ${index}`).join('\r\n')
 			);
@@ -464,9 +470,9 @@ function checkStartupDiagnosticRetention() {
 		assert.throws(() => owner.readDiagnosticMember(source, path.join(temporary, 'full-log')));
 		controls++;
 		const many = path.join(temporary, 'many-logs');
-		fs.mkdirSync(path.join(many, 'ergopti_plus/logs'), { recursive: true });
+		fs.mkdirSync(path.join(many, ...LOGS_SEGMENTS), { recursive: true });
 		for (let index = 0; index <= owner.MAX_LOG_MEMBERS; index++)
-			fs.writeFileSync(path.join(many, 'ergopti_plus/logs', `${index}.log`), 'x');
+			fs.writeFileSync(path.join(many, ...LOGS_SEGMENTS, `${index}.log`), 'x');
 		const refused = owner.createStartupDiagnostics(temporary, 'local', {});
 		assert.throws(
 			() =>
