@@ -23,6 +23,44 @@ local function roster_session(s, initial)
 end
 
 helpers.describe("source-owned simultaneous standalone remap holds", function()
+	helpers.it("(remap-multisource) retains a physical blocker held by another keyboard", function()
+		Fixture.with_session({ keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
+			s.edge("a", 58, 1, 1); s.edge("b", 58, 1, 2); s.edge("a", 58, 0, 3)
+			local before = #s.rows
+			s.edge("b", 56, 1, 4); s.edge("b", 56, 0, 5)
+			helpers.assert_eq(#s.rows, before, "the second CapsLock still blocks the LAlt one-shot")
+			helpers.assert_eq(s.action, nil)
+			s.edge("b", 58, 0, 6)
+			s.edge("b", 56, 1, 7)
+			helpers.assert_eq(s.rows[#s.rows], { 42, 1 }, "the last CapsLock release removes the blocker")
+			s.edge("b", 56, 0, 8)
+		end)
+	end)
+
+	helpers.it("(remap-multisource) retains a physical blocker without configured pairs", function()
+		Fixture.with_session({ keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
+			helpers.assert_true(s.hook.set_remapper(s.base))
+			s.edge("a", 58, 1, 1); s.edge("b", 58, 1, 2); s.edge("a", 58, 0, 3)
+			local before = #s.rows
+			s.edge("b", 56, 1, 4); s.edge("b", 56, 0, 5)
+			helpers.assert_eq(#s.rows, before)
+			s.edge("b", 58, 0, 6)
+		end)
+	end)
+
+	helpers.it("(remap-multisource) retains a blocker when its peer keyboard departs", function()
+		Fixture.with_session({ on_capture_reacquired = function() return true end,
+			keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
+			s.edge("a", 58, 1, 1); s.edge("b", 58, 1, 2)
+			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { s.paths.b }, {} end
+			for _ = 1, s.hook.DEVICE_CHECK_TICKS do s.hook.check_device() end
+			local before = #s.rows
+			s.edge("b", 56, 1, 4); s.edge("b", 56, 0, 5)
+			helpers.assert_true(s.hook.isRunning())
+			helpers.assert_eq(#s.rows, before, "the retained source still holds CapsLock")
+			s.edge("b", 58, 0, 6)
+		end)
+	end)
 	helpers.it("(remap-multisource) defers a nested pump until the current press is forwarded", function()
 		local injected = false
 		Fixture.with_session({ on_physical = function(s, code, _, _, value)
