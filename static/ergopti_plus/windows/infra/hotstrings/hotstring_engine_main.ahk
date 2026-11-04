@@ -867,7 +867,7 @@ _HSE_TrimBufferToCapacity() {
 		; word boundary into unknown context, or invent one after a word character.
 		DiscardedStart := _TextCodepointStart(HSE_Buffer, DropCount)
 		DiscardedChar := _TextCompleteTailScalar(SubStr(HSE_Buffer, DiscardedStart, DropCount - DiscardedStart + 1))
-		HSE_StartIsWordBoundary := DiscardedChar != "" && InStr(_HSE_WordBoundarySet(), DiscardedChar) > 0
+		HSE_StartIsWordBoundary := _HSE_CharOpensWord(DiscardedChar, _HSE_WordBoundarySet())
 		; The buffer now starts after typed text, never at the line start.
 		HSE_StartIsLineStart := false
 		HSE_Buffer := Tail
@@ -1122,7 +1122,7 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 				; The replacement itself may nevertheless end at a real boundary, so
 				; publish the actual final inserted character rather than the selector.
 				KnownBoundaryAfter: !ClearAll and InsertedText != ""
-						and InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1))) > 0
+						and _HSE_CharOpensWord(SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)), _HSE_WordBoundarySet())
 		}
 		; Send-key syntax can move the caret, change focus, or emit text that is
 		; intentionally different from the payload (for example '""{Left}'). The
@@ -1175,7 +1175,7 @@ HSE_IsWordChar(Ch) {
 ; A word character for the repeat: the shared rule, minus any delimiter the user
 ; added to the word delimiters (a custom delimiter ends a word on Windows).
 _HSE_RepeatWordChar(Ch) {
-		return HSE_IsWordChar(Ch) and InStr(_HSE_WordBoundarySet(), Ch) = 0
+		return Ch != "" and !_HSE_CharOpensWord(Ch, _HSE_WordBoundarySet())
 }
 
 ; Attempt the magic-key repeat: when the user types <x><MagicKey> and x is
