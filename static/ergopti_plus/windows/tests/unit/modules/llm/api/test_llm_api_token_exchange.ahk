@@ -689,7 +689,7 @@ _LTERP_Body(Mode, Posts, Lines) {
         if Mode == "fresh" || Mode == "renewed" || Mode == "exchange" {
             AssertEqual(Origin, Control["input"]["started_tick"])
             AssertEqual(Duration, Control["input"]["deadline_ms"])
-            AssertEqual("{`"messages`":[]}", Published["body"])
+            AssertEqual('{"messages":[]}', Published["body"])
         }
         AssertEqual(Mode == "fresh" ? "old-token" : "new-token", Slot["token"])
     } finally {
