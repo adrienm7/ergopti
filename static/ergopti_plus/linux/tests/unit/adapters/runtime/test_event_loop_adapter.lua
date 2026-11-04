@@ -542,6 +542,39 @@ helpers.describe("linux-event-reentry", function()
 		end
 	end
 
+	for _, failure in ipairs({ "idle_stop", "timer_stop", "close_idle", "close_timer" }) do
+		helpers.it("linux-event-cleanup-retention: retries " .. failure .. " before a new run", function()
+			local loop, state, backend = stop_fixture("periodic")
+			local original_stop_idle, original_stop_timer, original_close = backend.idle_stop, backend.timer_stop, backend.close
+			local refuse = true
+			backend.idle_stop = function(handle)
+				if refuse and failure == "idle_stop" then return nil, "controlled refusal" end
+				return original_stop_idle(handle)
+			end
+			backend.timer_stop = function(handle)
+				if refuse and failure == "timer_stop" then return nil, "controlled refusal" end
+				return original_stop_timer(handle)
+			end
+			backend.close = function(handle)
+				if refuse and failure == "close_" .. handle.kind then return false, "controlled refusal" end
+				return original_close(handle)
+			end
+			local options = { onPeriodic = function() loop.stop() end }
+			local ok, reason = pcall(loop.run, options)
+			helpers.assert_true(not ok and tostring(reason):find("cleanup remains pending", 1, true) ~= nil)
+			helpers.assert_eq(#state.handles, 2)
+			local pending = failure:find("idle", 1, true) and state.handles[1] or state.handles[2]
+			helpers.assert_true(not pending.closed, "the exact refused native handle stays owned")
+			ok = pcall(loop.run, options)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(#state.handles, 2, "no successor may replace cleanup debt")
+			refuse = false
+			loop.run(options)
+			helpers.assert_true(pending.closed, "retry closes the original native handle")
+			helpers.assert_eq(#state.handles, 4)
+		end)
+	end
+
 	helpers.it("linux-event-reentry: raised native run releases the admission guard for retry", function()
 		local loop, state, backend = stop_fixture("idle")
 		-- The retained backend is private to this fixture, so native refusal is
