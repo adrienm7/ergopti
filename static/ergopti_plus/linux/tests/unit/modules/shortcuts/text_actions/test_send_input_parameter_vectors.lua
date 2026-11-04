@@ -221,3 +221,34 @@ helpers.describe("send input actions press and type exactly (send-input-actions)
 		helpers.assert_true(ok, tostring(err))
 	end)
 end)
+
+helpers.it("send-input vocabulary refuses a FIFO without blocking", function()
+	local uv = require("luv")
+	local Shell = require("adapters.shell_runner")
+	local path = os.tmpname()
+	os.remove(path)
+	assert(Shell.run("mkfifo -- " .. Shell.quote(path)))
+	local code = string.format([[package.path = %q
+local paths = require("infra.paths")
+local original = paths.shared
+paths.shared = function(name) if name == "modules/actions/send_keys.json" then return %q end; return original(name) end
+local ok = pcall(require("modules.shortcuts.manager").send_vocabulary)
+assert(not ok, "a FIFO is not a vocabulary")
+]], package.path, path)
+	local exited, expired, status, signal = false, false, nil, nil
+	local timer = assert(uv.new_timer())
+	local child
+	child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+		exited, status, signal = true, code, sig
+		uv.timer_stop(timer); uv.close(timer); uv.close(child)
+	end))
+	assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+		expired = true; child:kill("sigkill")
+	end))
+	while not exited do uv.run("once") end
+	uv.run("nowait")
+	os.remove(path)
+	helpers.assert_eq(expired, false, "vocabulary loading must not wait for a FIFO writer")
+	helpers.assert_eq(status, 0)
+	helpers.assert_eq(signal, 0)
+end)

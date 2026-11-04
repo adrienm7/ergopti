@@ -296,10 +296,9 @@ end
 function M.send_vocabulary()
 	if _send_vocabulary then return _send_vocabulary end
 	local path = Paths.shared(SEND_KEYS_REL_PATH)
-	local handle = path and io.open(path, "r")
-	if not handle then error("shortcuts: cannot read " .. tostring(path)) end
-	local body = handle:read("*a")
-	handle:close()
+	local body, status
+	if path then body, status = require("toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then error("shortcuts: cannot read " .. tostring(path)) end
 	local ok, parsed = pcall(require("json").decode, body)
 	if not ok or type(parsed) ~= "table" or type(parsed.keys) ~= "table"
 		or type(parsed.modifiers) ~= "table" or type(parsed.text_max_code_points) ~= "number" then
