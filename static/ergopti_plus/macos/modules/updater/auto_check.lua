@@ -603,8 +603,10 @@ function M.new(opts)
 				result.state, channel, tostring(result.latest), #result.others)
 			answer(result)
 		end
+		local api_completed = false
 		local ok_dispatch, sent = pcall(opts.manual_http.get, config.releases_url, list_headers(), function(response)
-			if answered or request_generation ~= manual_generation then return end
+			if api_completed or answered or request_generation ~= manual_generation then return end
+			api_completed = true
 			local body, reason, detail = read_response(response)
 			if body then return answer_from(body) end
 			if reason ~= "no_connection" then return fail(reason, detail) end
@@ -616,7 +618,7 @@ function M.new(opts)
 				answer_from(feed_body)
 			end)
 		end)
-		if not ok_dispatch or sent ~= true then
+		if (not ok_dispatch or sent ~= true) and not api_completed then
 			if not answered then fail("no_connection", ok_dispatch and "the request was refused" or tostring(sent)) end
 			return false
 		end

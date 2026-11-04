@@ -432,6 +432,18 @@ local function check_now(ctx, channel)
 end
 
 helpers.describe("updater.auto_check (macOS): the manual check answers the update-check window", function()
+	helpers.it("ignores duplicate API callbacks while the fallback feed is pending", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local answers = check_now(ctx, "dev")
+		ctx.pending[1]({ ok = false, status = 500, error = "HTTP 500" })
+		helpers.assert_eq(#ctx.pending, 2)
+		ctx.pending[1]({ ok = true, status = 200, body = MIXED, headers = {} })
+		helpers.assert_eq(#answers, 0, "the first completion owns the pending fallback")
+		ctx.pending[2]({ ok = false, status = 500, error = "HTTP 500" })
+		helpers.assert_eq(#answers, 1)
+		helpers.assert_eq(answers[1].reason_key, "updater.no_connection")
+	end)
+
 	helpers.it("offers a newer release of the checked channel without announcing it", function()
 		local ctx = build({ now = T0, record = { seed = SEED },
 			responses = { { ok = true, status = 200, body = MIXED, headers = {} } } })

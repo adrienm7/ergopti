@@ -190,7 +190,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 		package.loaded["adapters.synthetic_input"] = {
 			current_action_epoch = function() return action_epoch end,
 		}
-		local timer_scheduler = {}
+		local timer_scheduler = { hotstring_time = function() return _G.hs.timer.secondsSinceEpoch() end }
 		function timer_scheduler.cancel(handle)
 			if handle.timer == nil then return true end
 			handle.timer = nil

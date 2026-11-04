@@ -122,12 +122,13 @@ end
 --- Queues catalogue scripts until the native page reports readiness.
 --- @param code string Raw JavaScript to evaluate.
 local function eval(code)
-	if not _wv then return end
-	if _ready and type(_wv.evaluateJavaScript) == "function" then
+	if not _wv then return false end
+	if _ready then
 		return submit_javascript(_wv, code)
 	else
 		table.insert(_queued, { code = code, session = _session })
 		if #_queued > 50 then table.remove(_queued, 1) end
+		return true
 	end
 end
 
@@ -176,8 +177,7 @@ local function inject_catalogue(ctx)
 	end
 	Logger.done(LOG, "Injecting %d model(s) (backend=%s).", #payload.models, tostring(payload.backend))
 	if _session ~= session or _wv ~= view or _ucc ~= controller or _wv_committed ~= true then return end
-	eval("injectModels(" .. json .. ")")
-	return true
+	return eval("injectModels(" .. json .. ")")
 end
 
 
@@ -487,8 +487,7 @@ function M.inject_progress(update)
 		Logger.warn(LOG, "Failed to encode a download percentage as JSON.")
 		return false
 	end
-	eval("injectProgress(" .. json .. ")")
-	return true
+	return eval("injectProgress(" .. json .. ")")
 end
 
 --- Shows a local backend's runtime install percentage in its group header.
@@ -501,8 +500,7 @@ function M.inject_install_progress(update)
 		Logger.warn(LOG, "Failed to encode a runtime install percentage as JSON.")
 		return false
 	end
-	eval("injectInstallProgress(" .. json .. ")")
-	return true
+	return eval("injectInstallProgress(" .. json .. ")")
 end
 
 --- Whether the page is open.

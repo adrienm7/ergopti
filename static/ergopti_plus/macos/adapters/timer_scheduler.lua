@@ -448,6 +448,32 @@ function M.awake_time()
 	return M.now_ns() / 1e9
 end
 
+-- Hotstring deadlines must also expire during sleep. Compare the civil and
+-- awake advances: a significant positive difference is sleep or a forward
+-- wall-clock correction, either of which safely expires short deadlines. The
+-- tolerance prevents ordinary sampling jitter from accumulating as elapsed time.
+local _hotstring_last_awake, _hotstring_last_wall = nil, nil
+local _hotstring_sleep_offset = 0
+local HOTSTRING_CLOCK_TOLERANCE_SEC = 0.1
+
+--- Monotonic elapsed time including observable sleep and forward clock jumps.
+--- An unavailable civil sample leaves awake-time progress intact.
+--- @return number seconds
+function M.hotstring_time()
+	local awake = M.awake_time()
+	local ok, wall = pcall(function() return hs.timer.secondsSinceEpoch() end)
+	if not ok or type(wall) ~= "number" or wall ~= wall or wall == math.huge or wall == -math.huge then
+		_hotstring_last_awake, _hotstring_last_wall = nil, nil
+		return awake + _hotstring_sleep_offset
+	end
+	if _hotstring_last_awake ~= nil then
+		local gap = (wall - _hotstring_last_wall) - (awake - _hotstring_last_awake)
+		if gap > HOTSTRING_CLOCK_TOLERANCE_SEC then _hotstring_sleep_offset = _hotstring_sleep_offset + gap end
+	end
+	_hotstring_last_awake, _hotstring_last_wall = awake, wall
+	return awake + _hotstring_sleep_offset
+end
+
 --- Suspends execution for the given number of microseconds.
 --- Wraps hs.timer.usleep(). Use sparingly — this blocks the Lua thread. A
 --- wait outside the shared timer ceiling is refused and logged.

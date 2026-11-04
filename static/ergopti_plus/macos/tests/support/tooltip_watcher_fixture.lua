@@ -134,6 +134,8 @@ local function with_fixture(callback)
 				restore_context()
 				local Config = helpers.load_with_stubs("ui.tooltip.config")
 				restore_context = TooltipContext.install()
+				-- Test deadlines use the fixture clock while production uses mach time.
+				hs.timer.absoluteTime = function() return math.floor(hs.timer.secondsSinceEpoch() * 1e9) end
 				Config.settings.timeout_sec = IDLE_TIMEOUT_SEC
 				Config.settings.llm_timeout_sec = IDLE_TIMEOUT_SEC
 				-- These adapters retain hs.timer/eventtap objects in module locals. Reload

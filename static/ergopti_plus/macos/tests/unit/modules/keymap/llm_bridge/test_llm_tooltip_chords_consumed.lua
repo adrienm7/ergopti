@@ -368,6 +368,9 @@ end)
 --- predictions until something resets them.
 --- @return table fixture
 local function load_keymap()
+	local scheduler = require("adapters.timer_scheduler")
+	local original_awake = scheduler.hotstring_time
+	scheduler.hotstring_time = function() return original_awake() + 10000 end
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (name:match("^modules%.keymap") or name:match("^modules%.llm")
 			or name == "adapters.synthetic_input" or name == "adapters.event_provenance") then
@@ -452,9 +455,10 @@ local function load_keymap()
 		state = state,
 		calls = calls,
 		press = press,
-		now = function() return hs_stub.timer.secondsSinceEpoch() end,
+		now = function() return scheduler.hotstring_time() end,
 		show = function() visible = true end,
 		cleanup = function()
+			scheduler.hotstring_time = original_awake
 			for name in pairs(package.loaded) do
 				if type(name) == "string" and name:match("^modules%.keymap") then package.loaded[name] = nil end
 			end
