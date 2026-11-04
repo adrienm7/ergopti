@@ -164,9 +164,19 @@ jobs:
         if: ${{ !cancelled() && steps.entry_inputs.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 5
+        env:
+          ERGOPTI_REPLAY_SELECTION: ${{ inputs.selection || '.github/ci/ahk-replay/windows-audit-20261104.json' }}
         run: |
           $evidence = Join-Path $env:RUNNER_TEMP 'windows-full-entry-evidence'
           New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          $selection = Get-Content -LiteralPath $env:ERGOPTI_REPLAY_SELECTION -Raw | ConvertFrom-Json
+          $hotstringSelection = $selection.PSObject.Properties['native_hotstring_e2e']
+          if ($null -ne $hotstringSelection -and $hotstringSelection.Value -isnot [bool]) { throw 'The native hotstring E2E selector must be Boolean.' }
+          if ($null -ne $hotstringSelection -and -not $hotstringSelection.Value) {
+              [ordered]@{ source_sha = $env:GITHUB_SHA; scope = 'hotstrings-pure-and-native-edit'; status = 'not-selected'; selection_path = $env:ERGOPTI_REPLAY_SELECTION; full_suite_qualified = $false } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'e2e.receipt.json') -Encoding utf8
+              Write-Host 'Native hotstring E2E is outside this declared replay selection.'
+              return
+          }
           $runner = Join-Path $env:GITHUB_WORKSPACE 'static/ergopti_plus/windows/tests/e2e/run_e2e.ahk'
           $plan = Join-Path $evidence 'e2e.plan.tsv'
           $discoveryTap = Join-Path $evidence 'e2e-discovery.tap.txt'
