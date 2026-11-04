@@ -711,6 +711,31 @@ const OPENS_SUBMENU = {
 			platforms: ['hs'],
 			kind: 'compose',
 			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		// Why Ergopti's own Karabiner runtime does not run (menu_tap_holds.lua BLOCK_ROWS).
+		{
+			menu: 'tap_hold_owned_not_installed_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_owned_other_running_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_owned_close_failed_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_owned_fetch_failed_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
 		}
 	],
 	// Both hand providers render this declared fixed command under every native key.
