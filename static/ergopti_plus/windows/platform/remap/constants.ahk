@@ -1577,10 +1577,11 @@ _TapCopyCheckTick(Generation) {
 	if Counter != Pending["baseline"] {
 		if !_TapCopyCheckRetire(Pending) || !_TapCopyGenerationCurrent(Generation)
 			return
-		if Pending["attempts"] > 1
+		if Pending["attempts"] > 1 {
 			try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} reached the clipboard only when sent again ({2} ms).", Pending["source"], WaitedMs)
-		else
+		} else {
 			try LoggerDebug("TapHoldCopy", "Tap-hold copy from {1} verified: the clipboard changed within {2} ms.", Pending["source"], WaitedMs)
+		}
 		return
 	}
 	if Pending["attempts"] > TAP_COPY_RETRIES {
