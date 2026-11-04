@@ -88,6 +88,17 @@ helpers.describe("typing range omits a history the page holds (ngram-history-reu
 		helpers.assert_true(rebuilt.historical_serial ~= extended.historical_serial)
 	end)
 
+	helpers.it("names no serial in a payload saved to disk", function()
+		-- The full projection becomes the next open's snapshot, read by another
+		-- process whose serials restart at one.
+		local projection, reader = fixture()
+		local saved = range(projection, reader, "2026-10-20", false)
+		helpers.assert_eq(type(saved.historical), "table")
+		helpers.assert_nil(saved.historical_serial, "a persisted serial could name another process's history")
+		local named = range(projection, reader, "2026-10-20", nil)
+		helpers.assert_eq(type(named.historical_serial), "number", "the cached history is still named live")
+	end)
+
 	helpers.it("never names an incomplete history", function()
 		local projection, reader, world = fixture()
 		world.complete = false
