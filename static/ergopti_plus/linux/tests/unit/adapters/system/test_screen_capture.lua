@@ -100,6 +100,7 @@ end)
 -- per scenario.
 local BEHAVIOURS = {
 	slurp_ok = 'printf "10,20 30x40"',
+	slurp_ok_with_warning = 'echo "compositor warning" >&2; printf "10,20 30x40"',
 	slurp_cancel = 'echo "selection cancelled" >&2; exit 1',
 	slurp_broken = 'echo "compositor does not support wlr-layer-shell" >&2; exit 1',
 	write_last = 'for a; do last=$a; done; printf "png" > "$last"',
@@ -120,6 +121,7 @@ local function run(mode, tools, wayland)
 	pipe:close()
 	local bin, log, out = root .. "/bin", root .. "/calls.log", root .. "/screen.png"
 	os.execute("mkdir " .. ShellRunner.quote(bin))
+	os.execute("ln -s /bin/rm " .. ShellRunner.quote(bin .. "/rm"))
 	for tool, behaviour in pairs(tools) do
 		local path = bin .. "/" .. tool
 		local handle = assert(io.open(path, "w"))
@@ -163,6 +165,11 @@ local function tools_run(outcome)
 end
 
 helpers.describe("screen capture: a region is drawn with one tool", function()
+	helpers.it("linux-screen-slurp-warning: keeps stderr out of successful geometry", function()
+		local outcome = run("region", { slurp = "slurp_ok_with_warning", grim = "write_last" }, true)
+		helpers.assert_eq(outcome.status, "ok")
+		helpers.assert_true(outcome.calls[2]:find("-g 10,20 30x40", 1, true) ~= nil, outcome.calls[2])
+	end)
 
 	helpers.it("uses slurp and grim under Wayland, with the drawn geometry", function()
 		local outcome = run("region", { slurp = "slurp_ok", grim = "write_last", ["gnome-screenshot"] = "write_last" }, true)
