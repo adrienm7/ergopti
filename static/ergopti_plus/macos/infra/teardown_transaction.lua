@@ -21,6 +21,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
+local ErrorDescription = require("error_description")
 
 local LOG = "infra.teardown_transaction"
 
@@ -103,7 +104,7 @@ function M.run(state, steps)
 			else
 				all_complete = false
 				Logger.error(LOG, "Local teardown step '%s' failed: %s",
-					step.name, tostring(result_or_err))
+					step.name, ErrorDescription.describe(result_or_err))
 			end
 		end
 	end

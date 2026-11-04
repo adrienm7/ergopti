@@ -25,6 +25,24 @@ local function load_transaction()
 end
 
 helpers.describe("retryable local teardown transaction", function()
+	helpers.it("keeps sibling cleanup and retry state when error formatting fails (teardown-error-object)", function()
+		local transaction, errors = load_transaction()
+		local state = transaction.new_state()
+		local calls, fail = 0, true
+		local hostile = setmetatable({}, { __tostring = function() error("formatting failed") end })
+		local steps = {
+			{ name = "unstable", run = function() if fail then error(hostile) end end },
+			{ name = "sibling", run = function() calls = calls + 1 end },
+		}
+		helpers.assert_eq(transaction.run(state, steps), false)
+		helpers.assert_eq(calls, 1, "a failed diagnostic must not skip sibling cleanup")
+		helpers.assert_eq(state.running, false, "failure must not strand the transaction")
+		helpers.assert_contains(errors[1], "error object (table)")
+		fail = false
+		helpers.assert_true(transaction.run(state, steps), "the failed owner remains retryable")
+		helpers.assert_eq(calls, 1, "the successful sibling must not run twice")
+	end)
+
 	helpers.it("retains validated steps and finalizer across reentrant mutation (teardown-step-mutation)", function()
 		local transaction = load_transaction()
 		local state = transaction.new_state()
