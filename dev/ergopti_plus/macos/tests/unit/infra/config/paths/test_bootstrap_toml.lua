@@ -56,7 +56,8 @@ local function fixture(callback)
 			local state = { root = root, file = root .. "/paths.toml", writes = 0 }
 			state.codec = require("infra.toml.codec")
 			state.config = root .. "/config/"
-			state.logs = root .. "/logs/ergopti_plus/"
+			-- Named after the application, so the resolver keeps it as is.
+			state.logs = root .. "/logs/" .. require("app_dirs").macos.folder_name .. "/"
 			state.line = function(key, value)
 				return key .. " = " .. state.codec.encode_value(value)
 			end

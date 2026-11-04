@@ -1,0 +1,139 @@
+// Sources/ErgoptiPlus/OwnedRuntimeInstallMainOperation.swift
+// The user's confirmed first install of the owned runtime: the verified download's helper, staged behind the admin prompt.
+import CryptoKit
+import Darwin
+import Foundation
+import Security
+
+/// Started only by the Lua install port after the user confirmed it (Tap-Holds row), never at startup. The helper
+/// comes from the verified download only (OwnedRuntimeDownloadedHelper), must carry this launcher's own
+/// certificate leaf and two code hashes, and the administrator shell copies it root-owned and proves that
+/// requirement and its digest again before its one `--owned-install-first` transaction runs.
+///
+/// One stdout line answers, for platform/remap/runtime_install.lua:
+/// - `OWNED_RUNTIME_INSTALL|1|<result>` relays the helper's own closed line (exit 0);
+/// - `OWNED_RUNTIME_INSTALL_REQUEST|1|refused|<reason>` before any prompt (exit 77);
+/// - `OWNED_RUNTIME_INSTALL_REQUEST|1|cancelled` when the prompt was closed (exit 1);
+/// - `OWNED_RUNTIME_INSTALL_REQUEST|1|failed|<status>` when the administrator shell failed (exit 75).
+enum OwnedRuntimeInstallMainOperation {
+	static let flag = "--request-owned-runtime-install"
+	/// The helper's two closed result values (OwnedRuntimeIdleServiceEntry.Result).
+	static let helperResults: Set<String> = ["files-published-services-observed-staging-retired", "files-published-service-cleanup-pending"]
+	private static let installerExecutable = "Contents/MacOS/ErgoptiPlus-Runtime-Installer"
+	/// AppleScript's error number for a prompt the user closed.
+	private static let userCancelled = -128
+
+	static func handles(arguments: [String]) -> Bool { arguments.count == 2 && arguments[1] == flag }
+
+	/// Writes the one answer line, then returns the exit status.
+	private static func answer(_ line: String, _ status: Int32) -> Int32 {
+		do { try FileHandle.standardOutput.write(contentsOf: Data((line + "\n").utf8)) } catch { return 75 }
+		return status
+	}
+	private static func refuse(_ reason: String, _ explanation: String) -> Int32 {
+		LauncherLog.write("owned runtime install: refused (\(reason)): \(explanation).")
+		return answer("OWNED_RUNTIME_INSTALL_REQUEST|1|refused|" + reason, 77)
+	}
+	private static func hex(_ bytes: some Sequence<UInt8>) -> String { bytes.map { String(format: "%02x", $0) }.joined() }
+
+	/// Exit statuses of the driver step's own checks (runtime_vhid_update.lua EXIT_DIGEST and EXIT_SIGNATURE).
+	static let driverDigestStatus = 78, driverSignatureStatus = 79
+
+	/// Root-owned copy of the kept package, its pinned digest and pqrs' Developer ID Installer team checked on that
+	/// copy, then /usr/sbin/installer; the same checks as the driver-only update's administrator shell.
+	static func driverProgram(_ package: OwnedRuntimeDownloadedHelper.DriverPackage) -> String {
+		let quote = OwnedVirtualHIDDaemonReportMainOperation.quote
+		return "task_work=$(/usr/bin/mktemp -d /private/tmp/ergoptiplus-vhid.XXXXXX); "
+			+ "/bin/cp -X " + quote(package.path) + " \"$task_work/driver.pkg\"; "
+			+ "task_sum=$(/usr/bin/shasum -a 256 \"$task_work/driver.pkg\"); task_sum=${task_sum%% *}; "
+			+ "[ \"$task_sum\" = " + quote(package.sha256) + " ] || { /bin/rm -rf \"$task_work\"; exit \(driverDigestStatus); }; "
+			+ "task_sig=$(/usr/sbin/pkgutil --check-signature \"$task_work/driver.pkg\") || { /bin/rm -rf \"$task_work\"; exit \(driverSignatureStatus); }; "
+			+ "printf '%s\\n' \"$task_sig\" | /usr/bin/grep -q '^ *Status: signed by a developer certificate issued by Apple' "
+			+ "|| { /bin/rm -rf \"$task_work\"; exit \(driverSignatureStatus); }; "
+			+ "printf '%s\\n' \"$task_sig\" | /usr/bin/grep -Eq '^ *1\\. Developer ID Installer: .*\\(" + package.team + "\\)$' "
+			+ "|| { /bin/rm -rf \"$task_work\"; exit \(driverSignatureStatus); }; "
+			+ "/usr/sbin/installer -pkg \"$task_work/driver.pkg\" -target / >/dev/null; /bin/rm -rf \"$task_work\"; "
+	}
+
+	/// Deliberate signed Main CLI request, off the main thread (the AppleScript prompt runs here).
+	static func run(arguments: [String]) -> Int32 {
+		guard handles(arguments: arguments), !Thread.isMainThread, getuid() != 0, getuid() == geteuid() else { return 64 }
+		guard let publisher = OwnedRuntimePublisherIdentity.currentLauncher(), publisher.current() else {
+			return refuse("launcher_unsigned", "this launcher carries no stable Ergopti signature to vouch for the installer helper")
+		}
+		defer { _ = publisher.retire() }
+		let helper: URL
+		switch OwnedRuntimeDownloadedHelper.current() {
+		case .success(let located): helper = located
+		case .failure(let refusal): return refuse(refusal.rawValue, refusal.explanation)
+		}
+		// pqrs' driver package, when no pqrs daemon is installed yet: the Lua install port downloaded and
+		// verified it (runtime_vhid_update.lua fetch), and this same shell checks it again before the helper.
+		var driverStep = ""
+		if !OwnedRuntimeVirtualHIDProvisionOwner.daemonInstalled() {
+			guard let package = OwnedRuntimeDownloadedHelper.currentDriverPackage() else {
+				return refuse("driver_package_absent", "no verified VirtualHIDDevice package is kept for the driver install")
+			}
+			driverStep = Self.driverProgram(package)
+		}
+		let program: String
+		do {
+			let source = try OwnedRuntimeInstallTree(root: helper, protected: false)
+			defer { _ = source.releaseOwnedDescriptors() }
+			var code: SecStaticCode?
+			guard SecStaticCodeCreateWithPath(helper as CFURL, [], &code) == errSecSuccess, let code,
+				let fields = OwnedRuntimePublisherSignature.information(code, role: .installer),
+				let certificates = fields[kSecCodeInfoCertificates as String] as? [SecCertificate], let certificate = certificates.first,
+				SecCertificateCopyData(certificate) as Data == publisher.leaf,
+				let hashes = fields[kSecCodeInfoCdHashes as String] as? [Data], hashes.count == 2, Set(hashes).count == 2,
+				hashes.allSatisfy({ $0.count == 20 || $0.count == 32 }) else {
+				return refuse("helper_signature", "the downloaded installer helper is not signed with this launcher's certificate")
+			}
+			let bytes = try Data(contentsOf: helper.appendingPathComponent(installerExecutable))
+			guard OwnedRuntimeInstallOwner.systemClosedExecutableForInstaller(bytes) else {
+				return refuse("helper_executable", "the downloaded installer helper links outside the system libraries")
+			}
+			try source.verify()
+			let stage = URL(fileURLWithPath: "/Library/Application Support/ErgoptiPlus/.runtime-installer-" + UUID().uuidString + "/Helper.app")
+			let codeHashes = hashes.map { "cdhash H\"" + hex($0) + "\"" }.sorted().joined(separator: " or ")
+			let requirement = "identifier \"" + Identifiers.SigningIds.runtimeInstaller + "\" and certificate leaf = H\""
+				+ hex(Insecure.SHA1.hash(data: publisher.leaf)) + "\" and (" + codeHashes + ")"
+			let directory = OwnedVirtualHIDDaemonReportMainOperation.quote(stage.deletingLastPathComponent().path)
+			program = OwnedVirtualHIDDaemonReportMainOperation.stagedHelperProgram(source: helper.path, stage: stage,
+				requirement: requirement, digest: hex(SHA256.hash(data: bytes))) { executable in
+				// The helper retires its own stage on success; any other exit leaves a copy only this shell can remove.
+				driverStep + "task_status=0; task_line=$(/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin "
+					+ OwnedVirtualHIDDaemonReportMainOperation.quote(executable) + " --owned-install-first) || task_status=$?; "
+					+ "if [ -d \(directory) ] && [ ! -L \(directory) ]; then /bin/rm -rf \(directory); fi; "
+					+ "printf '%s\\n' \"$task_line\"; exit \"$task_status\""
+			}
+		} catch {
+			return refuse("helper_unreadable", "the downloaded installer helper could not be read and verified")
+		}
+		guard publisher.current(), let script = NSAppleScript(source: "do shell script "
+			+ OwnedVirtualHIDDaemonReportMainOperation.appleQuote("/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin /bin/sh -c "
+				+ OwnedVirtualHIDDaemonReportMainOperation.quote(program)) + " with administrator privileges") else {
+			return refuse("launcher_changed", "this launcher's signature changed before the administrator prompt")
+		}
+		LauncherLog.write("owned runtime install: asking for the administrator prompt.")
+		var error: NSDictionary?
+		let output = script.executeAndReturnError(&error)
+		if let error {
+			let number = error[NSAppleScript.errorNumber] as? Int ?? 0
+			if number == userCancelled {
+				LauncherLog.write("owned runtime install: the administrator prompt was cancelled.")
+				return answer("OWNED_RUNTIME_INSTALL_REQUEST|1|cancelled", 1)
+			}
+			LauncherLog.write("owned runtime install: the administrator shell failed with status \(number).")
+			return answer("OWNED_RUNTIME_INSTALL_REQUEST|1|failed|" + String(number), 75)
+		}
+		let line = (output.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+		let prefix = "OWNED_RUNTIME_INSTALL|1|"
+		guard line.hasPrefix(prefix), helperResults.contains(String(line.dropFirst(prefix.count))) else {
+			LauncherLog.write("owned runtime install: the helper answered no closed result line.")
+			return answer("OWNED_RUNTIME_INSTALL_REQUEST|1|failed|unanswered", 75)
+		}
+		LauncherLog.write("owned runtime install: the helper answered \(line).")
+		return answer(line, 0)
+	}
+}

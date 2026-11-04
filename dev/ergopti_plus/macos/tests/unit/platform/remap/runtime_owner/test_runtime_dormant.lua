@@ -1,12 +1,12 @@
 --- tests/unit/platform/remap/runtime_owner/test_runtime_dormant.lua
 
 --- ==============================================================================
---- MODULE: Owned Runtime Stays Dormant By Default
+--- MODULE: Owned Runtime Selection
 --- DESCRIPTION:
---- Proves that nothing about the owned Karabiner runtime (ADR 011) changes
---- today's behaviour unless `[karabiner] runtime = "owned"` is written by hand:
---- the command line tool stays the shared one, the selection is made once, and
---- the remap bridge's source reaches the owner only behind that opt-in.
+--- Proves how the remap bridge selects the owned Karabiner runtime (ADR 011),
+--- the default since the release after 1.0.9: the command line tool follows
+--- the selection, which is made once, and the bridge's source reaches the owner
+--- only behind it, so a hand-kept `runtime = "shared"` never loads the owner.
 ---
 --- ROOT CAUSE ENCODED: the bridge's init.lua cannot be loaded by the unit
 --- suite, so a dormant guarantee that lived only in its control flow would be
@@ -157,12 +157,12 @@ helpers.describe("the remap bridge reaches the owned runtime only after an opt-i
 		helpers.assert_true(source:find("M._owned.teardown_reason = reason", revoke, true) ~= nil)
 	end)
 
-	helpers.it("selects the shared runtime when the preference is absent", function()
+	helpers.it("selects Ergopti's own runtime when the preference is absent, from the one default", function()
 		local source = init_source()
-		helpers.assert_true(source:find("user_cfg.runtime or M._owned.paths.RUNTIME_SHARED", 1, true) ~= nil)
+		helpers.assert_true(source:find("user_cfg.runtime or Config.RUNTIME_DEFAULT", 1, true) ~= nil)
 		package.loaded["platform.remap.ke_paths"] = nil
 		helpers.assert_eq(require("platform.remap.config") ~= nil, true)
-		helpers.assert_eq(require("platform.remap.config").RUNTIME_DEFAULT, "shared")
+		helpers.assert_eq(require("platform.remap.config").RUNTIME_DEFAULT, "owned")
 	end)
 
 	helpers.it("generates nothing for an owned boot until the owner admitted the runtime", function()
@@ -175,6 +175,41 @@ helpers.describe("the remap bridge reaches the owned runtime only after an opt-i
 	helpers.it("skips the official-application wizard for an owned boot", function()
 		local source = init_source()
 		helpers.assert_true(source:find("if _state.enabled and not M._owned.selected() and not _wizard_ran_this_session", 1, true) ~= nil)
+	end)
+
+	helpers.it("removes an earlier build's rules from the user's own karabiner.json on an owned boot", function()
+		-- The README promised this migration while no code did it: shared-mode rules
+		-- stayed active inside the user's Karabiner-Elements after the switch.
+		local source = init_source()
+		local boot = source:find("if M._owned.selected() then\n\t\tif M._owned.reconcile() ~= true then", 1, true)
+		local retire = source:find("M._owned.retire_shared_rules()", boot, true)
+		local wizard = source:find("if _state.enabled and not M._owned.selected() and not _wizard_ran_this_session", 1, true)
+		helpers.assert_true(boot ~= nil and retire ~= nil and retire < wizard, "the owned boot calls the migration")
+		local owned = source:find("if runtime == M._owned.paths.RUNTIME_OWNED then", 1, true)
+		local kept = source:find("M._owned.shared_config = KARABINER_OUT", owned, true)
+		local moved = source:find("KARABINER_OUT = file_system.expand_path(M._owned.paths.config_file_for(runtime))", owned, true)
+		helpers.assert_true(kept ~= nil and moved ~= nil and kept < moved,
+			"the shared path is kept before the output moves to the owned file")
+		local body = source:find("function M._owned.retire_shared_rules()", 1, true)
+		local body_end = source:find("\nend\n", body, true)
+		local text = source:sub(body, body_end)
+		helpers.assert_true(text:find('remove_managed_rules("Owned runtime migration", shared)', 1, true) ~= nil,
+			"the marker-exact byte-span removal owner does the cleaning")
+		helpers.assert_true(source:find("ManagedRuleRemoval.remove_managed_rules(path or KARABINER_OUT)", 1, true) ~= nil)
+	end)
+
+	helpers.it("saves a bulk edit for the admission instead of reverting it while ours is not admitted", function()
+		-- Restore recommended on a Mac without the runtime reverted its edit and
+		-- opened a blocking dialog (E2E, hardening-a/b, owned default).
+		local source = init_source()
+		local off = source:find('"persisted-integration-off"', 1, true)
+		local owned = source:find('"persisted-owned-runtime-not-admitted"', 1, true)
+		local dispatch = source:find('transaction.phase = "candidate-regeneration-pending"', 1, true)
+		helpers.assert_true(off ~= nil and owned ~= nil and dispatch ~= nil and off < owned and owned < dispatch,
+			"the owned settlement sits with the integration-off one, before the candidate dispatch")
+		local gate = source:find("local REGENERATION_REFUSED_BEFORE_DEPLOY = {", 1, true)
+		local gate_end = source:find("\n}\n", gate, true)
+		helpers.assert_true(source:sub(gate, gate_end):find('["owned-runtime-not-admitted"] = true', 1, true) ~= nil)
 	end)
 
 	helpers.it("deploys an owned boot only through the owned writer", function()

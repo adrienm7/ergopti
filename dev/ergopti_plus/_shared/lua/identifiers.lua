@@ -48,5 +48,6 @@ return {
 		branch_prefix = "field/",
 		folder = "docs/field-reports",
 		base_config_key = "ergoptiFieldBase",
+		environment = "ERGOPTI_FIELD_RUN_ROOT",
 	},
 }

@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 helpers.admit_logger_privacy(require("infra.logger"))
 package.loaded["adapters.boot_fatal"] = nil
@@ -176,8 +177,8 @@ helpers.describe("boot fatal reporter (silent-boot-abort)", function()
 		helpers.admit_logger_privacy(Logger)
 		-- The default logs folder, beside launcher.log, never the shared /tmp root.
 		helpers.assert_eq(Logger.FALLBACK_BOOT_LOG_FILE, Logger.FALLBACK_LOG_DIR .. "ErgoptiPlus_boot.log")
-		helpers.assert_true(Logger.FALLBACK_LOG_DIR:find("Library/Logs/ergopti_plus/", 1, true) ~= nil
-			or Logger.FALLBACK_LOG_DIR == "/tmp/ergopti_plus/",
+		helpers.assert_true(Logger.FALLBACK_LOG_DIR:find(AppDirs.macos.relative .. "/", 1, true) ~= nil
+			or Logger.FALLBACK_LOG_DIR == "/tmp/" .. AppDirs.macos.folder_name .. "/",
 			"the fallback boot log must live in the default logs folder: " .. Logger.FALLBACK_LOG_DIR)
 		local opened = {}
 		BootFatal.report("config_paths", "refused", "msg", {

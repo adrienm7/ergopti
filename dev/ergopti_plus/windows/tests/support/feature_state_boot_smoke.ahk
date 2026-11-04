@@ -36,6 +36,8 @@ global HSE_RepeatEnabled := true
 ; feature state, then the later-declared category-key normalizer.
 #Include ..\..\_generated\logger_sub_files.ahk
 #Include ..\..\_generated\app_dirs.ahk
+#Include ..\..\infra\app_folders.ahk
+#Include ..\..\infra\legacy_folder_migration.ahk
 #Include ..\..\infra\tick_count.ahk
 #Include ..\..\infra\wall_clock.ahk
 #Include ..\..\infra\logger.ahk

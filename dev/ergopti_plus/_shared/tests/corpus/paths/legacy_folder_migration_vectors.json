@@ -1,0 +1,189 @@
+{
+	"_comment": "Vectors of the one-time legacy folder migration (_shared/lua/legacy_folder_migration.lua and windows/infra/legacy_folder_migration.ahk). A tree lists every file and directory that exists, a directory ending with a slash. A plan step is a single move (from, to, backup) or a merge (from_dir, to_dir, backup_dir, optional entries). after is the complete tree once the plan ran; moved, backed_up and removed count the report rows, kept_reasons lists the reasons of the entries left in place, in order. A paths_text row rewrites paths.toml text: expected is null when nothing changes; a row whose os is windows spells Windows paths, where a backslash is a separator, and is replayed only where it is one.",
+	"moves": [
+		{
+			"name": "moves a whole folder when the destination is free",
+			"tree": ["/h/.config/old/", "/h/.config/old/config.toml", "/h/root/"],
+			"plan": [
+				{ "from": "/h/.config/old", "to": "/h/root/config", "backup": "/h/root/bak/.config/old" }
+			],
+			"after": ["/h/root/", "/h/root/config/", "/h/root/config/config.toml"],
+			"moved": 1,
+			"backed_up": 0,
+			"removed": 0,
+			"kept_reasons": []
+		},
+		{
+			"name": "an empty destination folder gives way to the old entry",
+			"tree": ["/h/old/", "/h/old/a.txt", "/h/root/config/"],
+			"plan": [{ "from": "/h/old", "to": "/h/root/config", "backup": "/h/root/bak/old" }],
+			"after": ["/h/root/", "/h/root/config/", "/h/root/config/a.txt"],
+			"moved": 1,
+			"backed_up": 0,
+			"removed": 0,
+			"kept_reasons": []
+		},
+		{
+			"name": "a taken destination sends the old entry to the backup folder",
+			"tree": ["/h/old/", "/h/old/a.txt", "/h/root/config/", "/h/root/config/b.txt"],
+			"plan": [{ "from": "/h/old", "to": "/h/root/config", "backup": "/h/root/bak/old" }],
+			"after": [
+				"/h/root/bak/",
+				"/h/root/bak/old/",
+				"/h/root/bak/old/a.txt",
+				"/h/root/config/",
+				"/h/root/config/b.txt"
+			],
+			"moved": 0,
+			"backed_up": 1,
+			"removed": 0,
+			"kept_reasons": []
+		},
+		{
+			"name": "a taken backup slot keeps the old entry in place",
+			"tree": [
+				"/h/old/",
+				"/h/old/a.txt",
+				"/h/root/config/",
+				"/h/root/config/b.txt",
+				"/h/root/bak/old/",
+				"/h/root/bak/old/c.txt"
+			],
+			"plan": [{ "from": "/h/old", "to": "/h/root/config", "backup": "/h/root/bak/old" }],
+			"after": [
+				"/h/old/",
+				"/h/old/a.txt",
+				"/h/root/bak/old/",
+				"/h/root/bak/old/c.txt",
+				"/h/root/config/",
+				"/h/root/config/b.txt"
+			],
+			"moved": 0,
+			"backed_up": 0,
+			"removed": 0,
+			"kept_reasons": ["backup_exists"]
+		},
+		{
+			"name": "does nothing when the old folder is absent",
+			"tree": ["/h/root/"],
+			"plan": [{ "from": "/h/old", "to": "/h/root/config", "backup": "/h/root/bak/old" }],
+			"after": ["/h/root/"],
+			"moved": 0,
+			"backed_up": 0,
+			"removed": 0,
+			"kept_reasons": []
+		},
+		{
+			"name": "merges every entry and removes the emptied folder",
+			"tree": ["/h/old/", "/h/old/logs/", "/h/old/logs/a.log", "/h/old/cache/", "/h/new/"],
+			"plan": [{ "from_dir": "/h/old", "to_dir": "/h/new", "backup_dir": "/h/new/bak/old" }],
+			"after": ["/h/new/", "/h/new/cache/", "/h/new/logs/", "/h/new/logs/a.log"],
+			"moved": 2,
+			"backed_up": 0,
+			"removed": 1,
+			"kept_reasons": []
+		},
+		{
+			"name": "a merge backs up a clashing entry and still removes the old folder",
+			"tree": [
+				"/h/old/",
+				"/h/old/logs/",
+				"/h/old/logs/a.log",
+				"/h/old/state.json",
+				"/h/new/",
+				"/h/new/logs/",
+				"/h/new/logs/b.log"
+			],
+			"plan": [{ "from_dir": "/h/old", "to_dir": "/h/new", "backup_dir": "/h/new/bak/old" }],
+			"after": [
+				"/h/new/",
+				"/h/new/bak/",
+				"/h/new/bak/old/",
+				"/h/new/bak/old/logs/",
+				"/h/new/bak/old/logs/a.log",
+				"/h/new/logs/",
+				"/h/new/logs/b.log",
+				"/h/new/state.json"
+			],
+			"moved": 1,
+			"backed_up": 1,
+			"removed": 1,
+			"kept_reasons": []
+		},
+		{
+			"name": "a merge limited to named entries leaves the others",
+			"tree": [
+				"/h/old/",
+				"/h/old/paths.toml",
+				"/h/old/karabiner/",
+				"/h/old/RemapRuntime/",
+				"/h/new/"
+			],
+			"plan": [
+				{
+					"from_dir": "/h/old",
+					"to_dir": "/h/new",
+					"backup_dir": "/h/new/bak/old",
+					"entries": ["paths.toml", "RemapRuntime"]
+				}
+			],
+			"after": [
+				"/h/new/",
+				"/h/new/RemapRuntime/",
+				"/h/new/paths.toml",
+				"/h/old/",
+				"/h/old/karabiner/"
+			],
+			"moved": 2,
+			"backed_up": 0,
+			"removed": 0,
+			"kept_reasons": []
+		},
+		{
+			"name": "creates the missing parent of a destination",
+			"tree": ["/h/old/", "/h/old/x"],
+			"plan": [{ "from": "/h/old", "to": "/h/a/b/config", "backup": "/h/a/bak/old" }],
+			"after": ["/h/a/", "/h/a/b/", "/h/a/b/config/", "/h/a/b/config/x"],
+			"moved": 1,
+			"backed_up": 0,
+			"removed": 0,
+			"kept_reasons": []
+		}
+	],
+	"paths_text": [
+		{
+			"name": "rewrites an old default configuration folder, keeping the trailing slash",
+			"text": "# paths\nConfigDirPath = \"/h/.config/old/\"\nLogsDirPath = \"\"\n",
+			"rewrites": [{ "key": "ConfigDirPath", "old": ["/h/.config/old"], "new": "/h/root/config" }],
+			"expected": "# paths\nConfigDirPath = \"/h/root/config/\"\nLogsDirPath = \"\"\n"
+		},
+		{
+			"name": "keeps a folder the user chose",
+			"text": "ConfigDirPath = \"/h/Documents/mine/\"\n",
+			"rewrites": [{ "key": "ConfigDirPath", "old": ["/h/.config/old"], "new": "/h/root/config" }],
+			"expected": null
+		},
+		{
+			"name": "rewrites the logs folder and leaves an empty value",
+			"text": "ConfigDirPath = \"\"\nLogsDirPath = \"/h/Logs/old\"\n",
+			"rewrites": [
+				{ "key": "ConfigDirPath", "old": ["/h/.config/old"], "new": "/h/root/config" },
+				{ "key": "LogsDirPath", "old": ["/h/Logs/old"], "new": "/h/Logs/new" }
+			],
+			"expected": "ConfigDirPath = \"\"\nLogsDirPath = \"/h/Logs/new\"\n"
+		},
+		{
+			"name": "matches a backslash spelling and a second old form",
+			"os": "windows",
+			"text": "ConfigDirPath = \"C:\\\\Users\\\\u\\\\.config\\\\old\\\\\"\n",
+			"rewrites": [
+				{
+					"key": "ConfigDirPath",
+					"old": ["C:/Users/u/.config/old", "C:\\\\Users\\\\u\\\\.config\\\\old"],
+					"new": "C:\\\\Users\\\\u\\\\AppData\\\\Local\\\\Root\\\\config"
+				}
+			],
+			"expected": "ConfigDirPath = \"C:\\\\Users\\\\u\\\\AppData\\\\Local\\\\Root\\\\config\\\\\"\n"
+		}
+	]
+}

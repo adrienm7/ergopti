@@ -47,11 +47,11 @@ _CRSP_CrashFolderEndsInOneSeparator() {
 	global _LogsDir
 	Saved := _LogsDir
 	try {
-		for Stored in ["C:\Logs\ergopti_plus", "C:\Logs\ergopti_plus\", "C:\Logs\ergopti_plus/"] {
+		for Stored in ["C:\Logs\Ergopti", "C:\Logs\Ergopti\", "C:\Logs\Ergopti/"] {
 			_LogsDir := Stored
-			AssertEqual("C:\Logs\ergopti_plus\", LoggerLogsDir(),
+			AssertEqual("C:\Logs\Ergopti\", LoggerLogsDir(),
 				"the logs folder must end in exactly one backslash whatever it was stored with")
-			AssertEqual("C:\Logs\ergopti_plus\crash_reports\", LoggerCrashReportsDir(),
+			AssertEqual("C:\Logs\Ergopti\crash_reports\", LoggerCrashReportsDir(),
 				"crash reports must land in <logs>\crash_reports\, never beside it")
 		}
 	} finally {

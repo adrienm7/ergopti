@@ -59,10 +59,7 @@ class DiagnosticCollectionWindows {
 		loop Id.Size
 			Hex .= Format("{:02x}", NumGet(Id, A_Index - 1, "UChar"))
 		this.Id := "ergopti-diagnostic-" . Hex
-		LocalData := EnvGet("LOCALAPPDATA")
-		if LocalData == ""
-			throw Error("Local diagnostic output directory is unavailable.")
-		this.Directory := LocalData . "\ergopti_plus\diagnostics\" . this.Id
+		this.Directory := AppFoldersRoot() . "diagnostics\" . this.Id
 		this.Archive := this.Directory . ".zip"
 		this.Terminal := false
 		this.Cancelled := false

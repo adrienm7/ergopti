@@ -19,8 +19,11 @@
 
 local helpers = require("tests.helpers")
 
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
+
 local HOME = "/home/jdoe"
-local ERRORS_FILE = HOME .. "/.local/state/ergopti_plus/logs/ErgoptiPlus_errors_2026-09-24.log"
+local ERRORS_FILE = HOME .. "/.local/state/" .. FOLDER .. "/logs/ErgoptiPlus_errors_2026-09-24.log"
 
 --- Loads the real bridge with controlled collaborators.
 --- @param controls table|nil { stored = boolean|nil, show = boolean|nil, newest = string|nil }
@@ -276,7 +279,7 @@ helpers.describe("error window bridge (linux): page and actions (error-dialog-li
 			helpers.assert_eq(init.type, "init")
 			helpers.assert_eq(init.kind, "error")
 			helpers.assert_eq(init.message, "Flush failed: ~/notes.txt", "the message is redacted")
-			helpers.assert_eq(init.log_path, "~/.local/state/ergopti_plus/logs/ErgoptiPlus_errors_2026-09-24.log")
+			helpers.assert_eq(init.log_path, "~/.local/state/" .. FOLDER .. "/logs/ErgoptiPlus_errors_2026-09-24.log")
 			helpers.assert_true(init.text:find("# ErgoptiPlus diagnostics", 1, true) ~= nil, "the report is sent")
 			helpers.assert_true(init.text:find(HOME, 1, true) == nil, "the report is redacted")
 		end)

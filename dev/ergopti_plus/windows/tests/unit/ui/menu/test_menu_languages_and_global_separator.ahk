@@ -93,13 +93,14 @@ _MLG_Order(MenuName) {
 }
 
 ; The Configuration submenu: the global restore and clear, a separator, the
-; cleanup, a separator, then configuration windows and the macOS-only
-; Karabiner rows, then a separator and the download proxy (moved from Debug on
-; 2026-11-03), with no separator left dangling at its end. The Windows-only
-; touchpad restore was merged into the Gestures clear (2026-11-03).
+; cleanup, a separator, then configuration windows, then a separator and the
+; download proxy (moved from Debug on 2026-11-03), with no separator left
+; dangling at its end. The Windows-only touchpad restore was merged into the
+; Gestures clear (2026-11-03). The macOS-only Karabiner rows left with the owned
+; runtime default (ADR 011).
 _MLG_ConfigurationRowsInOrder() {
 	AssertEqual("scope_restore, scope_clear, ---, clean_unused_keys, ---, config_folder, "
-		. "setup_wizard, karabiner_integration, remove_from_karabiner, ---, proxy_override",
+		. "setup_wizard, ---, proxy_override",
 		_MLG_Order("configuration_menu"), "configuration_menu must declare its rows in this order")
 	; The download proxy is configuration, not debugging (maintainer, 2026-11-03).
 	AssertFalse(InStr(_MLG_Order("debug_menu"), "proxy_override"), "Debug no longer declares the proxy row")

@@ -15,7 +15,9 @@ return function(helpers, driver)
 		local prefix = assert(os.tmpname()); os.remove(prefix)
 		local quote = require("text_utils").shell_quote
 		local function shell(command) local result = os.execute(command); assert(result == true or result == 0) end
-		shell("mkdir -p -- " .. quote(prefix .. "/ergopti_plus"))
+		-- The Linux settings store lives in the XDG configuration folder of app_dirs.
+		local linux_folder = require("app_dirs").linux.folder_name
+		shell("mkdir -p -- " .. quote(prefix .. "/" .. linux_folder))
 		local function write(path, bytes) local file = assert(io.open(path, "wb")); assert(file:write(bytes)); assert(file:close()) end
 		local function read(path) local file = io.open(path, "rb"); if not file then return nil end
 			local bytes = file:read("*a"); file:close(); return bytes end
@@ -29,7 +31,7 @@ return function(helpers, driver)
 			if driver == "linux" then
 				paths = require("infra.config_paths"); previous_config_home = paths.config_home
 				paths.config_home = function() return prefix end
-				write(prefix .. "/ergopti_plus/storage.json", settings.storage or
+				write(prefix .. "/" .. linux_folder .. "/storage.json", settings.storage or
 					'{"locale":"en","script.log_level":"DEBUG","script.show_error_dialog":false,"foreign":[1,2]}')
 				store, files = require("adapters.storage"), require("adapters.file_system")
 			else

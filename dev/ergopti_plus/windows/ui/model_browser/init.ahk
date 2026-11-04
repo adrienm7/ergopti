@@ -767,7 +767,7 @@ _LLM_MBW_Tool(Tools, Backend, Id, Text, Action) {
  * @returns {Boolean}
  */
 _LLM_MBW_OllamaRuntimePresent() {
-	Root := EnvGet("LOCALAPPDATA") . "\" . AppDirsWindowsManagedOllamaFolderName() . "\versions"
+	Root := AppFoldersManagedOllamaRoot() . "\versions"
 	Loop Files Root . "\*", "D" {
 		if FileExist(A_LoopFileFullPath . "\ollama.exe")
 			return true

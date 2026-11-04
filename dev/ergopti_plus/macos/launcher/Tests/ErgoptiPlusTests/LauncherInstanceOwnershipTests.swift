@@ -36,7 +36,7 @@ final class LauncherInstanceOwnershipTests: XCTestCase {
 	func testTheLockLivesBesideTheLauncherPathsFile() {
 		XCTAssertEqual(
 			launcherInstanceLockPath(homeDirectory: "/Users/u"),
-			"/Users/u/Library/Application Support/ErgoptiPlus/launcher.lock"
+			"/Users/u/" + kMacOSSupportHomeRelativePath + "/launcher.lock"
 		)
 		XCTAssertEqual(
 			(launcherInstanceLockPath(homeDirectory: "/Users/u") as NSString).deletingLastPathComponent,

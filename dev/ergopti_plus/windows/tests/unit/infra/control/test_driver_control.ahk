@@ -80,7 +80,7 @@ Test("driver-control: a pending record is claimed, completed or timed out exactl
 
 _TDC_Folder() {
 	Spec := _TDC_Spec()
-	AssertEqual("C:\Users\u\AppData\Local\ergopti_plus\control", DriverControl_Folder(Spec, "C:\Users\u\AppData\Local\"))
+	AssertEqual("C:\Users\u\AppData\Local\Ergopti\control", DriverControl_Folder(Spec, "C:\Users\u\AppData\Local\"))
 	AssertThrows(() => DriverControl_Folder(Spec, ""), "an unset base refuses the control")
 }
 Test("driver-control: the control folder follows the declared Windows base", _TDC_Folder)

@@ -14,14 +14,14 @@
 ; boot reads them before the logger include has run its own top level.
 ; ==============================================================================
 
-; Folder named after the application, on every OS.
+; Folder named after the application on Windows (and macOS).
 AppDirsFolderName() {
-	return "ergopti_plus"
+	return "Ergopti"
 }
 
-; Separate direct LocalApplicationData child for the managed Windows runtime.
+; Protected managed Windows runtime folder inside the Ergopti root.
 AppDirsWindowsManagedOllamaFolderName() {
-	return "ergopti_plus_ollama"
+	return "ollama"
 }
 
 ; paths.toml key of the optional logs-folder override.
@@ -66,5 +66,81 @@ AppDirsWindowsLogsBaseEnv() {
 
 ; Default logs folder, relative to that root.
 AppDirsWindowsLogsRelative() {
-	return "ergopti_plus\logs"
+	return "Ergopti\logs"
+}
+
+; Environment variable holding the Ergopti root.
+AppDirsWindowsSupportBaseEnv() {
+	return "LOCALAPPDATA"
+}
+
+; The Ergopti root, relative to that variable.
+AppDirsWindowsSupportRelative() {
+	return "Ergopti"
+}
+
+; Environment variable holding the default configuration folder.
+AppDirsWindowsConfigBaseEnv() {
+	return "LOCALAPPDATA"
+}
+
+; Default configuration folder, relative to that variable.
+AppDirsWindowsConfigRelative() {
+	return "Ergopti\config"
+}
+
+; The installed paths.toml, relative to the configuration variable.
+AppDirsWindowsPathsFileRelative() {
+	return "Ergopti\paths.toml"
+}
+
+; Environment variable holding the cache folder.
+AppDirsWindowsCacheBaseEnv() {
+	return "LOCALAPPDATA"
+}
+
+; Cache folder, relative to that variable.
+AppDirsWindowsCacheRelative() {
+	return "Ergopti\cache"
+}
+
+; Suffix of the copy the legacy folder migration keeps of a rewritten paths.toml.
+AppDirsMigrationBackupSuffix() {
+	return ".before-folder-migration"
+}
+
+; Folder of the root that receives an old entry whose destination is taken.
+AppDirsMigrationBackupFolder() {
+	return "before-folder-migration"
+}
+
+; Environment variable holding the paths.toml of the builds before the single folder.
+AppDirsMigrationWindowsLegacyPathsFileBaseEnv() {
+	return "APPDATA"
+}
+
+; That legacy paths.toml, relative to its variable.
+AppDirsMigrationWindowsLegacyPathsFileRelative() {
+	return "Ergopti\paths.toml"
+}
+
+; Environment variable holding the legacy default configuration folder.
+AppDirsMigrationWindowsLegacyConfigBaseEnv() {
+	return "USERPROFILE"
+}
+
+; That legacy configuration folder, relative to its variable.
+AppDirsMigrationWindowsLegacyConfigRelative() {
+	return ".config\ergopti_plus"
+}
+
+; Legacy LocalApplicationData folder whose entries move into the root.
+AppDirsMigrationWindowsLegacyLocalFolder() {
+	return "ergopti_plus"
+}
+
+; Legacy managed Ollama folders, LocalApplicationData children moved in order
+; into the managed runtime folder.
+AppDirsMigrationWindowsLegacyOllamaFolders() {
+	return ["ergopti_plus_ollama", "Ergopti-ollama"]
 }

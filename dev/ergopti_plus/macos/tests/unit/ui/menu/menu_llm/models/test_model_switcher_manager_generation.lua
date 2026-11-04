@@ -18,6 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 
 
@@ -59,7 +60,7 @@ local function install_common_stubs()
 	package.loaded["infra.config_paths"] = {
 		get = function(key)
 			helpers.assert_eq(key, "MlxActiveModelPath")
-			return "/Users/fixture/.config/ergopti_plus/hammerspoon/mlx_active_model.txt"
+			return "/Users/fixture/" .. AppDirs.config.macos_relative .. "/hammerspoon/mlx_active_model.txt"
 		end,
 	}
 	package.loaded["modules.llm.api_common"] = {

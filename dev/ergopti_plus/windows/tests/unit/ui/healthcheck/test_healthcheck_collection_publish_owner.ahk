@@ -80,7 +80,7 @@ _HCPT_Source(Root) {
 	CollectionOwner := _DriverProductionFileForSymbol("HealthCheck_CollectWindows", _DriverDir)
 	for Symbol in ["_Updater_ShowManagedDownloadFailure", "_LLM_NavEventOwnerPortFn", "OllamaNativeIdentityDrain",
 		"ShellRunner_SpawnTreeOwned", "BootClockWallMs", "BootProfile_MenuWaitMs", "HotPath_RecordLatency", "WMHandleExists",
-		"CB_Write", "ExternalUrl_OpenHttp", "NotifierSend",
+		"CB_Write", "ExternalUrl_OpenHttp", "NotifierSend", "AppFoldersRoot",
 		"HealthCheck_CollectWindows", "HealthCheck_CancelProbes", "HealthCheck_ValidateAction", "HealthCheck_PerformAction",
 		"HealthCheck_CompleteConfiguration"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)

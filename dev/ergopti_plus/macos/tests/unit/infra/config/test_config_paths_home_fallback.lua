@@ -18,6 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 -- Public resolver keys intentionally covered by this regression
 local EXPECTED_PATH_COUNT = 7
@@ -159,7 +160,7 @@ end)
 -- ==========================================
 
 helpers.describe("config_paths preserves the normal HOME-derived default", function()
-	helpers.it("(config-paths-home-fallback) valid HOME still selects ~/.config", function()
+	helpers.it("(config-paths-home-fallback) valid HOME still selects the support configuration folder", function()
 		local base_dir = make_tmp_dir()
 		local home_dir = make_tmp_dir():gsub("[/\\]$", "")
 		prepare_paths_toml(base_dir, nil)
@@ -167,7 +168,7 @@ helpers.describe("config_paths preserves the normal HOME-derived default", funct
 		local config_paths = load_with_home(function() return home_dir end)
 		config_paths.init(base_dir)
 
-		local expected_root = home_dir .. "/.config/ergopti_plus/"
+		local expected_root = home_dir .. "/" .. AppDirs.config.macos_relative .. "/"
 		helpers.assert_eq(config_paths.get_default_config_dir(), expected_root,
 			"a valid HOME must remain the canonical OS default")
 		helpers.assert_eq(config_paths.get_config_dir(), expected_root,

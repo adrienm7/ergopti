@@ -9,6 +9,9 @@
 
 local M = {}
 local helpers = require("tests.helpers")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
 local uv = require("luv")
 
 --- Opens one isolated original configuration stack.
@@ -21,7 +24,7 @@ function M.with_configuration(body)
 	local environment = {}
 	for _, key in ipairs(xdg_keys) do environment[key] = { value = uv.os_getenv(key) } end
 	local parent_paths = helpers.load_module("infra.config_paths")
-	local parent_bootstrap = parent_paths.config_home() .. "/ergopti_plus/storage.json"
+	local parent_bootstrap = parent_paths.config_home() .. "/" .. FOLDER .. "/storage.json"
 	local function bootstrap_snapshot()
 		local info, detail, code = uv.fs_lstat(parent_bootstrap)
 		if not info then assert(code == "ENOENT", detail); return { present = false } end

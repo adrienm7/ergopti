@@ -277,7 +277,7 @@ Test("config transition runtime: failed rollback keeps global admission closed "
 _CTRT_BootDefaultRefused(Overrides) {
 	Refused := false
 	try ConfigTransitionSelectBootConfigDir(Overrides,
-		"\.config\ergopti_plus\")
+		"\Ergopti\config\")
 	catch ValueError {
 		Refused := true
 	}
@@ -296,7 +296,7 @@ Test("config transition runtime: unrelated locator cannot authorize boot default
 	(*) => _CTRT_BootDefaultRefused(Map("LogsDirPath", "D:\Logs\")))
 
 _CTRT_BootDefaultIsExact() {
-	DefaultDir := "C:\Users\OwnedFixture\.config\ergopti_plus\"
+	DefaultDir := "C:\Users\OwnedFixture\AppData\Local\Ergopti\config\"
 	AssertEqual(DefaultDir, ConfigTransitionSelectBootConfigDir(Map(), DefaultDir))
 	AssertEqual(DefaultDir, ConfigTransitionSelectBootConfigDir(
 		Map("ConfigDirPath", ""), DefaultDir))
@@ -306,7 +306,7 @@ Test("config transition runtime: ordinary boot default bytes are preserved "
 	_CTRT_BootDefaultIsExact)
 
 _CTRT_BootUncDefaultIsExact() {
-	DefaultDir := "\\server\profiles\OwnedFixture\.config\ergopti_plus\"
+	DefaultDir := "\\server\profiles\OwnedFixture\AppData\Local\Ergopti\config\"
 	AssertEqual(DefaultDir, ConfigTransitionSelectBootConfigDir(Map(), DefaultDir))
 }
 Test("config transition runtime: absolute UNC boot default stays supported "
@@ -324,7 +324,7 @@ Test("config transition runtime: isolated smoke default remains authoritative "
 _CTRT_BootOverrideIgnoresUnusedDefault() {
 	Override := "D:\OwnedExplicitFixture"
 	AssertEqual(Override, ConfigTransitionSelectBootConfigDir(
-		Map("ConfigDirPath", Override), "\.config\ergopti_plus\"),
+		Map("ConfigDirPath", Override), "\Ergopti\config\"),
 		"an unused invalid default must not reject the explicit root")
 	AssertEqual(Override, ConfigTransitionSelectBootConfigDir(
 		Map("ConfigDirPath", Override), ""))

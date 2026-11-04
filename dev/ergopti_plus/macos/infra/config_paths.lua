@@ -38,7 +38,7 @@
 ---    every persisted override is an absolute native path, never cwd-relative
 ---    or a literal tilde segment.
 --- 6. The logs folder is the second key, LogsDirPath. Empty means
----    ~/Library/Logs/ergopti_plus/. A folder not named after the application
+---    ~/Library/Logs/Ergopti/. A folder not named after the application
 ---    gets that subfolder appended: the native logger worker restricts its
 ---    folder to the owner and purges old logs there, which must never happen to
 ---    a folder such as ~/Documents that the user merely picked.
@@ -208,8 +208,8 @@ local function normalize_logs_dir_override(value)
 	local normalized, err = normalize_config_dir_override(value, LOGS_DIR_KEY)
 	if normalized == nil or normalized == "" then return normalized, err end
 	local leaf = NativePath.basename(NativePath.without_trailing_separators(normalized))
-	if leaf ~= AppDirs.folder_name then
-		normalized = normalized .. AppDirs.folder_name .. "/"
+	if leaf ~= AppDirs.macos.folder_name then
+		normalized = normalized .. AppDirs.macos.folder_name .. "/"
 	end
 	return normalized
 end
@@ -279,7 +279,7 @@ local function load_bootstrap()
 end
 
 --- Returns the resolved config directory (with trailing slash).
---- Falls back to ~/.config/ergopti_plus/ when no override is set. Lazy-loads
+--- Falls back to ~/Library/Application Support/Ergopti/config/ when no override is set. Lazy-loads
 --- paths.toml on first call so that modules requiring this before init() still
 --- get the user-configured path.
 --- @return string
@@ -302,7 +302,7 @@ local function follow_config_dir_in_logs()
 end
 
 --- Returns the resolved logs folder (with trailing slash): the LogsDirPath
---- override, or ~/Library/Logs/ergopti_plus/. Lazy-loads paths.toml like
+--- override, or ~/Library/Logs/Ergopti/. Lazy-loads paths.toml like
 --- config_dir(). Without a home folder the logger's early-boot fallback is the
 --- only folder left.
 --- @return string
@@ -650,7 +650,7 @@ function M.init(base_dir)
 
 	-- Only create the default fallback directory when no custom path is
 	-- configured; otherwise the user ends up with an unwanted
-	-- ~/.config/ergopti_plus/ on every reload.
+	-- ~/Library/Application Support/Ergopti/config/ on every reload.
 	local resolved = config_dir()
 	if resolved == _default_config_dir then ensure_dir(_default_config_dir) end
 	_initialized = true
@@ -820,7 +820,7 @@ function M.metrics_cache_dir()
 	if type(home) ~= "string" or home:sub(1, 1) ~= "/" then
 		error("config_paths.metrics_cache_dir: an absolute HOME is required", 2)
 	end
-	return NativePath.with_trailing_separator(home) .. "Library/Caches/" .. AppDirs.folder_name .. "/metrics"
+	return NativePath.with_trailing_separator(home) .. AppDirs.macos.cache_relative .. "/metrics"
 end
 
 --- Ensures a directory exists. Exposed because the path editor creates the

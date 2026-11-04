@@ -279,6 +279,7 @@ return {
 	"tests.unit.infra.i18n.test_locale_path_layouts",
 	"tests.unit.infra.lifecycle.test_input_event_codec",
 	"tests.unit.infra.config.test_logs_dir",
+	"tests.unit.infra.config.test_legacy_folder_migration",
 	"tests.unit.infra.config.test_script_config_authority",
 	"tests.unit.infra.logger.test_logger_error_observer",
 	"tests.unit.infra.preferences.test_metrics_preferences",

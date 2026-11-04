@@ -62,7 +62,7 @@ final class OwnedLogDirectoryTests: XCTestCase {
 		XCTAssertTrue(try isSymbolicLink(logs), "the user's link must stay a link")
 	}
 
-	/// Layout A: ~/.config/ergopti_plus is a link and logs/ is gitignored, so absent.
+	/// Layout A: the configuration root is a link and logs/ is gitignored, so absent.
 	func testSymlinkedConfigRootCreatesTheMissingLogsFolderInsideTheTarget() throws {
 		let root = try makeRoot()
 		let target = root.appendingPathComponent("gitcfg/ergopti_plus", isDirectory: true)

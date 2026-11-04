@@ -15,8 +15,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
-local HOME = "/Users/test/Library/Application Support/ErgoptiPlus/RemapRuntime/16.3.0-ergopti.1"
+local HOME = "/Users/test/" .. AppDirs.macos.support_relative .. "/RemapRuntime/16.3.0-ergopti.1"
 local DIGEST = string.rep("ab", 32)
 
 --- A complete runtime pin.
@@ -131,6 +132,35 @@ helpers.describe("owned runtime artifact fetch: the first start", function()
 				end
 			end
 		end
+	end)
+
+	helpers.it("never reads a receipt that does not exist", function()
+		-- The real read port logs an ERROR for a path under a missing folder, which
+		-- every first start of an owned boot hit.
+		local _, _, Fetch = fake()
+		local reads = {}
+		local fetcher = Fetch.new({
+			exec = function(_, _, _, callback) callback(1, "", "offline") end,
+			exists = function() return false end,
+			read = function(path)
+				reads[#reads + 1] = path
+				return nil
+			end,
+			write = function() return true end,
+			expand = function(path) return (path:gsub("^~", "/Users/test")) end,
+		})
+		helpers.assert_nil(fetcher.payload_for(pin()))
+		local result = ensure(fetcher, pin())
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(#reads, 0)
+	end)
+
+	helpers.it("reports a download that failed as such, after clearing nothing it did not own", function()
+		local fetcher = fake({ curl = function() return 6, "", "Could not resolve host" end })
+		local result = ensure(fetcher, pin())
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(result.value, "artifact_download_failed")
+		helpers.assert_contains(result.detail, "Could not resolve host")
 	end)
 
 	helpers.it("downloads over https only, bounded by the pinned size", function()

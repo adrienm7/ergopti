@@ -1145,27 +1145,6 @@
 			"i18n": "menu.global.setup_wizard"
 		},
 		{
-			"type": "check",
-			"id": "karabiner_integration",
-			"i18n": "menu.global.karabiner_integration",
-			"checked_when": [
-				"karabiner_integration_enabled"
-			],
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.remap_engine_is_per_driver"
-		},
-		{
-			"type": "command",
-			"id": "remove_from_karabiner",
-			"i18n": "menu.global.remove_from_karabiner",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.remap_engine_is_per_driver"
-		},
-		{
 			"type": "---"
 		},
 		{
@@ -1672,6 +1651,61 @@
 			"type": "label",
 			"id": "tap_hold_vhid_not_active",
 			"i18n": "menu.tapholds.vhid_not_active",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_owned_not_installed_rows": [
+		{
+			"type": "label",
+			"id": "tap_hold_owned_not_installed",
+			"i18n": "menu.tapholds.owned_not_installed",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_owned_install_rows": [
+		{
+			"type": "command",
+			"id": "tap_hold_owned_install",
+			"i18n": "menu.tapholds.owned_install",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_owned_other_running_rows": [
+		{
+			"type": "label",
+			"id": "tap_hold_owned_other_running",
+			"i18n": "menu.tapholds.owned_other_running",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_owned_close_failed_rows": [
+		{
+			"type": "label",
+			"id": "tap_hold_owned_close_failed",
+			"i18n": "menu.tapholds.owned_close_failed",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_owned_fetch_failed_rows": [
+		{
+			"type": "label",
+			"id": "tap_hold_owned_fetch_failed",
+			"i18n": "menu.tapholds.owned_fetch_failed",
 			"platforms": [
 				"hs"
 			],

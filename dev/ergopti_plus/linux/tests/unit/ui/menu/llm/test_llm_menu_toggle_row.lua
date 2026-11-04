@@ -433,6 +433,8 @@ helpers.describe("Linux rendered AI source refusal", function()
 				package.loaded["infra.config_paths"] = {
 					config = function() return path end,
 					config_home = function() return assert(path:match("^(.*)/[^/]+$")) end,
+					-- The storage adapter keeps storage.json in the default configuration folder.
+					default_config_dir = function() return assert(path:match("^(.*)/[^/]+$")) .. "/" .. require("app_dirs").linux.folder_name end,
 				}
 				package.loaded["infra.llm_preferences"] = nil
 				local llm, calls = fake_llm(false)

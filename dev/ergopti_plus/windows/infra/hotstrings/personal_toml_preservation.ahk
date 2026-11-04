@@ -35,7 +35,7 @@ _PersonalTomlTypedEntry(Line, LineIndex) {
 			return false
 		Entry := Map("trigger", Parts[1], "output", Value["output"],
 			"line_index", LineIndex, "priority", Value.Get("priority", ""),
-			"strict_case", Value.Has("is_case_sensitive_strict")
+			"is_case_sensitive_strict", Value.Has("is_case_sensitive_strict")
 				? Value["is_case_sensitive_strict"].Value : false)
 		for Field in ["is_word", "auto_expand", "is_case_sensitive", "final_result"]
 			Entry[Field] := Value[Field].Value
@@ -52,7 +52,7 @@ _PersonalTomlEntryValue(Entry, Previous := 0) {
 	Value["output"] := Entry["output"]
 	for Field in ["is_word", "auto_expand", "is_case_sensitive", "final_result"]
 		Value[Field] := TOML_Bool(Entry[Field])
-	if Entry.Get("strict_case", false)
+	if Entry.Get("is_case_sensitive_strict", false)
 		Value["is_case_sensitive_strict"] := TOML_Bool(true)
 	else if Value.Has("is_case_sensitive_strict")
 		Value.Delete("is_case_sensitive_strict")
@@ -90,7 +90,9 @@ _PersonalTomlRenderEntry(Entry, Original := 0) {
 		_TOML_DocumentToken(Raw, &Position, "", , , &ValueEnd)
 		Tail := SubStr(Raw, ValueEnd + 1)
 	}
-	return TOML_RenderKey(Entry["trigger"]) . " = { " . ArrayJoin(Members, ", ") . " }" . Tail
+	; Always a quoted key, like the macOS and Linux writers: a bare `par = {...}`
+	; is valid TOML, but it is not the row shape every shipped file uses.
+	return TOML_RenderString(Entry["trigger"]) . " = { " . ArrayJoin(Members, ", ") . " }" . Tail
 }
 
 _PersonalTomlAppendSource(&Content, Text) {
@@ -301,7 +303,7 @@ _PersonalTomlPreserveModel(Source, Data, Order) {
 			if !(Entry["output"] == Actual[Index]["output"])
 					&& !(NormaliseOutput(Entry["output"]) == Actual[Index]["output"])
 				throw ValueError("personal-projection-mismatch")
-			if Entry.Get("strict_case", false) != Actual[Index].Get("strict_case", false)
+			if Entry.Get("is_case_sensitive_strict", false) != Actual[Index].Get("is_case_sensitive_strict", false)
 					|| Entry.Get("priority", "") != Actual[Index].Get("priority", "")
 				throw ValueError("personal-projection-mismatch")
 		}

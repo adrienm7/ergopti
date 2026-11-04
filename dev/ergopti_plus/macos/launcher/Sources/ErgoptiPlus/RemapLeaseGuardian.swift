@@ -124,7 +124,7 @@ struct LeaseGuardianPaths {
 	/// - Parameter homeDirectory: Current user's Foundation home directory.
 	init(homeDirectory: String = NSHomeDirectory()) {
 		root = homeDirectory
-			+ "/Library/Application Support/ErgoptiPlus/LeaseGuardian/v1"
+			+ "/" + kMacOSSupportHomeRelativePath + "/LeaseGuardian/v1"
 		records = root + "/records"
 		acknowledgements = root + "/acknowledgements"
 		singletonLock = root + "/guardian.lock"

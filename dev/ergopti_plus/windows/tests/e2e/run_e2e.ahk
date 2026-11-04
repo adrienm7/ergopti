@@ -87,6 +87,8 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 #Include ../../infra/native_dialogs.ahk
 #Include ../../infra/ui_style.ahk
 #Include ../../_generated/app_dirs.ahk
+#Include ../../infra/app_folders.ahk
+#Include ../../infra/legacy_folder_migration.ahk
 #Include ../../infra/wall_clock.ahk
 #Include ../../infra/logger.ahk
 #Include ../../infra/hotpath_profiler.ahk

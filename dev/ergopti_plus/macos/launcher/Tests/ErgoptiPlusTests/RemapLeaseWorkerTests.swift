@@ -3341,7 +3341,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			runtimeDirectory + "bin/../bin/ergoptiplus_remap_cli",
 			runtimeDirectory + "bin/ergoptiplus_remap_cli\u{0}",
 			"/Library/Application Support/ErgoptiPlus/bin/ergoptiplus_remap_cli",
-			"~/Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli",
+			// A per-user look-alike of the root-owned runtime folder.
+			"~/Library/Application Support/" + kMacOSOwnedRuntimeFolderName + "/Runtime/bin/ergoptiplus_remap_cli",
 			"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 		]
 		for forbiddenPath in forbiddenPaths {

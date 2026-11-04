@@ -45,9 +45,11 @@ local LOG = "field_check"
 
 local STATE = { pass = "pass", fail = "fail", info = "info", skip = "skip" }
 
-local OWNED_RUNTIME_DIR = "/Library/Application Support/ErgoptiPlus/Runtime"
+local OWNED_RUNTIME_DIR = KePaths.OWNED.RUNTIME_DIR
 local OWNED_JOB_FILE = "/Library/LaunchDaemons/" .. Identifiers.service_labels.macos_core .. ".plist"
 local OWNED_JOB = "system/" .. Identifiers.service_labels.macos_core
+local OWNED_VHID_JOB_FILE = "/Library/LaunchDaemons/" .. Identifiers.service_labels.macos_virtual_hid .. ".plist"
+local OWNED_VHID_JOB = "system/" .. Identifiers.service_labels.macos_virtual_hid
 local STOCK_APP = "/Applications/Karabiner-Elements.app"
 
 --- Seconds the key accounting check watches the keyboard.
@@ -241,8 +243,12 @@ function M.owned_runtime(ports, report, finish)
 	report.step("runtime_installed", STATE.info, yes_no(ports.path_exists(OWNED_RUNTIME_DIR)))
 	report.step("job_file", STATE.info, yes_no(ports.path_exists(OWNED_JOB_FILE)))
 	report.step("stock_app", STATE.info, yes_no(ports.path_exists(STOCK_APP)))
+	report.step("vhid_job_file", STATE.info, yes_no(ports.path_exists(OWNED_VHID_JOB_FILE)))
+	local function loaded(code) return code == 0 and "loaded" or (code == nil and "timeout" or "not_loaded") end
 	ports.exec("/bin/launchctl", { "print", OWNED_JOB }, COMMAND_TIMEOUT, function(code)
-		report.step("job_loaded", STATE.info, code == 0 and "loaded" or (code == nil and "timeout" or "not_loaded"))
+		report.step("job_loaded", STATE.info, loaded(code))
+		ports.exec("/bin/launchctl", { "print", OWNED_VHID_JOB }, COMMAND_TIMEOUT, function(vhid_code)
+		report.step("vhid_job_loaded", STATE.info, loaded(vhid_code))
 		ports.exec("/usr/bin/systemextensionsctl", { "list" }, COMMAND_TIMEOUT, function(ext_code, ext_out)
 			local driver, driver_state = M.read_driver(ext_code, ext_out)
 			report.step("driver_state", STATE.info, driver_state)
@@ -258,12 +264,25 @@ function M.owned_runtime(ports, report, finish)
 						report.step("installed_source", STATE.info, facts.source and "reachable" or "unavailable")
 						report.step("other_karabiner_helper", STATE.info, yes_no(facts.helper_present))
 						report.step("other_karabiner_active", STATE.info, facts.active == nil and "unknown" or facts.active)
+						report.step("artifact_receipt", STATE.info, facts.artifact or "unknown")
+						report.step("install_launcher", STATE.info, M.install_launcher(facts.launcher_identity))
 						finish()
 					end)
 				end)
 			end)
 		end)
+		end)
 	end)
+end
+
+--- Whether the install role can vouch for the downloaded helper: it refuses an
+--- ad hoc or unsigned launcher (OwnedRuntimeInstallMainOperation.swift).
+--- @param identity string|nil Signing identity of the running launcher.
+--- @return string value `possible:<identity>` or `refused:<identity>`.
+function M.install_launcher(identity)
+	identity = identity or "unknown"
+	local signed = identity == "certificate" or identity:match("^team:") ~= nil
+	return (signed and "possible:" or "refused:") .. identity
 end
 
 --- Key presses seen by Quartz against credits appended by the ledger.
@@ -871,6 +890,7 @@ M.checks = {
 	network = M.network,
 	lease = M.lease,
 	owned_runtime = M.owned_runtime,
+	owned_install = require("infra.field_check_owned_activation").install,
 	owned_start = require("infra.field_check_owned_activation").start,
 	owned_pause = require("infra.field_check_owned_activation").pause,
 	key_accounting = M.key_accounting,

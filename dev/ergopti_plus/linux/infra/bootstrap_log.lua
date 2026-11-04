@@ -16,7 +16,7 @@
 ---    codes below are accepted; anything else is refused instead of written.
 --- 2. Default folder. LogsDirPath lives in bootstrap storage that has not been
 ---    read, so the file is always in ${XDG_STATE_HOME:-~/.local/state}/
----    ergopti_plus/logs, like the Windows file.
+---    ergopti/logs, like the Windows file.
 --- 3. Never fatal itself. The record is best effort: a folder that cannot be
 ---    created leaves the stderr line (journald under systemd) as the only
 ---    evidence, and the caller still exits with its own code.

@@ -119,6 +119,12 @@ for _, argument in ipairs(arg or {}) do
 	end
 end
 
+-- The builds before the single folder name kept the configuration, the state
+-- and the logs in a second folder of each XDG base. They move once, here: before
+-- the logger sink opens its folder and before the bootstrap storage is read.
+local LegacyFolderMigration = require("infra.legacy_folder_migration")
+local legacy_folder_report = LegacyFolderMigration.run()
+
 
 -- =========================================
 -- =========================================
@@ -152,6 +158,7 @@ if not privacy_admitted or privacy_refusal then
 	BootstrapLog.append("privacy_admission_refused")
 	os.exit(1)
 end
+LegacyFolderMigration.log(Logger, legacy_folder_report)
 
 -- Single source of the driver version (never a re-typed literal).
 local Version = require("infra.version")

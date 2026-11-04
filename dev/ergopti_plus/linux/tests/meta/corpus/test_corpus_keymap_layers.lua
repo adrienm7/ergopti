@@ -18,6 +18,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
 local json = require("json")
 local toml_codec = require("toml_codec")
 local Layers = require("keymap.layers")
@@ -132,7 +135,7 @@ end)
 -- =========================================
 
 helpers.describe("keymap_layers — the user's layers.toml on Linux", function()
-	local config_dir = "/home/someone/.config/ergopti_plus"
+	local config_dir = "/home/someone/.config/" .. FOLDER
 
 	helpers.it("an absent file is no layer and no error", function()
 		local asked

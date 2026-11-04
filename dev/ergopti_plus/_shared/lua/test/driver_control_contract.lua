@@ -75,13 +75,13 @@ function M.run(helpers, shared_root)
 		helpers.it("resolves each platform folder from its declared base", function()
 			local env = { LOCALAPPDATA = "C:\\Users\\u\\AppData\\Local", HOME = "/Users/u", XDG_RUNTIME_DIR = "/run/user/1000/" }
 			local getenv = function(name) return env[name] end
-			helpers.assert_eq(Policy.folder(spec, "windows", getenv, "ergopti_plus", "\\"),
-				"C:\\Users\\u\\AppData\\Local\\ergopti_plus\\control")
-			helpers.assert_eq(Policy.folder(spec, "macos", getenv, "ergopti_plus", "/"),
-				"/Users/u/Library/Application Support/ergopti_plus/control")
-			helpers.assert_eq(Policy.folder(spec, "linux", getenv, "ergopti_plus", "/"),
-				"/run/user/1000/ergopti_plus/control")
-			local folder, reason = Policy.folder(spec, "linux", function() return nil end, "ergopti_plus", "/")
+			helpers.assert_eq(Policy.folder(spec, "windows", getenv, "Ergopti", "\\"),
+				"C:\\Users\\u\\AppData\\Local\\Ergopti\\control")
+			helpers.assert_eq(Policy.folder(spec, "macos", getenv, "Ergopti", "/"),
+				"/Users/u/Library/Application Support/Ergopti/control")
+			helpers.assert_eq(Policy.folder(spec, "linux", getenv, "ergopti", "/"),
+				"/run/user/1000/ergopti/control")
+			local folder, reason = Policy.folder(spec, "linux", function() return nil end, "ergopti", "/")
 			helpers.assert_nil(folder, "no runtime folder, no control")
 			helpers.assert_eq(reason, "XDG_RUNTIME_DIR is not set")
 		end)

@@ -170,6 +170,11 @@ do
 		return
 	end
 end
+-- The builds before the single folder name kept paths.toml and the default
+-- configuration folder elsewhere; they move once, here: after the instance
+-- admission, so a refused process leaves every folder as it found it, and
+-- before the breadcrumb, the logs and config_paths read them.
+require("adapters.legacy_folder_migration").run(Logger)
 local TimerScheduler     = require("adapters.timer_scheduler")
 if Storage.migrate_legacy_namespace() ~= true then
 	Logger.error("init", "Legacy settings namespace migration did not commit; only namespaced values will be used.")
@@ -414,7 +419,7 @@ Boot.mark("Path: config dir + paths.toml (config_paths.init)")
 Boot.stage("Path: log file open (retention purge deferred)")
 
 -- Re-point the logger to the logs folder (LogsDirPath, or
--- ~/Library/Logs/ergopti_plus/) now that paths.toml is read. Earlier boot lines
+-- ~/Library/Logs/Ergopti/) now that paths.toml is read. Earlier boot lines
 -- went to the fallback file in the default folder.
 -- (The old-log retention purge is scheduled off the boot path inside this call.)
 do
@@ -531,7 +536,7 @@ local TOML_CACHE_DIR = nil
 do
 	local home = os.getenv("HOME")
 	if type(home) == "string" and home ~= "" then
-		TOML_CACHE_DIR = home .. "/Library/Caches/" .. require("app_dirs").folder_name .. "/toml_hotstrings"
+		TOML_CACHE_DIR = home .. "/" .. require("app_dirs").macos.cache_relative .. "/toml_hotstrings"
 	end
 end
 do
@@ -2434,11 +2439,16 @@ require("infra.driver_control").start({
 		return TerminationCoordinator.request_reload_owned(reason, on_aborted)
 	end,
 })
--- The developer field run (tools/dev/collect-macos-field-report.sh): only a
--- developer app runs it, so a packaged runtime never even loads the module.
-if require("infra.dev_source").is_active() then
+-- The field run (tools/dev/collect-macos-field-report.sh): a developer app
+-- runs it for its clone, and an installed signed app only when the collector
+-- opened it with that clone (the launcher admits ERGOPTI_FIELD_RUN_ROOT only
+-- for a folder of this user holding the declaration); otherwise a packaged
+-- runtime never even loads the module.
+local field_run_root = require("infra.dev_source").is_active() and require("infra.dev_source").root()
+	or os.getenv(require("identifiers").field_report.environment)
+if type(field_run_root) == "string" and field_run_root ~= "" then
 	require("infra.field_run").start({
-		root = require("infra.dev_source").root(),
+		root = field_run_root,
 		pid = assert(tonumber(hs.processInfo.processID), "hs.processInfo.processID is unavailable"),
 	})
 end
