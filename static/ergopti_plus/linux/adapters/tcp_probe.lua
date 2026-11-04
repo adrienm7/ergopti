@@ -37,12 +37,12 @@ function M.probe(host, port, timeout_ms, callback, luv)
 		return nil, "tcp probe arguments are invalid"
 	end
 	luv = luv or require("luv")
-	local answered, cancelled, settled = false, false, false
+	local answered, cancelled, settled, closing_batch = false, false, false, false
 	local open_handles, resolving, listeners = 0, false, {}
 	local timer, tcp, request, result
 
 	local function settle()
-		if settled or not answered or resolving or open_handles > 0 then return end
+		if settled or not answered or resolving or closing_batch or open_handles > 0 then return end
 		settled = true
 		local pending = listeners
 		listeners = {}
@@ -72,8 +72,12 @@ function M.probe(host, port, timeout_ms, callback, luv)
 		answered = true
 		result = { reachable = reachable, reason = reason }
 		if resolving and request then pcall(luv.cancel, request) end
+		-- A callback may run synchronously in a native adapter: account for the
+		-- entire batch before allowing either close to settle the operation.
+		closing_batch = true
 		close(timer)
 		close(tcp)
+		closing_batch = false
 		settle()
 	end
 
