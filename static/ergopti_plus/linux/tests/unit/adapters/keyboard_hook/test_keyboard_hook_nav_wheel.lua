@@ -273,7 +273,7 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 			if attempted then return end
 			attempted = true
 			hook.while_released(function() entered = true end)
-		end, false, true)
+		end, nil, false, true)
 		helpers.assert_true(attempted)
 		helpers.assert_eq(entered, false, "a dialog cannot use a mouse still held by the daemon")
 	end)
