@@ -278,7 +278,12 @@ if [ -n "$WAIT_OWNER" ]; then
 	owner_start="${BASH_REMATCH[2]}"
 	for ((attempt = 0; attempt < 300; attempt++)); do
 		if [ ! -e "/proc/$owner_pid/stat" ]; then break; fi
-		if ! stat="$(cat "/proc/$owner_pid/stat")"; then continue; fi
+		if ! stat="$(cat "/proc/$owner_pid/stat")"; then
+			# A transient read error is still one timed wait, not an instant
+			# retry that can exhaust the entire shutdown deadline immediately.
+			sleep 0.1
+			continue
+		fi
 		read -ra fields <<< "${stat##*) }"
 		if [ "${fields[19]:-}" != "$owner_start" ]; then break; fi
 		# A zombie has finished cleanup; only its parent can reap the proc entry.
