@@ -140,6 +140,44 @@ helpers.describe("registry_index: a batched section toggle rebuilds the group on
 		helpers.assert_eq(counts.settings, 1)
 	end)
 
+	helpers.it("refuses sparse section batches before persisting or publishing (section-batch-sparse)", function()
+		local RI, counts = load_with_counters()
+		local published = 0
+		local sparse_sections = { [1] = "section_1", [3] = "section_3" }
+		local accepted = RI.set_groups_sections_enabled({ { name = GROUP, sections = sparse_sections } }, true,
+			function() published = published + 1; return true end)
+		counts.restore()
+		helpers.assert_eq(accepted, false)
+		helpers.assert_eq(counts.settings, 0)
+		helpers.assert_eq(counts.disable, 0)
+		helpers.assert_eq(published, 0)
+	end)
+
+	helpers.it("refuses sparse group batches before persisting or publishing (section-batch-sparse)", function()
+		local RI, counts = load_with_counters()
+		local published = 0
+		local changes = { [1] = { name = GROUP, sections = { "section_1" } },
+			[3] = { name = GROUP, sections = { "section_3" } } }
+		local accepted = RI.set_groups_sections_enabled(changes, true, function() published = published + 1; return true end)
+		counts.restore()
+		helpers.assert_eq(accepted, false)
+		helpers.assert_eq(counts.settings, 0)
+		helpers.assert_eq(counts.disable, 0)
+		helpers.assert_eq(published, 0)
+	end)
+
+	helpers.it("refuses keyed-only lists instead of treating them as empty (section-batch-sparse)", function()
+		local RI, counts = load_with_counters()
+		local published = 0
+		helpers.assert_eq(RI.set_sections_enabled(GROUP, { extra = "section_1" }, true), false)
+		helpers.assert_eq(RI.set_groups_sections_enabled({ extra = { name = GROUP, sections = {} } }, true,
+			function() published = published + 1; return true end), false)
+		counts.restore()
+		helpers.assert_eq(counts.settings, 0)
+		helpers.assert_eq(counts.disable, 0)
+		helpers.assert_eq(published, 0)
+	end)
+
 	helpers.it("an empty section list does no work at all", function()
 		local RI, counts = load_with_counters()
 

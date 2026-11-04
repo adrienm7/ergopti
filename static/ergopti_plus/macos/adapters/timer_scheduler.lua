@@ -184,6 +184,11 @@ function M.after(delaySec, fn)
 		id = _new_id(),
 		settlement_observers = {},
 	}
+	if type(fn) ~= "function" then
+		Logger.error(LOG, "after(): callback must be a function — timer rejected.")
+		settle_handle(handle)
+		return handle, false
+	end
 	if not admit_delay("after", delaySec) then
 		settle_handle(handle)
 		return handle, false
@@ -268,6 +273,11 @@ function M.every(intervalSec, fn)
 		id = _new_id(),
 		settlement_observers = {},
 	}
+	if type(fn) ~= "function" then
+		Logger.error(LOG, "every(): callback must be a function — timer rejected.")
+		settle_handle(handle)
+		return handle, false
+	end
 	if not admit_delay("every", intervalSec) then
 		settle_handle(handle)
 		return handle, false

@@ -326,6 +326,19 @@ local function restore_section_settings(previous)
 	end
 end
 
+--- Rejects holes and non-array keys before ipairs can silently skip work.
+--- @param values table Candidate ordered list.
+--- @return boolean dense
+local function dense_list(values)
+	if type(values) ~= "table" then return false end
+	local length, count = #values, 0
+	for index in pairs(values) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length then return false end
+		count = count + 1
+	end
+	return count == length
+end
+
 --- Persists and applies section changes for one or more groups atomically.
 --- Each change is `{ name, sections, enable_group|nil, group_enabled|nil }`.
 --- Exact true means all settings and live groups reached their postcondition;
@@ -336,7 +349,7 @@ end
 --- @return boolean committed
 function M.set_groups_sections_enabled(changes, enabled, publish)
 	if not require_state("set_groups_sections_enabled") then return false end
-	if type(changes) ~= "table" or type(enabled) ~= "boolean" then
+	if not dense_list(changes) or type(enabled) ~= "boolean" then
 		Logger.error(LOG, "set_groups_sections_enabled: changes table and boolean enabled are required.")
 		return false
 	end
@@ -348,7 +361,7 @@ function M.set_groups_sections_enabled(changes, enabled, publish)
 	local seen_keys = {}
 	for _, change in ipairs(changes) do
 		if type(change) ~= "table" or type(change.name) ~= "string" or change.name == ""
-			or type(change.sections) ~= "table" or known_groups[change.name] == nil
+			or not dense_list(change.sections) or known_groups[change.name] == nil
 			or (change.group_enabled ~= nil and type(change.group_enabled) ~= "boolean") then
 			Logger.error(LOG, "set_groups_sections_enabled: invalid or unknown group change.")
 			return false
@@ -528,7 +541,7 @@ end
 --- @param section_names table Array of section names.
 --- @param enabled boolean The explicit choice persisted for every listed section.
 function M.set_sections_enabled(gn, section_names, enabled)
-	if type(section_names) ~= "table" then return false end
+	if not dense_list(section_names) then return false end
 	if #section_names == 0 then return true end
 	return M.set_groups_sections_enabled({ {
 		name = gn,

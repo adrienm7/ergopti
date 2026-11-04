@@ -333,6 +333,21 @@ helpers.describe("model selector page owner", function()
 		end)
 	end)
 
+	helpers.it("ignores a late completion from an earlier download of the same model", function()
+		with_page({}, function(Page, ctx, calls, collected, p)
+			local action = { action = "download_model", backend = "ollama", name = "Qwen-B" }
+			helpers.assert_true(Page.handle_action(ctx, action, p, collected))
+			local old_done = calls.done
+			old_done()
+			helpers.assert_true(Page.handle_action(ctx, action, p, collected))
+			old_done()
+			helpers.assert_eq(row_of(Page.build_payload(ctx, p, collected), "ollama", "Qwen-B").pending, "download")
+			helpers.assert_true(Page.on_download_percent("ollama_model", 42))
+			calls.done()
+			helpers.assert_nil(row_of(Page.build_payload(ctx, p, collected), "ollama", "Qwen-B").pending)
+		end)
+	end)
+
 	helpers.it("shows the download window's percentage on the downloading row", function()
 		with_page({}, function(Page, ctx, calls, collected, p)
 			helpers.assert_eq(calls.percent_listener, Page.on_download_percent, "the page observes the window")

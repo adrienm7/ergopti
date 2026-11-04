@@ -591,14 +591,23 @@ function M.copy_pixel_color(parent)
 	if not operation then return false end
 	Logger.trace(LOG, "Pixel color read started…")
 	local ok, pos = pcall(hs.mouse.absolutePosition)
-	if not ok or not pos then
+	local function coordinate(value)
+		if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then return nil end
+		local integer = math.tointeger(math.floor(value))
+		-- The capture region subtracts one pixel around the requested point.
+		if integer == nil or integer == math.mininteger then return nil end
+		return integer
+	end
+	local x = ok and type(pos) == "table" and coordinate(pos.x) or nil
+	local y = ok and type(pos) == "table" and coordinate(pos.y) or nil
+	if x == nil or y == nil then
 		operation.authorized = false
 		finish_operation(operation)
 		Logger.error(LOG, "copy_pixel_color: failed to read mouse position.")
 		return false
 	end
 
-	return pixel_hex_at(operation, math.floor(pos.x), math.floor(pos.y), function(hex)
+	return pixel_hex_at(operation, x, y, function(hex)
 		if not hex then
 			notifications.notify(i18n.get("shortcuts.pixel_read_error"), nil, "error")
 			return
