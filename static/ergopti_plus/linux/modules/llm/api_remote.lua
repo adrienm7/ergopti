@@ -229,9 +229,10 @@ end
 local function catalogue()
 	if _catalogue then return _catalogue end
 	local path = Paths.shared("modules/llm/api_providers.json")
-	local fh = path and io.open(path, "r")
-	local text = fh and fh:read("*a") or nil
-	local closed = fh and fh:close()
+	local text, status
+	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then text = nil end
+	local closed = status == "ok"
 	local cloud_published
 	_catalogue, cloud_published = M.parse_catalogue(text)
 	local order, servers, local_published, _, request_fields, local_dialect = LocalCatalogue.load(_catalogue.providers)
@@ -729,9 +730,9 @@ end
 function thinking_families()
 	if _thinking_families then return _thinking_families end
 	local path = Paths.shared("modules/llm/thinking_off.json")
-	local fh = path and io.open(path, "r")
-	local text = fh and fh:read("*a") or nil
-	if fh then fh:close() end
+	local text, status
+	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then text = nil end
 	local families, reason = ThinkingOff.parse_families(type(text) == "string" and Json.decode(text) or nil)
 	if not families then
 		Logger.error(LOG, "thinking_off.json is unreadable (%s) — no request turns thinking off.", tostring(reason))

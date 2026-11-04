@@ -129,6 +129,10 @@ if package.config:sub(1, 1) == "/" then
 end
 
 for _, case in ipairs({
+	{ name = "remote provider catalogue", module = "modules.llm.api_remote", path = "modules/llm/api_providers.json",
+		invoke = function(owner) return owner.provider("openai") ~= nil end, returns_false = true },
+	{ name = "reasoning policy", module = "modules.llm.api_remote", path = "modules/llm/thinking_off.json",
+		invoke = function(owner) return owner.ollama_think("gpt-oss:20b") end, returns_false = true },
 	{ name = "inference", module = "modules.llm.inference", path = "modules/llm/inference.json",
 		invoke = function(owner) return owner.variant_temperature(0.5, 1) end, raises = true },
 	{ name = "backend brands", module = "modules.llm.backend_brands", path = "modules/llm/backends.json",
@@ -163,6 +167,7 @@ for _, case in ipairs({
 		os.remove(path); os.remove(dir)
 		while not exited do uv.run("once") end
 		if case.raises then helpers.assert_eq(ok, false, "unreadable source must fail")
+		elseif case.returns_false then helpers.assert_true(ok); helpers.assert_eq(value, false, "unreadable source must refuse")
 		else helpers.assert_true(ok); helpers.assert_nil(value, "unreadable source must refuse") end
 	end)
 end
