@@ -143,20 +143,34 @@ helpers.describe("ui.webkit_host", function()
 			local driver = '/tmp/ergopti\\checkout/linux'
 			local ui = driver .. "/../_shared/ui"
 			local locales = driver .. "/../_shared/data/locales"
-			local original_open = io.open
-			io.open = function(path, mode)
+			local reader = require("infra.regular_file_reader")
+			local original_open = reader.open_source
+			reader.open_source = function(path)
 				if path == ui .. "/host_bridge.js" or path == locales .. "/fr.json" then
 					return { close = function() return true end }
 				end
-				return original_open(path, mode)
+				return original_open(path)
 			end
 			local ok, resolved_ui, resolved_locales = pcall(function()
 				return WH.resolve_ui_root(driver), WH.resolve_locales_dir(driver)
 			end)
-			io.open = original_open
+			reader.open_source = original_open
 			if not ok then error(resolved_ui, 0) end
 			helpers.assert_eq(resolved_ui, ui, "a successful probe must return the exact admitted path")
 			helpers.assert_eq(resolved_locales, locales, "a backslash is a filename byte on Linux")
+		end)
+
+		helpers.it("(webview-asset-source) rejects a probe whose stream close fails", function()
+			local reader = require("infra.regular_file_reader")
+			local original, closes = reader.open_source, 0
+			reader.open_source = function()
+				return { close = function() closes = closes + 1; return nil end }
+			end
+			local ok, result = pcall(WH.resolve_ui_root, "/controlled")
+			reader.open_source = original
+			helpers.assert_true(ok)
+			helpers.assert_eq(result, "")
+			helpers.assert_eq(closes, 2)
 		end)
 
     helpers.it("returns empty for nonexistent roots", function()
@@ -273,13 +287,14 @@ helpers.describe("ui.webkit_host", function()
 		helpers.it("fails closed when a required local vendor is absent", function()
 			local ui_root = WH.resolve_ui_root(DRIVER_ROOT)
 			local app_dir = WH.resolve_app_dir(ui_root, "metrics_apps")
-			local original_open = io.open
-			io.open = function(path, mode)
+			local reader = require("infra.regular_file_reader")
+			local original_read = reader.read_source
+			reader.read_source = function(path)
 				if tostring(path):find("vendor/chart.umd.js", 1, true) then return nil end
-				return original_open(path, mode)
+				return original_read(path)
 			end
 			local ok, html = pcall(WH.build_injected_html, app_dir)
-			io.open = original_open
+			reader.read_source = original_read
 			if not ok then error(html, 0) end
 			helpers.assert_true(html:find("Build error", 1, true) ~= nil,
 				"missing verified code must fail the page instead of silently dropping charts")

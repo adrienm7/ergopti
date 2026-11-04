@@ -98,6 +98,16 @@ end
 -- 2. Path resolution
 -- ============================================================================
 
+--- Probes a pinned regular source and requires an acknowledged close.
+--- @param path string Candidate asset path.
+--- @return boolean readable
+local function regular_file_exists(path)
+	local called, stream = pcall(require("infra.regular_file_reader").open_source, path)
+	if not called or not stream then return false end
+	local closed, acknowledged = pcall(function() return stream:close() end)
+	return closed and acknowledged == true
+end
+
 --- Resolves the shared UI assets root directory relative to the driver root.
 --- @param driver_root string Absolute path to the linux driver root.
 --- @return string Absolute path to _shared/ui/, or empty string if not found.
@@ -108,9 +118,7 @@ function M.resolve_ui_root(driver_root)
 		driver_root .. "/../../_shared/ui",
 	}
 	for _, p in ipairs(candidates) do
-		local fh = io.open(p .. "/host_bridge.js", "r")
-		if fh then
-			fh:close()
+		if regular_file_exists(p .. "/host_bridge.js") then
 			-- Native Linux filenames retain backslashes as ordinary bytes.
 			return p
 		end
@@ -128,9 +136,7 @@ function M.resolve_locales_dir(driver_root)
 		driver_root .. "/../../_shared/data/locales",
 	}
 	for _, p in ipairs(candidates) do
-		local fh = io.open(p .. "/fr.json", "r")
-		if fh then
-			fh:close()
+		if regular_file_exists(p .. "/fr.json") then
 			return p
 		end
 	end
@@ -145,9 +151,7 @@ function M.resolve_app_dir(ui_root, app_name)
 	if type(ui_root) ~= "string" or ui_root == "" then return "" end
 	if type(app_name) ~= "string" or app_name == "" then return "" end
 	local path = ui_root .. "/" .. app_name
-	local fh = io.open(path .. "/index.html", "r")
-	if fh then
-		fh:close()
+	if regular_file_exists(path .. "/index.html") then
 		return path
 	end
 	return ""
@@ -174,11 +178,7 @@ end
 --- @return string The file content, or empty string if unreadable.
 local function read_file(path)
 	if type(path) ~= "string" or path == "" then return "" end
-	local ok, fh = pcall(io.open, path, "r")
-	if not ok or not fh then return "" end
-	local content = fh:read("*a")
-	fh:close()
-	return content or ""
+	return require("infra.regular_file_reader").read_source(path) or ""
 end
 
 --- Builds a self-contained HTML string by inlining local <script src> and
