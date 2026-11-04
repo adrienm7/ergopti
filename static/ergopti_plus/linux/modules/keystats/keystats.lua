@@ -738,9 +738,11 @@ function M.init(opts)
 	-- Resume only a pass a previous run left unfinished. Starting one
 	-- unconditionally would re-read every stored row at every daemon start, on
 	-- machines that may never have enabled the setting at all.
-	TextMigration.resume(
-		_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
-		_device_id)
+	if sqlite_available() then
+		TextMigration.resume(
+			_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
+			_device_id)
+	end
 
 	-- The user's stored choices, applied over the manifest defaults. Here rather
 	-- than at module load: see the note beside the declarations.
@@ -2040,7 +2042,7 @@ end
 --- posture. Idempotent: a pass over an already-converted table skips every row.
 --- @return boolean True when a pass is in flight.
 function M.migrate_stored_text()
-	if M.has_flush_debt() or _flush_stopping then return false end
+	if M.has_flush_debt() or _flush_stopping or not sqlite_available() then return false end
 	if not Preferences.admit() then return false end
 	TextMigration.cancel()
 	return TextMigration.start(
@@ -2053,7 +2055,7 @@ end
 --- one openssl spawn per value, and the flush path runs on the keystroke side of
 --- the daemon where that cost would be felt as input lag.
 function M.pump_migration()
-	if M.has_flush_debt() then return end
+	if M.has_flush_debt() or not sqlite_available() then return end
 	TextMigration.pump()
 end
 
