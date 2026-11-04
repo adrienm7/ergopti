@@ -675,13 +675,18 @@ function M.init(opts)
 	local open_called, open_result, open_reason = false, false, "sqlite_unavailable"
 	if SqliteWriter then open_called, open_result, open_reason = pcall(SqliteWriter.open_db, _sqlite_path) end
 	local sqlite_opened = open_called and open_result == true
-	local migration_ok, migrated = false, false
-	if sqlite_opened then migration_ok, migrated = pcall(SqliteWriter.ensure_token_encoding) end
+	-- Verify the real device registration before any n-gram rewrite. A schema
+	-- can contain the word "linux" in an unrelated constraint and still reject
+	-- this OS; a failed transactional registration must leave keys untouched.
 	local registration_ok, registered = false, false
-	if migration_ok and migrated == true then
+	if sqlite_opened then
 		registration_ok, registered = pcall(SqliteWriter.register_device, _device_id, hostname, "linux", "", hostname)
 	end
-	local sqlite_ready = registration_ok and registered == true
+	local migration_ok, migrated = false, false
+	if registration_ok and registered == true then
+		migration_ok, migrated = pcall(SqliteWriter.ensure_token_encoding)
+	end
+	local sqlite_ready = migration_ok and migrated == true
 	local sqlite_unavailable = not SqliteWriter or (open_called and open_result == false and open_reason == "sqlite_unavailable")
 	_storage_blocked = not sqlite_ready and not sqlite_unavailable
 	if sqlite_ready then
