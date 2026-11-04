@@ -1198,7 +1198,9 @@ if $INSTALL_SERVICE; then
 	# XDG is the sole owner only on hosts where systemd is absent.
 	if [ "${STARTUP_OWNER}" = "xdg" ]; then
 		install -d "${AUTOSTART_DIR}"
-		cat > "${AUTOSTART_FILE}" << AUTOSTART
+		AUTOSTART_TMP="$(mktemp "${AUTOSTART_DIR}/.ergopti-autostart.XXXXXX")"
+		write_autostart_entry() {
+			cat << AUTOSTART
 [Desktop Entry]
 Type=Application
 Name=Ergopti+
@@ -1207,6 +1209,14 @@ $(ergopti_desktop_exec "${BIN_DIR}/ergopti-hotstrings")
 Terminal=false
 X-GNOME-Autostart-enabled=true
 AUTOSTART
+		}
+		printf -v AUTOSTART_MODE '%03o' "$((0666 & ~ 8#$(umask)))"
+		if ! write_autostart_entry > "$AUTOSTART_TMP" \
+			|| ! chmod "$AUTOSTART_MODE" "$AUTOSTART_TMP" \
+			|| ! mv -f -- "$AUTOSTART_TMP" "$AUTOSTART_FILE"; then
+			rm -f -- "$AUTOSTART_TMP"
+			exit 1
+		fi
 		ergopti_msg_with "  ✔  " install.xdg_autostart "${AUTOSTART_FILE}"
 	fi
 fi
