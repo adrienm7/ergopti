@@ -637,6 +637,18 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(refused ~= nil and refused.saved == false,
         "an undeclared preference key must be refused, not written")
     end)
+    helpers.it("(hotstring-pref-invalid) falls back for mistyped stored preferences", function()
+      local previous_storage = package.loaded["adapters.storage"]
+      local previous_handler = package.loaded["ui.hotstring_editor.bridge"]
+      local values = { ["hotstring_editor.compact_view"] = "false",
+        ["hotstring_editor.auto_close"] = 1, ["hotstring_editor.default_section"] = { "foreign" } }
+      package.loaded["adapters.storage"] = { get = function(key) return values[key] end }
+      package.loaded["ui.hotstring_editor.bridge"] = nil
+      local bridge = require("ui.hotstring_editor.bridge")
+      local observed = { bridge.get_pref("compact_view"), bridge.get_pref("auto_close"), bridge.get_pref("default_section") }
+      package.loaded["adapters.storage"], package.loaded["ui.hotstring_editor.bridge"] = previous_storage, previous_handler
+      helpers.assert_eq(observed, { false, false, "" })
+    end)
     helpers.it("'save_pref' reports a storage failure and rejects the wrong value type", function()
       local previous_storage = package.loaded["adapters.storage"]
       local previous_handler = package.loaded["ui.hotstring_editor.bridge"]
