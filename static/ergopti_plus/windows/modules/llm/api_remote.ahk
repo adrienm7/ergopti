@@ -1606,6 +1606,12 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
 _LLMRemote_ReadyOnAccess(Owner, on_result, ProviderId, Auth, Key, BaseUrl, ProvFmt, Port, Ok, Failure) {
     if !_LLMRemote_ReadyOwnerIsCurrent(Owner)
         return
+    ; The token wait consumes this readiness owner's original whole-request
+    ; budget even when its due deadline timer has not been delivered yet.
+    if _LLM_DeadlineExpired(Owner["network_start_tick"], Owner["network_timeout_ms"]) {
+        _LLMRemote_CompleteReady(Owner, on_result, false)
+        return
+    }
     if !Ok {
         Owner["http_status"] := Failure.Get("key_refused", false) ? 401 : Failure.Get("status", 0)
         _LLMRemote_CompleteReady(Owner, on_result, false)
