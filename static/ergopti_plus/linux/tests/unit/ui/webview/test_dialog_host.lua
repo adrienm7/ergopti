@@ -147,6 +147,11 @@ h.describe("owned dialog resolver (owned-dialog-host)", function()
 	end)
 
 	h.it("(owned-dialog-host) os.execute results read as the host's exit code on every interpreter", function()
+		if jit then
+			local status = os.execute("kill -HUP $$")
+			h.assert_eq(status, 1, "the child really terminated by SIGHUP")
+			h.assert_nil(NativeDialog.exit_code(status), "a killed dialog is not a user cancellation")
+		end
 		h.assert_eq(NativeDialog.exit_code(0), 0)
 		h.assert_eq(NativeDialog.exit_code(true), 0)
 		h.assert_eq(NativeDialog.exit_code(256), NativeDialog.EXIT_CANCELLED)
