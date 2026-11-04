@@ -2639,7 +2639,9 @@ local function _dispatch_pointer(ev, slot)
 end
 
 local function _read_source(source)
+	local session = _capture_session
 	local event, status, reason = EvdevReader.read_event(source.slot)
+	if not _running or _capture_session ~= session then return nil end
 	if event and EvdevReader.capture_event then
 		_event_receipts[event] = EvdevReader.capture_event(event, source.slot)
 	end
@@ -2649,6 +2651,7 @@ local function _read_source(source)
 	_pending_events[source.slot] = nil
 	if not source.keyboard and _on_pointer_event then
 		_call_callback("pointer event callback", _on_pointer_event, "reset", nil, nil, source.slot)
+		if not _running or _capture_session ~= session then return nil end
 	end
 	if not source.keyboard and LayerPointer.slots[source.slot] then
 		M.emergency_stop("grabbed pointer reader failed")
@@ -2689,8 +2692,9 @@ end
 
 --- Reads the next event of every source that has none pending.
 --- @param sources table The pump's sources.
-local function _read_empty_sources(sources)
+local function _read_empty_sources(sources, session)
 	for _, source in ipairs(sources) do
+		if not _running or _capture_session ~= session then return end
 		if not _pending_events[source.slot] then
 			_pending_events[source.slot] = _read_source(source)
 		end
@@ -2721,6 +2725,7 @@ end
 function LayerPointer.pump_once()
 	if not _running then return end
 	if _source_reconciliation then return end
+	local session = _capture_session
 	Perf.count("input.pump_calls")
 	local open_keyboards = 0
 	local sources = {}
@@ -2749,7 +2754,9 @@ function LayerPointer.pump_once()
 	end
 
 	_number_row.drive() -- Same original pump/queue; no additional reader/timer.
-	_read_empty_sources(sources)
+	if not _running or _capture_session ~= session then return end
+	_read_empty_sources(sources, session)
+	if not _running or _capture_session ~= session then return end
 	local drained = false
 	for _ = 1, EvdevReader.MAX_EVENTS_PER_DRAIN do
 		local selected = _earliest_pending(sources)
@@ -2757,7 +2764,8 @@ function LayerPointer.pump_once()
 			-- A source is read again only once its event is dispatched: one
 			-- empty at the start of the drain is read once more before the
 			-- queues count as empty.
-			_read_empty_sources(sources)
+			_read_empty_sources(sources, session)
+			if not _running or _capture_session ~= session then return end
 			selected = _earliest_pending(sources)
 			if not selected then
 				drained = true
@@ -2772,6 +2780,7 @@ function LayerPointer.pump_once()
 			Perf.count("input.key_events")
 			_dispatch_event(selected_event, selected.path)
 			Perf.span("input.dispatch", dispatch_started)
+			if not _running or _capture_session ~= session then return end
 			LayerPointer.sync()
 		else
 			Perf.count("input.pointer_events")
@@ -2781,7 +2790,9 @@ function LayerPointer.pump_once()
 			if _remapper and _intercept then _event_time_ms(selected_event) end
 			_dispatch_pointer(selected_event, selected.slot)
 		end
+		if not _running or _capture_session ~= session then return end
 		_pending_events[selected.slot] = _read_source(selected)
+		if not _running or _capture_session ~= session then return end
 	end
 
 	-- Time passes with no event: a hold that came due since the last one goes
