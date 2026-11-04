@@ -242,15 +242,16 @@ _HotstringsOverrideCandidateIdentifiersAreValid(Source, &Detail) {
 ; One category-level override record. Delay is the EFFECTIVE delay in seconds
 ; (0 = unlimited, "" = none); it is stored in the file as an offset of the base
 ; expansion delay. PendingOffset holds a parsed offset until the base is known,
-; LegacyDelay an absolute delay of an earlier build until the boot migration.
+; StoredOffset retains the finite intent even when effective delay clamps;
+; LegacyDelay is an absolute delay of an earlier build until boot migration.
 _HotstringsNewOverrideEntry() {
-		return { Delay: "", PendingOffset: "", LegacyDelay: "", Color: "", ShowTooltip: "",
+		return { Delay: "", PendingOffset: "", StoredOffset: "", LegacyDelay: "", Color: "", ShowTooltip: "",
 				Priority: "", Sections: Map() }
 }
 
 ; One section-level override record, same fields as the category's.
 _HotstringsNewOverrideSection() {
-		return { Delay: "", PendingOffset: "", LegacyDelay: "", Color: "", ShowTooltip: "",
+		return { Delay: "", PendingOffset: "", StoredOffset: "", LegacyDelay: "", Color: "", ShowTooltip: "",
 				Priority: "" }
 }
 
@@ -446,7 +447,9 @@ _HotstringsDelayLine(Record, Base) {
 		if (Record.Delay != "") {
 				if (Record.Delay == 0)
 						return "delay_unlimited = true`n"
-				return "delay_offset = " . HotstringsSerialiseDelayOffset(Record.Delay - Base) . "`n"
+				Offset := Record.HasOwnProp("StoredOffset") && Record.StoredOffset != ""
+						? Record.StoredOffset : Record.Delay - Base
+				return "delay_offset = " . HotstringsSerialiseDelayOffset(Offset) . "`n"
 		}
 		if (Record.HasOwnProp("PendingOffset") and Record.PendingOffset != "")
 				return "delay_offset = " . HotstringsSerialiseDelayOffset(Record.PendingOffset) . "`n"

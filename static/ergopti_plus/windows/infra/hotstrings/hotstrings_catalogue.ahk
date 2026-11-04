@@ -107,10 +107,12 @@ HotstringsOverridesApplyBase(Overrides := unset) {
 }
 
 _HotstringsRecordApplyBase(Record, Base) {
-		if !Record.HasOwnProp("PendingOffset") or Record.PendingOffset == ""
-				return
-		Record.Delay := HotstringsDelayFromOffset(Base, Record.PendingOffset)
-		Record.PendingOffset := ""
+		if Record.HasOwnProp("PendingOffset") && Record.PendingOffset != "" {
+				Record.StoredOffset := Record.PendingOffset
+				Record.PendingOffset := ""
+		}
+		if Record.HasOwnProp("StoredOffset") && Record.StoredOffset != ""
+				Record.Delay := HotstringsDelayFromOffset(Base, Record.StoredOffset)
 }
 
 ; Moves every override with it when the base changes: the delays are offsets, so
@@ -129,7 +131,12 @@ HotstringsOverridesRebase(PreviousBase, NewBase) {
 _HotstringsRecordRebase(Record, PreviousBase, NewBase) {
 		if Record.Delay == "" or Record.Delay == 0
 				return
-		Record.Delay := HotstringsDelayFromOffset(NewBase, Record.Delay - PreviousBase)
+		; The effective millisecond clamp is lossy. Keep the finite relative
+		; intention instead of deriving a new offset from that projection.
+		Offset := Record.HasOwnProp("StoredOffset") && Record.StoredOffset != ""
+				? Record.StoredOffset : Record.Delay - PreviousBase
+		Record.StoredOffset := Offset
+		Record.Delay := HotstringsDelayFromOffset(NewBase, Offset)
 }
 
 ; Boot step, run once the configuration (and so the base expansion delay) is
@@ -481,6 +488,7 @@ _HotstringsCloneOverrideCategory(Source) {
 		return {
 				Delay: Source.Delay,
 				PendingOffset: Source.HasOwnProp("PendingOffset") ? Source.PendingOffset : "",
+				StoredOffset: Source.HasOwnProp("StoredOffset") ? Source.StoredOffset : "",
 				LegacyDelay: Source.HasOwnProp("LegacyDelay") ? Source.LegacyDelay : "",
 				Color: Source.Color,
 				ShowTooltip: Source.ShowTooltip,
@@ -494,6 +502,7 @@ _HotstringsCloneOverrideSection(Source) {
 		return {
 				Delay: Source.Delay,
 				PendingOffset: Source.HasOwnProp("PendingOffset") ? Source.PendingOffset : "",
+				StoredOffset: Source.HasOwnProp("StoredOffset") ? Source.StoredOffset : "",
 				LegacyDelay: Source.HasOwnProp("LegacyDelay") ? Source.LegacyDelay : "",
 				Color: Source.Color,
 				ShowTooltip: Source.ShowTooltip,
@@ -675,6 +684,7 @@ _HotstringsSetOverrideOwned(Cat, Sec, Field, Value, WriterFn, ReplaceFn,
 		if (Field == "delay") {
 				Target.Delay := Value
 				Target.PendingOffset := ""
+				Target.StoredOffset := Value == "" || Value == 0 ? "" : Value - HotstringsBaseDelay()
 		} else if (Field == "color") {
 				Target.Color := Value
 		} else if (Field == "priority") {
@@ -756,6 +766,7 @@ _HotstringsClearOverrideOwned(Cat, Sec, Field, WriterFn, ReplaceFn,
 		if (Field == "" or Field == "delay") {
 				Target.Delay := ""
 				Target.PendingOffset := ""
+				Target.StoredOffset := ""
 		}
 		if (Field == "" or Field == "color") {
 				Target.Color := ""
