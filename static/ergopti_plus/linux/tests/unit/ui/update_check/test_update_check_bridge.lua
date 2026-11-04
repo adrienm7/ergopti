@@ -127,6 +127,33 @@ end
 local function last(context) return context.pushed[#context.pushed].message end
 
 helpers.describe("update-check window bridge (Linux)", function()
+	for _, kind in ipairs({ "fifo", "regular" }) do
+		helpers.it("(update-log-fifo) inspects " .. kind .. " logs without blocking", function()
+			if package.config:sub(1, 1) == "\\" then return end
+			local path = os.tmpname(); os.remove(path)
+			local quote, root = require("text_utils").shell_quote, helpers.driver_root()
+			if kind == "fifo" then
+				local made = os.execute("mkfifo " .. quote(path))
+				assert(made == true or made == 0)
+			else
+				local file = assert(io.open(path, "w")); assert(file:write("log")); assert(file:close())
+			end
+			local source = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/?/init.lua;"
+				.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;") .. "..package.path;"
+				.. "package.loaded['infra.installation']={is_source_run=function()return false end};"
+				.. "package.loaded['infra.logger_sink']={main_log_path=function()return " .. string.format("%q", path) .. " end};"
+				.. "package.loaded['adapters.shell_runner']={has_command=function()return true end};"
+				.. "local window; package.loaded['ui.download_window.bridge']={show=function(v)window=v;return 1 end};"
+				.. "local release={tag='v1',download_url='https://example.invalid/a'}; local u={"
+				.. "get_cached_release=function()return release end,get_state=function()return 'idle' end,"
+				.. "get_channel=function()return 'dev' end,download_update=function()return true end};"
+				.. "assert(require('ui.update_check.bridge').download_offered(u,release,{on_open_today_log=function()end}));"
+				.. "assert(window.can_open_diagnostics()==" .. tostring(kind == "regular") .. ")"
+			local status = os.execute("timeout 3 " .. quote(assert(require("luv").exepath())) .. " -e " .. quote(source))
+			assert(os.remove(path))
+			helpers.assert_true(status == true or status == 0, "special logs must be refused without waiting")
+		end)
+	end
 	helpers.it("opens the window, shows checking, then the updater's answer", function()
 		scenario(available, function(bridge, context)
 			helpers.assert_true(bridge.open(context.ctx))
