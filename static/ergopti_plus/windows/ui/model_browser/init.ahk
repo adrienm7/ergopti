@@ -145,8 +145,10 @@ _LLM_ModelBrowser_Build() {
 	; LLM_LoadModelsJSON. Status reads ``ollama list`` so the user can
 	; tell installed vs available at a glance, but the column is filled
 	; lazily on refresh to avoid blocking the Gui at construction.
+	; RefreshRows owns family/parameter order. Automatic lexical insertion would
+	; both undo that order and shift its remembered active-row index.
 	lv := g.Add("ListView",
-		"r18 w780 vListView Sort -Multi",
+		"r18 w780 vListView -Multi",
 		[ t("menu.llm.browse_col_name")
 		, t("menu.llm.browse_col_family")
 		, t("menu.llm.browse_col_params")

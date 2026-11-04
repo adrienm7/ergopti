@@ -278,6 +278,6 @@ _MBPT_Case(Mode) {
 		throw ExportFailure
 }
 
-for _MBPT_Mode in ["current", "during-close", "paused-entry", "native-refused", "native-paused"]
+for _MBPT_Mode in ["current", "during-close", "paused-entry", "native-refused", "native-paused", "native-sort"]
 	Test("Model browser selection: " . _MBPT_Mode . " preserves native pause ownership (model-browser-close-pause-owner)",
 		_MBPT_Case.Bind(_MBPT_Mode))

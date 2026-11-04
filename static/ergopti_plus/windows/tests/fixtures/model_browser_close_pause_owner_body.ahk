@@ -120,7 +120,7 @@ _MBPO_Prepare() {
 	FSCreateDirectoryExclusiveStrict(Directory)
 	ConfigurationFile := Directory . "\config.toml"
 	Index := LLM_GetModelIndex()
-	_MBPO.ModelA := LLM_Defaults["llm_model"]
+	_MBPO.ModelA := _MBPO.Mode == "native-sort" ? "Qwen3.5-9B" : LLM_Defaults["llm_model"]
 	_MBPO_Require(Index is Map && Index.Has(_MBPO.ModelA), "The baseline must come from the real shared model catalogue/defaults.")
 	for Name in Index {
 		if Name != _MBPO.ModelA {
@@ -279,9 +279,58 @@ _MBPO_NativeRefused() {
 	FileAppend("RECEIPT native-model-refusal negative=lease positive=durable writer_confirmed=" . _MBPO.WriterConfirmed . "`n", "*", "UTF-8-RAW")
 }
 
+_MBPO_NativeSortSelection(List, Phase) {
+	global _MBPO
+	Selected := List.GetNext(0), Small := 0, Large := 0
+	_MBPO_Require(Selected > 0 && List.GetText(Selected, 1) == _MBPO.ModelA,
+		"The actual native selected row must name the active model after " . Phase . ".")
+	Loop List.GetCount() {
+		Name := List.GetText(A_Index, 1)
+		if Name == "Qwen3.5-9B"
+			Small := A_Index
+		if Name == "Qwen3.5-27B"
+			Large := A_Index
+	}
+	_MBPO_Require(Small > 0 && Large > Small,
+		"The real native rows must retain numeric parameter order: 9B before 27B after " . Phase . ".")
+}
+
+_MBPO_NativeSort() {
+	global _MBPO, _LLM_ModelBrowser_Gui, _LLM_Menu, ConfigurationFile
+	Index := LLM_GetModelIndex()
+	_MBPO_Require(Index.Has("Qwen3.5-9B") && Index.Has("Qwen3.5-27B")
+		&& Index["Qwen3.5-9B"]["params_b"] < Index["Qwen3.5-27B"]["params_b"],
+		"The genuine catalogue must supply the lexical-versus-numeric ordering counterexample.")
+	_MBPO.Window := _LLM_ModelBrowser_Build()
+	_MBPO.Hwnd := _MBPO.Window.Hwnd
+	_LLM_ModelBrowser_Gui := _MBPO.Window
+	_MBPO.Window.Show("NA")
+	List := _MBPO.Window.ListView
+	_MBPO_NativeSortSelection(List, "initial construction")
+	_LLM_ModelBrowser_RefreshRows(List)
+	_MBPO_NativeSortSelection(List, "full refresh")
+	_LLM_ModelBrowser_RefreshRows(List, "Qwen3.5")
+	_MBPO_NativeSortSelection(List, "family filter")
+	_LLM_ModelBrowser_RefreshRows(List, "no-such-audit-catalogue-model")
+	_MBPO_Require(List.GetCount() == 0 && List.GetNext(0) == 0,
+		"A filter with no catalogue match must leave no selected row.")
+	_LLM_ModelBrowser_RefreshRows(List)
+	_MBPO_NativeSortSelection(List, "filter removal")
+	_MBPO_Require(_MBPO.WriterEntries == 0 && _MBPO.MutationReturns == 0 && _MBPO.Errors.Length == 0
+		&& _LLM_Menu["model"] == _MBPO.ModelA
+		&& CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash,
+		"Construction, selection highlighting and filtering must preserve the actual durable active model.")
+	FileAppend("RECEIPT native-model-sort active=" . List.GetText(List.GetNext(0), 1)
+		. " count=" . List.GetCount() . "`n", "*", "UTF-8-RAW")
+}
+
 _MBPO_Run() {
 	global _MBPO, ConfigurationFile, _LLM_Menu, Features, _LLM_MBW_SessionEpoch
 	_MBPO_Prepare()
+	if _MBPO.Mode == "native-sort" {
+		_MBPO_NativeSort()
+		return
+	}
 	if InStr(_MBPO.Mode, "native-") == 1 {
 		_MBPO_NativeRefused()
 		return
@@ -339,7 +388,7 @@ _MBPO_Main() {
 		DestroyCalls: 0, PauseObserved: false, WriterEntries: 0, WriterConfirmed: 0,
 		PausedWriterEntries: 0, MutationReturns: 0, MutationConfirmed: 0, RepaintRequests: 0,
 		Pulses: 0, Cleaning: false, Errors: [], Failure: 0, NativePick: 0, NativeCommands: 0}
-	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry" || _MBPO.Mode == "native-refused" || _MBPO.Mode == "native-paused",
+	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry" || _MBPO.Mode == "native-refused" || _MBPO.Mode == "native-paused" || _MBPO.Mode == "native-sort",
 		"The model browser mode must be explicit.")
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_MBPO_OnError)

@@ -449,3 +449,17 @@ Consequence: The old translation is served and associated with the new JSON hash
 Regression: The reachable test_i18n.ahk cold-load regression uses real durable JSON writes, the real TSV publisher and identical native file timestamps; it asserts refreshed memory and disk values, plus a strictly-newer positive fast-path control. Native Windows execution is pending; the pre-fix failure is source-derived.
 
 The ongoing register now contains **30 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-031: Automatic native ListView sorting shifts the active model selection
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+\_LLM_ModelBrowser_Build in static/ergopti_plus/windows/ui/model_browser/init.ahk enables native Sort while \_LLM_ModelBrowser_RefreshRows records the active insertion index before all later rows are inserted. Native lexical sorting invalidates both the intended parameter ordering and that index.
+
+Reproduction: Open the native catalogue with Qwen3.5-9B active. Its numeric parameter ordering inserts Qwen3.5-27B later, but lexical automatic insertion places 27B before 9B and moves the remembered active row.
+
+Consequence: The highlighted row can designate a different model, so accepting the initial selection may unexpectedly change the configured model.
+
+Regression: Extend the reachable model-browser-close-pause-owner native child with native-sort: genuine boot and catalogue, real Gui/ListView construction, active row identity and 9B-before-27B assertions after construction, refresh, filtering and filter removal; no-match and durable-no-write controls. Native Windows execution is pending; pre-fix failure is source-derived.
+
+The ongoing register now contains **31 distinct new findings**. The requested target of 1,000 remains unmet.
