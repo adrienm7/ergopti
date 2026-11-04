@@ -105,6 +105,39 @@ local function page(context)
 end
 
 helpers.describe("diagnostics bridge (linux): the page's messages", function()
+	helpers.it("(healthcheck-ready-owner) drops a snapshot when the page closes during collection", function()
+		with_bridge(nil, function(bridge, context)
+			local old = page(context)
+			local build = bridge.build_snapshot
+			bridge.build_snapshot = function(...)
+				bridge.build_snapshot = build
+				context.epoch = nil
+				bridge.on_window_closed(old.epoch)
+				return build(...)
+			end
+			helpers.assert_nil(bridge.on_message("ready", {}, old))
+			helpers.assert_eq(context.starts, 0)
+		end)
+	end)
+
+	helpers.it("(healthcheck-ready-owner) preserves the replacement opened during collection", function()
+		with_bridge(nil, function(bridge, context)
+			local old = page(context)
+			local build = bridge.build_snapshot
+			bridge.build_snapshot = function(...)
+				bridge.build_snapshot = build
+				context.epoch = 8
+				bridge.on_window_closed(old.epoch)
+				helpers.assert_eq(bridge.on_message("ready", {}, page(context)).type, "init")
+				return build(...)
+			end
+			helpers.assert_nil(bridge.on_message("ready", {}, old))
+			helpers.assert_eq(context.starts, 1, "only the replacement starts probes")
+			bridge.on_window_closed(context.epoch)
+			helpers.assert_eq(context.cancels, 1, "the replacement retains its probes")
+		end)
+	end)
+
 	helpers.it("answers ready with a quick version 2 snapshot starting only the local probes", function()
 		with_bridge(nil, function(bridge, context)
 			local answer = bridge.on_message("ready", {}, page(context))
