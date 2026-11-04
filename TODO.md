@@ -471,10 +471,18 @@ between workers) green alone. All live checks pass, typed by the harness.
   acceptance of item 31 below come next, then `runtime = "owned"` becomes the default.
 - **One folder name for Ergopti on the three OS (maintainer, 3 November).** macOS has three folders in Application
   Support: `ErgoptiPlus` (paths.toml, runtime, locks, karabiner.json), `Ergopti` (managed Ollama, embedded Python, MLX)
-  and `ergopti_plus` (the local reload control); Windows mixes `%LOCALAPPDATA%ergopti_plus` and `Ergoptiundle`, and the
-  config, logs and caches use other spellings. Decided: `Ergopti` on macOS and
-  Windows, `ergopti` under XDG on Linux, no "Plus" in folder names; put each driver's data under one root, name it once in the shared identifiers,
-  and migrate the old folders once at boot with a backup.
+  and `ergopti_plus` (the local reload control); Windows mixes `%LOCALAPPDATA%\ergopti_plus` and `Ergopti\bundle`, and
+  the config, logs and caches use other spellings. Decided: `Ergopti` on macOS and Windows, `ergopti` under XDG on Linux,
+  no "Plus" in folder names; put each driver's data under one root, name it once in the shared identifiers, and migrate
+  the old folders once at boot with a backup. Branch `next/one-folder-name` (handoff:
+  `docs/tooling/one-folder-name-handoff.md`).
+  - Done: one root per OS in `_shared/modules/paths/app_dirs.toml` (generated for Lua, AHK and Swift; Node reads it
+    through `tools/test/lib/app-dirs.cjs`); the three drivers resolve their folders from it; the boot migration moves
+    the old folders, renames an entry whose destination is taken into `<root>/before-folder-migration/`, removes the
+    emptied old folders and backs up a rewritten paths.toml; shared vectors replayed on the three drivers.
+  - In progress: test, tool, collector, CI and doc spellings of the old folders on each OS.
+  - Next: the gate `tools/test/test-legacy-folder-names.cjs`; CI on the branch; the owned Karabiner runtime folder
+    (`ErgoptiPlus`) is renamed with its next rebuild (item 31).
 - **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
   branch `next/owned-karabiner`, [handoff](docs/tooling/next-release-handoff.md)). Status on 4 November:
   - Done: runtime `16.3.0-ergopti.2` published (prerelease `remap-runtime-v16.3.0-ergopti.2`, downloaded back: sha256
