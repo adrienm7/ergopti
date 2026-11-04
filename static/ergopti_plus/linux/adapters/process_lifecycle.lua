@@ -229,7 +229,10 @@ function M.start()
 	-- The daemon subscribes only to focus. Enumerating the whole machine has
 	-- no consumer until a launch/quit observer explicitly asks for it.
 	local seed
-	if #_launch_callbacks > 0 or #_quit_callbacks > 0 then seed = _snapshot_processes() end
+	if #_launch_callbacks > 0 or #_quit_callbacks > 0 then
+		local ok, snapshot = pcall(_snapshot_processes)
+		if ok then seed = snapshot else Logger.debug(LOG, "start(): process snapshot failed — retrying on poll.") end
+	end
 	_last_processes = seed or {}
 	_have_proc_baseline = seed ~= nil
 

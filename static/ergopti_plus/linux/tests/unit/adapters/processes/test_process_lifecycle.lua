@@ -451,3 +451,23 @@ for _, fault in ipairs({ "read_throw", "close_false", "close_throw" }) do
 		end)
 	end)
 end
+
+helpers.it("process polling recovers after an exception during initial snapshot", function()
+	with_proc(AB, function(M, proc, launched, quit)
+		local original = io.open
+		io.open = function(path, mode)
+			if path == proc.root .. "/101/stat" then error("injected initial proc open failure") end
+			return original(path, mode)
+		end
+		local called = pcall(M.start)
+		io.open = original
+		helpers.assert_true(called, "a failed initial process snapshot must not abort polling")
+		M.tick(PROCESS_TICK)
+		helpers.assert_eq(launched, {}, "recovery silently establishes a baseline")
+		helpers.assert_eq(quit, {})
+		proc.set(AC)
+		M.tick(PROCESS_TICK * 2)
+		helpers.assert_eq(launched, { "c" })
+		helpers.assert_eq(quit, { "b" })
+	end)
+end)
