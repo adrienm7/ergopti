@@ -150,9 +150,13 @@ local function read_proc_devices()
 		Logger.warn(LOG, "read_proc_devices(): cannot open '%s' — %s.", PROC_INPUT_DEVICES, tostring(err))
 		return {}
 	end
-	local text = fh:read("*a")
-	fh:close()
-	return M.parse_devices(text or "")
+	local read_ok, text = pcall(fh.read, fh, "*a")
+	local close_ok, closed = pcall(fh.close, fh)
+	if not read_ok or type(text) ~= "string" or not close_ok or closed ~= true then
+		Logger.warn(LOG, "read_proc_devices(): cannot complete reading '%s'.", PROC_INPUT_DEVICES)
+		return {}
+	end
+	return M.parse_devices(text)
 end
 
 --- Extracts the /dev/input/eventN path from a device descriptor's handlers.
