@@ -122,7 +122,11 @@ _IOBL_RolloverStillDeletesAfterDraining() {
 		&& InStr(Body, "_KL_RolloverResume(Scope.Token)")
 		> InStr(Body, "_KL_RolloverPrepare(Scope.Token, new_date)"),
 		"the consumed EOF must precede durable preparation and deletion")
-	Assert(InStr(Resume, "FileDelete(Keystats.today_log_path)") > 0,
+	DeletePos := InStr(Resume, "FSDeleteVerified(Keystats.today_log_path, _KL_RolloverSnapshotMatches.Bind(Expected))")
+	ExpectedPos := InStr(Resume, 'Expected := Receipt["snapshot"].Clone()')
+	Assert(ExpectedPos > 0 && DeletePos > ExpectedPos && !InStr(Resume, "FileDelete("),
+		"deletion must bind the original persisted consumed-file proof and never delete a later path occupant")
+	Assert(DeletePos > 0,
 		"prerequisite: the rollover still deletes today.log afterwards -- that is what turns "
 		. "a skipped batch into unrecoverable loss rather than a delayed read")
 }

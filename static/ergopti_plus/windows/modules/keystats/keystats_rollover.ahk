@@ -78,6 +78,19 @@ _KL_RolloverPrepare(Token, Date) {
 	}
 }
 
+; FSDeleteVerified pins Candidate against replacement while this adapter read
+; compares its complete identity with the original consumed receipt.
+_KL_RolloverSnapshotMatches(Expected, Candidate) {
+	Observed := FSReadRange(Candidate, 0, 0)
+	Snapshot := Observed.Get("snapshot", Map("ok", false))
+	if !Observed.Get("ok", false) || !Snapshot.Get("ok", false)
+		return false
+	for Name in ["volume", "index_high", "index_low", "write_high", "write_low", "size"]
+		if Snapshot[Name] != Expected[Name]
+			return false
+	return true
+}
+
 ; Called under journal ownership at startup and before a new writer is admitted.
 ; A missing file is recoverable only after a durable pending receipt exists.
 _KL_RolloverResume(Token, BeforeDeleteFn := 0) {
@@ -94,7 +107,7 @@ _KL_RolloverResume(Token, BeforeDeleteFn := 0) {
 		if FileExist(Keystats.today_log_path) {
 			Reader := FileOpen(Keystats.today_log_path, "r-w", "UTF-8")
 			Current := FSHandleSnapshot(Reader.Handle)
-			Expected := Receipt["snapshot"]
+			Expected := Receipt["snapshot"].Clone()
 			if !Expected["present"] || !Current.Get("ok", false)
 				throw Error("Pending rollover journal identity changed.")
 			for Name in ["volume", "index_high", "index_low", "write_high", "write_low", "size"]
@@ -103,9 +116,10 @@ _KL_RolloverResume(Token, BeforeDeleteFn := 0) {
 			; Optional native-I/O cutpoint; production performs no callback.
 			if HasMethod(BeforeDeleteFn, "Call")
 				BeforeDeleteFn.Call()
-			FileDelete(Keystats.today_log_path)
 			Reader.Close()
 			Reader := 0
+			if !FSDeleteVerified(Keystats.today_log_path, _KL_RolloverSnapshotMatches.Bind(Expected))
+				throw Error("Consumed rollover journal changed before deletion.")
 		}
 		OldDate := Keystats.today_log_date
 		OldOffset := Keystats.today_log_offset

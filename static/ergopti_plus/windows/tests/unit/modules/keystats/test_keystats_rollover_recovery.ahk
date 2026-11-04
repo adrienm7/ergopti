@@ -100,6 +100,9 @@ _KLRR_StateRefusal(Mode := "prepare") {
 			AssertTrue(IsObject(Token))
 			try Accepted := _KL_RolloverResume(Token, _KLRR_AfterProof.Bind(Root, NewEntry, Probe, Replace))
 			finally Owner.Release(Token)
+			_TestPrint("# ROLLOVER_NATIVE_RETURN " . KL_JsonEncode(Map("replacement", Replace,
+				"accepted", Accepted, "path_present", FileExist(Keystats.today_log_path) != "",
+				"cutpoint_calls", Probe["calls"], "pending_receipt", _KL_RolloverPending() is Map)))
 			AssertEqual(1, Probe["calls"], "the exact original I/O cutpoint must run once")
 			if !Replace {
 				AssertTrue(Accepted, "an unchanged consumed journal still completes through the same cutpoint")

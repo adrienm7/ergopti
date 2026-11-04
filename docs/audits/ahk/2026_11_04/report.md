@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **51 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **52 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -947,3 +947,21 @@ Consequence: An explicit driver pause creates an artificial provider refusal for
 Regression: Five token-managed-pause cases use genuine Prepare/Begin/Post, managed facade admission and original deadlines, actual token polling timers and native Suspend. Only Job/HTTP process I/O is controlled, not a wire/process-native proof. Success,403 and timeout retain their intended policies; pause and resume-before-Poll require a fresh exchange without cooldown. A narrow facade latch records only an actual pause refusal on a still-active unexpired request, and the internal Answer conveys that fact to token settlement. Secondary cleanup failures remain visible. Native four-case fail-before measured; post-fix qualification pending. Prompt cancellation of a silent server is outside this finding.
 
 The ongoing register now contains **51 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-052: Rollover can delete an unconsumed journal that replaces the checked file
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+\_KL_RolloverResume verifies the original consumed file through a reader that denies write sharing but permits deletion/rename. It then deletes by path, so the verified object and the deleted object can differ. Holding journal logical ownership does not pin an external filesystem replacement.
+
+Reproduction: Native run41912869071 ate4e5e62 passes the unchanged-file control. In the swap case, real MoveFileExW succeeds while the verified reader remains open, a new today.log is written and its distinct native identity is confirmed. Resume then returns true instead of refusing. Its successful branch executes FileDelete on that replacement path and publishes final rollover state. The failure repeats individually and reversed; the baseline test stops before directly observing the post-return absence.
+
+Consequence: A concurrent replacement journal containing new events can be deleted even though only its predecessor was consumed and committed, permanently losing those new events.
+
+Regression: Two actual ingest/prepare/recovery cases use a narrow original I/O cutpoint, real native rename/replacement, actual journal owners, durable receipts and SQLite event verification. The fix clones the original consumed snapshot and uses FSDeleteVerified with a native receipt comparator; final removal marks the exact exclusively verified handle. A replacement must survive unchanged and retain pending recovery/offset; retry remains fenced without duplicate ingestion. The unchanged control must complete. Source-wiring tests retain EOF/prepare/save ordering and now require verified deletion with the original proof. Native fail-before measured; post-fix pending.
+
+The ongoing register now contains **52 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## Native partial qualification checkpoint: 41912869071
+
+At `e4e5e62`, **53 selected cases passed and seven probes failed**, with the same outcome individually and reversed. AHK-048 passed its six new plus ten adjacent override cases; AHK-049 passed all four precedence cases; AHK-050 passed both native GUI cases and its checkbox unit matrix; AHK-051 passed all five token cases and 14 adjacent managed-owner cases. Production compile passed, native hotstring E2E passed **90/90**, and HTTP adapter proxy-override E2E passed **11/11**, with no not-executed cases. The seven failing probes are assessed separately, including one gesture probe that needs its per-key setup adapted to native Max termination. No aggregate green or complete-suite qualification is claimed.
