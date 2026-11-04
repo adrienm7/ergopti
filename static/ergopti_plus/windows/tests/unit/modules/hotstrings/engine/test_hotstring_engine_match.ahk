@@ -497,6 +497,33 @@ TestHSE_InWordTriggerFiresAnywhere() {
 Test("HSE InWord trigger ignores the word-boundary check",
     TestHSE_InWordTriggerFiresAnywhere)
 
+; The rule macOS and Linux share: a word-only trigger is refused only after a
+; word character. Windows refused it after every character outside its boundary
+; set, so "(teh" never corrected and a personal "(" never fired after "=".
+TestHSE_WordStartsAfterAnyNonWordChar() {
+    for Before in ["(", "=", "-", "[", "/", "<", "*", "+", "#", ")"] {
+        HSE_TestReset()
+        HSE_Register("*", "ui", () => 0)
+        HSE_FeedChar(Before)
+        HSE_FeedChar("u")
+        Match := HSE_FeedChar("i")
+        AssertTrue(Match != "", "a word-only trigger fires right after '" . Before . "'")
+        HSE_TestReset()
+        HSE_Register("*", "(", () => 0)
+        HSE_FeedChar(Before)
+        Match := HSE_FeedChar("(")
+        AssertTrue(Match != "", "a word-only '(' fires right after '" . Before . "'")
+    }
+    for Before in ["a", "Z", "7", "_", "@", Chr(0xE9)] {
+        HSE_TestReset()
+        HSE_Register("*", "(", () => 0)
+        HSE_FeedChar(Before)
+        AssertEqual("", HSE_FeedChar("("), "a word character still holds the word: '" . Before . "('")
+    }
+}
+Test("HSE word start: any non-word character opens a word, as on macOS and Linux (hse-word-start-shared-rule)",
+    TestHSE_WordStartsAfterAnyNonWordChar)
+
 TestHSE_ApostropheActsAsWordBoundaryStraight() {
     HSE_TestReset()
     ; Non-star, is_word=true trigger "ia" — only fires when a terminator is
