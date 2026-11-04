@@ -78,6 +78,23 @@ end)
 
 
 helpers.describe("personal editor opening-source admission", function()
+	for _, mode in ipairs({ "missing_order", "missing_section", "unlisted_section", "duplicate_order" }) do
+		helpers.it("(personal-save-model) refuses incomplete section model: " .. mode, function()
+			with_opening_file(function(f)
+				helpers.assert_true(f.ready())
+				local data = opening_model("edited")
+				if mode == "missing_order" then data.sections_order = nil
+				elseif mode == "missing_section" then data.sections[data.sections_order[1]] = nil
+				elseif mode == "unlisted_section" then data.sections.foreign = { entries = {} }
+				else data.sections_order[#data.sections_order + 1] = data.sections_order[1] end
+				local result = f.handler.on_message({ action = "save", data = data }, f.state, f.context)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(f.read(), OPENING_SOURCE)
+				helpers.assert_eq(f.seen.writes, 0)
+			end)
+		end)
+	end
+
 	helpers.it("refuses a foreign section added after the actual displayed model", function()
 		with_opening_file(function(f)
 			helpers.assert_eq(f.ready(), true)
