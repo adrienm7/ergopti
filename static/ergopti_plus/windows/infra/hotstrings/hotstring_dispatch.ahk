@@ -204,7 +204,7 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 		InsertedText: InsertedText,
 		EndCharEmitted: Owner["EndCharPart"] != "",
 		KnownBoundaryAfter: !ClearAll && InsertedText != ""
-			&& InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1))) > 0
+			&& InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)), true) > 0
 	}
 	BufferCritical := Critical("On")
 	PreviousBuffer := HSE_Buffer
@@ -282,7 +282,7 @@ _HSE_CommitTerminalRawOwner(Owner, TrailingText := "") {
 				InsertedText: InsertedText,
 				EndCharEmitted: false,
 				KnownBoundaryAfter: HSE_Buffer != ""
-					&& InStr(_HSE_WordBoundarySet(), SubStr(HSE_Buffer, -_TextTailCodeUnits(HSE_Buffer, 1))) > 0
+					&& InStr(_HSE_WordBoundarySet(), SubStr(HSE_Buffer, -_TextTailCodeUnits(HSE_Buffer, 1)), true) > 0
 			}
 			_HSE_MirrorCanonicalEffectToLlm(Effect)
 		} catch {
@@ -704,7 +704,7 @@ _HSE_CommitNotepadOwner(Owner) {
 	Effect := { IsPrivate: Owner["IsPrivate"], ClearAll: false, DeleteFromEnd: Owner["EraseUnits"],
 		InsertedText: InsertedText, EndCharEmitted: Owner["EndCharPart"] != "",
 		KnownBoundaryAfter: InsertedText != ""
-			&& InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1))) > 0 }
+			&& InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)), true) > 0 }
 	PreviousBuffer := HSE_Buffer
 	PreviousBoundary := HSE_StartIsWordBoundary
 	try {
@@ -1056,7 +1056,7 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 												InsertedText: Ins,
 												EndCharEmitted: false,
 												KnownBoundaryAfter: HSE_Buffer != ""
-														and InStr(_HSE_WordBoundarySet(), SubStr(HSE_Buffer, -_TextTailCodeUnits(HSE_Buffer, 1))) > 0
+														and InStr(_HSE_WordBoundarySet(), SubStr(HSE_Buffer, -_TextTailCodeUnits(HSE_Buffer, 1)), true) > 0
 										}
 										_HSE_MirrorCanonicalEffectToLlm(CanonicalEffect)
 										CommittedEffect := CanonicalEffect
@@ -1236,7 +1236,7 @@ _HSE_ExpansionPath(EndChar) {
 ; or forced by the caller.
 _HSE_EndCharConsumed(EndChar, ForceConsumeEndChar) {
 		global HSE_CONSUMED_DELIMITERS
-		return ForceConsumeEndChar or (EndChar != "" and !!InStr(HSE_CONSUMED_DELIMITERS, EndChar))
+		return ForceConsumeEndChar or (EndChar != "" and !!InStr(HSE_CONSUMED_DELIMITERS, EndChar, true))
 }
 
 ; The UTF-16 units an expansion strips from the engine buffer: the plan's erase

@@ -148,7 +148,7 @@ HSE_FindMatchAtEnd(JustTypedChar, TextIsClaimed := false) {
 		if JustTypedChar == ""
 				return ""
 		BufLen := StrLen(HSE_Buffer)
-		IsTerminator := InStr(HSE_WORD_TERMINATORS, JustTypedChar) > 0
+		IsTerminator := InStr(HSE_WORD_TERMINATORS, JustTypedChar, true) > 0
 
 		; Trigger-body buffer for the end-char path (buffer minus the
 		; just-typed terminator). For the star path, we match against the
@@ -340,7 +340,7 @@ _HSE_IsLiteralNoOp(Spec, Buffer, EndChar, TypoNbspStripped) {
 				or (Spec.HasOwnProp("RawCallback") and Spec.RawCallback)
 				or (Spec.HasOwnProp("OnlyText") and !Spec.OnlyText)
 				return false
-		if TypoNbspStripped or (EndChar != "" and InStr(HSE_CONSUMED_DELIMITERS, EndChar))
+		if TypoNbspStripped or (EndChar != "" and InStr(HSE_CONSUMED_DELIMITERS, EndChar, true))
 				return false
 		TriggerStart := StrLen(Buffer) - StrLen(EndChar) - Spec.Length + 1
 		if TriggerStart < 1
@@ -561,7 +561,7 @@ _HSE_WordBoundaryAllows(Buf, Spec, ObservedLength := 0) {
 						; DIFFERENT sets here let one character satisfy both at once, so a
 						; quote blocked the expansion and licensed the doubling that
 						; replaced it.
-						return PredChar != "" && InStr(Boundaries, PredChar) == 0
+						return PredChar != "" && InStr(Boundaries, PredChar, true) == 0
 				}
 				return true
 		}
@@ -569,7 +569,7 @@ _HSE_WordBoundaryAllows(Buf, Spec, ObservedLength := 0) {
 		if (BeforeLen >= 1) {
 				BeforeStart := _TextCodepointStart(Buf, BeforeLen)
 				BeforeChar := _TextCompleteTailScalar(SubStr(Buf, BeforeStart, BeforeLen - BeforeStart + 1))
-				return BeforeChar != "" && InStr(Boundaries, BeforeChar) > 0
+				return BeforeChar != "" && InStr(Boundaries, BeforeChar, true) > 0
 		}
 		return HSE_StartIsWordBoundary
 }
@@ -594,7 +594,7 @@ _HSE_WordBoundarySet() {
 								continue
 						for Char in Entry["chars"]
 								if Ord(Char) > 127
-										Boundaries := StrReplace(Boundaries, Char)
+										Boundaries := StrReplace(Boundaries, Char, "", true)
 						break
 				}
 		}

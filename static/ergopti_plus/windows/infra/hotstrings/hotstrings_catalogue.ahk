@@ -937,7 +937,7 @@ HSE_TerminatorEntryEnabled(CharsArr, WordStr) {
 		if (CharsArr.Length == 0)
 				return false
 		for _, Ch in CharsArr {
-				if !InStr(WordStr, Ch)
+				if !InStr(WordStr, Ch, true)
 						return false
 		}
 		return true
@@ -947,7 +947,7 @@ HSE_TerminatorEntryEnabled(CharsArr, WordStr) {
 ; the "(consumed)" suffix from the actual consumed-delimiter set).
 HSE_TerminatorAnyCharIn(CharsArr, Hay) {
 		for _, Ch in CharsArr {
-				if InStr(Hay, Ch)
+				if InStr(Hay, Ch, true)
 						return true
 		}
 		return false
